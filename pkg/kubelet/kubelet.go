@@ -180,7 +180,7 @@ func NewMainKubelet(
 		statusUpdateFrequency:          statusUpdateFrequency,
 		resyncInterval:                 resyncInterval,
 		podInfraContainerImage:         podInfraContainerImage,
-		dockerIDToRef:                  map[dockertools.DockerID]*api.ObjectReference{},
+		containerIDToRef:               map[string]*api.ObjectReference{},
 		runner:                         dockertools.NewDockerContainerCommandRunner(dockerClient),
 		httpClient:                     &http.Client{},
 		pullQPS:                        pullQPS,
@@ -264,8 +264,8 @@ type Kubelet struct {
 
 	// Needed to report events for containers belonging to deleted/modified pods.
 	// Tracks references for reporting events
-	dockerIDToRef map[dockertools.DockerID]*api.ObjectReference
-	refLock       sync.RWMutex
+	containerIDToRef map[string]*api.ObjectReference
+	refLock          sync.RWMutex
 
 	// Optional, defaults to simple Docker implementation
 	dockerPuller dockertools.DockerPuller
@@ -673,27 +673,27 @@ func containerRef(pod *api.Pod, container *api.Container) (*api.ObjectReference,
 }
 
 // setRef stores a reference to a pod's container, associating it with the given docker id.
-func (kl *Kubelet) setRef(id dockertools.DockerID, ref *api.ObjectReference) {
+func (kl *Kubelet) setRef(id string, ref *api.ObjectReference) {
 	kl.refLock.Lock()
 	defer kl.refLock.Unlock()
-	if kl.dockerIDToRef == nil {
-		kl.dockerIDToRef = map[dockertools.DockerID]*api.ObjectReference{}
+	if kl.containerIDToRef == nil {
+		kl.containerIDToRef = map[string]*api.ObjectReference{}
 	}
-	kl.dockerIDToRef[id] = ref
+	kl.containerIDToRef[id] = ref
 }
 
 // clearRef forgets the given docker id and its associated container reference.
-func (kl *Kubelet) clearRef(id dockertools.DockerID) {
+func (kl *Kubelet) clearRef(id string) {
 	kl.refLock.Lock()
 	defer kl.refLock.Unlock()
-	delete(kl.dockerIDToRef, id)
+	delete(kl.containerIDToRef, id)
 }
 
 // getRef returns the container reference of the given id, or (nil, false) if none is stored.
-func (kl *Kubelet) getRef(id dockertools.DockerID) (ref *api.ObjectReference, ok bool) {
+func (kl *Kubelet) getRef(id string) (ref *api.ObjectReference, ok bool) {
 	kl.refLock.RLock()
 	defer kl.refLock.RUnlock()
-	ref, ok = kl.dockerIDToRef[id]
+	ref, ok = kl.containerIDToRef[id]
 	return ref, ok
 }
 
@@ -733,7 +733,7 @@ func (kl *Kubelet) runContainer(pod *api.Pod, container *api.Container, podVolum
 	}
 	// Remember this reference so we can report events about this container
 	if ref != nil {
-		kl.setRef(dockertools.DockerID(dockerContainer.ID), ref)
+		kl.setRef(dockerContainer.ID, ref)
 		kl.recorder.Eventf(ref, "created", "Created with docker id %v", dockerContainer.ID)
 	}
 
@@ -949,7 +949,7 @@ func (kl *Kubelet) killContainerByID(ID string) error {
 	kl.readiness.remove(ID)
 	err := kl.dockerClient.StopContainer(ID, 10)
 
-	ref, ok := kl.getRef(dockertools.DockerID(ID))
+	ref, ok := kl.getRef(ID)
 	if !ok {
 		glog.Warningf("No ref for pod '%v'", ID)
 	} else {
@@ -1217,7 +1217,7 @@ func (kl *Kubelet) computePodContainerChanges(pod *api.Pod, hasMirrorPod bool, c
 				// look for changes in the container.
 				containerChanged := hash != 0 && hash != expectedHash
 				if !containerChanged {
-					result, err := kl.probeContainer(pod, podStatus, container, dockerContainer)
+					result, err := kl.probeContainer(pod, podStatus, container, dockerContainer.ID, dockerContainer.Created)
 					if err != nil {
 						// TODO(vmarmol): examine this logic.
 						glog.Infof("probe no-error: %s", container.Name)
