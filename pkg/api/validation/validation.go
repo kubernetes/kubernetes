@@ -691,6 +691,7 @@ func ValidatePodStatusUpdate(newPod, oldPod *api.Pod) errs.ValidationErrorList {
 		allErrs = append(allErrs, errs.NewFieldInvalid("status.host", newPod.Status.Host, "pod host cannot be changed directly"))
 	}
 
+	// For status update we ignore changes to pod spec.
 	newPod.Spec = oldPod.Spec
 
 	return allErrs

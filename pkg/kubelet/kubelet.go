@@ -299,7 +299,7 @@ type Kubelet struct {
 	// the EventRecorder to use
 	recorder record.EventRecorder
 
-	// A pod status cache currently used to store rejected pods and their statuses.
+	// A pod status cache stores statuses for pods (both rejected and synced).
 	podStatusesLock sync.RWMutex
 	podStatuses     map[string]api.PodStatus
 
@@ -503,6 +503,7 @@ func (kl *Kubelet) Run(updates <-chan PodUpdate) {
 		glog.Warning("No api server defined - no node status update will be sent.")
 	}
 	go kl.syncNodeStatus()
+	go util.Forever(kl.syncStatus, kl.resyncInterval)
 	kl.syncLoop(updates, kl)
 }
 
@@ -1281,6 +1282,17 @@ func (kl *Kubelet) computePodContainerChanges(pod *api.Pod, hasMirrorPod bool, c
 func (kl *Kubelet) syncPod(pod *api.Pod, hasMirrorPod bool, containersInPod dockertools.DockerContainers) error {
 	podFullName := GetPodFullName(pod)
 	uid := pod.UID
+
+	// Before returning, regenerate status and store it in the cache.
+	defer func() {
+		status, err := kl.generatePodStatus(podFullName, uid)
+		if err != nil {
+			glog.Errorf("Unable to generate status for pod with name %q and uid %q info with error(%v)", podFullName, uid, err)
+		} else {
+			kl.setPodStatusInCache(podFullName, status)
+		}
+	}()
+
 	containerChanges, err := kl.computePodContainerChanges(pod, hasMirrorPod, containersInPod)
 	glog.V(3).Infof("Got container changes for pod %q: %+v", podFullName, containerChanges)
 	if err != nil {
@@ -1649,13 +1661,29 @@ func (kl *Kubelet) syncLoop(updates <-chan PodUpdate, handler SyncHandler) {
 			}
 		}
 
-		pods, mirrorPods, err := kl.GetPods()
-		if err != nil {
-			glog.Errorf("Failed to get bound pods.")
-			return
-		}
+		pods, mirrorPods := kl.GetPods()
 		if err := handler.SyncPods(pods, podSyncTypes, mirrorPods, start); err != nil {
 			glog.Errorf("Couldn't sync containers: %v", err)
+		}
+	}
+}
+
+// syncStatus syncs pods statuses with the apiserver.
+func (kl *Kubelet) syncStatus() {
+	glog.V(3).Infof("Syncing pods status")
+
+	pods, _ := kl.GetPods()
+	for _, pod := range pods {
+		status, err := kl.GetPodStatus(GetPodFullName(&pod), pod.UID)
+		if err != nil {
+			glog.Warningf("Error getting pod %q status: %v, retry later", pod.Name, err)
+			continue
+		}
+		_, err = kl.kubeClient.Pods(pod.Namespace).UpdateStatus(pod.Name, &status)
+		if err != nil {
+			glog.Warningf("Error updating status for pod %s: %v (full pod: %s)", pod.Name, err, pod)
+		} else {
+			glog.V(3).Infof("Status for pod %q updated successfully: %s", pod.Name, pod)
 		}
 	}
 }
@@ -1769,10 +1797,10 @@ func (kl *Kubelet) GetHostname() string {
 
 // GetPods returns all pods bound to the kubelet and their spec, and the mirror
 // pod map.
-func (kl *Kubelet) GetPods() ([]api.Pod, util.StringSet, error) {
+func (kl *Kubelet) GetPods() ([]api.Pod, util.StringSet) {
 	kl.podLock.RLock()
 	defer kl.podLock.RUnlock()
-	return append([]api.Pod{}, kl.pods...), kl.mirrorPods, nil
+	return append([]api.Pod{}, kl.pods...), kl.mirrorPods
 }
 
 // GetPodByName provides the first pod that matches namespace and name, as well as whether the node was found.
@@ -1950,17 +1978,21 @@ func (kl *Kubelet) GetPodByFullName(podFullName string) (*api.PodSpec, bool) {
 
 // GetPodStatus returns information from Docker about the containers in a pod
 func (kl *Kubelet) GetPodStatus(podFullName string, uid types.UID) (api.PodStatus, error) {
+	// Check to see if we have a cached version of the status.
+	cachedPodStatus, found := kl.getPodStatusFromCache(podFullName)
+	if found {
+		glog.V(3).Infof("Returning cached status for %s", podFullName)
+		return cachedPodStatus, nil
+	}
+	return kl.generatePodStatus(podFullName, uid)
+}
+
+func (kl *Kubelet) generatePodStatus(podFullName string, uid types.UID) (api.PodStatus, error) {
+	glog.V(3).Infof("Generating status for %s", podFullName)
 	var podStatus api.PodStatus
 	spec, found := kl.GetPodByFullName(podFullName)
-
 	if !found {
 		return podStatus, fmt.Errorf("Couldn't find spec for pod %s", podFullName)
-	}
-
-	// Check to see if the pod has been rejected.
-	mappedPodStatus, ok := kl.getPodStatusFromCache(podFullName)
-	if ok {
-		return mappedPodStatus, nil
 	}
 
 	info, err := dockertools.GetDockerPodInfo(kl.dockerClient, *spec, podFullName, uid)
@@ -1992,6 +2024,7 @@ func (kl *Kubelet) GetPodStatus(podFullName string, uid types.UID) (api.PodStatu
 	if found {
 		podStatus.PodIP = netContainerInfo.PodIP
 	}
+	podStatus.Host = kl.hostname
 
 	return podStatus, nil
 }
