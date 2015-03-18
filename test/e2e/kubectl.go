@@ -40,7 +40,8 @@ const (
 	redisMasterSelector      = "name=redis-master"
 	redisSlaveSelector       = "name=redis-slave"
 	kubectlProxyPort         = 8011
-	guestbookResponseTimeout = 10 * time.Minute
+	guestbookStartupTimeout  = 10 * time.Minute
+	guestbookResponseTimeout = time.Minute
 )
 
 var _ = Describe("kubectl", func() {
@@ -111,40 +112,31 @@ var _ = Describe("kubectl", func() {
 })
 
 func validateGuestbookApp(c *client.Client) {
-	// Wait for frontend to serve content.
-	serving := false
-	for start := time.Now(); time.Since(start) < guestbookResponseTimeout; time.Sleep(5 * time.Second) {
-		entry, err := makeRequestToGuestbook(c, "get", "")
-		if err == nil && entry == `{"data": ""}` {
-			serving = true
-			break
-		}
-	}
-	if !serving {
-		Failf("Frontend service did not start serving content in %v seconds", guestbookResponseTimeout.Seconds())
+	Logf("Waiting for frontend to serve content.")
+	if !waitForGuestbookResponse(c, "get", "", `{"data": ""}`, guestbookStartupTimeout) {
+		Failf("Frontend service did not start serving content in %v seconds.", guestbookStartupTimeout.Seconds())
 	}
 
-	// Try to add a new entry to the guestbook.
-	added := false
-	for start := time.Now(); time.Since(start) < guestbookResponseTimeout; time.Sleep(5 * time.Second) {
-		result, err := makeRequestToGuestbook(c, "set", "TestEntry")
-		if err == nil && result == `{"message": "Updated"}` {
-			added = true
-			break
-		}
-	}
-	if !added {
-		Failf("Cannot added new entry in %v seconds", guestbookResponseTimeout.Seconds())
+	Logf("Trying to add a new entry to the guestbook.")
+	if !waitForGuestbookResponse(c, "set", "TestEntry", `{"message": "Updated"}`, guestbookResponseTimeout) {
+		Failf("Cannot added new entry in %v seconds.", guestbookResponseTimeout.Seconds())
 	}
 
-	// Verify that entry is correctly added to the guestbook.
-	entry, err := makeRequestToGuestbook(c, "get", "")
-	if err != nil {
-		Failf("Request to the guestbook failed with: %v", err)
+	Logf("Verifying that added entry can be retrieved.")
+	if !waitForGuestbookResponse(c, "get", "", `{"data": "TestEntry"}`, guestbookResponseTimeout) {
+		Failf("Entry to guestbook wasn't correctly added in %v seconds.", guestbookResponseTimeout.Seconds())
 	}
-	if entry != `{"data": "TestEntry"}` {
-		Failf("Wrong entry received: %v", entry)
+}
+
+// Returns whether received expected response from guestbook on time.
+func waitForGuestbookResponse(c *client.Client, cmd, arg, expectedResponse string, timeout time.Duration) bool {
+	for start := time.Now(); time.Since(start) < timeout; time.Sleep(5 * time.Second) {
+		res, err := makeRequestToGuestbook(c, cmd, arg)
+		if err == nil && res == expectedResponse {
+			return true
+		}
 	}
+	return false
 }
 
 func makeRequestToGuestbook(c *client.Client, cmd, value string) (string, error) {
