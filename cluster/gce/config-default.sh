@@ -76,7 +76,7 @@ done
 CLUSTER_IP_RANGE="10.244.0.0/16"
 MINION_IP_RANGES=($(eval echo "${subnets[@]}"))
 
-MINION_SCOPES=("storage-ro" "compute-rw")
+MINION_SCOPES=("storage-ro" "compute-rw" "https://www.googleapis.com/auth/monitoring")
 # Increase the sleep interval value if concerned about API rate limits. 3, in seconds, is the default.
 POLL_SLEEP_INTERVAL=3
 PORTAL_NET="10.0.0.0/16"
