@@ -167,6 +167,12 @@ func (f *Factory) BindFlags(flags *pflag.FlagSet) {
 	// pflags currently.  See https://github.com/spf13/cobra/issues/44.
 	util.AddPFlagSetToPFlagSet(pflag.CommandLine, flags)
 
+	// Hack for global access to validation flag.
+	// TODO: Refactor out after configuration flag overhaul.
+	if f.flags.Lookup("validate") == nil {
+		f.flags.Bool("validate", false, "If true, use a schema to validate the input before sending it")
+	}
+
 	if f.flags != nil {
 		f.flags.VisitAll(func(flag *pflag.Flag) {
 			flags.AddFlag(flag)
@@ -178,14 +184,6 @@ func (f *Factory) BindFlags(flags *pflag.FlagSet) {
 	// TODO Add a verbose flag that turns on glog logging. Probably need a way
 	// to do that automatically for every subcommand.
 	flags.BoolVar(&f.clients.matchVersion, FlagMatchBinaryVersion, false, "Require server version to match client version")
-
-	flags.Bool("validate", false, "If true, use a schema to validate the input before sending it")
-
-	// Hack for global access to validation flag.
-	// TODO: Refactor out after configuration flag overhaul.
-	if f.flags.Lookup("validate") == nil {
-		f.flags.Bool("validate", false, "If true, use a schema to validate the input before sending it")
-	}
 }
 
 // NewKubectlCommand creates the `kubectl` command and its nested children.
