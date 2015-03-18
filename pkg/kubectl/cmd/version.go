@@ -44,7 +44,7 @@ func RunVersion(f *Factory, out io.Writer, cmd *cobra.Command) error {
 		return nil
 	}
 
-	client, err := f.Client(cmd)
+	client, err := f.Client()
 	if err != nil {
 		return err
 	}

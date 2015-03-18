@@ -67,12 +67,12 @@ func RunExec(f *Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *cobra.C
 		return util.UsageError(cmd, "COMMAND is required for exec")
 	}
 
-	namespace, err := f.DefaultNamespace(cmd)
+	namespace, err := f.DefaultNamespace()
 	if err != nil {
 		return err
 	}
 
-	client, err := f.Client(cmd)
+	client, err := f.Client()
 	if err != nil {
 		return err
 	}
@@ -127,7 +127,7 @@ func RunExec(f *Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *cobra.C
 		}
 	}
 
-	config, err := f.ClientConfig(cmd)
+	config, err := f.ClientConfig()
 	if err != nil {
 		return err
 	}

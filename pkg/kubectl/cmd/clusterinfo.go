@@ -42,14 +42,14 @@ func (f *Factory) NewCmdClusterInfo(out io.Writer) *cobra.Command {
 }
 
 func RunClusterInfo(factory *Factory, out io.Writer, cmd *cobra.Command) error {
-	client, err := factory.ClientConfig(cmd)
+	client, err := factory.ClientConfig()
 	if err != nil {
 		return err
 	}
 	fmt.Fprintf(out, "Kubernetes master is running at %v\n", client.Host)
 
-	mapper, typer := factory.Object(cmd)
-	cmdNamespace, err := factory.DefaultNamespace(cmd)
+	mapper, typer := factory.Object()
+	cmdNamespace, err := factory.DefaultNamespace()
 	if err != nil {
 		return err
 	}

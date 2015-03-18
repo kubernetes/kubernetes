@@ -69,11 +69,11 @@ func RunExpose(f *Factory, out io.Writer, cmd *cobra.Command, args []string) err
 		return util.UsageError(cmd, "<name> is required for expose")
 	}
 
-	namespace, err := f.DefaultNamespace(cmd)
+	namespace, err := f.DefaultNamespace()
 	if err != nil {
 		return err
 	}
-	client, err := f.Client(cmd)
+	client, err := f.Client()
 	if err != nil {
 		return err
 	}

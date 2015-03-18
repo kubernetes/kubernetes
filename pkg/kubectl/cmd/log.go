@@ -82,11 +82,11 @@ func RunLog(f *Factory, out io.Writer, cmd *cobra.Command, args []string) error 
 		return util.UsageError(cmd, "log POD [CONTAINER]")
 	}
 
-	namespace, err := f.DefaultNamespace(cmd)
+	namespace, err := f.DefaultNamespace()
 	if err != nil {
 		return err
 	}
-	client, err := f.Client(cmd)
+	client, err := f.Client()
 	if err != nil {
 		return err
 	}

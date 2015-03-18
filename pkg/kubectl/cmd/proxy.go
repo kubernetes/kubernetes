@@ -58,7 +58,7 @@ func RunProxy(f *Factory, out io.Writer, cmd *cobra.Command) error {
 	port := util.GetFlagInt(cmd, "port")
 	fmt.Fprintf(out, "Starting to serve on localhost:%d", port)
 
-	clientConfig, err := f.ClientConfig(cmd)
+	clientConfig, err := f.ClientConfig()
 	if err != nil {
 		return err
 	}

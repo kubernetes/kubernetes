@@ -78,9 +78,9 @@ func (f *Factory) NewCmdGet(out io.Writer) *cobra.Command {
 // TODO: convert all direct flag accessors to a struct and pass that instead of cmd
 func RunGet(f *Factory, out io.Writer, cmd *cobra.Command, args []string) error {
 	selector := util.GetFlagString(cmd, "selector")
-	mapper, typer := f.Object(cmd)
+	mapper, typer := f.Object()
 
-	cmdNamespace, err := f.DefaultNamespace(cmd)
+	cmdNamespace, err := f.DefaultNamespace()
 	if err != nil {
 		return err
 	}
@@ -148,7 +148,7 @@ func RunGet(f *Factory, out io.Writer, cmd *cobra.Command, args []string) error 
 	}
 
 	if generic {
-		clientConfig, err := f.ClientConfig(cmd)
+		clientConfig, err := f.ClientConfig()
 		if err != nil {
 			return err
 		}

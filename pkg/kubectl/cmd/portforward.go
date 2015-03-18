@@ -68,12 +68,12 @@ func RunPortForward(f *Factory, cmd *cobra.Command, args []string) error {
 		return util.UsageError(cmd, "at least 1 PORT is required for port-forward")
 	}
 
-	namespace, err := f.DefaultNamespace(cmd)
+	namespace, err := f.DefaultNamespace()
 	if err != nil {
 		return err
 	}
 
-	client, err := f.Client(cmd)
+	client, err := f.Client()
 	if err != nil {
 		return err
 	}
@@ -87,7 +87,7 @@ func RunPortForward(f *Factory, cmd *cobra.Command, args []string) error {
 		glog.Fatalf("Unable to execute command because pod is not running. Current status=%v", pod.Status.Phase)
 	}
 
-	config, err := f.ClientConfig(cmd)
+	config, err := f.ClientConfig()
 	if err != nil {
 		return err
 	}
