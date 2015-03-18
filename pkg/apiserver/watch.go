@@ -17,6 +17,7 @@ limitations under the License.
 package apiserver
 
 import (
+	"fmt"
 	"net/http"
 	"path"
 	"regexp"
@@ -69,15 +70,15 @@ func (h *WatchHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	defer monitor("watch", &verb, &apiResource, &httpCode, reqStart)
 
 	if req.Method != "GET" {
-		notFound(w, req)
-		httpCode = http.StatusNotFound
+		httpCode = errorJSON(errors.NewBadRequest(
+			fmt.Sprintf("unsupported method for watch: %s", req.Method)), h.codec, w)
 		return
 	}
 
 	requestInfo, err := h.info.GetAPIRequestInfo(req)
 	if err != nil {
-		notFound(w, req)
-		httpCode = http.StatusNotFound
+		httpCode = errorJSON(errors.NewBadRequest(
+			fmt.Sprintf("failed to find api request info: %s", err.Error())), h.codec, w)
 		return
 	}
 	verb = requestInfo.Verb
@@ -85,8 +86,7 @@ func (h *WatchHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 	storage := h.storage[requestInfo.Resource]
 	if storage == nil {
-		notFound(w, req)
-		httpCode = http.StatusNotFound
+		httpCode = errorJSON(errors.NewNotFound(requestInfo.Resource, "Resource"), h.codec, w)
 		return
 	}
 	apiResource = requestInfo.Resource
