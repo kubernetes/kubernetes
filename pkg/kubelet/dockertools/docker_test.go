@@ -178,26 +178,63 @@ func TestDockerContainerCommand(t *testing.T) {
 		t.Errorf("unexpected command args: %s", cmd.Args)
 	}
 }
-
-var parseImageNameTests = []struct {
-	imageName string
-	name      string
-	tag       string
-}{
-	{"ubuntu", "ubuntu", ""},
-	{"ubuntu:2342", "ubuntu", "2342"},
-	{"ubuntu:latest", "ubuntu", "latest"},
-	{"foo/bar:445566", "foo/bar", "445566"},
-	{"registry.example.com:5000/foobar", "registry.example.com:5000/foobar", ""},
-	{"registry.example.com:5000/foobar:5342", "registry.example.com:5000/foobar", "5342"},
-	{"registry.example.com:5000/foobar:latest", "registry.example.com:5000/foobar", "latest"},
+func TestParseImageName(t *testing.T) {
+	tests := []struct {
+		imageName string
+		name      string
+		tag       string
+	}{
+		{"ubuntu", "ubuntu", ""},
+		{"ubuntu:2342", "ubuntu", "2342"},
+		{"ubuntu:latest", "ubuntu", "latest"},
+		{"foo/bar:445566", "foo/bar", "445566"},
+		{"registry.example.com:5000/foobar", "registry.example.com:5000/foobar", ""},
+		{"registry.example.com:5000/foobar:5342", "registry.example.com:5000/foobar", "5342"},
+		{"registry.example.com:5000/foobar:latest", "registry.example.com:5000/foobar", "latest"},
+	}
+	for _, test := range tests {
+		name, tag := parseImageName(test.imageName)
+		if name != test.name || tag != test.tag {
+			t.Errorf("Expected name/tag: %s/%s, got %s/%s", test.name, test.tag, name, tag)
+		}
+	}
 }
 
-func TestParseImageName(t *testing.T) {
-	for _, tt := range parseImageNameTests {
-		name, tag := parseImageName(tt.imageName)
-		if name != tt.name || tag != tt.tag {
-			t.Errorf("Expected name/tag: %s/%s, got %s/%s", tt.name, tt.tag, name, tag)
+func TestPull(t *testing.T) {
+	tests := []struct {
+		imageName     string
+		expectedImage string
+	}{
+		{"ubuntu", "ubuntu:latest"},
+		{"ubuntu:2342", "ubuntu:2342"},
+		{"ubuntu:latest", "ubuntu:latest"},
+		{"foo/bar:445566", "foo/bar:445566"},
+		{"registry.example.com:5000/foobar", "registry.example.com:5000/foobar:latest"},
+		{"registry.example.com:5000/foobar:5342", "registry.example.com:5000/foobar:5342"},
+		{"registry.example.com:5000/foobar:latest", "registry.example.com:5000/foobar:latest"},
+	}
+	for _, test := range tests {
+		fakeKeyring := &credentialprovider.FakeKeyring{}
+		fakeClient := &FakeDockerClient{}
+
+		dp := dockerPuller{
+			client:  fakeClient,
+			keyring: fakeKeyring,
+		}
+
+		err := dp.Pull(test.imageName)
+		if err != nil {
+			t.Errorf("unexpected non-nil err: %s", err)
+			continue
+		}
+
+		if e, a := 1, len(fakeClient.pulled); e != a {
+			t.Errorf("%s: expected 1 pulled image, got %d: %v", test.imageName, a, fakeClient.pulled)
+			continue
+		}
+
+		if e, a := test.expectedImage, fakeClient.pulled[0]; e != a {
+			t.Errorf("%s: expected pull of %q, but got %q", test.imageName, e, a)
 		}
 	}
 }
@@ -217,7 +254,7 @@ func TestDockerKeyringLookupFails(t *testing.T) {
 	if err == nil {
 		t.Errorf("unexpected non-error")
 	}
-	msg := "image pull failed for host/repository/image, this may be because there are no credentials on this request.  details: (test error)"
+	msg := "image pull failed for host/repository/image:version, this may be because there are no credentials on this request.  details: (test error)"
 	if err.Error() != msg {
 		t.Errorf("expected: %s, saw: %s", msg, err.Error())
 	}

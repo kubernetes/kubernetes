@@ -4,7 +4,7 @@ import (
 	"syscall"
 )
 
-type Stat struct {
+type Stat_t struct {
 	mode uint32
 	uid  uint32
 	gid  uint32
@@ -13,30 +13,30 @@ type Stat struct {
 	mtim syscall.Timespec
 }
 
-func (s Stat) Mode() uint32 {
+func (s Stat_t) Mode() uint32 {
 	return s.mode
 }
 
-func (s Stat) Uid() uint32 {
+func (s Stat_t) Uid() uint32 {
 	return s.uid
 }
 
-func (s Stat) Gid() uint32 {
+func (s Stat_t) Gid() uint32 {
 	return s.gid
 }
 
-func (s Stat) Rdev() uint64 {
+func (s Stat_t) Rdev() uint64 {
 	return s.rdev
 }
 
-func (s Stat) Size() int64 {
+func (s Stat_t) Size() int64 {
 	return s.size
 }
 
-func (s Stat) Mtim() syscall.Timespec {
+func (s Stat_t) Mtim() syscall.Timespec {
 	return s.mtim
 }
 
-func (s Stat) GetLastModification() syscall.Timespec {
+func (s Stat_t) GetLastModification() syscall.Timespec {
 	return s.Mtim()
 }
