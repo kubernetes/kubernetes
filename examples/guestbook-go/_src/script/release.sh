@@ -26,15 +26,15 @@ base_dir=$(cd "${base_dir}" && pwd)
 guestbook_version=${1:-latest}
 
 echo " ---> Cleaning up before building..."
-"${base_dir}/clean.sh" 2> /dev/null
+"${base_dir}/clean.sh" "${guestbook_version}" 2> /dev/null
 
 echo " ---> Building..."
-"${base_dir}/build.sh"
+"${base_dir}/build.sh" "${guestbook_version}"
 
 echo " ---> Pushing kubernetes/guestbook:${guestbook_version}..."
 "${base_dir}/push.sh" "${guestbook_version}"
 
 echo " ---> Cleaning up..."
-"${base_dir}/clean.sh"
+"${base_dir}/clean.sh" "${guestbook_version}"
 
 echo " ---> Done."
