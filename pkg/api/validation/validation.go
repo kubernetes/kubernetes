@@ -536,6 +536,10 @@ func validatePullPolicy(ctr *api.Container) errs.ValidationErrorList {
 func validateContainers(containers []api.Container, volumes util.StringSet) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 
+	if len(containers) == 0 {
+		return append(allErrs, errs.NewFieldRequired(""))
+	}
+
 	allNames := util.StringSet{}
 	for i, ctr := range containers {
 		cErrs := errs.ValidationErrorList{}
