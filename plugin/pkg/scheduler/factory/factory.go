@@ -201,8 +201,7 @@ func (factory *ConfigFactory) createMinionLW() *cache.ListWatch {
 // Lists all minions and filter out unhealthy ones, then returns
 // an enumerator for cache.Poller.
 func (factory *ConfigFactory) pollMinions() (cache.Enumerator, error) {
-	allNodes := &api.NodeList{}
-	err := factory.Client.Get().Resource("minions").Do().Into(allNodes)
+	allNodes, err := factory.Client.Nodes().List()
 	if err != nil {
 		return nil, err
 	}

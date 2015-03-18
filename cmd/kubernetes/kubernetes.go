@@ -76,7 +76,7 @@ func (h *delegateHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 }
 
 // RunApiServer starts an API server in a go routine.
-func runApiServer(cl *client.Client, etcdClient tools.EtcdClient, addr net.IP, port int, masterServiceNamespace string) {
+func runApiServer(etcdClient tools.EtcdClient, addr net.IP, port int, masterServiceNamespace string) {
 	handler := delegateHandler{}
 
 	helper, err := master.NewEtcdHelper(etcdClient, "")
@@ -86,7 +86,6 @@ func runApiServer(cl *client.Client, etcdClient tools.EtcdClient, addr net.IP, p
 
 	// Create a master and install handlers into mux.
 	m := master.New(&master.Config{
-		Client:     cl,
 		EtcdHelper: helper,
 		KubeletClient: &client.HTTPKubeletClient{
 			Client: http.DefaultClient,
@@ -142,7 +141,7 @@ func runControllerManager(machineList []string, cl *client.Client, nodeMilliCPU,
 func startComponents(etcdClient tools.EtcdClient, cl *client.Client, addr net.IP, port int) {
 	machineList := []string{"localhost"}
 
-	runApiServer(cl, etcdClient, addr, port, *masterServiceNamespace)
+	runApiServer(etcdClient, addr, port, *masterServiceNamespace)
 	runScheduler(cl)
 	runControllerManager(machineList, cl, *nodeMilliCPU, *nodeMemory)
 

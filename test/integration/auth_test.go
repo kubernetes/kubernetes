@@ -312,7 +312,6 @@ func TestAuthModeAlwaysAllow(t *testing.T) {
 	defer s.Close()
 
 	m = master.New(&master.Config{
-		Client:            client.NewOrDie(&client.Config{Host: s.URL}),
 		EtcdHelper:        helper,
 		KubeletClient:     client.FakeKubeletClient{},
 		EnableLogsSupport: false,
@@ -415,7 +414,6 @@ func TestAuthModeAlwaysDeny(t *testing.T) {
 	defer s.Close()
 
 	m = master.New(&master.Config{
-		Client:            client.NewOrDie(&client.Config{Host: s.URL}),
 		EtcdHelper:        helper,
 		KubeletClient:     client.FakeKubeletClient{},
 		EnableLogsSupport: false,
@@ -483,7 +481,6 @@ func TestAliceNotForbiddenOrUnauthorized(t *testing.T) {
 	defer s.Close()
 
 	m = master.New(&master.Config{
-		Client:            client.NewOrDie(&client.Config{Host: s.URL}),
 		EtcdHelper:        helper,
 		KubeletClient:     client.FakeKubeletClient{},
 		EnableLogsSupport: false,
@@ -569,7 +566,6 @@ func TestBobIsForbidden(t *testing.T) {
 	defer s.Close()
 
 	m = master.New(&master.Config{
-		Client:            client.NewOrDie(&client.Config{Host: s.URL}),
 		EtcdHelper:        helper,
 		KubeletClient:     client.FakeKubeletClient{},
 		EnableLogsSupport: false,
@@ -631,7 +627,6 @@ func TestUnknownUserIsUnauthorized(t *testing.T) {
 	defer s.Close()
 
 	m = master.New(&master.Config{
-		Client:            client.NewOrDie(&client.Config{Host: s.URL}),
 		EtcdHelper:        helper,
 		KubeletClient:     client.FakeKubeletClient{},
 		EnableLogsSupport: false,
@@ -712,7 +707,6 @@ func TestNamespaceAuthorization(t *testing.T) {
 	defer s.Close()
 
 	m = master.New(&master.Config{
-		Client:            client.NewOrDie(&client.Config{Host: s.URL}),
 		EtcdHelper:        helper,
 		KubeletClient:     client.FakeKubeletClient{},
 		EnableLogsSupport: false,
@@ -827,7 +821,6 @@ func TestKindAuthorization(t *testing.T) {
 	defer s.Close()
 
 	m = master.New(&master.Config{
-		Client:            client.NewOrDie(&client.Config{Host: s.URL}),
 		EtcdHelper:        helper,
 		KubeletClient:     client.FakeKubeletClient{},
 		EnableLogsSupport: false,
@@ -930,7 +923,6 @@ func TestReadOnlyAuthorization(t *testing.T) {
 	defer s.Close()
 
 	m = master.New(&master.Config{
-		Client:            client.NewOrDie(&client.Config{Host: s.URL}),
 		EtcdHelper:        helper,
 		KubeletClient:     client.FakeKubeletClient{},
 		EnableLogsSupport: false,

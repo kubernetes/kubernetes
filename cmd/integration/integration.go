@@ -37,7 +37,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	apierrors "github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	nodeControllerPkg "github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/controller"
@@ -59,10 +58,13 @@ import (
 
 	"github.com/coreos/go-etcd/etcd"
 	"github.com/golang/glog"
+	"github.com/spf13/pflag"
 )
 
 var (
 	fakeDocker1, fakeDocker2 dockertools.FakeDockerClient
+	// API version that should be used by the client to talk to the server.
+	apiVersion string
 )
 
 type fakeKubeletClient struct{}
@@ -120,7 +122,7 @@ func (h *delegateHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	w.WriteHeader(http.StatusNotFound)
 }
 
-func startComponents(manifestURL string) (string, string) {
+func startComponents(manifestURL, apiVersion string) (string, string) {
 	// Setup
 	servers := []string{}
 	glog.Infof("Creating etcd client pointing to %v", servers)
@@ -154,7 +156,7 @@ func startComponents(manifestURL string) (string, string) {
 		glog.Fatalf("Failed to connect to etcd")
 	}
 
-	cl := client.NewOrDie(&client.Config{Host: apiServer.URL, Version: testapi.Version()})
+	cl := client.NewOrDie(&client.Config{Host: apiServer.URL, Version: apiVersion})
 
 	helper, err := master.NewEtcdHelper(etcdClient, "")
 	if err != nil {
@@ -178,7 +180,6 @@ func startComponents(manifestURL string) (string, string) {
 
 	// Create a master and install handlers into mux.
 	m := master.New(&master.Config{
-		Client:            cl,
 		EtcdHelper:        helper,
 		KubeletClient:     fakeKubeletClient{},
 		EnableLogsSupport: false,
@@ -191,6 +192,7 @@ func startComponents(manifestURL string) (string, string) {
 		PublicAddress:     publicAddress,
 		CacheTimeout:      2 * time.Second,
 		SyncPodStatus:     true,
+		EnableV1Beta3:     true,
 	})
 	handler.delegate = m.Handler
 
@@ -338,7 +340,8 @@ containers:
 }
 
 func runReplicationControllerTest(c *client.Client) {
-	data, err := ioutil.ReadFile("cmd/integration/controller.json")
+	clientAPIVersion := c.APIVersion()
+	data, err := ioutil.ReadFile("cmd/integration/" + clientAPIVersion + "-controller.json")
 	if err != nil {
 		glog.Fatalf("Unexpected error: %v", err)
 	}
@@ -373,55 +376,55 @@ func runReplicationControllerTest(c *client.Client) {
 
 func runAPIVersionsTest(c *client.Client) {
 	v, err := c.ServerAPIVersions()
+	clientVersion := c.APIVersion()
 	if err != nil {
 		glog.Fatalf("failed to get api versions: %v", err)
 	}
-	if e, a := []string{"v1beta1", "v1beta2"}, v.Versions; !reflect.DeepEqual(e, a) {
-		glog.Fatalf("Expected version list '%v', got '%v'", e, a)
+	// Verify that the server supports the API version used by the client.
+	for _, version := range v.Versions {
+		if version == clientVersion {
+			glog.Infof("Version test passed")
+			return
+		}
 	}
-	glog.Infof("Version test passed")
+	glog.Fatalf("Server does not support APIVersion used by client. Server supported APIVersions: '%v', client APIVersion: '%v'", v.Versions, clientVersion)
 }
 
 func runSelfLinkTestOnNamespace(c *client.Client, namespace string) {
-	var svc api.Service
-	err := c.Post().
-		NamespaceIfScoped(namespace, len(namespace) > 0).
-		Resource("services").Body(
-		&api.Service{
-			ObjectMeta: api.ObjectMeta{
-				Name:      "selflinktest",
-				Namespace: namespace,
-				Labels: map[string]string{
-					"name": "selflinktest",
-				},
-			},
-			Spec: api.ServiceSpec{
-				Port: 12345,
-				// This is here because validation requires it.
-				Selector: map[string]string{
-					"foo": "bar",
-				},
-				Protocol:        "TCP",
-				SessionAffinity: "None",
+	svcBody := api.Service{
+		ObjectMeta: api.ObjectMeta{
+			Name:      "selflinktest",
+			Namespace: namespace,
+			Labels: map[string]string{
+				"name": "selflinktest",
 			},
 		},
-	).Do().Into(&svc)
+		Spec: api.ServiceSpec{
+			Port: 12345,
+			// This is here because validation requires it.
+			Selector: map[string]string{
+				"foo": "bar",
+			},
+			Protocol:        "TCP",
+			SessionAffinity: "None",
+		},
+	}
+	services := c.Services(namespace)
+	svc, err := services.Create(&svcBody)
 	if err != nil {
 		glog.Fatalf("Failed creating selflinktest service: %v", err)
 	}
-	// TODO: this is not namespace aware
-	err = c.Get().RequestURI(svc.SelfLink).Do().Into(&svc)
+	err = c.Get().RequestURI(svc.SelfLink).Do().Into(svc)
 	if err != nil {
 		glog.Fatalf("Failed listing service with supplied self link '%v': %v", svc.SelfLink, err)
 	}
 
-	var svcList api.ServiceList
-	err = c.Get().NamespaceIfScoped(namespace, len(namespace) > 0).Resource("services").Do().Into(&svcList)
+	svcList, err := services.List(labels.Everything())
 	if err != nil {
 		glog.Fatalf("Failed listing services: %v", err)
 	}
 
-	err = c.Get().RequestURI(svcList.SelfLink).Do().Into(&svcList)
+	err = c.Get().RequestURI(svcList.SelfLink).Do().Into(svcList)
 	if err != nil {
 		glog.Fatalf("Failed listing services with supplied self link '%v': %v", svcList.SelfLink, err)
 	}
@@ -433,7 +436,7 @@ func runSelfLinkTestOnNamespace(c *client.Client, namespace string) {
 			continue
 		}
 		found = true
-		err = c.Get().RequestURI(item.SelfLink).Do().Into(&svc)
+		err = c.Get().RequestURI(item.SelfLink).Do().Into(svc)
 		if err != nil {
 			glog.Fatalf("Failed listing service with supplied self link '%v': %v", item.SelfLink, err)
 		}
@@ -448,29 +451,28 @@ func runSelfLinkTestOnNamespace(c *client.Client, namespace string) {
 }
 
 func runAtomicPutTest(c *client.Client) {
-	var svc api.Service
-	err := c.Post().Resource("services").Body(
-		&api.Service{
-			TypeMeta: api.TypeMeta{
-				APIVersion: latest.Version,
-			},
-			ObjectMeta: api.ObjectMeta{
-				Name: "atomicservice",
-				Labels: map[string]string{
-					"name": "atomicService",
-				},
-			},
-			Spec: api.ServiceSpec{
-				Port: 12345,
-				// This is here because validation requires it.
-				Selector: map[string]string{
-					"foo": "bar",
-				},
-				Protocol:        "TCP",
-				SessionAffinity: "None",
+	svcBody := api.Service{
+		TypeMeta: api.TypeMeta{
+			APIVersion: c.APIVersion(),
+		},
+		ObjectMeta: api.ObjectMeta{
+			Name: "atomicservice",
+			Labels: map[string]string{
+				"name": "atomicService",
 			},
 		},
-	).Do().Into(&svc)
+		Spec: api.ServiceSpec{
+			Port: 12345,
+			// This is here because validation requires it.
+			Selector: map[string]string{
+				"foo": "bar",
+			},
+			Protocol:        "TCP",
+			SessionAffinity: "None",
+		},
+	}
+	services := c.Services(api.NamespaceDefault)
+	svc, err := services.Create(&svcBody)
 	if err != nil {
 		glog.Fatalf("Failed creating atomicService: %v", err)
 	}
@@ -488,12 +490,7 @@ func runAtomicPutTest(c *client.Client) {
 		go func(l, v string) {
 			for {
 				glog.Infof("Starting to update (%s, %s)", l, v)
-				var tmpSvc api.Service
-				err := c.Get().
-					Resource("services").
-					Name(svc.Name).
-					Do().
-					Into(&tmpSvc)
+				tmpSvc, err := services.Get(svc.Name)
 				if err != nil {
 					glog.Errorf("Error getting atomicService: %v", err)
 					continue
@@ -504,7 +501,7 @@ func runAtomicPutTest(c *client.Client) {
 					tmpSvc.Spec.Selector[l] = v
 				}
 				glog.Infof("Posting update (%s, %s)", l, v)
-				err = c.Put().Resource("services").Name(svc.Name).Body(&tmpSvc).Do().Error()
+				tmpSvc, err = services.Update(tmpSvc)
 				if err != nil {
 					if apierrors.IsConflict(err) {
 						glog.Infof("Conflict: (%s, %s)", l, v)
@@ -521,7 +518,8 @@ func runAtomicPutTest(c *client.Client) {
 		}(label, value)
 	}
 	wg.Wait()
-	if err := c.Get().Resource("services").Name(svc.Name).Do().Into(&svc); err != nil {
+	svc, err = services.Get(svc.Name)
+	if err != nil {
 		glog.Fatalf("Failed getting atomicService after writers are complete: %v", err)
 	}
 	if !reflect.DeepEqual(testLabels, labels.Set(svc.Spec.Selector)) {
@@ -532,30 +530,28 @@ func runAtomicPutTest(c *client.Client) {
 
 func runPatchTest(c *client.Client) {
 	name := "patchservice"
-	resource := "services"
-	var svc api.Service
-	err := c.Post().Resource(resource).Body(
-		&api.Service{
-			TypeMeta: api.TypeMeta{
-				APIVersion: latest.Version,
-			},
-			ObjectMeta: api.ObjectMeta{
-				Name: name,
-				Labels: map[string]string{
-					"name": name,
-				},
-			},
-			Spec: api.ServiceSpec{
-				Port: 12345,
-				// This is here because validation requires it.
-				Selector: map[string]string{
-					"foo": "bar",
-				},
-				Protocol:        "TCP",
-				SessionAffinity: "None",
+	svcBody := api.Service{
+		TypeMeta: api.TypeMeta{
+			APIVersion: c.APIVersion(),
+		},
+		ObjectMeta: api.ObjectMeta{
+			Name: name,
+			Labels: map[string]string{
+				"name": name,
 			},
 		},
-	).Do().Into(&svc)
+		Spec: api.ServiceSpec{
+			Port: 12345,
+			// This is here because validation requires it.
+			Selector: map[string]string{
+				"foo": "bar",
+			},
+			Protocol:        "TCP",
+			SessionAffinity: "None",
+		},
+	}
+	services := c.Services(api.NamespaceDefault)
+	svc, err := services.Create(&svcBody)
 	if err != nil {
 		glog.Fatalf("Failed creating patchservice: %v", err)
 	}
@@ -564,12 +560,11 @@ func runPatchTest(c *client.Client) {
 	}
 
 	// add label
-	_, err = c.Patch().Resource(resource).Name(name).Body([]byte("{\"labels\":{\"foo\":\"bar\"}}")).Do().Get()
-	if err != nil {
+	svc.Labels["foo"] = "bar"
+	if _, err = services.Update(svc); err != nil {
 		glog.Fatalf("Failed updating patchservice: %v", err)
 	}
-	err = c.Get().Resource(resource).Name(name).Do().Into(&svc)
-	if err != nil {
+	if svc, err = services.Get(name); err != nil {
 		glog.Fatalf("Failed getting patchservice: %v", err)
 	}
 	if len(svc.Labels) != 2 || svc.Labels["foo"] != "bar" {
@@ -577,12 +572,11 @@ func runPatchTest(c *client.Client) {
 	}
 
 	// remove one label
-	_, err = c.Patch().Resource(resource).Name(name).Body([]byte("{\"labels\":{\"name\":null}}")).Do().Get()
-	if err != nil {
+	delete(svc.Labels, "name")
+	if _, err = services.Update(svc); err != nil {
 		glog.Fatalf("Failed updating patchservice: %v", err)
 	}
-	err = c.Get().Resource(resource).Name(name).Do().Into(&svc)
-	if err != nil {
+	if svc, err = services.Get(name); err != nil {
 		glog.Fatalf("Failed getting patchservice: %v", err)
 	}
 	if len(svc.Labels) != 1 || svc.Labels["foo"] != "bar" {
@@ -590,12 +584,11 @@ func runPatchTest(c *client.Client) {
 	}
 
 	// remove all labels
-	_, err = c.Patch().Resource(resource).Name(name).Body([]byte("{\"labels\":null}")).Do().Get()
-	if err != nil {
+	svc.Labels = nil
+	if _, err = services.Update(svc); err != nil {
 		glog.Fatalf("Failed updating patchservice: %v", err)
 	}
-	err = c.Get().Resource(resource).Name(name).Do().Into(&svc)
-	if err != nil {
+	if svc, err = services.Get(name); err != nil {
 		glog.Fatalf("Failed getting patchservice: %v", err)
 	}
 	if svc.Labels != nil {
@@ -607,12 +600,7 @@ func runPatchTest(c *client.Client) {
 
 func runMasterServiceTest(client *client.Client) {
 	time.Sleep(12 * time.Second)
-	var svcList api.ServiceList
-	err := client.Get().
-		Namespace("default").
-		Resource("services").
-		Do().
-		Into(&svcList)
+	svcList, err := client.Services(api.NamespaceDefault).List(labels.Everything())
 	if err != nil {
 		glog.Fatalf("unexpected error listing services: %v", err)
 	}
@@ -628,13 +616,7 @@ func runMasterServiceTest(client *client.Client) {
 		}
 	}
 	if foundRW {
-		var ep api.Endpoints
-		err := client.Get().
-			Namespace("default").
-			Resource("endpoints").
-			Name("kubernetes").
-			Do().
-			Into(&ep)
+		ep, err := client.Endpoints(api.NamespaceDefault).Get("kubernetes")
 		if err != nil {
 			glog.Fatalf("unexpected error listing endpoints for kubernetes service: %v", err)
 		}
@@ -645,13 +627,7 @@ func runMasterServiceTest(client *client.Client) {
 		glog.Errorf("no RW service found: %v", found)
 	}
 	if foundRO {
-		var ep api.Endpoints
-		err := client.Get().
-			Namespace("default").
-			Resource("endpoints").
-			Name("kubernetes-ro").
-			Do().
-			Into(&ep)
+		ep, err := client.Endpoints(api.NamespaceDefault).Get("kubernetes-ro")
 		if err != nil {
 			glog.Fatalf("unexpected error listing endpoints for kubernetes service: %v", err)
 		}
@@ -683,7 +659,7 @@ func runServiceTest(client *client.Client) {
 					Ports: []api.ContainerPort{
 						{ContainerPort: 1234},
 					},
-					ImagePullPolicy: "PullIfNotPresent",
+					ImagePullPolicy: api.PullIfNotPresent,
 				},
 			},
 			RestartPolicy: api.RestartPolicyAlways,
@@ -777,9 +753,15 @@ func runServiceTest(client *client.Client) {
 
 type testFunc func(*client.Client)
 
+func addFlags(fs *pflag.FlagSet) {
+	fs.StringVar(&apiVersion, "apiVersion", latest.Version, "API version that should be used by the client for communicating with the server")
+}
+
 func main() {
-	util.InitFlags()
 	runtime.GOMAXPROCS(runtime.NumCPU())
+	addFlags(pflag.CommandLine)
+
+	util.InitFlags()
 	util.ReallyCrash = true
 	util.InitLogs()
 	defer util.FlushLogs()
@@ -790,16 +772,17 @@ func main() {
 		glog.Fatalf("This test has timed out.")
 	}()
 
-	manifestURL := ServeCachedManifestFile()
+	glog.Infof("Running tests for APIVersion: %s", apiVersion)
 
-	apiServerURL, configFilePath := startComponents(manifestURL)
+	manifestURL := ServeCachedManifestFile()
+	apiServerURL, configFilePath := startComponents(manifestURL, apiVersion)
 
 	// Ok. we're good to go.
 	glog.Infof("API Server started on %s", apiServerURL)
 	// Wait for the synchronization threads to come up.
 	time.Sleep(time.Second * 10)
 
-	kubeClient := client.NewOrDie(&client.Config{Host: apiServerURL, Version: testapi.Version()})
+	kubeClient := client.NewOrDie(&client.Config{Host: apiServerURL, Version: apiVersion})
 
 	// Run tests in parallel
 	testFuncs := []testFunc{
@@ -810,13 +793,14 @@ func main() {
 		runAPIVersionsTest,
 		runMasterServiceTest,
 		func(c *client.Client) {
-			runSelfLinkTestOnNamespace(c, "")
+			runSelfLinkTestOnNamespace(c, api.NamespaceDefault)
 			runSelfLinkTestOnNamespace(c, "other")
 		},
 		func(c *client.Client) {
 			runStaticPodTest(c, configFilePath)
 		},
 	}
+
 	var wg sync.WaitGroup
 	wg.Add(len(testFuncs))
 	for i := range testFuncs {
