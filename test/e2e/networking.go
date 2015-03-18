@@ -59,6 +59,7 @@ var _ = Describe("Networking", func() {
 
 		name := "nettest"
 
+		By(fmt.Sprintf("Creating service with name %s in namespace %s", name, ns))
 		svc, err := c.Services(ns).Create(&api.Service{
 			ObjectMeta: api.ObjectMeta{
 				Name: name,
@@ -74,7 +75,6 @@ var _ = Describe("Networking", func() {
 				},
 			},
 		})
-		By(fmt.Sprintf("Creating service with name %s in namespace %s", svc.Name, ns))
 		if err != nil {
 			Fail(fmt.Sprintf("unable to create test service %s: %v", svc.Name, err))
 		}
@@ -108,7 +108,7 @@ var _ = Describe("Networking", func() {
 						Containers: []api.Container{
 							{
 								Name:    "webserver",
-								Image:   "kubernetes/nettest:latest",
+								Image:   "kubernetes/nettest:1.1",
 								Command: []string{"-service=" + name, "-namespace=" + ns},
 								Ports:   []api.ContainerPort{{ContainerPort: 8080}},
 							},
@@ -140,7 +140,13 @@ var _ = Describe("Networking", func() {
 		var body []byte
 		for i := 0; i < maxAttempts && !passed; i++ {
 			time.Sleep(2 * time.Second)
-			body, err = c.Get().Namespace(ns).Prefix("proxy").Resource("services").Name(svc.Name).Suffix("status").Do().Raw()
+			body, err = c.Get().
+				Namespace(ns).
+				Prefix("proxy").
+				Resource("services").
+				Name(svc.Name).
+				Suffix("status").
+				Do().Raw()
 			if err != nil {
 				fmt.Printf("Attempt %v/%v: service/pod still starting. (error: '%v')\n", i, maxAttempts, err)
 				continue
