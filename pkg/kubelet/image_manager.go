@@ -179,11 +179,18 @@ func (self *realImageManager) GarbageCollect() error {
 	}
 	usage := int64(fsInfo.Usage)
 	capacity := int64(fsInfo.Capacity)
-	usagePercent := int(usage * 100 / capacity)
+
+	// Check valid capacity.
+	if capacity == 0 {
+		// TODO(vmarmol): Surface event.
+		return fmt.Errorf("invalid capacity %d on device %q at mount point %q", capacity, fsInfo.Device, fsInfo.Mountpoint)
+	}
 
 	// If over the max threshold, free enough to place us at the lower threshold.
+	usagePercent := int(usage * 100 / capacity)
 	if usagePercent >= self.policy.HighThresholdPercent {
 		amountToFree := usage - (int64(self.policy.LowThresholdPercent) * capacity / 100)
+		glog.Infof("[ImageManager]: Disk usage on %q (%s) is at %d%% which is over the high threshold (%d%%). Trying to free %d bytes", fsInfo.Device, fsInfo.Mountpoint, usagePercent, self.policy.HighThresholdPercent, amountToFree)
 		freed, err := self.freeSpace(amountToFree)
 		if err != nil {
 			return err
@@ -234,6 +241,7 @@ func (self *realImageManager) freeSpace(bytesToFree int64) (int64, error) {
 		}
 
 		// Remove image. Continue despite errors.
+		glog.Infof("[ImageManager]: Removing image %q to free %d bytes", image.id, image.size)
 		err := self.dockerClient.RemoveImage(image.id)
 		if err != nil {
 			lastErr = err
