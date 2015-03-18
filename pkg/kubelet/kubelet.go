@@ -254,6 +254,14 @@ type Kubelet struct {
 	// out beforehand.
 	mirrorPods util.StringSet
 
+	// A pod status cache stores statuses for pods (both rejected and synced).
+	// Note that currently no thread attempts to acquire podStatusesLock while
+	// holding podLock, and vice versa. If you intend to change this usage
+	// pattern, please explicitly impose an acquiring order to avoid deadlocks
+	// and document such an order in the comment.
+	podStatusesLock sync.RWMutex
+	podStatuses     map[string]api.PodStatus
+
 	// Needed to report events for containers belonging to deleted/modified pods.
 	// Tracks references for reporting events
 	dockerIDToRef map[dockertools.DockerID]*api.ObjectReference
@@ -298,10 +306,6 @@ type Kubelet struct {
 
 	// the EventRecorder to use
 	recorder record.EventRecorder
-
-	// A pod status cache stores statuses for pods (both rejected and synced).
-	podStatusesLock sync.RWMutex
-	podStatuses     map[string]api.PodStatus
 
 	// A mirror pod manager which provides helper functions.
 	mirrorManager mirrorManager
@@ -1462,7 +1466,8 @@ func (kl *Kubelet) SyncPods(allPods []api.Pod, podSyncTypes map[types.UID]metric
 	}
 	kl.removeOrphanedStatuses(podFullNames)
 
-	// Filtered out the rejected pod. They don't have running containers.
+	// Filter out the rejected pod. They don't have running containers.
+	kl.handleHostPortConflicts(allPods)
 	var pods []api.Pod
 	for _, pod := range allPods {
 		status, ok := kl.getPodStatusFromCache(GetPodFullName(&pod))
@@ -1712,8 +1717,6 @@ func (kl *Kubelet) updatePods(u PodUpdate, podSyncTypes map[types.UID]metrics.Sy
 		// Actually update the pods.
 		kl.pods = newPods
 		kl.mirrorPods = newMirrorPods
-
-		kl.handleHostPortConflicts(kl.pods)
 	case UPDATE:
 		glog.V(3).Infof("Update: Containers changed")
 
@@ -1724,7 +1727,6 @@ func (kl *Kubelet) updatePods(u PodUpdate, podSyncTypes map[types.UID]metrics.Sy
 		}
 		allPods := updatePods(u.Pods, kl.pods)
 		kl.pods, kl.mirrorPods = filterAndCategorizePods(allPods)
-		kl.handleHostPortConflicts(kl.pods)
 	default:
 		panic("syncLoop does not support incremental changes")
 	}
