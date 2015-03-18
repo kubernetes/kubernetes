@@ -8,10 +8,15 @@
 
 ### Prerequisites
 
-1. Install [qemu](http://wiki.qemu.org/Main_Page)
-2. Install [libvirt](http://libvirt.org/)
-3. [Grant libvirt access to your user¹](https://libvirt.org/aclpolkit.html)
-4. Check that your $HOME is accessible to the qemu user²
+1. Install [dnsmasq](http://www.thekelleys.org.uk/dnsmasq/doc.html)
+2. Install [ebtables](http://ebtables.netfilter.org/)
+3. Install [qemu](http://wiki.qemu.org/Main_Page)
+4. Install [libvirt](http://libvirt.org/)
+5. Enable and start the libvirt daemon, e.g:
+   * ``systemctl enable libvirtd``
+   * ``systemctl start libvirtd``
+6. [Grant libvirt access to your user¹](https://libvirt.org/aclpolkit.html)
+7. Check that your $HOME is accessible to the qemu user²
 
 #### ¹ Depending on your distribution, libvirt access may be denied by default or may require a password at each access.
 
@@ -22,9 +27,10 @@ virsh -c qemu:///system pool-list
 
 If you have access error messages, please read https://libvirt.org/acl.html and https://libvirt.org/aclpolkit.html .
 
-In short, if your libvirt has been compiled with Polkit support (ex: Arch, Fedora 21), you can create `/etc/polkit-1/rules.d/50-org.libvirt.unix.manage.rules` with the following content to grant full access to libvirt to `$USER`
+In short, if your libvirt has been compiled with Polkit support (ex: Arch, Fedora 21), you can create `/etc/polkit-1/rules.d/50-org.libvirt.unix.manage.rules` as follows to grant full access to libvirt to `$USER`
 
 ```
+sudo /bin/sh -c "cat - > /etc/polkit-1/rules.d/50-org.libvirt.unix.manage.rules" << EOF
 polkit.addRule(function(action, subject) {
         if (action.id == "org.libvirt.unix.manage" &&
             subject.user == "$USER") {
@@ -33,9 +39,8 @@ polkit.addRule(function(action, subject) {
                 polkit.log("subject=" + subject);
         }
 });
+EOF
 ```
-
-(Replace `$USER` with your login name)
 
 If your libvirt has not been compiled with Polkit (ex: Ubuntu 14.04.1 LTS), check the permissions on the libvirt unix socket:
 
@@ -233,3 +238,7 @@ On Ubuntu:
 ```
 usermod -a -G libvirtd $USER
 ```
+
+#### error: Out of memory initializing network (virsh net-create...)
+
+Ensure libvirtd has been restarted since ebtables was installed.
