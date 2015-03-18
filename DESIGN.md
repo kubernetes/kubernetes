@@ -28,13 +28,13 @@ Kubernetes is primarily targeted at applications comprised of multiple container
 
 Kubernetes enables users to ask a cluster to run a set of containers. The system automatically chooses hosts to run those containers on. While Kubernetes's scheduler is currently very simple, we expect it to grow in sophistication over time. Scheduling is a policy-rich, topology-aware, workload-specific function that significantly impacts availability, performance, and capacity. The scheduler needs to take into account individual and collective resource requirements, quality of service requirements, hardware/software/policy constraints, affinity and anti-affinity specifications, data locality, inter-workload interference, deadlines, and so on. Workload-specific requirements will be exposed through the API as necessary.
 
-Architecturally, we want Kubernetes to be built as a collection of pluggable components and layers, with the ability to use alternative schedulers, storage systems, and distribution mechanisms, and we're evolving its current code in that direction.
+Kubernetes is intended to run on a number of cloud providers, as well as on physical hosts.
 
-Kubernetes is intended to run on multiple cloud providers, as well as on physical hosts.
-
-A single Kubernetes cluster is not intended to span multiple availability zones. Instead, we recommend building a higher-level layer to replicate complete deployments of highly available applications across multiple zones.
+A single Kubernetes cluster is not intended to span multiple availability zones. Instead, we recommend building a higher-level layer to replicate complete deployments of highly available applications across multiple zones (see [the availability doc](docs/availability.md) for more details).
 
 Kubernetes is not currently suitable for use by multiple users -- see [Cluster Security](#cluster-security), below.
+
+Finally, Kubernetes aspires to be an extensible, pluggable, building-block OSS platform and toolkit. Therefore, architecturally, we want Kubernetes to be built as a collection of pluggable components and layers, with the ability to use alternative schedulers, controllers, storage systems, and distribution mechanisms, and we're evolving its current code in that direction. Furthermore, we want others to be able to extend Kubernetes functionality, such as with higher-level PaaS functionality or multi-cluster layers, without modification of core Kubernetes source. Therefore, its API isn't just (or even necessarily mainly) targeted at end users, but at tool and extension developers. Consequently, there are no "internal" inter-component APIs. All APIs are visible and available, including the APIs used by the scheduler, the node controller, the replication-controller manager, Kubelet's API, etc. There's no glass to break -- in order to handle more complex use cases, one can just access the lower-level APIs in a fully transparent, composable manner.
 
 ### Cluster Architecture
 
