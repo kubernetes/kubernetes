@@ -78,11 +78,11 @@ func testWriteAuthInfoFile(auth clientauth.Info, filename string) error {
 }
 
 func testBindClientConfig(cmd *cobra.Command) ClientConfig {
-	loadingRules := NewClientConfigLoadingRules()
-	loadingRules.EnvVarPath = ""
-	loadingRules.HomeDirectoryPath = ""
-	loadingRules.CurrentDirectoryPath = ""
-	cmd.PersistentFlags().StringVar(&loadingRules.CommandLinePath, "kubeconfig", "", "Path to the kubeconfig file to use for CLI requests.")
+	loadingRules := NewDefaultClientConfigLoadingRules()
+	loadingRules.Precedence[DefaultEnvVarIndex] = ""
+	loadingRules.Precedence[DefaultCurrentDirIndex] = ""
+	loadingRules.Precedence[DefaultHomeDirIndex] = ""
+	cmd.PersistentFlags().StringVar(&loadingRules.ExplicitPath, "kubeconfig", "", "Path to the kubeconfig file to use for CLI requests.")
 
 	overrides := &ConfigOverrides{}
 	BindOverrideFlags(overrides, cmd.PersistentFlags(), RecommendedConfigOverrideFlags(""))

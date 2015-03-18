@@ -19,7 +19,6 @@ package config
 import (
 	"fmt"
 	"io"
-	"os"
 
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
@@ -113,9 +112,8 @@ func (o viewOptions) validate() error {
 func (o *viewOptions) getStartingConfig() (*clientcmdapi.Config, string, error) {
 	switch {
 	case o.merge.Value():
-		loadingRules := clientcmd.NewClientConfigLoadingRules()
-		loadingRules.EnvVarPath = os.Getenv("KUBECONFIG")
-		loadingRules.CommandLinePath = o.pathOptions.specifiedFile
+		loadingRules := clientcmd.NewDefaultClientConfigLoadingRules()
+		loadingRules.ExplicitPath = o.pathOptions.specifiedFile
 
 		overrides := &clientcmd.ConfigOverrides{}
 		clientConfig := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(loadingRules, overrides)

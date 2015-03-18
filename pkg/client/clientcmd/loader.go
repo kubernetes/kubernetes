@@ -33,31 +33,35 @@ import (
 const (
 	RecommendedConfigPathFlag   = "kubeconfig"
 	RecommendedConfigPathEnvVar = "KUBECONFIG"
+
+	DefaultEnvVarIndex     = 0
+	DefaultCurrentDirIndex = 1
+	DefaultHomeDirIndex    = 2
 )
 
-// ClientConfigLoadingRules is a struct that calls our specific locations that are used for merging together a Config
+// ClientConfigLoadingRules is an ExplicitPath and string slice of specific locations that are used for merging together a Config
+// Callers can put the chain together however they want, but we'd recommend:
+// [0] = EnvVarPath
+// [1] = CurrentDirectoryPath
+// [2] = HomeDirectoryPath
+// ExplicitPath is special, because if a user specifically requests a certain file be used and error is reported if thie file is not present
 type ClientConfigLoadingRules struct {
-	CommandLinePath      string
-	EnvVarPath           string
-	CurrentDirectoryPath string
-	HomeDirectoryPath    string
+	ExplicitPath string
+	Precedence   []string
 }
 
-// NewClientConfigLoadingRules returns a ClientConfigLoadingRules object with default fields filled in.  You are not required to
+// NewDefaultClientConfigLoadingRules returns a ClientConfigLoadingRules object with default fields filled in.  You are not required to
 // use this constructor
-func NewClientConfigLoadingRules() *ClientConfigLoadingRules {
+func NewDefaultClientConfigLoadingRules() *ClientConfigLoadingRules {
 	return &ClientConfigLoadingRules{
-		CurrentDirectoryPath: ".kubeconfig",
-		HomeDirectoryPath:    os.Getenv("HOME") + "/.kube/.kubeconfig",
+		Precedence: []string{os.Getenv(RecommendedConfigPathEnvVar), ".kubeconfig", os.Getenv("HOME") + "/.kube/.kubeconfig"},
 	}
 }
 
 // Load takes the loading rules and merges together a Config object based on following order.
-//   1.  CommandLinePath
-//   2.  EnvVarPath
-//   3.  CurrentDirectoryPath
-//   4.  HomeDirectoryPath
-// A missing CommandLinePath file produces an error. Empty filenames or other missing files are ignored.
+//   1.  ExplicitPath
+//   2.  Precedence slice
+// A missing ExplicitPath file produces an error. Empty filenames or other missing files are ignored.
 // Read errors or files with non-deserializable content produce errors.
 // The first file to set a particular map key wins and map key's value is never changed.
 // BUT, if you set a struct value that is NOT contained inside of map, the value WILL be changed.
@@ -71,13 +75,14 @@ func (rules *ClientConfigLoadingRules) Load() (*clientcmdapi.Config, error) {
 	errlist := []error{}
 
 	// Make sure a file we were explicitly told to use exists
-	if len(rules.CommandLinePath) > 0 {
-		if _, err := os.Stat(rules.CommandLinePath); os.IsNotExist(err) {
-			errlist = append(errlist, fmt.Errorf("The config file %v does not exist", rules.CommandLinePath))
+	if len(rules.ExplicitPath) > 0 {
+		if _, err := os.Stat(rules.ExplicitPath); os.IsNotExist(err) {
+			errlist = append(errlist, fmt.Errorf("The config file %v does not exist", rules.ExplicitPath))
 		}
 	}
 
-	kubeConfigFiles := []string{rules.CommandLinePath, rules.EnvVarPath, rules.CurrentDirectoryPath, rules.HomeDirectoryPath}
+	kubeConfigFiles := []string{rules.ExplicitPath}
+	kubeConfigFiles = append(kubeConfigFiles, rules.Precedence...)
 
 	// first merge all of our maps
 	mapConfig := clientcmdapi.NewConfig()
@@ -85,7 +90,7 @@ func (rules *ClientConfigLoadingRules) Load() (*clientcmdapi.Config, error) {
 		if err := mergeConfigWithFile(mapConfig, file); err != nil {
 			errlist = append(errlist, err)
 		}
-		if err := resolveLocalPaths(file, mapConfig); err != nil {
+		if err := ResolveLocalPaths(file, mapConfig); err != nil {
 			errlist = append(errlist, err)
 		}
 	}
@@ -96,7 +101,7 @@ func (rules *ClientConfigLoadingRules) Load() (*clientcmdapi.Config, error) {
 	for i := len(kubeConfigFiles) - 1; i >= 0; i-- {
 		file := kubeConfigFiles[i]
 		mergeConfigWithFile(nonMapConfig, file)
-		resolveLocalPaths(file, nonMapConfig)
+		ResolveLocalPaths(file, nonMapConfig)
 	}
 
 	// since values are overwritten, but maps values are not, we can merge the non-map config on top of the map config and
@@ -127,10 +132,10 @@ func mergeConfigWithFile(startingConfig *clientcmdapi.Config, filename string) e
 	return nil
 }
 
-// resolveLocalPaths resolves all relative paths in the config object with respect to the parent directory of the filename
+// ResolveLocalPaths resolves all relative paths in the config object with respect to the parent directory of the filename
 // this cannot be done directly inside of LoadFromFile because doing so there would make it impossible to load a file without
 // modification of its contents.
-func resolveLocalPaths(filename string, config *clientcmdapi.Config) error {
+func ResolveLocalPaths(filename string, config *clientcmdapi.Config) error {
 	if len(filename) == 0 {
 		return nil
 	}
