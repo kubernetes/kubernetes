@@ -103,13 +103,13 @@ func TestLeastRequested(t *testing.T) {
 		{
 			/*
 				Minion1 scores (remaining resources) on 0-10 scale
-				CPU Score: (4000 - 0) / 4000 = 10
-				Memory Score: (10000 - 0) / 10000 = 10
+				CPU Score: ((4000 - 0) *10) / 4000 = 10
+				Memory Score: ((10000 - 0) *10) / 10000 = 10
 				Minion1 Score: (10 + 10) / 2 = 10
 
 				Minion2 scores (remaining resources) on 0-10 scale
-				CPU Score: (4000 - 0) / 4000 = 10
-				Memory Score: (10000 - 0) / 10000 = 10
+				CPU Score: ((4000 - 0) *10) / 4000 = 10
+				Memory Score: ((10000 - 0) *10) / 10000 = 10
 				Minion2 Score: (10 + 10) / 2 = 10
 			*/
 			pod:          api.Pod{Spec: noResources},
@@ -120,13 +120,13 @@ func TestLeastRequested(t *testing.T) {
 		{
 			/*
 				Minion1 scores on 0-10 scale
-				CPU Score: (4000 - 3000) / 4000 = 2.5
-				Memory Score: (10000 - 5000) / 10000 = 5
+				CPU Score: ((4000 - 3000) *10) / 4000 = 2.5
+				Memory Score: ((10000 - 5000) *10) / 10000 = 5
 				Minion1 Score: (2.5 + 5) / 2 = 3
 
 				Minion2 scores on 0-10 scale
-				CPU Score: (6000 - 3000) / 6000 = 5
-				Memory Score: (10000 - 5000) / 10000 = 5
+				CPU Score: ((6000 - 3000) *10) / 6000 = 5
+				Memory Score: ((10000 - 5000) *10) / 10000 = 5
 				Minion2 Score: (5 + 5) / 2 = 5
 			*/
 			pod:          api.Pod{Spec: cpuAndMemory},
@@ -137,13 +137,13 @@ func TestLeastRequested(t *testing.T) {
 		{
 			/*
 				Minion1 scores on 0-10 scale
-				CPU Score: (4000 - 0) / 4000 = 10
-				Memory Score: (10000 - 0) / 10000 = 10
+				CPU Score: ((4000 - 0) *10) / 4000 = 10
+				Memory Score: ((10000 - 0) *10) / 10000 = 10
 				Minion1 Score: (10 + 10) / 2 = 10
 
 				Minion2 scores on 0-10 scale
-				CPU Score: (4000 - 0) / 4000 = 10
-				Memory Score: (10000 - 0) / 10000 = 10
+				CPU Score: ((4000 - 0) *10) / 4000 = 10
+				Memory Score: ((10000 - 0) *10) / 10000 = 10
 				Minion2 Score: (10 + 10) / 2 = 10
 			*/
 			pod:          api.Pod{Spec: noResources},
@@ -160,13 +160,13 @@ func TestLeastRequested(t *testing.T) {
 		{
 			/*
 				Minion1 scores on 0-10 scale
-				CPU Score: (10000 - 6000) / 10000 = 4
-				Memory Score: (20000 - 0) / 20000 = 10
+				CPU Score: ((10000 - 6000) *10) / 10000 = 4
+				Memory Score: ((20000 - 0) *10) / 20000 = 10
 				Minion1 Score: (4 + 10) / 2 = 7
 
 				Minion2 scores on 0-10 scale
-				CPU Score: (10000 - 6000) / 10000 = 4
-				Memory Score: (20000 - 5000) / 20000 = 7.5
+				CPU Score: ((10000 - 6000) *10) / 10000 = 4
+				Memory Score: ((20000 - 5000) *10) / 20000 = 7.5
 				Minion2 Score: (4 + 7.5) / 2 = 5
 			*/
 			pod:          api.Pod{Spec: noResources},
@@ -183,13 +183,13 @@ func TestLeastRequested(t *testing.T) {
 		{
 			/*
 				Minion1 scores on 0-10 scale
-				CPU Score: (10000 - 6000) / 10000 = 4
-				Memory Score: (20000 - 5000) / 20000 = 7.5
+				CPU Score: ((10000 - 6000) *10) / 10000 = 4
+				Memory Score: ((20000 - 5000) *10) / 20000 = 7.5
 				Minion1 Score: (4 + 7.5) / 2 = 5
 
 				Minion2 scores on 0-10 scale
-				CPU Score: (10000 - 6000) / 10000 = 4
-				Memory Score: (20000 - 10000) / 20000 = 5
+				CPU Score: ((10000 - 6000) *10) / 10000 = 4
+				Memory Score: ((20000 - 10000) *10) / 20000 = 5
 				Minion2 Score: (4 + 5) / 2 = 4
 			*/
 			pod:          api.Pod{Spec: cpuAndMemory},
@@ -204,13 +204,13 @@ func TestLeastRequested(t *testing.T) {
 		{
 			/*
 				Minion1 scores on 0-10 scale
-				CPU Score: (10000 - 6000) / 10000 = 4
-				Memory Score: (20000 - 5000) / 20000 = 7.5
+				CPU Score: ((10000 - 6000) *10) / 10000 = 4
+				Memory Score: ((20000 - 5000) *10) / 20000 = 7.5
 				Minion1 Score: (4 + 7.5) / 2 = 5
 
 				Minion2 scores on 0-10 scale
-				CPU Score: (10000 - 6000) / 10000 = 4
-				Memory Score: (50000 - 10000) / 50000 = 8
+				CPU Score: ((10000 - 6000) *10) / 10000 = 4
+				Memory Score: ((50000 - 10000) *10) / 50000 = 8
 				Minion2 Score: (4 + 8) / 2 = 6
 			*/
 			pod:          api.Pod{Spec: cpuAndMemory},
@@ -225,13 +225,13 @@ func TestLeastRequested(t *testing.T) {
 		{
 			/*
 				Minion1 scores on 0-10 scale
-				CPU Score: (4000 - 6000) / 4000 = 0
-				Memory Score: (10000 - 0) / 10000 = 10
+				CPU Score: ((4000 - 6000) *10) / 4000 = 0
+				Memory Score: ((10000 - 0) *10) / 10000 = 10
 				Minion1 Score: (0 + 10) / 2 = 5
 
 				Minion2 scores on 0-10 scale
-				CPU Score: (4000 - 6000) / 4000 = 0
-				Memory Score: (10000 - 5000) / 10000 = 5
+				CPU Score: ((4000 - 6000) *10) / 4000 = 0
+				Memory Score: ((10000 - 5000) *10) / 10000 = 5
 				Minion2 Score: (0 + 5) / 2 = 2
 			*/
 			pod:          api.Pod{Spec: cpuOnly},
