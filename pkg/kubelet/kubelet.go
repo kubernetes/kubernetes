@@ -122,12 +122,16 @@ func NewMainKubelet(
 	recorder record.EventRecorder,
 	cadvisorInterface cadvisor.Interface,
 	statusUpdateFrequency time.Duration,
+	podStatusUpdateFrequency time.Duration,
 	imageGCPolicy ImageGCPolicy) (*Kubelet, error) {
 	if rootDirectory == "" {
 		return nil, fmt.Errorf("invalid root directory %q", rootDirectory)
 	}
 	if resyncInterval <= 0 {
 		return nil, fmt.Errorf("invalid sync frequency %d", resyncInterval)
+	}
+	if podStatusUpdateFrequency <= 0 {
+		return nil, fmt.Errorf("invalid status update frequency %d", podStatusUpdateFrequency)
 	}
 	dockerClient = metrics.NewInstrumentedDockerInterface(dockerClient)
 
@@ -179,6 +183,7 @@ func NewMainKubelet(
 		rootDirectory:                  rootDirectory,
 		statusUpdateFrequency:          statusUpdateFrequency,
 		resyncInterval:                 resyncInterval,
+		podStatusUpdateFrequency:       podStatusUpdateFrequency,
 		podInfraContainerImage:         podInfraContainerImage,
 		dockerIDToRef:                  map[dockertools.DockerID]*api.ObjectReference{},
 		runner:                         dockertools.NewDockerContainerCommandRunner(dockerClient),
@@ -232,16 +237,17 @@ type serviceLister interface {
 
 // Kubelet is the main kubelet implementation.
 type Kubelet struct {
-	hostname               string
-	dockerClient           dockertools.DockerInterface
-	dockerCache            dockertools.DockerCache
-	kubeClient             client.Interface
-	rootDirectory          string
-	podInfraContainerImage string
-	podWorkers             *podWorkers
-	statusUpdateFrequency  time.Duration
-	resyncInterval         time.Duration
-	sourcesReady           SourcesReadyFn
+	hostname                 string
+	dockerClient             dockertools.DockerInterface
+	dockerCache              dockertools.DockerCache
+	kubeClient               client.Interface
+	rootDirectory            string
+	podInfraContainerImage   string
+	podWorkers               *podWorkers
+	statusUpdateFrequency    time.Duration
+	resyncInterval           time.Duration
+	podStatusUpdateFrequency time.Duration
+	sourcesReady             SourcesReadyFn
 
 	// Protects the pods array
 	// We make complete array copies out of this while locked, which is OK because once added to this array,
@@ -507,7 +513,11 @@ func (kl *Kubelet) Run(updates <-chan PodUpdate) {
 		glog.Warning("No api server defined - no node status update will be sent.")
 	}
 	go kl.syncNodeStatus()
-	go util.Forever(kl.syncStatus, kl.resyncInterval)
+
+	// syncStatus handles its own frequency and throttling, run it always.
+	go util.Forever(func() {
+		kl.syncStatus(kl.podStatusUpdateFrequency)
+	}, 0)
 	kl.syncLoop(updates, kl)
 }
 
@@ -1673,12 +1683,25 @@ func (kl *Kubelet) syncLoop(updates <-chan PodUpdate, handler SyncHandler) {
 	}
 }
 
-// syncStatus syncs pods statuses with the apiserver.
-func (kl *Kubelet) syncStatus() {
+// syncStatus syncs pods statuses with the apiserver. Spread the updates over the specified deadline.
+func (kl *Kubelet) syncStatus(deadline time.Duration) {
+	start := time.Now()
 	glog.V(3).Infof("Syncing pods status")
 
 	pods, _ := kl.GetPods()
+	if len(pods) == 0 {
+		// No pods, sleep the rest of our deadline.
+		time.Sleep(deadline - time.Since(start))
+		return
+	}
+
+	// TODO(vmarmol): Enhance util.RateLimiter for our use here.
+	singleDeadline := time.Duration(deadline.Nanoseconds() / int64(len(pods)))
+	t := time.NewTicker(singleDeadline)
 	for _, pod := range pods {
+		// Don't hit the api server too hard, wait for the next time slot.
+		<-t.C
+
 		status, err := kl.GetPodStatus(GetPodFullName(&pod), pod.UID)
 		if err != nil {
 			glog.Warningf("Error getting pod %q status: %v, retry later", pod.Name, err)
@@ -1691,6 +1714,7 @@ func (kl *Kubelet) syncStatus() {
 			glog.V(3).Infof("Status for pod %q updated successfully: %s", pod.Name, pod)
 		}
 	}
+	t.Stop()
 }
 
 // Update the Kubelet's internal pods with those provided by the update.
