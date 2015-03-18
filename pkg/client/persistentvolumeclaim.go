@@ -21,6 +21,7 @@ import (
 	"fmt"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
@@ -37,7 +38,7 @@ type PersistentVolumeClaimInterface interface {
 	Create(claim *api.PersistentVolumeClaim) (*api.PersistentVolumeClaim, error)
 	Update(claim *api.PersistentVolumeClaim) (*api.PersistentVolumeClaim, error)
 	Delete(name string) error
-	Watch(label, field labels.Selector, resourceVersion string) (watch.Interface, error)
+	Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error)
 }
 
 // persistentVolumeClaims implements PersistentVolumeClaimsNamespacer interface
@@ -53,7 +54,7 @@ func newPersistentVolumeClaims(c *Client, namespace string) *persistentVolumeCla
 
 func (c *persistentVolumeClaims) List(selector labels.Selector) (result *api.PersistentVolumeClaimList, err error) {
 	result = &api.PersistentVolumeClaimList{}
-	err = c.r.Get().Namespace(c.ns).Resource("persistentVolumeClaims").SelectorParam("labels", selector).Do().Into(result)
+	err = c.r.Get().Namespace(c.ns).Resource("persistentVolumeClaims").LabelsSelectorParam("labels", selector).Do().Into(result)
 	return
 }
 
@@ -87,13 +88,13 @@ func (c *persistentVolumeClaims) Delete(name string) error {
 	return c.r.Delete().Namespace(c.ns).Resource("persistentVolumeClaims").Name(name).Do().Error()
 }
 
-func (c *persistentVolumeClaims) Watch(label, field labels.Selector, resourceVersion string) (watch.Interface, error) {
+func (c *persistentVolumeClaims) Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
 	return c.r.Get().
 		Prefix("watch").
 		Namespace(c.ns).
 		Resource("persistentVolumeClaims").
 		Param("resourceVersion", resourceVersion).
-		SelectorParam("labels", label).
-		SelectorParam("fields", field).
+		LabelsSelectorParam(api.LabelSelectorQueryParam(c.r.APIVersion()), label).
+		FieldsSelectorParam(api.FieldSelectorQueryParam(c.r.APIVersion()), field).
 		Watch()
 }

@@ -21,6 +21,7 @@ import (
 	"fmt"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
@@ -36,7 +37,7 @@ type PersistentVolumeInterface interface {
 	Create(volume *api.PersistentVolume) (*api.PersistentVolume, error)
 	Update(volume *api.PersistentVolume) (*api.PersistentVolume, error)
 	Delete(name string) error
-	Watch(label, field labels.Selector, resourceVersion string) (watch.Interface, error)
+	Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error)
 }
 
 // persistentVolumes implements PersistentVolumesInterface
@@ -50,7 +51,7 @@ func newPersistentVolumes(c *Client) *persistentVolumes {
 
 func (c *persistentVolumes) List(selector labels.Selector) (result *api.PersistentVolumeList, err error) {
 	result = &api.PersistentVolumeList{}
-	err = c.r.Get().Resource("persistentVolumes").SelectorParam("labels", selector).Do().Into(result)
+	err = c.r.Get().Resource("persistentVolumes").LabelsSelectorParam("labels", selector).Do().Into(result)
 	return
 }
 
@@ -84,12 +85,12 @@ func (c *persistentVolumes) Delete(name string) error {
 	return c.r.Delete().Resource("persistentVolumes").Name(name).Do().Error()
 }
 
-func (c *persistentVolumes) Watch(label, field labels.Selector, resourceVersion string) (watch.Interface, error) {
+func (c *persistentVolumes) Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
 	return c.r.Get().
 		Prefix("watch").
 		Resource("persistentVolumes").
 		Param("resourceVersion", resourceVersion).
-		SelectorParam("labels", label).
-		SelectorParam("fields", field).
+		LabelsSelectorParam(api.LabelSelectorQueryParam(c.r.APIVersion()), label).
+		FieldsSelectorParam(api.FieldSelectorQueryParam(c.r.APIVersion()), field).
 		Watch()
 }
