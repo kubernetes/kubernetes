@@ -174,6 +174,12 @@ function verify-cluster {
     done
   done
 
+  # By this time, all kube api calls should work, so no need to loop and retry.
+  echo "Validating we can run kubectl commands."
+  vagrant ssh master --command "kubectl get pods" || {
+    echo "WARNING: kubectl to localhost failed.  This could mean localhost is not bound to an IP"
+  }
+  
   (
     echo
     echo "Kubernetes cluster is running.  The master is running at:"
