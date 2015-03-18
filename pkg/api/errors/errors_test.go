@@ -126,7 +126,7 @@ func TestNewInvalid(t *testing.T) {
 			},
 		},
 		{
-			NewFieldRequired("field[0].name", "bar"),
+			NewFieldRequired("field[0].name"),
 			&api.StatusDetails{
 				Kind: "kind",
 				ID:   "name",

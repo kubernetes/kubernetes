@@ -71,12 +71,12 @@ func CreateObjects(typer runtime.ObjectTyper, mapper meta.RESTMapper, clientFor 
 func CreateObject(client RESTClientPoster, mapping *meta.RESTMapping, obj runtime.Object) *errs.ValidationError {
 	name, err := mapping.MetadataAccessor.Name(obj)
 	if err != nil || name == "" {
-		return errs.NewFieldRequired("name", err)
+		return errs.NewFieldRequired("name")
 	}
 
 	namespace, err := mapping.Namespace(obj)
 	if err != nil {
-		return errs.NewFieldRequired("namespace", err)
+		return errs.NewFieldRequired("namespace")
 	}
 
 	// TODO: This should be using RESTHelper
