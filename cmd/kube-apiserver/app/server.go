@@ -229,7 +229,6 @@ func (s *APIServer) Run(_ []string) error {
 	admissionController := admission.NewFromPlugins(client, admissionControlPluginNames, s.AdmissionControlConfigFile)
 
 	config := &master.Config{
-		Client:                 client,
 		Cloud:                  cloud,
 		EtcdHelper:             helper,
 		EventTTL:               s.EventTTL,

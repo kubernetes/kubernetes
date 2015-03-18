@@ -100,7 +100,8 @@ func TestExampleObjectSchemas(t *testing.T) {
 			"pod": &api.Pod{},
 		},
 		"../cmd/integration": {
-			"controller": &api.ReplicationController{},
+			"v1beta1-controller": &api.ReplicationController{},
+			"v1beta3-controller": &api.ReplicationController{},
 		},
 		"../examples/guestbook": {
 			"frontend-controller":     &api.ReplicationController{},

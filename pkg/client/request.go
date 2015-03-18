@@ -89,7 +89,7 @@ type Request struct {
 	baseURL *url.URL
 	codec   runtime.Codec
 
-	// If true, add "?namespace=<namespace>" as a query parameter, if false put ns/<namespace> in path
+	// If true, add "?namespace=<namespace>" as a query parameter, if false put namespaces/<namespace> in path
 	// Query parameter is considered legacy behavior
 	namespaceInQuery bool
 	// If true, lowercase resource prior to inserting into a path, if false, leave it as is. Preserving

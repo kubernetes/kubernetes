@@ -77,7 +77,13 @@ func (c *services) Get(name string) (result *api.Service, err error) {
 // Create creates a new service.
 func (c *services) Create(svc *api.Service) (result *api.Service, err error) {
 	result = &api.Service{}
-	err = c.r.Post().Namespace(c.ns).Resource("services").Body(svc).Do().Into(result)
+	// v1beta3 does not allow POST without a namespace.
+	needNamespace := !api.PreV1Beta3(c.r.APIVersion())
+	namespace := c.ns
+	if needNamespace && len(namespace) == 0 {
+		namespace = api.NamespaceDefault
+	}
+	err = c.r.Post().Namespace(namespace).Resource("services").Body(svc).Do().Into(result)
 	return
 }
 
@@ -88,12 +94,24 @@ func (c *services) Update(svc *api.Service) (result *api.Service, err error) {
 		err = fmt.Errorf("invalid update object, missing resource version: %v", svc)
 		return
 	}
-	err = c.r.Put().Namespace(c.ns).Resource("services").Name(svc.Name).Body(svc).Do().Into(result)
+	// v1beta3 does not allow PUT without a namespace.
+	needNamespace := !api.PreV1Beta3(c.r.APIVersion())
+	namespace := c.ns
+	if needNamespace && len(namespace) == 0 {
+		namespace = api.NamespaceDefault
+	}
+	err = c.r.Put().Namespace(namespace).Resource("services").Name(svc.Name).Body(svc).Do().Into(result)
 	return
 }
 
 // Delete deletes an existing service.
 func (c *services) Delete(name string) error {
+	// v1beta3 does not allow DELETE without a namespace.
+	needNamespace := !api.PreV1Beta3(c.r.APIVersion())
+	namespace := c.ns
+	if needNamespace && len(namespace) == 0 {
+		namespace = api.NamespaceDefault
+	}
 	return c.r.Delete().Namespace(c.ns).Resource("services").Name(name).Do().Error()
 }
 

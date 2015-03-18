@@ -50,7 +50,6 @@ func TestClient(t *testing.T) {
 	defer s.Close()
 
 	m = master.New(&master.Config{
-		Client:            client.NewOrDie(&client.Config{Host: s.URL}),
 		EtcdHelper:        helper,
 		KubeletClient:     client.FakeKubeletClient{},
 		EnableLogsSupport: false,
