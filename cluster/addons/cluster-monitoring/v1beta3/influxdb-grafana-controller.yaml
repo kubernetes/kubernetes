@@ -4,7 +4,7 @@ metadata:
   labels: 
     name: influxGrafana
     kubernetes.io/cluster-service: "true"
-  name: monitoring-influx-grafana
+  name: monitoring-influx-grafana-controller
 spec: 
   replicas: 1
   selector: 
@@ -24,7 +24,9 @@ spec:
             - containerPort: 8086
               hostPort: 8086
         - name: grafana
-          image: kubernetes/heapster_grafana:v0.4
+          image: kubernetes/heapster_grafana:v0.5
+          ports:
+              - containerPort: 80
           env: 
             - name: "HTTP_USER"
               value: "admin"
@@ -35,4 +37,6 @@ spec:
             - name: "INFLUXDB_HOST"
               value: '"+window.location.hostname+"/api/v1beta1/proxy/services/monitoring-influxdb'
             - name: "INFLUXDB_PORT"
+              value: ""
+            - name: "KUBERNETES_API_PORT"
               value: ""

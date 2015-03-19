@@ -16,12 +16,20 @@ spec:
         kubernetes.io/cluster-service: "true"
     spec: 
       containers: 
-        - image: kubernetes/heapster:v0.8
+        - image: kubernetes/heapster:v0.9
           name: heapster
           env: 
             - name: "INFLUXDB_HOST"
               value: "monitoring-influxdb"
-          ports: 
-            - containerPort: 5701
-              name: heapster
+            - name: "SINK"
+              value: "influxdb"
+          volumeMounts:
+            - name: ssl-certs
+              mountPath: /etc/ssl/certs
+              readOnly: true
+      volumes:
+        - name: ssl-certs
+          source:
+            hostDir:
+              path: /etc/ssl/certs
 
