@@ -739,14 +739,6 @@ function kube-push {
 
 }
 
-function setup-logging-firewall {
-  echo "TODO: setup logging"
-}
-
-function teardown-logging-firewall {
-  echo "TODO: teardown logging"
-}
-
 # -----------------------------------------------------------------------------
 # Cluster specific test helpers used from hack/e2e-test.sh
 
@@ -802,55 +794,6 @@ function restart-kube-proxy {
 # Restart the kube-apiserver on a node ($1)
 function restart-apiserver {
   ssh-to-node "$1" "sudo /etc/init.d/kube-apiserver restart"
-}
-
-function setup-logging-firewall {
-  # If logging with Fluentd to Elasticsearch is enabled then create pods
-  # and services for Elasticsearch (for ingesting logs) and Kibana (for
-  # viewing logs).
-  if [[ "${ENABLE_NODE_LOGGING-}" != "true" ]] || \
-     [[ "${LOGGING_DESTINATION-}" != "elasticsearch" ]] || \
-     [[ "${ENABLE_CLUSTER_LOGGING-}" != "true" ]]; then
-    return
-  fi
-
-  # TODO: Support logging
-  echo "Logging setup is not (yet) supported on AWS"
-
-#  detect-project
-#  gcloud compute firewall-rules create "${INSTANCE_PREFIX}-fluentd-elasticsearch-logging" --project "${PROJECT}" \
-#    --allow tcp:5601 tcp:9200 tcp:9300 --target-tags "${MINION_TAG}" --network="${NETWORK}"
-#
-#  # This should be nearly instant once kube-addons gets a chance to
-#  # run, and we already know we can hit the apiserver, but it's still
-#  # worth checking.
-#  echo "waiting for logging services to be created by the master."
-#  local kubectl="${KUBE_ROOT}/cluster/kubectl.sh"
-#  for i in `seq 1 10`; do
-#    if "${kubectl}" get services -l name=kibana-logging -o template -t {{range.items}}{{.id}}{{end}} | grep -q kibana-logging &&
-#      "${kubectl}" get services -l name=elasticsearch-logging -o template -t {{range.items}}{{.id}}{{end}} | grep -q elasticsearch-logging; then
-#      break
-#    fi
-#    sleep 10
-#  done
-#
-#  local -r region="${ZONE::-2}"
-#  local -r es_ip=$(gcloud compute forwarding-rules --project "${PROJECT}" describe --region "${region}" elasticsearch-logging | grep IPAddress | awk '{print $2}')
-#  local -r kibana_ip=$(gcloud compute forwarding-rules --project "${PROJECT}" describe --region "${region}" kibana-logging | grep IPAddress | awk '{print $2}')
-#  echo
-#  echo -e "${color_green}Cluster logs are ingested into Elasticsearch running at ${color_yellow}http://${es_ip}:9200"
-#  echo -e "${color_green}Kibana logging dashboard will be available at ${color_yellow}http://${kibana_ip}:5601${color_norm}"
-#  echo
-}
-
-function teardown-logging-firewall {
-  if [[ "${ENABLE_NODE_LOGGING-}" != "true" ]] || \
-     [[ "${LOGGING_DESTINATION-}" != "elasticsearch" ]] || \
-     [[ "${ENABLE_CLUSTER_LOGGING-}" != "true" ]]; then
-    return
-  fi
-
-  # TODO: Support logging
 }
 
 # Perform preparations required to run e2e tests

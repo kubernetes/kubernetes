@@ -343,11 +343,3 @@ function restart-apiserver {
 function prepare-e2e() {
   echo "Vagrant doesn't need special preparations for e2e tests" 1>&2
 }
-
-function setup-logging-firewall {
-  echo "TODO: setup logging"
-}
-
-function teardown-logging-firewall {
-  echo "TODO: teardown logging"
-}

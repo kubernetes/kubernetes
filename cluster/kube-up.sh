@@ -39,9 +39,8 @@ kube-up
 echo "... calling validate-cluster" >&2
 "${KUBE_ROOT}/cluster/validate-cluster.sh"
 
-echo "... calling setup-logging-firewall" >&2
-setup-logging-firewall
-
-echo "Done" >&2
+echo -e "Done, listing cluster services:\n" >&2
+"${KUBE_ROOT}/cluster/kubectl.sh" clusterinfo
+echo
 
 exit 0
