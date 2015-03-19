@@ -191,6 +191,12 @@ function kube-up {
 
   readonly machines=$(join , "${KUBE_MINION_IP_ADDRESSES[@]}")
 
+  etcd_servers=( $MASTER_IP ${MINION_IPS[@]} )
+  for (( i=0; i<${#etcd_servers[@]}; i++ )); do
+    etcd_servers[$i]=http://${etcd_servers[$i]}:4001
+  done
+  etcd_servers=$(join , ${etcd_servers[@]})
+
   local i
   for (( i = 0 ; i <= $NUM_MINIONS ; i++ )); do
     if [[ $i -eq $NUM_MINIONS ]]; then
