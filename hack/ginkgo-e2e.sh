@@ -110,6 +110,10 @@ if [[ -z "${AUTH_CONFIG:-}" ]];  then
       auth_config=(
         "--auth_config=${HOME}/.kube/${INSTANCE_PREFIX}/kubernetes_auth"
       )
+    elif [[ "${KUBERNETES_PROVIDER}" == "libvirt-coreos" ]]; then
+      auth_config=(
+        "--kubeconfig=${HOME}/.kube/.kubeconfig"
+      )
     elif [[ "${KUBERNETES_PROVIDER}" == "conformance_test" ]]; then
       auth_config=(
         "--auth_config=${KUBERNETES_CONFORMANCE_TEST_AUTH_CONFIG:-}"
@@ -118,12 +122,6 @@ if [[ -z "${AUTH_CONFIG:-}" ]];  then
     else
       auth_config=()
     fi
-
-    if [[ "$KUBERNETES_PROVIDER" == "libvirt-coreos" ]]; then
-        host="http://${KUBE_MASTER_IP-}:8080"
-    else
-        host="https://${KUBE_MASTER_IP-}"
-    fi
 else
   echo "Conformance Test.  No cloud-provider-specific preparation."
   KUBERNETES_PROVIDER=""
@@ -131,13 +129,15 @@ else
     "--auth_config=${AUTH_CONFIG:-}"
     "--cert_dir=${CERT_DIR:-}"
   )
-  host="https://${KUBE_MASTER_IP-}"
 fi
 
 # Use the kubectl binary from the same directory as the e2e binary.
+# The --host setting is used only when providing --auth_config
+# If --kubeconfig is used, the host to use is retrieved from the .kubeconfig
+# file and the one provided with --host is ignored.
 export PATH=$(dirname "${e2e}"):"${PATH}"
 "${e2e}" "${auth_config[@]:+${auth_config[@]}}" \
-  --host="$host" \
+  --host="https://${KUBE_MASTER_IP-}" \
   --provider="${KUBERNETES_PROVIDER}" \
   --gce_project="${PROJECT:-}" \
   --gce_zone="${ZONE:-}" \
