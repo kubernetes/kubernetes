@@ -131,6 +131,9 @@ else
 fi
 
 # Use the kubectl binary from the same directory as the e2e binary.
+# The --host setting is used only when providing --auth_config
+# If --kubeconfig is used, the host to use is retrieved from the .kubeconfig
+# file and the one provided with --host is ignored.
 export PATH=$(dirname "${e2e}"):"${PATH}"
 "${e2e}" "${auth_config[@]:+${auth_config[@]}}" \
   --host="https://${KUBE_MASTER_IP-}" \
