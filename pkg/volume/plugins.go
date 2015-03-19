@@ -29,19 +29,20 @@ import (
 	"github.com/golang/glog"
 )
 
-// Plugin is an interface to volume plugins.
-type Plugin interface {
+// VolumePlugin is an interface to volume plugins that can be used on a
+// kubernetes node (e.g. by kubelet) to instantiate and manage volumes.
+type VolumePlugin interface {
 	// Init initializes the plugin.  This will be called exactly once
 	// before any New* calls are made - implementations of plugins may
 	// depend on this.
-	Init(host Host)
+	Init(host VolumeHost)
 
 	// Name returns the plugin's name.  Plugins should use namespaced names
 	// such as "example.com/volume".  The "kubernetes.io" namespace is
 	// reserved for plugins which are bundled with kubernetes.
 	Name() string
 
-	// CanSupport tests whether the Plugin supports a given volume
+	// CanSupport tests whether the plugin supports a given volume
 	// specification from the API.  The spec pointer should be considered
 	// const.
 	CanSupport(spec *api.Volume) bool
@@ -58,8 +59,8 @@ type Plugin interface {
 	NewCleaner(name string, podUID types.UID) (Cleaner, error)
 }
 
-// Host is an interface that plugins can use to access the kubelet.
-type Host interface {
+// VolumeHost is an interface that plugins can use to access the kubelet.
+type VolumeHost interface {
 	// GetPluginDir returns the absolute path to a directory under which
 	// a given plugin may store data.  This directory might not actually
 	// exist on disk yet.  For plugin data that is per-pod, see
@@ -93,21 +94,21 @@ type Host interface {
 	NewWrapperCleaner(spec *api.Volume, podUID types.UID) (Cleaner, error)
 }
 
-// PluginMgr tracks registered plugins.
-type PluginMgr struct {
+// VolumePluginMgr tracks registered plugins.
+type VolumePluginMgr struct {
 	mutex   sync.Mutex
-	plugins map[string]Plugin
+	plugins map[string]VolumePlugin
 }
 
 // InitPlugins initializes each plugin.  All plugins must have unique names.
 // This must be called exactly once before any New* methods are called on any
 // plugins.
-func (pm *PluginMgr) InitPlugins(plugins []Plugin, host Host) error {
+func (pm *VolumePluginMgr) InitPlugins(plugins []VolumePlugin, host VolumeHost) error {
 	pm.mutex.Lock()
 	defer pm.mutex.Unlock()
 
 	if pm.plugins == nil {
-		pm.plugins = map[string]Plugin{}
+		pm.plugins = map[string]VolumePlugin{}
 	}
 
 	allErrs := []error{}
@@ -132,7 +133,7 @@ func (pm *PluginMgr) InitPlugins(plugins []Plugin, host Host) error {
 // FindPluginBySpec looks for a plugin that can support a given volume
 // specification.  If no plugins can support or more than one plugin can
 // support it, return error.
-func (pm *PluginMgr) FindPluginBySpec(spec *api.Volume) (Plugin, error) {
+func (pm *VolumePluginMgr) FindPluginBySpec(spec *api.Volume) (VolumePlugin, error) {
 	pm.mutex.Lock()
 	defer pm.mutex.Unlock()
 
@@ -153,7 +154,7 @@ func (pm *PluginMgr) FindPluginBySpec(spec *api.Volume) (Plugin, error) {
 
 // FindPluginByName fetches a plugin by name or by legacy name.  If no plugin
 // is found, returns error.
-func (pm *PluginMgr) FindPluginByName(name string) (Plugin, error) {
+func (pm *VolumePluginMgr) FindPluginByName(name string) (VolumePlugin, error) {
 	pm.mutex.Lock()
 	defer pm.mutex.Unlock()
 

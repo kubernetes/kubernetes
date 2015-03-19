@@ -22,18 +22,18 @@ import (
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/volume"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/mount"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume"
 )
 
 // The dir where volumes will be stored.
 const basePath = "/tmp/fake"
 
 // Construct an instance of a plugin, by name.
-func makePluginUnderTest(t *testing.T, plugName string) volume.Plugin {
-	plugMgr := volume.PluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), volume.NewFakeHost(basePath, nil, nil))
+func makePluginUnderTest(t *testing.T, plugName string) volume.VolumePlugin {
+	plugMgr := volume.VolumePluginMgr{}
+	plugMgr.InitPlugins(ProbeVolumePlugins(), volume.NewFakeVolumeHost(basePath, nil, nil))
 
 	plug, err := plugMgr.FindPluginByName(plugName)
 	if err != nil {

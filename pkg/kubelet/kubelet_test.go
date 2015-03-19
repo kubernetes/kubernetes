@@ -40,10 +40,10 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/dockertools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/metrics"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/network"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/volume"
-	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/volume/host_path"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume"
+	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/volume/host_path"
 	"github.com/fsouza/go-dockerclient"
 	cadvisorApi "github.com/google/cadvisor/info/v1"
 )
@@ -1022,7 +1022,7 @@ func TestSyncPodUnhealthy(t *testing.T) {
 func TestMountExternalVolumes(t *testing.T) {
 	testKubelet := newTestKubelet(t)
 	kubelet := testKubelet.kubelet
-	kubelet.volumePluginMgr.InitPlugins([]volume.Plugin{&volume.FakePlugin{"fake", nil}}, &volumeHost{kubelet})
+	kubelet.volumePluginMgr.InitPlugins([]volume.VolumePlugin{&volume.FakeVolumePlugin{"fake", nil}}, &volumeHost{kubelet})
 
 	pod := api.Pod{
 		ObjectMeta: api.ObjectMeta{
@@ -1057,8 +1057,8 @@ func TestMountExternalVolumes(t *testing.T) {
 func TestGetPodVolumesFromDisk(t *testing.T) {
 	testKubelet := newTestKubelet(t)
 	kubelet := testKubelet.kubelet
-	plug := &volume.FakePlugin{"fake", nil}
-	kubelet.volumePluginMgr.InitPlugins([]volume.Plugin{plug}, &volumeHost{kubelet})
+	plug := &volume.FakeVolumePlugin{"fake", nil}
+	kubelet.volumePluginMgr.InitPlugins([]volume.VolumePlugin{plug}, &volumeHost{kubelet})
 
 	volsOnDisk := []struct {
 		podUID  types.UID

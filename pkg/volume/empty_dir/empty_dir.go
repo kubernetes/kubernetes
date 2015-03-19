@@ -21,40 +21,40 @@ import (
 	"os"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/volume"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/mount"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume"
 )
 
 // This is the primary entrypoint for volume plugins.
-func ProbeVolumePlugins() []volume.Plugin {
+func ProbeVolumePlugins() []volume.VolumePlugin {
 	return ProbeVolumePluginsWithMounter(mount.New())
 }
 
 // ProbePluginsWithMounter is a convenience for testing other plugins which wrap this one.
 //FIXME: alternative: pass mount.Interface to all ProbeVolumePlugins() functions?  Opinions?
-func ProbeVolumePluginsWithMounter(mounter mount.Interface) []volume.Plugin {
-	return []volume.Plugin{
+func ProbeVolumePluginsWithMounter(mounter mount.Interface) []volume.VolumePlugin {
+	return []volume.VolumePlugin{
 		&emptyDirPlugin{nil, mounter, false},
 		&emptyDirPlugin{nil, mounter, true},
 	}
 }
 
 type emptyDirPlugin struct {
-	host       volume.Host
+	host       volume.VolumeHost
 	mounter    mount.Interface
 	legacyMode bool // if set, plugin answers to the legacy name
 }
 
-var _ volume.Plugin = &emptyDirPlugin{}
+var _ volume.VolumePlugin = &emptyDirPlugin{}
 
 const (
 	emptyDirPluginName       = "kubernetes.io/empty-dir"
 	emptyDirPluginLegacyName = "empty"
 )
 
-func (plugin *emptyDirPlugin) Init(host volume.Host) {
+func (plugin *emptyDirPlugin) Init(host volume.VolumeHost) {
 	plugin.host = host
 }
 

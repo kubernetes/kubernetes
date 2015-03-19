@@ -23,30 +23,30 @@ import (
 	"path"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/volume"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/exec"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume"
 	"github.com/golang/glog"
 )
 
 // This is the primary entrypoint for volume plugins.
-func ProbeVolumePlugins() []volume.Plugin {
-	return []volume.Plugin{&gitRepoPlugin{nil, false}, &gitRepoPlugin{nil, true}}
+func ProbeVolumePlugins() []volume.VolumePlugin {
+	return []volume.VolumePlugin{&gitRepoPlugin{nil, false}, &gitRepoPlugin{nil, true}}
 }
 
 type gitRepoPlugin struct {
-	host       volume.Host
+	host       volume.VolumeHost
 	legacyMode bool // if set, plugin answers to the legacy name
 }
 
-var _ volume.Plugin = &gitRepoPlugin{}
+var _ volume.VolumePlugin = &gitRepoPlugin{}
 
 const (
 	gitRepoPluginName       = "kubernetes.io/git-repo"
 	gitRepoPluginLegacyName = "git"
 )
 
-func (plugin *gitRepoPlugin) Init(host volume.Host) {
+func (plugin *gitRepoPlugin) Init(host volume.VolumeHost) {
 	plugin.host = host
 }
 

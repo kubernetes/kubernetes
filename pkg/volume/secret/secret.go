@@ -22,14 +22,14 @@ import (
 	"path"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/volume"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume"
 	"github.com/golang/glog"
 )
 
 // ProbeVolumePlugin is the entry point for plugin detection in a package.
-func ProbeVolumePlugins() []volume.Plugin {
-	return []volume.Plugin{&secretPlugin{}}
+func ProbeVolumePlugins() []volume.VolumePlugin {
+	return []volume.VolumePlugin{&secretPlugin{}}
 }
 
 const (
@@ -38,10 +38,10 @@ const (
 
 // secretPlugin implements the VolumePlugin interface.
 type secretPlugin struct {
-	host volume.Host
+	host volume.VolumeHost
 }
 
-func (plugin *secretPlugin) Init(host volume.Host) {
+func (plugin *secretPlugin) Init(host volume.VolumeHost) {
 	plugin.host = host
 }
 

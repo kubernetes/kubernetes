@@ -43,7 +43,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/envvars"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/metrics"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/network"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/volume"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/probe"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
@@ -51,6 +50,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	utilErrors "github.com/GoogleCloudPlatform/kubernetes/pkg/util/errors"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 	"github.com/fsouza/go-dockerclient"
 	"github.com/golang/glog"
@@ -101,7 +101,7 @@ type SyncHandler interface {
 
 type SourcesReadyFn func() bool
 
-type volumeMap map[string]volume.Interface
+type volumeMap map[string]volume.Volume
 
 // New creates a new Kubelet for use in main
 func NewMainKubelet(
@@ -118,7 +118,7 @@ func NewMainKubelet(
 	clusterDomain string,
 	clusterDNS net.IP,
 	masterServiceNamespace string,
-	volumePlugins []volume.Plugin,
+	volumePlugins []volume.VolumePlugin,
 	networkPlugins []network.NetworkPlugin,
 	networkPluginName string,
 	streamingConnectionIdleTimeout time.Duration,
@@ -308,7 +308,7 @@ type Kubelet struct {
 	serviceLister          serviceLister
 
 	// Volume plugins.
-	volumePluginMgr volume.PluginMgr
+	volumePluginMgr volume.VolumePluginMgr
 
 	// Network plugin
 	networkPlugin network.NetworkPlugin

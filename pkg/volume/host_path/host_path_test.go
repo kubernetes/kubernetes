@@ -20,13 +20,13 @@ import (
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/volume"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume"
 )
 
 func TestCanSupport(t *testing.T) {
-	plugMgr := volume.PluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), volume.NewFakeHost("fake", nil, nil))
+	plugMgr := volume.VolumePluginMgr{}
+	plugMgr.InitPlugins(ProbeVolumePlugins(), volume.NewFakeVolumeHost("fake", nil, nil))
 
 	plug, err := plugMgr.FindPluginByName("kubernetes.io/host-path")
 	if err != nil {
@@ -44,8 +44,8 @@ func TestCanSupport(t *testing.T) {
 }
 
 func TestPlugin(t *testing.T) {
-	plugMgr := volume.PluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), volume.NewFakeHost("fake", nil, nil))
+	plugMgr := volume.VolumePluginMgr{}
+	plugMgr.InitPlugins(ProbeVolumePlugins(), volume.NewFakeVolumeHost("fake", nil, nil))
 
 	plug, err := plugMgr.FindPluginByName("kubernetes.io/host-path")
 	if err != nil {
