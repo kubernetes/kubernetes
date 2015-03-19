@@ -19,12 +19,17 @@ package main
 import (
 	"runtime"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/healthz"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/version/verflag"
 	"github.com/GoogleCloudPlatform/kubernetes/plugin/cmd/kube-scheduler/app"
 
 	"github.com/spf13/pflag"
 )
+
+func init() {
+	healthz.DefaultHealthz()
+}
 
 func main() {
 	runtime.GOMAXPROCS(runtime.NumCPU())
