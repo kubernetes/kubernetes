@@ -2015,44 +2015,40 @@ func (kl *Kubelet) GetPodStatus(podFullName string, uid types.UID) (api.PodStatu
 
 func (kl *Kubelet) generatePodStatus(podFullName string, uid types.UID) (api.PodStatus, error) {
 	glog.V(3).Infof("Generating status for %s", podFullName)
-	var podStatus api.PodStatus
+
 	spec, found := kl.GetPodByFullName(podFullName)
 	if !found {
-		return podStatus, fmt.Errorf("Couldn't find spec for pod %s", podFullName)
+		return api.PodStatus{}, fmt.Errorf("Couldn't find spec for pod %s", podFullName)
 	}
 
-	info, err := dockertools.GetDockerPodInfo(kl.dockerClient, *spec, podFullName, uid)
+	podStatus, err := dockertools.GetDockerPodStatus(kl.dockerClient, *spec, podFullName, uid)
 
 	if err != nil {
 		// Error handling
 		glog.Infof("Query docker container info for pod %s failed with error (%v)", podFullName, err)
 		if strings.Contains(err.Error(), "resource temporarily unavailable") {
 			// Leave upstream layer to decide what to do
-			return podStatus, err
+			return api.PodStatus{}, err
 		} else {
-			podStatus.Phase = api.PodPending
-			podStatus.Message = fmt.Sprintf("Query docker container info failed with error (%v)", err)
-			return podStatus, nil
+			pendingStatus := api.PodStatus{
+				Phase:   api.PodPending,
+				Message: fmt.Sprintf("Query docker container info failed with error (%v)", err),
+			}
+			return pendingStatus, nil
 		}
 	}
 
 	// Assume info is ready to process
-	podStatus.Phase = getPhase(spec, info)
-	podStatus.Info = api.PodInfo{}
+	podStatus.Phase = getPhase(spec, podStatus.Info)
 	for _, c := range spec.Containers {
-		containerStatus := info[c.Name]
+		containerStatus := podStatus.Info[c.Name]
 		containerStatus.Ready = kl.readiness.IsReady(containerStatus)
 		podStatus.Info[c.Name] = containerStatus
 	}
 	podStatus.Conditions = append(podStatus.Conditions, getPodReadyCondition(spec, podStatus.Info)...)
-
-	netContainerInfo, found := info[dockertools.PodInfraContainerName]
-	if found {
-		podStatus.PodIP = netContainerInfo.PodIP
-	}
 	podStatus.Host = kl.hostname
 
-	return podStatus, nil
+	return *podStatus, nil
 }
 
 // Returns logs of current machine.

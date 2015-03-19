@@ -457,9 +457,6 @@ type ContainerStatus struct {
 	// Note that this is calculated from dead containers.  But those containers are subject to
 	// garbage collection.  This value will get capped at 5 by GC.
 	RestartCount int `json:"restartCount"`
-	// TODO(dchen1107): Deprecated this soon once we pull entire PodStatus from node,
-	// not just PodInfo. Now we need this to remove docker.Container from API
-	PodIP string `json:"podIP,omitempty"`
 	// TODO(dchen1107): Need to decide how to represent this in v1beta3
 	Image       string `json:"image"`
 	ImageID     string `json:"imageID" description:"ID of the container's image"`

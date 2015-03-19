@@ -636,7 +636,7 @@ func TestSyncPodsWithPodInfraCreatesContainer(t *testing.T) {
 	waitGroup.Wait()
 
 	verifyCalls(t, fakeDocker, []string{
-		"list", "list", "list", "inspect_container", "inspect_image", "list", "create", "start", "list", "inspect_container", "inspect_container"})
+		"list", "list", "list", "inspect_container", "list", "create", "start", "list", "inspect_container", "inspect_container"})
 
 	fakeDocker.Lock()
 	if len(fakeDocker.Created) != 1 ||
@@ -693,7 +693,7 @@ func TestSyncPodsWithPodInfraCreatesContainerCallsHandler(t *testing.T) {
 	waitGroup.Wait()
 
 	verifyCalls(t, fakeDocker, []string{
-		"list", "list", "list", "inspect_container", "inspect_image", "list", "create", "start", "list", "inspect_container", "inspect_container"})
+		"list", "list", "list", "inspect_container", "list", "create", "start", "list", "inspect_container", "inspect_container"})
 
 	fakeDocker.Lock()
 	if len(fakeDocker.Created) != 1 ||
