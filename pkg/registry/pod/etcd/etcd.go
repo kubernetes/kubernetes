@@ -30,12 +30,11 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/pod"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
 
 // rest implements a RESTStorage for pods against etcd
 type REST struct {
-	store *etcdgeneric.Etcd
+	etcdgeneric.Etcd
 }
 
 // NewREST returns a RESTStorage object that will work against pods.
@@ -71,61 +70,21 @@ func NewREST(h tools.EtcdHelper) (*REST, *BindingREST, *StatusREST) {
 
 	statusStore.UpdateStrategy = pod.StatusStrategy
 
-	return &REST{store: store}, &BindingREST{store: store}, &StatusREST{store: &statusStore}
-}
-
-// WithPodStatus returns a rest object that decorates returned responses with extra
-// status information.
-func (r *REST) WithPodStatus(cache pod.PodStatusGetter) *REST {
-	store := *r.store
-	store.Decorator = pod.PodStatusDecorator(cache)
-	store.AfterDelete = rest.AllFuncs(store.AfterDelete, pod.PodStatusReset(cache))
-	return &REST{store: &store}
-}
-
-// New returns a new object
-func (r *REST) New() runtime.Object {
-	return r.store.NewFunc()
-}
-
-// NewList returns a new list object
-func (r *REST) NewList() runtime.Object {
-	return r.store.NewListFunc()
-}
-
-// List obtains a list of pods with labels that match selector.
-func (r *REST) List(ctx api.Context, label labels.Selector, field fields.Selector) (runtime.Object, error) {
-	return r.store.List(ctx, label, field)
-}
-
-// Watch begins watching for new, changed, or deleted pods.
-func (r *REST) Watch(ctx api.Context, label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
-	return r.store.Watch(ctx, label, field, resourceVersion)
-}
-
-// Get gets a specific pod specified by its ID.
-func (r *REST) Get(ctx api.Context, name string) (runtime.Object, error) {
-	return r.store.Get(ctx, name)
-}
-
-// Create creates a pod based on a specification.
-func (r *REST) Create(ctx api.Context, obj runtime.Object) (runtime.Object, error) {
-	return r.store.Create(ctx, obj)
-}
-
-// Update changes a pod specification.
-func (r *REST) Update(ctx api.Context, obj runtime.Object) (runtime.Object, bool, error) {
-	return r.store.Update(ctx, obj)
-}
-
-// Delete deletes an existing pod specified by its ID.
-func (r *REST) Delete(ctx api.Context, name string) (runtime.Object, error) {
-	return r.store.Delete(ctx, name)
+	return &REST{*store}, &BindingREST{store: store}, &StatusREST{store: &statusStore}
 }
 
 // ResourceLocation returns a pods location from its HostIP
 func (r *REST) ResourceLocation(ctx api.Context, name string) (string, error) {
 	return pod.ResourceLocation(r, ctx, name)
+}
+
+// WithPodStatus returns a rest object that decorates returned responses with extra
+// status information.
+func (r *REST) WithPodStatus(cache pod.PodStatusGetter) *REST {
+	store := *r
+	store.Decorator = pod.PodStatusDecorator(cache)
+	store.AfterDelete = rest.AllFuncs(store.AfterDelete, pod.PodStatusReset(cache))
+	return &store
 }
 
 // BindingREST implements the REST endpoint for binding pods to nodes when etcd is in use.
