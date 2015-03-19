@@ -53,7 +53,6 @@ import (
 	"io/ioutil"
 	"path"
 	"strings"
-	"syscall"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/dockertools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/network"
@@ -72,7 +71,6 @@ const (
 	setUpCmd    = "setup"
 	tearDownCmd = "teardown"
 	execDir     = "/usr/libexec/kubernetes/kubelet-plugins/net/exec/"
-	X_OK        = 0x1
 )
 
 func ProbeNetworkPlugins() []network.NetworkPlugin {
@@ -120,7 +118,7 @@ func (plugin *execNetworkPlugin) Name() string {
 }
 
 func (plugin *execNetworkPlugin) validate() error {
-	if syscall.Access(plugin.getExecutable(), X_OK) != nil {
+	if !isExecutable(plugin.getExecutable()) {
 		errStr := fmt.Sprintf("Invalid exec plugin. Executable '%s' does not have correct permissions.", plugin.execName)
 		return errors.New(errStr)
 	}
