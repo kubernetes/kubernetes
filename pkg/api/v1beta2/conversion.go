@@ -1303,6 +1303,48 @@ func init() {
 			out.PodID = in.Name
 			return nil
 		},
+		func(in *newer.AutoScaler, out *AutoScaler, s conversion.Scope) error {
+			if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.ObjectMeta, &out.TypeMeta, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.Labels, &out.Labels, 0); err != nil {
+				return err
+			}
+
+			if err := s.Convert(&in.Spec, &out.Spec, 0); err != nil {
+				return err
+			}
+
+			if err := s.Convert(&in.Status, &out.Status, 0); err != nil {
+				return err
+			}
+
+			return nil
+		},
+		func(in *AutoScaler, out *newer.AutoScaler, s conversion.Scope) error {
+			if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.TypeMeta, &out.ObjectMeta, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.Labels, &out.Labels, 0); err != nil {
+				return err
+			}
+
+			if err := s.Convert(&in.Spec, &out.Spec, 0); err != nil {
+				return err
+			}
+
+			if err := s.Convert(&in.Status, &out.Status, 0); err != nil {
+				return err
+			}
+
+			return nil
+		},
 	)
 	if err != nil {
 		// If one of the conversion functions is malformed, detect it immediately.
