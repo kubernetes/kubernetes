@@ -17,26 +17,30 @@ limitations under the License.
 package gce_pd
 
 import (
-	"os"
 	"path"
 	"strconv"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/exec"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/mount"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume"
-	"github.com/golang/glog"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume/network_volume"
 )
 
 // This is the primary entrypoint for volume plugins.
 func ProbeVolumePlugins() []volume.VolumePlugin {
-	return []volume.VolumePlugin{&gcePersistentDiskPlugin{nil}}
+	return []volume.VolumePlugin{
+		&gcePersistentDiskPlugin{
+			NetworkVolumePlugin: &network_volume.NetworkVolumePlugin{
+				PluginName: gcePersistentDiskPluginName,
+				Host:       nil},
+		},
+	}
 }
 
 type gcePersistentDiskPlugin struct {
-	host volume.VolumeHost
+	*network_volume.NetworkVolumePlugin
 }
 
 var _ volume.VolumePlugin = &gcePersistentDiskPlugin{}
@@ -44,14 +48,6 @@ var _ volume.VolumePlugin = &gcePersistentDiskPlugin{}
 const (
 	gcePersistentDiskPluginName = "kubernetes.io/gce-pd"
 )
-
-func (plugin *gcePersistentDiskPlugin) Init(host volume.VolumeHost) {
-	plugin.host = host
-}
-
-func (plugin *gcePersistentDiskPlugin) Name() string {
-	return gcePersistentDiskPluginName
-}
 
 func (plugin *gcePersistentDiskPlugin) CanSupport(spec *volume.Spec) bool {
 	return spec.VolumeSource.GCEPersistentDisk != nil || spec.PersistentVolumeSource.GCEPersistentDisk != nil
@@ -86,16 +82,21 @@ func (plugin *gcePersistentDiskPlugin) newBuilderInternal(spec *volume.Spec, pod
 	readOnly := gce.ReadOnly
 
 	return &gcePersistentDisk{
-		podUID:      podUID,
-		volName:     spec.Name,
-		pdName:      pdName,
-		fsType:      fsType,
-		partition:   partition,
-		readOnly:    readOnly,
-		manager:     manager,
-		mounter:     mounter,
-		diskMounter: &gceSafeFormatAndMount{mounter, exec.New()},
-		plugin:      plugin,
+		NetworkVolume: &network_volume.NetworkVolume{
+			VolName: spec.Name,
+			Plugin:  plugin,
+			PodUID:  podUID,
+			Mounter: &gceNetworkVolumeMounter{
+				Interface:    mounter,
+				globalPDPath: makeGlobalPDName(plugin.GetHost(), pdName),
+				pdName:       pdName,
+				readOnly:     readOnly,
+				manager:      manager,
+				diskMounter:  &gceSafeFormatAndMount{mounter, exec.New()},
+				partition:    partition,
+				fsType:       fsType,
+			},
+		},
 	}, nil
 }
 
@@ -106,169 +107,84 @@ func (plugin *gcePersistentDiskPlugin) NewCleaner(volName string, podUID types.U
 
 func (plugin *gcePersistentDiskPlugin) newCleanerInternal(volName string, podUID types.UID, manager pdManager, mounter mount.Interface) (volume.Cleaner, error) {
 	return &gcePersistentDisk{
-		podUID:      podUID,
-		volName:     volName,
-		manager:     manager,
-		mounter:     mounter,
-		diskMounter: &gceSafeFormatAndMount{mounter, exec.New()},
-		plugin:      plugin,
+		NetworkVolume: &network_volume.NetworkVolume{
+			VolName: volName,
+			Plugin:  plugin,
+			PodUID:  podUID,
+			Mounter: &gceNetworkVolumeMounter{
+				Interface:   mounter,
+				manager:     manager,
+				diskMounter: &gceSafeFormatAndMount{mounter, exec.New()},
+			},
+		},
 	}, nil
 }
 
 // Abstract interface to PD operations.
 type pdManager interface {
 	// Attaches the disk to the kubelet's host machine.
-	AttachAndMountDisk(pd *gcePersistentDisk, globalPDPath string) error
+	AttachAndMountDisk(mounter *gceNetworkVolumeMounter) error
 	// Detaches the disk from the kubelet's host machine.
-	DetachDisk(pd *gcePersistentDisk) error
+	DetachDisk(mounter *gceNetworkVolumeMounter) error
 }
 
 // gcePersistentDisk volumes are disk resources provided by Google Compute Engine
 // that are attached to the kubelet's host machine and exposed to the pod.
 type gcePersistentDisk struct {
-	volName string
-	podUID  types.UID
-	// Unique identifier of the PD, used to find the disk resource in the provider.
-	pdName string
-	// Filesystem type, optional.
-	fsType string
-	// Specifies the partition to mount
-	partition string
-	// Specifies whether the disk will be attached as read-only.
-	readOnly bool
-	// Utility interface that provides API calls to the provider to attach/detach disks.
-	manager pdManager
-	// Mounter interface that provides system calls to mount the global path to the pod local path.
-	mounter mount.Interface
-	// diskMounter provides the interface that is used to mount the actual block device.
-	diskMounter mount.Interface
-	plugin      *gcePersistentDiskPlugin
+	*network_volume.NetworkVolume
 }
 
-func detachDiskLogError(pd *gcePersistentDisk) {
-	err := pd.manager.DetachDisk(pd)
-	if err != nil {
-		glog.Warningf("Failed to detach disk: %v (%v)", pd, err)
-	}
-}
-
-// SetUp attaches the disk and bind mounts to the volume path.
-func (pd *gcePersistentDisk) SetUp() error {
-	return pd.SetUpAt(pd.GetPath())
-}
-
-// SetUpAt attaches the disk and bind mounts to the volume path.
-func (pd *gcePersistentDisk) SetUpAt(dir string) error {
-	// TODO: handle failed mounts here.
-	mountpoint, err := pd.mounter.IsMountPoint(dir)
-	glog.V(4).Infof("PersistentDisk set up: %s %v %v", dir, mountpoint, err)
-	if err != nil && !os.IsNotExist(err) {
-		return err
-	}
-	if mountpoint {
-		return nil
-	}
-
-	globalPDPath := makeGlobalPDName(pd.plugin.host, pd.pdName)
-	if err := pd.manager.AttachAndMountDisk(pd, globalPDPath); err != nil {
-		return err
-	}
-
-	if err := os.MkdirAll(dir, 0750); err != nil {
-		// TODO: we should really eject the attach/detach out into its own control loop.
-		detachDiskLogError(pd)
-		return err
-	}
-
-	// Perform a bind mount to the full path to allow duplicate mounts of the same PD.
-	options := []string{"bind"}
-	if pd.readOnly {
-		options = append(options, "ro")
-	}
-	err = pd.mounter.Mount(globalPDPath, dir, "", options)
-	if err != nil {
-		mountpoint, mntErr := pd.mounter.IsMountPoint(dir)
-		if mntErr != nil {
-			glog.Errorf("isMountpoint check failed: %v", mntErr)
-			return err
-		}
-		if mountpoint {
-			if mntErr = pd.mounter.Unmount(dir); mntErr != nil {
-				glog.Errorf("Failed to unmount: %v", mntErr)
-				return err
-			}
-			mountpoint, mntErr := pd.mounter.IsMountPoint(dir)
-			if mntErr != nil {
-				glog.Errorf("isMountpoint check failed: %v", mntErr)
-				return err
-			}
-			if mountpoint {
-				// This is very odd, we don't expect it.  We'll try again next sync loop.
-				glog.Errorf("%s is still mounted, despite call to unmount().  Will try again next sync loop.", dir)
-				return err
-			}
-		}
-		os.Remove(dir)
-		// TODO: we should really eject the attach/detach out into its own control loop.
-		detachDiskLogError(pd)
-		return err
-	}
-
-	return nil
-}
-
+// Create a global unique path for this disk to be mounted on.
 func makeGlobalPDName(host volume.VolumeHost, devName string) string {
 	return path.Join(host.GetPluginDir(gcePersistentDiskPluginName), "mounts", devName)
 }
 
-func (pd *gcePersistentDisk) GetPath() string {
-	name := gcePersistentDiskPluginName
-	return pd.plugin.host.GetPodVolumeDir(pd.podUID, util.EscapeQualifiedNameForDisk(name), pd.volName)
+type gceNetworkVolumeMounter struct {
+	// Mounter interface that provides system calls to mount the global path to the pod local path.
+	mount.Interface
+	// Globally unique path on which the disk will be mounted.
+	globalPDPath string
+	// Utility interface that provides API calls to the provider to attach/detach disks.
+	manager pdManager
+	// Unique identifier of the PD, used to find the disk resource in the provider.
+	pdName string
+	// Specifies whether the disk will be attached as read-only.
+	readOnly bool
+	// diskMounter provides the interface that is used to mount the actual block device.
+	diskMounter mount.Interface
+	// Specifies the partition to mount
+	partition string
+	// Filesystem type, optional.
+	fsType string
 }
 
-// Unmounts the bind mount, and detaches the disk only if the PD
-// resource was the last reference to that disk on the kubelet.
-func (pd *gcePersistentDisk) TearDown() error {
-	return pd.TearDownAt(pd.GetPath())
+// Attaches the disk and bind mounts to the volume path.
+func (mounter *gceNetworkVolumeMounter) MountVolume(dest string) error {
+	// Perform a bind mount to the full path to allow duplicate mounts of the same PD.
+	options := []string{"bind"}
+	if mounter.readOnly {
+		options = append(options, "ro")
+	}
+	return mounter.Mount(mounter.globalPDPath, dest, "", options)
 }
 
-// Unmounts the bind mount, and detaches the disk only if the PD
-// resource was the last reference to that disk on the kubelet.
-func (pd *gcePersistentDisk) TearDownAt(dir string) error {
-	mountpoint, err := pd.mounter.IsMountPoint(dir)
-	if err != nil {
-		return err
-	}
-	if !mountpoint {
-		return os.Remove(dir)
-	}
+// UnmountVolume unmounts the volume
+func (mounter *gceNetworkVolumeMounter) UnmountVolume(dir string) error {
+	return mounter.Unmount(dir)
+}
 
-	refs, err := mount.GetMountRefs(pd.mounter, dir)
-	if err != nil {
-		return err
-	}
-	// Unmount the bind-mount inside this pod
-	if err := pd.mounter.Unmount(dir); err != nil {
-		return err
-	}
-	// If len(refs) is 1, then all bind mounts have been removed, and the
-	// remaining reference is the global mount. It is safe to detach.
-	if len(refs) == 1 {
-		// pd.pdName is not initially set for volume-cleaners, so set it here.
-		pd.pdName = path.Base(refs[0])
-		if err := pd.manager.DetachDisk(pd); err != nil {
-			return err
-		}
-	}
-	mountpoint, mntErr := pd.mounter.IsMountPoint(dir)
-	if mntErr != nil {
-		glog.Errorf("isMountpoint check failed: %v", mntErr)
-		return err
-	}
-	if !mountpoint {
-		if err := os.Remove(dir); err != nil {
-			return err
-		}
-	}
-	return nil
+func (mounter *gceNetworkVolumeMounter) AttachVolume() error {
+	// Attach the PD to this kubelet at the global path
+	return mounter.manager.AttachAndMountDisk(mounter)
+}
+
+func (mounter *gceNetworkVolumeMounter) DetachVolume(globalPath string) error {
+	// pdName is not initially set for volume-cleaners, so set it here.
+	mounter.pdName = path.Base(globalPath)
+	mounter.globalPDPath = globalPath
+	return mounter.manager.DetachDisk(mounter)
+}
+
+func (mounter *gceNetworkVolumeMounter) GetGlobalPath() string {
+	return mounter.globalPDPath
 }

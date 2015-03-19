@@ -17,6 +17,7 @@ limitations under the License.
 package gce_pd
 
 import (
+	"fmt"
 	"os"
 	"testing"
 
@@ -68,28 +69,32 @@ func contains(modes []api.PersistentVolumeAccessMode, mode api.PersistentVolumeA
 }
 
 type fakePDManager struct {
-	attachCalled bool
-	detachCalled bool
+	attachCalled        bool
+	detachCalled        bool
+	mountedGlobalPDPath string
 }
 
 // TODO(jonesdl) To fully test this, we could create a loopback device
 // and mount that instead.
-func (fake *fakePDManager) AttachAndMountDisk(pd *gcePersistentDisk, globalPDPath string) error {
-	globalPath := makeGlobalPDName(pd.plugin.host, pd.pdName)
-	err := os.MkdirAll(globalPath, 0750)
+func (fake *fakePDManager) AttachAndMountDisk(mounter *gceNetworkVolumeMounter) error {
+	err := os.MkdirAll(mounter.globalPDPath, 0750)
 	if err != nil {
 		return err
 	}
 	fake.attachCalled = true
 	// Simulate the global mount so that the fakeMounter returns the
 	// expected number of mounts for the attached disk.
-	pd.mounter.Mount(globalPath, globalPath, pd.fsType, nil)
+	mounter.Mount(mounter.globalPDPath, mounter.globalPDPath, mounter.fsType, nil)
+	fake.mountedGlobalPDPath = mounter.globalPDPath
 	return nil
 }
 
-func (fake *fakePDManager) DetachDisk(pd *gcePersistentDisk) error {
-	globalPath := makeGlobalPDName(pd.plugin.host, pd.pdName)
-	err := os.RemoveAll(globalPath)
+func (fake *fakePDManager) DetachDisk(mounter *gceNetworkVolumeMounter) error {
+	if mounter.globalPDPath != fake.mountedGlobalPDPath {
+		return fmt.Errorf("incorrect globalPDPath (%s)", mounter.globalPDPath)
+	}
+
+	err := os.RemoveAll(mounter.globalPDPath)
 	if err != nil {
 		return err
 	}
@@ -150,7 +155,6 @@ func TestPlugin(t *testing.T) {
 		t.Errorf("Attach watch not called")
 	}
 
-	fakeManager = &fakePDManager{}
 	cleaner, err := plug.(*gcePersistentDiskPlugin).newCleanerInternal("vol1", types.UID("poduid"), fakeManager, fakeMounter)
 	if err != nil {
 		t.Errorf("Failed to make a new Cleaner: %v", err)

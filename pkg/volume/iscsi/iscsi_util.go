@@ -74,22 +74,18 @@ func makePDNameInternal(host volume.VolumeHost, portal string, iqn string, lun s
 
 type ISCSIUtil struct{}
 
-func (util *ISCSIUtil) MakeGlobalPDName(iscsi iscsiDisk) string {
-	return makePDNameInternal(iscsi.plugin.host, iscsi.portal, iscsi.iqn, iscsi.lun)
-}
-
-func (util *ISCSIUtil) AttachDisk(iscsi iscsiDisk) error {
-	devicePath := strings.Join([]string{"/dev/disk/by-path/ip", iscsi.portal, "iscsi", iscsi.iqn, "lun", iscsi.lun}, "-")
+func (util *ISCSIUtil) AttachDisk(mounter *iscsiNetworkVolumeMounter) error {
+	devicePath := strings.Join([]string{"/dev/disk/by-path/ip", mounter.portal, "iscsi", mounter.iqn, "lun", mounter.lun}, "-")
 	exist := waitForPathToExist(devicePath, 1)
 	if exist == false {
 		// discover iscsi target
-		out, err := iscsi.plugin.execCommand("iscsiadm", []string{"-m", "discovery", "-t", "sendtargets", "-p", iscsi.portal})
+		out, err := mounter.plugin.execCommand("iscsiadm", []string{"-m", "discovery", "-t", "sendtargets", "-p", mounter.portal})
 		if err != nil {
-			glog.Errorf("iscsi: failed to sendtargets to portal %s error: %s", iscsi.portal, string(out))
+			glog.Errorf("iscsi: failed to sendtargets to portal %s error: %s", mounter.portal, string(out))
 			return err
 		}
 		// login to iscsi target
-		out, err = iscsi.plugin.execCommand("iscsiadm", []string{"-m", "node", "-p", iscsi.portal, "-T", iscsi.iqn, "--login"})
+		out, err = mounter.plugin.execCommand("iscsiadm", []string{"-m", "node", "-p", mounter.portal, "-T", mounter.iqn, "--login"})
 		if err != nil {
 			glog.Errorf("iscsi: failed to attach disk:Error: %s (%v)", string(out), err)
 			return err
@@ -100,8 +96,8 @@ func (util *ISCSIUtil) AttachDisk(iscsi iscsiDisk) error {
 		}
 	}
 	// mount it
-	globalPDPath := iscsi.manager.MakeGlobalPDName(iscsi)
-	mountpoint, err := iscsi.mounter.IsMountPoint(globalPDPath)
+	globalPDPath := mounter.globalPDPath
+	mountpoint, err := mounter.IsMountPoint(globalPDPath)
 	if mountpoint {
 		glog.Infof("iscsi: %s already mounted", globalPDPath)
 		return nil
@@ -112,21 +108,23 @@ func (util *ISCSIUtil) AttachDisk(iscsi iscsiDisk) error {
 		return err
 	}
 
-	err = iscsi.mounter.Mount(devicePath, globalPDPath, iscsi.fsType, nil)
+	err = mounter.Mount(devicePath, globalPDPath, mounter.fsType, nil)
 	if err != nil {
-		glog.Errorf("iscsi: failed to mount iscsi volume %s [%s] to %s, error %v", devicePath, iscsi.fsType, globalPDPath, err)
+		glog.Errorf("iscsi: failed to mount iscsi volume %s [%s] to %s, error %v", devicePath, mounter.fsType, globalPDPath, err)
 	}
 
 	return err
 }
 
-func (util *ISCSIUtil) DetachDisk(iscsi iscsiDisk, mntPath string) error {
-	device, cnt, err := mount.GetDeviceNameFromMount(iscsi.mounter, mntPath)
+func (util *ISCSIUtil) DetachDisk(mounter *iscsiNetworkVolumeMounter) error {
+	mntPath := mounter.globalPDPath
+	device, cnt, err := mount.GetDeviceNameFromMount(mounter, mntPath)
 	if err != nil {
 		glog.Errorf("iscsi detach disk: failed to get device from mnt: %s\nError: %v", mntPath, err)
 		return err
 	}
-	if err = iscsi.mounter.Unmount(mntPath); err != nil {
+
+	if err = mounter.Unmount(mntPath); err != nil {
 		glog.Errorf("iscsi detach disk: failed to unmount: %s\nError: %v", mntPath, err)
 		return err
 	}
@@ -136,7 +134,7 @@ func (util *ISCSIUtil) DetachDisk(iscsi iscsiDisk, mntPath string) error {
 		// strip -lun- from device path
 		ind := strings.LastIndex(device, "-lun-")
 		prefix := device[:(ind - 1)]
-		refCount, err := getDevicePrefixRefCount(iscsi.mounter, prefix)
+		refCount, err := getDevicePrefixRefCount(mounter, prefix)
 
 		if err == nil && refCount == 0 {
 			// this portal/iqn are no longer referenced, log out
@@ -146,7 +144,7 @@ func (util *ISCSIUtil) DetachDisk(iscsi iscsiDisk, mntPath string) error {
 			iqn := device[ind1+len("-iscsi-") : ind]
 
 			glog.Infof("iscsi: log out target %s iqn %s", portal, iqn)
-			out, err := iscsi.plugin.execCommand("iscsiadm", []string{"-m", "node", "-p", portal, "-T", iqn, "--logout"})
+			out, err := mounter.plugin.execCommand("iscsiadm", []string{"-m", "node", "-p", portal, "-T", iqn, "--logout"})
 			if err != nil {
 				glog.Errorf("iscsi: failed to detach disk Error: %s", string(out))
 			}

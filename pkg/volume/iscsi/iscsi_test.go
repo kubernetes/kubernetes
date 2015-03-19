@@ -17,6 +17,7 @@ limitations under the License.
 package iscsi
 
 import (
+	"fmt"
 	"os"
 	"testing"
 
@@ -65,30 +66,33 @@ func contains(modes []api.PersistentVolumeAccessMode, mode api.PersistentVolumeA
 }
 
 type fakeDiskManager struct {
-	attachCalled bool
-	detachCalled bool
+	attachCalled        bool
+	detachCalled        bool
+	mountedGlobalPDPath string
 }
 
 func (fake *fakeDiskManager) MakeGlobalPDName(disk iscsiDisk) string {
 	return "/tmp/fake_iscsi_path"
 }
-func (fake *fakeDiskManager) AttachDisk(disk iscsiDisk) error {
-	globalPath := disk.manager.MakeGlobalPDName(disk)
+func (fake *fakeDiskManager) AttachDisk(mounter *iscsiNetworkVolumeMounter) error {
+	globalPath := mounter.globalPDPath
 	err := os.MkdirAll(globalPath, 0750)
 	if err != nil {
 		return err
 	}
 	// Simulate the global mount so that the fakeMounter returns the
 	// expected number of mounts for the attached disk.
-	disk.mounter.Mount(globalPath, globalPath, disk.fsType, nil)
-
+	mounter.Mount(globalPath, globalPath, mounter.fsType, nil)
+	fake.mountedGlobalPDPath = mounter.globalPDPath
 	fake.attachCalled = true
 	return nil
 }
 
-func (fake *fakeDiskManager) DetachDisk(disk iscsiDisk, mntPath string) error {
-	globalPath := disk.manager.MakeGlobalPDName(disk)
-	err := os.RemoveAll(globalPath)
+func (fake *fakeDiskManager) DetachDisk(mounter *iscsiNetworkVolumeMounter) error {
+	if mounter.globalPDPath != fake.mountedGlobalPDPath {
+		return fmt.Errorf("incorrect globalPDPath (%s)", mounter.globalPDPath)
+	}
+	err := os.RemoveAll(mounter.globalPDPath)
 	if err != nil {
 		return err
 	}
@@ -140,7 +144,6 @@ func doTestPlugin(t *testing.T, spec *volume.Spec) {
 		t.Errorf("Attach was not called")
 	}
 
-	fakeManager = &fakeDiskManager{}
 	cleaner, err := plug.(*iscsiPlugin).newCleanerInternal("vol1", types.UID("poduid"), fakeManager, fakeMounter)
 	if err != nil {
 		t.Errorf("Failed to make a new Cleaner: %v", err)
