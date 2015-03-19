@@ -180,6 +180,8 @@ type VolumeSource struct {
 	GitRepo *GitRepoVolumeSource `json:"gitRepo"`
 	// Secret represents a secret that should populate this volume.
 	Secret *SecretVolumeSource `json:"secret"`
+	// NFS represents an NFS mount on the host that shares a pod's lifetime
+	NFS *NFSVolumeSource `json:"nfs"`
 }
 
 // HostPathVolumeSource represents a host directory mapped into a pod.
@@ -254,6 +256,19 @@ type GitRepoVolumeSource struct {
 type SecretVolumeSource struct {
 	// Reference to a Secret
 	Target ObjectReference `json:"target"`
+}
+
+// NFSVolumeSource represents an NFS Mount that lasts the lifetime of a pod
+type NFSVolumeSource struct {
+	// Server is the hostname or IP address of the NFS server
+	Server string `json:"server"`
+
+	// Path is the exported NFS share
+	Path string `json:"path"`
+
+	// Optional: Defaults to false (read/write). ReadOnly here will force
+	// the NFS export to be mounted with read-only permissions
+	ReadOnly bool `json:"readOnly,omitempty"`
 }
 
 // ContainerPort represents a network port in a single container

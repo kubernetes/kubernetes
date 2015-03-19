@@ -18,6 +18,7 @@ package validation
 
 import (
 	"fmt"
+	"path"
 	"strings"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -290,6 +291,10 @@ func validateSource(source *api.VolumeSource) errs.ValidationErrorList {
 		numVolumes++
 		allErrs = append(allErrs, validateSecretVolumeSource(source.Secret).Prefix("secret")...)
 	}
+	if source.NFS != nil {
+		numVolumes++
+		allErrs = append(allErrs, validateNFS(source.NFS).Prefix("nfs")...)
+	}
 	if numVolumes != 1 {
 		allErrs = append(allErrs, errs.NewFieldInvalid("", source, "exactly 1 volume type is required"))
 	}
@@ -336,6 +341,20 @@ func validateSecretVolumeSource(secretSource *api.SecretVolumeSource) errs.Valid
 	}
 	if secretSource.Target.Kind != "Secret" {
 		allErrs = append(allErrs, errs.NewFieldInvalid("target.kind", secretSource.Target.Kind, "Secret"))
+	}
+	return allErrs
+}
+
+func validateNFS(nfs *api.NFSVolumeSource) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+	if nfs.Server == "" {
+		allErrs = append(allErrs, errs.NewFieldRequired("server"))
+	}
+	if nfs.Path == "" {
+		allErrs = append(allErrs, errs.NewFieldRequired("path"))
+	}
+	if !path.IsAbs(nfs.Path) {
+		allErrs = append(allErrs, errs.NewFieldInvalid("path", nfs.Path, "must be an absolute path"))
 	}
 	return allErrs
 }
