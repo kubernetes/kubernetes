@@ -151,8 +151,9 @@ func TestExtractFromHTTP(t *testing.T) {
 				}),
 		},
 		{
-			desc:      "Single manifest without ID",
-			manifests: v1beta1.ContainerManifest{Version: "v1beta1", UUID: "111"},
+			desc: "Single manifest without ID",
+			manifests: v1beta1.ContainerManifest{Version: "v1beta1", UUID: "111",
+				Containers: []v1beta1.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}}},
 			expected: CreatePodUpdate(kubelet.SET,
 				kubelet.HTTPSource,
 				api.Pod{
@@ -165,6 +166,11 @@ func TestExtractFromHTTP(t *testing.T) {
 					Spec: api.PodSpec{
 						RestartPolicy: api.RestartPolicyAlways,
 						DNSPolicy:     api.DNSClusterFirst,
+						Containers: []api.Container{{
+							Name:  "ctr",
+							Image: "image",
+							TerminationMessagePath: "/dev/termination-log",
+							ImagePullPolicy:        "IfNotPresent"}},
 					},
 				}),
 		},

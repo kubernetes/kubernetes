@@ -62,6 +62,7 @@ func CreateValidPod(name, namespace, source string) api.Pod {
 		Spec: api.PodSpec{
 			RestartPolicy: api.RestartPolicyAlways,
 			DNSPolicy:     api.DNSClusterFirst,
+			Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
 		},
 	}
 }
