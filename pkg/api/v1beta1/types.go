@@ -108,7 +108,7 @@ type VolumeSource struct {
 	// NFS represents an NFS mount on the host that shares a pod's lifetime
 	NFS *NFSVolumeSource `json:"nfs" description:"NFS volume that will be mounted in the host machine "`
 	// PersistentVolumeClaimVolumeSource represents a reference to a PersistentVolumeClaim in the same namespace
-	PersistentVolumeClaimVolumeSource *PersistentVolumeClaimVolumeSource `json:"persistentVolumeClaim,omitempty"`
+	PersistentVolumeClaimVolumeSource *PersistentVolumeClaimVolumeSource `json:"persistentVolumeClaim,omitempty" description:"a reference to a PersistentVolumeClaim in the same namespace"`
 }
 
 // Similar to VolumeSource but meant for the administrator who creates PVs.
@@ -117,14 +117,6 @@ type PersistentVolumeSource struct {
 	// GCEPersistentDisk represents a GCE Disk resource that is attached to a
 	// kubelet's host machine and then exposed to the pod.
 	GCEPersistentDisk *GCEPersistentDiskVolumeSource `json:"persistentDisk" description:"GCE disk resource provisioned by an admin"`
-
-	// AWSElasticBlockStore represents an EBS volume in AWS that is attached to
-	// kubelet's host machine and then exposed to the pod.
-	AWSElasticBlockStore *AWSElasticBlockStore `json:"elasticBlockStore" description:"An AWS EBS volume resource provisioned by an admin"`
-
-	// NFSMount represents the location of an exported volume on a fileserver
-	NFSMount *NFSMount `json:"nfsMount" description:"An NFS mount resource provisioned by an admin"`
-
 	// HostPath represents a directory on the host.
 	// This is useful for development and testing only.
 	// on-host storage is not supported in any way.
@@ -231,22 +223,6 @@ type PersistentVolumeClaimVolumeSource struct {
 	// Optional: Defaults to false (read/write).  ReadOnly here
 	// will force the ReadOnly setting in VolumeMounts
 	ReadOnly bool `json:"readOnly,omitempty" description:"mount volume as read-only when true; default false"`
-}
-
-//
-// AWSEBS and NFS are orthogonal tasks that don't need to be here for Persistent Volumes.
-// They are here in the meantime for me to work with AccessModes correctly.
-// These will be refactored out after the NFS PR gets merged and this feature nears completion.
-//
-type AWSElasticBlockStore struct {
-	// the device's EBS volumeID from AWS
-	VolumeID string `json:"volumeId,omitempty"`
-}
-
-type NFSMount struct {
-	Server       string `json:"server"`
-	SourcePath   string `json:"sourcePath"`
-	MountOptions string `json:"mountOptions"`
 }
 
 // HostPathVolumeSource represents bare host directory volume.
@@ -425,7 +401,7 @@ type ResourceRequirements struct {
 	// Limits describes the maximum amount of compute resources required.
 	Limits ResourceList `json:"limits,omitempty" description:"Maximum amount of compute resources allowed"`
 	// Requests describes the minimum amount of compute resources required.
-	Requests ResourceList `json:"requests,omitempty"`
+	Requests ResourceList `json:"requests,omitempty" description:"Minimum amount of resources requested"`
 }
 
 // Container represents a single container that is expected to be run on the host.
