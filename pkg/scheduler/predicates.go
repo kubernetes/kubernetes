@@ -22,7 +22,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
-	"github.com/golang/glog"
 )
 
 type NodeInfo interface {
@@ -102,6 +101,28 @@ func getResourceRequest(pod *api.Pod) resourceRequest {
 	return result
 }
 
+func GetPodsExceedingCapacity(pods []api.Pod, capacity api.ResourceList) []api.Pod {
+	exceedingPods := []api.Pod{}
+	totalMilliCPU := capacity.Cpu().MilliValue()
+	totalMemory := capacity.Memory().Value()
+	milliCPURequested := int64(0)
+	memoryRequested := int64(0)
+	for ix := range pods {
+		podRequest := getResourceRequest(&pods[ix])
+		fitsCPU := totalMilliCPU == 0 || (totalMilliCPU-milliCPURequested) >= podRequest.milliCPU
+		fitsMemory := totalMemory == 0 || (totalMemory-memoryRequested) >= podRequest.memory
+		if !fitsCPU || !fitsMemory {
+			// the pod doesn't fit
+			exceedingPods = append(exceedingPods, pods[ix])
+		} else {
+			// the pod fits
+			milliCPURequested += podRequest.milliCPU
+			memoryRequested += podRequest.memory
+		}
+	}
+	return exceedingPods
+}
+
 // PodFitsResources calculates fit based on requested, rather than used resources
 func (r *ResourceFit) PodFitsResources(pod api.Pod, existingPods []api.Pod, node string) (bool, error) {
 	podRequest := getResourceRequest(&pod)
@@ -113,22 +134,13 @@ func (r *ResourceFit) PodFitsResources(pod api.Pod, existingPods []api.Pod, node
 	if err != nil {
 		return false, err
 	}
-	milliCPURequested := int64(0)
-	memoryRequested := int64(0)
-	for ix := range existingPods {
-		existingRequest := getResourceRequest(&existingPods[ix])
-		milliCPURequested += existingRequest.milliCPU
-		memoryRequested += existingRequest.memory
+	pods := []api.Pod{}
+	copy(pods, existingPods)
+	pods = append(existingPods, pod)
+	if len(GetPodsExceedingCapacity(pods, info.Spec.Capacity)) > 0 {
+		return false, nil
 	}
-
-	totalMilliCPU := info.Spec.Capacity.Cpu().MilliValue()
-	totalMemory := info.Spec.Capacity.Memory().Value()
-
-	fitsCPU := totalMilliCPU == 0 || (totalMilliCPU-milliCPURequested) >= podRequest.milliCPU
-	fitsMemory := totalMemory == 0 || (totalMemory-memoryRequested) >= podRequest.memory
-	glog.V(3).Infof("Calculated fit: cpu: %v, memory %v", fitsCPU, fitsMemory)
-
-	return fitsCPU && fitsMemory, nil
+	return true, nil
 }
 
 func NewResourceFitPredicate(info NodeInfo) FitPredicate {

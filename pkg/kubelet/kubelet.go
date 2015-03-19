@@ -32,7 +32,6 @@ import (
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/validation"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/capabilities"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
@@ -47,6 +46,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/probe"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/scheduler"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	utilErrors "github.com/GoogleCloudPlatform/kubernetes/pkg/util/errors"
@@ -321,6 +321,9 @@ type Kubelet struct {
 
 	// Manager for images.
 	imageManager imageManager
+
+	// Cached MachineInfo returned by cadvisor.
+	machineInfo *cadvisorApi.MachineInfo
 }
 
 // getRootDir returns the full path to the directory under which kubelet can
@@ -1477,7 +1480,7 @@ func (kl *Kubelet) SyncPods(allPods []api.Pod, podSyncTypes map[types.UID]metric
 	kl.removeOrphanedStatuses(podFullNames)
 
 	// Filter out the rejected pod. They don't have running containers.
-	kl.handleHostPortConflicts(allPods)
+	kl.handleNotfittingPods(allPods)
 	var pods []api.Pod
 	for _, pod := range allPods {
 		status, ok := kl.getPodStatusFromCache(GetPodFullName(&pod))
@@ -1636,14 +1639,44 @@ func getHostPortConflicts(pods []api.Pod) []api.Pod {
 	return conflicts
 }
 
-// handleHostPortConflicts handles pods that conflict on Port.HostPort values.
-func (kl *Kubelet) handleHostPortConflicts(pods []api.Pod) {
+func (kl *Kubelet) getPodsExceedingCapacity(pods []api.Pod) []api.Pod {
+	info, err := kl.GetCachedMachineInfo()
+	if err != nil {
+		glog.Error("error getting machine info: %v", err)
+		return []api.Pod{}
+	}
+
+	// Respect the pod creation order when resolving conflicts.
+	sort.Sort(podsByCreationTime(pods))
+
+	capacity := CapacityFromMachineInfo(info)
+	return scheduler.GetPodsExceedingCapacity(pods, capacity)
+}
+
+// handleNotfittingPods handles pods that do not fit on the node.
+// Currently conflicts on Port.HostPort values and exceeding node capacity are handled.
+func (kl *Kubelet) handleNotfittingPods(pods []api.Pod) {
 	conflicts := getHostPortConflicts(pods)
+	conflictsMap := map[types.UID]bool{}
 	for _, pod := range conflicts {
 		kl.recorder.Eventf(&pod, "hostPortConflict", "Cannot start the pod due to host port conflict.")
 		kl.setPodStatusInCache(GetPodFullName(&pod), api.PodStatus{
 			Phase:   api.PodFailed,
 			Message: "Pod cannot be started due to host port conflict"})
+		conflictsMap[pod.UID] = true
+	}
+	remainingPods := []api.Pod{}
+	for _, pod := range pods {
+		if !conflictsMap[pod.UID] {
+			remainingPods = append(remainingPods, pod)
+		}
+	}
+	conflicts = kl.getPodsExceedingCapacity(remainingPods)
+	for _, pod := range conflicts {
+		kl.recorder.Eventf(&pod, "capacityExceeded", "Cannot start the pod due to exceeded capacity.")
+		kl.setPodStatusInCache(GetPodFullName(&pod), api.PodStatus{
+			Phase:   api.PodFailed,
+			Message: "Pod cannot be started due to exceeded capacity"})
 	}
 }
 
@@ -1867,20 +1900,13 @@ func (kl *Kubelet) tryUpdateNodeStatus() error {
 
 	// TODO: Post NotReady if we cannot get MachineInfo from cAdvisor. This needs to start
 	// cAdvisor locally, e.g. for test-cmd.sh, and in integration test.
-	info, err := kl.GetMachineInfo()
+	info, err := kl.GetCachedMachineInfo()
 	if err != nil {
 		glog.Error("error getting machine info: %v", err)
 	} else {
 		node.Status.NodeInfo.MachineID = info.MachineID
 		node.Status.NodeInfo.SystemUUID = info.SystemUUID
-		node.Spec.Capacity = api.ResourceList{
-			api.ResourceCPU: *resource.NewMilliQuantity(
-				int64(info.NumCores*1000),
-				resource.DecimalSI),
-			api.ResourceMemory: *resource.NewQuantity(
-				info.MemoryCapacity,
-				resource.BinarySI),
-		}
+		node.Spec.Capacity = CapacityFromMachineInfo(info)
 	}
 
 	newCondition := api.NodeCondition{
@@ -2151,6 +2177,14 @@ func (kl *Kubelet) GetRootInfo(req *cadvisorApi.ContainerInfoRequest) (*cadvisor
 	return kl.cadvisor.ContainerInfo("/", req)
 }
 
-func (kl *Kubelet) GetMachineInfo() (*cadvisorApi.MachineInfo, error) {
-	return kl.cadvisor.MachineInfo()
+// GetCachedMachineInfo assumes that the machine info can't change without a reboot
+func (kl *Kubelet) GetCachedMachineInfo() (*cadvisorApi.MachineInfo, error) {
+	if kl.machineInfo == nil {
+		info, err := kl.cadvisor.MachineInfo()
+		if err != nil {
+			return nil, err
+		}
+		kl.machineInfo = info
+	}
+	return kl.machineInfo, nil
 }

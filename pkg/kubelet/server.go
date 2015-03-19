@@ -33,7 +33,6 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/healthz"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/httplog"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
@@ -48,9 +47,8 @@ import (
 
 // Server is a http.Handler which exposes kubelet functionality over HTTP.
 type Server struct {
-	host        HostInterface
-	mux         *http.ServeMux
-	machineInfo *cadvisorApi.MachineInfo
+	host HostInterface
+	mux  *http.ServeMux
 }
 
 type TLSOptions struct {
@@ -84,7 +82,7 @@ type HostInterface interface {
 	GetContainerInfo(podFullName string, uid types.UID, containerName string, req *cadvisorApi.ContainerInfoRequest) (*cadvisorApi.ContainerInfo, error)
 	GetRootInfo(req *cadvisorApi.ContainerInfoRequest) (*cadvisorApi.ContainerInfo, error)
 	GetDockerVersion() ([]uint, error)
-	GetMachineInfo() (*cadvisorApi.MachineInfo, error)
+	GetCachedMachineInfo() (*cadvisorApi.MachineInfo, error)
 	GetPods() ([]api.Pod, util.StringSet)
 	GetPodByName(namespace, name string) (*api.Pod, bool)
 	GetPodStatus(name string, uid types.UID) (api.PodStatus, error)
@@ -329,33 +327,14 @@ func (s *Server) handleLogs(w http.ResponseWriter, req *http.Request) {
 	s.host.ServeLogs(w, req)
 }
 
-// getCachedMachineInfo assumes that the machine info can't change without a reboot
-func (s *Server) getCachedMachineInfo() (*cadvisorApi.MachineInfo, error) {
-	if s.machineInfo == nil {
-		info, err := s.host.GetMachineInfo()
-		if err != nil {
-			return nil, err
-		}
-		s.machineInfo = info
-	}
-	return s.machineInfo, nil
-}
-
 // handleNodeInfoVersioned handles node info requests against the Kubelet.
 func (s *Server) handleNodeInfoVersioned(w http.ResponseWriter, req *http.Request) {
-	info, err := s.getCachedMachineInfo()
+	info, err := s.host.GetCachedMachineInfo()
 	if err != nil {
 		s.error(w, err)
 		return
 	}
-	capacity := api.ResourceList{
-		api.ResourceCPU: *resource.NewMilliQuantity(
-			int64(info.NumCores*1000),
-			resource.DecimalSI),
-		api.ResourceMemory: *resource.NewQuantity(
-			info.MemoryCapacity,
-			resource.BinarySI),
-	}
+	capacity := CapacityFromMachineInfo(info)
 	data, err := json.Marshal(api.NodeInfo{
 		Capacity: capacity,
 		NodeSystemInfo: api.NodeSystemInfo{
@@ -363,6 +342,7 @@ func (s *Server) handleNodeInfoVersioned(w http.ResponseWriter, req *http.Reques
 			SystemUUID: info.SystemUUID,
 		},
 	})
+
 	if err != nil {
 		s.error(w, err)
 		return
@@ -373,7 +353,7 @@ func (s *Server) handleNodeInfoVersioned(w http.ResponseWriter, req *http.Reques
 
 // handleSpec handles spec requests against the Kubelet.
 func (s *Server) handleSpec(w http.ResponseWriter, req *http.Request) {
-	info, err := s.getCachedMachineInfo()
+	info, err := s.host.GetCachedMachineInfo()
 	if err != nil {
 		s.error(w, err)
 		return

@@ -76,7 +76,7 @@ func (fk *fakeKubelet) GetDockerVersion() ([]uint, error) {
 	return fk.dockerVersionFunc()
 }
 
-func (fk *fakeKubelet) GetMachineInfo() (*cadvisorApi.MachineInfo, error) {
+func (fk *fakeKubelet) GetCachedMachineInfo() (*cadvisorApi.MachineInfo, error) {
 	return fk.machineInfoFunc()
 }
 

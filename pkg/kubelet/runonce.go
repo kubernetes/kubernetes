@@ -55,7 +55,7 @@ func (kl *Kubelet) runOnce(pods []api.Pod, retryDelay time.Duration) (results []
 	if kl.dockerPuller == nil {
 		kl.dockerPuller = dockertools.NewDockerPuller(kl.dockerClient, kl.pullQPS, kl.pullBurst)
 	}
-	kl.handleHostPortConflicts(pods)
+	kl.handleNotfittingPods(pods)
 
 	ch := make(chan RunPodResult)
 	for i := range pods {
