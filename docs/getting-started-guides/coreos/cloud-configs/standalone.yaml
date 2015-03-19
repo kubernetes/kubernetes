@@ -149,7 +149,7 @@ coreos:
         ExecStartPre=/usr/bin/wget -N -P /opt/bin https://storage.googleapis.com/kubernetes-release/release/v0.11.0/bin/linux/amd64/kube-proxy
         ExecStartPre=/usr/bin/chmod +x /opt/bin/kube-proxy
         ExecStart=/opt/bin/kube-proxy \
-        --master=<master-private-ip>:8080 \
+        --master=127.0.0.1:8080 \
         --logtostderr=true
         Restart=always
         RestartSec=10
