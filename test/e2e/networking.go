@@ -23,7 +23,6 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 
 	. "github.com/onsi/ginkgo"
@@ -46,6 +45,16 @@ var _ = Describe("Networking", func() {
 		if testContext.provider == "vagrant" {
 			By("Skipping test which is broken for vagrant (See https://github.com/GoogleCloudPlatform/kubernetes/issues/3580)")
 			return
+		}
+
+		// Obtain a list of nodes so we can place one webserver container on each node.
+		nodes, err := c.Nodes().List()
+		if err != nil {
+			Failf("Failed to list nodes: %v", err)
+		}
+		peers := len(nodes.Items)
+		if peers == 0 {
+			Failf("Failed to find any nodes")
 		}
 
 		// Test basic external connectivity.
@@ -87,52 +96,53 @@ var _ = Describe("Networking", func() {
 			}
 		}()
 
-		By("Creating a replication controller")
-		rc, err := c.ReplicationControllers(ns).Create(&api.ReplicationController{
-			ObjectMeta: api.ObjectMeta{
-				Name: name,
-				Labels: map[string]string{
-					"name": name,
-				},
-			},
-			Spec: api.ReplicationControllerSpec{
-				Replicas: 8,
-				Selector: map[string]string{
-					"name": name,
-				},
-				Template: &api.PodTemplateSpec{
-					ObjectMeta: api.ObjectMeta{
-						Labels: map[string]string{"name": name},
+		By("Creating a webserver pod on each node")
+		podNames := []string{}
+		for i, node := range nodes.Items {
+			podName := fmt.Sprintf("%s-%d", name, i)
+			podNames = append(podNames, podName)
+			Logf("Creating pod %s on node %s", podName, node.Name)
+			_, err := c.Pods(ns).Create(&api.Pod{
+				ObjectMeta: api.ObjectMeta{
+					Name: podName,
+					Labels: map[string]string{
+						"name": name,
 					},
-					Spec: api.PodSpec{
-						Containers: []api.Container{
-							{
-								Name:    "webserver",
-								Image:   "kubernetes/nettest:1.1",
-								Command: []string{"-service=" + name, "-namespace=" + ns},
-								Ports:   []api.ContainerPort{{ContainerPort: 8080}},
-							},
+				},
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{
+							Name:  "webserver",
+							Image: "kubernetes/nettest:1.1",
+							Command: []string{
+								"-service=" + name,
+								fmt.Sprintf("-peers=%d", peers),
+								"-namespace=" + ns},
+							Ports: []api.ContainerPort{{ContainerPort: 8080}},
 						},
 					},
+					Host:          node.Name,
+					RestartPolicy: api.RestartPolicyNever,
 				},
-			},
-		})
-		if err != nil {
-			Fail(fmt.Sprintf("unable to create test rc: %v", err))
+			})
+			Expect(err).NotTo(HaveOccurred())
 		}
-		// Clean up rc
+		// Clean up the pods
 		defer func() {
 			defer GinkgoRecover()
-			By("Cleaning up the replication controller")
-			// Resize the replication controller to zero to get rid of pods.
-			rcReaper, err := kubectl.ReaperFor("ReplicationController", c)
-			if err != nil {
-				Fail(fmt.Sprintf("unable to stop rc %v: %v", rc.Name, err))
-			}
-			if _, err = rcReaper.Stop(ns, rc.Name); err != nil {
-				Fail(fmt.Sprintf("unable to stop rc %v: %v", rc.Name, err))
+			By("Cleaning up the webserver pods")
+			for _, podName := range podNames {
+				if err = c.Pods(ns).Delete(podName); err != nil {
+					Logf("Failed to delete pod %s: %v", podName, err)
+				}
 			}
 		}()
+
+		By("Wait for the webserver pods to be ready")
+		for _, podName := range podNames {
+			err = waitForPodRunningInNamespace(c, podName, ns)
+			Expect(err).NotTo(HaveOccurred())
+		}
 
 		By("Waiting for connectivity to be verified")
 		const maxAttempts = 60
@@ -148,22 +158,26 @@ var _ = Describe("Networking", func() {
 				Suffix("status").
 				Do().Raw()
 			if err != nil {
-				fmt.Printf("Attempt %v/%v: service/pod still starting. (error: '%v')\n", i, maxAttempts, err)
+				Logf("Attempt %v/%v: service/pod still starting. (error: '%v')", i, maxAttempts, err)
 				continue
 			}
 			switch string(body) {
 			case "pass":
-				fmt.Printf("Passed on attempt %v. Cleaning up.\n", i)
+				Logf("Passed on attempt %v. Cleaning up.", i)
 				passed = true
 				break
 			case "running":
-				fmt.Printf("Attempt %v/%v: test still running\n", i, maxAttempts)
+				Logf("Attempt %v/%v: test still running", i, maxAttempts)
 				break
 			case "fail":
-				if body, err = c.Get().Namespace(ns).Prefix("proxy").Resource("services").Name(svc.Name).Suffix("read").Do().Raw(); err != nil {
+				if body, err = c.Get().
+					Namespace(ns).Prefix("proxy").
+					Resource("services").
+					Name(svc.Name).Suffix("read").
+					Do().Raw(); err != nil {
 					Fail(fmt.Sprintf("Failed on attempt %v. Cleaning up. Error reading details: %v", i, err))
 				} else {
-					Fail(fmt.Sprintf("Failed on attempt %v. Cleaning up. Details:\n%v", i, string(body)))
+					Fail(fmt.Sprintf("Failed on attempt %v. Cleaning up. Details:\n%s", i, string(body)))
 				}
 				break
 			}
@@ -179,7 +193,7 @@ var _ = Describe("Networking", func() {
 				Do().Raw(); err != nil {
 				Fail(fmt.Sprintf("Timed out. Cleaning up. Error reading details: %v", err))
 			} else {
-				Fail(fmt.Sprintf("Timed out. Cleaning up. Details:\n%v", string(body)))
+				Fail(fmt.Sprintf("Timed out. Cleaning up. Details:\n%s", string(body)))
 			}
 		}
 		Expect(string(body)).To(Equal("pass"))
@@ -198,8 +212,7 @@ var _ = Describe("Networking", func() {
 			data, err := c.RESTClient.Get().
 				Namespace(ns).
 				AbsPath(test.path).
-				Do().
-				Raw()
+				Do().Raw()
 			if err != nil {
 				Fail(fmt.Sprintf("Failed: %v\nBody: %s", err, string(data)))
 			}
