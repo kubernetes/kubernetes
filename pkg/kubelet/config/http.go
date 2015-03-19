@@ -123,9 +123,36 @@ func (s *sourceURL) extractFromURL() error {
 		return nil
 	}
 
-	return fmt.Errorf("%v: received '%v', but couldn't parse as a "+
-		"single manifest (%v: %+v) or as multiple manifests (%v: %+v).\n",
-		s.url, string(data), singleErr, manifest, multiErr, manifests)
+	// Parsing it as ContainerManifest(s) failed.
+	// Try to parse it as Pod(s).
+
+	// First try as it is a single pod.
+	parsed, pod, singlePodErr := tryDecodeSinglePod(data, s.url)
+	if parsed {
+		if singlePodErr != nil {
+			// It parsed but could not be used.
+			return singlePodErr
+		}
+		s.updates <- kubelet.PodUpdate{[]api.Pod{pod}, kubelet.SET, kubelet.HTTPSource}
+		return nil
+	}
+
+	// That didn't work, so try a list of pods.
+	parsed, pods, multiPodErr := tryDecodePodList(data, s.url)
+	if parsed {
+		if multiPodErr != nil {
+			// It parsed but could not be used.
+			return multiPodErr
+		}
+		s.updates <- kubelet.PodUpdate{pods.Items, kubelet.SET, kubelet.HTTPSource}
+		return nil
+	}
+
+	return fmt.Errorf("%v: received '%v', but couldn't parse as neither "+
+		"single (%v: %+v) or multiple manifests (%v: %+v) nor "+
+		"single (%v) or multiple pods (%v).\n",
+		s.url, string(data), singleErr, manifest, multiErr, manifests,
+		singlePodErr, multiPodErr)
 }
 
 func tryDecodeSingle(data []byte) (parsed bool, manifest v1beta1.ContainerManifest, pod api.Pod, err error) {
@@ -183,6 +210,53 @@ func tryDecodeList(data []byte) (parsed bool, manifests []v1beta1.ContainerManif
 	return true, manifests, pods, nil
 }
 
+func tryDecodeSinglePod(data []byte, url string) (parsed bool, pod api.Pod, err error) {
+	obj, err := api.Scheme.Decode(data)
+	if err != nil {
+		return false, pod, err
+	}
+	// Check whether the object could be converted to single pod.
+	if _, ok := obj.(*api.Pod); !ok {
+		err = fmt.Errorf("invalid pod: %+v", obj)
+		return false, pod, err
+	}
+	newPod := obj.(*api.Pod)
+	// Apply default values and validate the pod.
+	if err = applyDefaults(newPod, url); err != nil {
+		return true, pod, err
+	}
+	if errs := validation.ValidatePod(newPod); len(errs) > 0 {
+		err = fmt.Errorf("invalid pod: %v", errs)
+		return true, pod, err
+	}
+	return true, *newPod, nil
+}
+
+func tryDecodePodList(data []byte, url string) (parsed bool, pods api.PodList, err error) {
+	obj, err := api.Scheme.Decode(data)
+	if err != nil {
+		return false, pods, err
+	}
+	// Check whether the object could be converted to list of pods.
+	if _, ok := obj.(*api.PodList); !ok {
+		err = fmt.Errorf("invalid pods list: %+v", obj)
+		return false, pods, err
+	}
+	newPods := obj.(*api.PodList)
+	// Apply default values and validate pods.
+	for i := range newPods.Items {
+		newPod := &newPods.Items[i]
+		if err = applyDefaults(newPod, url); err != nil {
+			return true, pods, err
+		}
+		if errs := validation.ValidatePod(newPod); len(errs) > 0 {
+			err = fmt.Errorf("invalid pod: %v", errs)
+			return true, pods, err
+		}
+	}
+	return true, *newPods, err
+}
+
 func applyDefaults(pod *api.Pod, url string) error {
 	if len(pod.UID) == 0 {
 		hasher := md5.New()
@@ -203,8 +277,9 @@ func applyDefaults(pod *api.Pod, url string) error {
 	}
 	glog.V(5).Infof("Generated Name %q for UID %q from URL %s", pod.Name, pod.UID, url)
 
-	// Always overrides the namespace.
-	pod.Namespace = kubelet.NamespaceDefault
+	if pod.Namespace == "" {
+		pod.Namespace = kubelet.NamespaceDefault
+	}
 	glog.V(5).Infof("Using namespace %q for pod %q from URL %s", pod.Namespace, pod.Name, url)
 	pod.ObjectMeta.SelfLink = fmt.Sprintf("/api/v1beta2/pods/%s?namespace=%s",
 		pod.Name, pod.Namespace)
