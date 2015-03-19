@@ -32,14 +32,17 @@ import (
 
 var zero time.Time
 
-func newRealImageManager(t *testing.T, policy ImageGCPolicy) (*realImageManager, *dockertools.FakeDockerClient, *cadvisor.Mock) {
+func newRealImageManager(policy ImageGCPolicy) (*realImageManager, *dockertools.FakeDockerClient, *cadvisor.Mock) {
 	fakeDocker := &dockertools.FakeDockerClient{
 		RemovedImages: util.NewStringSet(),
 	}
 	mockCadvisor := new(cadvisor.Mock)
-	im, err := newImageManager(fakeDocker, mockCadvisor, policy)
-	require.NoError(t, err)
-	return im.(*realImageManager), fakeDocker, mockCadvisor
+	return &realImageManager{
+		dockerClient: fakeDocker,
+		policy:       policy,
+		imageRecords: make(map[string]*imageRecord),
+		cadvisor:     mockCadvisor,
+	}, fakeDocker, mockCadvisor
 }
 
 // Accessors used for thread-safe testing.
@@ -78,7 +81,7 @@ func makeContainer(id int) docker.APIContainers {
 }
 
 func TestDetectImagesInitialDetect(t *testing.T) {
-	manager, fakeDocker, _ := newRealImageManager(t, ImageGCPolicy{})
+	manager, fakeDocker, _ := newRealImageManager(ImageGCPolicy{})
 	fakeDocker.Images = []docker.APIImages{
 		makeImage(0, 1024),
 		makeImage(1, 2048),
@@ -104,7 +107,7 @@ func TestDetectImagesInitialDetect(t *testing.T) {
 
 func TestDetectImagesWithNewImage(t *testing.T) {
 	// Just one image initially.
-	manager, fakeDocker, _ := newRealImageManager(t, ImageGCPolicy{})
+	manager, fakeDocker, _ := newRealImageManager(ImageGCPolicy{})
 	fakeDocker.Images = []docker.APIImages{
 		makeImage(0, 1024),
 		makeImage(1, 2048),
@@ -145,7 +148,7 @@ func TestDetectImagesWithNewImage(t *testing.T) {
 }
 
 func TestDetectImagesContainerStopped(t *testing.T) {
-	manager, fakeDocker, _ := newRealImageManager(t, ImageGCPolicy{})
+	manager, fakeDocker, _ := newRealImageManager(ImageGCPolicy{})
 	fakeDocker.Images = []docker.APIImages{
 		makeImage(0, 1024),
 		makeImage(1, 2048),
@@ -177,7 +180,7 @@ func TestDetectImagesContainerStopped(t *testing.T) {
 }
 
 func TestDetectImagesWithRemovedImages(t *testing.T) {
-	manager, fakeDocker, _ := newRealImageManager(t, ImageGCPolicy{})
+	manager, fakeDocker, _ := newRealImageManager(ImageGCPolicy{})
 	fakeDocker.Images = []docker.APIImages{
 		makeImage(0, 1024),
 		makeImage(1, 2048),
@@ -199,7 +202,7 @@ func TestDetectImagesWithRemovedImages(t *testing.T) {
 }
 
 func TestFreeSpaceImagesInUseContainersAreIgnored(t *testing.T) {
-	manager, fakeDocker, _ := newRealImageManager(t, ImageGCPolicy{})
+	manager, fakeDocker, _ := newRealImageManager(ImageGCPolicy{})
 	fakeDocker.Images = []docker.APIImages{
 		makeImage(0, 1024),
 		makeImage(1, 2048),
@@ -217,7 +220,7 @@ func TestFreeSpaceImagesInUseContainersAreIgnored(t *testing.T) {
 }
 
 func TestFreeSpaceRemoveByLeastRecentlyUsed(t *testing.T) {
-	manager, fakeDocker, _ := newRealImageManager(t, ImageGCPolicy{})
+	manager, fakeDocker, _ := newRealImageManager(ImageGCPolicy{})
 	fakeDocker.Images = []docker.APIImages{
 		makeImage(0, 1024),
 		makeImage(1, 2048),
@@ -246,7 +249,7 @@ func TestFreeSpaceRemoveByLeastRecentlyUsed(t *testing.T) {
 }
 
 func TestFreeSpaceTiesBrokenByDetectedTime(t *testing.T) {
-	manager, fakeDocker, _ := newRealImageManager(t, ImageGCPolicy{})
+	manager, fakeDocker, _ := newRealImageManager(ImageGCPolicy{})
 	fakeDocker.Images = []docker.APIImages{
 		makeImage(0, 1024),
 	}
@@ -278,7 +281,7 @@ func TestFreeSpaceTiesBrokenByDetectedTime(t *testing.T) {
 }
 
 func TestFreeSpaceImagesAlsoDoesLookupByRepoTags(t *testing.T) {
-	manager, fakeDocker, _ := newRealImageManager(t, ImageGCPolicy{})
+	manager, fakeDocker, _ := newRealImageManager(ImageGCPolicy{})
 	fakeDocker.Images = []docker.APIImages{
 		makeImage(0, 1024),
 		{
@@ -307,7 +310,7 @@ func TestGarbageCollectBelowLowThreshold(t *testing.T) {
 		HighThresholdPercent: 90,
 		LowThresholdPercent:  80,
 	}
-	manager, _, mockCadvisor := newRealImageManager(t, policy)
+	manager, _, mockCadvisor := newRealImageManager(policy)
 
 	// Expect 40% usage.
 	mockCadvisor.On("DockerImagesFsInfo").Return(cadvisorApiV2.FsInfo{
@@ -323,7 +326,7 @@ func TestGarbageCollectCadvisorFailure(t *testing.T) {
 		HighThresholdPercent: 90,
 		LowThresholdPercent:  80,
 	}
-	manager, _, mockCadvisor := newRealImageManager(t, policy)
+	manager, _, mockCadvisor := newRealImageManager(policy)
 
 	mockCadvisor.On("DockerImagesFsInfo").Return(cadvisorApiV2.FsInfo{}, fmt.Errorf("error"))
 	assert.NotNil(t, manager.GarbageCollect())
@@ -334,7 +337,7 @@ func TestGarbageCollectBelowSuccess(t *testing.T) {
 		HighThresholdPercent: 90,
 		LowThresholdPercent:  80,
 	}
-	manager, fakeDocker, mockCadvisor := newRealImageManager(t, policy)
+	manager, fakeDocker, mockCadvisor := newRealImageManager(policy)
 
 	// Expect 95% usage and most of it gets freed.
 	mockCadvisor.On("DockerImagesFsInfo").Return(cadvisorApiV2.FsInfo{
@@ -353,7 +356,7 @@ func TestGarbageCollectNotEnoughFreed(t *testing.T) {
 		HighThresholdPercent: 90,
 		LowThresholdPercent:  80,
 	}
-	manager, fakeDocker, mockCadvisor := newRealImageManager(t, policy)
+	manager, fakeDocker, mockCadvisor := newRealImageManager(policy)
 
 	// Expect 95% usage and little of it gets freed.
 	mockCadvisor.On("DockerImagesFsInfo").Return(cadvisorApiV2.FsInfo{
