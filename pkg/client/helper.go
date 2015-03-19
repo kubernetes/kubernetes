@@ -86,6 +86,9 @@ type KubeletConfig struct {
 
 	// TLSClientConfig contains settings to enable transport layer security
 	TLSClientConfig
+
+	// HTTPTimeout is used by the client to timeout http requests to Kubelet.
+	HTTPTimeout time.Duration
 }
 
 // TLSClientConfig contains settings to enable transport layer security
