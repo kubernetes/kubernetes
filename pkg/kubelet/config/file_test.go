@@ -32,10 +32,17 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 )
 
+// TODO(wojtek-t): Most of the test cases are pretty similar and introduce
+// the same boilerplate. Refactor them similarly to what is done in http_test.go
+
 func ExampleManifestAndPod(id string) (v1beta1.ContainerManifest, api.Pod) {
+	hostname, _ := os.Hostname()
+	hostname = strings.ToLower(hostname)
+
 	manifest := v1beta1.ContainerManifest{
-		ID:   id,
-		UUID: types.UID(id),
+		Version: "v1beta1",
+		ID:      id,
+		UUID:    types.UID(id),
 		Containers: []v1beta1.Container{
 			{
 				Name:  "c" + id,
@@ -54,9 +61,10 @@ func ExampleManifestAndPod(id string) (v1beta1.ContainerManifest, api.Pod) {
 	}
 	expectedPod := api.Pod{
 		ObjectMeta: api.ObjectMeta{
-			Name:      id,
+			Name:      id + "-" + hostname,
 			UID:       types.UID(id),
 			Namespace: kubelet.NamespaceDefault,
+			SelfLink:  "/api/v1beta2/pods/" + id + "-" + hostname + "?namespace=default",
 		},
 		Spec: api.PodSpec{
 			Containers: []api.Container{
@@ -115,13 +123,16 @@ func writeTestFile(t *testing.T, dir, name string, contents string) *os.File {
 	return file
 }
 
-func TestReadFromFile(t *testing.T) {
+func TestReadManifestFromFile(t *testing.T) {
+	hostname, _ := os.Hostname()
+	hostname = strings.ToLower(hostname)
+
 	file := writeTestFile(t, os.TempDir(), "test_pod_config",
 		`{
 			"version": "v1beta1",
 			"uuid": "12345",
 			"id": "test",
-			"containers": [{ "image": "test/image", imagePullPolicy: "PullAlways"}]
+			"containers": [{ "name": "image", "image": "test/image", imagePullPolicy: "PullAlways"}]
 		}`)
 	defer os.Remove(file.Name())
 
@@ -132,30 +143,14 @@ func TestReadFromFile(t *testing.T) {
 		update := got.(kubelet.PodUpdate)
 		expected := CreatePodUpdate(kubelet.SET, kubelet.FileSource, api.Pod{
 			ObjectMeta: api.ObjectMeta{
-				Name:      "",
+				Name:      "test-" + hostname,
 				UID:       "12345",
 				Namespace: kubelet.NamespaceDefault,
-				SelfLink:  "",
+				SelfLink:  "/api/v1beta2/pods/test-" + hostname + "?namespace=default",
 			},
 			Spec: api.PodSpec{Containers: []api.Container{{Image: "test/image"}}},
 		})
 
-		if !strings.HasPrefix(update.Pods[0].Name, "test-") {
-			t.Errorf("Unexpected name: %s", update.Pods[0].Name)
-		}
-		// There's no way to provide namespace in ContainerManifest, so
-		// it will be defaulted.
-		if update.Pods[0].Namespace != kubelet.NamespaceDefault {
-			t.Errorf("Unexpected namespace: %s", update.Pods[0].Namespace)
-		}
-		// SelfLink depends on namespace.
-		if !strings.HasPrefix(update.Pods[0].SelfLink, "/api/") {
-			t.Errorf("Unexpected selflink: %s", update.Pods[0].SelfLink)
-		}
-
-		// Reset the fileds that we don't want to compare.
-		update.Pods[0].Name = ""
-		update.Pods[0].SelfLink = ""
 		if !api.Semantic.DeepDerivative(expected, update) {
 			t.Fatalf("Expected %#v, Got %#v", expected, update)
 		}
@@ -165,12 +160,15 @@ func TestReadFromFile(t *testing.T) {
 	}
 }
 
-func TestReadFromFileWithoutID(t *testing.T) {
+func TestReadManifestFromFileWithoutID(t *testing.T) {
+	hostname, _ := os.Hostname()
+	hostname = strings.ToLower(hostname)
+
 	file := writeTestFile(t, os.TempDir(), "test_pod_config",
 		`{
 			"version": "v1beta1",
 			"uuid": "12345",
-			"containers": [{ "image": "test/image", imagePullPolicy: "PullAlways"}]
+			"containers": [{ "name": "image", "image": "test/image", imagePullPolicy: "PullAlways"}]
 		}`)
 	defer os.Remove(file.Name())
 
@@ -181,20 +179,14 @@ func TestReadFromFileWithoutID(t *testing.T) {
 		update := got.(kubelet.PodUpdate)
 		expected := CreatePodUpdate(kubelet.SET, kubelet.FileSource, api.Pod{
 			ObjectMeta: api.ObjectMeta{
-				Name:      "",
+				Name:      "12345-" + hostname,
 				UID:       "12345",
 				Namespace: kubelet.NamespaceDefault,
-				SelfLink:  "",
+				SelfLink:  "/api/v1beta2/pods/12345-" + hostname + "?namespace=default",
 			},
 			Spec: api.PodSpec{Containers: []api.Container{{Image: "test/image"}}},
 		})
 
-		if len(update.Pods[0].ObjectMeta.Name) == 0 {
-			t.Errorf("Name did not get defaulted")
-		}
-		// Reset the fileds that we don't want to compare.
-		update.Pods[0].Name = ""
-		update.Pods[0].SelfLink = ""
 		if !api.Semantic.DeepDerivative(expected, update) {
 			t.Fatalf("Expected %#v, Got %#v", expected, update)
 		}
@@ -204,13 +196,16 @@ func TestReadFromFileWithoutID(t *testing.T) {
 	}
 }
 
-func TestReadV1Beta2FromFile(t *testing.T) {
+func TestReadManifestV1Beta2FromFile(t *testing.T) {
+	hostname, _ := os.Hostname()
+	hostname = strings.ToLower(hostname)
+
 	file := writeTestFile(t, os.TempDir(), "test_pod_config",
 		`{
 			"version": "v1beta2",
 			"uuid": "12345",
 			"id": "test",
-			"containers": [{ "image": "test/image", imagePullPolicy: "PullAlways"}]
+			"containers": [{ "name": "image", "image": "test/image", imagePullPolicy: "PullAlways"}]
 		}`)
 	defer os.Remove(file.Name())
 
@@ -221,17 +216,14 @@ func TestReadV1Beta2FromFile(t *testing.T) {
 		update := got.(kubelet.PodUpdate)
 		expected := CreatePodUpdate(kubelet.SET, kubelet.FileSource, api.Pod{
 			ObjectMeta: api.ObjectMeta{
-				Name:      "",
+				Name:      "test-" + hostname,
 				UID:       "12345",
 				Namespace: kubelet.NamespaceDefault,
-				SelfLink:  "",
+				SelfLink:  "/api/v1beta2/pods/test-" + hostname + "?namespace=default",
 			},
 			Spec: api.PodSpec{Containers: []api.Container{{Image: "test/image"}}},
 		})
 
-		// Reset the fileds that we don't want to compare.
-		update.Pods[0].Name = ""
-		update.Pods[0].SelfLink = ""
 		if !api.Semantic.DeepDerivative(expected, update) {
 			t.Fatalf("Expected %#v, Got %#v", expected, update)
 		}
@@ -241,12 +233,12 @@ func TestReadV1Beta2FromFile(t *testing.T) {
 	}
 }
 
-func TestReadFromFileWithDefaults(t *testing.T) {
+func TestReadManifestFromFileWithDefaults(t *testing.T) {
 	file := writeTestFile(t, os.TempDir(), "test_pod_config",
 		`{
 			"version": "v1beta1",
 			"id": "test",
-			"containers": [{ "image": "test/image" }]
+			"containers": [{ "name": "image", "image": "test/image" }]
 		}`)
 	defer os.Remove(file.Name())
 
@@ -257,6 +249,132 @@ func TestReadFromFileWithDefaults(t *testing.T) {
 		update := got.(kubelet.PodUpdate)
 		if update.Pods[0].UID == "" {
 			t.Errorf("Unexpected UID: %s", update.Pods[0].UID)
+		}
+
+	case <-time.After(time.Second):
+		t.Errorf("Expected update, timeout instead")
+	}
+}
+
+func TestReadPodFromFile(t *testing.T) {
+	hostname, _ := os.Hostname()
+	hostname = strings.ToLower(hostname)
+
+	file := writeTestFile(t, os.TempDir(), "test_pod_config",
+		`{
+			"kind": "Pod",
+			"apiVersion": "v1beta1",
+			"uid": "12345",
+			"id": "test",
+			"namespace": "mynamespace",
+			"desiredState": {
+				"manifest": {
+					"containers": [{ "name": "image", "image": "test/image" }],
+				},
+			},
+		}`)
+	defer os.Remove(file.Name())
+
+	ch := make(chan interface{})
+	NewSourceFile(file.Name(), time.Millisecond, ch)
+	select {
+	case got := <-ch:
+		update := got.(kubelet.PodUpdate)
+		expected := CreatePodUpdate(kubelet.SET, kubelet.FileSource, api.Pod{
+			ObjectMeta: api.ObjectMeta{
+				Name:      "test-" + hostname,
+				UID:       "12345",
+				Namespace: "mynamespace",
+				SelfLink:  "/api/v1beta2/pods/test-" + hostname + "?namespace=mynamespace",
+			},
+			Spec: api.PodSpec{Containers: []api.Container{{Image: "test/image"}}},
+		})
+
+		if !api.Semantic.DeepDerivative(expected, update) {
+			t.Fatalf("Expected %#v, Got %#v", expected, update)
+		}
+
+	case <-time.After(time.Second):
+		t.Errorf("Expected update, timeout instead")
+	}
+}
+
+func TestReadPodV1Beta3FromFile(t *testing.T) {
+	hostname, _ := os.Hostname()
+	hostname = strings.ToLower(hostname)
+
+	file := writeTestFile(t, os.TempDir(), "test_pod_config",
+		`{
+			"kind": "Pod",
+			"apiversion": "v1beta3",
+			"metadata": {
+				"uid": "12345",
+				"name": "test",
+			},
+			"spec": {
+				"containers": [{ "name": "image", "image": "test/image" }],
+			},
+		}`)
+	defer os.Remove(file.Name())
+
+	ch := make(chan interface{})
+	NewSourceFile(file.Name(), time.Millisecond, ch)
+	select {
+	case got := <-ch:
+		update := got.(kubelet.PodUpdate)
+		expected := CreatePodUpdate(kubelet.SET, kubelet.FileSource, api.Pod{
+			ObjectMeta: api.ObjectMeta{
+				Name:      "test-" + hostname,
+				UID:       "12345",
+				Namespace: kubelet.NamespaceDefault,
+				SelfLink:  "/api/v1beta2/pods/test-" + hostname + "?namespace=default",
+			},
+			Spec: api.PodSpec{Containers: []api.Container{{Image: "test/image"}}},
+		})
+
+		if !api.Semantic.DeepDerivative(expected, update) {
+			t.Fatalf("Expected %#v, Got %#v", expected, update)
+		}
+
+	case <-time.After(time.Second):
+		t.Errorf("Expected update, timeout instead")
+	}
+}
+
+func TestReadPodFromFileWithoutID(t *testing.T) {
+	hostname, _ := os.Hostname()
+	hostname = strings.ToLower(hostname)
+
+	file := writeTestFile(t, os.TempDir(), "test_pod_config",
+		`{
+			"kind": "Pod",
+			"apiversion": "v1beta1",
+			"uid": "12345",
+			"DesiredState": {
+				"Manifest": {
+					"containers": [{ "name": "image", "image": "test/image" }],
+				},
+			},
+		}`)
+	defer os.Remove(file.Name())
+
+	ch := make(chan interface{})
+	NewSourceFile(file.Name(), time.Millisecond, ch)
+	select {
+	case got := <-ch:
+		update := got.(kubelet.PodUpdate)
+		expected := CreatePodUpdate(kubelet.SET, kubelet.FileSource, api.Pod{
+			ObjectMeta: api.ObjectMeta{
+				Name:      "12345-" + hostname,
+				UID:       "12345",
+				Namespace: kubelet.NamespaceDefault,
+				SelfLink:  "/api/v1beta2/pods/12345-" + hostname + "?namespace=default",
+			},
+			Spec: api.PodSpec{Containers: []api.Container{{Image: "test/image"}}},
+		})
+
+		if !api.Semantic.DeepDerivative(expected, update) {
+			t.Fatalf("Expected %#v, Got %#v", expected, update)
 		}
 
 	case <-time.After(time.Second):
@@ -339,18 +457,7 @@ func TestExtractFromDir(t *testing.T) {
 	}
 
 	update := (<-ch).(kubelet.PodUpdate)
-	for i := range update.Pods {
-		// Pod name is generated with hash and is unique. Skip the comparision
-		// here by setting it to a simple value.
-		update.Pods[i].Name = manifests[i].ID
-		update.Pods[i].SelfLink = ""
-	}
 	expected := CreatePodUpdate(kubelet.SET, kubelet.FileSource, pods...)
-	for i := range expected.Pods {
-		// Pod name is generated with hash and is unique. Skip the comparision
-		// here by setting it to a simple value.
-		expected.Pods[i].Name = manifests[i].ID
-	}
 	sort.Sort(sortedPods(update.Pods))
 	sort.Sort(sortedPods(expected.Pods))
 	if !api.Semantic.DeepDerivative(expected, update) {

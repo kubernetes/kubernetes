@@ -18,23 +18,17 @@ limitations under the License.
 package config
 
 import (
-	"crypto/md5"
-	"encoding/hex"
 	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"sort"
-	"strings"
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 
-	"github.com/ghodss/yaml"
 	"github.com/golang/glog"
 )
 
@@ -131,9 +125,7 @@ func extractFromDir(name string) ([]api.Pod, error) {
 	return pods, nil
 }
 
-func extractFromFile(filename string) (api.Pod, error) {
-	var pod api.Pod
-
+func extractFromFile(filename string) (pod api.Pod, err error) {
 	glog.V(3).Infof("Reading config file %q", filename)
 	file, err := os.Open(filename)
 	if err != nil {
@@ -146,65 +138,28 @@ func extractFromFile(filename string) (api.Pod, error) {
 		return pod, err
 	}
 
-	// TODO: use api.Scheme.DecodeInto
-	// This is awful.  DecodeInto() expects to find an APIObject, which
-	// Manifest is not.  We keep reading manifest for now for compat, but
-	// we will eventually change it to read Pod (at which point this all
-	// becomes nicer).  Until then, we assert that the ContainerManifest
-	// structure on disk is always v1beta1.  Read that, convert it to a
-	// "current" ContainerManifest (should be ~identical), then convert
-	// that to a Pod (which is a well-understood conversion).  This
-	// avoids writing a v1beta1.ContainerManifest -> api.Pod
-	// conversion which would be identical to the api.ContainerManifest ->
-	// api.Pod conversion.
-	oldManifest := &v1beta1.ContainerManifest{}
-	if err := yaml.Unmarshal(data, oldManifest); err != nil {
-		return pod, fmt.Errorf("can't unmarshal file %q: %v", filename, err)
-	}
-	newManifest := &api.ContainerManifest{}
-	if err := api.Scheme.Convert(oldManifest, newManifest); err != nil {
-		return pod, fmt.Errorf("can't convert pod from file %q: %v", filename, err)
-	}
-	if err := api.Scheme.Convert(newManifest, &pod); err != nil {
-		return pod, fmt.Errorf("can't convert pod from file %q: %v", filename, err)
+	parsed, _, pod, manifestErr := tryDecodeSingleManifest(data)
+	if parsed {
+		if manifestErr != nil {
+			// It parsed but could not be used.
+			return pod, manifestErr
+		}
+		// It parsed!
+		if err = applyDefaults(&pod, filename, true); err != nil {
+			return pod, err
+		}
+		return pod, nil
 	}
 
-	hostname, err := os.Hostname() //TODO: kubelet name would be better
-	if err != nil {
-		return pod, err
+	parsed, pod, podErr := tryDecodeSinglePod(data, filename, true)
+	if parsed {
+		if podErr != nil {
+			return pod, podErr
+		}
+		return pod, nil
 	}
-	hostname = strings.ToLower(hostname)
 
-	if len(pod.UID) == 0 {
-		hasher := md5.New()
-		fmt.Fprintf(hasher, "host:%s", hostname)
-		fmt.Fprintf(hasher, "file:%s", filename)
-		util.DeepHashObject(hasher, pod)
-		pod.UID = types.UID(hex.EncodeToString(hasher.Sum(nil)[0:]))
-		glog.V(5).Infof("Generated UID %q for pod %q from file %s", pod.UID, pod.Name, filename)
-	}
-	// This is required for backward compatibility, and should be removed once we
-	// completely deprecate ContainerManifest.
-	if len(pod.Name) == 0 {
-		pod.Name = string(pod.UID)
-	}
-	if pod.Name, err = GeneratePodName(pod.Name); err != nil {
-		return pod, err
-	}
-	glog.V(5).Infof("Generated Name %q for UID %q from file %s", pod.Name, pod.UID, filename)
-
-	// Always overrides the namespace provided by the file.
-	pod.Namespace = kubelet.NamespaceDefault
-	glog.V(5).Infof("Using namespace %q for pod %q from file %s", pod.Namespace, pod.Name, filename)
-
-	// Currently just simply follow the same format in resthandler.go
-	pod.ObjectMeta.SelfLink = fmt.Sprintf("/api/v1beta2/pods/%s?namespace=%s",
-		pod.Name, pod.Namespace)
-
-	if glog.V(4) {
-		glog.Infof("Got pod from file %q: %#v", filename, pod)
-	} else {
-		glog.V(5).Infof("Got pod from file %q: %s.%s (%s)", filename, pod.Namespace, pod.Name, pod.UID)
-	}
-	return pod, nil
+	return pod, fmt.Errorf("%v: read '%v', but couldn't parse as neither "+
+		"manifest (%v) nor pod (%v).\n",
+		filename, string(data), manifestErr, podErr)
 }
