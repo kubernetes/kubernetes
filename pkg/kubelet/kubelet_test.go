@@ -39,7 +39,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/cadvisor"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/dockertools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/metrics"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/network"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/volume"
 	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/volume/host_path"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
@@ -74,7 +73,6 @@ func newTestKubelet(t *testing.T) *TestKubelet {
 	kubelet.kubeClient = fakeKubeClient
 	kubelet.dockerPuller = &dockertools.FakeDockerPuller{}
 	kubelet.hostname = "testnode"
-	kubelet.networkPlugin, _ = network.InitNetworkPlugin([]network.NetworkPlugin{}, "", network.NewFakeHost(nil))
 	if tempDir, err := ioutil.TempDir("/tmp", "kubelet_test."); err != nil {
 		t.Fatalf("can't make a temp rootdir: %v", err)
 	} else {

@@ -33,7 +33,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/cadvisor"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/config"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/dockertools"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/network"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/volume"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/master/ports"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -80,7 +79,6 @@ type KubeletServer struct {
 	StreamingConnectionIdleTimeout time.Duration
 	ImageGCHighThresholdPercent    int
 	ImageGCLowThresholdPercent     int
-	NetworkPluginName              string
 }
 
 // NewKubeletServer will create a new KubeletServer with default values.
@@ -106,7 +104,6 @@ func NewKubeletServer() *KubeletServer {
 		MasterServiceNamespace:      api.NamespaceDefault,
 		ImageGCHighThresholdPercent: 90,
 		ImageGCLowThresholdPercent:  80,
-		NetworkPluginName:           "",
 	}
 }
 
@@ -145,7 +142,6 @@ func (s *KubeletServer) AddFlags(fs *pflag.FlagSet) {
 	fs.DurationVar(&s.StreamingConnectionIdleTimeout, "streaming_connection_idle_timeout", 0, "Maximum time a streaming connection can be idle before the connection is automatically closed.  Example: '5m'")
 	fs.IntVar(&s.ImageGCHighThresholdPercent, "image_gc_high_threshold", s.ImageGCHighThresholdPercent, "The percent of disk usage after which image garbage collection is always run. Default: 90%%")
 	fs.IntVar(&s.ImageGCLowThresholdPercent, "image_gc_low_threshold", s.ImageGCLowThresholdPercent, "The percent of disk usage before which image garbage collection is never run. Lowest disk usage to garbage collect to. Default: 80%%")
-	fs.StringVar(&s.NetworkPluginName, "network_plugin", s.NetworkPluginName, "<Warning: Alpha feature> The name of the network plugin to be invoked for various events in kubelet/pod lifecycle")
 }
 
 // Run runs the specified KubeletServer.  This should never exit.
@@ -204,8 +200,6 @@ func (s *KubeletServer) Run(_ []string) error {
 		KubeClient:                     client,
 		MasterServiceNamespace:         s.MasterServiceNamespace,
 		VolumePlugins:                  ProbeVolumePlugins(),
-		NetworkPlugins:                 ProbeNetworkPlugins(),
-		NetworkPluginName:              s.NetworkPluginName,
 		StreamingConnectionIdleTimeout: s.StreamingConnectionIdleTimeout,
 		ImageGCPolicy:                  imageGCPolicy,
 	}
@@ -403,8 +397,6 @@ type KubeletConfig struct {
 	Runonce                        bool
 	MasterServiceNamespace         string
 	VolumePlugins                  []volume.Plugin
-	NetworkPlugins                 []network.NetworkPlugin
-	NetworkPluginName              string
 	StreamingConnectionIdleTimeout time.Duration
 	Recorder                       record.EventRecorder
 	TLSOptions                     *kubelet.TLSOptions
@@ -445,8 +437,6 @@ func createAndInitKubelet(kc *KubeletConfig, pc *config.PodConfig) (*kubelet.Kub
 		net.IP(kc.ClusterDNS),
 		kc.MasterServiceNamespace,
 		kc.VolumePlugins,
-		kc.NetworkPlugins,
-		kc.NetworkPluginName,
 		kc.StreamingConnectionIdleTimeout,
 		kc.Recorder,
 		kc.CadvisorInterface,
