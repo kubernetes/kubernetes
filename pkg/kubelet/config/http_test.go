@@ -152,7 +152,7 @@ func TestExtractFromHTTP(t *testing.T) {
 		},
 		{
 			desc:      "Single manifest without ID",
-			manifests: api.ContainerManifest{Version: "v1beta1", UUID: "111"},
+			manifests: v1beta1.ContainerManifest{Version: "v1beta1", UUID: "111"},
 			expected: CreatePodUpdate(kubelet.SET,
 				kubelet.HTTPSource,
 				api.Pod{
