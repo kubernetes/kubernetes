@@ -1,7 +1,7 @@
 # AWS specific configuration options
 
 These options can be set as environment variables to customize how your cluster is created.  Only options
-specific to AWS are documented in this file, for cross-provider options see TODO:global-options-doc.
+specific to AWS are documented here, for cross-provider options see [this document](../options.md).
 
 This is a work-in-progress; not all options are documented yet!
 
@@ -13,7 +13,7 @@ The AWS availability zone to deploy to.  Defaults to us-west-2a.
 
 The AMI to use.  If not specified, the image will be selected based on the AWS region.
 
-## AWS_S3_BUCKET, AWS_S3_REGION
+**AWS_S3_BUCKET**, **AWS_S3_REGION**
 
 The bucket name to use, and the region where the bucket should be created, or where the bucket is located if it exists already.
 
@@ -26,3 +26,14 @@ AWS_S3_BUCKET will default to a uniquely generated name, so you won't collide wi
 It is not a bad idea to set AWS_S3_BUCKET to something more human friendly.
 
 AWS_S3_REGION is useful for people that want to control their data location, because of regulatory restrictions for example.
+
+**MASTER_SIZE**, **MINION_SIZE**
+
+The instance type to use for creating the master/minion.  Defaults to t2.micro.
+
+For production usage, we recommend bigger instances, for example:
+
+```
+export MASTER_SIZE=c4.large
+export MINION_SIZE=r3.large
+```
