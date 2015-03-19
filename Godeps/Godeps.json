@@ -284,7 +284,7 @@
 		},
 		{
 			"ImportPath": "github.com/matttproud/golang_protobuf_extensions/ext",
-			"Rev": "7a864a042e844af638df17ebbabf8183dace556a"
+			"Rev": "ba7d65ac66e9da93a714ca18f6d1bc7a0c09100c"
 		},
 		{
 			"ImportPath": "github.com/miekg/dns",

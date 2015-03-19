@@ -21,8 +21,8 @@ import (
 	"testing"
 	"testing/quick"
 
-	. "code.google.com/p/goprotobuf/proto"
-	. "code.google.com/p/goprotobuf/proto/testdata"
+	. "github.com/golang/protobuf/proto"
+	. "github.com/golang/protobuf/proto/testdata"
 )
 
 func TestWriteDelimited(t *testing.T) {

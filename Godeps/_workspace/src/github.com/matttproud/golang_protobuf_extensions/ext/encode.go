@@ -18,7 +18,7 @@ import (
 	"encoding/binary"
 	"io"
 
-	"code.google.com/p/goprotobuf/proto"
+	"github.com/golang/protobuf/proto"
 )
 
 // WriteDelimited encodes and dumps a message to the provided writer prefixed

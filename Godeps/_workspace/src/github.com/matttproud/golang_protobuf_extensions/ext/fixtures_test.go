@@ -1,5 +1,5 @@
 // Copyright 2010 The Go Authors.  All rights reserved.
-// http://code.google.com/p/goprotobuf/
+// http://github.com/golang/protobuf/
 //
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions are
@@ -30,11 +30,11 @@
 package ext
 
 import (
-	. "code.google.com/p/goprotobuf/proto"
-	. "code.google.com/p/goprotobuf/proto/testdata"
+	. "github.com/golang/protobuf/proto"
+	. "github.com/golang/protobuf/proto/testdata"
 )
 
-// FROM https://code.google.com/p/goprotobuf/source/browse/proto/all_test.go.
+// FROM https://github.com/golang/protobuf/blob/master/proto/all_test.go.
 
 func initGoTestField() *GoTestField {
 	f := new(GoTestField)
