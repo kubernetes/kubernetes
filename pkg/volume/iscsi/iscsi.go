@@ -21,21 +21,33 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/exec"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/mount"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume/network_volume"
 	"github.com/golang/glog"
 )
 
+// Abstract interface to disk operations.
+type diskManager interface {
+	// Attaches the disk to the kubelet's host machine.
+	AttachDisk(*iscsiNetworkVolumeMounter) error
+	// Detaches the disk from the kubelet's host machine.
+	DetachDisk(*iscsiNetworkVolumeMounter) error
+}
+
 // This is the primary entrypoint for volume plugins.
 func ProbeVolumePlugins() []volume.VolumePlugin {
-	return []volume.VolumePlugin{&ISCSIPlugin{nil, exec.New()}}
+	return []volume.VolumePlugin{&ISCSIPlugin{
+		NetworkVolumePlugin: &network_volume.NetworkVolumePlugin{
+			PluginName: ISCSIPluginName,
+			Host:       nil},
+		exe: exec.New()}}
 }
 
 type ISCSIPlugin struct {
-	host volume.VolumeHost
-	exe  exec.Interface
+	*network_volume.NetworkVolumePlugin
+	exe exec.Interface
 }
 
 var _ volume.VolumePlugin = &ISCSIPlugin{}
@@ -43,14 +55,6 @@ var _ volume.VolumePlugin = &ISCSIPlugin{}
 const (
 	ISCSIPluginName = "kubernetes.io/iscsi"
 )
-
-func (plugin *ISCSIPlugin) Init(host volume.VolumeHost) {
-	plugin.host = host
-}
-
-func (plugin *ISCSIPlugin) Name() string {
-	return ISCSIPluginName
-}
 
 func (plugin *ISCSIPlugin) CanSupport(spec *volume.Spec) bool {
 	if spec.VolumeSource.ISCSI == nil && spec.PersistentVolumeSource.ISCSI == nil {
@@ -90,16 +94,22 @@ func (plugin *ISCSIPlugin) newBuilderInternal(spec *volume.Spec, podUID types.UI
 	lun := strconv.Itoa(iscsi.Lun)
 
 	return &iscsiDisk{
-		podUID:   podUID,
-		volName:  spec.Name,
-		portal:   iscsi.TargetPortal,
-		iqn:      iscsi.IQN,
-		lun:      lun,
-		fsType:   iscsi.FSType,
-		readOnly: iscsi.ReadOnly,
-		manager:  manager,
-		mounter:  mounter,
-		plugin:   plugin,
+		NetworkVolume: &network_volume.NetworkVolume{
+			VolName: spec.Name,
+			PodUID:  podUID,
+			Plugin:  plugin,
+			Mounter: &iscsiNetworkVolumeMounter{
+				Interface:    mounter,
+				globalPDPath: makePDNameInternal(plugin.GetHost(), iscsi.TargetPortal, iscsi.IQN, lun),
+				portal:       iscsi.TargetPortal,
+				iqn:          iscsi.IQN,
+				lun:          lun,
+				fsType:       iscsi.FSType,
+				readOnly:     iscsi.ReadOnly,
+				manager:      manager,
+				plugin:       plugin,
+			},
+		},
 	}, nil
 }
 
@@ -110,11 +120,16 @@ func (plugin *ISCSIPlugin) NewCleaner(volName string, podUID types.UID, mounter 
 
 func (plugin *ISCSIPlugin) newCleanerInternal(volName string, podUID types.UID, manager diskManager, mounter mount.Interface) (volume.Cleaner, error) {
 	return &iscsiDisk{
-		podUID:  podUID,
-		volName: volName,
-		manager: manager,
-		mounter: mounter,
-		plugin:  plugin,
+		NetworkVolume: &network_volume.NetworkVolume{
+			PodUID:  podUID,
+			VolName: volName,
+			Plugin:  plugin,
+			Mounter: &iscsiNetworkVolumeMounter{
+				Interface: mounter,
+				manager:   manager,
+				plugin:    plugin,
+			},
+		},
 	}, nil
 }
 
@@ -124,52 +139,58 @@ func (plugin *ISCSIPlugin) execCommand(command string, args []string) ([]byte, e
 }
 
 type iscsiDisk struct {
-	volName  string
-	podUID   types.UID
-	portal   string
-	iqn      string
-	readOnly bool
-	lun      string
-	fsType   string
-	plugin   *ISCSIPlugin
-	mounter  mount.Interface
+	*network_volume.NetworkVolume
+}
+
+type iscsiNetworkVolumeMounter struct {
+	mount.Interface
+	globalPDPath string
+	portal       string
+	iqn          string
+	readOnly     bool
+	lun          string
+	fsType       string
 	// Utility interface that provides API calls to the provider to attach/detach disks.
 	manager diskManager
+	plugin  *ISCSIPlugin
 }
 
-func (iscsi *iscsiDisk) GetPath() string {
-	name := ISCSIPluginName
-	// safe to use PodVolumeDir now: volume teardown occurs before pod is cleaned up
-	return iscsi.plugin.host.GetPodVolumeDir(iscsi.podUID, util.EscapeQualifiedNameForDisk(name), iscsi.volName)
-}
+func (mounter *iscsiNetworkVolumeMounter) MountVolume(dest string) error {
+	// Perform a bind mount to the full path to allow duplicate mounts of the same disk.
+	options := []string{"bind"}
+	if mounter.readOnly {
+		options = append(options, "ro")
+	}
 
-func (iscsi *iscsiDisk) SetUp() error {
-	return iscsi.SetUpAt(iscsi.GetPath())
-}
-
-func (iscsi *iscsiDisk) SetUpAt(dir string) error {
-	// diskSetUp checks mountpoints and prevent repeated calls
-	err := diskSetUp(iscsi.manager, *iscsi, dir, iscsi.mounter)
+	err := mounter.Mount(mounter.globalPDPath, dest, "", options)
 	if err != nil {
-		glog.Errorf("iscsi: failed to setup")
+		glog.Errorf("failed to bind mount:%s", mounter.globalPDPath)
 		return err
 	}
-	globalPDPath := iscsi.manager.MakeGlobalPDName(*iscsi)
-	var options []string
-	if iscsi.readOnly {
+	// Remount is needed because the first mount does not honor
+	// the ro option when passed
+	// TODO: Check that remount is still needed and debug if so.
+	if mounter.readOnly {
 		options = []string{"remount", "ro"}
 	} else {
 		options = []string{"remount", "rw"}
 	}
-	return iscsi.mounter.Mount(globalPDPath, dir, "", options)
+	return mounter.Mount(mounter.globalPDPath, dest, "", options)
 }
 
-// Unmounts the bind mount, and detaches the disk only if the disk
-// resource was the last reference to that disk on the kubelet.
-func (iscsi *iscsiDisk) TearDown() error {
-	return iscsi.TearDownAt(iscsi.GetPath())
+func (mounter *iscsiNetworkVolumeMounter) UnmountVolume(dest string) error {
+	return mounter.Unmount(dest)
 }
 
-func (iscsi *iscsiDisk) TearDownAt(dir string) error {
-	return diskTearDown(iscsi.manager, *iscsi, dir, iscsi.mounter)
+func (mounter *iscsiNetworkVolumeMounter) AttachVolume() error {
+	return mounter.manager.AttachDisk(mounter)
+}
+
+func (mounter *iscsiNetworkVolumeMounter) DetachVolume(globalPath string) error {
+	mounter.globalPDPath = globalPath
+	return mounter.manager.DetachDisk(mounter)
+}
+
+func (mounter *iscsiNetworkVolumeMounter) GetGlobalPath() string {
+	return mounter.globalPDPath
 }
