@@ -421,6 +421,7 @@ function kube-up {
     echo "readonly DNS_DOMAIN='${DNS_DOMAIN:-}'"
     echo "readonly ADMISSION_CONTROL='${ADMISSION_CONTROL:-}'"    
     grep -v "^#" "${KUBE_ROOT}/cluster/aws/templates/common.sh"
+    grep -v "^#" "${KUBE_ROOT}/cluster/aws/templates/format-disks.sh"
     grep -v "^#" "${KUBE_ROOT}/cluster/aws/templates/create-dynamic-salt-files.sh"
     grep -v "^#" "${KUBE_ROOT}/cluster/aws/templates/download-release.sh"
     grep -v "^#" "${KUBE_ROOT}/cluster/aws/templates/salt-master.sh"
@@ -498,6 +499,8 @@ function kube-up {
       echo "#! /bin/bash"
       echo "SALT_MASTER='${MASTER_INTERNAL_IP}'"
       echo "MINION_IP_RANGE='${MINION_IP_RANGES[$i]}'"
+      echo "DOCKER_OPTS='${EXTRA_DOCKER_OPTS:-}'"
+      grep -v "^#" "${KUBE_ROOT}/cluster/aws/templates/format-disks.sh"
       grep -v "^#" "${KUBE_ROOT}/cluster/aws/templates/salt-minion.sh"
     ) > "${KUBE_TEMP}/minion-start-${i}.sh"
     minion_id=$($AWS_CMD run-instances \
