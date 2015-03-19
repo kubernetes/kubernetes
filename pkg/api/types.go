@@ -203,14 +203,6 @@ type PersistentVolumeSource struct {
 	// GCEPersistentDisk represents a GCE Disk resource that is attached to a
 	// kubelet's host machine and then exposed to the pod.
 	GCEPersistentDisk *GCEPersistentDiskVolumeSource `json:"persistentDisk"`
-
-	// AWSElasticBlockStore represents an EBS volume in AWS that is attached to
-	// kubelet's host machine and then exposed to the pod.
-	AWSElasticBlockStore *AWSElasticBlockStore `json:"elasticBlockStore"`
-
-	// NFSMount represents the location of an exported volume on a fileserver
-	NFSMount *NFSMount `json:"nfsMount"`
-
 	// HostPath represents a directory on the host.
 	// This is useful for development and testing only.
 	// on-host storage is not supported in any way
@@ -321,22 +313,6 @@ type PersistentVolumeClaimVolumeSource struct {
 	// Optional: Defaults to false (read/write).  ReadOnly here
 	// will force the ReadOnly setting in VolumeMounts
 	ReadOnly bool `json:readOnly,omitempty`
-}
-
-//
-// AWSEBS and NFS are orthogonal tasks that don't need to be here for Persistent Volumes.
-// They are here in the meantime for me to work with AccessModes correctly.
-// These will be refactored out after the NFS PR gets merged and this feature nears completion.
-//
-type AWSElasticBlockStore struct {
-	// the device's EBS volumeID from AWS
-	VolumeID string `json:"volumeId,omitempty"`
-}
-
-type NFSMount struct {
-	Server       string `json:"server"`
-	SourcePath   string `json:"sourcePath"`
-	MountOptions string `json:"mountOptions"`
 }
 
 // HostPathVolumeSource represents a host directory mapped into a pod.

@@ -55,24 +55,11 @@ func contains(modes []api.AccessModeType, mode api.AccessModeType) bool {
 
 // TODO refactor this into a volume plugin interface method so that we're not hard-coding any volume names here
 func GetAccessModeType(source api.PersistentVolumeSource) []api.AccessModeType {
-	if source.AWSElasticBlockStore != nil || source.HostPath != nil {
-		return []api.AccessModeType{api.ReadWriteOnce}
-	}
-
 	if source.GCEPersistentDisk != nil {
 		return []api.AccessModeType{
 			api.ReadWriteOnce,
 			api.ReadOnlyMany,
 		}
 	}
-
-	if source.NFSMount != nil {
-		return []api.AccessModeType{
-			api.ReadWriteOnce,
-			api.ReadOnlyMany,
-			api.ReadWriteMany,
-		}
-	}
-
 	return []api.AccessModeType{}
 }

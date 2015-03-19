@@ -364,12 +364,11 @@ func validateNFS(nfs *api.NFSVolumeSource) errs.ValidationErrorList {
 	return allErrs
 }
 
-// TODO implement full validation to complete #4055
 func validatePersistentVolumeClaimVolumeSource(claimAttachment *api.PersistentVolumeClaimVolumeSource) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 
 	if claimAttachment.ClaimName == "" {
-		allErrs = append(allErrs, errs.NewFieldRequired("persistentVolumeClaim.Name", ""))
+		allErrs = append(allErrs, errs.NewFieldRequired("persistentVolumeClaim.Name"))
 	}
 	if ok, _ := ValidatePersistentVolumeName(claimAttachment.ClaimName, false); !ok {
 		allErrs = append(allErrs, errs.NewFieldInvalid("persistentVolumeClaim.Name", claimAttachment.ClaimName, "ClaimName"))
@@ -386,7 +385,7 @@ func ValidatePersistentVolume(pv *api.PersistentVolume) errs.ValidationErrorList
 	allErrs := ValidateObjectMeta(&pv.ObjectMeta, false, ValidatePersistentVolumeName)
 
 	if len(pv.Spec.Capacity) == 0 {
-		allErrs = append(allErrs, errs.NewFieldRequired("persistentVolume.Capacity", pv.Spec.Capacity))
+		allErrs = append(allErrs, errs.NewFieldRequired("persistentVolume.Capacity"))
 	}
 
 	if _, ok := pv.Spec.Capacity[api.ResourceStorage]; !ok || len(pv.Spec.Capacity) > 1 {
