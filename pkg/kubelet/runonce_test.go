@@ -77,6 +77,7 @@ func TestRunOnce(t *testing.T) {
 		rootDirectory: "/tmp/kubelet",
 		recorder:      &record.FakeRecorder{},
 		cadvisor:      cadvisor,
+		podStatuses:   make(map[string]api.PodStatus),
 	}
 
 	kb.networkPlugin, _ = network.InitNetworkPlugin([]network.NetworkPlugin{}, "", network.NewFakeHost(nil))
