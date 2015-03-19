@@ -25,6 +25,9 @@ spec:
               hostPort: 8086
         - name: grafana
           image: kubernetes/heapster_grafana:v0.4
+          ports:
+            - containerPort: 80
+              hostPort: 80
           env: 
             - name: "HTTP_USER"
               value: "admin"
