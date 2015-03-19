@@ -20,6 +20,7 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+guestbook_version=${1:-latest}
 docker rm -f guestbook-builder 2> /dev/null || true
 docker rmi -f kubernetes/guestbook-builder || true
-docker rmi -f kubernetes/guestbook || true
+docker rmi -f "kubernetes/guestbook:${guestbook_version}" || true

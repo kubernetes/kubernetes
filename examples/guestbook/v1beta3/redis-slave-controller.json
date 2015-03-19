@@ -22,7 +22,7 @@
             "containers":[
                {
                   "name":"slave",
-                  "image":"brendanburns/redis-slave",
+                  "image":"kubernetes/redis-slave:v2",
                   "ports":[
                      {
                         "containerPort":6379,

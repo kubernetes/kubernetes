@@ -11,7 +11,7 @@
           "version": "v1beta1",
           "id": "guestbook-controller",
           "containers": [{
-            "image": "kubernetes/guestbook",
+            "image": "kubernetes/guestbook:v2",
             "name": "guestbook",
             "ports": [{ "name": "http-server", "containerPort": 3000 }]
           }]

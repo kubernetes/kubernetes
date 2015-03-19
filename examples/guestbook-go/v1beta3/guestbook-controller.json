@@ -21,7 +21,7 @@
          "spec":{
             "containers":[
                {
-                  "image":"kubernetes/guestbook",
+                  "image":"kubernetes/guestbook:v2",
                   "name":"guestbook",
                   "ports":[
                      {

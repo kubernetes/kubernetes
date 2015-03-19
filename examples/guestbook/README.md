@@ -272,7 +272,7 @@ The pod is described in the file `examples/guestbook/frontend-controller.json`:
        },
        "labels": {
          "name": "frontend",
-         "uses": "redis-slave,redis-master",
+         "uses": "redis-slave-or-redis-master",
          "app": "frontend"
        }
       }},

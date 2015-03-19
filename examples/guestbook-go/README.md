@@ -82,7 +82,7 @@ redis-slave-controller                 redis-slave             gurpartap/redis  
 The redis slave configures itself by looking for the Kubernetes service environment variables in the container environment. In particular, the redis slave is started with the following command:
 
 ```shell
-redis-server --slaveof $REDIS_MASTER_SERVICE_HOST $REDIS_MASTER_SERVICE_PORT
+redis-server --slaveof redis-master 6379
 ```
 
 Once that's up you can list the pods in the cluster, to verify that the master and slaves are running:
@@ -125,7 +125,7 @@ $ cluster/kubectl.sh create -f examples/guestbook-go/guestbook-controller.json
 
 $ cluster/kubectl.sh get replicationControllers
 CONTROLLER                             CONTAINER(S)            IMAGE(S)                            SELECTOR                     REPLICAS
-guestbook-controller                   guestbook               kubernetes/guestbook                name=guestbook               3
+guestbook-controller                   guestbook               kubernetes/guestbook:v2             name=guestbook               3
 redis-master-controller                redis-master            gurpartap/redis                     name=redis,role=master       1
 redis-slave-controller                 redis-slave             gurpartap/redis                     name=redis,role=slave        2
 ```
@@ -135,9 +135,9 @@ Once that's up (it may take ten to thirty seconds to create the pods) you can li
 ```shell
 $ cluster/kubectl.sh get pods
 POD                                          IP                  CONTAINER(S)            IMAGE(S)                            HOST                                                             LABELS                                   STATUS
-guestbook-controller-182tv                   10.244.2.8          guestbook               kubernetes/guestbook                kubernetes-minion-3.c.lucid-walker-725.internal/104.154.52.39    name=guestbook                           Running
-guestbook-controller-jzjpe                   10.244.0.7          guestbook               kubernetes/guestbook                kubernetes-minion-1.c.lucid-walker-725.internal/104.154.37.86    name=guestbook                           Running
-guestbook-controller-zwk1b                   10.244.3.8          guestbook               kubernetes/guestbook                kubernetes-minion-4.c.lucid-walker-725.internal/104.154.49.134   name=guestbook                           Running
+guestbook-controller-182tv                   10.244.2.8          guestbook               kubernetes/guestbook:v2             kubernetes-minion-3.c.lucid-walker-725.internal/104.154.52.39    name=guestbook                           Running
+guestbook-controller-jzjpe                   10.244.0.7          guestbook               kubernetes/guestbook:v2             kubernetes-minion-1.c.lucid-walker-725.internal/104.154.37.86    name=guestbook                           Running
+guestbook-controller-zwk1b                   10.244.3.8          guestbook               kubernetes/guestbook:v2             kubernetes-minion-4.c.lucid-walker-725.internal/104.154.49.134   name=guestbook                           Running
 redis-master-pod-hh2gd                       10.244.3.7          redis-master            gurpartap/redis                     kubernetes-minion-4.c.lucid-walker-725.internal/104.154.49.134   name=redis,role=master                   Running
 redis-slave-controller-i7hvs                 10.244.2.7          redis-slave             gurpartap/redis                     kubernetes-minion-3.c.lucid-walker-725.internal/104.154.52.39    name=redis,role=slave                    Running
 redis-slave-controller-nyxxv                 10.244.1.6          redis-slave             gurpartap/redis                     kubernetes-minion-2.c.lucid-walker-725.internal/130.211.144.5    name=redis,role=slave                    Running
