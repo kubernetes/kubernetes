@@ -206,5 +206,7 @@ func applyDefaults(pod *api.Pod, url string) error {
 	// Always overrides the namespace.
 	pod.Namespace = kubelet.NamespaceDefault
 	glog.V(5).Infof("Using namespace %q for pod %q from URL %s", pod.Namespace, pod.Name, url)
+	pod.ObjectMeta.SelfLink = fmt.Sprintf("/api/v1beta2/pods/%s?namespace=%s",
+		pod.Name, pod.Namespace)
 	return nil
 }
