@@ -18,7 +18,6 @@ package nfs
 
 import (
 	"os/exec"
-	"syscall"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/mount"
 	"github.com/golang/glog"
@@ -59,7 +58,8 @@ func (mounter *nfsMounter) Mount(server string, exportDir string, mountDir strin
 }
 
 func (mounter *nfsMounter) Unmount(target string) error {
-	return syscall.Unmount(target, 0)
+	unmounter := mount.New()
+	return unmounter.Unmount(target, 0)
 }
 
 func (mounter *nfsMounter) List() ([]mount.MountPoint, error) {
