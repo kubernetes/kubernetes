@@ -71,15 +71,19 @@ func waitForPodCondition(c *client.Client, ns, podName, desc string, condition p
 		if done {
 			return err
 		}
-		Logf("Waiting for pod %s status to be %q (found %q) (%.2f seconds)", podName, desc, pod.Status.Phase, time.Since(start).Seconds())
+		Logf("Waiting for pod %s in namespace %s status to be %q (found %q) (%v)", podName, ns, desc, pod.Status.Phase, time.Since(start))
 	}
 	return fmt.Errorf("gave up waiting for pod %s to be %s after %.2f seconds", podName, desc, podStartTimeout.Seconds())
 }
 
-func waitForPodRunning(c *client.Client, podName string) error {
-	return waitForPodCondition(c, api.NamespaceDefault, podName, "running", func(pod *api.Pod) (bool, error) {
+func waitForPodRunningInNamespace(c *client.Client, podName string, namespace string) error {
+	return waitForPodCondition(c, namespace, podName, "running", func(pod *api.Pod) (bool, error) {
 		return (pod.Status.Phase == api.PodRunning), nil
 	})
+}
+
+func waitForPodRunning(c *client.Client, podName string) error {
+	return waitForPodRunningInNamespace(c, podName, api.NamespaceDefault)
 }
 
 // waitForPodNotPending returns an error if it took too long for the pod to go out of pending state.
