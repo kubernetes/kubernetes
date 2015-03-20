@@ -169,6 +169,22 @@ a name lookup for "my-service".  `Pods` which exist in other `Namespaces` must
 qualify the name as "my-service.my-ns".  The result of these name lookups is the
 virtual portal IP.
 
+## Headless Services
+
+Users can create headless services by specifying "None" for the PortalIP.
+For such services, an IP or DNS is not created and neither are service-specific
+environment variables for the pods created. Additionally, the kube proxy does not
+handle these services and there is no load balancing or proxying being done by the
+platform for them. The endpoints_controller would still create endpoint records in
+etcd for such services, which are also made available via the API. These services
+also take advantage of any UI, readiness probes, etc. that are applicable for
+services in general. 
+
+The tradeoff for a developer would be whether to couple to the Kubernetes API or to
+a particular discovery system. This API would not preclude the self-registration
+approach, however, and adapters for other discovery systems could be built upon this
+API, as well.
+
 ## External Services
 
 For some parts of your application (e.g. frontends) you may want to expose a
