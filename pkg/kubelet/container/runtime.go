@@ -81,4 +81,33 @@ type Container struct {
 	// Hash of the container, used for comparison. Optional for containers
 	// not managed by kubelet.
 	Hash uint64
+	// The timestamp of the creation time of the container.
+	// TODO(yifan): Consider to move it to api.ContainerStatus.
+	Created int64
+}
+
+type Pods []*Pod
+
+// FindPodByID returns a pod in the pod list by UID. It will return an empty pod
+// if not found.
+// TODO(yifan): Use a map?
+func (p Pods) FindPodByID(podUID types.UID) Pod {
+	for i := range p {
+		if p[i].ID == podUID {
+			return *p[i]
+		}
+	}
+	return Pod{}
+}
+
+// FindContainerByName returns a container in the pod with the given name.
+// When there are multiple containers with the same name, the first match will
+// be returned.
+func (p *Pod) FindContainerByName(containerName string) *Container {
+	for _, c := range p.Containers {
+		if c.Name == containerName {
+			return c
+		}
+	}
+	return nil
 }
