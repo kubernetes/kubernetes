@@ -26,10 +26,11 @@ func TestCDNContainers(t *testing.T) {
 
 	raxCDNClient, err := createClient(t, true)
 	th.AssertNoErr(t, err)
-
-	r := raxCDNContainers.Enable(raxCDNClient, "gophercloud-test", raxCDNContainers.EnableOpts{CDNEnabled: true, TTL: 900})
-	th.AssertNoErr(t, r.Err)
-	t.Logf("Headers from Enable CDN Container request: %+v\n", r.Header)
+	enableRes := raxCDNContainers.Enable(raxCDNClient, "gophercloud-test", raxCDNContainers.EnableOpts{CDNEnabled: true, TTL: 900})
+	t.Logf("Header map from Enable CDN Container request: %+v\n", enableRes.Header)
+	enableHeader, err := enableRes.Extract()
+	th.AssertNoErr(t, err)
+	t.Logf("Headers from Enable CDN Container request: %+v\n", enableHeader)
 
 	t.Logf("Container Names available to the currently issued token:")
 	count := 0
@@ -51,11 +52,15 @@ func TestCDNContainers(t *testing.T) {
 		t.Errorf("No CDN containers listed for your current token.")
 	}
 
-	updateres := raxCDNContainers.Update(raxCDNClient, "gophercloud-test", raxCDNContainers.UpdateOpts{CDNEnabled: false})
-	th.AssertNoErr(t, updateres.Err)
-	t.Logf("Headers from Update CDN Container request: %+v\n", updateres.Header)
-
-	metadata, err := raxCDNContainers.Get(raxCDNClient, "gophercloud-test").ExtractMetadata()
+	updateOpts := raxCDNContainers.UpdateOpts{XCDNEnabled: raxCDNContainers.Disabled, XLogRetention: raxCDNContainers.Enabled}
+	updateHeader, err := raxCDNContainers.Update(raxCDNClient, "gophercloud-test", updateOpts).Extract()
 	th.AssertNoErr(t, err)
-	t.Logf("Headers from Get CDN Container request (after update): %+v\n", metadata)
+	t.Logf("Headers from Update CDN Container request: %+v\n", updateHeader)
+
+	getRes := raxCDNContainers.Get(raxCDNClient, "gophercloud-test")
+	getHeader, err := getRes.Extract()
+	th.AssertNoErr(t, err)
+	t.Logf("Headers from Get CDN Container request (after update): %+v\n", getHeader)
+	metadata, err := getRes.ExtractMetadata()
+	t.Logf("Metadata from Get CDN Container request (after update): %+v\n", metadata)
 }

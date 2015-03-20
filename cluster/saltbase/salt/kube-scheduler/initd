@@ -18,7 +18,7 @@ PATH=/sbin:/usr/sbin:/bin:/usr/bin
 DESC="The Kubernetes scheduler plugin"
 NAME=kube-scheduler
 DAEMON=/usr/local/bin/kube-scheduler
-DAEMON_ARGS=" --master=127.0.0.1:8080"
+DAEMON_ARGS=" "
 DAEMON_LOG_FILE=/var/log/$NAME.log
 PIDFILE=/var/run/$NAME.pid
 SCRIPTNAME=/etc/init.d/$NAME

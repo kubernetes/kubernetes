@@ -32,7 +32,7 @@ echo "192.168.121.9	fed-master
 * Edit /etc/kubernetes/config which will be the same on all hosts to contain:
 
 ```
-# Comma seperated list of nodes in the etcd cluster
+# Comma separated list of nodes in the etcd cluster
 KUBE_ETCD_SERVERS="--etcd_servers=http://fed-master:4001"
 
 # logging to stderr means we get it in the systemd journal
@@ -41,7 +41,7 @@ KUBE_LOGTOSTDERR="--logtostderr=true"
 # journal message level, 0 is debug
 KUBE_LOG_LEVEL="--v=0"
 
-# Should this cluster be allowed to run privleged docker containers
+# Should this cluster be allowed to run privileged docker containers
 KUBE_ALLOW_PRIV="--allow_privileged=false"
 ```
 
@@ -78,7 +78,7 @@ KUBE_API_ARGS=""
 
 * Edit /etc/kubernetes/controller-manager to appear as such:
 ```
-# Comma seperated list of minions
+# Comma separated list of minions
 KUBELET_ADDRESSES="--machines=fed-minion"
 ```
 
@@ -128,8 +128,8 @@ done
 
 ```
 kubectl get minions
-NAME                LABELS
-fed-minion          <none>
+NAME                LABELS              STATUS
+fed-minion          <none>              Ready
 ```
 
 **The cluster should be running! Launch a test pod.**

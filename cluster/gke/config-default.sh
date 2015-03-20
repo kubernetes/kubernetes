@@ -29,3 +29,6 @@ LOGGING_DESTINATION=gcp # options: elasticsearch, gcp
 # Optional: When set to true, Elasticsearch and Kibana will be setup as part of the cluster bring up.
 ENABLE_CLUSTER_LOGGING=false
 ELASTICSEARCH_LOGGING_REPLICAS=1
+
+# Optional: When set to true, heapster, Influxdb and Grafana will be setup as part of the cluster bring up.
+ENABLE_CLUSTER_MONITORING="${KUBE_ENABLE_CLUSTER_MONITORING:-false}"

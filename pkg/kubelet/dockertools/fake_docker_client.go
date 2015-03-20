@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"reflect"
 	"sync"
+	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/fsouza/go-dockerclient"
@@ -118,8 +119,13 @@ func (f *FakeDockerClient) StartContainer(id string, hostConfig *docker.HostConf
 	f.called = append(f.called, "start")
 	f.Container = &docker.Container{
 		ID:         id,
+		Name:       id, // For testing purpose, we set name to id
 		Config:     &docker.Config{Image: "testimage"},
 		HostConfig: hostConfig,
+		State: docker.State{
+			Running: true,
+			Pid:     42,
+		},
 	}
 	return f.Err
 }
@@ -226,4 +232,22 @@ func (f *FakeDockerPuller) IsImagePresent(name string) (bool, error) {
 		}
 	}
 	return false, nil
+}
+
+type FakeDockerCache struct {
+	client DockerInterface
+}
+
+func NewFakeDockerCache(client DockerInterface) DockerCache {
+	return &FakeDockerCache{
+		client: client,
+	}
+}
+
+func (f *FakeDockerCache) RunningContainers() (DockerContainers, error) {
+	return GetKubeletDockerContainers(f.client, false)
+}
+
+func (f *FakeDockerCache) ForceUpdateIfOlder(time.Time) error {
+	return nil
 }

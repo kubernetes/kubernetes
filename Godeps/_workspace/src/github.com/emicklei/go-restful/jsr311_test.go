@@ -66,6 +66,14 @@ func TestDetectDispatcher(t *testing.T) {
 // Step 2 tests
 //
 
+// go test -v -test.run TestISSUE_179 ...restful
+func TestISSUE_179(t *testing.T) {
+	ws1 := new(WebService)
+	ws1.Route(ws1.GET("/v1/category/{param:*}").To(dummy))
+	routes := RouterJSR311{}.selectRoutes(ws1, "/v1/category/sub/sub")
+	t.Logf("%v", routes)
+}
+
 // go test -v -test.run TestISSUE_30 ...restful
 func TestISSUE_30(t *testing.T) {
 	ws1 := new(WebService).Path("/users")
@@ -179,38 +187,6 @@ func containsRoutePath(routes []Route, path string, t *testing.T) bool {
 		}
 	}
 	return false
-}
-
-var tempregexs = []struct {
-	template, regex        string
-	literalCount, varCount int
-}{
-	{"", "^(/.*)?$", 0, 0},
-	{"/a/{b}/c/", "^/a/([^/]+?)/c(/.*)?$", 2, 1},
-	{"/{a}/{b}/{c-d-e}/", "^/([^/]+?)/([^/]+?)/([^/]+?)(/.*)?$", 0, 3},
-	{"/{p}/abcde", "^/([^/]+?)/abcde(/.*)?$", 5, 1},
-}
-
-func TestTemplateToRegularExpression(t *testing.T) {
-	ok := true
-	for i, fixture := range tempregexs {
-		actual, lCount, vCount, _ := templateToRegularExpression(fixture.template)
-		if actual != fixture.regex {
-			t.Logf("regex mismatch, expected:%v , actual:%v, line:%v\n", fixture.regex, actual, i) // 11 = where the data starts
-			ok = false
-		}
-		if lCount != fixture.literalCount {
-			t.Logf("literal count mismatch, expected:%v , actual:%v, line:%v\n", fixture.literalCount, lCount, i)
-			ok = false
-		}
-		if vCount != fixture.varCount {
-			t.Logf("variable count mismatch, expected:%v , actual:%v, line:%v\n", fixture.varCount, vCount, i)
-			ok = false
-		}
-	}
-	if !ok {
-		t.Fatal("one or more expression did not match")
-	}
 }
 
 // go test -v -test.run TestSortableRouteCandidates ...restful

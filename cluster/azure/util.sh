@@ -343,11 +343,13 @@ function kube-up {
         echo "mkdir -p /var/cache/kubernetes-install"
         echo "cd /var/cache/kubernetes-install"
         echo "readonly MASTER_NAME='${MASTER_NAME}'"
+        echo "readonly INSTANCE_PREFIX='${INSTANCE_PREFIX}'"
         echo "readonly NODE_INSTANCE_PREFIX='${INSTANCE_PREFIX}-minion'"
         echo "readonly SERVER_BINARY_TAR_URL='${SERVER_BINARY_TAR_URL}'"
         echo "readonly SALT_TAR_URL='${SALT_TAR_URL}'"
         echo "readonly MASTER_HTPASSWD='${htpasswd}'"
         echo "readonly PORTAL_NET='${PORTAL_NET}'"
+        echo "readonly ADMISSION_CONTROL='${ADMISSION_CONTROL:-}'"        
         grep -v "^#" "${KUBE_ROOT}/cluster/azure/templates/common.sh"
         grep -v "^#" "${KUBE_ROOT}/cluster/azure/templates/create-dynamic-salt-files.sh"
         grep -v "^#" "${KUBE_ROOT}/cluster/azure/templates/download-release.sh"
@@ -555,13 +557,9 @@ function restart-kube-proxy {
     ssh-to-node "$1" "sudo /etc/init.d/kube-proxy restart"
 }
 
-# Setup monitoring using heapster and InfluxDB
-function setup-monitoring-firewall {
-    echo "not implemented"  >/dev/null
-}
-
-function teardown-monitoring-firewall {
-    echo "not implemented"  >/dev/null
+# Restart the kube-proxy on the master ($1)
+function restart-apiserver {
+    ssh-to-node "$1" "sudo /etc/init.d/kube-apiserver restart"
 }
 
 function setup-logging-firewall {

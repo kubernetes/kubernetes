@@ -12,7 +12,7 @@ desiredState:
         id: es-log-ingestion
         containers:
           - name: elasticsearch-logging
-            image: dockerfile/elasticsearch
+            image: kubernetes/elasticsearch:1.0
             ports:
               - name: es-port
                 containerPort: 9200
@@ -27,6 +27,7 @@ desiredState:
               emptyDir: {}
     labels:
       name: elasticsearch-logging
+      kubernetes.io/cluster-service: "true"
 labels:
   name: elasticsearch-logging
- 
+  kubernetes.io/cluster-service: "true"

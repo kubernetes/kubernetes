@@ -20,6 +20,7 @@ import (
 	"sync"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
@@ -71,14 +72,14 @@ func (r *ServiceRegistry) ListServices(ctx api.Context) (*api.ServiceList, error
 	return res, r.Err
 }
 
-func (r *ServiceRegistry) CreateService(ctx api.Context, svc *api.Service) error {
+func (r *ServiceRegistry) CreateService(ctx api.Context, svc *api.Service) (*api.Service, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
 	r.Service = new(api.Service)
 	*r.Service = *svc
 	r.List.Items = append(r.List.Items, *svc)
-	return r.Err
+	return svc, r.Err
 }
 
 func (r *ServiceRegistry) GetService(ctx api.Context, id string) (*api.Service, error) {
@@ -98,16 +99,16 @@ func (r *ServiceRegistry) DeleteService(ctx api.Context, id string) error {
 	return r.Err
 }
 
-func (r *ServiceRegistry) UpdateService(ctx api.Context, svc *api.Service) error {
+func (r *ServiceRegistry) UpdateService(ctx api.Context, svc *api.Service) (*api.Service, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
 	r.UpdatedID = svc.Name
 	*r.Service = *svc
-	return r.Err
+	return svc, r.Err
 }
 
-func (r *ServiceRegistry) WatchServices(ctx api.Context, label labels.Selector, field labels.Selector, resourceVersion string) (watch.Interface, error) {
+func (r *ServiceRegistry) WatchServices(ctx api.Context, label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -137,7 +138,7 @@ func (r *ServiceRegistry) UpdateEndpoints(ctx api.Context, e *api.Endpoints) err
 	return r.Err
 }
 
-func (r *ServiceRegistry) WatchEndpoints(ctx api.Context, label, field labels.Selector, resourceVersion string) (watch.Interface, error) {
+func (r *ServiceRegistry) WatchEndpoints(ctx api.Context, label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 

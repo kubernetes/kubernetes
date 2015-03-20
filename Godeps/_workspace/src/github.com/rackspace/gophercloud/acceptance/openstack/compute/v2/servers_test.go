@@ -12,6 +12,7 @@ import (
 	"github.com/rackspace/gophercloud/openstack/compute/v2/servers"
 	"github.com/rackspace/gophercloud/openstack/networking/v2/networks"
 	"github.com/rackspace/gophercloud/pagination"
+	th "github.com/rackspace/gophercloud/testhelper"
 )
 
 func TestListServers(t *testing.T) {
@@ -94,6 +95,8 @@ func createServer(t *testing.T, client *gophercloud.ServiceClient, choices *Comp
 	name := tools.RandomString("ACPTTEST", 16)
 	t.Logf("Attempting to create server: %s\n", name)
 
+	pwd := tools.MakeNewPassword("")
+
 	server, err := servers.Create(client, servers.CreateOpts{
 		Name:      name,
 		FlavorRef: choices.FlavorID,
@@ -101,10 +104,13 @@ func createServer(t *testing.T, client *gophercloud.ServiceClient, choices *Comp
 		Networks: []servers.Network{
 			servers.Network{UUID: network.ID},
 		},
+		AdminPass: pwd,
 	}).Extract()
 	if err != nil {
 		t.Fatalf("Unable to create server: %v", err)
 	}
+
+	th.AssertEquals(t, pwd, server.AdminPass)
 
 	return server, err
 }
@@ -390,4 +396,55 @@ func TestActionResizeRevert(t *testing.T) {
 	if err = waitForStatus(client, server, "ACTIVE"); err != nil {
 		t.Fatal(err)
 	}
+}
+
+func TestServerMetadata(t *testing.T) {
+	t.Parallel()
+
+	choices, err := ComputeChoicesFromEnv()
+	th.AssertNoErr(t, err)
+
+	client, err := newClient()
+	if err != nil {
+		t.Fatalf("Unable to create a compute client: %v", err)
+	}
+
+	server, err := createServer(t, client, choices)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer servers.Delete(client, server.ID)
+	if err = waitForStatus(client, server, "ACTIVE"); err != nil {
+		t.Fatal(err)
+	}
+
+	metadata, err := servers.UpdateMetadata(client, server.ID, servers.MetadataOpts{
+		"foo":  "bar",
+		"this": "that",
+	}).Extract()
+	th.AssertNoErr(t, err)
+	t.Logf("UpdateMetadata result: %+v\n", metadata)
+
+	err = servers.DeleteMetadatum(client, server.ID, "foo").ExtractErr()
+	th.AssertNoErr(t, err)
+
+	metadata, err = servers.CreateMetadatum(client, server.ID, servers.MetadatumOpts{
+		"foo": "baz",
+	}).Extract()
+	th.AssertNoErr(t, err)
+	t.Logf("CreateMetadatum result: %+v\n", metadata)
+
+	metadata, err = servers.Metadatum(client, server.ID, "foo").Extract()
+	th.AssertNoErr(t, err)
+	t.Logf("Metadatum result: %+v\n", metadata)
+	th.AssertEquals(t, "baz", metadata["foo"])
+
+	metadata, err = servers.Metadata(client, server.ID).Extract()
+	th.AssertNoErr(t, err)
+	t.Logf("Metadata result: %+v\n", metadata)
+
+	metadata, err = servers.ResetMetadata(client, server.ID, servers.MetadataOpts{}).Extract()
+	th.AssertNoErr(t, err)
+	t.Logf("ResetMetadata result: %+v\n", metadata)
+	th.AssertDeepEquals(t, map[string]string{}, metadata)
 }

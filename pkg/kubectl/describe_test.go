@@ -17,6 +17,8 @@ limitations under the License.
 package kubectl
 
 import (
+	"fmt"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -103,4 +105,84 @@ func TestPodDescribeResultsSorted(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 	VerifyDatesInOrder(out, "\n" /* rowDelimiter */, "\t" /* columnDelimiter */, t)
+}
+
+func TestDescribers(t *testing.T) {
+	first := &api.Event{}
+	second := &api.Pod{}
+	var third *api.Pod
+	testErr := fmt.Errorf("test")
+	d := Describers{}
+	d.Add(
+		func(e *api.Event, p *api.Pod) (string, error) {
+			if e != first {
+				t.Errorf("first argument not equal: %#v", e)
+			}
+			if p != second {
+				t.Errorf("second argument not equal: %#v", p)
+			}
+			return "test", testErr
+		},
+	)
+	if out, err := d.DescribeObject(first, second); out != "test" || err != testErr {
+		t.Errorf("unexpected result: %s %v", out, err)
+	}
+
+	if out, err := d.DescribeObject(first, second, third); out != "" || err == nil {
+		t.Errorf("unexpected result: %s %v", out, err)
+	} else {
+		if noDescriber, ok := err.(ErrNoDescriber); ok {
+			if !reflect.DeepEqual(noDescriber.Types, []string{"*api.Event", "*api.Pod", "*api.Pod"}) {
+				t.Errorf("unexpected describer: %v", err)
+			}
+		} else {
+			t.Errorf("unexpected error type: %v", err)
+		}
+	}
+
+	d.Add(
+		func(e *api.Event) (string, error) {
+			if e != first {
+				t.Errorf("first argument not equal: %#v", e)
+			}
+			return "simpler", testErr
+		},
+	)
+	if out, err := d.DescribeObject(first); out != "simpler" || err != testErr {
+		t.Errorf("unexpected result: %s %v", out, err)
+	}
+}
+
+func TestDefaultDescribers(t *testing.T) {
+	out, err := DefaultObjectDescriber.DescribeObject(&api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !strings.Contains(out, "foo") {
+		t.Errorf("unexpected output: %s", out)
+	}
+
+	out, err = DefaultObjectDescriber.DescribeObject(&api.Service{ObjectMeta: api.ObjectMeta{Name: "foo"}})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !strings.Contains(out, "foo") {
+		t.Errorf("unexpected output: %s", out)
+	}
+
+	out, err = DefaultObjectDescriber.DescribeObject(&api.ReplicationController{ObjectMeta: api.ObjectMeta{Name: "foo"}})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !strings.Contains(out, "foo") {
+		t.Errorf("unexpected output: %s", out)
+	}
+
+	out, err = DefaultObjectDescriber.DescribeObject(&api.Node{ObjectMeta: api.ObjectMeta{Name: "foo"}})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !strings.Contains(out, "foo") {
+		t.Errorf("unexpected output: %s", out)
+	}
 }

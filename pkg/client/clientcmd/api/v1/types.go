@@ -57,6 +57,8 @@ type Cluster struct {
 	InsecureSkipTLSVerify bool `json:"insecure-skip-tls-verify,omitempty"`
 	// CertificateAuthority is the path to a cert file for the certificate authority.
 	CertificateAuthority string `json:"certificate-authority,omitempty"`
+	// CertificateAuthorityData contains PEM-encoded certificate authority certificates. Overrides CertificateAuthority
+	CertificateAuthorityData []byte `json:"certificate-authority-data,omitempty"`
 	// Extensions holds additional information. This is useful for extenders so that reads and writes don't clobber unknown fields
 	Extensions []NamedExtension `json:"extensions,omitempty"`
 }
@@ -67,10 +69,18 @@ type AuthInfo struct {
 	AuthPath string `json:"auth-path,omitempty"`
 	// ClientCertificate is the path to a client cert file for TLS.
 	ClientCertificate string `json:"client-certificate,omitempty"`
+	// ClientCertificateData contains PEM-encoded data from a client cert file for TLS. Overrides ClientCertificate
+	ClientCertificateData []byte `json:"client-certificate-data,omitempty"`
 	// ClientKey is the path to a client key file for TLS.
 	ClientKey string `json:"client-key,omitempty"`
+	// ClientKeyData contains PEM-encoded data from a client key file for TLS. Overrides ClientKey
+	ClientKeyData []byte `json:"client-key-data,omitempty"`
 	// Token is the bearer token for authentication to the kubernetes cluster.
 	Token string `json:"token,omitempty"`
+	// Username is the username for basic authentication to the kubernetes cluster.
+	Username string `json:"username,omitempty"`
+	// Password is the password for basic authentication to the kubernetes cluster.
+	Password string `json:"password,omitempty"`
 	// Extensions holds additional information. This is useful for extenders so that reads and writes don't clobber unknown fields
 	Extensions []NamedExtension `json:"extensions,omitempty"`
 }

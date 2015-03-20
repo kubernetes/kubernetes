@@ -64,7 +64,7 @@ You can create a pod like this:
 
 ```
 cd kubernetes
-cluster/kubectl.sh create -f api/examples/pod.json
+cluster/kubectl.sh create -f docs/getting-started-guides/pod.json
 ```
 
 Where pod.json contains something like:
@@ -91,7 +91,7 @@ Where pod.json contains something like:
           "initialDelaySeconds": 30,
           "httpGet": {
             "path": "/index.html",
-            "port": "8080"
+            "port": 8080
           }
         }
       }]

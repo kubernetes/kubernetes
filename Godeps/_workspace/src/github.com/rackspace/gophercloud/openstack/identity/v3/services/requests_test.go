@@ -38,7 +38,7 @@ func TestCreateSuccessful(t *testing.T) {
 	}
 
 	if result.Description == nil || *result.Description != "Here's your service" {
-		t.Errorf("Service description was unexpected [%s]", result.Description)
+		t.Errorf("Service description was unexpected [%s]", *result.Description)
 	}
 	if result.ID != "1234" {
 		t.Errorf("Service ID was unexpected [%s]", result.ID)

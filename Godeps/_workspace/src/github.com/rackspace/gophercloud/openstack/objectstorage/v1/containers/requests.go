@@ -1,7 +1,6 @@
 package containers
 
 import (
-	"github.com/racker/perigee"
 	"github.com/rackspace/gophercloud"
 	"github.com/rackspace/gophercloud/pagination"
 )
@@ -111,11 +110,11 @@ func Create(c *gophercloud.ServiceClient, containerName string, opts CreateOptsB
 		}
 	}
 
-	resp, err := perigee.Request("PUT", createURL(c, containerName), perigee.Options{
+	resp, err := c.Request("PUT", createURL(c, containerName), gophercloud.RequestOpts{
 		MoreHeaders: h,
 		OkCodes:     []int{201, 202, 204},
 	})
-	res.Header = resp.HttpResponse.Header
+	res.Header = resp.Header
 	res.Err = err
 	return res
 }
@@ -123,9 +122,8 @@ func Create(c *gophercloud.ServiceClient, containerName string, opts CreateOptsB
 // Delete is a function that deletes a container.
 func Delete(c *gophercloud.ServiceClient, containerName string) DeleteResult {
 	var res DeleteResult
-	_, res.Err = perigee.Request("DELETE", deleteURL(c, containerName), perigee.Options{
-		MoreHeaders: c.AuthenticatedHeaders(),
-		OkCodes:     []int{202, 204},
+	_, res.Err = c.Request("DELETE", deleteURL(c, containerName), gophercloud.RequestOpts{
+		OkCodes: []int{202, 204},
 	})
 	return res
 }
@@ -180,11 +178,11 @@ func Update(c *gophercloud.ServiceClient, containerName string, opts UpdateOptsB
 		}
 	}
 
-	resp, err := perigee.Request("POST", updateURL(c, containerName), perigee.Options{
+	resp, err := c.Request("POST", updateURL(c, containerName), gophercloud.RequestOpts{
 		MoreHeaders: h,
 		OkCodes:     []int{202, 204},
 	})
-	res.Header = resp.HttpResponse.Header
+	res.Header = resp.Header
 	res.Err = err
 	return res
 }
@@ -194,11 +192,10 @@ func Update(c *gophercloud.ServiceClient, containerName string, opts UpdateOptsB
 // function.
 func Get(c *gophercloud.ServiceClient, containerName string) GetResult {
 	var res GetResult
-	resp, err := perigee.Request("HEAD", getURL(c, containerName), perigee.Options{
-		MoreHeaders: c.AuthenticatedHeaders(),
-		OkCodes:     []int{200, 204},
+	resp, err := c.Request("HEAD", getURL(c, containerName), gophercloud.RequestOpts{
+		OkCodes: []int{200, 204},
 	})
-	res.Header = resp.HttpResponse.Header
+	res.Header = resp.Header
 	res.Err = err
 	return res
 }

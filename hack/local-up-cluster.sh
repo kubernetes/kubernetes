@@ -87,8 +87,25 @@ esac
 
 GO_OUT="${KUBE_ROOT}/_output/local/bin/${host_os}/${host_arch}"
 
+cleanup()
+{
+    echo "Cleaning up..."
+    [[ -n "${APISERVER_PID-}" ]] && sudo kill "${APISERVER_PID}"
+    [[ -n "${CTLRMGR_PID-}" ]] && sudo kill "${CTLRMGR_PID}"
+    [[ -n "${KUBELET_PID-}" ]] && sudo kill "${KUBELET_PID}"
+    [[ -n "${PROXY_PID-}" ]] && sudo kill "${PROXY_PID}"
+    [[ -n "${SCHEDULER_PID-}" ]] && sudo kill "${SCHEDULER_PID}"
+
+    [[ -n "${ETCD_PID-}" ]] && kill "${ETCD_PID}"
+    [[ -n "${ETCD_DIR-}" ]] && rm -rf "${ETCD_DIR}"
+
+    exit 0
+}
+
+trap cleanup EXIT
+
 APISERVER_LOG=/tmp/kube-apiserver.log
-sudo "${GO_OUT}/kube-apiserver" \
+sudo -E "${GO_OUT}/kube-apiserver" \
   --v=${LOG_LEVEL} \
   --address="${API_HOST}" \
   --port="${API_PORT}" \
@@ -99,19 +116,19 @@ sudo "${GO_OUT}/kube-apiserver" \
 APISERVER_PID=$!
 
 # Wait for kube-apiserver to come up before launching the rest of the components.
-kube::util::wait_for_url "http://${API_HOST}:${API_PORT}/api/v1beta1/pods" "apiserver: "
+echo "Waiting for apiserver to come up"
+kube::util::wait_for_url "http://${API_HOST}:${API_PORT}/api/v1beta1/pods" "apiserver: " 1 10 || exit 1
 
 CTLRMGR_LOG=/tmp/kube-controller-manager.log
-sudo "${GO_OUT}/kube-controller-manager" \
+sudo -E "${GO_OUT}/kube-controller-manager" \
   --v=${LOG_LEVEL} \
   --machines="127.0.0.1" \
   --master="${API_HOST}:${API_PORT}" >"${CTLRMGR_LOG}" 2>&1 &
 CTLRMGR_PID=$!
 
 KUBELET_LOG=/tmp/kubelet.log
-sudo "${GO_OUT}/kubelet" \
+sudo -E "${GO_OUT}/kubelet" \
   --v=${LOG_LEVEL} \
-  --etcd_servers="http://127.0.0.1:4001" \
   --hostname_override="127.0.0.1" \
   --address="127.0.0.1" \
   --api_servers="${API_HOST}:${API_PORT}" \
@@ -120,13 +137,13 @@ sudo "${GO_OUT}/kubelet" \
 KUBELET_PID=$!
 
 PROXY_LOG=/tmp/kube-proxy.log
-sudo "${GO_OUT}/kube-proxy" \
+sudo -E "${GO_OUT}/kube-proxy" \
   --v=${LOG_LEVEL} \
   --master="http://${API_HOST}:${API_PORT}" >"${PROXY_LOG}" 2>&1 &
 PROXY_PID=$!
 
 SCHEDULER_LOG=/tmp/kube-scheduler.log
-sudo "${GO_OUT}/kube-scheduler" \
+sudo -E "${GO_OUT}/kube-scheduler" \
   --v=${LOG_LEVEL} \
   --master="http://${API_HOST}:${API_PORT}" >"${SCHEDULER_LOG}" 2>&1 &
 SCHEDULER_PID=$!
@@ -143,24 +160,10 @@ Logs:
 
 To start using your cluster, open up another terminal/tab and run:
 
-  export KUBERNETES_PROVIDER=local
+  cluster/kubectl.sh config set-cluster local --server=http://${API_HOST}:${API_PORT} --insecure-skip-tls-verify=true --global
+  cluster/kubectl.sh config set-context local --cluster=local --global
+  cluster/kubectl.sh config use-context local
   cluster/kubectl.sh
 EOF
-
-cleanup()
-{
-    echo "Cleaning up..."
-    sudo kill "${APISERVER_PID}"
-    sudo kill "${CTLRMGR_PID}"
-    sudo kill "${KUBELET_PID}"
-    sudo kill "${PROXY_PID}"
-    sudo kill "${SCHEDULER_PID}"
-
-    kill "${ETCD_PID}"
-    rm -rf "${ETCD_DIR}"
-    exit 0
-}
-
-trap cleanup EXIT
 
 while true; do sleep 1; done

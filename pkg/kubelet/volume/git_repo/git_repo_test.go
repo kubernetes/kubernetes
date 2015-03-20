@@ -26,6 +26,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/volume"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/volume/empty_dir"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/exec"
 )
@@ -35,7 +36,7 @@ func newTestHost(t *testing.T) volume.Host {
 	if err != nil {
 		t.Fatalf("can't make a temp rootdir: %v", err)
 	}
-	return &volume.FakeHost{tempDir}
+	return volume.NewFakeHost(tempDir, nil, empty_dir.ProbeVolumePlugins())
 }
 
 func TestCanSupport(t *testing.T) {
@@ -49,7 +50,7 @@ func TestCanSupport(t *testing.T) {
 	if plug.Name() != "kubernetes.io/git-repo" {
 		t.Errorf("Wrong name: %s", plug.Name())
 	}
-	if !plug.CanSupport(&api.Volume{Source: api.VolumeSource{GitRepo: &api.GitRepo{}}}) {
+	if !plug.CanSupport(&api.Volume{VolumeSource: api.VolumeSource{GitRepo: &api.GitRepoVolumeSource{}}}) {
 		t.Errorf("Expected true")
 	}
 }
@@ -110,14 +111,14 @@ func TestPlugin(t *testing.T) {
 	}
 	spec := &api.Volume{
 		Name: "vol1",
-		Source: api.VolumeSource{
-			GitRepo: &api.GitRepo{
+		VolumeSource: api.VolumeSource{
+			GitRepo: &api.GitRepoVolumeSource{
 				Repository: "https://github.com/GoogleCloudPlatform/kubernetes.git",
 				Revision:   "2a30ce65c5ab586b98916d83385c5983edd353a1",
 			},
 		},
 	}
-	builder, err := plug.NewBuilder(spec, types.UID("poduid"))
+	builder, err := plug.NewBuilder(spec, &api.ObjectReference{UID: types.UID("poduid")})
 	if err != nil {
 		t.Errorf("Failed to make a new Builder: %v", err)
 	}
@@ -168,11 +169,11 @@ func TestPluginLegacy(t *testing.T) {
 	if plug.Name() != "git" {
 		t.Errorf("Wrong name: %s", plug.Name())
 	}
-	if plug.CanSupport(&api.Volume{Source: api.VolumeSource{GitRepo: &api.GitRepo{}}}) {
+	if plug.CanSupport(&api.Volume{VolumeSource: api.VolumeSource{GitRepo: &api.GitRepoVolumeSource{}}}) {
 		t.Errorf("Expected false")
 	}
 
-	if _, err := plug.NewBuilder(&api.Volume{Source: api.VolumeSource{GitRepo: &api.GitRepo{}}}, types.UID("poduid")); err == nil {
+	if _, err := plug.NewBuilder(&api.Volume{VolumeSource: api.VolumeSource{GitRepo: &api.GitRepoVolumeSource{}}}, &api.ObjectReference{UID: types.UID("poduid")}); err == nil {
 		t.Errorf("Expected failiure")
 	}
 

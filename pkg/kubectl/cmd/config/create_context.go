@@ -36,19 +36,21 @@ type createContextOptions struct {
 	namespace   util.StringFlag
 }
 
+const (
+	create_context_long = `Sets a context entry in .kubeconfig
+Specifying a name that already exists will merge new fields on top of existing values for those fields.`
+	create_context_example = `// Set the user field on the gce context entry without touching other values
+$ kubectl config set-context gce --user=cluster-admin`
+)
+
 func NewCmdConfigSetContext(out io.Writer, pathOptions *pathOptions) *cobra.Command {
 	options := &createContextOptions{pathOptions: pathOptions}
 
 	cmd := &cobra.Command{
-		Use:   fmt.Sprintf("set-context name [--%v=cluster-nickname] [--%v=user-nickname] [--%v=namespace]", clientcmd.FlagClusterName, clientcmd.FlagAuthInfoName, clientcmd.FlagNamespace),
-		Short: "Sets a context entry in .kubeconfig",
-		Long: `Sets a context entry in .kubeconfig
-	Specifying a name that already exists will merge new fields on top of existing values for those fields.
-	e.g. 
-		kubectl config set-context gce --user=cluster-admin
-		only sets the user field on the gce context entry without touching other values.
-		`,
-
+		Use:     fmt.Sprintf("set-context NAME [--%v=cluster_nickname] [--%v=user_nickname] [--%v=namespace]", clientcmd.FlagClusterName, clientcmd.FlagAuthInfoName, clientcmd.FlagNamespace),
+		Short:   "Sets a context entry in .kubeconfig",
+		Long:    create_context_long,
+		Example: create_context_example,
 		Run: func(cmd *cobra.Command, args []string) {
 			if !options.complete(cmd) {
 				return

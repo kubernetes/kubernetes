@@ -34,16 +34,23 @@ func TestMaybeInt(t *testing.T) {
 }
 
 func TestBuildQueryString(t *testing.T) {
+	type testVar string
 	opts := struct {
-		J int    `q:"j"`
-		R string `q:"r,required"`
-		C bool   `q:"c"`
+		J  int       `q:"j"`
+		R  string    `q:"r,required"`
+		C  bool      `q:"c"`
+		S  []string  `q:"s"`
+		TS []testVar `q:"ts"`
+		TI []int     `q:"ti"`
 	}{
-		J: 2,
-		R: "red",
-		C: true,
+		J:  2,
+		R:  "red",
+		C:  true,
+		S:  []string{"one", "two", "three"},
+		TS: []testVar{"a", "b"},
+		TI: []int{1, 2},
 	}
-	expected := &url.URL{RawQuery: "j=2&r=red&c=true"}
+	expected := &url.URL{RawQuery: "c=true&j=2&r=red&s=one&s=two&s=three&ti=1&ti=2&ts=a&ts=b"}
 	actual, err := BuildQueryString(&opts)
 	if err != nil {
 		t.Errorf("Error building query string: %v", err)
@@ -51,9 +58,12 @@ func TestBuildQueryString(t *testing.T) {
 	th.CheckDeepEquals(t, expected, actual)
 
 	opts = struct {
-		J int    `q:"j"`
-		R string `q:"r,required"`
-		C bool   `q:"c"`
+		J  int       `q:"j"`
+		R  string    `q:"r,required"`
+		C  bool      `q:"c"`
+		S  []string  `q:"s"`
+		TS []testVar `q:"ts"`
+		TI []int     `q:"ti"`
 	}{
 		J: 2,
 		C: true,
@@ -138,5 +148,18 @@ func TestIsZero(t *testing.T) {
 	expected = false
 	actual = isZero(testStructValue)
 	th.CheckEquals(t, expected, actual)
+}
 
+func TestQueriesAreEscaped(t *testing.T) {
+	type foo struct {
+		Name  string `q:"something"`
+		Shape string `q:"else"`
+	}
+
+	expected := &url.URL{RawQuery: "else=Triangl+e&something=blah%2B%3F%21%21foo"}
+
+	actual, err := BuildQueryString(foo{Name: "blah+?!!foo", Shape: "Triangl e"})
+	th.AssertNoErr(t, err)
+
+	th.AssertDeepEquals(t, expected, actual)
 }

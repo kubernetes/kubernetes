@@ -22,6 +22,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 )
 
@@ -64,7 +65,7 @@ func (n *nodeAdaptor) Create(minion *api.Node) (*api.Node, error) {
 // List lists all the nodes in the cluster.
 func (n *nodeAdaptor) List() (*api.NodeList, error) {
 	ctx := api.NewContext()
-	obj, err := n.storage.(apiserver.RESTLister).List(ctx, labels.Everything(), labels.Everything())
+	obj, err := n.storage.(apiserver.RESTLister).List(ctx, labels.Everything(), fields.Everything())
 	if err != nil {
 		return nil, err
 	}

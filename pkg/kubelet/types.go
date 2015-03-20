@@ -18,10 +18,8 @@ package kubelet
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/golang/glog"
 )
 
 const ConfigSourceAnnotationKey = "kubernetes.io/config.source"
@@ -42,8 +40,6 @@ const (
 	// These constants identify the sources of pods
 	// Updates from a file
 	FileSource = "file"
-	// Updates from etcd
-	EtcdSource = "etcd"
 	// Updates from querying a web page
 	HTTPSource = "http"
 	// Updates received to the kubelet server
@@ -52,6 +48,8 @@ const (
 	ApiserverSource = "api"
 	// Updates from all sources
 	AllSource = "*"
+
+	NamespaceDefault = api.NamespaceDefault
 )
 
 // PodUpdate defines an operation sent on the channel. You can add or remove single services by
@@ -64,29 +62,19 @@ const (
 // functionally similar, this helps our unit tests properly check that the correct PodUpdates
 // are generated.
 type PodUpdate struct {
-	Pods   []api.BoundPod
+	Pods   []api.Pod
 	Op     PodOperation
 	Source string
 }
 
 // GetPodFullName returns a name that uniquely identifies a pod across all config sources.
-func GetPodFullName(pod *api.BoundPod) string {
-	return fmt.Sprintf("%s.%s.%s", pod.Name, pod.Namespace, pod.Annotations[ConfigSourceAnnotationKey])
+func GetPodFullName(pod *api.Pod) string {
+	// Use underscore as the delimiter because it is not allowed in pod name
+	// (DNS subdomain format), while allowed in the container name format.
+	return fmt.Sprintf("%s_%s", pod.Name, pod.Namespace)
 }
 
-// ParsePodFullName unpacks a pod full name and returns the pod name, namespace, and annotations.
-// If the pod full name is invalid, empty strings are returend.
-func ParsePodFullName(podFullName string) (podName, podNamespace string, podAnnotations map[string]string) {
-	parts := strings.Split(podFullName, ".")
-	expectedNumFields := 3
-	actualNumFields := len(parts)
-	if actualNumFields != expectedNumFields {
-		glog.Errorf("found a podFullName (%q) with too few fields: expected %d, actual %d.", podFullName, expectedNumFields, actualNumFields)
-		return
-	}
-	podName = parts[0]
-	podNamespace = parts[1]
-	podAnnotations = make(map[string]string)
-	podAnnotations[ConfigSourceAnnotationKey] = parts[2]
-	return
+// Build the pod full name from pod name and namespace.
+func BuildPodFullName(name, namespace string) string {
+	return name + "_" + namespace
 }

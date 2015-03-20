@@ -18,6 +18,7 @@ package controller
 
 import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
@@ -25,9 +26,9 @@ import (
 // Registry is an interface for things that know how to store ReplicationControllers.
 type Registry interface {
 	ListControllers(ctx api.Context) (*api.ReplicationControllerList, error)
-	WatchControllers(ctx api.Context, label, field labels.Selector, resourceVersion string) (watch.Interface, error)
+	WatchControllers(ctx api.Context, label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error)
 	GetController(ctx api.Context, controllerID string) (*api.ReplicationController, error)
-	CreateController(ctx api.Context, controller *api.ReplicationController) error
-	UpdateController(ctx api.Context, controller *api.ReplicationController) error
+	CreateController(ctx api.Context, controller *api.ReplicationController) (*api.ReplicationController, error)
+	UpdateController(ctx api.Context, controller *api.ReplicationController) (*api.ReplicationController, error)
 	DeleteController(ctx api.Context, controllerID string) error
 }

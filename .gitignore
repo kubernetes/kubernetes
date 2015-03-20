@@ -1,6 +1,9 @@
 # OSX leaves these everywhere on SMB shares
 ._*
 
+# OSX trash
+.DS_Store
+
 # Eclipse files
 .classpath
 .project
@@ -42,3 +45,5 @@ network_closure.sh
 
 # also ignore etcd installed by hack/install-etcd.sh
 /third_party/etcd*
+
+.tags*

@@ -60,6 +60,12 @@ func (w *WebService) Param(parameter *Parameter) *WebService {
 // PathParameter creates a new Parameter of kind Path for documentation purposes.
 // It is initialized as required with string as its DataType.
 func (w *WebService) PathParameter(name, description string) *Parameter {
+	return PathParameter(name, description)
+}
+
+// PathParameter creates a new Parameter of kind Path for documentation purposes.
+// It is initialized as required with string as its DataType.
+func PathParameter(name, description string) *Parameter {
 	p := &Parameter{&ParameterData{Name: name, Description: description, Required: true, DataType: "string"}}
 	p.bePath()
 	return p
@@ -68,6 +74,12 @@ func (w *WebService) PathParameter(name, description string) *Parameter {
 // QueryParameter creates a new Parameter of kind Query for documentation purposes.
 // It is initialized as not required with string as its DataType.
 func (w *WebService) QueryParameter(name, description string) *Parameter {
+	return QueryParameter(name, description)
+}
+
+// QueryParameter creates a new Parameter of kind Query for documentation purposes.
+// It is initialized as not required with string as its DataType.
+func QueryParameter(name, description string) *Parameter {
 	p := &Parameter{&ParameterData{Name: name, Description: description, Required: false, DataType: "string"}}
 	p.beQuery()
 	return p
@@ -76,6 +88,12 @@ func (w *WebService) QueryParameter(name, description string) *Parameter {
 // BodyParameter creates a new Parameter of kind Body for documentation purposes.
 // It is initialized as required without a DataType.
 func (w *WebService) BodyParameter(name, description string) *Parameter {
+	return BodyParameter(name, description)
+}
+
+// BodyParameter creates a new Parameter of kind Body for documentation purposes.
+// It is initialized as required without a DataType.
+func BodyParameter(name, description string) *Parameter {
 	p := &Parameter{&ParameterData{Name: name, Description: description, Required: true}}
 	p.beBody()
 	return p
@@ -84,6 +102,12 @@ func (w *WebService) BodyParameter(name, description string) *Parameter {
 // HeaderParameter creates a new Parameter of kind (Http) Header for documentation purposes.
 // It is initialized as not required with string as its DataType.
 func (w *WebService) HeaderParameter(name, description string) *Parameter {
+	return HeaderParameter(name, description)
+}
+
+// HeaderParameter creates a new Parameter of kind (Http) Header for documentation purposes.
+// It is initialized as not required with string as its DataType.
+func HeaderParameter(name, description string) *Parameter {
 	p := &Parameter{&ParameterData{Name: name, Description: description, Required: false, DataType: "string"}}
 	p.beHeader()
 	return p
@@ -92,6 +116,12 @@ func (w *WebService) HeaderParameter(name, description string) *Parameter {
 // FormParameter creates a new Parameter of kind Form (using application/x-www-form-urlencoded) for documentation purposes.
 // It is initialized as required with string as its DataType.
 func (w *WebService) FormParameter(name, description string) *Parameter {
+	return FormParameter(name, description)
+}
+
+// FormParameter creates a new Parameter of kind Form (using application/x-www-form-urlencoded) for documentation purposes.
+// It is initialized as required with string as its DataType.
+func FormParameter(name, description string) *Parameter {
 	p := &Parameter{&ParameterData{Name: name, Description: description, Required: false, DataType: "string"}}
 	p.beForm()
 	return p

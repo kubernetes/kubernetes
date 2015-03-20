@@ -18,11 +18,11 @@ package service
 
 import (
 	"fmt"
-	"net"
-	"strconv"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta2"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -64,10 +64,14 @@ func (e *EndpointController) SyncServiceEndpoints() error {
 			resultErr = err
 			continue
 		}
-		endpoints := []string{}
+		endpoints := []api.Endpoint{}
 
 		for _, pod := range pods.Items {
-			port, err := findPort(&pod, service.Spec.ContainerPort)
+			// TODO: Once v1beta1 and v1beta2 are EOL'ed, this can
+			// assume that service.Spec.ContainerPort is populated.
+			_ = v1beta1.Dependency
+			_ = v1beta2.Dependency
+			port, err := findPort(&pod, &service)
 			if err != nil {
 				glog.Errorf("Failed to find port for service %s/%s: %v", service.Namespace, service.Name, err)
 				continue
@@ -76,7 +80,30 @@ func (e *EndpointController) SyncServiceEndpoints() error {
 				glog.Errorf("Failed to find an IP for pod %s/%s", pod.Namespace, pod.Name)
 				continue
 			}
-			endpoints = append(endpoints, net.JoinHostPort(pod.Status.PodIP, strconv.Itoa(port)))
+
+			inService := false
+			for _, c := range pod.Status.Conditions {
+				if c.Type == api.PodReady && c.Status == api.ConditionFull {
+					inService = true
+					break
+				}
+			}
+			if !inService {
+				glog.V(5).Infof("Pod is out of service: %v/%v", pod.Namespace, pod.Name)
+				continue
+			}
+
+			endpoints = append(endpoints, api.Endpoint{
+				IP:   pod.Status.PodIP,
+				Port: port,
+				TargetRef: &api.ObjectReference{
+					Kind:            "Pod",
+					Namespace:       pod.ObjectMeta.Namespace,
+					Name:            pod.ObjectMeta.Name,
+					UID:             pod.ObjectMeta.UID,
+					ResourceVersion: pod.ObjectMeta.ResourceVersion,
+				},
+			})
 		}
 		currentEndpoints, err := e.client.Endpoints(service.Namespace).Get(service.Name)
 		if err != nil {
@@ -85,6 +112,7 @@ func (e *EndpointController) SyncServiceEndpoints() error {
 					ObjectMeta: api.ObjectMeta{
 						Name: service.Name,
 					},
+					Protocol: service.Spec.Protocol,
 				}
 			} else {
 				glog.Errorf("Error getting endpoints: %v", err)
@@ -100,8 +128,8 @@ func (e *EndpointController) SyncServiceEndpoints() error {
 			_, err = e.client.Endpoints(service.Namespace).Create(newEndpoints)
 		} else {
 			// Pre-existing
-			if endpointsEqual(currentEndpoints, endpoints) {
-				glog.V(5).Infof("endpoints are equal for %s/%s, skipping update", service.Namespace, service.Name)
+			if currentEndpoints.Protocol == service.Spec.Protocol && endpointsListEqual(currentEndpoints, endpoints) {
+				glog.V(5).Infof("protocol and endpoints are equal for %s/%s, skipping update", service.Namespace, service.Name)
 				continue
 			}
 			_, err = e.client.Endpoints(service.Namespace).Update(newEndpoints)
@@ -114,42 +142,66 @@ func (e *EndpointController) SyncServiceEndpoints() error {
 	return resultErr
 }
 
-func containsEndpoint(endpoints *api.Endpoints, endpoint string) bool {
-	if endpoints == nil {
+func endpointEqual(this, that *api.Endpoint) bool {
+	if this.IP != that.IP || this.Port != that.Port {
 		return false
 	}
-	for ix := range endpoints.Endpoints {
-		if endpoints.Endpoints[ix] == endpoint {
+
+	if this.TargetRef == nil || that.TargetRef == nil {
+		return this.TargetRef == that.TargetRef
+	}
+
+	return *this.TargetRef == *that.TargetRef
+}
+
+func containsEndpoint(haystack *api.Endpoints, needle *api.Endpoint) bool {
+	if haystack == nil || needle == nil {
+		return false
+	}
+	for ix := range haystack.Endpoints {
+		if endpointEqual(&haystack.Endpoints[ix], needle) {
 			return true
 		}
 	}
 	return false
 }
 
-func endpointsEqual(e *api.Endpoints, endpoints []string) bool {
-	if len(e.Endpoints) != len(endpoints) {
+func endpointsListEqual(eps *api.Endpoints, endpoints []api.Endpoint) bool {
+	if len(eps.Endpoints) != len(endpoints) {
 		return false
 	}
-	for _, endpoint := range endpoints {
-		if !containsEndpoint(e, endpoint) {
+	for i := range endpoints {
+		if !containsEndpoint(eps, &endpoints[i]) {
 			return false
 		}
 	}
 	return true
 }
 
-// findPort locates the container port for the given manifest and portName.
-func findPort(pod *api.Pod, portName util.IntOrString) (int, error) {
-	firstContainerPort := 0
-	if len(pod.Spec.Containers) > 0 && len(pod.Spec.Containers[0].Ports) > 0 {
-		firstContainerPort = pod.Spec.Containers[0].Ports[0].ContainerPort
+func findDefaultPort(pod *api.Pod, servicePort int) (int, bool) {
+	foundPorts := []int{}
+	for _, container := range pod.Spec.Containers {
+		for _, port := range container.Ports {
+			foundPorts = append(foundPorts, port.ContainerPort)
+		}
 	}
+	if len(foundPorts) == 0 {
+		return servicePort, true
+	}
+	if len(foundPorts) == 1 {
+		return foundPorts[0], true
+	}
+	return 0, false
+}
 
+// findPort locates the container port for the given manifest and portName.
+func findPort(pod *api.Pod, service *api.Service) (int, error) {
+	portName := service.Spec.ContainerPort
 	switch portName.Kind {
 	case util.IntstrString:
 		if len(portName.StrVal) == 0 {
-			if firstContainerPort != 0 {
-				return firstContainerPort, nil
+			if port, found := findDefaultPort(pod, service.Spec.Port); found {
+				return port, nil
 			}
 			break
 		}
@@ -163,8 +215,8 @@ func findPort(pod *api.Pod, portName util.IntOrString) (int, error) {
 		}
 	case util.IntstrInt:
 		if portName.IntVal == 0 {
-			if firstContainerPort != 0 {
-				return firstContainerPort, nil
+			if port, found := findDefaultPort(pod, service.Spec.Port); found {
+				return port, nil
 			}
 			break
 		}

@@ -31,6 +31,21 @@ type Binder interface {
 	Bind(binding *api.Binding) error
 }
 
+// SystemModeler can help scheduler produce a model of the system that
+// anticipates reality. For example, if scheduler has pods A and B both
+// using hostPort 80, when it binds A to machine M it should not bind B
+// to machine M in the time when it hasn't observed the binding of A
+// take effect yet.
+//
+// Since the model is only an optimization, it's expected to handle
+// any errors itself without sending them back to the scheduler.
+type SystemModeler interface {
+	// AssumePod assumes that the given pod exists in the system.
+	// The assumtion should last until the system confirms the
+	// assumtion or disconfirms it.
+	AssumePod(pod *api.Pod)
+}
+
 // Scheduler watches for new unscheduled pods. It attempts to find
 // minions that they fit on and writes bindings back to the api server.
 type Scheduler struct {
@@ -38,6 +53,9 @@ type Scheduler struct {
 }
 
 type Config struct {
+	// It is expected that changes made via modeler will be observed
+	// by MinionLister and Algorithm.
+	Modeler      SystemModeler
 	MinionLister scheduler.MinionLister
 	Algorithm    scheduler.Scheduler
 	Binder       Binder
@@ -51,6 +69,9 @@ type Config struct {
 	// Error is called if there is an error. It is passed the pod in
 	// question, and the error
 	Error func(*api.Pod, error)
+
+	// Recorder is the EventRecorder to use
+	Recorder record.EventRecorder
 }
 
 // New returns a new scheduler.
@@ -72,20 +93,27 @@ func (s *Scheduler) scheduleOne() {
 	dest, err := s.config.Algorithm.Schedule(*pod, s.config.MinionLister)
 	if err != nil {
 		glog.V(1).Infof("Failed to schedule: %v", pod)
-		record.Eventf(pod, "failedScheduling", "Error scheduling: %v", err)
+		s.config.Recorder.Eventf(pod, "failedScheduling", "Error scheduling: %v", err)
 		s.config.Error(pod, err)
 		return
 	}
 	b := &api.Binding{
-		ObjectMeta: api.ObjectMeta{Namespace: pod.Namespace},
-		PodID:      pod.Name,
-		Host:       dest,
+		ObjectMeta: api.ObjectMeta{Namespace: pod.Namespace, Name: pod.Name},
+		Target: api.ObjectReference{
+			Kind: "Node",
+			Name: dest,
+		},
 	}
 	if err := s.config.Binder.Bind(b); err != nil {
 		glog.V(1).Infof("Failed to bind pod: %v", err)
-		record.Eventf(pod, "failedScheduling", "Binding rejected: %v", err)
+		s.config.Recorder.Eventf(pod, "failedScheduling", "Binding rejected: %v", err)
 		s.config.Error(pod, err)
 		return
 	}
-	record.Eventf(pod, "scheduled", "Successfully assigned %v to %v", pod.Name, dest)
+	s.config.Recorder.Eventf(pod, "scheduled", "Successfully assigned %v to %v", pod.Name, dest)
+	// tell the model to assume that this binding took effect.
+	assumed := *pod
+	assumed.Spec.Host = dest
+	assumed.Status.Host = dest
+	s.config.Modeler.AssumePod(&assumed)
 }

@@ -19,6 +19,7 @@ package fuzz
 import (
 	"reflect"
 	"testing"
+	"time"
 )
 
 func TestFuzz_basic(t *testing.T) {
@@ -36,6 +37,7 @@ func TestFuzz_basic(t *testing.T) {
 		Uptr uintptr
 		S    string
 		B    bool
+		T    time.Time
 	}{}
 
 	failed := map[string]int{}
@@ -79,6 +81,9 @@ func TestFuzz_basic(t *testing.T) {
 			failed[n] = failed[n] + 1
 		}
 		if n, v := "b", obj.B; v == false {
+			failed[n] = failed[n] + 1
+		}
+		if n, v := "t", obj.T; v.IsZero() {
 			failed[n] = failed[n] + 1
 		}
 	}
@@ -255,4 +260,125 @@ func TestFuzz_custom(t *testing.T) {
 		}
 		return 7, true
 	})
+}
+
+type SelfFuzzer string
+
+// Implement fuzz.Interface.
+func (sf *SelfFuzzer) Fuzz(c Continue) {
+	*sf = selfFuzzerTestPhrase
+}
+
+const selfFuzzerTestPhrase = "was fuzzed"
+
+func TestFuzz_interface(t *testing.T) {
+	f := New()
+
+	var obj1 SelfFuzzer
+	tryFuzz(t, f, &obj1, func() (int, bool) {
+		if obj1 != selfFuzzerTestPhrase {
+			return 1, false
+		}
+		return 1, true
+	})
+
+	var obj2 map[int]SelfFuzzer
+	tryFuzz(t, f, &obj2, func() (int, bool) {
+		for _, v := range obj2 {
+			if v != selfFuzzerTestPhrase {
+				return 1, false
+			}
+		}
+		return 1, true
+	})
+}
+
+func TestFuzz_interfaceAndFunc(t *testing.T) {
+	const privateTestPhrase = "private phrase"
+	f := New().Funcs(
+		// This should take precedence over SelfFuzzer.Fuzz().
+		func(s *SelfFuzzer, c Continue) {
+			*s = privateTestPhrase
+		},
+	)
+
+	var obj1 SelfFuzzer
+	tryFuzz(t, f, &obj1, func() (int, bool) {
+		if obj1 != privateTestPhrase {
+			return 1, false
+		}
+		return 1, true
+	})
+
+	var obj2 map[int]SelfFuzzer
+	tryFuzz(t, f, &obj2, func() (int, bool) {
+		for _, v := range obj2 {
+			if v != privateTestPhrase {
+				return 1, false
+			}
+		}
+		return 1, true
+	})
+}
+
+func TestFuzz_noCustom(t *testing.T) {
+	type Inner struct {
+		Str string
+	}
+	type Outer struct {
+		Str string
+		In  Inner
+	}
+
+	testPhrase := "gotcalled"
+	f := New().Funcs(
+		func(outer *Outer, c Continue) {
+			outer.Str = testPhrase
+			c.Fuzz(&outer.In)
+		},
+		func(inner *Inner, c Continue) {
+			inner.Str = testPhrase
+		},
+	)
+	c := Continue{f: f, Rand: f.r}
+
+	// Fuzzer.Fuzz()
+	obj1 := Outer{}
+	f.Fuzz(&obj1)
+	if obj1.Str != testPhrase {
+		t.Errorf("expected Outer custom function to have been called")
+	}
+	if obj1.In.Str != testPhrase {
+		t.Errorf("expected Inner custom function to have been called")
+	}
+
+	// Continue.Fuzz()
+	obj2 := Outer{}
+	c.Fuzz(&obj2)
+	if obj2.Str != testPhrase {
+		t.Errorf("expected Outer custom function to have been called")
+	}
+	if obj2.In.Str != testPhrase {
+		t.Errorf("expected Inner custom function to have been called")
+	}
+
+	// Fuzzer.FuzzNoCustom()
+	obj3 := Outer{}
+	f.FuzzNoCustom(&obj3)
+	if obj3.Str == testPhrase {
+		t.Errorf("expected Outer custom function to not have been called")
+	}
+	if obj3.In.Str != testPhrase {
+		t.Errorf("expected Inner custom function to have been called")
+	}
+
+	// Continue.FuzzNoCustom()
+	obj4 := Outer{}
+	c.FuzzNoCustom(&obj4)
+	if obj4.Str == testPhrase {
+		t.Errorf("expected Outer custom function to not have been called")
+	}
+	if obj4.In.Str != testPhrase {
+		t.Errorf("expected Inner custom function to have been called")
+	}
 }

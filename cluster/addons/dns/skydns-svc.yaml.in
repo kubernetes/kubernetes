@@ -1,12 +1,14 @@
 kind: Service
 apiVersion: v1beta1
-id: skydns
+id: kube-dns
 namespace: default
 protocol: UDP
 port: 53
 portalIP: {{ pillar['dns_server'] }}
 containerPort: 53
 labels:
-  k8s-app: skydns
+  k8s-app: kube-dns
+  name: kube-dns
+  kubernetes.io/cluster-service: "true"
 selector:
-  k8s-app: skydns
+  k8s-app: kube-dns

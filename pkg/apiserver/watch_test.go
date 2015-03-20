@@ -25,6 +25,8 @@ import (
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 	"golang.org/x/net/websocket"
@@ -48,9 +50,7 @@ var watchTestTable = []struct {
 func TestWatchWebsocket(t *testing.T) {
 	simpleStorage := &SimpleRESTStorage{}
 	_ = ResourceWatcher(simpleStorage) // Give compile error if this doesn't work.
-	handler := Handle(map[string]RESTStorage{
-		"foo": simpleStorage,
-	}, codec, "/api", "version", selfLinker, admissionControl, mapper)
+	handler := handle(map[string]RESTStorage{"foo": simpleStorage})
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
@@ -102,9 +102,7 @@ func TestWatchWebsocket(t *testing.T) {
 
 func TestWatchHTTP(t *testing.T) {
 	simpleStorage := &SimpleRESTStorage{}
-	handler := Handle(map[string]RESTStorage{
-		"foo": simpleStorage,
-	}, codec, "/api", "version", selfLinker, admissionControl, mapper)
+	handler := handle(map[string]RESTStorage{"foo": simpleStorage})
 	server := httptest.NewServer(handler)
 	defer server.Close()
 	client := http.Client{}
@@ -164,15 +162,17 @@ func TestWatchHTTP(t *testing.T) {
 }
 
 func TestWatchParamParsing(t *testing.T) {
+	api.Scheme.AddFieldLabelConversionFunc(testVersion, "foo",
+		func(label, value string) (string, string, error) {
+			return label, value, nil
+		})
 	simpleStorage := &SimpleRESTStorage{}
-	handler := Handle(map[string]RESTStorage{
-		"foo": simpleStorage,
-	}, codec, "/api", "version", selfLinker, admissionControl, mapper)
+	handler := handle(map[string]RESTStorage{"foo": simpleStorage})
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
 	dest, _ := url.Parse(server.URL)
-	dest.Path = "/api/version/watch/foo"
+	dest.Path = "/api/" + testVersion + "/watch/foo"
 
 	table := []struct {
 		rawQuery        string
@@ -188,16 +188,16 @@ func TestWatchParamParsing(t *testing.T) {
 			fieldSelector:   "",
 			namespace:       api.NamespaceAll,
 		}, {
-			rawQuery:        "namespace=default&resourceVersion=314159&fields=Host%3D&labels=name%3Dfoo",
+			rawQuery:        "namespace=default&resourceVersion=314159&" + api.FieldSelectorQueryParam(testVersion) + "=Host%3D&" + api.LabelSelectorQueryParam(testVersion) + "=name%3Dfoo",
 			resourceVersion: "314159",
 			labelSelector:   "name=foo",
 			fieldSelector:   "Host=",
 			namespace:       api.NamespaceDefault,
 		}, {
-			rawQuery:        "namespace=watchother&fields=ID%3dfoo&resourceVersion=1492",
+			rawQuery:        "namespace=watchother&" + api.FieldSelectorQueryParam(testVersion) + "=id%3dfoo&resourceVersion=1492",
 			resourceVersion: "1492",
 			labelSelector:   "",
-			fieldSelector:   "ID=foo",
+			fieldSelector:   "id=foo",
 			namespace:       "watchother",
 		}, {
 			rawQuery:        "",
@@ -209,8 +209,8 @@ func TestWatchParamParsing(t *testing.T) {
 	}
 
 	for _, item := range table {
-		simpleStorage.requestedLabelSelector = nil
-		simpleStorage.requestedFieldSelector = nil
+		simpleStorage.requestedLabelSelector = labels.Everything()
+		simpleStorage.requestedFieldSelector = fields.Everything()
 		simpleStorage.requestedResourceVersion = "5" // Prove this is set in all cases
 		simpleStorage.requestedResourceNamespace = ""
 		dest.RawQuery = item.rawQuery
@@ -237,9 +237,7 @@ func TestWatchParamParsing(t *testing.T) {
 
 func TestWatchProtocolSelection(t *testing.T) {
 	simpleStorage := &SimpleRESTStorage{}
-	handler := Handle(map[string]RESTStorage{
-		"foo": simpleStorage,
-	}, codec, "/api", "version", selfLinker, admissionControl, mapper)
+	handler := handle(map[string]RESTStorage{"foo": simpleStorage})
 	server := httptest.NewServer(handler)
 	defer server.Close()
 	defer server.CloseClientConnections()

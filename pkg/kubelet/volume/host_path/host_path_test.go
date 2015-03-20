@@ -26,7 +26,7 @@ import (
 
 func TestCanSupport(t *testing.T) {
 	plugMgr := volume.PluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), &volume.FakeHost{"fake"})
+	plugMgr.InitPlugins(ProbeVolumePlugins(), volume.NewFakeHost("fake", nil, nil))
 
 	plug, err := plugMgr.FindPluginByName("kubernetes.io/host-path")
 	if err != nil {
@@ -35,27 +35,27 @@ func TestCanSupport(t *testing.T) {
 	if plug.Name() != "kubernetes.io/host-path" {
 		t.Errorf("Wrong name: %s", plug.Name())
 	}
-	if !plug.CanSupport(&api.Volume{Source: api.VolumeSource{HostPath: &api.HostPath{}}}) {
+	if !plug.CanSupport(&api.Volume{VolumeSource: api.VolumeSource{HostPath: &api.HostPathVolumeSource{}}}) {
 		t.Errorf("Expected true")
 	}
-	if plug.CanSupport(&api.Volume{Source: api.VolumeSource{}}) {
+	if plug.CanSupport(&api.Volume{VolumeSource: api.VolumeSource{}}) {
 		t.Errorf("Expected false")
 	}
 }
 
 func TestPlugin(t *testing.T) {
 	plugMgr := volume.PluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), &volume.FakeHost{"fake"})
+	plugMgr.InitPlugins(ProbeVolumePlugins(), volume.NewFakeHost("fake", nil, nil))
 
 	plug, err := plugMgr.FindPluginByName("kubernetes.io/host-path")
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
 	}
 	spec := &api.Volume{
-		Name:   "vol1",
-		Source: api.VolumeSource{HostPath: &api.HostPath{"/vol1"}},
+		Name:         "vol1",
+		VolumeSource: api.VolumeSource{HostPath: &api.HostPathVolumeSource{"/vol1"}},
 	}
-	builder, err := plug.NewBuilder(spec, types.UID("poduid"))
+	builder, err := plug.NewBuilder(spec, &api.ObjectReference{UID: types.UID("poduid")})
 	if err != nil {
 		t.Errorf("Failed to make a new Builder: %v", err)
 	}

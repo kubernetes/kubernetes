@@ -32,7 +32,7 @@ func TestGetServersToValidate(t *testing.T) {
 	fakeClient.Machines = []string{"http://machine1:4001", "http://machine2", "http://machine3:4003"}
 	config.EtcdHelper = tools.EtcdHelper{fakeClient, latest.Codec, nil}
 
-	master.minionRegistry = registrytest.NewMinionRegistry([]string{"node1", "node2"}, api.NodeResources{})
+	master.nodeRegistry = registrytest.NewMinionRegistry([]string{"node1", "node2"}, api.NodeResources{})
 
 	servers := master.getServersToValidate(&config)
 

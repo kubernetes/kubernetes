@@ -22,41 +22,6 @@ write_files:
       echo "Unpacking release"
       rm -rf /opt/kubernetes || false
       tar xzf /opt/kubernetes.tar.gz -C /opt/
-  - path: /opt/kubernetes-manifests/cadvisor.manifest
-    permissions: 0755
-    content: |
-      version: v1beta2
-      id: cadvisor-agent
-      containers:
-        - name: cadvisor
-          image: google/cadvisor:latest
-          ports:
-            - name: http
-              containerPort: 8080
-              hostPort: 4194
-          volumeMounts:
-            - name: varrun
-              mountPath: /var/run
-              readOnly: false
-            - name: varlibdocker
-              mountPath: /var/lib/docker
-              readOnly: true
-            - name: cgroups
-              mountPath: /sys/fs/cgroup
-              readOnly: true
-      volumes:
-        - name: varrun
-          source:
-            hostDir:
-              path: /var/run
-        - name: varlibdocker
-          source:
-            hostDir:
-              path: /var/lib/docker
-        - name: cgroups
-          source:
-            hostDir:
-              path: /sys/fs/cgroup
 
 coreos:
   etcd:
@@ -120,7 +85,7 @@ coreos:
         Requires=download-release.service
         [Service]
         ExecStartPre=/usr/bin/ln -sf /opt/kubernetes/server/bin/kube-proxy /opt/bin/kube-proxy
-        ExecStart=/opt/bin/kube-proxy --bind_address=$private_ipv4 --etcd_servers=http://127.0.0.1:4001 --logtostderr=true
+        ExecStart=/opt/bin/kube-proxy --bind_address=$private_ipv4 --etcd_servers=http://127.0.0.1:4001 --logtostderr=true --v=2
         Restart=always
         RestartSec=2
     - name: minion-advertiser.service
@@ -194,7 +159,7 @@ coreos:
 
         [Service]
         ExecStartPre=/bin/mount --make-rprivate /
-        ExecStart=/usr/bin/docker -d -s=btrfs -H fd:// -b cbr0 --iptables=false
+        ExecStart=/usr/bin/docker -d -H fd:// -b cbr0 --iptables=false
         Restart=always
         RestartSec=30
 

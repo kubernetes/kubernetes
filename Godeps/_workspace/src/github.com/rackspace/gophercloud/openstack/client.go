@@ -68,7 +68,7 @@ func Authenticate(client *gophercloud.ProviderClient, options gophercloud.AuthOp
 		&utils.Version{ID: v30, Priority: 30, Suffix: "/v3/"},
 	}
 
-	chosen, endpoint, err := utils.ChooseVersion(client.IdentityBase, client.IdentityEndpoint, versions)
+	chosen, endpoint, err := utils.ChooseVersion(client, versions)
 	if err != nil {
 		return err
 	}
@@ -107,6 +107,11 @@ func v2auth(client *gophercloud.ProviderClient, endpoint string, options gopherc
 		return err
 	}
 
+	if options.AllowReauth {
+		client.ReauthFunc = func() error {
+			return AuthenticateV2(client, options)
+		}
+	}
 	client.TokenID = token.ID
 	client.EndpointLocator = func(opts gophercloud.EndpointOpts) (string, error) {
 		return V2EndpointURL(catalog, opts)
@@ -133,6 +138,11 @@ func v3auth(client *gophercloud.ProviderClient, endpoint string, options gopherc
 	}
 	client.TokenID = token.ID
 
+	if options.AllowReauth {
+		client.ReauthFunc = func() error {
+			return AuthenticateV3(client, options)
+		}
+	}
 	client.EndpointLocator = func(opts gophercloud.EndpointOpts) (string, error) {
 		return V3EndpointURL(v3Client, opts)
 	}
@@ -197,6 +207,27 @@ func NewNetworkV2(client *gophercloud.ProviderClient, eo gophercloud.EndpointOpt
 // NewBlockStorageV1 creates a ServiceClient that may be used to access the v1 block storage service.
 func NewBlockStorageV1(client *gophercloud.ProviderClient, eo gophercloud.EndpointOpts) (*gophercloud.ServiceClient, error) {
 	eo.ApplyDefaults("volume")
+	url, err := client.EndpointLocator(eo)
+	if err != nil {
+		return nil, err
+	}
+	return &gophercloud.ServiceClient{ProviderClient: client, Endpoint: url}, nil
+}
+
+// NewCDNV1 creates a ServiceClient that may be used to access the OpenStack v1
+// CDN service.
+func NewCDNV1(client *gophercloud.ProviderClient, eo gophercloud.EndpointOpts) (*gophercloud.ServiceClient, error) {
+	eo.ApplyDefaults("cdn")
+	url, err := client.EndpointLocator(eo)
+	if err != nil {
+		return nil, err
+	}
+	return &gophercloud.ServiceClient{ProviderClient: client, Endpoint: url}, nil
+}
+
+// NewOrchestrationV1 creates a ServiceClient that may be used to access the v1 orchestration service.
+func NewOrchestrationV1(client *gophercloud.ProviderClient, eo gophercloud.EndpointOpts) (*gophercloud.ServiceClient, error) {
+	eo.ApplyDefaults("orchestration")
 	url, err := client.EndpointLocator(eo)
 	if err != nil {
 		return nil, err

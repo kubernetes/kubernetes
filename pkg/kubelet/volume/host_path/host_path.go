@@ -17,6 +17,8 @@ limitations under the License.
 package host_path
 
 import (
+	"fmt"
+
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/volume"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
@@ -46,14 +48,14 @@ func (plugin *hostPathPlugin) Name() string {
 }
 
 func (plugin *hostPathPlugin) CanSupport(spec *api.Volume) bool {
-	if spec.Source.HostPath != nil {
+	if spec.HostPath != nil {
 		return true
 	}
 	return false
 }
 
-func (plugin *hostPathPlugin) NewBuilder(spec *api.Volume, podUID types.UID) (volume.Builder, error) {
-	return &hostPath{spec.Source.HostPath.Path}, nil
+func (plugin *hostPathPlugin) NewBuilder(spec *api.Volume, podRef *api.ObjectReference) (volume.Builder, error) {
+	return &hostPath{spec.HostPath.Path}, nil
 }
 
 func (plugin *hostPathPlugin) NewCleaner(volName string, podUID types.UID) (volume.Cleaner, error) {
@@ -71,6 +73,11 @@ func (hp *hostPath) SetUp() error {
 	return nil
 }
 
+// SetUpAt does not make sense for host paths - probably programmer error.
+func (hp *hostPath) SetUpAt(dir string) error {
+	return fmt.Errorf("SetUpAt() does not make sense for host paths")
+}
+
 func (hp *hostPath) GetPath() string {
 	return hp.path
 }
@@ -78,4 +85,9 @@ func (hp *hostPath) GetPath() string {
 // TearDown does nothing.
 func (hp *hostPath) TearDown() error {
 	return nil
+}
+
+// TearDownAt does not make sense for host paths - probably programmer error.
+func (hp *hostPath) TearDownAt(dir string) error {
+	return fmt.Errorf("TearDownAt() does not make sense for host paths")
 }

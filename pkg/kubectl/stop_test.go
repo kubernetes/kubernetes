@@ -43,10 +43,10 @@ func TestReplicationControllerStop(t *testing.T) {
 	if s != expected {
 		t.Errorf("expected %s, got %s", expected, s)
 	}
-	if len(fake.Actions) != 4 {
+	if len(fake.Actions) != 5 {
 		t.Errorf("unexpected actions: %v, expected 4 actions (get, update, get, delete)", fake.Actions)
 	}
-	for i, action := range []string{"get", "update", "get", "delete"} {
+	for i, action := range []string{"get", "get", "update", "get", "delete"} {
 		if fake.Actions[i].Action != action+"-controller" {
 			t.Errorf("unexpected action: %v, expected %s-controller", fake.Actions[i], action)
 		}

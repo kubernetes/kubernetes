@@ -28,7 +28,7 @@ import (
 
 func TestCanSupport(t *testing.T) {
 	plugMgr := volume.PluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), &volume.FakeHost{"/tmp/fake"})
+	plugMgr.InitPlugins(ProbeVolumePlugins(), volume.NewFakeHost("/tmp/fake", nil, nil))
 
 	plug, err := plugMgr.FindPluginByName("kubernetes.io/gce-pd")
 	if err != nil {
@@ -37,7 +37,7 @@ func TestCanSupport(t *testing.T) {
 	if plug.Name() != "kubernetes.io/gce-pd" {
 		t.Errorf("Wrong name: %s", plug.Name())
 	}
-	if !plug.CanSupport(&api.Volume{Source: api.VolumeSource{GCEPersistentDisk: &api.GCEPersistentDisk{}}}) {
+	if !plug.CanSupport(&api.Volume{VolumeSource: api.VolumeSource{GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{}}}) {
 		t.Errorf("Expected true")
 	}
 }
@@ -46,8 +46,8 @@ type fakePDManager struct{}
 
 // TODO(jonesdl) To fully test this, we could create a loopback device
 // and mount that instead.
-func (fake *fakePDManager) AttachDisk(pd *gcePersistentDisk) error {
-	globalPath := makeGlobalPDName(pd.plugin.host, pd.pdName, pd.readOnly)
+func (fake *fakePDManager) AttachAndMountDisk(pd *gcePersistentDisk, globalPDPath string) error {
+	globalPath := makeGlobalPDName(pd.plugin.host, pd.pdName)
 	err := os.MkdirAll(globalPath, 0750)
 	if err != nil {
 		return err
@@ -55,8 +55,8 @@ func (fake *fakePDManager) AttachDisk(pd *gcePersistentDisk) error {
 	return nil
 }
 
-func (fake *fakePDManager) DetachDisk(pd *gcePersistentDisk, devicePath string) error {
-	globalPath := makeGlobalPDName(pd.plugin.host, pd.pdName, pd.readOnly)
+func (fake *fakePDManager) DetachDisk(pd *gcePersistentDisk) error {
+	globalPath := makeGlobalPDName(pd.plugin.host, pd.pdName)
 	err := os.RemoveAll(globalPath)
 	if err != nil {
 		return err
@@ -64,23 +64,9 @@ func (fake *fakePDManager) DetachDisk(pd *gcePersistentDisk, devicePath string) 
 	return nil
 }
 
-type fakeMounter struct{}
-
-func (fake *fakeMounter) Mount(source string, target string, fstype string, flags uintptr, data string) error {
-	return nil
-}
-
-func (fake *fakeMounter) Unmount(target string, flags int) error {
-	return nil
-}
-
-func (fake *fakeMounter) List() ([]mount.MountPoint, error) {
-	return []mount.MountPoint{}, nil
-}
-
 func TestPlugin(t *testing.T) {
 	plugMgr := volume.PluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), &volume.FakeHost{"/tmp/fake"})
+	plugMgr.InitPlugins(ProbeVolumePlugins(), volume.NewFakeHost("/tmp/fake", nil, nil))
 
 	plug, err := plugMgr.FindPluginByName("kubernetes.io/gce-pd")
 	if err != nil {
@@ -88,14 +74,14 @@ func TestPlugin(t *testing.T) {
 	}
 	spec := &api.Volume{
 		Name: "vol1",
-		Source: api.VolumeSource{
-			GCEPersistentDisk: &api.GCEPersistentDisk{
+		VolumeSource: api.VolumeSource{
+			GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{
 				PDName: "pd",
 				FSType: "ext4",
 			},
 		},
 	}
-	builder, err := plug.(*gcePersistentDiskPlugin).newBuilderInternal(spec, types.UID("poduid"), &fakePDManager{}, &fakeMounter{})
+	builder, err := plug.(*gcePersistentDiskPlugin).newBuilderInternal(spec, types.UID("poduid"), &fakePDManager{}, &mount.FakeMounter{})
 	if err != nil {
 		t.Errorf("Failed to make a new Builder: %v", err)
 	}
@@ -126,7 +112,7 @@ func TestPlugin(t *testing.T) {
 		}
 	}
 
-	cleaner, err := plug.(*gcePersistentDiskPlugin).newCleanerInternal("vol1", types.UID("poduid"), &fakePDManager{}, &fakeMounter{})
+	cleaner, err := plug.(*gcePersistentDiskPlugin).newCleanerInternal("vol1", types.UID("poduid"), &fakePDManager{}, &mount.FakeMounter{})
 	if err != nil {
 		t.Errorf("Failed to make a new Cleaner: %v", err)
 	}
@@ -146,7 +132,7 @@ func TestPlugin(t *testing.T) {
 
 func TestPluginLegacy(t *testing.T) {
 	plugMgr := volume.PluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), &volume.FakeHost{"/tmp/fake"})
+	plugMgr.InitPlugins(ProbeVolumePlugins(), volume.NewFakeHost("/tmp/fake", nil, nil))
 
 	plug, err := plugMgr.FindPluginByName("gce-pd")
 	if err != nil {
@@ -155,11 +141,11 @@ func TestPluginLegacy(t *testing.T) {
 	if plug.Name() != "gce-pd" {
 		t.Errorf("Wrong name: %s", plug.Name())
 	}
-	if plug.CanSupport(&api.Volume{Source: api.VolumeSource{GCEPersistentDisk: &api.GCEPersistentDisk{}}}) {
+	if plug.CanSupport(&api.Volume{VolumeSource: api.VolumeSource{GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{}}}) {
 		t.Errorf("Expected false")
 	}
 
-	if _, err := plug.NewBuilder(&api.Volume{Source: api.VolumeSource{GCEPersistentDisk: &api.GCEPersistentDisk{}}}, types.UID("poduid")); err == nil {
+	if _, err := plug.NewBuilder(&api.Volume{VolumeSource: api.VolumeSource{GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{}}}, &api.ObjectReference{UID: types.UID("poduid")}); err == nil {
 		t.Errorf("Expected failiure")
 	}
 

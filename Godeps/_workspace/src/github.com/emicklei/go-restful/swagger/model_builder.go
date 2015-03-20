@@ -168,8 +168,11 @@ func (b modelBuilder) buildArrayTypeProperty(field reflect.StructField, jsonName
 	var pType = "array"
 	prop.Type = &pType
 	elemName := b.getElementTypeName(modelName, jsonName, fieldType.Elem())
-	prop.Items = []Item{Item{Ref: &elemName}}
+	prop.Items = &Item{Ref: &elemName}
 	// add|overwrite model for element type
+	if fieldType.Elem().Kind() == reflect.Ptr {
+		fieldType = fieldType.Elem()
+	}
 	b.addModel(fieldType.Elem(), elemName)
 	return jsonName, prop
 }
@@ -182,7 +185,7 @@ func (b modelBuilder) buildPointerTypeProperty(field reflect.StructField, jsonNa
 		var pType = "array"
 		prop.Type = &pType
 		elemName := b.getElementTypeName(modelName, jsonName, fieldType.Elem().Elem())
-		prop.Items = []Item{Item{Ref: &elemName}}
+		prop.Items = &Item{Ref: &elemName}
 		// add|overwrite model for element type
 		b.addModel(fieldType.Elem().Elem(), elemName)
 	} else {
@@ -200,6 +203,9 @@ func (b modelBuilder) buildPointerTypeProperty(field reflect.StructField, jsonNa
 }
 
 func (b modelBuilder) getElementTypeName(modelName, jsonName string, t reflect.Type) string {
+	if t.Kind() == reflect.Ptr {
+		return t.String()[1:]
+	}
 	if t.Name() == "" {
 		return modelName + "." + jsonName
 	}

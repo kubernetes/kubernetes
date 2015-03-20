@@ -36,7 +36,7 @@ import (
 func NewTestLimitRangeEtcdRegistry(t *testing.T) (*tools.FakeEtcdClient, generic.Registry) {
 	f := tools.NewFakeEtcdClient(t)
 	f.TestIndex = true
-	h := tools.EtcdHelper{f, testapi.Codec(), tools.RuntimeVersionAdapter{testapi.MetadataAccessor()}}
+	h := tools.NewEtcdHelper(f, testapi.Codec())
 	return f, NewEtcdRegistry(h)
 }
 
@@ -109,7 +109,7 @@ func TestLimitRangeCreate(t *testing.T) {
 	for name, item := range table {
 		fakeClient, registry := NewTestLimitRangeEtcdRegistry(t)
 		fakeClient.Data[path] = item.existing
-		err := registry.Create(ctx, key, item.toCreate)
+		err := registry.CreateWithName(ctx, key, item.toCreate)
 		if !item.errOK(err) {
 			t.Errorf("%v: unexpected error: %v", name, err)
 		}

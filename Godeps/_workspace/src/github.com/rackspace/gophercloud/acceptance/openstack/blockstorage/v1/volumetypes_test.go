@@ -12,7 +12,7 @@ import (
 )
 
 func TestVolumeTypes(t *testing.T) {
-	client, err := newClient()
+	client, err := newClient(t)
 	th.AssertNoErr(t, err)
 
 	vt, err := volumetypes.Create(client, &volumetypes.CreateOpts{

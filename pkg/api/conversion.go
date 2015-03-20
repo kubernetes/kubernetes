@@ -39,17 +39,22 @@ func init() {
 			*out = *in.Copy()
 			return nil
 		},
-		// Convert ContainerManifest to BoundPod
-		func(in *ContainerManifest, out *BoundPod, s conversion.Scope) error {
+		// Convert ContainerManifest to Pod
+		func(in *ContainerManifest, out *Pod, s conversion.Scope) error {
 			out.Spec.Containers = in.Containers
 			out.Spec.Volumes = in.Volumes
 			out.Spec.RestartPolicy = in.RestartPolicy
 			out.Spec.DNSPolicy = in.DNSPolicy
 			out.Name = in.ID
 			out.UID = in.UUID
+
+			if in.ID != "" {
+				out.SelfLink = "/api/v1beta1/pods/" + in.ID
+			}
+
 			return nil
 		},
-		func(in *BoundPod, out *ContainerManifest, s conversion.Scope) error {
+		func(in *Pod, out *ContainerManifest, s conversion.Scope) error {
 			out.Containers = in.Spec.Containers
 			out.Volumes = in.Spec.Volumes
 			out.RestartPolicy = in.Spec.RestartPolicy
@@ -61,7 +66,7 @@ func init() {
 		},
 
 		// ContainerManifestList
-		func(in *ContainerManifestList, out *BoundPods, s conversion.Scope) error {
+		func(in *ContainerManifestList, out *PodList, s conversion.Scope) error {
 			if err := s.Convert(&in.Items, &out.Items, 0); err != nil {
 				return err
 			}
@@ -71,7 +76,7 @@ func init() {
 			}
 			return nil
 		},
-		func(in *BoundPods, out *ContainerManifestList, s conversion.Scope) error {
+		func(in *PodList, out *ContainerManifestList, s conversion.Scope) error {
 			if err := s.Convert(&in.Items, &out.Items, 0); err != nil {
 				return err
 			}

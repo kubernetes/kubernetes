@@ -17,10 +17,23 @@
 # The business logic for whether a given object should be created
 # was already enforced by salt, and /etc/kubernetes/addons is the
 # managed result is of that. Start everything below that directory.
-echo "== Kubernetes addon manager started at $(date -Is) =="
 KUBECTL=/usr/local/bin/kubectl
+
+function create-object() {
+  obj=$1
+
+  for tries in {1..5}; do
+    if ${KUBECTL} --server="127.0.0.1:8080" create --validate=true -f ${obj}; then
+      return
+    fi
+    echo "++ ${obj} failed, attempt ${try} (sleeping 5) ++"
+    sleep 5
+  done
+}
+
+echo "== Kubernetes addon manager started at $(date -Is) =="
 for obj in $(find /etc/kubernetes/addons -name \*.yaml); do
-  ${KUBECTL} --server="127.0.0.1:8080" create -f ${obj} &
+  create-object ${obj} &
   echo "++ addon ${obj} started in pid $! ++"
 done
 noerrors="true"

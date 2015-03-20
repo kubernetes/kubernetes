@@ -25,113 +25,137 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/clientauth"
-
 	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
+)
+
+const (
+	// Initial pod start can be delayed O(minutes) by slow docker pulls
+	// TODO: Make this 30 seconds once #4566 is resolved.
+	podStartTimeout = 5 * time.Minute
 )
 
 type testContextType struct {
+	kubeConfig string
 	authConfig string
 	certDir    string
 	host       string
 	repoRoot   string
 	provider   string
+	gceConfig  GCEConfig
 }
 
 var testContext testContextType
 
-func waitForPodRunning(c *client.Client, id string, tryFor time.Duration) error {
-	trySecs := int(tryFor.Seconds())
-	for i := 0; i <= trySecs; i += 5 {
-		time.Sleep(5 * time.Second)
-		pod, err := c.Pods(api.NamespaceDefault).Get(id)
-		if err != nil {
-			return fmt.Errorf("Get pod %s failed: %v", id, err.Error())
-		}
-		if pod.Status.Phase == api.PodRunning {
-			return nil
-		}
-		By(fmt.Sprintf("Waiting for pod %s status to be %q (found %q) (%d secs)", id, api.PodRunning, pod.Status.Phase, i))
-	}
-	return fmt.Errorf("Gave up waiting for pod %s to be running after %d seconds", id, trySecs)
+func Logf(format string, a ...interface{}) {
+	fmt.Fprintf(GinkgoWriter, "INFO: "+format+"\n", a...)
 }
 
-// waitForPodNotPending returns false if it took too long for the pod to go out of pending state.
-func waitForPodNotPending(c *client.Client, ns, podName string, tryFor time.Duration) error {
-	trySecs := int(tryFor.Seconds())
-	for i := 0; i <= trySecs; i += 5 {
-		if i > 0 {
-			time.Sleep(5 * time.Second)
-		}
+func Failf(format string, a ...interface{}) {
+	Fail(fmt.Sprintf(format, a...), 1)
+}
+
+type podCondition func(pod *api.Pod) (bool, error)
+
+func waitForPodCondition(c *client.Client, ns, podName, desc string, condition podCondition) error {
+	By(fmt.Sprintf("waiting up to %v for pod %s status to be %s", podStartTimeout, podName, desc))
+	for start := time.Now(); time.Since(start) < podStartTimeout; time.Sleep(5 * time.Second) {
 		pod, err := c.Pods(ns).Get(podName)
 		if err != nil {
-			By(fmt.Sprintf("Get pod %s in namespace %s failed, ignoring for 5s: %v", podName, ns, err))
+			Logf("Get pod failed, ignoring for 5s: %v", err)
 			continue
 		}
-		if pod.Status.Phase != api.PodPending {
-			By(fmt.Sprintf("Saw pod %s in namespace %s out of pending state (found %q)", podName, ns, pod.Status.Phase))
-			return nil
+		done, err := condition(pod)
+		if done {
+			return err
 		}
-		By(fmt.Sprintf("Waiting for status of pod %s in namespace %s to be !%q (found %q) (%v secs)", podName, ns, api.PodPending, pod.Status.Phase, i))
+		Logf("Waiting for pod %s status to be %q (found %q) (%.2f seconds)", podName, desc, pod.Status.Phase, time.Since(start).Seconds())
 	}
-	return fmt.Errorf("Gave up waiting for status of pod %s in namespace %s to go out of pending after %d seconds", podName, ns, trySecs)
+	return fmt.Errorf("gave up waiting for pod %s to be %s after %.2f seconds", podName, desc, podStartTimeout.Seconds())
 }
 
-// waitForPodSuccess returns true if the pod reached state success, or false if it reached failure or ran too long.
-func waitForPodSuccess(c *client.Client, podName string, contName string, tryFor time.Duration) error {
-	trySecs := int(tryFor.Seconds())
-	for i := 0; i <= trySecs; i += 5 {
-		if i > 0 {
-			time.Sleep(5 * time.Second)
+func waitForPodRunning(c *client.Client, podName string) error {
+	return waitForPodCondition(c, api.NamespaceDefault, podName, "running", func(pod *api.Pod) (bool, error) {
+		return (pod.Status.Phase == api.PodRunning), nil
+	})
+}
+
+// waitForPodNotPending returns an error if it took too long for the pod to go out of pending state.
+func waitForPodNotPending(c *client.Client, ns, podName string) error {
+	return waitForPodCondition(c, ns, podName, "!pending", func(pod *api.Pod) (bool, error) {
+		if pod.Status.Phase != api.PodPending {
+			Logf("Saw pod %s in namespace %s out of pending state (found %q)", podName, ns, pod.Status.Phase)
+			return true, nil
 		}
-		pod, err := c.Pods(api.NamespaceDefault).Get(podName)
-		if err != nil {
-			By(fmt.Sprintf("Get pod failed, ignoring for 5s: %v", err))
-			continue
-		}
+		return false, nil
+	})
+}
+
+// waitForPodSuccess returns nil if the pod reached state success, or an error if it reached failure or ran too long.
+func waitForPodSuccess(c *client.Client, podName string, contName string) error {
+	return waitForPodCondition(c, api.NamespaceDefault, podName, "success or failure", func(pod *api.Pod) (bool, error) {
 		// Cannot use pod.Status.Phase == api.PodSucceeded/api.PodFailed due to #2632
 		ci, ok := pod.Status.Info[contName]
 		if !ok {
-			By(fmt.Sprintf("No Status.Info for container %s in pod %s yet", contName, podName))
+			Logf("No Status.Info for container %s in pod %s yet", contName, podName)
 		} else {
 			if ci.State.Termination != nil {
 				if ci.State.Termination.ExitCode == 0 {
 					By("Saw pod success")
-					return nil
+					return true, nil
 				} else {
-					By(fmt.Sprintf("Saw pod failure: %+v", ci.State.Termination))
+					return true, fmt.Errorf("pod %s terminated with failure: %+v", podName, ci.State.Termination)
 				}
-				By(fmt.Sprintf("Waiting for pod %q status to be success or failure", podName))
+				Logf("Waiting for pod %q status to be success or failure", podName)
 			} else {
-				By(fmt.Sprintf("Nil State.Termination for container %s in pod %s so far", contName, podName))
+				Logf("Nil State.Termination for container %s in pod %s so far", contName, podName)
 			}
 		}
+		return false, nil
+	})
+}
+
+func loadConfig() (*client.Config, error) {
+	switch {
+	case testContext.kubeConfig != "":
+		fmt.Printf(">>> testContext.kubeConfig: %s\n", testContext.kubeConfig)
+		c, err := clientcmd.LoadFromFile(testContext.kubeConfig)
+		if err != nil {
+			return nil, fmt.Errorf("error loading kubeConfig: %v", err.Error())
+		}
+		return clientcmd.NewDefaultClientConfig(*c, &clientcmd.ConfigOverrides{}).ClientConfig()
+	case testContext.authConfig != "":
+		config := &client.Config{
+			Host: testContext.host,
+		}
+		info, err := clientauth.LoadFromFile(testContext.authConfig)
+		if err != nil {
+			return nil, fmt.Errorf("error loading authConfig: %v", err.Error())
+		}
+		// If the certificate directory is provided, set the cert paths to be there.
+		if testContext.certDir != "" {
+			Logf("Expecting certs in %v.", testContext.certDir)
+			info.CAFile = filepath.Join(testContext.certDir, "ca.crt")
+			info.CertFile = filepath.Join(testContext.certDir, "kubecfg.crt")
+			info.KeyFile = filepath.Join(testContext.certDir, "kubecfg.key")
+		}
+		mergedConfig, err := info.MergeWithConfig(*config)
+		return &mergedConfig, err
+	default:
+		return nil, fmt.Errorf("either kubeConfig or authConfig must be specified to load client config")
 	}
-	return fmt.Errorf("Gave up waiting for pod %q status to be success or failure after %d seconds", podName, trySecs)
 }
 
 func loadClient() (*client.Client, error) {
-	config := client.Config{
-		Host: testContext.host,
-	}
-	info, err := clientauth.LoadFromFile(testContext.authConfig)
+	config, err := loadConfig()
 	if err != nil {
-		return nil, fmt.Errorf("Error loading auth: %v", err.Error())
+		return nil, fmt.Errorf("error creating client: %v", err.Error())
 	}
-	// If the certificate directory is provided, set the cert paths to be there.
-	if testContext.certDir != "" {
-		By(fmt.Sprintf("Expecting certs in %v.", testContext.certDir))
-		info.CAFile = filepath.Join(testContext.certDir, "ca.crt")
-		info.CertFile = filepath.Join(testContext.certDir, "kubecfg.crt")
-		info.KeyFile = filepath.Join(testContext.certDir, "kubecfg.key")
-	}
-	config, err = info.MergeWithConfig(config)
+	c, err := client.New(config)
 	if err != nil {
-		return nil, fmt.Errorf("Error creating client: %v", err.Error())
-	}
-	c, err := client.New(&config)
-	if err != nil {
-		return nil, fmt.Errorf("Error creating client: %v", err.Error())
+		return nil, fmt.Errorf("error creating client: %v", err.Error())
 	}
 	return c, nil
 }
@@ -143,4 +167,8 @@ func loadClient() (*client.Client, error) {
 func randomSuffix() string {
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
 	return strconv.Itoa(r.Int() % 10000)
+}
+
+func expectNoError(err error, explain ...interface{}) {
+	ExpectWithOffset(1, err).NotTo(HaveOccurred(), explain...)
 }

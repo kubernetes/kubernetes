@@ -15,8 +15,7 @@ desiredState:
             image: kubernetes/redis:v1
             cpu: 1000
             ports:
-              - name: api
-                containerPort: 6379
+              - containerPort: 6379
             volumeMounts:
               - name: data
                 mountPath: /redis-master-data

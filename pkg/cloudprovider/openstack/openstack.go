@@ -299,17 +299,27 @@ func getAddressByName(api *gophercloud.ServiceClient, name string) (string, erro
 	return s, nil
 }
 
-func (i *Instances) IPAddress(name string) (net.IP, error) {
-	glog.V(2).Infof("IPAddress(%v) called", name)
+func (i *Instances) NodeAddresses(name string) ([]api.NodeAddress, error) {
+	glog.V(2).Infof("NodeAddresses(%v) called", name)
 
 	ip, err := getAddressByName(i.compute, name)
 	if err != nil {
 		return nil, err
 	}
 
-	glog.V(2).Infof("IPAddress(%v) => %v", name, ip)
+	glog.V(2).Infof("NodeAddresses(%v) => %v", name, ip)
 
-	return net.ParseIP(ip), err
+	// net.ParseIP().String() is to maintain compatibility with the old code
+	return []api.NodeAddress{{Type: api.NodeLegacyHostIP, Address: net.ParseIP(ip).String()}}, nil
+}
+
+// ExternalID returns the cloud provider ID of the specified instance.
+func (i *Instances) ExternalID(name string) (string, error) {
+	srv, err := getServerByName(i.compute, name)
+	if err != nil {
+		return "", err
+	}
+	return srv.ID, nil
 }
 
 func (i *Instances) GetNodeResources(name string) (*api.NodeResources, error) {
@@ -416,10 +426,10 @@ func (lb *LoadBalancer) TCPLoadBalancerExists(name, region string) (bool, error)
 // a list of regions (from config) and query/create loadbalancers in
 // each region.
 
-func (lb *LoadBalancer) CreateTCPLoadBalancer(name, region string, externalIP net.IP, port int, hosts []string, affinity api.AffinityType) (net.IP, error) {
+func (lb *LoadBalancer) CreateTCPLoadBalancer(name, region string, externalIP net.IP, port int, hosts []string, affinity api.AffinityType) (string, error) {
 	glog.V(2).Infof("CreateTCPLoadBalancer(%v, %v, %v, %v, %v)", name, region, externalIP, port, hosts)
 	if affinity != api.AffinityTypeNone {
-		return nil, fmt.Errorf("unsupported load balancer affinity: %v", affinity)
+		return "", fmt.Errorf("unsupported load balancer affinity: %v", affinity)
 	}
 	pool, err := pools.Create(lb.network, pools.CreateOpts{
 		Name:     name,
@@ -427,13 +437,13 @@ func (lb *LoadBalancer) CreateTCPLoadBalancer(name, region string, externalIP ne
 		SubnetID: lb.opts.SubnetId,
 	}).Extract()
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
 	for _, host := range hosts {
 		addr, err := getAddressByName(lb.compute, host)
 		if err != nil {
-			return nil, err
+			return "", err
 		}
 
 		_, err = members.Create(lb.network, members.CreateOpts{
@@ -443,7 +453,7 @@ func (lb *LoadBalancer) CreateTCPLoadBalancer(name, region string, externalIP ne
 		}).Extract()
 		if err != nil {
 			pools.Delete(lb.network, pool.ID)
-			return nil, err
+			return "", err
 		}
 	}
 
@@ -457,14 +467,14 @@ func (lb *LoadBalancer) CreateTCPLoadBalancer(name, region string, externalIP ne
 		}).Extract()
 		if err != nil {
 			pools.Delete(lb.network, pool.ID)
-			return nil, err
+			return "", err
 		}
 
 		_, err = pools.AssociateMonitor(lb.network, pool.ID, mon.ID).Extract()
 		if err != nil {
 			monitors.Delete(lb.network, mon.ID)
 			pools.Delete(lb.network, pool.ID)
-			return nil, err
+			return "", err
 		}
 	}
 
@@ -481,10 +491,10 @@ func (lb *LoadBalancer) CreateTCPLoadBalancer(name, region string, externalIP ne
 			monitors.Delete(lb.network, mon.ID)
 		}
 		pools.Delete(lb.network, pool.ID)
-		return nil, err
+		return "", err
 	}
 
-	return net.ParseIP(vip.Address), nil
+	return vip.Address, nil
 }
 
 func (lb *LoadBalancer) UpdateTCPLoadBalancer(name, region string, hosts []string) error {

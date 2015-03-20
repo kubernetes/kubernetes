@@ -26,18 +26,14 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/cache"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	algorithm "github.com/GoogleCloudPlatform/kubernetes/pkg/scheduler"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler"
+	schedulerapi "github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler/api"
 
 	"github.com/golang/glog"
-)
-
-var (
-	PodLister     = &cache.StoreToPodLister{cache.NewStore(cache.MetaNamespaceKeyFunc)}
-	MinionLister  = &cache.StoreToNodeLister{cache.NewStore(cache.MetaNamespaceKeyFunc)}
-	ServiceLister = &cache.StoreToServiceLister{cache.NewStore(cache.MetaNamespaceKeyFunc)}
 )
 
 // ConfigFactory knows how to fill out a scheduler config with its support functions.
@@ -45,23 +41,31 @@ type ConfigFactory struct {
 	Client *client.Client
 	// queue for pods that need scheduling
 	PodQueue *cache.FIFO
-	// a means to list all scheduled pods
-	PodLister *cache.StoreToPodLister
+	// a means to list all known scheduled pods.
+	ScheduledPodLister *cache.StoreToPodLister
+	// a means to list all known scheduled pods and pods assumed to have been scheduled.
+	PodLister algorithm.PodLister
 	// a means to list all minions
-	MinionLister *cache.StoreToNodeLister
+	NodeLister *cache.StoreToNodeLister
 	// a means to list all services
 	ServiceLister *cache.StoreToServiceLister
+
+	modeler scheduler.SystemModeler
 }
 
-// NewConfigFactory initializes the factory.
+// Initializes the factory.
 func NewConfigFactory(client *client.Client) *ConfigFactory {
-	return &ConfigFactory{
-		Client:        client,
-		PodQueue:      cache.NewFIFO(cache.MetaNamespaceKeyFunc),
-		PodLister:     PodLister,
-		MinionLister:  MinionLister,
-		ServiceLister: ServiceLister,
+	c := &ConfigFactory{
+		Client:             client,
+		PodQueue:           cache.NewFIFO(cache.MetaNamespaceKeyFunc),
+		ScheduledPodLister: &cache.StoreToPodLister{cache.NewStore(cache.MetaNamespaceKeyFunc)},
+		NodeLister:         &cache.StoreToNodeLister{cache.NewStore(cache.MetaNamespaceKeyFunc)},
+		ServiceLister:      &cache.StoreToServiceLister{cache.NewStore(cache.MetaNamespaceKeyFunc)},
 	}
+	modeler := scheduler.NewSimpleModeler(&cache.StoreToPodLister{c.PodQueue}, c.ScheduledPodLister)
+	c.modeler = modeler
+	c.PodLister = modeler.PodLister()
+	return c
 }
 
 // Create creates a scheduler with the default algorithm provider.
@@ -69,7 +73,7 @@ func (f *ConfigFactory) Create() (*scheduler.Config, error) {
 	return f.CreateFromProvider(DefaultProvider)
 }
 
-// CreateFromProvider creates a scheduler from the name of a registered algorithm provider.
+// Creates a scheduler from the name of a registered algorithm provider.
 func (f *ConfigFactory) CreateFromProvider(providerName string) (*scheduler.Config, error) {
 	glog.V(2).Infof("creating scheduler from algorithm provider '%v'", providerName)
 	provider, err := GetAlgorithmProvider(providerName)
@@ -80,40 +84,65 @@ func (f *ConfigFactory) CreateFromProvider(providerName string) (*scheduler.Conf
 	return f.CreateFromKeys(provider.FitPredicateKeys, provider.PriorityFunctionKeys)
 }
 
-// CreateFromKeys creates a scheduler from a set of registered fit predicate keys and priority keys.
+// Creates a scheduler from the configuration file
+func (f *ConfigFactory) CreateFromConfig(policy schedulerapi.Policy) (*scheduler.Config, error) {
+	glog.V(2).Infof("creating scheduler from configuration: %v", policy)
+
+	predicateKeys := util.NewStringSet()
+	for _, predicate := range policy.Predicates {
+		glog.V(2).Infof("Registering predicate: %s", predicate.Name)
+		predicateKeys.Insert(RegisterCustomFitPredicate(predicate))
+	}
+
+	priorityKeys := util.NewStringSet()
+	for _, priority := range policy.Priorities {
+		glog.V(2).Infof("Registering priority: %s", priority.Name)
+		priorityKeys.Insert(RegisterCustomPriorityFunction(priority))
+	}
+
+	return f.CreateFromKeys(predicateKeys, priorityKeys)
+}
+
+// Creates a scheduler from a set of registered fit predicate keys and priority keys.
 func (f *ConfigFactory) CreateFromKeys(predicateKeys, priorityKeys util.StringSet) (*scheduler.Config, error) {
 	glog.V(2).Infof("creating scheduler with fit predicates '%v' and priority functions '%v", predicateKeys, priorityKeys)
-	predicateFuncs, err := getFitPredicateFunctions(predicateKeys)
+	pluginArgs := PluginFactoryArgs{
+		PodLister:     f.PodLister,
+		ServiceLister: f.ServiceLister,
+		NodeLister:    f.NodeLister,
+		NodeInfo:      f.NodeLister,
+	}
+	predicateFuncs, err := getFitPredicateFunctions(predicateKeys, pluginArgs)
 	if err != nil {
 		return nil, err
 	}
 
-	priorityConfigs, err := getPriorityFunctionConfigs(priorityKeys)
+	priorityConfigs, err := getPriorityFunctionConfigs(priorityKeys, pluginArgs)
 	if err != nil {
 		return nil, err
 	}
 
 	// Watch and queue pods that need scheduling.
-	cache.NewReflector(f.createUnassignedPodLW(), &api.Pod{}, f.PodQueue).Run()
+	cache.NewReflector(f.createUnassignedPodLW(), &api.Pod{}, f.PodQueue, 0).Run()
 
 	// Watch and cache all running pods. Scheduler needs to find all pods
 	// so it knows where it's safe to place a pod. Cache this locally.
-	cache.NewReflector(f.createAssignedPodLW(), &api.Pod{}, f.PodLister.Store).Run()
+	cache.NewReflector(f.createAssignedPodLW(), &api.Pod{}, f.ScheduledPodLister.Store, 0).Run()
 
 	// Watch minions.
 	// Minions may be listed frequently, so provide a local up-to-date cache.
 	if false {
 		// Disable this code until minions support watches. Note when this code is enabled,
 		// we need to make sure minion ListWatcher has proper FieldSelector.
-		cache.NewReflector(f.createMinionLW(), &api.Node{}, f.MinionLister.Store).Run()
+		cache.NewReflector(f.createMinionLW(), &api.Node{}, f.NodeLister.Store, 0).Run()
 	} else {
-		cache.NewPoller(f.pollMinions, 10*time.Second, f.MinionLister.Store).Run()
+		cache.NewPoller(f.pollMinions, 10*time.Second, f.NodeLister.Store).Run()
 	}
 
 	// Watch and cache all service objects. Scheduler needs to find all pods
 	// created by the same service, so that it can spread them correctly.
 	// Cache this locally.
-	cache.NewReflector(f.createServiceLW(), &api.Service{}, f.ServiceLister.Store).Run()
+	cache.NewReflector(f.createServiceLW(), &api.Service{}, f.ServiceLister.Store, 0).Run()
 
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
 
@@ -128,26 +157,24 @@ func (f *ConfigFactory) CreateFromKeys(predicateKeys, priorityKeys util.StringSe
 	}
 
 	return &scheduler.Config{
-		MinionLister: f.MinionLister,
+		Modeler:      f.modeler,
+		MinionLister: f.NodeLister,
 		Algorithm:    algo,
 		Binder:       &binder{f.Client},
 		NextPod: func() *api.Pod {
 			pod := f.PodQueue.Pop().(*api.Pod)
-			glog.V(2).Infof("glog.v2 --> About to try and schedule pod %v", pod.Name)
+			glog.V(2).Infof("About to try and schedule pod %v", pod.Name)
 			return pod
 		},
-		Error: f.makeDefaultErrorFunc(&podBackoff, f.PodQueue),
+		Error:    f.makeDefaultErrorFunc(&podBackoff, f.PodQueue),
+		Recorder: record.FromSource(api.EventSource{Component: "scheduler"}),
 	}, nil
 }
 
-// createUnassignedPodLW returns a cache.ListWatch that finds all pods that need to be
+// Returns a cache.ListWatch that finds all pods that need to be
 // scheduled.
 func (factory *ConfigFactory) createUnassignedPodLW() *cache.ListWatch {
-	return &cache.ListWatch{
-		Client:        factory.Client,
-		FieldSelector: labels.Set{"DesiredState.Host": ""}.AsSelector(),
-		Resource:      "pods",
-	}
+	return cache.NewListWatchFromClient(factory.Client, "pods", api.NamespaceAll, labels.Set{getHostFieldLabel(factory.Client.APIVersion()): ""}.AsSelector())
 }
 
 func parseSelectorOrDie(s string) labels.Selector {
@@ -158,27 +185,20 @@ func parseSelectorOrDie(s string) labels.Selector {
 	return selector
 }
 
-// createAssignedPodLW returns a cache.ListWatch that finds all pods that are
+// Returns a cache.ListWatch that finds all pods that are
 // already scheduled.
 // TODO: return a ListerWatcher interface instead?
 func (factory *ConfigFactory) createAssignedPodLW() *cache.ListWatch {
-	return &cache.ListWatch{
-		Client:        factory.Client,
-		FieldSelector: parseSelectorOrDie("DesiredState.Host!="),
-		Resource:      "pods",
-	}
+	return cache.NewListWatchFromClient(factory.Client, "pods", api.NamespaceAll,
+		parseSelectorOrDie(getHostFieldLabel(factory.Client.APIVersion())+"!="))
 }
 
 // createMinionLW returns a cache.ListWatch that gets all changes to minions.
 func (factory *ConfigFactory) createMinionLW() *cache.ListWatch {
-	return &cache.ListWatch{
-		Client:        factory.Client,
-		FieldSelector: parseSelectorOrDie(""),
-		Resource:      "minions",
-	}
+	return cache.NewListWatchFromClient(factory.Client, "minions", api.NamespaceAll, parseSelectorOrDie(""))
 }
 
-// pollMinions lists all minions and filter out unhealthy ones, then returns
+// Lists all minions and filter out unhealthy ones, then returns
 // an enumerator for cache.Poller.
 func (factory *ConfigFactory) pollMinions() (cache.Enumerator, error) {
 	allNodes := &api.NodeList{}
@@ -191,10 +211,15 @@ func (factory *ConfigFactory) pollMinions() (cache.Enumerator, error) {
 		ListMeta: allNodes.ListMeta,
 	}
 	for _, node := range allNodes.Items {
-		conditionMap := make(map[api.NodeConditionKind]*api.NodeCondition)
+		conditionMap := make(map[api.NodeConditionType]*api.NodeCondition)
 		for i := range node.Status.Conditions {
 			cond := node.Status.Conditions[i]
-			conditionMap[cond.Kind] = &cond
+			conditionMap[cond.Type] = &cond
+		}
+		if condition, ok := conditionMap[api.NodeSchedulable]; ok {
+			if condition.Status != api.ConditionFull {
+				continue
+			}
 		}
 		if condition, ok := conditionMap[api.NodeReady]; ok {
 			if condition.Status == api.ConditionFull {
@@ -213,13 +238,9 @@ func (factory *ConfigFactory) pollMinions() (cache.Enumerator, error) {
 	return &nodeEnumerator{nodes}, nil
 }
 
-// createServiceLW returns a cache.ListWatch that gets all changes to services.
+// Returns a cache.ListWatch that gets all changes to services.
 func (factory *ConfigFactory) createServiceLW() *cache.ListWatch {
-	return &cache.ListWatch{
-		Client:        factory.Client,
-		FieldSelector: parseSelectorOrDie(""),
-		Resource:      "services",
-	}
+	return cache.NewListWatchFromClient(factory.Client, "services", api.NamespaceAll, parseSelectorOrDie(""))
 }
 
 func (factory *ConfigFactory) makeDefaultErrorFunc(backoff *podBackoff, podQueue *cache.FIFO) func(pod *api.Pod, err error) {
@@ -247,6 +268,15 @@ func (factory *ConfigFactory) makeDefaultErrorFunc(backoff *podBackoff, podQueue
 	}
 }
 
+func getHostFieldLabel(apiVersion string) string {
+	switch apiVersion {
+	case "v1beta1", "v1beta2":
+		return "DesiredState.Host"
+	default:
+		return "spec.host"
+	}
+}
+
 // nodeEnumerator allows a cache.Poller to enumerate items in an api.NodeList
 type nodeEnumerator struct {
 	*api.NodeList
@@ -271,9 +301,11 @@ type binder struct {
 
 // Bind just does a POST binding RPC.
 func (b *binder) Bind(binding *api.Binding) error {
-	glog.V(2).Infof("Attempting to bind %v to %v", binding.PodID, binding.Host)
+	glog.V(2).Infof("Attempting to bind %v to %v", binding.Name, binding.Target.Name)
 	ctx := api.WithNamespace(api.NewContext(), binding.Namespace)
-	return b.Post().Namespace(api.Namespace(ctx)).Resource("bindings").Body(binding).Do().Error()
+	return b.Post().Namespace(api.NamespaceValue(ctx)).Resource("bindings").Body(binding).Do().Error()
+	// TODO: use Pods interface for binding once clusters are upgraded
+	// return b.Pods(binding.Namespace).Bind(binding)
 }
 
 type clock interface {

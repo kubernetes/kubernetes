@@ -20,8 +20,10 @@ import (
 	"fmt"
 	"strconv"
 	"testing"
+	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/dockertools"
 	docker "github.com/fsouza/go-dockerclient"
 )
@@ -68,13 +70,14 @@ func (d *testDocker) InspectContainer(id string) (*docker.Container, error) {
 func TestRunOnce(t *testing.T) {
 	kb := &Kubelet{
 		rootDirectory: "/tmp/kubelet",
+		recorder:      &record.FakeRecorder{},
 	}
 	if err := kb.setupDataDirs(); err != nil {
 		t.Errorf("Failed to init data dirs: %v", err)
 	}
 	podContainers := []docker.APIContainers{
 		{
-			Names:  []string{"/k8s_bar." + strconv.FormatUint(dockertools.HashContainer(&api.Container{Name: "bar"}), 16) + "_foo.new.test_12345678_42"},
+			Names:  []string{"/k8s_bar." + strconv.FormatUint(dockertools.HashContainer(&api.Container{Name: "bar"}), 16) + "_foo_new_12345678_42"},
 			ID:     "1234",
 			Status: "running",
 		},
@@ -97,27 +100,40 @@ func TestRunOnce(t *testing.T) {
 				label: "syncPod",
 				container: docker.Container{
 					Config: &docker.Config{Image: "someimage"},
-					State:  docker.State{Running: true},
+					State:  docker.State{Running: true, Pid: 42},
 				},
 			},
 			{
 				label: "syncPod",
 				container: docker.Container{
 					Config: &docker.Config{Image: "someimage"},
-					State:  docker.State{Running: true},
+					State:  docker.State{Running: true, Pid: 42},
+				},
+			},
+			{
+				label: "syncPod",
+				container: docker.Container{
+					Config: &docker.Config{Image: "someimage"},
+					State:  docker.State{Running: true, Pid: 42},
+				},
+			},
+			{
+				label: "syncPod",
+				container: docker.Container{
+					Config: &docker.Config{Image: "someimage"},
+					State:  docker.State{Running: true, Pid: 42},
 				},
 			},
 		},
 		t: t,
 	}
 	kb.dockerPuller = &dockertools.FakeDockerPuller{}
-	results, err := kb.runOnce([]api.BoundPod{
+	results, err := kb.runOnce([]api.Pod{
 		{
 			ObjectMeta: api.ObjectMeta{
-				UID:         "12345678",
-				Name:        "foo",
-				Namespace:   "new",
-				Annotations: map[string]string{ConfigSourceAnnotationKey: "test"},
+				UID:       "12345678",
+				Name:      "foo",
+				Namespace: "new",
 			},
 			Spec: api.PodSpec{
 				Containers: []api.Container{
@@ -125,7 +141,7 @@ func TestRunOnce(t *testing.T) {
 				},
 			},
 		},
-	})
+	}, time.Millisecond)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}

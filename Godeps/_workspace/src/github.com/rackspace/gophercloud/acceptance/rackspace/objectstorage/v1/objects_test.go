@@ -21,6 +21,7 @@ func TestObjects(t *testing.T) {
 	th.AssertNoErr(t, res.Err)
 
 	defer func() {
+		t.Logf("Deleting container...")
 		res := raxContainers.Delete(c, "gophercloud-test")
 		th.AssertNoErr(t, res.Err)
 	}()
@@ -29,7 +30,9 @@ func TestObjects(t *testing.T) {
 	options := &osObjects.CreateOpts{ContentType: "text/plain"}
 	createres := raxObjects.Create(c, "gophercloud-test", "o1", content, options)
 	th.AssertNoErr(t, createres.Err)
+
 	defer func() {
+		t.Logf("Deleting object o1...")
 		res := raxObjects.Delete(c, "gophercloud-test", "o1", nil)
 		th.AssertNoErr(t, res.Err)
 	}()
@@ -80,6 +83,7 @@ func TestObjects(t *testing.T) {
 	copyres := raxObjects.Copy(c, "gophercloud-test", "o1", &raxObjects.CopyOpts{Destination: "gophercloud-test/o2"})
 	th.AssertNoErr(t, copyres.Err)
 	defer func() {
+		t.Logf("Deleting object o2...")
 		res := raxObjects.Delete(c, "gophercloud-test", "o2", nil)
 		th.AssertNoErr(t, res.Err)
 	}()
@@ -99,7 +103,7 @@ func TestObjects(t *testing.T) {
 		metadata, err := raxObjects.Get(c, "gophercloud-test", "o2", nil).ExtractMetadata()
 		th.AssertNoErr(t, err)
 		t.Logf("Metadata from Get Account request (after update reverted): %+v\n", metadata)
-		th.CheckEquals(t, metadata["White"], "")
+		th.CheckEquals(t, "", metadata["White"])
 	}()
 
 	getres := raxObjects.Get(c, "gophercloud-test", "o2", nil)
@@ -108,5 +112,13 @@ func TestObjects(t *testing.T) {
 	metadata, err := getres.ExtractMetadata()
 	th.AssertNoErr(t, err)
 	t.Logf("Metadata from Get Account request (after update): %+v\n", metadata)
-	th.CheckEquals(t, metadata["White"], "mountains")
+	th.CheckEquals(t, "mountains", metadata["White"])
+
+	createTempURLOpts := osObjects.CreateTempURLOpts{
+		Method: osObjects.GET,
+		TTL:    600,
+	}
+	tempURL, err := raxObjects.CreateTempURL(c, "gophercloud-test", "o1", createTempURLOpts)
+	th.AssertNoErr(t, err)
+	t.Logf("TempURL for object (%s): %s", "o1", tempURL)
 }

@@ -66,7 +66,7 @@ func copyOrDie(obj runtime.Object) runtime.Object {
 func (t *Tester) TestCreate(valid runtime.Object, invalid ...runtime.Object) {
 	t.TestCreateHasMetadata(copyOrDie(valid))
 	t.TestCreateGeneratesName(copyOrDie(valid))
-	t.TestCreateGeneratesNameReturnsTryAgain(copyOrDie(valid))
+	t.TestCreateGeneratesNameReturnsServerTimeout(copyOrDie(valid))
 	if t.clusterScope {
 		t.TestCreateRejectsNamespace(copyOrDie(valid))
 	} else {
@@ -85,12 +85,12 @@ func (t *Tester) TestCreateResetsUserData(valid runtime.Object) {
 	objectMeta.UID = "bad-uid"
 	objectMeta.CreationTimestamp = now
 
-	channel, err := t.storage.(apiserver.RESTCreater).Create(api.NewDefaultContext(), valid)
+	obj, err := t.storage.(apiserver.RESTCreater).Create(api.NewDefaultContext(), valid)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
-	if obj := <-channel; obj.Object == nil {
-		t.Fatalf("Unexpected object from channel: %#v", obj)
+	if obj == nil {
+		t.Fatalf("Unexpected object from result: %#v", obj)
 	}
 	if objectMeta.UID == "bad-uid" || objectMeta.CreationTimestamp == now {
 		t.Errorf("ObjectMeta did not reset basic fields: %#v", objectMeta)
@@ -111,12 +111,12 @@ func (t *Tester) TestCreateHasMetadata(valid runtime.Object) {
 		context = api.NewContext()
 	}
 
-	channel, err := t.storage.(apiserver.RESTCreater).Create(context, valid)
+	obj, err := t.storage.(apiserver.RESTCreater).Create(context, valid)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
-	if obj := <-channel; obj.Object == nil {
-		t.Fatalf("Unexpected object from channel: %#v", obj)
+	if obj == nil {
+		t.Fatalf("Unexpected object from result: %#v", obj)
 	}
 	if !api.HasObjectMetaSystemFieldValues(objectMeta) {
 		t.Errorf("storage did not populate object meta field values")
@@ -140,7 +140,7 @@ func (t *Tester) TestCreateGeneratesName(valid runtime.Object) {
 	}
 }
 
-func (t *Tester) TestCreateGeneratesNameReturnsTryAgain(valid runtime.Object) {
+func (t *Tester) TestCreateGeneratesNameReturnsServerTimeout(valid runtime.Object) {
 	objectMeta, err := api.ObjectMetaFor(valid)
 	if err != nil {
 		t.Fatalf("object does not have ObjectMeta: %v\n%#v", err, valid)
@@ -148,12 +148,8 @@ func (t *Tester) TestCreateGeneratesNameReturnsTryAgain(valid runtime.Object) {
 
 	objectMeta.GenerateName = "test-"
 	t.withStorageError(errors.NewAlreadyExists("kind", "thing"), func() {
-		ch, err := t.storage.(apiserver.RESTCreater).Create(api.NewDefaultContext(), valid)
-		if err != nil {
-			t.Fatalf("Unexpected error: %v", err)
-		}
-		res := <-ch
-		if err := errors.FromObject(res.Object); err == nil || !errors.IsTryAgainLater(err) {
+		_, err := t.storage.(apiserver.RESTCreater).Create(api.NewDefaultContext(), valid)
+		if err == nil || !errors.IsServerTimeout(err) {
 			t.Fatalf("Unexpected error: %v", err)
 		}
 	})

@@ -13,45 +13,8 @@ is a [_Pod_](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/
 
 We will used the shared network namespace to bootstrap our Redis cluster.  In particular, the very first sentinel needs to know how to find the master (subsequent sentinels just ask the first sentinel).  Because all containers in a Pod share a network namespace, the sentinel can simply look at ```$(hostname -i):6379```.
 
-Here is the config for the initial master and sentinel pod:
-```yaml
-id: redis-master
-kind: Pod
-apiVersion: v1beta1
-desiredState:
-  manifest:
-    version: v1beta1
-    id: redis-master
-    containers:
-      - name: master
-        image: kubernetes/redis:v1
-        cpu: 1000
-        ports:
-          - name: api
-            containerPort: 6379
-        volumeMounts:
-          - name: data
-            mountPath: /redis-master-data
-        env:
-          - key: MASTER
-            value: "true"
-      - name: sentinel
-        image: kubernetes/redis:v1
-        ports:
-          - name: api
-            containerPort: 26379
-        env:
-          - key: SENTINEL
-            value: "true"
-    volumes:
-      - name: data
-        source:
-          emptyDir: {}
-labels:
-  name: redis
-  role: master
-  redis-sentinel: "true"
-```
+Here is the config for the initial master and sentinel pod: [redis-master.yaml](redis-master.yaml)
+
 
 Create this master as follows:
 ```sh
@@ -63,20 +26,7 @@ In Kubernetes a _Service_ describes a set of Pods that perform the same task.  F
 
 In Redis, we will use a Kubernetes Service to provide a discoverable endpoints for the Redis sentinels in the cluster.  From the sentinels Redis clients can find the master, and then the slaves and other relevant info for the cluster.  This enables new members to join the cluster when failures occur.
 
-Here is the definition of the sentinel service:
-
-```yaml
-id: redis-sentinel
-kind: Service
-apiVersion: v1beta1
-port: 26379
-containerPort: 26379
-selector:
-  redis-sentinel: "true"
-labels:
-  name: sentinel 
-  role: service
-```
+Here is the definition of the sentinel service:[redis-sentinel-service.yaml](redis-sentinel-service.yaml)
 
 Create this service:
 ```sh
@@ -89,39 +39,7 @@ So far, what we have done is pretty manual, and not very fault-tolerant.  If the
 In Kubernetes a _Replication Controller_ is responsible for replicating sets of identical pods.  Like a _Service_ it has a selector query which identifies the members of it's set.  Unlike a _Service_ it also has a desired number of replicas, and it will create or delete _Pods_ to ensure that the number of _Pods_ matches up with it's desired state.
 
 Replication Controllers will "adopt" existing pods that match their selector query, so let's create a Replication Controller with a single replica to adopt our existing Redis server.
-
-```yaml
-id: redis
-kind: ReplicationController
-apiVersion: v1beta1
-desiredState:
-  replicas: 1
-  replicaSelector:
-    name: redis
-  # This template is basically identical to the single pod
-  # definition above
-  podTemplate:
-    desiredState:
-      manifest:
-        version: v1beta1
-        id: redis
-        containers:
-          - name: redis
-            image: kubernetes/redis:v1
-            cpu: 1000
-            ports:
-              - name: api
-                containerPort: 6379
-            volumeMounts:
-              - name: data
-                mountPath: /redis-master-data
-        volumes:
-          - name: data
-            source:
-              emptyDir: {}
-    labels:
-      name: redis
-```
+[redis-controller.yaml](redis-controller.yaml)
 
 The bulk of this controller config is actually identical to the redis-master pod definition above.  It forms the template or "cookie cutter" that defines what it means to be a member of this set.
 
@@ -131,34 +49,7 @@ Create this controller:
 kubectl create -f examples/redis/redis-controller.yaml
 ```
 
-We'll do the same thing for the sentinel.  Here is the controller config:
-```yaml
-id: redis-sentinel
-kind: ReplicationController
-apiVersion: v1beta1
-desiredState:
-  replicas: 1
-  replicaSelector:
-    redis-sentinel: "true"
-  podTemplate:
-    desiredState:
-      manifest:
-        version: v1beta1
-        id: redis-slave
-        containers:
-          - name: sentinel
-            image: kubernetes/redis:v1
-            ports:
-              - name: api
-                containerPort: 26379
-            env:
-              - key: SENTINEL
-                value: "true"
-    labels:
-      name: redis-sentinel
-      role: sentinel
-      redis-sentinel: "true"
-```
+We'll do the same thing for the sentinel.  Here is the controller config:[redis-sentinel-controller.yaml](redis-sentinel-controller.yaml)
 
 We create it as follows:
 ```sh

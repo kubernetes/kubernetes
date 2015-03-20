@@ -40,7 +40,7 @@ func NewCmdConfig(out io.Writer) *cobra.Command {
 	pathOptions := &pathOptions{}
 
 	cmd := &cobra.Command{
-		Use:   "config <subcommand>",
+		Use:   "config SUBCOMMAND",
 		Short: "config modifies .kubeconfig files",
 		Long:  `config modifies .kubeconfig files using subcommands like "kubectl config set current-context my-context"`,
 		Run: func(cmd *cobra.Command, args []string) {

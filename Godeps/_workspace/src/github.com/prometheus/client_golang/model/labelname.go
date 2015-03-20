@@ -33,6 +33,14 @@ const (
 	// JobLabel is the label name indicating the job from which a timeseries
 	// was scraped.
 	JobLabel LabelName = "job"
+
+	// BucketLabel is used for the label that defines the upper bound of a
+	// bucket of a histogram ("le" -> "less or equal").
+	BucketLabel = "le"
+
+	// QuantileLabel is used for the label that defines the quantile in a
+	// summary.
+	QuantileLabel = "quantile"
 )
 
 // A LabelName is a key for a LabelSet or Metric.  It has a value associated

@@ -198,6 +198,126 @@ func (d *dockerContainerCommandRunner) RunInContainer(containerID string, cmd []
 	return buf.Bytes(), <-errChan
 }
 
+// ExecInContainer uses nsenter to run the command inside the container identified by containerID.
+//
+// TODO:
+//  - match cgroups of container
+//  - should we support `docker exec`?
+//  - should we support nsenter in a container, running with elevated privs and --pid=host?
+func (d *dockerContainerCommandRunner) ExecInContainer(containerId string, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool) error {
+	container, err := d.client.InspectContainer(containerId)
+	if err != nil {
+		return err
+	}
+
+	if !container.State.Running {
+		return fmt.Errorf("container not running (%s)", container)
+	}
+
+	containerPid := container.State.Pid
+
+	// TODO what if the container doesn't have `env`???
+	args := []string{"-t", fmt.Sprintf("%d", containerPid), "-m", "-i", "-u", "-n", "-p", "--", "env", "-i"}
+	args = append(args, fmt.Sprintf("HOSTNAME=%s", container.Config.Hostname))
+	args = append(args, container.Config.Env...)
+	args = append(args, cmd...)
+	command := exec.Command("nsenter", args...)
+	// TODO use exec.LookPath
+	if tty {
+		p, err := StartPty(command)
+		if err != nil {
+			return err
+		}
+		defer p.Close()
+
+		// make sure to close the stdout stream
+		defer stdout.Close()
+
+		if stdin != nil {
+			go io.Copy(p, stdin)
+		}
+
+		if stdout != nil {
+			go io.Copy(stdout, p)
+		}
+
+		return command.Wait()
+	} else {
+		cp := func(dst io.WriteCloser, src io.Reader, closeDst bool) {
+			defer func() {
+				if closeDst {
+					dst.Close()
+				}
+			}()
+			io.Copy(dst, src)
+		}
+		if stdin != nil {
+			inPipe, err := command.StdinPipe()
+			if err != nil {
+				return err
+			}
+			go func() {
+				cp(inPipe, stdin, false)
+				inPipe.Close()
+			}()
+		}
+
+		if stdout != nil {
+			outPipe, err := command.StdoutPipe()
+			if err != nil {
+				return err
+			}
+			go cp(stdout, outPipe, true)
+		}
+
+		if stderr != nil {
+			errPipe, err := command.StderrPipe()
+			if err != nil {
+				return err
+			}
+			go cp(stderr, errPipe, true)
+		}
+
+		return command.Run()
+	}
+}
+
+// PortForward executes socat in the pod's network namespace and copies
+// data between stream (representing the user's local connection on their
+// computer) and the specified port in the container.
+//
+// TODO:
+//  - match cgroups of container
+//  - should we support nsenter + socat on the host? (current impl)
+//  - should we support nsenter + socat in a container, running with elevated privs and --pid=host?
+func (d *dockerContainerCommandRunner) PortForward(podInfraContainerID string, port uint16, stream io.ReadWriteCloser) error {
+	container, err := d.client.InspectContainer(podInfraContainerID)
+	if err != nil {
+		return err
+	}
+
+	if !container.State.Running {
+		return fmt.Errorf("container not running (%s)", container)
+	}
+
+	containerPid := container.State.Pid
+	// TODO use exec.LookPath for socat / what if the host doesn't have it???
+	args := []string{"-t", fmt.Sprintf("%d", containerPid), "-n", "socat", "-", fmt.Sprintf("TCP4:localhost:%d", port)}
+	// TODO use exec.LookPath
+	command := exec.Command("nsenter", args...)
+	in, err := command.StdinPipe()
+	if err != nil {
+		return err
+	}
+	out, err := command.StdoutPipe()
+	if err != nil {
+		return err
+	}
+	go io.Copy(in, stream)
+	go io.Copy(stream, out)
+	return command.Run()
+}
+
 // NewDockerContainerCommandRunner creates a ContainerCommandRunner which uses nsinit to run a command
 // inside a container.
 func NewDockerContainerCommandRunner(client DockerInterface) ContainerCommandRunner {
@@ -222,7 +342,21 @@ func (p dockerPuller) Pull(image string) error {
 		glog.V(1).Infof("Pulling image %s without credentials", image)
 	}
 
-	return p.client.PullImage(opts, creds)
+	err := p.client.PullImage(opts, creds)
+	// If there was no error, or we had credentials, just return the error.
+	if err == nil || ok {
+		return err
+	}
+	// Image spec: [<registry>/]<repository>/<image>[:<version] so we count '/'
+	explicitRegistry := (strings.Count(image, "/") == 2)
+	glog.Errorf("Foo: %s", explicitRegistry)
+	// Hack, look for a private registry, and decorate the error with the lack of
+	// credentials.  This is heuristic, and really probably could be done better
+	// by talking to the registry API directly from the kubelet here.
+	if explicitRegistry {
+		return fmt.Errorf("image pull failed for %s, this may be because there are no credentials on this request.  details: (%v)", image, err)
+	}
+	return err
 }
 
 func (p throttledDockerPuller) Pull(image string) error {
@@ -268,7 +402,10 @@ func (c DockerContainers) FindPodContainer(podFullName string, uid types.UID, co
 			continue
 		}
 		// TODO(proppy): build the docker container name and do a map lookup instead?
-		dockerManifestID, dockerUUID, dockerContainerName, hash := ParseDockerName(dockerContainer.Names[0])
+		dockerManifestID, dockerUUID, dockerContainerName, hash, err := ParseDockerName(dockerContainer.Names[0])
+		if err != nil {
+			continue
+		}
 		if dockerManifestID == podFullName &&
 			(uid == "" || dockerUUID == uid) &&
 			dockerContainerName == containerName {
@@ -278,17 +415,25 @@ func (c DockerContainers) FindPodContainer(podFullName string, uid types.UID, co
 	return nil, false, 0
 }
 
-// Note, this might return containers belong to a different Pod instance with the same name
-func (c DockerContainers) FindContainersByPodFullName(podFullName string) map[string]*docker.APIContainers {
-	containers := make(map[string]*docker.APIContainers)
+// RemoveContainerWithID removes the container with the given containerID.
+func (c DockerContainers) RemoveContainerWithID(containerID DockerID) {
+	delete(c, containerID)
+}
 
+// FindContainersByPod returns the containers that belong to the pod.
+func (c DockerContainers) FindContainersByPod(podUID types.UID, podFullName string) DockerContainers {
+	containers := make(DockerContainers)
 	for _, dockerContainer := range c {
 		if len(dockerContainer.Names) == 0 {
 			continue
 		}
-		dockerManifestID, _, dockerContainerName, _ := ParseDockerName(dockerContainer.Names[0])
-		if dockerManifestID == podFullName {
-			containers[dockerContainerName] = dockerContainer
+		dockerPodName, uuid, _, _, err := ParseDockerName(dockerContainer.Names[0])
+		if err != nil {
+			continue
+		}
+		if podUID == uuid ||
+			(podUID == "" && podFullName == dockerPodName) {
+			containers[DockerID(dockerContainer.ID)] = dockerContainer
 		}
 	}
 	return containers
@@ -332,7 +477,10 @@ func GetRecentDockerContainersWithNameAndUUID(client DockerInterface, podFullNam
 		if len(dockerContainer.Names) == 0 {
 			continue
 		}
-		dockerPodName, dockerUUID, dockerContainerName, _ := ParseDockerName(dockerContainer.Names[0])
+		dockerPodName, dockerUUID, dockerContainerName, _, err := ParseDockerName(dockerContainer.Names[0])
+		if err != nil {
+			continue
+		}
 		if dockerPodName != podFullName {
 			continue
 		}
@@ -455,7 +603,8 @@ func inspectContainer(client DockerInterface, dockerID, containerName, tPath str
 	return &containerStatus, nil
 }
 
-// GetDockerPodInfo returns docker info for all containers in the pod/manifest.
+// GetDockerPodInfo returns docker info for all containers in the pod/manifest and
+// infrastructure container
 func GetDockerPodInfo(client DockerInterface, manifest api.PodSpec, podFullName string, uid types.UID) (api.PodInfo, error) {
 	info := api.PodInfo{}
 	expectedContainers := make(map[string]api.Container)
@@ -473,7 +622,10 @@ func GetDockerPodInfo(client DockerInterface, manifest api.PodSpec, podFullName 
 		if len(value.Names) == 0 {
 			continue
 		}
-		dockerManifestID, dockerUUID, dockerContainerName, _ := ParseDockerName(value.Names[0])
+		dockerManifestID, dockerUUID, dockerContainerName, _, err := ParseDockerName(value.Names[0])
+		if err != nil {
+			continue
+		}
 		if dockerManifestID != podFullName {
 			continue
 		}
@@ -513,7 +665,7 @@ func GetDockerPodInfo(client DockerInterface, manifest api.PodSpec, podFullName 
 
 	if len(info) < (len(manifest.Containers) + 1) {
 		var containerStatus api.ContainerStatus
-		// Not all containers expected are created, verify if there are
+		// Not all containers expected are created, check if there are
 		// image related issues
 		for _, container := range manifest.Containers {
 			if _, found := info[container.Name]; found {
@@ -565,22 +717,22 @@ func BuildDockerName(podUID types.UID, podFullName string, container *api.Contai
 }
 
 // Unpacks a container name, returning the pod full name and container name we would have used to
-// construct the docker name. If the docker name isn't the one we created, we may return empty strings.
-func ParseDockerName(name string) (podFullName string, podUID types.UID, containerName string, hash uint64) {
+// construct the docker name. If we are unable to parse the name, an error is returned.
+func ParseDockerName(name string) (podFullName string, podUID types.UID, containerName string, hash uint64, err error) {
 	// For some reason docker appears to be appending '/' to names.
 	// If it's there, strip it.
-	if name[0] == '/' {
-		name = name[1:]
-	}
+	name = strings.TrimPrefix(name, "/")
 	parts := strings.Split(name, "_")
 	if len(parts) == 0 || parts[0] != containerNamePrefix {
+		err = fmt.Errorf("failed to parse Docker container name %q into parts", name)
 		return
 	}
-	if len(parts) < 5 {
+	if len(parts) < 6 {
 		// We have at least 5 fields.  We may have more in the future.
 		// Anything with less fields than this is not something we can
 		// manage.
-		glog.Warningf("found a container with the %q prefix, but too few fields (%d): ", containerNamePrefix, len(parts), name)
+		glog.Warningf("found a container with the %q prefix, but too few fields (%d): %q", containerNamePrefix, len(parts), name)
+		err = fmt.Errorf("Docker container name %q has less parts than expected %v", name, parts)
 		return
 	}
 
@@ -588,19 +740,17 @@ func ParseDockerName(name string) (podFullName string, podUID types.UID, contain
 	nameParts := strings.Split(parts[1], ".")
 	containerName = nameParts[0]
 	if len(nameParts) > 1 {
-		var err error
 		hash, err = strconv.ParseUint(nameParts[1], 16, 32)
 		if err != nil {
-			glog.Warningf("invalid container hash: %s", nameParts[1])
+			glog.Warningf("invalid container hash %q in container %q", nameParts[1], name)
 		}
 	}
 
 	// Pod fullname.
-	podFullName = parts[2]
+	podFullName = parts[2] + "_" + parts[3]
 
 	// Pod UID.
-	podUID = types.UID(parts[3])
-
+	podUID = types.UID(parts[4])
 	return
 }
 
@@ -675,4 +825,6 @@ func ConnectToDockerOrDie(dockerEndpoint string) DockerInterface {
 type ContainerCommandRunner interface {
 	RunInContainer(containerID string, cmd []string) ([]byte, error)
 	GetDockerServerVersion() ([]uint, error)
+	ExecInContainer(containerID string, cmd []string, in io.Reader, out, err io.WriteCloser, tty bool) error
+	PortForward(podInfraContainerID string, port uint16, stream io.ReadWriteCloser) error
 }

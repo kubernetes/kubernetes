@@ -6,7 +6,7 @@
 `SCRATCH` for go packages.
 
 It is based on the [Docker Image Specification v1.0.0](https://github.com/docker/docker/blob/master/image/spec/v1.md).
-l
+
 ## Usage
 ```
 go2docker [-image NAMESPACE/BASENAME] [PACKAGES]

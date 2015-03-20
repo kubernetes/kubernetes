@@ -38,6 +38,24 @@ func testMetric(t testing.TB) {
 			},
 			fingerprint: 1470933794305433534,
 		},
+		// The following two demonstrate a bug in fingerprinting. They
+		// should not have the same fingerprint with a sane
+		// fingerprinting function. See
+		// https://github.com/prometheus/client_golang/issues/74 .
+		{
+			input: Metric{
+				"a": "bb",
+				"b": "c",
+			},
+			fingerprint: 3734646176939799877,
+		},
+		{
+			input: Metric{
+				"a":  "b",
+				"bb": "c",
+			},
+			fingerprint: 3734646176939799877,
+		},
 	}
 
 	for i, scenario := range scenarios {

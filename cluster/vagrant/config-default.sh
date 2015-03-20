@@ -23,18 +23,21 @@ export NUM_MINIONS
 # The IP of the master
 export MASTER_IP="10.245.1.2"
 
-export INSTANCE_PREFIX=kubernetes
+export INSTANCE_PREFIX="kubernetes"
 export MASTER_NAME="${INSTANCE_PREFIX}-master"
 
 # Map out the IPs, names and container subnets of each minion
 export MINION_IP_BASE="10.245.1."
 MINION_CONTAINER_SUBNET_BASE="10.246"
+MASTER_CONTAINER_NETMASK="255.255.255.0"
+MASTER_CONTAINER_ADDR="${MINION_CONTAINER_SUBNET_BASE}.0.1"
+MASTER_CONTAINER_SUBNET="${MINION_CONTAINER_SUBNET_BASE}.0.1/24"
 CONTAINER_SUBNET="${MINION_CONTAINER_SUBNET_BASE}.0.0/16"
 for ((i=0; i < NUM_MINIONS; i++)) do
   MINION_IPS[$i]="${MINION_IP_BASE}$((i+3))"
   MINION_NAMES[$i]="${INSTANCE_PREFIX}-minion-$((i+1))"
-  MINION_CONTAINER_SUBNETS[$i]="${MINION_CONTAINER_SUBNET_BASE}.${i}.1/24"
-  MINION_CONTAINER_ADDRS[$i]="${MINION_CONTAINER_SUBNET_BASE}.${i}.1"
+  MINION_CONTAINER_SUBNETS[$i]="${MINION_CONTAINER_SUBNET_BASE}.$((i+1)).1/24"
+  MINION_CONTAINER_ADDRS[$i]="${MINION_CONTAINER_SUBNET_BASE}.$((i+1)).1"
   MINION_CONTAINER_NETMASKS[$i]="255.255.255.0"
   VAGRANT_MINION_NAMES[$i]="minion-$((i+1))"
 done
@@ -45,6 +48,8 @@ PORTAL_NET=10.247.0.0/16
 MASTER_USER=vagrant
 MASTER_PASSWD=vagrant
 
+# Admission Controllers to invoke prior to persisting objects in cluster
+ADMISSION_CONTROL=NamespaceAutoProvision,LimitRanger,ResourceQuota
 
 # Optional: Install node monitoring.
 ENABLE_NODE_MONITORING=true
@@ -57,6 +62,9 @@ LOGGING_DESTINATION=elasticsearch
 ENABLE_CLUSTER_LOGGING=false
 ELASTICSEARCH_LOGGING_REPLICAS=1
 
+# Optional: When set to true, heapster, Influxdb and Grafana will be setup as part of the cluster bring up.
+ENABLE_CLUSTER_MONITORING="${KUBE_ENABLE_CLUSTER_MONITORING:-true}"
+
 # Extra options to set on the Docker command line.  This is useful for setting
 # --insecure-registry for local registries.
 DOCKER_OPTS=""
@@ -68,5 +76,5 @@ DNS_DOMAIN="kubernetes.local"
 DNS_REPLICAS=1
 
 # Optional: Enable setting flags for kube-apiserver to turn on behavior in active-dev
-RUNTIME_CONFIG=""
-#RUNTIME_CONFIG="api/v1beta3"
+#RUNTIME_CONFIG=""
+RUNTIME_CONFIG="api/v1beta3"

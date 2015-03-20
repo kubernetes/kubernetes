@@ -29,6 +29,7 @@ type Route struct {
 
 	// documentation
 	Doc                     string
+	Notes                   string
 	Operation               string
 	ParameterDocs           []*Parameter
 	ResponseErrors          map[int]ResponseError

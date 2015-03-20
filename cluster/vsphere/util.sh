@@ -289,6 +289,7 @@ function kube-up {
     grep -v "^#" "${KUBE_ROOT}/cluster/vsphere/templates/hostname.sh"
     echo "cd /home/kube/cache/kubernetes-install"
     echo "readonly MASTER_NAME='${MASTER_NAME}'"
+    echo "readonly INSTANCE_PREFIX='${INSTANCE_PREFIX}'"
     echo "readonly NODE_INSTANCE_PREFIX='${INSTANCE_PREFIX}-minion'"
     echo "readonly PORTAL_NET='${PORTAL_NET}'"
     echo "readonly ENABLE_NODE_MONITORING='${ENABLE_NODE_MONITORING:-false}'"
@@ -476,14 +477,6 @@ function test-setup {
 # Execute after running tests to perform any required clean-up
 function test-teardown {
 	echo "TODO"
-}
-
-function setup-monitoring-firewall {
-    echo "TODO"
-}
-
-function teardown-monitoring-firewall {
-  echo "TODO"
 }
 
 function setup-logging-firewall {

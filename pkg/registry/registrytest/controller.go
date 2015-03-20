@@ -20,6 +20,7 @@ import (
 	"sync"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
@@ -46,19 +47,29 @@ func (r *ControllerRegistry) ListControllers(ctx api.Context) (*api.ReplicationC
 func (r *ControllerRegistry) GetController(ctx api.Context, ID string) (*api.ReplicationController, error) {
 	r.Lock()
 	defer r.Unlock()
+	if r.Controllers != nil {
+		for _, rc := range r.Controllers.Items {
+			if ID == rc.Name {
+				return &r.Controllers.Items[0], r.Err
+			}
+		}
+	}
 	return &api.ReplicationController{}, r.Err
 }
 
-func (r *ControllerRegistry) CreateController(ctx api.Context, controller *api.ReplicationController) error {
+func (r *ControllerRegistry) CreateController(ctx api.Context, controller *api.ReplicationController) (*api.ReplicationController, error) {
 	r.Lock()
 	defer r.Unlock()
-	return r.Err
+	if r.Controllers != nil {
+		r.Controllers.Items = append(r.Controllers.Items, *controller)
+	}
+	return controller, r.Err
 }
 
-func (r *ControllerRegistry) UpdateController(ctx api.Context, controller *api.ReplicationController) error {
+func (r *ControllerRegistry) UpdateController(ctx api.Context, controller *api.ReplicationController) (*api.ReplicationController, error) {
 	r.Lock()
 	defer r.Unlock()
-	return r.Err
+	return controller, r.Err
 }
 
 func (r *ControllerRegistry) DeleteController(ctx api.Context, ID string) error {
@@ -67,7 +78,7 @@ func (r *ControllerRegistry) DeleteController(ctx api.Context, ID string) error 
 	return r.Err
 }
 
-func (r *ControllerRegistry) WatchControllers(ctx api.Context, label, field labels.Selector, resourceVersion string) (watch.Interface, error) {
+func (r *ControllerRegistry) WatchControllers(ctx api.Context, label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
 	r.Lock()
 	defer r.Unlock()
 	return nil, r.Err

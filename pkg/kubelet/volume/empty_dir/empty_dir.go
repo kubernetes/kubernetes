@@ -24,15 +24,26 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/volume"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/mount"
 )
 
 // This is the primary entrypoint for volume plugins.
 func ProbeVolumePlugins() []volume.Plugin {
-	return []volume.Plugin{&emptyDirPlugin{nil, false}, &emptyDirPlugin{nil, true}}
+	return ProbeVolumePluginsWithMounter(mount.New())
+}
+
+// ProbePluginsWithMounter is a convenience for testing other plugins which wrap this one.
+//FIXME: alternative: pass mount.Interface to all ProbeVolumePlugins() functions?  Opinions?
+func ProbeVolumePluginsWithMounter(mounter mount.Interface) []volume.Plugin {
+	return []volume.Plugin{
+		&emptyDirPlugin{nil, mounter, false},
+		&emptyDirPlugin{nil, mounter, true},
+	}
 }
 
 type emptyDirPlugin struct {
 	host       volume.Host
+	mounter    mount.Interface
 	legacyMode bool // if set, plugin answers to the legacy name
 }
 
@@ -60,47 +71,131 @@ func (plugin *emptyDirPlugin) CanSupport(spec *api.Volume) bool {
 		return false
 	}
 
-	if util.AllPtrFieldsNil(&spec.Source) {
+	if util.AllPtrFieldsNil(&spec.VolumeSource) {
 		return true
 	}
-	if spec.Source.EmptyDir != nil {
+	if spec.EmptyDir != nil {
 		return true
 	}
 	return false
 }
 
-func (plugin *emptyDirPlugin) NewBuilder(spec *api.Volume, podUID types.UID) (volume.Builder, error) {
+func (plugin *emptyDirPlugin) NewBuilder(spec *api.Volume, podRef *api.ObjectReference) (volume.Builder, error) {
+	// Inject real implementations here, test through the internal function.
+	return plugin.newBuilderInternal(spec, podRef, plugin.mounter, &realMountDetector{})
+}
+
+func (plugin *emptyDirPlugin) newBuilderInternal(spec *api.Volume, podRef *api.ObjectReference, mounter mount.Interface, mountDetector mountDetector) (volume.Builder, error) {
 	if plugin.legacyMode {
 		// Legacy mode instances can be cleaned up but not created anew.
 		return nil, fmt.Errorf("legacy mode: can not create new instances")
 	}
-	return &emptyDir{podUID, spec.Name, plugin, false}, nil
+	medium := api.StorageTypeDefault
+	if spec.EmptyDir != nil { // Support a non-specified source as EmptyDir.
+		medium = spec.EmptyDir.Medium
+	}
+	return &emptyDir{
+		podUID:        podRef.UID,
+		volName:       spec.Name,
+		medium:        medium,
+		mounter:       mounter,
+		mountDetector: mountDetector,
+		plugin:        plugin,
+		legacyMode:    false,
+	}, nil
 }
 
 func (plugin *emptyDirPlugin) NewCleaner(volName string, podUID types.UID) (volume.Cleaner, error) {
+	// Inject real implementations here, test through the internal function.
+	return plugin.newCleanerInternal(volName, podUID, plugin.mounter, &realMountDetector{})
+}
+
+func (plugin *emptyDirPlugin) newCleanerInternal(volName string, podUID types.UID, mounter mount.Interface, mountDetector mountDetector) (volume.Cleaner, error) {
 	legacy := false
 	if plugin.legacyMode {
 		legacy = true
 	}
-	return &emptyDir{podUID, volName, plugin, legacy}, nil
+	ed := &emptyDir{
+		podUID:        podUID,
+		volName:       volName,
+		medium:        api.StorageTypeDefault, // might be changed later
+		mounter:       mounter,
+		mountDetector: mountDetector,
+		plugin:        plugin,
+		legacyMode:    legacy,
+	}
+	return ed, nil
 }
+
+// mountDetector abstracts how to find what kind of mount a path is backed by.
+type mountDetector interface {
+	// GetMountMedium determines what type of medium a given path is backed
+	// by and whether that path is a mount point.  For example, if this
+	// returns (mediumMemory, false, nil), the caller knows that the path is
+	// on a memory FS (tmpfs on Linux) but is not the root mountpoint of
+	// that tmpfs.
+	GetMountMedium(path string) (storageMedium, bool, error)
+}
+
+type storageMedium int
+
+const (
+	mediumUnknown storageMedium = 0 // assume anything we don't explicitly handle is this
+	mediumMemory  storageMedium = 1 // memory (e.g. tmpfs on linux)
+)
 
 // EmptyDir volumes are temporary directories exposed to the pod.
 // These do not persist beyond the lifetime of a pod.
 type emptyDir struct {
-	podUID     types.UID
-	volName    string
-	plugin     *emptyDirPlugin
-	legacyMode bool
+	podUID        types.UID
+	volName       string
+	medium        api.StorageType
+	mounter       mount.Interface
+	mountDetector mountDetector
+	plugin        *emptyDirPlugin
+	legacyMode    bool
 }
 
 // SetUp creates new directory.
 func (ed *emptyDir) SetUp() error {
+	return ed.SetUpAt(ed.GetPath())
+}
+
+// SetUpAt creates new directory.
+func (ed *emptyDir) SetUpAt(dir string) error {
 	if ed.legacyMode {
 		return fmt.Errorf("legacy mode: can not create new instances")
 	}
-	path := ed.GetPath()
-	return os.MkdirAll(path, 0750)
+	switch ed.medium {
+	case api.StorageTypeDefault:
+		return ed.setupDefault(dir)
+	case api.StorageTypeMemory:
+		return ed.setupTmpfs(dir)
+	default:
+		return fmt.Errorf("unknown storage medium %q", ed.medium)
+	}
+}
+
+func (ed *emptyDir) setupDefault(dir string) error {
+	return os.MkdirAll(dir, 0750)
+}
+
+func (ed *emptyDir) setupTmpfs(dir string) error {
+	if ed.mounter == nil {
+		return fmt.Errorf("memory storage requested, but mounter is nil")
+	}
+	if err := os.MkdirAll(dir, 0750); err != nil {
+		return err
+	}
+	// Make SetUp idempotent.
+	medium, isMnt, err := ed.mountDetector.GetMountMedium(dir)
+	if err != nil {
+		return err
+	}
+	if isMnt && medium == mediumMemory {
+		return nil // current state is what we expect
+	}
+	return ed.mounter.Mount("tmpfs", dir, "tmpfs", 0, "")
 }
 
 func (ed *emptyDir) GetPath() string {
@@ -111,14 +206,46 @@ func (ed *emptyDir) GetPath() string {
 	return ed.plugin.host.GetPodVolumeDir(ed.podUID, volume.EscapePluginName(name), ed.volName)
 }
 
-// TearDown simply deletes everything in the directory.
+// TearDown simply discards everything in the directory.
 func (ed *emptyDir) TearDown() error {
-	tmpDir, err := volume.RenameDirectory(ed.GetPath(), ed.volName+".deleting~")
+	return ed.TearDownAt(ed.GetPath())
+}
+
+// TearDownAt simply discards everything in the directory.
+func (ed *emptyDir) TearDownAt(dir string) error {
+	// Figure out the medium.
+	medium, isMnt, err := ed.mountDetector.GetMountMedium(dir)
+	if err != nil {
+		return err
+	}
+	if isMnt && medium == mediumMemory {
+		ed.medium = api.StorageTypeMemory
+		return ed.teardownTmpfs(dir)
+	}
+	// assume StorageTypeDefault
+	return ed.teardownDefault(dir)
+}
+
+func (ed *emptyDir) teardownDefault(dir string) error {
+	tmpDir, err := volume.RenameDirectory(dir, ed.volName+".deleting~")
 	if err != nil {
 		return err
 	}
 	err = os.RemoveAll(tmpDir)
 	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (ed *emptyDir) teardownTmpfs(dir string) error {
+	if ed.mounter == nil {
+		return fmt.Errorf("memory storage requested, but mounter is nil")
+	}
+	if err := ed.mounter.Unmount(dir, 0); err != nil {
+		return err
+	}
+	if err := os.RemoveAll(dir); err != nil {
 		return err
 	}
 	return nil

@@ -19,7 +19,7 @@ import (
 	"strings"
 	"testing"
 
-	"code.google.com/p/goprotobuf/proto"
+	"github.com/golang/protobuf/proto"
 	dto "github.com/prometheus/client_model/go"
 )
 
@@ -219,6 +219,98 @@ summary_name{name_1="value 1",name_2="value 2",quantile="0.9"} 2
 summary_name{name_1="value 1",name_2="value 2",quantile="0.99"} 3
 summary_name_sum{name_1="value 1",name_2="value 2"} 2010.1971
 summary_name_count{name_1="value 1",name_2="value 2"} 4711
+`,
+		},
+		// 4: Histogram
+		{
+			in: &dto.MetricFamily{
+				Name: proto.String("request_duration_microseconds"),
+				Help: proto.String("The response latency."),
+				Type: dto.MetricType_HISTOGRAM.Enum(),
+				Metric: []*dto.Metric{
+					&dto.Metric{
+						Histogram: &dto.Histogram{
+							SampleCount: proto.Uint64(2693),
+							SampleSum:   proto.Float64(1756047.3),
+							Bucket: []*dto.Bucket{
+								&dto.Bucket{
+									UpperBound:      proto.Float64(100),
+									CumulativeCount: proto.Uint64(123),
+								},
+								&dto.Bucket{
+									UpperBound:      proto.Float64(120),
+									CumulativeCount: proto.Uint64(412),
+								},
+								&dto.Bucket{
+									UpperBound:      proto.Float64(144),
+									CumulativeCount: proto.Uint64(592),
+								},
+								&dto.Bucket{
+									UpperBound:      proto.Float64(172.8),
+									CumulativeCount: proto.Uint64(1524),
+								},
+								&dto.Bucket{
+									UpperBound:      proto.Float64(math.Inf(+1)),
+									CumulativeCount: proto.Uint64(2693),
+								},
+							},
+						},
+					},
+				},
+			},
+			out: `# HELP request_duration_microseconds The response latency.
+# TYPE request_duration_microseconds histogram
+request_duration_microseconds_bucket{le="100"} 123
+request_duration_microseconds_bucket{le="120"} 412
+request_duration_microseconds_bucket{le="144"} 592
+request_duration_microseconds_bucket{le="172.8"} 1524
+request_duration_microseconds_bucket{le="+Inf"} 2693
+request_duration_microseconds_sum 1.7560473e+06
+request_duration_microseconds_count 2693
+`,
+		},
+		// 5: Histogram with missing +Inf bucket.
+		{
+			in: &dto.MetricFamily{
+				Name: proto.String("request_duration_microseconds"),
+				Help: proto.String("The response latency."),
+				Type: dto.MetricType_HISTOGRAM.Enum(),
+				Metric: []*dto.Metric{
+					&dto.Metric{
+						Histogram: &dto.Histogram{
+							SampleCount: proto.Uint64(2693),
+							SampleSum:   proto.Float64(1756047.3),
+							Bucket: []*dto.Bucket{
+								&dto.Bucket{
+									UpperBound:      proto.Float64(100),
+									CumulativeCount: proto.Uint64(123),
+								},
+								&dto.Bucket{
+									UpperBound:      proto.Float64(120),
+									CumulativeCount: proto.Uint64(412),
+								},
+								&dto.Bucket{
+									UpperBound:      proto.Float64(144),
+									CumulativeCount: proto.Uint64(592),
+								},
+								&dto.Bucket{
+									UpperBound:      proto.Float64(172.8),
+									CumulativeCount: proto.Uint64(1524),
+								},
+							},
+						},
+					},
+				},
+			},
+			out: `# HELP request_duration_microseconds The response latency.
+# TYPE request_duration_microseconds histogram
+request_duration_microseconds_bucket{le="100"} 123
+request_duration_microseconds_bucket{le="120"} 412
+request_duration_microseconds_bucket{le="144"} 592
+request_duration_microseconds_bucket{le="172.8"} 1524
+request_duration_microseconds_bucket{le="+Inf"} 2693
+request_duration_microseconds_sum 1.7560473e+06
+request_duration_microseconds_count 2693
 `,
 		},
 	}

@@ -35,6 +35,12 @@ func (c *FakeEvents) Create(event *api.Event) (*api.Event, error) {
 	return &api.Event{}, nil
 }
 
+// Update replaces an existing event. Returns the copy of the event the server returns, or an error.
+func (c *FakeEvents) Update(event *api.Event) (*api.Event, error) {
+	c.Fake.Actions = append(c.Fake.Actions, FakeAction{Action: "update-event", Value: event.Name})
+	return &api.Event{}, nil
+}
+
 // List returns a list of events matching the selectors.
 func (c *FakeEvents) List(label, field labels.Selector) (*api.EventList, error) {
 	c.Fake.Actions = append(c.Fake.Actions, FakeAction{Action: "list-events"})
@@ -57,4 +63,9 @@ func (c *FakeEvents) Watch(label, field labels.Selector, resourceVersion string)
 func (c *FakeEvents) Search(objOrRef runtime.Object) (*api.EventList, error) {
 	c.Fake.Actions = append(c.Fake.Actions, FakeAction{Action: "search-events"})
 	return &c.Fake.EventsList, nil
+}
+
+func (c *FakeEvents) Delete(name string) error {
+	c.Fake.Actions = append(c.Fake.Actions, FakeAction{Action: "delete-event", Value: name})
+	return nil
 }

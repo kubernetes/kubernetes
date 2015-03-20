@@ -216,11 +216,11 @@ For a more complete example of a larger application, please checkout [Hugo](http
 
 ## The Help Command
 
-Cobra automatically adds a help command to your application.
+Cobra automatically adds a help command to your application when you have subcommands.
 This will be called when a user runs 'app help'. Additionally help will also
 support all other commands as input. Say for instance you have a command called
 'create' without any additional configuration cobra will work when 'app help
-create' is called.
+create' is called.  Every command will automatically have the '--help' flag added.
 
 ### Example
 

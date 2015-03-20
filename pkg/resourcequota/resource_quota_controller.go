@@ -77,6 +77,34 @@ func (rm *ResourceQuotaManager) synchronize() {
 	wg.Wait()
 }
 
+// FilterQuotaPods eliminates pods that no longer have a cost against the quota
+// pods that have a restart policy of always are always returned
+// pods that are in a failed state, but have a restart policy of on failure are always returned
+// pods that are not in a success state or a failure state are included in quota
+func FilterQuotaPods(pods []api.Pod) []api.Pod {
+	var result []api.Pod
+	for _, value := range pods {
+		// a pod that has a restart policy always no matter its state counts against usage
+		if value.Spec.RestartPolicy == api.RestartPolicyAlways {
+			result = append(result, value)
+			continue
+		}
+		// a failed pod with a restart policy of on failure will count against usage
+		if api.PodFailed == value.Status.Phase &&
+			value.Spec.RestartPolicy == api.RestartPolicyOnFailure {
+			result = append(result, value)
+			continue
+		}
+		// if the pod is not succeeded or failed, then we count it against quota
+		if api.PodSucceeded != value.Status.Phase &&
+			api.PodFailed != value.Status.Phase {
+			result = append(result, value)
+			continue
+		}
+	}
+	return result
+}
+
 // syncResourceQuota runs a complete sync of current status
 func (rm *ResourceQuotaManager) syncResourceQuota(quota api.ResourceQuota) (err error) {
 
@@ -86,19 +114,27 @@ func (rm *ResourceQuotaManager) syncResourceQuota(quota api.ResourceQuota) (err 
 	dirty := quota.Status.Hard == nil || quota.Status.Used == nil
 
 	// Create a usage object that is based on the quota resource version
-	usage := api.ResourceQuotaUsage{
+	usage := api.ResourceQuota{
 		ObjectMeta: api.ObjectMeta{
 			Name:            quota.Name,
 			Namespace:       quota.Namespace,
-			ResourceVersion: quota.ResourceVersion},
+			ResourceVersion: quota.ResourceVersion,
+			Labels:          quota.Labels,
+			Annotations:     quota.Annotations},
 		Status: api.ResourceQuotaStatus{
 			Hard: api.ResourceList{},
 			Used: api.ResourceList{},
 		},
 	}
-	// populate the usage with the current observed hard/used limits
-	usage.Status.Hard = quota.Spec.Hard
-	usage.Status.Used = quota.Status.Used
+
+	// set the hard values supported on the quota
+	for k, v := range quota.Spec.Hard {
+		usage.Status.Hard[k] = *v.Copy()
+	}
+	// set any last known observed status values for usage
+	for k, v := range quota.Status.Used {
+		usage.Status.Used[k] = *v.Copy()
+	}
 
 	set := map[api.ResourceName]bool{}
 	for k := range usage.Status.Hard {
@@ -113,6 +149,8 @@ func (rm *ResourceQuotaManager) syncResourceQuota(quota api.ResourceQuota) (err 
 		}
 	}
 
+	filteredPods := FilterQuotaPods(pods.Items)
+
 	// iterate over each resource, and update observation
 	for k := range usage.Status.Hard {
 
@@ -126,17 +164,17 @@ func (rm *ResourceQuotaManager) syncResourceQuota(quota api.ResourceQuota) (err 
 
 		switch k {
 		case api.ResourcePods:
-			value = resource.NewQuantity(int64(len(pods.Items)), resource.DecimalSI)
+			value = resource.NewQuantity(int64(len(filteredPods)), resource.DecimalSI)
 		case api.ResourceMemory:
 			val := int64(0)
-			for i := range pods.Items {
-				val = val + PodMemory(&pods.Items[i]).Value()
+			for i := range filteredPods {
+				val = val + PodMemory(&filteredPods[i]).Value()
 			}
 			value = resource.NewQuantity(int64(val), resource.DecimalSI)
 		case api.ResourceCPU:
 			val := int64(0)
-			for i := range pods.Items {
-				val = val + PodCPU(&pods.Items[i]).MilliValue()
+			for i := range filteredPods {
+				val = val + PodCPU(&filteredPods[i]).MilliValue()
 			}
 			value = resource.NewMilliQuantity(int64(val), resource.DecimalSI)
 		case api.ResourceServices:
@@ -170,7 +208,8 @@ func (rm *ResourceQuotaManager) syncResourceQuota(quota api.ResourceQuota) (err 
 
 	// update the usage only if it changed
 	if dirty {
-		return rm.kubeClient.ResourceQuotaUsages(usage.Namespace).Create(&usage)
+		_, err = rm.kubeClient.ResourceQuotas(usage.Namespace).Status(&usage)
+		return err
 	}
 	return nil
 }

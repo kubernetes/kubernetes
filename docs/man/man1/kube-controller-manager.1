@@ -46,7 +46,7 @@ The kube\-controller\-manager has several options.
 
 .PP
 \fB\-\-minion\_regexp\fP=""
-    If non empty, and \-cloud\_provider is specified, a regular expression for matching minion VMs.
+    If non empty, and \-\-cloud\_provider is specified, a regular expression for matching minion VMs.
 
 .PP
 \fB\-\-insecure\_skip\_tls\_verify\fP=false
@@ -70,15 +70,31 @@ The kube\-controller\-manager has several options.
 
 .PP
 \fB\-\-machines\fP=[]
-        List of machines to schedule onto, comma separated.
+    List of machines to schedule onto, comma separated.
+
+.PP
+\fB\-\-pod\_eviction\_timeout\fP=5m
+    The grace peroid for deleting pods on failed nodes.
+
+.PP
+\fB\-\-sync\_nodes\fP=true
+    If true, and \-\-cloud\_provider is specified, sync nodes from the cloud provider. Default true.
 
 .PP
 \fB\-\-master\fP=""
     The address of the Kubernetes API server.
 
 .PP
+\fB\-\-node\_sync\_period\fP=10s
+    The period for syncing nodes from cloudprovider.
+
+.PP
 \fB\-\-port\fP=10252
     The port that the controller\-manager's http service runs on.
+
+.PP
+\fB\-\-resource\_quota\_sync\_period\fP=10s
+    The period for syncing quota usage status in the system.
 
 .PP
 \fB\-\-stderrthreshold\fP=0

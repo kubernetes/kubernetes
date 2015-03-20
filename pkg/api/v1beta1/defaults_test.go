@@ -53,6 +53,8 @@ func TestSetDefaultService(t *testing.T) {
 
 func TestSetDefaulPodSpec(t *testing.T) {
 	bp := &current.BoundPod{}
+	bp.Spec.Volumes = []current.Volume{{}}
+
 	obj2 := roundTrip(t, runtime.Object(bp))
 	bp2 := obj2.(*current.BoundPod)
 	if bp2.Spec.DNSPolicy != current.DNSClusterFirst {
@@ -60,6 +62,63 @@ func TestSetDefaulPodSpec(t *testing.T) {
 	}
 	policy := bp2.Spec.RestartPolicy
 	if policy.Never != nil || policy.OnFailure != nil || policy.Always == nil {
-		t.Errorf("Expected only policy.Aways is set, got: %s", policy)
+		t.Errorf("Expected only policy.Always is set, got: %s", policy)
+	}
+	vsource := bp2.Spec.Volumes[0].Source
+	if vsource.EmptyDir == nil {
+		t.Errorf("Expected non-empty volume is set, got: %s", vsource.EmptyDir)
+	}
+}
+
+func TestSetDefaultContainer(t *testing.T) {
+	bp := &current.BoundPod{}
+	bp.Spec.Containers = []current.Container{{}}
+	bp.Spec.Containers[0].Ports = []current.ContainerPort{{}}
+
+	obj2 := roundTrip(t, runtime.Object(bp))
+	bp2 := obj2.(*current.BoundPod)
+
+	container := bp2.Spec.Containers[0]
+	if container.TerminationMessagePath != current.TerminationMessagePathDefault {
+		t.Errorf("Expected termination message path: %s, got: %s",
+			current.TerminationMessagePathDefault, container.TerminationMessagePath)
+	}
+	if container.ImagePullPolicy != current.PullIfNotPresent {
+		t.Errorf("Expected image pull policy: %s, got: %s",
+			current.PullIfNotPresent, container.ImagePullPolicy)
+	}
+	if container.Ports[0].Protocol != current.ProtocolTCP {
+		t.Errorf("Expected protocol: %s, got: %s",
+			current.ProtocolTCP, container.Ports[0].Protocol)
+	}
+}
+
+func TestSetDefaultSecret(t *testing.T) {
+	s := &current.Secret{}
+	obj2 := roundTrip(t, runtime.Object(s))
+	s2 := obj2.(*current.Secret)
+
+	if s2.Type != current.SecretTypeOpaque {
+		t.Errorf("Expected secret type %v, got %v", current.SecretTypeOpaque, s2.Type)
+	}
+}
+
+func TestSetDefaulEndpointsProtocol(t *testing.T) {
+	in := &current.Endpoints{}
+	obj := roundTrip(t, runtime.Object(in))
+	out := obj.(*current.Endpoints)
+
+	if out.Protocol != current.ProtocolTCP {
+		t.Errorf("Expected protocol %s, got %s", current.ProtocolTCP, out.Protocol)
+	}
+}
+
+func TestSetDefaultNamespace(t *testing.T) {
+	s := &current.Namespace{}
+	obj2 := roundTrip(t, runtime.Object(s))
+	s2 := obj2.(*current.Namespace)
+
+	if s2.Status.Phase != current.NamespaceActive {
+		t.Errorf("Expected phase %v, got %v", current.NamespaceActive, s2.Status.Phase)
 	}
 }

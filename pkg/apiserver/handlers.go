@@ -19,6 +19,7 @@ package apiserver
 import (
 	"fmt"
 	"net/http"
+	"path"
 	"regexp"
 	"runtime/debug"
 	"strings"
@@ -27,7 +28,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/authorizer"
-	authhandlers "github.com/GoogleCloudPlatform/kubernetes/pkg/auth/handlers"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/httplog"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/golang/glog"
@@ -100,6 +100,7 @@ func RecoverPanics(handler http.Handler) http.Handler {
 				http.StatusConflict,
 				http.StatusNotFound,
 				errors.StatusUnprocessableEntity,
+				http.StatusSwitchingProtocols,
 			),
 		).Log()
 
@@ -154,21 +155,24 @@ type RequestAttributeGetter interface {
 }
 
 type requestAttributeGetter struct {
-	userContexts           authhandlers.RequestContext
+	requestContextMapper   api.RequestContextMapper
 	apiRequestInfoResolver *APIRequestInfoResolver
 }
 
 // NewAttributeGetter returns an object which implements the RequestAttributeGetter interface.
-func NewRequestAttributeGetter(userContexts authhandlers.RequestContext, restMapper meta.RESTMapper, apiRoots ...string) RequestAttributeGetter {
-	return &requestAttributeGetter{userContexts, &APIRequestInfoResolver{util.NewStringSet(apiRoots...), restMapper}}
+func NewRequestAttributeGetter(requestContextMapper api.RequestContextMapper, restMapper meta.RESTMapper, apiRoots ...string) RequestAttributeGetter {
+	return &requestAttributeGetter{requestContextMapper, &APIRequestInfoResolver{util.NewStringSet(apiRoots...), restMapper}}
 }
 
 func (r *requestAttributeGetter) GetAttribs(req *http.Request) authorizer.Attributes {
 	attribs := authorizer.AttributesRecord{}
 
-	user, ok := r.userContexts.Get(req)
+	ctx, ok := r.requestContextMapper.Get(req)
 	if ok {
-		attribs.User = user
+		user, ok := api.UserFrom(ctx)
+		if ok {
+			attribs.User = user
+		}
 	}
 
 	attribs.ReadOnly = IsReadOnlyReq(*req)
@@ -211,20 +215,36 @@ type APIRequestInfo struct {
 	Kind string
 	// Name is empty for some verbs, but if the request directly indicates a name (not in body content) then this field is filled in.
 	Name string
-	// Parts are the path parts for the request relative to /{resource}/{name}
+	// Parts are the path parts for the request, always starting with /{resource}/{name}
 	Parts []string
+	// Raw is the unparsed form of everything other than parts.
+	// Raw + Parts = complete URL path
+	Raw []string
+}
+
+// URLPath returns the URL path for this request, including /{resource}/{name} if present but nothing
+// following that.
+func (info APIRequestInfo) URLPath() string {
+	p := info.Parts
+	if n := len(p); n > 2 {
+		// Only take resource and name
+		p = p[:2]
+	}
+	return path.Join("/", path.Join(info.Raw...), path.Join(p...))
 }
 
 type APIRequestInfoResolver struct {
-	apiPrefixes util.StringSet
-	restMapper  meta.RESTMapper
+	APIPrefixes util.StringSet
+	RestMapper  meta.RESTMapper
 }
 
 // GetAPIRequestInfo returns the information from the http request.  If error is not nil, APIRequestInfo holds the information as best it is known before the failure
 // Valid Inputs:
 // Storage paths
-// /ns/{namespace}/{resource}
-// /ns/{namespace}/{resource}/{resourceName}
+// /namespaces
+// /namespaces/{namespace}
+// /namespaces/{namespace}/{resource}
+// /namespaces/{namespace}/{resource}/{resourceName}
 // /{resource}
 // /{resource}/{resourceName}
 // /{resource}/{resourceName}?namespace={namespace}
@@ -242,14 +262,16 @@ type APIRequestInfoResolver struct {
 // /api/{version}/*
 // /api/{version}/*
 func (r *APIRequestInfoResolver) GetAPIRequestInfo(req *http.Request) (APIRequestInfo, error) {
-	requestInfo := APIRequestInfo{}
+	requestInfo := APIRequestInfo{
+		Raw: splitPath(req.URL.Path),
+	}
 
-	currentParts := splitPath(req.URL.Path)
+	currentParts := requestInfo.Raw
 	if len(currentParts) < 1 {
 		return requestInfo, fmt.Errorf("Unable to determine kind and namespace from an empty URL path")
 	}
 
-	for _, currPrefix := range r.apiPrefixes.List() {
+	for _, currPrefix := range r.APIPrefixes.List() {
 		// handle input of form /api/{version}/* by adjusting special paths
 		if currentParts[0] == currPrefix {
 			if len(currentParts) > 1 {
@@ -287,15 +309,18 @@ func (r *APIRequestInfoResolver) GetAPIRequestInfo(req *http.Request) (APIReques
 
 	}
 
-	// URL forms: /ns/{namespace}/{resource}/*, where parts are adjusted to be relative to kind
-	if currentParts[0] == "ns" {
+	// URL forms: /namespaces/{namespace}/{kind}/*, where parts are adjusted to be relative to kind
+	if currentParts[0] == "namespaces" {
 		if len(currentParts) < 3 {
-			return requestInfo, fmt.Errorf("ResourceTypeAndNamespace expects a path of form /ns/{namespace}/*")
+			requestInfo.Resource = "namespaces"
+			if len(currentParts) > 1 {
+				requestInfo.Namespace = currentParts[1]
+			}
+		} else {
+			requestInfo.Resource = currentParts[2]
+			requestInfo.Namespace = currentParts[1]
+			currentParts = currentParts[2:]
 		}
-		requestInfo.Resource = currentParts[2]
-		requestInfo.Namespace = currentParts[1]
-		currentParts = currentParts[2:]
-
 	} else {
 		// URL forms: /{resource}/*
 		// URL forms: POST /{resource} is a legacy API convention to create in "default" namespace
@@ -314,6 +339,8 @@ func (r *APIRequestInfoResolver) GetAPIRequestInfo(req *http.Request) (APIReques
 
 	// parsing successful, so we now know the proper value for .Parts
 	requestInfo.Parts = currentParts
+	// Raw should have everything not in Parts
+	requestInfo.Raw = requestInfo.Raw[:len(requestInfo.Raw)-len(currentParts)]
 
 	// if there's another part remaining after the kind, then that's the resource name
 	if len(requestInfo.Parts) >= 2 {
@@ -327,7 +354,7 @@ func (r *APIRequestInfoResolver) GetAPIRequestInfo(req *http.Request) (APIReques
 
 	// if we have a resource, we have a good shot at being able to determine kind
 	if len(requestInfo.Resource) > 0 {
-		_, requestInfo.Kind, _ = r.restMapper.VersionAndKindForResource(requestInfo.Resource)
+		_, requestInfo.Kind, _ = r.RestMapper.VersionAndKindForResource(requestInfo.Resource)
 	}
 
 	return requestInfo, nil

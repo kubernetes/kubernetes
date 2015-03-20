@@ -35,7 +35,7 @@ func NewCmdConfigUseContext(out io.Writer, pathOptions *pathOptions) *cobra.Comm
 	options := &useContextOptions{pathOptions: pathOptions}
 
 	cmd := &cobra.Command{
-		Use:   "use-context context-name",
+		Use:   "use-context CONTEXT_NAME",
 		Short: "Sets the current-context in a .kubeconfig file",
 		Long:  `Sets the current-context in a .kubeconfig file`,
 		Run: func(cmd *cobra.Command, args []string) {

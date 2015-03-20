@@ -17,25 +17,24 @@ limitations under the License.
 package cmd
 
 import (
+	"fmt"
 	"io"
-	"os"
 
-	"github.com/golang/glog"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/cmd/util"
 	"github.com/spf13/cobra"
 )
 
 // TODO remove once people have been given enough time to notice
 func NewCmdNamespace(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "namespace [<namespace>]",
+		Use:   "namespace [namespace]",
 		Short: "SUPERCEDED: Set and view the current Kubernetes namespace",
 		Long: `SUPERCEDED:  Set and view the current Kubernetes namespace scope for command line requests.
 
 namespace has been superceded by the context.namespace field of .kubeconfig files.  See 'kubectl config set-context --help' for more details.
 `,
 		Run: func(cmd *cobra.Command, args []string) {
-			glog.Errorln("namespace has been superceded by the context.namespace field of .kubeconfig files.  See 'kubectl config set-context --help' for more details.")
-			os.Exit(1)
+			util.CheckErr(fmt.Errorf("namespace has been superceded by the context.namespace field of .kubeconfig files.  See 'kubectl config set-context --help' for more details."))
 		},
 	}
 	return cmd

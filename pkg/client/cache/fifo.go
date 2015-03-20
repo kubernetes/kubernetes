@@ -54,6 +54,29 @@ func (f *FIFO) Add(obj interface{}) error {
 	return nil
 }
 
+// AddIfNotPresent inserts an item, and puts it in the queue. If the item is already
+// present in the set, it is neither enqueued nor added to the set.
+//
+// This is useful in a single producer/consumer scenario so that the consumer can
+// safely retry items without contending with the producer and potentially enqueueing
+// stale items.
+func (f *FIFO) AddIfNotPresent(obj interface{}) error {
+	id, err := f.keyFunc(obj)
+	if err != nil {
+		return fmt.Errorf("couldn't create key for object: %v", err)
+	}
+	f.lock.Lock()
+	defer f.lock.Unlock()
+	if _, exists := f.items[id]; exists {
+		return nil
+	}
+
+	f.queue = append(f.queue, id)
+	f.items[id] = obj
+	f.cond.Broadcast()
+	return nil
+}
+
 // Update is the same as Add in this implementation.
 func (f *FIFO) Update(obj interface{}) error {
 	return f.Add(obj)

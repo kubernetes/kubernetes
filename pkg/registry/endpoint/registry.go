@@ -18,6 +18,7 @@ package endpoint
 
 import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
@@ -26,6 +27,6 @@ import (
 type Registry interface {
 	ListEndpoints(ctx api.Context) (*api.EndpointsList, error)
 	GetEndpoints(ctx api.Context, name string) (*api.Endpoints, error)
-	WatchEndpoints(ctx api.Context, labels, fields labels.Selector, resourceVersion string) (watch.Interface, error)
+	WatchEndpoints(ctx api.Context, labels labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error)
 	UpdateEndpoints(ctx api.Context, e *api.Endpoints) error
 }

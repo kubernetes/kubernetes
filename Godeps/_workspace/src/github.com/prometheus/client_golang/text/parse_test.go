@@ -18,7 +18,7 @@ import (
 	"strings"
 	"testing"
 
-	"code.google.com/p/goprotobuf/proto"
+	"github.com/golang/protobuf/proto"
 	dto "github.com/prometheus/client_model/go"
 )
 
@@ -335,6 +335,57 @@ my_summary{n1="val3", quantile="0.2"} 4711
 				},
 			},
 		},
+		// 4: The histogram.
+		{
+			in: `
+# HELP request_duration_microseconds The response latency.
+# TYPE request_duration_microseconds histogram
+request_duration_microseconds_bucket{le="100"} 123
+request_duration_microseconds_bucket{le="120"} 412
+request_duration_microseconds_bucket{le="144"} 592
+request_duration_microseconds_bucket{le="172.8"} 1524
+request_duration_microseconds_bucket{le="+Inf"} 2693
+request_duration_microseconds_sum 1.7560473e+06
+request_duration_microseconds_count 2693
+`,
+			out: []*dto.MetricFamily{
+				{
+					Name: proto.String("request_duration_microseconds"),
+					Help: proto.String("The response latency."),
+					Type: dto.MetricType_HISTOGRAM.Enum(),
+					Metric: []*dto.Metric{
+						&dto.Metric{
+							Histogram: &dto.Histogram{
+								SampleCount: proto.Uint64(2693),
+								SampleSum:   proto.Float64(1756047.3),
+								Bucket: []*dto.Bucket{
+									&dto.Bucket{
+										UpperBound:      proto.Float64(100),
+										CumulativeCount: proto.Uint64(123),
+									},
+									&dto.Bucket{
+										UpperBound:      proto.Float64(120),
+										CumulativeCount: proto.Uint64(412),
+									},
+									&dto.Bucket{
+										UpperBound:      proto.Float64(144),
+										CumulativeCount: proto.Uint64(592),
+									},
+									&dto.Bucket{
+										UpperBound:      proto.Float64(172.8),
+										CumulativeCount: proto.Uint64(1524),
+									},
+									&dto.Bucket{
+										UpperBound:      proto.Float64(math.Inf(+1)),
+										CumulativeCount: proto.Uint64(2693),
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+                },
 	}
 
 	for i, scenario := range scenarios {
@@ -427,7 +478,7 @@ line"} 3.14
 # TYPE metric summary
 metric{quantile="bla"} 3.14
 `,
-			err: "text format parsing error in line 3: expected float as value for quantile label",
+			err: "text format parsing error in line 3: expected float as value for 'quantile' label",
 		},
 		// 8:
 		{
@@ -499,6 +550,14 @@ metric 4.12
 		{
 			in:  `{label="bla"} 3.14 2`,
 			err: "text format parsing error in line 1: invalid metric name",
+		},
+		// 18:
+		{
+			in: `
+# TYPE metric histogram
+metric_bucket{le="bla"} 3.14
+`,
+			err: "text format parsing error in line 3: expected float as value for 'le' label",
 		},
 	}
 

@@ -25,8 +25,8 @@ import (
 )
 
 func TestCreateObject(t *testing.T) {
-	pods, _ := testData()
-	pods.Items[0].Name = "redis-master"
+	_, _, rc := testData()
+	rc.Items[0].Name = "redis-master-controller"
 
 	f, tf, codec := NewAPIFactory()
 	tf.Printer = &testPrinter{}
@@ -34,8 +34,8 @@ func TestCreateObject(t *testing.T) {
 		Codec: codec,
 		Client: client.HTTPClientFunc(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
-			case p == "/ns/test/pods" && m == "POST":
-				return &http.Response{StatusCode: 201, Body: objBody(codec, &pods.Items[0])}, nil
+			case p == "/namespaces/test/replicationcontrollers" && m == "POST":
+				return &http.Response{StatusCode: 201, Body: objBody(codec, &rc.Items[0])}, nil
 			default:
 				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 				return nil, nil
@@ -46,17 +46,17 @@ func TestCreateObject(t *testing.T) {
 	buf := bytes.NewBuffer([]byte{})
 
 	cmd := f.NewCmdCreate(buf)
-	cmd.Flags().Set("filename", "../../../examples/guestbook/redis-master.json")
+	cmd.Flags().Set("filename", "../../../examples/guestbook/redis-master-controller.json")
 	cmd.Run(cmd, []string{})
 
 	// uses the name from the file, not the response
-	if buf.String() != "redis-master\n" {
+	if buf.String() != "redis-master-controller\n" {
 		t.Errorf("unexpected output: %s", buf.String())
 	}
 }
 
 func TestCreateMultipleObject(t *testing.T) {
-	pods, svc := testData()
+	_, svc, rc := testData()
 
 	f, tf, codec := NewAPIFactory()
 	tf.Printer = &testPrinter{}
@@ -64,10 +64,10 @@ func TestCreateMultipleObject(t *testing.T) {
 		Codec: codec,
 		Client: client.HTTPClientFunc(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
-			case p == "/ns/test/pods" && m == "POST":
-				return &http.Response{StatusCode: 201, Body: objBody(codec, &pods.Items[0])}, nil
-			case p == "/ns/test/services" && m == "POST":
+			case p == "/namespaces/test/services" && m == "POST":
 				return &http.Response{StatusCode: 201, Body: objBody(codec, &svc.Items[0])}, nil
+			case p == "/namespaces/test/replicationcontrollers" && m == "POST":
+				return &http.Response{StatusCode: 201, Body: objBody(codec, &rc.Items[0])}, nil
 			default:
 				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 				return nil, nil
@@ -78,19 +78,19 @@ func TestCreateMultipleObject(t *testing.T) {
 	buf := bytes.NewBuffer([]byte{})
 
 	cmd := f.NewCmdCreate(buf)
-	cmd.Flags().Set("filename", "../../../examples/guestbook/redis-master.json")
+	cmd.Flags().Set("filename", "../../../examples/guestbook/redis-master-controller.json")
 	cmd.Flags().Set("filename", "../../../examples/guestbook/frontend-service.json")
 	cmd.Run(cmd, []string{})
 
 	// Names should come from the REST response, NOT the files
-	if buf.String() != "foo\nbaz\n" {
+	if buf.String() != "rc1\nbaz\n" {
 		t.Errorf("unexpected output: %s", buf.String())
 	}
 }
 
 func TestCreateDirectory(t *testing.T) {
-	pods, svc := testData()
-	pods.Items[0].Name = "redis-master"
+	_, svc, rc := testData()
+	rc.Items[0].Name = "name"
 
 	f, tf, codec := NewAPIFactory()
 	tf.Printer = &testPrinter{}
@@ -98,12 +98,10 @@ func TestCreateDirectory(t *testing.T) {
 		Codec: codec,
 		Client: client.HTTPClientFunc(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
-			case p == "/ns/test/pods" && m == "POST":
-				return &http.Response{StatusCode: 201, Body: objBody(codec, &pods.Items[0])}, nil
-			case p == "/ns/test/services" && m == "POST":
+			case p == "/namespaces/test/services" && m == "POST":
 				return &http.Response{StatusCode: 201, Body: objBody(codec, &svc.Items[0])}, nil
-			case p == "/ns/test/replicationcontrollers" && m == "POST":
-				return &http.Response{StatusCode: 201, Body: objBody(codec, &svc.Items[0])}, nil
+			case p == "/namespaces/test/replicationcontrollers" && m == "POST":
+				return &http.Response{StatusCode: 201, Body: objBody(codec, &rc.Items[0])}, nil
 			default:
 				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 				return nil, nil
@@ -117,7 +115,7 @@ func TestCreateDirectory(t *testing.T) {
 	cmd.Flags().Set("filename", "../../../examples/guestbook")
 	cmd.Run(cmd, []string{})
 
-	if buf.String() != "baz\nbaz\nbaz\nredis-master\nbaz\nbaz\n" {
+	if buf.String() != "name\nbaz\nname\nbaz\nname\nbaz\n" {
 		t.Errorf("unexpected output: %s", buf.String())
 	}
 }

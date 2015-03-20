@@ -70,7 +70,7 @@ function test-build-release() {
 function verify-prereqs() {
   echo "... in verify-prereqs()" >&2
 
-  ${GCLOUD} preview --help >/dev/null 2>&1 || {
+  ${GCLOUD} preview --help >/dev/null || {
     echo "Either the GCLOUD environment variable is wrong, or the 'preview' component"
     echo "is not installed. (Fix with 'gcloud components update preview')"
   }
@@ -112,12 +112,6 @@ function kube-up() {
     --cluster-api-version="${CLUSTER_API_VERSION:-}" \
     --num-nodes="${NUM_MINIONS}" \
     --network="${NETWORK}"
-}
-
-# Called during cluster/kube-up.sh
-function setup-monitoring-firewall() {
-  echo "... in setup-monitoring-firewall()" >&2
-  # TODO(mbforbes): This isn't currently supported in GKE.
 }
 
 # Execute prior to running tests to initialize required structure. This is
@@ -193,6 +187,23 @@ function detect-minions() {
   echo "... in detect-minions()" >&2
 }
 
+# Detect minions created in the minion group
+#
+# Assumed vars:
+#   none
+# Vars set:
+#   MINION_NAMES
+function detect-minion-names {
+  detect-project
+  export MINION_NAMES=""
+  count=$("${GCLOUD}" preview container clusters describe --project="${PROJECT}" --zone="${ZONE}" "${CLUSTER_NAME}" | grep numNodes | cut -f 2 -d ' ')
+  for x in $(seq 1 $count); do
+    export MINION_NAMES="${MINION_NAMES} k8s-${CLUSTER_NAME}-node-${x} ";
+  done
+  MINION_NAMES=(${MINION_NAMES})
+  echo "MINION_NAMES=${MINION_NAMES[*]}"
+}
+
 # SSH to a node by name ($1) and run a command ($2).
 #
 # Assumed vars:
@@ -212,6 +223,12 @@ function ssh-to-node() {
 function restart-kube-proxy() {
   echo "... in restart-kube-proxy()"  >&2
   ssh-to-node "$1" "sudo /etc/init.d/kube-proxy restart"
+}
+
+# Restart the kube-proxy on master ($1)
+function restart-apiserver() {
+  echo "... in restart-kube-apiserver()"  >&2
+  ssh-to-node "$1" "sudo /etc/init.d/kube-apiserver restart"
 }
 
 # Execute after running tests to perform any required clean-up.  This is called
@@ -236,12 +253,6 @@ function test-teardown() {
 
   # Then actually turn down the cluster.
   "${KUBE_ROOT}/cluster/kube-down.sh"
-}
-
-# Tears down monitoring.
-function teardown-monitoring-firewall() {
-  echo "... in teardown-monitoring-firewall()" >&2
-  # TODO(mbforbes): This isn't currently supported in GKE.
 }
 
 # Actually take down the cluster. This is called from test-teardown.

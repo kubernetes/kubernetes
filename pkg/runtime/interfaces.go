@@ -45,6 +45,11 @@ type ObjectTyper interface {
 	ObjectVersionAndKind(Object) (version, kind string, err error)
 }
 
+// ObjectCreater contains methods for instantiating an object by kind and version.
+type ObjectCreater interface {
+	New(version, kind string) (out Object, err error)
+}
+
 // ResourceVersioner provides methods for setting and retrieving
 // the resource version from an API object.
 type ResourceVersioner interface {

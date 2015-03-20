@@ -47,7 +47,7 @@ func nowSeries(t ...time.Time) nower {
 }
 
 // InstrumentHandler wraps the given HTTP handler for instrumentation. It
-// registers four metric collectors (if not already done) and reports http
+// registers four metric collectors (if not already done) and reports HTTP
 // metrics to the (newly or already) registered collectors: http_requests_total
 // (CounterVec), http_request_duration_microseconds (Summary),
 // http_request_size_bytes (Summary), http_response_size_bytes (Summary). Each

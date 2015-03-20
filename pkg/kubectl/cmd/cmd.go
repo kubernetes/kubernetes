@@ -34,7 +34,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 
-	"github.com/golang/glog"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 )
@@ -97,7 +96,7 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 
 		Object: func(cmd *cobra.Command) (meta.RESTMapper, runtime.ObjectTyper) {
 			cfg, err := clientConfig.ClientConfig()
-			checkErr(err)
+			cmdutil.CheckErr(err)
 			cmdApiVersion := cfg.Version
 
 			return kubectl.OutputVersionMapper{mapper, cmdApiVersion}, api.Scheme
@@ -183,7 +182,7 @@ func (f *Factory) BindFlags(flags *pflag.FlagSet) {
 }
 
 // NewKubectlCommand creates the `kubectl` command and its nested children.
-func (f *Factory) NewKubectlCommand(out io.Writer) *cobra.Command {
+func (f *Factory) NewKubectlCommand(in io.Reader, out, err io.Writer) *cobra.Command {
 	// Parent command to which all subcommands are added.
 	cmds := &cobra.Command{
 		Use:   "kubectl",
@@ -197,6 +196,7 @@ Find more information at https://github.com/GoogleCloudPlatform/kubernetes.`,
 	f.BindFlags(cmds.PersistentFlags())
 
 	cmds.AddCommand(f.NewCmdVersion(out))
+	cmds.AddCommand(f.NewCmdClusterInfo(out))
 	cmds.AddCommand(f.NewCmdProxy(out))
 
 	cmds.AddCommand(f.NewCmdGet(out))
@@ -211,9 +211,14 @@ Find more information at https://github.com/GoogleCloudPlatform/kubernetes.`,
 	cmds.AddCommand(f.NewCmdRollingUpdate(out))
 	cmds.AddCommand(f.NewCmdResize(out))
 
+	cmds.AddCommand(f.NewCmdExec(in, out, err))
+	cmds.AddCommand(f.NewCmdPortForward())
+
 	cmds.AddCommand(f.NewCmdRunContainer(out))
 	cmds.AddCommand(f.NewCmdStop(out))
 	cmds.AddCommand(f.NewCmdExposeService(out))
+
+	cmds.AddCommand(f.NewCmdLabel(out))
 
 	return cmds
 }
@@ -247,7 +252,9 @@ func (f *Factory) PrinterForMapping(cmd *cobra.Command, mapping *meta.RESTMappin
 	}
 	if ok {
 		clientConfig, err := f.ClientConfig(cmd)
-		checkErr(err)
+		if err != nil {
+			return nil, err
+		}
 		defaultVersion := clientConfig.Version
 
 		version := cmdutil.OutputVersion(cmd, defaultVersion)
@@ -321,18 +328,6 @@ func DefaultClientConfig(flags *pflag.FlagSet) clientcmd.ClientConfig {
 	clientConfig := clientcmd.NewInteractiveDeferredLoadingClientConfig(loadingRules, overrides, os.Stdin)
 
 	return clientConfig
-}
-
-func checkErr(err error) {
-	if err != nil {
-		glog.FatalDepth(1, err)
-	}
-}
-
-func usageError(cmd *cobra.Command, format string, args ...interface{}) {
-	glog.Errorf(format, args...)
-	glog.Errorf("See '%s -h' for help.", cmd.CommandPath())
-	os.Exit(1)
 }
 
 func runHelp(cmd *cobra.Command, args []string) {

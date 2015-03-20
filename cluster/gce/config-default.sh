@@ -26,14 +26,14 @@ MINION_DISK_SIZE=10GB
 # TODO(dchen1107): Filed an internal issue to create an alias
 # for containervm image, so that gcloud will expand this
 # to the latest supported image.
-IMAGE=container-vm-v20150129
+IMAGE=container-vm-v20150305
 IMAGE_PROJECT=google-containers
 NETWORK=${KUBE_GCE_NETWORK:-default}
 INSTANCE_PREFIX="${KUBE_GCE_INSTANCE_PREFIX:-kubernetes}"
 MASTER_NAME="${INSTANCE_PREFIX}-master"
 MASTER_TAG="${INSTANCE_PREFIX}-master"
 MINION_TAG="${INSTANCE_PREFIX}-minion"
-MINION_NAMES=($(eval echo ${INSTANCE_PREFIX}-minion-{1..${NUM_MINIONS}}))
+MASTER_IP_RANGE="${MASTER_IP_RANGE:-10.246.0.0/24}"
 
 # Compute IP addresses for nodes.
 function increment_ipv4 {
@@ -87,7 +87,7 @@ ENABLE_DOCKER_REGISTRY_CACHE=true
 # Optional: Install node monitoring.
 ENABLE_NODE_MONITORING="${KUBE_ENABLE_NODE_MONITORING:-true}"
 
-# Optional: When set to true, heapster will be setup as part of the cluster bring up.
+# Optional: When set to true, heapster, Influxdb and Grafana will be setup as part of the cluster bring up.
 ENABLE_CLUSTER_MONITORING="${KUBE_ENABLE_CLUSTER_MONITORING:-true}"
 
 # Optional: Enable node logging.
@@ -106,3 +106,6 @@ ENABLE_CLUSTER_DNS=true
 DNS_SERVER_IP="10.0.0.10"
 DNS_DOMAIN="kubernetes.local"
 DNS_REPLICAS=1
+
+# Admission Controllers to invoke prior to persisting objects in cluster
+ADMISSION_CONTROL=NamespaceAutoProvision,LimitRanger,ResourceQuota

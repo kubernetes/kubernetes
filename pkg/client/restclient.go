@@ -92,7 +92,7 @@ func (c *RESTClient) Verb(verb string) *Request {
 	// if c.Client != nil {
 	// 	timeout = c.Client.Timeout
 	// }
-	return NewRequest(c.Client, verb, c.baseURL, c.Codec, c.LegacyBehavior, c.LegacyBehavior).Timeout(c.Timeout)
+	return NewRequest(c.Client, verb, c.baseURL, c.apiVersion, c.Codec, c.LegacyBehavior, c.LegacyBehavior).Timeout(c.Timeout)
 }
 
 // Post begins a POST request. Short for c.Verb("POST").
@@ -103,6 +103,11 @@ func (c *RESTClient) Post() *Request {
 // Put begins a PUT request. Short for c.Verb("PUT").
 func (c *RESTClient) Put() *Request {
 	return c.Verb("PUT")
+}
+
+// Patch begins a PATCH request. Short for c.Verb("Patch").
+func (c *RESTClient) Patch() *Request {
+	return c.Verb("PATCH")
 }
 
 // Get begins a GET request. Short for c.Verb("GET").

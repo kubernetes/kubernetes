@@ -27,7 +27,6 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
-	"os/signal"
 	"path"
 	"path/filepath"
 	"strconv"
@@ -43,6 +42,7 @@ var (
 	pushup           = flag.Bool("pushup", false, "If true, push to e2e cluster if it's up, otherwise start the e2e cluster.")
 	down             = flag.Bool("down", false, "If true, tear down the cluster before exiting.")
 	test             = flag.Bool("test", false, "Run Ginkgo tests.")
+	testArgs         = flag.String("test_args", "", "Space-separated list of arguments to pass to Ginkgo test runner.")
 	root             = flag.String("root", absOrDie(filepath.Clean(filepath.Join(path.Base(os.Args[0]), ".."))), "Root directory of kubernetes repository.")
 	verbose          = flag.Bool("v", false, "If true, print all command output.")
 	checkVersionSkew = flag.Bool("check_version_skew", true, ""+
@@ -63,7 +63,6 @@ const (
 )
 
 var (
-	signals = make(chan os.Signal, 100)
 	// Root directory of the specified cluster version, rather than of where
 	// this script is being run from.
 	versionRoot = *root
@@ -86,7 +85,6 @@ type ResultsByTest map[string]TestResult
 
 func main() {
 	flag.Parse()
-	signal.Notify(signals, os.Interrupt)
 
 	if *isup {
 		status := 1
@@ -146,21 +144,21 @@ func main() {
 		}
 	}
 
-	failure := false
+	success := true
 	switch {
 	case *ctlCmd != "":
 		ctlArgs := strings.Fields(*ctlCmd)
 		os.Setenv("KUBE_CONFIG_FILE", "config-test.sh")
-		failure = !finishRunning("'kubectl "+*ctlCmd+"'", exec.Command(path.Join(versionRoot, "cluster/kubectl.sh"), ctlArgs...))
+		success = finishRunning("'kubectl "+*ctlCmd+"'", exec.Command(path.Join(versionRoot, "cluster/kubectl.sh"), ctlArgs...))
 	case *test:
-		failure = Test()
+		success = Test()
 	}
 
 	if *down {
 		TearDown()
 	}
 
-	if failure {
+	if !success {
 		os.Exit(1)
 	}
 }
@@ -184,12 +182,16 @@ func Up() bool {
 // Ensure that the cluster is large engough to run the e2e tests.
 func ValidateClusterSize() {
 	// Check that there are at least 3 minions running
-	res, stdout, _ := finishRunningWithOutputs("validate cluster size", exec.Command(path.Join(*root, "hack/e2e-internal/e2e-watch-events.sh")))
-	if !res {
-		log.Fatal("Could not get nodes to validate cluster size")
+	cmd := exec.Command(path.Join(*root, "hack/e2e-internal/e2e-cluster-size.sh"))
+	if *verbose {
+		cmd.Stderr = os.Stderr
+	}
+	stdout, err := cmd.Output()
+	if err != nil {
+		log.Fatal("Could not get nodes to validate cluster size (%s)", err)
 	}
 
-	numNodes, err := strconv.Atoi(strings.TrimSpace(stdout))
+	numNodes, err := strconv.Atoi(strings.TrimSpace(string(stdout)))
 	if err != nil {
 		log.Fatalf("Could not count number of nodes to validate cluster size (%s)", err)
 	}
@@ -269,7 +271,7 @@ func Test() bool {
 
 	ValidateClusterSize()
 
-	return finishRunning("Ginkgo tests", exec.Command(filepath.Join(*root, "hack/ginkgo-e2e.sh")))
+	return finishRunning("Ginkgo tests", exec.Command(filepath.Join(*root, "hack/ginkgo-e2e.sh"), strings.Fields(*testArgs)...))
 }
 
 // All nonsense below is temporary until we have go versions of these things.
@@ -277,8 +279,8 @@ func Test() bool {
 // call the returned anonymous function to stop.
 func runBashUntil(stepName string, cmd *exec.Cmd) func() {
 	log.Printf("Running in background: %v", stepName)
-	stdout, stderr := bytes.NewBuffer(nil), bytes.NewBuffer(nil)
-	cmd.Stdout, cmd.Stderr = stdout, stderr
+	output := bytes.NewBuffer(nil)
+	cmd.Stdout, cmd.Stderr = output, output
 	if err := cmd.Start(); err != nil {
 		log.Printf("Unable to start '%v': '%v'", stepName, err)
 		return func() {}
@@ -287,84 +289,28 @@ func runBashUntil(stepName string, cmd *exec.Cmd) func() {
 		cmd.Process.Signal(os.Interrupt)
 		headerprefix := stepName + " "
 		lineprefix := "  "
-		printBashOutputs(headerprefix, lineprefix, string(stdout.Bytes()), string(stderr.Bytes()), false)
+		printBashOutputs(headerprefix, lineprefix, string(output.Bytes()), false)
 	}
-}
-
-func finishRunningWithOutputs(stepName string, cmd *exec.Cmd) (bool, string, string) {
-	log.Printf("Running: %v", stepName)
-	stdout, stderr := bytes.NewBuffer(nil), bytes.NewBuffer(nil)
-	if *verbose {
-		cmd.Stdout = io.MultiWriter(os.Stdout, stdout)
-		cmd.Stderr = io.MultiWriter(os.Stderr, stderr)
-	} else {
-		cmd.Stdout = stdout
-		cmd.Stderr = stderr
-	}
-
-	done := make(chan struct{})
-	defer close(done)
-	go func() {
-		for {
-			select {
-			case <-done:
-				return
-			case s := <-signals:
-				cmd.Process.Signal(s)
-			}
-		}
-	}()
-
-	if err := cmd.Run(); err != nil {
-		log.Printf("Error running %v: %v", stepName, err)
-		return false, string(stdout.Bytes()), string(stderr.Bytes())
-	}
-	return true, string(stdout.Bytes()), string(stderr.Bytes())
 }
 
 func finishRunning(stepName string, cmd *exec.Cmd) bool {
-	result, _, _ := finishRunningWithOutputs(stepName, cmd)
-	return result
+	if *verbose {
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+	}
+	log.Printf("Running: %v", stepName)
+	if err := cmd.Run(); err != nil {
+		log.Printf("Error running %v: %v", stepName, err)
+		return false
+	}
+	return true
 }
 
-func printBashOutputs(headerprefix, lineprefix, stdout, stderr string, escape bool) {
-	// The |'s (plus appropriate prefixing) are to make this look
-	// "YAMLish" to the Jenkins TAP plugin:
-	//   https://wiki.jenkins-ci.org/display/JENKINS/TAP+Plugin
-	if stdout != "" {
-		fmt.Printf("%vstdout: |\n", headerprefix)
-		if escape {
-			stdout = escapeOutput(stdout)
-		}
-		printPrefixedLines(lineprefix, stdout)
+func printBashOutputs(headerprefix, lineprefix, output string, escape bool) {
+	if output != "" {
+		fmt.Printf("%voutput: |\n", headerprefix)
+		printPrefixedLines(lineprefix, output)
 	}
-	if stderr != "" {
-		fmt.Printf("%vstderr: |\n", headerprefix)
-		if escape {
-			stderr = escapeOutput(stderr)
-		}
-		printPrefixedLines(lineprefix, stderr)
-	}
-}
-
-// Escape stdout/stderr so the Jenkins YAMLish parser doesn't barf on
-// it. This escaping is crude (it masks all colons as something humans
-// will hopefully see as a colon, for instance), but it should get the
-// job done without pulling in a whole YAML package.
-func escapeOutput(s string) (out string) {
-	for _, r := range s {
-		switch {
-		case r == '\n':
-			out += string(r)
-		case !strconv.IsPrint(r):
-			out += " "
-		case r == ':':
-			out += "\ua789" // "꞉", modifier letter colon
-		default:
-			out += string(r)
-		}
-	}
-	return
 }
 
 func printPrefixedLines(prefix, s string) {

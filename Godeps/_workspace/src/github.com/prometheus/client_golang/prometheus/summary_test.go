@@ -120,6 +120,10 @@ func BenchmarkSummaryWrite8(b *testing.B) {
 }
 
 func TestSummaryConcurrency(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping test in short mode.")
+	}
+
 	rand.Seed(42)
 
 	it := func(n uint32) bool {
@@ -195,6 +199,10 @@ func TestSummaryConcurrency(t *testing.T) {
 }
 
 func TestSummaryVecConcurrency(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping test in short mode.")
+	}
+
 	rand.Seed(42)
 
 	objectives := make([]float64, 0, len(DefObjectives))

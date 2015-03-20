@@ -285,6 +285,11 @@ var (
 		Created:  "2014-09-25T13:10:02Z",
 		TenantID: "fcad67a6189847c4aecfa3c81a05783b",
 		Metadata: map[string]interface{}{},
+		SecurityGroups: []map[string]interface{}{
+			map[string]interface{}{
+				"name": "default",
+			},
+		},
 	}
 
 	// ServerDerp is a Server struct that should correspond to the second server in ServerListBody.
@@ -336,6 +341,11 @@ var (
 		Created:  "2014-09-25T13:04:41Z",
 		TenantID: "fcad67a6189847c4aecfa3c81a05783b",
 		Metadata: map[string]interface{}{},
+		SecurityGroups: []map[string]interface{}{
+			map[string]interface{}{
+				"name": "default",
+			},
+		},
 	}
 )
 
@@ -455,5 +465,105 @@ func HandleRebuildSuccessfully(t *testing.T, response string) {
 		w.WriteHeader(http.StatusAccepted)
 		w.Header().Add("Content-Type", "application/json")
 		fmt.Fprintf(w, response)
+	})
+}
+
+// HandleServerRescueSuccessfully sets up the test server to respond to a server Rescue request.
+func HandleServerRescueSuccessfully(t *testing.T) {
+	th.Mux.HandleFunc("/servers/1234asdf/action", func(w http.ResponseWriter, r *http.Request) {
+		th.TestMethod(t, r, "POST")
+		th.TestHeader(t, r, "X-Auth-Token", client.TokenID)
+		th.TestJSONRequest(t, r, `{ "rescue": { "adminPass": "1234567890" } }`)
+
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{ "adminPass": "1234567890" }`))
+	})
+}
+
+// HandleMetadatumGetSuccessfully sets up the test server to respond to a metadatum Get request.
+func HandleMetadatumGetSuccessfully(t *testing.T) {
+	th.Mux.HandleFunc("/servers/1234asdf/metadata/foo", func(w http.ResponseWriter, r *http.Request) {
+		th.TestMethod(t, r, "GET")
+		th.TestHeader(t, r, "X-Auth-Token", client.TokenID)
+		th.TestHeader(t, r, "Accept", "application/json")
+
+		w.WriteHeader(http.StatusOK)
+		w.Header().Add("Content-Type", "application/json")
+		w.Write([]byte(`{ "meta": {"foo":"bar"}}`))
+	})
+}
+
+// HandleMetadatumCreateSuccessfully sets up the test server to respond to a metadatum Create request.
+func HandleMetadatumCreateSuccessfully(t *testing.T) {
+	th.Mux.HandleFunc("/servers/1234asdf/metadata/foo", func(w http.ResponseWriter, r *http.Request) {
+		th.TestMethod(t, r, "PUT")
+		th.TestHeader(t, r, "X-Auth-Token", client.TokenID)
+		th.TestJSONRequest(t, r, `{
+			"meta": {
+				"foo": "bar"
+			}
+		}`)
+
+		w.WriteHeader(http.StatusOK)
+		w.Header().Add("Content-Type", "application/json")
+		w.Write([]byte(`{ "meta": {"foo":"bar"}}`))
+	})
+}
+
+// HandleMetadatumDeleteSuccessfully sets up the test server to respond to a metadatum Delete request.
+func HandleMetadatumDeleteSuccessfully(t *testing.T) {
+	th.Mux.HandleFunc("/servers/1234asdf/metadata/foo", func(w http.ResponseWriter, r *http.Request) {
+		th.TestMethod(t, r, "DELETE")
+		th.TestHeader(t, r, "X-Auth-Token", client.TokenID)
+
+		w.WriteHeader(http.StatusNoContent)
+	})
+}
+
+// HandleMetadataGetSuccessfully sets up the test server to respond to a metadata Get request.
+func HandleMetadataGetSuccessfully(t *testing.T) {
+	th.Mux.HandleFunc("/servers/1234asdf/metadata", func(w http.ResponseWriter, r *http.Request) {
+		th.TestMethod(t, r, "GET")
+		th.TestHeader(t, r, "X-Auth-Token", client.TokenID)
+		th.TestHeader(t, r, "Accept", "application/json")
+
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{ "metadata": {"foo":"bar", "this":"that"}}`))
+	})
+}
+
+// HandleMetadataResetSuccessfully sets up the test server to respond to a metadata Create request.
+func HandleMetadataResetSuccessfully(t *testing.T) {
+	th.Mux.HandleFunc("/servers/1234asdf/metadata", func(w http.ResponseWriter, r *http.Request) {
+		th.TestMethod(t, r, "PUT")
+		th.TestHeader(t, r, "X-Auth-Token", client.TokenID)
+		th.TestJSONRequest(t, r, `{
+				"metadata": {
+					"foo": "bar",
+					"this": "that"
+				}
+			}`)
+
+		w.WriteHeader(http.StatusOK)
+		w.Header().Add("Content-Type", "application/json")
+		w.Write([]byte(`{ "metadata": {"foo":"bar", "this":"that"}}`))
+	})
+}
+
+// HandleMetadataUpdateSuccessfully sets up the test server to respond to a metadata Update request.
+func HandleMetadataUpdateSuccessfully(t *testing.T) {
+	th.Mux.HandleFunc("/servers/1234asdf/metadata", func(w http.ResponseWriter, r *http.Request) {
+		th.TestMethod(t, r, "POST")
+		th.TestHeader(t, r, "X-Auth-Token", client.TokenID)
+		th.TestJSONRequest(t, r, `{
+				"metadata": {
+					"foo": "baz",
+					"this": "those"
+				}
+			}`)
+
+		w.WriteHeader(http.StatusOK)
+		w.Header().Add("Content-Type", "application/json")
+		w.Write([]byte(`{ "metadata": {"foo":"baz", "this":"those"}}`))
 	})
 }

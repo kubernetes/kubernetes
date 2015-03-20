@@ -47,6 +47,8 @@ type AuthOverrideFlags struct {
 	ClientCertificate string
 	ClientKey         string
 	Token             string
+	Username          string
+	Password          string
 }
 
 // ContextOverrideFlags holds the flag names to be used for binding command line flags for Cluster objects
@@ -79,7 +81,10 @@ const (
 	FlagCertFile     = "client-certificate"
 	FlagKeyFile      = "client-key"
 	FlagCAFile       = "certificate-authority"
+	FlagEmbedCerts   = "embed-certs"
 	FlagBearerToken  = "token"
+	FlagUsername     = "username"
+	FlagPassword     = "password"
 )
 
 // RecommendedAuthOverrideFlags is a convenience method to return recommended flag names prefixed with a string of your choosing
@@ -89,6 +94,8 @@ func RecommendedAuthOverrideFlags(prefix string) AuthOverrideFlags {
 		ClientCertificate: prefix + FlagCertFile,
 		ClientKey:         prefix + FlagKeyFile,
 		Token:             prefix + FlagBearerToken,
+		Username:          prefix + FlagUsername,
+		Password:          prefix + FlagPassword,
 	}
 }
 
@@ -127,11 +134,13 @@ func BindAuthInfoFlags(authInfo *clientcmdapi.AuthInfo, flags *pflag.FlagSet, fl
 	flags.StringVar(&authInfo.ClientCertificate, flagNames.ClientCertificate, "", "Path to a client key file for TLS.")
 	flags.StringVar(&authInfo.ClientKey, flagNames.ClientKey, "", "Path to a client key file for TLS.")
 	flags.StringVar(&authInfo.Token, flagNames.Token, "", "Bearer token for authentication to the API server.")
+	flags.StringVar(&authInfo.Username, flagNames.Username, "", "Username for basic authentication to the API server.")
+	flags.StringVar(&authInfo.Password, flagNames.Password, "", "Password for basic authentication to the API server.")
 }
 
 // BindClusterFlags is a convenience method to bind the specified flags to their associated variables
 func BindClusterFlags(clusterInfo *clientcmdapi.Cluster, flags *pflag.FlagSet, flagNames ClusterOverrideFlags) {
-	flags.StringVarP(&clusterInfo.Server, flagNames.APIServer, flagNames.APIServerShort, "", "The address of the Kubernetes API server")
+	flags.StringVarP(&clusterInfo.Server, flagNames.APIServer, flagNames.APIServerShort, "", "The address and port of the Kubernetes API server")
 	flags.StringVar(&clusterInfo.APIVersion, flagNames.APIVersion, "", "The API version to use when talking to the server")
 	flags.StringVar(&clusterInfo.CertificateAuthority, flagNames.CertificateAuthority, "", "Path to a cert. file for the certificate authority.")
 	flags.BoolVar(&clusterInfo.InsecureSkipTLSVerify, flagNames.InsecureSkipTLSVerify, false, "If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure.")

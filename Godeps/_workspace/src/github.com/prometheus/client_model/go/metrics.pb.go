@@ -15,27 +15,28 @@ It has these top-level messages:
 	Quantile
 	Summary
 	Untyped
+	Histogram
+	Bucket
 	Metric
 	MetricFamily
 */
 package io_prometheus_client
 
-import proto "code.google.com/p/goprotobuf/proto"
-import json "encoding/json"
+import proto "github.com/golang/protobuf/proto"
 import math "math"
 
-// Reference proto, json, and math imports to suppress error if they are not otherwise used.
+// Reference imports to suppress errors if they are not otherwise used.
 var _ = proto.Marshal
-var _ = &json.SyntaxError{}
 var _ = math.Inf
 
 type MetricType int32
 
 const (
-	MetricType_COUNTER MetricType = 0
-	MetricType_GAUGE   MetricType = 1
-	MetricType_SUMMARY MetricType = 2
-	MetricType_UNTYPED MetricType = 3
+	MetricType_COUNTER   MetricType = 0
+	MetricType_GAUGE     MetricType = 1
+	MetricType_SUMMARY   MetricType = 2
+	MetricType_UNTYPED   MetricType = 3
+	MetricType_HISTOGRAM MetricType = 4
 )
 
 var MetricType_name = map[int32]string{
@@ -43,12 +44,14 @@ var MetricType_name = map[int32]string{
 	1: "GAUGE",
 	2: "SUMMARY",
 	3: "UNTYPED",
+	4: "HISTOGRAM",
 }
 var MetricType_value = map[string]int32{
-	"COUNTER": 0,
-	"GAUGE":   1,
-	"SUMMARY": 2,
-	"UNTYPED": 3,
+	"COUNTER":   0,
+	"GAUGE":     1,
+	"SUMMARY":   2,
+	"UNTYPED":   3,
+	"HISTOGRAM": 4,
 }
 
 func (x MetricType) Enum() *MetricType {
@@ -196,12 +199,69 @@ func (m *Untyped) GetValue() float64 {
 	return 0
 }
 
+type Histogram struct {
+	SampleCount      *uint64   `protobuf:"varint,1,opt,name=sample_count" json:"sample_count,omitempty"`
+	SampleSum        *float64  `protobuf:"fixed64,2,opt,name=sample_sum" json:"sample_sum,omitempty"`
+	Bucket           []*Bucket `protobuf:"bytes,3,rep,name=bucket" json:"bucket,omitempty"`
+	XXX_unrecognized []byte    `json:"-"`
+}
+
+func (m *Histogram) Reset()         { *m = Histogram{} }
+func (m *Histogram) String() string { return proto.CompactTextString(m) }
+func (*Histogram) ProtoMessage()    {}
+
+func (m *Histogram) GetSampleCount() uint64 {
+	if m != nil && m.SampleCount != nil {
+		return *m.SampleCount
+	}
+	return 0
+}
+
+func (m *Histogram) GetSampleSum() float64 {
+	if m != nil && m.SampleSum != nil {
+		return *m.SampleSum
+	}
+	return 0
+}
+
+func (m *Histogram) GetBucket() []*Bucket {
+	if m != nil {
+		return m.Bucket
+	}
+	return nil
+}
+
+type Bucket struct {
+	CumulativeCount  *uint64  `protobuf:"varint,1,opt,name=cumulative_count" json:"cumulative_count,omitempty"`
+	UpperBound       *float64 `protobuf:"fixed64,2,opt,name=upper_bound" json:"upper_bound,omitempty"`
+	XXX_unrecognized []byte   `json:"-"`
+}
+
+func (m *Bucket) Reset()         { *m = Bucket{} }
+func (m *Bucket) String() string { return proto.CompactTextString(m) }
+func (*Bucket) ProtoMessage()    {}
+
+func (m *Bucket) GetCumulativeCount() uint64 {
+	if m != nil && m.CumulativeCount != nil {
+		return *m.CumulativeCount
+	}
+	return 0
+}
+
+func (m *Bucket) GetUpperBound() float64 {
+	if m != nil && m.UpperBound != nil {
+		return *m.UpperBound
+	}
+	return 0
+}
+
 type Metric struct {
 	Label            []*LabelPair `protobuf:"bytes,1,rep,name=label" json:"label,omitempty"`
 	Gauge            *Gauge       `protobuf:"bytes,2,opt,name=gauge" json:"gauge,omitempty"`
 	Counter          *Counter     `protobuf:"bytes,3,opt,name=counter" json:"counter,omitempty"`
 	Summary          *Summary     `protobuf:"bytes,4,opt,name=summary" json:"summary,omitempty"`
 	Untyped          *Untyped     `protobuf:"bytes,5,opt,name=untyped" json:"untyped,omitempty"`
+	Histogram        *Histogram   `protobuf:"bytes,7,opt,name=histogram" json:"histogram,omitempty"`
 	TimestampMs      *int64       `protobuf:"varint,6,opt,name=timestamp_ms" json:"timestamp_ms,omitempty"`
 	XXX_unrecognized []byte       `json:"-"`
 }
@@ -241,6 +301,13 @@ func (m *Metric) GetSummary() *Summary {
 func (m *Metric) GetUntyped() *Untyped {
 	if m != nil {
 		return m.Untyped
+	}
+	return nil
+}
+
+func (m *Metric) GetHistogram() *Histogram {
+	if m != nil {
+		return m.Histogram
 	}
 	return nil
 }

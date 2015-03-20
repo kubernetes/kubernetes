@@ -1,0 +1,19 @@
+kind: ReplicationController
+id: update-demo-kitten
+apiVersion: v1beta1
+desiredState:
+  replicaSelector:
+    name: update-demo
+    version: kitten
+  podTemplate:
+    desiredState:
+      manifest:
+        containers:
+        - name: update-demo
+          image: kubernetes/update-demo:kitten
+          ports:
+          - containerPort: 80
+            protocol: TCP
+    labels:
+      name: update-demo
+      version: kitten

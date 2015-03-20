@@ -1,6 +1,12 @@
 # Kubernetes
 
-[![GoDoc](https://godoc.org/github.com/GoogleCloudPlatform/kubernetes?status.png)](https://godoc.org/github.com/GoogleCloudPlatform/kubernetes) [![Travis](https://travis-ci.org/GoogleCloudPlatform/kubernetes.svg?branch=master)](https://travis-ci.org/GoogleCloudPlatform/kubernetes)
+[![GoDoc](https://godoc.org/github.com/GoogleCloudPlatform/kubernetes?status.png)](https://godoc.org/github.com/GoogleCloudPlatform/kubernetes) [![Travis](https://travis-ci.org/GoogleCloudPlatform/kubernetes.svg?branch=master)](https://travis-ci.org/GoogleCloudPlatform/kubernetes) [![Coverage Status](https://coveralls.io/repos/GoogleCloudPlatform/kubernetes/badge.svg)](https://coveralls.io/r/GoogleCloudPlatform/kubernetes)
+
+### I am ...
+  * Interested in learning more about using Kubernetes?  Please see our user-facing documentation on [kubernetes.io](http://kubernetes.io)
+  * Interested in hacking on the core Kubernetes code base?  Keep reading!
+
+<hr>
 
 Kubernetes is an open source system for managing containerized applications across multiple hosts,
 providing basic mechanisms for deployment, maintenance, and scaling of applications.
@@ -62,7 +68,8 @@ Kubernetes documentation is organized into several categories.
     - details of ```kube-proxy``` iptables
     - how to wire services to external internet
   - **Design Documentation**
-    - in [docs/design](docs/design)
+    - [Design Overview](DESIGN.md)
+    - More in [docs/design](docs/design)
     - for people who want to understand the design choices made
     - describes tradeoffs, alternative designs
     - descriptions of planned features that are too long for a github issue.
@@ -80,7 +87,9 @@ Kubernetes documentation is organized into several categories.
 
 If you have questions or want to start contributing please reach out.  We don't bite!
 
-The Kubernetes team is hanging out on IRC on the [#google-containers channel on freenode.net](http://webchat.freenode.net/?channels=google-containers).  We also have the [google-containers Google Groups mailing list](https://groups.google.com/forum/#!forum/google-containers) for questions and discussion as well as the [kubernetes-announce mailing list](https://groups.google.com/forum/#!forum/kubernetes-announce) for important announcements (low-traffic, no chatter).
+The Kubernetes team is hanging out on IRC on the [#google-containers channel on freenode.net](http://webchat.freenode.net/?channels=google-containers). This client may be overloaded from time to time. If this happens you can use any [IRC client out there](http://en.wikipedia.org/wiki/Comparison_of_Internet_Relay_Chat_clients) to talk to us.
+
+We also have the [google-containers Google Groups mailing list](https://groups.google.com/forum/#!forum/google-containers) for questions and discussion as well as the [kubernetes-announce mailing list](https://groups.google.com/forum/#!forum/kubernetes-announce) for important announcements (low-traffic, no chatter).
 
 If you are a company and are looking for a more formal engagement with Google around Kubernetes and containers at Google as a whole, please fill out [this form](https://docs.google.com/a/google.com/forms/d/1_RfwC8LZU4CKe4vKq32x5xpEJI5QZ-j0ShGmZVv9cm4/viewform) and we'll be in touch.
 

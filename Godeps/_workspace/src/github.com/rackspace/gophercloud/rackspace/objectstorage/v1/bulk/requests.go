@@ -4,7 +4,6 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/racker/perigee"
 	"github.com/rackspace/gophercloud"
 )
 
@@ -38,14 +37,13 @@ func Delete(c *gophercloud.ServiceClient, opts DeleteOptsBuilder) DeleteResult {
 
 	reqBody := strings.NewReader(reqString)
 
-	resp, err := perigee.Request("DELETE", deleteURL(c), perigee.Options{
-		ContentType: "text/plain",
-		MoreHeaders: c.AuthenticatedHeaders(),
-		OkCodes:     []int{200},
-		ReqBody:     reqBody,
-		Results:     &res.Body,
+	resp, err := c.Request("DELETE", deleteURL(c), gophercloud.RequestOpts{
+		MoreHeaders:  map[string]string{"Content-Type": "text/plain"},
+		OkCodes:      []int{200},
+		JSONBody:     reqBody,
+		JSONResponse: &res.Body,
 	})
-	res.Header = resp.HttpResponse.Header
+	res.Header = resp.Header
 	res.Err = err
 	return res
 }

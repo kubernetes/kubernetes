@@ -34,11 +34,13 @@ type EventNamespacer interface {
 // EventInterface has methods to work with Event resources
 type EventInterface interface {
 	Create(event *api.Event) (*api.Event, error)
+	Update(event *api.Event) (*api.Event, error)
 	List(label, field labels.Selector) (*api.EventList, error)
 	Get(name string) (*api.Event, error)
 	Watch(label, field labels.Selector, resourceVersion string) (watch.Interface, error)
 	// Search finds events about the specified object
 	Search(objOrRef runtime.Object) (*api.EventList, error)
+	Delete(name string) error
 }
 
 // events implements Events interface
@@ -65,8 +67,28 @@ func (e *events) Create(event *api.Event) (*api.Event, error) {
 	}
 	result := &api.Event{}
 	err := e.client.Post().
-		Namespace(event.Namespace).
+		NamespaceIfScoped(event.Namespace, len(event.Namespace) > 0).
 		Resource("events").
+		Body(event).
+		Do().
+		Into(result)
+	return result, err
+}
+
+// Update modifies an existing event. It returns the copy of the event that the server returns,
+// or an error. The namespace and key to update the event within is deduced from the event. The
+// namespace must either match this event client's namespace, or this event client must have been
+// created with the "" namespace. Update also requires the ResourceVersion to be set in the event
+// object.
+func (e *events) Update(event *api.Event) (*api.Event, error) {
+	if len(event.ResourceVersion) == 0 {
+		return nil, fmt.Errorf("invalid event update object, missing resource version: %#v", event)
+	}
+	result := &api.Event{}
+	err := e.client.Put().
+		NamespaceIfScoped(event.Namespace, len(event.Namespace) > 0).
+		Resource("events").
+		Name(event.Name).
 		Body(event).
 		Do().
 		Into(result)
@@ -77,10 +99,10 @@ func (e *events) Create(event *api.Event) (*api.Event, error) {
 func (e *events) List(label, field labels.Selector) (*api.EventList, error) {
 	result := &api.EventList{}
 	err := e.client.Get().
-		Namespace(e.namespace).
+		NamespaceIfScoped(e.namespace, len(e.namespace) > 0).
 		Resource("events").
-		SelectorParam("labels", label).
-		SelectorParam("fields", field).
+		SelectorParam(api.LabelSelectorQueryParam(e.client.APIVersion()), label).
+		SelectorParam(api.FieldSelectorQueryParam(e.client.APIVersion()), field).
 		Do().
 		Into(result)
 	return result, err
@@ -94,7 +116,7 @@ func (e *events) Get(name string) (*api.Event, error) {
 
 	result := &api.Event{}
 	err := e.client.Get().
-		Namespace(e.namespace).
+		NamespaceIfScoped(e.namespace, len(e.namespace) > 0).
 		Resource("events").
 		Name(name).
 		Do().
@@ -106,11 +128,11 @@ func (e *events) Get(name string) (*api.Event, error) {
 func (e *events) Watch(label, field labels.Selector, resourceVersion string) (watch.Interface, error) {
 	return e.client.Get().
 		Prefix("watch").
-		Namespace(e.namespace).
+		NamespaceIfScoped(e.namespace, len(e.namespace) > 0).
 		Resource("events").
 		Param("resourceVersion", resourceVersion).
-		SelectorParam("labels", label).
-		SelectorParam("fields", field).
+		SelectorParam(api.LabelSelectorQueryParam(e.client.APIVersion()), label).
+		SelectorParam(api.FieldSelectorQueryParam(e.client.APIVersion()), field).
 		Watch()
 }
 
@@ -139,4 +161,14 @@ func (e *events) Search(objOrRef runtime.Object) (*api.EventList, error) {
 		fields["involvedObject.uid"] = string(ref.UID)
 	}
 	return e.List(labels.Everything(), fields.AsSelector())
+}
+
+// Delete deletes an existing event.
+func (e *events) Delete(name string) error {
+	return e.client.Delete().
+		NamespaceIfScoped(e.namespace, len(e.namespace) > 0).
+		Resource("events").
+		Name(name).
+		Do().
+		Error()
 }

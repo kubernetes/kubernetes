@@ -29,9 +29,7 @@ func TestRedirect(t *testing.T) {
 		errors: map[string]error{},
 		expectedResourceNamespace: "default",
 	}
-	handler := Handle(map[string]RESTStorage{
-		"foo": simpleStorage,
-	}, codec, "/prefix", "version", selfLinker, admissionControl, mapper)
+	handler := handle(map[string]RESTStorage{"foo": simpleStorage})
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
@@ -54,7 +52,7 @@ func TestRedirect(t *testing.T) {
 	for _, item := range table {
 		simpleStorage.errors["resourceLocation"] = item.err
 		simpleStorage.resourceLocation = item.id
-		resp, err := client.Get(server.URL + "/prefix/version/redirect/foo/" + item.id)
+		resp, err := client.Get(server.URL + "/api/version/redirect/foo/" + item.id)
 		if resp == nil {
 			t.Fatalf("Unexpected nil resp")
 		}
@@ -71,7 +69,7 @@ func TestRedirect(t *testing.T) {
 		if err == nil || err.(*url.Error).Err != dontFollow {
 			t.Errorf("Unexpected err %#v", err)
 		}
-		if e, a := item.id, resp.Header.Get("Location"); e != a {
+		if e, a := "http://"+item.id, resp.Header.Get("Location"); e != a {
 			t.Errorf("Expected %v, got %v", e, a)
 		}
 	}
@@ -82,9 +80,7 @@ func TestRedirectWithNamespaces(t *testing.T) {
 		errors: map[string]error{},
 		expectedResourceNamespace: "other",
 	}
-	handler := Handle(map[string]RESTStorage{
-		"foo": simpleStorage,
-	}, codec, "/prefix", "version", selfLinker, admissionControl, namespaceMapper)
+	handler := handleNamespaced(map[string]RESTStorage{"foo": simpleStorage})
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
@@ -107,7 +103,7 @@ func TestRedirectWithNamespaces(t *testing.T) {
 	for _, item := range table {
 		simpleStorage.errors["resourceLocation"] = item.err
 		simpleStorage.resourceLocation = item.id
-		resp, err := client.Get(server.URL + "/prefix/version/redirect/ns/other/foo/" + item.id)
+		resp, err := client.Get(server.URL + "/api/version/redirect/namespaces/other/foo/" + item.id)
 		if resp == nil {
 			t.Fatalf("Unexpected nil resp")
 		}
@@ -124,7 +120,7 @@ func TestRedirectWithNamespaces(t *testing.T) {
 		if err == nil || err.(*url.Error).Err != dontFollow {
 			t.Errorf("Unexpected err %#v", err)
 		}
-		if e, a := item.id, resp.Header.Get("Location"); e != a {
+		if e, a := "http://"+item.id, resp.Header.Get("Location"); e != a {
 			t.Errorf("Expected %v, got %v", e, a)
 		}
 	}

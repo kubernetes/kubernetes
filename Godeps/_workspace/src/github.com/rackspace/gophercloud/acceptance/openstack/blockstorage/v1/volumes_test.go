@@ -13,7 +13,7 @@ import (
 	th "github.com/rackspace/gophercloud/testhelper"
 )
 
-func newClient() (*gophercloud.ServiceClient, error) {
+func newClient(t *testing.T) (*gophercloud.ServiceClient, error) {
 	ao, err := openstack.AuthOptionsFromEnv()
 	th.AssertNoErr(t, err)
 
@@ -26,7 +26,7 @@ func newClient() (*gophercloud.ServiceClient, error) {
 }
 
 func TestVolumes(t *testing.T) {
-	client, err := newClient()
+	client, err := newClient(t)
 	th.AssertNoErr(t, err)
 
 	cv, err := volumes.Create(client, &volumes.CreateOpts{

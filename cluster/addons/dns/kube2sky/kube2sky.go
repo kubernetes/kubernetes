@@ -25,18 +25,22 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"time"
 
 	kapi "github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	kclient "github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	klabels "github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
+	tools "github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
 	kwatch "github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 	etcd "github.com/coreos/go-etcd/etcd"
 	skymsg "github.com/skynetservices/skydns/msg"
 )
 
 var (
-	domain  = flag.String("domain", "kubernetes.local", "domain under which to create names")
-	verbose = flag.Bool("verbose", false, "log extra information")
+	domain                = flag.String("domain", "kubernetes.local", "domain under which to create names")
+	etcd_mutation_timeout = flag.Duration("etcd_mutation_timeout", 10*time.Second, "crash after retrying etcd mutation for a specified duration")
+	etcd_server           = flag.String("etcd-server", "http://127.0.0.1:4001", "URL to etcd server")
+	verbose               = flag.Bool("verbose", false, "log extra information")
 )
 
 func removeDNS(record string, etcdClient *etcd.Client) error {
@@ -64,9 +68,44 @@ func addDNS(record string, service *kapi.Service, etcdClient *etcd.Client) error
 	return err
 }
 
+// Implements retry logic for arbitrary mutator. Crashes after retrying for
+// etcd_mutation_timeout.
+func mutateEtcdOrDie(mutator func() error) {
+	timeout := time.After(*etcd_mutation_timeout)
+	for {
+		select {
+		case <-timeout:
+			log.Fatalf("Failed to mutate etcd for %v using mutator: %v", *etcd_mutation_timeout, mutator)
+		default:
+			if err := mutator(); err != nil {
+				delay := 50 * time.Millisecond
+				log.Printf("Failed to mutate etcd using mutator: %v due to: %v. Will retry in: %v", mutator, err, delay)
+				time.Sleep(delay)
+			} else {
+				return
+			}
+		}
+	}
+}
+
 func newEtcdClient() (client *etcd.Client) {
-	// TODO: take a flag for etcd server(s).
-	client = etcd.NewClient([]string{"http://127.0.0.1:4001"})
+	maxConnectRetries := 12
+	for maxConnectRetries > 0 {
+		if _, _, err := tools.GetEtcdVersion(*etcd_server); err != nil {
+			log.Fatalf("Failed to connect to etcd server: %v, error: %v", *etcd_server, err)
+			if maxConnectRetries > 0 {
+				log.Println("Retrying request after 5 second sleep.")
+				time.Sleep(5 * time.Second)
+				maxConnectRetries--
+			} else {
+				return nil
+			}
+		} else {
+			log.Printf("Etcd server found: %v", *etcd_server)
+			break
+		}
+	}
+	client = etcd.NewClient([]string{*etcd_server})
 	if client == nil {
 		return nil
 	}
@@ -116,19 +155,13 @@ func watchOnce(etcdClient *etcd.Client, kubeClient *kclient.Client) {
 			for i := range ev.Services {
 				s := &ev.Services[i]
 				name := buildNameString(s.Name, s.Namespace, *domain)
-				err := addDNS(name, s, etcdClient)
-				if err != nil {
-					log.Printf("Failed to add DNS for %s: %v", name, err)
-				}
+				mutateEtcdOrDie(func() error { return addDNS(name, s, etcdClient) })
 			}
 		case RemoveService:
 			for i := range ev.Services {
 				s := &ev.Services[i]
 				name := buildNameString(s.Name, s.Namespace, *domain)
-				err := removeDNS(name, etcdClient)
-				if err != nil {
-					log.Printf("Failed to remove DNS for %s: %v", name, err)
-				}
+				mutateEtcdOrDie(func() error { return removeDNS(name, etcdClient) })
 			}
 		}
 	}

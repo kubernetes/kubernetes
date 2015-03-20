@@ -26,13 +26,13 @@ import (
 func init() {
 	api.Scheme.AddDefaultingFuncs(
 		func(obj *Volume) {
-			if util.AllPtrFieldsNil(&obj.Source) {
-				obj.Source = VolumeSource{
-					EmptyDir: &EmptyDir{},
+			if util.AllPtrFieldsNil(&obj.VolumeSource) {
+				obj.VolumeSource = VolumeSource{
+					EmptyDir: &EmptyDirVolumeSource{},
 				}
 			}
 		},
-		func(obj *Port) {
+		func(obj *ContainerPort) {
 			if obj.Protocol == "" {
 				obj.Protocol = ProtocolTCP
 			}
@@ -52,11 +52,6 @@ func init() {
 				obj.TerminationMessagePath = TerminationMessagePathDefault
 			}
 		},
-		func(obj *RestartPolicy) {
-			if util.AllPtrFieldsNil(obj) {
-				obj.Always = &RestartPolicyAlways{}
-			}
-		},
 		func(obj *Service) {
 			if obj.Spec.Protocol == "" {
 				obj.Spec.Protocol = ProtocolTCP
@@ -68,6 +63,40 @@ func init() {
 		func(obj *PodSpec) {
 			if obj.DNSPolicy == "" {
 				obj.DNSPolicy = DNSClusterFirst
+			}
+			if obj.RestartPolicy == "" {
+				obj.RestartPolicy = RestartPolicyAlways
+			}
+		},
+		func(obj *Probe) {
+			if obj.TimeoutSeconds == 0 {
+				obj.TimeoutSeconds = 1
+			}
+		},
+		func(obj *Secret) {
+			if obj.Type == "" {
+				obj.Type = SecretTypeOpaque
+			}
+		},
+		func(obj *Endpoints) {
+			if obj.Protocol == "" {
+				obj.Protocol = "TCP"
+			}
+		},
+		func(obj *HTTPGetAction) {
+			if obj.Path == "" {
+				obj.Path = "/"
+			}
+		},
+		func(obj *ServiceSpec) {
+			if obj.ContainerPort.Kind == util.IntstrInt && obj.ContainerPort.IntVal == 0 ||
+				obj.ContainerPort.Kind == util.IntstrString && obj.ContainerPort.StrVal == "" {
+				obj.ContainerPort = util.NewIntOrStringFromInt(obj.Port)
+			}
+		},
+		func(obj *NamespaceStatus) {
+			if obj.Phase == "" {
+				obj.Phase = NamespaceActive
 			}
 		},
 	)

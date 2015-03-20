@@ -276,8 +276,8 @@ func TestDiskConflicts(t *testing.T) {
 	volState := api.PodSpec{
 		Volumes: []api.Volume{
 			{
-				Source: api.VolumeSource{
-					GCEPersistentDisk: &api.GCEPersistentDisk{
+				VolumeSource: api.VolumeSource{
+					GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{
 						PDName: "foo",
 					},
 				},
@@ -287,8 +287,8 @@ func TestDiskConflicts(t *testing.T) {
 	volState2 := api.PodSpec{
 		Volumes: []api.Volume{
 			{
-				Source: api.VolumeSource{
-					GCEPersistentDisk: &api.GCEPersistentDisk{
+				VolumeSource: api.VolumeSource{
+					GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{
 						PDName: "bar",
 					},
 				},
@@ -541,6 +541,33 @@ func TestServiceAffinity(t *testing.T) {
 			fits:     false,
 			labels:   []string{"region"},
 			test:     "service pod on different minion, region mismatch",
+		},
+		{
+			pod:      api.Pod{ObjectMeta: api.ObjectMeta{Labels: selector, Namespace: "ns1"}},
+			pods:     []api.Pod{{Status: api.PodStatus{Host: "machine3"}, ObjectMeta: api.ObjectMeta{Labels: selector, Namespace: "ns1"}}},
+			node:     "machine1",
+			services: []api.Service{{Spec: api.ServiceSpec{Selector: selector}, ObjectMeta: api.ObjectMeta{Namespace: "ns2"}}},
+			fits:     true,
+			labels:   []string{"region"},
+			test:     "service in different namespace, region mismatch",
+		},
+		{
+			pod:      api.Pod{ObjectMeta: api.ObjectMeta{Labels: selector, Namespace: "ns1"}},
+			pods:     []api.Pod{{Status: api.PodStatus{Host: "machine3"}, ObjectMeta: api.ObjectMeta{Labels: selector, Namespace: "ns2"}}},
+			node:     "machine1",
+			services: []api.Service{{Spec: api.ServiceSpec{Selector: selector}, ObjectMeta: api.ObjectMeta{Namespace: "ns1"}}},
+			fits:     true,
+			labels:   []string{"region"},
+			test:     "pod in different namespace, region mismatch",
+		},
+		{
+			pod:      api.Pod{ObjectMeta: api.ObjectMeta{Labels: selector, Namespace: "ns1"}},
+			pods:     []api.Pod{{Status: api.PodStatus{Host: "machine3"}, ObjectMeta: api.ObjectMeta{Labels: selector, Namespace: "ns1"}}},
+			node:     "machine1",
+			services: []api.Service{{Spec: api.ServiceSpec{Selector: selector}, ObjectMeta: api.ObjectMeta{Namespace: "ns1"}}},
+			fits:     false,
+			labels:   []string{"region"},
+			test:     "service and pod in same namespace, region mismatch",
 		},
 		{
 			pod:      api.Pod{ObjectMeta: api.ObjectMeta{Labels: selector}},

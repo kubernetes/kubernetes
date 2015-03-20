@@ -72,5 +72,21 @@ func TestStoreToPodLister(t *testing.T) {
 			t.Errorf("Expected %v, got %v", e, a)
 			continue
 		}
+
+		exists, err := spl.Exists(&api.Pod{ObjectMeta: api.ObjectMeta{Name: id}})
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		if !exists {
+			t.Errorf("exists returned false for %v", id)
+		}
+	}
+
+	exists, err := spl.Exists(&api.Pod{ObjectMeta: api.ObjectMeta{Name: "qux"}})
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if exists {
+		t.Errorf("Unexpected pod exists")
 	}
 }

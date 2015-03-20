@@ -80,7 +80,7 @@ func newVagrantCloud() (*VagrantCloud, error) {
 	}, nil
 }
 
-func (aws *VagrantCloud) Clusters() (cloudprovider.Clusters, bool) {
+func (v *VagrantCloud) Clusters() (cloudprovider.Clusters, bool) {
 	return nil, false
 }
 
@@ -99,8 +99,8 @@ func (v *VagrantCloud) Zones() (cloudprovider.Zones, bool) {
 	return nil, false
 }
 
-// IPAddress returns the address of a particular machine instance.
-func (v *VagrantCloud) IPAddress(instance string) (net.IP, error) {
+// getInstanceByAddress retuns
+func (v *VagrantCloud) getInstanceByAddress(address string) (*SaltMinion, error) {
 	token, err := v.saltLogin()
 	if err != nil {
 		return nil, err
@@ -112,11 +112,32 @@ func (v *VagrantCloud) IPAddress(instance string) (net.IP, error) {
 	filteredMinions := v.saltMinionsByRole(minions, "kubernetes-pool")
 	for _, minion := range filteredMinions {
 		// Due to vagrant not running with a dedicated DNS setup, we return the IP address of a minion as its hostname at this time
-		if minion.IP == instance {
-			return net.ParseIP(minion.IP), nil
+		if minion.IP == address {
+			return &minion, nil
 		}
 	}
-	return nil, fmt.Errorf("unable to find IP address for instance: %s", instance)
+	return nil, fmt.Errorf("unable to find instance for address: %s", address)
+}
+
+// NodeAddresses returns the NodeAddresses of a particular machine instance.
+func (v *VagrantCloud) NodeAddresses(instance string) ([]api.NodeAddress, error) {
+	// Due to vagrant not running with a dedicated DNS setup, we return the IP address of a minion as its hostname at this time
+	minion, err := v.getInstanceByAddress(instance)
+	if err != nil {
+		return nil, err
+	}
+	ip := net.ParseIP(minion.IP)
+	return []api.NodeAddress{{Type: api.NodeLegacyHostIP, Address: ip.String()}}, nil
+}
+
+// ExternalID returns the cloud provider ID of the specified instance.
+func (v *VagrantCloud) ExternalID(instance string) (string, error) {
+	// Due to vagrant not running with a dedicated DNS setup, we return the IP address of a minion as its hostname at this time
+	minion, err := v.getInstanceByAddress(instance)
+	if err != nil {
+		return "", err
+	}
+	return minion.IP, nil
 }
 
 // saltMinionsByRole filters a list of minions that have a matching role.

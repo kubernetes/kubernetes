@@ -17,6 +17,7 @@ limitations under the License.
 package testing
 
 import (
+	"fmt"
 	"math/rand"
 	"strconv"
 	"testing"
@@ -34,7 +35,6 @@ import (
 
 func fuzzOneOf(c fuzz.Continue, objs ...interface{}) {
 	// Use a new fuzzer which cannot populate nil to ensure one obj will be set.
-	// FIXME: would be nicer to use FuzzOnePtr() and reflect.
 	f := fuzz.New().NilChance(0).NumElements(1, 1)
 	i := c.RandUint64() % uint64(len(objs))
 	f.Fuzz(objs[i])
@@ -101,19 +101,20 @@ func FuzzerFor(t *testing.T, version string, src rand.Source) *fuzz.Fuzzer {
 			j.Spec = api.PodSpec{}
 			c.Fuzz(&j.Spec)
 		},
+		func(j *api.Binding, c fuzz.Continue) {
+			c.Fuzz(&j.ObjectMeta)
+			j.Target.Name = c.RandString()
+		},
 		func(j *api.ReplicationControllerSpec, c fuzz.Continue) {
-			// TemplateRef is set to nil by omission; this is required for round trip
-			c.Fuzz(&j.Template)
-			c.Fuzz(&j.Selector)
-			j.Replicas = int(c.RandUint64())
+			c.FuzzNoCustom(j)   // fuzz self without calling this function again
+			j.TemplateRef = nil // this is required for round trip
 		},
 		func(j *api.ReplicationControllerStatus, c fuzz.Continue) {
 			// only replicas round trips
 			j.Replicas = int(c.RandUint64())
 		},
 		func(j *api.List, c fuzz.Continue) {
-			c.Fuzz(&j.ListMeta)
-			c.Fuzz(&j.Items)
+			c.FuzzNoCustom(j) // fuzz self without calling this function again
 			if j.Items == nil {
 				j.Items = []runtime.Object{}
 			}
@@ -129,18 +130,6 @@ func FuzzerFor(t *testing.T, version string, src rand.Source) *fuzz.Fuzzer {
 				t := types[c.Rand.Intn(len(types))]
 				c.Fuzz(t)
 				*j = t
-			}
-		},
-		func(intstr *util.IntOrString, c fuzz.Continue) {
-			// util.IntOrString will panic if its kind is set wrong.
-			if c.RandBool() {
-				intstr.Kind = util.IntstrInt
-				intstr.IntVal = int(c.RandUint64())
-				intstr.StrVal = ""
-			} else {
-				intstr.Kind = util.IntstrString
-				intstr.IntVal = 0
-				intstr.StrVal = c.RandString()
 			}
 		},
 		func(pb map[docker.Port][]docker.PortBinding, c fuzz.Continue) {
@@ -172,13 +161,13 @@ func FuzzerFor(t *testing.T, version string, src rand.Source) *fuzz.Fuzzer {
 			*p = policies[c.Rand.Intn(len(policies))]
 		},
 		func(rp *api.RestartPolicy, c fuzz.Continue) {
-			// Exactly one of the fields should be set.
-			fuzzOneOf(c, &rp.Always, &rp.OnFailure, &rp.Never)
+			policies := []api.RestartPolicy{api.RestartPolicyAlways, api.RestartPolicyNever, api.RestartPolicyOnFailure}
+			*rp = policies[c.Rand.Intn(len(policies))]
 		},
 		func(vs *api.VolumeSource, c fuzz.Continue) {
 			// Exactly one of the fields should be set.
 			//FIXME: the fuzz can still end up nil.  What if fuzz allowed me to say that?
-			fuzzOneOf(c, &vs.HostPath, &vs.EmptyDir, &vs.GCEPersistentDisk, &vs.GitRepo)
+			fuzzOneOf(c, &vs.HostPath, &vs.EmptyDir, &vs.GCEPersistentDisk, &vs.GitRepo, &vs.Secret)
 		},
 		func(d *api.DNSPolicy, c fuzz.Continue) {
 			policies := []api.DNSPolicy{api.DNSClusterFirst, api.DNSDefault}
@@ -193,38 +182,41 @@ func FuzzerFor(t *testing.T, version string, src rand.Source) *fuzz.Fuzzer {
 			*p = types[c.Rand.Intn(len(types))]
 		},
 		func(ct *api.Container, c fuzz.Continue) {
-			// This function exists soley to set TerminationMessagePath to a
-			// non-empty string. TODO: consider making TerminationMessagePath a
-			// new type to simplify fuzzing.
-			ct.TerminationMessagePath = api.TerminationMessagePathDefault
-			// Let fuzzer handle the rest of the fileds.
-			c.Fuzz(&ct.Name)
-			c.Fuzz(&ct.Image)
-			c.Fuzz(&ct.Command)
-			c.Fuzz(&ct.Ports)
-			c.Fuzz(&ct.WorkingDir)
-			c.Fuzz(&ct.Env)
-			c.Fuzz(&ct.VolumeMounts)
-			c.Fuzz(&ct.LivenessProbe)
-			c.Fuzz(&ct.Lifecycle)
-			c.Fuzz(&ct.ImagePullPolicy)
-			c.Fuzz(&ct.Privileged)
-			c.Fuzz(&ct.Capabilities)
+			c.FuzzNoCustom(ct)                                          // fuzz self without calling this function again
+			ct.TerminationMessagePath = "/" + ct.TerminationMessagePath // Must be non-empty
 		},
 		func(e *api.Event, c fuzz.Continue) {
+			c.FuzzNoCustom(e) // fuzz self without calling this function again
 			// Fix event count to 1, otherwise, if a v1beta1 or v1beta2 event has a count set arbitrarily, it's count is ignored
-			c.Fuzz(&e.TypeMeta)
-			c.Fuzz(&e.ObjectMeta)
-			c.Fuzz(&e.InvolvedObject)
-			c.Fuzz(&e.Reason)
-			c.Fuzz(&e.Message)
-			c.Fuzz(&e.Source)
-			c.Fuzz(&e.FirstTimestamp)
-			c.Fuzz(&e.LastTimestamp)
 			if e.FirstTimestamp.IsZero() {
 				e.Count = 1
 			} else {
 				c.Fuzz(&e.Count)
+			}
+		},
+		func(s *api.Secret, c fuzz.Continue) {
+			c.FuzzNoCustom(s) // fuzz self without calling this function again
+			s.Type = api.SecretTypeOpaque
+		},
+		func(s *api.NamespaceStatus, c fuzz.Continue) {
+			s.Phase = api.NamespaceActive
+		},
+		func(ep *api.Endpoint, c fuzz.Continue) {
+			// TODO: If our API used a particular type for IP fields we could just catch that here.
+			ep.IP = fmt.Sprintf("%d.%d.%d.%d", c.Rand.Intn(256), c.Rand.Intn(256), c.Rand.Intn(256), c.Rand.Intn(256))
+			ep.Port = c.Rand.Intn(65536)
+		},
+		func(http *api.HTTPGetAction, c fuzz.Continue) {
+			c.FuzzNoCustom(http)        // fuzz self without calling this function again
+			http.Path = "/" + http.Path // can't be blank
+		},
+		func(ss *api.ServiceSpec, c fuzz.Continue) {
+			c.FuzzNoCustom(ss) // fuzz self without calling this function again
+			switch ss.ContainerPort.Kind {
+			case util.IntstrInt:
+				ss.ContainerPort.IntVal = 1 + ss.ContainerPort.IntVal%65535 // non-zero
+			case util.IntstrString:
+				ss.ContainerPort.StrVal = "x" + ss.ContainerPort.StrVal // non-empty
 			}
 		},
 	)

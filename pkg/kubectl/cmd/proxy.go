@@ -17,6 +17,7 @@ limitations under the License.
 package cmd
 
 import (
+	"fmt"
 	"io"
 	"strings"
 
@@ -26,29 +27,56 @@ import (
 	"github.com/spf13/cobra"
 )
 
+const (
+	proxy_example = `// Run a proxy to kubernetes apiserver on port 8011, serving static content from ./local/www/
+$ kubectl proxy --port=8011 --www=./local/www/
+
+// Run a proxy to kubernetes apiserver, changing the api prefix to k8s-api
+// This makes e.g. the pods api available at localhost:8011/k8s-api/v1beta1/pods/
+$ kubectl proxy --api-prefix=k8s-api`
+)
+
 func (f *Factory) NewCmdProxy(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "proxy",
-		Short: "Run a proxy to the Kubernetes API server",
-		Long:  `Run a proxy to the Kubernetes API server.`,
+		Use:     "proxy [--port=PORT] [--www=static-dir] [--www-prefix=prefix] [--api-prefix=prefix]",
+		Short:   "Run a proxy to the Kubernetes API server",
+		Long:    `Run a proxy to the Kubernetes API server. `,
+		Example: proxy_example,
 		Run: func(cmd *cobra.Command, args []string) {
-			port := util.GetFlagInt(cmd, "port")
-			glog.Infof("Starting to serve on localhost:%d", port)
-
-			clientConfig, err := f.ClientConfig(cmd)
-			checkErr(err)
-
-			staticPrefix := util.GetFlagString(cmd, "www-prefix")
-			if !strings.HasSuffix(staticPrefix, "/") {
-				staticPrefix += "/"
-			}
-			server, err := kubectl.NewProxyServer(util.GetFlagString(cmd, "www"), staticPrefix, clientConfig)
-			checkErr(err)
-			glog.Fatal(server.Serve(port))
+			err := RunProxy(f, out, cmd)
+			util.CheckErr(err)
 		},
 	}
-	cmd.Flags().StringP("www", "w", "", "Also serve static files from the given directory under the specified prefix")
-	cmd.Flags().StringP("www-prefix", "P", "/static/", "Prefix to serve static files under, if static file dir is specified")
-	cmd.Flags().IntP("port", "p", 8001, "The port on which to run the proxy")
+	cmd.Flags().StringP("www", "w", "", "Also serve static files from the given directory under the specified prefix.")
+	cmd.Flags().StringP("www-prefix", "P", "/static/", "Prefix to serve static files under, if static file directory is specified.")
+	cmd.Flags().StringP("api-prefix", "", "/api/", "Prefix to serve the proxied API under.")
+	cmd.Flags().IntP("port", "p", 8001, "The port on which to run the proxy.")
 	return cmd
+}
+
+func RunProxy(f *Factory, out io.Writer, cmd *cobra.Command) error {
+	port := util.GetFlagInt(cmd, "port")
+	fmt.Fprintf(out, "Starting to serve on localhost:%d", port)
+
+	clientConfig, err := f.ClientConfig(cmd)
+	if err != nil {
+		return err
+	}
+
+	staticPrefix := util.GetFlagString(cmd, "www-prefix")
+	if !strings.HasSuffix(staticPrefix, "/") {
+		staticPrefix += "/"
+	}
+
+	apiProxyPrefix := util.GetFlagString(cmd, "api-prefix")
+	if !strings.HasSuffix(apiProxyPrefix, "/") {
+		apiProxyPrefix += "/"
+	}
+	server, err := kubectl.NewProxyServer(util.GetFlagString(cmd, "www"), apiProxyPrefix, staticPrefix, clientConfig)
+	if err != nil {
+		return err
+	}
+
+	glog.Fatal(server.Serve(port))
+	return nil
 }

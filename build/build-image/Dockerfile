@@ -28,7 +28,7 @@ RUN go get golang.org/x/tools/cmd/cover github.com/tools/godep
 # We use rsync to copy some binaries around.  It is faster (0.3s vs. 1.1s) on my
 # machine vs. `install`
 RUN rm -rf /var/lib/apt/lists/
-RUN apt-get update && apt-get install -y rsync
+RUN apt-get -o Acquire::Check-Valid-Until=false update && apt-get install -y rsync
 
 # Download and symlink etcd.  We need this for our integration tests.
 RUN mkdir -p /usr/local/src/etcd &&\

@@ -21,11 +21,11 @@ import (
 	"crypto/md5"
 	"encoding/hex"
 	"fmt"
-	"hash/adler32"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -66,7 +66,7 @@ func (s *sourceFile) extractFromPath() error {
 			return err
 		}
 		// Emit an update with an empty PodList to allow FileSource to be marked as seen
-		s.updates <- kubelet.PodUpdate{[]api.BoundPod{}, kubelet.SET, kubelet.FileSource}
+		s.updates <- kubelet.PodUpdate{[]api.Pod{}, kubelet.SET, kubelet.FileSource}
 		return fmt.Errorf("path does not exist, ignoring")
 	}
 
@@ -83,7 +83,7 @@ func (s *sourceFile) extractFromPath() error {
 		if err != nil {
 			return err
 		}
-		s.updates <- kubelet.PodUpdate{[]api.BoundPod{pod}, kubelet.SET, kubelet.FileSource}
+		s.updates <- kubelet.PodUpdate{[]api.Pod{pod}, kubelet.SET, kubelet.FileSource}
 
 	default:
 		return fmt.Errorf("path is not a directory or file")
@@ -95,13 +95,13 @@ func (s *sourceFile) extractFromPath() error {
 // Get as many pod configs as we can from a directory.  Return an error iff something
 // prevented us from reading anything at all.  Do not return an error if only some files
 // were problematic.
-func extractFromDir(name string) ([]api.BoundPod, error) {
+func extractFromDir(name string) ([]api.Pod, error) {
 	dirents, err := filepath.Glob(filepath.Join(name, "[^.]*"))
 	if err != nil {
 		return nil, fmt.Errorf("glob failed: %v", err)
 	}
 
-	pods := make([]api.BoundPod, 0)
+	pods := make([]api.Pod, 0)
 	if len(dirents) == 0 {
 		return pods, nil
 	}
@@ -131,8 +131,8 @@ func extractFromDir(name string) ([]api.BoundPod, error) {
 	return pods, nil
 }
 
-func extractFromFile(filename string) (api.BoundPod, error) {
-	var pod api.BoundPod
+func extractFromFile(filename string) (api.Pod, error) {
+	var pod api.Pod
 
 	glog.V(3).Infof("Reading config file %q", filename)
 	file, err := os.Open(filename)
@@ -153,10 +153,10 @@ func extractFromFile(filename string) (api.BoundPod, error) {
 	// becomes nicer).  Until then, we assert that the ContainerManifest
 	// structure on disk is always v1beta1.  Read that, convert it to a
 	// "current" ContainerManifest (should be ~identical), then convert
-	// that to a BoundPod (which is a well-understood conversion).  This
-	// avoids writing a v1beta1.ContainerManifest -> api.BoundPod
+	// that to a Pod (which is a well-understood conversion).  This
+	// avoids writing a v1beta1.ContainerManifest -> api.Pod
 	// conversion which would be identical to the api.ContainerManifest ->
-	// api.BoundPod conversion.
+	// api.Pod conversion.
 	oldManifest := &v1beta1.ContainerManifest{}
 	if err := yaml.Unmarshal(data, oldManifest); err != nil {
 		return pod, fmt.Errorf("can't unmarshal file %q: %v", filename, err)
@@ -173,6 +173,7 @@ func extractFromFile(filename string) (api.BoundPod, error) {
 	if err != nil {
 		return pod, err
 	}
+	hostname = strings.ToLower(hostname)
 
 	if len(pod.UID) == 0 {
 		hasher := md5.New()
@@ -186,17 +187,16 @@ func extractFromFile(filename string) (api.BoundPod, error) {
 	// completely deprecate ContainerManifest.
 	if len(pod.Name) == 0 {
 		pod.Name = string(pod.UID)
-		glog.V(5).Infof("Generated Name %q for UID %q from file %s", pod.Name, pod.UID, filename)
 	}
-	if len(pod.Namespace) == 0 {
-		hasher := adler32.New()
-		fmt.Fprint(hasher, filename)
-		// TODO: file-<sum>.hostname would be better, if DNS subdomains
-		// are allowed for namespace (some places only allow DNS
-		// labels).
-		pod.Namespace = fmt.Sprintf("file-%08x-%s", hasher.Sum32(), hostname)
-		glog.V(5).Infof("Generated namespace %q for pod %q from file %s", pod.Namespace, pod.Name, filename)
+	if pod.Name, err = GeneratePodName(pod.Name); err != nil {
+		return pod, err
 	}
+	glog.V(5).Infof("Generated Name %q for UID %q from file %s", pod.Name, pod.UID, filename)
+
+	// Always overrides the namespace provided by the file.
+	pod.Namespace = kubelet.NamespaceDefault
+	glog.V(5).Infof("Using namespace %q for pod %q from file %s", pod.Namespace, pod.Name, filename)
+
 	// TODO(dchen1107): BoundPod is not type of runtime.Object. Once we allow kubelet talks
 	// about Pod directly, we can use SelfLinker defined in package: latest
 	// Currently just simply follow the same format in resthandler.go

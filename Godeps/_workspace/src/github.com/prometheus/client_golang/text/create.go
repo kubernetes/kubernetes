@@ -24,8 +24,10 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"math"
 	"strings"
 
+	"github.com/prometheus/client_golang/model"
 	dto "github.com/prometheus/client_model/go"
 )
 
@@ -116,7 +118,7 @@ func MetricFamilyToText(out io.Writer, in *dto.MetricFamily) (int, error) {
 			for _, q := range metric.Summary.Quantile {
 				n, err = writeSample(
 					name, metric,
-					"quantile", fmt.Sprint(q.GetQuantile()),
+					model.QuantileLabel, fmt.Sprint(q.GetQuantile()),
 					q.GetValue(),
 					out,
 				)
@@ -137,6 +139,54 @@ func MetricFamilyToText(out io.Writer, in *dto.MetricFamily) (int, error) {
 			n, err = writeSample(
 				name+"_count", metric, "", "",
 				float64(metric.Summary.GetSampleCount()),
+				out,
+			)
+		case dto.MetricType_HISTOGRAM:
+			if metric.Histogram == nil {
+				return written, fmt.Errorf(
+					"expected summary in metric %s", metric,
+				)
+			}
+			infSeen := false
+			for _, q := range metric.Histogram.Bucket {
+				n, err = writeSample(
+					name+"_bucket", metric,
+					model.BucketLabel, fmt.Sprint(q.GetUpperBound()),
+					float64(q.GetCumulativeCount()),
+					out,
+				)
+				written += n
+				if err != nil {
+					return written, err
+				}
+				if math.IsInf(q.GetUpperBound(), +1) {
+					infSeen = true
+				}
+			}
+			if !infSeen {
+				n, err = writeSample(
+					name+"_bucket", metric,
+					model.BucketLabel, "+Inf",
+					float64(metric.Histogram.GetSampleCount()),
+					out,
+				)
+				if err != nil {
+					return written, err
+				}
+				written += n
+			}
+			n, err = writeSample(
+				name+"_sum", metric, "", "",
+				metric.Histogram.GetSampleSum(),
+				out,
+			)
+			if err != nil {
+				return written, err
+			}
+			written += n
+			n, err = writeSample(
+				name+"_count", metric, "", "",
+				float64(metric.Histogram.GetSampleCount()),
 				out,
 			)
 		default:

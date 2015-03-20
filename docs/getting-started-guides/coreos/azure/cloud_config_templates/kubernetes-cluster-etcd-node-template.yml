@@ -1,0 +1,17 @@
+## This file is used as input to deployment script, which ammends it as needed.
+## More specifically, we need to add peer hosts for each but the elected peer.
+
+coreos:
+  etcd:
+    name: etcd
+    addr: $private_ipv4:4001
+    bind-addr: 0.0.0.0
+    peer-addr: $private_ipv4:7001
+    snapshot: true
+    max-retry-attempts: 50
+  units:
+    - name: etcd.service
+      command: start
+  update:
+    group: stable
+    reboot-strategy: off

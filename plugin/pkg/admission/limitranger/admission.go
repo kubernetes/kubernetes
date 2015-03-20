@@ -23,10 +23,13 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/admission"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	apierrors "github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/cache"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
 
 func init() {
@@ -39,6 +42,7 @@ func init() {
 type limitRanger struct {
 	client    client.Interface
 	limitFunc LimitFunc
+	indexer   cache.Indexer
 }
 
 // Admit admits resources into cluster that do not violate any defined LimitRange in the namespace
@@ -48,16 +52,30 @@ func (l *limitRanger) Admit(a admission.Attributes) (err error) {
 		return nil
 	}
 
-	// look for a limit range in current namespace that requires enforcement
-	// TODO: Move to cache when issue is resolved: https://github.com/GoogleCloudPlatform/kubernetes/issues/2294
-	items, err := l.client.LimitRanges(a.GetNamespace()).List(labels.Everything())
+	obj := a.GetObject()
+	resource := a.GetResource()
+	name := "Unknown"
+	if obj != nil {
+		name, _ = meta.NewAccessor().Name(obj)
+	}
+
+	key := &api.LimitRange{
+		ObjectMeta: api.ObjectMeta{
+			Namespace: a.GetNamespace(),
+			Name:      "",
+		},
+	}
+	items, err := l.indexer.Index("namespace", key)
 	if err != nil {
-		return err
+		return apierrors.NewForbidden(a.GetResource(), name, fmt.Errorf("Unable to %s %s at this time because there was an error enforcing limit ranges", a.GetOperation(), resource))
+	}
+	if len(items) == 0 {
+		return nil
 	}
 
 	// ensure it meets each prescribed min/max
-	for i := range items.Items {
-		limitRange := &items.Items[i]
+	for i := range items {
+		limitRange := items[i].(*api.LimitRange)
 		err = l.limitFunc(limitRange, a.GetResource(), a.GetObject())
 		if err != nil {
 			return err
@@ -68,7 +86,17 @@ func (l *limitRanger) Admit(a admission.Attributes) (err error) {
 
 // NewLimitRanger returns an object that enforces limits based on the supplied limit function
 func NewLimitRanger(client client.Interface, limitFunc LimitFunc) admission.Interface {
-	return &limitRanger{client: client, limitFunc: limitFunc}
+	lw := &cache.ListWatch{
+		ListFunc: func() (runtime.Object, error) {
+			return client.LimitRanges(api.NamespaceAll).List(labels.Everything())
+		},
+		WatchFunc: func(resourceVersion string) (watch.Interface, error) {
+			return client.LimitRanges(api.NamespaceAll).Watch(labels.Everything(), labels.Everything(), resourceVersion)
+		},
+	}
+	indexer, reflector := cache.NewNamespaceKeyedIndexerAndReflector(lw, &api.LimitRange{}, 0)
+	reflector.Run()
+	return &limitRanger{client: client, limitFunc: limitFunc, indexer: indexer}
 }
 
 func Min(a int64, b int64) int64 {

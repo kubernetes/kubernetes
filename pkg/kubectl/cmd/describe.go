@@ -26,26 +26,42 @@ import (
 
 func (f *Factory) NewCmdDescribe(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "describe <resource> <id>",
+		Use:   "describe RESOURCE ID",
 		Short: "Show details of a specific resource",
 		Long: `Show details of a specific resource.
 
 This command joins many API calls together to form a detailed description of a
 given resource.`,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdNamespace, err := f.DefaultNamespace(cmd)
-			checkErr(err)
-
-			mapper, _ := f.Object(cmd)
-			mapping, namespace, name := util.ResourceFromArgs(cmd, args, mapper, cmdNamespace)
-
-			describer, err := f.Describer(cmd, mapping)
-			checkErr(err)
-
-			s, err := describer.Describe(namespace, name)
-			checkErr(err)
-			fmt.Fprintf(out, "%s\n", s)
+			err := RunDescribe(f, out, cmd, args)
+			util.CheckErr(err)
 		},
 	}
 	return cmd
+}
+
+func RunDescribe(f *Factory, out io.Writer, cmd *cobra.Command, args []string) error {
+	cmdNamespace, err := f.DefaultNamespace(cmd)
+	if err != nil {
+		return err
+	}
+
+	mapper, _ := f.Object(cmd)
+	// TODO: use resource.Builder instead
+	mapping, namespace, name, err := util.ResourceFromArgs(cmd, args, mapper, cmdNamespace)
+	if err != nil {
+		return err
+	}
+
+	describer, err := f.Describer(cmd, mapping)
+	if err != nil {
+		return err
+	}
+
+	s, err := describer.Describe(namespace, name)
+	if err != nil {
+		return err
+	}
+	fmt.Fprintf(out, "%s\n", s)
+	return nil
 }

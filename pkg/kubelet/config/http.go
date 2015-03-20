@@ -22,7 +22,6 @@ import (
 	"crypto/md5"
 	"encoding/hex"
 	"fmt"
-	"hash/adler32"
 	"io/ioutil"
 	"net/http"
 	"time"
@@ -75,7 +74,7 @@ func (s *sourceURL) extractFromURL() error {
 	}
 	if len(data) == 0 {
 		// Emit an update with an empty PodList to allow HTTPSource to be marked as seen
-		s.updates <- kubelet.PodUpdate{[]api.BoundPod{}, kubelet.SET, kubelet.HTTPSource}
+		s.updates <- kubelet.PodUpdate{[]api.Pod{}, kubelet.SET, kubelet.HTTPSource}
 		return fmt.Errorf("zero-length data received from %v", s.url)
 	}
 	// Short circuit if the manifest has not changed since the last time it was read.
@@ -92,8 +91,10 @@ func (s *sourceURL) extractFromURL() error {
 			return singleErr
 		}
 		// It parsed!
-		applyDefaults(&pod, s.url)
-		s.updates <- kubelet.PodUpdate{[]api.BoundPod{pod}, kubelet.SET, kubelet.HTTPSource}
+		if err = applyDefaults(&pod, s.url); err != nil {
+			return err
+		}
+		s.updates <- kubelet.PodUpdate{[]api.Pod{pod}, kubelet.SET, kubelet.HTTPSource}
 		return nil
 	}
 
@@ -114,7 +115,9 @@ func (s *sourceURL) extractFromURL() error {
 		// Assume it parsed.
 		for i := range pods.Items {
 			pod := &pods.Items[i]
-			applyDefaults(pod, s.url)
+			if err = applyDefaults(pod, s.url); err != nil {
+				return err
+			}
 		}
 		s.updates <- kubelet.PodUpdate{pods.Items, kubelet.SET, kubelet.HTTPSource}
 		return nil
@@ -125,7 +128,7 @@ func (s *sourceURL) extractFromURL() error {
 		s.url, string(data), singleErr, manifest, multiErr, manifests)
 }
 
-func tryDecodeSingle(data []byte) (parsed bool, manifest v1beta1.ContainerManifest, pod api.BoundPod, err error) {
+func tryDecodeSingle(data []byte) (parsed bool, manifest v1beta1.ContainerManifest, pod api.Pod, err error) {
 	// TODO: should be api.Scheme.Decode
 	// This is awful.  DecodeInto() expects to find an APIObject, which
 	// Manifest is not.  We keep reading manifest for now for compat, but
@@ -133,10 +136,10 @@ func tryDecodeSingle(data []byte) (parsed bool, manifest v1beta1.ContainerManife
 	// becomes nicer).  Until then, we assert that the ContainerManifest
 	// structure on disk is always v1beta1.  Read that, convert it to a
 	// "current" ContainerManifest (should be ~identical), then convert
-	// that to a BoundPod (which is a well-understood conversion).  This
-	// avoids writing a v1beta1.ContainerManifest -> api.BoundPod
+	// that to a Pod (which is a well-understood conversion).  This
+	// avoids writing a v1beta1.ContainerManifest -> api.Pod
 	// conversion which would be identical to the api.ContainerManifest ->
-	// api.BoundPod conversion.
+	// api.Pod conversion.
 	if err = yaml.Unmarshal(data, &manifest); err != nil {
 		return false, manifest, pod, err
 	}
@@ -155,7 +158,7 @@ func tryDecodeSingle(data []byte) (parsed bool, manifest v1beta1.ContainerManife
 	return true, manifest, pod, nil
 }
 
-func tryDecodeList(data []byte) (parsed bool, manifests []v1beta1.ContainerManifest, pods api.BoundPods, err error) {
+func tryDecodeList(data []byte) (parsed bool, manifests []v1beta1.ContainerManifest, pods api.PodList, err error) {
 	// TODO: should be api.Scheme.Decode
 	// See the comment in tryDecodeSingle().
 	if err = yaml.Unmarshal(data, &manifests); err != nil {
@@ -180,7 +183,7 @@ func tryDecodeList(data []byte) (parsed bool, manifests []v1beta1.ContainerManif
 	return true, manifests, pods, nil
 }
 
-func applyDefaults(pod *api.BoundPod, url string) {
+func applyDefaults(pod *api.Pod, url string) error {
 	if len(pod.UID) == 0 {
 		hasher := md5.New()
 		fmt.Fprintf(hasher, "url:%s", url)
@@ -190,14 +193,18 @@ func applyDefaults(pod *api.BoundPod, url string) {
 	}
 	// This is required for backward compatibility, and should be removed once we
 	// completely deprecate ContainerManifest.
+	var err error
 	if len(pod.Name) == 0 {
 		pod.Name = string(pod.UID)
-		glog.V(5).Infof("Generate Name %q from UID %q from URL %s", pod.Name, pod.UID, url)
 	}
-	if len(pod.Namespace) == 0 {
-		hasher := adler32.New()
-		fmt.Fprint(hasher, url)
-		pod.Namespace = fmt.Sprintf("url-%08x", hasher.Sum32())
-		glog.V(5).Infof("Generated namespace %q for pod %q from URL %s", pod.Namespace, pod.Name, url)
+	pod.Name, err = GeneratePodName(pod.Name)
+	if err != nil {
+		return err
 	}
+	glog.V(5).Infof("Generated Name %q for UID %q from URL %s", pod.Name, pod.UID, url)
+
+	// Always overrides the namespace.
+	pod.Namespace = kubelet.NamespaceDefault
+	glog.V(5).Infof("Using namespace %q for pod %q from URL %s", pod.Namespace, pod.Name, url)
+	return nil
 }

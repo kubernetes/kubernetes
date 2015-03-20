@@ -9,7 +9,7 @@ This document proposes a system for enforcing min/max limits per resource as par
 A new resource, **LimitRange**, is introduced to enumerate min/max limits for a resource type scoped to a
 Kubernetes namespace.
 
-```
+```go
 const (
   // Limit that applies to all pods in a namespace
   LimitTypePod string = "Pod"
@@ -54,7 +54,7 @@ type LimitRangeList struct {
 
 ## AdmissionControl plugin: LimitRanger
 
-The **LimitRanger** plug-in introspects all incoming admission requests. 
+The **LimitRanger** plug-in introspects all incoming admission requests.
 
 It makes decisions by evaluating the incoming object against all defined **LimitRange** objects in the request context namespace.
 
@@ -97,20 +97,20 @@ kubectl is modified to support the **LimitRange** resource.
 
 For example,
 
-```
+```shell
 $ kubectl namespace myspace
 $ kubectl create -f examples/limitrange/limit-range.json
 $ kubectl get limits
 NAME
 limits
 $ kubectl describe limits limits
-Name:   limits
-Type    Resource  Min Max
-----    --------  --- ---
-Pod   memory    1Mi 1Gi
-Pod   cpu   250m  2
-Container cpu   250m  2
-Container memory    1Mi 1Gi
+Name:           limits
+Type            Resource        Min     Max
+----            --------        ---     ---
+Pod             memory          1Mi     1Gi
+Pod             cpu             250m    2
+Container       memory          1Mi     1Gi
+Container       cpu             250m    2
 ```
 
 ## Future Enhancements: Define limits for a particular pod or container.

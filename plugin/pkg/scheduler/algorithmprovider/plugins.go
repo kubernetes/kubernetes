@@ -18,6 +18,5 @@ limitations under the License.
 package algorithmprovider
 
 import (
-	_ "github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler/algorithmprovider/affinity"
 	_ "github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler/algorithmprovider/defaults"
 )

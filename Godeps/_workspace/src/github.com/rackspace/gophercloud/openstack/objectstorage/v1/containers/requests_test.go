@@ -29,6 +29,18 @@ func TestListContainerInfo(t *testing.T) {
 	th.CheckEquals(t, count, 1)
 }
 
+func TestListAllContainerInfo(t *testing.T) {
+	th.SetupHTTP()
+	defer th.TeardownHTTP()
+	HandleListContainerInfoSuccessfully(t)
+
+	allPages, err := List(fake.ServiceClient(), &ListOpts{Full: true}).AllPages()
+	th.AssertNoErr(t, err)
+	actual, err := ExtractInfo(allPages)
+	th.AssertNoErr(t, err)
+	th.CheckDeepEquals(t, ExpectedListInfo, actual)
+}
+
 func TestListContainerNames(t *testing.T) {
 	th.SetupHTTP()
 	defer th.TeardownHTTP()
@@ -51,6 +63,18 @@ func TestListContainerNames(t *testing.T) {
 	th.CheckEquals(t, count, 1)
 }
 
+func TestListAllContainerNames(t *testing.T) {
+	th.SetupHTTP()
+	defer th.TeardownHTTP()
+	HandleListContainerNamesSuccessfully(t)
+
+	allPages, err := List(fake.ServiceClient(), &ListOpts{Full: false}).AllPages()
+	th.AssertNoErr(t, err)
+	actual, err := ExtractNames(allPages)
+	th.AssertNoErr(t, err)
+	th.CheckDeepEquals(t, ExpectedListNames, actual)
+}
+
 func TestCreateContainer(t *testing.T) {
 	th.SetupHTTP()
 	defer th.TeardownHTTP()
@@ -58,8 +82,10 @@ func TestCreateContainer(t *testing.T) {
 
 	options := CreateOpts{ContentType: "application/json", Metadata: map[string]string{"foo": "bar"}}
 	res := Create(fake.ServiceClient(), "testContainer", options)
-	th.CheckNoErr(t, res.Err)
+	c, err := res.Extract()
+	th.CheckNoErr(t, err)
 	th.CheckEquals(t, "bar", res.Header["X-Container-Meta-Foo"][0])
+	th.CheckEquals(t, "1234567", c.TransID)
 }
 
 func TestDeleteContainer(t *testing.T) {

@@ -32,7 +32,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 )
 
-func ExampleManifestAndPod(id string) (v1beta1.ContainerManifest, api.BoundPod) {
+func ExampleManifestAndPod(id string) (v1beta1.ContainerManifest, api.Pod) {
 	manifest := v1beta1.ContainerManifest{
 		ID:   id,
 		UUID: types.UID(id),
@@ -47,15 +47,16 @@ func ExampleManifestAndPod(id string) (v1beta1.ContainerManifest, api.BoundPod) 
 			{
 				Name: "host-dir",
 				Source: v1beta1.VolumeSource{
-					HostDir: &v1beta1.HostPath{"/dir/path"},
+					HostDir: &v1beta1.HostPathVolumeSource{"/dir/path"},
 				},
 			},
 		},
 	}
-	expectedPod := api.BoundPod{
+	expectedPod := api.Pod{
 		ObjectMeta: api.ObjectMeta{
-			Name: id,
-			UID:  types.UID(id),
+			Name:      id,
+			UID:       types.UID(id),
+			Namespace: kubelet.NamespaceDefault,
 		},
 		Spec: api.PodSpec{
 			Containers: []api.Container{
@@ -67,8 +68,8 @@ func ExampleManifestAndPod(id string) (v1beta1.ContainerManifest, api.BoundPod) 
 			Volumes: []api.Volume{
 				{
 					Name: "host-dir",
-					Source: api.VolumeSource{
-						HostPath: &api.HostPath{"/dir/path"},
+					VolumeSource: api.VolumeSource{
+						HostPath: &api.HostPathVolumeSource{"/dir/path"},
 					},
 				},
 			},
@@ -129,29 +130,32 @@ func TestReadFromFile(t *testing.T) {
 	select {
 	case got := <-ch:
 		update := got.(kubelet.PodUpdate)
-		expected := CreatePodUpdate(kubelet.SET, kubelet.FileSource, api.BoundPod{
+		expected := CreatePodUpdate(kubelet.SET, kubelet.FileSource, api.Pod{
 			ObjectMeta: api.ObjectMeta{
-				Name:      "test",
+				Name:      "",
 				UID:       "12345",
-				Namespace: "",
+				Namespace: kubelet.NamespaceDefault,
 				SelfLink:  "",
 			},
 			Spec: api.PodSpec{Containers: []api.Container{{Image: "test/image"}}},
 		})
 
+		if !strings.HasPrefix(update.Pods[0].Name, "test-") {
+			t.Errorf("Unexpected name: %s", update.Pods[0].Name)
+		}
 		// There's no way to provide namespace in ContainerManifest, so
 		// it will be defaulted.
-		if !strings.HasPrefix(update.Pods[0].ObjectMeta.Namespace, "file-") {
-			t.Errorf("Unexpected namespace: %s", update.Pods[0].ObjectMeta.Namespace)
+		if update.Pods[0].Namespace != kubelet.NamespaceDefault {
+			t.Errorf("Unexpected namespace: %s", update.Pods[0].Namespace)
 		}
-		update.Pods[0].ObjectMeta.Namespace = ""
-
 		// SelfLink depends on namespace.
-		if !strings.HasPrefix(update.Pods[0].ObjectMeta.SelfLink, "/api/") {
-			t.Errorf("Unexpected selflink: %s", update.Pods[0].ObjectMeta.SelfLink)
+		if !strings.HasPrefix(update.Pods[0].SelfLink, "/api/") {
+			t.Errorf("Unexpected selflink: %s", update.Pods[0].SelfLink)
 		}
-		update.Pods[0].ObjectMeta.SelfLink = ""
 
+		// Reset the fileds that we don't want to compare.
+		update.Pods[0].Name = ""
+		update.Pods[0].SelfLink = ""
 		if !api.Semantic.DeepDerivative(expected, update) {
 			t.Fatalf("Expected %#v, Got %#v", expected, update)
 		}
@@ -175,11 +179,11 @@ func TestReadFromFileWithoutID(t *testing.T) {
 	select {
 	case got := <-ch:
 		update := got.(kubelet.PodUpdate)
-		expected := CreatePodUpdate(kubelet.SET, kubelet.FileSource, api.BoundPod{
+		expected := CreatePodUpdate(kubelet.SET, kubelet.FileSource, api.Pod{
 			ObjectMeta: api.ObjectMeta{
 				Name:      "",
 				UID:       "12345",
-				Namespace: "",
+				Namespace: kubelet.NamespaceDefault,
 				SelfLink:  "",
 			},
 			Spec: api.PodSpec{Containers: []api.Container{{Image: "test/image"}}},
@@ -188,10 +192,9 @@ func TestReadFromFileWithoutID(t *testing.T) {
 		if len(update.Pods[0].ObjectMeta.Name) == 0 {
 			t.Errorf("Name did not get defaulted")
 		}
-		update.Pods[0].ObjectMeta.Name = ""
-		update.Pods[0].ObjectMeta.Namespace = ""
-		update.Pods[0].ObjectMeta.SelfLink = ""
-
+		// Reset the fileds that we don't want to compare.
+		update.Pods[0].Name = ""
+		update.Pods[0].SelfLink = ""
 		if !api.Semantic.DeepDerivative(expected, update) {
 			t.Fatalf("Expected %#v, Got %#v", expected, update)
 		}
@@ -216,19 +219,19 @@ func TestReadV1Beta2FromFile(t *testing.T) {
 	select {
 	case got := <-ch:
 		update := got.(kubelet.PodUpdate)
-		expected := CreatePodUpdate(kubelet.SET, kubelet.FileSource, api.BoundPod{
+		expected := CreatePodUpdate(kubelet.SET, kubelet.FileSource, api.Pod{
 			ObjectMeta: api.ObjectMeta{
-				Name:      "test",
+				Name:      "",
 				UID:       "12345",
-				Namespace: "",
+				Namespace: kubelet.NamespaceDefault,
 				SelfLink:  "",
 			},
 			Spec: api.PodSpec{Containers: []api.Container{{Image: "test/image"}}},
 		})
 
-		update.Pods[0].ObjectMeta.Namespace = ""
-		update.Pods[0].ObjectMeta.SelfLink = ""
-
+		// Reset the fileds that we don't want to compare.
+		update.Pods[0].Name = ""
+		update.Pods[0].SelfLink = ""
 		if !api.Semantic.DeepDerivative(expected, update) {
 			t.Fatalf("Expected %#v, Got %#v", expected, update)
 		}
@@ -252,8 +255,8 @@ func TestReadFromFileWithDefaults(t *testing.T) {
 	select {
 	case got := <-ch:
 		update := got.(kubelet.PodUpdate)
-		if update.Pods[0].ObjectMeta.UID == "" {
-			t.Errorf("Unexpected UID: %s", update.Pods[0].ObjectMeta.UID)
+		if update.Pods[0].UID == "" {
+			t.Errorf("Unexpected UID: %s", update.Pods[0].UID)
 		}
 
 	case <-time.After(time.Second):
@@ -300,7 +303,7 @@ func TestExtractFromDir(t *testing.T) {
 	manifest2, expectedPod2 := ExampleManifestAndPod("2")
 
 	manifests := []v1beta1.ContainerManifest{manifest, manifest2}
-	pods := []api.BoundPod{expectedPod, expectedPod2}
+	pods := []api.Pod{expectedPod, expectedPod2}
 	files := make([]*os.File, len(manifests))
 
 	dirName, err := ioutil.TempDir("", "foo")
@@ -337,12 +340,16 @@ func TestExtractFromDir(t *testing.T) {
 
 	update := (<-ch).(kubelet.PodUpdate)
 	for i := range update.Pods {
-		update.Pods[i].Namespace = "foobar"
+		// Pod name is generated with hash and is unique. Skip the comparision
+		// here by setting it to a simple value.
+		update.Pods[i].Name = manifests[i].ID
 		update.Pods[i].SelfLink = ""
 	}
 	expected := CreatePodUpdate(kubelet.SET, kubelet.FileSource, pods...)
 	for i := range expected.Pods {
-		expected.Pods[i].Namespace = "foobar"
+		// Pod name is generated with hash and is unique. Skip the comparision
+		// here by setting it to a simple value.
+		expected.Pods[i].Name = manifests[i].ID
 	}
 	sort.Sort(sortedPods(update.Pods))
 	sort.Sort(sortedPods(expected.Pods))
@@ -350,8 +357,8 @@ func TestExtractFromDir(t *testing.T) {
 		t.Fatalf("Expected %#v, Got %#v", expected, update)
 	}
 	for i := range update.Pods {
-		if errs := validation.ValidateBoundPod(&update.Pods[i]); len(errs) != 0 {
-			t.Errorf("Expected no validation errors on %#v, Got %#v", update.Pods[i], errs)
+		if errs := validation.ValidatePod(&update.Pods[i]); len(errs) != 0 {
+			t.Errorf("Expected no validation errors on %#v, Got %q", update.Pods[i], errs)
 		}
 	}
 }

@@ -56,17 +56,23 @@ The kube-controller-manager has several options.
 **--machines**=[]
     List of machines to schedule onto, comma separated.
 
+**--pod_eviction_timeout**=5m
+    The grace peroid for deleting pods on failed nodes.
+
 **--sync_nodes**=true
-        If true, and --cloud_provider is specified, sync nodes from the cloud provider. Default true.
+    If true, and --cloud_provider is specified, sync nodes from the cloud provider. Default true.
 
 **--master**=""
 	The address of the Kubernetes API server.
 
-**--node_sync_peroid**=10s
+**--node_sync_period**=10s
     The period for syncing nodes from cloudprovider.
 
 **--port**=10252
-	The port that the controller-manager's http service runs on.
+    The port that the controller-manager's http service runs on.
+
+**--resource_quota_sync_period**=10s
+    The period for syncing quota usage status in the system.
 
 **--stderrthreshold**=0
 	logs at or above this threshold go to stderr.

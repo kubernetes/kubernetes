@@ -37,7 +37,7 @@ var testTTL uint64 = 60
 func NewTestEventEtcdRegistry(t *testing.T) (*tools.FakeEtcdClient, generic.Registry) {
 	f := tools.NewFakeEtcdClient(t)
 	f.TestIndex = true
-	h := tools.EtcdHelper{f, testapi.Codec(), tools.RuntimeVersionAdapter{testapi.MetadataAccessor()}}
+	h := tools.NewEtcdHelper(f, testapi.Codec())
 	return f, NewEtcdRegistry(h, testTTL)
 }
 
@@ -98,7 +98,7 @@ func TestEventCreate(t *testing.T) {
 	for name, item := range table {
 		fakeClient, registry := NewTestEventEtcdRegistry(t)
 		fakeClient.Data[path] = item.existing
-		err := registry.Create(ctx, key, item.toCreate)
+		err := registry.CreateWithName(ctx, key, item.toCreate)
 		if !item.errOK(err) {
 			t.Errorf("%v: unexpected error: %v", name, err)
 		}
@@ -200,7 +200,7 @@ func TestEventUpdate(t *testing.T) {
 	for name, item := range table {
 		fakeClient, registry := NewTestEventEtcdRegistry(t)
 		fakeClient.Data[path] = item.existing
-		err := registry.Update(ctx, key, item.toUpdate)
+		err := registry.UpdateWithName(ctx, key, item.toUpdate)
 		if !item.errOK(err) {
 			t.Errorf("%v: unexpected error: %v", name, err)
 		}

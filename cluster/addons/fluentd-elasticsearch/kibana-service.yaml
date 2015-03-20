@@ -1,10 +1,10 @@
 apiVersion: v1beta1
 kind: Service
 id: kibana-logging
-containerPort: kibana-port
+containerPort: 80
 port: 5601
 labels:
   name: kibana-logging
+  kubernetes.io/cluster-service: "true"
 selector:
   name: kibana-logging
-createExternalLoadBalancer: true

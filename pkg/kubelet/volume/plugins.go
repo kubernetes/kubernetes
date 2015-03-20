@@ -22,6 +22,7 @@ import (
 	"sync"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/errors"
@@ -48,8 +49,8 @@ type Plugin interface {
 	// NewBuilder creates a new volume.Builder from an API specification.
 	// Ownership of the spec pointer in *not* transferred.
 	// - spec: The api.Volume spec
-	// - podUID: The UID of the enclosing pod
-	NewBuilder(spec *api.Volume, podUID types.UID) (Builder, error)
+	// - podRef: a reference to the enclosing pod
+	NewBuilder(spec *api.Volume, podRef *api.ObjectReference) (Builder, error)
 
 	// NewCleaner creates a new volume.Cleaner from recoverable state.
 	// - name: The volume name, as per the api.Volume spec.
@@ -76,6 +77,20 @@ type Host interface {
 	// does not exist, the result of this call might not exist.  This
 	// directory might not actually exist on disk yet.
 	GetPodPluginDir(podUID types.UID, pluginName string) string
+
+	// GetKubeClient returns a client interface
+	GetKubeClient() client.Interface
+
+	// NewWrapperBuilder finds an appropriate plugin with which to handle
+	// the provided spec.  This is used to implement volume plugins which
+	// "wrap" other plugins.  For example, the "secret" volume is
+	// implemented in terms of the "emptyDir" volume.
+	NewWrapperBuilder(spec *api.Volume, podRef *api.ObjectReference) (Builder, error)
+
+	// NewWrapperCleaner finds an appropriate plugin with which to handle
+	// the provided spec.  See comments on NewWrapperBuilder for more
+	// context.
+	NewWrapperCleaner(spec *api.Volume, podUID types.UID) (Cleaner, error)
 }
 
 // PluginMgr tracks registered plugins.

@@ -56,6 +56,9 @@ type RealPodControl struct {
 	kubeClient client.Interface
 }
 
+// Time period of main replication controller sync loop
+const DefaultSyncPeriod = 10 * time.Second
+
 func (r RealPodControl) createReplica(namespace string, controller api.ReplicationController) {
 	desiredLabels := make(labels.Set)
 	for k, v := range controller.Spec.Template.Labels {
@@ -135,7 +138,7 @@ func (rm *ReplicationManager) watchControllers(resourceVersion *string) {
 		case event, open := <-watching.ResultChan():
 			if !open {
 				// watchChannel has been closed, or something else went
-				// wrong with our etcd watch call. Let the util.Forever()
+				// wrong with our watch call. Let the util.Forever()
 				// that called us call us again.
 				return
 			}
@@ -193,12 +196,13 @@ func (rm *ReplicationManager) syncReplicationController(controller api.Replicati
 		return err
 	}
 	filteredList := FilterActivePods(podList.Items)
-	diff := len(filteredList) - controller.Spec.Replicas
+	activePods := len(filteredList)
+	diff := activePods - controller.Spec.Replicas
 	if diff < 0 {
 		diff *= -1
 		wait := sync.WaitGroup{}
 		wait.Add(diff)
-		glog.V(2).Infof("Too few replicas, creating %d\n", diff)
+		glog.V(2).Infof("Too few \"%s\" replicas, creating %d\n", controller.Name, diff)
 		for i := 0; i < diff; i++ {
 			go func() {
 				defer wait.Done()
@@ -207,7 +211,7 @@ func (rm *ReplicationManager) syncReplicationController(controller api.Replicati
 		}
 		wait.Wait()
 	} else if diff > 0 {
-		glog.V(2).Infof("Too many replicas, deleting %d\n", diff)
+		glog.V(2).Infof("Too many \"%s\" replicas, deleting %d\n", controller.Name, diff)
 		wait := sync.WaitGroup{}
 		wait.Add(diff)
 		for i := 0; i < diff; i++ {
@@ -217,6 +221,13 @@ func (rm *ReplicationManager) syncReplicationController(controller api.Replicati
 			}(i)
 		}
 		wait.Wait()
+	}
+	if controller.Status.Replicas != activePods {
+		controller.Status.Replicas = activePods
+		_, err = rm.kubeClient.ReplicationControllers(controller.Namespace).Update(&controller)
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }

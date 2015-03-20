@@ -39,6 +39,19 @@ func TestListServers(t *testing.T) {
 	}
 }
 
+func TestListAllServers(t *testing.T) {
+	th.SetupHTTP()
+	defer th.TeardownHTTP()
+	HandleServerListSuccessfully(t)
+
+	allPages, err := List(client.ServiceClient(), ListOpts{}).AllPages()
+	th.AssertNoErr(t, err)
+	actual, err := ExtractServers(allPages)
+	th.AssertNoErr(t, err)
+	th.CheckDeepEquals(t, ServerHerp, actual[0])
+	th.CheckDeepEquals(t, ServerDerp, actual[1])
+}
+
 func TestCreateServer(t *testing.T) {
 	th.SetupHTTP()
 	defer th.TeardownHTTP()
@@ -173,4 +186,94 @@ func TestRevertResize(t *testing.T) {
 
 	res := RevertResize(client.ServiceClient(), "1234asdf")
 	th.AssertNoErr(t, res.Err)
+}
+
+func TestRescue(t *testing.T) {
+	th.SetupHTTP()
+	defer th.TeardownHTTP()
+
+	HandleServerRescueSuccessfully(t)
+
+	res := Rescue(client.ServiceClient(), "1234asdf", RescueOpts{
+		AdminPass: "1234567890",
+	})
+	th.AssertNoErr(t, res.Err)
+	adminPass, _ := res.Extract()
+	th.AssertEquals(t, "1234567890", adminPass)
+}
+
+func TestGetMetadatum(t *testing.T) {
+	th.SetupHTTP()
+	defer th.TeardownHTTP()
+
+	HandleMetadatumGetSuccessfully(t)
+
+	expected := map[string]string{"foo": "bar"}
+	actual, err := Metadatum(client.ServiceClient(), "1234asdf", "foo").Extract()
+	th.AssertNoErr(t, err)
+	th.AssertDeepEquals(t, expected, actual)
+}
+
+func TestCreateMetadatum(t *testing.T) {
+	th.SetupHTTP()
+	defer th.TeardownHTTP()
+
+	HandleMetadatumCreateSuccessfully(t)
+
+	expected := map[string]string{"foo": "bar"}
+	actual, err := CreateMetadatum(client.ServiceClient(), "1234asdf", MetadatumOpts{"foo": "bar"}).Extract()
+	th.AssertNoErr(t, err)
+	th.AssertDeepEquals(t, expected, actual)
+}
+
+func TestDeleteMetadatum(t *testing.T) {
+	th.SetupHTTP()
+	defer th.TeardownHTTP()
+
+	HandleMetadatumDeleteSuccessfully(t)
+
+	err := DeleteMetadatum(client.ServiceClient(), "1234asdf", "foo").ExtractErr()
+	th.AssertNoErr(t, err)
+}
+
+func TestGetMetadata(t *testing.T) {
+	th.SetupHTTP()
+	defer th.TeardownHTTP()
+
+	HandleMetadataGetSuccessfully(t)
+
+	expected := map[string]string{"foo": "bar", "this": "that"}
+	actual, err := Metadata(client.ServiceClient(), "1234asdf").Extract()
+	th.AssertNoErr(t, err)
+	th.AssertDeepEquals(t, expected, actual)
+}
+
+func TestResetMetadata(t *testing.T) {
+	th.SetupHTTP()
+	defer th.TeardownHTTP()
+
+	HandleMetadataResetSuccessfully(t)
+
+	expected := map[string]string{"foo": "bar", "this": "that"}
+	actual, err := ResetMetadata(client.ServiceClient(), "1234asdf", MetadataOpts{
+		"foo":  "bar",
+		"this": "that",
+	}).Extract()
+	th.AssertNoErr(t, err)
+	th.AssertDeepEquals(t, expected, actual)
+}
+
+func TestUpdateMetadata(t *testing.T) {
+	th.SetupHTTP()
+	defer th.TeardownHTTP()
+
+	HandleMetadataUpdateSuccessfully(t)
+
+	expected := map[string]string{"foo": "baz", "this": "those"}
+	actual, err := UpdateMetadata(client.ServiceClient(), "1234asdf", MetadataOpts{
+		"foo":  "baz",
+		"this": "those",
+	}).Extract()
+	th.AssertNoErr(t, err)
+	th.AssertDeepEquals(t, expected, actual)
 }

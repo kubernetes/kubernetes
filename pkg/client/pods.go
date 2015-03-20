@@ -22,6 +22,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
 
 // PodsNamespacer has methods to work with Pod resources in a namespace
@@ -36,6 +37,8 @@ type PodInterface interface {
 	Delete(name string) error
 	Create(pod *api.Pod) (*api.Pod, error)
 	Update(pod *api.Pod) (*api.Pod, error)
+	Watch(label, field labels.Selector, resourceVersion string) (watch.Interface, error)
+	Bind(binding *api.Binding) error
 }
 
 // pods implements PodsNamespacer interface
@@ -55,7 +58,7 @@ func newPods(c *Client, namespace string) *pods {
 // List takes a selector, and returns the list of pods that match that selector.
 func (c *pods) List(selector labels.Selector) (result *api.PodList, err error) {
 	result = &api.PodList{}
-	err = c.r.Get().Namespace(c.ns).Resource("pods").SelectorParam("labels", selector).Do().Into(result)
+	err = c.r.Get().Namespace(c.ns).Resource("pods").SelectorParam(api.LabelSelectorQueryParam(c.r.APIVersion()), selector).Do().Into(result)
 	return
 }
 
@@ -91,4 +94,21 @@ func (c *pods) Update(pod *api.Pod) (result *api.Pod, err error) {
 	}
 	err = c.r.Put().Namespace(c.ns).Resource("pods").Name(pod.Name).Body(pod).Do().Into(result)
 	return
+}
+
+// Watch returns a watch.Interface that watches the requested pods.
+func (c *pods) Watch(label, field labels.Selector, resourceVersion string) (watch.Interface, error) {
+	return c.r.Get().
+		Prefix("watch").
+		Namespace(c.ns).
+		Resource("pods").
+		Param("resourceVersion", resourceVersion).
+		SelectorParam("labels", label).
+		SelectorParam("fields", field).
+		Watch()
+}
+
+// Bind applies the provided binding to the named pod in the current namespace (binding.Namespace is ignored).
+func (c *pods) Bind(binding *api.Binding) error {
+	return c.r.Post().Namespace(c.ns).Resource("pods").Name(binding.Name).SubResource("binding").Body(binding).Do().Error()
 }

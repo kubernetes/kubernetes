@@ -17,13 +17,52 @@ limitations under the License.
 package kubectl
 
 import (
-	//	"strings"
+	"errors"
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	//	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
+
+type ErrorReplicationControllers struct {
+	client.FakeReplicationControllers
+}
+
+func (c *ErrorReplicationControllers) Update(controller *api.ReplicationController) (*api.ReplicationController, error) {
+	return nil, errors.New("Replication controller update failure")
+}
+
+type ErrorReplicationControllerClient struct {
+	client.Fake
+}
+
+func (c *ErrorReplicationControllerClient) ReplicationControllers(namespace string) client.ReplicationControllerInterface {
+	return &ErrorReplicationControllers{client.FakeReplicationControllers{&c.Fake, namespace}}
+}
+
+func TestReplicationControllerResizeRetry(t *testing.T) {
+	fake := &ErrorReplicationControllerClient{Fake: client.Fake{}}
+	resizer := ReplicationControllerResizer{fake}
+	preconditions := ResizePrecondition{-1, ""}
+	count := uint(3)
+	name := "foo"
+	namespace := "default"
+
+	resizeFunc := ResizeCondition(&resizer, &preconditions, namespace, name, count)
+	pass, err := resizeFunc()
+	if pass != false {
+		t.Errorf("Expected an update failure to return pass = false, got pass = %v", pass)
+	}
+	if err != nil {
+		t.Errorf("Did not expect an error on update failure, got %v", err)
+	}
+	preconditions = ResizePrecondition{3, ""}
+	resizeFunc = ResizeCondition(&resizer, &preconditions, namespace, name, count)
+	pass, err = resizeFunc()
+	if err == nil {
+		t.Errorf("Expected error on precondition failure")
+	}
+}
 
 func TestReplicationControllerResize(t *testing.T) {
 	fake := &client.Fake{}

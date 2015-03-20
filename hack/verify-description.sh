@@ -37,7 +37,10 @@ find_files() {
     \) -name '*.go'
 }
 
-find_files | egrep "pkg/api/v.[^/]*/types\.go" | grep -v v1beta3 | while read file ; do
+files=`find_files | egrep "pkg/api/v.[^/]*/types\.go"`
+
+for file in $files
+do
     if [[ "$("${KUBE_ROOT}/hooks/description.sh" "${file}")" -eq "0" ]]; then
       echo "API file is missing the required field descriptions: ${file}"
       result=1

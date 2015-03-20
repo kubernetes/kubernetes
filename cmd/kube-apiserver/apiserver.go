@@ -19,7 +19,11 @@ limitations under the License.
 package main
 
 import (
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/master/server"
+	"fmt"
+	"os"
+	"runtime"
+
+	"github.com/GoogleCloudPlatform/kubernetes/cmd/kube-apiserver/app"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/version/verflag"
 
@@ -27,7 +31,8 @@ import (
 )
 
 func main() {
-	s := server.NewAPIServer()
+	runtime.GOMAXPROCS(runtime.NumCPU())
+	s := app.NewAPIServer()
 	s.AddFlags(pflag.CommandLine)
 
 	util.InitFlags()
@@ -36,5 +41,8 @@ func main() {
 
 	verflag.PrintAndExitIfRequested()
 
-	s.Run(pflag.CommandLine.Args())
+	if err := s.Run(pflag.CommandLine.Args()); err != nil {
+		fmt.Fprint(os.Stderr, err.Error)
+		os.Exit(1)
+	}
 }

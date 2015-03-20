@@ -17,3 +17,5 @@ Docs in this directory relate to developing Kubernetes.
 
 * **Releasing Kubernetes** ([releasing.md](releasing.md)): How to create a Kubernetes release (as in version)
   and how the version information gets embedded into the built binaries.
+
+* **Profiling Kubernetes** ([profiling.md](profiling.md)): How to plug in go pprof profiler to Kubernetes.

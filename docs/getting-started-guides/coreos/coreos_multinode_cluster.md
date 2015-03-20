@@ -11,7 +11,7 @@ Use the [master.yaml](cloud-configs/master.yaml) and [node.yaml](cloud-configs/n
 
 ### AWS
 
-*Attention:* Replace ```<ami_image_id>``` bellow for a [suitable version of CoreOS image for AWS](https://coreos.com/docs/running-coreos/cloud-providers/ec2/).
+*Attention:* Replace ```<ami_image_id>``` below for a [suitable version of CoreOS image for AWS](https://coreos.com/docs/running-coreos/cloud-providers/ec2/).
 
 #### Provision the Master
 
@@ -57,7 +57,7 @@ aws ec2 run-instances \
 
 ### GCE
 
-*Attention:* Replace ```<gce_image_id>``` bellow for a [suitable version of CoreOS image for GCE](https://coreos.com/docs/running-coreos/cloud-providers/google-compute-engine/).
+*Attention:* Replace ```<gce_image_id>``` below for a [suitable version of CoreOS image for GCE](https://coreos.com/docs/running-coreos/cloud-providers/google-compute-engine/).
 
 #### Provision the Master
 
@@ -92,6 +92,12 @@ gcloud compute instances create node1 \
 --zone us-central1-a \
 --metadata-from-file user-data=node.yaml
 ```
+
+#### Establish network connectivity
+
+Next, setup an ssh tunnel to the master so you can run kubectl from your local host.
+In one terminal, run `gcloud compute ssh master --ssh-flag="-L 8080:127.0.0.1:8080"` and in a second
+run `gcloud compute ssh master --ssh-flag="-R 8080:127.0.0.1:8080"`.
 
 ### VMware Fusion
 

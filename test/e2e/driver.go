@@ -17,6 +17,7 @@ limitations under the License.
 package e2e
 
 import (
+	"fmt"
 	"path"
 	"regexp"
 	"strings"
@@ -30,6 +31,12 @@ import (
 )
 
 type testResult bool
+
+type GCEConfig struct {
+	ProjectID  string
+	Zone       string
+	MasterName string
+}
 
 func init() {
 	// Turn on verbose by default to get spec names
@@ -46,8 +53,8 @@ func (t *testResult) Fail() { *t = false }
 
 // Run each Go end-to-end-test. This function assumes the
 // creation of a test cluster.
-func RunE2ETests(authConfig, certDir, host, repoRoot, provider string, orderseed int64, times int, reportDir string, testList []string) {
-	testContext = testContextType{authConfig, certDir, host, repoRoot, provider}
+func RunE2ETests(kubeConfig, authConfig, certDir, host, repoRoot, provider string, gceConfig *GCEConfig, orderseed int64, times int, reportDir string, testList []string) {
+	testContext = testContextType{kubeConfig, authConfig, certDir, host, repoRoot, provider, *gceConfig}
 	util.ReallyCrash = true
 	util.InitLogs()
 	defer util.FlushLogs()
@@ -63,19 +70,18 @@ func RunE2ETests(authConfig, certDir, host, repoRoot, provider string, orderseed
 		config.GinkgoConfig.FocusString = `\b(` + strings.Join(testRegexps, "|") + `)\b`
 	}
 
-	// TODO: Make "times" work again.
 	// TODO: Make orderseed work again.
 
 	var passed testResult = true
 	gomega.RegisterFailHandler(ginkgo.Fail)
-	var r []ginkgo.Reporter
-	if reportDir != "" {
-		// TODO: When we start using parallel tests we need to change this to "junit_%d.xml",
-		// see ginkgo docs for more details.
-		r = append(r, reporters.NewJUnitReporter(path.Join(reportDir, "junit.xml")))
-	}
 	// Run the existing tests with output to console + JUnit for Jenkins
-	ginkgo.RunSpecsWithDefaultAndCustomReporters(&passed, "Kubernetes e2e Suite", r)
+	for i := 0; i < times && passed; i++ {
+		var r []ginkgo.Reporter
+		if reportDir != "" {
+			r = append(r, reporters.NewJUnitReporter(path.Join(reportDir, fmt.Sprintf("junit_%d.xml", i+1))))
+		}
+		ginkgo.RunSpecsWithDefaultAndCustomReporters(&passed, fmt.Sprintf("Kubernetes e2e Suite run %d of %d", i+1, times), r)
+	}
 
 	if !passed {
 		glog.Fatalf("At least one test failed")

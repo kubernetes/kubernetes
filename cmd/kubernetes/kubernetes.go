@@ -18,14 +18,17 @@ limitations under the License.
 // Expects an etcd server is available, or on the path somewhere.
 // Does *not* currently setup the Kubernetes network model, that must be done ahead of time.
 // TODO: Setup the k8s network bridge as part of setup.
+// TODO: combine this with the hypercube thingy.
 package main
 
 import (
 	"fmt"
 	"net"
 	"net/http"
+	"runtime"
 	"time"
 
+	kubeletapp "github.com/GoogleCloudPlatform/kubernetes/cmd/kubelet/app"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
@@ -33,8 +36,8 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	nodeControllerPkg "github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/controller"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/controller"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/cadvisor"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/dockertools"
-	kubeletServer "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/server"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/master"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/master/ports"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/service"
@@ -57,6 +60,7 @@ var (
 	nodeMilliCPU           = flag.Int64("node_milli_cpu", 1000, "The amount of MilliCPU provisioned on each node")
 	nodeMemory             = flag.Int64("node_memory", 3*1024*1024*1024, "The amount of memory (in bytes) provisioned on each node")
 	masterServiceNamespace = flag.String("master_service_namespace", api.NamespaceDefault, "The namespace from which the kubernetes master services should be injected into pods")
+	enableProfiling        = flag.Bool("profiling", false, "Enable profiling via web interface host:port/debug/pprof/")
 )
 
 type delegateHandler struct {
@@ -90,6 +94,7 @@ func runApiServer(cl *client.Client, etcdClient tools.EtcdClient, addr net.IP, p
 		},
 		EnableLogsSupport:    false,
 		EnableSwaggerSupport: true,
+		EnableProfiling:      *enableProfiling,
 		APIPrefix:            "/api",
 		Authorizer:           apiserver.NewAlwaysAllowAuthorizer(),
 
@@ -125,13 +130,13 @@ func runControllerManager(machineList []string, cl *client.Client, nodeMilliCPU,
 	kubeClient := &client.HTTPKubeletClient{Client: http.DefaultClient, Port: ports.KubeletPort}
 
 	nodeController := nodeControllerPkg.NewNodeController(nil, "", machineList, nodeResources, cl, kubeClient, 10, 5*time.Minute)
-	nodeController.Run(10*time.Second, true)
+	nodeController.Run(10*time.Second, true, true)
 
 	endpoints := service.NewEndpointController(cl)
 	go util.Forever(func() { endpoints.SyncServiceEndpoints() }, time.Second*10)
 
 	controllerManager := controller.NewReplicationManager(cl)
-	controllerManager.Run(10 * time.Second)
+	controllerManager.Run(controller.DefaultSyncPeriod)
 }
 
 func startComponents(etcdClient tools.EtcdClient, cl *client.Client, addr net.IP, port int) {
@@ -142,7 +147,11 @@ func startComponents(etcdClient tools.EtcdClient, cl *client.Client, addr net.IP
 	runControllerManager(machineList, cl, *nodeMilliCPU, *nodeMemory)
 
 	dockerClient := dockertools.ConnectToDockerOrDie(*dockerEndpoint)
-	kubeletServer.SimpleRunKubelet(cl, nil, dockerClient, machineList[0], "/tmp/kubernetes", "", "127.0.0.1", 10250, *masterServiceNamespace, kubeletServer.ProbeVolumePlugins())
+	cadvisorInterface, err := cadvisor.New(0)
+	if err != nil {
+		glog.Fatalf("Failed to create cAdvisor: %v", err)
+	}
+	kubeletapp.SimpleRunKubelet(cl, dockerClient, machineList[0], "/tmp/kubernetes", "", "127.0.0.1", 10250, *masterServiceNamespace, kubeletapp.ProbeVolumePlugins(), nil, cadvisorInterface)
 }
 
 func newApiClient(addr net.IP, port int) *client.Client {
@@ -152,6 +161,8 @@ func newApiClient(addr net.IP, port int) *client.Client {
 }
 
 func main() {
+	runtime.GOMAXPROCS(runtime.NumCPU())
+
 	util.InitFlags()
 	util.InitLogs()
 	defer util.FlushLogs()

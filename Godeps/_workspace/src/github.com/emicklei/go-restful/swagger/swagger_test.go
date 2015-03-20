@@ -103,10 +103,10 @@ func TestIssue78(t *testing.T) {
 		t.Fatal("wrong items type:" + *items.Type)
 	}
 	items_items := items.Items
-	if len(items_items) == 0 {
+	if items_items == nil {
 		t.Fatal("missing items->items")
 	}
-	ref := items_items[0].Ref
+	ref := items_items.Ref
 	if ref == nil {
 		t.Fatal("missing $ref")
 	}

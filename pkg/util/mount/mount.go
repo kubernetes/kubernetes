@@ -49,3 +49,30 @@ type MountPoint struct {
 	Freq   int
 	Pass   int
 }
+
+// Examines /proc/mounts to find all other references to the device referenced
+// by mountPath; returns a list of paths.
+func GetMountRefs(mounter Interface, mountPath string) ([]string, error) {
+	mps, err := mounter.List()
+	if err != nil {
+		return nil, err
+	}
+
+	// Find the device name.
+	deviceName := ""
+	for i := range mps {
+		if mps[i].Path == mountPath {
+			deviceName = mps[i].Device
+			break
+		}
+	}
+
+	// Find all references to the device.
+	var refs []string
+	for i := range mps {
+		if mps[i].Device == deviceName && mps[i].Path != mountPath {
+			refs = append(refs, mps[i].Path)
+		}
+	}
+	return refs, nil
+}

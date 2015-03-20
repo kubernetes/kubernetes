@@ -1,28 +1,19 @@
 #cloud-config
 
 coreos:
+  fleet:
+    etcd-servers: http://<master-private-ip>:4001
+    metadata: "role=node"
   units:
     - name: etcd.service
       mask: true
     - name: fleet.service
       command: start
-      content: |
-        [Unit]
-        Description=fleet daemon
-        Wants=fleet.socket
-        After=fleet.socket
-
-        [Service]
-        Environment="FLEET_ETCD_SERVERS=http://<master-private-ip>:4001"
-        Environment="FLEET_METADATA=role=node"
-        ExecStart=/usr/bin/fleetd
-        Restart=always
-        RestartSec=10s
     - name: flannel.service
       command: start
       content: |
         [Unit]
-        After=network-online.target 
+        After=network-online.target
         Wants=network-online.target
         Description=flannel is an etcd backed overlay network for containers
 
@@ -34,20 +25,11 @@ coreos:
         ExecStart=/opt/bin/flanneld -etcd-endpoints http://<master-private-ip>:4001
     - name: docker.service
       command: start
-      content: |
-        [Unit]
-        After=flannel.service
-        Wants=flannel.service
-        Description=Docker Application Container Engine
-        Documentation=http://docs.docker.io
-
-        [Service]
-        EnvironmentFile=/run/flannel/subnet.env
-        ExecStartPre=/bin/mount --make-rprivate /
-        ExecStart=/usr/bin/docker -d --bip=${FLANNEL_SUBNET} --mtu=${FLANNEL_MTU} -s=overlay -H fd://
-
-        [Install]
-        WantedBy=multi-user.target
+      drop-ins:
+        - name: 51-docker-mirror.conf
+          content: |
+            [Service]
+            Environment=DOCKER_OPTS='--registry-mirror=http://<master-private-ip>:5000'
     - name: setup-network-environment.service
       command: start
       content: |
@@ -74,10 +56,10 @@ coreos:
         After=setup-network-environment.service
 
         [Service]
-        ExecStartPre=/usr/bin/wget -N -P /opt/bin https://storage.googleapis.com/kubernetes-release/release/v0.9.1/bin/linux/amd64/kube-proxy
+        ExecStartPre=/usr/bin/wget -N -P /opt/bin https://storage.googleapis.com/kubernetes-release/release/v0.11.0/bin/linux/amd64/kube-proxy
         ExecStartPre=/usr/bin/chmod +x /opt/bin/kube-proxy
         ExecStart=/opt/bin/kube-proxy \
-        --etcd_servers=http://<master-private-ip>:4001 \
+        --master=<master-private-ip>:8080 \
         --logtostderr=true
         Restart=always
         RestartSec=10
@@ -92,13 +74,13 @@ coreos:
 
         [Service]
         EnvironmentFile=/etc/network-environment
-        ExecStartPre=/usr/bin/wget -N -P /opt/bin https://storage.googleapis.com/kubernetes-release/release/v0.9.1/bin/linux/amd64/kubelet
+        ExecStartPre=/usr/bin/wget -N -P /opt/bin https://storage.googleapis.com/kubernetes-release/release/v0.11.0/bin/linux/amd64/kubelet
         ExecStartPre=/usr/bin/chmod +x /opt/bin/kubelet
         ExecStart=/opt/bin/kubelet \
         --address=0.0.0.0 \
         --port=10250 \
         --hostname_override=$private_ipv4 \
-        --etcd_servers=http://<master-private-ip>:4001 \
+        --api_servers=<master-private-ip>:8080 \
         --logtostderr=true
         Restart=always
         RestartSec=10

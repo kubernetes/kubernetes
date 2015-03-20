@@ -23,6 +23,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strconv"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -102,8 +103,8 @@ func (fake *fakeIptables) IsIpv6() bool {
 	return false
 }
 
-var tcpServerPort string
-var udpServerPort string
+var tcpServerPort int
+var udpServerPort int
 
 func init() {
 	// Don't handle panics
@@ -118,9 +119,13 @@ func init() {
 	if err != nil {
 		panic(fmt.Sprintf("failed to parse: %v", err))
 	}
-	_, tcpServerPort, err = net.SplitHostPort(u.Host)
+	_, port, err := net.SplitHostPort(u.Host)
 	if err != nil {
 		panic(fmt.Sprintf("failed to parse: %v", err))
+	}
+	tcpServerPort, err = strconv.Atoi(port)
+	if err != nil {
+		panic(fmt.Sprintf("failed to atoi(%s): %v", port, err))
 	}
 
 	// UDP setup.
@@ -128,9 +133,13 @@ func init() {
 	if err != nil {
 		panic(fmt.Sprintf("failed to make a UDP server: %v", err))
 	}
-	_, udpServerPort, err = net.SplitHostPort(udp.LocalAddr().String())
+	_, port, err = net.SplitHostPort(udp.LocalAddr().String())
 	if err != nil {
 		panic(fmt.Sprintf("failed to parse: %v", err))
+	}
+	udpServerPort, err = strconv.Atoi(port)
+	if err != nil {
+		panic(fmt.Sprintf("failed to atoi(%s): %v", port, err))
 	}
 	go udp.Loop()
 }
@@ -188,11 +197,11 @@ func TestTCPProxy(t *testing.T) {
 	lb.OnUpdate([]api.Endpoints{
 		{
 			ObjectMeta: api.ObjectMeta{Name: "echo"},
-			Endpoints:  []string{net.JoinHostPort("127.0.0.1", tcpServerPort)},
+			Endpoints:  []api.Endpoint{{IP: "127.0.0.1", Port: tcpServerPort}},
 		},
 	})
 
-	p := NewProxier(lb, net.ParseIP("0.0.0.0"), &fakeIptables{})
+	p := CreateProxier(lb, net.ParseIP("0.0.0.0"), &fakeIptables{}, net.ParseIP("127.0.0.1"))
 	waitForNumProxyLoops(t, p, 0)
 
 	svcInfo, err := p.addServiceOnPort("echo", "TCP", 0, time.Second)
@@ -208,11 +217,11 @@ func TestUDPProxy(t *testing.T) {
 	lb.OnUpdate([]api.Endpoints{
 		{
 			ObjectMeta: api.ObjectMeta{Name: "echo"},
-			Endpoints:  []string{net.JoinHostPort("127.0.0.1", udpServerPort)},
+			Endpoints:  []api.Endpoint{{IP: "127.0.0.1", Port: udpServerPort}},
 		},
 	})
 
-	p := NewProxier(lb, net.ParseIP("0.0.0.0"), &fakeIptables{})
+	p := CreateProxier(lb, net.ParseIP("0.0.0.0"), &fakeIptables{}, net.ParseIP("127.0.0.1"))
 	waitForNumProxyLoops(t, p, 0)
 
 	svcInfo, err := p.addServiceOnPort("echo", "UDP", 0, time.Second)
@@ -237,11 +246,11 @@ func TestTCPProxyStop(t *testing.T) {
 	lb.OnUpdate([]api.Endpoints{
 		{
 			ObjectMeta: api.ObjectMeta{Name: "echo"},
-			Endpoints:  []string{net.JoinHostPort("127.0.0.1", tcpServerPort)},
+			Endpoints:  []api.Endpoint{{IP: "127.0.0.1", Port: tcpServerPort}},
 		},
 	})
 
-	p := NewProxier(lb, net.ParseIP("0.0.0.0"), &fakeIptables{})
+	p := CreateProxier(lb, net.ParseIP("0.0.0.0"), &fakeIptables{}, net.ParseIP("127.0.0.1"))
 	waitForNumProxyLoops(t, p, 0)
 
 	svcInfo, err := p.addServiceOnPort("echo", "TCP", 0, time.Second)
@@ -268,11 +277,11 @@ func TestUDPProxyStop(t *testing.T) {
 	lb.OnUpdate([]api.Endpoints{
 		{
 			ObjectMeta: api.ObjectMeta{Name: "echo"},
-			Endpoints:  []string{net.JoinHostPort("127.0.0.1", udpServerPort)},
+			Endpoints:  []api.Endpoint{{IP: "127.0.0.1", Port: udpServerPort}},
 		},
 	})
 
-	p := NewProxier(lb, net.ParseIP("0.0.0.0"), &fakeIptables{})
+	p := CreateProxier(lb, net.ParseIP("0.0.0.0"), &fakeIptables{}, net.ParseIP("127.0.0.1"))
 	waitForNumProxyLoops(t, p, 0)
 
 	svcInfo, err := p.addServiceOnPort("echo", "UDP", 0, time.Second)
@@ -299,11 +308,11 @@ func TestTCPProxyUpdateDelete(t *testing.T) {
 	lb.OnUpdate([]api.Endpoints{
 		{
 			ObjectMeta: api.ObjectMeta{Name: "echo"},
-			Endpoints:  []string{net.JoinHostPort("127.0.0.1", tcpServerPort)},
+			Endpoints:  []api.Endpoint{{IP: "127.0.0.1", Port: tcpServerPort}},
 		},
 	})
 
-	p := NewProxier(lb, net.ParseIP("0.0.0.0"), &fakeIptables{})
+	p := CreateProxier(lb, net.ParseIP("0.0.0.0"), &fakeIptables{}, net.ParseIP("127.0.0.1"))
 	waitForNumProxyLoops(t, p, 0)
 
 	svcInfo, err := p.addServiceOnPort("echo", "TCP", 0, time.Second)
@@ -329,11 +338,11 @@ func TestUDPProxyUpdateDelete(t *testing.T) {
 	lb.OnUpdate([]api.Endpoints{
 		{
 			ObjectMeta: api.ObjectMeta{Name: "echo"},
-			Endpoints:  []string{net.JoinHostPort("127.0.0.1", udpServerPort)},
+			Endpoints:  []api.Endpoint{{IP: "127.0.0.1", Port: udpServerPort}},
 		},
 	})
 
-	p := NewProxier(lb, net.ParseIP("0.0.0.0"), &fakeIptables{})
+	p := CreateProxier(lb, net.ParseIP("0.0.0.0"), &fakeIptables{}, net.ParseIP("127.0.0.1"))
 	waitForNumProxyLoops(t, p, 0)
 
 	svcInfo, err := p.addServiceOnPort("echo", "UDP", 0, time.Second)
@@ -359,11 +368,11 @@ func TestTCPProxyUpdateDeleteUpdate(t *testing.T) {
 	lb.OnUpdate([]api.Endpoints{
 		{
 			ObjectMeta: api.ObjectMeta{Name: "echo"},
-			Endpoints:  []string{net.JoinHostPort("127.0.0.1", tcpServerPort)},
+			Endpoints:  []api.Endpoint{{IP: "127.0.0.1", Port: tcpServerPort}},
 		},
 	})
 
-	p := NewProxier(lb, net.ParseIP("0.0.0.0"), &fakeIptables{})
+	p := CreateProxier(lb, net.ParseIP("0.0.0.0"), &fakeIptables{}, net.ParseIP("127.0.0.1"))
 	waitForNumProxyLoops(t, p, 0)
 
 	svcInfo, err := p.addServiceOnPort("echo", "TCP", 0, time.Second)
@@ -398,11 +407,11 @@ func TestUDPProxyUpdateDeleteUpdate(t *testing.T) {
 	lb.OnUpdate([]api.Endpoints{
 		{
 			ObjectMeta: api.ObjectMeta{Name: "echo"},
-			Endpoints:  []string{net.JoinHostPort("127.0.0.1", udpServerPort)},
+			Endpoints:  []api.Endpoint{{IP: "127.0.0.1", Port: udpServerPort}},
 		},
 	})
 
-	p := NewProxier(lb, net.ParseIP("0.0.0.0"), &fakeIptables{})
+	p := CreateProxier(lb, net.ParseIP("0.0.0.0"), &fakeIptables{}, net.ParseIP("127.0.0.1"))
 	waitForNumProxyLoops(t, p, 0)
 
 	svcInfo, err := p.addServiceOnPort("echo", "UDP", 0, time.Second)
@@ -437,11 +446,11 @@ func TestTCPProxyUpdatePort(t *testing.T) {
 	lb.OnUpdate([]api.Endpoints{
 		{
 			ObjectMeta: api.ObjectMeta{Name: "echo"},
-			Endpoints:  []string{net.JoinHostPort("127.0.0.1", tcpServerPort)},
+			Endpoints:  []api.Endpoint{{IP: "127.0.0.1", Port: tcpServerPort}},
 		},
 	})
 
-	p := NewProxier(lb, net.ParseIP("0.0.0.0"), &fakeIptables{})
+	p := CreateProxier(lb, net.ParseIP("0.0.0.0"), &fakeIptables{}, net.ParseIP("127.0.0.1"))
 	waitForNumProxyLoops(t, p, 0)
 
 	svcInfo, err := p.addServiceOnPort("echo", "TCP", 0, time.Second)
@@ -473,11 +482,11 @@ func TestUDPProxyUpdatePort(t *testing.T) {
 	lb.OnUpdate([]api.Endpoints{
 		{
 			ObjectMeta: api.ObjectMeta{Name: "echo"},
-			Endpoints:  []string{net.JoinHostPort("127.0.0.1", udpServerPort)},
+			Endpoints:  []api.Endpoint{{IP: "127.0.0.1", Port: udpServerPort}},
 		},
 	})
 
-	p := NewProxier(lb, net.ParseIP("0.0.0.0"), &fakeIptables{})
+	p := CreateProxier(lb, net.ParseIP("0.0.0.0"), &fakeIptables{}, net.ParseIP("127.0.0.1"))
 	waitForNumProxyLoops(t, p, 0)
 
 	svcInfo, err := p.addServiceOnPort("echo", "UDP", 0, time.Second)

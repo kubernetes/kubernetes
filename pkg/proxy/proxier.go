@@ -319,12 +319,16 @@ func NewProxier(loadBalancer LoadBalancer, listenIP net.IP, iptables iptables.In
 		return nil
 	}
 
-	hostIP, err := chooseHostInterface()
+	hostIP, err := util.ChooseHostInterface()
 	if err != nil {
 		glog.Errorf("Failed to select a host interface: %v", err)
 		return nil
 	}
+	glog.Infof("Setting Proxy IP to %v", hostIP)
+	return CreateProxier(loadBalancer, listenIP, iptables, hostIP)
+}
 
+func CreateProxier(loadBalancer LoadBalancer, listenIP net.IP, iptables iptables.Interface, hostIP net.IP) *Proxier {
 	glog.Infof("Initializing iptables")
 	// Clean up old messes.  Ignore erors.
 	iptablesDeleteOld(iptables)
@@ -760,46 +764,4 @@ func (proxier *Proxier) iptablesHostPortalArgs(destIP net.IP, destPort int, prot
 	// TODO: Can we DNAT with IPv6?
 	args = append(args, "-j", "DNAT", "--to-destination", net.JoinHostPort(proxyIP.String(), strconv.Itoa(proxyPort)))
 	return args
-}
-
-func chooseHostInterface() (net.IP, error) {
-	intfs, err := net.Interfaces()
-	if err != nil {
-		return nil, err
-	}
-	i := 0
-	for i = range intfs {
-		if flagsSet(intfs[i].Flags, net.FlagUp) && flagsClear(intfs[i].Flags, net.FlagLoopback|net.FlagPointToPoint) {
-			addrs, err := intfs[i].Addrs()
-			if err != nil {
-				return nil, err
-			}
-			if len(addrs) > 0 {
-				// This interface should suffice.
-				break
-			}
-		}
-	}
-	if i == len(intfs) {
-		return nil, err
-	}
-	glog.V(2).Infof("Choosing interface %s for from-host portals", intfs[i].Name)
-	addrs, err := intfs[i].Addrs()
-	if err != nil {
-		return nil, err
-	}
-	glog.V(2).Infof("Interface %s = %s", intfs[i].Name, addrs[0].String())
-	ip, _, err := net.ParseCIDR(addrs[0].String())
-	if err != nil {
-		return nil, err
-	}
-	return ip, nil
-}
-
-func flagsSet(flags net.Flags, test net.Flags) bool {
-	return flags&test != 0
-}
-
-func flagsClear(flags net.Flags, test net.Flags) bool {
-	return flags&test == 0
 }

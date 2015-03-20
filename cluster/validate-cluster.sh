@@ -55,7 +55,7 @@ echo "Found ${found} nodes."
 cat -n "${MINIONS_FILE}"
 
 # On vSphere, use minion IPs as their names
-if [[ "${KUBERNETES_PROVIDER}" == "vsphere" ]] || [[ "${KUBERNETES_PROVIDER}" == "vagrant" ]]; then
+if [[ "${KUBERNETES_PROVIDER}" == "vsphere" ]] || [[ "${KUBERNETES_PROVIDER}" == "vagrant" ]] || [[ "${KUBERNETES_PROVIDER}" == "libvirt-coreos" ]]; then
   MINION_NAMES=("${KUBE_MINION_IP_ADDRESSES[@]}")
 fi
 
@@ -69,7 +69,7 @@ for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
     fi
 
     name="${MINION_NAMES[$i]}"
-    if [ "$KUBERNETES_PROVIDER" != "vsphere" ] && [ "$KUBERNETES_PROVIDER" != "vagrant" ]; then
+    if [ "$KUBERNETES_PROVIDER" != "vsphere" ] && [ "$KUBERNETES_PROVIDER" != "vagrant" ] && [ "$KUBERNETES_PROVIDER" != "libvirt-coreos" ]; then
       # Grab fully qualified name
       name=$(grep "${MINION_NAMES[$i]}\." "${MINIONS_FILE}")
     fi
@@ -79,8 +79,13 @@ for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
     attempt=0
     while true; do
       echo -n "Attempt $((attempt+1)) at checking Kubelet installation on node ${MINION_NAMES[$i]} ..."
-      curl_output=$(curl -s --insecure --user "${KUBE_USER}:${KUBE_PASSWORD}" \
+      if [ "$KUBERNETES_PROVIDER" != "libvirt-coreos" ]; then
+        curl_output=$(curl -s --insecure --user "${KUBE_USER}:${KUBE_PASSWORD}" \
           "https://${KUBE_MASTER_IP}/api/v1beta1/proxy/minions/${name}/healthz")
+      else
+        curl_output=$(curl -s \
+          "http://${KUBE_MASTER_IP}:8080/api/v1beta1/proxy/minions/${name}/healthz")
+      fi
       if [[ "${curl_output}" != "ok" ]]; then
           if (( attempt > 5 )); then
             echo

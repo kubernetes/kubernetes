@@ -20,6 +20,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -77,9 +78,13 @@ func TestGetAPIRequestInfo(t *testing.T) {
 		expectedName       string
 		expectedParts      []string
 	}{
+
 		// resource paths
-		{"GET", "/ns/other/pods", "list", "", "other", "pods", "Pod", "", []string{"pods"}},
-		{"GET", "/ns/other/pods/foo", "get", "", "other", "pods", "Pod", "foo", []string{"pods", "foo"}},
+		{"GET", "/namespaces", "list", "", "", "namespaces", "Namespace", "", []string{"namespaces"}},
+		{"GET", "/namespaces/other", "get", "", "other", "namespaces", "Namespace", "other", []string{"namespaces", "other"}},
+
+		{"GET", "/namespaces/other/pods", "list", "", "other", "pods", "Pod", "", []string{"pods"}},
+		{"GET", "/namespaces/other/pods/foo", "get", "", "other", "pods", "Pod", "foo", []string{"pods", "foo"}},
 		{"GET", "/pods", "list", "", api.NamespaceAll, "pods", "Pod", "", []string{"pods"}},
 		{"POST", "/pods", "create", "", api.NamespaceDefault, "pods", "Pod", "", []string{"pods"}},
 		{"GET", "/pods/foo", "get", "", api.NamespaceDefault, "pods", "Pod", "foo", []string{"pods", "foo"}},
@@ -87,16 +92,16 @@ func TestGetAPIRequestInfo(t *testing.T) {
 		{"GET", "/pods?namespace=other", "list", "", "other", "pods", "Pod", "", []string{"pods"}},
 
 		// special verbs
-		{"GET", "/proxy/ns/other/pods/foo", "proxy", "", "other", "pods", "Pod", "foo", []string{"pods", "foo"}},
+		{"GET", "/proxy/namespaces/other/pods/foo", "proxy", "", "other", "pods", "Pod", "foo", []string{"pods", "foo"}},
 		{"GET", "/proxy/pods/foo", "proxy", "", api.NamespaceDefault, "pods", "Pod", "foo", []string{"pods", "foo"}},
-		{"GET", "/redirect/ns/other/pods/foo", "redirect", "", "other", "pods", "Pod", "foo", []string{"pods", "foo"}},
+		{"GET", "/redirect/namespaces/other/pods/foo", "redirect", "", "other", "pods", "Pod", "foo", []string{"pods", "foo"}},
 		{"GET", "/redirect/pods/foo", "redirect", "", api.NamespaceDefault, "pods", "Pod", "foo", []string{"pods", "foo"}},
 		{"GET", "/watch/pods", "watch", "", api.NamespaceAll, "pods", "Pod", "", []string{"pods"}},
-		{"GET", "/watch/ns/other/pods", "watch", "", "other", "pods", "Pod", "", []string{"pods"}},
+		{"GET", "/watch/namespaces/other/pods", "watch", "", "other", "pods", "Pod", "", []string{"pods"}},
 
 		// fully-qualified paths
-		{"GET", "/api/v1beta1/ns/other/pods", "list", "v1beta1", "other", "pods", "Pod", "", []string{"pods"}},
-		{"GET", "/api/v1beta1/ns/other/pods/foo", "get", "v1beta1", "other", "pods", "Pod", "foo", []string{"pods", "foo"}},
+		{"GET", "/api/v1beta1/namespaces/other/pods", "list", "v1beta1", "other", "pods", "Pod", "", []string{"pods"}},
+		{"GET", "/api/v1beta1/namespaces/other/pods/foo", "get", "v1beta1", "other", "pods", "Pod", "foo", []string{"pods", "foo"}},
 		{"GET", "/api/v1beta1/pods", "list", "v1beta1", api.NamespaceAll, "pods", "Pod", "", []string{"pods"}},
 		{"POST", "/api/v1beta1/pods", "create", "v1beta1", api.NamespaceDefault, "pods", "Pod", "", []string{"pods"}},
 		{"GET", "/api/v1beta1/pods/foo", "get", "v1beta1", api.NamespaceDefault, "pods", "Pod", "foo", []string{"pods", "foo"}},
@@ -105,7 +110,7 @@ func TestGetAPIRequestInfo(t *testing.T) {
 		{"GET", "/api/v1beta1/proxy/pods/foo", "proxy", "v1beta1", api.NamespaceDefault, "pods", "Pod", "foo", []string{"pods", "foo"}},
 		{"GET", "/api/v1beta1/redirect/pods/foo", "redirect", "v1beta1", api.NamespaceDefault, "pods", "Pod", "foo", []string{"pods", "foo"}},
 		{"GET", "/api/v1beta1/watch/pods", "watch", "v1beta1", api.NamespaceAll, "pods", "Pod", "", []string{"pods"}},
-		{"GET", "/api/v1beta1/watch/ns/other/pods", "watch", "v1beta1", "other", "pods", "Pod", "", []string{"pods"}},
+		{"GET", "/api/v1beta1/watch/namespaces/other/pods", "watch", "v1beta1", "other", "pods", "Pod", "", []string{"pods"}},
 	}
 
 	apiRequestInfoResolver := &APIRequestInfoResolver{util.NewStringSet("api"), latest.RESTMapper}
@@ -138,14 +143,15 @@ func TestGetAPIRequestInfo(t *testing.T) {
 		if !reflect.DeepEqual(successCase.expectedParts, apiRequestInfo.Parts) {
 			t.Errorf("Unexpected parts for url: %s, expected: %v, actual: %v", successCase.url, successCase.expectedParts, apiRequestInfo.Parts)
 		}
+		if e, a := strings.Split(successCase.url, "?")[0], apiRequestInfo.URLPath(); e != a {
+			t.Errorf("Expected %v, got %v", e, a)
+		}
 	}
 
 	errorCases := map[string]string{
-		"no resource path":               "/",
-		"missing resource type":          "/ns/other",
-		"just apiversion":                "/api/v1beta1/",
-		"apiversion with no resource":    "/api/v1beta1/",
-		"apiversion with just namespace": "/api/v1beta1/ns/other",
+		"no resource path":            "/",
+		"just apiversion":             "/api/v1beta1/",
+		"apiversion with no resource": "/api/v1beta1/",
 	}
 	for k, v := range errorCases {
 		req, err := http.NewRequest("GET", v, nil)

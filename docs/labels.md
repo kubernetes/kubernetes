@@ -1,9 +1,9 @@
 # Labels
 
 _Labels_ are key/value pairs that are attached to objects, such as pods.
-Labels can be used to organize and to select subsets of objects.  They are
-created by users at the same time as an object.  Each object can have a set of
-key/value labels set on it, with at most one label with a particular key. 
+Labels are intended to be used to specify identifying attributes of objects that are meaningful and relevant to users, but which do not directly imply semantics to the core system.
+Labels can be used to organize and to select subsets of objects.  Labels can be attached to objects at creation time and subsequently added and modified at any time.
+Each object can have a set of key/value labels defined.  Each Key must be unique for a given object.
 ```
 "labels": {
   "key1" : "value1",
@@ -11,42 +11,91 @@ key/value labels set on it, with at most one label with a particular key.
 }
 ```
 
-While there are no restrictions on the format of label values, label keys must be of the form:
-```
-label-key ::= prefixed-name | name
-prefixed-name ::= prefix '/' name
-prefix ::= DNS_SUBDOMAIN
-name ::= DNS_LABEL
-```
-DNS_LABEL and DNS_SUBDOMAIN are defined in the [identifiers design doc](/docs/design/identifiers.md). The prefix is optional. If the prefix is not specified, the key is assumed to be private to the user. Other system components that wish to use labels must specify a prefix. The "kubernetes.io/" prefix is reserved for use by kubernetes components.
+We'll eventually index and reverse-index labels for efficient queries and watches, use them to sort and group in UIs and CLIs, etc. We don't want to pollute labels with non-identifying, especially large and/or structured, data. Non-identifying information should be recorded using [annotations](/docs/annotations.md).
 
-Unlike [names and UIDs](identifiers.md), labels do not provide uniqueness. In general, we expect many objects to carry the same label(s). 
 
-Via a _label selector_, the client/user can identify a set of objects. The label selector is the core grouping primitive in Kubernetes. 
+## Motivation
 
-We also [plan](https://github.com/GoogleCloudPlatform/kubernetes/issues/560) to make labels available inside pods and [lifecycle hooks](container-environment.md).
+Labels enable users to map their own organizational structures onto system objects in a loosely coupled fashion, without requiring clients to store these mappings.
 
-Labels let you categorize objects in a complex service deployment or batch processing pipelines along multiple
-dimensions, such as:
-   - `release=stable`, `release=canary`, ...
-   - `environment=dev`, `environment=qa`, `environment=production`
-   - `tier=frontend`, `tier=backend`, ...
-   - `partition=customerA`, `partition=customerB`, ...
-   - `track=daily`, `track=weekly`
+Service deployments and batch processing pipelines are often multi-dimensional entities (e.g., multiple partitions or deployments, multiple release tracks, multiple tiers, multiple micro-services per tier). Management often requires cross-cutting operations, which breaks encapsulation of strictly hierarchical representations, especially rigid hierarchies determined by the infrastructure rather than by users.
+
+Example labels:
+   - `"release" : "stable"`, `"release" : "canary"`, ...
+   - `"environment" : "dev"`, `"environment" : "qa"`, `"environment" : "production"`
+   - `"tier" : "frontend"`, `"tier" : "backend"`, `"tier" : "middleware"`
+   - `"partition" : "customerA"`, `"partition" : "customerB"`, ...
+   - `"track" : "daily"`, `"track" : "weekly"`
 
 These are just examples; you are free to develop your own conventions.
 
-Label selectors permit very simple filtering by label keys and values.   Currently, label selectors only support these forms:
+
+## Syntax and character set
+
+As already mentioned, well formed _labels_ are key value pairs. Valid label keys are comprised of two segments - prefix and name - separated by a slash (`/`).  The name segment is required and must be a DNS label: 63 characters or less, all lowercase, beginning and ending with an alphanumeric character (`[a-z0-9A-Z]`), with dashes (`-`) and alphanumerics between.  The prefix and slash are optional.  If specified, the prefix must be a DNS subdomain (a series of DNS labels separated by dots (`.`), not longer than 253 characters in total.
+If the prefix is omitted, the label key is presumed to be private to the user. System components which use labels must specify a prefix.  The `kubernetes.io` prefix is reserved for kubernetes core components.
+
+Valid label values must be shorter than 64 characters, accepted characters are (`[-A-Za-z0-9_.]`) but the first character must be  (`[A-Za-z0-9]`).
+
+## Label selectors
+
+Unlike [names and UIDs](identifiers.md), labels do not provide uniqueness. In general, we expect many objects to carry the same label(s).
+
+Via a _label selector_, the client/user can identify a set of objects. The label selector is the core grouping primitive in Kubernetes.
+
+The API currently supports two types of selectors: _equality-based_ and _set-based_.
+A label selector can be made of multiple _requirements_ which are comma-separated. In the case of multiple requirements, all must be satisfied so comma separator acts as an AND logical operator.
+
+### _Equality-based_ requirement
+
+_Equality-_ or _inequality-based_ requirements allow filtering by label keys and values. Matching objects must have all of the specified labels (both keys and values), though they may have additional labels as well.
+Three kinds of operators are admitted `=`,`==`,`!=`. The first two represent _equality_ and are simply synonyms. While the latter represents _inequality_. For example:
 ```
-key1
-key1 = value11
-key1 != value11
-key1 in (value11, value12, ...)
-key1 not in (value11, value12, ...)
+environment = production
+tier != frontend
 ```
 
-LIST and WATCH operations may specify label selectors to filter the sets of objects returned using a query parameter: `?labels=key1%3Dvalue1,key2%3Dvalue2,...`. 
+The former selects all resources with key equal to `environment` and value equal to `production`.
+The latter selects all resources with key equal to `tier` and value distinct from `frontend`.
+One could filter for resources in `production` but not `frontend` using the comma operator: `environment=production,tier!=frontend`
 
-The `service` and `replicationController` kinds of objects use selectors to match sets of pods that they operate on.
 
-See the [Labels Design Document](./design/labels.md) for more about how we expect labels and selectors to be used, and planned features.
+### _Set-based_ requirement
+
+_Set-based_ label requirements allow filtering keys according to a set of values. Matching objects must have all of the specified labels (i.e. all keys and at least one of the values specified for each key). Three kind of operators are supported: `in`,`notin` and exists (only the key identifier). For example:
+```
+environment in (production, qa)
+tier notin (frontend, backend)
+partition
+```
+The first example selects all resources with key equal to `environment` and value equal to `production` or `qa`.
+The second example selects all resources with key equal to `tier` and value other than `frontend` and `backend`.
+The third example selects all resources including a label with key `partition`; no values are checked.
+Similary the comma separator acts as an _AND_ operator for example filtering resource with a `partition` key (not matter the value) and with `environment` different than  `qa`. For example: `partition,environment notin (qa)`.
+The _set-based_ label selector is a general form of equality since `environment=production` is equivalent to `environment in (production)`; similarly for `!=` and `notin`.
+
+_Set-based_ requirements can be mixed with _equality-based_ requirements. For example: `partition in (customerA, customerB),environment!=qa`.
+
+
+## API
+
+LIST and WATCH operations may specify label selectors to filter the sets of objects returned using a query parameter. Both requirements are permitted:
+   - _equality-based_ requirements: `?labels=key1%3Dvalue1,key2%3Dvalue2`
+   - _set-based_ requirements: `?labels=key+in+%28value1%2Cvalue2%29%2Ckey2+notin+%28value3`
+
+Kubernetes also currently supports two objects that use label selectors to keep track of their members, `service`s and `replicationController`s:
+- `service`: A [service](/docs/services.md) is a configuration unit for the proxies that run on every worker node.  It is named and points to one or more pods.
+- `replicationController`: A [replication controller](/docs/replication-controller.md) ensures that a specified number of pod "replicas" are running at any one time.
+
+The set of pods that a `service` targets is defined with a label selector. Similarly, the population of pods that a `replicationController` is monitoring is also defined with a label selector. For management convenience and consistency, `services` and `replicationControllers` may themselves have labels and would generally carry the labels their corresponding pods have in common.
+
+Sets identified by labels could be overlapping (think Venn diagrams). For instance, a service might target all pods with `"tier": "frontend"` and  `"environment" : "prod"`.  Now say you have 10 replicated pods that make up this tier.  But you want to be able to 'canary' a new version of this component.  You could set up a `replicationController` (with `replicas` set to 9) for the bulk of the replicas with labels `"tier" : "frontend"` and `"environment" : "prod"` and `"track" : "stable"` and another `replicationController` (with `replicas` set to 1) for the canary with labels `"tier" : "frontend"` and  `"environment" : "prod"` and `"track" : canary`.  Now the service is covering both the canary and non-canary pods.  But you can mess with the `replicationControllers` separately to test things out, monitor the results, etc.
+
+Note that the superset described in the previous example is also heterogeneous. In long-lived, highly available, horizontally scaled, distributed, continuously evolving service applications, heterogeneity is inevitable, due to canaries, incremental rollouts, live reconfiguration, simultaneous updates and auto-scaling, hardware upgrades, and so on.
+
+Pods (and other objects) may belong to multiple sets simultaneously, which enables representation of service substructure and/or superstructure. In particular, labels are intended to facilitate the creation of non-hierarchical, multi-dimensional deployment structures. They are useful for a variety of management purposes (e.g., configuration, deployment) and for application introspection and analysis (e.g., logging, monitoring, alerting, analytics). Without the ability to form sets by intersecting labels, many implicitly related, overlapping flat sets would need to be created, for each subset and/or superset desired, which would lose semantic information and be difficult to keep consistent. Purely hierarchically nested sets wouldn't readily support slicing sets across different dimensions.
+
+
+## Future developments
+
+Concerning API: we may extend such filtering to DELETE operations in the future.

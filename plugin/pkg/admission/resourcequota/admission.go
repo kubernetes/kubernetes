@@ -26,8 +26,11 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/cache"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/resourcequota"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
 
 func init() {
@@ -37,11 +40,22 @@ func init() {
 }
 
 type quota struct {
-	client client.Interface
+	client  client.Interface
+	indexer cache.Indexer
 }
 
 func NewResourceQuota(client client.Interface) admission.Interface {
-	return &quota{client: client}
+	lw := &cache.ListWatch{
+		ListFunc: func() (runtime.Object, error) {
+			return client.ResourceQuotas(api.NamespaceAll).List(labels.Everything())
+		},
+		WatchFunc: func(resourceVersion string) (watch.Interface, error) {
+			return client.ResourceQuotas(api.NamespaceAll).Watch(labels.Everything(), labels.Everything(), resourceVersion)
+		},
+	}
+	indexer, reflector := cache.NewNamespaceKeyedIndexerAndReflector(lw, &api.ResourceQuota{}, 0)
+	reflector.Run()
+	return &quota{client: client, indexer: indexer}
 }
 
 var resourceToResourceName = map[string]api.ResourceName{
@@ -63,32 +77,52 @@ func (q *quota) Admit(a admission.Attributes) (err error) {
 		name, _ = meta.NewAccessor().Name(obj)
 	}
 
-	list, err := q.client.ResourceQuotas(a.GetNamespace()).List(labels.Everything())
+	key := &api.ResourceQuota{
+		ObjectMeta: api.ObjectMeta{
+			Namespace: a.GetNamespace(),
+			Name:      "",
+		},
+	}
+	items, err := q.indexer.Index("namespace", key)
 	if err != nil {
 		return apierrors.NewForbidden(a.GetResource(), name, fmt.Errorf("Unable to %s %s at this time because there was an error enforcing quota", a.GetOperation(), resource))
 	}
-
-	if len(list.Items) == 0 {
+	if len(items) == 0 {
 		return nil
 	}
 
-	for i := range list.Items {
-		quota := list.Items[i]
-		dirty, err := IncrementUsage(a, &quota.Status, q.client)
+	for i := range items {
+		quota := items[i].(*api.ResourceQuota)
+
+		// we cannot modify the value directly in the cache, so we copy
+		status := &api.ResourceQuotaStatus{
+			Hard: api.ResourceList{},
+			Used: api.ResourceList{},
+		}
+		for k, v := range quota.Status.Hard {
+			status.Hard[k] = *v.Copy()
+		}
+		for k, v := range quota.Status.Used {
+			status.Used[k] = *v.Copy()
+		}
+
+		dirty, err := IncrementUsage(a, status, q.client)
 		if err != nil {
 			return err
 		}
 
 		if dirty {
 			// construct a usage record
-			usage := api.ResourceQuotaUsage{
+			usage := api.ResourceQuota{
 				ObjectMeta: api.ObjectMeta{
 					Name:            quota.Name,
 					Namespace:       quota.Namespace,
-					ResourceVersion: quota.ResourceVersion},
+					ResourceVersion: quota.ResourceVersion,
+					Labels:          quota.Labels,
+					Annotations:     quota.Annotations},
 			}
-			usage.Status = quota.Status
-			err = q.client.ResourceQuotaUsages(usage.Namespace).Create(&usage)
+			usage.Status = *status
+			_, err = q.client.ResourceQuotas(usage.Namespace).Status(&usage)
 			if err != nil {
 				return apierrors.NewForbidden(a.GetResource(), name, fmt.Errorf("Unable to %s %s at this time because there was an error enforcing quota", a.GetOperation(), a.GetResource()))
 			}

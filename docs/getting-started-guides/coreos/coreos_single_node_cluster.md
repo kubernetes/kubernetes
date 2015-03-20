@@ -38,6 +38,11 @@ gcloud compute instances create standalone \
 --metadata-from-file user-data=standalone.yaml 
 ```
 
+Next, setup an ssh tunnel to the master so you can run kubectl from your local host.
+In one terminal, run `gcloud compute ssh master --ssh-flag="-L 8080:127.0.0.1:8080"` and in a second
+run `gcloud compute ssh master --ssh-flag="-R 8080:127.0.0.1:8080"`.
+
+
 ### VMware Fusion
 
 Create a [config-drive](https://coreos.com/docs/cluster-management/setup/cloudinit-config-drive) ISO.

@@ -10,6 +10,10 @@
 
 {% set address = "--address=127.0.0.1" -%}
 
+{% if pillar['instance_prefix'] is defined -%}
+  {% set cluster_name = "--cluster_name=" + pillar['instance_prefix'] -%}
+{% endif -%}
+
 {% set publicAddressOverride = "" -%}
 {% if grains.publicAddressOverride is defined -%}
   {% set publicAddressOverride = "--public_address_override=" + grains.publicAddressOverride -%}
@@ -18,6 +22,9 @@
 
 {% if grains.etcd_servers is defined -%}
   {% set etcd_servers = "--etcd_servers=http://" + grains.etcd_servers + ":4001" -%}
+{% elif grains.cloud == 'gce' -%}
+  {# TODO(zmerlynn): I can't see why this isn't generally applicable, but making this change surgical for now. #}
+  {% set etcd_servers = "--etcd_servers=http://127.0.0.1:4001" -%}
 {% else -%}
   {% set ips = salt['mine.get']('roles:kubernetes-master', 'network.ip_addrs', 'grain').values() -%}
   {% set etcd_servers = "--etcd_servers=http://" + ips[0][0] + ":4001" -%}
@@ -52,8 +59,8 @@
 {% endif -%}
 
 {% set admission_control = "" -%}
-{% if grains.admission_control is defined -%}
- {% set admission_control = "--admission_control=" + grains.admission_control -%}
+{% if pillar['admission_control'] is defined -%}
+ {% set admission_control = "--admission_control=" + pillar['admission_control'] -%}
 {% endif -%}
 
 {% set runtime_config = "" -%}
@@ -61,4 +68,4 @@
  {% set runtime_config = "--runtime_config=" + grains.runtime_config -%}
 {% endif -%}
 
-DAEMON_ARGS="{{daemon_args}} {{address}} {{etcd_servers}} {{ cloud_provider }} {{ cloud_config }} {{ runtime_config }} {{admission_control}} --allow_privileged={{pillar['allow_privileged']}} {{portal_net}} {{cert_file}} {{key_file}} {{secure_port}} {{token_auth_file}} {{publicAddressOverride}} {{pillar['log_level']}}"
+DAEMON_ARGS="{{daemon_args}} {{address}} {{etcd_servers}} {{ cloud_provider }} {{ cloud_config }} {{ runtime_config }} {{admission_control}} --allow_privileged={{pillar['allow_privileged']}} {{portal_net}}  {{cluster_name}} {{cert_file}} {{key_file}} {{secure_port}} {{token_auth_file}} {{publicAddressOverride}} {{pillar['log_level']}}"

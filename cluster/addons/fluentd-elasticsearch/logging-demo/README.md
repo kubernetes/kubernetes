@@ -84,28 +84,81 @@ elasticsearch-logging   <none>                                    name=elasticse
 kibana-logging          <none>                                    name=kibana-logging          10.0.208.114        5601
 
 ```
-On the GCE provider you can also obtain the external IP addresses of the Elasticsearch and Kibana services:
+The `net` rule in the Makefile will report information about the Elasticsearch and Kibana services including the public IP addresses of each service.
 ```
 $ make net
-IPAddress: 130.211.120.118
-IPProtocol: TCP
-creationTimestamp: '2015-01-08T10:30:34.210-08:00'
-id: '12815488049392139704'
-kind: compute#forwardingRule
-name: elasticsearch-logging
-portRange: 9200-9200
-region: https://www.googleapis.com/compute/v1/projects/kubernetes-elk/regions/us-central1
-selfLink: https://www.googleapis.com/compute/v1/projects/kubernetes-elk/regions/us-central1/forwardingRules/elasticsearch-logging
-target: https://www.googleapis.com/compute/v1/projects/kubernetes-elk/regions/us-central1/targetPools/elasticsearch-logging
-gcloud compute forwarding-rules describe kibana-logging
-IPAddress: 146.148.40.158
-IPProtocol: TCP
-creationTimestamp: '2015-01-08T10:31:05.715-08:00'
-id: '2755171906970792849'
-kind: compute#forwardingRule
-name: kibana-logging
-portRange: 5601-5601
-region: https://www.googleapis.com/compute/v1/projects/kubernetes-elk/regions/us-central1
-selfLink: https://www.googleapis.com/compute/v1/projects/kubernetes-elk/regions/us-central1/forwardingRules/kibana-logging
-target: https://www.googleapis.com/compute/v1/projects/kubernetes-elk/regions/us-central1/targetPools/kibana-logging
+../../../kubectl.sh get services elasticsearch-logging -o json
+current-context: "kubernetes-satnam_kubernetes"
+Running: ../../../../cluster/gce/../../_output/dockerized/bin/linux/amd64/kubectl get services elasticsearch-logging -o json
+{
+    "kind": "Service",
+    "id": "elasticsearch-logging",
+    "uid": "e5bf0a51-b87f-11e4-bd62-42010af01267",
+    "creationTimestamp": "2015-02-19T21:40:18Z",
+    "selfLink": "/api/v1beta1/services/elasticsearch-logging?namespace=default",
+    "resourceVersion": 68,
+    "apiVersion": "v1beta1",
+    "namespace": "default",
+    "port": 9200,
+    "protocol": "TCP",
+    "labels": {
+        "name": "elasticsearch-logging"
+    },
+    "selector": {
+        "name": "elasticsearch-logging"
+    },
+    "createExternalLoadBalancer": true,
+    "publicIPs": [
+        "104.154.81.135"
+    ],
+    "containerPort": 9200,
+    "portalIP": "10.0.58.62",
+    "sessionAffinity": "None"
+}
+../../../kubectl.sh get services kibana-logging -o json
+current-context: "kubernetes-satnam_kubernetes"
+Running: ../../../../cluster/gce/../../_output/dockerized/bin/linux/amd64/kubectl get services kibana-logging -o json
+{
+    "kind": "Service",
+    "id": "kibana-logging",
+    "uid": "e5bd4617-b87f-11e4-bd62-42010af01267",
+    "creationTimestamp": "2015-02-19T21:40:18Z",
+    "selfLink": "/api/v1beta1/services/kibana-logging?namespace=default",
+    "resourceVersion": 67,
+    "apiVersion": "v1beta1",
+    "namespace": "default",
+    "port": 5601,
+    "protocol": "TCP",
+    "labels": {
+        "name": "kibana-logging"
+    },
+    "selector": {
+        "name": "kibana-logging"
+    },
+    "createExternalLoadBalancer": true,
+    "publicIPs": [
+        "104.154.91.224"
+    ],
+    "containerPort": 80,
+    "portalIP": "10.0.124.153",
+    "sessionAffinity": "None"
+}
 ```
+For this example the Elasticsearch service is running at `http://104.154.81.135:9200`.
+```
+$ curl http://104.154.81.135:9200
+{
+  "status" : 200,
+  "name" : "Wombat",
+  "cluster_name" : "elasticsearch",
+  "version" : {
+    "number" : "1.4.4",
+    "build_hash" : "c88f77ffc81301dfa9dfd81ca2232f09588bd512",
+    "build_timestamp" : "2015-02-19T13:05:36Z",
+    "build_snapshot" : false,
+    "lucene_version" : "4.10.3"
+  },
+  "tagline" : "You Know, for Search"
+}
+```
+Visiting the URL `http://104.154.91.224:5601` should show the Kibana viewer for the logging information stored in the Elasticsearch service running at `http://104.154.81.135:9200`.

@@ -60,6 +60,14 @@ done
 mkdir -p /etc/salt/minion.d
 cat <<EOF >/etc/salt/minion.d/master.conf
 master: '$(echo "$MASTER_NAME" | sed -e "s/'/''/g")'
+master: '$(echo "$MASTER_NAME" | sed -e "s/'/''/g")'
+auth_timeout: 10
+auth_tries: 2
+auth_safemode: True
+ping_interval: 1
+random_reauth_delay: 3
+state_aggregrate:
+  - pkg
 EOF
 
 cat <<EOF >/etc/salt/minion.d/grains.conf
@@ -75,7 +83,6 @@ grains:
   cloud_provider: vagrant
   roles:
     - kubernetes-master
-  admission_control: AlwaysAdmit
   runtime_config: '$(echo "$RUNTIME_CONFIG" | sed -e "s/'/''/g")'
 EOF
 
@@ -93,6 +100,8 @@ cat <<EOF >/srv/salt-overlay/pillar/cluster-params.sls
   dns_replicas: '$(echo "$DNS_REPLICAS" | sed -e "s/'/''/g")'
   dns_server: '$(echo "$DNS_SERVER_IP" | sed -e "s/'/''/g")'
   dns_domain: '$(echo "$DNS_DOMAIN" | sed -e "s/'/''/g")'
+  instance_prefix: '$(echo "$INSTANCE_PREFIX" | sed -e "s/'/''/g")'
+  admission_control: '$(echo "$ADMISSION_CONTROL" | sed -e "s/'/''/g")'  
 EOF
 
 # Configure the salt-master

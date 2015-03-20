@@ -22,7 +22,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/validation"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/generic"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
@@ -44,7 +44,7 @@ func NewREST(registry generic.Registry) *REST {
 }
 
 // Create a LimitRange object
-func (rs *REST) Create(ctx api.Context, obj runtime.Object) (<-chan apiserver.RESTResult, error) {
+func (rs *REST) Create(ctx api.Context, obj runtime.Object) (runtime.Object, error) {
 	limitRange, ok := obj.(*api.LimitRange)
 	if !ok {
 		return nil, fmt.Errorf("invalid object type")
@@ -63,29 +63,27 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (<-chan apiserver.RE
 	}
 	api.FillObjectMetaSystemFields(ctx, &limitRange.ObjectMeta)
 
-	return apiserver.MakeAsync(func() (runtime.Object, error) {
-		err := rs.registry.Create(ctx, limitRange.Name, limitRange)
-		if err != nil {
-			return nil, err
-		}
-		return rs.registry.Get(ctx, limitRange.Name)
-	}), nil
+	err := rs.registry.CreateWithName(ctx, limitRange.Name, limitRange)
+	if err != nil {
+		return nil, err
+	}
+	return rs.registry.Get(ctx, limitRange.Name)
 }
 
 // Update updates a LimitRange object.
-func (rs *REST) Update(ctx api.Context, obj runtime.Object) (<-chan apiserver.RESTResult, error) {
+func (rs *REST) Update(ctx api.Context, obj runtime.Object) (runtime.Object, bool, error) {
 	limitRange, ok := obj.(*api.LimitRange)
 	if !ok {
-		return nil, fmt.Errorf("invalid object type")
+		return nil, false, fmt.Errorf("invalid object type")
 	}
 
 	if !api.ValidNamespace(ctx, &limitRange.ObjectMeta) {
-		return nil, errors.NewConflict("limitRange", limitRange.Namespace, fmt.Errorf("LimitRange.Namespace does not match the provided context"))
+		return nil, false, errors.NewConflict("limitRange", limitRange.Namespace, fmt.Errorf("LimitRange.Namespace does not match the provided context"))
 	}
 
 	oldObj, err := rs.registry.Get(ctx, limitRange.Name)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 
 	editLimitRange := oldObj.(*api.LimitRange)
@@ -97,20 +95,18 @@ func (rs *REST) Update(ctx api.Context, obj runtime.Object) (<-chan apiserver.RE
 	editLimitRange.Spec = limitRange.Spec
 
 	if errs := validation.ValidateLimitRange(editLimitRange); len(errs) > 0 {
-		return nil, errors.NewInvalid("limitRange", editLimitRange.Name, errs)
+		return nil, false, errors.NewInvalid("limitRange", editLimitRange.Name, errs)
 	}
 
-	return apiserver.MakeAsync(func() (runtime.Object, error) {
-		err := rs.registry.Update(ctx, editLimitRange.Name, editLimitRange)
-		if err != nil {
-			return nil, err
-		}
-		return rs.registry.Get(ctx, editLimitRange.Name)
-	}), nil
+	if err := rs.registry.UpdateWithName(ctx, editLimitRange.Name, editLimitRange); err != nil {
+		return nil, false, err
+	}
+	out, err := rs.registry.Get(ctx, editLimitRange.Name)
+	return out, false, err
 }
 
 // Delete deletes the LimitRange with the specified name
-func (rs *REST) Delete(ctx api.Context, name string) (<-chan apiserver.RESTResult, error) {
+func (rs *REST) Delete(ctx api.Context, name string) (runtime.Object, error) {
 	obj, err := rs.registry.Get(ctx, name)
 	if err != nil {
 		return nil, err
@@ -119,9 +115,7 @@ func (rs *REST) Delete(ctx api.Context, name string) (<-chan apiserver.RESTResul
 	if !ok {
 		return nil, fmt.Errorf("invalid object type")
 	}
-	return apiserver.MakeAsync(func() (runtime.Object, error) {
-		return &api.Status{Status: api.StatusSuccess}, rs.registry.Delete(ctx, name)
-	}), nil
+	return rs.registry.Delete(ctx, name)
 }
 
 // Get gets a LimitRange with the specified name
@@ -137,16 +131,16 @@ func (rs *REST) Get(ctx api.Context, name string) (runtime.Object, error) {
 	return limitRange, err
 }
 
-func (rs *REST) getAttrs(obj runtime.Object) (objLabels, objFields labels.Set, err error) {
-	return labels.Set{}, labels.Set{}, nil
+func (rs *REST) getAttrs(obj runtime.Object) (objLabels labels.Set, objFields fields.Set, err error) {
+	return labels.Set{}, fields.Set{}, nil
 }
 
-func (rs *REST) List(ctx api.Context, label, field labels.Selector) (runtime.Object, error) {
-	return rs.registry.List(ctx, &generic.SelectionPredicate{label, field, rs.getAttrs})
+func (rs *REST) List(ctx api.Context, label labels.Selector, field fields.Selector) (runtime.Object, error) {
+	return rs.registry.ListPredicate(ctx, &generic.SelectionPredicate{label, field, rs.getAttrs})
 }
 
-func (rs *REST) Watch(ctx api.Context, label, field labels.Selector, resourceVersion string) (watch.Interface, error) {
-	return rs.registry.Watch(ctx, &generic.SelectionPredicate{label, field, rs.getAttrs}, resourceVersion)
+func (rs *REST) Watch(ctx api.Context, label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
+	return rs.registry.WatchPredicate(ctx, &generic.SelectionPredicate{label, field, rs.getAttrs}, resourceVersion)
 }
 
 // New returns a new api.LimitRange

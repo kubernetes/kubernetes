@@ -244,6 +244,25 @@ func TestValidateCertFilesNotFoundAuthInfo(t *testing.T) {
 	test.testAuthInfo("error", t)
 	test.testConfig(t)
 }
+func TestValidateCertDataOverridesFiles(t *testing.T) {
+	tempFile, _ := ioutil.TempFile("", "")
+	defer os.Remove(tempFile.Name())
+
+	config := clientcmdapi.NewConfig()
+	config.AuthInfos["clean"] = clientcmdapi.AuthInfo{
+		ClientCertificate:     tempFile.Name(),
+		ClientCertificateData: []byte("certdata"),
+		ClientKey:             tempFile.Name(),
+		ClientKeyData:         []byte("keydata"),
+	}
+	test := configValidationTest{
+		config:                 config,
+		expectedErrorSubstring: []string{"client-cert-data and client-cert are both specified", "client-key-data and client-key are both specified"},
+	}
+
+	test.testAuthInfo("clean", t)
+	test.testConfig(t)
+}
 func TestValidateCleanCertFilesAuthInfo(t *testing.T) {
 	tempFile, _ := ioutil.TempFile("", "")
 	defer os.Remove(tempFile.Name())
@@ -285,6 +304,21 @@ func TestValidateCleanTokenAuthInfo(t *testing.T) {
 	}
 
 	test.testAuthInfo("clean", t)
+	test.testConfig(t)
+}
+
+func TestValidateMultipleMethodsAuthInfo(t *testing.T) {
+	config := clientcmdapi.NewConfig()
+	config.AuthInfos["error"] = clientcmdapi.AuthInfo{
+		Token:    "token",
+		Username: "username",
+	}
+	test := configValidationTest{
+		config:                 config,
+		expectedErrorSubstring: []string{"more than one authentication method", "token", "basicAuth"},
+	}
+
+	test.testAuthInfo("error", t)
 	test.testConfig(t)
 }
 

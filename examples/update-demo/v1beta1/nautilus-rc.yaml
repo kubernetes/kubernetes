@@ -1,0 +1,20 @@
+kind: ReplicationController
+id: update-demo-nautilus
+apiVersion: v1beta1
+desiredState:
+  replicas: 2
+  replicaSelector:
+    name: update-demo
+    version: nautilus
+  podTemplate:
+    desiredState:
+      manifest:
+        containers:
+        - name: update-demo
+          image: kubernetes/update-demo:nautilus
+          ports:
+          - containerPort: 80
+            protocol: TCP
+    labels:
+        name: update-demo
+        version: nautilus

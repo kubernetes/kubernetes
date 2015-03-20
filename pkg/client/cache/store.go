@@ -21,6 +21,7 @@ import (
 	"sync"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
 // Store is a generic object storage interface. Reflector knows how to watch a server
@@ -56,7 +57,10 @@ func MetaNamespaceKeyFunc(obj interface{}) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("object has no meta: %v", err)
 	}
-	return meta.Namespace() + "/" + meta.Name(), nil
+	if len(meta.Namespace()) > 0 {
+		return meta.Namespace() + "/" + meta.Name(), nil
+	}
+	return meta.Name(), nil
 }
 
 type cache struct {
@@ -65,6 +69,10 @@ type cache struct {
 	// keyFunc is used to make the key for objects stored in and retrieved from items, and
 	// should be deterministic.
 	keyFunc KeyFunc
+	// indexers maps a name to an IndexFunc
+	indexers Indexers
+	// indices maps a name to an Index
+	indices Indices
 }
 
 // Add inserts an item into the cache.
@@ -73,9 +81,66 @@ func (c *cache) Add(obj interface{}) error {
 	if err != nil {
 		return fmt.Errorf("couldn't create key for object: %v", err)
 	}
+	// keep a pointer to whatever could have been there previously
 	c.lock.Lock()
 	defer c.lock.Unlock()
+	oldObject := c.items[key]
 	c.items[key] = obj
+	c.updateIndices(oldObject, obj)
+	return nil
+}
+
+// updateIndices modifies the objects location in the managed indexes, if this is an update, you must provide an oldObj
+// updateIndices must be called from a function that already has a lock on the cache
+func (c *cache) updateIndices(oldObj interface{}, newObj interface{}) error {
+	// if we got an old object, we need to remove it before we add it again
+	if oldObj != nil {
+		c.deleteFromIndices(oldObj)
+	}
+	key, err := c.keyFunc(newObj)
+	if err != nil {
+		return err
+	}
+	for name, indexFunc := range c.indexers {
+		indexValue, err := indexFunc(newObj)
+		if err != nil {
+			return err
+		}
+		index := c.indices[name]
+		if index == nil {
+			index = Index{}
+			c.indices[name] = index
+		}
+		set := index[indexValue]
+		if set == nil {
+			set = util.StringSet{}
+			index[indexValue] = set
+		}
+		set.Insert(key)
+	}
+	return nil
+}
+
+// deleteFromIndices removes the object from each of the managed indexes
+// it is intended to be called from a function that already has a lock on the cache
+func (c *cache) deleteFromIndices(obj interface{}) error {
+	key, err := c.keyFunc(obj)
+	if err != nil {
+		return err
+	}
+	for name, indexFunc := range c.indexers {
+		indexValue, err := indexFunc(obj)
+		if err != nil {
+			return err
+		}
+		index := c.indices[name]
+		if index != nil {
+			set := index[indexValue]
+			if set != nil {
+				set.Delete(key)
+			}
+		}
+	}
 	return nil
 }
 
@@ -87,7 +152,9 @@ func (c *cache) Update(obj interface{}) error {
 	}
 	c.lock.Lock()
 	defer c.lock.Unlock()
+	oldObject := c.items[key]
 	c.items[key] = obj
+	c.updateIndices(oldObject, obj)
 	return nil
 }
 
@@ -100,6 +167,7 @@ func (c *cache) Delete(obj interface{}) error {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 	delete(c.items, key)
+	c.deleteFromIndices(obj)
 	return nil
 }
 
@@ -113,6 +181,30 @@ func (c *cache) List() []interface{} {
 		list = append(list, item)
 	}
 	return list
+}
+
+// Index returns a list of items that match on the index function
+// Index is thread-safe so long as you treat all items as immutable
+func (c *cache) Index(indexName string, obj interface{}) ([]interface{}, error) {
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+
+	indexFunc := c.indexers[indexName]
+	if indexFunc == nil {
+		return nil, fmt.Errorf("Index with name %s does not exist", indexName)
+	}
+
+	indexKey, err := indexFunc(obj)
+	if err != nil {
+		return nil, err
+	}
+	index := c.indices[indexName]
+	set := index[indexKey]
+	list := make([]interface{}, 0, set.Len())
+	for _, key := range set.List() {
+		list = append(list, c.items[key])
+	}
+	return list, nil
 }
 
 // Get returns the requested item, or sets exists=false.
@@ -150,10 +242,22 @@ func (c *cache) Replace(list []interface{}) error {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 	c.items = items
+
+	// rebuild any index
+	c.indices = Indices{}
+	for _, item := range c.items {
+		c.updateIndices(nil, item)
+	}
+
 	return nil
 }
 
 // NewStore returns a Store implemented simply with a map and a lock.
 func NewStore(keyFunc KeyFunc) Store {
-	return &cache{items: map[string]interface{}{}, keyFunc: keyFunc}
+	return &cache{items: map[string]interface{}{}, keyFunc: keyFunc, indexers: Indexers{}, indices: Indices{}}
+}
+
+// NewIndexer returns an Indexer implemented simply with a map and a lock.
+func NewIndexer(keyFunc KeyFunc, indexers Indexers) Indexer {
+	return &cache{items: map[string]interface{}{}, keyFunc: keyFunc, indexers: indexers, indices: Indices{}}
 }

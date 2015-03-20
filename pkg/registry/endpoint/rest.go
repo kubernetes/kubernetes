@@ -21,7 +21,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
@@ -45,7 +45,7 @@ func (rs *REST) Get(ctx api.Context, id string) (runtime.Object, error) {
 }
 
 // List satisfies the RESTStorage interface.
-func (rs *REST) List(ctx api.Context, label, field labels.Selector) (runtime.Object, error) {
+func (rs *REST) List(ctx api.Context, label labels.Selector, field fields.Selector) (runtime.Object, error) {
 	if !label.Empty() || !field.Empty() {
 		return nil, errors.NewBadRequest("label/field selectors are not supported on endpoints")
 	}
@@ -54,12 +54,12 @@ func (rs *REST) List(ctx api.Context, label, field labels.Selector) (runtime.Obj
 
 // Watch returns Endpoint events via a watch.Interface.
 // It implements apiserver.ResourceWatcher.
-func (rs *REST) Watch(ctx api.Context, label, field labels.Selector, resourceVersion string) (watch.Interface, error) {
+func (rs *REST) Watch(ctx api.Context, label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
 	return rs.registry.WatchEndpoints(ctx, label, field, resourceVersion)
 }
 
 // Create satisfies the RESTStorage interface.
-func (rs *REST) Create(ctx api.Context, obj runtime.Object) (<-chan apiserver.RESTResult, error) {
+func (rs *REST) Create(ctx api.Context, obj runtime.Object) (runtime.Object, error) {
 	endpoints, ok := obj.(*api.Endpoints)
 	if !ok {
 		return nil, fmt.Errorf("not an endpoints: %#v", obj)
@@ -72,28 +72,25 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (<-chan apiserver.RE
 	}
 	api.FillObjectMetaSystemFields(ctx, &endpoints.ObjectMeta)
 
-	return apiserver.MakeAsync(func() (runtime.Object, error) {
-		err := rs.registry.UpdateEndpoints(ctx, endpoints)
-		if err != nil {
-			return nil, err
-		}
-		return rs.registry.GetEndpoints(ctx, endpoints.Name)
-	}), nil
+	err := rs.registry.UpdateEndpoints(ctx, endpoints)
+	if err != nil {
+		return nil, err
+	}
+	return rs.registry.GetEndpoints(ctx, endpoints.Name)
 }
 
 // Update satisfies the RESTStorage interface.
-func (rs *REST) Update(ctx api.Context, obj runtime.Object) (<-chan apiserver.RESTResult, error) {
+func (rs *REST) Update(ctx api.Context, obj runtime.Object) (runtime.Object, bool, error) {
 	endpoints, ok := obj.(*api.Endpoints)
 	if !ok {
-		return nil, fmt.Errorf("not an endpoints: %#v", obj)
+		return nil, false, fmt.Errorf("not an endpoints: %#v", obj)
 	}
-	return apiserver.MakeAsync(func() (runtime.Object, error) {
-		err := rs.registry.UpdateEndpoints(ctx, endpoints)
-		if err != nil {
-			return nil, err
-		}
-		return rs.registry.GetEndpoints(ctx, endpoints.Name)
-	}), nil
+	err := rs.registry.UpdateEndpoints(ctx, endpoints)
+	if err != nil {
+		return nil, false, err
+	}
+	out, err := rs.registry.GetEndpoints(ctx, endpoints.Name)
+	return out, false, err
 }
 
 // New implements the RESTStorage interface.

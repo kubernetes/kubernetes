@@ -20,3 +20,6 @@ example, if this is set to `kubernetes.io`, then a service named "nifty" in the
 "nifty.default.kubernetes.io".
 
 `-verbose`: Log additional information.
+
+'-etcd_mutation_timeout': For how long the application will keep retrying etcd 
+mutation (insertion or removal of a dns entry) before giving up and crashing.

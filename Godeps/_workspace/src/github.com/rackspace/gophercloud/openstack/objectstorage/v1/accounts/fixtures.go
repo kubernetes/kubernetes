@@ -14,9 +14,8 @@ import (
 // responds with a `Get` response.
 func HandleGetAccountSuccessfully(t *testing.T) {
 	th.Mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		th.TestMethod(t, r, "POST")
+		th.TestMethod(t, r, "HEAD")
 		th.TestHeader(t, r, "X-Auth-Token", fake.TokenID)
-		th.TestHeader(t, r, "X-Account-Meta-Gophercloud-Test", "accounts")
 
 		w.Header().Set("X-Account-Container-Count", "2")
 		w.Header().Set("X-Account-Bytes-Used", "14")
@@ -30,9 +29,10 @@ func HandleGetAccountSuccessfully(t *testing.T) {
 // responds with a `Update` response.
 func HandleUpdateAccountSuccessfully(t *testing.T) {
 	th.Mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		th.TestMethod(t, r, "HEAD")
+		th.TestMethod(t, r, "POST")
 		th.TestHeader(t, r, "X-Auth-Token", fake.TokenID)
-		w.Header().Set("X-Account-Meta-Foo", "bar")
+		th.TestHeader(t, r, "X-Account-Meta-Gophercloud-Test", "accounts")
+
 		w.WriteHeader(http.StatusNoContent)
 	})
 }

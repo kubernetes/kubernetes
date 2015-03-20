@@ -23,60 +23,25 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 )
 
-// rcStrategy implements behavior for Replication Controllers.
-// TODO: move to a replicationcontroller specific package.
-type rcStrategy struct {
-	runtime.ObjectTyper
-	api.NameGenerator
-}
+// ObjectFunc is a function to act on a given object. An error may be returned
+// if the hook cannot be completed. An ObjectFunc may transform the provided
+// object.
+type ObjectFunc func(obj runtime.Object) error
 
-// ReplicationControllers is the default logic that applies when creating and updating Replication Controller
-// objects.
-var ReplicationControllers RESTCreateStrategy = rcStrategy{api.Scheme, api.SimpleNameGenerator}
-
-// NamespaceScoped is true for replication controllers.
-func (rcStrategy) NamespaceScoped() bool {
-	return true
-}
-
-// ResetBeforeCreate clears fields that are not allowed to be set by end users on creation.
-func (rcStrategy) ResetBeforeCreate(obj runtime.Object) {
-	controller := obj.(*api.ReplicationController)
-	controller.Status = api.ReplicationControllerStatus{}
-}
-
-// Validate validates a new replication controller.
-func (rcStrategy) Validate(obj runtime.Object) errors.ValidationErrorList {
-	controller := obj.(*api.ReplicationController)
-	return validation.ValidateReplicationController(controller)
-}
-
-// podStrategy implements behavior for Pods
-// TODO: move to a pod specific package.
-type podStrategy struct {
-	runtime.ObjectTyper
-	api.NameGenerator
-}
-
-// Pods is the default logic that applies when creating and updating Pod
-// objects.
-var Pods RESTCreateStrategy = podStrategy{api.Scheme, api.SimpleNameGenerator}
-
-// NamespaceScoped is true for pods.
-func (podStrategy) NamespaceScoped() bool {
-	return true
-}
-
-// ResetBeforeCreate clears fields that are not allowed to be set by end users on creation.
-func (podStrategy) ResetBeforeCreate(obj runtime.Object) {
-	pod := obj.(*api.Pod)
-	pod.Status = api.PodStatus{}
-}
-
-// Validate validates a new pod.
-func (podStrategy) Validate(obj runtime.Object) errors.ValidationErrorList {
-	pod := obj.(*api.Pod)
-	return validation.ValidatePod(pod)
+// AllFuncs returns an ObjectFunc that attempts to run all of the provided functions
+// in order, returning early if there are any errors.
+func AllFuncs(fns ...ObjectFunc) ObjectFunc {
+	return func(obj runtime.Object) error {
+		for _, fn := range fns {
+			if fn == nil {
+				continue
+			}
+			if err := fn(obj); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
 }
 
 // svcStrategy implements behavior for Services
@@ -88,7 +53,7 @@ type svcStrategy struct {
 
 // Services is the default logic that applies when creating and updating Service
 // objects.
-var Services RESTCreateStrategy = svcStrategy{api.Scheme, api.SimpleNameGenerator}
+var Services = svcStrategy{api.Scheme, api.SimpleNameGenerator}
 
 // NamespaceScoped is true for services.
 func (svcStrategy) NamespaceScoped() bool {
@@ -107,6 +72,14 @@ func (svcStrategy) Validate(obj runtime.Object) errors.ValidationErrorList {
 	return validation.ValidateService(service)
 }
 
+func (svcStrategy) AllowCreateOnUpdate() bool {
+	return true
+}
+
+func (svcStrategy) ValidateUpdate(obj, old runtime.Object) errors.ValidationErrorList {
+	return validation.ValidateServiceUpdate(old.(*api.Service), obj.(*api.Service))
+}
+
 // nodeStrategy implements behavior for nodes
 // TODO: move to a node specific package.
 type nodeStrategy struct {
@@ -118,7 +91,7 @@ type nodeStrategy struct {
 // objects.
 var Nodes RESTCreateStrategy = nodeStrategy{api.Scheme, api.SimpleNameGenerator}
 
-// NamespaceScoped is false for services.
+// NamespaceScoped is false for nodes.
 func (nodeStrategy) NamespaceScoped() bool {
 	return false
 }

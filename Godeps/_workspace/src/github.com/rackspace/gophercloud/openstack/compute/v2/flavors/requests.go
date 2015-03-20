@@ -1,7 +1,6 @@
 package flavors
 
 import (
-	"github.com/racker/perigee"
 	"github.com/rackspace/gophercloud"
 	"github.com/rackspace/gophercloud/pagination"
 )
@@ -64,9 +63,8 @@ func ListDetail(client *gophercloud.ServiceClient, opts ListOptsBuilder) paginat
 // Use ExtractFlavor to convert its result into a Flavor.
 func Get(client *gophercloud.ServiceClient, id string) GetResult {
 	var gr GetResult
-	gr.Err = perigee.Get(getURL(client, id), perigee.Options{
-		Results:     &gr.Body,
-		MoreHeaders: client.AuthenticatedHeaders(),
+	_, gr.Err = client.Request("GET", getURL(client, id), gophercloud.RequestOpts{
+		JSONResponse: &gr.Body,
 	})
 	return gr
 }

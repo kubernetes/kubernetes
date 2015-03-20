@@ -93,6 +93,32 @@ func TestValidationErrorUsefulMessage(t *testing.T) {
 	}
 }
 
+func TestErrListFilter(t *testing.T) {
+	list := ValidationErrorList{
+		NewFieldInvalid("test.field", "", ""),
+		NewFieldInvalid("field.test", "", ""),
+		NewFieldDuplicate("test", "value"),
+	}
+	if len(list.Filter(NewValidationErrorTypeMatcher(ValidationErrorTypeDuplicate))) != 2 {
+		t.Errorf("should not filter")
+	}
+	if len(list.Filter(NewValidationErrorTypeMatcher(ValidationErrorTypeInvalid))) != 1 {
+		t.Errorf("should filter")
+	}
+	if len(list.Filter(NewValidationErrorFieldPrefixMatcher("test"))) != 1 {
+		t.Errorf("should filter")
+	}
+	if len(list.Filter(NewValidationErrorFieldPrefixMatcher("test."))) != 2 {
+		t.Errorf("should filter")
+	}
+	if len(list.Filter(NewValidationErrorFieldPrefixMatcher(""))) != 0 {
+		t.Errorf("should filter")
+	}
+	if len(list.Filter(NewValidationErrorFieldPrefixMatcher("field."), NewValidationErrorTypeMatcher(ValidationErrorTypeDuplicate))) != 1 {
+		t.Errorf("should filter")
+	}
+}
+
 func TestErrListPrefix(t *testing.T) {
 	testCases := []struct {
 		Err      *ValidationError

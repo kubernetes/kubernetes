@@ -26,8 +26,9 @@ import (
 )
 
 const (
-	interval = time.Second * 3
-	timeout  = time.Minute * 5
+	shortInterval = time.Millisecond * 100
+	interval      = time.Second * 3
+	timeout       = time.Minute * 5
 )
 
 // A Reaper handles terminating an object as gracefully as possible.
@@ -69,10 +70,12 @@ func (reaper *ReplicationControllerReaper) Stop(namespace, name string) (string,
 	if err != nil {
 		return "", err
 	}
-
-	controller.Spec.Replicas = 0
-	// TODO: do retry on 409 errors here?
-	if _, err := rc.Update(controller); err != nil {
+	resizer, err := ResizerFor("ReplicationController", *reaper)
+	if err != nil {
+		return "", err
+	}
+	cond := ResizeCondition(resizer, &ResizePrecondition{-1, ""}, namespace, name, 0)
+	if err = wait.Poll(shortInterval, reaper.timeout, cond); err != nil {
 		return "", err
 	}
 	if err := wait.Poll(reaper.pollInterval, reaper.timeout,

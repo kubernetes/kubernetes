@@ -48,7 +48,7 @@ check test:
 #
 # Example:
 #   make test_integration
-test_integration test_integ:
+test_integration:
 	hack/test-integration.sh
 .PHONY: test_integration test_integ
 

@@ -5,9 +5,12 @@
 
 .PHONY:	build push
 
+
+TAG = 1.1
+
 build:	
-	sudo docker build -t kubernetes/fluentd-gcp .
+	sudo docker build -t kubernetes/fluentd-gcp:$(TAG) .
 
 push:	
-	sudo docker push kubernetes/fluentd-gcp
+	sudo docker push kubernetes/fluentd-gcp:$(TAG)
 

@@ -29,6 +29,12 @@ import (
 const (
 	StatusUnprocessableEntity = 422
 	StatusTooManyRequests     = 429
+	// HTTP recommendations are for servers to define 5xx error codes
+	// for scenarios not covered by behavior. In this case, ServerTimeout
+	// is an indication that a transient server error has occured and the
+	// client *should* retry, with an optional Retry-After header to specify
+	// the back off window.
+	StatusServerTimeout = 504
 )
 
 // StatusError is an error intended for consumption by a REST API server; it can also be
@@ -174,13 +180,13 @@ func NewMethodNotSupported(kind, action string) error {
 	}}
 }
 
-// NewTryAgainLater returns an error indicating the requested action could not be completed due to a
+// NewServerTimeout returns an error indicating the requested action could not be completed due to a
 // transient error, and the client should try again.
-func NewTryAgainLater(kind, operation string) error {
+func NewServerTimeout(kind, operation string) error {
 	return &StatusError{api.Status{
 		Status: api.StatusFailure,
 		Code:   http.StatusInternalServerError,
-		Reason: api.StatusReasonTryAgainLater,
+		Reason: api.StatusReasonServerTimeout,
 		Details: &api.StatusDetails{
 			Kind: kind,
 			ID:   operation,
@@ -199,6 +205,17 @@ func NewInternalError(err error) error {
 			Causes: []api.StatusCause{{Message: err.Error()}},
 		},
 		Message: fmt.Sprintf("Internal error occurred: %v", err),
+	}}
+}
+
+// NewTimeoutError returns an error indicating that a timeout occurred before the request
+// could be completed.  Clients may retry, but the operation may still complete.
+func NewTimeoutError(message string) error {
+	return &StatusError{api.Status{
+		Status:  api.StatusFailure,
+		Code:    StatusServerTimeout,
+		Reason:  api.StatusReasonTimeout,
+		Message: fmt.Sprintf("Timeout: %s", message),
 	}}
 }
 
@@ -239,10 +256,22 @@ func IsForbidden(err error) bool {
 	return reasonForError(err) == api.StatusReasonForbidden
 }
 
-// IsTryAgainLater determines if err is an error which indicates that the request needs to be retried
+// IsServerTimeout determines if err is an error which indicates that the request needs to be retried
 // by the client.
-func IsTryAgainLater(err error) bool {
-	return reasonForError(err) == api.StatusReasonTryAgainLater
+func IsServerTimeout(err error) bool {
+	return reasonForError(err) == api.StatusReasonServerTimeout
+}
+
+// IsStatusError determines if err is an API Status error received from the master.
+func IsStatusError(err error) bool {
+	_, ok := err.(*StatusError)
+	return ok
+}
+
+// IsUnexpectedObjectError determines if err is due to an unexpected object from the master.
+func IsUnexpectedObjectError(err error) bool {
+	_, ok := err.(*UnexpectedObjectError)
+	return ok
 }
 
 func reasonForError(err error) api.StatusReason {

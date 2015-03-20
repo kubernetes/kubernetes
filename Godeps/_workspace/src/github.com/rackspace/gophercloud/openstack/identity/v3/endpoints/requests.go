@@ -1,7 +1,6 @@
 package endpoints
 
 import (
-	"github.com/racker/perigee"
 	"github.com/rackspace/gophercloud"
 	"github.com/rackspace/gophercloud/pagination"
 )
@@ -57,11 +56,10 @@ func Create(client *gophercloud.ServiceClient, opts EndpointOpts) CreateResult {
 	reqBody.Endpoint.Region = gophercloud.MaybeString(opts.Region)
 
 	var result CreateResult
-	_, result.Err = perigee.Request("POST", listURL(client), perigee.Options{
-		MoreHeaders: client.AuthenticatedHeaders(),
-		ReqBody:     &reqBody,
-		Results:     &result.Body,
-		OkCodes:     []int{201},
+	_, result.Err = client.Request("POST", listURL(client), gophercloud.RequestOpts{
+		JSONBody:     &reqBody,
+		JSONResponse: &result.Body,
+		OkCodes:      []int{201},
 	})
 	return result
 }
@@ -113,11 +111,10 @@ func Update(client *gophercloud.ServiceClient, endpointID string, opts EndpointO
 	reqBody.Endpoint.ServiceID = gophercloud.MaybeString(opts.ServiceID)
 
 	var result UpdateResult
-	_, result.Err = perigee.Request("PATCH", endpointURL(client, endpointID), perigee.Options{
-		MoreHeaders: client.AuthenticatedHeaders(),
-		ReqBody:     &reqBody,
-		Results:     &result.Body,
-		OkCodes:     []int{200},
+	_, result.Err = client.Request("PATCH", endpointURL(client, endpointID), gophercloud.RequestOpts{
+		JSONBody:     &reqBody,
+		JSONResponse: &result.Body,
+		OkCodes:      []int{200},
 	})
 	return result
 }
@@ -125,9 +122,8 @@ func Update(client *gophercloud.ServiceClient, endpointID string, opts EndpointO
 // Delete removes an endpoint from the service catalog.
 func Delete(client *gophercloud.ServiceClient, endpointID string) DeleteResult {
 	var res DeleteResult
-	_, res.Err = perigee.Request("DELETE", endpointURL(client, endpointID), perigee.Options{
-		MoreHeaders: client.AuthenticatedHeaders(),
-		OkCodes:     []int{204},
+	_, res.Err = client.Request("DELETE", endpointURL(client, endpointID), gophercloud.RequestOpts{
+		OkCodes: []int{204},
 	})
 	return res
 }

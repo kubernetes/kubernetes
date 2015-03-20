@@ -2,9 +2,9 @@ package servers
 
 import (
 	"encoding/base64"
+	"errors"
 	"fmt"
 
-	"github.com/racker/perigee"
 	"github.com/rackspace/gophercloud"
 	"github.com/rackspace/gophercloud/pagination"
 )
@@ -131,6 +131,16 @@ type CreateOpts struct {
 
 	// ConfigDrive [optional] enables metadata injection through a configuration drive.
 	ConfigDrive bool
+
+	// AdminPass [optional] sets the root user password. If not set, a randomly-generated
+	// password will be created and returned in the response.
+	AdminPass string
+
+	// AccessIPv4 [optional] specifies an IPv4 address for the instance.
+	AccessIPv4 string
+
+	// AccessIPv6 [optional] specifies an IPv6 address for the instance.
+	AccessIPv6 string
 }
 
 // ToServerCreateMap assembles a request body based on the contents of a CreateOpts.
@@ -158,12 +168,22 @@ func (opts CreateOpts) ToServerCreateMap() (map[string]interface{}, error) {
 	if opts.Metadata != nil {
 		server["metadata"] = opts.Metadata
 	}
+	if opts.AdminPass != "" {
+		server["adminPass"] = opts.AdminPass
+	}
+	if opts.AccessIPv4 != "" {
+		server["accessIPv4"] = opts.AccessIPv4
+	}
+	if opts.AccessIPv6 != "" {
+		server["accessIPv6"] = opts.AccessIPv6
+	}
 
 	if len(opts.SecurityGroups) > 0 {
 		securityGroups := make([]map[string]interface{}, len(opts.SecurityGroups))
 		for i, groupName := range opts.SecurityGroups {
 			securityGroups[i] = map[string]interface{}{"name": groupName}
 		}
+		server["security_groups"] = securityGroups
 	}
 
 	if len(opts.Networks) > 0 {
@@ -196,11 +216,10 @@ func Create(client *gophercloud.ServiceClient, opts CreateOptsBuilder) CreateRes
 		return res
 	}
 
-	_, res.Err = perigee.Request("POST", listURL(client), perigee.Options{
-		Results:     &res.Body,
-		ReqBody:     reqBody,
-		MoreHeaders: client.AuthenticatedHeaders(),
-		OkCodes:     []int{202},
+	_, res.Err = client.Request("POST", listURL(client), gophercloud.RequestOpts{
+		JSONResponse: &res.Body,
+		JSONBody:     reqBody,
+		OkCodes:      []int{202},
 	})
 	return res
 }
@@ -208,9 +227,8 @@ func Create(client *gophercloud.ServiceClient, opts CreateOptsBuilder) CreateRes
 // Delete requests that a server previously provisioned be removed from your account.
 func Delete(client *gophercloud.ServiceClient, id string) DeleteResult {
 	var res DeleteResult
-	_, res.Err = perigee.Request("DELETE", deleteURL(client, id), perigee.Options{
-		MoreHeaders: client.AuthenticatedHeaders(),
-		OkCodes:     []int{204},
+	_, res.Err = client.Request("DELETE", deleteURL(client, id), gophercloud.RequestOpts{
+		OkCodes: []int{204},
 	})
 	return res
 }
@@ -218,9 +236,9 @@ func Delete(client *gophercloud.ServiceClient, id string) DeleteResult {
 // Get requests details on a single server, by ID.
 func Get(client *gophercloud.ServiceClient, id string) GetResult {
 	var result GetResult
-	_, result.Err = perigee.Request("GET", getURL(client, id), perigee.Options{
-		Results:     &result.Body,
-		MoreHeaders: client.AuthenticatedHeaders(),
+	_, result.Err = client.Request("GET", getURL(client, id), gophercloud.RequestOpts{
+		JSONResponse: &result.Body,
+		OkCodes:      []int{200, 203},
 	})
 	return result
 }
@@ -262,10 +280,9 @@ func (opts UpdateOpts) ToServerUpdateMap() map[string]interface{} {
 // Update requests that various attributes of the indicated server be changed.
 func Update(client *gophercloud.ServiceClient, id string, opts UpdateOptsBuilder) UpdateResult {
 	var result UpdateResult
-	_, result.Err = perigee.Request("PUT", updateURL(client, id), perigee.Options{
-		Results:     &result.Body,
-		ReqBody:     opts.ToServerUpdateMap(),
-		MoreHeaders: client.AuthenticatedHeaders(),
+	_, result.Err = client.Request("PUT", updateURL(client, id), gophercloud.RequestOpts{
+		JSONResponse: &result.Body,
+		JSONBody:     opts.ToServerUpdateMap(),
 	})
 	return result
 }
@@ -282,10 +299,9 @@ func ChangeAdminPassword(client *gophercloud.ServiceClient, id, newPassword stri
 
 	var res ActionResult
 
-	_, res.Err = perigee.Request("POST", actionURL(client, id), perigee.Options{
-		ReqBody:     req,
-		MoreHeaders: client.AuthenticatedHeaders(),
-		OkCodes:     []int{202},
+	_, res.Err = client.Request("POST", actionURL(client, id), gophercloud.RequestOpts{
+		JSONBody: req,
+		OkCodes:  []int{202},
 	})
 
 	return res
@@ -351,14 +367,13 @@ func Reboot(client *gophercloud.ServiceClient, id string, how RebootMethod) Acti
 		return res
 	}
 
-	_, res.Err = perigee.Request("POST", actionURL(client, id), perigee.Options{
-		ReqBody: struct {
+	_, res.Err = client.Request("POST", actionURL(client, id), gophercloud.RequestOpts{
+		JSONBody: struct {
 			C map[string]string `json:"reboot"`
 		}{
 			map[string]string{"type": string(how)},
 		},
-		MoreHeaders: client.AuthenticatedHeaders(),
-		OkCodes:     []int{202},
+		OkCodes: []int{202},
 	})
 
 	return res
@@ -453,11 +468,10 @@ func Rebuild(client *gophercloud.ServiceClient, id string, opts RebuildOptsBuild
 		return result
 	}
 
-	_, result.Err = perigee.Request("POST", actionURL(client, id), perigee.Options{
-		ReqBody:     &reqBody,
-		Results:     &result.Body,
-		MoreHeaders: client.AuthenticatedHeaders(),
-		OkCodes:     []int{202},
+	_, result.Err = client.Request("POST", actionURL(client, id), gophercloud.RequestOpts{
+		JSONBody:     &reqBody,
+		JSONResponse: &result.Body,
+		OkCodes:      []int{202},
 	})
 
 	return result
@@ -475,7 +489,7 @@ type ResizeOpts struct {
 	FlavorRef string
 }
 
-// ToServerResizeMap formats a ResizeOpts as a map that can be used as a JSON request body to the
+// ToServerResizeMap formats a ResizeOpts as a map that can be used as a JSON request body for the
 // Resize request.
 func (opts ResizeOpts) ToServerResizeMap() (map[string]interface{}, error) {
 	resize := map[string]interface{}{
@@ -500,10 +514,9 @@ func Resize(client *gophercloud.ServiceClient, id string, opts ResizeOptsBuilder
 		return res
 	}
 
-	_, res.Err = perigee.Request("POST", actionURL(client, id), perigee.Options{
-		ReqBody:     reqBody,
-		MoreHeaders: client.AuthenticatedHeaders(),
-		OkCodes:     []int{202},
+	_, res.Err = client.Request("POST", actionURL(client, id), gophercloud.RequestOpts{
+		JSONBody: reqBody,
+		OkCodes:  []int{202},
 	})
 
 	return res
@@ -514,10 +527,9 @@ func Resize(client *gophercloud.ServiceClient, id string, opts ResizeOptsBuilder
 func ConfirmResize(client *gophercloud.ServiceClient, id string) ActionResult {
 	var res ActionResult
 
-	_, res.Err = perigee.Request("POST", actionURL(client, id), perigee.Options{
-		ReqBody:     map[string]interface{}{"confirmResize": nil},
-		MoreHeaders: client.AuthenticatedHeaders(),
-		OkCodes:     []int{204},
+	_, res.Err = client.Request("POST", actionURL(client, id), gophercloud.RequestOpts{
+		JSONBody: map[string]interface{}{"confirmResize": nil},
+		OkCodes:  []int{204},
 	})
 
 	return res
@@ -528,11 +540,182 @@ func ConfirmResize(client *gophercloud.ServiceClient, id string) ActionResult {
 func RevertResize(client *gophercloud.ServiceClient, id string) ActionResult {
 	var res ActionResult
 
-	_, res.Err = perigee.Request("POST", actionURL(client, id), perigee.Options{
-		ReqBody:     map[string]interface{}{"revertResize": nil},
-		MoreHeaders: client.AuthenticatedHeaders(),
-		OkCodes:     []int{202},
+	_, res.Err = client.Request("POST", actionURL(client, id), gophercloud.RequestOpts{
+		JSONBody: map[string]interface{}{"revertResize": nil},
+		OkCodes:  []int{202},
 	})
 
+	return res
+}
+
+// RescueOptsBuilder is an interface that allows extensions to override the
+// default structure of a Rescue request.
+type RescueOptsBuilder interface {
+	ToServerRescueMap() (map[string]interface{}, error)
+}
+
+// RescueOpts represents the configuration options used to control a Rescue
+// option.
+type RescueOpts struct {
+	// AdminPass is the desired administrative password for the instance in
+	// RESCUE mode. If it's left blank, the server will generate a password.
+	AdminPass string
+}
+
+// ToServerRescueMap formats a RescueOpts as a map that can be used as a JSON
+// request body for the Rescue request.
+func (opts RescueOpts) ToServerRescueMap() (map[string]interface{}, error) {
+	server := make(map[string]interface{})
+	if opts.AdminPass != "" {
+		server["adminPass"] = opts.AdminPass
+	}
+	return map[string]interface{}{"rescue": server}, nil
+}
+
+// Rescue instructs the provider to place the server into RESCUE mode.
+func Rescue(client *gophercloud.ServiceClient, id string, opts RescueOptsBuilder) RescueResult {
+	var result RescueResult
+
+	if id == "" {
+		result.Err = fmt.Errorf("ID is required")
+		return result
+	}
+	reqBody, err := opts.ToServerRescueMap()
+	if err != nil {
+		result.Err = err
+		return result
+	}
+
+	_, result.Err = client.Request("POST", actionURL(client, id), gophercloud.RequestOpts{
+		JSONResponse: &result.Body,
+		JSONBody:     &reqBody,
+		OkCodes:      []int{200},
+	})
+
+	return result
+}
+
+// ResetMetadataOptsBuilder allows extensions to add additional parameters to the
+// Reset request.
+type ResetMetadataOptsBuilder interface {
+	ToMetadataResetMap() (map[string]interface{}, error)
+}
+
+// MetadataOpts is a map that contains key-value pairs.
+type MetadataOpts map[string]string
+
+// ToMetadataResetMap assembles a body for a Reset request based on the contents of a MetadataOpts.
+func (opts MetadataOpts) ToMetadataResetMap() (map[string]interface{}, error) {
+	return map[string]interface{}{"metadata": opts}, nil
+}
+
+// ToMetadataUpdateMap assembles a body for an Update request based on the contents of a MetadataOpts.
+func (opts MetadataOpts) ToMetadataUpdateMap() (map[string]interface{}, error) {
+	return map[string]interface{}{"metadata": opts}, nil
+}
+
+// ResetMetadata will create multiple new key-value pairs for the given server ID.
+// Note: Using this operation will erase any already-existing metadata and create
+// the new metadata provided. To keep any already-existing metadata, use the
+// UpdateMetadatas or UpdateMetadata function.
+func ResetMetadata(client *gophercloud.ServiceClient, id string, opts ResetMetadataOptsBuilder) ResetMetadataResult {
+	var res ResetMetadataResult
+	metadata, err := opts.ToMetadataResetMap()
+	if err != nil {
+		res.Err = err
+		return res
+	}
+	_, res.Err = client.Request("PUT", metadataURL(client, id), gophercloud.RequestOpts{
+		JSONBody:     metadata,
+		JSONResponse: &res.Body,
+	})
+	return res
+}
+
+// Metadata requests all the metadata for the given server ID.
+func Metadata(client *gophercloud.ServiceClient, id string) GetMetadataResult {
+	var res GetMetadataResult
+	_, res.Err = client.Request("GET", metadataURL(client, id), gophercloud.RequestOpts{
+		JSONResponse: &res.Body,
+	})
+	return res
+}
+
+// UpdateMetadataOptsBuilder allows extensions to add additional parameters to the
+// Create request.
+type UpdateMetadataOptsBuilder interface {
+	ToMetadataUpdateMap() (map[string]interface{}, error)
+}
+
+// UpdateMetadata updates (or creates) all the metadata specified by opts for the given server ID.
+// This operation does not affect already-existing metadata that is not specified
+// by opts.
+func UpdateMetadata(client *gophercloud.ServiceClient, id string, opts UpdateMetadataOptsBuilder) UpdateMetadataResult {
+	var res UpdateMetadataResult
+	metadata, err := opts.ToMetadataUpdateMap()
+	if err != nil {
+		res.Err = err
+		return res
+	}
+	_, res.Err = client.Request("POST", metadataURL(client, id), gophercloud.RequestOpts{
+		JSONBody:     metadata,
+		JSONResponse: &res.Body,
+	})
+	return res
+}
+
+// MetadatumOptsBuilder allows extensions to add additional parameters to the
+// Create request.
+type MetadatumOptsBuilder interface {
+	ToMetadatumCreateMap() (map[string]interface{}, string, error)
+}
+
+// MetadatumOpts is a map of length one that contains a key-value pair.
+type MetadatumOpts map[string]string
+
+// ToMetadatumCreateMap assembles a body for a Create request based on the contents of a MetadataumOpts.
+func (opts MetadatumOpts) ToMetadatumCreateMap() (map[string]interface{}, string, error) {
+	if len(opts) != 1 {
+		return nil, "", errors.New("CreateMetadatum operation must have 1 and only 1 key-value pair.")
+	}
+	metadatum := map[string]interface{}{"meta": opts}
+	var key string
+	for k := range metadatum["meta"].(MetadatumOpts) {
+		key = k
+	}
+	return metadatum, key, nil
+}
+
+// CreateMetadatum will create or update the key-value pair with the given key for the given server ID.
+func CreateMetadatum(client *gophercloud.ServiceClient, id string, opts MetadatumOptsBuilder) CreateMetadatumResult {
+	var res CreateMetadatumResult
+	metadatum, key, err := opts.ToMetadatumCreateMap()
+	if err != nil {
+		res.Err = err
+		return res
+	}
+
+	_, res.Err = client.Request("PUT", metadatumURL(client, id, key), gophercloud.RequestOpts{
+		JSONBody:     metadatum,
+		JSONResponse: &res.Body,
+	})
+	return res
+}
+
+// Metadatum requests the key-value pair with the given key for the given server ID.
+func Metadatum(client *gophercloud.ServiceClient, id, key string) GetMetadatumResult {
+	var res GetMetadatumResult
+	_, res.Err = client.Request("GET", metadatumURL(client, id, key), gophercloud.RequestOpts{
+		JSONResponse: &res.Body,
+	})
+	return res
+}
+
+// DeleteMetadatum will delete the key-value pair with the given key for the given server ID.
+func DeleteMetadatum(client *gophercloud.ServiceClient, id, key string) DeleteMetadatumResult {
+	var res DeleteMetadatumResult
+	_, res.Err = client.Request("DELETE", metadatumURL(client, id, key), gophercloud.RequestOpts{
+		JSONResponse: &res.Body,
+	})
 	return res
 }

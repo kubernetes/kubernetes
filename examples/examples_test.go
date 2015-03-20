@@ -22,6 +22,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strings"
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -70,50 +71,68 @@ func validateObject(obj runtime.Object) (errors []error) {
 }
 
 func walkJSONFiles(inDir string, fn func(name, path string, data []byte)) error {
-	err := filepath.Walk(inDir, func(path string, info os.FileInfo, err error) error {
+	return filepath.Walk(inDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
+
 		if info.IsDir() && path != inDir {
 			return filepath.SkipDir
 		}
-		name := filepath.Base(path)
-		ext := filepath.Ext(name)
-		if ext != "" {
-			name = name[:len(name)-len(ext)]
+
+		file := filepath.Base(path)
+		if ext := filepath.Ext(file); ext == ".json" || ext == ".yaml" {
+			glog.Infof("Testing %s", path)
+			data, err := ioutil.ReadFile(path)
+			if err != nil {
+				return err
+			}
+			name := strings.TrimSuffix(file, ext)
+			fn(name, path, data)
 		}
-		if !(ext == ".json" || ext == ".yaml") {
-			return nil
-		}
-		glog.Infof("Testing %s", path)
-		data, err := ioutil.ReadFile(path)
-		if err != nil {
-			return err
-		}
-		fn(name, path, data)
 		return nil
 	})
-	return err
 }
 
 func TestExampleObjectSchemas(t *testing.T) {
 	cases := map[string]map[string]runtime.Object{
-		"../api/examples": {
-			"controller":       &api.ReplicationController{},
-			"controller-list":  &api.ReplicationControllerList{},
-			"pod":              &api.Pod{},
-			"pod-list":         &api.PodList{},
-			"service":          &api.Service{},
-			"external-service": &api.Service{},
-			"service-list":     &api.ServiceList{},
+		"../docs/getting-started-guides": {
+			"pod": &api.Pod{},
+		},
+		"../cmd/integration": {
+			"controller": &api.ReplicationController{},
 		},
 		"../examples/guestbook": {
+			"frontend-controller":     &api.ReplicationController{},
+			"redis-slave-controller":  &api.ReplicationController{},
+			"redis-master-controller": &api.ReplicationController{},
+			"frontend-service":        &api.Service{},
+			"redis-master-service":    &api.Service{},
+			"redis-slave-service":     &api.Service{},
+		},
+		"../examples/guestbook/v1beta3": {
 			"frontend-controller":    &api.ReplicationController{},
 			"redis-slave-controller": &api.ReplicationController{},
-			"redis-master":           &api.Pod{},
+			"redis-master":           &api.ReplicationController{},
 			"frontend-service":       &api.Service{},
 			"redis-master-service":   &api.Service{},
 			"redis-slave-service":    &api.Service{},
+		},
+		"../examples/guestbook-go": {
+			"guestbook-controller":    &api.ReplicationController{},
+			"redis-slave-controller":  &api.ReplicationController{},
+			"redis-master-controller": &api.ReplicationController{},
+			"guestbook-service":       &api.Service{},
+			"redis-master-service":    &api.Service{},
+			"redis-slave-service":     &api.Service{},
+		},
+		"../examples/guestbook-go/v1beta3": {
+			"guestbook-controller":    &api.ReplicationController{},
+			"redis-slave-controller":  &api.ReplicationController{},
+			"redis-master-controller": &api.ReplicationController{},
+			"guestbook-service":       &api.Service{},
+			"redis-master-service":    &api.Service{},
+			"redis-slave-service":     &api.Service{},
 		},
 		"../examples/walkthrough": {
 			"pod1": &api.Pod{},
@@ -122,7 +141,11 @@ func TestExampleObjectSchemas(t *testing.T) {
 			"service":                   &api.Service{},
 			"replication-controller":    &api.ReplicationController{},
 		},
-		"../examples/update-demo": {
+		"../examples/update-demo/v1beta1": {
+			"kitten-rc":   &api.ReplicationController{},
+			"nautilus-rc": &api.ReplicationController{},
+		},
+		"../examples/update-demo/v1beta3": {
 			"kitten-rc":   &api.ReplicationController{},
 			"nautilus-rc": &api.ReplicationController{},
 		},

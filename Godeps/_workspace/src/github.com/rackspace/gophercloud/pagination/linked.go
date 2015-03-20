@@ -59,3 +59,9 @@ func (current LinkedPageBase) NextPageURL() (string, error) {
 		}
 	}
 }
+
+// GetBody returns the linked page's body. This method is needed to satisfy the
+// Page interface.
+func (current LinkedPageBase) GetBody() interface{} {
+	return current.Body
+}

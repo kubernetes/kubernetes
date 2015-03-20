@@ -60,6 +60,9 @@ var Semantic = conversion.EqualitiesOrDie(
 		}
 		return a.Amount.Cmp(b.Amount) == 0
 	},
+	func(a, b util.Time) bool {
+		return a.UTC() == b.UTC()
+	},
 )
 
 var standardResources = util.NewStringSet(

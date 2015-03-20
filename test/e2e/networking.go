@@ -23,6 +23,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 
 	. "github.com/onsi/ginkgo"
@@ -109,7 +110,7 @@ var _ = Describe("Networking", func() {
 								Name:    "webserver",
 								Image:   "kubernetes/nettest:latest",
 								Command: []string{"-service=" + name},
-								Ports:   []api.Port{{ContainerPort: 8080}},
+								Ports:   []api.ContainerPort{{ContainerPort: 8080}},
 							},
 						},
 					},
@@ -123,13 +124,13 @@ var _ = Describe("Networking", func() {
 		defer func() {
 			defer GinkgoRecover()
 			By("Cleaning up the replication controller")
-			rc.Spec.Replicas = 0
-			rc, err = c.ReplicationControllers(ns).Update(rc)
+			// Resize the replication controller to zero to get rid of pods.
+			rcReaper, err := kubectl.ReaperFor("ReplicationController", c)
 			if err != nil {
-				Fail(fmt.Sprintf("unable to modify replica count for rc %v: %v", rc.Name, err))
+				Fail(fmt.Sprintf("unable to stop rc %v: %v", rc.Name, err))
 			}
-			if err = c.ReplicationControllers(ns).Delete(rc.Name); err != nil {
-				Fail(fmt.Sprintf("unable to delete rc %v: %v", rc.Name, err))
+			if _, err = rcReaper.Stop(ns, rc.Name); err != nil {
+				Fail(fmt.Sprintf("unable to stop rc %v: %v", rc.Name, err))
 			}
 		}()
 

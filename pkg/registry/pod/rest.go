@@ -23,168 +23,129 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/rest"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/validation"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/generic"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
 
+// podStrategy implements behavior for Pods
+// TODO: move to a pod specific package.
+type podStrategy struct {
+	runtime.ObjectTyper
+	api.NameGenerator
+}
+
+// Strategy is the default logic that applies when creating and updating Pod
+// objects via the REST API.
+// TODO: Create other strategies for updating status, bindings, etc
+var Strategy = podStrategy{api.Scheme, api.SimpleNameGenerator}
+
+// NamespaceScoped is true for pods.
+func (podStrategy) NamespaceScoped() bool {
+	return true
+}
+
+// ResetBeforeCreate clears fields that are not allowed to be set by end users on creation.
+func (podStrategy) ResetBeforeCreate(obj runtime.Object) {
+	pod := obj.(*api.Pod)
+	pod.Status = api.PodStatus{
+		Host:  pod.Spec.Host,
+		Phase: api.PodPending,
+	}
+}
+
+// Validate validates a new pod.
+func (podStrategy) Validate(obj runtime.Object) errors.ValidationErrorList {
+	pod := obj.(*api.Pod)
+	return validation.ValidatePod(pod)
+}
+
+// AllowCreateOnUpdate is false for pods.
+func (podStrategy) AllowCreateOnUpdate() bool {
+	return false
+}
+
+// ValidateUpdate is the default update validation for an end user.
+func (podStrategy) ValidateUpdate(obj, old runtime.Object) errors.ValidationErrorList {
+	return validation.ValidatePodUpdate(obj.(*api.Pod), old.(*api.Pod))
+}
+
+type podStatusStrategy struct {
+	podStrategy
+}
+
+var StatusStrategy = podStatusStrategy{Strategy}
+
+func (podStatusStrategy) ValidateUpdate(obj, old runtime.Object) errors.ValidationErrorList {
+	// TODO: merge valid fields after update
+	return validation.ValidatePodStatusUpdate(obj.(*api.Pod), old.(*api.Pod))
+}
+
+// PodStatusGetter is an interface used by Pods to fetch and retrieve status info.
 type PodStatusGetter interface {
 	GetPodStatus(namespace, name string) (*api.PodStatus, error)
 	ClearPodStatus(namespace, name string)
 }
 
-// REST implements the RESTStorage interface in terms of a PodRegistry.
-type REST struct {
-	podCache PodStatusGetter
-	registry Registry
-}
-
-type RESTConfig struct {
-	PodCache PodStatusGetter
-	Registry Registry
-}
-
-// NewREST returns a new REST.
-func NewREST(config *RESTConfig) *REST {
-	return &REST{
-		podCache: config.PodCache,
-		registry: config.Registry,
-	}
-}
-
-func (rs *REST) Create(ctx api.Context, obj runtime.Object) (<-chan apiserver.RESTResult, error) {
-	pod := obj.(*api.Pod)
-
-	if err := rest.BeforeCreate(rest.Pods, ctx, obj); err != nil {
-		return nil, err
-	}
-
-	return apiserver.MakeAsync(func() (runtime.Object, error) {
-		if err := rs.registry.CreatePod(ctx, pod); err != nil {
-			err = rest.CheckGeneratedNameError(rest.Pods, err, pod)
-			return nil, err
-		}
-		return rs.registry.GetPod(ctx, pod.Name)
-	}), nil
-}
-
-func (rs *REST) Delete(ctx api.Context, id string) (<-chan apiserver.RESTResult, error) {
-	return apiserver.MakeAsync(func() (runtime.Object, error) {
-		namespace, found := api.NamespaceFrom(ctx)
-		if !found {
-			return &api.Status{Status: api.StatusFailure}, nil
-		}
-		rs.podCache.ClearPodStatus(namespace, id)
-
-		return &api.Status{Status: api.StatusSuccess}, rs.registry.DeletePod(ctx, id)
-	}), nil
-}
-
-func (rs *REST) Get(ctx api.Context, id string) (runtime.Object, error) {
-	pod, err := rs.registry.GetPod(ctx, id)
-	if err != nil {
-		return pod, err
-	}
-	if pod == nil {
-		return pod, nil
-	}
-	host := pod.Status.Host
-	if status, err := rs.podCache.GetPodStatus(pod.Namespace, pod.Name); err != nil {
-		pod.Status = api.PodStatus{
-			Phase: api.PodUnknown,
-		}
-	} else {
-		pod.Status = *status
-	}
-	// Make sure not to hide a recent host with an old one from the cache.
-	// TODO: move host to spec
-	pod.Status.Host = host
-	return pod, err
-}
-
-func PodToSelectableFields(pod *api.Pod) labels.Set {
-
-	// TODO we are populating both Status and DesiredState because selectors are not aware of API versions
-	// see https://github.com/GoogleCloudPlatform/kubernetes/pull/2503
-
-	var olderPodStatus v1beta1.PodStatus
-	api.Scheme.Convert(pod.Status.Phase, &olderPodStatus)
-
-	return labels.Set{
-		"name":                pod.Name,
-		"Status.Phase":        string(pod.Status.Phase),
-		"Status.Host":         pod.Status.Host,
-		"DesiredState.Status": string(olderPodStatus),
-		"DesiredState.Host":   pod.Status.Host,
-	}
-}
-
-// filterFunc returns a predicate based on label & field selectors that can be passed to registry's
-// ListPods & WatchPods.
-func (rs *REST) filterFunc(label, field labels.Selector) func(*api.Pod) bool {
-	return func(pod *api.Pod) bool {
-		fields := PodToSelectableFields(pod)
-		return label.Matches(labels.Set(pod.Labels)) && field.Matches(fields)
-	}
-}
-
-func (rs *REST) List(ctx api.Context, label, field labels.Selector) (runtime.Object, error) {
-	pods, err := rs.registry.ListPodsPredicate(ctx, rs.filterFunc(label, field))
-	if err == nil {
-		for i := range pods.Items {
-			pod := &pods.Items[i]
-			host := pod.Status.Host
-			if status, err := rs.podCache.GetPodStatus(pod.Namespace, pod.Name); err != nil {
-				pod.Status = api.PodStatus{
-					Phase: api.PodUnknown,
-				}
-			} else {
-				pod.Status = *status
+// PodStatusDecorator returns a function that updates pod.Status based
+// on the provided pod cache.
+func PodStatusDecorator(cache PodStatusGetter) rest.ObjectFunc {
+	return func(obj runtime.Object) error {
+		pod := obj.(*api.Pod)
+		host := pod.Status.Host
+		if status, err := cache.GetPodStatus(pod.Namespace, pod.Name); err != nil {
+			pod.Status = api.PodStatus{
+				Phase: api.PodUnknown,
 			}
-			// Make sure not to hide a recent host with an old one from the cache.
-			// This is tested by the integration test.
-			// TODO: move host to spec
-			pod.Status.Host = host
+		} else {
+			pod.Status = *status
 		}
+		pod.Status.Host = host
+		return nil
 	}
-	return pods, err
 }
 
-// Watch begins watching for new, changed, or deleted pods.
-func (rs *REST) Watch(ctx api.Context, label, field labels.Selector, resourceVersion string) (watch.Interface, error) {
-	// TODO: Add pod status to watch command
-	return rs.registry.WatchPods(ctx, label, field, resourceVersion)
-}
-
-func (*REST) New() runtime.Object {
-	return &api.Pod{}
-}
-
-func (*REST) NewList() runtime.Object {
-	return &api.PodList{}
-}
-
-func (rs *REST) Update(ctx api.Context, obj runtime.Object) (<-chan apiserver.RESTResult, error) {
-	pod := obj.(*api.Pod)
-	if !api.ValidNamespace(ctx, &pod.ObjectMeta) {
-		return nil, errors.NewConflict("pod", pod.Namespace, fmt.Errorf("Pod.Namespace does not match the provided context"))
+// PodStatusReset returns a function that clears the pod cache when the object
+// is deleted.
+func PodStatusReset(cache PodStatusGetter) rest.ObjectFunc {
+	return func(obj runtime.Object) error {
+		pod := obj.(*api.Pod)
+		cache.ClearPodStatus(pod.Namespace, pod.Name)
+		return nil
 	}
-	if errs := validation.ValidatePod(pod); len(errs) > 0 {
-		return nil, errors.NewInvalid("pod", pod.Name, errs)
-	}
-	return apiserver.MakeAsync(func() (runtime.Object, error) {
-		if err := rs.registry.UpdatePod(ctx, pod); err != nil {
-			return nil, err
+}
+
+// MatchPod returns a generic matcher for a given label and field selector.
+func MatchPod(label labels.Selector, field fields.Selector) generic.Matcher {
+	return generic.MatcherFunc(func(obj runtime.Object) (bool, error) {
+		podObj, ok := obj.(*api.Pod)
+		if !ok {
+			return false, fmt.Errorf("not a pod")
 		}
-		return rs.registry.GetPod(ctx, pod.Name)
-	}), nil
+		fields := PodToSelectableFields(podObj)
+		return label.Matches(labels.Set(podObj.Labels)) && field.Matches(fields), nil
+	})
+}
+
+// PodToSelectableFields returns a label set that represents the object
+// TODO: fields are not labels, and the validation rules for them do not apply.
+func PodToSelectableFields(pod *api.Pod) labels.Set {
+	return labels.Set{
+		"name":         pod.Name,
+		"spec.host":    pod.Spec.Host,
+		"status.phase": string(pod.Status.Phase),
+	}
+}
+
+// ResourceGetter is an interface for retrieving resources by ResourceLocation.
+type ResourceGetter interface {
+	Get(api.Context, string) (runtime.Object, error)
 }
 
 // ResourceLocation returns a URL to which one can send traffic for the specified pod.
-func (rs *REST) ResourceLocation(ctx api.Context, id string) (string, error) {
+func ResourceLocation(getter ResourceGetter, ctx api.Context, id string) (string, error) {
 	// Allow ID as "podname" or "podname:port".  If port is not specified,
 	// try to use the first defined port on the pod.
 	parts := strings.Split(id, ":")
@@ -198,7 +159,7 @@ func (rs *REST) ResourceLocation(ctx api.Context, id string) (string, error) {
 		port = parts[1]
 	}
 
-	obj, err := rs.Get(ctx, name)
+	obj, err := getter.Get(ctx, name)
 	if err != nil {
 		return "", err
 	}

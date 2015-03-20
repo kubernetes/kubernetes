@@ -22,6 +22,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/registrytest"
 )
@@ -30,7 +31,7 @@ func TestGetEndpoints(t *testing.T) {
 	registry := &registrytest.ServiceRegistry{
 		Endpoints: api.Endpoints{
 			ObjectMeta: api.ObjectMeta{Name: "foo"},
-			Endpoints:  []string{"127.0.0.1:9000"},
+			Endpoints:  []api.Endpoint{{IP: "127.0.0.1", Port: 9000}},
 		},
 	}
 	storage := NewREST(registry)
@@ -39,7 +40,7 @@ func TestGetEndpoints(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %#v", err)
 	}
-	if !reflect.DeepEqual([]string{"127.0.0.1:9000"}, obj.(*api.Endpoints).Endpoints) {
+	if !reflect.DeepEqual([]api.Endpoint{{IP: "127.0.0.1", Port: 9000}}, obj.(*api.Endpoints).Endpoints) {
 		t.Errorf("unexpected endpoints: %#v", obj)
 	}
 }
@@ -81,7 +82,7 @@ func TestEndpointsRegistryList(t *testing.T) {
 		},
 	}
 	ctx := api.NewContext()
-	s, _ := storage.List(ctx, labels.Everything(), labels.Everything())
+	s, _ := storage.List(ctx, labels.Everything(), fields.Everything())
 	sl := s.(*api.EndpointsList)
 	if len(sl.Items) != 2 {
 		t.Fatalf("Expected 2 endpoints, but got %v", len(sl.Items))

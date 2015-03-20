@@ -168,6 +168,7 @@ func TestIsQualifiedName(t *testing.T) {
 		"1-num.2-num/3-num",
 		"1234/5678",
 		"1.2.3.4/5678",
+		"UppercaseIsOK123",
 	}
 	for i := range successCases {
 		if !IsQualifiedName(successCases[i]) {
@@ -176,15 +177,47 @@ func TestIsQualifiedName(t *testing.T) {
 	}
 
 	errorCases := []string{
-		"NoUppercase123",
 		"nospecialchars%^=@",
 		"cantendwithadash-",
-		"-cantstartwithadash",
 		"only/one/slash",
 		strings.Repeat("a", 254),
+		"-cantstartwithadash",
 	}
 	for i := range errorCases {
 		if IsQualifiedName(errorCases[i]) {
+			t.Errorf("case[%d] expected failure", i)
+		}
+	}
+}
+
+func TestIsValidLabelValue(t *testing.T) {
+	successCases := []string{
+		"simple",
+		"now-with-dashes",
+		"1-starts-with-num",
+		"end-with-num-1",
+		"1234",                  // only num
+		strings.Repeat("a", 63), // to the limit
+		"", // empty value
+	}
+	for i := range successCases {
+		if !IsValidLabelValue(successCases[i]) {
+			t.Errorf("case %s expected success", successCases[i])
+		}
+	}
+
+	errorCases := []string{
+		"nospecialchars%^=@",
+		"Tama-nui-te-rā.is.Māori.sun",
+		"\\backslashes\\are\\bad",
+		"-starts-with-dash",
+		"ends-with-dash-",
+		".starts.with.dot",
+		"ends.with.dot.",
+		strings.Repeat("a", 64), // over the limit
+	}
+	for i := range errorCases {
+		if IsValidLabelValue(errorCases[i]) {
 			t.Errorf("case[%d] expected failure", i)
 		}
 	}

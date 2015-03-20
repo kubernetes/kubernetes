@@ -20,6 +20,8 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/errors"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/golang/glog"
 )
@@ -50,6 +52,8 @@ const (
 	// values which would be accepted by some api instances, but which would invoke behavior
 	// not permitted by this api instance (such as due to stricter security policy).
 	ValidationErrorTypeForbidden ValidationErrorType = "FieldValueForbidden"
+	// ValidationErrorTypeTooLong is used to report that given value is too long.
+	ValidationErrorTypeTooLong ValidationErrorType = "FieldValueTooLong"
 )
 
 // String converts a ValidationErrorType into its corresponding error message.
@@ -67,6 +71,8 @@ func (t ValidationErrorType) String() string {
 		return "unsupported value"
 	case ValidationErrorTypeForbidden:
 		return "forbidden"
+	case ValidationErrorTypeTooLong:
+		return "too long"
 	default:
 		glog.Errorf("unrecognized validation type: %#v", t)
 		return ""
@@ -128,6 +134,10 @@ func NewFieldNotFound(field string, value interface{}) *ValidationError {
 	return &ValidationError{ValidationErrorTypeNotFound, field, value, ""}
 }
 
+func NewFieldTooLong(field string, value interface{}) *ValidationError {
+	return &ValidationError{ValidationErrorTypeTooLong, field, value, ""}
+}
+
 type ValidationErrorList []error
 
 // Prefix adds a prefix to the Field of every ValidationError in the list.
@@ -154,4 +164,38 @@ func (list ValidationErrorList) Prefix(prefix string) ValidationErrorList {
 // Returns the list for convenience.
 func (list ValidationErrorList) PrefixIndex(index int) ValidationErrorList {
 	return list.Prefix(fmt.Sprintf("[%d]", index))
+}
+
+// NewValidationErrorFieldPrefixMatcher returns an errors.Matcher that returns true
+// if the provided error is a ValidationError and has the provided ValidationErrorType.
+func NewValidationErrorTypeMatcher(t ValidationErrorType) errors.Matcher {
+	return func(err error) bool {
+		if e, ok := err.(*ValidationError); ok {
+			return e.Type == t
+		}
+		return false
+	}
+}
+
+// NewValidationErrorFieldPrefixMatcher returns an errors.Matcher that returns true
+// if the provided error is a ValidationError and has a field with the provided
+// prefix.
+func NewValidationErrorFieldPrefixMatcher(prefix string) errors.Matcher {
+	return func(err error) bool {
+		if e, ok := err.(*ValidationError); ok {
+			return strings.HasPrefix(e.Field, prefix)
+		}
+		return false
+	}
+}
+
+// Filter removes items from the ValidationErrorList that match the provided fns.
+func (list ValidationErrorList) Filter(fns ...errors.Matcher) ValidationErrorList {
+	err := errors.FilterOut(errors.NewAggregate(list), fns...)
+	if err == nil {
+		return nil
+	}
+	// FilterOut that takes an Aggregate returns an Aggregate
+	agg := err.(errors.Aggregate)
+	return ValidationErrorList(agg.Errors())
 }

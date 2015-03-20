@@ -22,6 +22,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
 
 // ResourceQuotasNamespacer has methods to work with ResourceQuota resources in a namespace
@@ -36,6 +37,8 @@ type ResourceQuotaInterface interface {
 	Delete(name string) error
 	Create(resourceQuota *api.ResourceQuota) (*api.ResourceQuota, error)
 	Update(resourceQuota *api.ResourceQuota) (*api.ResourceQuota, error)
+	Status(resourceQuota *api.ResourceQuota) (*api.ResourceQuota, error)
+	Watch(label, field labels.Selector, resourceVersion string) (watch.Interface, error)
 }
 
 // resourceQuotas implements ResourceQuotasNamespacer interface
@@ -55,7 +58,7 @@ func newResourceQuotas(c *Client, namespace string) *resourceQuotas {
 // List takes a selector, and returns the list of resourceQuotas that match that selector.
 func (c *resourceQuotas) List(selector labels.Selector) (result *api.ResourceQuotaList, err error) {
 	result = &api.ResourceQuotaList{}
-	err = c.r.Get().Namespace(c.ns).Resource("resourceQuotas").SelectorParam("labels", selector).Do().Into(result)
+	err = c.r.Get().Namespace(c.ns).Resource("resourceQuotas").SelectorParam(api.LabelSelectorQueryParam(c.r.APIVersion()), selector).Do().Into(result)
 	return
 }
 
@@ -82,7 +85,7 @@ func (c *resourceQuotas) Create(resourceQuota *api.ResourceQuota) (result *api.R
 	return
 }
 
-// Update takes the representation of a resourceQuota to update.  Returns the server's representation of the resourceQuota, and an error, if it occurs.
+// Update takes the representation of a resourceQuota to update spec.  Returns the server's representation of the resourceQuota, and an error, if it occurs.
 func (c *resourceQuotas) Update(resourceQuota *api.ResourceQuota) (result *api.ResourceQuota, err error) {
 	result = &api.ResourceQuota{}
 	if len(resourceQuota.ResourceVersion) == 0 {
@@ -91,4 +94,27 @@ func (c *resourceQuotas) Update(resourceQuota *api.ResourceQuota) (result *api.R
 	}
 	err = c.r.Put().Namespace(c.ns).Resource("resourceQuotas").Name(resourceQuota.Name).Body(resourceQuota).Do().Into(result)
 	return
+}
+
+// Status takes the representation of a resourceQuota to update status.  Returns the server's representation of the resourceQuota, and an error, if it occurs.
+func (c *resourceQuotas) Status(resourceQuota *api.ResourceQuota) (result *api.ResourceQuota, err error) {
+	result = &api.ResourceQuota{}
+	if len(resourceQuota.ResourceVersion) == 0 {
+		err = fmt.Errorf("invalid update object, missing resource version: %v", resourceQuota)
+		return
+	}
+	err = c.r.Put().Namespace(c.ns).Resource("resourceQuotas").Name(resourceQuota.Name).SubResource("status").Body(resourceQuota).Do().Into(result)
+	return
+}
+
+// Watch returns a watch.Interface that watches the requested resource
+func (c *resourceQuotas) Watch(label, field labels.Selector, resourceVersion string) (watch.Interface, error) {
+	return c.r.Get().
+		Prefix("watch").
+		Namespace(c.ns).
+		Resource("resourceQuotas").
+		Param("resourceVersion", resourceVersion).
+		SelectorParam(api.LabelSelectorQueryParam(c.r.APIVersion()), label).
+		SelectorParam(api.FieldSelectorQueryParam(c.r.APIVersion()), field).
+		Watch()
 }

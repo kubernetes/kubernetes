@@ -20,7 +20,10 @@ set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 source "${KUBE_ROOT}/cluster/kube-env.sh"
-source "${KUBE_ROOT}/cluster/${KUBERNETES_PROVIDER}/util.sh"
+UTILS=${KUBE_ROOT}/cluster/${KUBERNETES_PROVIDER}/util.sh
+if [ -f ${UTILS} ]; then
+    source "${UTILS}"
+fi
 
 # Get the absolute path of the directory component of a file, i.e. the
 # absolute path of the dirname of $1.
@@ -103,15 +106,6 @@ if [[ "$KUBERNETES_PROVIDER" == "gke" ]]; then
   detect-project &> /dev/null
   export PATH=$(get_absolute_dirname $kubectl):$PATH
   kubectl="${GCLOUD}"
-fi
-
-if [[ "$KUBERNETES_PROVIDER" == "vagrant" ]]; then
-  # When we are using vagrant it has hard coded auth.  We repeat that here so that
-  # we don't clobber auth that might be used for a publicly facing cluster.
-  config=(
-    "--auth-path=$HOME/.kubernetes_vagrant_auth"
-  )
-elif [[ "${KUBERNETES_PROVIDER}" == "gke" ]]; then
   # GKE runs kubectl through gcloud.
   config=(
     "preview"
@@ -121,12 +115,19 @@ elif [[ "${KUBERNETES_PROVIDER}" == "gke" ]]; then
     "--zone=${ZONE}"
     "--cluster=${CLUSTER_NAME}"
   )
+elif [[ "$KUBERNETES_PROVIDER" == "vagrant" ]]; then
+  # When we are using vagrant it has hard coded kubeconfig, and do not clobber public endpoints
+  config=(
+    "--kubeconfig=$HOME/.kubernetes_vagrant_kubeconfig"
+  )
+elif [[ "$KUBERNETES_PROVIDER" == "libvirt-coreos" ]]; then
+  detect-master > /dev/null
+  config=(
+    "--server=http://${KUBE_MASTER_IP}:8080"
+  )
 fi
 
-detect-master > /dev/null
-if [[ -n "${KUBE_MASTER_IP-}" && -z "${KUBERNETES_MASTER-}" ]]; then
-  export KUBERNETES_MASTER=https://${KUBE_MASTER_IP}
-fi
+echo "current-context: \"$(${kubectl} "${config[@]:+${config[@]}}" config view -o template --template='{{index . "current-context"}}')\"" >&2
 
-echo "Running:" "${kubectl}" "${config[@]:+${config[@]}}" "${@}" >&2
-"${kubectl}" "${config[@]:+${config[@]}}" "${@}"
+echo "Running:" "${kubectl}" "${config[@]:+${config[@]}}" "${@+$@}" >&2
+"${kubectl}" "${config[@]:+${config[@]}}" "${@+$@}"
