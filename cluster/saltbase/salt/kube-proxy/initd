@@ -40,6 +40,9 @@ DAEMON_USER=root
 #
 do_start()
 {
+        # Raise the file descriptor limit - we expect to open a lot of sockets!
+        ulimit -n 65536
+
         # Return
         #   0 if daemon has been started
         #   1 if daemon was already running
