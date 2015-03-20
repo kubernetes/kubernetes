@@ -52,7 +52,6 @@ type KubeletServer struct {
 	FileCheckFrequency             time.Duration
 	HTTPCheckFrequency             time.Duration
 	StatusUpdateFrequency          time.Duration
-	PodStatusUpdateFrequency       time.Duration
 	ManifestURL                    string
 	EnableServer                   bool
 	Address                        util.IP
@@ -86,14 +85,13 @@ type KubeletServer struct {
 // NewKubeletServer will create a new KubeletServer with default values.
 func NewKubeletServer() *KubeletServer {
 	return &KubeletServer{
-		SyncFrequency:            10 * time.Second,
-		FileCheckFrequency:       20 * time.Second,
-		HTTPCheckFrequency:       20 * time.Second,
-		StatusUpdateFrequency:    20 * time.Second,
-		PodStatusUpdateFrequency: 2 * time.Minute,
-		EnableServer:             true,
-		Address:                  util.IP(net.ParseIP("127.0.0.1")),
-		Port:                     ports.KubeletPort,
+		SyncFrequency:         10 * time.Second,
+		FileCheckFrequency:    20 * time.Second,
+		HTTPCheckFrequency:    20 * time.Second,
+		StatusUpdateFrequency: 20 * time.Second,
+		EnableServer:          true,
+		Address:               util.IP(net.ParseIP("127.0.0.1")),
+		Port:                  ports.KubeletPort,
 		PodInfraContainerImage:      kubelet.PodInfraContainerImage,
 		RootDirectory:               defaultRootDir,
 		RegistryBurst:               10,
@@ -115,7 +113,6 @@ func (s *KubeletServer) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.Config, "config", s.Config, "Path to the config file or directory of files")
 	fs.DurationVar(&s.SyncFrequency, "sync_frequency", s.SyncFrequency, "Max period between synchronizing running containers and config")
 	fs.DurationVar(&s.StatusUpdateFrequency, "status_update_frequency", s.StatusUpdateFrequency, "Duration between posting node status to master")
-	fs.DurationVar(&s.PodStatusUpdateFrequency, "pod_status_update_frequency", s.PodStatusUpdateFrequency, "Duration between posting pod status updates to the master")
 	fs.DurationVar(&s.FileCheckFrequency, "file_check_frequency", s.FileCheckFrequency, "Duration between checking config files for new data")
 	fs.DurationVar(&s.HTTPCheckFrequency, "http_check_frequency", s.HTTPCheckFrequency, "Duration between checking http for new data")
 	fs.StringVar(&s.ManifestURL, "manifest_url", s.ManifestURL, "URL for accessing the container manifest")
@@ -183,7 +180,6 @@ func (s *KubeletServer) Run(_ []string) error {
 		ConfigFile:                     s.Config,
 		ManifestURL:                    s.ManifestURL,
 		StatusUpdateFrequency:          s.StatusUpdateFrequency,
-		PodStatusUpdateFrequency:       s.PodStatusUpdateFrequency,
 		FileCheckFrequency:             s.FileCheckFrequency,
 		HTTPCheckFrequency:             s.HTTPCheckFrequency,
 		PodInfraContainerImage:         s.PodInfraContainerImage,
@@ -283,24 +279,23 @@ func SimpleKubelet(client *client.Client,
 		RootDirectory:          rootDir,
 		ManifestURL:            manifestURL,
 		PodInfraContainerImage: kubelet.PodInfraContainerImage,
-		Port:                     port,
-		Address:                  util.IP(net.ParseIP(address)),
-		EnableServer:             true,
-		EnableDebuggingHandlers:  true,
-		HTTPCheckFrequency:       1 * time.Second,
-		FileCheckFrequency:       1 * time.Second,
-		StatusUpdateFrequency:    3 * time.Second,
-		PodStatusUpdateFrequency: 2 * time.Minute,
-		SyncFrequency:            3 * time.Second,
-		MinimumGCAge:             10 * time.Second,
-		MaxPerPodContainerCount:  5,
-		MaxContainerCount:        100,
-		MasterServiceNamespace:   masterServiceNamespace,
-		VolumePlugins:            volumePlugins,
-		TLSOptions:               tlsOptions,
-		CadvisorInterface:        cadvisorInterface,
-		ConfigFile:               configFilePath,
-		ImageGCPolicy:            imageGCPolicy,
+		Port:                    port,
+		Address:                 util.IP(net.ParseIP(address)),
+		EnableServer:            true,
+		EnableDebuggingHandlers: true,
+		HTTPCheckFrequency:      1 * time.Second,
+		FileCheckFrequency:      1 * time.Second,
+		StatusUpdateFrequency:   3 * time.Second,
+		SyncFrequency:           3 * time.Second,
+		MinimumGCAge:            10 * time.Second,
+		MaxPerPodContainerCount: 5,
+		MaxContainerCount:       100,
+		MasterServiceNamespace:  masterServiceNamespace,
+		VolumePlugins:           volumePlugins,
+		TLSOptions:              tlsOptions,
+		CadvisorInterface:       cadvisorInterface,
+		ConfigFile:              configFilePath,
+		ImageGCPolicy:           imageGCPolicy,
 	}
 	return &kcfg
 }
@@ -386,7 +381,6 @@ type KubeletConfig struct {
 	ConfigFile                     string
 	ManifestURL                    string
 	StatusUpdateFrequency          time.Duration
-	PodStatusUpdateFrequency       time.Duration
 	FileCheckFrequency             time.Duration
 	HTTPCheckFrequency             time.Duration
 	Hostname                       string
@@ -453,7 +447,6 @@ func createAndInitKubelet(kc *KubeletConfig, pc *config.PodConfig) (*kubelet.Kub
 		kc.Recorder,
 		kc.CadvisorInterface,
 		kc.StatusUpdateFrequency,
-		kc.PodStatusUpdateFrequency,
 		kc.ImageGCPolicy)
 
 	if err != nil {

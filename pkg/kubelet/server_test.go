@@ -59,7 +59,7 @@ func (fk *fakeKubelet) GetPodByName(namespace, name string) (*api.Pod, bool) {
 	return fk.podByNameFunc(namespace, name)
 }
 
-func (fk *fakeKubelet) GetPodStatus(name string, uid types.UID) (api.PodStatus, error) {
+func (fk *fakeKubelet) GetPodStatus(name string) (api.PodStatus, error) {
 	return fk.statusFunc(name)
 }
 
