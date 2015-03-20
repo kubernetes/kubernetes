@@ -150,13 +150,16 @@ var _ = Describe("Networking", func() {
 		var body []byte
 		for i := 0; i < maxAttempts && !passed; i++ {
 			time.Sleep(2 * time.Second)
+			Logf("About to make a proxy status call")
+			start := time.Now()
 			body, err = c.Get().
 				Namespace(ns).
 				Prefix("proxy").
 				Resource("services").
 				Name(svc.Name).
 				Suffix("status").
-				Do().Raw()
+				DoRaw()
+			Logf("Proxy status call returned in %v", time.Since(start))
 			if err != nil {
 				Logf("Attempt %v/%v: service/pod still starting. (error: '%v')", i, maxAttempts, err)
 				continue
@@ -174,7 +177,7 @@ var _ = Describe("Networking", func() {
 					Namespace(ns).Prefix("proxy").
 					Resource("services").
 					Name(svc.Name).Suffix("read").
-					Do().Raw(); err != nil {
+					DoRaw(); err != nil {
 					Failf("Failed on attempt %v. Cleaning up. Error reading details: %v", i, err)
 				} else {
 					Failf("Failed on attempt %v. Cleaning up. Details:\n%s", i, string(body))
@@ -190,7 +193,7 @@ var _ = Describe("Networking", func() {
 				Resource("services").
 				Name(svc.Name).
 				Suffix("read").
-				Do().Raw(); err != nil {
+				DoRaw(); err != nil {
 				Failf("Timed out. Cleaning up. Error reading details: %v", err)
 			} else {
 				Failf("Timed out. Cleaning up. Details:\n%s", string(body))
@@ -212,7 +215,7 @@ var _ = Describe("Networking", func() {
 			data, err := c.RESTClient.Get().
 				Namespace(ns).
 				AbsPath(test.path).
-				Do().Raw()
+				DoRaw()
 			if err != nil {
 				Failf("Failed: %v\nBody: %s", err, string(data))
 			}
