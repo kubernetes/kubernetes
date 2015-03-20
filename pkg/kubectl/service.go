@@ -35,7 +35,8 @@ func (ServiceGenerator) ParamNames() []GeneratorParam {
 		{"public-ip", false},
 		{"create-external-load-balancer", false},
 		{"protocol", false},
-		{"container-port", false},
+		{"container-port", false}, // alias of target-port
+		{"target-port", false},
 	}
 }
 
@@ -75,15 +76,18 @@ func (ServiceGenerator) Generate(params map[string]string) (runtime.Object, erro
 			Selector: selector,
 		},
 	}
-	containerPort, found := params["container-port"]
-	if found && len(containerPort) > 0 {
-		if cPort, err := strconv.Atoi(containerPort); err != nil {
-			service.Spec.ContainerPort = util.NewIntOrStringFromString(containerPort)
+	targetPort, found := params["target-port"]
+	if !found {
+		targetPort, found = params["container-port"]
+	}
+	if found && len(targetPort) > 0 {
+		if portNum, err := strconv.Atoi(targetPort); err != nil {
+			service.Spec.TargetPort = util.NewIntOrStringFromString(targetPort)
 		} else {
-			service.Spec.ContainerPort = util.NewIntOrStringFromInt(cPort)
+			service.Spec.TargetPort = util.NewIntOrStringFromInt(portNum)
 		}
 	} else {
-		service.Spec.ContainerPort = util.NewIntOrStringFromInt(port)
+		service.Spec.TargetPort = util.NewIntOrStringFromInt(port)
 	}
 	if params["create-external-load-balancer"] == "true" {
 		service.Spec.CreateExternalLoadBalancer = true

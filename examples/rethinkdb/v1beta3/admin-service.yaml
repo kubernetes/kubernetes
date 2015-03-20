@@ -6,7 +6,7 @@ metadata:
   name: rethinkdb-admin
   namespace: rethinkdb
 spec:
-  containerPort: 8080
+  targetPort: 8080
   port: 8080
   selector:
     db: rethinkdb

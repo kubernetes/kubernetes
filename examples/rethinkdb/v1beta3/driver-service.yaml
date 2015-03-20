@@ -6,7 +6,7 @@ metadata:
   name: rethinkdb-driver
   namespace: rethinkdb
 spec:
-  containerPort: 28015
+  targetPort: 28015
   port: 28015
   selector:
     db: rethinkdb

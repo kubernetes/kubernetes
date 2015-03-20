@@ -5,7 +5,7 @@ metadata:
     name: hazelcast
   name: hazelcast
 spec: 
-  containerPort: 5701
+  targetPort: 5701
   port: 5701
   selector: 
     name: hazelcast

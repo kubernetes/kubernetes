@@ -735,9 +735,9 @@ func ValidateService(service *api.Service) errs.ValidationErrorList {
 	} else if !supportedPortProtocols.Has(strings.ToUpper(string(service.Spec.Protocol))) {
 		allErrs = append(allErrs, errs.NewFieldNotSupported("spec.protocol", service.Spec.Protocol))
 	}
-	if service.Spec.ContainerPort.Kind == util.IntstrInt && service.Spec.ContainerPort.IntVal != 0 && !util.IsValidPortNum(service.Spec.ContainerPort.IntVal) {
+	if service.Spec.TargetPort.Kind == util.IntstrInt && service.Spec.TargetPort.IntVal != 0 && !util.IsValidPortNum(service.Spec.TargetPort.IntVal) {
 		allErrs = append(allErrs, errs.NewFieldInvalid("spec.containerPort", service.Spec.Port, portRangeErrorMsg))
-	} else if service.Spec.ContainerPort.Kind == util.IntstrString && len(service.Spec.ContainerPort.StrVal) == 0 {
+	} else if service.Spec.TargetPort.Kind == util.IntstrString && len(service.Spec.TargetPort.StrVal) == 0 {
 		allErrs = append(allErrs, errs.NewFieldRequired("spec.containerPort"))
 	}
 

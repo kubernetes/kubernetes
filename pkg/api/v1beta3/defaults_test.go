@@ -72,19 +72,19 @@ func TestSetDefaulEndpointsProtocol(t *testing.T) {
 	}
 }
 
-func TestSetDefaulServiceDestinationPort(t *testing.T) {
+func TestSetDefaulServiceTargetPort(t *testing.T) {
 	in := &current.Service{Spec: current.ServiceSpec{Port: 1234}}
 	obj := roundTrip(t, runtime.Object(in))
 	out := obj.(*current.Service)
-	if out.Spec.ContainerPort.Kind != util.IntstrInt || out.Spec.ContainerPort.IntVal != 1234 {
-		t.Errorf("Expected ContainerPort to be defaulted, got %s", out.Spec.ContainerPort)
+	if out.Spec.TargetPort.Kind != util.IntstrInt || out.Spec.TargetPort.IntVal != 1234 {
+		t.Errorf("Expected TargetPort to be defaulted, got %s", out.Spec.TargetPort)
 	}
 
-	in = &current.Service{Spec: current.ServiceSpec{Port: 1234, ContainerPort: util.NewIntOrStringFromInt(5678)}}
+	in = &current.Service{Spec: current.ServiceSpec{Port: 1234, TargetPort: util.NewIntOrStringFromInt(5678)}}
 	obj = roundTrip(t, runtime.Object(in))
 	out = obj.(*current.Service)
-	if out.Spec.ContainerPort.Kind != util.IntstrInt || out.Spec.ContainerPort.IntVal != 5678 {
-		t.Errorf("Expected ContainerPort to be unchanged, got %s", out.Spec.ContainerPort)
+	if out.Spec.TargetPort.Kind != util.IntstrInt || out.Spec.TargetPort.IntVal != 5678 {
+		t.Errorf("Expected TargetPort to be unchanged, got %s", out.Spec.TargetPort)
 	}
 }
 

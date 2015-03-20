@@ -6,7 +6,7 @@ metadata:
     role: service
   name: redis-sentinel
 spec:
-  containerPort: 26379
+  targetPort: 26379
   port: 26379
   selector:
     redis-sentinel: "true"
