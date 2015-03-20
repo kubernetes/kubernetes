@@ -574,7 +574,8 @@ const (
 
 // PodSpec is a description of a pod
 type PodSpec struct {
-	Volumes       []Volume      `json:"volumes"`
+	Volumes []Volume `json:"volumes"`
+	// Required: there must be at least one container in a pod.
 	Containers    []Container   `json:"containers"`
 	RestartPolicy RestartPolicy `json:"restartPolicy,omitempty"`
 	// Required: Set DNS policy.
