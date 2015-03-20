@@ -69,7 +69,7 @@ func writeTestFile(t *testing.T, dir, name string, contents string) *os.File {
 	return file
 }
 
-func TestReadManifestFromFile(t *testing.T) {
+func TestReadFromFile(t *testing.T) {
 	hostname, _ := os.Hostname()
 	hostname = strings.ToLower(hostname)
 
@@ -93,7 +93,15 @@ func TestReadManifestFromFile(t *testing.T) {
 					Namespace: kubelet.NamespaceDefault,
 					SelfLink:  "/api/v1beta2/pods/test-" + hostname + "?namespace=default",
 				},
-				Spec: api.PodSpec{Containers: []api.Container{{Image: "test/image"}}},
+				Spec: api.PodSpec{
+					RestartPolicy: api.RestartPolicyAlways,
+					DNSPolicy:     api.DNSClusterFirst,
+					Containers: []api.Container{{
+						Name:  "image",
+						Image: "test/image",
+						TerminationMessagePath: "/dev/termination-log",
+						ImagePullPolicy:        "Always"}},
+				},
 			}),
 		},
 		{
@@ -110,7 +118,15 @@ func TestReadManifestFromFile(t *testing.T) {
 					Namespace: kubelet.NamespaceDefault,
 					SelfLink:  "/api/v1beta2/pods/12345-" + hostname + "?namespace=default",
 				},
-				Spec: api.PodSpec{Containers: []api.Container{{Image: "test/image"}}},
+				Spec: api.PodSpec{
+					RestartPolicy: api.RestartPolicyAlways,
+					DNSPolicy:     api.DNSClusterFirst,
+					Containers: []api.Container{{
+						Name:  "image",
+						Image: "test/image",
+						TerminationMessagePath: "/dev/termination-log",
+						ImagePullPolicy:        "Always"}},
+				},
 			}),
 		},
 		{
@@ -128,7 +144,15 @@ func TestReadManifestFromFile(t *testing.T) {
 					Namespace: kubelet.NamespaceDefault,
 					SelfLink:  "/api/v1beta2/pods/test-" + hostname + "?namespace=default",
 				},
-				Spec: api.PodSpec{Containers: []api.Container{{Image: "test/image"}}},
+				Spec: api.PodSpec{
+					RestartPolicy: api.RestartPolicyAlways,
+					DNSPolicy:     api.DNSClusterFirst,
+					Containers: []api.Container{{
+						Name:  "image",
+						Image: "test/image",
+						TerminationMessagePath: "/dev/termination-log",
+						ImagePullPolicy:        "Always"}},
+				},
 			}),
 		},
 		{
@@ -152,7 +176,15 @@ func TestReadManifestFromFile(t *testing.T) {
 					Namespace: "mynamespace",
 					SelfLink:  "/api/v1beta2/pods/test-" + hostname + "?namespace=mynamespace",
 				},
-				Spec: api.PodSpec{Containers: []api.Container{{Image: "test/image"}}},
+				Spec: api.PodSpec{
+					RestartPolicy: api.RestartPolicyAlways,
+					DNSPolicy:     api.DNSClusterFirst,
+					Containers: []api.Container{{
+						Name:  "image",
+						Image: "test/image",
+						TerminationMessagePath: "/dev/termination-log",
+						ImagePullPolicy:        "IfNotPresent"}},
+				},
 			}),
 		},
 		{
@@ -174,7 +206,15 @@ func TestReadManifestFromFile(t *testing.T) {
 					Namespace: kubelet.NamespaceDefault,
 					SelfLink:  "/api/v1beta2/pods/12345-" + hostname + "?namespace=default",
 				},
-				Spec: api.PodSpec{Containers: []api.Container{{Image: "test/image"}}},
+				Spec: api.PodSpec{
+					RestartPolicy: api.RestartPolicyAlways,
+					DNSPolicy:     api.DNSClusterFirst,
+					Containers: []api.Container{{
+						Name:  "image",
+						Image: "test/image",
+						TerminationMessagePath: "/dev/termination-log",
+						ImagePullPolicy:        "IfNotPresent"}},
+				},
 			}),
 		},
 		{
@@ -197,7 +237,15 @@ func TestReadManifestFromFile(t *testing.T) {
 					Namespace: kubelet.NamespaceDefault,
 					SelfLink:  "/api/v1beta2/pods/test-" + hostname + "?namespace=default",
 				},
-				Spec: api.PodSpec{Containers: []api.Container{{Image: "test/image"}}},
+				Spec: api.PodSpec{
+					RestartPolicy: api.RestartPolicyAlways,
+					DNSPolicy:     api.DNSClusterFirst,
+					Containers: []api.Container{{
+						Name:  "image",
+						Image: "test/image",
+						TerminationMessagePath: "/dev/termination-log",
+						ImagePullPolicy:        "IfNotPresent"}},
+				},
 			}),
 		},
 	}
@@ -212,7 +260,12 @@ func TestReadManifestFromFile(t *testing.T) {
 			select {
 			case got := <-ch:
 				update := got.(kubelet.PodUpdate)
-				if !api.Semantic.DeepDerivative(testCase.expected, update) {
+				for _, pod := range update.Pods {
+					if errs := validation.ValidatePod(&pod); len(errs) > 0 {
+						t.Errorf("%s: Invalid pod %#v, %#v", testCase.desc, pod, errs)
+					}
+				}
+				if !api.Semantic.DeepEqual(testCase.expected, update) {
 					t.Errorf("%s: Expected %#v, Got %#v", testCase.desc, testCase.expected, update)
 				}
 			case <-time.After(time.Second):
@@ -274,7 +327,7 @@ func TestExtractFromEmptyDir(t *testing.T) {
 
 	update := (<-ch).(kubelet.PodUpdate)
 	expected := CreatePodUpdate(kubelet.SET, kubelet.FileSource)
-	if !api.Semantic.DeepDerivative(expected, update) {
+	if !api.Semantic.DeepEqual(expected, update) {
 		t.Errorf("Expected %#v, Got %#v", expected, update)
 	}
 }
