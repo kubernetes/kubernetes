@@ -26,7 +26,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -68,8 +67,7 @@ func ClusterLevelLoggingWithElasticsearch(c *client.Client) {
 
 	// Check for the existence of the Elasticsearch service.
 	By("Checking the Elasticsearch service exists.")
-	const ns = api.NamespaceDefault
-	s := c.Services(ns)
+	s := c.Services(api.NamespaceDefault)
 	// Make a few attempts to connect. This makes the test robust against
 	// being run as the first e2e test just after the e2e cluster has been created.
 	var err error
@@ -85,7 +83,7 @@ func ClusterLevelLoggingWithElasticsearch(c *client.Client) {
 	// Wait for the Elasticsearch pods to enter the running state.
 	By("Checking to make sure the Elasticsearch pods are running")
 	label := labels.SelectorFromSet(labels.Set(map[string]string{"name": "elasticsearch-logging"}))
-	pods, err := c.Pods(ns).List(label)
+	pods, err := c.Pods(api.NamespaceDefault).List(label)
 	Expect(err).NotTo(HaveOccurred())
 	for _, pod := range pods.Items {
 		err = waitForPodRunning(c, pod.Name)
@@ -100,6 +98,7 @@ func ClusterLevelLoggingWithElasticsearch(c *client.Client) {
 	for start := time.Now(); time.Since(start) < graceTime; time.Sleep(5 * time.Second) {
 		// Query against the root URL for Elasticsearch.
 		body, err := c.Get().
+			Namespace(api.NamespaceDefault).
 			Prefix("proxy").
 			Resource("services").
 			Name("elasticsearch-logging").
@@ -143,6 +142,7 @@ func ClusterLevelLoggingWithElasticsearch(c *client.Client) {
 	// Check the cluster health.
 	By("Checking health of Elasticsearch service.")
 	body, err := c.Get().
+		Namespace(api.NamespaceDefault).
 		Prefix("proxy").
 		Resource("services").
 		Name("elasticsearch-logging").
@@ -174,9 +174,12 @@ func ClusterLevelLoggingWithElasticsearch(c *client.Client) {
 
 	// Create a unique root name for the resources in this test to permit
 	// parallel executions of this test.
-	name := "synthlogger-" + string(util.NewUUID())
+	// Use a unique namespace for the resources created in this test.
+	ns := "es-logging-" + randomSuffix()
+	name := "synthlogger"
+	// Form a unique name to taint log lines to be colelcted.
 	// Replace '-' characters with '_' to prevent the analyzer from breaking apart names.
-	underscoreName := strings.Replace(name, "-", "_", -1)
+	taintName := strings.Replace(ns+name, "-", "_", -1)
 
 	// podNames records the names of the synthetic logging pods that are created in the
 	// loop below.
@@ -196,7 +199,7 @@ func ClusterLevelLoggingWithElasticsearch(c *client.Client) {
 					{
 						Name:    "synth-logger",
 						Image:   "ubuntu:14.04",
-						Command: []string{"bash", "-c", fmt.Sprintf("i=0; while ((i < %d)); do echo \"%d %s $i %s\"; i=$(($i+1)); done", countTo, i, underscoreName, podName)},
+						Command: []string{"bash", "-c", fmt.Sprintf("i=0; while ((i < %d)); do echo \"%d %s $i %s\"; i=$(($i+1)); done", countTo, i, taintName, podName)},
 					},
 				},
 				Host:          node.Name,
@@ -219,7 +222,7 @@ func ClusterLevelLoggingWithElasticsearch(c *client.Client) {
 	// Wait for the syntehtic logging pods to finish.
 	By("Waiting for the pods to succeed.")
 	for _, pod := range podNames {
-		err = waitForPodSuccess(c, pod, "synth-logger")
+		err = waitForPodSuccessInNamespace(c, pod, "synth-logger", ns)
 		Expect(err).NotTo(HaveOccurred())
 	}
 
@@ -235,11 +238,12 @@ func ClusterLevelLoggingWithElasticsearch(c *client.Client) {
 		// verison of the name. Ask for twice as many log lines as we expect to check for
 		// duplication bugs.
 		body, err = c.Get().
+			Namespace(api.NamespaceDefault).
 			Prefix("proxy").
 			Resource("services").
 			Name("elasticsearch-logging").
 			Suffix("_search").
-			Param("q", fmt.Sprintf("log:%s", underscoreName)).
+			Param("q", fmt.Sprintf("log:%s", taintName)).
 			Param("size", strconv.Itoa(2*expected)).
 			DoRaw()
 		if err != nil {

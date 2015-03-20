@@ -97,9 +97,9 @@ func waitForPodNotPending(c *client.Client, ns, podName string) error {
 	})
 }
 
-// waitForPodSuccess returns nil if the pod reached state success, or an error if it reached failure or ran too long.
-func waitForPodSuccess(c *client.Client, podName string, contName string) error {
-	return waitForPodCondition(c, api.NamespaceDefault, podName, "success or failure", func(pod *api.Pod) (bool, error) {
+// waitForPodSuccessInNamespace returns nil if the pod reached state success, or an error if it reached failure or ran too long.
+func waitForPodSuccessInNamespace(c *client.Client, podName string, contName string, namespace string) error {
+	return waitForPodCondition(c, namespace, podName, "success or failure", func(pod *api.Pod) (bool, error) {
 		// Cannot use pod.Status.Phase == api.PodSucceeded/api.PodFailed due to #2632
 		ci, ok := pod.Status.Info[contName]
 		if !ok {
@@ -112,13 +112,19 @@ func waitForPodSuccess(c *client.Client, podName string, contName string) error 
 				} else {
 					return true, fmt.Errorf("pod %s terminated with failure: %+v", podName, ci.State.Termination)
 				}
-				Logf("Waiting for pod %q status to be success or failure", podName)
+				Logf("Waiting for pod %q in namespace %s status to be success or failure", podName, namespace)
 			} else {
-				Logf("Nil State.Termination for container %s in pod %s so far", contName, podName)
+				Logf("Nil State.Termination for container %s in pod %s in namespace %s so far", contName, podName, namespace)
 			}
 		}
 		return false, nil
 	})
+}
+
+// waitForPodSuccess returns nil if the pod reached state success, or an error if it reached failure or ran too long.
+// The default namespace is used to identify pods.
+func waitForPodSuccess(c *client.Client, podName string, contName string) error {
+	return waitForPodSuccessInNamespace(c, podName, contName, api.NamespaceDefault)
 }
 
 func loadConfig() (*client.Config, error) {
