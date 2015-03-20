@@ -1245,12 +1245,12 @@ func (kl *Kubelet) computePodContainerChanges(pod *api.Pod, hasMirrorPod bool, c
 					result, err := kl.probeContainer(pod, podStatus, container, dockerContainer.ID, dockerContainer.Created)
 					if err != nil {
 						// TODO(vmarmol): examine this logic.
-						glog.Infof("probe no-error: %q", container.Name)
+						glog.V(2).Infof("probe no-error: %q", container.Name)
 						containersToKeep[containerID] = index
 						continue
 					}
 					if result == probe.Success {
-						glog.Infof("probe success: %q", container.Name)
+						glog.V(4).Infof("probe success: %q", container.Name)
 						containersToKeep[containerID] = index
 						continue
 					}
