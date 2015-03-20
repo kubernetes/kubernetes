@@ -21,6 +21,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/cache"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
@@ -61,7 +62,7 @@ func TestFinalize(t *testing.T) {
 
 func TestSyncNamespaceThatIsTerminating(t *testing.T) {
 	mockClient := &client.Fake{}
-	nm := NewNamespaceManager(mockClient)
+	nm := NamespaceManager{kubeClient: mockClient, store: cache.NewStore(cache.MetaNamespaceKeyFunc)}
 	now := util.Now()
 	testNamespace := api.Namespace{
 		ObjectMeta: api.ObjectMeta{
@@ -101,7 +102,7 @@ func TestSyncNamespaceThatIsTerminating(t *testing.T) {
 
 func TestSyncNamespaceThatIsActive(t *testing.T) {
 	mockClient := &client.Fake{}
-	nm := NewNamespaceManager(mockClient)
+	nm := NamespaceManager{kubeClient: mockClient, store: cache.NewStore(cache.MetaNamespaceKeyFunc)}
 	testNamespace := api.Namespace{
 		ObjectMeta: api.ObjectMeta{
 			Name:            "test",
