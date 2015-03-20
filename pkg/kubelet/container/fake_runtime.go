@@ -128,7 +128,7 @@ func (f *FakeRuntime) GetPods(all bool) ([]*Pod, error) {
 	return f.Podlist, f.Err
 }
 
-func (f *FakeRuntime) RunPod(pod *api.Pod, volumeMap map[string]volume.Interface) error {
+func (f *FakeRuntime) RunPod(pod *api.Pod, volumeMap map[string]volume.VolumePlugin) error {
 	f.Lock()
 	defer f.Unlock()
 
@@ -152,7 +152,7 @@ func (f *FakeRuntime) KillPod(pod *api.Pod) error {
 	return f.Err
 }
 
-func (f *FakeRuntime) RunContainerInPod(container api.Container, pod *api.Pod, volumeMap map[string]volume.Interface) error {
+func (f *FakeRuntime) RunContainerInPod(container api.Container, pod *api.Pod, volumeMap map[string]volume.VolumePlugin) error {
 	f.Lock()
 	defer f.Unlock()
 
