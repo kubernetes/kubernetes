@@ -9,10 +9,6 @@
 #   kube-scheduler.service
 #   kubelet.service
 #   kube-proxy.service
-
-# Comma separated list of nodes in the etcd cluster
-KUBE_ETCD_SERVERS="--etcd_servers=http://127.0.0.1:4001"
-
 # logging to stderr means we get it in the systemd journal
 KUBE_LOGTOSTDERR="--logtostderr=true"
 
@@ -21,3 +17,6 @@ KUBE_LOG_LEVEL="--v=0"
 
 # Should this cluster be allowed to run privileged docker containers
 KUBE_ALLOW_PRIV="--allow_privileged=false"
+
+# How the controller-manager, scheduler, and proxy find the apiserver
+KUBE_MASTER="--master=http://127.0.0.1:8080"
