@@ -15,6 +15,7 @@ ExecStart=/usr/bin/kube-apiserver \
 	    $KUBELET_PORT \
 	    $KUBE_ALLOW_PRIV \
 	    $KUBE_SERVICE_ADDRESSES \
+	    $KUBE_ADMISSION_CONTROL \
 	    $KUBE_API_ARGS
 Restart=on-failure
 LimitNOFILE=65536
