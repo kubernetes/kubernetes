@@ -469,12 +469,13 @@ type ContainerStateRunning struct {
 }
 
 type ContainerStateTerminated struct {
-	ExitCode   int       `json:"exitCode" description:"exit status from the last termination of the container"`
-	Signal     int       `json:"signal,omitempty" description:"signal from the last termination of the container"`
-	Reason     string    `json:"reason,omitempty" description:"(brief) reason from the last termination of the container"`
-	Message    string    `json:"message,omitempty" description:"message regarding the last termination of the container"`
-	StartedAt  util.Time `json:"startedAt,omitempty" description:"time at which previous execution of the container started"`
-	FinishedAt util.Time `json:"finishedAt,omitempty" description:"time at which the container last terminated"`
+	ExitCode    int       `json:"exitCode" description:"exit status from the last termination of the container"`
+	Signal      int       `json:"signal,omitempty" description:"signal from the last termination of the container"`
+	Reason      string    `json:"reason,omitempty" description:"(brief) reason from the last termination of the container"`
+	Message     string    `json:"message,omitempty" description:"message regarding the last termination of the container"`
+	StartedAt   util.Time `json:"startedAt,omitempty" description:"time at which previous execution of the container started"`
+	FinishedAt  util.Time `json:"finishedAt,omitempty" description:"time at which the container last terminated"`
+	ContainerID string    `json:"containerID,omitempty" description:"container's ID in the format 'docker://<container_id>'"`
 }
 
 // ContainerState holds a possible state of container.
@@ -489,8 +490,9 @@ type ContainerState struct {
 type ContainerStatus struct {
 	// TODO(dchen1107): Should we rename PodStatus to a more generic name or have a separate states
 	// defined for container?
-	State ContainerState `json:"state,omitempty" description:"details about the container's current condition"`
-	Ready bool           `json:"ready" description:"specifies whether the container has passed its readiness probe"`
+	State                ContainerState `json:"state,omitempty" description:"details about the container's current condition"`
+	LastTerminationState ContainerState `json:"lastState,omitempty" description:"details about the container's last termination condition"`
+	Ready                bool           `json:"ready" description:"specifies whether the container has passed its readiness probe"`
 	// Note that this is calculated from dead containers.  But those containers are subject to
 	// garbage collection.  This value will get capped at 5 by GC.
 	RestartCount int `json:"restartCount" description:"the number of times the container has been restarted, currently based on the number of dead containers that have not yet been removed"`
