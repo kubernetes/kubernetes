@@ -710,6 +710,12 @@ type ReplicationControllerList struct {
 	Items []ReplicationController `json:"items"`
 }
 
+const (
+	// PortalIPNone - do not assign a portal IP
+	// no proxying required and no environment variables should be created for pods
+	PortalIPNone = "None"
+)
+
 // ServiceList holds a list of services.
 type ServiceList struct {
 	TypeMeta `json:",inline"`
@@ -749,6 +755,8 @@ type ServiceSpec struct {
 	// PortalIP is usually assigned by the master.  If specified by the user
 	// we will try to respect it or else fail the request.  This field can
 	// not be changed by updates.
+	// Valid values are None, empty string (""), or a valid IP address
+	// None can be specified for headless services when proxying is not required
 	PortalIP string `json:"portalIP,omitempty"`
 
 	// CreateExternalLoadBalancer indicates whether a load balancer should be created for this service.

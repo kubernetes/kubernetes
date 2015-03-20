@@ -30,6 +30,12 @@ import (
 func FromServices(services *api.ServiceList) []api.EnvVar {
 	var result []api.EnvVar
 	for _, service := range services.Items {
+		// ignore services where PortalIP is "None" or empty
+		// the services passed to this method should be pre-filtered
+		// only services that have the portal IP set should be included here
+		if !api.IsServiceIPSet(&service) {
+			continue
+		}
 		// Host
 		name := makeEnvVariableName(service.Name) + "_SERVICE_HOST"
 		result = append(result, api.EnvVar{Name: name, Value: service.Spec.PortalIP})

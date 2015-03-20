@@ -51,6 +51,12 @@ func removeDNS(record string, etcdClient *etcd.Client) error {
 }
 
 func addDNS(record string, service *kapi.Service, etcdClient *etcd.Client) error {
+	// if PortalIP is not set, a DNS entry should not be created
+	if !kapi.IsServiceIPSet(service) {
+		log.Printf("Skipping dns record for headless service: %s\n", service.Name)
+		return nil
+	}
+
 	svc := skymsg.Service{
 		Host:     service.Spec.PortalIP,
 		Port:     service.Spec.Port,

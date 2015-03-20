@@ -73,8 +73,7 @@ func reloadIPsFromStorage(ipa *ipAllocator, registry Registry) {
 	}
 	for i := range services.Items {
 		service := &services.Items[i]
-		if service.Spec.PortalIP == "" {
-			glog.Warningf("service %q has no PortalIP", service.Name)
+		if !api.IsServiceIPSet(service) {
 			continue
 		}
 		if err := ipa.Allocate(net.ParseIP(service.Spec.PortalIP)); err != nil {
@@ -91,14 +90,14 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (runtime.Object, err
 		return nil, err
 	}
 
-	if len(service.Spec.PortalIP) == 0 {
+	if api.IsServiceIPRequested(service) {
 		// Allocate next available.
 		ip, err := rs.portalMgr.AllocateNext()
 		if err != nil {
 			return nil, err
 		}
 		service.Spec.PortalIP = ip.String()
-	} else {
+	} else if api.IsServiceIPSet(service) {
 		// Try to respect the requested IP.
 		if err := rs.portalMgr.Allocate(net.ParseIP(service.Spec.PortalIP)); err != nil {
 			el := errors.ValidationErrorList{errors.NewFieldInvalid("spec.portalIP", service.Spec.PortalIP, err.Error())}
@@ -111,14 +110,18 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (runtime.Object, err
 	if service.Spec.CreateExternalLoadBalancer {
 		err := rs.createExternalLoadBalancer(ctx, service)
 		if err != nil {
-			rs.portalMgr.Release(net.ParseIP(service.Spec.PortalIP))
+			if api.IsServiceIPSet(service) {
+				rs.portalMgr.Release(net.ParseIP(service.Spec.PortalIP))
+			}
 			return nil, err
 		}
 	}
 
 	out, err := rs.registry.CreateService(ctx, service)
 	if err != nil {
-		rs.portalMgr.Release(net.ParseIP(service.Spec.PortalIP))
+		if api.IsServiceIPSet(service) {
+			rs.portalMgr.Release(net.ParseIP(service.Spec.PortalIP))
+		}
 		err = rest.CheckGeneratedNameError(rest.Services, err, service)
 	}
 	return out, err
@@ -137,7 +140,9 @@ func (rs *REST) Delete(ctx api.Context, id string) (runtime.Object, error) {
 	if err != nil {
 		return nil, err
 	}
-	rs.portalMgr.Release(net.ParseIP(service.Spec.PortalIP))
+	if api.IsServiceIPSet(service) {
+		rs.portalMgr.Release(net.ParseIP(service.Spec.PortalIP))
+	}
 	if service.Spec.CreateExternalLoadBalancer {
 		rs.deleteExternalLoadBalancer(ctx, service)
 	}

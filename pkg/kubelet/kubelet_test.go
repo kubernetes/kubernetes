@@ -1829,6 +1829,20 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 			},
 		},
 		{
+			ObjectMeta: api.ObjectMeta{Name: "kubernetes-ro", Namespace: api.NamespaceDefault},
+			Spec: api.ServiceSpec{
+				Port:     8082,
+				PortalIP: "None",
+			},
+		},
+		{
+			ObjectMeta: api.ObjectMeta{Name: "kubernetes-ro", Namespace: api.NamespaceDefault},
+			Spec: api.ServiceSpec{
+				Port:     8082,
+				PortalIP: "",
+			},
+		},
+		{
 			ObjectMeta: api.ObjectMeta{Name: "test", Namespace: "test1"},
 			Spec: api.ServiceSpec{
 				Port:     8083,
@@ -1850,6 +1864,19 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 			},
 		},
 		{
+			ObjectMeta: api.ObjectMeta{Name: "test", Namespace: "test2"},
+			Spec: api.ServiceSpec{
+				Port:     8085,
+				PortalIP: "None",
+			},
+		},
+		{
+			ObjectMeta: api.ObjectMeta{Name: "test", Namespace: "test2"},
+			Spec: api.ServiceSpec{
+				Port: 8085,
+			},
+		},
+		{
 			ObjectMeta: api.ObjectMeta{Name: "kubernetes", Namespace: "kubernetes"},
 			Spec: api.ServiceSpec{
 				Port:     8086,
@@ -1868,6 +1895,20 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 			Spec: api.ServiceSpec{
 				Port:     8088,
 				PortalIP: "1.2.3.8",
+			},
+		},
+		{
+			ObjectMeta: api.ObjectMeta{Name: "not-special", Namespace: "kubernetes"},
+			Spec: api.ServiceSpec{
+				Port:     8088,
+				PortalIP: "None",
+			},
+		},
+		{
+			ObjectMeta: api.ObjectMeta{Name: "not-special", Namespace: "kubernetes"},
+			Spec: api.ServiceSpec{
+				Port:     8088,
+				PortalIP: "",
 			},
 		},
 	}

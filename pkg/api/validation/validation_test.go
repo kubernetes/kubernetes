@@ -1135,6 +1135,13 @@ func TestValidateService(t *testing.T) {
 			numErrs: 1,
 		},
 		{
+			name: "invalid portal ip",
+			makeSvc: func(s *api.Service) {
+				s.Spec.PortalIP = "invalid"
+			},
+			numErrs: 1,
+		},
+		{
 			name: "missing port",
 			makeSvc: func(s *api.Service) {
 				s.Spec.Port = 0
@@ -1188,6 +1195,20 @@ func TestValidateService(t *testing.T) {
 			name: "valid 3",
 			makeSvc: func(s *api.Service) {
 				s.Spec.ContainerPort = util.NewIntOrStringFromString("http")
+			},
+			numErrs: 0,
+		},
+		{
+			name: "valid portal ip - none ",
+			makeSvc: func(s *api.Service) {
+				s.Spec.PortalIP = "None"
+			},
+			numErrs: 0,
+		},
+		{
+			name: "valid portal ip - empty",
+			makeSvc: func(s *api.Service) {
+				s.Spec.PortalIP = ""
 			},
 			numErrs: 0,
 		},

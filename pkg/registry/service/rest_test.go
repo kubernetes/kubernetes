@@ -735,6 +735,7 @@ func TestCreate(t *testing.T) {
 		&api.Service{
 			Spec: api.ServiceSpec{
 				Selector:        map[string]string{"bar": "baz"},
+				PortalIP:        "None",
 				Port:            6502,
 				Protocol:        "TCP",
 				SessionAffinity: "None",
@@ -743,6 +744,16 @@ func TestCreate(t *testing.T) {
 		// invalid
 		&api.Service{
 			Spec: api.ServiceSpec{},
+		},
+		// invalid
+		&api.Service{
+			Spec: api.ServiceSpec{
+				Selector:        map[string]string{"bar": "baz"},
+				Port:            6502,
+				Protocol:        "TCP",
+				PortalIP:        "invalid",
+				SessionAffinity: "None",
+			},
 		},
 	)
 }
