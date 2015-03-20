@@ -34,7 +34,11 @@ func TestEventSearch(t *testing.T) {
 			Method: "GET",
 			Path:   "/events",
 			Query: url.Values{
-				"fields": []string{"involvedObject.kind=Pod,involvedObject.name=foo,involvedObject.namespace=baz"},
+				"fields": []string{
+					"involvedObject.kind=Pod,",
+					getInvolvedObjectNameFieldLabel(testapi.Version()) + "=foo,",
+					"involvedObject.namespace=baz",
+				},
 				"labels": []string{},
 			},
 		},

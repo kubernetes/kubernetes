@@ -26,7 +26,6 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/golang/glog"
 )
@@ -204,13 +203,10 @@ func (d *PodDescriber) Describe(namespace, name string) (string, error) {
 
 	pod, err := pc.Get(name)
 	if err != nil {
-		events, err2 := d.Events(namespace).List(
+		eventsInterface := d.Events(namespace)
+		events, err2 := eventsInterface.List(
 			labels.Everything(),
-			fields.Set{
-				"involvedObject.name":      name,
-				"involvedObject.namespace": namespace,
-			}.AsSelector(),
-		)
+			eventsInterface.GetFieldSelector(&name, &namespace, nil, nil))
 		if err2 == nil && len(events.Items) > 0 {
 			return tabbedString(func(out io.Writer) error {
 				fmt.Fprintf(out, "Pod '%v': error '%v', but found events.\n", name, err)
