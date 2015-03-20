@@ -91,7 +91,9 @@ function kube-up() {
   # Make the specified network if we need to.
   if ! gcloud compute networks describe "${NETWORK}" &>/dev/null; then
     echo "Creating new network: ${NETWORK}" >&2
-    gcloud compute networks create "${NETWORK}" --range "${NETWORK_RANGE}"
+    gcloud compute networks create "${NETWORK}" --project="${PROJECT}" --range "${NETWORK_RANGE}"
+  else
+    echo "Using network: ${NETWORK}" >&2
   fi
 
   # Allow SSH on all nodes in the network. This doesn't actually check whether
@@ -103,6 +105,8 @@ function kube-up() {
       --network="${NETWORK}" \
       --project="${PROJECT}" \
       --source-ranges="0.0.0.0/0"
+  else
+    echo "Using firewall-rule: ${FIREWALL_SSH}" >&2
   fi
 
   # Bring up the cluster.
