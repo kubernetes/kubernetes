@@ -91,7 +91,7 @@ func TestNamespaceList(t *testing.T) {
 		},
 		Response: Response{StatusCode: 200, Body: namespaceList},
 	}
-	response, err := c.Setup().Namespaces().List(labels.Everything())
+	response, err := c.Setup().Namespaces().List(labels.Everything(), fields.Everything())
 
 	if err != nil {
 		t.Errorf("%#v should be nil.", err)
@@ -117,12 +117,37 @@ func TestNamespaceUpdate(t *testing.T) {
 				"name": "baz",
 			},
 		},
+		Spec: api.NamespaceSpec{
+			Finalizers: []api.FinalizerName{api.FinalizerKubernetes},
+		},
 	}
 	c := &testClient{
 		Request:  testRequest{Method: "PUT", Path: "/namespaces/foo"},
 		Response: Response{StatusCode: 200, Body: requestNamespace},
 	}
 	receivedNamespace, err := c.Setup().Namespaces().Update(requestNamespace)
+	c.Validate(t, receivedNamespace, err)
+}
+
+func TestNamespaceFinalize(t *testing.T) {
+	requestNamespace := &api.Namespace{
+		ObjectMeta: api.ObjectMeta{
+			Name:            "foo",
+			ResourceVersion: "1",
+			Labels: map[string]string{
+				"foo":  "bar",
+				"name": "baz",
+			},
+		},
+		Spec: api.NamespaceSpec{
+			Finalizers: []api.FinalizerName{api.FinalizerKubernetes},
+		},
+	}
+	c := &testClient{
+		Request:  testRequest{Method: "PUT", Path: "/namespaces/foo/finalize"},
+		Response: Response{StatusCode: 200, Body: requestNamespace},
+	}
+	receivedNamespace, err := c.Setup().Namespaces().Finalize(requestNamespace)
 	c.Validate(t, receivedNamespace, err)
 }
 

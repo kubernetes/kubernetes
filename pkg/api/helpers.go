@@ -95,3 +95,10 @@ func IsServiceIPSet(service *Service) bool {
 func IsServiceIPRequested(service *Service) bool {
 	return service.Spec.PortalIP == ""
 }
+
+var standardFinalizers = util.NewStringSet(
+	string(FinalizerKubernetes))
+
+func IsStandardFinalizerName(str string) bool {
+	return standardFinalizers.Has(str)
+}

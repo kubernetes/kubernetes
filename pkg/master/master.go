@@ -358,7 +358,7 @@ func (m *Master) init(c *Config) {
 	resourceQuotaStorage, resourceQuotaStatusStorage := resourcequotaetcd.NewStorage(c.EtcdHelper)
 	secretRegistry := secret.NewEtcdRegistry(c.EtcdHelper)
 
-	namespaceStorage := namespaceetcd.NewStorage(c.EtcdHelper)
+	namespaceStorage, namespaceStatusStorage, namespaceFinalizeStorage := namespaceetcd.NewStorage(c.EtcdHelper)
 	m.namespaceRegistry = namespace.NewRegistry(namespaceStorage)
 
 	// TODO: split me up into distinct storage registries
@@ -402,6 +402,8 @@ func (m *Master) init(c *Config) {
 		"resourceQuotas":        resourceQuotaStorage,
 		"resourceQuotas/status": resourceQuotaStatusStorage,
 		"namespaces":            namespaceStorage,
+		"namespaces/status":     namespaceStatusStorage,
+		"namespaces/finalize":   namespaceFinalizeStorage,
 		"secrets":               secret.NewStorage(secretRegistry),
 	}
 

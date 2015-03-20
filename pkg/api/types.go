@@ -966,7 +966,16 @@ type NodeList struct {
 
 // NamespaceSpec describes the attributes on a Namespace
 type NamespaceSpec struct {
+	// Finalizers is an opaque list of values that must be empty to permanently remove object from storage
+	Finalizers []FinalizerName
 }
+
+type FinalizerName string
+
+// These are internal finalizer values to Kubernetes, must be qualified name unless defined here
+const (
+	FinalizerKubernetes FinalizerName = "kubernetes"
+)
 
 // NamespaceStatus is information about the current status of a Namespace.
 type NamespaceStatus struct {
