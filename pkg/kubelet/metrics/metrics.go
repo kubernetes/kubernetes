@@ -148,11 +148,11 @@ func (self *podAndContainerCollector) Collect(ch chan<- prometheus.Metric) {
 	// Get a set of running pods.
 	runningPods := make(map[types.UID]struct{})
 	for _, cont := range runningContainers {
-		_, uid, _, _, err := dockertools.ParseDockerName(cont.Names[0])
+		containerName, _, err := dockertools.ParseDockerName(cont.Names[0])
 		if err != nil {
 			continue
 		}
-		runningPods[uid] = struct{}{}
+		runningPods[containerName.PodUID] = struct{}{}
 	}
 
 	ch <- prometheus.MustNewConstMetric(

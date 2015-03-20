@@ -737,7 +737,7 @@ func (kl *Kubelet) runContainer(pod *api.Pod, container *api.Container, podVolum
 	exposedPorts, portBindings := makePortsAndBindings(container)
 
 	opts := docker.CreateContainerOptions{
-		Name: dockertools.BuildDockerName(pod.UID, GetPodFullName(pod), container),
+		Name: dockertools.BuildDockerName(dockertools.KubeletContainerName{GetPodFullName(pod), pod.UID, container.Name}, container),
 		Config: &docker.Config{
 			Cmd:          container.Command,
 			Env:          envVariables,
@@ -1411,12 +1411,6 @@ func (kl *Kubelet) syncPod(pod *api.Pod, hasMirrorPod bool, containersInPod dock
 	return nil
 }
 
-type podContainer struct {
-	podFullName   string
-	uid           types.UID
-	containerName string
-}
-
 // Stores all volumes defined by the set of pods into a map.
 // Keys for each entry are in the format (POD_ID)/(VOLUME_NAME)
 func getDesiredVolumes(pods []api.Pod) map[string]api.Volume {
@@ -1461,11 +1455,11 @@ func (kl *Kubelet) cleanupOrphanedVolumes(pods []api.Pod, running []*docker.Cont
 		if len(running[ix].Name) == 0 {
 			glog.V(2).Infof("Found running container ix=%d with info: %+v", ix, running[ix])
 		}
-		_, uid, _, _, err := dockertools.ParseDockerName(running[ix].Name)
+		containerName, _, err := dockertools.ParseDockerName(running[ix].Name)
 		if err != nil {
 			continue
 		}
-		runningSet.Insert(string(uid))
+		runningSet.Insert(string(containerName.PodUID))
 	}
 	for name, vol := range currentVolumes {
 		if _, ok := desiredVolumes[name]; !ok {
@@ -1513,7 +1507,7 @@ func (kl *Kubelet) SyncPods(allPods []api.Pod, podSyncTypes map[types.UID]metric
 
 	glog.V(4).Infof("Desired: %#v", pods)
 	var err error
-	desiredContainers := make(map[podContainer]empty)
+	desiredContainers := make(map[dockertools.KubeletContainerName]empty)
 	desiredPods := make(map[types.UID]empty)
 
 	dockerContainers, err := kl.dockerCache.RunningContainers()
@@ -1530,9 +1524,9 @@ func (kl *Kubelet) SyncPods(allPods []api.Pod, podSyncTypes map[types.UID]metric
 		desiredPods[uid] = empty{}
 
 		// Add all containers (including net) to the map.
-		desiredContainers[podContainer{podFullName, uid, dockertools.PodInfraContainerName}] = empty{}
+		desiredContainers[dockertools.KubeletContainerName{podFullName, uid, dockertools.PodInfraContainerName}] = empty{}
 		for _, cont := range pod.Spec.Containers {
-			desiredContainers[podContainer{podFullName, uid, cont.Name}] = empty{}
+			desiredContainers[dockertools.KubeletContainerName{podFullName, uid, cont.Name}] = empty{}
 		}
 
 		// Run the sync in an async manifest worker.
@@ -1559,28 +1553,27 @@ func (kl *Kubelet) SyncPods(allPods []api.Pod, podSyncTypes map[types.UID]metric
 	killed := []string{}
 	for ix := range dockerContainers {
 		// Don't kill containers that are in the desired pods.
-		podFullName, uid, containerName, _, err := dockertools.ParseDockerName(dockerContainers[ix].Names[0])
-		_, found := desiredPods[uid]
+		dockerName, _, err := dockertools.ParseDockerName(dockerContainers[ix].Names[0])
+		_, found := desiredPods[dockerName.PodUID]
 		if err == nil && found {
 			// syncPod() will handle this one.
 			continue
 		}
 
-		pc := podContainer{podFullName, uid, containerName}
-		_, ok := desiredContainers[pc]
+		_, ok := desiredContainers[*dockerName]
 		if err != nil || !ok {
 			// call the networking plugin for teardown
-			if containerName == dockertools.PodInfraContainerName {
-				name, namespace, _ := ParsePodFullName(podFullName)
+			if dockerName.ContainerName == dockertools.PodInfraContainerName {
+				name, namespace, _ := ParsePodFullName(dockerName.PodFullName)
 				err := kl.networkPlugin.TearDownPod(namespace, name, dockertools.DockerID(dockerContainers[ix].ID))
 				if err != nil {
 					glog.Errorf("Network plugin pre-delete method returned an error: %v", err)
 				}
 			}
-			glog.V(1).Infof("Killing unwanted container %+v", pc)
+			glog.V(1).Infof("Killing unwanted container %+v", *dockerName)
 			err = kl.killContainer(dockerContainers[ix])
 			if err != nil {
-				glog.Errorf("Error killing container %+v: %v", pc, err)
+				glog.Errorf("Error killing container %+v: %v", *dockerName, err)
 			} else {
 				killed = append(killed, dockerContainers[ix].ID)
 			}
