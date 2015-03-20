@@ -23,7 +23,7 @@ import (
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/volume"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume"
 )
 
 // FakeRuntime is a fake container runtime for testing.
