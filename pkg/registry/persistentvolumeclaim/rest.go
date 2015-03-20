@@ -115,7 +115,7 @@ func (rs *REST) Delete(ctx api.Context, id string) (runtime.Object, error) {
 	if !ok {
 		return nil, fmt.Errorf("invalid object type")
 	}
-	return rs.registry.Delete(ctx, id)
+	return rs.registry.Delete(ctx, id, nil)
 }
 
 func (rs *REST) getAttrs(obj runtime.Object) (objLabels labels.Set, objFields fields.Set, err error) {
