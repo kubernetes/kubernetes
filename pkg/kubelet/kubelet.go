@@ -95,7 +95,7 @@ type SyncHandler interface {
 	// Syncs current state to match the specified pods. SyncPodType specified what
 	// type of sync is occuring per pod. StartTime specifies the time at which
 	// syncing began (for use in monitoring).
-	SyncPods(pods []api.Pod, podSyncTypes map[types.UID]metrics.SyncPodType, mirrorPods util.StringSet,
+	SyncPods(pods []api.Pod, podSyncTypes map[types.UID]metrics.SyncPodType, mirrorPods mirrorPods,
 		startTime time.Time) error
 }
 
@@ -267,7 +267,7 @@ type Kubelet struct {
 	// similar to pods, this is not immutable and is protected by the same podLock.
 	// Note that Kubelet.pods do not contain mirror pods as they are filtered
 	// out beforehand.
-	mirrorPods util.StringSet
+	mirrorPods mirrorPods
 
 	// A pod status cache stores statuses for pods (both rejected and synced).
 	// Note that currently no thread attempts to acquire podStatusesLock while
@@ -1488,7 +1488,7 @@ func (kl *Kubelet) cleanupOrphanedVolumes(pods []api.Pod, running []*docker.Cont
 }
 
 // SyncPods synchronizes the configured list of pods (desired state) with the host current state.
-func (kl *Kubelet) SyncPods(allPods []api.Pod, podSyncTypes map[types.UID]metrics.SyncPodType, mirrorPods util.StringSet, start time.Time) error {
+func (kl *Kubelet) SyncPods(allPods []api.Pod, podSyncTypes map[types.UID]metrics.SyncPodType, mirrorPods mirrorPods, start time.Time) error {
 	defer func() {
 		metrics.SyncPodsLatency.Observe(metrics.SinceInMicroseconds(start))
 	}()
@@ -1536,7 +1536,7 @@ func (kl *Kubelet) SyncPods(allPods []api.Pod, podSyncTypes map[types.UID]metric
 		}
 
 		// Run the sync in an async manifest worker.
-		kl.podWorkers.UpdatePod(pod, kl.mirrorPods.Has(podFullName), func() {
+		kl.podWorkers.UpdatePod(pod, kl.mirrorPods.HasMirrorPod(uid), func() {
 			metrics.SyncPodLatency.WithLabelValues(podSyncTypes[pod.UID].String()).Observe(metrics.SinceInMicroseconds(start))
 		})
 
@@ -1606,7 +1606,7 @@ func (kl *Kubelet) SyncPods(allPods []api.Pod, podSyncTypes map[types.UID]metric
 	}
 
 	// Remove any orphaned mirror pods.
-	deleteOrphanedMirrorPods(pods, mirrorPods, kl.mirrorManager)
+	deleteOrphanedMirrorPods(mirrorPods, kl.mirrorManager)
 
 	return err
 }
@@ -1885,7 +1885,7 @@ func (kl *Kubelet) GetHostname() string {
 
 // GetPods returns all pods bound to the kubelet and their spec, and the mirror
 // pod map.
-func (kl *Kubelet) GetPods() ([]api.Pod, util.StringSet) {
+func (kl *Kubelet) GetPods() ([]api.Pod, mirrorPods) {
 	kl.podLock.RLock()
 	defer kl.podLock.RUnlock()
 	return append([]api.Pod{}, kl.pods...), kl.mirrorPods
@@ -2057,6 +2057,8 @@ func getPodReadyCondition(spec *api.PodSpec, info api.PodInfo) []api.PodConditio
 
 // GetPodStatus returns information from Docker about the containers in a pod
 func (kl *Kubelet) GetPodStatus(podFullName string, uid types.UID) (api.PodStatus, error) {
+	uid = kl.translatePodUID(uid)
+
 	// Check to see if we have a cached version of the status.
 	cachedPodStatus, found := kl.getPodStatusFromCache(podFullName)
 	if found {
@@ -2119,6 +2121,8 @@ func (kl *Kubelet) ServeLogs(w http.ResponseWriter, req *http.Request) {
 
 // Run a command in a container, returns the combined stdout, stderr as an array of bytes
 func (kl *Kubelet) RunInContainer(podFullName string, uid types.UID, container string, cmd []string) ([]byte, error) {
+	uid = kl.translatePodUID(uid)
+
 	if kl.runner == nil {
 		return nil, fmt.Errorf("no runner specified.")
 	}
@@ -2136,6 +2140,8 @@ func (kl *Kubelet) RunInContainer(podFullName string, uid types.UID, container s
 // ExecInContainer executes a command in a container, connecting the supplied
 // stdin/stdout/stderr to the command's IO streams.
 func (kl *Kubelet) ExecInContainer(podFullName string, uid types.UID, container string, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool) error {
+	uid = kl.translatePodUID(uid)
+
 	if kl.runner == nil {
 		return fmt.Errorf("no runner specified.")
 	}
@@ -2153,6 +2159,8 @@ func (kl *Kubelet) ExecInContainer(podFullName string, uid types.UID, container 
 // PortForward connects to the pod's port and copies data between the port
 // and the stream.
 func (kl *Kubelet) PortForward(podFullName string, uid types.UID, port uint16, stream io.ReadWriteCloser) error {
+	uid = kl.translatePodUID(uid)
+
 	if kl.runner == nil {
 		return fmt.Errorf("no runner specified.")
 	}
@@ -2185,8 +2193,30 @@ func (kl *Kubelet) StreamingConnectionIdleTimeout() time.Duration {
 	return kl.streamingConnectionIdleTimeout
 }
 
+// If the UID belongs to a mirror pod, maps it to the UID of its static pod.
+// Otherwise, return the original UID. All public-facing functions should
+// perform this translation for UIDs because user may provide a mirror pod UID,
+// which is not recognized by internal Kubelet functions.
+func (kl *Kubelet) translatePodUID(uid types.UID) types.UID {
+	if uid == "" {
+		return uid
+	}
+
+	kl.podLock.RLock()
+	defer kl.podLock.RUnlock()
+	staticUID, ok := kl.mirrorPods.GetStaticUID(uid)
+	if ok {
+		return staticUID
+	} else {
+		return uid
+	}
+}
+
 // GetContainerInfo returns stats (from Cadvisor) for a container.
 func (kl *Kubelet) GetContainerInfo(podFullName string, uid types.UID, containerName string, req *cadvisorApi.ContainerInfoRequest) (*cadvisorApi.ContainerInfo, error) {
+
+	uid = kl.translatePodUID(uid)
+
 	dockerContainers, err := dockertools.GetKubeletDockerContainers(kl.dockerClient, false)
 	if err != nil {
 		return nil, err

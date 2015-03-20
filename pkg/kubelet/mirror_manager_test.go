@@ -121,7 +121,7 @@ func TestFilterOutMirrorPods(t *testing.T) {
 	if !reflect.DeepEqual(expectedPods, actualPods) {
 		t.Errorf("expected %#v, got %#v", expectedPods, actualPods)
 	}
-	if !actualMirrorPods.Has(GetPodFullName(&mirrorPod)) {
+	if _, ok := actualMirrorPods.mirror[GetPodFullName(&mirrorPod)]; !ok {
 		t.Errorf("mirror pod is not recorded")
 	}
 }

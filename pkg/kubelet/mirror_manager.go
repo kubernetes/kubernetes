@@ -21,7 +21,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	"github.com/golang/glog"
 )
 
@@ -86,15 +86,10 @@ func (self *basicMirrorManager) DeleteMirrorPod(podFullName string) error {
 }
 
 // Delete all orphaned mirror pods.
-func deleteOrphanedMirrorPods(pods []api.Pod, mirrorPods util.StringSet, manager mirrorManager) {
-	existingPods := util.NewStringSet()
-	for _, pod := range pods {
-		existingPods.Insert(GetPodFullName(&pod))
-	}
-	for podFullName := range mirrorPods {
-		if !existingPods.Has(podFullName) {
-			manager.DeleteMirrorPod(podFullName)
-		}
+func deleteOrphanedMirrorPods(mirrorPods mirrorPods, manager mirrorManager) {
+	podFullNames := mirrorPods.GetOrphanedMirrorPodNames()
+	for _, podFullName := range podFullNames {
+		manager.DeleteMirrorPod(podFullName)
 	}
 }
 
@@ -123,16 +118,90 @@ func isMirrorPod(pod *api.Pod) bool {
 
 // This function separate the mirror pods from regular pods to
 // facilitate pods syncing and mirror pod creation/deletion.
-func filterAndCategorizePods(pods []api.Pod) ([]api.Pod, util.StringSet) {
+func filterAndCategorizePods(pods []api.Pod) ([]api.Pod, mirrorPods) {
 	filteredPods := []api.Pod{}
-	mirrorPods := util.NewStringSet()
+	mirrorPods := newMirrorPods()
+
 	for _, pod := range pods {
-		name := GetPodFullName(&pod)
-		if isMirrorPod(&pod) {
-			mirrorPods.Insert(name)
-		} else {
+		mirrorPods.Insert(&pod)
+		if !isMirrorPod(&pod) {
 			filteredPods = append(filteredPods, pod)
 		}
 	}
-	return filteredPods, mirrorPods
+	return filteredPods, *mirrorPods
+}
+
+// mirrorPods is thread-compatible.
+// TODO (yujuhong): Replace this with a pod manager that manages both regular
+// pods and mirror pods.
+type mirrorPods struct {
+	// Static pod UIDs indexed by pod full name.
+	static map[string]types.UID
+	// Mirror pod UIDs indexed by pod full name.
+	mirror map[string]types.UID
+
+	// Bi-directional UID mappings.
+	staticToMirror map[types.UID]types.UID
+	mirrorToStatic map[types.UID]types.UID
+}
+
+func newMirrorPods() *mirrorPods {
+	mirrorPods := mirrorPods{}
+	mirrorPods.static = make(map[string]types.UID)
+	mirrorPods.mirror = make(map[string]types.UID)
+	mirrorPods.staticToMirror = make(map[types.UID]types.UID)
+	mirrorPods.mirrorToStatic = make(map[types.UID]types.UID)
+	return &mirrorPods
+}
+
+func (self *mirrorPods) Insert(pod *api.Pod) {
+	podFullName := GetPodFullName(pod)
+	if isMirrorPod(pod) {
+		self.mirror[podFullName] = pod.UID
+	} else if isStaticPod(pod) {
+		self.static[podFullName] = pod.UID
+	}
+	staticUID, found1 := self.static[podFullName]
+	mirrorUID, found2 := self.mirror[podFullName]
+	// Update the UID mappings.
+	if found1 && found2 {
+		self.staticToMirror[staticUID] = mirrorUID
+		self.mirrorToStatic[mirrorUID] = staticUID
+	}
+}
+
+func (self *mirrorPods) HasStaticPod(key types.UID) bool {
+	_, ok := self.mirrorToStatic[key]
+	return ok
+}
+
+func (self *mirrorPods) HasMirrorPod(key types.UID) bool {
+	_, ok := self.staticToMirror[key]
+	return ok
+}
+
+func (self *mirrorPods) GetMirrorUID(key types.UID) (types.UID, bool) {
+	value, ok := self.staticToMirror[key]
+	if !ok {
+		return "", false
+	}
+	return value, true
+}
+
+func (self *mirrorPods) GetStaticUID(key types.UID) (types.UID, bool) {
+	value, ok := self.mirrorToStatic[key]
+	if !ok {
+		return "", false
+	}
+	return value, true
+}
+
+func (self *mirrorPods) GetOrphanedMirrorPodNames() []string {
+	orphanedPodNames := []string{}
+	for podFullName := range self.mirror {
+		if _, ok := self.static[podFullName]; !ok {
+			orphanedPodNames = append(orphanedPodNames, podFullName)
+		}
+	}
+	return orphanedPodNames
 }
