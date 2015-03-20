@@ -89,9 +89,9 @@ func init() {
 			}
 		},
 		func(obj *ServiceSpec) {
-			if obj.ContainerPort.Kind == util.IntstrInt && obj.ContainerPort.IntVal == 0 ||
-				obj.ContainerPort.Kind == util.IntstrString && obj.ContainerPort.StrVal == "" {
-				obj.ContainerPort = util.NewIntOrStringFromInt(obj.Port)
+			if obj.TargetPort.Kind == util.IntstrInt && obj.TargetPort.IntVal == 0 ||
+				obj.TargetPort.Kind == util.IntstrString && obj.TargetPort.StrVal == "" {
+				obj.TargetPort = util.NewIntOrStringFromInt(obj.Port)
 			}
 		},
 		func(obj *NamespaceStatus) {

@@ -5,7 +5,7 @@ metadata:
 spec:
   # the container on each pod to connect to, can be a name
   # (e.g. 'www') or a number (e.g. 80)
-  containerPort: 80
+  targetPort: 80
   # the port that this service should serve on
   port: 8000
   protocol: TCP

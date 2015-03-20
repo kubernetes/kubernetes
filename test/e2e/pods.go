@@ -307,8 +307,8 @@ var _ = Describe("Pods", func() {
 				},
 			},
 			Spec: api.ServiceSpec{
-				Port:          8765,
-				ContainerPort: util.NewIntOrStringFromInt(8080),
+				Port:       8765,
+				TargetPort: util.NewIntOrStringFromInt(8080),
 				Selector: map[string]string{
 					"name": serverName,
 				},

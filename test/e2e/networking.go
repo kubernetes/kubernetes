@@ -77,8 +77,8 @@ var _ = Describe("Networking", func() {
 				},
 			},
 			Spec: api.ServiceSpec{
-				Port:          8080,
-				ContainerPort: util.NewIntOrStringFromInt(8080),
+				Port:       8080,
+				TargetPort: util.NewIntOrStringFromInt(8080),
 				Selector: map[string]string{
 					"name": name,
 				},

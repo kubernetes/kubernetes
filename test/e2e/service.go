@@ -197,9 +197,9 @@ var _ = Describe("Services", func() {
 				Name: serviceName,
 			},
 			Spec: api.ServiceSpec{
-				Port:          80,
-				Selector:      labels,
-				ContainerPort: util.NewIntOrStringFromInt(80),
+				Port:       80,
+				Selector:   labels,
+				TargetPort: util.NewIntOrStringFromInt(80),
 			},
 		}
 		_, err := c.Services(ns).Create(service)
@@ -257,7 +257,7 @@ var _ = Describe("Services", func() {
 			Spec: api.ServiceSpec{
 				Port:                       80,
 				Selector:                   labels,
-				ContainerPort:              util.NewIntOrStringFromInt(80),
+				TargetPort:                 util.NewIntOrStringFromInt(80),
 				CreateExternalLoadBalancer: true,
 			},
 		}

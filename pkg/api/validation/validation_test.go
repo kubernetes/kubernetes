@@ -1156,16 +1156,16 @@ func TestValidateService(t *testing.T) {
 			numErrs: 1,
 		},
 		{
-			name: "missing destinationPort string",
+			name: "missing targetPort string",
 			makeSvc: func(s *api.Service) {
-				s.Spec.ContainerPort = util.NewIntOrStringFromString("")
+				s.Spec.TargetPort = util.NewIntOrStringFromString("")
 			},
 			numErrs: 1,
 		},
 		{
-			name: "invalid destinationPort int",
+			name: "invalid targetPort int",
 			makeSvc: func(s *api.Service) {
-				s.Spec.ContainerPort = util.NewIntOrStringFromInt(65536)
+				s.Spec.TargetPort = util.NewIntOrStringFromInt(65536)
 			},
 			numErrs: 1,
 		},
@@ -1187,14 +1187,14 @@ func TestValidateService(t *testing.T) {
 			name: "valid 2",
 			makeSvc: func(s *api.Service) {
 				s.Spec.Protocol = "UDP"
-				s.Spec.ContainerPort = util.NewIntOrStringFromInt(12345)
+				s.Spec.TargetPort = util.NewIntOrStringFromInt(12345)
 			},
 			numErrs: 0,
 		},
 		{
 			name: "valid 3",
 			makeSvc: func(s *api.Service) {
-				s.Spec.ContainerPort = util.NewIntOrStringFromString("http")
+				s.Spec.TargetPort = util.NewIntOrStringFromString("http")
 			},
 			numErrs: 0,
 		},

@@ -5,7 +5,7 @@ metadata:
     name: influxGrafana
   name: monitoring-influxdb
 spec: 
-  containerPort: 8086
+  targetPort: 8086
   port: 80
   selector: 
     name: influxGrafana

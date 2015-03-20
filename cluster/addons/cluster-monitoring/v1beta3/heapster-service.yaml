@@ -6,7 +6,7 @@ metadata:
     kubernetes.io/cluster-service: "true"
   name: monitoring-heapster
 spec: 
-  containerPort: 8082
+  targetPort: 8082
   port: 80
   selector: 
     name: heapster

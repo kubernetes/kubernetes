@@ -68,7 +68,7 @@ func (e *EndpointController) SyncServiceEndpoints() error {
 
 		for _, pod := range pods.Items {
 			// TODO: Once v1beta1 and v1beta2 are EOL'ed, this can
-			// assume that service.Spec.ContainerPort is populated.
+			// assume that service.Spec.TargetPort is populated.
 			_ = v1beta1.Dependency
 			_ = v1beta2.Dependency
 			port, err := findPort(&pod, &service)
@@ -196,7 +196,7 @@ func findDefaultPort(pod *api.Pod, servicePort int) (int, bool) {
 
 // findPort locates the container port for the given manifest and portName.
 func findPort(pod *api.Pod, service *api.Service) (int, error) {
-	portName := service.Spec.ContainerPort
+	portName := service.Spec.TargetPort
 	switch portName.Kind {
 	case util.IntstrString:
 		if len(portName.StrVal) == 0 {

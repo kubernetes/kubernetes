@@ -213,7 +213,7 @@ func TestFindPort(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		port, err := findPort(&test.pod, &api.Service{Spec: api.ServiceSpec{Port: servicePort, ContainerPort: test.portName}})
+		port, err := findPort(&test.pod, &api.Service{Spec: api.ServiceSpec{Port: servicePort, TargetPort: test.portName}})
 		if port != test.wport {
 			t.Errorf("Expected port %d, Got %d", test.wport, port)
 		}
