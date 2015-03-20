@@ -17,7 +17,6 @@ limitations under the License.
 package client
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -56,10 +55,6 @@ func (c *persistentVolumes) List(selector labels.Selector) (result *api.Persiste
 }
 
 func (c *persistentVolumes) Get(name string) (result *api.PersistentVolume, err error) {
-	if len(name) == 0 {
-		return nil, errors.New("name is required parameter to Get")
-	}
-
 	result = &api.PersistentVolume{}
 	err = c.r.Get().Resource("persistentVolumes").Name(name).Do().Into(result)
 	return
