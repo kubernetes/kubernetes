@@ -245,7 +245,8 @@ var _ = Describe("Services", func() {
 			close(done)
 		}()
 	}, 240.0)
-	It("should correctly serve identically named services in different namespaces on different external IP addresses", func(done Done) {
+
+	It("should correctly serve identically named services in different namespaces on different external IP addresses", func() {
 		serviceNames := []string{"services-namespace-test0"} // Could add more here, but then it takes longer.
 		namespaces := []string{"namespace0", "namespace1"}   // As above.
 		labels := map[string]string{
@@ -261,11 +262,16 @@ var _ = Describe("Services", func() {
 				CreateExternalLoadBalancer: true,
 			},
 		}
+
+		// Always delete any turds from a previous run.
+		for _, namespace := range namespaces {
+			for _, serviceName := range serviceNames {
+				By("cleanup previous service " + serviceName + " in namespace " + namespace)
+				c.Services(namespace).Delete(serviceName)
+			}
+		}
+
 		publicIPs := []string{}
-		// We defer Gingko pieces that may Fail, so clean up at the end.
-		defer func() {
-			close(done)
-		}()
 		for _, namespace := range namespaces {
 			for _, serviceName := range serviceNames {
 				service.ObjectMeta.Name = serviceName
@@ -282,7 +288,7 @@ var _ = Describe("Services", func() {
 			}
 		}
 		validateUniqueOrFail(publicIPs)
-	}, 240.0)
+	})
 })
 
 func validateUniqueOrFail(s []string) {
