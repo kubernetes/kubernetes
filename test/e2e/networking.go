@@ -60,10 +60,10 @@ var _ = Describe("Networking", func() {
 		// Test basic external connectivity.
 		resp, err := http.Get("http://google.com/")
 		if err != nil {
-			Fail(fmt.Sprintf("unable to talk to the external internet: %v", err))
+			Failf("unable to talk to the external internet: %v", err)
 		}
 		if resp.StatusCode != http.StatusOK {
-			Fail(fmt.Sprintf("unexpected error code. expected 200, got: %v (%v)", resp.StatusCode, resp))
+			Failf("unexpected error code. expected 200, got: %v (%v)", resp.StatusCode, resp)
 		}
 
 		name := "nettest"
@@ -85,14 +85,14 @@ var _ = Describe("Networking", func() {
 			},
 		})
 		if err != nil {
-			Fail(fmt.Sprintf("unable to create test service %s: %v", svc.Name, err))
+			Failf("unable to create test service %s: %v", svc.Name, err)
 		}
 		// Clean up service
 		defer func() {
 			defer GinkgoRecover()
 			By("Cleaning up the service")
 			if err = c.Services(ns).Delete(svc.Name); err != nil {
-				Fail(fmt.Sprintf("unable to delete svc %v: %v", svc.Name, err))
+				Failf("unable to delete svc %v: %v", svc.Name, err)
 			}
 		}()
 
@@ -175,9 +175,9 @@ var _ = Describe("Networking", func() {
 					Resource("services").
 					Name(svc.Name).Suffix("read").
 					Do().Raw(); err != nil {
-					Fail(fmt.Sprintf("Failed on attempt %v. Cleaning up. Error reading details: %v", i, err))
+					Failf("Failed on attempt %v. Cleaning up. Error reading details: %v", i, err)
 				} else {
-					Fail(fmt.Sprintf("Failed on attempt %v. Cleaning up. Details:\n%s", i, string(body)))
+					Failf("Failed on attempt %v. Cleaning up. Details:\n%s", i, string(body))
 				}
 				break
 			}
@@ -191,9 +191,9 @@ var _ = Describe("Networking", func() {
 				Name(svc.Name).
 				Suffix("read").
 				Do().Raw(); err != nil {
-				Fail(fmt.Sprintf("Timed out. Cleaning up. Error reading details: %v", err))
+				Failf("Timed out. Cleaning up. Error reading details: %v", err)
 			} else {
-				Fail(fmt.Sprintf("Timed out. Cleaning up. Details:\n%s", string(body)))
+				Failf("Timed out. Cleaning up. Details:\n%s", string(body))
 			}
 		}
 		Expect(string(body)).To(Equal("pass"))
@@ -214,7 +214,7 @@ var _ = Describe("Networking", func() {
 				AbsPath(test.path).
 				Do().Raw()
 			if err != nil {
-				Fail(fmt.Sprintf("Failed: %v\nBody: %s", err, string(data)))
+				Failf("Failed: %v\nBody: %s", err, string(data))
 			}
 		}
 	})
