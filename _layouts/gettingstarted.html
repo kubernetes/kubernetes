@@ -53,6 +53,14 @@ layout: default
         </div>
        </div>
       </div>
+    {% elsif 'releases' == step.slug %}
+      <div class="row">
+       <div class="col-lg-3 col-md-3 col-sm-3">
+        <div class="button-group float-none">
+         <a href="{{page.releases.url}}" class="button small">{{page.releases.label}}</a>
+        </div>
+       </div>
+      </div>
     {% elsif 'technical' == step.slug %}
       <div class="row">
        <div class="button-group float-none">

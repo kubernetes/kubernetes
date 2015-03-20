@@ -31,10 +31,6 @@ hostedservices:
   - label: Google Container Engine
     url: https://cloud.google.com/container-engine/
 
-releases:
-  - label: Releases
-    url: https://github.com/GoogleCloudPlatform/kubernetes/releases
-
 installguides: 
   - label: Google Compute Engine
     url: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/getting-started-guides/gce.md
@@ -60,6 +56,10 @@ installguides:
 firstapp:
     label: Run Now
     url: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/examples/guestbook/README.md
+
+releases:
+    label: Releases
+    url: https://github.com/GoogleCloudPlatform/kubernetes/releases
 
 techdetails:
     api: 
