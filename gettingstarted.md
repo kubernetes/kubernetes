@@ -20,8 +20,9 @@ steps:
   - title: Your First Application
     text: "Now we're ready to run our first real application! A simple multi-tiered guestbook."
     slug: first_app
-  - title: Binary Releases
-    text: <em>Coming Soon &hellip;</em>
+  - title: Releases
+    text: Releases of Kubernetes
+    slug: releases
   - title: Technical Details
     text: "Interested in taking a peek inside Kubernetes? You should start by reading the <a href=\"https://github.com/GoogleCloudPlatform/kubernetes/blob/master/DESIGN.md\">design overview</a> which introduces core Kubernetes concepts and components. After that, you probably want to take a look at the API documentation and learn about the kubecfg command line tool."
     slug: technical
@@ -29,6 +30,10 @@ steps:
 hostedservices: 
   - label: Google Container Engine
     url: https://cloud.google.com/container-engine/
+
+releases:
+  - label: Releases
+    url: https://github.com/GoogleCloudPlatform/kubernetes/releases
 
 installguides: 
   - label: Google Compute Engine
