@@ -478,11 +478,3 @@ function test-setup {
 function test-teardown {
 	echo "TODO"
 }
-
-function setup-logging-firewall {
-  echo "TODO: setup logging"
-}
-
-function teardown-logging-firewall {
-  echo "TODO: teardown logging"
-}

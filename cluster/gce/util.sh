@@ -923,54 +923,6 @@ function restart-apiserver {
   ssh-to-node "$1" "sudo /etc/init.d/kube-apiserver restart"
 }
 
-function setup-logging-firewall {
-  # If logging with Fluentd to Elasticsearch is enabled then create pods
-  # and services for Elasticsearch (for ingesting logs) and Kibana (for
-  # viewing logs).
-  if [[ "${ENABLE_NODE_LOGGING-}" != "true" ]] || \
-     [[ "${LOGGING_DESTINATION-}" != "elasticsearch" ]] || \
-     [[ "${ENABLE_CLUSTER_LOGGING-}" != "true" ]]; then
-    return
-  fi
-
-  detect-project
-  gcloud compute firewall-rules create "${INSTANCE_PREFIX}-fluentd-elasticsearch-logging" --project "${PROJECT}" \
-    --allow tcp:5601 tcp:9200 tcp:9300 --target-tags "${MINION_TAG}" --network="${NETWORK}"
-
-  # This should be nearly instant once kube-addons gets a chance to
-  # run, and we already know we can hit the apiserver, but it's still
-  # worth checking.
-  echo "waiting for logging services to be created by the master."
-  local kubectl="${KUBE_ROOT}/cluster/kubectl.sh"
-  for i in `seq 1 10`; do
-    if "${kubectl}" get services -l name=kibana-logging -o template -t {{range.items}}{{.id}}{{end}} | grep -q kibana-logging &&
-      "${kubectl}" get services -l name=elasticsearch-logging -o template -t {{range.items}}{{.id}}{{end}} | grep -q elasticsearch-logging; then
-      break
-    fi
-    sleep 10
-  done
-
-  echo
-  echo -e "${color_green}Cluster logs are ingested into Elasticsearch running at ${color_yellow}https://${KUBE_MASTER_IP}/api/v1beta1/proxy/services/elasticsearch-logging/"
-  echo -e "${color_green}Kibana logging dashboard will be available at ${color_yellow}https://${KUBE_MASTER_IP}/api/v1beta1/proxy/services/kibana-logging/${color_norm} (note the trailing slash)"
-  echo
-}
-
-function teardown-logging-firewall {
-  if [[ "${ENABLE_NODE_LOGGING-}" != "true" ]] || \
-     [[ "${LOGGING_DESTINATION-}" != "elasticsearch" ]] || \
-     [[ "${ENABLE_CLUSTER_LOGGING-}" != "true" ]]; then
-    return
-  fi
-
-  detect-project
-  gcloud compute firewall-rules delete -q "${INSTANCE_PREFIX}-fluentd-elasticsearch-logging" --project "${PROJECT}" || true
-  # Also delete the logging services which will remove the associated forwarding rules (TCP load balancers).
-  local kubectl="${KUBE_ROOT}/cluster/kubectl.sh"
-  "${kubectl}" delete services elasticsearch-logging || true
-  "${kubectl}" delete services kibana-logging || true
-}
-
 # Perform preparations required to run e2e tests
 function prepare-e2e() {
   detect-project

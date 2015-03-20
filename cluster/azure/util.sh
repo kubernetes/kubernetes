@@ -561,11 +561,3 @@ function restart-kube-proxy {
 function restart-apiserver {
     ssh-to-node "$1" "sudo /etc/init.d/kube-apiserver restart"
 }
-
-function setup-logging-firewall {
-  echo "TODO: setup logging"
-}
-
-function teardown-logging-firewall {
-  echo "TODO: teardown logging"
-}

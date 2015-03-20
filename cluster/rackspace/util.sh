@@ -347,14 +347,6 @@ kube-up() {
   echo
 }
 
-function setup-logging-firewall {
-  echo "TODO: setup logging"
-}
-
-function teardown-logging-firewall {
-  echo "TODO: teardown logging"
-}
-
 # Perform preparations required to run e2e tests
 function prepare-e2e() {
   echo "Rackspace doesn't need special preparations for e2e tests"
