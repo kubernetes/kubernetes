@@ -2,9 +2,12 @@ sudo: false
 
 language: go
 
-go:
-  - 1.4
-  - 1.3
+matrix:
+  include:
+    - go: 1.4
+      env: KUBE_TEST_API_VERSIONS="v1beta1"
+    - go: 1.3
+      env: KUBE_TEST_API_VERSIONS="v1beta3"
 
 install:
   - if ! go get code.google.com/p/go.tools/cmd/cover; then go get golang.org/x/tools/cmd/cover; fi
@@ -18,10 +21,10 @@ install:
   - GOPATH=$PWD/Godeps/_workspace:$GOPATH go install ./...
 
 script:
-  - KUBE_RACE="-race" KUBE_COVER="y" KUBE_GOVERALLS_BIN="$HOME/gopath/bin/goveralls" KUBE_TIMEOUT='-timeout 300s' KUBE_COVERPROCS=8 ./hack/test-go.sh -- -p=2
+  - KUBE_RACE="-race" KUBE_COVER="y" KUBE_GOVERALLS_BIN="$HOME/gopath/bin/goveralls" KUBE_TIMEOUT='-timeout 300s' KUBE_COVERPROCS=8 KUBE_TEST_API_VERSIONS=$KUBE_TEST_API_VERSIONS ./hack/test-go.sh -- -p=2
   - PATH=$HOME/gopath/bin:./third_party/etcd:$PATH ./hack/test-cmd.sh
   - PATH=$HOME/gopath/bin:./third_party/etcd:$PATH ./hack/verify-gendocs.sh
-  - PATH=$HOME/gopath/bin:./third_party/etcd:$PATH ./hack/test-integration.sh
+  - PATH=$HOME/gopath/bin:./third_party/etcd:$PATH KUBE_TEST_API_VERSIONS=$KUBE_TEST_API_VERSIONS ./hack/test-integration.sh
 
 notifications:
   irc: "chat.freenode.net#google-containers"
