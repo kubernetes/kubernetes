@@ -48,7 +48,7 @@ nav:
    slug: events
    external: false
  - label: Blog
-   url: http://googlecloudplatform.blogspot.com/search/label/Kubernetes
+   url: http://kubernetesio.blogspot.com/
    slug: blog
    external: true
 
