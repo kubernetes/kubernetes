@@ -86,7 +86,7 @@ func (t *Time) UnmarshalJSON(b []byte) error {
 		return err
 	}
 
-	t.Time = pt
+	t.Time = pt.Local()
 	return nil
 }
 
@@ -97,7 +97,7 @@ func (t Time) MarshalJSON() ([]byte, error) {
 		return []byte("null"), nil
 	}
 
-	return json.Marshal(t.Format(time.RFC3339))
+	return json.Marshal(t.UTC().Format(time.RFC3339))
 }
 
 // Fuzz satisfies fuzz.Interface.
