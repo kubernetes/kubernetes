@@ -32,8 +32,9 @@ func TestBeforeUpdate(t *testing.T) {
 		{
 			obj: &api.Service{
 				ObjectMeta: api.ObjectMeta{
-					Name:      "foo",
-					Namespace: "#$%%invalid",
+					Name:            "foo",
+					ResourceVersion: "1",
+					Namespace:       "#$%%invalid",
 				},
 			},
 			old:       &api.Service{},
@@ -42,14 +43,16 @@ func TestBeforeUpdate(t *testing.T) {
 		{
 			obj: &api.Service{
 				ObjectMeta: api.ObjectMeta{
-					Name:      "foo",
-					Namespace: "valid",
+					Name:            "foo",
+					ResourceVersion: "1",
+					Namespace:       "valid",
 				},
 			},
 			old: &api.Service{
 				ObjectMeta: api.ObjectMeta{
-					Name:      "bar",
-					Namespace: "valid",
+					Name:            "bar",
+					ResourceVersion: "1",
+					Namespace:       "valid",
 				},
 			},
 			expectErr: true,
@@ -57,8 +60,9 @@ func TestBeforeUpdate(t *testing.T) {
 		{
 			obj: &api.Service{
 				ObjectMeta: api.ObjectMeta{
-					Name:      "foo",
-					Namespace: "valid",
+					Name:            "foo",
+					ResourceVersion: "1",
+					Namespace:       "valid",
 				},
 				Spec: api.ServiceSpec{
 					PortalIP: "1.2.3.4",
@@ -66,8 +70,9 @@ func TestBeforeUpdate(t *testing.T) {
 			},
 			old: &api.Service{
 				ObjectMeta: api.ObjectMeta{
-					Name:      "foo",
-					Namespace: "valid",
+					Name:            "foo",
+					ResourceVersion: "1",
+					Namespace:       "valid",
 				},
 				Spec: api.ServiceSpec{
 					PortalIP: "4.3.2.1",
@@ -78,8 +83,9 @@ func TestBeforeUpdate(t *testing.T) {
 		{
 			obj: &api.Service{
 				ObjectMeta: api.ObjectMeta{
-					Name:      "foo",
-					Namespace: api.NamespaceDefault,
+					Name:            "foo",
+					ResourceVersion: "1",
+					Namespace:       api.NamespaceDefault,
 				},
 				Spec: api.ServiceSpec{
 					PortalIP: "1.2.3.4",
@@ -88,8 +94,9 @@ func TestBeforeUpdate(t *testing.T) {
 			},
 			old: &api.Service{
 				ObjectMeta: api.ObjectMeta{
-					Name:      "foo",
-					Namespace: api.NamespaceDefault,
+					Name:            "foo",
+					ResourceVersion: "1",
+					Namespace:       api.NamespaceDefault,
 				},
 				Spec: api.ServiceSpec{
 					PortalIP: "1.2.3.4",

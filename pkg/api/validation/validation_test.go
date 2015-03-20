@@ -56,20 +56,20 @@ func TestValidateObjectMetaCustomName(t *testing.T) {
 
 func TestValidateObjectMetaUpdateIgnoresCreationTimestamp(t *testing.T) {
 	if errs := ValidateObjectMetaUpdate(
-		&api.ObjectMeta{Name: "test", CreationTimestamp: util.NewTime(time.Unix(10, 0))},
-		&api.ObjectMeta{Name: "test"},
+		&api.ObjectMeta{Name: "test", ResourceVersion: "1", CreationTimestamp: util.NewTime(time.Unix(10, 0))},
+		&api.ObjectMeta{Name: "test", ResourceVersion: "1"},
 	); len(errs) != 0 {
 		t.Fatalf("unexpected errors: %v", errs)
 	}
 	if errs := ValidateObjectMetaUpdate(
-		&api.ObjectMeta{Name: "test"},
-		&api.ObjectMeta{Name: "test", CreationTimestamp: util.NewTime(time.Unix(10, 0))},
+		&api.ObjectMeta{Name: "test", ResourceVersion: "1"},
+		&api.ObjectMeta{Name: "test", ResourceVersion: "1", CreationTimestamp: util.NewTime(time.Unix(10, 0))},
 	); len(errs) != 0 {
 		t.Fatalf("unexpected errors: %v", errs)
 	}
 	if errs := ValidateObjectMetaUpdate(
-		&api.ObjectMeta{Name: "test", CreationTimestamp: util.NewTime(time.Unix(11, 0))},
-		&api.ObjectMeta{Name: "test", CreationTimestamp: util.NewTime(time.Unix(10, 0))},
+		&api.ObjectMeta{Name: "test", ResourceVersion: "1", CreationTimestamp: util.NewTime(time.Unix(11, 0))},
+		&api.ObjectMeta{Name: "test", ResourceVersion: "1", CreationTimestamp: util.NewTime(time.Unix(10, 0))},
 	); len(errs) != 0 {
 		t.Fatalf("unexpected errors: %v", errs)
 	}
@@ -1208,6 +1208,8 @@ func TestValidatePodUpdate(t *testing.T) {
 	}
 
 	for _, test := range tests {
+		test.a.ObjectMeta.ResourceVersion = "1"
+		test.b.ObjectMeta.ResourceVersion = "1"
 		errs := ValidatePodUpdate(&test.a, &test.b)
 		if test.isValid {
 			if len(errs) != 0 {
@@ -1522,6 +1524,8 @@ func TestValidateReplicationControllerUpdate(t *testing.T) {
 		},
 	}
 	for _, successCase := range successCases {
+		successCase.old.ObjectMeta.ResourceVersion = "1"
+		successCase.update.ObjectMeta.ResourceVersion = "1"
 		if errs := ValidateReplicationControllerUpdate(&successCase.old, &successCase.update); len(errs) != 0 {
 			t.Errorf("expected success: %v", errs)
 		}
@@ -2009,6 +2013,8 @@ func TestValidateMinionUpdate(t *testing.T) {
 		}, true},
 	}
 	for i, test := range tests {
+		test.oldMinion.ObjectMeta.ResourceVersion = "1"
+		test.minion.ObjectMeta.ResourceVersion = "1"
 		errs := ValidateMinionUpdate(&test.oldMinion, &test.minion)
 		if test.valid && len(errs) > 0 {
 			t.Errorf("%d: Unexpected error: %v", i, errs)
@@ -2178,6 +2184,8 @@ func TestValidateServiceUpdate(t *testing.T) {
 			}, true},
 	}
 	for i, test := range tests {
+		test.oldService.ObjectMeta.ResourceVersion = "1"
+		test.service.ObjectMeta.ResourceVersion = "1"
 		errs := ValidateServiceUpdate(&test.oldService, &test.service)
 		if test.valid && len(errs) > 0 {
 			t.Errorf("%d: Unexpected error: %v", i, errs)
@@ -2443,6 +2451,8 @@ func TestValidateNamespaceFinalizeUpdate(t *testing.T) {
 			}, true},
 	}
 	for i, test := range tests {
+		test.namespace.ObjectMeta.ResourceVersion = "1"
+		test.oldNamespace.ObjectMeta.ResourceVersion = "1"
 		errs := ValidateNamespaceFinalizeUpdate(&test.namespace, &test.oldNamespace)
 		if test.valid && len(errs) > 0 {
 			t.Errorf("%d: Unexpected error: %v", i, errs)
@@ -2483,6 +2493,8 @@ func TestValidateNamespaceStatusUpdate(t *testing.T) {
 			}, false},
 	}
 	for i, test := range tests {
+		test.namespace.ObjectMeta.ResourceVersion = "1"
+		test.oldNamespace.ObjectMeta.ResourceVersion = "1"
 		errs := ValidateNamespaceStatusUpdate(&test.oldNamespace, &test.namespace)
 		if test.valid && len(errs) > 0 {
 			t.Errorf("%d: Unexpected error: %v", i, errs)
@@ -2553,6 +2565,8 @@ func TestValidateNamespaceUpdate(t *testing.T) {
 		}, true},
 	}
 	for i, test := range tests {
+		test.namespace.ObjectMeta.ResourceVersion = "1"
+		test.oldNamespace.ObjectMeta.ResourceVersion = "1"
 		errs := ValidateNamespaceUpdate(&test.oldNamespace, &test.namespace)
 		if test.valid && len(errs) > 0 {
 			t.Errorf("%d: Unexpected error: %v", i, errs)
