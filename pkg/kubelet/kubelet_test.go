@@ -3102,10 +3102,11 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 		Status: api.NodeStatus{
 			Conditions: []api.NodeCondition{
 				{
-					Type:          api.NodeReady,
-					Status:        api.ConditionFull,
-					Reason:        fmt.Sprintf("kubelet is posting ready status"),
-					LastProbeTime: util.Time{},
+					Type:               api.NodeReady,
+					Status:             api.ConditionFull,
+					Reason:             fmt.Sprintf("kubelet is posting ready status"),
+					LastProbeTime:      util.Time{},
+					LastTransitionTime: util.Time{},
 				},
 			},
 			NodeInfo: api.NodeSystemInfo{
@@ -3128,7 +3129,11 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 	if updatedNode.Status.Conditions[0].LastProbeTime.IsZero() {
 		t.Errorf("unexpected zero last probe timestamp")
 	}
+	if updatedNode.Status.Conditions[0].LastTransitionTime.IsZero() {
+		t.Errorf("unexpected zero last transition timestamp")
+	}
 	updatedNode.Status.Conditions[0].LastProbeTime = util.Time{}
+	updatedNode.Status.Conditions[0].LastTransitionTime = util.Time{}
 	if !reflect.DeepEqual(expectedNode, updatedNode) {
 		t.Errorf("expected \n%v\n, got \n%v", expectedNode, updatedNode)
 	}
@@ -3151,10 +3156,11 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 			Status: api.NodeStatus{
 				Conditions: []api.NodeCondition{
 					{
-						Type:          api.NodeReady,
-						Status:        api.ConditionFull,
-						Reason:        fmt.Sprintf("kubelet is posting ready status"),
-						LastProbeTime: util.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+						Type:               api.NodeReady,
+						Status:             api.ConditionFull,
+						Reason:             fmt.Sprintf("kubelet is posting ready status"),
+						LastProbeTime:      util.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+						LastTransitionTime: util.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
 					},
 				},
 			},
@@ -3173,10 +3179,11 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 		Status: api.NodeStatus{
 			Conditions: []api.NodeCondition{
 				{
-					Type:          api.NodeReady,
-					Status:        api.ConditionFull,
-					Reason:        fmt.Sprintf("kubelet is posting ready status"),
-					LastProbeTime: util.Time{}, // placeholder
+					Type:               api.NodeReady,
+					Status:             api.ConditionFull,
+					Reason:             fmt.Sprintf("kubelet is posting ready status"),
+					LastProbeTime:      util.Time{}, // placeholder
+					LastTransitionTime: util.Time{}, // placeholder
 				},
 			},
 			NodeInfo: api.NodeSystemInfo{
@@ -3196,11 +3203,16 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 	if !ok {
 		t.Errorf("unexpected object type")
 	}
+	// Expect LastProbeTime to be updated to Now, while LastTransitionTime to be the same.
 	if reflect.DeepEqual(updatedNode.Status.Conditions[0].LastProbeTime, util.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC)) {
-		t.Errorf("expected \n%v\n, got \n%v", updatedNode.Status.Conditions[0].LastProbeTime,
+		t.Errorf("expected \n%v\n, got \n%v", util.Now(), util.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC))
+	}
+	if !reflect.DeepEqual(updatedNode.Status.Conditions[0].LastTransitionTime, util.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC)) {
+		t.Errorf("expected \n%v\n, got \n%v", updatedNode.Status.Conditions[0].LastTransitionTime,
 			util.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC))
 	}
 	updatedNode.Status.Conditions[0].LastProbeTime = util.Time{}
+	updatedNode.Status.Conditions[0].LastTransitionTime = util.Time{}
 	if !reflect.DeepEqual(expectedNode, updatedNode) {
 		t.Errorf("expected \n%v\n, got \n%v", expectedNode, updatedNode)
 	}

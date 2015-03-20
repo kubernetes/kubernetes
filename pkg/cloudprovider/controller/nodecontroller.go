@@ -39,8 +39,18 @@ const (
 	// sync node status in this case, but will monitor node status updated from kubelet. If
 	// it doesn't receive update for this amount of time, it will start posting node NotReady
 	// condition. The amount of time when NodeController start evicting pods is controlled
-	// via flag 'pod_eviction_timeout'. Note: be cautious when changing nodeMonitorGracePeriod,
-	// it must work with kubelet.nodeStatusUpdateFrequency.
+	// via flag 'pod_eviction_timeout'.
+	// Note: be cautious when changing the constant, it must work with nodeStatusUpdateFrequency
+	// in kubelet. There are several constraints:
+	// 1. nodeMonitorGracePeriod must be N times more than nodeStatusUpdateFrequency, where
+	//    N means number of retries allowed for kubelet to post node status. It is pointless
+	//    to make nodeMonitorGracePeriod be less than nodeStatusUpdateFrequency, since there
+	//    will only be fresh values from Kubelet at an interval of nodeStatusUpdateFrequency.
+	// 2. nodeMonitorGracePeriod can't be too large for user experience - larger value takes
+	//    longer for user to see up-to-date node status.
+	// 3. nodeStatusUpdateFrequency needs to be large enough for Kubelet to generate node
+	//    status. Kubelet may fail to update node status reliablly if the value is too small,
+	//    as it takes time to gather all necessary node information.
 	nodeMonitorGracePeriod = 8 * time.Second
 	// The constant is used if sync_nodes_status=False, and for node startup. When node
 	// is just created, e.g. cluster bootstrap or node creation, we give a longer grace period.
@@ -94,15 +104,15 @@ func NewNodeController(
 }
 
 // Run creates initial node list and start syncing instances from cloudprovider, if any.
-// It also starts syncing cluster node status.
+// It also starts syncing or monitoring cluster node status.
 // 1. RegisterNodes() is called only once to register all initial nodes (from cloudprovider
 //    or from command line flag). To make cluster bootstrap faster, node controller populates
 //    node addresses.
 // 2. SyncCloudNodes() is called periodically (if enabled) to sync instances from cloudprovider.
 //    Node created here will only have specs.
-// 3. SyncNodeStatus() is called periodically (if enabled) to sync node status for nodes in
-//    k8s cluster. If not enabled, MonitorNodeStatus() is called otherwise to monitor node
-//    status posted from kubelet.
+// 3. Depending on how k8s is configured, there are two ways of syncing the node status:
+//   3.1 SyncProbedNodeStatus() is called periodically to sync node status for nodes in k8s cluster.
+//   3.2 MonitorNodeStatus() is called periodically to monitor node status posted from kubelet.
 func (s *NodeController) Run(period time.Duration, syncNodeList, syncNodeStatus bool) {
 	// Register intial set of nodes with their status set.
 	var nodes *api.NodeList
@@ -139,7 +149,7 @@ func (s *NodeController) Run(period time.Duration, syncNodeList, syncNodeStatus 
 	// Start syncing or monitoring node status.
 	if syncNodeStatus {
 		go util.Forever(func() {
-			if err = s.SyncNodeStatus(); err != nil {
+			if err = s.SyncProbedNodeStatus(); err != nil {
 				glog.Errorf("Error syncing status: %v", err)
 			}
 		}, period)
@@ -227,8 +237,8 @@ func (s *NodeController) SyncCloudNodes() error {
 	return nil
 }
 
-// SyncNodeStatus synchronizes cluster nodes status to master server.
-func (s *NodeController) SyncNodeStatus() error {
+// SyncProbedNodeStatus synchronizes cluster nodes status to master server.
+func (s *NodeController) SyncProbedNodeStatus() error {
 	nodes, err := s.kubeClient.Nodes().List()
 	if err != nil {
 		return err
@@ -415,45 +425,70 @@ func (s *NodeController) MonitorNodeStatus() error {
 		return err
 	}
 	for i := range nodes.Items {
-		node := &nodes.Items[i]
-		// Precompute all condition times to avoid deep copy of node status (We'll modify node for
-		// updating, and NodeStatus.Conditions is an array, which makes assignment copy not useful).
-		latestConditionTime := s.latestConditionTime(node, api.NodeReady)
 		var gracePeriod time.Duration
-		if latestConditionTime == node.CreationTimestamp {
+		var lastReadyCondition api.NodeCondition
+		node := &nodes.Items[i]
+		readyCondition := s.getCondition(node, api.NodeReady)
+		if readyCondition == nil {
+			// If ready condition is nil, then kubelet (or nodecontroller) never posted node status.
+			// A fake ready condition is created, where LastProbeTime and LastTransitionTime is set
+			// to node.CreationTimestamp to avoid handle the corner case.
+			lastReadyCondition = api.NodeCondition{
+				Type:               api.NodeReady,
+				Status:             api.ConditionUnknown,
+				LastProbeTime:      node.CreationTimestamp,
+				LastTransitionTime: node.CreationTimestamp,
+			}
 			gracePeriod = nodeStartupGracePeriod
 		} else {
+			// If ready condition is not nil, make a copy of it, since we may modify it in place later.
+			lastReadyCondition = *readyCondition
 			gracePeriod = nodeMonitorGracePeriod
 		}
-		latestFullConditionTime := s.latestConditionTimeWithStatus(node, api.NodeReady, api.ConditionFull)
-		// Grace period has passed, post node NotReady condition to master, without contacting kubelet.
-		if util.Now().After(latestConditionTime.Add(gracePeriod)) {
-			readyCondition := s.getCondition(node, api.NodeReady)
+
+		// Check last time when NodeReady was updated.
+		if util.Now().After(lastReadyCondition.LastProbeTime.Add(gracePeriod)) {
+			// NodeReady condition was last set longer ago than gracePeriod, so update it to Unknown
+			// (regardless of its current value) in the master, without contacting kubelet.
 			if readyCondition == nil {
+				glog.V(2).Infof("node %v is never updated by kubelet")
 				node.Status.Conditions = append(node.Status.Conditions, api.NodeCondition{
 					Type:               api.NodeReady,
-					Status:             api.ConditionNone,
+					Status:             api.ConditionUnknown,
 					Reason:             fmt.Sprintf("Kubelet never posted node status"),
 					LastProbeTime:      util.Now(),
 					LastTransitionTime: util.Now(),
 				})
 			} else {
-				readyCondition.Status = api.ConditionNone
-				readyCondition.Reason = fmt.Sprintf("Kubelet stop posting node status")
+				// Note here the out-dated condition can be the one posted by nodecontroller
+				// itself before. We keep posting the status to keep LastProbeTime fresh.
+				glog.V(2).Infof("node %v hasn't been updated for a while, last ready condition is %+v", node.Name, readyCondition)
+				readyCondition.Status = api.ConditionUnknown
+				readyCondition.Reason = fmt.Sprintf("Kubelet stopped posting node status")
 				readyCondition.LastProbeTime = util.Now()
-				if readyCondition.Status == api.ConditionFull {
+				if lastReadyCondition.Status != api.ConditionUnknown {
 					readyCondition.LastTransitionTime = util.Now()
 				}
 			}
-			glog.V(2).Infof("updating node %v, whose status hasn't been updated by kubelet for a long time", node.Name)
 			_, err = s.kubeClient.Nodes().Update(node)
 			if err != nil {
 				glog.Errorf("error updating node %s: %v", node.Name, err)
 			}
 		}
-		// Eviction timeout! Evict all pods on the unhealthy node.
-		if util.Now().After(latestFullConditionTime.Add(s.podEvictionTimeout)) {
-			s.deletePods(node.Name)
+
+		if readyCondition != nil {
+			// Check eviction timeout.
+			if lastReadyCondition.Status == api.ConditionNone &&
+				util.Now().After(lastReadyCondition.LastTransitionTime.Add(s.podEvictionTimeout)) {
+				// Node stays in not ready for at least 'podEvictionTimeout' - evict all pods on the unhealthy node.
+				s.deletePods(node.Name)
+			}
+			if lastReadyCondition.Status == api.ConditionUnknown &&
+				util.Now().After(lastReadyCondition.LastTransitionTime.Add(s.podEvictionTimeout-gracePeriod)) {
+				// Same as above. Note however, since condition unknown is posted by node controller, which means we
+				// need to substract monitoring grace period in order to get the real 'podEvictionTimeout'.
+				s.deletePods(node.Name)
+			}
 		}
 	}
 	return nil
@@ -554,31 +589,4 @@ func (s *NodeController) getCondition(node *api.Node, conditionType api.NodeCond
 		}
 	}
 	return nil
-}
-
-// latestConditionTime returns the latest condition timestamp for the node, regardless of condition status.
-// If nothing matches, the node creation timestamp will be returned.
-func (s *NodeController) latestConditionTime(node *api.Node, conditionType api.NodeConditionType) util.Time {
-	readyTime := node.ObjectMeta.CreationTimestamp
-	for _, condition := range node.Status.Conditions {
-		if condition.Type == conditionType &&
-			condition.LastProbeTime.After(readyTime.Time) {
-			readyTime = condition.LastProbeTime
-		}
-	}
-	return readyTime
-}
-
-// latestConditionTimeWithStatus returns the latest condition timestamp for the node, with given condition status.
-// If nothing matches, the node creation timestamp will be returned.
-func (s *NodeController) latestConditionTimeWithStatus(node *api.Node, conditionType api.NodeConditionType, conditionStatus api.ConditionStatus) util.Time {
-	readyTime := node.ObjectMeta.CreationTimestamp
-	for _, condition := range node.Status.Conditions {
-		if condition.Type == conditionType &&
-			condition.Status == conditionStatus &&
-			condition.LastProbeTime.After(readyTime.Time) {
-			readyTime = condition.LastProbeTime
-		}
-	}
-	return readyTime
 }
