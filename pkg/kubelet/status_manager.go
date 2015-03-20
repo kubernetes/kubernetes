@@ -106,16 +106,26 @@ func (s *statusManager) syncBatch() error {
 	podFullName := kubecontainer.GetPodFullName(pod)
 	status := syncRequest.status
 
-	_, err := s.kubeClient.Pods(pod.Namespace).UpdateStatus(pod.Name, &status)
+	var err error
+	statusPod := &api.Pod{
+		ObjectMeta: pod.ObjectMeta,
+	}
+	// TODO: make me easier to express from client code
+	if statusPod, err = s.kubeClient.Pods(statusPod.Namespace).Get(statusPod.Name); err == nil {
+		statusPod.Status = status
+	}
+	if err == nil {
+		statusPod, err = s.kubeClient.Pods(pod.Namespace).UpdateStatus(statusPod)
+		// TODO: handle conflict as a retry, make that easier too.
+	}
 	if err != nil {
 		// We failed to update status. In order to make sure we retry next time
 		// we delete cached value. This may result in an additional update, but
 		// this is ok.
 		s.DeletePodStatus(podFullName)
 		return fmt.Errorf("error updating status for pod %q: %v", pod.Name, err)
-	} else {
-		glog.V(3).Infof("Status for pod %q updated successfully", pod.Name)
 	}
 
+	glog.V(3).Infof("Status for pod %q updated successfully", pod.Name)
 	return nil
 }

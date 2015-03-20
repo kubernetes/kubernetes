@@ -208,7 +208,7 @@ func (rm *ResourceQuotaManager) syncResourceQuota(quota api.ResourceQuota) (err 
 
 	// update the usage only if it changed
 	if dirty {
-		_, err = rm.kubeClient.ResourceQuotas(usage.Namespace).Status(&usage)
+		_, err = rm.kubeClient.ResourceQuotas(usage.Namespace).UpdateStatus(&usage)
 		return err
 	}
 	return nil

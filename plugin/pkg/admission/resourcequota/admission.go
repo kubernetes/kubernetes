@@ -123,7 +123,7 @@ func (q *quota) Admit(a admission.Attributes) (err error) {
 					Annotations:     quota.Annotations},
 			}
 			usage.Status = *status
-			_, err = q.client.ResourceQuotas(usage.Namespace).Status(&usage)
+			_, err = q.client.ResourceQuotas(usage.Namespace).UpdateStatus(&usage)
 			if err != nil {
 				return apierrors.NewForbidden(a.GetResource(), name, fmt.Errorf("Unable to %s %s at this time because there was an error enforcing quota", a.GetOperation(), a.GetResource()))
 			}

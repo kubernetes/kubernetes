@@ -17,7 +17,6 @@ limitations under the License.
 package client
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -114,10 +113,6 @@ func (e *events) List(label labels.Selector, field fields.Selector) (*api.EventL
 
 // Get returns the given event, or an error.
 func (e *events) Get(name string) (*api.Event, error) {
-	if len(name) == 0 {
-		return nil, errors.New("name is required parameter to Get")
-	}
-
 	result := &api.Event{}
 	err := e.client.Get().
 		NamespaceIfScoped(e.namespace, len(e.namespace) > 0).

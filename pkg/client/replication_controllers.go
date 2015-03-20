@@ -17,9 +17,6 @@ limitations under the License.
 package client
 
 import (
-	"errors"
-	"fmt"
-
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
@@ -61,10 +58,6 @@ func (c *replicationControllers) List(selector labels.Selector) (result *api.Rep
 
 // Get returns information about a particular replication controller.
 func (c *replicationControllers) Get(name string) (result *api.ReplicationController, err error) {
-	if len(name) == 0 {
-		return nil, errors.New("name is required parameter to Get")
-	}
-
 	result = &api.ReplicationController{}
 	err = c.r.Get().Namespace(c.ns).Resource("replicationControllers").Name(name).Do().Into(result)
 	return
@@ -80,10 +73,6 @@ func (c *replicationControllers) Create(controller *api.ReplicationController) (
 // Update updates an existing replication controller.
 func (c *replicationControllers) Update(controller *api.ReplicationController) (result *api.ReplicationController, err error) {
 	result = &api.ReplicationController{}
-	if len(controller.ResourceVersion) == 0 {
-		err = fmt.Errorf("invalid update object, missing resource version: %v", controller)
-		return
-	}
 	err = c.r.Put().Namespace(c.ns).Resource("replicationControllers").Name(controller.Name).Body(controller).Do().Into(result)
 	return
 }

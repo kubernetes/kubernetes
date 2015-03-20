@@ -17,7 +17,6 @@ limitations under the License.
 package client
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -104,10 +103,6 @@ func (c *namespaces) Status(namespace *api.Namespace) (result *api.Namespace, er
 
 // Get gets an existing namespace
 func (c *namespaces) Get(name string) (*api.Namespace, error) {
-	if len(name) == 0 {
-		return nil, errors.New("name is required parameter to Get")
-	}
-
 	result := &api.Namespace{}
 	err := c.r.Get().Resource("namespaces").Name(name).Do().Into(result)
 	return result, err
