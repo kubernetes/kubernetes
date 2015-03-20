@@ -793,29 +793,62 @@ type Service struct {
 	Status ServiceStatus `json:"status,omitempty"`
 }
 
-// Endpoints is a collection of endpoints that implement the actual service, for example:
-// Name: "mysql", Endpoints: [{"ip": "10.10.1.1", "port": 1909}, {"ip": "10.10.2.2", "port": 8834}]
+// Endpoints is a collection of endpoints that implement the actual service.  Example:
+//   Name: "mysvc",
+//   Subsets: [
+//     {
+//       Addresses: [{"ip": "10.10.1.1"}, {"ip": "10.10.2.2"}],
+//       Ports: [{"name": "a", "port": 8675}, {"name": "b", "port": 309}]
+//     },
+//     {
+//       Addresses: [{"ip": "10.10.3.3"}],
+//       Ports: [{"name": "a", "port": 93}, {"name": "b", "port": 76}]
+//     },
+//  ]
 type Endpoints struct {
 	TypeMeta   `json:",inline"`
 	ObjectMeta `json:"metadata,omitempty"`
 
-	// Optional: The IP protocol for these endpoints. Supports "TCP" and
-	// "UDP".  Defaults to "TCP".
-	Protocol  Protocol   `json:"protocol,omitempty"`
-	Endpoints []Endpoint `json:"endpoints,omitempty"`
+	// The set of all endpoints is the union of all subsets.
+	Subsets []EndpointSubset
 }
 
-// Endpoint is a single IP endpoint of a service.
-type Endpoint struct {
-	// Required: The IP of this endpoint.
-	// TODO: This should allow hostname or IP, see #4447.
-	IP string `json:"ip"`
+// EndpointSubset is a group of addresses with a common set of ports.  The
+// expanded set of endpoints is the Cartesian product of Addresses x Ports.
+// For example, given:
+//   {
+//     Addresses: [{"ip": "10.10.1.1"}, {"ip": "10.10.2.2"}],
+//     Ports:     [{"name": "a", "port": 8675}, {"name": "b", "port": 309}]
+//   }
+// The resulting set of endpoints can be viewed as:
+//     a: [ 10.10.1.1:8675, 10.10.2.2:8675 ],
+//     b: [ 10.10.1.1:309, 10.10.2.2:309 ]
+type EndpointSubset struct {
+	Addresses []EndpointAddress
+	Ports     []EndpointPort
+}
 
-	// Required: The destination port to access.
-	Port int `json:"port"`
+// EndpointAddress is a tuple that describes single IP address.
+type EndpointAddress struct {
+	// The IP of this endpoint.
+	// TODO: This should allow hostname or IP, see #4447.
+	IP string
 
 	// Optional: The kubernetes object related to the entry point.
-	TargetRef *ObjectReference `json:"targetRef,omitempty"`
+	TargetRef *ObjectReference
+}
+
+// EndpointPort is a tuple that describes a single port.
+type EndpointPort struct {
+	// The name of this port (corresponds to ServicePort.Name).  Optional
+	// if only one port is defined.  Must be a DNS_LABEL.
+	Name string
+
+	// The IP protocol for this port.
+	Protocol Protocol
+
+	// The port number.
+	Port int
 }
 
 // EndpointsList is a list of endpoints.
