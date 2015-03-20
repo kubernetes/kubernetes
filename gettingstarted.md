@@ -20,7 +20,7 @@ steps:
   - title: Your First Application
     text: "Now we're ready to run our first real application! A simple multi-tiered guestbook."
     slug: first_app
-  - title: Releases
+  - title: releases
     text: Releases of Kubernetes
     slug: releases
   - title: Technical Details
