@@ -50,15 +50,20 @@ func validNewEndpoints() *api.Endpoints {
 			Name:      "foo",
 			Namespace: api.NamespaceDefault,
 		},
-		Protocol:  "TCP",
-		Endpoints: []api.Endpoint{{IP: "baz"}},
+		Subsets: []api.EndpointSubset{{
+			Addresses: []api.EndpointAddress{{IP: "1.2.3.4"}},
+			Ports:     []api.EndpointPort{{Port: 80, Protocol: "TCP"}},
+		}},
 	}
 }
 
 func validChangedEndpoints() *api.Endpoints {
 	endpoints := validNewEndpoints()
 	endpoints.ResourceVersion = "1"
-	endpoints.Endpoints = []api.Endpoint{{IP: "baz"}, {IP: "bar"}}
+	endpoints.Subsets = []api.EndpointSubset{{
+		Addresses: []api.EndpointAddress{{IP: "1.2.3.4"}, {IP: "5.6.7.8"}},
+		Ports:     []api.EndpointPort{{Port: 80, Protocol: "TCP"}},
+	}}
 	return endpoints
 }
 
@@ -113,10 +118,18 @@ func TestEtcdListEndpoints(t *testing.T) {
 			Node: &etcd.Node{
 				Nodes: []*etcd.Node{
 					{
-						Value: runtime.EncodeOrDie(latest.Codec, &api.Endpoints{ObjectMeta: api.ObjectMeta{Name: "foo"}, Protocol: "TCP", Endpoints: []api.Endpoint{{IP: "127.0.0.1", Port: 8345}}}),
+						Value: runtime.EncodeOrDie(latest.Codec, &api.Endpoints{
+							ObjectMeta: api.ObjectMeta{Name: "foo"},
+							Subsets: []api.EndpointSubset{{
+								Addresses: []api.EndpointAddress{{IP: "127.0.0.1"}},
+								Ports:     []api.EndpointPort{{Port: 8345, Protocol: "TCP"}},
+							}},
+						}),
 					},
 					{
-						Value: runtime.EncodeOrDie(latest.Codec, &api.Endpoints{ObjectMeta: api.ObjectMeta{Name: "bar"}, Protocol: "TCP"}),
+						Value: runtime.EncodeOrDie(latest.Codec, &api.Endpoints{
+							ObjectMeta: api.ObjectMeta{Name: "bar"},
+						}),
 					},
 				},
 			},

@@ -26,8 +26,8 @@ import (
 // LoadBalancer is an interface for distributing incoming requests to service endpoints.
 type LoadBalancer interface {
 	// NextEndpoint returns the endpoint to handle a request for the given
-	// service and source address.
-	NextEndpoint(service types.NamespacedName, srcAddr net.Addr) (string, error)
-	NewService(service types.NamespacedName, sessionAffinityType api.AffinityType, stickyMaxAgeMinutes int) error
-	CleanupStaleStickySessions(service types.NamespacedName)
+	// service-port and source address.
+	NextEndpoint(service types.NamespacedName, port string, srcAddr net.Addr) (string, error)
+	NewService(service types.NamespacedName, port string, sessionAffinityType api.AffinityType, stickyMaxAgeMinutes int) error
+	CleanupStaleStickySessions(service types.NamespacedName, port string)
 }

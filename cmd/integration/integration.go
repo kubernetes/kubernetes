@@ -283,11 +283,25 @@ func endpointsSet(c *client.Client, serviceNamespace, serviceID string, endpoint
 			glog.Infof("Error on creating endpoints: %v", err)
 			return false, nil
 		}
-		for _, e := range endpoints.Endpoints {
-			glog.Infof("%s/%s endpoint: %s:%d %#v", serviceNamespace, serviceID, e.IP, e.Port, e.TargetRef)
+		count := 0
+		for _, ss := range endpoints.Subsets {
+			for _, addr := range ss.Addresses {
+				for _, port := range ss.Ports {
+					count++
+					glog.Infof("%s/%s endpoint: %s:%d %#v", serviceNamespace, serviceID, addr.IP, port.Port, addr.TargetRef)
+				}
+			}
 		}
-		return len(endpoints.Endpoints) == endpointCount, nil
+		return count == endpointCount, nil
 	}
+}
+
+func countEndpoints(eps *api.Endpoints) int {
+	count := 0
+	for i := range eps.Subsets {
+		count += len(eps.Subsets[i].Addresses) * len(eps.Subsets[i].Ports)
+	}
+	return count
 }
 
 func podExists(c *client.Client, podNamespace string, podID string) wait.ConditionFunc {
@@ -669,7 +683,7 @@ func runMasterServiceTest(client *client.Client) {
 		if err != nil {
 			glog.Fatalf("unexpected error listing endpoints for kubernetes service: %v", err)
 		}
-		if len(ep.Endpoints) == 0 {
+		if countEndpoints(ep) == 0 {
 			glog.Fatalf("no endpoints for kubernetes service: %v", ep)
 		}
 	} else {
@@ -680,7 +694,7 @@ func runMasterServiceTest(client *client.Client) {
 		if err != nil {
 			glog.Fatalf("unexpected error listing endpoints for kubernetes service: %v", err)
 		}
-		if len(ep.Endpoints) == 0 {
+		if countEndpoints(ep) == 0 {
 			glog.Fatalf("no endpoints for kubernetes service: %v", ep)
 		}
 	} else {

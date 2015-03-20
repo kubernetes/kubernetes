@@ -23,6 +23,7 @@ import (
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	endptspkg "github.com/GoogleCloudPlatform/kubernetes/pkg/api/endpoints"
 	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
@@ -30,25 +31,17 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
-func newPodList(count int) *api.PodList {
+func newPodList(nPods int, nPorts int) *api.PodList {
 	pods := []api.Pod{}
-	for i := 0; i < count; i++ {
-		pods = append(pods, api.Pod{
+	for i := 0; i < nPods; i++ {
+		p := api.Pod{
 			TypeMeta:   api.TypeMeta{APIVersion: testapi.Version()},
 			ObjectMeta: api.ObjectMeta{Name: fmt.Sprintf("pod%d", i)},
 			Spec: api.PodSpec{
-				Containers: []api.Container{
-					{
-						Ports: []api.ContainerPort{
-							{
-								ContainerPort: 8080,
-							},
-						},
-					},
-				},
+				Containers: []api.Container{{Ports: []api.ContainerPort{}}},
 			},
 			Status: api.PodStatus{
-				PodIP: "1.2.3.4",
+				PodIP: fmt.Sprintf("1.2.3.%d", 4+i),
 				Conditions: []api.PodCondition{
 					{
 						Type:   api.PodReady,
@@ -56,7 +49,11 @@ func newPodList(count int) *api.PodList {
 					},
 				},
 			},
-		})
+		}
+		for j := 0; j < nPorts; j++ {
+			p.Spec.Containers[0].Ports = append(p.Spec.Containers[0].Ports, api.ContainerPort{ContainerPort: 8080 + j})
+		}
+		pods = append(pods, p)
 	}
 	return &api.PodList{
 		TypeMeta: api.TypeMeta{APIVersion: testapi.Version(), Kind: "PodList"},
@@ -65,163 +62,156 @@ func newPodList(count int) *api.PodList {
 }
 
 func TestFindPort(t *testing.T) {
-	pod := api.Pod{
-		Spec: api.PodSpec{
-			Containers: []api.Container{
-				{
-					Ports: []api.ContainerPort{
-						{
-							Name:          "foo",
-							ContainerPort: 8080,
-							HostPort:      9090,
-						},
-						{
-							Name:          "bar",
-							ContainerPort: 8000,
-							HostPort:      9000,
-						},
-						{
-							Name:          "default",
-							ContainerPort: 8100,
-							HostPort:      9200,
-						},
-					},
-				},
-			},
-		},
-	}
-
-	emptyPortsPod := api.Pod{
-		Spec: api.PodSpec{
-			Containers: []api.Container{
-				{
-					Ports: []api.ContainerPort{},
-				},
-			},
-		},
-	}
-
-	singlePortPod := api.Pod{
-		Spec: api.PodSpec{
-			Containers: []api.Container{
-				{
-					Ports: []api.ContainerPort{
-						{
-							ContainerPort: 8300,
-						},
-					},
-				},
-			},
-		},
-	}
-
-	noDefaultPod := api.Pod{
-		Spec: api.PodSpec{
-			Containers: []api.Container{
-				{
-					Ports: []api.ContainerPort{
-						{
-							Name:          "foo",
-							ContainerPort: 8300,
-						},
-					},
-				},
-			},
-		},
-	}
-
 	servicePort := 999
+	testCases := []struct {
+		name       string
+		containers []api.Container
+		port       util.IntOrString
+		expected   int
+		pass       bool
+	}{{
+		name:       "valid int, no ports",
+		containers: []api.Container{{}},
+		port:       util.NewIntOrStringFromInt(93),
+		expected:   93,
+		pass:       true,
+	}, {
+		name: "valid int, with ports",
+		containers: []api.Container{{Ports: []api.ContainerPort{{
+			Name:          "",
+			ContainerPort: 11,
+			Protocol:      "TCP",
+		}, {
+			Name:          "p",
+			ContainerPort: 22,
+			Protocol:      "TCP",
+		}}}},
+		port:     util.NewIntOrStringFromInt(93),
+		expected: 93,
+		pass:     true,
+	}, {
+		name:       "zero int, no ports",
+		containers: []api.Container{{}},
+		port:       util.NewIntOrStringFromInt(0),
+		expected:   servicePort,
+		pass:       true,
+	}, {
+		name: "zero int, one ctr with ports",
+		containers: []api.Container{{Ports: []api.ContainerPort{{
+			Name:          "",
+			ContainerPort: 11,
+			Protocol:      "UDP",
+		}, {
+			Name:          "p",
+			ContainerPort: 22,
+			Protocol:      "TCP",
+		}}}},
+		port:     util.NewIntOrStringFromInt(0),
+		expected: 22,
+		pass:     true,
+	}, {
+		name: "zero int, two ctr with ports",
+		containers: []api.Container{{}, {Ports: []api.ContainerPort{{
+			Name:          "",
+			ContainerPort: 11,
+			Protocol:      "UDP",
+		}, {
+			Name:          "p",
+			ContainerPort: 22,
+			Protocol:      "TCP",
+		}}}},
+		port:     util.NewIntOrStringFromInt(0),
+		expected: 22,
+		pass:     true,
+	}, {
+		name:       "empty str, no ports",
+		containers: []api.Container{{}},
+		port:       util.NewIntOrStringFromString(""),
+		expected:   servicePort,
+		pass:       true,
+	}, {
+		name: "empty str, one ctr with ports",
+		containers: []api.Container{{Ports: []api.ContainerPort{{
+			Name:          "",
+			ContainerPort: 11,
+			Protocol:      "UDP",
+		}, {
+			Name:          "p",
+			ContainerPort: 22,
+			Protocol:      "TCP",
+		}}}},
+		port:     util.NewIntOrStringFromString(""),
+		expected: 22,
+		pass:     true,
+	}, {
+		name: "empty str, two ctr with ports",
+		containers: []api.Container{{}, {Ports: []api.ContainerPort{{
+			Name:          "",
+			ContainerPort: 11,
+			Protocol:      "UDP",
+		}, {
+			Name:          "p",
+			ContainerPort: 22,
+			Protocol:      "TCP",
+		}}}},
+		port:     util.NewIntOrStringFromString(""),
+		expected: 22,
+		pass:     true,
+	}, {
+		name:       "valid str, no ports",
+		containers: []api.Container{{}},
+		port:       util.NewIntOrStringFromString("p"),
+		expected:   0,
+		pass:       false,
+	}, {
+		name: "valid str, one ctr with ports",
+		containers: []api.Container{{Ports: []api.ContainerPort{{
+			Name:          "",
+			ContainerPort: 11,
+			Protocol:      "UDP",
+		}, {
+			Name:          "p",
+			ContainerPort: 22,
+			Protocol:      "TCP",
+		}, {
+			Name:          "q",
+			ContainerPort: 33,
+			Protocol:      "TCP",
+		}}}},
+		port:     util.NewIntOrStringFromString("q"),
+		expected: 33,
+		pass:     true,
+	}, {
+		name: "valid str, two ctr with ports",
+		containers: []api.Container{{}, {Ports: []api.ContainerPort{{
+			Name:          "",
+			ContainerPort: 11,
+			Protocol:      "UDP",
+		}, {
+			Name:          "p",
+			ContainerPort: 22,
+			Protocol:      "TCP",
+		}, {
+			Name:          "q",
+			ContainerPort: 33,
+			Protocol:      "TCP",
+		}}}},
+		port:     util.NewIntOrStringFromString("q"),
+		expected: 33,
+		pass:     true,
+	}}
 
-	tests := []struct {
-		pod      api.Pod
-		portName util.IntOrString
-
-		wport int
-		werr  bool
-	}{
-		{
-			pod,
-			util.IntOrString{Kind: util.IntstrString, StrVal: "foo"},
-			8080,
-			false,
-		},
-		{
-			pod,
-			util.IntOrString{Kind: util.IntstrString, StrVal: "bar"},
-			8000,
-			false,
-		},
-		{
-			pod,
-			util.IntOrString{Kind: util.IntstrInt, IntVal: 8000},
-			8000,
-			false,
-		},
-		{
-			pod,
-			util.IntOrString{Kind: util.IntstrInt, IntVal: 7000},
-			7000,
-			false,
-		},
-		{
-			pod,
-			util.IntOrString{Kind: util.IntstrString, StrVal: "baz"},
-			0,
-			true,
-		},
-		{
-			emptyPortsPod,
-			util.IntOrString{Kind: util.IntstrString, StrVal: "foo"},
-			0,
-			true,
-		},
-		{
-			emptyPortsPod,
-			util.IntOrString{Kind: util.IntstrString, StrVal: ""},
-			servicePort,
-			false,
-		},
-		{
-			emptyPortsPod,
-			util.IntOrString{Kind: util.IntstrInt, IntVal: 0},
-			servicePort,
-			false,
-		},
-		{
-			singlePortPod,
-			util.IntOrString{Kind: util.IntstrString, StrVal: ""},
-			8300,
-			false,
-		},
-		{
-			singlePortPod,
-			util.IntOrString{Kind: util.IntstrInt, IntVal: 0},
-			8300,
-			false,
-		},
-		{
-			noDefaultPod,
-			util.IntOrString{Kind: util.IntstrString, StrVal: ""},
-			8300,
-			false,
-		},
-		{
-			noDefaultPod,
-			util.IntOrString{Kind: util.IntstrInt, IntVal: 0},
-			8300,
-			false,
-		},
-	}
-	for _, test := range tests {
-		port, err := findPort(&test.pod, &api.Service{Spec: api.ServiceSpec{Port: servicePort, TargetPort: test.portName}})
-		if port != test.wport {
-			t.Errorf("Expected port %d, Got %d", test.wport, port)
+	for _, tc := range testCases {
+		port, err := findPort(&api.Pod{Spec: api.PodSpec{Containers: tc.containers}},
+			&api.Service{Spec: api.ServiceSpec{Protocol: "TCP", Port: servicePort, TargetPort: tc.port}})
+		if err != nil && tc.pass {
+			t.Errorf("unexpected error for %s: %v", tc.name, err)
 		}
-		if err == nil && test.werr {
-			t.Errorf("unexpected non-error")
+		if err == nil && !tc.pass {
+			t.Errorf("unexpected non-error for %s: %d", tc.name, port)
 		}
-		if err != nil && test.werr == false {
-			t.Errorf("unexpected error: %v", err)
+		if port != tc.expected {
+			t.Errorf("wrong result for %s: expected %d, got %d", tc.name, tc.expected, port)
 		}
 	}
 }
@@ -258,7 +248,7 @@ func makeTestServer(t *testing.T, namespace string, podResponse, serviceResponse
 
 func TestSyncEndpointsEmpty(t *testing.T) {
 	testServer, _ := makeTestServer(t, api.NamespaceDefault,
-		serverResponse{http.StatusOK, newPodList(0)},
+		serverResponse{http.StatusOK, newPodList(0, 0)},
 		serverResponse{http.StatusOK, &api.ServiceList{}},
 		serverResponse{http.StatusOK, &api.Endpoints{}})
 	defer testServer.Close()
@@ -271,7 +261,7 @@ func TestSyncEndpointsEmpty(t *testing.T) {
 
 func TestSyncEndpointsError(t *testing.T) {
 	testServer, _ := makeTestServer(t, api.NamespaceDefault,
-		serverResponse{http.StatusOK, newPodList(0)},
+		serverResponse{http.StatusOK, newPodList(0, 0)},
 		serverResponse{http.StatusInternalServerError, &api.ServiceList{}},
 		serverResponse{http.StatusOK, &api.Endpoints{}})
 	defer testServer.Close()
@@ -292,15 +282,17 @@ func TestSyncEndpointsItemsPreserveNoSelector(t *testing.T) {
 		},
 	}
 	testServer, endpointsHandler := makeTestServer(t, api.NamespaceDefault,
-		serverResponse{http.StatusOK, newPodList(0)},
+		serverResponse{http.StatusOK, newPodList(0, 0)},
 		serverResponse{http.StatusOK, &serviceList},
 		serverResponse{http.StatusOK, &api.Endpoints{
 			ObjectMeta: api.ObjectMeta{
 				Name:            "foo",
 				ResourceVersion: "1",
 			},
-			Protocol:  api.ProtocolTCP,
-			Endpoints: []api.Endpoint{{IP: "6.7.8.9", Port: 1000}},
+			Subsets: []api.EndpointSubset{{
+				Addresses: []api.EndpointAddress{{IP: "6.7.8.9"}},
+				Ports:     []api.EndpointPort{{Port: 1000}},
+			}},
 		}})
 	defer testServer.Close()
 	client := client.NewOrDie(&client.Config{Host: testServer.URL, Version: testapi.Version()})
@@ -324,15 +316,17 @@ func TestSyncEndpointsProtocolTCP(t *testing.T) {
 		},
 	}
 	testServer, endpointsHandler := makeTestServer(t, "other",
-		serverResponse{http.StatusOK, newPodList(0)},
+		serverResponse{http.StatusOK, newPodList(0, 0)},
 		serverResponse{http.StatusOK, &serviceList},
 		serverResponse{http.StatusOK, &api.Endpoints{
 			ObjectMeta: api.ObjectMeta{
 				Name:            "foo",
 				ResourceVersion: "1",
 			},
-			Protocol:  api.ProtocolTCP,
-			Endpoints: []api.Endpoint{{IP: "6.7.8.9", Port: 1000}},
+			Subsets: []api.EndpointSubset{{
+				Addresses: []api.EndpointAddress{{IP: "6.7.8.9"}},
+				Ports:     []api.EndpointPort{{Port: 1000, Protocol: "TCP"}},
+			}},
 		}})
 	defer testServer.Close()
 	client := client.NewOrDie(&client.Config{Host: testServer.URL, Version: testapi.Version()})
@@ -356,15 +350,17 @@ func TestSyncEndpointsProtocolUDP(t *testing.T) {
 		},
 	}
 	testServer, endpointsHandler := makeTestServer(t, "other",
-		serverResponse{http.StatusOK, newPodList(0)},
+		serverResponse{http.StatusOK, newPodList(0, 0)},
 		serverResponse{http.StatusOK, &serviceList},
 		serverResponse{http.StatusOK, &api.Endpoints{
 			ObjectMeta: api.ObjectMeta{
 				Name:            "foo",
 				ResourceVersion: "1",
 			},
-			Protocol:  api.ProtocolUDP,
-			Endpoints: []api.Endpoint{{IP: "6.7.8.9", Port: 1000}},
+			Subsets: []api.EndpointSubset{{
+				Addresses: []api.EndpointAddress{{IP: "6.7.8.9"}},
+				Ports:     []api.EndpointPort{{Port: 1000, Protocol: "UDP"}},
+			}},
 		}})
 	defer testServer.Close()
 	client := client.NewOrDie(&client.Config{Host: testServer.URL, Version: testapi.Version()})
@@ -387,15 +383,14 @@ func TestSyncEndpointsItemsEmptySelectorSelectsAll(t *testing.T) {
 		},
 	}
 	testServer, endpointsHandler := makeTestServer(t, "other",
-		serverResponse{http.StatusOK, newPodList(1)},
+		serverResponse{http.StatusOK, newPodList(1, 1)},
 		serverResponse{http.StatusOK, &serviceList},
 		serverResponse{http.StatusOK, &api.Endpoints{
 			ObjectMeta: api.ObjectMeta{
 				Name:            "foo",
 				ResourceVersion: "1",
 			},
-			Protocol:  api.ProtocolTCP,
-			Endpoints: []api.Endpoint{},
+			Subsets: []api.EndpointSubset{},
 		}})
 	defer testServer.Close()
 	client := client.NewOrDie(&client.Config{Host: testServer.URL, Version: testapi.Version()})
@@ -408,14 +403,9 @@ func TestSyncEndpointsItemsEmptySelectorSelectsAll(t *testing.T) {
 			Name:            "foo",
 			ResourceVersion: "1",
 		},
-		Protocol: api.ProtocolTCP,
-		Endpoints: []api.Endpoint{{
-			IP:   "1.2.3.4",
-			Port: 8080,
-			TargetRef: &api.ObjectReference{
-				Kind: "Pod",
-				Name: "pod0",
-			},
+		Subsets: []api.EndpointSubset{{
+			Addresses: []api.EndpointAddress{{IP: "1.2.3.4", TargetRef: &api.ObjectReference{Kind: "Pod", Name: "pod0"}}},
+			Ports:     []api.EndpointPort{{Port: 8080, Protocol: "TCP"}},
 		}},
 	})
 	endpointsHandler.ValidateRequest(t, testapi.ResourcePathWithQueryParams("endpoints", "other", "foo"), "PUT", &data)
@@ -435,15 +425,17 @@ func TestSyncEndpointsItemsPreexisting(t *testing.T) {
 		},
 	}
 	testServer, endpointsHandler := makeTestServer(t, "bar",
-		serverResponse{http.StatusOK, newPodList(1)},
+		serverResponse{http.StatusOK, newPodList(1, 1)},
 		serverResponse{http.StatusOK, &serviceList},
 		serverResponse{http.StatusOK, &api.Endpoints{
 			ObjectMeta: api.ObjectMeta{
 				Name:            "foo",
 				ResourceVersion: "1",
 			},
-			Protocol:  api.ProtocolTCP,
-			Endpoints: []api.Endpoint{{IP: "6.7.8.9", Port: 1000}},
+			Subsets: []api.EndpointSubset{{
+				Addresses: []api.EndpointAddress{{IP: "6.7.8.9"}},
+				Ports:     []api.EndpointPort{{Port: 1000}},
+			}},
 		}})
 	defer testServer.Close()
 	client := client.NewOrDie(&client.Config{Host: testServer.URL, Version: testapi.Version()})
@@ -456,14 +448,9 @@ func TestSyncEndpointsItemsPreexisting(t *testing.T) {
 			Name:            "foo",
 			ResourceVersion: "1",
 		},
-		Protocol: api.ProtocolTCP,
-		Endpoints: []api.Endpoint{{
-			IP:   "1.2.3.4",
-			Port: 8080,
-			TargetRef: &api.ObjectReference{
-				Kind: "Pod",
-				Name: "pod0",
-			},
+		Subsets: []api.EndpointSubset{{
+			Addresses: []api.EndpointAddress{{IP: "1.2.3.4", TargetRef: &api.ObjectReference{Kind: "Pod", Name: "pod0"}}},
+			Ports:     []api.EndpointPort{{Port: 8080, Protocol: "TCP"}},
 		}},
 	})
 	endpointsHandler.ValidateRequest(t, testapi.ResourcePathWithQueryParams("endpoints", "bar", "foo"), "PUT", &data)
@@ -483,20 +470,15 @@ func TestSyncEndpointsItemsPreexistingIdentical(t *testing.T) {
 		},
 	}
 	testServer, endpointsHandler := makeTestServer(t, api.NamespaceDefault,
-		serverResponse{http.StatusOK, newPodList(1)},
+		serverResponse{http.StatusOK, newPodList(1, 1)},
 		serverResponse{http.StatusOK, &serviceList},
 		serverResponse{http.StatusOK, &api.Endpoints{
 			ObjectMeta: api.ObjectMeta{
 				ResourceVersion: "1",
 			},
-			Protocol: api.ProtocolTCP,
-			Endpoints: []api.Endpoint{{
-				IP:   "1.2.3.4",
-				Port: 8080,
-				TargetRef: &api.ObjectReference{
-					Kind: "Pod",
-					Name: "pod0",
-				},
+			Subsets: []api.EndpointSubset{{
+				Addresses: []api.EndpointAddress{{IP: "1.2.3.4", TargetRef: &api.ObjectReference{Kind: "Pod", Name: "pod0"}}},
+				Ports:     []api.EndpointPort{{Port: 8080, Protocol: "TCP"}},
 			}},
 		}})
 	defer testServer.Close()
@@ -522,7 +504,7 @@ func TestSyncEndpointsItems(t *testing.T) {
 		},
 	}
 	testServer, endpointsHandler := makeTestServer(t, "other",
-		serverResponse{http.StatusOK, newPodList(1)},
+		serverResponse{http.StatusOK, newPodList(3, 2)},
 		serverResponse{http.StatusOK, &serviceList},
 		serverResponse{http.StatusOK, &api.Endpoints{}})
 	defer testServer.Close()
@@ -531,19 +513,21 @@ func TestSyncEndpointsItems(t *testing.T) {
 	if err := endpoints.SyncServiceEndpoints(); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
+	expectedSubsets := []api.EndpointSubset{{
+		Addresses: []api.EndpointAddress{
+			{IP: "1.2.3.4", TargetRef: &api.ObjectReference{Kind: "Pod", Name: "pod0"}},
+			{IP: "1.2.3.5", TargetRef: &api.ObjectReference{Kind: "Pod", Name: "pod1"}},
+			{IP: "1.2.3.6", TargetRef: &api.ObjectReference{Kind: "Pod", Name: "pod2"}},
+		},
+		Ports: []api.EndpointPort{
+			{Port: 8080, Protocol: "TCP"},
+		},
+	}}
 	data := runtime.EncodeOrDie(testapi.Codec(), &api.Endpoints{
 		ObjectMeta: api.ObjectMeta{
 			ResourceVersion: "",
 		},
-		Protocol: api.ProtocolTCP,
-		Endpoints: []api.Endpoint{{
-			IP:   "1.2.3.4",
-			Port: 8080,
-			TargetRef: &api.ObjectReference{
-				Kind: "Pod",
-				Name: "pod0",
-			},
-		}},
+		Subsets: endptspkg.SortSubsets(expectedSubsets),
 	})
 	// endpointsHandler should get 2 requests - one for "GET" and the next for "POST".
 	endpointsHandler.ValidateRequestCount(t, 2)

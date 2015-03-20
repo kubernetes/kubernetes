@@ -334,7 +334,7 @@ func describeService(service *api.Service, endpoints *api.Endpoints, events *api
 			fmt.Fprintf(out, "Public IPs:\t%s\n", list)
 		}
 		fmt.Fprintf(out, "Port:\t%d\n", service.Spec.Port)
-		fmt.Fprintf(out, "Endpoints:\t%s\n", formatEndpoints(endpoints.Endpoints))
+		fmt.Fprintf(out, "Endpoints:\t%s\n", formatEndpoints(endpoints))
 		fmt.Fprintf(out, "Session Affinity:\t%s\n", service.Spec.SessionAffinity)
 		if events != nil {
 			describeEvents(events, out)

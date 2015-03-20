@@ -18,6 +18,7 @@ package master
 
 import (
 	"net"
+	"reflect"
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -40,7 +41,7 @@ func (m *Master) serviceWriterLoop(stop chan struct{}) {
 			if err := m.createMasterServiceIfNeeded("kubernetes", m.serviceReadWriteIP, m.serviceReadWritePort); err != nil {
 				glog.Errorf("Can't create rw service: %v", err)
 			}
-			if err := m.ensureEndpointsContain("kubernetes", m.clusterIP, m.publicReadWritePort); err != nil {
+			if err := m.setEndpoints("kubernetes", m.clusterIP, m.publicReadWritePort); err != nil {
 				glog.Errorf("Can't create rw endpoints: %v", err)
 			}
 		}
@@ -65,7 +66,7 @@ func (m *Master) roServiceWriterLoop(stop chan struct{}) {
 			if err := m.createMasterServiceIfNeeded("kubernetes-ro", m.serviceReadOnlyIP, m.serviceReadOnlyPort); err != nil {
 				glog.Errorf("Can't create ro service: %v", err)
 			}
-			if err := m.ensureEndpointsContain("kubernetes-ro", m.clusterIP, m.publicReadOnlyPort); err != nil {
+			if err := m.setEndpoints("kubernetes-ro", m.clusterIP, m.publicReadOnlyPort); err != nil {
 				glog.Errorf("Can't create ro endpoints: %v", err)
 			}
 		}
@@ -128,37 +129,28 @@ func (m *Master) createMasterServiceIfNeeded(serviceName string, serviceIP net.I
 	return err
 }
 
-// ensureEndpointsContain sets the endpoints for the given service. Also removes
-// excess endpoints (as determined by m.masterCount). Extra endpoints could appear
-// in the list if, for example, the master starts running on a different machine,
-// changing IP addresses.
-func (m *Master) ensureEndpointsContain(serviceName string, ip net.IP, port int) error {
+// setEndpoints sets the endpoints for the given service.
+// TODO: in a multi-master scenario this needs to consider all masters.
+func (m *Master) setEndpoints(serviceName string, ip net.IP, port int) error {
+	// The setting we want to find.
+	want := []api.EndpointSubset{{
+		Addresses: []api.EndpointAddress{{IP: ip.String()}},
+		Ports:     []api.EndpointPort{{Port: port, Protocol: api.ProtocolTCP}},
+	}}
+
 	ctx := api.NewDefaultContext()
 	e, err := m.endpointRegistry.GetEndpoints(ctx, serviceName)
-	if err != nil || e.Protocol != api.ProtocolTCP {
+	if err != nil {
 		e = &api.Endpoints{
 			ObjectMeta: api.ObjectMeta{
 				Name:      serviceName,
 				Namespace: api.NamespaceDefault,
 			},
-			Protocol: api.ProtocolTCP,
 		}
 	}
-	found := false
-	for i := range e.Endpoints {
-		ep := &e.Endpoints[i]
-		if ep.IP == ip.String() && ep.Port == port {
-			found = true
-			break
-		}
-	}
-	if !found {
-		e.Endpoints = append(e.Endpoints, api.Endpoint{IP: ip.String(), Port: port})
-		if len(e.Endpoints) > m.masterCount {
-			// We append to the end and remove from the beginning, so this should
-			// converge rapidly with all masters performing this operation.
-			e.Endpoints = e.Endpoints[len(e.Endpoints)-m.masterCount:]
-		}
+	if !reflect.DeepEqual(e.Subsets, want) {
+		e.Subsets = want
+		glog.Infof("setting endpoints for master service %q to %v", serviceName, e)
 		return m.endpointRegistry.UpdateEndpoints(ctx, e)
 	}
 	// We didn't make any changes, no need to actually call update.

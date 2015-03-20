@@ -469,7 +469,11 @@ func TestPrinters(t *testing.T) {
 		"pod":             &api.Pod{ObjectMeta: om("pod")},
 		"emptyPodList":    &api.PodList{},
 		"nonEmptyPodList": &api.PodList{Items: []api.Pod{{}}},
-		"endpoints":       &api.Endpoints{Endpoints: []api.Endpoint{{IP: "127.0.0.1"}, {IP: "localhost", Port: 8080}}},
+		"endpoints": &api.Endpoints{
+			Subsets: []api.EndpointSubset{{
+				Addresses: []api.EndpointAddress{{IP: "127.0.0.1"}, {IP: "localhost"}},
+				Ports:     []api.EndpointPort{{Port: 8080}},
+			}}},
 	}
 	// map of printer name to set of objects it should fail on.
 	expectedErrors := map[string]util.StringSet{

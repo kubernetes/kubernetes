@@ -24,7 +24,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 )
 
-func TestListEndpooints(t *testing.T) {
+func TestListEndpoints(t *testing.T) {
 	ns := api.NamespaceDefault
 	c := &testClient{
 		Request: testRequest{Method: "GET", Path: testapi.ResourcePath("endpoints", ns, ""), Query: buildQueryValues(ns, nil)},
@@ -33,8 +33,10 @@ func TestListEndpooints(t *testing.T) {
 				Items: []api.Endpoints{
 					{
 						ObjectMeta: api.ObjectMeta{Name: "endpoint-1"},
-						Endpoints: []api.Endpoint{
-							{IP: "10.245.1.2", Port: 8080}, {IP: "10.245.1.3", Port: 8080}},
+						Subsets: []api.EndpointSubset{{
+							Addresses: []api.EndpointAddress{{IP: "10.245.1.2"}, {IP: "10.245.1.3"}},
+							Ports:     []api.EndpointPort{{Port: 8080}},
+						}},
 					},
 				},
 			},

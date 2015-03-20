@@ -1158,7 +1158,6 @@ func ValidateNamespaceFinalizeUpdate(newNamespace, oldNamespace *api.Namespace) 
 	}
 	newNamespace.ObjectMeta = oldNamespace.ObjectMeta
 	newNamespace.Status = oldNamespace.Status
-	fmt.Printf("NEW NAMESPACE FINALIZERS : %v\n", newNamespace.Spec.Finalizers)
 	return allErrs
 }
 
@@ -1166,6 +1165,28 @@ func ValidateNamespaceFinalizeUpdate(newNamespace, oldNamespace *api.Namespace) 
 func ValidateEndpoints(endpoints *api.Endpoints) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 	allErrs = append(allErrs, ValidateObjectMeta(&endpoints.ObjectMeta, true, ValidateEndpointsName).Prefix("metadata")...)
+	allErrs = append(allErrs, validateEndpointSubsets(endpoints.Subsets).Prefix("subsets")...)
+	return allErrs
+}
+
+func validateEndpointSubsets(subsets []api.EndpointSubset) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+
+	for i := range subsets {
+		ss := &subsets[i]
+
+		ssErrs := errs.ValidationErrorList{}
+
+		if len(ss.Addresses) == 0 {
+			ssErrs = append(ssErrs, errs.NewFieldRequired("addresses"))
+		}
+		if len(ss.Ports) == 0 {
+			ssErrs = append(ssErrs, errs.NewFieldRequired("ports"))
+		}
+		// TODO: validate each address and port
+		allErrs = append(allErrs, ssErrs.PrefixIndex(i)...)
+	}
+
 	return allErrs
 }
 
@@ -1173,5 +1194,6 @@ func ValidateEndpoints(endpoints *api.Endpoints) errs.ValidationErrorList {
 func ValidateEndpointsUpdate(oldEndpoints *api.Endpoints, endpoints *api.Endpoints) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 	allErrs = append(allErrs, ValidateObjectMetaUpdate(&oldEndpoints.ObjectMeta, &endpoints.ObjectMeta).Prefix("metadata")...)
+	allErrs = append(allErrs, validateEndpointSubsets(endpoints.Subsets).Prefix("subsets")...)
 	return allErrs
 }
