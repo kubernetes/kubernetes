@@ -32,8 +32,252 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 )
 
-// TODO(wojtek-t): Most of the test cases are pretty similar and introduce
-// the same boilerplate. Refactor them similarly to what is done in http_test.go
+func TestExtractFromNonExistentFile(t *testing.T) {
+	ch := make(chan interface{}, 1)
+	c := sourceFile{"/some/fake/file", ch}
+	err := c.extractFromPath()
+	if err == nil {
+		t.Errorf("Expected error")
+	}
+}
+
+func TestUpdateOnNonExistentFile(t *testing.T) {
+	ch := make(chan interface{})
+	NewSourceFile("random_non_existent_path", time.Millisecond, ch)
+	select {
+	case got := <-ch:
+		update := got.(kubelet.PodUpdate)
+		expected := CreatePodUpdate(kubelet.SET, kubelet.FileSource)
+		if !api.Semantic.DeepDerivative(expected, update) {
+			t.Fatalf("Expected %#v, Got %#v", expected, update)
+		}
+
+	case <-time.After(time.Second):
+		t.Errorf("Expected update, timeout instead")
+	}
+}
+
+func writeTestFile(t *testing.T, dir, name string, contents string) *os.File {
+	file, err := ioutil.TempFile(os.TempDir(), "test_pod_config")
+	if err != nil {
+		t.Fatalf("Unable to create test file %#v", err)
+	}
+	file.Close()
+	if err := ioutil.WriteFile(file.Name(), []byte(contents), 0555); err != nil {
+		t.Fatalf("Unable to write test file %#v", err)
+	}
+	return file
+}
+
+func TestReadManifestFromFile(t *testing.T) {
+	hostname, _ := os.Hostname()
+	hostname = strings.ToLower(hostname)
+
+	var testCases = []struct {
+		desc         string
+		fileContents string
+		expected     kubelet.PodUpdate
+	}{
+		{
+			desc: "Manifest",
+			fileContents: `{
+					"version": "v1beta1",
+					"uuid": "12345",
+					"id": "test",
+					"containers": [{ "name": "image", "image": "test/image", "imagePullPolicy": "PullAlways"}]
+				}`,
+			expected: CreatePodUpdate(kubelet.SET, kubelet.FileSource, api.Pod{
+				ObjectMeta: api.ObjectMeta{
+					Name:      "test-" + hostname,
+					UID:       "12345",
+					Namespace: kubelet.NamespaceDefault,
+					SelfLink:  "/api/v1beta2/pods/test-" + hostname + "?namespace=default",
+				},
+				Spec: api.PodSpec{Containers: []api.Container{{Image: "test/image"}}},
+			}),
+		},
+		{
+			desc: "Manifest without ID",
+			fileContents: `{
+					"version": "v1beta1",
+					"uuid": "12345",
+					"containers": [{ "name": "image", "image": "test/image", "imagePullPolicy": "PullAlways"}]
+				}`,
+			expected: CreatePodUpdate(kubelet.SET, kubelet.FileSource, api.Pod{
+				ObjectMeta: api.ObjectMeta{
+					Name:      "12345-" + hostname,
+					UID:       "12345",
+					Namespace: kubelet.NamespaceDefault,
+					SelfLink:  "/api/v1beta2/pods/12345-" + hostname + "?namespace=default",
+				},
+				Spec: api.PodSpec{Containers: []api.Container{{Image: "test/image"}}},
+			}),
+		},
+		{
+			desc: "Manifest v1beta2",
+			fileContents: `{
+					"version": "v1beta2",
+					"uuid": "12345",
+					"id": "test",
+					"containers": [{ "name": "image", "image": "test/image", "imagePullPolicy": "PullAlways"}]
+				}`,
+			expected: CreatePodUpdate(kubelet.SET, kubelet.FileSource, api.Pod{
+				ObjectMeta: api.ObjectMeta{
+					Name:      "test-" + hostname,
+					UID:       "12345",
+					Namespace: kubelet.NamespaceDefault,
+					SelfLink:  "/api/v1beta2/pods/test-" + hostname + "?namespace=default",
+				},
+				Spec: api.PodSpec{Containers: []api.Container{{Image: "test/image"}}},
+			}),
+		},
+		{
+			desc: "Simple pod",
+			fileContents: `{
+					"kind": "Pod",
+					"apiVersion": "v1beta1",
+					"uid": "12345",
+					"id": "test",
+					"namespace": "mynamespace",
+					"desiredState": {
+						"manifest": {
+							"containers": [{ "name": "image", "image": "test/image" }],
+						},
+					},
+				}`,
+			expected: CreatePodUpdate(kubelet.SET, kubelet.FileSource, api.Pod{
+				ObjectMeta: api.ObjectMeta{
+					Name:      "test-" + hostname,
+					UID:       "12345",
+					Namespace: "mynamespace",
+					SelfLink:  "/api/v1beta2/pods/test-" + hostname + "?namespace=mynamespace",
+				},
+				Spec: api.PodSpec{Containers: []api.Container{{Image: "test/image"}}},
+			}),
+		},
+		{
+			desc: "Pod without ID",
+			fileContents: `{
+					"kind": "Pod",
+					"apiversion": "v1beta1",
+					"uid": "12345",
+					"desiredState": {
+						"manifest": {
+							"containers": [{ "name": "image", "image": "test/image" }],
+						},
+					},
+				}`,
+			expected: CreatePodUpdate(kubelet.SET, kubelet.FileSource, api.Pod{
+				ObjectMeta: api.ObjectMeta{
+					Name:      "12345-" + hostname,
+					UID:       "12345",
+					Namespace: kubelet.NamespaceDefault,
+					SelfLink:  "/api/v1beta2/pods/12345-" + hostname + "?namespace=default",
+				},
+				Spec: api.PodSpec{Containers: []api.Container{{Image: "test/image"}}},
+			}),
+		},
+		{
+			desc: "Pod v1beta3",
+			fileContents: `{
+					"kind": "Pod",
+					"apiversion": "v1beta3",
+					"metadata": {
+						"uid": "12345",
+						"name": "test",
+					},
+					"spec": {
+						"containers": [{ "name": "image", "image": "test/image" }],
+					},
+				}`,
+			expected: CreatePodUpdate(kubelet.SET, kubelet.FileSource, api.Pod{
+				ObjectMeta: api.ObjectMeta{
+					Name:      "test-" + hostname,
+					UID:       "12345",
+					Namespace: kubelet.NamespaceDefault,
+					SelfLink:  "/api/v1beta2/pods/test-" + hostname + "?namespace=default",
+				},
+				Spec: api.PodSpec{Containers: []api.Container{{Image: "test/image"}}},
+			}),
+		},
+	}
+
+	for _, testCase := range testCases {
+		func() {
+			file := writeTestFile(t, os.TempDir(), "test_pod_config", testCase.fileContents)
+			defer os.Remove(file.Name())
+
+			ch := make(chan interface{})
+			NewSourceFile(file.Name(), time.Millisecond, ch)
+			select {
+			case got := <-ch:
+				update := got.(kubelet.PodUpdate)
+				if !api.Semantic.DeepDerivative(testCase.expected, update) {
+					t.Errorf("%s: Expected %#v, Got %#v", testCase.desc, testCase.expected, update)
+				}
+			case <-time.After(time.Second):
+				t.Errorf("%s: Expected update, timeout instead", testCase.desc)
+			}
+		}()
+	}
+}
+
+func TestReadManifestFromFileWithDefaults(t *testing.T) {
+	file := writeTestFile(t, os.TempDir(), "test_pod_config",
+		`{
+			"version": "v1beta1",
+			"id": "test",
+			"containers": [{ "name": "image", "image": "test/image" }]
+		}`)
+	defer os.Remove(file.Name())
+
+	ch := make(chan interface{})
+	NewSourceFile(file.Name(), time.Millisecond, ch)
+	select {
+	case got := <-ch:
+		update := got.(kubelet.PodUpdate)
+		if update.Pods[0].UID == "" {
+			t.Errorf("Unexpected UID: %s", update.Pods[0].UID)
+		}
+
+	case <-time.After(time.Second):
+		t.Errorf("Expected update, timeout instead")
+	}
+}
+
+func TestExtractFromBadDataFile(t *testing.T) {
+	file := writeTestFile(t, os.TempDir(), "test_pod_config", string([]byte{1, 2, 3}))
+	defer os.Remove(file.Name())
+
+	ch := make(chan interface{}, 1)
+	c := sourceFile{file.Name(), ch}
+	err := c.extractFromPath()
+	if err == nil {
+		t.Fatalf("Expected error")
+	}
+	expectEmptyChannel(t, ch)
+}
+
+func TestExtractFromEmptyDir(t *testing.T) {
+	dirName, err := ioutil.TempDir("", "foo")
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	defer os.RemoveAll(dirName)
+
+	ch := make(chan interface{}, 1)
+	c := sourceFile{dirName, ch}
+	err = c.extractFromPath()
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	update := (<-ch).(kubelet.PodUpdate)
+	expected := CreatePodUpdate(kubelet.SET, kubelet.FileSource)
+	if !api.Semantic.DeepDerivative(expected, update) {
+		t.Errorf("Expected %#v, Got %#v", expected, update)
+	}
+}
 
 func ExampleManifestAndPod(id string) (v1beta1.ContainerManifest, api.Pod) {
 	hostname, _ := os.Hostname()
@@ -84,336 +328,6 @@ func ExampleManifestAndPod(id string) (v1beta1.ContainerManifest, api.Pod) {
 		},
 	}
 	return manifest, expectedPod
-}
-
-func TestExtractFromNonExistentFile(t *testing.T) {
-	ch := make(chan interface{}, 1)
-	c := sourceFile{"/some/fake/file", ch}
-	err := c.extractFromPath()
-	if err == nil {
-		t.Errorf("Expected error")
-	}
-}
-
-func TestUpdateOnNonExistentFile(t *testing.T) {
-	ch := make(chan interface{})
-	NewSourceFile("random_non_existent_path", time.Millisecond, ch)
-	select {
-	case got := <-ch:
-		update := got.(kubelet.PodUpdate)
-		expected := CreatePodUpdate(kubelet.SET, kubelet.FileSource)
-		if !api.Semantic.DeepDerivative(expected, update) {
-			t.Fatalf("Expected %#v, Got %#v", expected, update)
-		}
-
-	case <-time.After(time.Second):
-		t.Errorf("Expected update, timeout instead")
-	}
-}
-
-func writeTestFile(t *testing.T, dir, name string, contents string) *os.File {
-	file, err := ioutil.TempFile(os.TempDir(), "test_pod_config")
-	if err != nil {
-		t.Fatalf("Unable to create test file %#v", err)
-	}
-	file.Close()
-	if err := ioutil.WriteFile(file.Name(), []byte(contents), 0555); err != nil {
-		t.Fatalf("Unable to write test file %#v", err)
-	}
-	return file
-}
-
-func TestReadManifestFromFile(t *testing.T) {
-	hostname, _ := os.Hostname()
-	hostname = strings.ToLower(hostname)
-
-	file := writeTestFile(t, os.TempDir(), "test_pod_config",
-		`{
-			"version": "v1beta1",
-			"uuid": "12345",
-			"id": "test",
-			"containers": [{ "name": "image", "image": "test/image", imagePullPolicy: "PullAlways"}]
-		}`)
-	defer os.Remove(file.Name())
-
-	ch := make(chan interface{})
-	NewSourceFile(file.Name(), time.Millisecond, ch)
-	select {
-	case got := <-ch:
-		update := got.(kubelet.PodUpdate)
-		expected := CreatePodUpdate(kubelet.SET, kubelet.FileSource, api.Pod{
-			ObjectMeta: api.ObjectMeta{
-				Name:      "test-" + hostname,
-				UID:       "12345",
-				Namespace: kubelet.NamespaceDefault,
-				SelfLink:  "/api/v1beta2/pods/test-" + hostname + "?namespace=default",
-			},
-			Spec: api.PodSpec{Containers: []api.Container{{Image: "test/image"}}},
-		})
-
-		if !api.Semantic.DeepDerivative(expected, update) {
-			t.Fatalf("Expected %#v, Got %#v", expected, update)
-		}
-
-	case <-time.After(time.Second):
-		t.Errorf("Expected update, timeout instead")
-	}
-}
-
-func TestReadManifestFromFileWithoutID(t *testing.T) {
-	hostname, _ := os.Hostname()
-	hostname = strings.ToLower(hostname)
-
-	file := writeTestFile(t, os.TempDir(), "test_pod_config",
-		`{
-			"version": "v1beta1",
-			"uuid": "12345",
-			"containers": [{ "name": "image", "image": "test/image", imagePullPolicy: "PullAlways"}]
-		}`)
-	defer os.Remove(file.Name())
-
-	ch := make(chan interface{})
-	NewSourceFile(file.Name(), time.Millisecond, ch)
-	select {
-	case got := <-ch:
-		update := got.(kubelet.PodUpdate)
-		expected := CreatePodUpdate(kubelet.SET, kubelet.FileSource, api.Pod{
-			ObjectMeta: api.ObjectMeta{
-				Name:      "12345-" + hostname,
-				UID:       "12345",
-				Namespace: kubelet.NamespaceDefault,
-				SelfLink:  "/api/v1beta2/pods/12345-" + hostname + "?namespace=default",
-			},
-			Spec: api.PodSpec{Containers: []api.Container{{Image: "test/image"}}},
-		})
-
-		if !api.Semantic.DeepDerivative(expected, update) {
-			t.Fatalf("Expected %#v, Got %#v", expected, update)
-		}
-
-	case <-time.After(time.Second):
-		t.Errorf("Expected update, timeout instead")
-	}
-}
-
-func TestReadManifestV1Beta2FromFile(t *testing.T) {
-	hostname, _ := os.Hostname()
-	hostname = strings.ToLower(hostname)
-
-	file := writeTestFile(t, os.TempDir(), "test_pod_config",
-		`{
-			"version": "v1beta2",
-			"uuid": "12345",
-			"id": "test",
-			"containers": [{ "name": "image", "image": "test/image", imagePullPolicy: "PullAlways"}]
-		}`)
-	defer os.Remove(file.Name())
-
-	ch := make(chan interface{})
-	NewSourceFile(file.Name(), time.Millisecond, ch)
-	select {
-	case got := <-ch:
-		update := got.(kubelet.PodUpdate)
-		expected := CreatePodUpdate(kubelet.SET, kubelet.FileSource, api.Pod{
-			ObjectMeta: api.ObjectMeta{
-				Name:      "test-" + hostname,
-				UID:       "12345",
-				Namespace: kubelet.NamespaceDefault,
-				SelfLink:  "/api/v1beta2/pods/test-" + hostname + "?namespace=default",
-			},
-			Spec: api.PodSpec{Containers: []api.Container{{Image: "test/image"}}},
-		})
-
-		if !api.Semantic.DeepDerivative(expected, update) {
-			t.Fatalf("Expected %#v, Got %#v", expected, update)
-		}
-
-	case <-time.After(time.Second):
-		t.Errorf("Expected update, timeout instead")
-	}
-}
-
-func TestReadManifestFromFileWithDefaults(t *testing.T) {
-	file := writeTestFile(t, os.TempDir(), "test_pod_config",
-		`{
-			"version": "v1beta1",
-			"id": "test",
-			"containers": [{ "name": "image", "image": "test/image" }]
-		}`)
-	defer os.Remove(file.Name())
-
-	ch := make(chan interface{})
-	NewSourceFile(file.Name(), time.Millisecond, ch)
-	select {
-	case got := <-ch:
-		update := got.(kubelet.PodUpdate)
-		if update.Pods[0].UID == "" {
-			t.Errorf("Unexpected UID: %s", update.Pods[0].UID)
-		}
-
-	case <-time.After(time.Second):
-		t.Errorf("Expected update, timeout instead")
-	}
-}
-
-func TestReadPodFromFile(t *testing.T) {
-	hostname, _ := os.Hostname()
-	hostname = strings.ToLower(hostname)
-
-	file := writeTestFile(t, os.TempDir(), "test_pod_config",
-		`{
-			"kind": "Pod",
-			"apiVersion": "v1beta1",
-			"uid": "12345",
-			"id": "test",
-			"namespace": "mynamespace",
-			"desiredState": {
-				"manifest": {
-					"containers": [{ "name": "image", "image": "test/image" }],
-				},
-			},
-		}`)
-	defer os.Remove(file.Name())
-
-	ch := make(chan interface{})
-	NewSourceFile(file.Name(), time.Millisecond, ch)
-	select {
-	case got := <-ch:
-		update := got.(kubelet.PodUpdate)
-		expected := CreatePodUpdate(kubelet.SET, kubelet.FileSource, api.Pod{
-			ObjectMeta: api.ObjectMeta{
-				Name:      "test-" + hostname,
-				UID:       "12345",
-				Namespace: "mynamespace",
-				SelfLink:  "/api/v1beta2/pods/test-" + hostname + "?namespace=mynamespace",
-			},
-			Spec: api.PodSpec{Containers: []api.Container{{Image: "test/image"}}},
-		})
-
-		if !api.Semantic.DeepDerivative(expected, update) {
-			t.Fatalf("Expected %#v, Got %#v", expected, update)
-		}
-
-	case <-time.After(time.Second):
-		t.Errorf("Expected update, timeout instead")
-	}
-}
-
-func TestReadPodV1Beta3FromFile(t *testing.T) {
-	hostname, _ := os.Hostname()
-	hostname = strings.ToLower(hostname)
-
-	file := writeTestFile(t, os.TempDir(), "test_pod_config",
-		`{
-			"kind": "Pod",
-			"apiversion": "v1beta3",
-			"metadata": {
-				"uid": "12345",
-				"name": "test",
-			},
-			"spec": {
-				"containers": [{ "name": "image", "image": "test/image" }],
-			},
-		}`)
-	defer os.Remove(file.Name())
-
-	ch := make(chan interface{})
-	NewSourceFile(file.Name(), time.Millisecond, ch)
-	select {
-	case got := <-ch:
-		update := got.(kubelet.PodUpdate)
-		expected := CreatePodUpdate(kubelet.SET, kubelet.FileSource, api.Pod{
-			ObjectMeta: api.ObjectMeta{
-				Name:      "test-" + hostname,
-				UID:       "12345",
-				Namespace: kubelet.NamespaceDefault,
-				SelfLink:  "/api/v1beta2/pods/test-" + hostname + "?namespace=default",
-			},
-			Spec: api.PodSpec{Containers: []api.Container{{Image: "test/image"}}},
-		})
-
-		if !api.Semantic.DeepDerivative(expected, update) {
-			t.Fatalf("Expected %#v, Got %#v", expected, update)
-		}
-
-	case <-time.After(time.Second):
-		t.Errorf("Expected update, timeout instead")
-	}
-}
-
-func TestReadPodFromFileWithoutID(t *testing.T) {
-	hostname, _ := os.Hostname()
-	hostname = strings.ToLower(hostname)
-
-	file := writeTestFile(t, os.TempDir(), "test_pod_config",
-		`{
-			"kind": "Pod",
-			"apiversion": "v1beta1",
-			"uid": "12345",
-			"DesiredState": {
-				"Manifest": {
-					"containers": [{ "name": "image", "image": "test/image" }],
-				},
-			},
-		}`)
-	defer os.Remove(file.Name())
-
-	ch := make(chan interface{})
-	NewSourceFile(file.Name(), time.Millisecond, ch)
-	select {
-	case got := <-ch:
-		update := got.(kubelet.PodUpdate)
-		expected := CreatePodUpdate(kubelet.SET, kubelet.FileSource, api.Pod{
-			ObjectMeta: api.ObjectMeta{
-				Name:      "12345-" + hostname,
-				UID:       "12345",
-				Namespace: kubelet.NamespaceDefault,
-				SelfLink:  "/api/v1beta2/pods/12345-" + hostname + "?namespace=default",
-			},
-			Spec: api.PodSpec{Containers: []api.Container{{Image: "test/image"}}},
-		})
-
-		if !api.Semantic.DeepDerivative(expected, update) {
-			t.Fatalf("Expected %#v, Got %#v", expected, update)
-		}
-
-	case <-time.After(time.Second):
-		t.Errorf("Expected update, timeout instead")
-	}
-}
-
-func TestExtractFromBadDataFile(t *testing.T) {
-	file := writeTestFile(t, os.TempDir(), "test_pod_config", string([]byte{1, 2, 3}))
-	defer os.Remove(file.Name())
-
-	ch := make(chan interface{}, 1)
-	c := sourceFile{file.Name(), ch}
-	err := c.extractFromPath()
-	if err == nil {
-		t.Fatalf("Expected error")
-	}
-	expectEmptyChannel(t, ch)
-}
-
-func TestExtractFromEmptyDir(t *testing.T) {
-	dirName, err := ioutil.TempDir("", "foo")
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
-	defer os.RemoveAll(dirName)
-
-	ch := make(chan interface{}, 1)
-	c := sourceFile{dirName, ch}
-	err = c.extractFromPath()
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
-
-	update := (<-ch).(kubelet.PodUpdate)
-	expected := CreatePodUpdate(kubelet.SET, kubelet.FileSource)
-	if !api.Semantic.DeepDerivative(expected, update) {
-		t.Errorf("Expected %#v, Got %#v", expected, update)
-	}
 }
 
 func TestExtractFromDir(t *testing.T) {
