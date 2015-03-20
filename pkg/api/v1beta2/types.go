@@ -79,7 +79,7 @@ type VolumeSource struct {
 	// Secret is a secret to populate the volume with
 	Secret *SecretVolumeSource `json:"secret" description:"secret to populate volume"`
 	// NFS represents an NFS mount on the host that shares a pod's lifetime
-	NFS *NFSVolumeSource `json:"nfs" description:"NFS volume that will be mounted in the host machine"`	
+	NFS *NFSVolumeSource `json:"nfs" description:"NFS volume that will be mounted in the host machine"`
 	// PersistentVolumeClaimVolumeSource represents a reference to a PersistentVolumeClaim in the same namespace
 	PersistentVolumeClaimVolumeSource *PersistentVolumeClaimVolumeSource `json:"persistentVolumeClaim,omitempty" description:"a reference to a PersistentVolumeClaim in the same namespace"`
 }
