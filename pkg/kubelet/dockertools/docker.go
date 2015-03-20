@@ -839,31 +839,31 @@ func GetPods(client DockerInterface, all bool) ([]*container.Pod, error) {
 	// Group containers by pod.
 	for _, c := range containers {
 		if len(c.Names) == 0 {
-			glog.Warningf("Cannog parse empty docker container name: %#v", c.Names)
+			glog.Warningf("Cannot parse empty docker container name: %#v", c.Names)
 			continue
 		}
-		podFullName, podUID, containerName, hash, err := ParseDockerName(c.Names[0])
+		dockerName, hash, err := ParseDockerName(c.Names[0])
 		if err != nil {
 			glog.Warningf("Parse docker container name %q error: %v", c.Names[0], err)
 			continue
 		}
-		pod, found := pods[podUID]
+		pod, found := pods[dockerName.PodUID]
 		if !found {
-			name, namespace, err := parsePodFullName(podFullName)
+			name, namespace, err := parsePodFullName(dockerName.PodFullName)
 			if err != nil {
-				glog.Warningf("Parse pod full name %q error: %v", podFullName, err)
+				glog.Warningf("Parse pod full name %q error: %v", dockerName.PodFullName, err)
 				continue
 			}
 			pod = &container.Pod{
-				ID:        podUID,
+				ID:        dockerName.PodUID,
 				Name:      name,
 				Namespace: namespace,
 			}
-			pods[podUID] = pod
+			pods[dockerName.PodUID] = pod
 		}
 		pod.Containers = append(pod.Containers, &container.Container{
 			ID:      types.UID(c.ID),
-			Name:    containerName,
+			Name:    dockerName.ContainerName,
 			Hash:    hash,
 			Created: c.Created,
 		})

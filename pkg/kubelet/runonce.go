@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/dockertools"
 	"github.com/golang/glog"
 )
@@ -91,11 +92,12 @@ func (kl *Kubelet) runPod(pod api.Pod, retryDelay time.Duration) error {
 	delay := retryDelay
 	retry := 0
 	for {
-		dockerContainers, err := dockertools.GetKubeletDockerContainers(kl.dockerClient, false)
+		pods, err := dockertools.GetPods(kl.dockerClient, false)
 		if err != nil {
-			return fmt.Errorf("failed to get kubelet docker containers: %v", err)
+			return fmt.Errorf("failed to get kubelet pods: %v", err)
 		}
-		running, err := kl.isPodRunning(pod, dockerContainers)
+		p := container.Pods(pods).FindPodByID(pod.UID)
+		running, err := kl.isPodRunning(pod, p)
 		if err != nil {
 			return fmt.Errorf("failed to check pod status: %v", err)
 		}
@@ -106,7 +108,7 @@ func (kl *Kubelet) runPod(pod api.Pod, retryDelay time.Duration) error {
 		glog.Infof("pod %q containers not running: syncing", pod.Name)
 		// We don't create mirror pods in this mode; pass a dummy boolean value
 		// to sycnPod.
-		if err = kl.syncPod(&pod, false, dockerContainers); err != nil {
+		if err = kl.syncPod(&pod, false, p); err != nil {
 			return fmt.Errorf("error syncing pod: %v", err)
 		}
 		if retry >= RunOnceMaxRetries {
@@ -121,14 +123,14 @@ func (kl *Kubelet) runPod(pod api.Pod, retryDelay time.Duration) error {
 }
 
 // isPodRunning returns true if all containers of a manifest are running.
-func (kl *Kubelet) isPodRunning(pod api.Pod, dockerContainers dockertools.DockerContainers) (bool, error) {
+func (kl *Kubelet) isPodRunning(pod api.Pod, runningPod container.Pod) (bool, error) {
 	for _, container := range pod.Spec.Containers {
-		dockerContainer, found, _ := dockerContainers.FindPodContainer(GetPodFullName(&pod), pod.UID, container.Name)
-		if !found {
+		c := runningPod.FindContainerByName(container.Name)
+		if c == nil {
 			glog.Infof("container %q not found", container.Name)
 			return false, nil
 		}
-		inspectResult, err := kl.dockerClient.InspectContainer(dockerContainer.ID)
+		inspectResult, err := kl.dockerClient.InspectContainer(string(c.ID))
 		if err != nil {
 			glog.Infof("failed to inspect container %q: %v", container.Name, err)
 			return false, err

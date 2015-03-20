@@ -21,7 +21,6 @@ import (
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/dockertools"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	"github.com/golang/glog"
 	"github.com/prometheus/client_golang/prometheus"
 )
@@ -139,22 +138,16 @@ func (self *podAndContainerCollector) Describe(ch chan<- *prometheus.Desc) {
 }
 
 func (self *podAndContainerCollector) Collect(ch chan<- prometheus.Metric) {
-	runningContainers, err := self.containerCache.RunningContainers()
+	runningPods, err := self.containerCache.GetPods()
 	if err != nil {
 		glog.Warning("Failed to get running container information while collecting metrics: %v", err)
 		return
 	}
 
-	// Get a set of running pods.
-	runningPods := make(map[types.UID]struct{})
-	for _, cont := range runningContainers {
-		containerName, _, err := dockertools.ParseDockerName(cont.Names[0])
-		if err != nil {
-			continue
-		}
-		runningPods[containerName.PodUID] = struct{}{}
+	runningContainers := 0
+	for _, p := range runningPods {
+		runningContainers += len(p.Containers)
 	}
-
 	ch <- prometheus.MustNewConstMetric(
 		runningPodCountDesc,
 		prometheus.GaugeValue,
@@ -162,5 +155,5 @@ func (self *podAndContainerCollector) Collect(ch chan<- prometheus.Metric) {
 	ch <- prometheus.MustNewConstMetric(
 		runningContainerCountDesc,
 		prometheus.GaugeValue,
-		float64(len(runningContainers)))
+		float64(runningContainers))
 }
