@@ -141,10 +141,24 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage RESTStorage
 	lister, isLister := storage.(RESTLister)
 	getter, isGetter := storage.(RESTGetter)
 	deleter, isDeleter := storage.(RESTDeleter)
+	gracefulDeleter, isGracefulDeleter := storage.(RESTGracefulDeleter)
 	updater, isUpdater := storage.(RESTUpdater)
 	patcher, isPatcher := storage.(RESTPatcher)
 	_, isWatcher := storage.(ResourceWatcher)
 	_, isRedirector := storage.(Redirector)
+
+	var versionedDeleterObject runtime.Object
+	switch {
+	case isGracefulDeleter:
+		object, err := a.group.Creater.New(a.group.Version, "DeleteOptions")
+		if err != nil {
+			return err
+		}
+		versionedDeleterObject = object
+		isDeleter = true
+	case isDeleter:
+		gracefulDeleter = GracefulDeleteAdapter{deleter}
+	}
 
 	var ctxFn ContextFunc
 	ctxFn = func(req *restful.Request) api.Context {
@@ -314,10 +328,13 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage RESTStorage
 			addParams(route, action.Params)
 			ws.Route(route)
 		case "DELETE": // Delete a resource.
-			route := ws.DELETE(action.Path).To(DeleteResource(deleter, ctxFn, action.Namer, mapping.Codec, resource, kind, admit)).
+			route := ws.DELETE(action.Path).To(DeleteResource(gracefulDeleter, isGracefulDeleter, ctxFn, action.Namer, mapping.Codec, resource, kind, admit)).
 				Filter(m).
 				Doc("delete a " + kind).
 				Operation("delete" + kind)
+			if isGracefulDeleter {
+				route.Reads(versionedDeleterObject)
+			}
 			addParams(route, action.Params)
 			ws.Route(route)
 		case "WATCH": // Watch a resource.

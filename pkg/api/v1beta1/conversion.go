@@ -84,6 +84,7 @@ func init() {
 			out.GenerateName = in.GenerateName
 			out.UID = in.UID
 			out.CreationTimestamp = in.CreationTimestamp
+			out.DeletionTimestamp = in.DeletionTimestamp
 			out.SelfLink = in.SelfLink
 			if len(in.ResourceVersion) > 0 {
 				v, err := strconv.ParseUint(in.ResourceVersion, 10, 64)
@@ -100,6 +101,7 @@ func init() {
 			out.GenerateName = in.GenerateName
 			out.UID = in.UID
 			out.CreationTimestamp = in.CreationTimestamp
+			out.DeletionTimestamp = in.DeletionTimestamp
 			out.SelfLink = in.SelfLink
 			if in.ResourceVersion != 0 {
 				out.ResourceVersion = strconv.FormatUint(in.ResourceVersion, 10)

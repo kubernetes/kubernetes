@@ -115,7 +115,7 @@ func (rs *REST) Delete(ctx api.Context, name string) (runtime.Object, error) {
 	if !ok {
 		return nil, fmt.Errorf("invalid object type")
 	}
-	return rs.registry.Delete(ctx, name)
+	return rs.registry.Delete(ctx, name, nil)
 }
 
 // Get gets a LimitRange with the specified name

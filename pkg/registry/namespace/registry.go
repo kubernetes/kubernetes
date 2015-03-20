@@ -44,7 +44,7 @@ type Registry interface {
 // Storage is an interface for a standard REST Storage backend
 // TODO: move me somewhere common
 type Storage interface {
-	apiserver.RESTDeleter
+	apiserver.RESTGracefulDeleter
 	apiserver.RESTLister
 	apiserver.RESTGetter
 	apiserver.ResourceWatcher
@@ -95,6 +95,6 @@ func (s *storage) UpdateNamespace(ctx api.Context, namespace *api.Namespace) err
 }
 
 func (s *storage) DeleteNamespace(ctx api.Context, namespaceID string) error {
-	_, err := s.Delete(ctx, namespaceID)
+	_, err := s.Delete(ctx, namespaceID, nil)
 	return err
 }

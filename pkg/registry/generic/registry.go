@@ -80,7 +80,7 @@ type Registry interface {
 	CreateWithName(ctx api.Context, id string, obj runtime.Object) error
 	UpdateWithName(ctx api.Context, id string, obj runtime.Object) error
 	Get(ctx api.Context, id string) (runtime.Object, error)
-	Delete(ctx api.Context, id string) (runtime.Object, error)
+	Delete(ctx api.Context, id string, options *api.DeleteOptions) (runtime.Object, error)
 	WatchPredicate(ctx api.Context, m Matcher, resourceVersion string) (watch.Interface, error)
 }
 

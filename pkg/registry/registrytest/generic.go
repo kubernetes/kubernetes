@@ -84,7 +84,7 @@ func (r *GenericRegistry) UpdateWithName(ctx api.Context, id string, obj runtime
 	return r.Err
 }
 
-func (r *GenericRegistry) Delete(ctx api.Context, id string) (runtime.Object, error) {
+func (r *GenericRegistry) Delete(ctx api.Context, id string, options *api.DeleteOptions) (runtime.Object, error) {
 	r.Lock()
 	defer r.Unlock()
 	r.Broadcaster.Action(watch.Deleted, r.Object)

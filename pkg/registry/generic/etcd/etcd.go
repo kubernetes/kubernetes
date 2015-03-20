@@ -81,19 +81,21 @@ type Etcd struct {
 	// storage of the value in etcd is not appropriate, since they cannot
 	// be watched.
 	Decorator rest.ObjectFunc
-	// Allows extended behavior during creation
+	// Allows extended behavior during creation, required
 	CreateStrategy rest.RESTCreateStrategy
 	// On create of an object, attempt to run a further operation.
 	AfterCreate rest.ObjectFunc
-	// Allows extended behavior during updates
+	// Allows extended behavior during updates, required
 	UpdateStrategy rest.RESTUpdateStrategy
 	// On update of an object, attempt to run a further operation.
 	AfterUpdate rest.ObjectFunc
+	// Allows extended behavior during updates, optional
+	DeleteStrategy rest.RESTDeleteStrategy
+	// On deletion of an object, attempt to run a further operation.
+	AfterDelete rest.ObjectFunc
 	// If true, return the object that was deleted. Otherwise, return a generic
 	// success status response.
 	ReturnDeletedObject bool
-	// On deletion of an object, attempt to run a further operation.
-	AfterDelete rest.ObjectFunc
 
 	// Used for all etcd access functions
 	Helper tools.EtcdHelper
@@ -333,8 +335,7 @@ func (e *Etcd) Get(ctx api.Context, name string) (runtime.Object, error) {
 	if err != nil {
 		return nil, err
 	}
-	err = e.Helper.ExtractObj(key, obj, false)
-	if err != nil {
+	if err := e.Helper.ExtractObj(key, obj, false); err != nil {
 		return nil, etcderr.InterpretGetError(err, e.EndpointName, name)
 	}
 	if e.Decorator != nil {
@@ -346,26 +347,56 @@ func (e *Etcd) Get(ctx api.Context, name string) (runtime.Object, error) {
 }
 
 // Delete removes the item from etcd.
-func (e *Etcd) Delete(ctx api.Context, name string) (runtime.Object, error) {
+func (e *Etcd) Delete(ctx api.Context, name string, options *api.DeleteOptions) (runtime.Object, error) {
 	key, err := e.KeyFunc(ctx, name)
 	if err != nil {
 		return nil, err
 	}
+
 	obj := e.NewFunc()
-	if err := e.Helper.DeleteObj(key, obj); err != nil {
+	if err := e.Helper.ExtractObj(key, obj, false); err != nil {
 		return nil, etcderr.InterpretDeleteError(err, e.EndpointName, name)
 	}
-	if e.AfterDelete != nil {
+
+	// support older consumers of delete by treating "nil" as delete immediately
+	if options == nil {
+		options = api.NewDeleteOptions(0)
+	}
+	graceful, pendingGraceful, err := rest.BeforeDelete(e.DeleteStrategy, ctx, obj, options)
+	if err != nil {
+		return nil, err
+	}
+	if pendingGraceful {
+		return e.finalizeDelete(obj, false)
+	}
+	if graceful && *options.GracePeriodSeconds != 0 {
+		out := e.NewFunc()
+		if err := e.Helper.SetObj(key, obj, out, uint64(*options.GracePeriodSeconds)); err != nil {
+			return nil, etcderr.InterpretUpdateError(err, e.EndpointName, name)
+		}
+		return e.finalizeDelete(out, true)
+	}
+
+	// delete immediately, or no graceful deletion supported
+	out := e.NewFunc()
+	if err := e.Helper.DeleteObj(key, out); err != nil {
+		return nil, etcderr.InterpretDeleteError(err, e.EndpointName, name)
+	}
+	return e.finalizeDelete(out, true)
+}
+
+func (e *Etcd) finalizeDelete(obj runtime.Object, runHooks bool) (runtime.Object, error) {
+	if runHooks && e.AfterDelete != nil {
 		if err := e.AfterDelete(obj); err != nil {
 			return nil, err
 		}
 	}
-	if e.Decorator != nil {
-		if err := e.Decorator(obj); err != nil {
-			return nil, err
-		}
-	}
 	if e.ReturnDeletedObject {
+		if e.Decorator != nil {
+			if err := e.Decorator(obj); err != nil {
+				return nil, err
+			}
+		}
 		return obj, nil
 	}
 	return &api.Status{Status: api.StatusSuccess}, nil

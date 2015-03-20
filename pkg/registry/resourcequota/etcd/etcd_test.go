@@ -340,7 +340,7 @@ func TestDeleteResourceQuota(t *testing.T) {
 		},
 	}
 	storage, _ := NewREST(helper)
-	_, err := storage.Delete(api.NewDefaultContext(), "foo")
+	_, err := storage.Delete(api.NewDefaultContext(), "foo", nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -353,8 +353,8 @@ func TestEtcdGetDifferentNamespace(t *testing.T) {
 	ctx1 := api.NewDefaultContext()
 	ctx2 := api.WithNamespace(api.NewContext(), "other")
 
-	key1, _ := registry.store.KeyFunc(ctx1, "foo")
-	key2, _ := registry.store.KeyFunc(ctx2, "foo")
+	key1, _ := registry.KeyFunc(ctx1, "foo")
+	key2, _ := registry.KeyFunc(ctx2, "foo")
 
 	fakeClient.Set(key1, runtime.EncodeOrDie(latest.Codec, &api.ResourceQuota{ObjectMeta: api.ObjectMeta{Namespace: "default", Name: "foo"}}), 0)
 	fakeClient.Set(key2, runtime.EncodeOrDie(latest.Codec, &api.ResourceQuota{ObjectMeta: api.ObjectMeta{Namespace: "other", Name: "foo"}}), 0)
@@ -388,7 +388,7 @@ func TestEtcdGetDifferentNamespace(t *testing.T) {
 func TestEtcdGet(t *testing.T) {
 	registry, _, fakeClient, _ := newStorage(t)
 	ctx := api.NewDefaultContext()
-	key, _ := registry.store.KeyFunc(ctx, "foo")
+	key, _ := registry.KeyFunc(ctx, "foo")
 	fakeClient.Set(key, runtime.EncodeOrDie(latest.Codec, &api.ResourceQuota{ObjectMeta: api.ObjectMeta{Name: "foo"}}), 0)
 	obj, err := registry.Get(ctx, "foo")
 	if err != nil {
@@ -403,7 +403,7 @@ func TestEtcdGet(t *testing.T) {
 func TestEtcdGetNotFound(t *testing.T) {
 	registry, _, fakeClient, _ := newStorage(t)
 	ctx := api.NewDefaultContext()
-	key, _ := registry.store.KeyFunc(ctx, "foo")
+	key, _ := registry.KeyFunc(ctx, "foo")
 	fakeClient.Data[key] = tools.EtcdResponseWithError{
 		R: &etcd.Response{
 			Node: nil,
@@ -431,7 +431,7 @@ func TestEtcdCreateFailsWithoutNamespace(t *testing.T) {
 func TestEtcdCreateAlreadyExisting(t *testing.T) {
 	registry, _, fakeClient, _ := newStorage(t)
 	ctx := api.NewDefaultContext()
-	key, _ := registry.store.KeyFunc(ctx, "foo")
+	key, _ := registry.KeyFunc(ctx, "foo")
 	fakeClient.Data[key] = tools.EtcdResponseWithError{
 		R: &etcd.Response{
 			Node: &etcd.Node{
@@ -451,7 +451,7 @@ func TestEtcdUpdateStatus(t *testing.T) {
 	ctx := api.NewDefaultContext()
 	fakeClient.TestIndex = true
 
-	key, _ := registry.store.KeyFunc(ctx, "foo")
+	key, _ := registry.KeyFunc(ctx, "foo")
 	resourcequotaStart := validNewResourceQuota()
 	fakeClient.Set(key, runtime.EncodeOrDie(latest.Codec, resourcequotaStart), 1)
 
@@ -502,7 +502,7 @@ func TestEtcdUpdateStatus(t *testing.T) {
 func TestEtcdEmptyList(t *testing.T) {
 	registry, _, fakeClient, _ := newStorage(t)
 	ctx := api.NewDefaultContext()
-	key := registry.store.KeyRootFunc(ctx)
+	key := registry.KeyRootFunc(ctx)
 	fakeClient.Data[key] = tools.EtcdResponseWithError{
 		R: &etcd.Response{
 			Node: &etcd.Node{
@@ -525,7 +525,7 @@ func TestEtcdEmptyList(t *testing.T) {
 func TestEtcdListNotFound(t *testing.T) {
 	registry, _, fakeClient, _ := newStorage(t)
 	ctx := api.NewDefaultContext()
-	key := registry.store.KeyRootFunc(ctx)
+	key := registry.KeyRootFunc(ctx)
 	fakeClient.Data[key] = tools.EtcdResponseWithError{
 		R: &etcd.Response{},
 		E: tools.EtcdErrorNotFound,
@@ -543,7 +543,7 @@ func TestEtcdListNotFound(t *testing.T) {
 func TestEtcdList(t *testing.T) {
 	registry, _, fakeClient, _ := newStorage(t)
 	ctx := api.NewDefaultContext()
-	key := registry.store.KeyRootFunc(ctx)
+	key := registry.KeyRootFunc(ctx)
 	fakeClient.Data[key] = tools.EtcdResponseWithError{
 		R: &etcd.Response{
 			Node: &etcd.Node{
