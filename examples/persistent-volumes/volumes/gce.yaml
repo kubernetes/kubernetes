@@ -1,7 +1,7 @@
 kind: PersistentVolume
 apiVersion: v1beta3
 metadata:
-  name: pv0001
+  name: pv0003
 spec:
   capacity:
     storage: 10

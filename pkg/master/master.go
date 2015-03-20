@@ -49,6 +49,8 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/minion"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/namespace"
 	namespaceetcd "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/namespace/etcd"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/persistentvolume"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/persistentvolumeclaim"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/pod"
 	podetcd "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/pod/etcd"
 	resourcequotaetcd "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/resourcequota/etcd"
@@ -356,6 +358,8 @@ func (m *Master) init(c *Config) {
 
 	resourceQuotaStorage, resourceQuotaStatusStorage := resourcequotaetcd.NewREST(c.EtcdHelper)
 	secretRegistry := secret.NewEtcdRegistry(c.EtcdHelper)
+	persistentVolumeRegistry := persistentvolume.NewEtcdRegistry(c.EtcdHelper)
+	persistentVolumeClaimRegistry := persistentvolumeclaim.NewEtcdRegistry(c.EtcdHelper)
 
 	namespaceStorage := namespaceetcd.NewREST(c.EtcdHelper)
 	m.namespaceRegistry = namespace.NewRegistry(namespaceStorage)
@@ -397,11 +401,13 @@ func (m *Master) init(c *Config) {
 		"nodes":                  nodeStorage,
 		"events":                 event.NewREST(eventRegistry),
 
-		"limitRanges":           limitrange.NewREST(limitRangeRegistry),
-		"resourceQuotas":        resourceQuotaStorage,
-		"resourceQuotas/status": resourceQuotaStatusStorage,
-		"namespaces":            namespaceStorage,
-		"secrets":               secret.NewREST(secretRegistry),
+		"limitRanges":            limitrange.NewREST(limitRangeRegistry),
+		"resourceQuotas":         resourceQuotaStorage,
+		"resourceQuotas/status":  resourceQuotaStatusStorage,
+		"namespaces":             namespaceStorage,
+		"secrets":                secret.NewREST(secretRegistry),
+		"persistentVolumes":      persistentvolume.NewREST(persistentVolumeRegistry),
+		"persistentVolumeClaims": persistentvolumeclaim.NewREST(persistentVolumeClaimRegistry),
 	}
 
 	apiVersions := []string{"v1beta1", "v1beta2"}

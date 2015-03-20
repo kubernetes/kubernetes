@@ -2,7 +2,7 @@
     "kind": "PersistentVolumeClaim",
     "apiVersion": "v1beta3",
     "metadata": {
-        "name": "claim01"
+        "name": "myclaim-3"
     }, "spec": {
         "accessModes": [
             "ReadWriteOnce",
