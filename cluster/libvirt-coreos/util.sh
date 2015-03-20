@@ -123,7 +123,7 @@ function initialize-pool {
   # fi
 
   mkdir -p "$POOL_PATH/kubernetes"
-  kube-push
+  kube-push-internal
 
   mkdir -p "$POOL_PATH/kubernetes/manifests"
   if [[ "$ENABLE_NODE_LOGGING" == "true" ]]; then
@@ -271,8 +271,35 @@ function upload-server-tars {
 
 # Update a kubernetes cluster with latest source
 function kube-push {
+  kube-push-internal
+  ssh-to-node "$MASTER_NAME" "sudo systemctl restart kube-apiserver kube-controller-manager kube-scheduler"
+  for ((i=0; i < NUM_MINIONS; i++)); do
+    ssh-to-node "${MINION_NAMES[$i]}" "sudo systemctl restart kubelet kube-proxy"
+  done
+  wait-cluster-readiness
+}
+
+function kube-push-internal {
+  case "${KUBE_PUSH:-release}" in
+    release)
+      kube-push-release;;
+    local)
+      kube-push-local;;
+    *)
+      echo "The only known push methods are \"release\" to use the relase tarball or \"local\" to use the binaries built by make. KUBE_PUSH is set \"$KUBE_PUSH\"" >&2
+      return 1;;
+  esac
+}
+
+function kube-push-release {
   find-release-tars
   upload-server-tars
+}
+
+function kube-push-local {
+  rm -rf "$POOL_PATH/kubernetes/bin/*"
+  mkdir -p "$POOL_PATH/kubernetes/bin"
+  cp "${KUBE_ROOT}/_output/local/go/bin"/* "$POOL_PATH/kubernetes/bin"
 }
 
 # Execute prior to running tests to build a release if required for env
