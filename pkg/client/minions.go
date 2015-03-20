@@ -21,6 +21,9 @@ import (
 	"fmt"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
 
 type NodesInterface interface {
@@ -33,6 +36,7 @@ type NodeInterface interface {
 	List() (*api.NodeList, error)
 	Delete(name string) error
 	Update(*api.Node) (*api.Node, error)
+	Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error)
 }
 
 // nodes implements NodesInterface
@@ -93,4 +97,16 @@ func (c *nodes) Update(minion *api.Node) (*api.Node, error) {
 	}
 	err := c.r.Put().Resource(c.resourceName()).Name(minion.Name).Body(minion).Do().Into(result)
 	return result, err
+}
+
+// Watch returns a watch.Interface that watches the requested nodes.
+func (c *nodes) Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
+	return c.r.Get().
+		Prefix("watch").
+		Namespace(api.NamespaceAll).
+		Resource(c.resourceName()).
+		Param("resourceVersion", resourceVersion).
+		LabelsSelectorParam(api.LabelSelectorQueryParam(c.r.APIVersion()), label).
+		FieldsSelectorParam(api.FieldSelectorQueryParam(c.r.APIVersion()), field).
+		Watch()
 }

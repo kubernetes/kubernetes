@@ -101,8 +101,7 @@ func getResourceRequest(pod *api.Pod) resourceRequest {
 	return result
 }
 
-func GetPodsExceedingCapacity(pods []api.Pod, capacity api.ResourceList) []api.Pod {
-	exceedingPods := []api.Pod{}
+func CheckPodsExceedingCapacity(pods []api.Pod, capacity api.ResourceList) (fitting []api.Pod, notFitting []api.Pod) {
 	totalMilliCPU := capacity.Cpu().MilliValue()
 	totalMemory := capacity.Memory().Value()
 	milliCPURequested := int64(0)
@@ -113,14 +112,15 @@ func GetPodsExceedingCapacity(pods []api.Pod, capacity api.ResourceList) []api.P
 		fitsMemory := totalMemory == 0 || (totalMemory-memoryRequested) >= podRequest.memory
 		if !fitsCPU || !fitsMemory {
 			// the pod doesn't fit
-			exceedingPods = append(exceedingPods, pods[ix])
-		} else {
-			// the pod fits
-			milliCPURequested += podRequest.milliCPU
-			memoryRequested += podRequest.memory
+			notFitting = append(notFitting, pods[ix])
+			continue
 		}
+		// the pod fits
+		milliCPURequested += podRequest.milliCPU
+		memoryRequested += podRequest.memory
+		fitting = append(fitting, pods[ix])
 	}
-	return exceedingPods
+	return
 }
 
 // PodFitsResources calculates fit based on requested, rather than used resources
@@ -137,7 +137,8 @@ func (r *ResourceFit) PodFitsResources(pod api.Pod, existingPods []api.Pod, node
 	pods := []api.Pod{}
 	copy(pods, existingPods)
 	pods = append(existingPods, pod)
-	if len(GetPodsExceedingCapacity(pods, info.Spec.Capacity)) > 0 {
+	_, exceeding := CheckPodsExceedingCapacity(pods, info.Spec.Capacity)
+	if len(exceeding) > 0 {
 		return false, nil
 	}
 	return true, nil
@@ -157,20 +158,24 @@ func NewSelectorMatchPredicate(info NodeInfo) FitPredicate {
 	return selector.PodSelectorMatches
 }
 
+func PodMatchesNodeLabels(pod *api.Pod, node *api.Node) bool {
+	if len(pod.Spec.NodeSelector) == 0 {
+		return true
+	}
+	selector := labels.SelectorFromSet(pod.Spec.NodeSelector)
+	return selector.Matches(labels.Set(node.Labels))
+}
+
 type NodeSelector struct {
 	info NodeInfo
 }
 
 func (n *NodeSelector) PodSelectorMatches(pod api.Pod, existingPods []api.Pod, node string) (bool, error) {
-	if len(pod.Spec.NodeSelector) == 0 {
-		return true, nil
-	}
-	selector := labels.SelectorFromSet(pod.Spec.NodeSelector)
 	minion, err := n.info.GetNodeInfo(node)
 	if err != nil {
 		return false, err
 	}
-	return selector.Matches(labels.Set(minion.Labels)), nil
+	return PodMatchesNodeLabels(&pod, minion), nil
 }
 
 func PodFitsHost(pod api.Pod, existingPods []api.Pod, node string) (bool, error) {

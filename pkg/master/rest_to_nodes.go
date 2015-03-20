@@ -24,6 +24,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
 
 // RESTStorageToNodes will take a RESTStorage object and return a client interface
@@ -91,4 +92,9 @@ func (n *nodeAdaptor) Delete(name string) error {
 // Update updates an existing node.
 func (n *nodeAdaptor) Update(minion *api.Node) (*api.Node, error) {
 	return nil, errors.New("direct update not implemented")
+}
+
+// Watch watches for nodes.
+func (n *nodeAdaptor) Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
+	return nil, errors.New("direct watch not implemented")
 }

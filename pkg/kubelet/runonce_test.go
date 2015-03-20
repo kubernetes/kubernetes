@@ -78,6 +78,7 @@ func TestRunOnce(t *testing.T) {
 		recorder:      &record.FakeRecorder{},
 		cadvisor:      cadvisor,
 		podStatuses:   make(map[string]api.PodStatus),
+		nodeLister:    testNodeLister{},
 	}
 
 	kb.networkPlugin, _ = network.InitNetworkPlugin([]network.NetworkPlugin{}, "", network.NewFakeHost(nil))
