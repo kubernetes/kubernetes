@@ -32,6 +32,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/credentialprovider"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/leaky"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -815,4 +816,62 @@ type ContainerCommandRunner interface {
 	GetDockerServerVersion() ([]uint, error)
 	ExecInContainer(containerID string, cmd []string, in io.Reader, out, err io.WriteCloser, tty bool) error
 	PortForward(podInfraContainerID string, port uint16, stream io.ReadWriteCloser) error
+}
+
+// Parse the pod full name. TODO(yifan): This is duplicated with kubelet.ParsePodFullName.
+func parsePodFullName(podFullName string) (string, string, error) {
+	parts := strings.Split(podFullName, "_")
+	if len(parts) != 2 {
+		return "", "", fmt.Errorf("failed to parse the pod full name %q", podFullName)
+	}
+	return parts[0], parts[1], nil
+}
+
+func GetPods(client DockerInterface, all bool) ([]*container.Pod, error) {
+	pods := make(map[types.UID]*container.Pod)
+	var result []*container.Pod
+
+	containers, err := GetKubeletDockerContainers(client, all)
+	if err != nil {
+		return nil, err
+	}
+
+	// Group containers by pod.
+	for _, c := range containers {
+		if len(c.Names) == 0 {
+			glog.Warningf("Cannog parse empty docker container name: %#v", c.Names)
+			continue
+		}
+		podFullName, podUID, containerName, hash, err := ParseDockerName(c.Names[0])
+		if err != nil {
+			glog.Warningf("Parse docker container name %q error: %v", c.Names[0], err)
+			continue
+		}
+		pod, found := pods[podUID]
+		if !found {
+			name, namespace, err := parsePodFullName(podFullName)
+			if err != nil {
+				glog.Warningf("Parse pod full name %q error: %v", podFullName, err)
+				continue
+			}
+			pod = &container.Pod{
+				ID:        podUID,
+				Name:      name,
+				Namespace: namespace,
+			}
+			pods[podUID] = pod
+		}
+		pod.Containers = append(pod.Containers, &container.Container{
+			ID:      types.UID(c.ID),
+			Name:    containerName,
+			Hash:    hash,
+			Created: c.Created,
+		})
+	}
+
+	// Convert map to list.
+	for _, c := range pods {
+		result = append(result, c)
+	}
+	return result, nil
 }

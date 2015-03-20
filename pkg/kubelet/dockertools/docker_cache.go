@@ -19,10 +19,12 @@ package dockertools
 import (
 	"sync"
 	"time"
+
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
 )
 
 type DockerCache interface {
-	RunningContainers() (DockerContainers, error)
+	GetPods() ([]*container.Pod, error)
 	ForceUpdateIfOlder(time.Time) error
 }
 
@@ -43,7 +45,7 @@ type dockerCache struct {
 	// Last time when cache was updated.
 	cacheTime time.Time
 	// The content of the cache.
-	containers DockerContainers
+	pods []*container.Pod
 	// Whether the background thread updating the cache is running.
 	updatingCache bool
 	// Time when the background thread should be stopped.
@@ -53,15 +55,15 @@ type dockerCache struct {
 // Ensure that dockerCache abides by the DockerCache interface.
 var _ DockerCache = new(dockerCache)
 
-func (d *dockerCache) RunningContainers() (DockerContainers, error) {
+func (d *dockerCache) GetPods() ([]*container.Pod, error) {
 	d.lock.Lock()
 	defer d.lock.Unlock()
 	if time.Since(d.cacheTime) > 2*time.Second {
-		containers, err := GetKubeletDockerContainers(d.client, false)
+		pods, err := GetPods(d.client, false)
 		if err != nil {
-			return containers, err
+			return pods, err
 		}
-		d.containers = containers
+		d.pods = pods
 		d.cacheTime = time.Now()
 	}
 	// Stop refreshing thread if there were no requests within last 2 seconds.
@@ -70,18 +72,18 @@ func (d *dockerCache) RunningContainers() (DockerContainers, error) {
 		d.updatingCache = true
 		go d.startUpdatingCache()
 	}
-	return d.containers, nil
+	return d.pods, nil
 }
 
 func (d *dockerCache) ForceUpdateIfOlder(minExpectedCacheTime time.Time) error {
 	d.lock.Lock()
 	defer d.lock.Unlock()
 	if d.cacheTime.Before(minExpectedCacheTime) {
-		containers, err := GetKubeletDockerContainers(d.client, false)
+		pods, err := GetPods(d.client, false)
 		if err != nil {
 			return err
 		}
-		d.containers = containers
+		d.pods = pods
 		d.cacheTime = time.Now()
 	}
 	return nil
@@ -91,7 +93,7 @@ func (d *dockerCache) startUpdatingCache() {
 	run := true
 	for run {
 		time.Sleep(100 * time.Millisecond)
-		containers, err := GetKubeletDockerContainers(d.client, false)
+		pods, err := GetPods(d.client, false)
 		cacheTime := time.Now()
 		if err != nil {
 			continue
@@ -102,7 +104,7 @@ func (d *dockerCache) startUpdatingCache() {
 			d.updatingCache = false
 			run = false
 		}
-		d.containers = containers
+		d.pods = pods
 		d.cacheTime = cacheTime
 		d.lock.Unlock()
 	}
