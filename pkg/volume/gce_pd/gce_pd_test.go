@@ -21,14 +21,14 @@ import (
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/volume"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/mount"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume"
 )
 
 func TestCanSupport(t *testing.T) {
-	plugMgr := volume.PluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), volume.NewFakeHost("/tmp/fake", nil, nil))
+	plugMgr := volume.VolumePluginMgr{}
+	plugMgr.InitPlugins(ProbeVolumePlugins(), volume.NewFakeVolumeHost("/tmp/fake", nil, nil))
 
 	plug, err := plugMgr.FindPluginByName("kubernetes.io/gce-pd")
 	if err != nil {
@@ -65,8 +65,8 @@ func (fake *fakePDManager) DetachDisk(pd *gcePersistentDisk) error {
 }
 
 func TestPlugin(t *testing.T) {
-	plugMgr := volume.PluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), volume.NewFakeHost("/tmp/fake", nil, nil))
+	plugMgr := volume.VolumePluginMgr{}
+	plugMgr.InitPlugins(ProbeVolumePlugins(), volume.NewFakeVolumeHost("/tmp/fake", nil, nil))
 
 	plug, err := plugMgr.FindPluginByName("kubernetes.io/gce-pd")
 	if err != nil {
@@ -131,8 +131,8 @@ func TestPlugin(t *testing.T) {
 }
 
 func TestPluginLegacy(t *testing.T) {
-	plugMgr := volume.PluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(), volume.NewFakeHost("/tmp/fake", nil, nil))
+	plugMgr := volume.VolumePluginMgr{}
+	plugMgr.InitPlugins(ProbeVolumePlugins(), volume.NewFakeVolumeHost("/tmp/fake", nil, nil))
 
 	plug, err := plugMgr.FindPluginByName("gce-pd")
 	if err != nil {

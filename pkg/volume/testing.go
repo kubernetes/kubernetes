@@ -25,36 +25,36 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 )
 
-// fakeHost is useful for testing volume plugins.
-type fakeHost struct {
+// fakeVolumeHost is useful for testing volume plugins.
+type fakeVolumeHost struct {
 	rootDir    string
 	kubeClient client.Interface
-	pluginMgr  PluginMgr
+	pluginMgr  VolumePluginMgr
 }
 
-func NewFakeHost(rootDir string, kubeClient client.Interface, plugins []Plugin) *fakeHost {
-	host := &fakeHost{rootDir: rootDir, kubeClient: kubeClient}
+func NewFakeVolumeHost(rootDir string, kubeClient client.Interface, plugins []VolumePlugin) *fakeVolumeHost {
+	host := &fakeVolumeHost{rootDir: rootDir, kubeClient: kubeClient}
 	host.pluginMgr.InitPlugins(plugins, host)
 	return host
 }
 
-func (f *fakeHost) GetPluginDir(podUID string) string {
+func (f *fakeVolumeHost) GetPluginDir(podUID string) string {
 	return path.Join(f.rootDir, "plugins", podUID)
 }
 
-func (f *fakeHost) GetPodVolumeDir(podUID types.UID, pluginName, volumeName string) string {
+func (f *fakeVolumeHost) GetPodVolumeDir(podUID types.UID, pluginName, volumeName string) string {
 	return path.Join(f.rootDir, "pods", string(podUID), "volumes", pluginName, volumeName)
 }
 
-func (f *fakeHost) GetPodPluginDir(podUID types.UID, pluginName string) string {
+func (f *fakeVolumeHost) GetPodPluginDir(podUID types.UID, pluginName string) string {
 	return path.Join(f.rootDir, "pods", string(podUID), "plugins", pluginName)
 }
 
-func (f *fakeHost) GetKubeClient() client.Interface {
+func (f *fakeVolumeHost) GetKubeClient() client.Interface {
 	return f.kubeClient
 }
 
-func (f *fakeHost) NewWrapperBuilder(spec *api.Volume, podRef *api.ObjectReference) (Builder, error) {
+func (f *fakeVolumeHost) NewWrapperBuilder(spec *api.Volume, podRef *api.ObjectReference) (Builder, error) {
 	plug, err := f.pluginMgr.FindPluginBySpec(spec)
 	if err != nil {
 		return nil, err
@@ -62,7 +62,7 @@ func (f *fakeHost) NewWrapperBuilder(spec *api.Volume, podRef *api.ObjectReferen
 	return plug.NewBuilder(spec, podRef)
 }
 
-func (f *fakeHost) NewWrapperCleaner(spec *api.Volume, podUID types.UID) (Cleaner, error) {
+func (f *fakeVolumeHost) NewWrapperCleaner(spec *api.Volume, podUID types.UID) (Cleaner, error) {
 	plug, err := f.pluginMgr.FindPluginBySpec(spec)
 	if err != nil {
 		return nil, err
@@ -70,42 +70,42 @@ func (f *fakeHost) NewWrapperCleaner(spec *api.Volume, podUID types.UID) (Cleane
 	return plug.NewCleaner(spec.Name, podUID)
 }
 
-// FakePlugin is useful for for testing.  It tries to be a fully compliant
+// FakeVolumePlugin is useful for for testing.  It tries to be a fully compliant
 // plugin, but all it does is make empty directories.
 // Use as:
 //   volume.RegisterPlugin(&FakePlugin{"fake-name"})
-type FakePlugin struct {
+type FakeVolumePlugin struct {
 	PluginName string
-	Host       Host
+	Host       VolumeHost
 }
 
-var _ Plugin = &FakePlugin{}
+var _ VolumePlugin = &FakeVolumePlugin{}
 
-func (plugin *FakePlugin) Init(host Host) {
+func (plugin *FakeVolumePlugin) Init(host VolumeHost) {
 	plugin.Host = host
 }
 
-func (plugin *FakePlugin) Name() string {
+func (plugin *FakeVolumePlugin) Name() string {
 	return plugin.PluginName
 }
 
-func (plugin *FakePlugin) CanSupport(spec *api.Volume) bool {
+func (plugin *FakeVolumePlugin) CanSupport(spec *api.Volume) bool {
 	// TODO: maybe pattern-match on spec.Name to decide?
 	return true
 }
 
-func (plugin *FakePlugin) NewBuilder(spec *api.Volume, podRef *api.ObjectReference) (Builder, error) {
+func (plugin *FakeVolumePlugin) NewBuilder(spec *api.Volume, podRef *api.ObjectReference) (Builder, error) {
 	return &FakeVolume{podRef.UID, spec.Name, plugin}, nil
 }
 
-func (plugin *FakePlugin) NewCleaner(volName string, podUID types.UID) (Cleaner, error) {
+func (plugin *FakeVolumePlugin) NewCleaner(volName string, podUID types.UID) (Cleaner, error) {
 	return &FakeVolume{podUID, volName, plugin}, nil
 }
 
 type FakeVolume struct {
 	PodUID  types.UID
 	VolName string
-	Plugin  *FakePlugin
+	Plugin  *FakeVolumePlugin
 }
 
 func (fv *FakeVolume) SetUp() error {

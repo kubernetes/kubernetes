@@ -34,9 +34,9 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/config"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/dockertools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/network"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/volume"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/master/ports"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume"
 
 	"github.com/golang/glog"
 	"github.com/spf13/pflag"
@@ -267,7 +267,7 @@ func SimpleRunKubelet(client *client.Client,
 	hostname, rootDir, manifestURL, address string,
 	port uint,
 	masterServiceNamespace string,
-	volumePlugins []volume.Plugin,
+	volumePlugins []volume.VolumePlugin,
 	tlsOptions *kubelet.TLSOptions,
 	cadvisorInterface cadvisor.Interface,
 	configFilePath string) {
@@ -402,7 +402,7 @@ type KubeletConfig struct {
 	Port                           uint
 	Runonce                        bool
 	MasterServiceNamespace         string
-	VolumePlugins                  []volume.Plugin
+	VolumePlugins                  []volume.VolumePlugin
 	NetworkPlugins                 []network.NetworkPlugin
 	NetworkPluginName              string
 	StreamingConnectionIdleTimeout time.Duration

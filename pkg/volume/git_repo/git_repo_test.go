@@ -25,22 +25,22 @@ import (
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/volume"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/volume/empty_dir"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/exec"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume/empty_dir"
 )
 
-func newTestHost(t *testing.T) volume.Host {
+func newTestHost(t *testing.T) volume.VolumeHost {
 	tempDir, err := ioutil.TempDir("/tmp", "git_repo_test.")
 	if err != nil {
 		t.Fatalf("can't make a temp rootdir: %v", err)
 	}
-	return volume.NewFakeHost(tempDir, nil, empty_dir.ProbeVolumePlugins())
+	return volume.NewFakeVolumeHost(tempDir, nil, empty_dir.ProbeVolumePlugins())
 }
 
 func TestCanSupport(t *testing.T) {
-	plugMgr := volume.PluginMgr{}
+	plugMgr := volume.VolumePluginMgr{}
 	plugMgr.InitPlugins(ProbeVolumePlugins(), newTestHost(t))
 
 	plug, err := plugMgr.FindPluginByName("kubernetes.io/git-repo")
@@ -55,7 +55,7 @@ func TestCanSupport(t *testing.T) {
 	}
 }
 
-func testSetUp(plug volume.Plugin, builder volume.Builder, t *testing.T) {
+func testSetUp(plug volume.VolumePlugin, builder volume.Builder, t *testing.T) {
 	var fcmd exec.FakeCmd
 	fcmd = exec.FakeCmd{
 		CombinedOutputScript: []exec.FakeCombinedOutputAction{
@@ -102,7 +102,7 @@ func testSetUp(plug volume.Plugin, builder volume.Builder, t *testing.T) {
 }
 
 func TestPlugin(t *testing.T) {
-	plugMgr := volume.PluginMgr{}
+	plugMgr := volume.VolumePluginMgr{}
 	plugMgr.InitPlugins(ProbeVolumePlugins(), newTestHost(t))
 
 	plug, err := plugMgr.FindPluginByName("kubernetes.io/git-repo")
@@ -159,7 +159,7 @@ func TestPlugin(t *testing.T) {
 }
 
 func TestPluginLegacy(t *testing.T) {
-	plugMgr := volume.PluginMgr{}
+	plugMgr := volume.VolumePluginMgr{}
 	plugMgr.InitPlugins(ProbeVolumePlugins(), newTestHost(t))
 
 	plug, err := plugMgr.FindPluginByName("git")

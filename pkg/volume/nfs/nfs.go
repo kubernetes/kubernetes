@@ -20,28 +20,28 @@ import (
 	"os"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/volume"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume"
 	"github.com/golang/glog"
 )
 
 // This is the primary entrypoint for volume plugins.
-func ProbeVolumePlugins() []volume.Plugin {
-	return []volume.Plugin{&nfsPlugin{nil, newNFSMounter()}}
+func ProbeVolumePlugins() []volume.VolumePlugin {
+	return []volume.VolumePlugin{&nfsPlugin{nil, newNFSMounter()}}
 }
 
 type nfsPlugin struct {
-	host    volume.Host
+	host    volume.VolumeHost
 	mounter nfsMountInterface
 }
 
-var _ volume.Plugin = &nfsPlugin{}
+var _ volume.VolumePlugin = &nfsPlugin{}
 
 const (
 	nfsPluginName = "kubernetes.io/nfs"
 )
 
-func (plugin *nfsPlugin) Init(host volume.Host) {
+func (plugin *nfsPlugin) Init(host volume.VolumeHost) {
 	plugin.host = host
 }
 

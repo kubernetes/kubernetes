@@ -22,9 +22,9 @@ import (
 	"path"
 )
 
-// Interface is a directory used by pods or hosts.
+// Volume represents a directory used by pods or hosts on a node.
 // All method implementations of methods in the volume interface must be idempotent.
-type Interface interface {
+type Volume interface {
 	// GetPath returns the directory path the volume is mounted to.
 	GetPath() string
 }
@@ -32,7 +32,7 @@ type Interface interface {
 // Builder interface provides method to set up/mount the volume.
 type Builder interface {
 	// Uses Interface to provide the path for Docker binds.
-	Interface
+	Volume
 	// SetUp prepares and mounts/unpacks the volume to a self-determined
 	// directory path.  This may be called more than once, so
 	// implementations must be idempotent.
@@ -45,7 +45,7 @@ type Builder interface {
 
 // Cleaner interface provides method to cleanup/unmount the volumes.
 type Cleaner interface {
-	Interface
+	Volume
 	// TearDown unmounts the volume from a self-determined directory and
 	// removes traces of the SetUp procedure.
 	TearDown() error

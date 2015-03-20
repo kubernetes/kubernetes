@@ -23,31 +23,31 @@ import (
 	"strconv"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/volume"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/exec"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/mount"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume"
 	"github.com/golang/glog"
 )
 
 // This is the primary entrypoint for volume plugins.
-func ProbeVolumePlugins() []volume.Plugin {
-	return []volume.Plugin{&gcePersistentDiskPlugin{nil, false}, &gcePersistentDiskPlugin{nil, true}}
+func ProbeVolumePlugins() []volume.VolumePlugin {
+	return []volume.VolumePlugin{&gcePersistentDiskPlugin{nil, false}, &gcePersistentDiskPlugin{nil, true}}
 }
 
 type gcePersistentDiskPlugin struct {
-	host       volume.Host
+	host       volume.VolumeHost
 	legacyMode bool // if set, plugin answers to the legacy name
 }
 
-var _ volume.Plugin = &gcePersistentDiskPlugin{}
+var _ volume.VolumePlugin = &gcePersistentDiskPlugin{}
 
 const (
 	gcePersistentDiskPluginName       = "kubernetes.io/gce-pd"
 	gcePersistentDiskPluginLegacyName = "gce-pd"
 )
 
-func (plugin *gcePersistentDiskPlugin) Init(host volume.Host) {
+func (plugin *gcePersistentDiskPlugin) Init(host volume.VolumeHost) {
 	plugin.host = host
 }
 
@@ -233,7 +233,7 @@ func (pd *gcePersistentDisk) SetUpAt(dir string) error {
 	return nil
 }
 
-func makeGlobalPDName(host volume.Host, devName string) string {
+func makeGlobalPDName(host volume.VolumeHost, devName string) string {
 	return path.Join(host.GetPluginDir(gcePersistentDiskPluginName), "mounts", devName)
 }
 

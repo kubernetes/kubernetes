@@ -26,23 +26,23 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/volume"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/volume/empty_dir"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/mount"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume/empty_dir"
 )
 
-func newTestHost(t *testing.T, client client.Interface) volume.Host {
+func newTestHost(t *testing.T, client client.Interface) volume.VolumeHost {
 	tempDir, err := ioutil.TempDir("/tmp", "secret_volume_test.")
 	if err != nil {
 		t.Fatalf("can't make a temp rootdir: %v", err)
 	}
 
-	return volume.NewFakeHost(tempDir, client, empty_dir.ProbeVolumePluginsWithMounter(&mount.FakeMounter{}))
+	return volume.NewFakeVolumeHost(tempDir, client, empty_dir.ProbeVolumePluginsWithMounter(&mount.FakeMounter{}))
 }
 
 func TestCanSupport(t *testing.T) {
-	pluginMgr := volume.PluginMgr{}
+	pluginMgr := volume.VolumePluginMgr{}
 	pluginMgr.InitPlugins(ProbeVolumePlugins(), newTestHost(t, nil))
 
 	plugin, err := pluginMgr.FindPluginByName(secretPluginName)
@@ -93,7 +93,7 @@ func TestPlugin(t *testing.T) {
 		Secret: secret,
 	}
 
-	pluginMgr := volume.PluginMgr{}
+	pluginMgr := volume.VolumePluginMgr{}
 	pluginMgr.InitPlugins(ProbeVolumePlugins(), newTestHost(t, client))
 
 	plugin, err := pluginMgr.FindPluginByName(secretPluginName)
