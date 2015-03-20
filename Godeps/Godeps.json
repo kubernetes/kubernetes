@@ -1,6 +1,6 @@
 {
 	"ImportPath": "github.com/GoogleCloudPlatform/kubernetes",
-	"GoVersion": "go1.3",
+	"GoVersion": "go1.4.1",
 	"Packages": [
 		"./..."
 	],
