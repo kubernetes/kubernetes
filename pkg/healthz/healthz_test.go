@@ -59,12 +59,13 @@ func TestMulitipleChecks(t *testing.T) {
 
 	for i, test := range tests {
 		mux := http.NewServeMux()
+		checks := []HealthzChecker{PingHealthz}
 		if test.addBadCheck {
-			AddHealthzFunc("bad", func(_ *http.Request) error {
+			checks = append(checks, NamedCheck("bad", func(_ *http.Request) error {
 				return errors.New("this will fail")
-			})
+			}))
 		}
-		InstallHandler(mux)
+		InstallHandler(mux, checks...)
 		req, err := http.NewRequest("GET", fmt.Sprintf("http://example.com%v", test.path), nil)
 		if err != nil {
 			t.Fatalf("case[%d] Unexpected error: %v", i, err)

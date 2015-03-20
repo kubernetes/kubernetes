@@ -110,9 +110,11 @@ func NewServer(host HostInterface, enableDebuggingHandlers bool) Server {
 
 // InstallDefaultHandlers registers the default set of supported HTTP request patterns with the mux.
 func (s *Server) InstallDefaultHandlers() {
-	healthz.AddHealthzFunc("docker", s.dockerHealthCheck)
-	healthz.AddHealthzFunc("hostname", s.hostnameHealthCheck)
-	healthz.InstallHandler(s.mux)
+	healthz.InstallHandler(s.mux,
+		healthz.PingHealthz,
+		healthz.NamedCheck("docker", s.dockerHealthCheck),
+		healthz.NamedCheck("hostname", s.hostnameHealthCheck),
+	)
 	s.mux.HandleFunc("/podInfo", s.handlePodInfoOld)
 	s.mux.HandleFunc("/api/v1beta1/podInfo", s.handlePodInfoVersioned)
 	s.mux.HandleFunc("/api/v1beta1/nodeInfo", s.handleNodeInfoVersioned)
