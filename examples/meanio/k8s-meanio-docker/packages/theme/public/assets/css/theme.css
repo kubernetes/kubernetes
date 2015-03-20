@@ -1,0 +1,261 @@
+@font-face {
+    font-family: 'futura_bkbook';
+    src: url("/theme/assets/fonts/ufonts.com_futura-book.eot");
+    src: url("/theme/assets/fonts/ufonts.com_futura-book.eot?#iefix") format("embedded-opentype"), url("/theme/assets/fonts/ufonts.com_futura-book.woff") format("woff"), url("/theme/assets/fonts/ufonts.com_futura-book.ttf") format("truetype"), url("/theme/assets/fonts/ufonts.com_futura-book.svg#futura_bkbook") format("svg");
+    font-weight: normal;
+    font-style: normal;
+}
+
+@font-face {
+    font-family: 'open_sans_hebrewregular';
+    src: url("/theme/assets/fonts/opensanshebrew-regular.eot");
+    src: url("/theme/assets/fonts/opensanshebrew-regular.eot?#iefix") format("embedded-opentype"), url("/theme/assets/fonts/opensanshebrew-regular.woff") format("woff"), url("/theme/assets/fonts/opensanshebrew-regular.ttf") format("truetype"), url("/theme/assets/fonts/opensanshebrew-regular.svg#open_sans_hebrewregular") format("svg");
+    font-weight: bold;
+    font-style: normal;
+}
+
+.welcome.container-fluid {
+  margin:18px;
+  padding-top:10px;
+  background-color:#fff;
+  color:#525252;
+}
+
+.welcome .info, .welcome .featured {
+  float:left;
+}
+.welcome .row {
+  margin-top:10px;
+  background-color:#f3f3f3;
+}
+.welcome .first{
+  padding:0;
+  margin-bottom:30px;
+  font-size:22px;
+  background-color:#fff;
+}
+
+.welcome {
+  padding-bottom: 4px;
+  /*font-family: "futura_bkbook";*/
+  font-family:"open_sans_hebrewregular";
+  font-size:16px;
+  margin: 0;
+  margin:10px;
+}
+
+.welcome .info {
+  margin-top:10px;
+  background-color: #fff;
+	padding-bottom: 10px;
+}
+
+.welcome h1 {
+  font-size:30px;
+  text-transform: uppercase;
+  color:#0e0e0e;
+}
+
+.welcome h2 {
+  margin-top: 27px;
+  font-size:30px;
+  font-weight:300;
+}
+
+.featured-packages h2{
+	margin-top:0;
+}
+
+.welcome h3 {
+  font-size:17px;
+/*  font-weight:300; */
+  text-transform: uppercase;
+  color: #0e0e0e;
+}
+
+.docs h3 {
+  padding:10px;
+}
+
+
+.welcome .packages, .welcome .community, .welcome .featured-packages {
+  clear:both;
+  margin-top:80px;
+  height:100%;
+  border-top:3px solid #f3f3f3;
+}
+
+.welcome .packages h3 {
+  margin:20px 0 20px 0;
+}
+
+/* Docs */
+.welcome .info ul {
+  padding-left:20px;
+  width:220px;
+  list-style:none;
+}
+
+.welcome .info ul li {
+  width:100px;
+  font-size:14px;
+}
+
+.welcome .info ul li:before {
+    content: '\003E';
+     margin: 0 0.6em 0 -1em;
+}
+
+.welcome  p {
+  font-size: 12px;
+  margin-top: 10px;
+  margin-left:53px;
+}
+.welcome .info .docs {
+  height:100%;
+}
+.welcome .info .docs p{
+  font-size:14px;
+}
+
+.docs-desc {
+  float:left;
+}
+
+.docs-link {
+  margin: 16px 0 0 0;
+  float:left;
+  width:120px;
+}
+
+.docs-link.first {
+  margin: 16px 0 0 53px;
+}
+
+.morelink {
+  margin: 16px 0 6px 0;
+  clear:both;
+  float:right;
+}
+
+.docs .morelink {
+  margin-top:30px;
+}
+
+.morelink :before {
+  text-transform: uppercase;
+  content: '\003E';
+  margin: 0 0.5em 0 -1em;
+}
+
+/* Packages */
+
+.packages .package{
+  float:left;
+  width:200px;
+  margin-right:40px;
+}
+
+/* Packages */
+.packages .package h4, .community .package h4{
+  text-transform: uppercase;
+  margin-left:53px;
+  color:#176583;
+  font-size:16px;
+}
+
+.packages .package p {
+  margin-left:53px;
+}
+
+/* Community */
+.welcome-sprite{
+  float:left;
+  width:53px;
+  height:53px;
+}
+.welcome-sprite{
+  background-image: url(/theme/assets/img/welcome_sprite.png);
+  background-repeat: no-repeat;
+  display: block;
+}
+.docs .welcome-sprite {
+  background-position: 0 -7px ;
+}
+
+.packages .welcome-sprite {
+  background-position: -60px 0;
+}
+
+.community .welcome-sprite {
+  background-position: -120px 0;
+}
+
+.community .package {
+  float:left;
+  margin-bottom:10px;
+}
+.community .package p{
+  width:190px;
+  margin: 0 0 0 10px;
+}
+.community .package h4{
+  margin: 0 0 0 10px;
+}
+
+
+.socialsprite {
+    background-image: url(/theme/assets/img/welcome_social.png);
+    background-repeat: no-repeat;
+    display: block;
+    float:left;
+}
+
+.sprite-facebook {
+    width: 39px;
+    height: 42px;
+    background-position: -5px -5px;
+}
+
+.sprite-github {
+    width: 40px;
+    height: 44px;
+    background-position: -54px -5px;
+}
+
+.sprite-irc {
+    width: 38px;
+    height: 42px;
+    background-position: -104px -5px;
+}
+
+.sprite-stackoverflow {
+    width: 40px;
+    height: 44px;
+    background-position: -152px -5px;
+}
+
+/* Featured Pic */
+.featuredpic img{
+  width:510px;
+}
+
+.welcome .community h3{
+  margin-bottom:40px;
+}
+
+/* Featured Sites */
+
+
+.featured-sites h4{
+  font-size:24px;
+}
+
+.featured-sites h4 span{
+  font-size:14px;
+}
+
+.featured-sites p, .featured-packages p {
+  font-size:14px;
+  margin-left:0;
+}

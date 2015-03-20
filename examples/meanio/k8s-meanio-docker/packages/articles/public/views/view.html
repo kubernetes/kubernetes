@@ -1,0 +1,14 @@
+<section data-ng-controller="ArticlesController" data-ng-init="findOne()">
+  <span>{{article.created | date:'medium'}}</span> /
+  <span>{{article.user.name}}</span>
+  <h2>{{article.title}}</h2>
+  <div data-ng-if="hasAuthorization(article)">
+    <a class="btn" href="/#!/articles/{{article._id}}/edit">
+      <i class="glyphicon glyphicon-edit"></i>
+    </a>
+    <a class="btn" data-ng-click="remove(article);">
+      <i class="glyphicon glyphicon-trash"></i>
+    </a>
+  </div>
+  <div>{{article.content}}</div>
+</section>

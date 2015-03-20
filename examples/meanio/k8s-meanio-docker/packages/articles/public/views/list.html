@@ -1,0 +1,21 @@
+<section data-ng-controller="ArticlesController" data-ng-init="find()">
+  <ul class="articles unstyled">
+    <li data-ng-repeat="article in articles">
+      <span>{{article.created | date:'medium'}}</span> /
+      <span>{{article.user.name}}</span>
+      <h2>
+        <a data-ng-href="#!/articles/{{article._id}}">{{article.title}}</a>
+        <span data-ng-if="hasAuthorization(article)">
+          <a class="btn" href="/#!/articles/{{article._id}}/edit">
+            <i class="glyphicon glyphicon-edit"></i>
+          </a>
+          <a class="btn" data-ng-click="remove(article);">
+            <i class="glyphicon glyphicon-trash"></i>
+          </a>
+        </span>
+      </h2>
+      <div>{{article.content}}</div>
+    </li>
+  </ul>
+  <h1 data-ng-hide="!articles || articles.length">No articles yet. <br> Why don't you <a href="/#!/articles/create">Create One</a>?</h1>
+</section>
