@@ -33,6 +33,7 @@ import (
 	nodeControllerPkg "github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/controller"
 	replicationControllerPkg "github.com/GoogleCloudPlatform/kubernetes/pkg/controller"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/master/ports"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/namespace"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/resourcequota"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/service"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -51,6 +52,7 @@ type CMServer struct {
 	MinionRegexp            string
 	NodeSyncPeriod          time.Duration
 	ResourceQuotaSyncPeriod time.Duration
+	NamespaceSyncPeriod     time.Duration
 	RegisterRetryCount      int
 	MachineList             util.StringList
 	SyncNodeList            bool
@@ -72,6 +74,7 @@ func NewCMServer() *CMServer {
 		Address:                 util.IP(net.ParseIP("127.0.0.1")),
 		NodeSyncPeriod:          10 * time.Second,
 		ResourceQuotaSyncPeriod: 10 * time.Second,
+		NamespaceSyncPeriod:     10 * time.Second,
 		RegisterRetryCount:      10,
 		PodEvictionTimeout:      5 * time.Minute,
 		NodeMilliCPU:            1000,
@@ -98,6 +101,7 @@ func (s *CMServer) AddFlags(fs *pflag.FlagSet) {
 		"The period for syncing nodes from cloudprovider. Longer periods will result in "+
 		"fewer calls to cloud provider, but may delay addition of new nodes to cluster.")
 	fs.DurationVar(&s.ResourceQuotaSyncPeriod, "resource_quota_sync_period", s.ResourceQuotaSyncPeriod, "The period for syncing quota usage status in the system")
+	fs.DurationVar(&s.NamespaceSyncPeriod, "namespace_sync_period", s.NamespaceSyncPeriod, "The period for syncing namespace life-cycle updates")
 	fs.DurationVar(&s.PodEvictionTimeout, "pod_eviction_timeout", s.PodEvictionTimeout, "The grace peroid for deleting pods on failed nodes.")
 	fs.IntVar(&s.RegisterRetryCount, "register_retry_count", s.RegisterRetryCount, ""+
 		"The number of retries for initial node registration.  Retry interval equals node_sync_period.")
@@ -175,6 +179,9 @@ func (s *CMServer) Run(_ []string) error {
 
 	resourceQuotaManager := resourcequota.NewResourceQuotaManager(kubeClient)
 	resourceQuotaManager.Run(s.ResourceQuotaSyncPeriod)
+
+	namespaceManager := namespace.NewNamespaceManager(kubeClient)
+	namespaceManager.Run(s.NamespaceSyncPeriod)
 
 	select {}
 	return nil
