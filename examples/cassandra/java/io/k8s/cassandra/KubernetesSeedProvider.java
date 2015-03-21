@@ -70,7 +70,7 @@ public class KubernetesSeedProvider implements SeedProvider {
 	    ObjectMapper mapper = new ObjectMapper();
 	    Endpoints endpoints = mapper.readValue(url, Endpoints.class);
 	    if (endpoints != null) {
-            // here is a problem point. endpoint.endpoints can be null in first node cases
+            // Here is a problem point: endpoint.endpoints can be null in first node cases.
             if (endpoints.endpoints != null) {
 		for (String endpoint : endpoints.endpoints) {
 		    String[] parts = endpoint.split(":");
