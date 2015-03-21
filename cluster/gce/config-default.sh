@@ -22,7 +22,7 @@ MASTER_SIZE=n1-standard-1
 MINION_SIZE=n1-standard-1
 NUM_MINIONS=${NUM_MINIONS:-4}
 MINION_DISK_TYPE=pd-standard
-MINION_DISK_SIZE=10GB
+MINION_DISK_SIZE=100GB
 # TODO(dchen1107): Filed an internal issue to create an alias
 # for containervm image, so that gcloud will expand this
 # to the latest supported image.
