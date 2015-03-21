@@ -21,8 +21,8 @@ import (
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/rest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/registrytest"
@@ -74,8 +74,8 @@ func TestRESTCreate(t *testing.T) {
 	}
 
 	for _, item := range table {
-		_, rest := NewTestREST()
-		c, err := rest.Create(item.ctx, item.event)
+		_, storage := NewTestREST()
+		c, err := storage.Create(item.ctx, item.event)
 		if !item.valid {
 			if err == nil {
 				ctxNS := api.NamespaceValue(item.ctx)
@@ -94,7 +94,7 @@ func TestRESTCreate(t *testing.T) {
 			t.Errorf("diff: %s", util.ObjectDiff(e, a))
 		}
 		// Ensure we implement the interface
-		_ = apiserver.ResourceWatcher(rest)
+		_ = rest.Watcher(storage)
 	}
 }
 

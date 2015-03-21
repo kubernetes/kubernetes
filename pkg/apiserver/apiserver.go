@@ -30,6 +30,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/admission"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/rest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/healthz"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -90,12 +91,12 @@ type Mux interface {
 	HandleFunc(pattern string, handler func(http.ResponseWriter, *http.Request))
 }
 
-// APIGroupVersion is a helper for exposing RESTStorage objects as http.Handlers via go-restful
+// APIGroupVersion is a helper for exposing rest.Storage objects as http.Handlers via go-restful
 // It handles URLs of the form:
 // /${storage_key}[/${object_name}]
-// Where 'storage_key' points to a RESTStorage object stored in storage.
+// Where 'storage_key' points to a rest.Storage object stored in storage.
 type APIGroupVersion struct {
-	Storage map[string]RESTStorage
+	Storage map[string]rest.Storage
 
 	Root    string
 	Version string

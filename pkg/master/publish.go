@@ -22,7 +22,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/rest"
 
 	"github.com/golang/glog"
 )
@@ -91,7 +91,7 @@ func (m *Master) createMasterNamespaceIfNeeded(ns string) error {
 			Namespace: "",
 		},
 	}
-	_, err := m.storage["namespaces"].(apiserver.RESTCreater).Create(ctx, namespace)
+	_, err := m.storage["namespaces"].(rest.Creater).Create(ctx, namespace)
 	if err != nil && errors.IsAlreadyExists(err) {
 		err = nil
 	}
@@ -121,7 +121,7 @@ func (m *Master) createMasterServiceIfNeeded(serviceName string, serviceIP net.I
 			SessionAffinity: api.AffinityTypeNone,
 		},
 	}
-	_, err := m.storage["services"].(apiserver.RESTCreater).Create(ctx, svc)
+	_, err := m.storage["services"].(rest.Creater).Create(ctx, svc)
 	if err != nil && errors.IsAlreadyExists(err) {
 		err = nil
 	}

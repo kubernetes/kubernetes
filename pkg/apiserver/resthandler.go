@@ -26,6 +26,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/admission"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/rest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
@@ -58,8 +59,8 @@ type ScopeNamer interface {
 	GenerateListLink(req *restful.Request) (path, query string, err error)
 }
 
-// GetResource returns a function that handles retrieving a single resource from a RESTStorage object.
-func GetResource(r RESTGetter, ctxFn ContextFunc, namer ScopeNamer, codec runtime.Codec) restful.RouteFunction {
+// GetResource returns a function that handles retrieving a single resource from a rest.Storage object.
+func GetResource(r rest.Getter, ctxFn ContextFunc, namer ScopeNamer, codec runtime.Codec) restful.RouteFunction {
 	return func(req *restful.Request, res *restful.Response) {
 		w := res.ResponseWriter
 		namespace, name, err := namer.Name(req)
@@ -101,8 +102,8 @@ func parseSelectorQueryParams(query url.Values, version, apiResource string) (la
 	return label, field, nil
 }
 
-// ListResource returns a function that handles retrieving a list of resources from a RESTStorage object.
-func ListResource(r RESTLister, ctxFn ContextFunc, namer ScopeNamer, codec runtime.Codec, version, apiResource string) restful.RouteFunction {
+// ListResource returns a function that handles retrieving a list of resources from a rest.Storage object.
+func ListResource(r rest.Lister, ctxFn ContextFunc, namer ScopeNamer, codec runtime.Codec, version, apiResource string) restful.RouteFunction {
 	return func(req *restful.Request, res *restful.Response) {
 		w := res.ResponseWriter
 
@@ -134,7 +135,7 @@ func ListResource(r RESTLister, ctxFn ContextFunc, namer ScopeNamer, codec runti
 }
 
 // CreateResource returns a function that will handle a resource creation.
-func CreateResource(r RESTCreater, ctxFn ContextFunc, namer ScopeNamer, codec runtime.Codec, typer runtime.ObjectTyper, resource string, admit admission.Interface) restful.RouteFunction {
+func CreateResource(r rest.Creater, ctxFn ContextFunc, namer ScopeNamer, codec runtime.Codec, typer runtime.ObjectTyper, resource string, admit admission.Interface) restful.RouteFunction {
 	return func(req *restful.Request, res *restful.Response) {
 		w := res.ResponseWriter
 
@@ -191,7 +192,7 @@ func CreateResource(r RESTCreater, ctxFn ContextFunc, namer ScopeNamer, codec ru
 
 // PatchResource returns a function that will handle a resource patch
 // TODO: Eventually PatchResource should just use AtomicUpdate and this routine should be a bit cleaner
-func PatchResource(r RESTPatcher, ctxFn ContextFunc, namer ScopeNamer, codec runtime.Codec, typer runtime.ObjectTyper, resource string, admit admission.Interface) restful.RouteFunction {
+func PatchResource(r rest.Patcher, ctxFn ContextFunc, namer ScopeNamer, codec runtime.Codec, typer runtime.ObjectTyper, resource string, admit admission.Interface) restful.RouteFunction {
 	return func(req *restful.Request, res *restful.Response) {
 		w := res.ResponseWriter
 
@@ -266,7 +267,7 @@ func PatchResource(r RESTPatcher, ctxFn ContextFunc, namer ScopeNamer, codec run
 }
 
 // UpdateResource returns a function that will handle a resource update
-func UpdateResource(r RESTUpdater, ctxFn ContextFunc, namer ScopeNamer, codec runtime.Codec, typer runtime.ObjectTyper, resource string, admit admission.Interface) restful.RouteFunction {
+func UpdateResource(r rest.Updater, ctxFn ContextFunc, namer ScopeNamer, codec runtime.Codec, typer runtime.ObjectTyper, resource string, admit admission.Interface) restful.RouteFunction {
 	return func(req *restful.Request, res *restful.Response) {
 		w := res.ResponseWriter
 
@@ -330,7 +331,7 @@ func UpdateResource(r RESTUpdater, ctxFn ContextFunc, namer ScopeNamer, codec ru
 }
 
 // DeleteResource returns a function that will handle a resource deletion
-func DeleteResource(r RESTGracefulDeleter, checkBody bool, ctxFn ContextFunc, namer ScopeNamer, codec runtime.Codec, resource, kind string, admit admission.Interface) restful.RouteFunction {
+func DeleteResource(r rest.GracefulDeleter, checkBody bool, ctxFn ContextFunc, namer ScopeNamer, codec runtime.Codec, resource, kind string, admit admission.Interface) restful.RouteFunction {
 	return func(req *restful.Request, res *restful.Response) {
 		w := res.ResponseWriter
 
@@ -376,7 +377,7 @@ func DeleteResource(r RESTGracefulDeleter, checkBody bool, ctxFn ContextFunc, na
 			return
 		}
 
-		// if the RESTDeleter returns a nil object, fill out a status. Callers may return a valid
+		// if the rest.Deleter returns a nil object, fill out a status. Callers may return a valid
 		// object with the response.
 		if result == nil {
 			result = &api.Status{

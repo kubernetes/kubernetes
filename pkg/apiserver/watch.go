@@ -26,6 +26,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/rest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/httplog"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
@@ -36,7 +37,7 @@ import (
 )
 
 type WatchHandler struct {
-	storage map[string]RESTStorage
+	storage map[string]rest.Storage
 	codec   runtime.Codec
 	linker  runtime.SelfLinker
 	info    *APIRequestInfoResolver
@@ -90,7 +91,7 @@ func (h *WatchHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	apiResource = requestInfo.Resource
-	watcher, ok := storage.(ResourceWatcher)
+	watcher, ok := storage.(rest.Watcher)
 	if !ok {
 		httpCode = errorJSON(errors.NewMethodNotSupported(requestInfo.Resource, "watch"), h.codec, w)
 		return

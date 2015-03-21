@@ -31,6 +31,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/admission"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/rest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta2"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta3"
@@ -151,7 +152,7 @@ type Master struct {
 	masterServices       *util.Runner
 
 	// storage contains the RESTful endpoints exposed by this master
-	storage map[string]apiserver.RESTStorage
+	storage map[string]rest.Storage
 
 	// registries are internal client APIs for accessing the storage layer
 	// TODO: define the internal typed interface in a way that clients can
@@ -384,7 +385,7 @@ func (m *Master) init(c *Config) {
 	}
 
 	// TODO: Factor out the core API registration
-	m.storage = map[string]apiserver.RESTStorage{
+	m.storage = map[string]rest.Storage{
 		"pods":         podStorage,
 		"pods/status":  podStatusStorage,
 		"pods/binding": bindingStorage,
@@ -576,7 +577,7 @@ func (m *Master) defaultAPIGroupVersion() *apiserver.APIGroupVersion {
 
 // api_v1beta1 returns the resources and codec for API version v1beta1.
 func (m *Master) api_v1beta1() *apiserver.APIGroupVersion {
-	storage := make(map[string]apiserver.RESTStorage)
+	storage := make(map[string]rest.Storage)
 	for k, v := range m.storage {
 		storage[k] = v
 	}
@@ -589,7 +590,7 @@ func (m *Master) api_v1beta1() *apiserver.APIGroupVersion {
 
 // api_v1beta2 returns the resources and codec for API version v1beta2.
 func (m *Master) api_v1beta2() *apiserver.APIGroupVersion {
-	storage := make(map[string]apiserver.RESTStorage)
+	storage := make(map[string]rest.Storage)
 	for k, v := range m.storage {
 		storage[k] = v
 	}
@@ -602,7 +603,7 @@ func (m *Master) api_v1beta2() *apiserver.APIGroupVersion {
 
 // api_v1beta3 returns the resources and codec for API version v1beta3.
 func (m *Master) api_v1beta3() *apiserver.APIGroupVersion {
-	storage := make(map[string]apiserver.RESTStorage)
+	storage := make(map[string]rest.Storage)
 	for k, v := range m.storage {
 		if k == "minions" {
 			continue

@@ -174,7 +174,7 @@ func (rs *REST) List(ctx api.Context, label labels.Selector, field fields.Select
 }
 
 // Watch returns Services events via a watch.Interface.
-// It implements apiserver.ResourceWatcher.
+// It implements rest.Watcher.
 func (rs *REST) Watch(ctx api.Context, label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
 	return rs.registry.WatchServices(ctx, label, field, resourceVersion)
 }

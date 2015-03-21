@@ -20,7 +20,7 @@ import (
 	"errors"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/rest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
@@ -38,12 +38,12 @@ import (
 //
 // TODO: this also means that pod and node API endpoints have to be colocated in the same
 // process
-func RESTStorageToNodes(storage apiserver.RESTStorage) client.NodesInterface {
+func RESTStorageToNodes(storage rest.Storage) client.NodesInterface {
 	return &nodeAdaptor{storage}
 }
 
 type nodeAdaptor struct {
-	storage apiserver.RESTStorage
+	storage rest.Storage
 }
 
 func (n *nodeAdaptor) Nodes() client.NodeInterface {
@@ -66,7 +66,7 @@ func (n *nodeAdaptor) Create(minion *api.Node) (*api.Node, error) {
 // List lists all the nodes in the cluster.
 func (n *nodeAdaptor) List() (*api.NodeList, error) {
 	ctx := api.NewContext()
-	obj, err := n.storage.(apiserver.RESTLister).List(ctx, labels.Everything(), fields.Everything())
+	obj, err := n.storage.(rest.Lister).List(ctx, labels.Everything(), fields.Everything())
 	if err != nil {
 		return nil, err
 	}
@@ -76,7 +76,7 @@ func (n *nodeAdaptor) List() (*api.NodeList, error) {
 // Get gets an existing node.
 func (n *nodeAdaptor) Get(name string) (*api.Node, error) {
 	ctx := api.NewContext()
-	obj, err := n.storage.(apiserver.RESTGetter).Get(ctx, name)
+	obj, err := n.storage.(rest.Getter).Get(ctx, name)
 	if err != nil {
 		return nil, err
 	}

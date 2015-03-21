@@ -26,8 +26,8 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	etcderrors "github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors/etcd"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/rest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/rest/resttest"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
@@ -682,7 +682,7 @@ func TestResourceLocation(t *testing.T) {
 		cache := &fakeCache{statusToReturn: &api.PodStatus{PodIP: expectedIP}}
 		storage = storage.WithPodStatus(cache)
 
-		redirector := apiserver.Redirector(storage)
+		redirector := rest.Redirector(storage)
 		location, err := redirector.ResourceLocation(api.NewDefaultContext(), tc.query)
 		if err != nil {
 			t.Errorf("Unexpected error: %v", err)

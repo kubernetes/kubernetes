@@ -17,9 +17,10 @@ limitations under the License.
 package record
 
 import (
+	"testing"
+
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	"testing"
 )
 
 func TestAddOrUpdateEventNoExisting(t *testing.T) {

@@ -32,6 +32,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/rest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/httplog"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -79,7 +80,7 @@ var tagsToAttrs = map[string]util.StringSet{
 // specified by items implementing Redirector.
 type ProxyHandler struct {
 	prefix                 string
-	storage                map[string]RESTStorage
+	storage                map[string]rest.Storage
 	codec                  runtime.Codec
 	context                api.RequestContextMapper
 	apiRequestInfoResolver *APIRequestInfoResolver
@@ -112,15 +113,15 @@ func (r *ProxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	id := parts[1]
-	rest := ""
+	remainder := ""
 	if len(parts) > 2 {
 		proxyParts := parts[2:]
-		rest = strings.Join(proxyParts, "/")
+		remainder = strings.Join(proxyParts, "/")
 		if strings.HasSuffix(req.URL.Path, "/") {
 			// The original path had a trailing slash, which has been stripped
 			// by KindAndNamespace(). We should add it back because some
 			// servers (like etcd) require it.
-			rest = rest + "/"
+			remainder = remainder + "/"
 		}
 	}
 	storage, ok := r.storage[resource]
@@ -132,7 +133,7 @@ func (r *ProxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 	apiResource = resource
 
-	redirector, ok := storage.(Redirector)
+	redirector, ok := storage.(rest.Redirector)
 	if !ok {
 		httplog.LogOf(req, w).Addf("'%v' is not a redirector", resource)
 		httpCode = errorJSON(errors.NewMethodNotSupported(resource, "proxy"), r.codec, w)
@@ -160,7 +161,7 @@ func (r *ProxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		// hosts for paths.
 		destURL.Host = location
 	}
-	destURL.Path = rest
+	destURL.Path = remainder
 	destURL.RawQuery = req.URL.RawQuery
 	newReq, err := http.NewRequest(req.Method, destURL.String(), req.Body)
 	if err != nil {
