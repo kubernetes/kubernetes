@@ -70,10 +70,13 @@ public class KubernetesSeedProvider implements SeedProvider {
 	    ObjectMapper mapper = new ObjectMapper();
 	    Endpoints endpoints = mapper.readValue(url, Endpoints.class);
 	    if (endpoints != null) {
+            // Here is a problem point: endpoint.endpoints can be null in first node cases.
+            if (endpoints.endpoints != null) {
 		for (String endpoint : endpoints.endpoints) {
 		    String[] parts = endpoint.split(":");
 		    list.add(InetAddress.getByName(parts[0]));
 		}
+            }
 	    }
         } catch (IOException ex) {
 	    logger.warn("Request to kubernetes apiserver failed"); 
