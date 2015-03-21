@@ -78,8 +78,8 @@ type REST struct {
 	strategy  rcStrategy
 }
 
-// NewREST returns a new rest.Storage for the given registry and PodLister.
-func NewREST(registry Registry, podLister PodLister) *REST {
+// NewStorage returns a new rest.Storage for the given registry and PodLister.
+func NewStorage(registry Registry, podLister PodLister) *REST {
 	return &REST{
 		registry:  registry,
 		podLister: podLister,

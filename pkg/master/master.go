@@ -349,16 +349,16 @@ func logStackOnRecover(panicReason interface{}, httpWriter http.ResponseWriter) 
 
 // init initializes master.
 func (m *Master) init(c *Config) {
-	podStorage, bindingStorage, podStatusStorage := podetcd.NewREST(c.EtcdHelper)
+	podStorage, bindingStorage, podStatusStorage := podetcd.NewStorage(c.EtcdHelper)
 	podRegistry := pod.NewRegistry(podStorage)
 
 	eventRegistry := event.NewEtcdRegistry(c.EtcdHelper, uint64(c.EventTTL.Seconds()))
 	limitRangeRegistry := limitrange.NewEtcdRegistry(c.EtcdHelper)
 
-	resourceQuotaStorage, resourceQuotaStatusStorage := resourcequotaetcd.NewREST(c.EtcdHelper)
+	resourceQuotaStorage, resourceQuotaStatusStorage := resourcequotaetcd.NewStorage(c.EtcdHelper)
 	secretRegistry := secret.NewEtcdRegistry(c.EtcdHelper)
 
-	namespaceStorage := namespaceetcd.NewREST(c.EtcdHelper)
+	namespaceStorage := namespaceetcd.NewStorage(c.EtcdHelper)
 	m.namespaceRegistry = namespace.NewRegistry(namespaceStorage)
 
 	// TODO: split me up into distinct storage registries
@@ -368,7 +368,7 @@ func (m *Master) init(c *Config) {
 	m.endpointRegistry = registry
 	m.nodeRegistry = registry
 
-	nodeStorage := minion.NewREST(m.nodeRegistry)
+	nodeStorage := minion.NewStorage(m.nodeRegistry)
 	// TODO: unify the storage -> registry and storage -> client patterns
 	nodeStorageClient := RESTStorageToNodes(nodeStorage)
 	podCache := NewPodCache(
@@ -391,18 +391,18 @@ func (m *Master) init(c *Config) {
 		"pods/binding": bindingStorage,
 		"bindings":     bindingStorage,
 
-		"replicationControllers": controller.NewREST(registry, podRegistry),
-		"services":               service.NewREST(m.serviceRegistry, c.Cloud, m.nodeRegistry, m.portalNet, c.ClusterName),
-		"endpoints":              endpoint.NewREST(m.endpointRegistry),
+		"replicationControllers": controller.NewStorage(registry, podRegistry),
+		"services":               service.NewStorage(m.serviceRegistry, c.Cloud, m.nodeRegistry, m.portalNet, c.ClusterName),
+		"endpoints":              endpoint.NewStorage(m.endpointRegistry),
 		"minions":                nodeStorage,
 		"nodes":                  nodeStorage,
-		"events":                 event.NewREST(eventRegistry),
+		"events":                 event.NewStorage(eventRegistry),
 
-		"limitRanges":           limitrange.NewREST(limitRangeRegistry),
+		"limitRanges":           limitrange.NewStorage(limitRangeRegistry),
 		"resourceQuotas":        resourceQuotaStorage,
 		"resourceQuotas/status": resourceQuotaStatusStorage,
 		"namespaces":            namespaceStorage,
-		"secrets":               secret.NewREST(secretRegistry),
+		"secrets":               secret.NewStorage(secretRegistry),
 	}
 
 	apiVersions := []string{"v1beta1", "v1beta2"}

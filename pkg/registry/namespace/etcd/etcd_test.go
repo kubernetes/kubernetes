@@ -41,7 +41,7 @@ func newHelper(t *testing.T) (*tools.FakeEtcdClient, tools.EtcdHelper) {
 
 func newStorage(t *testing.T) (*REST, *tools.FakeEtcdClient, tools.EtcdHelper) {
 	fakeEtcdClient, h := newHelper(t)
-	storage := NewREST(h)
+	storage := NewStorage(h)
 	return storage, fakeEtcdClient, h
 }
 
@@ -69,7 +69,7 @@ func TestStorage(t *testing.T) {
 
 func TestCreate(t *testing.T) {
 	fakeEtcdClient, helper := newHelper(t)
-	storage := NewREST(helper)
+	storage := NewStorage(helper)
 	test := resttest.New(t, storage, fakeEtcdClient.SetError)
 	namespace := validNewNamespace()
 	namespace.ObjectMeta = api.ObjectMeta{}
@@ -94,7 +94,7 @@ func expectNamespace(t *testing.T, out runtime.Object) (*api.Namespace, bool) {
 
 func TestCreateSetsFields(t *testing.T) {
 	fakeEtcdClient, helper := newHelper(t)
-	storage := NewREST(helper)
+	storage := NewStorage(helper)
 	namespace := validNewNamespace()
 	_, err := storage.Create(api.NewDefaultContext(), namespace)
 	if err != fakeEtcdClient.Err {
@@ -124,7 +124,7 @@ func TestListEmptyNamespaceList(t *testing.T) {
 		E: fakeEtcdClient.NewError(tools.EtcdErrorCodeNotFound),
 	}
 
-	storage := NewREST(helper)
+	storage := NewStorage(helper)
 	namespaces, err := storage.List(api.NewContext(), labels.Everything(), fields.Everything())
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
@@ -157,7 +157,7 @@ func TestListNamespaceList(t *testing.T) {
 			},
 		},
 	}
-	storage := NewREST(helper)
+	storage := NewStorage(helper)
 	namespacesObj, err := storage.List(api.NewDefaultContext(), labels.Everything(), fields.Everything())
 	namespaces := namespacesObj.(*api.NamespaceList)
 	if err != nil {
@@ -204,7 +204,7 @@ func TestListNamespaceListSelection(t *testing.T) {
 			},
 		},
 	}
-	storage := NewREST(helper)
+	storage := NewStorage(helper)
 	ctx := api.NewDefaultContext()
 	table := []struct {
 		label, field string
@@ -252,7 +252,7 @@ func TestListNamespaceListSelection(t *testing.T) {
 }
 
 func TestNamespaceDecode(t *testing.T) {
-	storage := NewREST(tools.EtcdHelper{})
+	storage := NewStorage(tools.EtcdHelper{})
 	expected := validNewNamespace()
 	expected.Status.Phase = api.NamespaceActive
 	body, err := latest.Codec.Encode(expected)
@@ -281,7 +281,7 @@ func TestGet(t *testing.T) {
 			},
 		},
 	}
-	storage := NewREST(helper)
+	storage := NewStorage(helper)
 	obj, err := storage.Get(api.NewContext(), "foo")
 	namespace := obj.(*api.Namespace)
 	if err != nil {
@@ -311,7 +311,7 @@ func TestDeleteNamespace(t *testing.T) {
 			},
 		},
 	}
-	storage := NewREST(helper)
+	storage := NewStorage(helper)
 	_, err := storage.Delete(api.NewDefaultContext(), "foo", nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)

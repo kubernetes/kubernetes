@@ -38,8 +38,8 @@ type REST struct {
 	registry Registry
 }
 
-// NewREST returns a new rest.Storage implementation for minion.
-func NewREST(m Registry) *REST {
+// NewStorage returns a new rest.Storage implementation for minion.
+func NewStorage(m Registry) *REST {
 	return &REST{
 		registry: m,
 	}

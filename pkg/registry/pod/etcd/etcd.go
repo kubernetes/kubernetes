@@ -38,8 +38,8 @@ type REST struct {
 	etcdgeneric.Etcd
 }
 
-// NewREST returns a RESTStorage object that will work against pods.
-func NewREST(h tools.EtcdHelper) (*REST, *BindingREST, *StatusREST) {
+// NewStorage returns a RESTStorage object that will work against pods.
+func NewStorage(h tools.EtcdHelper) (*REST, *BindingREST, *StatusREST) {
 	prefix := "/registry/pods"
 	store := &etcdgeneric.Etcd{
 		NewFunc:     func() runtime.Object { return &api.Pod{} },

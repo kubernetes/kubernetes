@@ -35,9 +35,9 @@ type REST struct {
 	registry generic.Registry
 }
 
-// NewREST returns a new REST. You must use a registry created by
+// NewStorage returns a new REST. You must use a registry created by
 // NewEtcdRegistry unless you're testing.
-func NewREST(registry generic.Registry) *REST {
+func NewStorage(registry generic.Registry) *REST {
 	return &REST{
 		registry: registry,
 	}

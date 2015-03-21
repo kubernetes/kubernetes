@@ -32,8 +32,8 @@ type REST struct {
 	registry Registry
 }
 
-// NewREST returns a new rest.Storage implementation for endpoints
-func NewREST(registry Registry) *REST {
+// NewStorage returns a new rest.Storage implementation for endpoints
+func NewStorage(registry Registry) *REST {
 	return &REST{
 		registry: registry,
 	}

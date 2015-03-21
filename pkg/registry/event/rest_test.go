@@ -36,7 +36,7 @@ type testRegistry struct {
 
 func NewTestREST() (testRegistry, *REST) {
 	reg := testRegistry{registrytest.NewGeneric(nil)}
-	return reg, NewREST(reg)
+	return reg, NewStorage(reg)
 }
 
 func testEvent(name string) *api.Event {

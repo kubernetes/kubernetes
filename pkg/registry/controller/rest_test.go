@@ -397,7 +397,7 @@ func (f *fakePodLister) ListPods(ctx api.Context, s labels.Selector) (*api.PodLi
 
 // TODO: remove, covered by TestCreate
 func TestCreateControllerWithGeneratedName(t *testing.T) {
-	storage := NewREST(&registrytest.ControllerRegistry{}, nil)
+	storage := NewStorage(&registrytest.ControllerRegistry{}, nil)
 	controller := &api.ReplicationController{
 		ObjectMeta: api.ObjectMeta{
 			Namespace:    api.NamespaceDefault,
@@ -443,7 +443,7 @@ func TestCreateControllerWithConflictingNamespace(t *testing.T) {
 
 func TestCreate(t *testing.T) {
 	registry := &registrytest.ControllerRegistry{}
-	test := resttest.New(t, NewREST(registry, nil), registry.SetError)
+	test := resttest.New(t, NewStorage(registry, nil), registry.SetError)
 	test.TestCreate(
 		// valid
 		&api.ReplicationController{

@@ -42,7 +42,7 @@ func NewTestEtcdRegistry(client tools.EtcdClient) *Registry {
 
 func NewTestEtcdRegistryWithPods(client tools.EtcdClient) *Registry {
 	helper := tools.NewEtcdHelper(client, latest.Codec)
-	podStorage, _, _ := podetcd.NewREST(helper)
+	podStorage, _, _ := podetcd.NewStorage(helper)
 	registry := NewRegistry(helper, pod.NewRegistry(podStorage))
 	return registry
 }
