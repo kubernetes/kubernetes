@@ -79,8 +79,14 @@ func init() {
 			}
 		},
 		func(obj *Endpoints) {
-			if obj.Protocol == "" {
-				obj.Protocol = "TCP"
+			for i := range obj.Subsets {
+				ss := &obj.Subsets[i]
+				for i := range ss.Ports {
+					ep := &ss.Ports[i]
+					if ep.Protocol == "" {
+						ep.Protocol = ProtocolTCP
+					}
+				}
 			}
 		},
 		func(obj *HTTPGetAction) {

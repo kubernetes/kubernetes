@@ -844,11 +844,11 @@ type EndpointPort struct {
 	// if only one port is defined.  Must be a DNS_LABEL.
 	Name string
 
-	// The IP protocol for this port.
-	Protocol Protocol
-
 	// The port number.
 	Port int
+
+	// The IP protocol for this port.
+	Protocol Protocol
 }
 
 // EndpointsList is a list of endpoints.

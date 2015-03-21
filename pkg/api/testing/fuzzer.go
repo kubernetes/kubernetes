@@ -17,7 +17,6 @@ limitations under the License.
 package testing
 
 import (
-	"fmt"
 	"math/rand"
 	"strconv"
 	"testing"
@@ -200,11 +199,6 @@ func FuzzerFor(t *testing.T, version string, src rand.Source) *fuzz.Fuzzer {
 		},
 		func(s *api.NamespaceStatus, c fuzz.Continue) {
 			s.Phase = api.NamespaceActive
-		},
-		func(ep *api.Endpoint, c fuzz.Continue) {
-			// TODO: If our API used a particular type for IP fields we could just catch that here.
-			ep.IP = fmt.Sprintf("%d.%d.%d.%d", c.Rand.Intn(256), c.Rand.Intn(256), c.Rand.Intn(256), c.Rand.Intn(256))
-			ep.Port = c.Rand.Intn(65536)
 		},
 		func(http *api.HTTPGetAction, c fuzz.Continue) {
 			c.FuzzNoCustom(http)        // fuzz self without calling this function again

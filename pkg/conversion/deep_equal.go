@@ -174,6 +174,9 @@ func (e Equalities) deepValueEqual(v1, v2 reflect.Value, visited map[visit]bool,
 
 	switch v1.Kind() {
 	case reflect.Array:
+		if v1.Len() != v2.Len() {
+			return false
+		}
 		for i := 0; i < v1.Len(); i++ {
 			if !e.deepValueEqual(v1.Index(i), v2.Index(i), visited, depth+1) {
 				return false
@@ -181,6 +184,9 @@ func (e Equalities) deepValueEqual(v1, v2 reflect.Value, visited map[visit]bool,
 		}
 		return true
 	case reflect.Slice:
+		if v1.Len() != v2.Len() {
+			return false
+		}
 		if (v1.IsNil() || v1.Len() == 0) != (v2.IsNil() || v2.Len() == 0) {
 			return false
 		}
@@ -211,6 +217,9 @@ func (e Equalities) deepValueEqual(v1, v2 reflect.Value, visited map[visit]bool,
 		}
 		return true
 	case reflect.Map:
+		if v1.Len() != v2.Len() {
+			return false
+		}
 		if (v1.IsNil() || v1.Len() == 0) != (v2.IsNil() || v2.Len() == 0) {
 			return false
 		}
@@ -309,6 +318,9 @@ func (e Equalities) deepValueDerive(v1, v2 reflect.Value, visited map[visit]bool
 
 	switch v1.Kind() {
 	case reflect.Array:
+		if v1.Len() != v2.Len() {
+			return false
+		}
 		for i := 0; i < v1.Len(); i++ {
 			if !e.deepValueDerive(v1.Index(i), v2.Index(i), visited, depth+1) {
 				return false
@@ -316,6 +328,9 @@ func (e Equalities) deepValueDerive(v1, v2 reflect.Value, visited map[visit]bool
 		}
 		return true
 	case reflect.Slice:
+		if v1.Len() != v2.Len() {
+			return false
+		}
 		if (v1.IsNil() || v1.Len() == 0) != (v2.IsNil() || v2.Len() == 0) {
 			return false
 		}
@@ -332,6 +347,9 @@ func (e Equalities) deepValueDerive(v1, v2 reflect.Value, visited map[visit]bool
 		}
 		return true
 	case reflect.String:
+		if v1.Len() != v2.Len() {
+			return false
+		}
 		if v1.Len() == 0 {
 			return true
 		}
@@ -354,6 +372,9 @@ func (e Equalities) deepValueDerive(v1, v2 reflect.Value, visited map[visit]bool
 		}
 		return true
 	case reflect.Map:
+		if v1.Len() != v2.Len() {
+			return false
+		}
 		if (v1.IsNil() || v1.Len() == 0) != (v2.IsNil() || v2.Len() == 0) {
 			return false
 		}
