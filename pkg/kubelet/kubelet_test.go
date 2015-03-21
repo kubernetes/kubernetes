@@ -105,9 +105,9 @@ func newTestKubelet(t *testing.T) *TestKubelet {
 	}
 	mockCadvisor := &cadvisor.Mock{}
 	kubelet.cadvisor = mockCadvisor
-	mirrorManager := newFakeMirrorMananger()
-	kubelet.mirrorManager = mirrorManager
-	return &TestKubelet{kubelet, fakeDocker, mockCadvisor, fakeKubeClient, waitGroup, mirrorManager}
+	podManager, fakeMirrorManager := newFakePodManager()
+	kubelet.podManager = podManager
+	return &TestKubelet{kubelet, fakeDocker, mockCadvisor, fakeKubeClient, waitGroup, fakeMirrorManager}
 }
 
 func verifyCalls(t *testing.T, fakeDocker *dockertools.FakeDockerClient, calls []string) {
@@ -434,7 +434,7 @@ func TestSyncPodsDoesNothing(t *testing.T) {
 			ID:    "9876",
 		},
 	}
-	kubelet.pods = []api.Pod{
+	pods := []api.Pod{
 		{
 			ObjectMeta: api.ObjectMeta{
 				UID:       "12345678",
@@ -448,8 +448,9 @@ func TestSyncPodsDoesNothing(t *testing.T) {
 			},
 		},
 	}
+	kubelet.podManager.SetPods(pods)
 	waitGroup.Add(1)
-	err := kubelet.SyncPods(kubelet.pods, emptyPodUIDs, *newMirrorPods(), time.Now())
+	err := kubelet.SyncPods(pods, emptyPodUIDs, *newMirrorPods(), time.Now())
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -468,7 +469,7 @@ func TestSyncPodsWithTerminationLog(t *testing.T) {
 		TerminationMessagePath: "/dev/somepath",
 	}
 	fakeDocker.ContainerList = []docker.APIContainers{}
-	kubelet.pods = []api.Pod{
+	pods := []api.Pod{
 		{
 			ObjectMeta: api.ObjectMeta{
 				UID:       "12345678",
@@ -482,8 +483,9 @@ func TestSyncPodsWithTerminationLog(t *testing.T) {
 			},
 		},
 	}
+	kubelet.podManager.SetPods(pods)
 	waitGroup.Add(1)
-	err := kubelet.SyncPods(kubelet.pods, emptyPodUIDs, *newMirrorPods(), time.Now())
+	err := kubelet.SyncPods(pods, emptyPodUIDs, *newMirrorPods(), time.Now())
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -518,7 +520,7 @@ func TestSyncPodsCreatesNetAndContainer(t *testing.T) {
 	waitGroup := testKubelet.waitGroup
 	kubelet.podInfraContainerImage = "custom_image_name"
 	fakeDocker.ContainerList = []docker.APIContainers{}
-	kubelet.pods = []api.Pod{
+	pods := []api.Pod{
 		{
 			ObjectMeta: api.ObjectMeta{
 				UID:       "12345678",
@@ -532,8 +534,9 @@ func TestSyncPodsCreatesNetAndContainer(t *testing.T) {
 			},
 		},
 	}
+	kubelet.podManager.SetPods(pods)
 	waitGroup.Add(1)
-	err := kubelet.SyncPods(kubelet.pods, emptyPodUIDs, *newMirrorPods(), time.Now())
+	err := kubelet.SyncPods(pods, emptyPodUIDs, *newMirrorPods(), time.Now())
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -572,7 +575,7 @@ func TestSyncPodsCreatesNetAndContainerPullsImage(t *testing.T) {
 	puller.HasImages = []string{}
 	kubelet.podInfraContainerImage = "custom_image_name"
 	fakeDocker.ContainerList = []docker.APIContainers{}
-	kubelet.pods = []api.Pod{
+	pods := []api.Pod{
 		{
 			ObjectMeta: api.ObjectMeta{
 				UID:       "12345678",
@@ -587,7 +590,8 @@ func TestSyncPodsCreatesNetAndContainerPullsImage(t *testing.T) {
 		},
 	}
 	waitGroup.Add(1)
-	err := kubelet.SyncPods(kubelet.pods, emptyPodUIDs, *newMirrorPods(), time.Now())
+	kubelet.podManager.SetPods(pods)
+	err := kubelet.SyncPods(pods, emptyPodUIDs, *newMirrorPods(), time.Now())
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -623,7 +627,7 @@ func TestSyncPodsWithPodInfraCreatesContainer(t *testing.T) {
 			ID:    "9876",
 		},
 	}
-	kubelet.pods = []api.Pod{
+	pods := []api.Pod{
 		{
 			ObjectMeta: api.ObjectMeta{
 				UID:       "12345678",
@@ -638,7 +642,8 @@ func TestSyncPodsWithPodInfraCreatesContainer(t *testing.T) {
 		},
 	}
 	waitGroup.Add(1)
-	err := kubelet.SyncPods(kubelet.pods, emptyPodUIDs, *newMirrorPods(), time.Now())
+	kubelet.podManager.SetPods(pods)
+	err := kubelet.SyncPods(pods, emptyPodUIDs, *newMirrorPods(), time.Now())
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -670,7 +675,7 @@ func TestSyncPodsWithPodInfraCreatesContainerCallsHandler(t *testing.T) {
 			ID:    "9876",
 		},
 	}
-	kubelet.pods = []api.Pod{
+	pods := []api.Pod{
 		{
 			ObjectMeta: api.ObjectMeta{
 				UID:       "12345678",
@@ -696,7 +701,8 @@ func TestSyncPodsWithPodInfraCreatesContainerCallsHandler(t *testing.T) {
 		},
 	}
 	waitGroup.Add(1)
-	err := kubelet.SyncPods(kubelet.pods, emptyPodUIDs, *newMirrorPods(), time.Now())
+	kubelet.podManager.SetPods(pods)
+	err := kubelet.SyncPods(pods, emptyPodUIDs, *newMirrorPods(), time.Now())
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -739,7 +745,7 @@ func TestSyncPodsDeletesWithNoPodInfraContainer(t *testing.T) {
 			ID:    "8765",
 		},
 	}
-	kubelet.pods = []api.Pod{
+	pods := []api.Pod{
 		{
 			ObjectMeta: api.ObjectMeta{
 				UID:       "12345678",
@@ -766,7 +772,8 @@ func TestSyncPodsDeletesWithNoPodInfraContainer(t *testing.T) {
 		},
 	}
 	waitGroup.Add(2)
-	err := kubelet.SyncPods(kubelet.pods, emptyPodUIDs, *newMirrorPods(), time.Now())
+	kubelet.podManager.SetPods(pods)
+	err := kubelet.SyncPods(pods, emptyPodUIDs, *newMirrorPods(), time.Now())
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -907,7 +914,8 @@ func TestSyncPodDeletesDuplicate(t *testing.T) {
 			},
 		},
 	}
-	kubelet.pods = append(kubelet.pods, bound)
+	pods := []api.Pod{bound}
+	kubelet.podManager.SetPods(pods)
 	err := kubelet.syncPod(&bound, false, dockerContainers)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -948,7 +956,8 @@ func TestSyncPodBadHash(t *testing.T) {
 			},
 		},
 	}
-	kubelet.pods = append(kubelet.pods, bound)
+	pods := []api.Pod{bound}
+	kubelet.podManager.SetPods(pods)
 	err := kubelet.syncPod(&bound, false, dockerContainers)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -1002,7 +1011,8 @@ func TestSyncPodUnhealthy(t *testing.T) {
 			},
 		},
 	}
-	kubelet.pods = append(kubelet.pods, bound)
+	pods := []api.Pod{bound}
+	kubelet.podManager.SetPods(pods)
 	err := kubelet.syncPod(&bound, false, dockerContainers)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -1692,7 +1702,8 @@ func TestSyncPodEventHandlerFails(t *testing.T) {
 			},
 		},
 	}
-	kubelet.pods = append(kubelet.pods, bound)
+	pods := []api.Pod{bound}
+	kubelet.podManager.SetPods(pods)
 	err := kubelet.syncPod(&bound, false, dockerContainers)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -2868,7 +2879,7 @@ func TestHandlePortConflicts(t *testing.T) {
 	}
 
 	// Check if we can retrieve the pod status from GetPodStatus().
-	kl.pods = pods
+	kl.podManager.SetPods(pods)
 	status, err := kl.GetPodStatus(conflictedPodName, "")
 	if err != nil {
 		t.Fatalf("unable to retrieve pod status for pod %q: #v.", conflictedPodName, err)
@@ -2921,7 +2932,7 @@ func TestHandleNodeSelector(t *testing.T) {
 	}
 
 	// Check if we can retrieve the pod status from GetPodStatus().
-	kl.pods = pods
+	kl.podManager.SetPods(pods)
 	status, err := kl.GetPodStatus(notfittingPodName, "")
 	if err != nil {
 		t.Fatalf("unable to retrieve pod status for pod %q: #v.", notfittingPodName, err)
@@ -2980,7 +2991,7 @@ func TestHandleMemExceeded(t *testing.T) {
 	}
 
 	// Check if we can retrieve the pod status from GetPodStatus().
-	kl.pods = pods
+	kl.podManager.SetPods(pods)
 	status, err := kl.GetPodStatus(notfittingPodName, "")
 	if err != nil {
 		t.Fatalf("unable to retrieve pod status for pod %q: #v.", notfittingPodName, err)
@@ -3232,7 +3243,8 @@ func TestCreateMirrorPod(t *testing.T) {
 			},
 		},
 	}
-	kl.pods = append(kl.pods, pod)
+	pods := []api.Pod{pod}
+	kl.podManager.SetPods(pods)
 	hasMirrorPod := false
 	err := kl.syncPod(&pod, hasMirrorPod, dockertools.DockerContainers{})
 	if err != nil {
@@ -3357,7 +3369,7 @@ func TestGetContainerInfoForMirrorPods(t *testing.T) {
 		},
 	}
 
-	kubelet.pods, kubelet.mirrorPods = filterAndCategorizePods(pods)
+	kubelet.podManager.SetPods(pods)
 	// Use the mirror pod UID to retrieve the stats.
 	stats, err := kubelet.GetContainerInfo("qux_ns", "5678", "foo", cadvisorReq)
 	if err != nil {
