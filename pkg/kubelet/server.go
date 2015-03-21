@@ -37,7 +37,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/httplog"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/httpstream"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/httpstream/spdy"
 	"github.com/golang/glog"
@@ -83,7 +82,7 @@ type HostInterface interface {
 	GetRootInfo(req *cadvisorApi.ContainerInfoRequest) (*cadvisorApi.ContainerInfo, error)
 	GetDockerVersion() ([]uint, error)
 	GetCachedMachineInfo() (*cadvisorApi.MachineInfo, error)
-	GetPods() ([]api.Pod, util.StringSet)
+	GetPods() ([]api.Pod, mirrorPods)
 	GetPodByName(namespace, name string) (*api.Pod, bool)
 	GetPodStatus(name string, uid types.UID) (api.PodStatus, error)
 	RunInContainer(name string, uid types.UID, container string, cmd []string) ([]byte, error)
