@@ -106,7 +106,8 @@ find-object-url() {
 
   KUBE_TAR=${CLOUDFILES_CONTAINER}/${CONTAINER_PREFIX}/kubernetes-server-linux-amd64.tar.gz
 
-  RELEASE_TMP_URL=$(swiftly -A ${OS_AUTH_URL} -U ${OS_USERNAME} -K ${OS_PASSWORD} tempurl GET ${KUBE_TAR})
+ # Create temp URL good for 24 hours
+  RELEASE_TMP_URL=$(swiftly -A ${OS_AUTH_URL} -U ${OS_USERNAME} -K ${OS_PASSWORD} tempurl GET ${KUBE_TAR} 86400 )
   echo "cluster/rackspace/util.sh: Object temp URL:"
   echo -e "\t${RELEASE_TMP_URL}"
 
