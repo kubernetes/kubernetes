@@ -17,6 +17,7 @@ limitations under the License.
 package rest
 
 import (
+	"io"
 	"net/http"
 	"net/url"
 
@@ -147,4 +148,22 @@ type StandardStorage interface {
 type Redirector interface {
 	// ResourceLocation should return the remote location of the given resource, and an optional transport to use to request it, or an error.
 	ResourceLocation(ctx api.Context, id string) (remoteLocation *url.URL, transport http.RoundTripper, err error)
+}
+
+// ResourceStreamer is an interface implemented by objects that prefer to be streamed from the server
+// instead of decoded directly.
+type ResourceStreamer interface {
+	// InputStream should return an io.Reader if the provided object supports streaming. The desired
+	// api version and a accept header (may be empty) are passed to the call. If no error occurs,
+	// the caller may return a content type string with the reader that indicates the type of the
+	// stream.
+	InputStream(apiVersion, acceptHeader string) (io.ReadCloser, string, error)
+}
+
+// StorageMetadata is an optional interface that callers can implement to provide additional
+// information about their Storage objects.
+type StorageMetadata interface {
+	// ProducesMIMETypes returns a list of the MIME types the specified HTTP verb (GET, POST, DELETE,
+	// PATCH) can respond with.
+	ProducesMIMETypes(verb string) []string
 }

@@ -147,6 +147,10 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	patcher, isPatcher := storage.(rest.Patcher)
 	_, isWatcher := storage.(rest.Watcher)
 	_, isRedirector := storage.(rest.Redirector)
+	storageMeta, isMetadata := storage.(rest.StorageMetadata)
+	if !isMetadata {
+		storageMeta = defaultStorageMetadata{}
+	}
 
 	var versionedDeleterObject runtime.Object
 	switch {
@@ -283,56 +287,70 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	//
 	// test/integration/auth_test.go is currently the most comprehensive status code test
 
+	reqScope := RequestScope{
+		ContextFunc: ctxFn,
+		Codec:       mapping.Codec,
+		APIVersion:  a.group.Version,
+		Resource:    resource,
+		Kind:        kind,
+	}
 	for _, action := range actions {
+		reqScope.Namer = action.Namer
 		m := monitorFilter(action.Verb, resource)
 		switch action.Verb {
 		case "GET": // Get a resource.
-			route := ws.GET(action.Path).To(GetResource(getter, ctxFn, action.Namer, mapping.Codec)).
+			route := ws.GET(action.Path).To(GetResource(getter, reqScope)).
 				Filter(m).
 				Doc("read the specified " + kind).
 				Operation("read" + kind).
+				Produces(append(storageMeta.ProducesMIMETypes(action.Verb), "application/json")...).
 				Writes(versionedObject)
 			addParams(route, action.Params)
 			ws.Route(route)
 		case "LIST": // List all resources of a kind.
-			route := ws.GET(action.Path).To(ListResource(lister, ctxFn, action.Namer, mapping.Codec, a.group.Version, resource)).
+			route := ws.GET(action.Path).To(ListResource(lister, reqScope)).
 				Filter(m).
 				Doc("list objects of kind " + kind).
 				Operation("list" + kind).
+				Produces("application/json").
 				Writes(versionedList)
 			addParams(route, action.Params)
 			ws.Route(route)
 		case "PUT": // Update a resource.
-			route := ws.PUT(action.Path).To(UpdateResource(updater, ctxFn, action.Namer, mapping.Codec, a.group.Typer, resource, admit)).
+			route := ws.PUT(action.Path).To(UpdateResource(updater, reqScope, a.group.Typer, admit)).
 				Filter(m).
 				Doc("replace the specified " + kind).
 				Operation("replace" + kind).
+				Produces(append(storageMeta.ProducesMIMETypes(action.Verb), "application/json")...).
 				Reads(versionedObject)
 			addParams(route, action.Params)
 			ws.Route(route)
 		case "PATCH": // Partially update a resource
-			route := ws.PATCH(action.Path).To(PatchResource(patcher, ctxFn, action.Namer, mapping.Codec, a.group.Typer, resource, admit)).
+			route := ws.PATCH(action.Path).To(PatchResource(patcher, reqScope, a.group.Typer, admit)).
 				Filter(m).
 				Doc("partially update the specified " + kind).
 				// TODO: toggle patch strategy by content type
 				// Consumes("application/merge-patch+json", "application/json-patch+json").
 				Operation("patch" + kind).
+				Produces(append(storageMeta.ProducesMIMETypes(action.Verb), "application/json")...).
 				Reads(versionedObject)
 			addParams(route, action.Params)
 			ws.Route(route)
 		case "POST": // Create a resource.
-			route := ws.POST(action.Path).To(CreateResource(creater, ctxFn, action.Namer, mapping.Codec, a.group.Typer, resource, admit)).
+			route := ws.POST(action.Path).To(CreateResource(creater, reqScope, a.group.Typer, admit)).
 				Filter(m).
 				Doc("create a " + kind).
 				Operation("create" + kind).
+				Produces(append(storageMeta.ProducesMIMETypes(action.Verb), "application/json")...).
 				Reads(versionedObject)
 			addParams(route, action.Params)
 			ws.Route(route)
 		case "DELETE": // Delete a resource.
-			route := ws.DELETE(action.Path).To(DeleteResource(gracefulDeleter, isGracefulDeleter, ctxFn, action.Namer, mapping.Codec, resource, kind, admit)).
+			route := ws.DELETE(action.Path).To(DeleteResource(gracefulDeleter, isGracefulDeleter, reqScope, admit)).
 				Filter(m).
 				Doc("delete a " + kind).
-				Operation("delete" + kind)
+				Operation("delete" + kind).
+				Produces(append(storageMeta.ProducesMIMETypes(action.Verb), "application/json")...)
 			if isGracefulDeleter {
 				route.Reads(versionedDeleterObject)
 			}
@@ -343,6 +361,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 				Filter(m).
 				Doc("watch a particular " + kind).
 				Operation("watch" + kind).
+				Produces("application/json").
 				Writes(versionedObject)
 			addParams(route, action.Params)
 			ws.Route(route)
@@ -351,6 +370,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 				Filter(m).
 				Doc("watch a list of " + kind).
 				Operation("watch" + kind + "list").
+				Produces("application/json").
 				Writes(versionedList)
 			addParams(route, action.Params)
 			ws.Route(route)
@@ -629,4 +649,14 @@ func addParams(route *restful.RouteBuilder, params []*restful.Parameter) {
 	for _, param := range params {
 		route.Param(param)
 	}
+}
+
+// defaultStorageMetadata provides default answers to rest.StorageMetadata.
+type defaultStorageMetadata struct{}
+
+// defaultStorageMetadata implements rest.StorageMetadata
+var _ rest.StorageMetadata = defaultStorageMetadata{}
+
+func (defaultStorageMetadata) ProducesMIMETypes(verb string) []string {
+	return nil
 }
