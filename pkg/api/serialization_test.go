@@ -129,7 +129,7 @@ func TestList(t *testing.T) {
 }
 
 var nonRoundTrippableTypes = util.NewStringSet("ContainerManifest", "ContainerManifestList")
-var nonInternalRoundTrippableTypes = util.NewStringSet("List")
+var nonInternalRoundTrippableTypes = util.NewStringSet("List", "ListOptions")
 
 func TestRoundTripTypes(t *testing.T) {
 	// api.Scheme.Log(t)

@@ -19,6 +19,7 @@ package apiserver
 import (
 	"fmt"
 	"net/http"
+	"net/url"
 	"path"
 	"regexp"
 	"strings"
@@ -26,8 +27,11 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/rest"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/httplog"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 	watchjson "github.com/GoogleCloudPlatform/kubernetes/pkg/watch/json"
@@ -36,11 +40,14 @@ import (
 	"golang.org/x/net/websocket"
 )
 
+// TODO: convert me to resthandler custom verb
 type WatchHandler struct {
-	storage map[string]rest.Storage
-	codec   runtime.Codec
-	linker  runtime.SelfLinker
-	info    *APIRequestInfoResolver
+	storage   map[string]rest.Storage
+	mapper    meta.RESTMapper
+	convertor runtime.ObjectConvertor
+	codec     runtime.Codec
+	linker    runtime.SelfLinker
+	info      *APIRequestInfoResolver
 }
 
 // setSelfLinkAddName sets the self link, appending the object's name to the canonical path & type.
@@ -96,8 +103,24 @@ func (h *WatchHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		httpCode = errorJSON(errors.NewMethodNotSupported(requestInfo.Resource, "watch"), h.codec, w)
 		return
 	}
+	kind := requestInfo.Kind
+	if len(kind) == 0 {
+		if _, kind, err = h.mapper.VersionAndKindForResource(apiResource); err != nil {
+			glog.Errorf("No kind found for %s: %v", apiResource, err)
+		}
+	}
 
-	label, field, err := parseSelectorQueryParams(req.URL.Query(), requestInfo.APIVersion, apiResource)
+	scope := RequestScope{
+		Convertor:  h.convertor,
+		Kind:       kind,
+		Resource:   apiResource,
+		APIVersion: requestInfo.APIVersion,
+		// TODO: this must be parameterized per version, and is incorrect for implementors
+		// outside of Kubernetes. Fix by refactoring watch under resthandler as a custome
+		// resource.
+		ServerAPIVersion: requestInfo.APIVersion,
+	}
+	label, field, err := parseSelectorQueryParams(req.URL.Query(), scope)
 	if err != nil {
 		httpCode = errorJSON(err, h.codec, w)
 		return
@@ -123,6 +146,26 @@ func (h *WatchHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	} else {
 		watchServer.ServeHTTP(w, req)
 	}
+}
+
+// TODO: remove when watcher is refactored to fit under api_installer
+func parseSelectorQueryParams(query url.Values, scope RequestScope) (label labels.Selector, field fields.Selector, err error) {
+	labelString := query.Get(api.LabelSelectorQueryParam(scope.ServerAPIVersion))
+	label, err = labels.Parse(labelString)
+	if err != nil {
+		return nil, nil, errors.NewBadRequest(fmt.Sprintf("The 'labels' selector parameter (%s) could not be parsed: %v", labelString, err))
+	}
+
+	fn := func(label, value string) (newLabel, newValue string, err error) {
+		return scope.Convertor.ConvertFieldLabel(scope.APIVersion, scope.Kind, label, value)
+	}
+	fieldString := query.Get(api.FieldSelectorQueryParam(scope.ServerAPIVersion))
+	field, err = fields.ParseAndTransformSelector(fieldString, fn)
+	if err != nil {
+		return nil, nil, errors.NewBadRequest(fmt.Sprintf("The 'fields' selector parameter (%s) could not be parsed: %v", fieldString, err))
+	}
+	glog.Infof("Found %#v %#v from %v in scope %#v", label, field, query, scope)
+	return label, field, nil
 }
 
 // WatchServer serves a watch.Interface over a websocket or vanilla HTTP.

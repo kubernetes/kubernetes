@@ -37,6 +37,7 @@ import (
 	apierrs "github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/rest"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
@@ -96,11 +97,10 @@ func init() {
 	// api.Status is returned in errors
 
 	// "internal" version
-	api.Scheme.AddKnownTypes("", &Simple{}, &SimpleList{},
-		&api.Status{})
+	api.Scheme.AddKnownTypes("", &Simple{}, &SimpleList{}, &api.Status{}, &api.ListOptions{})
 	// "version" version
 	// TODO: Use versioned api objects?
-	api.Scheme.AddKnownTypes(testVersion, &Simple{}, &SimpleList{}, &api.DeleteOptions{}, &api.Status{})
+	api.Scheme.AddKnownTypes(testVersion, &Simple{}, &SimpleList{}, &v1beta1.DeleteOptions{}, &v1beta1.Status{}, &v1beta1.ListOptions{})
 
 	nsMapper := newMapper()
 	legacyNsMapper := newMapper()
@@ -156,10 +156,11 @@ func handleInternal(storage map[string]rest.Storage, admissionControl admission.
 		Root:    "/api",
 		Version: testVersion,
 
-		Creater: api.Scheme,
-		Typer:   api.Scheme,
-		Codec:   codec,
-		Linker:  selfLinker,
+		Creater:   api.Scheme,
+		Convertor: api.Scheme,
+		Typer:     api.Scheme,
+		Codec:     codec,
+		Linker:    selfLinker,
 
 		Admit:   admissionControl,
 		Context: requestContextMapper,
@@ -244,6 +245,8 @@ func (storage *SimpleRESTStorage) List(ctx api.Context, label labels.Selector, f
 	result := &SimpleList{
 		Items: storage.list,
 	}
+	storage.requestedLabelSelector = label
+	storage.requestedFieldSelector = field
 	return result, storage.errors["list"]
 }
 
@@ -522,15 +525,60 @@ func TestList(t *testing.T) {
 		namespace string
 		selfLink  string
 		legacy    bool
+		label     string
+		field     string
 	}{
-		{"/api/version/simple", "", "/api/version/simple?namespace=", true},
-		{"/api/version/simple?namespace=other", "other", "/api/version/simple?namespace=other", true},
+		{
+			url:       "/api/version/simple",
+			namespace: "",
+			selfLink:  "/api/version/simple?namespace=",
+			legacy:    true,
+		},
+		{
+			url:       "/api/version/simple?namespace=other",
+			namespace: "other",
+			selfLink:  "/api/version/simple?namespace=other",
+			legacy:    true,
+		},
+		{
+			url:       "/api/version/simple?namespace=other&labels=a%3Db&fields=c%3Dd",
+			namespace: "other",
+			selfLink:  "/api/version/simple?namespace=other",
+			legacy:    true,
+			label:     "a=b",
+			field:     "c=d",
+		},
 		// list items across all namespaces
-		{"/api/version/simple?namespace=", "", "/api/version/simple?namespace=", true},
-		{"/api/version/namespaces/default/simple", "default", "/api/version/namespaces/default/simple", false},
-		{"/api/version/namespaces/other/simple", "other", "/api/version/namespaces/other/simple", false},
+		{
+			url:       "/api/version/simple?namespace=",
+			namespace: "",
+			selfLink:  "/api/version/simple?namespace=",
+			legacy:    true,
+		},
+		// list items in a namespace, v1beta3+
+		{
+			url:       "/api/version/namespaces/default/simple",
+			namespace: "default",
+			selfLink:  "/api/version/namespaces/default/simple",
+		},
+		{
+			url:       "/api/version/namespaces/other/simple",
+			namespace: "other",
+			selfLink:  "/api/version/namespaces/other/simple",
+		},
+		{
+			url:       "/api/version/namespaces/other/simple?labels=a%3Db&fields=c%3Dd",
+			namespace: "other",
+			selfLink:  "/api/version/namespaces/other/simple",
+			label:     "a=b",
+			field:     "c=d",
+		},
 		// list items across all namespaces
-		{"/api/version/simple", "", "/api/version/simple", false},
+		{
+			url:       "/api/version/simple",
+			namespace: "",
+			selfLink:  "/api/version/simple",
+		},
 	}
 	for i, testCase := range testCases {
 		storage := map[string]rest.Storage{}
@@ -566,6 +614,12 @@ func TestList(t *testing.T) {
 			t.Errorf("%d: namespace not set", i)
 		} else if simpleStorage.actualNamespace != testCase.namespace {
 			t.Errorf("%d: unexpected resource namespace: %s", i, simpleStorage.actualNamespace)
+		}
+		if simpleStorage.requestedLabelSelector == nil || simpleStorage.requestedLabelSelector.String() != testCase.label {
+			t.Errorf("%d: unexpected label selector: %v", i, simpleStorage.requestedLabelSelector)
+		}
+		if simpleStorage.requestedFieldSelector == nil || simpleStorage.requestedFieldSelector.String() != testCase.field {
+			t.Errorf("%d: unexpected field selector: %v", i, simpleStorage.requestedFieldSelector)
 		}
 	}
 }

@@ -1158,6 +1158,16 @@ type DeleteOptions struct {
 	GracePeriodSeconds *int64 `json:"gracePeriodSeconds" description:"the duration in seconds to wait before deleting this object; defaults to a per object value if not specified; zero means delete immediately"`
 }
 
+// ListOptions is the query options to a standard REST list call
+type ListOptions struct {
+	TypeMeta `json:",inline"`
+
+	// A selector based on labels
+	LabelSelector string `json:"labelSelector" description:"a selector to restrict the list of returned objects by their labels; defaults to everything"`
+	// A selector based on fields
+	FieldSelector string `json:"fieldSelector" description:"a selector to restrict the list of returned objects by their fields; defaults to everything"`
+}
+
 // Status is a return value for calls that don't return other objects.
 type Status struct {
 	TypeMeta `json:",inline"`

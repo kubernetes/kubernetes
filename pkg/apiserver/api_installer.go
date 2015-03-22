@@ -29,6 +29,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/rest"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/conversion"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 
 	"github.com/emicklei/go-restful"
@@ -60,10 +61,12 @@ func (a *APIInstaller) Install() (ws *restful.WebService, errors []error) {
 
 	// Initialize the custom handlers.
 	watchHandler := (&WatchHandler{
-		storage: a.group.Storage,
-		codec:   a.group.Codec,
-		linker:  a.group.Linker,
-		info:    a.info,
+		storage:   a.group.Storage,
+		mapper:    a.group.Mapper,
+		convertor: a.group.Convertor,
+		codec:     a.group.Codec,
+		linker:    a.group.Linker,
+		info:      a.info,
 	})
 	redirectHandler := (&RedirectHandler{a.group.Storage, a.group.Codec, a.group.Context, a.info})
 	proxyHandler := (&ProxyHandler{a.prefix + "/proxy/", a.group.Storage, a.group.Codec, a.group.Context, a.info})
@@ -98,6 +101,11 @@ func (a *APIInstaller) newWebService() *restful.WebService {
 func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storage, ws *restful.WebService, watchHandler, redirectHandler, proxyHandler http.Handler) error {
 	admit := a.group.Admit
 	context := a.group.Context
+
+	serverVersion := a.group.ServerVersion
+	if len(serverVersion) == 0 {
+		serverVersion = a.group.Version
+	}
 
 	var resource, subresource string
 	switch parts := strings.Split(path, "/"); len(parts) {
@@ -152,10 +160,15 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		storageMeta = defaultStorageMetadata{}
 	}
 
+	versionedListOptions, err := a.group.Creater.New(serverVersion, "ListOptions")
+	if err != nil {
+		return err
+	}
+
 	var versionedDeleterObject runtime.Object
 	switch {
 	case isGracefulDeleter:
-		object, err := a.group.Creater.New(a.group.Version, "DeleteOptions")
+		object, err := a.group.Creater.New(serverVersion, "DeleteOptions")
 		if err != nil {
 			return err
 		}
@@ -288,11 +301,14 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	// test/integration/auth_test.go is currently the most comprehensive status code test
 
 	reqScope := RequestScope{
-		ContextFunc: ctxFn,
-		Codec:       mapping.Codec,
-		APIVersion:  a.group.Version,
-		Resource:    resource,
-		Kind:        kind,
+		ContextFunc:      ctxFn,
+		Creater:          a.group.Creater,
+		Convertor:        a.group.Convertor,
+		Codec:            mapping.Codec,
+		APIVersion:       a.group.Version,
+		ServerAPIVersion: serverVersion,
+		Resource:         resource,
+		Kind:             kind,
 	}
 	for _, action := range actions {
 		reqScope.Namer = action.Namer
@@ -314,6 +330,9 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 				Operation("list" + kind).
 				Produces("application/json").
 				Writes(versionedList)
+			if err := addObjectParams(ws, route, versionedListOptions); err != nil {
+				return err
+			}
 			addParams(route, action.Params)
 			ws.Route(route)
 		case "PUT": // Update a resource.
@@ -649,6 +668,39 @@ func addParams(route *restful.RouteBuilder, params []*restful.Parameter) {
 	for _, param := range params {
 		route.Param(param)
 	}
+}
+
+func addObjectParams(ws *restful.WebService, route *restful.RouteBuilder, obj runtime.Object) error {
+	sv, err := conversion.EnforcePtr(obj)
+	if err != nil {
+		return err
+	}
+	st := sv.Type()
+	switch st.Kind() {
+	case reflect.Struct:
+		for i := 0; i < st.NumField(); i++ {
+			name := st.Field(i).Name
+			sf, ok := st.FieldByName(name)
+			if !ok {
+				continue
+			}
+			switch sf.Type.Kind() {
+			case reflect.Interface, reflect.Struct:
+			default:
+				jsonTag := sf.Tag.Get("json")
+				if len(jsonTag) == 0 {
+					continue
+				}
+				jsonName := strings.SplitN(jsonTag, ",", 2)[0]
+				if len(jsonName) == 0 {
+					continue
+				}
+				desc := sf.Tag.Get("description")
+				route.Param(ws.QueryParameter(jsonName, desc).DataType(sf.Type.Name()))
+			}
+		}
+	}
+	return nil
 }
 
 // defaultStorageMetadata provides default answers to rest.StorageMetadata.

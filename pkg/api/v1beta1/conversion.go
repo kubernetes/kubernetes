@@ -1494,7 +1494,7 @@ func init() {
 	}
 
 	// Add field conversion funcs.
-	err = newer.Scheme.AddFieldLabelConversionFunc("v1beta1", "pods",
+	err = newer.Scheme.AddFieldLabelConversionFunc("v1beta1", "Pod",
 		func(label, value string) (string, string, error) {
 			switch label {
 			case "name":
@@ -1514,7 +1514,7 @@ func init() {
 		// If one of the conversion functions is malformed, detect it immediately.
 		panic(err)
 	}
-	err = newer.Scheme.AddFieldLabelConversionFunc("v1beta1", "replicationControllers",
+	err = newer.Scheme.AddFieldLabelConversionFunc("v1beta1", "ReplicationController",
 		func(label, value string) (string, string, error) {
 			switch label {
 			case "name":
@@ -1529,7 +1529,7 @@ func init() {
 		// If one of the conversion functions is malformed, detect it immediately.
 		panic(err)
 	}
-	err = newer.Scheme.AddFieldLabelConversionFunc("v1beta1", "events",
+	err = newer.Scheme.AddFieldLabelConversionFunc("v1beta1", "Event",
 		func(label, value string) (string, string, error) {
 			switch label {
 			case "involvedObject.kind",
@@ -1551,7 +1551,7 @@ func init() {
 		// If one of the conversion functions is malformed, detect it immediately.
 		panic(err)
 	}
-	err = newer.Scheme.AddFieldLabelConversionFunc("v1beta1", "namespaces",
+	err = newer.Scheme.AddFieldLabelConversionFunc("v1beta1", "Namespace",
 		func(label, value string) (string, string, error) {
 			switch label {
 			case "status.phase":

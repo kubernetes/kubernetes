@@ -102,12 +102,19 @@ type APIGroupVersion struct {
 	Root    string
 	Version string
 
+	// ServerVersion controls the Kubernetes APIVersion used for common objects in the apiserver
+	// schema like api.Status, api.DeleteOptions, and api.ListOptions. Other implementors may
+	// define a version "v1beta1" but want to use the Kubernetes "v1beta3" internal objects. If
+	// empty, defaults to Version.
+	ServerVersion string
+
 	Mapper meta.RESTMapper
 
-	Codec   runtime.Codec
-	Typer   runtime.ObjectTyper
-	Creater runtime.ObjectCreater
-	Linker  runtime.SelfLinker
+	Codec     runtime.Codec
+	Typer     runtime.ObjectTyper
+	Creater   runtime.ObjectCreater
+	Convertor runtime.ObjectConvertor
+	Linker    runtime.SelfLinker
 
 	Admit   admission.Interface
 	Context api.RequestContextMapper

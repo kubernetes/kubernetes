@@ -25,6 +25,7 @@ import (
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/rest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
@@ -48,16 +49,24 @@ var watchTestTable = []struct {
 	{watch.Deleted, &Simple{ObjectMeta: api.ObjectMeta{Name: "bar"}}},
 }
 
+func init() {
+	mapper.(*meta.DefaultRESTMapper).Add(meta.RESTScopeNamespaceLegacy, "Simple", testVersion, false)
+	api.Scheme.AddFieldLabelConversionFunc(testVersion, "Simple",
+		func(label, value string) (string, string, error) {
+			return label, value, nil
+		})
+}
+
 func TestWatchWebsocket(t *testing.T) {
 	simpleStorage := &SimpleRESTStorage{}
 	_ = rest.Watcher(simpleStorage) // Give compile error if this doesn't work.
-	handler := handle(map[string]rest.Storage{"foo": simpleStorage})
+	handler := handle(map[string]rest.Storage{"simples": simpleStorage})
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
 	dest, _ := url.Parse(server.URL)
 	dest.Scheme = "ws" // Required by websocket, though the server never sees it.
-	dest.Path = "/api/version/watch/foo"
+	dest.Path = "/api/version/watch/simples"
 	dest.RawQuery = ""
 
 	ws, err := websocket.Dial(dest.String(), "", "http://localhost")
@@ -103,13 +112,13 @@ func TestWatchWebsocket(t *testing.T) {
 
 func TestWatchHTTP(t *testing.T) {
 	simpleStorage := &SimpleRESTStorage{}
-	handler := handle(map[string]rest.Storage{"foo": simpleStorage})
+	handler := handle(map[string]rest.Storage{"simples": simpleStorage})
 	server := httptest.NewServer(handler)
 	defer server.Close()
 	client := http.Client{}
 
 	dest, _ := url.Parse(server.URL)
-	dest.Path = "/api/version/watch/foo"
+	dest.Path = "/api/version/watch/simples"
 	dest.RawQuery = ""
 
 	request, err := http.NewRequest("GET", dest.String(), nil)
@@ -163,17 +172,13 @@ func TestWatchHTTP(t *testing.T) {
 }
 
 func TestWatchParamParsing(t *testing.T) {
-	api.Scheme.AddFieldLabelConversionFunc(testVersion, "foo",
-		func(label, value string) (string, string, error) {
-			return label, value, nil
-		})
 	simpleStorage := &SimpleRESTStorage{}
-	handler := handle(map[string]rest.Storage{"foo": simpleStorage})
+	handler := handle(map[string]rest.Storage{"simples": simpleStorage})
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
 	dest, _ := url.Parse(server.URL)
-	dest.Path = "/api/" + testVersion + "/watch/foo"
+	dest.Path = "/api/" + testVersion + "/watch/simples"
 
 	table := []struct {
 		rawQuery        string
@@ -238,14 +243,14 @@ func TestWatchParamParsing(t *testing.T) {
 
 func TestWatchProtocolSelection(t *testing.T) {
 	simpleStorage := &SimpleRESTStorage{}
-	handler := handle(map[string]rest.Storage{"foo": simpleStorage})
+	handler := handle(map[string]rest.Storage{"simples": simpleStorage})
 	server := httptest.NewServer(handler)
 	defer server.Close()
 	defer server.CloseClientConnections()
 	client := http.Client{}
 
 	dest, _ := url.Parse(server.URL)
-	dest.Path = "/api/version/watch/foo"
+	dest.Path = "/api/version/watch/simples"
 	dest.RawQuery = ""
 
 	table := []struct {

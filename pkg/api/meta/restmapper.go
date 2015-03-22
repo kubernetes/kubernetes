@@ -14,6 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// TODO: move everything in this file to pkg/api/rest
 package meta
 
 import (
