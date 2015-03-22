@@ -217,6 +217,13 @@ func NewScheme() *Scheme {
 	); err != nil {
 		panic(err)
 	}
+	// Enable map[string][]string conversions by default
+	if err := s.raw.AddConversionFuncs(DefaultStringConversions...); err != nil {
+		panic(err)
+	}
+	if err := s.raw.RegisterInputDefaults(&map[string][]string{}, JSONKeyMapper, conversion.AllowDifferentFieldTypeNames|conversion.IgnoreMissingFields); err != nil {
+		panic(err)
+	}
 	return s
 }
 

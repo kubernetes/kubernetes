@@ -23,6 +23,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/conversion"
 )
 
+// TODO: move me to pkg/api/meta
 func IsListType(obj Object) bool {
 	_, err := GetItemsPtr(obj)
 	return err == nil
@@ -32,6 +33,7 @@ func IsListType(obj Object) bool {
 // If 'list' doesn't have an Items member, it's not really a list type
 // and an error will be returned.
 // This function will either return a pointer to a slice, or an error, but not both.
+// TODO: move me to pkg/api/meta
 func GetItemsPtr(list Object) (interface{}, error) {
 	v, err := conversion.EnforcePtr(list)
 	if err != nil {
@@ -57,6 +59,7 @@ func GetItemsPtr(list Object) (interface{}, error) {
 
 // ExtractList returns obj's Items element as an array of runtime.Objects.
 // Returns an error if obj is not a List type (does not have an Items member).
+// TODO: move me to pkg/api/meta
 func ExtractList(obj Object) ([]Object, error) {
 	itemsPtr, err := GetItemsPtr(obj)
 	if err != nil {
@@ -90,6 +93,7 @@ var objectSliceType = reflect.TypeOf([]Object{})
 // objects.
 // Returns an error if list is not a List type (does not have an Items member),
 // or if any of the objects are not of the right type.
+// TODO: move me to pkg/api/meta
 func SetList(list Object, objects []Object) error {
 	itemsPtr, err := GetItemsPtr(list)
 	if err != nil {
