@@ -12,7 +12,7 @@ Setting up a cluster is as simple as running:
 
 ```
 export KUBERNETES_PROVIDER=vagrant
-curl -sS https://get.k8s.io | sh
+curl -sS https://get.k8s.io | bash
 ```
 
 The `KUBERNETES_PROVIDER` environment variable tells all of the various cluster management scripts which variant to use.  If you forget to set this, the assumption is you are running on Google Compute Engine.

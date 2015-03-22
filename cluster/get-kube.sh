@@ -16,26 +16,26 @@
 
 # Bring up a Kubernetes cluster.
 # Usage:
-#   wget -q -O - https://get.k8s.io | sh
+#   wget -q -O - https://get.k8s.io | bash
 # or
-#   curl -sS https://get.k8s.io | sh
+#   curl -sS https://get.k8s.io | bash
 #
 # Advanced options
 #  Set KUBERNETES_PROVIDER to choose between different providers:
 #  Google Compute Engine [default]
-#   * export KUBERNETES_PROVIDER=gce; wget -q -O - https://get.k8s.io | sh
+#   * export KUBERNETES_PROVIDER=gce; wget -q -O - https://get.k8s.io | bash
 #  Google Container Engine
-#   * export KUBERNETES_PROVIDER=gke; wget -q -O - https://get.k8s.io | sh
+#   * export KUBERNETES_PROVIDER=gke; wget -q -O - https://get.k8s.io | bash
 #  Amazon EC2
-#   * export KUBERNETES_PROVIDER=aws; wget -q -O - https://get.k8s.io | sh
+#   * export KUBERNETES_PROVIDER=aws; wget -q -O - https://get.k8s.io | bash
 #  Microsoft Azure
-#   * export KUBERNETES_PROVIDER=azure; wget -q -O - https://get.k8s.io | sh
+#   * export KUBERNETES_PROVIDER=azure; wget -q -O - https://get.k8s.io | bash
 #  Vagrant (local virtual machines)
-#   * export KUBERNETES_PROVIDER=vagrant; wget -q -O - https://get.k8s.io | sh
+#   * export KUBERNETES_PROVIDER=vagrant; wget -q -O - https://get.k8s.io | bash
 #  VMWare VSphere
-#   * export KUBERNETES_PROVIDER=vsphere; wget -q -O - https://get.k8s.io | sh
+#   * export KUBERNETES_PROVIDER=vsphere; wget -q -O - https://get.k8s.io | bash
 #  Rackspace
-#   * export KUBERNETES_PROVIDER=rackspace; wget -q -O - https://get.k8s.io | sh
+#   * export KUBERNETES_PROVIDER=rackspace; wget -q -O - https://get.k8s.io | bash
 #
 #  Set KUBERNETES_SKIP_DOWNLOAD to non-empty to skip downloading a release.
 #  Set KUBERNETES_SKIP_CONFIRM to skip the installation confirmation prompt.
