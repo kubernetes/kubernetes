@@ -26,6 +26,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta2"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta3"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
 // Version is the string that represents the current external default version.
@@ -122,9 +123,15 @@ func init() {
 		"Namespace": true,
 	}
 
+	// these kinds should be excluded from the list of resources
+	ignoredKinds := util.NewStringSet("ListOptions", "DeleteOptions", "Status", "ContainerManifest")
+
 	// enumerate all supported versions, get the kinds, and register with the mapper how to address our resources
 	for _, version := range versions {
 		for kind := range api.Scheme.KnownTypes(version) {
+			if ignoredKinds.Has(kind) {
+				continue
+			}
 			mixedCase, found := versionMixedCase[version]
 			if !found {
 				mixedCase = false
