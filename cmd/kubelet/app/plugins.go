@@ -23,6 +23,7 @@ import (
 	// Network plugins
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/network"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/network/exec"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/volume/persistent_claim"
 	// Volume plugins
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume/empty_dir"
@@ -46,6 +47,7 @@ func ProbeVolumePlugins() []volume.VolumePlugin {
 	allPlugins = append(allPlugins, host_path.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, nfs.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, secret.ProbeVolumePlugins()...)
+	allPlugins = append(allPlugins, persistent_claim.ProbeVolumePlugins()...)
 
 	return allPlugins
 }

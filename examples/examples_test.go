@@ -64,6 +64,8 @@ func validateObject(obj runtime.Object) (errors []error) {
 		for i := range t.Items {
 			errors = append(errors, validateObject(&t.Items[i])...)
 		}
+	case *api.Namespace:
+		errors = validation.ValidateNamespace(t)
 	case *api.PersistentVolume:
 		errors = validation.ValidatePersistentVolume(t)
 	case *api.PersistentVolumeClaim:
@@ -164,6 +166,12 @@ func TestExampleObjectSchemas(t *testing.T) {
 			"claim-01": &api.PersistentVolumeClaim{},
 			"claim-02": &api.PersistentVolumeClaim{},
 			"claim-03": &api.PersistentVolumeClaim{},
+		},
+		"../examples/persistent-volumes/pods": {
+			"namespace": &api.Namespace{},
+			"nginx":     &api.Pod{},
+			"pod":       &api.Pod{},
+			"service":   &api.Service{},
 		},
 	}
 

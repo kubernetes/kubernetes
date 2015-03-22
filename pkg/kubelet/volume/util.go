@@ -24,24 +24,24 @@ func GetAccessModesAsString(modes []api.AccessModeType) string {
 	modesAsString := ""
 
 	if contains(modes, api.ReadWriteOnce) {
-		appendAccessMode(modesAsString, "RWO")
+		appendAccessMode(&modesAsString, "RWO")
 	}
 	if contains(modes, api.ReadOnlyMany) {
-		appendAccessMode(modesAsString, "ROX")
+		appendAccessMode(&modesAsString, "ROX")
 	}
 	if contains(modes, api.ReadWriteMany) {
-		appendAccessMode(modesAsString, "RWX")
+		appendAccessMode(&modesAsString, "RWX")
 	}
 
 	return modesAsString
 }
 
-func appendAccessMode(modes, mode string) string {
-	if modes != "" {
-		modes += ","
+func appendAccessMode(modes *string, mode string) string {
+	if *modes != "" {
+		*modes += ","
 	}
-	modes += mode
-	return modes
+	*modes += mode
+	return *modes
 }
 
 func contains(modes []api.AccessModeType, mode api.AccessModeType) bool {
@@ -59,6 +59,10 @@ func GetAccessModeType(source api.PersistentVolumeSource) []api.AccessModeType {
 		return []api.AccessModeType{
 			api.ReadWriteOnce,
 			api.ReadOnlyMany,
+		}
+	} else if source.HostPath != nil {
+		return []api.AccessModeType{
+			api.ReadWriteOnce,
 		}
 	}
 	return []api.AccessModeType{}
