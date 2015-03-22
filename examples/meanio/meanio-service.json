@@ -1,0 +1,14 @@
+{
+  "id": "meanio",
+  "kind": "Service",
+  "apiVersion": "v1beta1",
+  "port": 80,
+  "containerPort": "meanio-server",
+  "selector": {
+    "name": "meanio"
+  },
+  "labels": {
+    "name": "meanio"
+  },
+  "createExternalLoadBalancer": true
+}

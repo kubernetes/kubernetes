@@ -1,0 +1,13 @@
+{
+  "id": "meanio-mongodb",
+  "kind": "Service",
+  "apiVersion": "v1beta1",
+  "port": 27017,
+  "containerPort": 27017,
+  "labels": {
+    "name": "meanio-mongodb"
+  },
+  "selector": {
+    "name": "meanio-mongodb"
+  }
+}
