@@ -1,8 +1,0 @@
-{% extends 'layouts/default.html' %}
-{% block content %}
-  <section data-ui-view ></section>
-  <script type="text/javascript">
-    window.user = {{user|json|safe}};
-    window.modules = null;
-  </script>
-{% endblock %}
