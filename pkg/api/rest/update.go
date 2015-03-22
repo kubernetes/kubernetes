@@ -20,6 +20,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/fielderrors"
 )
 
 // RESTUpdateStrategy defines the minimum validation, accepted input, and
@@ -34,7 +35,7 @@ type RESTUpdateStrategy interface {
 	AllowCreateOnUpdate() bool
 	// ValidateUpdate is invoked after default fields in the object have been filled in before
 	// the object is persisted.
-	ValidateUpdate(obj, old runtime.Object) errors.ValidationErrorList
+	ValidateUpdate(obj, old runtime.Object) fielderrors.ValidationErrorList
 }
 
 // BeforeUpdate ensures that common operations for all resources are performed on update. It only returns

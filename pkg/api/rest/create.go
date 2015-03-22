@@ -20,6 +20,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/fielderrors"
 )
 
 // RESTCreateStrategy defines the minimum validation, accepted input, and
@@ -38,7 +39,7 @@ type RESTCreateStrategy interface {
 	ResetBeforeCreate(obj runtime.Object)
 	// Validate is invoked after default fields in the object have been filled in before
 	// the object is persisted.
-	Validate(obj runtime.Object) errors.ValidationErrorList
+	Validate(obj runtime.Object) fielderrors.ValidationErrorList
 }
 
 // BeforeCreate ensures that common operations for all resources are performed on creation. It only returns

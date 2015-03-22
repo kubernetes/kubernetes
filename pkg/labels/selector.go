@@ -22,8 +22,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/fielderrors"
 )
 
 // Selector represents a label selector.
@@ -758,14 +758,14 @@ const qualifiedNameErrorMsg string = "must match regex [" + util.DNS1123Subdomai
 
 func validateLabelKey(k string) error {
 	if !util.IsQualifiedName(k) {
-		return errors.NewFieldInvalid("label key", k, qualifiedNameErrorMsg)
+		return fielderrors.NewFieldInvalid("label key", k, qualifiedNameErrorMsg)
 	}
 	return nil
 }
 
 func validateLabelValue(v string) error {
 	if !util.IsValidLabelValue(v) {
-		return errors.NewFieldInvalid("label value", v, qualifiedNameErrorMsg)
+		return fielderrors.NewFieldInvalid("label value", v, qualifiedNameErrorMsg)
 	}
 	return nil
 }

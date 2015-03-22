@@ -23,6 +23,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/errors"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/fielderrors"
 )
 
 // HTTP Status codes not in the golang http package.
@@ -133,10 +134,10 @@ func NewConflict(kind, name string, err error) error {
 }
 
 // NewInvalid returns an error indicating the item is invalid and cannot be processed.
-func NewInvalid(kind, name string, errs ValidationErrorList) error {
+func NewInvalid(kind, name string, errs fielderrors.ValidationErrorList) error {
 	causes := make([]api.StatusCause, 0, len(errs))
 	for i := range errs {
-		if err, ok := errs[i].(*ValidationError); ok {
+		if err, ok := errs[i].(*fielderrors.ValidationError); ok {
 			causes = append(causes, api.StatusCause{
 				Type:    api.CauseType(err.Type),
 				Message: err.Error(),
