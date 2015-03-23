@@ -165,9 +165,9 @@ func TestReadFromFile(t *testing.T) {
 					"namespace": "mynamespace",
 					"desiredState": {
 						"manifest": {
-							"containers": [{ "name": "image", "image": "test/image" }],
-						},
-					},
+							"containers": [{ "name": "image", "image": "test/image" }]
+						}
+					}
 				}`,
 			expected: CreatePodUpdate(kubelet.SET, kubelet.FileSource, api.Pod{
 				ObjectMeta: api.ObjectMeta{
@@ -195,9 +195,9 @@ func TestReadFromFile(t *testing.T) {
 					"uid": "12345",
 					"desiredState": {
 						"manifest": {
-							"containers": [{ "name": "image", "image": "test/image" }],
-						},
-					},
+							"containers": [{ "name": "image", "image": "test/image" }]
+						}
+					}
 				}`,
 			expected: CreatePodUpdate(kubelet.SET, kubelet.FileSource, api.Pod{
 				ObjectMeta: api.ObjectMeta{
@@ -224,11 +224,11 @@ func TestReadFromFile(t *testing.T) {
 					"apiversion": "v1beta3",
 					"metadata": {
 						"uid": "12345",
-						"name": "test",
+						"name": "test"
 					},
 					"spec": {
-						"containers": [{ "name": "image", "image": "test/image" }],
-					},
+						"containers": [{ "name": "image", "image": "test/image" }]
+					}
 				}`,
 			expected: CreatePodUpdate(kubelet.SET, kubelet.FileSource, api.Pod{
 				ObjectMeta: api.ObjectMeta{
