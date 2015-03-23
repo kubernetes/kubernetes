@@ -1,7 +1,6 @@
 ---
 layout: default
 ---
-
 <div class="events">
  <div class="container">
   <div class="row">
@@ -13,8 +12,7 @@ layout: default
    </div>
   </div>
   <ul class="list">
-{% for event_hash in site.data.events reversed %}
-    {% assign event = event_hash[1] %}
+{% for event in site.data.events %}
    <li class="lazy_load_item event">
     <div class="row">
      <div class="col-lg-3 col-md-3 col-sm-3 col-lg-offset-1 col-md-offset-1 col-sm-offset-1">
