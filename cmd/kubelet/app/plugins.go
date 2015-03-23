@@ -31,6 +31,13 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume/host_path"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume/nfs"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume/secret"
+	//Cloud providers
+	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/aws"
+	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/gce"
+	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/openstack"
+	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/ovirt"
+	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/rackspace"
+	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/vagrant"
 )
 
 // ProbeVolumePlugins collects all volume plugins into an easy to use list.
