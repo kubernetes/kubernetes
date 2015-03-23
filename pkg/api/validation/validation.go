@@ -71,13 +71,10 @@ func ValidateAnnotations(annotations map[string]string, field string) errs.Valid
 		if !util.IsQualifiedName(strings.ToLower(k)) {
 			allErrs = append(allErrs, errs.NewFieldInvalid(field, k, qualifiedNameErrorMsg))
 		}
-		if !util.IsValidAnnotationValue(v) {
-			allErrs = append(allErrs, errs.NewFieldInvalid(field, k, ""))
-		}
 		totalSize += (int64)(len(k)) + (int64)(len(v))
 	}
 	if totalSize > (int64)(totalAnnotationSizeLimitB) {
-		allErrs = append(allErrs, errs.NewFieldTooLong("annotations", ""))
+		allErrs = append(allErrs, errs.NewFieldTooLong(field, "", totalAnnotationSizeLimitB))
 	}
 	return allErrs
 }

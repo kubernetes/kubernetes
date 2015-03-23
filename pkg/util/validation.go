@@ -33,11 +33,6 @@ func IsValidLabelValue(value string) bool {
 	return (len(value) <= LabelValueMaxLength && labelValueRegexp.MatchString(value))
 }
 
-// Annotation values are opaque.
-func IsValidAnnotationValue(value string) bool {
-	return true
-}
-
 const QualifiedNameFmt string = "(" + qnameTokenFmt + "/)?" + qnameTokenFmt
 const QualifiedNameMaxLength int = 253
 
