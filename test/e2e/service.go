@@ -18,7 +18,10 @@ package e2e
 
 import (
 	"fmt"
+	"io/ioutil"
+	"net/http"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -245,6 +248,94 @@ var _ = Describe("Services", func() {
 			close(done)
 		}()
 	}, 240.0)
+
+	It("should be able to create a functioning external load balancer", func() {
+		serviceName := "external-lb-test"
+		ns := api.NamespaceDefault
+		labels := map[string]string{
+			"key0": "value0",
+		}
+		service := &api.Service{
+			ObjectMeta: api.ObjectMeta{
+				Name: serviceName,
+			},
+			Spec: api.ServiceSpec{
+				Port:                       80,
+				Selector:                   labels,
+				TargetPort:                 util.NewIntOrStringFromInt(80),
+				CreateExternalLoadBalancer: true,
+			},
+		}
+
+		By("cleaning up previous service " + serviceName + " from namespace " + ns)
+		c.Services(ns).Delete(serviceName)
+
+		By("creating service " + serviceName + " with external load balancer in namespace " + ns)
+		result, err := c.Services(ns).Create(service)
+		Expect(err).NotTo(HaveOccurred())
+		defer func(ns, serviceName string) { // clean up when we're done
+			By("deleting service " + serviceName + " in namespace " + ns)
+			err := c.Services(ns).Delete(serviceName)
+			Expect(err).NotTo(HaveOccurred())
+		}(ns, serviceName)
+
+		if len(result.Spec.PublicIPs) != 1 {
+			Failf("got unexpected number (%d) of public IPs for externally load balanced service: %v", result.Spec.PublicIPs, result)
+		}
+		ip := result.Spec.PublicIPs[0]
+		port := result.Spec.Port
+
+		pod := &api.Pod{
+			TypeMeta: api.TypeMeta{
+				Kind:       "Pod",
+				APIVersion: "v1beta1",
+			},
+			ObjectMeta: api.ObjectMeta{
+				Name:   "elb-test-" + string(util.NewUUID()),
+				Labels: labels,
+			},
+			Spec: api.PodSpec{
+				Containers: []api.Container{
+					{
+						Name:  "webserver",
+						Image: "kubernetes/test-webserver",
+					},
+				},
+			},
+		}
+
+		By("creating pod to be part of service " + serviceName)
+		podClient := c.Pods(api.NamespaceDefault)
+		defer func() {
+			By("deleting pod " + pod.Name)
+			defer GinkgoRecover()
+			podClient.Delete(pod.Name)
+		}()
+		if _, err := podClient.Create(pod); err != nil {
+			Failf("Failed to create pod %s: %v", pod.Name, err)
+		}
+		expectNoError(waitForPodRunning(c, pod.Name))
+
+		By("hitting the pod through the service's external load balancer")
+		var resp *http.Response
+		for t := time.Now(); time.Since(t) < 4*time.Minute; time.Sleep(5 * time.Second) {
+			resp, err = http.Get(fmt.Sprintf("http://%s:%d", ip, port))
+			if err == nil {
+				break
+			}
+		}
+		Expect(err).NotTo(HaveOccurred())
+		defer resp.Body.Close()
+
+		body, err := ioutil.ReadAll(resp.Body)
+		Expect(err).NotTo(HaveOccurred())
+		if resp.StatusCode != 200 {
+			Failf("received non-success return status %q trying to access pod through load balancer; got body: %s", resp.Status, string(body))
+		}
+		if !strings.Contains(string(body), "test-webserver") {
+			Failf("received response body without expected substring 'test-webserver': %s", string(body))
+		}
+	})
 
 	It("should correctly serve identically named services in different namespaces on different external IP addresses", func() {
 		serviceNames := []string{"services-namespace-test0"} // Could add more here, but then it takes longer.
