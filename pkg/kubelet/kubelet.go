@@ -1922,6 +1922,7 @@ func (kl *Kubelet) tryUpdateNodeStatus() error {
 	} else {
 		node.Status.NodeInfo.MachineID = info.MachineID
 		node.Status.NodeInfo.SystemUUID = info.SystemUUID
+		node.Status.NodeInfo.BootID = info.BootID
 		node.Spec.Capacity = CapacityFromMachineInfo(info)
 	}
 

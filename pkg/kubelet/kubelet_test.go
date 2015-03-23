@@ -3128,7 +3128,13 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 	kubeClient.MinionsList = api.NodeList{Items: []api.Node{
 		{ObjectMeta: api.ObjectMeta{Name: "testnode"}},
 	}}
-	machineInfo := &cadvisorApi.MachineInfo{MachineID: "123", SystemUUID: "abc", NumCores: 2, MemoryCapacity: 1024}
+	machineInfo := &cadvisorApi.MachineInfo{
+		MachineID:      "123",
+		SystemUUID:     "abc",
+		BootID:         "1b3",
+		NumCores:       2,
+		MemoryCapacity: 1024,
+	}
 	mockCadvisor.On("MachineInfo").Return(machineInfo, nil)
 	expectedNode := &api.Node{
 		ObjectMeta: api.ObjectMeta{Name: "testnode"},
@@ -3151,6 +3157,7 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 			NodeInfo: api.NodeSystemInfo{
 				MachineID:  "123",
 				SystemUUID: "abc",
+				BootID:     "1b3",
 			},
 		},
 	}
@@ -3205,7 +3212,13 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 			},
 		},
 	}}
-	machineInfo := &cadvisorApi.MachineInfo{MachineID: "123", SystemUUID: "abc", NumCores: 2, MemoryCapacity: 1024}
+	machineInfo := &cadvisorApi.MachineInfo{
+		MachineID:      "123",
+		SystemUUID:     "abc",
+		BootID:         "1b3",
+		NumCores:       2,
+		MemoryCapacity: 1024,
+	}
 	mockCadvisor.On("MachineInfo").Return(machineInfo, nil)
 	expectedNode := &api.Node{
 		ObjectMeta: api.ObjectMeta{Name: "testnode"},
@@ -3228,6 +3241,7 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 			NodeInfo: api.NodeSystemInfo{
 				MachineID:  "123",
 				SystemUUID: "abc",
+				BootID:     "1b3",
 			},
 		},
 	}

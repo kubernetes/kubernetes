@@ -969,6 +969,8 @@ type NodeSystemInfo struct {
 	MachineID string `json:"machineID"`
 	// SystemUUID is the system-uuid reported by the node
 	SystemUUID string `json:"systemUUID"`
+	// BootID is the boot-id reported by the node
+	BootID string `json:"bootID" description:"boot id is the boot-id reported by the node"`
 }
 
 // NodeStatus is information about the current status of a node.
