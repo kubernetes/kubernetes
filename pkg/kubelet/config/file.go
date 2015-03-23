@@ -138,15 +138,11 @@ func extractFromFile(filename string) (pod api.Pod, err error) {
 		return pod, err
 	}
 
-	parsed, _, pod, manifestErr := tryDecodeSingleManifest(data)
+	parsed, _, pod, manifestErr := tryDecodeSingleManifest(data, filename, true)
 	if parsed {
 		if manifestErr != nil {
 			// It parsed but could not be used.
 			return pod, manifestErr
-		}
-		// It parsed!
-		if err = applyDefaults(&pod, filename, true); err != nil {
-			return pod, err
 		}
 		return pod, nil
 	}

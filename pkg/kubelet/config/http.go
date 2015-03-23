@@ -78,22 +78,19 @@ func (s *sourceURL) extractFromURL() error {
 	s.data = data
 
 	// First try as if it's a single manifest
-	parsed, manifest, pod, singleErr := tryDecodeSingleManifest(data)
+	parsed, manifest, pod, singleErr := tryDecodeSingleManifest(data, s.url, false)
 	if parsed {
 		if singleErr != nil {
 			// It parsed but could not be used.
 			return singleErr
 		}
 		// It parsed!
-		if err = applyDefaults(&pod, s.url, false); err != nil {
-			return err
-		}
 		s.updates <- kubelet.PodUpdate{[]api.Pod{pod}, kubelet.SET, kubelet.HTTPSource}
 		return nil
 	}
 
 	// That didn't work, so try an array of manifests.
-	parsed, manifests, pods, multiErr := tryDecodeManifestList(data)
+	parsed, manifests, pods, multiErr := tryDecodeManifestList(data, s.url, false)
 	if parsed {
 		if multiErr != nil {
 			// It parsed but could not be used.
@@ -106,13 +103,7 @@ func (s *sourceURL) extractFromURL() error {
 		if len(manifests) == 0 && len(manifest.Version) != 0 {
 			return singleErr
 		}
-		// Assume it parsed.
-		for i := range pods.Items {
-			pod := &pods.Items[i]
-			if err = applyDefaults(pod, s.url, false); err != nil {
-				return err
-			}
-		}
+		// It parsed!
 		s.updates <- kubelet.PodUpdate{pods.Items, kubelet.SET, kubelet.HTTPSource}
 		return nil
 	}

@@ -123,7 +123,7 @@ func tryDecodePodList(data []byte, source string, isFile bool) (parsed bool, pod
 	return true, *newPods, err
 }
 
-func tryDecodeSingleManifest(data []byte) (parsed bool, manifest v1beta1.ContainerManifest, pod api.Pod, err error) {
+func tryDecodeSingleManifest(data []byte, source string, isFile bool) (parsed bool, manifest v1beta1.ContainerManifest, pod api.Pod, err error) {
 	// TODO: should be api.Scheme.Decode
 	// This is awful.  DecodeInto() expects to find an APIObject, which
 	// Manifest is not.  We keep reading manifest for now for compat, but
@@ -149,11 +149,14 @@ func tryDecodeSingleManifest(data []byte) (parsed bool, manifest v1beta1.Contain
 	if err = api.Scheme.Convert(&newManifest, &pod); err != nil {
 		return true, manifest, pod, err
 	}
+	if err = applyDefaults(&pod, source, isFile); err != nil {
+		return true, manifest, pod, err
+	}
 	// Success.
 	return true, manifest, pod, nil
 }
 
-func tryDecodeManifestList(data []byte) (parsed bool, manifests []v1beta1.ContainerManifest, pods api.PodList, err error) {
+func tryDecodeManifestList(data []byte, source string, isFile bool) (parsed bool, manifests []v1beta1.ContainerManifest, pods api.PodList, err error) {
 	// TODO: should be api.Scheme.Decode
 	// See the comment in tryDecodeSingle().
 	if err = yaml.Unmarshal(data, &manifests); err != nil {
@@ -173,6 +176,12 @@ func tryDecodeManifestList(data []byte) (parsed bool, manifests []v1beta1.Contai
 	list := api.ContainerManifestList{Items: newManifests}
 	if err = api.Scheme.Convert(&list, &pods); err != nil {
 		return true, manifests, pods, err
+	}
+	for i := range pods.Items {
+		pod := &pods.Items[i]
+		if err = applyDefaults(pod, source, isFile); err != nil {
+			return true, manifests, pods, err
+		}
 	}
 	// Success.
 	return true, manifests, pods, nil
