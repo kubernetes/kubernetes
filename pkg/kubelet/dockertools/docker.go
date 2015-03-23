@@ -66,6 +66,12 @@ type DockerInterface interface {
 // DockerID is an ID of docker container. It is a type to make it clear when we're working with docker container Ids
 type DockerID string
 
+type KubeletContainerName struct {
+	PodFullName   string
+	PodUID        types.UID
+	ContainerName string
+}
+
 // DockerPuller is an abstract interface for testability.  It abstracts image pull operations.
 type DockerPuller interface {
 	Pull(image string) error
@@ -396,13 +402,13 @@ func (c DockerContainers) FindPodContainer(podFullName string, uid types.UID, co
 			continue
 		}
 		// TODO(proppy): build the docker container name and do a map lookup instead?
-		dockerManifestID, dockerUUID, dockerContainerName, hash, err := ParseDockerName(dockerContainer.Names[0])
+		dockerName, hash, err := ParseDockerName(dockerContainer.Names[0])
 		if err != nil {
 			continue
 		}
-		if dockerManifestID == podFullName &&
-			(uid == "" || dockerUUID == uid) &&
-			dockerContainerName == containerName {
+		if dockerName.PodFullName == podFullName &&
+			(uid == "" || dockerName.PodUID == uid) &&
+			dockerName.ContainerName == containerName {
 			return dockerContainer, true, hash
 		}
 	}
@@ -421,12 +427,12 @@ func (c DockerContainers) FindContainersByPod(podUID types.UID, podFullName stri
 		if len(dockerContainer.Names) == 0 {
 			continue
 		}
-		dockerPodName, uuid, _, _, err := ParseDockerName(dockerContainer.Names[0])
+		dockerName, _, err := ParseDockerName(dockerContainer.Names[0])
 		if err != nil {
 			continue
 		}
-		if podUID == uuid ||
-			(podUID == "" && podFullName == dockerPodName) {
+		if podUID == dockerName.PodUID ||
+			(podUID == "" && podFullName == dockerName.PodFullName) {
 			containers[DockerID(dockerContainer.ID)] = dockerContainer
 		}
 	}
@@ -471,17 +477,17 @@ func GetRecentDockerContainersWithNameAndUUID(client DockerInterface, podFullNam
 		if len(dockerContainer.Names) == 0 {
 			continue
 		}
-		dockerPodName, dockerUUID, dockerContainerName, _, err := ParseDockerName(dockerContainer.Names[0])
+		dockerName, _, err := ParseDockerName(dockerContainer.Names[0])
 		if err != nil {
 			continue
 		}
-		if dockerPodName != podFullName {
+		if dockerName.PodFullName != podFullName {
 			continue
 		}
-		if uid != "" && dockerUUID != uid {
+		if uid != "" && dockerName.PodUID != uid {
 			continue
 		}
-		if dockerContainerName != containerName {
+		if dockerName.ContainerName != containerName {
 			continue
 		}
 		inspectResult, _ := client.InspectContainer(dockerContainer.ID)
@@ -628,16 +634,17 @@ func GetDockerPodStatus(client DockerInterface, manifest api.PodSpec, podFullNam
 		if len(value.Names) == 0 {
 			continue
 		}
-		dockerManifestID, dockerUUID, dockerContainerName, _, err := ParseDockerName(value.Names[0])
+		dockerName, _, err := ParseDockerName(value.Names[0])
 		if err != nil {
 			continue
 		}
-		if dockerManifestID != podFullName {
+		if dockerName.PodFullName != podFullName {
 			continue
 		}
-		if uid != "" && dockerUUID != uid {
+		if uid != "" && dockerName.PodUID != uid {
 			continue
 		}
+		dockerContainerName := dockerName.ContainerName
 		c, found := expectedContainers[dockerContainerName]
 		terminationMessagePath := ""
 		if !found {
@@ -713,26 +720,26 @@ func HashContainer(container *api.Container) uint64 {
 }
 
 // Creates a name which can be reversed to identify both full pod name and container name.
-func BuildDockerName(podUID types.UID, podFullName string, container *api.Container) string {
-	containerName := container.Name + "." + strconv.FormatUint(HashContainer(container), 16)
+func BuildDockerName(dockerName KubeletContainerName, container *api.Container) string {
+	containerName := dockerName.ContainerName + "." + strconv.FormatUint(HashContainer(container), 16)
 	return fmt.Sprintf("%s_%s_%s_%s_%08x",
 		containerNamePrefix,
 		containerName,
-		podFullName,
-		podUID,
+		dockerName.PodFullName,
+		dockerName.PodUID,
 		rand.Uint32())
 }
 
 // Unpacks a container name, returning the pod full name and container name we would have used to
 // construct the docker name. If we are unable to parse the name, an error is returned.
-func ParseDockerName(name string) (podFullName string, podUID types.UID, containerName string, hash uint64, err error) {
+func ParseDockerName(name string) (dockerName *KubeletContainerName, hash uint64, err error) {
 	// For some reason docker appears to be appending '/' to names.
 	// If it's there, strip it.
 	name = strings.TrimPrefix(name, "/")
 	parts := strings.Split(name, "_")
 	if len(parts) == 0 || parts[0] != containerNamePrefix {
 		err = fmt.Errorf("failed to parse Docker container name %q into parts", name)
-		return
+		return nil, 0, err
 	}
 	if len(parts) < 6 {
 		// We have at least 5 fields.  We may have more in the future.
@@ -740,12 +747,11 @@ func ParseDockerName(name string) (podFullName string, podUID types.UID, contain
 		// manage.
 		glog.Warningf("found a container with the %q prefix, but too few fields (%d): %q", containerNamePrefix, len(parts), name)
 		err = fmt.Errorf("Docker container name %q has less parts than expected %v", name, parts)
-		return
+		return nil, 0, err
 	}
 
-	// Container name.
 	nameParts := strings.Split(parts[1], ".")
-	containerName = nameParts[0]
+	containerName := nameParts[0]
 	if len(nameParts) > 1 {
 		hash, err = strconv.ParseUint(nameParts[1], 16, 32)
 		if err != nil {
@@ -753,12 +759,10 @@ func ParseDockerName(name string) (podFullName string, podUID types.UID, contain
 		}
 	}
 
-	// Pod fullname.
-	podFullName = parts[2] + "_" + parts[3]
+	podFullName := parts[2] + "_" + parts[3]
+	podUID := types.UID(parts[4])
 
-	// Pod UID.
-	podUID = types.UID(parts[4])
-	return
+	return &KubeletContainerName{podFullName, podUID, containerName}, hash, nil
 }
 
 func GetRunningContainers(client DockerInterface, ids []string) ([]*docker.Container, error) {

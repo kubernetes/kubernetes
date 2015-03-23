@@ -213,13 +213,14 @@ func (self *realContainerGC) evictableContainers() (containersByEvictUnit, []con
 			createTime: data.Created,
 		}
 
-		_, uid, name, _, err := dockertools.ParseDockerName(container.Names[0])
+		containerName, _, err := dockertools.ParseDockerName(container.Names[0])
+
 		if err != nil {
 			unidentifiedContainers = append(unidentifiedContainers, containerInfo)
 		} else {
 			key := evictUnit{
-				uid:  uid,
-				name: name,
+				uid:  containerName.PodUID,
+				name: containerName.ContainerName,
 			}
 			evictUnits[key] = append(evictUnits[key], containerInfo)
 		}
