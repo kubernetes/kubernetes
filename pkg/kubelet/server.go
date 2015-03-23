@@ -35,6 +35,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/healthz"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/httplog"
+	kubecontainer "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/httpstream"
@@ -251,7 +252,7 @@ func (s *Server) handleContainerLogs(w http.ResponseWriter, req *http.Request) {
 	}
 	w.Header().Set("Transfer-Encoding", "chunked")
 	w.WriteHeader(http.StatusOK)
-	err = s.host.GetKubeletContainerLogs(GetPodFullName(pod), containerName, tail, follow, &fw, &fw)
+	err = s.host.GetKubeletContainerLogs(kubecontainer.GetPodFullName(pod), containerName, tail, follow, &fw, &fw)
 	if err != nil {
 		s.error(w, err)
 		return
@@ -303,7 +304,7 @@ func (s *Server) handlePodStatus(w http.ResponseWriter, req *http.Request, versi
 		http.Error(w, "Pod does not exist", http.StatusNotFound)
 		return
 	}
-	status, err := s.host.GetPodStatus(GetPodFullName(pod))
+	status, err := s.host.GetPodStatus(kubecontainer.GetPodFullName(pod))
 	if err != nil {
 		s.error(w, err)
 		return
@@ -407,7 +408,7 @@ func (s *Server) handleRun(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	command := strings.Split(u.Query().Get("cmd"), " ")
-	data, err := s.host.RunInContainer(GetPodFullName(pod), uid, container, command)
+	data, err := s.host.RunInContainer(kubecontainer.GetPodFullName(pod), uid, container, command)
 	if err != nil {
 		s.error(w, err)
 		return
@@ -515,7 +516,7 @@ WaitForStreams:
 		stdinStream.Close()
 	}
 
-	err = s.host.ExecInContainer(GetPodFullName(pod), uid, container, u.Query()[api.ExecCommandParamm], stdinStream, stdoutStream, stderrStream, tty)
+	err = s.host.ExecInContainer(kubecontainer.GetPodFullName(pod), uid, container, u.Query()[api.ExecCommandParamm], stdinStream, stdoutStream, stderrStream, tty)
 	if err != nil {
 		msg := fmt.Sprintf("Error executing command in container: %v", err)
 		glog.Error(msg)
@@ -596,7 +597,7 @@ Loop:
 			case "error":
 				ch := make(chan httpstream.Stream)
 				dataStreamChans[port] = ch
-				go waitForPortForwardDataStreamAndRun(GetPodFullName(pod), uid, stream, ch, s.host)
+				go waitForPortForwardDataStreamAndRun(kubecontainer.GetPodFullName(pod), uid, stream, ch, s.host)
 			case "data":
 				ch, ok := dataStreamChans[port]
 				if ok {
@@ -678,14 +679,14 @@ func (s *Server) serveStats(w http.ResponseWriter, req *http.Request) {
 			http.Error(w, "Pod does not exist", http.StatusNotFound)
 			return
 		}
-		stats, err = s.host.GetContainerInfo(GetPodFullName(pod), "", components[2], &query)
+		stats, err = s.host.GetContainerInfo(kubecontainer.GetPodFullName(pod), "", components[2], &query)
 	case 5:
 		pod, ok := s.host.GetPodByName(components[1], components[2])
 		if !ok {
 			http.Error(w, "Pod does not exist", http.StatusNotFound)
 			return
 		}
-		stats, err = s.host.GetContainerInfo(GetPodFullName(pod), types.UID(components[3]), components[4], &query)
+		stats, err = s.host.GetContainerInfo(kubecontainer.GetPodFullName(pod), types.UID(components[3]), components[4], &query)
 	default:
 		http.Error(w, "unknown resource.", http.StatusNotFound)
 		return

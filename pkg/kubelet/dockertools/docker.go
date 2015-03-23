@@ -32,7 +32,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/credentialprovider"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
+	kubecontainer "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/leaky"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -818,18 +818,9 @@ type ContainerCommandRunner interface {
 	PortForward(podInfraContainerID string, port uint16, stream io.ReadWriteCloser) error
 }
 
-// Parse the pod full name. TODO(yifan): This is duplicated with kubelet.ParsePodFullName.
-func parsePodFullName(podFullName string) (string, string, error) {
-	parts := strings.Split(podFullName, "_")
-	if len(parts) != 2 {
-		return "", "", fmt.Errorf("failed to parse the pod full name %q", podFullName)
-	}
-	return parts[0], parts[1], nil
-}
-
-func GetPods(client DockerInterface, all bool) ([]*container.Pod, error) {
-	pods := make(map[types.UID]*container.Pod)
-	var result []*container.Pod
+func GetPods(client DockerInterface, all bool) ([]*kubecontainer.Pod, error) {
+	pods := make(map[types.UID]*kubecontainer.Pod)
+	var result []*kubecontainer.Pod
 
 	containers, err := GetKubeletDockerContainers(client, all)
 	if err != nil {
@@ -849,19 +840,19 @@ func GetPods(client DockerInterface, all bool) ([]*container.Pod, error) {
 		}
 		pod, found := pods[dockerName.PodUID]
 		if !found {
-			name, namespace, err := parsePodFullName(dockerName.PodFullName)
+			name, namespace, err := kubecontainer.ParsePodFullName(dockerName.PodFullName)
 			if err != nil {
 				glog.Warningf("Parse pod full name %q error: %v", dockerName.PodFullName, err)
 				continue
 			}
-			pod = &container.Pod{
+			pod = &kubecontainer.Pod{
 				ID:        dockerName.PodUID,
 				Name:      name,
 				Namespace: namespace,
 			}
 			pods[dockerName.PodUID] = pod
 		}
-		pod.Containers = append(pod.Containers, &container.Container{
+		pod.Containers = append(pod.Containers, &kubecontainer.Container{
 			ID:      types.UID(c.ID),
 			Name:    dockerName.ContainerName,
 			Hash:    hash,

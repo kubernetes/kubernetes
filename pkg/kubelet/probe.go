@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	kubecontainer "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/probe"
 	execprobe "github.com/GoogleCloudPlatform/kubernetes/pkg/probe/exec"
 	httprobe "github.com/GoogleCloudPlatform/kubernetes/pkg/probe/http"
@@ -189,7 +190,7 @@ type execInContainer struct {
 
 func (kl *Kubelet) newExecInContainer(pod *api.Pod, container api.Container) exec.Cmd {
 	uid := pod.UID
-	podFullName := GetPodFullName(pod)
+	podFullName := kubecontainer.GetPodFullName(pod)
 	return execInContainer{func() ([]byte, error) {
 		return kl.RunInContainer(podFullName, uid, container.Name, container.LivenessProbe.Exec.Command)
 	}}

@@ -17,6 +17,9 @@ limitations under the License.
 package container
 
 import (
+	"fmt"
+	"strings"
+
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume"
@@ -110,4 +113,25 @@ func (p *Pod) FindContainerByName(containerName string) *Container {
 		}
 	}
 	return nil
+}
+
+// GetPodFullName returns a name that uniquely identifies a pod.
+func GetPodFullName(pod *api.Pod) string {
+	// Use underscore as the delimiter because it is not allowed in pod name
+	// (DNS subdomain format), while allowed in the container name format.
+	return fmt.Sprintf("%s_%s", pod.Name, pod.Namespace)
+}
+
+// Build the pod full name from pod name and namespace.
+func BuildPodFullName(name, namespace string) string {
+	return name + "_" + namespace
+}
+
+// Parse the pod full name.
+func ParsePodFullName(podFullName string) (string, string, error) {
+	parts := strings.Split(podFullName, "_")
+	if len(parts) != 2 {
+		return "", "", fmt.Errorf("failed to parse the pod full name %q", podFullName)
+	}
+	return parts[0], parts[1], nil
 }
