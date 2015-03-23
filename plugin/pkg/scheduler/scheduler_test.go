@@ -18,11 +18,14 @@ package scheduler
 
 import (
 	"errors"
+	"math/rand"
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/cache"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/scheduler"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -44,6 +47,14 @@ func podWithID(id, desiredHost string) *api.Pod {
 			Host: desiredHost,
 		},
 	}
+}
+
+func podWithPort(id, desiredHost string, port int) *api.Pod {
+	pod := podWithID(id, desiredHost)
+	pod.Spec.Containers = []api.Container{
+		{Name: "ctr", Ports: []api.ContainerPort{{HostPort: port}}},
+	}
+	return pod
 }
 
 type mockScheduler struct {
@@ -145,4 +156,114 @@ func TestScheduler(t *testing.T) {
 		<-called
 		events.Stop()
 	}
+}
+
+func TestSchedulerForgetAssumedPodAfterDelete(t *testing.T) {
+	defer record.StartLogging(t.Logf).Stop()
+
+	scheduledPodStore := cache.NewStore(cache.MetaNamespaceKeyFunc)
+	scheduledPodLister := &cache.StoreToPodLister{scheduledPodStore}
+
+	queuedPodStore := cache.NewFIFO(cache.MetaNamespaceKeyFunc)
+	queuedPodLister := &cache.StoreToPodLister{queuedPodStore}
+
+	modeler := NewSimpleModeler(queuedPodLister, scheduledPodLister)
+	assumedPodsStore := cache.NewStore(cache.MetaNamespaceKeyFunc)
+	modeler.assumedPods = &cache.StoreToPodLister{assumedPodsStore}
+
+	podPort := 8080
+	newPod := podWithPort("foo", "", podPort)
+
+	algo := scheduler.NewGenericScheduler(
+		map[string]scheduler.FitPredicate{"PodFitsPorts": scheduler.PodFitsPorts},
+		[]scheduler.PriorityConfig{},
+		modeler.PodLister(),
+		rand.New(rand.NewSource(time.Now().UnixNano())))
+
+	var gotBinding *api.Binding
+	expectBind := &api.Binding{
+		ObjectMeta: api.ObjectMeta{Name: "foo"},
+		Target:     api.ObjectReference{Kind: "Node", Name: "machine1"},
+	}
+
+	c := &Config{
+		Modeler: modeler,
+		MinionLister: scheduler.FakeMinionLister(
+			api.NodeList{Items: []api.Node{{ObjectMeta: api.ObjectMeta{Name: "machine1"}}}},
+		),
+		Algorithm: algo,
+		Binder: fakeBinder{func(b *api.Binding) error {
+			scheduledPodStore.Add(podWithPort(b.Name, b.Target.Name, podPort))
+			gotBinding = b
+			return nil
+		}},
+		NextPod: func() *api.Pod {
+			return queuedPodStore.Pop().(*api.Pod)
+		},
+		Error: func(p *api.Pod, err error) {
+			t.Errorf("Unexpected error when scheduling pod %+v: %v", p, err)
+		},
+		Recorder: record.FromSource(api.EventSource{Component: "scheduler"}),
+	}
+
+	s := New(c)
+	called := make(chan struct{})
+	events := record.GetEvents(func(e *api.Event) {
+		if e, a := "scheduled", e.Reason; e != a {
+			t.Errorf("expected %v, got %v", e, a)
+		}
+		close(called)
+	})
+
+	queuedPodStore.Add(newPod)
+	// queuedPodStore: [foo]
+	// scheduledPodStore: []
+	// assumedPods: []
+
+	s.scheduleOne()
+	// queuedPodStore: []
+	// scheduledPodStore: [foo]
+	// assumedPods: [foo]
+
+	pod, exists, _ := scheduledPodStore.GetByKey("foo")
+	if !exists {
+		t.Errorf("Expected scheduled pod store to contain pod")
+	}
+	pod, exists, _ = queuedPodStore.GetByKey("foo")
+	if exists {
+		t.Errorf("Did not expect a queued pod, found %+v", pod)
+	}
+	pod, exists, _ = assumedPodsStore.GetByKey("foo")
+	if !exists {
+		t.Errorf("Assumed pod store should contain stale pod")
+	}
+	if e, a := expectBind, gotBinding; !reflect.DeepEqual(e, a) {
+		t.Errorf("Expected exact match on binding: %s", util.ObjectDiff(e, a))
+	}
+
+	<-called
+	events.Stop()
+
+	scheduledPodStore.Delete(pod)
+	queuedPodStore.Add(newPod)
+	// queuedPodStore: [foo]
+	// scheduledPodStore: []
+	// assumedPods: [foo]
+
+	called = make(chan struct{})
+	events = record.GetEvents(func(e *api.Event) {
+		if e, a := "scheduled", e.Reason; e != a {
+			t.Errorf("expected %v, got %v", e, a)
+		}
+		close(called)
+	})
+
+	gotBinding = nil
+	s.scheduleOne()
+	if e, a := expectBind, gotBinding; !reflect.DeepEqual(e, a) {
+		t.Errorf("Expected exact match on binding: %s", util.ObjectDiff(e, a))
+	}
+
+	<-called
+	events.Stop()
 }

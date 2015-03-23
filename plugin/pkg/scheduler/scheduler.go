@@ -44,6 +44,9 @@ type SystemModeler interface {
 	// The assumtion should last until the system confirms the
 	// assumtion or disconfirms it.
 	AssumePod(pod *api.Pod)
+
+	// ForgetAssumedPod removes the given pod from the assumed store.
+	ForgetAssumedPod(pod *api.Pod)
 }
 
 // Scheduler watches for new unscheduled pods. It attempts to find
@@ -89,6 +92,12 @@ func (s *Scheduler) Run() {
 
 func (s *Scheduler) scheduleOne() {
 	pod := s.config.NextPod()
+
+	// If the assumed pods store contains this pod there is a conflict,
+	// since the store can't contain a pod without a host, and NextPod
+	// only gives us pods without hosts.
+	s.config.Modeler.ForgetAssumedPod(pod)
+
 	glog.V(3).Infof("Attempting to schedule: %v", pod)
 	dest, err := s.config.Algorithm.Schedule(*pod, s.config.MinionLister)
 	if err != nil {
