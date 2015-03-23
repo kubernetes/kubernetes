@@ -15,7 +15,7 @@ spec:
           mountPath: /testpd
   volumes:
     - name: testpd
-      persistentDisk:
+      gcePersistentDisk:
         # This GCE PD must already exist.
         pdName: %insert_pd_name_here%
         fsType: ext4
