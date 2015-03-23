@@ -85,14 +85,6 @@ func (self *basicMirrorManager) DeleteMirrorPod(podFullName string) error {
 	return nil
 }
 
-// Delete all orphaned mirror pods.
-func deleteOrphanedMirrorPods(mirrorPods mirrorPods, manager mirrorManager) {
-	podFullNames := mirrorPods.GetOrphanedMirrorPodNames()
-	for _, podFullName := range podFullNames {
-		manager.DeleteMirrorPod(podFullName)
-	}
-}
-
 // Helper functions.
 func getPodSource(pod *api.Pod) (string, error) {
 	if pod.Annotations != nil {
