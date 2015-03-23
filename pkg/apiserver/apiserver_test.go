@@ -24,6 +24,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"reflect"
 	"strings"
 	"sync"
@@ -226,7 +227,7 @@ type SimpleRESTStorage struct {
 
 	// The id requested, and location to return for ResourceLocation
 	requestedResourceLocationID string
-	resourceLocation            string
+	resourceLocation            *url.URL
 	expectedResourceNamespace   string
 
 	// If non-nil, called inside the WorkFunc when answering update, delete, create.
@@ -315,18 +316,23 @@ func (storage *SimpleRESTStorage) Watch(ctx api.Context, label labels.Selector, 
 }
 
 // Implement Redirector.
-func (storage *SimpleRESTStorage) ResourceLocation(ctx api.Context, id string) (string, error) {
+var _ = rest.Redirector(&SimpleRESTStorage{})
+
+// Implement Redirector.
+func (storage *SimpleRESTStorage) ResourceLocation(ctx api.Context, id string) (*url.URL, http.RoundTripper, error) {
 	storage.checkContext(ctx)
 	// validate that the namespace context on the request matches the expected input
 	storage.requestedResourceNamespace = api.NamespaceValue(ctx)
 	if storage.expectedResourceNamespace != storage.requestedResourceNamespace {
-		return "", fmt.Errorf("Expected request namespace %s, but got namespace %s", storage.expectedResourceNamespace, storage.requestedResourceNamespace)
+		return nil, nil, fmt.Errorf("Expected request namespace %s, but got namespace %s", storage.expectedResourceNamespace, storage.requestedResourceNamespace)
 	}
 	storage.requestedResourceLocationID = id
 	if err := storage.errors["resourceLocation"]; err != nil {
-		return "", err
+		return nil, nil, err
 	}
-	return storage.resourceLocation, nil
+	// Make a copy so the internal URL never gets mutated
+	locationCopy := *storage.resourceLocation
+	return &locationCopy, nil, nil
 }
 
 type LegacyRESTStorage struct {

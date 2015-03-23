@@ -17,6 +17,7 @@ limitations under the License.
 package minion
 
 import (
+	"net/http"
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -27,8 +28,15 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/registrytest"
 )
 
+type FakeConnectionInfoGetter struct {
+}
+
+func (FakeConnectionInfoGetter) GetConnectionInfo(host string) (string, uint, http.RoundTripper, error) {
+	return "http", 12345, nil, nil
+}
+
 func TestMinionRegistryREST(t *testing.T) {
-	ms := NewStorage(registrytest.NewMinionRegistry([]string{"foo", "bar"}, api.NodeResources{}))
+	ms := NewStorage(registrytest.NewMinionRegistry([]string{"foo", "bar"}, api.NodeResources{}), FakeConnectionInfoGetter{})
 	ctx := api.NewContext()
 	if obj, err := ms.Get(ctx, "foo"); err != nil || obj.(*api.Node).Name != "foo" {
 		t.Errorf("missing expected object")
@@ -88,7 +96,7 @@ func TestMinionRegistryREST(t *testing.T) {
 }
 
 func TestMinionRegistryValidUpdate(t *testing.T) {
-	storage := NewStorage(registrytest.NewMinionRegistry([]string{"foo", "bar"}, api.NodeResources{}))
+	storage := NewStorage(registrytest.NewMinionRegistry([]string{"foo", "bar"}, api.NodeResources{}), FakeConnectionInfoGetter{})
 	ctx := api.NewContext()
 	obj, err := storage.Get(ctx, "foo")
 	if err != nil {
@@ -113,7 +121,7 @@ var (
 )
 
 func TestMinionRegistryValidatesCreate(t *testing.T) {
-	storage := NewStorage(registrytest.NewMinionRegistry([]string{"foo", "bar"}, api.NodeResources{}))
+	storage := NewStorage(registrytest.NewMinionRegistry([]string{"foo", "bar"}, api.NodeResources{}), FakeConnectionInfoGetter{})
 	ctx := api.NewContext()
 	failureCases := map[string]api.Node{
 		"zero-length Name": {
@@ -156,7 +164,7 @@ func contains(nodes *api.NodeList, nodeID string) bool {
 
 func TestCreate(t *testing.T) {
 	registry := registrytest.NewMinionRegistry([]string{"foo", "bar"}, api.NodeResources{})
-	test := resttest.New(t, NewStorage(registry), registry.SetError).ClusterScope()
+	test := resttest.New(t, NewStorage(registry, FakeConnectionInfoGetter{}), registry.SetError).ClusterScope()
 	test.TestCreate(
 		// valid
 		&api.Node{

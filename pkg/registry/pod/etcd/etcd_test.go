@@ -683,13 +683,19 @@ func TestResourceLocation(t *testing.T) {
 		storage = storage.WithPodStatus(cache)
 
 		redirector := rest.Redirector(storage)
-		location, err := redirector.ResourceLocation(api.NewDefaultContext(), tc.query)
+		location, _, err := redirector.ResourceLocation(api.NewDefaultContext(), tc.query)
 		if err != nil {
 			t.Errorf("Unexpected error: %v", err)
 		}
+		if location == nil {
+			t.Errorf("Unexpected nil: %v", location)
+		}
 
-		if location != tc.location {
-			t.Errorf("Expected %v, but got %v", tc.location, location)
+		if location.Scheme != "" {
+			t.Errorf("Expected '%v', but got '%v'", "", location.Scheme)
+		}
+		if location.Host != tc.location {
+			t.Errorf("Expected %v, but got %v", tc.location, location.Host)
 		}
 	}
 }

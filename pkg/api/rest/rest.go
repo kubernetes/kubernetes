@@ -17,6 +17,9 @@ limitations under the License.
 package rest
 
 import (
+	"net/http"
+	"net/url"
+
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
@@ -142,6 +145,6 @@ type StandardStorage interface {
 
 // Redirector know how to return a remote resource's location.
 type Redirector interface {
-	// ResourceLocation should return the remote location of the given resource, or an error.
-	ResourceLocation(ctx api.Context, name string) (remoteLocation string, err error)
+	// ResourceLocation should return the remote location of the given resource, and an optional transport to use to request it, or an error.
+	ResourceLocation(ctx api.Context, id string) (remoteLocation *url.URL, transport http.RoundTripper, err error)
 }

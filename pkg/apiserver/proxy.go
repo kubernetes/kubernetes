@@ -19,6 +19,7 @@ package apiserver
 import (
 	"bytes"
 	"compress/gzip"
+	"crypto/tls"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -140,7 +141,7 @@ func (r *ProxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	location, err := redirector.ResourceLocation(ctx, id)
+	location, transport, err := redirector.ResourceLocation(ctx, id)
 	if err != nil {
 		httplog.LogOf(req, w).Addf("Error getting ResourceLocation: %v", err)
 		status := errToAPIStatus(err)
@@ -148,22 +149,31 @@ func (r *ProxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		httpCode = status.Code
 		return
 	}
-
-	destURL, err := url.Parse(location)
-	if err != nil {
-		status := errToAPIStatus(err)
-		writeJSON(status.Code, r.codec, status, w)
-		httpCode = status.Code
+	if location == nil {
+		httplog.LogOf(req, w).Addf("ResourceLocation for %v returned nil", id)
+		notFound(w, req)
+		httpCode = http.StatusNotFound
 		return
 	}
-	if destURL.Scheme == "" {
-		// If no scheme was present in location, url.Parse sometimes mistakes
-		// hosts for paths.
-		destURL.Host = location
+
+	// Default to http
+	if location.Scheme == "" {
+		location.Scheme = "http"
 	}
-	destURL.Path = remainder
-	destURL.RawQuery = req.URL.RawQuery
-	newReq, err := http.NewRequest(req.Method, destURL.String(), req.Body)
+	// Add the subpath
+	if len(remainder) > 0 {
+		location.Path = singleJoiningSlash(location.Path, remainder)
+	}
+	// Start with anything returned from the storage, and add the original request's parameters
+	values := location.Query()
+	for k, vs := range req.URL.Query() {
+		for _, v := range vs {
+			values.Add(k, v)
+		}
+	}
+	location.RawQuery = values.Encode()
+
+	newReq, err := http.NewRequest(req.Method, location.String(), req.Body)
 	if err != nil {
 		status := errToAPIStatus(err)
 		writeJSON(status.Code, r.codec, status, w)
@@ -177,29 +187,34 @@ func (r *ProxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	// TODO convert this entire proxy to an UpgradeAwareProxy similar to
 	// https://github.com/openshift/origin/blob/master/pkg/util/httpproxy/upgradeawareproxy.go.
 	// That proxy needs to be modified to support multiple backends, not just 1.
-	if r.tryUpgrade(w, req, newReq, destURL) {
+	if r.tryUpgrade(w, req, newReq, location, transport) {
 		return
 	}
 
-	proxy := httputil.NewSingleHostReverseProxy(&url.URL{Scheme: "http", Host: destURL.Host})
-	proxy.Transport = &proxyTransport{
-		proxyScheme:      req.URL.Scheme,
-		proxyHost:        req.URL.Host,
-		proxyPathPrepend: requestInfo.URLPath(),
+	proxy := httputil.NewSingleHostReverseProxy(&url.URL{Scheme: location.Scheme, Host: location.Host})
+	if transport == nil {
+		prepend := path.Join(r.prefix, resource, id)
+		if len(namespace) > 0 {
+			prepend = path.Join(r.prefix, "namespaces", namespace, resource, id)
+		}
+		transport = &proxyTransport{
+			proxyScheme:      req.URL.Scheme,
+			proxyHost:        req.URL.Host,
+			proxyPathPrepend: prepend,
+		}
 	}
+	proxy.Transport = transport
 	proxy.FlushInterval = 200 * time.Millisecond
 	proxy.ServeHTTP(w, newReq)
 }
 
 // tryUpgrade returns true if the request was handled.
-func (r *ProxyHandler) tryUpgrade(w http.ResponseWriter, req, newReq *http.Request, destURL *url.URL) bool {
-	connectionHeader := strings.ToLower(req.Header.Get(httpstream.HeaderConnection))
-	if !strings.Contains(connectionHeader, strings.ToLower(httpstream.HeaderUpgrade)) || len(req.Header.Get(httpstream.HeaderUpgrade)) == 0 {
+func (r *ProxyHandler) tryUpgrade(w http.ResponseWriter, req, newReq *http.Request, location *url.URL, transport http.RoundTripper) bool {
+	if !httpstream.IsUpgradeRequest(req) {
 		return false
 	}
-	//TODO support TLS? Doesn't look like proxyTransport does anything special ...
-	dialAddr := netutil.CanonicalAddr(destURL)
-	backendConn, err := net.Dial("tcp", dialAddr)
+
+	backendConn, err := dialURL(location, transport)
 	if err != nil {
 		status := errToAPIStatus(err)
 		writeJSON(status.Code, r.codec, status, w)
@@ -244,6 +259,54 @@ func (r *ProxyHandler) tryUpgrade(w http.ResponseWriter, req, newReq *http.Reque
 
 	<-done
 	return true
+}
+
+func dialURL(url *url.URL, transport http.RoundTripper) (net.Conn, error) {
+	dialAddr := netutil.CanonicalAddr(url)
+
+	switch url.Scheme {
+	case "http":
+		return net.Dial("tcp", dialAddr)
+	case "https":
+		// Get the tls config from the transport if we recognize it
+		var tlsConfig *tls.Config
+		if transport != nil {
+			httpTransport, ok := transport.(*http.Transport)
+			if ok {
+				tlsConfig = httpTransport.TLSClientConfig
+			}
+		}
+
+		// Dial
+		tlsConn, err := tls.Dial("tcp", dialAddr, tlsConfig)
+		if err != nil {
+			return nil, err
+		}
+
+		// Verify
+		host, _, _ := net.SplitHostPort(dialAddr)
+		if err := tlsConn.VerifyHostname(host); err != nil {
+			tlsConn.Close()
+			return nil, err
+		}
+
+		return tlsConn, nil
+	default:
+		return nil, fmt.Errorf("Unknown scheme: %s", url.Scheme)
+	}
+}
+
+// borrowed from net/http/httputil/reverseproxy.go
+func singleJoiningSlash(a, b string) string {
+	aslash := strings.HasSuffix(a, "/")
+	bslash := strings.HasPrefix(b, "/")
+	switch {
+	case aslash && bslash:
+		return a + b[1:]
+	case !aslash && !bslash:
+		return a + "/" + b
+	}
+	return a + b
 }
 
 type proxyTransport struct {

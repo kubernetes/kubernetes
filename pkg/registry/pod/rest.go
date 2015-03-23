@@ -18,6 +18,9 @@ package pod
 
 import (
 	"fmt"
+	"net"
+	"net/http"
+	"net/url"
 	"strings"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -151,12 +154,12 @@ type ResourceGetter interface {
 }
 
 // ResourceLocation returns a URL to which one can send traffic for the specified pod.
-func ResourceLocation(getter ResourceGetter, ctx api.Context, id string) (string, error) {
+func ResourceLocation(getter ResourceGetter, ctx api.Context, id string) (*url.URL, http.RoundTripper, error) {
 	// Allow ID as "podname" or "podname:port".  If port is not specified,
 	// try to use the first defined port on the pod.
 	parts := strings.Split(id, ":")
 	if len(parts) > 2 {
-		return "", errors.NewBadRequest(fmt.Sprintf("invalid pod request %q", id))
+		return nil, nil, errors.NewBadRequest(fmt.Sprintf("invalid pod request %q", id))
 	}
 	name := parts[0]
 	port := ""
@@ -167,11 +170,11 @@ func ResourceLocation(getter ResourceGetter, ctx api.Context, id string) (string
 
 	obj, err := getter.Get(ctx, name)
 	if err != nil {
-		return "", err
+		return nil, nil, err
 	}
 	pod := obj.(*api.Pod)
 	if pod == nil {
-		return "", nil
+		return nil, nil, nil
 	}
 
 	// Try to figure out a port.
@@ -186,9 +189,11 @@ func ResourceLocation(getter ResourceGetter, ctx api.Context, id string) (string
 
 	// We leave off the scheme ('http://') because we have no idea what sort of server
 	// is listening at this endpoint.
-	loc := pod.Status.PodIP
-	if port != "" {
-		loc += fmt.Sprintf(":%s", port)
+	loc := &url.URL{}
+	if port == "" {
+		loc.Host = pod.Status.PodIP
+	} else {
+		loc.Host = net.JoinHostPort(pod.Status.PodIP, port)
 	}
-	return loc, nil
+	return loc, nil, nil
 }

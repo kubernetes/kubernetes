@@ -20,6 +20,8 @@ import (
 	"fmt"
 	"math/rand"
 	"net"
+	"net/http"
+	"net/url"
 	"strconv"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -223,19 +225,24 @@ func (rs *REST) Update(ctx api.Context, obj runtime.Object) (runtime.Object, boo
 	return out, false, err
 }
 
+// Implement Redirector.
+var _ = rest.Redirector(&REST{})
+
 // ResourceLocation returns a URL to which one can send traffic for the specified service.
-func (rs *REST) ResourceLocation(ctx api.Context, id string) (string, error) {
+func (rs *REST) ResourceLocation(ctx api.Context, id string) (*url.URL, http.RoundTripper, error) {
 	eps, err := rs.registry.GetEndpoints(ctx, id)
 	if err != nil {
-		return "", err
+		return nil, nil, err
 	}
 	if len(eps.Endpoints) == 0 {
-		return "", fmt.Errorf("no endpoints available for %v", id)
+		return nil, nil, fmt.Errorf("no endpoints available for %v", id)
 	}
 	// We leave off the scheme ('http://') because we have no idea what sort of server
 	// is listening at this endpoint.
 	ep := &eps.Endpoints[rand.Intn(len(eps.Endpoints))]
-	return net.JoinHostPort(ep.IP, strconv.Itoa(ep.Port)), nil
+	return &url.URL{
+		Host: net.JoinHostPort(ep.IP, strconv.Itoa(ep.Port)),
+	}, nil, nil
 }
 
 func (rs *REST) getLoadbalancerName(ctx api.Context, service *api.Service) string {
