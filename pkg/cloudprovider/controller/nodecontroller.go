@@ -294,6 +294,16 @@ func (nc *NodeController) populateNodeInfo(node *api.Node) error {
 	for key, value := range nodeInfo.Capacity {
 		node.Spec.Capacity[key] = value
 	}
+	if node.Status.NodeInfo.BootID != "" &&
+		node.Status.NodeInfo.BootID != nodeInfo.NodeSystemInfo.BootID {
+		ref := &api.ObjectReference{
+			Kind:      "Minion",
+			Name:      node.Name,
+			UID:       node.UID,
+			Namespace: api.NamespaceDefault,
+		}
+		nc.recorder.Eventf(ref, "rebooted", "Node %s has been rebooted", node.Name)
+	}
 	node.Status.NodeInfo = nodeInfo.NodeSystemInfo
 	return nil
 }
