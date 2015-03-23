@@ -1,0 +1,16 @@
+kind: Pod
+apiVersion: v1beta3
+metadata:
+  name: mypod
+spec:
+  containers:
+    - image: nginx:latest
+      name: myfrontend
+      volumeMounts:
+      - mountPath: "/usr/share/nginx/html"
+        name: mypd
+  volumes:
+    - name: mypd
+      source:
+        hostPath:
+         path: "/Users/markturansky/site-content"

@@ -65,6 +65,11 @@ func validateObject(obj runtime.Object) (errors []error) {
 		for i := range t.Items {
 			errors = append(errors, validateObject(&t.Items[i])...)
 		}
+	case *api.PersistentVolume:
+		errors = validation.ValidatePersistentVolume(t)
+	case *api.PersistentVolumeClaim:
+		api.ValidNamespace(ctx, &t.ObjectMeta)
+		errors = validation.ValidatePersistentVolumeClaim(t)
 	default:
 		return []error{fmt.Errorf("no validation defined for %#v", obj)}
 	}
@@ -159,6 +164,16 @@ func TestExampleObjectSchemas(t *testing.T) {
 		"../examples/update-demo/v1beta3": {
 			"kitten-rc":   &api.ReplicationController{},
 			"nautilus-rc": &api.ReplicationController{},
+		},
+		"../examples/persistent-volumes/volumes": {
+			"local-01": &api.PersistentVolume{},
+			"local-02": &api.PersistentVolume{},
+			"gce":      &api.PersistentVolume{},
+		},
+		"../examples/persistent-volumes/claims": {
+			"claim-01": &api.PersistentVolumeClaim{},
+			"claim-02": &api.PersistentVolumeClaim{},
+			"claim-03": &api.PersistentVolumeClaim{},
 		},
 	}
 
