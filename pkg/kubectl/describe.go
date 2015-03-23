@@ -374,6 +374,8 @@ func (d *NodeDescriber) Describe(namespace, name string) (string, error) {
 func describeNode(node *api.Node, pods []api.Pod, events *api.EventList) (string, error) {
 	return tabbedString(func(out io.Writer) error {
 		fmt.Fprintf(out, "Name:\t%s\n", node.Name)
+		fmt.Fprintf(out, "Labels:\t%s\n", formatLabels(node.Labels))
+		fmt.Fprintf(out, "CreationTimestamp:\t%s\n", node.CreationTimestamp.Time.Format(time.RFC1123Z))
 		if len(node.Status.Conditions) > 0 {
 			fmt.Fprint(out, "Conditions:\n  Type\tStatus\tLastProbeTime\tLastTransitionTime\tReason\tMessage\n")
 			for _, c := range node.Status.Conditions {

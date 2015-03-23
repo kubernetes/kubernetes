@@ -501,7 +501,7 @@ __EOF__
 
   kube::test::get_object_assert nodes "{{range.items}}{{.$id_field}}:{{end}}" '127.0.0.1:'
 
-  kube::test::describe_object_assert nodes "127.0.0.1" "Name:" "Conditions:" "Addresses:" "Capacity:" "Pods:"
+  kube::test::describe_object_assert nodes "127.0.0.1" "Name:" "Labels:" "CreationTimestamp:" "Conditions:" "Addresses:" "Capacity:" "Pods:"
 
   ###########
   # Minions #
