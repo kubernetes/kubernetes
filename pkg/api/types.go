@@ -193,6 +193,126 @@ type VolumeSource struct {
 	Secret *SecretVolumeSource `json:"secret"`
 	// NFS represents an NFS mount on the host that shares a pod's lifetime
 	NFS *NFSVolumeSource `json:"nfs"`
+	// PersistentVolumeClaimVolumeSource represents a reference to a PersistentVolumeClaim in the same namespace
+	PersistentVolumeClaimVolumeSource *PersistentVolumeClaimVolumeSource `json:"persistentVolumeClaim,omitempty"`
+}
+
+// Similar to VolumeSource but meant for the administrator who creates PVs.
+// Exactly one of its members must be set.
+type PersistentVolumeSource struct {
+	// GCEPersistentDisk represents a GCE Disk resource that is attached to a
+	// kubelet's host machine and then exposed to the pod.
+	GCEPersistentDisk *GCEPersistentDiskVolumeSource `json:"persistentDisk"`
+	// HostPath represents a directory on the host.
+	// This is useful for development and testing only.
+	// on-host storage is not supported in any way
+	HostPath *HostPathVolumeSource `json:"hostPath"`
+}
+
+type PersistentVolume struct {
+	TypeMeta   `json:",inline"`
+	ObjectMeta `json:"metadata,omitempty"`
+
+	//Spec defines a persistent volume owned by the cluster
+	Spec PersistentVolumeSpec `json:"spec,omitempty"`
+
+	// Status represents the current information about persistent volume.
+	Status PersistentVolumeStatus `json:"status,omitempty"`
+}
+
+type PersistentVolumeSpec struct {
+	// Resources represents the actual resources of the volume
+	Capacity ResourceList `json:"capacity`
+	// Source represents the location and type of a volume to mount.
+	// AccessModeTypes are inferred from the Source.
+	PersistentVolumeSource `json:",inline"`
+	// holds the binding reference to a PersistentVolumeClaim
+	ClaimRef *ObjectReference `json:"claimRef,omitempty"`
+}
+
+type PersistentVolumeStatus struct {
+	// Phase represents the current phase of the PersistentVolume
+	Phase PersistentVolumePhase `json:"phase,omitempty"`
+}
+
+type PersistentVolumeList struct {
+	TypeMeta `json:",inline"`
+	ListMeta `json:"metadata,omitempty"`
+	Items    []PersistentVolume `json:"items,omitempty"`
+}
+
+// a PersistentVolumeClaim is a user's request for and claim to a persistent volume
+type PersistentVolumeClaim struct {
+	TypeMeta   `json:",inline"`
+	ObjectMeta `json:"metadata,omitempty"`
+
+	// Spec defines the volume
+	Spec PersistentVolumeClaimSpec `json:"spec,omitempty"`
+
+	// Status represents the current information about a persistent volume.
+	Status PersistentVolumeClaimStatus `json:"status,omitempty"`
+}
+
+type PersistentVolumeClaimList struct {
+	TypeMeta `json:",inline"`
+	ListMeta `json:"metadata,omitempty"`
+	Items    []PersistentVolumeClaim `json:"items,omitempty"`
+}
+
+// a PersistentVolumeClaimSpec describes the common attributes of storage devices
+// and allows a Source for provider-specific attributes
+type PersistentVolumeClaimSpec struct {
+	// Contains the types of access modes desired
+	AccessModes []AccessModeType `json:"accessModes,omitempty"`
+	// Resources represents the minimum resources required
+	Resources ResourceRequirements `json:"resources,omitempty"`
+}
+
+type PersistentVolumeClaimStatus struct {
+	// Phase represents the current phase of PersistentVolumeClaim
+	Phase PersistentVolumeClaimPhase `json:"phase,omitempty"`
+	// AccessModes contains all ways the volume backing the PVC can be mounted
+	AccessModes []AccessModeType `json:"accessModes,omitempty`
+	// Represents the actual resources of the underlying volume
+	Capacity ResourceList `json:"capacity,omitempty"`
+	// VolumeRef is a reference to the PersistentVolume bound to the PersistentVolumeClaim
+	VolumeRef *ObjectReference `json:"volumeRef,omitempty"`
+}
+
+type AccessModeType string
+
+const (
+	ReadWriteOnce AccessModeType = "ReadWriteOnce"
+	ReadOnlyMany  AccessModeType = "ReadOnlyMany"
+	ReadWriteMany AccessModeType = "ReadWriteMany"
+)
+
+type PersistentVolumePhase string
+
+const (
+	// used for PersistentVolumes that are not yet bound
+	VolumeAvailable PersistentVolumePhase = "Available"
+	// used for PersistentVolumes that are bound
+	VolumeBound PersistentVolumePhase = "Bound"
+	// used for PersistentVolumes where the bound PersistentVolumeClaim was deleted
+	VolumeReleased PersistentVolumePhase = "Released"
+)
+
+type PersistentVolumeClaimPhase string
+
+const (
+	// used for PersistentVolumeClaims that are not yet bound
+	ClaimPending PersistentVolumeClaimPhase = "Pending"
+	// used for PersistentVolumeClaims that are bound
+	ClaimBound PersistentVolumeClaimPhase = "Bound"
+)
+
+type PersistentVolumeClaimVolumeSource struct {
+	// ClaimName is the name of a PersistentVolumeClaim in the same namespace as the pod using this volume
+	ClaimName string `json:"claimName,omitempty"`
+	// Optional: Defaults to false (read/write).  ReadOnly here
+	// will force the ReadOnly setting in VolumeMounts
+	ReadOnly bool `json:readOnly,omitempty`
 }
 
 // HostPathVolumeSource represents a host directory mapped into a pod.
@@ -377,6 +497,8 @@ type Capabilities struct {
 type ResourceRequirements struct {
 	// Limits describes the maximum amount of compute resources required.
 	Limits ResourceList `json:"limits,omitempty"`
+	// Requests describes the minimum amount of compute resources required.
+	Requests ResourceList `json:"requests,omitempty"`
 }
 
 // Container represents a single container that is expected to be run on the host.
@@ -938,6 +1060,8 @@ const (
 	ResourceCPU ResourceName = "cpu"
 	// Memory, in bytes. (500Gi = 500GiB = 500 * 1024 * 1024 * 1024)
 	ResourceMemory ResourceName = "memory"
+	// Volume size, in bytes (e,g. 5Gi = 5GiB = 5 * 1024 * 1024 * 1024)
+	ResourceStorage ResourceName = "storage"
 )
 
 // ResourceList is a set of (resource name, quantity) pairs.
