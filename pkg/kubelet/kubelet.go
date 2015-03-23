@@ -1040,7 +1040,12 @@ func (kl *Kubelet) createPodInfraContainer(pod *api.Pod) (dockertools.DockerID, 
 	if ref != nil {
 		kl.recorder.Eventf(ref, "pulled", "Successfully pulled image %q", container.Image)
 	}
-	id, err := kl.runContainer(pod, container, nil, "", "")
+	// TODO(vmarmol): Auth.
+	netNamespace := ""
+	if pod.Spec.HostNetwork {
+		netNamespace = "host"
+	}
+	id, err := kl.runContainer(pod, container, nil, netNamespace, "")
 	if err != nil {
 		return "", err
 	}
