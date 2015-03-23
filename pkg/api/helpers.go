@@ -71,7 +71,8 @@ var standardResources = util.NewStringSet(
 	string(ResourcePods),
 	string(ResourceQuotas),
 	string(ResourceServices),
-	string(ResourceReplicationControllers))
+	string(ResourceReplicationControllers),
+	string(ResourceStorage))
 
 func IsStandardResourceName(str string) bool {
 	return standardResources.Has(str)

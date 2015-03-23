@@ -351,6 +351,47 @@ func validateNFS(nfs *api.NFSVolumeSource) errs.ValidationErrorList {
 	return allErrs
 }
 
+func ValidatePersistentVolumeName(name string, prefix bool) (bool, string) {
+	return util.IsDNS1123Label(name), name
+}
+
+func ValidatePersistentVolume(pv *api.PersistentVolume) errs.ValidationErrorList {
+	allErrs := ValidateObjectMeta(&pv.ObjectMeta, false, ValidatePersistentVolumeName)
+
+	if len(pv.Spec.Capacity) == 0 {
+		allErrs = append(allErrs, errs.NewFieldRequired("persistentVolume.Capacity"))
+	}
+
+	if _, ok := pv.Spec.Capacity[api.ResourceStorage]; !ok || len(pv.Spec.Capacity) > 1 {
+		allErrs = append(allErrs, errs.NewFieldInvalid("", pv.Spec.Capacity, fmt.Sprintf("only %s is expected", api.ResourceStorage)))
+	}
+
+	numVolumes := 0
+	if pv.Spec.HostPath != nil {
+		numVolumes++
+		allErrs = append(allErrs, validateHostPathVolumeSource(pv.Spec.HostPath).Prefix("hostPath")...)
+	}
+	if pv.Spec.GCEPersistentDisk != nil {
+		numVolumes++
+		allErrs = append(allErrs, validateGCEPersistentDiskVolumeSource(pv.Spec.GCEPersistentDisk).Prefix("persistentDisk")...)
+	}
+	if numVolumes != 1 {
+		allErrs = append(allErrs, errs.NewFieldInvalid("", pv.Spec.PersistentVolumeSource, "exactly 1 volume type is required"))
+	}
+	return allErrs
+}
+
+func ValidatePersistentVolumeClaim(pvc *api.PersistentVolumeClaim) errs.ValidationErrorList {
+	allErrs := ValidateObjectMeta(&pvc.ObjectMeta, true, ValidatePersistentVolumeName)
+	if len(pvc.Spec.AccessModes) == 0 {
+		allErrs = append(allErrs, errs.NewFieldInvalid("persistentVolumeClaim.Spec.AccessModes", pvc.Spec.AccessModes, "at least 1 AccessModeType is required"))
+	}
+	if len(pvc.Spec.Resources.Requests) == 0 {
+		allErrs = append(allErrs, errs.NewFieldInvalid("persistentVolumeClaim.Spec.Resources.Requests", pvc.Spec.AccessModes, "No Resource.Requests specified"))
+	}
+	return allErrs
+}
+
 var supportedPortProtocols = util.NewStringSet(string(api.ProtocolTCP), string(api.ProtocolUDP))
 
 func validatePorts(ports []api.ContainerPort) errs.ValidationErrorList {
