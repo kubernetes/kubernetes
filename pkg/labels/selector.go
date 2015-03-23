@@ -34,107 +34,13 @@ type Selector interface {
 	// Empty returns true if this selector does not restrict the selection space.
 	Empty() bool
 
-	// RequiresExactMatch allows a caller to introspect whether a given selector
-	// requires a single specific label to be set, and if so returns the value it
-	// requires.
-	RequiresExactMatch(label string) (value string, found bool)
-
 	// String returns a human readable string that represents this selector.
 	String() string
 }
 
 // Everything returns a selector that matches all labels.
 func Everything() Selector {
-	return andTerm{}
-}
-
-type hasTerm struct {
-	label, value string
-}
-
-func (t *hasTerm) Matches(ls Labels) bool {
-	return ls.Get(t.label) == t.value
-}
-
-func (t *hasTerm) Empty() bool {
-	return false
-}
-
-func (t *hasTerm) RequiresExactMatch(label string) (value string, found bool) {
-	if t.label == label {
-		return t.value, true
-	}
-	return "", false
-}
-
-func (t *hasTerm) String() string {
-	return fmt.Sprintf("%v=%v", t.label, t.value)
-}
-
-type notHasTerm struct {
-	label, value string
-}
-
-func (t *notHasTerm) Matches(ls Labels) bool {
-	return ls.Get(t.label) != t.value
-}
-
-func (t *notHasTerm) Empty() bool {
-	return false
-}
-
-func (t *notHasTerm) RequiresExactMatch(label string) (value string, found bool) {
-	return "", false
-}
-
-func (t *notHasTerm) String() string {
-	return fmt.Sprintf("%v!=%v", t.label, t.value)
-}
-
-type andTerm []Selector
-
-func (t andTerm) Matches(ls Labels) bool {
-	for _, q := range t {
-		if !q.Matches(ls) {
-			return false
-		}
-	}
-	return true
-}
-
-func (t andTerm) Empty() bool {
-	if t == nil {
-		return true
-	}
-	if len([]Selector(t)) == 0 {
-		return true
-	}
-	for i := range t {
-		if !t[i].Empty() {
-			return false
-		}
-	}
-	return true
-}
-
-func (t andTerm) RequiresExactMatch(label string) (string, bool) {
-	if t == nil || len([]Selector(t)) == 0 {
-		return "", false
-	}
-	for i := range t {
-		if value, found := t[i].RequiresExactMatch(label); found {
-			return value, found
-		}
-	}
-	return "", false
-}
-
-func (t andTerm) String() string {
-	var terms []string
-	for _, q := range t {
-		terms = append(terms, q.String())
-	}
-	return strings.Join(terms, ",")
+	return LabelSelector{}
 }
 
 // Operator represents a key's relationship
@@ -150,14 +56,10 @@ const (
 	ExistsOperator       Operator = "exists"
 )
 
-// LabelSelector contains a list of Requirements.
-// LabelSelector is set-based and is distinguished from exact
-// match-based selectors composed of key=value matching conjunctions.
-type LabelSelector struct {
-	Requirements []Requirement
-}
+//LabelSelector is a list of Requirements.
+type LabelSelector []Requirement
 
-// Sort by  obtain determisitic parser (minimic previous andTerm based stuff)
+// Sort by  obtain determisitic parser
 type ByKey []Requirement
 
 func (a ByKey) Len() int { return len(a) }
@@ -242,21 +144,10 @@ func (r *Requirement) Matches(ls Labels) bool {
 
 // Return true if the LabelSelector doesn't restrict selection space
 func (lsel LabelSelector) Empty() bool {
-	if len(lsel.Requirements) == 0 {
+	if lsel == nil {
 		return true
 	}
-
-	return false
-}
-
-// RequiresExactMatch allows a caller to introspect whether a given selector
-// requires a single specific label to be set, and if so returns the value it
-// requires.
-func (r *Requirement) RequiresExactMatch(label string) (string, bool) {
-	if len(r.strValues) == 1 && r.operator == InOperator && r.key == label {
-		return r.strValues.List()[0], true
-	}
-	return "", false
+	return len(lsel) == 0
 }
 
 // String returns a human-readable string that represents this
@@ -302,7 +193,7 @@ func (r *Requirement) String() string {
 // its Requirements match the input Labels. If any
 // Requirement does not match, false is returned.
 func (lsel LabelSelector) Matches(l Labels) bool {
-	for _, req := range lsel.Requirements {
+	for _, req := range lsel {
 		if matches := req.Matches(l); !matches {
 			return false
 		}
@@ -310,23 +201,11 @@ func (lsel LabelSelector) Matches(l Labels) bool {
 	return true
 }
 
-// RequiresExactMatch allows a caller to introspect whether a given selector
-// requires a single specific label to be set, and if so returns the value it
-// requires.
-func (lsel LabelSelector) RequiresExactMatch(label string) (value string, found bool) {
-	for _, req := range lsel.Requirements {
-		if value, found = req.RequiresExactMatch(label); found {
-			return value, found
-		}
-	}
-	return "", false
-}
-
 // String returns a comma-separated string of all
 // the LabelSelector Requirements' human-readable strings.
 func (lsel LabelSelector) String() string {
 	var reqs []string
-	for _, req := range lsel.Requirements {
+	for _, req := range lsel {
 		reqs = append(reqs, req.String())
 	}
 	return strings.Join(reqs, ",")
@@ -749,7 +628,7 @@ func Parse(selector string) (Selector, error) {
 	items, error := p.parse()
 	if error == nil {
 		sort.Sort(ByKey(items)) // sort to grant determistic parsing
-		return &LabelSelector{Requirements: items}, error
+		return LabelSelector(items), error
 	}
 	return nil, error
 }
@@ -770,111 +649,20 @@ func validateLabelValue(v string) error {
 	return nil
 }
 
-func try(selectorPiece, op string) (lhs, rhs string, ok bool) {
-	pieces := strings.Split(selectorPiece, op)
-	if len(pieces) == 2 {
-		return pieces[0], pieces[1], true
-	}
-	return "", "", false
-}
-
 // SelectorFromSet returns a Selector which will match exactly the given Set. A
 // nil Set is considered equivalent to Everything().
 func SelectorFromSet(ls Set) Selector {
 	if ls == nil {
-		return Everything()
-	}
-	items := make([]Selector, 0, len(ls))
-	for label, value := range ls {
-		items = append(items, &hasTerm{label: label, value: value})
-	}
-	if len(items) == 1 {
-		return items[0]
-	}
-	return andTerm(items)
-}
-
-// SelectorFromSet returns a Selector which will match exactly the given Set. A
-// nil Set is considered equivalent to Everything().
-func SelectorFromSetParse(ls Set) (Selector, error) {
-	if ls == nil {
-		return LabelSelector{}, nil
+		return LabelSelector{}
 	}
 	var requirements []Requirement
 	for label, value := range ls {
-		if r, err := NewRequirement(label, InOperator, util.NewStringSet(value)); err != nil {
-			return LabelSelector{}, err
+		if r, err := NewRequirement(label, EqualsOperator, util.NewStringSet(value)); err != nil {
+			//TODO: double check errors when input comes from serialization?
+			return LabelSelector{}
 		} else {
 			requirements = append(requirements, *r)
 		}
 	}
-	return LabelSelector{Requirements: requirements}, nil
-}
-
-// ParseSelector takes a string representing a selector and returns an
-// object suitable for matching, or an error.
-func ParseSelector(selector string) (Selector, error) {
-	return parseSelector(selector,
-		func(lhs, rhs string) (newLhs, newRhs string, err error) {
-			return lhs, rhs, nil
-		})
-}
-
-// Parses the selector and runs them through the given TransformFunc.
-func ParseAndTransformSelector(selector string, fn TransformFunc) (Selector, error) {
-	return parseSelector(selector, fn)
-}
-
-// Function to transform selectors.
-type TransformFunc func(label, value string) (newLabel, newValue string, err error)
-
-func parseSelector(selector string, fn TransformFunc) (Selector, error) {
-	parts := strings.Split(selector, ",")
-	sort.StringSlice(parts).Sort()
-	var items []Selector
-	for _, part := range parts {
-		if part == "" {
-			continue
-		}
-		if lhs, rhs, ok := try(part, "!="); ok {
-			lhs, rhs, err := fn(lhs, rhs)
-			if err != nil {
-				return nil, err
-			}
-			items = append(items, &notHasTerm{label: lhs, value: rhs})
-		} else if lhs, rhs, ok := try(part, "=="); ok {
-			lhs, rhs, err := fn(lhs, rhs)
-			if err != nil {
-				return nil, err
-			}
-			items = append(items, &hasTerm{label: lhs, value: rhs})
-		} else if lhs, rhs, ok := try(part, "="); ok {
-			lhs, rhs, err := fn(lhs, rhs)
-			if err != nil {
-				return nil, err
-			}
-			items = append(items, &hasTerm{label: lhs, value: rhs})
-		} else {
-			return nil, fmt.Errorf("invalid selector: '%s'; can't understand '%s'", selector, part)
-		}
-	}
-	if len(items) == 1 {
-		return items[0], nil
-	}
-	return andTerm(items), nil
-}
-
-// OneTermEqualSelector returns an object that matches objects where one label/field equals one value.
-// Cannot return an error.
-func OneTermEqualSelector(k, v string) Selector {
-	return &hasTerm{label: k, value: v}
-}
-
-// OneTermEqualSelectorParse: implement OneTermEqualSelector using of LabelSelector and Requirement
-// TODO: remove the original OneTermSelector  and rename OneTermEqualSelectorParse to OneTermEqualSelector
-// Since OneTermEqualSelector cannot return an error. the Requirement based version ignore error.
-// it's up to the caller being sure that k and v are not empty
-func OneTermEqualSelectorParse(k, v string) Selector {
-	r, _ := NewRequirement(k, InOperator, util.NewStringSet(v))
-	return &LabelSelector{Requirements: []Requirement{*r}}
+	return LabelSelector(requirements)
 }
