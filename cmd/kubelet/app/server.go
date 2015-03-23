@@ -262,7 +262,7 @@ func (s *KubeletServer) createAPIServerClient() (*client.Client, error) {
 
 // SimpleRunKubelet is a simple way to start a Kubelet talking to dockerEndpoint, using an API Client.
 // Under the hood it calls RunKubelet (below)
-func SimpleRunKubelet(client *client.Client,
+func SimpleKubelet(client *client.Client,
 	dockerClient dockertools.DockerInterface,
 	hostname, rootDir, manifestURL, address string,
 	port uint,
@@ -270,7 +270,7 @@ func SimpleRunKubelet(client *client.Client,
 	volumePlugins []volume.VolumePlugin,
 	tlsOptions *kubelet.TLSOptions,
 	cadvisorInterface cadvisor.Interface,
-	configFilePath string) {
+	configFilePath string) *KubeletConfig {
 
 	imageGCPolicy := kubelet.ImageGCPolicy{
 		HighThresholdPercent: 90,
@@ -302,7 +302,7 @@ func SimpleRunKubelet(client *client.Client,
 		ConfigFile:               configFilePath,
 		ImageGCPolicy:            imageGCPolicy,
 	}
-	RunKubelet(&kcfg)
+	return &kcfg
 }
 
 // RunKubelet is responsible for setting up and running a kubelet.  It is used in three different applications:
@@ -358,13 +358,13 @@ func makePodSourceConfig(kc *KubeletConfig) *config.PodConfig {
 	// define file config source
 	if kc.ConfigFile != "" {
 		glog.Infof("Adding manifest file: %v", kc.ConfigFile)
-		config.NewSourceFile(kc.ConfigFile, kc.FileCheckFrequency, cfg.Channel(kubelet.FileSource))
+		config.NewSourceFile(kc.ConfigFile, kc.Hostname, kc.FileCheckFrequency, cfg.Channel(kubelet.FileSource))
 	}
 
 	// define url config source
 	if kc.ManifestURL != "" {
 		glog.Infof("Adding manifest url: %v", kc.ManifestURL)
-		config.NewSourceURL(kc.ManifestURL, kc.HTTPCheckFrequency, cfg.Channel(kubelet.HTTPSource))
+		config.NewSourceURL(kc.ManifestURL, kc.Hostname, kc.HTTPCheckFrequency, cfg.Channel(kubelet.HTTPSource))
 	}
 	if kc.KubeClient != nil {
 		glog.Infof("Watching apiserver")

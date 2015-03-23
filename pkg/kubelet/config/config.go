@@ -18,9 +18,7 @@ package config
 
 import (
 	"fmt"
-	"os"
 	"reflect"
-	"strings"
 	"sync"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -363,11 +361,6 @@ func bestPodIdentString(pod *api.Pod) string {
 	return fmt.Sprintf("%s.%s", name, namespace)
 }
 
-func GeneratePodName(name string) (string, error) {
-	hostname, err := os.Hostname() //TODO: kubelet name would be better
-	if err != nil {
-		return "", err
-	}
-	hostname = strings.ToLower(hostname)
+func GeneratePodName(name, hostname string) (string, error) {
 	return fmt.Sprintf("%s-%s", name, hostname), nil
 }
