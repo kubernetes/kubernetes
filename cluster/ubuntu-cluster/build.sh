@@ -49,7 +49,7 @@ cp flannel/bin/flanneld binaries/
 
 # ectd
 echo "Download etcd release ..."
-ETCD_V="v2.0.0"
+ETCD_V="v2.0.5"
 ETCD="etcd-${ETCD_V}-linux-amd64"
 if [ ! -f etcd.tar.gz ] ; then
     curl -L  https://github.com/coreos/etcd/releases/download/$ETCD_V/$ETCD.tar.gz -o etcd.tar.gz
