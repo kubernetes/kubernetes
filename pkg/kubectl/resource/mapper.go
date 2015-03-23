@@ -22,6 +22,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/yaml"
 )
 
 // Mapper is a convenience struct for holding references to the three interfaces
@@ -36,6 +37,11 @@ type Mapper struct {
 // if any of the decoding or client lookup steps fail. Name and namespace will be
 // set into Info if the mapping's MetadataAccessor can retrieve them.
 func (m *Mapper) InfoForData(data []byte, source string) (*Info, error) {
+	json, err := yaml.ToJSON(data)
+	if err != nil {
+		return nil, fmt.Errorf("unable to parse %q: %v", err)
+	}
+	data = json
 	version, kind, err := m.DataVersionAndKind(data)
 	if err != nil {
 		return nil, fmt.Errorf("unable to get type info from %q: %v", source, err)

@@ -13,8 +13,8 @@
         "name": "kubernetes-serve-hostname",
         "image": "kubernetes/serve_hostname",        
         "cpu": 1000,
-        "memory": 1048576,
+        "memory": 1048576
       }]
     }
-  },
+  }
 }

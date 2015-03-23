@@ -73,7 +73,7 @@ var aPod string = `
     "manifest": {
       "version": "v1beta1",
       "id": "a",
-      "containers": [{ "name": "foo", "image": "bar/foo", }]
+      "containers": [{ "name": "foo", "image": "bar/foo" }]
     }
   }%s
 }
@@ -87,7 +87,7 @@ var aPodInBar string = `
     "manifest": {
       "version": "v1beta1",
       "id": "a",
-      "containers": [{ "name": "foo", "image": "bar/foo", }]
+      "containers": [{ "name": "foo", "image": "bar/foo" }]
     }
   }%s
 }
@@ -102,17 +102,18 @@ var aRC string = `
     "replicaSelector": {"name": "a"},
     "podTemplate": {
       "desiredState": {
-         "manifest": {
-           "version": "v1beta1",
-           "id": "a",
-           "containers": [{
-             "name": "foo",
-             "image": "bar/foo",
-           }]
-         }
-       },
-       "labels": {"name": "a"}
-      }},
+        "manifest": {
+          "version": "v1beta1",
+          "id": "a",
+          "containers": [{
+            "name": "foo",
+            "image": "bar/foo"
+          }]
+        }
+      },
+      "labels": {"name": "a"}
+    }
+  },
   "labels": {"name": "a"}%s
 }
 `
@@ -145,7 +146,7 @@ var aEvent string = `
     "kind": "Minion",
     "name": "a",
     "namespace": "default",
-    "apiVersion": "v1beta1",
+    "apiVersion": "v1beta1"
   }%s
 }
 `
@@ -343,10 +344,11 @@ func TestAuthModeAlwaysAllow(t *testing.T) {
 					sub += fmt.Sprintf(",\r\n\"resourceVersion\": %v", resVersion)
 				}
 				namespace := "default"
-				sub += fmt.Sprintf(",\r\n\"namespace\": %v", namespace)
+				sub += fmt.Sprintf(",\r\n\"namespace\": %q", namespace)
 			}
 			bodyStr = fmt.Sprintf(r.body, sub)
 		}
+		r.body = bodyStr
 		bodyBytes := bytes.NewReader([]byte(bodyStr))
 		req, err := http.NewRequest(r.verb, s.URL+r.URL, bodyBytes)
 		if err != nil {
@@ -514,10 +516,11 @@ func TestAliceNotForbiddenOrUnauthorized(t *testing.T) {
 					sub += fmt.Sprintf(",\r\n\"resourceVersion\": %v", resVersion)
 				}
 				namespace := "default"
-				sub += fmt.Sprintf(",\r\n\"namespace\": %v", namespace)
+				sub += fmt.Sprintf(",\r\n\"namespace\": %q", namespace)
 			}
 			bodyStr = fmt.Sprintf(r.body, sub)
 		}
+		r.body = bodyStr
 		bodyBytes := bytes.NewReader([]byte(bodyStr))
 		req, err := http.NewRequest(r.verb, s.URL+r.URL, bodyBytes)
 		if err != nil {
@@ -767,10 +770,11 @@ func TestNamespaceAuthorization(t *testing.T) {
 				if len(namespace) == 0 {
 					namespace = "default"
 				}
-				sub += fmt.Sprintf(",\r\n\"namespace\": %v", namespace)
+				sub += fmt.Sprintf(",\r\n\"namespace\": %q", namespace)
 			}
 			bodyStr = fmt.Sprintf(r.body, sub)
 		}
+		r.body = bodyStr
 		bodyBytes := bytes.NewReader([]byte(bodyStr))
 		req, err := http.NewRequest(r.verb, s.URL+r.URL, bodyBytes)
 		if err != nil {
@@ -873,6 +877,7 @@ func TestKindAuthorization(t *testing.T) {
 				}
 			}
 		}
+		r.body = bodyStr
 		bodyBytes := bytes.NewReader([]byte(bodyStr))
 		req, err := http.NewRequest(r.verb, s.URL+r.URL, bodyBytes)
 		if err != nil {

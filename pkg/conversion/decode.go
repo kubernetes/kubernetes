@@ -17,13 +17,12 @@ limitations under the License.
 package conversion
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
-
-	"github.com/ghodss/yaml"
 )
 
-// Decode converts a YAML or JSON string back into a pointer to an api object.
+// Decode converts a JSON string back into a pointer to an api object.
 // Deduces the type based upon the fields added by the MetaInsertionFactory
 // technique. The object will be converted, if necessary, into the
 // s.InternalVersion type before being returned. Decode will not decode
@@ -44,16 +43,12 @@ func (s *Scheme) Decode(data []byte) (interface{}, error) {
 		return nil, err
 	}
 
-	// yaml is a superset of json, so we use it to decode here. That way,
-	// we understand both.
-	err = yaml.Unmarshal(data, obj)
-	if err != nil {
+	if err := json.Unmarshal(data, obj); err != nil {
 		return nil, err
 	}
 
 	// Version and Kind should be blank in memory.
-	err = s.SetVersionAndKind("", "", obj)
-	if err != nil {
+	if err := s.SetVersionAndKind("", "", obj); err != nil {
 		return nil, err
 	}
 
@@ -63,8 +58,7 @@ func (s *Scheme) Decode(data []byte) (interface{}, error) {
 		if err != nil {
 			return nil, err
 		}
-		err = s.converter.Convert(obj, objOut, 0, s.generateConvertMeta(version, s.InternalVersion))
-		if err != nil {
+		if err := s.converter.Convert(obj, objOut, 0, s.generateConvertMeta(version, s.InternalVersion)); err != nil {
 			return nil, err
 		}
 		obj = objOut
@@ -72,16 +66,13 @@ func (s *Scheme) Decode(data []byte) (interface{}, error) {
 	return obj, nil
 }
 
-// DecodeInto parses a YAML or JSON string and stores it in obj. Returns an error
+// DecodeInto parses a JSON string and stores it in obj. Returns an error
 // if data.Kind is set and doesn't match the type of obj. Obj should be a
 // pointer to an api type.
 // If obj's version doesn't match that in data, an attempt will be made to convert
 // data into obj's version.
 func (s *Scheme) DecodeInto(data []byte, obj interface{}) error {
 	if len(data) == 0 {
-		// This is valid YAML, but it's a bad idea not to return an error
-		// for an empty string-- that's almost certainly not what the caller
-		// was expecting.
 		return errors.New("empty input")
 	}
 	dataVersion, dataKind, err := s.DataVersionAndKind(data)
@@ -107,14 +98,10 @@ func (s *Scheme) DecodeInto(data []byte, obj interface{}) error {
 	if err != nil {
 		return err
 	}
-	// yaml is a superset of json, so we use it to decode here. That way,
-	// we understand both.
-	err = yaml.Unmarshal(data, external)
-	if err != nil {
+	if err := json.Unmarshal(data, external); err != nil {
 		return err
 	}
-	err = s.converter.Convert(external, obj, 0, s.generateConvertMeta(dataVersion, objVersion))
-	if err != nil {
+	if err := s.converter.Convert(external, obj, 0, s.generateConvertMeta(dataVersion, objVersion)); err != nil {
 		return err
 	}
 
