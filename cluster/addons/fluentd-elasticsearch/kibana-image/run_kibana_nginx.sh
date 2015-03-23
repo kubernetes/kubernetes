@@ -43,6 +43,11 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+#Report all environment variables containing 'elasticsearch' and ES related
+set | grep -i elasticsearch
+set | grep -i ES_SCHEME
+set | grep -i ES_HOST
+
 cat << EOF > /usr/share/nginx/html/config.js
 /** @scratch /configuration/config.js/1
  *
@@ -75,11 +80,7 @@ function (Settings) {
      *  +elasticsearch: {server: "http://localhost:9200", withCredentials: true}+
      *
      */
-
-
-    elasticsearch: "https://"+window.location.hostname+"/api/v1beta1/proxy/services/elasticsearch-logging",
-
-
+    elasticsearch: "${ES_SCHEME}://${ES_HOST}",
     /** @scratch /configuration/config.js/5
      *
      * ==== default_route
