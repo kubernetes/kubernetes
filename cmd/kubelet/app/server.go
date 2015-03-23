@@ -262,7 +262,7 @@ func (s *KubeletServer) createAPIServerClient() (*client.Client, error) {
 
 // SimpleRunKubelet is a simple way to start a Kubelet talking to dockerEndpoint, using an API Client.
 // Under the hood it calls RunKubelet (below)
-func SimpleRunKubelet(client *client.Client,
+func SimpleKubelet(client *client.Client,
 	dockerClient dockertools.DockerInterface,
 	hostname, rootDir, manifestURL, address string,
 	port uint,
@@ -270,7 +270,7 @@ func SimpleRunKubelet(client *client.Client,
 	volumePlugins []volume.VolumePlugin,
 	tlsOptions *kubelet.TLSOptions,
 	cadvisorInterface cadvisor.Interface,
-	configFilePath string) {
+	configFilePath string) *KubeletConfig {
 
 	imageGCPolicy := kubelet.ImageGCPolicy{
 		HighThresholdPercent: 90,
@@ -302,7 +302,7 @@ func SimpleRunKubelet(client *client.Client,
 		ConfigFile:               configFilePath,
 		ImageGCPolicy:            imageGCPolicy,
 	}
-	RunKubelet(&kcfg)
+	return &kcfg
 }
 
 // RunKubelet is responsible for setting up and running a kubelet.  It is used in three different applications:
