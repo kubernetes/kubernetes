@@ -37,11 +37,13 @@ GUESTBOOK="${KUBE_ROOT}/examples/guestbook"
 
 function teardown() {
   ${KUBECTL} stop -f "${GUESTBOOK}"
-  if [[ "${KUBERNETES_PROVIDER}" == "gce" ]]; then
+  if [[ "${KUBERNETES_PROVIDER}" == "gce" ]] || [[ "${KUBERNETES_PROVIDER}" == "gke" ]]; then
     local REGION=${ZONE%-*}
-    gcloud compute forwarding-rules delete -q --region ${REGION} "${INSTANCE_PREFIX}-default-frontend" || true
-    gcloud compute target-pools delete -q --region ${REGION} "${INSTANCE_PREFIX}-default-frontend" || true
-    gcloud compute firewall-rules delete guestbook-e2e-minion-8000 -q || true
+    if [[ "${KUBERNETES_PROVIDER}" == "gce" ]]; then
+      gcloud compute forwarding-rules delete -q --project="${PROJECT}" --region ${REGION} "${INSTANCE_PREFIX}-default-frontend" || true
+      gcloud compute target-pools delete -q --project="${PROJECT}" --region ${REGION} "${INSTANCE_PREFIX}-default-frontend" || true
+    fi
+    gcloud compute firewall-rules delete guestbook-e2e-minion-8000 -q --project="${PROJECT}" || true
   fi
 }
 
@@ -84,8 +86,8 @@ ${KUBECTL} create -f "${GUESTBOOK}"
 # Verify that all pods are running
 wait_for_running
 
-if [[ "${KUBERNETES_PROVIDER}" == "gce" ]]; then
-  gcloud compute firewall-rules create --allow=tcp:8000 --network="${NETWORK}" --target-tags="${MINION_TAG}" guestbook-e2e-minion-8000
+if [[ "${KUBERNETES_PROVIDER}" == "gce" ]] || [[ "${KUBERNETES_PROVIDER}" == "gke" ]]; then
+  gcloud compute firewall-rules create --project="${PROJECT}" --allow=tcp:8000 --network="${NETWORK}" --target-tags="${MINION_TAG}" guestbook-e2e-minion-8000
 fi
 
 # Add a new entry to the guestbook and verify that it was remembered
