@@ -155,6 +155,8 @@ for version in "${kube_api_versions[@]}"; do
   # Post-condition: valid-pod POD is running
   kube::test::get_object_assert pods "{{range.items}}{{.$id_field}}:{{end}}" 'valid-pod:'
   kube::test::get_object_assert 'pod valid-pod' "{{.$id_field}}" 'valid-pod'
+  # Describe command should print detailed information
+  kube::test::describe_object_assert pods 'valid-pod' "Name:" "Image(s):" "Host:" "Labels:" "Status:" "Replication Controllers"
 
   ### Dump current valid-pod POD
   output_pod=$(kubectl get pod valid-pod -o yaml --output-version=v1beta1 "${kube_flags[@]}")
@@ -356,6 +358,8 @@ for version in "${kube_api_versions[@]}"; do
   kubectl create -f examples/guestbook/redis-master-service.json "${kube_flags[@]}"
   # Post-condition: redis-master service is running
   kube::test::get_object_assert services "{{range.items}}{{.$id_field}}:{{end}}" 'kubernetes:kubernetes-ro:redis-master:'
+  # Describe command should print detailed information
+  kube::test::describe_object_assert services 'redis-master' "Name:" "Labels:" "Selector:" "IP:" "Port:" "Endpoints:" "Session Affinity:"
 
   ### Dump current redis-master service
   output_service=$(kubectl get service redis-master -o json --output-version=v1beta3 "${kube_flags[@]}")
@@ -442,6 +446,8 @@ __EOF__
   kubectl create -f examples/guestbook/frontend-controller.json "${kube_flags[@]}"
   # Post-condition: frontend replication controller is running
   kube::test::get_object_assert rc "{{range.items}}{{.$id_field}}:{{end}}" 'frontend-controller:'
+  # Describe command should print detailed information
+  kube::test::describe_object_assert rc 'frontend-controller' "Name:" "Image(s):" "Labels:" "Selector:" "Replicas:" "Pods Status:"
 
   ### Resize replication controller frontend with current-replicas and replicas
   # Pre-condition: 3 replicas
