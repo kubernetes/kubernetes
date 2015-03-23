@@ -128,6 +128,9 @@ type MachineInfo struct {
 	// The system uuid
 	SystemUUID string `json:"system_uuid"`
 
+	// The boot id
+	BootID string `json:"boot_id"`
+
 	// Filesystems on this machine.
 	Filesystems []FsInfo `json:"filesystems"`
 

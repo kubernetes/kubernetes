@@ -234,25 +234,28 @@ type LoadStats struct {
 	NrIoWait uint64 `json:"nr_io_wait"`
 }
 
+// CPU usage time statistics.
+type CpuUsage struct {
+	// Total CPU usage.
+	// Units: nanoseconds
+	Total uint64 `json:"total"`
+
+	// Per CPU/core usage of the container.
+	// Unit: nanoseconds.
+	PerCpu []uint64 `json:"per_cpu_usage,omitempty"`
+
+	// Time spent in user space.
+	// Unit: nanoseconds
+	User uint64 `json:"user"`
+
+	// Time spent in kernel space.
+	// Unit: nanoseconds
+	System uint64 `json:"system"`
+}
+
 // All CPU usage metrics are cumulative from the creation of the container
 type CpuStats struct {
-	Usage struct {
-		// Total CPU usage.
-		// Units: nanoseconds
-		Total uint64 `json:"total"`
-
-		// Per CPU/core usage of the container.
-		// Unit: nanoseconds.
-		PerCpu []uint64 `json:"per_cpu_usage,omitempty"`
-
-		// Time spent in user space.
-		// Unit: nanoseconds
-		User uint64 `json:"user"`
-
-		// Time spent in kernel space.
-		// Unit: nanoseconds
-		System uint64 `json:"system"`
-	} `json:"usage"`
+	Usage CpuUsage `json:"usage"`
 	// Smoothed average of number of runnable threads x 1000.
 	// We multiply by thousand to avoid using floats, but preserving precision.
 	// Load is smoothed over the last 10 seconds. Instantaneous value can be read

@@ -21,6 +21,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/docker/libcontainer/cgroups"
 	"github.com/docker/libcontainer/cgroups/systemd"
@@ -43,23 +44,23 @@ var dockerRootDir = flag.String("docker_root", "/var/lib/docker", "Absolute path
 
 // Whether the system is using Systemd.
 var useSystemd bool
-
-func init() {
-	useSystemd = systemd.UseSystemd()
-	if !useSystemd {
-		// Second attempt at checking for systemd, check for a "name=systemd" cgroup.
-		mnt, err := cgroups.FindCgroupMountpoint("cpu")
-		if err == nil {
-			// systemd presence does not mean systemd controls cgroups.
-			// If system.slice cgroup exists, then systemd is taking control.
-			// This breaks if user creates system.slice manually :)
-			useSystemd = utils.FileExists(mnt + "/system.slice")
-		}
-	}
-}
+var check = sync.Once{}
 
 func UseSystemd() bool {
-	// init would run and initialize useSystemd before we can call this method.
+	check.Do(func() {
+		// run and initialize useSystemd
+		useSystemd = systemd.UseSystemd()
+		if !useSystemd {
+			// Second attempt at checking for systemd, check for a "name=systemd" cgroup.
+			mnt, err := cgroups.FindCgroupMountpoint("cpu")
+			if err == nil {
+				// systemd presence does not mean systemd controls cgroups.
+				// If system.slice cgroup exists, then systemd is taking control.
+				// This breaks if user creates system.slice manually :)
+				useSystemd = utils.FileExists(mnt + "/system.slice")
+			}
+		}
+	})
 	return useSystemd
 }
 
@@ -108,7 +109,7 @@ func ContainerNameToDockerId(name string) string {
 	id := path.Base(name)
 
 	// Turn systemd cgroup name into Docker ID.
-	if useSystemd {
+	if UseSystemd() {
 		id = strings.TrimPrefix(id, "docker-")
 		id = strings.TrimSuffix(id, ".scope")
 	}
@@ -119,7 +120,7 @@ func ContainerNameToDockerId(name string) string {
 // Returns a full container name for the specified Docker ID.
 func FullContainerName(dockerId string) string {
 	// Add the full container name.
-	if useSystemd {
+	if UseSystemd() {
 		return path.Join("/system.slice", fmt.Sprintf("docker-%s.scope", dockerId))
 	} else {
 		return path.Join("/docker", dockerId)
@@ -207,7 +208,7 @@ func Register(factory info.MachineInfoFactory, fsInfo fs.FsInfo) error {
 		}
 	}
 
-	if useSystemd {
+	if UseSystemd() {
 		glog.Infof("System is using systemd")
 	}
 
