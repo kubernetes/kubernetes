@@ -75,20 +75,20 @@ const (
 	initialNodeStatusUpdateFrequency = 100 * time.Millisecond
 	nodeStatusUpdateFrequencyInc     = 500 * time.Millisecond
 
-	// Node status update frequency and retry count.
+	// nodeStatusUpdateFrequency specifies how often kubelet posts node status to master.
 	// Note: be cautious when changing the constant, it must work with nodeMonitorGracePeriod
 	// in nodecontroller. There are several constraints:
 	// 1. nodeMonitorGracePeriod must be N times more than nodeStatusUpdateFrequency, where
 	//    N means number of retries allowed for kubelet to post node status. It is pointless
 	//    to make nodeMonitorGracePeriod be less than nodeStatusUpdateFrequency, since there
 	//    will only be fresh values from Kubelet at an interval of nodeStatusUpdateFrequency.
-	// 2. nodeMonitorGracePeriod can't be too large for user experience - larger value takes
-	//    longer for user to see up-to-date node status.
-	// 3. nodeStatusUpdateFrequency needs to be large enough for Kubelet to generate node
+	//    The constant must be less than podEvictionTimeout.
+	// 2. nodeStatusUpdateFrequency needs to be large enough for kubelet to generate node
 	//    status. Kubelet may fail to update node status reliablly if the value is too small,
 	//    as it takes time to gather all necessary node information.
 	nodeStatusUpdateFrequency = 2 * time.Second
-	nodeStatusUpdateRetry     = 5
+	// nodeStatusUpdateRetry specifies how many times kubelet retries when posting node status failed.
+	nodeStatusUpdateRetry = 5
 )
 
 var (
