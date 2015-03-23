@@ -18,6 +18,7 @@ package kubelet
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -95,6 +96,7 @@ func newTestKubelet(t *testing.T) *TestKubelet {
 	kubelet.sourcesReady = func() bool { return true }
 	kubelet.masterServiceNamespace = api.NamespaceDefault
 	kubelet.serviceLister = testServiceLister{}
+	kubelet.nodeLister = testNodeLister{}
 	kubelet.readiness = newReadinessStates()
 	kubelet.recorder = fakeRecorder
 	kubelet.podStatuses = map[string]api.PodStatus{}
@@ -1812,6 +1814,20 @@ func (ls testServiceLister) List() (api.ServiceList, error) {
 	}, nil
 }
 
+type testNodeLister struct {
+	nodes []api.Node
+}
+
+func (ls testNodeLister) GetNodeInfo(id string) (*api.Node, error) {
+	return nil, errors.New("not implemented")
+}
+
+func (ls testNodeLister) List() (api.NodeList, error) {
+	return api.NodeList{
+		Items: ls.nodes,
+	}, nil
+}
+
 func TestMakeEnvironmentVariables(t *testing.T) {
 	services := []api.Service{
 		{
@@ -2792,7 +2808,7 @@ func TestGetHostPortConflicts(t *testing.T) {
 		{Spec: api.PodSpec{Containers: []api.Container{{Ports: []api.ContainerPort{{HostPort: 83}}}}}},
 	}
 	// Pods should not cause any conflict.
-	conflicts := getHostPortConflicts(pods)
+	_, conflicts := checkHostPortConflicts(pods)
 	if len(conflicts) != 0 {
 		t.Errorf("expected no conflicts, Got %#v", conflicts)
 	}
@@ -2802,7 +2818,7 @@ func TestGetHostPortConflicts(t *testing.T) {
 		Spec: api.PodSpec{Containers: []api.Container{{Ports: []api.ContainerPort{{HostPort: 81}}}}},
 	}
 	pods = append(pods, expected)
-	if actual := getHostPortConflicts(pods); !reflect.DeepEqual(actual, []api.Pod{expected}) {
+	if _, actual := checkHostPortConflicts(pods); !reflect.DeepEqual(actual, []api.Pod{expected}) {
 		t.Errorf("expected %#v, Got %#v", expected, actual)
 	}
 }
@@ -2838,7 +2854,7 @@ func TestHandlePortConflicts(t *testing.T) {
 	// The newer pod should be rejected.
 	conflictedPodName := GetPodFullName(&pods[0])
 
-	kl.handleNotfittingPods(pods)
+	kl.handleNotFittingPods(pods)
 	if len(kl.podStatuses) != 1 {
 		t.Fatalf("expected length of status map to be 1. Got map %#v.", kl.podStatuses)
 	}
@@ -2856,6 +2872,59 @@ func TestHandlePortConflicts(t *testing.T) {
 	status, err := kl.GetPodStatus(conflictedPodName, "")
 	if err != nil {
 		t.Fatalf("unable to retrieve pod status for pod %q: #v.", conflictedPodName, err)
+	}
+	if status.Phase != api.PodFailed {
+		t.Fatalf("expected pod status %q. Got %q.", api.PodFailed, status.Phase)
+	}
+}
+
+// Tests that we handle not matching labels selector correctly by setting the failed status in status map.
+func TestHandleNodeSelector(t *testing.T) {
+	testKubelet := newTestKubelet(t)
+	kl := testKubelet.kubelet
+	kl.nodeLister = testNodeLister{nodes: []api.Node{
+		{ObjectMeta: api.ObjectMeta{Name: "testnode", Labels: map[string]string{"key": "B"}}},
+	}}
+	testKubelet.fakeCadvisor.On("MachineInfo").Return(&cadvisorApi.MachineInfo{}, nil)
+	pods := []api.Pod{
+		{
+			ObjectMeta: api.ObjectMeta{
+				UID:       "123456789",
+				Name:      "podA",
+				Namespace: "foo",
+			},
+			Spec: api.PodSpec{NodeSelector: map[string]string{"key": "A"}},
+		},
+		{
+			ObjectMeta: api.ObjectMeta{
+				UID:       "987654321",
+				Name:      "podB",
+				Namespace: "foo",
+			},
+			Spec: api.PodSpec{NodeSelector: map[string]string{"key": "B"}},
+		},
+	}
+	// The first pod should be rejected.
+	notfittingPodName := GetPodFullName(&pods[0])
+
+	kl.handleNotFittingPods(pods)
+	if len(kl.podStatuses) != 1 {
+		t.Fatalf("expected length of status map to be 1. Got map %#v.", kl.podStatuses)
+	}
+	// Check pod status stored in the status map.
+	status, ok := kl.podStatuses[notfittingPodName]
+	if !ok {
+		t.Fatalf("status of pod %q is not found in the status map.", notfittingPodName)
+	}
+	if status.Phase != api.PodFailed {
+		t.Fatalf("expected pod status %q. Got %q.", api.PodFailed, status.Phase)
+	}
+
+	// Check if we can retrieve the pod status from GetPodStatus().
+	kl.pods = pods
+	status, err := kl.GetPodStatus(notfittingPodName, "")
+	if err != nil {
+		t.Fatalf("unable to retrieve pod status for pod %q: #v.", notfittingPodName, err)
 	}
 	if status.Phase != api.PodFailed {
 		t.Fatalf("expected pod status %q. Got %q.", api.PodFailed, status.Phase)
@@ -2897,7 +2966,7 @@ func TestHandleMemExceeded(t *testing.T) {
 	// The newer pod should be rejected.
 	notfittingPodName := GetPodFullName(&pods[0])
 
-	kl.handleNotfittingPods(pods)
+	kl.handleNotFittingPods(pods)
 	if len(kl.podStatuses) != 1 {
 		t.Fatalf("expected length of status map to be 1. Got map %#v.", kl.podStatuses)
 	}
@@ -2931,7 +3000,7 @@ func TestPurgingObsoleteStatusMapEntries(t *testing.T) {
 		{Spec: api.PodSpec{Containers: []api.Container{{Ports: []api.ContainerPort{{HostPort: 80}}}}}},
 	}
 	// Run once to populate the status map.
-	kl.handleNotfittingPods(pods)
+	kl.handleNotFittingPods(pods)
 	if len(kl.podStatuses) != 1 {
 		t.Fatalf("expected length of status map to be 1. Got map %#v.", kl.podStatuses)
 	}

@@ -19,6 +19,9 @@ package client
 import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
 
 // FakeNodes implements MinionInterface. Meant to be embedded into a struct to get a default
@@ -55,4 +58,9 @@ func (c *FakeNodes) Delete(id string) error {
 func (c *FakeNodes) Update(minion *api.Node) (*api.Node, error) {
 	c.Fake.Actions = append(c.Fake.Actions, FakeAction{Action: "update-minion", Value: minion})
 	return &api.Node{}, nil
+}
+
+func (c *FakeNodes) Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
+	c.Fake.Actions = append(c.Fake.Actions, FakeAction{Action: "watch-minions", Value: resourceVersion})
+	return c.Fake.Watch, c.Fake.Err
 }
