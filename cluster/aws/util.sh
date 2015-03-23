@@ -688,21 +688,48 @@ function kube-down {
   fi
 
   echo "Deleting VPC"
-  sec_group_id=$($AWS_CMD describe-security-groups | get_sec_group_id)
-  if [[ -n "${sec_group_id}" ]]; then
-    $AWS_CMD delete-security-group --group-id $sec_group_id > $LOG
-  fi
-
   vpc_id=$($AWS_CMD describe-vpcs | get_vpc_id)
   if [[ -n "${vpc_id}" ]]; then
-    subnet_id=$($AWS_CMD describe-subnets | get_subnet_id $vpc_id)
-    igw_id=$($AWS_CMD describe-internet-gateways | get_igw_id $vpc_id)
-    route_table_id=$($AWS_CMD describe-route-tables | get_route_table_id $vpc_id)
+    default_sg_id=$($AWS_CMD --output text describe-security-groups \
+                             --filters Name=vpc-id,Values=$vpc_id Name=group-name,Values=default \
+                             --query SecurityGroups[].GroupId \
+                    | tr "\t" "\n")
+    sg_ids=$($AWS_CMD --output text describe-security-groups \
+                      --filters Name=vpc-id,Values=$vpc_id \
+                      --query SecurityGroups[].GroupId \
+             | tr "\t" "\n")
+    for sg_id in ${sg_ids}; do
+      # EC2 doesn't let us delete the default security group
+      if [[ "${sg_id}" != "${default_sg_id}" ]]; then
+        $AWS_CMD delete-security-group --group-id ${sg_id} > $LOG
+      fi
+    done
 
-    $AWS_CMD delete-subnet --subnet-id $subnet_id > $LOG
-    $AWS_CMD detach-internet-gateway --internet-gateway-id $igw_id --vpc-id $vpc_id > $LOG
-    $AWS_CMD delete-internet-gateway --internet-gateway-id $igw_id > $LOG
-    $AWS_CMD delete-route --route-table-id $route_table_id --destination-cidr-block 0.0.0.0/0 > $LOG
+    subnet_ids=$($AWS_CMD --output text describe-subnets \
+                          --filters Name=vpc-id,Values=$vpc_id \
+                          --query Subnets[].SubnetId \
+             | tr "\t" "\n")
+    for subnet_id in ${subnet_ids}; do
+      $AWS_CMD delete-subnet --subnet-id ${subnet_id} > $LOG
+    done
+
+    igw_ids=$($AWS_CMD --output text describe-internet-gateways \
+                       --filters Name=attachment.vpc-id,Values=$vpc_id \
+                       --query InternetGateways[].InternetGatewayId \
+             | tr "\t" "\n")
+    for igw_id in ${igw_ids}; do
+      $AWS_CMD detach-internet-gateway --internet-gateway-id $igw_id --vpc-id $vpc_id > $LOG
+      $AWS_CMD delete-internet-gateway --internet-gateway-id $igw_id > $LOG
+    done
+
+    route_table_ids=$($AWS_CMD --output text describe-route-tables \
+                               --filters Name=vpc-id,Values=$vpc_id \
+                                         Name=route.destination-cidr-block,Values=0.0.0.0/0 \
+                               --query RouteTables[].RouteTableId \
+                      | tr "\t" "\n")
+    for route_table_id in ${route_table_ids}; do
+      $AWS_CMD delete-route --route-table-id $route_table_id --destination-cidr-block 0.0.0.0/0 > $LOG
+    done
 
     $AWS_CMD delete-vpc --vpc-id $vpc_id > $LOG
   fi
