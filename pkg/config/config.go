@@ -19,10 +19,10 @@ package config
 import (
 	"fmt"
 
-	errs "github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	errs "github.com/GoogleCloudPlatform/kubernetes/pkg/util/fielderrors"
 )
 
 type RESTClientPoster interface {

@@ -18,9 +18,9 @@ package rest
 
 import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/validation"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/fielderrors"
 )
 
 // ObjectFunc is a function to act on a given object. An error may be returned
@@ -67,7 +67,7 @@ func (svcStrategy) ResetBeforeCreate(obj runtime.Object) {
 }
 
 // Validate validates a new service.
-func (svcStrategy) Validate(obj runtime.Object) errors.ValidationErrorList {
+func (svcStrategy) Validate(obj runtime.Object) fielderrors.ValidationErrorList {
 	service := obj.(*api.Service)
 	return validation.ValidateService(service)
 }
@@ -76,7 +76,7 @@ func (svcStrategy) AllowCreateOnUpdate() bool {
 	return true
 }
 
-func (svcStrategy) ValidateUpdate(obj, old runtime.Object) errors.ValidationErrorList {
+func (svcStrategy) ValidateUpdate(obj, old runtime.Object) fielderrors.ValidationErrorList {
 	return validation.ValidateServiceUpdate(old.(*api.Service), obj.(*api.Service))
 }
 
@@ -103,7 +103,7 @@ func (nodeStrategy) ResetBeforeCreate(obj runtime.Object) {
 }
 
 // Validate validates a new node.
-func (nodeStrategy) Validate(obj runtime.Object) errors.ValidationErrorList {
+func (nodeStrategy) Validate(obj runtime.Object) fielderrors.ValidationErrorList {
 	node := obj.(*api.Node)
 	return validation.ValidateMinion(node)
 }

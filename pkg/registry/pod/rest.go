@@ -28,6 +28,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/generic"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/fielderrors"
 )
 
 // podStrategy implements behavior for Pods
@@ -57,7 +58,7 @@ func (podStrategy) ResetBeforeCreate(obj runtime.Object) {
 }
 
 // Validate validates a new pod.
-func (podStrategy) Validate(obj runtime.Object) errors.ValidationErrorList {
+func (podStrategy) Validate(obj runtime.Object) fielderrors.ValidationErrorList {
 	pod := obj.(*api.Pod)
 	return validation.ValidatePod(pod)
 }
@@ -68,7 +69,7 @@ func (podStrategy) AllowCreateOnUpdate() bool {
 }
 
 // ValidateUpdate is the default update validation for an end user.
-func (podStrategy) ValidateUpdate(obj, old runtime.Object) errors.ValidationErrorList {
+func (podStrategy) ValidateUpdate(obj, old runtime.Object) fielderrors.ValidationErrorList {
 	return validation.ValidatePodUpdate(obj.(*api.Pod), old.(*api.Pod))
 }
 
@@ -83,7 +84,7 @@ type podStatusStrategy struct {
 
 var StatusStrategy = podStatusStrategy{Strategy}
 
-func (podStatusStrategy) ValidateUpdate(obj, old runtime.Object) errors.ValidationErrorList {
+func (podStatusStrategy) ValidateUpdate(obj, old runtime.Object) fielderrors.ValidationErrorList {
 	// TODO: merge valid fields after update
 	return validation.ValidatePodStatusUpdate(obj.(*api.Pod), old.(*api.Pod))
 }

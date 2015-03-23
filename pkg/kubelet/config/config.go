@@ -24,13 +24,13 @@ import (
 	"sync"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	apierrs "github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/validation"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/config"
 	utilerrors "github.com/GoogleCloudPlatform/kubernetes/pkg/util/errors"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/fielderrors"
 	"github.com/golang/glog"
 )
 
@@ -310,7 +310,7 @@ func filterInvalidPods(pods []api.Pod, source string, recorder record.EventRecor
 		} else {
 			name := kubelet.GetPodFullName(pod)
 			if names.Has(name) {
-				errlist = append(errlist, apierrs.NewFieldDuplicate("name", pod.Name))
+				errlist = append(errlist, fielderrors.NewFieldDuplicate("name", pod.Name))
 			} else {
 				names.Insert(name)
 			}

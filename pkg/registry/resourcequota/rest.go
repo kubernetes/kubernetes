@@ -20,12 +20,12 @@ import (
 	"fmt"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/validation"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/generic"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/fielderrors"
 )
 
 // resourcequotaStrategy implements behavior for ResourceQuota objects
@@ -50,7 +50,7 @@ func (resourcequotaStrategy) ResetBeforeCreate(obj runtime.Object) {
 }
 
 // Validate validates a new resourcequota.
-func (resourcequotaStrategy) Validate(obj runtime.Object) errors.ValidationErrorList {
+func (resourcequotaStrategy) Validate(obj runtime.Object) fielderrors.ValidationErrorList {
 	resourcequota := obj.(*api.ResourceQuota)
 	return validation.ValidateResourceQuota(resourcequota)
 }
@@ -61,7 +61,7 @@ func (resourcequotaStrategy) AllowCreateOnUpdate() bool {
 }
 
 // ValidateUpdate is the default update validation for an end user.
-func (resourcequotaStrategy) ValidateUpdate(obj, old runtime.Object) errors.ValidationErrorList {
+func (resourcequotaStrategy) ValidateUpdate(obj, old runtime.Object) fielderrors.ValidationErrorList {
 	return validation.ValidateResourceQuotaUpdate(obj.(*api.ResourceQuota), old.(*api.ResourceQuota))
 }
 
@@ -71,7 +71,7 @@ type resourcequotaStatusStrategy struct {
 
 var StatusStrategy = resourcequotaStatusStrategy{Strategy}
 
-func (resourcequotaStatusStrategy) ValidateUpdate(obj, old runtime.Object) errors.ValidationErrorList {
+func (resourcequotaStatusStrategy) ValidateUpdate(obj, old runtime.Object) fielderrors.ValidationErrorList {
 	return validation.ValidateResourceQuotaStatusUpdate(obj.(*api.ResourceQuota), old.(*api.ResourceQuota))
 }
 

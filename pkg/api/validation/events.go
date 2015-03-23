@@ -18,8 +18,8 @@ package validation
 
 import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	errs "github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	errs "github.com/GoogleCloudPlatform/kubernetes/pkg/util/fielderrors"
 )
 
 // ValidateEvent makes sure that the event makes sense.

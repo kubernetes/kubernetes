@@ -20,12 +20,12 @@ import (
 	"fmt"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/validation"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/generic"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/fielderrors"
 )
 
 // namespaceStrategy implements behavior for Namespaces
@@ -52,7 +52,7 @@ func (namespaceStrategy) ResetBeforeCreate(obj runtime.Object) {
 }
 
 // Validate validates a new namespace.
-func (namespaceStrategy) Validate(obj runtime.Object) errors.ValidationErrorList {
+func (namespaceStrategy) Validate(obj runtime.Object) fielderrors.ValidationErrorList {
 	namespace := obj.(*api.Namespace)
 	return validation.ValidateNamespace(namespace)
 }
@@ -63,7 +63,7 @@ func (namespaceStrategy) AllowCreateOnUpdate() bool {
 }
 
 // ValidateUpdate is the default update validation for an end user.
-func (namespaceStrategy) ValidateUpdate(obj, old runtime.Object) errors.ValidationErrorList {
+func (namespaceStrategy) ValidateUpdate(obj, old runtime.Object) fielderrors.ValidationErrorList {
 	return validation.ValidateNamespaceUpdate(obj.(*api.Namespace), old.(*api.Namespace))
 }
 
@@ -73,7 +73,7 @@ type namespaceStatusStrategy struct {
 
 var StatusStrategy = namespaceStatusStrategy{Strategy}
 
-func (namespaceStatusStrategy) ValidateUpdate(obj, old runtime.Object) errors.ValidationErrorList {
+func (namespaceStatusStrategy) ValidateUpdate(obj, old runtime.Object) fielderrors.ValidationErrorList {
 	// TODO: merge valid fields after update
 	return validation.ValidateNamespaceStatusUpdate(obj.(*api.Namespace), old.(*api.Namespace))
 }
