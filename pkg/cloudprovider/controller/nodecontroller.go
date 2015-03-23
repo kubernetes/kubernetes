@@ -27,6 +27,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	apierrors "github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/probe"
@@ -73,6 +74,7 @@ type NodeController struct {
 	nodes              []string
 	kubeClient         client.Interface
 	kubeletClient      client.KubeletClient
+	recorder           record.EventRecorder
 	registerRetryCount int
 	podEvictionTimeout time.Duration
 	// Method for easy mocking in unittest.
@@ -88,6 +90,7 @@ func NewNodeController(
 	staticResources *api.NodeResources,
 	kubeClient client.Interface,
 	kubeletClient client.KubeletClient,
+	recorder record.EventRecorder,
 	registerRetryCount int,
 	podEvictionTimeout time.Duration) *NodeController {
 	return &NodeController{
@@ -97,6 +100,7 @@ func NewNodeController(
 		staticResources:    staticResources,
 		kubeClient:         kubeClient,
 		kubeletClient:      kubeletClient,
+		recorder:           recorder,
 		registerRetryCount: registerRetryCount,
 		podEvictionTimeout: podEvictionTimeout,
 		lookupIP:           net.LookupIP,
@@ -120,6 +124,7 @@ func (nc *NodeController) Run(period time.Duration, syncNodeList, syncNodeStatus
 	// Register intial set of nodes with their status set.
 	var nodes *api.NodeList
 	var err error
+	record.StartRecording(nc.kubeClient.Events(""))
 	if nc.isRunningCloudProvider() {
 		if syncNodeList {
 			if nodes, err = nc.GetCloudNodesWithSpec(); err != nil {
