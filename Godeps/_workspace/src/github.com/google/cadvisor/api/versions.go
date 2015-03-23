@@ -36,6 +36,8 @@ const (
 	specApi          = "spec"
 	eventsApi        = "events"
 	storageApi       = "storage"
+	attributesApi    = "attributes"
+	versionApi       = "version"
 )
 
 // Interface for a cAdvisor API version
@@ -305,42 +307,69 @@ func (self *version2_0) SupportedRequestTypes() []string {
 }
 
 func (self *version2_0) HandleRequest(requestType string, request []string, m manager.Manager, w http.ResponseWriter, r *http.Request) error {
+	opt, err := getRequestOptions(r)
+	if err != nil {
+		return err
+	}
 	switch requestType {
-	case summaryApi:
-		containerName := getContainerName(request)
-		glog.V(2).Infof("Api - Summary(%v)", containerName)
-
-		stats, err := m.GetContainerDerivedStats(containerName)
+	case versionApi:
+		glog.V(2).Infof("Api - Version")
+		versionInfo, err := m.GetVersionInfo()
 		if err != nil {
 			return err
 		}
+		return writeResult(versionInfo.CadvisorVersion, w)
+	case attributesApi:
+		glog.V(2).Info("Api - Attributes")
 
+		machineInfo, err := m.GetMachineInfo()
+		if err != nil {
+			return err
+		}
+		versionInfo, err := m.GetVersionInfo()
+		if err != nil {
+			return err
+		}
+		info := v2.GetAttributes(machineInfo, versionInfo)
+		return writeResult(info, w)
+	case machineApi:
+		glog.V(2).Info("Api - Machine")
+
+		// TODO(rjnagal): Move machineInfo from v1.
+		machineInfo, err := m.GetMachineInfo()
+		if err != nil {
+			return err
+		}
+		return writeResult(machineInfo, w)
+	case summaryApi:
+		containerName := getContainerName(request)
+		glog.V(2).Infof("Api - Summary for container %q, options %+v", containerName, opt)
+
+		stats, err := m.GetDerivedStats(containerName, opt)
+		if err != nil {
+			return err
+		}
 		return writeResult(stats, w)
 	case statsApi:
 		name := getContainerName(request)
-		sr, err := getStatsRequest(name, r)
+		glog.V(2).Infof("Api - Stats: Looking for stats for container %q, options %+v", name, opt)
+		conts, err := m.GetRequestedContainersInfo(name, opt)
 		if err != nil {
 			return err
 		}
-		glog.V(2).Infof("Api - Stats: Looking for stats for container %q, options %+v", name, sr)
-		query := info.ContainerInfoRequest{
-			NumStats: sr.Count,
+		contStats := make(map[string][]v2.ContainerStats, 0)
+		for name, cont := range conts {
+			contStats[name] = convertStats(cont)
 		}
-		cont, err := m.GetContainerInfo(name, &query)
-		if err != nil {
-			return fmt.Errorf("failed to get container %q: %v", name, err)
-		}
-		contStats := convertStats(cont)
 		return writeResult(contStats, w)
 	case specApi:
 		containerName := getContainerName(request)
-		glog.V(2).Infof("Api - Spec(%v)", containerName)
-		spec, err := m.GetContainerSpec(containerName)
+		glog.V(2).Infof("Api - Spec for container %q, options %+v", containerName, opt)
+		specs, err := m.GetContainerSpec(containerName, opt)
 		if err != nil {
 			return err
 		}
-		specV2 := convertSpec(spec)
-		return writeResult(specV2, w)
+		return writeResult(specs, w)
 	case storageApi:
 		var err error
 		fi := []v2.FsInfo{}
@@ -362,26 +391,6 @@ func (self *version2_0) HandleRequest(requestType string, request []string, m ma
 	default:
 		return self.baseVersion.HandleRequest(requestType, request, m, w, r)
 	}
-}
-
-// Convert container spec from v1 to v2.
-func convertSpec(specV1 info.ContainerSpec) v2.ContainerSpec {
-	specV2 := v2.ContainerSpec{
-		CreationTime: specV1.CreationTime,
-		HasCpu:       specV1.HasCpu,
-		HasMemory:    specV1.HasMemory,
-	}
-	if specV1.HasCpu {
-		specV2.Cpu.Limit = specV1.Cpu.Limit
-		specV2.Cpu.MaxLimit = specV1.Cpu.MaxLimit
-		specV2.Cpu.Mask = specV1.Cpu.Mask
-	}
-	if specV1.HasMemory {
-		specV2.Memory.Limit = specV1.Memory.Limit
-		specV2.Memory.Reservation = specV1.Memory.Reservation
-		specV2.Memory.SwapLimit = specV1.Memory.SwapLimit
-	}
-	return specV2
 }
 
 func convertStats(cont *info.ContainerInfo) []v2.ContainerStats {
@@ -417,25 +426,35 @@ func convertStats(cont *info.ContainerInfo) []v2.ContainerStats {
 	return stats
 }
 
-func getStatsRequest(id string, r *http.Request) (v2.StatsRequest, error) {
+func getRequestOptions(r *http.Request) (v2.RequestOptions, error) {
+	supportedTypes := map[string]bool{
+		v2.TypeName:   true,
+		v2.TypeDocker: true,
+	}
 	// fill in the defaults.
-	sr := v2.StatsRequest{
-		IdType:    "name",
+	opt := v2.RequestOptions{
+		IdType:    v2.TypeName,
 		Count:     64,
 		Recursive: false,
 	}
 	idType := r.URL.Query().Get("type")
-	if len(idType) != 0 && idType != "name" {
-		return sr, fmt.Errorf("unknown 'type' %q for container name %q", idType, id)
+	if len(idType) != 0 {
+		if !supportedTypes[idType] {
+			return opt, fmt.Errorf("unknown 'type' %q", idType)
+		}
+		opt.IdType = idType
 	}
 	count := r.URL.Query().Get("count")
 	if len(count) != 0 {
 		n, err := strconv.ParseUint(count, 10, 32)
 		if err != nil {
-			return sr, fmt.Errorf("failed to parse 'count' option: %v", count)
+			return opt, fmt.Errorf("failed to parse 'count' option: %v", count)
 		}
-		sr.Count = int(n)
+		opt.Count = int(n)
 	}
-	// TODO(rjnagal): Add option to specify recursive.
-	return sr, nil
+	recursive := r.URL.Query().Get("recursive")
+	if recursive == "true" {
+		opt.Recursive = true
+	}
+	return opt, nil
 }

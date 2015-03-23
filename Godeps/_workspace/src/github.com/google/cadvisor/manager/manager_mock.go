@@ -55,14 +55,19 @@ func (c *ManagerMock) DockerContainer(name string, query *info.ContainerInfoRequ
 	return args.Get(0).(info.ContainerInfo), args.Error(1)
 }
 
-func (c *ManagerMock) GetContainerSpec(containerName string) (info.ContainerSpec, error) {
-	args := c.Called(containerName)
-	return args.Get(0).(info.ContainerSpec), args.Error(1)
+func (c *ManagerMock) GetContainerSpec(containerName string, options v2.RequestOptions) (map[string]v2.ContainerSpec, error) {
+	args := c.Called(containerName, options)
+	return args.Get(0).(map[string]v2.ContainerSpec), args.Error(1)
 }
 
-func (c *ManagerMock) GetContainerDerivedStats(containerName string) (v2.DerivedStats, error) {
-	args := c.Called(containerName)
-	return args.Get(0).(v2.DerivedStats), args.Error(1)
+func (c *ManagerMock) GetDerivedStats(containerName string, options v2.RequestOptions) (map[string]v2.DerivedStats, error) {
+	args := c.Called(containerName, options)
+	return args.Get(0).(map[string]v2.DerivedStats), args.Error(1)
+}
+
+func (c *ManagerMock) GetRequestedContainersInfo(containerName string, options v2.RequestOptions) (map[string]*info.ContainerInfo, error) {
+	args := c.Called(containerName, options)
+	return args.Get(0).(map[string]*info.ContainerInfo), args.Error(1)
 }
 
 func (c *ManagerMock) WatchForEvents(queryuest *events.Request, passedChannel chan *events.Event) error {

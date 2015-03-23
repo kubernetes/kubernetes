@@ -20,253 +20,359 @@ import (
 
 	"github.com/golang/glog"
 	info "github.com/google/cadvisor/info/v1"
-	"github.com/google/cadvisor/manager"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-type prometheusMetric struct {
-	valueType prometheus.ValueType
-	value     float64
-	labels    []string
+// This will usually be manager.Manager, but can be swapped out for testing.
+type subcontainersInfoProvider interface {
+	// Get information about all subcontainers of the specified container (includes self).
+	SubcontainersInfo(containerName string, query *info.ContainerInfoRequest) ([]*info.ContainerInfo, error)
+}
+
+// metricValue describes a single metric value for a given set of label values
+// within a parent containerMetric.
+type metricValue struct {
+	value  float64
+	labels []string
+}
+
+type metricValues []metricValue
+
+// fsValues is a helper method for assembling per-filesystem stats.
+func fsValues(fsStats []info.FsStats, valueFn func(*info.FsStats) float64) metricValues {
+	values := make(metricValues, 0, len(fsStats))
+	for _, stat := range fsStats {
+		values = append(values, metricValue{
+			value:  valueFn(&stat),
+			labels: []string{stat.Device},
+		})
+	}
+	return values
+}
+
+// A containerMetric describes a multi-dimensional metric used for exposing
+// a certain type of container statistic.
+type containerMetric struct {
+	name        string
+	help        string
+	valueType   prometheus.ValueType
+	extraLabels []string
+	getValues   func(s *info.ContainerStats) metricValues
+}
+
+func (cm *containerMetric) desc() *prometheus.Desc {
+	return prometheus.NewDesc(cm.name, cm.help, append([]string{"name", "id"}, cm.extraLabels...), nil)
 }
 
 // PrometheusCollector implements prometheus.Collector.
 type PrometheusCollector struct {
-	manager manager.Manager
-
-	errors   prometheus.Gauge
-	lastSeen *prometheus.Desc
-
-	cpuUsageUserSeconds   *prometheus.Desc
-	cpuUsageSystemSeconds *prometheus.Desc
-	cpuUsageSecondsPerCPU *prometheus.Desc
-
-	memoryUsageBytes *prometheus.Desc
-	memoryWorkingSet *prometheus.Desc
-	memoryFailures   *prometheus.Desc
-
-	fsLimit        *prometheus.Desc
-	fsUsage        *prometheus.Desc
-	fsReads        *prometheus.Desc
-	fsReadsSectors *prometheus.Desc
-	fsReadsMerged  *prometheus.Desc
-	fsReadTime     *prometheus.Desc
-
-	fsWrites        *prometheus.Desc
-	fsWritesSectors *prometheus.Desc
-	fsWritesMerged  *prometheus.Desc
-	fsWriteTime     *prometheus.Desc
-
-	fsIoInProgress *prometheus.Desc
-	fsIoTime       *prometheus.Desc
-
-	fsWeightedIoTime *prometheus.Desc
-
-	networkRxBytes   *prometheus.Desc
-	networkRxPackets *prometheus.Desc
-	networkRxErrors  *prometheus.Desc
-	networkRxDropped *prometheus.Desc
-	networkTxBytes   *prometheus.Desc
-	networkTxPackets *prometheus.Desc
-	networkTxErrors  *prometheus.Desc
-	networkTxDropped *prometheus.Desc
-
-	tasks *prometheus.Desc
-
-	descs []*prometheus.Desc
+	infoProvider     subcontainersInfoProvider
+	errors           prometheus.Gauge
+	containerMetrics []containerMetric
 }
 
 // NewPrometheusCollector returns a new PrometheusCollector.
-func NewPrometheusCollector(manager manager.Manager) *PrometheusCollector {
+func NewPrometheusCollector(infoProvider subcontainersInfoProvider) *PrometheusCollector {
 	c := &PrometheusCollector{
-		manager: manager,
+		infoProvider: infoProvider,
 		errors: prometheus.NewGauge(prometheus.GaugeOpts{
 			Namespace: "container",
 			Name:      "scrape_error",
 			Help:      "1 if there was an error while getting container metrics, 0 otherwise",
 		}),
-		lastSeen: prometheus.NewDesc(
-			"container_last_seen",
-			"Last time a container was seen by the exporter",
-			[]string{"name", "id"},
-			nil),
-		cpuUsageUserSeconds: prometheus.NewDesc(
-			"container_cpu_user_seconds_total",
-			"Cumulative user cpu time consumed in seconds.",
-			[]string{"name", "id"},
-			nil),
-		cpuUsageSystemSeconds: prometheus.NewDesc(
-			"container_cpu_system_seconds_total",
-			"Cumulative system cpu time consumed in seconds.",
-			[]string{"name", "id"},
-			nil),
-		cpuUsageSecondsPerCPU: prometheus.NewDesc(
-			"container_cpu_usage_seconds_total",
-			"Cumulative cpu time consumed per cpu in seconds.",
-			[]string{"name", "id", "cpu"},
-			nil),
-		memoryUsageBytes: prometheus.NewDesc(
-			"container_memory_usage_bytes",
-			"Current memory usage in bytes.",
-			[]string{"name", "id"},
-			nil),
-		memoryWorkingSet: prometheus.NewDesc(
-			"container_memory_working_set_bytes",
-			"Current working set in bytes.",
-			[]string{"name", "id"},
-			nil),
-		memoryFailures: prometheus.NewDesc(
-			"container_memory_failures_total",
-			"Cumulative count of memory allocation failures.",
-			[]string{"type", "scope", "name", "id"},
-			nil),
-
-		fsLimit: prometheus.NewDesc(
-			"container_fs_limit_bytes",
-			"Number of bytes that can be consumed by the container on this filesystem.",
-			[]string{"name", "id", "device"},
-			nil),
-		fsUsage: prometheus.NewDesc(
-			"container_fs_usage_bytes",
-			"Number of bytes that are consumed by the container on this filesystem.",
-			[]string{"name", "id", "device"},
-			nil),
-		fsReads: prometheus.NewDesc(
-			"container_fs_reads_total",
-			"Cumulative count of reads completed",
-			[]string{"name", "id", "device"},
-			nil),
-		fsReadsSectors: prometheus.NewDesc(
-			"container_fs_sector_reads_total",
-			"Cumulative count of sector reads completed",
-			[]string{"name", "id", "device"},
-			nil),
-		fsReadsMerged: prometheus.NewDesc(
-			"container_fs_reads_merged_total",
-			"Cumulative count of reads merged",
-			[]string{"name", "id", "device"},
-			nil),
-		fsReadTime: prometheus.NewDesc(
-			"container_fs_read_seconds_total",
-			"Cumulative count of seconds spent reading",
-			[]string{"name", "id", "device"},
-			nil),
-		fsWrites: prometheus.NewDesc(
-			"container_fs_writes_total",
-			"Cumulative count of writes completed",
-			[]string{"name", "id", "device"},
-			nil),
-		fsWritesSectors: prometheus.NewDesc(
-			"container_fs_sector_writes_total",
-			"Cumulative count of sector writes completed",
-			[]string{"name", "id", "device"},
-			nil),
-		fsWritesMerged: prometheus.NewDesc(
-			"container_fs_writes_merged_total",
-			"Cumulative count of writes merged",
-			[]string{"name", "id", "device"},
-			nil),
-		fsWriteTime: prometheus.NewDesc(
-			"container_fs_write_seconds_total",
-			"Cumulative count of seconds spent writing",
-			[]string{"name", "id", "device"},
-			nil),
-		fsIoInProgress: prometheus.NewDesc(
-			"container_fs_io_current",
-			"Number of I/Os currently in progress",
-			[]string{"name", "id", "device"},
-			nil),
-		fsIoTime: prometheus.NewDesc(
-			"container_fs_io_time_seconds_total",
-			"Cumulative count of seconds spent doing I/Os",
-			[]string{"name", "id", "device"},
-			nil),
-		fsWeightedIoTime: prometheus.NewDesc(
-			"container_fs_io_time_weighted_seconds_total",
-			"Cumulative weighted I/O time in seconds",
-			[]string{"name", "id", "device"},
-			nil),
-		networkRxBytes: prometheus.NewDesc(
-			"container_network_receive_bytes_total",
-			"Cumulative count of bytes received",
-			[]string{"name", "id"},
-			nil),
-		networkRxPackets: prometheus.NewDesc(
-			"container_network_receive_packets_total",
-			"Cumulative count of packets received",
-			[]string{"name", "id"},
-			nil),
-		networkRxDropped: prometheus.NewDesc(
-			"container_network_receive_packets_dropped_total",
-			"Cumulative count of packets dropped while receiving",
-			[]string{"name", "id"},
-			nil),
-		networkRxErrors: prometheus.NewDesc(
-			"container_network_receive_errors_total",
-			"Cumulative count of errors encountered while receiving",
-			[]string{"name", "id"},
-			nil),
-		networkTxBytes: prometheus.NewDesc(
-			"container_network_transmit_bytes_total",
-			"Cumulative count of bytes transmitted",
-			[]string{"name", "id"},
-			nil),
-		networkTxPackets: prometheus.NewDesc(
-			"container_network_transmit_packets_total",
-			"Cumulative count of packets transmitted",
-			[]string{"name", "id"},
-			nil),
-		networkTxDropped: prometheus.NewDesc(
-			"container_network_transmit_packets_dropped_total",
-			"Cumulative count of packets dropped while transmitting",
-			[]string{"name", "id"},
-			nil),
-		networkTxErrors: prometheus.NewDesc(
-			"container_network_transmit_errors_total",
-			"Cumulative count of errors encountered while transmitting",
-			[]string{"name", "id"},
-			nil),
-
-		tasks: prometheus.NewDesc(
-			"container_tasks_state",
-			"Number of tasks in given state",
-			[]string{"state", "name", "id"},
-			nil),
-	}
-	c.descs = []*prometheus.Desc{
-		c.lastSeen,
-
-		c.cpuUsageUserSeconds,
-		c.cpuUsageSystemSeconds,
-
-		c.memoryUsageBytes,
-		c.memoryWorkingSet,
-		c.memoryFailures,
-
-		c.fsLimit,
-		c.fsUsage,
-		c.fsReads,
-		c.fsReadsSectors,
-		c.fsReadsMerged,
-		c.fsReadTime,
-		c.fsWrites,
-		c.fsWritesSectors,
-		c.fsWritesMerged,
-		c.fsWriteTime,
-		c.fsIoInProgress,
-		c.fsIoTime,
-		c.fsWeightedIoTime,
-
-		c.networkRxBytes,
-		c.networkRxPackets,
-		c.networkRxErrors,
-		c.networkRxDropped,
-		c.networkTxBytes,
-		c.networkTxPackets,
-		c.networkTxErrors,
-		c.networkTxDropped,
-
-		c.tasks,
+		containerMetrics: []containerMetric{
+			{
+				name:      "container_last_seen",
+				help:      "Last time a container was seen by the exporter",
+				valueType: prometheus.GaugeValue,
+				getValues: func(s *info.ContainerStats) metricValues {
+					return metricValues{{value: float64(time.Now().Unix())}}
+				},
+			}, {
+				name:      "container_cpu_user_seconds_total",
+				help:      "Cumulative user cpu time consumed in seconds.",
+				valueType: prometheus.CounterValue,
+				getValues: func(s *info.ContainerStats) metricValues {
+					return metricValues{{value: float64(s.Cpu.Usage.User) / float64(time.Second)}}
+				},
+			}, {
+				name:      "container_cpu_system_seconds_total",
+				help:      "Cumulative system cpu time consumed in seconds.",
+				valueType: prometheus.CounterValue,
+				getValues: func(s *info.ContainerStats) metricValues {
+					return metricValues{{value: float64(s.Cpu.Usage.System) / float64(time.Second)}}
+				},
+			}, {
+				name:        "container_cpu_usage_seconds_total",
+				help:        "Cumulative cpu time consumed per cpu in seconds.",
+				valueType:   prometheus.CounterValue,
+				extraLabels: []string{"cpu"},
+				getValues: func(s *info.ContainerStats) metricValues {
+					values := make(metricValues, 0, len(s.Cpu.Usage.PerCpu))
+					for i, value := range s.Cpu.Usage.PerCpu {
+						values = append(values, metricValue{
+							value:  float64(value) / float64(time.Second),
+							labels: []string{fmt.Sprintf("cpu%02d", i)},
+						})
+					}
+					return values
+				},
+			}, {
+				name:      "container_memory_usage_bytes",
+				help:      "Current memory usage in bytes.",
+				valueType: prometheus.GaugeValue,
+				getValues: func(s *info.ContainerStats) metricValues {
+					return metricValues{{value: float64(s.Memory.Usage)}}
+				},
+			}, {
+				name:      "container_memory_working_set_bytes",
+				help:      "Current working set in bytes.",
+				valueType: prometheus.GaugeValue,
+				getValues: func(s *info.ContainerStats) metricValues {
+					return metricValues{{value: float64(s.Memory.WorkingSet)}}
+				},
+			}, {
+				name:        "container_memory_failures_total",
+				help:        "Cumulative count of memory allocation failures.",
+				valueType:   prometheus.CounterValue,
+				extraLabels: []string{"type", "scope"},
+				getValues: func(s *info.ContainerStats) metricValues {
+					return metricValues{
+						{
+							value:  float64(s.Memory.ContainerData.Pgfault),
+							labels: []string{"pgfault", "container"},
+						},
+						{
+							value:  float64(s.Memory.ContainerData.Pgmajfault),
+							labels: []string{"pgmajfault", "container"},
+						},
+						{
+							value:  float64(s.Memory.HierarchicalData.Pgfault),
+							labels: []string{"pgfault", "hierarchy"},
+						},
+						{
+							value:  float64(s.Memory.HierarchicalData.Pgmajfault),
+							labels: []string{"pgmajfault", "hierarchy"},
+						},
+					}
+				},
+			}, {
+				name:        "container_fs_limit_bytes",
+				help:        "Number of bytes that can be consumed by the container on this filesystem.",
+				valueType:   prometheus.GaugeValue,
+				extraLabels: []string{"device"},
+				getValues: func(s *info.ContainerStats) metricValues {
+					return fsValues(s.Filesystem, func(fs *info.FsStats) float64 {
+						return float64(fs.Limit)
+					})
+				},
+			}, {
+				name:        "container_fs_usage_bytes",
+				help:        "Number of bytes that are consumed by the container on this filesystem.",
+				valueType:   prometheus.GaugeValue,
+				extraLabels: []string{"device"},
+				getValues: func(s *info.ContainerStats) metricValues {
+					return fsValues(s.Filesystem, func(fs *info.FsStats) float64 {
+						return float64(fs.Usage)
+					})
+				},
+			}, {
+				name:        "container_fs_reads_total",
+				help:        "Cumulative count of reads completed",
+				valueType:   prometheus.CounterValue,
+				extraLabels: []string{"device"},
+				getValues: func(s *info.ContainerStats) metricValues {
+					return fsValues(s.Filesystem, func(fs *info.FsStats) float64 {
+						return float64(fs.ReadsCompleted)
+					})
+				},
+			}, {
+				name:        "container_fs_sector_reads_total",
+				help:        "Cumulative count of sector reads completed",
+				valueType:   prometheus.CounterValue,
+				extraLabels: []string{"device"},
+				getValues: func(s *info.ContainerStats) metricValues {
+					return fsValues(s.Filesystem, func(fs *info.FsStats) float64 {
+						return float64(fs.SectorsRead)
+					})
+				},
+			}, {
+				name:        "container_fs_reads_merged_total",
+				help:        "Cumulative count of reads merged",
+				valueType:   prometheus.CounterValue,
+				extraLabels: []string{"device"},
+				getValues: func(s *info.ContainerStats) metricValues {
+					return fsValues(s.Filesystem, func(fs *info.FsStats) float64 {
+						return float64(fs.ReadsMerged)
+					})
+				},
+			}, {
+				name:        "container_fs_read_seconds_total",
+				help:        "Cumulative count of seconds spent reading",
+				valueType:   prometheus.CounterValue,
+				extraLabels: []string{"device"},
+				getValues: func(s *info.ContainerStats) metricValues {
+					return fsValues(s.Filesystem, func(fs *info.FsStats) float64 {
+						return float64(fs.ReadTime) / float64(time.Second)
+					})
+				},
+			}, {
+				name:        "container_fs_writes_total",
+				help:        "Cumulative count of writes completed",
+				valueType:   prometheus.CounterValue,
+				extraLabels: []string{"device"},
+				getValues: func(s *info.ContainerStats) metricValues {
+					return fsValues(s.Filesystem, func(fs *info.FsStats) float64 {
+						return float64(fs.WritesCompleted)
+					})
+				},
+			}, {
+				name:        "container_fs_sector_writes_total",
+				help:        "Cumulative count of sector writes completed",
+				valueType:   prometheus.CounterValue,
+				extraLabels: []string{"device"},
+				getValues: func(s *info.ContainerStats) metricValues {
+					return fsValues(s.Filesystem, func(fs *info.FsStats) float64 {
+						return float64(fs.SectorsWritten)
+					})
+				},
+			}, {
+				name:        "container_fs_writes_merged_total",
+				help:        "Cumulative count of writes merged",
+				valueType:   prometheus.CounterValue,
+				extraLabels: []string{"device"},
+				getValues: func(s *info.ContainerStats) metricValues {
+					return fsValues(s.Filesystem, func(fs *info.FsStats) float64 {
+						return float64(fs.WritesMerged)
+					})
+				},
+			}, {
+				name:        "container_fs_write_seconds_total",
+				help:        "Cumulative count of seconds spent writing",
+				valueType:   prometheus.CounterValue,
+				extraLabels: []string{"device"},
+				getValues: func(s *info.ContainerStats) metricValues {
+					return fsValues(s.Filesystem, func(fs *info.FsStats) float64 {
+						return float64(fs.WriteTime) / float64(time.Second)
+					})
+				},
+			}, {
+				name:        "container_fs_io_current",
+				help:        "Number of I/Os currently in progress",
+				valueType:   prometheus.GaugeValue,
+				extraLabels: []string{"device"},
+				getValues: func(s *info.ContainerStats) metricValues {
+					return fsValues(s.Filesystem, func(fs *info.FsStats) float64 {
+						return float64(fs.IoInProgress)
+					})
+				},
+			}, {
+				name:        "container_fs_io_time_seconds_total",
+				help:        "Cumulative count of seconds spent doing I/Os",
+				valueType:   prometheus.CounterValue,
+				extraLabels: []string{"device"},
+				getValues: func(s *info.ContainerStats) metricValues {
+					return fsValues(s.Filesystem, func(fs *info.FsStats) float64 {
+						return float64(float64(fs.IoTime) / float64(time.Second))
+					})
+				},
+			}, {
+				name:        "container_fs_io_time_weighted_seconds_total",
+				help:        "Cumulative weighted I/O time in seconds",
+				valueType:   prometheus.CounterValue,
+				extraLabels: []string{"device"},
+				getValues: func(s *info.ContainerStats) metricValues {
+					return fsValues(s.Filesystem, func(fs *info.FsStats) float64 {
+						return float64(fs.WeightedIoTime) / float64(time.Second)
+					})
+				},
+			}, {
+				name:      "container_network_receive_bytes_total",
+				help:      "Cumulative count of bytes received",
+				valueType: prometheus.CounterValue,
+				getValues: func(s *info.ContainerStats) metricValues {
+					return metricValues{{value: float64(s.Network.RxBytes)}}
+				},
+			}, {
+				name:      "container_network_receive_packets_total",
+				help:      "Cumulative count of packets received",
+				valueType: prometheus.CounterValue,
+				getValues: func(s *info.ContainerStats) metricValues {
+					return metricValues{{value: float64(s.Network.RxPackets)}}
+				},
+			}, {
+				name:      "container_network_receive_packets_dropped_total",
+				help:      "Cumulative count of packets dropped while receiving",
+				valueType: prometheus.CounterValue,
+				getValues: func(s *info.ContainerStats) metricValues {
+					return metricValues{{value: float64(s.Network.RxDropped)}}
+				},
+			}, {
+				name:      "container_network_receive_errors_total",
+				help:      "Cumulative count of errors encountered while receiving",
+				valueType: prometheus.CounterValue,
+				getValues: func(s *info.ContainerStats) metricValues {
+					return metricValues{{value: float64(s.Network.RxErrors)}}
+				},
+			}, {
+				name:      "container_network_transmit_bytes_total",
+				help:      "Cumulative count of bytes transmitted",
+				valueType: prometheus.CounterValue,
+				getValues: func(s *info.ContainerStats) metricValues {
+					return metricValues{{value: float64(s.Network.TxBytes)}}
+				},
+			}, {
+				name:      "container_network_transmit_packets_total",
+				help:      "Cumulative count of packets transmitted",
+				valueType: prometheus.CounterValue,
+				getValues: func(s *info.ContainerStats) metricValues {
+					return metricValues{{value: float64(s.Network.TxPackets)}}
+				},
+			}, {
+				name:      "container_network_transmit_packets_dropped_total",
+				help:      "Cumulative count of packets dropped while transmitting",
+				valueType: prometheus.CounterValue,
+				getValues: func(s *info.ContainerStats) metricValues {
+					return metricValues{{value: float64(s.Network.TxDropped)}}
+				},
+			}, {
+				name:      "container_network_transmit_errors_total",
+				help:      "Cumulative count of errors encountered while transmitting",
+				valueType: prometheus.CounterValue,
+				getValues: func(s *info.ContainerStats) metricValues {
+					return metricValues{{value: float64(s.Network.TxErrors)}}
+				},
+			}, {
+				name:        "container_tasks_state",
+				help:        "Number of tasks in given state",
+				extraLabels: []string{"state"},
+				valueType:   prometheus.GaugeValue,
+				getValues: func(s *info.ContainerStats) metricValues {
+					return metricValues{
+						{
+							value:  float64(s.TaskStats.NrSleeping),
+							labels: []string{"sleeping"},
+						},
+						{
+							value:  float64(s.TaskStats.NrRunning),
+							labels: []string{"running"},
+						},
+						{
+							value:  float64(s.TaskStats.NrStopped),
+							labels: []string{"stopped"},
+						},
+						{
+							value:  float64(s.TaskStats.NrUninterruptible),
+							labels: []string{"uninterruptible"},
+						},
+						{
+							value:  float64(s.TaskStats.NrIoWait),
+							labels: []string{"iowaiting"},
+						},
+					}
+				},
+			},
+		},
 	}
 	return c
 }
@@ -275,15 +381,15 @@ func NewPrometheusCollector(manager manager.Manager) *PrometheusCollector {
 // implements prometheus.PrometheusCollector.
 func (c *PrometheusCollector) Describe(ch chan<- *prometheus.Desc) {
 	c.errors.Describe(ch)
-	for _, d := range c.descs {
-		ch <- d
+	for _, cm := range c.containerMetrics {
+		ch <- cm.desc()
 	}
 }
 
 // Collect fetches the stats from all containers and delivers them as
 // Prometheus metrics. It implements prometheus.PrometheusCollector.
 func (c *PrometheusCollector) Collect(ch chan<- prometheus.Metric) {
-	containers, err := c.manager.SubcontainersInfo("/", &info.ContainerInfoRequest{NumStats: 1})
+	containers, err := c.infoProvider.SubcontainersInfo("/", &info.ContainerInfoRequest{NumStats: 1})
 	if err != nil {
 		c.errors.Set(1)
 		glog.Warning("Couldn't get containers: %s", err)
@@ -297,68 +403,10 @@ func (c *PrometheusCollector) Collect(ch chan<- prometheus.Metric) {
 		}
 		stats := container.Stats[0]
 
-		for desc, metrics := range map[*prometheus.Desc][]prometheusMetric{
-			c.cpuUsageUserSeconds:   {{valueType: prometheus.CounterValue, value: float64(stats.Cpu.Usage.User) / float64(time.Second)}},
-			c.cpuUsageSystemSeconds: {{valueType: prometheus.CounterValue, value: float64(stats.Cpu.Usage.System) / float64(time.Second)}},
-
-			c.memoryFailures: {
-				{valueType: prometheus.CounterValue, labels: []string{"pgfault", "container"}, value: float64(stats.Memory.ContainerData.Pgfault)},
-				{valueType: prometheus.CounterValue, labels: []string{"pgmajfault", "container"}, value: float64(stats.Memory.ContainerData.Pgmajfault)},
-				{valueType: prometheus.CounterValue, labels: []string{"pgfault", "hierarchy"}, value: float64(stats.Memory.HierarchicalData.Pgfault)},
-				{valueType: prometheus.CounterValue, labels: []string{"pgmajfault", "hierarchy"}, value: float64(stats.Memory.HierarchicalData.Pgmajfault)},
-			},
-			c.tasks: {
-				{valueType: prometheus.GaugeValue, labels: []string{"sleeping"}, value: float64(stats.TaskStats.NrSleeping)},
-				{valueType: prometheus.GaugeValue, labels: []string{"running"}, value: float64(stats.TaskStats.NrRunning)},
-				{valueType: prometheus.GaugeValue, labels: []string{"stopped"}, value: float64(stats.TaskStats.NrStopped)},
-				{valueType: prometheus.GaugeValue, labels: []string{"uninterruptible"}, value: float64(stats.TaskStats.NrUninterruptible)},
-				{valueType: prometheus.GaugeValue, labels: []string{"iowaiting"}, value: float64(stats.TaskStats.NrIoWait)},
-			},
-
-			c.lastSeen: {{valueType: prometheus.GaugeValue, value: float64(time.Now().Unix())}},
-
-			c.memoryUsageBytes: {{valueType: prometheus.GaugeValue, value: float64(stats.Memory.Usage)}},
-			c.memoryWorkingSet: {{valueType: prometheus.GaugeValue, value: float64(stats.Memory.WorkingSet)}},
-
-			c.networkRxBytes:   {{valueType: prometheus.CounterValue, value: float64(stats.Network.RxBytes)}},
-			c.networkRxPackets: {{valueType: prometheus.CounterValue, value: float64(stats.Network.RxPackets)}},
-			c.networkRxErrors:  {{valueType: prometheus.CounterValue, value: float64(stats.Network.RxErrors)}},
-			c.networkRxDropped: {{valueType: prometheus.CounterValue, value: float64(stats.Network.RxDropped)}},
-			c.networkTxBytes:   {{valueType: prometheus.CounterValue, value: float64(stats.Network.TxBytes)}},
-			c.networkTxPackets: {{valueType: prometheus.CounterValue, value: float64(stats.Network.TxPackets)}},
-			c.networkTxErrors:  {{valueType: prometheus.CounterValue, value: float64(stats.Network.TxErrors)}},
-			c.networkTxDropped: {{valueType: prometheus.CounterValue, value: float64(stats.Network.TxDropped)}},
-		} {
-			for _, m := range metrics {
-				ch <- prometheus.MustNewConstMetric(desc, prometheus.CounterValue, float64(m.value), append(m.labels, name, id)...)
-			}
-		}
-
-		// Metrics with dynamic labels
-		for i, value := range stats.Cpu.Usage.PerCpu {
-			ch <- prometheus.MustNewConstMetric(c.cpuUsageSecondsPerCPU, prometheus.CounterValue, float64(value)/float64(time.Second), name, id, fmt.Sprintf("cpu%02d", i))
-		}
-
-		for _, stat := range stats.Filesystem {
-			for desc, m := range map[*prometheus.Desc]prometheusMetric{
-				c.fsReads:        {valueType: prometheus.CounterValue, value: float64(stat.ReadsCompleted)},
-				c.fsReadsSectors: {valueType: prometheus.CounterValue, value: float64(stat.SectorsRead)},
-				c.fsReadsMerged:  {valueType: prometheus.CounterValue, value: float64(stat.ReadsMerged)},
-				c.fsReadTime:     {valueType: prometheus.CounterValue, value: float64(stat.ReadTime) / float64(time.Second)},
-
-				c.fsWrites:        {valueType: prometheus.CounterValue, value: float64(stat.WritesCompleted)},
-				c.fsWritesSectors: {valueType: prometheus.CounterValue, value: float64(stat.SectorsWritten)},
-				c.fsWritesMerged:  {valueType: prometheus.CounterValue, value: float64(stat.WritesMerged)},
-				c.fsWriteTime:     {valueType: prometheus.CounterValue, value: float64(stat.WriteTime) / float64(time.Second)},
-
-				c.fsIoTime:         {valueType: prometheus.CounterValue, value: float64(stat.IoTime) / float64(time.Second)},
-				c.fsWeightedIoTime: {valueType: prometheus.CounterValue, value: float64(stat.WeightedIoTime) / float64(time.Second)},
-
-				c.fsIoInProgress: {valueType: prometheus.GaugeValue, value: float64(stat.IoInProgress)},
-				c.fsLimit:        {valueType: prometheus.GaugeValue, value: float64(stat.Limit)},
-				c.fsUsage:        {valueType: prometheus.GaugeValue, value: float64(stat.Usage)},
-			} {
-				ch <- prometheus.MustNewConstMetric(desc, m.valueType, m.value, name, id, stat.Device)
+		for _, cm := range c.containerMetrics {
+			desc := cm.desc()
+			for _, metricValue := range cm.getValues(stats) {
+				ch <- prometheus.MustNewConstMetric(desc, cm.valueType, float64(metricValue.value), append([]string{name, id}, metricValue.labels...)...)
 			}
 		}
 	}

@@ -182,7 +182,7 @@ func (c *containerData) housekeeping() {
 	}
 
 	// Housekeep every second.
-	glog.Infof("Start housekeeping for container %q\n", c.info.Name)
+	glog.V(3).Infof("Start housekeeping for container %q\n", c.info.Name)
 	lastHousekeeping := time.Now()
 	for {
 		select {

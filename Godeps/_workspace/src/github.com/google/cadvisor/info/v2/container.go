@@ -22,6 +22,11 @@ import (
 	"github.com/google/cadvisor/info/v1"
 )
 
+const (
+	TypeName   = "name"
+	TypeDocker = "docker"
+)
+
 type CpuSpec struct {
 	// Requested cpu shares. Default is 1024.
 	Limit uint64 `json:"limit"`
@@ -50,6 +55,14 @@ type MemorySpec struct {
 type ContainerSpec struct {
 	// Time at which the container was created.
 	CreationTime time.Time `json:"creation_time,omitempty"`
+
+	// Other names by which the container is known within a certain namespace.
+	// This is unique within that namespace.
+	Aliases []string `json:"aliases,omitempty"`
+
+	// Namespace under which the aliases of a container are unique.
+	// An example of a namespace is "docker" for Docker containers.
+	Namespace string `json:"namespace,omitempty"`
 
 	HasCpu bool    `json:"has_cpu"`
 	Cpu    CpuSpec `json:"cpu,omitempty"`
@@ -142,7 +155,7 @@ type FsInfo struct {
 	Labels []string `json:"labels"`
 }
 
-type StatsRequest struct {
+type RequestOptions struct {
 	// Type of container identifier specified - "name", "dockerid", dockeralias"
 	IdType string `json:"type"`
 	// Number of stats to return

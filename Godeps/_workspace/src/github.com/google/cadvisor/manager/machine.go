@@ -42,6 +42,7 @@ var CpuClockSpeedMHz = regexp.MustCompile("cpu MHz\\t*: +([0-9]+.[0-9]+)")
 var memoryCapacityRegexp = regexp.MustCompile("MemTotal: *([0-9]+) kB")
 
 var machineIdFilePath = flag.String("machine_id_file", "/etc/machine-id,/var/lib/dbus/machine-id", "Comma-separated list of files to check for machine-id. Use the first one that exists.")
+var bootIdFilePath = flag.String("boot_id_file", "/proc/sys/kernel/random/boot_id", "Comma-separated list of files to check for boot-id. Use the first one that exists.")
 
 func getClockSpeed(procInfo []byte) (uint64, error) {
 	// First look through sys to find a max supported cpu frequency.
@@ -209,17 +210,17 @@ func getTopology(sysFs sysfs.SysFs, cpuinfo string) ([]info.Node, int, error) {
 	return nodes, numCores, nil
 }
 
-func getMachineID() string {
-	if len(*machineIdFilePath) == 0 {
+func getInfoFromFiles(filePaths string) string {
+	if len(filePaths) == 0 {
 		return ""
 	}
-	for _, file := range strings.Split(*machineIdFilePath, ",") {
+	for _, file := range strings.Split(filePaths, ",") {
 		id, err := ioutil.ReadFile(file)
 		if err == nil {
 			return strings.TrimSpace(string(id))
 		}
 	}
-	glog.Infof("Couldn't collect machine-id from any of the files in %q", *machineIdFilePath)
+	glog.Infof("Couldn't collect info from any of the files in %q", filePaths)
 	return ""
 }
 
@@ -273,8 +274,9 @@ func getMachineInfo(sysFs sysfs.SysFs, fsInfo fs.FsInfo) (*info.MachineInfo, err
 		DiskMap:        diskMap,
 		NetworkDevices: netDevices,
 		Topology:       topology,
-		MachineID:      getMachineID(),
+		MachineID:      getInfoFromFiles(*machineIdFilePath),
 		SystemUUID:     systemUUID,
+		BootID:         getInfoFromFiles(*bootIdFilePath),
 	}
 
 	for _, fs := range filesystems {
