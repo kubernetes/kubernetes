@@ -231,7 +231,7 @@ type PersistentVolumeSpec struct {
 }
 
 type PersistentVolumeStatus struct {
-	// Phase represents the current phase of the PersistentVolume
+	// Phase indicates if a volume is available, bound to a claim, or released by a claim
 	Phase PersistentVolumePhase `json:"phase,omitempty"`
 }
 
@@ -262,7 +262,7 @@ type PersistentVolumeClaimList struct {
 // a PersistentVolumeClaimSpec describes the common attributes of storage devices
 // and allows a Source for provider-specific attributes
 type PersistentVolumeClaimSpec struct {
-	// Contains the types of access modes desired
+	// Contains the types of access modes required
 	AccessModes []AccessModeType `json:"accessModes,omitempty"`
 	// Resources represents the minimum resources required
 	Resources ResourceRequirements `json:"resources,omitempty"`
