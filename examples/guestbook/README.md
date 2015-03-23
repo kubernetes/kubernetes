@@ -10,12 +10,9 @@ The web front end interacts with the redis master via javascript redis API calls
 
 ### Step Zero: Prerequisites
 
-This example assumes that you have a basic understanding of kubernetes services and that you have forked the repository and [turned up a Kubernetes cluster](https://github.com/GoogleCloudPlatform/kubernetes#contents):
-This example requires a kubernetes cluster.
+This example requires a kubernetes cluster.  See the [Getting Started guides](../../docs/getting-started-guides) for how to get started.
 
-See the companion [Setup Kubernetes](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/examples/guestbook/SETUP.md) for some quick notes on how to get started.
-
-*If* you are running from source, replace commands such as "kubectl" below with calls to cluster/kubectl.sh.
+If you are running from source, replace commands such as `kubectl` below with calls to `cluster/kubectl.sh`.
 
 ### Step One: Fire up the redis master
 
