@@ -21,8 +21,6 @@ import (
 	"crypto/md5"
 	"encoding/hex"
 	"fmt"
-	"os"
-	"strings"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
@@ -35,15 +33,10 @@ import (
 	"github.com/golang/glog"
 )
 
-func applyDefaults(pod *api.Pod, source string, isFile bool) error {
+func applyDefaults(pod *api.Pod, source string, isFile bool, hostname string) error {
 	if len(pod.UID) == 0 {
 		hasher := md5.New()
 		if isFile {
-			hostname, err := os.Hostname() // TODO: kubelet name would be better
-			if err != nil {
-				return err
-			}
-			hostname = strings.ToLower(hostname)
 			fmt.Fprintf(hasher, "host:%s", hostname)
 			fmt.Fprintf(hasher, "file:%s", source)
 		} else {
@@ -60,7 +53,7 @@ func applyDefaults(pod *api.Pod, source string, isFile bool) error {
 	if len(pod.Name) == 0 {
 		pod.Name = string(pod.UID)
 	}
-	if pod.Name, err = GeneratePodName(pod.Name); err != nil {
+	if pod.Name, err = GeneratePodName(pod.Name, hostname); err != nil {
 		return err
 	}
 	glog.V(5).Infof("Generated Name %q for UID %q from URL %s", pod.Name, pod.UID, source)
@@ -76,7 +69,9 @@ func applyDefaults(pod *api.Pod, source string, isFile bool) error {
 	return nil
 }
 
-func tryDecodeSinglePod(data []byte, source string, isFile bool) (parsed bool, pod api.Pod, err error) {
+type defaultFunc func(pod *api.Pod) error
+
+func tryDecodeSinglePod(data []byte, defaultFn defaultFunc) (parsed bool, pod api.Pod, err error) {
 	obj, err := api.Scheme.Decode(data)
 	if err != nil {
 		return false, pod, err
@@ -88,7 +83,7 @@ func tryDecodeSinglePod(data []byte, source string, isFile bool) (parsed bool, p
 	}
 	newPod := obj.(*api.Pod)
 	// Apply default values and validate the pod.
-	if err = applyDefaults(newPod, source, isFile); err != nil {
+	if err = defaultFn(newPod); err != nil {
 		return true, pod, err
 	}
 	if errs := validation.ValidatePod(newPod); len(errs) > 0 {
@@ -98,7 +93,7 @@ func tryDecodeSinglePod(data []byte, source string, isFile bool) (parsed bool, p
 	return true, *newPod, nil
 }
 
-func tryDecodePodList(data []byte, source string, isFile bool) (parsed bool, pods api.PodList, err error) {
+func tryDecodePodList(data []byte, defaultFn defaultFunc) (parsed bool, pods api.PodList, err error) {
 	obj, err := api.Scheme.Decode(data)
 	if err != nil {
 		return false, pods, err
@@ -112,7 +107,7 @@ func tryDecodePodList(data []byte, source string, isFile bool) (parsed bool, pod
 	// Apply default values and validate pods.
 	for i := range newPods.Items {
 		newPod := &newPods.Items[i]
-		if err = applyDefaults(newPod, source, isFile); err != nil {
+		if err = defaultFn(newPod); err != nil {
 			return true, pods, err
 		}
 		if errs := validation.ValidatePod(newPod); len(errs) > 0 {
@@ -123,7 +118,7 @@ func tryDecodePodList(data []byte, source string, isFile bool) (parsed bool, pod
 	return true, *newPods, err
 }
 
-func tryDecodeSingleManifest(data []byte, source string, isFile bool) (parsed bool, manifest v1beta1.ContainerManifest, pod api.Pod, err error) {
+func tryDecodeSingleManifest(data []byte, defaultFn defaultFunc) (parsed bool, manifest v1beta1.ContainerManifest, pod api.Pod, err error) {
 	// TODO: should be api.Scheme.Decode
 	// This is awful.  DecodeInto() expects to find an APIObject, which
 	// Manifest is not.  We keep reading manifest for now for compat, but
@@ -149,14 +144,14 @@ func tryDecodeSingleManifest(data []byte, source string, isFile bool) (parsed bo
 	if err = api.Scheme.Convert(&newManifest, &pod); err != nil {
 		return true, manifest, pod, err
 	}
-	if err = applyDefaults(&pod, source, isFile); err != nil {
+	if err := defaultFn(&pod); err != nil {
 		return true, manifest, pod, err
 	}
 	// Success.
 	return true, manifest, pod, nil
 }
 
-func tryDecodeManifestList(data []byte, source string, isFile bool) (parsed bool, manifests []v1beta1.ContainerManifest, pods api.PodList, err error) {
+func tryDecodeManifestList(data []byte, defaultFn defaultFunc) (parsed bool, manifests []v1beta1.ContainerManifest, pods api.PodList, err error) {
 	// TODO: should be api.Scheme.Decode
 	// See the comment in tryDecodeSingle().
 	if err = yaml.Unmarshal(data, &manifests); err != nil {
@@ -179,7 +174,7 @@ func tryDecodeManifestList(data []byte, source string, isFile bool) (parsed bool
 	}
 	for i := range pods.Items {
 		pod := &pods.Items[i]
-		if err = applyDefaults(pod, source, isFile); err != nil {
+		if err := defaultFn(pod); err != nil {
 			return true, manifests, pods, err
 		}
 	}

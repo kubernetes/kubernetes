@@ -19,8 +19,6 @@ package config
 import (
 	"encoding/json"
 	"net/http/httptest"
-	"os"
-	"strings"
 	"testing"
 	"time"
 
@@ -35,7 +33,7 @@ import (
 
 func TestURLErrorNotExistNoUpdate(t *testing.T) {
 	ch := make(chan interface{})
-	NewSourceURL("http://localhost:49575/_not_found_", time.Millisecond, ch)
+	NewSourceURL("http://localhost:49575/_not_found_", "localhost", time.Millisecond, ch)
 	select {
 	case got := <-ch:
 		t.Errorf("Expected no update, Got %#v", got)
@@ -45,7 +43,7 @@ func TestURLErrorNotExistNoUpdate(t *testing.T) {
 
 func TestExtractFromHttpBadness(t *testing.T) {
 	ch := make(chan interface{}, 1)
-	c := sourceURL{"http://localhost:49575/_not_found_", ch, nil}
+	c := sourceURL{"http://localhost:49575/_not_found_", "other", ch, nil}
 	if err := c.extractFromURL(); err == nil {
 		t.Errorf("Expected error")
 	}
@@ -111,7 +109,7 @@ func TestExtractInvalidManifest(t *testing.T) {
 		testServer := httptest.NewServer(&fakeHandler)
 		defer testServer.Close()
 		ch := make(chan interface{}, 1)
-		c := sourceURL{testServer.URL, ch, nil}
+		c := sourceURL{testServer.URL, "localhost", ch, nil}
 		if err := c.extractFromURL(); err == nil {
 			t.Errorf("%s: Expected error", testCase.desc)
 		}
@@ -119,8 +117,7 @@ func TestExtractInvalidManifest(t *testing.T) {
 }
 
 func TestExtractManifestFromHTTP(t *testing.T) {
-	hostname, _ := os.Hostname()
-	hostname = strings.ToLower(hostname)
+	hostname := "random-hostname"
 
 	var testCases = []struct {
 		desc      string
@@ -263,7 +260,7 @@ func TestExtractManifestFromHTTP(t *testing.T) {
 		testServer := httptest.NewServer(&fakeHandler)
 		defer testServer.Close()
 		ch := make(chan interface{}, 1)
-		c := sourceURL{testServer.URL, ch, nil}
+		c := sourceURL{testServer.URL, hostname, ch, nil}
 		if err := c.extractFromURL(); err != nil {
 			t.Errorf("%s: Unexpected error: %v", testCase.desc, err)
 			continue
@@ -290,8 +287,7 @@ func TestExtractManifestFromHTTP(t *testing.T) {
 }
 
 func TestExtractPodsFromHTTP(t *testing.T) {
-	hostname, _ := os.Hostname()
-	hostname = strings.ToLower(hostname)
+	hostname := "different-value"
 
 	var testCases = []struct {
 		desc     string
@@ -454,7 +450,7 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 		testServer := httptest.NewServer(&fakeHandler)
 		defer testServer.Close()
 		ch := make(chan interface{}, 1)
-		c := sourceURL{testServer.URL, ch, nil}
+		c := sourceURL{testServer.URL, hostname, ch, nil}
 		if err := c.extractFromURL(); err != nil {
 			t.Errorf("%s: Unexpected error: %v", testCase.desc, err)
 			continue

@@ -26,8 +26,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
 
-const hostname string = "mcaa1"
-
 type fakePodLW struct {
 	listResp  runtime.Object
 	watchResp watch.Interface

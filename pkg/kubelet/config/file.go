@@ -33,14 +33,16 @@ import (
 )
 
 type sourceFile struct {
-	path    string
-	updates chan<- interface{}
+	path     string
+	hostname string
+	updates  chan<- interface{}
 }
 
-func NewSourceFile(path string, period time.Duration, updates chan<- interface{}) {
+func NewSourceFile(path string, hostname string, period time.Duration, updates chan<- interface{}) {
 	config := &sourceFile{
-		path:    path,
-		updates: updates,
+		path:     path,
+		hostname: hostname,
+		updates:  updates,
 	}
 	glog.V(1).Infof("Watching path %q", path)
 	go util.Forever(config.run, period)
@@ -50,6 +52,10 @@ func (s *sourceFile) run() {
 	if err := s.extractFromPath(); err != nil {
 		glog.Errorf("Unable to read config path %q: %v", s.path, err)
 	}
+}
+
+func (s *sourceFile) applyDefaults(pod *api.Pod, source string) error {
+	return applyDefaults(pod, source, true, s.hostname)
 }
 
 func (s *sourceFile) extractFromPath() error {
@@ -66,14 +72,14 @@ func (s *sourceFile) extractFromPath() error {
 
 	switch {
 	case statInfo.Mode().IsDir():
-		pods, err := extractFromDir(path)
+		pods, err := s.extractFromDir(path)
 		if err != nil {
 			return err
 		}
 		s.updates <- kubelet.PodUpdate{pods, kubelet.SET, kubelet.FileSource}
 
 	case statInfo.Mode().IsRegular():
-		pod, err := extractFromFile(path)
+		pod, err := s.extractFromFile(path)
 		if err != nil {
 			return err
 		}
@@ -89,7 +95,7 @@ func (s *sourceFile) extractFromPath() error {
 // Get as many pod configs as we can from a directory.  Return an error iff something
 // prevented us from reading anything at all.  Do not return an error if only some files
 // were problematic.
-func extractFromDir(name string) ([]api.Pod, error) {
+func (s *sourceFile) extractFromDir(name string) ([]api.Pod, error) {
 	dirents, err := filepath.Glob(filepath.Join(name, "[^.]*"))
 	if err != nil {
 		return nil, fmt.Errorf("glob failed: %v", err)
@@ -112,7 +118,7 @@ func extractFromDir(name string) ([]api.Pod, error) {
 		case statInfo.Mode().IsDir():
 			glog.V(1).Infof("Not recursing into config path %q", path)
 		case statInfo.Mode().IsRegular():
-			pod, err := extractFromFile(path)
+			pod, err := s.extractFromFile(path)
 			if err != nil {
 				glog.V(1).Infof("Can't process config file %q: %v", path, err)
 			} else {
@@ -125,7 +131,7 @@ func extractFromDir(name string) ([]api.Pod, error) {
 	return pods, nil
 }
 
-func extractFromFile(filename string) (pod api.Pod, err error) {
+func (s *sourceFile) extractFromFile(filename string) (pod api.Pod, err error) {
 	glog.V(3).Infof("Reading config file %q", filename)
 	file, err := os.Open(filename)
 	if err != nil {
@@ -138,7 +144,11 @@ func extractFromFile(filename string) (pod api.Pod, err error) {
 		return pod, err
 	}
 
-	parsed, _, pod, manifestErr := tryDecodeSingleManifest(data, filename, true)
+	defaultFn := func(pod *api.Pod) error {
+		return s.applyDefaults(pod, filename)
+	}
+
+	parsed, _, pod, manifestErr := tryDecodeSingleManifest(data, defaultFn)
 	if parsed {
 		if manifestErr != nil {
 			// It parsed but could not be used.
@@ -147,7 +157,7 @@ func extractFromFile(filename string) (pod api.Pod, err error) {
 		return pod, nil
 	}
 
-	parsed, pod, podErr := tryDecodeSinglePod(data, filename, true)
+	parsed, pod, podErr := tryDecodeSinglePod(data, defaultFn)
 	if parsed {
 		if podErr != nil {
 			return pod, podErr

@@ -205,7 +205,8 @@ func startComponents(manifestURL, apiVersion string) (string, string) {
 	scheduler.New(schedulerConfig).Run()
 
 	endpoints := service.NewEndpointController(cl)
-	go util.Forever(func() { endpoints.SyncServiceEndpoints() }, time.Second*10)
+	// ensure the service endpoints are sync'd several times within the window that the integration tests wait
+	go util.Forever(func() { endpoints.SyncServiceEndpoints() }, time.Second*4)
 
 	controllerManager := replicationControllerPkg.NewReplicationManager(cl)
 
@@ -277,7 +278,9 @@ func endpointsSet(c *client.Client, serviceNamespace, serviceID string, endpoint
 			glog.Infof("Error on creating endpoints: %v", err)
 			return false, nil
 		}
-		glog.Infof("endpoints: %v", endpoints.Endpoints)
+		for _, e := range endpoints.Endpoints {
+			glog.Infof("%s/%s endpoint: %s:%d %#v", serviceNamespace, serviceID, e.IP, e.Port, e.TargetRef)
+		}
 		return len(endpoints.Endpoints) == endpointCount, nil
 	}
 }
@@ -299,6 +302,9 @@ func podNotFound(c *client.Client, podNamespace string, podID string) wait.Condi
 func podRunning(c *client.Client, podNamespace string, podID string) wait.ConditionFunc {
 	return func() (bool, error) {
 		pod, err := c.Pods(podNamespace).Get(podID)
+		if apierrors.IsNotFound(err) {
+			return false, nil
+		}
 		if err != nil {
 			return false, err
 		}
@@ -321,11 +327,15 @@ containers:
 	ioutil.WriteFile(manifestFile.Name(), []byte(manifest), 0600)
 
 	// Wait for the mirror pod to be created.
-	hostname, _ := os.Hostname()
-	podName := fmt.Sprintf("static-pod-%s", hostname)
+	podName := "static-pod-localhost"
 	namespace := kubelet.NamespaceDefault
-	if err := wait.Poll(time.Second, time.Second*30,
+	if err := wait.Poll(time.Second, time.Minute*2,
 		podRunning(c, namespace, podName)); err != nil {
+		if pods, err := c.Pods(namespace).List(labels.Everything()); err == nil {
+			for _, pod := range pods.Items {
+				glog.Infof("pod found: %s/%s", namespace, pod.Name)
+			}
+		}
 		glog.Fatalf("FAILED: mirror pod has not been created or is not running: %v", err)
 	}
 	// Delete the mirror pod, and wait for it to be recreated.
@@ -713,7 +723,7 @@ func runServiceTest(client *client.Client) {
 		glog.Fatalf("Failed to create service: %v, %v", svc3, err)
 	}
 
-	if err := wait.Poll(time.Second, time.Second*20, endpointsSet(client, svc1.Namespace, svc1.Name, 1)); err != nil {
+	if err := wait.Poll(time.Second, time.Second*30, endpointsSet(client, svc1.Namespace, svc1.Name, 1)); err != nil {
 		glog.Fatalf("FAILED: unexpected endpoints: %v", err)
 	}
 	// A second service with the same port.
@@ -732,7 +742,7 @@ func runServiceTest(client *client.Client) {
 	if err != nil {
 		glog.Fatalf("Failed to create service: %v, %v", svc2, err)
 	}
-	if err := wait.Poll(time.Second, time.Second*20, endpointsSet(client, svc2.Namespace, svc2.Name, 1)); err != nil {
+	if err := wait.Poll(time.Second, time.Second*30, endpointsSet(client, svc2.Namespace, svc2.Name, 1)); err != nil {
 		glog.Fatalf("FAILED: unexpected endpoints: %v", err)
 	}
 

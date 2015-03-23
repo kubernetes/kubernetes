@@ -32,16 +32,18 @@ import (
 )
 
 type sourceURL struct {
-	url     string
-	updates chan<- interface{}
-	data    []byte
+	url      string
+	hostname string
+	updates  chan<- interface{}
+	data     []byte
 }
 
-func NewSourceURL(url string, period time.Duration, updates chan<- interface{}) {
+func NewSourceURL(url, hostname string, period time.Duration, updates chan<- interface{}) {
 	config := &sourceURL{
-		url:     url,
-		updates: updates,
-		data:    nil,
+		url:      url,
+		hostname: hostname,
+		updates:  updates,
+		data:     nil,
 	}
 	glog.V(1).Infof("Watching URL %s", url)
 	go util.Forever(config.run, period)
@@ -51,6 +53,10 @@ func (s *sourceURL) run() {
 	if err := s.extractFromURL(); err != nil {
 		glog.Errorf("Failed to read URL: %v", err)
 	}
+}
+
+func (s *sourceURL) applyDefaults(pod *api.Pod) error {
+	return applyDefaults(pod, s.url, false, s.hostname)
 }
 
 func (s *sourceURL) extractFromURL() error {
@@ -78,7 +84,7 @@ func (s *sourceURL) extractFromURL() error {
 	s.data = data
 
 	// First try as if it's a single manifest
-	parsed, manifest, pod, singleErr := tryDecodeSingleManifest(data, s.url, false)
+	parsed, manifest, pod, singleErr := tryDecodeSingleManifest(data, s.applyDefaults)
 	if parsed {
 		if singleErr != nil {
 			// It parsed but could not be used.
@@ -90,7 +96,7 @@ func (s *sourceURL) extractFromURL() error {
 	}
 
 	// That didn't work, so try an array of manifests.
-	parsed, manifests, pods, multiErr := tryDecodeManifestList(data, s.url, false)
+	parsed, manifests, pods, multiErr := tryDecodeManifestList(data, s.applyDefaults)
 	if parsed {
 		if multiErr != nil {
 			// It parsed but could not be used.
@@ -112,7 +118,7 @@ func (s *sourceURL) extractFromURL() error {
 	// Try to parse it as Pod(s).
 
 	// First try as it is a single pod.
-	parsed, pod, singlePodErr := tryDecodeSinglePod(data, s.url, false)
+	parsed, pod, singlePodErr := tryDecodeSinglePod(data, s.applyDefaults)
 	if parsed {
 		if singlePodErr != nil {
 			// It parsed but could not be used.
@@ -123,7 +129,7 @@ func (s *sourceURL) extractFromURL() error {
 	}
 
 	// That didn't work, so try a list of pods.
-	parsed, pods, multiPodErr := tryDecodePodList(data, s.url, false)
+	parsed, pods, multiPodErr := tryDecodePodList(data, s.applyDefaults)
 	if parsed {
 		if multiPodErr != nil {
 			// It parsed but could not be used.

@@ -21,7 +21,6 @@ import (
 	"io/ioutil"
 	"os"
 	"sort"
-	"strings"
 	"testing"
 	"time"
 
@@ -34,7 +33,7 @@ import (
 
 func TestExtractFromNonExistentFile(t *testing.T) {
 	ch := make(chan interface{}, 1)
-	c := sourceFile{"/some/fake/file", ch}
+	c := sourceFile{"/some/fake/file", "localhost", ch}
 	err := c.extractFromPath()
 	if err == nil {
 		t.Errorf("Expected error")
@@ -43,7 +42,7 @@ func TestExtractFromNonExistentFile(t *testing.T) {
 
 func TestUpdateOnNonExistentFile(t *testing.T) {
 	ch := make(chan interface{})
-	NewSourceFile("random_non_existent_path", time.Millisecond, ch)
+	NewSourceFile("random_non_existent_path", "localhost", time.Millisecond, ch)
 	select {
 	case got := <-ch:
 		update := got.(kubelet.PodUpdate)
@@ -70,9 +69,7 @@ func writeTestFile(t *testing.T, dir, name string, contents string) *os.File {
 }
 
 func TestReadFromFile(t *testing.T) {
-	hostname, _ := os.Hostname()
-	hostname = strings.ToLower(hostname)
-
+	hostname := "random-test-hostname"
 	var testCases = []struct {
 		desc         string
 		fileContents string
@@ -256,7 +253,7 @@ func TestReadFromFile(t *testing.T) {
 			defer os.Remove(file.Name())
 
 			ch := make(chan interface{})
-			NewSourceFile(file.Name(), time.Millisecond, ch)
+			NewSourceFile(file.Name(), hostname, time.Millisecond, ch)
 			select {
 			case got := <-ch:
 				update := got.(kubelet.PodUpdate)
@@ -285,7 +282,7 @@ func TestReadManifestFromFileWithDefaults(t *testing.T) {
 	defer os.Remove(file.Name())
 
 	ch := make(chan interface{})
-	NewSourceFile(file.Name(), time.Millisecond, ch)
+	NewSourceFile(file.Name(), "localhost", time.Millisecond, ch)
 	select {
 	case got := <-ch:
 		update := got.(kubelet.PodUpdate)
@@ -303,7 +300,7 @@ func TestExtractFromBadDataFile(t *testing.T) {
 	defer os.Remove(file.Name())
 
 	ch := make(chan interface{}, 1)
-	c := sourceFile{file.Name(), ch}
+	c := sourceFile{file.Name(), "localhost", ch}
 	err := c.extractFromPath()
 	if err == nil {
 		t.Fatalf("Expected error")
@@ -319,7 +316,7 @@ func TestExtractFromEmptyDir(t *testing.T) {
 	defer os.RemoveAll(dirName)
 
 	ch := make(chan interface{}, 1)
-	c := sourceFile{dirName, ch}
+	c := sourceFile{dirName, "localhost", ch}
 	err = c.extractFromPath()
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
@@ -333,8 +330,7 @@ func TestExtractFromEmptyDir(t *testing.T) {
 }
 
 func ExampleManifestAndPod(id string) (v1beta1.ContainerManifest, api.Pod) {
-	hostname, _ := os.Hostname()
-	hostname = strings.ToLower(hostname)
+	hostname := "an-example-host"
 
 	manifest := v1beta1.ContainerManifest{
 		Version: "v1beta1",
@@ -417,7 +413,7 @@ func TestExtractFromDir(t *testing.T) {
 	}
 
 	ch := make(chan interface{}, 1)
-	c := sourceFile{dirName, ch}
+	c := sourceFile{dirName, "an-example-host", ch}
 	err = c.extractFromPath()
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
