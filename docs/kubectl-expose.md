@@ -31,11 +31,8 @@ $ kubectl expose streamer --port=4100 --protocol=udp --service-name=video-stream
       --create-external-load-balancer=false: If true, create an external load balancer for this service. Implementation is cloud provider dependent. Default is 'false'.
       --dry-run=false: If true, only print the object that would be sent, without creating it.
       --generator="service/v1": The name of the API generator to use.  Default is 'service/v1'.
-<<<<<<< HEAD
-  -l, --labels="": Labels to apply to the service created by this call.
-=======
   -h, --help=false: help for expose
->>>>>>> Revert "Revert "Update cobra/pflag.  Also update generated kubectl documentation.""
+  -l, --labels="": Labels to apply to the service created by this call.
       --no-headers=false: When using the default output, don't print headers.
   -o, --output="": Output format. One of: json|yaml|template|templatefile.
       --output-version="": Output the formatted object with the given version (default api-version).
