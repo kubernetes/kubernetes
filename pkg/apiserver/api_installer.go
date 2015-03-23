@@ -28,6 +28,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/rest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 
 	"github.com/emicklei/go-restful"
@@ -94,7 +95,7 @@ func (a *APIInstaller) newWebService() *restful.WebService {
 	return ws
 }
 
-func (a *APIInstaller) registerResourceHandlers(path string, storage RESTStorage, ws *restful.WebService, watchHandler, redirectHandler, proxyHandler http.Handler) error {
+func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storage, ws *restful.WebService, watchHandler, redirectHandler, proxyHandler http.Handler) error {
 	admit := a.group.Admit
 	context := a.group.Context
 
@@ -121,7 +122,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage RESTStorage
 	versionedObject := indirectArbitraryPointer(versionedPtr)
 
 	var versionedList interface{}
-	if lister, ok := storage.(RESTLister); ok {
+	if lister, ok := storage.(rest.Lister); ok {
 		list := lister.NewList()
 		_, listKind, err := a.group.Typer.ObjectVersionAndKind(list)
 		versionedListPtr, err := a.group.Creater.New(a.group.Version, listKind)
@@ -137,15 +138,15 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage RESTStorage
 	}
 
 	// what verbs are supported by the storage, used to know what verbs we support per path
-	creater, isCreater := storage.(RESTCreater)
-	lister, isLister := storage.(RESTLister)
-	getter, isGetter := storage.(RESTGetter)
-	deleter, isDeleter := storage.(RESTDeleter)
-	gracefulDeleter, isGracefulDeleter := storage.(RESTGracefulDeleter)
-	updater, isUpdater := storage.(RESTUpdater)
-	patcher, isPatcher := storage.(RESTPatcher)
-	_, isWatcher := storage.(ResourceWatcher)
-	_, isRedirector := storage.(Redirector)
+	creater, isCreater := storage.(rest.Creater)
+	lister, isLister := storage.(rest.Lister)
+	getter, isGetter := storage.(rest.Getter)
+	deleter, isDeleter := storage.(rest.Deleter)
+	gracefulDeleter, isGracefulDeleter := storage.(rest.GracefulDeleter)
+	updater, isUpdater := storage.(rest.Updater)
+	patcher, isPatcher := storage.(rest.Patcher)
+	_, isWatcher := storage.(rest.Watcher)
+	_, isRedirector := storage.(rest.Redirector)
 
 	var versionedDeleterObject runtime.Object
 	switch {
@@ -157,7 +158,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage RESTStorage
 		versionedDeleterObject = object
 		isDeleter = true
 	case isDeleter:
-		gracefulDeleter = GracefulDeleteAdapter{deleter}
+		gracefulDeleter = rest.GracefulDeleteAdapter{deleter}
 	}
 
 	var ctxFn ContextFunc

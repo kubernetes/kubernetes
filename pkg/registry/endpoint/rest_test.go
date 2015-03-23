@@ -34,7 +34,7 @@ func TestGetEndpoints(t *testing.T) {
 			Endpoints:  []api.Endpoint{{IP: "127.0.0.1", Port: 9000}},
 		},
 	}
-	storage := NewREST(registry)
+	storage := NewStorage(registry)
 	ctx := api.NewContext()
 	obj, err := storage.Get(ctx, "foo")
 	if err != nil {
@@ -49,7 +49,7 @@ func TestGetEndpointsMissingService(t *testing.T) {
 	registry := &registrytest.ServiceRegistry{
 		Err: errors.NewNotFound("service", "foo"),
 	}
-	storage := NewREST(registry)
+	storage := NewStorage(registry)
 	ctx := api.NewContext()
 	// returns service not found
 	_, err := storage.Get(ctx, "foo")
@@ -73,7 +73,7 @@ func TestGetEndpointsMissingService(t *testing.T) {
 
 func TestEndpointsRegistryList(t *testing.T) {
 	registry := registrytest.NewServiceRegistry()
-	storage := NewREST(registry)
+	storage := NewStorage(registry)
 	registry.EndpointsList = api.EndpointsList{
 		ListMeta: api.ListMeta{ResourceVersion: "1"},
 		Items: []api.Endpoints{

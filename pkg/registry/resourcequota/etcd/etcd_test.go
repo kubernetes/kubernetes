@@ -46,7 +46,7 @@ func newHelper(t *testing.T) (*tools.FakeEtcdClient, tools.EtcdHelper) {
 
 func newStorage(t *testing.T) (*REST, *StatusREST, *tools.FakeEtcdClient, tools.EtcdHelper) {
 	fakeEtcdClient, h := newHelper(t)
-	storage, statusStorage := NewREST(h)
+	storage, statusStorage := NewStorage(h)
 	return storage, statusStorage, fakeEtcdClient, h
 }
 
@@ -85,7 +85,7 @@ func TestStorage(t *testing.T) {
 
 func TestCreate(t *testing.T) {
 	fakeEtcdClient, helper := newHelper(t)
-	storage, _ := NewREST(helper)
+	storage, _ := NewStorage(helper)
 	test := resttest.New(t, storage, fakeEtcdClient.SetError)
 	resourcequota := validNewResourceQuota()
 	resourcequota.ObjectMeta = api.ObjectMeta{}
@@ -111,7 +111,7 @@ func expectResourceQuota(t *testing.T, out runtime.Object) (*api.ResourceQuota, 
 func TestCreateRegistryError(t *testing.T) {
 	fakeEtcdClient, helper := newHelper(t)
 	fakeEtcdClient.Err = fmt.Errorf("test error")
-	storage, _ := NewREST(helper)
+	storage, _ := NewStorage(helper)
 
 	resourcequota := validNewResourceQuota()
 	_, err := storage.Create(api.NewDefaultContext(), resourcequota)
@@ -122,7 +122,7 @@ func TestCreateRegistryError(t *testing.T) {
 
 func TestCreateSetsFields(t *testing.T) {
 	fakeEtcdClient, helper := newHelper(t)
-	storage, _ := NewREST(helper)
+	storage, _ := NewStorage(helper)
 	resourcequota := validNewResourceQuota()
 	_, err := storage.Create(api.NewDefaultContext(), resourcequota)
 	if err != fakeEtcdClient.Err {
@@ -144,7 +144,7 @@ func TestCreateSetsFields(t *testing.T) {
 func TestListError(t *testing.T) {
 	fakeEtcdClient, helper := newHelper(t)
 	fakeEtcdClient.Err = fmt.Errorf("test error")
-	storage, _ := NewREST(helper)
+	storage, _ := NewStorage(helper)
 	resourcequotas, err := storage.List(api.NewDefaultContext(), labels.Everything(), fields.Everything())
 	if err != fakeEtcdClient.Err {
 		t.Fatalf("Expected %#v, Got %#v", fakeEtcdClient.Err, err)
@@ -162,7 +162,7 @@ func TestListEmptyResourceQuotaList(t *testing.T) {
 		E: fakeEtcdClient.NewError(tools.EtcdErrorCodeNotFound),
 	}
 
-	storage, _ := NewREST(helper)
+	storage, _ := NewStorage(helper)
 	resourcequotas, err := storage.List(api.NewContext(), labels.Everything(), fields.Everything())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -196,7 +196,7 @@ func TestListResourceQuotaList(t *testing.T) {
 			},
 		},
 	}
-	storage, _ := NewREST(helper)
+	storage, _ := NewStorage(helper)
 	resourcequotasObj, err := storage.List(api.NewDefaultContext(), labels.Everything(), fields.Everything())
 	resourcequotas := resourcequotasObj.(*api.ResourceQuotaList)
 	if err != nil {
@@ -236,7 +236,7 @@ func TestListResourceQuotaListSelection(t *testing.T) {
 			},
 		},
 	}
-	storage, _ := NewREST(helper)
+	storage, _ := NewStorage(helper)
 	ctx := api.NewDefaultContext()
 
 	table := []struct {
@@ -282,7 +282,7 @@ func TestListResourceQuotaListSelection(t *testing.T) {
 }
 
 func TestResourceQuotaDecode(t *testing.T) {
-	storage, _ := NewREST(tools.EtcdHelper{})
+	storage, _ := NewStorage(tools.EtcdHelper{})
 	expected := validNewResourceQuota()
 	body, err := latest.Codec.Encode(expected)
 	if err != nil {
@@ -309,7 +309,7 @@ func TestGet(t *testing.T) {
 			},
 		},
 	}
-	storage, _ := NewREST(helper)
+	storage, _ := NewStorage(helper)
 	obj, err := storage.Get(api.WithNamespace(api.NewContext(), "test"), "foo")
 	resourcequota := obj.(*api.ResourceQuota)
 	if err != nil {
@@ -339,7 +339,7 @@ func TestDeleteResourceQuota(t *testing.T) {
 			},
 		},
 	}
-	storage, _ := NewREST(helper)
+	storage, _ := NewStorage(helper)
 	_, err := storage.Delete(api.NewDefaultContext(), "foo", nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)

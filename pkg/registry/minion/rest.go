@@ -38,8 +38,8 @@ type REST struct {
 	registry Registry
 }
 
-// NewREST returns a new apiserver.RESTStorage implementation for minion.
-func NewREST(m Registry) *REST {
+// NewStorage returns a new rest.Storage implementation for minion.
+func NewStorage(m Registry) *REST {
 	return &REST{
 		registry: m,
 	}
@@ -133,7 +133,7 @@ func (rs *REST) Update(ctx api.Context, obj runtime.Object) (runtime.Object, boo
 }
 
 // Watch returns Minions events via a watch.Interface.
-// It implements apiserver.ResourceWatcher.
+// It implements rest.Watcher.
 func (rs *REST) Watch(ctx api.Context, label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
 	return rs.registry.WatchMinions(ctx, label, field, resourceVersion)
 }

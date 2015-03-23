@@ -45,8 +45,8 @@ type REST struct {
 	clusterName string
 }
 
-// NewREST returns a new REST.
-func NewREST(registry Registry, cloud cloudprovider.Interface, machines minion.Registry, portalNet *net.IPNet,
+// NewStorage returns a new REST.
+func NewStorage(registry Registry, cloud cloudprovider.Interface, machines minion.Registry, portalNet *net.IPNet,
 	clusterName string) *REST {
 	// TODO: Before we can replicate masters, this has to be synced (e.g. lives in etcd)
 	ipa := newIPAllocator(portalNet)
@@ -174,7 +174,7 @@ func (rs *REST) List(ctx api.Context, label labels.Selector, field fields.Select
 }
 
 // Watch returns Services events via a watch.Interface.
-// It implements apiserver.ResourceWatcher.
+// It implements rest.Watcher.
 func (rs *REST) Watch(ctx api.Context, label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
 	return rs.registry.WatchServices(ctx, label, field, resourceVersion)
 }

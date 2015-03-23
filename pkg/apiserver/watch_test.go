@@ -25,6 +25,7 @@ import (
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/rest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
@@ -49,8 +50,8 @@ var watchTestTable = []struct {
 
 func TestWatchWebsocket(t *testing.T) {
 	simpleStorage := &SimpleRESTStorage{}
-	_ = ResourceWatcher(simpleStorage) // Give compile error if this doesn't work.
-	handler := handle(map[string]RESTStorage{"foo": simpleStorage})
+	_ = rest.Watcher(simpleStorage) // Give compile error if this doesn't work.
+	handler := handle(map[string]rest.Storage{"foo": simpleStorage})
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
@@ -102,7 +103,7 @@ func TestWatchWebsocket(t *testing.T) {
 
 func TestWatchHTTP(t *testing.T) {
 	simpleStorage := &SimpleRESTStorage{}
-	handler := handle(map[string]RESTStorage{"foo": simpleStorage})
+	handler := handle(map[string]rest.Storage{"foo": simpleStorage})
 	server := httptest.NewServer(handler)
 	defer server.Close()
 	client := http.Client{}
@@ -167,7 +168,7 @@ func TestWatchParamParsing(t *testing.T) {
 			return label, value, nil
 		})
 	simpleStorage := &SimpleRESTStorage{}
-	handler := handle(map[string]RESTStorage{"foo": simpleStorage})
+	handler := handle(map[string]rest.Storage{"foo": simpleStorage})
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
@@ -237,7 +238,7 @@ func TestWatchParamParsing(t *testing.T) {
 
 func TestWatchProtocolSelection(t *testing.T) {
 	simpleStorage := &SimpleRESTStorage{}
-	handler := handle(map[string]RESTStorage{"foo": simpleStorage})
+	handler := handle(map[string]rest.Storage{"foo": simpleStorage})
 	server := httptest.NewServer(handler)
 	defer server.Close()
 	defer server.CloseClientConnections()

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package apiserver
+package rest
 
 import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -26,15 +26,15 @@ import (
 
 // RESTStorage is a generic interface for RESTful storage services.
 // Resources which are exported to the RESTful API of apiserver need to implement this interface. It is expected
-// that objects may implement any of the REST* interfaces.
-// TODO: implement dynamic introspection (so GenericREST objects can indicate what they implement)
-type RESTStorage interface {
+// that objects may implement any of the below interfaces.
+type Storage interface {
 	// New returns an empty object that can be used with Create and Update after request data has been put into it.
 	// This object must be a pointer type for use with Codec.DecodeInto([]byte, runtime.Object)
 	New() runtime.Object
 }
 
-type RESTLister interface {
+// Lister is an object that can retrieve resources that match the provided field and label criteria.
+type Lister interface {
 	// NewList returns an empty object that can be used with the List call.
 	// This object must be a pointer type for use with Codec.DecodeInto([]byte, runtime.Object)
 	NewList() runtime.Object
@@ -42,23 +42,27 @@ type RESTLister interface {
 	List(ctx api.Context, label labels.Selector, field fields.Selector) (runtime.Object, error)
 }
 
-type RESTGetter interface {
-	// Get finds a resource in the storage by id and returns it.
+// Getter is an object that can retrieve a named RESTful resource.
+type Getter interface {
+	// Get finds a resource in the storage by name and returns it.
 	// Although it can return an arbitrary error value, IsNotFound(err) is true for the
 	// returned error value err when the specified resource is not found.
-	Get(ctx api.Context, id string) (runtime.Object, error)
+	Get(ctx api.Context, name string) (runtime.Object, error)
 }
 
-type RESTDeleter interface {
+// Deleter is an object that can delete a named RESTful resource.
+type Deleter interface {
 	// Delete finds a resource in the storage and deletes it.
 	// Although it can return an arbitrary error value, IsNotFound(err) is true for the
 	// returned error value err when the specified resource is not found.
 	// Delete *may* return the object that was deleted, or a status object indicating additional
 	// information about deletion.
-	Delete(ctx api.Context, id string) (runtime.Object, error)
+	Delete(ctx api.Context, name string) (runtime.Object, error)
 }
 
-type RESTGracefulDeleter interface {
+// GracefulDeleter knows how to pass deletion options to allow delayed deletion of a
+// RESTful object.
+type GracefulDeleter interface {
 	// Delete finds a resource in the storage and deletes it.
 	// If options are provided, the resource will attempt to honor them or return an invalid
 	// request error.
@@ -66,20 +70,21 @@ type RESTGracefulDeleter interface {
 	// returned error value err when the specified resource is not found.
 	// Delete *may* return the object that was deleted, or a status object indicating additional
 	// information about deletion.
-	Delete(ctx api.Context, id string, options *api.DeleteOptions) (runtime.Object, error)
+	Delete(ctx api.Context, name string, options *api.DeleteOptions) (runtime.Object, error)
 }
 
-// GracefulDeleteAdapter adapts the RESTDeleter interface to RESTGracefulDeleter
+// GracefulDeleteAdapter adapts the Deleter interface to GracefulDeleter
 type GracefulDeleteAdapter struct {
-	RESTDeleter
+	Deleter
 }
 
-// Delete implements RESTGracefulDeleter in terms of RESTDeleter
-func (w GracefulDeleteAdapter) Delete(ctx api.Context, id string, options *api.DeleteOptions) (runtime.Object, error) {
-	return w.RESTDeleter.Delete(ctx, id)
+// Delete implements RESTGracefulDeleter in terms of Deleter
+func (w GracefulDeleteAdapter) Delete(ctx api.Context, name string, options *api.DeleteOptions) (runtime.Object, error) {
+	return w.Deleter.Delete(ctx, name)
 }
 
-type RESTCreater interface {
+// Creater is an object that can create an instance of a RESTful object.
+type Creater interface {
 	// New returns an empty object that can be used with Create after request data has been put into it.
 	// This object must be a pointer type for use with Codec.DecodeInto([]byte, runtime.Object)
 	New() runtime.Object
@@ -88,7 +93,8 @@ type RESTCreater interface {
 	Create(ctx api.Context, obj runtime.Object) (runtime.Object, error)
 }
 
-type RESTUpdater interface {
+// Updater is an object that can update an instance of a RESTful object.
+type Updater interface {
 	// New returns an empty object that can be used with Update after request data has been put into it.
 	// This object must be a pointer type for use with Codec.DecodeInto([]byte, runtime.Object)
 	New() runtime.Object
@@ -99,25 +105,24 @@ type RESTUpdater interface {
 	Update(ctx api.Context, obj runtime.Object) (runtime.Object, bool, error)
 }
 
-type RESTPatcher interface {
-	RESTGetter
-	RESTUpdater
+// CreaterUpdater is a storage object that must support both create and update.
+// Go prevents embedded interfaces that implement the same method.
+type CreaterUpdater interface {
+	Creater
+	Update(ctx api.Context, obj runtime.Object) (runtime.Object, bool, error)
 }
 
-// RESTResult indicates the result of a REST transformation.
-type RESTResult struct {
-	// The result of this operation. May be nil if the operation has no meaningful
-	// result (like Delete)
-	runtime.Object
+// CreaterUpdater must satisfy the Updater interface.
+var _ Updater = CreaterUpdater(nil)
 
-	// May be set true to indicate that the Update operation resulted in the object
-	// being created.
-	Created bool
+type Patcher interface {
+	Getter
+	Updater
 }
 
-// ResourceWatcher should be implemented by all RESTStorage objects that
+// Watcher should be implemented by all Storage objects that
 // want to offer the ability to watch for changes through the watch api.
-type ResourceWatcher interface {
+type Watcher interface {
 	// 'label' selects on labels; 'field' selects on the object's fields. Not all fields
 	// are supported; an error should be returned if 'field' tries to select on a field that
 	// isn't supported. 'resourceVersion' allows for continuing/starting a watch at a
@@ -125,8 +130,18 @@ type ResourceWatcher interface {
 	Watch(ctx api.Context, label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error)
 }
 
+// StandardStorage is an interface covering the common verbs. Provided for testing whether a
+// resource satisfies the normal storage methods. Use Storage when passing opaque storage objects.
+type StandardStorage interface {
+	Getter
+	Lister
+	CreaterUpdater
+	GracefulDeleter
+	Watcher
+}
+
 // Redirector know how to return a remote resource's location.
 type Redirector interface {
 	// ResourceLocation should return the remote location of the given resource, or an error.
-	ResourceLocation(ctx api.Context, id string) (remoteLocation string, err error)
+	ResourceLocation(ctx api.Context, name string) (remoteLocation string, err error)
 }

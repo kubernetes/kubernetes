@@ -71,15 +71,15 @@ type PodLister interface {
 	ListPods(ctx api.Context, labels labels.Selector) (*api.PodList, error)
 }
 
-// REST implements apiserver.RESTStorage for the replication controller service.
+// REST implements rest.Storage for the replication controller service.
 type REST struct {
 	registry  Registry
 	podLister PodLister
 	strategy  rcStrategy
 }
 
-// NewREST returns a new apiserver.RESTStorage for the given registry and PodLister.
-func NewREST(registry Registry, podLister PodLister) *REST {
+// NewStorage returns a new rest.Storage for the given registry and PodLister.
+func NewStorage(registry Registry, podLister PodLister) *REST {
 	return &REST{
 		registry:  registry,
 		podLister: podLister,
@@ -167,7 +167,7 @@ func (rs *REST) Update(ctx api.Context, obj runtime.Object) (runtime.Object, boo
 }
 
 // Watch returns ReplicationController events via a watch.Interface.
-// It implements apiserver.ResourceWatcher.
+// It implements rest.Watcher.
 func (rs *REST) Watch(ctx api.Context, label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
 	return rs.registry.WatchControllers(ctx, label, field, resourceVersion)
 }

@@ -31,6 +31,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/admission"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/rest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta2"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta3"
@@ -151,7 +152,7 @@ type Master struct {
 	masterServices       *util.Runner
 
 	// storage contains the RESTful endpoints exposed by this master
-	storage map[string]apiserver.RESTStorage
+	storage map[string]rest.Storage
 
 	// registries are internal client APIs for accessing the storage layer
 	// TODO: define the internal typed interface in a way that clients can
@@ -348,16 +349,16 @@ func logStackOnRecover(panicReason interface{}, httpWriter http.ResponseWriter) 
 
 // init initializes master.
 func (m *Master) init(c *Config) {
-	podStorage, bindingStorage, podStatusStorage := podetcd.NewREST(c.EtcdHelper)
+	podStorage, bindingStorage, podStatusStorage := podetcd.NewStorage(c.EtcdHelper)
 	podRegistry := pod.NewRegistry(podStorage)
 
 	eventRegistry := event.NewEtcdRegistry(c.EtcdHelper, uint64(c.EventTTL.Seconds()))
 	limitRangeRegistry := limitrange.NewEtcdRegistry(c.EtcdHelper)
 
-	resourceQuotaStorage, resourceQuotaStatusStorage := resourcequotaetcd.NewREST(c.EtcdHelper)
+	resourceQuotaStorage, resourceQuotaStatusStorage := resourcequotaetcd.NewStorage(c.EtcdHelper)
 	secretRegistry := secret.NewEtcdRegistry(c.EtcdHelper)
 
-	namespaceStorage := namespaceetcd.NewREST(c.EtcdHelper)
+	namespaceStorage := namespaceetcd.NewStorage(c.EtcdHelper)
 	m.namespaceRegistry = namespace.NewRegistry(namespaceStorage)
 
 	// TODO: split me up into distinct storage registries
@@ -367,7 +368,7 @@ func (m *Master) init(c *Config) {
 	m.endpointRegistry = registry
 	m.nodeRegistry = registry
 
-	nodeStorage := minion.NewREST(m.nodeRegistry)
+	nodeStorage := minion.NewStorage(m.nodeRegistry)
 	// TODO: unify the storage -> registry and storage -> client patterns
 	nodeStorageClient := RESTStorageToNodes(nodeStorage)
 	podCache := NewPodCache(
@@ -384,24 +385,24 @@ func (m *Master) init(c *Config) {
 	}
 
 	// TODO: Factor out the core API registration
-	m.storage = map[string]apiserver.RESTStorage{
+	m.storage = map[string]rest.Storage{
 		"pods":         podStorage,
 		"pods/status":  podStatusStorage,
 		"pods/binding": bindingStorage,
 		"bindings":     bindingStorage,
 
-		"replicationControllers": controller.NewREST(registry, podRegistry),
-		"services":               service.NewREST(m.serviceRegistry, c.Cloud, m.nodeRegistry, m.portalNet, c.ClusterName),
-		"endpoints":              endpoint.NewREST(m.endpointRegistry),
+		"replicationControllers": controller.NewStorage(registry, podRegistry),
+		"services":               service.NewStorage(m.serviceRegistry, c.Cloud, m.nodeRegistry, m.portalNet, c.ClusterName),
+		"endpoints":              endpoint.NewStorage(m.endpointRegistry),
 		"minions":                nodeStorage,
 		"nodes":                  nodeStorage,
-		"events":                 event.NewREST(eventRegistry),
+		"events":                 event.NewStorage(eventRegistry),
 
-		"limitRanges":           limitrange.NewREST(limitRangeRegistry),
+		"limitRanges":           limitrange.NewStorage(limitRangeRegistry),
 		"resourceQuotas":        resourceQuotaStorage,
 		"resourceQuotas/status": resourceQuotaStatusStorage,
 		"namespaces":            namespaceStorage,
-		"secrets":               secret.NewREST(secretRegistry),
+		"secrets":               secret.NewStorage(secretRegistry),
 	}
 
 	apiVersions := []string{"v1beta1", "v1beta2"}
@@ -576,7 +577,7 @@ func (m *Master) defaultAPIGroupVersion() *apiserver.APIGroupVersion {
 
 // api_v1beta1 returns the resources and codec for API version v1beta1.
 func (m *Master) api_v1beta1() *apiserver.APIGroupVersion {
-	storage := make(map[string]apiserver.RESTStorage)
+	storage := make(map[string]rest.Storage)
 	for k, v := range m.storage {
 		storage[k] = v
 	}
@@ -589,7 +590,7 @@ func (m *Master) api_v1beta1() *apiserver.APIGroupVersion {
 
 // api_v1beta2 returns the resources and codec for API version v1beta2.
 func (m *Master) api_v1beta2() *apiserver.APIGroupVersion {
-	storage := make(map[string]apiserver.RESTStorage)
+	storage := make(map[string]rest.Storage)
 	for k, v := range m.storage {
 		storage[k] = v
 	}
@@ -602,7 +603,7 @@ func (m *Master) api_v1beta2() *apiserver.APIGroupVersion {
 
 // api_v1beta3 returns the resources and codec for API version v1beta3.
 func (m *Master) api_v1beta3() *apiserver.APIGroupVersion {
-	storage := make(map[string]apiserver.RESTStorage)
+	storage := make(map[string]rest.Storage)
 	for k, v := range m.storage {
 		if k == "minions" {
 			continue

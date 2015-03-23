@@ -34,9 +34,9 @@ type REST struct {
 	registry generic.Registry
 }
 
-// NewREST returns a new REST. You must use a registry created by
+// NewStorage returns a new REST. You must use a registry created by
 // NewEtcdRegistry unless you're testing.
-func NewREST(registry generic.Registry) *REST {
+func NewStorage(registry generic.Registry) *REST {
 	return &REST{
 		registry: registry,
 	}
@@ -135,7 +135,7 @@ func (rs *REST) List(ctx api.Context, label labels.Selector, field fields.Select
 }
 
 // Watch returns Events events via a watch.Interface.
-// It implements apiserver.ResourceWatcher.
+// It implements rest.Watcher.
 func (rs *REST) Watch(ctx api.Context, label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
 	return rs.registry.WatchPredicate(ctx, &generic.SelectionPredicate{label, field, rs.getAttrs}, resourceVersion)
 }

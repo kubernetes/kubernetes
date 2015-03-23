@@ -32,8 +32,8 @@ type REST struct {
 	*etcdgeneric.Etcd
 }
 
-// NewREST returns a RESTStorage object that will work against namespaces
-func NewREST(h tools.EtcdHelper) *REST {
+// NewStorage returns a RESTStorage object that will work against namespaces
+func NewStorage(h tools.EtcdHelper) *REST {
 	store := &etcdgeneric.Etcd{
 		NewFunc:     func() runtime.Object { return &api.Namespace{} },
 		NewListFunc: func() runtime.Object { return &api.NamespaceList{} },

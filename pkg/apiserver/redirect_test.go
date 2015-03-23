@@ -22,6 +22,8 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"testing"
+
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/rest"
 )
 
 func TestRedirect(t *testing.T) {
@@ -29,7 +31,7 @@ func TestRedirect(t *testing.T) {
 		errors: map[string]error{},
 		expectedResourceNamespace: "default",
 	}
-	handler := handle(map[string]RESTStorage{"foo": simpleStorage})
+	handler := handle(map[string]rest.Storage{"foo": simpleStorage})
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
@@ -80,7 +82,7 @@ func TestRedirectWithNamespaces(t *testing.T) {
 		errors: map[string]error{},
 		expectedResourceNamespace: "other",
 	}
-	handler := handleNamespaced(map[string]RESTStorage{"foo": simpleStorage})
+	handler := handleNamespaced(map[string]rest.Storage{"foo": simpleStorage})
 	server := httptest.NewServer(handler)
 	defer server.Close()
 
