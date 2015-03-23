@@ -462,6 +462,7 @@ func init() {
 			}
 			out.DNSPolicy = DNSPolicy(in.DNSPolicy)
 			out.Version = "v1beta2"
+			out.HostNetwork = in.HostNetwork
 			return nil
 		},
 		func(in *ContainerManifest, out *newer.PodSpec, s conversion.Scope) error {
@@ -475,6 +476,7 @@ func init() {
 				return err
 			}
 			out.DNSPolicy = newer.DNSPolicy(in.DNSPolicy)
+			out.HostNetwork = in.HostNetwork
 			return nil
 		},
 

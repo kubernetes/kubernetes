@@ -67,6 +67,9 @@ func init() {
 			if obj.RestartPolicy == "" {
 				obj.RestartPolicy = RestartPolicyAlways
 			}
+			if obj.HostNetwork {
+				defaultHostNetworkPorts(&obj.Containers)
+			}
 		},
 		func(obj *Probe) {
 			if obj.TimeoutSeconds == 0 {
@@ -100,4 +103,15 @@ func init() {
 			}
 		},
 	)
+}
+
+// With host networking default all container ports to host ports.
+func defaultHostNetworkPorts(containers *[]Container) {
+	for i := range *containers {
+		for j := range (*containers)[i].Ports {
+			if (*containers)[i].Ports[j].HostPort == 0 {
+				(*containers)[i].Ports[j].HostPort = (*containers)[i].Ports[j].ContainerPort
+			}
+		}
+	}
 }

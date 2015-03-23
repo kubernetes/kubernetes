@@ -63,6 +63,10 @@ type ContainerManifest struct {
 	RestartPolicy RestartPolicy `json:"restartPolicy,omitempty" description:"restart policy for all containers within the pod; one of RestartPolicyAlways, RestartPolicyOnFailure, RestartPolicyNever"`
 	// Optional: Set DNS policy.  Defaults to "ClusterFirst"
 	DNSPolicy DNSPolicy `json:"dnsPolicy,omitempty" description:"DNS policy for containers within the pod; one of 'ClusterFirst' or 'Default'"`
+	// Uses the host's network namespace. If this option is set, the ports that will be
+	// used must be specified.
+	// Optional: Default to false.
+	HostNetwork bool `json:"hostNetwork,omitempty" description:"host networking requested for this pod"`
 }
 
 // ContainerManifestList is used to communicate container manifests to kubelet.
@@ -181,6 +185,7 @@ type ContainerPort struct {
 	// in a pod must have a unique name.
 	Name string `json:"name,omitempty" description:"name for the port that can be referred to by services; must be a DNS_LABEL and unique without the pod"`
 	// Optional: If specified, this must be a valid port number, 0 < x < 65536.
+	// If HostNetwork is specified, this must match ContainerPort.
 	HostPort int `json:"hostPort,omitempty" description:"number of port to expose on the host; most containers do not need this"`
 	// Required: This must be a valid port number, 0 < x < 65536.
 	ContainerPort int `json:"containerPort" description:"number of port to expose on the pod's IP address"`
@@ -1087,6 +1092,10 @@ type PodSpec struct {
 	// the the scheduler simply schedules this pod onto that host, assuming that it fits
 	// resource requirements.
 	Host string `json:"host,omitempty" description:"host requested for this pod"`
+	// Uses the host's network namespace. If this option is set, the ports that will be
+	// used must be specified.
+	// Optional: Default to false.
+	HostNetwork bool `json:"hostNetwork,omitempty" description:"host networking requested for this pod"`
 }
 
 // List holds a list of objects, which may not be known by the server.
