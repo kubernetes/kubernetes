@@ -40,10 +40,13 @@ Session.vim
 .vagrant
 network_closure.sh
 
-# compiled binaries in third_party
+# Compiled binaries in third_party
 /third_party/pkg
 
-# also ignore etcd installed by hack/install-etcd.sh
+# Also ignore etcd installed by hack/install-etcd.sh
 /third_party/etcd*
+
+# User cluster configs
+.kubeconfig
 
 .tags*
