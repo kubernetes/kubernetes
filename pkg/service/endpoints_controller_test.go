@@ -52,7 +52,7 @@ func newPodList(count int) *api.PodList {
 				Conditions: []api.PodCondition{
 					{
 						Type:   api.PodReady,
-						Status: api.ConditionFull,
+						Status: api.ConditionTrue,
 					},
 				},
 			},

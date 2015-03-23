@@ -1219,7 +1219,6 @@ func init() {
 				*out = NodeConditionKind(*in)
 				break
 			}
-
 			return nil
 		},
 		func(in *NodeConditionKind, out *newer.NodeConditionType, s conversion.Scope) error {
@@ -1236,7 +1235,35 @@ func init() {
 				*out = newer.NodeConditionType(*in)
 				break
 			}
+			return nil
+		},
 
+		func(in *newer.ConditionStatus, out *ConditionStatus, s conversion.Scope) error {
+			switch *in {
+			case newer.ConditionTrue:
+				*out = ConditionFull
+				break
+			case newer.ConditionFalse:
+				*out = ConditionNone
+				break
+			default:
+				*out = ConditionStatus(*in)
+				break
+			}
+			return nil
+		},
+		func(in *ConditionStatus, out *newer.ConditionStatus, s conversion.Scope) error {
+			switch *in {
+			case ConditionFull:
+				*out = newer.ConditionTrue
+				break
+			case ConditionNone:
+				*out = newer.ConditionFalse
+				break
+			default:
+				*out = newer.ConditionStatus(*in)
+				break
+			}
 			return nil
 		},
 
@@ -1270,7 +1297,6 @@ func init() {
 				*out = PodConditionKind(*in)
 				break
 			}
-
 			return nil
 		},
 		func(in *PodConditionKind, out *newer.PodConditionType, s conversion.Scope) error {
@@ -1284,9 +1310,9 @@ func init() {
 				*out = newer.PodConditionType(*in)
 				break
 			}
-
 			return nil
 		},
+
 		func(in *Binding, out *newer.Binding, s conversion.Scope) error {
 			if err := s.DefaultConvert(in, out, conversion.IgnoreMissingFields); err != nil {
 				return err

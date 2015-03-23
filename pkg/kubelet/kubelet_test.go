@@ -2465,11 +2465,11 @@ func TestPodPhaseWithRestartOnFailure(t *testing.T) {
 func TestGetPodReadyCondition(t *testing.T) {
 	ready := []api.PodCondition{{
 		Type:   api.PodReady,
-		Status: api.ConditionFull,
+		Status: api.ConditionTrue,
 	}}
 	unready := []api.PodCondition{{
 		Type:   api.PodReady,
-		Status: api.ConditionNone,
+		Status: api.ConditionFalse,
 	}}
 	tests := []struct {
 		spec     *api.PodSpec
@@ -3103,7 +3103,7 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 			Conditions: []api.NodeCondition{
 				{
 					Type:               api.NodeReady,
-					Status:             api.ConditionFull,
+					Status:             api.ConditionTrue,
 					Reason:             fmt.Sprintf("kubelet is posting ready status"),
 					LastProbeTime:      util.Time{},
 					LastTransitionTime: util.Time{},
@@ -3157,7 +3157,7 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 				Conditions: []api.NodeCondition{
 					{
 						Type:               api.NodeReady,
-						Status:             api.ConditionFull,
+						Status:             api.ConditionTrue,
 						Reason:             fmt.Sprintf("kubelet is posting ready status"),
 						LastProbeTime:      util.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
 						LastTransitionTime: util.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
@@ -3180,7 +3180,7 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 			Conditions: []api.NodeCondition{
 				{
 					Type:               api.NodeReady,
-					Status:             api.ConditionFull,
+					Status:             api.ConditionTrue,
 					Reason:             fmt.Sprintf("kubelet is posting ready status"),
 					LastProbeTime:      util.Time{}, // placeholder
 					LastTransitionTime: util.Time{}, // placeholder

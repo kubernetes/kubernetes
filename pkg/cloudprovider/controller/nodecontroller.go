@@ -301,7 +301,7 @@ func (nc *NodeController) DoCheck(node *api.Node) []api.NodeCondition {
 	oldReadyCondition := nc.getCondition(node, api.NodeReady)
 	newReadyCondition := nc.checkNodeReady(node)
 	nc.updateLastTransitionTime(oldReadyCondition, newReadyCondition)
-	if newReadyCondition.Status != api.ConditionFull {
+	if newReadyCondition.Status != api.ConditionTrue {
 		// Node is not ready for this probe, we need to check if pods need to be deleted.
 		if newReadyCondition.LastProbeTime.After(newReadyCondition.LastTransitionTime.Add(nc.podEvictionTimeout)) {
 			// As long as the node fails, we call delete pods to delete all pods. Node controller sync
@@ -338,14 +338,14 @@ func (nc *NodeController) checkNodeSchedulable(node *api.Node) *api.NodeConditio
 	if node.Spec.Unschedulable {
 		return &api.NodeCondition{
 			Type:          api.NodeSchedulable,
-			Status:        api.ConditionNone,
+			Status:        api.ConditionFalse,
 			Reason:        "User marked unschedulable during node create/update",
 			LastProbeTime: nc.now(),
 		}
 	} else {
 		return &api.NodeCondition{
 			Type:          api.NodeSchedulable,
-			Status:        api.ConditionFull,
+			Status:        api.ConditionTrue,
 			Reason:        "Node is schedulable by default",
 			LastProbeTime: nc.now(),
 		}
@@ -366,14 +366,14 @@ func (nc *NodeController) checkNodeReady(node *api.Node) *api.NodeCondition {
 	case status == probe.Failure:
 		return &api.NodeCondition{
 			Type:          api.NodeReady,
-			Status:        api.ConditionNone,
+			Status:        api.ConditionFalse,
 			Reason:        fmt.Sprintf("Node health check failed: kubelet /healthz endpoint returns not ok"),
 			LastProbeTime: nc.now(),
 		}
 	default:
 		return &api.NodeCondition{
 			Type:          api.NodeReady,
-			Status:        api.ConditionFull,
+			Status:        api.ConditionTrue,
 			Reason:        fmt.Sprintf("Node health check succeeded: kubelet /healthz endpoint returns ok"),
 			LastProbeTime: nc.now(),
 		}
@@ -481,7 +481,7 @@ func (nc *NodeController) MonitorNodeStatus() error {
 
 		if readyCondition != nil {
 			// Check eviction timeout.
-			if lastReadyCondition.Status == api.ConditionNone &&
+			if lastReadyCondition.Status == api.ConditionFalse &&
 				nc.now().After(lastReadyCondition.LastTransitionTime.Add(nc.podEvictionTimeout)) {
 				// Node stays in not ready for at least 'podEvictionTimeout' - evict all pods on the unhealthy node.
 				nc.deletePods(node.Name)
