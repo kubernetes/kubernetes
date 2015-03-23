@@ -4,30 +4,31 @@ The example below creates a Kubernetes cluster with 4 worker node Virtual Machin
 
 ### Getting VMs
 
-1. You need a Google Cloud Platform account with billing enabled. Visit
-   [http://cloud.google.com/console](http://cloud.google.com/console) for more details.
-2. Make sure you can start up a GCE VM.  At least make sure you can do the [Create an instance](https://developers.google.com/compute/docs/quickstart#addvm) part of the GCE Quickstart.
-3. Make sure you can ssh into the VM without interactive prompts.
+1. You need a Google Cloud Platform account with billing enabled. Visit the [Google Developers Console](http://cloud.google.com/console) for more details.
+2. Make sure you can start up a GCE VM from the command line.  At least make sure you can do the [Create an instance](https://cloud.google.com/compute/docs/quickstart#create_an_instance) part of the GCE Quickstart.
+3. Make sure you can ssh into the VM without interactive prompts.  See the [Log in to the instance](https://cloud.google.com/compute/docs/quickstart#ssh) part of the GCE Quickstart.
   * Your GCE SSH key must either have no passcode or you need to be using `ssh-agent`.
   * Ensure the GCE firewall isn't blocking port 22 to your VMs.  By default, this should work but if you have edited firewall rules or created a new non-default network, you'll need to expose it: `gcloud compute firewall-rules create --network=<network-name> --description "SSH allowed from anywhere" --allow tcp:22 default-ssh`
-4. You need to have the Google Cloud Storage API, and the Google Cloud Storage JSON API enabled. This can be done in the Google Cloud Console.
-
+4. You need to have the Google Cloud Storage API, and the Google Cloud Storage JSON API enabled. It is activated by default for new projects. Otherwise, it can be done in the Google Cloud Console.  See the [Google Cloud Storage JSON API Overview](https://cloud.google.com/storage/docs/json_api/) for more details.
 
 ### Prerequisites for your workstation
 
-1. Be running a Linux or Mac OS X.
+1. You must be running Linux or Mac OS X on your workstation.
 2. You must have the [Google Cloud SDK](https://developers.google.com/cloud/sdk/) installed.  This will get you `gcloud` and `gsutil`.
-3. Ensure that your `gcloud` components are up-to-date by running `gcloud components update`.
-4. If you want to build your own release, you need to have [Docker
-installed](https://docs.docker.com/installation/).  On Mac OS X you can use
-[boot2docker](http://boot2docker.io/). (see also: https://docs.docker.com/installation/mac/)
-5. Get or build a [binary release](binary_release.md)
+3. Install `gcloud preview`: run `gcloud components update preview` to make sure it is.
+4. Ensure that your other `gcloud` components are up-to-date by running `gcloud components update`.
+5. If you want to build your own release, you need to have [Docker installed](https://docs.docker.com/installation/).  On Mac OS X you can use [boot2docker](http://boot2docker.io/). (see also: https://docs.docker.com/installation/mac/)
+6. Get or build a [binary release](binary_release.md) of Kubernetes.
 
 ### Starting a Cluster
+
+Change into the `kubernetes` directory in which you have the binary release, and then do
 
 ```bash
 cluster/kube-up.sh
 ```
+
+(If it fails, do `cluster/kube-down.sh` to clean up before trying again; otherwise, you'll get errors about resources that already exist.)
 
 The script above relies on Google Storage to stage the Kubernetes release. It
 then will start (by default) a single master VM along with 4 worker VMs.  You
