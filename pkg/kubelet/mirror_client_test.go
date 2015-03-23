@@ -17,7 +17,6 @@ limitations under the License.
 package kubelet
 
 import (
-	"reflect"
 	"sync"
 	"testing"
 
@@ -25,7 +24,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
-type fakeMirrorManager struct {
+type fakeMirrorClient struct {
 	mirrorPodLock sync.RWMutex
 	// Note that a real mirror manager does not store the mirror pods in
 	// itself. This fake manager does this to track calls.
@@ -34,7 +33,7 @@ type fakeMirrorManager struct {
 	deleteCounts map[string]int
 }
 
-func (self *fakeMirrorManager) CreateMirrorPod(pod api.Pod, _ string) error {
+func (self *fakeMirrorClient) CreateMirrorPod(pod api.Pod, _ string) error {
 	self.mirrorPodLock.Lock()
 	defer self.mirrorPodLock.Unlock()
 	podFullName := GetPodFullName(&pod)
@@ -43,7 +42,7 @@ func (self *fakeMirrorManager) CreateMirrorPod(pod api.Pod, _ string) error {
 	return nil
 }
 
-func (self *fakeMirrorManager) DeleteMirrorPod(podFullName string) error {
+func (self *fakeMirrorClient) DeleteMirrorPod(podFullName string) error {
 	self.mirrorPodLock.Lock()
 	defer self.mirrorPodLock.Unlock()
 	self.mirrorPods.Delete(podFullName)
@@ -51,79 +50,36 @@ func (self *fakeMirrorManager) DeleteMirrorPod(podFullName string) error {
 	return nil
 }
 
-func newFakeMirrorMananger() *fakeMirrorManager {
-	m := fakeMirrorManager{}
+func newFakeMirrorClient() *fakeMirrorClient {
+	m := fakeMirrorClient{}
 	m.mirrorPods = util.NewStringSet()
 	m.createCounts = make(map[string]int)
 	m.deleteCounts = make(map[string]int)
 	return &m
 }
 
-func (self *fakeMirrorManager) HasPod(podFullName string) bool {
+func (self *fakeMirrorClient) HasPod(podFullName string) bool {
 	self.mirrorPodLock.RLock()
 	defer self.mirrorPodLock.RUnlock()
 	return self.mirrorPods.Has(podFullName)
 }
 
-func (self *fakeMirrorManager) NumOfPods() int {
+func (self *fakeMirrorClient) NumOfPods() int {
 	self.mirrorPodLock.RLock()
 	defer self.mirrorPodLock.RUnlock()
 	return self.mirrorPods.Len()
 }
 
-func (self *fakeMirrorManager) GetPods() []string {
+func (self *fakeMirrorClient) GetPods() []string {
 	self.mirrorPodLock.RLock()
 	defer self.mirrorPodLock.RUnlock()
 	return self.mirrorPods.List()
 }
 
-func (self *fakeMirrorManager) GetCounts(podFullName string) (int, int) {
+func (self *fakeMirrorClient) GetCounts(podFullName string) (int, int) {
 	self.mirrorPodLock.RLock()
 	defer self.mirrorPodLock.RUnlock()
 	return self.createCounts[podFullName], self.deleteCounts[podFullName]
-}
-
-// Tests that mirror pods are filtered out properly from the pod update.
-func TestFilterOutMirrorPods(t *testing.T) {
-	mirrorPod := api.Pod{
-		ObjectMeta: api.ObjectMeta{
-			UID:       "987654321",
-			Name:      "bar",
-			Namespace: "default",
-			Annotations: map[string]string{
-				ConfigSourceAnnotationKey: "api",
-				ConfigMirrorAnnotationKey: "mirror",
-			},
-		},
-	}
-	staticPod := api.Pod{
-		ObjectMeta: api.ObjectMeta{
-			UID:         "123456789",
-			Name:        "bar",
-			Namespace:   "default",
-			Annotations: map[string]string{ConfigSourceAnnotationKey: "file"},
-		},
-	}
-
-	expectedPods := []api.Pod{
-		{
-			ObjectMeta: api.ObjectMeta{
-				UID:         "999999999",
-				Name:        "taco",
-				Namespace:   "default",
-				Annotations: map[string]string{ConfigSourceAnnotationKey: "api"},
-			},
-		},
-		staticPod,
-	}
-	updates := append(expectedPods, mirrorPod)
-	actualPods, actualMirrorPods := filterAndCategorizePods(updates)
-	if !reflect.DeepEqual(expectedPods, actualPods) {
-		t.Errorf("expected %#v, got %#v", expectedPods, actualPods)
-	}
-	if _, ok := actualMirrorPods.mirror[GetPodFullName(&mirrorPod)]; !ok {
-		t.Errorf("mirror pod is not recorded")
-	}
 }
 
 func TestParsePodFullName(t *testing.T) {
