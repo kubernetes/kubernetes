@@ -24,11 +24,11 @@ gcloud config set project <project-name>
 
 Next, grab the Kubernetes [release binary](https://github.com/GoogleCloudPlatform/kubernetes/releases). You can do this via:
 ```shell
-wget -q -O - https://get.k8s.io | sh
+wget -q -O - https://get.k8s.io | bash
 ```
 or
 ```shell
-curl -sS https://get.k8s.io | sh
+curl -sS https://get.k8s.io | bash
 ```
 
 Then, start up a Kubernetes cluster as [described here](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/getting-started-guides/gce.md).
