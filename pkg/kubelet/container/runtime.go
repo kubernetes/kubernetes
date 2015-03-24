@@ -64,18 +64,18 @@ type ContainerRunner interface {
 type Pod struct {
 	// The ID of the pod, which can be used to retrieve a particular pod
 	// from the pod list returned by GetPods().
-	ID types.UID
+	ID types.UID `json:"id"`
 	// The name and namespace of the pod, which is readable by human.
-	Name      string
-	Namespace string
+	Name      string `json:"name"`
+	Namespace string `json:"namespace"`
 	// List of containers that belongs to this pod. It may contain only
 	// running containers, or mixed with dead ones (when GetPods(true)).
-	Containers []*Container
+	Containers []*Container `json:"containers"`
 	// The status of the pod.
 	// TODO(yifan): Inspect and get the statuses for all pods can be expensive,
 	// maybe we want to get one pod's status at a time (e.g. GetPodStatus()
 	// for the particular pod after we GetPods()).
-	Status api.PodStatus
+	Status api.PodStatus `json:"status"`
 }
 
 // Container provides the runtime information for a container, such as ID, hash,
@@ -83,18 +83,18 @@ type Pod struct {
 type Container struct {
 	// The ID of the container, used by the container runtime to identify
 	// a container.
-	ID types.UID
+	ID types.UID `json:"id"`
 	// The name of the container, which should be the same as specified by
 	// api.Container.
-	Name string
+	Name string `json:"name"`
 	// The image name of the container.
-	Image string
+	Image string `json:"image"`
 	// Hash of the container, used for comparison. Optional for containers
 	// not managed by kubelet.
-	Hash uint64
+	Hash uint64 `json:"hash"`
 	// The timestamp of the creation time of the container.
 	// TODO(yifan): Consider to move it to api.ContainerStatus.
-	Created int64
+	Created int64 `json:"created"`
 }
 
 // RunContainerOptions specify the options which are necessary for running containers
