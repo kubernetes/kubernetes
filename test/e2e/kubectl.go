@@ -41,7 +41,7 @@ const (
 	redisSlaveSelector       = "name=redis-slave"
 	kubectlProxyPort         = 8011
 	guestbookStartupTimeout  = 10 * time.Minute
-	guestbookResponseTimeout = time.Minute
+	guestbookResponseTimeout = 3 * time.Minute
 )
 
 var _ = Describe("kubectl", func() {
