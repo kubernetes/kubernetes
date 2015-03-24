@@ -182,17 +182,6 @@ func (pm *VolumePluginMgr) FindPluginByName(name string) (VolumePlugin, error) {
 	return pm.plugins[matches[0]], nil
 }
 
-// FindPersistentPluginBySpec looks for a plugin that can support a given volume
-// specification.  If no plugins can support or more than one plugin can
-// support it, return error.
-func (pm *VolumePluginMgr) FindPersistentPluginBySpec(spec *api.Volume) (PersistentVolumePlugin, error) {
-	volumePlugin, err := pm.FindPluginBySpec(spec)
-	if err != nil {
-		return nil, err
-	}
-	return volumePlugin.(PersistentVolumePlugin), nil
-}
-
 // FindPluginByName fetches a plugin by name or by legacy name.  If no plugin
 // is found, returns error.
 func (pm *VolumePluginMgr) FindPersistentPluginByName(name string) (PersistentVolumePlugin, error) {

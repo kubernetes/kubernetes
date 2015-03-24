@@ -195,20 +195,6 @@ type VolumeSource struct {
 	NFS *NFSVolumeSource `json:"nfs"`
 }
 
-// PersistentVolumeSource is similar to VolumeSource but meant for the administrator who creates PVs.
-// Exactly one of its members must be set.
-type PersistentVolumeSource struct {
-	// GCEPersistentDisk represents a GCE Disk resource that is attached to a
-	// kubelet's host machine and then exposed to the pod.
-	GCEPersistentDisk *GCEPersistentDiskVolumeSource `json:"persistentDisk"`
-	// HostPath represents a directory on the host.
-	// This is useful for development and testing only.
-	// on-host storage is not supported in any way
-	HostPath *HostPathVolumeSource `json:"hostPath"`
-	// NFS represents an NFS mount on the host that shares a pod's lifetime
-	NFS *NFSVolumeSource `json:"nfs"`
-}
-
 // used by VolumeSources to describe their mounting/access modes
 type AccessModeType string
 
