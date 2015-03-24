@@ -103,7 +103,7 @@ The services in a Kubernetes cluster are discoverable inside other containers vi
 
 Services find the containers to load balance based on pod labels.
 
-The pod that you created in Step One has the label `name=redis-master`. The selector field of the service determines *which pods will receive the traffic* sent to the service, and the port and containerPort information defines what port the service proxy will run at. 
+The pod that you created in Step One has the label `name=redis-master`. The selector field of the service determines *which pods will receive the traffic* sent to the service, and the port and containerPort (targetPort in v1beta3 and higher APIs) information defines what port the service proxy will run at. 
 
 Use the file `examples/guestbook/redis-master-service.json`:
 
@@ -137,7 +137,7 @@ redis-master            name=redis-master                         name=redis-mas
 This will cause all pods to see the redis master apparently running on <ip>:6379.  The traffic flow from slaves to masters can be described in two steps, like so.
 
 - A *redis slave* will connect to "port" on the *redis master service*
-- Traffic will be forwarded from the service "port" (on the service node) to the  *containerPort* on the pod which (a node the service listens to). 
+- Traffic will be forwarded from the service "port" (on the service node) to the  *containerPort* (targetPort in v1beta3 and higher APIs) on the pod which (a node the service listens to). 
 
 Thus, once created, the service proxy on each minion is configured to set up a proxy on the specified port (in this case port 6379).
 
