@@ -74,7 +74,7 @@ func NewCMServer() *CMServer {
 		Address:                 util.IP(net.ParseIP("127.0.0.1")),
 		NodeSyncPeriod:          10 * time.Second,
 		ResourceQuotaSyncPeriod: 10 * time.Second,
-		NamespaceSyncPeriod:     10 * time.Second,
+		NamespaceSyncPeriod:     1 * time.Minute,
 		RegisterRetryCount:      10,
 		PodEvictionTimeout:      5 * time.Minute,
 		NodeMilliCPU:            1000,

@@ -105,7 +105,7 @@ func (r *REST) Delete(ctx api.Context, name string, options *api.DeleteOptions) 
 }
 
 func (r *StatusREST) New() runtime.Object {
-	return &api.Namespace{}
+	return r.store.New()
 }
 
 // Update alters the status subset of an object.
@@ -114,7 +114,7 @@ func (r *StatusREST) Update(ctx api.Context, obj runtime.Object) (runtime.Object
 }
 
 func (r *FinalizeREST) New() runtime.Object {
-	return &api.Namespace{}
+	return r.store.New()
 }
 
 // Update alters the status finalizers subset of an object.

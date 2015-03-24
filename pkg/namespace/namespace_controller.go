@@ -159,7 +159,7 @@ func (nm *NamespaceManager) syncNamespace(namespace api.Namespace) (err error) {
 	}
 
 	// if there is a deletion timestamp, and the status is not terminating, then update status
-	if namespace.DeletionTimestamp != nil && namespace.Status.Phase != api.NamespaceTerminating {
+	if !namespace.DeletionTimestamp.IsZero() && namespace.Status.Phase != api.NamespaceTerminating {
 		newNamespace := api.Namespace{}
 		newNamespace.ObjectMeta = namespace.ObjectMeta
 		newNamespace.Status = namespace.Status
