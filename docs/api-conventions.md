@@ -297,11 +297,14 @@ The following HTTP status codes may be returned by the API.
 Response Status Kind
 ---------------------
 
-Kubernetes MAY return the ```Status``` kind from any API endpoint. Clients SHOULD handle these types of objects when appropriate.
+Kubernetes will always return the ```Status``` kind from any API endpoint when an error occurs.
+Clients SHOULD handle these types of objects when appropriate.
 
-A ```Status``` kind MAY be returned by an API when an operation is successful (i.e. when an HTTP 200 status code is returned). In particular, delete APIs return the ```Status``` kind. The success status object simply contains a ```Status``` field set to ```Successs```.
+A ```Status``` kind will be returned by the API in two cases:
+  * When an operation is not successful (i.e. when the server would return a non 2xx HTTP status code).
+  * When a HTTP ```DELETE``` call is successful.
 
-A ```Status``` kind SHOULD be returned by an API when an operation is not successful (i.e. when the server would return a non 2xx HTTP status code). The status object contains fields for humans and machine consumers of the API to get more detailed information for the cause of the failure. The information in the status object supplements, but does not override, the HTTP status code's meaning.
+The status object is encoded as JSON and provided as the body of the response.  The status object contains fields for humans and machine consumers of the API to get more detailed information for the cause of the failure. The information in the status object supplements, but does not override, the HTTP status code's meaning.
 
 **Example:**
 ```JSON
