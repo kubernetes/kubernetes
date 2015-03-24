@@ -166,7 +166,7 @@ func NewMainKubelet(
 	}
 	serviceLister := &cache.StoreToServiceLister{serviceStore}
 
-	serviceStore = cache.NewStore(cache.MetaNamespaceKeyFunc)
+	nodeStore := cache.NewStore(cache.MetaNamespaceKeyFunc)
 	if kubeClient != nil {
 		// TODO: cache.NewListWatchFromClient is limited as it takes a client implementation rather
 		// than an interface. There is no way to construct a list+watcher using resource name.
@@ -183,9 +183,9 @@ func NewMainKubelet(
 					labels.Everything(), fields.Everything(), resourceVersion)
 			},
 		}
-		cache.NewReflector(listWatch, &api.Service{}, serviceStore, 0).Run()
+		cache.NewReflector(listWatch, &api.Node{}, nodeStore, 0).Run()
 	}
-	nodeLister := &cache.StoreToNodeLister{serviceStore}
+	nodeLister := &cache.StoreToNodeLister{nodeStore}
 
 	containerGC, err := newContainerGC(dockerClient, containerGCPolicy)
 	if err != nil {
