@@ -115,18 +115,26 @@ download-or-bust() {
 # Install salt from GCS.  See README.md for instructions on how to update these
 # debs.
 install-salt() {
-  apt-get update
+  echo "== Refreshing package database =="
+  until apt-get update; do
+    echo "== apt-get update failed, retrying =="
+    echo sleep 5
+  done
 
   mkdir -p /var/cache/salt-install
   cd /var/cache/salt-install
 
-  TARS=(
+  DEBS=(
     libzmq3_3.2.3+dfsg-1~bpo70~dst+1_amd64.deb
     python-zmq_13.1.0-1~bpo70~dst+1_amd64.deb
     salt-common_2014.1.13+ds-1~bpo70+1_all.deb
     salt-minion_2014.1.13+ds-1~bpo70+1_all.deb
   )
   URL_BASE="https://storage.googleapis.com/kubernetes-release/salt"
+
+  for deb in "${DEBS[@]}"; do
+    download-or-bust "${URL_BASE}/${deb}"
+  done
 
   # Based on
   # https://major.io/2014/06/26/install-debian-packages-without-starting-daemons/
@@ -141,13 +149,17 @@ exit 101
 EOF
   chmod 0755 /usr/sbin/policy-rc.d
 
-  for tar in "${TARS[@]}"; do
-    download-or-bust "${URL_BASE}/${tar}"
-    dpkg -i "${tar}" || true
+  for deb in "${DEBS[@]}"; do
+    echo "== Installing ${deb}, ignore dependency complaints (will fix later) =="
+    dpkg --force-depends -i "${deb}"
   done
 
   # This will install any of the unmet dependencies from above.
-  apt-get install -f -y
+  echo "== Installing unmet dependencies =="
+  until apt-get install -f -y; do
+    echo "== apt-get install failed, retrying =="
+    echo sleep 5
+  done
 
   rm /usr/sbin/policy-rc.d
 }
