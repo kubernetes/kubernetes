@@ -457,12 +457,13 @@ type ContainerStateRunning struct {
 }
 
 type ContainerStateTerminated struct {
-	ExitCode   int       `json:"exitCode"`
-	Signal     int       `json:"signal,omitempty"`
-	Reason     string    `json:"reason,omitempty"`
-	Message    string    `json:"message,omitempty"`
-	StartedAt  util.Time `json:"startedAt,omitempty"`
-	FinishedAt util.Time `json:"finishedAt,omitempty"`
+	ExitCode    int       `json:"exitCode"`
+	Signal      int       `json:"signal,omitempty"`
+	Reason      string    `json:"reason,omitempty"`
+	Message     string    `json:"message,omitempty"`
+	StartedAt   util.Time `json:"startedAt,omitempty"`
+	FinishedAt  util.Time `json:"finishedAt,omitempty"`
+	ContainerID string    `json:"containerID,omitempty"`
 }
 
 // ContainerState holds a possible state of container.
@@ -477,7 +478,8 @@ type ContainerState struct {
 type ContainerStatus struct {
 	// TODO(dchen1107): Should we rename PodStatus to a more generic name or have a separate states
 	// defined for container?
-	State ContainerState `json:"state,omitempty"`
+	State                ContainerState `json:"state,omitempty"`
+	LastTerminationState ContainerState `json:"lastState,omitempty"`
 	// Ready specifies whether the conatiner has passed its readiness check.
 	Ready bool `json:"ready"`
 	// Note that this is calculated from dead containers.  But those containers are subject to
