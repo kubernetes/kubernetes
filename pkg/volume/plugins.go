@@ -173,18 +173,3 @@ func (pm *VolumePluginMgr) FindPluginByName(name string) (VolumePlugin, error) {
 	}
 	return pm.plugins[matches[0]], nil
 }
-
-// EscapePluginName converts a plugin name, which might contain a / into a
-// string that is safe to use on-disk.  This assumes that the input has already
-// been validates as a qualified name.  we use "~" rather than ":" here in case
-// we ever use a filesystem that doesn't allow ":".
-func EscapePluginName(in string) string {
-	return strings.Replace(in, "/", "~", -1)
-}
-
-// UnescapePluginName converts an escaped plugin name (as per EscapePluginName)
-// back to its normal form.  This assumes that the input has already been
-// validates as a qualified name.
-func UnescapePluginName(in string) string {
-	return strings.Replace(in, "~", "/", -1)
-}

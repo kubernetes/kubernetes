@@ -24,6 +24,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/exec"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/mount"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume"
@@ -242,7 +243,7 @@ func (pd *gcePersistentDisk) GetPath() string {
 	if pd.legacyMode {
 		name = gcePersistentDiskPluginLegacyName
 	}
-	return pd.plugin.host.GetPodVolumeDir(pd.podUID, volume.EscapePluginName(name), pd.volName)
+	return pd.plugin.host.GetPodVolumeDir(pd.podUID, util.EscapeQualifiedNameForDisk(name), pd.volName)
 }
 
 // Unmounts the bind mount, and detaches the disk only if the PD
