@@ -63,7 +63,7 @@ func (plugin *secretPlugin) NewBuilder(spec *api.Volume, podRef *api.ObjectRefer
 }
 
 func (plugin *secretPlugin) newBuilderInternal(spec *api.Volume, podRef *api.ObjectReference) (volume.Builder, error) {
-	return &secretVolume{spec.Name, *podRef, plugin, spec.Secret.Target}, nil
+	return &secretVolume{spec.Name, *podRef, plugin, spec.Secret.SecretName}, nil
 }
 
 func (plugin *secretPlugin) NewCleaner(volName string, podUID types.UID) (volume.Cleaner, error) {
@@ -71,16 +71,16 @@ func (plugin *secretPlugin) NewCleaner(volName string, podUID types.UID) (volume
 }
 
 func (plugin *secretPlugin) newCleanerInternal(volName string, podUID types.UID) (volume.Cleaner, error) {
-	return &secretVolume{volName, api.ObjectReference{UID: podUID}, plugin, api.ObjectReference{}}, nil
+	return &secretVolume{volName, api.ObjectReference{UID: podUID}, plugin, ""}, nil
 }
 
 // secretVolume handles retrieving secrets from the API server
 // and placing them into the volume on the host.
 type secretVolume struct {
-	volName   string
-	podRef    api.ObjectReference
-	plugin    *secretPlugin
-	secretRef api.ObjectReference
+	volName    string
+	podRef     api.ObjectReference
+	plugin     *secretPlugin
+	secretName string
 }
 
 func (sv *secretVolume) SetUp() error {
@@ -110,9 +110,9 @@ func (sv *secretVolume) SetUpAt(dir string) error {
 		return fmt.Errorf("Cannot setup secret volume %v because kube client is not configured", sv)
 	}
 
-	secret, err := kubeClient.Secrets(sv.podRef.Namespace).Get(sv.secretRef.Name)
+	secret, err := kubeClient.Secrets(sv.podRef.Namespace).Get(sv.secretName)
 	if err != nil {
-		glog.Errorf("Couldn't get secret %v/%v", sv.secretRef.Namespace, sv.secretRef.Name)
+		glog.Errorf("Couldn't get secret %v/%v", sv.podRef.Namespace, sv.secretName)
 		return err
 	}
 

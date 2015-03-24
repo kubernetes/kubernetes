@@ -281,3 +281,31 @@ func TestEndpointsConversion(t *testing.T) {
 		}
 	}
 }
+
+func TestSecretVolumeSourceConversion(t *testing.T) {
+	given := current.SecretVolumeSource{
+		Target: current.ObjectReference{
+			ID: "foo",
+		},
+	}
+
+	expected := newer.SecretVolumeSource{
+		SecretName: "foo",
+	}
+
+	got := newer.SecretVolumeSource{}
+	if err := newer.Scheme.Convert(&given, &got); err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	if got.SecretName != expected.SecretName {
+		t.Errorf("Expected %v; got %v", expected, got)
+	}
+
+	got2 := current.SecretVolumeSource{}
+	if err := newer.Scheme.Convert(&got, &got2); err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	if got2.Target.ID != given.Target.ID {
+		t.Errorf("Expected %v; got %v", given, got2)
+	}
+}

@@ -171,7 +171,8 @@ type GitRepoVolumeSource struct {
 
 // SecretVolumeSource adapts a Secret into a VolumeSource
 type SecretVolumeSource struct {
-	// Reference to a Secret
+	// Reference to a Secret to use.  Only the ID field of this reference is used; a
+	// secret can only be used by pods in its namespace.
 	Target ObjectReference `json:"target" description:"target is a reference to a secret"`
 }
 

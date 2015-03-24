@@ -110,7 +110,8 @@ const (
 //
 // https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/design/secrets.md
 type SecretVolumeSource struct {
-	// Reference to a Secret
+	// Reference to a Secret to use.  Only the ID field of this reference is used; a
+	// secret can only be used by pods in its namespace.
 	Target ObjectReference `json:"target" description:"target is a reference to a secret"`
 }
 
