@@ -11,12 +11,6 @@ Sets the current-context in a .kubeconfig file
 kubectl config use-context CONTEXT_NAME
 ```
 
-### Options
-
-```
-  -h, --help=false: help for use-context
-```
-
 ### Options inherrited from parent commands
 
 ```
@@ -30,6 +24,7 @@ kubectl config use-context CONTEXT_NAME
       --context="": The name of the kubeconfig context to use
       --envvar=false: use the .kubeconfig from $KUBECONFIG
       --global=false: use the .kubeconfig from /home/username
+  -h, --help=false: help for config
       --insecure-skip-tls-verify=false: If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure.
       --kubeconfig="": use a particular .kubeconfig file
       --local=false: use the .kubeconfig in the current directory
