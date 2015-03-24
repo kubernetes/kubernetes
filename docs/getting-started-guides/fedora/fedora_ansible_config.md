@@ -12,31 +12,34 @@ The hosts can be virtual or bare metal.  The only requirement to make the ansibl
 
 Ansible will take care of the rest of the configuration for you - configuring networking, installing packages, handling the firewall, etc... This example will use one master and two minions.
 
-## Configuring cluster information:
+## Architecture of the cluster
 
-Hosts:
-```
-fed1 (master) = 192.168.121.205
-fed2 (minion) = 192.168.121.84
-fed3 (minion) = 192.168.121.116
-```
-
-**Make sure your local machine has ansible installed**
+A Kubernetes cluster reqiures etcd, a master, and n minions, so we will create a cluster with three hosts, for example:
 
 ```
-yum install -y ansible
+    fed1 (master,etcd) = 192.168.121.205
+    fed2 (minion) = 192.168.121.84
+    fed3 (minion) = 192.168.121.116
 ```
 
-**Clone the kubernetes-ansible repo on the host running Ansible.**
+**Make sure your local machine** 
+
+ - has ansible
+ - has git
+
+then we just clone down the kubernetes-ansible repositry** 
 
 ```
-git clone https://github.com/eparis/kubernetes-ansible.git
-cd kubernetes-ansible
+   yum install -y ansible git
+   git clone https://github.com/eparis/kubernetes-ansible.git
+   cd kubernetes-ansible
 ```
 
 **Tell ansible about each machine and its role in your cluster.**
 
-Get the IP addresses from the master and minions.  Add those to the inventory file at the root of the repo on the host running Ansible.  Ignore the kube_ip_addr= option for a moment.
+Get the IP addresses from the master and minions.  Add those to the `inventory` file (at the root of the repo) on the host running Ansible.  
+
+We will set the kube_ip_addr to '10.254.0.[1-3]', for now.  The reason we do this is explained later...  It might work for you as a default.
 
 ```
 [masters]
@@ -46,11 +49,15 @@ Get the IP addresses from the master and minions.  Add those to the inventory fi
 192.168.121.205
 
 [minions]
-192.168.121.84  kube_ip_addr=[ignored]
-192.168.121.116 kube_ip_addr=[ignored]
+192.168.121.84  kube_ip_addr=[10.254.0.1]
+192.168.121.116 kube_ip_addr=[10.254.0.2]
 ```
 
-**Tell ansible which user has ssh access (and sudo access to root)**
+**Setup ansible access to your nodes**
+
+If you already are running on a machine which has passwordless ssh access to the fed[1-3] nodes, and 'sudo' privileges, simply set the value of `ansible_ssh_user` in `group_vars/all.yaml` to the username which you use to ssh to the nodes (i.e. `fedora`), and proceed to the next step...
+
+*Otherwise* setup ssh on the machines like so (you will need to know the root password to all machines in the cluster).
 
 edit: group_vars/all.yml
 
@@ -72,36 +79,44 @@ echo "password" > ~/rootpassword
 
 **Agree to accept each machine's ssh public key**
 
+After this is completed, ansible is now enabled to ssh into any of the machines you're configuring.
+
 ```
 ansible-playbook -i inventory ping.yml # This will look like it fails, that's ok
 ```
 
 **Push your ssh public key to every machine**
 
+Again, you can skip this step if your ansible machine has ssh access to the nodes you are going to use in the kubernetes cluster.
 ```
 ansible-playbook -i inventory keys.yml
 ```
 
-## Configuring the network
+## Configuring the internal kubernetes network
 
 If you already have configured your network and docker will use it correctly, skip to [setting up the cluster](#setting-up-the-cluster)
 
-The ansible scripts are quite hacky configuring the network, see the README
+The ansible scripts are quite hacky configuring the network, you can see the [README](https://github.com/eparis/kubernetes-ansible) for details, or you can simply enter in variants of the 'kube_service_addresses' (in the all.yaml file) as `kube_ip_addr` entries in the minions field, as shown in the next section.
 
 **Configure the ip addresses which should be used to run pods on each machine**
 
-The IP address pool used to assign addresses to pods for each minion is the kube_ip_addr= option.  Choose a /24 to use for each minion and add that to you inventory file.
+The IP address pool used to assign addresses to pods for each minion is the `kube_ip_addr`= option.  Choose a /24 to use for each minion and add that to you inventory file.
+
+For this example, as shown earlier, we can do something like this...
 
 ```
 [minions]
-192.168.121.84  kube_ip_addr=10.0.1.0
-192.168.121.116 kube_ip_addr=10.0.2.0
+192.168.121.84  kube_ip_addr=10.254.0.1
+192.168.121.116 kube_ip_addr=10.254.0.2
 ```
 
 **Run the network setup playbook**
 
+On EACH node, make sure NetworkManager is installed, and the service "NetworkManager" is running, then you can run 
+the network manager playbook...
+
 ```
-ansible-playbook -i inventory hack-network.yml
+ansible-playbook -i inventory ./old-network-config/hack-network.yml
 ```
 
 ## Setting up the cluster
@@ -117,6 +132,8 @@ kube_service_addresses: 10.254.0.0/16
 ```
 
 **Tell ansible to get to work!**
+
+This will finally setup your whole kubernetes cluster for you.
 
 ```
 ansible-playbook -i inventory setup.yml
@@ -142,7 +159,7 @@ iptables -nvL
 **Create the following apache.json file and deploy pod to minion.**
 
 ```
-cat ~/apache.json
+cat << EOF > apache.json
 {
   "id": "fedoraapache",
   "kind": "Pod",
@@ -165,15 +182,25 @@ cat ~/apache.json
     "name": "fedoraapache"
   }
 }
+EOF 
 
 /usr/bin/kubectl create -f apache.json
+
+**Testing your new kube cluster**
+
 ```
 
 **Check where the pod was created**
 
 ```
-/usr/bin/kubectl get pod fedoraapache
+kubectl get pods
 ```
+
+Important : Note that the ip of the pods IP fields are on the network which you created in the kube_ip_addr file.
+
+In this example, that was the 10.254 network.
+
+If you see 172 in the IP fields, networking was not setup correctly, and you may want to re run or dive deeper into the way networking is being setup by looking at the details of the networking scripts used above.
 
 **Check Docker status on minion.**
 
@@ -187,3 +214,5 @@ docker images
 ```
 curl http://localhost
 ```
+
+Thats it !
