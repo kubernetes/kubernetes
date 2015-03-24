@@ -368,7 +368,7 @@ func (m *Master) init(c *Config) {
 	m.endpointRegistry = registry
 	m.nodeRegistry = registry
 
-	nodeStorage := minion.NewStorage(m.nodeRegistry)
+	nodeStorage := minion.NewStorage(m.nodeRegistry, c.KubeletClient)
 	// TODO: unify the storage -> registry and storage -> client patterns
 	nodeStorageClient := RESTStorageToNodes(nodeStorage)
 	podCache := NewPodCache(

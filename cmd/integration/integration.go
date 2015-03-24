@@ -106,6 +106,10 @@ func (fakeKubeletClient) GetNodeInfo(host string) (api.NodeInfo, error) {
 	return api.NodeInfo{}, nil
 }
 
+func (fakeKubeletClient) GetConnectionInfo(host string) (string, uint, http.RoundTripper, error) {
+	return "", 0, nil, errors.New("Not Implemented")
+}
+
 func (fakeKubeletClient) HealthCheck(host string) (probe.Result, error) {
 	return probe.Success, nil
 }

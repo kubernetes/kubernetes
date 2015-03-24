@@ -19,6 +19,7 @@ package httpstream
 import (
 	"io"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -77,4 +78,14 @@ type Stream interface {
 	Reset() error
 	// Headers returns the headers used to create the stream.
 	Headers() http.Header
+}
+
+// IsUpgradeRequest returns true if the given request is a connection upgrade request
+func IsUpgradeRequest(req *http.Request) bool {
+	for _, h := range req.Header[http.CanonicalHeaderKey(HeaderConnection)] {
+		if strings.Contains(strings.ToLower(h), strings.ToLower(HeaderUpgrade)) {
+			return true
+		}
+	}
+	return false
 }

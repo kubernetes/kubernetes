@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"net/http"
 	"reflect"
 	"sort"
 	"testing"
@@ -133,6 +134,10 @@ func (c *FakeKubeletClient) GetPodStatus(host, podNamespace, podID string) (api.
 
 func (c *FakeKubeletClient) GetNodeInfo(host string) (api.NodeInfo, error) {
 	return api.NodeInfo{}, errors.New("Not Implemented")
+}
+
+func (c *FakeKubeletClient) GetConnectionInfo(host string) (string, uint, http.RoundTripper, error) {
+	return "", 0, nil, errors.New("Not Implemented")
 }
 
 func (c *FakeKubeletClient) HealthCheck(host string) (probe.Result, error) {

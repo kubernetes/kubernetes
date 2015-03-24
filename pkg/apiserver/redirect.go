@@ -17,7 +17,6 @@ limitations under the License.
 package apiserver
 
 import (
-	"fmt"
 	"net/http"
 	"time"
 
@@ -79,15 +78,26 @@ func (r *RedirectHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	location, err := redirector.ResourceLocation(ctx, id)
+	location, _, err := redirector.ResourceLocation(ctx, id)
 	if err != nil {
 		status := errToAPIStatus(err)
 		writeJSON(status.Code, r.codec, status, w)
 		httpCode = status.Code
 		return
 	}
+	if location == nil {
+		httplog.LogOf(req, w).Addf("ResourceLocation for %v returned nil", id)
+		notFound(w, req)
+		httpCode = http.StatusNotFound
+		return
+	}
 
-	w.Header().Set("Location", fmt.Sprintf("http://%s", location))
+	// Default to http
+	if location.Scheme == "" {
+		location.Scheme = "http"
+	}
+
+	w.Header().Set("Location", location.String())
 	w.WriteHeader(http.StatusTemporaryRedirect)
 	httpCode = http.StatusTemporaryRedirect
 }

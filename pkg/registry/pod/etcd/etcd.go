@@ -18,6 +18,8 @@ package etcd
 
 import (
 	"fmt"
+	"net/http"
+	"net/url"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
@@ -75,8 +77,11 @@ func NewStorage(h tools.EtcdHelper) (*REST, *BindingREST, *StatusREST) {
 	return &REST{*store}, &BindingREST{store: store}, &StatusREST{store: &statusStore}
 }
 
+// Implement Redirector.
+var _ = rest.Redirector(&REST{})
+
 // ResourceLocation returns a pods location from its HostIP
-func (r *REST) ResourceLocation(ctx api.Context, name string) (string, error) {
+func (r *REST) ResourceLocation(ctx api.Context, name string) (*url.URL, http.RoundTripper, error) {
 	return pod.ResourceLocation(r, ctx, name)
 }
 

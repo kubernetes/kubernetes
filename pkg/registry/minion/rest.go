@@ -20,28 +20,32 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"net/http"
+	"net/url"
 	"strconv"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	kerrors "github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/rest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/validation"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/master/ports"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
 
 // REST adapts minion into apiserver's RESTStorage model.
 type REST struct {
-	registry Registry
+	registry   Registry
+	connection client.ConnectionInfoGetter
 }
 
 // NewStorage returns a new rest.Storage implementation for minion.
-func NewStorage(m Registry) *REST {
+func NewStorage(m Registry, connection client.ConnectionInfoGetter) *REST {
 	return &REST{
-		registry: m,
+		registry:   m,
+		connection: connection,
 	}
 }
 
@@ -138,13 +142,29 @@ func (rs *REST) Watch(ctx api.Context, label labels.Selector, field fields.Selec
 	return rs.registry.WatchMinions(ctx, label, field, resourceVersion)
 }
 
+// Implement Redirector.
+var _ = rest.Redirector(&REST{})
+
 // ResourceLocation returns a URL to which one can send traffic for the specified minion.
-func (rs *REST) ResourceLocation(ctx api.Context, id string) (string, error) {
+func (rs *REST) ResourceLocation(ctx api.Context, id string) (*url.URL, http.RoundTripper, error) {
 	minion, err := rs.registry.GetMinion(ctx, id)
 	if err != nil {
-		return "", err
+		return nil, nil, err
 	}
 	host := minion.Name
-	// TODO: Minion webservers should be secure!
-	return "http://" + net.JoinHostPort(host, strconv.Itoa(ports.KubeletPort)), nil
+
+	scheme, port, transport, err := rs.connection.GetConnectionInfo(host)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return &url.URL{
+			Scheme: scheme,
+			Host: net.JoinHostPort(
+				host,
+				strconv.FormatUint(uint64(port), 10),
+			),
+		},
+		transport,
+		nil
 }

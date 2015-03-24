@@ -385,11 +385,14 @@ func TestServiceRegistryResourceLocation(t *testing.T) {
 		},
 	})
 	redirector := rest.Redirector(storage)
-	location, err := redirector.ResourceLocation(ctx, "foo")
+	location, _, err := redirector.ResourceLocation(ctx, "foo")
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
-	if e, a := "foo:80", location; e != a {
+	if location == nil {
+		t.Errorf("Unexpected nil: %v", location)
+	}
+	if e, a := "//foo:80", location.String(); e != a {
 		t.Errorf("Expected %v, but got %v", e, a)
 	}
 	if e, a := "foo", registry.GottenID; e != a {
@@ -398,7 +401,7 @@ func TestServiceRegistryResourceLocation(t *testing.T) {
 
 	// Test error path
 	registry.Err = fmt.Errorf("fake error")
-	if _, err = redirector.ResourceLocation(ctx, "foo"); err == nil {
+	if _, _, err = redirector.ResourceLocation(ctx, "foo"); err == nil {
 		t.Errorf("unexpected nil error")
 	}
 }

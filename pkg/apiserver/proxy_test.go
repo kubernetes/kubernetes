@@ -275,9 +275,10 @@ func TestProxy(t *testing.T) {
 		}))
 		defer proxyServer.Close()
 
+		serverURL, _ := url.Parse(proxyServer.URL)
 		simpleStorage := &SimpleRESTStorage{
 			errors:                    map[string]error{},
-			resourceLocation:          proxyServer.URL,
+			resourceLocation:          serverURL,
 			expectedResourceNamespace: item.reqNamespace,
 		}
 
@@ -335,9 +336,10 @@ func TestProxyUpgrade(t *testing.T) {
 	}))
 	defer backendServer.Close()
 
+	serverURL, _ := url.Parse(backendServer.URL)
 	simpleStorage := &SimpleRESTStorage{
 		errors:                    map[string]error{},
-		resourceLocation:          backendServer.URL,
+		resourceLocation:          serverURL,
 		expectedResourceNamespace: "myns",
 	}
 
