@@ -84,7 +84,7 @@ type HostInterface interface {
 	GetCachedMachineInfo() (*cadvisorApi.MachineInfo, error)
 	GetPods() ([]api.Pod, mirrorPods)
 	GetPodByName(namespace, name string) (*api.Pod, bool)
-	GetPodStatus(name string, uid types.UID) (api.PodStatus, error)
+	GetPodStatus(name string) (api.PodStatus, error)
 	RunInContainer(name string, uid types.UID, container string, cmd []string) ([]byte, error)
 	ExecInContainer(name string, uid types.UID, container string, cmd []string, in io.Reader, out, err io.WriteCloser, tty bool) error
 	GetKubeletContainerLogs(podFullName, containerName, tail string, follow bool, stdout, stderr io.Writer) error
@@ -289,7 +289,6 @@ func (s *Server) handlePodStatus(w http.ResponseWriter, req *http.Request, versi
 		return
 	}
 	podID := u.Query().Get("podID")
-	podUID := types.UID(u.Query().Get("UUID"))
 	podNamespace := u.Query().Get("podNamespace")
 	if len(podID) == 0 {
 		http.Error(w, "Missing 'podID=' query entry.", http.StatusBadRequest)
@@ -304,7 +303,7 @@ func (s *Server) handlePodStatus(w http.ResponseWriter, req *http.Request, versi
 		http.Error(w, "Pod does not exist", http.StatusNotFound)
 		return
 	}
-	status, err := s.host.GetPodStatus(GetPodFullName(pod), podUID)
+	status, err := s.host.GetPodStatus(GetPodFullName(pod))
 	if err != nil {
 		s.error(w, err)
 		return

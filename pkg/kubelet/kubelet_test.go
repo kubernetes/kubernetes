@@ -99,7 +99,7 @@ func newTestKubelet(t *testing.T) *TestKubelet {
 	kubelet.nodeLister = testNodeLister{}
 	kubelet.readiness = newReadinessStates()
 	kubelet.recorder = fakeRecorder
-	kubelet.podStatuses = map[string]api.PodStatus{}
+	kubelet.statusManager = newStatusManager(fakeKubeClient)
 	if err := kubelet.setupDataDirs(); err != nil {
 		t.Fatalf("can't initialize kubelet data dirs: %v", err)
 	}
@@ -2866,13 +2866,10 @@ func TestHandlePortConflicts(t *testing.T) {
 	conflictedPodName := GetPodFullName(&pods[0])
 
 	kl.handleNotFittingPods(pods)
-	if len(kl.podStatuses) != 1 {
-		t.Fatalf("expected length of status map to be 1. Got map %#v.", kl.podStatuses)
-	}
 	// Check pod status stored in the status map.
-	status, ok := kl.podStatuses[conflictedPodName]
-	if !ok {
-		t.Fatalf("status of pod %q is not found in the status map.", conflictedPodName)
+	status, err := kl.GetPodStatus(conflictedPodName)
+	if err != nil {
+		t.Fatalf("status of pod %q is not found in the status map: ", conflictedPodName, err)
 	}
 	if status.Phase != api.PodFailed {
 		t.Fatalf("expected pod status %q. Got %q.", api.PodFailed, status.Phase)
@@ -2880,9 +2877,9 @@ func TestHandlePortConflicts(t *testing.T) {
 
 	// Check if we can retrieve the pod status from GetPodStatus().
 	kl.podManager.SetPods(pods)
-	status, err := kl.GetPodStatus(conflictedPodName, "")
+	status, err = kl.GetPodStatus(conflictedPodName)
 	if err != nil {
-		t.Fatalf("unable to retrieve pod status for pod %q: #v.", conflictedPodName, err)
+		t.Fatalf("unable to retrieve pod status for pod %q: %#v.", conflictedPodName, err)
 	}
 	if status.Phase != api.PodFailed {
 		t.Fatalf("expected pod status %q. Got %q.", api.PodFailed, status.Phase)
@@ -2919,13 +2916,10 @@ func TestHandleNodeSelector(t *testing.T) {
 	notfittingPodName := GetPodFullName(&pods[0])
 
 	kl.handleNotFittingPods(pods)
-	if len(kl.podStatuses) != 1 {
-		t.Fatalf("expected length of status map to be 1. Got map %#v.", kl.podStatuses)
-	}
 	// Check pod status stored in the status map.
-	status, ok := kl.podStatuses[notfittingPodName]
-	if !ok {
-		t.Fatalf("status of pod %q is not found in the status map.", notfittingPodName)
+	status, err := kl.GetPodStatus(notfittingPodName)
+	if err != nil {
+		t.Fatalf("status of pod %q is not found in the status map: %#v", notfittingPodName, err)
 	}
 	if status.Phase != api.PodFailed {
 		t.Fatalf("expected pod status %q. Got %q.", api.PodFailed, status.Phase)
@@ -2933,9 +2927,9 @@ func TestHandleNodeSelector(t *testing.T) {
 
 	// Check if we can retrieve the pod status from GetPodStatus().
 	kl.podManager.SetPods(pods)
-	status, err := kl.GetPodStatus(notfittingPodName, "")
+	status, err = kl.GetPodStatus(notfittingPodName)
 	if err != nil {
-		t.Fatalf("unable to retrieve pod status for pod %q: #v.", notfittingPodName, err)
+		t.Fatalf("unable to retrieve pod status for pod %q: %#v.", notfittingPodName, err)
 	}
 	if status.Phase != api.PodFailed {
 		t.Fatalf("expected pod status %q. Got %q.", api.PodFailed, status.Phase)
@@ -2978,13 +2972,10 @@ func TestHandleMemExceeded(t *testing.T) {
 	notfittingPodName := GetPodFullName(&pods[0])
 
 	kl.handleNotFittingPods(pods)
-	if len(kl.podStatuses) != 1 {
-		t.Fatalf("expected length of status map to be 1. Got map %#v.", kl.podStatuses)
-	}
 	// Check pod status stored in the status map.
-	status, ok := kl.podStatuses[notfittingPodName]
-	if !ok {
-		t.Fatalf("status of pod %q is not found in the status map.", notfittingPodName)
+	status, err := kl.GetPodStatus(notfittingPodName)
+	if err != nil {
+		t.Fatalf("status of pod %q is not found in the status map: ", notfittingPodName, err)
 	}
 	if status.Phase != api.PodFailed {
 		t.Fatalf("expected pod status %q. Got %q.", api.PodFailed, status.Phase)
@@ -2992,7 +2983,7 @@ func TestHandleMemExceeded(t *testing.T) {
 
 	// Check if we can retrieve the pod status from GetPodStatus().
 	kl.podManager.SetPods(pods)
-	status, err := kl.GetPodStatus(notfittingPodName, "")
+	status, err = kl.GetPodStatus(notfittingPodName)
 	if err != nil {
 		t.Fatalf("unable to retrieve pod status for pod %q: #v.", notfittingPodName, err)
 	}
@@ -3001,24 +2992,25 @@ func TestHandleMemExceeded(t *testing.T) {
 	}
 }
 
+// TODO(filipg): This test should be removed once StatusSyncer can do garbage collection without external signal.
 func TestPurgingObsoleteStatusMapEntries(t *testing.T) {
 	testKubelet := newTestKubelet(t)
 	testKubelet.fakeCadvisor.On("MachineInfo").Return(&cadvisorApi.MachineInfo{}, nil)
 
 	kl := testKubelet.kubelet
 	pods := []api.Pod{
-		{Spec: api.PodSpec{Containers: []api.Container{{Ports: []api.ContainerPort{{HostPort: 80}}}}}},
-		{Spec: api.PodSpec{Containers: []api.Container{{Ports: []api.ContainerPort{{HostPort: 80}}}}}},
+		{ObjectMeta: api.ObjectMeta{Name: "pod1"}, Spec: api.PodSpec{Containers: []api.Container{{Ports: []api.ContainerPort{{HostPort: 80}}}}}},
+		{ObjectMeta: api.ObjectMeta{Name: "pod2"}, Spec: api.PodSpec{Containers: []api.Container{{Ports: []api.ContainerPort{{HostPort: 80}}}}}},
 	}
 	// Run once to populate the status map.
 	kl.handleNotFittingPods(pods)
-	if len(kl.podStatuses) != 1 {
-		t.Fatalf("expected length of status map to be 1. Got map %#v.", kl.podStatuses)
+	if _, err := kl.GetPodStatus(BuildPodFullName("pod2", "")); err != nil {
+		t.Fatalf("expected to have status cached for %q: %v", "pod2", err)
 	}
 	// Sync with empty pods so that the entry in status map will be removed.
 	kl.SyncPods([]api.Pod{}, emptyPodUIDs, *newMirrorPods(), time.Now())
-	if len(kl.podStatuses) != 0 {
-		t.Fatalf("expected length of status map to be 0. Got map %#v.", kl.podStatuses)
+	if _, err := kl.GetPodStatus(BuildPodFullName("pod2", "")); err == nil {
+		t.Fatalf("expected to not have status cached for %q: %v", "pod2", err)
 	}
 }
 
