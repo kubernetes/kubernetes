@@ -63,9 +63,19 @@
 			"Rev": "8d75e11374a1928608c906fe745b538483e7aeb2"
 		},
 		{
+			"ImportPath": "github.com/coreos/etcd/etcdserver/etcdhttp/httptypes",
+			"Comment": "v2.0.4-288-g866a9d4",
+			"Rev": "866a9d4e41401657ea44bf539b2c5561d6fdcd67"
+		},
+		{
+			"ImportPath": "github.com/coreos/etcd/pkg/types",
+			"Comment": "v2.0.4-288-g866a9d4",
+			"Rev": "866a9d4e41401657ea44bf539b2c5561d6fdcd67"
+		},
+		{
 			"ImportPath": "github.com/coreos/go-etcd/etcd",
-			"Comment": "v0.2.0-rc1-120-g23142f6",
-			"Rev": "23142f6773a676cc2cae8dd0cb90b2ea761c853f"
+			"Comment": "v0.4.6-8-g60e12ca",
+			"Rev": "60e12cac3db8ffce00b576b4af0e7b0a968f1003"
 		},
 		{
 			"ImportPath": "github.com/coreos/go-systemd/dbus",
