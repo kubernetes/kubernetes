@@ -545,14 +545,6 @@ const (
 	AffinityTypeNone AffinityType = "None"
 )
 
-// LoadBalancerInfo defines whether the LoadBalancer is rewriting or
-// pass through
-type LoadBalancerInfo struct {
-	DestIP   string `json:"destIP,omitempty" description:"External IP of the Load Balancer"`
-	SourceIP string `json:"sourceIP,omitempty" description:"Source IP of the Load Balancer"`
-	Rewrite  bool   `json:"rewrite,omitempty" description:"Does the LB rewrite packets"`
-}
-
 // ServiceList holds a list of services.
 type ServiceList struct {
 	TypeMeta `json:",inline"`
