@@ -33,7 +33,6 @@ $ kubectl run-container nginx --image=dockerfile/nginx --overrides='{ "apiVersio
 ```
       --dry-run=false: If true, only print the object that would be sent, without sending it.
       --generator="run-container/v1": The name of the API generator to use.  Default is 'run-container-controller/v1'.
-  -h, --help=false: help for run-container
       --image="": The image for the container to run.
   -l, --labels="": Labels to apply to the pod(s) created by this call to run-container.
       --no-headers=false: When using the default output, don't print headers.
@@ -56,6 +55,7 @@ $ kubectl run-container nginx --image=dockerfile/nginx --overrides='{ "apiVersio
       --client-key="": Path to a client key file for TLS.
       --cluster="": The name of the kubeconfig cluster to use
       --context="": The name of the kubeconfig context to use
+  -h, --help=false: help for kubectl
       --insecure-skip-tls-verify=false: If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure.
       --kubeconfig="": Path to the kubeconfig file to use for CLI requests.
       --log_backtrace_at=:0: when logging hits line file:N, emit a stack trace
