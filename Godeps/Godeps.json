@@ -1,6 +1,6 @@
 {
 	"ImportPath": "github.com/GoogleCloudPlatform/kubernetes",
-	"GoVersion": "go1.4.1",
+	"GoVersion": "go1.4.2",
 	"Packages": [
 		"./..."
 	],
@@ -45,11 +45,6 @@
 			"Rev": "98c78185197025f935947caac56a7b6d022f89d2"
 		},
 		{
-			"ImportPath": "code.google.com/p/goprotobuf/proto",
-			"Comment": "go.r60-163",
-			"Rev": "9352842ae63ee1d7e74e074ce7bb10370c4b6b9e"
-		},
-		{
 			"ImportPath": "github.com/Sirupsen/logrus",
 			"Comment": "v0.6.2-10-g51fe59a",
 			"Rev": "51fe59aca108dc5680109e7b2051cbdcfa5a253c"
@@ -85,6 +80,10 @@
 		{
 			"ImportPath": "github.com/davecgh/go-spew/spew",
 			"Rev": "1aaf839fb07e099361e445273993ccd9adc21b07"
+		},
+		{
+			"ImportPath": "github.com/daviddengcn/go-colortext",
+			"Rev": "b5c0891944c2f150ccc9d02aecf51b76c14c2948"
 		},
 		{
 			"ImportPath": "github.com/docker/docker/pkg/archive",
@@ -322,10 +321,6 @@
 		},
 		{
 			"ImportPath": "github.com/mitchellh/goamz/ec2",
-			"Rev": "703cfb45985762869e465f37ed030ff01615ff1e"
-		},
-		{
-			"ImportPath": "github.com/mitchellh/goamz/elb",
 			"Rev": "703cfb45985762869e465f37ed030ff01615ff1e"
 		},
 		{
