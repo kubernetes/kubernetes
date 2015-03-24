@@ -52,15 +52,15 @@ sane state but not allowed to accept new pods:
 "conditions": [
   {
     "kind": "Reachable",
-    "status": "Full",
+    "status": "True",
   },
   {
     "kind": "Ready",
-    "status": "Full",
+    "status": "True",
   },
   {
     "kind": "Schedulable",
-    "status": "None",
+    "status": "False",
   },
 ]
 ```
