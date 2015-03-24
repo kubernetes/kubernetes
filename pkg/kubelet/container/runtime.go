@@ -35,11 +35,11 @@ type Runtime interface {
 	// exited and dead containers (used for garbage collection).
 	GetPods(all bool) ([]*Pod, error)
 	// RunPod starts all the containers of a pod within a namespace.
-	RunPod(*api.Pod, map[string]volume.VolumePlugin) error
+	RunPod(*api.Pod, map[string]volume.Volume) error
 	// KillPod kills all the containers of a pod.
 	KillPod(*api.Pod) error
 	// RunContainerInPod starts a container within the same namespace of a pod.
-	RunContainerInPod(api.Container, *api.Pod, map[string]volume.VolumePlugin) error
+	RunContainerInPod(api.Container, *api.Pod, map[string]volume.Volume) error
 	// KillContainerInPod kills a container in the pod.
 	KillContainerInPod(api.Container, *api.Pod) error
 	// GetPodStatus retrieves the status of the pod, including the information of
