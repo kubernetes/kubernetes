@@ -45,9 +45,26 @@ func (namespaceStrategy) NamespaceScoped() bool {
 
 // ResetBeforeCreate clears fields that are not allowed to be set by end users on creation.
 func (namespaceStrategy) ResetBeforeCreate(obj runtime.Object) {
+	// on create, status is active
 	namespace := obj.(*api.Namespace)
 	namespace.Status = api.NamespaceStatus{
 		Phase: api.NamespaceActive,
+	}
+	// on create, we require the kubernetes value
+	// we cannot use this in defaults conversion because we let it get removed over life of object
+	hasKubeFinalizer := false
+	for i := range namespace.Spec.Finalizers {
+		if namespace.Spec.Finalizers[i] == api.FinalizerKubernetes {
+			hasKubeFinalizer = true
+			break
+		}
+	}
+	if !hasKubeFinalizer {
+		if len(namespace.Spec.Finalizers) == 0 {
+			namespace.Spec.Finalizers = []api.FinalizerName{api.FinalizerKubernetes}
+		} else {
+			namespace.Spec.Finalizers = append(namespace.Spec.Finalizers, api.FinalizerKubernetes)
+		}
 	}
 }
 
@@ -74,8 +91,17 @@ type namespaceStatusStrategy struct {
 var StatusStrategy = namespaceStatusStrategy{Strategy}
 
 func (namespaceStatusStrategy) ValidateUpdate(obj, old runtime.Object) fielderrors.ValidationErrorList {
-	// TODO: merge valid fields after update
 	return validation.ValidateNamespaceStatusUpdate(obj.(*api.Namespace), old.(*api.Namespace))
+}
+
+type namespaceFinalizeStrategy struct {
+	namespaceStrategy
+}
+
+var FinalizeStrategy = namespaceFinalizeStrategy{Strategy}
+
+func (namespaceFinalizeStrategy) ValidateUpdate(obj, old runtime.Object) fielderrors.ValidationErrorList {
+	return validation.ValidateNamespaceFinalizeUpdate(obj.(*api.Namespace), old.(*api.Namespace))
 }
 
 // MatchNamespace returns a generic matcher for a given label and field selector.

@@ -198,6 +198,9 @@ func FuzzerFor(t *testing.T, version string, src rand.Source) *fuzz.Fuzzer {
 			c.FuzzNoCustom(s) // fuzz self without calling this function again
 			s.Type = api.SecretTypeOpaque
 		},
+		func(s *api.NamespaceSpec, c fuzz.Continue) {
+			s.Finalizers = []api.FinalizerName{api.FinalizerKubernetes}
+		},
 		func(s *api.NamespaceStatus, c fuzz.Continue) {
 			s.Phase = api.NamespaceActive
 		},
