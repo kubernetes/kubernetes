@@ -58,14 +58,29 @@
 			"Rev": "b965b613227fddccbfffe13eae360ed3fa822f8d"
 		},
 		{
+			"ImportPath": "github.com/codegangsta/inject",
+			"Comment": "v1.0-rc1-10-g33e0aa1",
+			"Rev": "33e0aa1cb7c019ccc3fbe049a8262a6403d30504"
+		},
+		{
 			"ImportPath": "github.com/codegangsta/negroni",
 			"Comment": "v0.1-62-g8d75e11",
 			"Rev": "8d75e11374a1928608c906fe745b538483e7aeb2"
 		},
 		{
+			"ImportPath": "github.com/coreos/etcd/etcdserver/etcdhttp/httptypes",
+			"Comment": "v2.0.4-277-g823c6d6",
+			"Rev": "823c6d678c04f9504c4e98d334cb3af8066b0119"
+		},
+		{
+			"ImportPath": "github.com/coreos/etcd/pkg/types",
+			"Comment": "v2.0.4-277-g823c6d6",
+			"Rev": "823c6d678c04f9504c4e98d334cb3af8066b0119"
+		},
+		{
 			"ImportPath": "github.com/coreos/go-etcd/etcd",
-			"Comment": "v0.2.0-rc1-120-g23142f6",
-			"Rev": "23142f6773a676cc2cae8dd0cb90b2ea761c853f"
+			"Comment": "v0.4.6-8-g60e12ca",
+			"Rev": "60e12cac3db8ffce00b576b4af0e7b0a968f1003"
 		},
 		{
 			"ImportPath": "github.com/coreos/go-systemd/dbus",
@@ -182,6 +197,11 @@
 		{
 			"ImportPath": "github.com/ghodss/yaml",
 			"Rev": "588cb435e59ee8b6c2795482887755841ad67207"
+		},
+		{
+			"ImportPath": "github.com/go-martini/martini",
+			"Comment": "v1.0-115-g8412a65",
+			"Rev": "8412a652ddae77553a9442708a527d0e616939a3"
 		},
 		{
 			"ImportPath": "github.com/godbus/dbus",
