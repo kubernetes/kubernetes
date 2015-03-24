@@ -65,12 +65,12 @@ Users attach their claim to their pod using a new ```PersistentVolumeClaimVolume
 
 | Action | HTTP Verb | Path | Description |
 | ---- | ---- | ---- | ---- |
-| CREATE | POST | /api/{version}/ns/{ns}/persistentvolumeclaims/ | Create instance of PersistentVolumeClaim in namespace {ns} |
-| GET | GET | /api/{version}/ns/{ns}/persistentvolumeclaims/{name} | Get instance of PersistentVolumeClaim in namespace {ns} with {name} |
-| UPDATE | PUT | /api/{version}/ns/{ns}/persistentvolumeclaims/{name} | Update instance of PersistentVolumeClaim in namespace {ns} with {name} |
-| DELETE | DELETE | /api/{version}/ns/{ns}/persistentvolumeclaims/{name} | Delete instance of PersistentVolumeClaim in namespace {ns} with {name} |
-| LIST | GET | /api/{version}/ns/{ns}/persistentvolumeclaims | List instances of PersistentVolumeClaim in namespace {ns} |
-| WATCH | GET | /api/{version}/watch/ns/{ns}/persistentvolumeclaims | Watch for changes to PersistentVolumeClaim in namespace {ns} |
+| CREATE | POST | /api/{version}/namespaces/{ns}/persistentvolumeclaims/ | Create instance of PersistentVolumeClaim in namespace {ns} |
+| GET | GET | /api/{version}/namespaces/{ns}/persistentvolumeclaims/{name} | Get instance of PersistentVolumeClaim in namespace {ns} with {name} |
+| UPDATE | PUT | /api/{version}/namespaces/{ns}/persistentvolumeclaims/{name} | Update instance of PersistentVolumeClaim in namespace {ns} with {name} |
+| DELETE | DELETE | /api/{version}/namespaces/{ns}/persistentvolumeclaims/{name} | Delete instance of PersistentVolumeClaim in namespace {ns} with {name} |
+| LIST | GET | /api/{version}/namespaces/{ns}/persistentvolumeclaims | List instances of PersistentVolumeClaim in namespace {ns} |
+| WATCH | GET | /api/{version}/watch/namespaces/{ns}/persistentvolumeclaims | Watch for changes to PersistentVolumeClaim in namespace {ns} |
 
 
 

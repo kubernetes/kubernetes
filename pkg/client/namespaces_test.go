@@ -86,7 +86,7 @@ func TestNamespaceList(t *testing.T) {
 	c := &testClient{
 		Request: testRequest{
 			Method: "GET",
-			Path:   "/ns",
+			Path:   "/namespaces",
 			Body:   nil,
 		},
 		Response: Response{StatusCode: 200, Body: namespaceList},

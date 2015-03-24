@@ -169,7 +169,7 @@ func (c *testClient) ValidateCommon(t *testing.T, err error) {
 func buildResourcePath(namespace, resource string) string {
 	if len(namespace) > 0 {
 		if !(testapi.Version() == "v1beta1" || testapi.Version() == "v1beta2") {
-			return path.Join("ns", namespace, resource)
+			return path.Join("namespaces", namespace, resource)
 		}
 	}
 	return resource
