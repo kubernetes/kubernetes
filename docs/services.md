@@ -211,6 +211,15 @@ network interfaces.  If you assign that `Node`'s external IP as a `publicIP`, yo
 can then aim traffic at the `Service` port on that `Node` and it will be proxied
 to the backends.
 
+## Choosing your own PortalIP address
+A user can specify their own ```PortalIP``` address as part of a service creation
+request.  For example, if they already have an existing DNS entry that they wish
+to replace, or legacy systems that are configured for a specific IP address and difficult
+to re-configure.  The ```PortalIP``` address that a user chooses must be a valid IP address
+and within the portal net CIDR range that is specified by flag to the API server.  If
+the PortalIP value is invalid, the apiserver returns a ```422``` HTTP status code to
+indicate that the value is invalid.
+
 ## Shortcomings
 
 We expect that using iptables and userspace proxies for portals will work at
