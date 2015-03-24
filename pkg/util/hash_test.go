@@ -49,12 +49,18 @@ func TestDeepObjectPointer(t *testing.T) {
 		// Act
 		DeepHashObject(hasher1, myUni1)
 		hash1 := hasher1.Sum32()
+		DeepHashObject(hasher1, myUni1)
+		hash1a := hasher1.Sum32()
 		DeepHashObject(hasher2, myUni2)
 		hash2 := hasher2.Sum32()
 		DeepHashObject(hasher3, myUni3)
 		hash3 := hasher3.Sum32()
 
 		// Assert
+		if hash1 != hash1a {
+			t.Errorf("repeated hash of the same object produced different results: %d vs %d", hash1, hash1a)
+		}
+
 		if hash1 == hash2 {
 			t.Errorf("hash1 (%d) and hash2(%d) must be different because they have different values for wheel size", hash1, hash2)
 		}
