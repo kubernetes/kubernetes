@@ -42,7 +42,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/master/ports"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/controller"
+	controlleretcd "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/controller/etcd"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/endpoint"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/etcd"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/event"
@@ -384,6 +384,8 @@ func (m *Master) init(c *Config) {
 		podStorage = podStorage.WithPodStatus(podCache)
 	}
 
+	controllerStorage := controlleretcd.NewREST(c.EtcdHelper)
+
 	// TODO: Factor out the core API registration
 	m.storage = map[string]rest.Storage{
 		"pods":         podStorage,
@@ -391,7 +393,7 @@ func (m *Master) init(c *Config) {
 		"pods/binding": bindingStorage,
 		"bindings":     bindingStorage,
 
-		"replicationControllers": controller.NewStorage(registry, podRegistry),
+		"replicationControllers": controllerStorage,
 		"services":               service.NewStorage(m.serviceRegistry, c.Cloud, m.nodeRegistry, m.portalNet, c.ClusterName),
 		"endpoints":              endpoint.NewStorage(m.endpointRegistry),
 		"minions":                nodeStorage,

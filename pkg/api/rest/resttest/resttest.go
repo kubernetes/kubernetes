@@ -24,7 +24,9 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/rest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/coreos/go-etcd/etcd"
 )
 
 type Tester struct {
@@ -195,6 +197,44 @@ func (t *Tester) TestCreateRejectsNamespace(valid runtime.Object) {
 	} else if strings.Contains(err.Error(), "Controller.Namespace does not match the provided context") {
 		t.Errorf("Expected 'Controller.Namespace does not match the provided context' error, got '%v'", err.Error())
 	}
+}
+
+func (t *Tester) TestDeleteInvokesValidation(invalid ...runtime.Object) {
+	for i, obj := range invalid {
+		objectMeta, err := api.ObjectMetaFor(obj)
+		if err != nil {
+			t.Fatalf("object does not have ObjectMeta: %v\n%#v", err, obj)
+		}
+		ctx := api.NewDefaultContext()
+		_, err = t.storage.(rest.GracefulDeleter).Delete(ctx, objectMeta.Name, nil)
+		if !errors.IsInvalid(err) {
+			t.Errorf("%d: Expected to get an invalid resource error, got %v", i, err)
+		}
+	}
+}
+
+func (t *Tester) TestDelete(createFn func() runtime.Object, wasGracefulFn func() bool, invalid ...runtime.Object) {
+	t.TestDeleteNonExist(createFn)
+	t.TestDeleteNoGraceful(createFn, wasGracefulFn)
+	t.TestDeleteInvokesValidation(invalid...)
+	// TODO: Test delete namespace mismatch rejection
+	// once #5684 is fixed.
+}
+
+func (t *Tester) TestDeleteNonExist(createFn func() runtime.Object) {
+	existing := createFn()
+	objectMeta, err := api.ObjectMetaFor(existing)
+	if err != nil {
+		t.Fatalf("object does not have ObjectMeta: %v\n%#v", err, existing)
+	}
+	context := api.NewDefaultContext()
+
+	t.withStorageError(&etcd.EtcdError{ErrorCode: tools.EtcdErrorCodeNotFound}, func() {
+		_, err := t.storage.(rest.GracefulDeleter).Delete(context, objectMeta.Name, nil)
+		if err == nil || !errors.IsNotFound(err) {
+			t.Fatalf("Unexpected error: %v", err)
+		}
+	})
 }
 
 func (t *Tester) TestDeleteGraceful(createFn func() runtime.Object, expectedGrace int64, wasGracefulFn func() bool) {

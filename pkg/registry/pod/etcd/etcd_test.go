@@ -155,7 +155,7 @@ func TestDelete(t *testing.T) {
 		}
 		return fakeEtcdClient.Data["/registry/pods/default/foo"].R.Node.TTL == 30
 	}
-	test.TestDeleteNoGraceful(createFn, gracefulSetFn)
+	test.TestDelete(createFn, gracefulSetFn)
 }
 
 func expectPod(t *testing.T, out runtime.Object) (*api.Pod, bool) {

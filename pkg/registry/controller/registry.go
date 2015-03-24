@@ -17,7 +17,9 @@ limitations under the License.
 package controller
 
 import (
+	"fmt"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/rest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
@@ -25,10 +27,66 @@ import (
 
 // Registry is an interface for things that know how to store ReplicationControllers.
 type Registry interface {
-	ListControllers(ctx api.Context) (*api.ReplicationControllerList, error)
+	ListControllers(ctx api.Context, label labels.Selector, field fields.Selector) (*api.ReplicationControllerList, error)
 	WatchControllers(ctx api.Context, label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error)
 	GetController(ctx api.Context, controllerID string) (*api.ReplicationController, error)
 	CreateController(ctx api.Context, controller *api.ReplicationController) (*api.ReplicationController, error)
 	UpdateController(ctx api.Context, controller *api.ReplicationController) (*api.ReplicationController, error)
 	DeleteController(ctx api.Context, controllerID string) error
+}
+
+// storage puts strong typing around storage calls
+type storage struct {
+	rest.StandardStorage
+}
+
+// NewRegistry returns a new Registry interface for the given Storage. Any mismatched
+// types will panic.
+func NewRegistry(s rest.StandardStorage) Registry {
+	return &storage{s}
+}
+
+// List obtains a list of ReplicationControllers that match selector.
+func (s *storage) ListControllers(ctx api.Context, label labels.Selector, field fields.Selector) (*api.ReplicationControllerList, error) {
+	if !field.Empty() {
+		return nil, fmt.Errorf("field selector not supported yet")
+	}
+	obj, err := s.List(ctx, label, field)
+	if err != nil {
+		return nil, err
+	}
+	return obj.(*api.ReplicationControllerList), err
+}
+
+func (s *storage) WatchControllers(ctx api.Context, label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
+	return s.Watch(ctx, label, field, resourceVersion)
+}
+
+func (s *storage) GetController(ctx api.Context, controllerID string) (*api.ReplicationController, error) {
+	obj, err := s.Get(ctx, controllerID)
+	if err != nil {
+		return nil, err
+	}
+	return obj.(*api.ReplicationController), nil
+}
+
+func (s *storage) CreateController(ctx api.Context, controller *api.ReplicationController) (*api.ReplicationController, error) {
+	obj, err := s.Create(ctx, controller)
+	if err != nil {
+		return nil, err
+	}
+	return obj.(*api.ReplicationController), nil
+}
+
+func (s *storage) UpdateController(ctx api.Context, controller *api.ReplicationController) (*api.ReplicationController, error) {
+	obj, _, err := s.Update(ctx, controller)
+	if err != nil {
+		return nil, err
+	}
+	return obj.(*api.ReplicationController), nil
+}
+
+func (s *storage) DeleteController(ctx api.Context, controllerID string) error {
+	_, err := s.Delete(ctx, controllerID, nil)
+	return err
 }
