@@ -274,9 +274,11 @@ type GitRepoVolumeSource struct {
 }
 
 // SecretVolumeSource adapts a Secret into a VolumeSource
+//
+// https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/design/secrets.md
 type SecretVolumeSource struct {
-	// Reference to a Secret
-	Target ObjectReference `json:"target" description:"target is a reference to a secret"`
+	// Name of the secret in the pod's namespace to use
+	SecretName string `json:"secretName" description:"secretName is the name of a secret in the pod's namespace"`
 }
 
 // NFSVolumeSource represents an NFS mount that lasts the lifetime of a pod

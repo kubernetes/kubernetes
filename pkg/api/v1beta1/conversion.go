@@ -1377,6 +1377,14 @@ func init() {
 			out.PodID = in.Name
 			return nil
 		},
+		func(in *newer.SecretVolumeSource, out *SecretVolumeSource, s conversion.Scope) error {
+			out.Target.ID = in.SecretName
+			return nil
+		},
+		func(in *SecretVolumeSource, out *newer.SecretVolumeSource, s conversion.Scope) error {
+			out.SecretName = in.Target.ID
+			return nil
+		},
 	)
 	if err != nil {
 		// If one of the conversion functions is malformed, detect it immediately.

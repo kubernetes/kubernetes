@@ -331,14 +331,8 @@ func validateGCEPersistentDiskVolumeSource(PD *api.GCEPersistentDiskVolumeSource
 
 func validateSecretVolumeSource(secretSource *api.SecretVolumeSource) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
-	if secretSource.Target.Name == "" {
-		allErrs = append(allErrs, errs.NewFieldRequired("target.name"))
-	}
-	if secretSource.Target.Namespace == "" {
-		allErrs = append(allErrs, errs.NewFieldRequired("target.namespace"))
-	}
-	if secretSource.Target.Kind != "Secret" {
-		allErrs = append(allErrs, errs.NewFieldInvalid("target.kind", secretSource.Target.Kind, "Secret"))
+	if secretSource.SecretName == "" {
+		allErrs = append(allErrs, errs.NewFieldRequired("secretName"))
 	}
 	return allErrs
 }

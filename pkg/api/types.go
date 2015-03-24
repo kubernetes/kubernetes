@@ -265,8 +265,8 @@ type GitRepoVolumeSource struct {
 // The contents of the target Secret's Data field will be presented in a volume
 // as files using the keys in the Data field as the file names.
 type SecretVolumeSource struct {
-	// Reference to a Secret
-	Target ObjectReference `json:"target"`
+	// Name of the secret in the pod's namespace to use
+	SecretName string `json:"secretName"`
 }
 
 // NFSVolumeSource represents an NFS Mount that lasts the lifetime of a pod
