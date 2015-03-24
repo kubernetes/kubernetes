@@ -765,13 +765,20 @@ func (kl *Kubelet) runContainer(pod *api.Pod, container *api.Container, podVolum
 	binds := makeBinds(container, podVolumes)
 	exposedPorts, portBindings := makePortsAndBindings(container)
 
+	// TODO(vmarmol): Handle better.
+	// Cap hostname at 63 chars (specification is 64bytes which is 63 chars and the null terminating char).
+	const hostnameMaxLen = 63
+	containerHostname := pod.Name
+	if len(containerHostname) > hostnameMaxLen {
+		containerHostname = containerHostname[:hostnameMaxLen]
+	}
 	opts := docker.CreateContainerOptions{
 		Name: dockertools.BuildDockerName(dockertools.KubeletContainerName{GetPodFullName(pod), pod.UID, container.Name}, container),
 		Config: &docker.Config{
 			Cmd:          container.Command,
 			Env:          envVariables,
 			ExposedPorts: exposedPorts,
-			Hostname:     pod.Name,
+			Hostname:     containerHostname,
 			Image:        container.Image,
 			Memory:       container.Resources.Limits.Memory().Value(),
 			CPUShares:    milliCPUToShares(container.Resources.Limits.Cpu().MilliValue()),
