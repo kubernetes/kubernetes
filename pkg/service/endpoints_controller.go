@@ -17,7 +17,12 @@ limitations under the License.
 package service
 
 import (
+	"bytes"
+	"crypto/md5"
+	"encoding/hex"
 	"fmt"
+	"reflect"
+	"sort"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
@@ -50,7 +55,9 @@ func (e *EndpointController) SyncServiceEndpoints() error {
 		return err
 	}
 	var resultErr error
-	for _, service := range services.Items {
+	for i := range services.Items {
+		service := &services.Items[i]
+
 		if service.Spec.Selector == nil {
 			// services without a selector receive no endpoints from this controller;
 			// these services will receive the endpoints that are created out-of-band via the REST API.
@@ -64,14 +71,19 @@ func (e *EndpointController) SyncServiceEndpoints() error {
 			resultErr = err
 			continue
 		}
-		endpoints := []api.Endpoint{}
 
-		for _, pod := range pods.Items {
+		subsets := []api.EndpointSubset{}
+		for i := range pods.Items {
+			pod := &pods.Items[i]
+
 			// TODO: Once v1beta1 and v1beta2 are EOL'ed, this can
 			// assume that service.Spec.TargetPort is populated.
 			_ = v1beta1.Dependency
 			_ = v1beta2.Dependency
-			port, err := findPort(&pod, &service)
+			// TODO: Add multiple-ports to Service and expose them here.
+			portName := ""
+			portProto := service.Spec.Protocol
+			portNum, err := findPort(pod, service)
 			if err != nil {
 				glog.Errorf("Failed to find port for service %s/%s: %v", service.Namespace, service.Name, err)
 				continue
@@ -93,18 +105,19 @@ func (e *EndpointController) SyncServiceEndpoints() error {
 				continue
 			}
 
-			endpoints = append(endpoints, api.Endpoint{
-				IP:   pod.Status.PodIP,
-				Port: port,
-				TargetRef: &api.ObjectReference{
-					Kind:            "Pod",
-					Namespace:       pod.ObjectMeta.Namespace,
-					Name:            pod.ObjectMeta.Name,
-					UID:             pod.ObjectMeta.UID,
-					ResourceVersion: pod.ObjectMeta.ResourceVersion,
-				},
-			})
+			epp := api.EndpointPort{Name: portName, Port: portNum, Protocol: portProto}
+			epa := api.EndpointAddress{IP: pod.Status.PodIP, TargetRef: &api.ObjectReference{
+				Kind:            "Pod",
+				Namespace:       pod.ObjectMeta.Namespace,
+				Name:            pod.ObjectMeta.Name,
+				UID:             pod.ObjectMeta.UID,
+				ResourceVersion: pod.ObjectMeta.ResourceVersion,
+			}}
+			subsets = append(subsets, api.EndpointSubset{Addresses: []api.EndpointAddress{epa}, Ports: []api.EndpointPort{epp}})
 		}
+		subsets = packSubsets(subsets)
+
+		// See if there's actually an update here.
 		currentEndpoints, err := e.client.Endpoints(service.Namespace).Get(service.Name)
 		if err != nil {
 			if errors.IsNotFound(err) {
@@ -112,26 +125,24 @@ func (e *EndpointController) SyncServiceEndpoints() error {
 					ObjectMeta: api.ObjectMeta{
 						Name: service.Name,
 					},
-					Protocol: service.Spec.Protocol,
 				}
 			} else {
 				glog.Errorf("Error getting endpoints: %v", err)
 				continue
 			}
 		}
-		newEndpoints := &api.Endpoints{}
-		*newEndpoints = *currentEndpoints
-		newEndpoints.Endpoints = endpoints
+		if reflect.DeepEqual(currentEndpoints.Subsets, subsets) {
+			glog.V(5).Infof("endpoints are equal for %s/%s, skipping update", service.Namespace, service.Name)
+			continue
+		}
+		newEndpoints := currentEndpoints
+		newEndpoints.Subsets = subsets
 
 		if len(currentEndpoints.ResourceVersion) == 0 {
 			// No previous endpoints, create them
 			_, err = e.client.Endpoints(service.Namespace).Create(newEndpoints)
 		} else {
 			// Pre-existing
-			if currentEndpoints.Protocol == service.Spec.Protocol && endpointsListEqual(currentEndpoints, endpoints) {
-				glog.V(5).Infof("protocol and endpoints are equal for %s/%s, skipping update", service.Namespace, service.Name)
-				continue
-			}
 			_, err = e.client.Endpoints(service.Namespace).Update(newEndpoints)
 		}
 		if err != nil {
@@ -142,56 +153,115 @@ func (e *EndpointController) SyncServiceEndpoints() error {
 	return resultErr
 }
 
-func endpointEqual(this, that *api.Endpoint) bool {
-	if this.IP != that.IP || this.Port != that.Port {
-		return false
-	}
-
-	if this.TargetRef == nil || that.TargetRef == nil {
-		return this.TargetRef == that.TargetRef
-	}
-
-	return *this.TargetRef == *that.TargetRef
-}
-
-func containsEndpoint(haystack *api.Endpoints, needle *api.Endpoint) bool {
-	if haystack == nil || needle == nil {
-		return false
-	}
-	for ix := range haystack.Endpoints {
-		if endpointEqual(&haystack.Endpoints[ix], needle) {
-			return true
+func packSubsets(subsets []api.EndpointSubset) []api.EndpointSubset {
+	// First map each unique port definition to the sets of hosts
+	// that offer it.
+	portsToAddrs := map[api.EndpointPort][]api.EndpointAddress{}
+	for i := range subsets {
+		for j := range subsets[i].Ports {
+			epp := &subsets[i].Ports[j]
+			for k := range subsets[i].Addresses {
+				epa := &subsets[i].Addresses[k]
+				portsToAddrs[*epp] = append(portsToAddrs[*epp], *epa)
+			}
 		}
 	}
-	return false
+
+	// Next, map the sets of hosts to the sets of ports they offer.
+	// Go does not allow maps or slices as keys to maps, so we have
+	// to synthesize and artificial key and do a sort of 2-part
+	// associative entity.
+	addrSets := map[string][]api.EndpointAddress{}
+	addrSetsToPorts := map[string][]api.EndpointPort{}
+	for epp, pods := range portsToAddrs {
+		key := makePodsKey(pods)
+		addrSets[key] = pods
+		addrSetsToPorts[key] = append(addrSetsToPorts[key], epp)
+	}
+
+	// Next, build the N-to-M association the API wants.
+	final := []api.EndpointSubset{}
+	for key, ports := range addrSetsToPorts {
+		final = append(final, api.EndpointSubset{Addresses: addrSets[key], Ports: ports})
+	}
+
+	// Finally, sort it.
+	return sortSubsets(final)
 }
 
-func endpointsListEqual(eps *api.Endpoints, endpoints []api.Endpoint) bool {
-	if len(eps.Endpoints) != len(endpoints) {
-		return false
-	}
-	for i := range endpoints {
-		if !containsEndpoint(eps, &endpoints[i]) {
-			return false
-		}
-	}
-	return true
+func makePodsKey(addrs []api.EndpointAddress) string {
+	// Flatten the list of addresses into a string so it can be used as a
+	// map key.
+	hasher := md5.New()
+	util.DeepHashObject(hasher, addrs)
+	return hex.EncodeToString(hasher.Sum(nil)[0:])
 }
 
-func findDefaultPort(pod *api.Pod, servicePort int) (int, bool) {
-	foundPorts := []int{}
+func sortSubsets(subsets []api.EndpointSubset) []api.EndpointSubset {
+	for i := range subsets {
+		ss := &subsets[i]
+		sort.Sort(addrsByHash(ss.Addresses))
+		sort.Sort(portsByHash(ss.Ports))
+	}
+	sort.Sort(subsetsByHash(subsets))
+	return subsets
+}
+
+type subsetsByHash []api.EndpointSubset
+
+func (sl subsetsByHash) Len() int      { return len(sl) }
+func (sl subsetsByHash) Swap(i, j int) { sl[i], sl[j] = sl[j], sl[i] }
+func (sl subsetsByHash) Less(i, j int) bool {
+	hasher := md5.New()
+	util.DeepHashObject(hasher, sl[i])
+	h1 := hasher.Sum(nil)
+	util.DeepHashObject(hasher, sl[j])
+	h2 := hasher.Sum(nil)
+	return bytes.Compare(h1, h2) < 0
+}
+
+type addrsByHash []api.EndpointAddress
+
+func (sl addrsByHash) Len() int      { return len(sl) }
+func (sl addrsByHash) Swap(i, j int) { sl[i], sl[j] = sl[j], sl[i] }
+func (sl addrsByHash) Less(i, j int) bool {
+	hasher := md5.New()
+	util.DeepHashObject(hasher, sl[i])
+	h1 := hasher.Sum(nil)
+	util.DeepHashObject(hasher, sl[j])
+	h2 := hasher.Sum(nil)
+	return bytes.Compare(h1, h2) < 0
+}
+
+type portsByHash []api.EndpointPort
+
+func (sl portsByHash) Len() int      { return len(sl) }
+func (sl portsByHash) Swap(i, j int) { sl[i], sl[j] = sl[j], sl[i] }
+func (sl portsByHash) Less(i, j int) bool {
+	hasher := md5.New()
+	util.DeepHashObject(hasher, sl[i])
+	h1 := hasher.Sum(nil)
+	util.DeepHashObject(hasher, sl[j])
+	h2 := hasher.Sum(nil)
+	return bytes.Compare(h1, h2) < 0
+}
+
+func findDefaultPort(pod *api.Pod, servicePort int) int {
+	firstPort := 0
 	for _, container := range pod.Spec.Containers {
 		for _, port := range container.Ports {
-			foundPorts = append(foundPorts, port.ContainerPort)
+			if port.Name == "" {
+				return port.ContainerPort
+			}
+			if firstPort == 0 {
+				firstPort = port.ContainerPort
+			}
 		}
 	}
-	if len(foundPorts) == 0 {
-		return servicePort, true
+	if firstPort == 0 {
+		return servicePort
 	}
-	if len(foundPorts) == 1 {
-		return foundPorts[0], true
-	}
-	return 0, false
+	return firstPort
 }
 
 // findPort locates the container port for the given manifest and portName.
@@ -200,10 +270,7 @@ func findPort(pod *api.Pod, service *api.Service) (int, error) {
 	switch portName.Kind {
 	case util.IntstrString:
 		if len(portName.StrVal) == 0 {
-			if port, found := findDefaultPort(pod, service.Spec.Port); found {
-				return port, nil
-			}
-			break
+			return findDefaultPort(pod, service.Spec.Port), nil
 		}
 		name := portName.StrVal
 		for _, container := range pod.Spec.Containers {
@@ -215,10 +282,7 @@ func findPort(pod *api.Pod, service *api.Service) (int, error) {
 		}
 	case util.IntstrInt:
 		if portName.IntVal == 0 {
-			if port, found := findDefaultPort(pod, service.Spec.Port); found {
-				return port, nil
-			}
-			break
+			return findDefaultPort(pod, service.Spec.Port), nil
 		}
 		return portName.IntVal, nil
 	}

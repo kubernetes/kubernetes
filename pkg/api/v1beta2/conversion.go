@@ -1107,21 +1107,42 @@ func init() {
 			if err := s.Convert(&in.ObjectMeta, &out.TypeMeta, 0); err != nil {
 				return err
 			}
-			if err := s.Convert(&in.Protocol, &out.Protocol, 0); err != nil {
+			if err := s.Convert(&in.Subsets, &out.Subsets, 0); err != nil {
 				return err
 			}
-			for i := range in.Endpoints {
-				ep := &in.Endpoints[i]
-				hostPort := net.JoinHostPort(ep.IP, strconv.Itoa(ep.Port))
-				out.Endpoints = append(out.Endpoints, hostPort)
-				if ep.TargetRef != nil {
-					target := EndpointObjectReference{
-						Endpoint: hostPort,
-					}
-					if err := s.Convert(ep.TargetRef, &target.ObjectReference, 0); err != nil {
+			// Handle back-compat fields.
+			firstPortName := ""
+			if len(in.Subsets) > 0 {
+				if len(in.Subsets[0].Ports) > 0 {
+					if err := s.Convert(&in.Subsets[0].Ports[0].Protocol, &out.Protocol, 0); err != nil {
 						return err
 					}
-					out.TargetRefs = append(out.TargetRefs, target)
+					firstPortName = in.Subsets[0].Ports[0].Name
+				}
+			} else {
+				out.Protocol = ProtocolTCP
+			}
+			for i := range in.Subsets {
+				ss := &in.Subsets[i]
+				for j := range ss.Ports {
+					ssp := &ss.Ports[j]
+					if ssp.Name != firstPortName {
+						continue
+					}
+					for k := range ss.Addresses {
+						ssa := &ss.Addresses[k]
+						hostPort := net.JoinHostPort(ssa.IP, strconv.Itoa(ssp.Port))
+						out.Endpoints = append(out.Endpoints, hostPort)
+						if ssa.TargetRef != nil {
+							target := EndpointObjectReference{
+								Endpoint: hostPort,
+							}
+							if err := s.Convert(ssa.TargetRef, &target.ObjectReference, 0); err != nil {
+								return err
+							}
+							out.TargetRefs = append(out.TargetRefs, target)
+						}
+					}
 				}
 			}
 			return nil
@@ -1133,31 +1154,8 @@ func init() {
 			if err := s.Convert(&in.TypeMeta, &out.ObjectMeta, 0); err != nil {
 				return err
 			}
-			if err := s.Convert(&in.Protocol, &out.Protocol, 0); err != nil {
+			if err := s.Convert(&in.Subsets, &out.Subsets, 0); err != nil {
 				return err
-			}
-			for i := range in.Endpoints {
-				out.Endpoints = append(out.Endpoints, newer.Endpoint{})
-				ep := &out.Endpoints[i]
-				host, port, err := net.SplitHostPort(in.Endpoints[i])
-				if err != nil {
-					return err
-				}
-				ep.IP = host
-				pn, err := strconv.Atoi(port)
-				if err != nil {
-					return err
-				}
-				ep.Port = pn
-				for j := range in.TargetRefs {
-					if in.TargetRefs[j].Endpoint != in.Endpoints[i] {
-						continue
-					}
-					ep.TargetRef = &newer.ObjectReference{}
-					if err := s.Convert(&in.TargetRefs[j], ep.TargetRef, 0); err != nil {
-						return err
-					}
-				}
 			}
 			return nil
 		},

@@ -58,6 +58,8 @@ func TestEqualities(t *testing.T) {
 		{map[string]int{"foo": 1}, map[string]int{"foo": 2}, true},
 		{map[string]int{}, map[string]int(nil), true},
 		{[]int{}, []int(nil), true},
+		{[]int{1, 2, 3}, []int{}, false},
+		{map[int]bool{1: true}, map[int]bool{}, false},
 	}
 
 	for _, item := range table {

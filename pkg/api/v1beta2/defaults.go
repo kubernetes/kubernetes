@@ -17,6 +17,8 @@ limitations under the License.
 package v1beta2
 
 import (
+	"net"
+	"strconv"
 	"strings"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -89,7 +91,43 @@ func init() {
 		},
 		func(obj *Endpoints) {
 			if obj.Protocol == "" {
-				obj.Protocol = "TCP"
+				obj.Protocol = ProtocolTCP
+			}
+			if len(obj.Subsets) == 0 && len(obj.Endpoints) > 0 {
+				// Must be a legacy-style object - populate
+				// Subsets from the older fields.  Do this the
+				// simplest way, which is dumb (but valid).
+				for i := range obj.Endpoints {
+					host, portStr, err := net.SplitHostPort(obj.Endpoints[i])
+					if err != nil {
+						glog.Errorf("failed to SplitHostPort(%q)", obj.Endpoints[i])
+					}
+					var tgtRef *ObjectReference
+					for j := range obj.TargetRefs {
+						if obj.TargetRefs[j].Endpoint == obj.Endpoints[i] {
+							tgtRef = &ObjectReference{}
+							*tgtRef = obj.TargetRefs[j].ObjectReference
+						}
+					}
+					port, err := strconv.Atoi(portStr)
+					if err != nil {
+						glog.Errorf("failed to Atoi(%q)", portStr)
+					}
+					ss := EndpointSubset{
+						Addresses: []EndpointAddress{{IP: host, TargetRef: tgtRef}},
+						Ports:     []EndpointPort{{Protocol: obj.Protocol, Port: port}},
+					}
+					obj.Subsets = append(obj.Subsets, ss)
+				}
+			}
+			for i := range obj.Subsets {
+				ss := &obj.Subsets[i]
+				for i := range ss.Ports {
+					ep := &ss.Ports[i]
+					if ep.Protocol == "" {
+						ep.Protocol = ProtocolTCP
+					}
+				}
 			}
 		},
 		func(obj *HTTPGetAction) {

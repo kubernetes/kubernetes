@@ -793,30 +793,62 @@ type ServiceList struct {
 	Items []Service `json:"items" description:"list of services"`
 }
 
-// Endpoints is a collection of endpoints that implement the actual service, for example:
-// Name: "mysql", Endpoints: [{"ip": "10.10.1.1", "port": 1909}, {"ip": "10.10.2.2", "port": 8834}]
+// Endpoints is a collection of endpoints that implement the actual service.  Example:
+//   Name: "mysvc",
+//   Subsets: [
+//     {
+//       Addresses: [{"ip": "10.10.1.1"}, {"ip": "10.10.2.2"}],
+//       Ports: [{"name": "a", "port": 8675}, {"name": "b", "port": 309}]
+//     },
+//     {
+//       Addresses: [{"ip": "10.10.3.3"}],
+//       Ports: [{"name": "a", "port": 93}, {"name": "b", "port": 76}]
+//     },
+//  ]
 type Endpoints struct {
 	TypeMeta   `json:",inline"`
 	ObjectMeta `json:"metadata,omitempty" description:"standard object metadata; see https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#metadata"`
 
-	// Optional: The IP protocol for these endpoints. Supports "TCP" and
-	// "UDP".  Defaults to "TCP".
-	Protocol Protocol `json:"protocol,omitempty" description:"IP protocol for endpoint ports; must be UDP or TCP; TCP if unspecified"`
-
-	Endpoints []Endpoint `json:"endpoints,omitempty" description:"list of endpoints corresponding to a service"`
+	// The set of all endpoints is the union of all subsets.
+	Subsets []EndpointSubset `json:"subsets" description:"sets of addresses and ports that comprise a service"`
 }
 
-// Endpoint is a single IP endpoint of a service.
-type Endpoint struct {
-	// Required: The IP of this endpoint.
-	// TODO: This should allow hostname or IP, see #4447.
-	IP string `json:"ip" description:"IP of this endpoint"`
+// EndpointSubset is a group of addresses with a common set of ports.  The
+// expanded set of endpoints is the Cartesian product of Addresses x Ports.
+// For example, given:
+//   {
+//     Addresses: [{"ip": "10.10.1.1"}, {"ip": "10.10.2.2"}],
+//     Ports:     [{"name": "a", "port": 8675}, {"name": "b", "port": 309}]
+//   }
+// The resulting set of endpoints can be viewed as:
+//     a: [ 10.10.1.1:8675, 10.10.2.2:8675 ],
+//     b: [ 10.10.1.1:309, 10.10.2.2:309 ]
+type EndpointSubset struct {
+	Addresses []EndpointAddress `json:"addresses,omitempty" description:"IP addresses which offer the related ports"`
+	Ports     []EndpointPort    `json:"ports,omitempty" description:"port numbers available on the related IP addresses"`
+}
 
-	// Required: The destination port to access.
-	Port int `json:"port" description:"destination port of this endpoint"`
+// EndpointAddress is a tuple that describes single IP address.
+type EndpointAddress struct {
+	// The IP of this endpoint.
+	// TODO: This should allow hostname or IP, see #4447.
+	IP string `json:"IP" description:"IP address of the endpoint"`
 
 	// Optional: The kubernetes object related to the entry point.
 	TargetRef *ObjectReference `json:"targetRef,omitempty" description:"reference to object providing the endpoint"`
+}
+
+// EndpointPort is a tuple that describes a single port.
+type EndpointPort struct {
+	// The name of this port (corresponds to ServicePort.Name).  Optional
+	// if only one port is defined.  Must be a DNS_LABEL.
+	Name string `json:"name,omitempty" description:"name of this port"`
+
+	// The port number.
+	Port int `json:"port" description:"port number of the endpoint"`
+
+	// The IP protocol for this port.
+	Protocol Protocol `json:"protocol,omitempty" description:"protocol for this port; must be UDP or TCP; TCP if unspecified"`
 }
 
 // EndpointsList is a list of endpoints.
