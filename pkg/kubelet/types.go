@@ -16,7 +16,11 @@ limitations under the License.
 
 package kubelet
 
-import "github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+import (
+	"fmt"
+
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+)
 
 const ConfigSourceAnnotationKey = "kubernetes.io/config.source"
 const ConfigMirrorAnnotationKey = "kubernetes.io/config.mirror"
@@ -63,4 +67,23 @@ type PodUpdate struct {
 	Pods   []api.Pod
 	Op     PodOperation
 	Source string
+}
+
+// Gets all validated sources from the specified sources.
+func GetValidatedSources(sources []string) ([]string, error) {
+	validated := make([]string, 0, len(sources))
+	for _, source := range sources {
+		switch source {
+		case AllSource:
+			return []string{FileSource, HTTPSource, ApiserverSource}, nil
+		case FileSource, HTTPSource, ApiserverSource:
+			validated = append(validated, source)
+			break
+		case "":
+			break
+		default:
+			return []string{}, fmt.Errorf("unknown pod source %q", source)
+		}
+	}
+	return validated, nil
 }

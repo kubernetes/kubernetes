@@ -35,6 +35,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/capabilities"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/cadvisor"
@@ -3454,5 +3455,63 @@ func TestDoNotCacheStatusForStaticPods(t *testing.T) {
 	status, ok := kubelet.statusManager.GetPodStatus(podFullName)
 	if ok {
 		t.Errorf("unexpected status %#v found for static pod %q", status, podFullName)
+	}
+}
+
+func TestHostNetworkAllowed(t *testing.T) {
+	testKubelet := newTestKubelet(t)
+	kubelet := testKubelet.kubelet
+
+	capabilities.SetForTests(capabilities.Capabilities{
+		HostNetworkSources: []string{ApiserverSource, FileSource},
+	})
+	pod := &api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			UID:       "12345678",
+			Name:      "foo",
+			Namespace: "new",
+			Annotations: map[string]string{
+				ConfigSourceAnnotationKey: FileSource,
+			},
+		},
+		Spec: api.PodSpec{
+			Containers: []api.Container{
+				{Name: "foo"},
+			},
+			HostNetwork: true,
+		},
+	}
+	_, err := kubelet.createPodInfraContainer(pod)
+	if err != nil {
+		t.Errorf("expected pod infra creation to succeed: %v", err)
+	}
+}
+
+func TestHostNetworkDisallowed(t *testing.T) {
+	testKubelet := newTestKubelet(t)
+	kubelet := testKubelet.kubelet
+
+	capabilities.SetForTests(capabilities.Capabilities{
+		HostNetworkSources: []string{},
+	})
+	pod := &api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			UID:       "12345678",
+			Name:      "foo",
+			Namespace: "new",
+			Annotations: map[string]string{
+				ConfigSourceAnnotationKey: FileSource,
+			},
+		},
+		Spec: api.PodSpec{
+			Containers: []api.Container{
+				{Name: "foo"},
+			},
+			HostNetwork: true,
+		},
+	}
+	_, err := kubelet.createPodInfraContainer(pod)
+	if err == nil {
+		t.Errorf("expected pod infra creation to fail")
 	}
 }

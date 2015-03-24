@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"math/rand"
 	"net"
+	"strings"
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -61,6 +62,7 @@ type KubeletServer struct {
 	DockerEndpoint                 string
 	RootDirectory                  string
 	AllowPrivileged                bool
+	HostNetworkSources             string
 	RegistryPullQPS                float64
 	RegistryBurst                  int
 	RunOnce                        bool
@@ -106,6 +108,7 @@ func NewKubeletServer() *KubeletServer {
 		ImageGCHighThresholdPercent: 90,
 		ImageGCLowThresholdPercent:  80,
 		NetworkPluginName:           "",
+		HostNetworkSources:          kubelet.FileSource,
 	}
 }
 
@@ -124,6 +127,7 @@ func (s *KubeletServer) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.DockerEndpoint, "docker_endpoint", s.DockerEndpoint, "If non-empty, use this for the docker endpoint to communicate with")
 	fs.StringVar(&s.RootDirectory, "root_dir", s.RootDirectory, "Directory path for managing kubelet files (volume mounts,etc).")
 	fs.BoolVar(&s.AllowPrivileged, "allow_privileged", s.AllowPrivileged, "If true, allow containers to request privileged mode. [default=false]")
+	fs.StringVar(&s.HostNetworkSources, "host_network_sources", s.HostNetworkSources, "Comma-separated list of sources from which the Kubelet allows pods to use of host network. For all sources use \"*\" [default=\"file\"]")
 	fs.Float64Var(&s.RegistryPullQPS, "registry_qps", s.RegistryPullQPS, "If > 0, limit registry pull QPS to this value.  If 0, unlimited. [default=0.0]")
 	fs.IntVar(&s.RegistryBurst, "registry_burst", s.RegistryBurst, "Maximum size of a bursty pulls, temporarily allows pulls to burst to this number, while still not exceeding registry_qps.  Only used if --registry_qps > 0")
 	fs.BoolVar(&s.RunOnce, "runonce", s.RunOnce, "If true, exit after spawning pods from local manifests or remote urls. Exclusive with --api_servers, and --enable-server")
@@ -178,9 +182,14 @@ func (s *KubeletServer) Run(_ []string) error {
 	cloud := cloudprovider.InitCloudProvider(s.CloudProvider, s.CloudConfigFile)
 	glog.Infof("Successfully initialized cloud provider: %q from the config file: %q\n", s.CloudProvider, s.CloudConfigFile)
 
+	hostNetworkSources, err := kubelet.GetValidatedSources(strings.Split(s.HostNetworkSources, ","))
+	if err != nil {
+		return err
+	}
 	kcfg := KubeletConfig{
 		Address:                        s.Address,
 		AllowPrivileged:                s.AllowPrivileged,
+		HostNetworkSources:             hostNetworkSources,
 		HostnameOverride:               s.HostnameOverride,
 		RootDirectory:                  s.RootDirectory,
 		ConfigFile:                     s.Config,
@@ -321,7 +330,7 @@ func RunKubelet(kcfg *KubeletConfig) {
 		glog.Infof("No api server defined - no events will be sent.")
 	}
 	kubelet.SetupLogging()
-	kubelet.SetupCapabilities(kcfg.AllowPrivileged)
+	kubelet.SetupCapabilities(kcfg.AllowPrivileged, kcfg.HostNetworkSources)
 
 	credentialprovider.SetPreferredDockercfgPath(kcfg.RootDirectory)
 
@@ -383,6 +392,7 @@ type KubeletConfig struct {
 	CadvisorInterface              cadvisor.Interface
 	Address                        util.IP
 	AllowPrivileged                bool
+	HostNetworkSources             []string
 	HostnameOverride               string
 	RootDirectory                  string
 	ConfigFile                     string

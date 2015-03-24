@@ -1007,6 +1007,20 @@ const (
 	PodInfraContainerImage = "kubernetes/pause:latest"
 )
 
+// Determined whether the specified pod is allowed to use host networking
+func allowHostNetwork(pod *api.Pod) (bool, error) {
+	podSource, err := getPodSource(pod)
+	if err != nil {
+		return false, err
+	}
+	for _, source := range capabilities.Get().HostNetworkSources {
+		if source == podSource {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
 // createPodInfraContainer starts the pod infra container for a pod. Returns the docker container ID of the newly created container.
 func (kl *Kubelet) createPodInfraContainer(pod *api.Pod) (dockertools.DockerID, error) {
 	var ports []api.ContainerPort
@@ -1040,11 +1054,21 @@ func (kl *Kubelet) createPodInfraContainer(pod *api.Pod) (dockertools.DockerID, 
 	if ref != nil {
 		kl.recorder.Eventf(ref, "pulled", "Successfully pulled image %q", container.Image)
 	}
-	// TODO(vmarmol): Auth.
+
+	// Use host networking if specified and allowed.
 	netNamespace := ""
 	if pod.Spec.HostNetwork {
+		allowed, err := allowHostNetwork(pod)
+		if err != nil {
+			return "", err
+		}
+		if !allowed {
+			return "", fmt.Errorf("pod with UID %q specified host networking, but is disallowed", pod.UID)
+		}
+
 		netNamespace = "host"
 	}
+
 	id, err := kl.runContainer(pod, container, nil, netNamespace, "")
 	if err != nil {
 		return "", err
