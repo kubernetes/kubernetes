@@ -19,12 +19,17 @@ package client
 import (
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
+
+// TODO(a-robinson): Remove this explicit timeout and the calls to
+// request.Timeout() that use it once #5180 is in.
+const extendedTimeout = 4 * time.Minute
 
 // ServicesNamespacer has methods to work with Service resources in a namespace
 type ServicesNamespacer interface {
@@ -84,7 +89,9 @@ func (c *services) Create(svc *api.Service) (result *api.Service, err error) {
 	if needNamespace && len(namespace) == 0 {
 		namespace = api.NamespaceDefault
 	}
-	err = c.r.Post().Namespace(namespace).Resource("services").Body(svc).Do().Into(result)
+	request := c.r.Post()
+	request.Timeout(extendedTimeout)
+	err = request.Namespace(namespace).Resource("services").Body(svc).Do().Into(result)
 	return
 }
 
@@ -101,7 +108,9 @@ func (c *services) Update(svc *api.Service) (result *api.Service, err error) {
 	if needNamespace && len(namespace) == 0 {
 		namespace = api.NamespaceDefault
 	}
-	err = c.r.Put().Namespace(namespace).Resource("services").Name(svc.Name).Body(svc).Do().Into(result)
+	request := c.r.Put()
+	request.Timeout(extendedTimeout)
+	err = request.Namespace(namespace).Resource("services").Name(svc.Name).Body(svc).Do().Into(result)
 	return
 }
 
@@ -113,7 +122,9 @@ func (c *services) Delete(name string) error {
 	if needNamespace && len(namespace) == 0 {
 		namespace = api.NamespaceDefault
 	}
-	return c.r.Delete().Namespace(c.ns).Resource("services").Name(name).Do().Error()
+	request := c.r.Delete()
+	request.Timeout(extendedTimeout)
+	return request.Namespace(c.ns).Resource("services").Name(name).Do().Error()
 }
 
 // Watch returns a watch.Interface that watches the requested services.
