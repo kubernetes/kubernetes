@@ -23,7 +23,7 @@ desiredState:
     id: cassandra
     containers:
       - name: cassandra
-        image: kubernetes/cassandra
+        image: kubernetes/cassandra:v2
         command:
           - /run.sh
         cpu: 1000
@@ -121,7 +121,7 @@ desiredState:
         id: cassandra
         containers:
           - name: cassandra
-            image: kubernetes/cassandra
+            image: kubernetes/cassandra:v2
             command:
               - /run.sh
             cpu: 1000
