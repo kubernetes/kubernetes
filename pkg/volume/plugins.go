@@ -189,5 +189,8 @@ func (pm *VolumePluginMgr) FindPersistentPluginByName(name string) (PersistentVo
 	if err != nil {
 		return nil, err
 	}
-	return volumePlugin.(PersistentVolumePlugin), nil
+	if persistentVolumePlugin, ok := volumePlugin.(PersistentVolumePlugin); ok {
+		return persistentVolumePlugin, nil
+	}
+	return nil, fmt.Errorf("no persistent volume plugin matched")
 }
