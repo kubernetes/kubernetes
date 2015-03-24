@@ -267,7 +267,7 @@ func TestTransformResponse(t *testing.T) {
 		if err != nil {
 			t.Errorf("failed to read body of response: %v", err)
 		}
-		response, created, err := r.transformResponse(body, test.Response, &http.Request{})
+		response, created, err := r.transformResponse(test.Response, &http.Request{}, body)
 		hasErr := err != nil
 		if hasErr != test.Error {
 			t.Errorf("%d: unexpected error: %t %v", i, test.Error, err)
@@ -357,7 +357,7 @@ func TestTransformUnstructuredError(t *testing.T) {
 		if err != nil {
 			t.Errorf("failed to read body: %v", err)
 		}
-		_, _, err = r.transformResponse(body, testCase.Res, testCase.Req)
+		_, _, err = r.transformResponse(testCase.Res, testCase.Req, body)
 		if !testCase.ErrFn(err) {
 			t.Errorf("unexpected error: %v", err)
 			continue
@@ -381,6 +381,7 @@ func TestRequestWatch(t *testing.T) {
 	testCases := []struct {
 		Request *Request
 		Err     bool
+		ErrFn   func(error) bool
 		Empty   bool
 	}{
 		{
@@ -402,12 +403,48 @@ func TestRequestWatch(t *testing.T) {
 		},
 		{
 			Request: &Request{
+				codec: testapi.Codec(),
 				client: clientFunc(func(req *http.Request) (*http.Response, error) {
 					return &http.Response{StatusCode: http.StatusForbidden}, nil
 				}),
 				baseURL: &url.URL{},
 			},
 			Err: true,
+			ErrFn: func(err error) bool {
+				return apierrors.IsForbidden(err)
+			},
+		},
+		{
+			Request: &Request{
+				codec: testapi.Codec(),
+				client: clientFunc(func(req *http.Request) (*http.Response, error) {
+					return &http.Response{StatusCode: http.StatusUnauthorized}, nil
+				}),
+				baseURL: &url.URL{},
+			},
+			Err: true,
+			ErrFn: func(err error) bool {
+				return apierrors.IsUnauthorized(err)
+			},
+		},
+		{
+			Request: &Request{
+				codec: testapi.Codec(),
+				client: clientFunc(func(req *http.Request) (*http.Response, error) {
+					return &http.Response{
+						StatusCode: http.StatusUnauthorized,
+						Body: ioutil.NopCloser(bytes.NewReader([]byte(runtime.EncodeOrDie(testapi.Codec(), &api.Status{
+							Status: api.StatusFailure,
+							Reason: api.StatusReasonUnauthorized,
+						})))),
+					}, nil
+				}),
+				baseURL: &url.URL{},
+			},
+			Err: true,
+			ErrFn: func(err error) bool {
+				return apierrors.IsUnauthorized(err)
+			},
 		},
 		{
 			Request: &Request{
@@ -452,6 +489,9 @@ func TestRequestWatch(t *testing.T) {
 		if hasErr != testCase.Err {
 			t.Errorf("%d: expected %t, got %t: %v", i, testCase.Err, hasErr, err)
 			continue
+		}
+		if testCase.ErrFn != nil && !testCase.ErrFn(err) {
+			t.Errorf("%d: error not valid: %v", i, err)
 		}
 		if hasErr && watch != nil {
 			t.Errorf("%d: watch should be nil when error is returned", i)

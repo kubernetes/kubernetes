@@ -449,11 +449,10 @@ func (r *Request) Watch() (watch.Interface, error) {
 		return nil, err
 	}
 	if resp.StatusCode != http.StatusOK {
-		var body []byte
-		if resp.Body != nil {
-			body, _ = ioutil.ReadAll(resp.Body)
+		if _, _, err := r.transformResponse(resp, req, nil); err != nil {
+			return nil, err
 		}
-		return nil, fmt.Errorf("for request '%+v', got status: %v\nbody: %v", req.URL, resp.StatusCode, string(body))
+		return nil, fmt.Errorf("for request '%+v', got status: %v", req.URL, resp.StatusCode)
 	}
 	return watch.NewStreamWatcher(watchjson.NewDecoder(resp.Body, r.codec)), nil
 }
@@ -604,12 +603,18 @@ func (r *Request) Do() Result {
 	if err != nil {
 		return Result{err: err}
 	}
-	respBody, created, err := r.transformResponse(body, r.resp, r.req)
+	respBody, created, err := r.transformResponse(r.resp, r.req, body)
 	return Result{respBody, created, err, r.codec}
 }
 
-// transformResponse converts an API response into a structured API object.
-func (r *Request) transformResponse(body []byte, resp *http.Response, req *http.Request) ([]byte, bool, error) {
+// transformResponse converts an API response into a structured API object. If body is nil, the response
+// body will be read to try and gather more response data.
+func (r *Request) transformResponse(resp *http.Response, req *http.Request, body []byte) ([]byte, bool, error) {
+	if body == nil && resp.Body != nil {
+		if data, err := ioutil.ReadAll(resp.Body); err == nil {
+			body = data
+		}
+	}
 	// Did the server give us a status response?
 	isStatusResponse := false
 	var status api.Status
@@ -622,43 +627,7 @@ func (r *Request) transformResponse(body []byte, resp *http.Response, req *http.
 		// no-op, we've been upgraded
 	case resp.StatusCode < http.StatusOK || resp.StatusCode > http.StatusPartialContent:
 		if !isStatusResponse {
-			var err error = &UnexpectedStatusError{
-				Request:  req,
-				Response: resp,
-				Body:     string(body),
-			}
-			message := "unknown"
-			if isTextResponse(resp) {
-				message = strings.TrimSpace(string(body))
-			}
-			// TODO: handle other error classes we know about
-			switch resp.StatusCode {
-			case http.StatusConflict:
-				if req.Method == "POST" {
-					err = errors.NewAlreadyExists(r.resource, r.resourceName)
-				} else {
-					err = errors.NewConflict(r.resource, r.resourceName, err)
-				}
-			case http.StatusNotFound:
-				err = errors.NewNotFound(r.resource, r.resourceName)
-			case http.StatusBadRequest:
-				err = errors.NewBadRequest(message)
-			case http.StatusUnauthorized:
-				err = errors.NewUnauthorized(message)
-			case http.StatusForbidden:
-				err = errors.NewForbidden(r.resource, r.resourceName, err)
-			case errors.StatusUnprocessableEntity:
-				err = errors.NewInvalid(r.resource, r.resourceName, nil)
-			case errors.StatusServerTimeout:
-				retryAfter, _ := retryAfter(resp)
-				err = errors.NewServerTimeout(r.resource, r.verb, retryAfter)
-			case errors.StatusTooManyRequests:
-				retryAfter, _ := retryAfter(resp)
-				err = errors.NewServerTimeout(r.resource, r.verb, retryAfter)
-			case http.StatusInternalServerError:
-				err = errors.NewInternalError(fmt.Errorf(message))
-			}
-			return nil, false, err
+			return nil, false, r.transformUnstructuredResponseError(resp, req, body)
 		}
 		return nil, false, errors.FromObject(&status)
 	}
@@ -673,6 +642,52 @@ func (r *Request) transformResponse(body []byte, resp *http.Response, req *http.
 
 	created := resp.StatusCode == http.StatusCreated
 	return body, created, nil
+}
+
+// transformUnstructuredResponseError handles an error from the server that is not in a structured form.
+func (r *Request) transformUnstructuredResponseError(resp *http.Response, req *http.Request, body []byte) error {
+	if body == nil && resp.Body != nil {
+		if data, err := ioutil.ReadAll(resp.Body); err == nil {
+			body = data
+		}
+	}
+	var err error = &UnexpectedStatusError{
+		Request:  req,
+		Response: resp,
+		Body:     string(body),
+	}
+	message := "unknown"
+	if isTextResponse(resp) {
+		message = strings.TrimSpace(string(body))
+	}
+	// TODO: handle other error classes we know about
+	switch resp.StatusCode {
+	case http.StatusConflict:
+		if req.Method == "POST" {
+			err = errors.NewAlreadyExists(r.resource, r.resourceName)
+		} else {
+			err = errors.NewConflict(r.resource, r.resourceName, err)
+		}
+	case http.StatusNotFound:
+		err = errors.NewNotFound(r.resource, r.resourceName)
+	case http.StatusBadRequest:
+		err = errors.NewBadRequest(message)
+	case http.StatusUnauthorized:
+		err = errors.NewUnauthorized(message)
+	case http.StatusForbidden:
+		err = errors.NewForbidden(r.resource, r.resourceName, err)
+	case errors.StatusUnprocessableEntity:
+		err = errors.NewInvalid(r.resource, r.resourceName, nil)
+	case errors.StatusServerTimeout:
+		retryAfter, _ := retryAfter(resp)
+		err = errors.NewServerTimeout(r.resource, r.verb, retryAfter)
+	case errors.StatusTooManyRequests:
+		retryAfter, _ := retryAfter(resp)
+		err = errors.NewServerTimeout(r.resource, r.verb, retryAfter)
+	case http.StatusInternalServerError:
+		err = errors.NewInternalError(fmt.Errorf(message))
+	}
+	return err
 }
 
 // isTextResponse returns true if the response appears to be a textual media type.
