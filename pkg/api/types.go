@@ -195,6 +195,18 @@ type VolumeSource struct {
 	NFS *NFSVolumeSource `json:"nfs"`
 }
 
+// used by VolumeSources to describe their mounting/access modes
+type AccessModeType string
+
+const (
+	// can be mounted read/write mode to exactly 1 host
+	ReadWriteOnce AccessModeType = "ReadWriteOnce"
+	// can be mounted in read-only mode to many hosts
+	ReadOnlyMany AccessModeType = "ReadOnlyMany"
+	// can be mounted in read/write mode to many hosts
+	ReadWriteMany AccessModeType = "ReadWriteMany"
+)
+
 // HostPathVolumeSource represents a host directory mapped into a pod.
 type HostPathVolumeSource struct {
 	Path string `json:"path"`

@@ -59,6 +59,14 @@ type VolumePlugin interface {
 	NewCleaner(name string, podUID types.UID) (Cleaner, error)
 }
 
+// PersistentVolumePlugin is an extended interface of VolumePlugin and is used
+// by volumes that want to provide long term persistence of data
+type PersistentVolumePlugin interface {
+	VolumePlugin
+	// GetAccessModes describes the ways a given volume can be accessed/mounted.
+	GetAccessModes() []api.AccessModeType
+}
+
 // VolumeHost is an interface that plugins can use to access the kubelet.
 type VolumeHost interface {
 	// GetPluginDir returns the absolute path to a directory under which
@@ -172,4 +180,17 @@ func (pm *VolumePluginMgr) FindPluginByName(name string) (VolumePlugin, error) {
 		return nil, fmt.Errorf("multiple volume plugins matched: %s", strings.Join(matches, ","))
 	}
 	return pm.plugins[matches[0]], nil
+}
+
+// FindPluginByName fetches a plugin by name or by legacy name.  If no plugin
+// is found, returns error.
+func (pm *VolumePluginMgr) FindPersistentPluginByName(name string) (PersistentVolumePlugin, error) {
+	volumePlugin, err := pm.FindPluginByName(name)
+	if err != nil {
+		return nil, err
+	}
+	if persistentVolumePlugin, ok := volumePlugin.(PersistentVolumePlugin); ok {
+		return persistentVolumePlugin, nil
+	}
+	return nil, fmt.Errorf("no persistent volume plugin matched")
 }

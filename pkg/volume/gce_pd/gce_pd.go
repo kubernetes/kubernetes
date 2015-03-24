@@ -71,6 +71,13 @@ func (plugin *gcePersistentDiskPlugin) CanSupport(spec *api.Volume) bool {
 	return false
 }
 
+func (plugin *gcePersistentDiskPlugin) GetAccessModes() []api.AccessModeType {
+	return []api.AccessModeType{
+		api.ReadWriteOnce,
+		api.ReadOnlyMany,
+	}
+}
+
 func (plugin *gcePersistentDiskPlugin) NewBuilder(spec *api.Volume, podRef *api.ObjectReference) (volume.Builder, error) {
 	// Inject real implementations here, test through the internal function.
 	return plugin.newBuilderInternal(spec, podRef.UID, &GCEDiskUtil{}, mount.New())
