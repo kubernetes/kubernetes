@@ -33,7 +33,7 @@ function detect-minions {
 # Verify prereqs on host machine  Also sets exports USING_KUBE_SCRIPTS=true so
 # that our Vagrantfile doesn't error out.
 function verify-prereqs {
-  for x in vagrant virtualbox; do
+  for x in vagrant VBoxManage; do
     if ! which "$x" >/dev/null; then
       echo "Can't find $x in PATH, please fix and retry."
       exit 1
