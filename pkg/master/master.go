@@ -114,9 +114,6 @@ type Config struct {
 
 	// The name of the cluster.
 	ClusterName string
-
-	// If true we will periodically probe pods statuses.
-	SyncPodStatus bool
 }
 
 // Master contains state for a Kubernetes cluster master/api server.
@@ -369,20 +366,6 @@ func (m *Master) init(c *Config) {
 	m.nodeRegistry = registry
 
 	nodeStorage := minion.NewStorage(m.nodeRegistry, c.KubeletClient)
-	// TODO: unify the storage -> registry and storage -> client patterns
-	nodeStorageClient := RESTStorageToNodes(nodeStorage)
-	podCache := NewPodCache(
-		c.KubeletClient,
-		nodeStorageClient.Nodes(),
-		podRegistry,
-	)
-
-	if c.SyncPodStatus {
-		go util.Forever(podCache.UpdateAllContainers, m.cacheTimeout)
-		go util.Forever(podCache.GarbageCollectPodStatus, time.Minute*30)
-		// Note the pod cache needs access to an un-decorated RESTStorage
-		podStorage = podStorage.WithPodStatus(podCache)
-	}
 
 	controllerStorage := controlleretcd.NewREST(c.EtcdHelper)
 

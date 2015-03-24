@@ -1423,6 +1423,11 @@ func (kl *Kubelet) syncPod(pod *api.Pod, hasMirrorPod bool, runningPod kubeconta
 
 	if !hasMirrorPod && isStaticPod(pod) {
 		glog.V(4).Infof("Creating a mirror pod %q", podFullName)
+		// To make sure we will properly update static pod status we need to delete
+		// it from status manager. Otherwise it is possible that we will miss manual
+		// deletion of mirror pod in apiserver and will never reset its status to
+		// Running after recreating it.
+		kl.statusManager.DeletePodStatus(podFullName)
 		if err := kl.podManager.CreateMirrorPod(*pod, kl.hostname); err != nil {
 			glog.Errorf("Failed creating a mirror pod %q: %#v", podFullName, err)
 		}
@@ -1800,6 +1805,29 @@ func (kl *Kubelet) GetHostname() string {
 	return kl.hostname
 }
 
+// Returns host IP or nil in case of error.
+func (kl *Kubelet) GetHostIP() (net.IP, error) {
+	node, err := kl.GetNode()
+	if err != nil {
+		return nil, fmt.Errorf("Cannot get node: %v", err)
+	}
+	addresses := node.Status.Addresses
+	addressMap := make(map[api.NodeAddressType][]api.NodeAddress)
+	for i := range addresses {
+		addressMap[addresses[i].Type] = append(addressMap[addresses[i].Type], addresses[i])
+	}
+	if addresses, ok := addressMap[api.NodeLegacyHostIP]; ok {
+		return net.ParseIP(addresses[0].Address), nil
+	}
+	if addresses, ok := addressMap[api.NodeInternalIP]; ok {
+		return net.ParseIP(addresses[0].Address), nil
+	}
+	if addresses, ok := addressMap[api.NodeExternalIP]; ok {
+		return net.ParseIP(addresses[0].Address), nil
+	}
+	return nil, fmt.Errorf("Host IP unknown; known addresses: %v", addresses)
+}
+
 // GetPods returns all pods bound to the kubelet and their spec, and the mirror
 // pods.
 func (kl *Kubelet) GetPods() []api.Pod {
@@ -2012,7 +2040,12 @@ func (kl *Kubelet) generatePodStatusByPod(pod *api.Pod) (api.PodStatus, error) {
 		podStatus.Info[c.Name] = containerStatus
 	}
 	podStatus.Conditions = append(podStatus.Conditions, getPodReadyCondition(spec, podStatus.Info)...)
-	podStatus.Host = kl.hostname
+	podStatus.Host = kl.GetHostname()
+	hostIP, err := kl.GetHostIP()
+	if err != nil {
+		return api.PodStatus{}, fmt.Errorf("Cannot get host IP: %v", err)
+	}
+	podStatus.HostIP = hostIP.String()
 
 	return *podStatus, nil
 }

@@ -85,15 +85,6 @@ func (r *REST) ResourceLocation(ctx api.Context, name string) (*url.URL, http.Ro
 	return pod.ResourceLocation(r, ctx, name)
 }
 
-// WithPodStatus returns a rest object that decorates returned responses with extra
-// status information.
-func (r *REST) WithPodStatus(cache pod.PodStatusGetter) *REST {
-	store := *r
-	store.Decorator = pod.PodStatusDecorator(cache)
-	store.AfterDelete = rest.AllFuncs(store.AfterDelete, pod.PodStatusReset(cache))
-	return &store
-}
-
 // BindingREST implements the REST endpoint for binding pods to nodes when etcd is in use.
 type BindingREST struct {
 	store *etcdgeneric.Etcd
