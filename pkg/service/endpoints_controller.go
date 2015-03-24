@@ -83,7 +83,7 @@ func (e *EndpointController) SyncServiceEndpoints() error {
 
 			inService := false
 			for _, c := range pod.Status.Conditions {
-				if c.Type == api.PodReady && c.Status == api.ConditionTrue {
+				if c.Type == api.PodReady && c.Status == api.ConditionFull {
 					inService = true
 					break
 				}

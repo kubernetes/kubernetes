@@ -198,7 +198,7 @@ func (p *PodCache) computePodStatus(pod *api.Pod) (api.PodStatus, error) {
 
 	// Assigned to an unhealthy node.
 	for _, condition := range nodeStatus.Conditions {
-		if (condition.Type == api.NodeReady || condition.Type == api.NodeReachable) && condition.Status == api.ConditionFalse {
+		if (condition.Type == api.NodeReady || condition.Type == api.NodeReachable) && condition.Status == api.ConditionNone {
 			glog.V(5).Infof("node status: %v, setting pod %q status to unknown", condition, pod.Name)
 			newStatus.Phase = api.PodUnknown
 			newStatus.Conditions = append(newStatus.Conditions, pod.Status.Conditions...)

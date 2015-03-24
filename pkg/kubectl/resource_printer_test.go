@@ -524,7 +524,7 @@ func TestPrintMinionStatus(t *testing.T) {
 		{
 			minion: api.Node{
 				ObjectMeta: api.ObjectMeta{Name: "foo1"},
-				Status:     api.NodeStatus{Conditions: []api.NodeCondition{{Type: api.NodeReady, Status: api.ConditionTrue}}},
+				Status:     api.NodeStatus{Conditions: []api.NodeCondition{{Type: api.NodeReady, Status: api.ConditionFull}}},
 			},
 			status: "Ready",
 		},
@@ -532,8 +532,8 @@ func TestPrintMinionStatus(t *testing.T) {
 			minion: api.Node{
 				ObjectMeta: api.ObjectMeta{Name: "foo2"},
 				Status: api.NodeStatus{Conditions: []api.NodeCondition{
-					{Type: api.NodeReady, Status: api.ConditionTrue},
-					{Type: api.NodeReachable, Status: api.ConditionTrue}}},
+					{Type: api.NodeReady, Status: api.ConditionFull},
+					{Type: api.NodeReachable, Status: api.ConditionFull}}},
 			},
 			status: "Ready,Reachable",
 		},
@@ -541,22 +541,22 @@ func TestPrintMinionStatus(t *testing.T) {
 			minion: api.Node{
 				ObjectMeta: api.ObjectMeta{Name: "foo3"},
 				Status: api.NodeStatus{Conditions: []api.NodeCondition{
-					{Type: api.NodeReady, Status: api.ConditionTrue},
-					{Type: api.NodeReady, Status: api.ConditionTrue}}},
+					{Type: api.NodeReady, Status: api.ConditionFull},
+					{Type: api.NodeReady, Status: api.ConditionFull}}},
 			},
 			status: "Ready",
 		},
 		{
 			minion: api.Node{
 				ObjectMeta: api.ObjectMeta{Name: "foo4"},
-				Status:     api.NodeStatus{Conditions: []api.NodeCondition{{Type: api.NodeReady, Status: api.ConditionFalse}}},
+				Status:     api.NodeStatus{Conditions: []api.NodeCondition{{Type: api.NodeReady, Status: api.ConditionNone}}},
 			},
 			status: "NotReady",
 		},
 		{
 			minion: api.Node{
 				ObjectMeta: api.ObjectMeta{Name: "foo5"},
-				Status:     api.NodeStatus{Conditions: []api.NodeCondition{{Type: "InvalidValue", Status: api.ConditionTrue}}},
+				Status:     api.NodeStatus{Conditions: []api.NodeCondition{{Type: "InvalidValue", Status: api.ConditionFull}}},
 			},
 			status: "Unknown",
 		},
@@ -571,9 +571,9 @@ func TestPrintMinionStatus(t *testing.T) {
 			minion: api.Node{
 				ObjectMeta: api.ObjectMeta{Name: "foo7"},
 				Status: api.NodeStatus{Conditions: []api.NodeCondition{
-					{Type: api.NodeSchedulable, Status: api.ConditionTrue},
-					{Type: api.NodeReady, Status: api.ConditionTrue},
-					{Type: api.NodeReachable, Status: api.ConditionTrue}}},
+					{Type: api.NodeSchedulable, Status: api.ConditionFull},
+					{Type: api.NodeReady, Status: api.ConditionFull},
+					{Type: api.NodeReachable, Status: api.ConditionFull}}},
 			},
 			status: "Schedulable,Ready,Reachable",
 		},
@@ -581,9 +581,9 @@ func TestPrintMinionStatus(t *testing.T) {
 			minion: api.Node{
 				ObjectMeta: api.ObjectMeta{Name: "foo8"},
 				Status: api.NodeStatus{Conditions: []api.NodeCondition{
-					{Type: api.NodeSchedulable, Status: api.ConditionFalse},
-					{Type: api.NodeReady, Status: api.ConditionFalse},
-					{Type: api.NodeReachable, Status: api.ConditionTrue}}},
+					{Type: api.NodeSchedulable, Status: api.ConditionNone},
+					{Type: api.NodeReady, Status: api.ConditionNone},
+					{Type: api.NodeReachable, Status: api.ConditionFull}}},
 			},
 			status: "NotSchedulable,NotReady,Reachable",
 		},

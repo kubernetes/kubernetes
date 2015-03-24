@@ -580,14 +580,14 @@ func TestNodeConditionsCheck(t *testing.T) {
 			expectedConditions: []api.NodeCondition{
 				{
 					Type:               api.NodeReady,
-					Status:             api.ConditionTrue,
+					Status:             api.ConditionFull,
 					Reason:             "Node health check succeeded: kubelet /healthz endpoint returns ok",
 					LastProbeTime:      fakeNow,
 					LastTransitionTime: fakeNow,
 				},
 				{
 					Type:               api.NodeSchedulable,
-					Status:             api.ConditionTrue,
+					Status:             api.ConditionFull,
 					Reason:             "Node is schedulable by default",
 					LastProbeTime:      fakeNow,
 					LastTransitionTime: fakeNow,
@@ -605,14 +605,14 @@ func TestNodeConditionsCheck(t *testing.T) {
 			expectedConditions: []api.NodeCondition{
 				{
 					Type:               api.NodeReady,
-					Status:             api.ConditionFalse,
+					Status:             api.ConditionNone,
 					Reason:             "Node health check failed: kubelet /healthz endpoint returns not ok",
 					LastProbeTime:      fakeNow,
 					LastTransitionTime: fakeNow,
 				},
 				{
 					Type:               api.NodeSchedulable,
-					Status:             api.ConditionTrue,
+					Status:             api.ConditionFull,
 					Reason:             "Node is schedulable by default",
 					LastProbeTime:      fakeNow,
 					LastTransitionTime: fakeNow,
@@ -637,7 +637,7 @@ func TestNodeConditionsCheck(t *testing.T) {
 				},
 				{
 					Type:               api.NodeSchedulable,
-					Status:             api.ConditionFalse,
+					Status:             api.ConditionNone,
 					Reason:             "User marked unschedulable during node create/update",
 					LastProbeTime:      fakeNow,
 					LastTransitionTime: fakeNow,
@@ -719,14 +719,14 @@ func TestSyncProbedNodeStatus(t *testing.T) {
 						Conditions: []api.NodeCondition{
 							{
 								Type:               api.NodeReady,
-								Status:             api.ConditionTrue,
+								Status:             api.ConditionFull,
 								Reason:             "Node health check succeeded: kubelet /healthz endpoint returns ok",
 								LastProbeTime:      fakeNow,
 								LastTransitionTime: fakeNow,
 							},
 							{
 								Type:               api.NodeSchedulable,
-								Status:             api.ConditionTrue,
+								Status:             api.ConditionFull,
 								Reason:             "Node is schedulable by default",
 								LastProbeTime:      fakeNow,
 								LastTransitionTime: fakeNow,
@@ -743,14 +743,14 @@ func TestSyncProbedNodeStatus(t *testing.T) {
 						Conditions: []api.NodeCondition{
 							{
 								Type:               api.NodeReady,
-								Status:             api.ConditionTrue,
+								Status:             api.ConditionFull,
 								Reason:             "Node health check succeeded: kubelet /healthz endpoint returns ok",
 								LastProbeTime:      fakeNow,
 								LastTransitionTime: fakeNow,
 							},
 							{
 								Type:               api.NodeSchedulable,
-								Status:             api.ConditionTrue,
+								Status:             api.ConditionFull,
 								Reason:             "Node is schedulable by default",
 								LastProbeTime:      fakeNow,
 								LastTransitionTime: fakeNow,
@@ -810,13 +810,13 @@ func TestSyncProbedNodeStatusTransitionTime(t *testing.T) {
 							Conditions: []api.NodeCondition{
 								{
 									Type:               api.NodeReady,
-									Status:             api.ConditionTrue,
+									Status:             api.ConditionFull,
 									Reason:             "Node health check succeeded: kubelet /healthz endpoint returns ok",
 									LastTransitionTime: util.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
 								},
 								{
 									Type:               api.NodeSchedulable,
-									Status:             api.ConditionTrue,
+									Status:             api.ConditionFull,
 									Reason:             "Node is schedulable by default",
 									LastTransitionTime: util.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
 								},
@@ -845,13 +845,13 @@ func TestSyncProbedNodeStatusTransitionTime(t *testing.T) {
 							Conditions: []api.NodeCondition{
 								{
 									Type:               api.NodeReady,
-									Status:             api.ConditionTrue,
+									Status:             api.ConditionFull,
 									Reason:             "Node health check succeeded: kubelet /healthz endpoint returns ok",
 									LastTransitionTime: util.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
 								},
 								{
 									Type:               api.NodeSchedulable,
-									Status:             api.ConditionTrue,
+									Status:             api.ConditionFull,
 									Reason:             "Node is schedulable by default",
 									LastTransitionTime: util.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
 								},
@@ -906,7 +906,7 @@ func TestSyncProbedNodeStatusEvictPods(t *testing.T) {
 							Conditions: []api.NodeCondition{
 								{
 									Type:               api.NodeReady,
-									Status:             api.ConditionTrue,
+									Status:             api.ConditionFull,
 									Reason:             "Node health check succeeded: kubelet /healthz endpoint returns ok",
 									LastTransitionTime: util.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
 								},
@@ -936,7 +936,7 @@ func TestSyncProbedNodeStatusEvictPods(t *testing.T) {
 							Conditions: []api.NodeCondition{
 								{
 									Type:               api.NodeReady,
-									Status:             api.ConditionTrue,
+									Status:             api.ConditionFull,
 									Reason:             "Node health check succeeded: kubelet /healthz endpoint returns ok",
 									LastTransitionTime: util.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
 								},
@@ -965,7 +965,7 @@ func TestSyncProbedNodeStatusEvictPods(t *testing.T) {
 							Conditions: []api.NodeCondition{
 								{
 									Type:   api.NodeReady,
-									Status: api.ConditionFalse,
+									Status: api.ConditionNone,
 									Reason: "Node health check failed: kubelet /healthz endpoint returns not ok",
 									// Here, last transition time is Now(). In node controller, the new condition's probe time is
 									// also Now(). The two calls to Now() yields differnt time due to test execution, but the
@@ -997,7 +997,7 @@ func TestSyncProbedNodeStatusEvictPods(t *testing.T) {
 							Conditions: []api.NodeCondition{
 								{
 									Type:   api.NodeReady,
-									Status: api.ConditionFalse,
+									Status: api.ConditionNone,
 									Reason: "Node health check failed: kubelet /healthz endpoint returns not ok",
 									// Here, last transition time is in the past, and in node controller, the
 									// new condition's probe time is Now(). The time difference is larger than
@@ -1075,7 +1075,7 @@ func TestMonitorNodeStatusEvictPods(t *testing.T) {
 							Conditions: []api.NodeCondition{
 								{
 									Type:   api.NodeReady,
-									Status: api.ConditionFalse,
+									Status: api.ConditionNone,
 									// Node status has just been updated, and transited to NotReady for 10min.
 									LastProbeTime:      util.Date(2015, 1, 1, 11, 59, 0, 0, time.UTC),
 									LastTransitionTime: util.Date(2015, 1, 1, 11, 50, 0, 0, time.UTC),
@@ -1104,7 +1104,7 @@ func TestMonitorNodeStatusEvictPods(t *testing.T) {
 							Conditions: []api.NodeCondition{
 								{
 									Type:   api.NodeReady,
-									Status: api.ConditionFalse,
+									Status: api.ConditionNone,
 									// Node status has just been updated, and transited to NotReady for 1hr.
 									LastProbeTime:      util.Date(2015, 1, 1, 11, 59, 0, 0, time.UTC),
 									LastTransitionTime: util.Date(2015, 1, 1, 11, 0, 0, 0, time.UTC),
@@ -1275,7 +1275,7 @@ func TestMonitorNodeStatusUpdateStatus(t *testing.T) {
 							Conditions: []api.NodeCondition{
 								{
 									Type:   api.NodeReady,
-									Status: api.ConditionTrue,
+									Status: api.ConditionFull,
 									// Node status hasn't been updated for 1hr.
 									LastProbeTime:      util.Date(2015, 1, 1, 11, 0, 0, 0, time.UTC),
 									LastTransitionTime: util.Date(2015, 1, 1, 11, 0, 0, 0, time.UTC),
@@ -1323,7 +1323,7 @@ func TestMonitorNodeStatusUpdateStatus(t *testing.T) {
 							Conditions: []api.NodeCondition{
 								{
 									Type:   api.NodeReady,
-									Status: api.ConditionTrue,
+									Status: api.ConditionFull,
 									// Node status has just been updated.
 									LastProbeTime:      fakeNow,
 									LastTransitionTime: fakeNow,

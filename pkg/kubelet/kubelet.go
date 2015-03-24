@@ -1852,7 +1852,7 @@ func (kl *Kubelet) tryUpdateNodeStatus() error {
 	currentTime := util.Now()
 	newCondition := api.NodeCondition{
 		Type:          api.NodeReady,
-		Status:        api.ConditionTrue,
+		Status:        api.ConditionFull,
 		Reason:        fmt.Sprintf("kubelet is posting ready status"),
 		LastProbeTime: currentTime,
 	}
@@ -1939,11 +1939,11 @@ func getPhase(spec *api.PodSpec, info api.PodInfo) api.PodPhase {
 func getPodReadyCondition(spec *api.PodSpec, info api.PodInfo) []api.PodCondition {
 	ready := []api.PodCondition{{
 		Type:   api.PodReady,
-		Status: api.ConditionTrue,
+		Status: api.ConditionFull,
 	}}
 	unready := []api.PodCondition{{
 		Type:   api.PodReady,
-		Status: api.ConditionFalse,
+		Status: api.ConditionNone,
 	}}
 	if info == nil {
 		return unready
