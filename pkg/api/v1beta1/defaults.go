@@ -69,10 +69,16 @@ func init() {
 			if obj.DNSPolicy == "" {
 				obj.DNSPolicy = DNSClusterFirst
 			}
+			if obj.HostNetwork {
+				defaultHostNetworkPorts(&obj.Containers)
+			}
 		},
 		func(obj *ContainerManifest) {
 			if obj.DNSPolicy == "" {
 				obj.DNSPolicy = DNSClusterFirst
+			}
+			if obj.HostNetwork {
+				defaultHostNetworkPorts(&obj.Containers)
 			}
 		},
 		func(obj *LivenessProbe) {
@@ -101,4 +107,15 @@ func init() {
 			}
 		},
 	)
+}
+
+// With host networking default all host ports to container ports.
+func defaultHostNetworkPorts(containers *[]Container) {
+	for i := range *containers {
+		for j := range (*containers)[i].Ports {
+			if (*containers)[i].Ports[j].HostPort == 0 {
+				(*containers)[i].Ports[j].HostPort = (*containers)[i].Ports[j].ContainerPort
+			}
+		}
+	}
 }

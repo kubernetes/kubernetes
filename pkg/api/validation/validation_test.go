@@ -712,6 +712,16 @@ func TestValidatePodSpec(t *testing.T) {
 			Host:      "foobar",
 			DNSPolicy: api.DNSClusterFirst,
 		},
+		{ // Populate HostNetwork.
+			Containers: []api.Container{
+				{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", Ports: []api.ContainerPort{
+					{HostPort: 8080, ContainerPort: 8080, Protocol: "TCP"}},
+				},
+			},
+			HostNetwork:   true,
+			RestartPolicy: api.RestartPolicyAlways,
+			DNSPolicy:     api.DNSClusterFirst,
+		},
 	}
 	for i := range successCases {
 		if errs := ValidatePodSpec(&successCases[i]); len(errs) != 0 {
@@ -744,6 +754,16 @@ func TestValidatePodSpec(t *testing.T) {
 			RestartPolicy: "UnknowPolicy",
 			DNSPolicy:     api.DNSClusterFirst,
 			Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+		},
+		"with hostNetwork hostPort not equal to containerPort": {
+			Containers: []api.Container{
+				{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent", Ports: []api.ContainerPort{
+					{HostPort: 8080, ContainerPort: 2600, Protocol: "TCP"}},
+				},
+			},
+			HostNetwork:   true,
+			RestartPolicy: api.RestartPolicyAlways,
+			DNSPolicy:     api.DNSClusterFirst,
 		},
 	}
 	for k, v := range failureCases {

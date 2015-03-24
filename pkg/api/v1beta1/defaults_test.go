@@ -80,3 +80,28 @@ func TestSetDefaultNamespace(t *testing.T) {
 		t.Errorf("Expected phase %v, got %v", current.NamespaceActive, s2.Status.Phase)
 	}
 }
+
+func TestSetDefaultContainerManifestHostNetwork(t *testing.T) {
+	portNum := 8080
+	s := current.ContainerManifest{}
+	s.HostNetwork = true
+	s.Containers = []current.Container{
+		{
+			Ports: []current.ContainerPort{
+				{
+					ContainerPort: portNum,
+				},
+			},
+		},
+	}
+	obj2 := roundTrip(t, runtime.Object(&current.ContainerManifestList{
+		Items: []current.ContainerManifest{s},
+	}))
+	sList2 := obj2.(*current.ContainerManifestList)
+	s2 := sList2.Items[0]
+
+	hostPortNum := s2.Containers[0].Ports[0].HostPort
+	if hostPortNum != portNum {
+		t.Errorf("Expected container port to be defaulted, was made %d instead of %d", hostPortNum, portNum)
+	}
+}

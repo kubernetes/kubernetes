@@ -97,3 +97,29 @@ func TestSetDefaultNamespace(t *testing.T) {
 		t.Errorf("Expected phase %v, got %v", current.NamespaceActive, s2.Status.Phase)
 	}
 }
+
+func TestSetDefaultPodSpecHostNetwork(t *testing.T) {
+	portNum := 8080
+	s := current.PodSpec{}
+	s.HostNetwork = true
+	s.Containers = []current.Container{
+		{
+			Ports: []current.ContainerPort{
+				{
+					ContainerPort: portNum,
+				},
+			},
+		},
+	}
+	pod := &current.Pod{
+		Spec: s,
+	}
+	obj2 := roundTrip(t, runtime.Object(pod))
+	pod2 := obj2.(*current.Pod)
+	s2 := pod2.Spec
+
+	hostPortNum := s2.Containers[0].Ports[0].HostPort
+	if hostPortNum != portNum {
+		t.Errorf("Expected container port to be defaulted, was made %d instead of %d", hostPortNum, portNum)
+	}
+}
