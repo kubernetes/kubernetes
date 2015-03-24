@@ -30,6 +30,13 @@ grains:
   cloud: aws
 EOF
 
+
+if [[ -n "{DOCKER_OPTS}" ]]; then
+  cat <<EOF >>/etc/salt/minion.d/grains.conf
+  docker_opts: '$(echo "$DOCKER_OPTS" | sed -e "s/'/''/g")'
+EOF
+fi
+
 # Install Salt
 #
 # We specify -X to avoid a race condition that can cause minion failure to
