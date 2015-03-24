@@ -46,12 +46,19 @@ func (f *Factory) NewCmdCreate(out io.Writer) *cobra.Command {
 		Long:    create_long,
 		Example: create_example,
 		Run: func(cmd *cobra.Command, args []string) {
-			err := RunCreate(f, out, cmd, filenames)
-			cmdutil.CheckErr(err)
+			cmdutil.CheckErr(ValidateArgs(cmd, args))
+			cmdutil.CheckErr(RunCreate(f, out, cmd, filenames))
 		},
 	}
 	cmd.Flags().VarP(&filenames, "filename", "f", "Filename, directory, or URL to file to use to create the resource")
 	return cmd
+}
+
+func ValidateArgs(cmd *cobra.Command, args []string) error {
+	if len(args) != 0 {
+		return cmdutil.UsageError(cmd, "Unexpected args: %v", args)
+	}
+	return nil
 }
 
 func RunCreate(f *Factory, out io.Writer, cmd *cobra.Command, filenames util.StringList) error {
