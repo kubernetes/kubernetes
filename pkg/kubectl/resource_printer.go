@@ -440,7 +440,7 @@ func printNode(node *api.Node, w io.Writer) error {
 	var status []string
 	for _, validCondition := range NodeAllConditions {
 		if condition, ok := conditionMap[validCondition]; ok {
-			if condition.Status == api.ConditionTrue {
+			if condition.Status == api.ConditionFull {
 				status = append(status, string(condition.Type))
 			} else {
 				status = append(status, "Not"+string(condition.Type))

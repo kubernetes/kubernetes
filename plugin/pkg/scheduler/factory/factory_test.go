@@ -143,7 +143,7 @@ func TestPollMinions(t *testing.T) {
 					ObjectMeta: api.ObjectMeta{Name: "foo"},
 					Status: api.NodeStatus{
 						Conditions: []api.NodeCondition{
-							{Type: api.NodeReady, Status: api.ConditionTrue},
+							{Type: api.NodeReady, Status: api.ConditionFull},
 						},
 					},
 				},
@@ -151,7 +151,7 @@ func TestPollMinions(t *testing.T) {
 					ObjectMeta: api.ObjectMeta{Name: "bar"},
 					Status: api.NodeStatus{
 						Conditions: []api.NodeCondition{
-							{Type: api.NodeReachable, Status: api.ConditionTrue},
+							{Type: api.NodeReachable, Status: api.ConditionFull},
 						},
 					},
 				},
@@ -159,7 +159,7 @@ func TestPollMinions(t *testing.T) {
 					ObjectMeta: api.ObjectMeta{Name: "fiz"},
 					Status: api.NodeStatus{
 						Conditions: []api.NodeCondition{
-							{Type: api.NodeSchedulable, Status: api.ConditionTrue},
+							{Type: api.NodeSchedulable, Status: api.ConditionFull},
 						},
 					},
 				},
@@ -167,8 +167,8 @@ func TestPollMinions(t *testing.T) {
 					ObjectMeta: api.ObjectMeta{Name: "biz"},
 					Status: api.NodeStatus{
 						Conditions: []api.NodeCondition{
-							{Type: api.NodeReady, Status: api.ConditionTrue},
-							{Type: api.NodeReachable, Status: api.ConditionTrue},
+							{Type: api.NodeReady, Status: api.ConditionFull},
+							{Type: api.NodeReachable, Status: api.ConditionFull},
 						},
 					},
 				},
@@ -176,8 +176,8 @@ func TestPollMinions(t *testing.T) {
 					ObjectMeta: api.ObjectMeta{Name: "baz"},
 					Status: api.NodeStatus{
 						Conditions: []api.NodeCondition{
-							{Type: api.NodeReady, Status: api.ConditionTrue},
-							{Type: api.NodeReady, Status: api.ConditionTrue},
+							{Type: api.NodeReady, Status: api.ConditionFull},
+							{Type: api.NodeReady, Status: api.ConditionFull},
 						},
 					},
 				},
@@ -185,9 +185,9 @@ func TestPollMinions(t *testing.T) {
 					ObjectMeta: api.ObjectMeta{Name: "fuz"},
 					Status: api.NodeStatus{
 						Conditions: []api.NodeCondition{
-							{Type: api.NodeSchedulable, Status: api.ConditionTrue},
-							{Type: api.NodeReady, Status: api.ConditionTrue},
-							{Type: api.NodeReachable, Status: api.ConditionTrue},
+							{Type: api.NodeSchedulable, Status: api.ConditionFull},
+							{Type: api.NodeReady, Status: api.ConditionFull},
+							{Type: api.NodeReachable, Status: api.ConditionFull},
 						},
 					},
 				},
@@ -195,9 +195,9 @@ func TestPollMinions(t *testing.T) {
 					ObjectMeta: api.ObjectMeta{Name: "buz"},
 					Status: api.NodeStatus{
 						Conditions: []api.NodeCondition{
-							{Type: api.NodeSchedulable, Status: api.ConditionFalse},
-							{Type: api.NodeReady, Status: api.ConditionTrue},
-							{Type: api.NodeReachable, Status: api.ConditionTrue},
+							{Type: api.NodeSchedulable, Status: api.ConditionNone},
+							{Type: api.NodeReady, Status: api.ConditionFull},
+							{Type: api.NodeReachable, Status: api.ConditionFull},
 						},
 					},
 				},
@@ -205,9 +205,9 @@ func TestPollMinions(t *testing.T) {
 					ObjectMeta: api.ObjectMeta{Name: "foobar"},
 					Status: api.NodeStatus{
 						Conditions: []api.NodeCondition{
-							{Type: api.NodeSchedulable, Status: api.ConditionTrue},
-							{Type: api.NodeReady, Status: api.ConditionFalse},
-							{Type: api.NodeReachable, Status: api.ConditionTrue},
+							{Type: api.NodeSchedulable, Status: api.ConditionFull},
+							{Type: api.NodeReady, Status: api.ConditionNone},
+							{Type: api.NodeReachable, Status: api.ConditionFull},
 						},
 					},
 				},
@@ -215,8 +215,8 @@ func TestPollMinions(t *testing.T) {
 					ObjectMeta: api.ObjectMeta{Name: "fizbiz"},
 					Status: api.NodeStatus{
 						Conditions: []api.NodeCondition{
-							{Type: api.NodeSchedulable, Status: api.ConditionTrue},
-							{Type: api.NodeReachable, Status: api.ConditionFalse},
+							{Type: api.NodeSchedulable, Status: api.ConditionFull},
+							{Type: api.NodeReachable, Status: api.ConditionNone},
 						},
 					},
 				},
@@ -229,7 +229,7 @@ func TestPollMinions(t *testing.T) {
 					ObjectMeta: api.ObjectMeta{Name: "foo"},
 					Status: api.NodeStatus{
 						Conditions: []api.NodeCondition{
-							{Type: api.NodeReady, Status: api.ConditionTrue},
+							{Type: api.NodeReady, Status: api.ConditionFull},
 						},
 					},
 				},
@@ -237,7 +237,7 @@ func TestPollMinions(t *testing.T) {
 					ObjectMeta: api.ObjectMeta{Name: "bar"},
 					Status: api.NodeStatus{
 						Conditions: []api.NodeCondition{
-							{Type: api.NodeReady, Status: api.ConditionFalse},
+							{Type: api.NodeReady, Status: api.ConditionNone},
 						},
 					},
 				},
@@ -250,7 +250,7 @@ func TestPollMinions(t *testing.T) {
 					ObjectMeta: api.ObjectMeta{Name: "foo"},
 					Status: api.NodeStatus{
 						Conditions: []api.NodeCondition{
-							{Type: api.NodeSchedulable, Status: api.ConditionTrue},
+							{Type: api.NodeSchedulable, Status: api.ConditionFull},
 						},
 					},
 				},
@@ -258,7 +258,7 @@ func TestPollMinions(t *testing.T) {
 					ObjectMeta: api.ObjectMeta{Name: "bar"},
 					Status: api.NodeStatus{
 						Conditions: []api.NodeCondition{
-							{Type: api.NodeSchedulable, Status: api.ConditionFalse},
+							{Type: api.NodeSchedulable, Status: api.ConditionNone},
 						},
 					},
 				},
@@ -271,8 +271,8 @@ func TestPollMinions(t *testing.T) {
 					ObjectMeta: api.ObjectMeta{Name: "foo"},
 					Status: api.NodeStatus{
 						Conditions: []api.NodeCondition{
-							{Type: api.NodeReady, Status: api.ConditionTrue},
-							{Type: api.NodeReachable, Status: api.ConditionFalse}},
+							{Type: api.NodeReady, Status: api.ConditionFull},
+							{Type: api.NodeReachable, Status: api.ConditionNone}},
 					},
 				},
 			},
@@ -284,8 +284,8 @@ func TestPollMinions(t *testing.T) {
 					ObjectMeta: api.ObjectMeta{Name: "foo"},
 					Status: api.NodeStatus{
 						Conditions: []api.NodeCondition{
-							{Type: api.NodeReachable, Status: api.ConditionTrue},
-							{Type: "invalidValue", Status: api.ConditionFalse}},
+							{Type: api.NodeReachable, Status: api.ConditionFull},
+							{Type: "invalidValue", Status: api.ConditionNone}},
 					},
 				},
 			},
