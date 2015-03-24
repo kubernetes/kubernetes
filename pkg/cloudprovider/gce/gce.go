@@ -17,7 +17,6 @@ limitations under the License.
 package gce_cloud
 
 import (
-	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -37,6 +36,7 @@ import (
 	"code.google.com/p/gcfg"
 	compute "code.google.com/p/google-api-go-client/compute/v1"
 	container "code.google.com/p/google-api-go-client/container/v1beta1"
+	"code.google.com/p/google-api-go-client/googleapi"
 	"github.com/golang/glog"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
@@ -196,7 +196,7 @@ const (
 	GCEAffinityTypeClientIPProto GCEAffinityType = "CLIENT_IP_PROTO"
 )
 
-func (gce *GCECloud) makeTargetPool(name, region string, hosts []string, affinityType GCEAffinityType) (string, error) {
+func (gce *GCECloud) makeTargetPool(name, region string, hosts []string, affinityType GCEAffinityType) error {
 	var instances []string
 	for _, host := range hosts {
 		instances = append(instances, makeHostLink(gce.projectID, gce.zone, host))
@@ -208,13 +208,16 @@ func (gce *GCECloud) makeTargetPool(name, region string, hosts []string, affinit
 	}
 	op, err := gce.service.TargetPools.Insert(gce.projectID, region, pool).Do()
 	if err != nil {
-		return "", err
+		return err
 	}
 	if err = gce.waitForRegionOp(op, region); err != nil {
-		return "", err
+		return err
 	}
-	link := fmt.Sprintf("https://www.googleapis.com/compute/v1/projects/%s/regions/%s/targetPools/%s", gce.projectID, region, name)
-	return link, nil
+	return nil
+}
+
+func (gce *GCECloud) targetPoolURL(name, region string) string {
+	return fmt.Sprintf("https://www.googleapis.com/compute/v1/projects/%s/regions/%s/targetPools/%s", gce.projectID, region, name)
 }
 
 func (gce *GCECloud) waitForRegionOp(op *compute.Operation, region string) error {
@@ -228,7 +231,10 @@ func (gce *GCECloud) waitForRegionOp(op *compute.Operation, region string) error
 		}
 	}
 	if pollOp.Error != nil && len(pollOp.Error.Errors) > 0 {
-		return errors.New(pollOp.Error.Errors[0].Message)
+		return &googleapi.Error{
+			Code:    int(pollOp.HttpErrorStatusCode),
+			Message: pollOp.Error.Errors[0].Message,
+		}
 	}
 	return nil
 }
@@ -236,10 +242,21 @@ func (gce *GCECloud) waitForRegionOp(op *compute.Operation, region string) error
 // TCPLoadBalancerExists is an implementation of TCPLoadBalancer.TCPLoadBalancerExists.
 func (gce *GCECloud) TCPLoadBalancerExists(name, region string) (bool, error) {
 	_, err := gce.service.ForwardingRules.Get(gce.projectID, region, name).Do()
+	if err == nil {
+		return true, nil
+	}
+	if isHTTPErrorCode(err, http.StatusNotFound) {
+		return false, nil
+	}
 	return false, err
 }
 
-//translate from what K8s supports to what the cloud provider supports for session affinity.
+func isHTTPErrorCode(err error, code int) bool {
+	apiErr, ok := err.(*googleapi.Error)
+	return ok && apiErr.Code == code
+}
+
+// translate from what K8s supports to what the cloud provider supports for session affinity.
 func translateAffinityType(affinityType api.AffinityType) GCEAffinityType {
 	switch affinityType {
 	case api.AffinityTypeClientIP:
@@ -253,10 +270,15 @@ func translateAffinityType(affinityType api.AffinityType) GCEAffinityType {
 }
 
 // CreateTCPLoadBalancer is an implementation of TCPLoadBalancer.CreateTCPLoadBalancer.
+// TODO(a-robinson): Don't just ignore specified IP addresses. Check if they're
+// owned by the project and available to be used, and use them if they are.
 func (gce *GCECloud) CreateTCPLoadBalancer(name, region string, externalIP net.IP, ports []int, hosts []string, affinityType api.AffinityType) (string, error) {
-	pool, err := gce.makeTargetPool(name, region, hosts, translateAffinityType(affinityType))
+	err := gce.makeTargetPool(name, region, hosts, translateAffinityType(affinityType))
 	if err != nil {
-		return "", err
+		if !isHTTPErrorCode(err, http.StatusConflict) {
+			return "", err
+		}
+		glog.Infof("Creating forwarding rule pointing at target pool that already exists: %v", err)
 	}
 
 	if len(ports) == 0 {
@@ -276,18 +298,17 @@ func (gce *GCECloud) CreateTCPLoadBalancer(name, region string, externalIP net.I
 		Name:       name,
 		IPProtocol: "TCP",
 		PortRange:  fmt.Sprintf("%d-%d", minPort, maxPort),
-		Target:     pool,
-	}
-	if len(externalIP) > 0 {
-		req.IPAddress = externalIP.String()
+		Target:     gce.targetPoolURL(name, region),
 	}
 	op, err := gce.service.ForwardingRules.Insert(gce.projectID, region, req).Do()
-	if err != nil {
+	if err != nil && !isHTTPErrorCode(err, http.StatusConflict) {
 		return "", err
 	}
-	err = gce.waitForRegionOp(op, region)
-	if err != nil {
-		return "", err
+	if op != nil {
+		err = gce.waitForRegionOp(op, region)
+		if err != nil && !isHTTPErrorCode(err, http.StatusConflict) {
+			return "", err
+		}
 	}
 	fwd, err := gce.service.ForwardingRules.Get(gce.projectID, region, name).Do()
 	if err != nil {
@@ -343,23 +364,28 @@ func (gce *GCECloud) UpdateTCPLoadBalancer(name, region string, hosts []string) 
 // DeleteTCPLoadBalancer is an implementation of TCPLoadBalancer.DeleteTCPLoadBalancer.
 func (gce *GCECloud) DeleteTCPLoadBalancer(name, region string) error {
 	op, err := gce.service.ForwardingRules.Delete(gce.projectID, region, name).Do()
-	if err != nil {
-		glog.Warningln("Failed to delete Forwarding Rules %s: got error %s. Trying to delete Target Pool", name, err.Error())
+	if err != nil && isHTTPErrorCode(err, http.StatusNotFound) {
+		glog.Infof("Forwarding rule %s already deleted. Continuing to delete target pool.", name)
+	} else if err != nil {
+		glog.Warningf("Failed to delete Forwarding Rules %s: got error %s.", name, err.Error())
 		return err
 	} else {
 		err = gce.waitForRegionOp(op, region)
 		if err != nil {
-			glog.Warningln("Failed waiting for Forwarding Rule %s to be deleted: got error %s. Trying to delete Target Pool", name, err.Error())
+			glog.Warningf("Failed waiting for Forwarding Rule %s to be deleted: got error %s.", name, err.Error())
 		}
 	}
 	op, err = gce.service.TargetPools.Delete(gce.projectID, region, name).Do()
-	if err != nil {
-		glog.Warningln("Failed to delete Target Pool %s, got error %s.", name, err.Error())
+	if err != nil && isHTTPErrorCode(err, http.StatusNotFound) {
+		glog.Infof("Target pool %s already deleted.", name)
+		return nil
+	} else if err != nil {
+		glog.Warningf("Failed to delete Target Pool %s, got error %s.", name, err.Error())
 		return err
 	}
 	err = gce.waitForRegionOp(op, region)
 	if err != nil {
-		glog.Warningln("Failed waiting for Target Pool %s to be deleted: got error %s.", name, err.Error())
+		glog.Warningf("Failed waiting for Target Pool %s to be deleted: got error %s.", name, err.Error())
 	}
 	return err
 }

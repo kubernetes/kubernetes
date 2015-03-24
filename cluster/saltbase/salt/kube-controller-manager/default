@@ -6,11 +6,15 @@
 {% set master="--master=127.0.0.1:8080" -%}
 
 {% set machines = ""-%}
+{% set cluster_name = "" -%}
 {% set minion_regexp = "--minion_regexp=.*" -%}
 {% set sync_nodes = "--sync_nodes=true" -%}
 
 {% if pillar['node_instance_prefix'] is defined -%}
   {% set minion_regexp = "--minion_regexp='" + pillar['node_instance_prefix'] + ".*'" -%}
+{% endif -%}
+{% if pillar['instance_prefix'] is defined -%}
+  {% set cluster_name = "--cluster_name=" + pillar['instance_prefix'] -%}
 {% endif -%}
 
 {% set cloud_provider = "" -%}
@@ -49,4 +53,4 @@
 
 {% endif -%} # grains.cloud is defined
 
-DAEMON_ARGS="{{daemon_args}} {{master}} {{machines}} {{ minion_regexp }} {{ cloud_provider }} {{ sync_nodes }} {{ cloud_config }} {{pillar['log_level']}}"
+DAEMON_ARGS="{{daemon_args}} {{master}} {{machines}} {{cluster_name}} {{ minion_regexp }} {{ cloud_provider }} {{ sync_nodes }} {{ cloud_config }} {{pillar['log_level']}}"

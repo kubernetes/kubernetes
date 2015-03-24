@@ -35,6 +35,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/nodecontroller"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/servicecontroller"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/controller"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/cadvisor"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/dockertools"
@@ -131,6 +132,11 @@ func runControllerManager(machineList []string, cl *client.Client, nodeMilliCPU,
 	nodeController := nodecontroller.NewNodeController(
 		nil, "", machineList, nodeResources, cl, 10, 5*time.Minute, util.NewTokenBucketRateLimiter(*deletingPodsQps, *deletingPodsBurst), 40*time.Second, 60*time.Second, 5*time.Second, "")
 	nodeController.Run(10*time.Second, true)
+
+	serviceController := servicecontroller.New(nil, cl, "kubernetes")
+	if err := serviceController.Run(); err != nil {
+		glog.Warningf("Running without a service controller: %v", err)
+	}
 
 	endpoints := service.NewEndpointController(cl)
 	go util.Forever(func() { endpoints.SyncServiceEndpoints() }, time.Second*10)

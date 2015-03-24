@@ -19,7 +19,6 @@ package service
 import (
 	"bytes"
 	"encoding/gob"
-	"fmt"
 	"net"
 	"strings"
 	"testing"
@@ -257,10 +256,11 @@ func TestServiceRegistryExternalService(t *testing.T) {
 			}},
 		},
 	}
-	if _, err := storage.Create(ctx, svc); err != nil {
-		t.Fatalf("Unexpected error: %v", err)
+	_, err := storage.Create(ctx, svc)
+	if err != nil {
+		t.Errorf("Failed to create service: %#v", err)
 	}
-	if len(fakeCloud.Calls) != 2 || fakeCloud.Calls[0] != "get-zone" || fakeCloud.Calls[1] != "create" {
+	if len(fakeCloud.Calls) != 0 {
 		t.Errorf("Unexpected call(s): %#v", fakeCloud.Calls)
 	}
 	srv, err := registry.GetService(ctx, svc.Name)
@@ -270,35 +270,8 @@ func TestServiceRegistryExternalService(t *testing.T) {
 	if srv == nil {
 		t.Errorf("Failed to find service: %s", svc.Name)
 	}
-	if len(fakeCloud.Balancers) != 1 || fakeCloud.Balancers[0].Name != "kubernetes-default-foo" || fakeCloud.Balancers[0].Ports[0] != 6502 {
+	if len(fakeCloud.Balancers) != 0 {
 		t.Errorf("Unexpected balancer created: %v", fakeCloud.Balancers)
-	}
-}
-
-func TestServiceRegistryExternalServiceError(t *testing.T) {
-	storage, registry, fakeCloud := NewTestREST(t, nil)
-	fakeCloud.Err = fmt.Errorf("test error")
-	svc := &api.Service{
-		ObjectMeta: api.ObjectMeta{Name: "foo"},
-		Spec: api.ServiceSpec{
-			Selector:                   map[string]string{"bar": "baz"},
-			CreateExternalLoadBalancer: true,
-			SessionAffinity:            api.AffinityTypeNone,
-			Ports: []api.ServicePort{{
-				Port:     6502,
-				Protocol: api.ProtocolTCP,
-			}},
-		},
-	}
-	ctx := api.NewDefaultContext()
-	if _, err := storage.Create(ctx, svc); err == nil {
-		t.Fatalf("Unexpected success")
-	}
-	if len(fakeCloud.Calls) != 1 || fakeCloud.Calls[0] != "get-zone" {
-		t.Errorf("Unexpected call(s): %#v", fakeCloud.Calls)
-	}
-	if registry.Service != nil {
-		t.Errorf("Expected registry.CreateService to not get called, but it got %#v", registry.Service)
 	}
 }
 
@@ -343,7 +316,7 @@ func TestServiceRegistryDeleteExternal(t *testing.T) {
 	}
 	registry.CreateService(ctx, svc)
 	storage.Delete(ctx, svc.Name)
-	if len(fakeCloud.Calls) != 2 || fakeCloud.Calls[0] != "get-zone" || fakeCloud.Calls[1] != "delete" {
+	if len(fakeCloud.Calls) != 0 {
 		t.Errorf("Unexpected call(s): %#v", fakeCloud.Calls)
 	}
 	if e, a := "foo", registry.DeletedID; e != a {
@@ -381,7 +354,7 @@ func TestServiceRegistryUpdateExternalService(t *testing.T) {
 	if _, _, err := storage.Update(ctx, svc2); err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
-	if len(fakeCloud.Calls) != 2 || fakeCloud.Calls[0] != "get-zone" || fakeCloud.Calls[1] != "create" {
+	if len(fakeCloud.Calls) != 0 {
 		t.Errorf("Unexpected call(s): %#v", fakeCloud.Calls)
 	}
 
@@ -391,9 +364,7 @@ func TestServiceRegistryUpdateExternalService(t *testing.T) {
 	if _, _, err := storage.Update(ctx, svc3); err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
-	if len(fakeCloud.Calls) != 6 || fakeCloud.Calls[0] != "get-zone" || fakeCloud.Calls[1] != "create" ||
-		fakeCloud.Calls[2] != "get-zone" || fakeCloud.Calls[3] != "delete" ||
-		fakeCloud.Calls[4] != "get-zone" || fakeCloud.Calls[5] != "create" {
+	if len(fakeCloud.Calls) != 0 {
 		t.Errorf("Unexpected call(s): %#v", fakeCloud.Calls)
 	}
 }
@@ -423,7 +394,7 @@ func TestServiceRegistryUpdateMultiPortExternalService(t *testing.T) {
 	if _, err := storage.Create(ctx, svc1); err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
-	if len(fakeCloud.Calls) != 2 || fakeCloud.Calls[0] != "get-zone" || fakeCloud.Calls[1] != "create" {
+	if len(fakeCloud.Calls) != 0 {
 		t.Errorf("Unexpected call(s): %#v", fakeCloud.Calls)
 	}
 
@@ -433,9 +404,7 @@ func TestServiceRegistryUpdateMultiPortExternalService(t *testing.T) {
 	if _, _, err := storage.Update(ctx, svc2); err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
-	if len(fakeCloud.Calls) != 6 || fakeCloud.Calls[0] != "get-zone" || fakeCloud.Calls[1] != "create" ||
-		fakeCloud.Calls[2] != "get-zone" || fakeCloud.Calls[3] != "delete" ||
-		fakeCloud.Calls[4] != "get-zone" || fakeCloud.Calls[5] != "create" {
+	if len(fakeCloud.Calls) != 0 {
 		t.Errorf("Unexpected call(s): %#v", fakeCloud.Calls)
 	}
 }
@@ -744,7 +713,7 @@ func TestServiceRegistryIPExternalLoadBalancer(t *testing.T) {
 	if err != nil {
 		t.Errorf("Unexpected error %v", err)
 	}
-	if len(fakeCloud.Balancers) != 1 || fakeCloud.Balancers[0].Name != "kubernetes-default-foo" || fakeCloud.Balancers[0].Ports[0] != 6502 {
+	if len(fakeCloud.Balancers) != 0 {
 		t.Errorf("Unexpected balancer created: %v", fakeCloud.Balancers)
 	}
 }

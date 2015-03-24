@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2015 Google Inc. All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,6 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package service provides the Registry interface and its RESTStorage
-// implementation for storing Service api objects.
-package service
+// Package servicecontroller contains code for syncing cloud load balancers
+// with the service registry.
+package servicecontroller

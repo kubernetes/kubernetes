@@ -286,6 +286,15 @@ var _ = Describe("Services", func() {
 			Expect(err).NotTo(HaveOccurred())
 		}(ns, serviceName)
 
+		// Wait for the load balancer to be created asynchronously, which is
+		// (unfortunately) currently indicated by a public IP address being
+		// added to the spec.
+		for t := time.Now(); time.Since(t) < 4*time.Minute; time.Sleep(5 * time.Second) {
+			result, _ = c.Services(ns).Get(serviceName)
+			if len(result.Spec.PublicIPs) == 1 {
+				break
+			}
+		}
 		if len(result.Spec.PublicIPs) != 1 {
 			Failf("got unexpected number (%d) of public IPs for externally load balanced service: %v", result.Spec.PublicIPs, result)
 		}
@@ -325,7 +334,7 @@ var _ = Describe("Services", func() {
 
 		By("hitting the pod through the service's external load balancer")
 		var resp *http.Response
-		for t := time.Now(); time.Since(t) < 4*time.Minute; time.Sleep(5 * time.Second) {
+		for t := time.Now(); time.Since(t) < time.Minute; time.Sleep(5 * time.Second) {
 			resp, err = http.Get(fmt.Sprintf("http://%s:%d", ip, port))
 			if err == nil {
 				break

@@ -42,7 +42,8 @@ import (
 
 // REST adapts a service registry into apiserver's RESTStorage model.
 type REST struct {
-	registry    Registry
+	registry Registry
+	// TODO(a-robinson): Remove cloud
 	cloud       cloudprovider.Interface
 	machines    minion.Registry
 	endpoints   endpoint.Registry
@@ -97,6 +98,14 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (runtime.Object, err
 		return nil, err
 	}
 
+	// Make sure that we'll be able to create a load balancer for the service,
+	// even though it'll be created by the ServiceController.
+	if service.Spec.CreateExternalLoadBalancer {
+		if _, err := getTCPPorts(service); err != nil {
+			return nil, err
+		}
+	}
+
 	releaseServiceIP := false
 	defer func() {
 		if releaseServiceIP {
@@ -123,15 +132,6 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (runtime.Object, err
 		releaseServiceIP = true
 	}
 
-	// TODO: Move this to post-creation rectification loop, so that we make/remove external load balancers
-	// correctly no matter what http operations happen.
-	if service.Spec.CreateExternalLoadBalancer {
-		err := rs.createExternalLoadBalancer(ctx, service)
-		if err != nil {
-			return nil, err
-		}
-	}
-
 	out, err := rs.registry.CreateService(ctx, service)
 	if err != nil {
 		err = rest.CheckGeneratedNameError(rest.Services, err, service)
@@ -144,14 +144,6 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (runtime.Object, err
 	return out, err
 }
 
-func hostsFromMinionList(list *api.NodeList) []string {
-	result := make([]string, len(list.Items))
-	for ix := range list.Items {
-		result[ix] = list.Items[ix].Name
-	}
-	return result
-}
-
 func (rs *REST) Delete(ctx api.Context, id string) (runtime.Object, error) {
 	service, err := rs.registry.GetService(ctx, id)
 	if err != nil {
@@ -159,9 +151,6 @@ func (rs *REST) Delete(ctx api.Context, id string) (runtime.Object, error) {
 	}
 	if api.IsServiceIPSet(service) {
 		rs.portalMgr.Release(net.ParseIP(service.Spec.PortalIP))
-	}
-	if service.Spec.CreateExternalLoadBalancer {
-		rs.deleteExternalLoadBalancer(ctx, service)
 	}
 	return &api.Status{Status: api.StatusSuccess}, rs.registry.DeleteService(ctx, id)
 }
@@ -219,22 +208,6 @@ func (rs *REST) Update(ctx api.Context, obj runtime.Object) (runtime.Object, boo
 	if errs := validation.ValidateServiceUpdate(oldService, service); len(errs) > 0 {
 		return nil, false, errors.NewInvalid("service", service.Name, errs)
 	}
-	// Recreate external load balancer if changed.
-	if externalLoadBalancerNeedsUpdate(oldService, service) {
-		// TODO: support updating existing balancers
-		if oldService.Spec.CreateExternalLoadBalancer {
-			err = rs.deleteExternalLoadBalancer(ctx, oldService)
-			if err != nil {
-				return nil, false, err
-			}
-		}
-		if service.Spec.CreateExternalLoadBalancer {
-			err = rs.createExternalLoadBalancer(ctx, service)
-			if err != nil {
-				return nil, false, err
-			}
-		}
-	}
 	out, err := rs.registry.UpdateService(ctx, service)
 	return out, false, err
 }
@@ -283,52 +256,7 @@ func (rs *REST) ResourceLocation(ctx api.Context, id string) (*url.URL, http.Rou
 	return nil, nil, fmt.Errorf("no endpoints available for %q", id)
 }
 
-func (rs *REST) createExternalLoadBalancer(ctx api.Context, service *api.Service) error {
-	if rs.cloud == nil {
-		return fmt.Errorf("requested an external service, but no cloud provider supplied.")
-	}
-
-	ports, err := getTCPPorts(service)
-	if err != nil {
-		return err
-	}
-
-	balancer, ok := rs.cloud.TCPLoadBalancer()
-	if !ok {
-		return fmt.Errorf("the cloud provider does not support external TCP load balancers.")
-	}
-	zones, ok := rs.cloud.Zones()
-	if !ok {
-		return fmt.Errorf("the cloud provider does not support zone enumeration.")
-	}
-	hosts, err := rs.machines.ListMinions(ctx, labels.Everything(), fields.Everything())
-	if err != nil {
-		return err
-	}
-	zone, err := zones.GetZone()
-	if err != nil {
-		return err
-	}
-	name := cloudprovider.GetLoadBalancerName(rs.clusterName, api.NamespaceValue(ctx), service.Name)
-	var affinityType api.AffinityType = service.Spec.SessionAffinity
-	if len(service.Spec.PublicIPs) > 0 {
-		for _, publicIP := range service.Spec.PublicIPs {
-			_, err = balancer.CreateTCPLoadBalancer(name, zone.Region, net.ParseIP(publicIP), ports, hostsFromMinionList(hosts), affinityType)
-			if err != nil {
-				// TODO: have to roll-back any successful calls.
-				return err
-			}
-		}
-	} else {
-		endpoint, err := balancer.CreateTCPLoadBalancer(name, zone.Region, nil, ports, hostsFromMinionList(hosts), affinityType)
-		if err != nil {
-			return err
-		}
-		service.Spec.PublicIPs = []string{endpoint}
-	}
-	return nil
-}
-
+// TODO: Deduplicate with the copy of this in pkg/registry/service/rest.go
 func getTCPPorts(service *api.Service) ([]int, error) {
 	ports := []int{}
 	for i := range service.Spec.Ports {
@@ -340,72 +268,4 @@ func getTCPPorts(service *api.Service) ([]int, error) {
 		ports = append(ports, sp.Port)
 	}
 	return ports, nil
-}
-
-func portsEqual(x, y *api.Service) bool {
-	xPorts, err := getTCPPorts(x)
-	if err != nil {
-		return false
-	}
-	yPorts, err := getTCPPorts(y)
-	if err != nil {
-		return false
-	}
-	if len(xPorts) != len(yPorts) {
-		return false
-	}
-	for i := range xPorts {
-		if xPorts[i] != yPorts[i] {
-			return false
-		}
-	}
-	return true
-}
-
-func (rs *REST) deleteExternalLoadBalancer(ctx api.Context, service *api.Service) error {
-	if rs.cloud == nil {
-		return fmt.Errorf("requested an external service, but no cloud provider supplied.")
-	}
-	zones, ok := rs.cloud.Zones()
-	if !ok {
-		// We failed to get zone enumerator.
-		// As this should have failed when we tried in "create" too,
-		// assume external load balancer was never created.
-		return nil
-	}
-	balancer, ok := rs.cloud.TCPLoadBalancer()
-	if !ok {
-		// See comment above.
-		return nil
-	}
-	zone, err := zones.GetZone()
-	if err != nil {
-		return err
-	}
-	name := cloudprovider.GetLoadBalancerName(rs.clusterName, api.NamespaceValue(ctx), service.Name)
-	if err := balancer.DeleteTCPLoadBalancer(name, zone.Region); err != nil {
-		return err
-	}
-	return nil
-}
-
-func externalLoadBalancerNeedsUpdate(oldService, newService *api.Service) bool {
-	if !oldService.Spec.CreateExternalLoadBalancer && !newService.Spec.CreateExternalLoadBalancer {
-		return false
-	}
-	if oldService.Spec.CreateExternalLoadBalancer != newService.Spec.CreateExternalLoadBalancer {
-		return true
-	}
-	if !portsEqual(oldService, newService) || oldService.Spec.SessionAffinity != newService.Spec.SessionAffinity {
-		return true
-	}
-	if len(oldService.Spec.PublicIPs) != len(newService.Spec.PublicIPs) {
-		return true
-	}
-	for i := range oldService.Spec.PublicIPs {
-		if oldService.Spec.PublicIPs[i] != newService.Spec.PublicIPs[i] {
-			return true
-		}
-	}
-	return false
 }
