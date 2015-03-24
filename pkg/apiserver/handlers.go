@@ -252,11 +252,11 @@ type APIRequestInfoResolver struct {
 //
 // Special verbs:
 // /proxy/{resource}/{resourceName}
-// /proxy/ns/{namespace}/{resource}/{resourceName}
-// /redirect/ns/{namespace}/{resource}/{resourceName}
+// /proxy/namespaces/{namespace}/{resource}/{resourceName}
+// /redirect/namespaces/{namespace}/{resource}/{resourceName}
 // /redirect/{resource}/{resourceName}
 // /watch/{resource}
-// /watch/ns/{namespace}/{resource}
+// /watch/namespaces/{namespace}/{resource}
 //
 // Fully qualified paths for above:
 // /api/{version}/*
