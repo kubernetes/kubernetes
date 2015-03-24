@@ -1170,7 +1170,8 @@ type DeleteOptions struct {
 	GracePeriodSeconds *int64 `json:"gracePeriodSeconds"`
 }
 
-// ListOptions is the query options to a standard REST list call
+// ListOptions is the query options to a standard REST list call, and has future support for
+// watch calls.
 type ListOptions struct {
 	TypeMeta `json:",inline"`
 
@@ -1178,6 +1179,10 @@ type ListOptions struct {
 	LabelSelector labels.Selector
 	// A selector based on fields
 	FieldSelector fields.Selector
+	// If true, watch for changes to this list
+	Watch bool
+	// The resource version to watch (no effect on list yet)
+	ResourceVersion string
 }
 
 // Status is a return value for calls that don't return other objects.

@@ -19,6 +19,7 @@ package apiserver
 import (
 	"fmt"
 	"net/http"
+	"net/url"
 	gpath "path"
 	"time"
 
@@ -98,7 +99,7 @@ func GetResource(r rest.Getter, scope RequestScope) restful.RouteFunction {
 }
 
 // ListResource returns a function that handles retrieving a list of resources from a rest.Storage object.
-func ListResource(r rest.Lister, scope RequestScope) restful.RouteFunction {
+func ListResource(r rest.Lister, rw rest.Watcher, scope RequestScope, forceWatch bool) restful.RouteFunction {
 	return func(req *restful.Request, res *restful.Response) {
 		w := res.ResponseWriter
 
@@ -110,22 +111,8 @@ func ListResource(r rest.Lister, scope RequestScope) restful.RouteFunction {
 		ctx := scope.ContextFunc(req)
 		ctx = api.WithNamespace(ctx, namespace)
 
-		// TODO: extract me into a method
-		query := req.Request.URL.Query()
-		versioned, err := scope.Creater.New(scope.ServerAPIVersion, "ListOptions")
+		out, err := queryToObject(req.Request.URL.Query(), scope, "ListOptions")
 		if err != nil {
-			// programmer error
-			errorJSON(err, scope.Codec, w)
-			return
-		}
-		if err := scope.Convertor.Convert(&query, versioned); err != nil {
-			// bad request
-			errorJSON(err, scope.Codec, w)
-			return
-		}
-		out, err := scope.Convertor.ConvertToVersion(versioned, "")
-		if err != nil {
-			// programmer error
 			errorJSON(err, scope.Codec, w)
 			return
 		}
@@ -136,8 +123,19 @@ func ListResource(r rest.Lister, scope RequestScope) restful.RouteFunction {
 			return scope.Convertor.ConvertFieldLabel(scope.APIVersion, scope.Kind, label, value)
 		}
 		if opts.FieldSelector, err = opts.FieldSelector.Transform(fn); err != nil {
-			// invalid field
+			// TODO: allow bad request to set field causes based on query parameters
+			err = errors.NewBadRequest(err.Error())
 			errorJSON(err, scope.Codec, w)
+			return
+		}
+
+		if (opts.Watch || forceWatch) && rw != nil {
+			watcher, err := rw.Watch(ctx, opts.LabelSelector, opts.FieldSelector, opts.ResourceVersion)
+			if err != nil {
+				errorJSON(err, scope.Codec, w)
+				return
+			}
+			serveWatch(watcher, scope, w, req)
 			return
 		}
 
@@ -417,6 +415,27 @@ func DeleteResource(r rest.GracefulDeleter, checkBody bool, scope RequestScope, 
 		}
 		write(http.StatusOK, scope.APIVersion, scope.Codec, result, w, req.Request)
 	}
+}
+
+// queryToObject converts query parameters into a structured internal object by
+// kind. The caller must cast the returned object to the matching internal Kind
+// to use it.
+// TODO: add appropriate structured error responses
+func queryToObject(query url.Values, scope RequestScope, kind string) (runtime.Object, error) {
+	versioned, err := scope.Creater.New(scope.ServerAPIVersion, kind)
+	if err != nil {
+		// programmer error
+		return nil, err
+	}
+	if err := scope.Convertor.Convert(&query, versioned); err != nil {
+		return nil, errors.NewBadRequest(err.Error())
+	}
+	out, err := scope.Convertor.ConvertToVersion(versioned, "")
+	if err != nil {
+		// programmer error
+		return nil, err
+	}
+	return out, nil
 }
 
 // resultFunc is a function that returns a rest result and can be run in a goroutine

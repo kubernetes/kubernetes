@@ -1166,6 +1166,10 @@ type ListOptions struct {
 	LabelSelector string `json:"labelSelector" description:"a selector to restrict the list of returned objects by their labels; defaults to everything"`
 	// A selector based on fields
 	FieldSelector string `json:"fieldSelector" description:"a selector to restrict the list of returned objects by their fields; defaults to everything"`
+	// If true, watch for changes to the selected resources
+	Watch bool `json:"watch" description:"watch for changes to the described resources and return them as a stream of add, update, and remove notifications; specify resourceVersion"`
+	// The desired resource version to watch
+	ResourceVersion string `json:"resourceVersion" description:"when specified with a watch call, shows changes that occur after that particular version of a resource; defaults to changes from the beginning of history"`
 }
 
 // Status is a return value for calls that don't return other objects.

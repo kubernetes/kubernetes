@@ -31,6 +31,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/rest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/conversion"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	watchjson "github.com/GoogleCloudPlatform/kubernetes/pkg/watch/json"
 
 	"github.com/emicklei/go-restful"
 )
@@ -59,15 +60,6 @@ func (a *APIInstaller) Install() (ws *restful.WebService, errors []error) {
 	// Create the WebService.
 	ws = a.newWebService()
 
-	// Initialize the custom handlers.
-	watchHandler := (&WatchHandler{
-		storage:   a.group.Storage,
-		mapper:    a.group.Mapper,
-		convertor: a.group.Convertor,
-		codec:     a.group.Codec,
-		linker:    a.group.Linker,
-		info:      a.info,
-	})
 	redirectHandler := (&RedirectHandler{a.group.Storage, a.group.Codec, a.group.Context, a.info})
 	proxyHandler := (&ProxyHandler{a.prefix + "/proxy/", a.group.Storage, a.group.Codec, a.group.Context, a.info})
 
@@ -80,7 +72,7 @@ func (a *APIInstaller) Install() (ws *restful.WebService, errors []error) {
 	}
 	sort.Strings(paths)
 	for _, path := range paths {
-		if err := a.registerResourceHandlers(path, a.group.Storage[path], ws, watchHandler, redirectHandler, proxyHandler); err != nil {
+		if err := a.registerResourceHandlers(path, a.group.Storage[path], ws, redirectHandler, proxyHandler); err != nil {
 			errors = append(errors, err)
 		}
 	}
@@ -98,7 +90,7 @@ func (a *APIInstaller) newWebService() *restful.WebService {
 	return ws
 }
 
-func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storage, ws *restful.WebService, watchHandler, redirectHandler, proxyHandler http.Handler) error {
+func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storage, ws *restful.WebService, redirectHandler, proxyHandler http.Handler) error {
 	admit := a.group.Admit
 	context := a.group.Context
 
@@ -129,17 +121,6 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	}
 	versionedObject := indirectArbitraryPointer(versionedPtr)
 
-	var versionedList interface{}
-	if lister, ok := storage.(rest.Lister); ok {
-		list := lister.NewList()
-		_, listKind, err := a.group.Typer.ObjectVersionAndKind(list)
-		versionedListPtr, err := a.group.Creater.New(a.group.Version, listKind)
-		if err != nil {
-			return err
-		}
-		versionedList = indirectArbitraryPointer(versionedListPtr)
-	}
-
 	mapping, err := a.group.Mapper.RESTMapping(kind, a.group.Version)
 	if err != nil {
 		return err
@@ -153,11 +134,22 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	gracefulDeleter, isGracefulDeleter := storage.(rest.GracefulDeleter)
 	updater, isUpdater := storage.(rest.Updater)
 	patcher, isPatcher := storage.(rest.Patcher)
-	_, isWatcher := storage.(rest.Watcher)
+	watcher, isWatcher := storage.(rest.Watcher)
 	_, isRedirector := storage.(rest.Redirector)
 	storageMeta, isMetadata := storage.(rest.StorageMetadata)
 	if !isMetadata {
 		storageMeta = defaultStorageMetadata{}
+	}
+
+	var versionedList interface{}
+	if isLister {
+		list := lister.NewList()
+		_, listKind, err := a.group.Typer.ObjectVersionAndKind(list)
+		versionedListPtr, err := a.group.Creater.New(a.group.Version, listKind)
+		if err != nil {
+			return err
+		}
+		versionedList = indirectArbitraryPointer(versionedListPtr)
 	}
 
 	versionedListOptions, err := a.group.Creater.New(serverVersion, "ListOptions")
@@ -324,7 +316,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			addParams(route, action.Params)
 			ws.Route(route)
 		case "LIST": // List all resources of a kind.
-			route := ws.GET(action.Path).To(ListResource(lister, reqScope)).
+			route := ws.GET(action.Path).To(ListResource(lister, watcher, reqScope, false)).
 				Filter(m).
 				Doc("list objects of kind " + kind).
 				Operation("list" + kind).
@@ -375,22 +367,30 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			}
 			addParams(route, action.Params)
 			ws.Route(route)
+		// TODO: deprecated
 		case "WATCH": // Watch a resource.
-			route := ws.GET(action.Path).To(routeFunction(watchHandler)).
+			route := ws.GET(action.Path).To(ListResource(lister, watcher, reqScope, true)).
 				Filter(m).
-				Doc("watch a particular " + kind).
+				Doc("watch changes to an object of kind " + kind).
 				Operation("watch" + kind).
 				Produces("application/json").
-				Writes(versionedObject)
+				Writes(watchjson.NewWatchEvent())
+			if err := addObjectParams(ws, route, versionedListOptions); err != nil {
+				return err
+			}
 			addParams(route, action.Params)
 			ws.Route(route)
+		// TODO: deprecated
 		case "WATCHLIST": // Watch all resources of a kind.
-			route := ws.GET(action.Path).To(routeFunction(watchHandler)).
+			route := ws.GET(action.Path).To(ListResource(lister, watcher, reqScope, true)).
 				Filter(m).
-				Doc("watch a list of " + kind).
+				Doc("watch individual changes to a list of " + kind).
 				Operation("watch" + kind + "list").
 				Produces("application/json").
-				Writes(versionedList)
+				Writes(watchjson.NewWatchEvent())
+			if err := addObjectParams(ws, route, versionedListOptions); err != nil {
+				return err
+			}
 			addParams(route, action.Params)
 			ws.Route(route)
 		case "REDIRECT": // Get the redirect URL for a resource.

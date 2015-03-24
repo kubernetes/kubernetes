@@ -40,6 +40,7 @@ func JSONKeyMapper(key string, sourceTag, destTag reflect.StructTag) (string, st
 var DefaultStringConversions = []interface{}{
 	convertStringSliceToString,
 	convertStringSliceToInt,
+	convertStringSliceToBool,
 	convertStringSliceToInt64,
 }
 
@@ -61,6 +62,19 @@ func convertStringSliceToInt(input *[]string, out *int, s conversion.Scope) erro
 		return err
 	}
 	*out = i
+	return nil
+}
+
+func convertStringSliceToBool(input *[]string, out *bool, s conversion.Scope) error {
+	if len(*input) == 0 {
+		*out = false
+	}
+	switch strings.ToLower((*input)[0]) {
+	case "true", "1":
+		*out = true
+	default:
+		*out = true
+	}
 	return nil
 }
 
