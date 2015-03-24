@@ -122,7 +122,7 @@ func (h *delegateHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	w.WriteHeader(http.StatusNotFound)
 }
 
-func startComponents(manifestURL, apiVersion string) (string, string) {
+func startComponents(firstManifestURL, secondManifestURL, apiVersion string) (string, string) {
 	// Setup
 	servers := []string{}
 	glog.Infof("Creating etcd client pointing to %v", servers)
@@ -223,7 +223,7 @@ func startComponents(manifestURL, apiVersion string) (string, string) {
 	testRootDir := makeTempDirOrDie("kubelet_integ_1.", "")
 	configFilePath := makeTempDirOrDie("config", testRootDir)
 	glog.Infof("Using %s as root dir for kubelet #1", testRootDir)
-	kcfg := kubeletapp.SimpleKubelet(cl, &fakeDocker1, machineList[0], testRootDir, manifestURL, "127.0.0.1", 10250, api.NamespaceDefault, empty_dir.ProbeVolumePlugins(), nil, cadvisorInterface, configFilePath)
+	kcfg := kubeletapp.SimpleKubelet(cl, &fakeDocker1, machineList[0], testRootDir, firstManifestURL, "127.0.0.1", 10250, api.NamespaceDefault, empty_dir.ProbeVolumePlugins(), nil, cadvisorInterface, configFilePath)
 	kcfg.PodStatusUpdateFrequency = 1 * time.Second
 	kubeletapp.RunKubelet(kcfg)
 	// Kubelet (machine)
@@ -231,7 +231,7 @@ func startComponents(manifestURL, apiVersion string) (string, string) {
 	// have a place they can schedule.
 	testRootDir = makeTempDirOrDie("kubelet_integ_2.", "")
 	glog.Infof("Using %s as root dir for kubelet #2", testRootDir)
-	kcfg = kubeletapp.SimpleKubelet(cl, &fakeDocker2, machineList[1], testRootDir, "", "127.0.0.1", 10251, api.NamespaceDefault, empty_dir.ProbeVolumePlugins(), nil, cadvisorInterface, "")
+	kcfg = kubeletapp.SimpleKubelet(cl, &fakeDocker2, machineList[1], testRootDir, secondManifestURL, "127.0.0.1", 10251, api.NamespaceDefault, empty_dir.ProbeVolumePlugins(), nil, cadvisorInterface, "")
 	kcfg.PodStatusUpdateFrequency = 1 * time.Second
 	kubeletapp.RunKubelet(kcfg)
 	return apiServer.URL, configFilePath
@@ -316,41 +316,69 @@ func podRunning(c *client.Client, podNamespace string, podID string) wait.Condit
 }
 
 func runStaticPodTest(c *client.Client, configFilePath string) {
-	manifest := `version: v1beta2
-id: static-pod
+	var testCases = []struct {
+		desc         string
+		fileContents string
+	}{
+		{
+			desc: "static-pod-from-manifest",
+			fileContents: `version: v1beta2
+id: static-pod-from-manifest
 containers:
-    - name: static-container
-      image: kubernetes/pause`
+  - name: static-container
+    image: kubernetes/pause`,
+		},
+		{
+			desc: "static-pod-from-spec",
+			fileContents: `{
+				"kind": "Pod",
+				"apiVersion": "v1beta3",
+				"metadata": {
+					"name": "static-pod-from-spec"
+				},
+				"spec": {
+					"containers": [{
+						"name": "static-container",
+						"image": "kubernetes/pause"
+					}]
+				}
+			}`,
+		},
+	}
 
-	manifestFile, err := ioutil.TempFile(configFilePath, "")
-	defer os.Remove(manifestFile.Name())
-	ioutil.WriteFile(manifestFile.Name(), []byte(manifest), 0600)
+	for _, testCase := range testCases {
+		func() {
+			desc := testCase.desc
+			manifestFile, err := ioutil.TempFile(configFilePath, "")
+			defer os.Remove(manifestFile.Name())
+			ioutil.WriteFile(manifestFile.Name(), []byte(testCase.fileContents), 0600)
 
-	// Wait for the mirror pod to be created.
-	podName := "static-pod-localhost"
-	namespace := kubelet.NamespaceDefault
-	if err := wait.Poll(time.Second, time.Minute*2,
-		podRunning(c, namespace, podName)); err != nil {
-		if pods, err := c.Pods(namespace).List(labels.Everything()); err == nil {
-			for _, pod := range pods.Items {
-				glog.Infof("pod found: %s/%s", namespace, pod.Name)
+			// Wait for the mirror pod to be created.
+			podName := fmt.Sprintf("%s-localhost", desc)
+			namespace := kubelet.NamespaceDefault
+			if err := wait.Poll(time.Second, time.Minute*2,
+				podRunning(c, namespace, podName)); err != nil {
+				if pods, err := c.Pods(namespace).List(labels.Everything()); err == nil {
+					for _, pod := range pods.Items {
+						glog.Infof("pod found: %s/%s", namespace, pod.Name)
+					}
+				}
+				glog.Fatalf("%s FAILED: mirror pod has not been created or is not running: %v", desc, err)
 			}
-		}
-		glog.Fatalf("FAILED: mirror pod has not been created or is not running: %v", err)
+			// Delete the mirror pod, and wait for it to be recreated.
+			c.Pods(namespace).Delete(podName)
+			if err = wait.Poll(time.Second, time.Second*30,
+				podRunning(c, namespace, podName)); err != nil {
+				glog.Fatalf("%s FAILED: mirror pod has not been re-created or is not running: %v", desc, err)
+			}
+			// Remove the manifest file, and wait for the mirror pod to be deleted.
+			os.Remove(manifestFile.Name())
+			if err = wait.Poll(time.Second, time.Second*30,
+				podNotFound(c, namespace, podName)); err != nil {
+				glog.Fatalf("%s FAILED: mirror pod has not been deleted: %v", desc, err)
+			}
+		}()
 	}
-	// Delete the mirror pod, and wait for it to be recreated.
-	c.Pods(namespace).Delete(podName)
-	if err = wait.Poll(time.Second, time.Second*30,
-		podRunning(c, namespace, podName)); err != nil {
-		glog.Fatalf("FAILED: mirror pod has not been re-created or is not running: %v", err)
-	}
-	// Remove the manifest file, and wait for the mirror pod to be deleted.
-	os.Remove(manifestFile.Name())
-	if err = wait.Poll(time.Second, time.Second*30,
-		podNotFound(c, namespace, podName)); err != nil {
-		glog.Fatalf("FAILED: mirror pod has not been deleted: %v", err)
-	}
-
 }
 
 func runReplicationControllerTest(c *client.Client) {
@@ -788,8 +816,9 @@ func main() {
 
 	glog.Infof("Running tests for APIVersion: %s", apiVersion)
 
-	manifestURL := ServeCachedManifestFile()
-	apiServerURL, configFilePath := startComponents(manifestURL, apiVersion)
+	firstManifestURL := ServeCachedManifestFile(testPodSpecFile)
+	secondManifestURL := ServeCachedManifestFile(testManifestFile)
+	apiServerURL, configFilePath := startComponents(firstManifestURL, secondManifestURL, apiVersion)
 
 	// Ok. we're good to go.
 	glog.Infof("API Server started on %s", apiServerURL)
@@ -842,24 +871,25 @@ func main() {
 			createdConts.Insert(p[:n-8])
 		}
 	}
-	// We expect 9: 2 pod infra containers + 2 pods from the replication controller +
-	//              1 pod infra container + 2 pods from the URL +
-	//              1 pod infra container + 1 pod from the service test.
-	// In addition, runStaticPodTest creates 1 pod infra containers +
-	//                                       1 pod container from the mainfest file
-	// The total number of container created is 11
+	// We expect 9: 2 pod infra containers + 2 containers from the replication controller +
+	//              1 pod infra container + 2 containers from the URL on first Kubelet +
+	//              1 pod infra container + 2 containers from the URL on second Kubelet +
+	//              1 pod infra container + 1 container from the service test.
+	// In addition, runStaticPodTest creates 2 pod infra containers +
+	//                                       2 pod containers from the file (1 for manifest and 1 for spec)
+	// The total number of container created is 13
 
-	if len(createdConts) != 11 {
-		glog.Fatalf("Expected 11 containers; got %v\n\nlist of created containers:\n\n%#v\n\nDocker 1 Created:\n\n%#v\n\nDocker 2 Created:\n\n%#v\n\n", len(createdConts), createdConts.List(), fakeDocker1.Created, fakeDocker2.Created)
+	if len(createdConts) != 16 {
+		glog.Fatalf("Expected 16 containers; got %v\n\nlist of created containers:\n\n%#v\n\nDocker 1 Created:\n\n%#v\n\nDocker 2 Created:\n\n%#v\n\n", len(createdConts), createdConts.List(), fakeDocker1.Created, fakeDocker2.Created)
 	}
 	glog.Infof("OK - found created containers: %#v", createdConts.List())
 }
 
 // ServeCachedManifestFile serves a file for kubelet to read.
-func ServeCachedManifestFile() (servingAddress string) {
+func ServeCachedManifestFile(contents string) (servingAddress string) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/manifest" {
-			w.Write([]byte(testManifestFile))
+			w.Write([]byte(contents))
 			return
 		}
 		glog.Fatalf("Got request: %#v\n", r)
@@ -869,11 +899,42 @@ func ServeCachedManifestFile() (servingAddress string) {
 }
 
 const (
+	testPodSpecFile = `{
+		"kind": "Pod",
+		"apiVersion": "v1beta3",
+		"metadata": {
+			"name": "container-vm-guestbook-pod-spec"
+		},
+		"spec": {
+			"containers": [
+				{
+					"name": "redis",
+					"image": "dockerfile/redis",
+					"volumeMounts": [{
+						"name": "redis-data",
+						"mountPath": "/data"
+					}]
+				},
+				{
+					"name": "guestbook",
+					"image": "google/guestbook-python-redis",
+					"ports": [{
+						"name": "www",
+						"hostPort": 80,
+						"containerPort": 80
+					}]
+				}],
+			"volumes": [{	"name": "redis-data" }]
+		}
+	}`
+)
+
+const (
 	// This is copied from, and should be kept in sync with:
 	// https://raw.githubusercontent.com/GoogleCloudPlatform/container-vm-guestbook-redis-python/master/manifest.yaml
 	// Note that kubelet complains about these containers not having a self link.
 	testManifestFile = `version: v1beta2
-id: container-vm-guestbook
+id: container-vm-guestbook-manifest
 containers:
   - name: redis
     image: dockerfile/redis
