@@ -24,6 +24,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/golang/glog"
@@ -174,7 +175,7 @@ func (kl *Kubelet) getPodVolumesFromDisk() map[string]volume.Cleaner {
 }
 
 func (kl *Kubelet) newVolumeCleanerFromPlugins(kind string, name string, podUID types.UID) (volume.Cleaner, error) {
-	plugName := volume.UnescapePluginName(kind)
+	plugName := util.UnescapeQualifiedNameForDisk(kind)
 	plugin, err := kl.volumePluginMgr.FindPluginByName(plugName)
 	if err != nil {
 		// TODO: Maybe we should launch a cleanup of this dir?

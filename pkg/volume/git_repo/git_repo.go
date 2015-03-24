@@ -24,6 +24,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/exec"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume"
 	"github.com/golang/glog"
@@ -169,7 +170,7 @@ func (gr *gitRepo) SetUpAt(dir string) error {
 }
 
 func (gr *gitRepo) getMetaDir() string {
-	return path.Join(gr.plugin.host.GetPodPluginDir(gr.podRef.UID, volume.EscapePluginName(gitRepoPluginName)), gr.volName)
+	return path.Join(gr.plugin.host.GetPodPluginDir(gr.podRef.UID, util.EscapeQualifiedNameForDisk(gitRepoPluginName)), gr.volName)
 }
 
 func (gr *gitRepo) isReady() bool {
@@ -212,7 +213,7 @@ func (gr *gitRepo) GetPath() string {
 	if gr.legacyMode {
 		name = gitRepoPluginLegacyName
 	}
-	return gr.plugin.host.GetPodVolumeDir(gr.podRef.UID, volume.EscapePluginName(name), gr.volName)
+	return gr.plugin.host.GetPodVolumeDir(gr.podRef.UID, util.EscapeQualifiedNameForDisk(name), gr.volName)
 }
 
 // TearDown simply deletes everything in the directory.

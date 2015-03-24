@@ -21,6 +21,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume"
 	"github.com/golang/glog"
 )
@@ -146,7 +147,7 @@ func (nfsVolume *nfs) SetUpAt(dir string) error {
 
 func (nfsVolume *nfs) GetPath() string {
 	name := nfsPluginName
-	return nfsVolume.plugin.host.GetPodVolumeDir(nfsVolume.podRef.UID, volume.EscapePluginName(name), nfsVolume.volName)
+	return nfsVolume.plugin.host.GetPodVolumeDir(nfsVolume.podRef.UID, util.EscapeQualifiedNameForDisk(name), nfsVolume.volName)
 }
 
 func (nfsVolume *nfs) TearDown() error {

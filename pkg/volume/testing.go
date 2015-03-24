@@ -23,6 +23,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
 // fakeVolumeHost is useful for testing volume plugins.
@@ -117,7 +118,7 @@ func (fv *FakeVolume) SetUpAt(dir string) error {
 }
 
 func (fv *FakeVolume) GetPath() string {
-	return path.Join(fv.Plugin.Host.GetPodVolumeDir(fv.PodUID, EscapePluginName(fv.Plugin.PluginName), fv.VolName))
+	return path.Join(fv.Plugin.Host.GetPodVolumeDir(fv.PodUID, util.EscapeQualifiedNameForDisk(fv.Plugin.PluginName), fv.VolName))
 }
 
 func (fv *FakeVolume) TearDown() error {
