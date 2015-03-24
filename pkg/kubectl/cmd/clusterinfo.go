@@ -25,6 +25,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/cmd/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/resource"
 
+	"github.com/daviddengcn/go-colortext"
 	"github.com/spf13/cobra"
 )
 
@@ -46,7 +47,7 @@ func RunClusterInfo(factory *Factory, out io.Writer, cmd *cobra.Command) error {
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(out, "Kubernetes master is running at %v\n", client.Host)
+	printService(out, "Kubernetes master", client.Host, false)
 
 	mapper, typer := factory.Object()
 	cmdNamespace, err := factory.DefaultNamespace()
@@ -54,7 +55,7 @@ func RunClusterInfo(factory *Factory, out io.Writer, cmd *cobra.Command) error {
 		return err
 	}
 
-	// TODO: use generalized labels once they are implemented (#341)
+	// TODO use generalized labels once they are implemented (#341)
 	b := resource.NewBuilder(mapper, typer, factory.ClientMapperForCommand(cmd)).
 		NamespaceParam(cmdNamespace).DefaultNamespace().
 		SelectorParam("kubernetes.io/cluster-service=true").
@@ -68,12 +69,27 @@ func RunClusterInfo(factory *Factory, out io.Writer, cmd *cobra.Command) error {
 			splittedLink = append(splittedLink, "")
 			copy(splittedLink[4:], splittedLink[3:])
 			splittedLink[3] = "proxy"
-			link := strings.Join(splittedLink, "/")
-			fmt.Fprintf(out, "%v is running at %v%v/\n", service.ObjectMeta.Labels["name"], client.Host, link)
+			link := client.Host + strings.Join(splittedLink, "/") + "/"
+			printService(out, service.ObjectMeta.Labels["name"], link, true)
 		}
 		return nil
 	})
 	return nil
 
-	// TODO: consider printing more information about cluster
+	// TODO consider printing more information about cluster
+}
+
+func printService(out io.Writer, name, link string, warn bool) {
+	ct.ChangeColor(ct.Green, false, ct.None, false)
+	fmt.Fprint(out, name)
+	ct.ResetColor()
+	fmt.Fprintf(out, " is running at ")
+	ct.ChangeColor(ct.Yellow, false, ct.None, false)
+	fmt.Fprint(out, link)
+	ct.ResetColor()
+	// TODO remove this warn once trailing slash is no longer required
+	if warn {
+		fmt.Fprint(out, " (note the trailing slash)")
+	}
+	fmt.Fprintln(out, "")
 }
