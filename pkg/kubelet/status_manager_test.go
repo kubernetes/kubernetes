@@ -25,9 +25,13 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 )
 
-const (
-	podFullName string = "podName_namespace"
-)
+var testPod *api.Pod = &api.Pod{
+	ObjectMeta: api.ObjectMeta{
+		UID:       "12345678",
+		Name:      "foo",
+		Namespace: "new",
+	},
+}
 
 func newTestStatusManager() *statusManager {
 	return newStatusManager(&client.Fake{})
@@ -58,16 +62,16 @@ func verifyActions(t *testing.T, kubeClient client.Interface, expectedActions []
 
 func TestNewStatus(t *testing.T) {
 	syncer := newTestStatusManager()
-	syncer.SetPodStatus(podFullName, getRandomPodStatus())
+	syncer.SetPodStatus(testPod, getRandomPodStatus())
 	syncer.SyncBatch()
 	verifyActions(t, syncer.kubeClient, []string{"update-status-pod"})
 }
 
 func TestChangedStatus(t *testing.T) {
 	syncer := newTestStatusManager()
-	syncer.SetPodStatus(podFullName, getRandomPodStatus())
+	syncer.SetPodStatus(testPod, getRandomPodStatus())
 	syncer.SyncBatch()
-	syncer.SetPodStatus(podFullName, getRandomPodStatus())
+	syncer.SetPodStatus(testPod, getRandomPodStatus())
 	syncer.SyncBatch()
 	verifyActions(t, syncer.kubeClient, []string{"update-status-pod", "update-status-pod"})
 }
@@ -75,9 +79,9 @@ func TestChangedStatus(t *testing.T) {
 func TestUnchangedStatus(t *testing.T) {
 	syncer := newTestStatusManager()
 	podStatus := getRandomPodStatus()
-	syncer.SetPodStatus(podFullName, podStatus)
+	syncer.SetPodStatus(testPod, podStatus)
 	syncer.SyncBatch()
-	syncer.SetPodStatus(podFullName, podStatus)
+	syncer.SetPodStatus(testPod, podStatus)
 	syncer.SyncBatch()
 	verifyActions(t, syncer.kubeClient, []string{"update-status-pod"})
 }

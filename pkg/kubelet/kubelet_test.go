@@ -89,8 +89,8 @@ func newTestKubelet(t *testing.T) *TestKubelet {
 	waitGroup := new(sync.WaitGroup)
 	kubelet.podWorkers = newPodWorkers(
 		fakeDockerCache,
-		func(pod *api.Pod, hasMirrorPod bool, runningPod container.Pod) error {
-			err := kubelet.syncPod(pod, hasMirrorPod, runningPod)
+		func(pod *api.Pod, mirrorPod *api.Pod, runningPod container.Pod) error {
+			err := kubelet.syncPod(pod, mirrorPod, runningPod)
 			waitGroup.Done()
 			return err
 		},
@@ -488,7 +488,7 @@ func TestSyncPodsDoesNothing(t *testing.T) {
 	}
 	kubelet.podManager.SetPods(pods)
 	waitGroup.Add(1)
-	err := kubelet.SyncPods(pods, emptyPodUIDs, map[string]*api.Pod{}, time.Now())
+	err := kubelet.SyncPods(pods, emptyPodUIDs, map[string]api.Pod{}, time.Now())
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -523,7 +523,7 @@ func TestSyncPodsWithTerminationLog(t *testing.T) {
 	}
 	kubelet.podManager.SetPods(pods)
 	waitGroup.Add(1)
-	err := kubelet.SyncPods(pods, emptyPodUIDs, map[string]*api.Pod{}, time.Now())
+	err := kubelet.SyncPods(pods, emptyPodUIDs, map[string]api.Pod{}, time.Now())
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -574,7 +574,7 @@ func TestSyncPodsCreatesNetAndContainer(t *testing.T) {
 	}
 	kubelet.podManager.SetPods(pods)
 	waitGroup.Add(1)
-	err := kubelet.SyncPods(pods, emptyPodUIDs, map[string]*api.Pod{}, time.Now())
+	err := kubelet.SyncPods(pods, emptyPodUIDs, map[string]api.Pod{}, time.Now())
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -629,7 +629,7 @@ func TestSyncPodsCreatesNetAndContainerPullsImage(t *testing.T) {
 	}
 	waitGroup.Add(1)
 	kubelet.podManager.SetPods(pods)
-	err := kubelet.SyncPods(pods, emptyPodUIDs, map[string]*api.Pod{}, time.Now())
+	err := kubelet.SyncPods(pods, emptyPodUIDs, map[string]api.Pod{}, time.Now())
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -681,7 +681,7 @@ func TestSyncPodsWithPodInfraCreatesContainer(t *testing.T) {
 	}
 	waitGroup.Add(1)
 	kubelet.podManager.SetPods(pods)
-	err := kubelet.SyncPods(pods, emptyPodUIDs, map[string]*api.Pod{}, time.Now())
+	err := kubelet.SyncPods(pods, emptyPodUIDs, map[string]api.Pod{}, time.Now())
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -740,7 +740,7 @@ func TestSyncPodsWithPodInfraCreatesContainerCallsHandler(t *testing.T) {
 	}
 	waitGroup.Add(1)
 	kubelet.podManager.SetPods(pods)
-	err := kubelet.SyncPods(pods, emptyPodUIDs, map[string]*api.Pod{}, time.Now())
+	err := kubelet.SyncPods(pods, emptyPodUIDs, map[string]api.Pod{}, time.Now())
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -811,7 +811,7 @@ func TestSyncPodsDeletesWithNoPodInfraContainer(t *testing.T) {
 	}
 	waitGroup.Add(2)
 	kubelet.podManager.SetPods(pods)
-	err := kubelet.SyncPods(pods, emptyPodUIDs, map[string]*api.Pod{}, time.Now())
+	err := kubelet.SyncPods(pods, emptyPodUIDs, map[string]api.Pod{}, time.Now())
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -852,7 +852,7 @@ func TestSyncPodsDeletesWhenSourcesAreReady(t *testing.T) {
 			ID:    "9876",
 		},
 	}
-	if err := kubelet.SyncPods([]api.Pod{}, emptyPodUIDs, map[string]*api.Pod{}, time.Now()); err != nil {
+	if err := kubelet.SyncPods([]api.Pod{}, emptyPodUIDs, map[string]api.Pod{}, time.Now()); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 	// Validate nothing happened.
@@ -860,7 +860,7 @@ func TestSyncPodsDeletesWhenSourcesAreReady(t *testing.T) {
 	fakeDocker.ClearCalls()
 
 	ready = true
-	if err := kubelet.SyncPods([]api.Pod{}, emptyPodUIDs, map[string]*api.Pod{}, time.Now()); err != nil {
+	if err := kubelet.SyncPods([]api.Pod{}, emptyPodUIDs, map[string]api.Pod{}, time.Now()); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 	verifyCalls(t, fakeDocker, []string{"list", "stop", "stop", "inspect_container", "inspect_container"})
@@ -899,7 +899,7 @@ func TestSyncPodsDeletes(t *testing.T) {
 			ID:    "4567",
 		},
 	}
-	err := kubelet.SyncPods([]api.Pod{}, emptyPodUIDs, map[string]*api.Pod{}, time.Now())
+	err := kubelet.SyncPods([]api.Pod{}, emptyPodUIDs, map[string]api.Pod{}, time.Now())
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -954,7 +954,7 @@ func TestSyncPodDeletesDuplicate(t *testing.T) {
 	}
 	pods := []api.Pod{bound}
 	kubelet.podManager.SetPods(pods)
-	err := kubelet.syncPod(&bound, false, dockerContainersToPod(dockerContainers))
+	err := kubelet.syncPod(&bound, nil, dockerContainersToPod(dockerContainers))
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -996,7 +996,7 @@ func TestSyncPodBadHash(t *testing.T) {
 	}
 	pods := []api.Pod{bound}
 	kubelet.podManager.SetPods(pods)
-	err := kubelet.syncPod(&bound, false, dockerContainersToPod(dockerContainers))
+	err := kubelet.syncPod(&bound, nil, dockerContainersToPod(dockerContainers))
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -1051,7 +1051,7 @@ func TestSyncPodUnhealthy(t *testing.T) {
 	}
 	pods := []api.Pod{bound}
 	kubelet.podManager.SetPods(pods)
-	err := kubelet.syncPod(&bound, false, dockerContainersToPod(dockerContainers))
+	err := kubelet.syncPod(&bound, nil, dockerContainersToPod(dockerContainers))
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -1742,7 +1742,7 @@ func TestSyncPodEventHandlerFails(t *testing.T) {
 	}
 	pods := []api.Pod{bound}
 	kubelet.podManager.SetPods(pods)
-	err := kubelet.syncPod(&bound, false, dockerContainersToPod(dockerContainers))
+	err := kubelet.syncPod(&bound, nil, dockerContainersToPod(dockerContainers))
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -1782,7 +1782,7 @@ func TestSyncPodsWithPullPolicy(t *testing.T) {
 				},
 			},
 		},
-	}, emptyPodUIDs, map[string]*api.Pod{}, time.Now())
+	}, emptyPodUIDs, map[string]api.Pod{}, time.Now())
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -3046,7 +3046,7 @@ func TestPurgingObsoleteStatusMapEntries(t *testing.T) {
 		t.Fatalf("expected to have status cached for %q: %v", "pod2", err)
 	}
 	// Sync with empty pods so that the entry in status map will be removed.
-	kl.SyncPods([]api.Pod{}, emptyPodUIDs, map[string]*api.Pod{}, time.Now())
+	kl.SyncPods([]api.Pod{}, emptyPodUIDs, map[string]api.Pod{}, time.Now())
 	if _, err := kl.GetPodStatus(kubecontainer.BuildPodFullName("pod2", "")); err == nil {
 		t.Fatalf("expected to not have status cached for %q: %v", "pod2", err)
 	}
@@ -3287,8 +3287,7 @@ func TestCreateMirrorPod(t *testing.T) {
 	}
 	pods := []api.Pod{pod}
 	kl.podManager.SetPods(pods)
-	hasMirrorPod := false
-	err := kl.syncPod(&pod, hasMirrorPod, container.Pod{})
+	err := kl.syncPod(&pod, nil, container.Pod{})
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -3419,4 +3418,41 @@ func TestGetContainerInfoForMirrorPods(t *testing.T) {
 		t.Fatalf("stats should not be nil")
 	}
 	mockCadvisor.AssertExpectations(t)
+}
+
+func TestDoNotCacheStatusForStaticPods(t *testing.T) {
+	testKubelet := newTestKubelet(t)
+	testKubelet.fakeCadvisor.On("MachineInfo").Return(&cadvisorApi.MachineInfo{}, nil)
+	kubelet := testKubelet.kubelet
+	waitGroup := testKubelet.waitGroup
+
+	pods := []api.Pod{
+		{
+			ObjectMeta: api.ObjectMeta{
+				UID:       "12345678",
+				Name:      "foo",
+				Namespace: "new",
+				Annotations: map[string]string{
+					ConfigSourceAnnotationKey: "file",
+				},
+			},
+			Spec: api.PodSpec{
+				Containers: []api.Container{
+					{Name: "bar"},
+				},
+			},
+		},
+	}
+	kubelet.podManager.SetPods(pods)
+	waitGroup.Add(1)
+	err := kubelet.SyncPods(pods, emptyPodUIDs, map[string]api.Pod{}, time.Now())
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	waitGroup.Wait()
+	podFullName := kubecontainer.GetPodFullName(&pods[0])
+	status, ok := kubelet.statusManager.GetPodStatus(podFullName)
+	if ok {
+		t.Errorf("unexpected status %#v found for static pod %q", status, podFullName)
+	}
 }

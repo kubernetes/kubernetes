@@ -29,8 +29,8 @@ import (
 )
 
 type podStatusSyncRequest struct {
-	podFullName string
-	status      api.PodStatus
+	pod    *api.Pod
+	status api.PodStatus
 }
 
 // Updates pod statuses in apiserver. Writes only when new status has changed.
@@ -63,13 +63,14 @@ func (s *statusManager) GetPodStatus(podFullName string) (api.PodStatus, bool) {
 	return status, ok
 }
 
-func (s *statusManager) SetPodStatus(podFullName string, status api.PodStatus) {
+func (s *statusManager) SetPodStatus(pod *api.Pod, status api.PodStatus) {
+	podFullName := kubecontainer.GetPodFullName(pod)
 	s.podStatusesLock.Lock()
 	defer s.podStatusesLock.Unlock()
 	oldStatus, found := s.podStatuses[podFullName]
 	if !found || !reflect.DeepEqual(oldStatus, status) {
 		s.podStatuses[podFullName] = status
-		s.podStatusChannel <- podStatusSyncRequest{podFullName, status}
+		s.podStatusChannel <- podStatusSyncRequest{pod, status}
 	} else {
 		glog.V(3).Infof("Ignoring same pod status for %s - old: %s new: %s", podFullName, oldStatus, status)
 	}
@@ -99,22 +100,19 @@ func (s *statusManager) SyncBatch() {
 	for {
 		select {
 		case syncRequest := <-s.podStatusChannel:
-			podFullName := syncRequest.podFullName
+			pod := syncRequest.pod
+			podFullName := kubecontainer.GetPodFullName(pod)
 			status := syncRequest.status
 			glog.V(3).Infof("Syncing status for %s", podFullName)
-			name, namespace, err := kubecontainer.ParsePodFullName(podFullName)
-			if err != nil {
-				glog.Warningf("Cannot parse pod full name %q: %s", podFullName, err)
-			}
-			_, err = s.kubeClient.Pods(namespace).UpdateStatus(name, &status)
+			_, err := s.kubeClient.Pods(pod.Namespace).UpdateStatus(pod.Name, &status)
 			if err != nil {
 				// We failed to update status. In order to make sure we retry next time
 				// we delete cached value. This may result in an additional update, but
 				// this is ok.
 				s.DeletePodStatus(podFullName)
-				glog.Warningf("Error updating status for pod %q: %v", name, err)
+				glog.Warningf("Error updating status for pod %q: %v", podFullName, err)
 			} else {
-				glog.V(3).Infof("Status for pod %q updated successfully", name)
+				glog.V(3).Infof("Status for pod %q updated successfully", podFullName)
 			}
 		case <-time.After(1 * time.Second):
 			return
