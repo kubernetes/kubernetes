@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2015 Google Inc. All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -22,9 +22,17 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 )
+
+func getLimitRangesResourceName() string {
+	if api.PreV1Beta3(testapi.Version()) {
+		return "limitRanges"
+	}
+	return "limitranges"
+}
 
 func TestLimitRangeCreate(t *testing.T) {
 	ns := api.NamespaceDefault
@@ -51,7 +59,7 @@ func TestLimitRangeCreate(t *testing.T) {
 	c := &testClient{
 		Request: testRequest{
 			Method: "POST",
-			Path:   buildResourcePath(ns, "/limitRanges"),
+			Path:   testapi.ResourcePath(getLimitRangesResourceName(), ns, ""),
 			Query:  buildQueryValues(ns, nil),
 			Body:   limitRange,
 		},
@@ -87,7 +95,7 @@ func TestLimitRangeGet(t *testing.T) {
 	c := &testClient{
 		Request: testRequest{
 			Method: "GET",
-			Path:   buildResourcePath(ns, "/limitRanges/abc"),
+			Path:   testapi.ResourcePath(getLimitRangesResourceName(), ns, "abc"),
 			Query:  buildQueryValues(ns, nil),
 			Body:   nil,
 		},
@@ -111,7 +119,7 @@ func TestLimitRangeList(t *testing.T) {
 	c := &testClient{
 		Request: testRequest{
 			Method: "GET",
-			Path:   buildResourcePath(ns, "/limitRanges"),
+			Path:   testapi.ResourcePath(getLimitRangesResourceName(), ns, ""),
 			Query:  buildQueryValues(ns, nil),
 			Body:   nil,
 		},
@@ -145,7 +153,7 @@ func TestLimitRangeUpdate(t *testing.T) {
 		},
 	}
 	c := &testClient{
-		Request:  testRequest{Method: "PUT", Path: buildResourcePath(ns, "/limitRanges/abc"), Query: buildQueryValues(ns, nil)},
+		Request:  testRequest{Method: "PUT", Path: testapi.ResourcePath(getLimitRangesResourceName(), ns, "abc"), Query: buildQueryValues(ns, nil)},
 		Response: Response{StatusCode: 200, Body: limitRange},
 	}
 	response, err := c.Setup().LimitRanges(ns).Update(limitRange)
@@ -175,7 +183,7 @@ func TestInvalidLimitRangeUpdate(t *testing.T) {
 		},
 	}
 	c := &testClient{
-		Request:  testRequest{Method: "PUT", Path: buildResourcePath(ns, "/limitRanges/abc"), Query: buildQueryValues(ns, nil)},
+		Request:  testRequest{Method: "PUT", Path: testapi.ResourcePath(getLimitRangesResourceName(), ns, "abc"), Query: buildQueryValues(ns, nil)},
 		Response: Response{StatusCode: 200, Body: limitRange},
 	}
 	_, err := c.Setup().LimitRanges(ns).Update(limitRange)
@@ -187,7 +195,7 @@ func TestInvalidLimitRangeUpdate(t *testing.T) {
 func TestLimitRangeDelete(t *testing.T) {
 	ns := api.NamespaceDefault
 	c := &testClient{
-		Request:  testRequest{Method: "DELETE", Path: buildResourcePath(ns, "/limitRanges/foo"), Query: buildQueryValues(ns, nil)},
+		Request:  testRequest{Method: "DELETE", Path: testapi.ResourcePath(getLimitRangesResourceName(), ns, "foo"), Query: buildQueryValues(ns, nil)},
 		Response: Response{StatusCode: 200},
 	}
 	err := c.Setup().LimitRanges(ns).Delete("foo")
@@ -196,7 +204,10 @@ func TestLimitRangeDelete(t *testing.T) {
 
 func TestLimitRangeWatch(t *testing.T) {
 	c := &testClient{
-		Request:  testRequest{Method: "GET", Path: "/watch/limitRanges", Query: url.Values{"resourceVersion": []string{}}},
+		Request: testRequest{
+			Method: "GET",
+			Path:   "/api/" + testapi.Version() + "/watch/" + getLimitRangesResourceName(),
+			Query:  url.Values{"resourceVersion": []string{}}},
 		Response: Response{StatusCode: 200},
 	}
 	_, err := c.Setup().LimitRanges(api.NamespaceAll).Watch(labels.Everything(), fields.Everything(), "")

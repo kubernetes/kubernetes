@@ -22,9 +22,17 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 )
+
+func getResourceQuotasResoureName() string {
+	if api.PreV1Beta3(testapi.Version()) {
+		return "resourceQuotas"
+	}
+	return "resourcequotas"
+}
 
 func TestResourceQuotaCreate(t *testing.T) {
 	ns := api.NamespaceDefault
@@ -47,7 +55,7 @@ func TestResourceQuotaCreate(t *testing.T) {
 	c := &testClient{
 		Request: testRequest{
 			Method: "POST",
-			Path:   buildResourcePath(ns, "/resourceQuotas"),
+			Path:   testapi.ResourcePath(getResourceQuotasResoureName(), ns, ""),
 			Query:  buildQueryValues(ns, nil),
 			Body:   resourceQuota,
 		},
@@ -79,7 +87,7 @@ func TestResourceQuotaGet(t *testing.T) {
 	c := &testClient{
 		Request: testRequest{
 			Method: "GET",
-			Path:   buildResourcePath(ns, "/resourceQuotas/abc"),
+			Path:   testapi.ResourcePath(getResourceQuotasResoureName(), ns, "abc"),
 			Query:  buildQueryValues(ns, nil),
 			Body:   nil,
 		},
@@ -103,7 +111,7 @@ func TestResourceQuotaList(t *testing.T) {
 	c := &testClient{
 		Request: testRequest{
 			Method: "GET",
-			Path:   buildResourcePath(ns, "/resourceQuotas"),
+			Path:   testapi.ResourcePath(getResourceQuotasResoureName(), ns, ""),
 			Query:  buildQueryValues(ns, nil),
 			Body:   nil,
 		},
@@ -133,7 +141,7 @@ func TestResourceQuotaUpdate(t *testing.T) {
 		},
 	}
 	c := &testClient{
-		Request:  testRequest{Method: "PUT", Path: buildResourcePath(ns, "/resourceQuotas/abc"), Query: buildQueryValues(ns, nil)},
+		Request:  testRequest{Method: "PUT", Path: testapi.ResourcePath(getResourceQuotasResoureName(), ns, "abc"), Query: buildQueryValues(ns, nil)},
 		Response: Response{StatusCode: 200, Body: resourceQuota},
 	}
 	response, err := c.Setup().ResourceQuotas(ns).Update(resourceQuota)
@@ -160,7 +168,10 @@ func TestResourceQuotaStatusUpdate(t *testing.T) {
 		},
 	}
 	c := &testClient{
-		Request:  testRequest{Method: "PUT", Path: buildResourcePath(ns, "/resourceQuotas/abc/status"), Query: buildQueryValues(ns, nil)},
+		Request: testRequest{
+			Method: "PUT",
+			Path:   testapi.ResourcePath(getResourceQuotasResoureName(), ns, "abc") + "/status",
+			Query:  buildQueryValues(ns, nil)},
 		Response: Response{StatusCode: 200, Body: resourceQuota},
 	}
 	response, err := c.Setup().ResourceQuotas(ns).Status(resourceQuota)
@@ -186,7 +197,7 @@ func TestInvalidResourceQuotaUpdate(t *testing.T) {
 		},
 	}
 	c := &testClient{
-		Request:  testRequest{Method: "PUT", Path: buildResourcePath(ns, "/resourceQuotas/abc"), Query: buildQueryValues(ns, nil)},
+		Request:  testRequest{Method: "PUT", Path: testapi.ResourcePath(getResourceQuotasResoureName(), ns, "abc"), Query: buildQueryValues(ns, nil)},
 		Response: Response{StatusCode: 200, Body: resourceQuota},
 	}
 	_, err := c.Setup().ResourceQuotas(ns).Update(resourceQuota)
@@ -198,7 +209,7 @@ func TestInvalidResourceQuotaUpdate(t *testing.T) {
 func TestResourceQuotaDelete(t *testing.T) {
 	ns := api.NamespaceDefault
 	c := &testClient{
-		Request:  testRequest{Method: "DELETE", Path: buildResourcePath(ns, "/resourceQuotas/foo"), Query: buildQueryValues(ns, nil)},
+		Request:  testRequest{Method: "DELETE", Path: testapi.ResourcePath(getResourceQuotasResoureName(), ns, "foo"), Query: buildQueryValues(ns, nil)},
 		Response: Response{StatusCode: 200},
 	}
 	err := c.Setup().ResourceQuotas(ns).Delete("foo")
@@ -207,7 +218,10 @@ func TestResourceQuotaDelete(t *testing.T) {
 
 func TestResourceQuotaWatch(t *testing.T) {
 	c := &testClient{
-		Request:  testRequest{Method: "GET", Path: "/watch/resourceQuotas", Query: url.Values{"resourceVersion": []string{}}},
+		Request: testRequest{
+			Method: "GET",
+			Path:   "/api/" + testapi.Version() + "/watch/" + getResourceQuotasResoureName(),
+			Query:  url.Values{"resourceVersion": []string{}}},
 		Response: Response{StatusCode: 200},
 	}
 	_, err := c.Setup().ResourceQuotas(api.NamespaceAll).Watch(labels.Everything(), fields.Everything(), "")
