@@ -222,6 +222,7 @@ func TestTransformResponse(t *testing.T) {
 		Data     []byte
 		Created  bool
 		Error    bool
+		ErrFn    func(err error) bool
 	}{
 		{Response: &http.Response{StatusCode: 200}, Data: []byte{}},
 		{Response: &http.Response{StatusCode: 201}, Data: []byte{}, Created: true},
@@ -230,6 +231,30 @@ func TestTransformResponse(t *testing.T) {
 		{Response: &http.Response{StatusCode: 422}, Error: true},
 		{Response: &http.Response{StatusCode: 409}, Error: true},
 		{Response: &http.Response{StatusCode: 404}, Error: true},
+		{Response: &http.Response{StatusCode: 401}, Error: true},
+		{
+			Response: &http.Response{
+				StatusCode: 401,
+				Header:     http.Header{"Content-Type": []string{"application/json"}},
+				Body:       ioutil.NopCloser(bytes.NewReader(invalid)),
+			},
+			Error: true,
+			ErrFn: func(err error) bool {
+				return err.Error() != "aaaaa" && apierrors.IsUnauthorized(err)
+			},
+		},
+		{
+			Response: &http.Response{
+				StatusCode: 401,
+				Header:     http.Header{"Content-Type": []string{"text/any"}},
+				Body:       ioutil.NopCloser(bytes.NewReader(invalid)),
+			},
+			Error: true,
+			ErrFn: func(err error) bool {
+				return err.Error() == "aaaaa" && apierrors.IsUnauthorized(err)
+			},
+		},
+		{Response: &http.Response{StatusCode: 403}, Error: true},
 		{Response: &http.Response{StatusCode: 200, Body: ioutil.NopCloser(bytes.NewReader(invalid))}, Data: invalid},
 		{Response: &http.Response{StatusCode: 200, Body: ioutil.NopCloser(bytes.NewReader(invalid))}, Data: invalid},
 	}
@@ -246,6 +271,18 @@ func TestTransformResponse(t *testing.T) {
 		hasErr := err != nil
 		if hasErr != test.Error {
 			t.Errorf("%d: unexpected error: %t %v", i, test.Error, err)
+		} else if hasErr && test.Response.StatusCode > 399 {
+			status, ok := err.(APIStatus)
+			if !ok {
+				t.Errorf("%d: response should have been transformable into APIStatus: %v", i, err)
+				continue
+			}
+			if status.Status().Code != test.Response.StatusCode {
+				t.Errorf("%d: status code did not match response: %#v", i, status.Status())
+			}
+		}
+		if test.ErrFn != nil && !test.ErrFn(err) {
+			t.Errorf("%d: error function did not match: %v", i, err)
 		}
 		if !(test.Data == nil && response == nil) && !api.Semantic.DeepDerivative(test.Data, response) {
 			t.Errorf("%d: unexpected response: %#v %#v", i, test.Data, response)

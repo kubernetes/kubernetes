@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"mime"
 	"net/http"
 	"net/url"
 	"path"
@@ -621,11 +622,14 @@ func (r *Request) transformResponse(body []byte, resp *http.Response, req *http.
 		// no-op, we've been upgraded
 	case resp.StatusCode < http.StatusOK || resp.StatusCode > http.StatusPartialContent:
 		if !isStatusResponse {
-			var err error
-			err = &UnexpectedStatusError{
+			var err error = &UnexpectedStatusError{
 				Request:  req,
 				Response: resp,
 				Body:     string(body),
+			}
+			message := "unknown"
+			if isTextResponse(resp) {
+				message = strings.TrimSpace(string(body))
 			}
 			// TODO: handle other error classes we know about
 			switch resp.StatusCode {
@@ -638,7 +642,21 @@ func (r *Request) transformResponse(body []byte, resp *http.Response, req *http.
 			case http.StatusNotFound:
 				err = errors.NewNotFound(r.resource, r.resourceName)
 			case http.StatusBadRequest:
-				err = errors.NewBadRequest(err.Error())
+				err = errors.NewBadRequest(message)
+			case http.StatusUnauthorized:
+				err = errors.NewUnauthorized(message)
+			case http.StatusForbidden:
+				err = errors.NewForbidden(r.resource, r.resourceName, err)
+			case errors.StatusUnprocessableEntity:
+				err = errors.NewInvalid(r.resource, r.resourceName, nil)
+			case errors.StatusServerTimeout:
+				retryAfter, _ := retryAfter(resp)
+				err = errors.NewServerTimeout(r.resource, r.verb, retryAfter)
+			case errors.StatusTooManyRequests:
+				retryAfter, _ := retryAfter(resp)
+				err = errors.NewServerTimeout(r.resource, r.verb, retryAfter)
+			case http.StatusInternalServerError:
+				err = errors.NewInternalError(fmt.Errorf(message))
 			}
 			return nil, false, err
 		}
@@ -655,6 +673,30 @@ func (r *Request) transformResponse(body []byte, resp *http.Response, req *http.
 
 	created := resp.StatusCode == http.StatusCreated
 	return body, created, nil
+}
+
+// isTextResponse returns true if the response appears to be a textual media type.
+func isTextResponse(resp *http.Response) bool {
+	contentType := resp.Header.Get("Content-Type")
+	if len(contentType) == 0 {
+		return true
+	}
+	media, _, err := mime.ParseMediaType(contentType)
+	if err != nil {
+		return false
+	}
+	return strings.HasPrefix(media, "text/")
+}
+
+// retryAfter returns the value of the Retry-After header and true, or 0 and false if
+// the header was missing or not a valid number.
+func retryAfter(resp *http.Response) (int, bool) {
+	if h := resp.Header.Get("Retry-After"); len(h) > 0 {
+		if i, err := strconv.Atoi(h); err == nil {
+			return i, true
+		}
+	}
+	return 0, false
 }
 
 // Result contains the result of calling Request.Do().

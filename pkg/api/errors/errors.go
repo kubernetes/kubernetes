@@ -105,6 +105,21 @@ func NewAlreadyExists(kind, name string) error {
 	}}
 }
 
+// NewUnauthorized returns an error indicating the client is not authorized to perform the requested
+// action.
+func NewUnauthorized(reason string) error {
+	message := reason
+	if len(message) == 0 {
+		message = "not authorized"
+	}
+	return &StatusError{api.Status{
+		Status:  api.StatusFailure,
+		Code:    http.StatusUnauthorized,
+		Reason:  api.StatusReasonUnauthorized,
+		Message: message,
+	}}
+}
+
 // NewForbidden returns an error indicating the requested action was forbidden
 func NewForbidden(kind, name string, err error) error {
 	return &StatusError{api.Status{
@@ -183,14 +198,15 @@ func NewMethodNotSupported(kind, action string) error {
 
 // NewServerTimeout returns an error indicating the requested action could not be completed due to a
 // transient error, and the client should try again.
-func NewServerTimeout(kind, operation string) error {
+func NewServerTimeout(kind, operation string, retryAfter int) error {
 	return &StatusError{api.Status{
 		Status: api.StatusFailure,
 		Code:   http.StatusInternalServerError,
 		Reason: api.StatusReasonServerTimeout,
 		Details: &api.StatusDetails{
-			Kind: kind,
-			ID:   operation,
+			Kind:       kind,
+			ID:         operation,
+			RetryAfter: retryAfter,
 		},
 		Message: fmt.Sprintf("The %s operation against %s could not be completed at this time, please try again.", operation, kind),
 	}}
@@ -211,12 +227,15 @@ func NewInternalError(err error) error {
 
 // NewTimeoutError returns an error indicating that a timeout occurred before the request
 // could be completed.  Clients may retry, but the operation may still complete.
-func NewTimeoutError(message string) error {
+func NewTimeoutError(message string, retryAfter int) error {
 	return &StatusError{api.Status{
 		Status:  api.StatusFailure,
 		Code:    StatusServerTimeout,
 		Reason:  api.StatusReasonTimeout,
 		Message: fmt.Sprintf("Timeout: %s", message),
+		Details: &api.StatusDetails{
+			RetryAfter: retryAfter,
+		},
 	}}
 }
 
@@ -251,6 +270,12 @@ func IsBadRequest(err error) bool {
 	return reasonForError(err) == api.StatusReasonBadRequest
 }
 
+// IsUnauthorized determines if err is an error which indicates that the request is unauthorized and
+// requires authentication by the user.
+func IsUnauthorized(err error) bool {
+	return reasonForError(err) == api.StatusReasonUnauthorized
+}
+
 // IsForbidden determines if err is an error which indicates that the request is forbidden and cannot
 // be completed as requested.
 func IsForbidden(err error) bool {
@@ -273,6 +298,21 @@ func IsStatusError(err error) bool {
 func IsUnexpectedObjectError(err error) bool {
 	_, ok := err.(*UnexpectedObjectError)
 	return ok
+}
+
+// SuggestsClientDelay returns true if this error suggests a client delay as well as the
+// suggested seconds to wait, or false if the error does not imply a wait.
+func SuggestsClientDelay(err error) (int, bool) {
+	switch t := err.(type) {
+	case *StatusError:
+		if t.Status().Details != nil {
+			switch t.Status().Reason {
+			case api.StatusReasonServerTimeout, api.StatusReasonTimeout:
+				return t.Status().Details.RetryAfter, true
+			}
+		}
+	}
+	return 0, false
 }
 
 func reasonForError(err error) api.StatusReason {

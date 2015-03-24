@@ -436,7 +436,7 @@ func finishRequest(timeout time.Duration, fn resultFunc) (result runtime.Object,
 	case err = <-errCh:
 		return nil, err
 	case <-time.After(timeout):
-		return nil, errors.NewTimeoutError("request did not complete within allowed duration")
+		return nil, errors.NewTimeoutError("request did not complete within allowed duration", 0)
 	}
 }
 

@@ -84,7 +84,7 @@ func CheckGeneratedNameError(strategy RESTCreateStrategy, err error, obj runtime
 		return err
 	}
 
-	return errors.NewServerTimeout(kind, "POST")
+	return errors.NewServerTimeout(kind, "POST", 0)
 }
 
 // objectMetaAndKind retrieves kind and ObjectMeta from a runtime object, or returns an error.
