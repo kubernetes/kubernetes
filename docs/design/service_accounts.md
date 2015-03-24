@@ -1,6 +1,6 @@
 #Service Accounts
 
-## Motivation 
+## Motivation
 
 Processes in Pods may need to call the Kubernetes API.  For example:
   - scheduler
@@ -20,7 +20,7 @@ They also may interact with services other than the Kubernetes API, such as:
 ## Design Overview
 A service account binds together several things:
   - a *name*, understood by users, and perhaps by peripheral systems, for an identity
-  - a *principal* that can be authenticated and (authorized)[../authorization.md]
+  - a *principal* that can be authenticated and [authorized](../authorization.md)
   - a [security context](./security_contexts.md), which defines the Linux Capabilities, User IDs, Groups IDs, and other
     capabilities and controls on interaction with the file system and OS.
   - a set of [secrets](./secrets.md), which a container may use to
@@ -60,7 +60,7 @@ This includes a human running `kubectl` on her desktop and a container in a Pod 
 
 There is already a notion of a username in kubernetes, which is populated into a request context after authentication.
 However, there is no API object representing a user.  While this may evolve, it is expected that in mature installations,
-the canonical storage of user identifiers will be handled by a system external to kubernetes. 
+the canonical storage of user identifiers will be handled by a system external to kubernetes.
 
 Kubernetes does not dictate how to divide up the space of user identifier strings.  User names can be
 simple Unix-style short usernames, (e.g. `alice`), or may be qualified to allow for federated identity (
@@ -84,7 +84,7 @@ The distinction is useful for a number of reasons:
     - A Human typically keeps credentials on a machine that is not part of the cluster and so not subject to automatic
       management.  A VM with a role/service-account can have its credentials automatically managed.
   - the identity of a Pod cannot in general be mapped to a single human.
-    - If policy allows, it may be created by one human, and then updated by another, and another, until its behavior cannot be attributed to a single human.  
+    - If policy allows, it may be created by one human, and then updated by another, and another, until its behavior cannot be attributed to a single human.
 
 **TODO**: consider getting rid of separate serviceAccount object and just rolling its parts into the SecurityContext or
 Pod Object.
@@ -106,7 +106,7 @@ might have some types that do not do anything on apiserver but just get pushed t
 ### Pods
 The `PodSpec` is extended to have a `Pods.Spec.ServiceAccountUsername` field.  If this is unset, then a
 default value is chosen.  If it is set, then the corresponding value of `Pods.Spec.SecurityContext` is set by the
-Service Account Finalizer (see below). 
+Service Account Finalizer (see below).
 
 TBD: how policy limits which users can make pods with which service accounts.
 
@@ -122,7 +122,7 @@ Service Account Finalizer is one place where this can happen (see below).
 ### Kubelet
 
 The kubelet will treat as "not ready to run" (needing a finalizer to act on it) any Pod which has an empty
-SecurityContext.  
+SecurityContext.
 
 The kubelet will set a default, restrictive, security context for any pods created from non-Apiserver config
 sources (http, file).
@@ -141,7 +141,7 @@ like this:
 **TODO**: example of pod with explicit refs.
 
 Another way is with the *Service Account Finalizer*, a plugin process which is optional, and which handles
-business logic around service accounts. 
+business logic around service accounts.
 
 The Service Account Finalizer watches Pods, Namespaces, and ServiceAccount definitions.
 
