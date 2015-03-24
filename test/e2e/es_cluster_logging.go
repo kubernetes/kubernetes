@@ -334,5 +334,5 @@ func ClusterLevelLoggingWithElasticsearch(c *client.Client) {
 		Logf("After %s found all %d log lines", time.Since(start), expected)
 		return
 	}
-	Failf("Failed to find all %d log lines (%d were missing)", expected, missing)
+	Failf("Failed to find all %d log lines", expected)
 }
