@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"testing"
 
-	. "github.com/ogier/pflag"
+	. "github.com/spf13/pflag"
 )
 
 // This value can be a boolean ("true", "false") or "maybe"

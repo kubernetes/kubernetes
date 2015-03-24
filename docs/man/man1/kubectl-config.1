@@ -26,6 +26,14 @@ config modifies .kubeconfig files using subcommands like "kubectl config set cur
     use the .kubeconfig from /home/username
 
 .PP
+\fB\-h\fP, \fB\-\-help\fP=false
+    help for config
+
+.PP
+\fB\-\-kubeconfig\fP=""
+    use a particular .kubeconfig file
+
+.PP
 \fB\-\-local\fP=false
     use the .kubeconfig in the current directory
 
@@ -64,16 +72,8 @@ config modifies .kubeconfig files using subcommands like "kubectl config set cur
     The name of the kubeconfig context to use
 
 .PP
-\fB\-h\fP, \fB\-\-help\fP=false
-    help for kubectl
-
-.PP
 \fB\-\-insecure\-skip\-tls\-verify\fP=false
     If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure.
-
-.PP
-\fB\-\-kubeconfig\fP=""
-    Path to the kubeconfig file to use for CLI requests.
 
 .PP
 \fB\-\-log\_backtrace\_at\fP=:0

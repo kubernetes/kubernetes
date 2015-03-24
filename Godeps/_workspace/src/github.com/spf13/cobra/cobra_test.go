@@ -10,11 +10,14 @@ import (
 var _ = fmt.Println
 
 var tp, te, tt, t1 []string
-var flagb1, flagb2, flagb3, flagbr bool
-var flags1, flags2, flags3 string
+var flagb1, flagb2, flagb3, flagbr, flagbp bool
+var flags1, flags2a, flags2b, flags3 string
 var flagi1, flagi2, flagi3, flagir int
 var globalFlag1 bool
 var flagEcho, rootcalled bool
+
+const strtwoParentHelp = "help message for parent flag strtwo"
+const strtwoChildHelp = "help message for child flag strtwo"
 
 var cmdPrint = &Command{
 	Use:   "print [string to print]",
@@ -72,11 +75,13 @@ func flagInit() {
 	cmdRootNoRun.ResetFlags()
 	cmdRootSameName.ResetFlags()
 	cmdRootWithRun.ResetFlags()
+	cmdRootNoRun.PersistentFlags().StringVarP(&flags2a, "strtwo", "t", "two", strtwoParentHelp)
 	cmdEcho.Flags().IntVarP(&flagi1, "intone", "i", 123, "help message for flag intone")
 	cmdTimes.Flags().IntVarP(&flagi2, "inttwo", "j", 234, "help message for flag inttwo")
 	cmdPrint.Flags().IntVarP(&flagi3, "intthree", "i", 345, "help message for flag intthree")
 	cmdEcho.PersistentFlags().StringVarP(&flags1, "strone", "s", "one", "help message for flag strone")
-	cmdTimes.PersistentFlags().StringVarP(&flags2, "strtwo", "t", "two", "help message for flag strtwo")
+	cmdEcho.PersistentFlags().BoolVarP(&flagbp, "persistentbool", "p", false, "help message for flag persistentbool")
+	cmdTimes.PersistentFlags().StringVarP(&flags2b, "strtwo", "t", "2", strtwoChildHelp)
 	cmdPrint.PersistentFlags().StringVarP(&flags3, "strthree", "s", "three", "help message for flag strthree")
 	cmdEcho.Flags().BoolVarP(&flagb1, "boolone", "b", true, "help message for flag boolone")
 	cmdTimes.Flags().BoolVarP(&flagb2, "booltwo", "c", false, "help message for flag booltwo")
@@ -377,8 +382,19 @@ func TestChildCommandFlags(t *testing.T) {
 		t.Errorf("invalid flag should generate error")
 	}
 
-	if !strings.Contains(r.Output, "intone=123") {
+	if !strings.Contains(r.Output, "unknown shorthand flag") {
 		t.Errorf("Wrong error message displayed, \n %s", r.Output)
+	}
+
+	// Testing with persistent flag overwritten by child
+	noRRSetupTest("echo times --strtwo=child one two")
+
+	if flags2b != "child" {
+		t.Errorf("flag value should be child, %s given", flags2b)
+	}
+
+	if flags2a != "two" {
+		t.Errorf("unset flag should have default value, expecting two, given %s", flags2a)
 	}
 
 	// Testing flag with invalid input
@@ -402,19 +418,21 @@ func TestTrailingCommandFlags(t *testing.T) {
 }
 
 func TestPersistentFlags(t *testing.T) {
-	fullSetupTest("echo -s something more here")
+	fullSetupTest("echo -s something -p more here")
 
 	// persistentFlag should act like normal flag on it's own command
 	if strings.Join(te, " ") != "more here" {
 		t.Errorf("flags didn't leave proper args remaining..%s given", te)
 	}
-
-	// persistentFlag should act like normal flag on it's own command
 	if flags1 != "something" {
 		t.Errorf("string flag didn't get correct value, had %v", flags1)
 	}
+	if !flagbp {
+		t.Errorf("persistent bool flag not parsed correctly. Expected true, had %v", flagbp)
+	}
 
-	fullSetupTest("echo times -s again -c test here")
+	// persistentFlag should act like normal flag on it's own command
+	fullSetupTest("echo times -s again -c -p test here")
 
 	if strings.Join(tt, " ") != "test here" {
 		t.Errorf("flags didn't leave proper args remaining..%s given", tt)
@@ -424,8 +442,11 @@ func TestPersistentFlags(t *testing.T) {
 		t.Errorf("string flag didn't get correct value, had %v", flags1)
 	}
 
-	if flagb2 != true {
-		t.Errorf("local flag not parsed correctly. Expected false, had %v", flagb2)
+	if !flagb2 {
+		t.Errorf("local flag not parsed correctly. Expected true, had %v", flagb2)
+	}
+	if !flagbp {
+		t.Errorf("persistent bool flag not parsed correctly. Expected true, had %v", flagbp)
 	}
 }
 
@@ -435,6 +456,13 @@ func TestHelpCommand(t *testing.T) {
 
 	r := fullSetupTest("help echo times")
 	checkResultContains(t, r, cmdTimes.Long)
+}
+
+func TestChildCommandHelp(t *testing.T) {
+	c := noRRSetupTest("print --help")
+	checkResultContains(t, c, strtwoParentHelp)
+	r := noRRSetupTest("echo times --help")
+	checkResultContains(t, r, strtwoChildHelp)
 }
 
 func TestRunnableRootCommand(t *testing.T) {
@@ -484,6 +512,26 @@ func TestRootHelp(t *testing.T) {
 		t.Errorf("--help shouldn't trigger an error, Got: \n %s", x.Output)
 	}
 
+}
+
+func TestFlagAccess(t *testing.T) {
+	initialize()
+
+	local := cmdTimes.LocalFlags()
+	inherited := cmdTimes.InheritedFlags()
+
+	for _, f := range []string{"inttwo", "strtwo", "booltwo"} {
+		if local.Lookup(f) == nil {
+			t.Errorf("LocalFlags expected to contain %s, Got: nil", f)
+		}
+	}
+	if inherited.Lookup("strone") == nil {
+		t.Errorf("InheritedFlags expected to contain strone, Got: nil")
+	}
+	if inherited.Lookup("strtwo") != nil {
+		t.Errorf("InheritedFlags shouldn not contain overwritten flag strtwo")
+
+	}
 }
 
 func TestRootNoCommandHelp(t *testing.T) {

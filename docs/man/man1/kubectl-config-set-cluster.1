@@ -19,8 +19,28 @@ Specifying a name that already exists will merge new fields on top of existing v
 
 .SH OPTIONS
 .PP
+\fB\-\-api\-version\fP=""
+    api\-version for the cluster entry in .kubeconfig
+
+.PP
+\fB\-\-certificate\-authority\fP=""
+    path to certificate\-authority for the cluster entry in .kubeconfig
+
+.PP
 \fB\-\-embed\-certs\fP=false
     embed\-certs for the cluster entry in .kubeconfig
+
+.PP
+\fB\-h\fP, \fB\-\-help\fP=false
+    help for set\-cluster
+
+.PP
+\fB\-\-insecure\-skip\-tls\-verify\fP=false
+    insecure\-skip\-tls\-verify for the cluster entry in .kubeconfig
+
+.PP
+\fB\-\-server\fP=""
+    server for the cluster entry in .kubeconfig
 
 
 .SH OPTIONS INHERITED FROM PARENT COMMANDS
@@ -29,16 +49,8 @@ Specifying a name that already exists will merge new fields on top of existing v
     log to standard error as well as files
 
 .PP
-\fB\-\-api\-version\fP=""
-    The API version to use when talking to the server
-
-.PP
 \fB\-a\fP, \fB\-\-auth\-path\fP=""
     Path to the auth info file. If missing, prompt the user. Only used if using https.
-
-.PP
-\fB\-\-certificate\-authority\fP=""
-    Path to a cert. file for the certificate authority.
 
 .PP
 \fB\-\-client\-certificate\fP=""
@@ -63,14 +75,6 @@ Specifying a name that already exists will merge new fields on top of existing v
 .PP
 \fB\-\-global\fP=false
     use the .kubeconfig from /home/username
-
-.PP
-\fB\-h\fP, \fB\-\-help\fP=false
-    help for config
-
-.PP
-\fB\-\-insecure\-skip\-tls\-verify\fP=false
-    If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure.
 
 .PP
 \fB\-\-kubeconfig\fP=""
@@ -107,10 +111,6 @@ Specifying a name that already exists will merge new fields on top of existing v
 .PP
 \fB\-\-password\fP=""
     Password for basic authentication to the API server.
-
-.PP
-\fB\-s\fP, \fB\-\-server\fP=""
-    The address and port of the Kubernetes API server
 
 .PP
 \fB\-\-stderrthreshold\fP=2
