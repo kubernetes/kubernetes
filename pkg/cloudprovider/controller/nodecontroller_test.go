@@ -279,8 +279,14 @@ func TestCreateGetStaticNodesWithSpec(t *testing.T) {
 				Items: []api.Node{
 					{
 						ObjectMeta: api.ObjectMeta{Name: "node0"},
-						Spec:       api.NodeSpec{},
-						Status:     api.NodeStatus{},
+						Spec: api.NodeSpec{
+							ExternalID: "node0",
+							Capacity: api.ResourceList{
+								api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
+								api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
+							},
+						},
+						Status: api.NodeStatus{},
 					},
 				},
 			},
@@ -291,21 +297,39 @@ func TestCreateGetStaticNodesWithSpec(t *testing.T) {
 				Items: []api.Node{
 					{
 						ObjectMeta: api.ObjectMeta{Name: "node0"},
-						Spec:       api.NodeSpec{},
-						Status:     api.NodeStatus{},
+						Spec: api.NodeSpec{
+							ExternalID: "node0",
+							Capacity: api.ResourceList{
+								api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
+								api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
+							},
+						},
+						Status: api.NodeStatus{},
 					},
 					{
 						ObjectMeta: api.ObjectMeta{Name: "node1"},
-						Spec:       api.NodeSpec{},
-						Status:     api.NodeStatus{},
+						Spec: api.NodeSpec{
+							ExternalID: "node1",
+							Capacity: api.ResourceList{
+								api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
+								api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
+							},
+						},
+						Status: api.NodeStatus{},
 					},
 				},
 			},
 		},
 	}
 
+	resources := api.NodeResources{
+		Capacity: api.ResourceList{
+			api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
+			api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
+		},
+	}
 	for _, item := range table {
-		nodeController := NewNodeController(nil, "", item.machines, &api.NodeResources{}, nil, nil, nil, 10, time.Minute)
+		nodeController := NewNodeController(nil, "", item.machines, &resources, nil, nil, nil, 10, time.Minute)
 		nodes, err := nodeController.GetStaticNodesWithSpec()
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
@@ -736,6 +760,13 @@ func TestSyncProbedNodeStatus(t *testing.T) {
 							{Type: api.NodeLegacyHostIP, Address: "1.2.3.4"},
 						},
 					},
+					Spec: api.NodeSpec{
+						ExternalID: "node0",
+						Capacity: api.ResourceList{
+							api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
+							api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
+						},
+					},
 				},
 				{
 					ObjectMeta: api.ObjectMeta{Name: "node1"},
@@ -758,6 +789,13 @@ func TestSyncProbedNodeStatus(t *testing.T) {
 						},
 						Addresses: []api.NodeAddress{
 							{Type: api.NodeLegacyHostIP, Address: "1.2.3.4"},
+						},
+					},
+					Spec: api.NodeSpec{
+						ExternalID: "node1",
+						Capacity: api.ResourceList{
+							api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
+							api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
 						},
 					},
 				},
@@ -1282,6 +1320,13 @@ func TestMonitorNodeStatusUpdateStatus(t *testing.T) {
 								},
 							},
 						},
+						Spec: api.NodeSpec{
+							ExternalID: "node0",
+							Capacity: api.ResourceList{
+								api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
+								api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
+							},
+						},
 					},
 				},
 				Fake: client.Fake{
@@ -1306,6 +1351,13 @@ func TestMonitorNodeStatusUpdateStatus(t *testing.T) {
 							},
 						},
 					},
+					Spec: api.NodeSpec{
+						ExternalID: "node0",
+						Capacity: api.ResourceList{
+							api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
+							api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
+						},
+					},
 				},
 			},
 		},
@@ -1328,6 +1380,13 @@ func TestMonitorNodeStatusUpdateStatus(t *testing.T) {
 									LastProbeTime:      fakeNow,
 									LastTransitionTime: fakeNow,
 								},
+							},
+						},
+						Spec: api.NodeSpec{
+							ExternalID: "node0",
+							Capacity: api.ResourceList{
+								api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
+								api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
 							},
 						},
 					},
@@ -1357,7 +1416,16 @@ func TestMonitorNodeStatusUpdateStatus(t *testing.T) {
 }
 
 func newNode(name string) *api.Node {
-	return &api.Node{ObjectMeta: api.ObjectMeta{Name: name}}
+	return &api.Node{
+		ObjectMeta: api.ObjectMeta{Name: name},
+		Spec: api.NodeSpec{
+			ExternalID: name,
+			Capacity: api.ResourceList{
+				api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
+				api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
+			},
+		},
+	}
 }
 
 func newPod(name, host string) *api.Pod {

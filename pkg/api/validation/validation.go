@@ -909,6 +909,28 @@ func ValidateReadOnlyPersistentDisks(volumes []api.Volume) errs.ValidationErrorL
 func ValidateMinion(node *api.Node) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 	allErrs = append(allErrs, ValidateObjectMeta(&node.ObjectMeta, false, ValidateNodeName).Prefix("metadata")...)
+	// Capacity is required. Within capacity, memory and cpu resources are required.
+	if len(node.Spec.Capacity) == 0 {
+		allErrs = append(allErrs, errs.NewFieldRequired("spec.Capacity"))
+	} else {
+		if val, ok := node.Spec.Capacity[api.ResourceMemory]; !ok {
+			allErrs = append(allErrs, errs.NewFieldRequired("spec.Capacity[memory]"))
+		} else if val.Value() < 0 {
+			allErrs = append(allErrs, errs.NewFieldInvalid("spec.Capacity[memory]", val, "memory capacity cannot be negative"))
+		}
+		if val, ok := node.Spec.Capacity[api.ResourceCPU]; !ok {
+			allErrs = append(allErrs, errs.NewFieldRequired("spec.Capacity[cpu]"))
+		} else if val.Value() < 0 {
+			allErrs = append(allErrs, errs.NewFieldInvalid("spec.Capacity[cpu]", val, "cpu capacity cannot be negative"))
+		}
+	}
+
+	// external ID is required.
+	if len(node.Spec.ExternalID) == 0 {
+		allErrs = append(allErrs, errs.NewFieldRequired("spec.ExternalID"))
+	}
+
+	// TODO(rjnagal): Ignore PodCIDR till its completely implemented.
 	return allErrs
 }
 

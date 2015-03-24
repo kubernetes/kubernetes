@@ -37,6 +37,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	apierrors "github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
@@ -217,7 +218,11 @@ func startComponents(firstManifestURL, secondManifestURL, apiVersion string) (st
 	// TODO: Write an integration test for the replication controllers watch.
 	controllerManager.Run(1 * time.Second)
 
-	nodeResources := &api.NodeResources{}
+	nodeResources := &api.NodeResources{
+		Capacity: api.ResourceList{
+			api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
+			api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
+		}}
 
 	nodeController := nodeControllerPkg.NewNodeController(nil, "", machineList, nodeResources, cl, fakeKubeletClient{},
 		record.FromSource(api.EventSource{Component: "controllermanager"}), 10, 5*time.Minute)
