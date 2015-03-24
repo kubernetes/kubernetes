@@ -75,7 +75,19 @@ const (
 	initialNodeStatusUpdateFrequency = 100 * time.Millisecond
 	nodeStatusUpdateFrequencyInc     = 500 * time.Millisecond
 
-	// The retry count for updating node status at each sync period.
+	// nodeStatusUpdateFrequency specifies how often kubelet posts node status to master.
+	// Note: be cautious when changing the constant, it must work with nodeMonitorGracePeriod
+	// in nodecontroller. There are several constraints:
+	// 1. nodeMonitorGracePeriod must be N times more than nodeStatusUpdateFrequency, where
+	//    N means number of retries allowed for kubelet to post node status. It is pointless
+	//    to make nodeMonitorGracePeriod be less than nodeStatusUpdateFrequency, since there
+	//    will only be fresh values from Kubelet at an interval of nodeStatusUpdateFrequency.
+	//    The constant must be less than podEvictionTimeout.
+	// 2. nodeStatusUpdateFrequency needs to be large enough for kubelet to generate node
+	//    status. Kubelet may fail to update node status reliablly if the value is too small,
+	//    as it takes time to gather all necessary node information.
+	nodeStatusUpdateFrequency = 2 * time.Second
+	// nodeStatusUpdateRetry specifies how many times kubelet retries when posting node status failed.
 	nodeStatusUpdateRetry = 5
 )
 
@@ -124,7 +136,6 @@ func NewMainKubelet(
 	streamingConnectionIdleTimeout time.Duration,
 	recorder record.EventRecorder,
 	cadvisorInterface cadvisor.Interface,
-	statusUpdateFrequency time.Duration,
 	imageGCPolicy ImageGCPolicy) (*Kubelet, error) {
 	if rootDirectory == "" {
 		return nil, fmt.Errorf("invalid root directory %q", rootDirectory)
@@ -202,7 +213,6 @@ func NewMainKubelet(
 		dockerClient:                   dockerClient,
 		kubeClient:                     kubeClient,
 		rootDirectory:                  rootDirectory,
-		statusUpdateFrequency:          statusUpdateFrequency,
 		resyncInterval:                 resyncInterval,
 		podInfraContainerImage:         podInfraContainerImage,
 		containerIDToRef:               map[string]*api.ObjectReference{},
@@ -275,7 +285,6 @@ type Kubelet struct {
 	rootDirectory          string
 	podInfraContainerImage string
 	podWorkers             *podWorkers
-	statusUpdateFrequency  time.Duration
 	resyncInterval         time.Duration
 	sourcesReady           SourcesReadyFn
 
@@ -532,7 +541,8 @@ func (kl *Kubelet) syncNodeStatus() {
 	if kl.kubeClient == nil {
 		return
 	}
-	for feq := initialNodeStatusUpdateFrequency; feq < kl.statusUpdateFrequency; feq += nodeStatusUpdateFrequencyInc {
+
+	for feq := initialNodeStatusUpdateFrequency; feq < nodeStatusUpdateFrequency; feq += nodeStatusUpdateFrequencyInc {
 		select {
 		case <-time.After(feq):
 			if err := kl.updateNodeStatus(); err != nil {
@@ -542,7 +552,7 @@ func (kl *Kubelet) syncNodeStatus() {
 	}
 	for {
 		select {
-		case <-time.After(kl.statusUpdateFrequency):
+		case <-time.After(nodeStatusUpdateFrequency):
 			if err := kl.updateNodeStatus(); err != nil {
 				glog.Errorf("Unable to update node status: %v", err)
 			}
@@ -1837,20 +1847,23 @@ func (kl *Kubelet) tryUpdateNodeStatus() error {
 		node.Spec.Capacity = CapacityFromMachineInfo(info)
 	}
 
+	currentTime := util.Now()
 	newCondition := api.NodeCondition{
 		Type:          api.NodeReady,
 		Status:        api.ConditionFull,
 		Reason:        fmt.Sprintf("kubelet is posting ready status"),
-		LastProbeTime: util.Now(),
+		LastProbeTime: currentTime,
 	}
 	updated := false
 	for i := range node.Status.Conditions {
 		if node.Status.Conditions[i].Type == api.NodeReady {
+			newCondition.LastTransitionTime = node.Status.Conditions[i].LastTransitionTime
 			node.Status.Conditions[i] = newCondition
 			updated = true
 		}
 	}
 	if !updated {
+		newCondition.LastTransitionTime = currentTime
 		node.Status.Conditions = append(node.Status.Conditions, newCondition)
 	}
 

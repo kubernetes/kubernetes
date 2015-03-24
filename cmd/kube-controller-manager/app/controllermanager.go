@@ -107,7 +107,9 @@ func (s *CMServer) AddFlags(fs *pflag.FlagSet) {
 		"The number of retries for initial node registration.  Retry interval equals node_sync_period.")
 	fs.Var(&s.MachineList, "machines", "List of machines to schedule onto, comma separated.")
 	fs.BoolVar(&s.SyncNodeList, "sync_nodes", s.SyncNodeList, "If true, and --cloud_provider is specified, sync nodes from the cloud provider. Default true.")
-	fs.BoolVar(&s.SyncNodeStatus, "sync_node_status", s.SyncNodeStatus, "Should node controler send probes to kubelets and update NodeStatus.")
+	fs.BoolVar(&s.SyncNodeStatus, "sync_node_status", s.SyncNodeStatus, ""+
+		"If true, node controller sends probes to kubelet and updates NodeStatus."+
+		"If false, Kubelet posts NodeStatus to API server.")
 	// TODO: Discover these by pinging the host machines, and rip out these flags.
 	// TODO: in the meantime, use resource.QuantityFlag() instead of these
 	fs.Int64Var(&s.NodeMilliCPU, "node_milli_cpu", s.NodeMilliCPU, "The amount of MilliCPU provisioned on each node")
