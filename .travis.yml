@@ -1,3 +1,5 @@
+sudo: false
+
 language: go
 
 go:
