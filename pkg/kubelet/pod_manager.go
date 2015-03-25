@@ -46,7 +46,7 @@ type podManager interface {
 	GetPods() []api.Pod
 	GetPodByFullName(podFullName string) (*api.Pod, bool)
 	GetPodByName(namespace, name string) (*api.Pod, bool)
-	GetPodsAndMirrorMap() ([]api.Pod, map[string]*api.Pod)
+	GetPodsAndMirrorMap() ([]api.Pod, map[string]api.Pod)
 	SetPods(pods []api.Pod)
 	UpdatePods(u PodUpdate, podSyncTypes map[types.UID]metrics.SyncPodType)
 	DeleteOrphanedMirrorPods()
@@ -194,15 +194,15 @@ func (self *basicPodManager) GetPods() []api.Pod {
 }
 
 // GetPodsAndMirrorMap returns the a copy of the regular pods and the mirror
-// pod map indexed by full name for existence check.
-func (self *basicPodManager) GetPodsAndMirrorMap() ([]api.Pod, map[string]*api.Pod) {
+// pods indexed by full name.
+func (self *basicPodManager) GetPodsAndMirrorMap() ([]api.Pod, map[string]api.Pod) {
 	self.lock.RLock()
 	defer self.lock.RUnlock()
-	mirrorPodByFullName := make(map[string]*api.Pod)
-	for key, value := range self.mirrorPodByFullName {
-		mirrorPodByFullName[key] = value
+	mirrorPods := make(map[string]api.Pod)
+	for key, pod := range self.mirrorPodByFullName {
+		mirrorPods[key] = *pod
 	}
-	return self.getPods(), mirrorPodByFullName
+	return self.getPods(), mirrorPods
 }
 
 // GetPodByName provides the (non-mirror) pod that matches namespace and name,
