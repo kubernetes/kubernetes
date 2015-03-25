@@ -40,24 +40,24 @@ import (
 )
 
 var (
-	queries = flag.Int("queries", 100, "Number of hostname queries to make in each iteration")
-	perNode = flag.Int("per_node", 1, "Number of hostname pods per node")
-	upTo    = flag.Int("up_to", 1, "Number of iterations or -1 for no limit")
+	queriesAverage = flag.Int("queries", 10, "Number of hostname queries to make in each iteration per pod on average")
+	podsPerNode    = flag.Int("pods_per_node", 1, "Number of serve_hostname pods per node")
+	upTo           = flag.Int("up_to", 1, "Number of iterations or -1 for no limit")
 )
 
 const (
 	deleteTimeout        = 2 * time.Minute
 	endpointTimeout      = 5 * time.Minute
 	podCreateTimeout     = 2 * time.Minute
-	podStartTimeout      = 5 * time.Minute
+	podStartTimeout      = 10 * time.Minute
 	serviceCreateTimeout = 2 * time.Minute
 )
 
 func main() {
 	flag.Parse()
 
-	glog.Infof("Starting serve_hostnames soak test with queries=%d and perNode=%d upTo=%d",
-		*queries, *perNode, *upTo)
+	glog.Infof("Starting serve_hostnames soak test with queries=%d and podsPerNode=%d upTo=%d",
+		*queriesAverage, *podsPerNode, *upTo)
 
 	settings, err := clientcmd.LoadFromFile(filepath.Join(os.Getenv("HOME"), ".kube", ".kubeconfig"))
 	if err != nil {
@@ -87,6 +87,8 @@ func main() {
 		glog.Infof("%d: %s", i, node.Name)
 	}
 
+	queries := *queriesAverage * len(nodes.Items) * *podsPerNode
+
 	// Make a unique namespace for this test.
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
 	ns := "serve-hostnames-" + strconv.Itoa(r.Int()%10000)
@@ -113,7 +115,7 @@ func main() {
 				},
 			},
 		})
-		glog.Infof("Service create %s/server-hostnames took %v", ns, time.Since(t))
+		glog.V(4).Infof("Service create %s/server-hostnames took %v", ns, time.Since(t))
 		if err == nil {
 			break
 		}
@@ -138,7 +140,7 @@ func main() {
 	// Put serve-hostname pods on each node.
 	podNames := []string{}
 	for i, node := range nodes.Items {
-		for j := 0; j < *perNode; j++ {
+		for j := 0; j < *podsPerNode; j++ {
 			podName := fmt.Sprintf("serve-hostname-%d-%d", i, j)
 			podNames = append(podNames, podName)
 			// Make several attempts
@@ -163,7 +165,7 @@ func main() {
 						Host: node.Name,
 					},
 				})
-				glog.Infof("Pod create %s/%s request took %v", ns, podName, time.Since(t))
+				glog.V(4).Infof("Pod create %s/%s request took %v", ns, podName, time.Since(t))
 				if err == nil {
 					break
 				}
@@ -181,10 +183,10 @@ func main() {
 		// Make several attempts to delete the pods.
 		for _, podName := range podNames {
 			for start := time.Now(); time.Since(start) < deleteTimeout; time.Sleep(1 * time.Second) {
-				if err := c.Pods(ns).Delete(podName); err == nil {
+				if err = c.Pods(ns).Delete(podName); err == nil {
 					break
 				}
-				glog.Warningf("After %v failed to delete pod %s: %v", time.Since(start), podName, err)
+				glog.Warningf("After %v failed to delete pod %s/%s: %v", time.Since(start), ns, podName, err)
 			}
 		}
 	}()
@@ -234,9 +236,9 @@ func main() {
 
 	// Repeatedly make requests.
 	for iteration := 0; iteration != *upTo; iteration++ {
-		responses := make(map[string]int, *perNode*len(nodes.Items))
+		responses := make(map[string]int, *podsPerNode*len(nodes.Items))
 		start := time.Now()
-		for q := 0; q < *queries; q++ {
+		for q := 0; q < queries; q++ {
 			t := time.Now()
 			hostname, err := c.Get().
 				Namespace(ns).
@@ -244,7 +246,7 @@ func main() {
 				Resource("services").
 				Name("serve-hostnames").
 				DoRaw()
-			glog.Infof("Proxy call in namespace %s took %v", ns, time.Since(t))
+			glog.V(4).Infof("Proxy call in namespace %s took %v", ns, time.Since(t))
 			if err != nil {
 				glog.Infof("Call failed during iteration %d query %d : %v", iteration, q, err)
 			} else {
@@ -253,17 +255,17 @@ func main() {
 
 		}
 		for k, v := range responses {
-			glog.Infof("%s: %d  ", k, v)
+			glog.V(4).Infof("%s: %d  ", k, v)
 		}
 		// Report any nodes that did not respond.
 		for n, node := range nodes.Items {
-			for i := 0; i < *perNode; i++ {
+			for i := 0; i < *podsPerNode; i++ {
 				name := fmt.Sprintf("serve-hostname-%d-%d", n, i)
 				if _, ok := responses[name]; !ok {
 					glog.Warningf("No response from pod %s on node %s at iteration %d", name, node.Name, iteration)
 				}
 			}
 		}
-		glog.Infof("Iteration %d took %v for %d queries (%.2f QPS)", iteration, time.Since(start), *queries, float64(*queries)/time.Since(start).Seconds())
+		glog.Infof("Iteration %d took %v for %d queries (%.2f QPS)", iteration, time.Since(start), queries, float64(queries)/time.Since(start).Seconds())
 	}
 }
