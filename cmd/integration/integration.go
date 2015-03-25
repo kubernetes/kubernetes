@@ -308,10 +308,12 @@ func podRunning(c *client.Client, podNamespace string, podID string) wait.Condit
 			return false, nil
 		}
 		if err != nil {
-			return false, err
+			// This could be a connection error so we want to retry, but log the error.
+			glog.Errorf("Error when reading pod %q: %v", podID, err)
+			return false, nil
 		}
 		if pod.Status.Phase != api.PodRunning {
-			return false, errors.New(fmt.Sprintf("Pod status is %q", pod.Status.Phase))
+			return false, nil
 		}
 		return true, nil
 	}
