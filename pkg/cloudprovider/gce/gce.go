@@ -41,6 +41,8 @@ import (
 	"google.golang.org/cloud/compute/metadata"
 )
 
+const EXTERNAL_IP_METADATA_URL = "http://169.254.169.254/computeMetadata/v1/instance/network-interfaces/0/access-configs/0/external-ip"
+
 // GCECloud is an implementation of Interface, TCPLoadBalancer and Instances for Google Compute Engine.
 type GCECloud struct {
 	service          *compute.Service
@@ -48,6 +50,9 @@ type GCECloud struct {
 	projectID        string
 	zone             string
 	instanceID       string
+
+	// Used for accessing the metadata server
+	metadataAccess func(string) (string, error)
 }
 
 func init() {
@@ -125,6 +130,7 @@ func newGCECloud() (*GCECloud, error) {
 		projectID:        projectID,
 		zone:             zone,
 		instanceID:       instanceID,
+		metadataAccess:   getMetadata,
 	}, nil
 }
 
@@ -325,7 +331,16 @@ func (gce *GCECloud) NodeAddresses(instance string) ([]api.NodeAddress, error) {
 	if ip == nil {
 		return nil, fmt.Errorf("invalid network IP: %s", inst.NetworkInterfaces[0].AccessConfigs[0].NatIP)
 	}
-	return []api.NodeAddress{{Type: api.NodeLegacyHostIP, Address: ip.String()}}, nil
+
+	externalIP, err := gce.metadataAccess(EXTERNAL_IP_METADATA_URL)
+	if err != nil {
+		return nil, err
+	}
+
+	return []api.NodeAddress{
+		{Type: api.NodeExternalIP, Address: externalIP},
+		{Type: api.NodeLegacyHostIP, Address: ip.String()},
+	}, nil
 }
 
 // ExternalID returns the cloud provider ID of the specified instance.
