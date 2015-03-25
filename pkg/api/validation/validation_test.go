@@ -1191,6 +1191,27 @@ func TestValidateService(t *testing.T) {
 			numErrs: 1,
 		},
 		{
+			name: "invalid publicIPs localhost",
+			makeSvc: func(s *api.Service) {
+				s.Spec.PublicIPs = []string{"127.0.0.1"}
+			},
+			numErrs: 1,
+		},
+		{
+			name: "invalid publicIPs",
+			makeSvc: func(s *api.Service) {
+				s.Spec.PublicIPs = []string{"0.0.0.0"}
+			},
+			numErrs: 1,
+		},
+		{
+			name: "valid publicIPs host",
+			makeSvc: func(s *api.Service) {
+				s.Spec.PublicIPs = []string{"myhost.mydomain"}
+			},
+			numErrs: 0,
+		},
+		{
 			name: "nil selector",
 			makeSvc: func(s *api.Service) {
 				s.Spec.Selector = nil
