@@ -53,10 +53,6 @@ function get_route_table_id {
   python -c "import json,sys; lst = [str(route_table['RouteTableId']) for route_table in json.load(sys.stdin)['RouteTables'] if route_table['VpcId'] == '$1']; print ''.join(lst)"
 }
 
-function get_sec_group_id {
-  python -c 'import json,sys; lst = [str(group["GroupId"]) for group in json.load(sys.stdin)["SecurityGroups"] if group["GroupName"] == "kubernetes-sec-group"]; print "".join(lst)'
-}
-
 function get_elbs_in_vpc {
  # ELB doesn't seem to be on the same platform as the rest of AWS; doesn't support filtering
   $AWS_ELB_CMD describe-load-balancers | \
@@ -395,7 +391,11 @@ function kube-up {
 
   echo "Using Route Table $ROUTE_TABLE_ID"
 
-  SEC_GROUP_ID=$($AWS_CMD describe-security-groups | get_sec_group_id)
+  SEC_GROUP_ID=$($AWS_CMD --output text describe-security-groups \
+                          --filters Name=vpc-id,Values=$VPC_ID \
+                                    Name=group-name,Values=kubernetes-sec-group \
+                          --query SecurityGroups[].GroupId \
+                    | tr "\t" "\n")
 
   if [ -z "$SEC_GROUP_ID" ]; then
 	  echo "Creating security group."
