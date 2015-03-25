@@ -20,7 +20,7 @@ The example below creates a Kubernetes cluster with 4 worker node Virtual Machin
 3. Ensure that your `gcloud` components are up-to-date by running `gcloud components update`.
 4. If you want to build your own release, you need to have [Docker
 installed](https://docs.docker.com/installation/).  On Mac OS X you can use
-boot2docker.
+[boot2docker](http://boot2docker.io/). (see also: https://docs.docker.com/installation/mac/)
 5. Get or build a [binary release](binary_release.md)
 
 ### Starting a Cluster
