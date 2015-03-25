@@ -38,6 +38,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
 	"github.com/golang/glog"
 	"github.com/spf13/pflag"
 )
@@ -79,6 +80,8 @@ type KubeletServer struct {
 	ImageGCHighThresholdPercent    int
 	ImageGCLowThresholdPercent     int
 	NetworkPluginName              string
+	CloudProvider                  string
+	CloudConfigFile                string
 }
 
 // NewKubeletServer will create a new KubeletServer with default values.
@@ -140,6 +143,8 @@ func (s *KubeletServer) AddFlags(fs *pflag.FlagSet) {
 	fs.IntVar(&s.ImageGCHighThresholdPercent, "image_gc_high_threshold", s.ImageGCHighThresholdPercent, "The percent of disk usage after which image garbage collection is always run. Default: 90%%")
 	fs.IntVar(&s.ImageGCLowThresholdPercent, "image_gc_low_threshold", s.ImageGCLowThresholdPercent, "The percent of disk usage before which image garbage collection is never run. Lowest disk usage to garbage collect to. Default: 80%%")
 	fs.StringVar(&s.NetworkPluginName, "network_plugin", s.NetworkPluginName, "<Warning: Alpha feature> The name of the network plugin to be invoked for various events in kubelet/pod lifecycle")
+	fs.StringVar(&s.CloudProvider, "cloud_provider", s.CloudProvider, "The provider for cloud services.  Empty string for no provider.")
+	fs.StringVar(&s.CloudConfigFile, "cloud_config", s.CloudConfigFile, "The path to the cloud provider configuration file.  Empty string for no configuration file.")
 }
 
 // Run runs the specified KubeletServer.  This should never exit.
@@ -169,6 +174,10 @@ func (s *KubeletServer) Run(_ []string) error {
 		HighThresholdPercent: s.ImageGCHighThresholdPercent,
 		LowThresholdPercent:  s.ImageGCLowThresholdPercent,
 	}
+
+	cloud := cloudprovider.InitCloudProvider(s.CloudProvider, s.CloudConfigFile)
+	glog.Infof("Successfully initialized cloud provider: %q from the config file: %q\n", s.CloudProvider, s.CloudConfigFile)
+
 	kcfg := KubeletConfig{
 		Address:                        s.Address,
 		AllowPrivileged:                s.AllowPrivileged,
@@ -200,6 +209,7 @@ func (s *KubeletServer) Run(_ []string) error {
 		NetworkPluginName:              s.NetworkPluginName,
 		StreamingConnectionIdleTimeout: s.StreamingConnectionIdleTimeout,
 		ImageGCPolicy:                  imageGCPolicy,
+		Cloud:                          cloud,
 	}
 
 	RunKubelet(&kcfg)
@@ -262,7 +272,8 @@ func SimpleKubelet(client *client.Client,
 	volumePlugins []volume.VolumePlugin,
 	tlsOptions *kubelet.TLSOptions,
 	cadvisorInterface cadvisor.Interface,
-	configFilePath string) *KubeletConfig {
+	configFilePath string,
+	cloud cloudprovider.Interface) *KubeletConfig {
 
 	imageGCPolicy := kubelet.ImageGCPolicy{
 		HighThresholdPercent: 90,
@@ -291,6 +302,7 @@ func SimpleKubelet(client *client.Client,
 		CadvisorInterface:       cadvisorInterface,
 		ConfigFile:              configFilePath,
 		ImageGCPolicy:           imageGCPolicy,
+		Cloud:                   cloud,
 	}
 	return &kcfg
 }
@@ -399,6 +411,7 @@ type KubeletConfig struct {
 	Recorder                       record.EventRecorder
 	TLSOptions                     *kubelet.TLSOptions
 	ImageGCPolicy                  kubelet.ImageGCPolicy
+	Cloud                          cloudprovider.Interface
 }
 
 func createAndInitKubelet(kc *KubeletConfig, pc *config.PodConfig) (*kubelet.Kubelet, error) {
@@ -440,7 +453,8 @@ func createAndInitKubelet(kc *KubeletConfig, pc *config.PodConfig) (*kubelet.Kub
 		kc.StreamingConnectionIdleTimeout,
 		kc.Recorder,
 		kc.CadvisorInterface,
-		kc.ImageGCPolicy)
+		kc.ImageGCPolicy,
+		kc.Cloud)
 
 	if err != nil {
 		return nil, err

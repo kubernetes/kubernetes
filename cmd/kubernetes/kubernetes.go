@@ -150,8 +150,9 @@ func startComponents(etcdClient tools.EtcdClient, cl *client.Client, addr net.IP
 	if err != nil {
 		glog.Fatalf("Failed to create cAdvisor: %v", err)
 	}
-	kcfg := kubeletapp.SimpleKubelet(cl, dockerClient, machineList[0], "/tmp/kubernetes", "", "127.0.0.1", 10250, *masterServiceNamespace, kubeletapp.ProbeVolumePlugins(), nil, cadvisorInterface, "")
+	kcfg := kubeletapp.SimpleKubelet(cl, dockerClient, machineList[0], "/tmp/kubernetes", "", "127.0.0.1", 10250, *masterServiceNamespace, kubeletapp.ProbeVolumePlugins(), nil, cadvisorInterface, "", nil)
 	kubeletapp.RunKubelet(kcfg)
+
 }
 
 func newApiClient(addr net.IP, port int) *client.Client {

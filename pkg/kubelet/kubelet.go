@@ -37,6 +37,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/cache"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/cadvisor"
 	kubecontainer "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
@@ -137,7 +138,8 @@ func NewMainKubelet(
 	streamingConnectionIdleTimeout time.Duration,
 	recorder record.EventRecorder,
 	cadvisorInterface cadvisor.Interface,
-	imageGCPolicy ImageGCPolicy) (*Kubelet, error) {
+	imageGCPolicy ImageGCPolicy,
+	cloud cloudprovider.Interface) (*Kubelet, error) {
 	if rootDirectory == "" {
 		return nil, fmt.Errorf("invalid root directory %q", rootDirectory)
 	}
@@ -235,6 +237,7 @@ func NewMainKubelet(
 		containerGC:                    containerGC,
 		imageManager:                   imageManager,
 		statusManager:                  statusManager,
+		cloud:                          cloud,
 	}
 
 	klet.podManager = newBasicPodManager(klet.kubeClient)
@@ -351,6 +354,9 @@ type Kubelet struct {
 
 	// Syncs pods statuses with apiserver; also used as a cache of statuses.
 	statusManager *statusManager
+
+	//Cloud provider interface
+	cloud cloudprovider.Interface
 }
 
 // getRootDir returns the full path to the directory under which kubelet can
