@@ -32,6 +32,15 @@ import (
 	"github.com/golang/glog"
 )
 
+// Etcd watch event actions
+const (
+	EtcdCreate = "create"
+	EtcdGet    = "get"
+	EtcdSet    = "set"
+	EtcdCAS    = "compareAndSwap"
+	EtcdDelete = "delete"
+)
+
 // FilterFunc is a predicate which takes an API object and returns true
 // iff the object should remain in the set.
 type FilterFunc func(obj runtime.Object) bool
@@ -377,11 +386,11 @@ func (w *etcdWatcher) sendDelete(res *etcd.Response) {
 
 func (w *etcdWatcher) sendResult(res *etcd.Response) {
 	switch res.Action {
-	case "create", "get":
+	case EtcdCreate, EtcdGet:
 		w.sendAdd(res)
-	case "set", "compareAndSwap":
+	case EtcdSet, EtcdCAS:
 		w.sendModify(res)
-	case "delete":
+	case EtcdDelete:
 		w.sendDelete(res)
 	default:
 		glog.Errorf("unknown action: %v", res.Action)
