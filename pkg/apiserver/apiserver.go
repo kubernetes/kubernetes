@@ -204,7 +204,11 @@ func APIVersionHandler(versions ...string) restful.RouteFunction {
 	}
 }
 
-// write renders a returned runtime.Object to the response as a stream or an encoded object.
+// write renders a returned runtime.Object to the response as a stream or an encoded object. If the object
+// returned by the response implements rest.ResourceStreamer that interface will be used to render the
+// response. The Accept header and current API version will be passed in, and the output will be copied
+// directly to the response body. If content type is returned it is used, otherwise the content type will
+// be "application/octet-stream". All other objects are sent to standard JSON serialization.
 func write(statusCode int, apiVersion string, codec runtime.Codec, object runtime.Object, w http.ResponseWriter, req *http.Request) {
 	if stream, ok := object.(rest.ResourceStreamer); ok {
 		out, contentType, err := stream.InputStream(apiVersion, req.Header.Get("Accept"))

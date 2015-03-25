@@ -25,7 +25,6 @@ import (
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/rest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
@@ -47,14 +46,6 @@ var watchTestTable = []struct {
 	{watch.Added, &Simple{ObjectMeta: api.ObjectMeta{Name: "foo"}}},
 	{watch.Modified, &Simple{ObjectMeta: api.ObjectMeta{Name: "bar"}}},
 	{watch.Deleted, &Simple{ObjectMeta: api.ObjectMeta{Name: "bar"}}},
-}
-
-func init() {
-	mapper.(*meta.DefaultRESTMapper).Add(meta.RESTScopeNamespaceLegacy, "Simple", testVersion, false)
-	api.Scheme.AddFieldLabelConversionFunc(testVersion, "Simple",
-		func(label, value string) (string, string, error) {
-			return label, value, nil
-		})
 }
 
 func TestWatchWebsocket(t *testing.T) {

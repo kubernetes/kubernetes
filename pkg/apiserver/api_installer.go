@@ -670,6 +670,12 @@ func addParams(route *restful.RouteBuilder, params []*restful.Parameter) {
 	}
 }
 
+// addObjectParams converts a runtime.Object into a set of go-restful Param() definitions on the route.
+// The object must be a pointer to a struct; only fields at the top level of the struct that are not
+// themselves interfaces or structs are used; only fields with a json tag that is non empty (the standard
+// Go JSON behavior for omitting a field) become query parameters. The name of the query parameter is
+// the JSON field name. If a description struct tag is set on the field, that description is used on the
+// query parameter. In essence, it converts a standard JSON top level object into a query param schema.
 func addObjectParams(ws *restful.WebService, route *restful.RouteBuilder, obj runtime.Object) error {
 	sv, err := conversion.EnforcePtr(obj)
 	if err != nil {

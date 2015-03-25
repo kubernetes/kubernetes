@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// Defines conversions between generic types and structs to map query strings
+// to struct objects.
 package runtime
 
 import (
