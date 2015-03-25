@@ -310,7 +310,7 @@ kube::golang::build_binaries() {
           fi
           
           if kube::golang::is_statically_linked_library "${binary}"; then
-            CGO_ENABLED=0 go build -installsuffix cgo -o "${output_path}/${bin}" \
+            CGO_ENABLED=0 go build -o "${output_path}/${bin}" \
               "${goflags[@]:+${goflags[@]}}" \
               -ldflags "${version_ldflags}" \
               "${binary}"
@@ -324,7 +324,7 @@ kube::golang::build_binaries() {
       else
         for binary in "${binaries[@]}"; do
           if kube::golang::is_statically_linked_library "${binary}"; then
-            CGO_ENABLED=0 go install -installsuffix cgo "${goflags[@]:+${goflags[@]}}" \
+            CGO_ENABLED=0 go install "${goflags[@]:+${goflags[@]}}" \
               -ldflags "${version_ldflags}" \
               "${binary}"
           else
