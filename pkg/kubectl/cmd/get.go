@@ -34,31 +34,34 @@ const (
 	get_long = `Display one or many resources.
 
 Possible resources include pods (po), replication controllers (rc), services
-(se), minions (mi), or events (ev).
+(svc), minions (mi), or events (ev).
 
 By specifying the output as 'template' and providing a Go template as the value
 of the --template flag, you can filter the attributes of the fetched resource(s).`
 	get_example = `// List all pods in ps output format.
 $ kubectl get pods
 
-// List a single replication controller with specified ID in ps output format.
-$ kubectl get replicationController 1234-56-7890-234234-456456
+// List a single replication controller with specified NAME in ps output format.
+$ kubectl get replicationController web
 
 // List a single pod in JSON output format.
-$ kubectl get -o json pod 1234-56-7890-234234-456456
+$ kubectl get -o json pod web-pod-13je7
 
 // Return only the status value of the specified pod.
-$ kubectl get -o template pod 1234-56-7890-234234-456456 --template={{.currentState.status}}
+$ kubectl get -o template web-pod-13je7 --template={{.currentState.status}}
 
 // List all replication controllers and services together in ps output format.
-$ kubectl get rc,services`
+$ kubectl get rc,services
+
+// List one or more resources by their type and names
+$ kubectl get rc/web service/frontend pods/web-pod-13je7`
 )
 
 // NewCmdGet creates a command object for the generic "get" action, which
 // retrieves one or more resources from a server.
 func (f *Factory) NewCmdGet(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "get [(-o|--output=)json|yaml|template|...] RESOURCE [ID]",
+		Use:     "get [(-o|--output=)json|yaml|template|...] (RESOURCE [NAME] | RESOURCE/NAME ...)",
 		Short:   "Display one or many resources",
 		Long:    get_long,
 		Example: get_example,
@@ -141,6 +144,7 @@ func RunGet(f *Factory, out io.Writer, cmd *cobra.Command, args []string) error 
 		NamespaceParam(cmdNamespace).DefaultNamespace().
 		SelectorParam(selector).
 		ResourceTypeOrNameArgs(true, args...).
+		ContinueOnError().
 		Latest()
 	printer, generic, err := util.PrinterForCommand(cmd)
 	if err != nil {

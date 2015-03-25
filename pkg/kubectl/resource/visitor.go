@@ -130,6 +130,11 @@ func (i *Info) Refresh(obj runtime.Object, ignoreError bool) error {
 	return nil
 }
 
+// Namespaced returns true if the object belongs to a namespace
+func (i *Info) Namespaced() bool {
+	return i.Mapping != nil && i.Mapping.Scope.Name() == meta.RESTScopeNameNamespace
+}
+
 // Watch returns server changes to this object after it was retrieved.
 func (i *Info) Watch(resourceVersion string) (watch.Interface, error) {
 	return NewHelper(i.Client, i.Mapping).WatchSingle(i.Namespace, i.Name, resourceVersion)
@@ -418,14 +423,12 @@ func UpdateObjectNamespace(info *Info) error {
 }
 
 // FilterNamespace omits the namespace if the object is not namespace scoped
-func FilterNamespace() VisitorFunc {
-	return func(info *Info) error {
-		if info.Mapping.Scope.Name() != meta.RESTScopeNameNamespace {
-			info.Namespace = ""
-			UpdateObjectNamespace(info)
-		}
-		return nil
+func FilterNamespace(info *Info) error {
+	if !info.Namespaced() {
+		info.Namespace = ""
+		UpdateObjectNamespace(info)
 	}
+	return nil
 }
 
 // SetNamespace ensures that every Info object visited will have a namespace
@@ -446,6 +449,9 @@ func SetNamespace(namespace string) VisitorFunc {
 // accidentally operating on resources outside their namespace.
 func RequireNamespace(namespace string) VisitorFunc {
 	return func(info *Info) error {
+		if !info.Namespaced() {
+			return nil
+		}
 		if len(info.Namespace) == 0 {
 			info.Namespace = namespace
 			UpdateObjectNamespace(info)
@@ -461,8 +467,11 @@ func RequireNamespace(namespace string) VisitorFunc {
 // RetrieveLatest updates the Object on each Info by invoking a standard client
 // Get.
 func RetrieveLatest(info *Info) error {
-	if len(info.Name) == 0 || len(info.Namespace) == 0 {
+	if len(info.Name) == 0 {
 		return nil
+	}
+	if info.Namespaced() && len(info.Namespace) == 0 {
+		return fmt.Errorf("no namespace set on resource %s %q", info.Mapping.Resource, info.Name)
 	}
 	obj, err := NewHelper(info.Client, info.Mapping).Get(info.Namespace, info.Name)
 	if err != nil {
@@ -470,5 +479,13 @@ func RetrieveLatest(info *Info) error {
 	}
 	info.Object = obj
 	info.ResourceVersion, _ = info.Mapping.MetadataAccessor.ResourceVersion(obj)
+	return nil
+}
+
+// RetrieveLazy updates the object if it has not been loaded yet.
+func RetrieveLazy(info *Info) error {
+	if info.Object == nil {
+		return info.Get()
+	}
 	return nil
 }

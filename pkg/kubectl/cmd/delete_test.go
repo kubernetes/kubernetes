@@ -50,7 +50,7 @@ func TestDeleteObject(t *testing.T) {
 	cmd.Run(cmd, []string{})
 
 	// uses the name from the file, not the response
-	if buf.String() != "redis-master-controller\n" {
+	if buf.String() != "replicationControllers/redis-master-controller\n" {
 		t.Errorf("unexpected output: %s", buf.String())
 	}
 }
@@ -109,7 +109,7 @@ func TestDeleteMultipleObject(t *testing.T) {
 	cmd.Flags().Set("filename", "../../../examples/guestbook/frontend-service.json")
 	cmd.Run(cmd, []string{})
 
-	if buf.String() != "redis-master-controller\nfrontend\n" {
+	if buf.String() != "replicationControllers/redis-master-controller\nservices/frontend\n" {
 		t.Errorf("unexpected output: %s", buf.String())
 	}
 }
@@ -141,7 +141,7 @@ func TestDeleteMultipleObjectIgnoreMissing(t *testing.T) {
 	cmd.Flags().Set("filename", "../../../examples/guestbook/frontend-service.json")
 	cmd.Run(cmd, []string{})
 
-	if buf.String() != "frontend\n" {
+	if buf.String() != "services/frontend\n" {
 		t.Errorf("unexpected output: %s", buf.String())
 	}
 }
@@ -172,7 +172,7 @@ func TestDeleteDirectory(t *testing.T) {
 	cmd.Flags().Set("filename", "../../../examples/guestbook")
 	cmd.Run(cmd, []string{})
 
-	if buf.String() != "frontend-controller\nfrontend\nredis-master-controller\nredis-master\nredis-slave-controller\nredis-slave\n" {
+	if buf.String() != "replicationControllers/frontend-controller\nservices/frontend\nreplicationControllers/redis-master-controller\nservices/redis-master\nreplicationControllers/redis-slave-controller\nservices/redis-slave\n" {
 		t.Errorf("unexpected output: %s", buf.String())
 	}
 }
@@ -213,7 +213,7 @@ func TestDeleteMultipleSelector(t *testing.T) {
 	cmd.Flags().Set("selector", "a=b")
 	cmd.Run(cmd, []string{"pods,services"})
 
-	if buf.String() != "foo\nbar\nbaz\n" {
+	if buf.String() != "pods/foo\npods/bar\nservices/baz\n" {
 		t.Errorf("unexpected output: %s", buf.String())
 	}
 }
