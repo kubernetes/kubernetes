@@ -36,10 +36,7 @@ func newSourceApiserverFromLW(lw cache.ListerWatcher, updates chan<- interface{}
 	send := func(objs []interface{}) {
 		var pods []api.Pod
 		for _, o := range objs {
-			pod := o.(*api.Pod)
-			// Make a dummy self link so that references to this pod will work.
-			pod.SelfLink = "/api/v1beta1/pods/" + pod.Name
-			pods = append(pods, *pod)
+			pods = append(pods, *o.(*api.Pod))
 		}
 		updates <- kubelet.PodUpdate{pods, kubelet.SET, kubelet.ApiserverSource}
 	}
