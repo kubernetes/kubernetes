@@ -83,19 +83,14 @@ func DeleteRC(c *client.Client, ns, name string) error {
 }
 
 // Launch a Replication Controller and wait for all pods it spawns
-// to become running
+// to become running.  The controller will need to be cleaned up external
+// to this method
 func RunRC(c *client.Client, name string, ns, image string, replicas int) {
 	defer GinkgoRecover()
 
 	var last int
 	current := 0
 	same := 0
-
-	defer func() {
-		By("Cleaning up the replication controller")
-		err := DeleteRC(c, ns, name)
-		Expect(err).NotTo(HaveOccurred())
-	}()
 
 	By(fmt.Sprintf("Creating replication controller %s", name))
 	_, err := c.ReplicationControllers(ns).Create(&api.ReplicationController{
@@ -138,7 +133,7 @@ func RunRC(c *client.Client, name string, ns, image string, replicas int) {
 		} else if last == current {
 			same++
 		} else if current < last {
-			Failf("Controller %s: Number of submitted pods dropped from %d to %d", last, current)
+			Failf("Controller %s: Number of submitted pods dropped from %d to %d", name, last, current)
 		}
 
 		if same >= failCount {
@@ -228,13 +223,21 @@ var _ = Describe("Density", func() {
 		// during the test so clean it up here
 		rc, err := c.ReplicationControllers(ns).Get(RCName)
 		if err == nil && rc.Spec.Replicas != 0 {
-			DeleteRC(c, ns, RCName)
+			By("Cleaning up the replication controller")
+			err := DeleteRC(c, ns, RCName)
+			expectNoError(err)
+		}
+
+		// Clean up the namespace if a non-default one was used
+		if ns != api.NamespaceDefault {
+			By("Cleaning up the namespace")
+			err := c.Namespaces().Delete(ns)
+			expectNoError(err)
 		}
 	})
 
 	// Tests with "Skipped" substring in their name will be skipped when running
 	// e2e test suite without --ginkgo.focus & --ginkgo.skip flags.
-
 	type Density struct {
 		skip          bool
 		podsPerMinion int
@@ -260,9 +263,38 @@ var _ = Describe("Density", func() {
 		}
 		itArg := testArg
 		It(name, func() {
+			uuid := string(util.NewUUID())
 			totalPods := itArg.podsPerMinion * minionCount
-			RCName = "my-hostname-density" + strconv.Itoa(totalPods) + "-" + string(util.NewUUID())
+			nameStr := strconv.Itoa(totalPods) + "-" + uuid
+			ns = "e2e-density" + nameStr
+			RCName = "my-hostname-density" + nameStr
 			RunRC(c, RCName, ns, "gcr.io/google_containers/pause:go", totalPods)
+			By("waiting for all events to be recorded")
+			last := -1
+			current := 0
+			var events *api.EventList
+			for last < current {
+				e, err := c.Events(ns).List(
+					labels.Everything(),
+					fields.Set{
+						"involvedObject.namespace": ns,
+					}.AsSelector(),
+				)
+				expectNoError(err)
+				last = current
+				current = len(e.Items)
+				events = e
+				time.Sleep(10 * time.Second)
+			}
+			Logf("Found %d events", current)
+
+			// Verify no pods were killed or failed to start
+			By("verifying no pods were killed or failed to start")
+			for _, e := range events.Items {
+				for _, s := range []string{"kill", "fail"} {
+					Expect(e.Reason).NotTo(ContainSubstring(s), "event:' %s', reason: '%s', message: '%s', field path: '%s'", e, e.ObjectMeta.Name, e.Message, e.InvolvedObject.FieldPath)
+				}
+			}
 		})
 	}
 
@@ -305,6 +337,8 @@ var _ = Describe("Density", func() {
 						RunRC(c, name, ns, "gcr.io/google_containers/pause:go", n)
 						podsLaunched += n
 						glog.Info("Launched %v pods so far...", podsLaunched)
+						err := DeleteRC(c, ns, name)
+						expectNoError(err)
 					}
 				}()
 			}
