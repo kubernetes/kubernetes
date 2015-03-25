@@ -25,7 +25,6 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/rest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/validation"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
@@ -90,40 +89,6 @@ var StatusStrategy = podStatusStrategy{Strategy}
 func (podStatusStrategy) ValidateUpdate(obj, old runtime.Object) fielderrors.ValidationErrorList {
 	// TODO: merge valid fields after update
 	return validation.ValidatePodStatusUpdate(obj.(*api.Pod), old.(*api.Pod))
-}
-
-// PodStatusGetter is an interface used by Pods to fetch and retrieve status info.
-type PodStatusGetter interface {
-	GetPodStatus(namespace, name string) (*api.PodStatus, error)
-	ClearPodStatus(namespace, name string)
-}
-
-// PodStatusDecorator returns a function that updates pod.Status based
-// on the provided pod cache.
-func PodStatusDecorator(cache PodStatusGetter) rest.ObjectFunc {
-	return func(obj runtime.Object) error {
-		pod := obj.(*api.Pod)
-		host := pod.Status.Host
-		if status, err := cache.GetPodStatus(pod.Namespace, pod.Name); err != nil {
-			pod.Status = api.PodStatus{
-				Phase: api.PodUnknown,
-			}
-		} else {
-			pod.Status = *status
-		}
-		pod.Status.Host = host
-		return nil
-	}
-}
-
-// PodStatusReset returns a function that clears the pod cache when the object
-// is deleted.
-func PodStatusReset(cache PodStatusGetter) rest.ObjectFunc {
-	return func(obj runtime.Object) error {
-		pod := obj.(*api.Pod)
-		cache.ClearPodStatus(pod.Namespace, pod.Name)
-		return nil
-	}
 }
 
 // MatchPod returns a generic matcher for a given label and field selector.
