@@ -151,6 +151,13 @@ func ValidateSecretName(name string, prefix bool) (bool, string) {
 	return nameIsDNSSubdomain(name, prefix)
 }
 
+// ValidateEndpointsName can be used to check whether the given endpoints name is valid.
+// Prefix indicates this name will be used as part of generation, in which case
+// trailing dashes are allowed.
+func ValidateEndpointsName(name string, prefix bool) (bool, string) {
+	return nameIsDNSSubdomain(name, prefix)
+}
+
 // nameIsDNSSubdomain is a ValidateNameFunc for names that must be a DNS subdomain.
 func nameIsDNSSubdomain(name string, prefix bool) (bool, string) {
 	if prefix {
@@ -1087,7 +1094,7 @@ func validateFinalizerName(stringValue string) errs.ValidationErrorList {
 	return errs.ValidationErrorList{}
 }
 
-// ValidateNamespaceUpdate tests to make sure a mamespace update can be applied.  Modifies oldNamespace.
+// ValidateNamespaceUpdate tests to make sure a namespace update can be applied.  Modifies oldNamespace.
 func ValidateNamespaceUpdate(oldNamespace *api.Namespace, namespace *api.Namespace) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 	allErrs = append(allErrs, ValidateObjectMetaUpdate(&oldNamespace.ObjectMeta, &namespace.ObjectMeta).Prefix("metadata")...)
@@ -1125,5 +1132,19 @@ func ValidateNamespaceFinalizeUpdate(newNamespace, oldNamespace *api.Namespace) 
 	newNamespace.ObjectMeta = oldNamespace.ObjectMeta
 	newNamespace.Status = oldNamespace.Status
 	fmt.Printf("NEW NAMESPACE FINALIZERS : %v\n", newNamespace.Spec.Finalizers)
+	return allErrs
+}
+
+// ValidateEndpoints tests if required fields are set.
+func ValidateEndpoints(endpoints *api.Endpoints) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+	allErrs = append(allErrs, ValidateObjectMeta(&endpoints.ObjectMeta, true, ValidateEndpointsName).Prefix("metadata")...)
+	return allErrs
+}
+
+// ValidateEndpointsUpdate tests to make sure an endpoints update can be applied.
+func ValidateEndpointsUpdate(oldEndpoints *api.Endpoints, endpoints *api.Endpoints) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+	allErrs = append(allErrs, ValidateObjectMetaUpdate(&oldEndpoints.ObjectMeta, &endpoints.ObjectMeta).Prefix("metadata")...)
 	return allErrs
 }
