@@ -49,6 +49,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/event"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/limitrange"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/minion"
+	nodeetcd "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/minion/etcd"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/namespace"
 	namespaceetcd "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/namespace/etcd"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/pod"
@@ -362,13 +363,12 @@ func (m *Master) init(c *Config) {
 	endpointsStorage := endpointsetcd.NewStorage(c.EtcdHelper)
 	m.endpointRegistry = endpoint.NewRegistry(endpointsStorage)
 
+	nodeStorage := nodeetcd.NewStorage(c.EtcdHelper, c.KubeletClient)
+	m.nodeRegistry = minion.NewRegistry(nodeStorage)
+
 	// TODO: split me up into distinct storage registries
 	registry := etcd.NewRegistry(c.EtcdHelper, podRegistry, m.endpointRegistry)
-
 	m.serviceRegistry = registry
-	m.nodeRegistry = registry
-
-	nodeStorage := minion.NewStorage(m.nodeRegistry, c.KubeletClient)
 
 	controllerStorage := controlleretcd.NewREST(c.EtcdHelper)
 

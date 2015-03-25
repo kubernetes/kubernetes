@@ -79,31 +79,3 @@ func (svcStrategy) AllowCreateOnUpdate() bool {
 func (svcStrategy) ValidateUpdate(obj, old runtime.Object) fielderrors.ValidationErrorList {
 	return validation.ValidateServiceUpdate(old.(*api.Service), obj.(*api.Service))
 }
-
-// nodeStrategy implements behavior for nodes
-// TODO: move to a node specific package.
-type nodeStrategy struct {
-	runtime.ObjectTyper
-	api.NameGenerator
-}
-
-// Nodes is the default logic that applies when creating and updating Node
-// objects.
-var Nodes RESTCreateStrategy = nodeStrategy{api.Scheme, api.SimpleNameGenerator}
-
-// NamespaceScoped is false for nodes.
-func (nodeStrategy) NamespaceScoped() bool {
-	return false
-}
-
-// ResetBeforeCreate clears fields that are not allowed to be set by end users on creation.
-func (nodeStrategy) ResetBeforeCreate(obj runtime.Object) {
-	_ = obj.(*api.Node)
-	// Nodes allow *all* fields, including status, to be set.
-}
-
-// Validate validates a new node.
-func (nodeStrategy) Validate(obj runtime.Object) fielderrors.ValidationErrorList {
-	node := obj.(*api.Node)
-	return validation.ValidateMinion(node)
-}
