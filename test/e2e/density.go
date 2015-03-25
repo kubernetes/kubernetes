@@ -166,11 +166,11 @@ func RunRC(c *client.Client, name string, ns, image string, replicas int) {
 	Expect(current).To(Equal(replicas))
 }
 
-// This test suite can take a long time to run, so by default it is disabled
-// by being marked as Pending.  To enable this suite, remove the P from the
-// front of PDescribe (PDescribe->Describe) and then all tests will
-// be available
-var _ = PDescribe("Density", func() {
+// This test suite can take a long time to run, so by default it is added to
+// the ginkgo.skip list (see driver.go).
+// To run this suite you must explicitly ask for it by setting the
+// -t/--test flag or ginkgo.focus flag.
+var _ = Describe("Density", func() {
 	var c *client.Client
 	var minionCount int
 	var RCName string
