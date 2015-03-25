@@ -1,10 +1,14 @@
 package restful
 
+import (
+	"os"
+
+	"github.com/emicklei/go-restful/log"
+)
+
 // Copyright 2013 Ernest Micklei. All rights reserved.
 // Use of this source code is governed by a license
 // that can be found in the LICENSE file.
-
-import "log"
 
 // WebService holds a collection of Route values that bind a Http Method + URL Path to a function.
 type WebService struct {
@@ -26,7 +30,8 @@ func (w *WebService) compilePathExpression() {
 	}
 	compiled, err := newPathExpression(w.rootPath)
 	if err != nil {
-		log.Fatalf("[restful] invalid path:%s because:%v", w.rootPath, err)
+		log.Printf("[restful] invalid path:%s because:%v", w.rootPath, err)
+		os.Exit(1)
 	}
 	w.pathExpr = compiled
 }

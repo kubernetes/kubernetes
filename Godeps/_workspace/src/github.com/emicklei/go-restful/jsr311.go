@@ -55,22 +55,22 @@ func (r RouterJSR311) detectRoute(routes []Route, httpRequest *http.Request) (*R
 		return nil, NewError(http.StatusMethodNotAllowed, "405: Method Not Allowed")
 	}
 	inputMediaOk := methodOk
+
 	// content-type
 	contentType := httpRequest.Header.Get(HEADER_ContentType)
-	if httpRequest.ContentLength > 0 {
-		inputMediaOk = []Route{}
-		for _, each := range methodOk {
-			if each.matchesContentType(contentType) {
-				inputMediaOk = append(inputMediaOk, each)
-			}
-		}
-		if len(inputMediaOk) == 0 {
-			if trace {
-				traceLogger.Printf("no Route found (from %d) that matches HTTP Content-Type: %s\n", len(methodOk), contentType)
-			}
-			return nil, NewError(http.StatusUnsupportedMediaType, "415: Unsupported Media Type")
+	inputMediaOk = []Route{}
+	for _, each := range methodOk {
+		if each.matchesContentType(contentType) {
+			inputMediaOk = append(inputMediaOk, each)
 		}
 	}
+	if len(inputMediaOk) == 0 {
+		if trace {
+			traceLogger.Printf("no Route found (from %d) that matches HTTP Content-Type: %s\n", len(methodOk), contentType)
+		}
+		return nil, NewError(http.StatusUnsupportedMediaType, "415: Unsupported Media Type")
+	}
+
 	// accept
 	outputMediaOk := []Route{}
 	accept := httpRequest.Header.Get(HEADER_Accept)

@@ -32,7 +32,7 @@ func (c CrossOriginResourceSharing) Filter(req *Request, resp *Response, chain *
 	origin := req.Request.Header.Get(HEADER_Origin)
 	if len(origin) == 0 {
 		if trace {
-			traceLogger.Println("no Http header Origin set")
+			traceLogger.Print("no Http header Origin set")
 		}
 		chain.ProcessFilter(req, resp)
 		return

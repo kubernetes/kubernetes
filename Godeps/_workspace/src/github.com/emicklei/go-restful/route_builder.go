@@ -5,9 +5,12 @@ package restful
 // that can be found in the LICENSE file.
 
 import (
-	"log"
+	"os"
 	"reflect"
+	"runtime"
 	"strings"
+
+	"github.com/emicklei/go-restful/log"
 )
 
 // RouteBuilder is a helper to construct Routes.
@@ -126,6 +129,7 @@ func (b *RouteBuilder) Param(parameter *Parameter) *RouteBuilder {
 }
 
 // Operation allows you to document what the acutal method/function call is of the Route.
+// Unless called, the operation name is derived from the RouteFunction set using To(..).
 func (b *RouteBuilder) Operation(name string) *RouteBuilder {
 	b.operation = name
 	return b
@@ -133,7 +137,7 @@ func (b *RouteBuilder) Operation(name string) *RouteBuilder {
 
 // ReturnsError is deprecated, use Returns instead.
 func (b *RouteBuilder) ReturnsError(code int, message string, model interface{}) *RouteBuilder {
-	log.Println("ReturnsError is deprecated, use Returns instead.")
+	log.Print("ReturnsError is deprecated, use Returns instead.")
 	return b.Returns(code, message, model)
 }
 
@@ -186,10 +190,17 @@ func (b *RouteBuilder) copyDefaults(rootProduces, rootConsumes []string) {
 func (b *RouteBuilder) Build() Route {
 	pathExpr, err := newPathExpression(b.currentPath)
 	if err != nil {
-		log.Fatalf("[restful] Invalid path:%s because:%v", b.currentPath, err)
+		log.Printf("[restful] Invalid path:%s because:%v", b.currentPath, err)
+		os.Exit(1)
 	}
 	if b.function == nil {
-		log.Fatalf("[restful] No function specified for route:" + b.currentPath)
+		log.Printf("[restful] No function specified for route:" + b.currentPath)
+		os.Exit(1)
+	}
+	operationName := b.operation
+	if len(operationName) == 0 && b.function != nil {
+		// extract from definition
+		operationName = nameOfFunction(b.function)
 	}
 	route := Route{
 		Method:         b.httpMethod,
@@ -202,7 +213,7 @@ func (b *RouteBuilder) Build() Route {
 		pathExpr:       pathExpr,
 		Doc:            b.doc,
 		Notes:          b.notes,
-		Operation:      b.operation,
+		Operation:      operationName,
 		ParameterDocs:  b.parameters,
 		ResponseErrors: b.errorMap,
 		ReadSample:     b.readSample,
@@ -213,4 +224,17 @@ func (b *RouteBuilder) Build() Route {
 
 func concatPath(path1, path2 string) string {
 	return strings.TrimRight(path1, "/") + "/" + strings.TrimLeft(path2, "/")
+}
+
+// nameOfFunction returns the short name of the function f for documentation.
+// It uses a runtime feature for debugging ; its value may change for later Go versions.
+func nameOfFunction(f interface{}) string {
+	fun := runtime.FuncForPC(reflect.ValueOf(f).Pointer())
+	tokenized := strings.Split(fun.Name(), ".")
+	last := tokenized[len(tokenized)-1]
+	last = strings.TrimSuffix(last, ")·fm") // < Go 1.5
+	last = strings.TrimSuffix(last, ")-fm") // Go 1.5
+	last = strings.TrimSuffix(last, "·fm")  // < Go 1.5
+	last = strings.TrimSuffix(last, "-fm")  // Go 1.5
+	return last
 }

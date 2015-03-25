@@ -53,6 +53,7 @@ func (u UserResource) findUser(request *restful.Request, response *restful.Respo
 - API declaration for Swagger UI (see swagger package)
 - Panic recovery to produce HTTP 500, customizable using RecoverHandler(...)
 - Route errors produce HTTP 404/405/406/415 errors, customizable using ServiceErrorHandler(...)
+- Configurable (trace) logging
 	
 ### Resources
 
@@ -64,8 +65,8 @@ func (u UserResource) findUser(request *restful.Request, response *restful.Respo
 - [gopkg.in](https://gopkg.in/emicklei/go-restful.v1)
 - [showcase: Mora - MongoDB REST Api server](https://github.com/emicklei/mora)
 
-[![Build Status](https://drone.io/github.com/emicklei/go-restful/status.png)](https://drone.io/github.com/emicklei/go-restful/latest)[![library users](https://sourcegraph.com/api/repos/github.com/emicklei/go-restful/badges/library-users.png)](https://sourcegraph.com/github.com/emicklei/go-restful) [![authors](https://sourcegraph.com/api/repos/github.com/emicklei/go-restful/badges/authors.png)](https://sourcegraph.com/github.com/emicklei/go-restful) [![xrefs](https://sourcegraph.com/api/repos/github.com/emicklei/go-restful/badges/xrefs.png)](https://sourcegraph.com/github.com/emicklei/go-restful)
+[![Build Status](https://drone.io/github.com/emicklei/go-restful/status.png)](https://drone.io/github.com/emicklei/go-restful/latest)
 
-(c) 2012 - 2014, http://ernestmicklei.com. MIT License
+(c) 2012 - 2015, http://ernestmicklei.com. MIT License
 
 Type ```git shortlog -s``` for a full list of contributors.

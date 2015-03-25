@@ -23,9 +23,11 @@ func TestServiceToApi(t *testing.T) {
 	ws.Route(ws.DELETE("/a").To(dummy).Writes(sample{}))
 	ws.ApiVersion("1.2.3")
 	cfg := Config{
-		WebServicesUrl: "http://here.com",
-		ApiPath:        "/apipath",
-		WebServices:    []*restful.WebService{ws}}
+		WebServicesUrl:   "http://here.com",
+		ApiPath:          "/apipath",
+		WebServices:      []*restful.WebService{ws},
+		PostBuildHandler: func(in map[string]ApiDeclaration) {},
+	}
 	sws := newSwaggerService(cfg)
 	decl := sws.composeDeclaration(ws, "/tests")
 	// checks

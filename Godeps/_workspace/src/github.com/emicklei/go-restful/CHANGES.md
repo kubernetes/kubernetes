@@ -1,5 +1,19 @@
 Change history of go-restful
 =
+2015-03-20
+- add configurable logging
+
+2015-03-18
+- if not specified, the Operation is derived from the Route function
+
+2015-03-17
+- expose Parameter creation functions
+- make trace logger an interface
+- fix OPTIONSFilter
+- customize rendering of ServiceError
+- JSR311 router now handles wildcards
+- add Notes to Route
+
 2014-11-27
 - (api add) PrettyPrint per response. (as proposed in #167)
 
