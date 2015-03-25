@@ -20,18 +20,14 @@ import (
 	"fmt"
 	"os/exec"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
 
 var _ = Describe("MasterCerts", func() {
-	var c *client.Client
-
 	BeforeEach(func() {
 		var err error
-		c, err = loadClient()
+		_, err = loadClient()
 		Expect(err).NotTo(HaveOccurred())
 	})
 
