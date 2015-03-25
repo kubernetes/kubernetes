@@ -1823,6 +1823,14 @@ func TestValidateMinion(t *testing.T) {
 					{Type: api.NodeLegacyHostIP, Address: "something"},
 				},
 			},
+			Spec: api.NodeSpec{
+				ExternalID: "external",
+				Capacity: api.ResourceList{
+					api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
+					api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
+					api.ResourceName("my.org/gpu"):       resource.MustParse("10"),
+				},
+			},
 		},
 		{
 			ObjectMeta: api.ObjectMeta{
@@ -1831,6 +1839,13 @@ func TestValidateMinion(t *testing.T) {
 			Status: api.NodeStatus{
 				Addresses: []api.NodeAddress{
 					{Type: api.NodeLegacyHostIP, Address: "something"},
+				},
+			},
+			Spec: api.NodeSpec{
+				ExternalID: "external",
+				Capacity: api.ResourceList{
+					api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
+					api.ResourceName(api.ResourceMemory): resource.MustParse("0"),
 				},
 			},
 		},
@@ -1850,11 +1865,96 @@ func TestValidateMinion(t *testing.T) {
 			Status: api.NodeStatus{
 				Addresses: []api.NodeAddress{},
 			},
+			Spec: api.NodeSpec{
+				ExternalID: "external",
+				Capacity: api.ResourceList{
+					api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
+					api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
+				},
+			},
 		},
 		"invalid-labels": {
 			ObjectMeta: api.ObjectMeta{
 				Name:   "abc-123",
 				Labels: invalidSelector,
+			},
+			Spec: api.NodeSpec{
+				ExternalID: "external",
+				Capacity: api.ResourceList{
+					api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
+					api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
+				},
+			},
+		},
+		"missing-external-id": {
+			ObjectMeta: api.ObjectMeta{
+				Name:   "abc-123",
+				Labels: validSelector,
+			},
+			Spec: api.NodeSpec{
+				Capacity: api.ResourceList{
+					api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
+					api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
+				},
+			},
+		},
+		"missing-capacity": {
+			ObjectMeta: api.ObjectMeta{
+				Name:   "abc-123",
+				Labels: validSelector,
+			},
+			Spec: api.NodeSpec{
+				ExternalID: "external",
+			},
+		},
+		"missing-memory": {
+			ObjectMeta: api.ObjectMeta{
+				Name:   "abc-123",
+				Labels: validSelector,
+			},
+			Spec: api.NodeSpec{
+				ExternalID: "external",
+				Capacity: api.ResourceList{
+					api.ResourceName(api.ResourceCPU): resource.MustParse("10"),
+				},
+			},
+		},
+		"missing-cpu": {
+			ObjectMeta: api.ObjectMeta{
+				Name:   "abc-123",
+				Labels: validSelector,
+			},
+			Spec: api.NodeSpec{
+				ExternalID: "external",
+				Capacity: api.ResourceList{
+					api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
+				},
+			},
+		},
+		"invalid-memory": {
+			ObjectMeta: api.ObjectMeta{
+				Name:   "abc-123",
+				Labels: validSelector,
+			},
+			Spec: api.NodeSpec{
+				ExternalID: "external",
+				Capacity: api.ResourceList{
+					api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
+					api.ResourceName(api.ResourceMemory): resource.MustParse("-10G"),
+				},
+			},
+		},
+		"invalid-cpu": {
+			ObjectMeta: api.ObjectMeta{
+				Name:   "abc-123",
+				Labels: validSelector,
+			},
+			Spec: api.NodeSpec{
+				ExternalID: "external",
+				Capacity: api.ResourceList{
+					api.ResourceName(api.ResourceCPU):    resource.MustParse("-10"),
+					api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
+				},
 			},
 		},
 	}
@@ -1865,10 +1965,17 @@ func TestValidateMinion(t *testing.T) {
 		}
 		for i := range errs {
 			field := errs[i].(*errors.ValidationError).Field
-			if field != "metadata.name" &&
-				field != "metadata.labels" &&
-				field != "metadata.annotations" &&
-				field != "metadata.namespace" {
+			expectedFields := map[string]bool{
+				"metadata.name":         true,
+				"metadata.labels":       true,
+				"metadata.annotations":  true,
+				"metadata.namespace":    true,
+				"spec.Capacity":         true,
+				"spec.Capacity[memory]": true,
+				"spec.Capacity[cpu]":    true,
+				"spec.ExternalID":       true,
+			}
+			if expectedFields[field] == false {
 				t.Errorf("%s: missing prefix for: %v", k, errs[i])
 			}
 		}

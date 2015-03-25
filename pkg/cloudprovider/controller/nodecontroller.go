@@ -520,7 +520,9 @@ func (nc *NodeController) GetStaticNodesWithSpec() (*api.NodeList, error) {
 	for _, nodeID := range nc.nodes {
 		node := api.Node{
 			ObjectMeta: api.ObjectMeta{Name: nodeID},
-			Spec:       api.NodeSpec{Capacity: nc.staticResources.Capacity},
+			Spec: api.NodeSpec{
+				Capacity:   nc.staticResources.Capacity,
+				ExternalID: nodeID},
 		}
 		result.Items = append(result.Items, node)
 	}

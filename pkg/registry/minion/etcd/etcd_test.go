@@ -24,6 +24,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/rest/resttest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
@@ -59,6 +60,13 @@ func validNewNode() *api.Node {
 			Name: "foo",
 			Labels: map[string]string{
 				"name": "foo",
+			},
+		},
+		Spec: api.NodeSpec{
+			ExternalID: "external",
+			Capacity: api.ResourceList{
+				api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
+				api.ResourceName(api.ResourceMemory): resource.MustParse("0"),
 			},
 		},
 	}

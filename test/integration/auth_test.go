@@ -133,6 +133,10 @@ var aMinion string = `
   "kind": "Minion",
   "apiVersion": "v1beta1",
   "id": "a",
+  "resources": {
+	"capacity": { "memory": "10", "cpu": "10"}
+  },
+  "externalID": "external",
   "hostIP": "10.10.10.10"%s
 }
 `
