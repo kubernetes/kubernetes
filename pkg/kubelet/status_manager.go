@@ -23,6 +23,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	kubecontainer "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/golang/glog"
 )
@@ -101,7 +102,7 @@ func (s *statusManager) SyncBatch() {
 			podFullName := syncRequest.podFullName
 			status := syncRequest.status
 			glog.V(3).Infof("Syncing status for %s", podFullName)
-			name, namespace, err := ParsePodFullName(podFullName)
+			name, namespace, err := kubecontainer.ParsePodFullName(podFullName)
 			if err != nil {
 				glog.Warningf("Cannot parse pod full name %q: %s", podFullName, err)
 			}

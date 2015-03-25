@@ -23,6 +23,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/dockertools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 )
@@ -46,7 +47,7 @@ func createPodWorkers() (*podWorkers, map[types.UID][]string) {
 
 	podWorkers := newPodWorkers(
 		fakeDockerCache,
-		func(pod *api.Pod, hasMirrorPod bool, containers dockertools.DockerContainers) error {
+		func(pod *api.Pod, hasMirrorPod bool, runningPod container.Pod) error {
 			func() {
 				lock.Lock()
 				defer lock.Unlock()

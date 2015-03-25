@@ -38,6 +38,8 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/cadvisor"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
+	kubecontainer "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/dockertools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/metrics"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/network"
@@ -87,8 +89,8 @@ func newTestKubelet(t *testing.T) *TestKubelet {
 	waitGroup := new(sync.WaitGroup)
 	kubelet.podWorkers = newPodWorkers(
 		fakeDockerCache,
-		func(pod *api.Pod, hasMirrorPod bool, containers dockertools.DockerContainers) error {
-			err := kubelet.syncPod(pod, hasMirrorPod, containers)
+		func(pod *api.Pod, hasMirrorPod bool, runningPod container.Pod) error {
+			err := kubelet.syncPod(pod, hasMirrorPod, runningPod)
 			waitGroup.Done()
 			return err
 		},
@@ -313,15 +315,49 @@ func TestKubeletDirsCompat(t *testing.T) {
 	}
 }
 
+func apiContainerToContainer(c docker.APIContainers) container.Container {
+	dockerName, hash, err := dockertools.ParseDockerName(c.Names[0])
+	if err != nil {
+		return container.Container{}
+	}
+	return container.Container{
+		ID:   types.UID(c.ID),
+		Name: dockerName.ContainerName,
+		Hash: hash,
+	}
+}
+
+func dockerContainersToPod(containers dockertools.DockerContainers) container.Pod {
+	var pod container.Pod
+	for _, c := range containers {
+		dockerName, hash, err := dockertools.ParseDockerName(c.Names[0])
+		if err != nil {
+			continue
+		}
+		pod.Containers = append(pod.Containers, &container.Container{
+			ID:    types.UID(c.ID),
+			Name:  dockerName.ContainerName,
+			Hash:  hash,
+			Image: c.Image,
+		})
+		// TODO(yifan): Only one evaluation is enough.
+		pod.ID = dockerName.PodUID
+		name, namespace, _ := kubecontainer.ParsePodFullName(dockerName.PodFullName)
+		pod.Name = name
+		pod.Namespace = namespace
+	}
+	return pod
+}
+
 func TestKillContainerWithError(t *testing.T) {
 	containers := []docker.APIContainers{
 		{
 			ID:    "1234",
-			Names: []string{"/k8s_foo_qux_1234_42"},
+			Names: []string{"/k8s_foo_qux_new_1234_42"},
 		},
 		{
 			ID:    "5678",
-			Names: []string{"/k8s_bar_qux_5678_42"},
+			Names: []string{"/k8s_bar_qux_new_5678_42"},
 		},
 	}
 	fakeDocker := &dockertools.FakeDockerClient{
@@ -334,7 +370,8 @@ func TestKillContainerWithError(t *testing.T) {
 		kubelet.readiness.set(c.ID, true)
 	}
 	kubelet.dockerClient = fakeDocker
-	err := kubelet.killContainer(&fakeDocker.ContainerList[0])
+	c := apiContainerToContainer(fakeDocker.ContainerList[0])
+	err := kubelet.killContainer(&c)
 	if err == nil {
 		t.Errorf("expected error, found nil")
 	}
@@ -353,11 +390,11 @@ func TestKillContainer(t *testing.T) {
 	containers := []docker.APIContainers{
 		{
 			ID:    "1234",
-			Names: []string{"/k8s_foo_qux_1234_42"},
+			Names: []string{"/k8s_foo_qux_new_1234_42"},
 		},
 		{
 			ID:    "5678",
-			Names: []string{"/k8s_bar_qux_5678_42"},
+			Names: []string{"/k8s_bar_qux_new_5678_42"},
 		},
 	}
 	testKubelet := newTestKubelet(t)
@@ -371,7 +408,8 @@ func TestKillContainer(t *testing.T) {
 		kubelet.readiness.set(c.ID, true)
 	}
 
-	err := kubelet.killContainer(&fakeDocker.ContainerList[0])
+	c := apiContainerToContainer(fakeDocker.ContainerList[0])
+	err := kubelet.killContainer(&c)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -916,7 +954,7 @@ func TestSyncPodDeletesDuplicate(t *testing.T) {
 	}
 	pods := []api.Pod{bound}
 	kubelet.podManager.SetPods(pods)
-	err := kubelet.syncPod(&bound, false, dockerContainers)
+	err := kubelet.syncPod(&bound, false, dockerContainersToPod(dockerContainers))
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -958,7 +996,7 @@ func TestSyncPodBadHash(t *testing.T) {
 	}
 	pods := []api.Pod{bound}
 	kubelet.podManager.SetPods(pods)
-	err := kubelet.syncPod(&bound, false, dockerContainers)
+	err := kubelet.syncPod(&bound, false, dockerContainersToPod(dockerContainers))
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -1013,7 +1051,7 @@ func TestSyncPodUnhealthy(t *testing.T) {
 	}
 	pods := []api.Pod{bound}
 	kubelet.podManager.SetPods(pods)
-	err := kubelet.syncPod(&bound, false, dockerContainers)
+	err := kubelet.syncPod(&bound, false, dockerContainersToPod(dockerContainers))
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -1499,7 +1537,7 @@ func TestRunInContainerNoSuchPod(t *testing.T) {
 	podNamespace := "nsFoo"
 	containerName := "containerFoo"
 	output, err := kubelet.RunInContainer(
-		GetPodFullName(&api.Pod{ObjectMeta: api.ObjectMeta{Name: podName, Namespace: podNamespace}}),
+		kubecontainer.GetPodFullName(&api.Pod{ObjectMeta: api.ObjectMeta{Name: podName, Namespace: podNamespace}}),
 		"",
 		containerName,
 		[]string{"ls"})
@@ -1532,7 +1570,7 @@ func TestRunInContainer(t *testing.T) {
 
 	cmd := []string{"ls"}
 	_, err := kubelet.RunInContainer(
-		GetPodFullName(&api.Pod{
+		kubecontainer.GetPodFullName(&api.Pod{
 			ObjectMeta: api.ObjectMeta{
 				UID:       "12345678",
 				Name:      podName,
@@ -1704,7 +1742,7 @@ func TestSyncPodEventHandlerFails(t *testing.T) {
 	}
 	pods := []api.Pod{bound}
 	kubelet.podManager.SetPods(pods)
-	err := kubelet.syncPod(&bound, false, dockerContainers)
+	err := kubelet.syncPod(&bound, false, dockerContainersToPod(dockerContainers))
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -2566,7 +2604,7 @@ func TestExecInContainerNoSuchPod(t *testing.T) {
 	podNamespace := "nsFoo"
 	containerName := "containerFoo"
 	err := kubelet.ExecInContainer(
-		GetPodFullName(&api.Pod{ObjectMeta: api.ObjectMeta{Name: podName, Namespace: podNamespace}}),
+		kubecontainer.GetPodFullName(&api.Pod{ObjectMeta: api.ObjectMeta{Name: podName, Namespace: podNamespace}}),
 		"",
 		containerName,
 		[]string{"ls"},
@@ -2602,7 +2640,7 @@ func TestExecInContainerNoSuchContainer(t *testing.T) {
 	}
 
 	err := kubelet.ExecInContainer(
-		GetPodFullName(&api.Pod{ObjectMeta: api.ObjectMeta{
+		kubecontainer.GetPodFullName(&api.Pod{ObjectMeta: api.ObjectMeta{
 			UID:       "12345678",
 			Name:      podName,
 			Namespace: podNamespace,
@@ -2661,7 +2699,7 @@ func TestExecInContainer(t *testing.T) {
 	}
 
 	err := kubelet.ExecInContainer(
-		GetPodFullName(&api.Pod{ObjectMeta: api.ObjectMeta{
+		kubecontainer.GetPodFullName(&api.Pod{ObjectMeta: api.ObjectMeta{
 			UID:       "12345678",
 			Name:      podName,
 			Namespace: podNamespace,
@@ -2710,7 +2748,7 @@ func TestPortForwardNoSuchPod(t *testing.T) {
 	var port uint16 = 5000
 
 	err := kubelet.PortForward(
-		GetPodFullName(&api.Pod{ObjectMeta: api.ObjectMeta{Name: podName, Namespace: podNamespace}}),
+		kubecontainer.GetPodFullName(&api.Pod{ObjectMeta: api.ObjectMeta{Name: podName, Namespace: podNamespace}}),
 		"",
 		port,
 		nil,
@@ -2742,7 +2780,7 @@ func TestPortForwardNoSuchContainer(t *testing.T) {
 	}
 
 	err := kubelet.PortForward(
-		GetPodFullName(&api.Pod{ObjectMeta: api.ObjectMeta{
+		kubecontainer.GetPodFullName(&api.Pod{ObjectMeta: api.ObjectMeta{
 			UID:       "12345678",
 			Name:      podName,
 			Namespace: podNamespace,
@@ -2787,7 +2825,7 @@ func TestPortForward(t *testing.T) {
 	}
 
 	err := kubelet.PortForward(
-		GetPodFullName(&api.Pod{ObjectMeta: api.ObjectMeta{
+		kubecontainer.GetPodFullName(&api.Pod{ObjectMeta: api.ObjectMeta{
 			UID:       "12345678",
 			Name:      podName,
 			Namespace: podNamespace,
@@ -2863,7 +2901,7 @@ func TestHandlePortConflicts(t *testing.T) {
 	pods[1].CreationTimestamp = util.NewTime(time.Now())
 	pods[0].CreationTimestamp = util.NewTime(time.Now().Add(1 * time.Second))
 	// The newer pod should be rejected.
-	conflictedPodName := GetPodFullName(&pods[0])
+	conflictedPodName := kubecontainer.GetPodFullName(&pods[0])
 
 	kl.handleNotFittingPods(pods)
 	// Check pod status stored in the status map.
@@ -2913,7 +2951,7 @@ func TestHandleNodeSelector(t *testing.T) {
 		},
 	}
 	// The first pod should be rejected.
-	notfittingPodName := GetPodFullName(&pods[0])
+	notfittingPodName := kubecontainer.GetPodFullName(&pods[0])
 
 	kl.handleNotFittingPods(pods)
 	// Check pod status stored in the status map.
@@ -2969,7 +3007,7 @@ func TestHandleMemExceeded(t *testing.T) {
 	pods[1].CreationTimestamp = util.NewTime(time.Now())
 	pods[0].CreationTimestamp = util.NewTime(time.Now().Add(1 * time.Second))
 	// The newer pod should be rejected.
-	notfittingPodName := GetPodFullName(&pods[0])
+	notfittingPodName := kubecontainer.GetPodFullName(&pods[0])
 
 	kl.handleNotFittingPods(pods)
 	// Check pod status stored in the status map.
@@ -3004,12 +3042,12 @@ func TestPurgingObsoleteStatusMapEntries(t *testing.T) {
 	}
 	// Run once to populate the status map.
 	kl.handleNotFittingPods(pods)
-	if _, err := kl.GetPodStatus(BuildPodFullName("pod2", "")); err != nil {
+	if _, err := kl.GetPodStatus(kubecontainer.BuildPodFullName("pod2", "")); err != nil {
 		t.Fatalf("expected to have status cached for %q: %v", "pod2", err)
 	}
 	// Sync with empty pods so that the entry in status map will be removed.
 	kl.SyncPods([]api.Pod{}, emptyPodUIDs, map[string]*api.Pod{}, time.Now())
-	if _, err := kl.GetPodStatus(BuildPodFullName("pod2", "")); err == nil {
+	if _, err := kl.GetPodStatus(kubecontainer.BuildPodFullName("pod2", "")); err == nil {
 		t.Fatalf("expected to not have status cached for %q: %v", "pod2", err)
 	}
 }
@@ -3250,11 +3288,11 @@ func TestCreateMirrorPod(t *testing.T) {
 	pods := []api.Pod{pod}
 	kl.podManager.SetPods(pods)
 	hasMirrorPod := false
-	err := kl.syncPod(&pod, hasMirrorPod, dockertools.DockerContainers{})
+	err := kl.syncPod(&pod, hasMirrorPod, container.Pod{})
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	podFullName := GetPodFullName(&pod)
+	podFullName := kubecontainer.GetPodFullName(&pod)
 	if !manager.HasPod(podFullName) {
 		t.Errorf("expected mirror pod %q to be created", podFullName)
 	}
@@ -3304,7 +3342,7 @@ func TestDeleteOrphanedMirrorPods(t *testing.T) {
 		t.Errorf("expected zero mirror pods, got %v", manager.GetPods())
 	}
 	for _, pod := range orphanPods {
-		name := GetPodFullName(&pod)
+		name := kubecontainer.GetPodFullName(&pod)
 		creates, deletes := manager.GetCounts(name)
 		if creates != 0 || deletes != 1 {
 			t.Errorf("expected 0 creation and one deletion of %q, got %d, %d", name, creates, deletes)

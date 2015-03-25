@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	kubecontainer "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
 )
 
 // Stub out mirror client for testing purpose.
@@ -78,9 +79,9 @@ func TestGetSetPods(t *testing.T) {
 	} else if !reflect.DeepEqual(&mirrorPod, actualPod) {
 		t.Errorf("mirror pod is recorded incorrectly. expect: %v, got: %v", mirrorPod, actualPod)
 	}
-	actualPod, ok = podManager.mirrorPodByFullName[GetPodFullName(&mirrorPod)]
+	actualPod, ok = podManager.mirrorPodByFullName[kubecontainer.GetPodFullName(&mirrorPod)]
 	if !ok {
-		t.Errorf("mirror pod %q is not found in the mirror pod map by full name", GetPodFullName(&mirrorPod))
+		t.Errorf("mirror pod %q is not found in the mirror pod map by full name", kubecontainer.GetPodFullName(&mirrorPod))
 	} else if !reflect.DeepEqual(&mirrorPod, actualPod) {
 		t.Errorf("mirror pod is recorded incorrectly. expect: %v, got: %v", mirrorPod, actualPod)
 	}

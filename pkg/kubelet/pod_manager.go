@@ -21,6 +21,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	kubecontainer "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/metrics"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	"github.com/golang/glog"
@@ -139,7 +140,7 @@ func (self *basicPodManager) setPods(newPods []api.Pod) {
 
 	for i := range newPods {
 		pod := newPods[i]
-		podFullName := GetPodFullName(&pod)
+		podFullName := kubecontainer.GetPodFullName(&pod)
 		if isMirrorPod(&pod) {
 			mirrorPodByUID[pod.UID] = &pod
 			mirrorPodByFullName[podFullName] = &pod
@@ -207,7 +208,7 @@ func (self *basicPodManager) GetPodsAndMirrorMap() ([]api.Pod, map[string]*api.P
 // GetPodByName provides the (non-mirror) pod that matches namespace and name,
 // as well as whether the pod was found.
 func (self *basicPodManager) GetPodByName(namespace, name string) (*api.Pod, bool) {
-	podFullName := BuildPodFullName(name, namespace)
+	podFullName := kubecontainer.BuildPodFullName(name, namespace)
 	return self.GetPodByFullName(podFullName)
 }
 
@@ -234,7 +235,7 @@ func (self *basicPodManager) TranslatePodUID(uid types.UID) types.UID {
 	self.lock.RLock()
 	defer self.lock.RUnlock()
 	if mirrorPod, ok := self.mirrorPodByUID[uid]; ok {
-		podFullName := GetPodFullName(mirrorPod)
+		podFullName := kubecontainer.GetPodFullName(mirrorPod)
 		if pod, ok := self.podByFullName[podFullName]; ok {
 			return pod.UID
 		}

@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	kubecontainer "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
@@ -36,7 +37,7 @@ type fakeMirrorClient struct {
 func (self *fakeMirrorClient) CreateMirrorPod(pod api.Pod, _ string) error {
 	self.mirrorPodLock.Lock()
 	defer self.mirrorPodLock.Unlock()
-	podFullName := GetPodFullName(&pod)
+	podFullName := kubecontainer.GetPodFullName(&pod)
 	self.mirrorPods.Insert(podFullName)
 	self.createCounts[podFullName]++
 	return nil
@@ -95,7 +96,7 @@ func TestParsePodFullName(t *testing.T) {
 	failedCases := []string{"barfoo", "bar_foo_foo", ""}
 
 	for podFullName, expected := range successfulCases {
-		name, namespace, err := ParsePodFullName(podFullName)
+		name, namespace, err := kubecontainer.ParsePodFullName(podFullName)
 		if err != nil {
 			t.Errorf("unexpected error when parsing the full name: %v", err)
 			continue
@@ -106,7 +107,7 @@ func TestParsePodFullName(t *testing.T) {
 		}
 	}
 	for _, podFullName := range failedCases {
-		_, _, err := ParsePodFullName(podFullName)
+		_, _, err := kubecontainer.ParsePodFullName(podFullName)
 		if err == nil {
 			t.Errorf("expected error when parsing the full name, got none")
 		}

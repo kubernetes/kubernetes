@@ -22,6 +22,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/fsouza/go-dockerclient"
 )
@@ -249,8 +250,8 @@ func NewFakeDockerCache(client DockerInterface) DockerCache {
 	}
 }
 
-func (f *FakeDockerCache) RunningContainers() (DockerContainers, error) {
-	return GetKubeletDockerContainers(f.client, false)
+func (f *FakeDockerCache) GetPods() ([]*container.Pod, error) {
+	return GetPods(f.client, false)
 }
 
 func (f *FakeDockerCache) ForceUpdateIfOlder(time.Time) error {

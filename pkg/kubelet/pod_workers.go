@@ -22,13 +22,14 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/dockertools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/golang/glog"
 )
 
-type syncPodFnType func(*api.Pod, bool, dockertools.DockerContainers) error
+type syncPodFnType func(*api.Pod, bool, container.Pod) error
 
 type podWorkers struct {
 	// Protects all per worker fields.
@@ -90,14 +91,14 @@ func (p *podWorkers) managePodLoop(podUpdates <-chan workUpdate) {
 				glog.Errorf("Error updating docker cache: %v", err)
 				return
 			}
-			containers, err := p.dockerCache.RunningContainers()
+			pods, err := p.dockerCache.GetPods()
 			if err != nil {
-				glog.Errorf("Error listing containers while syncing pod: %v", err)
+				glog.Errorf("Error getting pods while syncing pod: %v", err)
 				return
 			}
 
 			err = p.syncPodFn(newWork.pod, newWork.hasMirrorPod,
-				containers.FindContainersByPod(newWork.pod.UID, GetPodFullName(newWork.pod)))
+				container.Pods(pods).FindPodByID(newWork.pod.UID))
 			if err != nil {
 				glog.Errorf("Error syncing pod %s, skipping: %v", newWork.pod.UID, err)
 				p.recorder.Eventf(newWork.pod, "failedSync", "Error syncing pod, skipping: %v", err)

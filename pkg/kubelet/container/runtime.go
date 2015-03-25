@@ -17,6 +17,9 @@ limitations under the License.
 package container
 
 import (
+	"fmt"
+	"strings"
+
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume"
@@ -32,11 +35,11 @@ type Runtime interface {
 	// exited and dead containers (used for garbage collection).
 	GetPods(all bool) ([]*Pod, error)
 	// RunPod starts all the containers of a pod within a namespace.
-	RunPod(*api.Pod, map[string]volume.VolumePlugin) error
+	RunPod(*api.Pod, map[string]volume.Volume) error
 	// KillPod kills all the containers of a pod.
 	KillPod(*api.Pod) error
 	// RunContainerInPod starts a container within the same namespace of a pod.
-	RunContainerInPod(api.Container, *api.Pod, map[string]volume.VolumePlugin) error
+	RunContainerInPod(api.Container, *api.Pod, map[string]volume.Volume) error
 	// KillContainerInPod kills a container in the pod.
 	KillContainerInPod(api.Container, *api.Pod) error
 	// GetPodStatus retrieves the status of the pod, including the information of
@@ -81,4 +84,54 @@ type Container struct {
 	// Hash of the container, used for comparison. Optional for containers
 	// not managed by kubelet.
 	Hash uint64
+	// The timestamp of the creation time of the container.
+	// TODO(yifan): Consider to move it to api.ContainerStatus.
+	Created int64
+}
+
+type Pods []*Pod
+
+// FindPodByID returns a pod in the pod list by UID. It will return an empty pod
+// if not found.
+// TODO(yifan): Use a map?
+func (p Pods) FindPodByID(podUID types.UID) Pod {
+	for i := range p {
+		if p[i].ID == podUID {
+			return *p[i]
+		}
+	}
+	return Pod{}
+}
+
+// FindContainerByName returns a container in the pod with the given name.
+// When there are multiple containers with the same name, the first match will
+// be returned.
+func (p *Pod) FindContainerByName(containerName string) *Container {
+	for _, c := range p.Containers {
+		if c.Name == containerName {
+			return c
+		}
+	}
+	return nil
+}
+
+// GetPodFullName returns a name that uniquely identifies a pod.
+func GetPodFullName(pod *api.Pod) string {
+	// Use underscore as the delimiter because it is not allowed in pod name
+	// (DNS subdomain format), while allowed in the container name format.
+	return fmt.Sprintf("%s_%s", pod.Name, pod.Namespace)
+}
+
+// Build the pod full name from pod name and namespace.
+func BuildPodFullName(name, namespace string) string {
+	return name + "_" + namespace
+}
+
+// Parse the pod full name.
+func ParsePodFullName(podFullName string) (string, string, error) {
+	parts := strings.Split(podFullName, "_")
+	if len(parts) != 2 {
+		return "", "", fmt.Errorf("failed to parse the pod full name %q", podFullName)
+	}
+	return parts[0], parts[1], nil
 }

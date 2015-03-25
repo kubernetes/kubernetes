@@ -25,6 +25,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/validation"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet"
+	kubecontainer "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/config"
 	utilerrors "github.com/GoogleCloudPlatform/kubernetes/pkg/util/errors"
@@ -206,7 +207,7 @@ func (s *podStorage) merge(source string, change interface{}) (adds, updates, de
 
 		filtered := filterInvalidPods(update.Pods, source, s.recorder)
 		for _, ref := range filtered {
-			name := kubelet.GetPodFullName(ref)
+			name := kubecontainer.GetPodFullName(ref)
 			if existing, found := pods[name]; found {
 				if !reflect.DeepEqual(existing.Spec, ref.Spec) {
 					// this is an update
@@ -229,7 +230,7 @@ func (s *podStorage) merge(source string, change interface{}) (adds, updates, de
 	case kubelet.REMOVE:
 		glog.V(4).Infof("Removing a pod %v", update)
 		for _, value := range update.Pods {
-			name := kubelet.GetPodFullName(&value)
+			name := kubecontainer.GetPodFullName(&value)
 			if existing, found := pods[name]; found {
 				// this is a delete
 				delete(pods, name)
@@ -248,7 +249,7 @@ func (s *podStorage) merge(source string, change interface{}) (adds, updates, de
 
 		filtered := filterInvalidPods(update.Pods, source, s.recorder)
 		for _, ref := range filtered {
-			name := kubelet.GetPodFullName(ref)
+			name := kubecontainer.GetPodFullName(ref)
 			if existing, found := oldPods[name]; found {
 				pods[name] = existing
 				if !reflect.DeepEqual(existing.Spec, ref.Spec) {
@@ -306,7 +307,7 @@ func filterInvalidPods(pods []api.Pod, source string, recorder record.EventRecor
 			// If validation fails, don't trust it any further -
 			// even Name could be bad.
 		} else {
-			name := kubelet.GetPodFullName(pod)
+			name := kubecontainer.GetPodFullName(pod)
 			if names.Has(name) {
 				errlist = append(errlist, fielderrors.NewFieldDuplicate("name", pod.Name))
 			} else {

@@ -21,6 +21,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	kubecontainer "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
 	"github.com/golang/glog"
 )
 
@@ -59,7 +60,7 @@ func (self *basicMirrorClient) DeleteMirrorPod(podFullName string) error {
 	if self.apiserverClient == nil {
 		return nil
 	}
-	name, namespace, err := ParsePodFullName(podFullName)
+	name, namespace, err := kubecontainer.ParsePodFullName(podFullName)
 	if err != nil {
 		glog.Errorf("Failed to parse a pod full name %q", podFullName)
 		return err
