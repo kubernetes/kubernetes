@@ -1,2 +1,2 @@
 all:	
-	go build serve_hostnames.go
+	go build ./serve_hostnames.go
