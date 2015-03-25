@@ -23,6 +23,7 @@ grains:
   roles:
     - kubernetes-master
   cloud: aws
+  cbr-cidr: "${MASTER_IP_RANGE}"
 EOF
 
 cat <<EOF > /etc/aws.conf

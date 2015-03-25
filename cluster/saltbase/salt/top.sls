@@ -46,6 +46,10 @@ base:
     - docker
     - sdn
 {% endif %}
+{% if grains['cloud'] is defined and grains['cloud'] == 'aws' %}
+    - docker
+    - kubelet
+{% endif %}
 {% if grains['cloud'] is defined and grains['cloud'] == 'gce' %}
     - docker
     - kubelet
