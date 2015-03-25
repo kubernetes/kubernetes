@@ -85,7 +85,8 @@ kube::log::error_exit() {
 
 # Log an error but keep going.  Don't dump the stack or exit.
 kube::log::error() {
-  echo "!!! ${1-}" >&2
+  timestamp=$(date +"[%m%d %H:%M:%S]")
+  echo "!!! $timestamp ${1-}" >&2
   shift
   for message; do
     echo "    $message" >&2
@@ -129,7 +130,8 @@ kube::log::info_from_stdin() {
 
 # Print a status line.  Formatted to show up in a stream of output.
 kube::log::status() {
-  echo "+++ $1"
+  timestamp=$(date +"[%m%d %H:%M:%S]")
+  echo "+++ $timestamp $1"
   shift
   for message; do
     echo "    $message"
