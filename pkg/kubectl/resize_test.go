@@ -37,7 +37,7 @@ type ErrorReplicationControllerClient struct {
 }
 
 func (c *ErrorReplicationControllerClient) ReplicationControllers(namespace string) client.ReplicationControllerInterface {
-	return &ErrorReplicationControllers{client.FakeReplicationControllers{&c.Fake, namespace}}
+	return &ErrorReplicationControllers{client.FakeReplicationControllers{Fake: &c.Fake, Namespace: namespace}}
 }
 
 func TestReplicationControllerResizeRetry(t *testing.T) {
@@ -70,7 +70,7 @@ func TestReplicationControllerResize(t *testing.T) {
 	preconditions := ResizePrecondition{-1, ""}
 	count := uint(3)
 	name := "foo"
-	resizer.Resize("default", name, &preconditions, count)
+	resizer.Resize("default", name, count, &preconditions, nil, nil)
 
 	if len(fake.Actions) != 2 {
 		t.Errorf("unexpected actions: %v, expected 2 actions (get, update)", fake.Actions)
@@ -95,7 +95,7 @@ func TestReplicationControllerResizeFailsPreconditions(t *testing.T) {
 	preconditions := ResizePrecondition{2, ""}
 	count := uint(3)
 	name := "foo"
-	resizer.Resize("default", name, &preconditions, count)
+	resizer.Resize("default", name, count, &preconditions, nil, nil)
 
 	if len(fake.Actions) != 1 {
 		t.Errorf("unexpected actions: %v, expected 2 actions (get, update)", fake.Actions)
