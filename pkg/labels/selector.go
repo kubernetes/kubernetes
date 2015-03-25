@@ -36,6 +36,9 @@ type Selector interface {
 
 	// String returns a human readable string that represents this selector.
 	String() string
+
+	// Add add a specific requirement for the selector
+	Add(key string, operator Operator, values []string) Selector
 }
 
 // Everything returns a selector that matches all labels.
@@ -187,6 +190,18 @@ func (r *Requirement) String() string {
 		buffer.WriteString(")")
 	}
 	return buffer.String()
+}
+
+// Add adds a requirement to the selector. It copies the current selector returning a new one
+func (lsel LabelSelector) Add(key string, operator Operator, values []string) Selector {
+	var reqs []Requirement
+	for _, item := range lsel {
+		reqs = append(reqs, item)
+	}
+	if r, err := NewRequirement(key, operator, util.NewStringSet(values...)); err == nil {
+		reqs = append(reqs, *r)
+	}
+	return LabelSelector(reqs)
 }
 
 // Matches for a LabelSelector returns true if all
