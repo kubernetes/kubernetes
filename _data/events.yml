@@ -1,0 +1,63 @@
+- 
+    date: 2015-01-21 00:00:00 -0800
+    title: "Mesos Meetup Seattle - Enabling distributed system development with Kubernetes"
+    location: "Seattle, WA, USA"
+    venue: "Twitter Seattle"
+    speaker: "Brendan Burns"
+    url: "http://www.meetup.com/Seattle-Mesos-Meetup/events/219684171/"
+-
+    date: 2015-01-15 00:00:00 -0800
+    title: "South Bay Meteor Meetup - Intro to Containers & Kubernetes "
+    location: "Mountain View, CA, USA"
+    venue: "Google Campus"
+    speaker: "Kit Merker"
+    url: "http://www.meetup.com/Meteor-South-Bay/events/219161381/"
+-
+    date: 2014-11-22 00:00:00 -0800
+    title: "Top100 Summit"
+    location: "Beijing, China"
+    venue: "Beijing International Convention Center"
+    speaker: "Tim Hockin & Dawn Chen"
+    url: "http://www.top100summit.com/"
+- 
+    date: 2014-11-13 00:00:00 -0800
+    title: "Seattle CoreOS Meetup"
+    location: "Seattle, WA, USA"
+    venue: "Formidable Labs"
+    speaker: "Brendan Burns"
+    url: "http://www.meetup.com/Seattle-CoreOS-Meetup/events/215991262/"
+- 
+    date: 2014-11-05 00:00:00 -0800
+    title: "AppSphere 2014"
+    location: "Las Vegas, NV, USA"
+    venue: "Containers in the Cloud: AppDynamics and Kubernetes"
+    speaker: "Eric Johnson"
+    url: "https://appsphere2014.secure.mfactormeetings.com/agenda/"
+- 
+    date: 2014-10-21 00:00:00 -0800
+    title: "Tech Talk"
+    location: "London, UK"
+    venue: "Imperial College"
+    speaker: "John Wilkes"
+    url: "https://docs.google.com/file/d/0B5g07T_gRDg9V2NadXpVeVpTb0E/edit"
+- 
+    date: 2014-09-16 00:00:00 -0800
+    title: "GCP Japan Night"
+    location: "Tokyo, Japan"
+    venue: "FreakOut ヒルズガレージ"
+    speaker: "Brian Dorsey"
+    url: "http://connpass.com/event/8120/"
+- 
+    date: 2014-09-11 00:00:00 -0800
+    title: "SPCS006"
+    location: San Francisco, CA, USA
+    venue: Moscone Center
+    speaker: John Wilkes
+    url: "https://docs.google.com/a/google.com/presentation/d/11hE5JH75Q4LOl59-EPcmyg_S9mNJ2pZunNN4EOeRTbg/edit"
+- 
+    date: 2014-08-21 00:00:00 -0800
+    title: "MesosCon"
+    location: "Chicago, IL, USA"
+    venue: "MesosCon"
+    speaker: "John Wilkes"
+    url: "https://www.youtube.com/watch?v=VQAAkO5B5Hg"

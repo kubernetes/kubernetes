@@ -33,7 +33,7 @@ Folder Structure
     - **`index.html`** - Variables and content that are displayed in the *`homepage.html`* layout. Variables are stored in YAML format.
     - **`news.md`** - Variables and content that are stored in the *news.html* layout. Variables are stored in YAML format.
 - **`/_data`** - YAML files that populate dynamic sections with content.
-    - **`/events`** - Contains YAML files for individual events. Events follow a simple YAML template structure that uses key/value pairs to set variables that are displayed.  Events, like news, are sorted reverse chronologically, and must be named with their date in `YYYY-MM-DD.yml` format.  Events with duplicate dates that conflict with another file should have a single digit appended to the end of the filename to allow proper sorting.
+    - **`/events.yml`** - A YAML file describing events. Events follow a simple YAML template structure that uses key/value pairs to set variables that are displayed.  Events are sorted in the order they appear in the file. New events should be added to the top of the file to maintain a reverse chronological sort.
     - **/`news`** - Contains YAML files for individual news stories.  News files follow a simple YAML template structure that uses key/value pairs to set variables that are displayed.  News, like events, are sorted reverse chronologically, and must be named with their date in `YYYY-MM-DD.yml` format.  News files with duplicate dates that conflict with another file should have a single digit appended to the end of the filename to allow proper sorting.
 - **`/_includes`** - Generic HTML/Liquid includes for all pages.
     - **`head.html`** - HTML declaration, meta tags, style tags and script tags. This file is included in all layouts.
@@ -57,14 +57,22 @@ Folder Structure
 
 Events file example
 -
-#### Filename: `2014-11-22.yml`
+#### Filename: `events.yml`
 ```yaml
-date: 2014-11-22 00:00:00 -0800
-title: "Top100 Summit"
-location: "Beijing, China"
-venue: "Beijing International Convention Center"
-speaker: "Tim Hockin & Dawn Chen"
-url: "http://www.top100summit.com/"
+- 
+    date: 2014-11-22 00:00:00 -0800
+    title: "Top100 Summit"
+    location: "Beijing, China"
+    venue: "Beijing International Convention Center"
+    speaker: "Tim Hockin & Dawn Chen"
+    url: "http://www.top100summit.com/"
+- 
+    date: 2014-11-05 00:00:00 -0800
+    title: "AppSphere 2014"
+    location: "Las Vegas, NV, USA"
+    venue: "Containers in the Cloud: AppDynamics and Kubernetes"
+    speaker: "Eric Johnson"
+    url: "https://appsphere2014.secure.mfactormeetings.com/agenda/"
 ```
 ##### Note that dates follow the format: `YYYY-MM-DD HH:II:SS +0000`
 
