@@ -37,7 +37,7 @@ $ _output/go/bin/kube-version-change -i myPod.v1beta1.yaml -o myPod.v1beta3.yaml
 If you need to reboot a node (such as for a kernel upgrade, libc upgrade, hardware repair, etc.), and the downtime is
 brief, then when the Kubelet restarts, it will attempt to restart the pods scheduled to it.  If the reboot takes longer,
 then the node controller will terminate the pods that are bound to the unavailable node.  If there is a corresponding
-replication controller, the a new copy of the pod will be started on a different node.  So, in the the case where all
+replication controller, then a new copy of the pod will be started on a different node.  So, in the case where all
 pods are replicated, upgrades can be done without special coordination.
 
 If you want more control over the upgrading process, you may use the following workflow:
