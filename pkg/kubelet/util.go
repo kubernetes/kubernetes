@@ -27,9 +27,10 @@ import (
 )
 
 // TODO: move this into pkg/capabilities
-func SetupCapabilities(allowPrivileged bool) {
+func SetupCapabilities(allowPrivileged bool, hostNetworkSources []string) {
 	capabilities.Initialize(capabilities.Capabilities{
-		AllowPrivileged: allowPrivileged,
+		AllowPrivileged:    allowPrivileged,
+		HostNetworkSources: hostNetworkSources,
 	})
 }
 
