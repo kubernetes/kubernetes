@@ -341,6 +341,7 @@ func (s *Server) handleNodeInfoVersioned(w http.ResponseWriter, req *http.Reques
 		NodeSystemInfo: api.NodeSystemInfo{
 			MachineID:  info.MachineID,
 			SystemUUID: info.SystemUUID,
+			BootID:     info.BootID,
 		},
 	})
 
