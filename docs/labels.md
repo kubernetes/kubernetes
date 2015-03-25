@@ -32,7 +32,7 @@ These are just examples; you are free to develop your own conventions.
 
 ## Syntax and character set
 
-As already mentioned, well formed _labels_ are key value pairs. Valid label keys are comprised of two segments - prefix and name - separated by a slash (`/`).  The name segment is required and must be a DNS label: 63 characters or less, all lowercase, beginning and ending with an alphanumeric character (`[a-z0-9A-Z]`), with dashes (`-`) and alphanumerics between.  The prefix and slash are optional.  If specified, the prefix must be a DNS subdomain (a series of DNS labels separated by dots (`.`), not longer than 253 characters in total.
+As already mentioned, well formed _labels_ are key value pairs. Valid label keys have two segments - prefix and name - separated by a slash (`/`).  The name segment is required and must be a DNS label: 63 characters or less, all lowercase, beginning and ending with an alphanumeric character (`[a-z0-9A-Z]`), with dashes (`-`) and alphanumerics between.  The prefix and slash are optional.  If specified, the prefix must be a DNS subdomain (a series of DNS labels separated by dots (`.`), not longer than 253 characters in total.
 If the prefix is omitted, the label key is presumed to be private to the user. System components which use labels must specify a prefix.  The `kubernetes.io` prefix is reserved for kubernetes core components.
 
 Valid label values must be shorter than 64 characters, accepted characters are (`[-A-Za-z0-9_.]`) but the first character must be  (`[A-Za-z0-9]`).

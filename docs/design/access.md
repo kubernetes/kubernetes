@@ -15,7 +15,7 @@ Each of these can act as normal users or attackers.
    - External Users: People who are accessing applications running on K8s (e.g. a web site served by webserver running in a container on K8s), but who do not have K8s API access.
    - K8s Users : People who access the K8s API (e.g. create K8s API objects like Pods)
    - K8s Project Admins: People who manage access for some K8s Users
-   - K8s Cluster Admins: People who control the machines, networks, or binaries that comprise a K8s cluster.
+   - K8s Cluster Admins: People who control the machines, networks, or binaries that make up a K8s cluster.
    - K8s Admin means K8s Cluster Admins and K8s Project Admins taken together.
 
 ### Threats
