@@ -73,7 +73,7 @@ const (
 
 // TODO(jnagal): Infer schema through reflection. (See bigquery/client/example)
 func (self *bigqueryStorage) GetSchema() *bigquery.TableSchema {
-	fields := make([]*bigquery.TableFieldSchema, 18)
+	fields := make([]*bigquery.TableFieldSchema, 19)
 	i := 0
 	fields[i] = &bigquery.TableFieldSchema{
 		Type: typeTimestamp,

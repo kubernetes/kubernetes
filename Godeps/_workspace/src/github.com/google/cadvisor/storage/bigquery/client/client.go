@@ -18,12 +18,11 @@ import (
 	"flag"
 	"fmt"
 	"io/ioutil"
-	"net/http"
 	"strings"
 
-	"code.google.com/p/goauth2/oauth"
-	"code.google.com/p/goauth2/oauth/jwt"
 	bigquery "code.google.com/p/google-api-go-client/bigquery/v2"
+	"golang.org/x/oauth2"
+	"golang.org/x/oauth2/jwt"
 )
 
 var (
@@ -42,13 +41,13 @@ const (
 
 type Client struct {
 	service   *bigquery.Service
-	token     *oauth.Token
+	token     *oauth2.Token
 	datasetId string
 	tableId   string
 }
 
 // Helper method to create an authenticated connection.
-func connect() (*oauth.Token, *bigquery.Service, error) {
+func connect() (*oauth2.Token, *bigquery.Service, error) {
 	if *clientId == "" {
 		return nil, nil, fmt.Errorf("no client id specified")
 	}
@@ -67,25 +66,30 @@ func connect() (*oauth.Token, *bigquery.Service, error) {
 		return nil, nil, fmt.Errorf("could not access credential file %v - %v", pemFile, err)
 	}
 
-	t := jwt.NewToken(*serviceAccount, authScope, pemBytes)
-	token, err := t.Assert(&http.Client{})
+	jwtConfig := &jwt.Config{
+		Email:      *serviceAccount,
+		Scopes:     []string{authScope},
+		PrivateKey: pemBytes,
+		TokenURL:   "https://accounts.google.com/o/oauth2/token",
+	}
+	token, err := jwtConfig.TokenSource(oauth2.NoContext).Token()
 	if err != nil {
-		fmt.Printf("Invalid token: %v\n", err)
 		return nil, nil, err
 	}
-	config := &oauth.Config{
-		ClientId:     *clientId,
-		ClientSecret: *clientSecret,
-		Scope:        authScope,
-		AuthURL:      "https://accounts.google.com/o/oauth2/auth",
-		TokenURL:     "https://accounts.google.com/o/oauth2/token",
+	if !token.Valid() {
+		return nil, nil, fmt.Errorf("invalid token for BigQuery oauth")
 	}
 
-	transport := &oauth.Transport{
-		Token:  token,
-		Config: config,
+	config := &oauth2.Config{
+		ClientID:     *clientId,
+		ClientSecret: *clientSecret,
+		Scopes:       []string{authScope},
+		Endpoint: oauth2.Endpoint{
+			AuthURL:  "https://accounts.google.com/o/oauth2/auth",
+			TokenURL: "https://accounts.google.com/o/oauth2/token",
+		},
 	}
-	client := transport.Client()
+	client := config.Client(oauth2.NoContext, token)
 
 	service, err := bigquery.New(client)
 	if err != nil {
@@ -122,7 +126,7 @@ func (c *Client) getService() (*bigquery.Service, error) {
 	}
 
 	// Refresh expired token.
-	if c.token.Expired() {
+	if !c.token.Valid() {
 		token, service, err := connect()
 		if err != nil {
 			return nil, err
