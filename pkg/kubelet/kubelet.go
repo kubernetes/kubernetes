@@ -1825,15 +1825,14 @@ func (kl *Kubelet) validatePodPhase(podStatus *api.PodStatus) error {
 }
 
 func (kl *Kubelet) validateContainerStatus(podStatus *api.PodStatus, containerName string) (dockerID string, err error) {
-	for cName, cStatus := range podStatus.Info {
-		if containerName == cName {
-			if cStatus.State.Waiting != nil {
-				return "", fmt.Errorf("container %q is in waiting state.", containerName)
-			}
-			return strings.Replace(podStatus.Info[containerName].ContainerID, dockertools.DockerPrefix, "", 1), nil
-		}
+	cStatus, found := api.GetContainerStatus(podStatus.ContainerStatuses, containerName)
+	if !found {
+		return "", fmt.Errorf("container %q not found in pod", containerName)
 	}
-	return "", fmt.Errorf("container %q not found in pod", containerName)
+	if cStatus.State.Waiting != nil {
+		return "", fmt.Errorf("container %q is in waiting state.", containerName)
+	}
+	return strings.Replace(cStatus.ContainerID, dockertools.DockerPrefix, "", 1), nil
 }
 
 // GetKubeletContainerLogs returns logs from the container
@@ -1963,7 +1962,7 @@ func (kl *Kubelet) tryUpdateNodeStatus() error {
 }
 
 // getPhase returns the phase of a pod given its container info.
-func getPhase(spec *api.PodSpec, info api.PodInfo) api.PodPhase {
+func getPhase(spec *api.PodSpec, info []api.ContainerStatus) api.PodPhase {
 	running := 0
 	waiting := 0
 	stopped := 0
@@ -1971,7 +1970,7 @@ func getPhase(spec *api.PodSpec, info api.PodInfo) api.PodPhase {
 	succeeded := 0
 	unknown := 0
 	for _, container := range spec.Containers {
-		if containerStatus, ok := info[container.Name]; ok {
+		if containerStatus, ok := api.GetContainerStatus(info, container.Name); ok {
 			if containerStatus.State.Running != nil {
 				running++
 			} else if containerStatus.State.Termination != nil {
@@ -2025,7 +2024,7 @@ func getPhase(spec *api.PodSpec, info api.PodInfo) api.PodPhase {
 }
 
 // getPodReadyCondition returns ready condition if all containers in a pod are ready, else it returns an unready condition.
-func getPodReadyCondition(spec *api.PodSpec, info api.PodInfo) []api.PodCondition {
+func getPodReadyCondition(spec *api.PodSpec, statuses []api.ContainerStatus) []api.PodCondition {
 	ready := []api.PodCondition{{
 		Type:   api.PodReady,
 		Status: api.ConditionTrue,
@@ -2034,11 +2033,11 @@ func getPodReadyCondition(spec *api.PodSpec, info api.PodInfo) []api.PodConditio
 		Type:   api.PodReady,
 		Status: api.ConditionFalse,
 	}}
-	if info == nil {
+	if statuses == nil {
 		return unready
 	}
 	for _, container := range spec.Containers {
-		if containerStatus, ok := info[container.Name]; ok {
+		if containerStatus, ok := api.GetContainerStatus(statuses, container.Name); ok {
 			if !containerStatus.Ready {
 				return unready
 			}
@@ -2093,13 +2092,16 @@ func (kl *Kubelet) generatePodStatusByPod(pod *api.Pod) (api.PodStatus, error) {
 	}
 
 	// Assume info is ready to process
-	podStatus.Phase = getPhase(spec, podStatus.Info)
+	podStatus.Phase = getPhase(spec, podStatus.ContainerStatuses)
 	for _, c := range spec.Containers {
-		containerStatus := podStatus.Info[c.Name]
-		containerStatus.Ready = kl.readiness.IsReady(containerStatus)
-		podStatus.Info[c.Name] = containerStatus
+		for i, st := range podStatus.ContainerStatuses {
+			if st.Name == c.Name {
+				podStatus.ContainerStatuses[i].Ready = kl.readiness.IsReady(st)
+				break
+			}
+		}
 	}
-	podStatus.Conditions = append(podStatus.Conditions, getPodReadyCondition(spec, podStatus.Info)...)
+	podStatus.Conditions = append(podStatus.Conditions, getPodReadyCondition(spec, podStatus.ContainerStatuses)...)
 	podStatus.Host = kl.GetHostname()
 	hostIP, err := kl.GetHostIP()
 	if err != nil {

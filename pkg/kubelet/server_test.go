@@ -166,8 +166,8 @@ func getPodName(name, namespace string) string {
 func TestPodStatus(t *testing.T) {
 	fw := newServerTest()
 	expected := api.PodStatus{
-		Info: map[string]api.ContainerStatus{
-			"goodpod": {},
+		ContainerStatuses: []api.ContainerStatus{
+			{Name: "goodpod"},
 		},
 	}
 	fw.fakeKubelet.statusFunc = func(name string) (api.PodStatus, error) {

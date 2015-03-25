@@ -95,12 +95,9 @@ func (fakeKubeletClient) GetPodStatus(host, podNamespace, podID string) (api.Pod
 		return r, err
 	}
 	r.Status.PodIP = "1.2.3.4"
-	m := make(api.PodInfo)
-	for k, v := range r.Status.Info {
-		v.Ready = true
-		m[k] = v
+	for i := range r.Status.ContainerStatuses {
+		r.Status.ContainerStatuses[i].Ready = true
 	}
-	r.Status.Info = m
 	return r, nil
 }
 

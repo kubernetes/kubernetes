@@ -327,11 +327,15 @@ func TestTemplateStrings(t *testing.T) {
 		expect string
 	}{
 		"nilInfo":   {api.Pod{}, "false"},
-		"emptyInfo": {api.Pod{Status: api.PodStatus{Info: api.PodInfo{}}}, "false"},
+		"emptyInfo": {api.Pod{Status: api.PodStatus{ContainerStatuses: []api.ContainerStatus{}}}, "false"},
 		"fooExists": {
 			api.Pod{
 				Status: api.PodStatus{
-					Info: api.PodInfo{"foo": api.ContainerStatus{}},
+					ContainerStatuses: []api.ContainerStatus{
+						{
+							Name: "foo",
+						},
+					},
 				},
 			},
 			"false",
@@ -339,7 +343,11 @@ func TestTemplateStrings(t *testing.T) {
 		"barExists": {
 			api.Pod{
 				Status: api.PodStatus{
-					Info: api.PodInfo{"bar": api.ContainerStatus{}},
+					ContainerStatuses: []api.ContainerStatus{
+						{
+							Name: "bar",
+						},
+					},
 				},
 			},
 			"false",
@@ -347,9 +355,13 @@ func TestTemplateStrings(t *testing.T) {
 		"bothExist": {
 			api.Pod{
 				Status: api.PodStatus{
-					Info: api.PodInfo{
-						"foo": api.ContainerStatus{},
-						"bar": api.ContainerStatus{},
+					ContainerStatuses: []api.ContainerStatus{
+						{
+							Name: "foo",
+						},
+						{
+							Name: "bar",
+						},
 					},
 				},
 			},
@@ -358,9 +370,12 @@ func TestTemplateStrings(t *testing.T) {
 		"oneValid": {
 			api.Pod{
 				Status: api.PodStatus{
-					Info: api.PodInfo{
-						"foo": api.ContainerStatus{},
-						"bar": api.ContainerStatus{
+					ContainerStatuses: []api.ContainerStatus{
+						{
+							Name: "foo",
+						},
+						{
+							Name: "bar",
 							State: api.ContainerState{
 								Running: &api.ContainerStateRunning{
 									StartedAt: util.Time{},
@@ -375,15 +390,17 @@ func TestTemplateStrings(t *testing.T) {
 		"bothValid": {
 			api.Pod{
 				Status: api.PodStatus{
-					Info: api.PodInfo{
-						"foo": api.ContainerStatus{
+					ContainerStatuses: []api.ContainerStatus{
+						{
+							Name: "foo",
 							State: api.ContainerState{
 								Running: &api.ContainerStateRunning{
 									StartedAt: util.Time{},
 								},
 							},
 						},
-						"bar": api.ContainerStatus{
+						{
+							Name: "bar",
 							State: api.ContainerState{
 								Running: &api.ContainerStateRunning{
 									StartedAt: util.Time{},

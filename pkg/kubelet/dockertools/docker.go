@@ -558,6 +558,7 @@ func inspectContainer(client DockerInterface, dockerID, containerName, tPath str
 
 	glog.V(3).Infof("Container inspect result: %+v", *inspectResult)
 	result.status = api.ContainerStatus{
+		Name:        containerName,
 		Image:       inspectResult.Config.Image,
 		ImageID:     DockerPrefix + inspectResult.Image,
 		ContainerID: DockerPrefix + dockerID,
@@ -618,7 +619,7 @@ func inspectContainer(client DockerInterface, dockerID, containerName, tPath str
 // infrastructure container
 func GetDockerPodStatus(client DockerInterface, manifest api.PodSpec, podFullName string, uid types.UID) (*api.PodStatus, error) {
 	var podStatus api.PodStatus
-	podStatus.Info = api.PodInfo{}
+	statuses := make(map[string]api.ContainerStatus)
 
 	expectedContainers := make(map[string]api.Container)
 	for _, container := range manifest.Containers {
@@ -655,9 +656,9 @@ func GetDockerPodStatus(client DockerInterface, manifest api.PodSpec, podFullNam
 			terminationMessagePath = c.TerminationMessagePath
 		}
 		// We assume docker return us a list of containers in time order
-		if containerStatus, found := podStatus.Info[dockerContainerName]; found {
+		if containerStatus, found := statuses[dockerContainerName]; found {
 			containerStatus.RestartCount += 1
-			podStatus.Info[dockerContainerName] = containerStatus
+			statuses[dockerContainerName] = containerStatus
 			continue
 		}
 
@@ -670,20 +671,20 @@ func GetDockerPodStatus(client DockerInterface, manifest api.PodSpec, podFullNam
 			// Found network container
 			podStatus.PodIP = result.ip
 		} else {
-			podStatus.Info[dockerContainerName] = result.status
+			statuses[dockerContainerName] = result.status
 		}
 	}
 
-	if len(podStatus.Info) == 0 && podStatus.PodIP == "" {
+	if len(statuses) == 0 && podStatus.PodIP == "" {
 		return nil, ErrNoContainersInPod
 	}
 
 	// Not all containers expected are created, check if there are
 	// image related issues
-	if len(podStatus.Info) < len(manifest.Containers) {
+	if len(statuses) < len(manifest.Containers) {
 		var containerStatus api.ContainerStatus
 		for _, container := range manifest.Containers {
-			if _, found := podStatus.Info[container.Name]; found {
+			if _, found := statuses[container.Name]; found {
 				continue
 			}
 
@@ -705,8 +706,13 @@ func GetDockerPodStatus(client DockerInterface, manifest api.PodSpec, podFullNam
 				}
 			}
 
-			podStatus.Info[container.Name] = containerStatus
+			statuses[container.Name] = containerStatus
 		}
+	}
+
+	podStatus.ContainerStatuses = make([]api.ContainerStatus, 0)
+	for _, status := range statuses {
+		podStatus.ContainerStatuses = append(podStatus.ContainerStatuses, status)
 	}
 
 	return &podStatus, nil

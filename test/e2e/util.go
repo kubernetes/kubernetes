@@ -101,7 +101,7 @@ func waitForPodNotPending(c *client.Client, ns, podName string) error {
 func waitForPodSuccessInNamespace(c *client.Client, podName string, contName string, namespace string) error {
 	return waitForPodCondition(c, namespace, podName, "success or failure", func(pod *api.Pod) (bool, error) {
 		// Cannot use pod.Status.Phase == api.PodSucceeded/api.PodFailed due to #2632
-		ci, ok := pod.Status.Info[contName]
+		ci, ok := api.GetContainerStatus(pod.Status.ContainerStatuses, contName)
 		if !ok {
 			Logf("No Status.Info for container %s in pod %s yet", contName, podName)
 		} else {

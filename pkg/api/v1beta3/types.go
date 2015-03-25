@@ -607,6 +607,8 @@ type ContainerState struct {
 }
 
 type ContainerStatus struct {
+	// Required: This must be a DNS_LABEL.  Each container in a pod must have a unique name.
+	Name string `json:"name" description:"name of the container; must be a DNS_LABEL and unique within the pod; cannot be updated"`
 	// TODO(dchen1107): Should we rename PodStatus to a more generic name or have a separate states
 	// defined for container?
 	State                ContainerState `json:"state,omitempty" description:"details about the container's current condition"`
@@ -662,9 +664,6 @@ type PodCondition struct {
 	// Status is the status of the condition
 	Status ConditionStatus `json:"status" description:"status of the condition, one of Full, None, Unknown"`
 }
-
-// PodInfo contains one entry for every container with available info.
-type PodInfo map[string]ContainerStatus
 
 // RestartPolicy describes how the container should be restarted.
 // Only one of the following restart policies may be specified.
@@ -727,13 +726,12 @@ type PodStatus struct {
 	HostIP string `json:"hostIP,omitempty" description:"IP address of the host to which the pod is assigned; empty if not yet scheduled"`
 	PodIP  string `json:"podIP,omitempty" description:"IP address allocated to the pod; routable at least within the cluster; empty if not yet allocated"`
 
-	// The key of this map is the *name* of the container within the manifest; it has one
-	// entry per container in the manifest. The value of this map is currently the output
+	// The list has one entry per container in the manifest. Each entry is currently the output
 	// of `docker inspect`. This output format is *not* final and should not be relied
 	// upon.
 	// TODO: Make real decisions about what our info should look like. Re-enable fuzz test
 	// when we have done this.
-	Info PodInfo `json:"info,omitempty" description:"map of container name to container status"`
+	ContainerStatuses []ContainerStatus `json:"info,omitempty" description:"list of container statuses"`
 }
 
 // PodStatusResult is a wrapper for PodStatus returned by kubelet that can be encode/decoded

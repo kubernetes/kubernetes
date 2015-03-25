@@ -188,7 +188,7 @@ func init() {
 			if err := s.Convert(&in.Conditions, &out.Conditions, 0); err != nil {
 				return err
 			}
-			if err := s.Convert(&in.Info, &out.Info, 0); err != nil {
+			if err := s.Convert(&in.ContainerStatuses, &out.Info, 0); err != nil {
 				return err
 			}
 			out.Message = in.Message
@@ -204,7 +204,7 @@ func init() {
 			if err := s.Convert(&in.Conditions, &out.Conditions, 0); err != nil {
 				return err
 			}
-			if err := s.Convert(&in.Info, &out.Info, 0); err != nil {
+			if err := s.Convert(&in.Info, &out.ContainerStatuses, 0); err != nil {
 				return err
 			}
 
@@ -226,6 +226,78 @@ func init() {
 				return err
 			}
 			out.Host = in.Host
+			return nil
+		},
+
+		func(in *[]newer.ContainerStatus, out *PodInfo, s conversion.Scope) error {
+			*out = make(map[string]ContainerStatus)
+			for _, st := range *in {
+				v := ContainerStatus{}
+				if err := s.Convert(&st, &v, 0); err != nil {
+					return err
+				}
+				(*out)[st.Name] = v
+			}
+			return nil
+		},
+		func(in *PodInfo, out *[]newer.ContainerStatus, s conversion.Scope) error {
+			for k, v := range *in {
+				st := newer.ContainerStatus{}
+				if err := s.Convert(&v, &st, 0); err != nil {
+					return err
+				}
+				st.Name = k
+				*out = append(*out, st)
+			}
+			return nil
+		},
+
+		func(in *newer.ContainerStatus, out *ContainerStatus, s conversion.Scope) error {
+			if err := s.Convert(&in.State, &out.State, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.LastTerminationState, &out.LastTerminationState, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.Ready, &out.Ready, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.RestartCount, &out.RestartCount, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.Image, &out.Image, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.ImageID, &out.ImageID, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.ContainerID, &out.ContainerID, 0); err != nil {
+				return err
+			}
+			return nil
+		},
+		func(in *ContainerStatus, out *newer.ContainerStatus, s conversion.Scope) error {
+			if err := s.Convert(&in.State, &out.State, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.LastTerminationState, &out.LastTerminationState, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.Ready, &out.Ready, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.RestartCount, &out.RestartCount, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.Image, &out.Image, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.ImageID, &out.ImageID, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.ContainerID, &out.ContainerID, 0); err != nil {
+				return err
+			}
 			return nil
 		},
 
