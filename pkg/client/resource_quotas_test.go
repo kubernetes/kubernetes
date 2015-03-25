@@ -174,36 +174,8 @@ func TestResourceQuotaStatusUpdate(t *testing.T) {
 			Query:  buildQueryValues(ns, nil)},
 		Response: Response{StatusCode: 200, Body: resourceQuota},
 	}
-	response, err := c.Setup().ResourceQuotas(ns).Status(resourceQuota)
+	response, err := c.Setup().ResourceQuotas(ns).UpdateStatus(resourceQuota)
 	c.Validate(t, response, err)
-}
-
-func TestInvalidResourceQuotaUpdate(t *testing.T) {
-	ns := api.NamespaceDefault
-	resourceQuota := &api.ResourceQuota{
-		ObjectMeta: api.ObjectMeta{
-			Name:      "abc",
-			Namespace: "foo",
-		},
-		Spec: api.ResourceQuotaSpec{
-			Hard: api.ResourceList{
-				api.ResourceCPU:                    resource.MustParse("100"),
-				api.ResourceMemory:                 resource.MustParse("10000"),
-				api.ResourcePods:                   resource.MustParse("10"),
-				api.ResourceServices:               resource.MustParse("10"),
-				api.ResourceReplicationControllers: resource.MustParse("10"),
-				api.ResourceQuotas:                 resource.MustParse("10"),
-			},
-		},
-	}
-	c := &testClient{
-		Request:  testRequest{Method: "PUT", Path: testapi.ResourcePath(getResourceQuotasResoureName(), ns, "abc"), Query: buildQueryValues(ns, nil)},
-		Response: Response{StatusCode: 200, Body: resourceQuota},
-	}
-	_, err := c.Setup().ResourceQuotas(ns).Update(resourceQuota)
-	if err == nil {
-		t.Errorf("Expected an error due to missing ResourceVersion")
-	}
 }
 
 func TestResourceQuotaDelete(t *testing.T) {

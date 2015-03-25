@@ -17,7 +17,6 @@ limitations under the License.
 package client
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -64,10 +63,6 @@ func (c *limitRanges) List(selector labels.Selector) (result *api.LimitRangeList
 
 // Get takes the name of the limitRange, and returns the corresponding Pod object, and an error if it occurs
 func (c *limitRanges) Get(name string) (result *api.LimitRange, err error) {
-	if len(name) == 0 {
-		return nil, errors.New("name is required parameter to Get")
-	}
-
 	result = &api.LimitRange{}
 	err = c.r.Get().Namespace(c.ns).Resource("limitRanges").Name(name).Do().Into(result)
 	return

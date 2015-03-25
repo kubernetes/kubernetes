@@ -17,9 +17,6 @@ limitations under the License.
 package client
 
 import (
-	"errors"
-	"fmt"
-
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
@@ -54,10 +51,6 @@ func newSecrets(c *Client, ns string) *secrets {
 }
 
 func (s *secrets) Create(secret *api.Secret) (*api.Secret, error) {
-	if s.namespace != "" && secret.Namespace != s.namespace {
-		return nil, fmt.Errorf("can't create a secret with namespace '%v' in namespace '%v'", secret.Namespace, s.namespace)
-	}
-
 	result := &api.Secret{}
 	err := s.client.Post().
 		Namespace(secret.Namespace).
@@ -86,10 +79,6 @@ func (s *secrets) List(label labels.Selector, field fields.Selector) (*api.Secre
 
 // Get returns the given secret, or an error.
 func (s *secrets) Get(name string) (*api.Secret, error) {
-	if len(name) == 0 {
-		return nil, errors.New("name is required parameter to Get")
-	}
-
 	result := &api.Secret{}
 	err := s.client.Get().
 		Namespace(s.namespace).
@@ -124,11 +113,6 @@ func (s *secrets) Delete(name string) error {
 
 func (s *secrets) Update(secret *api.Secret) (result *api.Secret, err error) {
 	result = &api.Secret{}
-	if len(secret.ResourceVersion) == 0 {
-		err = fmt.Errorf("invalid update object, missing resource version: %v", secret)
-		return
-	}
-
 	err = s.client.Put().
 		Namespace(s.namespace).
 		Resource("secrets").

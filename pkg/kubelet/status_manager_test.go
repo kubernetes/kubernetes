@@ -110,5 +110,5 @@ func TestSyncBatch(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected syncing error: %v", err)
 	}
-	verifyActions(t, syncer.kubeClient, []string{"update-status-pod"})
+	verifyActions(t, syncer.kubeClient, []string{"get-pod", "update-status-pod"})
 }

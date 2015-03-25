@@ -17,8 +17,6 @@ limitations under the License.
 package client
 
 import (
-	"errors"
-	"fmt"
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -71,10 +69,6 @@ func (c *services) List(selector labels.Selector) (result *api.ServiceList, err 
 
 // Get returns information about a particular service.
 func (c *services) Get(name string) (result *api.Service, err error) {
-	if len(name) == 0 {
-		return nil, errors.New("name is required parameter to Get")
-	}
-
 	result = &api.Service{}
 	err = c.r.Get().Namespace(c.ns).Resource("services").Name(name).Do().Into(result)
 	return
@@ -83,48 +77,20 @@ func (c *services) Get(name string) (result *api.Service, err error) {
 // Create creates a new service.
 func (c *services) Create(svc *api.Service) (result *api.Service, err error) {
 	result = &api.Service{}
-	// v1beta3 does not allow POST without a namespace.
-	needNamespace := !api.PreV1Beta3(c.r.APIVersion())
-	namespace := c.ns
-	if needNamespace && len(namespace) == 0 {
-		namespace = api.NamespaceDefault
-	}
-	request := c.r.Post()
-	request.Timeout(extendedTimeout)
-	err = request.Namespace(namespace).Resource("services").Body(svc).Do().Into(result)
+	err = c.r.Post().Timeout(extendedTimeout).Namespace(c.ns).Resource("services").Body(svc).Do().Into(result)
 	return
 }
 
 // Update updates an existing service.
 func (c *services) Update(svc *api.Service) (result *api.Service, err error) {
 	result = &api.Service{}
-	if len(svc.ResourceVersion) == 0 {
-		err = fmt.Errorf("invalid update object, missing resource version: %v", svc)
-		return
-	}
-	// v1beta3 does not allow PUT without a namespace.
-	needNamespace := !api.PreV1Beta3(c.r.APIVersion())
-	namespace := c.ns
-	if needNamespace && len(namespace) == 0 {
-		namespace = api.NamespaceDefault
-	}
-	request := c.r.Put()
-	request.Timeout(extendedTimeout)
-	err = request.Namespace(namespace).Resource("services").Name(svc.Name).Body(svc).Do().Into(result)
+	err = c.r.Put().Timeout(extendedTimeout).Timeout(extendedTimeout).Namespace(c.ns).Resource("services").Name(svc.Name).Body(svc).Do().Into(result)
 	return
 }
 
 // Delete deletes an existing service.
 func (c *services) Delete(name string) error {
-	// v1beta3 does not allow DELETE without a namespace.
-	needNamespace := !api.PreV1Beta3(c.r.APIVersion())
-	namespace := c.ns
-	if needNamespace && len(namespace) == 0 {
-		namespace = api.NamespaceDefault
-	}
-	request := c.r.Delete()
-	request.Timeout(extendedTimeout)
-	return request.Namespace(c.ns).Resource("services").Name(name).Do().Error()
+	return c.r.Delete().Timeout(extendedTimeout).Namespace(c.ns).Resource("services").Name(name).Do().Error()
 }
 
 // Watch returns a watch.Interface that watches the requested services.

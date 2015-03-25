@@ -190,6 +190,10 @@ func (r *Request) Name(resourceName string) *Request {
 	if r.err != nil {
 		return r
 	}
+	if len(resourceName) == 0 {
+		r.err = fmt.Errorf("resource name may not be empty")
+		return r
+	}
 	if len(r.resourceName) != 0 {
 		r.err = fmt.Errorf("resource name already set to %q, cannot change to %q", r.resourceName, resourceName)
 		return r

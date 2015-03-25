@@ -17,7 +17,6 @@ limitations under the License.
 package client
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -74,10 +73,6 @@ func (c *nodes) List() (*api.NodeList, error) {
 
 // Get gets an existing node.
 func (c *nodes) Get(name string) (*api.Node, error) {
-	if len(name) == 0 {
-		return nil, errors.New("name is required parameter to Get")
-	}
-
 	result := &api.Node{}
 	err := c.r.Get().Resource(c.resourceName()).Name(name).Do().Into(result)
 	return result, err

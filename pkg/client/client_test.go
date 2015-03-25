@@ -35,7 +35,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/version"
 )
 
-const nameRequiredError = "name is required parameter to Get"
+const nameRequiredError = "resource name may not be empty"
 
 type testRequest struct {
 	Method  string
