@@ -165,17 +165,17 @@ exports.queue_default_network = function () {
 
 exports.queue_storage_if_needed = function() {
   if (!process.env['AZURE_STORAGE_ACCOUNT']) {
-    conf.storage_account = util.rand_suffix;
+    conf.resources['storage_account'] = util.rand_suffix;
     task_queue.push([
       'storage', 'account', 'create',
       get_location(),
-      conf.storage_account,
+      conf.resources['storage_account'],
     ]);
-    process.env['AZURE_STORAGE_ACCOUNT'] = conf.storage_account;
+    process.env['AZURE_STORAGE_ACCOUNT'] = conf.resources['storage_account'];
   } else {
     // Preserve it for resizing, so we don't create a new one by accedent,
     // when the environment variable is unset
-    conf.storage_account = process.env['AZURE_STORAGE_ACCOUNT'];
+    conf.resources['storage_account'] = process.env['AZURE_STORAGE_ACCOUNT'];
   }
 };
 
@@ -247,7 +247,7 @@ exports.destroy_cluster = function (state_file) {
   });
 
   task_queue.push(['network', 'vnet', 'delete', '--quiet', conf.resources['vnet']]);
-  task_queue.push(['storage', 'account', 'delete', '--quiet', conf.storage_account]);
+  task_queue.push(['storage', 'account', 'delete', '--quiet', conf.resources['storage_account']]);
 
   exports.run_task_queue();
 };
@@ -264,5 +264,5 @@ exports.load_state_for_resizing = function (state_file, node_type, new_nodes) {
   conf.nodes[node_type] += new_nodes;
   hosts.collection = conf.hosts;
   hosts.ssh_port_counter += conf.hosts.length;
-  process.env['AZURE_STORAGE_ACCOUNT'] = conf.storage_account;
+  process.env['AZURE_STORAGE_ACCOUNT'] = conf.resources['storage_account'];
 }
