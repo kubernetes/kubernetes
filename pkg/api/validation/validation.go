@@ -701,8 +701,7 @@ func ValidatePodUpdate(newPod, oldPod *api.Pod) errs.ValidationErrorList {
 	}
 	pod.Spec.Containers = newContainers
 	if !api.Semantic.DeepEqual(pod.Spec, oldPod.Spec) {
-		// TODO: a better error would include all immutable fields explicitly.
-		allErrs = append(allErrs, errs.NewFieldInvalid("spec.containers", newPod.Spec.Containers, "some fields are immutable"))
+		allErrs = append(allErrs, errs.NewFieldInvalid("spec", newPod.Spec, "may not update fields other than container.image"))
 	}
 
 	newPod.Status = oldPod.Status
