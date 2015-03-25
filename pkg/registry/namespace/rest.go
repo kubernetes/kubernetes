@@ -43,8 +43,8 @@ func (namespaceStrategy) NamespaceScoped() bool {
 	return false
 }
 
-// ResetBeforeCreate clears fields that are not allowed to be set by end users on creation.
-func (namespaceStrategy) ResetBeforeCreate(obj runtime.Object) {
+// PrepareForCreate clears fields that are not allowed to be set by end users on creation.
+func (namespaceStrategy) PrepareForCreate(obj runtime.Object) {
 	// on create, status is active
 	namespace := obj.(*api.Namespace)
 	namespace.Status = api.NamespaceStatus{

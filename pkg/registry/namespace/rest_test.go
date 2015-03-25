@@ -33,7 +33,7 @@ func TestNamespaceStrategy(t *testing.T) {
 		ObjectMeta: api.ObjectMeta{Name: "foo"},
 		Status:     api.NamespaceStatus{Phase: api.NamespaceTerminating},
 	}
-	Strategy.ResetBeforeCreate(namespace)
+	Strategy.PrepareForCreate(namespace)
 	if namespace.Status.Phase != api.NamespaceActive {
 		t.Errorf("Namespaces do not allow setting phase on create")
 	}

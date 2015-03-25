@@ -53,8 +53,8 @@ func (nodeStrategy) AllowCreateOnUpdate() bool {
 	return false
 }
 
-// ResetBeforeCreate clears fields that are not allowed to be set by end users on creation.
-func (nodeStrategy) ResetBeforeCreate(obj runtime.Object) {
+// PrepareForCreate clears fields that are not allowed to be set by end users on creation.
+func (nodeStrategy) PrepareForCreate(obj runtime.Object) {
 	_ = obj.(*api.Node)
 	// Nodes allow *all* fields, including status, to be set.
 }

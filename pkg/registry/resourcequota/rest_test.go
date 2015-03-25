@@ -51,7 +51,7 @@ func TestResourceQuotaStrategy(t *testing.T) {
 			},
 		},
 	}
-	Strategy.ResetBeforeCreate(resourceQuota)
+	Strategy.PrepareForCreate(resourceQuota)
 	if resourceQuota.Status.Used != nil {
 		t.Errorf("ResourceQuota does not allow setting status on create")
 	}

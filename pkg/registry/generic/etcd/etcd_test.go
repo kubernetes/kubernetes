@@ -43,7 +43,7 @@ type testRESTStrategy struct {
 func (t *testRESTStrategy) NamespaceScoped() bool     { return t.namespaceScoped }
 func (t *testRESTStrategy) AllowCreateOnUpdate() bool { return t.allowCreateOnUpdate }
 
-func (t *testRESTStrategy) ResetBeforeCreate(obj runtime.Object) {}
+func (t *testRESTStrategy) PrepareForCreate(obj runtime.Object) {}
 func (t *testRESTStrategy) Validate(obj runtime.Object) fielderrors.ValidationErrorList {
 	return nil
 }

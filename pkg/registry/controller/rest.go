@@ -42,8 +42,8 @@ func (rcStrategy) NamespaceScoped() bool {
 	return true
 }
 
-// ResetBeforeCreate clears the status of a replication controller before creation.
-func (rcStrategy) ResetBeforeCreate(obj runtime.Object) {
+// PrepareForCreate clears the status of a replication controller before creation.
+func (rcStrategy) PrepareForCreate(obj runtime.Object) {
 	controller := obj.(*api.ReplicationController)
 	controller.Status = api.ReplicationControllerStatus{}
 }
