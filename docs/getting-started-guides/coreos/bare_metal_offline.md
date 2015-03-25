@@ -23,6 +23,7 @@ Deploy a CoreOS running Kubernetes environment. This particular guild is made to
 | CoreOS Slave 1                | d0:00:67:13:0d:01 | 10.20.30.41 |
 | CoreOS Slave 2                | d0:00:67:13:0d:02 | 10.20.30.42 |
 
+
 ## Setup PXELINUX CentOS
 To setup CentOS PXELINUX environment there is a complete [guide here](http://docs.fedoraproject.org/en-US/Fedora/7/html/Installation_Guide/ap-pxe-server.html). This section is the abbreviated version.
 
@@ -644,8 +645,9 @@ List fleet machines
 
 List Kubernetes
 
-    kubecfg list pods
-    kubecfg list minions
+    kubectl get pods
+    kubectl grt minions
+
 
 Kill all pods:
 
