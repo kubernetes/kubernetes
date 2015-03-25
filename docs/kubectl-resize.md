@@ -30,7 +30,6 @@ $ kubectl resize --current-replicas=2 --replicas=3 replicationcontrollers foo
 
 ```
       --current-replicas=-1: Precondition for current size. Requires that the current size of the replication controller match this value in order to resize.
-  -h, --help=false: help for resize
       --replicas=-1: The new desired number of replicas. Required.
       --resource-version="": Precondition for resource version. Requires that the current resource version match this value in order to resize.
 ```
@@ -46,6 +45,7 @@ $ kubectl resize --current-replicas=2 --replicas=3 replicationcontrollers foo
       --client-key="": Path to a client key file for TLS.
       --cluster="": The name of the kubeconfig cluster to use
       --context="": The name of the kubeconfig context to use
+  -h, --help=false: help for kubectl
       --insecure-skip-tls-verify=false: If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure.
       --kubeconfig="": Path to the kubeconfig file to use for CLI requests.
       --log_backtrace_at=:0: when logging hits line file:N, emit a stack trace

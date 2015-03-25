@@ -15,7 +15,6 @@ kubectl version
 
 ```
   -c, --client=false: Client version only (no server required).
-  -h, --help=false: help for version
 ```
 
 ### Options inherrited from parent commands
@@ -29,6 +28,7 @@ kubectl version
       --client-key="": Path to a client key file for TLS.
       --cluster="": The name of the kubeconfig cluster to use
       --context="": The name of the kubeconfig context to use
+  -h, --help=false: help for kubectl
       --insecure-skip-tls-verify=false: If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure.
       --kubeconfig="": Path to the kubeconfig file to use for CLI requests.
       --log_backtrace_at=:0: when logging hits line file:N, emit a stack trace
