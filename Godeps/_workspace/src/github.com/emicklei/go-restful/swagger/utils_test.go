@@ -32,6 +32,8 @@ func compareJson(t *testing.T, actualJsonAsString string, expectedJsonAsString s
 		fmt.Println(withLineNumbers(expectedJsonAsString))
 		fmt.Println("---- actual -----")
 		fmt.Println(withLineNumbers(actualJsonAsString))
+		fmt.Println("---- raw -----")
+		fmt.Println(actualJsonAsString)
 		t.Error("there are differences")
 		return false
 	}

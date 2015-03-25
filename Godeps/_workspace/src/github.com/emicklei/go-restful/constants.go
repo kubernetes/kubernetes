@@ -5,8 +5,9 @@ package restful
 // that can be found in the LICENSE file.
 
 const (
-	MIME_XML  = "application/xml"  // Accept or Content-Type used in Consumes() and/or Produces()
-	MIME_JSON = "application/json" // Accept or Content-Type used in Consumes() and/or Produces()
+	MIME_XML   = "application/xml"          // Accept or Content-Type used in Consumes() and/or Produces()
+	MIME_JSON  = "application/json"         // Accept or Content-Type used in Consumes() and/or Produces()
+	MIME_OCTET = "application/octet-stream" // If Content-Type is not present in request, use the default
 
 	HEADER_Allow                         = "Allow"
 	HEADER_Accept                        = "Accept"

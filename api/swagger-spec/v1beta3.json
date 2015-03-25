@@ -235,6 +235,44 @@
       "consumes": [
        "*/*"
       ]
+     },
+     {
+      "type": "void",
+      "method": "DELETE",
+      "summary": "delete a Endpoints",
+      "nickname": "deleteEndpoints",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Endpoints",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespaces",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "*v1beta3.DeleteOptions",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
      }
     ]
    },
@@ -1075,6 +1113,14 @@
         "description": "name of the Namespace",
         "required": true,
         "allowMultiple": false
+       },
+       {
+        "type": "*v1beta3.DeleteOptions",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
        }
       ],
       "produces": [
@@ -1101,6 +1147,78 @@
         "paramType": "path",
         "name": "name",
         "description": "name of the Namespace",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/api/v1beta3/namespaces/{name}/finalize",
+    "description": "API at /api/v1beta3 version v1beta3",
+    "operations": [
+     {
+      "type": "void",
+      "method": "PUT",
+      "summary": "replace the specified Namespace",
+      "nickname": "replaceNamespace",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Namespace",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1beta3.Namespace",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/api/v1beta3/namespaces/{name}/status",
+    "description": "API at /api/v1beta3 version v1beta3",
+    "operations": [
+     {
+      "type": "void",
+      "method": "PUT",
+      "summary": "replace the specified Namespace",
+      "nickname": "replaceNamespace",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Namespace",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1beta3.Namespace",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
         "required": true,
         "allowMultiple": false
        }
@@ -1271,6 +1389,14 @@
         "paramType": "path",
         "name": "name",
         "description": "name of the Node",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "*v1beta3.DeleteOptions",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
         "required": true,
         "allowMultiple": false
        }
@@ -1743,6 +1869,14 @@
         "paramType": "path",
         "name": "namespaces",
         "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "*v1beta3.DeleteOptions",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
         "required": true,
         "allowMultiple": false
        }
@@ -2415,6 +2549,14 @@
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
+       },
+       {
+        "type": "*v1beta3.DeleteOptions",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
        }
       ],
       "produces": [
@@ -2715,6 +2857,14 @@
         "paramType": "path",
         "name": "namespaces",
         "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "*v1beta3.DeleteOptions",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
         "required": true,
         "allowMultiple": false
        }
@@ -3740,6 +3890,10 @@
    }
   ],
   "models": {
+   "*v1beta3.DeleteOptions": {
+    "id": "*v1beta3.DeleteOptions",
+    "properties": {}
+   },
    "v1beta3.Binding": {
     "id": "v1beta3.Binding",
     "required": [
@@ -3747,7 +3901,7 @@
     ],
     "properties": {
      "annotations": {
-      "type": "v1beta3.ObjectMeta.annotations",
+      "$ref": "v1beta3.ObjectMeta.annotations",
       "description": "map of string keys and values that can be used by external tooling to store and retrieve arbitrary metadata about objects"
      },
      "apiVersion": {
@@ -3758,6 +3912,10 @@
       "type": "string",
       "description": "RFC 3339 date and time at which the object was created; populated by the system, read-only; null for lists"
      },
+     "deletionTimestamp": {
+      "type": "string",
+      "description": "RFC 3339 date and time at which the object will be deleted; populated by the system when a graceful deletion is requested, read-only; if not set, graceful deletion of the object has not been requested"
+     },
      "generateName": {
       "type": "string",
       "description": "an optional prefix to use to generate a unique name; has the same validation rules as name; optional, and is applied only name if is not specified"
@@ -3767,7 +3925,7 @@
       "description": "kind of object, in CamelCase; cannot be updated"
      },
      "labels": {
-      "type": "v1beta3.ObjectMeta.labels",
+      "$ref": "v1beta3.ObjectMeta.labels",
       "description": "map of string keys and values that can be used to organize and categorize objects; may match selectors of replication controllers and services"
      },
      "name": {
@@ -3787,11 +3945,11 @@
       "description": "URL for the object; populated by the system, read-only"
      },
      "target": {
-      "type": "v1beta3.ObjectReference",
+      "$ref": "v1beta3.ObjectReference",
       "description": "an object to bind to"
      },
      "uid": {
-      "type": "types.UID",
+      "$ref": "types.UID",
       "description": "unique UUID across space and time; populated by the system; read-only"
      }
     }
@@ -3828,13 +3986,13 @@
     ],
     "properties": {
      "capabilities": {
-      "type": "v1beta3.Capabilities",
+      "$ref": "v1beta3.Capabilities",
       "description": "capabilities for container; cannot be updated"
      },
      "command": {
       "type": "array",
       "items": {
-       "$ref": "string"
+       "type": "string"
       },
       "description": "command argv array; not executed within a shell; defaults to entrypoint or command in the image; cannot be updated"
      },
@@ -3850,15 +4008,15 @@
       "description": "Docker image name"
      },
      "imagePullPolicy": {
-      "type": "v1beta3.PullPolicy",
+      "$ref": "v1beta3.PullPolicy",
       "description": "image pull policy; one of PullAlways, PullNever, PullIfNotPresent; defaults to PullAlways if :latest tag is specified, or PullIfNotPresent otherwise; cannot be updated"
      },
      "lifecycle": {
-      "type": "v1beta3.Lifecycle",
+      "$ref": "v1beta3.Lifecycle",
       "description": "actions that the management system should take in response to container lifecycle events; cannot be updated"
      },
      "livenessProbe": {
-      "type": "v1beta3.Probe",
+      "$ref": "v1beta3.Probe",
       "description": "periodic probe of container liveness; container will be restarted if the probe fails; cannot be updated"
      },
      "name": {
@@ -3877,11 +4035,11 @@
       "description": "whether or not the container is granted privileged status; defaults to false; cannot be updated"
      },
      "readinessProbe": {
-      "type": "v1beta3.Probe",
+      "$ref": "v1beta3.Probe",
       "description": "periodic probe of container service readiness; container will be removed from service endpoints if the probe fails; cannot be updated"
      },
      "resources": {
-      "type": "v1beta3.ResourceRequirements",
+      "$ref": "v1beta3.ResourceRequirements",
       "description": "Compute Resources required by this container; cannot be updated"
      },
      "terminationMessagePath": {
@@ -3926,7 +4084,7 @@
       "description": "name for the port that can be referred to by services; must be a DNS_LABEL and unique without the pod"
      },
      "protocol": {
-      "type": "v1beta3.Protocol",
+      "$ref": "v1beta3.Protocol",
       "description": "protocol for port; must be UDP or TCP; TCP if unspecified"
      }
     }
@@ -3948,7 +4106,7 @@
       "description": "destination port of this endpoint"
      },
      "targetRef": {
-      "type": "v1beta3.ObjectReference",
+      "$ref": "v1beta3.ObjectReference",
       "description": "reference to object providing the endpoint"
      }
     }
@@ -3957,7 +4115,7 @@
     "id": "v1beta3.Endpoints",
     "properties": {
      "annotations": {
-      "type": "v1beta3.ObjectMeta.annotations",
+      "$ref": "v1beta3.ObjectMeta.annotations",
       "description": "map of string keys and values that can be used by external tooling to store and retrieve arbitrary metadata about objects"
      },
      "apiVersion": {
@@ -3967,6 +4125,10 @@
      "creationTimestamp": {
       "type": "string",
       "description": "RFC 3339 date and time at which the object was created; populated by the system, read-only; null for lists"
+     },
+     "deletionTimestamp": {
+      "type": "string",
+      "description": "RFC 3339 date and time at which the object will be deleted; populated by the system when a graceful deletion is requested, read-only; if not set, graceful deletion of the object has not been requested"
      },
      "endpoints": {
       "type": "array",
@@ -3984,7 +4146,7 @@
       "description": "kind of object, in CamelCase; cannot be updated"
      },
      "labels": {
-      "type": "v1beta3.ObjectMeta.labels",
+      "$ref": "v1beta3.ObjectMeta.labels",
       "description": "map of string keys and values that can be used to organize and categorize objects; may match selectors of replication controllers and services"
      },
      "name": {
@@ -3996,7 +4158,7 @@
       "description": "namespace of the object; cannot be updated"
      },
      "protocol": {
-      "type": "v1beta3.Protocol",
+      "$ref": "v1beta3.Protocol",
       "description": "IP protocol for endpoint ports; must be UDP or TCP; TCP if unspecified"
      },
      "resourceVersion": {
@@ -4008,7 +4170,7 @@
       "description": "URL for the object; populated by the system, read-only"
      },
      "uid": {
-      "type": "types.UID",
+      "$ref": "types.UID",
       "description": "unique UUID across space and time; populated by the system; read-only"
      }
     }
@@ -4064,7 +4226,7 @@
     "id": "v1beta3.Event",
     "properties": {
      "annotations": {
-      "type": "v1beta3.ObjectMeta.annotations",
+      "$ref": "v1beta3.ObjectMeta.annotations",
       "description": "map of string keys and values that can be used by external tooling to store and retrieve arbitrary metadata about objects"
      },
      "apiVersion": {
@@ -4080,6 +4242,10 @@
       "type": "string",
       "description": "RFC 3339 date and time at which the object was created; populated by the system, read-only; null for lists"
      },
+     "deletionTimestamp": {
+      "type": "string",
+      "description": "RFC 3339 date and time at which the object will be deleted; populated by the system when a graceful deletion is requested, read-only; if not set, graceful deletion of the object has not been requested"
+     },
      "firstTimestamp": {
       "type": "string",
       "description": "the time at which the event was first recorded"
@@ -4089,7 +4255,7 @@
       "description": "an optional prefix to use to generate a unique name; has the same validation rules as name; optional, and is applied only name if is not specified"
      },
      "involvedObject": {
-      "type": "v1beta3.ObjectReference",
+      "$ref": "v1beta3.ObjectReference",
       "description": "object this event is about"
      },
      "kind": {
@@ -4097,7 +4263,7 @@
       "description": "kind of object, in CamelCase; cannot be updated"
      },
      "labels": {
-      "type": "v1beta3.ObjectMeta.labels",
+      "$ref": "v1beta3.ObjectMeta.labels",
       "description": "map of string keys and values that can be used to organize and categorize objects; may match selectors of replication controllers and services"
      },
      "lastTimestamp": {
@@ -4129,11 +4295,11 @@
       "description": "URL for the object; populated by the system, read-only"
      },
      "source": {
-      "type": "v1beta3.EventSource",
+      "$ref": "v1beta3.EventSource",
       "description": "component reporting this event"
      },
      "uid": {
-      "type": "types.UID",
+      "$ref": "types.UID",
       "description": "unique UUID across space and time; populated by the system; read-only"
      }
     }
@@ -4188,11 +4354,15 @@
      "command": {
       "type": "array",
       "items": {
-       "$ref": "string"
+       "type": "string"
       },
       "description": "command line to execute inside the container; working directory for the command is root ('/') in the container's file system; the command is exec'd, not run inside a shell; exit status of 0 is treated as live/healthy and non-zero is unhealthy"
      }
     }
+   },
+   "v1beta3.FinalizerName": {
+    "id": "v1beta3.FinalizerName",
+    "properties": {}
    },
    "v1beta3.HTTPGetAction": {
     "id": "v1beta3.HTTPGetAction",
@@ -4215,15 +4385,15 @@
     "id": "v1beta3.Handler",
     "properties": {
      "exec": {
-      "type": "v1beta3.ExecAction",
+      "$ref": "v1beta3.ExecAction",
       "description": "exec-based handler"
      },
      "httpGet": {
-      "type": "v1beta3.HTTPGetAction",
+      "$ref": "v1beta3.HTTPGetAction",
       "description": "HTTP-based handler"
      },
      "tcpSocket": {
-      "type": "v1beta3.TCPSocketAction",
+      "$ref": "v1beta3.TCPSocketAction",
       "description": "TCP-based handler; TCP hooks not yet supported"
      }
     }
@@ -4232,11 +4402,11 @@
     "id": "v1beta3.Lifecycle",
     "properties": {
      "postStart": {
-      "type": "v1beta3.Handler",
+      "$ref": "v1beta3.Handler",
       "description": "called immediately after a container is started; if the handler fails, the container is terminated and restarted according to its restart policy; other management of the container blocks until the hook completes"
      },
      "preStop": {
-      "type": "v1beta3.Handler",
+      "$ref": "v1beta3.Handler",
       "description": "called before a container is terminated; the container is terminated after the handler completes; other management of the container blocks until the hook completes"
      }
     }
@@ -4245,7 +4415,7 @@
     "id": "v1beta3.LimitRange",
     "properties": {
      "annotations": {
-      "type": "v1beta3.ObjectMeta.annotations",
+      "$ref": "v1beta3.ObjectMeta.annotations",
       "description": "map of string keys and values that can be used by external tooling to store and retrieve arbitrary metadata about objects"
      },
      "apiVersion": {
@@ -4256,6 +4426,10 @@
       "type": "string",
       "description": "RFC 3339 date and time at which the object was created; populated by the system, read-only; null for lists"
      },
+     "deletionTimestamp": {
+      "type": "string",
+      "description": "RFC 3339 date and time at which the object will be deleted; populated by the system when a graceful deletion is requested, read-only; if not set, graceful deletion of the object has not been requested"
+     },
      "generateName": {
       "type": "string",
       "description": "an optional prefix to use to generate a unique name; has the same validation rules as name; optional, and is applied only name if is not specified"
@@ -4265,7 +4439,7 @@
       "description": "kind of object, in CamelCase; cannot be updated"
      },
      "labels": {
-      "type": "v1beta3.ObjectMeta.labels",
+      "$ref": "v1beta3.ObjectMeta.labels",
       "description": "map of string keys and values that can be used to organize and categorize objects; may match selectors of replication controllers and services"
      },
      "name": {
@@ -4285,11 +4459,11 @@
       "description": "URL for the object; populated by the system, read-only"
      },
      "spec": {
-      "type": "v1beta3.LimitRangeSpec",
+      "$ref": "v1beta3.LimitRangeSpec",
       "description": "spec defines the limits enforced; https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#spec-and-status"
      },
      "uid": {
-      "type": "types.UID",
+      "$ref": "types.UID",
       "description": "unique UUID across space and time; populated by the system; read-only"
      }
     }
@@ -4298,15 +4472,15 @@
     "id": "v1beta3.LimitRangeItem",
     "properties": {
      "max": {
-      "type": "v1beta3.ResourceList",
+      "$ref": "v1beta3.ResourceList",
       "description": "max usage constraints on this kind by resource name"
      },
      "min": {
-      "type": "v1beta3.ResourceList",
+      "$ref": "v1beta3.ResourceList",
       "description": "min usage constraints on this kind by resource name"
      },
      "type": {
-      "type": "v1beta3.LimitType",
+      "$ref": "v1beta3.LimitType",
       "description": "type of resource that this limit applies to"
      }
     }
@@ -4361,7 +4535,7 @@
     "id": "v1beta3.Namespace",
     "properties": {
      "annotations": {
-      "type": "v1beta3.ObjectMeta.annotations",
+      "$ref": "v1beta3.ObjectMeta.annotations",
       "description": "map of string keys and values that can be used by external tooling to store and retrieve arbitrary metadata about objects"
      },
      "apiVersion": {
@@ -4372,6 +4546,10 @@
       "type": "string",
       "description": "RFC 3339 date and time at which the object was created; populated by the system, read-only; null for lists"
      },
+     "deletionTimestamp": {
+      "type": "string",
+      "description": "RFC 3339 date and time at which the object will be deleted; populated by the system when a graceful deletion is requested, read-only; if not set, graceful deletion of the object has not been requested"
+     },
      "generateName": {
       "type": "string",
       "description": "an optional prefix to use to generate a unique name; has the same validation rules as name; optional, and is applied only name if is not specified"
@@ -4381,7 +4559,7 @@
       "description": "kind of object, in CamelCase; cannot be updated"
      },
      "labels": {
-      "type": "v1beta3.ObjectMeta.labels",
+      "$ref": "v1beta3.ObjectMeta.labels",
       "description": "map of string keys and values that can be used to organize and categorize objects; may match selectors of replication controllers and services"
      },
      "name": {
@@ -4401,15 +4579,15 @@
       "description": "URL for the object; populated by the system, read-only"
      },
      "spec": {
-      "type": "v1beta3.NamespaceSpec",
+      "$ref": "v1beta3.NamespaceSpec",
       "description": "spec defines the behavior of the Namespace; https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#spec-and-status"
      },
      "status": {
-      "type": "v1beta3.NamespaceStatus",
+      "$ref": "v1beta3.NamespaceStatus",
       "description": "status describes the current status of a Namespace; https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#spec-and-status"
      },
      "uid": {
-      "type": "types.UID",
+      "$ref": "types.UID",
       "description": "unique UUID across space and time; populated by the system; read-only"
      }
     }
@@ -4447,13 +4625,21 @@
    },
    "v1beta3.NamespaceSpec": {
     "id": "v1beta3.NamespaceSpec",
-    "properties": {}
+    "properties": {
+     "finalizers": {
+      "type": "array",
+      "items": {
+       "$ref": "v1beta3.FinalizerName"
+      },
+      "description": "an opaque list of values that must be empty to permanently remove object from storage"
+     }
+    }
    },
    "v1beta3.NamespaceStatus": {
     "id": "v1beta3.NamespaceStatus",
     "properties": {
      "phase": {
-      "type": "v1beta3.NamespacePhase",
+      "$ref": "v1beta3.NamespacePhase",
       "description": "phase is the current lifecycle phase of the namespace"
      }
     }
@@ -4462,7 +4648,7 @@
     "id": "v1beta3.Node",
     "properties": {
      "annotations": {
-      "type": "v1beta3.ObjectMeta.annotations",
+      "$ref": "v1beta3.ObjectMeta.annotations",
       "description": "map of string keys and values that can be used by external tooling to store and retrieve arbitrary metadata about objects"
      },
      "apiVersion": {
@@ -4473,6 +4659,10 @@
       "type": "string",
       "description": "RFC 3339 date and time at which the object was created; populated by the system, read-only; null for lists"
      },
+     "deletionTimestamp": {
+      "type": "string",
+      "description": "RFC 3339 date and time at which the object will be deleted; populated by the system when a graceful deletion is requested, read-only; if not set, graceful deletion of the object has not been requested"
+     },
      "generateName": {
       "type": "string",
       "description": "an optional prefix to use to generate a unique name; has the same validation rules as name; optional, and is applied only name if is not specified"
@@ -4482,7 +4672,7 @@
       "description": "kind of object, in CamelCase; cannot be updated"
      },
      "labels": {
-      "type": "v1beta3.ObjectMeta.labels",
+      "$ref": "v1beta3.ObjectMeta.labels",
       "description": "map of string keys and values that can be used to organize and categorize objects; may match selectors of replication controllers and services"
      },
      "name": {
@@ -4502,15 +4692,15 @@
       "description": "URL for the object; populated by the system, read-only"
      },
      "spec": {
-      "type": "v1beta3.NodeSpec",
+      "$ref": "v1beta3.NodeSpec",
       "description": "specification of a node; https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#spec-and-status"
      },
      "status": {
-      "type": "v1beta3.NodeStatus",
+      "$ref": "v1beta3.NodeStatus",
       "description": "most recently observed status of the node; populated by the system, read-only; https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#spec-and-status"
      },
      "uid": {
-      "type": "types.UID",
+      "$ref": "types.UID",
       "description": "unique UUID across space and time; populated by the system; read-only"
      }
     }
@@ -4526,7 +4716,7 @@
       "type": "string"
      },
      "type": {
-      "type": "v1beta3.NodeAddressType"
+      "$ref": "v1beta3.NodeAddressType"
      }
     }
    },
@@ -4554,11 +4744,11 @@
       "description": "(brief) reason for the condition's last transition"
      },
      "status": {
-      "type": "v1beta3.ConditionStatus",
+      "$ref": "v1beta3.ConditionStatus",
       "description": "status of the condition, one of Full, None, Unknown"
      },
      "type": {
-      "type": "v1beta3.NodeConditionType",
+      "$ref": "v1beta3.NodeConditionType",
       "description": "type of node condition, one of Reachable, Ready"
      }
     }
@@ -4598,7 +4788,7 @@
     "id": "v1beta3.NodeSpec",
     "properties": {
      "capacity": {
-      "type": "v1beta3.ResourceList",
+      "$ref": "v1beta3.ResourceList",
       "description": "compute resource capacity of the node; https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/resources.md"
      },
      "externalID": {
@@ -4633,10 +4823,10 @@
       "description": "list of node conditions observed"
      },
      "nodeInfo": {
-      "type": "v1beta3.NodeSystemInfo"
+      "$ref": "v1beta3.NodeSystemInfo"
      },
      "phase": {
-      "type": "v1beta3.NodePhase",
+      "$ref": "v1beta3.NodePhase",
       "description": "most recently observed lifecycle phase of the node"
      }
     }
@@ -4684,7 +4874,7 @@
       "description": "specific resourceVersion to which this reference is made, if any: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
      },
      "uid": {
-      "type": "types.UID",
+      "$ref": "types.UID",
       "description": "uid of the referent"
      }
     }
@@ -4693,7 +4883,7 @@
     "id": "v1beta3.Pod",
     "properties": {
      "annotations": {
-      "type": "v1beta3.ObjectMeta.annotations",
+      "$ref": "v1beta3.ObjectMeta.annotations",
       "description": "map of string keys and values that can be used by external tooling to store and retrieve arbitrary metadata about objects"
      },
      "apiVersion": {
@@ -4704,6 +4894,10 @@
       "type": "string",
       "description": "RFC 3339 date and time at which the object was created; populated by the system, read-only; null for lists"
      },
+     "deletionTimestamp": {
+      "type": "string",
+      "description": "RFC 3339 date and time at which the object will be deleted; populated by the system when a graceful deletion is requested, read-only; if not set, graceful deletion of the object has not been requested"
+     },
      "generateName": {
       "type": "string",
       "description": "an optional prefix to use to generate a unique name; has the same validation rules as name; optional, and is applied only name if is not specified"
@@ -4713,7 +4907,7 @@
       "description": "kind of object, in CamelCase; cannot be updated"
      },
      "labels": {
-      "type": "v1beta3.ObjectMeta.labels",
+      "$ref": "v1beta3.ObjectMeta.labels",
       "description": "map of string keys and values that can be used to organize and categorize objects; may match selectors of replication controllers and services"
      },
      "name": {
@@ -4733,15 +4927,15 @@
       "description": "URL for the object; populated by the system, read-only"
      },
      "spec": {
-      "type": "v1beta3.PodSpec",
+      "$ref": "v1beta3.PodSpec",
       "description": "specification of the desired behavior of the pod; https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#spec-and-status"
      },
      "status": {
-      "type": "v1beta3.PodStatus",
+      "$ref": "v1beta3.PodStatus",
       "description": "most recently observed status of the pod; populated by the system, read-only; https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#spec-and-status"
      },
      "uid": {
-      "type": "types.UID",
+      "$ref": "types.UID",
       "description": "unique UUID across space and time; populated by the system; read-only"
      }
     }
@@ -4754,11 +4948,11 @@
     ],
     "properties": {
      "status": {
-      "type": "v1beta3.ConditionStatus",
+      "$ref": "v1beta3.ConditionStatus",
       "description": "status of the condition, one of Full, None, Unknown"
      },
      "type": {
-      "type": "v1beta3.PodConditionType",
+      "$ref": "v1beta3.PodConditionType",
       "description": "kind of the condition"
      }
     }
@@ -4806,22 +5000,26 @@
       "items": {
        "$ref": "v1beta3.Container"
       },
-      "description": "list of containers belonging to the pod; cannot be updated; containers cannot currently be added or removed"
+      "description": "list of containers belonging to the pod; cannot be updated; containers cannot currently be added or removed; there must be at least one container in a Pod"
      },
      "dnsPolicy": {
-      "type": "v1beta3.DNSPolicy",
+      "$ref": "v1beta3.DNSPolicy",
       "description": "DNS policy for containers within the pod; one of 'ClusterFirst' or 'Default'"
      },
      "host": {
       "type": "string",
       "description": "host requested for this pod"
      },
+     "hostNetwork": {
+      "type": "boolean",
+      "description": "host networking requested for this pod"
+     },
      "nodeSelector": {
-      "type": "v1beta3.PodSpec.nodeSelector",
+      "$ref": "v1beta3.PodSpec.nodeSelector",
       "description": "selector which must match a node's labels for the pod to be scheduled on that node"
      },
      "restartPolicy": {
-      "type": "v1beta3.RestartPolicy",
+      "$ref": "v1beta3.RestartPolicy",
       "description": "restart policy for all containers within the pod; one of RestartPolicyAlways, RestartPolicyOnFailure, RestartPolicyNever"
      },
      "volumes": {
@@ -4856,7 +5054,7 @@
       "description": "IP address of the host to which the pod is assigned; empty if not yet scheduled"
      },
      "info": {
-      "type": "v1beta3.PodInfo",
+      "$ref": "v1beta3.PodInfo",
       "description": "map of container name to container status"
      },
      "message": {
@@ -4864,7 +5062,7 @@
       "description": "human readable message indicating details about why the pod is in this condition"
      },
      "phase": {
-      "type": "v1beta3.PodPhase",
+      "$ref": "v1beta3.PodPhase",
       "description": "current condition of the pod."
      },
      "podIP": {
@@ -4877,19 +5075,23 @@
     "id": "v1beta3.PodTemplateSpec",
     "properties": {
      "annotations": {
-      "type": "v1beta3.ObjectMeta.annotations",
+      "$ref": "v1beta3.ObjectMeta.annotations",
       "description": "map of string keys and values that can be used by external tooling to store and retrieve arbitrary metadata about objects"
      },
      "creationTimestamp": {
       "type": "string",
       "description": "RFC 3339 date and time at which the object was created; populated by the system, read-only; null for lists"
      },
+     "deletionTimestamp": {
+      "type": "string",
+      "description": "RFC 3339 date and time at which the object will be deleted; populated by the system when a graceful deletion is requested, read-only; if not set, graceful deletion of the object has not been requested"
+     },
      "generateName": {
       "type": "string",
       "description": "an optional prefix to use to generate a unique name; has the same validation rules as name; optional, and is applied only name if is not specified"
      },
      "labels": {
-      "type": "v1beta3.ObjectMeta.labels",
+      "$ref": "v1beta3.ObjectMeta.labels",
       "description": "map of string keys and values that can be used to organize and categorize objects; may match selectors of replication controllers and services"
      },
      "name": {
@@ -4909,11 +5111,11 @@
       "description": "URL for the object; populated by the system, read-only"
      },
      "spec": {
-      "type": "v1beta3.PodSpec",
+      "$ref": "v1beta3.PodSpec",
       "description": "specification of the desired behavior of the pod; https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#spec-and-status"
      },
      "uid": {
-      "type": "types.UID",
+      "$ref": "types.UID",
       "description": "unique UUID across space and time; populated by the system; read-only"
      }
     }
@@ -4922,11 +5124,11 @@
     "id": "v1beta3.Probe",
     "properties": {
      "exec": {
-      "type": "v1beta3.ExecAction",
+      "$ref": "v1beta3.ExecAction",
       "description": "exec-based handler"
      },
      "httpGet": {
-      "type": "v1beta3.HTTPGetAction",
+      "$ref": "v1beta3.HTTPGetAction",
       "description": "HTTP-based handler"
      },
      "initialDelaySeconds": {
@@ -4935,7 +5137,7 @@
       "description": "number of seconds after the container has started before liveness probes are initiated"
      },
      "tcpSocket": {
-      "type": "v1beta3.TCPSocketAction",
+      "$ref": "v1beta3.TCPSocketAction",
       "description": "TCP-based handler; TCP hooks not yet supported"
      },
      "timeoutSeconds": {
@@ -4949,7 +5151,7 @@
     "id": "v1beta3.ReplicationController",
     "properties": {
      "annotations": {
-      "type": "v1beta3.ObjectMeta.annotations",
+      "$ref": "v1beta3.ObjectMeta.annotations",
       "description": "map of string keys and values that can be used by external tooling to store and retrieve arbitrary metadata about objects"
      },
      "apiVersion": {
@@ -4960,6 +5162,10 @@
       "type": "string",
       "description": "RFC 3339 date and time at which the object was created; populated by the system, read-only; null for lists"
      },
+     "deletionTimestamp": {
+      "type": "string",
+      "description": "RFC 3339 date and time at which the object will be deleted; populated by the system when a graceful deletion is requested, read-only; if not set, graceful deletion of the object has not been requested"
+     },
      "generateName": {
       "type": "string",
       "description": "an optional prefix to use to generate a unique name; has the same validation rules as name; optional, and is applied only name if is not specified"
@@ -4969,7 +5175,7 @@
       "description": "kind of object, in CamelCase; cannot be updated"
      },
      "labels": {
-      "type": "v1beta3.ObjectMeta.labels",
+      "$ref": "v1beta3.ObjectMeta.labels",
       "description": "map of string keys and values that can be used to organize and categorize objects; may match selectors of replication controllers and services"
      },
      "name": {
@@ -4989,15 +5195,15 @@
       "description": "URL for the object; populated by the system, read-only"
      },
      "spec": {
-      "type": "v1beta3.ReplicationControllerSpec",
+      "$ref": "v1beta3.ReplicationControllerSpec",
       "description": "specification of the desired behavior of the replication controller; https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#spec-and-status"
      },
      "status": {
-      "type": "v1beta3.ReplicationControllerStatus",
+      "$ref": "v1beta3.ReplicationControllerStatus",
       "description": "most recently observed status of the replication controller; populated by the system, read-only; https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#spec-and-status"
      },
      "uid": {
-      "type": "types.UID",
+      "$ref": "types.UID",
       "description": "unique UUID across space and time; populated by the system; read-only"
      }
     }
@@ -5045,15 +5251,15 @@
       "description": "number of replicas desired"
      },
      "selector": {
-      "type": "v1beta3.ReplicationControllerSpec.selector",
+      "$ref": "v1beta3.ReplicationControllerSpec.selector",
       "description": "label keys and values that must match in order to be controlled by this replication controller"
      },
      "template": {
-      "type": "v1beta3.PodTemplateSpec",
+      "$ref": "v1beta3.PodTemplateSpec",
       "description": "object that describes the pod that will be created if insufficient replicas are detected; takes precendence over templateRef"
      },
      "templateRef": {
-      "type": "v1beta3.ObjectReference",
+      "$ref": "v1beta3.ObjectReference",
       "description": "reference to an object that describes the pod that will be created if insufficient replicas are detected"
      }
     }
@@ -5079,7 +5285,7 @@
     "id": "v1beta3.ResourceQuota",
     "properties": {
      "annotations": {
-      "type": "v1beta3.ObjectMeta.annotations",
+      "$ref": "v1beta3.ObjectMeta.annotations",
       "description": "map of string keys and values that can be used by external tooling to store and retrieve arbitrary metadata about objects"
      },
      "apiVersion": {
@@ -5090,6 +5296,10 @@
       "type": "string",
       "description": "RFC 3339 date and time at which the object was created; populated by the system, read-only; null for lists"
      },
+     "deletionTimestamp": {
+      "type": "string",
+      "description": "RFC 3339 date and time at which the object will be deleted; populated by the system when a graceful deletion is requested, read-only; if not set, graceful deletion of the object has not been requested"
+     },
      "generateName": {
       "type": "string",
       "description": "an optional prefix to use to generate a unique name; has the same validation rules as name; optional, and is applied only name if is not specified"
@@ -5099,7 +5309,7 @@
       "description": "kind of object, in CamelCase; cannot be updated"
      },
      "labels": {
-      "type": "v1beta3.ObjectMeta.labels",
+      "$ref": "v1beta3.ObjectMeta.labels",
       "description": "map of string keys and values that can be used to organize and categorize objects; may match selectors of replication controllers and services"
      },
      "name": {
@@ -5119,15 +5329,15 @@
       "description": "URL for the object; populated by the system, read-only"
      },
      "spec": {
-      "type": "v1beta3.ResourceQuotaSpec",
+      "$ref": "v1beta3.ResourceQuotaSpec",
       "description": "spec defines the desired quota; https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#spec-and-status"
      },
      "status": {
-      "type": "v1beta3.ResourceQuotaStatus",
+      "$ref": "v1beta3.ResourceQuotaStatus",
       "description": "status defines the actual enforced quota and current usage; https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#spec-and-status"
      },
      "uid": {
-      "type": "types.UID",
+      "$ref": "types.UID",
       "description": "unique UUID across space and time; populated by the system; read-only"
      }
     }
@@ -5167,7 +5377,7 @@
     "id": "v1beta3.ResourceQuotaSpec",
     "properties": {
      "hard": {
-      "type": "v1beta3.ResourceList",
+      "$ref": "v1beta3.ResourceList",
       "description": "hard is the set of desired hard limits for each named resource"
      }
     }
@@ -5176,11 +5386,11 @@
     "id": "v1beta3.ResourceQuotaStatus",
     "properties": {
      "hard": {
-      "type": "v1beta3.ResourceList",
+      "$ref": "v1beta3.ResourceList",
       "description": "hard is the set of enforced hard limits for each named resource"
      },
      "used": {
-      "type": "v1beta3.ResourceList",
+      "$ref": "v1beta3.ResourceList",
       "description": "used is the current observed total usage of the resource in the namespace"
      }
     }
@@ -5189,8 +5399,12 @@
     "id": "v1beta3.ResourceRequirements",
     "properties": {
      "limits": {
-      "type": "v1beta3.ResourceList",
+      "$ref": "v1beta3.ResourceList",
       "description": "Maximum amount of compute resources allowed"
+     },
+     "requests": {
+      "$ref": "v1beta3.ResourceList",
+      "description": "Minimum amount of resources requested"
      }
     }
    },
@@ -5198,7 +5412,7 @@
     "id": "v1beta3.Secret",
     "properties": {
      "annotations": {
-      "type": "v1beta3.ObjectMeta.annotations",
+      "$ref": "v1beta3.ObjectMeta.annotations",
       "description": "map of string keys and values that can be used by external tooling to store and retrieve arbitrary metadata about objects"
      },
      "apiVersion": {
@@ -5210,8 +5424,12 @@
       "description": "RFC 3339 date and time at which the object was created; populated by the system, read-only; null for lists"
      },
      "data": {
-      "type": "v1beta3.Secret.data",
+      "$ref": "v1beta3.Secret.data",
       "description": "data contains the secret data.  Each key must be a valid DNS_SUBDOMAIN.  Each value must be a base64 encoded string"
+     },
+     "deletionTimestamp": {
+      "type": "string",
+      "description": "RFC 3339 date and time at which the object will be deleted; populated by the system when a graceful deletion is requested, read-only; if not set, graceful deletion of the object has not been requested"
      },
      "generateName": {
       "type": "string",
@@ -5222,7 +5440,7 @@
       "description": "kind of object, in CamelCase; cannot be updated"
      },
      "labels": {
-      "type": "v1beta3.ObjectMeta.labels",
+      "$ref": "v1beta3.ObjectMeta.labels",
       "description": "map of string keys and values that can be used to organize and categorize objects; may match selectors of replication controllers and services"
      },
      "name": {
@@ -5242,11 +5460,11 @@
       "description": "URL for the object; populated by the system, read-only"
      },
      "type": {
-      "type": "v1beta3.SecretType",
+      "$ref": "v1beta3.SecretType",
       "description": "type facilitates programmatic handling of secret data"
      },
      "uid": {
-      "type": "types.UID",
+      "$ref": "types.UID",
       "description": "unique UUID across space and time; populated by the system; read-only"
      }
     }
@@ -5290,7 +5508,7 @@
     "id": "v1beta3.Service",
     "properties": {
      "annotations": {
-      "type": "v1beta3.ObjectMeta.annotations",
+      "$ref": "v1beta3.ObjectMeta.annotations",
       "description": "map of string keys and values that can be used by external tooling to store and retrieve arbitrary metadata about objects"
      },
      "apiVersion": {
@@ -5301,6 +5519,10 @@
       "type": "string",
       "description": "RFC 3339 date and time at which the object was created; populated by the system, read-only; null for lists"
      },
+     "deletionTimestamp": {
+      "type": "string",
+      "description": "RFC 3339 date and time at which the object will be deleted; populated by the system when a graceful deletion is requested, read-only; if not set, graceful deletion of the object has not been requested"
+     },
      "generateName": {
       "type": "string",
       "description": "an optional prefix to use to generate a unique name; has the same validation rules as name; optional, and is applied only name if is not specified"
@@ -5310,7 +5532,7 @@
       "description": "kind of object, in CamelCase; cannot be updated"
      },
      "labels": {
-      "type": "v1beta3.ObjectMeta.labels",
+      "$ref": "v1beta3.ObjectMeta.labels",
       "description": "map of string keys and values that can be used to organize and categorize objects; may match selectors of replication controllers and services"
      },
      "name": {
@@ -5330,15 +5552,15 @@
       "description": "URL for the object; populated by the system, read-only"
      },
      "spec": {
-      "type": "v1beta3.ServiceSpec",
+      "$ref": "v1beta3.ServiceSpec",
       "description": "specification of the desired behavior of the service; https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#spec-and-status"
      },
      "status": {
-      "type": "v1beta3.ServiceStatus",
+      "$ref": "v1beta3.ServiceStatus",
       "description": "most recently observed status of the service; populated by the system, read-only; https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#spec-and-status"
      },
      "uid": {
-      "type": "types.UID",
+      "$ref": "types.UID",
       "description": "unique UUID across space and time; populated by the system; read-only"
      }
     }
@@ -5382,10 +5604,6 @@
      "portalIP"
     ],
     "properties": {
-     "containerPort": {
-      "type": "string",
-      "description": "number or name of the port to access on the containers belonging to pods targeted by the service; defaults to the container's first open port"
-     },
      "createExternalLoadBalancer": {
       "type": "boolean",
       "description": "set up a cloud-provider-specific load balancer on an external IP"
@@ -5399,23 +5617,27 @@
       "type": "string"
      },
      "protocol": {
-      "type": "v1beta3.Protocol",
+      "$ref": "v1beta3.Protocol",
       "description": "protocol for port; must be UDP or TCP; TCP if unspecified"
      },
      "publicIPs": {
       "type": "array",
       "items": {
-       "$ref": "string"
+       "type": "string"
       },
       "description": "externally visible IPs (e.g. load balancers) that should be proxied to this service"
      },
      "selector": {
-      "type": "v1beta3.ServiceSpec.selector",
+      "$ref": "v1beta3.ServiceSpec.selector",
       "description": "label keys and values that must match in order to receive traffic for this service; if empty, all pods are selected, if not specified, endpoints must be manually specified"
      },
      "sessionAffinity": {
-      "type": "v1beta3.AffinityType",
+      "$ref": "v1beta3.AffinityType",
       "description": "enable client IP based session affinity; must be ClientIP or None; defaults to None"
+     },
+     "targetPort": {
+      "type": "string",
+      "description": "number or name of the port to access on the containers belonging to pods targeted by the service; defaults to the container's first open port"
      }
     }
    },
@@ -5444,31 +5666,36 @@
      "emptyDir",
      "gcePersistentDisk",
      "gitRepo",
-     "secret"
+     "secret",
+     "nfs"
     ],
     "properties": {
      "emptyDir": {
-      "type": "v1beta3.EmptyDirVolumeSource",
+      "$ref": "v1beta3.EmptyDirVolumeSource",
       "description": "temporary directory that shares a pod's lifetime"
      },
      "gcePersistentDisk": {
-      "type": "v1beta3.GCEPersistentDiskVolumeSource",
+      "$ref": "v1beta3.GCEPersistentDiskVolumeSource",
       "description": "GCE disk resource attached to the host machine on demand"
      },
      "gitRepo": {
-      "type": "v1beta3.GitRepoVolumeSource",
+      "$ref": "v1beta3.GitRepoVolumeSource",
       "description": "git repository at a particular revision"
      },
      "hostPath": {
-      "type": "v1beta3.HostPathVolumeSource",
+      "$ref": "v1beta3.HostPathVolumeSource",
       "description": "pre-existing host file or directory; generally for privileged system daemons or other agents tied to the host"
      },
      "name": {
       "type": "string",
       "description": "volume name; must be a DNS_LABEL and unique within the pod"
      },
+     "nfs": {
+      "$ref": "v1beta3.NFSVolumeSource",
+      "description": "NFS volume that will be mounted in the host machine"
+     },
      "secret": {
-      "type": "v1beta3.SecretVolumeSource",
+      "$ref": "v1beta3.SecretVolumeSource",
       "description": "secret to populate volume"
      }
     }
