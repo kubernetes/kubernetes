@@ -341,13 +341,13 @@ function kube-up {
   local htpasswd
   htpasswd=$(cat "${KUBE_TEMP}/htpasswd")
 
-  if [[ ! -f $AWS_SSH_KEY ]]; then
-    ssh-keygen -f $AWS_SSH_KEY -N ''
+  if [[ ! -f "$AWS_SSH_KEY" ]]; then
+    ssh-keygen -f "$AWS_SSH_KEY" -N ''
   fi
 
   detect-image
 
-  $AWS_CMD import-key-pair --key-name kubernetes --public-key-material file://$AWS_SSH_KEY.pub > $LOG 2>&1 || true
+  $AWS_CMD import-key-pair --key-name kubernetes --public-key-material "file://$AWS_SSH_KEY.pub" > $LOG 2>&1 || true
 
   VPC_ID=$($AWS_CMD describe-vpcs | get_vpc_id)
 
@@ -474,7 +474,7 @@ function kube-up {
   while true; do
     echo -n Attempt "$(($attempt+1))" to check for salt-master
     local output
-    output=$(ssh -oStrictHostKeyChecking=no -i ${AWS_SSH_KEY} ubuntu@${KUBE_MASTER_IP} pgrep salt-master 2> $LOG) || output=""
+    output=$(ssh -oStrictHostKeyChecking=no -i "${AWS_SSH_KEY}" ubuntu@${KUBE_MASTER_IP} pgrep salt-master 2> $LOG) || output=""
     if [[ -z "${output}" ]]; then
       if (( attempt > 30 )); then
         echo
@@ -561,7 +561,7 @@ function kube-up {
     sleep 10
   done
   echo "Re-running salt highstate"
-  ssh -oStrictHostKeyChecking=no -i ${AWS_SSH_KEY} ubuntu@${KUBE_MASTER_IP} sudo salt '*' state.highstate > $LOG
+  ssh -oStrictHostKeyChecking=no -i "${AWS_SSH_KEY}" ubuntu@${KUBE_MASTER_IP} sudo salt '*' state.highstate > $LOG
 
   echo "Waiting for cluster initialization."
   echo
@@ -594,9 +594,9 @@ function kube-up {
   (
     mkdir -p "${config_dir}"
     umask 077
-    ssh -oStrictHostKeyChecking=no -i ${AWS_SSH_KEY} ubuntu@${KUBE_MASTER_IP} sudo cat /srv/kubernetes/kubecfg.crt >"${config_dir}/${kube_cert}" 2>$LOG
-    ssh -oStrictHostKeyChecking=no -i ${AWS_SSH_KEY} ubuntu@${KUBE_MASTER_IP} sudo cat /srv/kubernetes/kubecfg.key >"${config_dir}/${kube_key}" 2>$LOG
-    ssh -oStrictHostKeyChecking=no -i ${AWS_SSH_KEY} ubuntu@${KUBE_MASTER_IP} sudo cat /srv/kubernetes/ca.crt >"${config_dir}/${ca_cert}" 2>$LOG
+    ssh -oStrictHostKeyChecking=no -i "${AWS_SSH_KEY}" ubuntu@${KUBE_MASTER_IP} sudo cat /srv/kubernetes/kubecfg.crt >"${config_dir}/${kube_cert}" 2>$LOG
+    ssh -oStrictHostKeyChecking=no -i "${AWS_SSH_KEY}" ubuntu@${KUBE_MASTER_IP} sudo cat /srv/kubernetes/kubecfg.key >"${config_dir}/${kube_key}" 2>$LOG
+    ssh -oStrictHostKeyChecking=no -i "${AWS_SSH_KEY}" ubuntu@${KUBE_MASTER_IP} sudo cat /srv/kubernetes/ca.crt >"${config_dir}/${ca_cert}" 2>$LOG
 
     "${kubectl}" config set-cluster "${context}" --server="https://${KUBE_MASTER_IP}" --certificate-authority="${config_dir}/${ca_cert}" --global
     "${kubectl}" config set-credentials "${user}" --auth-path="${config_dir}/${kube_auth}" --global
@@ -634,7 +634,7 @@ EOF
         local minion_name=${MINION_NAMES[$i]}
         local minion_ip=${KUBE_MINION_IP_ADDRESSES[$i]}
         echo -n Attempt "$(($attempt+1))" to check Docker on node "${minion_name} @ ${minion_ip}" ...
-        local output=$(ssh -oStrictHostKeyChecking=no -i ${AWS_SSH_KEY} ubuntu@$minion_ip sudo docker ps -a 2>/dev/null)
+        local output=$(ssh -oStrictHostKeyChecking=no -i "${AWS_SSH_KEY}" ubuntu@$minion_ip sudo docker ps -a 2>/dev/null)
         if [[ -z "${output}" ]]; then
           if (( attempt > 9 )); then
             echo
@@ -658,7 +658,7 @@ EOF
         fi
         echo -e " ${color_yellow}[not working yet]${color_norm}"
         # Start Docker, in case it failed to start.
-        ssh -oStrictHostKeyChecking=no -i ${AWS_SSH_KEY} ubuntu@$minion_ip sudo service docker start > $LOG 2>&1
+        ssh -oStrictHostKeyChecking=no -i "${AWS_SSH_KEY}" ubuntu@$minion_ip sudo service docker start > $LOG 2>&1
         attempt=$(($attempt+1))
         sleep 30
       done
@@ -758,7 +758,7 @@ function kube-push {
     echo "echo Executing configuration"
     echo "sudo salt '*' mine.update"
     echo "sudo salt --force-color '*' state.highstate"
-  ) | ssh -oStrictHostKeyChecking=no -i ${AWS_SSH_KEY} ubuntu@${KUBE_MASTER_IP} sudo bash
+  ) | ssh -oStrictHostKeyChecking=no -i "${AWS_SSH_KEY}" ubuntu@${KUBE_MASTER_IP} sudo bash
 
   get-password
 
@@ -811,7 +811,7 @@ function ssh-to-node {
   fi
 
   for try in $(seq 1 5); do
-    if ssh -oLogLevel=quiet -oStrictHostKeyChecking=no -i ${AWS_SSH_KEY} ubuntu@${ip} "${cmd}"; then
+    if ssh -oLogLevel=quiet -oStrictHostKeyChecking=no -i "${AWS_SSH_KEY}" ubuntu@${ip} "${cmd}"; then
       break
     fi
   done
