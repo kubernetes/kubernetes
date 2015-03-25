@@ -60,28 +60,55 @@ func verifyActions(t *testing.T, kubeClient client.Interface, expectedActions []
 	}
 }
 
+func verifyUpdates(t *testing.T, manager *statusManager, expectedUpdates int) {
+	// Consume all updates in the channel.
+	numUpdates := 0
+	for {
+		hasUpdate := true
+		select {
+		case <-manager.podStatusChannel:
+			numUpdates++
+		default:
+			hasUpdate = false
+		}
+
+		if !hasUpdate {
+			break
+		}
+	}
+
+	if numUpdates != expectedUpdates {
+		t.Errorf("unexpected number of updates %d, expected %s", numUpdates, expectedUpdates)
+	}
+}
+
 func TestNewStatus(t *testing.T) {
 	syncer := newTestStatusManager()
 	syncer.SetPodStatus(testPod, getRandomPodStatus())
-	syncer.SyncBatch()
-	verifyActions(t, syncer.kubeClient, []string{"update-status-pod"})
+	verifyUpdates(t, syncer, 1)
 }
 
 func TestChangedStatus(t *testing.T) {
 	syncer := newTestStatusManager()
 	syncer.SetPodStatus(testPod, getRandomPodStatus())
-	syncer.SyncBatch()
 	syncer.SetPodStatus(testPod, getRandomPodStatus())
-	syncer.SyncBatch()
-	verifyActions(t, syncer.kubeClient, []string{"update-status-pod", "update-status-pod"})
+	verifyUpdates(t, syncer, 2)
 }
 
 func TestUnchangedStatus(t *testing.T) {
 	syncer := newTestStatusManager()
 	podStatus := getRandomPodStatus()
 	syncer.SetPodStatus(testPod, podStatus)
-	syncer.SyncBatch()
 	syncer.SetPodStatus(testPod, podStatus)
-	syncer.SyncBatch()
+	verifyUpdates(t, syncer, 1)
+}
+
+func TestSyncBatch(t *testing.T) {
+	syncer := newTestStatusManager()
+	syncer.SetPodStatus(testPod, getRandomPodStatus())
+	err := syncer.syncBatch()
+	if err != nil {
+		t.Errorf("unexpected syncing error: %v", err)
+	}
 	verifyActions(t, syncer.kubeClient, []string{"update-status-pod"})
 }
