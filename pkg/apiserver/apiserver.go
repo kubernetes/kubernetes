@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"path"
@@ -194,6 +195,26 @@ func APIVersionHandler(versions ...string) restful.RouteFunction {
 		// TODO: use restful's Response methods
 		writeRawJSON(http.StatusOK, api.APIVersions{Versions: versions}, resp.ResponseWriter)
 	}
+}
+
+// write renders a returned runtime.Object to the response as a stream or an encoded object.
+func write(statusCode int, apiVersion string, codec runtime.Codec, object runtime.Object, w http.ResponseWriter, req *http.Request) {
+	if stream, ok := object.(rest.ResourceStreamer); ok {
+		out, contentType, err := stream.InputStream(apiVersion, req.Header.Get("Accept"))
+		if err != nil {
+			errorJSONFatal(err, codec, w)
+			return
+		}
+		defer out.Close()
+		if len(contentType) == 0 {
+			contentType = "application/octet-stream"
+		}
+		w.Header().Set("Content-Type", contentType)
+		w.WriteHeader(statusCode)
+		io.Copy(w, out)
+		return
+	}
+	writeJSON(statusCode, codec, object, w)
 }
 
 // writeJSON renders an object as JSON to the response.

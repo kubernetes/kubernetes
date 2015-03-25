@@ -35,6 +35,10 @@ type Selector interface {
 	// requires.
 	RequiresExactMatch(field string) (value string, found bool)
 
+	// Transform returns a new copy of the selector after TransformFunc has been
+	// applied to the entire selector, or an error if fn returns an error.
+	Transform(fn TransformFunc) (Selector, error)
+
 	// String returns a human readable string that represents this selector.
 	String() string
 }
@@ -63,6 +67,14 @@ func (t *hasTerm) RequiresExactMatch(field string) (value string, found bool) {
 	return "", false
 }
 
+func (t *hasTerm) Transform(fn TransformFunc) (Selector, error) {
+	field, value, err := fn(t.field, t.value)
+	if err != nil {
+		return nil, err
+	}
+	return &hasTerm{field, value}, nil
+}
+
 func (t *hasTerm) String() string {
 	return fmt.Sprintf("%v=%v", t.field, t.value)
 }
@@ -81,6 +93,14 @@ func (t *notHasTerm) Empty() bool {
 
 func (t *notHasTerm) RequiresExactMatch(field string) (value string, found bool) {
 	return "", false
+}
+
+func (t *notHasTerm) Transform(fn TransformFunc) (Selector, error) {
+	field, value, err := fn(t.field, t.value)
+	if err != nil {
+		return nil, err
+	}
+	return &notHasTerm{field, value}, nil
 }
 
 func (t *notHasTerm) String() string {
@@ -123,6 +143,18 @@ func (t andTerm) RequiresExactMatch(field string) (string, bool) {
 		}
 	}
 	return "", false
+}
+
+func (t andTerm) Transform(fn TransformFunc) (Selector, error) {
+	next := make([]Selector, len([]Selector(t)))
+	for i, s := range []Selector(t) {
+		n, err := s.Transform(fn)
+		if err != nil {
+			return nil, err
+		}
+		next[i] = n
+	}
+	return andTerm(next), nil
 }
 
 func (t andTerm) String() string {
@@ -183,31 +215,19 @@ func parseSelector(selector string, fn TransformFunc) (Selector, error) {
 			continue
 		}
 		if lhs, rhs, ok := try(part, "!="); ok {
-			lhs, rhs, err := fn(lhs, rhs)
-			if err != nil {
-				return nil, err
-			}
 			items = append(items, &notHasTerm{field: lhs, value: rhs})
 		} else if lhs, rhs, ok := try(part, "=="); ok {
-			lhs, rhs, err := fn(lhs, rhs)
-			if err != nil {
-				return nil, err
-			}
 			items = append(items, &hasTerm{field: lhs, value: rhs})
 		} else if lhs, rhs, ok := try(part, "="); ok {
-			lhs, rhs, err := fn(lhs, rhs)
-			if err != nil {
-				return nil, err
-			}
 			items = append(items, &hasTerm{field: lhs, value: rhs})
 		} else {
 			return nil, fmt.Errorf("invalid selector: '%s'; can't understand '%s'", selector, part)
 		}
 	}
 	if len(items) == 1 {
-		return items[0], nil
+		return items[0].Transform(fn)
 	}
-	return andTerm(items), nil
+	return andTerm(items).Transform(fn)
 }
 
 // OneTermEqualSelector returns an object that matches objects where one field/field equals one value.

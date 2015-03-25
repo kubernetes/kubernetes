@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
@@ -122,7 +123,8 @@ func init() {
 // defaultAPIServer exposes nested objects for testability.
 type defaultAPIServer struct {
 	http.Handler
-	group *APIGroupVersion
+	group     *APIGroupVersion
+	container *restful.Container
 }
 
 // uses the default settings
@@ -169,7 +171,7 @@ func handleInternal(storage map[string]rest.Storage, admissionControl admission.
 	ws := new(restful.WebService)
 	InstallSupport(mux, ws)
 	container.Add(ws)
-	return &defaultAPIServer{mux, group}
+	return &defaultAPIServer{mux, group, container}
 }
 
 type Simple struct {
@@ -212,6 +214,8 @@ type SimpleRESTStorage struct {
 	updated *Simple
 	created *Simple
 
+	stream *SimpleStream
+
 	deleted       string
 	deleteOptions *api.DeleteOptions
 
@@ -243,8 +247,34 @@ func (storage *SimpleRESTStorage) List(ctx api.Context, label labels.Selector, f
 	return result, storage.errors["list"]
 }
 
+type SimpleStream struct {
+	version     string
+	accept      string
+	contentType string
+	err         error
+
+	io.Reader
+	closed bool
+}
+
+func (s *SimpleStream) Close() error {
+	s.closed = true
+	return nil
+}
+
+func (s *SimpleStream) IsAnAPIObject() {}
+
+func (s *SimpleStream) InputStream(version, accept string) (io.ReadCloser, string, error) {
+	s.version = version
+	s.accept = accept
+	return s, s.contentType, s.err
+}
+
 func (storage *SimpleRESTStorage) Get(ctx api.Context, id string) (runtime.Object, error) {
 	storage.checkContext(ctx)
+	if id == "binary" {
+		return storage.stream, storage.errors["get"]
+	}
 	return api.Scheme.CopyOrDie(&storage.item), storage.errors["get"]
 }
 
@@ -341,6 +371,15 @@ type LegacyRESTStorage struct {
 
 func (storage LegacyRESTStorage) Delete(ctx api.Context, id string) (runtime.Object, error) {
 	return storage.SimpleRESTStorage.Delete(ctx, id, nil)
+}
+
+type MetadataRESTStorage struct {
+	*SimpleRESTStorage
+	types []string
+}
+
+func (m *MetadataRESTStorage) ProducesMIMETypes(method string) []string {
+	return m.types
 }
 
 func extractBody(response *http.Response, object runtime.Object) (string, error) {
@@ -646,6 +685,26 @@ func TestSelfLinkSkipsEmptyName(t *testing.T) {
 	}
 }
 
+func TestMetadata(t *testing.T) {
+	simpleStorage := &MetadataRESTStorage{&SimpleRESTStorage{}, []string{"text/plain"}}
+	h := handle(map[string]rest.Storage{"simple": simpleStorage})
+	ws := h.(*defaultAPIServer).container.RegisteredWebServices()
+	if len(ws) == 0 {
+		t.Fatal("no web services registered")
+	}
+	matches := map[string]int{}
+	for _, w := range ws {
+		for _, r := range w.Routes() {
+			s := strings.Join(r.Produces, ",")
+			i := matches[s]
+			matches[s] = i + 1
+		}
+	}
+	if matches["text/plain,application/json"] == 0 || matches["application/json"] == 0 || matches["*/*"] == 0 || len(matches) != 3 {
+		t.Errorf("unexpected mime types: %v", matches)
+	}
+}
+
 func TestGet(t *testing.T) {
 	storage := map[string]rest.Storage{}
 	simpleStorage := SimpleRESTStorage{
@@ -682,6 +741,36 @@ func TestGet(t *testing.T) {
 	}
 	if !selfLinker.called {
 		t.Errorf("Never set self link")
+	}
+}
+
+func TestGetBinary(t *testing.T) {
+	simpleStorage := SimpleRESTStorage{
+		stream: &SimpleStream{
+			contentType: "text/plain",
+			Reader:      bytes.NewBufferString("response data"),
+		},
+	}
+	stream := simpleStorage.stream
+	server := httptest.NewServer(handle(map[string]rest.Storage{"simple": &simpleStorage}))
+	defer server.Close()
+
+	req, _ := http.NewRequest("GET", server.URL+"/api/version/simple/binary", nil)
+	req.Header.Add("Accept", "text/other, */*")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("unexpected response: %#v", resp)
+	}
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if !stream.closed || stream.version != "version" || stream.accept != "text/other, */*" ||
+		resp.Header.Get("Content-Type") != stream.contentType || string(body) != "response data" {
+		t.Errorf("unexpected stream: %#v", stream)
 	}
 }
 

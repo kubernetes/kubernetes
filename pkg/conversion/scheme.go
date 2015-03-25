@@ -232,6 +232,14 @@ func (s *Scheme) AddDefaultingFuncs(defaultingFuncs ...interface{}) error {
 	return nil
 }
 
+// RegisterInputDefaults sets the provided field mapping function and field matching
+// as the defaults for the provided input type.  The fn may be nil, in which case no
+// mapping will happen by default. Use this method to register a mechanism for handling
+// a specific input type in conversion, such as a map[string]string to structs.
+func (s *Scheme) RegisterInputDefaults(in interface{}, fn FieldMappingFunc, defaultFlags FieldMatchingFlags) error {
+	return s.converter.RegisterInputDefaults(in, fn, defaultFlags)
+}
+
 // Convert will attempt to convert in into out. Both must be pointers. For easy
 // testing of conversion functions. Returns an error if the conversion isn't
 // possible. You can call this with types that haven't been registered (for example,
@@ -247,7 +255,11 @@ func (s *Scheme) Convert(in, out interface{}) error {
 	if v, _, err := s.ObjectVersionAndKind(out); err == nil {
 		outVersion = v
 	}
-	return s.converter.Convert(in, out, AllowDifferentFieldTypeNames, s.generateConvertMeta(inVersion, outVersion))
+	flags, meta := s.generateConvertMeta(inVersion, outVersion, in)
+	if flags == 0 {
+		flags = AllowDifferentFieldTypeNames
+	}
+	return s.converter.Convert(in, out, flags, meta)
 }
 
 // ConvertToVersion attempts to convert an input object to its matching Kind in another
@@ -279,7 +291,8 @@ func (s *Scheme) ConvertToVersion(in interface{}, outVersion string) (interface{
 		return nil, err
 	}
 
-	if err := s.converter.Convert(in, out, 0, s.generateConvertMeta(inVersion, outVersion)); err != nil {
+	flags, meta := s.generateConvertMeta(inVersion, outVersion, in)
+	if err := s.converter.Convert(in, out, flags, meta); err != nil {
 		return nil, err
 	}
 
@@ -290,11 +303,18 @@ func (s *Scheme) ConvertToVersion(in interface{}, outVersion string) (interface{
 	return out, nil
 }
 
+// Converter allows access to the converter for the scheme
+func (s *Scheme) Converter() *Converter {
+	return s.converter
+}
+
 // generateConvertMeta constructs the meta value we pass to Convert.
-func (s *Scheme) generateConvertMeta(srcVersion, destVersion string) *Meta {
-	return &Meta{
-		SrcVersion:  srcVersion,
-		DestVersion: destVersion,
+func (s *Scheme) generateConvertMeta(srcVersion, destVersion string, in interface{}) (FieldMatchingFlags, *Meta) {
+	t := reflect.TypeOf(in)
+	return s.converter.inputDefaultFlags[t], &Meta{
+		SrcVersion:     srcVersion,
+		DestVersion:    destVersion,
+		KeyNameMapping: s.converter.inputFieldMappingFuncs[t],
 	}
 }
 

@@ -58,7 +58,8 @@ func (s *Scheme) Decode(data []byte) (interface{}, error) {
 		if err != nil {
 			return nil, err
 		}
-		if err := s.converter.Convert(obj, objOut, 0, s.generateConvertMeta(version, s.InternalVersion)); err != nil {
+		flags, meta := s.generateConvertMeta(version, s.InternalVersion, obj)
+		if err := s.converter.Convert(obj, objOut, flags, meta); err != nil {
 			return nil, err
 		}
 		obj = objOut
@@ -101,7 +102,8 @@ func (s *Scheme) DecodeInto(data []byte, obj interface{}) error {
 	if err := json.Unmarshal(data, external); err != nil {
 		return err
 	}
-	if err := s.converter.Convert(external, obj, 0, s.generateConvertMeta(dataVersion, objVersion)); err != nil {
+	flags, meta := s.generateConvertMeta(dataVersion, objVersion, external)
+	if err := s.converter.Convert(external, obj, flags, meta); err != nil {
 		return err
 	}
 

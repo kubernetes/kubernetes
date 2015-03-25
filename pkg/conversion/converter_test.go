@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"reflect"
 	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/google/gofuzz"
@@ -170,6 +171,105 @@ func TestConverter_CallsRegisteredFunctions(t *testing.T) {
 	err = c.Convert(&A{}, &C{}, 0, nil)
 	if err == nil {
 		t.Errorf("unexpected non-error")
+	}
+}
+
+func TestConverter_MapsStringArrays(t *testing.T) {
+	type A struct {
+		Foo   string
+		Baz   int
+		Other string
+	}
+	c := NewConverter()
+	c.Debug = t
+	if err := c.RegisterConversionFunc(func(input *[]string, out *string, s Scope) error {
+		if len(*input) == 0 {
+			*out = ""
+		}
+		*out = (*input)[0]
+		return nil
+	}); err != nil {
+		t.Fatalf("unexpected error %v", err)
+	}
+
+	x := map[string][]string{
+		"Foo":   {"bar"},
+		"Baz":   {"1"},
+		"Other": {"", "test"},
+		"other": {"wrong"},
+	}
+	y := A{"test", 2, "something"}
+
+	if err := c.Convert(&x, &y, AllowDifferentFieldTypeNames, nil); err == nil {
+		t.Error("unexpected non-error")
+	}
+
+	if err := c.RegisterConversionFunc(func(input *[]string, out *int, s Scope) error {
+		if len(*input) == 0 {
+			*out = 0
+		}
+		str := (*input)[0]
+		i, err := strconv.Atoi(str)
+		if err != nil {
+			return err
+		}
+		*out = i
+		return nil
+	}); err != nil {
+		t.Fatalf("unexpected error %v", err)
+	}
+
+	if err := c.Convert(&x, &y, AllowDifferentFieldTypeNames, nil); err != nil {
+		t.Fatalf("unexpected error %v", err)
+	}
+	if !reflect.DeepEqual(y, A{"bar", 1, ""}) {
+		t.Errorf("unexpected result: %#v", y)
+	}
+}
+
+func TestConverter_MapsStringArraysWithMappingKey(t *testing.T) {
+	type A struct {
+		Foo   string `json:"test"`
+		Baz   int
+		Other string
+	}
+	c := NewConverter()
+	c.Debug = t
+	if err := c.RegisterConversionFunc(func(input *[]string, out *string, s Scope) error {
+		if len(*input) == 0 {
+			*out = ""
+		}
+		*out = (*input)[0]
+		return nil
+	}); err != nil {
+		t.Fatalf("unexpected error %v", err)
+	}
+
+	x := map[string][]string{
+		"Foo":  {"bar"},
+		"test": {"baz"},
+	}
+	y := A{"", 0, ""}
+
+	if err := c.Convert(&x, &y, AllowDifferentFieldTypeNames|IgnoreMissingFields, &Meta{}); err != nil {
+		t.Fatalf("unexpected error %v", err)
+	}
+	if !reflect.DeepEqual(y, A{"bar", 0, ""}) {
+		t.Errorf("unexpected result: %#v", y)
+	}
+
+	mapping := func(key string, sourceTag, destTag reflect.StructTag) (source string, dest string) {
+		if s := destTag.Get("json"); len(s) > 0 {
+			return strings.SplitN(s, ",", 2)[0], key
+		}
+		return key, key
+	}
+
+	if err := c.Convert(&x, &y, AllowDifferentFieldTypeNames|IgnoreMissingFields, &Meta{KeyNameMapping: mapping}); err != nil {
+		t.Fatalf("unexpected error %v", err)
+	}
+	if !reflect.DeepEqual(y, A{"baz", 0, ""}) {
+		t.Errorf("unexpected result: %#v", y)
 	}
 }
 
