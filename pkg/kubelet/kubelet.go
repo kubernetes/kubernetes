@@ -1935,7 +1935,7 @@ func (kl *Kubelet) tryUpdateNodeStatus() error {
 		node.Status.NodeInfo.MachineID = info.MachineID
 		node.Status.NodeInfo.SystemUUID = info.SystemUUID
 		node.Status.NodeInfo.BootID = info.BootID
-		node.Spec.Capacity = CapacityFromMachineInfo(info)
+		node.Status.Capacity = CapacityFromMachineInfo(info)
 	}
 
 	currentTime := util.Now()

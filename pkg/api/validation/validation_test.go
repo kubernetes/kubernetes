@@ -1822,14 +1822,14 @@ func TestValidateMinion(t *testing.T) {
 				Addresses: []api.NodeAddress{
 					{Type: api.NodeLegacyHostIP, Address: "something"},
 				},
-			},
-			Spec: api.NodeSpec{
-				ExternalID: "external",
 				Capacity: api.ResourceList{
 					api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
 					api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
 					api.ResourceName("my.org/gpu"):       resource.MustParse("10"),
 				},
+			},
+			Spec: api.NodeSpec{
+				ExternalID: "external",
 			},
 		},
 		{
@@ -1840,13 +1840,13 @@ func TestValidateMinion(t *testing.T) {
 				Addresses: []api.NodeAddress{
 					{Type: api.NodeLegacyHostIP, Address: "something"},
 				},
-			},
-			Spec: api.NodeSpec{
-				ExternalID: "external",
 				Capacity: api.ResourceList{
 					api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
 					api.ResourceName(api.ResourceMemory): resource.MustParse("0"),
 				},
+			},
+			Spec: api.NodeSpec{
+				ExternalID: "external",
 			},
 		},
 	}
@@ -1864,13 +1864,13 @@ func TestValidateMinion(t *testing.T) {
 			},
 			Status: api.NodeStatus{
 				Addresses: []api.NodeAddress{},
-			},
-			Spec: api.NodeSpec{
-				ExternalID: "external",
 				Capacity: api.ResourceList{
 					api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
 					api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
 				},
+			},
+			Spec: api.NodeSpec{
+				ExternalID: "external",
 			},
 		},
 		"invalid-labels": {
@@ -1878,12 +1878,14 @@ func TestValidateMinion(t *testing.T) {
 				Name:   "abc-123",
 				Labels: invalidSelector,
 			},
-			Spec: api.NodeSpec{
-				ExternalID: "external",
+			Status: api.NodeStatus{
 				Capacity: api.ResourceList{
 					api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
 					api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
 				},
+			},
+			Spec: api.NodeSpec{
+				ExternalID: "external",
 			},
 		},
 		"missing-external-id": {
@@ -1891,7 +1893,7 @@ func TestValidateMinion(t *testing.T) {
 				Name:   "abc-123",
 				Labels: validSelector,
 			},
-			Spec: api.NodeSpec{
+			Status: api.NodeStatus{
 				Capacity: api.ResourceList{
 					api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
 					api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
@@ -1912,11 +1914,13 @@ func TestValidateMinion(t *testing.T) {
 				Name:   "abc-123",
 				Labels: validSelector,
 			},
-			Spec: api.NodeSpec{
-				ExternalID: "external",
+			Status: api.NodeStatus{
 				Capacity: api.ResourceList{
 					api.ResourceName(api.ResourceCPU): resource.MustParse("10"),
 				},
+			},
+			Spec: api.NodeSpec{
+				ExternalID: "external",
 			},
 		},
 		"missing-cpu": {
@@ -1924,11 +1928,13 @@ func TestValidateMinion(t *testing.T) {
 				Name:   "abc-123",
 				Labels: validSelector,
 			},
-			Spec: api.NodeSpec{
-				ExternalID: "external",
+			Status: api.NodeStatus{
 				Capacity: api.ResourceList{
 					api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
 				},
+			},
+			Spec: api.NodeSpec{
+				ExternalID: "external",
 			},
 		},
 		"invalid-memory": {
@@ -1936,12 +1942,14 @@ func TestValidateMinion(t *testing.T) {
 				Name:   "abc-123",
 				Labels: validSelector,
 			},
-			Spec: api.NodeSpec{
-				ExternalID: "external",
+			Status: api.NodeStatus{
 				Capacity: api.ResourceList{
 					api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
 					api.ResourceName(api.ResourceMemory): resource.MustParse("-10G"),
 				},
+			},
+			Spec: api.NodeSpec{
+				ExternalID: "external",
 			},
 		},
 		"invalid-cpu": {
@@ -1949,12 +1957,14 @@ func TestValidateMinion(t *testing.T) {
 				Name:   "abc-123",
 				Labels: validSelector,
 			},
-			Spec: api.NodeSpec{
-				ExternalID: "external",
+			Status: api.NodeStatus{
 				Capacity: api.ResourceList{
 					api.ResourceName(api.ResourceCPU):    resource.MustParse("-10"),
 					api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
 				},
+			},
+			Spec: api.NodeSpec{
+				ExternalID: "external",
 			},
 		},
 	}
@@ -1966,14 +1976,14 @@ func TestValidateMinion(t *testing.T) {
 		for i := range errs {
 			field := errs[i].(*errors.ValidationError).Field
 			expectedFields := map[string]bool{
-				"metadata.name":         true,
-				"metadata.labels":       true,
-				"metadata.annotations":  true,
-				"metadata.namespace":    true,
-				"spec.Capacity":         true,
-				"spec.Capacity[memory]": true,
-				"spec.Capacity[cpu]":    true,
-				"spec.ExternalID":       true,
+				"metadata.name":           true,
+				"metadata.labels":         true,
+				"metadata.annotations":    true,
+				"metadata.namespace":      true,
+				"status.Capacity":         true,
+				"status.Capacity[memory]": true,
+				"status.Capacity[cpu]":    true,
+				"spec.ExternalID":         true,
 			}
 			if expectedFields[field] == false {
 				t.Errorf("%s: missing prefix for: %v", k, errs[i])
@@ -2032,7 +2042,7 @@ func TestValidateMinionUpdate(t *testing.T) {
 			ObjectMeta: api.ObjectMeta{
 				Name: "foo",
 			},
-			Spec: api.NodeSpec{
+			Status: api.NodeStatus{
 				Capacity: api.ResourceList{
 					api.ResourceCPU:    resource.MustParse("10000"),
 					api.ResourceMemory: resource.MustParse("100"),
@@ -2042,7 +2052,7 @@ func TestValidateMinionUpdate(t *testing.T) {
 			ObjectMeta: api.ObjectMeta{
 				Name: "foo",
 			},
-			Spec: api.NodeSpec{
+			Status: api.NodeStatus{
 				Capacity: api.ResourceList{
 					api.ResourceCPU:    resource.MustParse("100"),
 					api.ResourceMemory: resource.MustParse("10000"),
@@ -2054,7 +2064,7 @@ func TestValidateMinionUpdate(t *testing.T) {
 				Name:   "foo",
 				Labels: map[string]string{"bar": "foo"},
 			},
-			Spec: api.NodeSpec{
+			Status: api.NodeStatus{
 				Capacity: api.ResourceList{
 					api.ResourceCPU:    resource.MustParse("10000"),
 					api.ResourceMemory: resource.MustParse("100"),
@@ -2065,7 +2075,7 @@ func TestValidateMinionUpdate(t *testing.T) {
 				Name:   "foo",
 				Labels: map[string]string{"bar": "fooobaz"},
 			},
-			Spec: api.NodeSpec{
+			Status: api.NodeStatus{
 				Capacity: api.ResourceList{
 					api.ResourceCPU:    resource.MustParse("100"),
 					api.ResourceMemory: resource.MustParse("10000"),

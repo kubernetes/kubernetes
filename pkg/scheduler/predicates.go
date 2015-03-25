@@ -137,7 +137,7 @@ func (r *ResourceFit) PodFitsResources(pod api.Pod, existingPods []api.Pod, node
 	pods := []api.Pod{}
 	copy(pods, existingPods)
 	pods = append(existingPods, pod)
-	_, exceeding := CheckPodsExceedingCapacity(pods, info.Spec.Capacity)
+	_, exceeding := CheckPodsExceedingCapacity(pods, info.Status.Capacity)
 	if len(exceeding) > 0 {
 		return false, nil
 	}

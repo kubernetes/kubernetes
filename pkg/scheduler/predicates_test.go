@@ -120,7 +120,7 @@ func TestPodFitsResources(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		node := api.Node{Spec: api.NodeSpec{Capacity: makeResources(10, 20).Capacity}}
+		node := api.Node{Status: api.NodeStatus{Capacity: makeResources(10, 20).Capacity}}
 
 		fit := ResourceFit{FakeNodeInfo(node)}
 		fits, err := fit.PodFitsResources(test.pod, test.existingPods, "machine")

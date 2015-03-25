@@ -292,7 +292,7 @@ func (nc *NodeController) populateNodeInfo(node *api.Node) error {
 		return err
 	}
 	for key, value := range nodeInfo.Capacity {
-		node.Spec.Capacity[key] = value
+		node.Status.Capacity[key] = value
 	}
 	if node.Status.NodeInfo.BootID != "" &&
 		node.Status.NodeInfo.BootID != nodeInfo.NodeSystemInfo.BootID {
@@ -521,8 +521,11 @@ func (nc *NodeController) GetStaticNodesWithSpec() (*api.NodeList, error) {
 		node := api.Node{
 			ObjectMeta: api.ObjectMeta{Name: nodeID},
 			Spec: api.NodeSpec{
-				Capacity:   nc.staticResources.Capacity,
-				ExternalID: nodeID},
+				ExternalID: nodeID,
+			},
+			Status: api.NodeStatus{
+				Capacity: nc.staticResources.Capacity,
+			},
 		}
 		result.Items = append(result.Items, node)
 	}
@@ -553,7 +556,7 @@ func (nc *NodeController) GetCloudNodesWithSpec() (*api.NodeList, error) {
 			resources = nc.staticResources
 		}
 		if resources != nil {
-			node.Spec.Capacity = resources.Capacity
+			node.Status.Capacity = resources.Capacity
 		}
 		instanceID, err := instances.ExternalID(node.Name)
 		if err != nil {

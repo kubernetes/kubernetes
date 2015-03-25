@@ -64,6 +64,8 @@ func validNewNode() *api.Node {
 		},
 		Spec: api.NodeSpec{
 			ExternalID: "external",
+		},
+		Status: api.NodeStatus{
 			Capacity: api.ResourceList{
 				api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
 				api.ResourceName(api.ResourceMemory): resource.MustParse("0"),

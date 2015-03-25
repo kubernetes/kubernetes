@@ -69,11 +69,13 @@ func TestCreateMinion(t *testing.T) {
 		ObjectMeta: api.ObjectMeta{
 			Name: "minion-1",
 		},
-		Spec: api.NodeSpec{
+		Status: api.NodeStatus{
 			Capacity: api.ResourceList{
 				api.ResourceCPU:    resource.MustParse("1000m"),
 				api.ResourceMemory: resource.MustParse("1Mi"),
 			},
+		},
+		Spec: api.NodeSpec{
 			Unschedulable: false,
 		},
 	}
@@ -109,11 +111,13 @@ func TestUpdateMinion(t *testing.T) {
 			Name:            "foo",
 			ResourceVersion: "1",
 		},
-		Spec: api.NodeSpec{
+		Status: api.NodeStatus{
 			Capacity: api.ResourceList{
 				api.ResourceCPU:    resource.MustParse("1000m"),
 				api.ResourceMemory: resource.MustParse("1Mi"),
 			},
+		},
+		Spec: api.NodeSpec{
 			Unschedulable: true,
 		},
 	}

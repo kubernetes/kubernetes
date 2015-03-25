@@ -53,8 +53,8 @@ func calculateOccupancy(pod api.Pod, node api.Node, pods []api.Pod) HostPriority
 		totalMemory += container.Resources.Limits.Memory().Value()
 	}
 
-	capacityMilliCPU := node.Spec.Capacity.Cpu().MilliValue()
-	capacityMemory := node.Spec.Capacity.Memory().Value()
+	capacityMilliCPU := node.Status.Capacity.Cpu().MilliValue()
+	capacityMemory := node.Status.Capacity.Memory().Value()
 
 	cpuScore := calculateScore(totalMilliCPU, capacityMilliCPU, node.Name)
 	memoryScore := calculateScore(totalMemory, capacityMemory, node.Name)
