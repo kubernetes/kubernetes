@@ -32,5 +32,5 @@ source "${KUBE_VERSION_ROOT}/cluster/${KUBERNETES_PROVIDER}/util.sh"
 prepare-e2e
 
 while true; do
-  ${KUBECTL} --watch-only get events
+  ${KUBECTL} get events --watch-only
 done
