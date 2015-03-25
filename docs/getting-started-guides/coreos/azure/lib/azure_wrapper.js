@@ -247,8 +247,7 @@ exports.destroy_cluster = function (state_file) {
   });
 
   task_queue.push(['network', 'vnet', 'delete', '--quiet', conf.resources['vnet']]);
-
-  // TODO: add storage deletion when AZURE_STORAGE_ACCOUNT is unset (depends on Azure/azure-xplat-cli#1615)
+  task_queue.push(['storage', 'account', 'delete', '--quiet', conf.storage_account]);
 
   exports.run_task_queue();
 };
