@@ -231,7 +231,7 @@ type serverResponse struct {
 	obj        interface{}
 }
 
-func makeTestServer(t *testing.T, podResponse serverResponse, serviceResponse serverResponse, endpointsResponse serverResponse) (*httptest.Server, *util.FakeHandler) {
+func makeTestServer(t *testing.T, namespace string, podResponse, serviceResponse, endpointsResponse serverResponse) (*httptest.Server, *util.FakeHandler) {
 	fakePodHandler := util.FakeHandler{
 		StatusCode:   podResponse.statusCode,
 		ResponseBody: runtime.EncodeOrDie(testapi.Codec(), podResponse.obj.(runtime.Object)),
@@ -245,10 +245,10 @@ func makeTestServer(t *testing.T, podResponse serverResponse, serviceResponse se
 		ResponseBody: runtime.EncodeOrDie(testapi.Codec(), endpointsResponse.obj.(runtime.Object)),
 	}
 	mux := http.NewServeMux()
-	mux.Handle("/api/"+testapi.Version()+"/pods", &fakePodHandler)
-	mux.Handle("/api/"+testapi.Version()+"/services", &fakeServiceHandler)
-	mux.Handle("/api/"+testapi.Version()+"/endpoints", &fakeEndpointsHandler)
-	mux.Handle("/api/"+testapi.Version()+"/endpoints/", &fakeEndpointsHandler)
+	mux.Handle(testapi.ResourcePath("pods", namespace, ""), &fakePodHandler)
+	mux.Handle(testapi.ResourcePath("services", "", ""), &fakeServiceHandler)
+	mux.Handle(testapi.ResourcePath("endpoints", namespace, ""), &fakeEndpointsHandler)
+	mux.Handle(testapi.ResourcePath("endpoints/", namespace, ""), &fakeEndpointsHandler)
 	mux.HandleFunc("/", func(res http.ResponseWriter, req *http.Request) {
 		t.Errorf("unexpected request: %v", req.RequestURI)
 		res.WriteHeader(http.StatusNotFound)
@@ -257,7 +257,7 @@ func makeTestServer(t *testing.T, podResponse serverResponse, serviceResponse se
 }
 
 func TestSyncEndpointsEmpty(t *testing.T) {
-	testServer, _ := makeTestServer(t,
+	testServer, _ := makeTestServer(t, api.NamespaceDefault,
 		serverResponse{http.StatusOK, newPodList(0)},
 		serverResponse{http.StatusOK, &api.ServiceList{}},
 		serverResponse{http.StatusOK, &api.Endpoints{}})
@@ -270,7 +270,7 @@ func TestSyncEndpointsEmpty(t *testing.T) {
 }
 
 func TestSyncEndpointsError(t *testing.T) {
-	testServer, _ := makeTestServer(t,
+	testServer, _ := makeTestServer(t, api.NamespaceDefault,
 		serverResponse{http.StatusOK, newPodList(0)},
 		serverResponse{http.StatusInternalServerError, &api.ServiceList{}},
 		serverResponse{http.StatusOK, &api.Endpoints{}})
@@ -291,7 +291,7 @@ func TestSyncEndpointsItemsPreserveNoSelector(t *testing.T) {
 			},
 		},
 	}
-	testServer, endpointsHandler := makeTestServer(t,
+	testServer, endpointsHandler := makeTestServer(t, api.NamespaceDefault,
 		serverResponse{http.StatusOK, newPodList(0)},
 		serverResponse{http.StatusOK, &serviceList},
 		serverResponse{http.StatusOK, &api.Endpoints{
@@ -323,7 +323,7 @@ func TestSyncEndpointsProtocolTCP(t *testing.T) {
 			},
 		},
 	}
-	testServer, endpointsHandler := makeTestServer(t,
+	testServer, endpointsHandler := makeTestServer(t, "other",
 		serverResponse{http.StatusOK, newPodList(0)},
 		serverResponse{http.StatusOK, &serviceList},
 		serverResponse{http.StatusOK, &api.Endpoints{
@@ -355,7 +355,7 @@ func TestSyncEndpointsProtocolUDP(t *testing.T) {
 			},
 		},
 	}
-	testServer, endpointsHandler := makeTestServer(t,
+	testServer, endpointsHandler := makeTestServer(t, "other",
 		serverResponse{http.StatusOK, newPodList(0)},
 		serverResponse{http.StatusOK, &serviceList},
 		serverResponse{http.StatusOK, &api.Endpoints{
@@ -386,7 +386,7 @@ func TestSyncEndpointsItemsEmptySelectorSelectsAll(t *testing.T) {
 			},
 		},
 	}
-	testServer, endpointsHandler := makeTestServer(t,
+	testServer, endpointsHandler := makeTestServer(t, "other",
 		serverResponse{http.StatusOK, newPodList(1)},
 		serverResponse{http.StatusOK, &serviceList},
 		serverResponse{http.StatusOK, &api.Endpoints{
@@ -418,7 +418,7 @@ func TestSyncEndpointsItemsEmptySelectorSelectsAll(t *testing.T) {
 			},
 		}},
 	})
-	endpointsHandler.ValidateRequest(t, "/api/"+testapi.Version()+"/endpoints/foo?namespace=other", "PUT", &data)
+	endpointsHandler.ValidateRequest(t, testapi.ResourcePathWithQueryParams("endpoints", "other", "foo"), "PUT", &data)
 }
 
 func TestSyncEndpointsItemsPreexisting(t *testing.T) {
@@ -434,7 +434,7 @@ func TestSyncEndpointsItemsPreexisting(t *testing.T) {
 			},
 		},
 	}
-	testServer, endpointsHandler := makeTestServer(t,
+	testServer, endpointsHandler := makeTestServer(t, "bar",
 		serverResponse{http.StatusOK, newPodList(1)},
 		serverResponse{http.StatusOK, &serviceList},
 		serverResponse{http.StatusOK, &api.Endpoints{
@@ -466,7 +466,7 @@ func TestSyncEndpointsItemsPreexisting(t *testing.T) {
 			},
 		}},
 	})
-	endpointsHandler.ValidateRequest(t, "/api/"+testapi.Version()+"/endpoints/foo?namespace=bar", "PUT", &data)
+	endpointsHandler.ValidateRequest(t, testapi.ResourcePathWithQueryParams("endpoints", "bar", "foo"), "PUT", &data)
 }
 
 func TestSyncEndpointsItemsPreexistingIdentical(t *testing.T) {
@@ -482,7 +482,7 @@ func TestSyncEndpointsItemsPreexistingIdentical(t *testing.T) {
 			},
 		},
 	}
-	testServer, endpointsHandler := makeTestServer(t,
+	testServer, endpointsHandler := makeTestServer(t, api.NamespaceDefault,
 		serverResponse{http.StatusOK, newPodList(1)},
 		serverResponse{http.StatusOK, &serviceList},
 		serverResponse{http.StatusOK, &api.Endpoints{
@@ -505,7 +505,7 @@ func TestSyncEndpointsItemsPreexistingIdentical(t *testing.T) {
 	if err := endpoints.SyncServiceEndpoints(); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	endpointsHandler.ValidateRequest(t, "/api/"+testapi.Version()+"/endpoints/foo?namespace=default", "GET", nil)
+	endpointsHandler.ValidateRequest(t, testapi.ResourcePathWithQueryParams("endpoints", api.NamespaceDefault, "foo"), "GET", nil)
 }
 
 func TestSyncEndpointsItems(t *testing.T) {
@@ -521,7 +521,7 @@ func TestSyncEndpointsItems(t *testing.T) {
 			},
 		},
 	}
-	testServer, endpointsHandler := makeTestServer(t,
+	testServer, endpointsHandler := makeTestServer(t, "other",
 		serverResponse{http.StatusOK, newPodList(1)},
 		serverResponse{http.StatusOK, &serviceList},
 		serverResponse{http.StatusOK, &api.Endpoints{}})
@@ -545,13 +545,16 @@ func TestSyncEndpointsItems(t *testing.T) {
 			},
 		}},
 	})
-	endpointsHandler.ValidateRequest(t, "/api/"+testapi.Version()+"/endpoints?namespace=other", "POST", &data)
+	// endpointsHandler should get 2 requests - one for "GET" and the next for "POST".
+	endpointsHandler.ValidateRequestCount(t, 2)
+	endpointsHandler.ValidateRequest(t, testapi.ResourcePathWithQueryParams("endpoints", "other", ""), "POST", &data)
 }
 
 func TestSyncEndpointsPodError(t *testing.T) {
 	serviceList := api.ServiceList{
 		Items: []api.Service{
 			{
+				ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: api.NamespaceDefault},
 				Spec: api.ServiceSpec{
 					Selector: map[string]string{
 						"foo": "bar",
@@ -560,7 +563,7 @@ func TestSyncEndpointsPodError(t *testing.T) {
 			},
 		},
 	}
-	testServer, _ := makeTestServer(t,
+	testServer, _ := makeTestServer(t, api.NamespaceDefault,
 		serverResponse{http.StatusInternalServerError, &api.PodList{}},
 		serverResponse{http.StatusOK, &serviceList},
 		serverResponse{http.StatusOK, &api.Endpoints{}})

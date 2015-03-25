@@ -78,6 +78,7 @@ func buildLocation(resourcePath string, query url.Values) string {
 }
 
 func TestListWatchesCanList(t *testing.T) {
+	fieldSelectorQueryParamName := api.FieldSelectorQueryParam(testapi.Version())
 	table := []struct {
 		location      string
 		resource      string
@@ -93,14 +94,18 @@ func TestListWatchesCanList(t *testing.T) {
 		},
 		// pod with "assigned" field selector.
 		{
-			location:      buildLocation(buildResourcePath("", api.NamespaceAll, "pods"), buildQueryValues(api.NamespaceAll, url.Values{"fields": []string{getHostFieldLabel() + "="}})),
+			location: buildLocation(
+				buildResourcePath("", api.NamespaceAll, "pods"),
+				buildQueryValues(api.NamespaceAll, url.Values{fieldSelectorQueryParamName: []string{getHostFieldLabel() + "="}})),
 			resource:      "pods",
 			namespace:     api.NamespaceAll,
 			fieldSelector: fields.Set{getHostFieldLabel(): ""}.AsSelector(),
 		},
 		// pod in namespace "foo"
 		{
-			location:      buildLocation(buildResourcePath("", "foo", "pods"), buildQueryValues("foo", url.Values{"fields": []string{getHostFieldLabel() + "="}})),
+			location: buildLocation(
+				buildResourcePath("", "foo", "pods"),
+				buildQueryValues("foo", url.Values{fieldSelectorQueryParamName: []string{getHostFieldLabel() + "="}})),
 			resource:      "pods",
 			namespace:     "foo",
 			fieldSelector: fields.Set{getHostFieldLabel(): ""}.AsSelector(),
@@ -123,6 +128,7 @@ func TestListWatchesCanList(t *testing.T) {
 }
 
 func TestListWatchesCanWatch(t *testing.T) {
+	fieldSelectorQueryParamName := api.FieldSelectorQueryParam(testapi.Version())
 	table := []struct {
 		rv            string
 		location      string
@@ -132,14 +138,18 @@ func TestListWatchesCanWatch(t *testing.T) {
 	}{
 		// Minion
 		{
-			location:      buildLocation(buildResourcePath("watch", api.NamespaceAll, "minions"), buildQueryValues(api.NamespaceAll, url.Values{"resourceVersion": []string{""}})),
+			location: buildLocation(
+				buildResourcePath("watch", api.NamespaceAll, "minions"),
+				buildQueryValues(api.NamespaceAll, url.Values{"resourceVersion": []string{""}})),
 			rv:            "",
 			resource:      "minions",
 			namespace:     api.NamespaceAll,
 			fieldSelector: parseSelectorOrDie(""),
 		},
 		{
-			location:      buildLocation(buildResourcePath("watch", api.NamespaceAll, "minions"), buildQueryValues(api.NamespaceAll, url.Values{"resourceVersion": []string{"42"}})),
+			location: buildLocation(
+				buildResourcePath("watch", api.NamespaceAll, "minions"),
+				buildQueryValues(api.NamespaceAll, url.Values{"resourceVersion": []string{"42"}})),
 			rv:            "42",
 			resource:      "minions",
 			namespace:     api.NamespaceAll,
@@ -147,7 +157,9 @@ func TestListWatchesCanWatch(t *testing.T) {
 		},
 		// pod with "assigned" field selector.
 		{
-			location:      buildLocation(buildResourcePath("watch", api.NamespaceAll, "pods"), buildQueryValues(api.NamespaceAll, url.Values{"fields": []string{getHostFieldLabel() + "="}, "resourceVersion": []string{"0"}})),
+			location: buildLocation(
+				buildResourcePath("watch", api.NamespaceAll, "pods"),
+				buildQueryValues(api.NamespaceAll, url.Values{fieldSelectorQueryParamName: []string{getHostFieldLabel() + "="}, "resourceVersion": []string{"0"}})),
 			rv:            "0",
 			resource:      "pods",
 			namespace:     api.NamespaceAll,
@@ -155,7 +167,9 @@ func TestListWatchesCanWatch(t *testing.T) {
 		},
 		// pod with namespace foo and assigned field selector
 		{
-			location:      buildLocation(buildResourcePath("watch", "foo", "pods"), buildQueryValues("foo", url.Values{"fields": []string{getHostFieldLabel() + "="}, "resourceVersion": []string{"0"}})),
+			location: buildLocation(
+				buildResourcePath("watch", "foo", "pods"),
+				buildQueryValues("foo", url.Values{fieldSelectorQueryParamName: []string{getHostFieldLabel() + "="}, "resourceVersion": []string{"0"}})),
 			rv:            "0",
 			resource:      "pods",
 			namespace:     "foo",

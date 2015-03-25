@@ -19,7 +19,6 @@ package factory
 import (
 	"net/http"
 	"net/http/httptest"
-	"path"
 	"reflect"
 	"testing"
 	"time"
@@ -313,7 +312,11 @@ func TestPollMinions(t *testing.T) {
 		}
 		mux := http.NewServeMux()
 		// FakeHandler musn't be sent requests other than the one you want to test.
-		mux.Handle("/api/"+testapi.Version()+"/minions", &handler)
+		resource := "nodes"
+		if api.PreV1Beta3(testapi.Version()) {
+			resource = "minions"
+		}
+		mux.Handle(testapi.ResourcePath(resource, api.NamespaceAll, ""), &handler)
 		server := httptest.NewServer(mux)
 		defer server.Close()
 		client := client.NewOrDie(&client.Config{Host: server.URL, Version: testapi.Version()})
@@ -324,28 +327,12 @@ func TestPollMinions(t *testing.T) {
 			t.Errorf("Unexpected error: %v", err)
 			continue
 		}
-		handler.ValidateRequest(t, "/api/"+testapi.Version()+"/minions", "GET", nil)
+		handler.ValidateRequest(t, testapi.ResourcePath(resource, api.NamespaceAll, ""), "GET", nil)
 
 		if a := ce.Len(); item.expectedCount != a {
 			t.Errorf("Expected %v, got %v", item.expectedCount, a)
 		}
 	}
-}
-
-func makeNamespaceURL(namespace, suffix string, isClient bool) string {
-	if !(testapi.Version() == "v1beta1" || testapi.Version() == "v1beta2") {
-		return makeURL("/namespaces/" + namespace + suffix)
-	}
-	// if this is a url the client should call, encode the url
-	if isClient {
-		return makeURL(suffix + "?namespace=" + namespace)
-	}
-	// its not a client url, so its what the server needs to listen on
-	return makeURL(suffix)
-}
-
-func makeURL(suffix string) string {
-	return path.Join("/api", testapi.Version(), suffix)
 }
 
 func TestDefaultErrorFunc(t *testing.T) {
@@ -364,7 +351,7 @@ func TestDefaultErrorFunc(t *testing.T) {
 	mux := http.NewServeMux()
 
 	// FakeHandler musn't be sent requests other than the one you want to test.
-	mux.Handle(makeNamespaceURL("bar", "/pods/foo", false), &handler)
+	mux.Handle(testapi.ResourcePath("pods", "bar", "foo"), &handler)
 	server := httptest.NewServer(mux)
 	defer server.Close()
 	factory := NewConfigFactory(client.NewOrDie(&client.Config{Host: server.URL, Version: testapi.Version()}))
@@ -387,7 +374,7 @@ func TestDefaultErrorFunc(t *testing.T) {
 		if !exists {
 			continue
 		}
-		handler.ValidateRequest(t, makeNamespaceURL("bar", "/pods/foo", true), "GET", nil)
+		handler.ValidateRequest(t, testapi.ResourcePathWithQueryParams("pods", "bar", "foo"), "GET", nil)
 		if e, a := testPod, got; !reflect.DeepEqual(e, a) {
 			t.Errorf("Expected %v, got %v", e, a)
 		}
@@ -458,7 +445,7 @@ func TestBind(t *testing.T) {
 			continue
 		}
 		expectedBody := runtime.EncodeOrDie(testapi.Codec(), item.binding)
-		handler.ValidateRequest(t, "/api/"+testapi.Version()+"/bindings?namespace=default", "POST", &expectedBody)
+		handler.ValidateRequest(t, testapi.ResourcePathWithQueryParams("bindings", api.NamespaceDefault, ""), "POST", &expectedBody)
 	}
 }
 

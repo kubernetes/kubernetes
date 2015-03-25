@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
@@ -73,4 +74,35 @@ func SelfLink(resource, name string) string {
 		return fmt.Sprintf("/api/%s/%s", Version(), resource)
 	}
 	return fmt.Sprintf("/api/%s/%s/%s", Version(), resource, name)
+}
+
+// Returns the appropriate path for the given resource, namespace and name.
+// For ex, this is of the form:
+// /api/v1beta1/pods/pod0 for v1beta1 and
+// /api/v1beta3/namespaces/foo/pods/pod0 for v1beta3.
+func ResourcePath(resource, namespace, name string) string {
+	path := "/api/" + Version()
+	if !api.PreV1Beta3(Version()) && namespace != "" {
+		path = path + "/namespaces/" + namespace
+	}
+	if resource != "" {
+		path = path + "/" + resource
+	}
+	if name != "" {
+		path = path + "/" + name
+	}
+	return path
+}
+
+// Returns the appropriate path along with the query params for the given resource, namespace and name.
+// For ex, this is of the form:
+// /api/v1beta1/pods/pod0?namespace=foo for v1beta1 and
+// /api/v1beta3/namespaces/foo/pods/pod0 for v1beta3.
+func ResourcePathWithQueryParams(resource, namespace, name string) string {
+	path := ResourcePath(resource, namespace, name)
+	// Add namespace as query param for pre v1beta3.
+	if api.PreV1Beta3(Version()) {
+		path = path + "?namespace=" + namespace
+	}
+	return path
 }
