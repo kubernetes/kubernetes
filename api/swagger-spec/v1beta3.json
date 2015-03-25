@@ -235,6 +235,44 @@
       "consumes": [
        "*/*"
       ]
+     },
+     {
+      "type": "void",
+      "method": "DELETE",
+      "summary": "delete a Endpoints",
+      "nickname": "deleteEndpoints",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Endpoints",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespaces",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "*v1beta3.DeleteOptions",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
      }
     ]
    },
@@ -1075,6 +1113,14 @@
         "description": "name of the Namespace",
         "required": true,
         "allowMultiple": false
+       },
+       {
+        "type": "*v1beta3.DeleteOptions",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
        }
       ],
       "produces": [
@@ -1101,6 +1147,78 @@
         "paramType": "path",
         "name": "name",
         "description": "name of the Namespace",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/api/v1beta3/namespaces/{name}/finalize",
+    "description": "API at /api/v1beta3 version v1beta3",
+    "operations": [
+     {
+      "type": "void",
+      "method": "PUT",
+      "summary": "replace the specified Namespace",
+      "nickname": "replaceNamespace",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Namespace",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1beta3.Namespace",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/api/v1beta3/namespaces/{name}/status",
+    "description": "API at /api/v1beta3 version v1beta3",
+    "operations": [
+     {
+      "type": "void",
+      "method": "PUT",
+      "summary": "replace the specified Namespace",
+      "nickname": "replaceNamespace",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Namespace",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1beta3.Namespace",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
         "required": true,
         "allowMultiple": false
        }
@@ -1271,6 +1389,14 @@
         "paramType": "path",
         "name": "name",
         "description": "name of the Node",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "*v1beta3.DeleteOptions",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
         "required": true,
         "allowMultiple": false
        }
@@ -1743,6 +1869,14 @@
         "paramType": "path",
         "name": "namespaces",
         "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "*v1beta3.DeleteOptions",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
         "required": true,
         "allowMultiple": false
        }
@@ -2415,6 +2549,14 @@
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
+       },
+       {
+        "type": "*v1beta3.DeleteOptions",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
        }
       ],
       "produces": [
@@ -2715,6 +2857,14 @@
         "paramType": "path",
         "name": "namespaces",
         "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "*v1beta3.DeleteOptions",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
         "required": true,
         "allowMultiple": false
        }
@@ -3740,6 +3890,10 @@
    }
   ],
   "models": {
+   "*v1beta3.DeleteOptions": {
+    "id": "*v1beta3.DeleteOptions",
+    "properties": {}
+   },
    "v1beta3.Binding": {
     "id": "v1beta3.Binding",
     "required": [
@@ -3757,6 +3911,10 @@
      "creationTimestamp": {
       "type": "string",
       "description": "RFC 3339 date and time at which the object was created; populated by the system, read-only; null for lists"
+     },
+     "deletionTimestamp": {
+      "type": "string",
+      "description": "RFC 3339 date and time at which the object will be deleted; populated by the system when a graceful deletion is requested, read-only; if not set, graceful deletion of the object has not been requested"
      },
      "generateName": {
       "type": "string",
@@ -3968,6 +4126,10 @@
       "type": "string",
       "description": "RFC 3339 date and time at which the object was created; populated by the system, read-only; null for lists"
      },
+     "deletionTimestamp": {
+      "type": "string",
+      "description": "RFC 3339 date and time at which the object will be deleted; populated by the system when a graceful deletion is requested, read-only; if not set, graceful deletion of the object has not been requested"
+     },
      "endpoints": {
       "type": "array",
       "items": {
@@ -4079,6 +4241,10 @@
      "creationTimestamp": {
       "type": "string",
       "description": "RFC 3339 date and time at which the object was created; populated by the system, read-only; null for lists"
+     },
+     "deletionTimestamp": {
+      "type": "string",
+      "description": "RFC 3339 date and time at which the object will be deleted; populated by the system when a graceful deletion is requested, read-only; if not set, graceful deletion of the object has not been requested"
      },
      "firstTimestamp": {
       "type": "string",
@@ -4194,6 +4360,10 @@
      }
     }
    },
+   "v1beta3.FinalizerName": {
+    "id": "v1beta3.FinalizerName",
+    "properties": {}
+   },
    "v1beta3.HTTPGetAction": {
     "id": "v1beta3.HTTPGetAction",
     "properties": {
@@ -4255,6 +4425,10 @@
      "creationTimestamp": {
       "type": "string",
       "description": "RFC 3339 date and time at which the object was created; populated by the system, read-only; null for lists"
+     },
+     "deletionTimestamp": {
+      "type": "string",
+      "description": "RFC 3339 date and time at which the object will be deleted; populated by the system when a graceful deletion is requested, read-only; if not set, graceful deletion of the object has not been requested"
      },
      "generateName": {
       "type": "string",
@@ -4372,6 +4546,10 @@
       "type": "string",
       "description": "RFC 3339 date and time at which the object was created; populated by the system, read-only; null for lists"
      },
+     "deletionTimestamp": {
+      "type": "string",
+      "description": "RFC 3339 date and time at which the object will be deleted; populated by the system when a graceful deletion is requested, read-only; if not set, graceful deletion of the object has not been requested"
+     },
      "generateName": {
       "type": "string",
       "description": "an optional prefix to use to generate a unique name; has the same validation rules as name; optional, and is applied only name if is not specified"
@@ -4447,7 +4625,15 @@
    },
    "v1beta3.NamespaceSpec": {
     "id": "v1beta3.NamespaceSpec",
-    "properties": {}
+    "properties": {
+     "finalizers": {
+      "type": "array",
+      "items": {
+       "$ref": "v1beta3.FinalizerName"
+      },
+      "description": "an opaque list of values that must be empty to permanently remove object from storage"
+     }
+    }
    },
    "v1beta3.NamespaceStatus": {
     "id": "v1beta3.NamespaceStatus",
@@ -4472,6 +4658,10 @@
      "creationTimestamp": {
       "type": "string",
       "description": "RFC 3339 date and time at which the object was created; populated by the system, read-only; null for lists"
+     },
+     "deletionTimestamp": {
+      "type": "string",
+      "description": "RFC 3339 date and time at which the object will be deleted; populated by the system when a graceful deletion is requested, read-only; if not set, graceful deletion of the object has not been requested"
      },
      "generateName": {
       "type": "string",
@@ -4704,6 +4894,10 @@
       "type": "string",
       "description": "RFC 3339 date and time at which the object was created; populated by the system, read-only; null for lists"
      },
+     "deletionTimestamp": {
+      "type": "string",
+      "description": "RFC 3339 date and time at which the object will be deleted; populated by the system when a graceful deletion is requested, read-only; if not set, graceful deletion of the object has not been requested"
+     },
      "generateName": {
       "type": "string",
       "description": "an optional prefix to use to generate a unique name; has the same validation rules as name; optional, and is applied only name if is not specified"
@@ -4806,7 +5000,7 @@
       "items": {
        "$ref": "v1beta3.Container"
       },
-      "description": "list of containers belonging to the pod; cannot be updated; containers cannot currently be added or removed"
+      "description": "list of containers belonging to the pod; cannot be updated; containers cannot currently be added or removed; there must be at least one container in a Pod"
      },
      "dnsPolicy": {
       "type": "v1beta3.DNSPolicy",
@@ -4815,6 +5009,10 @@
      "host": {
       "type": "string",
       "description": "host requested for this pod"
+     },
+     "hostNetwork": {
+      "type": "boolean",
+      "description": "host networking requested for this pod"
      },
      "nodeSelector": {
       "type": "v1beta3.PodSpec.nodeSelector",
@@ -4883,6 +5081,10 @@
      "creationTimestamp": {
       "type": "string",
       "description": "RFC 3339 date and time at which the object was created; populated by the system, read-only; null for lists"
+     },
+     "deletionTimestamp": {
+      "type": "string",
+      "description": "RFC 3339 date and time at which the object will be deleted; populated by the system when a graceful deletion is requested, read-only; if not set, graceful deletion of the object has not been requested"
      },
      "generateName": {
       "type": "string",
@@ -4959,6 +5161,10 @@
      "creationTimestamp": {
       "type": "string",
       "description": "RFC 3339 date and time at which the object was created; populated by the system, read-only; null for lists"
+     },
+     "deletionTimestamp": {
+      "type": "string",
+      "description": "RFC 3339 date and time at which the object will be deleted; populated by the system when a graceful deletion is requested, read-only; if not set, graceful deletion of the object has not been requested"
      },
      "generateName": {
       "type": "string",
@@ -5090,6 +5296,10 @@
       "type": "string",
       "description": "RFC 3339 date and time at which the object was created; populated by the system, read-only; null for lists"
      },
+     "deletionTimestamp": {
+      "type": "string",
+      "description": "RFC 3339 date and time at which the object will be deleted; populated by the system when a graceful deletion is requested, read-only; if not set, graceful deletion of the object has not been requested"
+     },
      "generateName": {
       "type": "string",
       "description": "an optional prefix to use to generate a unique name; has the same validation rules as name; optional, and is applied only name if is not specified"
@@ -5191,6 +5401,10 @@
      "limits": {
       "type": "v1beta3.ResourceList",
       "description": "Maximum amount of compute resources allowed"
+     },
+     "requests": {
+      "type": "v1beta3.ResourceList",
+      "description": "Minimum amount of resources requested"
      }
     }
    },
@@ -5212,6 +5426,10 @@
      "data": {
       "type": "v1beta3.Secret.data",
       "description": "data contains the secret data.  Each key must be a valid DNS_SUBDOMAIN.  Each value must be a base64 encoded string"
+     },
+     "deletionTimestamp": {
+      "type": "string",
+      "description": "RFC 3339 date and time at which the object will be deleted; populated by the system when a graceful deletion is requested, read-only; if not set, graceful deletion of the object has not been requested"
      },
      "generateName": {
       "type": "string",
@@ -5301,6 +5519,10 @@
       "type": "string",
       "description": "RFC 3339 date and time at which the object was created; populated by the system, read-only; null for lists"
      },
+     "deletionTimestamp": {
+      "type": "string",
+      "description": "RFC 3339 date and time at which the object will be deleted; populated by the system when a graceful deletion is requested, read-only; if not set, graceful deletion of the object has not been requested"
+     },
      "generateName": {
       "type": "string",
       "description": "an optional prefix to use to generate a unique name; has the same validation rules as name; optional, and is applied only name if is not specified"
@@ -5382,10 +5604,6 @@
      "portalIP"
     ],
     "properties": {
-     "containerPort": {
-      "type": "string",
-      "description": "number or name of the port to access on the containers belonging to pods targeted by the service; defaults to the container's first open port"
-     },
      "createExternalLoadBalancer": {
       "type": "boolean",
       "description": "set up a cloud-provider-specific load balancer on an external IP"
@@ -5416,6 +5634,10 @@
      "sessionAffinity": {
       "type": "v1beta3.AffinityType",
       "description": "enable client IP based session affinity; must be ClientIP or None; defaults to None"
+     },
+     "targetPort": {
+      "type": "string",
+      "description": "number or name of the port to access on the containers belonging to pods targeted by the service; defaults to the container's first open port"
      }
     }
    },
@@ -5444,7 +5666,8 @@
      "emptyDir",
      "gcePersistentDisk",
      "gitRepo",
-     "secret"
+     "secret",
+     "nfs"
     ],
     "properties": {
      "emptyDir": {
@@ -5466,6 +5689,10 @@
      "name": {
       "type": "string",
       "description": "volume name; must be a DNS_LABEL and unique within the pod"
+     },
+     "nfs": {
+      "type": "v1beta3.NFSVolumeSource",
+      "description": "NFS volume that will be mounted in the host machine"
      },
      "secret": {
       "type": "v1beta3.SecretVolumeSource",
