@@ -161,6 +161,9 @@ func TestInTimeRange(t *testing.T) {
 	expectElements(t, sb.InTimeRange(createTime(3), createTime(5), 10), []int32{3, 4})
 	assert.Empty(sb.InTimeRange(createTime(5), createTime(5), 10))
 
+	// Start and end time ignores maxResults.
+	expectElements(t, sb.InTimeRange(createTime(1), createTime(5), 1), []int32{1, 2, 3, 4})
+
 	// No start time.
 	expectElements(t, sb.InTimeRange(empty, createTime(5), 10), []int32{1, 2, 3, 4})
 	expectElements(t, sb.InTimeRange(empty, createTime(4), 10), []int32{1, 2, 3, 4})

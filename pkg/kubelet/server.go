@@ -659,7 +659,7 @@ func (s *Server) serveStats(w http.ResponseWriter, req *http.Request) {
 	components := strings.Split(strings.TrimPrefix(path.Clean(req.URL.Path), "/"), "/")
 	var stats *cadvisorApi.ContainerInfo
 	var err error
-	var query cadvisorApi.ContainerInfoRequest
+	query := cadvisorApi.DefaultContainerInfoRequest()
 	err = json.NewDecoder(req.Body).Decode(&query)
 	if err != nil && err != io.EOF {
 		s.error(w, err)

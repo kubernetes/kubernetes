@@ -47,11 +47,17 @@ func (self *StatsBuffer) Add(item *info.ContainerStats) {
 }
 
 // Returns up to maxResult elements in the specified time period (inclusive).
-// Results are from first to last. maxResults of -1 means no limit.
+// Results are from first to last. maxResults of -1 means no limit. When first
+// and last are specified, maxResults is ignored.
 func (self *StatsBuffer) InTimeRange(start, end time.Time, maxResults int) []*info.ContainerStats {
 	// No stats, return empty.
 	if self.size == 0 {
 		return []*info.ContainerStats{}
+	}
+
+	// Return all results in a time range if specified.
+	if !start.IsZero() && !end.IsZero() {
+		maxResults = -1
 	}
 
 	// NOTE: Since we store the elments in descending timestamp order "start" will
