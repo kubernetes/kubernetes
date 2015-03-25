@@ -81,7 +81,9 @@ func (self ContainerReferenceSlice) Less(i, j int) bool { return self[i].Name < 
 // ContainerInfoQuery is used when users check a container info from the REST api.
 // It specifies how much data users want to get about a container
 type ContainerInfoRequest struct {
-	// Max number of stats to return.
+	// Max number of stats to return. Specify -1 for all stats currently available.
+	// If start and end time are specified this limit is ignored.
+	// Default: 60
 	NumStats int `json:"num_stats,omitempty"`
 
 	// Start time for which to query information.
@@ -91,6 +93,13 @@ type ContainerInfoRequest struct {
 	// End time for which to query information.
 	// If ommitted, current time is assumed.
 	End time.Time `json:"end,omitempty"`
+}
+
+// Returns a ContainerInfoRequest with all default values specified.
+func DefaultContainerInfoRequest() ContainerInfoRequest {
+	return ContainerInfoRequest{
+		NumStats: 60,
+	}
 }
 
 func (self *ContainerInfoRequest) Equals(other ContainerInfoRequest) bool {

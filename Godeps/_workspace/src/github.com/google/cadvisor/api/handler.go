@@ -164,11 +164,7 @@ func streamResults(results chan *events.Event, w http.ResponseWriter, r *http.Re
 }
 
 func getContainerInfoRequest(body io.ReadCloser) (*info.ContainerInfoRequest, error) {
-	var query info.ContainerInfoRequest
-
-	// Default stats and samples is 64.
-	query.NumStats = 64
-
+	query := info.DefaultContainerInfoRequest()
 	decoder := json.NewDecoder(body)
 	err := decoder.Decode(&query)
 	if err != nil && err != io.EOF {
