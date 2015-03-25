@@ -1,4 +1,53 @@
 - 
+    date: 2015-06-08 00:00:00 -0800
+    title: "dotScale"
+    location: "Paris, France"
+    venue: ""
+    speaker: "TBD"
+    url: "http://www.dotscale.io/"
+- 
+    date: 2015-05-21 00:00:00 -0800
+    title: "OpenStack Summit"
+    location: "Vancouver, BC, Canada"
+    venue: ""
+    speaker: "Kit Merker"
+    url: "http://openstacksummitmay2015vancouver.sched.org/event/57654c61f86cec3210d4d1065756409a#.VRC4TTTF9CC"
+- 
+    date: 2015-05-20 00:00:00 -0800
+    title: "GlueCon"
+    location: "Devner (Broomfield), CO, USA"
+    venue: "Omni Interlocken Resort"
+    speaker: "Brendan Burns"
+    url: "http://gluecon.com/"
+- 
+    date: 2015-04-18 00:00:00 -0800
+    title: "Hands-on Kubernetes workshop @ Berkeley GDG"
+    location: "Berkeley, CA, USA"
+    venue: "Next Space Berkeley"
+    speaker: "Brian Dorsey"
+    url: "http://www.meetup.com/GDGBerkeley/events/221376112/"
+- 
+    date: 2015-04-17 00:00:00 -0800
+    title: "OpenCloud 2015"
+    location: "Beijing, China"
+    venue: ""
+    speaker: "Ray Tsang"
+    url: "http://occ.csdn.net/"
+- 
+    date: 2015-04-17 00:00:00 -0800
+    title: "Container.camp"
+    location: "San Francisco, CA, USA"
+    venue: "Broadway Studios"
+    speaker: "Tim Hockin"
+    url: "http://container.camp/"
+- 
+    date: 2015-03-18 00:00:00 -0800
+    title: "Kubernetes & OpenStack Demonstration"
+    location: "Santa Clara, CA, USA"
+    venue: "Intel Museum & Auditorium"
+    speaker: "Kit Merker"
+    url: "http://www.redapt.com/about/resources/events/kubernetes_openstack_event/"
+- 
     date: 2015-01-21 00:00:00 -0800
     title: "Mesos Meetup Seattle - Enabling distributed system development with Kubernetes"
     location: "Seattle, WA, USA"
