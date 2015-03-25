@@ -24,7 +24,7 @@ Is Kubernetes, then, a Docker "orchestration" system? Yes and no.
 
 Kubernetes establishes robust declarative primitives for maintaining the desired state requested by the user. We see these primitives as the main value added by Kubernetes. Self-healing mechanisms, such as auto-restarting, re-scheduling, and replicating containers require active controllers, not just imperative orchestration.
 
-Kubernetes is primarily targeted at applications comprised of multiple containers, such as elastic, distributed micro-services. It is also designed to facilitate migration of non-containerized application stacks to Kubernetes. It therefore includes abstractions for grouping containers in both loosely coupled and tightly coupled formations, and provides ways for containers to find and communicate with each other in relatively familiar ways.
+Kubernetes is primarily targeted at applications composed of multiple containers, such as elastic, distributed micro-services. It is also designed to facilitate migration of non-containerized application stacks to Kubernetes. It therefore includes abstractions for grouping containers in both loosely coupled and tightly coupled formations, and provides ways for containers to find and communicate with each other in relatively familiar ways.
 
 Kubernetes enables users to ask a cluster to run a set of containers. The system automatically chooses hosts to run those containers on. While Kubernetes's scheduler is currently very simple, we expect it to grow in sophistication over time. Scheduling is a policy-rich, topology-aware, workload-specific function that significantly impacts availability, performance, and capacity. The scheduler needs to take into account individual and collective resource requirements, quality of service requirements, hardware/software/policy constraints, affinity and anti-affinity specifications, data locality, inter-workload interference, deadlines, and so on. Workload-specific requirements will be exposed through the API as necessary.
 
@@ -72,7 +72,7 @@ For management convenience and consistency, `services` and `replicationControlle
 
 ## The Kubernetes Node
 
-When looking at the architecture of the system, we'll break it down to services that run on the worker node and services that comprise the cluster-level control plane.
+When looking at the architecture of the system, we'll break it down to services that run on the worker node and services that compose the cluster-level control plane.
 
 The Kubernetes node has the services necessary to run Docker containers and be managed from the master systems.
 

@@ -21,7 +21,7 @@ Selector`](labels.md).
 
 As an example, consider an image-processing backend which is running with 3
 replicas.  Those replicas are fungible - frontends do not care which backend
-they use.  While the actual `Pods` that comprise the backend set may change, the
+they use.  While the actual `Pods` that compose the backend set may change, the
 frontend clients should not need to manage that themselves.  The `Service`
 abstraction enables this decoupling.
 
