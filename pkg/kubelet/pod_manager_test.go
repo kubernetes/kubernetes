@@ -21,7 +21,6 @@ import (
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	kubecontainer "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
 )
 
 // Stub out mirror client for testing purpose.
@@ -69,26 +68,36 @@ func TestGetSetPods(t *testing.T) {
 	updates := append(expectedPods, mirrorPod)
 	podManager, _ := newFakePodManager()
 	podManager.SetPods(updates)
+
+	// Tests that all regular pods are recorded corrrectly.
 	actualPods := podManager.GetPods()
-	if !reflect.DeepEqual(expectedPods, actualPods) {
-		t.Errorf("pods are not set correctly; expected %#v, got %#v", expectedPods, actualPods)
+	if len(actualPods) != len(expectedPods) {
+		t.Errorf("expected %d pods, got %d pods; expected pods %#v, got pods %#v", len(expectedPods), len(actualPods),
+			expectedPods, actualPods)
 	}
-	actualPod, ok := podManager.mirrorPodByUID[mirrorPod.UID]
-	if !ok {
-		t.Errorf("mirror pod %q is not found in the mirror pod map by UID", mirrorPod.UID)
-	} else if !reflect.DeepEqual(&mirrorPod, actualPod) {
-		t.Errorf("mirror pod is recorded incorrectly. expect: %v, got: %v", mirrorPod, actualPod)
+	for _, expected := range expectedPods {
+		found := false
+		for _, actual := range actualPods {
+			if actual.UID == expected.UID {
+				if !reflect.DeepEqual(&expected, &actual) {
+					t.Errorf("pod was recorded incorrectly. expect: %#v, got: %#v", expected, actual)
+				}
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("pod %q was not found in %#v", expected.UID, actualPods)
+		}
 	}
-	actualPod, ok = podManager.mirrorPodByFullName[kubecontainer.GetPodFullName(&mirrorPod)]
-	if !ok {
-		t.Errorf("mirror pod %q is not found in the mirror pod map by full name", kubecontainer.GetPodFullName(&mirrorPod))
-	} else if !reflect.DeepEqual(&mirrorPod, actualPod) {
-		t.Errorf("mirror pod is recorded incorrectly. expect: %v, got: %v", mirrorPod, actualPod)
-	}
+	// Tests UID translation works as expected.
 	if uid := podManager.TranslatePodUID(mirrorPod.UID); uid != staticPod.UID {
-		t.Errorf("unable to translate UID %q to the static POD's UID %q; %#v", mirrorPod.UID, staticPod.UID, podManager.mirrorPodByUID)
+		t.Errorf("unable to translate UID %q to the static POD's UID %q; %#v",
+			mirrorPod.UID, staticPod.UID, podManager.mirrorPodByUID)
 	}
-	actualPod, ok = podManager.GetPodByFullName("bar_default")
+
+	// Test the basic Get methods.
+	actualPod, ok := podManager.GetPodByFullName("bar_default")
 	if !ok || !reflect.DeepEqual(actualPod, &staticPod) {
 		t.Errorf("unable to get pod by full name; expected: %#v, got: %#v", staticPod, actualPod)
 	}
