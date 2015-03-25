@@ -50,5 +50,6 @@ kube::etcd::start() {
 
 kube::etcd::cleanup() {
   kill "${ETCD_PID-}" >/dev/null 2>&1 || :
+  wait "${ETCD_PID-}" >/dev/null 2>&1 || :
   rm -rf "${ETCD_DIR-}"
 }
