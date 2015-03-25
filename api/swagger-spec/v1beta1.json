@@ -4020,7 +4020,7 @@
     ],
     "properties": {
      "annotations": {
-      "type": "v1beta1.TypeMeta.annotations",
+      "$ref": "v1beta1.TypeMeta.annotations",
       "description": "map of string keys and values that can be used by external tooling to store and retrieve arbitrary metadata about the object"
      },
      "apiVersion": {
@@ -4060,7 +4060,7 @@
       "description": "name of the pod to bind"
      },
      "resourceVersion": {
-      "type": "uint64",
+      "$ref": "uint64",
       "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
      },
      "selfLink": {
@@ -4068,7 +4068,7 @@
       "description": "URL for the object; populated by the system, read-only"
      },
      "uid": {
-      "type": "types.UID",
+      "$ref": "types.UID",
       "description": "unique UUID across space and time; populated by the system, read-only; cannot be updated"
      }
     }
@@ -4105,13 +4105,13 @@
     ],
     "properties": {
      "capabilities": {
-      "type": "v1beta1.Capabilities",
+      "$ref": "v1beta1.Capabilities",
       "description": "capabilities for container; cannot be updated"
      },
      "command": {
       "type": "array",
       "items": {
-       "$ref": "string"
+       "type": "string"
       },
       "description": "command argv array; not executed within a shell; defaults to entrypoint or command in the image; cannot be updated"
      },
@@ -4132,15 +4132,15 @@
       "description": "Docker image name"
      },
      "imagePullPolicy": {
-      "type": "v1beta1.PullPolicy",
+      "$ref": "v1beta1.PullPolicy",
       "description": "image pull policy; one of PullAlways, PullNever, PullIfNotPresent; defaults to PullAlways if :latest tag is specified, or PullIfNotPresent otherwise; cannot be updated"
      },
      "lifecycle": {
-      "type": "v1beta1.Lifecycle",
+      "$ref": "v1beta1.Lifecycle",
       "description": "actions that the management system should take in response to container lifecycle events; cannot be updated"
      },
      "livenessProbe": {
-      "type": "v1beta1.LivenessProbe",
+      "$ref": "v1beta1.LivenessProbe",
       "description": "periodic probe of container liveness; container will be restarted if the probe fails; cannot be updated"
      },
      "memory": {
@@ -4164,11 +4164,11 @@
       "description": "whether or not the container is granted privileged status; defaults to false; cannot be updated"
      },
      "readinessProbe": {
-      "type": "v1beta1.LivenessProbe",
+      "$ref": "v1beta1.LivenessProbe",
       "description": "periodic probe of container service readiness; container will be removed from service endpoints if the probe fails; cannot be updated"
      },
      "resources": {
-      "type": "v1beta1.ResourceRequirements",
+      "$ref": "v1beta1.ResourceRequirements",
       "description": "Compute Resources required by this container; cannot be updated"
      },
      "terminationMessagePath": {
@@ -4205,7 +4205,7 @@
       "description": "list of containers belonging to the pod; containers cannot currently be added or removed"
      },
      "dnsPolicy": {
-      "type": "v1beta1.DNSPolicy",
+      "$ref": "v1beta1.DNSPolicy",
       "description": "DNS policy for containers within the pod; one of 'ClusterFirst' or 'Default'"
      },
      "hostNetwork": {
@@ -4217,11 +4217,11 @@
       "description": "manifest name; must be a DNS_SUBDOMAIN; cannot be updated"
      },
      "restartPolicy": {
-      "type": "v1beta1.RestartPolicy",
+      "$ref": "v1beta1.RestartPolicy",
       "description": "restart policy for all containers within the pod; one of RestartPolicyAlways, RestartPolicyOnFailure, RestartPolicyNever"
      },
      "uuid": {
-      "type": "types.UID",
+      "$ref": "types.UID",
       "description": "manifest UUID, populated by the system, read-only"
      },
      "version": {
@@ -4262,7 +4262,7 @@
       "description": "name for the port that can be referred to by services; must be a DNS_LABEL and unique without the pod"
      },
      "protocol": {
-      "type": "v1beta1.Protocol",
+      "$ref": "v1beta1.Protocol",
       "description": "protocol for port; must be UDP or TCP; TCP if unspecified"
      }
     }
@@ -4274,7 +4274,7 @@
     ],
     "properties": {
      "medium": {
-      "type": "v1beta1.StorageType",
+      "$ref": "v1beta1.StorageType",
       "description": "type of storage used to back the volume; must be an empty string (default) or Memory"
      }
     }
@@ -4314,7 +4314,7 @@
       "description": "specific resourceVersion to which this reference is made, if any: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
      },
      "uid": {
-      "type": "types.UID",
+      "$ref": "types.UID",
       "description": "uid of the referent"
      }
     }
@@ -4326,7 +4326,7 @@
     ],
     "properties": {
      "annotations": {
-      "type": "v1beta1.TypeMeta.annotations",
+      "$ref": "v1beta1.TypeMeta.annotations",
       "description": "map of string keys and values that can be used by external tooling to store and retrieve arbitrary metadata about the object"
      },
      "apiVersion": {
@@ -4344,7 +4344,7 @@
      "endpoints": {
       "type": "array",
       "items": {
-       "$ref": "string"
+       "type": "string"
       },
       "description": "list of endpoints corresponding to a service, of the form address:port, such as 10.10.1.1:1909"
      },
@@ -4365,11 +4365,11 @@
       "description": "namespace to which the object belongs; must be a DNS_SUBDOMAIN; 'default' by default; cannot be updated"
      },
      "protocol": {
-      "type": "v1beta1.Protocol",
+      "$ref": "v1beta1.Protocol",
       "description": "IP protocol for endpoint ports; must be UDP or TCP; TCP if unspecified"
      },
      "resourceVersion": {
-      "type": "uint64",
+      "$ref": "uint64",
       "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
      },
      "selfLink": {
@@ -4384,7 +4384,7 @@
       "description": "list of references to objects providing the endpoints"
      },
      "uid": {
-      "type": "types.UID",
+      "$ref": "types.UID",
       "description": "unique UUID across space and time; populated by the system, read-only; cannot be updated"
      }
     }
@@ -4396,7 +4396,7 @@
     ],
     "properties": {
      "annotations": {
-      "type": "v1beta1.TypeMeta.annotations",
+      "$ref": "v1beta1.TypeMeta.annotations",
       "description": "map of string keys and values that can be used by external tooling to store and retrieve arbitrary metadata about the object"
      },
      "apiVersion": {
@@ -4435,7 +4435,7 @@
       "description": "namespace to which the object belongs; must be a DNS_SUBDOMAIN; 'default' by default; cannot be updated"
      },
      "resourceVersion": {
-      "type": "uint64",
+      "$ref": "uint64",
       "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
      },
      "selfLink": {
@@ -4443,7 +4443,7 @@
       "description": "URL for the object; populated by the system, read-only"
      },
      "uid": {
-      "type": "types.UID",
+      "$ref": "types.UID",
       "description": "unique UUID across space and time; populated by the system, read-only; cannot be updated"
      }
     }
@@ -4472,7 +4472,7 @@
     "id": "v1beta1.Event",
     "properties": {
      "annotations": {
-      "type": "v1beta1.TypeMeta.annotations",
+      "$ref": "v1beta1.TypeMeta.annotations",
       "description": "map of string keys and values that can be used by external tooling to store and retrieve arbitrary metadata about the object"
      },
      "apiVersion": {
@@ -4509,7 +4509,7 @@
       "description": "name of the object; must be a DNS_SUBDOMAIN and unique among all objects of the same kind within the same namespace; used in resource URLs; cannot be updated"
      },
      "involvedObject": {
-      "type": "v1beta1.ObjectReference",
+      "$ref": "v1beta1.ObjectReference",
       "description": "object that this event is about"
      },
      "kind": {
@@ -4533,7 +4533,7 @@
       "description": "short, machine understandable string that gives the reason for the transition into the object's current status"
      },
      "resourceVersion": {
-      "type": "uint64",
+      "$ref": "uint64",
       "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
      },
      "selfLink": {
@@ -4553,7 +4553,7 @@
       "description": "time at which the client recorded the event"
      },
      "uid": {
-      "type": "types.UID",
+      "$ref": "types.UID",
       "description": "unique UUID across space and time; populated by the system, read-only; cannot be updated"
      }
     }
@@ -4565,7 +4565,7 @@
     ],
     "properties": {
      "annotations": {
-      "type": "v1beta1.TypeMeta.annotations",
+      "$ref": "v1beta1.TypeMeta.annotations",
       "description": "map of string keys and values that can be used by external tooling to store and retrieve arbitrary metadata about the object"
      },
      "apiVersion": {
@@ -4604,7 +4604,7 @@
       "description": "namespace to which the object belongs; must be a DNS_SUBDOMAIN; 'default' by default; cannot be updated"
      },
      "resourceVersion": {
-      "type": "uint64",
+      "$ref": "uint64",
       "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
      },
      "selfLink": {
@@ -4612,7 +4612,7 @@
       "description": "URL for the object; populated by the system, read-only"
      },
      "uid": {
-      "type": "types.UID",
+      "$ref": "types.UID",
       "description": "unique UUID across space and time; populated by the system, read-only; cannot be updated"
      }
     }
@@ -4623,7 +4623,7 @@
      "command": {
       "type": "array",
       "items": {
-       "$ref": "string"
+       "type": "string"
       },
       "description": "command line to execute inside the container; working directory for the command is root ('/') in the container's file system; the command is exec'd, not run inside a shell; exit status of 0 is treated as live/healthy and non-zero is unhealthy"
      }
@@ -4696,15 +4696,15 @@
     "id": "v1beta1.Handler",
     "properties": {
      "exec": {
-      "type": "v1beta1.ExecAction",
+      "$ref": "v1beta1.ExecAction",
       "description": "exec-based handler"
      },
      "httpGet": {
-      "type": "v1beta1.HTTPGetAction",
+      "$ref": "v1beta1.HTTPGetAction",
       "description": "HTTP-based handler"
      },
      "tcpSocket": {
-      "type": "v1beta1.TCPSocketAction",
+      "$ref": "v1beta1.TCPSocketAction",
       "description": "TCP-based handler; TCP hooks not yet supported"
      }
     }
@@ -4725,11 +4725,11 @@
     "id": "v1beta1.Lifecycle",
     "properties": {
      "postStart": {
-      "type": "v1beta1.Handler",
+      "$ref": "v1beta1.Handler",
       "description": "called immediately after a container is started; if the handler fails, the container is terminated and restarted according to its restart policy; other management of the container blocks until the hook completes"
      },
      "preStop": {
-      "type": "v1beta1.Handler",
+      "$ref": "v1beta1.Handler",
       "description": "called before a container is terminated; the container is terminated after the handler completes; other management of the container blocks until the hook completes"
      }
     }
@@ -4738,7 +4738,7 @@
     "id": "v1beta1.LimitRange",
     "properties": {
      "annotations": {
-      "type": "v1beta1.TypeMeta.annotations",
+      "$ref": "v1beta1.TypeMeta.annotations",
       "description": "map of string keys and values that can be used by external tooling to store and retrieve arbitrary metadata about the object"
      },
      "apiVersion": {
@@ -4770,7 +4770,7 @@
       "description": "namespace to which the object belongs; must be a DNS_SUBDOMAIN; 'default' by default; cannot be updated"
      },
      "resourceVersion": {
-      "type": "uint64",
+      "$ref": "uint64",
       "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
      },
      "selfLink": {
@@ -4778,11 +4778,11 @@
       "description": "URL for the object; populated by the system, read-only"
      },
      "spec": {
-      "type": "v1beta1.LimitRangeSpec",
+      "$ref": "v1beta1.LimitRangeSpec",
       "description": "spec defines the limits enforced"
      },
      "uid": {
-      "type": "types.UID",
+      "$ref": "types.UID",
       "description": "unique UUID across space and time; populated by the system, read-only; cannot be updated"
      }
     }
@@ -4791,15 +4791,15 @@
     "id": "v1beta1.LimitRangeItem",
     "properties": {
      "max": {
-      "type": "v1beta1.ResourceList",
+      "$ref": "v1beta1.ResourceList",
       "description": "max usage constraints on this kind by resource name"
      },
      "min": {
-      "type": "v1beta1.ResourceList",
+      "$ref": "v1beta1.ResourceList",
       "description": "min usage constraints on this kind by resource name"
      },
      "type": {
-      "type": "v1beta1.LimitType",
+      "$ref": "v1beta1.LimitType",
       "description": "type of resource that this limit applies to"
      }
     }
@@ -4811,7 +4811,7 @@
     ],
     "properties": {
      "annotations": {
-      "type": "v1beta1.TypeMeta.annotations",
+      "$ref": "v1beta1.TypeMeta.annotations",
       "description": "map of string keys and values that can be used by external tooling to store and retrieve arbitrary metadata about the object"
      },
      "apiVersion": {
@@ -4850,7 +4850,7 @@
       "description": "namespace to which the object belongs; must be a DNS_SUBDOMAIN; 'default' by default; cannot be updated"
      },
      "resourceVersion": {
-      "type": "uint64",
+      "$ref": "uint64",
       "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
      },
      "selfLink": {
@@ -4858,7 +4858,7 @@
       "description": "URL for the object; populated by the system, read-only"
      },
      "uid": {
-      "type": "types.UID",
+      "$ref": "types.UID",
       "description": "unique UUID across space and time; populated by the system, read-only; cannot be updated"
      }
     }
@@ -4882,11 +4882,11 @@
     "id": "v1beta1.LivenessProbe",
     "properties": {
      "exec": {
-      "type": "v1beta1.ExecAction",
+      "$ref": "v1beta1.ExecAction",
       "description": "parameters for exec-based liveness probe"
      },
      "httpGet": {
-      "type": "v1beta1.HTTPGetAction",
+      "$ref": "v1beta1.HTTPGetAction",
       "description": "parameters for HTTP-based liveness probe"
      },
      "initialDelaySeconds": {
@@ -4895,7 +4895,7 @@
       "description": "number of seconds after the container has started before liveness probes are initiated"
      },
      "tcpSocket": {
-      "type": "v1beta1.TCPSocketAction",
+      "$ref": "v1beta1.TCPSocketAction",
       "description": "parameters for TCP-based liveness probe"
      },
      "timeoutSeconds": {
@@ -4909,7 +4909,7 @@
     "id": "v1beta1.Minion",
     "properties": {
      "annotations": {
-      "type": "v1beta1.TypeMeta.annotations",
+      "$ref": "v1beta1.TypeMeta.annotations",
       "description": "map of string keys and values that can be used by external tooling to store and retrieve arbitrary metadata about the object"
      },
      "apiVersion": {
@@ -4945,7 +4945,7 @@
       "description": "kind of object, in CamelCase; cannot be updated"
      },
      "labels": {
-      "type": "v1beta1.Minion.labels",
+      "$ref": "v1beta1.Minion.labels",
       "description": "map of string keys and values that can be used to organize and categorize minions; labels of a minion assigned by the scheduler must match the scheduled pod's nodeSelector"
      },
      "namespace": {
@@ -4957,11 +4957,11 @@
       "description": "IP range assigned to the node"
      },
      "resourceVersion": {
-      "type": "uint64",
+      "$ref": "uint64",
       "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
      },
      "resources": {
-      "type": "v1beta1.NodeResources",
+      "$ref": "v1beta1.NodeResources",
       "description": "characterization of node resources"
      },
      "selfLink": {
@@ -4969,11 +4969,11 @@
       "description": "URL for the object; populated by the system, read-only"
      },
      "status": {
-      "type": "v1beta1.NodeStatus",
+      "$ref": "v1beta1.NodeStatus",
       "description": "current status of node"
      },
      "uid": {
-      "type": "types.UID",
+      "$ref": "types.UID",
       "description": "unique UUID across space and time; populated by the system, read-only; cannot be updated"
      },
      "unschedulable": {
@@ -4993,7 +4993,7 @@
     ],
     "properties": {
      "annotations": {
-      "type": "v1beta1.TypeMeta.annotations",
+      "$ref": "v1beta1.TypeMeta.annotations",
       "description": "map of string keys and values that can be used by external tooling to store and retrieve arbitrary metadata about the object"
      },
      "apiVersion": {
@@ -5039,7 +5039,7 @@
       "description": "namespace to which the object belongs; must be a DNS_SUBDOMAIN; 'default' by default; cannot be updated"
      },
      "resourceVersion": {
-      "type": "uint64",
+      "$ref": "uint64",
       "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
      },
      "selfLink": {
@@ -5047,7 +5047,7 @@
       "description": "URL for the object; populated by the system, read-only"
      },
      "uid": {
-      "type": "types.UID",
+      "$ref": "types.UID",
       "description": "unique UUID across space and time; populated by the system, read-only; cannot be updated"
      }
     }
@@ -5077,7 +5077,7 @@
     "id": "v1beta1.Namespace",
     "properties": {
      "annotations": {
-      "type": "v1beta1.TypeMeta.annotations",
+      "$ref": "v1beta1.TypeMeta.annotations",
       "description": "map of string keys and values that can be used by external tooling to store and retrieve arbitrary metadata about the object"
      },
      "apiVersion": {
@@ -5105,7 +5105,7 @@
       "description": "kind of object, in CamelCase; cannot be updated"
      },
      "labels": {
-      "type": "v1beta1.Namespace.labels",
+      "$ref": "v1beta1.Namespace.labels",
       "description": "map of string keys and values that can be used to organize and categorize namespaces"
      },
      "namespace": {
@@ -5113,7 +5113,7 @@
       "description": "namespace to which the object belongs; must be a DNS_SUBDOMAIN; 'default' by default; cannot be updated"
      },
      "resourceVersion": {
-      "type": "uint64",
+      "$ref": "uint64",
       "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
      },
      "selfLink": {
@@ -5121,15 +5121,15 @@
       "description": "URL for the object; populated by the system, read-only"
      },
      "spec": {
-      "type": "v1beta1.NamespaceSpec",
+      "$ref": "v1beta1.NamespaceSpec",
       "description": "spec defines the behavior of the Namespace"
      },
      "status": {
-      "type": "v1beta1.NamespaceStatus",
+      "$ref": "v1beta1.NamespaceStatus",
       "description": "status describes the current status of a Namespace; read-only"
      },
      "uid": {
-      "type": "types.UID",
+      "$ref": "types.UID",
       "description": "unique UUID across space and time; populated by the system, read-only; cannot be updated"
      }
     }
@@ -5145,7 +5145,7 @@
     ],
     "properties": {
      "annotations": {
-      "type": "v1beta1.TypeMeta.annotations",
+      "$ref": "v1beta1.TypeMeta.annotations",
       "description": "map of string keys and values that can be used by external tooling to store and retrieve arbitrary metadata about the object"
      },
      "apiVersion": {
@@ -5184,7 +5184,7 @@
       "description": "namespace to which the object belongs; must be a DNS_SUBDOMAIN; 'default' by default; cannot be updated"
      },
      "resourceVersion": {
-      "type": "uint64",
+      "$ref": "uint64",
       "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
      },
      "selfLink": {
@@ -5192,7 +5192,7 @@
       "description": "URL for the object; populated by the system, read-only"
      },
      "uid": {
-      "type": "types.UID",
+      "$ref": "types.UID",
       "description": "unique UUID across space and time; populated by the system, read-only; cannot be updated"
      }
     }
@@ -5213,7 +5213,7 @@
     "id": "v1beta1.NamespaceStatus",
     "properties": {
      "phase": {
-      "type": "v1beta1.NamespacePhase",
+      "$ref": "v1beta1.NamespacePhase",
       "description": "phase is the current lifecycle phase of the namespace"
      }
     }
@@ -5230,7 +5230,7 @@
       "description": "string representation of the address"
      },
      "type": {
-      "type": "v1beta1.NodeAddressType",
+      "$ref": "v1beta1.NodeAddressType",
       "description": "type of the node address, e.g. external ip, internal ip, hostname, etc"
      }
     }
@@ -5243,7 +5243,7 @@
     ],
     "properties": {
      "kind": {
-      "type": "v1beta1.NodeConditionKind",
+      "$ref": "v1beta1.NodeConditionKind",
       "description": "kind of the condition, one of Reachable, Ready"
      },
      "lastProbeTime": {
@@ -5263,7 +5263,7 @@
       "description": "(brief) reason for the condition's last transition"
      },
      "status": {
-      "type": "v1beta1.ConditionStatus",
+      "$ref": "v1beta1.ConditionStatus",
       "description": "status of the condition, one of Full, None, Unknown"
      }
     }
@@ -5272,7 +5272,7 @@
     "id": "v1beta1.NodeResources",
     "properties": {
      "capacity": {
-      "type": "v1beta1.ResourceList",
+      "$ref": "v1beta1.ResourceList",
       "description": "resource capacity of a node represented as a map of resource name to quantity of resource"
      }
     }
@@ -5295,11 +5295,11 @@
       "description": "conditions is an array of current node conditions"
      },
      "nodeInfo": {
-      "type": "v1beta1.NodeSystemInfo",
+      "$ref": "v1beta1.NodeSystemInfo",
       "description": "node identity is a set of ids/uuids to uniquely identify the node"
      },
      "phase": {
-      "type": "v1beta1.NodePhase",
+      "$ref": "v1beta1.NodePhase",
       "description": "node phase is the current lifecycle phase of the node"
      }
     }
@@ -5349,7 +5349,7 @@
       "description": "specific resourceVersion to which this reference is made, if any: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
      },
      "uid": {
-      "type": "types.UID",
+      "$ref": "types.UID",
       "description": "uid of the referent"
      }
     }
@@ -5358,7 +5358,7 @@
     "id": "v1beta1.Pod",
     "properties": {
      "annotations": {
-      "type": "v1beta1.TypeMeta.annotations",
+      "$ref": "v1beta1.TypeMeta.annotations",
       "description": "map of string keys and values that can be used by external tooling to store and retrieve arbitrary metadata about the object"
      },
      "apiVersion": {
@@ -5370,7 +5370,7 @@
       "description": "RFC 3339 date and time at which the object was created; populated by the system, read-only; null for lists"
      },
      "currentState": {
-      "type": "v1beta1.PodState",
+      "$ref": "v1beta1.PodState",
       "description": "current state of the pod; populated by the system, read-only"
      },
      "deletionTimestamp": {
@@ -5378,7 +5378,7 @@
       "description": "RFC 3339 date and time at which the object will be deleted; populated by the system when a graceful deletion is requested, read-only; if not set, graceful deletion of the object has not been requested"
      },
      "desiredState": {
-      "type": "v1beta1.PodState",
+      "$ref": "v1beta1.PodState",
       "description": "specification of the desired state of the pod"
      },
      "generateName": {
@@ -5394,7 +5394,7 @@
       "description": "kind of object, in CamelCase; cannot be updated"
      },
      "labels": {
-      "type": "v1beta1.Pod.labels",
+      "$ref": "v1beta1.Pod.labels",
       "description": "map of string keys and values that can be used to organize and categorize pods; may match selectors of replication controllers and services"
      },
      "namespace": {
@@ -5402,11 +5402,11 @@
       "description": "namespace to which the object belongs; must be a DNS_SUBDOMAIN; 'default' by default; cannot be updated"
      },
      "nodeSelector": {
-      "type": "v1beta1.Pod.nodeSelector",
+      "$ref": "v1beta1.Pod.nodeSelector",
       "description": "selector which must match a node's labels for the pod to be scheduled on that node"
      },
      "resourceVersion": {
-      "type": "uint64",
+      "$ref": "uint64",
       "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
      },
      "selfLink": {
@@ -5414,7 +5414,7 @@
       "description": "URL for the object; populated by the system, read-only"
      },
      "uid": {
-      "type": "types.UID",
+      "$ref": "types.UID",
       "description": "unique UUID across space and time; populated by the system, read-only; cannot be updated"
      }
     }
@@ -5435,11 +5435,11 @@
     ],
     "properties": {
      "kind": {
-      "type": "v1beta1.PodConditionKind",
+      "$ref": "v1beta1.PodConditionKind",
       "description": "kind of the condition, currently only Ready"
      },
      "status": {
-      "type": "v1beta1.ConditionStatus",
+      "$ref": "v1beta1.ConditionStatus",
       "description": "status of the condition, one of Full, None, Unknown"
      }
     }
@@ -5451,7 +5451,7 @@
     ],
     "properties": {
      "annotations": {
-      "type": "v1beta1.TypeMeta.annotations",
+      "$ref": "v1beta1.TypeMeta.annotations",
       "description": "map of string keys and values that can be used by external tooling to store and retrieve arbitrary metadata about the object"
      },
      "apiVersion": {
@@ -5490,7 +5490,7 @@
       "description": "namespace to which the object belongs; must be a DNS_SUBDOMAIN; 'default' by default; cannot be updated"
      },
      "resourceVersion": {
-      "type": "uint64",
+      "$ref": "uint64",
       "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
      },
      "selfLink": {
@@ -5498,7 +5498,7 @@
       "description": "URL for the object; populated by the system, read-only"
      },
      "uid": {
-      "type": "types.UID",
+      "$ref": "types.UID",
       "description": "unique UUID across space and time; populated by the system, read-only; cannot be updated"
      }
     }
@@ -5522,11 +5522,11 @@
       "description": "IP address of the host to which the pod is assigned; empty if not yet scheduled"
      },
      "info": {
-      "type": "v1beta1.PodInfo",
+      "$ref": "v1beta1.PodInfo",
       "description": "map of container name to container status"
      },
      "manifest": {
-      "type": "v1beta1.ContainerManifest",
+      "$ref": "v1beta1.ContainerManifest",
       "description": "manifest of containers and volumes comprising the pod"
      },
      "message": {
@@ -5538,7 +5538,7 @@
       "description": "IP address allocated to the pod; routable at least within the cluster; empty if not yet allocated"
      },
      "status": {
-      "type": "v1beta1.PodStatus",
+      "$ref": "v1beta1.PodStatus",
       "description": "current condition of the pod, Waiting, Running, or Terminated"
      }
     }
@@ -5547,19 +5547,19 @@
     "id": "v1beta1.PodTemplate",
     "properties": {
      "annotations": {
-      "type": "v1beta1.PodTemplate.annotations",
+      "$ref": "v1beta1.PodTemplate.annotations",
       "description": "map of string keys and values that can be used by external tooling to store and retrieve arbitrary metadata about pods created from the template"
      },
      "desiredState": {
-      "type": "v1beta1.PodState",
+      "$ref": "v1beta1.PodState",
       "description": "specification of the desired state of pods created from this template"
      },
      "labels": {
-      "type": "v1beta1.PodTemplate.labels",
+      "$ref": "v1beta1.PodTemplate.labels",
       "description": "map of string keys and values that can be used to organize and categorize the pods created from the template; must match the selector of the replication controller to which the template belongs; may match selectors of services"
      },
      "nodeSelector": {
-      "type": "v1beta1.PodTemplate.nodeSelector",
+      "$ref": "v1beta1.PodTemplate.nodeSelector",
       "description": "a selector which must be true for the pod to fit on a node"
      }
     }
@@ -5580,7 +5580,7 @@
     "id": "v1beta1.ReplicationController",
     "properties": {
      "annotations": {
-      "type": "v1beta1.TypeMeta.annotations",
+      "$ref": "v1beta1.TypeMeta.annotations",
       "description": "map of string keys and values that can be used by external tooling to store and retrieve arbitrary metadata about the object"
      },
      "apiVersion": {
@@ -5592,7 +5592,7 @@
       "description": "RFC 3339 date and time at which the object was created; populated by the system, read-only; null for lists"
      },
      "currentState": {
-      "type": "v1beta1.ReplicationControllerState",
+      "$ref": "v1beta1.ReplicationControllerState",
       "description": "current state of the replication controller; populated by the system, read-only"
      },
      "deletionTimestamp": {
@@ -5600,7 +5600,7 @@
       "description": "RFC 3339 date and time at which the object will be deleted; populated by the system when a graceful deletion is requested, read-only; if not set, graceful deletion of the object has not been requested"
      },
      "desiredState": {
-      "type": "v1beta1.ReplicationControllerState",
+      "$ref": "v1beta1.ReplicationControllerState",
       "description": "specification of the desired state of the replication controller"
      },
      "generateName": {
@@ -5616,7 +5616,7 @@
       "description": "kind of object, in CamelCase; cannot be updated"
      },
      "labels": {
-      "type": "v1beta1.ReplicationController.labels",
+      "$ref": "v1beta1.ReplicationController.labels",
       "description": "map of string keys and values that can be used to organize and categorize replication controllers"
      },
      "namespace": {
@@ -5624,7 +5624,7 @@
       "description": "namespace to which the object belongs; must be a DNS_SUBDOMAIN; 'default' by default; cannot be updated"
      },
      "resourceVersion": {
-      "type": "uint64",
+      "$ref": "uint64",
       "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
      },
      "selfLink": {
@@ -5632,7 +5632,7 @@
       "description": "URL for the object; populated by the system, read-only"
      },
      "uid": {
-      "type": "types.UID",
+      "$ref": "types.UID",
       "description": "unique UUID across space and time; populated by the system, read-only; cannot be updated"
      }
     }
@@ -5648,7 +5648,7 @@
     ],
     "properties": {
      "annotations": {
-      "type": "v1beta1.TypeMeta.annotations",
+      "$ref": "v1beta1.TypeMeta.annotations",
       "description": "map of string keys and values that can be used by external tooling to store and retrieve arbitrary metadata about the object"
      },
      "apiVersion": {
@@ -5687,7 +5687,7 @@
       "description": "namespace to which the object belongs; must be a DNS_SUBDOMAIN; 'default' by default; cannot be updated"
      },
      "resourceVersion": {
-      "type": "uint64",
+      "$ref": "uint64",
       "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
      },
      "selfLink": {
@@ -5695,7 +5695,7 @@
       "description": "URL for the object; populated by the system, read-only"
      },
      "uid": {
-      "type": "types.UID",
+      "$ref": "types.UID",
       "description": "unique UUID across space and time; populated by the system, read-only; cannot be updated"
      }
     }
@@ -5707,11 +5707,11 @@
     ],
     "properties": {
      "podTemplate": {
-      "type": "v1beta1.PodTemplate",
+      "$ref": "v1beta1.PodTemplate",
       "description": "template for pods to be created by this replication controller when the observed number of replicas is less than the desired number of replicas"
      },
      "replicaSelector": {
-      "type": "v1beta1.ReplicationControllerState.replicaSelector",
+      "$ref": "v1beta1.ReplicationControllerState.replicaSelector",
       "description": "label keys and values that must match in order to be controlled by this replication controller"
      },
      "replicas": {
@@ -5729,7 +5729,7 @@
     "id": "v1beta1.ResourceQuota",
     "properties": {
      "annotations": {
-      "type": "v1beta1.TypeMeta.annotations",
+      "$ref": "v1beta1.TypeMeta.annotations",
       "description": "map of string keys and values that can be used by external tooling to store and retrieve arbitrary metadata about the object"
      },
      "apiVersion": {
@@ -5757,7 +5757,7 @@
       "description": "kind of object, in CamelCase; cannot be updated"
      },
      "labels": {
-      "type": "v1beta1.ResourceQuota.labels",
+      "$ref": "v1beta1.ResourceQuota.labels",
       "description": "map of string keys and values that can be used to organize and categorize resource quotas"
      },
      "namespace": {
@@ -5765,7 +5765,7 @@
       "description": "namespace to which the object belongs; must be a DNS_SUBDOMAIN; 'default' by default; cannot be updated"
      },
      "resourceVersion": {
-      "type": "uint64",
+      "$ref": "uint64",
       "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
      },
      "selfLink": {
@@ -5773,15 +5773,15 @@
       "description": "URL for the object; populated by the system, read-only"
      },
      "spec": {
-      "type": "v1beta1.ResourceQuotaSpec",
+      "$ref": "v1beta1.ResourceQuotaSpec",
       "description": "spec defines the desired quota"
      },
      "status": {
-      "type": "v1beta1.ResourceQuotaStatus",
+      "$ref": "v1beta1.ResourceQuotaStatus",
       "description": "status defines the actual enforced quota and current usage"
      },
      "uid": {
-      "type": "types.UID",
+      "$ref": "types.UID",
       "description": "unique UUID across space and time; populated by the system, read-only; cannot be updated"
      }
     }
@@ -5797,7 +5797,7 @@
     ],
     "properties": {
      "annotations": {
-      "type": "v1beta1.TypeMeta.annotations",
+      "$ref": "v1beta1.TypeMeta.annotations",
       "description": "map of string keys and values that can be used by external tooling to store and retrieve arbitrary metadata about the object"
      },
      "apiVersion": {
@@ -5836,7 +5836,7 @@
       "description": "namespace to which the object belongs; must be a DNS_SUBDOMAIN; 'default' by default; cannot be updated"
      },
      "resourceVersion": {
-      "type": "uint64",
+      "$ref": "uint64",
       "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
      },
      "selfLink": {
@@ -5844,7 +5844,7 @@
       "description": "URL for the object; populated by the system, read-only"
      },
      "uid": {
-      "type": "types.UID",
+      "$ref": "types.UID",
       "description": "unique UUID across space and time; populated by the system, read-only; cannot be updated"
      }
     }
@@ -5853,7 +5853,7 @@
     "id": "v1beta1.ResourceQuotaSpec",
     "properties": {
      "hard": {
-      "type": "v1beta1.ResourceList",
+      "$ref": "v1beta1.ResourceList",
       "description": "hard is the set of desired hard limits for each named resource"
      }
     }
@@ -5862,11 +5862,11 @@
     "id": "v1beta1.ResourceQuotaStatus",
     "properties": {
      "hard": {
-      "type": "v1beta1.ResourceList",
+      "$ref": "v1beta1.ResourceList",
       "description": "hard is the set of enforced hard limits for each named resource"
      },
      "used": {
-      "type": "v1beta1.ResourceList",
+      "$ref": "v1beta1.ResourceList",
       "description": "used is the current observed total usage of the resource in the namespace"
      }
     }
@@ -5875,11 +5875,11 @@
     "id": "v1beta1.ResourceRequirements",
     "properties": {
      "limits": {
-      "type": "v1beta1.ResourceList",
+      "$ref": "v1beta1.ResourceList",
       "description": "Maximum amount of compute resources allowed"
      },
      "requests": {
-      "type": "v1beta1.ResourceList",
+      "$ref": "v1beta1.ResourceList",
       "description": "Minimum amount of resources requested"
      }
     }
@@ -5888,15 +5888,15 @@
     "id": "v1beta1.RestartPolicy",
     "properties": {
      "always": {
-      "type": "v1beta1.RestartPolicyAlways",
+      "$ref": "v1beta1.RestartPolicyAlways",
       "description": "always restart the container after termination"
      },
      "never": {
-      "type": "v1beta1.RestartPolicyNever",
+      "$ref": "v1beta1.RestartPolicyNever",
       "description": "never restart the container"
      },
      "onFailure": {
-      "type": "v1beta1.RestartPolicyOnFailure",
+      "$ref": "v1beta1.RestartPolicyOnFailure",
       "description": "restart the container if it fails for any reason, but not if it succeeds (exit 0)"
      }
     }
@@ -5917,7 +5917,7 @@
     "id": "v1beta1.Secret",
     "properties": {
      "annotations": {
-      "type": "v1beta1.TypeMeta.annotations",
+      "$ref": "v1beta1.TypeMeta.annotations",
       "description": "map of string keys and values that can be used by external tooling to store and retrieve arbitrary metadata about the object"
      },
      "apiVersion": {
@@ -5929,7 +5929,7 @@
       "description": "RFC 3339 date and time at which the object was created; populated by the system, read-only; null for lists"
      },
      "data": {
-      "type": "v1beta1.Secret.data",
+      "$ref": "v1beta1.Secret.data",
       "description": "data contains the secret data.  Each key must be a valid DNS_SUBDOMAIN.  Each value must be a base64 encoded string"
      },
      "deletionTimestamp": {
@@ -5953,7 +5953,7 @@
       "description": "namespace to which the object belongs; must be a DNS_SUBDOMAIN; 'default' by default; cannot be updated"
      },
      "resourceVersion": {
-      "type": "uint64",
+      "$ref": "uint64",
       "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
      },
      "selfLink": {
@@ -5961,11 +5961,11 @@
       "description": "URL for the object; populated by the system, read-only"
      },
      "type": {
-      "type": "v1beta1.SecretType",
+      "$ref": "v1beta1.SecretType",
       "description": "type facilitates programmatic handling of secret data"
      },
      "uid": {
-      "type": "types.UID",
+      "$ref": "types.UID",
       "description": "unique UUID across space and time; populated by the system, read-only; cannot be updated"
      }
     }
@@ -5981,7 +5981,7 @@
     ],
     "properties": {
      "annotations": {
-      "type": "v1beta1.TypeMeta.annotations",
+      "$ref": "v1beta1.TypeMeta.annotations",
       "description": "map of string keys and values that can be used by external tooling to store and retrieve arbitrary metadata about the object"
      },
      "apiVersion": {
@@ -6020,7 +6020,7 @@
       "description": "namespace to which the object belongs; must be a DNS_SUBDOMAIN; 'default' by default; cannot be updated"
      },
      "resourceVersion": {
-      "type": "uint64",
+      "$ref": "uint64",
       "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
      },
      "selfLink": {
@@ -6028,7 +6028,7 @@
       "description": "URL for the object; populated by the system, read-only"
      },
      "uid": {
-      "type": "types.UID",
+      "$ref": "types.UID",
       "description": "unique UUID across space and time; populated by the system, read-only; cannot be updated"
      }
     }
@@ -6040,7 +6040,7 @@
     ],
     "properties": {
      "target": {
-      "type": "v1beta1.ObjectReference",
+      "$ref": "v1beta1.ObjectReference",
       "description": "target is a reference to a secret"
      }
     }
@@ -6053,7 +6053,7 @@
     ],
     "properties": {
      "annotations": {
-      "type": "v1beta1.TypeMeta.annotations",
+      "$ref": "v1beta1.TypeMeta.annotations",
       "description": "map of string keys and values that can be used by external tooling to store and retrieve arbitrary metadata about the object"
      },
      "apiVersion": {
@@ -6089,7 +6089,7 @@
       "description": "kind of object, in CamelCase; cannot be updated"
      },
      "labels": {
-      "type": "v1beta1.Service.labels",
+      "$ref": "v1beta1.Service.labels",
       "description": "map of string keys and values that can be used to organize and categorize services"
      },
      "namespace": {
@@ -6106,7 +6106,7 @@
       "description": "IP address of the service; usually assigned by the system; if specified, it will be allocated to the service if unused, and creation of the service will fail otherwise; cannot be updated; 'None' can be specified for a headless service when proxying is not required"
      },
      "protocol": {
-      "type": "v1beta1.Protocol",
+      "$ref": "v1beta1.Protocol",
       "description": "protocol for port; must be UDP or TCP; TCP if unspecified"
      },
      "proxyPort": {
@@ -6117,16 +6117,16 @@
      "publicIPs": {
       "type": "array",
       "items": {
-       "$ref": "string"
+       "type": "string"
       },
       "description": "externally visible IPs (e.g. load balancers) that should be proxied to this service"
      },
      "resourceVersion": {
-      "type": "uint64",
+      "$ref": "uint64",
       "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
      },
      "selector": {
-      "type": "v1beta1.Service.selector",
+      "$ref": "v1beta1.Service.selector",
       "description": "label keys and values that must match in order to receive traffic for this service; if empty, all pods are selected, if not specified, endpoints must be manually specified"
      },
      "selfLink": {
@@ -6134,11 +6134,11 @@
       "description": "URL for the object; populated by the system, read-only"
      },
      "sessionAffinity": {
-      "type": "v1beta1.AffinityType",
+      "$ref": "v1beta1.AffinityType",
       "description": "enable client IP based session affinity; must be ClientIP or None; defaults to None"
      },
      "uid": {
-      "type": "types.UID",
+      "$ref": "types.UID",
       "description": "unique UUID across space and time; populated by the system, read-only; cannot be updated"
      }
     }
@@ -6158,7 +6158,7 @@
     ],
     "properties": {
      "annotations": {
-      "type": "v1beta1.TypeMeta.annotations",
+      "$ref": "v1beta1.TypeMeta.annotations",
       "description": "map of string keys and values that can be used by external tooling to store and retrieve arbitrary metadata about the object"
      },
      "apiVersion": {
@@ -6197,7 +6197,7 @@
       "description": "namespace to which the object belongs; must be a DNS_SUBDOMAIN; 'default' by default; cannot be updated"
      },
      "resourceVersion": {
-      "type": "uint64",
+      "$ref": "uint64",
       "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
      },
      "selfLink": {
@@ -6205,7 +6205,7 @@
       "description": "URL for the object; populated by the system, read-only"
      },
      "uid": {
-      "type": "types.UID",
+      "$ref": "types.UID",
       "description": "unique UUID across space and time; populated by the system, read-only; cannot be updated"
      }
     }
@@ -6230,7 +6230,7 @@
       "description": "volume name; must be a DNS_LABEL and unique within the pod"
      },
      "source": {
-      "type": "v1beta1.VolumeSource",
+      "$ref": "v1beta1.VolumeSource",
       "description": "location and type of volume to mount; at most one of HostDir, EmptyDir, GCEPersistentDisk, or GitRepo; default is EmptyDir"
      }
     }
@@ -6276,27 +6276,27 @@
     ],
     "properties": {
      "emptyDir": {
-      "type": "v1beta1.EmptyDirVolumeSource",
+      "$ref": "v1beta1.EmptyDirVolumeSource",
       "description": "temporary directory that shares a pod's lifetime"
      },
      "gitRepo": {
-      "type": "v1beta1.GitRepoVolumeSource",
+      "$ref": "v1beta1.GitRepoVolumeSource",
       "description": "git repository at a particular revision"
      },
      "hostDir": {
-      "type": "v1beta1.HostPathVolumeSource",
+      "$ref": "v1beta1.HostPathVolumeSource",
       "description": "pre-existing host file or directory; generally for privileged system daemons or other agents tied to the host"
      },
      "nfs": {
-      "type": "v1beta1.NFSVolumeSource",
+      "$ref": "v1beta1.NFSVolumeSource",
       "description": "NFS volume that will be mounted in the host machine "
      },
      "persistentDisk": {
-      "type": "v1beta1.GCEPersistentDiskVolumeSource",
+      "$ref": "v1beta1.GCEPersistentDiskVolumeSource",
       "description": "GCE disk resource attached to the host machine on demand"
      },
      "secret": {
-      "type": "v1beta1.SecretVolumeSource",
+      "$ref": "v1beta1.SecretVolumeSource",
       "description": "secret to populate volume with"
      }
     }
