@@ -23,6 +23,7 @@ source "${KUBE_ROOT}/cluster/aws/${KUBE_CONFIG_FILE-"config-default.sh"}"
 
 export AWS_DEFAULT_REGION=${ZONE}
 AWS_CMD="aws --output json ec2"
+AWS_ELB_CMD="aws --output json elb"
 
 MASTER_INTERNAL_IP=172.20.0.9
 
@@ -54,6 +55,12 @@ function get_route_table_id {
 
 function get_sec_group_id {
   python -c 'import json,sys; lst = [str(group["GroupId"]) for group in json.load(sys.stdin)["SecurityGroups"] if group["GroupName"] == "kubernetes-sec-group"]; print "".join(lst)'
+}
+
+function get_elbs_in_vpc {
+ # ELB doesn't seem to be on the same platform as the rest of AWS; doesn't support filtering
+  $AWS_ELB_CMD describe-load-balancers | \
+    python -c "import json,sys; lst = [str(lb['LoadBalancerName']) for lb in json.load(sys.stdin)['LoadBalancerDescriptions'] if lb['VPCId'] == '$1']; print '\n'.join(lst)"
 }
 
 function expect_instance_states {
@@ -694,6 +701,11 @@ function kube-down {
   echo "Deleting VPC"
   vpc_id=$($AWS_CMD describe-vpcs | get_vpc_id)
   if [[ -n "${vpc_id}" ]]; then
+    elb_ids=$(get_elbs_in_vpc ${vpc_id})
+    for elb_id in ${elb_ids}; do
+      $AWS_ELB_CMD delete-load-balancer --load-balancer-name=${elb_id}
+    done
+
     default_sg_id=$($AWS_CMD --output text describe-security-groups \
                              --filters Name=vpc-id,Values=$vpc_id Name=group-name,Values=default \
                              --query SecurityGroups[].GroupId \
