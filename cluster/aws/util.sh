@@ -658,7 +658,7 @@ EOF
         fi
         echo -e " ${color_yellow}[not working yet]${color_norm}"
         # Start Docker, in case it failed to start.
-        ssh -oStrictHostKeyChecking=no -i ${AWS_SSH_KEY} ubuntu@$$minion_ip sudo service docker start > $LOG 2>&1
+        ssh -oStrictHostKeyChecking=no -i ${AWS_SSH_KEY} ubuntu@$minion_ip sudo service docker start > $LOG 2>&1
         attempt=$(($attempt+1))
         sleep 30
       done
@@ -805,7 +805,7 @@ function ssh-to-node {
   local cmd="$2"
 
   local ip=$(get_instance_public_ip ${node})
-  if [[ -z "ip" ]]; then
+  if [[ -z "$ip" ]]; then
     echo "Could not detect IP for ${node}."
     exit 1
   fi
