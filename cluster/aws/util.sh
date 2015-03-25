@@ -460,6 +460,7 @@ function kube-up {
     else
       KUBE_MASTER=${MASTER_NAME}
       KUBE_MASTER_IP=${ip}
+      $AWS_CMD create-route --route-table-id $ROUTE_TABLE_ID --destination-cidr-block ${MASTER_IP_RANGE} --instance-id $master_id > $LOG
 
       echo -e " ${color_green}[master running @${KUBE_MASTER_IP}]${color_norm}"
       break
