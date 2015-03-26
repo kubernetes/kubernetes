@@ -45,6 +45,8 @@ const (
 // Factory provides abstractions that allow the Kubectl command to be extended across multiple types
 // of resources and different API sets.
 // TODO: make the functions interfaces
+// TODO: pass the various interfaces on the factory directly into the command constructors (so the
+// commands are decoupled from the factory).
 type Factory struct {
 	clients *clientCache
 	flags   *pflag.FlagSet
@@ -66,6 +68,9 @@ type Factory struct {
 	Resizer func(mapping *meta.RESTMapping) (kubectl.Resizer, error)
 	// Returns a Reaper for gracefully shutting down resources.
 	Reaper func(mapping *meta.RESTMapping) (kubectl.Reaper, error)
+	// PodSelectorForResource returns the pod selector associated with the provided resource name
+	// or an error.
+	PodSelectorForResource func(mapping *meta.RESTMapping, namespace, name string) (string, error)
 	// Returns a schema that can validate objects stored on disk.
 	Validator func() (validation.Schema, error)
 	// Returns the default namespace to use in cases where no other namespace is specified
@@ -127,6 +132,41 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 		},
 		Printer: func(mapping *meta.RESTMapping, noHeaders bool) (kubectl.ResourcePrinter, error) {
 			return kubectl.NewHumanReadablePrinter(noHeaders), nil
+		},
+		PodSelectorForResource: func(mapping *meta.RESTMapping, namespace, name string) (string, error) {
+			// TODO: replace with a swagger schema based approach (identify pod selector via schema introspection)
+			client, err := clients.ClientForVersion("")
+			if err != nil {
+				return "", err
+			}
+			switch mapping.Kind {
+			case "ReplicationController":
+				rc, err := client.ReplicationControllers(namespace).Get(name)
+				if err != nil {
+					return "", err
+				}
+				return kubectl.MakeLabels(rc.Spec.Selector), nil
+			case "Pod":
+				rc, err := client.Pods(namespace).Get(name)
+				if err != nil {
+					return "", err
+				}
+				if len(rc.Labels) == 0 {
+					return "", fmt.Errorf("the pod has no labels and cannot be exposed")
+				}
+				return kubectl.MakeLabels(rc.Labels), nil
+			case "Service":
+				rc, err := client.ReplicationControllers(namespace).Get(name)
+				if err != nil {
+					return "", err
+				}
+				if rc.Spec.Selector == nil {
+					return "", fmt.Errorf("the service has no pod selector set")
+				}
+				return kubectl.MakeLabels(rc.Spec.Selector), nil
+			default:
+				return "", fmt.Errorf("it is not possible to get a pod selector from %s", mapping.Kind)
+			}
 		},
 		Resizer: func(mapping *meta.RESTMapping) (kubectl.Resizer, error) {
 			client, err := clients.ClientForVersion(mapping.APIVersion)
