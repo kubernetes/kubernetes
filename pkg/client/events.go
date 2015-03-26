@@ -146,12 +146,17 @@ func (e *events) Search(objOrRef runtime.Object) (*api.EventList, error) {
 	if e.namespace != "" && ref.Namespace != e.namespace {
 		return nil, fmt.Errorf("won't be able to find any events of namespace '%v' in namespace '%v'", ref.Namespace, e.namespace)
 	}
+	stringRefKind := string(ref.Kind)
+	var refKind *string
+	if stringRefKind != "" {
+		refKind = &stringRefKind
+	}
 	stringRefUID := string(ref.UID)
 	var refUID *string
 	if stringRefUID != "" {
 		refUID = &stringRefUID
 	}
-	fieldSelector := e.GetFieldSelector(&ref.Name, &ref.Namespace, &ref.Kind, refUID)
+	fieldSelector := e.GetFieldSelector(&ref.Name, &ref.Namespace, refKind, refUID)
 	return e.List(labels.Everything(), fieldSelector)
 }
 
