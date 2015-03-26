@@ -19,6 +19,7 @@ package dockertools
 import (
 	"fmt"
 	"reflect"
+	"sort"
 	"sync"
 	"time"
 
@@ -63,6 +64,23 @@ func (f *FakeDockerClient) AssertCalls(calls []string) (err error) {
 		err = fmt.Errorf("expected %#v, got %#v", calls, f.called)
 	}
 
+	return
+}
+
+func (f *FakeDockerClient) AssertUnorderedCalls(calls []string) (err error) {
+	f.Lock()
+	defer f.Unlock()
+
+	var actual, expected []string
+	copy(actual, calls)
+	copy(expected, f.called)
+
+	sort.StringSlice(actual).Sort()
+	sort.StringSlice(expected).Sort()
+
+	if !reflect.DeepEqual(actual, expected) {
+		err = fmt.Errorf("expected(sorted) %#v, got(sorted) %#v", expected, actual)
+	}
 	return
 }
 
