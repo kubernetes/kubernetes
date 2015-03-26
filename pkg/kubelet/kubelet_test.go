@@ -27,6 +27,7 @@ import (
 	"path"
 	"reflect"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -143,23 +144,15 @@ func verifyStringArrayEquals(t *testing.T, actual, expected []string) {
 }
 
 func verifyStringArrayEqualsAnyOrder(t *testing.T, actual, expected []string) {
-	invalid := len(actual) != len(expected)
-	if !invalid {
-		for _, exp := range expected {
-			found := false
-			for _, act := range actual {
-				if exp == act {
-					found = true
-					break
-				}
-			}
-			if !found {
-				t.Errorf("Expected element %q not found in %#v", exp, actual)
-			}
-		}
-	}
-	if invalid {
-		t.Errorf("Expected: %#v, Actual: %#v", expected, actual)
+	var act, exp []string
+	copy(act, actual)
+	copy(exp, expected)
+
+	sort.StringSlice(act).Sort()
+	sort.StringSlice(exp).Sort()
+
+	if !reflect.DeepEqual(exp, act) {
+		t.Errorf("Expected(sorted): %#v, Actual(sorted): %#v", exp, act)
 	}
 }
 
