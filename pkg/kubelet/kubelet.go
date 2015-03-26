@@ -1372,11 +1372,22 @@ func (kl *Kubelet) canRunPod(pod *api.Pod) error {
 	return nil
 }
 
+func (kl *Kubelet) killContainersInRunningPod(runningPod kubecontainer.Pod) {
+	for _, container := range runningPod.Containers {
+		glog.V(3).Infof("Killing unwanted container %+v", container)
+		err := kl.killContainer(container)
+		if err != nil {
+			glog.Errorf("Error killing container: %v", err)
+		}
+	}
+}
+
 func (kl *Kubelet) syncPod(pod *api.Pod, mirrorPod *api.Pod, runningPod kubecontainer.Pod) error {
 	podFullName := kubecontainer.GetPodFullName(pod)
 	uid := pod.UID
 	err := kl.canRunPod(pod)
 	if err != nil {
+		kl.killContainersInRunningPod(runningPod)
 		return err
 	}
 
