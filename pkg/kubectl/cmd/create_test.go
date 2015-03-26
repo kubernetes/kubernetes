@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package cmd_test
+package cmd
 
 import (
 	"bytes"
@@ -22,7 +22,6 @@ import (
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/cmd"
 )
 
 func TestExtraArgsFail(t *testing.T) {
@@ -30,7 +29,7 @@ func TestExtraArgsFail(t *testing.T) {
 
 	f, _, _ := NewAPIFactory()
 	c := f.NewCmdCreate(buf)
-	if cmd.ValidateArgs(c, []string{"rc"}) == nil {
+	if ValidateArgs(c, []string{"rc"}) == nil {
 		t.Errorf("unexpected non-error")
 	}
 }

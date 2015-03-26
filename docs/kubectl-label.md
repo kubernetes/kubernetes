@@ -23,6 +23,9 @@ $ kubectl label pods foo unhealthy=true
 // Update pod 'foo' with the label 'status' and the value 'unhealthy', overwriting any existing value.
 $ kubectl label --overwrite pods foo status=unhealthy
 
+// Update all pods in the namespace
+$ kubectl label pods --all status=unhealthy
+
 // Update pod 'foo' only if the resource is unchanged from version 1.
 $ kubectl label pods foo status=unhealthy --resource-version=1
 
@@ -34,12 +37,14 @@ $ kubectl label pods foo bar-
 ### Options
 
 ```
+      --all=false: select all resources in the namespace of the specified resource types
   -h, --help=false: help for label
       --no-headers=false: When using the default output, don't print headers.
   -o, --output="": Output format. One of: json|yaml|template|templatefile.
       --output-version="": Output the formatted object with the given version (default api-version).
       --overwrite=false: If true, allow labels to be overwritten, otherwise reject label updates that overwrite existing labels.
-      --resource-version="": If non-empty, the labels update will only succeed if this is the current resource-version for the object.
+      --resource-version="": If non-empty, the labels update will only succeed if this is the current resource-version for the object. Only valid when specifying a single resource.
+  -l, --selector="": Selector (label query) to filter on
   -t, --template="": Template string or path to template file to use when -o=template or -o=templatefile.  The template format is golang templates [http://golang.org/pkg/text/template/#pkg-overview]
 ```
 

@@ -17,10 +17,14 @@ limitations under the License.
 package cmd
 
 import (
+	"bytes"
+	"net/http"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 )
 
@@ -256,5 +260,108 @@ func TestLabelFunc(t *testing.T) {
 		if !reflect.DeepEqual(out, test.expected) {
 			t.Errorf("expected: %v, got %v", test.expected, out)
 		}
+	}
+}
+
+func TestLabelErrors(t *testing.T) {
+	testCases := map[string]struct {
+		args  []string
+		flags map[string]string
+		errFn func(error) bool
+	}{
+		"no args": {
+			args:  []string{},
+			errFn: func(err error) bool { return strings.Contains(err.Error(), "one or more resources must be specified") },
+		},
+		"not enough labels": {
+			args:  []string{"pods"},
+			errFn: func(err error) bool { return strings.Contains(err.Error(), "at least one label update is required") },
+		},
+		"no resources": {
+			args:  []string{"pods-"},
+			errFn: func(err error) bool { return strings.Contains(err.Error(), "one or more resources must be specified") },
+		},
+		"no resources 2": {
+			args:  []string{"pods=bar"},
+			errFn: func(err error) bool { return strings.Contains(err.Error(), "one or more resources must be specified") },
+		},
+	}
+
+	for k, testCase := range testCases {
+		f, tf, _ := NewAPIFactory()
+		tf.Printer = &testPrinter{}
+		tf.Namespace = "test"
+		tf.ClientConfig = &client.Config{Version: "v1beta1"}
+
+		buf := bytes.NewBuffer([]byte{})
+		cmd := f.NewCmdLabel(buf)
+		cmd.SetOutput(buf)
+
+		for k, v := range testCase.flags {
+			cmd.Flags().Set(k, v)
+		}
+		err := RunLabel(f, buf, cmd, testCase.args)
+		if !testCase.errFn(err) {
+			t.Errorf("%s: unexpected error: %v", k, err)
+			continue
+		}
+		if tf.Printer.(*testPrinter).Objects != nil {
+			t.Errorf("unexpected print to default printer")
+		}
+		if buf.Len() > 0 {
+			t.Errorf("buffer should be empty: %s", string(buf.Bytes()))
+		}
+	}
+}
+
+func TestLabelMultipleObjects(t *testing.T) {
+	pods, _, _ := testData()
+
+	f, tf, codec := NewAPIFactory()
+	tf.Printer = &testPrinter{}
+	tf.Client = &client.FakeRESTClient{
+		Codec: codec,
+		Client: client.HTTPClientFunc(func(req *http.Request) (*http.Response, error) {
+			switch req.Method {
+			case "GET":
+				switch req.URL.Path {
+				case "/namespaces/test/pods":
+					return &http.Response{StatusCode: 200, Body: objBody(codec, pods)}, nil
+				default:
+					t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+					return nil, nil
+				}
+			case "PUT":
+				switch req.URL.Path {
+				case "/namespaces/test/pods/foo":
+					return &http.Response{StatusCode: 200, Body: objBody(codec, &pods.Items[0])}, nil
+				case "/namespaces/test/pods/bar":
+					return &http.Response{StatusCode: 200, Body: objBody(codec, &pods.Items[1])}, nil
+				default:
+					t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+					return nil, nil
+				}
+			default:
+				t.Fatalf("unexpected request: %s %#v\n%#v", req.Method, req.URL, req)
+				return nil, nil
+			}
+		}),
+	}
+	tf.Namespace = "test"
+	tf.ClientConfig = &client.Config{Version: "v1beta1"}
+	buf := bytes.NewBuffer([]byte{})
+
+	cmd := f.NewCmdLabel(buf)
+
+	cmd.Flags().Set("all", "true")
+	if err := RunLabel(f, buf, cmd, []string{"pods", "a=b"}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if tf.Printer.(*testPrinter).Objects == nil {
+		t.Errorf("unexpected non print to default printer")
+	}
+	if !reflect.DeepEqual(tf.Printer.(*testPrinter).Objects[0].(*api.Pod).Labels, map[string]string{"a": "b"}) {
+		t.Errorf("did not set labels: %#v", string(buf.Bytes()))
 	}
 }

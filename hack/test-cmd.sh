@@ -309,11 +309,11 @@ for version in "${kube_api_versions[@]}"; do
   # Post-condition: name is still valid-pod
   kube::test::get_object_assert 'pod valid-pod' "{{.${labels_field}.name}}" 'valid-pod'
 
-  ### --overwrite must be used to overwrite existing label
+  ### --overwrite must be used to overwrite existing label, can be applied to all resources
   # Pre-condition: name is valid-pod
   kube::test::get_object_assert 'pod valid-pod' "{{.${labels_field}.name}}" 'valid-pod'
   # Command
-  kubectl label --overwrite pods valid-pod name=valid-pod-super-sayan "${kube_flags[@]}"
+  kubectl label --overwrite pods --all name=valid-pod-super-sayan "${kube_flags[@]}"
   # Post-condition: name is valid-pod-super-sayan
   kube::test::get_object_assert 'pod valid-pod' "{{.${labels_field}.name}}" 'valid-pod-super-sayan'
 
