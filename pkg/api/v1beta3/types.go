@@ -952,9 +952,6 @@ type EndpointsList struct {
 
 // NodeSpec describes the attributes that a node is created with.
 type NodeSpec struct {
-	// Capacity represents the available resources of a node.
-	// see https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/resources.md for more details.
-	Capacity ResourceList `json:"capacity,omitempty" description:"compute resource capacity of the node; https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/resources.md"`
 	// PodCIDR represents the pod IP range assigned to the node
 	PodCIDR string `json:"podCIDR,omitempty" description:"pod IP range assigned to the node"`
 	// External ID of the node assigned by some machine database (e.g. a cloud provider)
@@ -975,6 +972,9 @@ type NodeSystemInfo struct {
 
 // NodeStatus is information about the current status of a node.
 type NodeStatus struct {
+	// Capacity represents the available resources of a node.
+	// see https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/resources.md for more details.
+	Capacity ResourceList `json:"capacity,omitempty" description:"compute resource capacity of the node; https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/resources.md"`
 	// NodePhase is the current lifecycle phase of the node.
 	Phase NodePhase `json:"phase,omitempty" description:"most recently observed lifecycle phase of the node"`
 	// Conditions is an array of current node conditions.

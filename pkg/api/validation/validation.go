@@ -910,18 +910,18 @@ func ValidateMinion(node *api.Node) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 	allErrs = append(allErrs, ValidateObjectMeta(&node.ObjectMeta, false, ValidateNodeName).Prefix("metadata")...)
 	// Capacity is required. Within capacity, memory and cpu resources are required.
-	if len(node.Spec.Capacity) == 0 {
-		allErrs = append(allErrs, errs.NewFieldRequired("spec.Capacity"))
+	if len(node.Status.Capacity) == 0 {
+		allErrs = append(allErrs, errs.NewFieldRequired("status.Capacity"))
 	} else {
-		if val, ok := node.Spec.Capacity[api.ResourceMemory]; !ok {
-			allErrs = append(allErrs, errs.NewFieldRequired("spec.Capacity[memory]"))
+		if val, ok := node.Status.Capacity[api.ResourceMemory]; !ok {
+			allErrs = append(allErrs, errs.NewFieldRequired("status.Capacity[memory]"))
 		} else if val.Value() < 0 {
-			allErrs = append(allErrs, errs.NewFieldInvalid("spec.Capacity[memory]", val, "memory capacity cannot be negative"))
+			allErrs = append(allErrs, errs.NewFieldInvalid("status.Capacity[memory]", val, "memory capacity cannot be negative"))
 		}
-		if val, ok := node.Spec.Capacity[api.ResourceCPU]; !ok {
-			allErrs = append(allErrs, errs.NewFieldRequired("spec.Capacity[cpu]"))
+		if val, ok := node.Status.Capacity[api.ResourceCPU]; !ok {
+			allErrs = append(allErrs, errs.NewFieldRequired("status.Capacity[cpu]"))
 		} else if val.Value() < 0 {
-			allErrs = append(allErrs, errs.NewFieldInvalid("spec.Capacity[cpu]", val, "cpu capacity cannot be negative"))
+			allErrs = append(allErrs, errs.NewFieldInvalid("status.Capacity[cpu]", val, "cpu capacity cannot be negative"))
 		}
 	}
 
@@ -949,7 +949,7 @@ func ValidateMinionUpdate(oldMinion *api.Node, minion *api.Node) errs.Validation
 	// Ignore metadata changes now that they have been tested
 	oldMinion.ObjectMeta = minion.ObjectMeta
 	// Allow users to update capacity
-	oldMinion.Spec.Capacity = minion.Spec.Capacity
+	oldMinion.Status.Capacity = minion.Status.Capacity
 	// Allow users to unschedule node
 	oldMinion.Spec.Unschedulable = minion.Spec.Unschedulable
 	// Clear status

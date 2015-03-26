@@ -31,7 +31,7 @@ type NodesInterface interface {
 
 type NodeInterface interface {
 	Get(name string) (result *api.Node, err error)
-	Create(minion *api.Node) (*api.Node, error)
+	Create(node *api.Node) (*api.Node, error)
 	List() (*api.NodeList, error)
 	Delete(name string) error
 	Update(*api.Node) (*api.Node, error)
@@ -43,13 +43,13 @@ type nodes struct {
 	r *Client
 }
 
-// newNodes returns a nodes object. Uses "minions" as the
-// URL resource name for v1beta1 and v1beta2.
+// newNodes returns a nodes object.
 func newNodes(c *Client) *nodes {
 	return &nodes{c}
 }
 
 // resourceName returns node's URL resource name based on resource version.
+// Uses "minions" as the URL resource name for v1beta1 and v1beta2.
 func (c *nodes) resourceName() string {
 	if api.PreV1Beta3(c.r.APIVersion()) {
 		return "minions"
@@ -58,9 +58,9 @@ func (c *nodes) resourceName() string {
 }
 
 // Create creates a new node.
-func (c *nodes) Create(minion *api.Node) (*api.Node, error) {
+func (c *nodes) Create(node *api.Node) (*api.Node, error) {
 	result := &api.Node{}
-	err := c.r.Post().Resource(c.resourceName()).Body(minion).Do().Into(result)
+	err := c.r.Post().Resource(c.resourceName()).Body(node).Do().Into(result)
 	return result, err
 }
 
@@ -84,13 +84,13 @@ func (c *nodes) Delete(name string) error {
 }
 
 // Update updates an existing node.
-func (c *nodes) Update(minion *api.Node) (*api.Node, error) {
+func (c *nodes) Update(node *api.Node) (*api.Node, error) {
 	result := &api.Node{}
-	if len(minion.ResourceVersion) == 0 {
-		err := fmt.Errorf("invalid update object, missing resource version: %v", minion)
+	if len(node.ResourceVersion) == 0 {
+		err := fmt.Errorf("invalid update object, missing resource version: %v", node)
 		return nil, err
 	}
-	err := c.r.Put().Resource(c.resourceName()).Name(minion.Name).Body(minion).Do().Into(result)
+	err := c.r.Put().Resource(c.resourceName()).Name(node.Name).Body(node).Do().Into(result)
 	return result, err
 }
 

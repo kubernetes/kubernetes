@@ -281,12 +281,13 @@ func TestCreateGetStaticNodesWithSpec(t *testing.T) {
 						ObjectMeta: api.ObjectMeta{Name: "node0"},
 						Spec: api.NodeSpec{
 							ExternalID: "node0",
+						},
+						Status: api.NodeStatus{
 							Capacity: api.ResourceList{
 								api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
 								api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
 							},
 						},
-						Status: api.NodeStatus{},
 					},
 				},
 			},
@@ -299,23 +300,25 @@ func TestCreateGetStaticNodesWithSpec(t *testing.T) {
 						ObjectMeta: api.ObjectMeta{Name: "node0"},
 						Spec: api.NodeSpec{
 							ExternalID: "node0",
+						},
+						Status: api.NodeStatus{
 							Capacity: api.ResourceList{
 								api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
 								api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
 							},
 						},
-						Status: api.NodeStatus{},
 					},
 					{
 						ObjectMeta: api.ObjectMeta{Name: "node1"},
 						Spec: api.NodeSpec{
 							ExternalID: "node1",
+						},
+						Status: api.NodeStatus{
 							Capacity: api.ResourceList{
 								api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
 								api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
 							},
 						},
-						Status: api.NodeStatus{},
 					},
 				},
 			},
@@ -364,7 +367,7 @@ func TestCreateGetCloudNodesWithSpec(t *testing.T) {
 				Items: []api.Node{
 					{
 						ObjectMeta: api.ObjectMeta{Name: "node0"},
-						Spec:       api.NodeSpec{Capacity: resourceList},
+						Status:     api.NodeStatus{Capacity: resourceList},
 					},
 				},
 			},
@@ -378,11 +381,11 @@ func TestCreateGetCloudNodesWithSpec(t *testing.T) {
 				Items: []api.Node{
 					{
 						ObjectMeta: api.ObjectMeta{Name: "node0"},
-						Spec:       api.NodeSpec{Capacity: resourceList},
+						Status:     api.NodeStatus{Capacity: resourceList},
 					},
 					{
 						ObjectMeta: api.ObjectMeta{Name: "node1"},
-						Spec:       api.NodeSpec{Capacity: resourceList},
+						Status:     api.NodeStatus{Capacity: resourceList},
 					},
 				},
 			},
@@ -759,13 +762,13 @@ func TestSyncProbedNodeStatus(t *testing.T) {
 						Addresses: []api.NodeAddress{
 							{Type: api.NodeLegacyHostIP, Address: "1.2.3.4"},
 						},
-					},
-					Spec: api.NodeSpec{
-						ExternalID: "node0",
 						Capacity: api.ResourceList{
 							api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
 							api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
 						},
+					},
+					Spec: api.NodeSpec{
+						ExternalID: "node0",
 					},
 				},
 				{
@@ -790,13 +793,13 @@ func TestSyncProbedNodeStatus(t *testing.T) {
 						Addresses: []api.NodeAddress{
 							{Type: api.NodeLegacyHostIP, Address: "1.2.3.4"},
 						},
-					},
-					Spec: api.NodeSpec{
-						ExternalID: "node1",
 						Capacity: api.ResourceList{
 							api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
 							api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
 						},
+					},
+					Spec: api.NodeSpec{
+						ExternalID: "node1",
 					},
 				},
 			},
@@ -1319,13 +1322,13 @@ func TestMonitorNodeStatusUpdateStatus(t *testing.T) {
 									LastTransitionTime: util.Date(2015, 1, 1, 11, 0, 0, 0, time.UTC),
 								},
 							},
-						},
-						Spec: api.NodeSpec{
-							ExternalID: "node0",
 							Capacity: api.ResourceList{
 								api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
 								api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
 							},
+						},
+						Spec: api.NodeSpec{
+							ExternalID: "node0",
 						},
 					},
 				},
@@ -1350,13 +1353,13 @@ func TestMonitorNodeStatusUpdateStatus(t *testing.T) {
 								LastTransitionTime: fakeNow,
 							},
 						},
-					},
-					Spec: api.NodeSpec{
-						ExternalID: "node0",
 						Capacity: api.ResourceList{
 							api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
 							api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
 						},
+					},
+					Spec: api.NodeSpec{
+						ExternalID: "node0",
 					},
 				},
 			},
@@ -1381,13 +1384,13 @@ func TestMonitorNodeStatusUpdateStatus(t *testing.T) {
 									LastTransitionTime: fakeNow,
 								},
 							},
-						},
-						Spec: api.NodeSpec{
-							ExternalID: "node0",
 							Capacity: api.ResourceList{
 								api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
 								api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
 							},
+						},
+						Spec: api.NodeSpec{
+							ExternalID: "node0",
 						},
 					},
 				},
@@ -1420,6 +1423,8 @@ func newNode(name string) *api.Node {
 		ObjectMeta: api.ObjectMeta{Name: name},
 		Spec: api.NodeSpec{
 			ExternalID: name,
+		},
+		Status: api.NodeStatus{
 			Capacity: api.ResourceList{
 				api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
 				api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),

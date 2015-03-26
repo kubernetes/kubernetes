@@ -3138,12 +3138,7 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 	mockCadvisor.On("MachineInfo").Return(machineInfo, nil)
 	expectedNode := &api.Node{
 		ObjectMeta: api.ObjectMeta{Name: "testnode"},
-		Spec: api.NodeSpec{
-			Capacity: api.ResourceList{
-				api.ResourceCPU:    *resource.NewMilliQuantity(2000, resource.DecimalSI),
-				api.ResourceMemory: *resource.NewQuantity(1024, resource.BinarySI),
-			},
-		},
+		Spec:       api.NodeSpec{},
 		Status: api.NodeStatus{
 			Conditions: []api.NodeCondition{
 				{
@@ -3158,6 +3153,10 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 				MachineID:  "123",
 				SystemUUID: "abc",
 				BootID:     "1b3",
+			},
+			Capacity: api.ResourceList{
+				api.ResourceCPU:    *resource.NewMilliQuantity(2000, resource.DecimalSI),
+				api.ResourceMemory: *resource.NewQuantity(1024, resource.BinarySI),
 			},
 		},
 	}
@@ -3193,12 +3192,7 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 	kubeClient.MinionsList = api.NodeList{Items: []api.Node{
 		{
 			ObjectMeta: api.ObjectMeta{Name: "testnode"},
-			Spec: api.NodeSpec{
-				Capacity: api.ResourceList{
-					api.ResourceCPU:    *resource.NewMilliQuantity(3000, resource.DecimalSI),
-					api.ResourceMemory: *resource.NewQuantity(2048, resource.BinarySI),
-				},
-			},
+			Spec:       api.NodeSpec{},
 			Status: api.NodeStatus{
 				Conditions: []api.NodeCondition{
 					{
@@ -3208,6 +3202,10 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 						LastProbeTime:      util.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
 						LastTransitionTime: util.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
 					},
+				},
+				Capacity: api.ResourceList{
+					api.ResourceCPU:    *resource.NewMilliQuantity(3000, resource.DecimalSI),
+					api.ResourceMemory: *resource.NewQuantity(2048, resource.BinarySI),
 				},
 			},
 		},
@@ -3222,12 +3220,7 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 	mockCadvisor.On("MachineInfo").Return(machineInfo, nil)
 	expectedNode := &api.Node{
 		ObjectMeta: api.ObjectMeta{Name: "testnode"},
-		Spec: api.NodeSpec{
-			Capacity: api.ResourceList{
-				api.ResourceCPU:    *resource.NewMilliQuantity(2000, resource.DecimalSI),
-				api.ResourceMemory: *resource.NewQuantity(1024, resource.BinarySI),
-			},
-		},
+		Spec:       api.NodeSpec{},
 		Status: api.NodeStatus{
 			Conditions: []api.NodeCondition{
 				{
@@ -3242,6 +3235,10 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 				MachineID:  "123",
 				SystemUUID: "abc",
 				BootID:     "1b3",
+			},
+			Capacity: api.ResourceList{
+				api.ResourceCPU:    *resource.NewMilliQuantity(2000, resource.DecimalSI),
+				api.ResourceMemory: *resource.NewQuantity(1024, resource.BinarySI),
 			},
 		},
 	}

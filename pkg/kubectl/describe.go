@@ -393,9 +393,9 @@ func describeNode(node *api.Node, pods []api.Pod, events *api.EventList) (string
 			addresses = append(addresses, address.Address)
 		}
 		fmt.Fprintf(out, "Addresses:\t%s\n", strings.Join(addresses, ","))
-		if len(node.Spec.Capacity) > 0 {
+		if len(node.Status.Capacity) > 0 {
 			fmt.Fprintf(out, "Capacity:\n")
-			for resource, value := range node.Spec.Capacity {
+			for resource, value := range node.Status.Capacity {
 				fmt.Fprintf(out, " %s:\t%s\n", resource, value.String())
 			}
 		}

@@ -28,7 +28,7 @@ import (
 func makeMinion(node string, milliCPU, memory int64) api.Node {
 	return api.Node{
 		ObjectMeta: api.ObjectMeta{Name: node},
-		Spec: api.NodeSpec{
+		Status: api.NodeStatus{
 			Capacity: api.ResourceList{
 				"cpu":    *resource.NewMilliQuantity(milliCPU, resource.DecimalSI),
 				"memory": *resource.NewQuantity(memory, resource.BinarySI),

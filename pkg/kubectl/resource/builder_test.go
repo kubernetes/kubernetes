@@ -185,7 +185,8 @@ func TestPathBuilder(t *testing.T) {
 func TestNodeBuilder(t *testing.T) {
 	node := &api.Node{
 		ObjectMeta: api.ObjectMeta{Name: "node1", Namespace: "should-not-have", ResourceVersion: "10"},
-		Spec: api.NodeSpec{
+		Spec:       api.NodeSpec{},
+		Status: api.NodeStatus{
 			Capacity: api.ResourceList{
 				api.ResourceCPU:    resource.MustParse("1000m"),
 				api.ResourceMemory: resource.MustParse("1Mi"),
