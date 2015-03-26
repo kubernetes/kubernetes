@@ -702,11 +702,28 @@ function kube-down {
   echo "Deleting VPC"
   vpc_id=$($AWS_CMD describe-vpcs | get_vpc_id)
   if [[ -n "${vpc_id}" ]]; then
-    elb_ids=$(get_elbs_in_vpc ${vpc_id})
-    for elb_id in ${elb_ids}; do
-      $AWS_ELB_CMD delete-load-balancer --load-balancer-name=${elb_id}
-    done
+    local elb_ids=$(get_elbs_in_vpc ${vpc_id})
+    if [[ -n ${elb_ids} ]]; then
+      echo "Deleting ELBs in: ${vpc_id}"
+      for elb_id in ${elb_ids}; do
+        $AWS_ELB_CMD delete-load-balancer --load-balancer-name=${elb_id}
+      done
 
+      echo "Waiting for ELBs to be deleted"
+      while true; do
+        elb_ids=$(get_elbs_in_vpc ${vpc_id})
+        if [[ -z "$elb_ids"  ]]; then
+          echo "All ELBs deleted"
+          break
+        else
+          echo "ELBs not yet deleted: $elb_ids"
+          echo "Sleeping for 3 seconds..."
+          sleep 3
+        fi
+      done
+    fi
+
+    echo "Deleting VPC: ${vpc_id}"
     default_sg_id=$($AWS_CMD --output text describe-security-groups \
                              --filters Name=vpc-id,Values=$vpc_id Name=group-name,Values=default \
                              --query SecurityGroups[].GroupId \
