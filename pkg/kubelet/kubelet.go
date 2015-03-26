@@ -218,7 +218,7 @@ func NewMainKubelet(
 		rootDirectory:                  rootDirectory,
 		resyncInterval:                 resyncInterval,
 		podInfraContainerImage:         podInfraContainerImage,
-		containerRefManager:            newContainerRefManager(),
+		containerRefManager:            kubecontainer.NewRefManager(),
 		runner:                         dockertools.NewDockerContainerCommandRunner(dockerClient),
 		httpClient:                     &http.Client{},
 		pullQPS:                        pullQPS,
@@ -296,7 +296,7 @@ type Kubelet struct {
 
 	// Needed to report events for containers belonging to deleted/modified pods.
 	// Tracks references for reporting events
-	containerRefManager *ContainerRefManager
+	containerRefManager *kubecontainer.RefManager
 
 	// Optional, defaults to simple Docker implementation
 	dockerPuller dockertools.DockerPuller
@@ -666,22 +666,6 @@ func (kl *Kubelet) runHandler(podFullName string, uid types.UID, container *api.
 		return fmt.Errorf("invalid handler")
 	}
 	return actionHandler.Run(podFullName, uid, container, handler)
-}
-
-// fieldPath returns a fieldPath locating container within pod.
-// Returns an error if the container isn't part of the pod.
-func fieldPath(pod *api.Pod, container *api.Container) (string, error) {
-	for i := range pod.Spec.Containers {
-		here := &pod.Spec.Containers[i]
-		if here.Name == container.Name {
-			if here.Name == "" {
-				return fmt.Sprintf("spec.containers[%d]", i), nil
-			} else {
-				return fmt.Sprintf("spec.containers{%s}", here.Name), nil
-			}
-		}
-	}
-	return "", fmt.Errorf("container %#v not found in pod %#v", container, pod)
 }
 
 // Run a single container from a pod. Returns the docker container ID

@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	kubecontainer "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/probe"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/exec"
@@ -153,7 +154,7 @@ func makeTestKubelet(result probe.Result, err error) *Kubelet {
 				err:    err,
 			},
 		},
-		containerRefManager: newContainerRefManager(),
+		containerRefManager: kubecontainer.NewRefManager(),
 	}
 }
 

@@ -25,6 +25,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/cadvisor"
+	kubecontainer "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/dockertools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/network"
 	docker "github.com/fsouza/go-dockerclient"
@@ -79,7 +80,7 @@ func TestRunOnce(t *testing.T) {
 		cadvisor:            cadvisor,
 		nodeLister:          testNodeLister{},
 		statusManager:       newStatusManager(nil),
-		containerRefManager: newContainerRefManager(),
+		containerRefManager: kubecontainer.NewRefManager(),
 	}
 
 	kb.networkPlugin, _ = network.InitNetworkPlugin([]network.NetworkPlugin{}, "", network.NewFakeHost(nil))
