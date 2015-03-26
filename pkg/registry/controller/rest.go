@@ -42,10 +42,18 @@ func (rcStrategy) NamespaceScoped() bool {
 	return true
 }
 
-// ResetBeforeCreate clears the status of a replication controller before creation.
-func (rcStrategy) ResetBeforeCreate(obj runtime.Object) {
+// PrepareForCreate clears the status of a replication controller before creation.
+func (rcStrategy) PrepareForCreate(obj runtime.Object) {
 	controller := obj.(*api.ReplicationController)
 	controller.Status = api.ReplicationControllerStatus{}
+}
+
+// PrepareForUpdate clears fields that are not allowed to be set by end users on update.
+func (rcStrategy) PrepareForUpdate(obj, old runtime.Object) {
+	// TODO: once RC has a status sub-resource we can enable this.
+	//newController := obj.(*api.ReplicationController)
+	//oldController := old.(*api.ReplicationController)
+	//newController.Status = oldController.Status
 }
 
 // Validate validates a new replication controller.

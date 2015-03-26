@@ -60,10 +60,18 @@ func (svcStrategy) NamespaceScoped() bool {
 	return true
 }
 
-// ResetBeforeCreate clears fields that are not allowed to be set by end users on creation.
-func (svcStrategy) ResetBeforeCreate(obj runtime.Object) {
+// PrepareForCreate clears fields that are not allowed to be set by end users on creation.
+func (svcStrategy) PrepareForCreate(obj runtime.Object) {
 	service := obj.(*api.Service)
 	service.Status = api.ServiceStatus{}
+}
+
+// PrepareForUpdate clears fields that are not allowed to be set by end users on update.
+func (svcStrategy) PrepareForUpdate(obj, old runtime.Object) {
+	// TODO: once service has a status sub-resource we can enable this.
+	//newService := obj.(*api.Service)
+	//oldService := old.(*api.Service)
+	//newService.Status = oldService.Status
 }
 
 // Validate validates a new service.

@@ -43,9 +43,15 @@ func (endpointsStrategy) NamespaceScoped() bool {
 	return true
 }
 
-// ResetBeforeCreate clears fields that are not allowed to be set by end users on creation.
-func (endpointsStrategy) ResetBeforeCreate(obj runtime.Object) {
+// PrepareForCreate clears fields that are not allowed to be set by end users on creation.
+func (endpointsStrategy) PrepareForCreate(obj runtime.Object) {
 	_ = obj.(*api.Endpoints)
+}
+
+// PrepareForUpdate clears fields that are not allowed to be set by end users on update.
+func (endpointsStrategy) PrepareForUpdate(obj, old runtime.Object) {
+	_ = obj.(*api.Endpoints)
+	_ = old.(*api.Endpoints)
 }
 
 // Validate validates a new endpoints.

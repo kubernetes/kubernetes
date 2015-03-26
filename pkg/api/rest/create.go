@@ -34,16 +34,17 @@ type RESTCreateStrategy interface {
 
 	// NamespaceScoped returns true if the object must be within a namespace.
 	NamespaceScoped() bool
-	// ResetBeforeCreate is invoked on create before validation to remove any fields
-	// that may not be persisted.
-	ResetBeforeCreate(obj runtime.Object)
+	// PrepareForCreate is invoked on create before validation to normalize
+	// the object.  For example: remove fields that are not to be persisted,
+	// sort order-insensitive list fields, etc.
+	PrepareForCreate(obj runtime.Object)
 	// Validate is invoked after default fields in the object have been filled in before
 	// the object is persisted.
 	Validate(obj runtime.Object) fielderrors.ValidationErrorList
 }
 
 // BeforeCreate ensures that common operations for all resources are performed on creation. It only returns
-// errors that can be converted to api.Status. It invokes ResetBeforeCreate, then GenerateName, then Validate.
+// errors that can be converted to api.Status. It invokes PrepareForCreate, then GenerateName, then Validate.
 // It returns nil if the object should be created.
 func BeforeCreate(strategy RESTCreateStrategy, ctx api.Context, obj runtime.Object) error {
 	objectMeta, kind, kerr := objectMetaAndKind(strategy, obj)
@@ -58,7 +59,7 @@ func BeforeCreate(strategy RESTCreateStrategy, ctx api.Context, obj runtime.Obje
 	} else {
 		objectMeta.Namespace = api.NamespaceNone
 	}
-	strategy.ResetBeforeCreate(obj)
+	strategy.PrepareForCreate(obj)
 	api.FillObjectMetaSystemFields(ctx, objectMeta)
 	api.GenerateName(strategy, objectMeta)
 

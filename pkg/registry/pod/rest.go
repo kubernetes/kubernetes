@@ -50,13 +50,20 @@ func (podStrategy) NamespaceScoped() bool {
 	return true
 }
 
-// ResetBeforeCreate clears fields that are not allowed to be set by end users on creation.
-func (podStrategy) ResetBeforeCreate(obj runtime.Object) {
+// PrepareForCreate clears fields that are not allowed to be set by end users on creation.
+func (podStrategy) PrepareForCreate(obj runtime.Object) {
 	pod := obj.(*api.Pod)
 	pod.Status = api.PodStatus{
 		Host:  pod.Spec.Host,
 		Phase: api.PodPending,
 	}
+}
+
+// PrepareForUpdate clears fields that are not allowed to be set by end users on update.
+func (podStrategy) PrepareForUpdate(obj, old runtime.Object) {
+	newPod := obj.(*api.Pod)
+	oldPod := old.(*api.Pod)
+	newPod.Status = oldPod.Status
 }
 
 // Validate validates a new pod.
@@ -85,6 +92,12 @@ type podStatusStrategy struct {
 }
 
 var StatusStrategy = podStatusStrategy{Strategy}
+
+func (podStatusStrategy) PrepareForUpdate(obj, old runtime.Object) {
+	newPod := obj.(*api.Pod)
+	oldPod := old.(*api.Pod)
+	newPod.Spec = oldPod.Spec
+}
 
 func (podStatusStrategy) ValidateUpdate(obj, old runtime.Object) fielderrors.ValidationErrorList {
 	// TODO: merge valid fields after update
