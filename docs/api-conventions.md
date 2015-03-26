@@ -232,6 +232,8 @@ TODO: Plugins, extensions, nested kinds, headers
 HTTP Status codes
 -----------------
 
+The server will respond with HTTP status codes that match the HTTP spec. See the section below for a breakdown of the types of status codes the server will send.
+
 The following HTTP status codes may be returned by the API.
 
 #### Success codes
@@ -253,6 +255,11 @@ The following HTTP status codes may be returned by the API.
   * Indicates the requested is invalid.
   * Suggested client recovery behavior:
     * Do not retry. Fix the request.
+* `401 StatusUnauthorized`
+  * Indicates that the server can be reached and understood the request, but refuses to take any further action, because the client must provide authorization. If the client has provided authorization, the server is indicating the provided authorization is unsuitable or invalid.
+  * Suggested client recovery behavior
+    * If the user has not supplied authorization information, prompt them for the appropriate credentials
+    * If the user has supplied authorization information, inform them their credentials were rejected and optionally prompt them again.
 * `403 StatusForbidden`
   * Indicates that the server can be reached and understood the request, but refuses to take any further action, because it is configured to deny access for some reason to the requested resource by the client.
   * Suggested client recovery behavior
@@ -295,7 +302,7 @@ The following HTTP status codes may be returned by the API.
     * Increase the value of the timeout param and retry with exponential backoff
 
 Response Status Kind
----------------------
+--------------------
 
 Kubernetes will always return the ```Status``` kind from any API endpoint when an error occurs.
 Clients SHOULD handle these types of objects when appropriate.
@@ -304,7 +311,7 @@ A ```Status``` kind will be returned by the API in two cases:
   * When an operation is not successful (i.e. when the server would return a non 2xx HTTP status code).
   * When a HTTP ```DELETE``` call is successful.
 
-The status object is encoded as JSON and provided as the body of the response.  The status object contains fields for humans and machine consumers of the API to get more detailed information for the cause of the failure. The information in the status object supplements, but does not override, the HTTP status code's meaning.
+The status object is encoded as JSON and provided as the body of the response.  The status object contains fields for humans and machine consumers of the API to get more detailed information for the cause of the failure. The information in the status object supplements, but does not override, the HTTP status code's meaning. When fields in the status object have the same meaning as generally defined HTTP headers and that header is returned with the response, the header should be considered as having higher priority.
 
 **Example:**
 ```JSON
@@ -341,6 +348,19 @@ Content-Length: 144
 ```details``` may contain extended data associated with the reason. Each reason may define its own extended details. This field is optional and the data returned is not guaranteed to conform to any schema except that defined by the reason type.
 
 Possible values for the ```reason``` and ```details``` fields:
+* `BadRequest`
+  * Indicates that the request itself was invalid, because the request doesn't make any sense, for example deleting a read-only object.
+  * This is different than `status reason` `Invalid` above which indicates that the API call could possibly succeed, but the data was invalid.
+  * API calls that return BadRequest can never succeed.
+  * Http status code: `400 StatusBadRequest`
+* `Unauthorized`
+  * Indicates that the server can be reached and understood the request, but refuses to take any further action without the client providing appropriate authorization. If the client has provided authorization, this error indicates the provided credentials are insufficient or invalid.
+  * Details (optional):
+    * `kind string`
+      * The kind attribute of the unauthorized resource (on some operations may differ from the requested resource).
+    * `id   string`
+      * The identifier of the unauthorized resource.
+   * HTTP status code: `401 StatusUnauthorized`
 * `Forbidden`
   * Indicates that the server can be reached and understood the request, but refuses to take any further action, because it is configured to deny access for some reason to the requested resource by the client.
   * Details (optional):
@@ -378,6 +398,10 @@ Possible values for the ```reason``` and ```details``` fields:
     * `causes`
       * One or more `StatusCause` entries indicating the data in the provided resource that was invalid. The `reason`, `message`, and `field` attributes will be set.
   * HTTP status code: `422 StatusUnprocessableEntity`
+* `Timeout`
+  * Indicates that the request could not be completed within the given time. Clients may receive this response if the server has decided to rate limit the client, or if the server is overloaded and cannot process the request at this time.
+  * Http status code: `429 TooManyRequests`
+  * The server should set the `Retry-After` HTTP header and return `retryAfterSeconds` in the details field of the object. A value of `0` is the default.
 * `ServerTimeout`
   * Indicates that the server can be reached and understood the request, but cannot complete the action in a reasonable time. This maybe due to temporary server load or a transient communication issue with another server.
     * Details (optional):
@@ -385,15 +409,8 @@ Possible values for the ```reason``` and ```details``` fields:
         * The kind attribute of the resource being acted on.
       * `id   string`
         * The operation that is being attempted.
-  * Http status code: `500 StatusInternalServerError`
-* `Timeout`
-  * Indicates that the request could not be completed within the given time. Clients can get this response ONLY when they specified a timeout param in the request. The request might succeed with an increased value of timeout param.
+  * The server should set the `Retry-After` HTTP header and return `retryAfterSeconds` in the details field of the object. A value of `0` is the default.
   * Http status code: `504 StatusServerTimeout`
-* `BadRequest`
-  * Indicates that the request itself was invalid, because the request doesn't make any sense, for example deleting a read-only object.
-  * This is different than `status reason` `Invalid` above which indicates that the API call could possibly succeed, but the data was invalid.
-  * API calls that return BadRequest can never succeed.
-  * Http status code: `400 StatusBadRequest`
 * `MethodNotAllowed`
   * Indicates that that the action the client attempted to perform on the resource was not supported by the code.
   * For instance, attempting to delete a resource that can only be created.

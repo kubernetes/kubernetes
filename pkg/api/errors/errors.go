@@ -198,15 +198,15 @@ func NewMethodNotSupported(kind, action string) error {
 
 // NewServerTimeout returns an error indicating the requested action could not be completed due to a
 // transient error, and the client should try again.
-func NewServerTimeout(kind, operation string, retryAfter int) error {
+func NewServerTimeout(kind, operation string, retryAfterSeconds int) error {
 	return &StatusError{api.Status{
 		Status: api.StatusFailure,
 		Code:   http.StatusInternalServerError,
 		Reason: api.StatusReasonServerTimeout,
 		Details: &api.StatusDetails{
-			Kind:       kind,
-			ID:         operation,
-			RetryAfter: retryAfter,
+			Kind:              kind,
+			ID:                operation,
+			RetryAfterSeconds: retryAfterSeconds,
 		},
 		Message: fmt.Sprintf("The %s operation against %s could not be completed at this time, please try again.", operation, kind),
 	}}
@@ -227,14 +227,14 @@ func NewInternalError(err error) error {
 
 // NewTimeoutError returns an error indicating that a timeout occurred before the request
 // could be completed.  Clients may retry, but the operation may still complete.
-func NewTimeoutError(message string, retryAfter int) error {
+func NewTimeoutError(message string, retryAfterSeconds int) error {
 	return &StatusError{api.Status{
 		Status:  api.StatusFailure,
 		Code:    StatusServerTimeout,
 		Reason:  api.StatusReasonTimeout,
 		Message: fmt.Sprintf("Timeout: %s", message),
 		Details: &api.StatusDetails{
-			RetryAfter: retryAfter,
+			RetryAfterSeconds: retryAfterSeconds,
 		},
 	}}
 }
@@ -308,7 +308,7 @@ func SuggestsClientDelay(err error) (int, bool) {
 		if t.Status().Details != nil {
 			switch t.Status().Reason {
 			case api.StatusReasonServerTimeout, api.StatusReasonTimeout:
-				return t.Status().Details.RetryAfter, true
+				return t.Status().Details.RetryAfterSeconds, true
 			}
 		}
 	}

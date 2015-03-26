@@ -1201,7 +1201,7 @@ type StatusDetails struct {
 	// failure. Not all StatusReasons may provide detailed causes.
 	Causes []StatusCause `json:"causes,omitempty"`
 	// If specified, the time in seconds before the operation should be retried.
-	RetryAfter int `json:"retryAfter,omitempty"`
+	RetryAfterSeconds int `json:"retryAfterSeconds,omitempty"`
 }
 
 // Values of Status.Status
@@ -1285,7 +1285,7 @@ const (
 	// Details (optional):
 	//   "kind" string - the kind attribute of the resource being acted on.
 	//   "id"   string - the operation that is being attempted.
-	//   "retryAfter" int - the number of seconds before the operation should be retried
+	//   "retryAfterSeconds" int - the number of seconds before the operation should be retried
 	// Status code 500
 	StatusReasonServerTimeout StatusReason = "ServerTimeout"
 
@@ -1293,9 +1293,9 @@ const (
 	// Clients can get this response only when they specified a timeout param in the request,
 	// or if the server cannot complete the operation within a reasonable amount of time.
 	// The request might succeed with an increased value of timeout param. The client *should*
-	// wait at least the number of seconds specified by the retryAfter field.
+	// wait at least the number of seconds specified by the retryAfterSeconds field.
 	// Details (optional):
-	//   "retryAfter" int - the number of seconds before the operation should be retried
+	//   "retryAfterSeconds" int - the number of seconds before the operation should be retried
 	// Status code 504
 	StatusReasonTimeout StatusReason = "Timeout"
 

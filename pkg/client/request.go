@@ -645,6 +645,24 @@ func (r *Request) transformResponse(resp *http.Response, req *http.Request, body
 }
 
 // transformUnstructuredResponseError handles an error from the server that is not in a structured form.
+// It is expected to transform any response that is not recognizable as a clear server sent error from the
+// K8S API using the information provided with the request. In practice, HTTP proxies and client libraries
+// introduce a level of uncertainty to the responses returned by servers that in common use result in
+// unexpected responses. The rough structure is:
+//
+// 1. Assume the server sends you something sane - JSON + well defined error objects + proper codes
+//    - this is the happy path
+//    - when you get this output, trust what the server sends
+// 2. Guard against empty fields / bodies in received JSON and attempt to cull sufficient info from them to
+//    generate a reasonable facsimile of the original failure.
+//    - Be sure to use a distinct error type or flag that allows a client to distinguish between this and error 1 above
+// 3. Handle true disconnect failures / completely malformed data by moving up to a more generic client error
+// 4. Distinguish between various connection failures like SSL certificates, timeouts, proxy errors, unexpected
+//    initial contact, the presence of mismatched body contents from posted content types
+//    - Give these a separate distinct error type and capture as much as possible of the original message
+//
+// TODO: introduce further levels of refinement that allow a client to distinguish between 1 and 2-3.
+// TODO: introduce transformation of generic http.Client.Do() errors that separates 4.
 func (r *Request) transformUnstructuredResponseError(resp *http.Response, req *http.Request, body []byte) error {
 	if body == nil && resp.Body != nil {
 		if data, err := ioutil.ReadAll(resp.Body); err == nil {
@@ -679,11 +697,11 @@ func (r *Request) transformUnstructuredResponseError(resp *http.Response, req *h
 	case errors.StatusUnprocessableEntity:
 		err = errors.NewInvalid(r.resource, r.resourceName, nil)
 	case errors.StatusServerTimeout:
-		retryAfter, _ := retryAfter(resp)
-		err = errors.NewServerTimeout(r.resource, r.verb, retryAfter)
+		retryAfterSeconds, _ := retryAfterSeconds(resp)
+		err = errors.NewServerTimeout(r.resource, r.verb, retryAfterSeconds)
 	case errors.StatusTooManyRequests:
-		retryAfter, _ := retryAfter(resp)
-		err = errors.NewServerTimeout(r.resource, r.verb, retryAfter)
+		retryAfterSeconds, _ := retryAfterSeconds(resp)
+		err = errors.NewServerTimeout(r.resource, r.verb, retryAfterSeconds)
 	case http.StatusInternalServerError:
 		err = errors.NewInternalError(fmt.Errorf(message))
 	}
@@ -703,9 +721,9 @@ func isTextResponse(resp *http.Response) bool {
 	return strings.HasPrefix(media, "text/")
 }
 
-// retryAfter returns the value of the Retry-After header and true, or 0 and false if
+// retryAfterSeconds returns the value of the Retry-After header and true, or 0 and false if
 // the header was missing or not a valid number.
-func retryAfter(resp *http.Response) (int, bool) {
+func retryAfterSeconds(resp *http.Response) (int, bool) {
 	if h := resp.Header.Get("Retry-After"); len(h) > 0 {
 		if i, err := strconv.Atoi(h); err == nil {
 			return i, true
