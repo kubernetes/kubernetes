@@ -130,7 +130,7 @@
         "ImageId": {"Fn::FindInMap" : ["RegionMap", {"Ref": "AWS::Region" }, "AMI"]},
         "InstanceType": {"Ref": "InstanceType"},
         "KeyName": {"Ref": "KeyPair"},
-        "SecurityGroups": [{"Ref": "KubernetesSecurityGroup"}],
+        "SecurityGroups": [{"Fn::GetAtt": ["KubernetesSecurityGroup", "GroupId"]}],
         "UserData": { "Fn::Base64": {"Fn::Join" : ["", [
           "#cloud-config\n\n",
           "---\n",
@@ -300,7 +300,7 @@
         "ImageId": {"Fn::FindInMap" : ["RegionMap", {"Ref": "AWS::Region" }, "AMI" ]},
         "InstanceType": {"Ref": "InstanceType"},
         "KeyName": {"Ref": "KeyPair"},
-        "SecurityGroups": [{"Ref": "KubernetesSecurityGroup"}],
+        "SecurityGroups": [{"Fn::GetAtt": ["KubernetesSecurityGroup", "GroupId"]}],
         "UserData": { "Fn::Base64": {"Fn::Join" : ["", [
           "#cloud-config\n\n",
           "coreos:\n",
