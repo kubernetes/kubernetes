@@ -200,18 +200,12 @@ Find more information at https://github.com/GoogleCloudPlatform/kubernetes.`,
 
 	f.BindFlags(cmds.PersistentFlags())
 
-	cmds.AddCommand(f.NewCmdVersion(out))
-	cmds.AddCommand(f.NewCmdApiVersions(out))
-	cmds.AddCommand(f.NewCmdClusterInfo(out))
-	cmds.AddCommand(f.NewCmdProxy(out))
-
 	cmds.AddCommand(f.NewCmdGet(out))
 	cmds.AddCommand(f.NewCmdDescribe(out))
 	cmds.AddCommand(f.NewCmdCreate(out))
 	cmds.AddCommand(f.NewCmdUpdate(out))
 	cmds.AddCommand(f.NewCmdDelete(out))
 
-	cmds.AddCommand(cmdconfig.NewCmdConfig(out))
 	cmds.AddCommand(NewCmdNamespace(out))
 	cmds.AddCommand(f.NewCmdLog(out))
 	cmds.AddCommand(f.NewCmdRollingUpdate(out))
@@ -219,12 +213,18 @@ Find more information at https://github.com/GoogleCloudPlatform/kubernetes.`,
 
 	cmds.AddCommand(f.NewCmdExec(in, out, err))
 	cmds.AddCommand(f.NewCmdPortForward())
+	cmds.AddCommand(f.NewCmdProxy(out))
 
 	cmds.AddCommand(f.NewCmdRunContainer(out))
 	cmds.AddCommand(f.NewCmdStop(out))
 	cmds.AddCommand(f.NewCmdExposeService(out))
 
 	cmds.AddCommand(f.NewCmdLabel(out))
+
+	cmds.AddCommand(cmdconfig.NewCmdConfig(out))
+	cmds.AddCommand(f.NewCmdClusterInfo(out))
+	cmds.AddCommand(f.NewCmdApiVersions(out))
+	cmds.AddCommand(f.NewCmdVersion(out))
 
 	return cmds
 }
