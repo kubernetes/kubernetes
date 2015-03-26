@@ -100,6 +100,7 @@ func NewAPIServer() *APIServer {
 		KubeletConfig: client.KubeletConfig{
 			Port:        10250,
 			EnableHttps: false,
+			HTTPTimeout: time.Duration(5) * time.Second,
 		},
 	}
 

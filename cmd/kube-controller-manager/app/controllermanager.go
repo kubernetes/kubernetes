@@ -85,6 +85,7 @@ func NewCMServer() *CMServer {
 		KubeletConfig: client.KubeletConfig{
 			Port:        ports.KubeletPort,
 			EnableHttps: false,
+			HTTPTimeout: time.Duration(5) * time.Second,
 		},
 	}
 	return &s

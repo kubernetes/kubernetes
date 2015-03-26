@@ -16,12 +16,17 @@ limitations under the License.
 
 package client
 
+import (
+	"time"
+)
+
 // FlagSet abstracts the flag interface for compatibility with both Golang "flag"
 // and cobra pflags (Posix style).
 type FlagSet interface {
 	StringVar(p *string, name, value, usage string)
 	BoolVar(p *bool, name string, value bool, usage string)
 	UintVar(p *uint, name string, value uint, usage string)
+	DurationVar(p *time.Duration, name string, value time.Duration, usage string)
 }
 
 // BindClientConfigFlags registers a standard set of CLI flags for connecting to a Kubernetes API server.
@@ -38,6 +43,7 @@ func BindClientConfigFlags(flags FlagSet, config *Config) {
 func BindKubeletClientConfigFlags(flags FlagSet, config *KubeletConfig) {
 	flags.BoolVar(&config.EnableHttps, "kubelet_https", config.EnableHttps, "Use https for kubelet connections")
 	flags.UintVar(&config.Port, "kubelet_port", config.Port, "Kubelet port")
+	flags.DurationVar(&config.HTTPTimeout, "kubelet_timeout", config.HTTPTimeout, "Timeout for kubelet operations")
 	flags.StringVar(&config.CertFile, "kubelet_client_certificate", config.CertFile, "Path to a client key file for TLS.")
 	flags.StringVar(&config.KeyFile, "kubelet_client_key", config.KeyFile, "Path to a client key file for TLS.")
 	flags.StringVar(&config.CAFile, "kubelet_certificate_authority", config.CAFile, "Path to a cert. file for the certificate authority.")
