@@ -70,6 +70,11 @@ func RunE2ETests(kubeConfig, authConfig, certDir, host, repoRoot, provider strin
 		config.GinkgoConfig.FocusString = `\b(` + strings.Join(testRegexps, "|") + `)\b`
 	}
 
+	// Disable density test unless it's explicitly requested.
+	if config.GinkgoConfig.FocusString == "" && config.GinkgoConfig.SkipString == "" {
+		config.GinkgoConfig.SkipString = "Density"
+	}
+
 	// TODO: Make orderseed work again.
 
 	var passed testResult = true
