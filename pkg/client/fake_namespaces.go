@@ -46,7 +46,7 @@ func (c *FakeNamespaces) Delete(name string) error {
 
 func (c *FakeNamespaces) Create(namespace *api.Namespace) (*api.Namespace, error) {
 	c.Fake.Actions = append(c.Fake.Actions, FakeAction{Action: "create-namespace"})
-	return &api.Namespace{}, nil
+	return &api.Namespace{}, c.Fake.Err
 }
 
 func (c *FakeNamespaces) Update(namespace *api.Namespace) (*api.Namespace, error) {
