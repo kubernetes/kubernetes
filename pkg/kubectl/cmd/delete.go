@@ -99,7 +99,7 @@ func RunDelete(f *Factory, out io.Writer, cmd *cobra.Command, args []string, fil
 		if err := resource.NewHelper(r.Client, r.Mapping).Delete(r.Namespace, r.Name); err != nil {
 			return err
 		}
-		fmt.Fprintf(out, "%s\n", r.Name)
+		fmt.Fprintf(out, "%s/%s\n", r.Mapping.Resource, r.Name)
 		return nil
 	})
 	if err != nil {

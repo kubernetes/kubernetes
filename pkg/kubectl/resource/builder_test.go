@@ -416,6 +416,88 @@ func TestSingleResourceType(t *testing.T) {
 	}
 }
 
+func TestResourceTuple(t *testing.T) {
+	expectNoErr := func(err error) bool { return err == nil }
+	expectErr := func(err error) bool { return err != nil }
+	testCases := map[string]struct {
+		args  []string
+		errFn func(error) bool
+	}{
+		"valid": {
+			args:  []string{"pods/foo"},
+			errFn: expectNoErr,
+		},
+		"valid multiple with name indirection": {
+			args:  []string{"pods/foo", "pod/bar"},
+			errFn: expectNoErr,
+		},
+		"valid multiple with namespaced and non-namespaced types": {
+			args:  []string{"minions/foo", "pod/bar"},
+			errFn: expectNoErr,
+		},
+		"mixed arg types": {
+			args:  []string{"pods/foo", "bar"},
+			errFn: expectErr,
+		},
+		/*"missing resource": {
+			args:  []string{"pods/foo2"},
+			errFn: expectNoErr, // not an error because resources are lazily visited
+		},*/
+		"comma in resource": {
+			args:  []string{",pods/foo"},
+			errFn: expectErr,
+		},
+		"multiple types in resource": {
+			args:  []string{"pods,services/foo"},
+			errFn: expectErr,
+		},
+		"unknown resource type": {
+			args:  []string{"unknown/foo"},
+			errFn: expectErr,
+		},
+		"leading slash": {
+			args:  []string{"/bar"},
+			errFn: expectErr,
+		},
+		"trailing slash": {
+			args:  []string{"bar/"},
+			errFn: expectErr,
+		},
+	}
+	for k, testCase := range testCases {
+		pods, _ := testData()
+		b := NewBuilder(latest.RESTMapper, api.Scheme, fakeClientWith(t, map[string]string{
+			"/namespaces/test/pods/foo": runtime.EncodeOrDie(latest.Codec, &pods.Items[0]),
+			"/namespaces/test/pods/bar": runtime.EncodeOrDie(latest.Codec, &pods.Items[0]),
+			"/nodes/foo":                runtime.EncodeOrDie(latest.Codec, &api.Node{ObjectMeta: api.ObjectMeta{Name: "foo"}}),
+		})).
+			NamespaceParam("test").DefaultNamespace().
+			ResourceTypeOrNameArgs(true, testCase.args...)
+
+		r := b.Do()
+
+		if !testCase.errFn(r.Err()) {
+			t.Errorf("%s: unexpected error: %v", k, r.Err())
+		}
+		if r.Err() != nil {
+			continue
+		}
+		switch {
+		case (r.singular && len(testCase.args) != 1),
+			(!r.singular && len(testCase.args) == 1):
+			t.Errorf("%s: result had unexpected singular value", k)
+		}
+		info, err := r.Infos()
+		if err != nil {
+			// test error
+			continue
+		}
+		if len(info) != len(testCase.args) {
+			t.Errorf("%s: unexpected number of infos returned: %#v", info)
+		}
+	}
+}
+
 func TestStream(t *testing.T) {
 	r, pods, rc := streamTestData()
 	b := NewBuilder(latest.RESTMapper, api.Scheme, fakeClient()).
@@ -619,7 +701,7 @@ func TestLatest(t *testing.T) {
 
 	err := b.Do().IntoSingular(&singular).Visit(test.Handle)
 	if err != nil || singular || len(test.Infos) != 3 {
-		t.Fatalf("unexpected response: %v %f %#v", err, singular, test.Infos)
+		t.Fatalf("unexpected response: %v %t %#v", err, singular, test.Infos)
 	}
 	if !api.Semantic.DeepDerivative([]runtime.Object{newPod, newPod2, newSvc}, test.Objects()) {
 		t.Errorf("unexpected visited objects: %#v", test.Objects())

@@ -52,7 +52,7 @@ func TestUpdateObject(t *testing.T) {
 	cmd.Run(cmd, []string{})
 
 	// uses the name from the file, not the response
-	if buf.String() != "rc1\n" {
+	if buf.String() != "replicationControllers/rc1\n" {
 		t.Errorf("unexpected output: %s", buf.String())
 	}
 }
@@ -88,7 +88,7 @@ func TestUpdateMultipleObject(t *testing.T) {
 	cmd.Flags().Set("filename", "../../../examples/guestbook/frontend-service.json")
 	cmd.Run(cmd, []string{})
 
-	if buf.String() != "rc1\nbaz\n" {
+	if buf.String() != "replicationControllers/rc1\nservices/baz\n" {
 		t.Errorf("unexpected output: %s", buf.String())
 	}
 }
@@ -120,7 +120,7 @@ func TestUpdateDirectory(t *testing.T) {
 	cmd.Flags().Set("namespace", "test")
 	cmd.Run(cmd, []string{})
 
-	if buf.String() != "rc1\nbaz\nrc1\nbaz\nrc1\nbaz\n" {
+	if buf.String() != "replicationControllers/rc1\nservices/baz\nreplicationControllers/rc1\nservices/baz\nreplicationControllers/rc1\nservices/baz\n" {
 		t.Errorf("unexpected output: %s", buf.String())
 	}
 }

@@ -30,6 +30,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch/json"
 )
@@ -313,6 +314,47 @@ func TestGetMultipleTypeObjectsWithSelector(t *testing.T) {
 	}
 }
 
+func TestGetMultipleTypeObjectsWithDirectReference(t *testing.T) {
+	_, svc, _ := testData()
+	node := &api.Node{
+		ObjectMeta: api.ObjectMeta{
+			Name: "foo",
+		},
+	}
+
+	f, tf, codec := NewAPIFactory()
+	tf.Printer = &testPrinter{}
+	tf.Client = &client.FakeRESTClient{
+		Codec: codec,
+		Client: client.HTTPClientFunc(func(req *http.Request) (*http.Response, error) {
+			switch req.URL.Path {
+			case "/nodes/foo":
+				return &http.Response{StatusCode: 200, Body: objBody(codec, node)}, nil
+			case "/namespaces/test/services/bar":
+				return &http.Response{StatusCode: 200, Body: objBody(codec, &svc.Items[0])}, nil
+			default:
+				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+				return nil, nil
+			}
+		}),
+	}
+	tf.Namespace = "test"
+	buf := bytes.NewBuffer([]byte{})
+
+	cmd := f.NewCmdGet(buf)
+	cmd.SetOutput(buf)
+
+	cmd.Run(cmd, []string{"services/bar", "node/foo"})
+
+	expected := []runtime.Object{&svc.Items[0], node}
+	actual := tf.Printer.(*testPrinter).Objects
+	if !api.Semantic.DeepEqual(expected, actual) {
+		t.Errorf("unexpected object: %s", util.ObjectDiff(expected, actual))
+	}
+	if len(buf.String()) == 0 {
+		t.Errorf("unexpected empty output")
+	}
+}
 func watchTestData() ([]api.Pod, []watch.Event) {
 	pods := []api.Pod{
 		{

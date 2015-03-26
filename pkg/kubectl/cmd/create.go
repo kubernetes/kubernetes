@@ -99,7 +99,7 @@ func RunCreate(f *Factory, out io.Writer, cmd *cobra.Command, filenames util.Str
 		}
 		count++
 		info.Refresh(obj, true)
-		fmt.Fprintf(out, "%s\n", info.Name)
+		fmt.Fprintf(out, "%s/%s\n", info.Mapping.Resource, info.Name)
 		return nil
 	})
 	if err != nil {

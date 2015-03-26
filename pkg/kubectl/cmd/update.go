@@ -111,7 +111,7 @@ func RunUpdate(f *Factory, out io.Writer, cmd *cobra.Command, args []string, fil
 			return err
 		}
 		info.Refresh(obj, true)
-		fmt.Fprintf(out, "%s\n", info.Name)
+		fmt.Fprintf(out, "%s/%s\n", info.Mapping.Resource, info.Name)
 		return nil
 	})
 

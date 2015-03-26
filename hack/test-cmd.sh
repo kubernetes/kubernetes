@@ -155,6 +155,8 @@ for version in "${kube_api_versions[@]}"; do
   # Post-condition: valid-pod POD is running
   kube::test::get_object_assert pods "{{range.items}}{{.$id_field}}:{{end}}" 'valid-pod:'
   kube::test::get_object_assert 'pod valid-pod' "{{.$id_field}}" 'valid-pod'
+  kube::test::get_object_assert 'pod/valid-pod' "{{.$id_field}}" 'valid-pod'
+  kube::test::get_object_assert 'pods/valid-pod' "{{.$id_field}}" 'valid-pod'
   # Describe command should print detailed information
   kube::test::describe_object_assert pods 'valid-pod' "Name:" "Image(s):" "Host:" "Labels:" "Status:" "Replication Controllers"
 
@@ -523,6 +525,13 @@ __EOF__
 
     kube::test::describe_object_assert minions "127.0.0.1" "Name:" "Conditions:" "Addresses:" "Capacity:" "Pods:"
   fi
+
+  #####################
+  # Retrieve multiple #
+  #####################
+
+  kube::log::status "Testing kubectl(${version}:multiget)"
+  kube::test::get_object_assert 'nodes/127.0.0.1 service/kubernetes' "{{range.items}}{{.$id_field}}:{{end}}" '127.0.0.1:kubernetes:'
 
   kube::test::clear_all
 done
