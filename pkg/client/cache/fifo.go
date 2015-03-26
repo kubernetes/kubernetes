@@ -17,7 +17,6 @@ limitations under the License.
 package cache
 
 import (
-	"fmt"
 	"sync"
 )
 
@@ -67,7 +66,7 @@ var (
 func (f *FIFO) Add(obj interface{}) error {
 	id, err := f.keyFunc(obj)
 	if err != nil {
-		return fmt.Errorf("couldn't create key for object: %v", err)
+		return KeyError{obj, err}
 	}
 	f.lock.Lock()
 	defer f.lock.Unlock()
@@ -88,7 +87,7 @@ func (f *FIFO) Add(obj interface{}) error {
 func (f *FIFO) AddIfNotPresent(obj interface{}) error {
 	id, err := f.keyFunc(obj)
 	if err != nil {
-		return fmt.Errorf("couldn't create key for object: %v", err)
+		return KeyError{obj, err}
 	}
 	f.lock.Lock()
 	defer f.lock.Unlock()
@@ -113,7 +112,7 @@ func (f *FIFO) Update(obj interface{}) error {
 func (f *FIFO) Delete(obj interface{}) error {
 	id, err := f.keyFunc(obj)
 	if err != nil {
-		return fmt.Errorf("couldn't create key for object: %v", err)
+		return KeyError{obj, err}
 	}
 	f.lock.Lock()
 	defer f.lock.Unlock()
@@ -148,7 +147,7 @@ func (f *FIFO) ListKeys() []string {
 func (f *FIFO) Get(obj interface{}) (item interface{}, exists bool, err error) {
 	key, err := f.keyFunc(obj)
 	if err != nil {
-		return nil, false, fmt.Errorf("couldn't create key for object: %v", err)
+		return nil, false, KeyError{obj, err}
 	}
 	return f.GetByKey(key)
 }
@@ -194,7 +193,7 @@ func (f *FIFO) Replace(list []interface{}) error {
 	for _, item := range list {
 		key, err := f.keyFunc(item)
 		if err != nil {
-			return fmt.Errorf("couldn't create key for object: %v", err)
+			return KeyError{item, err}
 		}
 		items[key] = item
 	}
