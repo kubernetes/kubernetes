@@ -110,6 +110,7 @@ func newTestKubelet(t *testing.T) *TestKubelet {
 	kubelet.cadvisor = mockCadvisor
 	podManager, fakeMirrorClient := newFakePodManager()
 	kubelet.podManager = podManager
+	kubelet.containerRefManager = newContainerRefManager()
 	return &TestKubelet{kubelet, fakeDocker, mockCadvisor, fakeKubeClient, waitGroup, fakeMirrorClient}
 }
 

@@ -153,6 +153,7 @@ func makeTestKubelet(result probe.Result, err error) *Kubelet {
 				err:    err,
 			},
 		},
+		containerRefManager: newContainerRefManager(),
 	}
 }
 
