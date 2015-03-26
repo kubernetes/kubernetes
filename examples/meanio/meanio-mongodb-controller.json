@@ -13,7 +13,6 @@
            "containers": [{
              "name": "meanio-mongodb",
              "image": "mongo:2.6.8",
-             "cpu": 100,
              "ports": [{"containerPort": 27017}]
            }]
          }

@@ -34,7 +34,6 @@ We are using mongodb 2.6.8 for MEAN.io compatibilily.
            "containers": [{
              "name": "meanio-mongodb",
              "image": "mongo:2.6.8",
-             "cpu": 100,
              "ports": [{"containerPort": 27017}]
            }]
          }
@@ -161,8 +160,6 @@ The pod is described in the file `examples/meanio/meanio-controller.json`:
            "containers": [{
              "name": "meanio",
              "image":"shaiweinstein/k8s:v1",
-             "cpu": 100,
-             "memory": 2000000000,
              "ports": [{"name": "meanio-server", "containerPort": 3000}],
              "env": [{"name": "DB_PORT_27017_TCP_ADDR", "value": "meanio-mongodb" }]
            }]
@@ -203,7 +200,7 @@ meanio-mongodb-controller-nyxxv              10.244.0.11         meanio-mongodb 
 
 You will see a mongodb server pod, and meanio pod.
 
-### Step Four: Create the meanio service.
+### Step Four: Create the meanio service
 
 Just like the others, you want a service to group your meanio pods (in case of running more than one relica)..
 The service is described in the file `examples/meanio/meanio-service.json`:
