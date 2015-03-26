@@ -30,14 +30,22 @@ monit:
     - user: root
     - group: root
     - mode: 644
+
+/etc/monit/conf.d/kube-proxy:
+  file:
+    - managed
+    - source: salt://monit/kube-proxy
+    - user: root
+    - group: root
+    - mode: 644
 {% endif %}
 
 monit-service:
   service:
     - running
-    - name: monit 
+    - name: monit
     - watch:
-      - pkg: monit 
+      - pkg: monit
       - file: /etc/monit/conf.d/*
 
 {% endif %}
