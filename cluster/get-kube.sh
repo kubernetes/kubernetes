@@ -61,7 +61,7 @@ if [[ "${KUBERNETES_SKIP_DOWNLOAD-}" ]]; then
 fi
 
 function get_latest_version_number {
-  local -r latest_url="https://storage.googleapis.com/kubernetes-release/release/latest.txt"
+  local -r latest_url="https://storage.googleapis.com/kubernetes-release/release/stable.txt"
   if [[ $(which wget) ]]; then
     wget -qO- ${latest_url}
   elif [[ $(which curl) ]]; then
