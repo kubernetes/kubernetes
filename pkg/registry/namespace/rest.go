@@ -68,6 +68,14 @@ func (namespaceStrategy) PrepareForCreate(obj runtime.Object) {
 	}
 }
 
+// PrepareForUpdate clears fields that are not allowed to be set by end users on update.
+func (namespaceStrategy) PrepareForUpdate(obj, old runtime.Object) {
+	newNamespace := obj.(*api.Namespace)
+	oldNamespace := old.(*api.Namespace)
+	newNamespace.Spec.Finalizers = oldNamespace.Spec.Finalizers
+	newNamespace.Status = oldNamespace.Status
+}
+
 // Validate validates a new namespace.
 func (namespaceStrategy) Validate(obj runtime.Object) fielderrors.ValidationErrorList {
 	namespace := obj.(*api.Namespace)
@@ -89,6 +97,12 @@ type namespaceStatusStrategy struct {
 }
 
 var StatusStrategy = namespaceStatusStrategy{Strategy}
+
+func (namespaceStatusStrategy) PrepareForUpdate(obj, old runtime.Object) {
+	newNamespace := obj.(*api.Namespace)
+	oldNamespace := old.(*api.Namespace)
+	newNamespace.Spec = oldNamespace.Spec
+}
 
 func (namespaceStatusStrategy) ValidateUpdate(obj, old runtime.Object) fielderrors.ValidationErrorList {
 	return validation.ValidateNamespaceStatusUpdate(obj.(*api.Namespace), old.(*api.Namespace))

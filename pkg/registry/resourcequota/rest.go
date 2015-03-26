@@ -49,6 +49,13 @@ func (resourcequotaStrategy) PrepareForCreate(obj runtime.Object) {
 	resourcequota.Status = api.ResourceQuotaStatus{}
 }
 
+// PrepareForUpdate clears fields that are not allowed to be set by end users on update.
+func (resourcequotaStrategy) PrepareForUpdate(obj, old runtime.Object) {
+	newResourcequota := obj.(*api.ResourceQuota)
+	oldResourcequota := old.(*api.ResourceQuota)
+	newResourcequota.Status = oldResourcequota.Status
+}
+
 // Validate validates a new resourcequota.
 func (resourcequotaStrategy) Validate(obj runtime.Object) fielderrors.ValidationErrorList {
 	resourcequota := obj.(*api.ResourceQuota)
@@ -70,6 +77,12 @@ type resourcequotaStatusStrategy struct {
 }
 
 var StatusStrategy = resourcequotaStatusStrategy{Strategy}
+
+func (resourcequotaStatusStrategy) PrepareForUpdate(obj, old runtime.Object) {
+	newResourcequota := obj.(*api.ResourceQuota)
+	oldResourcequota := old.(*api.ResourceQuota)
+	newResourcequota.Spec = oldResourcequota.Spec
+}
 
 func (resourcequotaStatusStrategy) ValidateUpdate(obj, old runtime.Object) fielderrors.ValidationErrorList {
 	return validation.ValidateResourceQuotaStatusUpdate(obj.(*api.ResourceQuota), old.(*api.ResourceQuota))

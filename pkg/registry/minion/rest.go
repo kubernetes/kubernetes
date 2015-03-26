@@ -59,6 +59,13 @@ func (nodeStrategy) PrepareForCreate(obj runtime.Object) {
 	// Nodes allow *all* fields, including status, to be set.
 }
 
+// PrepareForUpdate clears fields that are not allowed to be set by end users on update.
+func (nodeStrategy) PrepareForUpdate(obj, old runtime.Object) {
+	_ = obj.(*api.Node)
+	_ = old.(*api.Node)
+	// Nodes allow *all* fields, including status, to be set.
+}
+
 // Validate validates a new node.
 func (nodeStrategy) Validate(obj runtime.Object) fielderrors.ValidationErrorList {
 	node := obj.(*api.Node)

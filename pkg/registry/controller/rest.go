@@ -48,6 +48,14 @@ func (rcStrategy) PrepareForCreate(obj runtime.Object) {
 	controller.Status = api.ReplicationControllerStatus{}
 }
 
+// PrepareForUpdate clears fields that are not allowed to be set by end users on update.
+func (rcStrategy) PrepareForUpdate(obj, old runtime.Object) {
+	// TODO: once RC has a status sub-resource we can enable this.
+	//newController := obj.(*api.ReplicationController)
+	//oldController := old.(*api.ReplicationController)
+	//newController.Status = oldController.Status
+}
+
 // Validate validates a new replication controller.
 func (rcStrategy) Validate(obj runtime.Object) fielderrors.ValidationErrorList {
 	controller := obj.(*api.ReplicationController)

@@ -59,6 +59,13 @@ func (podStrategy) PrepareForCreate(obj runtime.Object) {
 	}
 }
 
+// PrepareForUpdate clears fields that are not allowed to be set by end users on update.
+func (podStrategy) PrepareForUpdate(obj, old runtime.Object) {
+	newPod := obj.(*api.Pod)
+	oldPod := old.(*api.Pod)
+	newPod.Status = oldPod.Status
+}
+
 // Validate validates a new pod.
 func (podStrategy) Validate(obj runtime.Object) fielderrors.ValidationErrorList {
 	pod := obj.(*api.Pod)
@@ -85,6 +92,12 @@ type podStatusStrategy struct {
 }
 
 var StatusStrategy = podStatusStrategy{Strategy}
+
+func (podStatusStrategy) PrepareForUpdate(obj, old runtime.Object) {
+	newPod := obj.(*api.Pod)
+	oldPod := old.(*api.Pod)
+	newPod.Spec = oldPod.Spec
+}
 
 func (podStatusStrategy) ValidateUpdate(obj, old runtime.Object) fielderrors.ValidationErrorList {
 	// TODO: merge valid fields after update

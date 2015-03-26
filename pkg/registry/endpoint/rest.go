@@ -48,6 +48,12 @@ func (endpointsStrategy) PrepareForCreate(obj runtime.Object) {
 	_ = obj.(*api.Endpoints)
 }
 
+// PrepareForUpdate clears fields that are not allowed to be set by end users on update.
+func (endpointsStrategy) PrepareForUpdate(obj, old runtime.Object) {
+	_ = obj.(*api.Endpoints)
+	_ = old.(*api.Endpoints)
+}
+
 // Validate validates a new endpoints.
 func (endpointsStrategy) Validate(obj runtime.Object) fielderrors.ValidationErrorList {
 	return validation.ValidateEndpoints(obj.(*api.Endpoints))
