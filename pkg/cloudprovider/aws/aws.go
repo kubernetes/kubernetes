@@ -43,7 +43,6 @@ type EC2 interface {
 	// Query EC2 for instances matching the filter
 	Instances(instIds []string, filter *ec2InstanceFilter) (resp *ec2.InstancesResp, err error)
 
-
 	// Attach a volume to an instance
 	AttachVolume(volumeId string, instanceId string, mountDevice string) (resp *ec2.AttachVolumeResp, err error)
 	// Detach a volume from whatever instance it is attached to
@@ -241,22 +240,18 @@ func newAWSCloud(config io.Reader, authFunc AuthFunc, instanceId string, metadat
 
 	ec2 := &goamzEC2{ec2: ec2.New(auth, region)}
 
-	if instanceId == "" {
-		instanceIdBytes, err := ec2.GetMetaData("instance-id")
-		if err != nil {
-			return nil, fmt.Errorf("error fetching instance-id from ec2 metadata service: %v", err)
-		}
-		instanceId = string(instanceIdBytes)
-	}
-
 	awsCloud := &AWSCloud{
-		ec2: ec2,
-		cfg: cfg,
+		ec2:              ec2,
+		cfg:              cfg,
 		region:           region,
 		availabilityZone: zone,
 	}
 
-	awsCloud.selfAwsInstance = newAwsInstance(ec2, instanceId)
+	instanceIdBytes, err := metadata.GetMetaData("instance-id")
+	if err != nil {
+		return nil, fmt.Errorf("error fetching instance-id from ec2 metadata service: %v", err)
+	}
+	awsCloud.selfAwsInstance = newAwsInstance(ec2, string(instanceIdBytes))
 
 	return awsCloud, nil
 }

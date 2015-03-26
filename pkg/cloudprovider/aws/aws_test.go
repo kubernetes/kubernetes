@@ -178,11 +178,14 @@ func (self *FakeEC2) Instances(instanceIds []string, filter *ec2InstanceFilter) 
 
 type FakeMetadata struct {
 	availabilityZone string
+	instanceId       string
 }
 
 func (self *FakeMetadata) GetMetaData(key string) ([]byte, error) {
 	if key == "placement/availability-zone" {
 		return []byte(self.availabilityZone), nil
+	} else if key == "instance-id" {
+		return []byte(self.instanceId), nil
 	} else {
 		return nil, nil
 	}

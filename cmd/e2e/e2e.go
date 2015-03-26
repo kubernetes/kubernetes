@@ -75,7 +75,7 @@ func main() {
 
 	if *provider == "aws" {
 		awsConfig := "[Global]\n"
-		awsConfig += fmt.Sprintf("Region=%s\n", *gceZone)
+		awsConfig += fmt.Sprintf("Zone=%s\n", *gceZone)
 
 		var err error
 		cloudConfig.Provider, err = cloudprovider.GetCloudProvider(*provider, strings.NewReader(awsConfig))
