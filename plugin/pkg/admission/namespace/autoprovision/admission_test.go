@@ -21,6 +21,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/admission"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/cache"
 )
@@ -101,5 +102,29 @@ func TestIgnoreAdmission(t *testing.T) {
 	}
 	if len(mockClient.Actions) != 0 {
 		t.Errorf("No client request should have been made")
+	}
+}
+
+// TestAdmissionNamespaceExistsUnknownToHandler
+func TestAdmissionNamespaceExistsUnknownToHandler(t *testing.T) {
+	namespace := "test"
+	mockClient := &client.Fake{
+		Err: errors.NewAlreadyExists("namespaces", namespace),
+	}
+	store := cache.NewStore(cache.MetaNamespaceKeyFunc)
+	handler := &provision{
+		client: mockClient,
+		store:  store,
+	}
+	pod := api.Pod{
+		ObjectMeta: api.ObjectMeta{Name: "123", Namespace: namespace},
+		Spec: api.PodSpec{
+			Volumes:    []api.Volume{{Name: "vol"}},
+			Containers: []api.Container{{Name: "ctr", Image: "image"}},
+		},
+	}
+	err := handler.Admit(admission.NewAttributesRecord(&pod, namespace, "pods", "CREATE"))
+	if err != nil {
+		t.Errorf("Unexpected error returned from admission handler")
 	}
 }
