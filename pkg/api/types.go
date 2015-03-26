@@ -730,7 +730,7 @@ type PodStatus struct {
 	// final and should not be relied upon.
 	// TODO: Make real decisions about what our info should look like. Re-enable fuzz test
 	// when we have done this.
-	ContainerStatuses []ContainerStatus `json:"info,omitempty"`
+	ContainerStatuses []ContainerStatus `json:"containerStatuses,omitempty"`
 }
 
 // PodStatusResult is a wrapper for PodStatus returned by kubelet that can be encode/decoded

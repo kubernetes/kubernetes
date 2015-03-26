@@ -731,7 +731,7 @@ type PodStatus struct {
 	// upon.
 	// TODO: Make real decisions about what our info should look like. Re-enable fuzz test
 	// when we have done this.
-	ContainerStatuses []ContainerStatus `json:"info,omitempty" description:"list of container statuses"`
+	ContainerStatuses []ContainerStatus `json:"containerStatuses,omitempty" description:"list of container statuses"`
 }
 
 // PodStatusResult is a wrapper for PodStatus returned by kubelet that can be encode/decoded
