@@ -65,7 +65,7 @@ func (kl *Kubelet) probeContainer(pod *api.Pod, status api.PodStatus, container 
 	glog.V(1).Infof("Readiness probe failed/errored: %v, %v", ready, err)
 	kl.readiness.set(containerID, false)
 
-	ref, ok := kl.getRef(containerID)
+	ref, ok := kl.containerRefManager.GetRef(containerID)
 	if !ok {
 		glog.Warningf("No ref for pod '%v' - '%v'", containerID, container.Name)
 	} else {

@@ -74,11 +74,12 @@ func TestRunOnce(t *testing.T) {
 	cadvisor := &cadvisor.Mock{}
 	cadvisor.On("MachineInfo").Return(&cadvisorApi.MachineInfo{}, nil)
 	kb := &Kubelet{
-		rootDirectory: "/tmp/kubelet",
-		recorder:      &record.FakeRecorder{},
-		cadvisor:      cadvisor,
-		nodeLister:    testNodeLister{},
-		statusManager: newStatusManager(nil),
+		rootDirectory:       "/tmp/kubelet",
+		recorder:            &record.FakeRecorder{},
+		cadvisor:            cadvisor,
+		nodeLister:          testNodeLister{},
+		statusManager:       newStatusManager(nil),
+		containerRefManager: newContainerRefManager(),
 	}
 
 	kb.networkPlugin, _ = network.InitNetworkPlugin([]network.NetworkPlugin{}, "", network.NewFakeHost(nil))
