@@ -206,7 +206,7 @@ reportCoverageToCoveralls() {
 }
 
 # Convert the CSV to an array of API versions to test
-IFS=',' read -a apiVersions <<< ${KUBE_TEST_API_VERSIONS}
+IFS=',' read -a apiVersions <<< "${KUBE_TEST_API_VERSIONS}"
 for apiVersion in "${apiVersions[@]}"; do
   echo "Running tests for APIVersion: $apiVersion"
   runTestsForVersion $apiVersion "${@}"
