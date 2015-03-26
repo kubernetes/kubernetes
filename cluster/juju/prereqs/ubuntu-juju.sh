@@ -1,8 +1,6 @@
 #!/bin/bash
 
-set -euo pipefail
-
-# Copyright 2014 Canonical LTD. All rights reserved.
+# Copyright 2015 Google Inc. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,8 +14,11 @@ set -euo pipefail
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# If you find any bugs within this script - please file bugs against the
-# Kubernetes Juju Charms project - located here: https://github.com/whitmo/bundle-kubernetes
+
+set -o errexit
+set -o nounset
+set -o pipefail
+
 
 function check_for_ppa(){
     local repo="$1"
