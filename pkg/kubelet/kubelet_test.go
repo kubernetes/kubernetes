@@ -3495,7 +3495,7 @@ func TestHostNetworkAllowed(t *testing.T) {
 			HostNetwork: true,
 		},
 	}
-	_, err := kubelet.createPodInfraContainer(pod)
+	err := kubelet.syncPod(pod, nil, container.Pod{})
 	if err != nil {
 		t.Errorf("expected pod infra creation to succeed: %v", err)
 	}
@@ -3524,7 +3524,7 @@ func TestHostNetworkDisallowed(t *testing.T) {
 			HostNetwork: true,
 		},
 	}
-	_, err := kubelet.createPodInfraContainer(pod)
+	err := kubelet.syncPod(pod, nil, container.Pod{})
 	if err == nil {
 		t.Errorf("expected pod infra creation to fail")
 	}
