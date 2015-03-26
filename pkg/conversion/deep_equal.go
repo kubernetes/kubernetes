@@ -174,6 +174,8 @@ func (e Equalities) deepValueEqual(v1, v2 reflect.Value, visited map[visit]bool,
 
 	switch v1.Kind() {
 	case reflect.Array:
+		// We don't need to check length here because length is part of
+		// an array's type, which has already been filtered for.
 		for i := 0; i < v1.Len(); i++ {
 			if !e.deepValueEqual(v1.Index(i), v2.Index(i), visited, depth+1) {
 				return false
@@ -186,6 +188,9 @@ func (e Equalities) deepValueEqual(v1, v2 reflect.Value, visited map[visit]bool,
 		}
 		if v1.IsNil() || v1.Len() == 0 {
 			return true
+		}
+		if v1.Len() != v2.Len() {
+			return false
 		}
 		if v1.Pointer() == v2.Pointer() {
 			return true
@@ -216,6 +221,9 @@ func (e Equalities) deepValueEqual(v1, v2 reflect.Value, visited map[visit]bool,
 		}
 		if v1.IsNil() || v1.Len() == 0 {
 			return true
+		}
+		if v1.Len() != v2.Len() {
+			return false
 		}
 		if v1.Pointer() == v2.Pointer() {
 			return true
@@ -309,6 +317,8 @@ func (e Equalities) deepValueDerive(v1, v2 reflect.Value, visited map[visit]bool
 
 	switch v1.Kind() {
 	case reflect.Array:
+		// We don't need to check length here because length is part of
+		// an array's type, which has already been filtered for.
 		for i := 0; i < v1.Len(); i++ {
 			if !e.deepValueDerive(v1.Index(i), v2.Index(i), visited, depth+1) {
 				return false
@@ -316,11 +326,11 @@ func (e Equalities) deepValueDerive(v1, v2 reflect.Value, visited map[visit]bool
 		}
 		return true
 	case reflect.Slice:
-		if (v1.IsNil() || v1.Len() == 0) != (v2.IsNil() || v2.Len() == 0) {
-			return false
-		}
 		if v1.IsNil() || v1.Len() == 0 {
 			return true
+		}
+		if v1.Len() > v2.Len() {
+			return false
 		}
 		if v1.Pointer() == v2.Pointer() {
 			return true
@@ -334,6 +344,9 @@ func (e Equalities) deepValueDerive(v1, v2 reflect.Value, visited map[visit]bool
 	case reflect.String:
 		if v1.Len() == 0 {
 			return true
+		}
+		if v1.Len() > v2.Len() {
+			return false
 		}
 		return v1.String() == v2.String()
 	case reflect.Interface:
@@ -354,11 +367,11 @@ func (e Equalities) deepValueDerive(v1, v2 reflect.Value, visited map[visit]bool
 		}
 		return true
 	case reflect.Map:
-		if (v1.IsNil() || v1.Len() == 0) != (v2.IsNil() || v2.Len() == 0) {
-			return false
-		}
 		if v1.IsNil() || v1.Len() == 0 {
 			return true
+		}
+		if v1.Len() > v2.Len() {
+			return false
 		}
 		if v1.Pointer() == v2.Pointer() {
 			return true
