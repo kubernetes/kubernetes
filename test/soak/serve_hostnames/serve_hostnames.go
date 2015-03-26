@@ -49,7 +49,7 @@ const (
 	deleteTimeout        = 2 * time.Minute
 	endpointTimeout      = 5 * time.Minute
 	podCreateTimeout     = 2 * time.Minute
-	podStartTimeout      = 10 * time.Minute
+	podStartTimeout      = 30 * time.Minute
 	serviceCreateTimeout = 2 * time.Minute
 )
 
