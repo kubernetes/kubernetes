@@ -137,7 +137,7 @@ func getInfluxdbData(c *influxdb.Client, query string) (map[string]bool, error) 
 		return nil, err
 	}
 	if len(series) != 1 {
-		Failf("expected only one series from Influxdb for query %q. Got %+v", query, series)
+		return nil, fmt.Errorf("expected only one series from Influxdb for query %q. Got %+v", query, series)
 	}
 	if len(series[0].GetColumns()) != 2 {
 		Failf("Expected two columns for query %q. Found %v", query, series[0].GetColumns())
