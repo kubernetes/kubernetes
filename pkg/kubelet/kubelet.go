@@ -1023,12 +1023,21 @@ func allowHostNetwork(pod *api.Pod) (bool, error) {
 
 // createPodInfraContainer starts the pod infra container for a pod. Returns the docker container ID of the newly created container.
 func (kl *Kubelet) createPodInfraContainer(pod *api.Pod) (dockertools.DockerID, error) {
+
+	// Use host networking if specified and allowed.
+	netNamespace := ""
 	var ports []api.ContainerPort
-	// Docker only exports ports from the pod infra container.  Let's
-	// collect all of the relevant ports and export them.
-	for _, container := range pod.Spec.Containers {
-		ports = append(ports, container.Ports...)
+
+	if pod.Spec.HostNetwork {
+		netNamespace = "host"
+	} else {
+		// Docker only exports ports from the pod infra container.  Let's
+		// collect all of the relevant ports and export them.
+		for _, container := range pod.Spec.Containers {
+			ports = append(ports, container.Ports...)
+		}
 	}
+
 	container := &api.Container{
 		Name:  dockertools.PodInfraContainerName,
 		Image: kl.podInfraContainerImage,
@@ -1053,20 +1062,6 @@ func (kl *Kubelet) createPodInfraContainer(pod *api.Pod) (dockertools.DockerID, 
 	}
 	if ref != nil {
 		kl.recorder.Eventf(ref, "pulled", "Successfully pulled image %q", container.Image)
-	}
-
-	// Use host networking if specified and allowed.
-	netNamespace := ""
-	if pod.Spec.HostNetwork {
-		allowed, err := allowHostNetwork(pod)
-		if err != nil {
-			return "", err
-		}
-		if !allowed {
-			return "", fmt.Errorf("pod with UID %q specified host networking, but is disallowed", pod.UID)
-		}
-
-		netNamespace = "host"
 	}
 
 	id, err := kl.runContainer(pod, container, nil, netNamespace, "")
@@ -1364,9 +1359,26 @@ func (kl *Kubelet) computePodContainerChanges(pod *api.Pod, runningPod kubeconta
 	}, nil
 }
 
+func (kl *Kubelet) canRunPod(pod *api.Pod) error {
+	if pod.Spec.HostNetwork {
+		allowed, err := allowHostNetwork(pod)
+		if err != nil {
+			return err
+		}
+		if !allowed {
+			return fmt.Errorf("pod with UID %q specified host networking, but is disallowed", pod.UID)
+		}
+	}
+	return nil
+}
+
 func (kl *Kubelet) syncPod(pod *api.Pod, mirrorPod *api.Pod, runningPod kubecontainer.Pod) error {
 	podFullName := kubecontainer.GetPodFullName(pod)
 	uid := pod.UID
+	err := kl.canRunPod(pod)
+	if err != nil {
+		return err
+	}
 
 	// Before returning, regenerate status and store it in the cache.
 	defer func() {
