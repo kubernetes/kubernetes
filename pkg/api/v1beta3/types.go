@@ -191,7 +191,7 @@ type Volume struct {
 	VolumeSource `json:",inline,omitempty"`
 }
 
-// VolumeSource represents the source location of a valume to mount.
+// VolumeSource represents the source location of a volume to mount.
 // Only one of its members may be specified.
 type VolumeSource struct {
 	// HostPath represents a pre-existing file or directory on the host
