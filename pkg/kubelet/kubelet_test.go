@@ -27,6 +27,7 @@ import (
 	"path"
 	"reflect"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -121,6 +122,13 @@ func verifyCalls(t *testing.T, fakeDocker *dockertools.FakeDockerClient, calls [
 	}
 }
 
+func verifyUnorderedCalls(t *testing.T, fakeDocker *dockertools.FakeDockerClient, calls []string) {
+	err := fakeDocker.AssertUnorderedCalls(calls)
+	if err != nil {
+		t.Error(err)
+	}
+}
+
 func verifyStringArrayEquals(t *testing.T, actual, expected []string) {
 	invalid := len(actual) != len(expected)
 	if !invalid {
@@ -136,23 +144,15 @@ func verifyStringArrayEquals(t *testing.T, actual, expected []string) {
 }
 
 func verifyStringArrayEqualsAnyOrder(t *testing.T, actual, expected []string) {
-	invalid := len(actual) != len(expected)
-	if !invalid {
-		for _, exp := range expected {
-			found := false
-			for _, act := range actual {
-				if exp == act {
-					found = true
-					break
-				}
-			}
-			if !found {
-				t.Errorf("Expected element %q not found in %#v", exp, actual)
-			}
-		}
-	}
-	if invalid {
-		t.Errorf("Expected: %#v, Actual: %#v", expected, actual)
+	var act, exp []string
+	copy(act, actual)
+	copy(exp, expected)
+
+	sort.StringSlice(act).Sort()
+	sort.StringSlice(exp).Sort()
+
+	if !reflect.DeepEqual(exp, act) {
+		t.Errorf("Expected(sorted): %#v, Actual(sorted): %#v", exp, act)
 	}
 }
 
@@ -819,7 +819,7 @@ func TestSyncPodsDeletesWithNoPodInfraContainer(t *testing.T) {
 	}
 	waitGroup.Wait()
 
-	verifyCalls(t, fakeDocker, []string{
+	verifyUnorderedCalls(t, fakeDocker, []string{
 		"list", "list", "list", "list", "inspect_container", "inspect_container", "list", "inspect_container", "inspect_container", "stop", "create", "start", "inspect_container", "create", "start", "list", "inspect_container", "inspect_container"})
 
 	// A map iteration is used to delete containers, so must not depend on
