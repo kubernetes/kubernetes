@@ -34,6 +34,7 @@ base:
     - kube-scheduler
     - monit
     - nginx
+    - cadvisor
     - kube-client-tools
 {% if grains['cloud'] is defined and grains['cloud'] != 'vagrant' %}
     - logrotate
