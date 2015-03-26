@@ -27,10 +27,13 @@ import (
 	"math/rand"
 	"os"
 	"os/exec"
+	"path"
 	"strconv"
 	"strings"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/capabilities"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/credentialprovider"
 	kubecontainer "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/leaky"
@@ -44,6 +47,13 @@ import (
 const (
 	PodInfraContainerName = leaky.PodInfraContainerName
 	DockerPrefix          = "docker://"
+)
+
+const (
+	// Taken from lmctfy https://github.com/google/lmctfy/blob/master/lmctfy/controllers/cpu_controller.cc
+	minShares     = 2
+	sharesPerCPU  = 1024
+	milliCPUToCPU = 1000
 )
 
 // DockerInterface is an abstract interface for testability.  It abstracts the interface of docker.Client.
@@ -871,4 +881,166 @@ func GetPods(client DockerInterface, all bool) ([]*kubecontainer.Pod, error) {
 		result = append(result, c)
 	}
 	return result, nil
+}
+
+func milliCPUToShares(milliCPU int64) int64 {
+	if milliCPU == 0 {
+		// zero milliCPU means unset. Use kernel default.
+		return 0
+	}
+	// Conceptually (milliCPU / milliCPUToCPU) * sharesPerCPU, but factored to improve rounding.
+	shares := (milliCPU * sharesPerCPU) / milliCPUToCPU
+	if shares < minShares {
+		return minShares
+	}
+	return shares
+}
+
+func makePortsAndBindings(container *api.Container) (map[docker.Port]struct{}, map[docker.Port][]docker.PortBinding) {
+	exposedPorts := map[docker.Port]struct{}{}
+	portBindings := map[docker.Port][]docker.PortBinding{}
+	for _, port := range container.Ports {
+		exteriorPort := port.HostPort
+		if exteriorPort == 0 {
+			// No need to do port binding when HostPort is not specified
+			continue
+		}
+		interiorPort := port.ContainerPort
+		// Some of this port stuff is under-documented voodoo.
+		// See http://stackoverflow.com/questions/20428302/binding-a-port-to-a-host-interface-using-the-rest-api
+		var protocol string
+		switch strings.ToUpper(string(port.Protocol)) {
+		case "UDP":
+			protocol = "/udp"
+		case "TCP":
+			protocol = "/tcp"
+		default:
+			glog.Warningf("Unknown protocol %q: defaulting to TCP", port.Protocol)
+			protocol = "/tcp"
+		}
+		dockerPort := docker.Port(strconv.Itoa(interiorPort) + protocol)
+		exposedPorts[dockerPort] = struct{}{}
+		portBindings[dockerPort] = []docker.PortBinding{
+			{
+				HostPort: strconv.Itoa(exteriorPort),
+				HostIP:   port.HostIP,
+			},
+		}
+	}
+	return exposedPorts, portBindings
+}
+
+func makeCapabilites(capAdd []api.CapabilityType, capDrop []api.CapabilityType) ([]string, []string) {
+	var (
+		addCaps  []string
+		dropCaps []string
+	)
+	for _, cap := range capAdd {
+		addCaps = append(addCaps, string(cap))
+	}
+	for _, cap := range capDrop {
+		dropCaps = append(dropCaps, string(cap))
+	}
+	return addCaps, dropCaps
+}
+
+// RunContainer creates and starts a docker container with the required RunContainerOptions.
+// On success it will return the container's ID with nil error. During the process, it will
+// use the reference and event recorder to report the state of the container (e.g. created,
+// started, failed, etc.).
+// TODO(yifan): To use a strong type for the returned container ID.
+func RunContainer(client DockerInterface, container *api.Container, pod *api.Pod, opts *kubecontainer.RunContainerOptions,
+	refManager *kubecontainer.RefManager, ref *api.ObjectReference, recorder record.EventRecorder) (string, error) {
+	dockerName := KubeletContainerName{
+		PodFullName:   kubecontainer.GetPodFullName(pod),
+		PodUID:        pod.UID,
+		ContainerName: container.Name,
+	}
+	exposedPorts, portBindings := makePortsAndBindings(container)
+	// TODO(vmarmol): Handle better.
+	// Cap hostname at 63 chars (specification is 64bytes which is 63 chars and the null terminating char).
+	const hostnameMaxLen = 63
+	containerHostname := pod.Name
+	if len(containerHostname) > hostnameMaxLen {
+		containerHostname = containerHostname[:hostnameMaxLen]
+	}
+	dockerOpts := docker.CreateContainerOptions{
+		Name: BuildDockerName(dockerName, container),
+		Config: &docker.Config{
+			Cmd:          container.Command,
+			Env:          opts.Envs,
+			ExposedPorts: exposedPorts,
+			Hostname:     containerHostname,
+			Image:        container.Image,
+			Memory:       container.Resources.Limits.Memory().Value(),
+			CPUShares:    milliCPUToShares(container.Resources.Limits.Cpu().MilliValue()),
+			WorkingDir:   container.WorkingDir,
+		},
+	}
+	dockerContainer, err := client.CreateContainer(dockerOpts)
+	if err != nil {
+		if ref != nil {
+			recorder.Eventf(ref, "failed", "Failed to create docker container with error: %v", err)
+		}
+		return "", err
+	}
+	// Remember this reference so we can report events about this container
+	if ref != nil {
+		refManager.SetRef(dockerContainer.ID, ref)
+		recorder.Eventf(ref, "created", "Created with docker id %v", dockerContainer.ID)
+	}
+
+	// The reason we create and mount the log file in here (not in kubelet) is because
+	// the file's location depends on the ID of the container, and we need to create and
+	// mount the file before actually starting the container.
+	// TODO(yifan): Consider to pull this logic out since we might need to reuse it in
+	// other container runtime.
+	if opts.PodContainerDir != "" && len(container.TerminationMessagePath) != 0 {
+		containerLogPath := path.Join(opts.PodContainerDir, dockerContainer.ID)
+		fs, err := os.Create(containerLogPath)
+		if err != nil {
+			// TODO: Clean up the previouly created dir? return the error?
+			glog.Errorf("Error on creating termination-log file %q: %v", containerLogPath, err)
+		} else {
+			fs.Close() // Close immediately; we're just doing a `touch` here
+			b := fmt.Sprintf("%s:%s", containerLogPath, container.TerminationMessagePath)
+			opts.Binds = append(opts.Binds, b)
+		}
+	}
+
+	privileged := false
+	if capabilities.Get().AllowPrivileged {
+		privileged = container.Privileged
+	} else if container.Privileged {
+		return "", fmt.Errorf("container requested privileged mode, but it is disallowed globally.")
+	}
+
+	capAdd, capDrop := makeCapabilites(container.Capabilities.Add, container.Capabilities.Drop)
+	hc := &docker.HostConfig{
+		PortBindings: portBindings,
+		Binds:        opts.Binds,
+		NetworkMode:  opts.NetMode,
+		IpcMode:      opts.IpcMode,
+		Privileged:   privileged,
+		CapAdd:       capAdd,
+		CapDrop:      capDrop,
+	}
+	if len(opts.DNS) > 0 {
+		hc.DNS = opts.DNS
+	}
+	if len(opts.DNSSearch) > 0 {
+		hc.DNSSearch = opts.DNSSearch
+	}
+
+	if err = client.StartContainer(dockerContainer.ID, hc); err != nil {
+		if ref != nil {
+			recorder.Eventf(ref, "failed",
+				"Failed to start with docker id %v with error: %v", dockerContainer.ID, err)
+		}
+		return "", err
+	}
+	if ref != nil {
+		recorder.Eventf(ref, "started", "Started with docker id %v", dockerContainer.ID)
+	}
+	return dockerContainer.ID, nil
 }
