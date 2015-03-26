@@ -17,20 +17,16 @@ limitations under the License.
 package e2e
 
 import (
-	"bytes"
 	"fmt"
 	"math/rand"
-	"os/exec"
 	"path/filepath"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/clientauth"
-
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
@@ -185,117 +181,4 @@ func randomSuffix() string {
 
 func expectNoError(err error, explain ...interface{}) {
 	ExpectWithOffset(1, err).NotTo(HaveOccurred(), explain...)
-}
-
-func cleanup(filePath string, selectors ...string) {
-	By("using stop to clean up resources")
-	runKubectl("stop", "-f", filePath)
-
-	for _, selector := range selectors {
-		resources := runKubectl("get", "pods,rc,se", "-l", selector, "--no-headers")
-		if resources != "" {
-			Failf("Resources left running after stop:\n%s", resources)
-		}
-	}
-}
-
-// validatorFn is the function which is individual tests will implement.
-// we may want it to return more than just an error, at some point.
-type validatorFn func(c *client.Client, podID string) error
-
-// validateController is a generic mechanism for testing RC's that are running.
-// It takes a container name, a test name, and a validator function which is plugged in by a specific test.
-// "containername": this is grepped for.
-// "testname":  which gets bubbled up to the logging/failure messages if errors happen.
-// "validator" function: This function is given a podID and a client, and it can do some specific validations that way.
-func validateController(c *client.Client, image string, replicas int, containername string, testname string, validator validatorFn) {
-	getPodsTemplate := "--template={{range.items}}{{.id}} {{end}}"
-	// NB: kubectl adds the "exists" function to the standard template functions.
-	// This lets us check to see if the "running" entry exists for each of the containers
-	// we care about. Exists will never return an error and it's safe to check a chain of
-	// things, any one of which may not exist. In the below template, all of info,
-	// containername, and running might be nil, so the normal index function isn't very
-	// helpful.
-	// This template is unit-tested in kubectl, so if you change it, update the unit test.
-	// You can read about the syntax here: http://golang.org/pkg/text/template/.
-	getContainerStateTemplate := fmt.Sprintf(`--template={{and (exists . "currentState" "info" "%s" "state" "running")}}`, containername)
-
-	getImageTemplate := fmt.Sprintf(`--template={{(index .currentState.info "%s").image}}`, containername)
-
-	By(fmt.Sprintf("waiting for all containers in %s pods to come up.", testname)) //testname should be selector
-	for start := time.Now(); time.Since(start) < podStartTimeout; time.Sleep(5 * time.Second) {
-		getPodsOutput := runKubectl("get", "pods", "-o", "template", getPodsTemplate, "-l", testname)
-		pods := strings.Fields(getPodsOutput)
-		if numPods := len(pods); numPods != replicas {
-			By(fmt.Sprintf("Replicas for %s: expected=%d actual=%d", testname, replicas, numPods))
-			continue
-		}
-		var runningPods []string
-		for _, podID := range pods {
-			running := runKubectl("get", "pods", podID, "-o", "template", getContainerStateTemplate)
-			if running == "false" {
-				Logf("%s is created but not running", podID)
-				continue
-			}
-
-			currentImage := runKubectl("get", "pods", podID, "-o", "template", getImageTemplate)
-			if currentImage != image {
-				Logf("%s is created but running wrong image; expected: %s, actual: %s", podID, image, currentImage)
-				continue
-			}
-
-			// Call the generic validator function here.
-			// This might validate for example, that (1) getting a url works and (2) url is serving correct content.
-			if err := validator(c, podID); err != nil {
-				Logf("%s is running right image but validator function failed: %v", podID, err)
-				continue
-			}
-
-			Logf("%s is verified up and running", podID)
-			runningPods = append(runningPods, podID)
-		}
-		// If we reach here, then all our checks passed.
-		if len(runningPods) == replicas {
-			return
-		}
-	}
-	// Reaching here means that one of more checks failed multiple times.  Assuming its not a race condition, something is broken.
-	Failf("Timed out after %v seconds waiting for %s pods to reach valid state", podStartTimeout.Seconds(), testname)
-}
-
-func kubectlCmd(args ...string) *exec.Cmd {
-	defaultArgs := []string{}
-	if testContext.kubeConfig != "" {
-		defaultArgs = append(defaultArgs, "--"+clientcmd.RecommendedConfigPathFlag+"="+testContext.kubeConfig)
-	} else {
-		defaultArgs = append(defaultArgs, "--"+clientcmd.FlagAuthPath+"="+testContext.authConfig)
-		if testContext.certDir != "" {
-			defaultArgs = append(defaultArgs,
-				fmt.Sprintf("--certificate-authority=%s", filepath.Join(testContext.certDir, "ca.crt")),
-				fmt.Sprintf("--client-certificate=%s", filepath.Join(testContext.certDir, "kubecfg.crt")),
-				fmt.Sprintf("--client-key=%s", filepath.Join(testContext.certDir, "kubecfg.key")))
-		}
-	}
-	kubectlArgs := append(defaultArgs, args...)
-	// TODO: Remove this once gcloud writes a proper entry in the kubeconfig file.
-	if testContext.provider == "gke" {
-		kubectlArgs = append(kubectlArgs, "--server="+testContext.host)
-	}
-	cmd := exec.Command("kubectl", kubectlArgs...)
-	Logf("Running '%s %s'", cmd.Path, strings.Join(cmd.Args, " "))
-	return cmd
-}
-
-func runKubectl(args ...string) string {
-	var stdout, stderr bytes.Buffer
-	cmd := kubectlCmd(args...)
-	cmd.Stdout, cmd.Stderr = &stdout, &stderr
-
-	if err := cmd.Run(); err != nil {
-		Failf("Error running %v:\nCommand stdout:\n%v\nstderr:\n%v\n", cmd, cmd.Stdout, cmd.Stderr)
-		return ""
-	}
-	Logf(stdout.String())
-	// TODO: trimspace should be unnecessary after switching to use kubectl binary directly
-	return strings.TrimSpace(stdout.String())
 }
