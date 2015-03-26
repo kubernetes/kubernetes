@@ -266,7 +266,7 @@ function download-release() {
   echo "Downloading binary release tar ($SERVER_BINARY_TAR_URL)"
   download-or-bust "$SERVER_BINARY_TAR_URL"
 
-  echo "Downloading binary release tar ($SALT_TAR_URL)"
+  echo "Downloading Salt tar ($SALT_TAR_URL)"
   download-or-bust "$SALT_TAR_URL"
 
   echo "Unpacking Salt tree"
