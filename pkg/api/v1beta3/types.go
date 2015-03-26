@@ -215,6 +215,8 @@ type VolumeSource struct {
 	// ISCSI represents an ISCSI Disk resource that is attached to a
 	// kubelet's host machine and then exposed to the pod.
 	ISCSI *ISCSIVolumeSource `json:"iscsi" description:"iSCSI disk attached to host machine on demand"`
+	// Glusterfs represents a Glusterfs mount on the host that shares a pod's lifetime
+	Glusterfs *GlusterfsVolumeSource `json:"glusterfs" description:"Glusterfs volume that will be mounted on the host machine "`
 }
 
 // Similar to VolumeSource but meant for the administrator who creates PVs.
@@ -227,6 +229,8 @@ type PersistentVolumeSource struct {
 	// This is useful for development and testing only.
 	// on-host storage is not supported in any way.
 	HostPath *HostPathVolumeSource `json:"hostPath" description:"a HostPath provisioned by a developer or tester; for develment use only"`
+	// Glusterfs represents a Glusterfs volume that is attached to a host and exposed to the pod
+	Glusterfs *GlusterfsVolumeSource `json:"glusterfs" description:"Glusterfs volume resource provisioned by an admin"`
 }
 
 type PersistentVolume struct {
@@ -341,6 +345,19 @@ type EmptyDirVolumeSource struct {
 	// Optional: what type of storage medium should back this directory.
 	// The default is "" which means to use the node's default medium.
 	Medium StorageType `json:"medium" description:"type of storage used to back the volume; must be an empty string (default) or Memory"`
+}
+
+// GlusterfsVolumeSource represents a Glusterfs Mount that lasts the lifetime of a pod
+type GlusterfsVolumeSource struct {
+	// Required: EndpointsName is the endpoint name that details Glusterfs topology
+	EndpointsName string `json:"endpoints" description:"gluster hosts endpoints name"`
+
+	// Required: Path is the Glusterfs volume path
+	Path string `json:"path" description:"path to gluster volume"`
+
+	// Optional: Defaults to false (read/write). ReadOnly here will force
+	// the Glusterfs volume to be mounted with read-only permissions
+	ReadOnly bool `json:"readOnly,omitempty" description:"glusterfs volume to be mounted with read-only permissions"`
 }
 
 // StorageType defines ways that storage can be allocated to a volume.
