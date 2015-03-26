@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2015 Google Inc. All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,34 +14,35 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package kubelet
+package container
 
 import (
+	"fmt"
 	"sync"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 )
 
-// ContainerRefManager manages the references for the containers.
+// RefManager manages the references for the containers.
 // The references are used for reporting events such as creation,
 // failure, etc. This manager is thread-safe, no locks are necessary
 // for the caller.
-type ContainerRefManager struct {
+type RefManager struct {
 	sync.RWMutex
 	// TODO(yifan): To use strong type.
 	containerIDToRef map[string]*api.ObjectReference
 }
 
-// newContainerRefManager creates and returns a container reference manager
+// NewRefManager creates and returns a container reference manager
 // with empty contents.
-func newContainerRefManager() *ContainerRefManager {
-	c := ContainerRefManager{}
+func NewRefManager() *RefManager {
+	c := RefManager{}
 	c.containerIDToRef = make(map[string]*api.ObjectReference)
 	return &c
 }
 
-// SetRef stores a reference to a pod's container, associating it with the given container id.
-func (c *ContainerRefManager) SetRef(id string, ref *api.ObjectReference) {
+// SetRef stores a reference to a pod's container, associating it with the given container ID.
+func (c *RefManager) SetRef(id string, ref *api.ObjectReference) {
 	c.Lock()
 	defer c.Unlock()
 	c.containerIDToRef[id] = ref
@@ -50,18 +51,34 @@ func (c *ContainerRefManager) SetRef(id string, ref *api.ObjectReference) {
 // ClearRef forgets the given container id and its associated container reference.
 // TODO(yifan): This is currently never called. Consider to remove this function,
 // or figure out when to clear the references.
-func (c *ContainerRefManager) ClearRef(id string) {
+func (c *RefManager) ClearRef(id string) {
 	c.Lock()
 	defer c.Unlock()
 	delete(c.containerIDToRef, id)
 }
 
-// GetRef returns the container reference of the given id, or (nil, false) if none is stored.
-func (c *ContainerRefManager) GetRef(id string) (ref *api.ObjectReference, ok bool) {
+// GetRef returns the container reference of the given ID, or (nil, false) if none is stored.
+func (c *RefManager) GetRef(id string) (ref *api.ObjectReference, ok bool) {
 	c.RLock()
 	defer c.RUnlock()
 	ref, ok = c.containerIDToRef[id]
 	return ref, ok
+}
+
+// fieldPath returns a fieldPath locating container within pod.
+// Returns an error if the container isn't part of the pod.
+func fieldPath(pod *api.Pod, container *api.Container) (string, error) {
+	for i := range pod.Spec.Containers {
+		here := &pod.Spec.Containers[i]
+		if here.Name == container.Name {
+			if here.Name == "" {
+				return fmt.Sprintf("spec.containers[%d]", i), nil
+			} else {
+				return fmt.Sprintf("spec.containers{%s}", here.Name), nil
+			}
+		}
+	}
+	return "", fmt.Errorf("container %#v not found in pod %#v", container, pod)
 }
 
 // GenerateContainerRef returns an *api.ObjectReference which references the given container within the
@@ -70,9 +87,9 @@ func (c *ContainerRefManager) GetRef(id string) (ref *api.ObjectReference, ok bo
 // TODO: Pods that came to us by static config or over HTTP have no selfLink set, which makes
 // this fail and log an error. Figure out how we want to identify these pods to the rest of the
 // system.
-// TODO(yifan): Revisit this function later, for current case, it does not need to use ContainerRefManager
-// as a receiver, and does not need to be exported.
-func (c *ContainerRefManager) GenerateContainerRef(pod *api.Pod, container *api.Container) (*api.ObjectReference, error) {
+// TODO(yifan): Revisit this function later, for current case it does not need to use RefManager
+// as a receiver.
+func (c *RefManager) GenerateContainerRef(pod *api.Pod, container *api.Container) (*api.ObjectReference, error) {
 	fieldPath, err := fieldPath(pod, container)
 	if err != nil {
 		// TODO: figure out intelligent way to refer to containers that we implicitly
