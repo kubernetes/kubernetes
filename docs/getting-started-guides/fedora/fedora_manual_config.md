@@ -17,6 +17,8 @@ fed-node = 192.168.121.65
 **Prepare the hosts:**
     
 * Install kubernetes on all hosts - fed-{master,node}.  This will also pull in etcd and docker.  This guide has been tested with kubernetes-0.12.0 but should work with later versions too.
+* The [--enablerepo=update-testing](https://fedoraproject.org/wiki/QA:Updates_Testing) directive in the yum command below will ensure that the most recent Kubernetes version that is scheduled for pre-release will be installed. This should be a more recent version than the Fedora "stable" release for Kubernetes that you would get without adding the directive. 
+* If you want the very latest Kubernetes release [you can download and yum install the RPM directly from Fedora Koji](http://koji.fedoraproject.org/koji/packageinfo?packageID=19202) instead of using the yum install command below.
 
 ```
 yum -y install --enablerepo=updates-testing kubernetes
