@@ -29,27 +29,50 @@ import (
 )
 
 func TestReadAWSCloudConfig(t *testing.T) {
-	_, err1 := readAWSCloudConfig(nil)
+	_, err1 := readAWSCloudConfig(nil, nil)
 	if err1 == nil {
 		t.Errorf("Should error when no config reader is given")
 	}
 
-	_, err2 := readAWSCloudConfig(strings.NewReader(""))
+	_, err2 := readAWSCloudConfig(strings.NewReader(""), nil)
 	if err2 == nil {
 		t.Errorf("Should error when config is empty")
 	}
 
-	_, err3 := readAWSCloudConfig(strings.NewReader("[global]\n"))
+	_, err3 := readAWSCloudConfig(strings.NewReader("[global]\n"), nil)
 	if err3 == nil {
-		t.Errorf("Should error when no region is specified")
+		t.Errorf("Should error when no zone is specified")
 	}
 
-	cfg, err4 := readAWSCloudConfig(strings.NewReader("[global]\nregion = eu-west-1"))
+	cfg, err4 := readAWSCloudConfig(strings.NewReader("[global]\nzone = eu-west-1a"), nil)
 	if err4 != nil {
-		t.Errorf("Should succeed when a region is specified: %s", err4)
+		t.Errorf("Should succeed when a zone is specified: %s", err4)
 	}
-	if cfg.Global.Region != "eu-west-1" {
-		t.Errorf("Should read region from config")
+	if cfg.Global.Zone != "eu-west-1a" {
+		t.Errorf("Should read zone from config")
+	}
+
+	_, err5 := readAWSCloudConfig(strings.NewReader("[global]\n"), &FakeMetadata{})
+	if err5 == nil {
+		t.Errorf("Should error when no zone is specified in metadata")
+	}
+
+	cfg, err6 := readAWSCloudConfig(strings.NewReader("[global]\n"),
+		&FakeMetadata{availabilityZone: "eu-west-1a"})
+	if err6 != nil {
+		t.Errorf("Should succeed when getting zone from metadata: %s", err6)
+	}
+	if cfg.Global.Zone != "eu-west-1a" {
+		t.Errorf("Should read zone from metadata")
+	}
+
+	cfg, err7 := readAWSCloudConfig(strings.NewReader("[global]\nzone = us-east-1a"),
+		&FakeMetadata{availabilityZone: "eu-west-1a"})
+	if err7 != nil {
+		t.Errorf("Should succeed when zone is specified: %s", err7)
+	}
+	if cfg.Global.Zone != "us-east-1a" {
+		t.Errorf("Should prefer zone from config over metadata")
 	}
 }
 
@@ -58,29 +81,42 @@ func TestNewAWSCloud(t *testing.T) {
 		return aws.Auth{"", "", ""}, nil
 	}
 
-	_, err1 := newAWSCloud(nil, fakeAuthFunc)
+	_, err1 := newAWSCloud(nil, fakeAuthFunc, nil)
 	if err1 == nil {
 		t.Errorf("Should error when no config reader is given")
 	}
 
 	_, err2 := newAWSCloud(strings.NewReader(
-		"[global]\nregion = blahonga"),
-		fakeAuthFunc)
+		"[global]\nzone = blahonga"),
+		fakeAuthFunc, nil)
 	if err2 == nil {
-		t.Errorf("Should error when config specifies invalid region")
+		t.Errorf("Should error when config specifies invalid zone")
 	}
 
 	_, err3 := newAWSCloud(
-		strings.NewReader("[global]\nregion = eu-west-1"),
-		fakeAuthFunc)
+		strings.NewReader("[global]\nzone = eu-west-1a"),
+		fakeAuthFunc, nil)
 	if err3 != nil {
-		t.Errorf("Should succeed when a valid region is specified: %s", err3)
+		t.Errorf("Should succeed when a valid zone is specified: %s", err3)
+	}
+
+	_, err4 := newAWSCloud(strings.NewReader(
+		"[global]\n"),
+		fakeAuthFunc, &FakeMetadata{availabilityZone: "us-east-1a"})
+	if err4 != nil {
+		t.Errorf("Should success when zone is in metadata")
+	}
+
+	_, err5 := newAWSCloud(strings.NewReader(
+		"[global]\n"),
+		fakeAuthFunc, &FakeMetadata{})
+	if err5 == nil {
+		t.Errorf("Should error when AZ cannot be found in metadata")
 	}
 }
 
 type FakeEC2 struct {
-	instances        []ec2.Instance
-	availabilityZone string
+	instances []ec2.Instance
 }
 
 func (self *FakeEC2) Instances(instanceIds []string, filter *ec2InstanceFilter) (resp *ec2.InstancesResp, err error) {
@@ -95,7 +131,11 @@ func (self *FakeEC2) Instances(instanceIds []string, filter *ec2InstanceFilter) 
 			{"", "", "", nil, matches}}}, nil
 }
 
-func (self *FakeEC2) GetMetaData(key string) ([]byte, error) {
+type FakeMetadata struct {
+	availabilityZone string
+}
+
+func (self *FakeMetadata) GetMetaData(key string) ([]byte, error) {
 	if key == "placement/availability-zone" {
 		return []byte(self.availabilityZone), nil
 	} else {
@@ -107,19 +147,19 @@ func mockInstancesResp(instances []ec2.Instance) (aws *AWSCloud) {
 	availabilityZone := "us-west-2d"
 	return &AWSCloud{
 		ec2: &FakeEC2{
-			instances:        instances,
-			availabilityZone: availabilityZone,
+			instances: instances,
 		},
+		availabilityZone: availabilityZone,
 	}
 }
 
 func mockAvailabilityZone(region string, availabilityZone string) *AWSCloud {
 	return &AWSCloud{
-		ec2: &FakeEC2{
-			availabilityZone: availabilityZone,
-		},
-		region: aws.Regions[region],
+		ec2:              &FakeEC2{},
+		availabilityZone: availabilityZone,
+		region:           aws.Regions[region],
 	}
+
 }
 
 func TestList(t *testing.T) {

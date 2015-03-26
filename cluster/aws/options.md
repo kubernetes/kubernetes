@@ -5,6 +5,10 @@ specific to AWS are documented in this file, for cross-provider options see TODO
 
 This is a work-in-progress; not all options are documented yet!
 
+## KUBE_AWS_ZONE
+
+The AWS availability to deploy to.  Defaults to us-west-2a.
+
 ## AWS_IMAGE
 
 The AMI to use.  If not specified, the image will be selected based on the AWS region.
