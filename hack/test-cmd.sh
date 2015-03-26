@@ -131,11 +131,13 @@ for version in "${kube_api_versions[@]}"; do
   labels_field="labels"
   service_selector_field="selector"
   rc_replicas_field="desiredState.replicas"
+  port_field="port"
   if [ "$version" = "v1beta3" ]; then
     id_field="metadata.name"
     labels_field="metadata.labels"
     service_selector_field="spec.selector"
     rc_replicas_field="spec.replicas"
+    port_field="spec.port"
   fi
 
   # Passing no arguments to create is an error
@@ -474,6 +476,26 @@ __EOF__
   kubectl resize  --replicas=3 replicationcontrollers frontend-controller "${kube_flags[@]}"
   # Post-condition: 3 replicas
   kube::test::get_object_assert 'rc frontend-controller' "{{.$rc_replicas_field}}" '3'
+
+  ### Expose replication controller as service
+  # Pre-condition: 3 replicas
+  kube::test::get_object_assert 'rc frontend-controller' "{{.$rc_replicas_field}}" '3'
+  # Command
+  kubectl expose rc frontend-controller --port=80 "${kube_flags[@]}"
+  # Post-condition: service exists
+  kube::test::get_object_assert 'service frontend-controller' "{{.$port_field}}" '80'
+  # Command
+  kubectl expose service frontend-controller --port=443 --service-name=frontend-controller-2 "${kube_flags[@]}"
+  # Post-condition: service exists
+  kube::test::get_object_assert 'service frontend-controller-2' "{{.$port_field}}" '443'
+  # Command
+  kubectl create -f examples/limitrange/valid-pod.json "${kube_flags[@]}"
+  kubectl expose pod valid-pod --port=444 --service-name=frontend-controller-3 "${kube_flags[@]}"
+  # Post-condition: service exists
+  kube::test::get_object_assert 'service frontend-controller-3' "{{.$port_field}}" '444'
+  # Cleanup services
+  kubectl delete pod valid-pod "${kube_flags[@]}"
+  kubectl delete service frontend-controller{,-2,-3} "${kube_flags[@]}"
 
   ### Delete replication controller with id
   # Pre-condition: frontend replication controller is running

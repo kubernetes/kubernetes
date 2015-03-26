@@ -29,11 +29,14 @@ import (
 const (
 	expose_long = `Take a replicated application and expose it as Kubernetes Service.
 
-Looks up a ReplicationController by name, and uses the selector for that replication controller
-as the selector for a new Service on the specified port.`
+Looks up a replication controller or service by name and uses the selector for that resource as the
+selector for a new Service on the specified port.`
 
 	expose_example = `// Creates a service for a replicated nginx, which serves on port 80 and connects to the containers on port 8000.
 $ kubectl expose nginx --port=80 --container-port=8000
+
+// Creates a second service based on the above service, exposing the container port 8443 as port 443 with the name "nginx-https"
+$ kubectl expose service nginx --port=443 --container-port=8443 --service-name=nginx-https
 
 // Create a service for a replicated streaming application on port 4100 balancing UDP traffic and named 'video-stream'.
 $ kubectl expose streamer --port=4100 --protocol=udp --service-name=video-stream`
@@ -41,7 +44,7 @@ $ kubectl expose streamer --port=4100 --protocol=udp --service-name=video-stream
 
 func (f *Factory) NewCmdExposeService(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "expose NAME --port=port [--protocol=TCP|UDP] [--container-port=number-or-name] [--service-name=name] [--public-ip=ip] [--create-external-load-balancer=bool]",
+		Use:     "expose RESOURCE NAME --port=port [--protocol=TCP|UDP] [--container-port=number-or-name] [--service-name=name] [--public-ip=ip] [--create-external-load-balancer=bool]",
 		Short:   "Take a replicated application and expose it as Kubernetes Service",
 		Long:    expose_long,
 		Example: expose_example,
@@ -66,8 +69,12 @@ func (f *Factory) NewCmdExposeService(out io.Writer) *cobra.Command {
 }
 
 func RunExpose(f *Factory, out io.Writer, cmd *cobra.Command, args []string) error {
-	if len(args) != 1 {
-		return util.UsageError(cmd, "<name> is required for expose")
+	var name, resource string
+	switch l := len(args); {
+	case l == 2:
+		resource, name = args[0], args[1]
+	default:
+		return util.UsageError(cmd, "the type and name of a resource to expose are required arguments")
 	}
 
 	namespace, err := f.DefaultNamespace()
@@ -83,7 +90,7 @@ func RunExpose(f *Factory, out io.Writer, cmd *cobra.Command, args []string) err
 
 	generator, found := kubectl.Generators[generatorName]
 	if !found {
-		return util.UsageError(cmd, fmt.Sprintf("Generator: %s not found.", generator))
+		return util.UsageError(cmd, fmt.Sprintf("generator %q not found.", generator))
 	}
 	if util.GetFlagInt(cmd, "port") < 1 {
 		return util.UsageError(cmd, "--port is required and must be a positive integer.")
@@ -91,16 +98,25 @@ func RunExpose(f *Factory, out io.Writer, cmd *cobra.Command, args []string) err
 	names := generator.ParamNames()
 	params := kubectl.MakeParams(cmd, names)
 	if len(util.GetFlagString(cmd, "service-name")) == 0 {
-		params["name"] = args[0]
+		params["name"] = name
 	} else {
 		params["name"] = util.GetFlagString(cmd, "service-name")
 	}
-	if _, found := params["selector"]; !found {
-		rc, err := client.ReplicationControllers(namespace).Get(args[0])
+	if s, found := params["selector"]; !found || len(s) == 0 {
+		mapper, _ := f.Object()
+		v, k, err := mapper.VersionAndKindForResource(resource)
 		if err != nil {
 			return err
 		}
-		params["selector"] = kubectl.MakeLabels(rc.Spec.Selector)
+		mapping, err := mapper.RESTMapping(k, v)
+		if err != nil {
+			return err
+		}
+		s, err := f.PodSelectorForResource(mapping, namespace, name)
+		if err != nil {
+			return err
+		}
+		params["selector"] = s
 	}
 	if util.GetFlagBool(cmd, "create-external-load-balancer") {
 		params["create-external-load-balancer"] = "true"
