@@ -23,6 +23,7 @@ import (
 	"crypto/tls"
 	"net"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -45,6 +46,7 @@ import (
 // APIServer runs a kubernetes api server.
 type APIServer struct {
 	WideOpenPort               int
+	ExternalHost               string
 	Address                    util.IP
 	PublicAddressOverride      util.IP
 	ReadOnlyPort               int
@@ -151,6 +153,7 @@ func (s *APIServer) AddFlags(fs *pflag.FlagSet) {
 	client.BindKubeletClientConfigFlags(fs, &s.KubeletConfig)
 	fs.StringVar(&s.ClusterName, "cluster_name", s.ClusterName, "The instance prefix for the cluster")
 	fs.BoolVar(&s.EnableProfiling, "profiling", false, "Enable profiling via web interface host:port/debug/pprof/")
+	fs.StringVar(&s.ExternalHost, "external_hostname", "", "The hostname to use when generating externalized URLs for this master (e.g. Swagger API Docs.)")
 }
 
 // TODO: Longer term we should read this from some config store, rather than a flag.
@@ -227,6 +230,30 @@ func (s *APIServer) Run(_ []string) error {
 	admissionControlPluginNames := strings.Split(s.AdmissionControl, ",")
 	admissionController := admission.NewFromPlugins(client, admissionControlPluginNames, s.AdmissionControlConfigFile)
 
+	if len(s.ExternalHost) == 0 {
+		// TODO: extend for other providers
+		if s.CloudProvider == "gce" {
+			instances, supported := cloud.Instances()
+			if !supported {
+				glog.Fatalf("gce cloud provider has no instances.  this shouldn't happen. exiting.")
+			}
+			name, err := os.Hostname()
+			if err != nil {
+				glog.Fatalf("failed to get hostname: %v", err)
+			}
+			addrs, err := instances.NodeAddresses(name)
+			if err != nil {
+				glog.Warningf("unable to obtain external host address from cloud provider: %v", err)
+			} else {
+				for _, addr := range addrs {
+					if addr.Type == api.NodeExternalIP {
+						s.ExternalHost = addr.Address
+					}
+				}
+			}
+		}
+	}
+
 	config := &master.Config{
 		Cloud:                  cloud,
 		EtcdHelper:             helper,
@@ -249,6 +276,7 @@ func (s *APIServer) Run(_ []string) error {
 		EnableV1Beta3:          v1beta3,
 		MasterServiceNamespace: s.MasterServiceNamespace,
 		ClusterName:            s.ClusterName,
+		ExternalHost:           s.ExternalHost,
 	}
 	m := master.New(config)
 

@@ -40,7 +40,7 @@ func (m *Master) serviceWriterLoop(stop chan struct{}) {
 			if err := m.createMasterServiceIfNeeded("kubernetes", m.serviceReadWriteIP, m.serviceReadWritePort); err != nil {
 				glog.Errorf("Can't create rw service: %v", err)
 			}
-			if err := m.ensureEndpointsContain("kubernetes", m.publicIP, m.publicReadWritePort); err != nil {
+			if err := m.ensureEndpointsContain("kubernetes", m.clusterIP, m.publicReadWritePort); err != nil {
 				glog.Errorf("Can't create rw endpoints: %v", err)
 			}
 		}
@@ -65,7 +65,7 @@ func (m *Master) roServiceWriterLoop(stop chan struct{}) {
 			if err := m.createMasterServiceIfNeeded("kubernetes-ro", m.serviceReadOnlyIP, m.serviceReadOnlyPort); err != nil {
 				glog.Errorf("Can't create ro service: %v", err)
 			}
-			if err := m.ensureEndpointsContain("kubernetes-ro", m.publicIP, m.publicReadOnlyPort); err != nil {
+			if err := m.ensureEndpointsContain("kubernetes-ro", m.clusterIP, m.publicReadOnlyPort); err != nil {
 				glog.Errorf("Can't create ro endpoints: %v", err)
 			}
 		}

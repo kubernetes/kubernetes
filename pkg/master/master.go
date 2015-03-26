@@ -107,6 +107,9 @@ type Config struct {
 	// Defaults to 6443 if not set.
 	ReadWritePort int
 
+	// ExternalHost is the host name to use for external (public internet) facing URLs (e.g. Swagger)
+	ExternalHost string
+
 	// If nil, the first result from net.InterfaceAddrs will be used.
 	PublicAddress net.IP
 
@@ -141,7 +144,10 @@ type Master struct {
 	v1beta3               bool
 	requestContextMapper  api.RequestContextMapper
 
-	publicIP             net.IP
+	// External host is the name that should be used in external (public internet) URLs for this master
+	externalHost string
+	// clusterIP is the IP address of the master within the cluster.
+	clusterIP            net.IP
 	publicReadOnlyPort   int
 	publicReadWritePort  int
 	serviceReadOnlyIP    net.IP
@@ -277,7 +283,8 @@ func New(c *Config) *Master {
 		cacheTimeout: c.CacheTimeout,
 
 		masterCount:         c.MasterCount,
-		publicIP:            c.PublicAddress,
+		externalHost:        c.ExternalHost,
+		clusterIP:           c.PublicAddress,
 		publicReadOnlyPort:  c.ReadOnlyPort,
 		publicReadWritePort: c.ReadWritePort,
 		serviceReadOnlyIP:   serviceReadOnlyIP,
@@ -494,14 +501,23 @@ func (m *Master) init(c *Config) {
 // register their own web services into the Kubernetes mux prior to initialization
 // of swagger, so that other resource types show up in the documentation.
 func (m *Master) InstallSwaggerAPI() {
-	webServicesUrl := ""
-	// Use the secure read write port, if available.
-	if m.publicReadWritePort != 0 {
-		webServicesUrl = "https://" + net.JoinHostPort(m.publicIP.String(), strconv.Itoa(m.publicReadWritePort))
-	} else {
-		// Use the read only port.
-		webServicesUrl = "http://" + net.JoinHostPort(m.publicIP.String(), strconv.Itoa(m.publicReadOnlyPort))
+	hostAndPort := m.externalHost
+	protocol := "https://"
+
+	// TODO: this is kind of messed up, we should just pipe in the full URL from the outside, rather
+	// than guessing at it.
+	if len(m.externalHost) == 0 && m.clusterIP != nil {
+		host := m.clusterIP.String()
+		if m.publicReadWritePort != 0 {
+			hostAndPort = net.JoinHostPort(host, strconv.Itoa(m.publicReadWritePort))
+		} else {
+			// Use the read only port.
+			hostAndPort = net.JoinHostPort(host, strconv.Itoa(m.publicReadOnlyPort))
+			protocol = "http://"
+		}
 	}
+	webServicesUrl := protocol + hostAndPort
+
 	// Enable swagger UI and discovery API
 	swaggerConfig := swagger.Config{
 		WebServicesUrl:  webServicesUrl,
