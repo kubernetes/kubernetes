@@ -216,7 +216,8 @@ func getAvailabilityZone(metadata AWSMetadata) (string, error) {
 }
 
 // newAWSCloud creates a new instance of AWSCloud.
-func newAWSCloud(config io.Reader, authFunc AuthFunc, metadata AWSMetadata) (*AWSCloud, error) {
+// authFunc and instanceId are primarily for tests
+func newAWSCloud(config io.Reader, authFunc AuthFunc, instanceId string, metadata AWSMetadata) (*AWSCloud, error) {
 	cfg, err := readAWSCloudConfig(config, metadata)
 	if err != nil {
 		return nil, fmt.Errorf("unable to read AWS cloud provider config file: %v", err)
@@ -240,9 +241,12 @@ func newAWSCloud(config io.Reader, authFunc AuthFunc, metadata AWSMetadata) (*AW
 
 	ec2 := &goamzEC2{ec2: ec2.New(auth, region)}
 
-	instanceId, err := ec2.GetMetaData("instance-id")
-	if err != nil {
-		return nil, fmt.Errorf("error fetching instance-id from ec2 metadata service: %v", err)
+	if instanceId == "" {
+		instanceIdBytes, err := ec2.GetMetaData("instance-id")
+		if err != nil {
+			return nil, fmt.Errorf("error fetching instance-id from ec2 metadata service: %v", err)
+		}
+		instanceId = string(instanceIdBytes)
 	}
 
 	awsCloud := &AWSCloud{
@@ -252,7 +256,7 @@ func newAWSCloud(config io.Reader, authFunc AuthFunc, metadata AWSMetadata) (*AW
 		availabilityZone: zone,
 	}
 
-	awsCloud.selfAwsInstance = newAwsInstance(ec2, string(instanceId))
+	awsCloud.selfAwsInstance = newAwsInstance(ec2, instanceId)
 
 	return awsCloud, nil
 }

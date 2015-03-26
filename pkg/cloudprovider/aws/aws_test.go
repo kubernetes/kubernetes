@@ -188,6 +188,26 @@ func (self *FakeMetadata) GetMetaData(key string) ([]byte, error) {
 	}
 }
 
+func (ec2 *FakeEC2) AttachVolume(volumeId string, instanceId string, mountDevice string) (resp *ec2.AttachVolumeResp, err error) {
+	panic("Not implemented")
+}
+
+func (ec2 *FakeEC2) DetachVolume(volumeId string) (resp *ec2.SimpleResp, err error) {
+	panic("Not implemented")
+}
+
+func (ec2 *FakeEC2) Volumes(volumeIds []string, filter *ec2.Filter) (resp *ec2.VolumesResp, err error) {
+	panic("Not implemented")
+}
+
+func (ec2 *FakeEC2) CreateVolume(request *ec2.CreateVolume) (resp *ec2.CreateVolumeResp, err error) {
+	panic("Not implemented")
+}
+
+func (ec2 *FakeEC2) DeleteVolume(volumeId string) (resp *ec2.SimpleResp, err error) {
+	panic("Not implemented")
+}
+
 func mockInstancesResp(instances []ec2.Instance) (aws *AWSCloud) {
 	availabilityZone := "us-west-2d"
 	return &AWSCloud{

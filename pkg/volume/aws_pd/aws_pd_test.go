@@ -50,8 +50,11 @@ func TestGetAccessModes(t *testing.T) {
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
 	}
-	if !contains(plug.GetAccessModes(), api.ReadWriteOnce) || !contains(plug.GetAccessModes(), api.ReadOnlyMany) {
-		t.Errorf("Expected two AccessModeTypes:  %s and %s", api.ReadWriteOnce, api.ReadOnlyMany)
+	if !contains(plug.GetAccessModes(), api.ReadWriteOnce) {
+		t.Errorf("Expected to find AccessMode:  %s", api.ReadWriteOnce)
+	}
+	if len(plug.GetAccessModes()) != 1 {
+		t.Errorf("Expected to find exactly one AccessMode")
 	}
 }
 
