@@ -40,3 +40,21 @@ func (self *ResourceList) Memory() *resource.Quantity {
 	}
 	return &resource.Quantity{}
 }
+
+func GetContainerStatus(statuses []ContainerStatus, name string) (ContainerStatus, bool) {
+	for i := range statuses {
+		if statuses[i].Name == name {
+			return statuses[i], true
+		}
+	}
+	return ContainerStatus{}, false
+}
+
+func GetExistingContainerStatus(statuses []ContainerStatus, name string) ContainerStatus {
+	for i := range statuses {
+		if statuses[i].Name == name {
+			return statuses[i]
+		}
+	}
+	return ContainerStatus{}
+}

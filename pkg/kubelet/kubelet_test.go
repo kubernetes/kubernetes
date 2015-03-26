@@ -2183,6 +2183,43 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 	}
 }
 
+func runningState(cName string) api.ContainerStatus {
+	return api.ContainerStatus{
+		Name: cName,
+		State: api.ContainerState{
+			Running: &api.ContainerStateRunning{},
+		},
+	}
+}
+func stoppedState(cName string) api.ContainerStatus {
+	return api.ContainerStatus{
+		Name: cName,
+		State: api.ContainerState{
+			Termination: &api.ContainerStateTerminated{},
+		},
+	}
+}
+func succeededState(cName string) api.ContainerStatus {
+	return api.ContainerStatus{
+		Name: cName,
+		State: api.ContainerState{
+			Termination: &api.ContainerStateTerminated{
+				ExitCode: 0,
+			},
+		},
+	}
+}
+func failedState(cName string) api.ContainerStatus {
+	return api.ContainerStatus{
+		Name: cName,
+		State: api.ContainerState{
+			Termination: &api.ContainerStateTerminated{
+				ExitCode: -1,
+			},
+		},
+	}
+}
+
 func TestPodPhaseWithRestartAlways(t *testing.T) {
 	desiredState := api.PodSpec{
 		Containers: []api.Container{
@@ -2193,16 +2230,6 @@ func TestPodPhaseWithRestartAlways(t *testing.T) {
 	}
 	currentState := api.PodStatus{
 		Host: "machine",
-	}
-	runningState := api.ContainerStatus{
-		State: api.ContainerState{
-			Running: &api.ContainerStateRunning{},
-		},
-	}
-	stoppedState := api.ContainerStatus{
-		State: api.ContainerState{
-			Termination: &api.ContainerStateTerminated{},
-		},
 	}
 
 	tests := []struct {
@@ -2215,9 +2242,9 @@ func TestPodPhaseWithRestartAlways(t *testing.T) {
 			&api.Pod{
 				Spec: desiredState,
 				Status: api.PodStatus{
-					Info: map[string]api.ContainerStatus{
-						"containerA": runningState,
-						"containerB": runningState,
+					ContainerStatuses: []api.ContainerStatus{
+						runningState("containerA"),
+						runningState("containerB"),
 					},
 					Host: "machine",
 				},
@@ -2229,9 +2256,9 @@ func TestPodPhaseWithRestartAlways(t *testing.T) {
 			&api.Pod{
 				Spec: desiredState,
 				Status: api.PodStatus{
-					Info: map[string]api.ContainerStatus{
-						"containerA": stoppedState,
-						"containerB": stoppedState,
+					ContainerStatuses: []api.ContainerStatus{
+						stoppedState("containerA"),
+						stoppedState("containerB"),
 					},
 					Host: "machine",
 				},
@@ -2243,9 +2270,9 @@ func TestPodPhaseWithRestartAlways(t *testing.T) {
 			&api.Pod{
 				Spec: desiredState,
 				Status: api.PodStatus{
-					Info: map[string]api.ContainerStatus{
-						"containerA": runningState,
-						"containerB": stoppedState,
+					ContainerStatuses: []api.ContainerStatus{
+						runningState("containerA"),
+						stoppedState("containerB"),
 					},
 					Host: "machine",
 				},
@@ -2257,8 +2284,8 @@ func TestPodPhaseWithRestartAlways(t *testing.T) {
 			&api.Pod{
 				Spec: desiredState,
 				Status: api.PodStatus{
-					Info: map[string]api.ContainerStatus{
-						"containerA": runningState,
+					ContainerStatuses: []api.ContainerStatus{
+						runningState("containerA"),
 					},
 					Host: "machine",
 				},
@@ -2268,7 +2295,7 @@ func TestPodPhaseWithRestartAlways(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		if status := getPhase(&test.pod.Spec, test.pod.Status.Info); status != test.status {
+		if status := getPhase(&test.pod.Spec, test.pod.Status.ContainerStatuses); status != test.status {
 			t.Errorf("In test %s, expected %v, got %v", test.test, test.status, status)
 		}
 	}
@@ -2285,25 +2312,6 @@ func TestPodPhaseWithRestartNever(t *testing.T) {
 	currentState := api.PodStatus{
 		Host: "machine",
 	}
-	runningState := api.ContainerStatus{
-		State: api.ContainerState{
-			Running: &api.ContainerStateRunning{},
-		},
-	}
-	succeededState := api.ContainerStatus{
-		State: api.ContainerState{
-			Termination: &api.ContainerStateTerminated{
-				ExitCode: 0,
-			},
-		},
-	}
-	failedState := api.ContainerStatus{
-		State: api.ContainerState{
-			Termination: &api.ContainerStateTerminated{
-				ExitCode: -1,
-			},
-		},
-	}
 
 	tests := []struct {
 		pod    *api.Pod
@@ -2315,9 +2323,9 @@ func TestPodPhaseWithRestartNever(t *testing.T) {
 			&api.Pod{
 				Spec: desiredState,
 				Status: api.PodStatus{
-					Info: map[string]api.ContainerStatus{
-						"containerA": runningState,
-						"containerB": runningState,
+					ContainerStatuses: []api.ContainerStatus{
+						runningState("containerA"),
+						runningState("containerB"),
 					},
 					Host: "machine",
 				},
@@ -2329,9 +2337,9 @@ func TestPodPhaseWithRestartNever(t *testing.T) {
 			&api.Pod{
 				Spec: desiredState,
 				Status: api.PodStatus{
-					Info: map[string]api.ContainerStatus{
-						"containerA": succeededState,
-						"containerB": succeededState,
+					ContainerStatuses: []api.ContainerStatus{
+						succeededState("containerA"),
+						succeededState("containerB"),
 					},
 					Host: "machine",
 				},
@@ -2343,9 +2351,9 @@ func TestPodPhaseWithRestartNever(t *testing.T) {
 			&api.Pod{
 				Spec: desiredState,
 				Status: api.PodStatus{
-					Info: map[string]api.ContainerStatus{
-						"containerA": failedState,
-						"containerB": failedState,
+					ContainerStatuses: []api.ContainerStatus{
+						failedState("containerA"),
+						failedState("containerB"),
 					},
 					Host: "machine",
 				},
@@ -2357,9 +2365,9 @@ func TestPodPhaseWithRestartNever(t *testing.T) {
 			&api.Pod{
 				Spec: desiredState,
 				Status: api.PodStatus{
-					Info: map[string]api.ContainerStatus{
-						"containerA": runningState,
-						"containerB": succeededState,
+					ContainerStatuses: []api.ContainerStatus{
+						runningState("containerA"),
+						succeededState("containerB"),
 					},
 					Host: "machine",
 				},
@@ -2371,8 +2379,8 @@ func TestPodPhaseWithRestartNever(t *testing.T) {
 			&api.Pod{
 				Spec: desiredState,
 				Status: api.PodStatus{
-					Info: map[string]api.ContainerStatus{
-						"containerA": runningState,
+					ContainerStatuses: []api.ContainerStatus{
+						runningState("containerA"),
 					},
 					Host: "machine",
 				},
@@ -2382,7 +2390,7 @@ func TestPodPhaseWithRestartNever(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		if status := getPhase(&test.pod.Spec, test.pod.Status.Info); status != test.status {
+		if status := getPhase(&test.pod.Spec, test.pod.Status.ContainerStatuses); status != test.status {
 			t.Errorf("In test %s, expected %v, got %v", test.test, test.status, status)
 		}
 	}
@@ -2399,25 +2407,6 @@ func TestPodPhaseWithRestartOnFailure(t *testing.T) {
 	currentState := api.PodStatus{
 		Host: "machine",
 	}
-	runningState := api.ContainerStatus{
-		State: api.ContainerState{
-			Running: &api.ContainerStateRunning{},
-		},
-	}
-	succeededState := api.ContainerStatus{
-		State: api.ContainerState{
-			Termination: &api.ContainerStateTerminated{
-				ExitCode: 0,
-			},
-		},
-	}
-	failedState := api.ContainerStatus{
-		State: api.ContainerState{
-			Termination: &api.ContainerStateTerminated{
-				ExitCode: -1,
-			},
-		},
-	}
 
 	tests := []struct {
 		pod    *api.Pod
@@ -2429,9 +2418,9 @@ func TestPodPhaseWithRestartOnFailure(t *testing.T) {
 			&api.Pod{
 				Spec: desiredState,
 				Status: api.PodStatus{
-					Info: map[string]api.ContainerStatus{
-						"containerA": runningState,
-						"containerB": runningState,
+					ContainerStatuses: []api.ContainerStatus{
+						runningState("containerA"),
+						runningState("containerB"),
 					},
 					Host: "machine",
 				},
@@ -2443,9 +2432,9 @@ func TestPodPhaseWithRestartOnFailure(t *testing.T) {
 			&api.Pod{
 				Spec: desiredState,
 				Status: api.PodStatus{
-					Info: map[string]api.ContainerStatus{
-						"containerA": succeededState,
-						"containerB": succeededState,
+					ContainerStatuses: []api.ContainerStatus{
+						succeededState("containerA"),
+						succeededState("containerB"),
 					},
 					Host: "machine",
 				},
@@ -2457,9 +2446,9 @@ func TestPodPhaseWithRestartOnFailure(t *testing.T) {
 			&api.Pod{
 				Spec: desiredState,
 				Status: api.PodStatus{
-					Info: map[string]api.ContainerStatus{
-						"containerA": failedState,
-						"containerB": failedState,
+					ContainerStatuses: []api.ContainerStatus{
+						failedState("containerA"),
+						failedState("containerB"),
 					},
 					Host: "machine",
 				},
@@ -2471,9 +2460,9 @@ func TestPodPhaseWithRestartOnFailure(t *testing.T) {
 			&api.Pod{
 				Spec: desiredState,
 				Status: api.PodStatus{
-					Info: map[string]api.ContainerStatus{
-						"containerA": runningState,
-						"containerB": succeededState,
+					ContainerStatuses: []api.ContainerStatus{
+						runningState("containerA"),
+						succeededState("containerB"),
 					},
 					Host: "machine",
 				},
@@ -2485,8 +2474,8 @@ func TestPodPhaseWithRestartOnFailure(t *testing.T) {
 			&api.Pod{
 				Spec: desiredState,
 				Status: api.PodStatus{
-					Info: map[string]api.ContainerStatus{
-						"containerA": runningState,
+					ContainerStatuses: []api.ContainerStatus{
+						runningState("containerA"),
 					},
 					Host: "machine",
 				},
@@ -2496,9 +2485,22 @@ func TestPodPhaseWithRestartOnFailure(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		if status := getPhase(&test.pod.Spec, test.pod.Status.Info); status != test.status {
+		if status := getPhase(&test.pod.Spec, test.pod.Status.ContainerStatuses); status != test.status {
 			t.Errorf("In test %s, expected %v, got %v", test.test, test.status, status)
 		}
+	}
+}
+
+func getReadyStatus(cName string) api.ContainerStatus {
+	return api.ContainerStatus{
+		Name:  cName,
+		Ready: true,
+	}
+}
+func getNotReadyStatus(cName string) api.ContainerStatus {
+	return api.ContainerStatus{
+		Name:  cName,
+		Ready: false,
 	}
 }
 
@@ -2513,7 +2515,7 @@ func TestGetPodReadyCondition(t *testing.T) {
 	}}
 	tests := []struct {
 		spec     *api.PodSpec
-		info     api.PodInfo
+		info     []api.ContainerStatus
 		expected []api.PodCondition
 	}{
 		{
@@ -2523,7 +2525,7 @@ func TestGetPodReadyCondition(t *testing.T) {
 		},
 		{
 			spec:     &api.PodSpec{},
-			info:     api.PodInfo{},
+			info:     []api.ContainerStatus{},
 			expected: ready,
 		},
 		{
@@ -2532,7 +2534,7 @@ func TestGetPodReadyCondition(t *testing.T) {
 					{Name: "1234"},
 				},
 			},
-			info:     api.PodInfo{},
+			info:     []api.ContainerStatus{},
 			expected: unready,
 		},
 		{
@@ -2541,8 +2543,8 @@ func TestGetPodReadyCondition(t *testing.T) {
 					{Name: "1234"},
 				},
 			},
-			info: api.PodInfo{
-				"1234": api.ContainerStatus{Ready: true},
+			info: []api.ContainerStatus{
+				getReadyStatus("1234"),
 			},
 			expected: ready,
 		},
@@ -2553,9 +2555,9 @@ func TestGetPodReadyCondition(t *testing.T) {
 					{Name: "5678"},
 				},
 			},
-			info: api.PodInfo{
-				"1234": api.ContainerStatus{Ready: true},
-				"5678": api.ContainerStatus{Ready: true},
+			info: []api.ContainerStatus{
+				getReadyStatus("1234"),
+				getReadyStatus("5678"),
 			},
 			expected: ready,
 		},
@@ -2566,8 +2568,8 @@ func TestGetPodReadyCondition(t *testing.T) {
 					{Name: "5678"},
 				},
 			},
-			info: api.PodInfo{
-				"1234": api.ContainerStatus{Ready: true},
+			info: []api.ContainerStatus{
+				getReadyStatus("1234"),
 			},
 			expected: unready,
 		},
@@ -2578,9 +2580,9 @@ func TestGetPodReadyCondition(t *testing.T) {
 					{Name: "5678"},
 				},
 			},
-			info: api.PodInfo{
-				"1234": api.ContainerStatus{Ready: true},
-				"5678": api.ContainerStatus{Ready: false},
+			info: []api.ContainerStatus{
+				getReadyStatus("1234"),
+				getNotReadyStatus("5678"),
 			},
 			expected: unready,
 		},
@@ -3085,26 +3087,47 @@ func TestValidateContainerStatus(t *testing.T) {
 	kubelet := testKubelet.kubelet
 	containerName := "x"
 	testCases := []struct {
-		podInfo api.PodInfo
-		success bool
+		statuses []api.ContainerStatus
+		success  bool
 	}{
 		{
-			podInfo: api.PodInfo{containerName: api.ContainerStatus{State: api.ContainerState{Running: &api.ContainerStateRunning{}}}},
+			statuses: []api.ContainerStatus{
+				{
+					Name: containerName,
+					State: api.ContainerState{
+						Running: &api.ContainerStateRunning{},
+					},
+				},
+			},
 			success: true,
 		},
 		{
-			podInfo: api.PodInfo{containerName: api.ContainerStatus{State: api.ContainerState{Termination: &api.ContainerStateTerminated{}}}},
+			statuses: []api.ContainerStatus{
+				{
+					Name: containerName,
+					State: api.ContainerState{
+						Termination: &api.ContainerStateTerminated{},
+					},
+				},
+			},
 			success: true,
 		},
 		{
-			podInfo: api.PodInfo{containerName: api.ContainerStatus{State: api.ContainerState{Waiting: &api.ContainerStateWaiting{}}}},
+			statuses: []api.ContainerStatus{
+				{
+					Name: containerName,
+					State: api.ContainerState{
+						Waiting: &api.ContainerStateWaiting{},
+					},
+				},
+			},
 			success: false,
 		},
 	}
 
 	for i, tc := range testCases {
 		_, err := kubelet.validateContainerStatus(&api.PodStatus{
-			Info: tc.podInfo,
+			ContainerStatuses: tc.statuses,
 		}, containerName)
 		if tc.success {
 			if err != nil {
@@ -3115,7 +3138,7 @@ func TestValidateContainerStatus(t *testing.T) {
 		}
 	}
 	if _, err := kubelet.validateContainerStatus(&api.PodStatus{
-		Info: testCases[0].podInfo,
+		ContainerStatuses: testCases[0].statuses,
 	}, "blah"); err == nil {
 		t.Errorf("expected error with invalid container name")
 	}

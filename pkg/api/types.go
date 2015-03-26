@@ -593,6 +593,8 @@ type ContainerState struct {
 }
 
 type ContainerStatus struct {
+	// Each container in a pod must have a unique name.
+	Name string `name of the container; must be a DNS_LABEL and unique within the pod; cannot be updated"`
 	// TODO(dchen1107): Should we rename PodStatus to a more generic name or have a separate states
 	// defined for container?
 	State                ContainerState `json:"state,omitempty"`
@@ -646,15 +648,12 @@ type PodCondition struct {
 	Status ConditionStatus  `json:"status"`
 }
 
-// PodInfo contains one entry for every container with available info.
-type PodInfo map[string]ContainerStatus
-
 // PodContainerInfo is a wrapper for PodInfo that can be encode/decoded
 // DEPRECATED: Replaced with PodStatusResult
 type PodContainerInfo struct {
 	TypeMeta      `json:",inline"`
 	ObjectMeta    `json:"metadata,omitempty"`
-	ContainerInfo PodInfo `json:"containerInfo"`
+	ContainerInfo []ContainerStatus `json:"containerInfo"`
 }
 
 // RestartPolicy describes how the container should be restarted.
@@ -726,13 +725,12 @@ type PodStatus struct {
 	HostIP string `json:"hostIP,omitempty"`
 	PodIP  string `json:"podIP,omitempty"`
 
-	// The key of this map is the *name* of the container within the manifest; it has one
-	// entry per container in the manifest. The value of this map is currently the output
-	// of `docker inspect`. This output format is *not* final and should not be relied
-	// upon.
+	// The list has one entry per container in the manifest. Each entry is
+	// currently the output of `docker inspect`. This output format is *not*
+	// final and should not be relied upon.
 	// TODO: Make real decisions about what our info should look like. Re-enable fuzz test
 	// when we have done this.
-	Info PodInfo `json:"info,omitempty"`
+	ContainerStatuses []ContainerStatus `json:"containerStatuses,omitempty"`
 }
 
 // PodStatusResult is a wrapper for PodStatus returned by kubelet that can be encode/decoded

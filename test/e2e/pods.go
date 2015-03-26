@@ -57,7 +57,7 @@ func runLivenessTest(c *client.Client, podDescr *api.Pod) {
 	By("checking the pod's current state and verifying that restartCount is present")
 	pod, err := c.Pods(ns).Get(podDescr.Name)
 	expectNoError(err, fmt.Sprintf("getting pod %s in namespace %s", podDescr.Name, ns))
-	initialRestartCount := pod.Status.Info["liveness"].RestartCount
+	initialRestartCount := api.GetExistingContainerStatus(pod.Status.ContainerStatuses, "liveness").RestartCount
 	By(fmt.Sprintf("Initial restart count of pod %s is %d", podDescr.Name, initialRestartCount))
 
 	// Wait for at most 48 * 5 = 240s = 4 minutes until restartCount is incremented
@@ -67,7 +67,7 @@ func runLivenessTest(c *client.Client, podDescr *api.Pod) {
 		time.Sleep(5 * time.Second)
 		pod, err = c.Pods(ns).Get(podDescr.Name)
 		expectNoError(err, fmt.Sprintf("getting pod %s", podDescr.Name))
-		restartCount := pod.Status.Info["liveness"].RestartCount
+		restartCount := api.GetExistingContainerStatus(pod.Status.ContainerStatuses, "liveness").RestartCount
 		By(fmt.Sprintf("Restart count of pod %s in namespace %s is now %d", podDescr.Name, ns, restartCount))
 		if restartCount > initialRestartCount {
 			By(fmt.Sprintf("Restart count of pod %s in namespace %s increased from %d to %d during the test", podDescr.Name, ns, initialRestartCount, restartCount))
