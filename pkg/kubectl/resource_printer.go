@@ -32,6 +32,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/conversion"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume"
 	"github.com/docker/docker/pkg/units"
 	"github.com/ghodss/yaml"
 	"github.com/golang/glog"
@@ -237,6 +238,8 @@ var limitRangeColumns = []string{"NAME"}
 var resourceQuotaColumns = []string{"NAME"}
 var namespaceColumns = []string{"NAME", "LABELS", "STATUS"}
 var secretColumns = []string{"NAME", "DATA"}
+var persistentVolumeColumns = []string{"NAME", "LABELS", "CAPACITY", "ACCESSMODES", "STATUS", "CLAIM"}
+var persistentVolumeClaimColumns = []string{"NAME", "LABELS", "STATUS", "VOLUME"}
 
 // addDefaultHandlers adds print handlers for default Kubernetes types.
 func (h *HumanReadablePrinter) addDefaultHandlers() {
@@ -261,6 +264,10 @@ func (h *HumanReadablePrinter) addDefaultHandlers() {
 	h.Handler(namespaceColumns, printNamespaceList)
 	h.Handler(secretColumns, printSecret)
 	h.Handler(secretColumns, printSecretList)
+	h.Handler(persistentVolumeClaimColumns, printPersistentVolumeClaim)
+	h.Handler(persistentVolumeClaimColumns, printPersistentVolumeClaimList)
+	h.Handler(persistentVolumeColumns, printPersistentVolume)
+	h.Handler(persistentVolumeColumns, printPersistentVolumeList)
 }
 
 func (h *HumanReadablePrinter) unknown(data []byte, w io.Writer) error {
@@ -500,6 +507,50 @@ func printNode(node *api.Node, w io.Writer) error {
 func printNodeList(list *api.NodeList, w io.Writer) error {
 	for _, node := range list.Items {
 		if err := printNode(&node, w); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func printPersistentVolume(pv *api.PersistentVolume, w io.Writer) error {
+	claimRefUID := ""
+	if pv.Spec.ClaimRef != nil {
+		claimRefUID += pv.Spec.ClaimRef.Name
+		claimRefUID += " / "
+		claimRefUID += string(pv.Spec.ClaimRef.UID)
+	}
+
+	modesStr := volume.GetAccessModesAsString(pv.Spec.AccessModes)
+
+	aQty := pv.Spec.Capacity[api.ResourceStorage]
+	aSize := aQty.Value()
+
+	_, err := fmt.Fprintf(w, "%s\t%s\t%d\t%s\t%s\t%s\n", pv.Name, pv.Labels, aSize, modesStr, pv.Status.Phase, claimRefUID)
+	return err
+}
+
+func printPersistentVolumeList(list *api.PersistentVolumeList, w io.Writer) error {
+	for _, pv := range list.Items {
+		if err := printPersistentVolume(&pv, w); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func printPersistentVolumeClaim(pvc *api.PersistentVolumeClaim, w io.Writer) error {
+	volumeRefUID := ""
+	if pvc.Status.VolumeRef != nil {
+		volumeRefUID = string(pvc.Status.VolumeRef.UID)
+	}
+	_, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", pvc.Name, pvc.Labels, pvc.Status.Phase, volumeRefUID)
+	return err
+}
+
+func printPersistentVolumeClaimList(list *api.PersistentVolumeClaimList, w io.Writer) error {
+	for _, psd := range list.Items {
+		if err := printPersistentVolumeClaim(&psd, w); err != nil {
 			return err
 		}
 	}

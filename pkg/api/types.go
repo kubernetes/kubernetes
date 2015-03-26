@@ -224,8 +224,9 @@ type PersistentVolumeSpec struct {
 	// Resources represents the actual resources of the volume
 	Capacity ResourceList `json:"capacity`
 	// Source represents the location and type of a volume to mount.
-	// AccessModeTypes are inferred from the Source.
 	PersistentVolumeSource `json:",inline"`
+	// AccessModes contains all ways the volume can be mounted
+	AccessModes []AccessModeType `json:"accessModes,omitempty"`
 	// holds the binding reference to a PersistentVolumeClaim
 	ClaimRef *ObjectReference `json:"claimRef,omitempty"`
 }
