@@ -130,7 +130,7 @@ This will cause all pods to see the MongoDB server apparently running on <ip>:27
 Thus, once created, the service proxy on each minion is configured to set up a proxy on the specified port (in this case port 27017).
 
 
-make sure that the mongodb pod is running and listening by running:
+Make sure that the mongodb pod is running and listening by running:
 
 ```shell
 
