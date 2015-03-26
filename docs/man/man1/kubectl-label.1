@@ -22,6 +22,10 @@ If \-\-resource\-version is specified, then updates will use this resource versi
 
 .SH OPTIONS
 .PP
+\fB\-\-all\fP=false
+    select all resources in the namespace of the specified resource types
+
+.PP
 \fB\-h\fP, \fB\-\-help\fP=false
     help for label
 
@@ -43,7 +47,11 @@ If \-\-resource\-version is specified, then updates will use this resource versi
 
 .PP
 \fB\-\-resource\-version\fP=""
-    If non\-empty, the labels update will only succeed if this is the current resource\-version for the object.
+    If non\-empty, the labels update will only succeed if this is the current resource\-version for the object. Only valid when specifying a single resource.
+
+.PP
+\fB\-l\fP, \fB\-\-selector\fP=""
+    Selector (label query) to filter on
 
 .PP
 \fB\-t\fP, \fB\-\-template\fP=""
@@ -163,6 +171,9 @@ $ kubectl label pods foo unhealthy=true
 
 // Update pod 'foo' with the label 'status' and the value 'unhealthy', overwriting any existing value.
 $ kubectl label \-\-overwrite pods foo status=unhealthy
+
+// Update all pods in the namespace
+$ kubectl label pods \-\-all status=unhealthy
 
 // Update pod 'foo' only if the resource is unchanged from version 1.
 $ kubectl label pods foo status=unhealthy \-\-resource\-version=1
