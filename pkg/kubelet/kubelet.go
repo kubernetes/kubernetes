@@ -1056,29 +1056,22 @@ func (kl *Kubelet) pullImage(img string, ref *api.ObjectReference) error {
 	return nil
 }
 
-// Kill all containers in a pod.  Returns the number of containers deleted and an error if one occurs.
-func (kl *Kubelet) killContainersInPod(pod *api.Pod, runningPod kubecontainer.Pod) (int, error) {
-	podFullName := kubecontainer.GetPodFullName(pod)
-
-	count := 0
-	errs := make(chan error, len(pod.Spec.Containers))
+// Kill all running containers in a pod (includes the pod infra container).
+func (kl *Kubelet) killPod(runningPod kubecontainer.Pod) error {
+	// Send the kills in parallel since they may take a long time.
+	errs := make(chan error, len(runningPod.Containers))
 	wg := sync.WaitGroup{}
-	for _, container := range pod.Spec.Containers {
-		// TODO: Consider being more aggressive: kill all containers with this pod UID, period.
-		c := runningPod.FindContainerByName(container.Name)
-		if c != nil {
-			count++
-			wg.Add(1)
-			go func() {
-				defer util.HandleCrash()
-				err := kl.killContainer(c)
-				if err != nil {
-					glog.Errorf("Failed to delete container: %v; Skipping pod %q", err, podFullName)
-					errs <- err
-				}
-				wg.Done()
-			}()
-		}
+	for _, container := range runningPod.Containers {
+		wg.Add(1)
+		go func(container *kubecontainer.Container) {
+			defer util.HandleCrash()
+			err := kl.killContainer(container)
+			if err != nil {
+				glog.Errorf("Failed to delete container: %v; Skipping pod %q", err, runningPod.ID)
+				errs <- err
+			}
+			wg.Done()
+		}(container)
 	}
 	wg.Wait()
 	close(errs)
@@ -1087,9 +1080,9 @@ func (kl *Kubelet) killContainersInPod(pod *api.Pod, runningPod kubecontainer.Po
 		for err := range errs {
 			errList = append(errList, err)
 		}
-		return -1, fmt.Errorf("failed to delete containers (%v)", errList)
+		return fmt.Errorf("failed to delete containers (%v)", errList)
 	}
-	return count, nil
+	return nil
 }
 
 type empty struct{}
@@ -1313,6 +1306,7 @@ func (kl *Kubelet) computePodContainerChanges(pod *api.Pod, runningPod kubeconta
 	}, nil
 }
 
+// Check whether we can run the specified pod.
 func (kl *Kubelet) canRunPod(pod *api.Pod) error {
 	if pod.Spec.HostNetwork {
 		allowed, err := allowHostNetwork(pod)
@@ -1323,27 +1317,13 @@ func (kl *Kubelet) canRunPod(pod *api.Pod) error {
 			return fmt.Errorf("pod with UID %q specified host networking, but is disallowed", pod.UID)
 		}
 	}
+	// TODO(vmarmol): Check Privileged too.
 	return nil
-}
-
-func (kl *Kubelet) killContainersInRunningPod(runningPod kubecontainer.Pod) {
-	for _, container := range runningPod.Containers {
-		glog.V(3).Infof("Killing unwanted container %+v", container)
-		err := kl.killContainer(container)
-		if err != nil {
-			glog.Errorf("Error killing container: %v", err)
-		}
-	}
 }
 
 func (kl *Kubelet) syncPod(pod *api.Pod, mirrorPod *api.Pod, runningPod kubecontainer.Pod) error {
 	podFullName := kubecontainer.GetPodFullName(pod)
 	uid := pod.UID
-	err := kl.canRunPod(pod)
-	if err != nil {
-		kl.killContainersInRunningPod(runningPod)
-		return err
-	}
 
 	// Before returning, regenerate status and store it in the cache.
 	defer func() {
@@ -1364,6 +1344,13 @@ func (kl *Kubelet) syncPod(pod *api.Pod, mirrorPod *api.Pod, runningPod kubecont
 		}
 	}()
 
+	// Kill pods we can't run.
+	err := kl.canRunPod(pod)
+	if err != nil {
+		kl.killPod(runningPod)
+		return err
+	}
+
 	containerChanges, err := kl.computePodContainerChanges(pod, runningPod)
 	glog.V(3).Infof("Got container changes for pod %q: %+v", podFullName, containerChanges)
 	if err != nil {
@@ -1378,14 +1365,7 @@ func (kl *Kubelet) syncPod(pod *api.Pod, mirrorPod *api.Pod, runningPod kubecont
 		}
 
 		// Killing phase: if we want to start new infra container, or nothing is running kill everything (including infra container)
-		// TODO(yifan): Replace with KillPod().
-		podInfraContainer := runningPod.FindContainerByName(dockertools.PodInfraContainerName)
-		if podInfraContainer != nil {
-			if err := kl.killContainer(podInfraContainer); err != nil {
-				glog.Warningf("Failed to kill pod infra container %q: %v", podInfraContainer.ID, err)
-			}
-		}
-		_, err = kl.killContainersInPod(pod, runningPod)
+		err = kl.killPod(runningPod)
 		if err != nil {
 			return err
 		}
