@@ -13,9 +13,9 @@ var inspect = require('util').inspect;
 var util = require('./util.js');
 
 var coreos_image_ids = {
-  'stable': '2b171e93f07c4903bcad35bda10acf22__CoreOS-Stable-557.2.0',
-  'beta': '2b171e93f07c4903bcad35bda10acf22__CoreOS-Beta-557.2.0',
-  'alpha': '2b171e93f07c4903bcad35bda10acf22__CoreOS-Alpha-584.0.0',
+  'stable': '2b171e93f07c4903bcad35bda10acf22__CoreOS-Stable-607.0.0',
+  'beta': '2b171e93f07c4903bcad35bda10acf22__CoreOS-Beta-612.1.0', // untested
+  'alpha': '2b171e93f07c4903bcad35bda10acf22__CoreOS-Alpha-626.0.0', // untested
 };
 
 var conf = {};
@@ -165,17 +165,17 @@ exports.queue_default_network = function () {
 
 exports.queue_storage_if_needed = function() {
   if (!process.env['AZURE_STORAGE_ACCOUNT']) {
-    conf.storage_account = util.rand_suffix;
+    conf.resources['storage_account'] = util.rand_suffix;
     task_queue.push([
       'storage', 'account', 'create',
       get_location(),
-      conf.storage_account,
+      conf.resources['storage_account'],
     ]);
-    process.env['AZURE_STORAGE_ACCOUNT'] = conf.storage_account;
+    process.env['AZURE_STORAGE_ACCOUNT'] = conf.resources['storage_account'];
   } else {
     // Preserve it for resizing, so we don't create a new one by accedent,
     // when the environment variable is unset
-    conf.storage_account = process.env['AZURE_STORAGE_ACCOUNT'];
+    conf.resources['storage_account'] = process.env['AZURE_STORAGE_ACCOUNT'];
   }
 };
 
@@ -247,8 +247,7 @@ exports.destroy_cluster = function (state_file) {
   });
 
   task_queue.push(['network', 'vnet', 'delete', '--quiet', conf.resources['vnet']]);
-
-  // TODO: add storage deletion when AZURE_STORAGE_ACCOUNT is unset (depends on Azure/azure-xplat-cli#1615)
+  task_queue.push(['storage', 'account', 'delete', '--quiet', conf.resources['storage_account']]);
 
   exports.run_task_queue();
 };
@@ -265,5 +264,5 @@ exports.load_state_for_resizing = function (state_file, node_type, new_nodes) {
   conf.nodes[node_type] += new_nodes;
   hosts.collection = conf.hosts;
   hosts.ssh_port_counter += conf.hosts.length;
-  process.env['AZURE_STORAGE_ACCOUNT'] = conf.storage_account;
+  process.env['AZURE_STORAGE_ACCOUNT'] = conf.resources['storage_account'];
 }
