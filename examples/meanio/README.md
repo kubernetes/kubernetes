@@ -1,18 +1,15 @@
 ## MEAN.io example
 
 This example shows how to build a simple, multi-tier web application using Kubernetes and Docker.
-it is based on the [guestbook](https://github.com/GoogleCloudPlatform/kubernetes/tree/master/examples/guestbook) example.
+It is based on the [guestbook](https://github.com/GoogleCloudPlatform/kubernetes/tree/master/examples/guestbook) example.
 
 The example consists of:
-- A web framework using MEAN framework.
+- A nodejs web app using MEAN framework.
 - A MongoDB server.
 
 ### Step Zero: Prerequisites
 
-This example assumes that you have a basic understanding of kubernetes services and that you have forked the repository and [turned up a Kubernetes cluster](https://github.com/GoogleCloudPlatform/kubernetes#contents):
-This example requires a kubernetes cluster.
-
-*If* you are running from source, replace commands such as "kubectl" below with calls to cluster/kubectl.sh.
+This example requires a kubernetes cluster. use the prerequisites of the [guestbook](https://github.com/GoogleCloudPlatform/kubernetes/tree/master/examples/guestbook#step-zero-prerequisites) example.
 
 ### Step One: Fire up the MongoDB Server
 
