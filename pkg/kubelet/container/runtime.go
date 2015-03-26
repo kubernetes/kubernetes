@@ -89,6 +89,31 @@ type Container struct {
 	Created int64
 }
 
+// RunContainerOptions specify the options which are necessary for running containers
+type RunContainerOptions struct {
+	// The environment variables, they are in the form of 'key=value'.
+	Envs []string
+	// The mounts for the containers, they are in the form of:
+	// 'hostPath:containerPath', or
+	// 'hostPath:containerPath:ro', if the path read only.
+	Binds []string
+	// If the container has specified the TerminationMessagePath, then
+	// this directory will be used to create and mount the log file to
+	// container.TerminationMessagePath
+	PodContainerDir string
+	// The list of DNS servers for the container to use.
+	DNS []string
+	// The list of DNS search domains.
+	DNSSearch []string
+	// Docker namespace identifiers(currently we have 'NetMode' and 'IpcMode'.
+	// These are for docker to attach a container in a pod to the pod infra
+	// container's namespace.
+	// TODO(yifan): Remove these after we pushed the pod infra container logic
+	// into docker's container runtime.
+	NetMode string
+	IpcMode string
+}
+
 type Pods []*Pod
 
 // FindPodByID returns a pod in the pod list by UID. It will return an empty pod
