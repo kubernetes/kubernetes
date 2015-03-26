@@ -330,6 +330,21 @@ function ensure-iam-profiles {
   }
 }
 
+# Wait for instance to be in running state
+function wait-for-instance-running {
+  instance_id=$1
+  while true; do
+    instance_state=$($AWS_CMD describe-instances --instance-ids $instance_id | expect_instance_states running)
+    if [[ "$instance_state" == "" ]]; then
+      break
+    else
+      echo "Waiting for instance ${instance_id} to spawn"
+      echo "Sleeping for 3 seconds..."
+      sleep 3
+    fi
+  done
+}
+
 function kube-up {
   find-release-tars
   upload-server-tars
@@ -467,6 +482,9 @@ function kube-up {
     else
       KUBE_MASTER=${MASTER_NAME}
       KUBE_MASTER_IP=${ip}
+      # We are not able to add a route to the instance until that instance is in "running" state.
+      wait-for-instance-running $master_id
+      sleep 10
       $AWS_CMD create-route --route-table-id $ROUTE_TABLE_ID --destination-cidr-block ${MASTER_IP_RANGE} --instance-id $master_id > $LOG
 
       echo -e " ${color_green}[master running @${KUBE_MASTER_IP}]${color_norm}"
@@ -532,19 +550,10 @@ function kube-up {
     # We are not able to add a route to the instance until that instance is in "running" state.
     # This is quite an ugly solution to this problem. In Bash 4 we could use assoc. arrays to do this for
     # all instances at once but we can't be sure we are running Bash 4.
-    while true; do
-      instance_state=$($AWS_CMD describe-instances --instance-ids $minion_id | expect_instance_states running)
-      if [[ "$instance_state" == "" ]]; then
-        echo "Minion ${MINION_NAMES[$i]} running"
-        sleep 10
-        $AWS_CMD create-route --route-table-id $ROUTE_TABLE_ID --destination-cidr-block ${MINION_IP_RANGES[$i]} --instance-id $minion_id > $LOG
-        break
-      else
-        echo "Waiting for minion ${MINION_NAMES[$i]} to spawn"
-        echo "Sleeping for 3 seconds..."
-        sleep 3
-      fi
-    done
+    wait-for-instance-running $minion_id
+    echo "Minion ${MINION_NAMES[$i]} running"
+    sleep 10
+    $AWS_CMD create-route --route-table-id $ROUTE_TABLE_ID --destination-cidr-block ${MINION_IP_RANGES[$i]} --instance-id $minion_id > $LOG
   done
 
   FAIL=0
