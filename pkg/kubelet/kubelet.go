@@ -25,6 +25,7 @@ import (
 	"net/http"
 	"os"
 	"path"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -675,7 +676,7 @@ func (kl *Kubelet) runContainer(pod *api.Pod, container *api.Container, podVolum
 		glog.Errorf("Couldn't make a ref to pod %v, container %v: '%v'", pod.Name, container.Name, err)
 	}
 
-	envVariables, err := kl.makeEnvironmentVariables(pod.Namespace, container)
+	envVariables, err := kl.makeEnvironmentVariables(pod, container)
 	if err != nil {
 		return "", err
 	}
@@ -831,8 +832,17 @@ func (kl *Kubelet) getServiceEnvVarMap(ns string) (map[string]string, error) {
 	return m, nil
 }
 
-// Make the service environment variables for a pod in the given namespace.
-func (kl *Kubelet) makeEnvironmentVariables(ns string, container *api.Container) ([]string, error) {
+func (kl *Kubelet) getDownwardAPIEnvVarMap(pod *api.Pod) map[string]string {
+	return map[string]string{
+		"K8S_API_POD_NAME": pod.Name,
+	}
+}
+
+var parameterExp = regexp.MustCompile(`(^|[^\\])\$\{([a-zA-Z0-9\_]+)\}`)
+
+// Make the service environment variables for the given pod.
+func (kl *Kubelet) makeEnvironmentVariables(pod *api.Pod, container *api.Container) ([]string, error) {
+
 	var result []string
 	// Note:  These are added to the docker.Config, but are not included in the checksum computed
 	// by dockertools.BuildDockerName(...).  That way, we can still determine whether an
@@ -843,9 +853,52 @@ func (kl *Kubelet) makeEnvironmentVariables(ns string, container *api.Container)
 	// To avoid this users can: (1) wait between starting a service and starting; or (2) detect
 	// missing service env var and exit and be restarted; or (3) use DNS instead of env vars
 	// and keep trying to resolve the DNS name of the service (recommended).
-	serviceEnv, err := kl.getServiceEnvVarMap(ns)
+	serviceEnv, err := kl.getServiceEnvVarMap(pod.Namespace)
 	if err != nil {
 		return result, err
+	}
+
+	downwardAPIEnv := kl.getDownwardAPIEnvVarMap(pod)
+	resolvedVars := make(map[string]string)
+
+	sources := []map[string]string{
+		resolvedVars,
+		serviceEnv,
+		downwardAPIEnv,
+	}
+
+	// iterate through the container's Env
+	for _, value := range container.Env {
+		envValue := value.Value
+		for _, match := range parameterExp.FindAllStringSubmatch(envValue, -1) {
+			if len(match) > 2 {
+				// default back to the value of the var name if it cannot be resolved
+				varName := match[2]
+				varValue := match[2]
+				resolved := false
+
+				for _, source := range sources {
+					sourceValue, ok := source[varName]
+					if ok {
+						varValue = sourceValue
+						resolved = true
+						break
+					}
+				}
+
+				if resolved {
+					glog.V(3).Infof("Resolved var %v to %v for pod %v/%v", varName, varValue, pod.Namespace, pod.Name)
+					envValue = strings.Replace(envValue, match[0], match[1]+varValue, 1)
+				} else {
+					// TODO: add pod info to message
+					glog.Errorf("Couldn't resolve var %v for pod %v/%v", varName, pod.Namespace, pod.Name)
+				}
+			}
+		}
+
+		// Remove escapes
+		envValue = strings.Replace(envValue, "\\${", "${", -1)
+		resolvedVars[value.Name] = envValue
 	}
 
 	for _, value := range container.Env {
@@ -855,7 +908,7 @@ func (kl *Kubelet) makeEnvironmentVariables(ns string, container *api.Container)
 		// env vars.
 		// TODO: remove this net line once all platforms use apiserver+Pods.
 		delete(serviceEnv, value.Name)
-		result = append(result, fmt.Sprintf("%s=%s", value.Name, value.Value))
+		result = append(result, fmt.Sprintf("%s=%s", value.Name, resolvedVars[value.Name]))
 	}
 
 	// Append remaining service env vars.

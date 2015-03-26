@@ -19,6 +19,7 @@ package kubelet
 import (
 	"bytes"
 	"errors"
+	"flag"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -56,6 +57,7 @@ import (
 func init() {
 	api.ForTesting_ReferencesAllowBlankSelfLinks = true
 	util.ReallyCrash = true
+	flag.Set("v", "5")
 }
 
 type TestKubelet struct {
@@ -1944,7 +1946,7 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 
 	testCases := []struct {
 		name                   string         // the name of the test case
-		ns                     string         // the namespace to generate environment for
+		pod                    *api.Pod       // the namespace to generate environment for
 		container              *api.Container // the container to use
 		masterServiceNamespace string         // the namespace to read master service info from
 		nilLister              bool           // whether the lister should be nil
@@ -1953,7 +1955,7 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 	}{
 		{
 			"api server = Y, kubelet = Y",
-			"test1",
+			&api.Pod{ObjectMeta: api.ObjectMeta{Namespace: "test1"}},
 			&api.Container{
 				Env: []api.EnvVar{
 					{Name: "FOO", Value: "BAR"},
@@ -1994,7 +1996,7 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 		},
 		{
 			"api server = Y, kubelet = N",
-			"test1",
+			&api.Pod{ObjectMeta: api.ObjectMeta{Namespace: "test1"}},
 			&api.Container{
 				Env: []api.EnvVar{
 					{Name: "FOO", Value: "BAR"},
@@ -2021,7 +2023,7 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 		},
 		{
 			"api server = N; kubelet = Y",
-			"test1",
+			&api.Pod{ObjectMeta: api.ObjectMeta{Namespace: "test1"}},
 			&api.Container{
 				Env: []api.EnvVar{
 					{Name: "FOO", Value: "BAZ"},
@@ -2055,7 +2057,7 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 		},
 		{
 			"master service in pod ns",
-			"test2",
+			&api.Pod{ObjectMeta: api.ObjectMeta{Namespace: "test2"}},
 			&api.Container{
 				Env: []api.EnvVar{
 					{Name: "FOO", Value: "ZAP"},
@@ -2089,7 +2091,7 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 		},
 		{
 			"pod in master service ns",
-			"kubernetes",
+			&api.Pod{ObjectMeta: api.ObjectMeta{Namespace: "kubernetes"}},
 			&api.Container{},
 			"kubernetes",
 			false,
@@ -2117,6 +2119,65 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 				"KUBERNETES_RO_PORT_8087_TCP_ADDR=1.2.3.7"),
 			21,
 		},
+		{
+			"simple substitution",
+			&api.Pod{ObjectMeta: api.ObjectMeta{Namespace: "unknown", Name: "test-pod"}},
+			&api.Container{
+				Env: []api.EnvVar{
+					{Name: "BAR", Value: "bar"},
+					{Name: "FOO", Value: "${BAR}"},
+				},
+			},
+			"kubernetes",
+			true,
+			util.NewStringSet(
+				"BAR=bar",
+				"FOO=bar",
+			),
+			2,
+		},
+		{
+			"slightly more complex substitution",
+			&api.Pod{ObjectMeta: api.ObjectMeta{Namespace: "unknown", Name: "test-pod"}},
+			&api.Container{
+				Env: []api.EnvVar{
+					{Name: "BAR", Value: "bar"},
+					{Name: "FOO", Value: "${BAR}"},
+					{Name: "ZOO", Value: "${FOO}-${BAR}"},
+					{Name: "BOO", Value: "--${FOO}"},
+					{Name: "MOO", Value: "${FOO"},
+					{Name: "UNRESOLVED", Value: "${SOMETHING}"},
+					{Name: "ESCAPED", Value: "\\${BAR}"},
+				},
+			},
+			"kubernetes",
+			true,
+			util.NewStringSet(
+				"BAR=bar",
+				"FOO=bar",
+				"ZOO=bar-bar",
+				"BOO=--bar",
+				"MOO=${FOO",
+				"UNRESOLVED=${SOMETHING}",
+				"ESCAPED=${BAR}",
+			),
+			7,
+		},
+		{
+			"downward API",
+			&api.Pod{ObjectMeta: api.ObjectMeta{Namespace: "unknown", Name: "test-pod"}},
+			&api.Container{
+				Env: []api.EnvVar{
+					{Name: "POD_NAME", Value: "${K8S_API_POD_NAME}"},
+				},
+			},
+			"kubernetes",
+			true,
+			util.NewStringSet(
+				"POD_NAME=test-pod",
+			),
+			1,
+		},
 	}
 
 	for _, tc := range testCases {
@@ -2129,7 +2190,7 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 			kl.serviceLister = testServiceLister{services}
 		}
 
-		result, err := kl.makeEnvironmentVariables(tc.ns, tc.container)
+		result, err := kl.makeEnvironmentVariables(tc.pod, tc.container)
 		if err != nil {
 			t.Errorf("[%v] Unexpected error: %v", tc.name, err)
 		}
