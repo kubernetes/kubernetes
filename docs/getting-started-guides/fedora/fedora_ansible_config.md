@@ -112,6 +112,19 @@ For this example, as shown earlier, we can do something like this...
 
 **Run the network setup playbook**
 
+There are two ways to do this: via flannel, or using NetworkManager. 
+
+Flannel is a cleaner mechanism to use, and is the recommended choice.
+
+- If you are using flannel, you should check the kubernetes-ansible repository above... Currently, 
+
+you essentially have to (1) update group_vars/all.yml, and then (2) run
+```
+ansible-playbook -i inventory flannel.yml
+```
+
+- On the other hand, if using the NetworkManager based setup (i.e. you do not  want to use flannel).
+
 On EACH node, make sure NetworkManager is installed, and the service "NetworkManager" is running, then you can run 
 the network manager playbook...
 
