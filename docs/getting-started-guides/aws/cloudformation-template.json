@@ -305,18 +305,12 @@
     "KubernetesNodeLaunchConfig": {
       "Type": "AWS::AutoScaling::LaunchConfiguration",
       "Properties": {
-        "SubnetId": {"Fn::If": ["UseEC2Classic", {"Ref": "AWS::NoValue"}, {"Ref": "SubnetId"}]},
         "ImageId": {"Fn::FindInMap" : ["RegionMap", {"Ref": "AWS::Region" }, "AMI" ]},
         "InstanceType": {"Ref": "InstanceType"},
         "KeyName": {"Ref": "KeyPair"},
         "SecurityGroups": [{"Fn::If": [
           "UseEC2Classic",
           {"Ref": "KubernetesSecurityGroup"},
-          {"Ref": "AWS::NoValue"}]
-        }],
-        "SecurityGroupIds": [{"Fn::If": [
-          "UseEC2Classic",
-          {"Ref": "AWS::NoValue"},
           {"Fn::GetAtt": ["KubernetesSecurityGroup", "GroupId"]}]
         }],
         "UserData": { "Fn::Base64": {"Fn::Join" : ["", [
