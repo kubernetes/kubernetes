@@ -361,7 +361,3 @@ func bestPodIdentString(pod *api.Pod) string {
 	}
 	return fmt.Sprintf("%s.%s", name, namespace)
 }
-
-func GeneratePodName(name, hostname string) (string, error) {
-	return fmt.Sprintf("%s-%s", name, hostname), nil
-}
