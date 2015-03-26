@@ -78,20 +78,6 @@ var aPod string = `
   }%s
 }
 `
-var aPodInBar string = `
-{
-  "kind": "Pod",
-  "apiVersion": "v1beta1",
-  "id": "a",
-  "desiredState": {
-    "manifest": {
-      "version": "v1beta1",
-      "id": "a",
-      "containers": [{ "name": "foo", "image": "bar/foo" }]
-    }
-  }%s
-}
-`
 var aRC string = `
 {
   "kind": "ReplicationController",
