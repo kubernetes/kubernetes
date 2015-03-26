@@ -27,6 +27,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/wait"
 
+	"github.com/golang/glog"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
@@ -105,7 +106,7 @@ func RunRC(c *client.Client, name string, ns, image string, replicas int) {
 	current = len(pods.Items)
 	failCount := 5
 	for same < failCount && current < replicas {
-		Logf("Controller %s: Found %d pods out of %d", name, current, replicas)
+		glog.Infof("Controller %s: Found %d pods out of %d", name, current, replicas)
 		if last < current {
 			same = 0
 		} else if last == current {
@@ -115,7 +116,7 @@ func RunRC(c *client.Client, name string, ns, image string, replicas int) {
 		}
 
 		if same >= failCount {
-			Logf("No pods submitted for the last %d checks", failCount)
+			glog.Infof("No pods submitted for the last %d checks", failCount)
 		}
 
 		last = current
@@ -125,32 +126,39 @@ func RunRC(c *client.Client, name string, ns, image string, replicas int) {
 		current = len(pods.Items)
 	}
 	Expect(current).To(Equal(replicas))
-	Logf("Controller %s: Found %d pods out of %d", name, current, replicas)
+	glog.Infof("Controller %s: Found %d pods out of %d", name, current, replicas)
 
 	By("Waiting for each pod to be running")
 	same = 0
 	last = 0
-	failCount = 6
-	unknown := 0
-	pending := 0
+	failCount = 10
 	current = 0
 	for same < failCount && current < replicas {
 		current = 0
-		pending = 0
-		unknown = 0
+		waiting := 0
+		pending := 0
+		unknown := 0
 		time.Sleep(10 * time.Second)
-		for _, pod := range pods.Items {
-			p, err := c.Pods(ns).Get(pod.Name)
-			Expect(err).NotTo(HaveOccurred())
+
+		currentPods, listErr := c.Pods(ns).List(label)
+		Expect(listErr).NotTo(HaveOccurred())
+		if len(currentPods.Items) != len(pods.Items) {
+			Failf("Number of reported pods changed: %d vs %d", len(currentPods.Items), len(pods.Items))
+		}
+		for _, p := range currentPods.Items {
 			if p.Status.Phase == api.PodRunning {
 				current++
 			} else if p.Status.Phase == api.PodPending {
-				pending++
+				if p.Status.Host == "" {
+					waiting++
+				} else {
+					pending++
+				}
 			} else if p.Status.Phase == api.PodUnknown {
 				unknown++
 			}
 		}
-		Logf("Pod States: %d running, %d pending, %d unknown ", current, pending, unknown)
+		glog.Infof("Pod States: %d running, %d pending, %d waiting, %d unknown ", current, pending, waiting, unknown)
 		if last < current {
 			same = 0
 		} else if last == current {
@@ -159,7 +167,7 @@ func RunRC(c *client.Client, name string, ns, image string, replicas int) {
 			Failf("Number of running pods dropped from %d to %d", last, current)
 		}
 		if same >= failCount {
-			Logf("No pods started for the last %d checks", failCount)
+			glog.Infof("No pods started for the last %d checks", failCount)
 		}
 		last = current
 	}
