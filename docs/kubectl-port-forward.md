@@ -1,11 +1,11 @@
 ## kubectl port-forward
 
-Forward 1 or more local ports to a pod.
+Forward one or more local ports to a pod.
 
 ### Synopsis
 
 
-Forward 1 or more local ports to a pod.
+Forward one or more local ports to a pod.
 
 ```
 kubectl port-forward -p POD [LOCAL_PORT:]REMOTE_PORT [...[LOCAL_PORT_N:]REMOTE_PORT_N]
