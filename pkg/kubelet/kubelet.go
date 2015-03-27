@@ -1924,9 +1924,10 @@ func (kl *Kubelet) generatePodStatusByPod(pod *api.Pod) (api.PodStatus, error) {
 	podStatus.Host = kl.GetHostname()
 	hostIP, err := kl.GetHostIP()
 	if err != nil {
-		return api.PodStatus{}, fmt.Errorf("Cannot get host IP: %v", err)
+		glog.Errorf("Cannot get host IP: %v", err)
+	} else {
+		podStatus.HostIP = hostIP.String()
 	}
-	podStatus.HostIP = hostIP.String()
 
 	return *podStatus, nil
 }
