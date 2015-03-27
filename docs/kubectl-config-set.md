@@ -13,12 +13,6 @@ PROPERTY_VALUE is the new value you wish to set.
 kubectl config set PROPERTY_NAME PROPERTY_VALUE
 ```
 
-### Options
-
-```
-  -h, --help=false: help for set
-```
-
 ### Options inherrited from parent commands
 
 ```
@@ -32,6 +26,7 @@ kubectl config set PROPERTY_NAME PROPERTY_VALUE
       --context="": The name of the kubeconfig context to use
       --envvar=false: use the .kubeconfig from $KUBECONFIG
       --global=false: use the .kubeconfig from /home/username
+  -h, --help=false: help for config
       --insecure-skip-tls-verify=false: If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure.
       --kubeconfig="": use a particular .kubeconfig file
       --local=false: use the .kubeconfig in the current directory
