@@ -194,11 +194,6 @@ runTests() {
   kube::log::status "Combined coverage report: ${coverage_html_file}"
 }
 
-runTestsForVersion() {
-  export KUBE_API_VERSION="$1"
-  runTests "${@:2}"
-}
-
 reportCoverageToCoveralls() {
   if [[ -x "${KUBE_GOVERALLS_BIN}" ]]; then
     ${KUBE_GOVERALLS_BIN} -coverprofile="${COMBINED_COVER_PROFILE}" || true
@@ -209,7 +204,7 @@ reportCoverageToCoveralls() {
 IFS=',' read -a apiVersions <<< "${KUBE_TEST_API_VERSIONS}"
 for apiVersion in "${apiVersions[@]}"; do
   echo "Running tests for APIVersion: $apiVersion"
-  runTestsForVersion $apiVersion "${@}"
+  KUBE_API_VERSION="${apiVersion}" runTests "$@"
 done
 
 # We might run the tests for multiple versions, but we want to report only
