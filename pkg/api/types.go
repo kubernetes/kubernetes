@@ -1069,9 +1069,7 @@ type NodeConditionType string
 // node condition. In the future, we will add more. The proposed set of conditions are:
 // NodeReachable, NodeLive, NodeReady, NodeSchedulable, NodeRunnable.
 const (
-	// NodeReachable means the node can be reached (in the sense of HTTP connection) from node controller.
-	NodeReachable NodeConditionType = "Reachable"
-	// NodeReady means the node returns StatusOK for HTTP health check.
+	// NodeReady means kubelet is healthy and ready to accept pods.
 	NodeReady NodeConditionType = "Ready"
 	// NodeSchedulable means the node is ready to accept new pods.
 	NodeSchedulable NodeConditionType = "Schedulable"

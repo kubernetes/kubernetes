@@ -1390,9 +1390,6 @@ func init() {
 
 		func(in *newer.NodeConditionType, out *NodeConditionKind, s conversion.Scope) error {
 			switch *in {
-			case newer.NodeReachable:
-				*out = NodeReachable
-				break
 			case newer.NodeReady:
 				*out = NodeReady
 				break
@@ -1406,9 +1403,6 @@ func init() {
 		},
 		func(in *NodeConditionKind, out *newer.NodeConditionType, s conversion.Scope) error {
 			switch *in {
-			case NodeReachable:
-				*out = newer.NodeReachable
-				break
 			case NodeReady:
 				*out = newer.NodeReady
 				break
