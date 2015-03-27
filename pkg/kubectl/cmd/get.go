@@ -91,7 +91,7 @@ func RunGet(f *Factory, out io.Writer, cmd *cobra.Command, args []string) error 
 	// handle watch separately since we cannot watch multiple resource types
 	isWatch, isWatchOnly := util.GetFlagBool(cmd, "watch"), util.GetFlagBool(cmd, "watch-only")
 	if isWatch || isWatchOnly {
-		r := resource.NewBuilder(mapper, typer, f.ClientMapperForCommand(cmd)).
+		r := resource.NewBuilder(mapper, typer, f.ClientMapperForCommand()).
 			NamespaceParam(cmdNamespace).DefaultNamespace().
 			SelectorParam(selector).
 			ResourceTypeOrNameArgs(true, args...).
@@ -140,7 +140,7 @@ func RunGet(f *Factory, out io.Writer, cmd *cobra.Command, args []string) error 
 		return nil
 	}
 
-	b := resource.NewBuilder(mapper, typer, f.ClientMapperForCommand(cmd)).
+	b := resource.NewBuilder(mapper, typer, f.ClientMapperForCommand()).
 		NamespaceParam(cmdNamespace).DefaultNamespace().
 		SelectorParam(selector).
 		ResourceTypeOrNameArgs(true, args...).

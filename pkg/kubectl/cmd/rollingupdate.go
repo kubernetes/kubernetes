@@ -81,7 +81,7 @@ func RunRollingUpdate(f *Factory, out io.Writer, cmd *cobra.Command, args []stri
 
 	mapper, typer := f.Object()
 	// TODO: use resource.Builder instead
-	obj, err := resource.NewBuilder(mapper, typer, f.ClientMapperForCommand(cmd)).
+	obj, err := resource.NewBuilder(mapper, typer, f.ClientMapperForCommand()).
 		NamespaceParam(cmdNamespace).RequireNamespace().
 		FilenameParam(filename).
 		Do().

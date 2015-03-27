@@ -57,7 +57,7 @@ func (f *Factory) NewCmdStop(out io.Writer) *cobra.Command {
 			cmdNamespace, err := f.DefaultNamespace()
 			cmdutil.CheckErr(err)
 			mapper, typer := f.Object()
-			r := resource.NewBuilder(mapper, typer, f.ClientMapperForCommand(cmd)).
+			r := resource.NewBuilder(mapper, typer, f.ClientMapperForCommand()).
 				ContinueOnError().
 				NamespaceParam(cmdNamespace).RequireNamespace().
 				ResourceTypeOrNameArgs(false, args...).

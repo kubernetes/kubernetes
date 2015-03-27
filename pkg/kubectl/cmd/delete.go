@@ -79,7 +79,7 @@ func RunDelete(f *Factory, out io.Writer, cmd *cobra.Command, args []string, fil
 		return err
 	}
 	mapper, typer := f.Object()
-	r := resource.NewBuilder(mapper, typer, f.ClientMapperForCommand(cmd)).
+	r := resource.NewBuilder(mapper, typer, f.ClientMapperForCommand()).
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
 		FilenameParam(filenames...).

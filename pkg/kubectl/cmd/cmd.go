@@ -320,8 +320,8 @@ func (f *Factory) PrinterForMapping(cmd *cobra.Command, mapping *meta.RESTMappin
 	return printer, nil
 }
 
-// ClientMapperForCommand returns a ClientMapper for the given command and factory.
-func (f *Factory) ClientMapperForCommand(cmd *cobra.Command) resource.ClientMapper {
+// ClientMapperForCommand returns a ClientMapper for the factory.
+func (f *Factory) ClientMapperForCommand() resource.ClientMapper {
 	return resource.ClientMapperFunc(func(mapping *meta.RESTMapping) (resource.RESTClient, error) {
 		return f.RESTClient(mapping)
 	})

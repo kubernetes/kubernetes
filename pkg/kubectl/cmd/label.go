@@ -189,7 +189,7 @@ func RunLabel(f *Factory, out io.Writer, cmd *cobra.Command, args []string) erro
 	}
 
 	mapper, typer := f.Object()
-	b := resource.NewBuilder(mapper, typer, f.ClientMapperForCommand(cmd)).
+	b := resource.NewBuilder(mapper, typer, f.ClientMapperForCommand()).
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
 		SelectorParam(selector).
