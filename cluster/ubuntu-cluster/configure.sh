@@ -143,7 +143,6 @@ do
     mm[$i]=$name
     let ii++
 done
-echo 
 
 # input node IPs
 while true; do
@@ -168,7 +167,13 @@ while true; do
             sed -i "s/MASTER_IP/${masterIP}/g" default_scripts/kube-proxy        
             
             # For master set MINION IPs in kube-controller-manager
-	        minionIPs="$minionIPs,$myIP"
+            if [ -z "$minionIPs" ]; then
+                #one node act as both minion and master role
+                minionIPs="$myIP"
+            else
+                minionIPs="$minionIPs,$myIP"
+            fi
+
 	        sed -i "s/MINION_IPS/${minionIPs}/g" default_scripts/kube-controller-manager
 	        
 	        cpMaster
