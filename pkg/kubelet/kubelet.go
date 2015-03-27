@@ -206,25 +206,25 @@ func NewMainKubelet(
 	statusManager := newStatusManager(kubeClient)
 
 	klet := &Kubelet{
-		hostname:                       hostname,
-		dockerClient:                   dockerClient,
-		kubeClient:                     kubeClient,
-		rootDirectory:                  rootDirectory,
-		resyncInterval:                 resyncInterval,
-		podInfraContainerImage:         podInfraContainerImage,
-		containerRefManager:            kubecontainer.NewRefManager(),
-		runner:                         dockertools.NewDockerContainerCommandRunner(dockerClient),
-		httpClient:                     &http.Client{},
-		pullQPS:                        pullQPS,
-		pullBurst:                      pullBurst,
-		sourcesReady:                   sourcesReady,
-		clusterDomain:                  clusterDomain,
-		clusterDNS:                     clusterDNS,
-		serviceLister:                  serviceLister,
-		nodeLister:                     nodeLister,
-		masterServiceNamespace:         masterServiceNamespace,
-		prober:                         newProbeHolder(),
-		readiness:                      newReadinessStates(),
+		hostname:               hostname,
+		dockerClient:           dockerClient,
+		kubeClient:             kubeClient,
+		rootDirectory:          rootDirectory,
+		resyncInterval:         resyncInterval,
+		podInfraContainerImage: podInfraContainerImage,
+		containerRefManager:    kubecontainer.NewRefManager(),
+		readinessManager:       kubecontainer.NewReadinessManager(),
+		runner:                 dockertools.NewDockerContainerCommandRunner(dockerClient),
+		httpClient:             &http.Client{},
+		pullQPS:                pullQPS,
+		pullBurst:              pullBurst,
+		sourcesReady:           sourcesReady,
+		clusterDomain:          clusterDomain,
+		clusterDNS:             clusterDNS,
+		serviceLister:          serviceLister,
+		nodeLister:             nodeLister,
+		masterServiceNamespace: masterServiceNamespace,
+		prober:                 newProbeHolder(),
 		streamingConnectionIdleTimeout: streamingConnectionIdleTimeout,
 		recorder:                       recorder,
 		cadvisor:                       cadvisorInterface,
@@ -326,8 +326,8 @@ type Kubelet struct {
 
 	// Probe runner holder
 	prober probeHolder
-	// Container readiness state holder
-	readiness *readinessStates
+	// Container readiness state manager.
+	readinessManager *kubecontainer.ReadinessManager
 
 	// How long to keep idle streaming command execution/port forwarding
 	// connections open before terminating them
@@ -818,7 +818,7 @@ func (kl *Kubelet) killContainer(c *kubecontainer.Container) error {
 
 func (kl *Kubelet) killContainerByID(ID string) error {
 	glog.V(2).Infof("Killing container with id %q", ID)
-	kl.readiness.remove(ID)
+	kl.readinessManager.RemoveReadiness(ID)
 	err := kl.dockerClient.StopContainer(ID, 10)
 
 	ref, ok := kl.containerRefManager.GetRef(ID)
@@ -986,7 +986,7 @@ func (kl *Kubelet) shouldContainerBeRestarted(container *api.Container, pod *api
 	}
 	// set dead containers to unready state
 	for _, c := range recentContainers {
-		kl.readiness.remove(c.ID)
+		kl.readinessManager.RemoveReadiness(c.ID)
 	}
 
 	if len(recentContainers) > 0 {
@@ -1915,7 +1915,8 @@ func (kl *Kubelet) generatePodStatusByPod(pod *api.Pod) (api.PodStatus, error) {
 	for _, c := range spec.Containers {
 		for i, st := range podStatus.ContainerStatuses {
 			if st.Name == c.Name {
-				podStatus.ContainerStatuses[i].Ready = kl.readiness.IsReady(st)
+				ready := st.State.Running != nil && kl.readinessManager.GetReadiness(strings.TrimPrefix(st.ContainerID, "docker://"))
+				podStatus.ContainerStatuses[i].Ready = ready
 				break
 			}
 		}

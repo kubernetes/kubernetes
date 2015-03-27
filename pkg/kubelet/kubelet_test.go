@@ -101,7 +101,7 @@ func newTestKubelet(t *testing.T) *TestKubelet {
 	kubelet.masterServiceNamespace = api.NamespaceDefault
 	kubelet.serviceLister = testServiceLister{}
 	kubelet.nodeLister = testNodeLister{}
-	kubelet.readiness = newReadinessStates()
+	kubelet.readinessManager = kubecontainer.NewReadinessManager()
 	kubelet.recorder = fakeRecorder
 	kubelet.statusManager = newStatusManager(fakeKubeClient)
 	if err := kubelet.setupDataDirs(); err != nil {
@@ -369,7 +369,7 @@ func TestKillContainerWithError(t *testing.T) {
 	testKubelet := newTestKubelet(t)
 	kubelet := testKubelet.kubelet
 	for _, c := range fakeDocker.ContainerList {
-		kubelet.readiness.set(c.ID, true)
+		kubelet.readinessManager.SetReadiness(c.ID, true)
 	}
 	kubelet.dockerClient = fakeDocker
 	c := apiContainerToContainer(fakeDocker.ContainerList[0])
@@ -380,11 +380,13 @@ func TestKillContainerWithError(t *testing.T) {
 	verifyCalls(t, fakeDocker, []string{"stop"})
 	killedContainer := containers[0]
 	liveContainer := containers[1]
-	if _, found := kubelet.readiness.states[killedContainer.ID]; found {
-		t.Errorf("exepcted container entry ID '%v' to not be found. states: %+v", killedContainer.ID, kubelet.readiness.states)
+	ready := kubelet.readinessManager.GetReadiness(killedContainer.ID)
+	if ready {
+		t.Errorf("exepcted container entry ID '%v' to not be found. states: %+v", killedContainer.ID, ready)
 	}
-	if _, found := kubelet.readiness.states[liveContainer.ID]; !found {
-		t.Errorf("exepcted container entry ID '%v' to be found. states: %+v", liveContainer.ID, kubelet.readiness.states)
+	ready = kubelet.readinessManager.GetReadiness(liveContainer.ID)
+	if !ready {
+		t.Errorf("exepcted container entry ID '%v' to be found. states: %+v", liveContainer.ID, ready)
 	}
 }
 
@@ -407,7 +409,7 @@ func TestKillContainer(t *testing.T) {
 		Name: "foobar",
 	}
 	for _, c := range fakeDocker.ContainerList {
-		kubelet.readiness.set(c.ID, true)
+		kubelet.readinessManager.SetReadiness(c.ID, true)
 	}
 
 	c := apiContainerToContainer(fakeDocker.ContainerList[0])
@@ -418,11 +420,13 @@ func TestKillContainer(t *testing.T) {
 	verifyCalls(t, fakeDocker, []string{"stop"})
 	killedContainer := containers[0]
 	liveContainer := containers[1]
-	if _, found := kubelet.readiness.states[killedContainer.ID]; found {
-		t.Errorf("exepcted container entry ID '%v' to not be found. states: %+v", killedContainer.ID, kubelet.readiness.states)
+	ready := kubelet.readinessManager.GetReadiness(killedContainer.ID)
+	if ready {
+		t.Errorf("exepcted container entry ID '%v' to not be found. states: %+v", killedContainer.ID, ready)
 	}
-	if _, found := kubelet.readiness.states[liveContainer.ID]; !found {
-		t.Errorf("exepcted container entry ID '%v' to be found. states: %+v", liveContainer.ID, kubelet.readiness.states)
+	ready = kubelet.readinessManager.GetReadiness(liveContainer.ID)
+	if !ready {
+		t.Errorf("exepcted container entry ID '%v' to be found. states: %+v", liveContainer.ID, ready)
 	}
 }
 
