@@ -36,9 +36,7 @@ type RefManager struct {
 // NewRefManager creates and returns a container reference manager
 // with empty contents.
 func NewRefManager() *RefManager {
-	c := RefManager{}
-	c.containerIDToRef = make(map[string]*api.ObjectReference)
-	return &c
+	return &RefManager{containerIDToRef: make(map[string]*api.ObjectReference)}
 }
 
 // SetRef stores a reference to a pod's container, associating it with the given container ID.

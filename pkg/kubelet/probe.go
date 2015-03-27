@@ -19,8 +19,6 @@ package kubelet
 import (
 	"fmt"
 	"strconv"
-	"strings"
-	"sync"
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -45,12 +43,12 @@ func (kl *Kubelet) probeContainer(pod *api.Pod, status api.PodStatus, container 
 	live, err := kl.probeContainerLiveness(pod, status, container, createdAt)
 	if err != nil {
 		glog.V(1).Infof("Liveness probe errored: %v", err)
-		kl.readiness.set(containerID, false)
+		kl.readinessManager.SetReadiness(containerID, false)
 		return probe.Unknown, err
 	}
 	if live != probe.Success {
 		glog.V(1).Infof("Liveness probe unsuccessful: %v", live)
-		kl.readiness.set(containerID, false)
+		kl.readinessManager.SetReadiness(containerID, false)
 		return live, nil
 	}
 
@@ -58,12 +56,12 @@ func (kl *Kubelet) probeContainer(pod *api.Pod, status api.PodStatus, container 
 	ready, err := kl.probeContainerReadiness(pod, status, container, createdAt)
 	if err == nil && ready == probe.Success {
 		glog.V(3).Infof("Readiness probe successful: %v", ready)
-		kl.readiness.set(containerID, true)
+		kl.readinessManager.SetReadiness(containerID, true)
 		return probe.Success, nil
 	}
 
 	glog.V(1).Infof("Readiness probe failed/errored: %v, %v", ready, err)
-	kl.readiness.set(containerID, false)
+	kl.readinessManager.SetReadiness(containerID, false)
 
 	ref, ok := kl.containerRefManager.GetRef(containerID)
 	if !ok {
@@ -202,44 +200,6 @@ func (eic execInContainer) CombinedOutput() ([]byte, error) {
 
 func (eic execInContainer) SetDir(dir string) {
 	//unimplemented
-}
-
-// This will eventually maintain info about probe results over time
-// to allow for implementation of health thresholds
-func newReadinessStates() *readinessStates {
-	return &readinessStates{states: make(map[string]bool)}
-}
-
-type readinessStates struct {
-	// guards states
-	sync.RWMutex
-	states map[string]bool
-}
-
-func (r *readinessStates) IsReady(c api.ContainerStatus) bool {
-	if c.State.Running == nil {
-		return false
-	}
-	return r.get(strings.TrimPrefix(c.ContainerID, "docker://"))
-}
-
-func (r *readinessStates) get(key string) bool {
-	r.RLock()
-	defer r.RUnlock()
-	state, found := r.states[key]
-	return state && found
-}
-
-func (r *readinessStates) set(key string, value bool) {
-	r.Lock()
-	defer r.Unlock()
-	r.states[key] = value
-}
-
-func (r *readinessStates) remove(key string) {
-	r.Lock()
-	defer r.Unlock()
-	delete(r.states, key)
 }
 
 func newProbeHolder() probeHolder {
