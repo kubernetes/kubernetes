@@ -240,9 +240,9 @@ func newAWSCloud(config io.Reader, authFunc AuthFunc, instanceId string, metadat
 	ec2 := &goamzEC2{ec2: ec2.New(auth, region)}
 
 	awsCloud := &AWSCloud{
-		ec2: ec2,
-		cfg: cfg,
-		region: region,
+		ec2:              ec2,
+		cfg:              cfg,
+		region:           region,
 		availabilityZone: zone,
 	}
 

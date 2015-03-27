@@ -186,16 +186,14 @@ func createPD() (string, error) {
 			return "", err
 		}
 		return pdName, nil
-	} else if testContext.provider == "aws" {
+	} else {
 		volumes, ok := testContext.cloudConfig.Provider.(aws_cloud.Volumes)
 		if !ok {
-			return "", fmt.Errorf("Provider does not implement volumes interface")
+			return "", fmt.Errorf("Provider does not support volumes")
 		}
 		volumeOptions := &aws_cloud.VolumeOptions{}
 		volumeOptions.CapacityMB = 10 * 1024
 		return volumes.CreateVolume(volumeOptions)
-	} else {
-		return "", fmt.Errorf("Unsupported provider type")
 	}
 }
 
@@ -205,14 +203,12 @@ func deletePD(pdName string) error {
 
 		// TODO: make this hit the compute API directly.
 		return exec.Command("gcloud", "compute", "disks", "delete", "--zone="+zone, pdName).Run()
-	} else if testContext.provider == "aws" {
+	} else {
 		volumes, ok := testContext.cloudConfig.Provider.(aws_cloud.Volumes)
 		if !ok {
-			return fmt.Errorf("Provider does not implement volumes interface")
+			return "", fmt.Errorf("Provider does not support volumes")
 		}
 		return volumes.DeleteVolume(pdName)
-	} else {
-		return fmt.Errorf("Unsupported provider type")
 	}
 }
 
@@ -224,14 +220,12 @@ func detachPD(hostName, pdName string) error {
 
 		// TODO: make this hit the compute API directly.
 		return exec.Command("gcloud", "compute", "instances", "detach-disk", "--zone="+zone, "--disk="+pdName, instanceName).Run()
-	} else if testContext.provider == "aws" {
+	} else {
 		volumes, ok := testContext.cloudConfig.Provider.(aws_cloud.Volumes)
 		if !ok {
-			return fmt.Errorf("Provider does not implement volumes interface")
+			return "", fmt.Errorf("Provider does not support volumes")
 		}
 		return volumes.DetachDisk(hostName, pdName)
-	} else {
-		return fmt.Errorf("Unsupported provider type")
 	}
 
 }
