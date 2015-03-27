@@ -220,7 +220,7 @@ func TestPollMinions(t *testing.T) {
 					},
 				},
 			},
-			expectedCount: 6,
+			expectedCount: 5,
 		},
 		{
 			minions: []api.Node{
@@ -262,7 +262,7 @@ func TestPollMinions(t *testing.T) {
 					},
 				},
 			},
-			expectedCount: 1,
+			expectedCount: 0,
 		},
 		{
 			minions: []api.Node{
@@ -299,7 +299,7 @@ func TestPollMinions(t *testing.T) {
 					},
 				},
 			},
-			expectedCount: 1,
+			expectedCount: 0,
 		},
 	}
 

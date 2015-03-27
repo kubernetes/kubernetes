@@ -230,8 +230,8 @@ func (factory *ConfigFactory) pollMinions() (cache.Enumerator, error) {
 			}
 		} else {
 			// If no condition is set, we get unknown node condition. In such cases,
-			// we add nodes unconditionally.
-			nodes.Items = append(nodes.Items, node)
+			// do not add the node
+			glog.V(2).Infof("Minion %s is not available.  Skipping", node.Name)
 		}
 	}
 	return &nodeEnumerator{nodes}, nil
