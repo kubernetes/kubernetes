@@ -1087,6 +1087,8 @@ type StatusDetails struct {
 	// The Causes array includes more details associated with the StatusReason
 	// failure. Not all StatusReasons may provide detailed causes.
 	Causes []StatusCause `json:"causes,omitempty" description:"the Causes array includes more details associated with the StatusReason failure; not all StatusReasons may provide detailed causes"`
+	// If specified, the time in seconds before the operation should be retried.
+	RetryAfterSeconds int `json:"retryAfterSeconds,omitempty" description:"the number of seconds before the client should attempt to retry this operation"`
 }
 
 // Values of Status.Status

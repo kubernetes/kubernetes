@@ -225,7 +225,13 @@ func TestDoRequestSuccess(t *testing.T) {
 }
 
 func TestDoRequestFailed(t *testing.T) {
-	status := &api.Status{Status: api.StatusFailure, Reason: api.StatusReasonInvalid, Details: &api.StatusDetails{ID: "test", Kind: "test"}}
+	status := &api.Status{
+		Code:    http.StatusNotFound,
+		Status:  api.StatusFailure,
+		Reason:  api.StatusReasonNotFound,
+		Message: " \"\" not found",
+		Details: &api.StatusDetails{},
+	}
 	expectedBody, _ := latest.Codec.Encode(status)
 	fakeHandler := util.FakeHandler{
 		StatusCode:   404,
@@ -253,7 +259,7 @@ func TestDoRequestFailed(t *testing.T) {
 	}
 	actual := ss.Status()
 	if !reflect.DeepEqual(status, &actual) {
-		t.Errorf("Unexpected mis-match. Expected %#v.  Saw %#v", status, actual)
+		t.Errorf("Unexpected mis-match: %s", util.ObjectDiff(status, &actual))
 	}
 }
 

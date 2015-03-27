@@ -1243,6 +1243,8 @@ type StatusDetails struct {
 	// The Causes array includes more details associated with the StatusReason
 	// failure. Not all StatusReasons may provide detailed causes.
 	Causes []StatusCause `json:"causes,omitempty"`
+	// If specified, the time in seconds before the operation should be retried.
+	RetryAfterSeconds int `json:"retryAfterSeconds,omitempty"`
 }
 
 // Values of Status.Status
@@ -1262,6 +1264,13 @@ const (
 	// The details field may contain other information about this error.
 	// Status code 500.
 	StatusReasonUnknown StatusReason = ""
+
+	// StatusReasonUnauthorized means the server can be reached and understood the request, but requires
+	// the user to present appropriate authorization credentials (identified by the WWW-Authenticate header)
+	// in order for the action to be completed. If the user has specified credentials on the request, the
+	// server considers them insufficient.
+	// Status code 401
+	StatusReasonUnauthorized StatusReason = "Unauthorized"
 
 	// StatusReasonForbidden means the server can be reached and understood the request, but refuses
 	// to take any further action.  It is the result of the server being configured to deny access for some reason
@@ -1319,12 +1328,17 @@ const (
 	// Details (optional):
 	//   "kind" string - the kind attribute of the resource being acted on.
 	//   "id"   string - the operation that is being attempted.
+	//   "retryAfterSeconds" int - the number of seconds before the operation should be retried
 	// Status code 500
 	StatusReasonServerTimeout StatusReason = "ServerTimeout"
 
 	// StatusReasonTimeout means that the request could not be completed within the given time.
-	// Clients can get this response only when they specified a timeout param in the request.
-	// The request might succeed with an increased value of timeout param.
+	// Clients can get this response only when they specified a timeout param in the request,
+	// or if the server cannot complete the operation within a reasonable amount of time.
+	// The request might succeed with an increased value of timeout param. The client *should*
+	// wait at least the number of seconds specified by the retryAfterSeconds field.
+	// Details (optional):
+	//   "retryAfterSeconds" int - the number of seconds before the operation should be retried
 	// Status code 504
 	StatusReasonTimeout StatusReason = "Timeout"
 

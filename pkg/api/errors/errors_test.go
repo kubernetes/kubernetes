@@ -69,8 +69,17 @@ func TestErrorNew(t *testing.T) {
 	if !IsForbidden(NewForbidden("test", "2", errors.New("reason"))) {
 		t.Errorf("expected to be %s", api.StatusReasonForbidden)
 	}
-	if !IsServerTimeout(NewServerTimeout("test", "reason")) {
+	if !IsUnauthorized(NewUnauthorized("reason")) {
+		t.Errorf("expected to be %s", api.StatusReasonUnauthorized)
+	}
+	if !IsServerTimeout(NewServerTimeout("test", "reason", 0)) {
 		t.Errorf("expected to be %s", api.StatusReasonServerTimeout)
+	}
+	if time, ok := SuggestsClientDelay(NewServerTimeout("test", "doing something", 10)); time != 10 || !ok {
+		t.Errorf("expected to be %s", api.StatusReasonServerTimeout)
+	}
+	if time, ok := SuggestsClientDelay(NewTimeoutError("test reason", 10)); time != 10 || !ok {
+		t.Errorf("expected to be %s", api.StatusReasonTimeout)
 	}
 	if !IsMethodNotSupported(NewMethodNotSupported("foo", "delete")) {
 		t.Errorf("expected to be %s", api.StatusReasonMethodNotAllowed)
