@@ -29,7 +29,6 @@ $ kubectl config view -o template --template='{{ index . "users" "e2e" "password
 ### Options
 
 ```
-  -h, --help=false: help for view
       --merge=true: merge together the full hierarchy of .kubeconfig files
       --no-headers=false: When using the default output, don't print headers.
   -o, --output="": Output format. One of: json|yaml|template|templatefile.
@@ -50,6 +49,7 @@ $ kubectl config view -o template --template='{{ index . "users" "e2e" "password
       --context="": The name of the kubeconfig context to use
       --envvar=false: use the .kubeconfig from $KUBECONFIG
       --global=false: use the .kubeconfig from /home/username
+  -h, --help=false: help for config
       --insecure-skip-tls-verify=false: If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure.
       --kubeconfig="": use a particular .kubeconfig file
       --local=false: use the .kubeconfig in the current directory

@@ -26,7 +26,6 @@ $ kubectl proxy --api-prefix=k8s-api
 
 ```
       --api-prefix="/api/": Prefix to serve the proxied API under.
-  -h, --help=false: help for proxy
   -p, --port=8001: The port on which to run the proxy.
   -w, --www="": Also serve static files from the given directory under the specified prefix.
   -P, --www-prefix="/static/": Prefix to serve static files under, if static file directory is specified.
@@ -43,6 +42,7 @@ $ kubectl proxy --api-prefix=k8s-api
       --client-key="": Path to a client key file for TLS.
       --cluster="": The name of the kubeconfig cluster to use
       --context="": The name of the kubeconfig context to use
+  -h, --help=false: help for kubectl
       --insecure-skip-tls-verify=false: If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure.
       --kubeconfig="": Path to the kubeconfig file to use for CLI requests.
       --log_backtrace_at=:0: when logging hits line file:N, emit a stack trace
