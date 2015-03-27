@@ -49,7 +49,7 @@ func CheckErr(err error) {
 		if client.IsUnexpectedStatusError(err) {
 			glog.FatalDepth(1, fmt.Sprintf("Unexpected status received from server: %s", err.Error()))
 		}
-		glog.FatalDepth(1, fmt.Sprintf("Error: %s", err.Error()))
+		glog.FatalDepth(1, fmt.Sprintf("Client error: %s", err.Error()))
 	}
 }
 
