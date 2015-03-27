@@ -24,6 +24,8 @@ source "${KUBE_ROOT}/cluster/common.sh"
 
 NODE_INSTANCE_PREFIX="${INSTANCE_PREFIX}-minion"
 
+KUBE_PROMPT_FOR_UPDATE=y
+
 # Verify prereqs
 function verify-prereqs {
   local cmd
@@ -43,8 +45,11 @@ function verify-prereqs {
     fi 
   done
   # update and install components as needed
-  gcloud components update preview
-  gcloud components update
+  if [[ "${KUBE_PROMPT_FOR_UPDATE}" != "y" ]]; then
+    gcloud_prompt="-q"
+  fi
+  gcloud ${gcloud_prompt:-} components update preview || true
+  gcloud ${gcloud_prompt:-} components update || true
 }
 
 # Create a temp dir that'll be deleted at the end of this bash session.
