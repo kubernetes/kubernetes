@@ -24,16 +24,32 @@ source "${KUBE_ROOT}/cluster/common.sh"
 
 NODE_INSTANCE_PREFIX="${INSTANCE_PREFIX}-minion"
 
+KUBE_PROMPT_FOR_UPDATE=y
+
 # Verify prereqs
 function verify-prereqs {
   local cmd
   for cmd in gcloud gsutil; do
-    which "${cmd}" >/dev/null || {
-      echo "Can't find ${cmd} in PATH, please fix and retry. The Google Cloud "
-      echo "SDK can be downloaded from https://cloud.google.com/sdk/."
-      exit 1
-    }
+    if ! which "${cmd}" >/dev/null; then
+      echo "Can't find ${cmd} in PATH.  Do you wish to install the Google Cloud SDK? [Y/n]"
+      local resp
+      read resp
+      if [[ "${resp}" != "n" && "${resp}" != "N" ]]; then
+        curl https://sdk.cloud.google.com | bash
+      fi
+      if ! which "${cmd}" >/dev/null; then
+        echo "Can't find ${cmd} in PATH, please fix and retry. The Google Cloud "
+        echo "SDK can be downloaded from https://cloud.google.com/sdk/."
+        exit 1
+      fi
+    fi 
   done
+  # update and install components as needed
+  if [[ "${KUBE_PROMPT_FOR_UPDATE}" != "y" ]]; then
+    gcloud_prompt="-q"
+  fi
+  gcloud ${gcloud_prompt:-} components update preview || true
+  gcloud ${gcloud_prompt:-} components update || true
 }
 
 # Create a temp dir that'll be deleted at the end of this bash session.
