@@ -4,6 +4,8 @@ coreos:
   fleet:
     etcd-servers: http://<master-private-ip>:4001
     metadata: "role=node"
+  flannel:
+    interface: eth1
   units:
     - name: etcd.service
       mask: true
@@ -14,19 +16,10 @@ coreos:
       drop-ins:
         - name: 50-network-config.conf
           content: |
+            [Unit]
+            Requires=etcd.service
             [Service]
             ExecStartPre=/usr/bin/etcdctl set /coreos.com/network/config '{"Network":"10.244.0.0/16", "Backend": {"Type": "vxlan"}}'
-            # as we need to turn eth1 as the default interface
-            # https://github.com/coreos/bugs/issues/228 is sorted
-            # see notes in https://github.com/coreos/flannel/pull/137
-            ExecStart=
-            ExecStart=/usr/libexec/sdnotify-proxy /run/flannel/sd.sock \
-                /usr/bin/docker run --net=host --privileged=true --rm \
-                    --volume=/run/flannel:/run/flannel \
-                    --env=NOTIFY_SOCKET=/run/flannel/sd.sock \
-                    --env-file=/run/flannel/options.env \
-                    --volume=${ETCD_SSL_DIR}:/etc/ssl/etcd:ro \
-                    quay.io/coreos/flannel:${FLANNEL_VER} /opt/bin/flanneld -etcd-endpoints http://<master-private-ip>:4001 --ip-masq=true --iface=eth1
     - name: docker.service
       command: start
       drop-ins:
