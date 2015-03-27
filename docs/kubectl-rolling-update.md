@@ -1,4 +1,4 @@
-## kubectl rollingupdate
+## kubectl rolling-update
 
 Perform a rolling update of the given ReplicationController.
 
@@ -12,24 +12,24 @@ new PodTemplate. The new-controller.json must specify the same namespace as the
 existing controller and overwrite at least one (common) label in its replicaSelector.
 
 ```
-kubectl rollingupdate OLD_CONTROLLER_NAME -f NEW_CONTROLLER_SPEC
+kubectl rolling-update OLD_CONTROLLER_NAME -f NEW_CONTROLLER_SPEC
 ```
 
 ### Examples
 
 ```
 // Update pods of frontend-v1 using new controller data in frontend-v2.json.
-$ kubectl rollingupdate frontend-v1 -f frontend-v2.json
+$ kubectl rolling-update frontend-v1 -f frontend-v2.json
 
 // Update pods of frontend-v1 using JSON data passed into stdin.
-$ cat frontend-v2.json | kubectl rollingupdate frontend-v1 -f -
+$ cat frontend-v2.json | kubectl rolling-update frontend-v1 -f -
 ```
 
 ### Options
 
 ```
   -f, --filename="": Filename or URL to file to use to create the new controller.
-  -h, --help=false: help for rollingupdate
+  -h, --help=false: help for rolling-update
       --poll-interval="3s": Time delay between polling controller status after update. Valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".
       --timeout="5m0s": Max time to wait for a controller to update before giving up. Valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".
       --update-period="1m0s": Time to wait between updating pods. Valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".

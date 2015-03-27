@@ -11,7 +11,7 @@ See also issues with the following labels:
 1. Service address/port lookup command(s)
 1. Finish rolling update [#1353](https://github.com/GoogleCloudPlatform/kubernetes/issues/1353)
   1. Friendly to auto-scaling [#2863](https://github.com/GoogleCloudPlatform/kubernetes/pull/2863#issuecomment-69701562)
-  1. Rollback (make rollingupdate reversible, and complete an in-progress rolling update by taking 2 replication controller names rather than always taking a file)
+  1. Rollback (make rolling-update reversible, and complete an in-progress rolling update by taking 2 replication controller names rather than always taking a file)
   1. Rollover (replace multiple replication controllers with one, such as to clean up an aborted partial rollout)
   1. Write a ReplicationController generator to derive the new ReplicationController from an old one (e.g., `--image-version=newversion`, which would apply a name suffix, update a label value, and apply an image tag)
   1. Use readiness [#620](https://github.com/GoogleCloudPlatform/kubernetes/issues/620)

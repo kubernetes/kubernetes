@@ -40,7 +40,7 @@ echo "... calling validate-cluster" >&2
 "${KUBE_ROOT}/cluster/validate-cluster.sh"
 
 echo -e "Done, listing cluster services:\n" >&2
-"${KUBE_ROOT}/cluster/kubectl.sh" clusterinfo
+"${KUBE_ROOT}/cluster/kubectl.sh" cluster-info
 echo
 
 exit 0

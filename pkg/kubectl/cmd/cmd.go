@@ -34,6 +34,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/resource"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/golang/glog"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -491,4 +492,8 @@ func (c *clientCache) ClientForVersion(version string) (*client.Client, error) {
 
 	c.clients[config.Version] = client
 	return client, nil
+}
+
+func printDeprecationWarning(command, alias string) {
+	glog.Warningf("%s is DEPRECATED and will be removed in a future version. Use %s instead.", alias, command)
 }

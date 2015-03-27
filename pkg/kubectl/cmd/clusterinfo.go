@@ -19,6 +19,7 @@ package cmd
 import (
 	"fmt"
 	"io"
+	"os"
 	"strings"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -31,9 +32,11 @@ import (
 
 func (f *Factory) NewCmdClusterInfo(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "clusterinfo",
-		Short: "Display cluster info",
-		Long:  "Display addresses of the master and services with label kubernetes.io/cluster-service=true",
+		Use: "cluster-info",
+		// clusterinfo is deprecated.
+		Aliases: []string{"clusterinfo"},
+		Short:   "Display cluster info",
+		Long:    "Display addresses of the master and services with label kubernetes.io/cluster-service=true",
 		Run: func(cmd *cobra.Command, args []string) {
 			err := RunClusterInfo(f, out, cmd)
 			util.CheckErr(err)
@@ -43,6 +46,10 @@ func (f *Factory) NewCmdClusterInfo(out io.Writer) *cobra.Command {
 }
 
 func RunClusterInfo(factory *Factory, out io.Writer, cmd *cobra.Command) error {
+	if os.Args[1] == "clusterinfo" {
+		printDeprecationWarning("cluster-info", "clusterinfo")
+	}
+
 	client, err := factory.ClientConfig()
 	if err != nil {
 		return err
