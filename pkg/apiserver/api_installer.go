@@ -181,6 +181,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	allowWatchList := isWatcher && isLister // watching on lists is allowed only for kinds that support both watch and list.
 	scope := mapping.Scope
 	nameParam := ws.PathParameter("name", "name of the "+kind).DataType("string")
+	pathParam := ws.PathParameter("path:*", "path to the resource").DataType("string")
 	params := []*restful.Parameter{}
 	actions := []action{}
 
@@ -193,6 +194,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			resourcePath = itemPath
 		}
 		nameParams := append(params, nameParam)
+		proxyParams := append(nameParams, pathParam)
 		namer := rootScopeNaming{scope, a.group.Linker, gpath.Join(a.prefix, itemPath)}
 
 		// Handler for standard REST verbs (GET, PUT, POST and DELETE).
@@ -206,7 +208,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		actions = appendIf(actions, action{"DELETE", itemPath, nameParams, namer}, isDeleter)
 		actions = appendIf(actions, action{"WATCH", "watch/" + itemPath, nameParams, namer}, isWatcher)
 		actions = appendIf(actions, action{"REDIRECT", "redirect/" + itemPath, nameParams, namer}, isRedirector)
-		actions = appendIf(actions, action{"PROXY", "proxy/" + itemPath + "/{path:*}", nameParams, namer}, isRedirector)
+		actions = appendIf(actions, action{"PROXY", "proxy/" + itemPath + "/{path:*}", proxyParams, namer}, isRedirector)
 		actions = appendIf(actions, action{"PROXY", "proxy/" + itemPath, nameParams, namer}, isRedirector)
 
 	} else {
@@ -224,6 +226,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 				resourcePath = itemPath
 			}
 			nameParams := append(namespaceParams, nameParam)
+			proxyParams := append(nameParams, pathParam)
 			namer := scopeNaming{scope, a.group.Linker, gpath.Join(a.prefix, itemPath), false}
 
 			actions = appendIf(actions, action{"LIST", resourcePath, namespaceParams, namer}, isLister)
@@ -236,7 +239,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			actions = appendIf(actions, action{"DELETE", itemPath, nameParams, namer}, isDeleter)
 			actions = appendIf(actions, action{"WATCH", "watch/" + itemPath, nameParams, namer}, isWatcher)
 			actions = appendIf(actions, action{"REDIRECT", "redirect/" + itemPath, nameParams, namer}, isRedirector)
-			actions = appendIf(actions, action{"PROXY", "proxy/" + itemPath + "/{path:*}", nameParams, namer}, isRedirector)
+			actions = appendIf(actions, action{"PROXY", "proxy/" + itemPath + "/{path:*}", proxyParams, namer}, isRedirector)
 			actions = appendIf(actions, action{"PROXY", "proxy/" + itemPath, nameParams, namer}, isRedirector)
 
 			// list across namespace.
@@ -258,6 +261,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 				resourcePath = itemPath
 			}
 			nameParams := append(namespaceParams, nameParam)
+			proxyParams := append(nameParams, pathParam)
 			namer := legacyScopeNaming{scope, a.group.Linker, gpath.Join(a.prefix, itemPath)}
 
 			actions = appendIf(actions, action{"LIST", resourcePath, namespaceParams, namer}, isLister)
@@ -270,7 +274,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			actions = appendIf(actions, action{"DELETE", itemPath, nameParams, namer}, isDeleter)
 			actions = appendIf(actions, action{"WATCH", "watch/" + itemPath, nameParams, namer}, isWatcher)
 			actions = appendIf(actions, action{"REDIRECT", "redirect/" + itemPath, nameParams, namer}, isRedirector)
-			actions = appendIf(actions, action{"PROXY", "proxy/" + itemPath + "/{path:*}", nameParams, namer}, isRedirector)
+			actions = appendIf(actions, action{"PROXY", "proxy/" + itemPath + "/{path:*}", proxyParams, namer}, isRedirector)
 			actions = appendIf(actions, action{"PROXY", "proxy/" + itemPath, nameParams, namer}, isRedirector)
 		}
 	}
