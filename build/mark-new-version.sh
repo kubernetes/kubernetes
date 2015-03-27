@@ -48,8 +48,29 @@ release_branch="release-${VERSION_MAJOR}.${VERSION_MINOR}"
 current_branch=$(git rev-parse --abbrev-ref HEAD)
 
 if [[ "${VERSION_PATCH}" != "0" ]]; then
-  if [[ ${current_branch} != "${release_branch}" ]]; then
-    echo "!!! You are trying to tag to an existing minor release but are not on the release branch: ${release_branch}"
+  # sorry, no going back in time, pull latest from upstream
+  git remote update > /dev/null 2>&1
+
+  if git ls-remote --tags --exit-code git@github.com:GoogleCloudPlatform/kubernetes.git refs/tags/${NEW_VERSION} > /dev/null; then
+    echo "!!! You are trying to tag ${NEW_VERSION} but it already exists.  Stop it!"
+    exit 1
+  fi
+
+  last_version="v${VERSION_MAJOR}.${VERSION_MINOR}.$((VERSION_PATCH-1))"
+  if ! git ls-remote --tags --exit-code git@github.com:GoogleCloudPlatform/kubernetes.git refs/tags/${last_version} > /dev/null; then
+    echo "!!! You are trying to tag ${NEW_VERSION} but ${last_version} doesn't even exist!"
+    exit 1
+  fi
+
+  # this is rather magic.  This checks that HEAD is a descendant of the github branch release-x.y
+  branches=$(git branch --contains $(git ls-remote --heads git@github.com:GoogleCloudPlatform/kubernetes.git refs/heads/${release_branch} | cut -f1) ${current_branch})
+  if [[ $? -ne 0 ]]; then
+    echo "!!! git failed, I dunno...."
+    exit 1
+  fi
+
+  if [[ ${branches} != "* ${current_branch}" ]]; then
+    echo "!!! You are trying to tag to an existing minor release but branch: ${release_branch} is not an ancestor of ${current_branch}"
     exit 1
   fi
 fi
@@ -93,6 +114,7 @@ if [[ "${VERSION_PATCH}" == "0" ]]; then
   git branch "${release_branch}"
 fi
 
+echo ""
 echo "Success you must now:"
 echo ""
 echo "- Push the tag:"
