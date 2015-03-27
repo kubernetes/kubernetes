@@ -129,15 +129,21 @@ func TestServiceStorageValidatesCreate(t *testing.T) {
 func TestServiceRegistryUpdate(t *testing.T) {
 	ctx := api.NewDefaultContext()
 	storage, registry, _ := NewTestREST(t, nil)
-	registry.CreateService(ctx, &api.Service{
-		ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: api.NamespaceDefault},
+	svc, err := registry.CreateService(ctx, &api.Service{
+		ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "1", Namespace: api.NamespaceDefault},
 		Spec: api.ServiceSpec{
 			Port:     6502,
 			Selector: map[string]string{"bar": "baz1"},
 		},
 	})
+
+	if err != nil {
+		t.Fatalf("Expected no error: %v", err)
+	}
 	updated_svc, created, err := storage.Update(ctx, &api.Service{
-		ObjectMeta: api.ObjectMeta{Name: "foo"},
+		ObjectMeta: api.ObjectMeta{
+			Name:            "foo",
+			ResourceVersion: svc.ResourceVersion},
 		Spec: api.ServiceSpec{
 			Port:            6502,
 			Selector:        map[string]string{"bar": "baz2"},
@@ -305,7 +311,7 @@ func TestServiceRegistryUpdateExternalService(t *testing.T) {
 
 	// Create non-external load balancer.
 	svc1 := &api.Service{
-		ObjectMeta: api.ObjectMeta{Name: "foo"},
+		ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "1"},
 		Spec: api.ServiceSpec{
 			Port:                       6502,
 			Selector:                   map[string]string{"bar": "baz"},
@@ -546,7 +552,7 @@ func TestServiceRegistryIPUpdate(t *testing.T) {
 	rest.portalMgr.randomAttempts = 0
 
 	svc := &api.Service{
-		ObjectMeta: api.ObjectMeta{Name: "foo"},
+		ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "1"},
 		Spec: api.ServiceSpec{
 			Selector:        map[string]string{"bar": "baz"},
 			Port:            6502,
@@ -589,7 +595,7 @@ func TestServiceRegistryIPExternalLoadBalancer(t *testing.T) {
 	rest.portalMgr.randomAttempts = 0
 
 	svc := &api.Service{
-		ObjectMeta: api.ObjectMeta{Name: "foo"},
+		ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "1"},
 		Spec: api.ServiceSpec{
 			Selector: map[string]string{"bar": "baz"},
 			Port:     6502,

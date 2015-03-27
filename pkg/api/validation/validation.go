@@ -232,6 +232,11 @@ func ValidateObjectMetaUpdate(old, meta *api.ObjectMeta) errs.ValidationErrorLis
 		meta.CreationTimestamp = old.CreationTimestamp
 	}
 
+	// Reject updates that don't specify a resource version
+	if meta.ResourceVersion == "" {
+		allErrs = append(allErrs, errs.NewFieldInvalid("resourceVersion", meta.ResourceVersion, "resourceVersion must be specified for an update"))
+	}
+
 	if old.Name != meta.Name {
 		allErrs = append(allErrs, errs.NewFieldInvalid("name", meta.Name, "field is immutable"))
 	}
