@@ -44,6 +44,16 @@ type SystemModeler interface {
 	// The assumtion should last until the system confirms the
 	// assumtion or disconfirms it.
 	AssumePod(pod *api.Pod)
+	// ForgetPod removes a pod assumtion. (It won't make the model
+	// show the absence of the given pod if the pod is in the scheduled
+	// pods list!)
+	ForgetPod(pod *api.Pod)
+
+	// For serializing calls to Assume/ForgetPod: imagine you want to add
+	// a pod iff a bind succeeds, but also remove a pod if it is deleted.
+	// TODO: if SystemModeler begins modeling things other than pods, this
+	// should probably be parameterized or specialized for pods.
+	LockedAction(f func())
 }
 
 // Scheduler watches for new unscheduled pods. It attempts to find
@@ -104,16 +114,21 @@ func (s *Scheduler) scheduleOne() {
 			Name: dest,
 		},
 	}
-	if err := s.config.Binder.Bind(b); err != nil {
-		glog.V(1).Infof("Failed to bind pod: %v", err)
-		s.config.Recorder.Eventf(pod, "failedScheduling", "Binding rejected: %v", err)
-		s.config.Error(pod, err)
-		return
-	}
-	s.config.Recorder.Eventf(pod, "scheduled", "Successfully assigned %v to %v", pod.Name, dest)
-	// tell the model to assume that this binding took effect.
-	assumed := *pod
-	assumed.Spec.Host = dest
-	assumed.Status.Host = dest
-	s.config.Modeler.AssumePod(&assumed)
+
+	// We want to add the pod to the model iff the bind succeeds, but we don't want to race
+	// with any deletions, which happen asyncronously.
+	s.config.Modeler.LockedAction(func() {
+		if err := s.config.Binder.Bind(b); err != nil {
+			glog.V(1).Infof("Failed to bind pod: %v", err)
+			s.config.Recorder.Eventf(pod, "failedScheduling", "Binding rejected: %v", err)
+			s.config.Error(pod, err)
+			return
+		}
+		s.config.Recorder.Eventf(pod, "scheduled", "Successfully assigned %v to %v", pod.Name, dest)
+		// tell the model to assume that this binding took effect.
+		assumed := *pod
+		assumed.Spec.Host = dest
+		assumed.Status.Host = dest
+		s.config.Modeler.AssumePod(&assumed)
+	})
 }
