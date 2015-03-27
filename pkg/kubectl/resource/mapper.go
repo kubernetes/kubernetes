@@ -39,7 +39,7 @@ type Mapper struct {
 func (m *Mapper) InfoForData(data []byte, source string) (*Info, error) {
 	json, err := yaml.ToJSON(data)
 	if err != nil {
-		return nil, fmt.Errorf("unable to parse %q: %v", err)
+		return nil, fmt.Errorf("unable to parse %q: %v", source, err)
 	}
 	data = json
 	version, kind, err := m.DataVersionAndKind(data)
