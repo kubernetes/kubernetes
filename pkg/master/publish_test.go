@@ -19,245 +19,149 @@ package master
 import (
 	"net"
 	"reflect"
-	"sync"
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/registrytest"
 )
 
-func TestEnsureEndpointsContain(t *testing.T) {
+func TestSetEndpoints(t *testing.T) {
 	tests := []struct {
-		serviceName       string
-		ip                string
-		port              int
-		expectError       bool
-		expectUpdate      bool
-		endpoints         *api.EndpointsList
-		expectedEndpoints []api.Endpoint
-		err               error
-		masterCount       int
+		testName     string
+		serviceName  string
+		ip           string
+		port         int
+		endpoints    *api.EndpointsList
+		expectUpdate bool
 	}{
 		{
+			testName:     "no existing endpoints",
 			serviceName:  "foo",
 			ip:           "1.2.3.4",
 			port:         8080,
-			expectError:  false,
+			endpoints:    nil,
 			expectUpdate: true,
-			masterCount:  1,
 		},
 		{
-			serviceName:  "foo",
-			ip:           "1.2.3.4",
-			port:         8080,
-			expectError:  false,
+			testName:    "existing endpoints satisfy",
+			serviceName: "foo",
+			ip:          "1.2.3.4",
+			port:        8080,
+			endpoints: &api.EndpointsList{
+				Items: []api.Endpoints{{
+					ObjectMeta: api.ObjectMeta{Name: "foo"},
+					Subsets: []api.EndpointSubset{{
+						Addresses: []api.EndpointAddress{{IP: "1.2.3.4"}},
+						Ports:     []api.EndpointPort{{Port: 8080, Protocol: "TCP"}},
+					}},
+				}},
+			},
 			expectUpdate: false,
-			endpoints: &api.EndpointsList{
-				Items: []api.Endpoints{
-					{
-						ObjectMeta: api.ObjectMeta{
-							Name: "foo",
-						},
-						Endpoints: []api.Endpoint{
-							{
-								IP:   "1.2.3.4",
-								Port: 8080,
-							},
-						},
-						Protocol: api.ProtocolTCP,
-					},
-				},
-			},
-			masterCount:       1,
-			expectedEndpoints: []api.Endpoint{{"1.2.3.4", 8080, nil}},
 		},
 		{
-			serviceName:  "foo",
-			ip:           "1.2.3.4",
-			port:         8080,
-			expectError:  false,
-			expectUpdate: true,
+			testName:    "existing endpoints satisfy but too many",
+			serviceName: "foo",
+			ip:          "1.2.3.4",
+			port:        8080,
 			endpoints: &api.EndpointsList{
-				Items: []api.Endpoints{
-					{
-						ObjectMeta: api.ObjectMeta{
-							Name:      "foo",
-							Namespace: api.NamespaceDefault,
-						},
-						Endpoints: []api.Endpoint{
-							{
-								IP:   "4.3.2.1",
-								Port: 8080,
-							},
-						},
-						Protocol: api.ProtocolTCP,
-					},
-				},
+				Items: []api.Endpoints{{
+					ObjectMeta: api.ObjectMeta{Name: "foo"},
+					Subsets: []api.EndpointSubset{{
+						Addresses: []api.EndpointAddress{{IP: "1.2.3.4"}, {IP: "4.3.2.1"}},
+						Ports:     []api.EndpointPort{{Port: 8080, Protocol: "TCP"}},
+					}},
+				}},
 			},
-			masterCount: 1,
+			expectUpdate: true,
 		},
 		{
-			serviceName:  "foo",
-			ip:           "1.2.3.4",
-			port:         8080,
-			expectError:  false,
-			expectUpdate: true,
+			testName:    "existing endpoints wrong name",
+			serviceName: "foo",
+			ip:          "1.2.3.4",
+			port:        8080,
 			endpoints: &api.EndpointsList{
-				Items: []api.Endpoints{
-					{
-						ObjectMeta: api.ObjectMeta{
-							Name:      "foo",
-							Namespace: api.NamespaceDefault,
-						},
-						Endpoints: []api.Endpoint{
-							{
-								IP:   "4.3.2.1",
-								Port: 9090,
-							},
-						},
-						Protocol: api.ProtocolTCP,
-					},
-				},
+				Items: []api.Endpoints{{
+					ObjectMeta: api.ObjectMeta{Name: "bar"},
+					Subsets: []api.EndpointSubset{{
+						Addresses: []api.EndpointAddress{{IP: "1.2.3.4"}},
+						Ports:     []api.EndpointPort{{Port: 8080, Protocol: "TCP"}},
+					}},
+				}},
 			},
-			masterCount:       2,
-			expectedEndpoints: []api.Endpoint{{"4.3.2.1", 9090, nil}, {"1.2.3.4", 8080, nil}},
+			expectUpdate: true,
 		},
 		{
-			serviceName:  "foo",
-			ip:           "1.2.3.4",
-			port:         8080,
-			expectError:  false,
-			expectUpdate: true,
+			testName:    "existing endpoints wrong IP",
+			serviceName: "foo",
+			ip:          "1.2.3.4",
+			port:        8080,
 			endpoints: &api.EndpointsList{
-				Items: []api.Endpoints{
-					{
-						ObjectMeta: api.ObjectMeta{
-							Name:      "foo",
-							Namespace: api.NamespaceDefault,
-						},
-						Endpoints: []api.Endpoint{
-							{
-								IP:   "4.3.2.1",
-								Port: 9090,
-							},
-							{
-								IP:   "1.2.3.4",
-								Port: 8000,
-							},
-						},
-						Protocol: api.ProtocolTCP,
-					},
-				},
+				Items: []api.Endpoints{{
+					ObjectMeta: api.ObjectMeta{Name: "foo"},
+					Subsets: []api.EndpointSubset{{
+						Addresses: []api.EndpointAddress{{IP: "4.3.2.1"}},
+						Ports:     []api.EndpointPort{{Port: 8080, Protocol: "TCP"}},
+					}},
+				}},
 			},
-			masterCount:       2,
-			expectedEndpoints: []api.Endpoint{{"1.2.3.4", 8000, nil}, {"1.2.3.4", 8080, nil}},
+			expectUpdate: true,
+		},
+		{
+			testName:    "existing endpoints wrong port",
+			serviceName: "foo",
+			ip:          "1.2.3.4",
+			port:        8080,
+			endpoints: &api.EndpointsList{
+				Items: []api.Endpoints{{
+					ObjectMeta: api.ObjectMeta{Name: "foo"},
+					Subsets: []api.EndpointSubset{{
+						Addresses: []api.EndpointAddress{{IP: "1.2.3.4"}},
+						Ports:     []api.EndpointPort{{Port: 9090, Protocol: "TCP"}},
+					}},
+				}},
+			},
+			expectUpdate: true,
+		},
+		{
+			testName:    "existing endpoints wrong protocol",
+			serviceName: "foo",
+			ip:          "1.2.3.4",
+			port:        8080,
+			endpoints: &api.EndpointsList{
+				Items: []api.Endpoints{{
+					ObjectMeta: api.ObjectMeta{Name: "foo"},
+					Subsets: []api.EndpointSubset{{
+						Addresses: []api.EndpointAddress{{IP: "1.2.3.4"}},
+						Ports:     []api.EndpointPort{{Port: 8080, Protocol: "UDP"}},
+					}},
+				}},
+			},
+			expectUpdate: true,
 		},
 	}
 	for _, test := range tests {
 		master := Master{}
 		registry := &registrytest.EndpointRegistry{
 			Endpoints: test.endpoints,
-			Err:       test.err,
 		}
 		master.endpointRegistry = registry
-		master.masterCount = test.masterCount
-		err := master.ensureEndpointsContain(test.serviceName, net.ParseIP(test.ip), test.port)
-		if test.expectError && err == nil {
-			t.Errorf("unexpected non-error")
-		}
-		if !test.expectError && err != nil {
-			t.Errorf("unexpected error: %v", err)
+		err := master.setEndpoints(test.serviceName, net.ParseIP(test.ip), test.port)
+		if err != nil {
+			t.Errorf("case %q: unexpected error: %v", test.testName, err)
 		}
 		if test.expectUpdate {
-			if test.expectedEndpoints == nil {
-				test.expectedEndpoints = []api.Endpoint{{test.ip, test.port, nil}}
-			}
-			expectedUpdate := api.Endpoints{
-				ObjectMeta: api.ObjectMeta{
-					Name:      test.serviceName,
-					Namespace: "default",
-				},
-				Endpoints: test.expectedEndpoints,
-				Protocol:  "TCP",
-			}
+			expectedSubsets := []api.EndpointSubset{{
+				Addresses: []api.EndpointAddress{{IP: "1.2.3.4"}},
+				Ports:     []api.EndpointPort{{Port: 8080, Protocol: "TCP"}},
+			}}
 			if len(registry.Updates) != 1 {
-				t.Errorf("unexpected updates: %v", registry.Updates)
-			} else if !reflect.DeepEqual(expectedUpdate, registry.Updates[0]) {
-				t.Errorf("expected update:\n%#v\ngot:\n%#v\n", expectedUpdate, registry.Updates[0])
+				t.Errorf("case %q: unexpected updates: %v", test.testName, registry.Updates)
+			} else if !reflect.DeepEqual(expectedSubsets, registry.Updates[0].Subsets) {
+				t.Errorf("case %q: expected update:\n%#v\ngot:\n%#v\n", test.testName, expectedSubsets, registry.Updates[0].Subsets)
 			}
 		}
 		if !test.expectUpdate && len(registry.Updates) > 0 {
-			t.Errorf("no update expected, yet saw: %v", registry.Updates)
-		}
-	}
-}
-
-func TestEnsureEndpointsContainConverges(t *testing.T) {
-	master := Master{}
-	registry := &registrytest.EndpointRegistry{
-		Endpoints: &api.EndpointsList{
-			Items: []api.Endpoints{
-				{
-					ObjectMeta: api.ObjectMeta{
-						Name:      "foo",
-						Namespace: api.NamespaceDefault,
-					},
-					Endpoints: []api.Endpoint{
-						{
-							IP:   "4.3.2.1",
-							Port: 9000,
-						},
-						{
-							IP:   "1.2.3.4",
-							Port: 8000,
-						},
-					},
-					Protocol: api.ProtocolTCP,
-				},
-			},
-		},
-	}
-	master.endpointRegistry = registry
-	master.masterCount = 2
-	// This is purposefully racy, it shouldn't matter the order that these things arrive,
-	// we should still converge on the right answer.
-	wg := sync.WaitGroup{}
-	wg.Add(2)
-	go func() {
-		for i := 0; i < 10; i++ {
-			if err := master.ensureEndpointsContain("foo", net.ParseIP("4.3.2.1"), 9090); err != nil {
-				t.Errorf("unexpected error: %v", err)
-				t.Fail()
-			}
-		}
-		wg.Done()
-	}()
-	go func() {
-		for i := 0; i < 10; i++ {
-			if err := master.ensureEndpointsContain("foo", net.ParseIP("1.2.3.4"), 8080); err != nil {
-				t.Errorf("unexpected error: %v", err)
-				t.Fail()
-			}
-		}
-		wg.Done()
-	}()
-	wg.Wait()
-
-	// We should see at least two updates.
-	if len(registry.Updates) > 2 {
-		t.Errorf("unexpected updates: %v", registry.Updates)
-	}
-	// Pick up the last update and validate.
-	endpoints := registry.Updates[len(registry.Updates)-1]
-	if len(endpoints.Endpoints) != 2 {
-		t.Errorf("unexpected update: %v", endpoints)
-	}
-	for _, endpoint := range endpoints.Endpoints {
-		if endpoint.IP == "4.3.2.1" && endpoint.Port != 9090 {
-			t.Errorf("unexpected endpoint state: %v", endpoint)
-		}
-		if endpoint.IP == "1.2.3.4" && endpoint.Port != 8080 {
-			t.Errorf("unexpected endpoint state: %v", endpoint)
+			t.Errorf("case %q: no update expected, yet saw: %v", test.testName, registry.Updates)
 		}
 	}
 }

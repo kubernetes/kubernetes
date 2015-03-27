@@ -2746,3 +2746,7 @@ func TestValidateSecret(t *testing.T) {
 		}
 	}
 }
+
+func TestValidateEndpoints(t *testing.T) {
+	// TODO: implement this
+}

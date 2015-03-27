@@ -23,6 +23,7 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
@@ -233,19 +234,43 @@ var _ = rest.Redirector(&REST{})
 
 // ResourceLocation returns a URL to which one can send traffic for the specified service.
 func (rs *REST) ResourceLocation(ctx api.Context, id string) (*url.URL, http.RoundTripper, error) {
-	eps, err := rs.endpoints.GetEndpoints(ctx, id)
+	// Allow ID as "svcname" or "svcname:port".
+	parts := strings.Split(id, ":")
+	if len(parts) > 2 {
+		return nil, nil, errors.NewBadRequest(fmt.Sprintf("invalid service request %q", id))
+	}
+	svcName := parts[0]
+	portStr := ""
+	if len(parts) == 2 {
+		portStr = parts[1]
+	}
+
+	eps, err := rs.endpoints.GetEndpoints(ctx, svcName)
 	if err != nil {
 		return nil, nil, err
 	}
-	if len(eps.Endpoints) == 0 {
-		return nil, nil, fmt.Errorf("no endpoints available for %v", id)
+	if len(eps.Subsets) == 0 {
+		return nil, nil, fmt.Errorf("no endpoints available for %q", svcName)
 	}
-	// We leave off the scheme ('http://') because we have no idea what sort of server
-	// is listening at this endpoint.
-	ep := &eps.Endpoints[rand.Intn(len(eps.Endpoints))]
-	return &url.URL{
-		Host: net.JoinHostPort(ep.IP, strconv.Itoa(ep.Port)),
-	}, nil, nil
+	// Pick a random Subset to start searching from.
+	ssSeed := rand.Intn(len(eps.Subsets))
+	// Find a Subset that has the port.
+	for ssi := 0; ssi < len(eps.Subsets); ssi++ {
+		ss := &eps.Subsets[(ssSeed+ssi)%len(eps.Subsets)]
+		for i := range ss.Ports {
+			if ss.Ports[i].Name == portStr {
+				// Pick a random address.
+				ip := ss.Addresses[rand.Intn(len(ss.Addresses))].IP
+				port := ss.Ports[i].Port
+				// We leave off the scheme ('http://') because we have no idea what sort of server
+				// is listening at this endpoint.
+				return &url.URL{
+					Host: net.JoinHostPort(ip, strconv.Itoa(port)),
+				}, nil, nil
+			}
+		}
+	}
+	return nil, nil, fmt.Errorf("no endpoints available for %q", id)
 }
 
 func (rs *REST) getLoadbalancerName(ctx api.Context, service *api.Service) string {

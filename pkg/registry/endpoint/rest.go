@@ -20,6 +20,7 @@ import (
 	"fmt"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	endptspkg "github.com/GoogleCloudPlatform/kubernetes/pkg/api/endpoints"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/validation"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
@@ -45,13 +46,15 @@ func (endpointsStrategy) NamespaceScoped() bool {
 
 // PrepareForCreate clears fields that are not allowed to be set by end users on creation.
 func (endpointsStrategy) PrepareForCreate(obj runtime.Object) {
-	_ = obj.(*api.Endpoints)
+	endpoints := obj.(*api.Endpoints)
+	endpoints.Subsets = endptspkg.RepackSubsets(endpoints.Subsets)
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
 func (endpointsStrategy) PrepareForUpdate(obj, old runtime.Object) {
-	_ = obj.(*api.Endpoints)
+	newEndpoints := obj.(*api.Endpoints)
 	_ = old.(*api.Endpoints)
+	newEndpoints.Subsets = endptspkg.RepackSubsets(newEndpoints.Subsets)
 }
 
 // Validate validates a new endpoints.

@@ -22,10 +22,8 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"net"
 	"reflect"
 	"sort"
-	"strconv"
 	"strings"
 	"text/tabwriter"
 	"text/template"
@@ -277,16 +275,35 @@ func (h *HumanReadablePrinter) printHeader(columnNames []string, w io.Writer) er
 	return nil
 }
 
-func formatEndpoints(endpoints []api.Endpoint) string {
-	if len(endpoints) == 0 {
+func formatEndpoints(endpoints *api.Endpoints) string {
+	if len(endpoints.Subsets) == 0 {
 		return "<none>"
 	}
 	list := []string{}
-	for i := range endpoints {
-		ep := &endpoints[i]
-		list = append(list, net.JoinHostPort(ep.IP, strconv.Itoa(ep.Port)))
+	max := 3
+	more := false
+Loop:
+	for i := range endpoints.Subsets {
+		ss := &endpoints.Subsets[i]
+		for i := range ss.Ports {
+			port := &ss.Ports[i]
+			if port.Name == "" { // TODO: add multi-port support.
+				for i := range ss.Addresses {
+					if len(list) == max {
+						more = true
+						break Loop
+					}
+					addr := &ss.Addresses[i]
+					list = append(list, fmt.Sprintf("%s:%d", addr.IP, port.Port))
+				}
+			}
+		}
 	}
-	return strings.Join(list, ",")
+	ret := strings.Join(list, ",")
+	if more {
+		ret += "..."
+	}
+	return ret
 }
 
 func podHostString(host, ip string) string {
@@ -387,8 +404,8 @@ func printServiceList(list *api.ServiceList, w io.Writer) error {
 	return nil
 }
 
-func printEndpoints(endpoint *api.Endpoints, w io.Writer) error {
-	_, err := fmt.Fprintf(w, "%s\t%s\n", endpoint.Name, formatEndpoints(endpoint.Endpoints))
+func printEndpoints(endpoints *api.Endpoints, w io.Writer) error {
+	_, err := fmt.Fprintf(w, "%s\t%s\n", endpoints.Name, formatEndpoints(endpoints))
 	return err
 }
 

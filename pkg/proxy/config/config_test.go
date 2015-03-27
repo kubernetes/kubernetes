@@ -218,11 +218,17 @@ func TestNewMultipleSourcesEndpointsMultipleHandlersAddedAndNotified(t *testing.
 	config.RegisterHandler(handler2)
 	endpointsUpdate1 := CreateEndpointsUpdate(ADD, api.Endpoints{
 		ObjectMeta: api.ObjectMeta{Namespace: "testnamespace", Name: "foo"},
-		Endpoints:  []api.Endpoint{{IP: "endpoint1"}, {IP: "endpoint2"}},
+		Subsets: []api.EndpointSubset{{
+			Addresses: []api.EndpointAddress{{IP: "1.1.1.1"}, {IP: "2.2.2.2"}},
+			Ports:     []api.EndpointPort{{Port: 80}},
+		}},
 	})
 	endpointsUpdate2 := CreateEndpointsUpdate(ADD, api.Endpoints{
 		ObjectMeta: api.ObjectMeta{Namespace: "testnamespace", Name: "bar"},
-		Endpoints:  []api.Endpoint{{IP: "endpoint3"}, {IP: "endpoint4"}},
+		Subsets: []api.EndpointSubset{{
+			Addresses: []api.EndpointAddress{{IP: "3.3.3.3"}, {IP: "4.4.4.4"}},
+			Ports:     []api.EndpointPort{{Port: 80}},
+		}},
 	})
 	handler.Wait(2)
 	handler2.Wait(2)
@@ -244,11 +250,17 @@ func TestNewMultipleSourcesEndpointsMultipleHandlersAddRemoveSetAndNotified(t *t
 	config.RegisterHandler(handler2)
 	endpointsUpdate1 := CreateEndpointsUpdate(ADD, api.Endpoints{
 		ObjectMeta: api.ObjectMeta{Namespace: "testnamespace", Name: "foo"},
-		Endpoints:  []api.Endpoint{{IP: "endpoint1"}, {IP: "endpoint2"}},
+		Subsets: []api.EndpointSubset{{
+			Addresses: []api.EndpointAddress{{IP: "1.1.1.1"}, {IP: "2.2.2.2"}},
+			Ports:     []api.EndpointPort{{Port: 80}},
+		}},
 	})
 	endpointsUpdate2 := CreateEndpointsUpdate(ADD, api.Endpoints{
 		ObjectMeta: api.ObjectMeta{Namespace: "testnamespace", Name: "bar"},
-		Endpoints:  []api.Endpoint{{IP: "endpoint3"}, {IP: "endpoint4"}},
+		Subsets: []api.EndpointSubset{{
+			Addresses: []api.EndpointAddress{{IP: "3.3.3.3"}, {IP: "4.4.4.4"}},
+			Ports:     []api.EndpointPort{{Port: 80}},
+		}},
 	})
 	handler.Wait(2)
 	handler2.Wait(2)
@@ -262,7 +274,10 @@ func TestNewMultipleSourcesEndpointsMultipleHandlersAddRemoveSetAndNotified(t *t
 	// Add one more
 	endpointsUpdate3 := CreateEndpointsUpdate(ADD, api.Endpoints{
 		ObjectMeta: api.ObjectMeta{Namespace: "testnamespace", Name: "foobar"},
-		Endpoints:  []api.Endpoint{{IP: "endpoint5"}, {IP: "endpoint6"}},
+		Subsets: []api.EndpointSubset{{
+			Addresses: []api.EndpointAddress{{IP: "5.5.5.5"}, {IP: "6.6.6.6"}},
+			Ports:     []api.EndpointPort{{Port: 80}},
+		}},
 	})
 	handler.Wait(1)
 	handler2.Wait(1)
@@ -274,7 +289,10 @@ func TestNewMultipleSourcesEndpointsMultipleHandlersAddRemoveSetAndNotified(t *t
 	// Update the "foo" service with new endpoints
 	endpointsUpdate1 = CreateEndpointsUpdate(ADD, api.Endpoints{
 		ObjectMeta: api.ObjectMeta{Namespace: "testnamespace", Name: "foo"},
-		Endpoints:  []api.Endpoint{{IP: "endpoint7"}},
+		Subsets: []api.EndpointSubset{{
+			Addresses: []api.EndpointAddress{{IP: "7.7.7.7"}},
+			Ports:     []api.EndpointPort{{Port: 80}},
+		}},
 	})
 	handler.Wait(1)
 	handler2.Wait(1)

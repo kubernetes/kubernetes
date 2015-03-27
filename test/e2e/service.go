@@ -394,16 +394,22 @@ func validateUniqueOrFail(s []string) {
 	}
 }
 
-func validateIPsOrFail(c *client.Client, ns string, expectedPort int, expectedEndpoints []string, endpoints *api.Endpoints) {
+func flattenSubsets(subsets []api.EndpointSubset, expectedPort int) util.StringSet {
 	ips := util.StringSet{}
-	for _, ep := range endpoints.Endpoints {
-		if ep.Port != expectedPort {
-			Failf("invalid port, expected %d, got %d", expectedPort, ep.Port)
+	for _, ss := range subsets {
+		for _, port := range ss.Ports {
+			if port.Port == expectedPort {
+				for _, addr := range ss.Addresses {
+					ips.Insert(addr.IP)
+				}
+			}
 		}
-		ips.Insert(ep.IP)
 	}
+	return ips
+}
 
-	for _, name := range expectedEndpoints {
+func validateIPsOrFail(c *client.Client, ns string, expectedPods []string, ips util.StringSet) {
+	for _, name := range expectedPods {
 		pod, err := c.Pods(ns).Get(name)
 		if err != nil {
 			Failf("failed to get pod %s, that's pretty weird. validation failed: %s", name, err)
@@ -413,26 +419,26 @@ func validateIPsOrFail(c *client.Client, ns string, expectedPort int, expectedEn
 		}
 		By(fmt.Sprintf(""))
 	}
-	By(fmt.Sprintf("successfully validated IPs %v against expected endpoints %v port %d on namespace %s", ips, expectedEndpoints, expectedPort, ns))
-
+	By(fmt.Sprintf("successfully validated IPs %v against expected endpoints %v on namespace %s", ips, expectedPods, ns))
 }
 
-func validateEndpointsOrFail(c *client.Client, ns, serviceName string, expectedPort int, expectedEndpoints []string) {
+func validateEndpointsOrFail(c *client.Client, ns, serviceName string, expectedPort int, expectedPods []string) {
 	for {
 		endpoints, err := c.Endpoints(ns).Get(serviceName)
 		if err == nil {
-			if len(endpoints.Endpoints) == len(expectedEndpoints) {
-				validateIPsOrFail(c, ns, expectedPort, expectedEndpoints, endpoints)
-				return
+			ips := flattenSubsets(endpoints.Subsets, expectedPort)
+			if len(ips) == len(expectedPods) {
+				validateIPsOrFail(c, ns, expectedPods, ips)
+				break
 			} else {
-				By(fmt.Sprintf("Unexpected number of endpoints: found %v, expected %v (ignoring for 1 second)", endpoints.Endpoints, expectedEndpoints))
+				By(fmt.Sprintf("Unexpected number of endpoints: found %v, expected %v (ignoring for 1 second)", ips, expectedPods))
 			}
 		} else {
 			By(fmt.Sprintf("Failed to get endpoints: %v (ignoring for 1 second)", err))
 		}
 		time.Sleep(time.Second)
 	}
-	By(fmt.Sprintf("successfully validated endpoints %v port %d on service %s/%s", expectedEndpoints, expectedPort, ns, serviceName))
+	By(fmt.Sprintf("successfully validated endpoints %v port %d on service %s/%s", expectedPods, expectedPort, ns, serviceName))
 }
 
 func addEndpointPodOrFail(c *client.Client, ns, name string, labels map[string]string) {

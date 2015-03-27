@@ -45,6 +45,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
 var (
@@ -218,9 +219,17 @@ func contactOthers(state *State) {
 			time.Sleep(time.Duration(1+rand.Intn(10)) * time.Second)
 		}
 
-		for i, e := range endpoints.Endpoints {
-			state.Logf("Attempting to contact IP %s at endpoint number %d port %v", e.IP, i, e.Port)
-			contactSingle(fmt.Sprintf("http://%s:%d", e.IP, e.Port), state)
+		eps := util.StringSet{}
+		for _, ss := range endpoints.Subsets {
+			for _, a := range ss.Addresses {
+				for _, p := range ss.Ports {
+					eps.Insert(fmt.Sprintf("http://%s:%d", a.IP, p.Port))
+				}
+			}
+		}
+		for ep := range eps {
+			state.Logf("Attempting to contact %s", ep)
+			contactSingle(ep, state)
 		}
 
 		time.Sleep(5 * time.Second)
