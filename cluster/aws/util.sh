@@ -22,7 +22,7 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
 source "${KUBE_ROOT}/cluster/aws/${KUBE_CONFIG_FILE-"config-default.sh"}"
 
 # This removes the final character in bash (somehow)
-AWS_REGION=${AWS_ZONE%?}
+AWS_REGION=${ZONE%?}
 
 export AWS_DEFAULT_REGION=${AWS_REGION}
 AWS_CMD="aws --output json ec2"
@@ -431,7 +431,7 @@ function kube-up {
     echo "readonly NODE_INSTANCE_PREFIX='${INSTANCE_PREFIX}-minion'"
     echo "readonly SERVER_BINARY_TAR_URL='${SERVER_BINARY_TAR_URL}'"
     echo "readonly SALT_TAR_URL='${SALT_TAR_URL}'"
-    echo "readonly AWS_ZONE='${AWS_ZONE}'"
+    echo "readonly ZONE='${ZONE}'"
     echo "readonly MASTER_HTPASSWD='${htpasswd}'"
     echo "readonly PORTAL_NET='${PORTAL_NET}'"
     echo "readonly ENABLE_CLUSTER_MONITORING='${ENABLE_CLUSTER_MONITORING:-false}'"

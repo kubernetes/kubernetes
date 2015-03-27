@@ -28,7 +28,7 @@ EOF
 
 cat <<EOF > /etc/aws.conf
 [Global]
-Zone = ${AWS_ZONE}
+Zone = ${ZONE}
 EOF
 
 # Auto accept all keys from minions that try to join
