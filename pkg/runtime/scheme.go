@@ -18,6 +18,7 @@ package runtime
 
 import (
 	"fmt"
+	"net/url"
 	"reflect"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/conversion"
@@ -224,6 +225,9 @@ func NewScheme() *Scheme {
 	if err := s.raw.RegisterInputDefaults(&map[string][]string{}, JSONKeyMapper, conversion.AllowDifferentFieldTypeNames|conversion.IgnoreMissingFields); err != nil {
 		panic(err)
 	}
+	if err := s.raw.RegisterInputDefaults(&url.Values{}, JSONKeyMapper, conversion.AllowDifferentFieldTypeNames|conversion.IgnoreMissingFields); err != nil {
+		panic(err)
+	}
 	return s
 }
 
@@ -294,13 +298,13 @@ func (s *Scheme) AddConversionFuncs(conversionFuncs ...interface{}) error {
 }
 
 // AddFieldLabelConversionFunc adds a conversion function to convert field selectors
-// of the given api resource from the given version to internal version representation.
-func (s *Scheme) AddFieldLabelConversionFunc(version, apiResource string, conversionFunc FieldLabelConversionFunc) error {
+// of the given kind from the given version to internal version representation.
+func (s *Scheme) AddFieldLabelConversionFunc(version, kind string, conversionFunc FieldLabelConversionFunc) error {
 	if s.fieldLabelConversionFuncs[version] == nil {
 		s.fieldLabelConversionFuncs[version] = map[string]FieldLabelConversionFunc{}
 	}
 
-	s.fieldLabelConversionFuncs[version][apiResource] = conversionFunc
+	s.fieldLabelConversionFuncs[version][kind] = conversionFunc
 	return nil
 }
 
@@ -326,15 +330,15 @@ func (s *Scheme) Convert(in, out interface{}) error {
 	return s.raw.Convert(in, out)
 }
 
-// Converts the given field label and value for an apiResource field selector from
+// Converts the given field label and value for an kind field selector from
 // versioned representation to an unversioned one.
-func (s *Scheme) ConvertFieldLabel(version, apiResource, label, value string) (string, string, error) {
+func (s *Scheme) ConvertFieldLabel(version, kind, label, value string) (string, string, error) {
 	if s.fieldLabelConversionFuncs[version] == nil {
 		return "", "", fmt.Errorf("No conversion function found for version: %s", version)
 	}
-	conversionFunc, ok := s.fieldLabelConversionFuncs[version][apiResource]
+	conversionFunc, ok := s.fieldLabelConversionFuncs[version][kind]
 	if !ok {
-		return "", "", fmt.Errorf("No conversion function found for version %s and api resource %s", version, apiResource)
+		return "", "", fmt.Errorf("No conversion function found for version %s and kind %s", version, kind)
 	}
 	return conversionFunc(label, value)
 }

@@ -37,6 +37,11 @@ type watchEvent struct {
 	Object runtime.RawExtension `json:"object,omitempty"`
 }
 
+// NewWatchEvent returns the serialization form of watchEvent for structured schemas
+func NewWatchEvent() interface{} {
+	return &watchEvent{}
+}
+
 // Object converts a watch.Event into an appropriately serializable JSON object
 func Object(codec runtime.Codec, event *watch.Event) (interface{}, error) {
 	obj, ok := event.Object.(runtime.Object)

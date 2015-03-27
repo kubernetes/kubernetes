@@ -38,8 +38,16 @@ func (fakeCodec) DecodeInto([]byte, runtime.Object) error {
 
 type fakeConvertor struct{}
 
+func (fakeConvertor) Convert(in, out interface{}) error {
+	return nil
+}
+
 func (fakeConvertor) ConvertToVersion(in runtime.Object, _ string) (runtime.Object, error) {
 	return in, nil
+}
+
+func (fakeConvertor) ConvertFieldLabel(version, kind, label, value string) (string, string, error) {
+	return label, value, nil
 }
 
 var validCodec = fakeCodec{}

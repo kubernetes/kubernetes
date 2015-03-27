@@ -27,8 +27,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/rest"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 
 	"github.com/emicklei/go-restful"
@@ -64,9 +62,15 @@ type RequestScope struct {
 	Namer ScopeNamer
 	ContextFunc
 	runtime.Codec
+	Creater   runtime.ObjectCreater
+	Convertor runtime.ObjectConvertor
+
 	Resource   string
 	Kind       string
 	APIVersion string
+
+	// The version of apiserver resources to use
+	ServerAPIVersion string
 }
 
 // GetResource returns a function that handles retrieving a single resource from a rest.Storage object.
@@ -94,26 +98,8 @@ func GetResource(r rest.Getter, scope RequestScope) restful.RouteFunction {
 	}
 }
 
-func parseSelectorQueryParams(query url.Values, version, apiResource string) (label labels.Selector, field fields.Selector, err error) {
-	labelString := query.Get(api.LabelSelectorQueryParam(version))
-	label, err = labels.Parse(labelString)
-	if err != nil {
-		return nil, nil, errors.NewBadRequest(fmt.Sprintf("The 'labels' selector parameter (%s) could not be parsed: %v", labelString, err))
-	}
-
-	convertToInternalVersionFunc := func(label, value string) (newLabel, newValue string, err error) {
-		return api.Scheme.ConvertFieldLabel(version, apiResource, label, value)
-	}
-	fieldString := query.Get(api.FieldSelectorQueryParam(version))
-	field, err = fields.ParseAndTransformSelector(fieldString, convertToInternalVersionFunc)
-	if err != nil {
-		return nil, nil, errors.NewBadRequest(fmt.Sprintf("The 'fields' selector parameter (%s) could not be parsed: %v", fieldString, err))
-	}
-	return label, field, nil
-}
-
 // ListResource returns a function that handles retrieving a list of resources from a rest.Storage object.
-func ListResource(r rest.Lister, scope RequestScope) restful.RouteFunction {
+func ListResource(r rest.Lister, rw rest.Watcher, scope RequestScope, forceWatch bool) restful.RouteFunction {
 	return func(req *restful.Request, res *restful.Response) {
 		w := res.ResponseWriter
 
@@ -125,13 +111,35 @@ func ListResource(r rest.Lister, scope RequestScope) restful.RouteFunction {
 		ctx := scope.ContextFunc(req)
 		ctx = api.WithNamespace(ctx, namespace)
 
-		label, field, err := parseSelectorQueryParams(req.Request.URL.Query(), scope.APIVersion, scope.Resource)
+		out, err := queryToObject(req.Request.URL.Query(), scope, "ListOptions")
 		if err != nil {
 			errorJSON(err, scope.Codec, w)
 			return
 		}
+		opts := *out.(*api.ListOptions)
 
-		result, err := r.List(ctx, label, field)
+		// transform fields
+		fn := func(label, value string) (newLabel, newValue string, err error) {
+			return scope.Convertor.ConvertFieldLabel(scope.APIVersion, scope.Kind, label, value)
+		}
+		if opts.FieldSelector, err = opts.FieldSelector.Transform(fn); err != nil {
+			// TODO: allow bad request to set field causes based on query parameters
+			err = errors.NewBadRequest(err.Error())
+			errorJSON(err, scope.Codec, w)
+			return
+		}
+
+		if (opts.Watch || forceWatch) && rw != nil {
+			watcher, err := rw.Watch(ctx, opts.LabelSelector, opts.FieldSelector, opts.ResourceVersion)
+			if err != nil {
+				errorJSON(err, scope.Codec, w)
+				return
+			}
+			serveWatch(watcher, scope, w, req)
+			return
+		}
+
+		result, err := r.List(ctx, opts.LabelSelector, opts.FieldSelector)
 		if err != nil {
 			errorJSON(err, scope.Codec, w)
 			return
@@ -407,6 +415,27 @@ func DeleteResource(r rest.GracefulDeleter, checkBody bool, scope RequestScope, 
 		}
 		write(http.StatusOK, scope.APIVersion, scope.Codec, result, w, req.Request)
 	}
+}
+
+// queryToObject converts query parameters into a structured internal object by
+// kind. The caller must cast the returned object to the matching internal Kind
+// to use it.
+// TODO: add appropriate structured error responses
+func queryToObject(query url.Values, scope RequestScope, kind string) (runtime.Object, error) {
+	versioned, err := scope.Creater.New(scope.ServerAPIVersion, kind)
+	if err != nil {
+		// programmer error
+		return nil, err
+	}
+	if err := scope.Convertor.Convert(&query, versioned); err != nil {
+		return nil, errors.NewBadRequest(err.Error())
+	}
+	out, err := scope.Convertor.ConvertToVersion(versioned, "")
+	if err != nil {
+		// programmer error
+		return nil, err
+	}
+	return out, nil
 }
 
 // resultFunc is a function that returns a rest result and can be run in a goroutine

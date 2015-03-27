@@ -21,6 +21,8 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/conversion"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 
 	"github.com/davecgh/go-spew/spew"
@@ -62,6 +64,12 @@ var Semantic = conversion.EqualitiesOrDie(
 	},
 	func(a, b util.Time) bool {
 		return a.UTC() == b.UTC()
+	},
+	func(a, b labels.Selector) bool {
+		return a.String() == b.String()
+	},
+	func(a, b fields.Selector) bool {
+		return a.String() == b.String()
 	},
 )
 

@@ -40,18 +40,20 @@ func PreV1Beta3(version string) bool {
 	return version == "v1beta1" || version == "v1beta2"
 }
 
+// TODO: remove me when watch is refactored
 func LabelSelectorQueryParam(version string) string {
 	if PreV1Beta3(version) {
 		return "labels"
 	}
-	return "label-selector"
+	return "labelSelector"
 }
 
+// TODO: remove me when watch is refactored
 func FieldSelectorQueryParam(version string) string {
 	if PreV1Beta3(version) {
 		return "fields"
 	}
-	return "field-selector"
+	return "fieldSelector"
 }
 
 // String returns available api versions as a human-friendly version string.

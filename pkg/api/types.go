@@ -18,6 +18,8 @@ package api
 
 import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -1199,6 +1201,21 @@ type DeleteOptions struct {
 	// The value zero indicates delete immediately. If this value is nil, the default grace period for the
 	// specified type will be used.
 	GracePeriodSeconds *int64 `json:"gracePeriodSeconds"`
+}
+
+// ListOptions is the query options to a standard REST list call, and has future support for
+// watch calls.
+type ListOptions struct {
+	TypeMeta `json:",inline"`
+
+	// A selector based on labels
+	LabelSelector labels.Selector
+	// A selector based on fields
+	FieldSelector fields.Selector
+	// If true, watch for changes to this list
+	Watch bool
+	// The resource version to watch (no effect on list yet)
+	ResourceVersion string
 }
 
 // Status is a return value for calls that don't return other objects.

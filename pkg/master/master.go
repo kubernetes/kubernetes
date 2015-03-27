@@ -572,9 +572,10 @@ func (m *Master) defaultAPIGroupVersion() *apiserver.APIGroupVersion {
 
 		Mapper: latest.RESTMapper,
 
-		Creater: api.Scheme,
-		Typer:   api.Scheme,
-		Linker:  latest.SelfLinker,
+		Creater:   api.Scheme,
+		Convertor: api.Scheme,
+		Typer:     api.Scheme,
+		Linker:    latest.SelfLinker,
 
 		Admit:   m.admissionControl,
 		Context: m.requestContextMapper,

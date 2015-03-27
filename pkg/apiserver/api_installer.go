@@ -29,7 +29,9 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/rest"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/conversion"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	watchjson "github.com/GoogleCloudPlatform/kubernetes/pkg/watch/json"
 
 	"github.com/emicklei/go-restful"
 )
@@ -58,13 +60,6 @@ func (a *APIInstaller) Install() (ws *restful.WebService, errors []error) {
 	// Create the WebService.
 	ws = a.newWebService()
 
-	// Initialize the custom handlers.
-	watchHandler := (&WatchHandler{
-		storage: a.group.Storage,
-		codec:   a.group.Codec,
-		linker:  a.group.Linker,
-		info:    a.info,
-	})
 	redirectHandler := (&RedirectHandler{a.group.Storage, a.group.Codec, a.group.Context, a.info})
 	proxyHandler := (&ProxyHandler{a.prefix + "/proxy/", a.group.Storage, a.group.Codec, a.group.Context, a.info})
 
@@ -77,7 +72,7 @@ func (a *APIInstaller) Install() (ws *restful.WebService, errors []error) {
 	}
 	sort.Strings(paths)
 	for _, path := range paths {
-		if err := a.registerResourceHandlers(path, a.group.Storage[path], ws, watchHandler, redirectHandler, proxyHandler); err != nil {
+		if err := a.registerResourceHandlers(path, a.group.Storage[path], ws, redirectHandler, proxyHandler); err != nil {
 			errors = append(errors, err)
 		}
 	}
@@ -95,9 +90,14 @@ func (a *APIInstaller) newWebService() *restful.WebService {
 	return ws
 }
 
-func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storage, ws *restful.WebService, watchHandler, redirectHandler, proxyHandler http.Handler) error {
+func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storage, ws *restful.WebService, redirectHandler, proxyHandler http.Handler) error {
 	admit := a.group.Admit
 	context := a.group.Context
+
+	serverVersion := a.group.ServerVersion
+	if len(serverVersion) == 0 {
+		serverVersion = a.group.Version
+	}
 
 	var resource, subresource string
 	switch parts := strings.Split(path, "/"); len(parts) {
@@ -121,17 +121,6 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	}
 	versionedObject := indirectArbitraryPointer(versionedPtr)
 
-	var versionedList interface{}
-	if lister, ok := storage.(rest.Lister); ok {
-		list := lister.NewList()
-		_, listKind, err := a.group.Typer.ObjectVersionAndKind(list)
-		versionedListPtr, err := a.group.Creater.New(a.group.Version, listKind)
-		if err != nil {
-			return err
-		}
-		versionedList = indirectArbitraryPointer(versionedListPtr)
-	}
-
 	mapping, err := a.group.Mapper.RESTMapping(kind, a.group.Version)
 	if err != nil {
 		return err
@@ -145,17 +134,33 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	gracefulDeleter, isGracefulDeleter := storage.(rest.GracefulDeleter)
 	updater, isUpdater := storage.(rest.Updater)
 	patcher, isPatcher := storage.(rest.Patcher)
-	_, isWatcher := storage.(rest.Watcher)
+	watcher, isWatcher := storage.(rest.Watcher)
 	_, isRedirector := storage.(rest.Redirector)
 	storageMeta, isMetadata := storage.(rest.StorageMetadata)
 	if !isMetadata {
 		storageMeta = defaultStorageMetadata{}
 	}
 
+	var versionedList interface{}
+	if isLister {
+		list := lister.NewList()
+		_, listKind, err := a.group.Typer.ObjectVersionAndKind(list)
+		versionedListPtr, err := a.group.Creater.New(a.group.Version, listKind)
+		if err != nil {
+			return err
+		}
+		versionedList = indirectArbitraryPointer(versionedListPtr)
+	}
+
+	versionedListOptions, err := a.group.Creater.New(serverVersion, "ListOptions")
+	if err != nil {
+		return err
+	}
+
 	var versionedDeleterObject runtime.Object
 	switch {
 	case isGracefulDeleter:
-		object, err := a.group.Creater.New(a.group.Version, "DeleteOptions")
+		object, err := a.group.Creater.New(serverVersion, "DeleteOptions")
 		if err != nil {
 			return err
 		}
@@ -288,11 +293,14 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	// test/integration/auth_test.go is currently the most comprehensive status code test
 
 	reqScope := RequestScope{
-		ContextFunc: ctxFn,
-		Codec:       mapping.Codec,
-		APIVersion:  a.group.Version,
-		Resource:    resource,
-		Kind:        kind,
+		ContextFunc:      ctxFn,
+		Creater:          a.group.Creater,
+		Convertor:        a.group.Convertor,
+		Codec:            mapping.Codec,
+		APIVersion:       a.group.Version,
+		ServerAPIVersion: serverVersion,
+		Resource:         resource,
+		Kind:             kind,
 	}
 	for _, action := range actions {
 		reqScope.Namer = action.Namer
@@ -308,12 +316,15 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			addParams(route, action.Params)
 			ws.Route(route)
 		case "LIST": // List all resources of a kind.
-			route := ws.GET(action.Path).To(ListResource(lister, reqScope)).
+			route := ws.GET(action.Path).To(ListResource(lister, watcher, reqScope, false)).
 				Filter(m).
 				Doc("list objects of kind " + kind).
 				Operation("list" + kind).
 				Produces("application/json").
 				Writes(versionedList)
+			if err := addObjectParams(ws, route, versionedListOptions); err != nil {
+				return err
+			}
 			addParams(route, action.Params)
 			ws.Route(route)
 		case "PUT": // Update a resource.
@@ -356,22 +367,30 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			}
 			addParams(route, action.Params)
 			ws.Route(route)
+		// TODO: deprecated
 		case "WATCH": // Watch a resource.
-			route := ws.GET(action.Path).To(routeFunction(watchHandler)).
+			route := ws.GET(action.Path).To(ListResource(lister, watcher, reqScope, true)).
 				Filter(m).
-				Doc("watch a particular " + kind).
+				Doc("watch changes to an object of kind " + kind).
 				Operation("watch" + kind).
 				Produces("application/json").
-				Writes(versionedObject)
+				Writes(watchjson.NewWatchEvent())
+			if err := addObjectParams(ws, route, versionedListOptions); err != nil {
+				return err
+			}
 			addParams(route, action.Params)
 			ws.Route(route)
+		// TODO: deprecated
 		case "WATCHLIST": // Watch all resources of a kind.
-			route := ws.GET(action.Path).To(routeFunction(watchHandler)).
+			route := ws.GET(action.Path).To(ListResource(lister, watcher, reqScope, true)).
 				Filter(m).
-				Doc("watch a list of " + kind).
+				Doc("watch individual changes to a list of " + kind).
 				Operation("watch" + kind + "list").
 				Produces("application/json").
-				Writes(versionedList)
+				Writes(watchjson.NewWatchEvent())
+			if err := addObjectParams(ws, route, versionedListOptions); err != nil {
+				return err
+			}
 			addParams(route, action.Params)
 			ws.Route(route)
 		case "REDIRECT": // Get the redirect URL for a resource.
@@ -649,6 +668,45 @@ func addParams(route *restful.RouteBuilder, params []*restful.Parameter) {
 	for _, param := range params {
 		route.Param(param)
 	}
+}
+
+// addObjectParams converts a runtime.Object into a set of go-restful Param() definitions on the route.
+// The object must be a pointer to a struct; only fields at the top level of the struct that are not
+// themselves interfaces or structs are used; only fields with a json tag that is non empty (the standard
+// Go JSON behavior for omitting a field) become query parameters. The name of the query parameter is
+// the JSON field name. If a description struct tag is set on the field, that description is used on the
+// query parameter. In essence, it converts a standard JSON top level object into a query param schema.
+func addObjectParams(ws *restful.WebService, route *restful.RouteBuilder, obj runtime.Object) error {
+	sv, err := conversion.EnforcePtr(obj)
+	if err != nil {
+		return err
+	}
+	st := sv.Type()
+	switch st.Kind() {
+	case reflect.Struct:
+		for i := 0; i < st.NumField(); i++ {
+			name := st.Field(i).Name
+			sf, ok := st.FieldByName(name)
+			if !ok {
+				continue
+			}
+			switch sf.Type.Kind() {
+			case reflect.Interface, reflect.Struct:
+			default:
+				jsonTag := sf.Tag.Get("json")
+				if len(jsonTag) == 0 {
+					continue
+				}
+				jsonName := strings.SplitN(jsonTag, ",", 2)[0]
+				if len(jsonName) == 0 {
+					continue
+				}
+				desc := sf.Tag.Get("description")
+				route.Param(ws.QueryParameter(jsonName, desc).DataType(sf.Type.Name()))
+			}
+		}
+	}
+	return nil
 }
 
 // defaultStorageMetadata provides default answers to rest.StorageMetadata.

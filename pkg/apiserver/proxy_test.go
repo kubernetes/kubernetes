@@ -294,7 +294,7 @@ func TestProxy(t *testing.T) {
 			server           *httptest.Server
 			proxyTestPattern string
 		}{
-			{namespaceServer, "/api/version/proxy/namespaces/" + item.reqNamespace + "/foo/id" + item.path},
+			{namespaceServer, "/api/version2/proxy/namespaces/" + item.reqNamespace + "/foo/id" + item.path},
 			{legacyNamespaceServer, "/api/version/proxy/foo/id" + item.path + "?namespace=" + item.reqNamespace},
 		}
 
@@ -348,7 +348,7 @@ func TestProxyUpgrade(t *testing.T) {
 	server := httptest.NewServer(namespaceHandler)
 	defer server.Close()
 
-	ws, err := websocket.Dial("ws://"+server.Listener.Addr().String()+"/api/version/proxy/namespaces/myns/foo/123", "", "http://127.0.0.1/")
+	ws, err := websocket.Dial("ws://"+server.Listener.Addr().String()+"/api/version2/proxy/namespaces/myns/foo/123", "", "http://127.0.0.1/")
 	if err != nil {
 		t.Fatalf("websocket dial err: %s", err)
 	}

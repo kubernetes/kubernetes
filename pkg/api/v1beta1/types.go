@@ -1034,6 +1034,20 @@ type DeleteOptions struct {
 	GracePeriodSeconds *int64 `json:"gracePeriodSeconds" description:"the duration in seconds to wait before deleting this object; defaults to a per object value if not specified; zero means delete immediately"`
 }
 
+// ListOptions is the query options to a standard REST list call
+type ListOptions struct {
+	TypeMeta `json:",inline"`
+
+	// A selector based on labels
+	LabelSelector string `json:"labels" description:"a selector to restrict the list of returned objects by their labels; defaults to everything"`
+	// A selector based on fields
+	FieldSelector string `json:"fields" description:"a selector to restrict the list of returned objects by their fields; defaults to everything"`
+	// If true, watch for changes to the selected resources
+	Watch bool `json:"watch" description:"watch for changes to the described resources and return them as a stream of add, update, and remove notifications; specify resourceVersion"`
+	// The desired resource version to watch
+	ResourceVersion string `json:"resourceVersion" description:"when specified with a watch call, shows changes that occur after that particular version of a resource; defaults to changes from the beginning of history"`
+}
+
 // Status is a return value for calls that don't return other objects.
 // TODO: this could go in apiserver, but I'm including it here so clients needn't
 // import both.

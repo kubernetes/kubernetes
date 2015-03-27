@@ -33,12 +33,14 @@ function cleanup()
     [[ -n ${PROXY_PID-} ]] && kill ${PROXY_PID} 1>&2 2>/dev/null
 
     kube::etcd::cleanup
+    rm -rf "${KUBE_TEMP}"
 
     kube::log::status "Clean up complete"
 }
 
 trap cleanup EXIT SIGINT
 
+kube::util::ensure-temp-dir
 kube::etcd::start
 
 ETCD_HOST=${ETCD_HOST:-127.0.0.1}
@@ -533,6 +535,7 @@ __EOF__
 
   kube::test::describe_object_assert nodes "127.0.0.1" "Name:" "Labels:" "CreationTimestamp:" "Conditions:" "Addresses:" "Capacity:" "Pods:"
 
+
   ###########
   # Minions #
   ###########
@@ -548,12 +551,27 @@ __EOF__
     kube::test::describe_object_assert minions "127.0.0.1" "Name:" "Conditions:" "Addresses:" "Capacity:" "Pods:"
   fi
 
+
   #####################
   # Retrieve multiple #
   #####################
 
   kube::log::status "Testing kubectl(${version}:multiget)"
   kube::test::get_object_assert 'nodes/127.0.0.1 service/kubernetes' "{{range.items}}{{.$id_field}}:{{end}}" '127.0.0.1:kubernetes:'
+
+
+  ###########
+  # Swagger #
+  ###########
+
+  if [[ -n "${version}" ]]; then
+    # Verify schema
+    file="${KUBE_TEMP}/schema-${version}.json"
+    curl -s "http://127.0.0.1:${API_PORT}/swaggerapi/api/${version}" > "${file}"
+    [[ "$(grep "list of returned" "${file}")" ]]
+    [[ "$(grep "list of pods" "${file}")" ]]
+    [[ "$(grep "watch for changes to the described resources" "${file}")" ]]
+  fi
 
   kube::test::clear_all
 done

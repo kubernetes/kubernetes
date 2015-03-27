@@ -43,6 +43,16 @@ kube::util::wait_for_url() {
   return 1
 }
 
+# Create a temp dir that'll be deleted at the end of this bash session.
+#
+# Vars set:
+#   KUBE_TEMP
+kube::util::ensure-temp-dir() {
+  if [[ -z ${KUBE_TEMP-} ]]; then
+    KUBE_TEMP=$(mktemp -d -t kubernetes.XXXXXX)
+  fi
+}
+
 # This figures out the host platform without relying on golang.  We need this as
 # we don't want a golang install to be a prerequisite to building yet we need
 # this info to figure out where the final binaries are placed.
