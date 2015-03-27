@@ -199,7 +199,11 @@ func (s *APIServer) Run(_ []string) error {
 		glog.Fatalf("Failure to start kubelet client: %v", err)
 	}
 
-	_, v1beta3 := s.RuntimeConfig["api/v1beta3"]
+	disableV1beta3 := false
+	v1beta3FlagValue, ok := s.RuntimeConfig["api/v1beta3"]
+	if ok && v1beta3FlagValue == "false" {
+		disableV1beta3 = true
+	}
 
 	// TODO: expose same flags as client.BindClientConfigFlags but for a server
 	clientConfig := &client.Config{
@@ -274,7 +278,7 @@ func (s *APIServer) Run(_ []string) error {
 		Authenticator:          authenticator,
 		Authorizer:             authorizer,
 		AdmissionControl:       admissionController,
-		EnableV1Beta3:          v1beta3,
+		DisableV1Beta3:         disableV1beta3,
 		MasterServiceNamespace: s.MasterServiceNamespace,
 		ClusterName:            s.ClusterName,
 		ExternalHost:           s.ExternalHost,

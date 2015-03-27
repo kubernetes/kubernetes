@@ -55,7 +55,6 @@ func TestClient(t *testing.T) {
 		EnableLogsSupport: false,
 		EnableProfiling:   true,
 		EnableUISupport:   false,
-		EnableV1Beta3:     true,
 		APIPrefix:         "/api",
 		Authorizer:        apiserver.NewAlwaysAllowAuthorizer(),
 		AdmissionControl:  admit.NewAlwaysAdmit(),

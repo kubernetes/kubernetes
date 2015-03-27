@@ -194,7 +194,6 @@ func startComponents(firstManifestURL, secondManifestURL, apiVersion string) (st
 		ReadOnlyPort:      portNumber,
 		PublicAddress:     publicAddress,
 		CacheTimeout:      2 * time.Second,
-		EnableV1Beta3:     true,
 	})
 	handler.delegate = m.Handler
 
