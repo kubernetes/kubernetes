@@ -132,7 +132,7 @@ func runControllerManager(machineList []string, cl *client.Client, nodeMilliCPU,
 
 	nodeController := nodeControllerPkg.NewNodeController(
 		nil, "", machineList, nodeResources, cl, kubeClient, 10, 5*time.Minute, util.NewTokenBucketRateLimiter(*deletingPodsQps, *deletingPodsBurst), 40*time.Second, 60*time.Second, 5*time.Second)
-	nodeController.Run(10*time.Second, true, true)
+	nodeController.Run(10*time.Second, true)
 
 	endpoints := service.NewEndpointController(cl)
 	go util.Forever(func() { endpoints.SyncServiceEndpoints() }, time.Second*10)

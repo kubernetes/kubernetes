@@ -1369,7 +1369,7 @@ func init() {
 			if err := s.Convert(&in.Status, &out.Status, 0); err != nil {
 				return err
 			}
-			if err := s.Convert(&in.LastProbeTime, &out.LastProbeTime, 0); err != nil {
+			if err := s.Convert(&in.LastHeartbeatTime, &out.LastProbeTime, 0); err != nil {
 				return err
 			}
 			if err := s.Convert(&in.LastTransitionTime, &out.LastTransitionTime, 0); err != nil {
@@ -1390,7 +1390,7 @@ func init() {
 			if err := s.Convert(&in.Status, &out.Status, 0); err != nil {
 				return err
 			}
-			if err := s.Convert(&in.LastProbeTime, &out.LastProbeTime, 0); err != nil {
+			if err := s.Convert(&in.LastProbeTime, &out.LastHeartbeatTime, 0); err != nil {
 				return err
 			}
 			if err := s.Convert(&in.LastTransitionTime, &out.LastTransitionTime, 0); err != nil {

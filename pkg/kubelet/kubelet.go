@@ -1807,10 +1807,10 @@ func (kl *Kubelet) tryUpdateNodeStatus() error {
 
 	currentTime := util.Now()
 	newCondition := api.NodeCondition{
-		Type:          api.NodeReady,
-		Status:        api.ConditionTrue,
-		Reason:        fmt.Sprintf("kubelet is posting ready status"),
-		LastProbeTime: currentTime,
+		Type:              api.NodeReady,
+		Status:            api.ConditionTrue,
+		Reason:            fmt.Sprintf("kubelet is posting ready status"),
+		LastHeartbeatTime: currentTime,
 	}
 	updated := false
 	for i := range node.Status.Conditions {
