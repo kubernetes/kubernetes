@@ -150,6 +150,11 @@ func (r *Response) WriteAsXml(value interface{}) error {
 
 // WriteAsJson is a convenience method for writing a value in json
 func (r *Response) WriteAsJson(value interface{}) error {
+	return r.WriteJson(value, MIME_JSON) // no charset
+}
+
+// WriteJson is a convenience method for writing a value in Json with a given Content-Type
+func (r *Response) WriteJson(value interface{}, contentType string) error {
 	var output []byte
 	var err error
 
@@ -165,7 +170,7 @@ func (r *Response) WriteAsJson(value interface{}) error {
 	if err != nil {
 		return r.WriteErrorString(http.StatusInternalServerError, err.Error())
 	}
-	r.Header().Set(HEADER_ContentType, MIME_JSON)
+	r.Header().Set(HEADER_ContentType, contentType)
 	if r.statusCode > 0 { // a WriteHeader was intercepted
 		r.ResponseWriter.WriteHeader(r.statusCode)
 	}

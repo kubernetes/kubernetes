@@ -79,8 +79,8 @@ func (r Route) matchesAccept(mimeTypesWithQuality string) bool {
 		if withoutQuality == "*/*" {
 			return true
 		}
-		for _, other := range r.Produces {
-			if other == withoutQuality {
+		for _, producibleType := range r.Produces {
+			if producibleType == "*/*" || producibleType == withoutQuality {
 				return true
 			}
 		}

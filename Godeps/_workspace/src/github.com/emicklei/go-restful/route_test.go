@@ -31,6 +31,17 @@ func TestMatchesAcceptXml(t *testing.T) {
 	}
 }
 
+// accept should match produces
+func TestMatchesAcceptAny(t *testing.T) {
+	r := Route{Produces: []string{"*/*"}}
+	if !r.matchesAccept("application/json") {
+		t.Errorf("accept should match json")
+	}
+	if !r.matchesAccept("application/xml") {
+		t.Errorf("accept should match xml")
+	}
+}
+
 // content type should match consumes
 func TestMatchesContentTypeXml(t *testing.T) {
 	r := Route{Consumes: []string{"application/xml"}}
