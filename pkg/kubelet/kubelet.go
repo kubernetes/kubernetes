@@ -811,24 +811,12 @@ func parseResolvConf(reader io.Reader) (nameservers []string, searches []string,
 	return nameservers, searches, nil
 }
 
-// Kill a docker container
 func (kl *Kubelet) killContainer(c *kubecontainer.Container) error {
-	return kl.killContainerByID(string(c.ID))
+	return dockertools.KillContainer(kl.dockerClient, string(c.ID), kl.containerRefManager, kl.readinessManager, kl.recorder)
 }
 
 func (kl *Kubelet) killContainerByID(ID string) error {
-	glog.V(2).Infof("Killing container with id %q", ID)
-	kl.readinessManager.RemoveReadiness(ID)
-	err := kl.dockerClient.StopContainer(ID, 10)
-
-	ref, ok := kl.containerRefManager.GetRef(ID)
-	if !ok {
-		glog.Warningf("No ref for pod '%v'", ID)
-	} else {
-		// TODO: pass reason down here, and state, or move this call up the stack.
-		kl.recorder.Eventf(ref, "killing", "Killing %v", ID)
-	}
-	return err
+	return dockertools.KillContainer(kl.dockerClient, ID, kl.containerRefManager, kl.readinessManager, kl.recorder)
 }
 
 const (
