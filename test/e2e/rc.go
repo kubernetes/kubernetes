@@ -46,7 +46,7 @@ var _ = Describe("ReplicationController", func() {
 	It("should serve a basic image on each replica with a private image", func() {
 		switch testContext.provider {
 		case "gce", "gke":
-			ServeImageOrFail(c, "private", "gcr.io/_b_k8s_test/serve_hostname:1.0")
+			ServeImageOrFail(c, "private", "gcr.io/_b_k8s_authenticated_test/serve_hostname:1.1")
 		default:
 			By(fmt.Sprintf("Skipping private variant, which is only supported for providers gce and gke (not %s)",
 				testContext.provider))

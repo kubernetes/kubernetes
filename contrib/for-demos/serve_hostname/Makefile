@@ -7,9 +7,11 @@ serve_hostname: serve_hostname.go
 
 container: serve_hostname
 	sudo docker build -t gcr.io/google-containers/serve_hostname:$(TAG) .
+	sudo docker tag gcr.io/google-containers/serve_hostname:$(TAG) gcr.io/_b_k8s_authenticated_test/serve_hostname:$(TAG)
 
 push:
 	gcloud preview docker push gcr.io/google-containers/serve_hostname:$(TAG)
+	gcloud preview docker push gcr.io/_b_k8s_authenticated_test/serve_hostname:$(TAG)
 
 clean:
 	rm -f serve_hostname
