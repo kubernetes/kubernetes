@@ -48,7 +48,7 @@ clustered database or key-value store. We will target such workloads for our
 15. Demonstrate cluster stability over time
   - Status
 16. Kubelet use the kubernetes API to fetch jobs to run (instead of etcd) on supported platforms
-  - Status
+  - Status: DONE
 
 ## Reliability and performance
 
@@ -59,12 +59,13 @@ clustered database or key-value store. We will target such workloads for our
 3. Scale to 30-50 pods (1-2 containers each) per node (#4188)
   - Status:
 4. Scheduling throughput: 99% of scheduling decisions made in less than 1s on 100 node, 3000 pod cluster; linear time to number of nodes and pods (#3954)
+5. Startup time: 99% of end-to-end pod startup time with prepulled images is less than 5s on 100 node, 3000 pod cluster; linear time to number of nodes and pods (#3952, #3954)
   - Status:
-5. API performance: 99% of API calls return in less than 1s; constant time to number of nodes and pods (#4521)
+6. API performance: 99% of API calls return in less than 1s; constant time to number of nodes and pods (#4521)
   - Status:
-6. Manage and report disk space on nodes (#4135)
+7. Manage and report disk space on nodes (#4135)
   - Status: in progress
-7. API test coverage more than 85% in e2e tests
+8. API test coverage more than 85% in e2e tests
   - Status:
 
 ## Project
