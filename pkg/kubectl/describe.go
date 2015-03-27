@@ -27,6 +27,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	"github.com/golang/glog"
 )
 
@@ -366,7 +367,14 @@ func (d *NodeDescriber) Describe(namespace, name string) (string, error) {
 		pods = append(pods, pod)
 	}
 
-	events, _ := d.Events(namespace).Search(node)
+	var events *api.EventList
+	if ref, err := api.GetReference(node); err != nil {
+		glog.Errorf("Unable to construct reference to '%#v': %v", node, err)
+	} else {
+		// TODO: We haven't decided the namespace for Node object yet.
+		ref.UID = types.UID(ref.Name)
+		events, _ = d.Events("").Search(ref)
+	}
 
 	return describeNode(node, pods, events)
 }

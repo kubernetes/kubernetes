@@ -1998,11 +1998,12 @@ func (kl *Kubelet) BirthCry() {
 	// Make an event that kubelet restarted.
 	// TODO: get the real minion object of ourself,
 	// and use the real minion name and UID.
+	// TODO: what is namespace for node?
 	ref := &api.ObjectReference{
-		Kind:      "Minion",
+		Kind:      "Node",
 		Name:      kl.hostname,
 		UID:       types.UID(kl.hostname),
-		Namespace: api.NamespaceDefault,
+		Namespace: "",
 	}
 	kl.recorder.Eventf(ref, "starting", "Starting kubelet.")
 }
