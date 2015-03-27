@@ -479,10 +479,10 @@ func (proxier *Proxier) OnUpdate(services []api.Service) {
 		info, exists := proxier.getServiceInfo(serviceName)
 		serviceIP := net.ParseIP(service.Spec.PortalIP)
 		// TODO: check health of the socket?  What if ProxyLoop exited?
-		if exists && info.portalPort == service.Spec.Port && info.portalIP.Equal(serviceIP) {
+		if exists && info.portalPort == service.Spec.Port && info.portalIP.Equal(serviceIP) && ipsEqual(service.Spec.PublicIPs, info.publicIP) {
 			continue
 		}
-		if exists && (info.portalPort != service.Spec.Port || !info.portalIP.Equal(serviceIP) || !ipsEqual(service.Spec.PublicIPs, info.publicIP)) {
+		if exists {
 			glog.V(4).Infof("Something changed for service %q: stopping it", serviceName.String())
 			err := proxier.closePortal(serviceName, info)
 			if err != nil {
