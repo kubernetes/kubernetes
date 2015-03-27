@@ -9,6 +9,8 @@ write_files:
     until curl http://127.0.0.1:4001/v2/machines; do sleep 2; done
 hostname: standalone
 coreos:
+  flannel:
+    interface: eth1
   units:
     - name: etcd.service
       command: start
@@ -35,16 +37,10 @@ coreos:
       drop-ins:
         - name: 50-network-config.conf
           content: |
+            [Unit]
+            Requires=etcd.service
             [Service]
             ExecStartPre=/usr/bin/etcdctl set /coreos.com/network/config '{"Network":"10.244.0.0/16", "Backend": {"Type": "vxlan"}}'
-            ExecStart=
-            ExecStart=/usr/libexec/sdnotify-proxy /run/flannel/sd.sock \
-                /usr/bin/docker run --net=host --privileged=true --rm \
-                    --volume=/run/flannel:/run/flannel \
-                    --env=NOTIFY_SOCKET=/run/flannel/sd.sock \
-                    --env-file=/run/flannel/options.env \
-                    --volume=${ETCD_SSL_DIR}:/etc/ssl/etcd:ro \
-                    quay.io/coreos/flannel:${FLANNEL_VER} /opt/bin/flanneld --ip-masq=true --iface=eth1
     - name: docker-cache.service
       command: start
       content: |
