@@ -465,3 +465,37 @@ func getRequirement(key string, op Operator, vals util.StringSet, t *testing.T) 
 	}
 	return *req
 }
+
+func TestAdd(t *testing.T) {
+	testCases := []struct {
+		sel         Selector
+		key         string
+		operator    Operator
+		values      []string
+		refSelector Selector
+	}{
+		{
+			LabelSelector{},
+			"key",
+			InOperator,
+			[]string{"value"},
+			LabelSelector{Requirement{"key", InOperator, util.NewStringSet("value")}},
+		},
+		{
+			LabelSelector{Requirement{"key", InOperator, util.NewStringSet("value")}},
+			"key2",
+			EqualsOperator,
+			[]string{"value2"},
+			LabelSelector{
+				Requirement{"key", InOperator, util.NewStringSet("value")},
+				Requirement{"key2", EqualsOperator, util.NewStringSet("value2")},
+			},
+		},
+	}
+	for _, ts := range testCases {
+		ts.sel = ts.sel.Add(ts.key, ts.operator, ts.values)
+		if !reflect.DeepEqual(ts.sel, ts.refSelector) {
+			t.Errorf("Expected %t found %t", ts.refSelector, ts.sel)
+		}
+	}
+}
