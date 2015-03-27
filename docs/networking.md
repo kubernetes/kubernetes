@@ -77,7 +77,7 @@ very niche operation.  In this case a port will be allocated on the host `Node`
 and traffic will be forwarded to the `Pod`.  The `Pod` itself is blind to the
 existence or non-existence of host ports.
 
-## How to acheive this
+## How to achieve this
 
 There are a number of ways that this network model can be implemented.  This
 document is not an exhaustive study of the various methods, but hopefully serves
