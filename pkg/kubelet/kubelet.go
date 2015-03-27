@@ -1752,8 +1752,15 @@ func (kl *Kubelet) tryUpdateNodeStatus() error {
 	} else {
 		node.Status.NodeInfo.MachineID = info.MachineID
 		node.Status.NodeInfo.SystemUUID = info.SystemUUID
-		node.Status.NodeInfo.BootID = info.BootID
 		node.Status.Capacity = CapacityFromMachineInfo(info)
+		if node.Status.NodeInfo.BootID != "" &&
+			node.Status.NodeInfo.BootID != info.BootID {
+			// TODO: This requires a transaction, either both node status is updated
+			// and event is recorded or neither should happen, see issue #6055.
+			kl.recorder.Eventf(kl.getNodeReference(), "rebooted",
+				"Node %s has been rebooted, boot id: %s", kl.hostname, info.BootID)
+		}
+		node.Status.NodeInfo.BootID = info.BootID
 	}
 
 	currentTime := util.Now()
