@@ -11,17 +11,17 @@ Looks up a replication controller or service by name and uses the selector for t
 selector for a new Service on the specified port.
 
 ```
-kubectl expose RESOURCE NAME --port=port [--protocol=TCP|UDP] [--container-port=number-or-name] [--service-name=name] [--public-ip=ip] [--create-external-load-balancer=bool]
+kubectl expose RESOURCE NAME --port=port [--protocol=TCP|UDP] [--target-port=number-or-name] [--service-name=name] [--public-ip=ip] [--create-external-load-balancer=bool]
 ```
 
 ### Examples
 
 ```
 // Creates a service for a replicated nginx, which serves on port 80 and connects to the containers on port 8000.
-$ kubectl expose nginx --port=80 --container-port=8000
+$ kubectl expose nginx --port=80 --target-port=8000
 
 // Creates a second service based on the above service, exposing the container port 8443 as port 443 with the name "nginx-https"
-$ kubectl expose service nginx --port=443 --container-port=8443 --service-name=nginx-https
+$ kubectl expose service nginx --port=443 --target-port=8443 --service-name=nginx-https
 
 // Create a service for a replicated streaming application on port 4100 balancing UDP traffic and named 'video-stream'.
 $ kubectl expose streamer --port=4100 --protocol=udp --service-name=video-stream
@@ -30,7 +30,7 @@ $ kubectl expose streamer --port=4100 --protocol=udp --service-name=video-stream
 ### Options
 
 ```
-      --container-port="": Name or number for the port on the container that the service should direct traffic to. Optional.
+      --container-port="": Synonym for --target-port
       --create-external-load-balancer=false: If true, create an external load balancer for this service. Implementation is cloud provider dependent. Default is 'false'.
       --dry-run=false: If true, only print the object that would be sent, without creating it.
       --generator="service/v1": The name of the API generator to use.  Default is 'service/v1'.
@@ -45,6 +45,7 @@ $ kubectl expose streamer --port=4100 --protocol=udp --service-name=video-stream
       --public-ip="": Name of a public IP address to set for the service. The service will be assigned this IP in addition to its generated service IP.
       --selector="": A label selector to use for this service. If empty (the default) infer the selector from the replication controller.
       --service-name="": The name for the newly created service.
+      --target-port="": Name or number for the port on the container that the service should direct traffic to. Optional.
   -t, --template="": Template string or path to template file to use when -o=template or -o=templatefile.  The template format is golang templates [http://golang.org/pkg/text/template/#pkg-overview]
 ```
 
