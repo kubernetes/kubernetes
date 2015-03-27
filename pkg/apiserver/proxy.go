@@ -191,6 +191,15 @@ func (r *ProxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
+	// Redirect requests of the form "/{resource}/{name}" to "/{resource}/{name}/"
+	// This is essentially a hack for https://github.com/GoogleCloudPlatform/kubernetes/issues/4958.
+	// Note: Keep this code after tryUpgrade to not break that flow.
+	if len(parts) == 2 && !strings.HasSuffix(req.URL.Path, "/") {
+		w.Header().Set("Location", req.URL.Path+"/")
+		w.WriteHeader(http.StatusMovedPermanently)
+		return
+	}
+
 	proxy := httputil.NewSingleHostReverseProxy(&url.URL{Scheme: location.Scheme, Host: location.Host})
 	if transport == nil {
 		prepend := path.Join(r.prefix, resource, id)
