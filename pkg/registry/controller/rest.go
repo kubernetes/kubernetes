@@ -26,6 +26,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/generic"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/fielderrors"
+	"strconv"
 )
 
 // rcStrategy implements verification logic for Replication Controllers.
@@ -73,19 +74,25 @@ func (rcStrategy) ValidateUpdate(obj, old runtime.Object) fielderrors.Validation
 	return validation.ValidateReplicationControllerUpdate(old.(*api.ReplicationController), obj.(*api.ReplicationController))
 }
 
+// ControllerToSelectableFields returns a label set that represents the object.
+func ControllerToSelectableFields(controller *api.ReplicationController) labels.Set {
+	return labels.Set{
+		"name":            controller.Name,
+		"status.replicas": strconv.Itoa(controller.Status.Replicas),
+	}
+}
+
 // MatchController is the filter used by the generic etcd backend to route
 // watch events from etcd to clients of the apiserver only interested in specific
 // labels/fields.
 func MatchController(label labels.Selector, field fields.Selector) generic.Matcher {
 	return generic.MatcherFunc(
 		func(obj runtime.Object) (bool, error) {
-			if !field.Empty() {
-				return false, fmt.Errorf("field selector not supported yet")
-			}
 			controllerObj, ok := obj.(*api.ReplicationController)
 			if !ok {
 				return false, fmt.Errorf("Given object is not a replication controller.")
 			}
-			return label.Matches(labels.Set(controllerObj.Labels)), nil
+			fields := ControllerToSelectableFields(controllerObj)
+			return label.Matches(labels.Set(controllerObj.Labels)) && field.Matches(fields), nil
 		})
 }
