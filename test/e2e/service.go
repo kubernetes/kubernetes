@@ -34,11 +34,15 @@ import (
 
 var _ = Describe("Services", func() {
 	var c *client.Client
+	// Use these in tests.  They're unique for each test to prevent name collisions.
+	var namespace0, namespace1 string
 
 	BeforeEach(func() {
 		var err error
 		c, err = loadClient()
 		Expect(err).NotTo(HaveOccurred())
+		namespace0 = "e2e-ns-" + dateStamp() + "-0"
+		namespace1 = "e2e-ns-" + dateStamp() + "-1"
 	})
 
 	It("should provide DNS for the cluster", func() {
@@ -137,7 +141,7 @@ var _ = Describe("Services", func() {
 				_, err := c.Get().
 					Prefix("proxy").
 					Resource("pods").
-					Namespace("default").
+					Namespace(api.NamespaceDefault).
 					Name(pod.Name).
 					Suffix("results", name).
 					Do().Raw()
@@ -162,7 +166,7 @@ var _ = Describe("Services", func() {
 	It("should provide RW and RO services", func() {
 		svc := api.ServiceList{}
 		err := c.Get().
-			Namespace("default").
+			Namespace(api.NamespaceDefault).
 			AbsPath("/api/v1beta1/proxy/services/kubernetes-ro/api/v1beta1/services").
 			Do().
 			Into(&svc)
@@ -338,8 +342,8 @@ var _ = Describe("Services", func() {
 	})
 
 	It("should correctly serve identically named services in different namespaces on different external IP addresses", func() {
-		serviceNames := []string{"services-namespace-test0"} // Could add more here, but then it takes longer.
-		namespaces := []string{"namespace0", "namespace1"}   // As above.
+		serviceNames := []string{"s0"}                 // Could add more here, but then it takes longer.
+		namespaces := []string{namespace0, namespace1} // As above.
 		labels := map[string]string{
 			"key0": "value0",
 			"key1": "value1",
@@ -352,14 +356,6 @@ var _ = Describe("Services", func() {
 				TargetPort:                 util.NewIntOrStringFromInt(80),
 				CreateExternalLoadBalancer: true,
 			},
-		}
-
-		// Always delete any turds from a previous run.
-		for _, namespace := range namespaces {
-			for _, serviceName := range serviceNames {
-				By("cleanup previous service " + serviceName + " in namespace " + namespace)
-				c.Services(namespace).Delete(serviceName)
-			}
 		}
 
 		publicIPs := []string{}
@@ -460,4 +456,11 @@ func addEndpointPodOrFail(c *client.Client, ns, name string, labels map[string]s
 	}
 	_, err := c.Pods(ns).Create(pod)
 	Expect(err).NotTo(HaveOccurred())
+}
+
+// dateStamp returns the current time as a string "YYYY-MM-DDTHHMMSS"
+// Handy for unique names across test runs
+func dateStamp() string {
+	now := time.Now()
+	return fmt.Sprintf("%04d-%02d-%02dt%02d%02d%02d", now.Year(), now.Month(), now.Day(), now.Hour(), now.Minute(), now.Second())
 }
