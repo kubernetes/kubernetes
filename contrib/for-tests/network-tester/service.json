@@ -1,14 +1,18 @@
 {
-  "id": "nettest",
   "kind": "Service",
-  "apiVersion": "v1beta1",
-  "port": 8080,
-  "containerPort": 8080,
-  "selector": {
-    "name": "nettest"
+  "apiVersion": "v1beta3",
+  "metadata": {
+    "name": "nettest",
+    "labels": {
+      "name": "nettest"
+    }
   },
-  "labels": {
-    "name": "nettest"
+  "spec": {
+    "port": 8080,
+    "protocol": "TCP",
+    "selector": {
+      "name": "nettest"
+    },
+    "targetPort": 8080,
   }
 }
-
