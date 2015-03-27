@@ -1,29 +1,40 @@
 {
-  "id": "nettestController",
   "kind": "ReplicationController",
-  "apiVersion": "v1beta1",
-  "desiredState": {
+  "apiVersion": "v1beta3",
+  "metadata": {
+    "name": "nettest-controller",
+    "labels": {
+      "name": "nettest"
+    }
+  },
+  "spec": {
     "replicas": 8,
-    "replicaSelector": {"name": "nettest"},
-    "podTemplate": {
-      "desiredState": {
-        "manifest": {
-          "version": "v1beta1",
-          "id": "nettest",
-          "containers": [{
+    "selector": {
+      "name": "nettest"
+    },
+    "template": {
+      "metadata": {
+        "labels": {
+          "name": "nettest"
+        }
+      },
+      "spec": {
+        "containers": [
+          {
             "name": "webserver",
             "image": "kubernetes/nettest:latest",
-            "command": ["-service=nettest"],
-            "ports": [{
-              "containerPort": 8080
-            }]
-          }]
-        }
-       },
-       "labels": {
-         "name": "nettest"
-       }
+            "command": [
+              "-service=nettest"
+            ],
+            "ports": [
+              {
+                "containerPort": 8080,
+                "protocol": "TCP"
+              }
+            ]
+          }
+        ]
       }
-    },
-  "labels": {"name": "nettest"}
+    }
+  }
 }
