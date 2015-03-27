@@ -29,13 +29,13 @@ desiredState:
                     "-advertise-client-urls=http://127.0.0.1:4001",
             ]
           - name: kube2sky
-            image: kubernetes/kube2sky:1.1
+            image: gcr.io/google-containers/kube2sky:1.1
             command: [
                     # entrypoint = "/kube2sky",
                     "-domain={{ pillar['dns_domain'] }}",
             ]
           - name: skydns
-            image: kubernetes/skydns:2015-03-11-001
+            image: gcr.io/google-containers/skydns:2015-03-11-001
             command: [
                     # entrypoint = "/skydns",
                     "-machines=http://localhost:4001",

@@ -12,7 +12,7 @@ desiredState:
         id: kibana-viewer
         containers:
           - name: kibana-logging
-            image: kubernetes/kibana:1.1
+            image: gcr.io/google-containers/kibana:1.1
             ports:
               - name: kibana-port
                 containerPort: 80
