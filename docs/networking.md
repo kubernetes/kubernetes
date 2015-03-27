@@ -74,7 +74,7 @@ with Docker's `--net=container:<id>` function.
 
 As with Docker, it is possible to request host ports, but this is reduced to a
 very niche operation.  In this case a port will be allocated on the host `Node`
-and traffic will be forearded to the `Pod`.  The `Pod` itself is blind to the
+and traffic will be forwarded to the `Pod`.  The `Pod` itself is blind to the
 existence or non-existence of host ports.
 
 ## How to acheive this
