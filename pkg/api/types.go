@@ -968,6 +968,16 @@ type NodeSystemInfo struct {
 	SystemUUID string `json:"systemUUID"`
 	// BootID is the boot-id reported by the node
 	BootID string `json:"bootID"`
+	// Kernel version reported by the node
+	KernelVersion string `json:"kernelVersion""`
+	// OS image used reported by the node
+	OsImage string `json:"osImage"`
+	// Container runtime version reported by the node
+	ContainerRuntimeVersion string `json:"containerRuntimeVersion"`
+	// Kubelet version reported by the node
+	KubeletVersion string `json:"kubeletVersion"`
+	// Kube-proxy version reported by the node
+	KubeProxyVersion string `json:"kubeProxyVersion"`
 }
 
 // NodeStatus is information about the current status of a node.
