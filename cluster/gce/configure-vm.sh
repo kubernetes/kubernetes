@@ -73,22 +73,12 @@ for k,v in yaml.load(sys.stdin).iteritems():
     KUBERNETES_MASTER="true"
   fi
 
-  if [[ "${KUBERNETES_MASTER}" == "true" ]]; then
-    # TODO(zmerlynn): This block of code should disappear once #4561 & #4562 are done
-    if [[ -z "${KUBERNETES_NODE_NAMES:-}" ]]; then
-      until KUBERNETES_NODE_NAMES=$(curl-metadata kube-node-names); do
-        echo 'Waiting for metadata KUBERNETES_NODE_NAMES...'
-        sleep 3
-      done
-    fi
-  else
-    # And this should go away once the master can allocate CIDRs
-    if [[ -z "${MINION_IP_RANGE:-}" ]]; then
-      until MINION_IP_RANGE=$(curl-metadata node-ip-range); do
-        echo 'Waiting for metadata MINION_IP_RANGE...'
-        sleep 3
-      done
-    fi
+  if [[ "${KUBERNETES_MASTER}" != "true" ]] && [[ -z "${MINION_IP_RANGE:-}" ]]; then
+    # This block of code should go away once the master can allocate CIDRs
+    until MINION_IP_RANGE=$(curl-metadata node-ip-range); do
+      echo 'Waiting for metadata MINION_IP_RANGE...'
+      sleep 3
+    done
   fi
 }
 
@@ -238,12 +228,6 @@ dns_server: '$(echo "$DNS_SERVER_IP" | sed -e "s/'/''/g")'
 dns_domain: '$(echo "$DNS_DOMAIN" | sed -e "s/'/''/g")'
 admission_control: '$(echo "$ADMISSION_CONTROL" | sed -e "s/'/''/g")'
 EOF
-
-  if [[ "${KUBERNETES_MASTER}" == "true" ]]; then
-    cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
-gce_node_names: '$(echo "$KUBERNETES_NODE_NAMES" | sed -e "s/'/''/g")'
-EOF
-  fi
 }
 
 # This should only happen on cluster initialization
