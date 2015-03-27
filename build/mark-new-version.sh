@@ -45,10 +45,10 @@ if ! git diff-files --quiet pkg/version/base.go; then
 fi
 
 release_branch="release-${VERSION_MAJOR}.${VERSION_MINOR}"
+current_branch=$(git rev-parse --abbrev-ref HEAD)
 
 if [[ "${VERSION_PATCH}" != "0" ]]; then
-  branch=$(git rev-parse --abbrev-ref HEAD)
-  if [[ ${branch} != "${release_branch}" ]]; then
+  if [[ ${current_branch} != "${release_branch}" ]]; then
     echo "!!! You are trying to tag to an existing minor release but are not on the release branch: ${release_branch}"
     exit 1
   fi
@@ -98,11 +98,11 @@ echo ""
 echo "- Push the tag:"
 echo "   git push git@github.com:GoogleCloudPlatform/kubernetes.git v${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH}"
 if [[ "${VERSION_PATCH}" == "0" ]]; then
-  echo "- Submit HEAD as a PR to master"
+  echo "- Submit branch: ${current_branch} as a PR to master"
   echo "- Merge that PR"
   echo "- Push the new release branch"
   echo "   git push git@github.com:GoogleCloudPlatform/kubernetes.git ${release_branch}"
 else
-  echo "- Submit HEAD as a PR to ${release_branch}"
+  echo "- Submit branch: ${current_branch} as a PR to ${release_branch}"
   echo "- Merge that PR"
 fi
