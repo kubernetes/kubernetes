@@ -75,6 +75,10 @@ func main() {
 
 	if *provider == "aws" {
 		awsConfig := "[Global]\n"
+		if *gceZone == "" {
+			glog.Error("gce_zone must be specified for AWS")
+			os.Exit(1)
+		}
 		awsConfig += fmt.Sprintf("Zone=%s\n", *gceZone)
 
 		var err error

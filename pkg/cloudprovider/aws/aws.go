@@ -64,7 +64,6 @@ type AWSMetadata interface {
 
 type VolumeOptions struct {
 	CapacityMB int
-	Zone       string
 }
 
 // Volumes is an interface for managing cloud-provisioned volumes
@@ -241,9 +240,9 @@ func newAWSCloud(config io.Reader, authFunc AuthFunc, instanceId string, metadat
 	ec2 := &goamzEC2{ec2: ec2.New(auth, region)}
 
 	awsCloud := &AWSCloud{
-		ec2:              ec2,
-		cfg:              cfg,
-		region:           region,
+		ec2: ec2,
+		cfg: cfg,
+		region: region,
 		availabilityZone: zone,
 	}
 
@@ -894,7 +893,7 @@ func (aws *AWSCloud) DetachDisk(instanceName string, diskName string) error {
 // Implements Volumes.CreateVolume
 func (aws *AWSCloud) CreateVolume(volumeOptions *VolumeOptions) (string, error) {
 	request := &ec2.CreateVolume{}
-	request.AvailZone = volumeOptions.Zone
+	request.AvailZone = aws.availabilityZone
 	request.Size = (int64(volumeOptions.CapacityMB) + 1023) / 1024
 	response, err := aws.ec2.CreateVolume(request)
 	if err != nil {

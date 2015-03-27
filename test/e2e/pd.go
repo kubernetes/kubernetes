@@ -193,7 +193,6 @@ func createPD() (string, error) {
 		}
 		volumeOptions := &aws_cloud.VolumeOptions{}
 		volumeOptions.CapacityMB = 10 * 1024
-		volumeOptions.Zone = testContext.cloudConfig.Zone
 		return volumes.CreateVolume(volumeOptions)
 	} else {
 		return "", fmt.Errorf("Unsupported provider type")
