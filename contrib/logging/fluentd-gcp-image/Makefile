@@ -9,8 +9,8 @@
 TAG = 1.2
 
 build:	
-	sudo docker build -t kubernetes/fluentd-gcp:$(TAG) .
+	docker build -t gcr.io/google-containers/fluentd-gcp:$(TAG) .
 
 push:	
-	sudo docker push kubernetes/fluentd-gcp:$(TAG)
+	gcloud preview docker push gcr.io/google-containers/fluentd-gcp:$(TAG)
 
