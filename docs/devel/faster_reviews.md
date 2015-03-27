@@ -120,8 +120,8 @@ your whole PR is pretty trivial, you should instead put your fixups into a new
 commit and re-push.  Your reviewer can then look at that commit on its own - so
 much faster to review than starting over.
 
-We might still ask you to squash commits at the very end, for the sake of a clean
-history.
+We might still ask you to clean up your commits at the very end, for the sake
+of a more readable history.
 
 ## 8. KISS, YAGNI, MVP, etc
 
