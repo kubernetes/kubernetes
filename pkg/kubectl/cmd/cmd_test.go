@@ -238,6 +238,6 @@ func ExamplePrintReplicationController() {
 		fmt.Printf("Unexpected error: %v", err)
 	}
 	// Output:
-	// CONTROLLER          CONTAINER(S)        IMAGE(S)            SELECTOR            REPLICAS
-	// foo                 foo                 someimage           foo=bar             1
+	// CONTROLLER   CONTAINER(S)   IMAGE(S)    SELECTOR   REPLICAS
+	// foo          foo            someimage   foo=bar    1
 }

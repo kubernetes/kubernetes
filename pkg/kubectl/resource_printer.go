@@ -550,7 +550,7 @@ func printResourceQuotaList(list *api.ResourceQuotaList, w io.Writer) error {
 
 // PrintObj prints the obj in a human-friendly format according to the type of the obj.
 func (h *HumanReadablePrinter) PrintObj(obj runtime.Object, output io.Writer) error {
-	w := tabwriter.NewWriter(output, 20, 5, 3, ' ', 0)
+	w := tabwriter.NewWriter(output, 10, 4, 3, ' ', 0)
 	defer w.Flush()
 	t := reflect.TypeOf(obj)
 	if handler := h.handlerMap[t]; handler != nil {
