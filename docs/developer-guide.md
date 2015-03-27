@@ -28,7 +28,7 @@ Guide](cluster-admin-guide.md).
   Authorization applies to all HTTP requests on the main apiserver port.
   This doc explains the available authorization implementations.
 
-* **Admission Control Plugins** ([admission_control](devel/admission_control.md))
+* **Admission Control Plugins** ([admission_control](design/admission_control.md))
 
 ## Contributing to the Kubernetes Project
 
