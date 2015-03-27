@@ -789,8 +789,8 @@ type NodeSystemInfo struct {
 	KernelVersion string `json:"kernelVersion" description:"Kernel version reported by the node from 'uname -r' (e.g. 3.16.0-0.bpo.4-amd64)"`
 	// OS image used reported by the node
 	OsImage string `json:"osImage" description:"OS image used reported by the node from /etc/os-release (e.g. Debian GNU/Linux 7 (wheezy))"`
-	// Docker version reported by the node
-	DockerVersion string `json:"dockerVersion" description:"Docker version reported by the node through docker remote API (e.g. 1.5.0)"`
+	// Container runtime version reported by the node
+	ContainerRuntimeVersion string `json:"containerRuntimeVersion" description:"Container runtime version reported by the node through runtime remote API (e.g. docker://1.5.0)"`
 	// Kubelet version reported by the node
 	KubeletVersion string `json:"kubeletVersion" description:"Kubelet version reported by the node"`
 	// Kube-proxy version reported by the node
