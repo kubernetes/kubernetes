@@ -687,9 +687,6 @@ func GetDockerPodStatus(client DockerInterface, manifest api.PodSpec, podFullNam
 		}
 	}
 
-	if podStatus.PodIP == "" {
-		return nil, ErrNoPodInfraContainerInPod
-	}
 	if len(statuses) == 0 && podStatus.PodIP == "" {
 		return nil, ErrNoContainersInPod
 	}
