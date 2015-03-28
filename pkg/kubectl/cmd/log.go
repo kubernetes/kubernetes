@@ -100,6 +100,10 @@ func RunLog(f *Factory, out io.Writer, cmd *cobra.Command, args []string) error 
 
 	var container string
 	if len(args) == 1 {
+		if len(pod.Spec.Containers) != 1 {
+			return fmt.Errorf("POD %s has more than one container; please specify the container to print logs for", pod.ObjectMeta.Name)
+		}
+		container = pod.Spec.Containers[0].Name
 	} else {
 		container = args[1]
 	}
