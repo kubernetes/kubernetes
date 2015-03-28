@@ -600,18 +600,7 @@ function kube-up {
   # command returns, but currently it returns before the instances come up due
   # to gcloud's deficiency.
   wait-for-minions-to-run
-
-  # Give the master an initial node list (it's waiting in
-  # startup). This resolves a bit of a chicken-egg issue: The minions
-  # need to know the master's ip, so we boot the master first. The
-  # master still needs to know the initial minion list (until all the
-  # pieces #156 are complete), so we have it wait on the minion
-  # boot. (The minions further wait until the loop below, where CIDRs
-  # get filled in.)
   detect-minion-names
-  local kube_node_names
-  kube_node_names=$(IFS=,; echo "${MINION_NAMES[*]}")
-  add-instance-metadata "${MASTER_NAME}" "kube-node-names=${kube_node_names}"
 
   # Create the routes and set IP ranges to instance metadata, 5 instances at a time.
   for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
