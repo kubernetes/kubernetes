@@ -4,6 +4,16 @@ monit:
   pkg:
     - installed
 
+{% if "kubernetes-master" in grains.get('roles', []) %}
+/etc/monit/conf.d/etcd:
+  file:
+    - managed
+    - source: salt://monit/etcd
+    - user: root
+    - group: root
+    - mode: 644
+{% endif %}
+
 /etc/monit/conf.d/docker:
   file:
     - managed
