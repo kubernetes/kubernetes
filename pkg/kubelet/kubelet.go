@@ -1904,6 +1904,7 @@ func (kl *Kubelet) generatePodStatusByPod(pod *api.Pod) (api.PodStatus, error) {
 		} else {
 			pendingStatus := api.PodStatus{
 				Phase:   api.PodPending,
+				Host:    kl.GetHostname(),
 				Message: fmt.Sprintf("Query docker container info failed with error (%v)", err),
 			}
 			return pendingStatus, nil
