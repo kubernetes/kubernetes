@@ -1,8 +1,6 @@
 ## GuestBook example
 
-This example shows how to build a simple multi-tier web application using Kubernetes and Docker.
-
-The example combines a web frontend, a redis master for storage and a replicated set of redis slaves.
+This example shows how to build a simple multi-tier web application using Kubernetes and Docker. It consists of a web frontend, a redis master for storage and a replicated set of redis slaves.
 
 ### Step Zero: Prerequisites
 
@@ -51,7 +49,7 @@ d5c458dabe50        gurpartap/redis:latest                 "/usr/local/bin/redi 
 (Note that initial `docker pull` may take a few minutes, depending on network conditions.)
 
 ### Step Two: Turn up the master service.
-A Kubernetes 'service' is a named load balancer that proxies traffic to one or more containers. The services in a Kubernetes cluster are discoverable inside other containers via environment variables. Services find the containers to load balance based on pod labels.
+A Kubernetes 'service' is a named load balancer that proxies traffic to one or more containers. The services in a Kubernetes cluster are discoverable inside other containers via environment variables or DNS. Services find the containers to load balance based on pod labels.
 
 The pod that you created in Step One has the label `name=redis` and `role=master`. The selector field of the service determines which pods will receive the traffic sent to the service.  Use the file `examples/guestbook-go/redis-master-service.json` to create the service in the `kubectl` cli:
 
@@ -63,7 +61,7 @@ NAME                    LABELS                                    SELECTOR      
 redis-master            <none>                                    name=redis,role=master       10.0.186.234        6379
 ```
 
-This will cause all new pods to see the redis master apparently running on $REDIS_MASTER_SERVICE_HOST at port 6379. Once created, the service proxy on each node is configured to set up a proxy on the specified port (in this case port 6379).
+This will cause all new pods to see the redis master apparently running on $REDIS_MASTER_SERVICE_HOST at port 6379, or running on 'redis-master:6379'. Once created, the service proxy on each node is configured to set up a proxy on the specified port (in this case port 6379).
 
 ### Step Three: Turn up the replicated slave pods.
 Although the redis master is a single pod, the redis read slaves are a 'replicated' pod. In Kubernetes, a replication controller is responsible for managing multiple instances of a replicated pod.
@@ -79,7 +77,7 @@ redis-master-controller                redis-master            gurpartap/redis  
 redis-slave-controller                 redis-slave             gurpartap/redis                     name=redis,role=slave        2
 ```
 
-The redis slave configures itself by looking for the Kubernetes service environment variables in the container environment. In particular, the redis slave is started with the following command:
+The redis slave configures itself by looking for the redis-master service name:port pair. In particular, the redis slave is started with the following command:
 
 ```shell
 redis-server --slaveof redis-master 6379

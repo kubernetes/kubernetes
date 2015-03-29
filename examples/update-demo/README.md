@@ -110,7 +110,7 @@ To use your custom docker image in the above examples, you will need to change t
 
 ### Image Copyright
 
-Note that he images included here are public domain.
+Note that the images included here are public domain.
 
 * [kitten](http://commons.wikimedia.org/wiki/File:Kitten-stare.jpg)
 * [nautilus](http://commons.wikimedia.org/wiki/File:Nautilus_pompilius.jpg)
