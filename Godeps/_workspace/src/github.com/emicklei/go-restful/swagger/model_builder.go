@@ -106,6 +106,15 @@ func (b modelBuilder) buildProperty(field reflect.StructField, model *Model, mod
 		return b.buildArrayTypeProperty(field, jsonName, modelName)
 	case fieldKind == reflect.Ptr:
 		return b.buildPointerTypeProperty(field, jsonName, modelName)
+	case fieldKind == reflect.String:
+	     	stringt := "string"
+		prop.Type = &stringt
+		return jsonName, prop
+	case fieldKind == reflect.Map:
+                // if it's a map, it's unstructured, and swagger 1.2 can't handle it
+	        anyt := "any"
+		prop.Type = &anyt
+		return jsonName, prop
 	}
 
 	if b.isPrimitiveType(fieldType.String()) {
@@ -154,6 +163,10 @@ func (b modelBuilder) buildStructTypeProperty(field reflect.StructField, jsonNam
 			}
 			if required {
 				model.Required = append(model.Required, k)
+			}
+			// Add the model type to the global model list
+			if v.Ref != nil {
+				b.Models[*v.Ref] = sub.Models[*v.Ref]
 			}
 		}
 		// empty name signals skip property
@@ -258,6 +271,7 @@ func (b modelBuilder) jsonSchemaType(modelName string) string {
 		"int":       "integer",
 		"int32":     "integer",
 		"int64":     "integer",
+                "uint64":    "integer",
 		"byte":      "string",
 		"float64":   "number",
 		"float32":   "number",
