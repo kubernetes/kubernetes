@@ -27,6 +27,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/cache"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	algorithm "github.com/GoogleCloudPlatform/kubernetes/pkg/scheduler"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler"
@@ -233,7 +234,7 @@ func (factory *ConfigFactory) createMinionLW() *cache.ListWatch {
 // Lists all minions and filter out unhealthy ones, then returns
 // an enumerator for cache.Poller.
 func (factory *ConfigFactory) pollMinions() (cache.Enumerator, error) {
-	allNodes, err := factory.Client.Nodes().List()
+	allNodes, err := factory.Client.Nodes().List(labels.Everything())
 	if err != nil {
 		return nil, err
 	}

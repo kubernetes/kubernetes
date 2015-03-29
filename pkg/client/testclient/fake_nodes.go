@@ -34,7 +34,7 @@ func (c *FakeNodes) Get(name string) (*api.Node, error) {
 	return obj.(*api.Node), err
 }
 
-func (c *FakeNodes) List() (*api.NodeList, error) {
+func (c *FakeNodes) List(selector labels.Selector) (*api.NodeList, error) {
 	obj, err := c.Fake.Invokes(FakeAction{Action: "list-nodes"}, &api.NodeList{})
 	return obj.(*api.NodeList), err
 }

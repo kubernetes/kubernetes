@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 
 	. "github.com/onsi/ginkgo"
 )
@@ -47,7 +48,7 @@ var _ = Describe("Cadvisor", func() {
 
 func CheckCadvisorHealthOnAllNodes(c *client.Client, timeout time.Duration) {
 	By("getting list of nodes")
-	nodeList, err := c.Nodes().List()
+	nodeList, err := c.Nodes().List(labels.Everything())
 	expectNoError(err)
 	var errors []error
 	retries := maxRetries

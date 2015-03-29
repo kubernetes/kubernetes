@@ -121,7 +121,7 @@ func expectedServicesExist(c *client.Client) error {
 }
 
 func getAllNodesInCluster(c *client.Client) ([]string, error) {
-	nodeList, err := c.Nodes().List()
+	nodeList, err := c.Nodes().List(labels.Everything())
 	if err != nil {
 		return nil, err
 	}
