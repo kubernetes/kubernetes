@@ -77,8 +77,11 @@ func NewCmdRollingUpdate(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd.Flags().Duration("update-period", updatePeriod, `Time to wait between updating pods. Valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".`)
 	cmd.Flags().Duration("poll-interval", pollInterval, `Time delay between polling for replication controller status after the update. Valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".`)
 	cmd.Flags().Duration("timeout", timeout, `Max time to wait for a replication controller to update before giving up. Valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".`)
-	cmd.Flags().StringP("filename", "f", "", "Filename or URL to file to use to create the new replication controller.")
+	usage := "Filename or URL to file to use to create the new replication controller."
+	kubectl.AddJsonFilenameFlag(cmd, usage)
+	cmd.MarkFlagRequired("filename")
 	cmd.Flags().String("image", "", "Image to use for upgrading the replication controller.  Can not be used with --filename/-f")
+	cmd.MarkFlagRequired("image")
 	cmd.Flags().String("deployment-label-key", "deployment", "The key to use to differentiate between two different controllers, default 'deployment'.  Only relevant when --image is specified, ignored otherwise")
 	cmd.Flags().Bool("dry-run", false, "If true, print out the changes that would be made, but don't actually make them.")
 	cmd.Flags().Bool("rollback", false, "If true, this is a request to abort an existing rollout that is partially rolled out. It effectively reverses current and next and runs a rollout")
@@ -88,16 +91,23 @@ func NewCmdRollingUpdate(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 
 func validateArguments(cmd *cobra.Command, args []string) (deploymentKey, filename, image, oldName string, err error) {
 	deploymentKey = cmdutil.GetFlagString(cmd, "deployment-label-key")
-	filename = cmdutil.GetFlagString(cmd, "filename")
 	image = cmdutil.GetFlagString(cmd, "image")
+	filenames := cmdutil.GetFlagStringSlice(cmd, "filename")
+	filename = ""
 
 	if len(deploymentKey) == 0 {
 		return "", "", "", "", cmdutil.UsageError(cmd, "--deployment-label-key can not be empty")
 	}
-	if len(filename) == 0 && len(image) == 0 {
+	if len(filenames) > 1 {
+		return "", "", "", "", cmdutil.UsageError(cmd, "May only specificy a single filename for new controller")
+	}
+	if len(filenames) > 0 {
+		filename = filenames[0]
+	}
+	if len(filenames) == 0 && len(image) == 0 {
 		return "", "", "", "", cmdutil.UsageError(cmd, "Must specify --filename or --image for new controller")
 	}
-	if len(filename) != 0 && len(image) != 0 {
+	if len(filenames) != 0 && len(image) != 0 {
 		return "", "", "", "", cmdutil.UsageError(cmd, "--filename and --image can not both be specified")
 	}
 	if len(args) < 1 {
