@@ -1752,8 +1752,15 @@ func (kl *Kubelet) tryUpdateNodeStatus() error {
 	} else {
 		node.Status.NodeInfo.MachineID = info.MachineID
 		node.Status.NodeInfo.SystemUUID = info.SystemUUID
-		node.Status.NodeInfo.BootID = info.BootID
 		node.Status.Capacity = CapacityFromMachineInfo(info)
+		if node.Status.NodeInfo.BootID != "" &&
+			node.Status.NodeInfo.BootID != info.BootID {
+			// TODO: This requires a transaction, either both node status is updated
+			// and event is recorded or neither should happen, see issue #6055.
+			kl.recorder.Eventf(kl.getNodeReference(), "rebooted",
+				"Node %s has been rebooted, boot id: %s", kl.hostname, info.BootID)
+		}
+		node.Status.NodeInfo.BootID = info.BootID
 	}
 
 	currentTime := util.Now()
@@ -1996,19 +2003,22 @@ func (kl *Kubelet) PortForward(podFullName string, uid types.UID, port uint16, s
 	return kl.runner.PortForward(podInfraContainer.ID, port, stream)
 }
 
-// BirthCry sends an event that the kubelet has started up.
-func (kl *Kubelet) BirthCry() {
-	// Make an event that kubelet restarted.
-	// TODO: get the real minion object of ourself,
+func (kl *Kubelet) getNodeReference() *api.ObjectReference {
 	// and use the real minion name and UID.
 	// TODO: what is namespace for node?
-	ref := &api.ObjectReference{
+	return &api.ObjectReference{
 		Kind:      "Node",
 		Name:      kl.hostname,
 		UID:       types.UID(kl.hostname),
 		Namespace: "",
 	}
-	kl.recorder.Eventf(ref, "starting", "Starting kubelet.")
+}
+
+// BirthCry sends an event that the kubelet has started up.
+func (kl *Kubelet) BirthCry() {
+	// Make an event that kubelet restarted.
+	// TODO: get the real minion object of ourself,
+	kl.recorder.Eventf(kl.getNodeReference(), "starting", "Starting kubelet.")
 }
 
 func (kl *Kubelet) StreamingConnectionIdleTimeout() time.Duration {
