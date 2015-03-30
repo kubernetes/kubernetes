@@ -758,7 +758,7 @@ type Service struct {
 	// ContainerPort) will be overwritten by the first member of this
 	// array.  If this field is not specified, it will be populated from
 	// the legacy fields.
-	Ports []ServicePort `json:"ports" description:"ports to be exposed on the service"`
+	Ports []ServicePort `json:"ports" description:"ports to be exposed on the service; if this field is specified, the legacy fields (Port, PortName, Protocol, and ContainerPort) will be overwritten by the first member of this array; if this field is not specified, it will be populated from the legacy fields"`
 }
 
 type ServicePort struct {

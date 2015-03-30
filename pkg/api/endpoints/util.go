@@ -98,7 +98,7 @@ func (set addressSet) Insert(addr *api.EndpointAddress) {
 func hashAddresses(addrs addressSet) string {
 	// Flatten the list of addresses into a string so it can be used as a
 	// map key.  Unfortunately, DeepHashObject is implemented in terms of
-	// spew, and spew does not handle non-primitive mapo keys well.  So
+	// spew, and spew does not handle non-primitive map keys well.  So
 	// first we collapse it into a slice, sort the slice, then hash that.
 	slice := []*api.EndpointAddress{}
 	for k := range addrs {

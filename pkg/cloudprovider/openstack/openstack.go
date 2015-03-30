@@ -488,6 +488,10 @@ func (lb *LoadBalancer) TCPLoadBalancerExists(name, region string) (bool, error)
 func (lb *LoadBalancer) CreateTCPLoadBalancer(name, region string, externalIP net.IP, ports []int, hosts []string, affinity api.AffinityType) (string, error) {
 	glog.V(4).Infof("CreateTCPLoadBalancer(%v, %v, %v, %v, %v, %v)", name, region, externalIP, ports, hosts, affinity)
 
+	if len(ports) > 1 {
+		return "", fmt.Errorf("multiple ports are not yet supported in openstack load balancers")
+	}
+
 	var persistence *vips.SessionPersistence
 	switch affinity {
 	case api.AffinityTypeNone:
@@ -515,7 +519,7 @@ func (lb *LoadBalancer) CreateTCPLoadBalancer(name, region string, externalIP ne
 
 		_, err = members.Create(lb.network, members.CreateOpts{
 			PoolID:       pool.ID,
-			ProtocolPort: ports[0], //FIXME: need to handle multi-port
+			ProtocolPort: ports[0], //TODO: need to handle multi-port
 			Address:      addr,
 		}).Extract()
 		if err != nil {
@@ -550,7 +554,7 @@ func (lb *LoadBalancer) CreateTCPLoadBalancer(name, region string, externalIP ne
 		Description:  fmt.Sprintf("Kubernetes external service %s", name),
 		Address:      externalIP.String(),
 		Protocol:     "TCP",
-		ProtocolPort: ports[0], //FIXME: need to handle multi-port
+		ProtocolPort: ports[0], //TODO: need to handle multi-port
 		PoolID:       pool.ID,
 		Persistence:  persistence,
 	}).Extract()

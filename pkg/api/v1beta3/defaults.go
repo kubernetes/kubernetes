@@ -52,17 +52,18 @@ func init() {
 				obj.TerminationMessagePath = TerminationMessagePathDefault
 			}
 		},
-		func(obj *Service) {
-			if obj.Spec.SessionAffinity == "" {
-				obj.Spec.SessionAffinity = AffinityTypeNone
+		func(obj *ServiceSpec) {
+			if obj.SessionAffinity == "" {
+				obj.SessionAffinity = AffinityTypeNone
 			}
-		},
-		func(obj *ServicePort) {
-			if obj.Protocol == "" {
-				obj.Protocol = ProtocolTCP
-			}
-			if obj.TargetPort == util.NewIntOrStringFromInt(0) || obj.TargetPort == util.NewIntOrStringFromString("") {
-				obj.TargetPort = util.NewIntOrStringFromInt(obj.Port)
+			for i := range obj.Ports {
+				sp := &obj.Ports[i]
+				if sp.Protocol == "" {
+					sp.Protocol = ProtocolTCP
+				}
+				if sp.TargetPort == util.NewIntOrStringFromInt(0) || sp.TargetPort == util.NewIntOrStringFromString("") {
+					sp.TargetPort = util.NewIntOrStringFromInt(sp.Port)
+				}
 			}
 		},
 		func(obj *PodSpec) {
@@ -100,14 +101,6 @@ func init() {
 		func(obj *HTTPGetAction) {
 			if obj.Path == "" {
 				obj.Path = "/"
-			}
-		},
-		func(obj *ServicePort) {
-			if obj.Protocol == "" {
-				obj.Protocol = ProtocolTCP
-			}
-			if obj.TargetPort == util.NewIntOrStringFromInt(0) || obj.TargetPort == util.NewIntOrStringFromString("") {
-				obj.TargetPort = util.NewIntOrStringFromInt(obj.Port)
 			}
 		},
 		func(obj *NamespaceStatus) {

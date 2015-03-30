@@ -76,8 +76,9 @@ func (e *EndpointController) SyncServiceEndpoints() error {
 			for i := range service.Spec.Ports {
 				servicePort := &service.Spec.Ports[i]
 
-				// TODO: Once v1beta1 and v1beta2 are EOL'ed, this can
-				// assume that service.Spec.TargetPort is populated.
+				// TODO: Once v1beta1 and v1beta2 are EOL'ed,
+				// this can safely assume that TargetPort is
+				// populated, and findPort() can be removed.
 				_ = v1beta1.Dependency
 				_ = v1beta2.Dependency
 

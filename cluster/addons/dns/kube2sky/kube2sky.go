@@ -57,22 +57,27 @@ func addDNS(record string, service *kapi.Service, etcdClient *etcd.Client) error
 		return nil
 	}
 
-	svc := skymsg.Service{
-		Host:     service.Spec.PortalIP,
-		Port:     service.Spec.Port,
-		Priority: 10,
-		Weight:   10,
-		Ttl:      30,
-	}
-	b, err := json.Marshal(svc)
-	if err != nil {
-		return err
-	}
-	// Set with no TTL, and hope that kubernetes events are accurate.
+	for i := range service.Spec.Ports {
+		svc := skymsg.Service{
+			Host:     service.Spec.PortalIP,
+			Port:     service.Spec.Ports[i].Port,
+			Priority: 10,
+			Weight:   10,
+			Ttl:      30,
+		}
+		b, err := json.Marshal(svc)
+		if err != nil {
+			return err
+		}
+		// Set with no TTL, and hope that kubernetes events are accurate.
 
-	log.Printf("Setting dns record: %v -> %s:%d\n", record, service.Spec.PortalIP, service.Spec.Port)
-	_, err = etcdClient.Set(skymsg.Path(record), string(b), uint64(0))
-	return err
+		log.Printf("Setting DNS record: %v -> %s:%d\n", record, service.Spec.PortalIP, service.Spec.Ports[i].Port)
+		_, err = etcdClient.Set(skymsg.Path(record), string(b), uint64(0))
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // Implements retry logic for arbitrary mutator. Crashes after retrying for

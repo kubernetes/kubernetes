@@ -108,8 +108,11 @@ func main() {
 				},
 			},
 			Spec: api.ServiceSpec{
-				Port:       9376,
-				TargetPort: util.NewIntOrStringFromInt(9376),
+				Ports: []api.ServicePort{{
+					Protocol:   "TCP",
+					Port:       9376,
+					TargetPort: util.NewIntOrStringFromInt(9376),
+				}},
 				Selector: map[string]string{
 					"name": "serve-hostname",
 				},

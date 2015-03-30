@@ -68,13 +68,14 @@ func init() {
 			if obj.SessionAffinity == "" {
 				obj.SessionAffinity = AffinityTypeNone
 			}
-		},
-		func(obj *ServicePort) {
-			if obj.Protocol == "" {
-				obj.Protocol = ProtocolTCP
-			}
-			if obj.ContainerPort == util.NewIntOrStringFromInt(0) || obj.ContainerPort == util.NewIntOrStringFromString("") {
-				obj.ContainerPort = util.NewIntOrStringFromInt(obj.Port)
+			for i := range obj.Ports {
+				sp := &obj.Ports[i]
+				if sp.Protocol == "" {
+					sp.Protocol = ProtocolTCP
+				}
+				if sp.ContainerPort == util.NewIntOrStringFromInt(0) || sp.ContainerPort == util.NewIntOrStringFromString("") {
+					sp.ContainerPort = util.NewIntOrStringFromInt(sp.Port)
+				}
 			}
 		},
 		func(obj *PodSpec) {
