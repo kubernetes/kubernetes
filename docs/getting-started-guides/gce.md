@@ -127,11 +127,12 @@ You can view a transcript of a successful cluster creation
 #### Creating VMs
 
 1. You need a Google Cloud Platform account with billing enabled. Visit the [Google Developers Console](http://cloud.google.com/console) for more details.
-2. Make sure you can start up a GCE VM from the command line.  At least make sure you can do the [Create an instance](https://cloud.google.com/compute/docs/quickstart#create_an_instance) part of the GCE Quickstart.
-3. Make sure you can ssh into the VM without interactive prompts.  See the [Log in to the instance](https://cloud.google.com/compute/docs/quickstart#ssh) part of the GCE Quickstart.
+1. Make sure you can start up a GCE VM from the command line.  At least make sure you can do the [Create an instance](https://cloud.google.com/compute/docs/quickstart#create_an_instance) part of the GCE Quickstart.
+1. Make sure you have the `gcloud preview` command line component installed. Simply run `gcloud preview` at the command line - if it asks to install any components, go ahead and install them. If it simply shows help text, you're good to go.
+1. Make sure you can ssh into the VM without interactive prompts.  See the [Log in to the instance](https://cloud.google.com/compute/docs/quickstart#ssh) part of the GCE Quickstart.
   * Your GCE SSH key must either have no passcode or you need to be using `ssh-agent`.
   * Ensure the GCE firewall isn't blocking port 22 to your VMs.  By default, this should work but if you have edited firewall rules or created a new non-default network, you'll need to expose it: `gcloud compute firewall-rules create --network=<network-name> --description "SSH allowed from anywhere" --allow tcp:22 default-ssh`
-4. You need to have the Google Cloud Storage API, and the Google Cloud Storage JSON API enabled. It is activated by default for new projects. Otherwise, it can be done in the Google Cloud Console.  See the [Google Cloud Storage JSON API Overview](https://cloud.google.com/storage/docs/json_api/) for more details.
+1. You need to have the Google Cloud Storage API, and the Google Cloud Storage JSON API enabled. It is activated by default for new projects. Otherwise, it can be done in the Google Cloud Console.  See the [Google Cloud Storage JSON API Overview](https://cloud.google.com/storage/docs/json_api/) for more details.
 
 
 #### Networking
