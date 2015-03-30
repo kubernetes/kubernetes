@@ -60,6 +60,7 @@ type APIServer struct {
 	CloudProvider              string
 	CloudConfigFile            string
 	EventTTL                   time.Duration
+	ClientCAFile               string
 	TokenAuthFile              string
 	AuthorizationMode          string
 	AuthorizationPolicyFile    string
@@ -139,6 +140,7 @@ func (s *APIServer) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.CloudProvider, "cloud_provider", s.CloudProvider, "The provider for cloud services.  Empty string for no provider.")
 	fs.StringVar(&s.CloudConfigFile, "cloud_config", s.CloudConfigFile, "The path to the cloud provider configuration file.  Empty string for no configuration file.")
 	fs.DurationVar(&s.EventTTL, "event_ttl", s.EventTTL, "Amount of time to retain events. Default 1 hour.")
+	fs.StringVar(&s.ClientCAFile, "client_ca_file", s.ClientCAFile, "If set, any request presenting a client certificate signed by one of the authorities in the client_ca_file is authenticated with an identity corresponding to the CommonName of the client certificate.")
 	fs.StringVar(&s.TokenAuthFile, "token_auth_file", s.TokenAuthFile, "If set, the file that will be used to secure the secure port of the API server via token authentication.")
 	fs.StringVar(&s.AuthorizationMode, "authorization_mode", s.AuthorizationMode, "Selects how to do authorization on the secure port.  One of: "+strings.Join(apiserver.AuthorizationModeChoices, ","))
 	fs.StringVar(&s.AuthorizationPolicyFile, "authorization_policy_file", s.AuthorizationPolicyFile, "File with authorization policy in csv format, used with --authorization_mode=ABAC, on the secure port.")
@@ -222,7 +224,7 @@ func (s *APIServer) Run(_ []string) error {
 
 	n := net.IPNet(s.PortalNet)
 
-	authenticator, err := apiserver.NewAuthenticatorFromTokenFile(s.TokenAuthFile)
+	authenticator, err := apiserver.NewAuthenticator(s.ClientCAFile, s.TokenAuthFile)
 	if err != nil {
 		glog.Fatalf("Invalid Authentication Config: %v", err)
 	}
@@ -330,11 +332,21 @@ func (s *APIServer) Run(_ []string) error {
 			TLSConfig: &tls.Config{
 				// Change default from SSLv3 to TLSv1.0 (because of POODLE vulnerability)
 				MinVersion: tls.VersionTLS10,
-				// Populate PeerCertificates in requests, but don't reject connections without certificates
-				// This allows certificates to be validated by authenticators, while still allowing other auth types
-				ClientAuth: tls.RequestClientCert,
 			},
 		}
+
+		if len(s.ClientCAFile) > 0 {
+			clientCAs, err := util.CertPoolFromFile(s.ClientCAFile)
+			if err != nil {
+				glog.Fatalf("unable to load client CA file: %v", err)
+			}
+			// Populate PeerCertificates in requests, but don't reject connections without certificates
+			// This allows certificates to be validated by authenticators, while still allowing other auth types
+			secureServer.TLSConfig.ClientAuth = tls.RequestClientCert
+			// Specify allowed CAs for client certificates
+			secureServer.TLSConfig.ClientCAs = clientCAs
+		}
+
 		glog.Infof("Serving securely on %s", secureLocation)
 		go func() {
 			defer util.HandleCrash()

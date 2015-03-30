@@ -1,8 +1,14 @@
 # Authentication Plugins
 
-Kubernetes uses tokens to authenticate users for API calls.
+Kubernetes uses tokens or client certificates to authenticate users for API calls.
 
-Authentication is enabled by passing the `--token_auth_file=SOMEFILE` option
+Client certificate authentication is enabled by passing the `--client_ca_file=SOMEFILE`
+option to apiserver. The referenced file must contain one or more certificates authorities
+to use to validate client certificates presented to the apiserver. If a client certificate
+is presented and verified, the common name of the subject is used as the user name for the
+request.
+
+Token authentication is enabled by passing the `--token_auth_file=SOMEFILE` option
 to apiserver.  Currently, tokens last indefinitely, and the token list cannot
 be changed without restarting apiserver.  We plan in the future for tokens to
 be short-lived, and to be generated as needed rather than stored in a file.
