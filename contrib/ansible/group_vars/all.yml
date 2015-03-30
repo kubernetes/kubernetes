@@ -1,0 +1,3 @@
+ansible_ssh_user: root
+#ansible_ssh_pass: password
+#ansible_sudo_pass: password

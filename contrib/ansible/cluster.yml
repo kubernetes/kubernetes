@@ -1,0 +1,4 @@
+# Set up a whole working cluster!
+- include: etcd.yml
+- include: kubernetes-services.yml
+

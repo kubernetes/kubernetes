@@ -1,0 +1,1 @@
+kube_service_addresses: 10.254.0.0/16 # MUST be defined as a range not used in your infrastructure
