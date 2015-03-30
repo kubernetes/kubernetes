@@ -40,7 +40,13 @@ type PluginFactoryArgs struct {
 type FitPredicateFactory func(PluginFactoryArgs) algorithm.FitPredicate
 
 // A PriorityFunctionFactory produces a PriorityConfig from the given args.
-type PriorityConfigFactory func(PluginFactoryArgs) algorithm.PriorityConfig
+type PriorityFunctionFactory func(PluginFactoryArgs) algorithm.PriorityFunction
+
+// A PriorityConfigFactory produces a PriorityConfig from the given function and weight
+type PriorityConfigFactory struct {
+	Function PriorityFunctionFactory
+	Weight   int
+}
 
 var (
 	schedulerFactoryMutex sync.Mutex
@@ -127,8 +133,11 @@ func IsFitPredicateRegistered(name string) bool {
 // Registers a priority function with the algorithm registry. Returns the name,
 // with which the function was registered.
 func RegisterPriorityFunction(name string, function algorithm.PriorityFunction, weight int) string {
-	return RegisterPriorityConfigFactory(name, func(PluginFactoryArgs) algorithm.PriorityConfig {
-		return algorithm.PriorityConfig{Function: function, Weight: weight}
+	return RegisterPriorityConfigFactory(name, PriorityConfigFactory{
+		Function: func(PluginFactoryArgs) algorithm.PriorityFunction {
+			return function
+		},
+		Weight: 1,
 	})
 }
 
@@ -143,43 +152,47 @@ func RegisterPriorityConfigFactory(name string, pcf PriorityConfigFactory) strin
 // Registers a custom priority function with the algorithm registry.
 // Returns the name, with which the priority function was registered.
 func RegisterCustomPriorityFunction(policy schedulerapi.PriorityPolicy) string {
-	var pcf PriorityConfigFactory
+	var pcf *PriorityConfigFactory
 
 	validatePriorityOrDie(policy)
 
 	// generate the priority function, if a custom priority is requested
 	if policy.Argument != nil {
 		if policy.Argument.ServiceAntiAffinity != nil {
-			pcf = func(args PluginFactoryArgs) algorithm.PriorityConfig {
-				return algorithm.PriorityConfig{
-					Function: algorithm.NewServiceAntiAffinityPriority(
+			pcf = &PriorityConfigFactory{
+				Function: func(args PluginFactoryArgs) algorithm.PriorityFunction {
+					return algorithm.NewServiceAntiAffinityPriority(
 						args.ServiceLister,
 						policy.Argument.ServiceAntiAffinity.Label,
-					),
-					Weight: policy.Weight,
-				}
+					)
+				},
+				Weight: policy.Weight,
 			}
 		} else if policy.Argument.LabelPreference != nil {
-			pcf = func(args PluginFactoryArgs) algorithm.PriorityConfig {
-				return algorithm.PriorityConfig{
-					Function: algorithm.NewNodeLabelPriority(
+			pcf = &PriorityConfigFactory{
+				Function: func(args PluginFactoryArgs) algorithm.PriorityFunction {
+					return algorithm.NewNodeLabelPriority(
 						policy.Argument.LabelPreference.Label,
 						policy.Argument.LabelPreference.Presence,
-					),
-					Weight: policy.Weight,
-				}
+					)
+				},
+				Weight: policy.Weight,
 			}
 		}
-	} else if _, ok := priorityFunctionMap[policy.Name]; ok {
+	} else if existing_pcf, ok := priorityFunctionMap[policy.Name]; ok {
 		glog.V(2).Infof("Priority type %s already registered, reusing.", policy.Name)
-		return policy.Name
+		// set/update the weight based on the policy
+		pcf = &PriorityConfigFactory{
+			Function: existing_pcf.Function,
+			Weight:   policy.Weight,
+		}
 	}
 
 	if pcf == nil {
 		glog.Fatalf("Invalid configuration: Priority type not found for %s", policy.Name)
 	}
 
-	return RegisterPriorityConfigFactory(policy.Name, pcf)
+	return RegisterPriorityConfigFactory(policy.Name, *pcf)
 }
 
 // This check is useful for testing providers.
@@ -242,7 +255,10 @@ func getPriorityFunctionConfigs(names util.StringSet, args PluginFactoryArgs) ([
 		if !ok {
 			return nil, fmt.Errorf("Invalid priority name %s specified - no corresponding function found", name)
 		}
-		configs = append(configs, factory(args))
+		configs = append(configs, algorithm.PriorityConfig{
+			Function: factory.Function(args),
+			Weight:   factory.Weight,
+		})
 	}
 	return configs, nil
 }
