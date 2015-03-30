@@ -96,7 +96,7 @@ cd kubernetes
 if [[ ! -z ${E2E_SET_CLUSTER_API_VERSION:-} ]]; then
     export CLUSTER_API_VERSION=$(echo ${GITHASH} | cut -c 2-)
 elif [[ ! -z ${E2E_USE_LATEST_RELEASE_VERSION:-} ]]; then
-    release=$(gsutil cat gs://kubernetes-release/release/latest.txt)
+    release=$(gsutil cat gs://kubernetes-release/release/latest.txt | cut -c 2-)
     export CLUSTER_API_VERSION=${release}
 fi
 
