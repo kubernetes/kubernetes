@@ -27,8 +27,8 @@ import (
 
 const (
 	timeout       = 1 * time.Minute
-	maxRetries    = 10
-	sleepDuration = time.Minute
+	maxRetries    = 6
+	sleepDuration = 10 * time.Second
 )
 
 var _ = Describe("Cadvisor", func() {
