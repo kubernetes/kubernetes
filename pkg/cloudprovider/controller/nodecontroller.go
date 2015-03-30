@@ -223,6 +223,16 @@ func (nc *NodeController) SyncCloudNodes() error {
 	// Create nodes which have been created in cloud, but not in kubernetes cluster.
 	for _, node := range matches.Items {
 		if _, ok := nodeMap[node.Name]; !ok {
+			glog.V(3).Infof("Querying addresses for new node: %s", node.Name)
+			nodeList := &api.NodeList{}
+			nodeList.Items = []api.Node{node}
+			_, err = nc.PopulateAddresses(nodeList)
+			if err != nil {
+				glog.Errorf("Error fetching addresses for new node %s: %v", node.Name, err)
+				continue
+			}
+			node.Status.Addresses = nodeList.Items[0].Status.Addresses
+
 			glog.Infof("Create node in registry: %s", node.Name)
 			_, err = nc.kubeClient.Nodes().Create(&node)
 			if err != nil {
