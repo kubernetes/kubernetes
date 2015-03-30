@@ -98,6 +98,10 @@ func (s *SwaggerSchema) ValidateObject(obj interface{}, apiVersion, fieldName, t
 			glog.V(2).Infof("couldn't find properties for %s, skipping", key)
 			continue
 		}
+		if details.Type == nil {
+			glog.V(2).Infof("nil details for %s, skipping", key)
+			continue
+		}
 		fieldType := *details.Type
 		if value == nil {
 			glog.V(2).Infof("Skipping nil field: %s", key)
