@@ -18,10 +18,9 @@ package runtime
 
 import (
 	"fmt"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/conversion"
 	"net/url"
 	"reflect"
-
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/conversion"
 )
 
 // Scheme defines methods for serializing and deserializing API objects. It

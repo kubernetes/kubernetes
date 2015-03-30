@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/cache"
@@ -95,7 +96,9 @@ func NewSimpleModeler(queuedPods, scheduledPods ExtendedPodLister) *SimpleModele
 	return &SimpleModeler{
 		queuedPods:    queuedPods,
 		scheduledPods: scheduledPods,
-		assumedPods:   &cache.StoreToPodLister{cache.NewStore(cache.MetaNamespaceKeyFunc)},
+		assumedPods: &cache.StoreToPodLister{
+			cache.NewTTLStore(cache.MetaNamespaceKeyFunc, 30*time.Second),
+		},
 	}
 }
 
@@ -124,10 +127,6 @@ func (s *SimpleModeler) listPods(selector labels.Selector) (pods []api.Pod, err 
 	// Since the assumed list will be short, just check every one.
 	// Goal here is to stop making assumptions about a pod once it shows
 	// up in one of these other lists.
-	// TODO: there's a possibility that a pod could get deleted at the
-	//       exact wrong time and linger in assumedPods forever. So we
-	//       need go through that periodically and check for deleted
-	//       pods.
 	for _, pod := range assumed {
 		qExist, err := s.queuedPods.Exists(&pod)
 		if err != nil {
@@ -151,7 +150,7 @@ func (s *SimpleModeler) listPods(selector labels.Selector) (pods []api.Pod, err 
 	if err != nil {
 		return nil, err
 	}
-	// re-get in case we deleted any.
+	// Listing purges the ttl cache and re-gets, in case we deleted any entries.
 	assumed, err = s.assumedPods.List(selector)
 	if err != nil {
 		return nil, err

@@ -20,16 +20,6 @@ import (
 	"bytes"
 	"crypto/tls"
 	"fmt"
-	"io"
-	"io/ioutil"
-	"mime"
-	"net/http"
-	"net/url"
-	"path"
-	"strconv"
-	"strings"
-	"time"
-
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/metrics"
@@ -41,6 +31,15 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 	watchjson "github.com/GoogleCloudPlatform/kubernetes/pkg/watch/json"
 	"github.com/golang/glog"
+	"io"
+	"io/ioutil"
+	"mime"
+	"net/http"
+	"net/url"
+	"path"
+	"strconv"
+	"strings"
+	"time"
 )
 
 // specialParams lists parameters that are handled specially and which users of Request
