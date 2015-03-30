@@ -31,9 +31,13 @@ function verify-prereqs {
   local cmd
   for cmd in gcloud gsutil; do
     if ! which "${cmd}" >/dev/null; then
-      echo "Can't find ${cmd} in PATH.  Do you wish to install the Google Cloud SDK? [Y/n]"
       local resp
-      read resp
+      if [[ "${KUBE_PROMPT_FOR_UPDATE" == "y" ]]; then
+        echo "Can't find ${cmd} in PATH.  Do you wish to install the Google Cloud SDK? [Y/n]"
+        read resp
+      else
+        resp="y"
+      fi
       if [[ "${resp}" != "n" && "${resp}" != "N" ]]; then
         curl https://sdk.cloud.google.com | bash
       fi

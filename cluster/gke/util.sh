@@ -19,6 +19,7 @@
 # Use the config file specified in $KUBE_CONFIG_FILE, or default to
 # config-default.sh.
 
+KUBE_PROMPT_FOR_UPDATE=y
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
 source "${KUBE_ROOT}/cluster/gke/${KUBE_CONFIG_FILE:-config-default.sh}"
 
@@ -68,12 +69,29 @@ function test-build-release() {
 
 # Verify needed binaries exist.
 function verify-prereqs() {
-  echo "... in verify-prereqs()" >&2
-
-  ${GCLOUD} preview --help >/dev/null || {
-    echo "Either the GCLOUD environment variable is wrong, or the 'preview' component"
-    echo "is not installed. (Fix with 'gcloud components update preview')"
-  }
+  if ! which gcloud >/dev/null; then
+    local resp
+    if [[ "${KUBE_PROMPT_FOR_UPDATE" == "y" ]]; then
+      echo "Can't find gcloud in PATH.  Do you wish to install the Google Cloud SDK? [Y/n]"
+      read resp
+    else
+      resp="y"
+    fi
+    if [[ "${resp}" != "n" && "${resp}" != "N" ]]; then
+      curl https://sdk.cloud.google.com | bash
+    fi
+    if ! which gcloud >/dev/null; then
+      echo "Can't find gcloud in PATH, please fix and retry. The Google Cloud "
+      echo "SDK can be downloaded from https://cloud.google.com/sdk/."
+      exit 1
+    fi
+  fi 
+  # update and install components as needed
+  if [[ "${KUBE_PROMPT_FOR_UPDATE}" != "y" ]]; then
+    gcloud_prompt="-q"
+  fi
+  gcloud ${gcloud_prompt:-} components update preview || true
+  gcloud ${gcloud_prompt:-} components update || true
 }
 
 # Instantiate a kubernetes cluster
