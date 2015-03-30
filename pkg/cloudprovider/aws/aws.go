@@ -288,7 +288,20 @@ func (aws *AWSCloud) getInstancesByRegex(regex string) ([]string, error) {
 		for _, instance := range reservation.Instances {
 			// TODO: Push filtering down into EC2 API filter?
 			if !isAlive(&instance) {
-				glog.V(2).Infof("skipping EC2 instance (not alive): %s", instance.InstanceId)
+				glog.V(2).Infof("skipping EC2 instance (%s): %s",
+					instance.State.Name, instance.InstanceId)
+				continue
+			}
+
+			// Only return fully-ready instances when listing instances
+			// (vs a query by name, where we will return it if we find it)
+			if instance.State.Name == "pending" {
+				glog.V(2).Infof("skipping EC2 instance (pending): %s", instance.InstanceId)
+				continue
+			}
+			if instance.PrivateDNSName == "" {
+				glog.V(2).Infof("skipping EC2 instance (no PrivateDNSName): %s",
+					instance.InstanceId)
 				continue
 			}
 
