@@ -1,3 +1,10 @@
+If you are not sure what OSes and infrastructure is supported, the table below lists all the combinations which have
+been tested recently.
+
+If you are considering contributing a new guide, please read the
+[guidelines](../../docs/devel/writing-a-getting-started-guide.md).
+
+
 IaaS Provider  | Config. Mgmt | OS     | Networking  | Docs                                                   | Support Level                | Notes
 -------------- | ------------ | ------ | ----------  | ----------------------------------------------------   | ---------------------------- | -----
 GCE            | Saltstack    | Debian | GCE         | [docs](../../docs/getting-started-guides/gce.md)       | Project                      | Tested with 0.13.2 by @brendandburns
