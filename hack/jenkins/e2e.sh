@@ -95,6 +95,9 @@ cd kubernetes
 # Set by GKE-CI to change the CLUSTER_API_VERSION to the git version
 if [[ ! -z ${E2E_SET_CLUSTER_API_VERSION:-} ]]; then
     export CLUSTER_API_VERSION=$(echo ${GITHASH} | cut -c 2-)
+elif [[ ! -z ${E2E_USE_LATEST_RELEASE_VERSION:-} ]]; then
+    release=$(gsutil cat gs://kubernetes-release/release/latest.txt)
+    export CLUSTER_API_VERSION=${release}
 fi
 
 # Have cmd/e2e run by goe2e.sh generate JUnit report in ${WORKSPACE}/junit*.xml
