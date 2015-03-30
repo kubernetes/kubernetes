@@ -1766,6 +1766,18 @@ func (kl *Kubelet) recordNodeOnlineEvent() {
 	kl.recorder.Eventf(kl.nodeRef, "online", "Node %s is now online", kl.hostname)
 }
 
+func (kl *Kubelet) recordNodeUnschedulableEvent() {
+	// TODO: This requires a transaction, either both node status is updated
+	// and event is recorded or neither should happen, see issue #6055.
+	kl.recorder.Eventf(kl.nodeRef, "unschedulable", "Node %s is now unschedulable", kl.hostname)
+}
+
+func (kl *Kubelet) recordNodeSchedulableEvent() {
+	// TODO: This requires a transaction, either both node status is updated
+	// and event is recorded or neither should happen, see issue #6055.
+	kl.recorder.Eventf(kl.nodeRef, "schedulable", "Node %s is now schedulable", kl.hostname)
+}
+
 // tryUpdateNodeStatus tries to update node status to master.
 func (kl *Kubelet) tryUpdateNodeStatus() error {
 	node, err := kl.kubeClient.Nodes().Get(kl.hostname)
@@ -1835,11 +1847,13 @@ func (kl *Kubelet) tryUpdateNodeStatus() error {
 				newSchedulableCondition.Status = api.ConditionFalse
 				newSchedulableCondition.LastTransitionTime = currentTime
 				newSchedulableCondition.Reason = fmt.Sprintf("user marked unschedulable during node update")
+				kl.recordNodeUnschedulableEvent()
 				node.Status.Conditions[i] = newSchedulableCondition
 			} else if !node.Spec.Unschedulable && (node.Status.Conditions[i].Status != api.ConditionTrue) {
 				newSchedulableCondition.Status = api.ConditionTrue
 				newSchedulableCondition.LastTransitionTime = currentTime
 				newSchedulableCondition.Reason = fmt.Sprintf("user marked schedulable during node update")
+				kl.recordNodeSchedulableEvent()
 				node.Status.Conditions[i] = newSchedulableCondition
 			} else {
 				newSchedulableCondition.Status = node.Status.Conditions[i].Status
@@ -1860,9 +1874,11 @@ func (kl *Kubelet) tryUpdateNodeStatus() error {
 		if node.Spec.Unschedulable {
 			newSchedulableCondition.Status = api.ConditionFalse
 			newSchedulableCondition.Reason = fmt.Sprintf("user marked unschedulable during node create/update")
+			kl.recordNodeUnschedulableEvent()
 		} else {
 			newSchedulableCondition.Status = api.ConditionTrue
 			newSchedulableCondition.Reason = fmt.Sprintf("node is schedulable by default")
+			kl.recordNodeSchedulableEvent()
 		}
 		node.Status.Conditions = append(node.Status.Conditions, newSchedulableCondition)
 	}

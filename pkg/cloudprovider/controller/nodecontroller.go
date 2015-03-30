@@ -332,9 +332,19 @@ func (nc *NodeController) DoCheck(node *api.Node) []api.NodeCondition {
 			// status. Keep listing pods to sanity check if pods are all deleted makes more sense.
 			nc.deletePods(node.Name)
 		}
-		if oldReadyCondition != nil && oldReadyCondition.Status == api.ConditionTrue {
+	}
+	// Record node ready event
+	if oldReadyCondition == nil {
+		switch newReadyCondition.Status {
+		case api.ConditionFalse:
 			nc.recordNodeOfflineEvent(node)
+		case api.ConditionTrue:
+			nc.recordNodeOnlineEvent(node)
 		}
+	} else if oldReadyCondition.Status == api.ConditionTrue && newReadyCondition.Status == api.ConditionFalse {
+		nc.recordNodeOfflineEvent(node)
+	} else if oldReadyCondition.Status == api.ConditionFalse && newReadyCondition.Status == api.ConditionTrue {
+		nc.recordNodeOnlineEvent(node)
 	}
 	conditions = append(conditions, *newReadyCondition)
 
@@ -342,6 +352,19 @@ func (nc *NodeController) DoCheck(node *api.Node) []api.NodeCondition {
 	oldSchedulableCondition := nc.getCondition(node, api.NodeSchedulable)
 	newSchedulableCondition := nc.checkNodeSchedulable(node)
 	nc.updateLastTransitionTime(oldSchedulableCondition, newSchedulableCondition)
+	// Record node schedulable event
+	if oldSchedulableCondition == nil {
+		switch newSchedulableCondition.Status {
+		case api.ConditionFalse:
+			nc.recordNodeUnschedulableEvent(node)
+		case api.ConditionTrue:
+			nc.recordNodeSchedulableEvent(node)
+		}
+	} else if oldSchedulableCondition.Status == api.ConditionTrue && newSchedulableCondition.Status == api.ConditionFalse {
+		nc.recordNodeUnschedulableEvent(node)
+	} else if oldSchedulableCondition.Status == api.ConditionFalse && newSchedulableCondition.Status == api.ConditionTrue {
+		nc.recordNodeSchedulableEvent(node)
+	}
 	conditions = append(conditions, *newSchedulableCondition)
 
 	return conditions
@@ -445,16 +468,36 @@ func (nc *NodeController) PopulateAddresses(nodes *api.NodeList) (*api.NodeList,
 	return nodes, nil
 }
 
-func (nc *NodeController) recordNodeOfflineEvent(node *api.Node) {
-	ref := &api.ObjectReference{
-		Kind:      "Node",
-		Name:      node.Name,
-		UID:       types.UID(node.Name),
-		Namespace: "",
+func (nc *NodeController) getNodeReference(node *api.Node) *api.ObjectReference {
+	return &api.ObjectReference{
+		Kind: "Node",
+		Name: node.Name,
+		UID:  types.UID(node.Name),
 	}
+}
+
+func (nc *NodeController) recordNodeOnlineEvent(node *api.Node) {
 	// TODO: This requires a transaction, either both node status is updated
 	// and event is recorded or neither should happen, see issue #6055.
-	nc.recorder.Eventf(ref, "offline", "Node %s is now offline", node.Name)
+	nc.recorder.Eventf(nc.getNodeReference(node), "online", "Node %s is now online", node.Name)
+}
+
+func (nc *NodeController) recordNodeOfflineEvent(node *api.Node) {
+	// TODO: This requires a transaction, either both node status is updated
+	// and event is recorded or neither should happen, see issue #6055.
+	nc.recorder.Eventf(nc.getNodeReference(node), "offline", "Node %s is now offline", node.Name)
+}
+
+func (nc *NodeController) recordNodeUnschedulableEvent(node *api.Node) {
+	// TODO: This requires a transaction, either both node status is updated
+	// and event is recorded or neither should happen, see issue #6055.
+	nc.recorder.Eventf(nc.getNodeReference(node), "unschedulable", "Node %s is now unschedulable", node.Name)
+}
+
+func (nc *NodeController) recordNodeSchedulableEvent(node *api.Node) {
+	// TODO: This requires a transaction, either both node status is updated
+	// and event is recorded or neither should happen, see issue #6055.
+	nc.recorder.Eventf(nc.getNodeReference(node), "schedulable", "Node %s is now schedulable", node.Name)
 }
 
 // MonitorNodeStatus verifies node status are constantly updated by kubelet, and if not,

@@ -30,6 +30,7 @@ import (
 	apierrors "github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
 	fake_cloud "github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/fake"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
@@ -823,6 +824,7 @@ func TestSyncProbedNodeStatus(t *testing.T) {
 	for _, item := range table {
 		nodeController := NewNodeController(item.fakeCloud, ".*", nil, nil, item.fakeNodeHandler, item.fakeKubeletClient, 10, time.Minute)
 		nodeController.now = func() util.Time { return fakeNow }
+		nodeController.recorder = &record.FakeRecorder{}
 		if err := nodeController.SyncProbedNodeStatus(); err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -927,6 +929,7 @@ func TestSyncProbedNodeStatusTransitionTime(t *testing.T) {
 		nodeController := NewNodeController(nil, "", []string{"node0"}, nil, item.fakeNodeHandler, item.fakeKubeletClient, 10, time.Minute)
 		nodeController.lookupIP = func(host string) ([]net.IP, error) { return nil, fmt.Errorf("lookup %v: no such host", host) }
 		nodeController.now = func() util.Time { return fakeNow }
+		nodeController.recorder = &record.FakeRecorder{}
 		if err := nodeController.SyncProbedNodeStatus(); err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -1079,6 +1082,7 @@ func TestSyncProbedNodeStatusEvictPods(t *testing.T) {
 	for _, item := range table {
 		nodeController := NewNodeController(nil, "", []string{"node0"}, nil, item.fakeNodeHandler, item.fakeKubeletClient, 10, 5*time.Minute)
 		nodeController.lookupIP = func(host string) ([]net.IP, error) { return nil, fmt.Errorf("lookup %v: no such host", host) }
+		nodeController.recorder = &record.FakeRecorder{}
 		if err := nodeController.SyncProbedNodeStatus(); err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
