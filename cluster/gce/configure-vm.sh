@@ -83,10 +83,18 @@ for k,v in yaml.load(sys.stdin).iteritems():
 }
 
 function remove-docker-artifacts() {
+  echo "== Deleting docker0 =="
+  # Forcibly install bridge-utils (options borrowed from Salt logs).
+  until apt-get -q -y -o DPkg::Options::=--force-confold -o DPkg::Options::=--force-confdef install bridge-utils; do
+    echo "== install of bridge-utils failed, retrying =="
+    sleep 5
+  done
+
   # Remove docker artifacts on minion nodes, if present
   iptables -t nat -F || true
   ifconfig docker0 down || true
   brctl delbr docker0 || true
+  echo "== Finished deleting docker0 =="
 }
 
 # Retry a download until we get it.
@@ -152,6 +160,9 @@ EOF
   done
 
   rm /usr/sbin/policy-rc.d
+
+  # Log a timestamp
+  echo "== Finished installing Salt =="
 }
 
 # Ensure salt-minion never runs
@@ -352,6 +363,7 @@ function configure-salt() {
 }
 
 function run-salt() {
+  echo "== Calling Salt =="
   salt-call --local state.highstate || true
 }
 
