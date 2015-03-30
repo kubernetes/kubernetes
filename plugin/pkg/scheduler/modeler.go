@@ -42,13 +42,21 @@ type ExtendedPodLister interface {
 
 // FakeModeler implements the SystemModeler interface.
 type FakeModeler struct {
-	AssumePodFunc func(pod *api.Pod)
+	AssumePodFunc        func(pod *api.Pod)
+	ForgetAssumedPodFunc func(pod *api.Pod)
 }
 
 // AssumePod calls the function variable if it is not nil.
 func (f *FakeModeler) AssumePod(pod *api.Pod) {
 	if f.AssumePodFunc != nil {
 		f.AssumePodFunc(pod)
+	}
+}
+
+// ForgetAssumedPod calls the function variable if it is not nil.
+func (f *FakeModeler) ForgetAssumedPod(pod *api.Pod) {
+	if f.ForgetAssumedPodFunc != nil {
+		f.ForgetAssumedPodFunc(pod)
 	}
 }
 
@@ -76,6 +84,10 @@ func NewSimpleModeler(queuedPods, scheduledPods ExtendedPodLister) *SimpleModele
 
 func (s *SimpleModeler) AssumePod(pod *api.Pod) {
 	s.assumedPods.Add(pod)
+}
+
+func (s *SimpleModeler) ForgetAssumedPod(pod *api.Pod) {
+	s.assumedPods.Delete(pod)
 }
 
 // Extract names for readable logging.
