@@ -56,7 +56,7 @@ func RunClusterInfo(factory *Factory, out io.Writer, cmd *cobra.Command) error {
 	}
 
 	// TODO use generalized labels once they are implemented (#341)
-	b := resource.NewBuilder(mapper, typer, factory.ClientMapperForCommand(cmd)).
+	b := resource.NewBuilder(mapper, typer, factory.ClientMapperForCommand()).
 		NamespaceParam(cmdNamespace).DefaultNamespace().
 		SelectorParam("kubernetes.io/cluster-service=true").
 		ResourceTypeOrNameArgs(false, []string{"services"}...).

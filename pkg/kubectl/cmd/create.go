@@ -73,7 +73,7 @@ func RunCreate(f *Factory, out io.Writer, cmd *cobra.Command, filenames util.Str
 	}
 
 	mapper, typer := f.Object()
-	r := resource.NewBuilder(mapper, typer, f.ClientMapperForCommand(cmd)).
+	r := resource.NewBuilder(mapper, typer, f.ClientMapperForCommand()).
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).RequireNamespace().
 		FilenameParam(filenames...).
