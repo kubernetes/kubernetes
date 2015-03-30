@@ -103,6 +103,21 @@ func (f *ConfigFactory) CreateFromConfig(policy schedulerapi.Policy) (*scheduler
 	return f.CreateFromKeys(predicateKeys, priorityKeys)
 }
 
+// ReflectorDeletionHook passes all operations through to Store, but calls
+// OnDelete in a goroutine if there is a deletion.
+type ReflectorDeletionHook struct {
+	cache.Store
+	OnDelete func(obj interface{})
+}
+
+func (r ReflectorDeletionHook) Delete(obj interface{}) error {
+	go func() {
+		defer util.HandleCrash()
+		r.OnDelete(obj)
+	}()
+	return r.Store.Delete(obj)
+}
+
 // Creates a scheduler from a set of registered fit predicate keys and priority keys.
 func (f *ConfigFactory) CreateFromKeys(predicateKeys, priorityKeys util.StringSet) (*scheduler.Config, error) {
 	glog.V(2).Infof("creating scheduler with fit predicates '%v' and priority functions '%v", predicateKeys, priorityKeys)
@@ -125,9 +140,22 @@ func (f *ConfigFactory) CreateFromKeys(predicateKeys, priorityKeys util.StringSe
 	// Watch and queue pods that need scheduling.
 	cache.NewReflector(f.createUnassignedPodLW(), &api.Pod{}, f.PodQueue, 0).Run()
 
+	// Pass through all events to the scheduled pod store, but on a deletion,
+	// also remove from the assumed pods.
+	assumedPodDeleter := ReflectorDeletionHook{
+		Store: f.ScheduledPodLister.Store,
+		OnDelete: func(obj interface{}) {
+			if pod, ok := obj.(*api.Pod); ok {
+				f.modeler.LockedAction(func() {
+					f.modeler.ForgetPod(pod)
+				})
+			}
+		},
+	}
+
 	// Watch and cache all running pods. Scheduler needs to find all pods
 	// so it knows where it's safe to place a pod. Cache this locally.
-	cache.NewReflector(f.createAssignedPodLW(), &api.Pod{}, f.ScheduledPodLister.Store, 0).Run()
+	cache.NewReflector(f.createAssignedPodLW(), &api.Pod{}, assumedPodDeleter, 0).Run()
 
 	// Watch minions.
 	// Minions may be listed frequently, so provide a local up-to-date cache.
