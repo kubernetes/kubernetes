@@ -21,6 +21,8 @@ import (
 	"fmt"
 	"math/rand"
 	"net"
+	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -29,7 +31,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/clientauth"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/credentialprovider"
-	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/healthz"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/healthz"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/cadvisor"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/config"
@@ -72,6 +74,8 @@ type KubeletServer struct {
 	MaxContainerCount              int
 	AuthPath                       string
 	CadvisorPort                   uint
+	HealthzPort                    int
+	HealthzBindAddress             util.IP
 	OOMScoreAdj                    int
 	APIServerList                  util.StringList
 	ClusterDomain                  string
@@ -103,6 +107,8 @@ func NewKubeletServer() *KubeletServer {
 		MaxPerPodContainerCount:     5,
 		MaxContainerCount:           100,
 		CadvisorPort:                4194,
+		HealthzPort:                 10248,
+		HealthzBindAddress:          util.IP(net.ParseIP("127.0.0.1")),
 		OOMScoreAdj:                 -900,
 		MasterServiceNamespace:      api.NamespaceDefault,
 		ImageGCHighThresholdPercent: 90,
@@ -137,6 +143,8 @@ func (s *KubeletServer) AddFlags(fs *pflag.FlagSet) {
 	fs.IntVar(&s.MaxContainerCount, "maximum_dead_containers", s.MaxContainerCount, "Maximum number of old instances of a containers to retain globally.  Each container takes up some disk space.  Default: 100.")
 	fs.StringVar(&s.AuthPath, "auth_path", s.AuthPath, "Path to .kubernetes_auth file, specifying how to authenticate to API server.")
 	fs.UintVar(&s.CadvisorPort, "cadvisor_port", s.CadvisorPort, "The port of the localhost cAdvisor endpoint")
+	fs.IntVar(&s.HealthzPort, "healthz_port", s.HealthzPort, "The port of the localhost healthz endpoint")
+	fs.Var(&s.HealthzBindAddress, "healthz_bind_address", "The IP address for the healthz server to serve on, defaulting to 127.0.0.1 (set to 0.0.0.0 for all interfaces)")
 	fs.IntVar(&s.OOMScoreAdj, "oom_score_adj", s.OOMScoreAdj, "The oom_score_adj value for kubelet process. Values must be within the range [-1000, 1000]")
 	fs.Var(&s.APIServerList, "api_servers", "List of Kubernetes API servers for publishing events, and reading pods and services. (ip:port), comma separated.")
 	fs.StringVar(&s.ClusterDomain, "cluster_domain", s.ClusterDomain, "Domain for this cluster.  If set, kubelet will configure all containers to search this domain in addition to the host's search domains")
@@ -222,6 +230,16 @@ func (s *KubeletServer) Run(_ []string) error {
 	}
 
 	RunKubelet(&kcfg)
+
+	if s.HealthzPort > 0 {
+		healthz.DefaultHealthz()
+		go util.Forever(func() {
+			err := http.ListenAndServe(net.JoinHostPort(s.HealthzBindAddress.String(), strconv.Itoa(s.HealthzPort)), nil)
+			if err != nil {
+				glog.Errorf("Starting health server failed: %v", err)
+			}
+		}, 5*time.Second)
+	}
 
 	// runs forever
 	select {}
