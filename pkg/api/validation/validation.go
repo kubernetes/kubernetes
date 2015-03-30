@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"net"
 	"path"
+	"reflect"
 	"strings"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -28,6 +29,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	errs "github.com/GoogleCloudPlatform/kubernetes/pkg/util/fielderrors"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume"
 
 	"github.com/golang/glog"
 )
@@ -421,7 +423,7 @@ func ValidatePersistentVolumeClaim(pvc *api.PersistentVolumeClaim) errs.Validati
 		allErrs = append(allErrs, errs.NewFieldInvalid("persistentVolumeClaim.Spec.AccessModes", pvc.Spec.AccessModes, "at least 1 AccessModeType is required"))
 	}
 	if len(pvc.Spec.Resources.Requests) == 0 {
-		allErrs = append(allErrs, errs.NewFieldInvalid("persistentVolumeClaim.Spec.Resources.Requests", pvc.Spec.AccessModes, "No Resource.Requests specified"))
+		allErrs = append(allErrs, errs.NewFieldInvalid("persistentVolumeClaim.Spec.Resources.Requests", pvc.Spec.Resources.Requests, "No Resource.Requests specified"))
 	}
 	return allErrs
 }
@@ -429,6 +431,16 @@ func ValidatePersistentVolumeClaim(pvc *api.PersistentVolumeClaim) errs.Validati
 func ValidatePersistentVolumeClaimUpdate(newPvc, oldPvc *api.PersistentVolumeClaim) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 	allErrs = ValidatePersistentVolumeClaim(newPvc)
+	if oldPvc.Status.VolumeRef != nil {
+		oldModesAsString := volume.GetAccessModesAsString(oldPvc.Spec.AccessModes)
+		newModesAsString := volume.GetAccessModesAsString(newPvc.Spec.AccessModes)
+		if oldModesAsString != newModesAsString {
+			allErrs = append(allErrs, errs.NewFieldInvalid("spec.AccessModes", oldPvc.Spec.AccessModes, "field is immutable"))
+		}
+		if !reflect.DeepEqual(oldPvc.Spec.Resources, newPvc.Spec.Resources) {
+			allErrs = append(allErrs, errs.NewFieldInvalid("spec.Resources", oldPvc.Spec.Resources, "field is immutable"))
+		}
+	}
 	newPvc.Status = oldPvc.Status
 	return allErrs
 }
