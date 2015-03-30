@@ -57,7 +57,7 @@ func (resourcequotaStrategy) PrepareForUpdate(obj, old runtime.Object) {
 }
 
 // Validate validates a new resourcequota.
-func (resourcequotaStrategy) Validate(obj runtime.Object) fielderrors.ValidationErrorList {
+func (resourcequotaStrategy) Validate(ctx api.Context, obj runtime.Object) fielderrors.ValidationErrorList {
 	resourcequota := obj.(*api.ResourceQuota)
 	return validation.ValidateResourceQuota(resourcequota)
 }
@@ -68,7 +68,7 @@ func (resourcequotaStrategy) AllowCreateOnUpdate() bool {
 }
 
 // ValidateUpdate is the default update validation for an end user.
-func (resourcequotaStrategy) ValidateUpdate(obj, old runtime.Object) fielderrors.ValidationErrorList {
+func (resourcequotaStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) fielderrors.ValidationErrorList {
 	return validation.ValidateResourceQuotaUpdate(obj.(*api.ResourceQuota), old.(*api.ResourceQuota))
 }
 
@@ -84,7 +84,7 @@ func (resourcequotaStatusStrategy) PrepareForUpdate(obj, old runtime.Object) {
 	newResourcequota.Spec = oldResourcequota.Spec
 }
 
-func (resourcequotaStatusStrategy) ValidateUpdate(obj, old runtime.Object) fielderrors.ValidationErrorList {
+func (resourcequotaStatusStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) fielderrors.ValidationErrorList {
 	return validation.ValidateResourceQuotaStatusUpdate(obj.(*api.ResourceQuota), old.(*api.ResourceQuota))
 }
 

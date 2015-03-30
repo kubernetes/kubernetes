@@ -18,6 +18,7 @@ package controller
 
 import (
 	"fmt"
+	"strconv"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/validation"
@@ -26,7 +27,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/generic"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/fielderrors"
-	"strconv"
 )
 
 // rcStrategy implements verification logic for Replication Controllers.
@@ -58,7 +58,7 @@ func (rcStrategy) PrepareForUpdate(obj, old runtime.Object) {
 }
 
 // Validate validates a new replication controller.
-func (rcStrategy) Validate(obj runtime.Object) fielderrors.ValidationErrorList {
+func (rcStrategy) Validate(ctx api.Context, obj runtime.Object) fielderrors.ValidationErrorList {
 	controller := obj.(*api.ReplicationController)
 	return validation.ValidateReplicationController(controller)
 }
@@ -70,7 +70,7 @@ func (rcStrategy) AllowCreateOnUpdate() bool {
 }
 
 // ValidateUpdate is the default update validation for an end user.
-func (rcStrategy) ValidateUpdate(obj, old runtime.Object) fielderrors.ValidationErrorList {
+func (rcStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) fielderrors.ValidationErrorList {
 	return validation.ValidateReplicationControllerUpdate(old.(*api.ReplicationController), obj.(*api.ReplicationController))
 }
 

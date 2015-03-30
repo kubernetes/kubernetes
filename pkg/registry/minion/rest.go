@@ -67,13 +67,13 @@ func (nodeStrategy) PrepareForUpdate(obj, old runtime.Object) {
 }
 
 // Validate validates a new node.
-func (nodeStrategy) Validate(obj runtime.Object) fielderrors.ValidationErrorList {
+func (nodeStrategy) Validate(ctx api.Context, obj runtime.Object) fielderrors.ValidationErrorList {
 	node := obj.(*api.Node)
 	return validation.ValidateMinion(node)
 }
 
 // ValidateUpdate is the default update validation for an end user.
-func (nodeStrategy) ValidateUpdate(obj, old runtime.Object) fielderrors.ValidationErrorList {
+func (nodeStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) fielderrors.ValidationErrorList {
 	return validation.ValidateMinionUpdate(old.(*api.Node), obj.(*api.Node))
 }
 

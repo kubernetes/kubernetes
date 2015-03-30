@@ -67,7 +67,7 @@ func (podStrategy) PrepareForUpdate(obj, old runtime.Object) {
 }
 
 // Validate validates a new pod.
-func (podStrategy) Validate(obj runtime.Object) fielderrors.ValidationErrorList {
+func (podStrategy) Validate(ctx api.Context, obj runtime.Object) fielderrors.ValidationErrorList {
 	pod := obj.(*api.Pod)
 	return validation.ValidatePod(pod)
 }
@@ -78,7 +78,7 @@ func (podStrategy) AllowCreateOnUpdate() bool {
 }
 
 // ValidateUpdate is the default update validation for an end user.
-func (podStrategy) ValidateUpdate(obj, old runtime.Object) fielderrors.ValidationErrorList {
+func (podStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) fielderrors.ValidationErrorList {
 	return validation.ValidatePodUpdate(obj.(*api.Pod), old.(*api.Pod))
 }
 
@@ -99,7 +99,7 @@ func (podStatusStrategy) PrepareForUpdate(obj, old runtime.Object) {
 	newPod.Spec = oldPod.Spec
 }
 
-func (podStatusStrategy) ValidateUpdate(obj, old runtime.Object) fielderrors.ValidationErrorList {
+func (podStatusStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) fielderrors.ValidationErrorList {
 	// TODO: merge valid fields after update
 	return validation.ValidatePodStatusUpdate(obj.(*api.Pod), old.(*api.Pod))
 }
