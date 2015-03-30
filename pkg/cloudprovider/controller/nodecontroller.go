@@ -31,6 +31,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/probe"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/golang/glog"
 )
@@ -314,6 +315,9 @@ func (nc *NodeController) DoCheck(node *api.Node) []api.NodeCondition {
 			// status. Keep listing pods to sanity check if pods are all deleted makes more sense.
 			nc.deletePods(node.Name)
 		}
+		if oldReadyCondition != nil && oldReadyCondition.Status == api.ConditionTrue {
+			nc.recordNodeOfflineEvent(node)
+		}
 	}
 	conditions = append(conditions, *newReadyCondition)
 
@@ -424,6 +428,18 @@ func (nc *NodeController) PopulateAddresses(nodes *api.NodeList) (*api.NodeList,
 	return nodes, nil
 }
 
+func (nc *NodeController) recordNodeOfflineEvent(node *api.Node) {
+	ref := &api.ObjectReference{
+		Kind:      "Node",
+		Name:      node.Name,
+		UID:       types.UID(node.Name),
+		Namespace: "",
+	}
+	// TODO: This requires a transaction, either both node status is updated
+	// and event is recorded or neither should happen, see issue #6055.
+	nc.recorder.Eventf(ref, "offline", "Node %s is now offline", node.Name)
+}
+
 // MonitorNodeStatus verifies node status are constantly updated by kubelet, and if not,
 // post "NodeReady==ConditionUnknown". It also evicts all pods if node is not ready or
 // not reachable for a long period of time.
@@ -476,6 +492,10 @@ func (nc *NodeController) MonitorNodeStatus() error {
 					// LastProbeTime is the last time we heard from kubelet.
 					readyCondition.LastProbeTime = lastReadyCondition.LastProbeTime
 					readyCondition.LastTransitionTime = nc.now()
+				}
+				if readyCondition.Status != api.ConditionTrue &&
+					lastReadyCondition.Status == api.ConditionTrue {
+					nc.recordNodeOfflineEvent(node)
 				}
 			}
 			_, err = nc.kubeClient.Nodes().Update(node)

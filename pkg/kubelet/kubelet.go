@@ -1734,6 +1734,12 @@ func (kl *Kubelet) updateNodeStatus() error {
 	return fmt.Errorf("Update node status exceeds retry count")
 }
 
+func (kl *Kubelet) recordNodeOnlineEvent() {
+	// TODO: This requires a transaction, either both node status is updated
+	// and event is recorded or neither should happen, see issue #6055.
+	kl.recorder.Eventf(kl.getNodeReference(), "online", "Node %s is now online", kl.hostname)
+}
+
 // tryUpdateNodeStatus tries to update node status to master.
 func (kl *Kubelet) tryUpdateNodeStatus() error {
 	node, err := kl.kubeClient.Nodes().Get(kl.hostname)
@@ -1774,6 +1780,9 @@ func (kl *Kubelet) tryUpdateNodeStatus() error {
 	for i := range node.Status.Conditions {
 		if node.Status.Conditions[i].Type == api.NodeReady {
 			newCondition.LastTransitionTime = node.Status.Conditions[i].LastTransitionTime
+			if node.Status.Conditions[i].Status != api.ConditionTrue {
+				kl.recordNodeOnlineEvent()
+			}
 			node.Status.Conditions[i] = newCondition
 			updated = true
 		}
@@ -1781,6 +1790,7 @@ func (kl *Kubelet) tryUpdateNodeStatus() error {
 	if !updated {
 		newCondition.LastTransitionTime = currentTime
 		node.Status.Conditions = append(node.Status.Conditions, newCondition)
+		kl.recordNodeOnlineEvent()
 	}
 
 	_, err = kl.kubeClient.Nodes().Update(node)
