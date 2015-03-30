@@ -30,6 +30,7 @@ import (
 	apierrors "github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
 	fake_cloud "github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/fake"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
@@ -911,7 +912,7 @@ func TestSyncProbedNodeStatusTransitionTime(t *testing.T) {
 	}
 
 	for _, item := range table {
-		nodeController := NewNodeController(nil, "", []string{"node0"}, nil, item.fakeNodeHandler, item.fakeKubeletClient, nil, 10, time.Minute)
+		nodeController := NewNodeController(nil, "", []string{"node0"}, nil, item.fakeNodeHandler, item.fakeKubeletClient, &record.FakeRecorder{}, 10, time.Minute)
 		nodeController.lookupIP = func(host string) ([]net.IP, error) { return nil, fmt.Errorf("lookup %v: no such host", host) }
 		nodeController.now = func() util.Time { return fakeNow }
 		if err := nodeController.SyncProbedNodeStatus(); err != nil {
@@ -1064,7 +1065,7 @@ func TestSyncProbedNodeStatusEvictPods(t *testing.T) {
 	}
 
 	for _, item := range table {
-		nodeController := NewNodeController(nil, "", []string{"node0"}, nil, item.fakeNodeHandler, item.fakeKubeletClient, nil, 10, 5*time.Minute)
+		nodeController := NewNodeController(nil, "", []string{"node0"}, nil, item.fakeNodeHandler, item.fakeKubeletClient, &record.FakeRecorder{}, 10, 5*time.Minute)
 		nodeController.lookupIP = func(host string) ([]net.IP, error) { return nil, fmt.Errorf("lookup %v: no such host", host) }
 		if err := nodeController.SyncProbedNodeStatus(); err != nil {
 			t.Errorf("unexpected error: %v", err)
@@ -1222,7 +1223,7 @@ func TestMonitorNodeStatusEvictPods(t *testing.T) {
 	}
 
 	for _, item := range table {
-		nodeController := NewNodeController(nil, "", []string{"node0"}, nil, item.fakeNodeHandler, nil, nil, 10, item.evictionTimeout)
+		nodeController := NewNodeController(nil, "", []string{"node0"}, nil, item.fakeNodeHandler, nil, &record.FakeRecorder{}, 10, item.evictionTimeout)
 		nodeController.now = func() util.Time { return fakeNow }
 		if err := nodeController.MonitorNodeStatus(); err != nil {
 			t.Errorf("unexpected error: %v", err)
@@ -1404,7 +1405,7 @@ func TestMonitorNodeStatusUpdateStatus(t *testing.T) {
 	}
 
 	for _, item := range table {
-		nodeController := NewNodeController(nil, "", []string{"node0"}, nil, item.fakeNodeHandler, nil, nil, 10, 5*time.Minute)
+		nodeController := NewNodeController(nil, "", []string{"node0"}, nil, item.fakeNodeHandler, nil, &record.FakeRecorder{}, 10, 5*time.Minute)
 		nodeController.now = func() util.Time { return fakeNow }
 		if err := nodeController.MonitorNodeStatus(); err != nil {
 			t.Errorf("unexpected error: %v", err)
