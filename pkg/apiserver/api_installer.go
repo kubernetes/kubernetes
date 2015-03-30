@@ -537,9 +537,7 @@ func (n scopeNaming) GenerateLink(req *restful.Request, obj runtime.Object) (pat
 		}
 	}
 	path = strings.Replace(n.itemPath, "{name}", name, 1)
-	if !n.allNamespaces {
-		path = strings.Replace(path, "{"+n.scope.ParamName()+"}", namespace, 1)
-	}
+	path = strings.Replace(path, "{"+n.scope.ParamName()+"}", namespace, 1)
 	return path, "", nil
 }
 
