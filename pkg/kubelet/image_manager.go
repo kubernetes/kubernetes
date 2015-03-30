@@ -22,6 +22,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/cadvisor"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/dockertools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -65,6 +67,12 @@ type realImageManager struct {
 
 	// cAdvisor instance.
 	cadvisor cadvisor.Interface
+
+	// Recorder for Kubernetes events.
+	recorder record.EventRecorder
+
+	// Reference to this node.
+	nodeRef *api.ObjectReference
 }
 
 // Information about the images we track.
@@ -79,7 +87,7 @@ type imageRecord struct {
 	size int64
 }
 
-func newImageManager(dockerClient dockertools.DockerInterface, cadvisorInterface cadvisor.Interface, policy ImageGCPolicy) (imageManager, error) {
+func newImageManager(dockerClient dockertools.DockerInterface, cadvisorInterface cadvisor.Interface, recorder record.EventRecorder, nodeRef *api.ObjectReference, policy ImageGCPolicy) (imageManager, error) {
 	// Validate policy.
 	if policy.HighThresholdPercent < 0 || policy.HighThresholdPercent > 100 {
 		return nil, fmt.Errorf("invalid HighThresholdPercent %d, must be in range [0-100]", policy.HighThresholdPercent)
@@ -92,6 +100,8 @@ func newImageManager(dockerClient dockertools.DockerInterface, cadvisorInterface
 		policy:       policy,
 		imageRecords: make(map[string]*imageRecord),
 		cadvisor:     cadvisorInterface,
+		recorder:     recorder,
+		nodeRef:      nodeRef,
 	}
 
 	err := im.start()
@@ -182,8 +192,9 @@ func (self *realImageManager) GarbageCollect() error {
 
 	// Check valid capacity.
 	if capacity == 0 {
-		// TODO(vmarmol): Surface event.
-		return fmt.Errorf("invalid capacity %d on device %q at mount point %q", capacity, fsInfo.Device, fsInfo.Mountpoint)
+		err := fmt.Errorf("invalid capacity %d on device %q at mount point %q", capacity, fsInfo.Device, fsInfo.Mountpoint)
+		self.recorder.Eventf(self.nodeRef, "invalidDiskCapacity", err.Error())
+		return err
 	}
 
 	// If over the max threshold, free enough to place us at the lower threshold.
@@ -197,8 +208,9 @@ func (self *realImageManager) GarbageCollect() error {
 		}
 
 		if freed < amountToFree {
-			// TODO(vmarmol): Surface event.
-			return fmt.Errorf("failed to garbage collect required amount of images. Wanted to free %d, but freed %d", amountToFree, freed)
+			err := fmt.Errorf("failed to garbage collect required amount of images. Wanted to free %d, but freed %d", amountToFree, freed)
+			self.recorder.Eventf(self.nodeRef, "freeDiskSpaceFailed", err.Error())
+			return err
 		}
 	}
 
