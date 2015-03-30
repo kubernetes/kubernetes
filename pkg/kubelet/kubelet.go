@@ -1996,19 +1996,22 @@ func (kl *Kubelet) PortForward(podFullName string, uid types.UID, port uint16, s
 	return kl.runner.PortForward(podInfraContainer.ID, port, stream)
 }
 
-// BirthCry sends an event that the kubelet has started up.
-func (kl *Kubelet) BirthCry() {
-	// Make an event that kubelet restarted.
-	// TODO: get the real minion object of ourself,
+func (kl *Kubelet) getNodeReference() *api.ObjectReference {
 	// and use the real minion name and UID.
 	// TODO: what is namespace for node?
-	ref := &api.ObjectReference{
+	return &api.ObjectReference{
 		Kind:      "Node",
 		Name:      kl.hostname,
 		UID:       types.UID(kl.hostname),
 		Namespace: "",
 	}
-	kl.recorder.Eventf(ref, "starting", "Starting kubelet.")
+}
+
+// BirthCry sends an event that the kubelet has started up.
+func (kl *Kubelet) BirthCry() {
+	// Make an event that kubelet restarted.
+	// TODO: get the real minion object of ourself,
+	kl.recorder.Eventf(kl.getNodeReference(), "starting", "Starting kubelet.")
 }
 
 func (kl *Kubelet) StreamingConnectionIdleTimeout() time.Duration {
