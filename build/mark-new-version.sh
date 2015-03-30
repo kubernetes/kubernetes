@@ -109,22 +109,24 @@ echo "+++ Committing version change"
 git add "${VERSION_FILE}"
 git commit -m "Kubernetes version ${NEW_VERSION}-dev"
 
-if [[ "${VERSION_PATCH}" == "0" ]]; then
-  echo "+++ Creating release branch"
-  git branch "${release_branch}"
-fi
-
 echo ""
 echo "Success you must now:"
 echo ""
 echo "- Push the tag:"
 echo "   git push git@github.com:GoogleCloudPlatform/kubernetes.git v${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH}"
+echo "   - Please note you are pushing the tag live BEFORE your PRs."
+echo "       You need this so the builds pick up the right tag info."
+echo "       If something goes wrong further down please fix the tag!"
+echo "       Either delete this tag and give up, fix the tag before your next PR,"
+echo "       or find someone who can help solve the tag problem!"
+echo ""
+
 if [[ "${VERSION_PATCH}" == "0" ]]; then
   echo "- Submit branch: ${current_branch} as a PR to master"
-  echo "- Merge that PR"
+  echo "- Get someone to review and merge that PR"
   echo "- Push the new release branch"
-  echo "   git push git@github.com:GoogleCloudPlatform/kubernetes.git ${release_branch}"
+  echo "   git push git@github.com:GoogleCloudPlatform/kubernetes.git ${current_branch}:${release_branch}"
 else
   echo "- Submit branch: ${current_branch} as a PR to ${release_branch}"
-  echo "- Merge that PR"
+  echo "- Get someone to review and merge that PR"
 fi
