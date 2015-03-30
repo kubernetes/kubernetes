@@ -7,7 +7,7 @@ This is a work-in-progress; not all options are documented yet!
 
 ## ZONE
 
-The AWS availability to deploy to.  Defaults to us-west-2a.
+The AWS availability zone to deploy to.  Defaults to us-west-2a.
 
 ## AWS_IMAGE
 
