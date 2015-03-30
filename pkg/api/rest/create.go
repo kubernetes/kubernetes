@@ -40,7 +40,7 @@ type RESTCreateStrategy interface {
 	PrepareForCreate(obj runtime.Object)
 	// Validate is invoked after default fields in the object have been filled in before
 	// the object is persisted.
-	Validate(obj runtime.Object) fielderrors.ValidationErrorList
+	Validate(ctx api.Context, obj runtime.Object) fielderrors.ValidationErrorList
 }
 
 // BeforeCreate ensures that common operations for all resources are performed on creation. It only returns
@@ -63,7 +63,7 @@ func BeforeCreate(strategy RESTCreateStrategy, ctx api.Context, obj runtime.Obje
 	api.FillObjectMetaSystemFields(ctx, objectMeta)
 	api.GenerateName(strategy, objectMeta)
 
-	if errs := strategy.Validate(obj); len(errs) > 0 {
+	if errs := strategy.Validate(ctx, obj); len(errs) > 0 {
 		return errors.NewInvalid(kind, objectMeta.Name, errs)
 	}
 	return nil
