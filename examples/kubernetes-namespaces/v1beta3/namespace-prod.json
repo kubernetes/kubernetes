@@ -2,10 +2,10 @@
   "apiVersion":"v1beta3",  
   "kind": "Namespace",
   "metadata": {
-    "name": "production",
+    "name": "production"
   },
   "spec": {},
   "labels": {
     "name": "production"
-  },  
+  }  
 }

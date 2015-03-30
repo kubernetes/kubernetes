@@ -2,7 +2,7 @@
   "apiVersion":"v1beta3",
   "kind": "Pod",
   "metadata": {
-    "name": "valid-pod",
+    "name": "valid-pod"
   },
   "labels": {
     "name": "valid-pod"
@@ -14,9 +14,9 @@
         "resources": {
           "limits": {
             "cpu": "1",
-            "memory": "1Mi",
-         },
-      },
+            "memory": "1Mi"
+         }
+      }
     }]
-  },
+  }
 }

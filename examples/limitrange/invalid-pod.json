@@ -11,8 +11,8 @@
       "id": "invalid-pod",
       "containers": [{
         "name": "kubernetes-serve-hostname",
-        "image": "kubernetes/serve_hostname",        
+        "image": "kubernetes/serve_hostname"        
       }]
     }
-  },
+  }
 }
