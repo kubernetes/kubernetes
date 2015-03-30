@@ -20,21 +20,21 @@ import (
 	"os"
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/mount"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/types"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/util/mount"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/volume"
 )
 
 func TestCanSupport(t *testing.T) {
 	plugMgr := volume.VolumePluginMgr{}
 	plugMgr.InitPlugins(ProbeVolumePlugins(), volume.NewFakeVolumeHost("/tmp/fake", nil, nil))
 
-	plug, err := plugMgr.FindPluginByName("kubernetes.io/gce-pd")
+	plug, err := plugMgr.FindPluginByName("lmktfy.io/gce-pd")
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
 	}
-	if plug.Name() != "kubernetes.io/gce-pd" {
+	if plug.Name() != "lmktfy.io/gce-pd" {
 		t.Errorf("Wrong name: %s", plug.Name())
 	}
 	if !plug.CanSupport(&api.Volume{VolumeSource: api.VolumeSource{GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{}}}) {
@@ -46,7 +46,7 @@ func TestGetAccessModes(t *testing.T) {
 	plugMgr := volume.VolumePluginMgr{}
 	plugMgr.InitPlugins(ProbeVolumePlugins(), volume.NewFakeVolumeHost("/tmp/fake", nil, nil))
 
-	plug, err := plugMgr.FindPersistentPluginByName("kubernetes.io/gce-pd")
+	plug, err := plugMgr.FindPersistentPluginByName("lmktfy.io/gce-pd")
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
 	}
@@ -90,7 +90,7 @@ func TestPlugin(t *testing.T) {
 	plugMgr := volume.VolumePluginMgr{}
 	plugMgr.InitPlugins(ProbeVolumePlugins(), volume.NewFakeVolumeHost("/tmp/fake", nil, nil))
 
-	plug, err := plugMgr.FindPluginByName("kubernetes.io/gce-pd")
+	plug, err := plugMgr.FindPluginByName("lmktfy.io/gce-pd")
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
 	}
@@ -112,7 +112,7 @@ func TestPlugin(t *testing.T) {
 	}
 
 	path := builder.GetPath()
-	if path != "/tmp/fake/pods/poduid/volumes/kubernetes.io~gce-pd/vol1" {
+	if path != "/tmp/fake/pods/poduid/volumes/lmktfy.io~gce-pd/vol1" {
 		t.Errorf("Got unexpected path: %s", path)
 	}
 

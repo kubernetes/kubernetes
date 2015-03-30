@@ -1,0 +1,326 @@
+## This file is used as input to deployment script, which ammends it as needed.
+## More specifically, we need to add environment files for as many nodes as we
+## are going to deploy.
+
+write_files:
+  - path: /opt/bin/register_minion.sh
+    permissions: '0755'
+    owner: root
+    content: |
+      #!/bin/sh -xe
+      minion_id="${1}"
+      master_url="${2}"
+      until healthcheck=$(curl --fail --silent "${master_url}/healthz")
+      do sleep 2
+      done
+      test -n "${healthcheck}"
+      test "${healthcheck}" = "ok"
+      printf '{ "id": "%s", "kind": "Minion", "apiVersion": "v1beta1", "labels": { "environment": "production" }  }' "${minion_id}" \
+        | /opt/bin/lmktfyctl create -s "${master_url}" -f -
+
+coreos:
+  update:
+    group: stable
+  units:
+    - name: docker.service
+      drop-ins:
+        - name: 50-weave-lmktfy.conf
+          content: |
+            [Service]
+            Environment=DOCKER_OPTS='--bridge="weave" -r="false"'
+
+    - name: weave-network.target
+      enable: true
+      content: |
+        [Unit]
+        Description=Weave Network Setup Complete
+        Documentation=man:systemd.special(7)
+        RefuseManualStart=no
+        After=network-online.target
+        [Install]
+        WantedBy=multi-user.target
+        WantedBy=lmktfy-master.target
+        WantedBy=lmktfy-minion.target
+
+    - name: lmktfy-master.target
+      enable: true
+      command: start
+      content: |
+        [Unit]
+        Description=LMKTFY Cluster Master
+        Documentation=http://lmktfy.io/
+        RefuseManualStart=no
+        After=weave-network.target
+        Requires=weave-network.target
+        ConditionHost=lmktfy-00
+        Wants=apiserver.service
+        Wants=scheduler.service
+        Wants=controller-manager.service
+        [Install]
+        WantedBy=multi-user.target
+
+    - name: lmktfy-minion.target
+      enable: true
+      command: start
+      content: |
+        [Unit]
+        Description=LMKTFY Cluster Minion
+        Documentation=http://lmktfy.io/
+        RefuseManualStart=no
+        After=weave-network.target
+        Requires=weave-network.target
+        ConditionHost=!lmktfy-00
+        Wants=proxy.service
+        Wants=lmktfylet.service
+        [Install]
+        WantedBy=multi-user.target
+
+    - name: 10-weave.network
+      runtime: false
+      content: |
+        [Match]
+        Type=bridge
+        Name=weave*
+        [Network]
+
+    - name: install-weave.service
+      enable: true
+      content: |
+        [Unit]
+        After=network-online.target
+        Before=weave.service
+        Before=weave-helper.service
+        Before=docker.service
+        Description=Install Weave
+        Documentation=http://zettio.github.io/weave/
+        Requires=network-online.target
+        [Service]
+        Type=oneshot
+        RemainAfterExit=yes
+        ExecStartPre=/bin/mkdir -p /opt/bin/
+        ExecStartPre=/usr/bin/curl \
+          --silent \
+          --location \
+          https://github.com/zettio/weave/releases/download/latest_release/weave \
+          --output /opt/bin/weave
+        ExecStartPre=/usr/bin/curl \
+          --silent \
+          --location \
+          https://raw.github.com/errordeveloper/weave-demos/master/poseidon/weave-helper \
+          --output /opt/bin/weave-helper
+        ExecStartPre=/usr/bin/chmod +x /opt/bin/weave
+        ExecStartPre=/usr/bin/chmod +x /opt/bin/weave-helper
+        ExecStart=/bin/echo Weave Installed
+        [Install]
+        WantedBy=weave-network.target
+        WantedBy=weave.service
+
+    - name: weave-helper.service
+      enable: true
+      content: |
+        [Unit]
+        After=install-weave.service
+        After=docker.service
+        Description=Weave Network Router
+        Documentation=http://zettio.github.io/weave/
+        Requires=docker.service
+        Requires=install-weave.service
+        [Service]
+        ExecStart=/opt/bin/weave-helper
+        [Install]
+        WantedBy=weave-network.target
+
+    - name: weave.service
+      enable: true
+      content: |
+        [Unit]
+        After=install-weave.service
+        After=docker.service
+        Description=Weave Network Router
+        Documentation=http://zettio.github.io/weave/
+        Requires=docker.service
+        Requires=install-weave.service
+        [Service]
+        EnvironmentFile=/etc/weave.%H.env
+        ExecStartPre=/usr/bin/docker pull zettio/weave:latest
+        ExecStartPre=/usr/bin/docker pull zettio/weavetools:latest
+        ExecStartPre=/opt/bin/weave launch $WEAVE_PEERS
+        ExecStart=/usr/bin/docker attach weave
+        Restart=on-failure
+        ExecStop=/opt/bin/weave stop
+        [Install]
+        WantedBy=weave-network.target
+
+    - name: weave-create-bridge.service
+      enable: true
+      content: |
+        [Unit]
+        After=network.target
+        After=install-weave.service
+        Before=weave.service
+        Before=docker.service
+        Description=Docker Application Container Engine
+        Documentation=http://docs.docker.io
+        Requires=network.target
+        Requires=install-weave.service
+        [Service]
+        Type=oneshot
+        EnvironmentFile=/etc/weave.%H.env
+        ExecStart=/opt/bin/weave create-bridge
+        ExecStart=/usr/bin/ip addr add dev weave $BRIDGE_ADDRESS_CIDR
+        ExecStart=/usr/bin/ip route add $BREAKOUT_ROUTE dev weave scope link
+        ExecStart=/usr/bin/ip route add 224.0.0.0/4 dev weave
+        [Install]
+        WantedBy=multi-user.target
+        WantedBy=weave-network.target
+
+    - name: download-lmktfy.service
+      enable: true
+      content: |
+        [Unit]
+        After=network-online.target
+        Before=apiserver.service
+        Before=controller-manager.service
+        Before=lmktfylet.service
+        Before=proxy.service
+        Description=Download LMKTFY Binaries
+        Documentation=https://github.com/GoogleCloudPlatform/lmktfy
+        Requires=network-online.target
+        [Service]
+        Environment=LMKTFY_RELEASE_TARBALL=https://github.com/GoogleCloudPlatform/lmktfy/releases/download/v0.11.0/lmktfy.tar.gz
+        ExecStartPre=/bin/mkdir -p /opt/
+        ExecStart=/bin/bash -c "curl --silent --location $LMKTFY_RELEASE_TARBALL | tar xzv -C /tmp/"
+        ExecStart=/bin/tar xzvf /tmp/lmktfy/server/lmktfy-server-linux-amd64.tar.gz -C /opt
+        ExecStartPost=/bin/ln -s /opt/lmktfy/server/bin/lmktfyctl /opt/bin/
+        ExecStartPost=/bin/mv /tmp/lmktfy/examples/guestbook /home/core/guestbook-example
+        ExecStartPost=/bin/rm -rf /tmp/lmktfy
+        RemainAfterExit=yes
+        Type=oneshot
+        [Install]
+        WantedBy=lmktfy-master.target
+        WantedBy=lmktfy-minion.target
+
+    - name: apiserver.service
+      enable: true
+      content: |
+        [Unit]
+        After=download-lmktfy.service
+        Before=controller-manager.service
+        Before=scheduler.service
+        ConditionFileIsExecutable=/opt/lmktfy/server/bin/lmktfy-apiserver
+        Description=LMKTFY API Server
+        Documentation=https://github.com/GoogleCloudPlatform/lmktfy
+        Wants=download-lmktfy.service
+        ConditionHost=lmktfy-00
+        [Service]
+        ExecStart=/opt/lmktfy/server/bin/lmktfy-apiserver \
+            --address=0.0.0.0 \
+            --port=8080 \
+            --etcd_servers=http://etcd-00:4001,http://etcd-01:4001,http://etcd-02:4001 \
+            --portal_net=10.1.0.0/16 \
+            --cloud_provider=vagrant \
+            --logtostderr=true --v=3
+        Restart=always
+        RestartSec=10
+        [Install]
+        WantedBy=lmktfy-master.target
+
+    - name: scheduler.service
+      enable: true
+      content: |
+        [Unit]
+        After=apiserver.service
+        After=download-lmktfy.service
+        ConditionFileIsExecutable=/opt/lmktfy/server/bin/lmktfy-scheduler
+        Description=LMKTFY Scheduler
+        Documentation=https://github.com/GoogleCloudPlatform/lmktfy
+        Wants=apiserver.service
+        ConditionHost=lmktfy-00
+        [Service]
+        ExecStart=/opt/lmktfy/server/bin/lmktfy-scheduler \
+            --logtostderr=true \
+            --master=127.0.0.1:8080
+        Restart=always
+        RestartSec=10
+        [Install]
+        WantedBy=lmktfy-master.target
+
+    - name: controller-manager.service
+      enable: true
+      content: |
+        [Unit]
+        After=download-lmktfy.service
+        After=apiserver.service
+        ConditionFileIsExecutable=/opt/lmktfy/server/bin/lmktfy-controller-manager
+        Description=LMKTFY Controller Manager
+        Documentation=https://github.com/GoogleCloudPlatform/lmktfy
+        Wants=apiserver.service
+        Wants=download-lmktfy.service
+        ConditionHost=lmktfy-00
+        [Service]
+        ExecStart=/opt/lmktfy/server/bin/lmktfy-controller-manager \
+            --cloud_provider=vagrant \
+            --master=127.0.0.1:8080 \
+            --logtostderr=true
+        Restart=always
+        RestartSec=10
+        [Install]
+        WantedBy=lmktfy-master.target
+
+    - name: lmktfylet.service
+      enable: true
+      content: |
+        [Unit]
+        After=download-lmktfy.service
+        ConditionFileIsExecutable=/opt/lmktfy/server/bin/lmktfylet
+        Description=LMKTFY LMKTFYlet
+        Documentation=https://github.com/GoogleCloudPlatform/lmktfy
+        Wants=download-lmktfy.service
+        ConditionHost=!lmktfy-00
+        [Service]
+        ExecStart=/opt/lmktfy/server/bin/lmktfylet \
+            --address=0.0.0.0 \
+            --port=10250 \
+            --hostname_override=%H \
+            --api_servers=http://lmktfy-00:8080 \
+            --logtostderr=true
+        Restart=always
+        RestartSec=10
+        [Install]
+        WantedBy=lmktfy-minion.target
+
+    - name: proxy.service
+      enable: true
+      content: |
+        [Unit]
+        After=download-lmktfy.service
+        ConditionFileIsExecutable=/opt/lmktfy/server/bin/lmktfy-proxy
+        Description=LMKTFY Proxy
+        Documentation=https://github.com/GoogleCloudPlatform/lmktfy
+        Wants=download-lmktfy.service
+        ConditionHost=!lmktfy-00
+        [Service]
+        ExecStart=/opt/lmktfy/server/bin/lmktfy-proxy \
+             --master=http://lmktfy-00:8080 \
+             --logtostderr=true
+        Restart=always
+        RestartSec=10
+        [Install]
+        WantedBy=lmktfy-minion.target
+
+    - name: lmktfyctl-create-minion.service
+      enable: true
+      content: |
+        [Unit]
+        After=download-lmktfy.service
+        ConditionFileIsExecutable=/opt/lmktfy/server/bin/lmktfyctl
+        ConditionFileIsExecutable=/opt/bin/register_minion.sh
+        Description=LMKTFY Create Minion
+        Documentation=https://github.com/GoogleCloudPlatform/lmktfy
+        Wants=download-lmktfy.service
+        ConditionHost=!lmktfy-00
+        [Service]
+        ExecStart=/opt/bin/register_minion.sh %H http://lmktfy-00:8080
+        Type=oneshot
+        [Install]
+        WantedBy=lmktfy-minion.target

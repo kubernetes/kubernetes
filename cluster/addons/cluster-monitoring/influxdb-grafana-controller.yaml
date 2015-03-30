@@ -8,7 +8,7 @@ desiredState:
   podTemplate:
     labels:
       name: influxGrafana
-      kubernetes.io/cluster-service: "true"
+      lmktfy.io/cluster-service: "true"
     desiredState:
       manifest:
         version: v1beta1
@@ -34,8 +34,8 @@ desiredState:
                 value: "localhost"
               - name: "INFLUXDB_PORT"
                 value: ""
-              - name: "KUBERNETES_API_PORT"
+              - name: "LMKTFYRNETES_API_PORT"
                 value: ""
 labels:
   name: influxGrafana
-  kubernetes.io/cluster-service: "true"
+  lmktfy.io/cluster-service: "true"

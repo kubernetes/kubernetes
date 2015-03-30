@@ -20,24 +20,24 @@ import (
 	"os"
 	goruntime "runtime"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	"github.com/GoogleCloudPlatform/kubernetes/test/e2e"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/client/clientcmd"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/util"
+	"github.com/GoogleCloudPlatform/lmktfy/test/e2e"
 	"github.com/golang/glog"
 	flag "github.com/spf13/pflag"
 )
 
 var (
-	kubeConfig = flag.String(clientcmd.RecommendedConfigPathFlag, "", "Path to kubeconfig containing embeded authinfo. Will use cluster/user info from 'current-context'")
+	lmktfyConfig = flag.String(clientcmd.RecommendedConfigPathFlag, "", "Path to lmktfyconfig containing embeded authinfo. Will use cluster/user info from 'current-context'")
 	authConfig = flag.String("auth_config", "", "Path to the auth info file.")
 	certDir    = flag.String("cert_dir", "", "Path to the directory containing the certs. Default is empty, which doesn't use certs.")
 	gceProject = flag.String("gce_project", "", "The GCE project being used, if applicable")
 	gceZone    = flag.String("gce_zone", "", "GCE zone being used, if applicable")
 	host       = flag.String("host", "", "The host to connect to")
-	masterName = flag.String("kube_master", "", "Name of the kubernetes master. Only required if provider is gce or gke")
-	provider   = flag.String("provider", "", "The name of the Kubernetes provider")
+	masterName = flag.String("lmktfy_master", "", "Name of the lmktfy master. Only required if provider is gce or gke")
+	provider   = flag.String("provider", "", "The name of the LMKTFY provider")
 	orderseed  = flag.Int64("orderseed", 0, "If non-zero, seed of random test shuffle order. (Otherwise random.)")
-	repoRoot   = flag.String("repo_root", "./", "Root directory of kubernetes repository, for finding test files. Default assumes working directory is repository root")
+	repoRoot   = flag.String("repo_root", "./", "Root directory of lmktfy repository, for finding test files. Default assumes working directory is repository root")
 	reportDir  = flag.String("report_dir", "", "Path to the directory where the JUnit XML reports should be saved. Default is empty, which doesn't generate these reports.")
 	times      = flag.Int("times", 1, "Number of times each test is eligible to be run. Individual order is determined by shuffling --times instances of each test using --orderseed (like a multi-deck shoe of cards).")
 	testList   util.StringList
@@ -63,5 +63,5 @@ func main() {
 		Zone:       *gceZone,
 		MasterName: *masterName,
 	}
-	e2e.RunE2ETests(*kubeConfig, *authConfig, *certDir, *host, *repoRoot, *provider, gceConfig, *orderseed, *times, *reportDir, testList)
+	e2e.RunE2ETests(*lmktfyConfig, *authConfig, *certDir, *host, *repoRoot, *provider, gceConfig, *orderseed, *times, *reportDir, testList)
 }

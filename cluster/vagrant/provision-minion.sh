@@ -72,7 +72,7 @@ grains:
   networkInterfaceName: eth1
   apiservers: '$(echo "$MASTER_IP" | sed -e "s/'/''/g")'
   roles:
-    - kubernetes-pool
+    - lmktfy-pool
   cbr-cidr: '$(echo "$CONTAINER_SUBNET" | sed -e "s/'/''/g")'
   minion_ip: '$(echo "$MINION_IP" | sed -e "s/'/''/g")'
 EOF

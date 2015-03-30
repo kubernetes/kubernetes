@@ -20,13 +20,13 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta2"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta3"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api/meta"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api/v1beta1"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api/v1beta2"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api/v1beta3"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/runtime"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/util"
 )
 
 // Version is the string that represents the current external default version.
@@ -45,7 +45,7 @@ var Versions = []string{"v1beta1", "v1beta2", "v1beta3"}
 // Codec is the default codec for serializing output that should use
 // the latest supported version.  Use this Codec when writing to
 // disk, a data store that is not dynamically versioned, or in tests.
-// This codec can decode any object that Kubernetes is aware of.
+// This codec can decode any object that LMKTFY is aware of.
 var Codec = v1beta1.Codec
 
 // accessor is the shared static metadata accessor for the API.
@@ -58,7 +58,7 @@ var accessor = meta.NewAccessor()
 var SelfLinker = runtime.SelfLinker(accessor)
 
 // RESTMapper provides the default mapping between REST paths and the objects declared in api.Scheme and all known
-// Kubernetes versions.
+// LMKTFY versions.
 var RESTMapper meta.RESTMapper
 
 // InterfacesFor returns the default Codec and ResourceVersioner for a given version

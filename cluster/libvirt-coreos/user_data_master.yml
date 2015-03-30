@@ -2,40 +2,40 @@
 
 coreos:
   units:
-    - name: kube-apiserver.service
+    - name: lmktfy-apiserver.service
       command: start
       content: |
         [Unit]
-        After=opt-kubernetes.mount etcd.service
-        ConditionFileIsExecutable=/opt/kubernetes/bin/kube-apiserver
-        Description=Kubernetes API Server
-        Documentation=https://github.com/GoogleCloudPlatform/kubernetes
-        Requires=opt-kubernetes.mount etcd.service
+        After=opt-lmktfy.mount etcd.service
+        ConditionFileIsExecutable=/opt/lmktfy/bin/lmktfy-apiserver
+        Description=LMKTFY API Server
+        Documentation=https://github.com/GoogleCloudPlatform/lmktfy
+        Requires=opt-lmktfy.mount etcd.service
 
         [Service]
-        ExecStart=/opt/kubernetes/bin/kube-apiserver \
+        ExecStart=/opt/lmktfy/bin/lmktfy-apiserver \
         --address=0.0.0.0 \
         --port=8080 \
         --etcd_servers=${etcd_servers} \
-        --kubelet_port=10250 \
+        --lmktfylet_port=10250 \
         --portal_net=${PORTAL_NET}
         Restart=always
         RestartSec=2
 
         [Install]
         WantedBy=multi-user.target
-    - name: kube-controller-manager.service
+    - name: lmktfy-controller-manager.service
       command: start
       content: |
         [Unit]
-        After=opt-kubernetes.mount kube-apiserver.service
-        ConditionFileIsExecutable=/opt/kubernetes/bin/kube-controller-manager
-        Description=Kubernetes Controller Manager
-        Documentation=https://github.com/GoogleCloudPlatform/kubernetes
-        Requires=opt-kubernetes.mount kube-apiserver.service
+        After=opt-lmktfy.mount lmktfy-apiserver.service
+        ConditionFileIsExecutable=/opt/lmktfy/bin/lmktfy-controller-manager
+        Description=LMKTFY Controller Manager
+        Documentation=https://github.com/GoogleCloudPlatform/lmktfy
+        Requires=opt-lmktfy.mount lmktfy-apiserver.service
 
         [Service]
-        ExecStart=/opt/kubernetes/bin/kube-controller-manager \
+        ExecStart=/opt/lmktfy/bin/lmktfy-controller-manager \
         --master=127.0.0.1:8080 \
         --machines=${machines}
         Restart=always
@@ -43,41 +43,41 @@ coreos:
 
         [Install]
         WantedBy=multi-user.target
-    - name: kube-scheduler.service
+    - name: lmktfy-scheduler.service
       command: start
       content: |
         [Unit]
-        After=opt-kubernetes.mount kube-apiserver.service
-        ConditionFileIsExecutable=/opt/kubernetes/bin/kube-scheduler
-        Description=Kubernetes Scheduler
-        Documentation=https://github.com/GoogleCloudPlatform/kubernetes
-        Requires=opt-kubernetes.mount kube-apiserver.service
+        After=opt-lmktfy.mount lmktfy-apiserver.service
+        ConditionFileIsExecutable=/opt/lmktfy/bin/lmktfy-scheduler
+        Description=LMKTFY Scheduler
+        Documentation=https://github.com/GoogleCloudPlatform/lmktfy
+        Requires=opt-lmktfy.mount lmktfy-apiserver.service
 
         [Service]
-        ExecStart=/opt/kubernetes/bin/kube-scheduler \
+        ExecStart=/opt/lmktfy/bin/lmktfy-scheduler \
         --master=127.0.0.1:8080
         Restart=always
         RestartSec=2
 
         [Install]
         WantedBy=multi-user.target
-    - name: kube-addons.service
+    - name: lmktfy-addons.service
       command: start
       content: |
         [Unit]
-        After=opt-kubernetes.mount kube-apiserver.service
-        ConditionPathIsDirectory=/opt/kubernetes/addons
-        Description=Kubernetes addons
-        Documentation=https://github.com/GoogleCloudPlatform/kubernetes
-        Requires=opt-kubernetes.mount
-        Wants=kube-apiserver.service
+        After=opt-lmktfy.mount lmktfy-apiserver.service
+        ConditionPathIsDirectory=/opt/lmktfy/addons
+        Description=LMKTFY addons
+        Documentation=https://github.com/GoogleCloudPlatform/lmktfy
+        Requires=opt-lmktfy.mount
+        Wants=lmktfy-apiserver.service
 
         [Service]
         Type=oneshot
         ExecStartPre=/bin/bash -c 'while [[ \"\$(curl -s http://127.0.0.1:8080/healthz)\" != \"ok\" ]]; do sleep 1; done'
         ExecStartPre=/bin/sleep 10
-        ExecStart=/opt/kubernetes/bin/kubectl create -f /opt/kubernetes/addons
-        ExecStop=/opt/kubernetes/bin/kubectl stop -f /opt/kubernetes/addons
+        ExecStart=/opt/lmktfy/bin/lmktfyctl create -f /opt/lmktfy/addons
+        ExecStop=/opt/lmktfy/bin/lmktfyctl stop -f /opt/lmktfy/addons
         RemainAfterExit=yes
 
         [Install]

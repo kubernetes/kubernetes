@@ -19,10 +19,10 @@ package nfs
 import (
 	"os"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/types"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/util"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/volume"
 	"github.com/golang/glog"
 )
 
@@ -39,7 +39,7 @@ type nfsPlugin struct {
 var _ volume.VolumePlugin = &nfsPlugin{}
 
 const (
-	nfsPluginName = "kubernetes.io/nfs"
+	nfsPluginName = "lmktfy.io/nfs"
 )
 
 func (plugin *nfsPlugin) Init(host volume.VolumeHost) {

@@ -20,11 +20,11 @@ import (
 	"net/http"
 	"net/url"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/version"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api/testapi"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/runtime"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/version"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/watch"
 )
 
 type FakeAction struct {

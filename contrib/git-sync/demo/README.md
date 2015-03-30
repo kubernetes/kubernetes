@@ -23,8 +23,8 @@ docker push <some-registry>/hugo <some-registry>/git-sync
 Create the pod and the service for the blog
 
 ```
-kubectl pods create config/pod.html
-kubectl services create config/pod.html
+lmktfyctl pods create config/pod.html
+lmktfyctl services create config/pod.html
 ```
 
 Open the service external ip in your browser

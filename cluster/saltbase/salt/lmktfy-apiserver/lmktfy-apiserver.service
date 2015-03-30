@@ -1,0 +1,11 @@
+[Unit]
+Description=LMKTFYrnetes API Server
+Documentation=https://github.com/GoogleCloudPlatform/lmktfyrnetes
+
+[Service]
+EnvironmentFile=/etc/sysconfig/lmktfy-apiserver
+ExecStart=/usr/local/bin/lmktfy-apiserver "$DAEMON_ARGS"
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

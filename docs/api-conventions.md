@@ -1,9 +1,9 @@
 API Conventions
 ===============
 
-The conventions of the Kubernetes API (and related APIs in the ecosystem) are intended to ease client development and ensure that configuration mechanisms can be implemented that work across a diverse set of use cases consistently.
+The conventions of the LMKTFY API (and related APIs in the ecosystem) are intended to ease client development and ensure that configuration mechanisms can be implemented that work across a diverse set of use cases consistently.
 
-The general style of the Kubernetes API is RESTful - clients create, update, delete, or retrieve a description of an object via the standard HTTP verbs (POST, PUT, DELETE, and GET) - and those APIs preferentially accept and return JSON. Kubernetes also exposes additional endpoints for non-standard verbs and allows alternative content types. All of the JSON accepted and returned by the server has a schema, identified by the "kind" and "apiVersion" fields.
+The general style of the LMKTFY API is RESTful - clients create, update, delete, or retrieve a description of an object via the standard HTTP verbs (POST, PUT, DELETE, and GET) - and those APIs preferentially accept and return JSON. LMKTFY also exposes additional endpoints for non-standard verbs and allows alternative content types. All of the JSON accepted and returned by the server has a schema, identified by the "kind" and "apiVersion" fields.
 
 The following terms are defined:
 
@@ -80,7 +80,7 @@ Labels are intended for organizational purposes by end users (select the pods th
 
 #### Spec and Status
 
-By convention, the Kubernetes API makes a distinction between the specification of the desired state of an object (a nested object field called "spec") and the status of the object at the current time (a nested object field called "status"). The specification is persisted in stable storage with the API object and reflects user input. The status is summarizes the current state of the object in the system, and is usually persisted with the object by an automated processes (but may be created on the fly).
+By convention, the LMKTFY API makes a distinction between the specification of the desired state of an object (a nested object field called "spec") and the status of the object at the current time (a nested object field called "status"). The specification is persisted in stable storage with the API object and reflects user input. The status is summarizes the current state of the object in the system, and is usually persisted with the object by an automated processes (but may be created on the fly).
 
 For example, a pod object has a "spec" object field that defines how the pod should be run. The pod also has a "status" object field that shows details about what is happening on the host that is running the containers in the pod (if available) and a summarized "phase" string that indicates where the pod is in its lifecycle.
 
@@ -94,7 +94,7 @@ All objects that represent a physical resource whose state may vary from the use
 
 #### Lists of named subobjects preferred over maps
 
-Discussed in [#2004](https://github.com/GoogleCloudPlatform/kubernetes/issues/2004) and elsewhere. There are no maps of subobjects in any API objects. Instead, the convention is to use a list of subobjects containing name fields.
+Discussed in [#2004](https://github.com/GoogleCloudPlatform/lmktfy/issues/2004) and elsewhere. There are no maps of subobjects in any API objects. Instead, the convention is to use a list of subobjects containing name fields.
 
 For example:
 ```yaml
@@ -129,11 +129,11 @@ Differing Representations
 
 An API may represent a single entity in different ways for different clients, or transform an object after certain transitions in the system occur. In these cases, one request object may have two representations available as different resources, or different kinds.
 
-An example is a Service, which represents the intent of the user to group a set of pods with common behavior on common ports. When Kubernetes detects a pod matches the service selector, the IP address and port of the pod are added to an Endpoints resource for that Service. The Endpoints resource exists only if the Service exists, but exposes only the IPs and ports of the selected pods.  The full service is represented by two distinct resources - under the original Service resource the user created, as well as in the Endpoints resource.
+An example is a Service, which represents the intent of the user to group a set of pods with common behavior on common ports. When LMKTFY detects a pod matches the service selector, the IP address and port of the pod are added to an Endpoints resource for that Service. The Endpoints resource exists only if the Service exists, but exposes only the IPs and ports of the selected pods.  The full service is represented by two distinct resources - under the original Service resource the user created, as well as in the Endpoints resource.
 
 As another example, a "pod status" resource may accept a PUT with the "pod" kind, with different rules about what fields may be changed.
 
-Future versions of Kubernetes may allow alternative encodings of objects beyond JSON.
+Future versions of LMKTFY may allow alternative encodings of objects beyond JSON.
 
 
 Verbs on Resources
@@ -147,7 +147,7 @@ API resources should use the traditional REST pattern:
 * DELETE /&lt;resourceNamePlural&gt;/&lt;name&gt;  - Delete the single resource with the given name.
 * PUT /&lt;resourceNamePlural&gt;/&lt;name&gt; - Update or create the resource with the given name with the JSON object provided by the client.
 
-Kubernetes by convention exposes additional verbs as new root endpoints with singular names. Examples:
+LMKTFY by convention exposes additional verbs as new root endpoints with singular names. Examples:
 
 * GET /watch/&lt;resourceNamePlural&gt; - Receive a stream of JSON objects corresponding to changes made to any resource of the given kind over time.
 * GET /watch/&lt;resourceNamePlural&gt;/&lt;name&gt; - Receive a stream of JSON objects corresponding to changes made to the named resource of the given kind over time.
@@ -164,7 +164,7 @@ TODO: more documentation of Watch
 Idempotency
 -----------
 
-All compatible Kubernetes APIs MUST support "name idempotency" and respond with an HTTP status code 409 when a request is made to POST an object that has the same name as an existing object in the system. See [identifiers.md](identifiers.md) for details.
+All compatible LMKTFY APIs MUST support "name idempotency" and respond with an HTTP status code 409 when a request is made to POST an object that has the same name as an existing object in the system. See [identifiers.md](identifiers.md) for details.
 
 TODO: name generation
 
@@ -183,11 +183,11 @@ achieve the state, and for the user to know what to anticipate.
 Concurrency Control and Consistency
 -----------------------------------
 
-Kubernetes leverages the concept of *resource versions* to achieve optimistic concurrency. All Kubernetes resources have a "resourceVersion" field as part of their metadata. This resourceVersion is a string that identifies the internal version of an object that can be used by clients to determine when objects have changed. When a record is about to be updated, it's version is checked against a pre-saved value, and if it doesn't match, the update fails with a StatusConflict (HTTP status code 409).
+LMKTFY leverages the concept of *resource versions* to achieve optimistic concurrency. All LMKTFY resources have a "resourceVersion" field as part of their metadata. This resourceVersion is a string that identifies the internal version of an object that can be used by clients to determine when objects have changed. When a record is about to be updated, it's version is checked against a pre-saved value, and if it doesn't match, the update fails with a StatusConflict (HTTP status code 409).
 
 The resourceVersion is changed by the server every time an object is modified. If resourceVersion is included with the PUT operation the system will verify that there have not been other successful mutations to the resource during a read/modify/write cycle, by verifying that the current value of resourceVersion matches the specified value.
 
-The resourceVersion is currently backed by [etcd's modifiedIndex](https://coreos.com/docs/distributed-configuration/etcd-api/). However, it's important to note that the application should *not* rely on the implementation details of the versioning system maintained by Kubernetes. We may change the implementation of resourceVersion in the future, such as to change it to a timestamp or per-object counter.
+The resourceVersion is currently backed by [etcd's modifiedIndex](https://coreos.com/docs/distributed-configuration/etcd-api/). However, it's important to note that the application should *not* rely on the implementation details of the versioning system maintained by LMKTFY. We may change the implementation of resourceVersion in the future, such as to change it to a timestamp or per-object counter.
 
 The only way for a client to know the expected value of resourceVersion is to have received it from the server in response to a prior operation, typically a GET. This value MUST be treated as opaque by clients and passed unmodified back to the server. Clients should not assume that the resource version has meaning across namespaces, different kinds of resources, or different servers. Currently, the value of resourceVersion is set to match etcd's sequencer. You could think of it as a logical clock the API server can use to order requests. However, we expect the implementation of resourceVersion to change in the future, such as in the case we shard the state by kind and/or namespace, or port to another storage system.
 
@@ -304,7 +304,7 @@ The following HTTP status codes may be returned by the API.
 Response Status Kind
 --------------------
 
-Kubernetes will always return the ```Status``` kind from any API endpoint when an error occurs.
+LMKTFY will always return the ```Status``` kind from any API endpoint when an error occurs.
 Clients SHOULD handle these types of objects when appropriate.
 
 A ```Status``` kind will be returned by the API in two cases:
@@ -435,6 +435,6 @@ TODO: Document events (refer to another doc for details)
 API Documentation
 -----------------
 
-API documentation can be found at [http://kubernetes.io/third_party/swagger-ui/](http://kubernetes.io/third_party/swagger-ui/).
+API documentation can be found at [http://lmktfy.io/third_party/swagger-ui/](http://lmktfy.io/third_party/swagger-ui/).
 
 

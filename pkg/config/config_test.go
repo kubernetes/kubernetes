@@ -24,11 +24,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api/latest"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api/meta"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/client"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/runtime"
 )
 
 func getTyperAndMapper() (runtime.ObjectTyper, meta.RESTMapper) {

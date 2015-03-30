@@ -25,11 +25,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/validation"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/yaml"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api/latest"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api/validation"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/runtime"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/util/yaml"
 	"github.com/golang/glog"
 )
 

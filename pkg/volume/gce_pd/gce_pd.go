@@ -22,12 +22,12 @@ import (
 	"path"
 	"strconv"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/exec"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/mount"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/types"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/util"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/util/exec"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/util/mount"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/volume"
 	"github.com/golang/glog"
 )
 
@@ -44,7 +44,7 @@ type gcePersistentDiskPlugin struct {
 var _ volume.VolumePlugin = &gcePersistentDiskPlugin{}
 
 const (
-	gcePersistentDiskPluginName       = "kubernetes.io/gce-pd"
+	gcePersistentDiskPluginName       = "lmktfy.io/gce-pd"
 	gcePersistentDiskPluginLegacyName = "gce-pd"
 )
 
@@ -135,14 +135,14 @@ func (plugin *gcePersistentDiskPlugin) newCleanerInternal(volName string, podUID
 
 // Abstract interface to PD operations.
 type pdManager interface {
-	// Attaches the disk to the kubelet's host machine.
+	// Attaches the disk to the lmktfylet's host machine.
 	AttachAndMountDisk(pd *gcePersistentDisk, globalPDPath string) error
-	// Detaches the disk from the kubelet's host machine.
+	// Detaches the disk from the lmktfylet's host machine.
 	DetachDisk(pd *gcePersistentDisk) error
 }
 
 // gcePersistentDisk volumes are disk resources provided by Google Compute Engine
-// that are attached to the kubelet's host machine and exposed to the pod.
+// that are attached to the lmktfylet's host machine and exposed to the pod.
 type gcePersistentDisk struct {
 	volName string
 	podUID  types.UID
@@ -254,13 +254,13 @@ func (pd *gcePersistentDisk) GetPath() string {
 }
 
 // Unmounts the bind mount, and detaches the disk only if the PD
-// resource was the last reference to that disk on the kubelet.
+// resource was the last reference to that disk on the lmktfylet.
 func (pd *gcePersistentDisk) TearDown() error {
 	return pd.TearDownAt(pd.GetPath())
 }
 
 // Unmounts the bind mount, and detaches the disk only if the PD
-// resource was the last reference to that disk on the kubelet.
+// resource was the last reference to that disk on the lmktfylet.
 func (pd *gcePersistentDisk) TearDownAt(dir string) error {
 	mountpoint, err := mount.IsMountPoint(dir)
 	if err != nil {

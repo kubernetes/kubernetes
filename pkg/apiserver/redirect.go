@@ -20,11 +20,11 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/rest"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/httplog"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api/errors"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api/rest"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/httplog"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/runtime"
 )
 
 type RedirectHandler struct {

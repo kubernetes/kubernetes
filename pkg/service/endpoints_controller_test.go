@@ -22,13 +22,13 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	endptspkg "github.com/GoogleCloudPlatform/kubernetes/pkg/api/endpoints"
-	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api"
+	endptspkg "github.com/GoogleCloudPlatform/lmktfy/pkg/api/endpoints"
+	_ "github.com/GoogleCloudPlatform/lmktfy/pkg/api/latest"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api/testapi"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/client"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/runtime"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/util"
 )
 
 func newPodList(nPods int, nPorts int) *api.PodList {

@@ -18,11 +18,11 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
-source "${KUBE_ROOT}/hack/lib/init.sh"
+LMKTFY_ROOT=$(dirname "${BASH_SOURCE}")/..
+source "${LMKTFY_ROOT}/hack/lib/init.sh"
 
-kube::golang::setup_env
-"${KUBE_ROOT}/hack/build-go.sh" cmd/gendocs cmd/genman
+lmktfy::golang::setup_env
+"${LMKTFY_ROOT}/hack/build-go.sh" cmd/gendocs cmd/genman
 
 # Get the absolute path of the directory component of a file, i.e. the
 # absolute path of the dirname of $1.
@@ -68,15 +68,15 @@ esac
 
 # Find binary
 doc_locations=(
-  "${KUBE_ROOT}/_output/dockerized/bin/${host_os}/${host_arch}/gendocs"
-  "${KUBE_ROOT}/_output/local/bin/${host_os}/${host_arch}/gendocs"
-  "${KUBE_ROOT}/platforms/${host_os}/${host_arch}/gendocs"
+  "${LMKTFY_ROOT}/_output/dockerized/bin/${host_os}/${host_arch}/gendocs"
+  "${LMKTFY_ROOT}/_output/local/bin/${host_os}/${host_arch}/gendocs"
+  "${LMKTFY_ROOT}/platforms/${host_os}/${host_arch}/gendocs"
 )
 gendocs=$( (ls -t "${doc_locations[@]}" 2>/dev/null || true) | head -1 )
 man_locations=(
-  "${KUBE_ROOT}/_output/dockerized/bin/${host_os}/${host_arch}/genman"
-  "${KUBE_ROOT}/_output/local/bin/${host_os}/${host_arch}/genman"
-  "${KUBE_ROOT}/platforms/${host_os}/${host_arch}/genman"
+  "${LMKTFY_ROOT}/_output/dockerized/bin/${host_os}/${host_arch}/genman"
+  "${LMKTFY_ROOT}/_output/local/bin/${host_os}/${host_arch}/genman"
+  "${LMKTFY_ROOT}/platforms/${host_os}/${host_arch}/genman"
 )
 genman=$( (ls -t "${man_locations[@]}" 2>/dev/null || true) | head -1 )
 
@@ -90,5 +90,5 @@ if [[ ! -x "$gendocs" || ! -x "$genman" ]]; then
   exit 1
 fi
 
-${gendocs} "${KUBE_ROOT}/docs/"
-${genman} "${KUBE_ROOT}/docs/man/man1/"
+${gendocs} "${LMKTFY_ROOT}/docs/"
+${genman} "${LMKTFY_ROOT}/docs/man/man1/"

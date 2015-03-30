@@ -30,15 +30,15 @@ import (
 	"strings"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/httpstream"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
-	watchjson "github.com/GoogleCloudPlatform/kubernetes/pkg/watch/json"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api/errors"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/fields"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/labels"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/runtime"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/util"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/util/httpstream"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/watch"
+	watchjson "github.com/GoogleCloudPlatform/lmktfy/pkg/watch/json"
 	"github.com/golang/glog"
 )
 
@@ -102,7 +102,7 @@ type Request struct {
 	subpath string
 	params  url.Values
 
-	// structural elements of the request that are part of the Kubernetes API conventions
+	// structural elements of the request that are part of the LMKTFY API conventions
 	namespace    string
 	namespaceSet bool
 	resource     string
@@ -646,7 +646,7 @@ func (r *Request) transformResponse(resp *http.Response, req *http.Request, body
 
 // transformUnstructuredResponseError handles an error from the server that is not in a structured form.
 // It is expected to transform any response that is not recognizable as a clear server sent error from the
-// K8S API using the information provided with the request. In practice, HTTP proxies and client libraries
+// LMKTFY API using the information provided with the request. In practice, HTTP proxies and client libraries
 // introduce a level of uncertainty to the responses returned by servers that in common use result in
 // unexpected responses. The rough structure is:
 //

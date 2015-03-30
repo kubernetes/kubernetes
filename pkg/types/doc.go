@@ -14,5 +14,5 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package types implements various generic types used throughout kubernetes.
+// Package types implements various generic types used throughout lmktfy.
 package types

@@ -1,8 +1,8 @@
-**Note that the model described in this document has not yet been implemented. The tracking issue for implementation of this model is [#168](https://github.com/GoogleCloudPlatform/kubernetes/issues/168). Currently, only memory and cpu limits on containers (not pods) are supported. "memory" is in bytes and "cpu" is in milli-cores.**
+**Note that the model described in this document has not yet been implemented. The tracking issue for implementation of this model is [#168](https://github.com/GoogleCloudPlatform/lmktfy/issues/168). Currently, only memory and cpu limits on containers (not pods) are supported. "memory" is in bytes and "cpu" is in milli-cores.**
 
-# The Kubernetes resource model
+# The LMKTFY resource model
 
-To do good pod placement, Kubernetes needs to know how big pods are, as well as the sizes of the nodes onto which they are being placed.  The definition of "how big" is given by the Kubernetes resource model - the subject of this document.
+To do good pod placement, LMKTFY needs to know how big pods are, as well as the sizes of the nodes onto which they are being placed.  The definition of "how big" is given by the LMKTFY resource model - the subject of this document.
 
 The resource model aims to be:
 * simple, for common cases;
@@ -11,28 +11,28 @@ The resource model aims to be:
 * precise, to avoid misunderstandings and promote pod portability.
 
 ## The resource model
-A Kubernetes _resource_ is something that can be requested by, allocated to, or consumed by a pod or container.  Examples include memory (RAM), CPU, disk-time, and network bandwidth.
+A LMKTFY _resource_ is something that can be requested by, allocated to, or consumed by a pod or container.  Examples include memory (RAM), CPU, disk-time, and network bandwidth.
 
-Once resources on a node have been allocated to one pod, they should not be allocated to another until that pod is removed or exits. This means that Kubernetes schedulers should ensure that the sum of the resources allocated (requested and granted) to its pods never exceeds the usable capacity of the node. Testing whether a pod will fit on a node is called _feasibility checking_. 
+Once resources on a node have been allocated to one pod, they should not be allocated to another until that pod is removed or exits. This means that LMKTFY schedulers should ensure that the sum of the resources allocated (requested and granted) to its pods never exceeds the usable capacity of the node. Testing whether a pod will fit on a node is called _feasibility checking_. 
 
 Note that the resource model currently prohibits over-committing resources; we will want to relax that restriction later.
 
 ### Resource types
 
-All resources have a _type_ that is identified by their _typename_ (a string, e.g., "memory").  Several resource types are predefined by Kubernetes (a full list is below), although only two will be supported at first: CPU and memory.  Users and system administrators can define their own resource types if they wish (e.g., Hadoop slots).
+All resources have a _type_ that is identified by their _typename_ (a string, e.g., "memory").  Several resource types are predefined by LMKTFY (a full list is below), although only two will be supported at first: CPU and memory.  Users and system administrators can define their own resource types if they wish (e.g., Hadoop slots).
 
 A fully-qualified resource typename is constructed from a DNS-style _subdomain_, followed by a slash `/`, followed by a DNS Label.
-* The subdomain must conform to [RFC 1035](http://tools.ietf.org/html/rfc1035) / [RFC 1123](http://www.ietf.org/rfc/rfc1123.txt) (e.g., `kubernetes.io`, `myveryown.org`).
+* The subdomain must conform to [RFC 1035](http://tools.ietf.org/html/rfc1035) / [RFC 1123](http://www.ietf.org/rfc/rfc1123.txt) (e.g., `lmktfy.io`, `myveryown.org`).
 * The DNS label must conform to [RFC 1123](http://www.ietf.org/rfc/rfc1123.txt) - alphanumeric characters, with a maximum length of 63 characters, with the '-' character allowed anywhere except the first or last character.
-* As a shorthand, any resource typename that does not start with a subdomain and a slash will automatically be prefixed with the built-in Kubernetes _namespace_, `kubernetes.io/` in order to fully-qualify it.  This namespace is reserved for code in the open source Kubernetes repository; as a result, all user typenames MUST be fully qualified, and cannot be created in this namespace.
+* As a shorthand, any resource typename that does not start with a subdomain and a slash will automatically be prefixed with the built-in LMKTFY _namespace_, `lmktfy.io/` in order to fully-qualify it.  This namespace is reserved for code in the open source LMKTFY repository; as a result, all user typenames MUST be fully qualified, and cannot be created in this namespace.
 
-Some example typenames include `memory` (which will be fully-qualified as `kubernetes.io/memory`), and `myveryown.org/shiny-new-resource`.
+Some example typenames include `memory` (which will be fully-qualified as `lmktfy.io/memory`), and `myveryown.org/shiny-new-resource`.
 
-For future reference, note that some resources, such as CPU and network bandwidth, are _compressible_, which means that their usage can potentially be throttled in a relatively benign manner. All other resources are _incompressible_, which means that any attempt to throttle them is likely to cause grief.  This distinction will be important if a Kubernetes implementation supports over-committing of resources.
+For future reference, note that some resources, such as CPU and network bandwidth, are _compressible_, which means that their usage can potentially be throttled in a relatively benign manner. All other resources are _incompressible_, which means that any attempt to throttle them is likely to cause grief.  This distinction will be important if a LMKTFY implementation supports over-committing of resources.
 
 ### Resource quantities
 
-Initially, all Kubernetes resource types are _quantitative_, and have an associated _unit_ for quantities of the associated resource (e.g., bytes for memory, bytes per seconds for bandwidth, instances for software licences). The units will always be a resource type's natural base units (e.g., bytes, not MB), to avoid confusion between binary and decimal multipliers and the underlying unit multiplier (e.g., is memory measured in MiB, MB, or GB?).  
+Initially, all LMKTFY resource types are _quantitative_, and have an associated _unit_ for quantities of the associated resource (e.g., bytes for memory, bytes per seconds for bandwidth, instances for software licences). The units will always be a resource type's natural base units (e.g., bytes, not MB), to avoid confusion between binary and decimal multipliers and the underlying unit multiplier (e.g., is memory measured in MiB, MB, or GB?).  
 
 Resource quantities can be added and subtracted: for example, a node has a fixed quantity of each resource type that can be allocated to pods/containers; once such an allocation has been made, the allocated resources cannot be made available to other pods/containers without over-committing the resources.
 
@@ -41,13 +41,13 @@ To make life easier for people, quantities can be represented externally as unad
   * Case is significant: "m" and "M" are not the same, so "k" is not a valid SI suffix. There are no power-of-two equivalents for SI suffixes that represent multipliers less than 1.
   * These conventions only apply to resource quantities, not arbitrary values.
 
-Internally (i.e., everywhere else), Kubernetes will represent resource quantities as integers so it can avoid problems with rounding errors, and will not use strings to represent numeric values. To achieve this, quantities that naturally have fractional parts (e.g., CPU seconds/second) will be scaled to integral numbers of milli-units (e.g., milli-CPUs) as soon as they are read in.  Internal APIs, data structures, and protobufs will use these scaled integer units.  Raw measurement data such as usage may still need to be tracked and calculated using floating point values, but internally they should be rescaled to avoid some values being in milli-units and some not.
+Internally (i.e., everywhere else), LMKTFY will represent resource quantities as integers so it can avoid problems with rounding errors, and will not use strings to represent numeric values. To achieve this, quantities that naturally have fractional parts (e.g., CPU seconds/second) will be scaled to integral numbers of milli-units (e.g., milli-CPUs) as soon as they are read in.  Internal APIs, data structures, and protobufs will use these scaled integer units.  Raw measurement data such as usage may still need to be tracked and calculated using floating point values, but internally they should be rescaled to avoid some values being in milli-units and some not.
   * Note that reading in a resource quantity and writing it out again may change the way its values are represented, and truncate precision (e.g., 1.0001 may become 1.000), so comparison and difference operations (e.g., by an updater) must be done on the internal representations.
-  * Avoiding milli-units in external representations has advantages for people who will use Kubernetes, but runs the risk of developers forgetting to rescale or accidentally using floating-point representations. That seems like the right choice. We will try to reduce the risk by providing libraries that automatically do the quantization for JSON/YAML inputs.
+  * Avoiding milli-units in external representations has advantages for people who will use LMKTFY, but runs the risk of developers forgetting to rescale or accidentally using floating-point representations. That seems like the right choice. We will try to reduce the risk by providing libraries that automatically do the quantization for JSON/YAML inputs.
 
 ### Resource specifications
 
-Both users and a number of system components, such as schedulers, (horizontal) auto-scalers, (vertical) auto-sizers, load balancers, and worker-pool managers need to reason about resource requirements of workloads, resource capacities of nodes, and resource usage. Kubernetes divides specifications of *desired state*, aka the Spec, and representations of *current state*, aka the Status. Resource requirements and total node capacity fall into the specification category, while resource usage, characterizations derived from usage (e.g., maximum usage, histograms), and other resource demand signals (e.g., CPU load) clearly fall into the status category and are discussed in the Appendix for now.
+Both users and a number of system components, such as schedulers, (horizontal) auto-scalers, (vertical) auto-sizers, load balancers, and worker-pool managers need to reason about resource requirements of workloads, resource capacities of nodes, and resource usage. LMKTFY divides specifications of *desired state*, aka the Spec, and representations of *current state*, aka the Status. Resource requirements and total node capacity fall into the specification category, while resource usage, characterizations derived from usage (e.g., maximum usage, histograms), and other resource demand signals (e.g., CPU load) clearly fall into the status category and are discussed in the Appendix for now.
 
 Resource requirements for a container or pod should have the following form:
 ```
@@ -78,29 +78,29 @@ Where:
 
   * If multiple pods are running on the same node and attempting to use more resources than they have requested, the result is implementation-defined. For example: unallocated or unused resources might be spread equally across claimants, or the assignment might be weighted by the size of the original request, or as a function of limits, or priority, or the phase of the moon, perhaps modulated by the direction of the tide. Thus, although it's not mandatory to provide a _request_, it's probably a good idea.  (Note that the _request_ could be filled in by an automated system that is observing actual usage and/or historical data.)
 
-  * Internally, the Kubernetes master can decide the defaulting behavior and the kubelet implementation may expected an absolute specification.  For example, if the master decided that "the default is unbounded" it would pass 2^64 to the kubelet.
+  * Internally, the LMKTFY master can decide the defaulting behavior and the lmktfylet implementation may expected an absolute specification.  For example, if the master decided that "the default is unbounded" it would pass 2^64 to the lmktfylet.
 
 
 
-## Kubernetes-defined resource types
-The following resource types are predefined ("reserved") by Kubernetes in the `kubernetes.io` namespace, and so cannot be used for user-defined resources.  Note that the syntax of all resource types in the resource spec is deliberately similar, but some resource types (e.g., CPU) may receive significantly more support than simply tracking quantities in the schedulers and/or the Kubelet.
+## LMKTFY-defined resource types
+The following resource types are predefined ("reserved") by LMKTFY in the `lmktfy.io` namespace, and so cannot be used for user-defined resources.  Note that the syntax of all resource types in the resource spec is deliberately similar, but some resource types (e.g., CPU) may receive significantly more support than simply tracking quantities in the schedulers and/or the LMKTFYlet.
 
 ### Processor cycles
-  * Name: `cpu` (or `kubernetes.io/cpu`)
-  * Units: Kubernetes Compute Unit seconds/second (i.e., CPU cores normalized to a canonical "Kubernetes CPU")
+  * Name: `cpu` (or `lmktfy.io/cpu`)
+  * Units: LMKTFY Compute Unit seconds/second (i.e., CPU cores normalized to a canonical "LMKTFY CPU")
   * Internal representation: milli-KCUs
   * Compressible? yes
-  * Qualities: this is a placeholder for the kind of thing that may be supported in the future -- see [#147](https://github.com/GoogleCloudPlatform/kubernetes/issues/147)
+  * Qualities: this is a placeholder for the kind of thing that may be supported in the future -- see [#147](https://github.com/GoogleCloudPlatform/lmktfy/issues/147)
     * [future] `schedulingLatency`: as per lmctfy
-    * [future] `cpuConversionFactor`: property of a node: the speed of a CPU core on the node's processor divided by the speed of the canonical Kubernetes CPU (a floating point value; default = 1.0).
+    * [future] `cpuConversionFactor`: property of a node: the speed of a CPU core on the node's processor divided by the speed of the canonical LMKTFY CPU (a floating point value; default = 1.0).
 
-To reduce performance portability problems for pods, and to avoid worse-case provisioning behavior, the units of CPU will be normalized to a canonical "Kubernetes Compute Unit" (KCU, pronounced ˈko͝oko͞o), which will roughly be equivalent to a single CPU hyperthreaded core for some recent x86 processor. The normalization may be implementation-defined, although some reasonable defaults will be provided in the open-source Kubernetes code.
+To reduce performance portability problems for pods, and to avoid worse-case provisioning behavior, the units of CPU will be normalized to a canonical "LMKTFY Compute Unit" (KCU, pronounced ˈko͝oko͞o), which will roughly be equivalent to a single CPU hyperthreaded core for some recent x86 processor. The normalization may be implementation-defined, although some reasonable defaults will be provided in the open-source LMKTFY code.
 
 Note that requesting 2 KCU won't guarantee that precisely 2 physical cores will be allocated - control of aspects like this will be handled by resource _qualities_ (a future feature).
 
 
 ### Memory
-  * Name: `memory` (or `kubernetes.io/memory`)
+  * Name: `memory` (or `lmktfy.io/memory`)
   * Units: bytes
   * Compressible? no (at least initially)
 
@@ -114,23 +114,23 @@ rather than decimal ones: "64MiB" rather than "64MB".
 A resource type may have an associated read-only ResourceType structure, that contains metadata about the type.  For example:
 ```
 resourceTypes: [
-  "kubernetes.io/memory": [
+  "lmktfy.io/memory": [
     isCompressible: false, ... 
   ]
-  "kubernetes.io/cpu": [
+  "lmktfy.io/cpu": [
     isCompressible: true, internalScaleExponent: 3, ...
   ]
-  "kubernetes.io/disk-space": [ ... }
+  "lmktfy.io/disk-space": [ ... }
 ]
 ```
 
-Kubernetes will provide ResourceType metadata for its predefined types.  If no resource metadata can be found for a resource type, Kubernetes will assume that it is a quantified, incompressible resource that is not specified in milli-units, and has no default value.
+LMKTFY will provide ResourceType metadata for its predefined types.  If no resource metadata can be found for a resource type, LMKTFY will assume that it is a quantified, incompressible resource that is not specified in milli-units, and has no default value.
 
 The defined properties are as follows:
 
 | field name | type | contents |
 | ---------- | ---- | -------- |
-| name | string, required | the typename, as a fully-qualified string (e.g., `kubernetes.io/cpu`) |
+| name | string, required | the typename, as a fully-qualified string (e.g., `lmktfy.io/cpu`) |
 | internalScaleExponent | int, default=0 | external values are multiplied by 10 to this power for internal storage (e.g., 3 for milli-units) |
 | units | string, required | format: `unit* [per unit+]` (e.g., `second`, `byte per second`). An empty unit field means "dimensionless". |
 | isCompressible | bool, default=false | true if the resource type is compressible |
@@ -178,24 +178,24 @@ and predicted
 ## Future resource types
 
 ### _[future] Network bandwidth_
-  * Name: "network-bandwidth" (or `kubernetes.io/network-bandwidth`)
+  * Name: "network-bandwidth" (or `lmktfy.io/network-bandwidth`)
   * Units: bytes per second
   * Compressible? yes
 
 ### _[future] Network operations_
-  * Name: "network-iops" (or `kubernetes.io/network-iops`)
+  * Name: "network-iops" (or `lmktfy.io/network-iops`)
   * Units: operations (messages) per second
   * Compressible? yes
 
 ### _[future] Storage space_
-  * Name: "storage-space" (or `kubernetes.io/storage-space`)
+  * Name: "storage-space" (or `lmktfy.io/storage-space`)
   * Units: bytes
   * Compressible? no
 
 The amount of secondary storage space available to a container.  The main target is local disk drives and SSDs, although this could also be used to qualify remotely-mounted volumes.   Specifying whether a resource is a raw disk, an SSD, a disk array, or a file system fronting any of these, is left for future work.
 
 ### _[future] Storage time_
-  * Name: storage-time (or `kubernetes.io/storage-time`)
+  * Name: storage-time (or `lmktfy.io/storage-time`)
   * Units: seconds per second of disk time
   * Internal representation: milli-units
   * Compressible? yes
@@ -203,6 +203,6 @@ The amount of secondary storage space available to a container.  The main target
 This is the amount of time a container spends accessing disk, including actuator and transfer time.  A standard disk drive provides 1.0 diskTime seconds per second.
 
 ### _[future] Storage operations_
-  * Name: "storage-iops" (or `kubernetes.io/storage-iops`)
+  * Name: "storage-iops" (or `lmktfy.io/storage-iops`)
   * Units: operations per second
   * Compressible? yes

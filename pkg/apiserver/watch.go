@@ -22,10 +22,10 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/httplog"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
-	watchjson "github.com/GoogleCloudPlatform/kubernetes/pkg/watch/json"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/httplog"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/runtime"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/watch"
+	watchjson "github.com/GoogleCloudPlatform/lmktfy/pkg/watch/json"
 
 	"github.com/emicklei/go-restful"
 	"github.com/golang/glog"

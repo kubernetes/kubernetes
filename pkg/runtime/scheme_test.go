@@ -20,8 +20,8 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/conversion"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/conversion"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/runtime"
 )
 
 type TypeMeta struct {

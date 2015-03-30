@@ -24,13 +24,13 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/master"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/version"
-	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/admission/admit"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/apiserver"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/client"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/labels"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/master"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/version"
+	"github.com/GoogleCloudPlatform/lmktfy/plugin/pkg/admission/admit"
 )
 
 func init() {
@@ -51,7 +51,7 @@ func TestClient(t *testing.T) {
 
 	m = master.New(&master.Config{
 		EtcdHelper:        helper,
-		KubeletClient:     client.FakeKubeletClient{},
+		LMKTFYletClient:     client.FakeLMKTFYletClient{},
 		EnableLogsSupport: false,
 		EnableProfiling:   true,
 		EnableUISupport:   false,

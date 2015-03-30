@@ -16,7 +16,7 @@ The bucket name to use, and the region where the bucket should be created, or wh
 If not specified, defaults to AWS_S3_REGION us-east-1, because buckets are globally named and you probably
 want to share a bucket across all regions; us-east-1 is a sensible (relatively arbitrary) default.
 
-AWS_S3_BUCKET will default to a uniquely generated name, so you won't collide with other kubernetes users.
+AWS_S3_BUCKET will default to a uniquely generated name, so you won't collide with other lmktfy users.
 (Currently this uses the hash of your AWS Access key to produce a per-user unique value).
 
 It is not a bad idea to set AWS_S3_BUCKET to something more human friendly.

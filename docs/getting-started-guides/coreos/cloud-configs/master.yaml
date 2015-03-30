@@ -25,7 +25,7 @@ coreos:
 
         [Service]
         ExecStartPre=-/usr/bin/mkdir -p /opt/bin
-        ExecStartPre=/usr/bin/wget -N -P /opt/bin https://storage.googleapis.com/k8s/setup-network-environment 
+        ExecStartPre=/usr/bin/wget -N -P /opt/bin https://storage.googleapis.com/lmktfy/setup-network-environment 
         ExecStartPre=/usr/bin/chmod +x /opt/bin/setup-network-environment
         ExecStart=/opt/bin/setup-network-environment
         RemainAfterExit=yes
@@ -118,20 +118,20 @@ coreos:
             After=docker-cache.service flanneld.service
             [Service]
             Environment=DOCKER_OPTS='--registry-mirror=http://$private_ipv4:5000'
-    - name: kube-apiserver.service
+    - name: lmktfy-apiserver.service
       command: start
       content: |
         [Unit]
-        Description=Kubernetes API Server
-        Documentation=https://github.com/GoogleCloudPlatform/kubernetes
+        Description=LMKTFY API Server
+        Documentation=https://github.com/GoogleCloudPlatform/lmktfy
         Requires=etcd.service
         After=etcd.service
 
         [Service]
         ExecStartPre=-/usr/bin/mkdir -p /opt/bin
-        ExecStartPre=/usr/bin/wget -N -P /opt/bin https://storage.googleapis.com/kubernetes-release/release/v0.11.0/bin/linux/amd64/kube-apiserver
-        ExecStartPre=/usr/bin/chmod +x /opt/bin/kube-apiserver
-        ExecStart=/opt/bin/kube-apiserver \
+        ExecStartPre=/usr/bin/wget -N -P /opt/bin https://storage.googleapis.com/lmktfy-release/release/v0.11.0/bin/linux/amd64/lmktfy-apiserver
+        ExecStartPre=/usr/bin/chmod +x /opt/bin/lmktfy-apiserver
+        ExecStart=/opt/bin/lmktfy-apiserver \
         --address=0.0.0.0 \
         --port=8080 \
         --portal_net=10.100.0.0/16 \
@@ -140,53 +140,53 @@ coreos:
         --logtostderr=true
         Restart=always
         RestartSec=10
-    - name: kube-controller-manager.service
+    - name: lmktfy-controller-manager.service
       command: start
       content: |
         [Unit]
-        Description=Kubernetes Controller Manager
-        Documentation=https://github.com/GoogleCloudPlatform/kubernetes
-        Requires=kube-apiserver.service
-        After=kube-apiserver.service
+        Description=LMKTFY Controller Manager
+        Documentation=https://github.com/GoogleCloudPlatform/lmktfy
+        Requires=lmktfy-apiserver.service
+        After=lmktfy-apiserver.service
 
         [Service]
-        ExecStartPre=/usr/bin/wget -N -P /opt/bin https://storage.googleapis.com/kubernetes-release/release/v0.11.0/bin/linux/amd64/kube-controller-manager
-        ExecStartPre=/usr/bin/chmod +x /opt/bin/kube-controller-manager
-        ExecStart=/opt/bin/kube-controller-manager \
+        ExecStartPre=/usr/bin/wget -N -P /opt/bin https://storage.googleapis.com/lmktfy-release/release/v0.11.0/bin/linux/amd64/lmktfy-controller-manager
+        ExecStartPre=/usr/bin/chmod +x /opt/bin/lmktfy-controller-manager
+        ExecStart=/opt/bin/lmktfy-controller-manager \
         --master=127.0.0.1:8080 \
         --logtostderr=true
         Restart=always
         RestartSec=10
-    - name: kube-scheduler.service
+    - name: lmktfy-scheduler.service
       command: start
       content: |
         [Unit]
-        Description=Kubernetes Scheduler
-        Documentation=https://github.com/GoogleCloudPlatform/kubernetes
-        Requires=kube-apiserver.service
-        After=kube-apiserver.service
+        Description=LMKTFY Scheduler
+        Documentation=https://github.com/GoogleCloudPlatform/lmktfy
+        Requires=lmktfy-apiserver.service
+        After=lmktfy-apiserver.service
 
         [Service]
-        ExecStartPre=/usr/bin/wget -N -P /opt/bin https://storage.googleapis.com/kubernetes-release/release/v0.11.0/bin/linux/amd64/kube-scheduler
-        ExecStartPre=/usr/bin/chmod +x /opt/bin/kube-scheduler
-        ExecStart=/opt/bin/kube-scheduler --master=127.0.0.1:8080
+        ExecStartPre=/usr/bin/wget -N -P /opt/bin https://storage.googleapis.com/lmktfy-release/release/v0.11.0/bin/linux/amd64/lmktfy-scheduler
+        ExecStartPre=/usr/bin/chmod +x /opt/bin/lmktfy-scheduler
+        ExecStart=/opt/bin/lmktfy-scheduler --master=127.0.0.1:8080
         Restart=always
         RestartSec=10
-    - name: kube-register.service
+    - name: lmktfy-register.service
       command: start
       content: |
         [Unit]
-        Description=Kubernetes Registration Service
-        Documentation=https://github.com/kelseyhightower/kube-register
-        Requires=kube-apiserver.service
-        After=kube-apiserver.service
+        Description=LMKTFY Registration Service
+        Documentation=https://github.com/kelseyhightower/lmktfy-register
+        Requires=lmktfy-apiserver.service
+        After=lmktfy-apiserver.service
         Requires=fleet.service
         After=fleet.service
 
         [Service]
-        ExecStartPre=/usr/bin/wget -N -P /opt/bin https://storage.googleapis.com/k8s/kube-register
-        ExecStartPre=/usr/bin/chmod +x /opt/bin/kube-register
-        ExecStart=/opt/bin/kube-register \
+        ExecStartPre=/usr/bin/wget -N -P /opt/bin https://storage.googleapis.com/lmktfy/lmktfy-register
+        ExecStartPre=/usr/bin/chmod +x /opt/bin/lmktfy-register
+        ExecStart=/opt/bin/lmktfy-register \
         --metadata=role=node \
         --fleet-endpoint=unix:///var/run/fleet.sock \
         --api-endpoint=http://127.0.0.1:8080

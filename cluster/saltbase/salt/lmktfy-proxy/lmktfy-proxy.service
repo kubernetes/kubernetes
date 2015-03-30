@@ -1,0 +1,12 @@
+[Unit]
+Description=LMKTFYrnetes LMKTFY-Proxy Server
+Documentation=https://github.com/GoogleCloudPlatform/lmktfyrnetes
+
+[Service]
+EnvironmentFile=/etc/sysconfig/lmktfy-proxy
+ExecStart=/usr/local/bin/lmktfy-proxy "$DAEMON_ARGS"
+Restart=on-failure
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target

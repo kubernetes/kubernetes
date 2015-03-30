@@ -19,8 +19,8 @@ package record
 import (
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/util"
 )
 
 func TestAddOrUpdateEventNoExisting(t *testing.T) {
@@ -37,7 +37,7 @@ func TestAddOrUpdateEventNoExisting(t *testing.T) {
 			APIVersion: "v1beta1",
 		},
 		Source: api.EventSource{
-			Component: "kubelet",
+			Component: "lmktfylet",
 			Host:      "kublet.node1",
 		},
 		Count:          1,
@@ -70,7 +70,7 @@ func TestAddOrUpdateEventExisting(t *testing.T) {
 			APIVersion: "v1beta2",
 		},
 		Source: api.EventSource{
-			Component: "kubelet",
+			Component: "lmktfylet",
 			Host:      "kublet.node2",
 		},
 		Count:          1,
@@ -91,7 +91,7 @@ func TestAddOrUpdateEventExisting(t *testing.T) {
 			APIVersion: "v1beta2",
 		},
 		Source: api.EventSource{
-			Component: "kubelet",
+			Component: "lmktfylet",
 			Host:      "kublet.node2",
 		},
 		Count:          3,
@@ -122,7 +122,7 @@ func TestGetEventNoExisting(t *testing.T) {
 			APIVersion: "v1beta3",
 		},
 		Source: api.EventSource{
-			Component: "kubelet",
+			Component: "lmktfylet",
 			Host:      "kublet.node3",
 		},
 		Count: 1,
@@ -151,7 +151,7 @@ func TestGetEventExisting(t *testing.T) {
 			APIVersion: "v1beta1",
 		},
 		Source: api.EventSource{
-			Component: "kubelet",
+			Component: "lmktfylet",
 			Host:      "kublet.node4",
 		},
 		Count:          1,

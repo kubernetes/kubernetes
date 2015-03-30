@@ -14,8 +14,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# kubernetes-e2e-{gce, gke, gke-ci} jobs: This script is triggered by
-# the kubernetes-build job, or runs every half hour. We abort this job
+# lmktfy-e2e-{gce, gke, gke-ci} jobs: This script is triggered by
+# the lmktfy-build job, or runs every half hour. We abort this job
 # if it takes more than 75m. As of initial commit, it typically runs
 # in about half an hour.
 #
@@ -37,7 +37,7 @@ else
     export HOME=${WORKSPACE} # Nothing should want Jenkins $HOME
 fi
 
-# Unlike the kubernetes-build script, we expect some environment
+# Unlike the lmktfy-build script, we expect some environment
 # variables to be set. We echo these immediately and presume "set -o
 # nounset" will force the caller to set them: (The first several are
 # Jenkins variables.)
@@ -45,7 +45,7 @@ fi
 echo "JOB_NAME: ${JOB_NAME}"
 echo "BUILD_NUMBER: ${BUILD_NUMBER}"
 echo "WORKSPACE: ${WORKSPACE}"
-echo "KUBERNETES_PROVIDER: ${KUBERNETES_PROVIDER}" # Cloud provider
+echo "LMKTFYRNETES_PROVIDER: ${LMKTFYRNETES_PROVIDER}" # Cloud provider
 echo "E2E_CLUSTER_NAME: ${E2E_CLUSTER_NAME}"       # Name of the cluster (e.g. "e2e-test-jenkins")
 echo "E2E_NETWORK: ${E2E_NETWORK}"                 # Name of the network (e.g. "e2e")
 echo "E2E_ZONE: ${E2E_ZONE}"                       # Name of the GCE zone (e.g. "us-central1-f")
@@ -55,25 +55,25 @@ echo "--------------------------------------------------------------------------
 
 
 # AWS variables
-export KUBE_AWS_INSTANCE_PREFIX=${E2E_CLUSTER_NAME}
-export KUBE_AWS_ZONE=${E2E_ZONE}
+export LMKTFY_AWS_INSTANCE_PREFIX=${E2E_CLUSTER_NAME}
+export LMKTFY_AWS_ZONE=${E2E_ZONE}
 
 # GCE variables
 export INSTANCE_PREFIX=${E2E_CLUSTER_NAME}
-export KUBE_GCE_ZONE=${E2E_ZONE}
-export KUBE_GCE_NETWORK=${E2E_NETWORK}
+export LMKTFY_GCE_ZONE=${E2E_ZONE}
+export LMKTFY_GCE_NETWORK=${E2E_NETWORK}
 
 # GKE variables
 export CLUSTER_NAME=${E2E_CLUSTER_NAME}
 export ZONE=${E2E_ZONE}
-export KUBE_GKE_NETWORK=${E2E_NETWORK}
+export LMKTFY_GKE_NETWORK=${E2E_NETWORK}
 
 export PATH=${PATH}:/usr/local/go/bin
-export KUBE_SKIP_CONFIRMATIONS=y
+export LMKTFY_SKIP_CONFIRMATIONS=y
 
-if [[ ${KUBE_RUN_FROM_OUTPUT:-} =~ ^[yY]$ ]]; then
-    echo "Found KUBE_RUN_FROM_OUTPUT=y; will use binaries from _output"
-    cp _output/release-tars/kubernetes*.tar.gz .
+if [[ ${LMKTFY_RUN_FROM_OUTPUT:-} =~ ^[yY]$ ]]; then
+    echo "Found LMKTFY_RUN_FROM_OUTPUT=y; will use binaries from _output"
+    cp _output/release-tars/lmktfy*.tar.gz .
 else
     echo "Pulling binaries from GCS"
     if [[ $(find . | wc -l) != 1 ]]; then
@@ -83,20 +83,20 @@ else
 
     # sudo gcloud components update -q
 
-    GITHASH=$(gsutil cat gs://kubernetes-release/ci/latest.txt)
-    gsutil -m cp gs://kubernetes-release/ci/${GITHASH}/kubernetes.tar.gz gs://kubernetes-release/ci/${GITHASH}/kubernetes-test.tar.gz .
+    GITHASH=$(gsutil cat gs://lmktfy-release/ci/latest.txt)
+    gsutil -m cp gs://lmktfy-release/ci/${GITHASH}/lmktfy.tar.gz gs://lmktfy-release/ci/${GITHASH}/lmktfy-test.tar.gz .
 fi
 
-md5sum kubernetes*.tar.gz
-tar -xzf kubernetes.tar.gz
-tar -xzf kubernetes-test.tar.gz
-cd kubernetes
+md5sum lmktfy*.tar.gz
+tar -xzf lmktfy.tar.gz
+tar -xzf lmktfy-test.tar.gz
+cd lmktfy
 
 # Set by GKE-CI to change the CLUSTER_API_VERSION to the git version
 if [[ ! -z ${E2E_SET_CLUSTER_API_VERSION:-} ]]; then
     export CLUSTER_API_VERSION=$(echo ${GITHASH} | cut -c 2-)
 elif [[ ! -z ${E2E_USE_LATEST_RELEASE_VERSION:-} ]]; then
-    release=$(gsutil cat gs://kubernetes-release/release/latest.txt | cut -c 2-)
+    release=$(gsutil cat gs://lmktfy-release/release/latest.txt | cut -c 2-)
     export CLUSTER_API_VERSION=${release}
 fi
 

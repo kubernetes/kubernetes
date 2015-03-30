@@ -1,4 +1,4 @@
-# Container Command Execution & Port Forwarding in Kubernetes
+# Container Command Execution & Port Forwarding in LMKTFY
 
 ## Abstract
 
@@ -11,9 +11,9 @@ This describes an approach for providing support for:
 
 There are several related issues/PRs:
 
-- [Support attach](https://github.com/GoogleCloudPlatform/kubernetes/issues/1521)
-- [Real container ssh](https://github.com/GoogleCloudPlatform/kubernetes/issues/1513)
-- [Provide easy debug network access to services](https://github.com/GoogleCloudPlatform/kubernetes/issues/1863)
+- [Support attach](https://github.com/GoogleCloudPlatform/lmktfy/issues/1521)
+- [Real container ssh](https://github.com/GoogleCloudPlatform/lmktfy/issues/1513)
+- [Provide easy debug network access to services](https://github.com/GoogleCloudPlatform/lmktfy/issues/1863)
 - [OpenShift container command execution proposal](https://github.com/openshift/origin/pull/576)
 
 ## Motivation
@@ -21,7 +21,7 @@ There are several related issues/PRs:
 Users and administrators are accustomed to being able to access their systems
 via SSH to run remote commands, get shell access, and do port forwarding.
 
-Supporting SSH to containers in Kubernetes is a difficult task. You must
+Supporting SSH to containers in LMKTFY is a difficult task. You must
 specify a "user" and a hostname to make an SSH connection, and `sshd` requires
 real users (resolvable by NSS and PAM). Because a container belongs to a pod,
 and the pod belongs to a namespace, you need to specify namespace/pod/container
@@ -49,25 +49,25 @@ won't be able to work with this mechanism, unless adapters can be written.
 
 ## Use Cases
 
-- As a user of a Kubernetes cluster, I want to run arbitrary commands in a container, attaching my local stdin/stdout/stderr to the container
-- As a user of a Kubernetes cluster, I want to be able to connect to local ports on my computer and have them forwarded to ports in the container
+- As a user of a LMKTFY cluster, I want to run arbitrary commands in a container, attaching my local stdin/stdout/stderr to the container
+- As a user of a LMKTFY cluster, I want to be able to connect to local ports on my computer and have them forwarded to ports in the container
 
 ## Process Flow
 
 ### Remote Command Execution Flow
-1. The client connects to the Kubernetes Master to initiate a remote command execution
+1. The client connects to the LMKTFY Master to initiate a remote command execution
 request
-2. The Master proxies the request to the Kubelet where the container lives
-3. The Kubelet executes nsenter + the requested command and streams stdin/stdout/stderr back and forth between the client and the container
+2. The Master proxies the request to the LMKTFYlet where the container lives
+3. The LMKTFYlet executes nsenter + the requested command and streams stdin/stdout/stderr back and forth between the client and the container
 
 ### Port Forwarding Flow
-1. The client connects to the Kubernetes Master to initiate a remote command execution
+1. The client connects to the LMKTFY Master to initiate a remote command execution
 request
-2. The Master proxies the request to the Kubelet where the container lives
+2. The Master proxies the request to the LMKTFYlet where the container lives
 3. The client listens on each specified local port, awaiting local connections
 4. The client connects to one of the local listening ports
-4. The client notifies the Kubelet of the new connection
-5. The Kubelet executes nsenter + socat and streams data back and forth between the client and the port in the container
+4. The client notifies the LMKTFYlet of the new connection
+5. The LMKTFYlet executes nsenter + socat and streams data back and forth between the client and the port in the container
 
 
 ## Design Considerations
@@ -80,7 +80,7 @@ we will switch to that.
 
 ### Master as First Level Proxy
 
-Clients should not be allowed to communicate directly with the Kubelet for
+Clients should not be allowed to communicate directly with the LMKTFYlet for
 security reasons. Therefore, the Master is currently the only suggested entry
 point to be used for remote command execution and port forwarding. This is not
 necessarily desirable, as it means that all remote command execution and port
@@ -92,12 +92,12 @@ the Master, and then use that token to initiate a remote command execution or
 port forwarding request with a load balanced proxy service dedicated to this
 functionality. This would keep the streaming traffic out of the Master.
 
-### Kubelet as Backend Proxy
+### LMKTFYlet as Backend Proxy
 
-The kubelet is currently responsible for handling remote command execution and
+The lmktfylet is currently responsible for handling remote command execution and
 port forwarding requests. Just like with the Master described above, this means
 that all remote command execution and port forwarding streaming traffic must
-travel through the Kubelet, which could result in a degraded ability to service
+travel through the LMKTFYlet, which could result in a degraded ability to service
 other requests.
 
 In the future, it might make more sense to use a separate service on the node.

@@ -1,0 +1,13 @@
+[Unit]
+Description=LMKTFYrnetes LMKTFYlet Server
+Documentation=https://github.com/GoogleCloudPlatform/lmktfyrnetes
+After=docker.service
+Requires=docker.service
+
+[Service]
+EnvironmentFile=/etc/sysconfig/lmktfylet
+ExecStart=/usr/local/bin/lmktfylet "$DAEMON_ARGS"
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

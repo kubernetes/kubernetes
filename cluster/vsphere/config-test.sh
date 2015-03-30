@@ -15,7 +15,7 @@
 # limitations under the License.
 
 NUM_MINIONS=2
-DISK=./kube/kube.vmdk
+DISK=./lmktfy/lmktfy.vmdk
 GUEST_ID=debian7_64Guest
 
 INSTANCE_PREFIX="e2e-test-${USER}"

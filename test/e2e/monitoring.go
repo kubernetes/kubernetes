@@ -22,9 +22,9 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/client"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/labels"
 	influxdb "github.com/influxdb/influxdb/client"
 
 	. "github.com/onsi/ginkgo"
@@ -51,7 +51,7 @@ var _ = Describe("Monitoring", func() {
 
 const (
 	influxdbService      = "monitoring-influxdb"
-	influxdbDatabaseName = "k8s"
+	influxdbDatabaseName = "lmktfy"
 	influxdbUser         = "root"
 	influxdbPW           = "root"
 	podlistQuery         = "select distinct(pod_id) from /cpu.*/"
@@ -203,7 +203,7 @@ func testMonitoringUsingHeapsterInfluxdb(c *client.Client) {
 	expectNoError(err)
 	expectNoError(expectedServicesExist(c))
 	// TODO: Wait for all pods and services to be running.
-	kubeMasterHttpClient, ok := c.Client.(*http.Client)
+	lmktfyMasterHttpClient, ok := c.Client.(*http.Client)
 	if !ok {
 		Failf("failed to get master http client")
 	}
@@ -214,7 +214,7 @@ func testMonitoringUsingHeapsterInfluxdb(c *client.Client) {
 		Username:   influxdbUser,
 		Password:   influxdbPW,
 		Database:   influxdbDatabaseName,
-		HttpClient: kubeMasterHttpClient,
+		HttpClient: lmktfyMasterHttpClient,
 		IsSecure:   true,
 	}
 	influxdbClient, err := influxdb.NewClient(config)

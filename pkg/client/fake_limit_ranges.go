@@ -17,10 +17,10 @@ limitations under the License.
 package client
 
 import (
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/fields"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/labels"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/watch"
 )
 
 // FakeLimitRanges implements PodsInterface. Meant to be embedded into a struct to get a default

@@ -7,5 +7,5 @@
 #
 highstate_minions:
   cmd.state.highstate:
-    - tgt: 'roles:kubernetes-pool'
+    - tgt: 'roles:lmktfyrnetes-pool'
     - expr_form: grain

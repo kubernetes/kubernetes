@@ -1,6 +1,6 @@
-# Identifiers and Names in Kubernetes
+# Identifiers and Names in LMKTFY
 
-A summarization of the goals and recommendations for identifiers in Kubernetes.  Described in [GitHub issue #199](https://github.com/GoogleCloudPlatform/kubernetes/issues/199).
+A summarization of the goals and recommendations for identifiers in LMKTFY.  Described in [GitHub issue #199](https://github.com/GoogleCloudPlatform/lmktfy/issues/199).
 
 
 ## Definitions
@@ -39,8 +39,8 @@ Name
 1. When an object is created via an API, a Name string (a DNS_SUBDOMAIN) must be specified.  Name must be non-empty and unique within the apiserver.  This enables idempotent and space-unique creation operations.  Parts of the system (e.g. replication controller) may join strings (e.g. a base name and a random suffix) to create a unique Name.  For situations where generating a name is impractical, some or all objects may support a param to auto-generate a name.  Generating random names will defeat idempotency.
    * Examples: "guestbook.user", "backend-x4eb1"
 
-2. When an object is created via an api, a Namespace string (a DNS_SUBDOMAIN? format TBD via #1114) may be specified.  Depending on the API receiver, namespaces might be validated (e.g. apiserver might ensure that the namespace actually exists).  If a namespace is not specified, one will be assigned by the API receiver.  This assignment policy might vary across API receivers (e.g. apiserver might have a default, kubelet might generate something semi-random).
-   * Example: "api.k8s.example.com"
+2. When an object is created via an api, a Namespace string (a DNS_SUBDOMAIN? format TBD via #1114) may be specified.  Depending on the API receiver, namespaces might be validated (e.g. apiserver might ensure that the namespace actually exists).  If a namespace is not specified, one will be assigned by the API receiver.  This assignment policy might vary across API receivers (e.g. apiserver might have a default, lmktfylet might generate something semi-random).
+   * Example: "api.lmktfy.example.com"
 
 3. Upon acceptance of an object via an API, the object is assigned a UID (a UUID).  UID must be non-empty and unique across space and time.
    * Example: "01234567-89ab-cdef-0123-456789abcdef"
@@ -65,11 +65,11 @@ objectives.
    1. A new UID is assigned.
 
 4. The pod is bound to a node.
-   1. The kubelet on the node is passed the pod's UID, Namespace, and Name.
+   1. The lmktfylet on the node is passed the pod's UID, Namespace, and Name.
 
-5. Kubelet validates the input.
+5. LMKTFYlet validates the input.
 
-6. Kubelet runs the pod.
+6. LMKTFYlet runs the pod.
    1. Each container is started up with enough metadata to distinguish the pod from whence it came.
    2. Each attempt to run a container is assigned a UID (a string) that is unique across time.
       * This may correspond to Docker's container ID.
@@ -78,13 +78,13 @@ objectives.
 
 1. A config file is stored on the node, containing a pod with UID="", Namespace="", and Name="cadvisor".
 
-2. Kubelet validates the input.
-   1. Since UID is not provided, kubelet generates one.
-   2. Since Namespace is not provided, kubelet generates one.
+2. LMKTFYlet validates the input.
+   1. Since UID is not provided, lmktfylet generates one.
+   2. Since Namespace is not provided, lmktfylet generates one.
       1. The generated namespace should be deterministic and cluster-unique for the source, such as a hash of the hostname and file path.
          * E.g. Namespace="file-f4231812554558a718a01ca942782d81"
 
-3. Kubelet runs the pod.
+3. LMKTFYlet runs the pod.
    1. Each container is started up with enough metadata to distinguish the pod from whence it came.
    2. Each attempt to run a container is assigned a UID (a string) that is unique across time.
       1. This may correspond to Docker's container ID.

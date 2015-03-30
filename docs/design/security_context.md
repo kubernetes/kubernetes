@@ -7,7 +7,7 @@ A security context is a set of constraints that are applied to a container in or
 
 ## Background
 
-The problem of securing containers in Kubernetes has come up [before](https://github.com/GoogleCloudPlatform/kubernetes/issues/398) and the potential problems with container security are [well known](http://opensource.com/business/14/7/docker-security-selinux). Although it is not possible to completely isolate Docker containers from their hosts, new features like [user namespaces](https://github.com/docker/libcontainer/pull/304) make it possible to greatly reduce the attack surface.
+The problem of securing containers in LMKTFY has come up [before](https://github.com/GoogleCloudPlatform/lmktfy/issues/398) and the potential problems with container security are [well known](http://opensource.com/business/14/7/docker-security-selinux). Although it is not possible to completely isolate Docker containers from their hosts, new features like [user namespaces](https://github.com/docker/libcontainer/pull/304) make it possible to greatly reduce the attack surface.
 
 ## Motivation
 
@@ -21,7 +21,7 @@ to the container process.
 Support for user namespaces has recently been [merged](https://github.com/docker/libcontainer/pull/304) into Docker's libcontainer project and should soon surface in Docker itself. It will make it possible to assign a range of unprivileged uids and gids from the host to each container, improving the isolation between host and container and between containers.
 
 ### External integration with shared storage
-In order to support external integration with shared storage, processes running in a Kubernetes cluster 
+In order to support external integration with shared storage, processes running in a LMKTFY cluster 
 should be able to be uniquely identified by their Unix UID, such that a chain of  ownership can be established. 
 Processes in pods will need to have consistent UID/GID/SELinux category labels in order to access shared disks.
 
@@ -32,14 +32,14 @@ Processes in pods will need to have consistent UID/GID/SELinux category labels i
 * The concept of a security context should not be tied to a particular security mechanism or platform 
   (ie. SELinux, AppArmor)
 * Applying a different security context to a scope (namespace or pod) requires a solution such as the one proposed for
-  [service accounts](https://github.com/GoogleCloudPlatform/kubernetes/pull/2297).
+  [service accounts](https://github.com/GoogleCloudPlatform/lmktfy/pull/2297).
 
 ## Use Cases
 
 In order of increasing complexity, following are example use cases that would 
 be addressed with security contexts:
 
-1.  Kubernetes is used to run a single cloud application. In order to protect
+1.  LMKTFY is used to run a single cloud application. In order to protect
     nodes from containers:
     * All containers run as a single non-root user
     * Privileged containers are disabled
@@ -47,11 +47,11 @@ be addressed with security contexts:
     * Kernel capabilities like CHOWN and MKNOD are removed from containers
     
 2.  Just like case #1, except that I have more than one application running on
-    the Kubernetes cluster.
+    the LMKTFY cluster.
     * Each application is run in its own namespace to avoid name collisions
     * For each application a different uid and MCS label is used
     
-3.  Kubernetes is used as the base for a PAAS with 
+3.  LMKTFY is used as the base for a PAAS with 
     multiple projects, each project represented by a namespace. 
     * Each namespace is associated with a range of uids/gids on the node that
       are mapped to uids/gids on containers using linux user namespaces. 
@@ -66,12 +66,12 @@ be addressed with security contexts:
 ### Overview
 A *security context* consists of a set of constraints that determine how a container
 is secured before getting created and run. It has a 1:1 correspondence to a
-[service account](https://github.com/GoogleCloudPlatform/kubernetes/pull/2297). A *security context provider* is passed to the Kubelet so it can have a chance
+[service account](https://github.com/GoogleCloudPlatform/lmktfy/pull/2297). A *security context provider* is passed to the LMKTFYlet so it can have a chance
 to mutate Docker API calls in order to apply the security context.
 
 It is recommended that this design be implemented in two phases:
 
-1.  Implement the security context provider extension point in the Kubelet 
+1.  Implement the security context provider extension point in the LMKTFYlet 
     so that a default security context can be applied on container run and creation.
 2.  Implement a security context structure that is part of a service account. The
     default context provider can then be used to apply a security context based
@@ -79,7 +79,7 @@ It is recommended that this design be implemented in two phases:
     
 ### Security Context Provider
 
-The Kubelet will have an interface that points to a `SecurityContextProvider`. The `SecurityContextProvider` is invoked before creating and running a given container:
+The LMKTFYlet will have an interface that points to a `SecurityContextProvider`. The `SecurityContextProvider` is invoked before creating and running a given container:
 
 ```go
 type SecurityContextProvider interface {
@@ -99,7 +99,7 @@ type SecurityContextProvider interface {
 }
 ```
 
-If the value of the SecurityContextProvider field on the Kubelet is nil, the kubelet will create and run the container as it does today.   
+If the value of the SecurityContextProvider field on the LMKTFYlet is nil, the lmktfylet will create and run the container as it does today.   
 
 ### Security Context
 
@@ -187,4 +187,4 @@ type IDMappingRange struct {
 
 #### Security Context Lifecycle
  
-The lifecycle of a security context will be tied to that of a service account. It is expected that a service account with a default security context will be created for every Kubernetes namespace (without administrator intervention). If resources need to be allocated when creating a security context (for example, assign a range of host uids/gids), a pattern such as [finalizers](https://github.com/GoogleCloudPlatform/kubernetes/issues/3585) can be used before declaring the security context / service account / namespace ready for use.
+The lifecycle of a security context will be tied to that of a service account. It is expected that a service account with a default security context will be created for every LMKTFY namespace (without administrator intervention). If resources need to be allocated when creating a security context (for example, assign a range of host uids/gids), a pattern such as [finalizers](https://github.com/GoogleCloudPlatform/lmktfy/issues/3585) can be used before declaring the security context / service account / namespace ready for use.

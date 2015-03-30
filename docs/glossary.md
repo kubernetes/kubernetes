@@ -2,9 +2,9 @@
 # Glossary and Concept Index
 
 **Authorization**
-:Kubernetes does not currently have an authorization system.  Anyone with the cluster password can do anything.  We plan
+:LMKTFY does not currently have an authorization system.  Anyone with the cluster password can do anything.  We plan
 to add sophisticated authorization, and to make it pluggable.  See the [access control design doc](./devel/access.md) and
-[this issue](https://github.com/GoogleCloudPlatform/kubernetes/issue/1430).
+[this issue](https://github.com/GoogleCloudPlatform/lmktfy/issue/1430).
 
 **Annotation**
 : A key/value pair that can hold large (compared to a Label), and possibly not human-readable data.  Intended to store
@@ -43,10 +43,10 @@ service.  See [labels](labels.md).
 : A load-balanced set of `pods` which can be accessed via a single stable IP address.  See [services](./services.md).
 
 **UID**
-: An identifier on all Kubernetes objects that is set by the Kubernetes API server.  Can be used to distinguish between historical
+: An identifier on all LMKTFY objects that is set by the LMKTFY API server.  Can be used to distinguish between historical
 occurrences of same-Name objects.  See [identifiers](identifiers.md).
 
 **Volume**
-: A directory, possibly with some data in it, which is accessible to a Container as part of its filesystem.  Kubernetes
+: A directory, possibly with some data in it, which is accessible to a Container as part of its filesystem.  LMKTFY
 Volumes build upon [Docker Volumes](https://docs.docker.com/userguide/dockervolumes/), adding provisioning of the Volume
 directory and/or device.  See [volumes](volumes.md).

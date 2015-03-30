@@ -23,11 +23,11 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/version"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/version"
 )
 
-// Interface holds the methods for clients of Kubernetes,
+// Interface holds the methods for clients of LMKTFY,
 // an interface to allow mock testing.
 type Interface interface {
 	PodsNamespacer
@@ -95,7 +95,7 @@ type APIStatus interface {
 	Status() api.Status
 }
 
-// Client is the implementation of a Kubernetes client.
+// Client is the implementation of a LMKTFY client.
 type Client struct {
 	*RESTClient
 }

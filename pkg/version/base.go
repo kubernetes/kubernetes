@@ -19,7 +19,7 @@ package version
 // Base version information.
 //
 // This is the fallback data used when version information from git is not
-// provided via go ldflags. It provides an approximation of the Kubernetes
+// provided via go ldflags. It provides an approximation of the LMKTFY
 // version for ad-hoc builds (e.g. `go build`) that cannot get the version
 // information from git.
 //
@@ -28,7 +28,7 @@ package version
 // means version > 0.7 and < 0.8. (There's exceptions to this rule, see
 // docs/releasing.md for more details.)
 //
-// When releasing a new Kubernetes version, this file should be updated to
+// When releasing a new LMKTFY version, this file should be updated to
 // reflect the new version, and then a git annotated tag (using format vX.Y
 // where X == Major version and Y == Minor version) should be created to point
 // to the commit that updates pkg/version/base.go

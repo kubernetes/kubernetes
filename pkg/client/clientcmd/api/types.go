@@ -17,14 +17,14 @@ limitations under the License.
 package api
 
 import (
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/runtime"
 )
 
 // Where possible, json tags match the cli argument names.
 // Top level config objects and all values required for proper functioning are not "omitempty".  Any truly optional piece of config is allowed to be omitted.
 
-// Config holds the information needed to build connect to remote kubernetes clusters as a given user
+// Config holds the information needed to build connect to remote lmktfy clusters as a given user
 type Config struct {
 	api.TypeMeta `json:",inline"`
 	// Preferences holds general information to be use for cli interactions
@@ -47,11 +47,11 @@ type Preferences struct {
 	Extensions map[string]runtime.EmbeddedObject `json:"extensions,omitempty"`
 }
 
-// Cluster contains information about how to communicate with a kubernetes cluster
+// Cluster contains information about how to communicate with a lmktfy cluster
 type Cluster struct {
-	// Server is the address of the kubernetes cluster (https://hostname:port).
+	// Server is the address of the lmktfy cluster (https://hostname:port).
 	Server string `json:"server"`
-	// APIVersion is the preferred api version for communicating with the kubernetes cluster (v1beta1, v1beta2, v1beta3, etc).
+	// APIVersion is the preferred api version for communicating with the lmktfy cluster (v1beta1, v1beta2, v1beta3, etc).
 	APIVersion string `json:"api-version,omitempty"`
 	// InsecureSkipTLSVerify skips the validity check for the server's certificate. This will make your HTTPS connections insecure.
 	InsecureSkipTLSVerify bool `json:"insecure-skip-tls-verify,omitempty"`
@@ -63,9 +63,9 @@ type Cluster struct {
 	Extensions map[string]runtime.EmbeddedObject `json:"extensions,omitempty"`
 }
 
-// AuthInfo contains information that describes identity information.  This is use to tell the kubernetes cluster who you are.
+// AuthInfo contains information that describes identity information.  This is use to tell the lmktfy cluster who you are.
 type AuthInfo struct {
-	// AuthPath is the path to a kubernetes auth file (~/.kubernetes_auth).  If you provide an AuthPath, the other options specified are ignored
+	// AuthPath is the path to a lmktfy auth file (~/.lmktfy_auth).  If you provide an AuthPath, the other options specified are ignored
 	AuthPath string `json:"auth-path,omitempty"`
 	// ClientCertificate is the path to a client cert file for TLS.
 	ClientCertificate string `json:"client-certificate,omitempty"`
@@ -75,17 +75,17 @@ type AuthInfo struct {
 	ClientKey string `json:"client-key,omitempty"`
 	// ClientKeyData contains PEM-encoded data from a client key file for TLS. Overrides ClientKey
 	ClientKeyData []byte `json:"client-key-data,omitempty"`
-	// Token is the bearer token for authentication to the kubernetes cluster.
+	// Token is the bearer token for authentication to the lmktfy cluster.
 	Token string `json:"token,omitempty"`
-	// Username is the username for basic authentication to the kubernetes cluster.
+	// Username is the username for basic authentication to the lmktfy cluster.
 	Username string `json:"username,omitempty"`
-	// Password is the password for basic authentication to the kubernetes cluster.
+	// Password is the password for basic authentication to the lmktfy cluster.
 	Password string `json:"password,omitempty"`
 	// Extensions holds additional information. This is useful for extenders so that reads and writes don't clobber unknown fields
 	Extensions map[string]runtime.EmbeddedObject `json:"extensions,omitempty"`
 }
 
-// Context is a tuple of references to a cluster (how do I communicate with a kubernetes cluster), a user (how do I identify myself), and a namespace (what subset of resources do I want to work with)
+// Context is a tuple of references to a cluster (how do I communicate with a lmktfy cluster), a user (how do I identify myself), and a namespace (what subset of resources do I want to work with)
 type Context struct {
 	// Cluster is the name of the cluster for this context
 	Cluster string `json:"cluster"`

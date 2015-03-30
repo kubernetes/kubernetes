@@ -37,15 +37,15 @@ bootstrap the juju root node and setup the juju web based user
 interface.
 
 
-## Launch Kubernetes cluster
+## Launch LMKTFY cluster
 
-    juju quickstart https://raw.githubusercontent.com/whitmo/bundle-kubernetes/master/bundles.yaml
+    juju quickstart https://raw.githubusercontent.com/whitmo/bundle-lmktfy/master/bundles.yaml
 
 First this command will start a curses based gui allowing you to set
 up credentials and other environmental settings for several different
 providers including Azure and AWS.
 
-Next it will deploy the kubernetes master, etcd, 2 minions with flannel networking.
+Next it will deploy the lmktfy master, etcd, 2 minions with flannel networking.
 
 
 ## Exploring the cluster
@@ -58,27 +58,27 @@ Juju status provides information about each unit in the cluster:
     - flannel/0: 52.0.149.150 (started)
     - flannel/1: 52.0.185.81 (started)
     - juju-gui/0: 52.1.150.81 (started)
-    - kubernetes/0: 52.0.149.150 (started)
-    - kubernetes/1: 52.0.185.81 (started)
-    - kubernetes-master/0: 52.1.120.142 (started)
+    - lmktfy/0: 52.0.149.150 (started)
+    - lmktfy/1: 52.0.185.81 (started)
+    - lmktfy-master/0: 52.1.120.142 (started)
 
 You can use `juju ssh` to access any of the units:
 
-    juju ssh kubernetes-master/0
+    juju ssh lmktfy-master/0
 
 
 ## Run some containers!
 
-`kubectl` is available on the kubernetes master node.  We'll ssh in to
-launch some containers, but one could use kubectl locally setting
-KUBERNETES_MASTER to point at the ip of `kubernetes-master/0`.
+`lmktfyctl` is available on the lmktfy master node.  We'll ssh in to
+launch some containers, but one could use lmktfyctl locally setting
+LMKTFYRNETES_MASTER to point at the ip of `lmktfy-master/0`.
 
 No pods will be available before starting a container:
 
-    kubectl get pods
+    lmktfyctl get pods
     POD  CONTAINER(S)   IMAGE(S)   HOST  LABELS  STATUS
 
-    kubectl get replicationControllers
+    lmktfyctl get replicationControllers
     CONTROLLER  CONTAINER(S)  IMAGE(S)  SELECTOR  REPLICAS
 
 We'll follow the aws-coreos example. Create a pod manifest: `pod.json`
@@ -109,14 +109,14 @@ We'll follow the aws-coreos example. Create a pod manifest: `pod.json`
 }
 ```
 
-Create the pod with kubectl:
+Create the pod with lmktfyctl:
 
-    kubectl create -f pod.json
+    lmktfyctl create -f pod.json
 
 
 Get info on the pod:
 
-    kubectl get pods
+    lmktfyctl get pods
 
 
 To test the hello app, we'll need to locate which minion is hosting
@@ -126,24 +126,24 @@ our hello app.
 
 Exit out of our ssh session and run:
 
-    juju run --unit kubernetes/0 "docker ps -n=1"
+    juju run --unit lmktfy/0 "docker ps -n=1"
     ...
-    juju run --unit kubernetes/1 "docker ps -n=1"
+    juju run --unit lmktfy/1 "docker ps -n=1"
     CONTAINER ID        IMAGE                                  COMMAND             CREATED             STATUS              PORTS               NAMES
-    02beb61339d8        quay.io/kelseyhightower/hello:latest   /hello              About an hour ago   Up About an hour                        k8s_hello....
+    02beb61339d8        quay.io/kelseyhightower/hello:latest   /hello              About an hour ago   Up About an hour                        lmktfy_hello....
 
 
-We see `kubernetes/1` has our container, we can open port 80:
+We see `lmktfy/1` has our container, we can open port 80:
 
-    juju run --unit kubernetes/1 "open-port 80"
-    juju expose kubernetes
+    juju run --unit lmktfy/1 "open-port 80"
+    juju expose lmktfy
     sudo apt-get install curl
-    curl $(juju status --format=oneline kubernetes/1 | cut -d' ' -f3)
+    curl $(juju status --format=oneline lmktfy/1 | cut -d' ' -f3)
 
 Finally delete the pod:
 
-    juju ssh kubernetes-master/0
-    kubectl delete pods hello
+    juju ssh lmktfy-master/0
+    lmktfyctl delete pods hello
 
 
 ## Scale out cluster
@@ -151,7 +151,7 @@ Finally delete the pod:
 We can add minion units like so:
 
     juju add-unit flannel # creates unit flannel/2
-    juju add-unit kubernetes --to flannel/2
+    juju add-unit lmktfy --to flannel/2
 
 
 ## Tear down cluster
@@ -161,12 +161,12 @@ We can add minion units like so:
 
 ## More Info
 
-Kubernetes Bundle on Github
+LMKTFY Bundle on Github
 
- - [Bundle Repository](https://github.com/whitmo/bundle-kubernetes)
-   * [Kubernetes master charm](https://github.com/whitmo/charm-kubernetes-master)
-   * [Kubernetes mininion charm](https://github.com/whitmo/charm-kubernetes)
- - [Bundle Documentation](http://whitmo.github.io/bundle-kubernetes)
+ - [Bundle Repository](https://github.com/whitmo/bundle-lmktfy)
+   * [LMKTFY master charm](https://github.com/whitmo/charm-lmktfy-master)
+   * [LMKTFY mininion charm](https://github.com/whitmo/charm-lmktfy)
+ - [Bundle Documentation](http://whitmo.github.io/bundle-lmktfy)
  - [More about Juju](https://juju.ubuntu.com)
 
 

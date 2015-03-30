@@ -1,6 +1,6 @@
 # Maintainers
 
-People responsible for ports of Kubernetes to different environments. CC at
+People responsible for ports of LMKTFY to different environments. CC at
 least one maintainer on relevant issues and PRs.
 
 ## OS Distributions

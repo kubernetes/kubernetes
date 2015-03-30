@@ -1,15 +1,15 @@
 ## Getting started on Ubuntu 
 
-This document describes how to get started to run kubernetes services on a single host (which is acting both as master and minion) for ubuntu systems. It consists of three steps
+This document describes how to get started to run lmktfy services on a single host (which is acting both as master and minion) for ubuntu systems. It consists of three steps
 
-1. Make kubernetes and etcd binaries
+1. Make lmktfy and etcd binaries
 2. Install upstart scripts
 3. Customizing ubuntu launch
 
-### 1. Make kubernetes and etcd binaries
-Either build or download the latest [kubernetes binaries] (https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/getting-started-guides/binary_release.md)
+### 1. Make lmktfy and etcd binaries
+Either build or download the latest [lmktfy binaries] (https://github.com/GoogleCloudPlatform/lmktfy/blob/master/docs/getting-started-guides/binary_release.md)
 
-Copy the kube binaries into `/opt/bin` or a path of your choice
+Copy the lmktfy binaries into `/opt/bin` or a path of your choice
 
 Similarly pull an `etcd` binary from [etcd releases](https://github.com/coreos/etcd/releases) or build the `etcd` yourself using instructions at [https://github.com/coreos/etcd](https://github.com/coreos/etcd)
 
@@ -19,16 +19,16 @@ Copy the `etcd` binary into `/opt/bin` or path of your choice
 Running ubuntu/util.sh would install/copy the scripts for upstart to pick up. The script may warn you on some valid problems/conditions
 
 ```
-$ cd kubernetes/cluster/ubuntu
+$ cd lmktfy/cluster/ubuntu
 $ sudo ./util.sh
 ```
 
-After this the kubernetes and `etcd` services would be up and running. You can use `service start/stop/restart/force-reload` on the services.
+After this the lmktfy and `etcd` services would be up and running. You can use `service start/stop/restart/force-reload` on the services.
 
-Launching and scheduling containers using kubectl can also be used at this point, as explained mentioned in the [examples](https://github.com/GoogleCloudPlatform/kubernetes/tree/master/examples/guestbook)
+Launching and scheduling containers using lmktfyctl can also be used at this point, as explained mentioned in the [examples](https://github.com/GoogleCloudPlatform/lmktfy/tree/master/examples/guestbook)
 
 ### 3. Customizing the ubuntu launch
-To customize the defaults you will need to tweak `/etc/default/kube*` files and restart the appropriate services. This is needed if the binaries are copied in a place other than `/opt/bin`. A run could look like
+To customize the defaults you will need to tweak `/etc/default/lmktfy*` files and restart the appropriate services. This is needed if the binaries are copied in a place other than `/opt/bin`. A run could look like
 
 ```
 $ sudo cat /etc/default/etcd 

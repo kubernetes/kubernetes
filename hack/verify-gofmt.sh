@@ -20,7 +20,7 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+LMKTFY_ROOT=$(dirname "${BASH_SOURCE}")/..
 
 GO_VERSION=($(go version))
 
@@ -29,7 +29,7 @@ if [[ -z $(echo "${GO_VERSION[2]}" | grep -E 'go1.2|go1.3|go1.4') ]]; then
   exit 0
 fi
 
-cd "${KUBE_ROOT}"
+cd "${LMKTFY_ROOT}"
 
 find_files() {
   find . -not \( \

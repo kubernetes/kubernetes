@@ -1,0 +1,14 @@
+# LMKTFYlet Upstart and SysVinit configuration file
+
+# Customize lmktfylet binary location 
+# LMKTFYLET="/opt/bin/lmktfylet"
+
+# Use LMKTFYLET_OPTS to modify the start/restart options
+
+LMKTFYLET_OPTS="--address=0.0.0.0 \
+--port=10250 \
+--hostname_override=MY_IP \
+--api_servers=http://MASTER_IP:8080 \
+--logtostderr=true"
+
+# Add more envionrment settings used by lmktfy-scheduler here

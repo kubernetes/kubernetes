@@ -6,29 +6,29 @@ Official releases are built in Docker containers.  Details are [here](../../buil
 
 ## Go development environment
 
-Kubernetes is written in [Go](http://golang.org) programming language. If you haven't set up Go development environment, please follow [this instruction](http://golang.org/doc/code.html) to install go tool and set up GOPATH. Ensure your version of Go is at least 1.3.
+LMKTFY is written in [Go](http://golang.org) programming language. If you haven't set up Go development environment, please follow [this instruction](http://golang.org/doc/code.html) to install go tool and set up GOPATH. Ensure your version of Go is at least 1.3.
 
-## Clone kubernetes into GOPATH
+## Clone lmktfy into GOPATH
 
-We highly recommend to put kubernetes' code into your GOPATH. For example, the following commands will download kubernetes' code under the current user's GOPATH (Assuming there's only one directory in GOPATH.):
+We highly recommend to put lmktfy' code into your GOPATH. For example, the following commands will download lmktfy' code under the current user's GOPATH (Assuming there's only one directory in GOPATH.):
 
 ```
 $ echo $GOPATH
 /home/user/goproj
 $ mkdir -p $GOPATH/src/github.com/GoogleCloudPlatform/
 $ cd $GOPATH/src/github.com/GoogleCloudPlatform/
-$ git clone https://github.com/GoogleCloudPlatform/kubernetes.git
+$ git clone https://github.com/GoogleCloudPlatform/lmktfy.git
 ```
 
 The commands above will not work if there are more than one directory in ``$GOPATH``.
 
 If you plan to do development, read about the
-[Kubernetes Github Flow](https://docs.google.com/presentation/d/1HVxKSnvlc2WJJq8b9KCYtact5ZRrzDzkWgKEfm0QO_o/pub?start=false&loop=false&delayms=3000),
-and then clone your own fork of Kubernetes as described there.
+[LMKTFY Github Flow](https://docs.google.com/presentation/d/1HVxKSnvlc2WJJq8b9KCYtact5ZRrzDzkWgKEfm0QO_o/pub?start=false&loop=false&delayms=3000),
+and then clone your own fork of LMKTFY as described there.
 
 ## godep and dependency management
 
-Kubernetes uses [godep](https://github.com/tools/godep) to manage dependencies. It is not strictly required for building Kubernetes but it is required when managing dependencies under the Godeps/ tree, and is required by a number of the build and test scripts. Please make sure that ``godep`` is installed and in your ``$PATH``.
+LMKTFY uses [godep](https://github.com/tools/godep) to manage dependencies. It is not strictly required for building LMKTFY but it is required when managing dependencies under the Godeps/ tree, and is required by a number of the build and test scripts. Please make sure that ``godep`` is installed and in your ``$PATH``.
 
 ### Installing godep
 There are many ways to build and host go binaries. Here is an easy way to get utilities like ```godep``` installed:
@@ -51,13 +51,13 @@ export PATH=$PATH:$GOPATH/bin
 ```
 
 ### Using godep
-Here's a quick walkthrough of one way to use godeps to add or update a Kubernetes dependency into Godeps/_workspace. For more details, please see the instructions in [godep's documentation](https://github.com/tools/godep).
+Here's a quick walkthrough of one way to use godeps to add or update a LMKTFY dependency into Godeps/_workspace. For more details, please see the instructions in [godep's documentation](https://github.com/tools/godep).
 
 1) Devote a directory to this endeavor:
 ```
-export KPATH=$HOME/code/kubernetes
-mkdir -p $KPATH/src/github.com/GoogleCloudPlatform/kubernetes
-cd $KPATH/src/github.com/GoogleCloudPlatform/kubernetes
+export KPATH=$HOME/code/lmktfy
+mkdir -p $KPATH/src/github.com/GoogleCloudPlatform/lmktfy
+cd $KPATH/src/github.com/GoogleCloudPlatform/lmktfy
 git clone https://path/to/your/fork .
 # Or copy your existing local repo here. IMPORTANT: making a symlink doesn't work.
 ```
@@ -73,22 +73,22 @@ export GOPATH=$KPATH
 
 3) Populate your new GOPATH.
 ```
-cd $KPATH/src/github.com/GoogleCloudPlatform/kubernetes
+cd $KPATH/src/github.com/GoogleCloudPlatform/lmktfy
 godep restore
 ```
 
 4) Next, you can either add a new dependency or update an existing one.
 ```
 # To add a new dependency, do:
-cd $KPATH/src/github.com/GoogleCloudPlatform/kubernetes
+cd $KPATH/src/github.com/GoogleCloudPlatform/lmktfy
 go get path/to/dependency
-# Change code in Kubernetes to use the dependency.
+# Change code in LMKTFY to use the dependency.
 godep save ./...
 
 # To update an existing dependency, do:
-cd $KPATH/src/github.com/GoogleCloudPlatform/kubernetes
+cd $KPATH/src/github.com/GoogleCloudPlatform/lmktfy
 go get -u path/to/dependency
-# Change code in Kubernetes accordingly if necessary.
+# Change code in LMKTFY accordingly if necessary.
 godep update path/to/dependency
 ```
 
@@ -104,7 +104,7 @@ Before committing any changes, please link/copy these hooks into your .git
 directory. This will keep you from accidentally committing non-gofmt'd go code.
 
 ```
-cd kubernetes/.git/hooks/
+cd lmktfy/.git/hooks/
 ln -s ../../hooks/prepare-commit-msg .
 ln -s ../../hooks/commit-msg .
 ```
@@ -112,26 +112,26 @@ ln -s ../../hooks/commit-msg .
 ## Unit tests
 
 ```
-cd kubernetes
+cd lmktfy
 hack/test-go.sh
 ```
 
 Alternatively, you could also run:
 
 ```
-cd kubernetes
+cd lmktfy
 godep go test ./...
 ```
 
-If you only want to run unit tests in one package, you could run ``godep go test`` under the package directory. For example, the following commands will run all unit tests in package kubelet:
+If you only want to run unit tests in one package, you could run ``godep go test`` under the package directory. For example, the following commands will run all unit tests in package lmktfylet:
 
 ```
-$ cd kubernetes # step into kubernetes' directory.
-$ cd pkg/kubelet
+$ cd lmktfy # step into lmktfy' directory.
+$ cd pkg/lmktfylet
 $ godep go test
 # some output from unit tests
 PASS
-ok      github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet   0.317s
+ok      github.com/GoogleCloudPlatform/lmktfy/pkg/lmktfylet   0.317s
 ```
 
 ## Coverage
@@ -141,35 +141,35 @@ Currently, collecting coverage is only supported for the Go unit tests.
 To run all unit tests and generate an HTML coverage report, run the following:
 
 ```
-cd kubernetes
-KUBE_COVER=y hack/test-go.sh
+cd lmktfy
+LMKTFY_COVER=y hack/test-go.sh
 ```
 
 At the end of the run, an the HTML report will be generated with the path printed to stdout.
 
-To run tests and collect coverage in only one package, pass its relative path under the `kubernetes` directory as an argument, for example:
+To run tests and collect coverage in only one package, pass its relative path under the `lmktfy` directory as an argument, for example:
 ```
-cd kubernetes
-KUBE_COVER=y hack/test-go.sh pkg/kubectl
+cd lmktfy
+LMKTFY_COVER=y hack/test-go.sh pkg/lmktfyctl
 ```
 
 Multiple arguments can be passed, in which case the coverage results will be combined for all tests run.
 
-Coverage results for the project can also be viewed on [Coveralls](https://coveralls.io/r/GoogleCloudPlatform/kubernetes), and are continuously updated as commits are merged. Additionally, all pull requests which spawn a Travis build will report unit test coverage results to Coveralls.
+Coverage results for the project can also be viewed on [Coveralls](https://coveralls.io/r/GoogleCloudPlatform/lmktfy), and are continuously updated as commits are merged. Additionally, all pull requests which spawn a Travis build will report unit test coverage results to Coveralls.
 
 ## Integration tests
 
 You need an [etcd](https://github.com/coreos/etcd/releases/tag/v2.0.0) in your path, please make sure it is installed and in your ``$PATH``.
 ```
-cd kubernetes
+cd lmktfy
 hack/test-integration.sh
 ```
 
 ## End-to-End tests
 
-You can run an end-to-end test which will bring up a master and two minions, perform some tests, and then tear everything down. Make sure you have followed the getting started steps for your chosen cloud platform (which might involve changing the `KUBERNETES_PROVIDER` environment variable to something other than "gce".
+You can run an end-to-end test which will bring up a master and two minions, perform some tests, and then tear everything down. Make sure you have followed the getting started steps for your chosen cloud platform (which might involve changing the `LMKTFYRNETES_PROVIDER` environment variable to something other than "gce".
 ```
-cd kubernetes
+cd lmktfy
 hack/e2e-test.sh
 ```
 
@@ -220,9 +220,9 @@ go run hack/e2e.go -build -pushup -test -down
 # -v (verbose) can be added if you want streaming output instead of only
 # seeing the output of failed commands.
 
-# -ctl can be used to quickly call kubectl against your e2e cluster. Useful for
+# -ctl can be used to quickly call lmktfyctl against your e2e cluster. Useful for
 # cleaning up after a failed test or viewing logs. Use -v to avoid supressing
-# kubectl output.
+# lmktfyctl output.
 go run hack/e2e.go -v -ctl='get events'
 go run hack/e2e.go -v -ctl='delete pod foobar'
 ```
@@ -235,7 +235,7 @@ go run hack/e2e.go -v -ctl='delete pod foobar'
 One time after cloning your forked repo:
 
 ```
-git remote add upstream https://github.com/GoogleCloudPlatform/kubernetes.git
+git remote add upstream https://github.com/GoogleCloudPlatform/lmktfy.git
 ```
 
 Then each time you want to sync to upstream:

@@ -14,23 +14,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# A library of helper functions that each provider hosting Kubernetes must implement to use cluster/kube-*.sh scripts.
+# A library of helper functions that each provider hosting LMKTFY must implement to use cluster/lmktfy-*.sh scripts.
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
-source "${KUBE_ROOT}/cluster/vagrant/${KUBE_CONFIG_FILE-"config-default.sh"}"
+LMKTFY_ROOT=$(dirname "${BASH_SOURCE}")/../..
+source "${LMKTFY_ROOT}/cluster/vagrant/${LMKTFY_CONFIG_FILE-"config-default.sh"}"
 
 function detect-master () {
-  KUBE_MASTER_IP=$MASTER_IP
-  echo "KUBE_MASTER_IP: ${KUBE_MASTER_IP}" 1>&2
+  LMKTFY_MASTER_IP=$MASTER_IP
+  echo "LMKTFY_MASTER_IP: ${LMKTFY_MASTER_IP}" 1>&2
 }
 
-# Get minion IP addresses and store in KUBE_MINION_IP_ADDRESSES[]
+# Get minion IP addresses and store in LMKTFY_MINION_IP_ADDRESSES[]
 function detect-minions {
   echo "Minions already detected" 1>&2
-  KUBE_MINION_IP_ADDRESSES=("${MINION_IPS[@]}")
+  LMKTFY_MINION_IP_ADDRESSES=("${MINION_IPS[@]}")
 }
 
-# Verify prereqs on host machine  Also sets exports USING_KUBE_SCRIPTS=true so
+# Verify prereqs on host machine  Also sets exports USING_LMKTFY_SCRIPTS=true so
 # that our Vagrantfile doesn't error out.
 function verify-prereqs {
   for x in vagrant VBoxManage; do
@@ -40,21 +40,21 @@ function verify-prereqs {
     fi
   done
 
-  # Set VAGRANT_CWD to KUBE_ROOT so that we find the right Vagrantfile no
+  # Set VAGRANT_CWD to LMKTFY_ROOT so that we find the right Vagrantfile no
   # matter what directory the tools are called from.
-  export VAGRANT_CWD="${KUBE_ROOT}"
+  export VAGRANT_CWD="${LMKTFY_ROOT}"
 
-  export USING_KUBE_SCRIPTS=true
+  export USING_LMKTFY_SCRIPTS=true
 }
 
 # Create a temp dir that'll be deleted at the end of this bash session.
 #
 # Vars set:
-#   KUBE_TEMP
+#   LMKTFY_TEMP
 function ensure-temp-dir {
-  if [[ -z ${KUBE_TEMP-} ]]; then
-    export KUBE_TEMP=$(mktemp -d -t kubernetes.XXXXXX)
-    trap 'rm -rf "${KUBE_TEMP}"' EXIT
+  if [[ -z ${LMKTFY_TEMP-} ]]; then
+    export LMKTFY_TEMP=$(mktemp -d -t lmktfy.XXXXXX)
+    trap 'rm -rf "${LMKTFY_TEMP}"' EXIT
   fi
 }
 
@@ -64,7 +64,7 @@ function create-provision-scripts {
 
   (
     echo "#! /bin/bash"
-    echo "KUBE_ROOT=/vagrant"
+    echo "LMKTFY_ROOT=/vagrant"
     echo "INSTANCE_PREFIX='${INSTANCE_PREFIX}'"
     echo "MASTER_NAME='${INSTANCE_PREFIX}-master'"
     echo "MASTER_IP='${MASTER_IP}'"
@@ -89,9 +89,9 @@ function create-provision-scripts {
     echo "DNS_REPLICAS='${DNS_REPLICAS:-}'"
     echo "RUNTIME_CONFIG='${RUNTIME_CONFIG:-}'"
     echo "ADMISSION_CONTROL='${ADMISSION_CONTROL:-}'"
-    grep -v "^#" "${KUBE_ROOT}/cluster/vagrant/provision-master.sh"
-    grep -v "^#" "${KUBE_ROOT}/cluster/vagrant/provision-network.sh"
-  ) > "${KUBE_TEMP}/master-start.sh"
+    grep -v "^#" "${LMKTFY_ROOT}/cluster/vagrant/provision-master.sh"
+    grep -v "^#" "${LMKTFY_ROOT}/cluster/vagrant/provision-network.sh"
+  ) > "${LMKTFY_TEMP}/master-start.sh"
 
   for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
     (
@@ -109,9 +109,9 @@ function create-provision-scripts {
       echo "MINION_CONTAINER_SUBNETS=(${MINION_CONTAINER_SUBNETS[@]})"
       echo "CONTAINER_SUBNET='${CONTAINER_SUBNET}'"
       echo "DOCKER_OPTS='${EXTRA_DOCKER_OPTS-}'"
-      grep -v "^#" "${KUBE_ROOT}/cluster/vagrant/provision-minion.sh"
-      grep -v "^#" "${KUBE_ROOT}/cluster/vagrant/provision-network.sh"
-    ) > "${KUBE_TEMP}/minion-start-${i}.sh"
+      grep -v "^#" "${LMKTFY_ROOT}/cluster/vagrant/provision-minion.sh"
+      grep -v "^#" "${LMKTFY_ROOT}/cluster/vagrant/provision-network.sh"
+    ) > "${LMKTFY_TEMP}/minion-start-${i}.sh"
   done
 }
 
@@ -124,7 +124,7 @@ function verify-cluster {
   # verify master has all required daemons
   echo "Validating master"
   local machine="master"
-  local -a required_daemon=("salt-master" "salt-minion" "kube-apiserver" "nginx" "kube-controller-manager" "kube-scheduler")
+  local -a required_daemon=("salt-master" "salt-minion" "lmktfy-apiserver" "nginx" "lmktfy-controller-manager" "lmktfy-scheduler")
   local validated="1"
   until [[ "$validated" == "0" ]]; do
     validated="0"
@@ -143,7 +143,7 @@ function verify-cluster {
   for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
     echo "Validating ${VAGRANT_MINION_NAMES[$i]}"
     local machine=${VAGRANT_MINION_NAMES[$i]}
-    local -a required_daemon=("salt-minion" "kubelet" "docker")
+    local -a required_daemon=("salt-minion" "lmktfylet" "docker")
     local validated="1"
     until [[ "$validated" == "0" ]]; do
       validated="0"
@@ -165,7 +165,7 @@ function verify-cluster {
     local count="0"
     until [[ "$count" == "1" ]]; do
       local minions
-      minions=$("${KUBE_ROOT}/cluster/kubectl.sh" get minions -o template -t '{{range.items}}{{.id}}:{{end}}')
+      minions=$("${LMKTFY_ROOT}/cluster/lmktfyctl.sh" get minions -o template -t '{{range.items}}{{.id}}:{{end}}')
       count=$(echo $minions | grep -c "${MINION_IPS[i]}") || {
         printf "."
         sleep 2
@@ -174,51 +174,51 @@ function verify-cluster {
     done
   done
 
-  # By this time, all kube api calls should work, so no need to loop and retry.
-  echo "Validating we can run kubectl commands."
-  vagrant ssh master --command "kubectl get pods" || {
-    echo "WARNING: kubectl to localhost failed.  This could mean localhost is not bound to an IP"
+  # By this time, all lmktfy api calls should work, so no need to loop and retry.
+  echo "Validating we can run lmktfyctl commands."
+  vagrant ssh master --command "lmktfyctl get pods" || {
+    echo "WARNING: lmktfyctl to localhost failed.  This could mean localhost is not bound to an IP"
   }
   
   (
     echo
-    echo "Kubernetes cluster is running.  The master is running at:"
+    echo "LMKTFY cluster is running.  The master is running at:"
     echo
     echo "  https://${MASTER_IP}"
     echo
-    echo "The user name and password to use is located in ~/.kubernetes_vagrant_auth."
+    echo "The user name and password to use is located in ~/.lmktfy_vagrant_auth."
     echo
     )
 }
 
 
-# Instantiate a kubernetes cluster
-function kube-up {
+# Instantiate a lmktfy cluster
+function lmktfy-up {
   get-password
   create-provision-scripts
 
   vagrant up
 
-  local kube_cert=".kubecfg.vagrant.crt"
-  local kube_key=".kubecfg.vagrant.key"
-  local ca_cert=".kubernetes.vagrant.ca.crt"
+  local lmktfy_cert=".lmktfycfg.vagrant.crt"
+  local lmktfy_key=".lmktfycfg.vagrant.key"
+  local ca_cert=".lmktfy.vagrant.ca.crt"
 
   (umask 077
-   vagrant ssh master -- sudo cat /srv/kubernetes/kubecfg.crt >"${HOME}/${kube_cert}" 2>/dev/null
-   vagrant ssh master -- sudo cat /srv/kubernetes/kubecfg.key >"${HOME}/${kube_key}" 2>/dev/null
-   vagrant ssh master -- sudo cat /srv/kubernetes/ca.crt >"${HOME}/${ca_cert}" 2>/dev/null
+   vagrant ssh master -- sudo cat /srv/lmktfy/lmktfycfg.crt >"${HOME}/${lmktfy_cert}" 2>/dev/null
+   vagrant ssh master -- sudo cat /srv/lmktfy/lmktfycfg.key >"${HOME}/${lmktfy_key}" 2>/dev/null
+   vagrant ssh master -- sudo cat /srv/lmktfy/ca.crt >"${HOME}/${ca_cert}" 2>/dev/null
 
-   cat <<EOF >"${HOME}/.kubernetes_vagrant_auth"
+   cat <<EOF >"${HOME}/.lmktfy_vagrant_auth"
 {
-  "User": "$KUBE_USER",
-  "Password": "$KUBE_PASSWORD",
+  "User": "$LMKTFY_USER",
+  "Password": "$LMKTFY_PASSWORD",
   "CAFile": "$HOME/$ca_cert",
-  "CertFile": "$HOME/$kube_cert",
-  "KeyFile": "$HOME/$kube_key"
+  "CertFile": "$HOME/$lmktfy_cert",
+  "KeyFile": "$HOME/$lmktfy_key"
 }
 EOF
 
-   cat <<EOF >"${HOME}/.kubernetes_vagrant_kubeconfig"
+   cat <<EOF >"${HOME}/.lmktfy_vagrant_lmktfyconfig"
 apiVersion: v1
 clusters:
 - cluster:
@@ -237,23 +237,23 @@ preferences: {}
 users:
 - name: vagrant
   user:
-    auth-path: ${HOME}/.kubernetes_vagrant_auth
+    auth-path: ${HOME}/.lmktfy_vagrant_auth
 EOF
 
-   chmod 0600 ~/.kubernetes_vagrant_auth "${HOME}/${kube_cert}" \
-     "${HOME}/${kube_key}" "${HOME}/${ca_cert}"
+   chmod 0600 ~/.lmktfy_vagrant_auth "${HOME}/${lmktfy_cert}" \
+     "${HOME}/${lmktfy_key}" "${HOME}/${ca_cert}"
   )
 
   verify-cluster
 }
 
-# Delete a kubernetes cluster
-function kube-down {
+# Delete a lmktfy cluster
+function lmktfy-down {
   vagrant destroy -f
 }
 
-# Update a kubernetes cluster with latest source
-function kube-push {
+# Update a lmktfy cluster with latest source
+function lmktfy-push {
   get-password
   create-provision-scripts
   vagrant provision
@@ -262,7 +262,7 @@ function kube-push {
 # Execute prior to running tests to build a release if required for env
 function test-build-release {
   # Make a release
-  "${KUBE_ROOT}/build/release.sh"
+  "${LMKTFY_ROOT}/build/release.sh"
 }
 
 # Execute prior to running tests to initialize required structure
@@ -277,9 +277,9 @@ function test-teardown {
 
 # Set the {user} and {password} environment values required to interact with provider
 function get-password {
-  export KUBE_USER=vagrant
-  export KUBE_PASSWORD=vagrant
-  echo "Using credentials: $KUBE_USER:$KUBE_PASSWORD" 1>&2
+  export LMKTFY_USER=vagrant
+  export LMKTFY_PASSWORD=vagrant
+  echo "Using credentials: $LMKTFY_USER:$LMKTFY_PASSWORD" 1>&2
 }
 
 # Find the minion name based on the IP address
@@ -329,14 +329,14 @@ function ssh-to-node {
   vagrant ssh "${machine}" -c "${cmd}"
 }
 
-# Restart the kube-proxy on a node ($1)
-function restart-kube-proxy {
-  ssh-to-node "$1" "sudo systemctl restart kube-proxy"
+# Restart the lmktfy-proxy on a node ($1)
+function restart-lmktfy-proxy {
+  ssh-to-node "$1" "sudo systemctl restart lmktfy-proxy"
 }
 
 # Restart the apiserver
 function restart-apiserver {
-  ssh-to-node "$1" "sudo systemctl restart kube-apiserver"
+  ssh-to-node "$1" "sudo systemctl restart lmktfy-apiserver"
 }
 
 # Perform preparations required to run e2e tests

@@ -94,7 +94,7 @@ type VersionInterfacesFunc func(apiVersion string) (*VersionInterfaces, bool)
 
 // NewDefaultRESTMapper initializes a mapping between Kind and APIVersion
 // to a resource name and back based on the objects in a runtime.Scheme
-// and the Kubernetes API conventions. Takes a priority list of the versions to
+// and the LMKTFY API conventions. Takes a priority list of the versions to
 // search when an object has no default version (set empty to return an error)
 // and a function that retrieves the correct codec and metadata for a given version.
 func NewDefaultRESTMapper(versions []string, f VersionInterfacesFunc) *DefaultRESTMapper {

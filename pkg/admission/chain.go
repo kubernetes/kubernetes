@@ -17,7 +17,7 @@ limitations under the License.
 package admission
 
 import (
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/client"
 )
 
 // chainAdmissionHandler is an instance of admission.Interface that performs admission control using a chain of admission handlers

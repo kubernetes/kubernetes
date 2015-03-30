@@ -3,18 +3,18 @@ __Note (11/21/2014): This mostly works, but doesn't currently register minions c
 
 # Getting started on Amazon EC2
 
-The example below creates an elastic Kubernetes cluster with 3 worker nodes and a master.
+The example below creates an elastic LMKTFY cluster with 3 worker nodes and a master.
 
 ## Highlights
 
 * Cluster bootstrapping using [cloud-config](https://coreos.com/docs/cluster-management/setup/cloudinit-cloud-config)
 * Cross container networking with [flannel](https://github.com/coreos/flannel#flannel)
-* Auto worker registration with [kube-register](https://github.com/kelseyhightower/kube-register#kube-register)
-* Kubernetes v0.10.1 [official binaries](https://github.com/GoogleCloudPlatform/kubernetes/releases/tag/v0.10.1)
+* Auto worker registration with [lmktfy-register](https://github.com/kelseyhightower/lmktfy-register#lmktfy-register)
+* LMKTFY v0.10.1 [official binaries](https://github.com/GoogleCloudPlatform/lmktfy/releases/tag/v0.10.1)
 
 ## Prerequisites
 
-* [kubectl CLI](aws/kubectl.md)
+* [lmktfyctl CLI](aws/lmktfyctl.md)
 * [aws CLI](http://aws.amazon.com/cli)
 * [CoreOS image for AWS](https://coreos.com/docs/running-coreos/cloud-providers/ec2/#choosing-a-channel)
 
@@ -22,10 +22,10 @@ The example below creates an elastic Kubernetes cluster with 3 worker nodes and 
 
 ### Cloud Formation
 
-The [cloudformation-template.json](aws/cloudformation-template.json) can be used to bootstrap a Kubernetes cluster with a single command.
+The [cloudformation-template.json](aws/cloudformation-template.json) can be used to bootstrap a LMKTFY cluster with a single command.
 
 ```
-aws cloudformation create-stack --stack-name kubernetes --region us-west-2 \
+aws cloudformation create-stack --stack-name lmktfy --region us-west-2 \
 --template-body file://aws/cloudformation-template.json \
 --parameters ParameterKey=KeyPair,ParameterValue=<keypair>
 ```
@@ -33,28 +33,28 @@ aws cloudformation create-stack --stack-name kubernetes --region us-west-2 \
 It will take a few minutes for the entire stack to come up. You can monitor the stack progress with the following command:
 
 ```
-aws cloudformation describe-stack-events --stack-name kubernetes
+aws cloudformation describe-stack-events --stack-name lmktfy
 ```
 
-> Record the Kubernetes Master IP address
+> Record the LMKTFY Master IP address
 
 ```
-aws cloudformation describe-stacks --stack-name kubernetes
+aws cloudformation describe-stacks --stack-name lmktfy
 ```
 
-[Skip to kubectl client configuration](#configure-the-kubectl-ssh-tunnel)
+[Skip to lmktfyctl client configuration](#configure-the-lmktfyctl-ssh-tunnel)
 
 ### Manually
 
 The following commands shall use the latest CoreOS alpha AMI for the `us-west-2` region. For a list of different regions and corresponding AMI IDs see the [CoreOS EC2 cloud provider documentation](https://coreos.com/docs/running-coreos/cloud-providers/ec2/#choosing-a-channel).
 
-#### Create the Kubernetes Security Group
+#### Create the LMKTFY Security Group
 
 ```
-aws ec2 create-security-group --group-name kubernetes --description "Kubernetes Security Group"
-aws ec2 authorize-security-group-ingress --group-name kubernetes --protocol tcp --port 22 --cidr 0.0.0.0/0
-aws ec2 authorize-security-group-ingress --group-name kubernetes --protocol tcp --port 80 --cidr 0.0.0.0/0
-aws ec2 authorize-security-group-ingress --group-name kubernetes --source-security-group-name kubernetes
+aws ec2 create-security-group --group-name lmktfy --description "LMKTFY Security Group"
+aws ec2 authorize-security-group-ingress --group-name lmktfy --protocol tcp --port 22 --cidr 0.0.0.0/0
+aws ec2 authorize-security-group-ingress --group-name lmktfy --protocol tcp --port 80 --cidr 0.0.0.0/0
+aws ec2 authorize-security-group-ingress --group-name lmktfy --source-security-group-name lmktfy
 ```
 
 #### Save the master and node cloud-configs
@@ -68,7 +68,7 @@ aws ec2 authorize-security-group-ingress --group-name kubernetes --source-securi
 
 ```
 aws ec2 run-instances --image-id <ami_image_id> --key-name <keypair> \
---region us-west-2 --security-groups kubernetes --instance-type m3.medium \
+--region us-west-2 --security-groups lmktfy --instance-type m3.medium \
 --user-data file://master.yaml
 ```
 
@@ -107,7 +107,7 @@ Edit `node.yaml` and replace all instances of `<master-private-ip>` with the **p
 
 ```
 aws ec2 run-instances --count 3 --image-id <ami_image_id> --key-name <keypair> \
---region us-west-2 --security-groups kubernetes --instance-type m3.medium \
+--region us-west-2 --security-groups lmktfy --instance-type m3.medium \
 --user-data file://node.yaml
 ```
 
@@ -117,13 +117,13 @@ aws ec2 run-instances --count 3 --image-id <ami_image_id> --key-name <keypair> \
 
 ```
 aws ec2 run-instances --count 1 --image-id <ami_image_id> --key-name <keypair> \
---region us-west-2 --security-groups kubernetes --instance-type m3.medium \
+--region us-west-2 --security-groups lmktfy --instance-type m3.medium \
 --user-data file://node.yaml
 ```
 
-### Configure the kubectl SSH tunnel
+### Configure the lmktfyctl SSH tunnel
 
-This command enables secure communication between the kubectl client and the Kubernetes API.
+This command enables secure communication between the lmktfyctl client and the LMKTFY API.
 
 ```
 ssh -f -nNT -L 8080:127.0.0.1:8080 core@<master-public-ip>
@@ -131,10 +131,10 @@ ssh -f -nNT -L 8080:127.0.0.1:8080 core@<master-public-ip>
 
 ### Listing worker nodes
 
-Once the worker instances have fully booted, they will be automatically registered with the Kubernetes API server by the kube-register service running on the master node. It may take a few mins.
+Once the worker instances have fully booted, they will be automatically registered with the LMKTFY API server by the lmktfy-register service running on the master node. It may take a few mins.
 
 ```
-kubectl get nodes
+lmktfyctl get nodes
 ```
 
 ## Starting a simple pod
@@ -167,16 +167,16 @@ Create a pod manifest: `pod.json`
 }
 ```
 
-### Create the pod using the kubectl command line tool
+### Create the pod using the lmktfyctl command line tool
 
 ```
-kubectl create -f pod.json
+lmktfyctl create -f pod.json
 ```
 
 ### Testing
 
 ```
-kubectl get pods
+lmktfyctl get pods
 ```
 
 > Record the **Host** of the pod, which should be the private IP address.
@@ -208,5 +208,5 @@ Visit the public IP address in your browser to view the running pod.
 ### Delete the pod
 
 ```
-kubectl delete pods hello
+lmktfyctl delete pods hello
 ```

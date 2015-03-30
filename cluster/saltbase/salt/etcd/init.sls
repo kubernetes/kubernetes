@@ -3,15 +3,15 @@
 # 2. Download tar file:
 #    curl -LO https://github.com/coreos/etcd/releases/download/<ver>/etcd-<ver>-linux-amd64.tar.gz
 # 3. Upload to GCS (the cache control makes :
-#    gsutil cp <tar> gs://kubernetes-release/etcd/<tar>
+#    gsutil cp <tar> gs://lmktfyrnetes-release/etcd/<tar>
 # 4. Make it world readable:
-#    gsutil -m acl ch -R -g all:R gs://kubernetes-release/etcd/
+#    gsutil -m acl ch -R -g all:R gs://lmktfyrnetes-release/etcd/
 # 5. Get a hash of the tar:
 #    shasum <tar>
 # 6. Update this file with new tar version and new hash
 
 {% set etcd_version="v2.0.5" %}
-{% set etcd_tar_url="https://storage.googleapis.com/kubernetes-release/etcd/etcd-%s-linux-amd64.tar.gz"
+{% set etcd_tar_url="https://storage.googleapis.com/lmktfyrnetes-release/etcd/etcd-%s-linux-amd64.tar.gz"
   | format(etcd_version)  %}
 {% set etcd_tar_hash="sha1=34b185efa954327d6cdfe6be5b1eb5fcfb7c478c" %}
 

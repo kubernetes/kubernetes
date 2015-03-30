@@ -32,4 +32,4 @@ This is for dev and test.
 
 You can rename Vagrantfile_atomic to Vagrantfile if you want to try to test in atomic instead.
 
-** Now you can run the code on the kubernetes cluster with reasonable assurance that any problems you run into are not bugs in the code itself :) *
+** Now you can run the code on the lmktfyrnetes cluster with reasonable assurance that any problems you run into are not bugs in the code itself :) *

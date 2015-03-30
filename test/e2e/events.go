@@ -21,11 +21,11 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/client"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/fields"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/labels"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/util"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -40,10 +40,10 @@ var _ = Describe("Events", func() {
 		Expect(err).NotTo(HaveOccurred())
 	})
 
-	It("should be sent by kubelets and the scheduler about pods scheduling and running", func() {
+	It("should be sent by lmktfylets and the scheduler about pods scheduling and running", func() {
 		provider := testContext.provider
 		if len(provider) > 0 && provider != "gce" && provider != "gke" && provider != "aws" {
-			By(fmt.Sprintf("skipping TestKubeletSendsEvent on cloud provider %s", provider))
+			By(fmt.Sprintf("skipping TestLMKTFYletSendsEvent on cloud provider %s", provider))
 			return
 		}
 
@@ -64,14 +64,14 @@ var _ = Describe("Events", func() {
 				Containers: []api.Container{
 					{
 						Name:  "p",
-						Image: "kubernetes/serve_hostname",
+						Image: "lmktfy/serve_hostname",
 						Ports: []api.ContainerPort{{ContainerPort: 80}},
 					},
 				},
 			},
 		}
 
-		By("submitting the pod to kubernetes")
+		By("submitting the pod to lmktfy")
 		defer func() {
 			By("deleting the pod")
 			podClient.Delete(pod.Name)
@@ -82,7 +82,7 @@ var _ = Describe("Events", func() {
 
 		expectNoError(waitForPodRunning(c, pod.Name))
 
-		By("verifying the pod is in kubernetes")
+		By("verifying the pod is in lmktfy")
 		pods, err := podClient.List(labels.SelectorFromSet(labels.Set(map[string]string{"time": value})))
 		Expect(len(pods.Items)).To(Equal(1))
 
@@ -110,21 +110,21 @@ var _ = Describe("Events", func() {
 		Expect(len(events.Items)).ToNot(BeZero(), "scheduler events from running pod")
 		fmt.Println("Saw scheduler event for our pod.")
 
-		// Check for kubelet event about the pod.
-		By("checking for kubelet event about the pod")
+		// Check for lmktfylet event about the pod.
+		By("checking for lmktfylet event about the pod")
 		events, err = c.Events(api.NamespaceDefault).List(
 			labels.Everything(),
 			fields.Set{
 				"involvedObject.uid":       string(podWithUid.UID),
 				"involvedObject.kind":      "Pod",
 				"involvedObject.namespace": api.NamespaceDefault,
-				"source":                   "kubelet",
+				"source":                   "lmktfylet",
 			}.AsSelector(),
 		)
 		if err != nil {
 			Failf("Error while listing events: %v", err)
 		}
-		Expect(len(events.Items)).ToNot(BeZero(), "kubelet events from running pod")
-		fmt.Println("Saw kubelet event for our pod.")
+		Expect(len(events.Items)).ToNot(BeZero(), "lmktfylet events from running pod")
+		fmt.Println("Saw lmktfylet event for our pod.")
 	})
 })

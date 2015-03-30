@@ -21,16 +21,16 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/errors"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/client"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/types"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/util"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/util/errors"
 	"github.com/golang/glog"
 )
 
 // VolumePlugin is an interface to volume plugins that can be used on a
-// kubernetes node (e.g. by kubelet) to instantiate and manage volumes.
+// lmktfy node (e.g. by lmktfylet) to instantiate and manage volumes.
 type VolumePlugin interface {
 	// Init initializes the plugin.  This will be called exactly once
 	// before any New* calls are made - implementations of plugins may
@@ -38,8 +38,8 @@ type VolumePlugin interface {
 	Init(host VolumeHost)
 
 	// Name returns the plugin's name.  Plugins should use namespaced names
-	// such as "example.com/volume".  The "kubernetes.io" namespace is
-	// reserved for plugins which are bundled with kubernetes.
+	// such as "example.com/volume".  The "lmktfy.io" namespace is
+	// reserved for plugins which are bundled with lmktfy.
 	Name() string
 
 	// CanSupport tests whether the plugin supports a given volume
@@ -67,7 +67,7 @@ type PersistentVolumePlugin interface {
 	GetAccessModes() []api.AccessModeType
 }
 
-// VolumeHost is an interface that plugins can use to access the kubelet.
+// VolumeHost is an interface that plugins can use to access the lmktfylet.
 type VolumeHost interface {
 	// GetPluginDir returns the absolute path to a directory under which
 	// a given plugin may store data.  This directory might not actually
@@ -87,8 +87,8 @@ type VolumeHost interface {
 	// directory might not actually exist on disk yet.
 	GetPodPluginDir(podUID types.UID, pluginName string) string
 
-	// GetKubeClient returns a client interface
-	GetKubeClient() client.Interface
+	// GetLMKTFYClient returns a client interface
+	GetLMKTFYClient() client.Interface
 
 	// NewWrapperBuilder finds an appropriate plugin with which to handle
 	// the provided spec.  This is used to implement volume plugins which

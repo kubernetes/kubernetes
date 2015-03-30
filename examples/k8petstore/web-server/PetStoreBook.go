@@ -53,7 +53,7 @@ func main() {
 	var connection = os.Getenv("REDISMASTER_SERVICE_HOST") + ":" + os.Getenv("REDISMASTER_SERVICE_PORT")
 
 	if connection == ":" {
-		print("WARNING ::: If in kube, this is a failure: Missing env variable REDISMASTER_SERVICE_HOST")
+		print("WARNING ::: If in lmktfy, this is a failure: Missing env variable REDISMASTER_SERVICE_HOST")
 		print("WARNING ::: Attempting to connect redis localhost.")
 		connection = "127.0.0.1:6379"
 	} else {

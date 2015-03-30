@@ -22,11 +22,11 @@ import (
 
 	"github.com/imdario/mergo"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	clientcmdapi "github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/clientauth"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/errors"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/client"
+	clientcmdapi "github.com/GoogleCloudPlatform/lmktfy/pkg/client/clientcmd/api"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/clientauth"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/util/errors"
 )
 
 var (
@@ -35,7 +35,7 @@ var (
 	DefaultCluster = clientcmdapi.Cluster{Server: "http://localhost:8080"}
 
 	// EnvVarCluster allows overriding the DefaultCluster using an envvar for the server name
-	EnvVarCluster = clientcmdapi.Cluster{Server: os.Getenv("KUBERNETES_MASTER")}
+	EnvVarCluster = clientcmdapi.Cluster{Server: os.Getenv("LMKTFYRNETES_MASTER")}
 )
 
 // ClientConfig is used to make it easy to get an api server client
@@ -112,13 +112,13 @@ func (config DirectClientConfig) ClientConfig() (*client.Config, error) {
 // clientauth.Info object contain both user identification and server identification.  We want different precedence orders for
 // both, so we have to split the objects and merge them separately
 // we want this order of precedence for the server identification
-// 1.  configClusterInfo (the final result of command line flags and merged .kubeconfig files)
+// 1.  configClusterInfo (the final result of command line flags and merged .lmktfyconfig files)
 // 2.  configAuthInfo.auth-path (this file can contain information that conflicts with #1, and we want #1 to win the priority)
-// 3.  load the ~/.kubernetes_auth file as a default
+// 3.  load the ~/.lmktfy_auth file as a default
 func getServerIdentificationPartialConfig(configAuthInfo clientcmdapi.AuthInfo, configClusterInfo clientcmdapi.Cluster) (*client.Config, error) {
 	mergedConfig := &client.Config{}
 
-	defaultAuthPathInfo, err := NewDefaultAuthLoader().LoadAuth(os.Getenv("HOME") + "/.kubernetes_auth")
+	defaultAuthPathInfo, err := NewDefaultAuthLoader().LoadAuth(os.Getenv("HOME") + "/.lmktfy_auth")
 	// if the error is anything besides a does not exist, then fail.  Not existing is ok
 	if err != nil && !os.IsNotExist(err) {
 		return nil, err
@@ -137,7 +137,7 @@ func getServerIdentificationPartialConfig(configAuthInfo clientcmdapi.AuthInfo, 
 		mergo.Merge(mergedConfig, authPathConfig)
 	}
 
-	// configClusterInfo holds the information identify the server provided by .kubeconfig
+	// configClusterInfo holds the information identify the server provided by .lmktfyconfig
 	configClientConfig := &client.Config{}
 	configClientConfig.CAFile = configClusterInfo.CertificateAuthority
 	configClientConfig.CAData = configClusterInfo.CertificateAuthorityData
@@ -150,9 +150,9 @@ func getServerIdentificationPartialConfig(configAuthInfo clientcmdapi.AuthInfo, 
 // clientauth.Info object contain both user identification and server identification.  We want different precedence orders for
 // both, so we have to split the objects and merge them separately
 // we want this order of precedence for user identifcation
-// 1.  configAuthInfo minus auth-path (the final result of command line flags and merged .kubeconfig files)
+// 1.  configAuthInfo minus auth-path (the final result of command line flags and merged .lmktfyconfig files)
 // 2.  configAuthInfo.auth-path (this file can contain information that conflicts with #1, and we want #1 to win the priority)
-// 3.  if there is not enough information to idenfity the user, load try the ~/.kubernetes_auth file
+// 3.  if there is not enough information to idenfity the user, load try the ~/.lmktfy_auth file
 // 4.  if there is not enough information to identify the user, prompt if possible
 func getUserIdentificationPartialConfig(configAuthInfo clientcmdapi.AuthInfo, fallbackReader io.Reader) (*client.Config, error) {
 	mergedConfig := &client.Config{}
@@ -181,9 +181,9 @@ func getUserIdentificationPartialConfig(configAuthInfo clientcmdapi.AuthInfo, fa
 		mergedConfig.Password = configAuthInfo.Password
 	}
 
-	// if there isn't sufficient information to authenticate the user to the server, merge in ~/.kubernetes_auth.
+	// if there isn't sufficient information to authenticate the user to the server, merge in ~/.lmktfy_auth.
 	if !canIdentifyUser(*mergedConfig) {
-		defaultAuthPathInfo, err := NewDefaultAuthLoader().LoadAuth(os.Getenv("HOME") + "/.kubernetes_auth")
+		defaultAuthPathInfo, err := NewDefaultAuthLoader().LoadAuth(os.Getenv("HOME") + "/.lmktfy_auth")
 		// if the error is anything besides a does not exist, then fail.  Not existing is ok
 		if err != nil && !os.IsNotExist(err) {
 			return nil, err
@@ -240,7 +240,7 @@ func canIdentifyUser(config client.Config) bool {
 
 }
 
-// Namespace implements KubeConfig
+// Namespace implements LMKTFYConfig
 func (config DirectClientConfig) Namespace() (string, error) {
 	if err := config.ConfirmUsable(); err != nil {
 		return "", err

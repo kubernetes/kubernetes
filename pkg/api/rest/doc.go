@@ -14,5 +14,5 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package rest defines common logic around changes to Kubernetes resources.
+// Package rest defines common logic around changes to LMKTFY resources.
 package rest

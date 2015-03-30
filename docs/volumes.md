@@ -1,7 +1,7 @@
 # Volumes
-This document describes the current state of Volumes in kubernetes.  Familiarity with [pods](./pods.md) is suggested.
+This document describes the current state of Volumes in lmktfy.  Familiarity with [pods](./pods.md) is suggested.
 
-A Volume is a directory, possibly with some data in it, which is accessible to a Container. Kubernetes Volumes are similar to but not the same as [Docker Volumes](https://docs.docker.com/userguide/dockervolumes/).
+A Volume is a directory, possibly with some data in it, which is accessible to a Container. LMKTFY Volumes are similar to but not the same as [Docker Volumes](https://docs.docker.com/userguide/dockervolumes/).
 
 A Pod specifies which Volumes its containers need in its [ContainerManifest](https://developers.google.com/compute/docs/containers/container_vms#container_manifest) property.
 
@@ -9,7 +9,7 @@ A process in a Container sees a filesystem view composed from two sources: a sin
 
 ## Resources
 
-The storage media (Disk, SSD, or memory) of a volume is determined by the media of the filesystem holding the kubelet root dir (typically `/var/lib/kubelet`).
+The storage media (Disk, SSD, or memory) of a volume is determined by the media of the filesystem holding the lmktfylet root dir (typically `/var/lib/lmktfylet`).
 There is no limit on how much space an EmptyDir or PersistentDir volume can consume, and no isolation between containers or between pods.
 
 In the future, we expect that a Volume will be able to request a certain amount of space using a [resource](./resources.md) specification,
@@ -17,7 +17,7 @@ and to select the type of media to use, for clusters that have several media typ
 
 ## Types of Volumes
 
-Kubernetes currently supports three types of Volumes, but more may be added in the future.
+LMKTFY currently supports three types of Volumes, but more may be added in the future.
 
 ### EmptyDir
 
@@ -27,7 +27,7 @@ Some uses for an EmptyDir are:
   - scratch space, such as for a disk-based mergesort or checkpointing a long computation.
   - a directory that a content-manager container fills with data while a webserver container serves the data.
 
-Currently, the user cannot control what kind of media is used for an EmptyDir.  If the Kubelet is configured to use a disk drive, then all EmptyDirectories will be created on that disk drive.  In the future, it is expected that Pods can control whether the EmptyDir is on a disk drive, SSD, or tmpfs.
+Currently, the user cannot control what kind of media is used for an EmptyDir.  If the LMKTFYlet is configured to use a disk drive, then all EmptyDirectories will be created on that disk drive.  In the future, it is expected that Pods can control whether the EmptyDir is on a disk drive, SSD, or tmpfs.
 
 ### HostDir
 A Volume with a HostDir property allows access to files on the current node.
@@ -38,7 +38,7 @@ Some uses for a HostDir are:
 
 Watch out when using this type of volume, because:
   - pods with identical configuration (such as created from a podTemplate) may behave differently on different nodes due to different files on different nodes.
-  - When Kubernetes adds resource-aware scheduling, as is planned, it will not be able to account for resources used by a HostDir.
+  - When LMKTFY adds resource-aware scheduling, as is planned, it will not be able to account for resources used by a HostDir.
 
 ### GCEPersistentDisk
 __Important: You must create a PD using ```gcloud``` or the GCE API before you can use it__
@@ -47,7 +47,7 @@ A Volume with a GCEPersistentDisk property allows access to files on a Google Co
 [Persistent Disk](http://cloud.google.com/compute/docs/disks).
 
 There are some restrictions when using a GCEPersistentDisk:
-  - the nodes (what the kubelet runs on) need to be GCE VMs
+  - the nodes (what the lmktfylet runs on) need to be GCE VMs
   - those VMs need to be in the same GCE project and zone as the PD
   - avoid creating multiple pods that use the same Volume if any mount it read/write.
     - if a pod P already mounts a volume read/write, and a second pod Q attempts to use the volume, regardless of if it tries to use it read-only or read/write, Q will fail.
@@ -67,7 +67,7 @@ apiVersion: v1beta1
 desiredState:
   manifest:
     containers:
-      - image: kubernetes/pause
+      - image: lmktfy/pause
         name: testpd
         volumeMounts:
           - mountPath: "/testpd"

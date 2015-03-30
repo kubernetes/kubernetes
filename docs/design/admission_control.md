@@ -1,10 +1,10 @@
-# Kubernetes Proposal - Admission Control
+# LMKTFY Proposal - Admission Control
 
 **Related PR:**
 
 | Topic | Link |
 | ----- | ---- |
-| Separate validation from RESTStorage | https://github.com/GoogleCloudPlatform/kubernetes/issues/2977 |
+| Separate validation from RESTStorage | https://github.com/GoogleCloudPlatform/lmktfy/issues/2977 |
 
 ## Background
 
@@ -18,15 +18,15 @@ Authorization via policy is focused on answering if a user is authorized to perf
 
 Admission Control is focused on if the system will accept an authorized action.
 
-Kubernetes may choose to dismiss an authorized action based on any number of admission control strategies.
+LMKTFY may choose to dismiss an authorized action based on any number of admission control strategies.
 
 This proposal documents the basic design, and describes how any number of admission control plug-ins could be injected.
 
 Implementation of specific admission control strategies are handled in separate documents.
 
-## kube-apiserver
+## lmktfy-apiserver
 
-The kube-apiserver takes the following OPTIONAL arguments to enable admission control
+The lmktfy-apiserver takes the following OPTIONAL arguments to enable admission control
 
 | Option | Behavior |
 | ------ | -------- |

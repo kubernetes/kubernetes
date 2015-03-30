@@ -8,7 +8,7 @@ Celery is implemented in Python.
 
 Since Celery is based on message passing, it requires some middleware (to handle translation of the message between sender and receiver) called a _message broker_. RabbitMQ is a message broker often used in conjunction with Celery.
 
-This example will show you how to use Kubernetes to set up a very basic distributed task queue using Celery as the task queue and RabbitMQ as the message broker. It will also show you how to set up a Flower-based front end to monitor the tasks.
+This example will show you how to use LMKTFY to set up a very basic distributed task queue using Celery as the task queue and RabbitMQ as the message broker. It will also show you how to set up a Flower-based front end to monitor the tasks.
 
 ## Goal
 
@@ -24,7 +24,7 @@ At the end of the example, we will have:
 
 ## Prerequisites
 
-You should already have turned up a Kubernetes cluster. To get the most of this example, ensure that Kubernetes will create more than one minion (e.g. by setting your `NUM_MINIONS` environment variable to 2 or more).
+You should already have turned up a LMKTFY cluster. To get the most of this example, ensure that LMKTFY will create more than one minion (e.g. by setting your `NUM_MINIONS` environment variable to 2 or more).
 
 
 ## Step 1: Start the RabbitMQ service
@@ -52,10 +52,10 @@ Use the file `examples/celery-rabbitmq/rabbitmq-service.json`:
 To start the service, run:
 
 ```shell
-$ kubectl create -f examples/celery-rabbitmq/rabbitmq-service.json
+$ lmktfyctl create -f examples/celery-rabbitmq/rabbitmq-service.json
 ```
 
-**NOTE**: If you're running Kubernetes from source, you can use `cluster/kubectl.sh` instead of `kubectl`.
+**NOTE**: If you're running LMKTFY from source, you can use `cluster/lmktfyctl.sh` instead of `lmktfyctl`.
 
 This service allows other pods to connect to the rabbitmq. To them, it will be seen as available on port 5672, although the service is routing the traffic to the container (also via port 5672).
 
@@ -97,14 +97,14 @@ A RabbitMQ broker can be turned up using the file `examples/celery-rabbitmq/rabb
 }
 ```
 
-Running `$ kubectl create -f examples/celery-rabbitmq/rabbitmq-controller.json` brings up a replication controller that ensures one pod exists which is running a RabbitMQ instance.
+Running `$ lmktfyctl create -f examples/celery-rabbitmq/rabbitmq-controller.json` brings up a replication controller that ensures one pod exists which is running a RabbitMQ instance.
 
 Note that bringing up the pod includes pulling down a docker image, which may take a few moments. This applies to all other pods in this example.
 
 
 ## Step 3: Fire up Celery
 
-Bringing up the celery worker is done by running `$ kubectl create -f examples/celery-rabbitmq/celery-controller.json`, which contains this:
+Bringing up the celery worker is done by running `$ lmktfyctl create -f examples/celery-rabbitmq/celery-controller.json`, which contains this:
 
 ```js
 {
@@ -166,7 +166,7 @@ import os
 
 from celery import Celery
 
-# Get Kubernetes-provided address of the broker service
+# Get LMKTFY-provided address of the broker service
 broker_service_host = os.environ.get('RABBITMQ_SERVICE_SERVICE_HOST')
 
 app = Celery('tasks', broker='amqp://guest@%s//' % broker_service_host, backend='amqp')
@@ -176,7 +176,7 @@ def add(x, y):
     return x + y
 ```
 
-Assuming you're already familiar with how Celery works, everything here should be familiar, except perhaps the part `os.environ.get('RABBITMQ_SERVICE_SERVICE_HOST')`. This environment variable contains the IP address of the RabbitMQ service we created in step 1. Kubernetes automatically provides this environment variable to all containers which have the same app label as that defined in the RabbitMQ service (in this case "taskQueue"). In the Python code above, this has the effect of automatically filling in the broker address when the pod is started.
+Assuming you're already familiar with how Celery works, everything here should be familiar, except perhaps the part `os.environ.get('RABBITMQ_SERVICE_SERVICE_HOST')`. This environment variable contains the IP address of the RabbitMQ service we created in step 1. LMKTFY automatically provides this environment variable to all containers which have the same app label as that defined in the RabbitMQ service (in this case "taskQueue"). In the Python code above, this has the effect of automatically filling in the broker address when the pod is started.
 
 The second python script (run\_tasks.py) periodically executes the `add()` task every 5 seconds with a couple of random numbers.
 
@@ -187,7 +187,7 @@ The question now is, how do you see what's going on?
 
 Flower is a web-based tool for monitoring and administrating Celery clusters. By connecting to the node that contains Celery, you can see the behaviour of all the workers and their tasks in real-time.
 
-To bring up the frontend, run this command `$ kubectl create -f examples/celery-rabbitmq/celery-controller.json`. This controller is defined as so:
+To bring up the frontend, run this command `$ lmktfyctl create -f examples/celery-rabbitmq/celery-controller.json`. This controller is defined as so:
 
 ```js
 {
@@ -228,17 +228,17 @@ This will bring up a new pod with Flower installed and port 5555 (Flower's defau
 flower --broker=amqp://guest:guest@${RABBITMQ_SERVICE_SERVICE_HOST:localhost}:5672//
 ```
 
-Again, it uses the Kubernetes-provided environment variable to obtain the address of the RabbitMQ service.
+Again, it uses the LMKTFY-provided environment variable to obtain the address of the RabbitMQ service.
 
-Once all pods are up and running, running `kubectl get pods` will display something like this:
+Once all pods are up and running, running `lmktfyctl get pods` will display something like this:
 
 ```
 POD                         IP                  CONTAINER(S)        IMAGE(S)                           HOST                    LABELS                                                STATUS
 celery-controller-h3x9k     10.246.1.11         celery              endocode/celery-app-add            10.245.1.3/10.245.1.3   app=taskQueue,name=celery                             Running
 flower-controller-cegta     10.246.2.17         flower              endocode/flower                    10.245.1.4/10.245.1.4   app=taskQueue,name=flower                             Running
-kube-dns-fplln              10.246.1.3          etcd                quay.io/coreos/etcd:latest         10.245.1.3/10.245.1.3   k8s-app=kube-dns,kubernetes.io/cluster-service=true   Running
-                                                kube2sky            kubernetes/kube2sky:1.0                                                                                          
-                                                skydns              kubernetes/skydns:2014-12-23-001                                                                                 
+lmktfy-dns-fplln              10.246.1.3          etcd                quay.io/coreos/etcd:latest         10.245.1.3/10.245.1.3   lmktfy-app=lmktfy-dns,lmktfy.io/cluster-service=true   Running
+                                                lmktfy2sky            lmktfy/lmktfy2sky:1.0                                                                                          
+                                                skydns              lmktfy/skydns:2014-12-23-001                                                                                 
 rabbitmq-controller-pjzb3   10.246.2.16         rabbitmq            dockerfile/rabbitmq                10.245.1.4/10.245.1.4   app=taskQueue,name=rabbitmq                           Running
 
 ```

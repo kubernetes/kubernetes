@@ -19,7 +19,7 @@ package nfs
 import (
 	"os/exec"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/mount"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/util/mount"
 	"github.com/golang/glog"
 )
 

@@ -118,7 +118,7 @@ func TestHTTPContainerInfoGetterGetContainerInfoSuccessfully(t *testing.T) {
 		req,
 		1*time.Second,
 	)
-	testHTTPContainerInfoGetter(req, cinfo, "somePodID", "containerNameInK8S", 0, t)
+	testHTTPContainerInfoGetter(req, cinfo, "somePodID", "containerNameInLMKTFY", 0, t)
 }
 
 func TestHTTPContainerInfoGetterGetRootInfoSuccessfully(t *testing.T) {
@@ -144,7 +144,7 @@ func TestHTTPContainerInfoGetterGetContainerInfoWithError(t *testing.T) {
 		req,
 		1*time.Second,
 	)
-	testHTTPContainerInfoGetter(req, cinfo, "somePodID", "containerNameInK8S", http.StatusNotFound, t)
+	testHTTPContainerInfoGetter(req, cinfo, "somePodID", "containerNameInLMKTFY", http.StatusNotFound, t)
 }
 
 func TestHTTPContainerInfoGetterGetRootInfoWithError(t *testing.T) {

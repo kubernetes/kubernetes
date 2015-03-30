@@ -17,10 +17,10 @@ limitations under the License.
 package api
 
 import (
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/runtime"
 )
 
-// Scheme is the default instance of runtime.Scheme to which types in the Kubernetes API are already registered.
+// Scheme is the default instance of runtime.Scheme to which types in the LMKTFY API are already registered.
 var Scheme = runtime.NewScheme()
 
 func init() {

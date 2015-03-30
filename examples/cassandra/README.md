@@ -1,17 +1,17 @@
-## Cloud Native Deployments of Cassandra using Kubernetes
+## Cloud Native Deployments of Cassandra using LMKTFY
 
-The following document describes the development of a _cloud native_ [Cassandra](http://cassandra.apache.org/) deployment on Kubernetes.  When we say _cloud native_ we mean an application which understands that it is running within a cluster manager, and uses this cluster management infrastructure to help implement the application.  In particular, in this instance, a custom Cassandra ```SeedProvider``` is used to enable Cassandra to dynamically discover new Cassandra nodes as they join the cluster.
+The following document describes the development of a _cloud native_ [Cassandra](http://cassandra.apache.org/) deployment on LMKTFY.  When we say _cloud native_ we mean an application which understands that it is running within a cluster manager, and uses this cluster management infrastructure to help implement the application.  In particular, in this instance, a custom Cassandra ```SeedProvider``` is used to enable Cassandra to dynamically discover new Cassandra nodes as they join the cluster.
 
-This document also attempts to describe the core components of Kubernetes, _Pods_, _Services_ and _Replication Controllers_.
+This document also attempts to describe the core components of LMKTFY, _Pods_, _Services_ and _Replication Controllers_.
 
 ### Prerequisites
-This example assumes that you have a Kubernetes cluster installed and running, and that you have installed the ```kubectl``` command line tool somewhere in your path.  Please see the [getting started](https://github.com/GoogleCloudPlatform/kubernetes/tree/master/docs/getting-started-guides) for installation instructions for your platform.
+This example assumes that you have a LMKTFY cluster installed and running, and that you have installed the ```lmktfyctl``` command line tool somewhere in your path.  Please see the [getting started](https://github.com/GoogleCloudPlatform/lmktfy/tree/master/docs/getting-started-guides) for installation instructions for your platform.
 
 ### A note for the impatient
 This is a somewhat long tutorial.  If you want to jump straight to the "do it now" commands, please see the [tl; dr](#tl-dr) at the end.
 
 ### Simple Single Pod Cassandra Node
-In Kubernetes, the atomic unit of an application is a [_Pod_](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/pods.md).  A Pod is one or more containers that _must_ be scheduled onto the same host.  All containers in a pod share a network namespace, and may optionally share mounted volumes.  In this simple case, we define a single container running Cassandra for our pod:
+In LMKTFY, the atomic unit of an application is a [_Pod_](https://github.com/GoogleCloudPlatform/lmktfy/blob/master/docs/pods.md).  A Pod is one or more containers that _must_ be scheduled onto the same host.  All containers in a pod share a network namespace, and may optionally share mounted volumes.  In this simple case, we define a single container running Cassandra for our pod:
 
 ```yaml
 id: cassandra
@@ -23,7 +23,7 @@ desiredState:
     id: cassandra
     containers:
       - name: cassandra
-        image: kubernetes/cassandra:v2
+        image: lmktfy/cassandra:v2
         command:
           - /run.sh
         cpu: 1000
@@ -41,27 +41,27 @@ labels:
   name: cassandra
 ```
 
-There are a few things to note in this description.  First is that we are running the ```kubernetes/cassandra``` image.  This is a standard Cassandra installation on top of Debian.  However it also adds a custom [```SeedProvider```](https://svn.apache.org/repos/asf/cassandra/trunk/src/java/org/apache/cassandra/locator/SeedProvider.java) to Cassandra.  In Cassandra, a ```SeedProvider``` bootstraps the gossip protocol that Cassandra uses to find other nodes.  The ```KubernetesSeedProvider``` discovers the Kubernetes API Server using the built in Kubernetes discovery service, and then uses the Kubernetes API to find new nodes (more on this later)
+There are a few things to note in this description.  First is that we are running the ```lmktfy/cassandra``` image.  This is a standard Cassandra installation on top of Debian.  However it also adds a custom [```SeedProvider```](https://svn.apache.org/repos/asf/cassandra/trunk/src/java/org/apache/cassandra/locator/SeedProvider.java) to Cassandra.  In Cassandra, a ```SeedProvider``` bootstraps the gossip protocol that Cassandra uses to find other nodes.  The ```LMKTFYSeedProvider``` discovers the LMKTFY API Server using the built in LMKTFY discovery service, and then uses the LMKTFY API to find new nodes (more on this later)
 
-You may also note that we are setting some Cassandra parameters (```MAX_HEAP_SIZE``` and ```HEAP_NEWSIZE```).  We also tell Kubernetes that the container exposes both the ```CQL``` and ```Thrift``` API ports.  Finally, we tell the cluster manager that we need 1000 milli-cpus (1 core).
+You may also note that we are setting some Cassandra parameters (```MAX_HEAP_SIZE``` and ```HEAP_NEWSIZE```).  We also tell LMKTFY that the container exposes both the ```CQL``` and ```Thrift``` API ports.  Finally, we tell the cluster manager that we need 1000 milli-cpus (1 core).
 
 Given this configuration, we can create the pod as follows
 
 ```sh
-$ kubectl create -f cassandra.yaml
+$ lmktfyctl create -f cassandra.yaml
 ```
 
 After a few moments, you should be able to see the pod running:
 
 ```sh
-$ kubectl get pods cassandra
+$ lmktfyctl get pods cassandra
 POD                 CONTAINER(S)        IMAGE(S)               HOST                                                          LABELS              STATUS
-cassandra           cassandra           kubernetes/cassandra   kubernetes-minion-1/1.2.3.4   name=cassandra      Running
+cassandra           cassandra           lmktfy/cassandra   lmktfy-minion-1/1.2.3.4   name=cassandra      Running
 ```
 
 
 ### Adding a Cassandra Service
-In Kubernetes a _Service_ describes a set of Pods that perform the same task.  For example, the set of nodes in a Cassandra cluster, or even the single node we created above.  An important use for a Service is to create a load balancer which distributes traffic across members of the set.  But a _Service_ can also be used as a standing query which makes a dynamically changing set of Pods (or the single Pod we've already created) available via the Kubernetes API.  This is the way that we use initially use Services with Cassandra.
+In LMKTFY a _Service_ describes a set of Pods that perform the same task.  For example, the set of nodes in a Cassandra cluster, or even the single node we created above.  An important use for a Service is to create a load balancer which distributes traffic across members of the set.  But a _Service_ can also be used as a standing query which makes a dynamically changing set of Pods (or the single Pod we've already created) available via the LMKTFY API.  This is the way that we use initially use Services with Cassandra.
 
 Here is the service description:
 ```yaml
@@ -78,12 +78,12 @@ The important thing to note here is the ```selector```. It is a query over label
 
 Create this service as follows:
 ```sh
-$ kubectl create -f cassandra-service.yaml
+$ lmktfyctl create -f cassandra-service.yaml
 ```
 
 Once the service is created, you can query it's endpoints:
 ```sh
-$ kubectl get endpoints cassandra -o yaml
+$ lmktfyctl get endpoints cassandra -o yaml
 apiVersion: v1beta1
 creationTimestamp: 2015-01-05T05:51:50Z
 endpoints:
@@ -99,9 +99,9 @@ uid: f1937b47-949e-11e4-8a8b-42010af0e23e
 You can see that the _Service_ has found the pod we created in step one.
 
 ### Adding replicated nodes
-Of course, a single node cluster isn't particularly interesting.  The real power of Kubernetes and Cassandra lies in easily building a replicated, resizable Cassandra cluster.
+Of course, a single node cluster isn't particularly interesting.  The real power of LMKTFY and Cassandra lies in easily building a replicated, resizable Cassandra cluster.
 
-In Kubernetes a _Replication Controller_ is responsible for replicating sets of identical pods.  Like a _Service_ it has a selector query which identifies the members of it's set.  Unlike a _Service_ it also has a desired number of replicas, and it will create or delete _Pods_ to ensure that the number of _Pods_ matches up with it's desired state.
+In LMKTFY a _Replication Controller_ is responsible for replicating sets of identical pods.  Like a _Service_ it has a selector query which identifies the members of it's set.  Unlike a _Service_ it also has a desired number of replicas, and it will create or delete _Pods_ to ensure that the number of _Pods_ matches up with it's desired state.
 
 Replication Controllers will "adopt" existing pods that match their selector query, so let's create a Replication Controller with a single replica to adopt our existing Cassandra Pod.
 
@@ -121,7 +121,7 @@ desiredState:
         id: cassandra
         containers:
           - name: cassandra
-            image: kubernetes/cassandra:v2
+            image: lmktfy/cassandra:v2
             command:
               - /run.sh
             cpu: 1000
@@ -144,23 +144,23 @@ The bulk of the replication controller config is actually identical to the Cassa
 Create this controller:
 
 ```sh
-$ kubectl create -f cassandra-controller.yaml
+$ lmktfyctl create -f cassandra-controller.yaml
 ```
 
 Now this is actually not that interesting, since we haven't actually done anything new.  Now it will get interesting.
 
 Let's resize our cluster to 2:
 ```sh
-$ kubectl resize rc cassandra --replicas=2
+$ lmktfyctl resize rc cassandra --replicas=2
 ```
 
 Now if you list the pods in your cluster, you should see two cassandra pods:
 
 ```sh
-$ kubectl get pods
+$ lmktfyctl get pods
 POD                                    CONTAINER(S)        IMAGE(S)                       HOST                                                          LABELS              STATUS
-cassandra                              cassandra           kubernetes/cassandra           kubernetes-minion-1.c.my-cloud-code.internal/1.2.3.4   name=cassandra      Running
-16b2beab-94a1-11e4-8a8b-42010af0e23e   cassandra           kubernetes/cassandra           kubernetes-minion-3.c.my-cloud-code.internal/2.3.4.5                 name=cassandra      Running
+cassandra                              cassandra           lmktfy/cassandra           lmktfy-minion-1.c.my-cloud-code.internal/1.2.3.4   name=cassandra      Running
+16b2beab-94a1-11e4-8a8b-42010af0e23e   cassandra           lmktfy/cassandra           lmktfy-minion-3.c.my-cloud-code.internal/2.3.4.5                 name=cassandra      Running
 ```
 
 Notice that one of the pods has the human readable name ```cassandra``` that you specified in your config before, and one has a random string, since it was named by the replication controller.
@@ -181,7 +181,7 @@ UN  10.244.1.10  41.14 KB   256     100.0%            42617acd-b16e-4ee3-9486-68
 
 Now let's resize our cluster to 4 nodes:
 ```sh
-$ kubectl resize rc cassandra --replicas=4
+$ lmktfyctl resize rc cassandra --replicas=4
 ```
 
 Examining the status again:
@@ -203,27 +203,27 @@ For those of you who are impatient, here is the summary of the commands we ran i
 
 ```sh
 # create a single cassandra node
-kubectl create -f cassandra.yaml
+lmktfyctl create -f cassandra.yaml
 
 # create a service to track all cassandra nodes
-kubectl create -f cassandra-service.yaml
+lmktfyctl create -f cassandra-service.yaml
 
 # create a replication controller to replicate cassandra nodes
-kubectl create -f cassandra-controller.yaml
+lmktfyctl create -f cassandra-controller.yaml
 
 # scale up to 2 nodes
-kubectl resize rc cassandra --replicas=2
+lmktfyctl resize rc cassandra --replicas=2
 
 # validate the cluster
 docker exec <container-id> nodetool status
 
 # scale up to 4 nodes
-kubectl resize rc cassandra --replicas=4
+lmktfyctl resize rc cassandra --replicas=4
 ```
 
 ### Seed Provider Source
 ```java
-package io.k8s.cassandra;
+package io.lmktfy.cassandra;
 
 import java.io.IOException;
 import java.net.InetAddress;
@@ -245,7 +245,7 @@ import org.apache.cassandra.locator.SeedProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class KubernetesSeedProvider implements SeedProvider {
+public class LMKTFYSeedProvider implements SeedProvider {
     @JsonIgnoreProperties(ignoreUnknown = true)
     static class Endpoints {
         public String[] endpoints;
@@ -259,13 +259,13 @@ public class KubernetesSeedProvider implements SeedProvider {
         return val;
     }
 
-    private static final Logger logger = LoggerFactory.getLogger(KubernetesSeedProvider.class);
+    private static final Logger logger = LoggerFactory.getLogger(LMKTFYSeedProvider.class);
 
     private List defaultSeeds;
    
-    public KubernetesSeedProvider(Map<String, String> params) {
+    public LMKTFYSeedProvider(Map<String, String> params) {
         // Taken from SimpleSeedProvider.java
-        // These are used as a fallback, if we get nothing from k8s.
+        // These are used as a fallback, if we get nothing from lmktfy.
         String[] hosts = params.get("seeds").split(",", -1);
         defaultSeeds = new ArrayList<InetAddress>(hosts.length);
         for (String host : hosts)
@@ -283,9 +283,9 @@ public class KubernetesSeedProvider implements SeedProvider {
 
     public List<InetAddress> getSeeds() {
         List<InetAddress> list = new ArrayList<InetAddress>();
-        String protocol = getEnvOrDefault("KUBERNETES_API_PROTOCOL", "http");
-        String hostName = getEnvOrDefault("KUBERNETES_RO_SERVICE_HOST", "localhost");
-        String hostPort = getEnvOrDefault("KUBERNETES_RO_SERVICE_PORT", "8080");
+        String protocol = getEnvOrDefault("LMKTFYRNETES_API_PROTOCOL", "http");
+        String hostName = getEnvOrDefault("LMKTFYRNETES_RO_SERVICE_HOST", "localhost");
+        String hostPort = getEnvOrDefault("LMKTFYRNETES_RO_SERVICE_PORT", "8080");
 
         String host = protocol + "://" + hostName + ":" + hostPort;
         String serviceName = getEnvOrDefault("CASSANDRA_SERVICE", "cassandra");
@@ -304,7 +304,7 @@ public class KubernetesSeedProvider implements SeedProvider {
             }
 	    }
         } catch (IOException ex) {
-	    logger.warn("Request to kubernetes apiserver failed"); 
+	    logger.warn("Request to lmktfy apiserver failed"); 
         }
         if (list.size() == 0) {
 	    // If we got nothing, we might be the first instance, in that case
@@ -316,7 +316,7 @@ public class KubernetesSeedProvider implements SeedProvider {
 
     // Simple main to test the implementation
     public static void main(String[] args) {
-        SeedProvider provider = new KubernetesSeedProvider(new HashMap<String, String>());
+        SeedProvider provider = new LMKTFYSeedProvider(new HashMap<String, String>());
         System.out.println(provider.getSeeds());
     }
 }

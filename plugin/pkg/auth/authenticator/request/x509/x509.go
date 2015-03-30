@@ -20,8 +20,8 @@ import (
 	"crypto/x509"
 	"net/http"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/user"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/errors"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/auth/user"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/util/errors"
 )
 
 // UserConversion defines an interface for extracting user info from a client certificate chain

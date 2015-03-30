@@ -26,10 +26,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/clientauth"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/client"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/client/clientcmd"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/clientauth"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -42,7 +42,7 @@ const (
 )
 
 type testContextType struct {
-	kubeConfig string
+	lmktfyConfig string
 	authConfig string
 	certDir    string
 	host       string
@@ -133,11 +133,11 @@ func waitForPodSuccess(c *client.Client, podName string, contName string) error 
 
 func loadConfig() (*client.Config, error) {
 	switch {
-	case testContext.kubeConfig != "":
-		fmt.Printf(">>> testContext.kubeConfig: %s\n", testContext.kubeConfig)
-		c, err := clientcmd.LoadFromFile(testContext.kubeConfig)
+	case testContext.lmktfyConfig != "":
+		fmt.Printf(">>> testContext.lmktfyConfig: %s\n", testContext.lmktfyConfig)
+		c, err := clientcmd.LoadFromFile(testContext.lmktfyConfig)
 		if err != nil {
-			return nil, fmt.Errorf("error loading kubeConfig: %v", err.Error())
+			return nil, fmt.Errorf("error loading lmktfyConfig: %v", err.Error())
 		}
 		return clientcmd.NewDefaultClientConfig(*c, &clientcmd.ConfigOverrides{}).ClientConfig()
 	case testContext.authConfig != "":
@@ -152,13 +152,13 @@ func loadConfig() (*client.Config, error) {
 		if testContext.certDir != "" {
 			Logf("Expecting certs in %v.", testContext.certDir)
 			info.CAFile = filepath.Join(testContext.certDir, "ca.crt")
-			info.CertFile = filepath.Join(testContext.certDir, "kubecfg.crt")
-			info.KeyFile = filepath.Join(testContext.certDir, "kubecfg.key")
+			info.CertFile = filepath.Join(testContext.certDir, "lmktfycfg.crt")
+			info.KeyFile = filepath.Join(testContext.certDir, "lmktfycfg.key")
 		}
 		mergedConfig, err := info.MergeWithConfig(*config)
 		return &mergedConfig, err
 	default:
-		return nil, fmt.Errorf("either kubeConfig or authConfig must be specified to load client config")
+		return nil, fmt.Errorf("either lmktfyConfig or authConfig must be specified to load client config")
 	}
 }
 
@@ -189,10 +189,10 @@ func expectNoError(err error, explain ...interface{}) {
 
 func cleanup(filePath string, selectors ...string) {
 	By("using stop to clean up resources")
-	runKubectl("stop", "-f", filePath)
+	runLMKTFYctl("stop", "-f", filePath)
 
 	for _, selector := range selectors {
-		resources := runKubectl("get", "pods,rc,se", "-l", selector, "--no-headers")
+		resources := runLMKTFYctl("get", "pods,rc,se", "-l", selector, "--no-headers")
 		if resources != "" {
 			Failf("Resources left running after stop:\n%s", resources)
 		}
@@ -211,13 +211,13 @@ type validatorFn func(c *client.Client, podID string) error
 // "validator" function: This function is given a podID and a client, and it can do some specific validations that way.
 func validateController(c *client.Client, containerImage string, replicas int, containername string, testname string, validator validatorFn) {
 	getPodsTemplate := "--template={{range.items}}{{.id}} {{end}}"
-	// NB: kubectl adds the "exists" function to the standard template functions.
+	// NB: lmktfyctl adds the "exists" function to the standard template functions.
 	// This lets us check to see if the "running" entry exists for each of the containers
 	// we care about. Exists will never return an error and it's safe to check a chain of
 	// things, any one of which may not exist. In the below template, all of info,
 	// containername, and running might be nil, so the normal index function isn't very
 	// helpful.
-	// This template is unit-tested in kubectl, so if you change it, update the unit test.
+	// This template is unit-tested in lmktfyctl, so if you change it, update the unit test.
 	// You can read about the syntax here: http://golang.org/pkg/text/template/.
 	getContainerStateTemplate := fmt.Sprintf(`--template={{and (exists . "currentState" "info" "%s" "state" "running")}}`, containername)
 
@@ -225,7 +225,7 @@ func validateController(c *client.Client, containerImage string, replicas int, c
 
 	By(fmt.Sprintf("waiting for all containers in %s pods to come up.", testname)) //testname should be selector
 	for start := time.Now(); time.Since(start) < podStartTimeout; time.Sleep(5 * time.Second) {
-		getPodsOutput := runKubectl("get", "pods", "-o", "template", getPodsTemplate, "-l", testname)
+		getPodsOutput := runLMKTFYctl("get", "pods", "-o", "template", getPodsTemplate, "-l", testname)
 		pods := strings.Fields(getPodsOutput)
 		if numPods := len(pods); numPods != replicas {
 			By(fmt.Sprintf("Replicas for %s: expected=%d actual=%d", testname, replicas, numPods))
@@ -233,13 +233,13 @@ func validateController(c *client.Client, containerImage string, replicas int, c
 		}
 		var runningPods []string
 		for _, podID := range pods {
-			running := runKubectl("get", "pods", podID, "-o", "template", getContainerStateTemplate)
+			running := runLMKTFYctl("get", "pods", podID, "-o", "template", getContainerStateTemplate)
 			if running == "false" {
 				Logf("%s is created but not running", podID)
 				continue
 			}
 
-			currentImage := runKubectl("get", "pods", podID, "-o", "template", getImageTemplate)
+			currentImage := runLMKTFYctl("get", "pods", podID, "-o", "template", getImageTemplate)
 			if currentImage != containerImage {
 				Logf("%s is created but running wrong image; expected: %s, actual: %s", podID, containerImage, currentImage)
 				continue
@@ -264,34 +264,34 @@ func validateController(c *client.Client, containerImage string, replicas int, c
 	Failf("Timed out after %v seconds waiting for %s pods to reach valid state", podStartTimeout.Seconds(), testname)
 }
 
-// kubectlCmd runs the kubectl executable.
-func kubectlCmd(args ...string) *exec.Cmd {
+// lmktfyctlCmd runs the lmktfyctl executable.
+func lmktfyctlCmd(args ...string) *exec.Cmd {
 	defaultArgs := []string{}
-	if testContext.kubeConfig != "" {
-		defaultArgs = append(defaultArgs, "--"+clientcmd.RecommendedConfigPathFlag+"="+testContext.kubeConfig)
+	if testContext.lmktfyConfig != "" {
+		defaultArgs = append(defaultArgs, "--"+clientcmd.RecommendedConfigPathFlag+"="+testContext.lmktfyConfig)
 	} else {
 		defaultArgs = append(defaultArgs, "--"+clientcmd.FlagAuthPath+"="+testContext.authConfig)
 		if testContext.certDir != "" {
 			defaultArgs = append(defaultArgs,
 				fmt.Sprintf("--certificate-authority=%s", filepath.Join(testContext.certDir, "ca.crt")),
-				fmt.Sprintf("--client-certificate=%s", filepath.Join(testContext.certDir, "kubecfg.crt")),
-				fmt.Sprintf("--client-key=%s", filepath.Join(testContext.certDir, "kubecfg.key")))
+				fmt.Sprintf("--client-certificate=%s", filepath.Join(testContext.certDir, "lmktfycfg.crt")),
+				fmt.Sprintf("--client-key=%s", filepath.Join(testContext.certDir, "lmktfycfg.key")))
 		}
 	}
-	kubectlArgs := append(defaultArgs, args...)
-	// TODO: Remove this once gcloud writes a proper entry in the kubeconfig file.
+	lmktfyctlArgs := append(defaultArgs, args...)
+	// TODO: Remove this once gcloud writes a proper entry in the lmktfyconfig file.
 	if testContext.provider == "gke" {
-		kubectlArgs = append(kubectlArgs, "--server="+testContext.host)
+		lmktfyctlArgs = append(lmktfyctlArgs, "--server="+testContext.host)
 	}
-	//TODO: the "kubectl" path string might be worth externalizing into an (optional) ginko arg.
-	cmd := exec.Command("kubectl", kubectlArgs...)
+	//TODO: the "lmktfyctl" path string might be worth externalizing into an (optional) ginko arg.
+	cmd := exec.Command("lmktfyctl", lmktfyctlArgs...)
 	Logf("Running '%s %s'", cmd.Path, strings.Join(cmd.Args, " "))
 	return cmd
 }
 
-func runKubectl(args ...string) string {
+func runLMKTFYctl(args ...string) string {
 	var stdout, stderr bytes.Buffer
-	cmd := kubectlCmd(args...)
+	cmd := lmktfyctlCmd(args...)
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr
 
 	if err := cmd.Run(); err != nil {
@@ -299,6 +299,6 @@ func runKubectl(args ...string) string {
 		return ""
 	}
 	Logf(stdout.String())
-	// TODO: trimspace should be unnecessary after switching to use kubectl binary directly
+	// TODO: trimspace should be unnecessary after switching to use lmktfyctl binary directly
 	return strings.TrimSpace(stdout.String())
 }

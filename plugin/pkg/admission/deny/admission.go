@@ -20,9 +20,9 @@ import (
 	"errors"
 	"io"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/admission"
-	apierrors "github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/admission"
+	apierrors "github.com/GoogleCloudPlatform/lmktfy/pkg/api/errors"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/client"
 )
 
 func init() {

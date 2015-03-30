@@ -21,4 +21,4 @@ set -o nounset
 set -o pipefail
 
 guestbook_version=${1:-latest}
-docker push "kubernetes/guestbook:${guestbook_version}"
+docker push "lmktfy/guestbook:${guestbook_version}"

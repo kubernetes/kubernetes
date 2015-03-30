@@ -1,7 +1,7 @@
-GitHub Issues for the Kubernetes Project
+GitHub Issues for the LMKTFY Project
 ========================================
 
-A list quick overview of how we will review and prioritize incoming issues at https://github.com/GoogleCloudPlatform/kubernetes/issues
+A list quick overview of how we will review and prioritize incoming issues at https://github.com/GoogleCloudPlatform/lmktfy/issues
 
 Priorities
 ----------
@@ -10,7 +10,7 @@ We will use GitHub issue labels for prioritization.  The absence of a priority l
 
 Priorities are "moment in time" labels, and what is low priority today, could be high priority tomorrow, and vice versa.  As we move to v1.0, we may decide certain bugs aren't actually needed yet, or that others really do need to be pulled in.
 
-Here we define the priorities for up until v1.0.  Once the Kubernetes project hits 1.0, we will revisit the scheme and update as appropriate.
+Here we define the priorities for up until v1.0.  Once the LMKTFY project hits 1.0, we will revisit the scheme and update as appropriate.
 
 Definitions
 -----------

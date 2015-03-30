@@ -23,7 +23,7 @@ import (
 	"net/url"
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/rest"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api/rest"
 )
 
 func TestRedirect(t *testing.T) {

@@ -20,8 +20,8 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/authenticator"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/user"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/auth/authenticator"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/auth/user"
 )
 
 type Authenticator struct {

@@ -35,9 +35,9 @@ import (
 	"github.com/rackspace/gophercloud/openstack/networking/v2/extensions/lbaas/vips"
 	"github.com/rackspace/gophercloud/pagination"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api/resource"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/cloudprovider"
 	"github.com/golang/glog"
 )
 
@@ -547,7 +547,7 @@ func (lb *LoadBalancer) CreateTCPLoadBalancer(name, region string, externalIP ne
 
 	vip, err := vips.Create(lb.network, vips.CreateOpts{
 		Name:         name,
-		Description:  fmt.Sprintf("Kubernetes external service %s", name),
+		Description:  fmt.Sprintf("LMKTFY external service %s", name),
 		Address:      externalIP.String(),
 		Protocol:     "TCP",
 		ProtocolPort: port,

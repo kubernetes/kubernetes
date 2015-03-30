@@ -25,14 +25,14 @@ import (
 	"github.com/ghodss/yaml"
 	"github.com/imdario/mergo"
 
-	clientcmdapi "github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd/api"
-	clientcmdlatest "github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd/api/latest"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/errors"
+	clientcmdapi "github.com/GoogleCloudPlatform/lmktfy/pkg/client/clientcmd/api"
+	clientcmdlatest "github.com/GoogleCloudPlatform/lmktfy/pkg/client/clientcmd/api/latest"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/util/errors"
 )
 
 const (
-	RecommendedConfigPathFlag   = "kubeconfig"
-	RecommendedConfigPathEnvVar = "KUBECONFIG"
+	RecommendedConfigPathFlag   = "lmktfyconfig"
+	RecommendedConfigPathEnvVar = "LMKTFYCONFIG"
 
 	DefaultEnvVarIndex     = 0
 	DefaultCurrentDirIndex = 1
@@ -54,7 +54,7 @@ type ClientConfigLoadingRules struct {
 // use this constructor
 func NewDefaultClientConfigLoadingRules() *ClientConfigLoadingRules {
 	return &ClientConfigLoadingRules{
-		Precedence: []string{os.Getenv(RecommendedConfigPathEnvVar), ".kubeconfig", os.Getenv("HOME") + "/.kube/.kubeconfig"},
+		Precedence: []string{os.Getenv(RecommendedConfigPathEnvVar), ".lmktfyconfig", os.Getenv("HOME") + "/.lmktfy/.lmktfyconfig"},
 	}
 }
 
@@ -68,7 +68,7 @@ func NewDefaultClientConfigLoadingRules() *ClientConfigLoadingRules {
 // This results in some odd looking logic to merge in one direction, merge in the other, and then merge the two.
 // It also means that if two files specify a "red-user", only values from the first file's red-user are used.  Even
 // non-conflicting entries from the second file's "red-user" are discarded.
-// Relative paths inside of the .kubeconfig files are resolved against the .kubeconfig file's parent folder
+// Relative paths inside of the .lmktfyconfig files are resolved against the .lmktfyconfig file's parent folder
 // and only absolute file paths are returned.
 func (rules *ClientConfigLoadingRules) Load() (*clientcmdapi.Config, error) {
 
@@ -81,12 +81,12 @@ func (rules *ClientConfigLoadingRules) Load() (*clientcmdapi.Config, error) {
 		}
 	}
 
-	kubeConfigFiles := []string{rules.ExplicitPath}
-	kubeConfigFiles = append(kubeConfigFiles, rules.Precedence...)
+	lmktfyConfigFiles := []string{rules.ExplicitPath}
+	lmktfyConfigFiles = append(lmktfyConfigFiles, rules.Precedence...)
 
 	// first merge all of our maps
 	mapConfig := clientcmdapi.NewConfig()
-	for _, file := range kubeConfigFiles {
+	for _, file := range lmktfyConfigFiles {
 		if err := mergeConfigWithFile(mapConfig, file); err != nil {
 			errlist = append(errlist, err)
 		}
@@ -98,8 +98,8 @@ func (rules *ClientConfigLoadingRules) Load() (*clientcmdapi.Config, error) {
 	// merge all of the struct values in the reverse order so that priority is given correctly
 	// errors are not added to the list the second time
 	nonMapConfig := clientcmdapi.NewConfig()
-	for i := len(kubeConfigFiles) - 1; i >= 0; i-- {
-		file := kubeConfigFiles[i]
+	for i := len(lmktfyConfigFiles) - 1; i >= 0; i-- {
+		file := lmktfyConfigFiles[i]
 		mergeConfigWithFile(nonMapConfig, file)
 		ResolveLocalPaths(file, nonMapConfig)
 	}
@@ -178,11 +178,11 @@ func resolveLocalPath(startingDir, path string) string {
 
 // LoadFromFile takes a filename and deserializes the contents into Config object
 func LoadFromFile(filename string) (*clientcmdapi.Config, error) {
-	kubeconfigBytes, err := ioutil.ReadFile(filename)
+	lmktfyconfigBytes, err := ioutil.ReadFile(filename)
 	if err != nil {
 		return nil, err
 	}
-	return Load(kubeconfigBytes)
+	return Load(lmktfyconfigBytes)
 }
 
 // Load takes a byte slice and deserializes the contents into Config object.

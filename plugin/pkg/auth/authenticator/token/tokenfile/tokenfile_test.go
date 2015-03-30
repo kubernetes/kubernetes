@@ -22,7 +22,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/user"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/auth/user"
 )
 
 func TestTokenFile(t *testing.T) {

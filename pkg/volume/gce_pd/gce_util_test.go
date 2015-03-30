@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/exec"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/util/exec"
 )
 
 func TestSafeFormatAndMount(t *testing.T) {

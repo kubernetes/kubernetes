@@ -17,7 +17,7 @@ limitations under the License.
 package latest
 
 import (
-	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler/api/v1"
+	"github.com/GoogleCloudPlatform/lmktfy/plugin/pkg/scheduler/api/v1"
 )
 
 // Version is the string that represents the current external default version.
@@ -34,5 +34,5 @@ var Versions = []string{"v1"}
 
 // Codec is the default codec for serializing input that should use
 // the latest supported version.
-// This codec can decode any object that Kubernetes is aware of.
+// This codec can decode any object that LMKTFY is aware of.
 var Codec = v1.Codec

@@ -15,5 +15,5 @@ limitations under the License.
 */
 
 // Package meta provides functions for retrieving API metadata from objects
-// belonging to the Kubernetes API
+// belonging to the LMKTFY API
 package meta

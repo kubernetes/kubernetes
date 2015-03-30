@@ -20,11 +20,11 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/client"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/lmktfyctl"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/labels"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/util"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -40,13 +40,13 @@ var _ = Describe("ReplicationController", func() {
 	})
 
 	It("should serve a basic image on each replica with a public image", func() {
-		ServeImageOrFail(c, "basic", "kubernetes/serve_hostname:1.1")
+		ServeImageOrFail(c, "basic", "lmktfy/serve_hostname:1.1")
 	})
 
 	It("should serve a basic image on each replica with a private image", func() {
 		switch testContext.provider {
 		case "gce", "gke":
-			ServeImageOrFail(c, "private", "gcr.io/_b_k8s_authenticated_test/serve_hostname:1.1")
+			ServeImageOrFail(c, "private", "gcr.io/_b_lmktfy_authenticated_test/serve_hostname:1.1")
 		default:
 			By(fmt.Sprintf("Skipping private variant, which is only supported for providers gce and gke (not %s)",
 				testContext.provider))
@@ -64,7 +64,7 @@ func ServeImageOrFail(c *client.Client, test string, image string) {
 
 	// Create a replication controller for a service
 	// that serves its hostname.
-	// The source for the Docker containter kubernetes/serve_hostname is
+	// The source for the Docker containter lmktfy/serve_hostname is
 	// in contrib/for-demos/serve_hostname
 	By(fmt.Sprintf("Creating replication controller %s", name))
 	controller, err := c.ReplicationControllers(ns).Create(&api.ReplicationController{
@@ -97,7 +97,7 @@ func ServeImageOrFail(c *client.Client, test string, image string) {
 	defer func() {
 		// Resize the replication controller to zero to get rid of pods.
 		By("Cleaning up the replication controller")
-		rcReaper, err := kubectl.ReaperFor("ReplicationController", c)
+		rcReaper, err := lmktfyctl.ReaperFor("ReplicationController", c)
 		if err != nil {
 			Logf("Failed to cleanup replication controller %v: %v.", controller.Name, err)
 		}

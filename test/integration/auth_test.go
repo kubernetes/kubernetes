@@ -34,16 +34,16 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/authenticator"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/authenticator/bearertoken"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/authorizer"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/authorizer/abac"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/user"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/master"
-	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/admission/admit"
-	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/auth/authenticator/token/tokentest"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/apiserver"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/auth/authenticator"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/auth/authenticator/bearertoken"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/auth/authorizer"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/auth/authorizer/abac"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/auth/user"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/client"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/master"
+	"github.com/GoogleCloudPlatform/lmktfy/plugin/pkg/admission/admit"
+	"github.com/GoogleCloudPlatform/lmktfy/plugin/pkg/auth/authenticator/token/tokentest"
 )
 
 func init() {
@@ -312,7 +312,7 @@ func TestAuthModeAlwaysAllow(t *testing.T) {
 
 	m = master.New(&master.Config{
 		EtcdHelper:        helper,
-		KubeletClient:     client.FakeKubeletClient{},
+		LMKTFYletClient:     client.FakeLMKTFYletClient{},
 		EnableLogsSupport: false,
 		EnableUISupport:   false,
 		EnableIndex:       true,
@@ -415,7 +415,7 @@ func TestAuthModeAlwaysDeny(t *testing.T) {
 
 	m = master.New(&master.Config{
 		EtcdHelper:        helper,
-		KubeletClient:     client.FakeKubeletClient{},
+		LMKTFYletClient:     client.FakeLMKTFYletClient{},
 		EnableLogsSupport: false,
 		EnableUISupport:   false,
 		EnableIndex:       true,
@@ -482,7 +482,7 @@ func TestAliceNotForbiddenOrUnauthorized(t *testing.T) {
 
 	m = master.New(&master.Config{
 		EtcdHelper:        helper,
-		KubeletClient:     client.FakeKubeletClient{},
+		LMKTFYletClient:     client.FakeLMKTFYletClient{},
 		EnableLogsSupport: false,
 		EnableUISupport:   false,
 		EnableIndex:       true,
@@ -568,7 +568,7 @@ func TestBobIsForbidden(t *testing.T) {
 
 	m = master.New(&master.Config{
 		EtcdHelper:        helper,
-		KubeletClient:     client.FakeKubeletClient{},
+		LMKTFYletClient:     client.FakeLMKTFYletClient{},
 		EnableLogsSupport: false,
 		EnableUISupport:   false,
 		EnableIndex:       true,
@@ -629,7 +629,7 @@ func TestUnknownUserIsUnauthorized(t *testing.T) {
 
 	m = master.New(&master.Config{
 		EtcdHelper:        helper,
-		KubeletClient:     client.FakeKubeletClient{},
+		LMKTFYletClient:     client.FakeLMKTFYletClient{},
 		EnableLogsSupport: false,
 		EnableUISupport:   false,
 		EnableIndex:       true,
@@ -709,7 +709,7 @@ func TestNamespaceAuthorization(t *testing.T) {
 
 	m = master.New(&master.Config{
 		EtcdHelper:        helper,
-		KubeletClient:     client.FakeKubeletClient{},
+		LMKTFYletClient:     client.FakeLMKTFYletClient{},
 		EnableLogsSupport: false,
 		EnableUISupport:   false,
 		EnableIndex:       true,
@@ -824,7 +824,7 @@ func TestKindAuthorization(t *testing.T) {
 
 	m = master.New(&master.Config{
 		EtcdHelper:        helper,
-		KubeletClient:     client.FakeKubeletClient{},
+		LMKTFYletClient:     client.FakeLMKTFYletClient{},
 		EnableLogsSupport: false,
 		EnableUISupport:   false,
 		EnableIndex:       true,
@@ -927,7 +927,7 @@ func TestReadOnlyAuthorization(t *testing.T) {
 
 	m = master.New(&master.Config{
 		EtcdHelper:        helper,
-		KubeletClient:     client.FakeKubeletClient{},
+		LMKTFYletClient:     client.FakeLMKTFYletClient{},
 		EnableLogsSupport: false,
 		EnableUISupport:   false,
 		EnableIndex:       true,

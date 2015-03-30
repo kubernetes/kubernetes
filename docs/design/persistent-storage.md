@@ -18,7 +18,7 @@ One new volume:
 
 `PersistentVolumeClaimVolumeSource` references the user's PVC in the same namespace.  This volume finds the bound PV and mounts that volume for the pod.  A `PersistentVolumeClaimVolumeSource` is, essentially, a wrapper around another type of volume that is owned by someone else (the system).
 
-Kubernetes makes no guarantees at runtime that the underlying storage exists or is available.  High availability is left to the storage provider.
+LMKTFY makes no guarantees at runtime that the underlying storage exists or is available.  High availability is left to the storage provider.
 
 ### Goals
 
@@ -32,7 +32,7 @@ Kubernetes makes no guarantees at runtime that the underlying storage exists or 
 
 #### Describe available storage
 
-Cluster administrators use the API to manage *PersistentVolumes*.  The singleton PersistentVolumeManager watches the Kubernetes API for new volumes and adds them to its internal cache of volumes in the system. All persistent volumes are managed and made available by the volume manager.  The manager also watches for new claims for storage and binds them to an available volume by matching the volume's characteristics (AccessModes and storage size) to the user's request.
+Cluster administrators use the API to manage *PersistentVolumes*.  The singleton PersistentVolumeManager watches the LMKTFY API for new volumes and adds them to its internal cache of volumes in the system. All persistent volumes are managed and made available by the volume manager.  The manager also watches for new claims for storage and binds them to an available volume by matching the volume's characteristics (AccessModes and storage size) to the user's request.
 
 PVs are system objects and, thus, have no namespace.
 
@@ -53,7 +53,7 @@ Many means of dynamic provisioning will be eventually be implemented for various
 
 #### Request Storage
 
-Kubernetes users request persistent storage for their pod by creating a ```PersistentVolumeClaim```.  Their request for storage is described by their requirements for resources and mount capabilities.
+LMKTFY users request persistent storage for their pod by creating a ```PersistentVolumeClaim```.  Their request for storage is described by their requirements for resources and mount capabilities.
 
 Requests for volumes are bound to available volumes by the volume manager, if a suitable match is found.  Requests for resources can go unfulfilled.
 
@@ -110,7 +110,7 @@ spec:
 
 --------------------------------------------------
 
-cluster/kubectl.sh get pv
+cluster/lmktfyctl.sh get pv
 
 NAME                LABELS              CAPACITY            ACCESSMODES         STATUS              CLAIM
 pv0001              map[]               10737418240         RWO                 Pending    
@@ -140,7 +140,7 @@ spec:
 
 --------------------------------------------------
 
-cluster/kubectl.sh get pvc
+cluster/lmktfyctl.sh get pvc
 
 
 NAME                LABELS              STATUS              VOLUME
@@ -155,13 +155,13 @@ myclaim-1           map[]               pending
 
 ```
 
-cluster/kubectl.sh get pv
+cluster/lmktfyctl.sh get pv
 
 NAME                LABELS              CAPACITY            ACCESSMODES         STATUS              CLAIM
 pv0001              map[]               10737418240         RWO                 Bound               myclaim-1 / f4b3d283-c0ef-11e4-8be4-80e6500a981e
 
 
-cluster/kubectl.sh get pvc
+cluster/lmktfyctl.sh get pvc
 
 NAME                LABELS              STATUS              VOLUME
 myclaim-1           map[]               Bound               b16e91d6-c0ef-11e4-8be4-80e6500a981e
@@ -205,7 +205,7 @@ When a claim holder is finished with their data, they can delete their claim.
 
 ```
 
-cluster/kubectl.sh delete pvc myclaim-1
+cluster/lmktfyctl.sh delete pvc myclaim-1
 
 ```
 

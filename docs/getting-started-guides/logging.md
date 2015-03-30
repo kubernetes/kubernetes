@@ -5,7 +5,7 @@
 ### Logging with Fluentd and Elastiscsearch
 
 To enable logging of the stdout and stderr output of every Docker container in
-a Kubernetes cluster set the shell environment variables
+a LMKTFY cluster set the shell environment variables
 ``ENABLE_NODE_LOGGING`` to ``true`` and ``LOGGING_DESTINATION`` to ``elasticsearch``.
 
 e.g. in bash:

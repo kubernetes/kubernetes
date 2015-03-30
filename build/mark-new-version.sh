@@ -20,7 +20,7 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+LMKTFY_ROOT=$(dirname "${BASH_SOURCE}")/..
 
 NEW_VERSION=${1-}
 
@@ -51,19 +51,19 @@ if [[ "${VERSION_PATCH}" != "0" ]]; then
   # sorry, no going back in time, pull latest from upstream
   git remote update > /dev/null 2>&1
 
-  if git ls-remote --tags --exit-code git@github.com:GoogleCloudPlatform/kubernetes.git refs/tags/${NEW_VERSION} > /dev/null; then
+  if git ls-remote --tags --exit-code git@github.com:GoogleCloudPlatform/lmktfy.git refs/tags/${NEW_VERSION} > /dev/null; then
     echo "!!! You are trying to tag ${NEW_VERSION} but it already exists.  Stop it!"
     exit 1
   fi
 
   last_version="v${VERSION_MAJOR}.${VERSION_MINOR}.$((VERSION_PATCH-1))"
-  if ! git ls-remote --tags --exit-code git@github.com:GoogleCloudPlatform/kubernetes.git refs/tags/${last_version} > /dev/null; then
+  if ! git ls-remote --tags --exit-code git@github.com:GoogleCloudPlatform/lmktfy.git refs/tags/${last_version} > /dev/null; then
     echo "!!! You are trying to tag ${NEW_VERSION} but ${last_version} doesn't even exist!"
     exit 1
   fi
 
   # this is rather magic.  This checks that HEAD is a descendant of the github branch release-x.y
-  branches=$(git branch --contains $(git ls-remote --heads git@github.com:GoogleCloudPlatform/kubernetes.git refs/heads/${release_branch} | cut -f1) ${current_branch})
+  branches=$(git branch --contains $(git ls-remote --heads git@github.com:GoogleCloudPlatform/lmktfy.git refs/heads/${release_branch} | cut -f1) ${current_branch})
   if [[ $? -ne 0 ]]; then
     echo "!!! git failed, I dunno...."
     exit 1
@@ -83,7 +83,7 @@ if ! ("$SED" --version 2>&1 | grep -q GNU); then
   echo "!!! GNU sed is required.  If on OS X, use 'brew install gnu-sed'."
 fi
 
-VERSION_FILE="${KUBE_ROOT}/pkg/version/base.go"
+VERSION_FILE="${LMKTFY_ROOT}/pkg/version/base.go"
 
 GIT_MINOR="${VERSION_MINOR}.${VERSION_PATCH}"
 echo "+++ Updating to ${NEW_VERSION}"
@@ -94,10 +94,10 @@ gofmt -s -w "${VERSION_FILE}"
 
 echo "+++ Committing version change"
 git add "${VERSION_FILE}"
-git commit -m "Kubernetes version $NEW_VERSION"
+git commit -m "LMKTFY version $NEW_VERSION"
 
 echo "+++ Tagging version"
-git tag -a -m "Kubernetes version $NEW_VERSION" "${NEW_VERSION}"
+git tag -a -m "LMKTFY version $NEW_VERSION" "${NEW_VERSION}"
 
 echo "+++ Updating to ${NEW_VERSION}-dev"
 "$SED" -r -i -e "s/gitMajor\s+string = \"[^\"]*\"/gitMajor string = \"${VERSION_MAJOR}\"/" "${VERSION_FILE}"
@@ -107,13 +107,13 @@ gofmt -s -w "${VERSION_FILE}"
 
 echo "+++ Committing version change"
 git add "${VERSION_FILE}"
-git commit -m "Kubernetes version ${NEW_VERSION}-dev"
+git commit -m "LMKTFY version ${NEW_VERSION}-dev"
 
 echo ""
 echo "Success you must now:"
 echo ""
 echo "- Push the tag:"
-echo "   git push git@github.com:GoogleCloudPlatform/kubernetes.git v${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH}"
+echo "   git push git@github.com:GoogleCloudPlatform/lmktfy.git v${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH}"
 echo "   - Please note you are pushing the tag live BEFORE your PRs."
 echo "       You need this so the builds pick up the right tag info."
 echo "       If something goes wrong further down please fix the tag!"
@@ -125,7 +125,7 @@ if [[ "${VERSION_PATCH}" == "0" ]]; then
   echo "- Submit branch: ${current_branch} as a PR to master"
   echo "- Get someone to review and merge that PR"
   echo "- Push the new release branch"
-  echo "   git push git@github.com:GoogleCloudPlatform/kubernetes.git ${current_branch}:${release_branch}"
+  echo "   git push git@github.com:GoogleCloudPlatform/lmktfy.git ${current_branch}:${release_branch}"
 else
   echo "- Submit branch: ${current_branch} as a PR to ${release_branch}"
   echo "- Get someone to review and merge that PR"

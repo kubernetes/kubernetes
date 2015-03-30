@@ -1,7 +1,7 @@
 <project>
   <modelVersion>4.0.0</modelVersion>
-  <groupId>io.k8s.cassandra</groupId>
-  <artifactId>kubernetes-cassandra</artifactId>
+  <groupId>io.lmktfy.cassandra</groupId>
+  <artifactId>lmktfy-cassandra</artifactId>
   <version>0.0.2</version>
   <build>
     <sourceDirectory>src</sourceDirectory>

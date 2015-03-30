@@ -16,10 +16,10 @@
 
 # A library of helper functions and constant for the local config.
 
-# Use the config file specified in $KUBE_CONFIG_FILE, or default to
+# Use the config file specified in $LMKTFY_CONFIG_FILE, or default to
 # config-default.sh.
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
-source "${KUBE_ROOT}/cluster/aws/${KUBE_CONFIG_FILE-"config-default.sh"}"
+LMKTFY_ROOT=$(dirname "${BASH_SOURCE}")/../..
+source "${LMKTFY_ROOT}/cluster/aws/${LMKTFY_CONFIG_FILE-"config-default.sh"}"
 
 export AWS_DEFAULT_REGION=${ZONE}
 AWS_CMD="aws --output json ec2"
@@ -38,7 +38,7 @@ function get_instance_ids {
 }
 
 function get_vpc_id {
-  python -c 'import json,sys; lst = [str(vpc["VpcId"]) for vpc in json.load(sys.stdin)["Vpcs"] for tag in vpc.get("Tags", []) if tag["Value"] == "kubernetes-vpc"]; print "".join(lst)'
+  python -c 'import json,sys; lst = [str(vpc["VpcId"]) for vpc in json.load(sys.stdin)["Vpcs"] for tag in vpc.get("Tags", []) if tag["Value"] == "lmktfy-vpc"]; print "".join(lst)'
 }
 
 function get_subnet_id {
@@ -72,26 +72,26 @@ function get_instance_public_ip {
 
 
 function detect-master () {
-  KUBE_MASTER=${MASTER_NAME}
-  if [[ -z "${KUBE_MASTER_IP-}" ]]; then
-    KUBE_MASTER_IP=$(get_instance_public_ip $MASTER_NAME)
+  LMKTFY_MASTER=${MASTER_NAME}
+  if [[ -z "${LMKTFY_MASTER_IP-}" ]]; then
+    LMKTFY_MASTER_IP=$(get_instance_public_ip $MASTER_NAME)
   fi
-  if [[ -z "${KUBE_MASTER_IP-}" ]]; then
-    echo "Could not detect Kubernetes master node.  Make sure you've launched a cluster with 'kube-up.sh'"
+  if [[ -z "${LMKTFY_MASTER_IP-}" ]]; then
+    echo "Could not detect LMKTFY master node.  Make sure you've launched a cluster with 'lmktfy-up.sh'"
     exit 1
   fi
-  echo "Using master: $KUBE_MASTER (external IP: $KUBE_MASTER_IP)"
+  echo "Using master: $LMKTFY_MASTER (external IP: $LMKTFY_MASTER_IP)"
 }
 
 function detect-minions () {
-  KUBE_MINION_IP_ADDRESSES=()
+  LMKTFY_MINION_IP_ADDRESSES=()
   for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
     local minion_ip=$(get_instance_public_ip ${MINION_NAMES[$i]})
     echo "Found ${MINION_NAMES[$i]} at ${minion_ip}"
-    KUBE_MINION_IP_ADDRESSES+=("${minion_ip}")
+    LMKTFY_MINION_IP_ADDRESSES+=("${minion_ip}")
   done
-  if [[ -z "$KUBE_MINION_IP_ADDRESSES" ]]; then
-    echo "Could not detect Kubernetes minion nodes.  Make sure you've launched a cluster with 'kube-up.sh'"
+  if [[ -z "$LMKTFY_MINION_IP_ADDRESSES" ]]; then
+    echo "Could not detect LMKTFY minion nodes.  Make sure you've launched a cluster with 'lmktfy-up.sh'"
     exit 1
   fi
 }
@@ -169,11 +169,11 @@ function verify-prereqs {
 # Create a temp dir that'll be deleted at the end of this bash session.
 #
 # Vars set:
-#   KUBE_TEMP
+#   LMKTFY_TEMP
 function ensure-temp-dir {
-  if [[ -z ${KUBE_TEMP-} ]]; then
-    KUBE_TEMP=$(mktemp -d -t kubernetes.XXXXXX)
-    trap 'rm -rf "${KUBE_TEMP}"' EXIT
+  if [[ -z ${LMKTFY_TEMP-} ]]; then
+    LMKTFY_TEMP=$(mktemp -d -t lmktfy.XXXXXX)
+    trap 'rm -rf "${LMKTFY_TEMP}"' EXIT
   fi
 }
 
@@ -183,21 +183,21 @@ function ensure-temp-dir {
 #   SERVER_BINARY_TAR
 #   SALT_TAR
 function find-release-tars {
-  SERVER_BINARY_TAR="${KUBE_ROOT}/server/kubernetes-server-linux-amd64.tar.gz"
+  SERVER_BINARY_TAR="${LMKTFY_ROOT}/server/lmktfy-server-linux-amd64.tar.gz"
   if [[ ! -f "$SERVER_BINARY_TAR" ]]; then
-    SERVER_BINARY_TAR="${KUBE_ROOT}/_output/release-tars/kubernetes-server-linux-amd64.tar.gz"
+    SERVER_BINARY_TAR="${LMKTFY_ROOT}/_output/release-tars/lmktfy-server-linux-amd64.tar.gz"
   fi
   if [[ ! -f "$SERVER_BINARY_TAR" ]]; then
-    echo "!!! Cannot find kubernetes-server-linux-amd64.tar.gz"
+    echo "!!! Cannot find lmktfy-server-linux-amd64.tar.gz"
     exit 1
   fi
 
-  SALT_TAR="${KUBE_ROOT}/server/kubernetes-salt.tar.gz"
+  SALT_TAR="${LMKTFY_ROOT}/server/lmktfy-salt.tar.gz"
   if [[ ! -f "$SALT_TAR" ]]; then
-    SALT_TAR="${KUBE_ROOT}/_output/release-tars/kubernetes-salt.tar.gz"
+    SALT_TAR="${LMKTFY_ROOT}/_output/release-tars/lmktfy-salt.tar.gz"
   fi
   if [[ ! -f "$SALT_TAR" ]]; then
-    echo "!!! Cannot find kubernetes-salt.tar.gz"
+    echo "!!! Cannot find lmktfy-salt.tar.gz"
     exit 1
   fi
 }
@@ -223,7 +223,7 @@ function upload-server-tars() {
       else
         project_hash=$(echo -n "${USER} ${key}" | md5sum | awk '{ print $1 }')
       fi
-      AWS_S3_BUCKET="kubernetes-staging-${project_hash}"
+      AWS_S3_BUCKET="lmktfy-staging-${project_hash}"
   fi
 
   echo "Uploading to Amazon S3"
@@ -260,26 +260,26 @@ function upload-server-tars() {
 
 
 # Ensure that we have a password created for validating to the master.  Will
-# read from the kubernetes auth-file for the current context if available.
+# read from the lmktfy auth-file for the current context if available.
 #
 # Assumed vars
-#   KUBE_ROOT
+#   LMKTFY_ROOT
 #
 # Vars set:
-#   KUBE_USER
-#   KUBE_PASSWORD
+#   LMKTFY_USER
+#   LMKTFY_PASSWORD
 function get-password {
   # go template to extract the auth-path of the current-context user
   # Note: we save dot ('.') to $dot because the 'with' action overrides dot
   local template='{{$dot := .}}{{with $ctx := index $dot "current-context"}}{{$user := index $dot "contexts" $ctx "user"}}{{index $dot "users" $user "auth-path"}}{{end}}'
-  local file=$("${KUBE_ROOT}/cluster/kubectl.sh" config view -o template --template="${template}")
+  local file=$("${LMKTFY_ROOT}/cluster/lmktfyctl.sh" config view -o template --template="${template}")
   if [[ ! -z "$file" && -r "$file" ]]; then
-    KUBE_USER=$(cat "$file" | python -c 'import json,sys;print json.load(sys.stdin)["User"]')
-    KUBE_PASSWORD=$(cat "$file" | python -c 'import json,sys;print json.load(sys.stdin)["Password"]')
+    LMKTFY_USER=$(cat "$file" | python -c 'import json,sys;print json.load(sys.stdin)["User"]')
+    LMKTFY_PASSWORD=$(cat "$file" | python -c 'import json,sys;print json.load(sys.stdin)["Password"]')
     return
   fi
-  KUBE_USER=admin
-  KUBE_PASSWORD=$(python -c 'import string,random; print "".join(random.SystemRandom().choice(string.ascii_letters + string.digits) for _ in range(16))')
+  LMKTFY_USER=admin
+  LMKTFY_PASSWORD=$(python -c 'import string,random; print "".join(random.SystemRandom().choice(string.ascii_letters + string.digits) for _ in range(16))')
 }
 
 # Adds a tag to an AWS resource
@@ -304,7 +304,7 @@ function add-tag {
 function create-iam-profile {
   local key=$1
 
-  local conf_dir=file://${KUBE_ROOT}/cluster/aws/templates/iam
+  local conf_dir=file://${LMKTFY_ROOT}/cluster/aws/templates/iam
 
   echo "Creating IAM role: ${key}"
   aws iam create-role --role-name ${key} --assume-role-policy-document ${conf_dir}/${key}-role.json > $LOG
@@ -346,7 +346,7 @@ function wait-for-instance-running {
   done
 }
 
-function kube-up {
+function lmktfy-up {
   find-release-tars
   upload-server-tars
 
@@ -355,10 +355,10 @@ function kube-up {
   ensure-iam-profiles
 
   get-password
-  python "${KUBE_ROOT}/third_party/htpasswd/htpasswd.py" \
-    -b -c "${KUBE_TEMP}/htpasswd" "$KUBE_USER" "$KUBE_PASSWORD"
+  python "${LMKTFY_ROOT}/third_party/htpasswd/htpasswd.py" \
+    -b -c "${LMKTFY_TEMP}/htpasswd" "$LMKTFY_USER" "$LMKTFY_PASSWORD"
   local htpasswd
-  htpasswd=$(cat "${KUBE_TEMP}/htpasswd")
+  htpasswd=$(cat "${LMKTFY_TEMP}/htpasswd")
 
   if [[ ! -f "$AWS_SSH_KEY" ]]; then
     ssh-keygen -f "$AWS_SSH_KEY" -N ''
@@ -366,7 +366,7 @@ function kube-up {
 
   detect-image
 
-  $AWS_CMD import-key-pair --key-name kubernetes --public-key-material "file://$AWS_SSH_KEY.pub" > $LOG 2>&1 || true
+  $AWS_CMD import-key-pair --key-name lmktfy --public-key-material "file://$AWS_SSH_KEY.pub" > $LOG 2>&1 || true
 
   VPC_ID=$($AWS_CMD describe-vpcs | get_vpc_id)
 
@@ -375,7 +375,7 @@ function kube-up {
 	  VPC_ID=$($AWS_CMD create-vpc --cidr-block 172.20.0.0/16 | json_val '["Vpc"]["VpcId"]')
 	  $AWS_CMD modify-vpc-attribute --vpc-id $VPC_ID --enable-dns-support '{"Value": true}' > $LOG
 	  $AWS_CMD modify-vpc-attribute --vpc-id $VPC_ID --enable-dns-hostnames '{"Value": true}' > $LOG
-	  add-tag $VPC_ID Name kubernetes-vpc
+	  add-tag $VPC_ID Name lmktfy-vpc
   fi
 
   echo "Using VPC $VPC_ID"
@@ -409,21 +409,21 @@ function kube-up {
 
   SEC_GROUP_ID=$($AWS_CMD --output text describe-security-groups \
                           --filters Name=vpc-id,Values=$VPC_ID \
-                                    Name=group-name,Values=kubernetes-sec-group \
+                                    Name=group-name,Values=lmktfy-sec-group \
                           --query SecurityGroups[].GroupId \
                     | tr "\t" "\n")
 
   if [[ -z "$SEC_GROUP_ID" ]]; then
 	  echo "Creating security group."
-	  SEC_GROUP_ID=$($AWS_CMD create-security-group --group-name kubernetes-sec-group --description kubernetes-sec-group --vpc-id $VPC_ID | json_val '["GroupId"]')
+	  SEC_GROUP_ID=$($AWS_CMD create-security-group --group-name lmktfy-sec-group --description lmktfy-sec-group --vpc-id $VPC_ID | json_val '["GroupId"]')
 	  $AWS_CMD authorize-security-group-ingress --group-id $SEC_GROUP_ID --protocol -1 --port all --cidr 0.0.0.0/0 > $LOG
   fi
 
   (
     # We pipe this to the ami as a startup script in the user-data field.  Requires a compatible ami
     echo "#! /bin/bash"
-    echo "mkdir -p /var/cache/kubernetes-install"
-    echo "cd /var/cache/kubernetes-install"
+    echo "mkdir -p /var/cache/lmktfy-install"
+    echo "cd /var/cache/lmktfy-install"
     echo "readonly SALT_MASTER='${MASTER_INTERNAL_IP}'"
     echo "readonly INSTANCE_PREFIX='${INSTANCE_PREFIX}'"
     echo "readonly NODE_INSTANCE_PREFIX='${INSTANCE_PREFIX}-minion'"
@@ -444,12 +444,12 @@ function kube-up {
     echo "readonly DNS_DOMAIN='${DNS_DOMAIN:-}'"
     echo "readonly ADMISSION_CONTROL='${ADMISSION_CONTROL:-}'"
     echo "readonly MASTER_IP_RANGE='${MASTER_IP_RANGE:-}'"
-    grep -v "^#" "${KUBE_ROOT}/cluster/aws/templates/common.sh"
-    grep -v "^#" "${KUBE_ROOT}/cluster/aws/templates/format-disks.sh"
-    grep -v "^#" "${KUBE_ROOT}/cluster/aws/templates/create-dynamic-salt-files.sh"
-    grep -v "^#" "${KUBE_ROOT}/cluster/aws/templates/download-release.sh"
-    grep -v "^#" "${KUBE_ROOT}/cluster/aws/templates/salt-master.sh"
-  ) > "${KUBE_TEMP}/master-start.sh"
+    grep -v "^#" "${LMKTFY_ROOT}/cluster/aws/templates/common.sh"
+    grep -v "^#" "${LMKTFY_ROOT}/cluster/aws/templates/format-disks.sh"
+    grep -v "^#" "${LMKTFY_ROOT}/cluster/aws/templates/create-dynamic-salt-files.sh"
+    grep -v "^#" "${LMKTFY_ROOT}/cluster/aws/templates/download-release.sh"
+    grep -v "^#" "${LMKTFY_ROOT}/cluster/aws/templates/salt-master.sh"
+  ) > "${LMKTFY_TEMP}/master-start.sh"
 
   echo "Starting Master"
   master_id=$($AWS_CMD run-instances \
@@ -458,10 +458,10 @@ function kube-up {
     --instance-type $MASTER_SIZE \
     --subnet-id $SUBNET_ID \
     --private-ip-address 172.20.0.9 \
-    --key-name kubernetes \
+    --key-name lmktfy \
     --security-group-ids $SEC_GROUP_ID \
     --associate-public-ip-address \
-    --user-data file://${KUBE_TEMP}/master-start.sh | json_val '["Instances"][0]["InstanceId"]')
+    --user-data file://${LMKTFY_TEMP}/master-start.sh | json_val '["Instances"][0]["InstanceId"]')
   add-tag $master_id Name $MASTER_NAME
   add-tag $master_id Role $MASTER_TAG
 
@@ -476,14 +476,14 @@ function kube-up {
       if (( attempt > 30 )); then
         echo
         echo -e "${color_red}master failed to start. Your cluster is unlikely" >&2
-        echo "to work correctly. Please run ./cluster/kube-down.sh and re-create the" >&2
+        echo "to work correctly. Please run ./cluster/lmktfy-down.sh and re-create the" >&2
         echo -e "cluster. (sorry!)${color_norm}" >&2
         exit 1
       fi
     else
-      KUBE_MASTER=${MASTER_NAME}
-      KUBE_MASTER_IP=${ip}
-      echo -e " ${color_green}[master running @${KUBE_MASTER_IP}]${color_norm}"
+      LMKTFY_MASTER=${MASTER_NAME}
+      LMKTFY_MASTER_IP=${ip}
+      echo -e " ${color_green}[master running @${LMKTFY_MASTER_IP}]${color_norm}"
 
       # We are not able to add a route to the instance until that instance is in "running" state.
       wait-for-instance-running $master_id
@@ -502,12 +502,12 @@ function kube-up {
   while true; do
     echo -n Attempt "$(($attempt+1))" to check for salt-master
     local output
-    output=$(ssh -oStrictHostKeyChecking=no -i "${AWS_SSH_KEY}" ubuntu@${KUBE_MASTER_IP} pgrep salt-master 2> $LOG) || output=""
+    output=$(ssh -oStrictHostKeyChecking=no -i "${AWS_SSH_KEY}" ubuntu@${LMKTFY_MASTER_IP} pgrep salt-master 2> $LOG) || output=""
     if [[ -z "${output}" ]]; then
       if (( attempt > 30 )); then
         echo
-        echo -e "${color_red}salt-master failed to start on ${KUBE_MASTER_IP}. Your cluster is unlikely" >&2
-        echo "to work correctly. Please run ./cluster/kube-down.sh and re-create the" >&2
+        echo -e "${color_red}salt-master failed to start on ${LMKTFY_MASTER_IP}. Your cluster is unlikely" >&2
+        echo "to work correctly. Please run ./cluster/lmktfy-down.sh and re-create the" >&2
         echo -e "cluster. (sorry!)${color_norm}" >&2
         exit 1
       fi
@@ -529,19 +529,19 @@ function kube-up {
       echo "SALT_MASTER='${MASTER_INTERNAL_IP}'"
       echo "MINION_IP_RANGE='${MINION_IP_RANGES[$i]}'"
       echo "DOCKER_OPTS='${EXTRA_DOCKER_OPTS:-}'"
-      grep -v "^#" "${KUBE_ROOT}/cluster/aws/templates/format-disks.sh"
-      grep -v "^#" "${KUBE_ROOT}/cluster/aws/templates/salt-minion.sh"
-    ) > "${KUBE_TEMP}/minion-start-${i}.sh"
+      grep -v "^#" "${LMKTFY_ROOT}/cluster/aws/templates/format-disks.sh"
+      grep -v "^#" "${LMKTFY_ROOT}/cluster/aws/templates/salt-minion.sh"
+    ) > "${LMKTFY_TEMP}/minion-start-${i}.sh"
     minion_id=$($AWS_CMD run-instances \
       --image-id $AWS_IMAGE \
       --iam-instance-profile Name=$IAM_PROFILE_MINION \
       --instance-type $MINION_SIZE \
       --subnet-id $SUBNET_ID \
       --private-ip-address 172.20.0.1${i} \
-      --key-name kubernetes \
+      --key-name lmktfy \
       --security-group-ids $SEC_GROUP_ID \
       --associate-public-ip-address \
-      --user-data file://${KUBE_TEMP}/minion-start-${i}.sh | json_val '["Instances"][0]["InstanceId"]')
+      --user-data file://${LMKTFY_TEMP}/minion-start-${i}.sh | json_val '["Instances"][0]["InstanceId"]')
 
     add-tag $minion_id Name ${MINION_NAMES[$i]}
     add-tag $minion_id Role $MINION_TAG
@@ -584,61 +584,61 @@ function kube-up {
     sleep 10
   done
   echo "Re-running salt highstate"
-  ssh -oStrictHostKeyChecking=no -i "${AWS_SSH_KEY}" ubuntu@${KUBE_MASTER_IP} sudo salt '*' state.highstate > $LOG
+  ssh -oStrictHostKeyChecking=no -i "${AWS_SSH_KEY}" ubuntu@${LMKTFY_MASTER_IP} sudo salt '*' state.highstate > $LOG
 
   echo "Waiting for cluster initialization."
   echo
-  echo "  This will continually check to see if the API for kubernetes is reachable."
+  echo "  This will continually check to see if the API for lmktfy is reachable."
   echo "  This might loop forever if there was some uncaught error during start"
   echo "  up."
   echo
 
-  until $(curl --insecure --user ${KUBE_USER}:${KUBE_PASSWORD} --max-time 5 \
-    --fail --output $LOG --silent https://${KUBE_MASTER_IP}/api/v1beta1/pods); do
+  until $(curl --insecure --user ${LMKTFY_USER}:${LMKTFY_PASSWORD} --max-time 5 \
+    --fail --output $LOG --silent https://${LMKTFY_MASTER_IP}/api/v1beta1/pods); do
     printf "."
     sleep 2
   done
 
-  echo "Kubernetes cluster created."
+  echo "LMKTFY cluster created."
 
-  local kube_cert="kubecfg.crt"
-  local kube_key="kubecfg.key"
-  local ca_cert="kubernetes.ca.crt"
-  # TODO use token instead of kube_auth
-  local kube_auth="kubernetes_auth"
+  local lmktfy_cert="lmktfycfg.crt"
+  local lmktfy_key="lmktfycfg.key"
+  local ca_cert="lmktfy.ca.crt"
+  # TODO use token instead of lmktfy_auth
+  local lmktfy_auth="lmktfy_auth"
 
-  local kubectl="${KUBE_ROOT}/cluster/kubectl.sh"
+  local lmktfyctl="${LMKTFY_ROOT}/cluster/lmktfyctl.sh"
   local context="${INSTANCE_PREFIX}"
   local user="${INSTANCE_PREFIX}-admin"
-  local config_dir="${HOME}/.kube/${context}"
+  local config_dir="${HOME}/.lmktfy/${context}"
 
-  # TODO: generate ADMIN (and KUBELET) tokens and put those in the master's
+  # TODO: generate ADMIN (and LMKTFYLET) tokens and put those in the master's
   # config file.  Distribute the same way the htpasswd is done.
   (
     mkdir -p "${config_dir}"
     umask 077
-    ssh -oStrictHostKeyChecking=no -i "${AWS_SSH_KEY}" ubuntu@${KUBE_MASTER_IP} sudo cat /srv/kubernetes/kubecfg.crt >"${config_dir}/${kube_cert}" 2>$LOG
-    ssh -oStrictHostKeyChecking=no -i "${AWS_SSH_KEY}" ubuntu@${KUBE_MASTER_IP} sudo cat /srv/kubernetes/kubecfg.key >"${config_dir}/${kube_key}" 2>$LOG
-    ssh -oStrictHostKeyChecking=no -i "${AWS_SSH_KEY}" ubuntu@${KUBE_MASTER_IP} sudo cat /srv/kubernetes/ca.crt >"${config_dir}/${ca_cert}" 2>$LOG
+    ssh -oStrictHostKeyChecking=no -i "${AWS_SSH_KEY}" ubuntu@${LMKTFY_MASTER_IP} sudo cat /srv/lmktfy/lmktfycfg.crt >"${config_dir}/${lmktfy_cert}" 2>$LOG
+    ssh -oStrictHostKeyChecking=no -i "${AWS_SSH_KEY}" ubuntu@${LMKTFY_MASTER_IP} sudo cat /srv/lmktfy/lmktfycfg.key >"${config_dir}/${lmktfy_key}" 2>$LOG
+    ssh -oStrictHostKeyChecking=no -i "${AWS_SSH_KEY}" ubuntu@${LMKTFY_MASTER_IP} sudo cat /srv/lmktfy/ca.crt >"${config_dir}/${ca_cert}" 2>$LOG
 
-    "${kubectl}" config set-cluster "${context}" --server="https://${KUBE_MASTER_IP}" --certificate-authority="${config_dir}/${ca_cert}" --global
-    "${kubectl}" config set-credentials "${user}" --auth-path="${config_dir}/${kube_auth}" --global
-    "${kubectl}" config set-context "${context}" --cluster="${context}" --user="${user}" --global
-    "${kubectl}" config use-context "${context}" --global
+    "${lmktfyctl}" config set-cluster "${context}" --server="https://${LMKTFY_MASTER_IP}" --certificate-authority="${config_dir}/${ca_cert}" --global
+    "${lmktfyctl}" config set-credentials "${user}" --auth-path="${config_dir}/${lmktfy_auth}" --global
+    "${lmktfyctl}" config set-context "${context}" --cluster="${context}" --user="${user}" --global
+    "${lmktfyctl}" config use-context "${context}" --global
 
-    cat << EOF > "${config_dir}/${kube_auth}"
+    cat << EOF > "${config_dir}/${lmktfy_auth}"
 {
-  "User": "$KUBE_USER",
-  "Password": "$KUBE_PASSWORD",
+  "User": "$LMKTFY_USER",
+  "Password": "$LMKTFY_PASSWORD",
   "CAFile": "${config_dir}/${ca_cert}",
-  "CertFile": "${config_dir}/${kube_cert}",
-  "KeyFile": "${config_dir}/${kube_key}"
+  "CertFile": "${config_dir}/${lmktfy_cert}",
+  "KeyFile": "${config_dir}/${lmktfy_key}"
 }
 EOF
 
-    chmod 0600 "${config_dir}/${kube_auth}" "${config_dir}/$kube_cert" \
-      "${config_dir}/${kube_key}" "${config_dir}/${ca_cert}"
-    echo "Wrote ${config_dir}/${kube_auth}"
+    chmod 0600 "${config_dir}/${lmktfy_auth}" "${config_dir}/$lmktfy_cert" \
+      "${config_dir}/${lmktfy_key}" "${config_dir}/${ca_cert}"
+    echo "Wrote ${config_dir}/${lmktfy_auth}"
   )
 
   echo "Sanity checking cluster..."
@@ -655,23 +655,23 @@ EOF
       local attempt=0
       while true; do
         local minion_name=${MINION_NAMES[$i]}
-        local minion_ip=${KUBE_MINION_IP_ADDRESSES[$i]}
+        local minion_ip=${LMKTFY_MINION_IP_ADDRESSES[$i]}
         echo -n Attempt "$(($attempt+1))" to check Docker on node "${minion_name} @ ${minion_ip}" ...
         local output=$(ssh -oStrictHostKeyChecking=no -i "${AWS_SSH_KEY}" ubuntu@$minion_ip sudo docker ps -a 2>/dev/null)
         if [[ -z "${output}" ]]; then
           if (( attempt > 9 )); then
             echo
             echo -e "${color_red}Docker failed to install on node ${minion_name}. Your cluster is unlikely" >&2
-            echo "to work correctly. Please run ./cluster/kube-down.sh and re-create the" >&2
+            echo "to work correctly. Please run ./cluster/lmktfy-down.sh and re-create the" >&2
             echo -e "cluster. (sorry!)${color_norm}" >&2
             exit 1
           fi
         # TODO: Reintroduce this (where does this container come from?)
-#        elif [[ "${output}" != *"kubernetes/pause"* ]]; then
+#        elif [[ "${output}" != *"lmktfy/pause"* ]]; then
 #          if (( attempt > 9 )); then
 #            echo
-#            echo -e "${color_red}Failed to observe kubernetes/pause on node ${minion_name}. Your cluster is unlikely" >&2
-#            echo "to work correctly. Please run ./cluster/kube-down.sh and re-create the" >&2
+#            echo -e "${color_red}Failed to observe lmktfy/pause on node ${minion_name}. Your cluster is unlikely" >&2
+#            echo "to work correctly. Please run ./cluster/lmktfy-down.sh and re-create the" >&2
 #            echo -e "cluster. (sorry!)${color_norm}" >&2
 #            exit 1
 #          fi
@@ -688,15 +688,15 @@ EOF
   done
 
   echo
-  echo -e "${color_green}Kubernetes cluster is running.  The master is running at:"
+  echo -e "${color_green}LMKTFY cluster is running.  The master is running at:"
   echo
-  echo -e "${color_yellow}  https://${KUBE_MASTER_IP}"
+  echo -e "${color_yellow}  https://${LMKTFY_MASTER_IP}"
   echo
-  echo -e "${color_green}The user name and password to use is located in ${config_dir}/${kube_auth}${color_norm}"
+  echo -e "${color_green}The user name and password to use is located in ${config_dir}/${lmktfy_auth}${color_norm}"
   echo
 }
 
-function kube-down {
+function lmktfy-down {
   instance_ids=$($AWS_CMD describe-instances | get_instance_ids)
   if [[ -n ${instance_ids} ]]; then
     $AWS_CMD terminate-instances --instance-ids $instance_ids > $LOG
@@ -784,8 +784,8 @@ function kube-down {
   fi
 }
 
-# Update a kubernetes cluster with latest source
-function kube-push {
+# Update a lmktfy cluster with latest source
+function lmktfy-push {
   detect-master
 
   # Make sure we have the tar files staged on Google Storage
@@ -794,23 +794,23 @@ function kube-push {
 
   (
     echo "#! /bin/bash"
-    echo "mkdir -p /var/cache/kubernetes-install"
-    echo "cd /var/cache/kubernetes-install"
+    echo "mkdir -p /var/cache/lmktfy-install"
+    echo "cd /var/cache/lmktfy-install"
     echo "readonly SERVER_BINARY_TAR_URL='${SERVER_BINARY_TAR_URL}'"
     echo "readonly SALT_TAR_URL='${SALT_TAR_URL}'"
-    grep -v "^#" "${KUBE_ROOT}/cluster/aws/templates/common.sh"
-    grep -v "^#" "${KUBE_ROOT}/cluster/aws/templates/download-release.sh"
+    grep -v "^#" "${LMKTFY_ROOT}/cluster/aws/templates/common.sh"
+    grep -v "^#" "${LMKTFY_ROOT}/cluster/aws/templates/download-release.sh"
     echo "echo Executing configuration"
     echo "sudo salt '*' mine.update"
     echo "sudo salt --force-color '*' state.highstate"
-  ) | ssh -oStrictHostKeyChecking=no -i "${AWS_SSH_KEY}" ubuntu@${KUBE_MASTER_IP} sudo bash
+  ) | ssh -oStrictHostKeyChecking=no -i "${AWS_SSH_KEY}" ubuntu@${LMKTFY_MASTER_IP} sudo bash
 
   get-password
 
   echo
-  echo "Kubernetes cluster is running.  The master is running at:"
+  echo "LMKTFY cluster is running.  The master is running at:"
   echo
-  echo "  https://${KUBE_MASTER_IP}"
+  echo "  https://${LMKTFY_MASTER_IP}"
   echo
 
 }
@@ -821,14 +821,14 @@ function kube-push {
 # Execute prior to running tests to build a release if required for env.
 #
 # Assumed Vars:
-#   KUBE_ROOT
+#   LMKTFY_ROOT
 function test-build-release {
   # Make a release
-  "${KUBE_ROOT}/build/release.sh"
+  "${LMKTFY_ROOT}/build/release.sh"
 }
 
 # Execute prior to running tests to initialize required structure. This is
-# called from hack/e2e.go only when running -up (it is run after kube-up).
+# called from hack/e2e.go only when running -up (it is run after lmktfy-up).
 #
 # Assumed vars:
 #   Variables from config.sh
@@ -840,7 +840,7 @@ function test-setup {
 # from hack/e2e.go
 function test-teardown {
   echo "Shutting down test cluster."
-  "${KUBE_ROOT}/cluster/kube-down.sh"
+  "${LMKTFY_ROOT}/cluster/lmktfy-down.sh"
 }
 
 
@@ -862,14 +862,14 @@ function ssh-to-node {
   done
 }
 
-# Restart the kube-proxy on a node ($1)
-function restart-kube-proxy {
-  ssh-to-node "$1" "sudo /etc/init.d/kube-proxy restart"
+# Restart the lmktfy-proxy on a node ($1)
+function restart-lmktfy-proxy {
+  ssh-to-node "$1" "sudo /etc/init.d/lmktfy-proxy restart"
 }
 
-# Restart the kube-apiserver on a node ($1)
+# Restart the lmktfy-apiserver on a node ($1)
 function restart-apiserver {
-  ssh-to-node "$1" "sudo /etc/init.d/kube-apiserver restart"
+  ssh-to-node "$1" "sudo /etc/init.d/lmktfy-apiserver restart"
 }
 
 # Perform preparations required to run e2e tests

@@ -23,8 +23,8 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/util"
 )
 
 func falsePredicate(pod api.Pod, existingPods []api.Pod, node string) (bool, error) {

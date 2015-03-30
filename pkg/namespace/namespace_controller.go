@@ -20,20 +20,20 @@ import (
 	"sync"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/cache"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/client"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/client/cache"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/fields"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/labels"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/runtime"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/util"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/watch"
 	"github.com/golang/glog"
 )
 
 // NamespaceManager is responsible for performing actions dependent upon a namespace phase
 type NamespaceManager struct {
-	kubeClient client.Interface
+	lmktfyClient client.Interface
 	store      cache.Store
 	syncTime   <-chan time.Time
 
@@ -42,15 +42,15 @@ type NamespaceManager struct {
 }
 
 // NewNamespaceManager creates a new NamespaceManager
-func NewNamespaceManager(kubeClient client.Interface) *NamespaceManager {
+func NewNamespaceManager(lmktfyClient client.Interface) *NamespaceManager {
 	store := cache.NewStore(cache.MetaNamespaceKeyFunc)
 	reflector := cache.NewReflector(
 		&cache.ListWatch{
 			ListFunc: func() (runtime.Object, error) {
-				return kubeClient.Namespaces().List(labels.Everything(), fields.Everything())
+				return lmktfyClient.Namespaces().List(labels.Everything(), fields.Everything())
 			},
 			WatchFunc: func(resourceVersion string) (watch.Interface, error) {
-				return kubeClient.Namespaces().Watch(labels.Everything(), fields.Everything(), resourceVersion)
+				return lmktfyClient.Namespaces().Watch(labels.Everything(), fields.Everything(), resourceVersion)
 			},
 		},
 		&api.Namespace{},
@@ -59,7 +59,7 @@ func NewNamespaceManager(kubeClient client.Interface) *NamespaceManager {
 	)
 	reflector.Run()
 	nm := &NamespaceManager{
-		kubeClient: kubeClient,
+		lmktfyClient: lmktfyClient,
 		store:      store,
 	}
 	// set the synchronization handler
@@ -97,8 +97,8 @@ func finalized(namespace api.Namespace) bool {
 	return len(namespace.Spec.Finalizers) == 0
 }
 
-// finalize will finalize the namespace for kubernetes
-func finalize(kubeClient client.Interface, namespace api.Namespace) (*api.Namespace, error) {
+// finalize will finalize the namespace for lmktfy
+func finalize(lmktfyClient client.Interface, namespace api.Namespace) (*api.Namespace, error) {
 	namespaceFinalize := api.Namespace{
 		ObjectMeta: api.ObjectMeta{
 			Name:            namespace.Name,
@@ -108,7 +108,7 @@ func finalize(kubeClient client.Interface, namespace api.Namespace) (*api.Namesp
 	}
 	finalizerSet := util.NewStringSet()
 	for i := range namespace.Spec.Finalizers {
-		if namespace.Spec.Finalizers[i] != api.FinalizerKubernetes {
+		if namespace.Spec.Finalizers[i] != api.FinalizerLMKTFY {
 			finalizerSet.Insert(string(namespace.Spec.Finalizers[i]))
 		}
 	}
@@ -116,36 +116,36 @@ func finalize(kubeClient client.Interface, namespace api.Namespace) (*api.Namesp
 	for _, value := range finalizerSet.List() {
 		namespaceFinalize.Spec.Finalizers = append(namespaceFinalize.Spec.Finalizers, api.FinalizerName(value))
 	}
-	return kubeClient.Namespaces().Finalize(&namespaceFinalize)
+	return lmktfyClient.Namespaces().Finalize(&namespaceFinalize)
 }
 
 // deleteAllContent will delete all content known to the system in a namespace
-func deleteAllContent(kubeClient client.Interface, namespace string) (err error) {
-	err = deleteServices(kubeClient, namespace)
+func deleteAllContent(lmktfyClient client.Interface, namespace string) (err error) {
+	err = deleteServices(lmktfyClient, namespace)
 	if err != nil {
 		return err
 	}
-	err = deleteReplicationControllers(kubeClient, namespace)
+	err = deleteReplicationControllers(lmktfyClient, namespace)
 	if err != nil {
 		return err
 	}
-	err = deletePods(kubeClient, namespace)
+	err = deletePods(lmktfyClient, namespace)
 	if err != nil {
 		return err
 	}
-	err = deleteSecrets(kubeClient, namespace)
+	err = deleteSecrets(lmktfyClient, namespace)
 	if err != nil {
 		return err
 	}
-	err = deleteLimitRanges(kubeClient, namespace)
+	err = deleteLimitRanges(lmktfyClient, namespace)
 	if err != nil {
 		return err
 	}
-	err = deleteResourceQuotas(kubeClient, namespace)
+	err = deleteResourceQuotas(lmktfyClient, namespace)
 	if err != nil {
 		return err
 	}
-	err = deleteEvents(kubeClient, namespace)
+	err = deleteEvents(lmktfyClient, namespace)
 	if err != nil {
 		return err
 	}
@@ -164,7 +164,7 @@ func (nm *NamespaceManager) syncNamespace(namespace api.Namespace) (err error) {
 		newNamespace.ObjectMeta = namespace.ObjectMeta
 		newNamespace.Status = namespace.Status
 		newNamespace.Status.Phase = api.NamespaceTerminating
-		result, err := nm.kubeClient.Namespaces().Status(&newNamespace)
+		result, err := nm.lmktfyClient.Namespaces().Status(&newNamespace)
 		if err != nil {
 			return err
 		}
@@ -174,38 +174,38 @@ func (nm *NamespaceManager) syncNamespace(namespace api.Namespace) (err error) {
 
 	// if the namespace is already finalized, delete it
 	if finalized(namespace) {
-		err = nm.kubeClient.Namespaces().Delete(namespace.Name)
+		err = nm.lmktfyClient.Namespaces().Delete(namespace.Name)
 		return err
 	}
 
 	// there may still be content for us to remove
-	err = deleteAllContent(nm.kubeClient, namespace.Name)
+	err = deleteAllContent(nm.lmktfyClient, namespace.Name)
 	if err != nil {
 		return err
 	}
 
 	// we have removed content, so mark it finalized by us
-	result, err := finalize(nm.kubeClient, namespace)
+	result, err := finalize(nm.lmktfyClient, namespace)
 	if err != nil {
 		return err
 	}
 
 	// now check if all finalizers have reported that we delete now
 	if finalized(*result) {
-		err = nm.kubeClient.Namespaces().Delete(namespace.Name)
+		err = nm.lmktfyClient.Namespaces().Delete(namespace.Name)
 		return err
 	}
 
 	return nil
 }
 
-func deleteLimitRanges(kubeClient client.Interface, ns string) error {
-	items, err := kubeClient.LimitRanges(ns).List(labels.Everything())
+func deleteLimitRanges(lmktfyClient client.Interface, ns string) error {
+	items, err := lmktfyClient.LimitRanges(ns).List(labels.Everything())
 	if err != nil {
 		return err
 	}
 	for i := range items.Items {
-		err := kubeClient.LimitRanges(ns).Delete(items.Items[i].Name)
+		err := lmktfyClient.LimitRanges(ns).Delete(items.Items[i].Name)
 		if err != nil {
 			return err
 		}
@@ -213,13 +213,13 @@ func deleteLimitRanges(kubeClient client.Interface, ns string) error {
 	return nil
 }
 
-func deleteResourceQuotas(kubeClient client.Interface, ns string) error {
-	resourceQuotas, err := kubeClient.ResourceQuotas(ns).List(labels.Everything())
+func deleteResourceQuotas(lmktfyClient client.Interface, ns string) error {
+	resourceQuotas, err := lmktfyClient.ResourceQuotas(ns).List(labels.Everything())
 	if err != nil {
 		return err
 	}
 	for i := range resourceQuotas.Items {
-		err := kubeClient.ResourceQuotas(ns).Delete(resourceQuotas.Items[i].Name)
+		err := lmktfyClient.ResourceQuotas(ns).Delete(resourceQuotas.Items[i].Name)
 		if err != nil {
 			return err
 		}
@@ -227,13 +227,13 @@ func deleteResourceQuotas(kubeClient client.Interface, ns string) error {
 	return nil
 }
 
-func deleteServices(kubeClient client.Interface, ns string) error {
-	items, err := kubeClient.Services(ns).List(labels.Everything())
+func deleteServices(lmktfyClient client.Interface, ns string) error {
+	items, err := lmktfyClient.Services(ns).List(labels.Everything())
 	if err != nil {
 		return err
 	}
 	for i := range items.Items {
-		err := kubeClient.Services(ns).Delete(items.Items[i].Name)
+		err := lmktfyClient.Services(ns).Delete(items.Items[i].Name)
 		if err != nil {
 			return err
 		}
@@ -241,13 +241,13 @@ func deleteServices(kubeClient client.Interface, ns string) error {
 	return nil
 }
 
-func deleteReplicationControllers(kubeClient client.Interface, ns string) error {
-	items, err := kubeClient.ReplicationControllers(ns).List(labels.Everything())
+func deleteReplicationControllers(lmktfyClient client.Interface, ns string) error {
+	items, err := lmktfyClient.ReplicationControllers(ns).List(labels.Everything())
 	if err != nil {
 		return err
 	}
 	for i := range items.Items {
-		err := kubeClient.ReplicationControllers(ns).Delete(items.Items[i].Name)
+		err := lmktfyClient.ReplicationControllers(ns).Delete(items.Items[i].Name)
 		if err != nil {
 			return err
 		}
@@ -255,13 +255,13 @@ func deleteReplicationControllers(kubeClient client.Interface, ns string) error 
 	return nil
 }
 
-func deletePods(kubeClient client.Interface, ns string) error {
-	items, err := kubeClient.Pods(ns).List(labels.Everything())
+func deletePods(lmktfyClient client.Interface, ns string) error {
+	items, err := lmktfyClient.Pods(ns).List(labels.Everything())
 	if err != nil {
 		return err
 	}
 	for i := range items.Items {
-		err := kubeClient.Pods(ns).Delete(items.Items[i].Name)
+		err := lmktfyClient.Pods(ns).Delete(items.Items[i].Name)
 		if err != nil {
 			return err
 		}
@@ -269,13 +269,13 @@ func deletePods(kubeClient client.Interface, ns string) error {
 	return nil
 }
 
-func deleteEvents(kubeClient client.Interface, ns string) error {
-	items, err := kubeClient.Events(ns).List(labels.Everything(), fields.Everything())
+func deleteEvents(lmktfyClient client.Interface, ns string) error {
+	items, err := lmktfyClient.Events(ns).List(labels.Everything(), fields.Everything())
 	if err != nil {
 		return err
 	}
 	for i := range items.Items {
-		err := kubeClient.Events(ns).Delete(items.Items[i].Name)
+		err := lmktfyClient.Events(ns).Delete(items.Items[i].Name)
 		if err != nil {
 			return err
 		}
@@ -283,13 +283,13 @@ func deleteEvents(kubeClient client.Interface, ns string) error {
 	return nil
 }
 
-func deleteSecrets(kubeClient client.Interface, ns string) error {
-	items, err := kubeClient.Secrets(ns).List(labels.Everything(), fields.Everything())
+func deleteSecrets(lmktfyClient client.Interface, ns string) error {
+	items, err := lmktfyClient.Secrets(ns).List(labels.Everything(), fields.Everything())
 	if err != nil {
 		return err
 	}
 	for i := range items.Items {
-		err := kubeClient.Secrets(ns).Delete(items.Items[i].Name)
+		err := lmktfyClient.Secrets(ns).Delete(items.Items[i].Name)
 		if err != nil {
 			return err
 		}

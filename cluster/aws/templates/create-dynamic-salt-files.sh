@@ -15,7 +15,7 @@
 # limitations under the License.
 
 # Create the overlay files for the salt tree.  We create these in a separate
-# place so that we can blow away the rest of the salt configs on a kube-push and
+# place so that we can blow away the rest of the salt configs on a lmktfy-push and
 # re-apply these.
 
 mkdir -p /srv/salt-overlay/pillar
@@ -40,15 +40,15 @@ mkdir -p /srv/salt-overlay/salt/nginx
 echo $MASTER_HTPASSWD > /srv/salt-overlay/salt/nginx/htpasswd
 
 # Generate and distribute a shared secret (bearer token) to
-# apiserver and kubelet so that kubelet can authenticate to
+# apiserver and lmktfylet so that lmktfylet can authenticate to
 # apiserver to send events.
 # This works on CoreOS, so it should work on a lot of distros.
-kubelet_token=$(cat /dev/urandom | base64 | tr -d "=+/" | dd bs=32 count=1 2> /dev/null)
+lmktfylet_token=$(cat /dev/urandom | base64 | tr -d "=+/" | dd bs=32 count=1 2> /dev/null)
 
-mkdir -p /srv/salt-overlay/salt/kube-apiserver
-known_tokens_file="/srv/salt-overlay/salt/kube-apiserver/known_tokens.csv"
-(umask u=rw,go= ; echo "$kubelet_token,kubelet,kubelet" > $known_tokens_file)
+mkdir -p /srv/salt-overlay/salt/lmktfy-apiserver
+known_tokens_file="/srv/salt-overlay/salt/lmktfy-apiserver/known_tokens.csv"
+(umask u=rw,go= ; echo "$lmktfylet_token,lmktfylet,lmktfylet" > $known_tokens_file)
 
-mkdir -p /srv/salt-overlay/salt/kubelet
-kubelet_auth_file="/srv/salt-overlay/salt/kubelet/kubernetes_auth"
-(umask u=rw,go= ; echo "{\"BearerToken\": \"$kubelet_token\", \"Insecure\": true }" > $kubelet_auth_file)
+mkdir -p /srv/salt-overlay/salt/lmktfylet
+lmktfylet_auth_file="/srv/salt-overlay/salt/lmktfylet/lmktfy_auth"
+(umask u=rw,go= ; echo "{\"BearerToken\": \"$lmktfylet_token\", \"Insecure\": true }" > $lmktfylet_auth_file)

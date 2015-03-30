@@ -95,9 +95,9 @@ Upon creation of a *Namespace*, the creator may provide a list of *Finalizer* ob
 ```
 type FinalizerName string
 
-// These are internal finalizers to Kubernetes, must be qualified name unless defined here
+// These are internal finalizers to LMKTFY, must be qualified name unless defined here
 const (
-  FinalizerKubernetes FinalizerName = "kubernetes"
+  FinalizerLMKTFY FinalizerName = "lmktfy"
 )
 
 // NamespaceSpec describes the attributes on a Namespace
@@ -114,7 +114,7 @@ it's *Namespace.Spec.Finalizers* is empty.
 
 A *finalize* operation is the only mechanism to modify the *Namespace.Spec.Finalizers* field post creation.
 
-Each *Namespace* created has *kubernetes* as an item in its list of initial *Namespace.Spec.Finalizers*
+Each *Namespace* created has *lmktfy* as an item in its list of initial *Namespace.Spec.Finalizers*
 set by default.
 
 ### Phases
@@ -161,7 +161,7 @@ when in fact some other rogue client agent had created new objects.  Using admis
 scenario allows each of registry implementations for the individual objects to not need to take into account Namespace life-cycle.
 
 Once all objects known to the *namespace controller* have been deleted, the *namespace controller*
-executes a *finalize* operation on the namespace that removes the *kubernetes* value from 
+executes a *finalize* operation on the namespace that removes the *lmktfy* value from 
 the *Namespace.Spec.Finalizers* list.
 
 If the *namespace controller* sees a *Namespace* whose *ObjectMeta.DeletionTimestamp* is set, and
@@ -212,22 +212,22 @@ In etcd, we want to continue to still support efficient WATCH across namespaces.
 
 Resources that persist content in etcd will have storage paths as follows:
 
-/{k8s_storage_prefix}/{resourceType}/{resource.Namespace}/{resource.Name} 
+/{lmktfy_storage_prefix}/{resourceType}/{resource.Namespace}/{resource.Name} 
 
 This enables consumers to WATCH /registry/{resourceType} for changes across namespace of a particular {resourceType}.
 
-### Kubelet
+### LMKTFYlet
 
-The kubelet will register pod's it sources from a file or http source with a namespace associated with the 
+The lmktfylet will register pod's it sources from a file or http source with a namespace associated with the 
 *cluster-id*
 
-### Example: OpenShift Origin managing a Kubernetes Namespace
+### Example: OpenShift Origin managing a LMKTFY Namespace
 
 In this example, we demonstrate how the design allows for agents built on-top of
-Kubernetes that manage their own set of resource types associated with a *Namespace*
+LMKTFY that manage their own set of resource types associated with a *Namespace*
 to take part in Namespace termination.
 
-OpenShift creates a Namespace in Kubernetes
+OpenShift creates a Namespace in LMKTFY
 
 ```
 {
@@ -237,7 +237,7 @@ OpenShift creates a Namespace in Kubernetes
     "name": "development",
   },
   "spec": {
-    "finalizers": ["openshift.com/origin", "kubernetes"],
+    "finalizers": ["openshift.com/origin", "lmktfy"],
   },
   "status": {
     "phase": "Active",
@@ -250,9 +250,9 @@ OpenShift creates a Namespace in Kubernetes
 
 OpenShift then goes and creates a set of resources (pods, services, etc) associated
 with the "development" namespace.  It also creates its own set of resources in its
-own storage associated with the "development" namespace unknown to Kubernetes.
+own storage associated with the "development" namespace unknown to LMKTFY.
 
-User deletes the Namespace in Kubernetes, and Namespace now has following state:
+User deletes the Namespace in LMKTFY, and Namespace now has following state:
 
 ```
 {
@@ -263,7 +263,7 @@ User deletes the Namespace in Kubernetes, and Namespace now has following state:
     "deletionTimestamp": "..."
   },
   "spec": {
-    "finalizers": ["openshift.com/origin", "kubernetes"],
+    "finalizers": ["openshift.com/origin", "lmktfy"],
   },
   "status": {
     "phase": "Terminating",
@@ -274,10 +274,10 @@ User deletes the Namespace in Kubernetes, and Namespace now has following state:
 }
 ```
 
-The Kubernetes *namespace controller* observes the namespace has a *deletionTimestamp*
+The LMKTFY *namespace controller* observes the namespace has a *deletionTimestamp*
 and begins to terminate all of the content in the namespace that it knows about.  Upon
 success, it executes a *finalize* action that modifies the *Namespace* by
-removing *kubernetes* from the list of finalizers:
+removing *lmktfy* from the list of finalizers:
 
 ```
 {
@@ -327,7 +327,7 @@ This results in the following state:
 }
 ```
 
-At this point, the Kubernetes *namespace controller* in its sync loop will see that the namespace
+At this point, the LMKTFY *namespace controller* in its sync loop will see that the namespace
 has a deletion timestamp and that its list of finalizers is empty.  As a result, it knows all
 content associated from that namespace has been purged.  It performs a final DELETE action 
 to remove that Namespace from the storage.

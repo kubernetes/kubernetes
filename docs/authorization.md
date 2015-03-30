@@ -1,7 +1,7 @@
 # Authorization Plugins
 
 
-In Kubernetes, authorization happens as a separate step from authentication.
+In LMKTFY, authorization happens as a separate step from authentication.
 See the [authentication documentation](./authentication.md) for an 
 overview of authentication.
 
@@ -76,8 +76,8 @@ To permit an action Policy with an unset namespace applies regardless of namespa
 
 ### Examples
  1. Alice can do anything: `{"user":"alice"}`
- 2. Kubelet can read any pods: `{"user":"kubelet", "resource": "pods", "readonly": true}`
- 3. Kubelet can read and write events: `{"user":"kubelet", "resource": "events"}`
+ 2. LMKTFYlet can read any pods: `{"user":"lmktfylet", "resource": "pods", "readonly": true}`
+ 3. LMKTFYlet can read and write events: `{"user":"lmktfylet", "resource": "events"}`
  4. Bob can just read pods in namespace "projectCaribou": `{"user":"bob", "resource": "pods", "readonly": true, "ns": "projectCaribou"}`
 
 [Complete file example](../pkg/auth/authorizer/abac/example_policy_file.jsonl)

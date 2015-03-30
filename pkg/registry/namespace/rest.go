@@ -19,13 +19,13 @@ package namespace
 import (
 	"fmt"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/validation"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/generic"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/fielderrors"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api/validation"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/fields"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/labels"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/registry/generic"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/runtime"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/util/fielderrors"
 )
 
 // namespaceStrategy implements behavior for Namespaces
@@ -50,20 +50,20 @@ func (namespaceStrategy) PrepareForCreate(obj runtime.Object) {
 	namespace.Status = api.NamespaceStatus{
 		Phase: api.NamespaceActive,
 	}
-	// on create, we require the kubernetes value
+	// on create, we require the lmktfy value
 	// we cannot use this in defaults conversion because we let it get removed over life of object
-	hasKubeFinalizer := false
+	hasLMKTFYFinalizer := false
 	for i := range namespace.Spec.Finalizers {
-		if namespace.Spec.Finalizers[i] == api.FinalizerKubernetes {
-			hasKubeFinalizer = true
+		if namespace.Spec.Finalizers[i] == api.FinalizerLMKTFY {
+			hasLMKTFYFinalizer = true
 			break
 		}
 	}
-	if !hasKubeFinalizer {
+	if !hasLMKTFYFinalizer {
 		if len(namespace.Spec.Finalizers) == 0 {
-			namespace.Spec.Finalizers = []api.FinalizerName{api.FinalizerKubernetes}
+			namespace.Spec.Finalizers = []api.FinalizerName{api.FinalizerLMKTFY}
 		} else {
-			namespace.Spec.Finalizers = append(namespace.Spec.Finalizers, api.FinalizerKubernetes)
+			namespace.Spec.Finalizers = append(namespace.Spec.Finalizers, api.FinalizerLMKTFY)
 		}
 	}
 }

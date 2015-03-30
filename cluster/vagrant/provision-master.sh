@@ -18,28 +18,28 @@
 set -e
 
 function release_not_found() {
-  echo "It looks as if you don't have a compiled version of Kubernetes.  If you" >&2
+  echo "It looks as if you don't have a compiled version of LMKTFY.  If you" >&2
   echo "are running from a clone of the git repo, please run ./build/release.sh." >&2
   echo "Note that this requires having Docker installed.  If you are running " >&2
   echo "from a release tarball, something is wrong.  Look at " >&2
-  echo "http://kubernetes.io/ for information on how to contact the development team for help." >&2
+  echo "http://lmktfy.io/ for information on how to contact the development team for help." >&2
   exit 1
 }
 
 # Look for our precompiled binary releases.  When running from a source repo,
 # these are generated under _output.  When running from an release tarball these
 # are under ./server.
-server_binary_tar="/vagrant/server/kubernetes-server-linux-amd64.tar.gz"
+server_binary_tar="/vagrant/server/lmktfy-server-linux-amd64.tar.gz"
 if [[ ! -f "$server_binary_tar" ]]; then
-  server_binary_tar="/vagrant/_output/release-tars/kubernetes-server-linux-amd64.tar.gz"
+  server_binary_tar="/vagrant/_output/release-tars/lmktfy-server-linux-amd64.tar.gz"
 fi
 if [[ ! -f "$server_binary_tar" ]]; then
   release_not_found
 fi
 
-salt_tar="/vagrant/server/kubernetes-salt.tar.gz"
+salt_tar="/vagrant/server/lmktfy-salt.tar.gz"
 if [[ ! -f "$salt_tar" ]]; then
-  salt_tar="/vagrant/_output/release-tars/kubernetes-salt.tar.gz"
+  salt_tar="/vagrant/_output/release-tars/lmktfy-salt.tar.gz"
 fi
 if [[ ! -f "$salt_tar" ]]; then
   release_not_found
@@ -54,7 +54,7 @@ for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
     echo "Adding $minion to hosts file"
     echo "$ip $minion" >> /etc/hosts
   fi
-  echo "127.0.0.1 localhost" >> /etc/hosts # enables cmds like 'kubectl get pods' on master.
+  echo "127.0.0.1 localhost" >> /etc/hosts # enables cmds like 'lmktfyctl get pods' on master.
 done
 
 # Update salt configuration
@@ -83,7 +83,7 @@ grains:
   cloud: vagrant
   cloud_provider: vagrant
   roles:
-    - kubernetes-master
+    - lmktfy-master
   runtime_config: '$(echo "$RUNTIME_CONFIG" | sed -e "s/'/''/g")'
 EOF
 
@@ -135,36 +135,36 @@ EOF
 
 
 # Generate and distribute a shared secret (bearer token) to
-# apiserver and kubelet so that kubelet can authenticate to
+# apiserver and lmktfylet so that lmktfylet can authenticate to
 # apiserver to send events.
-known_tokens_file="/srv/salt-overlay/salt/kube-apiserver/known_tokens.csv"
+known_tokens_file="/srv/salt-overlay/salt/lmktfy-apiserver/known_tokens.csv"
 if [[ ! -f "${known_tokens_file}" ]]; then
-  kubelet_token=$(cat /dev/urandom | base64 | tr -d "=+/" | dd bs=32 count=1 2> /dev/null)
+  lmktfylet_token=$(cat /dev/urandom | base64 | tr -d "=+/" | dd bs=32 count=1 2> /dev/null)
 
-  mkdir -p /srv/salt-overlay/salt/kube-apiserver
-  known_tokens_file="/srv/salt-overlay/salt/kube-apiserver/known_tokens.csv"
-  (umask u=rw,go= ; echo "$kubelet_token,kubelet,kubelet" > $known_tokens_file)
+  mkdir -p /srv/salt-overlay/salt/lmktfy-apiserver
+  known_tokens_file="/srv/salt-overlay/salt/lmktfy-apiserver/known_tokens.csv"
+  (umask u=rw,go= ; echo "$lmktfylet_token,lmktfylet,lmktfylet" > $known_tokens_file)
 
-  mkdir -p /srv/salt-overlay/salt/kubelet
-  kubelet_auth_file="/srv/salt-overlay/salt/kubelet/kubernetes_auth"
-  (umask u=rw,go= ; echo "{\"BearerToken\": \"$kubelet_token\", \"Insecure\": true }" > $kubelet_auth_file)
+  mkdir -p /srv/salt-overlay/salt/lmktfylet
+  lmktfylet_auth_file="/srv/salt-overlay/salt/lmktfylet/lmktfy_auth"
+  (umask u=rw,go= ; echo "{\"BearerToken\": \"$lmktfylet_token\", \"Insecure\": true }" > $lmktfylet_auth_file)
 fi
 
 # Configure nginx authorization
 mkdir -p /srv/salt-overlay/salt/nginx
 if [[ ! -f /srv/salt-overlay/salt/nginx/htpasswd ]]; then
-  python "${KUBE_ROOT}/third_party/htpasswd/htpasswd.py" \
+  python "${LMKTFY_ROOT}/third_party/htpasswd/htpasswd.py" \
     -b -c "/srv/salt-overlay/salt/nginx/htpasswd" \
     "$MASTER_USER" "$MASTER_PASSWD"
 fi
 
 echo "Running release install script"
-rm -rf /kube-install
-mkdir -p /kube-install
-pushd /kube-install
+rm -rf /lmktfy-install
+mkdir -p /lmktfy-install
+pushd /lmktfy-install
   tar xzf "$salt_tar"
   cp "$server_binary_tar" .
-  ./kubernetes/saltbase/install.sh "${server_binary_tar##*/}"
+  ./lmktfy/saltbase/install.sh "${server_binary_tar##*/}"
 popd
 
 # we will run provision to update code each time we test, so we do not want to do salt installs each time

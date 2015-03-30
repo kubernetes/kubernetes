@@ -21,17 +21,17 @@ set -o nounset
 set -o pipefail
 
 LATEST=$(git describe)
-KUBE_GCS_NO_CACHING=n
-KUBE_GCS_MAKE_PUBLIC=y
-KUBE_GCS_UPLOAD_RELEASE=y
-KUBE_GCS_RELEASE_BUCKET=kubernetes-release
-KUBE_GCS_PROJECT=google-containers
-KUBE_GCS_RELEASE_PREFIX="ci/${LATEST}"
-KUBE_GCS_LATEST_FILE="ci/latest.txt"
-KUBE_GCS_LATEST_CONTENTS=${LATEST}
+LMKTFY_GCS_NO_CACHING=n
+LMKTFY_GCS_MAKE_PUBLIC=y
+LMKTFY_GCS_UPLOAD_RELEASE=y
+LMKTFY_GCS_RELEASE_BUCKET=lmktfy-release
+LMKTFY_GCS_PROJECT=google-containers
+LMKTFY_GCS_RELEASE_PREFIX="ci/${LATEST}"
+LMKTFY_GCS_LATEST_FILE="ci/latest.txt"
+LMKTFY_GCS_LATEST_CONTENTS=${LATEST}
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
-source "$KUBE_ROOT/build/common.sh"
+LMKTFY_ROOT=$(dirname "${BASH_SOURCE}")/..
+source "$LMKTFY_ROOT/build/common.sh"
 
-kube::release::gcs::release
-kube::release::gcs::publish_latest
+lmktfy::release::gcs::release
+lmktfy::release::gcs::publish_latest

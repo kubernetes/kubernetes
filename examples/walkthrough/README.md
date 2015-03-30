@@ -1,7 +1,7 @@
-# Kubernetes 101 - Walkthrough
+# LMKTFY 101 - Walkthrough
 
 ## Pods
-The first atom of Kubernetes is a _pod_.  A pod is a collection of containers that are symbiotically grouped.
+The first atom of LMKTFY is a _pod_.  A pod is a collection of containers that are symbiotically grouped.
 
 See [pods](../../docs/pods.md) for more details.
 
@@ -22,7 +22,7 @@ desiredState:
         image: dockerfile/nginx
 ```
 
-A pod definition is a declaration of a _desired state_.  Desired state is a very important concept in the Kubernetes model.  Many things present a desired state to the system, and it is Kubernetes' responsibility to make sure that the current state matches the desired state.  For example, when you create a Pod, you declare that you want the containers in it to be running.  If the containers happen to not be running (e.g. program failure, ...), Kubernetes will continue to (re-)create them for you in order to drive them to the desired state. This process continues until you delete the Pod.
+A pod definition is a declaration of a _desired state_.  Desired state is a very important concept in the LMKTFY model.  Many things present a desired state to the system, and it is LMKTFY' responsibility to make sure that the current state matches the desired state.  For example, when you create a Pod, you declare that you want the containers in it to be running.  If the containers happen to not be running (e.g. program failure, ...), LMKTFY will continue to (re-)create them for you in order to drive them to the desired state. This process continues until you delete the Pod.
 
 See the [design document](../../DESIGN.md) for more details.
 
@@ -74,7 +74,7 @@ And we added a reference to that volume to our container:
 ...
 ```
 
-In Kubernetes, ```emptyDir``` Volumes live for the lifespan of the Pod, which is longer than the lifespan of any one container, so if the container fails and is restarted, our persistent storage will live on.
+In LMKTFY, ```emptyDir``` Volumes live for the lifespan of the Pod, which is longer than the lifespan of any one container, so if the container fails and is restarted, our persistent storage will live on.
 
 If you want to mount a directory that already exists in the file system (e.g. ```/var/logs```) you can use the ```hostDir``` directive.
 
@@ -83,7 +83,7 @@ See [volumes](../../docs/volumes.md) for more details.
 ### Multiple Containers
 
 _Note:
-The examples below are syntactically correct, but some of the images (e.g. kubernetes/git-monitor) don't exist yet.  We're working on turning these into working examples._
+The examples below are syntactically correct, but some of the images (e.g. lmktfy/git-monitor) don't exist yet.  We're working on turning these into working examples._
 
 
 However, often you want to have two different containers that work together.  An example of this would be a web server, and a helper job that polls a git repository for new updates:
@@ -104,7 +104,7 @@ desiredState:
             mountPath: /srv/www
             readOnly: true
       - name: git-monitor
-        image: kubernetes/git-monitor
+        image: lmktfy/git-monitor
         env:
           - name: GIT_REPO
             value: http://github.com/some/repo.git
@@ -123,5 +123,5 @@ Finally, we have also introduced an environment variable to the ```git-monitor``
 
 
 ### What's next?
-Continue on to [Kubernetes 201](https://github.com/GoogleCloudPlatform/kubernetes/tree/master/examples/walkthrough/k8s201.md) or
-for a complete application see the [guestbook example](https://github.com/GoogleCloudPlatform/kubernetes/tree/master/examples/guestbook/README.md)
+Continue on to [LMKTFY 201](https://github.com/GoogleCloudPlatform/lmktfy/tree/master/examples/walkthrough/lmktfy201.md) or
+for a complete application see the [guestbook example](https://github.com/GoogleCloudPlatform/lmktfy/tree/master/examples/guestbook/README.md)

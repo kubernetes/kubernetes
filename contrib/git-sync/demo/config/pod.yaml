@@ -10,7 +10,7 @@ desiredState:
       imagePullPolicy: PullAlways
       env:
       - name: GIT_SYNC_REPO
-        value: https://github.com/GoogleCloudPlatform/kubernetes.git
+        value: https://github.com/GoogleCloudPlatform/lmktfy.git
       - name: GIT_SYNC_DEST
         value: /git
       volumeMounts:

@@ -17,8 +17,8 @@ limitations under the License.
 package meta
 
 import (
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/runtime"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/types"
 )
 
 // VersionInterfaces contains the interfaces one should use for dealing with types of a particular version.
@@ -138,7 +138,7 @@ type RESTMapping struct {
 
 // RESTMapper allows clients to map resources to kind, and map kind and version
 // to interfaces for manipulating those objects. It is primarily intended for
-// consumers of Kubernetes compatible REST APIs as defined in docs/api-conventions.md.
+// consumers of LMKTFY compatible REST APIs as defined in docs/api-conventions.md.
 type RESTMapper interface {
 	VersionAndKindForResource(resource string) (defaultVersion, kind string, err error)
 	RESTMapping(kind string, versions ...string) (*RESTMapping, error)

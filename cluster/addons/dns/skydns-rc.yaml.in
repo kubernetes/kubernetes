@@ -1,23 +1,23 @@
 kind: ReplicationController
 apiVersion: v1beta1
-id: kube-dns
+id: lmktfy-dns
 namespace: default
 labels:
-  k8s-app: kube-dns
-  kubernetes.io/cluster-service: "true"
+  lmktfy-app: lmktfy-dns
+  lmktfyrnetes.io/cluster-service: "true"
 desiredState:
   replicas: {{ pillar['dns_replicas'] }}
   replicaSelector:
-    k8s-app: kube-dns
+    lmktfy-app: lmktfy-dns
   podTemplate:
     labels:
-      name: kube-dns
-      k8s-app: kube-dns
-      kubernetes.io/cluster-service: "true"
+      name: lmktfy-dns
+      lmktfy-app: lmktfy-dns
+      lmktfyrnetes.io/cluster-service: "true"
     desiredState:
       manifest:
         version: v1beta2
-        id: kube-dns
+        id: lmktfy-dns
         dnsPolicy: "Default"  # Don't use cluster DNS.
         containers:
           - name: etcd
@@ -28,10 +28,10 @@ desiredState:
                     "-initial-cluster-token=skydns-etcd",
                     "-advertise-client-urls=http://127.0.0.1:4001",
             ]
-          - name: kube2sky
-            image: gcr.io/google-containers/kube2sky:1.1
+          - name: lmktfy2sky
+            image: gcr.io/google-containers/lmktfy2sky:1.1
             command: [
-                    # entrypoint = "/kube2sky",
+                    # entrypoint = "/lmktfy2sky",
                     "-domain={{ pillar['dns_domain'] }}",
             ]
           - name: skydns

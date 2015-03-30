@@ -1,4 +1,4 @@
-package io.k8s.cassandra;
+package io.lmktfy.cassandra;
 
 import java.io.IOException;
 import java.net.InetAddress;
@@ -20,7 +20,7 @@ import org.apache.cassandra.locator.SeedProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class KubernetesSeedProvider implements SeedProvider {
+public class LMKTFYSeedProvider implements SeedProvider {
     @JsonIgnoreProperties(ignoreUnknown = true)
     static class Endpoints {
         public String[] endpoints;
@@ -34,13 +34,13 @@ public class KubernetesSeedProvider implements SeedProvider {
         return val;
     }
 
-    private static final Logger logger = LoggerFactory.getLogger(KubernetesSeedProvider.class);
+    private static final Logger logger = LoggerFactory.getLogger(LMKTFYSeedProvider.class);
 
     private List defaultSeeds;
    
-    public KubernetesSeedProvider(Map<String, String> params) {
+    public LMKTFYSeedProvider(Map<String, String> params) {
         // Taken from SimpleSeedProvider.java
-        // These are used as a fallback, if we get nothing from k8s.
+        // These are used as a fallback, if we get nothing from lmktfy.
         String[] hosts = params.get("seeds").split(",", -1);
         defaultSeeds = new ArrayList<InetAddress>(hosts.length);
         for (String host : hosts)
@@ -58,9 +58,9 @@ public class KubernetesSeedProvider implements SeedProvider {
 
     public List<InetAddress> getSeeds() {
         List<InetAddress> list = new ArrayList<InetAddress>();
-        String protocol = getEnvOrDefault("KUBERNETES_API_PROTOCOL", "http");
-        String hostName = getEnvOrDefault("KUBERNETES_RO_SERVICE_HOST", "localhost");
-        String hostPort = getEnvOrDefault("KUBERNETES_RO_SERVICE_PORT", "8080");
+        String protocol = getEnvOrDefault("LMKTFYRNETES_API_PROTOCOL", "http");
+        String hostName = getEnvOrDefault("LMKTFYRNETES_RO_SERVICE_HOST", "localhost");
+        String hostPort = getEnvOrDefault("LMKTFYRNETES_RO_SERVICE_PORT", "8080");
 
         String host = protocol + "://" + hostName + ":" + hostPort;
         String serviceName = getEnvOrDefault("CASSANDRA_SERVICE", "cassandra");
@@ -79,7 +79,7 @@ public class KubernetesSeedProvider implements SeedProvider {
             }
 	    }
         } catch (IOException ex) {
-	    logger.warn("Request to kubernetes apiserver failed"); 
+	    logger.warn("Request to lmktfy apiserver failed"); 
         }
         if (list.size() == 0) {
 	    // If we got nothing, we might be the first instance, in that case
@@ -91,7 +91,7 @@ public class KubernetesSeedProvider implements SeedProvider {
 
     // Simple main to test the implementation
     public static void main(String[] args) {
-        SeedProvider provider = new KubernetesSeedProvider(new HashMap<String, String>());
+        SeedProvider provider = new LMKTFYSeedProvider(new HashMap<String, String>());
         System.out.println(provider.getSeeds());
     }
 }

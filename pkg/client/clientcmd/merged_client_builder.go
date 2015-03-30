@@ -19,8 +19,8 @@ package clientcmd
 import (
 	"io"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	clientcmdapi "github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd/api"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/client"
+	clientcmdapi "github.com/GoogleCloudPlatform/lmktfy/pkg/client/clientcmd/api"
 )
 
 // DeferredLoadingClientConfig is a ClientConfig interface that is backed by a set of loading rules
@@ -79,12 +79,12 @@ func (config DeferredLoadingClientConfig) ClientConfig() (*client.Config, error)
 	return mergedClientConfig.ClientConfig()
 }
 
-// Namespace implements KubeConfig
+// Namespace implements LMKTFYConfig
 func (config DeferredLoadingClientConfig) Namespace() (string, error) {
-	mergedKubeConfig, err := config.createClientConfig()
+	mergedLMKTFYConfig, err := config.createClientConfig()
 	if err != nil {
 		return "", err
 	}
 
-	return mergedKubeConfig.Namespace()
+	return mergedLMKTFYConfig.Namespace()
 }

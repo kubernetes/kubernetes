@@ -19,8 +19,8 @@ package record
 import (
 	"sync"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/util"
 	"github.com/golang/groupcache/lru"
 )
 

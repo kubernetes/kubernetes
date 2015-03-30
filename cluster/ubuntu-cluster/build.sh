@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Download the etcd, flannel, and K8s binaries automatically
+# Download the etcd, flannel, and LMKTFY binaries automatically
 # Run as root only
 
 # author @resouer @WIZARD-CXY
@@ -22,7 +22,7 @@ set -e
 
 function cleanup {
     # cleanup work
-    rm -rf flannel kubernetes* etcd* binaries
+    rm -rf flannel lmktfy* etcd* binaries
 }
 trap cleanup SIGHUP SIGINT SIGTERM
 
@@ -57,18 +57,18 @@ if [ ! -f etcd.tar.gz ] ; then
 fi
 cp $ETCD/etcd $ETCD/etcdctl binaries
 
-# k8s
-echo "Download kubernetes release ..."
+# lmktfy
+echo "Download lmktfy release ..."
 
-K8S_V="v0.12.0"
-if [ ! -f kubernetes.tar.gz ] ; then
-    curl -L https://github.com/GoogleCloudPlatform/kubernetes/releases/download/$K8S_V/kubernetes.tar.gz -o kubernetes.tar.gz
-    tar xzf kubernetes.tar.gz
+LMKTFY_V="v0.12.0"
+if [ ! -f lmktfy.tar.gz ] ; then
+    curl -L https://github.com/GoogleCloudPlatform/lmktfy/releases/download/$LMKTFY_V/lmktfy.tar.gz -o lmktfy.tar.gz
+    tar xzf lmktfy.tar.gz
 fi
-pushd kubernetes/server
-tar xzf kubernetes-server-linux-amd64.tar.gz
+pushd lmktfy/server
+tar xzf lmktfy-server-linux-amd64.tar.gz
 popd
-cp kubernetes/server/kubernetes/server/bin/* binaries/
+cp lmktfy/server/lmktfy/server/bin/* binaries/
 
-rm -rf flannel kubernetes* etcd*
+rm -rf flannel lmktfy* etcd*
 echo "Done! All your commands locate in ./binaries dir"

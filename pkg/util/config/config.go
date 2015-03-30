@@ -19,7 +19,7 @@ package config
 import (
 	"sync"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/util"
 )
 
 type Merger interface {

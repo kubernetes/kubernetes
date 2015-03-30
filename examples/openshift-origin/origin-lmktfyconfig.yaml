@@ -1,0 +1,18 @@
+apiVersion: v1
+clusters:
+- cluster:
+    certificate-authority: /etc/secret-volume/lmktfy-ca
+    server:  https://146.148.35.28
+  name: lmktfy
+contexts:
+- context:
+    cluster: lmktfy
+    user: lmktfy-admin
+  name: lmktfy
+current-context: lmktfy
+kind: Config
+preferences: {}
+users:
+- name: lmktfy-admin
+  user:  
+    auth-path: /etc/secret-volume/lmktfy-auth-path

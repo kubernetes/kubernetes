@@ -21,13 +21,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/capabilities"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	utilerrors "github.com/GoogleCloudPlatform/kubernetes/pkg/util/errors"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/fielderrors"
-	errors "github.com/GoogleCloudPlatform/kubernetes/pkg/util/fielderrors"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api/resource"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/capabilities"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/util"
+	utilerrors "github.com/GoogleCloudPlatform/lmktfy/pkg/util/errors"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/util/fielderrors"
+	errors "github.com/GoogleCloudPlatform/lmktfy/pkg/util/fielderrors"
 )
 
 func expectPrefix(t *testing.T, prefix string, errs fielderrors.ValidationErrorList) {
@@ -2333,11 +2333,11 @@ func TestValidateResourceNames(t *testing.T) {
 		{"my.favorite.app.co/12345", true},
 		{"my.favorite.app.co/_12345", false},
 		{"my.favorite.app.co/12345_", false},
-		{"kubernetes.io/..", false},
-		{"kubernetes.io/" + longString, true},
-		{"kubernetes.io//", false},
-		{"kubernetes.io", false},
-		{"kubernetes.io/will/not/work/", false},
+		{"lmktfy.io/..", false},
+		{"lmktfy.io/" + longString, true},
+		{"lmktfy.io//", false},
+		{"lmktfy.io", false},
+		{"lmktfy.io/will/not/work/", false},
 	}
 	for k, item := range table {
 		err := validateResourceName(item.input, "sth")

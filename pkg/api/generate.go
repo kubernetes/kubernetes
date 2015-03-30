@@ -44,7 +44,7 @@ func GenerateName(u NameGenerator, meta *ObjectMeta) {
 type simpleNameGenerator struct{}
 
 // SimpleNameGenerator is a generator that returns the name plus a random suffix of five alphanumerics
-// when a name is requested. The string is guaranteed to not exceed the length of a standard Kubernetes
+// when a name is requested. The string is guaranteed to not exceed the length of a standard LMKTFY
 // name (63 characters)
 var SimpleNameGenerator NameGenerator = simpleNameGenerator{}
 

@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 // Package verflag defines utility functions to handle command line flags
-// related to version of Kubernetes.
+// related to version of LMKTFY.
 package verflag
 
 import (
@@ -23,7 +23,7 @@ import (
 	"os"
 	"strconv"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/version"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/version"
 	flag "github.com/spf13/pflag"
 )
 
@@ -93,7 +93,7 @@ func PrintAndExitIfRequested() {
 		fmt.Printf("%#v\n", version.Get())
 		os.Exit(0)
 	} else if *versionFlag == VersionTrue {
-		fmt.Printf("Kubernetes %s\n", version.Get())
+		fmt.Printf("LMKTFY %s\n", version.Get())
 		os.Exit(0)
 	}
 }

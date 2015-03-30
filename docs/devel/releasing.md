@@ -1,17 +1,17 @@
-# Releasing Kubernetes
+# Releasing LMKTFY
 
-This document explains how to create a Kubernetes release (as in version) and
+This document explains how to create a LMKTFY release (as in version) and
 how the version information gets embedded into the built binaries.
 
 ## Origin of the Sources
 
-Kubernetes may be built from either a git tree (using `hack/build-go.sh`) or
+LMKTFY may be built from either a git tree (using `hack/build-go.sh`) or
 from a tarball (using either `hack/build-go.sh` or `go install`) or directly by
 the Go native build system (using `go get`).
 
 When building from git, we want to be able to insert specific information about
 the build tree at build time. In particular, we want to use the output of `git
-describe` to generate the version of Kubernetes and the status of the build
+describe` to generate the version of LMKTFY and the status of the build
 tree (add a `-dirty` prefix if the tree was modified.)
 
 When building from a tarball or using the Go build system, we will not have
@@ -22,7 +22,7 @@ between releases (e.g. at some point in development between v0.3 and v0.4).
 ## Version Number Format
 
 In order to account for these use cases, there are some specific formats that
-may end up representing the Kubernetes version. Here are a few examples:
+may end up representing the LMKTFY version. Here are a few examples:
 
 - **v0.5**: This is official version 0.5 and this version will only be used
   when building from a clean git tree at the v0.5 git tag, or from a tree

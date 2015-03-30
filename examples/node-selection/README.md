@@ -4,19 +4,19 @@ This example shows how to assign a pod to a specific node or to one of a set of 
 
 ### Step Zero: Prerequisites
 
-This example assumes that you have a basic understanding of kubernetes pods and that you have [turned up a Kubernetes cluster](https://github.com/GoogleCloudPlatform/kubernetes#documentation).
+This example assumes that you have a basic understanding of lmktfy pods and that you have [turned up a LMKTFY cluster](https://github.com/GoogleCloudPlatform/lmktfy#documentation).
 
 ### Step One: Attach label to the node
 
-Run `kubectl get nodes` to get the names of your cluster's nodes. Pick out the one that you want to add a label to.
+Run `lmktfyctl get nodes` to get the names of your cluster's nodes. Pick out the one that you want to add a label to.
 
-Then, to add a label to the node you've chosen, run `kubectl label nodes <node-name> <label-key>=<label-value>`. For example, if my node name is 'kubernetes-foo-node-1.c.a-robinson.internal' and my desired label is 'disktype=ssd', then I can run `kubectl label nodes kubernetes-foo-node-1.c.a-robinson.internal disktype=ssd`.
+Then, to add a label to the node you've chosen, run `lmktfyctl label nodes <node-name> <label-key>=<label-value>`. For example, if my node name is 'lmktfy-foo-node-1.c.a-robinson.internal' and my desired label is 'disktype=ssd', then I can run `lmktfyctl label nodes lmktfy-foo-node-1.c.a-robinson.internal disktype=ssd`.
 
-If this fails with an "invalid command" error, you're likely using an older version of kubectl that doesn't have the `label` command. In that case, see the [previous version](https://github.com/GoogleCloudPlatform/kubernetes/blob/a053dbc313572ed60d89dae9821ecab8bfd676dc/examples/node-selection/README.md) of this guide for instructions on how to manually set labels on a node.
+If this fails with an "invalid command" error, you're likely using an older version of lmktfyctl that doesn't have the `label` command. In that case, see the [previous version](https://github.com/GoogleCloudPlatform/lmktfy/blob/a053dbc313572ed60d89dae9821ecab8bfd676dc/examples/node-selection/README.md) of this guide for instructions on how to manually set labels on a node.
 
 Also, note that label keys must be in the form of DNS labels (as described in the [identifiers doc](/docs/design/identifiers.md)), meaning that they are not allowed to contain any upper-case letters.
 
-You can verify that it worked by re-running `kubectl get nodes` and checking that the node now has a label.
+You can verify that it worked by re-running `lmktfyctl get nodes` and checking that the node now has a label.
 
 ### Step Two: Add a nodeSelector field to your pod configuration
 
@@ -56,7 +56,7 @@ labels:
   disktype: ssd</b>
 </pre>
 
-When you then run `kubectl create -f pod.yaml`, the pod will get scheduled on the node that you attached the label to! You can verify that it worked by running `kubectl get pods` and looking at the "host" that the pod was assigned to.
+When you then run `lmktfyctl create -f pod.yaml`, the pod will get scheduled on the node that you attached the label to! You can verify that it worked by running `lmktfyctl get pods` and looking at the "host" that the pod was assigned to.
 
 ### Conclusion
 

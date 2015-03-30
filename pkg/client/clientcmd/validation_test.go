@@ -22,8 +22,8 @@ import (
 	"strings"
 	"testing"
 
-	clientcmdapi "github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/errors"
+	clientcmdapi "github.com/GoogleCloudPlatform/lmktfy/pkg/client/clientcmd/api"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/util/errors"
 )
 
 func TestConfirmUsableBadInfoButOkConfig(t *testing.T) {

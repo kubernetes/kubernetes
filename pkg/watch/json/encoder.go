@@ -20,8 +20,8 @@ import (
 	"encoding/json"
 	"io"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/runtime"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/watch"
 )
 
 // Encoder implements the json.Encoder interface for io.Writers that

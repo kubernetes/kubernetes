@@ -46,7 +46,7 @@ install-salt() {
   if [[ ${1-} == '--master' ]]; then
     TARS+=(salt-master_2014.1.13+ds-1~bpo70+1_all.deb)
   fi
-  URL_BASE="https://storage.googleapis.com/kubernetes-release/salt"
+  URL_BASE="https://storage.googleapis.com/lmktfy-release/salt"
 
   for tar in "${TARS[@]}"; do
     download-or-bust "${URL_BASE}/${tar}"

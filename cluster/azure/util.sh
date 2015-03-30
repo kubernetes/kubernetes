@@ -16,11 +16,11 @@
 
 # A library of helper functions and constant for the local config.
 
-# Use the config file specified in $KUBE_CONFIG_FILE, or default to
+# Use the config file specified in $LMKTFY_CONFIG_FILE, or default to
 # config-default.sh.
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
-source "${KUBE_ROOT}/cluster/azure/${KUBE_CONFIG_FILE-"config-default.sh"}"
+LMKTFY_ROOT=$(dirname "${BASH_SOURCE}")/../..
+source "${LMKTFY_ROOT}/cluster/azure/${LMKTFY_CONFIG_FILE-"config-default.sh"}"
 
 function azure_call {
     local -a params=()
@@ -72,24 +72,24 @@ function verify-prereqs {
     fi
 
     AZ_HSH=${AZ_HSH:0:7}
-    AZ_STG=kube$AZ_HSH
+    AZ_STG=lmktfy$AZ_HSH
     echo "==> AZ_STG: $AZ_STG"
 
     AZ_CS="$AZ_CS_PREFIX-$AZ_HSH"
     echo "==> AZ_CS: $AZ_CS"
 
-    CONTAINER=kube-$TAG
+    CONTAINER=lmktfy-$TAG
     echo "==> CONTAINER: $CONTAINER"
 }
 
 # Create a temp dir that'll be deleted at the end of this bash session.
 #
 # Vars set:
-#   KUBE_TEMP
+#   LMKTFY_TEMP
 function ensure-temp-dir {
-    if [[ -z ${KUBE_TEMP-} ]]; then
-        KUBE_TEMP=$(mktemp -d -t kubernetes.XXXXXX)
-        trap 'rm -rf "${KUBE_TEMP}"' EXIT
+    if [[ -z ${LMKTFY_TEMP-} ]]; then
+        LMKTFY_TEMP=$(mktemp -d -t lmktfy.XXXXXX)
+        trap 'rm -rf "${LMKTFY_TEMP}"' EXIT
     fi
 }
 
@@ -99,21 +99,21 @@ function ensure-temp-dir {
 #   SERVER_BINARY_TAR
 #   SALT_TAR
 function find-release-tars {
-    SERVER_BINARY_TAR="${KUBE_ROOT}/server/kubernetes-server-linux-amd64.tar.gz"
+    SERVER_BINARY_TAR="${LMKTFY_ROOT}/server/lmktfy-server-linux-amd64.tar.gz"
     if [[ ! -f "$SERVER_BINARY_TAR" ]]; then
-        SERVER_BINARY_TAR="${KUBE_ROOT}/_output/release-tars/kubernetes-server-linux-amd64.tar.gz"
+        SERVER_BINARY_TAR="${LMKTFY_ROOT}/_output/release-tars/lmktfy-server-linux-amd64.tar.gz"
     fi
     if [[ ! -f "$SERVER_BINARY_TAR" ]]; then
-        echo "!!! Cannot find kubernetes-server-linux-amd64.tar.gz"
+        echo "!!! Cannot find lmktfy-server-linux-amd64.tar.gz"
         exit 1
     fi
 
-    SALT_TAR="${KUBE_ROOT}/server/kubernetes-salt.tar.gz"
+    SALT_TAR="${LMKTFY_ROOT}/server/lmktfy-salt.tar.gz"
     if [[ ! -f "$SALT_TAR" ]]; then
-        SALT_TAR="${KUBE_ROOT}/_output/release-tars/kubernetes-salt.tar.gz"
+        SALT_TAR="${LMKTFY_ROOT}/_output/release-tars/lmktfy-salt.tar.gz"
     fi
     if [[ ! -f "$SALT_TAR" ]]; then
-        echo "!!! Cannot find kubernetes-salt.tar.gz"
+        echo "!!! Cannot find lmktfy-salt.tar.gz"
         exit 1
     fi
 }
@@ -229,65 +229,65 @@ function detect-minions () {
 #   MASTER_NAME
 #   ZONE
 # Vars set:
-#   KUBE_MASTER
-#   KUBE_MASTER_IP
+#   LMKTFY_MASTER
+#   LMKTFY_MASTER_IP
 function detect-master () {
     if [[ -z "$AZ_CS" ]]; then
         verify-prereqs
     fi
 
-    KUBE_MASTER=${MASTER_NAME}
-    KUBE_MASTER_IP="${AZ_CS}.cloudapp.net"
-    echo "Using master: $KUBE_MASTER (external IP: $KUBE_MASTER_IP)"
+    LMKTFY_MASTER=${MASTER_NAME}
+    LMKTFY_MASTER_IP="${AZ_CS}.cloudapp.net"
+    echo "Using master: $LMKTFY_MASTER (external IP: $LMKTFY_MASTER_IP)"
 }
 
 # Ensure that we have a password created for validating to the master.  Will
-# read from $HOME/.kubernetres_auth if available.
+# read from $HOME/.lmktfyrnetres_auth if available.
 #
 # Vars set:
-#   KUBE_USER
-#   KUBE_PASSWORD
+#   LMKTFY_USER
+#   LMKTFY_PASSWORD
 function get-password {
-    local file="$HOME/.kubernetes_auth"
+    local file="$HOME/.lmktfy_auth"
     if [[ -r "$file" ]]; then
-        KUBE_USER=$(cat "$file" | python -c 'import json,sys;print json.load(sys.stdin)["User"]')
-        KUBE_PASSWORD=$(cat "$file" | python -c 'import json,sys;print json.load(sys.stdin)["Password"]')
+        LMKTFY_USER=$(cat "$file" | python -c 'import json,sys;print json.load(sys.stdin)["User"]')
+        LMKTFY_PASSWORD=$(cat "$file" | python -c 'import json,sys;print json.load(sys.stdin)["Password"]')
         return
     fi
-    KUBE_USER=admin
-    KUBE_PASSWORD=$(python -c 'import string,random; print "".join(random.SystemRandom().choice(string.ascii_letters + string.digits) for _ in range(16))')
+    LMKTFY_USER=admin
+    LMKTFY_PASSWORD=$(python -c 'import string,random; print "".join(random.SystemRandom().choice(string.ascii_letters + string.digits) for _ in range(16))')
 
     # Remove this code, since in all use cases I can see, we are overwriting this
     # at cluster creation time.
     cat << EOF > "$file"
 {
-  "User": "$KUBE_USER",
-  "Password": "$KUBE_PASSWORD"
+  "User": "$LMKTFY_USER",
+  "Password": "$LMKTFY_PASSWORD"
 }
 EOF
     chmod 0600 "$file"
 }
 
 # Generate authentication token for admin user. Will
-# read from $HOME/.kubernetes_auth if available.
+# read from $HOME/.lmktfy_auth if available.
 #
 # Vars set:
-#   KUBE_ADMIN_TOKEN
+#   LMKTFY_ADMIN_TOKEN
 function get-admin-token {
-    local file="$HOME/.kubernetes_auth"
+    local file="$HOME/.lmktfy_auth"
     if [[ -r "$file" ]]; then
-        KUBE_ADMIN_TOKEN=$(cat "$file" | python -c 'import json,sys;print json.load(sys.stdin)["BearerToken"]')
+        LMKTFY_ADMIN_TOKEN=$(cat "$file" | python -c 'import json,sys;print json.load(sys.stdin)["BearerToken"]')
         return
     fi
-    KUBE_ADMIN_TOKEN=$(python -c 'import string,random; print "".join(random.SystemRandom().choice(string.ascii_letters + string.digits) for _ in range(32))')
+    LMKTFY_ADMIN_TOKEN=$(python -c 'import string,random; print "".join(random.SystemRandom().choice(string.ascii_letters + string.digits) for _ in range(32))')
 }
 
-# Instantiate a kubernetes cluster
+# Instantiate a lmktfy cluster
 #
 # Assumed vars
-#   KUBE_ROOT
+#   LMKTFY_ROOT
 #   <Various vars set in config file>
-function kube-up {
+function lmktfy-up {
     # Make sure we have the tar files staged on Azure Storage
     find-release-tars
     upload-server-tars
@@ -295,53 +295,53 @@ function kube-up {
     ensure-temp-dir
 
     get-password
-    python "${KUBE_ROOT}/third_party/htpasswd/htpasswd.py" \
-        -b -c "${KUBE_TEMP}/htpasswd" "$KUBE_USER" "$KUBE_PASSWORD"
+    python "${LMKTFY_ROOT}/third_party/htpasswd/htpasswd.py" \
+        -b -c "${LMKTFY_TEMP}/htpasswd" "$LMKTFY_USER" "$LMKTFY_PASSWORD"
     local htpasswd
-    htpasswd=$(cat "${KUBE_TEMP}/htpasswd")
+    htpasswd=$(cat "${LMKTFY_TEMP}/htpasswd")
 
     # Generate openvpn certs
     echo "--> Generating openvpn certs"
-    echo 01 > ${KUBE_TEMP}/ca.srl
-    openssl genrsa -out ${KUBE_TEMP}/ca.key
+    echo 01 > ${LMKTFY_TEMP}/ca.srl
+    openssl genrsa -out ${LMKTFY_TEMP}/ca.key
     openssl req -new -x509 -days 1095 \
-        -key ${KUBE_TEMP}/ca.key \
-        -out ${KUBE_TEMP}/ca.crt \
+        -key ${LMKTFY_TEMP}/ca.key \
+        -out ${LMKTFY_TEMP}/ca.crt \
         -subj "/CN=openvpn-ca"
-    openssl genrsa -out ${KUBE_TEMP}/server.key
+    openssl genrsa -out ${LMKTFY_TEMP}/server.key
     openssl req -new \
-        -key ${KUBE_TEMP}/server.key \
-        -out ${KUBE_TEMP}/server.csr \
+        -key ${LMKTFY_TEMP}/server.key \
+        -out ${LMKTFY_TEMP}/server.csr \
         -subj "/CN=server"
     openssl x509 -req -days 1095 \
-        -in ${KUBE_TEMP}/server.csr \
-        -CA ${KUBE_TEMP}/ca.crt \
-        -CAkey ${KUBE_TEMP}/ca.key \
-        -CAserial ${KUBE_TEMP}/ca.srl \
-        -out ${KUBE_TEMP}/server.crt
+        -in ${LMKTFY_TEMP}/server.csr \
+        -CA ${LMKTFY_TEMP}/ca.crt \
+        -CAkey ${LMKTFY_TEMP}/ca.key \
+        -CAserial ${LMKTFY_TEMP}/ca.srl \
+        -out ${LMKTFY_TEMP}/server.crt
     for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
-        openssl genrsa -out ${KUBE_TEMP}/${MINION_NAMES[$i]}.key
+        openssl genrsa -out ${LMKTFY_TEMP}/${MINION_NAMES[$i]}.key
         openssl req -new \
-            -key ${KUBE_TEMP}/${MINION_NAMES[$i]}.key \
-            -out ${KUBE_TEMP}/${MINION_NAMES[$i]}.csr \
+            -key ${LMKTFY_TEMP}/${MINION_NAMES[$i]}.key \
+            -out ${LMKTFY_TEMP}/${MINION_NAMES[$i]}.csr \
             -subj "/CN=${MINION_NAMES[$i]}"
         openssl x509 -req -days 1095 \
-            -in ${KUBE_TEMP}/${MINION_NAMES[$i]}.csr \
-            -CA ${KUBE_TEMP}/ca.crt \
-            -CAkey ${KUBE_TEMP}/ca.key \
-            -CAserial ${KUBE_TEMP}/ca.srl \
-            -out ${KUBE_TEMP}/${MINION_NAMES[$i]}.crt
+            -in ${LMKTFY_TEMP}/${MINION_NAMES[$i]}.csr \
+            -CA ${LMKTFY_TEMP}/ca.crt \
+            -CAkey ${LMKTFY_TEMP}/ca.key \
+            -CAserial ${LMKTFY_TEMP}/ca.srl \
+            -out ${LMKTFY_TEMP}/${MINION_NAMES[$i]}.crt
     done
 
     # Build up start up script for master
     echo "--> Building up start up script for master"
     (
         echo "#!/bin/bash"
-        echo "CA_CRT=\"$(cat ${KUBE_TEMP}/ca.crt)\""
-        echo "SERVER_CRT=\"$(cat ${KUBE_TEMP}/server.crt)\""
-        echo "SERVER_KEY=\"$(cat ${KUBE_TEMP}/server.key)\""
-        echo "mkdir -p /var/cache/kubernetes-install"
-        echo "cd /var/cache/kubernetes-install"
+        echo "CA_CRT=\"$(cat ${LMKTFY_TEMP}/ca.crt)\""
+        echo "SERVER_CRT=\"$(cat ${LMKTFY_TEMP}/server.crt)\""
+        echo "SERVER_KEY=\"$(cat ${LMKTFY_TEMP}/server.key)\""
+        echo "mkdir -p /var/cache/lmktfy-install"
+        echo "cd /var/cache/lmktfy-install"
         echo "readonly MASTER_NAME='${MASTER_NAME}'"
         echo "readonly INSTANCE_PREFIX='${INSTANCE_PREFIX}'"
         echo "readonly NODE_INSTANCE_PREFIX='${INSTANCE_PREFIX}-minion'"
@@ -350,11 +350,11 @@ function kube-up {
         echo "readonly MASTER_HTPASSWD='${htpasswd}'"
         echo "readonly PORTAL_NET='${PORTAL_NET}'"
         echo "readonly ADMISSION_CONTROL='${ADMISSION_CONTROL:-}'"        
-        grep -v "^#" "${KUBE_ROOT}/cluster/azure/templates/common.sh"
-        grep -v "^#" "${KUBE_ROOT}/cluster/azure/templates/create-dynamic-salt-files.sh"
-        grep -v "^#" "${KUBE_ROOT}/cluster/azure/templates/download-release.sh"
-        grep -v "^#" "${KUBE_ROOT}/cluster/azure/templates/salt-master.sh"
-    ) > "${KUBE_TEMP}/master-start.sh"
+        grep -v "^#" "${LMKTFY_ROOT}/cluster/azure/templates/common.sh"
+        grep -v "^#" "${LMKTFY_ROOT}/cluster/azure/templates/create-dynamic-salt-files.sh"
+        grep -v "^#" "${LMKTFY_ROOT}/cluster/azure/templates/download-release.sh"
+        grep -v "^#" "${LMKTFY_ROOT}/cluster/azure/templates/salt-master.sh"
+    ) > "${LMKTFY_TEMP}/master-start.sh"
 
     if [[ ! -f $AZ_SSH_KEY ]]; then
         ssh-keygen -f $AZ_SSH_KEY -N ''
@@ -377,7 +377,7 @@ function kube-up {
         -l "$AZ_LOCATION" \
         -t $AZ_SSH_CERT \
         -e 22000 -P \
-        -d ${KUBE_TEMP}/master-start.sh \
+        -d ${LMKTFY_TEMP}/master-start.sh \
         -b $AZ_SUBNET \
         $AZ_CS $AZ_IMAGE $USER
 
@@ -389,13 +389,13 @@ function kube-up {
         (
             echo "#!/bin/bash"
             echo "MASTER_NAME='${MASTER_NAME}'"
-            echo "CA_CRT=\"$(cat ${KUBE_TEMP}/ca.crt)\""
-            echo "CLIENT_CRT=\"$(cat ${KUBE_TEMP}/${MINION_NAMES[$i]}.crt)\""
-            echo "CLIENT_KEY=\"$(cat ${KUBE_TEMP}/${MINION_NAMES[$i]}.key)\""
+            echo "CA_CRT=\"$(cat ${LMKTFY_TEMP}/ca.crt)\""
+            echo "CLIENT_CRT=\"$(cat ${LMKTFY_TEMP}/${MINION_NAMES[$i]}.crt)\""
+            echo "CLIENT_KEY=\"$(cat ${LMKTFY_TEMP}/${MINION_NAMES[$i]}.key)\""
             echo "MINION_IP_RANGE='${MINION_IP_RANGES[$i]}'"
-            grep -v "^#" "${KUBE_ROOT}/cluster/azure/templates/common.sh"
-            grep -v "^#" "${KUBE_ROOT}/cluster/azure/templates/salt-minion.sh"
-        ) > "${KUBE_TEMP}/minion-start-${i}.sh"
+            grep -v "^#" "${LMKTFY_ROOT}/cluster/azure/templates/common.sh"
+            grep -v "^#" "${LMKTFY_ROOT}/cluster/azure/templates/salt-minion.sh"
+        ) > "${LMKTFY_TEMP}/minion-start-${i}.sh"
 
         echo "--> Starting VM"
         azure_call vm create \
@@ -404,7 +404,7 @@ function kube-up {
             -l "$AZ_LOCATION" \
             -t $AZ_SSH_CERT \
             -e ${ssh_ports[$i]} -P \
-            -d ${KUBE_TEMP}/minion-start-${i}.sh \
+            -d ${LMKTFY_TEMP}/minion-start-${i}.sh \
             -b $AZ_SUBNET \
             $AZ_CS $AZ_IMAGE $USER
     done
@@ -414,50 +414,50 @@ function kube-up {
 
     detect-master > /dev/null
 
-    echo "==> KUBE_MASTER_IP: ${KUBE_MASTER_IP}"
+    echo "==> LMKTFY_MASTER_IP: ${LMKTFY_MASTER_IP}"
 
     echo "Waiting for cluster initialization."
     echo
-    echo "  This will continually check to see if the API for kubernetes is reachable."
+    echo "  This will continually check to see if the API for lmktfy is reachable."
     echo "  This might loop forever if there was some uncaught error during start"
     echo "  up."
     echo
 
-    until curl --insecure --user "${KUBE_USER}:${KUBE_PASSWORD}" --max-time 5 \
-        --fail --output /dev/null --silent "https://${KUBE_MASTER_IP}/api/v1beta1/pods"; do
+    until curl --insecure --user "${LMKTFY_USER}:${LMKTFY_PASSWORD}" --max-time 5 \
+        --fail --output /dev/null --silent "https://${LMKTFY_MASTER_IP}/api/v1beta1/pods"; do
         printf "."
         sleep 2
     done
 
     printf "\n"
-    echo "Kubernetes cluster created."
+    echo "LMKTFY cluster created."
 
-    local kube_cert=".kubecfg.crt"
-    local kube_key=".kubecfg.key"
-    local ca_cert=".kubernetes.ca.crt"
+    local lmktfy_cert=".lmktfycfg.crt"
+    local lmktfy_key=".lmktfycfg.key"
+    local ca_cert=".lmktfy.ca.crt"
 
-    # TODO: generate ADMIN (and KUBELET) tokens and put those in the master's
+    # TODO: generate ADMIN (and LMKTFYLET) tokens and put those in the master's
     # config file.  Distribute the same way the htpasswd is done.
 (umask 077
     ssh -oStrictHostKeyChecking=no -i $AZ_SSH_KEY -p 22000 $AZ_CS.cloudapp.net \
-        sudo cat /srv/kubernetes/kubecfg.crt >"${HOME}/${kube_cert}" 2>/dev/null
+        sudo cat /srv/lmktfy/lmktfycfg.crt >"${HOME}/${lmktfy_cert}" 2>/dev/null
     ssh -oStrictHostKeyChecking=no -i $AZ_SSH_KEY -p 22000 $AZ_CS.cloudapp.net \
-        sudo cat /srv/kubernetes/kubecfg.key >"${HOME}/${kube_key}" 2>/dev/null
+        sudo cat /srv/lmktfy/lmktfycfg.key >"${HOME}/${lmktfy_key}" 2>/dev/null
     ssh -oStrictHostKeyChecking=no -i $AZ_SSH_KEY -p 22000 $AZ_CS.cloudapp.net \
-        sudo cat /srv/kubernetes/ca.crt >"${HOME}/${ca_cert}" 2>/dev/null
+        sudo cat /srv/lmktfy/ca.crt >"${HOME}/${ca_cert}" 2>/dev/null
 
-    cat << EOF > ~/.kubernetes_auth
+    cat << EOF > ~/.lmktfy_auth
 {
-  "User": "$KUBE_USER",
-  "Password": "$KUBE_PASSWORD",
+  "User": "$LMKTFY_USER",
+  "Password": "$LMKTFY_PASSWORD",
   "CAFile": "$HOME/$ca_cert",
-  "CertFile": "$HOME/$kube_cert",
-  "KeyFile": "$HOME/$kube_key"
+  "CertFile": "$HOME/$lmktfy_cert",
+  "KeyFile": "$HOME/$lmktfy_key"
 }
 EOF
 
-    chmod 0600 ~/.kubernetes_auth "${HOME}/${kube_cert}" \
-        "${HOME}/${kube_key}" "${HOME}/${ca_cert}"
+    chmod 0600 ~/.lmktfy_auth "${HOME}/${lmktfy_cert}" \
+        "${HOME}/${lmktfy_key}" "${HOME}/${ca_cert}"
 )
 
     # Wait for salt on the minions
@@ -471,23 +471,23 @@ EOF
         ssh -oStrictHostKeyChecking=no -i $AZ_SSH_KEY -p ${ssh_ports[$i]} \
             $AZ_CS.cloudapp.net which docker > /dev/null || {
             echo "Docker failed to install on ${MINION_NAMES[$i]}. Your cluster is unlikely" >&2
-            echo "to work correctly. Please run ./cluster/kube-down.sh and re-create the" >&2
+            echo "to work correctly. Please run ./cluster/lmktfy-down.sh and re-create the" >&2
             echo "cluster. (sorry!)" >&2
             exit 1
         }
     done
 
     echo
-    echo "Kubernetes cluster is running.  The master is running at:"
+    echo "LMKTFY cluster is running.  The master is running at:"
     echo
-    echo "  https://${KUBE_MASTER_IP}"
+    echo "  https://${LMKTFY_MASTER_IP}"
     echo
-    echo "The user name and password to use is located in ~/.kubernetes_auth."
+    echo "The user name and password to use is located in ~/.lmktfy_auth."
     echo
 }
 
-# Delete a kubernetes cluster
-function kube-down {
+# Delete a lmktfy cluster
+function lmktfy-down {
     echo "Bringing down cluster"
 
     set +e
@@ -499,8 +499,8 @@ function kube-down {
     wait
 }
 
-# Update a kubernetes cluster with latest source
-#function kube-push {
+# Update a lmktfy cluster with latest source
+#function lmktfy-push {
 #  detect-project
 #  detect-master
 
@@ -510,25 +510,25 @@ function kube-down {
 
 #  (
 #    echo "#! /bin/bash"
-#    echo "mkdir -p /var/cache/kubernetes-install"
-#    echo "cd /var/cache/kubernetes-install"
+#    echo "mkdir -p /var/cache/lmktfy-install"
+#    echo "cd /var/cache/lmktfy-install"
 #    echo "readonly SERVER_BINARY_TAR_URL='${SERVER_BINARY_TAR_URL}'"
 #    echo "readonly SALT_TAR_URL='${SALT_TAR_URL}'"
-#    grep -v "^#" "${KUBE_ROOT}/cluster/azure/templates/common.sh"
-#    grep -v "^#" "${KUBE_ROOT}/cluster/azure/templates/download-release.sh"
+#    grep -v "^#" "${LMKTFY_ROOT}/cluster/azure/templates/common.sh"
+#    grep -v "^#" "${LMKTFY_ROOT}/cluster/azure/templates/download-release.sh"
 #    echo "echo Executing configuration"
 #    echo "sudo salt '*' mine.update"
 #    echo "sudo salt --force-color '*' state.highstate"
-#   ) | gcutil ssh --project "$PROJECT" --zone "$ZONE" "$KUBE_MASTER" sudo bash
+#   ) | gcutil ssh --project "$PROJECT" --zone "$ZONE" "$LMKTFY_MASTER" sudo bash
 
 #  get-password
 
 #  echo
-#  echo "Kubernetes cluster is running.  The master is running at:"
+#  echo "LMKTFY cluster is running.  The master is running at:"
 #  echo
-#  echo "  https://${KUBE_MASTER_IP}"
+#  echo "  https://${LMKTFY_MASTER_IP}"
 # echo
-#  echo "The user name and password to use is located in ~/.kubernetes_auth."
+#  echo "The user name and password to use is located in ~/.lmktfy_auth."
 #  echo
 
 #}
@@ -539,10 +539,10 @@ function kube-down {
 # Execute prior to running tests to build a release if required for env.
 #
 # Assumed Vars:
-#   KUBE_ROOT
+#   LMKTFY_ROOT
 function test-build-release {
     # Make a release
-    "${KUBE_ROOT}/build/release.sh"
+    "${LMKTFY_ROOT}/build/release.sh"
 }
 
 # SSH to a node by name ($1) and run a command ($2).
@@ -552,12 +552,12 @@ function ssh-to-node {
     ssh --ssh_arg "-o LogLevel=quiet" "${node}" "${cmd}"
 }
 
-# Restart the kube-proxy on a node ($1)
-function restart-kube-proxy {
-    ssh-to-node "$1" "sudo /etc/init.d/kube-proxy restart"
+# Restart the lmktfy-proxy on a node ($1)
+function restart-lmktfy-proxy {
+    ssh-to-node "$1" "sudo /etc/init.d/lmktfy-proxy restart"
 }
 
-# Restart the kube-proxy on the master ($1)
+# Restart the lmktfy-proxy on the master ($1)
 function restart-apiserver {
-    ssh-to-node "$1" "sudo /etc/init.d/kube-apiserver restart"
+    ssh-to-node "$1" "sudo /etc/init.d/lmktfy-apiserver restart"
 }

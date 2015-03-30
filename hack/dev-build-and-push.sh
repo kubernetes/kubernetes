@@ -20,14 +20,14 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+LMKTFY_ROOT=$(dirname "${BASH_SOURCE}")/..
 
 # Build a release
-"${KUBE_ROOT}/build/release.sh"
+"${LMKTFY_ROOT}/build/release.sh"
 if [ "$?" != "0" ]; then
         echo "Building a release failed!"
         exit 1
 fi
 
 # Now push this out to the cluster
-"${KUBE_ROOT}/cluster/kube-push.sh"
+"${LMKTFY_ROOT}/cluster/lmktfy-push.sh"

@@ -17,9 +17,9 @@ limitations under the License.
 package ports
 
 const (
-	// KubeletPort is the default port for the kubelet status server on each host machine.
+	// LMKTFYletPort is the default port for the lmktfylet status server on each host machine.
 	// May be overridden by a flag at startup.
-	KubeletPort = 10250
+	LMKTFYletPort = 10250
 	// SchedulerPort is the default port for the scheduler status server.
 	// May be overridden by a flag at startup.
 	SchedulerPort = 10251

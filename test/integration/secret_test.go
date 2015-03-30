@@ -25,11 +25,11 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/master"
-	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/admission/admit"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/apiserver"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/client"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/master"
+	"github.com/GoogleCloudPlatform/lmktfy/plugin/pkg/admission/admit"
 )
 
 func init() {
@@ -62,7 +62,7 @@ func TestSecrets(t *testing.T) {
 
 	m = master.New(&master.Config{
 		EtcdHelper:        helper,
-		KubeletClient:     client.FakeKubeletClient{},
+		LMKTFYletClient:     client.FakeLMKTFYletClient{},
 		EnableLogsSupport: false,
 		EnableUISupport:   false,
 		EnableIndex:       true,
@@ -148,8 +148,8 @@ func DoTestSecrets(t *testing.T, client *client.Client, apiVersion string) {
 	}
 	defer deletePodOrErrorf(t, client, ns, pod.Name)
 	// This pod may fail to run, but we don't currently prevent this, and this
-	// test can't check whether the kubelet actually pulls the secret.
+	// test can't check whether the lmktfylet actually pulls the secret.
 
 	// Verifying contents of the volumes is out of scope for a
-	// apiserver<->kubelet integration test.  It is covered by an e2e test.
+	// apiserver<->lmktfylet integration test.  It is covered by an e2e test.
 }

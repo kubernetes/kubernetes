@@ -17,14 +17,14 @@ limitations under the License.
 package rest
 
 import (
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/fielderrors"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api/errors"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/runtime"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/util/fielderrors"
 )
 
 // RESTCreateStrategy defines the minimum validation, accepted input, and
-// name generation behavior to create an object that follows Kubernetes
+// name generation behavior to create an object that follows LMKTFY
 // API conventions.
 type RESTCreateStrategy interface {
 	runtime.ObjectTyper

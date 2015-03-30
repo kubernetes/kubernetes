@@ -22,9 +22,9 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/authenticator"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/user"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/auth/authenticator"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/auth/user"
 )
 
 func TestAuthenticateRequest(t *testing.T) {

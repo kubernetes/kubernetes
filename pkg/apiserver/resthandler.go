@@ -23,11 +23,11 @@ import (
 	gpath "path"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/admission"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/rest"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/admission"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api/errors"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api/rest"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/runtime"
 
 	"github.com/emicklei/go-restful"
 	"github.com/evanphx/json-patch"

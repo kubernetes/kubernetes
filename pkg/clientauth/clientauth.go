@@ -16,11 +16,11 @@ limitations under the License.
 
 /*
 Package authcfg defines a file format for holding authentication
-information needed by clients of Kubernetes.  Typically,
-a Kubernetes cluster will put auth info for the admin in a known
+information needed by clients of LMKTFY.  Typically,
+a LMKTFY cluster will put auth info for the admin in a known
 location when it is created, and will (soon) put it in a known
 location within a Container's file tree for Containers that
-need access to the Kubernetes API.
+need access to the LMKTFY API.
 
 Having a defined format allows:
   - clients to be implmented in multiple languages
@@ -35,7 +35,7 @@ The file format is json, marshalled from a struct authcfg.Info.
 Clinet libraries in other languages should use the same format.
 
 It is not intended to store general preferences, such as default
-namespace, output options, etc.  CLIs (such as kubectl) and UIs should
+namespace, output options, etc.  CLIs (such as lmktfyctl) and UIs should
 develop their own format and may wish to inline the authcfg.Info type.
 
 The authcfg.Info is just a file format.  It is distinct from
@@ -68,10 +68,10 @@ import (
 	"io/ioutil"
 	"os"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/client"
 )
 
-// Info holds Kubernetes API authorization config.  It is intended
+// Info holds LMKTFY API authorization config.  It is intended
 // to be read/written from a file as a JSON object.
 type Info struct {
 	User        string

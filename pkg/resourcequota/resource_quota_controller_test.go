@@ -19,10 +19,10 @@ package resourcequota
 import (
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api/resource"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/client"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/util"
 )
 
 func getResourceRequirements(cpu, memory string) api.ResourceRequirements {
@@ -150,17 +150,17 @@ func TestSyncResourceQuota(t *testing.T) {
 		},
 	}
 
-	kubeClient := &client.Fake{
+	lmktfyClient := &client.Fake{
 		PodsList: podList,
 	}
 
-	resourceQuotaManager := NewResourceQuotaManager(kubeClient)
+	resourceQuotaManager := NewResourceQuotaManager(lmktfyClient)
 	err := resourceQuotaManager.syncResourceQuota(quota)
 	if err != nil {
 		t.Errorf("Unexpected error %v", err)
 	}
 
-	usage := kubeClient.ResourceQuotaStatus
+	usage := lmktfyClient.ResourceQuotaStatus
 
 	// ensure hard and used limits are what we expected
 	for k, v := range expectedUsage.Status.Hard {

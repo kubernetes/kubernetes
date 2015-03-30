@@ -6,12 +6,12 @@ This document proposes a system for enforcing hard resource usage limits per nam
 
 ## Model Changes
 
-A new resource, **ResourceQuota**, is introduced to enumerate hard resource limits in a Kubernetes namespace.
+A new resource, **ResourceQuota**, is introduced to enumerate hard resource limits in a LMKTFY namespace.
 
 A new resource, **ResourceQuotaUsage**, is introduced to support atomic updates of a **ResourceQuota** status.
 
 ```go
-// The following identify resource constants for Kubernetes object types
+// The following identify resource constants for LMKTFY object types
 const (
   // Pods, number
   ResourcePods ResourceName = "pods"
@@ -77,7 +77,7 @@ The **ResourceQuota** plug-in introspects all incoming admission requests.
 It makes decisions by evaluating the incoming object against all defined **ResourceQuota.Status.Hard** resource limits in the request
 namespace.  If acceptance of the resource would cause the total usage of a named resource to exceed its hard limit, the request is denied.
 
-The following resource limits are imposed as part of core Kubernetes at the namespace level:
+The following resource limits are imposed as part of core LMKTFY at the namespace level:
 
 | ResourceName | Description |
 | ------------ | ----------- |
@@ -88,7 +88,7 @@ The following resource limits are imposed as part of core Kubernetes at the name
 | replicationcontrollers | Total number of replication controllers |
 | resourcequotas | Total number of resource quotas |
 
-Any resource that is not part of core Kubernetes must follow the resource naming convention prescribed by Kubernetes.
+Any resource that is not part of core LMKTFY must follow the resource naming convention prescribed by LMKTFY.
 
 This means the resource must have a fully-qualified name (i.e. mycompany.org/shinynewresource)
 
@@ -101,17 +101,17 @@ To optimize system performance, it is encouraged that all resource quotas are tr
 its encouraged to actually impose a cap on the total number of individual quotas that are tracked in the **Namespace** to 1 by explicitly
 capping it in **ResourceQuota** document.
 
-## kube-apiserver
+## lmktfy-apiserver
 
 The server is updated to be aware of **ResourceQuota** objects.
 
-The quota is only enforced if the kube-apiserver is started as follows:
+The quota is only enforced if the lmktfy-apiserver is started as follows:
 
 ```
-$ kube-apiserver -admission_control=ResourceQuota
+$ lmktfy-apiserver -admission_control=ResourceQuota
 ```
 
-## kube-controller-manager
+## lmktfy-controller-manager
 
 A new controller is defined that runs a synch loop to calculate quota usage across the namespace.
 
@@ -126,21 +126,21 @@ To optimize the synchronization loop, this controller will WATCH on Pod resource
 usage.  This is because a Pod deletion will have the most impact on observed cpu and memory usage in the system, and we anticipate
 this being the resource most closely running at the prescribed quota limits.
 
-## kubectl
+## lmktfyctl
 
-kubectl is modified to support the **ResourceQuota** resource.
+lmktfyctl is modified to support the **ResourceQuota** resource.
 
-```kubectl describe``` provides a human-readable output of quota.
+```lmktfyctl describe``` provides a human-readable output of quota.
 
 For example,
 
 ```
-$ kubectl namespace myspace
-$ kubectl create -f examples/resourcequota/resource-quota.json
-$ kubectl get quota
+$ lmktfyctl namespace myspace
+$ lmktfyctl create -f examples/resourcequota/resource-quota.json
+$ lmktfyctl get quota
 NAME
 quota
-$ kubectl describe quota quota
+$ lmktfyctl describe quota quota
 Name:                   quota
 Resource                Used    Hard
 --------                ----    ----

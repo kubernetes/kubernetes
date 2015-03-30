@@ -67,15 +67,15 @@ purge-old-docker:
 # 2. Download based on that:
 #    curl -O https://get.docker.com/ubuntu/pool/main/<...>
 # 3. Upload to GCS:
-#    gsutil cp <deb> gs://kubernetes-release/docker/<deb>
+#    gsutil cp <deb> gs://lmktfyrnetes-release/docker/<deb>
 # 4. Make it world readable:
-#    gsutil acl ch -R -g all:R gs://kubernetes-release/docker/<deb>
+#    gsutil acl ch -R -g all:R gs://lmktfyrnetes-release/docker/<deb>
 # 5. Get a hash of the deb:
 #    shasum <deb>
 # 6. Update this file with new deb name, new hash and new version
 # 7. Add the old version to purge-old-docker above.
 
-{% set storage_base='https://storage.googleapis.com/kubernetes-release/docker/' %}
+{% set storage_base='https://storage.googleapis.com/lmktfyrnetes-release/docker/' %}
 {% set deb='lxc-docker-1.5.0_1.5.0_amd64.deb' %}
 {% set deb_hash='sha1=ba4db088a741c15311406780d828fa6a6341fb40' %}
 {% set docker_ver='1.5.0' %}

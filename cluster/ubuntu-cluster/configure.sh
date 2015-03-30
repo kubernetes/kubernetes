@@ -24,41 +24,41 @@ set -e
 function cpMaster(){
 	# copy /etc/init files
     cp init_conf/etcd.conf /etc/init/
-    cp init_conf/kube-apiserver.conf /etc/init/
-    cp init_conf/kube-controller-manager.conf /etc/init/
-    cp init_conf/kube-scheduler.conf /etc/init/
+    cp init_conf/lmktfy-apiserver.conf /etc/init/
+    cp init_conf/lmktfy-controller-manager.conf /etc/init/
+    cp init_conf/lmktfy-scheduler.conf /etc/init/
 
     # copy /etc/initd/ files
     cp initd_scripts/etcd /etc/init.d/
-    cp initd_scripts/kube-apiserver /etc/init.d/
-    cp initd_scripts/kube-controller-manager /etc/init.d/
-    cp initd_scripts/kube-scheduler /etc/init.d/
+    cp initd_scripts/lmktfy-apiserver /etc/init.d/
+    cp initd_scripts/lmktfy-controller-manager /etc/init.d/
+    cp initd_scripts/lmktfy-scheduler /etc/init.d/
 
     # copy default configs
     cp default_scripts/etcd /etc/default/
-    cp default_scripts/kube-apiserver /etc/default/
-    cp default_scripts/kube-scheduler /etc/default/
-    cp default_scripts/kube-controller-manager /etc/default/
+    cp default_scripts/lmktfy-apiserver /etc/default/
+    cp default_scripts/lmktfy-scheduler /etc/default/
+    cp default_scripts/lmktfy-controller-manager /etc/default/
 }
 
 function cpMinion(){
 	# copy /etc/init files
     cp init_conf/etcd.conf /etc/init/
-    cp init_conf/kubelet.conf /etc/init/
+    cp init_conf/lmktfylet.conf /etc/init/
     cp init_conf/flanneld.conf /etc/init/
-    cp init_conf/kube-proxy.conf /etc/init/
+    cp init_conf/lmktfy-proxy.conf /etc/init/
 
     # copy /etc/initd/ files
     cp initd_scripts/etcd /etc/init.d/
     cp initd_scripts/flanneld /etc/init.d/
-    cp initd_scripts/kubelet /etc/init.d/
-    cp initd_scripts/kube-proxy /etc/init.d/
+    cp initd_scripts/lmktfylet /etc/init.d/
+    cp initd_scripts/lmktfy-proxy /etc/init.d/
 
     # copy default configs
     cp default_scripts/etcd /etc/default/
     cp default_scripts/flanneld /etc/default/
-    cp default_scripts/kube-proxy /etc/default
-    cp default_scripts/kubelet /etc/default/
+    cp default_scripts/lmktfy-proxy /etc/default
+    cp default_scripts/lmktfylet /etc/default/
 }
 
 # check if input IP in machine list
@@ -80,7 +80,7 @@ if [ "$(id -u)" != "0" ]; then
     exit 1
 fi
 
-echo "Welcome to use this script to configure k8s setup"
+echo "Welcome to use this script to configure lmktfy setup"
 
 echo
 
@@ -100,10 +100,10 @@ then
     exit 1
 fi
 
-# check kube commands
-if ! $(which kube-apiserver > /dev/null) && ! $(which kubelet > /dev/null)
+# check lmktfy commands
+if ! $(which lmktfy-apiserver > /dev/null) && ! $(which lmktfylet > /dev/null)
 then
-    echo "warning: kube binaries are not found in the $PATH"
+    echo "warning: lmktfy binaries are not found in the $PATH"
     exit 1
 fi
 
@@ -161,12 +161,12 @@ while true; do
             etcdName=${mm[$myIP]}
             inList $etcdName $myIP
             configEtcd $etcdName $myIP $cluster
-            # For minion set MINION IP in default_scripts/kubelet
-            sed -i "s/MY_IP/${myIP}/g" default_scripts/kubelet
-            sed -i "s/MASTER_IP/${masterIP}/g" default_scripts/kubelet         
-            sed -i "s/MASTER_IP/${masterIP}/g" default_scripts/kube-proxy        
+            # For minion set MINION IP in default_scripts/lmktfylet
+            sed -i "s/MY_IP/${myIP}/g" default_scripts/lmktfylet
+            sed -i "s/MASTER_IP/${masterIP}/g" default_scripts/lmktfylet         
+            sed -i "s/MASTER_IP/${masterIP}/g" default_scripts/lmktfy-proxy        
             
-            # For master set MINION IPs in kube-controller-manager
+            # For master set MINION IPs in lmktfy-controller-manager
             if [ -z "$minionIPs" ]; then
                 #one node act as both minion and master role
                 minionIPs="$myIP"
@@ -174,7 +174,7 @@ while true; do
                 minionIPs="$minionIPs,$myIP"
             fi
 
-	        sed -i "s/MINION_IPS/${minionIPs}/g" default_scripts/kube-controller-manager
+	        sed -i "s/MINION_IPS/${minionIPs}/g" default_scripts/lmktfy-controller-manager
 	        
 	        cpMaster
 	        cpMinion
@@ -187,8 +187,8 @@ while true; do
             etcdName=${mm[$myIP]}
             inList $etcdName $myIP
             configEtcd $etcdName $myIP $cluster
-            # set MINION IPs in kube-controller-manager
-            sed -i "s/MINION_IPS/${minionIPs}/g" default_scripts/kube-controller-manager
+            # set MINION IPs in lmktfy-controller-manager
+            sed -i "s/MINION_IPS/${minionIPs}/g" default_scripts/lmktfy-controller-manager
 	        cpMaster
 	        break
             ;;
@@ -199,9 +199,9 @@ while true; do
             etcdName=${mm[$myIP]}
             inList $etcdName $myIP
             configEtcd $etcdName $myIP $cluster
-            # set MINION IP in default_scripts/kubelet
-            sed -i "s/MY_IP/${myIP}/g" default_scripts/kubelet
-            sed -i "s/MASTER_IP/${masterIP}/g" default_scripts/kubelet
+            # set MINION IP in default_scripts/lmktfylet
+            sed -i "s/MY_IP/${myIP}/g" default_scripts/lmktfylet
+            sed -i "s/MASTER_IP/${masterIP}/g" default_scripts/lmktfylet
 	        cpMinion
 	        break
 	        ;;

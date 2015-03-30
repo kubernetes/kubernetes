@@ -1,5 +1,5 @@
 # A Dockerfile for creating a Kibana container that is designed
-# to work with Kubernetes logging.
+# to work with LMKTFYrnetes logging.
 
 FROM ubuntu:14.04
 MAINTAINER Satnam Singh "satnam@google.com"

@@ -53,37 +53,37 @@ while [[ $# > 0 ]]; do
        esac
 done
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
-cd "${KUBE_ROOT}"
+LMKTFY_ROOT=$(dirname "${BASH_SOURCE}")/../..
+cd "${LMKTFY_ROOT}"
 
 echo All verbose output will be redirected to $logfile, use --logfile option to change.
 
 printf "Start the cluster with 2 minions .. "
 export NUM_MINIONS=2
-export KUBERNETES_PROVIDER=vagrant
+export LMKTFYRNETES_PROVIDER=vagrant
 
-(cluster/kube-up.sh >>"$logfile" 2>&1) || true
+(cluster/lmktfy-up.sh >>"$logfile" 2>&1) || true
 echoOK $?
 
-printf "Check if minion-1 can reach kubernetes master .. "
-vagrant ssh minion-1 -- ping -c 10 kubernetes-master >>"$logfile" 2>&1
+printf "Check if minion-1 can reach lmktfy master .. "
+vagrant ssh minion-1 -- ping -c 10 lmktfy-master >>"$logfile" 2>&1
 echoOK $?
-printf "Check if minion-2 can reach kubernetes master .. "
-vagrant ssh minion-2 -- ping -c 10 kubernetes-master >>"$logfile" 2>&1
+printf "Check if minion-2 can reach lmktfy master .. "
+vagrant ssh minion-2 -- ping -c 10 lmktfy-master >>"$logfile" 2>&1
 echoOK $?
 
 printf "Pull an image that runs a web server on minion-1 .. "
-vagrant ssh minion-1 -- 'sudo docker pull kubernetes/serve_hostname' >>"$logfile" 2>&1
+vagrant ssh minion-1 -- 'sudo docker pull lmktfy/serve_hostname' >>"$logfile" 2>&1
 echoOK $?
 printf "Pull an image that runs a web server on minion-2 .. "
-vagrant ssh minion-2 -- 'sudo docker pull kubernetes/serve_hostname' >>"$logfile" 2>&1
+vagrant ssh minion-2 -- 'sudo docker pull lmktfy/serve_hostname' >>"$logfile" 2>&1
 echoOK $?
 
 printf "Run the server on minion-1 .. "
-vagrant ssh minion-1 -- sudo docker run -d kubernetes/serve_hostname >>"$logfile" 2>&1
+vagrant ssh minion-1 -- sudo docker run -d lmktfy/serve_hostname >>"$logfile" 2>&1
 echoOK $?
 printf "Run the server on minion-2 .. "
-vagrant ssh minion-2 -- sudo docker run -d kubernetes/serve_hostname >>"$logfile" 2>&1
+vagrant ssh minion-2 -- sudo docker run -d lmktfy/serve_hostname >>"$logfile" 2>&1
 echoOK $?
 
 printf "Run ping from minion-1 to docker bridges and to the containers on both minions .. "

@@ -1,0 +1,9 @@
+check process lmktfy-proxy with pidfile /var/run/lmktfy-proxy.pid
+group lmktfy-proxy
+start program = "/etc/init.d/lmktfy-proxy start"
+stop program = "/etc/init.d/lmktfy-proxy stop"
+if does not exist then restart
+if failed port 10249
+  protocol HTTP request "/healthz"
+  with timeout 10 seconds
+  then restart

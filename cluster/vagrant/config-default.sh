@@ -23,7 +23,7 @@ export NUM_MINIONS
 # The IP of the master
 export MASTER_IP="10.245.1.2"
 
-export INSTANCE_PREFIX="kubernetes"
+export INSTANCE_PREFIX="lmktfy"
 export MASTER_NAME="${INSTANCE_PREFIX}-master"
 
 # Map out the IPs, names and container subnets of each minion
@@ -63,7 +63,7 @@ ENABLE_CLUSTER_LOGGING=false
 ELASTICSEARCH_LOGGING_REPLICAS=1
 
 # Optional: When set to true, heapster, Influxdb and Grafana will be setup as part of the cluster bring up.
-ENABLE_CLUSTER_MONITORING="${KUBE_ENABLE_CLUSTER_MONITORING:-true}"
+ENABLE_CLUSTER_MONITORING="${LMKTFY_ENABLE_CLUSTER_MONITORING:-true}"
 
 # Extra options to set on the Docker command line.  This is useful for setting
 # --insecure-registry for local registries.
@@ -72,9 +72,9 @@ DOCKER_OPTS=""
 # Optional: Install cluster DNS.
 ENABLE_CLUSTER_DNS=true
 DNS_SERVER_IP="10.247.0.10"
-DNS_DOMAIN="kubernetes.local"
+DNS_DOMAIN="lmktfy.local"
 DNS_REPLICAS=1
 
-# Optional: Enable setting flags for kube-apiserver to turn on behavior in active-dev
+# Optional: Enable setting flags for lmktfy-apiserver to turn on behavior in active-dev
 #RUNTIME_CONFIG=""
 RUNTIME_CONFIG="api/v1beta3"

@@ -307,9 +307,9 @@ func TestSplitQualifiedName(t *testing.T) {
 		input  string
 		output []string
 	}{
-		{"kubernetes.io/blah", []string{"kubernetes.io", "blah"}},
+		{"lmktfy.io/blah", []string{"lmktfy.io", "blah"}},
 		{"blah", []string{"", "blah"}},
-		{"kubernetes.io/blah/blah", []string{"kubernetes.io", "blah"}},
+		{"lmktfy.io/blah/blah", []string{"lmktfy.io", "blah"}},
 	}
 	for i, tc := range testCases {
 		namespace, name := SplitQualifiedName(tc.input)
@@ -324,9 +324,9 @@ func TestJoinQualifiedName(t *testing.T) {
 		input  []string
 		output string
 	}{
-		{[]string{"kubernetes.io", "blah"}, "kubernetes.io/blah"},
+		{[]string{"lmktfy.io", "blah"}, "lmktfy.io/blah"},
 		{[]string{"blah", ""}, "blah"},
-		{[]string{"kubernetes.io", "blah"}, "kubernetes.io/blah"},
+		{[]string{"lmktfy.io", "blah"}, "lmktfy.io/blah"},
 	}
 	for i, tc := range testCases {
 		res := JoinQualifiedName(tc.input[0], tc.input[1])

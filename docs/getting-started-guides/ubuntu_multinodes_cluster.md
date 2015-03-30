@@ -1,6 +1,6 @@
-# Kubernetes deployed on multiple ubuntu nodes
+# LMKTFY deployed on multiple ubuntu nodes
 
-This document describes how to deploy kubernetes on multiple ubuntu nodes, including 1 master node and 3 minion nodes, and people uses this approach can scale to **any number of minion nodes** by changing some settings with ease. Although there exists saltstack based ubuntu k8s installation ,  it may be tedious and hard for a guy that knows little about saltstack but want to build a really distributed k8s cluster. This approach is inspired by [k8s deploy on a single node](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/getting-started-guides/ubuntu_single_node.md).
+This document describes how to deploy lmktfy on multiple ubuntu nodes, including 1 master node and 3 minion nodes, and people uses this approach can scale to **any number of minion nodes** by changing some settings with ease. Although there exists saltstack based ubuntu lmktfy installation ,  it may be tedious and hard for a guy that knows little about saltstack but want to build a really distributed lmktfy cluster. This approach is inspired by [lmktfy deploy on a single node](https://github.com/GoogleCloudPlatform/lmktfy/blob/master/docs/getting-started-guides/ubuntu_single_node.md).
 
 [Cloud team from ZJU](https://github.com/ZJU-SEL) will keep updating this work.
 
@@ -11,17 +11,17 @@ This document describes how to deploy kubernetes on multiple ubuntu nodes, inclu
 
 *3 These guide is tested OK on Ubuntu 14.04 LTS 64bit server, but it should also work on most Ubuntu versions*
 
-*4 Dependences of this guide: etcd-2.0.0, flannel-0.2.0, k8s-0.12.0, but it may work with higher versions*
+*4 Dependences of this guide: etcd-2.0.0, flannel-0.2.0, lmktfy-0.12.0, but it may work with higher versions*
 
 
 ### **Main Steps**
-#### I. Make *kubernetes* , *etcd* and *flanneld* binaries
+#### I. Make *lmktfy* , *etcd* and *flanneld* binaries
 
 On your laptop, copy `cluster/ubuntu-cluster` directory to your workspace.
 
 The `build.sh` will download and build all the needed binaries into `./binaries`.
 
-You can customize your etcd version or K8s version in the build.sh by changing  variable `ETCD_V` and `K8S_V` in build.sh, default etcd version is 2.0.0 and K8s version is 0.12.0.
+You can customize your etcd version or LMKTFY version in the build.sh by changing  variable `ETCD_V` and `LMKTFY_V` in build.sh, default etcd version is 2.0.0 and LMKTFY version is 0.12.0.
 
 
 ```
@@ -29,10 +29,10 @@ $ cd cluster/ubuntu-cluster
 $ sudo ./build.sh
 ```
 
-Please copy all the files in `./binaries` into `/opt/bin` of every machine you want to run as Kubernetes cluster node.
+Please copy all the files in `./binaries` into `/opt/bin` of every machine you want to run as LMKTFY cluster node.
 
 
-Alternatively, if your Kubernetes nodes have access to Internet, you can copy `cluster/ubuntu-cluster` directory to every node and run:
+Alternatively, if your LMKTFY nodes have access to Internet, you can copy `cluster/ubuntu-cluster` directory to every node and run:
 ```
 # in every node
 $ cd cluster/ubuntu-cluster
@@ -41,7 +41,7 @@ $ sudo cp ./binaries/* /opt/bin
 ```
 
 
-> We used flannel here because we want to use overlay network, but please remember it is not the only choice, and it is also not a k8s' necessary dependence. Actually you can just build up k8s cluster natively, or use flannel, Open vSwitch or any other SDN tool you like, we just choose flannel here as a example.
+> We used flannel here because we want to use overlay network, but please remember it is not the only choice, and it is also not a lmktfy' necessary dependence. Actually you can just build up lmktfy cluster natively, or use flannel, Open vSwitch or any other SDN tool you like, we just choose flannel here as a example.
 
 #### II. Configue and install every components upstart script
 An example cluster is listed as below:
@@ -60,7 +60,7 @@ On master( infra1 10.10.103.250 ) node:
 ```
 # in cluster/ubuntu-cluster
 $ sudo ./configure.sh
-Welcome to use this script to configure k8s setup
+Welcome to use this script to configure lmktfy setup
 
 Please enter all your cluster node ips, MASTER node comes first
 And separated with blank space like "<ip_1> <ip2> <ip3>": 10.10.103.250 10.10.103.223 10.10.103.224 10.10.103.162
@@ -82,7 +82,7 @@ On every minion ( e.g.  10.10.103.224 ) node:
 ```
 # in cluster/ubuntu-cluster
 $ sudo ./configure.sh 
-Welcome to use this script to configure k8s setup
+Welcome to use this script to configure lmktfy setup
 
 Please enter all your cluster node ips, MASTER node comes first
 And separated with blank space like "<ip_1> <ip2> <ip3>": 10.10.103.250 10.10.103.223 10.10.103.224 10.10.103.162
@@ -109,7 +109,7 @@ If you want a node acts as **both running the master and minion**, please choose
 	
 	`$ sudo service etcd start`
 	
-	> The kubernetes commands will be started automatically after etcd
+	> The lmktfy commands will be started automatically after etcd
   
 2. On any node:
 	
@@ -136,11 +136,11 @@ If you want a node acts as **both running the master and minion**, please choose
 **All done !**
 
 #### IV. Validation
-You can use kubectl command to see if the newly created k8s is working correctly. 
+You can use lmktfyctl command to see if the newly created lmktfy is working correctly. 
 
-For example , `$ kubectl get minions` to see if you get all your minion nodes comming up. 
+For example , `$ lmktfyctl get minions` to see if you get all your minion nodes comming up. 
 
-Also you can run kubernetes [guest-example](https://github.com/GoogleCloudPlatform/kubernetes/tree/master/examples/guestbook) to build a redis backend cluster on the k8s．
+Also you can run lmktfy [guest-example](https://github.com/GoogleCloudPlatform/lmktfy/tree/master/examples/guestbook) to build a redis backend cluster on the lmktfy．
 
 #### V. Trouble Shooting
 
@@ -152,7 +152,7 @@ Generally, what of this guide did is quite simple:
 
 3. Create and start flannel network
 
-So, whenver you have problem, do not blame Kubernetes, **check etcd configuration first** 
+So, whenver you have problem, do not blame LMKTFY, **check etcd configuration first** 
 
 Please try:
 

@@ -47,6 +47,6 @@ network_closure.sh
 /third_party/etcd*
 
 # User cluster configs
-.kubeconfig
+.lmktfyconfig
 
 .tags*

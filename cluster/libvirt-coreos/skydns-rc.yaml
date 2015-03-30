@@ -3,14 +3,14 @@ apiVersion: v1beta1
 id: skydns
 namespace: default
 labels:
-  k8s-app: skydns
+  lmktfy-app: skydns
 desiredState:
   replicas: ${DNS_REPLICAS}
   replicaSelector:
-    k8s-app: skydns
+    lmktfy-app: skydns
   podTemplate:
     labels:
-      k8s-app: skydns
+      lmktfy-app: skydns
     desiredState:
       manifest:
         version: v1beta2
@@ -24,14 +24,14 @@ desiredState:
                     \"-bind-addr=127.0.0.1\",
                     \"-peer-bind-addr=127.0.0.1\",
             ]
-          - name: kube2sky
-            image: kubernetes/kube2sky:1.0
+          - name: lmktfy2sky
+            image: lmktfy/lmktfy2sky:1.0
             command: [
-                    # entrypoint = \"/kube2sky\",
+                    # entrypoint = \"/lmktfy2sky\",
                     \"-domain=${DNS_DOMAIN}\",
             ]
           - name: skydns
-            image: kubernetes/skydns:2014-12-23-001
+            image: lmktfy/skydns:2014-12-23-001
             command: [
                     # entrypoint = \"/skydns\",
                     \"-machines=http://localhost:4001\",

@@ -7,6 +7,6 @@ port: 53
 portalIP: ${DNS_SERVER_IP}
 containerPort: 53
 labels:
-  k8s-app: skydns
+  lmktfy-app: skydns
 selector:
-  k8s-app: skydns
+  lmktfy-app: skydns

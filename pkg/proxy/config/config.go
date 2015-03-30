@@ -19,9 +19,9 @@ package config
 import (
 	"sync"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/config"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/types"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/util/config"
 	"github.com/golang/glog"
 )
 

@@ -15,5 +15,5 @@
 # limitations under the License.
 
 perl -pi -e "s/%%ip%%/$(hostname -I)/g" /etc/cassandra/cassandra.yaml
-export CLASSPATH=/kubernetes-cassandra.jar
+export CLASSPATH=/lmktfy-cassandra.jar
 cassandra -f

@@ -18,53 +18,53 @@
 # Version management helpers.  These functions help to set, save and load the
 # following variables:
 #
-#    KUBE_GIT_COMMIT - The git commit id corresponding to this
+#    LMKTFY_GIT_COMMIT - The git commit id corresponding to this
 #          source code.
-#    KUBE_GIT_TREE_STATE - "clean" indicates no changes since the git commit id
+#    LMKTFY_GIT_TREE_STATE - "clean" indicates no changes since the git commit id
 #        "dirty" indicates source code changes after the git commit id
-#    KUBE_GIT_VERSION - "vX.Y" used to indicate the last release version.
-#    KUBE_GIT_MAJOR - The major part of the version
-#    KUBE_GIT_MINOR - The minor component of the version
+#    LMKTFY_GIT_VERSION - "vX.Y" used to indicate the last release version.
+#    LMKTFY_GIT_MAJOR - The major part of the version
+#    LMKTFY_GIT_MINOR - The minor component of the version
 
 # Grovels through git to set a set of env variables.
 #
-# If KUBE_GIT_VERSION_FILE, this function will load from that file instead of
+# If LMKTFY_GIT_VERSION_FILE, this function will load from that file instead of
 # querying git.
-kube::version::get_version_vars() {
-  if [[ -n ${KUBE_GIT_VERSION_FILE-} ]]; then
-    kube::version::load_version_vars "${KUBE_GIT_VERSION_FILE}"
+lmktfy::version::get_version_vars() {
+  if [[ -n ${LMKTFY_GIT_VERSION_FILE-} ]]; then
+    lmktfy::version::load_version_vars "${LMKTFY_GIT_VERSION_FILE}"
     return
   fi
 
-  local git=(git --work-tree "${KUBE_ROOT}")
+  local git=(git --work-tree "${LMKTFY_ROOT}")
 
-  if [[ -n ${KUBE_GIT_COMMIT-} ]] || KUBE_GIT_COMMIT=$("${git[@]}" rev-parse "HEAD^{commit}" 2>/dev/null); then
-    if [[ -z ${KUBE_GIT_TREE_STATE-} ]]; then
+  if [[ -n ${LMKTFY_GIT_COMMIT-} ]] || LMKTFY_GIT_COMMIT=$("${git[@]}" rev-parse "HEAD^{commit}" 2>/dev/null); then
+    if [[ -z ${LMKTFY_GIT_TREE_STATE-} ]]; then
       # Check if the tree is dirty.  default to dirty
       if git_status=$("${git[@]}" status --porcelain 2>/dev/null) && [[ -z ${git_status} ]]; then
-        KUBE_GIT_TREE_STATE="clean"
+        LMKTFY_GIT_TREE_STATE="clean"
       else
-        KUBE_GIT_TREE_STATE="dirty"
+        LMKTFY_GIT_TREE_STATE="dirty"
       fi
     fi
 
     # Use git describe to find the version based on annotated tags.
-    if [[ -n ${KUBE_GIT_VERSION-} ]] || KUBE_GIT_VERSION=$("${git[@]}" describe --tags --abbrev=14 "${KUBE_GIT_COMMIT}^{commit}" 2>/dev/null); then
-      if [[ "${KUBE_GIT_TREE_STATE}" == "dirty" ]]; then
+    if [[ -n ${LMKTFY_GIT_VERSION-} ]] || LMKTFY_GIT_VERSION=$("${git[@]}" describe --tags --abbrev=14 "${LMKTFY_GIT_COMMIT}^{commit}" 2>/dev/null); then
+      if [[ "${LMKTFY_GIT_TREE_STATE}" == "dirty" ]]; then
         # git describe --dirty only considers changes to existing files, but
         # that is problematic since new untracked .go files affect the build,
         # so use our idea of "dirty" from git status instead.
-        KUBE_GIT_VERSION+="-dirty"
+        LMKTFY_GIT_VERSION+="-dirty"
       fi
 
       # Try to match the "git describe" output to a regex to try to extract
       # the "major" and "minor" versions and whether this is the exact tagged
       # version or whether the tree is between two tagged versions.
-      if [[ "${KUBE_GIT_VERSION}" =~ ^v([0-9]+)\.([0-9]+)(\.[0-9]+)?([-].*)?$ ]]; then
-        KUBE_GIT_MAJOR=${BASH_REMATCH[1]}
-        KUBE_GIT_MINOR=${BASH_REMATCH[2]}
+      if [[ "${LMKTFY_GIT_VERSION}" =~ ^v([0-9]+)\.([0-9]+)(\.[0-9]+)?([-].*)?$ ]]; then
+        LMKTFY_GIT_MAJOR=${BASH_REMATCH[1]}
+        LMKTFY_GIT_MINOR=${BASH_REMATCH[2]}
         if [[ -n "${BASH_REMATCH[4]}" ]]; then
-          KUBE_GIT_MINOR+="+"
+          LMKTFY_GIT_MINOR+="+"
         fi
       fi
     fi
@@ -72,27 +72,27 @@ kube::version::get_version_vars() {
 }
 
 # Saves the environment flags to $1
-kube::version::save_version_vars() {
+lmktfy::version::save_version_vars() {
   local version_file=${1-}
   [[ -n ${version_file} ]] || {
-    echo "!!! Internal error.  No file specified in kube::version::save_version_vars"
+    echo "!!! Internal error.  No file specified in lmktfy::version::save_version_vars"
     return 1
   }
 
   cat <<EOF >"${version_file}"
-KUBE_GIT_COMMIT='${KUBE_GIT_COMMIT-}'
-KUBE_GIT_TREE_STATE='${KUBE_GIT_TREE_STATE-}'
-KUBE_GIT_VERSION='${KUBE_GIT_VERSION-}'
-KUBE_GIT_MAJOR='${KUBE_GIT_MAJOR-}'
-KUBE_GIT_MINOR='${KUBE_GIT_MINOR-}'
+LMKTFY_GIT_COMMIT='${LMKTFY_GIT_COMMIT-}'
+LMKTFY_GIT_TREE_STATE='${LMKTFY_GIT_TREE_STATE-}'
+LMKTFY_GIT_VERSION='${LMKTFY_GIT_VERSION-}'
+LMKTFY_GIT_MAJOR='${LMKTFY_GIT_MAJOR-}'
+LMKTFY_GIT_MINOR='${LMKTFY_GIT_MINOR-}'
 EOF
 }
 
 # Loads up the version variables from file $1
-kube::version::load_version_vars() {
+lmktfy::version::load_version_vars() {
   local version_file=${1-}
   [[ -n ${version_file} ]] || {
-    echo "!!! Internal error.  No file specified in kube::version::load_version_vars"
+    echo "!!! Internal error.  No file specified in lmktfy::version::load_version_vars"
     return 1
   }
 
@@ -100,24 +100,24 @@ kube::version::load_version_vars() {
 }
 
 # Prints the value that needs to be passed to the -ldflags parameter of go build
-# in order to set the Kubernetes based on the git tree status.
-kube::version::ldflags() {
-  kube::version::get_version_vars
+# in order to set the LMKTFY based on the git tree status.
+lmktfy::version::ldflags() {
+  lmktfy::version::get_version_vars
 
   local -a ldflags=()
-  if [[ -n ${KUBE_GIT_COMMIT-} ]]; then
-    ldflags+=(-X "${KUBE_GO_PACKAGE}/pkg/version.gitCommit" "${KUBE_GIT_COMMIT}")
-    ldflags+=(-X "${KUBE_GO_PACKAGE}/pkg/version.gitTreeState" "${KUBE_GIT_TREE_STATE}")
+  if [[ -n ${LMKTFY_GIT_COMMIT-} ]]; then
+    ldflags+=(-X "${LMKTFY_GO_PACKAGE}/pkg/version.gitCommit" "${LMKTFY_GIT_COMMIT}")
+    ldflags+=(-X "${LMKTFY_GO_PACKAGE}/pkg/version.gitTreeState" "${LMKTFY_GIT_TREE_STATE}")
   fi
 
-  if [[ -n ${KUBE_GIT_VERSION-} ]]; then
-    ldflags+=(-X "${KUBE_GO_PACKAGE}/pkg/version.gitVersion" "${KUBE_GIT_VERSION}")
+  if [[ -n ${LMKTFY_GIT_VERSION-} ]]; then
+    ldflags+=(-X "${LMKTFY_GO_PACKAGE}/pkg/version.gitVersion" "${LMKTFY_GIT_VERSION}")
   fi
 
-  if [[ -n ${KUBE_GIT_MAJOR-} && -n ${KUBE_GIT_MINOR-} ]]; then
+  if [[ -n ${LMKTFY_GIT_MAJOR-} && -n ${LMKTFY_GIT_MINOR-} ]]; then
     ldflags+=(
-      -X "${KUBE_GO_PACKAGE}/pkg/version.gitMajor" "${KUBE_GIT_MAJOR}"
-      -X "${KUBE_GO_PACKAGE}/pkg/version.gitMinor" "${KUBE_GIT_MINOR}"
+      -X "${LMKTFY_GO_PACKAGE}/pkg/version.gitMajor" "${LMKTFY_GIT_MAJOR}"
+      -X "${LMKTFY_GO_PACKAGE}/pkg/version.gitMinor" "${LMKTFY_GIT_MINOR}"
     )
   fi
 

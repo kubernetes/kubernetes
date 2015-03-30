@@ -18,9 +18,9 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+LMKTFY_ROOT=$(dirname "${BASH_SOURCE}")/..
 
-cd ${KUBE_ROOT}
+cd ${LMKTFY_ROOT}
 
 result=0
 find_files() {
@@ -37,7 +37,7 @@ find_files() {
 }
 
 for file in $(find_files); do
-  if [[ "$("${KUBE_ROOT}/hooks/boilerplate.sh" "${file}")" -eq "0" ]]; then
+  if [[ "$("${LMKTFY_ROOT}/hooks/boilerplate.sh" "${file}")" -eq "0" ]]; then
     echo "Boilerplate header is wrong for: ${file}"
     result=1
   fi
@@ -47,7 +47,7 @@ dirs=("cluster" "hack" "hooks" "build")
 
 for dir in ${dirs[@]}; do
   for file in $(find "$dir" -name '*.sh'); do
-    if [[ "$("${KUBE_ROOT}/hooks/boilerplate.sh" "${file}")" -eq "0" ]]; then
+    if [[ "$("${LMKTFY_ROOT}/hooks/boilerplate.sh" "${file}")" -eq "0" ]]; then
       echo "Boilerplate header is wrong for: ${file}"
       result=1
     fi

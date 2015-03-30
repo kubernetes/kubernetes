@@ -16,7 +16,7 @@
     <rect style="fill: #ffffff" x="723.2" y="235" width="69.6" height="38"/>
     <rect style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x="723.2" y="235" width="69.6" height="38"/>
     <text font-size="12.8" style="fill: #000000;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="758" y="257.9">
-      <tspan x="758" y="257.9">kubelet</tspan>
+      <tspan x="758" y="257.9">lmktfylet</tspan>
     </text>
   </g>
   <g>
@@ -127,7 +127,7 @@
     <rect style="fill: #ffffff" x="126.911" y="92.49" width="189.4" height="38"/>
     <rect style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x="126.911" y="92.49" width="189.4" height="38"/>
     <text font-size="12.8" style="fill: #000000;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="221.611" y="115.39">
-      <tspan x="221.611" y="115.39">kubectl (user commands)</tspan>
+      <tspan x="221.611" y="115.39">lmktfyctl (user commands)</tspan>
     </text>
   </g>
   <text font-size="12.8" style="fill: #000000;text-anchor:start;font-family:sans-serif;font-style:normal;font-weight:normal" x="142.476" y="866.282">
@@ -329,7 +329,7 @@
     <rect style="fill: #ffffff" x="721.2" y="703" width="69.6" height="38"/>
     <rect style="fill: none; fill-opacity:0; stroke-width: 2; stroke: #000000" x="721.2" y="703" width="69.6" height="38"/>
     <text font-size="12.8" style="fill: #000000;text-anchor:middle;font-family:sans-serif;font-style:normal;font-weight:normal" x="756" y="725.9">
-      <tspan x="756" y="725.9">kubelet</tspan>
+      <tspan x="756" y="725.9">lmktfylet</tspan>
     </text>
   </g>
   <g>

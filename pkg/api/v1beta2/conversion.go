@@ -21,10 +21,10 @@ import (
 	"net"
 	"strconv"
 
-	newer "github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/conversion"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	newer "github.com/GoogleCloudPlatform/lmktfy/pkg/api"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api/resource"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/conversion"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/util"
 )
 
 func init() {

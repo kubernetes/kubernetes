@@ -21,10 +21,10 @@ import (
 	"math/rand"
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	apitesting "github.com/GoogleCloudPlatform/kubernetes/pkg/api/testing"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api"
+	apitesting "github.com/GoogleCloudPlatform/lmktfy/pkg/api/testing"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api/v1beta1"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/runtime"
 )
 
 func LoadSchemaForTest(file string) (Schema, error) {

@@ -1,0 +1,9 @@
+check process lmktfylet with pidfile /var/run/lmktfylet.pid
+group lmktfylet 
+start program = "/etc/init.d/lmktfylet start"
+stop program = "/etc/init.d/lmktfylet stop"
+if does not exist then restart
+if failed port 10250
+  protocol HTTP request "/healthz"
+  with timeout 10 seconds
+  then restart

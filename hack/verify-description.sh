@@ -18,9 +18,9 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+LMKTFY_ROOT=$(dirname "${BASH_SOURCE}")/..
 
-cd "${KUBE_ROOT}"
+cd "${LMKTFY_ROOT}"
 
 result=0
 
@@ -41,7 +41,7 @@ files=`find_files | egrep "pkg/api/v.[^/]*/types\.go"`
 
 for file in $files
 do
-    if [[ "$("${KUBE_ROOT}/hooks/description.sh" "${file}")" -eq "0" ]]; then
+    if [[ "$("${LMKTFY_ROOT}/hooks/description.sh" "${file}")" -eq "0" ]]; then
       echo "API file is missing the required field descriptions: ${file}"
       result=1
     fi

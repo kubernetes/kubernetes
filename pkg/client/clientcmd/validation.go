@@ -22,9 +22,9 @@ import (
 	"os"
 	"strings"
 
-	clientcmdapi "github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	utilerrors "github.com/GoogleCloudPlatform/kubernetes/pkg/util/errors"
+	clientcmdapi "github.com/GoogleCloudPlatform/lmktfy/pkg/client/clientcmd/api"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/util"
+	utilerrors "github.com/GoogleCloudPlatform/lmktfy/pkg/util/errors"
 )
 
 var ErrNoContext = errors.New("no context chosen")
@@ -203,7 +203,7 @@ func validateContext(contextName string, context clientcmdapi.Context, config cl
 	}
 
 	if (len(context.Namespace) != 0) && !util.IsDNS952Label(context.Namespace) {
-		validationErrors = append(validationErrors, fmt.Errorf("namespace, %v, for context %v, does not conform to the kubernetes DNS952 rules", context.Namespace, contextName))
+		validationErrors = append(validationErrors, fmt.Errorf("namespace, %v, for context %v, does not conform to the lmktfy DNS952 rules", context.Namespace, contextName))
 	}
 
 	return validationErrors

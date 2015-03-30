@@ -31,18 +31,18 @@
       <readonly/>
     </filesystem>
     <filesystem type='mount' accessmode='squash'>
-      <source dir='${kubernetes_dir}'/>
-      <target dir='kubernetes'/>
+      <source dir='${lmktfy_dir}'/>
+      <target dir='lmktfy'/>
       <readonly/>
     </filesystem>
     <interface type='network'>
        <mac address='52:54:00:00:00:${i}'/>
-       <source network='kubernetes_global'/>
+       <source network='lmktfy_global'/>
        <model type='virtio'/>
     </interface>
     <interface type='network'>
        <mac address='52:54:00:00:01:${i}'/>
-       <source network='kubernetes_pods'/>
+       <source network='lmktfy_pods'/>
        <model type='virtio'/>
     </interface>
     <serial type='pty'>

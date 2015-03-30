@@ -19,8 +19,8 @@ set -o nounset
 set -o pipefail
 
 cert_ip=$1
-cert_dir=/srv/kubernetes
-cert_group=kube-cert
+cert_dir=/srv/lmktfy
+cert_group=lmktfy-cert
 
 mkdir -p "$cert_dir"
 
@@ -40,7 +40,7 @@ if [ "$cert_ip" == "_use_azure_dns_name_" ]; then
   use_cn=true
 fi
 
-tmpdir=$(mktemp -d --tmpdir kubernetes_cacert.XXXXXX)
+tmpdir=$(mktemp -d --tmpdir lmktfy_cacert.XXXXXX)
 trap 'rm -rf "${tmpdir}"' EXIT
 cd "${tmpdir}"
 
@@ -51,12 +51,12 @@ cd "${tmpdir}"
 #
 # To update, do the following:
 # curl -o easy-rsa.tar.gz https://github.com/brendandburns/easy-rsa/archive/master.tar.gz
-# gsutil cp easy-rsa.tar.gz gs://kubernetes-release/easy-rsa/easy-rsa.tar.gz
-# gsutil acl ch -R -g all:R gs://kubernetes-release/easy-rsa/easy-rsa.tar.gz
+# gsutil cp easy-rsa.tar.gz gs://lmktfy-release/easy-rsa/easy-rsa.tar.gz
+# gsutil acl ch -R -g all:R gs://lmktfy-release/easy-rsa/easy-rsa.tar.gz
 #
 # Due to GCS caching of public objects, it may take time for this to be widely
 # distributed.
-curl -L -O https://storage.googleapis.com/kubernetes-release/easy-rsa/easy-rsa.tar.gz > /dev/null 2>&1
+curl -L -O https://storage.googleapis.com/lmktfy-release/easy-rsa/easy-rsa.tar.gz > /dev/null 2>&1
 tar xzf easy-rsa.tar.gz > /dev/null 2>&1
 
 cd easy-rsa-master/easyrsa3
@@ -67,14 +67,14 @@ if [ $use_cn = "true" ]; then
     cp -p pki/issued/$cert_ip.crt "${cert_dir}/server.cert" > /dev/null 2>&1
     cp -p pki/private/$cert_ip.key "${cert_dir}/server.key" > /dev/null 2>&1
 else
-    ./easyrsa --subject-alt-name=IP:$cert_ip build-server-full kubernetes-master nopass > /dev/null 2>&1
-    cp -p pki/issued/kubernetes-master.crt "${cert_dir}/server.cert" > /dev/null 2>&1
-    cp -p pki/private/kubernetes-master.key "${cert_dir}/server.key" > /dev/null 2>&1
+    ./easyrsa --subject-alt-name=IP:$cert_ip build-server-full lmktfy-master nopass > /dev/null 2>&1
+    cp -p pki/issued/lmktfy-master.crt "${cert_dir}/server.cert" > /dev/null 2>&1
+    cp -p pki/private/lmktfy-master.key "${cert_dir}/server.key" > /dev/null 2>&1
 fi
-./easyrsa build-client-full kubecfg nopass > /dev/null 2>&1
+./easyrsa build-client-full lmktfycfg nopass > /dev/null 2>&1
 cp -p pki/ca.crt "${cert_dir}/ca.crt"
-cp -p pki/issued/kubecfg.crt "${cert_dir}/kubecfg.crt"
-cp -p pki/private/kubecfg.key "${cert_dir}/kubecfg.key"
+cp -p pki/issued/lmktfycfg.crt "${cert_dir}/lmktfycfg.crt"
+cp -p pki/private/lmktfycfg.key "${cert_dir}/lmktfycfg.key"
 # Make server certs accessible to apiserver.
 chgrp $cert_group "${cert_dir}/server.key" "${cert_dir}/server.cert" "${cert_dir}/ca.crt"
 chmod 660 "${cert_dir}/server.key" "${cert_dir}/server.cert" "${cert_dir}/ca.crt"

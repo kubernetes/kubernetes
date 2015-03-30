@@ -7,7 +7,7 @@
     - mode: 644
     - makedirs: True
 
-{% for (minion, grains) in salt['mine.get']('roles:kubernetes-pool', 'grains.items', expr_form='grain').items() %}
+{% for (minion, grains) in salt['mine.get']('roles:lmktfyrnetes-pool', 'grains.items', expr_form='grain').items() %}
 /etc/openvpn/ccd/{{ minion }}:
   file.managed:
     - contents: "iroute {{ grains['cbr-string'] }}\n"

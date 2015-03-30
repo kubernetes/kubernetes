@@ -22,7 +22,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/util"
 	"github.com/golang/glog"
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/ginkgo/config"
@@ -53,8 +53,8 @@ func (t *testResult) Fail() { *t = false }
 
 // Run each Go end-to-end-test. This function assumes the
 // creation of a test cluster.
-func RunE2ETests(kubeConfig, authConfig, certDir, host, repoRoot, provider string, gceConfig *GCEConfig, orderseed int64, times int, reportDir string, testList []string) {
-	testContext = testContextType{kubeConfig, authConfig, certDir, host, repoRoot, provider, *gceConfig}
+func RunE2ETests(lmktfyConfig, authConfig, certDir, host, repoRoot, provider string, gceConfig *GCEConfig, orderseed int64, times int, reportDir string, testList []string) {
+	testContext = testContextType{lmktfyConfig, authConfig, certDir, host, repoRoot, provider, *gceConfig}
 	util.ReallyCrash = true
 	util.InitLogs()
 	defer util.FlushLogs()
@@ -85,7 +85,7 @@ func RunE2ETests(kubeConfig, authConfig, certDir, host, repoRoot, provider strin
 		if reportDir != "" {
 			r = append(r, reporters.NewJUnitReporter(path.Join(reportDir, fmt.Sprintf("junit_%d.xml", i+1))))
 		}
-		ginkgo.RunSpecsWithDefaultAndCustomReporters(&passed, fmt.Sprintf("Kubernetes e2e Suite run %d of %d", i+1, times), r)
+		ginkgo.RunSpecsWithDefaultAndCustomReporters(&passed, fmt.Sprintf("LMKTFY e2e Suite run %d of %d", i+1, times), r)
 	}
 
 	if !passed {

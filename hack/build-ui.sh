@@ -20,10 +20,10 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
-source "${KUBE_ROOT}/hack/lib/init.sh"
+LMKTFY_ROOT=$(dirname "${BASH_SOURCE}")/..
+source "${LMKTFY_ROOT}/hack/lib/init.sh"
 
-cd "${KUBE_ROOT}"
+cd "${LMKTFY_ROOT}"
 
 if ! which go-bindata > /dev/null 2>&1 ; then
 	echo "Cannot find go-bindata. Install with \"go get github.com/jteeuwen/go-bindata/...\""

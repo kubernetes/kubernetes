@@ -1,0 +1,19 @@
+[Unit]
+Description=LMKTFYrnetes Controller Manager
+Documentation=https://github.com/GoogleCloudPlatform/lmktfyrnetes
+
+[Service]
+EnvironmentFile=-/etc/lmktfyrnetes/config
+EnvironmentFile=-/etc/lmktfyrnetes/controller-manager
+User=lmktfy
+ExecStart=/usr/bin/lmktfy-controller-manager \
+	    $LMKTFY_LOGTOSTDERR \
+	    $LMKTFY_LOG_LEVEL \
+	    $LMKTFYLET_ADDRESSES \
+	    $LMKTFY_MASTER \
+	    $LMKTFY_CONTROLLER_MANAGER_ARGS
+Restart=on-failure
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target

@@ -16,7 +16,7 @@ limitations under the License.
 
 /*
 Package client contains the implementation of the client side communication with the
-Kubernetes master. The Client class provides methods for reading, creating, updating,
+LMKTFY master. The Client class provides methods for reading, creating, updating,
 and deleting pods, replication controllers, services, and minions.
 
 Most consumers should use the Config object to create a Client:
@@ -40,8 +40,8 @@ More advanced consumers may wish to provide their own transport via a http.Round
     }
     client, err := client.New(&config)
 
-The RESTClient type implements the Kubernetes API conventions (see `docs/api-conventions.md`)
-for a given API path and is intended for use by consumers implementing their own Kubernetes
+The RESTClient type implements the LMKTFY API conventions (see `docs/api-conventions.md`)
+for a given API path and is intended for use by consumers implementing their own LMKTFY
 compatible APIs.
 */
 package client

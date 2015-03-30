@@ -23,9 +23,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/client"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/labels"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -134,8 +134,8 @@ func ClusterLevelLoggingWithElasticsearch(c *client.Client) {
 	if !ok {
 		Failf("No cluster_name field in Elasticsearch response: %v", esResponse)
 	}
-	if clusterName != "kubernetes_logging" {
-		Failf("Connected to wrong cluster %q (expecting kubernetes_logging)", clusterName)
+	if clusterName != "lmktfy_logging" {
+		Failf("Connected to wrong cluster %q (expecting lmktfy_logging)", clusterName)
 	}
 
 	// Now assume we really are talking to an Elasticsearch instance.

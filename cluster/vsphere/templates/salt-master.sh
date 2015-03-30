@@ -24,7 +24,7 @@ echo "master: $MASTER_NAME" > /etc/salt/minion.d/master.conf
 cat <<EOF >/etc/salt/minion.d/grains.conf
 grains:
   roles:
-    - kubernetes-master
+    - lmktfy-master
   cloud: vsphere
 EOF
 

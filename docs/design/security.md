@@ -1,8 +1,8 @@
-# Security in Kubernetes
+# Security in LMKTFY
 
-Kubernetes should define a reasonable set of security best practices that allows processes to be isolated from each other, from the cluster infrastructure, and which preserves important boundaries between those who manage the cluster, and those who use the cluster.
+LMKTFY should define a reasonable set of security best practices that allows processes to be isolated from each other, from the cluster infrastructure, and which preserves important boundaries between those who manage the cluster, and those who use the cluster.
 
-While Kubernetes today is not primarily a multi-tenant system, the long term evolution of Kubernetes will increasingly rely on proper boundaries between users and administrators. The code running on the cluster must be appropriately isolated and secured to prevent malicious parties from affecting the entire cluster.
+While LMKTFY today is not primarily a multi-tenant system, the long term evolution of LMKTFY will increasingly rely on proper boundaries between users and administrators. The code running on the cluster must be appropriately isolated and secured to prevent malicious parties from affecting the entire cluster.
 
 
 ## High Level Goals
@@ -20,16 +20,16 @@ While Kubernetes today is not primarily a multi-tenant system, the long term evo
 
 ### Roles:
 
-We define "user" as a unique identity accessing the Kubernetes API server, which may be a human or an automated process.  Human users fall into the following categories:
+We define "user" as a unique identity accessing the LMKTFY API server, which may be a human or an automated process.  Human users fall into the following categories:
 
-1. k8s admin - administers a kubernetes cluster and has access to the undelying components of the system
-2. k8s project administrator - administrates the security of a small subset of the cluster
-3. k8s developer - launches pods on a kubernetes cluster and consumes cluster resources
+1. lmktfy admin - administers a lmktfy cluster and has access to the undelying components of the system
+2. lmktfy project administrator - administrates the security of a small subset of the cluster
+3. lmktfy developer - launches pods on a lmktfy cluster and consumes cluster resources
 
 Automated process users fall into the following categories:
 
-1. k8s container user - a user that processes running inside a container (on the cluster) can use to access other cluster resources indepedent of the human users attached to a project
-2. k8s infrastructure user - the user that kubernetes infrastructure components use to perform cluster functions with clearly defined roles
+1. lmktfy container user - a user that processes running inside a container (on the cluster) can use to access other cluster resources indepedent of the human users attached to a project
+2. lmktfy infrastructure user - the user that lmktfy infrastructure components use to perform cluster functions with clearly defined roles
 
 
 ### Description of roles:
@@ -63,14 +63,14 @@ Automated process users fall into the following categories:
 A pod runs in a *security context* under a *service account* that is defined by an administrator or project administrator, and the *secrets* a pod has access to is limited by that *service account*.
 
 
-1. The API should authenticate and authorize user actions [authn and authz](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/design/access.md)
-2. All infrastructure components (kubelets, kube-proxies, controllers, scheduler) should have an infrastructure user that they can authenticate with and be authorized to perform only the functions they require against the API.
+1. The API should authenticate and authorize user actions [authn and authz](https://github.com/GoogleCloudPlatform/lmktfy/blob/master/docs/design/access.md)
+2. All infrastructure components (lmktfylets, lmktfy-proxies, controllers, scheduler) should have an infrastructure user that they can authenticate with and be authorized to perform only the functions they require against the API.
 3. Most infrastructure components should use the API as a way of exchanging data and changing the system, and only the API should have access to the underlying data store (etcd)
-4. When containers run on the cluster and need to talk to other containers or the API server, they should be identified and authorized clearly as an autonomous process via a [service account](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/design/service_accounts.md)
+4. When containers run on the cluster and need to talk to other containers or the API server, they should be identified and authorized clearly as an autonomous process via a [service account](https://github.com/GoogleCloudPlatform/lmktfy/blob/master/docs/design/service_accounts.md)
    1.  If the user who started a long-lived process is removed from access to the cluster, the process should be able to continue without interruption
    2.  If the user who started processes are removed from the cluster, administrators may wish to terminate their processes in bulk
    3.  When containers run with a service account, the user that created / triggered the service account behavior must be associated with the container's action
-5. When container processes run on the cluster, they should run in a [security context](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/design/security_context.md) that isolates those processes via Linux user security, user namespaces, and permissions.
+5. When container processes run on the cluster, they should run in a [security context](https://github.com/GoogleCloudPlatform/lmktfy/blob/master/docs/design/security_context.md) that isolates those processes via Linux user security, user namespaces, and permissions.
    1.  Administrators should be able to configure the cluster to automatically confine all container processes as a non-root, randomly assigned UID
    2.  Administrators should be able to ensure that container processes within the same namespace are all assigned the same unix user UID
    3.  Administrators should be able to limit which developers and project administrators have access to higher privilege actions
@@ -79,12 +79,12 @@ A pod runs in a *security context* under a *service account* that is defined by 
    6.  Developers may need to ensure their images work within higher security requirements specified by administrators
    7.  When available, Linux kernel user namespaces can be used to ensure 5.2 and 5.4 are met.
    8.  When application developers want to share filesytem data via distributed filesystems, the Unix user ids on those filesystems must be consistent across different container processes
-6. Developers should be able to define [secrets](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/design/secrets.md) that are automatically added to the containers when pods are run
+6. Developers should be able to define [secrets](https://github.com/GoogleCloudPlatform/lmktfy/blob/master/docs/design/secrets.md) that are automatically added to the containers when pods are run
    1.  Secrets are files injected into the container whose values should not be displayed within a pod. Examples:
        1. An SSH private key for git cloning remote data
        2. A client certificate for accessing a remote system
        3. A private key and certificate for a web server
-       4. A .kubeconfig file with embedded cert / token data for accessing the Kubernetes master
+       4. A .lmktfyconfig file with embedded cert / token data for accessing the LMKTFY master
        5. A .dockercfg file for pulling images from a protected registry
    2.  Developers should be able to define the pod spec so that a secret lands in a specific location
    3.  Project administrators should be able to limit developers within a namespace from viewing or modifying secrets (anyone who can launch an arbitrary pod can view secrets)
@@ -93,12 +93,12 @@ A pod runs in a *security context* under a *service account* that is defined by 
 
 ### Related design discussion
 
-* Authorization and authentication https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/design/access.md
-* Secret distribution via files https://github.com/GoogleCloudPlatform/kubernetes/pull/2030
+* Authorization and authentication https://github.com/GoogleCloudPlatform/lmktfy/blob/master/docs/design/access.md
+* Secret distribution via files https://github.com/GoogleCloudPlatform/lmktfy/pull/2030
 * Docker secrets https://github.com/docker/docker/pull/6697
 * Docker vault https://github.com/docker/docker/issues/10310
-* Service Accounts: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/design/service_accounts.md
-* Secret volumes https://github.com/GoogleCloudPlatform/kubernetes/4126
+* Service Accounts: https://github.com/GoogleCloudPlatform/lmktfy/blob/master/docs/design/service_accounts.md
+* Secret volumes https://github.com/GoogleCloudPlatform/lmktfy/4126
 
 ## Specific Design Points
 
@@ -106,12 +106,12 @@ A pod runs in a *security context* under a *service account* that is defined by 
 
 ### Isolate the data store from the minions and supporting infrastructure
 
-Access to the central data store (etcd) in Kubernetes allows an attacker to run arbitrary containers on hosts, to gain access to any protected information stored in either volumes or in pods (such as access tokens or shared secrets provided as environment variables), to intercept and redirect traffic from running services by inserting middlemen, or to simply delete the entire history of the custer.
+Access to the central data store (etcd) in LMKTFY allows an attacker to run arbitrary containers on hosts, to gain access to any protected information stored in either volumes or in pods (such as access tokens or shared secrets provided as environment variables), to intercept and redirect traffic from running services by inserting middlemen, or to simply delete the entire history of the custer.
 
-As a general principle, access to the central data store should be restricted to the components that need full control over the system and which can apply appropriate authorization and authentication of change requests.  In the future, etcd may offer granular access control, but that granularity will require an administrator to understand the schema of the data to properly apply security.  An administrator must be able to properly secure Kubernetes at a policy level, rather than at an implementation level, and schema changes over time should not risk unintended security leaks.
+As a general principle, access to the central data store should be restricted to the components that need full control over the system and which can apply appropriate authorization and authentication of change requests.  In the future, etcd may offer granular access control, but that granularity will require an administrator to understand the schema of the data to properly apply security.  An administrator must be able to properly secure LMKTFY at a policy level, rather than at an implementation level, and schema changes over time should not risk unintended security leaks.
 
-Both the Kubelet and Kube Proxy need information related to their specific roles - for the Kubelet, the set of pods it should be running, and for the Proxy, the set of services and endpoints to load balance.  The Kubelet also needs to provide information about running pods and historical termination data.  The access pattern for both Kubelet and Proxy to load their configuration is an efficient "wait for changes" request over HTTP.  It should be possible to limit the Kubelet and Proxy to only access the information they need to perform their roles and no more.
+Both the LMKTFYlet and LMKTFY Proxy need information related to their specific roles - for the LMKTFYlet, the set of pods it should be running, and for the Proxy, the set of services and endpoints to load balance.  The LMKTFYlet also needs to provide information about running pods and historical termination data.  The access pattern for both LMKTFYlet and Proxy to load their configuration is an efficient "wait for changes" request over HTTP.  It should be possible to limit the LMKTFYlet and Proxy to only access the information they need to perform their roles and no more.
 
-The controller manager for Replication Controllers and other future controllers act on behalf of a user via delegation to perform automated maintenance on Kubernetes resources. Their ability to access or modify resource state should be strictly limited to their intended duties and they should be prevented from accessing information not pertinent to their role.  For example, a replication controller needs only to create a copy of a known pod configuration, to determine the running state of an existing pod, or to delete an existing pod that it created - it does not need to know the contents or current state of a pod, nor have access to any data in the pods attached volumes.
+The controller manager for Replication Controllers and other future controllers act on behalf of a user via delegation to perform automated maintenance on LMKTFY resources. Their ability to access or modify resource state should be strictly limited to their intended duties and they should be prevented from accessing information not pertinent to their role.  For example, a replication controller needs only to create a copy of a known pod configuration, to determine the running state of an existing pod, or to delete an existing pod that it created - it does not need to know the contents or current state of a pod, nor have access to any data in the pods attached volumes.
 
-The Kubernetes pod scheduler is responsible for reading data from the pod to fit it onto a minion in the cluster.  At a minimum, it needs access to view the ID of a pod (to craft the binding), its current state, any resource information necessary to identify placement, and other data relevant to concerns like anti-affinity, zone or region preference, or custom logic.  It does not need the ability to modify pods or see other resources, only to create bindings.  It should not need the ability to delete bindings unless the scheduler takes control of relocating components on failed hosts (which could be implemented by a separate component that can delete bindings but not create them).  The scheduler may need read access to user or project-container information to determine preferential location (underspecified at this time).
+The LMKTFY pod scheduler is responsible for reading data from the pod to fit it onto a minion in the cluster.  At a minimum, it needs access to view the ID of a pod (to craft the binding), its current state, any resource information necessary to identify placement, and other data relevant to concerns like anti-affinity, zone or region preference, or custom logic.  It does not need the ability to modify pods or see other resources, only to create bindings.  It should not need the ability to delete bindings unless the scheduler takes control of relocating components on failed hosts (which could be implemented by a separate component that can delete bindings but not create them).  The scheduler may need read access to user or project-container information to determine preferential location (underspecified at this time).

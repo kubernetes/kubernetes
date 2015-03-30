@@ -1,0 +1,9 @@
+[Unit]
+Description=LMKTFYrnetes Addon Object Manager
+Documentation=https://github.com/GoogleCloudPlatform/lmktfyrnetes
+
+[Service]
+ExecStart=/etc/lmktfyrnetes/lmktfy-addons.sh
+
+[Install]
+WantedBy=multi-user.target

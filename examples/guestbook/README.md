@@ -1,6 +1,6 @@
 ## GuestBook example
 
-This example shows how to build a simple, multi-tier web application using Kubernetes and Docker.
+This example shows how to build a simple, multi-tier web application using LMKTFY and Docker.
 
 The example consists of:
 - A web frontend
@@ -10,9 +10,9 @@ The web front end interacts with the redis master via javascript redis API calls
 
 ### Step Zero: Prerequisites
 
-This example requires a kubernetes cluster.  See the [Getting Started guides](../../docs/getting-started-guides) for how to get started.
+This example requires a lmktfy cluster.  See the [Getting Started guides](../../docs/getting-started-guides) for how to get started.
 
-If you are running from source, replace commands such as `kubectl` below with calls to `cluster/kubectl.sh`.
+If you are running from source, replace commands such as `lmktfyctl` below with calls to `cluster/lmktfyctl.sh`.
 
 ### Step One: Fire up the redis master
 
@@ -58,12 +58,12 @@ Note that, although the redis server runs just with a single replica, we use rep
 }
 ```
 
-Now, create the redis pod in your Kubernetes cluster by running:
+Now, create the redis pod in your LMKTFY cluster by running:
 
 ```shell
-$ kubectl create -f examples/guestbook/redis-master-controller.json
+$ lmktfyctl create -f examples/guestbook/redis-master-controller.json
 
-$ cluster/kubectl.sh get rc
+$ cluster/lmktfyctl.sh get rc
 CONTROLLER                             CONTAINER(S)            IMAGE(S)                                 SELECTOR                     REPLICAS
 redis-master-controller                redis-master            dockerfile/redis                         name=redis-master            1
 ```
@@ -71,32 +71,32 @@ redis-master-controller                redis-master            dockerfile/redis 
 Once that's up you can list the pods in the cluster, to verify that the master is running:
 
 ```shell
-$ kubectl get pods
+$ lmktfyctl get pods
 ```
 
-You'll see all kubernetes components, most importantly the redis master pod. It will also display the machine that the pod is running on once it gets placed (may take up to thirty seconds):
+You'll see all lmktfy components, most importantly the redis master pod. It will also display the machine that the pod is running on once it gets placed (may take up to thirty seconds):
 
 ```shell
 POD                                          IP                  CONTAINER(S)            IMAGE(S)                                 HOST                                                              LABELS                                                     STATUS
-redis-master-controller-gb50a                10.244.3.7          redis-master            dockerfile/redis                         kubernetes-minion-7agi.c.hazel-mote-834.internal/104.154.54.203   app=redis,name=redis-master                                Running
+redis-master-controller-gb50a                10.244.3.7          redis-master            dockerfile/redis                         lmktfy-minion-7agi.c.hazel-mote-834.internal/104.154.54.203   app=redis,name=redis-master                                Running
 ```
 
 If you ssh to that machine, you can run `docker ps` to see the actual pod:
 
 ```shell
-me@workstation$ gcloud compute ssh kubernetes-minion-7agi
+me@workstation$ gcloud compute ssh lmktfy-minion-7agi
 
-me@kubernetes-minion-7agi:~$ sudo docker ps
+me@lmktfy-minion-7agi:~$ sudo docker ps
 CONTAINER ID        IMAGE                                  COMMAND                CREATED              STATUS              PORTS                    NAMES
-0ffef9649265        dockerfile/redis:latest                "redis-server /etc/r   About a minute ago   Up About a minute                            k8s_redis-master.767aef46_redis-master-controller-gb50a.default.api_4530d7b3-ae5d-11e4-bf77-42010af0d719_579ee964
+0ffef9649265        dockerfile/redis:latest                "redis-server /etc/r   About a minute ago   Up About a minute                            lmktfy_redis-master.767aef46_redis-master-controller-gb50a.default.api_4530d7b3-ae5d-11e4-bf77-42010af0d719_579ee964
 ```
 
-(Note that initial `docker pull` may take a few minutes, depending on network conditions.  You can monitor the status of this by running `journalctl -f -u docker` to check when the image is being downloaded.  Of course, you can also run `journalctl -f -u kubelet` to see what state the kubelet is in as well during this time.
+(Note that initial `docker pull` may take a few minutes, depending on network conditions.  You can monitor the status of this by running `journalctl -f -u docker` to check when the image is being downloaded.  Of course, you can also run `journalctl -f -u lmktfylet` to see what state the lmktfylet is in as well during this time.
 
 ### Step Two: Fire up the master service
-A Kubernetes 'service' is a named load balancer that proxies traffic to *one or more* containers. This is done using the *labels* metadata which we defined in the redis-master pod above.  As mentioned, in redis there is only one master, but we nevertheless still want to create a service for it.  Why?  Because it gives us a deterministic way to route to the single master using an elastic IP.
+A LMKTFY 'service' is a named load balancer that proxies traffic to *one or more* containers. This is done using the *labels* metadata which we defined in the redis-master pod above.  As mentioned, in redis there is only one master, but we nevertheless still want to create a service for it.  Why?  Because it gives us a deterministic way to route to the single master using an elastic IP.
 
-The services in a Kubernetes cluster are discoverable inside other containers via environment variables. 
+The services in a LMKTFY cluster are discoverable inside other containers via environment variables. 
 
 Services find the containers to load balance based on pod labels.
 
@@ -123,10 +123,10 @@ Use the file `examples/guestbook/redis-master-service.json`:
 to create the service by running:
 
 ```shell
-$ kubectl create -f examples/guestbook/redis-master-service.json
+$ lmktfyctl create -f examples/guestbook/redis-master-service.json
 redis-master
 
-$ kubectl get services
+$ lmktfyctl get services
 NAME                    LABELS                                    SELECTOR                     IP                  PORT
 redis-master            name=redis-master                         name=redis-master            10.0.246.242        6379
 ```
@@ -139,7 +139,7 @@ This will cause all pods to see the redis master apparently running on <ip>:6379
 Thus, once created, the service proxy on each minion is configured to set up a proxy on the specified port (in this case port 6379).
 
 ### Step Three: Fire up the replicated slave pods
-Although the redis master is a single pod, the redis read slaves are a 'replicated' pod. In Kubernetes, a replication controller is responsible for managing multiple instances of a replicated pod.  The replicationController will automatically launch new Pods if the number of replicas falls (this is quite easy - and fun - to test, just kill the docker processes for your pods at will and watch them come back online on a new node shortly thereafter).
+Although the redis master is a single pod, the redis read slaves are a 'replicated' pod. In LMKTFY, a replication controller is responsible for managing multiple instances of a replicated pod.  The replicationController will automatically launch new Pods if the number of replicas falls (this is quite easy - and fun - to test, just kill the docker processes for your pods at will and watch them come back online on a new node shortly thereafter).
 
 Use the file `examples/guestbook/redis-slave-controller.json`, which looks like this:
 
@@ -158,7 +158,7 @@ Use the file `examples/guestbook/redis-slave-controller.json`, which looks like 
            "id": "redis-slave",
            "containers": [{
              "name": "redis-slave",
-             "image": "kubernetes/redis-slave:v2",
+             "image": "lmktfy/redis-slave:v2",
              "ports": [{"containerPort": 6379}]
            }]
          }
@@ -177,13 +177,13 @@ Use the file `examples/guestbook/redis-slave-controller.json`, which looks like 
 to create the replication controller by running:
 
 ```shell
-$ kubectl create -f examples/guestbook/redis-slave-controller.json
+$ lmktfyctl create -f examples/guestbook/redis-slave-controller.json
 redis-slave-controller
 
-$ kubectl get rc
+$ lmktfyctl get rc
 CONTROLLER                             CONTAINER(S)            IMAGE(S)                                 SELECTOR                     REPLICAS
 redis-master-controller                redis-master            dockerfile/redis                         name=redis-master            1
-redis-slave-controller                 redis-slave             kubernetes/redis-slave:v2                name=redis-slave             2
+redis-slave-controller                 redis-slave             lmktfy/redis-slave:v2                name=redis-slave             2
 ```
 
 The redis slave is started with the following command:
@@ -195,11 +195,11 @@ redis-server --slaveof redis-master 6379
 Once that's up you can list the pods in the cluster, to verify that the master and slaves are running:
 
 ```shell
-$ kubectl get pods
+$ lmktfyctl get pods
 POD                                          IP                  CONTAINER(S)            IMAGE(S)                                 HOST                                                              LABELS                                                     STATUS
-redis-master-controller-gb50a                10.244.3.7          redis-master            dockerfile/redis                         kubernetes-minion-7agi.c.hazel-mote-834.internal/104.154.54.203   app=redis,name=redis-master                                Running
-redis-slave-controller-182tv                 10.244.3.6          redis-slave             kubernetes/redis-slave:v2                kubernetes-minion-7agi.c.hazel-mote-834.internal/104.154.54.203   app=redis,name=redis-slave,uses=redis-master               Running
-redis-slave-controller-zwk1b                 10.244.2.8          redis-slave             kubernetes/redis-slave:v2                kubernetes-minion-3vxa.c.hazel-mote-834.internal/104.154.54.6     app=redis,name=redis-slave,uses=redis-master               Running
+redis-master-controller-gb50a                10.244.3.7          redis-master            dockerfile/redis                         lmktfy-minion-7agi.c.hazel-mote-834.internal/104.154.54.203   app=redis,name=redis-master                                Running
+redis-slave-controller-182tv                 10.244.3.6          redis-slave             lmktfy/redis-slave:v2                lmktfy-minion-7agi.c.hazel-mote-834.internal/104.154.54.203   app=redis,name=redis-slave,uses=redis-master               Running
+redis-slave-controller-zwk1b                 10.244.2.8          redis-slave             lmktfy/redis-slave:v2                lmktfy-minion-3vxa.c.hazel-mote-834.internal/104.154.54.6     app=redis,name=redis-slave,uses=redis-master               Running
 ```
 
 You will see a single redis master pod and two redis slave pods.
@@ -226,15 +226,15 @@ The service specification for the slaves is in `examples/guestbook/redis-slave-s
 }
 ```
 
-This time the selector for the service is `name=redis-slave`, because that identifies the pods running redis slaves. It may also be helpful to set labels on your service itself as we've done here to make it easy to locate them with the `cluster/kubectl.sh get services -l "label=value"` command.
+This time the selector for the service is `name=redis-slave`, because that identifies the pods running redis slaves. It may also be helpful to set labels on your service itself as we've done here to make it easy to locate them with the `cluster/lmktfyctl.sh get services -l "label=value"` command.
 
 Now that you have created the service specification, create it in your cluster by running:
 
 ```shell
-$ kubectl create -f examples/guestbook/redis-slave-service.json
+$ lmktfyctl create -f examples/guestbook/redis-slave-service.json
 redis-slave
 
-$ kubectl get services
+$ lmktfyctl get services
 NAME                    LABELS                                    SELECTOR                     IP                  PORT
 redis-master            name=redis-master                         name=redis-master            10.0.246.242        6379
 redis-slave             name=redis-slave                          name=redis-slave             10.0.72.62          6379
@@ -263,7 +263,7 @@ The pod is described in the file `examples/guestbook/frontend-controller.json`:
            "id": "frontend",
            "containers": [{
              "name": "php-redis",
-             "image": "kubernetes/example-guestbook-php-redis:v2",
+             "image": "lmktfy/example-guestbook-php-redis:v2",
              "ports": [{"name": "http-server", "containerPort": 80}]
            }]
          }
@@ -281,27 +281,27 @@ The pod is described in the file `examples/guestbook/frontend-controller.json`:
 Using this file, you can turn up your frontend with:
 
 ```shell
-$ kubectl create -f examples/guestbook/frontend-controller.json
+$ lmktfyctl create -f examples/guestbook/frontend-controller.json
 frontend-controller
 
-$ kubectl get rc
+$ lmktfyctl get rc
 CONTROLLER                             CONTAINER(S)            IMAGE(S)                                   SELECTOR                     REPLICAS
-frontend-controller                    php-redis               kubernetes/example-guestbook-php-redis:v2  name=frontend                3
+frontend-controller                    php-redis               lmktfy/example-guestbook-php-redis:v2  name=frontend                3
 redis-master-controller                redis-master            dockerfile/redis                           name=redis-master            1
-redis-slave-controller                 redis-slave             kubernetes/redis-slave:v2                  name=redis-slave             2
+redis-slave-controller                 redis-slave             lmktfy/redis-slave:v2                  name=redis-slave             2
 ```
 
 Once that's up (it may take ten to thirty seconds to create the pods) you can list the pods in the cluster, to verify that the master, slaves and frontends are running:
 
 ```shell
-$ kubectl get pods
+$ lmktfyctl get pods
 POD                                          IP                  CONTAINER(S)            IMAGE(S)                                   HOST                                                              LABELS                                                     STATUS
-frontend-controller-5m1zc                    10.244.1.131        php-redis               kubernetes/example-guestbook-php-redis:v2  kubernetes-minion-3vxa.c.hazel-mote-834.internal/146.148.71.71    app=frontend,name=frontend,uses=redis-slave,redis-master   Running
-frontend-controller-ckn42                    10.244.2.134        php-redis               kubernetes/example-guestbook-php-redis:v2  kubernetes-minion-by92.c.hazel-mote-834.internal/104.154.54.6     app=frontend,name=frontend,uses=redis-slave,redis-master   Running
-frontend-controller-v5drx                    10.244.0.128        php-redis               kubernetes/example-guestbook-php-redis:v2  kubernetes-minion-wilb.c.hazel-mote-834.internal/23.236.61.63     app=frontend,name=frontend,uses=redis-slave,redis-master   Running
-redis-master-controller-gb50a                10.244.3.7          redis-master            dockerfile/redis                           kubernetes-minion-7agi.c.hazel-mote-834.internal/104.154.54.203   app=redis,name=redis-master                                Running
-redis-slave-controller-182tv                 10.244.3.6          redis-slave             kubernetes/redis-slave:v2                  kubernetes-minion-7agi.c.hazel-mote-834.internal/104.154.54.203   app=redis,name=redis-slave,uses=redis-master               Running
-redis-slave-controller-zwk1b                 10.244.2.8          redis-slave             kubernetes/redis-slave:v2                  kubernetes-minion-3vxa.c.hazel-mote-834.internal/104.154.54.6     app=redis,name=redis-slave,uses=redis-master               Running
+frontend-controller-5m1zc                    10.244.1.131        php-redis               lmktfy/example-guestbook-php-redis:v2  lmktfy-minion-3vxa.c.hazel-mote-834.internal/146.148.71.71    app=frontend,name=frontend,uses=redis-slave,redis-master   Running
+frontend-controller-ckn42                    10.244.2.134        php-redis               lmktfy/example-guestbook-php-redis:v2  lmktfy-minion-by92.c.hazel-mote-834.internal/104.154.54.6     app=frontend,name=frontend,uses=redis-slave,redis-master   Running
+frontend-controller-v5drx                    10.244.0.128        php-redis               lmktfy/example-guestbook-php-redis:v2  lmktfy-minion-wilb.c.hazel-mote-834.internal/23.236.61.63     app=frontend,name=frontend,uses=redis-slave,redis-master   Running
+redis-master-controller-gb50a                10.244.3.7          redis-master            dockerfile/redis                           lmktfy-minion-7agi.c.hazel-mote-834.internal/104.154.54.203   app=redis,name=redis-master                                Running
+redis-slave-controller-182tv                 10.244.3.6          redis-slave             lmktfy/redis-slave:v2                  lmktfy-minion-7agi.c.hazel-mote-834.internal/104.154.54.203   app=redis,name=redis-slave,uses=redis-master               Running
+redis-slave-controller-zwk1b                 10.244.2.8          redis-slave             lmktfy/redis-slave:v2                  lmktfy-minion-3vxa.c.hazel-mote-834.internal/104.154.54.6     app=redis,name=redis-slave,uses=redis-master               Running
 ```
 
 You will see a single redis master pod, two redis slaves, and three frontend pods.
@@ -374,10 +374,10 @@ Read the *Accessing the guestbook site externally* section below for details and
 delete these parameters or run this - either way it won't hurt anything to have both parameters the way they are).
 
 ```shell
-$ kubectl create -f examples/guestbook/frontend-service.json
+$ lmktfyctl create -f examples/guestbook/frontend-service.json
 frontend
 
-$ kubectl get services
+$ lmktfyctl get services
 NAME                    LABELS                                    SELECTOR                     IP                  PORT
 frontend                name=frontend                             name=frontend                10.0.93.211         8000
 redis-master            name=redis-master                         name=redis-master            10.0.246.242        6379
@@ -386,7 +386,7 @@ redis-slave             name=redis-slave                          name=redis-sla
 
 ### A few Google Container Engine specifics for playing around with the services.
 
-In GCE, `cluster/kubectl.sh` automatically creates forwarding rule for services with `createExternalLoadBalancer`.
+In GCE, `cluster/lmktfyctl.sh` automatically creates forwarding rule for services with `createExternalLoadBalancer`.
 
 ```shell
 $ gcloud compute forwarding-rules list
@@ -396,10 +396,10 @@ frontend              us-central1 130.211.188.51 TCP         us-central1/targetP
 
 You can grab the external IP of the load balancer associated with that rule and visit `http://130.211.188.51:8000`.
 
-In GCE, you also may need to open the firewall for port 8000 using the [console][cloud-console] or the `gcloud` tool. The following command will allow traffic from any source to instances tagged `kubernetes-minion`:
+In GCE, you also may need to open the firewall for port 8000 using the [console][cloud-console] or the `gcloud` tool. The following command will allow traffic from any source to instances tagged `lmktfy-minion`:
 
 ```shell
-$ gcloud compute firewall-rules create --allow=tcp:8000 --target-tags=kubernetes-minion kubernetes-minion-8000
+$ gcloud compute firewall-rules create --allow=tcp:8000 --target-tags=lmktfy-minion lmktfy-minion-8000
 ```
 
 For GCE details about limiting traffic to specific sources, see the [GCE firewall documentation][gce-firewall-docs].
@@ -409,32 +409,32 @@ For GCE details about limiting traffic to specific sources, see the [GCE firewal
 
 ### Accessing the guestbook site externally
 
-The pods that we have set up are reachable through the frontend service, but you'll notice that 10.0.93.211 (the IP of the frontend service) is unavailable from outside of kubernetes. 
-Of course, if you are running kubernetes minions locally, this isn't such a big problem - the port binding will allow you to reach the guestbook website at localhost:8000... but the beloved **localhost** solution obviously doesn't work in any real world scenario.
+The pods that we have set up are reachable through the frontend service, but you'll notice that 10.0.93.211 (the IP of the frontend service) is unavailable from outside of lmktfy. 
+Of course, if you are running lmktfy minions locally, this isn't such a big problem - the port binding will allow you to reach the guestbook website at localhost:8000... but the beloved **localhost** solution obviously doesn't work in any real world scenario.
 
-Unless you have access to the `createExternalLoadBalancer` feature (cloud provider specific), you will want to set up a **publicIP on a minion**, so that the service can be accessed from outside of the internal kubernetes network. This is quite easy.  You simply look at you're list of kubelet IP addresses, and update the service file to include a `publicIPs` string, which is mapped to an IP address of any number of your existing kubelets.  This will allow all you're kubelets to act as external entry points to the service (translation: this will allow you to browse the guestbook site at your kubelet IP address from your browser).
+Unless you have access to the `createExternalLoadBalancer` feature (cloud provider specific), you will want to set up a **publicIP on a minion**, so that the service can be accessed from outside of the internal lmktfy network. This is quite easy.  You simply look at you're list of lmktfylet IP addresses, and update the service file to include a `publicIPs` string, which is mapped to an IP address of any number of your existing lmktfylets.  This will allow all you're lmktfylets to act as external entry points to the service (translation: this will allow you to browse the guestbook site at your lmktfylet IP address from your browser).
 
-If you are more advanced in the ops arena, note you can manually get the service IP from looking at the output of `kubectl get pods,services`, and modify your firewall using standard tools and services (firewalld, iptables, selinux) which you are already familar with.
+If you are more advanced in the ops arena, note you can manually get the service IP from looking at the output of `lmktfyctl get pods,services`, and modify your firewall using standard tools and services (firewalld, iptables, selinux) which you are already familar with.
 
-And of course, finally, if you are running Kubernetes locally, you can just visit http://localhost:8000.
+And of course, finally, if you are running LMKTFY locally, you can just visit http://localhost:8000.
 
 ### Step Seven: Cleanup
 
-To turn down a Kubernetes cluster, if you ran this from source, you can use
+To turn down a LMKTFY cluster, if you ran this from source, you can use
 
 ```shell
-$ cluster/kube-down.sh
+$ cluster/lmktfy-down.sh
 ```
 
-If you are in a live kubernetes cluster, you can just kill the pods, using a script such as this (obviously, read through it and make sure you understand it before running it blindly, as it will kill several pods automatically for you).
+If you are in a live lmktfy cluster, you can just kill the pods, using a script such as this (obviously, read through it and make sure you understand it before running it blindly, as it will kill several pods automatically for you).
 
 ```shell
 ### First, kill services and controllers.
-kubectl stop -f examples/guestbook/redis-slave-controller.json
-kubectl stop -f examples/guestbook/frontend-controller.json
-kubectl delete -f examples/guestbook/redis-master-service.json
-kubectl delete -f examples/guestbook/redis-slave-service.json
-kubectl delete pod redis-master # This is the only pod that requires manual removal.
+lmktfyctl stop -f examples/guestbook/redis-slave-controller.json
+lmktfyctl stop -f examples/guestbook/frontend-controller.json
+lmktfyctl delete -f examples/guestbook/redis-master-service.json
+lmktfyctl delete -f examples/guestbook/redis-slave-service.json
+lmktfyctl delete pod redis-master # This is the only pod that requires manual removal.
 ```
 
 ### Troubleshooting
@@ -443,9 +443,9 @@ the Guestbook example can fail for a variety of reasons, which makes it an effec
 
 Before we proceed, what are some setup idiosyncracies that might cause the app to fail (or, appear to fail, when merely you have a *cold start* issue.
 
-- running kubernetes from HEAD, in which case, there may be subtle bugs in the kubernetes core component interactions.
-- running kubernetes with security turned on, in such a way that containers are restricted from doing their job.
-- starting the kubernetes and not allowing enough time for all services and pods to come online, before doing testing.
+- running lmktfy from HEAD, in which case, there may be subtle bugs in the lmktfy core component interactions.
+- running lmktfy with security turned on, in such a way that containers are restricted from doing their job.
+- starting the lmktfy and not allowing enough time for all services and pods to come online, before doing testing.
 
 
 

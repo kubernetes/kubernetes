@@ -17,11 +17,11 @@ limitations under the License.
 package rest
 
 import (
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/runtime"
 )
 
-// RESTDeleteStrategy defines deletion behavior on an object that follows Kubernetes
+// RESTDeleteStrategy defines deletion behavior on an object that follows LMKTFY
 // API conventions.
 type RESTDeleteStrategy interface {
 	runtime.ObjectTyper

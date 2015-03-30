@@ -23,7 +23,7 @@ import (
 )
 
 func TestDockerKeyringFromBytes(t *testing.T) {
-	url := "hello.kubernetes.io"
+	url := "hello.lmktfy.io"
 	email := "foo@bar.baz"
 	username := "foo"
 	password := "bar"
@@ -59,7 +59,7 @@ func TestDockerKeyringFromBytes(t *testing.T) {
 }
 
 func TestKeyringMiss(t *testing.T) {
-	url := "hello.kubernetes.io"
+	url := "hello.lmktfy.io"
 	email := "foo@bar.baz"
 	username := "foo"
 	password := "bar"

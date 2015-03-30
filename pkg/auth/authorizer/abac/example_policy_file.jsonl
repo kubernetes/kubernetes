@@ -1,9 +1,9 @@
 {"user":"admin"}
 {"user":"scheduler", "readonly": true, "resource": "pods"}
 {"user":"scheduler", "resource": "bindings"}
-{"user":"kubelet",  "readonly": true, "resource": "pods"}
-{"user":"kubelet",  "readonly": true, "resource": "services"}
-{"user":"kubelet",  "readonly": true, "resource": "endpoints"}
-{"user":"kubelet", "resource": "events"}
+{"user":"lmktfylet",  "readonly": true, "resource": "pods"}
+{"user":"lmktfylet",  "readonly": true, "resource": "services"}
+{"user":"lmktfylet",  "readonly": true, "resource": "endpoints"}
+{"user":"lmktfylet", "resource": "events"}
 {"user":"alice", "ns": "projectCaribou"}
 {"user":"bob", "readonly": true, "ns": "projectCaribou"}

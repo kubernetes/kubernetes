@@ -32,9 +32,9 @@ import (
 	"github.com/rackspace/gophercloud/rackspace/compute/v2/flavors"
 	"github.com/rackspace/gophercloud/rackspace/compute/v2/servers"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api/resource"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/cloudprovider"
 	"github.com/golang/glog"
 )
 

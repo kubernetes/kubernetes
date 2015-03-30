@@ -22,13 +22,13 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
-source "$KUBE_ROOT/build/common.sh"
+LMKTFY_ROOT=$(dirname "${BASH_SOURCE}")/..
+source "$LMKTFY_ROOT/build/common.sh"
 
-kube::build::verify_prereqs
-kube::build::build_image
-kube::build::run_build_command "$@"
+lmktfy::build::verify_prereqs
+lmktfy::build::build_image
+lmktfy::build::run_build_command "$@"
 
-if [[ ${KUBE_RUN_COPY_OUTPUT:-y} =~ ^[yY]$ ]]; then
-  kube::build::copy_output
+if [[ ${LMKTFY_RUN_COPY_OUTPUT:-y} =~ ^[yY]$ ]]; then
+  lmktfy::build::copy_output
 fi

@@ -7,7 +7,7 @@ desiredState:
     id: cassandra
     containers:
       - name: cassandra
-        image: kubernetes/cassandra:v2
+        image: lmktfy/cassandra:v2
         command:
           - /run.sh
         cpu: 1000
@@ -24,7 +24,7 @@ desiredState:
             value: 512M
           - key: HEAP_NEWSIZE
             value: 100M
-          - key: KUBERNETES_API_PROTOCOL
+          - key: LMKTFYRNETES_API_PROTOCOL
             value: http
     volumes:
       - name: data

@@ -19,7 +19,7 @@ package namespace
 import (
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api"
 )
 
 func TestNamespaceStrategy(t *testing.T) {

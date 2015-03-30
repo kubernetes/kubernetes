@@ -18,29 +18,29 @@
 sed -i -e "s/http.us.debian.org/mirrors.kernel.org/" /etc/apt/sources.list
 
 # Resolve hostname of master
-if ! grep -q $KUBE_MASTER /etc/hosts; then
-  echo "Adding host entry for $KUBE_MASTER"
-  echo "$KUBE_MASTER_IP $KUBE_MASTER" >> /etc/hosts
+if ! grep -q $LMKTFY_MASTER /etc/hosts; then
+  echo "Adding host entry for $LMKTFY_MASTER"
+  echo "$LMKTFY_MASTER_IP $LMKTFY_MASTER" >> /etc/hosts
 fi
 
 # Prepopulate the name of the Master
 mkdir -p /etc/salt/minion.d
-echo "master: $KUBE_MASTER" > /etc/salt/minion.d/master.conf
+echo "master: $LMKTFY_MASTER" > /etc/salt/minion.d/master.conf
 
 # Turn on debugging for salt-minion
 # echo "DAEMON_ARGS=\"\$DAEMON_ARGS --log-file-level=debug\"" > /etc/default/salt-minion
 
 # Our minions will have a pool role to distinguish them from the master.
 #
-# Setting the "minion_ip" here causes the kubelet to use its IP for
+# Setting the "minion_ip" here causes the lmktfylet to use its IP for
 # identification instead of its hostname.
 #
 cat <<EOF >/etc/salt/minion.d/grains.conf
 grains:
   minion_ip: $(ip route get 1.1.1.1 | awk '{print $7}')
   roles:
-    - kubernetes-pool
-    - kubernetes-pool-vsphere
+    - lmktfy-pool
+    - lmktfy-pool-vsphere
   cbr-cidr: $MINION_IP_RANGE
 EOF
 

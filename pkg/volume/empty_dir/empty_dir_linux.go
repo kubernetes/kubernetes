@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"syscall"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/mount"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/util/mount"
 )
 
 // Defined by Linux - the type number for tmpfs mounts.

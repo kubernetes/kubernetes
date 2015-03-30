@@ -19,8 +19,8 @@
 # master and run.
 
 echo "Unpacking Salt tree"
-rm -rf kubernetes
+rm -rf lmktfy
 tar xzf "${SALT_TAR}"
 
 echo "Running release install script"
-sudo kubernetes/saltbase/install.sh "${SERVER_BINARY_TAR}"
+sudo lmktfy/saltbase/install.sh "${SERVER_BINARY_TAR}"

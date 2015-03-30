@@ -1,8 +1,8 @@
 # So you want to change the API?
 
-The Kubernetes API has two major components - the internal structures and
+The LMKTFY API has two major components - the internal structures and
 the versioned APIs.  The versioned APIs are intended to be stable, while the
-internal structures are implemented to best reflect the needs of the Kubernetes
+internal structures are implemented to best reflect the needs of the LMKTFY
 code itself.
 
 What this means for API changes is that you have to be somewhat thoughtful in
@@ -13,7 +13,7 @@ not all API changes will need all of these steps.
 ## Operational overview
 
 It's important to have a high level understanding of the API system used in
-Kubernetes in order to navigate the rest of this document.
+LMKTFY in order to navigate the rest of this document.
 
 As mentioned above, the internal representation of an API object is decoupled
 from any one API version.  This provides a lot of freedom to evolve the code,
@@ -25,7 +25,7 @@ The conversion process is logically a "star" with the internal form at the
 center. Every versioned API can be converted to the internal form (and
 vice-versa), but versioned APIs do not convert to other versioned APIs directly.
 This sounds like a heavy process, but in reality we don't intend to keep more
-than a small number of versions alive at once.  While all of the Kubernetes code
+than a small number of versions alive at once.  While all of the LMKTFY code
 operates on the internal structures, they are always converted to a versioned
 form before being written to storage (disk or etcd) or being sent over a wire.
 Clients should consume and operate on the versioned APIs exclusively.
@@ -75,7 +75,7 @@ Put another way:
 If your change does not meet these criteria, it is not considered strictly
 compatible.  There are times when this might be OK, but mostly we want changes
 that meet this definition.  If you think you need to break compatibility, you
-should talk to the Kubernetes team first.
+should talk to the LMKTFY team first.
 
 Let's consider some examples.  In a hypothetical API (assume we're at version
 v6), the `Frobber` struct looks something like this:
@@ -286,7 +286,7 @@ an example to illustrate your change.
 
 ## Incompatible API changes
 If your change is going to be backward incompatible or might be a breaking change for API
-consumers, please send an announcement to `kubernetes-dev@googlegroups.com` before
+consumers, please send an announcement to `lmktfy-dev@googlegroups.com` before
 the change gets in. If you are unsure, ask. Also make sure that the change gets documented in
 `CHANGELOG.md` for the next release.
 

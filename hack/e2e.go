@@ -43,19 +43,19 @@ var (
 	down             = flag.Bool("down", false, "If true, tear down the cluster before exiting.")
 	test             = flag.Bool("test", false, "Run Ginkgo tests.")
 	testArgs         = flag.String("test_args", "", "Space-separated list of arguments to pass to Ginkgo test runner.")
-	root             = flag.String("root", absOrDie(filepath.Clean(filepath.Join(path.Base(os.Args[0]), ".."))), "Root directory of kubernetes repository.")
+	root             = flag.String("root", absOrDie(filepath.Clean(filepath.Join(path.Base(os.Args[0]), ".."))), "Root directory of lmktfy repository.")
 	verbose          = flag.Bool("v", false, "If true, print all command output.")
 	checkVersionSkew = flag.Bool("check_version_skew", true, ""+
 		"By default, verify that client and server have exact version match. "+
 		"You can explicitly set to false if you're, e.g., testing client changes "+
 		"for which the server version doesn't make a difference.")
 
-	ctlCmd = flag.String("ctl", "", "If nonempty, pass this as an argument, and call kubectl. Implies -v. (-test, -cfg, -ctl are mutually exclusive)")
+	ctlCmd = flag.String("ctl", "", "If nonempty, pass this as an argument, and call lmktfyctl. Implies -v. (-test, -cfg, -ctl are mutually exclusive)")
 )
 
 const (
-	serverTarName   = "kubernetes-server-linux-amd64.tar.gz"
-	saltTarName     = "kubernetes-salt.tar.gz"
+	serverTarName   = "lmktfy-server-linux-amd64.tar.gz"
+	saltTarName     = "lmktfy-salt.tar.gz"
 	downloadDirName = "_output/downloads"
 	tarDirName      = "server"
 	tempDirName     = "upgrade-e2e-temp-dir"
@@ -117,11 +117,11 @@ func main() {
 			log.Fatalf("Error preparing a binary of version %s: %s. Aborting.", *version, err)
 		} else {
 			versionRoot = newVersionRoot
-			os.Setenv("KUBE_VERSION_ROOT", newVersionRoot)
+			os.Setenv("LMKTFY_VERSION_ROOT", newVersionRoot)
 		}
 	}
 
-	os.Setenv("KUBECTL", versionRoot+`/cluster/kubectl.sh`+kubectlArgs())
+	os.Setenv("LMKTFYCTL", versionRoot+`/cluster/lmktfyctl.sh`+lmktfyctlArgs())
 
 	if *pushup {
 		if IsUp() {
@@ -148,8 +148,8 @@ func main() {
 	switch {
 	case *ctlCmd != "":
 		ctlArgs := strings.Fields(*ctlCmd)
-		os.Setenv("KUBE_CONFIG_FILE", "config-test.sh")
-		success = finishRunning("'kubectl "+*ctlCmd+"'", exec.Command(path.Join(versionRoot, "cluster/kubectl.sh"), ctlArgs...))
+		os.Setenv("LMKTFY_CONFIG_FILE", "config-test.sh")
+		success = finishRunning("'lmktfyctl "+*ctlCmd+"'", exec.Command(path.Join(versionRoot, "cluster/lmktfyctl.sh"), ctlArgs...))
 	case *test:
 		success = Test()
 	}
@@ -207,7 +207,7 @@ func IsUp() bool {
 }
 
 // PrepareVersion makes sure that the specified release version is locally
-// available and ready to be used by kube-up or kube-push. Returns the director
+// available and ready to be used by lmktfy-up or lmktfy-push. Returns the director
 // path of the release.
 func PrepareVersion(version string) (string, error) {
 	if version == "" {
@@ -226,8 +226,8 @@ func PrepareVersion(version string) (string, error) {
 		return "", err
 	}
 
-	remoteReleaseTar := fmt.Sprintf("https://storage.googleapis.com/kubernetes-release/release/%s/kubernetes.tar.gz", version)
-	localReleaseTar := filepath.Join(downloadDir, fmt.Sprintf("kubernetes-%s.tar.gz", version))
+	remoteReleaseTar := fmt.Sprintf("https://storage.googleapis.com/lmktfy-release/release/%s/lmktfy.tar.gz", version)
+	localReleaseTar := filepath.Join(downloadDir, fmt.Sprintf("lmktfy-%s.tar.gz", version))
 	if _, err := os.Stat(localReleaseTar); os.IsNotExist(err) {
 		out, err := os.Create(localReleaseTar)
 		if err != nil {
@@ -320,8 +320,8 @@ func printPrefixedLines(prefix, s string) {
 }
 
 // returns either "", or a list of args intended for appending with the
-// kubectl command (begining with a space).
-func kubectlArgs() string {
+// lmktfyctl command (begining with a space).
+func lmktfyctlArgs() string {
 	if *checkVersionSkew {
 		return " --match-server-version"
 	}

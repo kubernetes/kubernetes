@@ -15,7 +15,7 @@
 # limitations under the License.
 
 # This script will set up the salt directory on the target server.  It takes one
-# argument that is a tarball with the pre-compiled kuberntes server binaries.
+# argument that is a tarball with the pre-compiled lmktfyrntes server binaries.
 
 set -o errexit
 set -o nounset
@@ -31,8 +31,8 @@ if [[ -z "$SERVER_BIN_TAR" ]]; then
 fi
 
 # Create a temp dir for untaring
-KUBE_TEMP=$(mktemp -d -t kubernetes.XXXXXX)
-trap 'rm -rf "${KUBE_TEMP}"' EXIT
+LMKTFY_TEMP=$(mktemp -d -t lmktfy.XXXXXX)
+trap 'rm -rf "${LMKTFY_TEMP}"' EXIT
 
 # This file is meant to run on the master.  It will install the salt configs
 # into the appropriate place on the master.  We do this by creating a new set of
@@ -56,9 +56,9 @@ for dir in "${SALTDIRS[@]}"; do
 done
 
 echo "+++ Install binaries from tar: $1"
-tar -xz -C "${KUBE_TEMP}" -f "$1"
-mkdir -p /srv/salt-new/salt/kube-bins
-cp -v "${KUBE_TEMP}/kubernetes/server/bin/"* /srv/salt-new/salt/kube-bins/
+tar -xz -C "${LMKTFY_TEMP}" -f "$1"
+mkdir -p /srv/salt-new/salt/lmktfy-bins
+cp -v "${LMKTFY_TEMP}/lmktfy/server/bin/"* /srv/salt-new/salt/lmktfy-bins/
 
 echo "+++ Swapping in new configs"
 for dir in "${SALTDIRS[@]}"; do

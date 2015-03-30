@@ -6,5 +6,5 @@
 #
 highstate_master:
   cmd.state.highstate:
-    - tgt: 'roles:kubernetes-master'
+    - tgt: 'roles:lmktfyrnetes-master'
     - expr_form: grain

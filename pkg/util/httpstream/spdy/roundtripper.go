@@ -25,8 +25,8 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/httpstream"
-	"github.com/GoogleCloudPlatform/kubernetes/third_party/golang/netutil"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/util/httpstream"
+	"github.com/GoogleCloudPlatform/lmktfy/third_party/golang/netutil"
 )
 
 // SpdyRoundTripper knows how to upgrade an HTTP request to one that supports

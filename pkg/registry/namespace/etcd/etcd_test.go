@@ -19,15 +19,15 @@ package etcd
 import (
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/rest/resttest"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/namespace"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api/latest"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api/rest/resttest"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/fields"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/labels"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/registry/namespace"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/runtime"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/tools"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/util"
 
 	"github.com/coreos/go-etcd/etcd"
 )
@@ -256,7 +256,7 @@ func TestNamespaceDecode(t *testing.T) {
 	storage, _, _ := NewStorage(helper)
 	expected := validNewNamespace()
 	expected.Status.Phase = api.NamespaceActive
-	expected.Spec.Finalizers = []api.FinalizerName{api.FinalizerKubernetes}
+	expected.Spec.Finalizers = []api.FinalizerName{api.FinalizerLMKTFY}
 	body, err := latest.Codec.Encode(expected)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)

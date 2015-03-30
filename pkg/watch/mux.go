@@ -19,7 +19,7 @@ package watch
 import (
 	"sync"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/runtime"
 )
 
 // FullChannelBehavior controls how the Broadcaster reacts if a watcher's watch

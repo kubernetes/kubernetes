@@ -18,10 +18,10 @@
 # Specifically, the following environment variables are assumed:
 # - CLUSTER_NAME  (the name of the cluster)
 
-MASTER_NAME="k8s-${CLUSTER_NAME}-master"
+MASTER_NAME="lmktfy-${CLUSTER_NAME}-master"
 ZONE="${ZONE:-us-central1-f}"
 NUM_MINIONS="${NUM_MINIONS:-2}"
-MINION_NAMES=($(eval echo "k8s-${CLUSTER_NAME}-node-{1..${NUM_MINIONS}}"))
+MINION_NAMES=($(eval echo "lmktfy-${CLUSTER_NAME}-node-{1..${NUM_MINIONS}}"))
 CLUSTER_API_VERSION="${CLUSTER_API_VERSION:-}"
 # TODO(mbforbes): Actually plumb this through; this currently only works
 #                 because we use the 'default' network by default.
@@ -29,10 +29,10 @@ NETWORK="${NETWORK:-default}"
 NETWORK_RANGE="${NETWORK_RANGE:-10.240.0.0/16}"
 FIREWALL_SSH="${FIREWALL_SSH:-${NETWORK}-allow-ssh}"
 GCLOUD="${GCLOUD:-gcloud}"
-GCLOUD_CONFIG_DIR="${GCLOUD_CONFIG_DIR:-${HOME}/.config/gcloud/kubernetes}"
+GCLOUD_CONFIG_DIR="${GCLOUD_CONFIG_DIR:-${HOME}/.config/gcloud/lmktfy}"
 ENABLE_CLUSTER_DNS=false
 
 # This is a hack, but I keep setting this when I run commands manually, and
-# then things grossly fail during normal runs because cluster/kubecfg.sh and
-# cluster/kubectl.sh both use this if it's set.
-unset KUBERNETES_MASTER
+# then things grossly fail during normal runs because cluster/lmktfycfg.sh and
+# cluster/lmktfyctl.sh both use this if it's set.
+unset LMKTFYRNETES_MASTER

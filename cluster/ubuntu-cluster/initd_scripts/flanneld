@@ -20,7 +20,7 @@ BASE=$(basename $0)
 
 # modify these in /etc/default/$BASE (/etc/default/flannel)
 FLANNEL=/opt/bin/$BASE
-# This is the pid file managed by kube-apiserver itself
+# This is the pid file managed by lmktfy-apiserver itself
 FLANNEL_PIDFILE=/var/run/$BASE.pid
 FLANNEL_LOGFILE=/var/log/$BASE.log
 FLANNEL_OPTS=""
@@ -69,22 +69,22 @@ case "$1" in
 	start)
 		fail_unless_root
 		log_begin_msg "Starting $FLANNEL_DESC: $BASE"
-        $KUBE_APISERVER_START
+        $LMKTFY_APISERVER_START
 		log_end_msg $?
 		;;
 
 	stop)
 		fail_unless_root
 		log_begin_msg "Stopping $FLANNEL_DESC: $BASE"
-		$KUBE_APISERVER_STOP
+		$LMKTFY_APISERVER_STOP
 		log_end_msg $?
 		;;
 
 	restart | force-reload)
 		fail_unless_root
 		log_begin_msg "Stopping $FLANNEL_DESC: $BASE"
-		$KUBE_APISERVER_STOP
-		$KUBE_APISERVER_START
+		$LMKTFY_APISERVER_STOP
+		$LMKTFY_APISERVER_START
 		log_end_msg $?
 		;;
 

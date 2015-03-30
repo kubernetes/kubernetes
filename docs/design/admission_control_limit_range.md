@@ -7,7 +7,7 @@ This document proposes a system for enforcing min/max limits per resource as par
 ## Model Changes
 
 A new resource, **LimitRange**, is introduced to enumerate min/max limits for a resource type scoped to a
-Kubernetes namespace.
+LMKTFY namespace.
 
 ```go
 const (
@@ -79,31 +79,31 @@ messages explaining what constraints were the source of the denial.
 
 If a constraint is not enumerated by a **LimitRange** it is not tracked.
 
-## kube-apiserver
+## lmktfy-apiserver
 
 The server is updated to be aware of **LimitRange** objects.
 
-The constraints are only enforced if the kube-apiserver is started as follows:
+The constraints are only enforced if the lmktfy-apiserver is started as follows:
 
 ```
-$ kube-apiserver -admission_control=LimitRanger
+$ lmktfy-apiserver -admission_control=LimitRanger
 ```
 
-## kubectl
+## lmktfyctl
 
-kubectl is modified to support the **LimitRange** resource.
+lmktfyctl is modified to support the **LimitRange** resource.
 
-```kubectl describe``` provides a human-readable output of limits.
+```lmktfyctl describe``` provides a human-readable output of limits.
 
 For example,
 
 ```shell
-$ kubectl namespace myspace
-$ kubectl create -f examples/limitrange/limit-range.json
-$ kubectl get limits
+$ lmktfyctl namespace myspace
+$ lmktfyctl create -f examples/limitrange/limit-range.json
+$ lmktfyctl get limits
 NAME
 limits
-$ kubectl describe limits limits
+$ lmktfyctl describe limits limits
 Name:           limits
 Type            Resource        Min     Max
 ----            --------        ---     ---

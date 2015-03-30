@@ -24,12 +24,12 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/mount"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume/empty_dir"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/client"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/types"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/util/mount"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/volume"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/volume/empty_dir"
 )
 
 func newTestHost(t *testing.T, client client.Interface) volume.VolumeHost {
@@ -107,7 +107,7 @@ func TestPlugin(t *testing.T) {
 	}
 
 	volumePath := builder.GetPath()
-	if !strings.HasSuffix(volumePath, fmt.Sprintf("pods/test_pod_uid/volumes/kubernetes.io~secret/test_volume_name")) {
+	if !strings.HasSuffix(volumePath, fmt.Sprintf("pods/test_pod_uid/volumes/lmktfy.io~secret/test_volume_name")) {
 		t.Errorf("Got unexpected path: %s", volumePath)
 	}
 

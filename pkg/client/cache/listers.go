@@ -19,8 +19,8 @@ package cache
 import (
 	"fmt"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/labels"
 )
 
 //  TODO: generate these classes and methods for all resources of interest using
@@ -128,4 +128,4 @@ func (s *StoreToServiceLister) GetPodServices(pod api.Pod) (services []api.Servi
 	return
 }
 
-// TODO: add StoreToEndpointsLister for use in kube-proxy.
+// TODO: add StoreToEndpointsLister for use in lmktfy-proxy.

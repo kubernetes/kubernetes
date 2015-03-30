@@ -15,7 +15,7 @@ nginx:
   file:
     - managed
     - makedirs: true
-    - source: salt://nginx/kubernetes-site
+    - source: salt://nginx/lmktfyrnetes-site
     - user: root
     - group: root
     - mode: 644
@@ -37,4 +37,4 @@ nginx-service:
       - file: /etc/nginx/nginx.conf
       - file: /etc/nginx/sites-enabled/default
       - file: /usr/share/nginx/htpasswd
-      - cmd: kubernetes-cert
+      - cmd: lmktfyrnetes-cert

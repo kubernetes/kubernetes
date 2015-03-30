@@ -1,20 +1,20 @@
-# Kubernetes Developer Guide
+# LMKTFY Developer Guide
 
 The developer guide is for anyone wanting to either write code which directly accesses the
-kubernetes API, or to contribute directly to the kubernetes project.
+lmktfy API, or to contribute directly to the lmktfy project.
 It assumes some familiarity with concepts in the [User Guide](user-guide.md) and the [Cluster Admin
 Guide](cluster-admin-guide.md).
 
 
-## Developing against the Kubernetes API
+## Developing against the LMKTFY API
 
-* API objects are explained at [http://kubernetes.io/third_party/swagger-ui/](http://kubernetes.io/third_party/swagger-ui/).
+* API objects are explained at [http://lmktfy.io/third_party/swagger-ui/](http://lmktfy.io/third_party/swagger-ui/).
 
 * **Annotations** ([annotations.md](annotations.md)): are for attaching arbitrary non-identifying metadata to objects.
-  Programs that automate Kubernetes objects may use annotations to store small amounts of their state.
+  Programs that automate LMKTFY objects may use annotations to store small amounts of their state.
 
 * **API Conventions** ([api-conventions.md](api-conventions.md)):
-  Defining the verbs and resources used in the Kubernetes API.
+  Defining the verbs and resources used in the LMKTFY API.
 
 * **API Client Libraries** ([client-libraries.md](client-libraries.md)):
   A list of existing client libraries, both supported and user-contributed.
@@ -30,6 +30,6 @@ Guide](cluster-admin-guide.md).
 
 * **Admission Control Plugins** ([admission_control](design/admission_control.md))
 
-## Contributing to the Kubernetes Project
+## Contributing to the LMKTFY Project
 
 See this [README](../docs/devel/README.md).

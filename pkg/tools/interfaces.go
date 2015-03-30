@@ -17,7 +17,7 @@ limitations under the License.
 package tools
 
 import (
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/runtime"
 	"github.com/coreos/go-etcd/etcd"
 )
 

@@ -21,7 +21,7 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api"
 )
 
 func TestServiceSpreadPriority(t *testing.T) {

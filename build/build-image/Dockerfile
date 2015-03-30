@@ -12,9 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# This file creates a standard build environment for building Kubernetes
+# This file creates a standard build environment for building LMKTFYrnetes
 
-FROM kube-build:cross
+FROM lmktfy-build:cross
 MAINTAINER  Joe Beda <jbeda@google.com>
 
 # (set an explicit GOARM of 5 for maximum compatibility)
@@ -37,17 +37,17 @@ RUN mkdir -p /usr/local/src/etcd &&\
     tar xzf etcd-v2.0.0-linux-amd64.tar.gz &&\
     ln -s ../src/etcd/etcd-v2.0.0-linux-amd64/etcd /usr/local/bin/
 
-# Mark this as a kube-build container
-RUN touch /kube-build-image
+# Mark this as a lmktfy-build container
+RUN touch /lmktfy-build-image
 
-WORKDIR /go/src/github.com/GoogleCloudPlatform/kubernetes
+WORKDIR /go/src/github.com/GoogleCloudPlatform/lmktfyrnetes
 
 # Propagate the git tree version into the build image
-ADD kube-version-defs /kube-version-defs
-ENV KUBE_GIT_VERSION_FILE /kube-version-defs
+ADD lmktfy-version-defs /lmktfy-version-defs
+ENV LMKTFY_GIT_VERSION_FILE /lmktfy-version-defs
 
 # Make output from the dockerized build go someplace else
-ENV KUBE_OUTPUT_SUBPATH _output/dockerized
+ENV LMKTFY_OUTPUT_SUBPATH _output/dockerized
 
-# Upload Kubernetes source
-ADD kube-source.tar.gz /go/src/github.com/GoogleCloudPlatform/kubernetes
+# Upload LMKTFYrnetes source
+ADD lmktfy-source.tar.gz /go/src/github.com/GoogleCloudPlatform/lmktfyrnetes

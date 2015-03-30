@@ -23,16 +23,16 @@ import (
 	"testing"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/cache"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	algorithm "github.com/GoogleCloudPlatform/kubernetes/pkg/scheduler"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	schedulerapi "github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler/api"
-	latestschedulerapi "github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler/api/latest"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api/latest"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api/testapi"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/client"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/client/cache"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/runtime"
+	algorithm "github.com/GoogleCloudPlatform/lmktfy/pkg/scheduler"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/util"
+	schedulerapi "github.com/GoogleCloudPlatform/lmktfy/plugin/pkg/scheduler/api"
+	latestschedulerapi "github.com/GoogleCloudPlatform/lmktfy/plugin/pkg/scheduler/api/latest"
 )
 
 func TestCreate(t *testing.T) {
@@ -424,7 +424,7 @@ func TestBind(t *testing.T) {
 				Name:      "foo",
 			},
 			Target: api.ObjectReference{
-				Name: "foohost.kubernetes.mydomain.com",
+				Name: "foohost.lmktfy.mydomain.com",
 			},
 		}},
 	}

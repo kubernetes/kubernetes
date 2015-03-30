@@ -21,7 +21,7 @@ import (
 	"os"
 	"sync"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/client"
 	"github.com/golang/glog"
 )
 

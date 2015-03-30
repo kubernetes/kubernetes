@@ -19,20 +19,20 @@ package host_path
 import (
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/types"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/volume"
 )
 
 func TestCanSupport(t *testing.T) {
 	plugMgr := volume.VolumePluginMgr{}
 	plugMgr.InitPlugins(ProbeVolumePlugins(), volume.NewFakeVolumeHost("fake", nil, nil))
 
-	plug, err := plugMgr.FindPluginByName("kubernetes.io/host-path")
+	plug, err := plugMgr.FindPluginByName("lmktfy.io/host-path")
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
 	}
-	if plug.Name() != "kubernetes.io/host-path" {
+	if plug.Name() != "lmktfy.io/host-path" {
 		t.Errorf("Wrong name: %s", plug.Name())
 	}
 	if !plug.CanSupport(&api.Volume{VolumeSource: api.VolumeSource{HostPath: &api.HostPathVolumeSource{}}}) {
@@ -47,7 +47,7 @@ func TestGetAccessModes(t *testing.T) {
 	plugMgr := volume.VolumePluginMgr{}
 	plugMgr.InitPlugins(ProbeVolumePlugins(), volume.NewFakeVolumeHost("/tmp/fake", nil, nil))
 
-	plug, err := plugMgr.FindPersistentPluginByName("kubernetes.io/host-path")
+	plug, err := plugMgr.FindPersistentPluginByName("lmktfy.io/host-path")
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
 	}
@@ -60,7 +60,7 @@ func TestPlugin(t *testing.T) {
 	plugMgr := volume.VolumePluginMgr{}
 	plugMgr.InitPlugins(ProbeVolumePlugins(), volume.NewFakeVolumeHost("fake", nil, nil))
 
-	plug, err := plugMgr.FindPluginByName("kubernetes.io/host-path")
+	plug, err := plugMgr.FindPluginByName("lmktfy.io/host-path")
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
 	}

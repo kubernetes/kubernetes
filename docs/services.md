@@ -1,20 +1,20 @@
-# Services in Kubernetes
+# Services in LMKTFY
 
 ## Overview
 
-Kubernetes [`Pods`](Pods.md) are mortal. They are born and they die, and they
+LMKTFY [`Pods`](Pods.md) are mortal. They are born and they die, and they
 are not resurrected.  [`ReplicationControllers`](replication-controller.md) in
 particular create and destroy `Pods` dynamically (e.g. when scaling up or down
 or when doing rolling updates).  While each `Pod` gets its own IP address, even
 those IP addresses can not be relied upon to be stable over time. This leads to
 a problem: if some set of `Pods` (let's call them backends) provides
-functionality to other `Pods` (let's call them frontends) inside the Kubernetes
+functionality to other `Pods` (let's call them frontends) inside the LMKTFY
 cluster, how do those frontends find out and keep track of which backends are
 in that set?
 
 Enter `Services`.
 
-A Kubernetes `Service` is an abstraction which defines a logical set of `Pods`
+A LMKTFY `Service` is an abstraction which defines a logical set of `Pods`
 and a policy by which to access them - sometimes called a micro-service.  The
 set of `Pods` targetted by a `Service` is determined by a [`Label
 Selector`](labels.md).
@@ -25,14 +25,14 @@ they use.  While the actual `Pods` that compose the backend set may change, the
 frontend clients should not need to manage that themselves.  The `Service`
 abstraction enables this decoupling.
 
-For Kubernetes-native applications, Kubernetes offers a simple `Endpoints` API
+For LMKTFY-native applications, LMKTFY offers a simple `Endpoints` API
 that is updated whenever the set of `Pods` in a `Service` changes.  For
-non-native applications, Kubernetes offers a virtual-IP-based bridge to Services
+non-native applications, LMKTFY offers a virtual-IP-based bridge to Services
 which redirects to the backend `Pods`.
 
 ## Defining a Service
 
-A `Service` in Kubernetes is a REST object, similar to a `Pod`.  Like all of the
+A `Service` in LMKTFY is a REST object, similar to a `Pod`.  Like all of the
 REST objects, a `Service` definition can be POSTed to the apiserver to create a
 new instance.  For example, suppose you have a set of `Pods` that each expose
 port 9376 and carry a label "app=MyApp".
@@ -67,8 +67,8 @@ abstract any kind of backend.  For example:
     you use your own databases.
   - you want to point your service to a service in another
     [`Namespace`](namespaces.md) or on another cluster.
-  - you are migrating your workload to Kubernetes and some of your backends run
-    outside of Kubernetes.
+  - you are migrating your workload to LMKTFY and some of your backends run
+    outside of LMKTFY.
 
 In any of these scenarios you can define a service without a selector:
 
@@ -94,8 +94,8 @@ this example).
 
 ## Portals and service proxies
 
-Every node in a Kubernetes cluster runs a `kube-proxy`.  This application
-watches the Kubernetes master for the addition and removal of `Service`
+Every node in a LMKTFY cluster runs a `lmktfy-proxy`.  This application
+watches the LMKTFY master for the addition and removal of `Service`
 and `Endpoints` objects. For each `Service` it opens a port (random) on the
 local node.  Any connections made to that port will be proxied to one of the
 corresponding backend `Pods`.  Which backend to use is decided based on the
@@ -104,7 +104,7 @@ capture traffic to the `Service`'s `Port` on the `Service`'s portal IP and
 redirects that traffic to the previously described port.
 
 The net result is that any traffic bound for the `Service` is proxied to an
-appropriate backend without the clients knowing anything about Kubernetes or
+appropriate backend without the clients knowing anything about LMKTFY or
 `Services` or `Pods`.
 
 ![Services overview diagram](services_overview.png)
@@ -125,15 +125,15 @@ if enough people ask for this, we may implement it as an alternative to portals.
 
 ## Discovering services
 
-Kubernetes supports 2 primary modes of finding a `Service` - environment
+LMKTFY supports 2 primary modes of finding a `Service` - environment
 variables and DNS.
 
 ### Environment variables
 
-When a `Pod` is run on a `Node`, the kubelet adds a set of environment variables
+When a `Pod` is run on a `Node`, the lmktfylet adds a set of environment variables
 for each active `Service`.  It supports both [Docker links
 compatible](https://docs.docker.com/userguide/dockerlinks/) variables (see
-[makeLinkVariables](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/pkg/kubelet/envvars/envvars.go#L49))
+[makeLinkVariables](https://github.com/GoogleCloudPlatform/lmktfy/blob/master/pkg/lmktfylet/envvars/envvars.go#L49))
 and simpler `{SVCNAME}_SERVICE_HOST` and `{SVCNAME}_SERVICE_PORT` variables,
 where the Service name is upper-cased and dashes are converted to underscores.
 
@@ -158,11 +158,11 @@ variables will not be populated.  DNS does not have this restriction.
 ### DNS
 
 An optional (though strongly recommended) cluster add-on is a DNS server.  The
-DNS server watches the Kubernetes API for new `Services` and creates a set of
+DNS server watches the LMKTFY API for new `Services` and creates a set of
 DNS records for each.  If DNS has been enabled throughout the cluster then all
 `Pods` should be able to do name resolution of `Services` automatically.
 
-For example, if you have a `Service` called "my-service" in Kubernetes
+For example, if you have a `Service` called "my-service" in LMKTFY
 `Namespace` "my-ns" a DNS record for "my-service.my-ns" is created.  `Pods`
 which exist in the "my-ns" `Namespace` should be able to find it by simply doing
 a name lookup for "my-service".  `Pods` which exist in other `Namespaces` must
@@ -173,14 +173,14 @@ virtual portal IP.
 
 Users can create headless services by specifying "None" for the PortalIP.
 For such services, an IP or DNS is not created and neither are service-specific
-environment variables for the pods created. Additionally, the kube proxy does not
+environment variables for the pods created. Additionally, the lmktfy proxy does not
 handle these services and there is no load balancing or proxying being done by the
 platform for them. The endpoints_controller would still create endpoint records in
 etcd for such services, which are also made available via the API. These services
 also take advantage of any UI, readiness probes, etc. that are applicable for
 services in general. 
 
-The tradeoff for a developer would be whether to couple to the Kubernetes API or to
+The tradeoff for a developer would be whether to couple to the LMKTFY API or to
 a particular discovery system. This API would not preclude the self-registration
 approach, however, and adapters for other discovery systems could be built upon this
 API, as well.
@@ -201,9 +201,9 @@ cloud provider.
 For cloud providers which do not support external load balancers, there is
 another approach that is a bit more "do-it-yourself" - the `publicIPs` field.
 Any address you put into the `publicIPs` array will be handled the same as the
-portal IP - the kube-proxy will install iptables rules which proxy traffic
+portal IP - the lmktfy-proxy will install iptables rules which proxy traffic
 through to the backends.  You are then responsible for ensuring that traffic to
-those IPs gets sent to one or more Kubernetes `Nodes`.  As long as the traffic
+those IPs gets sent to one or more LMKTFY `Nodes`.  As long as the traffic
 arrives at a Node, it will be be subject to the iptables rules.
 
 An example situation might be when a `Node` has both internal and an external
@@ -225,10 +225,10 @@ indicate that the value is invalid.
 We expect that using iptables and userspace proxies for portals will work at
 small to medium scale, but may not scale to very large clusters with thousands
 of Services.  See [the original design proposal for
-portals](https://github.com/GoogleCloudPlatform/kubernetes/issues/1107) for more
+portals](https://github.com/GoogleCloudPlatform/lmktfy/issues/1107) for more
 details.
 
-Using the kube-proxy obscures the source-IP of a packet accessing a `Service`.
+Using the lmktfy-proxy obscures the source-IP of a packet accessing a `Service`.
 
 ## Future work
 
@@ -238,7 +238,7 @@ envision that some `Services` will have "real" load balancers, in which case the
 portal will simply transport the packets there.
 
 There's a
-[proposal](https://github.com/GoogleCloudPlatform/kubernetes/issues/3760) to
+[proposal](https://github.com/GoogleCloudPlatform/lmktfy/issues/3760) to
 eliminate userspace proxying in favor of doing it all in iptables.  This should
 perform better, though is less flexible than arbitrary userspace code.
 
@@ -253,7 +253,7 @@ worth understanding.
 
 ### Avoiding collisions
 
-One of the primary philosophies of Kubernetes is that users should not be
+One of the primary philosophies of LMKTFY is that users should not be
 exposed to situations that could cause their actions to fail through no fault
 of their own.  In this situation, we are looking at network ports - users
 should not have to choose a port number if that choice might collide with
@@ -275,10 +275,10 @@ endpoint.  The environment variables and DNS for `Services` are actually
 populated in terms of the portal IP and port.
 
 As an example, consider the image processing application described above.
-When the backend `Service` is created, the Kubernetes master assigns a portal
+When the backend `Service` is created, the LMKTFY master assigns a portal
 IP address, for example 10.0.0.1.  Assuming the `Service` port is 1234, the
 portal is 10.0.0.1:1234.  The master stores that information, which is then
-observed by all of the `kube-proxy` instances in the cluster.  When a proxy
+observed by all of the `lmktfy-proxy` instances in the cluster.  When a proxy
 sees a new portal, it opens a new random port, establishes an iptables redirect
 from the portal to this new port, and starts accepting connections on it.
 

@@ -28,15 +28,15 @@ import (
 	"strings"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/admission"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/rest"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/healthz"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/errors"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/version"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/admission"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api/meta"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api/rest"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/healthz"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/runtime"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/util"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/util/errors"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/version"
 
 	"github.com/emicklei/go-restful"
 	"github.com/golang/glog"
@@ -102,9 +102,9 @@ type APIGroupVersion struct {
 	Root    string
 	Version string
 
-	// ServerVersion controls the Kubernetes APIVersion used for common objects in the apiserver
+	// ServerVersion controls the LMKTFY APIVersion used for common objects in the apiserver
 	// schema like api.Status, api.DeleteOptions, and api.ListOptions. Other implementors may
-	// define a version "v1beta1" but want to use the Kubernetes "v1beta3" internal objects. If
+	// define a version "v1beta1" but want to use the LMKTFY "v1beta3" internal objects. If
 	// empty, defaults to Version.
 	ServerVersion string
 

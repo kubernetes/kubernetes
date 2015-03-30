@@ -1,8 +1,8 @@
 FROM google/golang:latest
 
-ADD . /gopath/src/github.com/GoogleCloudPlatform/kubernetes/examples/guestbook-go/_src
+ADD . /gopath/src/github.com/GoogleCloudPlatform/lmktfyrnetes/examples/guestbook-go/_src
 
-WORKDIR /gopath/src/github.com/GoogleCloudPlatform/kubernetes/examples/guestbook-go/
+WORKDIR /gopath/src/github.com/GoogleCloudPlatform/lmktfyrnetes/examples/guestbook-go/
 RUN cd _src/ && go get && go build -o ../bin/guestbook
 RUN cp _src/guestbook/Dockerfile .
 

@@ -19,7 +19,7 @@ package api_test
 import (
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api"
 )
 
 // TestFillObjectMetaSystemFields validates that system populated fields are set on an object

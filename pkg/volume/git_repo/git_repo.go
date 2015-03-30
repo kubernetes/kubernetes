@@ -22,11 +22,11 @@ import (
 	"os"
 	"path"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/exec"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/types"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/util"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/util/exec"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/volume"
 	"github.com/golang/glog"
 )
 
@@ -43,7 +43,7 @@ type gitRepoPlugin struct {
 var _ volume.VolumePlugin = &gitRepoPlugin{}
 
 const (
-	gitRepoPluginName       = "kubernetes.io/git-repo"
+	gitRepoPluginName       = "lmktfy.io/git-repo"
 	gitRepoPluginLegacyName = "git"
 )
 

@@ -1,7 +1,7 @@
 ###
-# kubernetes scheduler config
+# lmktfyrnetes scheduler config
 
 # default config should be adequate
 
 # Add your own!
-KUBE_SCHEDULER_ARGS=""
+LMKTFY_SCHEDULER_ARGS=""

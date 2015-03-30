@@ -3,7 +3,7 @@ base:
     - base
     - debian-auto-upgrades
 
-  'roles:kubernetes-pool':
+  'roles:lmktfyrnetes-pool':
     - match: grain
     - docker
 {% if grains['cloud'] is defined and grains['cloud'] == 'azure' %}
@@ -12,8 +12,8 @@ base:
     - sdn
 {% endif %}
     - cadvisor
-    - kubelet
-    - kube-proxy
+    - lmktfylet
+    - lmktfy-proxy
 {% if pillar.get('enable_node_logging', '').lower() == 'true' %}
   {% if pillar['logging_destination'] is defined and pillar['logging_destination'] == 'elasticsearch' %}
     - fluentd-es
@@ -25,21 +25,21 @@ base:
     - logrotate
     - monit
 
-  'roles:kubernetes-master':
+  'roles:lmktfyrnetes-master':
     - match: grain
     - generate-cert
     - etcd
-    - kube-apiserver
-    - kube-controller-manager
-    - kube-scheduler
+    - lmktfy-apiserver
+    - lmktfy-controller-manager
+    - lmktfy-scheduler
     - monit
     - nginx
     - cadvisor
-    - kube-client-tools
+    - lmktfy-client-tools
 {% if grains['cloud'] is defined and grains['cloud'] != 'vagrant' %}
     - logrotate
 {% endif %}
-    - kube-addons
+    - lmktfy-addons
 {% if grains['cloud'] is defined and grains['cloud'] == 'azure' %}
     - openvpn
 {% endif %}
@@ -49,14 +49,14 @@ base:
 {% endif %}
 {% if grains['cloud'] is defined and grains['cloud'] == 'aws' %}
     - docker
-    - kubelet
+    - lmktfylet
 {% endif %}
 {% if grains['cloud'] is defined and grains['cloud'] == 'gce' %}
     - docker
-    - kubelet
+    - lmktfylet
 {% endif %}
 
 
-  'roles:kubernetes-pool-vsphere':
+  'roles:lmktfyrnetes-pool-vsphere':
     - match: grain
     - static-routes

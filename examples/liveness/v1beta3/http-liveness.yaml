@@ -16,7 +16,7 @@ spec:
       containers: 
         - command: 
             - "/server"
-          image: kubernetes/liveness
+          image: lmktfy/liveness
           livenessProbe: 
             httpGet: 
               path: "/healthz"

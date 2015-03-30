@@ -1,9 +1,9 @@
-# Kubernetes Roadmap
+# LMKTFY Roadmap
 
 Updated Feb 9, 2015
 
 This document is intended to capture the set of supported use cases, features,
-docs, and patterns that we feel are required to call Kubernetes “feature
+docs, and patterns that we feel are required to call LMKTFY “feature
 complete” for a 1.0 release candidate.  This list does not emphasize the bug
 fixes and stabilization that will be required to take it all the way to
 production ready.  This is a living document, and is certainly open for
@@ -34,7 +34,7 @@ clustered database or key-value store. We will target such workloads for our
 8. Persistent storage support (#4055)
   - Status: in progress
 9. Allow nodes to join/leave a cluster (#2303,#2435)
-  - Status: high level [design doc](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/design/clustering.md).
+  - Status: high level [design doc](https://github.com/GoogleCloudPlatform/lmktfy/blob/master/docs/design/clustering.md).
 10. Handle node death
   - Status: mostly covered by nodes joining/leaving a cluster
 11. Allow live cluster upgrades (#2524)
@@ -47,7 +47,7 @@ clustered database or key-value store. We will target such workloads for our
   - Status:
 15. Demonstrate cluster stability over time
   - Status
-16. Kubelet use the kubernetes API to fetch jobs to run (instead of etcd) on supported platforms
+16. LMKTFYlet use the lmktfy API to fetch jobs to run (instead of etcd) on supported platforms
   - Status: DONE
 
 ## Reliability and performance
@@ -81,7 +81,7 @@ clustered database or key-value store. We will target such workloads for our
   - Status:
 
 ## Platforms
-1. Possible for cloud partners / vendors to self-qualify Kubernetes on their platform.
+1. Possible for cloud partners / vendors to self-qualify LMKTFY on their platform.
   - Status:
 2. Define the set of platforms that are supported by the core team.
   - Status:

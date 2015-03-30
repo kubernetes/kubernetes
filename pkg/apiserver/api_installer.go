@@ -25,13 +25,13 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/rest"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/conversion"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	watchjson "github.com/GoogleCloudPlatform/kubernetes/pkg/watch/json"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api/errors"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api/meta"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api/rest"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/conversion"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/runtime"
+	watchjson "github.com/GoogleCloudPlatform/lmktfy/pkg/watch/json"
 
 	"github.com/emicklei/go-restful"
 )
@@ -412,7 +412,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			addParams(route, action.Params)
 			ws.Route(route)
 		case "PROXY": // Proxy requests to a resource.
-			// Accept all methods as per https://github.com/GoogleCloudPlatform/kubernetes/issues/3996
+			// Accept all methods as per https://github.com/GoogleCloudPlatform/lmktfy/issues/3996
 			addProxyRoute(ws, "GET", a.prefix, action.Path, proxyHandler, kind, resource, action.Params)
 			addProxyRoute(ws, "PUT", a.prefix, action.Path, proxyHandler, kind, resource, action.Params)
 			addProxyRoute(ws, "POST", a.prefix, action.Path, proxyHandler, kind, resource, action.Params)

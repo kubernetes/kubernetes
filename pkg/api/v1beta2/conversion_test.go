@@ -20,10 +20,10 @@ import (
 	"encoding/json"
 	"testing"
 
-	newer "github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
-	current "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta2"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	newer "github.com/GoogleCloudPlatform/lmktfy/pkg/api"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api/resource"
+	current "github.com/GoogleCloudPlatform/lmktfy/pkg/api/v1beta2"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/util"
 )
 
 func TestServiceEmptySelector(t *testing.T) {

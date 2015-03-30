@@ -21,9 +21,9 @@ import (
 	"regexp"
 	"sync"
 
-	algorithm "github.com/GoogleCloudPlatform/kubernetes/pkg/scheduler"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	schedulerapi "github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler/api"
+	algorithm "github.com/GoogleCloudPlatform/lmktfy/pkg/scheduler"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/util"
+	schedulerapi "github.com/GoogleCloudPlatform/lmktfy/plugin/pkg/scheduler/api"
 
 	"github.com/golang/glog"
 )

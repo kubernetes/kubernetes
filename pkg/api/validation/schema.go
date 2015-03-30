@@ -22,7 +22,7 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/yaml"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/util/yaml"
 	"github.com/emicklei/go-restful/swagger"
 	"github.com/golang/glog"
 )

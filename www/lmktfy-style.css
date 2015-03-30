@@ -1,0 +1,108 @@
+.logo {
+  background: url('titlelogo.svg');
+  background-repeat: no-repeat;
+  height: 150px;
+  width: 600px;
+}
+
+.navbar-logo {
+  margin-left: 10px;
+  margin-top: 5px;
+}
+
+.title {
+  color: #fff;
+  font-size: 14pt;
+  height: 20px;
+  padding-top: 10px;
+  padding-left: 10px;
+  width: 1024px;
+}
+
+#nav-logo-img {
+  height: 42px;
+}
+
+.spread {
+  width: 1024px;
+}
+
+.content {
+  margin-left: 20px;
+  margin-top: 10px;
+}
+
+.bar {
+  background: #DFE7FA;
+  padding: 10px;
+}
+
+.navbar {
+  background-color: #447AE8;
+  border: 0px;
+  border-radius: 0;
+}
+
+.link {
+  color: #22F;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.lmktfy-title-font {
+  font-family: 'Ubuntu Mono', arial, sans-serif;
+  font-size: 14pt;
+}
+
+.lmktfy-font-medium {
+  font-size: 18pt;
+}
+
+.lmktfy-font-regular {
+  font-size: 12pt;
+}
+
+.lmktfy-box {
+  background: #CCC;
+  border: 1px solid darkgray;
+  padding: 10px;
+  width: 90%;
+  margin-left: 5%;
+}
+
+.lmktfy-item {
+  background: #DDD;
+  border: 1px solid whitesmoke;
+  padding: 10px;
+  width: 200px;
+}
+
+.lmktfy-list {
+  background: #DDD;
+  border: 1px solid whitesmoke;
+  padding: 10px;
+  width: 90%;
+}
+
+.lmktfy-inline {
+  display: inline-block;
+}
+
+.lmktfy-button {
+  border: 1px solid black;
+  background: lightgray;
+  cursor: pointer;
+  padding: 2px 4px 2px 4px;
+}
+
+.lmktfy-odd {
+  background: #EEE;
+}
+
+.lmktfy-even {
+  background: #DDD;
+}
+
+.lmktfy-cell {
+  padding: 10px;
+}

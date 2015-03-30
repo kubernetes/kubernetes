@@ -8,13 +8,13 @@ This is a follow up to the [Guestbook Example](../guestbook/README.md)'s [Go imp
 - It generates massive load using a semantically rich, realistic transaction simulator for petstores
 
 This application will run a web server which returns REDIS records for a petstore application.
-It is meant to simulate and test high load on kubernetes or any other docker based system.
+It is meant to simulate and test high load on lmktfy or any other docker based system.
 
-If you are new to kubernetes, and you haven't run guestbook yet, 
+If you are new to lmktfy, and you haven't run guestbook yet, 
 
 you might want to stop here and go back and run guestbook app first.  
 
-The guestbook tutorial will teach you alot about the basics of kubernetes, and we've tried not to be redundant here.
+The guestbook tutorial will teach you alot about the basics of lmktfy, and we've tried not to be redundant here.
 
 ## Architecture of this SOA
 
@@ -48,7 +48,7 @@ To work on the app, just cd to the `dev` directory, and follow the instructions.
 
 redis and go.  Then you can use the `Vagrantfile` in this top level directory to launch a minimal version of the app in pure docker containers.
 
-If that is all working, you can finally run `k8petstore.sh` in any kubernetes cluster, and run the app at scale.
+If that is all working, you can finally run `k8petstore.sh` in any lmktfy cluster, and run the app at scale.
 
 ## Set up the data generator (optional)
 
@@ -70,7 +70,7 @@ You will likely want to checkout the branch 2b2392bf135e9f1256bd0b930f05ae5aef8b
 
 ## Now what? 
 
-Once you have done the above 3 steps, you have a working, from source, locally runnable version of the k8petstore app, now, we can try to run it in kubernetes.
+Once you have done the above 3 steps, you have a working, from source, locally runnable version of the k8petstore app, now, we can try to run it in lmktfy.
 
 ## Hacking, testing, benchmarking
 
@@ -80,11 +80,11 @@ and the k8petstore title page, as well as an indicator of transaction throughput
 
 You can modify the HTML pages, add new REST paths to the Go app, and so on.
 
-## Running in kubernetes
+## Running in lmktfy
 
-Now that you are done hacking around on the app, you can run it in kubernetes.  To do this, you will want to rebuild the docker images (most likely, for the Go web-server app), but less likely for the other images which you are less likely to need to change. Then you will push those images to dockerhub.
+Now that you are done hacking around on the app, you can run it in lmktfy.  To do this, you will want to rebuild the docker images (most likely, for the Go web-server app), but less likely for the other images which you are less likely to need to change. Then you will push those images to dockerhub.
 
-Now, how to run the entire application in kubernetes? 
+Now, how to run the entire application in lmktfy? 
 
 To simplify running this application, we have a single file, k8petstore.sh, which writes out json files on to disk.  This allows us to have dynamic parameters, without needing to worry about managing multiplejson files.
 
@@ -92,7 +92,7 @@ You might want to change it to point to your customized Go image, if you chose t
 
 like the number of data generators (more generators will create more load on the redis master).
 
-So, to run this app in kubernetes, simply run [The all in one k8petstore.sh shell script](k8petstore.sh).
+So, to run this app in lmktfy, simply run [The all in one k8petstore.sh shell script](k8petstore.sh).
 
 Note that there are a few , self explanatory parameters to set at the top of it.  
 

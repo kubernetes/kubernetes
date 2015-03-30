@@ -31,7 +31,7 @@ echo " ---> Cleaning up before building..."
 echo " ---> Building..."
 "${base_dir}/build.sh" "${guestbook_version}"
 
-echo " ---> Pushing kubernetes/guestbook:${guestbook_version}..."
+echo " ---> Pushing lmktfy/guestbook:${guestbook_version}..."
 "${base_dir}/push.sh" "${guestbook_version}"
 
 echo " ---> Cleaning up..."

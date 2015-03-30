@@ -21,21 +21,21 @@ import (
 	"sync"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/validation"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api/errors"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api/validation"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/client"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/fields"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/labels"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/util"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/watch"
 	"github.com/golang/glog"
 )
 
 // ReplicationManager is responsible for synchronizing ReplicationController objects stored
 // in the system with actual running pods.
 type ReplicationManager struct {
-	kubeClient client.Interface
+	lmktfyClient client.Interface
 	podControl PodControlInterface
 	syncTime   <-chan time.Time
 
@@ -54,7 +54,7 @@ type PodControlInterface interface {
 
 // RealPodControl is the default implementation of PodControllerInterface.
 type RealPodControl struct {
-	kubeClient client.Interface
+	lmktfyClient client.Interface
 }
 
 // Time period of main replication controller sync loop
@@ -91,21 +91,21 @@ func (r RealPodControl) createReplica(namespace string, controller api.Replicati
 		util.HandleError(fmt.Errorf("unable to create pod replica, no labels"))
 		return
 	}
-	if _, err := r.kubeClient.Pods(namespace).Create(pod); err != nil {
+	if _, err := r.lmktfyClient.Pods(namespace).Create(pod); err != nil {
 		util.HandleError(fmt.Errorf("unable to create pod replica: %v", err))
 	}
 }
 
 func (r RealPodControl) deletePod(namespace, podID string) error {
-	return r.kubeClient.Pods(namespace).Delete(podID)
+	return r.lmktfyClient.Pods(namespace).Delete(podID)
 }
 
 // NewReplicationManager creates a new ReplicationManager.
-func NewReplicationManager(kubeClient client.Interface) *ReplicationManager {
+func NewReplicationManager(lmktfyClient client.Interface) *ReplicationManager {
 	rm := &ReplicationManager{
-		kubeClient: kubeClient,
+		lmktfyClient: lmktfyClient,
 		podControl: RealPodControl{
-			kubeClient: kubeClient,
+			lmktfyClient: lmktfyClient,
 		},
 	}
 	rm.syncHandler = rm.syncReplicationController
@@ -121,7 +121,7 @@ func (rm *ReplicationManager) Run(period time.Duration) {
 
 // resourceVersion is a pointer to the resource version to use/update.
 func (rm *ReplicationManager) watchControllers(resourceVersion *string) {
-	watching, err := rm.kubeClient.ReplicationControllers(api.NamespaceAll).Watch(
+	watching, err := rm.lmktfyClient.ReplicationControllers(api.NamespaceAll).Watch(
 		labels.Everything(),
 		fields.Everything(),
 		*resourceVersion,
@@ -192,7 +192,7 @@ func FilterActivePods(pods []api.Pod) []api.Pod {
 
 func (rm *ReplicationManager) syncReplicationController(controller api.ReplicationController) error {
 	s := labels.Set(controller.Spec.Selector).AsSelector()
-	podList, err := rm.kubeClient.Pods(controller.Namespace).List(s)
+	podList, err := rm.lmktfyClient.Pods(controller.Namespace).List(s)
 	if err != nil {
 		return err
 	}
@@ -225,7 +225,7 @@ func (rm *ReplicationManager) syncReplicationController(controller api.Replicati
 	}
 	if controller.Status.Replicas != activePods {
 		controller.Status.Replicas = activePods
-		_, err = rm.kubeClient.ReplicationControllers(controller.Namespace).Update(&controller)
+		_, err = rm.lmktfyClient.ReplicationControllers(controller.Namespace).Update(&controller)
 		if err != nil {
 			return err
 		}
@@ -237,7 +237,7 @@ func (rm *ReplicationManager) synchronize() {
 	// TODO: remove this method completely and rely on the watch.
 	// Add resource version tracking to watch to make this work.
 	var controllers []api.ReplicationController
-	list, err := rm.kubeClient.ReplicationControllers(api.NamespaceAll).List(labels.Everything())
+	list, err := rm.lmktfyClient.ReplicationControllers(api.NamespaceAll).List(labels.Everything())
 	if err != nil {
 		util.HandleError(fmt.Errorf("synchronization error: %v", err))
 		return

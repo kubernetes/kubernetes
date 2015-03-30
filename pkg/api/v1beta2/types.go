@@ -17,9 +17,9 @@ limitations under the License.
 package v1beta2
 
 import (
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/runtime"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/types"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/util"
 )
 
 // Common string formats
@@ -47,7 +47,7 @@ import (
 
 // Volume represents a named volume in a pod that may be accessed by any containers in the pod.
 //
-// https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/volumes.md
+// https://github.com/GoogleCloudPlatform/lmktfy/blob/master/docs/volumes.md
 type Volume struct {
 	// Required: This must be a DNS_LABEL.  Each volume in a pod must have
 	// a unique name.
@@ -61,7 +61,7 @@ type Volume struct {
 // VolumeSource represents the source location of a volume to mount.
 // Only one of its members may be specified.
 //
-// https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/volumes.md#types-of-volumes
+// https://github.com/GoogleCloudPlatform/lmktfy/blob/master/docs/volumes.md#types-of-volumes
 type VolumeSource struct {
 	// HostDir represents a pre-existing directory on the host machine that is directly
 	// exposed to the container. This is generally used for system agents or other privileged
@@ -72,7 +72,7 @@ type VolumeSource struct {
 	// EmptyDir represents a temporary directory that shares a pod's lifetime.
 	EmptyDir *EmptyDirVolumeSource `json:"emptyDir" description:"temporary directory that shares a pod's lifetime"`
 	// A persistent disk that is mounted to the
-	// kubelet's host machine and then exposed to the pod.
+	// lmktfylet's host machine and then exposed to the pod.
 	GCEPersistentDisk *GCEPersistentDiskVolumeSource `json:"persistentDisk" description:"GCE disk resource attached to the host machine on demand"`
 	// GitRepo represents a git repository at a particular revision.
 	GitRepo *GitRepoVolumeSource `json:"gitRepo" description:"git repository at a particular revision"`
@@ -86,7 +86,7 @@ type VolumeSource struct {
 // Exactly one of its members must be set.
 type PersistentVolumeSource struct {
 	// GCEPersistentDisk represents a GCE Disk resource that is attached to a
-	// kubelet's host machine and then exposed to the pod.
+	// lmktfylet's host machine and then exposed to the pod.
 	GCEPersistentDisk *GCEPersistentDiskVolumeSource `json:"persistentDisk" description:"GCE disk resource provisioned by an admin"`
 	// HostPath represents a directory on the host.
 	// This is useful for development and testing only.
@@ -194,14 +194,14 @@ const (
 
 // HostPathVolumeSource represents bare host directory volume.
 //
-// https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/volumes.md#hostdir
+// https://github.com/GoogleCloudPlatform/lmktfy/blob/master/docs/volumes.md#hostdir
 type HostPathVolumeSource struct {
 	Path string `json:"path" description:"path of the directory on the host"`
 }
 
 // Represents an empty directory volume.
 //
-// https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/volumes.md#emptydir
+// https://github.com/GoogleCloudPlatform/lmktfy/blob/master/docs/volumes.md#emptydir
 type EmptyDirVolumeSource struct {
 	// Optional: what type of storage medium should back this directory.
 	// The default is "" which means to use the node's default medium.
@@ -218,7 +218,7 @@ const (
 
 // SecretVolumeSource adapts a Secret into a VolumeSource
 //
-// https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/design/secrets.md
+// https://github.com/GoogleCloudPlatform/lmktfy/blob/master/docs/design/secrets.md
 type SecretVolumeSource struct {
 	// Reference to a Secret to use.  Only the ID field of this reference is used; a
 	// secret can only be used by pods in its namespace.
@@ -254,10 +254,10 @@ type ContainerPort struct {
 // GCEPersistentDiskVolumeSource represents a Persistent Disk resource in Google Compute Engine.
 //
 // A GCE PD must exist and be formatted before mounting to a container.
-// The disk must also be in the same GCE project and zone as the kubelet.
+// The disk must also be in the same GCE project and zone as the lmktfylet.
 // A GCE PD can only be mounted as read/write once.
 //
-// https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/volumes.md#gcepersistentdisk
+// https://github.com/GoogleCloudPlatform/lmktfy/blob/master/docs/volumes.md#gcepersistentdisk
 type GCEPersistentDiskVolumeSource struct {
 	// Unique name of the PD resource. Used to identify the disk in GCE
 	PDName string `json:"pdName" description:"unique name of the PD resource in GCE"`
@@ -268,7 +268,7 @@ type GCEPersistentDiskVolumeSource struct {
 	// TODO: why omitempty if required?
 	FSType string `json:"fsType,omitempty" description:"file system type to mount, such as ext4, xfs, ntfs"`
 	// Optional: Partition on the disk to mount.
-	// If omitted, kubelet will attempt to mount the device name.
+	// If omitted, lmktfylet will attempt to mount the device name.
 	// Ex. For /dev/sda1, this field is "1", for /dev/sda, this field 0 or empty.
 	Partition int `json:"partition,omitempty" description:"partition on the disk to mount (e.g., '1' for /dev/sda1); if omitted the plain device name (e.g., /dev/sda) will be mounted"`
 	// Optional: Defaults to false (read/write). ReadOnly here will force
@@ -286,7 +286,7 @@ type GitRepoVolumeSource struct {
 
 // VolumeMount describes a mounting of a Volume within a container.
 //
-// https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/volumes.md
+// https://github.com/GoogleCloudPlatform/lmktfy/blob/master/docs/volumes.md
 type VolumeMount struct {
 	// Required: This must match the Name of a Volume [above].
 	Name string `json:"name" description:"name of the volume to mount"`
@@ -306,7 +306,7 @@ type EnvVar struct {
 
 // HTTPGetAction describes an action based on HTTP Get requests.
 //
-// https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/container-environment.md#hook-handler-implementations
+// https://github.com/GoogleCloudPlatform/lmktfy/blob/master/docs/container-environment.md#hook-handler-implementations
 type HTTPGetAction struct {
 	// Optional: Path to access on the HTTP server.
 	Path string `json:"path,omitempty" description:"path to access on the HTTP server"`
@@ -318,7 +318,7 @@ type HTTPGetAction struct {
 
 // TCPSocketAction describes an action based on opening a socket
 //
-// https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/container-environment.md#hook-handler-implementations
+// https://github.com/GoogleCloudPlatform/lmktfy/blob/master/docs/container-environment.md#hook-handler-implementations
 type TCPSocketAction struct {
 	// Required: Port to connect to.
 	Port util.IntOrString `json:"port,omitempty" description:"number of name of the port to access on the container"`
@@ -326,7 +326,7 @@ type TCPSocketAction struct {
 
 // ExecAction describes a "run in container" action.
 //
-// https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/container-environment.md#hook-handler-implementations
+// https://github.com/GoogleCloudPlatform/lmktfy/blob/master/docs/container-environment.md#hook-handler-implementations
 type ExecAction struct {
 	// Command is the command line to execute inside the container, the working directory for the
 	// command  is root ('/') in the container's filesystem.  The command is simply exec'd, it is
@@ -352,15 +352,15 @@ type LivenessProbe struct {
 
 // PullPolicy describes a policy for if/when to pull a container image
 //
-// https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/images.md#preloading-images
+// https://github.com/GoogleCloudPlatform/lmktfy/blob/master/docs/images.md#preloading-images
 type PullPolicy string
 
 const (
-	// PullAlways means that kubelet always attempts to pull the latest image.  Container will fail If the pull fails.
+	// PullAlways means that lmktfylet always attempts to pull the latest image.  Container will fail If the pull fails.
 	PullAlways PullPolicy = "PullAlways"
-	// PullNever means that kubelet never pulls an image, but only uses a local image.  Container will fail if the image isn't present
+	// PullNever means that lmktfylet never pulls an image, but only uses a local image.  Container will fail if the image isn't present
 	PullNever PullPolicy = "PullNever"
-	// PullIfNotPresent means that kubelet pulls if the image isn't present on disk. Container will fail if the image isn't present and the pull fails.
+	// PullIfNotPresent means that lmktfylet pulls if the image isn't present on disk. Container will fail if the image isn't present and the pull fails.
 	PullIfNotPresent PullPolicy = "PullIfNotPresent"
 )
 
@@ -369,7 +369,7 @@ type CapabilityType string
 
 // Capabilities represent POSIX capabilities that can be added or removed to a running container.
 //
-// https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/containers.md#capabilities
+// https://github.com/GoogleCloudPlatform/lmktfy/blob/master/docs/containers.md#capabilities
 type Capabilities struct {
 	// Added capabilities
 	Add []CapabilityType `json:"add,omitempty" description:"added capabilities"`
@@ -426,7 +426,7 @@ const (
 // Handler defines a specific action that should be taken
 // TODO: pass structured data to these actions, and document that data here.
 //
-// https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/container-environment.md#hook-handler-implementations
+// https://github.com/GoogleCloudPlatform/lmktfy/blob/master/docs/container-environment.md#hook-handler-implementations
 type Handler struct {
 	// One and only one of the following should be specified.
 	// Exec specifies the action to take.
@@ -442,7 +442,7 @@ type Handler struct {
 // events.  For the PostStart and PreStop lifecycle handlers, management of the container blocks
 // until the action is complete, unless the container process fails, in which case the handler is aborted.
 //
-// https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/container-environment.md#hook-details
+// https://github.com/GoogleCloudPlatform/lmktfy/blob/master/docs/container-environment.md#hook-details
 type Lifecycle struct {
 	// PostStart is called immediately after a container is created.  If the handler fails, the container
 	// is terminated and restarted.
@@ -452,7 +452,7 @@ type Lifecycle struct {
 	PreStop *Handler `json:"preStop,omitempty" description:"called before a container is terminated; the container is terminated after the handler completes; other management of the container blocks until the hook completes"`
 }
 
-// The below types are used by kube_client and api_server.
+// The below types are used by lmktfy_client and api_server.
 
 // TypeMeta is shared by all objects sent to, or returned from the client.
 type TypeMeta struct {
@@ -461,7 +461,7 @@ type TypeMeta struct {
 	UID               types.UID `json:"uid,omitempty" description:"unique UUID across space and time; populated by the system, read-only"`
 	CreationTimestamp util.Time `json:"creationTimestamp,omitempty" description:"RFC 3339 date and time at which the object was created; populated by the system, read-only; null for lists"`
 	SelfLink          string    `json:"selfLink,omitempty" description:"URL for the object; populated by the system, read-only"`
-	ResourceVersion   uint64    `json:"resourceVersion,omitempty" description:"string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"`
+	ResourceVersion   uint64    `json:"resourceVersion,omitempty" description:"string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/lmktfy/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"`
 	APIVersion        string    `json:"apiVersion,omitempty" description:"version of the schema the object should have"`
 	Namespace         string    `json:"namespace,omitempty" description:"namespace to which the object belongs; must be a DNS_SUBDOMAIN; 'default' by default; cannot be updated"`
 
@@ -471,8 +471,8 @@ type TypeMeta struct {
 	// resource lists, and not reachable by name) after the time in this field. Once set, this
 	// value may not be unset or be set further into the future, although it may be shortened
 	// or the resource may be deleted prior to this time. For example, a user may request that
-	// a pod is deleted in 30 seconds. The Kubelet will react by sending a graceful termination
-	// signal to the containers in the pod. Once the resource is deleted in the API, the Kubelet
+	// a pod is deleted in 30 seconds. The LMKTFYlet will react by sending a graceful termination
+	// signal to the containers in the pod. Once the resource is deleted in the API, the LMKTFYlet
 	// will send a hard termination signal to the container.
 	DeletionTimestamp *util.Time `json:"deletionTimestamp,omitempty" description:"RFC 3339 date and time at which the object will be deleted; populated by the system when a graceful deletion is requested, read-only; if not set, graceful deletion of the object has not been requested"`
 
@@ -498,7 +498,7 @@ type TypeMeta struct {
 type ConditionStatus string
 
 // These are valid condition statuses. "ConditionFull" means a resource is in the condition;
-// "ConditionNone" means a resource is not in the condition; "ConditionUnknown" means kubernetes
+// "ConditionNone" means a resource is not in the condition; "ConditionUnknown" means lmktfy
 // can't decide if a resource is in the condition or not. In the future, we could add other
 // intermediate conditions, e.g. ConditionDegraded.
 const (
@@ -509,7 +509,7 @@ const (
 
 // PodStatus represents a status of a pod.
 //
-// https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/pod-states.md
+// https://github.com/GoogleCloudPlatform/lmktfy/blob/master/docs/pod-states.md
 type PodStatus string
 
 // These are the valid statuses of pods.
@@ -643,7 +643,7 @@ type PodList struct {
 
 // Pod is a collection of containers, used as either input (create, update) or as output (list, get).
 //
-// https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/pods.md
+// https://github.com/GoogleCloudPlatform/lmktfy/blob/master/docs/pods.md
 type Pod struct {
 	TypeMeta     `json:",inline"`
 	Labels       map[string]string `json:"labels,omitempty" description:"map of string keys and values that can be used to organize and categorize pods; may match selectors of replication controllers and services"`
@@ -668,7 +668,7 @@ type ReplicationControllerList struct {
 
 // ReplicationController represents the configuration of a replication controller.
 //
-// https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/replication-controller.md
+// https://github.com/GoogleCloudPlatform/lmktfy/blob/master/docs/replication-controller.md
 type ReplicationController struct {
 	TypeMeta     `json:",inline"`
 	DesiredState ReplicationControllerState `json:"desiredState,omitempty" description:"specification of the desired state of the replication controller"`
@@ -678,7 +678,7 @@ type ReplicationController struct {
 
 // PodTemplate holds the information used for creating pods.
 //
-// https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/replication-controller.md#pod-template
+// https://github.com/GoogleCloudPlatform/lmktfy/blob/master/docs/replication-controller.md#pod-template
 type PodTemplate struct {
 	DesiredState PodState          `json:"desiredState,omitempty" description:"specification of the desired state of pods created from this template"`
 	NodeSelector map[string]string `json:"nodeSelector,omitempty" description:"a selector which must be true for the pod to fit on a node"`
@@ -713,7 +713,7 @@ type ServiceList struct {
 // (for example 3306) that the proxy listens on, and the selector that determines which pods
 // will answer requests sent through the proxy.
 //
-// https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/services.md
+// https://github.com/GoogleCloudPlatform/lmktfy/blob/master/docs/services.md
 type Service struct {
 	TypeMeta `json:",inline"`
 
@@ -773,7 +773,7 @@ type Endpoints struct {
 	//     will be used to generate Subsets.
 	Protocol  Protocol `json:"protocol,omitempty" description:"IP protocol for the first set of endpoint ports; must be UDP or TCP; TCP if unspecified"`
 	Endpoints []string `json:"endpoints" description:"first set of endpoints corresponding to a service, of the form address:port, such as 10.10.1.1:1909"`
-	// Optional: The kubernetes objects related to the first set of entry points.
+	// Optional: The lmktfy objects related to the first set of entry points.
 	TargetRefs []EndpointObjectReference `json:"targetRefs,omitempty" description:"list of references to objects providing the endpoints"`
 
 	// The set of all endpoints is the union of all subsets.  If this field
@@ -803,7 +803,7 @@ type EndpointAddress struct {
 	// TODO: This should allow hostname or IP, see #4447.
 	IP string `json:"IP" description:"IP address of the endpoint"`
 
-	// Optional: The kubernetes object related to the entry point.
+	// Optional: The lmktfy object related to the entry point.
 	TargetRef *ObjectReference `json:"targetRef,omitempty" description:"reference to object providing the endpoint"`
 }
 
@@ -840,15 +840,15 @@ type NodeSystemInfo struct {
 	OsImage string `json:"osImage" description:"OS image used reported by the node from /etc/os-release (e.g. Debian GNU/Linux 7 (wheezy))"`
 	// Container runtime version reported by the node
 	ContainerRuntimeVersion string `json:"containerRuntimeVersion" description:"Container runtime version reported by the node through runtime remote API (e.g. docker://1.5.0)"`
-	// Kubelet version reported by the node
-	KubeletVersion string `json:"kubeletVersion" description:"Kubelet version reported by the node"`
-	// Kube-proxy version reported by the node
-	KubeProxyVersion string `json:"KubeProxyVersion" description:"Kube-proxy version reported by the node"`
+	// LMKTFYlet version reported by the node
+	LMKTFYletVersion string `json:"lmktfyletVersion" description:"LMKTFYlet version reported by the node"`
+	// LMKTFY-proxy version reported by the node
+	LMKTFYProxyVersion string `json:"LMKTFYProxyVersion" description:"LMKTFY-proxy version reported by the node"`
 }
 
 // NodeStatus is information about the current status of a node.
 //
-// https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/node.md#node-status
+// https://github.com/GoogleCloudPlatform/lmktfy/blob/master/docs/node.md#node-status
 type NodeStatus struct {
 	// NodePhase is the current lifecycle phase of the node.
 	Phase NodePhase `json:"phase,omitempty" description:"node phase is the current lifecycle phase of the node"`
@@ -871,14 +871,14 @@ type NodeInfo struct {
 
 // Described the current lifecycle phase of a node.
 //
-// https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/node.md#node-phase
+// https://github.com/GoogleCloudPlatform/lmktfy/blob/master/docs/node.md#node-phase
 type NodePhase string
 
 // These are the valid phases of node.
 const (
 	// NodePending means the node has been created/added by the system, but not configured.
 	NodePending NodePhase = "Pending"
-	// NodeRunning means the node has been configured and has Kubernetes components running.
+	// NodeRunning means the node has been configured and has LMKTFY components running.
 	NodeRunning NodePhase = "Running"
 	// NodeTerminated means the node has been removed from the cluster.
 	NodeTerminated NodePhase = "Terminated"
@@ -886,7 +886,7 @@ const (
 
 // Describes the condition of a running node.
 //
-// https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/node.md#node-condition
+// https://github.com/GoogleCloudPlatform/lmktfy/blob/master/docs/node.md#node-condition
 type NodeConditionKind string
 
 // These are valid conditions of node. Currently, we don't have enough information to decide
@@ -903,7 +903,7 @@ const (
 
 // Described the conditions of a running node.
 //
-// https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/node.md#node-condition
+// https://github.com/GoogleCloudPlatform/lmktfy/blob/master/docs/node.md#node-condition
 type NodeCondition struct {
 	Kind               NodeConditionKind `json:"kind" description:"kind of the condition, one of Reachable, Ready"`
 	Status             ConditionStatus   `json:"status" description:"status of the condition, one of Full, None, Unknown"`
@@ -927,9 +927,9 @@ type NodeAddress struct {
 	Address string          `json:"address" description:"string representation of the address"`
 }
 
-// NodeResources represents resources on a Kubernetes system node
+// NodeResources represents resources on a LMKTFY system node
 //
-// https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/resources.md
+// https://github.com/GoogleCloudPlatform/lmktfy/blob/master/docs/resources.md
 type NodeResources struct {
 	// Capacity represents the available resources.
 	Capacity ResourceList `json:"capacity,omitempty" description:"resource capacity of a node represented as a map of resource name to quantity of resource"`
@@ -948,10 +948,10 @@ const (
 
 type ResourceList map[ResourceName]util.IntOrString
 
-// Minion is a worker node in Kubernetenes.
+// Minion is a worker node in LMKTFYrnetenes.
 // The name of the minion according to etcd is in ID.
 //
-// https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/node.md#node-condition
+// https://github.com/GoogleCloudPlatform/lmktfy/blob/master/docs/node.md#node-condition
 type Minion struct {
 	TypeMeta `json:",inline"`
 	// DEPRECATED: Use Status.Addresses instead.
@@ -979,9 +979,9 @@ type MinionList struct {
 
 type FinalizerName string
 
-// These are internal finalizer values to Kubernetes, must be qualified name unless defined here
+// These are internal finalizer values to LMKTFY, must be qualified name unless defined here
 const (
-	FinalizerKubernetes FinalizerName = "kubernetes"
+	FinalizerLMKTFY FinalizerName = "lmktfy"
 )
 
 // NamespaceSpec describes the attributes on a Namespace
@@ -1009,7 +1009,7 @@ const (
 // A namespace provides a scope for Names.
 // Use of multiple namespaces is optional.
 //
-// https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/namespaces.md
+// https://github.com/GoogleCloudPlatform/lmktfy/blob/master/docs/namespaces.md
 type Namespace struct {
 	TypeMeta `json:",inline"`
 
@@ -1223,7 +1223,7 @@ type ObjectReference struct {
 	ID              string    `json:"name,omitempty" description:"id of the referent"`
 	UID             types.UID `json:"uid,omitempty" description:"uid of the referent"`
 	APIVersion      string    `json:"apiVersion,omitempty" description:"API version of the referent"`
-	ResourceVersion string    `json:"resourceVersion,omitempty" description:"specific resourceVersion to which this reference is made, if any: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"`
+	ResourceVersion string    `json:"resourceVersion,omitempty" description:"specific resourceVersion to which this reference is made, if any: https://github.com/GoogleCloudPlatform/lmktfy/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"`
 
 	// Optional. If referring to a piece of an object instead of an entire object, this string
 	// should contain information to identify the sub-object. For example, if the object
@@ -1239,7 +1239,7 @@ type ObjectReference struct {
 // Event is a report of an event somewhere in the cluster.
 // TODO: Decide whether to store these separately or with the object they apply to.
 //
-// https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/pod-states.md#events
+// https://github.com/GoogleCloudPlatform/lmktfy/blob/master/docs/pod-states.md#events
 type Event struct {
 	TypeMeta `json:",inline"`
 
@@ -1296,7 +1296,7 @@ type EventList struct {
 
 // ContainerManifest corresponds to the Container Manifest format, documented at:
 // https://developers.google.com/compute/docs/containers/container_vms#container_manifest
-// This is used as the representation of Kubernetes workloads.
+// This is used as the representation of LMKTFY workloads.
 // DEPRECATED: Replaced with Pod
 type ContainerManifest struct {
 	// Required: This must be a supported version string, such as "v1beta1".
@@ -1319,7 +1319,7 @@ type ContainerManifest struct {
 	HostNetwork bool `json:"hostNetwork,omitempty" description:"host networking requested for this pod"`
 }
 
-// ContainerManifestList is used to communicate container manifests to kubelet.
+// ContainerManifestList is used to communicate container manifests to lmktfylet.
 // DEPRECATED: Replaced with PodList
 type ContainerManifestList struct {
 	TypeMeta `json:",inline"`
@@ -1334,11 +1334,11 @@ type DNSPolicy string
 const (
 	// DNSClusterFirst indicates that the pod should use cluster DNS
 	// first, if it is available, then fall back on the default (as
-	// determined by kubelet) DNS settings.
+	// determined by lmktfylet) DNS settings.
 	DNSClusterFirst DNSPolicy = "ClusterFirst"
 
 	// DNSDefault indicates that the pod should use the default (as
-	// determined by kubelet) DNS settings.
+	// determined by lmktfylet) DNS settings.
 	DNSDefault DNSPolicy = "Default"
 )
 
@@ -1411,7 +1411,7 @@ type LimitRangeList struct {
 	Items []LimitRange `json:"items" description:"items is a list of LimitRange objects"`
 }
 
-// The following identify resource constants for Kubernetes object types
+// The following identify resource constants for LMKTFY object types
 const (
 	// Pods, number
 	ResourcePods ResourceName = "pods"
@@ -1472,7 +1472,7 @@ type NFSVolumeSource struct {
 // Secret holds secret data of a certain type.  The total bytes of the values in
 // the Data field must be less than MaxSecretSize bytes.
 //
-// https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/design/secrets.md
+// https://github.com/GoogleCloudPlatform/lmktfy/blob/master/docs/design/secrets.md
 type Secret struct {
 	TypeMeta `json:",inline"`
 

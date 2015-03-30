@@ -16,11 +16,11 @@
 
 # A library of helper functions and constant for the local config.
 
-# Use the config file specified in $KUBE_CONFIG_FILE, or default to
+# Use the config file specified in $LMKTFY_CONFIG_FILE, or default to
 # config-default.sh.
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
-source "${KUBE_ROOT}/cluster/gke/${KUBE_CONFIG_FILE:-config-default.sh}"
+LMKTFY_ROOT=$(dirname "${BASH_SOURCE}")/../..
+source "${LMKTFY_ROOT}/cluster/gke/${LMKTFY_CONFIG_FILE:-config-default.sh}"
 
 # Perform preparations required to run e2e tests
 #
@@ -62,7 +62,7 @@ function detect-project() {
 # Execute prior to running tests to build a release if required for env.
 function test-build-release() {
   echo "... in test-build-release()" >&2
-  # We currently use the Kubernetes version that GKE supports (not testing
+  # We currently use the LMKTFY version that GKE supports (not testing
   # bleeding-edge builds).
 }
 
@@ -76,7 +76,7 @@ function verify-prereqs() {
   }
 }
 
-# Instantiate a kubernetes cluster
+# Instantiate a lmktfy cluster
 #
 # Assumed vars:
 #   GCLOUD
@@ -84,8 +84,8 @@ function verify-prereqs() {
 #   ZONE
 #   CLUSTER_API_VERSION (optional)
 #   NUM_MINIONS
-function kube-up() {
-  echo "... in kube-up()" >&2
+function lmktfy-up() {
+  echo "... in lmktfy-up()" >&2
   detect-project >&2
 
   # Make the specified network if we need to.
@@ -119,7 +119,7 @@ function kube-up() {
 }
 
 # Execute prior to running tests to initialize required structure. This is
-# called from hack/e2e-go only when running -up (it is run after kube-up, so
+# called from hack/e2e-go only when running -up (it is run after lmktfy-up, so
 # the cluster already exists at this point).
 #
 # Assumed vars:
@@ -133,7 +133,7 @@ function test-setup() {
   detect-project >&2
 
   # At this point, CLUSTER_NAME should have been used, so its value is final.
-  MINION_TAG="k8s-${CLUSTER_NAME}-node"
+  MINION_TAG="lmktfy-${CLUSTER_NAME}-node"
 
   # Open up port 80 & 8080 so common containers on minions can be reached.
   # TODO(mbforbes): Is adding ${USER} necessary, and sufficient, to avoid
@@ -152,15 +152,15 @@ function test-setup() {
 #  ZONE
 #  CLUSTER_NAME
 # Vars set:
-#   KUBE_USER
-#   KUBE_PASSWORD
+#   LMKTFY_USER
+#   LMKTFY_PASSWORD
 function get-password() {
   echo "... in get-password()" >&2
   detect-project >&2
-  KUBE_USER=$("${GCLOUD}" preview container clusters describe \
+  LMKTFY_USER=$("${GCLOUD}" preview container clusters describe \
     --project="${PROJECT}" --zone="${ZONE}" "${CLUSTER_NAME}" \
     | grep user | cut -f 4 -d ' ')
-  KUBE_PASSWORD=$("${GCLOUD}" preview container clusters describe \
+  LMKTFY_PASSWORD=$("${GCLOUD}" preview container clusters describe \
     --project="${PROJECT}" --zone="${ZONE}" "${CLUSTER_NAME}" \
     | grep password | cut -f 4 -d ' ')
 }
@@ -171,13 +171,13 @@ function get-password() {
 #   ZONE
 #   CLUSTER_NAME
 # Vars set:
-#   KUBE_MASTER
-#   KUBE_MASTER_IP
+#   LMKTFY_MASTER
+#   LMKTFY_MASTER_IP
 function detect-master() {
   echo "... in detect-master()" >&2
   detect-project >&2
-  KUBE_MASTER="k8s-${CLUSTER_NAME}-master"
-  KUBE_MASTER_IP=$("${GCLOUD}" preview container clusters describe \
+  LMKTFY_MASTER="lmktfy-${CLUSTER_NAME}-master"
+  LMKTFY_MASTER_IP=$("${GCLOUD}" preview container clusters describe \
     --project="${PROJECT}" --zone="${ZONE}" "${CLUSTER_NAME}" \
     | grep endpoint | cut -f 2 -d ' ')
 }
@@ -202,7 +202,7 @@ function detect-minion-names {
   export MINION_NAMES=""
   count=$("${GCLOUD}" preview container clusters describe --project="${PROJECT}" --zone="${ZONE}" "${CLUSTER_NAME}" | grep numNodes | cut -f 2 -d ' ')
   for x in $(seq 1 $count); do
-    export MINION_NAMES="${MINION_NAMES} k8s-${CLUSTER_NAME}-node-${x} ";
+    export MINION_NAMES="${MINION_NAMES} lmktfy-${CLUSTER_NAME}-node-${x} ";
   done
   MINION_NAMES=(${MINION_NAMES})
   echo "MINION_NAMES=${MINION_NAMES[*]}"
@@ -223,32 +223,32 @@ function ssh-to-node() {
     --zone="${ZONE}" "${node}" --command "${cmd}"
 }
 
-# Restart the kube-proxy on a node ($1)
-function restart-kube-proxy() {
-  echo "... in restart-kube-proxy()"  >&2
-  ssh-to-node "$1" "sudo /etc/init.d/kube-proxy restart"
+# Restart the lmktfy-proxy on a node ($1)
+function restart-lmktfy-proxy() {
+  echo "... in restart-lmktfy-proxy()"  >&2
+  ssh-to-node "$1" "sudo /etc/init.d/lmktfy-proxy restart"
 }
 
-# Restart the kube-proxy on master ($1)
+# Restart the lmktfy-proxy on master ($1)
 function restart-apiserver() {
-  echo "... in restart-kube-apiserver()"  >&2
-  ssh-to-node "$1" "sudo /etc/init.d/kube-apiserver restart"
+  echo "... in restart-lmktfy-apiserver()"  >&2
+  ssh-to-node "$1" "sudo /etc/init.d/lmktfy-apiserver restart"
 }
 
 # Execute after running tests to perform any required clean-up.  This is called
-# from hack/e2e-test.sh. This calls kube-down, so the cluster still exists when
+# from hack/e2e-test.sh. This calls lmktfy-down, so the cluster still exists when
 # this is called.
 #
 # Assumed vars:
 #   CLUSTER_NAME
 #   GCLOUD
-#   KUBE_ROOT
+#   LMKTFY_ROOT
 function test-teardown() {
   echo "... in test-teardown()" >&2
 
   detect-project >&2
   # At this point, CLUSTER_NAME should have been used, so its value is final.
-  MINION_TAG="k8s-${CLUSTER_NAME}-node"
+  MINION_TAG="lmktfy-${CLUSTER_NAME}-node"
 
   # First, remove anything we did with test-setup (currently, the firewall).
   # NOTE: Keep in sync with name above in test-setup.
@@ -256,7 +256,7 @@ function test-teardown() {
     --project="${PROJECT}" || true
 
   # Then actually turn down the cluster.
-  "${KUBE_ROOT}/cluster/kube-down.sh"
+  "${LMKTFY_ROOT}/cluster/lmktfy-down.sh"
 }
 
 # Actually take down the cluster. This is called from test-teardown.
@@ -265,8 +265,8 @@ function test-teardown() {
 #  GCLOUD
 #  ZONE
 #  CLUSTER_NAME
-function kube-down() {
-  echo "... in kube-down()" >&2
+function lmktfy-down() {
+  echo "... in lmktfy-down()" >&2
   detect-project >&2
   "${GCLOUD}" preview container clusters delete --project="${PROJECT}" \
     --zone="${ZONE}" "${CLUSTER_NAME}"

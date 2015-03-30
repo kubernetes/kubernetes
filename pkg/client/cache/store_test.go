@@ -19,7 +19,7 @@ package cache
 import (
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/util"
 )
 
 // Test public interface

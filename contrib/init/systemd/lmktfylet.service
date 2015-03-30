@@ -1,0 +1,23 @@
+[Unit]
+Description=LMKTFYrnetes LMKTFYlet Server
+Documentation=https://github.com/GoogleCloudPlatform/lmktfyrnetes
+After=docker.service cadvisor.service
+Requires=docker.service
+
+[Service]
+WorkingDirectory=/var/lib/lmktfylet
+EnvironmentFile=-/etc/lmktfyrnetes/config
+EnvironmentFile=-/etc/lmktfyrnetes/lmktfylet
+ExecStart=/usr/bin/lmktfylet \
+	    $LMKTFY_LOGTOSTDERR \
+	    $LMKTFY_LOG_LEVEL \
+	    $LMKTFYLET_API_SERVER \
+	    $LMKTFYLET_ADDRESS \
+	    $LMKTFYLET_PORT \
+	    $LMKTFYLET_HOSTNAME \
+	    $LMKTFY_ALLOW_PRIV \
+	    $LMKTFYLET_ARGS
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

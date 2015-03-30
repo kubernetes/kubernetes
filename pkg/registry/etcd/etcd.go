@@ -19,16 +19,16 @@ package etcd
 import (
 	"fmt"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
-	etcderr "github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors/etcd"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/endpoint"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/pod"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api/errors"
+	etcderr "github.com/GoogleCloudPlatform/lmktfy/pkg/api/errors/etcd"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/fields"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/labels"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/registry/endpoint"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/registry/pod"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/runtime"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/tools"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/watch"
 
 	"github.com/golang/glog"
 )
@@ -41,7 +41,7 @@ const (
 )
 
 // TODO: Need to add a reconciler loop that makes sure that things in pods are reflected into
-//       kubelet (and vice versa)
+//       lmktfylet (and vice versa)
 
 // Registry implements BindingRegistry, ControllerRegistry, EndpointRegistry,
 // MinionRegistry, PodRegistry and ServiceRegistry, backed by etcd.

@@ -1,0 +1,18 @@
+[Unit]
+Description=LMKTFYrnetes Scheduler Plugin
+Documentation=https://github.com/GoogleCloudPlatform/lmktfyrnetes
+
+[Service]
+EnvironmentFile=-/etc/lmktfyrnetes/config
+EnvironmentFile=-/etc/lmktfyrnetes/scheduler
+User=lmktfy
+ExecStart=/usr/bin/lmktfy-scheduler \
+	    $LMKTFY_LOGTOSTDERR \
+	    $LMKTFY_LOG_LEVEL \
+	    $LMKTFY_MASTER \
+	    $LMKTFY_SCHEDULER_ARGS
+Restart=on-failure
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target

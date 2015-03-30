@@ -1,0 +1,24 @@
+[Unit]
+Description=LMKTFYrnetes API Server
+Documentation=https://github.com/GoogleCloudPlatform/lmktfyrnetes
+
+[Service]
+EnvironmentFile=-/etc/lmktfyrnetes/config
+EnvironmentFile=-/etc/lmktfyrnetes/apiserver
+User=lmktfy
+ExecStart=/usr/bin/lmktfy-apiserver \
+	    $LMKTFY_LOGTOSTDERR \
+	    $LMKTFY_LOG_LEVEL \
+	    $LMKTFY_ETCD_SERVERS \
+	    $LMKTFY_API_ADDRESS \
+	    $LMKTFY_API_PORT \
+	    $LMKTFYLET_PORT \
+	    $LMKTFY_ALLOW_PRIV \
+	    $LMKTFY_SERVICE_ADDRESSES \
+	    $LMKTFY_ADMISSION_CONTROL \
+	    $LMKTFY_API_ARGS
+Restart=on-failure
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target

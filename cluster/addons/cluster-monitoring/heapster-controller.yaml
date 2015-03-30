@@ -30,7 +30,7 @@ desiredState:
     labels: 
       name: heapster
       uses: monitoring-influxdb
-      kubernetes.io/cluster-service: "true"
+      lmktfy.io/cluster-service: "true"
 labels: 
   name: heapster
-  kubernetes.io/cluster-service: "true"
+  lmktfy.io/cluster-service: "true"

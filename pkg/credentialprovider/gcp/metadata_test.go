@@ -27,11 +27,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/credentialprovider"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/credentialprovider"
 )
 
 func TestDockerKeyringFromGoogleDockerConfigMetadata(t *testing.T) {
-	registryUrl := "hello.kubernetes.io"
+	registryUrl := "hello.lmktfy.io"
 	email := "foo@bar.baz"
 	username := "foo"
 	password := "bar"
@@ -93,7 +93,7 @@ func TestDockerKeyringFromGoogleDockerConfigMetadata(t *testing.T) {
 }
 
 func TestDockerKeyringFromGoogleDockerConfigMetadataUrl(t *testing.T) {
-	registryUrl := "hello.kubernetes.io"
+	registryUrl := "hello.lmktfy.io"
 	email := "foo@bar.baz"
 	username := "foo"
 	password := "bar"

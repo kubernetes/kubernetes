@@ -4,4 +4,4 @@ path:
   plugins: /data/plugins
   work: /data/work
 cluster:
-  name: kubernetes_logging
+  name: lmktfy_logging

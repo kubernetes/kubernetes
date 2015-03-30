@@ -13,7 +13,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-var k8sApp = angular.module('k8s', ['ngRoute']);
+var lmktfyApp = angular.module('lmktfy', ['ngRoute']);
 
 function PodController() {}
 
@@ -37,7 +37,7 @@ PodController.prototype.handleError = function(data, status, headers, config) {
 	this.scope_.loading = false;
 };
 
-k8sApp.controller('PodCtrl', function ($scope, $http, $routeParams) {
+lmktfyApp.controller('PodCtrl', function ($scope, $http, $routeParams) {
 	$scope.controller = new PodController();
 	$scope.controller.http = $http;
         $scope.controller.scope = $scope;
@@ -201,7 +201,7 @@ GroupController.prototype.handleError = function(data, status, headers, config) 
 	this.scope.loading = false;
 };
 
-k8sApp.controller('GroupCtrl', function ($scope, $http, $route, $routeParams) {
+lmktfyApp.controller('GroupCtrl', function ($scope, $http, $route, $routeParams) {
 	$scope.controller = new GroupController();
 	$scope.controller.http = $http;
         $scope.controller.scope = $scope;
@@ -215,7 +215,7 @@ k8sApp.controller('GroupCtrl', function ($scope, $http, $route, $routeParams) {
     });
 
 
-k8sApp.config(['$routeProvider',
+lmktfyApp.config(['$routeProvider',
 		function($routeProvider) {
 			  $routeProvider.
 			      when('/groups/:grouping*?\/selector/:selector*?', {

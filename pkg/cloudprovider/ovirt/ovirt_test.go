@@ -21,7 +21,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/cloudprovider"
 )
 
 func TestOVirtCloudConfiguration(t *testing.T) {

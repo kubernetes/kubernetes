@@ -15,14 +15,14 @@ limitations under the License.
 
 -->
 # Live update example
-This example demonstrates the usage of Kubernetes to perform a live update on a running group of pods.
+This example demonstrates the usage of LMKTFY to perform a live update on a running group of pods.
 
 ### Step Zero: Prerequisites
 
-This example assumes that you have forked the repository and [turned up a Kubernetes cluster](https://github.com/GoogleCloudPlatform/kubernetes-new#contents):
+This example assumes that you have forked the repository and [turned up a LMKTFY cluster](https://github.com/GoogleCloudPlatform/lmktfy-new#contents):
 
 ```bash
-$ cd kubernetes
+$ cd lmktfy
 $ hack/dev-build-and-up.sh
 ```
 
@@ -31,8 +31,8 @@ $ hack/dev-build-and-up.sh
 You can use bash job control to run this in the background (note that you must use the default port -- 8001 -- for the following demonstration to work properly).  This can sometimes spew to the output so you could also run it in a different terminal.
 
 ```
-$ ./cluster/kubectl.sh proxy --www=examples/update-demo/local/ &
-+ ./cluster/kubectl.sh proxy --www=examples/update-demo/local/
+$ ./cluster/lmktfyctl.sh proxy --www=examples/update-demo/local/ &
++ ./cluster/lmktfyctl.sh proxy --www=examples/update-demo/local/
 I0218 15:18:31.623279   67480 proxy.go:36] Starting to serve on localhost:8001
 ```
 
@@ -42,7 +42,7 @@ Now visit the the [demo website](http://localhost:8001/static).  You won't see a
 Now we will turn up two replicas of an image.  They all serve on internal port 80.
 
 ```bash
-$ ./cluster/kubectl.sh create -f examples/update-demo/v1beta1/nautilus-rc.yaml
+$ ./cluster/lmktfyctl.sh create -f examples/update-demo/v1beta1/nautilus-rc.yaml
 ```
 
 After pulling the image from the Docker Hub to your worker nodes (which may take a minute or so) you'll see a couple of squares in the UI detailing the pods that are running along with the image that they are serving up.  A cute little nautilus.
@@ -52,7 +52,7 @@ After pulling the image from the Docker Hub to your worker nodes (which may take
 Now we will increase the number of replicas from two to four:
 
 ```bash
-$ ./cluster/kubectl.sh resize rc update-demo-nautilus --replicas=4
+$ ./cluster/lmktfyctl.sh resize rc update-demo-nautilus --replicas=4
 ```
 
 If you go back to the [demo website](http://localhost:8001/static/index.html) you should eventually see four boxes, one for each pod.
@@ -61,11 +61,11 @@ If you go back to the [demo website](http://localhost:8001/static/index.html) yo
 We will now update the docker image to serve a different image by doing a rolling update to a new Docker image.
 
 ```bash
-$ ./cluster/kubectl.sh rollingupdate update-demo-nautilus --update-period=10s -f examples/update-demo/v1beta1/kitten-rc.yaml
+$ ./cluster/lmktfyctl.sh rollingupdate update-demo-nautilus --update-period=10s -f examples/update-demo/v1beta1/kitten-rc.yaml
 ```
-The rollingupdate command in kubectl will do 2 things:
+The rollingupdate command in lmktfyctl will do 2 things:
 
-1. Create a new replication controller with a pod template that uses the new image (`kubernetes/update-demo:kitten`)
+1. Create a new replication controller with a pod template that uses the new image (`lmktfy/update-demo:kitten`)
 2. Resize the old and new replication controllers until the new controller replaces the old. This will kill the current pods one at a time, spinnning up new ones to replace them.
 
 Watch the [demo website](http://localhost:8001/static/index.html), it will update one pod every 10 seconds until all of the pods have the new image.
@@ -73,18 +73,18 @@ Watch the [demo website](http://localhost:8001/static/index.html), it will updat
 ### Step Five: Bring down the pods
 
 ```bash
-$ ./cluster/kubectl.sh stop rc update-demo-kitten
+$ ./cluster/lmktfyctl.sh stop rc update-demo-kitten
 ```
 
 This will first 'stop' the replication controller by turning the target number of replicas to 0.  It'll then delete that controller.
 
 ### Step Six: Cleanup
 
-To turn down a Kubernetes cluster:
+To turn down a LMKTFY cluster:
 
 ```bash
-$ cd ../..  # Up to kubernetes.
-$ cluster/kube-down.sh
+$ cd ../..  # Up to lmktfy.
+$ cluster/lmktfy-down.sh
 ```
 
 Kill the proxy running in the background:
@@ -92,9 +92,9 @@ After you are done running this demo make sure to kill it:
 
 ```bash
 $ jobs
-[1]+  Running                 ./cluster/kubectl.sh proxy --www=local/ &
+[1]+  Running                 ./cluster/lmktfyctl.sh proxy --www=local/ &
 $ kill %1
-[1]+  Terminated: 15          ./cluster/kubectl.sh proxy --www=local/
+[1]+  Terminated: 15          ./cluster/lmktfyctl.sh proxy --www=local/
 ```
 
 ### Updating the Docker images

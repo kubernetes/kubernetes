@@ -1,18 +1,18 @@
 ## OpenShift Origin example
 
-This example shows how to run OpenShift Origin as a pod on an existing Kubernetes cluster.
+This example shows how to run OpenShift Origin as a pod on an existing LMKTFY cluster.
 
 This example demonstrates usage of a pod with a secret volume mount.
 
 ### Step 0: Prerequisites
 
-This example assumes that you have a basic understanding of Kubernetes and that you have forked the repository and [turned up a Kubernetes cluster](https://github.com/GoogleCloudPlatform/kubernetes#contents):
+This example assumes that you have a basic understanding of LMKTFY and that you have forked the repository and [turned up a LMKTFY cluster](https://github.com/GoogleCloudPlatform/lmktfy#contents):
 
-This example has been tested against the **gce** and **vagrant** based KUBERNETES_PROVIDER.
+This example has been tested against the **gce** and **vagrant** based LMKTFYRNETES_PROVIDER.
 
 ```shell
-$ cd kubernetes
-$ export KUBERNETES_PROVIDER=gce
+$ cd lmktfy
+$ export LMKTFYRNETES_PROVIDER=gce
 $ hack/dev-build-and-up.sh
 ```
 
@@ -20,25 +20,25 @@ $ hack/dev-build-and-up.sh
 
 The demonstration will require the following resources:
 
-1. A Kubernetes Secret that contains information needed to securely communicate to your Kubernetes master as an administrator
-2. A Kubernetes Pod that contains information for how to run OpenShift Origin that consumes this Secret securely
-3. A Kubernetes Service that exposes OpenShift Origin API via an external load balancer
-4. A Kubernetes Service that exposes OpenShift Origin UI via an external load balancer
+1. A LMKTFY Secret that contains information needed to securely communicate to your LMKTFY master as an administrator
+2. A LMKTFY Pod that contains information for how to run OpenShift Origin that consumes this Secret securely
+3. A LMKTFY Service that exposes OpenShift Origin API via an external load balancer
+4. A LMKTFY Service that exposes OpenShift Origin UI via an external load balancer
 
-To generate these resources, we will run a script that introspects your configured KUBERNETES_PROVIDER:
+To generate these resources, we will run a script that introspects your configured LMKTFYRNETES_PROVIDER:
 
 ```shell
 $ examples/openshift-origin/resource-generator.sh
 ```
-A Kubernetes Secret was generated that contains the following data:
+A LMKTFY Secret was generated that contains the following data:
 
-1. kubeconfig: a valid kubeconfig file that is used by OpenShift Origin to communicate to the master
-2. kube-ca: a certificate authority for the Kubernetes master
-3. kube-auth-path: a Kubernetes authorization file
-4. kube-cert: a Kubernetes certificate
-5. kube-key: a Kubernetes key file
+1. lmktfyconfig: a valid lmktfyconfig file that is used by OpenShift Origin to communicate to the master
+2. lmktfy-ca: a certificate authority for the LMKTFY master
+3. lmktfy-auth-path: a LMKTFY authorization file
+4. lmktfy-cert: a LMKTFY certificate
+5. lmktfy-key: a LMKTFY key file
 
-As required by a Kubernetes secret, each piece of data is base64 encoded - with no line wraps.
+As required by a LMKTFY secret, each piece of data is base64 encoded - with no line wraps.
 
 You can view the file by doing:
 
@@ -46,11 +46,11 @@ You can view the file by doing:
 $ cat examples/openshift-origin/secret.json
 ```
 
-Caution:  This file contains all of the required information to operate as a Kubernetes admin on your cluster, so only share this file with trusted parties.
+Caution:  This file contains all of the required information to operate as a LMKTFY admin on your cluster, so only share this file with trusted parties.
 
-A Kubernetes Pod file was generated that can run OpenShift Origin on your cluster.
+A LMKTFY Pod file was generated that can run OpenShift Origin on your cluster.
 
-The OpenShift Origin pod file has a volume mount that references the Kubernetes secret we created to know how to work with the underlying Kubernetes provider.
+The OpenShift Origin pod file has a volume mount that references the LMKTFY secret we created to know how to work with the underlying LMKTFY provider.
 
 You can view the file by doing:
 
@@ -58,22 +58,22 @@ You can view the file by doing:
 $ cat examples/openshift-origin/pod.json
 ```
 
-Finally, a Kubernetes service was generated for the UI and the API and available via an external load balancer:
+Finally, a LMKTFY service was generated for the UI and the API and available via an external load balancer:
 
 ``shell
 $ cat examples/openshift-origin
 
-### Step 2: Create the secret in Kubernetes
+### Step 2: Create the secret in LMKTFY
 
-To provision the secret on Kubernetes:
+To provision the secret on LMKTFY:
 
 ```shell
-$ cluster/kubectl.sh create -f examples/openshift-origin/secret.json
+$ cluster/lmktfyctl.sh create -f examples/openshift-origin/secret.json
 ```
 
 You should see your secret resource was created by listing:
 ```shell
-$ cluster/kubectl.sh get secrets
+$ cluster/lmktfyctl.sh get secrets
 ```
 
 ### Step 3: Provisioning OpenShift Origin
@@ -81,7 +81,7 @@ $ cluster/kubectl.sh get secrets
 To create the OpenShift Origin pod:
 
 ```shell
-$ cluster/kubectl.sh create -f examples/openshift-origin/pod.json
+$ cluster/lmktfyctl.sh create -f examples/openshift-origin/pod.json
 ```
 
 ### Step 4: Provisioning OpenShift Origin Services
@@ -89,8 +89,8 @@ $ cluster/kubectl.sh create -f examples/openshift-origin/pod.json
 To create the OpenShift Origin Services that expose the API and UI:
 
 ```shell
-$ cluster/kubectl.sh create -f examples/openshift-origin/ui-service.json
-$ cluster/kubectl.sh create -f examples/openshift-origin/api-service.json
+$ cluster/lmktfyctl.sh create -f examples/openshift-origin/ui-service.json
+$ cluster/lmktfyctl.sh create -f examples/openshift-origin/api-service.json
 ```
 
 ### Step 5: Open Firewall Ports
@@ -102,8 +102,8 @@ $ gcloud compute instances list
 
 FIND THE MINION NAME PREFIX
 
-$ gcloud compute firewall-rules create openshift-origin-node-8444 --allow tcp:8444 --target-tags kubernetes-minion-prq8
-$ gcloud compute firewall-rules create openshift-origin-node-8443 --allow tcp:8443 --target-tags kubernetes-minion-prq8
+$ gcloud compute firewall-rules create openshift-origin-node-8444 --allow tcp:8444 --target-tags lmktfy-minion-prq8
+$ gcloud compute firewall-rules create openshift-origin-node-8443 --allow tcp:8443 --target-tags lmktfy-minion-prq8
 ```
 ### Step 4: Try out OpenShift Origin
 

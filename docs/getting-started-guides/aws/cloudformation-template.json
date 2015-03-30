@@ -1,6 +1,6 @@
 {
   "AWSTemplateFormatVersion": "2010-09-09",
-  "Description": "Kubernetes 0.11.0 on EC2",
+  "Description": "LMKTFYrnetes 0.11.0 on EC2",
   "Mappings": {
       "RegionMap": {
           "eu-central-1": {"AMI": "ami-488ebe55"},
@@ -84,11 +84,11 @@
      "UseEC2Classic": {"Fn::Equals": [{"Ref": "VpcId"}, ""]}
   },
   "Resources": {
-    "KubernetesSecurityGroup": {
+    "LMKTFYrnetesSecurityGroup": {
       "Type": "AWS::EC2::SecurityGroup",
       "Properties": {
         "VpcId": {"Fn::If": ["UseEC2Classic", {"Ref": "AWS::NoValue"}, {"Ref": "VpcId"}]},
-        "GroupDescription": "Kubernetes SecurityGroup",
+        "GroupDescription": "LMKTFYrnetes SecurityGroup",
         "SecurityGroupIngress": [
           {
             "IpProtocol": "tcp",
@@ -99,31 +99,31 @@
         ]
       }
     },
-    "KubernetesIngress": {
+    "LMKTFYrnetesIngress": {
       "Type": "AWS::EC2::SecurityGroupIngress",
       "Properties": {
-        "GroupId": {"Fn::GetAtt": ["KubernetesSecurityGroup", "GroupId"]},
+        "GroupId": {"Fn::GetAtt": ["LMKTFYrnetesSecurityGroup", "GroupId"]},
         "IpProtocol": "tcp",
         "FromPort": "1",
         "ToPort": "65535",
         "SourceSecurityGroupId": {
-          "Fn::GetAtt" : [ "KubernetesSecurityGroup", "GroupId" ]
+          "Fn::GetAtt" : [ "LMKTFYrnetesSecurityGroup", "GroupId" ]
         }
       }
     },
-    "KubernetesIngressUDP": {
+    "LMKTFYrnetesIngressUDP": {
       "Type": "AWS::EC2::SecurityGroupIngress",
       "Properties": {
-        "GroupId": {"Fn::GetAtt": ["KubernetesSecurityGroup", "GroupId"]},
+        "GroupId": {"Fn::GetAtt": ["LMKTFYrnetesSecurityGroup", "GroupId"]},
         "IpProtocol": "udp",
         "FromPort": "1",
         "ToPort": "65535",
         "SourceSecurityGroupId": {
-          "Fn::GetAtt" : [ "KubernetesSecurityGroup", "GroupId" ]
+          "Fn::GetAtt" : [ "LMKTFYrnetesSecurityGroup", "GroupId" ]
         }
       }
     },
-    "KubernetesMasterInstance": {
+    "LMKTFYrnetesMasterInstance": {
       "Type": "AWS::EC2::Instance",
       "Properties": {
         "SubnetId": {"Fn::If": ["UseEC2Classic", {"Ref": "AWS::NoValue"}, {"Ref": "SubnetId"}]},
@@ -132,13 +132,13 @@
         "KeyName": {"Ref": "KeyPair"},
         "SecurityGroups": [{"Fn::If": [
           "UseEC2Classic",
-          {"Ref": "KubernetesSecurityGroup"},
+          {"Ref": "LMKTFYrnetesSecurityGroup"},
           {"Ref": "AWS::NoValue"}]
         }],
         "SecurityGroupIds": [{"Fn::If": [
           "UseEC2Classic",
           {"Ref": "AWS::NoValue"},
-          {"Fn::GetAtt": ["KubernetesSecurityGroup", "GroupId"]}]
+          {"Fn::GetAtt": ["LMKTFYrnetesSecurityGroup", "GroupId"]}]
         }],
         "UserData": { "Fn::Base64": {"Fn::Join" : ["", [
           "#cloud-config\n\n",
@@ -164,7 +164,7 @@
           "        After=network-online.target\n\n",
           "        [Service]\n",
           "        ExecStartPre=/usr/bin/mkdir -p /opt/bin\n",
-          "        ExecStartPre=/usr/bin/wget -N -P /opt/bin https://storage.googleapis.com/k8s/setup-network-environment\n",
+          "        ExecStartPre=/usr/bin/wget -N -P /opt/bin https://storage.googleapis.com/lmktfy/setup-network-environment\n",
           "        ExecStartPre=/usr/bin/chmod +x /opt/bin/setup-network-environment\n",
           "        ExecStart=/opt/bin/setup-network-environment\n",
           "        RemainAfterExit=yes\n",
@@ -222,22 +222,22 @@
           "        [Service]\n",
           "        Type=notify\n",
           "        ExecStartPre=-/usr/bin/mkdir -p /opt/bin\n",
-          "        ExecStartPre=/usr/bin/wget -N -P /opt/bin https://storage.googleapis.com/k8s/flanneld\n",
+          "        ExecStartPre=/usr/bin/wget -N -P /opt/bin https://storage.googleapis.com/lmktfy/flanneld\n",
           "        ExecStartPre=/usr/bin/chmod +x /opt/bin/flanneld\n",
           "        ExecStartPre=-/usr/bin/etcdctl mk /coreos.com/network/config '{\"Network\":\"10.244.0.0/16\"}'\n",
           "        ExecStart=/opt/bin/flanneld\n",
-          "    - name: kube-apiserver.service\n",
+          "    - name: lmktfy-apiserver.service\n",
           "      command: start\n",
           "      content: |\n",
           "        [Unit]\n",
-          "        Description=Kubernetes API Server\n",
-          "        Documentation=https://github.com/GoogleCloudPlatform/kubernetes\n",
+          "        Description=LMKTFYrnetes API Server\n",
+          "        Documentation=https://github.com/GoogleCloudPlatform/lmktfyrnetes\n",
           "        Requires=etcd.service\n",
           "        After=etcd.service\n\n",
           "        [Service]\n",
-          "        ExecStartPre=/usr/bin/wget -N -P /opt/bin https://storage.googleapis.com/kubernetes-release/release/v0.11.0/bin/linux/amd64/kube-apiserver\n",
-          "        ExecStartPre=/usr/bin/chmod +x /opt/bin/kube-apiserver\n",
-          "        ExecStart=/opt/bin/kube-apiserver \\\n",
+          "        ExecStartPre=/usr/bin/wget -N -P /opt/bin https://storage.googleapis.com/lmktfyrnetes-release/release/v0.11.0/bin/linux/amd64/lmktfy-apiserver\n",
+          "        ExecStartPre=/usr/bin/chmod +x /opt/bin/lmktfy-apiserver\n",
+          "        ExecStart=/opt/bin/lmktfy-apiserver \\\n",
           "        --address=0.0.0.0 \\\n",
           "        --port=8080 \\\n",
           "        --portal_net=10.100.0.0/16 \\\n",
@@ -246,50 +246,50 @@
           "        --logtostderr=true\n",
           "        Restart=always\n",
           "        RestartSec=10\n",
-          "    - name: kube-controller-manager.service\n",
+          "    - name: lmktfy-controller-manager.service\n",
           "      command: start\n",
           "      content: |\n",
           "        [Unit]\n",
-          "        Description=Kubernetes Controller Manager\n",
-          "        Documentation=https://github.com/GoogleCloudPlatform/kubernetes\n",
-          "        Requires=kube-apiserver.service\n",
-          "        After=kube-apiserver.service\n\n",
+          "        Description=LMKTFYrnetes Controller Manager\n",
+          "        Documentation=https://github.com/GoogleCloudPlatform/lmktfyrnetes\n",
+          "        Requires=lmktfy-apiserver.service\n",
+          "        After=lmktfy-apiserver.service\n\n",
           "        [Service]\n",
-          "        ExecStartPre=/usr/bin/wget -N -P /opt/bin https://storage.googleapis.com/kubernetes-release/release/v0.11.0/bin/linux/amd64/kube-controller-manager\n",
-          "        ExecStartPre=/usr/bin/chmod +x /opt/bin/kube-controller-manager\n",
-          "        ExecStart=/opt/bin/kube-controller-manager \\\n",
+          "        ExecStartPre=/usr/bin/wget -N -P /opt/bin https://storage.googleapis.com/lmktfyrnetes-release/release/v0.11.0/bin/linux/amd64/lmktfy-controller-manager\n",
+          "        ExecStartPre=/usr/bin/chmod +x /opt/bin/lmktfy-controller-manager\n",
+          "        ExecStart=/opt/bin/lmktfy-controller-manager \\\n",
           "        --master=127.0.0.1:8080 \\\n",
           "        --logtostderr=true\n",
           "        Restart=always\n",
           "        RestartSec=10\n",
-          "    - name: kube-scheduler.service\n",
+          "    - name: lmktfy-scheduler.service\n",
           "      command: start\n",
           "      content: |\n",
           "        [Unit]\n",
-          "        Description=Kubernetes Scheduler\n",
-          "        Documentation=https://github.com/GoogleCloudPlatform/kubernetes\n",
-          "        Requires=kube-apiserver.service\n",
-          "        After=kube-apiserver.service\n\n",
+          "        Description=LMKTFYrnetes Scheduler\n",
+          "        Documentation=https://github.com/GoogleCloudPlatform/lmktfyrnetes\n",
+          "        Requires=lmktfy-apiserver.service\n",
+          "        After=lmktfy-apiserver.service\n\n",
           "        [Service]\n",
-          "        ExecStartPre=/usr/bin/wget -N -P /opt/bin https://storage.googleapis.com/kubernetes-release/release/v0.11.0/bin/linux/amd64/kube-scheduler\n",
-          "        ExecStartPre=/usr/bin/chmod +x /opt/bin/kube-scheduler\n",
-          "        ExecStart=/opt/bin/kube-scheduler --master=127.0.0.1:8080\n",
+          "        ExecStartPre=/usr/bin/wget -N -P /opt/bin https://storage.googleapis.com/lmktfyrnetes-release/release/v0.11.0/bin/linux/amd64/lmktfy-scheduler\n",
+          "        ExecStartPre=/usr/bin/chmod +x /opt/bin/lmktfy-scheduler\n",
+          "        ExecStart=/opt/bin/lmktfy-scheduler --master=127.0.0.1:8080\n",
           "        Restart=always\n",
           "        RestartSec=10\n",
-          "    - name: kube-register.service\n",
+          "    - name: lmktfy-register.service\n",
           "      command: start\n",
           "      content: |\n",
           "        [Unit]\n",
-          "        Description=Kubernetes Registration Service\n",
-          "        Documentation=https://github.com/kelseyhightower/kube-register\n",
-          "        Requires=kube-apiserver.service\n",
-          "        After=kube-apiserver.service\n\n",
+          "        Description=LMKTFYrnetes Registration Service\n",
+          "        Documentation=https://github.com/kelseyhightower/lmktfy-register\n",
+          "        Requires=lmktfy-apiserver.service\n",
+          "        After=lmktfy-apiserver.service\n\n",
           "        Requires=fleet.service\n",
           "        After=fleet.service\n\n",
           "        [Service]\n",
-          "        ExecStartPre=/usr/bin/wget -N -P /opt/bin https://storage.googleapis.com/k8s/kube-register\n",
-          "        ExecStartPre=/usr/bin/chmod +x /opt/bin/kube-register\n",
-          "        ExecStart=/opt/bin/kube-register \\\n",
+          "        ExecStartPre=/usr/bin/wget -N -P /opt/bin https://storage.googleapis.com/lmktfy/lmktfy-register\n",
+          "        ExecStartPre=/usr/bin/chmod +x /opt/bin/lmktfy-register\n",
+          "        ExecStart=/opt/bin/lmktfy-register \\\n",
           "        --metadata=role=knode \\\n",
           "        --fleet-endpoint=unix:///var/run/fleet.sock \\\n",
           "        --api-endpoint=http://127.0.0.1:8080\n",
@@ -302,7 +302,7 @@
         }
       }
     },
-    "KubernetesNodeLaunchConfig": {
+    "LMKTFYrnetesNodeLaunchConfig": {
       "Type": "AWS::AutoScaling::LaunchConfiguration",
       "Properties": {
         "ImageId": {"Fn::FindInMap" : ["RegionMap", {"Ref": "AWS::Region" }, "AMI" ]},
@@ -310,14 +310,14 @@
         "KeyName": {"Ref": "KeyPair"},
         "SecurityGroups": [{"Fn::If": [
           "UseEC2Classic",
-          {"Ref": "KubernetesSecurityGroup"},
-          {"Fn::GetAtt": ["KubernetesSecurityGroup", "GroupId"]}]
+          {"Ref": "LMKTFYrnetesSecurityGroup"},
+          {"Fn::GetAtt": ["LMKTFYrnetesSecurityGroup", "GroupId"]}]
         }],
         "UserData": { "Fn::Base64": {"Fn::Join" : ["", [
           "#cloud-config\n\n",
           "coreos:\n",
           "  fleet:\n",
-          "    etcd_servers: http://", {"Fn::GetAtt":["KubernetesMasterInstance" , "PrivateIp"]}, ":4001\n",
+          "    etcd_servers: http://", {"Fn::GetAtt":["LMKTFYrnetesMasterInstance" , "PrivateIp"]}, ":4001\n",
           "    metadata: role=knode\n",
           "  units:\n",
           "    - name: etcd.service\n",
@@ -334,9 +334,9 @@
           "        [Service]\n",
           "        Type=notify\n",
           "        ExecStartPre=-/usr/bin/mkdir -p /opt/bin\n",
-          "        ExecStartPre=/usr/bin/wget -N -P /opt/bin https://storage.googleapis.com/k8s/flanneld\n",
+          "        ExecStartPre=/usr/bin/wget -N -P /opt/bin https://storage.googleapis.com/lmktfy/flanneld\n",
           "        ExecStartPre=/usr/bin/chmod +x /opt/bin/flanneld\n",
-          "        ExecStart=/opt/bin/flanneld -etcd-endpoints http://", {"Fn::GetAtt" :["KubernetesMasterInstance" , "PrivateIp"]}, ":4001\n",
+          "        ExecStart=/opt/bin/flanneld -etcd-endpoints http://", {"Fn::GetAtt" :["LMKTFYrnetesMasterInstance" , "PrivateIp"]}, ":4001\n",
           "    - name: docker.service\n",
           "      command: start\n",
           "      content: |\n",
@@ -361,44 +361,44 @@
           "        After=network-online.target\n\n",
           "        [Service]\n",
           "        ExecStartPre=-/usr/bin/mkdir -p /opt/bin\n",
-          "        ExecStartPre=/usr/bin/wget -N -P /opt/bin https://storage.googleapis.com/k8s/setup-network-environment\n",
+          "        ExecStartPre=/usr/bin/wget -N -P /opt/bin https://storage.googleapis.com/lmktfy/setup-network-environment\n",
           "        ExecStartPre=/usr/bin/chmod +x /opt/bin/setup-network-environment\n",
           "        ExecStart=/opt/bin/setup-network-environment\n",
           "        RemainAfterExit=yes\n",
           "        Type=oneshot\n",
-          "    - name: kube-kubelet.service\n",
+          "    - name: lmktfy-lmktfylet.service\n",
           "      command: start\n",
           "      content: |\n",
           "        [Unit]\n",
-          "        Description=Kubernetes Kubelet\n",
-          "        Documentation=https://github.com/GoogleCloudPlatform/kubernetes\n",
+          "        Description=LMKTFYrnetes LMKTFYlet\n",
+          "        Documentation=https://github.com/GoogleCloudPlatform/lmktfyrnetes\n",
           "        Requires=setup-network-environment.service\n",
           "        After=setup-network-environment.service\n\n",
           "        [Service]\n",
           "        EnvironmentFile=/etc/network-environment\n",
-          "        ExecStartPre=/usr/bin/wget -N -P /opt/bin https://storage.googleapis.com/kubernetes-release/release/v0.11.0/bin/linux/amd64/kubelet\n",
-          "        ExecStartPre=/usr/bin/chmod +x /opt/bin/kubelet\n",
-          "        ExecStart=/opt/bin/kubelet \\\n",
+          "        ExecStartPre=/usr/bin/wget -N -P /opt/bin https://storage.googleapis.com/lmktfyrnetes-release/release/v0.11.0/bin/linux/amd64/lmktfylet\n",
+          "        ExecStartPre=/usr/bin/chmod +x /opt/bin/lmktfylet\n",
+          "        ExecStart=/opt/bin/lmktfylet \\\n",
           "        --address=0.0.0.0 \\\n",
           "        --port=10250 \\\n",
           "        --hostname_override=${DEFAULT_IPV4} \\\n",
-          "        --api_servers=", {"Fn::GetAtt" :["KubernetesMasterInstance" , "PrivateIp"]}, ":8080\\\n",
+          "        --api_servers=", {"Fn::GetAtt" :["LMKTFYrnetesMasterInstance" , "PrivateIp"]}, ":8080\\\n",
           "        --logtostderr=true\n",
           "        Restart=always\n",
           "        RestartSec=10\n",
-          "    - name: kube-proxy.service\n",
+          "    - name: lmktfy-proxy.service\n",
           "      command: start\n",
           "      content: |\n",
           "        [Unit]\n",
-          "        Description=Kubernetes Proxy\n",
-          "        Documentation=https://github.com/GoogleCloudPlatform/kubernetes\n",
+          "        Description=LMKTFYrnetes Proxy\n",
+          "        Documentation=https://github.com/GoogleCloudPlatform/lmktfyrnetes\n",
           "        Requires=setup-network-environment.service\n",
           "        After=setup-network-environment.service\n\n",
           "        [Service]\n",
-          "        ExecStartPre=/usr/bin/wget -N -P /opt/bin https://storage.googleapis.com/kubernetes-release/release/v0.11.0/bin/linux/amd64/kube-proxy\n",
-          "        ExecStartPre=/usr/bin/chmod +x /opt/bin/kube-proxy\n",
-          "        ExecStart=/opt/bin/kube-proxy \\\n",
-          "        --master=http://", {"Fn::GetAtt" :["KubernetesMasterInstance" , "PrivateIp"]}, ":8080\\\n",
+          "        ExecStartPre=/usr/bin/wget -N -P /opt/bin https://storage.googleapis.com/lmktfyrnetes-release/release/v0.11.0/bin/linux/amd64/lmktfy-proxy\n",
+          "        ExecStartPre=/usr/bin/chmod +x /opt/bin/lmktfy-proxy\n",
+          "        ExecStart=/opt/bin/lmktfy-proxy \\\n",
+          "        --master=http://", {"Fn::GetAtt" :["LMKTFYrnetesMasterInstance" , "PrivateIp"]}, ":8080\\\n",
           "        --logtostderr=true\n",
           "        Restart=always\n",
           "        RestartSec=10\n",
@@ -409,12 +409,12 @@
         }
       }
     },
-    "KubernetesAutoScalingGroup": {
+    "LMKTFYrnetesAutoScalingGroup": {
       "Type": "AWS::AutoScaling::AutoScalingGroup",
       "Properties": {
         "AvailabilityZones": {"Fn::If": ["UseEC2Classic", {"Fn::GetAZs": ""}, [{"Ref": "SubnetAZ"}]]},
         "VPCZoneIdentifier": {"Fn::If": ["UseEC2Classic", {"Ref": "AWS::NoValue"}, [{"Ref": "SubnetId"}]]},
-        "LaunchConfigurationName": {"Ref": "KubernetesNodeLaunchConfig"},
+        "LaunchConfigurationName": {"Ref": "LMKTFYrnetesNodeLaunchConfig"},
         "MinSize": "3",
         "MaxSize": "12",
         "DesiredCapacity": {"Ref": "ClusterSize"}
@@ -422,9 +422,9 @@
     }
   },
   "Outputs": {
-    "KubernetesMasterPublicIp": {
-    "Description": "Public Ip of the newly created Kubernetes Master instance",
-      "Value": {"Fn::GetAtt": ["KubernetesMasterInstance" , "PublicIp"]}
+    "LMKTFYrnetesMasterPublicIp": {
+    "Description": "Public Ip of the newly created LMKTFYrnetes Master instance",
+      "Value": {"Fn::GetAtt": ["LMKTFYrnetesMasterInstance" , "PublicIp"]}
     }
   }
 }

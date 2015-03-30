@@ -22,7 +22,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/credentialprovider"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/credentialprovider"
 	"github.com/golang/glog"
 )
 

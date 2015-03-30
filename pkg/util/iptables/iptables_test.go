@@ -19,8 +19,8 @@ package iptables
 import (
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/exec"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/util"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/util/exec"
 )
 
 func getIptablesCommand(protocol Protocol) string {

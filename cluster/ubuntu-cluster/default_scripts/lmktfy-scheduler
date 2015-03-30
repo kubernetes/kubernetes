@@ -1,0 +1,11 @@
+# LMKTFY-Scheduler Upstart and SysVinit configuration file
+
+# Customize lmktfy-apiserver binary location 
+
+# LMKTFY_SCHEDULER="/opt/bin/lmktfy-scheduler"
+
+# Use LMKTFY_SCHEDULER_OPTS to modify the start/restart options
+LMKTFY_SCHEDULER_OPTS="--logtostderr=true \
+--master=127.0.0.1:8080"
+
+# Add more envionrment settings used by lmktfy-scheduler here

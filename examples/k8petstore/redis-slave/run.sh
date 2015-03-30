@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 i
-echo "Note, if you get errors below indicate kubernetes env injection could be faliing..."
+echo "Note, if you get errors below indicate lmktfy env injection could be faliing..."
 echo "env vars ="
 env
 echo "CHECKING ENVS BEFORE STARTUP........"

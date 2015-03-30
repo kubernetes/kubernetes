@@ -17,7 +17,7 @@ limitations under the License.
 package api
 
 import (
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api/resource"
 )
 
 // Returns string version of ResourceName.

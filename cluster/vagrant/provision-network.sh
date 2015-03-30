@@ -19,7 +19,7 @@ OVS_SWITCH=obr0
 DOCKER_OVS_TUN=tun0
 TUNNEL_BASE=gre
 NETWORK_CONF_PATH=/etc/sysconfig/network-scripts/
-POST_NETWORK_SCRIPT_DIR=/kubernetes-vagrant
+POST_NETWORK_SCRIPT_DIR=/lmktfy-vagrant
 POST_NETWORK_SCRIPT=${POST_NETWORK_SCRIPT_DIR}/network_closure.sh
 
 # ensure location of POST_NETWORK_SCRIPT exists
@@ -86,7 +86,7 @@ ifconfig | grep -q kbr0 || {
   ip route add ${CONTAINER_SUBNET} dev ${DOCKER_BRIDGE} scope link src ${CONTAINER_ADDR}
 
 
-  # modify the docker service file such that it uses the kube docker bridge and not its own
+  # modify the docker service file such that it uses the lmktfy docker bridge and not its own
   echo "OPTIONS='-b=kbr0 --selinux-enabled ${DOCKER_OPTS}'" >/etc/sysconfig/docker
   systemctl daemon-reload
   systemctl start docker

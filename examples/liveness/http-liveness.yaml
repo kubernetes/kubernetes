@@ -2,7 +2,7 @@ apiVersion: v1beta1
 desiredState:
   manifest:
     containers:
-      - image: kubernetes/liveness
+      - image: lmktfy/liveness
         name: liveness
         livenessProbe:
           httpGet:

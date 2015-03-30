@@ -31,15 +31,15 @@ import (
 	"strings"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/rest"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/httplog"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/httpstream"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api/errors"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api/rest"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/httplog"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/runtime"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/util"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/util/httpstream"
 
-	"github.com/GoogleCloudPlatform/kubernetes/third_party/golang/netutil"
+	"github.com/GoogleCloudPlatform/lmktfy/third_party/golang/netutil"
 	"github.com/golang/glog"
 	"golang.org/x/net/html"
 )
@@ -192,7 +192,7 @@ func (r *ProxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 
 	// Redirect requests of the form "/{resource}/{name}" to "/{resource}/{name}/"
-	// This is essentially a hack for https://github.com/GoogleCloudPlatform/kubernetes/issues/4958.
+	// This is essentially a hack for https://github.com/GoogleCloudPlatform/lmktfy/issues/4958.
 	// Note: Keep this code after tryUpgrade to not break that flow.
 	if len(parts) == 2 && !strings.HasSuffix(req.URL.Path, "/") {
 		w.Header().Set("Location", req.URL.Path+"/")

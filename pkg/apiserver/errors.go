@@ -20,9 +20,9 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/tools"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/util"
 )
 
 // statusError is an object that can be converted into an api.Status

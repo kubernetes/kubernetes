@@ -21,12 +21,12 @@ if [[ -z "$1" ]]; then
   exit 1
 fi
 
-if ! gsutil ls gs://kubernetes-release/release/${1}/kubernetes.tar.gz; then
+if ! gsutil ls gs://lmktfy-release/release/${1}/lmktfy.tar.gz; then
   echo "Release files don't exist, aborting."
   exit 2
 fi
 
-STABLE_FILE_LOCATION="kubernetes-release/release/stable.txt"
+STABLE_FILE_LOCATION="lmktfy-release/release/stable.txt"
 
 version_file=$(mktemp -t stable)
 

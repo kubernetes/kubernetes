@@ -1,0 +1,11 @@
+[Unit]
+Description=LMKTFYrnetes Controller Manager
+Documentation=https://github.com/GoogleCloudPlatform/lmktfyrnetes
+
+[Service]
+EnvironmentFile=-/etc/sysconfig/lmktfy-controller-manager
+ExecStart=/usr/local/bin/lmktfy-controller-manager "$DAEMON_ARGS"
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

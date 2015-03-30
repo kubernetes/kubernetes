@@ -3,7 +3,7 @@
 TAG = 1.0
 
 build:	
-	docker build -t kubernetes/elasticsearch:$(TAG) .
+	docker build -t lmktfy/elasticsearch:$(TAG) .
 
 push:	
-	docker push kubernetes/elasticsearch:$(TAG)
+	docker push lmktfy/elasticsearch:$(TAG)

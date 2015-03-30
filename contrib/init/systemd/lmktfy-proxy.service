@@ -1,0 +1,18 @@
+[Unit]
+Description=LMKTFYrnetes LMKTFY-Proxy Server
+Documentation=https://github.com/GoogleCloudPlatform/lmktfyrnetes
+After=network.target
+
+[Service]
+EnvironmentFile=-/etc/lmktfyrnetes/config
+EnvironmentFile=-/etc/lmktfyrnetes/proxy
+ExecStart=/usr/bin/lmktfy-proxy \
+	    $LMKTFY_LOGTOSTDERR \
+	    $LMKTFY_LOG_LEVEL \
+	    $LMKTFY_MASTER \
+	    $LMKTFY_PROXY_ARGS
+Restart=on-failure
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target

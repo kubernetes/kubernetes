@@ -32,10 +32,10 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/client"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/client/clientcmd"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/util"
 	"github.com/golang/glog"
 )
 
@@ -59,7 +59,7 @@ func main() {
 	glog.Infof("Starting serve_hostnames soak test with queries=%d and podsPerNode=%d upTo=%d",
 		*queriesAverage, *podsPerNode, *upTo)
 
-	settings, err := clientcmd.LoadFromFile(filepath.Join(os.Getenv("HOME"), ".kube", ".kubeconfig"))
+	settings, err := clientcmd.LoadFromFile(filepath.Join(os.Getenv("HOME"), ".lmktfy", ".lmktfyconfig"))
 	if err != nil {
 		glog.Fatalf("Error loading configuration: %v", err.Error())
 	}

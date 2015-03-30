@@ -26,17 +26,17 @@ import (
 	"testing"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	apierrors "github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
-	fake_cloud "github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/fake"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/probe"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api"
+	apierrors "github.com/GoogleCloudPlatform/lmktfy/pkg/api/errors"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api/resource"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/client"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/client/record"
+	fake_cloud "github.com/GoogleCloudPlatform/lmktfy/pkg/cloudprovider/fake"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/fields"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/labels"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/probe"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/util"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/watch"
 )
 
 // FakeNodeHandler is a fake implementation of NodesInterface and NodeInterface. It
@@ -123,25 +123,25 @@ func (m *FakeNodeHandler) Watch(label labels.Selector, field fields.Selector, re
 	return nil, nil
 }
 
-// FakeKubeletClient is a fake implementation of KubeletClient.
-type FakeKubeletClient struct {
+// FakeLMKTFYletClient is a fake implementation of LMKTFYletClient.
+type FakeLMKTFYletClient struct {
 	Status probe.Result
 	Err    error
 }
 
-func (c *FakeKubeletClient) GetPodStatus(host, podNamespace, podID string) (api.PodStatusResult, error) {
+func (c *FakeLMKTFYletClient) GetPodStatus(host, podNamespace, podID string) (api.PodStatusResult, error) {
 	return api.PodStatusResult{}, errors.New("Not Implemented")
 }
 
-func (c *FakeKubeletClient) GetNodeInfo(host string) (api.NodeInfo, error) {
+func (c *FakeLMKTFYletClient) GetNodeInfo(host string) (api.NodeInfo, error) {
 	return api.NodeInfo{}, errors.New("Not Implemented")
 }
 
-func (c *FakeKubeletClient) GetConnectionInfo(host string) (string, uint, http.RoundTripper, error) {
+func (c *FakeLMKTFYletClient) GetConnectionInfo(host string) (string, uint, http.RoundTripper, error) {
 	return "", 0, nil, errors.New("Not Implemented")
 }
 
-func (c *FakeKubeletClient) HealthCheck(host string) (probe.Result, error) {
+func (c *FakeLMKTFYletClient) HealthCheck(host string) (probe.Result, error) {
 	return c.Status, c.Err
 }
 
@@ -594,14 +594,14 @@ func TestNodeConditionsCheck(t *testing.T) {
 	fakeNow := util.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC)
 	table := []struct {
 		node               *api.Node
-		fakeKubeletClient  *FakeKubeletClient
+		fakeLMKTFYletClient  *FakeLMKTFYletClient
 		expectedConditions []api.NodeCondition
 	}{
 		{
-			// Node with default spec and kubelet /healthz probe returns success.
+			// Node with default spec and lmktfylet /healthz probe returns success.
 			// Expected node condition to be ready and marked schedulable.
 			node: newNode("node0"),
-			fakeKubeletClient: &FakeKubeletClient{
+			fakeLMKTFYletClient: &FakeLMKTFYletClient{
 				Status: probe.Success,
 				Err:    nil,
 			},
@@ -609,7 +609,7 @@ func TestNodeConditionsCheck(t *testing.T) {
 				{
 					Type:               api.NodeReady,
 					Status:             api.ConditionTrue,
-					Reason:             "Node health check succeeded: kubelet /healthz endpoint returns ok",
+					Reason:             "Node health check succeeded: lmktfylet /healthz endpoint returns ok",
 					LastProbeTime:      fakeNow,
 					LastTransitionTime: fakeNow,
 				},
@@ -623,10 +623,10 @@ func TestNodeConditionsCheck(t *testing.T) {
 			},
 		},
 		{
-			// User specified node as schedulable and kubelet /healthz probe returns failure with no error.
+			// User specified node as schedulable and lmktfylet /healthz probe returns failure with no error.
 			// Expected node condition to be not ready and marked schedulable.
 			node: &api.Node{ObjectMeta: api.ObjectMeta{Name: "node0"}, Spec: api.NodeSpec{Unschedulable: false}},
-			fakeKubeletClient: &FakeKubeletClient{
+			fakeLMKTFYletClient: &FakeLMKTFYletClient{
 				Status: probe.Failure,
 				Err:    nil,
 			},
@@ -634,7 +634,7 @@ func TestNodeConditionsCheck(t *testing.T) {
 				{
 					Type:               api.NodeReady,
 					Status:             api.ConditionFalse,
-					Reason:             "Node health check failed: kubelet /healthz endpoint returns not ok",
+					Reason:             "Node health check failed: lmktfylet /healthz endpoint returns not ok",
 					LastProbeTime:      fakeNow,
 					LastTransitionTime: fakeNow,
 				},
@@ -648,10 +648,10 @@ func TestNodeConditionsCheck(t *testing.T) {
 			},
 		},
 		{
-			// User specified node as unschedulable and kubelet /healthz probe returns failure with some error.
+			// User specified node as unschedulable and lmktfylet /healthz probe returns failure with some error.
 			// Expected node condition to be not ready and marked unschedulable.
 			node: &api.Node{ObjectMeta: api.ObjectMeta{Name: "node0"}, Spec: api.NodeSpec{Unschedulable: true}},
-			fakeKubeletClient: &FakeKubeletClient{
+			fakeLMKTFYletClient: &FakeLMKTFYletClient{
 				Status: probe.Failure,
 				Err:    errors.New("Error"),
 			},
@@ -675,7 +675,7 @@ func TestNodeConditionsCheck(t *testing.T) {
 	}
 
 	for _, item := range table {
-		nodeController := NewNodeController(nil, "", nil, nil, nil, item.fakeKubeletClient, nil, 10, time.Minute)
+		nodeController := NewNodeController(nil, "", nil, nil, nil, item.fakeLMKTFYletClient, nil, 10, time.Minute)
 		nodeController.now = func() util.Time { return fakeNow }
 		conditions := nodeController.DoCheck(item.node)
 		if !reflect.DeepEqual(item.expectedConditions, conditions) {
@@ -724,7 +724,7 @@ func TestSyncProbedNodeStatus(t *testing.T) {
 	fakeNow := util.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC)
 	table := []struct {
 		fakeNodeHandler      *FakeNodeHandler
-		fakeKubeletClient    *FakeKubeletClient
+		fakeLMKTFYletClient    *FakeLMKTFYletClient
 		fakeCloud            *fake_cloud.FakeCloud
 		expectedNodes        []*api.Node
 		expectedRequestCount int
@@ -733,7 +733,7 @@ func TestSyncProbedNodeStatus(t *testing.T) {
 			fakeNodeHandler: &FakeNodeHandler{
 				Existing: []*api.Node{newNode("node0"), newNode("node1")},
 			},
-			fakeKubeletClient: &FakeKubeletClient{
+			fakeLMKTFYletClient: &FakeLMKTFYletClient{
 				Status: probe.Success,
 				Err:    nil,
 			},
@@ -748,7 +748,7 @@ func TestSyncProbedNodeStatus(t *testing.T) {
 							{
 								Type:               api.NodeReady,
 								Status:             api.ConditionTrue,
-								Reason:             "Node health check succeeded: kubelet /healthz endpoint returns ok",
+								Reason:             "Node health check succeeded: lmktfylet /healthz endpoint returns ok",
 								LastProbeTime:      fakeNow,
 								LastTransitionTime: fakeNow,
 							},
@@ -779,7 +779,7 @@ func TestSyncProbedNodeStatus(t *testing.T) {
 							{
 								Type:               api.NodeReady,
 								Status:             api.ConditionTrue,
-								Reason:             "Node health check succeeded: kubelet /healthz endpoint returns ok",
+								Reason:             "Node health check succeeded: lmktfylet /healthz endpoint returns ok",
 								LastProbeTime:      fakeNow,
 								LastTransitionTime: fakeNow,
 							},
@@ -809,7 +809,7 @@ func TestSyncProbedNodeStatus(t *testing.T) {
 	}
 
 	for _, item := range table {
-		nodeController := NewNodeController(item.fakeCloud, ".*", nil, nil, item.fakeNodeHandler, item.fakeKubeletClient, nil, 10, time.Minute)
+		nodeController := NewNodeController(item.fakeCloud, ".*", nil, nil, item.fakeNodeHandler, item.fakeLMKTFYletClient, nil, 10, time.Minute)
 		nodeController.now = func() util.Time { return fakeNow }
 		if err := nodeController.SyncProbedNodeStatus(); err != nil {
 			t.Errorf("unexpected error: %v", err)
@@ -835,7 +835,7 @@ func TestSyncProbedNodeStatusTransitionTime(t *testing.T) {
 	fakeNow := util.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC)
 	table := []struct {
 		fakeNodeHandler        *FakeNodeHandler
-		fakeKubeletClient      *FakeKubeletClient
+		fakeLMKTFYletClient      *FakeLMKTFYletClient
 		expectedRequestCount   int
 		expectedTransitionTime util.Time
 	}{
@@ -853,7 +853,7 @@ func TestSyncProbedNodeStatusTransitionTime(t *testing.T) {
 								{
 									Type:               api.NodeReady,
 									Status:             api.ConditionTrue,
-									Reason:             "Node health check succeeded: kubelet /healthz endpoint returns ok",
+									Reason:             "Node health check succeeded: lmktfylet /healthz endpoint returns ok",
 									LastTransitionTime: util.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
 								},
 								{
@@ -867,7 +867,7 @@ func TestSyncProbedNodeStatusTransitionTime(t *testing.T) {
 					},
 				},
 			},
-			fakeKubeletClient: &FakeKubeletClient{
+			fakeLMKTFYletClient: &FakeLMKTFYletClient{
 				Status: probe.Success,
 				Err:    nil,
 			},
@@ -888,7 +888,7 @@ func TestSyncProbedNodeStatusTransitionTime(t *testing.T) {
 								{
 									Type:               api.NodeReady,
 									Status:             api.ConditionTrue,
-									Reason:             "Node health check succeeded: kubelet /healthz endpoint returns ok",
+									Reason:             "Node health check succeeded: lmktfylet /healthz endpoint returns ok",
 									LastTransitionTime: util.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
 								},
 								{
@@ -902,7 +902,7 @@ func TestSyncProbedNodeStatusTransitionTime(t *testing.T) {
 					},
 				},
 			},
-			fakeKubeletClient: &FakeKubeletClient{
+			fakeLMKTFYletClient: &FakeLMKTFYletClient{
 				Status: probe.Failure,
 				Err:    nil,
 			},
@@ -912,7 +912,7 @@ func TestSyncProbedNodeStatusTransitionTime(t *testing.T) {
 	}
 
 	for _, item := range table {
-		nodeController := NewNodeController(nil, "", []string{"node0"}, nil, item.fakeNodeHandler, item.fakeKubeletClient, &record.FakeRecorder{}, 10, time.Minute)
+		nodeController := NewNodeController(nil, "", []string{"node0"}, nil, item.fakeNodeHandler, item.fakeLMKTFYletClient, &record.FakeRecorder{}, 10, time.Minute)
 		nodeController.lookupIP = func(host string) ([]net.IP, error) { return nil, fmt.Errorf("lookup %v: no such host", host) }
 		nodeController.now = func() util.Time { return fakeNow }
 		if err := nodeController.SyncProbedNodeStatus(); err != nil {
@@ -934,7 +934,7 @@ func TestSyncProbedNodeStatusTransitionTime(t *testing.T) {
 func TestSyncProbedNodeStatusEvictPods(t *testing.T) {
 	table := []struct {
 		fakeNodeHandler      *FakeNodeHandler
-		fakeKubeletClient    *FakeKubeletClient
+		fakeLMKTFYletClient    *FakeLMKTFYletClient
 		expectedRequestCount int
 		expectedActions      []client.FakeAction
 	}{
@@ -949,7 +949,7 @@ func TestSyncProbedNodeStatusEvictPods(t *testing.T) {
 								{
 									Type:               api.NodeReady,
 									Status:             api.ConditionTrue,
-									Reason:             "Node health check succeeded: kubelet /healthz endpoint returns ok",
+									Reason:             "Node health check succeeded: lmktfylet /healthz endpoint returns ok",
 									LastTransitionTime: util.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
 								},
 							},
@@ -960,7 +960,7 @@ func TestSyncProbedNodeStatusEvictPods(t *testing.T) {
 					PodsList: api.PodList{Items: []api.Pod{*newPod("pod0", "node1")}},
 				},
 			},
-			fakeKubeletClient: &FakeKubeletClient{
+			fakeLMKTFYletClient: &FakeLMKTFYletClient{
 				Status: probe.Success,
 				Err:    nil,
 			},
@@ -979,7 +979,7 @@ func TestSyncProbedNodeStatusEvictPods(t *testing.T) {
 								{
 									Type:               api.NodeReady,
 									Status:             api.ConditionTrue,
-									Reason:             "Node health check succeeded: kubelet /healthz endpoint returns ok",
+									Reason:             "Node health check succeeded: lmktfylet /healthz endpoint returns ok",
 									LastTransitionTime: util.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
 								},
 							},
@@ -990,7 +990,7 @@ func TestSyncProbedNodeStatusEvictPods(t *testing.T) {
 					PodsList: api.PodList{Items: []api.Pod{*newPod("pod0", "node0")}},
 				},
 			},
-			fakeKubeletClient: &FakeKubeletClient{
+			fakeLMKTFYletClient: &FakeLMKTFYletClient{
 				Status: probe.Failure,
 				Err:    nil,
 			},
@@ -1008,7 +1008,7 @@ func TestSyncProbedNodeStatusEvictPods(t *testing.T) {
 								{
 									Type:   api.NodeReady,
 									Status: api.ConditionFalse,
-									Reason: "Node health check failed: kubelet /healthz endpoint returns not ok",
+									Reason: "Node health check failed: lmktfylet /healthz endpoint returns not ok",
 									// Here, last transition time is Now(). In node controller, the new condition's probe time is
 									// also Now(). The two calls to Now() yields differnt time due to test execution, but the
 									// time difference is within 5 minutes, which is the grace peroid.
@@ -1022,7 +1022,7 @@ func TestSyncProbedNodeStatusEvictPods(t *testing.T) {
 					PodsList: api.PodList{Items: []api.Pod{*newPod("pod0", "node0")}},
 				},
 			},
-			fakeKubeletClient: &FakeKubeletClient{
+			fakeLMKTFYletClient: &FakeLMKTFYletClient{
 				Status: probe.Failure,
 				Err:    nil,
 			},
@@ -1040,7 +1040,7 @@ func TestSyncProbedNodeStatusEvictPods(t *testing.T) {
 								{
 									Type:   api.NodeReady,
 									Status: api.ConditionFalse,
-									Reason: "Node health check failed: kubelet /healthz endpoint returns not ok",
+									Reason: "Node health check failed: lmktfylet /healthz endpoint returns not ok",
 									// Here, last transition time is in the past, and in node controller, the
 									// new condition's probe time is Now(). The time difference is larger than
 									// 5*min. The test will fail if system clock is wrong, but we don't yet have
@@ -1055,7 +1055,7 @@ func TestSyncProbedNodeStatusEvictPods(t *testing.T) {
 					PodsList: api.PodList{Items: []api.Pod{*newPod("pod0", "node0")}},
 				},
 			},
-			fakeKubeletClient: &FakeKubeletClient{
+			fakeLMKTFYletClient: &FakeLMKTFYletClient{
 				Status: probe.Failure,
 				Err:    nil,
 			},
@@ -1065,7 +1065,7 @@ func TestSyncProbedNodeStatusEvictPods(t *testing.T) {
 	}
 
 	for _, item := range table {
-		nodeController := NewNodeController(nil, "", []string{"node0"}, nil, item.fakeNodeHandler, item.fakeKubeletClient, &record.FakeRecorder{}, 10, 5*time.Minute)
+		nodeController := NewNodeController(nil, "", []string{"node0"}, nil, item.fakeNodeHandler, item.fakeLMKTFYletClient, &record.FakeRecorder{}, 10, 5*time.Minute)
 		nodeController.lookupIP = func(host string) ([]net.IP, error) { return nil, fmt.Errorf("lookup %v: no such host", host) }
 		if err := nodeController.SyncProbedNodeStatus(); err != nil {
 			t.Errorf("unexpected error: %v", err)
@@ -1104,7 +1104,7 @@ func TestMonitorNodeStatusEvictPods(t *testing.T) {
 			evictionTimeout:   30 * time.Minute,
 			expectedEvictPods: false,
 		},
-		// Node created long time ago, and kubelet posted NotReady for a short period of time.
+		// Node created long time ago, and lmktfylet posted NotReady for a short period of time.
 		{
 			fakeNodeHandler: &FakeNodeHandler{
 				Existing: []*api.Node{
@@ -1133,7 +1133,7 @@ func TestMonitorNodeStatusEvictPods(t *testing.T) {
 			evictionTimeout:   30 * time.Minute,
 			expectedEvictPods: false,
 		},
-		// Node created long time ago, and kubelet posted NotReady for a long period of time.
+		// Node created long time ago, and lmktfylet posted NotReady for a long period of time.
 		{
 			fakeNodeHandler: &FakeNodeHandler{
 				Existing: []*api.Node{
@@ -1275,7 +1275,7 @@ func TestMonitorNodeStatusUpdateStatus(t *testing.T) {
 							{
 								Type:               api.NodeReady,
 								Status:             api.ConditionUnknown,
-								Reason:             fmt.Sprintf("Kubelet never posted node status"),
+								Reason:             fmt.Sprintf("LMKTFYlet never posted node status"),
 								LastProbeTime:      util.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
 								LastTransitionTime: fakeNow,
 							},
@@ -1303,7 +1303,7 @@ func TestMonitorNodeStatusUpdateStatus(t *testing.T) {
 			expectedRequestCount: 1, // List
 			expectedNodes:        nil,
 		},
-		// Node created long time ago, with status updated by kubelet exceeds grace period.
+		// Node created long time ago, with status updated by lmktfylet exceeds grace period.
 		// Expect Unknown status posted from node controller.
 		{
 			fakeNodeHandler: &FakeNodeHandler{
@@ -1349,7 +1349,7 @@ func TestMonitorNodeStatusUpdateStatus(t *testing.T) {
 							{
 								Type:               api.NodeReady,
 								Status:             api.ConditionUnknown,
-								Reason:             fmt.Sprintf("Kubelet stopped posting node status"),
+								Reason:             fmt.Sprintf("LMKTFYlet stopped posting node status"),
 								LastProbeTime:      util.Date(2015, 1, 1, 11, 0, 0, 0, time.UTC),
 								LastTransitionTime: fakeNow,
 							},

@@ -1,6 +1,6 @@
 # Authentication Plugins
 
-Kubernetes uses tokens to authenticate users for API calls.
+LMKTFY uses tokens to authenticate users for API calls.
 
 Authentication is enabled by passing the `--token_auth_file=SOMEFILE` option
 to apiserver.  Currently, tokens last indefinitely, and the token list cannot
@@ -12,8 +12,8 @@ and is a csv file with 3 columns: token, user name, user uid.
 
 ## Plugin Development
 
-We plan for the Kubernetes API server to issue tokens
+We plan for the LMKTFY API server to issue tokens
 after the user has been (re)authenticated by a *bedrock* authentication
-provider external to Kubernetes.  We plan to make it easy to develop modules
-that interface between kubernetes and a bedrock authentication provider (e.g.
+provider external to LMKTFY.  We plan to make it easy to develop modules
+that interface between lmktfy and a bedrock authentication provider (e.g.
 github.com, google.com, enterprise directory, kerberos, etc.)

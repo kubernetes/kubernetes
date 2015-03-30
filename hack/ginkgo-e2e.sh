@@ -18,7 +18,7 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+LMKTFY_ROOT=$(dirname "${BASH_SOURCE}")/..
 
 # --- Find local test binaries.
 
@@ -60,87 +60,87 @@ esac
 
 # Gather up the list of likely places and use ls to find the latest one.
 locations=(
-  "${KUBE_ROOT}/_output/dockerized/bin/${host_os}/${host_arch}/e2e"
-  "${KUBE_ROOT}/_output/local/bin/${host_os}/${host_arch}/e2e"
-  "${KUBE_ROOT}/platforms/${host_os}/${host_arch}/e2e"
+  "${LMKTFY_ROOT}/_output/dockerized/bin/${host_os}/${host_arch}/e2e"
+  "${LMKTFY_ROOT}/_output/local/bin/${host_os}/${host_arch}/e2e"
+  "${LMKTFY_ROOT}/platforms/${host_os}/${host_arch}/e2e"
 )
 e2e=$( (ls -t "${locations[@]}" 2>/dev/null || true) | head -1 )
 
 # --- Setup some env vars.
 
-: ${KUBE_VERSION_ROOT:=${KUBE_ROOT}}
-: ${KUBECTL:="${KUBE_VERSION_ROOT}/cluster/kubectl.sh"}
-: ${KUBE_CONFIG_FILE:="config-test.sh"}
+: ${LMKTFY_VERSION_ROOT:=${LMKTFY_ROOT}}
+: ${LMKTFYCTL:="${LMKTFY_VERSION_ROOT}/cluster/lmktfyctl.sh"}
+: ${LMKTFY_CONFIG_FILE:="config-test.sh"}
 
-export KUBECTL KUBE_CONFIG_FILE
+export LMKTFYCTL LMKTFY_CONFIG_FILE
 
-source "${KUBE_ROOT}/cluster/kube-env.sh"
+source "${LMKTFY_ROOT}/cluster/lmktfy-env.sh"
 
 # ---- Do cloud-provider-specific setup
 if [[ -z "${AUTH_CONFIG:-}" ]];  then
-    echo "Setting up for KUBERNETES_PROVIDER=\"${KUBERNETES_PROVIDER}\"."
+    echo "Setting up for LMKTFYRNETES_PROVIDER=\"${LMKTFYRNETES_PROVIDER}\"."
 
-    source "${KUBE_VERSION_ROOT}/cluster/${KUBERNETES_PROVIDER}/util.sh"
+    source "${LMKTFY_VERSION_ROOT}/cluster/${LMKTFYRNETES_PROVIDER}/util.sh"
 
     prepare-e2e
 
     detect-master >/dev/null
 
 
-    if [[ "$KUBERNETES_PROVIDER" == "vagrant" ]]; then
+    if [[ "$LMKTFYRNETES_PROVIDER" == "vagrant" ]]; then
       # When we are using vagrant it has hard coded auth.  We repeat that here so that
       # we don't clobber auth that might be used for a publicly facing cluster.
       auth_config=(
-        "--auth_config=${HOME}/.kubernetes_vagrant_auth"
-        "--kubeconfig=${HOME}/.kubernetes_vagrant_kubeconfig"
+        "--auth_config=${HOME}/.lmktfy_vagrant_auth"
+        "--lmktfyconfig=${HOME}/.lmktfy_vagrant_lmktfyconfig"
       )
-    elif [[ "${KUBERNETES_PROVIDER}" == "gke" ]]; then
+    elif [[ "${LMKTFYRNETES_PROVIDER}" == "gke" ]]; then
       # With GKE, our auth and certs are in gcloud's config directory.
       detect-project &> /dev/null
       cfg_dir="${GCLOUD_CONFIG_DIR}/${PROJECT}.${ZONE}.${CLUSTER_NAME}"
       auth_config=(
-        "--auth_config=${cfg_dir}/kubernetes_auth"
+        "--auth_config=${cfg_dir}/lmktfy_auth"
         "--cert_dir=${cfg_dir}"
       )
-    elif [[ "${KUBERNETES_PROVIDER}" == "gce" ]]; then
+    elif [[ "${LMKTFYRNETES_PROVIDER}" == "gce" ]]; then
       auth_config=(
-        "--kubeconfig=${HOME}/.kube/.kubeconfig"
+        "--lmktfyconfig=${HOME}/.lmktfy/.lmktfyconfig"
       )
-    elif [[ "${KUBERNETES_PROVIDER}" == "aws" ]]; then
+    elif [[ "${LMKTFYRNETES_PROVIDER}" == "aws" ]]; then
       auth_config=(
-        "--auth_config=${HOME}/.kube/${INSTANCE_PREFIX}/kubernetes_auth"
+        "--auth_config=${HOME}/.lmktfy/${INSTANCE_PREFIX}/lmktfy_auth"
       )
-    elif [[ "${KUBERNETES_PROVIDER}" == "libvirt-coreos" ]]; then
+    elif [[ "${LMKTFYRNETES_PROVIDER}" == "libvirt-coreos" ]]; then
       auth_config=(
-        "--kubeconfig=${HOME}/.kube/.kubeconfig"
+        "--lmktfyconfig=${HOME}/.lmktfy/.lmktfyconfig"
       )
-    elif [[ "${KUBERNETES_PROVIDER}" == "conformance_test" ]]; then
+    elif [[ "${LMKTFYRNETES_PROVIDER}" == "conformance_test" ]]; then
       auth_config=(
-        "--auth_config=${KUBERNETES_CONFORMANCE_TEST_AUTH_CONFIG:-}"
-        "--cert_dir=${KUBERNETES_CONFORMANCE_TEST_CERT_DIR:-}"
+        "--auth_config=${LMKTFYRNETES_CONFORMANCE_TEST_AUTH_CONFIG:-}"
+        "--cert_dir=${LMKTFYRNETES_CONFORMANCE_TEST_CERT_DIR:-}"
       )
     else
       auth_config=()
     fi
 else
   echo "Conformance Test.  No cloud-provider-specific preparation."
-  KUBERNETES_PROVIDER=""
+  LMKTFYRNETES_PROVIDER=""
   auth_config=(
     "--auth_config=${AUTH_CONFIG:-}"
     "--cert_dir=${CERT_DIR:-}"
   )
 fi
 
-# Use the kubectl binary from the same directory as the e2e binary.
+# Use the lmktfyctl binary from the same directory as the e2e binary.
 # The --host setting is used only when providing --auth_config
-# If --kubeconfig is used, the host to use is retrieved from the .kubeconfig
+# If --lmktfyconfig is used, the host to use is retrieved from the .lmktfyconfig
 # file and the one provided with --host is ignored.
 export PATH=$(dirname "${e2e}"):"${PATH}"
 "${e2e}" "${auth_config[@]:+${auth_config[@]}}" \
-  --host="https://${KUBE_MASTER_IP-}" \
-  --provider="${KUBERNETES_PROVIDER}" \
+  --host="https://${LMKTFY_MASTER_IP-}" \
+  --provider="${LMKTFYRNETES_PROVIDER}" \
   --gce_project="${PROJECT:-}" \
   --gce_zone="${ZONE:-}" \
-  --kube_master="${KUBE_MASTER:-}" \
+  --lmktfy_master="${LMKTFY_MASTER:-}" \
   ${E2E_REPORT_DIR+"--report_dir=${E2E_REPORT_DIR}"} \
   "${@:-}"

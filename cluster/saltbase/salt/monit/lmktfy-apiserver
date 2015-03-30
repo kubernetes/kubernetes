@@ -1,0 +1,10 @@
+check process lmktfy-apiserver with pidfile /var/run/lmktfy-apiserver.pid
+group lmktfy-apiserver
+start program = "/etc/init.d/lmktfy-apiserver start"
+stop program = "/etc/init.d/lmktfy-apiserver stop"
+if failed
+  host 127.0.0.1
+  port 8080
+  protocol http
+  request "/index.html"
+then restart

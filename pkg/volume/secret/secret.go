@@ -21,10 +21,10 @@ import (
 	"io/ioutil"
 	"path"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/types"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/util"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/volume"
 	"github.com/golang/glog"
 )
 
@@ -34,7 +34,7 @@ func ProbeVolumePlugins() []volume.VolumePlugin {
 }
 
 const (
-	secretPluginName = "kubernetes.io/secret"
+	secretPluginName = "lmktfy.io/secret"
 )
 
 // secretPlugin implements the VolumePlugin interface.
@@ -105,12 +105,12 @@ func (sv *secretVolume) SetUpAt(dir string) error {
 		return err
 	}
 
-	kubeClient := sv.plugin.host.GetKubeClient()
-	if kubeClient == nil {
-		return fmt.Errorf("Cannot setup secret volume %v because kube client is not configured", sv)
+	lmktfyClient := sv.plugin.host.GetLMKTFYClient()
+	if lmktfyClient == nil {
+		return fmt.Errorf("Cannot setup secret volume %v because lmktfy client is not configured", sv)
 	}
 
-	secret, err := kubeClient.Secrets(sv.podRef.Namespace).Get(sv.secretName)
+	secret, err := lmktfyClient.Secrets(sv.podRef.Namespace).Get(sv.secretName)
 	if err != nil {
 		glog.Errorf("Couldn't get secret %v/%v", sv.podRef.Namespace, sv.secretName)
 		return err

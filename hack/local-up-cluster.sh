@@ -14,21 +14,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# This command builds and runs a local kubernetes cluster. It's just like
+# This command builds and runs a local lmktfy cluster. It's just like
 # local-up.sh, but this one launches the three separate binaries.
-# You may need to run this as root to allow kubelet to open docker's socket.
+# You may need to run this as root to allow lmktfylet to open docker's socket.
 DOCKER_OPTS=${DOCKER_OPTS:-""}
 DOCKER_NATIVE=${DOCKER_NATIVE:-""}
 DOCKER=(docker ${DOCKER_OPTS})
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
-cd "${KUBE_ROOT}"
+LMKTFY_ROOT=$(dirname "${BASH_SOURCE}")/..
+cd "${LMKTFY_ROOT}"
 
 # Stop right away if the build fails
 set -e
 
-source "${KUBE_ROOT}/hack/lib/init.sh"
-"${KUBE_ROOT}/hack/build-go.sh"
+source "${LMKTFY_ROOT}/hack/lib/init.sh"
+"${LMKTFY_ROOT}/hack/build-go.sh"
 
 ${DOCKER[@]} ps 2> /dev/null 1> /dev/null
 if [ "$?" != "0" ]; then
@@ -37,7 +37,7 @@ if [ "$?" != "0" ]; then
 fi
 
 echo "Starting etcd"
-kube::etcd::start
+lmktfy::etcd::start
 
 # Shut down anyway if there's an error.
 set +e
@@ -46,7 +46,7 @@ API_PORT=${API_PORT:-8080}
 API_HOST=${API_HOST:-127.0.0.1}
 # By default only allow CORS for requests on localhost
 API_CORS_ALLOWED_ORIGINS=${API_CORS_ALLOWED_ORIGINS:-"/127.0.0.1(:[0-9]+)?$,/localhost(:[0-9]+)?$"}
-KUBELET_PORT=${KUBELET_PORT:-10250}
+LMKTFYLET_PORT=${LMKTFYLET_PORT:-10250}
 LOG_LEVEL=${LOG_LEVEL:-3}
 
 # Detect the OS name/arch so that we can find our binary
@@ -85,14 +85,14 @@ case "$(uname -m)" in
     ;;
 esac
 
-GO_OUT="${KUBE_ROOT}/_output/local/bin/${host_os}/${host_arch}"
+GO_OUT="${LMKTFY_ROOT}/_output/local/bin/${host_os}/${host_arch}"
 
 cleanup()
 {
     echo "Cleaning up..."
     [[ -n "${APISERVER_PID-}" ]] && sudo kill "${APISERVER_PID}"
     [[ -n "${CTLRMGR_PID-}" ]] && sudo kill "${CTLRMGR_PID}"
-    [[ -n "${KUBELET_PID-}" ]] && sudo kill "${KUBELET_PID}"
+    [[ -n "${LMKTFYLET_PID-}" ]] && sudo kill "${LMKTFYLET_PID}"
     [[ -n "${PROXY_PID-}" ]] && sudo kill "${PROXY_PID}"
     [[ -n "${SCHEDULER_PID-}" ]] && sudo kill "${SCHEDULER_PID}"
 
@@ -104,8 +104,8 @@ cleanup()
 
 trap cleanup EXIT
 
-APISERVER_LOG=/tmp/kube-apiserver.log
-sudo -E "${GO_OUT}/kube-apiserver" \
+APISERVER_LOG=/tmp/lmktfy-apiserver.log
+sudo -E "${GO_OUT}/lmktfy-apiserver" \
   --v=${LOG_LEVEL} \
   --address="${API_HOST}" \
   --port="${API_PORT}" \
@@ -115,55 +115,55 @@ sudo -E "${GO_OUT}/kube-apiserver" \
   --cors_allowed_origins="${API_CORS_ALLOWED_ORIGINS}" >"${APISERVER_LOG}" 2>&1 &
 APISERVER_PID=$!
 
-# Wait for kube-apiserver to come up before launching the rest of the components.
+# Wait for lmktfy-apiserver to come up before launching the rest of the components.
 echo "Waiting for apiserver to come up"
-kube::util::wait_for_url "http://${API_HOST}:${API_PORT}/api/v1beta1/pods" "apiserver: " 1 10 || exit 1
+lmktfy::util::wait_for_url "http://${API_HOST}:${API_PORT}/api/v1beta1/pods" "apiserver: " 1 10 || exit 1
 
-CTLRMGR_LOG=/tmp/kube-controller-manager.log
-sudo -E "${GO_OUT}/kube-controller-manager" \
+CTLRMGR_LOG=/tmp/lmktfy-controller-manager.log
+sudo -E "${GO_OUT}/lmktfy-controller-manager" \
   --v=${LOG_LEVEL} \
   --machines="127.0.0.1" \
   --master="${API_HOST}:${API_PORT}" >"${CTLRMGR_LOG}" 2>&1 &
 CTLRMGR_PID=$!
 
-KUBELET_LOG=/tmp/kubelet.log
-sudo -E "${GO_OUT}/kubelet" \
+LMKTFYLET_LOG=/tmp/lmktfylet.log
+sudo -E "${GO_OUT}/lmktfylet" \
   --v=${LOG_LEVEL} \
   --hostname_override="127.0.0.1" \
   --address="127.0.0.1" \
   --api_servers="${API_HOST}:${API_PORT}" \
-  --auth_path="${KUBE_ROOT}/hack/.test-cmd-auth" \
-  --port="$KUBELET_PORT" >"${KUBELET_LOG}" 2>&1 &
-KUBELET_PID=$!
+  --auth_path="${LMKTFY_ROOT}/hack/.test-cmd-auth" \
+  --port="$LMKTFYLET_PORT" >"${LMKTFYLET_LOG}" 2>&1 &
+LMKTFYLET_PID=$!
 
-PROXY_LOG=/tmp/kube-proxy.log
-sudo -E "${GO_OUT}/kube-proxy" \
+PROXY_LOG=/tmp/lmktfy-proxy.log
+sudo -E "${GO_OUT}/lmktfy-proxy" \
   --v=${LOG_LEVEL} \
   --master="http://${API_HOST}:${API_PORT}" >"${PROXY_LOG}" 2>&1 &
 PROXY_PID=$!
 
-SCHEDULER_LOG=/tmp/kube-scheduler.log
-sudo -E "${GO_OUT}/kube-scheduler" \
+SCHEDULER_LOG=/tmp/lmktfy-scheduler.log
+sudo -E "${GO_OUT}/lmktfy-scheduler" \
   --v=${LOG_LEVEL} \
   --master="http://${API_HOST}:${API_PORT}" >"${SCHEDULER_LOG}" 2>&1 &
 SCHEDULER_PID=$!
 
 cat <<EOF
-Local Kubernetes cluster is running. Press Ctrl-C to shut it down.
+Local LMKTFY cluster is running. Press Ctrl-C to shut it down.
 
 Logs:
   ${APISERVER_LOG}
   ${CTLRMGR_LOG}
-  ${KUBELET_LOG}
+  ${LMKTFYLET_LOG}
   ${PROXY_LOG}
   ${SCHEDULER_LOG}
 
 To start using your cluster, open up another terminal/tab and run:
 
-  cluster/kubectl.sh config set-cluster local --server=http://${API_HOST}:${API_PORT} --insecure-skip-tls-verify=true --global
-  cluster/kubectl.sh config set-context local --cluster=local --global
-  cluster/kubectl.sh config use-context local
-  cluster/kubectl.sh
+  cluster/lmktfyctl.sh config set-cluster local --server=http://${API_HOST}:${API_PORT} --insecure-skip-tls-verify=true --global
+  cluster/lmktfyctl.sh config set-context local --cluster=local --global
+  cluster/lmktfyctl.sh config use-context local
+  cluster/lmktfyctl.sh
 EOF
 
 while true; do sleep 1; done

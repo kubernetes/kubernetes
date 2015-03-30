@@ -3,7 +3,7 @@ kind: ReplicationController
 metadata: 
   labels: 
     name: influxGrafana
-    kubernetes.io/cluster-service: "true"
+    lmktfy.io/cluster-service: "true"
   name: monitoring-influx-grafana-controller
 spec: 
   replicas: 1
@@ -13,7 +13,7 @@ spec:
     metadata: 
       labels: 
         name: influxGrafana
-        kubernetes.io/cluster-service: "true"
+        lmktfy.io/cluster-service: "true"
     spec: 
       containers: 
         - image: gcr.io/google-containers/heapster_influxdb:v0.3
@@ -38,5 +38,5 @@ spec:
               value: '"+window.location.hostname+"/api/v1beta1/proxy/services/monitoring-influxdb'
             - name: "INFLUXDB_PORT"
               value: ""
-            - name: "KUBERNETES_API_PORT"
+            - name: "LMKTFYRNETES_API_PORT"
               value: ""

@@ -1,17 +1,17 @@
-Kubernetes Documentation
+LMKTFY Documentation
 ====================
 
-This directory contains the Kubernetes user manual in the Markdown format.
+This directory contains the LMKTFY user manual in the Markdown format.
 Do *not* edit the man pages in the man1 directory. Instead, amend the
 Markdown (*.md) files.
 
 # File List
 
-	kube-apiserver.1.md
-	kube-controller-manager.1.md
-	kubelet.1.md
-	kube-proxy.1.md
-	kube-scheduler.1.md
+	lmktfy-apiserver.1.md
+	lmktfy-controller-manager.1.md
+	lmktfylet.1.md
+	lmktfy-proxy.1.md
+	lmktfy-scheduler.1.md
 	Dockerfile
 	md2man-all.sh
 
@@ -23,7 +23,7 @@ environment. This uses `go-md2man`, a pure Go Markdown to man page generator.
 
 ## Building the md2man image
 
-There is a `Dockerfile` provided in the `kubernetes/docs/man` directory.
+There is a `Dockerfile` provided in the `lmktfy/docs/man` directory.
 
 Using this `Dockerfile`, create a Docker image tagged `docker/md2man`:
 
@@ -33,7 +33,7 @@ Using this `Dockerfile`, create a Docker image tagged `docker/md2man`:
 
 Once the image is built, run a container using the image with *volumes*:
 
-    docker run -v /<path-to-git-dir>/kubernetes/docs/man:/docs:rw \
+    docker run -v /<path-to-git-dir>/lmktfy/docs/man:/docs:rw \
     -w /docs -i docker/md2man /docs/md2man-all.sh
 
 The `md2man` Docker container will process the Markdown files and generate

@@ -33,7 +33,7 @@ These are just examples; you are free to develop your own conventions.
 ## Syntax and character set
 
 As already mentioned, well formed _labels_ are key value pairs. Valid label keys have two segments - prefix and name - separated by a slash (`/`).  The name segment is required and must be a DNS label: 63 characters or less, all lowercase, beginning and ending with an alphanumeric character (`[a-z0-9A-Z]`), with dashes (`-`) and alphanumerics between.  The prefix and slash are optional.  If specified, the prefix must be a DNS subdomain (a series of DNS labels separated by dots (`.`), not longer than 253 characters in total.
-If the prefix is omitted, the label key is presumed to be private to the user. System components which use labels must specify a prefix.  The `kubernetes.io` prefix is reserved for kubernetes core components.
+If the prefix is omitted, the label key is presumed to be private to the user. System components which use labels must specify a prefix.  The `lmktfy.io` prefix is reserved for lmktfy core components.
 
 Valid label values must be shorter than 64 characters, accepted characters are (`[-A-Za-z0-9_.]`) but the first character must be  (`[A-Za-z0-9]`).
 
@@ -41,7 +41,7 @@ Valid label values must be shorter than 64 characters, accepted characters are (
 
 Unlike [names and UIDs](identifiers.md), labels do not provide uniqueness. In general, we expect many objects to carry the same label(s).
 
-Via a _label selector_, the client/user can identify a set of objects. The label selector is the core grouping primitive in Kubernetes.
+Via a _label selector_, the client/user can identify a set of objects. The label selector is the core grouping primitive in LMKTFY.
 
 The API currently supports two types of selectors: _equality-based_ and _set-based_.
 A label selector can be made of multiple _requirements_ which are comma-separated. In the case of multiple requirements, all must be satisfied so comma separator acts as an AND logical operator.
@@ -83,7 +83,7 @@ LIST and WATCH operations may specify label selectors to filter the sets of obje
    - _equality-based_ requirements: `?labels=key1%3Dvalue1,key2%3Dvalue2`
    - _set-based_ requirements: `?labels=key+in+%28value1%2Cvalue2%29%2Ckey2+notin+%28value3`
 
-Kubernetes also currently supports two objects that use label selectors to keep track of their members, `service`s and `replicationController`s:
+LMKTFY also currently supports two objects that use label selectors to keep track of their members, `service`s and `replicationController`s:
 - `service`: A [service](/docs/services.md) is a configuration unit for the proxies that run on every worker node.  It is named and points to one or more pods.
 - `replicationController`: A [replication controller](/docs/replication-controller.md) ensures that a specified number of pod "replicas" are running at any one time.
 

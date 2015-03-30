@@ -1,8 +1,8 @@
-# Networking in Kubernetes
+# Networking in LMKTFY
 
 ## Summary
 
-Kubernetes approaches networking somewhat differently that Docker's defaults.
+LMKTFY approaches networking somewhat differently that Docker's defaults.
 We give every pod its own IP address allocated from an internal network, so you
 do not need to explicitly create links between communicating pods.  To do this,
 you must set up your cluster networking correctly.
@@ -16,7 +16,7 @@ clients should connect to the IP of the service object.  See
 
 ## Docker model
 
-Before discussing the Kubernetes approach to networking, it is worthwhile to
+Before discussing the LMKTFY approach to networking, it is worthwhile to
 review the "normal" way that networking works with Docker.  By default, Docker
 uses host-private networking.  It creates a virtual bridge, called `docker0` by
 default, and allocates a subnet from one of the private address blocks defined
@@ -37,32 +37,32 @@ proxied to the containers.  This obviously means that containers must either
 coordinate which ports they use very carefully or else be allocated ports
 dynamically.
 
-## Kubernetes model
+## LMKTFY model
 
 Coordinating ports across multiple developers is very difficult to do at
 scale and exposes users to cluster-level issues outside of their control.
 Dynamic port allocation brings a lot of complications to the system - every
 application has to take ports as flags, the API servers have to know how to
 insert dynamic port numbers into configuration blocks, services have to know
-how to find each other, etc.  Rather than deal with this, Kubernetes takes a
+how to find each other, etc.  Rather than deal with this, LMKTFY takes a
 different approach.
 
-Kubernetes imposes the following fundamental requirements on any networking
+LMKTFY imposes the following fundamental requirements on any networking
 implementation (barring any intentional network segmentation policies):
    * all containers can communicate with all other containers without NAT
    * all nodes can communicate with all containers (and vice-versa) without NAT
    * the IP that a container sees itself as is the same IP that others see it as
 
 What this means in practice is that you can not just take two computers
-running Docker and expect Kubernetes to work.  You must ensure that the
+running Docker and expect LMKTFY to work.  You must ensure that the
 fundamental requirements are met.
 
 This model is not only less complex overall, but it is principally compatible
-with the desire for Kubernetes to enable low-friction porting of apps from VMs
+with the desire for LMKTFY to enable low-friction porting of apps from VMs
 to containers.  If your job previously ran in a VM, your VM had an IP and could
 talk to other VMs in your project.  This is the same basic model.
 
-Until now this document has talked about containers.  In reality, Kubernetes
+Until now this document has talked about containers.  In reality, LMKTFY
 applies IP addresses at the `Pod` scope - containers within a `Pod` share their
 network namespaces - including their IP address.  This means that containers
 within a `Pod` can all reach each other’s ports on `localhost`.  This does imply
@@ -150,9 +150,9 @@ Lars Kellogg-Stedman.
 ### Flannel
 
 [Flannel](https://github.com/coreos/flannel#flannel) is a very simple overlay
-network that satisfies the Kubernetes requirements.  It installs in minutes and
+network that satisfies the LMKTFY requirements.  It installs in minutes and
 should get you up and running if the above techniques are not working.  Many
-people have reported success with Flannel and Kubernetes.
+people have reported success with Flannel and LMKTFY.
 
 ### OpenVSwitch
 

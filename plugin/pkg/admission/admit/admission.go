@@ -19,8 +19,8 @@ package admit
 import (
 	"io"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/admission"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/admission"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/client"
 )
 
 func init() {
@@ -30,7 +30,7 @@ func init() {
 }
 
 // alwaysAdmit is an implementation of admission.Interface which always says yes to an admit request.
-// It is useful in tests and when using kubernetes in an open manner.
+// It is useful in tests and when using lmktfy in an open manner.
 type alwaysAdmit struct{}
 
 func (alwaysAdmit) Admit(a admission.Attributes) (err error) {

@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/client"
 
 	. "github.com/onsi/ginkgo"
 )
@@ -55,7 +55,7 @@ func CheckCadvisorHealthOnAllNodes(c *client.Client, timeout time.Duration) {
 		errors = []error{}
 		for _, node := range nodeList.Items {
 			// cadvisor is not accessible directly unless its port (4194 by default) is exposed.
-			// Here, we access '/stats/' REST endpoint on the kubelet which polls cadvisor internally.
+			// Here, we access '/stats/' REST endpoint on the lmktfylet which polls cadvisor internally.
 			statsResource := fmt.Sprintf("api/v1beta1/proxy/minions/%s/stats/", node.Name)
 			By(fmt.Sprintf("Querying stats from node %s using url %s", node.Name, statsResource))
 			_, err = c.Get().AbsPath(statsResource).Timeout(timeout).Do().Raw()
@@ -69,7 +69,7 @@ func CheckCadvisorHealthOnAllNodes(c *client.Client, timeout time.Duration) {
 		if retries--; retries <= 0 {
 			break
 		}
-		Logf("failed to retrieve kubelet stats -\n %v", errors)
+		Logf("failed to retrieve lmktfylet stats -\n %v", errors)
 		time.Sleep(sleepDuration)
 	}
 	Failf("Failed after retrying %d times for cadvisor to be healthy on all nodes. Errors:\n%v", maxRetries, errors)

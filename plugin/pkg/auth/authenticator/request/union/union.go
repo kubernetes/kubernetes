@@ -19,9 +19,9 @@ package union
 import (
 	"net/http"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/authenticator"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/user"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/errors"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/auth/authenticator"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/auth/user"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/util/errors"
 )
 
 // unionAuthRequestHandler authenticates requests using a chain of authenticator.Requests

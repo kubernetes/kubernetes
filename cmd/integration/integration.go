@@ -33,30 +33,30 @@ import (
 	"sync"
 	"time"
 
-	kubeletapp "github.com/GoogleCloudPlatform/kubernetes/cmd/kubelet/app"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	apierrors "github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
-	nodeControllerPkg "github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/controller"
-	replicationControllerPkg "github.com/GoogleCloudPlatform/kubernetes/pkg/controller"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/cadvisor"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/dockertools"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/master"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/probe"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/service"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/wait"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume/empty_dir"
-	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/admission/admit"
-	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler"
-	_ "github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler/algorithmprovider"
-	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler/factory"
+	lmktfyletapp "github.com/GoogleCloudPlatform/lmktfy/cmd/lmktfylet/app"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api"
+	apierrors "github.com/GoogleCloudPlatform/lmktfy/pkg/api/errors"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api/latest"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api/resource"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/apiserver"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/client"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/client/record"
+	nodeControllerPkg "github.com/GoogleCloudPlatform/lmktfy/pkg/cloudprovider/controller"
+	replicationControllerPkg "github.com/GoogleCloudPlatform/lmktfy/pkg/controller"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/lmktfylet"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/lmktfylet/cadvisor"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/lmktfylet/dockertools"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/labels"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/master"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/probe"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/service"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/util"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/util/wait"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/volume/empty_dir"
+	"github.com/GoogleCloudPlatform/lmktfy/plugin/pkg/admission/admit"
+	"github.com/GoogleCloudPlatform/lmktfy/plugin/pkg/scheduler"
+	_ "github.com/GoogleCloudPlatform/lmktfy/plugin/pkg/scheduler/algorithmprovider"
+	"github.com/GoogleCloudPlatform/lmktfy/plugin/pkg/scheduler/factory"
 
 	"github.com/coreos/go-etcd/etcd"
 	"github.com/golang/glog"
@@ -69,21 +69,21 @@ var (
 	apiVersion string
 )
 
-type fakeKubeletClient struct{}
+type fakeLMKTFYletClient struct{}
 
-func (fakeKubeletClient) GetPodStatus(host, podNamespace, podName string) (api.PodStatusResult, error) {
+func (fakeLMKTFYletClient) GetPodStatus(host, podNamespace, podName string) (api.PodStatusResult, error) {
 	glog.V(3).Infof("Trying to get container info for %v/%v/%v", host, podNamespace, podName)
 	// This is a horrible hack to get around the fact that we can't provide
-	// different port numbers per kubelet...
+	// different port numbers per lmktfylet...
 	var c client.PodInfoGetter
 	switch host {
 	case "localhost":
-		c = &client.HTTPKubeletClient{
+		c = &client.HTTPLMKTFYletClient{
 			Client: http.DefaultClient,
 			Port:   10250,
 		}
 	case "127.0.0.1":
-		c = &client.HTTPKubeletClient{
+		c = &client.HTTPLMKTFYletClient{
 			Client: http.DefaultClient,
 			Port:   10251,
 		}
@@ -101,15 +101,15 @@ func (fakeKubeletClient) GetPodStatus(host, podNamespace, podName string) (api.P
 	return r, nil
 }
 
-func (fakeKubeletClient) GetNodeInfo(host string) (api.NodeInfo, error) {
+func (fakeLMKTFYletClient) GetNodeInfo(host string) (api.NodeInfo, error) {
 	return api.NodeInfo{}, nil
 }
 
-func (fakeKubeletClient) GetConnectionInfo(host string) (string, uint, http.RoundTripper, error) {
+func (fakeLMKTFYletClient) GetConnectionInfo(host string) (string, uint, http.RoundTripper, error) {
 	return "", 0, nil, errors.New("Not Implemented")
 }
 
-func (fakeKubeletClient) HealthCheck(host string) (probe.Result, error) {
+func (fakeLMKTFYletClient) HealthCheck(host string) (probe.Result, error) {
 	return probe.Success, nil
 }
 
@@ -184,7 +184,7 @@ func startComponents(firstManifestURL, secondManifestURL, apiVersion string) (st
 	// Create a master and install handlers into mux.
 	m := master.New(&master.Config{
 		EtcdHelper:        helper,
-		KubeletClient:     fakeKubeletClient{},
+		LMKTFYletClient:     fakeLMKTFYletClient{},
 		EnableLogsSupport: false,
 		EnableProfiling:   true,
 		APIPrefix:         "/api",
@@ -221,24 +221,24 @@ func startComponents(firstManifestURL, secondManifestURL, apiVersion string) (st
 			api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
 		}}
 
-	nodeController := nodeControllerPkg.NewNodeController(nil, "", machineList, nodeResources, cl, fakeKubeletClient{},
+	nodeController := nodeControllerPkg.NewNodeController(nil, "", machineList, nodeResources, cl, fakeLMKTFYletClient{},
 		record.FromSource(api.EventSource{Component: "controllermanager"}), 10, 5*time.Minute)
 	nodeController.Run(5*time.Second, true, false)
 	cadvisorInterface := new(cadvisor.Fake)
 
-	// Kubelet (localhost)
-	testRootDir := makeTempDirOrDie("kubelet_integ_1.", "")
+	// LMKTFYlet (localhost)
+	testRootDir := makeTempDirOrDie("lmktfylet_integ_1.", "")
 	configFilePath := makeTempDirOrDie("config", testRootDir)
-	glog.Infof("Using %s as root dir for kubelet #1", testRootDir)
-	kcfg := kubeletapp.SimpleKubelet(cl, &fakeDocker1, machineList[0], testRootDir, firstManifestURL, "127.0.0.1", 10250, api.NamespaceDefault, empty_dir.ProbeVolumePlugins(), nil, cadvisorInterface, configFilePath, nil)
-	kubeletapp.RunKubelet(kcfg)
-	// Kubelet (machine)
-	// Create a second kubelet so that the guestbook example's two redis slaves both
+	glog.Infof("Using %s as root dir for lmktfylet #1", testRootDir)
+	kcfg := lmktfyletapp.SimpleLMKTFYlet(cl, &fakeDocker1, machineList[0], testRootDir, firstManifestURL, "127.0.0.1", 10250, api.NamespaceDefault, empty_dir.ProbeVolumePlugins(), nil, cadvisorInterface, configFilePath, nil)
+	lmktfyletapp.RunLMKTFYlet(kcfg)
+	// LMKTFYlet (machine)
+	// Create a second lmktfylet so that the guestbook example's two redis slaves both
 	// have a place they can schedule.
-	testRootDir = makeTempDirOrDie("kubelet_integ_2.", "")
-	glog.Infof("Using %s as root dir for kubelet #2", testRootDir)
-	kcfg = kubeletapp.SimpleKubelet(cl, &fakeDocker2, machineList[1], testRootDir, secondManifestURL, "127.0.0.1", 10251, api.NamespaceDefault, empty_dir.ProbeVolumePlugins(), nil, cadvisorInterface, "", nil)
-	kubeletapp.RunKubelet(kcfg)
+	testRootDir = makeTempDirOrDie("lmktfylet_integ_2.", "")
+	glog.Infof("Using %s as root dir for lmktfylet #2", testRootDir)
+	kcfg = lmktfyletapp.SimpleLMKTFYlet(cl, &fakeDocker2, machineList[1], testRootDir, secondManifestURL, "127.0.0.1", 10251, api.NamespaceDefault, empty_dir.ProbeVolumePlugins(), nil, cadvisorInterface, "", nil)
+	lmktfyletapp.RunLMKTFYlet(kcfg)
 	return apiServer.URL, configFilePath
 }
 
@@ -258,7 +258,7 @@ func makeTempDirOrDie(prefix string, baseDir string) string {
 
 // podsOnMinions returns true when all of the selected pods exist on a minion.
 func podsOnMinions(c *client.Client, pods api.PodList) wait.ConditionFunc {
-	podInfo := fakeKubeletClient{}
+	podInfo := fakeLMKTFYletClient{}
 	return func() (bool, error) {
 		for i := range pods.Items {
 			host, id, namespace := pods.Items[i].Status.Host, pods.Items[i].Name, pods.Items[i].Namespace
@@ -347,7 +347,7 @@ func runStaticPodTest(c *client.Client, configFilePath string) {
 id: static-pod-from-manifest
 containers:
   - name: static-container
-    image: kubernetes/pause`,
+    image: lmktfy/pause`,
 		},
 		{
 			desc: "static-pod-from-spec",
@@ -360,7 +360,7 @@ containers:
 				"spec": {
 					"containers": [{
 						"name": "static-container",
-						"image": "kubernetes/pause"
+						"image": "lmktfy/pause"
 					}]
 				}
 			}`,
@@ -376,7 +376,7 @@ containers:
 
 			// Wait for the mirror pod to be created.
 			podName := fmt.Sprintf("%s-localhost", desc)
-			namespace := kubelet.NamespaceDefault
+			namespace := lmktfylet.NamespaceDefault
 			if err := wait.Poll(time.Second, time.Minute*2,
 				podRunning(c, namespace, podName)); err != nil {
 				if pods, err := c.Pods(namespace).List(labels.Everything()); err == nil {
@@ -671,37 +671,37 @@ func runMasterServiceTest(client *client.Client) {
 	found := util.StringSet{}
 	for i := range svcList.Items {
 		found.Insert(svcList.Items[i].Name)
-		if svcList.Items[i].Name == "kubernetes" {
+		if svcList.Items[i].Name == "lmktfy" {
 			foundRW = true
 		}
-		if svcList.Items[i].Name == "kubernetes-ro" {
+		if svcList.Items[i].Name == "lmktfy-ro" {
 			foundRO = true
 		}
 	}
 	if foundRW {
-		ep, err := client.Endpoints(api.NamespaceDefault).Get("kubernetes")
+		ep, err := client.Endpoints(api.NamespaceDefault).Get("lmktfy")
 		if err != nil {
-			glog.Fatalf("unexpected error listing endpoints for kubernetes service: %v", err)
+			glog.Fatalf("unexpected error listing endpoints for lmktfy service: %v", err)
 		}
 		if countEndpoints(ep) == 0 {
-			glog.Fatalf("no endpoints for kubernetes service: %v", ep)
+			glog.Fatalf("no endpoints for lmktfy service: %v", ep)
 		}
 	} else {
 		glog.Errorf("no RW service found: %v", found)
 	}
 	if foundRO {
-		ep, err := client.Endpoints(api.NamespaceDefault).Get("kubernetes-ro")
+		ep, err := client.Endpoints(api.NamespaceDefault).Get("lmktfy-ro")
 		if err != nil {
-			glog.Fatalf("unexpected error listing endpoints for kubernetes service: %v", err)
+			glog.Fatalf("unexpected error listing endpoints for lmktfy service: %v", err)
 		}
 		if countEndpoints(ep) == 0 {
-			glog.Fatalf("no endpoints for kubernetes service: %v", ep)
+			glog.Fatalf("no endpoints for lmktfy service: %v", ep)
 		}
 	} else {
 		glog.Errorf("no RO service found: %v", found)
 	}
 	if !foundRW || !foundRO {
-		glog.Fatalf("Kubernetes service test failed: %v", found)
+		glog.Fatalf("LMKTFY service test failed: %v", found)
 	}
 	glog.Infof("Master service test passed.")
 }
@@ -807,7 +807,7 @@ func runServiceTest(client *client.Client) {
 	for _, svc := range svcList.Items {
 		names.Insert(fmt.Sprintf("%s/%s", svc.Namespace, svc.Name))
 	}
-	if !names.HasAll("default/kubernetes", "default/kubernetes-ro", "default/service1", "default/service2", "other/service1") {
+	if !names.HasAll("default/lmktfy", "default/lmktfy-ro", "default/service1", "default/service2", "other/service1") {
 		glog.Fatalf("Unexpected service list: %#v", names)
 	}
 
@@ -820,7 +820,7 @@ func runSchedulerNoPhantomPodsTest(client *client.Client) {
 			Containers: []api.Container{
 				{
 					Name:  "c1",
-					Image: "kubernetes/pause",
+					Image: "lmktfy/pause",
 					Ports: []api.ContainerPort{
 						{ContainerPort: 1234, HostPort: 9999},
 					},
@@ -901,7 +901,7 @@ func main() {
 	// Wait for the synchronization threads to come up.
 	time.Sleep(time.Second * 10)
 
-	kubeClient := client.NewOrDie(&client.Config{Host: apiServerURL, Version: apiVersion})
+	lmktfyClient := client.NewOrDie(&client.Config{Host: apiServerURL, Version: apiVersion})
 
 	// Run tests in parallel
 	testFuncs := []testFunc{
@@ -925,15 +925,15 @@ func main() {
 	for i := range testFuncs {
 		f := testFuncs[i]
 		go func() {
-			f(kubeClient)
+			f(lmktfyClient)
 			wg.Done()
 		}()
 	}
 	wg.Wait()
 
-	// Check that kubelet tried to make the containers.
+	// Check that lmktfylet tried to make the containers.
 	// Using a set to list unique creation attempts. Our fake is
-	// really stupid, so kubelet tries to create these multiple times.
+	// really stupid, so lmktfylet tries to create these multiple times.
 	createdConts := util.StringSet{}
 	for _, p := range fakeDocker1.Created {
 		// The last 8 characters are random, so slice them off.
@@ -948,8 +948,8 @@ func main() {
 		}
 	}
 	// We expect 9: 2 pod infra containers + 2 containers from the replication controller +
-	//              1 pod infra container + 2 containers from the URL on first Kubelet +
-	//              1 pod infra container + 2 containers from the URL on second Kubelet +
+	//              1 pod infra container + 2 containers from the URL on first LMKTFYlet +
+	//              1 pod infra container + 2 containers from the URL on second LMKTFYlet +
 	//              1 pod infra container + 1 container from the service test.
 	// In addition, runStaticPodTest creates 2 pod infra containers +
 	//                                       2 pod containers from the file (1 for manifest and 1 for spec)
@@ -963,10 +963,10 @@ func main() {
 	// This test doesn't run with the others because it can't run in
 	// parallel and also it schedules extra pods which would change the
 	// above pod counting logic.
-	runSchedulerNoPhantomPodsTest(kubeClient)
+	runSchedulerNoPhantomPodsTest(lmktfyClient)
 }
 
-// ServeCachedManifestFile serves a file for kubelet to read.
+// ServeCachedManifestFile serves a file for lmktfylet to read.
 func ServeCachedManifestFile(contents string) (servingAddress string) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/manifest" {
@@ -1013,7 +1013,7 @@ const (
 const (
 	// This is copied from, and should be kept in sync with:
 	// https://raw.githubusercontent.com/GoogleCloudPlatform/container-vm-guestbook-redis-python/master/manifest.yaml
-	// Note that kubelet complains about these containers not having a self link.
+	// Note that lmktfylet complains about these containers not having a self link.
 	testManifestFile = `version: v1beta2
 id: container-vm-guestbook-manifest
 containers:

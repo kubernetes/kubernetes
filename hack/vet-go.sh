@@ -19,15 +19,15 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
-source "${KUBE_ROOT}/hack/lib/init.sh"
+LMKTFY_ROOT=$(dirname "${BASH_SOURCE}")/..
+source "${LMKTFY_ROOT}/hack/lib/init.sh"
 
-kube::golang::setup_env
+lmktfy::golang::setup_env
 
-cd "${KUBE_ROOT}"
+cd "${LMKTFY_ROOT}"
 
 # Use eval to preserve embedded quoted strings.
-eval "goflags=(${KUBE_GOFLAGS:-})"
+eval "goflags=(${LMKTFY_GOFLAGS:-})"
 
 # Filter out arguments that start with "-" and move them to goflags.
 targets=()

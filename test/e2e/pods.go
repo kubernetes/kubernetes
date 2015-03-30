@@ -22,12 +22,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/client"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/fields"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/labels"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/util"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/watch"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -136,7 +136,7 @@ var _ = Describe("Pods", func() {
 			Fail(fmt.Sprintf("Failed to set up watch: %v", err))
 		}
 
-		By("submitting the pod to kubernetes")
+		By("submitting the pod to lmktfy")
 		// We call defer here in case there is a problem with
 		// the test so we can ensure that we clean up after
 		// ourselves
@@ -146,7 +146,7 @@ var _ = Describe("Pods", func() {
 			Fail(fmt.Sprintf("Failed to create pod: %v", err))
 		}
 
-		By("verifying the pod is in kubernetes")
+		By("verifying the pod is in lmktfy")
 		pods, err = podClient.List(labels.SelectorFromSet(labels.Set(map[string]string{"time": value})))
 		if err != nil {
 			Fail(fmt.Sprintf("Failed to query for pods: %v", err))
@@ -224,7 +224,7 @@ var _ = Describe("Pods", func() {
 			},
 		}
 
-		By("submitting the pod to kubernetes")
+		By("submitting the pod to lmktfy")
 		defer func() {
 			By("deleting the pod")
 			podClient.Delete(pod.Name)
@@ -236,7 +236,7 @@ var _ = Describe("Pods", func() {
 
 		expectNoError(waitForPodRunning(c, pod.Name))
 
-		By("verifying the pod is in kubernetes")
+		By("verifying the pod is in lmktfy")
 		pods, err := podClient.List(labels.SelectorFromSet(labels.Set(map[string]string{"time": value})))
 		Expect(len(pods.Items)).To(Equal(1))
 
@@ -259,7 +259,7 @@ var _ = Describe("Pods", func() {
 
 		expectNoError(waitForPodRunning(c, pod.Name))
 
-		By("verifying the updated pod is in kubernetes")
+		By("verifying the updated pod is in lmktfy")
 		pods, err = podClient.List(labels.SelectorFromSet(labels.Set(map[string]string{"time": value})))
 		Expect(len(pods.Items)).To(Equal(1))
 		fmt.Println("pod update OK")
@@ -278,7 +278,7 @@ var _ = Describe("Pods", func() {
 				Containers: []api.Container{
 					{
 						Name:  "srv",
-						Image: "kubernetes/serve_hostname",
+						Image: "lmktfy/serve_hostname",
 						Ports: []api.ContainerPort{{ContainerPort: 9376}},
 					},
 				},
@@ -431,7 +431,7 @@ var _ = Describe("Pods", func() {
 				Containers: []api.Container{
 					{
 						Name:    "liveness",
-						Image:   "kubernetes/liveness",
+						Image:   "lmktfy/liveness",
 						Command: []string{"/server"},
 						LivenessProbe: &api.Probe{
 							Handler: api.Handler{
@@ -450,7 +450,7 @@ var _ = Describe("Pods", func() {
 
 	// The following tests for remote command execution and port forwarding are
 	// commented out because the GCE environment does not currently have nsenter
-	// in the kubelet's PATH, nor does it have socat installed. Once we figure
+	// in the lmktfylet's PATH, nor does it have socat installed. Once we figure
 	// out the best way to have nsenter and socat available in GCE (and hopefully
 	// all providers), we can enable these tests.
 	/*
@@ -483,7 +483,7 @@ var _ = Describe("Pods", func() {
 				},
 			}
 
-			By("submitting the pod to kubernetes")
+			By("submitting the pod to lmktfy")
 			_, err = podClient.Create(pod)
 			if err != nil {
 				Fail(fmt.Sprintf("Failed to create pod: %v", err))
@@ -498,7 +498,7 @@ var _ = Describe("Pods", func() {
 			By("waiting for the pod to start running")
 			expectNoError(waitForPodRunning(c, pod.Name, 300*time.Second))
 
-			By("verifying the pod is in kubernetes")
+			By("verifying the pod is in lmktfy")
 			pods, err := podClient.List(labels.SelectorFromSet(labels.Set(map[string]string{"time": value})))
 			if err != nil {
 				Fail(fmt.Sprintf("Failed to query for pods: %v", err))
@@ -556,7 +556,7 @@ var _ = Describe("Pods", func() {
 				},
 			}
 
-			By("submitting the pod to kubernetes")
+			By("submitting the pod to lmktfy")
 			_, err = podClient.Create(pod)
 			if err != nil {
 				Fail(fmt.Sprintf("Failed to create pod: %v", err))
@@ -571,7 +571,7 @@ var _ = Describe("Pods", func() {
 			By("waiting for the pod to start running")
 			expectNoError(waitForPodRunning(c, pod.Name, 300*time.Second))
 
-			By("verifying the pod is in kubernetes")
+			By("verifying the pod is in lmktfy")
 			pods, err := podClient.List(labels.SelectorFromSet(labels.Set(map[string]string{"time": value})))
 			if err != nil {
 				Fail(fmt.Sprintf("Failed to query for pods: %v", err))

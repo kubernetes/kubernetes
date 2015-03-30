@@ -17,12 +17,12 @@ limitations under the License.
 package api
 
 import (
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api/resource"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/fields"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/labels"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/runtime"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/types"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/util"
 )
 
 // Common string formats
@@ -128,8 +128,8 @@ type ObjectMeta struct {
 	// resource lists, and not reachable by name) after the time in this field. Once set, this
 	// value may not be unset or be set further into the future, although it may be shortened
 	// or the resource may be deleted prior to this time. For example, a user may request that
-	// a pod is deleted in 30 seconds. The Kubelet will react by sending a graceful termination
-	// signal to the containers in the pod. Once the resource is deleted in the API, the Kubelet
+	// a pod is deleted in 30 seconds. The LMKTFYlet will react by sending a graceful termination
+	// signal to the containers in the pod. Once the resource is deleted in the API, the LMKTFYlet
 	// will send a hard termination signal to the container.
 	DeletionTimestamp *util.Time `json:"deletionTimestamp,omitempty"`
 
@@ -141,7 +141,7 @@ type ObjectMeta struct {
 	//     name ::= DNS_LABEL
 	// The prefix is optional.  If the prefix is not specified, the key is assumed to be private
 	// to the user.  Other system components that wish to use labels must specify a prefix.  The
-	// "kubernetes.io/" prefix is reserved for use by kubernetes components.
+	// "lmktfy.io/" prefix is reserved for use by lmktfy components.
 	// TODO: replace map[string]string with labels.LabelSet type
 	Labels map[string]string `json:"labels,omitempty"`
 
@@ -187,7 +187,7 @@ type VolumeSource struct {
 	// EmptyDir represents a temporary directory that shares a pod's lifetime.
 	EmptyDir *EmptyDirVolumeSource `json:"emptyDir"`
 	// GCEPersistentDisk represents a GCE Disk resource that is attached to a
-	// kubelet's host machine and then exposed to the pod.
+	// lmktfylet's host machine and then exposed to the pod.
 	GCEPersistentDisk *GCEPersistentDiskVolumeSource `json:"gcePersistentDisk"`
 	// GitRepo represents a git repository at a particular revision.
 	GitRepo *GitRepoVolumeSource `json:"gitRepo"`
@@ -201,7 +201,7 @@ type VolumeSource struct {
 // Exactly one of its members must be set.
 type PersistentVolumeSource struct {
 	// GCEPersistentDisk represents a GCE Disk resource that is attached to a
-	// kubelet's host machine and then exposed to the pod.
+	// lmktfylet's host machine and then exposed to the pod.
 	GCEPersistentDisk *GCEPersistentDiskVolumeSource `json:"gcePersistentDisk"`
 	// HostPath represents a directory on the host.
 	// This is useful for development and testing only.
@@ -348,7 +348,7 @@ const (
 // GCEPersistentDiskVolumeSource represents a Persistent Disk resource in Google Compute Engine.
 //
 // A GCE PD must exist and be formatted before mounting to a container.
-// The disk must also be in the same GCE project and zone as the kubelet.
+// The disk must also be in the same GCE project and zone as the lmktfylet.
 // A GCE PD can only be mounted as read/write once.
 type GCEPersistentDiskVolumeSource struct {
 	// Unique name of the PD resource. Used to identify the disk in GCE
@@ -359,7 +359,7 @@ type GCEPersistentDiskVolumeSource struct {
 	// TODO: how do we prevent errors in the filesystem from compromising the machine
 	FSType string `json:"fsType,omitempty"`
 	// Optional: Partition on the disk to mount.
-	// If omitted, kubelet will attempt to mount the device name.
+	// If omitted, lmktfylet will attempt to mount the device name.
 	// Ex. For /dev/sda1, this field is "1", for /dev/sda, this field is 0 or empty.
 	Partition int `json:"partition,omitempty"`
 	// Optional: Defaults to false (read/write). ReadOnly here will force
@@ -471,11 +471,11 @@ type Probe struct {
 type PullPolicy string
 
 const (
-	// PullAlways means that kubelet always attempts to pull the latest image.  Container will fail If the pull fails.
+	// PullAlways means that lmktfylet always attempts to pull the latest image.  Container will fail If the pull fails.
 	PullAlways PullPolicy = "Always"
-	// PullNever means that kubelet never pulls an image, but only uses a local image.  Container will fail if the image isn't present
+	// PullNever means that lmktfylet never pulls an image, but only uses a local image.  Container will fail if the image isn't present
 	PullNever PullPolicy = "Never"
-	// PullIfNotPresent means that kubelet pulls if the image isn't present on disk. Container will fail if the image isn't present and the pull fails.
+	// PullIfNotPresent means that lmktfylet pulls if the image isn't present on disk. Container will fail if the image isn't present and the pull fails.
 	PullIfNotPresent PullPolicy = "IfNotPresent"
 )
 
@@ -552,12 +552,12 @@ type Lifecycle struct {
 	PreStop *Handler `json:"preStop,omitempty"`
 }
 
-// The below types are used by kube_client and api_server.
+// The below types are used by lmktfy_client and api_server.
 
 type ConditionStatus string
 
 // These are valid condition statuses. "ConditionTrue" means a resource is in the condition;
-// "ConditionFalse" means a resource is not in the condition; "ConditionUnknown" means kubernetes
+// "ConditionFalse" means a resource is not in the condition; "ConditionUnknown" means lmktfy
 // can't decide if a resource is in the condition or not. In the future, we could add other
 // intermediate conditions, e.g. ConditionDegraded.
 const (
@@ -684,11 +684,11 @@ type DNSPolicy string
 const (
 	// DNSClusterFirst indicates that the pod should use cluster DNS
 	// first, if it is available, then fall back on the default (as
-	// determined by kubelet) DNS settings.
+	// determined by lmktfylet) DNS settings.
 	DNSClusterFirst DNSPolicy = "ClusterFirst"
 
 	// DNSDefault indicates that the pod should use the default (as
-	// determined by kubelet) DNS settings.
+	// determined by lmktfylet) DNS settings.
 	DNSDefault DNSPolicy = "Default"
 )
 
@@ -735,7 +735,7 @@ type PodStatus struct {
 	ContainerStatuses []ContainerStatus `json:"containerStatuses,omitempty"`
 }
 
-// PodStatusResult is a wrapper for PodStatus returned by kubelet that can be encode/decoded
+// PodStatusResult is a wrapper for PodStatus returned by lmktfylet that can be encode/decoded
 type PodStatusResult struct {
 	TypeMeta   `json:",inline"`
 	ObjectMeta `json:"metadata,omitempty"`
@@ -871,7 +871,7 @@ type ServiceSpec struct {
 	Protocol Protocol `json:"protocol,omitempty"`
 
 	// This service will route traffic to pods having labels matching this selector. If empty or not present,
-	// the service is assumed to have endpoints set by an external process and Kubernetes will not modify
+	// the service is assumed to have endpoints set by an external process and LMKTFY will not modify
 	// those endpoints.
 	Selector map[string]string `json:"selector"`
 
@@ -957,7 +957,7 @@ type EndpointAddress struct {
 	// TODO: This should allow hostname or IP, see #4447.
 	IP string
 
-	// Optional: The kubernetes object related to the entry point.
+	// Optional: The lmktfy object related to the entry point.
 	TargetRef *ObjectReference
 }
 
@@ -1009,10 +1009,10 @@ type NodeSystemInfo struct {
 	OsImage string `json:"osImage"`
 	// Container runtime version reported by the node
 	ContainerRuntimeVersion string `json:"containerRuntimeVersion"`
-	// Kubelet version reported by the node
-	KubeletVersion string `json:"kubeletVersion"`
-	// Kube-proxy version reported by the node
-	KubeProxyVersion string `json:"kubeProxyVersion"`
+	// LMKTFYlet version reported by the node
+	LMKTFYletVersion string `json:"lmktfyletVersion"`
+	// LMKTFY-proxy version reported by the node
+	LMKTFYProxyVersion string `json:"lmktfyProxyVersion"`
 }
 
 // NodeStatus is information about the current status of a node.
@@ -1044,7 +1044,7 @@ type NodePhase string
 const (
 	// NodePending means the node has been created/added by the system, but not configured.
 	NodePending NodePhase = "Pending"
-	// NodeRunning means the node has been configured and has Kubernetes components running.
+	// NodeRunning means the node has been configured and has LMKTFY components running.
 	NodeRunning NodePhase = "Running"
 	// NodeTerminated means the node has been removed from the cluster.
 	NodeTerminated NodePhase = "Terminated"
@@ -1090,7 +1090,7 @@ type NodeAddress struct {
 }
 
 // NodeResources is an object for conveying resource information about a node.
-// see https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/resources.md for more details.
+// see https://github.com/GoogleCloudPlatform/lmktfy/blob/master/docs/resources.md for more details.
 // TODO: Use ResourceList instead?
 type NodeResources struct {
 	// Capacity represents the available resources of a node
@@ -1112,7 +1112,7 @@ const (
 // ResourceList is a set of (resource name, quantity) pairs.
 type ResourceList map[ResourceName]resource.Quantity
 
-// Node is a worker node in Kubernetes
+// Node is a worker node in LMKTFY
 // The name of the node according to etcd is in ObjectMeta.Name.
 type Node struct {
 	TypeMeta   `json:",inline"`
@@ -1141,9 +1141,9 @@ type NamespaceSpec struct {
 
 type FinalizerName string
 
-// These are internal finalizer values to Kubernetes, must be qualified name unless defined here
+// These are internal finalizer values to LMKTFY, must be qualified name unless defined here
 const (
-	FinalizerKubernetes FinalizerName = "kubernetes"
+	FinalizerLMKTFY FinalizerName = "lmktfy"
 )
 
 // NamespaceStatus is information about the current status of a Namespace.
@@ -1491,7 +1491,7 @@ type EventList struct {
 
 // ContainerManifest corresponds to the Container Manifest format, documented at:
 // https://developers.google.com/compute/docs/containers/container_vms#container_manifest
-// This is used as the representation of Kubernetes workloads.
+// This is used as the representation of LMKTFY workloads.
 // DEPRECATED: Replaced with Pod
 type ContainerManifest struct {
 	// Required: This must be a supported version string, such as "v1beta1".
@@ -1510,7 +1510,7 @@ type ContainerManifest struct {
 	DNSPolicy DNSPolicy `json:"dnsPolicy"`
 }
 
-// ContainerManifestList is used to communicate container manifests to kubelet.
+// ContainerManifestList is used to communicate container manifests to lmktfylet.
 // DEPRECATED: Replaced with Pods
 type ContainerManifestList struct {
 	TypeMeta `json:",inline"`
@@ -1571,7 +1571,7 @@ type LimitRangeList struct {
 	Items []LimitRange `json:"items"`
 }
 
-// The following identify resource constants for Kubernetes object types
+// The following identify resource constants for LMKTFY object types
 const (
 	// Pods, number
 	ResourcePods ResourceName = "pods"

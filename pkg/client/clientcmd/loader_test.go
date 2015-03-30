@@ -27,8 +27,8 @@ import (
 
 	"github.com/ghodss/yaml"
 
-	clientcmdapi "github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd/api"
-	clientcmdlatest "github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd/api/latest"
+	clientcmdapi "github.com/GoogleCloudPlatform/lmktfy/pkg/client/clientcmd/api"
+	clientcmdlatest "github.com/GoogleCloudPlatform/lmktfy/pkg/client/clientcmd/api/latest"
 )
 
 var (
@@ -196,12 +196,12 @@ func TestResolveRelativePaths(t *testing.T) {
 	}
 
 	configDir1, _ := ioutil.TempDir("", "")
-	configFile1 := path.Join(configDir1, ".kubeconfig")
+	configFile1 := path.Join(configDir1, ".lmktfyconfig")
 	configDir1, _ = filepath.Abs(configDir1)
 	defer os.Remove(configFile1)
 	configDir2, _ := ioutil.TempDir("", "")
 	configDir2, _ = ioutil.TempDir(configDir2, "")
-	configFile2 := path.Join(configDir2, ".kubeconfig")
+	configFile2 := path.Join(configDir2, ".lmktfyconfig")
 	configDir2, _ = filepath.Abs(configDir2)
 	defer os.Remove(configFile2)
 

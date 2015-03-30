@@ -1,7 +1,7 @@
 # Storm example
 
 Following this example, you will create a functional [Apache
-Storm](http://storm.apache.org/) cluster using Kubernetes and
+Storm](http://storm.apache.org/) cluster using LMKTFY and
 [Docker](http://docker.io).
 
 You will setup an [Apache ZooKeeper](http://zookeeper.apache.org/)
@@ -13,8 +13,8 @@ section.
 
 ## Step Zero: Prerequisites
 
-This example assumes you have a Kubernetes cluster installed and
-running, and that you have installed the ```kubectl``` command line
+This example assumes you have a LMKTFY cluster installed and
+running, and that you have installed the ```lmktfyctl``` command line
 tool somewhere in your path. Please see the [getting
 started](../../docs/getting-started-guides) for installation
 instructions for your platform.
@@ -28,7 +28,7 @@ Use the `examples/storm/zookeeper.json` file to create a pod running
 the ZooKeeper service.
 
 ```shell
-$ kubectl create -f examples/storm/zookeeper.json
+$ lmktfyctl create -f examples/storm/zookeeper.json
 ```
 
 Then, use the `examples/storm/zookeeper-service.json` file to create a
@@ -36,7 +36,7 @@ logical service endpoint that Storm can use to access the ZooKeeper
 pod.
 
 ```shell
-$ kubectl create -f examples/storm/zookeeper-service.json
+$ lmktfyctl create -f examples/storm/zookeeper-service.json
 ```
 
 You should make sure the ZooKeeper pod is Running and accessible
@@ -45,7 +45,7 @@ before proceeding.
 ### Check to see if ZooKeeper is running
 
 ```shell
-$ kubectl get pods
+$ lmktfyctl get pods
 POD                 IP                  CONTAINER(S)        IMAGE(S)             HOST                          LABELS                      STATUS
 zookeeper           192.168.86.4        zookeeper           mattf/zookeeper      172.18.145.8/172.18.145.8     name=zookeeper              Running
 ```
@@ -53,10 +53,10 @@ zookeeper           192.168.86.4        zookeeper           mattf/zookeeper     
 ### Check to see if ZooKeeper is accessible
 
 ```shell
-$ kubectl get services
+$ lmktfyctl get services
 NAME                LABELS                                    SELECTOR            IP                  PORT
-kubernetes          component=apiserver,provider=kubernetes   <none>              10.254.0.2          443
-kubernetes-ro       component=apiserver,provider=kubernetes   <none>              10.254.0.1          80
+lmktfy          component=apiserver,provider=lmktfy   <none>              10.254.0.2          443
+lmktfy-ro       component=apiserver,provider=lmktfy   <none>              10.254.0.1          80
 zookeeper           name=zookeeper                            name=zookeeper      10.254.139.141      2181
 
 $ echo ruok | nc 10.254.139.141 2181; echo
@@ -72,7 +72,7 @@ Use the `examples/storm/storm-nimbus.json` file to create a pod running
 the Nimbus service.
 
 ```shell
-$ kubectl create -f examples/storm/storm-nimbus.json
+$ lmktfyctl create -f examples/storm/storm-nimbus.json
 ```
 
 Then, use the `examples/storm/storm-nimbus-service.json` file to
@@ -80,7 +80,7 @@ create a logical service endpoint that Storm workers can use to access
 the Nimbus pod.
 
 ```shell
-$ kubectl create -f examples/storm/storm-nimbus-service.json
+$ lmktfyctl create -f examples/storm/storm-nimbus-service.json
 ```
 
 Ensure that the Nimbus service is running and functional.
@@ -88,10 +88,10 @@ Ensure that the Nimbus service is running and functional.
 ### Check to see if Nimbus is running and accessible
 
 ```shell
-$ kubectl get services
+$ lmktfyctl get services
 NAME                LABELS                                    SELECTOR            IP                  PORT
-kubernetes          component=apiserver,provider=kubernetes   <none>              10.254.0.2          443
-kubernetes-ro       component=apiserver,provider=kubernetes   <none>              10.254.0.1          80
+lmktfy          component=apiserver,provider=lmktfy   <none>              10.254.0.2          443
+lmktfy-ro       component=apiserver,provider=lmktfy   <none>              10.254.0.1          80
 zookeeper           name=zookeeper                            name=zookeeper      10.254.139.141      2181
 nimbus              name=nimbus                               name=nimbus         10.254.115.208      6627
 
@@ -113,7 +113,7 @@ Use the `examples/storm/storm-worker-controller.json` file to create a
 ReplicationController that manages the worker pods.
 
 ```shell
-$ kubectl create -f examples/storm/storm-worker-controller.json
+$ lmktfyctl create -f examples/storm/storm-worker-controller.json
 ```
 
 ### Check to see if the workers are running
@@ -149,16 +149,16 @@ before and after creating the ReplicationController.
 
 ## tl;dr
 
-```kubectl create -f zookeeper.json```
+```lmktfyctl create -f zookeeper.json```
 
-```kubectl create -f zookeeper-service.json```
+```lmktfyctl create -f zookeeper-service.json```
 
-Make sure the ZooKeeper Pod is running (use: ```kubectl get pods```).
+Make sure the ZooKeeper Pod is running (use: ```lmktfyctl get pods```).
 
-```kubectl create -f storm-nimbus.json```
+```lmktfyctl create -f storm-nimbus.json```
 
-```kubectl create -f storm-nimbus-service.json```
+```lmktfyctl create -f storm-nimbus-service.json```
 
 Make sure the Nimbus Pod is running.
 
-```kubectl create -f storm-worker-controller.json```
+```lmktfyctl create -f storm-worker-controller.json```

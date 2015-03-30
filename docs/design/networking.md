@@ -2,7 +2,7 @@
 
 ## Model and motivation
 
-Kubernetes deviates from the default Docker networking model.  The goal is for each pod to have an IP in a flat shared networking namespace that has full communication with other physical computers and containers across the network.  IP-per-pod creates a clean, backward-compatible model where pods can be treated much like VMs or physical hosts from the perspectives of port allocation, networking, naming, service discovery, load balancing, application configuration, and migration.
+LMKTFY deviates from the default Docker networking model.  The goal is for each pod to have an IP in a flat shared networking namespace that has full communication with other physical computers and containers across the network.  IP-per-pod creates a clean, backward-compatible model where pods can be treated much like VMs or physical hosts from the perspectives of port allocation, networking, naming, service discovery, load balancing, application configuration, and migration.
 
 OTOH, dynamic port allocation requires supporting both static ports (e.g., for externally accessible services) and dynamically allocated ports, requires partitioning centrally allocated and locally acquired dynamic ports, complicates scheduling (since ports are a scarce resource), is inconvenient for users, complicates application configuration, is plagued by port conflicts and reuse and exhaustion, requires non-standard approaches to naming (e.g., etcd rather than DNS), requires proxies and/or redirection for programs using standard naming/addressing mechanisms (e.g., web browsers), requires watching and cache invalidation for address/port changes for instances in addition to watching group membership changes, and obstructs container/pod migration (e.g., using CRIU). NAT introduces additional complexity by fragmenting the addressing space, which breaks self-registration mechanisms, among other problems.
 
@@ -22,7 +22,7 @@ An alternative we considered was an additional layer of addressing: pod-centric 
 
 For the Google Compute Engine cluster configuration scripts, [advanced routing](https://developers.google.com/compute/docs/networking#routing) is set up so that each VM has an extra 256 IP addresses that get routed to it.  This is in addition to the 'main' IP address assigned to the VM that is NAT-ed for Internet access.  The networking bridge (called `cbr0` to differentiate it from `docker0`) is set up outside of Docker proper and only does NAT for egress network traffic that isn't aimed at the virtual network.
 
-Ports mapped in from the 'main IP' (and hence the internet if the right firewall rules are set up) are proxied in user mode by Docker.  In the future, this should be done with `iptables` by either the Kubelet or Docker: [Issue #15](https://github.com/GoogleCloudPlatform/kubernetes/issues/15).
+Ports mapped in from the 'main IP' (and hence the internet if the right firewall rules are set up) are proxied in user mode by Docker.  In the future, this should be done with `iptables` by either the LMKTFYlet or Docker: [Issue #15](https://github.com/GoogleCloudPlatform/lmktfy/issues/15).
 
 We start Docker with:
     DOCKER_OPTS="--bridge cbr0 --iptables=false"
@@ -35,7 +35,7 @@ We set up this bridge on each node with SaltStack, in [container_bridge.py](clus
     ...
     grains:
       roles:
-      - kubernetes-pool
+      - lmktfy-pool
       cbr-cidr: $MINION_IP_RANGE
 
 We make these addresses routable in GCE:
@@ -51,7 +51,7 @@ The minion IP ranges are /24s in the 10-dot space.
 
 GCE itself does not know anything about these IPs, though.
 
-These are not externally routable, though, so containers that need to communicate with the outside world need to use host networking. To set up an external IP that forwards to the VM, it will only forward to the VM's primary IP (which is assigned to no pod). So we use docker's -p flag to map published ports to the main interface. This has the side effect of disallowing two pods from exposing the same port. (More discussion on this in [Issue #390](https://github.com/GoogleCloudPlatform/kubernetes/issues/390).)
+These are not externally routable, though, so containers that need to communicate with the outside world need to use host networking. To set up an external IP that forwards to the VM, it will only forward to the VM's primary IP (which is assigned to no pod). So we use docker's -p flag to map published ports to the main interface. This has the side effect of disallowing two pods from exposing the same port. (More discussion on this in [Issue #390](https://github.com/GoogleCloudPlatform/lmktfy/issues/390).)
 
 We create a container to use for the pod network namespace -- a single loopback device and a single veth device. All the user's containers get their network namespaces from this pod networking container.
 
@@ -81,11 +81,11 @@ We want to be able to assign IP addresses externally from Docker ([Docker issue 
 
 ### Naming, discovery, and load balancing
 
-In addition to enabling self-registration with 3rd-party discovery mechanisms, we'd like to setup DDNS automatically ([Issue #146](https://github.com/GoogleCloudPlatform/kubernetes/issues/146)). hostname, $HOSTNAME, etc. should return a name for the pod ([Issue #298](https://github.com/GoogleCloudPlatform/kubernetes/issues/298)), and gethostbyname should be able to resolve names of other pods. Probably we need to set up a DNS resolver to do the latter ([Docker issue #2267](https://github.com/dotcloud/docker/issues/2267)), so that we don't need to keep /etc/hosts files up to date dynamically.
+In addition to enabling self-registration with 3rd-party discovery mechanisms, we'd like to setup DDNS automatically ([Issue #146](https://github.com/GoogleCloudPlatform/lmktfy/issues/146)). hostname, $HOSTNAME, etc. should return a name for the pod ([Issue #298](https://github.com/GoogleCloudPlatform/lmktfy/issues/298)), and gethostbyname should be able to resolve names of other pods. Probably we need to set up a DNS resolver to do the latter ([Docker issue #2267](https://github.com/dotcloud/docker/issues/2267)), so that we don't need to keep /etc/hosts files up to date dynamically.
 
-[Service](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/services.md) endpoints are currently found through environment variables.  Both [Docker-links-compatible](https://docs.docker.com/userguide/dockerlinks/) variables and kubernetes-specific variables ({NAME}_SERVICE_HOST and {NAME}_SERVICE_BAR) are supported, and resolve to ports opened by the service proxy. We don't actually use [the Docker ambassador pattern](https://docs.docker.com/articles/ambassador_pattern_linking/) to link containers because we don't require applications to identify all clients at configuration time, yet.  While services today are managed by the service proxy, this is an implementation detail that applications should not rely on.  Clients should instead use the [service portal IP](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/services.md) (which the above environment variables will resolve to).  However, a flat service namespace doesn't scale and environment variables don't permit dynamic updates, which complicates service deployment by imposing implicit ordering constraints.  We intend to register each service portal IP in DNS, and for that to become the preferred resolution protocol.
+[Service](https://github.com/GoogleCloudPlatform/lmktfy/blob/master/docs/services.md) endpoints are currently found through environment variables.  Both [Docker-links-compatible](https://docs.docker.com/userguide/dockerlinks/) variables and lmktfy-specific variables ({NAME}_SERVICE_HOST and {NAME}_SERVICE_BAR) are supported, and resolve to ports opened by the service proxy. We don't actually use [the Docker ambassador pattern](https://docs.docker.com/articles/ambassador_pattern_linking/) to link containers because we don't require applications to identify all clients at configuration time, yet.  While services today are managed by the service proxy, this is an implementation detail that applications should not rely on.  Clients should instead use the [service portal IP](https://github.com/GoogleCloudPlatform/lmktfy/blob/master/docs/services.md) (which the above environment variables will resolve to).  However, a flat service namespace doesn't scale and environment variables don't permit dynamic updates, which complicates service deployment by imposing implicit ordering constraints.  We intend to register each service portal IP in DNS, and for that to become the preferred resolution protocol.
 
-We'd also like to accommodate other load-balancing solutions (e.g., HAProxy), non-load-balanced services ([Issue #260](https://github.com/GoogleCloudPlatform/kubernetes/issues/260)), and other types of groups (worker pools, etc.). Providing the ability to Watch a label selector applied to pod addresses would enable efficient monitoring of group membership, which could be directly consumed or synced with a discovery mechanism. Event hooks ([Issue #140](https://github.com/GoogleCloudPlatform/kubernetes/issues/140)) for join/leave events would probably make this even easier.
+We'd also like to accommodate other load-balancing solutions (e.g., HAProxy), non-load-balanced services ([Issue #260](https://github.com/GoogleCloudPlatform/lmktfy/issues/260)), and other types of groups (worker pools, etc.). Providing the ability to Watch a label selector applied to pod addresses would enable efficient monitoring of group membership, which could be directly consumed or synced with a discovery mechanism. Event hooks ([Issue #140](https://github.com/GoogleCloudPlatform/lmktfy/issues/140)) for join/leave events would probably make this even easier.
 
 ### External routability
 
@@ -99,10 +99,10 @@ So we end up with 3 cases:
 
 2. Container -> Internet. These have to get mapped to the primary host IP so that GCE knows how to egress that traffic. There is actually 2 layers of NAT here: Container IP -> Internal Host IP -> External Host IP. The first level happens in the guest with IP tables and the second happens as part of GCE networking. The first one (Container IP -> internal host IP) does dynamic port allocation while the second maps ports 1:1.
 
-3. Internet -> Container. This also has to go through the primary host IP and also has 2 levels of NAT, ideally. However, the path currently is a proxy with (External Host IP -> Internal Host IP -> Docker) -> (Docker -> Container IP). Once [issue #15](https://github.com/GoogleCloudPlatform/kubernetes/issues/15) is closed, it should be External Host IP -> Internal Host IP -> Container IP. But to get that second arrow we have to set up the port forwarding iptables rules per mapped port.
+3. Internet -> Container. This also has to go through the primary host IP and also has 2 levels of NAT, ideally. However, the path currently is a proxy with (External Host IP -> Internal Host IP -> Docker) -> (Docker -> Container IP). Once [issue #15](https://github.com/GoogleCloudPlatform/lmktfy/issues/15) is closed, it should be External Host IP -> Internal Host IP -> Container IP. But to get that second arrow we have to set up the port forwarding iptables rules per mapped port.
 
 Another approach could be to create a new host interface alias for each pod, if we had a way to route an external IP to it. This would eliminate the scheduling constraints resulting from using the host's IP address.
 
 ### IPv6
 
-IPv6 would be a nice option, also, but we can't depend on it yet. Docker support is in progress: [Docker issue #2974](https://github.com/dotcloud/docker/issues/2974), [Docker issue #6923](https://github.com/dotcloud/docker/issues/6923), [Docker issue #6975](https://github.com/dotcloud/docker/issues/6975). Additionally, direct ipv6 assignment to instances doesn't appear to be supported by major cloud providers (e.g., AWS EC2, GCE) yet. We'd happily take pull requests from people running Kubernetes on bare metal, though. :-)
+IPv6 would be a nice option, also, but we can't depend on it yet. Docker support is in progress: [Docker issue #2974](https://github.com/dotcloud/docker/issues/2974), [Docker issue #6923](https://github.com/dotcloud/docker/issues/6923), [Docker issue #6975](https://github.com/dotcloud/docker/issues/6975). Additionally, direct ipv6 assignment to instances doesn't appear to be supported by major cloud providers (e.g., AWS EC2, GCE) yet. We'd happily take pull requests from people running LMKTFY on bare metal, though. :-)

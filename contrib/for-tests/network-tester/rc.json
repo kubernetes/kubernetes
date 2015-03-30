@@ -22,7 +22,7 @@
         "containers": [
           {
             "name": "webserver",
-            "image": "kubernetes/nettest:latest",
+            "image": "lmktfyrnetes/nettest:latest",
             "command": [
               "-service=nettest"
             ],

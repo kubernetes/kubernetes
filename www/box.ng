@@ -14,13 +14,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 -->
 <div style="margin-top: 10px">
-<div class="k8s-title-font k8s-box">
+<div class="lmktfy-title-font lmktfy-box">
   {{ groupName }}
 
 <div ng-if="group.kind != 'grouping'">
   <div ng-if="!settings.display || settings.display=='box'">
-  <div class="content k8s-item k8s-inline" ng-repeat="item in group">
-    <div class="k8s-title-font k8s-font-regular">
+  <div class="content lmktfy-item lmktfy-inline" ng-repeat="item in group">
+    <div class="lmktfy-title-font lmktfy-font-regular">
       <div ng-switch on='item.labels["type"]'>
         <a ng-switch-when='pod' href="#/pods/{{ item.id }}">{{ item.id }}</a>
 	<a ng-switch-when='service' href="#/services/{{ item.id }}">{{ item.id }}</a>
@@ -32,8 +32,8 @@ limitations under the License.
   </div>
   <div ng-if="settings.display=='list'">
     <table style="width: 90%; padding: 10px">
-    <tr ng-repeat="item in group" ng-class-odd="'k8s-odd'" ng-class-even="'k8s-even'" valign="top">
-      <td class="k8s-cell">
+    <tr ng-repeat="item in group" ng-class-odd="'lmktfy-odd'" ng-class-even="'lmktfy-even'" valign="top">
+      <td class="lmktfy-cell">
         <div ng-switch on='item.labels["type"]'>
           <a ng-switch-when='pod' href="#/pods/{{ item.id }}">{{ item.id }}</a>
 	  <a ng-switch-when='service' href="#/services/{{ item.id }}">{{ item.id }}</a>
@@ -41,7 +41,7 @@ limitations under the License.
 	  <span ng-switch-default>{{item.id}}</span>
       </div>
       </td>
-      <td class="k8s-cell">
+      <td class="lmktfy-cell">
         <div ng-repeat='(key, value) in item.labels'>
 	  <a href="#/groups/{{key}}/selector/{{controller.routeParams.selector}}">{{key}}</a> :
 	  <a href="#/groups/{{controller.routeParams.grouping}}/selector/{{key}}={{value}}">{{value}}</a> </span>

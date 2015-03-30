@@ -92,15 +92,15 @@ coreos:
 
         [Install]
         WantedBy=sockets.target
-    - name: opt-kubernetes.mount
+    - name: opt-lmktfy.mount
       command: start
       content: |
         [Unit]
         ConditionVirtualization=|vm
 
         [Mount]
-        What=kubernetes
-        Where=/opt/kubernetes
+        What=lmktfy
+        Where=/opt/lmktfy
         Options=ro,trans=virtio,version=9p2000.L
         Type=9p
   update:

@@ -17,11 +17,11 @@ limitations under the License.
 package scheduler
 
 import (
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/client/record"
 	// TODO: move everything from pkg/scheduler into this package. Remove references from registry.
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/scheduler"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/scheduler"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/util"
 
 	"github.com/golang/glog"
 )

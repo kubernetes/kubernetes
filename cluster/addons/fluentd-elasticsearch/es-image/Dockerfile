@@ -1,5 +1,5 @@
 # A Dockerfile for creating an Elasticsearch instance that is designed
-# to work with Kubernetes logging. Inspired by the Dockerfile
+# to work with LMKTFYrnetes logging. Inspired by the Dockerfile
 # dockerfile/elasticsearch
 
 FROM dockerfile/java:openjdk-7-jre

@@ -21,13 +21,13 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api/resource"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/fields"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/labels"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/runtime"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/types"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/util"
 	"github.com/fsouza/go-dockerclient"
 	"github.com/google/gofuzz"
 
@@ -205,7 +205,7 @@ func FuzzerFor(t *testing.T, version string, src rand.Source) *fuzz.Fuzzer {
 			s.Type = api.SecretTypeOpaque
 		},
 		func(s *api.NamespaceSpec, c fuzz.Continue) {
-			s.Finalizers = []api.FinalizerName{api.FinalizerKubernetes}
+			s.Finalizers = []api.FinalizerName{api.FinalizerLMKTFY}
 		},
 		func(s *api.NamespaceStatus, c fuzz.Continue) {
 			s.Phase = api.NamespaceActive

@@ -20,7 +20,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/util"
 )
 
 type fakeFlagSet struct {
@@ -77,10 +77,10 @@ func TestBindClientConfigFlags(t *testing.T) {
 	}
 }
 
-func TestBindKubeletClientConfigFlags(t *testing.T) {
+func TestBindLMKTFYletClientConfigFlags(t *testing.T) {
 	flags := &fakeFlagSet{t, util.StringSet{}}
-	config := &KubeletConfig{}
-	BindKubeletClientConfigFlags(flags, config)
+	config := &LMKTFYletConfig{}
+	BindLMKTFYletClientConfigFlags(flags, config)
 	if len(flags.set) != 6 {
 		t.Errorf("unexpected flag set: %#v", flags)
 	}

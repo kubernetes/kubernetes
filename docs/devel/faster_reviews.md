@@ -1,10 +1,10 @@
 # How to get faster PR reviews
 
-Most of what is written here is not at all specific to Kubernetes, but it bears
+Most of what is written here is not at all specific to LMKTFY, but it bears
 being written down in the hope that it will occasionally remind people of "best
 practices" around code reviews.
 
-You've just had a brilliant idea on how to make Kubernetes better.  Let's call
+You've just had a brilliant idea on how to make LMKTFY better.  Let's call
 that idea "FeatureX".  Feature X is not even that complicated.  You have a
 pretty good idea of how to implement it.  You jump in and implement it, fixing a
 bunch of stuff along the way.  You send your PR - this is awesome!  And it sits.
@@ -22,7 +22,7 @@ Let's talk about how to avoid this.
 
 ## 1. Don't build a cathedral in one PR
 
-Are you sure FeatureX is something the Kubernetes team wants or will accept, or
+Are you sure FeatureX is something the LMKTFY team wants or will accept, or
 that it is implemented to fit with other changes in flight?  Are you willing to
 bet a few days or weeks of work on it?  If you have any doubt at all about the
 usefulness of your feature or the design - make a proposal doc or a sketch PR
@@ -60,7 +60,7 @@ common sense.
 ## 3. Multiple small PRs are often better than multiple commits
 
 If you can extract whole ideas from your PR and send those as PRs of their own,
-you can avoid the painful problem of continually rebasing.  Kubernetes is a
+you can avoid the painful problem of continually rebasing.  LMKTFY is a
 fast-moving codebase - lock in your changes ASAP, and make merges be someone
 else's problem.
 

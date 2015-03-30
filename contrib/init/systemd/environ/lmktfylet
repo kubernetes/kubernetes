@@ -1,0 +1,17 @@
+###
+# lmktfyrnetes lmktfylet (minion) config
+
+# The address for the info server to serve on (set to 0.0.0.0 or "" for all interfaces)
+LMKTFYLET_ADDRESS="--address=127.0.0.1"
+
+# The port for the info server to serve on
+# LMKTFYLET_PORT="--port=10250"
+
+# You may leave this blank to use the actual hostname
+LMKTFYLET_HOSTNAME="--hostname_override=127.0.0.1"
+
+# location of the api-server
+LMKTFYLET_API_SERVER="--api_servers=http://127.0.0.1:8080"
+
+# Add your own!
+LMKTFYLET_ARGS=""

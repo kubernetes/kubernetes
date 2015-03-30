@@ -27,9 +27,9 @@ import (
 	"github.com/mitchellh/goamz/aws"
 	"github.com/mitchellh/goamz/ec2"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api/resource"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/cloudprovider"
 
 	"github.com/golang/glog"
 )
@@ -350,7 +350,7 @@ func makeNodeResources(family string, cpu float64, memory float64) (*api.NodeRes
 	}, nil
 }
 
-// Maps an EC2 instance type to k8s resource information
+// Maps an EC2 instance type to lmktfy resource information
 func getResourcesByInstanceType(instanceType string) (*api.NodeResources, error) {
 	// There is no API for this (that I know of)
 	switch instanceType {

@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Bring up a Kubernetes cluster.
+# Bring up a LMKTFY cluster.
 #
 # If the full release name (gs://<bucket>/<release>) is passed in then we take
 # that directly.  If not then we assume we are doing development stuff and take
@@ -24,7 +24,7 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
-KUBE_CONFIG_FILE="config-default.sh"
+LMKTFY_ROOT=$(dirname "${BASH_SOURCE}")/..
+LMKTFY_CONFIG_FILE="config-default.sh"
 
-${KUBE_ROOT}/hack/ginkgo-e2e.sh --ginkgo.focus=Networking
+${LMKTFY_ROOT}/hack/ginkgo-e2e.sh --ginkgo.focus=Networking

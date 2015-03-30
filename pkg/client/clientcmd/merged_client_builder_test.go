@@ -24,10 +24,10 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/clientauth"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/clientauth"
 )
 
-// Verifies that referencing an old .kubernetes_auth file respects all fields
+// Verifies that referencing an old .lmktfy_auth file respects all fields
 func TestAuthPathUpdatesBothClusterAndUser(t *testing.T) {
 	authFile, _ := ioutil.TempFile("", "")
 	defer os.Remove(authFile.Name())
@@ -82,7 +82,7 @@ func testBindClientConfig(cmd *cobra.Command) ClientConfig {
 	loadingRules.Precedence[DefaultEnvVarIndex] = ""
 	loadingRules.Precedence[DefaultCurrentDirIndex] = ""
 	loadingRules.Precedence[DefaultHomeDirIndex] = ""
-	cmd.PersistentFlags().StringVar(&loadingRules.ExplicitPath, "kubeconfig", "", "Path to the kubeconfig file to use for CLI requests.")
+	cmd.PersistentFlags().StringVar(&loadingRules.ExplicitPath, "lmktfyconfig", "", "Path to the lmktfyconfig file to use for CLI requests.")
 
 	overrides := &ConfigOverrides{}
 	BindOverrideFlags(overrides, cmd.PersistentFlags(), RecommendedConfigOverrideFlags(""))

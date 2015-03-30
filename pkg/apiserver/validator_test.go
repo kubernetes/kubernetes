@@ -25,8 +25,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/probe"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/probe"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/util"
 )
 
 type fakeHttpGet struct {

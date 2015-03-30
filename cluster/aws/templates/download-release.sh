@@ -27,8 +27,8 @@ echo "Downloading binary release tar ($SALT_TAR_URL)"
 download-or-bust "$SALT_TAR_URL"
 
 echo "Unpacking Salt tree"
-rm -rf kubernetes
+rm -rf lmktfy
 tar xzf "${SALT_TAR_URL##*/}"
 
 echo "Running release install script"
-sudo kubernetes/saltbase/install.sh "${SERVER_BINARY_TAR_URL##*/}"
+sudo lmktfy/saltbase/install.sh "${SERVER_BINARY_TAR_URL##*/}"

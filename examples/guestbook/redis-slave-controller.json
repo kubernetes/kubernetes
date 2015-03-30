@@ -12,7 +12,7 @@
            "id": "redis-slave",
            "containers": [{
              "name": "redis-slave",
-             "image": "kubernetes/redis-slave:v2",
+             "image": "lmktfyrnetes/redis-slave:v2",
              "ports": [{"containerPort": 6379}]
            }]
          }

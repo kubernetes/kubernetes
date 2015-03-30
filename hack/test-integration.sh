@@ -22,40 +22,40 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
-source "${KUBE_ROOT}/hack/lib/init.sh"
+LMKTFY_ROOT=$(dirname "${BASH_SOURCE}")/..
+source "${LMKTFY_ROOT}/hack/lib/init.sh"
 # Comma separated list of API Versions that should be tested.
-KUBE_TEST_API_VERSIONS=${KUBE_TEST_API_VERSIONS:-"v1beta1,v1beta3"}
+LMKTFY_TEST_API_VERSIONS=${LMKTFY_TEST_API_VERSIONS:-"v1beta1,v1beta3"}
 
 
 cleanup() {
-  kube::etcd::cleanup
-  kube::log::status "Integration test cleanup complete"
+  lmktfy::etcd::cleanup
+  lmktfy::log::status "Integration test cleanup complete"
 }
 
 runTests() {
-  kube::etcd::start
+  lmktfy::etcd::start
 
-  kube::log::status "Running integration test cases"
-  KUBE_GOFLAGS="-tags 'integration no-docker' " \
-    KUBE_RACE="-race" \
-    KUBE_TEST_API_VERSIONS="$1" \
-    "${KUBE_ROOT}/hack/test-go.sh" test/integration
+  lmktfy::log::status "Running integration test cases"
+  LMKTFY_GOFLAGS="-tags 'integration no-docker' " \
+    LMKTFY_RACE="-race" \
+    LMKTFY_TEST_API_VERSIONS="$1" \
+    "${LMKTFY_ROOT}/hack/test-go.sh" test/integration
 
-  kube::log::status "Running integration test scenario"
+  lmktfy::log::status "Running integration test scenario"
 
-  "${KUBE_OUTPUT_HOSTBIN}/integration" --v=2 --apiVersion="$1"
+  "${LMKTFY_OUTPUT_HOSTBIN}/integration" --v=2 --apiVersion="$1"
 
   cleanup
 }
 
-"${KUBE_ROOT}/hack/build-go.sh" "$@" cmd/integration
+"${LMKTFY_ROOT}/hack/build-go.sh" "$@" cmd/integration
 
 # Run cleanup to stop etcd on interrupt or other kill signal.
 trap cleanup EXIT
 
 # Convert the CSV to an array of API versions to test
-IFS=',' read -a apiVersions <<< "${KUBE_TEST_API_VERSIONS}"
+IFS=',' read -a apiVersions <<< "${LMKTFY_TEST_API_VERSIONS}"
 for apiVersion in "${apiVersions[@]}"; do
   runTests "${apiVersion}"
 done

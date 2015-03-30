@@ -17,7 +17,7 @@ limitations under the License.
 package admission
 
 import (
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/runtime"
 )
 
 type attributesRecord struct {

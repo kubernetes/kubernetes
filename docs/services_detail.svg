@@ -15,7 +15,7 @@
    version="1.1"
    inkscape:version="0.48.3.1 r9886"
    sodipodi:docname="services_detail.svg"
-   inkscape:export-filename="/usr/local/google/home/thockin/src/kubernetes/docs/services_overview.png"
+   inkscape:export-filename="/usr/local/google/home/thockin/src/lmktfy/docs/services_overview.png"
    inkscape:export-xdpi="76.910004"
    inkscape:export-ydpi="76.910004">
   <defs
@@ -450,7 +450,7 @@
              id="tspan3757-9-4"
              x="36.710861"
              y="91.845612"
-             style="font-size:32px;text-align:start;text-anchor:start">kube-proxy</tspan></text>
+             style="font-size:32px;text-align:start;text-anchor:start">lmktfy-proxy</tspan></text>
       </g>
     </g>
     <g

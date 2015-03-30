@@ -4061,7 +4061,7 @@
      },
      "resourceVersion": {
       "$ref": "uint64",
-      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
+      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/lmktfyrnetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
      },
      "selfLink": {
       "type": "string",
@@ -4311,7 +4311,7 @@
      },
      "resourceVersion": {
       "type": "string",
-      "description": "specific resourceVersion to which this reference is made, if any: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
+      "description": "specific resourceVersion to which this reference is made, if any: https://github.com/GoogleCloudPlatform/lmktfyrnetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
      },
      "uid": {
       "$ref": "types.UID",
@@ -4370,7 +4370,7 @@
      },
      "resourceVersion": {
       "$ref": "uint64",
-      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
+      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/lmktfyrnetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
      },
      "selfLink": {
       "type": "string",
@@ -4436,7 +4436,7 @@
      },
      "resourceVersion": {
       "$ref": "uint64",
-      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
+      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/lmktfyrnetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
      },
      "selfLink": {
       "type": "string",
@@ -4534,7 +4534,7 @@
      },
      "resourceVersion": {
       "$ref": "uint64",
-      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
+      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/lmktfyrnetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
      },
      "selfLink": {
       "type": "string",
@@ -4605,7 +4605,7 @@
      },
      "resourceVersion": {
       "$ref": "uint64",
-      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
+      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/lmktfyrnetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
      },
      "selfLink": {
       "type": "string",
@@ -4771,7 +4771,7 @@
      },
      "resourceVersion": {
       "$ref": "uint64",
-      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
+      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/lmktfyrnetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
      },
      "selfLink": {
       "type": "string",
@@ -4851,7 +4851,7 @@
      },
      "resourceVersion": {
       "$ref": "uint64",
-      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
+      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/lmktfyrnetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
      },
      "selfLink": {
       "type": "string",
@@ -4958,7 +4958,7 @@
      },
      "resourceVersion": {
       "$ref": "uint64",
-      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
+      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/lmktfyrnetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
      },
      "resources": {
       "$ref": "v1beta1.NodeResources",
@@ -5040,7 +5040,7 @@
      },
      "resourceVersion": {
       "$ref": "uint64",
-      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
+      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/lmktfyrnetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
      },
      "selfLink": {
       "type": "string",
@@ -5114,7 +5114,7 @@
      },
      "resourceVersion": {
       "$ref": "uint64",
-      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
+      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/lmktfyrnetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
      },
      "selfLink": {
       "type": "string",
@@ -5185,7 +5185,7 @@
      },
      "resourceVersion": {
       "$ref": "uint64",
-      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
+      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/lmktfyrnetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
      },
      "selfLink": {
       "type": "string",
@@ -5346,7 +5346,7 @@
      },
      "resourceVersion": {
       "type": "string",
-      "description": "specific resourceVersion to which this reference is made, if any: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
+      "description": "specific resourceVersion to which this reference is made, if any: https://github.com/GoogleCloudPlatform/lmktfyrnetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
      },
      "uid": {
       "$ref": "types.UID",
@@ -5407,7 +5407,7 @@
      },
      "resourceVersion": {
       "$ref": "uint64",
-      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
+      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/lmktfyrnetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
      },
      "selfLink": {
       "type": "string",
@@ -5491,7 +5491,7 @@
      },
      "resourceVersion": {
       "$ref": "uint64",
-      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
+      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/lmktfyrnetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
      },
      "selfLink": {
       "type": "string",
@@ -5625,7 +5625,7 @@
      },
      "resourceVersion": {
       "$ref": "uint64",
-      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
+      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/lmktfyrnetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
      },
      "selfLink": {
       "type": "string",
@@ -5688,7 +5688,7 @@
      },
      "resourceVersion": {
       "$ref": "uint64",
-      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
+      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/lmktfyrnetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
      },
      "selfLink": {
       "type": "string",
@@ -5766,7 +5766,7 @@
      },
      "resourceVersion": {
       "$ref": "uint64",
-      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
+      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/lmktfyrnetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
      },
      "selfLink": {
       "type": "string",
@@ -5837,7 +5837,7 @@
      },
      "resourceVersion": {
       "$ref": "uint64",
-      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
+      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/lmktfyrnetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
      },
      "selfLink": {
       "type": "string",
@@ -5954,7 +5954,7 @@
      },
      "resourceVersion": {
       "$ref": "uint64",
-      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
+      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/lmktfyrnetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
      },
      "selfLink": {
       "type": "string",
@@ -6021,7 +6021,7 @@
      },
      "resourceVersion": {
       "$ref": "uint64",
-      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
+      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/lmktfyrnetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
      },
      "selfLink": {
       "type": "string",
@@ -6123,7 +6123,7 @@
      },
      "resourceVersion": {
       "$ref": "uint64",
-      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
+      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/lmktfyrnetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
      },
      "selector": {
       "$ref": "v1beta1.Service.selector",
@@ -6198,7 +6198,7 @@
      },
      "resourceVersion": {
       "$ref": "uint64",
-      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
+      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/lmktfyrnetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
      },
      "selfLink": {
       "type": "string",

@@ -1,31 +1,31 @@
-# Using Salt to configure Kubernetes
+# Using Salt to configure LMKTFY
 
-The Kubernetes cluster can be configured using Salt.
+The LMKTFY cluster can be configured using Salt.
 
-The Salt scripts are shared across multiple hosting providers, so it's important to understand some background information prior to making a modification to ensure your changes do not break hosting Kubernetes across multiple environments.  Depending on where you host your Kubernetes cluster, you may be using different operating systems and different networking configurations.  As a result, it's important to understand some background information before making Salt changes in order to minimize introducing failures for other hosting providers.
+The Salt scripts are shared across multiple hosting providers, so it's important to understand some background information prior to making a modification to ensure your changes do not break hosting LMKTFY across multiple environments.  Depending on where you host your LMKTFY cluster, you may be using different operating systems and different networking configurations.  As a result, it's important to understand some background information before making Salt changes in order to minimize introducing failures for other hosting providers.
 
 ## Salt cluster setup
 
-The **salt-master** service runs on the kubernetes-master node.
+The **salt-master** service runs on the lmktfy-master node.
 
-The **salt-minion** service runs on the kubernetes-master node and each kubernetes-minion node in the cluster.
+The **salt-minion** service runs on the lmktfy-master node and each lmktfy-minion node in the cluster.
 
-Each salt-minion service is configured to interact with the **salt-master** service hosted on the kubernetes-master via the **master.conf** file.
+Each salt-minion service is configured to interact with the **salt-master** service hosted on the lmktfy-master via the **master.conf** file.
 
 ```
-[root@kubernetes-master] $ cat /etc/salt/minion.d/master.conf
-master: kubernetes-master
+[root@lmktfy-master] $ cat /etc/salt/minion.d/master.conf
+master: lmktfy-master
 ```
-The salt-master is contacted by each salt-minion and depending upon the machine information presented, the salt-master will provision the machine as either a kubernetes-master or kubernetes-minion with all the required capabilities needed to run Kubernetes.
+The salt-master is contacted by each salt-minion and depending upon the machine information presented, the salt-master will provision the machine as either a lmktfy-master or lmktfy-minion with all the required capabilities needed to run LMKTFY.
 
-If you are running the Vagrant based environment, the **salt-api** service is running on the kubernetes-master.  It is configured to enable the vagrant user to introspect the salt cluster in order to find out about machines in the Vagrant environment via a REST API.
+If you are running the Vagrant based environment, the **salt-api** service is running on the lmktfy-master.  It is configured to enable the vagrant user to introspect the salt cluster in order to find out about machines in the Vagrant environment via a REST API.
 
 ## Salt security
 
 Security is not enabled on the salt-master, and the salt-master is configured to auto-accept incoming requests from minions.  It is not recommended to use this security configuration in production environments without deeper study.  (In some environments this isn't as bad as it might sound if the salt master port isn't externally accessible and you trust everyone on your network.)
 
 ```
-[root@kubernetes-master] $ cat /etc/salt/master.d/auto-accept.conf
+[root@lmktfy-master] $ cat /etc/salt/master.d/auto-accept.conf
 open_mode: True
 auto_accept: True
 ```
@@ -36,13 +36,13 @@ Each minion in the salt cluster has an associated configuration that instructs t
 An example file is presented below using the Vagrant based environment.
 
 ```
-[root@kubernetes-master] $ cat /etc/salt/minion.d/grains.conf
+[root@lmktfy-master] $ cat /etc/salt/minion.d/grains.conf
 grains:
   master_ip: $MASTER_IP
   etcd_servers: $MASTER_IP
   cloud_provider: vagrant
   roles:
-    - kubernetes-master
+    - lmktfy-master
 ```
 
 Each hosting environment has a slightly different grains.conf file that is used to build conditional logic where required in the Salt files.
@@ -51,19 +51,19 @@ The following enumerates the set of defined key/value pairs that are supported t
 
 Key | Value
 ------------- | -------------
-`apiservers` | (Optional) The IP address / host name where a kubelet can get read-only access to kube-apiserver
+`apiservers` | (Optional) The IP address / host name where a lmktfylet can get read-only access to lmktfy-apiserver
 `cbr-cidr` | (Optional) The minion IP address range used for the docker container bridge.
-`cloud` | (Optional) Which IaaS platform is used to host kubernetes, *gce*, *azure*, *aws*, *vagrant*
+`cloud` | (Optional) Which IaaS platform is used to host lmktfy, *gce*, *azure*, *aws*, *vagrant*
 `cloud_provider` | (Optional) The cloud_provider used by apiserver: *gce*, *azure*, *vagrant*
-`etcd_servers` | (Optional) Comma-delimited list of IP addresses the kube-apiserver and kubelet use to reach etcd.  Uses the IP of the first machine in the kubernetes_master role.
+`etcd_servers` | (Optional) Comma-delimited list of IP addresses the lmktfy-apiserver and lmktfylet use to reach etcd.  Uses the IP of the first machine in the lmktfy_master role.
 `hostnamef` | (Optional) The full host name of the machine, i.e. hostname -f
-`master_ip` | (Optional) The IP address that the kube-apiserver will bind against
+`master_ip` | (Optional) The IP address that the lmktfy-apiserver will bind against
 `node_ip` | (Optional) The IP address to use to address this node
-`minion_ip` | (Optional) Mapped to the kubelet hostname_override, K8S TODO - change this name
+`minion_ip` | (Optional) Mapped to the lmktfylet hostname_override, LMKTFY TODO - change this name
 `network_mode` | (Optional) Networking model to use among nodes: *openvswitch*
 `networkInterfaceName` | (Optional) Networking interface to use to bind addresses, default value *eth0*
-`publicAddressOverride` | (Optional) The IP address the kube-apiserver should use to bind against for external read-only access
-`roles` | (Required) 1. `kubernetes-master` means this machine is the master in the kubernetes cluster.  2. `kubernetes-pool` means this machine is a kubernetes-minion.  Depending on the role, the Salt scripts will provision different resources on the machine.
+`publicAddressOverride` | (Optional) The IP address the lmktfy-apiserver should use to bind against for external read-only access
+`roles` | (Required) 1. `lmktfy-master` means this machine is the master in the lmktfy cluster.  2. `lmktfy-pool` means this machine is a lmktfy-minion.  Depending on the role, the Salt scripts will provision different resources on the machine.
 
 These keys may be leveraged by the Salt sls files to branch behavior.
 

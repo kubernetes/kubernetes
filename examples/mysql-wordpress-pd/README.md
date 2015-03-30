@@ -1,50 +1,50 @@
 
-# Persistent Installation of MySQL and WordPress on Kubernetes
+# Persistent Installation of MySQL and WordPress on LMKTFY
 
 This example describes how to run a persistent installation of [Wordpress](https://wordpress.org/).
 
 We'll use the [mysql](https://registry.hub.docker.com/_/mysql/) and [wordpress](https://registry.hub.docker.com/_/wordpress/) official [Docker](https://www.docker.com/) images for this installation. (The wordpress image includes an Apache server).
 
-We'll create two Kubernetes [pods](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/pods.md) to run mysql and wordpress, both with associated [persistent disks](https://cloud.google.com/compute/docs/disks), then set up a Kubernetes [service](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/services.md) to front each pod.
+We'll create two LMKTFY [pods](https://github.com/GoogleCloudPlatform/lmktfy/blob/master/docs/pods.md) to run mysql and wordpress, both with associated [persistent disks](https://cloud.google.com/compute/docs/disks), then set up a LMKTFY [service](https://github.com/GoogleCloudPlatform/lmktfy/blob/master/docs/services.md) to front each pod.
 
-This example demonstrates several useful things, including: how to set up and use persistent disks with Kubernetes pods; how to define Kubernetes services to leverage docker-links-compatible service environment variables; and use of an external load balancer to expose the wordpress service externally and make it transparent to the user if the wordpress pod moves to a different cluster node.
+This example demonstrates several useful things, including: how to set up and use persistent disks with LMKTFY pods; how to define LMKTFY services to leverage docker-links-compatible service environment variables; and use of an external load balancer to expose the wordpress service externally and make it transparent to the user if the wordpress pod moves to a different cluster node.
 
-Some of the example's details, such as the Persistent Disk setup, require that Kubernetes is running on [Google Compute Engine](https://cloud.google.com/compute/).
+Some of the example's details, such as the Persistent Disk setup, require that LMKTFY is running on [Google Compute Engine](https://cloud.google.com/compute/).
 
 
-## Install gcloud and start up a Kubernetes cluster
+## Install gcloud and start up a LMKTFY cluster
 
 First, if you have not already done so, [create](https://cloud.google.com/compute/docs/quickstart) a [Google Cloud Platform](https://cloud.google.com/) project, and install the [gcloud SDK](https://cloud.google.com/sdk/).
 
-Then, set the gcloud default project name to point to the project you want to use for your Kubernetes cluster:
+Then, set the gcloud default project name to point to the project you want to use for your LMKTFY cluster:
 
 ```
 gcloud config set project <project-name>
 ```
 
-Next, grab the Kubernetes [release binary](https://github.com/GoogleCloudPlatform/kubernetes/releases). You can do this via:
+Next, grab the LMKTFY [release binary](https://github.com/GoogleCloudPlatform/lmktfy/releases). You can do this via:
 ```shell
-wget -q -O - https://get.k8s.io | bash
+wget -q -O - https://get.lmktfy.io | bash
 ```
 or
 ```shell
-curl -sS https://get.k8s.io | bash
+curl -sS https://get.lmktfy.io | bash
 ```
 
-Then, start up a Kubernetes cluster as [described here](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/getting-started-guides/gce.md).
+Then, start up a LMKTFY cluster as [described here](https://github.com/GoogleCloudPlatform/lmktfy/blob/master/docs/getting-started-guides/gce.md).
 
 ```
-$ <kubernetes>/cluster/kube-up.sh
+$ <lmktfy>/cluster/lmktfy-up.sh
 ```
 
-where `<kubernetes>` is the path to your Kubernetes installation.
+where `<lmktfy>` is the path to your LMKTFY installation.
 
 ## Create two persistent disks
 
-For this WordPress installation, we're going to configure our Kubernetes [pods](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/pods.md) to use [persistent disks](https://cloud.google.com/compute/docs/disks). This means that we can preserve installation state across pod shutdown and re-startup.
+For this WordPress installation, we're going to configure our LMKTFY [pods](https://github.com/GoogleCloudPlatform/lmktfy/blob/master/docs/pods.md) to use [persistent disks](https://cloud.google.com/compute/docs/disks). This means that we can preserve installation state across pod shutdown and re-startup.
 
 Before doing anything else, we'll create the persistent disks that we'll use for the installation: one for the mysql pod, and one for the wordpress pod.
-The general series of steps required is as described [here](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/volumes.md), where $ZONE is the zone where your cluster is running, and $DISK_SIZE is specified as, e.g. '500GB'.  In future, this process will be more streamlined.
+The general series of steps required is as described [here](https://github.com/GoogleCloudPlatform/lmktfy/blob/master/docs/volumes.md), where $ZONE is the zone where your cluster is running, and $DISK_SIZE is specified as, e.g. '500GB'.  In future, this process will be more streamlined.
 
 So for the two disks used in this example, do the following.
 First create the mysql disk, setting the disk size to meet your needs:
@@ -61,7 +61,7 @@ gcloud compute disks create --size=$DISK_SIZE --zone=$ZONE wordpress-disk
 
 ## Start the Mysql Pod and Service
 
-Now that the persistent disks are defined, the Kubernetes pods can be launched.  We'll start with the mysql pod.
+Now that the persistent disks are defined, the LMKTFY pods can be launched.  We'll start with the mysql pod.
 
 ### Start the Mysql pod
 
@@ -103,36 +103,36 @@ kind: Pod
 ```
 
 Note that we've defined a volume mount for `/var/lib/mysql`, and specified a volume that uses the persistent disk (`mysql-disk`) that you created.
-Once you've edited the file to set your database password, create the pod as follows, where `<kubernetes>` is the path to your Kubernetes installation:
+Once you've edited the file to set your database password, create the pod as follows, where `<lmktfy>` is the path to your LMKTFY installation:
 
 ```shell
-$ <kubernetes>/cluster/kubectl.sh create -f mysql.yaml
+$ <lmktfy>/cluster/lmktfyctl.sh create -f mysql.yaml
 ```
 
 It may take a short period before the new pod reaches the `Running` state.
 List all pods to see the status of this new pod and the cluster node that it is running on:
 
 ```shell
-$ <kubernetes>/cluster/kubectl.sh get pods
+$ <lmktfy>/cluster/lmktfyctl.sh get pods
 ```
 
 
 #### Check the running pod on the Compute instance
 
-You can take a look at the logs for a pod by using `kubectl.sh log`.  For example:
+You can take a look at the logs for a pod by using `lmktfyctl.sh log`.  For example:
 
 ```shell
-$ <kubernetes>/cluster/kubectl.sh log mysql
+$ <lmktfy>/cluster/lmktfyctl.sh log mysql
 ```
 
-If you want to do deeper troubleshooting, e.g. if it seems a container is not staying up, you can also ssh in to the node that a pod is running on.  There, you can run `sudo -s`, then `docker ps -a` to see all the containers.  You can then inspect the logs of containers that have exited, via `docker logs <container_id>`.  (You can also find some relevant logs under `/var/log`, e.g. `docker.log` and `kubelet.log`).
+If you want to do deeper troubleshooting, e.g. if it seems a container is not staying up, you can also ssh in to the node that a pod is running on.  There, you can run `sudo -s`, then `docker ps -a` to see all the containers.  You can then inspect the logs of containers that have exited, via `docker logs <container_id>`.  (You can also find some relevant logs under `/var/log`, e.g. `docker.log` and `lmktfylet.log`).
 
 ### Start the Mysql service
 
-We'll define and start a [service](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/services.md) that lets other pods access the mysql database on a known port and host.
-We will specifically name the service `mysql`.  This will let us leverage the support for [Docker-links-compatible](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/services.md#how-do-they-work) service environment variables when we up the wordpress pod. The wordpress Docker image expects to be linked to a mysql container named `mysql`, as you can see in the "How to use this image" section on the wordpress docker hub [page](https://registry.hub.docker.com/_/wordpress/).
+We'll define and start a [service](https://github.com/GoogleCloudPlatform/lmktfy/blob/master/docs/services.md) that lets other pods access the mysql database on a known port and host.
+We will specifically name the service `mysql`.  This will let us leverage the support for [Docker-links-compatible](https://github.com/GoogleCloudPlatform/lmktfy/blob/master/docs/services.md#how-do-they-work) service environment variables when we up the wordpress pod. The wordpress Docker image expects to be linked to a mysql container named `mysql`, as you can see in the "How to use this image" section on the wordpress docker hub [page](https://registry.hub.docker.com/_/wordpress/).
 
-So if we label our Kubernetes mysql service `mysql`, the wordpress pod will be able to use the Docker-links-compatible environment variables, defined by Kubernetes, to connect to the database.
+So if we label our LMKTFY mysql service `mysql`, the wordpress pod will be able to use the Docker-links-compatible environment variables, defined by LMKTFY, to connect to the database.
 
 The `mysql-service.yaml` file looks like this:
 
@@ -157,13 +157,13 @@ labels:
 Start the service like this:
 
 ```shell
-$ <kubernetes>/cluster/kubectl.sh create -f mysql-service.yaml
+$ <lmktfy>/cluster/lmktfyctl.sh create -f mysql-service.yaml
 ```
 
 You can see what services are running via:
 
 ```shell
-$ <kubernetes>/cluster/kubectl.sh get services
+$ <lmktfy>/cluster/lmktfyctl.sh get services
 ```
 
 
@@ -210,14 +210,14 @@ kind: Pod
 Create the pod:
 
 ```shell
-$ <kubernetes>/cluster/kubectl.sh create -f wordpress.yaml
+$ <lmktfy>/cluster/lmktfyctl.sh create -f wordpress.yaml
 ```
 
 And list the pods to check that the status of the new pod changes
 to `Running`.  As above, this might take a minute.
 
 ```shell
-$ <kubernetes>/cluster/kubectl.sh get pods
+$ <lmktfy>/cluster/lmktfyctl.sh get pods
 ```
 
 ### Start the WordPress service
@@ -252,13 +252,13 @@ Note also that we've set the service port to 80.  We'll return to that shortly.
 Start the service:
 
 ```shell
-$ <kubernetes>/cluster/kubectl.sh create -f wordpress-service.yaml
+$ <lmktfy>/cluster/lmktfyctl.sh create -f wordpress-service.yaml
 ```
 
 and see it in the list of services:
 
 ```shell
-$ <kubernetes>/cluster/kubectl.sh get services
+$ <lmktfy>/cluster/lmktfyctl.sh get services
 ```
 
 Then, find the external IP for your WordPress service by listing the forwarding rules for your project:
@@ -295,18 +295,18 @@ Set up your WordPress blog and play around with it a bit.  Then, take down its p
 If you are just experimenting, you can take down and bring up only the pods:
 
 ```shell
-$ <kubernetes>/cluster/kubectl.sh delete -f wordpress.yaml
-$ <kubernetes>/cluster/kubectl.sh delete -f mysql.yaml
+$ <lmktfy>/cluster/lmktfyctl.sh delete -f wordpress.yaml
+$ <lmktfy>/cluster/lmktfyctl.sh delete -f mysql.yaml
 ```
 
 When you restart the pods again (using the `create` operation as described above), their services will pick up the new pods based on their labels.
 
 If you want to shut down the entire app installation, you can delete the services as well.
 
-If you are ready to turn down your Kubernetes cluster altogether, run:
+If you are ready to turn down your LMKTFY cluster altogether, run:
 
 ```shell
-$ <kubernetes>/cluster/kube-down.sh
+$ <lmktfy>/cluster/lmktfy-down.sh
 ```
 
 

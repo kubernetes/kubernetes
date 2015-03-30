@@ -16,15 +16,15 @@
 
 # A library of helper functions and constant for the local config.
 
-# Use the config file specified in $KUBE_CONFIG_FILE, or default to
+# Use the config file specified in $LMKTFY_CONFIG_FILE, or default to
 # config-default.sh.
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
-source "${KUBE_ROOT}/cluster/gce/${KUBE_CONFIG_FILE-"config-default.sh"}"
-source "${KUBE_ROOT}/cluster/common.sh"
+LMKTFY_ROOT=$(dirname "${BASH_SOURCE}")/../..
+source "${LMKTFY_ROOT}/cluster/gce/${LMKTFY_CONFIG_FILE-"config-default.sh"}"
+source "${LMKTFY_ROOT}/cluster/common.sh"
 
 NODE_INSTANCE_PREFIX="${INSTANCE_PREFIX}-minion"
 
-KUBE_PROMPT_FOR_UPDATE=y
+LMKTFY_PROMPT_FOR_UPDATE=y
 
 # Verify prereqs
 function verify-prereqs {
@@ -45,7 +45,7 @@ function verify-prereqs {
     fi 
   done
   # update and install components as needed
-  if [[ "${KUBE_PROMPT_FOR_UPDATE}" != "y" ]]; then
+  if [[ "${LMKTFY_PROMPT_FOR_UPDATE}" != "y" ]]; then
     gcloud_prompt="-q"
   fi
   gcloud ${gcloud_prompt:-} components update preview || true
@@ -55,11 +55,11 @@ function verify-prereqs {
 # Create a temp dir that'll be deleted at the end of this bash session.
 #
 # Vars set:
-#   KUBE_TEMP
+#   LMKTFY_TEMP
 function ensure-temp-dir {
-  if [[ -z ${KUBE_TEMP-} ]]; then
-    KUBE_TEMP=$(mktemp -d -t kubernetes.XXXXXX)
-    trap 'rm -rf "${KUBE_TEMP}"' EXIT
+  if [[ -z ${LMKTFY_TEMP-} ]]; then
+    LMKTFY_TEMP=$(mktemp -d -t lmktfy.XXXXXX)
+    trap 'rm -rf "${LMKTFY_TEMP}"' EXIT
   fi
 }
 
@@ -69,21 +69,21 @@ function ensure-temp-dir {
 #   SERVER_BINARY_TAR
 #   SALT_TAR
 function find-release-tars {
-  SERVER_BINARY_TAR="${KUBE_ROOT}/server/kubernetes-server-linux-amd64.tar.gz"
+  SERVER_BINARY_TAR="${LMKTFY_ROOT}/server/lmktfy-server-linux-amd64.tar.gz"
   if [[ ! -f "$SERVER_BINARY_TAR" ]]; then
-    SERVER_BINARY_TAR="${KUBE_ROOT}/_output/release-tars/kubernetes-server-linux-amd64.tar.gz"
+    SERVER_BINARY_TAR="${LMKTFY_ROOT}/_output/release-tars/lmktfy-server-linux-amd64.tar.gz"
   fi
   if [[ ! -f "$SERVER_BINARY_TAR" ]]; then
-    echo "!!! Cannot find kubernetes-server-linux-amd64.tar.gz"
+    echo "!!! Cannot find lmktfy-server-linux-amd64.tar.gz"
     exit 1
   fi
 
-  SALT_TAR="${KUBE_ROOT}/server/kubernetes-salt.tar.gz"
+  SALT_TAR="${LMKTFY_ROOT}/server/lmktfy-salt.tar.gz"
   if [[ ! -f "$SALT_TAR" ]]; then
-    SALT_TAR="${KUBE_ROOT}/_output/release-tars/kubernetes-salt.tar.gz"
+    SALT_TAR="${LMKTFY_ROOT}/_output/release-tars/lmktfy-salt.tar.gz"
   fi
   if [[ ! -f "$SALT_TAR" ]]; then
-    echo "!!! Cannot find kubernetes-salt.tar.gz"
+    echo "!!! Cannot find lmktfy-salt.tar.gz"
     exit 1
   fi
 }
@@ -134,7 +134,7 @@ function upload-server-tars() {
   fi
   project_hash=${project_hash:0:5}
 
-  local -r staging_bucket="gs://kubernetes-staging-${project_hash}"
+  local -r staging_bucket="gs://lmktfy-staging-${project_hash}"
 
   # Ensure the bucket is created
   if ! gsutil ls "$staging_bucket" > /dev/null 2>&1 ; then
@@ -195,11 +195,11 @@ function wait-for-minions-to-run {
 #   ZONE
 # Vars set:
 #   MINION_NAMES
-#   KUBE_MINION_IP_ADDRESSES (array)
+#   LMKTFY_MINION_IP_ADDRESSES (array)
 function detect-minions () {
   detect-project
   detect-minion-names
-  KUBE_MINION_IP_ADDRESSES=()
+  LMKTFY_MINION_IP_ADDRESSES=()
   for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
     local minion_ip=$(gcloud compute instances describe --project "${PROJECT}" --zone "${ZONE}" \
       "${MINION_NAMES[$i]}" --fields networkInterfaces[0].accessConfigs[0].natIP \
@@ -208,11 +208,11 @@ function detect-minions () {
       echo "Did not find ${MINION_NAMES[$i]}" >&2
     else
       echo "Found ${MINION_NAMES[$i]} at ${minion_ip}"
-      KUBE_MINION_IP_ADDRESSES+=("${minion_ip}")
+      LMKTFY_MINION_IP_ADDRESSES+=("${minion_ip}")
     fi
   done
-  if [[ -z "${KUBE_MINION_IP_ADDRESSES-}" ]]; then
-    echo "Could not detect Kubernetes minion nodes.  Make sure you've launched a cluster with 'kube-up.sh'" >&2
+  if [[ -z "${LMKTFY_MINION_IP_ADDRESSES-}" ]]; then
+    echo "Could not detect LMKTFY minion nodes.  Make sure you've launched a cluster with 'lmktfy-up.sh'" >&2
     exit 1
   fi
 }
@@ -223,61 +223,61 @@ function detect-minions () {
 #   MASTER_NAME
 #   ZONE
 # Vars set:
-#   KUBE_MASTER
-#   KUBE_MASTER_IP
-#   KUBE_MASTER_IP_INTERNAL
+#   LMKTFY_MASTER
+#   LMKTFY_MASTER_IP
+#   LMKTFY_MASTER_IP_INTERNAL
 function detect-master () {
   detect-project
-  KUBE_MASTER=${MASTER_NAME}
-  if [[ -z "${KUBE_MASTER_IP-}" ]]; then
-    KUBE_MASTER_IP=$(gcloud compute instances describe --project "${PROJECT}" --zone "${ZONE}" \
+  LMKTFY_MASTER=${MASTER_NAME}
+  if [[ -z "${LMKTFY_MASTER_IP-}" ]]; then
+    LMKTFY_MASTER_IP=$(gcloud compute instances describe --project "${PROJECT}" --zone "${ZONE}" \
       "${MASTER_NAME}" --fields networkInterfaces[0].accessConfigs[0].natIP \
       --format=text | awk '{ print $2 }')
   fi
-  if [[ -z "${KUBE_MASTER_IP-}" ]]; then
-    echo "Could not detect Kubernetes master node.  Make sure you've launched a cluster with 'kube-up.sh'" >&2
+  if [[ -z "${LMKTFY_MASTER_IP-}" ]]; then
+    echo "Could not detect LMKTFY master node.  Make sure you've launched a cluster with 'lmktfy-up.sh'" >&2
     exit 1
   fi
-  echo "Using master: $KUBE_MASTER (external IP: $KUBE_MASTER_IP)"
+  echo "Using master: $LMKTFY_MASTER (external IP: $LMKTFY_MASTER_IP)"
 }
 
 # Ensure that we have a password created for validating to the master.  Will
-# read from kubeconfig for the current context if available.
+# read from lmktfyconfig for the current context if available.
 #
 # Assumed vars
-#   KUBE_ROOT
+#   LMKTFY_ROOT
 #
 # Vars set:
-#   KUBE_USER
-#   KUBE_PASSWORD
+#   LMKTFY_USER
+#   LMKTFY_PASSWORD
 function get-password {
-  get-kubeconfig-basicauth
-  if [[ -z "${KUBE_USER}" || -z "${KUBE_PASSWORD}" ]]; then
-    KUBE_USER=admin
-    KUBE_PASSWORD=$(python -c 'import string,random; print "".join(random.SystemRandom().choice(string.ascii_letters + string.digits) for _ in range(16))')
+  get-lmktfyconfig-basicauth
+  if [[ -z "${LMKTFY_USER}" || -z "${LMKTFY_PASSWORD}" ]]; then
+    LMKTFY_USER=admin
+    LMKTFY_PASSWORD=$(python -c 'import string,random; print "".join(random.SystemRandom().choice(string.ascii_letters + string.digits) for _ in range(16))')
   fi
 }
 
 # Set MASTER_HTPASSWD
 function set-master-htpasswd {
-  python "${KUBE_ROOT}/third_party/htpasswd/htpasswd.py" \
-    -b -c "${KUBE_TEMP}/htpasswd" "$KUBE_USER" "$KUBE_PASSWORD"
+  python "${LMKTFY_ROOT}/third_party/htpasswd/htpasswd.py" \
+    -b -c "${LMKTFY_TEMP}/htpasswd" "$LMKTFY_USER" "$LMKTFY_PASSWORD"
   local htpasswd
-  MASTER_HTPASSWD=$(cat "${KUBE_TEMP}/htpasswd")
+  MASTER_HTPASSWD=$(cat "${LMKTFY_TEMP}/htpasswd")
 }
 
 # Generate authentication token for admin user. Will
-# read from $HOME/.kubernetes_auth if available.
+# read from $HOME/.lmktfy_auth if available.
 #
 # Vars set:
-#   KUBE_ADMIN_TOKEN
+#   LMKTFY_ADMIN_TOKEN
 function get-admin-token {
-  local file="$HOME/.kubernetes_auth"
+  local file="$HOME/.lmktfy_auth"
   if [[ -r "$file" ]]; then
-    KUBE_ADMIN_TOKEN=$(cat "$file" | python -c 'import json,sys;print json.load(sys.stdin)["BearerToken"]')
+    LMKTFY_ADMIN_TOKEN=$(cat "$file" | python -c 'import json,sys;print json.load(sys.stdin)["BearerToken"]')
     return
   fi
-  KUBE_ADMIN_TOKEN=$(python -c 'import string,random; print "".join(random.SystemRandom().choice(string.ascii_letters + string.digits) for _ in range(32))')
+  LMKTFY_ADMIN_TOKEN=$(python -c 'import string,random; print "".join(random.SystemRandom().choice(string.ascii_letters + string.digits) for _ in range(32))')
 }
 
 
@@ -352,7 +352,7 @@ function create-route {
 # $1: The name of the instance template.
 # $2: The scopes flag.
 # $3: The minion start script metadata from file.
-# $4: The kube-env metadata.
+# $4: The lmktfy-env metadata.
 # $5: Raw metadata
 function create-node-template {
   detect-project
@@ -439,7 +439,7 @@ function yaml-quote {
 }
 
 # $1: if 'true', we're building a master yaml, else a node
-function build-kube-env {
+function build-lmktfy-env {
   local master=$1
   local file=$2
 
@@ -468,7 +468,7 @@ EOF
 
   if [[ "${master}" != "true" ]]; then
     cat >>$file <<EOF
-KUBERNETES_MASTER_NAME: $(yaml-quote ${MASTER_NAME})
+LMKTFYRNETES_MASTER_NAME: $(yaml-quote ${MASTER_NAME})
 ZONE: $(yaml-quote ${ZONE})
 EXTRA_DOCKER_OPTS: $(yaml-quote ${EXTRA_DOCKER_OPTS})
 ENABLE_DOCKER_REGISTRY_CACHE: $(yaml-quote ${ENABLE_DOCKER_REGISTRY_CACHE:-false})
@@ -477,19 +477,19 @@ EOF
 }
 
 function write-master-env {
-  build-kube-env true "${KUBE_TEMP}/master-kube-env.yaml"
+  build-lmktfy-env true "${LMKTFY_TEMP}/master-lmktfy-env.yaml"
 }
 
 function write-node-env {
-  build-kube-env false "${KUBE_TEMP}/node-kube-env.yaml"
+  build-lmktfy-env false "${LMKTFY_TEMP}/node-lmktfy-env.yaml"
 }
 
-# Instantiate a kubernetes cluster
+# Instantiate a lmktfy cluster
 #
 # Assumed vars
-#   KUBE_ROOT
+#   LMKTFY_ROOT
 #   <Various vars set in config file>
-function kube-up {
+function lmktfy-up {
   ensure-temp-dir
   detect-project
 
@@ -540,8 +540,8 @@ function kube-up {
   # Generate a bearer token for this cluster. We push this separately
   # from the other cluster variables so that the client (this
   # computer) can forget it later. This should disappear with
-  # https://github.com/GoogleCloudPlatform/kubernetes/issues/3168
-  KUBELET_TOKEN=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
+  # https://github.com/GoogleCloudPlatform/lmktfy/issues/3168
+  LMKTFYLET_TOKEN=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
 
   write-master-env
   gcloud compute instances create "${MASTER_NAME}" \
@@ -555,8 +555,8 @@ function kube-up {
     --scopes "storage-ro" "compute-rw" \
     --can-ip-forward \
     --metadata-from-file \
-      "startup-script=${KUBE_ROOT}/cluster/gce/configure-vm.sh" \
-      "kube-env=${KUBE_TEMP}/master-kube-env.yaml" \
+      "startup-script=${LMKTFY_ROOT}/cluster/gce/configure-vm.sh" \
+      "lmktfy-env=${LMKTFY_TEMP}/master-lmktfy-env.yaml" \
     --disk name="${MASTER_NAME}-pd" device-name=master-pd mode=rw boot=no auto-delete=no &
 
   # Create a single firewall rule for all minions.
@@ -573,7 +573,7 @@ function kube-up {
 
   # Wait for last batch of jobs
   wait-for-jobs
-  add-instance-metadata "${MASTER_NAME}" "kube-token=${KUBELET_TOKEN}"
+  add-instance-metadata "${MASTER_NAME}" "lmktfy-token=${LMKTFYLET_TOKEN}"
 
   echo "Creating minions."
 
@@ -586,9 +586,9 @@ function kube-up {
 
   write-node-env
   create-node-template "${NODE_INSTANCE_PREFIX}-template" "${scope_flags[*]}" \
-    "startup-script=${KUBE_ROOT}/cluster/gce/configure-vm.sh" \
-    "kube-env=${KUBE_TEMP}/node-kube-env.yaml" \
-    "kube-token=${KUBELET_TOKEN}"
+    "startup-script=${LMKTFY_ROOT}/cluster/gce/configure-vm.sh" \
+    "lmktfy-env=${LMKTFY_TEMP}/node-lmktfy-env.yaml" \
+    "lmktfy-token=${LMKTFYLET_TOKEN}"
 
   gcloud preview managed-instance-groups --zone "${ZONE}" \
       create "${NODE_INSTANCE_PREFIX}-group" \
@@ -621,46 +621,46 @@ function kube-up {
   detect-master
 
   # Reserve the master's IP so that it can later be transferred to another VM
-  # without disrupting the kubelets. IPs are associated with regions, not zones,
+  # without disrupting the lmktfylets. IPs are associated with regions, not zones,
   # so extract the region name, which is the same as the zone but with the final
   # dash and characters trailing the dash removed.
   local REGION=${ZONE%-*}
   gcloud compute addresses create "${MASTER_NAME}-ip" \
     --project "${PROJECT}" \
-    --addresses "${KUBE_MASTER_IP}" \
+    --addresses "${LMKTFY_MASTER_IP}" \
     --region "${REGION}"
 
   echo "Waiting for cluster initialization."
   echo
-  echo "  This will continually check to see if the API for kubernetes is reachable."
+  echo "  This will continually check to see if the API for lmktfy is reachable."
   echo "  This might loop forever if there was some uncaught error during start"
   echo "  up."
   echo
 
-  until curl --insecure --user "${KUBE_USER}:${KUBE_PASSWORD}" --max-time 5 \
-          --fail --output /dev/null --silent "https://${KUBE_MASTER_IP}/api/v1beta1/pods"; do
+  until curl --insecure --user "${LMKTFY_USER}:${LMKTFY_PASSWORD}" --max-time 5 \
+          --fail --output /dev/null --silent "https://${LMKTFY_MASTER_IP}/api/v1beta1/pods"; do
       printf "."
       sleep 2
   done
 
-  echo "Kubernetes cluster created."
+  echo "LMKTFY cluster created."
 
   # TODO use token instead of basic auth
-  export KUBECONFIG="${HOME}/.kube/.kubeconfig"
-  export KUBE_CERT="/tmp/kubecfg.crt"
-  export KUBE_KEY="/tmp/kubecfg.key"
-  export CA_CERT="/tmp/kubernetes.ca.crt"
+  export LMKTFYCONFIG="${HOME}/.lmktfy/.lmktfyconfig"
+  export LMKTFY_CERT="/tmp/lmktfycfg.crt"
+  export LMKTFY_KEY="/tmp/lmktfycfg.key"
+  export CA_CERT="/tmp/lmktfy.ca.crt"
   export CONTEXT="${PROJECT}_${INSTANCE_PREFIX}"
 
-  # TODO: generate ADMIN (and KUBELET) tokens and put those in the master's
+  # TODO: generate ADMIN (and LMKTFYLET) tokens and put those in the master's
   # config file.  Distribute the same way the htpasswd is done.
   (
    umask 077
-   gcloud compute ssh --project "${PROJECT}" --zone "$ZONE" "${MASTER_NAME}" --command "sudo cat /srv/kubernetes/kubecfg.crt" >"${KUBE_CERT}" 2>/dev/null
-   gcloud compute ssh --project "${PROJECT}" --zone "$ZONE" "${MASTER_NAME}" --command "sudo cat /srv/kubernetes/kubecfg.key" >"${KUBE_KEY}" 2>/dev/null
-   gcloud compute ssh --project "${PROJECT}" --zone "$ZONE" "${MASTER_NAME}" --command "sudo cat /srv/kubernetes/ca.crt" >"${CA_CERT}" 2>/dev/null
+   gcloud compute ssh --project "${PROJECT}" --zone "$ZONE" "${MASTER_NAME}" --command "sudo cat /srv/lmktfy/lmktfycfg.crt" >"${LMKTFY_CERT}" 2>/dev/null
+   gcloud compute ssh --project "${PROJECT}" --zone "$ZONE" "${MASTER_NAME}" --command "sudo cat /srv/lmktfy/lmktfycfg.key" >"${LMKTFY_KEY}" 2>/dev/null
+   gcloud compute ssh --project "${PROJECT}" --zone "$ZONE" "${MASTER_NAME}" --command "sudo cat /srv/lmktfy/ca.crt" >"${CA_CERT}" 2>/dev/null
 
-   create-kubeconfig
+   create-lmktfyconfig
   )
 
   echo "Sanity checking cluster..."
@@ -678,15 +678,15 @@ function kube-up {
           if (( attempt > 9 )); then
             echo
             echo -e "${color_red}Docker failed to install on node ${MINION_NAMES[$i]}. Your cluster is unlikely" >&2
-            echo "to work correctly. Please run ./cluster/kube-down.sh and re-create the" >&2
+            echo "to work correctly. Please run ./cluster/lmktfy-down.sh and re-create the" >&2
             echo -e "cluster. (sorry!)${color_norm}" >&2
             exit 1
           fi
-        elif [[ "${output}" != *"kubernetes/pause"* ]]; then
+        elif [[ "${output}" != *"lmktfy/pause"* ]]; then
           if (( attempt > 9 )); then
             echo
-            echo -e "${color_red}Failed to observe kubernetes/pause on node ${MINION_NAMES[$i]}. Your cluster is unlikely" >&2
-            echo "to work correctly. Please run ./cluster/kube-down.sh and re-create the" >&2
+            echo -e "${color_red}Failed to observe lmktfy/pause on node ${MINION_NAMES[$i]}. Your cluster is unlikely" >&2
+            echo "to work correctly. Please run ./cluster/lmktfy-down.sh and re-create the" >&2
             echo -e "cluster. (sorry!)${color_norm}" >&2
             exit 1
           fi
@@ -704,16 +704,16 @@ function kube-up {
   done
 
   echo
-  echo -e "${color_green}Kubernetes cluster is running.  The master is running at:"
+  echo -e "${color_green}LMKTFY cluster is running.  The master is running at:"
   echo
-  echo -e "${color_yellow}  https://${KUBE_MASTER_IP}"
+  echo -e "${color_yellow}  https://${LMKTFY_MASTER_IP}"
   echo
-  echo -e "${color_green}The user name and password to use is located in ${KUBECONFIG}.${color_norm}"
+  echo -e "${color_green}The user name and password to use is located in ${LMKTFYCONFIG}.${color_norm}"
   echo
 
 }
 
-# Delete a kubernetes cluster. This is called from test-teardown.
+# Delete a lmktfy cluster. This is called from test-teardown.
 #
 # Assumed vars:
 #   MASTER_NAME
@@ -722,7 +722,7 @@ function kube-up {
 # This function tears down cluster resources 10 at a time to avoid issuing too many
 # API calls and exceeding API quota. It is important to bring down the instances before bringing
 # down the firewall rules and routes.
-function kube-down {
+function lmktfy-down {
   detect-project
 
   echo "Bringing down cluster"
@@ -745,7 +745,7 @@ function kube-down {
     --zone "${ZONE}" \
     "${MASTER_NAME}" || true
 
-  # Delete the master pd (possibly leaked by kube-up if master create failed)
+  # Delete the master pd (possibly leaked by lmktfy-up if master create failed)
   gcloud compute disks delete \
     --project "${PROJECT}" \
     --quiet \
@@ -804,14 +804,14 @@ function kube-down {
     --quiet \
     "${MASTER_NAME}-ip" || true
 
-  export KUBECONFIG="${HOME}/.kube/.kubeconfig"
+  export LMKTFYCONFIG="${HOME}/.lmktfy/.lmktfyconfig"
   export CONTEXT="${PROJECT}_${INSTANCE_PREFIX}"
-  clear-kubeconfig
+  clear-lmktfyconfig
 }
 
-# Update a kubernetes cluster with latest source
-function kube-push {
-  OUTPUT=${KUBE_ROOT}/_output/logs
+# Update a lmktfy cluster with latest source
+function lmktfy-push {
+  OUTPUT=${LMKTFY_ROOT}/_output/logs
   mkdir -p ${OUTPUT}
 
   ensure-temp-dir
@@ -826,21 +826,21 @@ function kube-push {
   upload-server-tars
 
   write-master-env
-  add-instance-metadata-from-file "${KUBE_MASTER}" "kube-env=${KUBE_TEMP}/master-kube-env.yaml"
-  echo "Pushing to master (log at ${OUTPUT}/kube-push-${KUBE_MASTER}.log) ..."
-  cat ${KUBE_ROOT}/cluster/gce/configure-vm.sh | gcloud compute ssh --ssh-flag="-o LogLevel=quiet" --project "${PROJECT}" --zone "${ZONE}" "${KUBE_MASTER}" --command "sudo bash -s -- --push" &> ${OUTPUT}/kube-push-"${KUBE_MASTER}".log
+  add-instance-metadata-from-file "${LMKTFY_MASTER}" "lmktfy-env=${LMKTFY_TEMP}/master-lmktfy-env.yaml"
+  echo "Pushing to master (log at ${OUTPUT}/lmktfy-push-${LMKTFY_MASTER}.log) ..."
+  cat ${LMKTFY_ROOT}/cluster/gce/configure-vm.sh | gcloud compute ssh --ssh-flag="-o LogLevel=quiet" --project "${PROJECT}" --zone "${ZONE}" "${LMKTFY_MASTER}" --command "sudo bash -s -- --push" &> ${OUTPUT}/lmktfy-push-"${LMKTFY_MASTER}".log
 
   echo "Pushing metadata to minions... "
   write-node-env
   for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
-    add-instance-metadata-from-file "${MINION_NAMES[$i]}" "kube-env=${KUBE_TEMP}/node-kube-env.yaml" &
+    add-instance-metadata-from-file "${MINION_NAMES[$i]}" "lmktfy-env=${LMKTFY_TEMP}/node-lmktfy-env.yaml" &
   done
   wait-for-jobs
   echo "Done"
 
   for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
-    echo "Starting push to node (log at ${OUTPUT}/kube-push-${MINION_NAMES[$i]}.log) ..."
-    cat ${KUBE_ROOT}/cluster/gce/configure-vm.sh | gcloud compute ssh --ssh-flag="-o LogLevel=quiet" --project "${PROJECT}" --zone "${ZONE}" "${MINION_NAMES[$i]}" --command "sudo bash -s -- --push" &> ${OUTPUT}/kube-push-"${MINION_NAMES[$i]}".log &
+    echo "Starting push to node (log at ${OUTPUT}/lmktfy-push-${MINION_NAMES[$i]}.log) ..."
+    cat ${LMKTFY_ROOT}/cluster/gce/configure-vm.sh | gcloud compute ssh --ssh-flag="-o LogLevel=quiet" --project "${PROJECT}" --zone "${ZONE}" "${MINION_NAMES[$i]}" --command "sudo bash -s -- --push" &> ${OUTPUT}/lmktfy-push-"${MINION_NAMES[$i]}".log &
   done
 
   echo -n "Waiting for node pushes... "
@@ -848,19 +848,19 @@ function kube-push {
   echo "Done"
 
   # TODO(zmerlynn): Re-create instance-template with the new
-  # node-kube-env. This isn't important until the node-ip-range issue
+  # node-lmktfy-env. This isn't important until the node-ip-range issue
   # is solved (because that's blocking automatic dynamic nodes from
-  # working). The node-kube-env has to be composed with the kube-token
+  # working). The node-lmktfy-env has to be composed with the lmktfy-token
   # metadata. Ideally we would have
-  # https://github.com/GoogleCloudPlatform/kubernetes/issues/3168
+  # https://github.com/GoogleCloudPlatform/lmktfy/issues/3168
   # implemented before then, though, so avoiding this mess until then.
 
   echo
-  echo "Kubernetes cluster is running.  The master is running at:"
+  echo "LMKTFY cluster is running.  The master is running at:"
   echo
-  echo "  https://${KUBE_MASTER_IP}"
+  echo "  https://${LMKTFY_MASTER_IP}"
   echo
-  echo "The user name and password to use is located in ~/.kubernetes_auth."
+  echo "The user name and password to use is located in ~/.lmktfy_auth."
   echo
 }
 
@@ -870,14 +870,14 @@ function kube-push {
 # Execute prior to running tests to build a release if required for env.
 #
 # Assumed Vars:
-#   KUBE_ROOT
+#   LMKTFY_ROOT
 function test-build-release {
   # Make a release
-  "${KUBE_ROOT}/build/release.sh"
+  "${LMKTFY_ROOT}/build/release.sh"
 }
 
 # Execute prior to running tests to initialize required structure. This is
-# called from hack/e2e.go only when running -up (it is run after kube-up).
+# called from hack/e2e.go only when running -up (it is run after lmktfy-up).
 #
 # Assumed vars:
 #   Variables from config.sh
@@ -904,7 +904,7 @@ function test-teardown {
     --project "${PROJECT}" \
     --quiet \
     "${MINION_TAG}-${INSTANCE_PREFIX}-http-alt" || true
-  "${KUBE_ROOT}/cluster/kube-down.sh"
+  "${LMKTFY_ROOT}/cluster/lmktfy-down.sh"
 }
 
 # SSH to a node by name ($1) and run a command ($2).
@@ -918,14 +918,14 @@ function ssh-to-node {
   done
 }
 
-# Restart the kube-proxy on a node ($1)
-function restart-kube-proxy {
-  ssh-to-node "$1" "sudo /etc/init.d/kube-proxy restart"
+# Restart the lmktfy-proxy on a node ($1)
+function restart-lmktfy-proxy {
+  ssh-to-node "$1" "sudo /etc/init.d/lmktfy-proxy restart"
 }
 
-# Restart the kube-apiserver on a node ($1)
+# Restart the lmktfy-apiserver on a node ($1)
 function restart-apiserver {
-  ssh-to-node "$1" "sudo /etc/init.d/kube-apiserver restart"
+  ssh-to-node "$1" "sudo /etc/init.d/lmktfy-apiserver restart"
 }
 
 # Perform preparations required to run e2e tests

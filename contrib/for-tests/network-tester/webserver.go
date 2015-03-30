@@ -43,16 +43,16 @@ import (
 	"sync"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api/latest"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/client"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/util"
 )
 
 var (
 	port      = flag.Int("port", 8080, "Port number to serve at.")
 	peerCount = flag.Int("peers", 8, "Must find at least this many peers for the test to pass.")
 	service   = flag.String("service", "nettest", "Service to find other network test pods in.")
-	namespace = flag.String("namespace", "default", "Namespace of this pod. TODO: kubernetes should make this discoverable.")
+	namespace = flag.String("namespace", "default", "Namespace of this pod. TODO: lmktfy should make this discoverable.")
 )
 
 // State tracks the internal state of our little http server.
@@ -205,7 +205,7 @@ func contactOthers(state *State) {
 	defer state.doneContactingPeers()
 	masterRO := url.URL{
 		Scheme: "http",
-		Host:   os.Getenv("KUBERNETES_RO_SERVICE_HOST") + ":" + os.Getenv("KUBERNETES_RO_SERVICE_PORT"),
+		Host:   os.Getenv("LMKTFYRNETES_RO_SERVICE_HOST") + ":" + os.Getenv("LMKTFYRNETES_RO_SERVICE_PORT"),
 		Path:   "/api/v1beta1",
 	}
 	client := &client.Client{client.NewRESTClient(&masterRO, "v1beta1", latest.Codec, true)}

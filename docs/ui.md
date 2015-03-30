@@ -1,24 +1,24 @@
-# Kubernetes UI instructions
+# LMKTFY UI instructions
 
-## Kubernetes User Interface
-Kubernetes currently supports a simple web user interface.
+## LMKTFY User Interface
+LMKTFY currently supports a simple web user interface.
 
 ### Running locally
 Start the server:
 
 ```sh
-cluster/kubectl.sh proxy --www=$PWD/www
+cluster/lmktfyctl.sh proxy --www=$PWD/www
 ```
 
 The UI should now be running on [localhost](http://localhost:8001/static/index.html#/groups//selector)
 
 ### Running remotely
-When Kubernetes is deployed, the server deploys the UI, you can visit ```/static/index.html#/groups//selector``` on your master server.
+When LMKTFY is deployed, the server deploys the UI, you can visit ```/static/index.html#/groups//selector``` on your master server.
 
 
 ### Interacting with the user interface.
 
-The Kubernetes user interface is a query-based visualization of the Kubernetes API.  The user interface is defined by two functional primitives:
+The LMKTFY user interface is a query-based visualization of the LMKTFY API.  The user interface is defined by two functional primitives:
 
 #### GroupBy
 _GroupBy_ takes a label ```key``` as a parameter, places all objects with the same value for that key within a single group. For example ```/groups/host/selector``` groups pods by host.  ```/groups/name/selector``` groups pods by name.  Groups are hiearchical, for example ```/groups/name/host/selector``` first groups by pod name, and then by host.

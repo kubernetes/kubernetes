@@ -25,7 +25,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/probe"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/probe"
 )
 
 // TODO: this basic interface is duplicated in N places.  consolidate?

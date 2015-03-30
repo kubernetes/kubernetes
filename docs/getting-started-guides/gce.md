@@ -1,60 +1,60 @@
 ## Getting started on Google Compute Engine
 
-The example below creates a Kubernetes cluster with 4 worker node Virtual Machines and a master Virtual Machine (i.e. 5 VMs in your cluster). This cluster is set up and controlled from your workstation (or wherever you find convenient).
+The example below creates a LMKTFY cluster with 4 worker node Virtual Machines and a master Virtual Machine (i.e. 5 VMs in your cluster). This cluster is set up and controlled from your workstation (or wherever you find convenient).
 
 ### Starting a Cluster
 
 You can install a cluster with one of two one-liners:
 
 ```bash
-curl -sS https://get.k8s.io | bash
+curl -sS https://get.lmktfy.io | bash
 ```
 
 or
 
 ```bash
-wget -q -O - https://get.k8s.io | bash
+wget -q -O - https://get.lmktfy.io | bash
 ```
 
-This will leave you with a ```kubernetes``` directory and a running cluster.  Feel free to move the ```kubernetes``` directory to the appropriate directory (e.g. ```/opt/kubernetes```) then cd into that directory.
+This will leave you with a ```lmktfy``` directory and a running cluster.  Feel free to move the ```lmktfy``` directory to the appropriate directory (e.g. ```/opt/lmktfy```) then cd into that directory.
 
 ```bash
-mv kubernetes ${SOME_DIR}/kubernetes
-cd ${SOME_DIR}/kubernetes
+mv lmktfy ${SOME_DIR}/lmktfy
+cd ${SOME_DIR}/lmktfy
 ```
 
-If you run into trouble please see the section on [troubleshooting](https://github.com/brendandburns/kubernetes/blob/docs/docs/getting-started-guides/gce.md#troubleshooting), or come ask questions on IRC at #google-containers on freenode.
+If you run into trouble please see the section on [troubleshooting](https://github.com/brendandburns/lmktfy/blob/docs/docs/getting-started-guides/gce.md#troubleshooting), or come ask questions on IRC at #google-containers on freenode.
 
 
 ### Running a container (simple version)
 
-Once you have your cluster created you can use ```${SOME_DIR}/kubernetes/cluster/kubectl.sh``` to access
-the kubernetes api.
+Once you have your cluster created you can use ```${SOME_DIR}/lmktfy/cluster/lmktfyctl.sh``` to access
+the lmktfy api.
 
-The `kubectl.sh` line below spins up two containers running
+The `lmktfyctl.sh` line below spins up two containers running
 [Nginx](http://nginx.org/en/) running on port 80:
 
 ```bash
-cluster/kubectl.sh run-container my-nginx --image=dockerfile/nginx --replicas=2 --port=80
+cluster/lmktfyctl.sh run-container my-nginx --image=dockerfile/nginx --replicas=2 --port=80
 ```
 
 To stop the containers:
 
 ```bash
-cluster/kubectl.sh stop rc my-nginx
+cluster/lmktfyctl.sh stop rc my-nginx
 ```
 
 To delete the containers:
 
 ```bash
-cluster/kubectl.sh delete rc my-nginx
+cluster/lmktfyctl.sh delete rc my-nginx
 ```
 
 ### Running a container (more complete version)
 
 ```bash
-cd kubernetes
-cluster/kubectl.sh create -f docs/getting-started-guides/pod.json
+cd lmktfy
+cluster/lmktfyctl.sh create -f docs/getting-started-guides/pod.json
 ```
 
 Where pod.json contains something like:
@@ -96,13 +96,13 @@ Where pod.json contains something like:
 You can see your cluster's pods:
 
 ```bash
-cluster/kubectl.sh get pods
+cluster/lmktfyctl.sh get pods
 ```
 
 and delete the pod you just created:
 
 ```bash
-cluster/kubectl.sh delete pods php
+cluster/lmktfyctl.sh delete pods php
 ```
 
 Since this pod is scheduled on a minion running in GCE, you will have to enable incoming tcp traffic via the port specified in the
@@ -112,14 +112,14 @@ Look in `examples/` for more examples
 
 ### Tearing down the cluster
 ```bash
-cd kubernetes
-cluster/kube-down.sh
+cd lmktfy
+cluster/lmktfy-down.sh
 ```
 
 ### Customizing
-The script above relies on Google Storage to stage the Kubernetes release. It
+The script above relies on Google Storage to stage the LMKTFY release. It
 then will start (by default) a single master VM along with 4 worker VMs.  You
-can tweak some of these parameters by editing `kubernetes/cluster/gce/config-default.sh`
+can tweak some of these parameters by editing `lmktfy/cluster/gce/config-default.sh`
 You can view a transcript of a successful cluster creation
 [here](https://gist.github.com/satnam6502/fc689d1b46db9772adea).
 

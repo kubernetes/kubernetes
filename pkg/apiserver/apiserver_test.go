@@ -32,21 +32,21 @@ import (
 	"testing"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/admission"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	apierrs "github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/rest"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta3"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/version"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
-	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/admission/admit"
-	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/admission/deny"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/admission"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api"
+	apierrs "github.com/GoogleCloudPlatform/lmktfy/pkg/api/errors"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api/meta"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api/rest"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api/v1beta1"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api/v1beta3"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/fields"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/labels"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/runtime"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/util"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/version"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/watch"
+	"github.com/GoogleCloudPlatform/lmktfy/plugin/pkg/admission/admit"
+	"github.com/GoogleCloudPlatform/lmktfy/plugin/pkg/admission/deny"
 
 	"github.com/emicklei/go-restful"
 )
@@ -56,10 +56,10 @@ func convert(obj runtime.Object) (runtime.Object, error) {
 }
 
 // This creates a fake API version, similar to api/latest.go for a v1beta1 equivalent api. It is distinct
-// from the Kubernetes API versions to allow clients to properly distinguish the two.
+// from the LMKTFY API versions to allow clients to properly distinguish the two.
 const testVersion = "version"
 
-// The equivalent of the Kubernetes v1beta3 API.
+// The equivalent of the LMKTFY v1beta3 API.
 const testVersion2 = "version2"
 
 var versions = []string{testVersion, testVersion2}
@@ -1449,7 +1449,7 @@ func TestCreateNotFound(t *testing.T) {
 	handler := handle(map[string]rest.Storage{
 		"simple": &SimpleRESTStorage{
 			// storage.Create can fail with not found error in theory.
-			// See https://github.com/GoogleCloudPlatform/kubernetes/pull/486#discussion_r15037092.
+			// See https://github.com/GoogleCloudPlatform/lmktfy/pull/486#discussion_r15037092.
 			errors: map[string]error{"create": apierrs.NewNotFound("simple", "id")},
 		},
 	})

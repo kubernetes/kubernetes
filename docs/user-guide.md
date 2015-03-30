@@ -1,17 +1,17 @@
-# Kubernetes User Guide
+# LMKTFY User Guide
 
 The user guide is intended for anyone who wants to run programs and services
-on an existing Kubernetes cluster.  Setup and administration of a
-Kubernetes cluster is described in the [Cluster Admin Guide](cluster-admin-guide.md).
+on an existing LMKTFY cluster.  Setup and administration of a
+LMKTFY cluster is described in the [Cluster Admin Guide](cluster-admin-guide.md).
 The developer guide describes is for anyone wanting to either write code which directly accesses the
-kubernetes API, or to contribute directly to the kubernetes project.
+lmktfy API, or to contribute directly to the lmktfy project.
 
 ## Primary concepts
 
 * **Overview** ([overview.md](overview.md)): A brief overview
-  of Kubernetes concepts. 
+  of LMKTFY concepts. 
 
-* **Nodes** ([node.md](node.md)): A node is a worker machine in Kubernetes.
+* **Nodes** ([node.md](node.md)): A node is a worker machine in LMKTFY.
 
 * **Pods** ([pods.md](pods.md)): A pod is a tightly-coupled group of containers
   with shared volumes.
@@ -24,7 +24,7 @@ kubernetes API, or to contribute directly to the kubernetes project.
   A replication controller ensures that a specified number of pod "replicas" are 
   running at any one time.
 
-* **Services** ([services.md](services.md)): A Kubernetes service is an abstraction 
+* **Services** ([services.md](services.md)): A LMKTFY service is an abstraction 
   which defines a logical set of pods and a policy by which to access them.
 
 * **Volumes** ([volumes.md](volumes.md)): A Volume is a directory, possibly with some 
@@ -37,17 +37,17 @@ kubernetes API, or to contribute directly to the kubernetes project.
 * **Accessing the API** ([accessing_the_api.md](accessing_the_api.md)):
   Ports, IPs, proxies, and firewall rules.
 
-* **Kubernetes Web Interface** ([ui.md](ui.md)): Accessing the Kubernetes
+* **LMKTFY Web Interface** ([ui.md](ui.md)): Accessing the LMKTFY
   web user interface.
 
-* **Kubectl Command Line Interface** ([kubectl.md](kubectl.md)):
-  The `kubectl` command line reference.
+* **LMKTFYctl Command Line Interface** ([lmktfyctl.md](lmktfyctl.md)):
+  The `lmktfyctl` command line reference.
 
 * **Sharing Cluster Access** ([sharing-clusters.md](sharing-clusters.md)):
-  How to share client credentials for a kubernetes cluster.
+  How to share client credentials for a lmktfy cluster.
 
 * **Roadmap** ([roadmap.md](roadmap.md)): The set of supported use cases, features,
-  docs, and patterns that are required before Kubernetes 1.0.
+  docs, and patterns that are required before LMKTFY 1.0.
 
 * **Glossary** ([glossary.md](glossary.md)): Terms and concepts.
 
@@ -57,12 +57,12 @@ kubernetes API, or to contribute directly to the kubernetes project.
 * **Annotations** ([annotations.md](annotations.md)): Attaching
   arbitrary non-identifying metadata.
 
-* **Kubernetes Container Environment** ([container-environment.md](container-environment.md)):
-  Describes the environment for Kubelet managed containers on a Kubernetes
+* **LMKTFY Container Environment** ([container-environment.md](container-environment.md)):
+  Describes the environment for LMKTFYlet managed containers on a LMKTFY
   node.
 
 * **DNS Integration with SkyDNS** ([dns.md](dns.md)):
-  Resolving a DNS name directly to a Kubernetes service.
+  Resolving a DNS name directly to a LMKTFY service.
 
 * **Identifiers** ([identifiers.md](identifiers.md)): Names and UIDs
   explained.
@@ -73,17 +73,17 @@ kubernetes API, or to contribute directly to the kubernetes project.
 * **Logging** ([logging.md](logging.md)): Pointers to logging info.
 
 * **Namespaces** ([namespaces.md](namespaces.md)): Namespaces help different
-  projects, teams, or customers to share a kubernetes cluster.
+  projects, teams, or customers to share a lmktfy cluster.
 
 * **Networking** ([networking.md](networking.md)): Pod networking overview.
 
-* **The Kubernetes Resource Model** ([resources.md](resources.md)):
+* **The LMKTFY Resource Model** ([resources.md](resources.md)):
   Provides resource information such as size, type, and quantity to assist in
-  assigning Kubernetes resources appropriately.
+  assigning LMKTFY resources appropriately.
 
 * **Accessing cluster services via a Proxy** [accessing-the-cluster.md](../docs/accessing-the-cluster.md)
 
-* The [API object documentation](http://kubernetes.io/third_party/swagger-ui/).
+* The [API object documentation](http://lmktfy.io/third_party/swagger-ui/).
 
-* Frequently asked questions are answered on this project's [wiki](https://github.com/GoogleCloudPlatform/kubernetes/wiki).
+* Frequently asked questions are answered on this project's [wiki](https://github.com/GoogleCloudPlatform/lmktfy/wiki).
 

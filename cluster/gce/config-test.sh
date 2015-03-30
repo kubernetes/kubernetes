@@ -17,7 +17,7 @@
 # TODO(jbeda): Provide a way to override project
 # gcloud multiplexing for shared GCE/GKE tests.
 GCLOUD=gcloud
-ZONE=${KUBE_GCE_ZONE:-us-central1-b}
+ZONE=${LMKTFY_GCE_ZONE:-us-central1-b}
 MASTER_SIZE=g1-small
 MINION_SIZE=g1-small
 NUM_MINIONS=${NUM_MINIONS:-2}
@@ -28,8 +28,8 @@ MINION_DISK_SIZE=100GB
 # to the latest supported image.
 IMAGE=container-vm-v20150317
 IMAGE_PROJECT=google-containers
-NETWORK=${KUBE_GCE_NETWORK:-e2e}
-INSTANCE_PREFIX="${KUBE_GCE_INSTANCE_PREFIX:-e2e-test-${USER}}"
+NETWORK=${LMKTFY_GCE_NETWORK:-e2e}
+INSTANCE_PREFIX="${LMKTFY_GCE_INSTANCE_PREFIX:-e2e-test-${USER}}"
 MASTER_NAME="${INSTANCE_PREFIX}-master"
 MASTER_TAG="${INSTANCE_PREFIX}-master"
 MINION_TAG="${INSTANCE_PREFIX}-minion"
@@ -46,17 +46,17 @@ PORTAL_NET="10.0.0.0/16"
 ENABLE_DOCKER_REGISTRY_CACHE=true
 
 # Optional: Install node monitoring.
-ENABLE_NODE_MONITORING="${KUBE_ENABLE_NODE_MONITORING:-true}"
+ENABLE_NODE_MONITORING="${LMKTFY_ENABLE_NODE_MONITORING:-true}"
 
 # Optional: When set to true, heapster will be setup as part of the cluster bring up.
-ENABLE_CLUSTER_MONITORING="${KUBE_ENABLE_CLUSTER_MONITORING:-true}"
+ENABLE_CLUSTER_MONITORING="${LMKTFY_ENABLE_CLUSTER_MONITORING:-true}"
 
 # Optional: Enable node logging.
-ENABLE_NODE_LOGGING="${KUBE_ENABLE_NODE_LOGGING:-true}"
-LOGGING_DESTINATION="${KUBE_LOGGING_DESTINATION:-elasticsearch}" # options: elasticsearch, gcp
+ENABLE_NODE_LOGGING="${LMKTFY_ENABLE_NODE_LOGGING:-true}"
+LOGGING_DESTINATION="${LMKTFY_LOGGING_DESTINATION:-elasticsearch}" # options: elasticsearch, gcp
 
 # Optional: When set to true, Elasticsearch and Kibana will be setup as part of the cluster bring up.
-ENABLE_CLUSTER_LOGGING="${KUBE_ENABLE_CLUSTER_LOGGING:-true}"
+ENABLE_CLUSTER_LOGGING="${LMKTFY_ENABLE_CLUSTER_LOGGING:-true}"
 ELASTICSEARCH_LOGGING_REPLICAS=1
 
 # Don't require https for registries in our local RFC1918 network
@@ -65,7 +65,7 @@ EXTRA_DOCKER_OPTS="--insecure-registry 10.0.0.0/8"
 # Optional: Install cluster DNS.
 ENABLE_CLUSTER_DNS=true
 DNS_SERVER_IP="10.0.0.10"
-DNS_DOMAIN="kubernetes.local"
+DNS_DOMAIN="lmktfy.local"
 DNS_REPLICAS=1
 
 ADMISSION_CONTROL=NamespaceAutoProvision,LimitRanger,ResourceQuota

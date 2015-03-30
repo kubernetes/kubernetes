@@ -21,10 +21,10 @@ import (
 	"path"
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/mount"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/types"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/util/mount"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/volume"
 )
 
 // The dir where volumes will be stored.
@@ -43,9 +43,9 @@ func makePluginUnderTest(t *testing.T, plugName string) volume.VolumePlugin {
 }
 
 func TestCanSupport(t *testing.T) {
-	plug := makePluginUnderTest(t, "kubernetes.io/empty-dir")
+	plug := makePluginUnderTest(t, "lmktfy.io/empty-dir")
 
-	if plug.Name() != "kubernetes.io/empty-dir" {
+	if plug.Name() != "lmktfy.io/empty-dir" {
 		t.Errorf("Wrong name: %s", plug.Name())
 	}
 	if !plug.CanSupport(&api.Volume{VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}}) {
@@ -66,7 +66,7 @@ func (fake *fakeMountDetector) GetMountMedium(path string) (storageMedium, bool,
 }
 
 func TestPlugin(t *testing.T) {
-	plug := makePluginUnderTest(t, "kubernetes.io/empty-dir")
+	plug := makePluginUnderTest(t, "lmktfy.io/empty-dir")
 
 	spec := &api.Volume{
 		Name:         "vol1",
@@ -83,7 +83,7 @@ func TestPlugin(t *testing.T) {
 	}
 
 	volPath := builder.GetPath()
-	if volPath != path.Join(basePath, "pods/poduid/volumes/kubernetes.io~empty-dir/vol1") {
+	if volPath != path.Join(basePath, "pods/poduid/volumes/lmktfy.io~empty-dir/vol1") {
 		t.Errorf("Got unexpected path: %s", volPath)
 	}
 
@@ -125,7 +125,7 @@ func TestPlugin(t *testing.T) {
 }
 
 func TestPluginTmpfs(t *testing.T) {
-	plug := makePluginUnderTest(t, "kubernetes.io/empty-dir")
+	plug := makePluginUnderTest(t, "lmktfy.io/empty-dir")
 
 	spec := &api.Volume{
 		Name:         "vol1",
@@ -142,7 +142,7 @@ func TestPluginTmpfs(t *testing.T) {
 	}
 
 	volPath := builder.GetPath()
-	if volPath != path.Join(basePath, "pods/poduid/volumes/kubernetes.io~empty-dir/vol1") {
+	if volPath != path.Join(basePath, "pods/poduid/volumes/lmktfy.io~empty-dir/vol1") {
 		t.Errorf("Got unexpected path: %s", volPath)
 	}
 
@@ -192,7 +192,7 @@ func TestPluginTmpfs(t *testing.T) {
 }
 
 func TestPluginBackCompat(t *testing.T) {
-	plug := makePluginUnderTest(t, "kubernetes.io/empty-dir")
+	plug := makePluginUnderTest(t, "lmktfy.io/empty-dir")
 
 	spec := &api.Volume{
 		Name: "vol1",
@@ -206,7 +206,7 @@ func TestPluginBackCompat(t *testing.T) {
 	}
 
 	volPath := builder.GetPath()
-	if volPath != path.Join(basePath, "pods/poduid/volumes/kubernetes.io~empty-dir/vol1") {
+	if volPath != path.Join(basePath, "pods/poduid/volumes/lmktfy.io~empty-dir/vol1") {
 		t.Errorf("Got unexpected path: %s", volPath)
 	}
 }

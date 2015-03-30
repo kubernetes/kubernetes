@@ -2,14 +2,14 @@
 
 ## Abstract
 
-A proposal for the distribution of secrets (passwords, keys, etc) to the Kubelet and to
-containers inside Kubernetes using a custom volume type.
+A proposal for the distribution of secrets (passwords, keys, etc) to the LMKTFYlet and to
+containers inside LMKTFY using a custom volume type.
 
 ## Motivation
 
-Secrets are needed in containers to access internal resources like the Kubernetes master or
+Secrets are needed in containers to access internal resources like the LMKTFY master or
 external resources such as git repositories, databases, etc.  Users may also want behaviors in the
-kubelet that depend on secret data (credentials for image pull from a docker registry) associated
+lmktfylet that depend on secret data (credentials for image pull from a docker registry) associated
 with pods.
 
 Goals of this design:
@@ -37,8 +37,8 @@ Goals of this design:
 1.  As a user, I want to store secret artifacts for my applications and consume them securely in
     containers, so that I can keep the configuration for my applications separate from the images
     that use them:
-    1.  As a cluster operator, I want to allow a pod to access the Kubernetes master using a custom
-        `.kubeconfig` file, so that I can securely reach the master
+    1.  As a cluster operator, I want to allow a pod to access the LMKTFY master using a custom
+        `.lmktfyconfig` file, so that I can securely reach the master
     2.  As a cluster operator, I want to allow a pod to access a Docker registry using credentials
         from a `.dockercfg` file, so that containers can push images
     3.  As a cluster operator, I want to allow a pod to access a git repository using SSH keys,
@@ -47,10 +47,10 @@ Goals of this design:
     as username and password which should be kept secret, so that I can share secrets about a
     service amongst the containers in my application securely
 3.  As a user, I want to associate a pod with a `ServiceAccount` that consumes a secret and have
-    the kubelet implement some reserved behaviors based on the types of secrets the service account
+    the lmktfylet implement some reserved behaviors based on the types of secrets the service account
     consumes:
     1.  Use credentials for a docker registry to pull the pod's docker image
-    2.  Present kubernetes auth token to the pod or transparently decorate traffic between the pod
+    2.  Present lmktfy auth token to the pod or transparently decorate traffic between the pod
         and master service
 4.  As a user, I want to be able to indicate that a secret expires and for that secret's value to
     be rotated once it expires, so that the system can help me follow good practices
@@ -72,28 +72,28 @@ service would also consume the secrets associated with the MySQL service.
 
 ### Use-Case: Secrets associated with service accounts
 
-[Service Accounts](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/design/service_accounts.md) are proposed as a
+[Service Accounts](https://github.com/GoogleCloudPlatform/lmktfy/blob/master/docs/design/service_accounts.md) are proposed as a
 mechanism to decouple capabilities and security contexts from individual human users.  A
 `ServiceAccount` contains references to some number of secrets.  A `Pod` can specify that it is
-associated with a `ServiceAccount`.  Secrets should have a `Type` field to allow the Kubelet and
+associated with a `ServiceAccount`.  Secrets should have a `Type` field to allow the LMKTFYlet and
 other system components to take action based on the secret's type.
 
 #### Example: service account consumes auth token secret
 
 As an example, the service account proposal discusses service accounts consuming secrets which
-contain kubernetes auth tokens.  When a Kubelet starts a pod associated with a service account
-which consumes this type of secret, the Kubelet may take a number of actions:
+contain lmktfy auth tokens.  When a LMKTFYlet starts a pod associated with a service account
+which consumes this type of secret, the LMKTFYlet may take a number of actions:
 
-1.  Expose the secret in a `.kubernetes_auth` file in a well-known location in the container's
+1.  Expose the secret in a `.lmktfy_auth` file in a well-known location in the container's
     file system
-2.  Configure that node's `kube-proxy` to decorate HTTP requests from that pod to the 
-    `kubernetes-master` service with the auth token, e. g. by adding a header to the request
-    (see the [LOAS Daemon](https://github.com/GoogleCloudPlatform/kubernetes/issues/2209) proposal)
+2.  Configure that node's `lmktfy-proxy` to decorate HTTP requests from that pod to the 
+    `lmktfy-master` service with the auth token, e. g. by adding a header to the request
+    (see the [LOAS Daemon](https://github.com/GoogleCloudPlatform/lmktfy/issues/2209) proposal)
 
 #### Example: service account consumes docker registry credentials
 
 Another example use case is where a pod is associated with a secret containing docker registry
-credentials.  The Kubelet could use these credentials for the docker pull to retrieve the image.
+credentials.  The LMKTFYlet could use these credentials for the docker pull to retrieve the image.
 
 ### Use-Case: Secret expiry and rotation
 
@@ -134,7 +134,7 @@ be a future proposal that handles exposing secrets as environment variables.
 There are two fundamentally different use-cases for access to secrets:
 
 1.  CRUD operations on secrets by their owners
-2.  Read-only access to the secrets needed for a particular node by the kubelet
+2.  Read-only access to the secrets needed for a particular node by the lmktfylet
 
 ### Use-Case: CRUD operations by owners
 
@@ -155,7 +155,7 @@ have different preferences for the central store of secret data.  Some possibili
 There should be a size limit for secrets in order to:
 
 1.  Prevent DOS attacks against the API server
-2.  Allow kubelet implementations that prevent secret data from touching the node's filesystem
+2.  Allow lmktfylet implementations that prevent secret data from touching the node's filesystem
 
 The size limit should satisfy the following conditions:
 
@@ -184,20 +184,20 @@ For now, we will not implement validations around these limits.  Cluster operato
 much node storage is allocated to secrets. It will be the operator's responsibility to ensure that
 the allocated storage is sufficient for the workload scheduled onto a node.
 
-### Use-Case: Kubelet read of secrets for node
+### Use-Case: LMKTFYlet read of secrets for node
 
-The use-case where the kubelet reads secrets has several additional requirements:
+The use-case where the lmktfylet reads secrets has several additional requirements:
 
-1.  Kubelets should only be able to receive secret data which is required by pods scheduled onto
-    the kubelet's node
-2.  Kubelets should have read-only access to secret data
+1.  LMKTFYlets should only be able to receive secret data which is required by pods scheduled onto
+    the lmktfylet's node
+2.  LMKTFYlets should have read-only access to secret data
 3.  Secret data should not be transmitted over the wire insecurely
-4.  Kubelets must ensure pods do not have access to each other's secrets
+4.  LMKTFYlets must ensure pods do not have access to each other's secrets
 
-#### Read of secret data by the Kubelet
+#### Read of secret data by the LMKTFYlet
 
-The Kubelet should only be allowed to read secrets which are consumed by pods scheduled onto that
-Kubelet's node and their associated service accounts.  Authorization of the Kubelet to read this
+The LMKTFYlet should only be allowed to read secrets which are consumed by pods scheduled onto that
+LMKTFYlet's node and their associated service accounts.  Authorization of the LMKTFYlet to read this
 data would be delegated to an authorization plugin and associated policy rule.
 
 #### Secret data on the node: data at rest
@@ -212,33 +212,33 @@ Consideration must be given to whether secret data should be allowed to be at re
 
 For the sake of limiting complexity, we propose that initially secret data should not be allowed
 to be at rest on a node; secret data should be stored on a node-level tmpfs filesystem.  This
-filesystem can be subdivided into directories for use by the kubelet and by the volume plugin.
+filesystem can be subdivided into directories for use by the lmktfylet and by the volume plugin.
 
 #### Secret data on the node: resource consumption
 
-The Kubelet will be responsible for creating the per-node tmpfs file system for secret storage.
+The LMKTFYlet will be responsible for creating the per-node tmpfs file system for secret storage.
 It is hard to make a prescriptive declaration about how much storage is appropriate to reserve for
 secrets because different installations will vary widely in available resources, desired pod to
 node density, overcommit policy, and other operation dimensions.  That being the case, we propose
-for simplicity that the amount of secret storage be controlled by a new parameter to the kubelet
+for simplicity that the amount of secret storage be controlled by a new parameter to the lmktfylet
 with a default value of **64MB**.  It is the cluster operator's responsibility to handle choosing
-the right storage size for their installation and configuring their Kubelets correctly.
+the right storage size for their installation and configuring their LMKTFYlets correctly.
 
-Configuring each Kubelet is not the ideal story for operator experience; it is more intuitive that
+Configuring each LMKTFYlet is not the ideal story for operator experience; it is more intuitive that
 the cluster-wide storage size be readable from a central configuration store like the one proposed
-in [#1553](https://github.com/GoogleCloudPlatform/kubernetes/issues/1553).  When such a store
-exists, the Kubelet could be modified to read this configuration item from the store.
+in [#1553](https://github.com/GoogleCloudPlatform/lmktfy/issues/1553).  When such a store
+exists, the LMKTFYlet could be modified to read this configuration item from the store.
 
-When the Kubelet is modified to advertise node resources (as proposed in
-[#4441](https://github.com/GoogleCloudPlatform/kubernetes/issues/4441)), the capacity calculation
+When the LMKTFYlet is modified to advertise node resources (as proposed in
+[#4441](https://github.com/GoogleCloudPlatform/lmktfy/issues/4441)), the capacity calculation
 for available memory should factor in the potential size of the node-level tmpfs in order to avoid
 memory overcommit on the node.
 
 #### Secret data on the node: isolation
 
-Every pod will have a [security context](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/design/security_context.md).
+Every pod will have a [security context](https://github.com/GoogleCloudPlatform/lmktfy/blob/master/docs/design/security_context.md).
 Secret data on the node should be isolated according to the security context of the container.  The
-Kubelet volume plugin API will be changed so that a volume plugin receives the security context of
+LMKTFYlet volume plugin API will be changed so that a volume plugin receives the security context of
 a volume along with the volume spec.  This will allow volume plugins to implement setting the
 security context of volumes they manage.
 
@@ -248,7 +248,7 @@ Several proposals / upstream patches are notable as background for this proposal
 
 1.  [Docker vault proposal](https://github.com/docker/docker/issues/10310)
 2.  [Specification for image/container standardization based on volumes](https://github.com/docker/docker/issues/9277)
-3.  [Kubernetes service account proposal](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/design/service_accounts.md)
+3.  [LMKTFY service account proposal](https://github.com/GoogleCloudPlatform/lmktfy/blob/master/docs/design/service_accounts.md)
 4.  [Secrets proposal for docker (1)](https://github.com/docker/docker/pull/6075)
 5.  [Secrets proposal for docker (2)](https://github.com/docker/docker/pull/6697)
 
@@ -285,7 +285,7 @@ type SecretType string
 
 const (
     SecretTypeOpaque              SecretType = "Opaque"              // Opaque (arbitrary data; default)
-    SecretTypeKubernetesAuthToken SecretType = "KubernetesAuth"      // Kubernetes auth token
+    SecretTypeLMKTFYAuthToken SecretType = "LMKTFYAuth"      // LMKTFY auth token
     SecretTypeDockerRegistryAuth  SecretType = "DockerRegistryAuth"  // Docker registry auth
     // FUTURE: other type values
 )
@@ -338,7 +338,7 @@ In the future, the `SecretSource` will be extended to allow:
 
 ### Secret Volume Plugin
 
-A new Kubelet volume plugin will be added to handle volumes with a secret source.  This plugin will
+A new LMKTFYlet volume plugin will be added to handle volumes with a secret source.  This plugin will
 require access to the API server to retrieve secret data and therefore the volume `Host` interface
 will have to change to expose a client interface:
 
@@ -346,8 +346,8 @@ will have to change to expose a client interface:
 type Host interface {
     // Other methods omitted
 
-    // GetKubeClient returns a client interface
-    GetKubeClient() client.Interface
+    // GetLMKTFYClient returns a client interface
+    GetLMKTFYClient() client.Interface
 }
 ```
 
@@ -360,21 +360,21 @@ The secret volume plugin will be responsible for:
 2.  Returning a `volume.Cleaner` implementation from `NewClear` that cleans the volume from the
     container's filesystem
 
-### Kubelet: Node-level secret storage
+### LMKTFYlet: Node-level secret storage
 
-The Kubelet must be modified to accept a new parameter for the secret storage size and to create
+The LMKTFYlet must be modified to accept a new parameter for the secret storage size and to create
 a tmpfs file system of that size to store secret data.  Rough accounting of specific changes:
 
-1.  The Kubelet should have a new field added called `secretStorageSize`; units are megabytes
-2.  `NewMainKubelet` should accept a value for secret storage size
-3.  The Kubelet server should have a new flag added for secret storage size
-4.  The Kubelet's `setupDataDirs` method should be changed to create the secret storage
+1.  The LMKTFYlet should have a new field added called `secretStorageSize`; units are megabytes
+2.  `NewMainLMKTFYlet` should accept a value for secret storage size
+3.  The LMKTFYlet server should have a new flag added for secret storage size
+4.  The LMKTFYlet's `setupDataDirs` method should be changed to create the secret storage
 
-### Kubelet: New behaviors for secrets associated with service accounts
+### LMKTFYlet: New behaviors for secrets associated with service accounts
 
-For use-cases where the Kubelet's behavior is affected by the secrets associated with a pod's
-`ServiceAccount`, the Kubelet will need to be changed.  For example, if secrets of type
-`docker-reg-auth` affect how the pod's images are pulled, the Kubelet will need to be changed
+For use-cases where the LMKTFYlet's behavior is affected by the secrets associated with a pod's
+`ServiceAccount`, the LMKTFYlet will need to be changed.  For example, if secrets of type
+`docker-reg-auth` affect how the pod's images are pulled, the LMKTFYlet will need to be changed
 to accomodate this.  Subsequent proposals can address this on a type-by-type basis.
 
 ## Examples

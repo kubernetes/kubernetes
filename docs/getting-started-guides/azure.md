@@ -15,9 +15,9 @@ installed](https://docs.docker.com/installation/).  On Mac OS X you can use
 [boot2docker](http://boot2docker.io/).
 
 ### Setup
-The cluster setup scripts can setup Kubernetes for multiple targets. First modify `cluster/kube-env.sh` to specify azure:
+The cluster setup scripts can setup LMKTFY for multiple targets. First modify `cluster/lmktfy-env.sh` to specify azure:
 
-    KUBERNETES_PROVIDER="azure"
+    LMKTFYRNETES_PROVIDER="azure"
 
 Next, specify an existing virtual network in `cluster/azure/config-defualt.sh`:
 
@@ -25,9 +25,9 @@ Next, specify an existing virtual network in `cluster/azure/config-defualt.sh`:
 
 Now you're ready.
 
-You can then use the `cluster/kube-*.sh` scripts to manage your azure cluster, start with:
+You can then use the `cluster/lmktfy-*.sh` scripts to manage your azure cluster, start with:
 
-    cluster/kube-up.sh
+    cluster/lmktfy-up.sh
 
 The script above will start (by default) a single master VM along with 4 worker VMs.  You
 can tweak some of these parameters by editing `cluster/azure/config-default.sh`.
@@ -37,23 +37,23 @@ can tweak some of these parameters by editing `cluster/azure/config-default.sh`.
 Once you have your instances up and running, the `hack/build-go.sh` script sets up
 your Go workspace and builds the Go components.
 
-The `kubectl.sh` line below spins up two containers running
+The `lmktfyctl.sh` line below spins up two containers running
 [Nginx](http://nginx.org/en/) running on port 80:
 
 ```bash
-cluster/kubectl.sh run-container my-nginx --image=dockerfile/nginx --replicas=2 --port=80
+cluster/lmktfyctl.sh run-container my-nginx --image=dockerfile/nginx --replicas=2 --port=80
 ```
 
 To stop the containers:
 
 ```bash
-cluster/kubectl.sh stop rc my-nginx
+cluster/lmktfyctl.sh stop rc my-nginx
 ```
 
 To delete the containers:
 
 ```bash
-cluster/kubectl.sh delete rc my-nginx
+cluster/lmktfyctl.sh delete rc my-nginx
 ```
 
 ### Running a container (more complete version)
@@ -63,8 +63,8 @@ You can create a pod like this:
 
 
 ```
-cd kubernetes
-cluster/kubectl.sh create -f docs/getting-started-guides/pod.json
+cd lmktfy
+cluster/lmktfyctl.sh create -f docs/getting-started-guides/pod.json
 ```
 
 Where pod.json contains something like:
@@ -106,18 +106,18 @@ Where pod.json contains something like:
 You can see your cluster's pods:
 
 ```
-cluster/kubectl.sh get pods
+cluster/lmktfyctl.sh get pods
 ```
 
 and delete the pod you just created:
 
 ```
-cluster/kubectl.sh delete pods php
+cluster/lmktfyctl.sh delete pods php
 ```
 
 Look in `api/examples/` for more examples
 
 ### Tearing down the cluster
 ```
-cluster/kube-down.sh
+cluster/lmktfy-down.sh
 ```

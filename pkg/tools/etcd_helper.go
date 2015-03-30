@@ -25,8 +25,8 @@ import (
 	"os/exec"
 	"reflect"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/conversion"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/conversion"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/runtime"
 	"github.com/coreos/go-etcd/etcd"
 
 	"github.com/golang/glog"
@@ -41,7 +41,7 @@ type EtcdHelper struct {
 }
 
 // NewEtcdHelper creates a helper that works against objects that use the internal
-// Kubernetes API objects.
+// LMKTFY API objects.
 func NewEtcdHelper(client EtcdGetSet, codec runtime.Codec) EtcdHelper {
 	return EtcdHelper{
 		Client:    client,

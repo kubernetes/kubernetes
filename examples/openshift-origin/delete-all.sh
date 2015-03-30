@@ -21,14 +21,14 @@ set -o nounset
 set -o pipefail
 
 ORIGIN=$(dirname "${BASH_SOURCE}")
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
+LMKTFY_ROOT=$(dirname "${BASH_SOURCE}")/../..
 
 ## Delete the services
-${KUBE_ROOT}/cluster/kubectl.sh delete services origin-api
-${KUBE_ROOT}/cluster/kubectl.sh delete services origin-ui
+${LMKTFY_ROOT}/cluster/lmktfyctl.sh delete services origin-api
+${LMKTFY_ROOT}/cluster/lmktfyctl.sh delete services origin-ui
 
 ## Delete the pod
-${KUBE_ROOT}/cluster/kubectl.sh delete pods openshift
+${LMKTFY_ROOT}/cluster/lmktfyctl.sh delete pods openshift
 
 ## Delete the secret
-${KUBE_ROOT}/cluster/kubectl.sh delete secrets kubernetes-secret
+${LMKTFY_ROOT}/cluster/lmktfyctl.sh delete secrets lmktfy-secret

@@ -4,7 +4,7 @@
 
 .PHONY: up down logger-up logger-down get
 
-KUBECTL=kubectl.sh
+LMKTFYCTL=lmktfyctl.sh
 
 up:	logger-up
 
@@ -12,11 +12,11 @@ down:	logger-down
 
 
 logger-up:
-	-${KUBECTL} create -f synthetic_0_25lps.yml
+	-${LMKTFYCTL} create -f synthetic_0_25lps.yml
 
 logger-down:
-	-${KUBECTL} delete pods synthetic-logger-0.25lps-pod
+	-${LMKTFYCTL} delete pods synthetic-logger-0.25lps-pod
 
 get:	
-	${KUBECTL} get pods
+	${LMKTFYCTL} get pods
 

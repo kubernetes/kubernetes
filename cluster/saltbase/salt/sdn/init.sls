@@ -3,7 +3,7 @@
 
 sdn:
   cmd.script:
-    - source: /kubernetes-vagrant/network_closure.sh
+    - source: /lmktfyrnetes-vagrant/network_closure.sh
     - require:
       - pkg: docker-io
     - cwd: /

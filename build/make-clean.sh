@@ -19,9 +19,9 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
-source "$KUBE_ROOT/build/common.sh"
+LMKTFY_ROOT=$(dirname "${BASH_SOURCE}")/..
+source "$LMKTFY_ROOT/build/common.sh"
 
-kube::build::verify_prereqs clean
-kube::build::clean_output
-kube::build::clean_images
+lmktfy::build::verify_prereqs clean
+lmktfy::build::clean_output
+lmktfy::build::clean_images

@@ -1,13 +1,13 @@
 # Administering Resource Quotas
 
-Kubernetes can limit the both number of objects created in a namespace, and the
+LMKTFY can limit the both number of objects created in a namespace, and the
 total amount of resources requested by pods in a namespace.  This facilitates
-sharing of a single Kubernetes cluster by several teams or tenants, each in
+sharing of a single LMKTFY cluster by several teams or tenants, each in
 a namespace.
 
 ## Enabling Resource Quota
 
-Resource Quota support is enabled by default for many kubernetes distributions.  It is
+Resource Quota support is enabled by default for many lmktfy distributions.  It is
 enabled when the apiserver `--admission_control=` flag has `ResourceQuota` as
 one of its arguments.  
 
@@ -42,14 +42,14 @@ are supported:
 For example, `cpu` quota sums up the `resources.limits.cpu` fields of every
 container of every pod in the namespace, and enforces a maximum on that sum.
 
-Any resource that is not part of core Kubernetes must follow the resource naming convention prescribed by Kubernetes.
+Any resource that is not part of core LMKTFY must follow the resource naming convention prescribed by LMKTFY.
 
 This means the resource must have a fully-qualified name (i.e. mycompany.org/shinynewresource)
 
 ## Viewing and Setting Quotas
-Kubectl supports creating, updating, and viewing quotas
+LMKTFYctl supports creating, updating, and viewing quotas
 ```
-$ kubectl namespace myspace
+$ lmktfyctl namespace myspace
 $ cat <<EOF > quota.json
 {
   "apiVersion": "v1beta3",
@@ -69,11 +69,11 @@ $ cat <<EOF > quota.json
   }
 }
 EOF
-$ kubectl create -f quota.json
-$ kubectl get quota
+$ lmktfyctl create -f quota.json
+$ lmktfyctl get quota
 NAME
 quota
-$ kubectl describe quota quota
+$ lmktfyctl describe quota quota
 Name:                   quota
 Resource                Used    Hard
 --------                ----    ----

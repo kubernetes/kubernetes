@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# kubernetes-build job: Triggered by github checkins on a 5 minute
+# lmktfy-build job: Triggered by github checkins on a 5 minute
 # poll. We abort this job if it takes longer than 10m. (Typically this
 # job takes about ~5m as of 0.8.0, but it's actually not completely
 # hermetic right now due to things like the golang image. It can take
@@ -31,14 +31,14 @@ set -o xtrace
 # space.
 export HOME=${WORKSPACE} # Nothing should want Jenkins $HOME
 export PATH=$PATH:/usr/local/go/bin
-export KUBE_RELEASE_RUN_TESTS=n
-export KUBE_SKIP_CONFIRMATIONS=y
+export LMKTFY_RELEASE_RUN_TESTS=n
+export LMKTFY_SKIP_CONFIRMATIONS=y
 
 # Clean stuff out. Assume the worst - the last build may have left the
 # tree in an odd state. There's a Jenkins git clean plugin, but we
 # have the docker images to worry about as well, so be really pedantic
 # about cleaning.
-rm -rf ~/.kube*
+rm -rf ~/.lmktfy*
 make clean
 git clean -fdx
 docker ps -aq | xargs -r docker rm
@@ -47,9 +47,9 @@ docker images -q | xargs -r docker rmi
 # Build
 go run ./hack/e2e.go -v --build
 
-[[ ${KUBE_SKIP_PUSH_GCS:-} =~ ^[yY]$ ]] || {
+[[ ${LMKTFY_SKIP_PUSH_GCS:-} =~ ^[yY]$ ]] || {
     # Push to GCS
     ./build/push-ci-build.sh
 }
 
-sha256sum _output/release-tars/kubernetes*.tar.gz
+sha256sum _output/release-tars/lmktfy*.tar.gz

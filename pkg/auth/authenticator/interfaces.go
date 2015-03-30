@@ -19,7 +19,7 @@ package authenticator
 import (
 	"net/http"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/user"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/auth/user"
 )
 
 // Token checks a string value against a backing authentication store and returns

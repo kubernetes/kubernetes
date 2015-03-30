@@ -22,7 +22,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api/latest"
 )
 
 const (
@@ -249,7 +249,7 @@ func TestIsConfigTransportTLS(t *testing.T) {
 		},
 	}
 	for _, testCase := range testCases {
-		if err := SetKubernetesDefaults(testCase.Config); err != nil {
+		if err := SetLMKTFYDefaults(testCase.Config); err != nil {
 			t.Errorf("setting defaults failed for %#v: %v", testCase.Config, err)
 			continue
 		}
@@ -260,7 +260,7 @@ func TestIsConfigTransportTLS(t *testing.T) {
 	}
 }
 
-func TestSetKubernetesDefaults(t *testing.T) {
+func TestSetLMKTFYDefaults(t *testing.T) {
 	testCases := []struct {
 		Config Config
 		After  Config
@@ -286,7 +286,7 @@ func TestSetKubernetesDefaults(t *testing.T) {
 	}
 	for _, testCase := range testCases {
 		val := &testCase.Config
-		err := SetKubernetesDefaults(val)
+		err := SetLMKTFYDefaults(val)
 		val.UserAgent = ""
 		switch {
 		case err == nil && testCase.Err:
@@ -304,12 +304,12 @@ func TestSetKubernetesDefaults(t *testing.T) {
 	}
 }
 
-func TestSetKubernetesDefaultsUserAgent(t *testing.T) {
+func TestSetLMKTFYDefaultsUserAgent(t *testing.T) {
 	config := &Config{}
-	if err := SetKubernetesDefaults(config); err != nil {
+	if err := SetLMKTFYDefaults(config); err != nil {
 		t.Errorf("unexpected error: %v")
 	}
-	if !strings.Contains(config.UserAgent, "kubernetes/") {
+	if !strings.Contains(config.UserAgent, "lmktfy/") {
 		t.Errorf("no user agent set: %#v", config)
 	}
 }

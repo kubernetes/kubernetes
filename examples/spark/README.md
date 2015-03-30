@@ -1,7 +1,7 @@
 # Spark example
 
 Following this example, you will create a functional [Apache
-Spark](http://spark.apache.org/) cluster using Kubernetes and
+Spark](http://spark.apache.org/) cluster using LMKTFY and
 [Docker](http://docker.io).
 
 You will setup a Spark master service and a set of
@@ -18,8 +18,8 @@ Source is freely available at:
 
 ## Step Zero: Prerequisites
 
-This example assumes you have a Kubernetes cluster installed and
-running, and that you have installed the ```kubectl``` command line
+This example assumes you have a LMKTFY cluster installed and
+running, and that you have installed the ```lmktfyctl``` command line
 tool somewhere in your path. Please see the [getting
 started](../../docs/getting-started-guides) for installation
 instructions for your platform.
@@ -33,7 +33,7 @@ Use the `examples/spark/spark-master.json` file to create a pod running
 the Master service.
 
 ```shell
-$ kubectl create -f examples/spark/spark-master.json
+$ lmktfyctl create -f examples/spark/spark-master.json
 ```
 
 Then, use the `examples/spark/spark-master-service.json` file to
@@ -41,7 +41,7 @@ create a logical service endpoint that Spark workers can use to access
 the Master pod.
 
 ```shell
-$ kubectl create -f examples/spark/spark-master-service.json
+$ lmktfyctl create -f examples/spark/spark-master-service.json
 ```
 
 Ensure that the Master service is running and functional.
@@ -49,12 +49,12 @@ Ensure that the Master service is running and functional.
 ### Check to see if Master is running and accessible
 
 ```shell
-$ kubectl get pods,services
+$ lmktfyctl get pods,services
 POD                             IP                  CONTAINER(S)        IMAGE(S)             HOST                          LABELS                                STATUS
 spark-master                    192.168.90.14       spark-master        mattf/spark-master   172.18.145.8/172.18.145.8     name=spark-master                     Running
 NAME                LABELS                                    SELECTOR            IP                  PORT
-kubernetes          component=apiserver,provider=kubernetes   <none>              10.254.0.2          443
-kubernetes-ro       component=apiserver,provider=kubernetes   <none>              10.254.0.1          80
+lmktfy          component=apiserver,provider=lmktfy   <none>              10.254.0.2          443
+lmktfy-ro       component=apiserver,provider=lmktfy   <none>              10.254.0.1          80
 spark-master        name=spark-master                         name=spark-master   10.254.125.166      7077
 ```
 
@@ -89,7 +89,7 @@ Use the `examples/spark/spark-worker-controller.json` file to create a
 ReplicationController that manages the worker pods.
 
 ```shell
-$ kubectl create -f examples/spark/spark-worker-controller.json
+$ lmktfyctl create -f examples/spark/spark-worker-controller.json
 ```
 
 ### Check to see if the workers are running
@@ -127,15 +127,15 @@ port)
 ## Step Three: Do something with the cluster
 
 ```shell
-$ kubectl get pods,services
+$ lmktfyctl get pods,services
 POD                             IP                  CONTAINER(S)        IMAGE(S)             HOST                          LABELS                                STATUS
 spark-master                    192.168.90.14       spark-master        mattf/spark-master   172.18.145.8/172.18.145.8     name=spark-master                     Running
 spark-worker-controller-51wgg   192.168.75.14       spark-worker        mattf/spark-worker   172.18.145.9/172.18.145.9     name=spark-worker,uses=spark-master   Running
 spark-worker-controller-5v48c   192.168.90.17       spark-worker        mattf/spark-worker   172.18.145.8/172.18.145.8     name=spark-worker,uses=spark-master   Running
 spark-worker-controller-ehq23   192.168.35.17       spark-worker        mattf/spark-worker   172.18.145.12/172.18.145.12   name=spark-worker,uses=spark-master   Running
 NAME                LABELS                                    SELECTOR            IP                  PORT
-kubernetes          component=apiserver,provider=kubernetes   <none>              10.254.0.2          443
-kubernetes-ro       component=apiserver,provider=kubernetes   <none>              10.254.0.1          80
+lmktfy          component=apiserver,provider=lmktfy   <none>              10.254.0.2          443
+lmktfy-ro       component=apiserver,provider=lmktfy   <none>              10.254.0.1          80
 spark-master        name=spark-master                         name=spark-master   10.254.125.166      7077
 
 $ sudo docker run -it mattf/spark-base sh
@@ -164,10 +164,10 @@ SparkContext available as sc.
 
 ## tl;dr
 
-```kubectl create -f spark-master.json```
+```lmktfyctl create -f spark-master.json```
 
-```kubectl create -f spark-master-service.json```
+```lmktfyctl create -f spark-master-service.json```
 
-Make sure the Master Pod is running (use: ```kubectl get pods```).
+Make sure the Master Pod is running (use: ```lmktfyctl get pods```).
 
-```kubectl create -f spark-worker-controller.json```
+```lmktfyctl create -f spark-worker-controller.json```

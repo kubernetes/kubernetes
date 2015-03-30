@@ -4,7 +4,7 @@ monit:
   pkg:
     - installed
 
-{% if "kubernetes-master" in grains.get('roles', []) %}
+{% if "lmktfyrnetes-master" in grains.get('roles', []) %}
 /etc/monit/conf.d/etcd:
   file:
     - managed
@@ -22,19 +22,19 @@ monit:
     - group: root
     - mode: 644
 
-{% if "kubernetes-pool" in grains.get('roles', []) %}
-/etc/monit/conf.d/kubelet:
+{% if "lmktfyrnetes-pool" in grains.get('roles', []) %}
+/etc/monit/conf.d/lmktfylet:
   file:
     - managed
-    - source: salt://monit/kubelet
+    - source: salt://monit/lmktfylet
     - user: root
     - group: root
     - mode: 644
 
-/etc/monit/conf.d/kube-proxy:
+/etc/monit/conf.d/lmktfy-proxy:
   file:
     - managed
-    - source: salt://monit/kube-proxy
+    - source: salt://monit/lmktfy-proxy
     - user: root
     - group: root
     - mode: 644

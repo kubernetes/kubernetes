@@ -19,16 +19,16 @@
 # setup, teardown, and other cluster/... scripts.
 #
 # The user must export these environment variables:
-# KUBE_MASTER_IP to the ip address of the master.
+# LMKTFY_MASTER_IP to the ip address of the master.
 # AUTH_CONFIG to the argument of the "--auth_config=" flag.
 # If certs required, set CERT_DIR.
 # 
 # Example to test against a local vagrant cluster:
-# declare -x AUTH_CONFIG="$HOME/.kubernetes_vagrant_auth"
-# declare -x KUBE_MASTER_IP=10.245.1.2
+# declare -x AUTH_CONFIG="$HOME/.lmktfy_vagrant_auth"
+# declare -x LMKTFY_MASTER_IP=10.245.1.2
 # hack/conformance-test.sh
-if [[ -z "KUBE_MASTER_IP" ]]; then
-  echo "Must set KUBE_MASTER_IP before running conformance test."
+if [[ -z "LMKTFY_MASTER_IP" ]]; then
+  echo "Must set LMKTFY_MASTER_IP before running conformance test."
   exit 1
 fi
 if [[ -z "AUTH_CONFIG" ]]; then

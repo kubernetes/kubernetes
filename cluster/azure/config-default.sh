@@ -14,10 +14,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-INSTANCE_PREFIX=kubernetes
+INSTANCE_PREFIX=lmktfy
 AZ_LOCATION='West US'
 TAG=testing
-AZ_CS_PREFIX=kube
+AZ_CS_PREFIX=lmktfy
 AZ_VNET=MyVnet
 AZ_SUBNET=Subnet-1
 AZ_IMAGE=b39f27a8b8c64d52b05eac6a62ebad85__Ubuntu-14_04_1-LTS-amd64-server-20140927-en-us-30GB
@@ -46,7 +46,7 @@ ENABLE_CLUSTER_LOGGING=false
 ELASTICSEARCH_LOGGING_REPLICAS=1
 
 # Optional: When set to true, heapster, Influxdb and grafana will be setup as part of the cluster bring up.
-ENABLE_CLUSTER_MONITORING="${KUBE_ENABLE_CLUSTER_MONITORING:-true}"
+ENABLE_CLUSTER_MONITORING="${LMKTFY_ENABLE_CLUSTER_MONITORING:-true}"
 
 # Admission Controllers to invoke prior to persisting objects in cluster
 ADMISSION_CONTROL=NamespaceLifecycle,NamespaceAutoProvision,LimitRanger,ResourceQuota

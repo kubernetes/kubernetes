@@ -1,6 +1,6 @@
-# CoreOS - Single Node Kubernetes Cluster
+# CoreOS - Single Node LMKTFY Cluster
 
-Use the [standalone.yaml](cloud-configs/standalone.yaml) cloud-config to provision a single node Kubernetes cluster.
+Use the [standalone.yaml](cloud-configs/standalone.yaml) cloud-config to provision a single node LMKTFY cluster.
 
 *Attention:* This requires at least CoreOS version 593.0.0/598.0.0.
 
@@ -9,9 +9,9 @@ Use the [standalone.yaml](cloud-configs/standalone.yaml) cloud-config to provisi
 ### AWS
 
 ```
-aws ec2 create-security-group --group-name kubernetes --description "Kubernetes Security Group"
-aws ec2 authorize-security-group-ingress --group-name kubernetes --protocol tcp --port 22 --cidr 0.0.0.0/0
-aws ec2 authorize-security-group-ingress --group-name kubernetes --source-security-group-name kubernetes
+aws ec2 create-security-group --group-name lmktfy --description "LMKTFY Security Group"
+aws ec2 authorize-security-group-ingress --group-name lmktfy --protocol tcp --port 22 --cidr 0.0.0.0/0
+aws ec2 authorize-security-group-ingress --group-name lmktfy --source-security-group-name lmktfy
 ```
 
 *Attention:* Replace ```<ami_image_id>``` bellow for a [suitable version of CoreOS image for AWS](https://coreos.com/docs/running-coreos/cloud-providers/ec2/).
@@ -21,7 +21,7 @@ aws ec2 run-instances \
 --image-id <ami_image_id> \
 --key-name <keypair> \
 --region us-west-2 \
---security-groups kubernetes \
+--security-groups lmktfy \
 --instance-type m3.medium \
 --user-data file://standalone.yaml
 ```
@@ -40,7 +40,7 @@ gcloud compute instances create standalone \
 --metadata-from-file user-data=standalone.yaml 
 ```
 
-Next, setup an ssh tunnel to the master so you can run kubectl from your local host.
+Next, setup an ssh tunnel to the master so you can run lmktfyctl from your local host.
 In one terminal, run `gcloud compute ssh master --ssh-flag="-L 8080:127.0.0.1:8080"` and in a second
 run `gcloud compute ssh master --ssh-flag="-R 8080:127.0.0.1:8080"`.
 

@@ -10,8 +10,8 @@
       "version": "v1beta1",
       "id": "valid-pod",
       "containers": [{
-        "name": "kubernetes-serve-hostname",
-        "image": "kubernetes/serve_hostname",        
+        "name": "lmktfyrnetes-serve-hostname",
+        "image": "lmktfyrnetes/serve_hostname",        
         "cpu": 1000,
         "memory": 1048576
       }]

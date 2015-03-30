@@ -18,9 +18,9 @@ limitations under the License.
 package defaults
 
 import (
-	algorithm "github.com/GoogleCloudPlatform/kubernetes/pkg/scheduler"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler/factory"
+	algorithm "github.com/GoogleCloudPlatform/lmktfy/pkg/scheduler"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/util"
+	"github.com/GoogleCloudPlatform/lmktfy/plugin/pkg/scheduler/factory"
 )
 
 func init() {

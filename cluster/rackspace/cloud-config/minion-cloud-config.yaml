@@ -1,7 +1,7 @@
 #cloud-config
 
 write_files:
-  - path: /opt/bin/kube-net-update.sh
+  - path: /opt/bin/lmktfy-net-update.sh
     permissions: 0755
     content: |
       #!/bin/sh
@@ -18,14 +18,14 @@ write_files:
       #!/bin/bash
       OBJECT_URL="CLOUD_FILES_URL"
       echo "Downloading release ($OBJECT_URL)"
-      wget "${OBJECT_URL}" -O /opt/kubernetes.tar.gz
+      wget "${OBJECT_URL}" -O /opt/lmktfy.tar.gz
       echo "Unpacking release"
-      rm -rf /opt/kubernetes || false
-      tar xzf /opt/kubernetes.tar.gz -C /opt/
+      rm -rf /opt/lmktfy || false
+      tar xzf /opt/lmktfy.tar.gz -C /opt/
 
 coreos:
   etcd:
-    name: kubernetes-minion-INDEX
+    name: lmktfy-minion-INDEX
     discovery: https://discovery.etcd.io/DISCOVERY_ID
     addr: $private_ipv4:4001
     peer-addr: $private_ipv4:7001
@@ -33,7 +33,7 @@ coreos:
 
   fleet:
     public-ip: $private_ipv4
-    metadata: kubernetes_role=minion
+    metadata: lmktfy_role=minion
 
   update:
     reboot-strategy: etcd-lock
@@ -47,19 +47,19 @@ coreos:
       command: start
       content: |
         [Unit]
-        Description=Downloads Kubernetes Release
+        Description=Downloads LMKTFY Release
         After=network-online.target
         Requires=network-online.target
         [Service]
         Type=oneshot
         RemainAfterExit=yes
         ExecStart=/usr/bin/bash /opt/bin/download-release.sh
-    - name: minion-kubelet.service
+    - name: minion-lmktfylet.service
       command: start
       content: |
         [Unit]
-        Description=Kubernetes Kubelet
-        Documentation=https://github.com/GoogleCloudPlatform/kubernetes
+        Description=LMKTFY LMKTFYlet
+        Documentation=https://github.com/GoogleCloudPlatform/lmktfy
         After=network-online.target
         Requires=network-online.target
         After=docker.service
@@ -67,16 +67,16 @@ coreos:
         After=download-release.service
         Requires=download-release.service
         [Service]
-        ExecStartPre=/usr/bin/ln -sf /opt/kubernetes/server/bin/kubelet /opt/bin/kubelet
-        ExecStart=/opt/bin/kubelet --address=$private_ipv4 --hostname_override=$private_ipv4 --etcd_servers=http://127.0.0.1:4001 --logtostderr=true --config=/opt/kubernetes-manifests --cluster_dns=DNS_SERVER_IP --cluster_domain=DNS_DOMAIN
+        ExecStartPre=/usr/bin/ln -sf /opt/lmktfy/server/bin/lmktfylet /opt/bin/lmktfylet
+        ExecStart=/opt/bin/lmktfylet --address=$private_ipv4 --hostname_override=$private_ipv4 --etcd_servers=http://127.0.0.1:4001 --logtostderr=true --config=/opt/lmktfy-manifests --cluster_dns=DNS_SERVER_IP --cluster_domain=DNS_DOMAIN
         Restart=always
         RestartSec=2
     - name: minion-proxy.service
       command: start
       content: |
         [Unit]
-        Description=Kubernetes Proxy
-        Documentation=https://github.com/GoogleCloudPlatform/kubernetes
+        Description=LMKTFY Proxy
+        Documentation=https://github.com/GoogleCloudPlatform/lmktfy
         After=network-online.target
         Requires=network-online.target
         After=docker.service
@@ -84,44 +84,44 @@ coreos:
         After=download-release.service
         Requires=download-release.service
         [Service]
-        ExecStartPre=/usr/bin/ln -sf /opt/kubernetes/server/bin/kube-proxy /opt/bin/kube-proxy
-        ExecStart=/opt/bin/kube-proxy --bind_address=$private_ipv4 --etcd_servers=http://127.0.0.1:4001 --logtostderr=true --v=2
+        ExecStartPre=/usr/bin/ln -sf /opt/lmktfy/server/bin/lmktfy-proxy /opt/bin/lmktfy-proxy
+        ExecStart=/opt/bin/lmktfy-proxy --bind_address=$private_ipv4 --etcd_servers=http://127.0.0.1:4001 --logtostderr=true --v=2
         Restart=always
         RestartSec=2
     - name: minion-advertiser.service
       command: start
       content: |
         [Unit]
-        Description=Kubernetes Minion Advertiser
+        Description=LMKTFY Minion Advertiser
         After=etcd.service
         Requires=etcd.service
-        After=minion-kubelet.service
+        After=minion-lmktfylet.service
         [Service]
-        ExecStart=/bin/sh -c 'while :; do etcdctl set /corekube/minions/$private_ipv4 $private_ipv4 --ttl 300; sleep 120; done'
+        ExecStart=/bin/sh -c 'while :; do etcdctl set /corelmktfy/minions/$private_ipv4 $private_ipv4 --ttl 300; sleep 120; done'
         Restart=always
         RestartSec=120
     - name: net-advertiser.service
       command: start
       content: |
         [Unit]
-        Description=Kubernetes Network Advertiser
+        Description=LMKTFY Network Advertiser
         After=etcd.service
         Requires=etcd.service
-        After=minion-kubelet.service
+        After=minion-lmktfylet.service
         [Service]
-        ExecStart=/bin/sh -c 'eth2_ip=$$(ip -o -f inet a show dev eth2 | sed "s/.* inet \([0-9.]\+\).*/\1/"); while :; do etcdctl set /corekube/net/$$eth2_ip 10.240.INDEX.0/24 --ttl 300; sleep 120; done'
+        ExecStart=/bin/sh -c 'eth2_ip=$$(ip -o -f inet a show dev eth2 | sed "s/.* inet \([0-9.]\+\).*/\1/"); while :; do etcdctl set /corelmktfy/net/$$eth2_ip 10.240.INDEX.0/24 --ttl 300; sleep 120; done'
         Restart=always
         RestartSec=120
     - name: net-router.service
       command: start
       content: |
         [Unit]
-        Description=Kubernetes Network Router
+        Description=LMKTFY Network Router
         After=etcd.service
         Requires=etcd.service
-        After=minion-kubelet.service
+        After=minion-lmktfylet.service
         [Service]
-        ExecStart=/usr/bin/etcdctl exec-watch --recursive /corekube/net -- /opt/bin/kube-net-update.sh
+        ExecStart=/usr/bin/etcdctl exec-watch --recursive /corelmktfy/net -- /opt/bin/lmktfy-net-update.sh
         Restart=always
         RestartSec=120
     - name: cbr0.netdev

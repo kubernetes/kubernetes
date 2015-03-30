@@ -75,13 +75,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 -->
 <div style="margin-top: 10px">
-<div class="k8s-title-font k8s-box">
+<div class="lmktfy-title-font lmktfy-box">
   {{ groupName }}
 
 <div ng-if="group.kind != 'grouping'">
   <div ng-if="!settings.display || settings.display=='box'">
-  <div class="content k8s-item k8s-inline" ng-repeat="item in group">
-    <div class="k8s-title-font k8s-font-regular">
+  <div class="content lmktfy-item lmktfy-inline" ng-repeat="item in group">
+    <div class="lmktfy-title-font lmktfy-font-regular">
       <div ng-switch on='item.labels["type"]'>
         <a ng-switch-when='pod' href="#/pods/{{ item.id }}">{{ item.id }}</a>
 	<a ng-switch-when='service' href="#/services/{{ item.id }}">{{ item.id }}</a>
@@ -93,8 +93,8 @@ limitations under the License.
   </div>
   <div ng-if="settings.display=='list'">
     <table style="width: 90%; padding: 10px">
-    <tr ng-repeat="item in group" ng-class-odd="'k8s-odd'" ng-class-even="'k8s-even'" valign="top">
-      <td class="k8s-cell">
+    <tr ng-repeat="item in group" ng-class-odd="'lmktfy-odd'" ng-class-even="'lmktfy-even'" valign="top">
+      <td class="lmktfy-cell">
         <div ng-switch on='item.labels["type"]'>
           <a ng-switch-when='pod' href="#/pods/{{ item.id }}">{{ item.id }}</a>
 	  <a ng-switch-when='service' href="#/services/{{ item.id }}">{{ item.id }}</a>
@@ -102,7 +102,7 @@ limitations under the License.
 	  <span ng-switch-default>{{item.id}}</span>
       </div>
       </td>
-      <td class="k8s-cell">
+      <td class="lmktfy-cell">
         <div ng-repeat='(key, value) in item.labels'>
 	  <a href="#/groups/{{key}}/selector/{{controller.routeParams.selector}}">{{key}}</a> :
 	  <a href="#/groups/{{controller.routeParams.grouping}}/selector/{{key}}={{value}}">{{value}}</a> </span>
@@ -153,9 +153,9 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 -->
-<html ng-app="k8s">
+<html ng-app="lmktfy">
   <head>
-    <title>Kubernetes</title>
+    <title>LMKTFY</title>
     <link href='https://fonts.googleapis.com/css?family=Ubuntu%20Mono' rel='stylesheet' type='text/css'>
     <link href='https://fonts.googleapis.com/css?family=Open+Sans' rel='stylesheet' type='text/css'>
     <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.2.25/angular.min.js"></script>
@@ -165,7 +165,7 @@ limitations under the License.
     <script src="/angular.min.js"></script>
     <!-- -->
     <script src="podcontroller.js"></script>
-    <link rel="stylesheet" href="k8s-style.css">
+    <link rel="stylesheet" href="lmktfy-style.css">
   </head>
   <body>
     <div class="navbar">
@@ -194,7 +194,7 @@ func www_index_html() (*asset, error) {
 	return a, nil
 }
 
-var _www_k8s_style_css = []byte(`.logo {
+var _www_lmktfy_style_css = []byte(`.logo {
   background: url('titlelogo.svg');
   background-repeat: no-repeat;
   height: 150px;
@@ -245,20 +245,20 @@ var _www_k8s_style_css = []byte(`.logo {
   text-decoration: underline;
 }
 
-.k8s-title-font {
+.lmktfy-title-font {
   font-family: 'Ubuntu Mono', arial, sans-serif;
   font-size: 14pt;
 }
 
-.k8s-font-medium {
+.lmktfy-font-medium {
   font-size: 18pt;
 }
 
-.k8s-font-regular {
+.lmktfy-font-regular {
   font-size: 12pt;
 }
 
-.k8s-box {
+.lmktfy-box {
   background: #CCC;
   border: 1px solid darkgray;
   padding: 10px;
@@ -266,54 +266,54 @@ var _www_k8s_style_css = []byte(`.logo {
   margin-left: 5%;
 }
 
-.k8s-item {
+.lmktfy-item {
   background: #DDD;
   border: 1px solid whitesmoke;
   padding: 10px;
   width: 200px;
 }
 
-.k8s-list {
+.lmktfy-list {
   background: #DDD;
   border: 1px solid whitesmoke;
   padding: 10px;
   width: 90%;
 }
 
-.k8s-inline {
+.lmktfy-inline {
   display: inline-block;
 }
 
-.k8s-button {
+.lmktfy-button {
   border: 1px solid black;
   background: lightgray;
   cursor: pointer;
   padding: 2px 4px 2px 4px;
 }
 
-.k8s-odd {
+.lmktfy-odd {
   background: #EEE;
 }
 
-.k8s-even {
+.lmktfy-even {
   background: #DDD;
 }
 
-.k8s-cell {
+.lmktfy-cell {
   padding: 10px;
 }`)
 
-func www_k8s_style_css_bytes() ([]byte, error) {
-	return _www_k8s_style_css, nil
+func www_lmktfy_style_css_bytes() ([]byte, error) {
+	return _www_lmktfy_style_css, nil
 }
 
-func www_k8s_style_css() (*asset, error) {
-	bytes, err := www_k8s_style_css_bytes()
+func www_lmktfy_style_css() (*asset, error) {
+	bytes, err := www_lmktfy_style_css_bytes()
 	if err != nil {
 		return nil, err
 	}
 
-	info := bindata_file_info{name: "www/k8s-style.css", size: 1355, mode: os.FileMode(416), modTime: time.Unix(1422479417, 0)}
+	info := bindata_file_info{name: "www/lmktfy-style.css", size: 1355, mode: os.FileMode(416), modTime: time.Unix(1422479417, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -724,8 +724,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 -->
 <div class="content" style="width: 90%; margin-left: 5%" ng-if="selector && selector.length > 0">
-  <div class="k8s-inline k8s-font-regular k8s-title-font">{{selector}}</div>
-  <div class="k8s-inline k8s-title-font k8s-button" ng-click="controller.clearSelector(controller.routeParams.grouping)">X</div>
+  <div class="lmktfy-inline lmktfy-font-regular lmktfy-title-font">{{selector}}</div>
+  <div class="lmktfy-inline lmktfy-title-font lmktfy-button" ng-click="controller.clearSelector(controller.routeParams.grouping)">X</div>
 </div>
 <div ng-repeat="(groupName,group) in groups.items" ng-include="'box.ng'">
 `)
@@ -760,8 +760,8 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 -->
-<div class="content k8s-title-font k8s-font-regular">
-  <div class="navbar title k8s-title-font">
+<div class="content lmktfy-title-font lmktfy-font-regular">
+  <div class="navbar title lmktfy-title-font">
     {{pod.id}}
   </div>
   {{pod.currentState.status}} on <a href="#/groups/host/selector/$.DesiredState.Host={{pod.currentState.host}}">{{pod.currentState.host}}</a>
@@ -840,7 +840,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-var k8sApp = angular.module('k8s', ['ngRoute']);
+var lmktfyApp = angular.module('lmktfy', ['ngRoute']);
 
 function PodController() {}
 
@@ -864,7 +864,7 @@ PodController.prototype.handleError = function(data, status, headers, config) {
 	this.scope_.loading = false;
 };
 
-k8sApp.controller('PodCtrl', function ($scope, $http, $routeParams) {
+lmktfyApp.controller('PodCtrl', function ($scope, $http, $routeParams) {
 	$scope.controller = new PodController();
 	$scope.controller.http = $http;
         $scope.controller.scope = $scope;
@@ -1028,7 +1028,7 @@ GroupController.prototype.handleError = function(data, status, headers, config) 
 	this.scope.loading = false;
 };
 
-k8sApp.controller('GroupCtrl', function ($scope, $http, $route, $routeParams) {
+lmktfyApp.controller('GroupCtrl', function ($scope, $http, $route, $routeParams) {
 	$scope.controller = new GroupController();
 	$scope.controller.http = $http;
         $scope.controller.scope = $scope;
@@ -1042,7 +1042,7 @@ k8sApp.controller('GroupCtrl', function ($scope, $http, $route, $routeParams) {
     });
 
 
-k8sApp.config(['$routeProvider',
+lmktfyApp.config(['$routeProvider',
 		function($routeProvider) {
 			  $routeProvider.
 			      when('/groups/:grouping*?\/selector/:selector*?', {
@@ -18289,7 +18289,7 @@ func AssetNames() []string {
 var _bindata = map[string]func() (*asset, error){
 	"www/box.ng":                                                     www_box_ng,
 	"www/index.html":                                                 www_index_html,
-	"www/k8s-style.css":                                              www_k8s_style_css,
+	"www/lmktfy-style.css":                                              www_lmktfy_style_css,
 	"www/logotext.svg":                                               www_logotext_svg,
 	"www/partials/groups.html":                                       www_partials_groups_html,
 	"www/partials/pod.html":                                          www_partials_pod_html,
@@ -18433,7 +18433,7 @@ var _bintree = &_bintree_t{nil, map[string]*_bintree_t{
 	"www": {nil, map[string]*_bintree_t{
 		"box.ng":        {www_box_ng, map[string]*_bintree_t{}},
 		"index.html":    {www_index_html, map[string]*_bintree_t{}},
-		"k8s-style.css": {www_k8s_style_css, map[string]*_bintree_t{}},
+		"lmktfy-style.css": {www_lmktfy_style_css, map[string]*_bintree_t{}},
 		"logotext.svg":  {www_logotext_svg, map[string]*_bintree_t{}},
 		"partials": {nil, map[string]*_bintree_t{
 			"groups.html": {www_partials_groups_html, map[string]*_bintree_t{}},

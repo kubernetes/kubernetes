@@ -1,6 +1,6 @@
 # Pods
 
-In Kubernetes, rather than individual application containers, _pods_ are the smallest deployable units that can be created, scheduled, and managed.
+In LMKTFY, rather than individual application containers, _pods_ are the smallest deployable units that can be created, scheduled, and managed.
 
 ## What is a _pod_?
 
@@ -48,7 +48,7 @@ Individual pods are not intended to run multiple instances of the same applicati
 _Why not just run multiple programs in a single (Docker) container?_
 
 1. Transparency. Making the containers within the pod visible to the infrastructure enables the infrastructure to provide services to those containers, such as process management and resource monitoring. This facilitates a number of conveniences for users.
-2. Decoupling software dependencies. The individual containers may be rebuilt and redeployed independently. Kubernetes may even support live updates of individual containers someday.
+2. Decoupling software dependencies. The individual containers may be rebuilt and redeployed independently. LMKTFY may even support live updates of individual containers someday.
 3. Ease of use. Users don't need to run their own process managers, worry about signal and exit-code propagation, etc.
 4. Efficiency. Because the infrastructure takes on more responsibility, containers can be lighterweight.
 
@@ -67,8 +67,8 @@ Pod is exposed as a primitive in order to facilitate:
 * support for pod-level operations without the need to "proxy" them via controller APIs  
 * decoupling of pod lifetime from controller lifetime, such as for bootstrapping
 * decoupling of controllers and services -- the endpoint controller just watches pods
-* clean composition of Kubelet-level functionality with cluster-level functionality -- Kubelet is effectively the "pod controller"
-* high-availability applications, which will expect pods to be replaced in advance of their termination and certainly in advance of deletion, such as in the case of planned evictions, image prefetching, or live pod migration [#3949](https://github.com/GoogleCloudPlatform/kubernetes/issues/3949)
+* clean composition of LMKTFYlet-level functionality with cluster-level functionality -- LMKTFYlet is effectively the "pod controller"
+* high-availability applications, which will expect pods to be replaced in advance of their termination and certainly in advance of deletion, such as in the case of planned evictions, image prefetching, or live pod migration [#3949](https://github.com/GoogleCloudPlatform/lmktfy/issues/3949)
 
-The current best practice for pets is to create a replication controller with `replicas` equal to `1` and a corresponding service. If you find this cumbersome, please comment on [issue #260](https://github.com/GoogleCloudPlatform/kubernetes/issues/260). 
+The current best practice for pets is to create a replication controller with `replicas` equal to `1` and a corresponding service. If you find this cumbersome, please comment on [issue #260](https://github.com/GoogleCloudPlatform/lmktfy/issues/260). 
 

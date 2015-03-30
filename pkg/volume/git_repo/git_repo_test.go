@@ -24,11 +24,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/exec"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume/empty_dir"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/types"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/util/exec"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/volume"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/volume/empty_dir"
 )
 
 func newTestHost(t *testing.T) volume.VolumeHost {
@@ -43,11 +43,11 @@ func TestCanSupport(t *testing.T) {
 	plugMgr := volume.VolumePluginMgr{}
 	plugMgr.InitPlugins(ProbeVolumePlugins(), newTestHost(t))
 
-	plug, err := plugMgr.FindPluginByName("kubernetes.io/git-repo")
+	plug, err := plugMgr.FindPluginByName("lmktfy.io/git-repo")
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
 	}
-	if plug.Name() != "kubernetes.io/git-repo" {
+	if plug.Name() != "lmktfy.io/git-repo" {
 		t.Errorf("Wrong name: %s", plug.Name())
 	}
 	if !plug.CanSupport(&api.Volume{VolumeSource: api.VolumeSource{GitRepo: &api.GitRepoVolumeSource{}}}) {
@@ -61,7 +61,7 @@ func testSetUp(plug volume.VolumePlugin, builder volume.Builder, t *testing.T) {
 		CombinedOutputScript: []exec.FakeCombinedOutputAction{
 			// git clone
 			func() ([]byte, error) {
-				os.MkdirAll(path.Join(fcmd.Dirs[0], "kubernetes"), 0750)
+				os.MkdirAll(path.Join(fcmd.Dirs[0], "lmktfy"), 0750)
 				return []byte{}, nil
 			},
 			// git checkout
@@ -95,7 +95,7 @@ func testSetUp(plug volume.VolumePlugin, builder volume.Builder, t *testing.T) {
 	if !reflect.DeepEqual(expectedCmds, fcmd.CombinedOutputLog) {
 		t.Errorf("unexpected commands: %v, expected: %v", fcmd.CombinedOutputLog, expectedCmds)
 	}
-	expectedDirs := []string{g.GetPath(), g.GetPath() + "/kubernetes", g.GetPath() + "/kubernetes"}
+	expectedDirs := []string{g.GetPath(), g.GetPath() + "/lmktfy", g.GetPath() + "/lmktfy"}
 	if len(fcmd.Dirs) != 3 || !reflect.DeepEqual(expectedDirs, fcmd.Dirs) {
 		t.Errorf("unexpected directories: %v, expected: %v", fcmd.Dirs, expectedDirs)
 	}
@@ -105,7 +105,7 @@ func TestPlugin(t *testing.T) {
 	plugMgr := volume.VolumePluginMgr{}
 	plugMgr.InitPlugins(ProbeVolumePlugins(), newTestHost(t))
 
-	plug, err := plugMgr.FindPluginByName("kubernetes.io/git-repo")
+	plug, err := plugMgr.FindPluginByName("lmktfy.io/git-repo")
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
 	}
@@ -113,7 +113,7 @@ func TestPlugin(t *testing.T) {
 		Name: "vol1",
 		VolumeSource: api.VolumeSource{
 			GitRepo: &api.GitRepoVolumeSource{
-				Repository: "https://github.com/GoogleCloudPlatform/kubernetes.git",
+				Repository: "https://github.com/GoogleCloudPlatform/lmktfy.git",
 				Revision:   "2a30ce65c5ab586b98916d83385c5983edd353a1",
 			},
 		},
@@ -127,7 +127,7 @@ func TestPlugin(t *testing.T) {
 	}
 
 	path := builder.GetPath()
-	if !strings.HasSuffix(path, "pods/poduid/volumes/kubernetes.io~git-repo/vol1") {
+	if !strings.HasSuffix(path, "pods/poduid/volumes/lmktfy.io~git-repo/vol1") {
 		t.Errorf("Got unexpected path: %s", path)
 	}
 

@@ -16,19 +16,19 @@
 
 # Pushes a development build to a directory in your current project,
 # pushing to something like:
-# gs://kubernetes-releases-3fda2/devel/v0.8.0-437-g7f147ed/
+# gs://lmktfy-releases-3fda2/devel/v0.8.0-437-g7f147ed/
 
 set -o errexit
 set -o nounset
 set -o pipefail
 
 LATEST=$(git describe)
-KUBE_GCS_NO_CACHING=n
-KUBE_GCS_MAKE_PUBLIC=y
-KUBE_GCS_UPLOAD_RELEASE=y
-KUBE_GCS_RELEASE_PREFIX="devel/${LATEST}"
+LMKTFY_GCS_NO_CACHING=n
+LMKTFY_GCS_MAKE_PUBLIC=y
+LMKTFY_GCS_UPLOAD_RELEASE=y
+LMKTFY_GCS_RELEASE_PREFIX="devel/${LATEST}"
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
-source "$KUBE_ROOT/build/common.sh"
+LMKTFY_ROOT=$(dirname "${BASH_SOURCE}")/..
+source "$LMKTFY_ROOT/build/common.sh"
 
-kube::release::gcs::release
+lmktfy::release::gcs::release

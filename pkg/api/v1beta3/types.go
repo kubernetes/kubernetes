@@ -17,10 +17,10 @@ limitations under the License.
 package v1beta3
 
 import (
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api/resource"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/runtime"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/types"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/util"
 )
 
 // Common string formats
@@ -70,7 +70,7 @@ type ListMeta struct {
 	// concurrency and change monitoring endpoints.  Clients must treat these values as opaque
 	// and values may only be valid for a particular resource or set of resources. Only servers
 	// will generate resource versions.
-	ResourceVersion string `json:"resourceVersion,omitempty" description:"string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"`
+	ResourceVersion string `json:"resourceVersion,omitempty" description:"string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/lmktfy/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"`
 }
 
 // ObjectMeta is metadata that all persisted resources must have, which includes all objects
@@ -113,7 +113,7 @@ type ObjectMeta struct {
 	// concurrency, change detection, and the watch operation on a resource or set of resources.
 	// Clients must treat these values as opaque and values may only be valid for a particular
 	// resource or set of resources. Only servers will generate resource versions.
-	ResourceVersion string `json:"resourceVersion,omitempty" description:"string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"`
+	ResourceVersion string `json:"resourceVersion,omitempty" description:"string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/lmktfy/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"`
 
 	// CreationTimestamp is a timestamp representing the server time when this object was
 	// created. It is not guaranteed to be set in happens-before order across separate operations.
@@ -126,8 +126,8 @@ type ObjectMeta struct {
 	// resource lists, and not reachable by name) after the time in this field. Once set, this
 	// value may not be unset or be set further into the future, although it may be shortened
 	// or the resource may be deleted prior to this time. For example, a user may request that
-	// a pod is deleted in 30 seconds. The Kubelet will react by sending a graceful termination
-	// signal to the containers in the pod. Once the resource is deleted in the API, the Kubelet
+	// a pod is deleted in 30 seconds. The LMKTFYlet will react by sending a graceful termination
+	// signal to the containers in the pod. Once the resource is deleted in the API, the LMKTFYlet
 	// will send a hard termination signal to the container.
 	DeletionTimestamp *util.Time `json:"deletionTimestamp,omitempty" description:"RFC 3339 date and time at which the object will be deleted; populated by the system when a graceful deletion is requested, read-only; if not set, graceful deletion of the object has not been requested"`
 
@@ -151,7 +151,7 @@ const (
 //
 //// ContainerManifest corresponds to the Container Manifest format, documented at:
 //// https://developers.google.com/compute/docs/containers/container_vms#container_manifest
-//// This is used as the representation of Kubernetes workloads.
+//// This is used as the representation of LMKTFY workloads.
 //// DEPRECATED: Exists to allow backwards compatible storage for clients accessing etcd
 //// directly.
 //type ContainerManifest struct {
@@ -169,7 +169,7 @@ const (
 //	RestartPolicy RestartPolicy `json:"restartPolicy,omitempty"`
 //}
 //
-//// ContainerManifestList is used to communicate container manifests to kubelet.
+//// ContainerManifestList is used to communicate container manifests to lmktfylet.
 //// DEPRECATED: Exists to allow backwards compatible storage for clients accessing etcd
 //// directly.
 //type ContainerManifestList struct {
@@ -204,7 +204,7 @@ type VolumeSource struct {
 	// EmptyDir represents a temporary directory that shares a pod's lifetime.
 	EmptyDir *EmptyDirVolumeSource `json:"emptyDir" description:"temporary directory that shares a pod's lifetime"`
 	// GCEPersistentDisk represents a GCE Disk resource that is attached to a
-	// kubelet's host machine and then exposed to the pod.
+	// lmktfylet's host machine and then exposed to the pod.
 	GCEPersistentDisk *GCEPersistentDiskVolumeSource `json:"gcePersistentDisk" description:"GCE disk resource attached to the host machine on demand"`
 	// GitRepo represents a git repository at a particular revision.
 	GitRepo *GitRepoVolumeSource `json:"gitRepo" description:"git repository at a particular revision"`
@@ -218,7 +218,7 @@ type VolumeSource struct {
 // Exactly one of its members must be set.
 type PersistentVolumeSource struct {
 	// GCEPersistentDisk represents a GCE Disk resource that is attached to a
-	// kubelet's host machine and then exposed to the pod.
+	// lmktfylet's host machine and then exposed to the pod.
 	GCEPersistentDisk *GCEPersistentDiskVolumeSource `json:"gcePersistentDisk" description:"GCE disk resource provisioned by an admin"`
 	// HostPath represents a directory on the host.
 	// This is useful for development and testing only.
@@ -360,7 +360,7 @@ const (
 // GCEPersistentDiskVolumeSource represents a Persistent Disk resource in Google Compute Engine.
 //
 // A GCE PD must exist and be formatted before mounting to a container.
-// The disk must also be in the same GCE project and zone as the kubelet.
+// The disk must also be in the same GCE project and zone as the lmktfylet.
 // A GCE PD can only be mounted as read/write once.
 type GCEPersistentDiskVolumeSource struct {
 	// Unique name of the PD resource. Used to identify the disk in GCE
@@ -371,7 +371,7 @@ type GCEPersistentDiskVolumeSource struct {
 	// TODO: how do we prevent errors in the filesystem from compromising the machine
 	FSType string `json:"fsType,omitempty" description:"file system type to mount, such as ext4, xfs, ntfs"`
 	// Optional: Partition on the disk to mount.
-	// If omitted, kubelet will attempt to mount the device name.
+	// If omitted, lmktfylet will attempt to mount the device name.
 	// Ex. For /dev/sda1, this field is "1", for /dev/sda, this field is 0 or empty.
 	Partition int `json:"partition,omitempty" description:"partition on the disk to mount (e.g., '1' for /dev/sda1); if omitted the plain device name (e.g., /dev/sda) will be mounted"`
 	// Optional: Defaults to false (read/write). ReadOnly here will force
@@ -389,7 +389,7 @@ type GitRepoVolumeSource struct {
 
 // SecretVolumeSource adapts a Secret into a VolumeSource
 //
-// https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/design/secrets.md
+// https://github.com/GoogleCloudPlatform/lmktfy/blob/master/docs/design/secrets.md
 type SecretVolumeSource struct {
 	// Name of the secret in the pod's namespace to use
 	SecretName string `json:"secretName" description:"secretName is the name of a secret in the pod's namespace"`
@@ -481,11 +481,11 @@ type Probe struct {
 type PullPolicy string
 
 const (
-	// PullAlways means that kubelet always attempts to pull the latest image.  Container will fail If the pull fails.
+	// PullAlways means that lmktfylet always attempts to pull the latest image.  Container will fail If the pull fails.
 	PullAlways PullPolicy = "Always"
-	// PullNever means that kubelet never pulls an image, but only uses a local image.  Container will fail if the image isn't present
+	// PullNever means that lmktfylet never pulls an image, but only uses a local image.  Container will fail if the image isn't present
 	PullNever PullPolicy = "Never"
-	// PullIfNotPresent means that kubelet pulls if the image isn't present on disk. Container will fail if the image isn't present and the pull fails.
+	// PullIfNotPresent means that lmktfylet pulls if the image isn't present on disk. Container will fail if the image isn't present and the pull fails.
 	PullIfNotPresent PullPolicy = "IfNotPresent"
 )
 
@@ -569,7 +569,7 @@ type Lifecycle struct {
 type ConditionStatus string
 
 // These are valid condition statuses. "ConditionTrue" means a resource is in the condition;
-// "ConditionFalse" means a resource is not in the condition; "ConditionUnknown" means kubernetes
+// "ConditionFalse" means a resource is not in the condition; "ConditionUnknown" means lmktfy
 // can't decide if a resource is in the condition or not. In the future, we could add other
 // intermediate conditions, e.g. ConditionDegraded.
 const (
@@ -683,11 +683,11 @@ type DNSPolicy string
 const (
 	// DNSClusterFirst indicates that the pod should use cluster DNS
 	// first, if it is available, then fall back on the default (as
-	// determined by kubelet) DNS settings.
+	// determined by lmktfylet) DNS settings.
 	DNSClusterFirst DNSPolicy = "ClusterFirst"
 
 	// DNSDefault indicates that the pod should use the default (as
-	// determined by kubelet) DNS settings.
+	// determined by lmktfylet) DNS settings.
 	DNSDefault DNSPolicy = "Default"
 )
 
@@ -734,33 +734,33 @@ type PodStatus struct {
 	ContainerStatuses []ContainerStatus `json:"containerStatuses,omitempty" description:"list of container statuses"`
 }
 
-// PodStatusResult is a wrapper for PodStatus returned by kubelet that can be encode/decoded
+// PodStatusResult is a wrapper for PodStatus returned by lmktfylet that can be encode/decoded
 type PodStatusResult struct {
 	TypeMeta   `json:",inline"`
-	ObjectMeta `json:"metadata,omitempty" description:"standard object metadata; see https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#metadata"`
+	ObjectMeta `json:"metadata,omitempty" description:"standard object metadata; see https://github.com/GoogleCloudPlatform/lmktfy/blob/master/docs/api-conventions.md#metadata"`
 	// Status represents the current information about a pod. This data may not be up
 	// to date.
-	Status PodStatus `json:"status,omitempty" description:"most recently observed status of the pod; populated by the system, read-only; https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#spec-and-status"`
+	Status PodStatus `json:"status,omitempty" description:"most recently observed status of the pod; populated by the system, read-only; https://github.com/GoogleCloudPlatform/lmktfy/blob/master/docs/api-conventions.md#spec-and-status"`
 }
 
 // Pod is a collection of containers that can run on a host. This resource is created
 // by clients and scheduled onto hosts.
 type Pod struct {
 	TypeMeta   `json:",inline"`
-	ObjectMeta `json:"metadata,omitempty" description:"standard object metadata; see https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#metadata"`
+	ObjectMeta `json:"metadata,omitempty" description:"standard object metadata; see https://github.com/GoogleCloudPlatform/lmktfy/blob/master/docs/api-conventions.md#metadata"`
 
 	// Spec defines the behavior of a pod.
-	Spec PodSpec `json:"spec,omitempty" description:"specification of the desired behavior of the pod; https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#spec-and-status"`
+	Spec PodSpec `json:"spec,omitempty" description:"specification of the desired behavior of the pod; https://github.com/GoogleCloudPlatform/lmktfy/blob/master/docs/api-conventions.md#spec-and-status"`
 
 	// Status represents the current information about a pod. This data may not be up
 	// to date.
-	Status PodStatus `json:"status,omitempty" description:"most recently observed status of the pod; populated by the system, read-only; https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#spec-and-status"`
+	Status PodStatus `json:"status,omitempty" description:"most recently observed status of the pod; populated by the system, read-only; https://github.com/GoogleCloudPlatform/lmktfy/blob/master/docs/api-conventions.md#spec-and-status"`
 }
 
 // PodList is a list of Pods.
 type PodList struct {
 	TypeMeta `json:",inline"`
-	ListMeta `json:"metadata,omitempty" description:"standard list metadata; see https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#types-kinds`
+	ListMeta `json:"metadata,omitempty" description:"standard list metadata; see https://github.com/GoogleCloudPlatform/lmktfy/blob/master/docs/api-conventions.md#types-kinds`
 
 	Items []Pod `json:"items" description:"list of pods"`
 }
@@ -768,25 +768,25 @@ type PodList struct {
 // PodTemplateSpec describes the data a pod should have when created from a template
 type PodTemplateSpec struct {
 	// Metadata of the pods created from this template.
-	ObjectMeta `json:"metadata,omitempty" description:"standard object metadata; see https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#metadata"`
+	ObjectMeta `json:"metadata,omitempty" description:"standard object metadata; see https://github.com/GoogleCloudPlatform/lmktfy/blob/master/docs/api-conventions.md#metadata"`
 
 	// Spec defines the behavior of a pod.
-	Spec PodSpec `json:"spec,omitempty" description:"specification of the desired behavior of the pod; https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#spec-and-status"`
+	Spec PodSpec `json:"spec,omitempty" description:"specification of the desired behavior of the pod; https://github.com/GoogleCloudPlatform/lmktfy/blob/master/docs/api-conventions.md#spec-and-status"`
 }
 
 // PodTemplate describes a template for creating copies of a predefined pod.
 type PodTemplate struct {
 	TypeMeta   `json:",inline"`
-	ObjectMeta `json:"metadata,omitempty" description:"standard object metadata; see https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#metadata"`
+	ObjectMeta `json:"metadata,omitempty" description:"standard object metadata; see https://github.com/GoogleCloudPlatform/lmktfy/blob/master/docs/api-conventions.md#metadata"`
 
 	// Spec defines the behavior of a pod.
-	Spec PodTemplateSpec `json:"spec,omitempty" description:"specification of the desired behavior of the pod; https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#spec-and-status"`
+	Spec PodTemplateSpec `json:"spec,omitempty" description:"specification of the desired behavior of the pod; https://github.com/GoogleCloudPlatform/lmktfy/blob/master/docs/api-conventions.md#spec-and-status"`
 }
 
 // PodTemplateList is a list of PodTemplates.
 type PodTemplateList struct {
 	TypeMeta `json:",inline"`
-	ListMeta `json:"metadata,omitempty" description:"standard list metadata; see https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#metadata"`
+	ListMeta `json:"metadata,omitempty" description:"standard list metadata; see https://github.com/GoogleCloudPlatform/lmktfy/blob/master/docs/api-conventions.md#metadata"`
 
 	Items []PodTemplate `json:"items" description:"list of pod templates"`
 }
@@ -819,20 +819,20 @@ type ReplicationControllerStatus struct {
 // ReplicationController represents the configuration of a replication controller.
 type ReplicationController struct {
 	TypeMeta   `json:",inline"`
-	ObjectMeta `json:"metadata,omitempty" description:"standard object metadata; see https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#metadata"`
+	ObjectMeta `json:"metadata,omitempty" description:"standard object metadata; see https://github.com/GoogleCloudPlatform/lmktfy/blob/master/docs/api-conventions.md#metadata"`
 
 	// Spec defines the desired behavior of this replication controller.
-	Spec ReplicationControllerSpec `json:"spec,omitempty" description:"specification of the desired behavior of the replication controller; https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#spec-and-status"`
+	Spec ReplicationControllerSpec `json:"spec,omitempty" description:"specification of the desired behavior of the replication controller; https://github.com/GoogleCloudPlatform/lmktfy/blob/master/docs/api-conventions.md#spec-and-status"`
 
 	// Status is the current status of this replication controller. This data may be
 	// out of date by some window of time.
-	Status ReplicationControllerStatus `json:"status,omitempty" description:"most recently observed status of the replication controller; populated by the system, read-only; https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#spec-and-status"`
+	Status ReplicationControllerStatus `json:"status,omitempty" description:"most recently observed status of the replication controller; populated by the system, read-only; https://github.com/GoogleCloudPlatform/lmktfy/blob/master/docs/api-conventions.md#spec-and-status"`
 }
 
 // ReplicationControllerList is a collection of replication controllers.
 type ReplicationControllerList struct {
 	TypeMeta `json:",inline"`
-	ListMeta `json:"metadata,omitempty" description:"standard list metadata; see https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#metadata"`
+	ListMeta `json:"metadata,omitempty" description:"standard list metadata; see https://github.com/GoogleCloudPlatform/lmktfy/blob/master/docs/api-conventions.md#metadata"`
 
 	Items []ReplicationController `json:"items" description:"list of replication controllers"`
 }
@@ -891,13 +891,13 @@ type ServiceSpec struct {
 // will answer requests sent through the proxy.
 type Service struct {
 	TypeMeta   `json:",inline"`
-	ObjectMeta `json:"metadata,omitempty" description:"standard object metadata; see https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#metadata"`
+	ObjectMeta `json:"metadata,omitempty" description:"standard object metadata; see https://github.com/GoogleCloudPlatform/lmktfy/blob/master/docs/api-conventions.md#metadata"`
 
 	// Spec defines the behavior of a service.
-	Spec ServiceSpec `json:"spec,omitempty" description:"specification of the desired behavior of the service; https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#spec-and-status"`
+	Spec ServiceSpec `json:"spec,omitempty" description:"specification of the desired behavior of the service; https://github.com/GoogleCloudPlatform/lmktfy/blob/master/docs/api-conventions.md#spec-and-status"`
 
 	// Status represents the current status of a service.
-	Status ServiceStatus `json:"status,omitempty" description:"most recently observed status of the service; populated by the system, read-only; https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#spec-and-status"`
+	Status ServiceStatus `json:"status,omitempty" description:"most recently observed status of the service; populated by the system, read-only; https://github.com/GoogleCloudPlatform/lmktfy/blob/master/docs/api-conventions.md#spec-and-status"`
 }
 
 const (
@@ -909,7 +909,7 @@ const (
 // ServiceList holds a list of services.
 type ServiceList struct {
 	TypeMeta `json:",inline"`
-	ListMeta `json:"metadata,omitempty" description:"standard list metadata; see https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#metadata"`
+	ListMeta `json:"metadata,omitempty" description:"standard list metadata; see https://github.com/GoogleCloudPlatform/lmktfy/blob/master/docs/api-conventions.md#metadata"`
 
 	Items []Service `json:"items" description:"list of services"`
 }
@@ -928,7 +928,7 @@ type ServiceList struct {
 //  ]
 type Endpoints struct {
 	TypeMeta   `json:",inline"`
-	ObjectMeta `json:"metadata,omitempty" description:"standard object metadata; see https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#metadata"`
+	ObjectMeta `json:"metadata,omitempty" description:"standard object metadata; see https://github.com/GoogleCloudPlatform/lmktfy/blob/master/docs/api-conventions.md#metadata"`
 
 	// The set of all endpoints is the union of all subsets.
 	Subsets []EndpointSubset `json:"subsets" description:"sets of addresses and ports that comprise a service"`
@@ -955,7 +955,7 @@ type EndpointAddress struct {
 	// TODO: This should allow hostname or IP, see #4447.
 	IP string `json:"IP" description:"IP address of the endpoint"`
 
-	// Optional: The kubernetes object related to the entry point.
+	// Optional: The lmktfy object related to the entry point.
 	TargetRef *ObjectReference `json:"targetRef,omitempty" description:"reference to object providing the endpoint"`
 }
 
@@ -975,7 +975,7 @@ type EndpointPort struct {
 // EndpointsList is a list of endpoints.
 type EndpointsList struct {
 	TypeMeta `json:",inline"`
-	ListMeta `json:"metadata,omitempty" description:"standard list metadata; see https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#metadata"`
+	ListMeta `json:"metadata,omitempty" description:"standard list metadata; see https://github.com/GoogleCloudPlatform/lmktfy/blob/master/docs/api-conventions.md#metadata"`
 
 	Items []Endpoints `json:"items" description:"list of endpoints"`
 }
@@ -1004,17 +1004,17 @@ type NodeSystemInfo struct {
 	OsImage string `json:"osImage" description:"OS image used reported by the node from /etc/os-release (e.g. Debian GNU/Linux 7 (wheezy))"`
 	// Container runtime version reported by the node
 	ContainerRuntimeVersion string `json:"containerRuntimeVersion" description:"Container runtime version reported by the node through runtime remote API (e.g. docker://1.5.0)"`
-	// Kubelet version reported by the node
-	KubeletVersion string `json:"kubeletVersion" description:"Kubelet version reported by the node"`
-	// Kube-proxy version reported by the node
-	KubeProxyVersion string `json:"KubeProxyVersion" description:"Kube-proxy version reported by the node"`
+	// LMKTFYlet version reported by the node
+	LMKTFYletVersion string `json:"lmktfyletVersion" description:"LMKTFYlet version reported by the node"`
+	// LMKTFY-proxy version reported by the node
+	LMKTFYProxyVersion string `json:"LMKTFYProxyVersion" description:"LMKTFY-proxy version reported by the node"`
 }
 
 // NodeStatus is information about the current status of a node.
 type NodeStatus struct {
 	// Capacity represents the available resources of a node.
-	// see https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/resources.md for more details.
-	Capacity ResourceList `json:"capacity,omitempty" description:"compute resource capacity of the node; https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/resources.md"`
+	// see https://github.com/GoogleCloudPlatform/lmktfy/blob/master/docs/resources.md for more details.
+	Capacity ResourceList `json:"capacity,omitempty" description:"compute resource capacity of the node; https://github.com/GoogleCloudPlatform/lmktfy/blob/master/docs/resources.md"`
 	// NodePhase is the current lifecycle phase of the node.
 	Phase NodePhase `json:"phase,omitempty" description:"most recently observed lifecycle phase of the node"`
 	// Conditions is an array of current node conditions.
@@ -1040,7 +1040,7 @@ type NodePhase string
 const (
 	// NodePending means the node has been created/added by the system, but not configured.
 	NodePending NodePhase = "Pending"
-	// NodeRunning means the node has been configured and has Kubernetes components running.
+	// NodeRunning means the node has been configured and has LMKTFY components running.
 	NodeRunning NodePhase = "Running"
 	// NodeTerminated means the node has been removed from the cluster.
 	NodeTerminated NodePhase = "Terminated"
@@ -1098,32 +1098,32 @@ const (
 // ResourceList is a set of (resource name, quantity) pairs.
 type ResourceList map[ResourceName]resource.Quantity
 
-// Node is a worker node in Kubernetes.
+// Node is a worker node in LMKTFY.
 // The name of the node according to etcd is in ID.
 type Node struct {
 	TypeMeta   `json:",inline"`
-	ObjectMeta `json:"metadata,omitempty" description:"standard object metadata; see https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#metadata"`
+	ObjectMeta `json:"metadata,omitempty" description:"standard object metadata; see https://github.com/GoogleCloudPlatform/lmktfy/blob/master/docs/api-conventions.md#metadata"`
 
 	// Spec defines the behavior of a node.
-	Spec NodeSpec `json:"spec,omitempty" description:"specification of a node; https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#spec-and-status"`
+	Spec NodeSpec `json:"spec,omitempty" description:"specification of a node; https://github.com/GoogleCloudPlatform/lmktfy/blob/master/docs/api-conventions.md#spec-and-status"`
 
 	// Status describes the current status of a Node
-	Status NodeStatus `json:"status,omitempty" description:"most recently observed status of the node; populated by the system, read-only; https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#spec-and-status"`
+	Status NodeStatus `json:"status,omitempty" description:"most recently observed status of the node; populated by the system, read-only; https://github.com/GoogleCloudPlatform/lmktfy/blob/master/docs/api-conventions.md#spec-and-status"`
 }
 
 // NodeList is a list of minions.
 type NodeList struct {
 	TypeMeta `json:",inline"`
-	ListMeta `json:"metadata,omitempty" description:"standard list metadata; see https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#metadata"`
+	ListMeta `json:"metadata,omitempty" description:"standard list metadata; see https://github.com/GoogleCloudPlatform/lmktfy/blob/master/docs/api-conventions.md#metadata"`
 
 	Items []Node `json:"items" description:"list of nodes"`
 }
 
 type FinalizerName string
 
-// These are internal finalizer values to Kubernetes, must be qualified name unless defined here
+// These are internal finalizer values to LMKTFY, must be qualified name unless defined here
 const (
-	FinalizerKubernetes FinalizerName = "kubernetes"
+	FinalizerLMKTFY FinalizerName = "lmktfy"
 )
 
 // NamespaceSpec describes the attributes on a Namespace
@@ -1152,19 +1152,19 @@ const (
 // Use of multiple namespaces is optional
 type Namespace struct {
 	TypeMeta   `json:",inline"`
-	ObjectMeta `json:"metadata,omitempty" description:"standard object metadata; see https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#metadata"`
+	ObjectMeta `json:"metadata,omitempty" description:"standard object metadata; see https://github.com/GoogleCloudPlatform/lmktfy/blob/master/docs/api-conventions.md#metadata"`
 
 	// Spec defines the behavior of the Namespace.
-	Spec NamespaceSpec `json:"spec,omitempty" description:"spec defines the behavior of the Namespace; https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#spec-and-status"`
+	Spec NamespaceSpec `json:"spec,omitempty" description:"spec defines the behavior of the Namespace; https://github.com/GoogleCloudPlatform/lmktfy/blob/master/docs/api-conventions.md#spec-and-status"`
 
 	// Status describes the current status of a Namespace
-	Status NamespaceStatus `json:"status,omitempty" description:"status describes the current status of a Namespace; https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#spec-and-status"`
+	Status NamespaceStatus `json:"status,omitempty" description:"status describes the current status of a Namespace; https://github.com/GoogleCloudPlatform/lmktfy/blob/master/docs/api-conventions.md#spec-and-status"`
 }
 
 // NamespaceList is a list of Namespaces.
 type NamespaceList struct {
 	TypeMeta `json:",inline"`
-	ListMeta `json:"metadata,omitempty" description:"standard list metadata; see https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#metadata"`
+	ListMeta `json:"metadata,omitempty" description:"standard list metadata; see https://github.com/GoogleCloudPlatform/lmktfy/blob/master/docs/api-conventions.md#metadata"`
 
 	// Items is the list of Namespace objects in the list
 	Items []Namespace `json:"items"  description:"items is the list of Namespace objects in the list"`
@@ -1174,7 +1174,7 @@ type NamespaceList struct {
 type Binding struct {
 	TypeMeta `json:",inline"`
 	// ObjectMeta describes the object that is being bound.
-	ObjectMeta `json:"metadata,omitempty" description:"standard object metadata; see https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#metadata"`
+	ObjectMeta `json:"metadata,omitempty" description:"standard object metadata; see https://github.com/GoogleCloudPlatform/lmktfy/blob/master/docs/api-conventions.md#metadata"`
 
 	// Target is the object to bind to.
 	Target ObjectReference `json:"target" description:"an object to bind to"`
@@ -1207,7 +1207,7 @@ type ListOptions struct {
 // Status is a return value for calls that don't return other objects.
 type Status struct {
 	TypeMeta `json:",inline"`
-	ListMeta `json:"metadata,omitempty" description:"standard list metadata; see https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#metadata"`
+	ListMeta `json:"metadata,omitempty" description:"standard list metadata; see https://github.com/GoogleCloudPlatform/lmktfy/blob/master/docs/api-conventions.md#metadata"`
 
 	// One of: "Success" or "Failure"
 	Status string `json:"status,omitempty" description:"status of the operation; either Success, or Failure"`
@@ -1365,7 +1365,7 @@ type ObjectReference struct {
 	Name            string    `json:"name,omitempty" description:"name of the referent"`
 	UID             types.UID `json:"uid,omitempty" description:"uid of the referent"`
 	APIVersion      string    `json:"apiVersion,omitempty" description:"API version of the referent"`
-	ResourceVersion string    `json:"resourceVersion,omitempty" description:"specific resourceVersion to which this reference is made, if any: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"`
+	ResourceVersion string    `json:"resourceVersion,omitempty" description:"specific resourceVersion to which this reference is made, if any: https://github.com/GoogleCloudPlatform/lmktfy/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"`
 
 	// Optional. If referring to a piece of an object instead of an entire object, this string
 	// should contain information to identify the sub-object. For example, if the object
@@ -1389,7 +1389,7 @@ type EventSource struct {
 // TODO: Decide whether to store these separately or with the object they apply to.
 type Event struct {
 	TypeMeta   `json:",inline"`
-	ObjectMeta `json:"metadata" description:"standard object metadata; see https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#metadata"`
+	ObjectMeta `json:"metadata" description:"standard object metadata; see https://github.com/GoogleCloudPlatform/lmktfy/blob/master/docs/api-conventions.md#metadata"`
 
 	// Required. The object that this event is about.
 	InvolvedObject ObjectReference `json:"involvedObject,omitempty" description:"object this event is about"`
@@ -1419,7 +1419,7 @@ type Event struct {
 // EventList is a list of events.
 type EventList struct {
 	TypeMeta `json:",inline"`
-	ListMeta `json:"metadata,omitempty" description:"standard list metadata; see https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#metadata"`
+	ListMeta `json:"metadata,omitempty" description:"standard list metadata; see https://github.com/GoogleCloudPlatform/lmktfy/blob/master/docs/api-conventions.md#metadata"`
 
 	Items []Event `json:"items" description:"list of events"`
 }
@@ -1427,7 +1427,7 @@ type EventList struct {
 // List holds a list of objects, which may not be known by the server.
 type List struct {
 	TypeMeta `json:",inline"`
-	ListMeta `json:"metadata,omitempty" description:"standard list metadata; see https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#metadata"`
+	ListMeta `json:"metadata,omitempty" description:"standard list metadata; see https://github.com/GoogleCloudPlatform/lmktfy/blob/master/docs/api-conventions.md#metadata"`
 
 	Items []runtime.RawExtension `json:"items" description:"list of objects"`
 }
@@ -1461,22 +1461,22 @@ type LimitRangeSpec struct {
 // LimitRange sets resource usage limits for each kind of resource in a Namespace
 type LimitRange struct {
 	TypeMeta   `json:",inline"`
-	ObjectMeta `json:"metadata,omitempty" description:"standard object metadata; see https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#metadata"`
+	ObjectMeta `json:"metadata,omitempty" description:"standard object metadata; see https://github.com/GoogleCloudPlatform/lmktfy/blob/master/docs/api-conventions.md#metadata"`
 
 	// Spec defines the limits enforced
-	Spec LimitRangeSpec `json:"spec,omitempty" description:"spec defines the limits enforced; https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#spec-and-status"`
+	Spec LimitRangeSpec `json:"spec,omitempty" description:"spec defines the limits enforced; https://github.com/GoogleCloudPlatform/lmktfy/blob/master/docs/api-conventions.md#spec-and-status"`
 }
 
 // LimitRangeList is a list of LimitRange items.
 type LimitRangeList struct {
 	TypeMeta `json:",inline"`
-	ListMeta `json:"metadata,omitempty" description:"standard list metadata; see https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#metadata"`
+	ListMeta `json:"metadata,omitempty" description:"standard list metadata; see https://github.com/GoogleCloudPlatform/lmktfy/blob/master/docs/api-conventions.md#metadata"`
 
 	// Items is a list of LimitRange objects
 	Items []LimitRange `json:"items" description:"items is a list of LimitRange objects"`
 }
 
-// The following identify resource constants for Kubernetes object types
+// The following identify resource constants for LMKTFY object types
 const (
 	// Pods, number
 	ResourcePods ResourceName = "pods"
@@ -1505,19 +1505,19 @@ type ResourceQuotaStatus struct {
 // ResourceQuota sets aggregate quota restrictions enforced per namespace
 type ResourceQuota struct {
 	TypeMeta   `json:",inline"`
-	ObjectMeta `json:"metadata,omitempty" description:"standard object metadata; see https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#metadata"`
+	ObjectMeta `json:"metadata,omitempty" description:"standard object metadata; see https://github.com/GoogleCloudPlatform/lmktfy/blob/master/docs/api-conventions.md#metadata"`
 
 	// Spec defines the desired quota
-	Spec ResourceQuotaSpec `json:"spec,omitempty" description:"spec defines the desired quota; https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#spec-and-status"`
+	Spec ResourceQuotaSpec `json:"spec,omitempty" description:"spec defines the desired quota; https://github.com/GoogleCloudPlatform/lmktfy/blob/master/docs/api-conventions.md#spec-and-status"`
 
 	// Status defines the actual enforced quota and its current usage
-	Status ResourceQuotaStatus `json:"status,omitempty" description:"status defines the actual enforced quota and current usage; https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#spec-and-status"`
+	Status ResourceQuotaStatus `json:"status,omitempty" description:"status defines the actual enforced quota and current usage; https://github.com/GoogleCloudPlatform/lmktfy/blob/master/docs/api-conventions.md#spec-and-status"`
 }
 
 // ResourceQuotaList is a list of ResourceQuota items
 type ResourceQuotaList struct {
 	TypeMeta `json:",inline"`
-	ListMeta `json:"metadata,omitempty" description:"standard list metadata; see https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#metadata"`
+	ListMeta `json:"metadata,omitempty" description:"standard list metadata; see https://github.com/GoogleCloudPlatform/lmktfy/blob/master/docs/api-conventions.md#metadata"`
 
 	// Items is a list of ResourceQuota objects
 	Items []ResourceQuota `json:"items" description:"items is a list of ResourceQuota objects"`
@@ -1527,7 +1527,7 @@ type ResourceQuotaList struct {
 // the Data field must be less than MaxSecretSize bytes.
 type Secret struct {
 	TypeMeta   `json:",inline"`
-	ObjectMeta `json:"metadata,omitempty" description:"standard object metadata; see https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#metadata"`
+	ObjectMeta `json:"metadata,omitempty" description:"standard object metadata; see https://github.com/GoogleCloudPlatform/lmktfy/blob/master/docs/api-conventions.md#metadata"`
 
 	// Data contains the secret data.  Each key must be a valid DNS_SUBDOMAIN.
 	// The serialized form of the secret data is a base64 encoded string,
@@ -1548,7 +1548,7 @@ const (
 
 type SecretList struct {
 	TypeMeta `json:",inline"`
-	ListMeta `json:"metadata,omitempty" description:"standard list metadata; see https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#metadata"`
+	ListMeta `json:"metadata,omitempty" description:"standard list metadata; see https://github.com/GoogleCloudPlatform/lmktfy/blob/master/docs/api-conventions.md#metadata"`
 
 	Items []Secret `json:"items" description:"items is a list of secret objects"`
 }

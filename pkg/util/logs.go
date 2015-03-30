@@ -41,7 +41,7 @@ func (writer GlogWriter) Write(data []byte) (n int, err error) {
 	return len(data), nil
 }
 
-// InitLogs initializes logs the way we want for kubernetes.
+// InitLogs initializes logs the way we want for lmktfy.
 func InitLogs() {
 	log.SetOutput(GlogWriter{})
 	log.SetFlags(0)

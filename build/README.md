@@ -1,6 +1,6 @@
-# Building Kubernetes
+# Building LMKTFY
 
-To build Kubernetes you need to have access to a Docker installation through either of the following methods:
+To build LMKTFY you need to have access to a Docker installation through either of the following methods:
 
 ## Requirements
 
@@ -12,7 +12,7 @@ To build Kubernetes you need to have access to a Docker installation through eit
 
 ## Overview
 
-While it is possible to build Kubernetes using a local golang installation, we have a build process that runs in a Docker container.  This simplifies initial set up and provides for a very consistent build and test environment.
+While it is possible to build LMKTFY using a local golang installation, we have a build process that runs in a Docker container.  This simplifies initial set up and provides for a very consistent build and test environment.
 
 There is also early support for building Docker "run" containers
 
@@ -32,36 +32,36 @@ There is also early support for building Docker "run" containers
 
 The `release.sh` script will build a release.  It will build binaries, run tests, (optionally) build runtime Docker images and then (optionally) upload all build artifacts to a GCS bucket.
 
-The main output is a tar file: `kubernetes.tar.gz`.  This includes:
+The main output is a tar file: `lmktfy.tar.gz`.  This includes:
 * Cross compiled client utilities.
-* Script (`cluster/kubectl.sh`) for picking and running the right client binary based on platform.
+* Script (`cluster/lmktfyctl.sh`) for picking and running the right client binary based on platform.
 * Examples
 * Cluster deployment scripts for various clouds
 * Tar file containing all server binaries
 * Tar file containing salt deployment tree shared across multiple cloud deployments.
 
 In addition, there are some other tar files that are created:
-* `kubernetes-client-*.tar.gz` Client binaries for a specific platform.
-* `kubernetes-server-*.tar.gz` Server binaries for a specific platform.
-* `kubernetes-salt.tar.gz` The salt script/tree shared across multiple deployment scripts.
+* `lmktfy-client-*.tar.gz` Client binaries for a specific platform.
+* `lmktfy-server-*.tar.gz` Server binaries for a specific platform.
+* `lmktfy-salt.tar.gz` The salt script/tree shared across multiple deployment scripts.
 
 The release utilities grab a set of environment variables to modify behavior.  Arguably, these should be command line flags:
 
 Env Variable | Default | Description
 -------------|---------|------------
-`KUBE_SKIP_CONFIRMATIONS` | `n` | If `y` then no questions are asked and the scripts just continue.
-`KUBE_GCS_UPLOAD_RELEASE` | `n` | Upload release artifacts to GCS
-`KUBE_GCS_RELEASE_BUCKET` | `kubernetes-releases-${project_hash}` | The bucket to upload releases to
-`KUBE_GCS_RELEASE_PREFIX` | `devel` | The path under the release bucket to put releases
-`KUBE_GCS_MAKE_PUBLIC` | `y` | Make GCS links readable from anywhere
-`KUBE_GCS_NO_CACHING` | `y` | Disable HTTP caching of GCS release artifacts.  By default GCS will cache public objects for up to an hour.  When doing "devel" releases this can cause problems.
-`KUBE_GCS_DOCKER_REG_PREFIX` | `docker-reg` | *Experimental* When uploading docker images, the bucket that backs the registry.
+`LMKTFY_SKIP_CONFIRMATIONS` | `n` | If `y` then no questions are asked and the scripts just continue.
+`LMKTFY_GCS_UPLOAD_RELEASE` | `n` | Upload release artifacts to GCS
+`LMKTFY_GCS_RELEASE_BUCKET` | `lmktfy-releases-${project_hash}` | The bucket to upload releases to
+`LMKTFY_GCS_RELEASE_PREFIX` | `devel` | The path under the release bucket to put releases
+`LMKTFY_GCS_MAKE_PUBLIC` | `y` | Make GCS links readable from anywhere
+`LMKTFY_GCS_NO_CACHING` | `y` | Disable HTTP caching of GCS release artifacts.  By default GCS will cache public objects for up to an hour.  When doing "devel" releases this can cause problems.
+`LMKTFY_GCS_DOCKER_REG_PREFIX` | `docker-reg` | *Experimental* When uploading docker images, the bucket that backs the registry.
 
 ## Basic Flow
 
-The scripts directly under `build/` are used to build and test.  They will ensure that the `kube-build` Docker image is built (based on `build/build-image/Dockerfile`) and then execute the appropriate command in that container.  If necessary (for Mac OS X), the scripts will also copy results out.
+The scripts directly under `build/` are used to build and test.  They will ensure that the `lmktfy-build` Docker image is built (based on `build/build-image/Dockerfile`) and then execute the appropriate command in that container.  If necessary (for Mac OS X), the scripts will also copy results out.
 
-The `kube-build` container image is built by first creating a "context" directory in `_output/images/build-image`.  It is done there instead of at the root of the Kubernetes repo to minimize the amount of data we need to package up when building the image.
+The `lmktfy-build` container image is built by first creating a "context" directory in `_output/images/build-image`.  It is done there instead of at the root of the LMKTFY repo to minimize the amount of data we need to package up when building the image.
 
 Everything in `build/build-image/` is meant to be run inside of the container.  If it doesn't think it is running in the container it'll throw a warning.  While you can run some of that stuff outside of the container, it wasn't built to do so.
 
@@ -88,4 +88,4 @@ These are in no particular order
 
 * [X] Harmonize with scripts in `hack/`.  How much do we support building outside of Docker and these scripts?
 * [X] Deprecate/replace most of the stuff in the hack/
-* [ ] Finish support for the Dockerized runtime. Issue (#19)[https://github.com/GoogleCloudPlatform/kubernetes/issues/19].  A key issue here is to make this fast/light enough that we can use it for development workflows.
+* [ ] Finish support for the Dockerized runtime. Issue (#19)[https://github.com/GoogleCloudPlatform/lmktfy/issues/19].  A key issue here is to make this fast/light enough that we can use it for development workflows.

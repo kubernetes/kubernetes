@@ -22,58 +22,58 @@ set -o pipefail
 is_push=$@
 
 function ensure-install-dir() {
-  INSTALL_DIR="/var/cache/kubernetes-install"
+  INSTALL_DIR="/var/cache/lmktfy-install"
   mkdir -p ${INSTALL_DIR}
   cd ${INSTALL_DIR}
 }
 
 function set-broken-motd() {
-  echo -e '\nBroken (or in progress) GCE Kubernetes node setup! Suggested first step:\n  tail /var/log/startupscript.log\n' > /etc/motd
+  echo -e '\nBroken (or in progress) GCE LMKTFY node setup! Suggested first step:\n  tail /var/log/startupscript.log\n' > /etc/motd
 }
 
 function set-good-motd() {
-  echo -e '\n=== GCE Kubernetes node setup complete ===\n' > /etc/motd
+  echo -e '\n=== GCE LMKTFY node setup complete ===\n' > /etc/motd
 }
 
 function curl-metadata() {
   curl --fail --silent -H 'Metadata-Flavor: Google' "http://metadata/computeMetadata/v1/instance/attributes/${1}"
 }
 
-function set-kube-env() {
-  local kube_env_yaml="${INSTALL_DIR}/kube_env.yaml"
+function set-lmktfy-env() {
+  local lmktfy_env_yaml="${INSTALL_DIR}/lmktfy_env.yaml"
 
-  until curl-metadata kube-env > "${kube_env_yaml}"; do
-    echo 'Waiting for kube-env...'
+  until curl-metadata lmktfy-env > "${lmktfy_env_yaml}"; do
+    echo 'Waiting for lmktfy-env...'
     sleep 3
   done
 
-  # kube-env has all the environment variables we care about, in a flat yaml format
+  # lmktfy-env has all the environment variables we care about, in a flat yaml format
   eval $(python -c '''
 import pipes,sys,yaml
 
 for k,v in yaml.load(sys.stdin).iteritems():
   print "readonly {var}={value}".format(var = k, value = pipes.quote(str(v)))
-''' < "${kube_env_yaml}")
+''' < "${lmktfy_env_yaml}")
 
-  # We bake the KUBELET_TOKEN in separately to avoid auth information
-  # having to be re-communicated on kube-push. (Otherwise the client
+  # We bake the LMKTFYLET_TOKEN in separately to avoid auth information
+  # having to be re-communicated on lmktfy-push. (Otherwise the client
   # has to keep the bearer token around to handle generating a valid
-  # kube-env.)
-  if [[ -z "${KUBELET_TOKEN:-}" ]]; then
-    until KUBELET_TOKEN=$(curl-metadata kube-token); do
-      echo 'Waiting for metadata KUBELET_TOKEN...'
+  # lmktfy-env.)
+  if [[ -z "${LMKTFYLET_TOKEN:-}" ]]; then
+    until LMKTFYLET_TOKEN=$(curl-metadata lmktfy-token); do
+      echo 'Waiting for metadata LMKTFYLET_TOKEN...'
       sleep 3
     done
   fi
 
   # Infer master status from presence in node pool
   if [[ $(hostname) = ${NODE_INSTANCE_PREFIX}* ]]; then
-    KUBERNETES_MASTER="false"
+    LMKTFYRNETES_MASTER="false"
   else
-    KUBERNETES_MASTER="true"
+    LMKTFYRNETES_MASTER="true"
   fi
 
-  if [[ "${KUBERNETES_MASTER}" != "true" ]] && [[ -z "${MINION_IP_RANGE:-}" ]]; then
+  if [[ "${LMKTFYRNETES_MASTER}" != "true" ]] && [[ -z "${MINION_IP_RANGE:-}" ]]; then
     # This block of code should go away once the master can allocate CIDRs
     until MINION_IP_RANGE=$(curl-metadata node-ip-range); do
       echo 'Waiting for metadata MINION_IP_RANGE...'
@@ -128,7 +128,7 @@ install-salt() {
     salt-common_2014.1.13+ds-1~bpo70+1_all.deb
     salt-minion_2014.1.13+ds-1~bpo70+1_all.deb
   )
-  URL_BASE="https://storage.googleapis.com/kubernetes-release/salt"
+  URL_BASE="https://storage.googleapis.com/lmktfy-release/salt"
 
   for deb in "${DEBS[@]}"; do
     download-or-bust "${URL_BASE}/${deb}"
@@ -199,11 +199,11 @@ mount-master-pd() {
   # Contains all the data stored in etcd
   mkdir -m 700 -p /mnt/master-pd/var/etcd
   # Contains the dynamically generated apiserver auth certs and keys
-  mkdir -p /mnt/master-pd/srv/kubernetes
+  mkdir -p /mnt/master-pd/srv/lmktfy
   # Contains the cluster's initial config parameters and auth tokens
   mkdir -p /mnt/master-pd/srv/salt-overlay
   ln -s /mnt/master-pd/var/etcd /var/etcd
-  ln -s /mnt/master-pd/srv/kubernetes /srv/kubernetes
+  ln -s /mnt/master-pd/srv/lmktfy /srv/lmktfy
   ln -s /mnt/master-pd/srv/salt-overlay /srv/salt-overlay
 
   # This is a bit of a hack to get around the fact that salt has to run after the
@@ -217,7 +217,7 @@ mount-master-pd() {
 }
 
 # Create the overlay files for the salt tree.  We create these in a separate
-# place so that we can blow away the rest of the salt configs on a kube-push and
+# place so that we can blow away the rest of the salt configs on a lmktfy-push and
 # re-apply these.
 function create-salt-pillar() {
   # Always overwrite the cluster-params.sls (even on a push, we have
@@ -246,15 +246,15 @@ function create-salt-auth() {
   mkdir -p /srv/salt-overlay/salt/nginx
   echo "${MASTER_HTPASSWD}" > /srv/salt-overlay/salt/nginx/htpasswd
 
-  mkdir -p /srv/salt-overlay/salt/kube-apiserver
-  known_tokens_file="/srv/salt-overlay/salt/kube-apiserver/known_tokens.csv"
+  mkdir -p /srv/salt-overlay/salt/lmktfy-apiserver
+  known_tokens_file="/srv/salt-overlay/salt/lmktfy-apiserver/known_tokens.csv"
   (umask 077;
-    echo "${KUBELET_TOKEN},kubelet,kubelet" > "${known_tokens_file}")
+    echo "${LMKTFYLET_TOKEN},lmktfylet,lmktfylet" > "${known_tokens_file}")
 
-  mkdir -p /srv/salt-overlay/salt/kubelet
-  kubelet_auth_file="/srv/salt-overlay/salt/kubelet/kubernetes_auth"
+  mkdir -p /srv/salt-overlay/salt/lmktfylet
+  lmktfylet_auth_file="/srv/salt-overlay/salt/lmktfylet/lmktfy_auth"
   (umask 077;
-    echo "{\"BearerToken\": \"${KUBELET_TOKEN}\", \"Insecure\": true }" > "${kubelet_auth_file}")
+    echo "{\"BearerToken\": \"${LMKTFYLET_TOKEN}\", \"Insecure\": true }" > "${lmktfylet_auth_file}")
 }
 
 function download-release() {
@@ -265,11 +265,11 @@ function download-release() {
   download-or-bust "$SALT_TAR_URL"
 
   echo "Unpacking Salt tree"
-  rm -rf kubernetes
+  rm -rf lmktfy
   tar xzf "${SALT_TAR_URL##*/}"
 
   echo "Running release install script"
-  sudo kubernetes/saltbase/install.sh "${SERVER_BINARY_TAR_URL##*/}"
+  sudo lmktfy/saltbase/install.sh "${SERVER_BINARY_TAR_URL##*/}"
 }
 
 function fix-apt-sources() {
@@ -297,7 +297,7 @@ function salt-master-role() {
   cat <<EOF >/etc/salt/minion.d/grains.conf
 grains:
   roles:
-    - kubernetes-master
+    - lmktfy-master
   cbr-cidr: ${MASTER_IP_RANGE}
   cloud: gce
 EOF
@@ -307,7 +307,7 @@ function salt-node-role() {
   cat <<EOF >/etc/salt/minion.d/grains.conf
 grains:
   roles:
-    - kubernetes-pool
+    - lmktfy-pool
   cbr-cidr: '$(echo "$MINION_IP_RANGE" | sed -e "s/'/''/g")'
   cloud: gce
 EOF
@@ -335,15 +335,15 @@ EOF
 }
 
 function salt-set-apiserver() {
-  local kube_master_fqdn
-  until kube_master_fqdn=$(getent hosts ${KUBERNETES_MASTER_NAME} | awk '{ print $2 }'); do
-    echo 'Waiting for DNS resolution of ${KUBERNETES_MASTER_NAME}...'
+  local lmktfy_master_fqdn
+  until lmktfy_master_fqdn=$(getent hosts ${LMKTFYRNETES_MASTER_NAME} | awk '{ print $2 }'); do
+    echo 'Waiting for DNS resolution of ${LMKTFYRNETES_MASTER_NAME}...'
     sleep 3
   done
 
   cat <<EOF >>/etc/salt/minion.d/grains.conf
-  api_servers: '${kube_master_fqdn}'
-  apiservers: '${kube_master_fqdn}'
+  api_servers: '${lmktfy_master_fqdn}'
+  apiservers: '${lmktfy_master_fqdn}'
 EOF
 }
 
@@ -351,7 +351,7 @@ function configure-salt() {
   fix-apt-sources
   mkdir -p /etc/salt/minion.d
   salt-run-local
-  if [[ "${KUBERNETES_MASTER}" == "true" ]]; then
+  if [[ "${LMKTFYRNETES_MASTER}" == "true" ]]; then
     salt-master-role
   else
     salt-node-role
@@ -370,11 +370,11 @@ function run-salt() {
 ####################################################################################
 
 if [[ -z "${is_push}" ]]; then
-  echo "== kube-up node config starting =="
+  echo "== lmktfy-up node config starting =="
   set-broken-motd
   ensure-install-dir
-  set-kube-env
-  [[ "${KUBERNETES_MASTER}" == "true" ]] && mount-master-pd
+  set-lmktfy-env
+  [[ "${LMKTFYRNETES_MASTER}" == "true" ]] && mount-master-pd
   create-salt-pillar
   create-salt-auth
   download-release
@@ -382,13 +382,13 @@ if [[ -z "${is_push}" ]]; then
   remove-docker-artifacts
   run-salt
   set-good-motd
-  echo "== kube-up node config done =="
+  echo "== lmktfy-up node config done =="
 else
-  echo "== kube-push node config starting =="
+  echo "== lmktfy-push node config starting =="
   ensure-install-dir
-  set-kube-env
+  set-lmktfy-env
   create-salt-pillar
   download-release
   run-salt
-  echo "== kube-push node config done =="
+  echo "== lmktfy-push node config done =="
 fi

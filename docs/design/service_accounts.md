@@ -2,7 +2,7 @@
 
 ## Motivation
 
-Processes in Pods may need to call the Kubernetes API.  For example:
+Processes in Pods may need to call the LMKTFY API.  For example:
   - scheduler
   - replication controller
   - minion controller
@@ -10,7 +10,7 @@ Processes in Pods may need to call the Kubernetes API.  For example:
   - continuous build and push system
   - monitoring system
 
-They also may interact with services other than the Kubernetes API, such as:
+They also may interact with services other than the LMKTFY API, such as:
   - an image repository, such as docker -- both when the images are pulled to start the containers, and for writing
     images in the case of pods that generate images.
   - accessing other cloud services, such as blob storage, in the context of a larged, integrated, cloud offering (hosted
@@ -41,7 +41,7 @@ type ServiceAccount struct {
 ```
 
 The name ServiceAccount is chosen because it is widely used already (e.g. by Kerberos and LDAP)
-to refer to this type of account.  Note that it has no relation to kubernetes Service objects.
+to refer to this type of account.  Note that it has no relation to lmktfy Service objects.
 
 The ServiceAccount object does not include any information that could not be defined separately:
   - username can be defined however users are defined.
@@ -55,21 +55,21 @@ These features are explained later.
 
 ### Names
 
-From the standpoint of the Kubernetes API, a `user` is any principal which can authenticate to kubernetes API.
-This includes a human running `kubectl` on her desktop and a container in a Pod on a Node making API calls.
+From the standpoint of the LMKTFY API, a `user` is any principal which can authenticate to lmktfy API.
+This includes a human running `lmktfyctl` on her desktop and a container in a Pod on a Node making API calls.
 
-There is already a notion of a username in kubernetes, which is populated into a request context after authentication.
+There is already a notion of a username in lmktfy, which is populated into a request context after authentication.
 However, there is no API object representing a user.  While this may evolve, it is expected that in mature installations,
-the canonical storage of user identifiers will be handled by a system external to kubernetes.
+the canonical storage of user identifiers will be handled by a system external to lmktfy.
 
-Kubernetes does not dictate how to divide up the space of user identifier strings.  User names can be
+LMKTFY does not dictate how to divide up the space of user identifier strings.  User names can be
 simple Unix-style short usernames, (e.g. `alice`), or may be qualified to allow for federated identity (
 `alice@example.com` vs `alice@example.org`.)  Naming convention may distinguish service accounts from user
 accounts (e.g. `alice@example.com` vs `build-service-account-a3b7f0@foo-namespace.service-accounts.example.com`),
-but Kubernetes does not require this.
+but LMKTFY does not require this.
 
-Kubernetes also does not require that there be a distinction between human and Pod users.  It will be possible
-to setup a cluster where Alice the human talks to the kubernetes API as username `alice` and starts pods that
+LMKTFY also does not require that there be a distinction between human and Pod users.  It will be possible
+to setup a cluster where Alice the human talks to the lmktfy API as username `alice` and starts pods that
 also talk to the API as user `alice` and write files to NFS as user `alice`.  But, this is not recommended.
 
 Instead, it is recommended that Pods and Humans have distinct identities, and reference implementations will
@@ -95,13 +95,13 @@ have access to to be able to assert that role.
 The secrets are not inline with the serviceAccount object.  This way, most or all users can have permission to `GET /serviceAccounts` so they can remind themselves
 what serviceAccounts are available for use.
 
-Nothing will prevent creation of a serviceAccount with two secrets of type `SecretTypeKubernetesAuth`, or secrets of two
-different types.  Kubelet and client libraries will have some behavior, TBD, to handle the case of multiple secrets of a
+Nothing will prevent creation of a serviceAccount with two secrets of type `SecretTypeLMKTFYAuth`, or secrets of two
+different types.  LMKTFYlet and client libraries will have some behavior, TBD, to handle the case of multiple secrets of a
 given type (pick first or provide all and try each in order, etc).
 
 When a serviceAccount and a matching secret exist, then a `User.Info` for the serviceAccount and a `BearerToken` from the secret
 are added to the map of tokens used by the authentication process in the apiserver, and similarly for other types.  (We
-might have some types that do not do anything on apiserver but just get pushed to the kubelet.)
+might have some types that do not do anything on apiserver but just get pushed to the lmktfylet.)
 
 ### Pods
 The `PodSpec` is extended to have a `Pods.Spec.ServiceAccountUsername` field.  If this is unset, then a
@@ -111,25 +111,25 @@ Service Account Finalizer (see below).
 TBD: how policy limits which users can make pods with which service accounts.
 
 ### Authorization
-Kubernetes API Authorization Policies refer to users.  Pods created with a `Pods.Spec.ServiceAccountUsername` typically
-get a `Secret` which allows them to authenticate to the Kubernetes APIserver as a particular user.  So any
+LMKTFY API Authorization Policies refer to users.  Pods created with a `Pods.Spec.ServiceAccountUsername` typically
+get a `Secret` which allows them to authenticate to the LMKTFY APIserver as a particular user.  So any
 policy that is desired can be applied to them.
 
 A higher level workflow is needed to coordinate creation of serviceAccounts, secrets and relevant policy objects.
-Users are free to extend kubernetes to put this business logic wherever is convenient for them, though the
+Users are free to extend lmktfy to put this business logic wherever is convenient for them, though the
 Service Account Finalizer is one place where this can happen (see below).
 
-### Kubelet
+### LMKTFYlet
 
-The kubelet will treat as "not ready to run" (needing a finalizer to act on it) any Pod which has an empty
+The lmktfylet will treat as "not ready to run" (needing a finalizer to act on it) any Pod which has an empty
 SecurityContext.
 
-The kubelet will set a default, restrictive, security context for any pods created from non-Apiserver config
+The lmktfylet will set a default, restrictive, security context for any pods created from non-Apiserver config
 sources (http, file).
 
-Kubelet watches apiserver for secrets which are needed by pods bound to it.
+LMKTFYlet watches apiserver for secrets which are needed by pods bound to it.
 
-**TODO**: how to only let kubelet see secrets it needs to know.
+**TODO**: how to only let lmktfylet see secrets it needs to know.
 
 ### The service account finalizer
 
@@ -153,8 +153,8 @@ Second, if ServiceAccount definitions change, it may take some actions.
 allow someone to list ones that out out of spec?  In general, people may want to customize this?
 
 Third, if a new namespace is created, it may create a new serviceAccount for that namespace.  This may include
-a new username (e.g. `NAMESPACE-default-service-account@serviceaccounts.$CLUSTERID.kubernetes.io`), a new
-securityContext, a newly generated secret to authenticate that serviceAccount to the Kubernetes API, and default
+a new username (e.g. `NAMESPACE-default-service-account@serviceaccounts.$CLUSTERID.lmktfy.io`), a new
+securityContext, a newly generated secret to authenticate that serviceAccount to the LMKTFY API, and default
 policies for that service account.
 **TODO**: more concrete example.  What are typical default permissions for default service account (e.g. readonly access
 to services in the same namespace and read-write access to events in that namespace?)

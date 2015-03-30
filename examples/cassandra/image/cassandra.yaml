@@ -254,7 +254,7 @@ seed_provider:
     # Cassandra nodes use this list of hosts to find each other and learn
     # the topology of the ring.  You must change this if you are running
     # multiple nodes!
-    - class_name: io.k8s.cassandra.KubernetesSeedProvider 
+    - class_name: io.lmktfy.cassandra.LMKTFYSeedProvider 
       parameters:
           # seeds is actually a comma-delimited list of addresses.
           # Ex: "<ip1>,<ip2>,<ip3>"

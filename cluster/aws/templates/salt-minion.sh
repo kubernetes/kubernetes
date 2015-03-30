@@ -25,7 +25,7 @@ echo "master: $SALT_MASTER" > /etc/salt/minion.d/master.conf
 cat <<EOF >/etc/salt/minion.d/grains.conf
 grains:
   roles:
-    - kubernetes-pool
+    - lmktfy-pool
   cbr-cidr: $MINION_IP_RANGE
   cloud: aws
 EOF

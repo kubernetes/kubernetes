@@ -19,16 +19,16 @@ package etcd
 import (
 	"fmt"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	kubeerr "github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
-	etcderr "github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors/etcd"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/rest"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/generic"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api"
+	lmktfyerr "github.com/GoogleCloudPlatform/lmktfy/pkg/api/errors"
+	etcderr "github.com/GoogleCloudPlatform/lmktfy/pkg/api/errors/etcd"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api/rest"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/fields"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/labels"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/registry/generic"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/runtime"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/tools"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/watch"
 
 	"github.com/golang/glog"
 )
@@ -43,7 +43,7 @@ import (
 //
 // The intended use of this type is embedding within a Kind specific
 // RESTStorage implementation. This type provides CRUD semantics on
-// a Kubelike resource, handling details like conflict detection with
+// a LMKTFYlike resource, handling details like conflict detection with
 // ResourceVersion and semantics. The RESTCreateStrategy and
 // RESTUpdateStrategy are generic across all backends, and encapsulate
 // logic specific to the API.
@@ -117,10 +117,10 @@ func NamespaceKeyFunc(ctx api.Context, prefix string, name string) (string, erro
 	key := NamespaceKeyRootFunc(ctx, prefix)
 	ns, ok := api.NamespaceFrom(ctx)
 	if !ok || len(ns) == 0 {
-		return "", kubeerr.NewBadRequest("Namespace parameter required.")
+		return "", lmktfyerr.NewBadRequest("Namespace parameter required.")
 	}
 	if len(name) == 0 {
-		return "", kubeerr.NewBadRequest("Name parameter required.")
+		return "", lmktfyerr.NewBadRequest("Name parameter required.")
 	}
 	key = key + "/" + name
 	return key, nil
@@ -261,7 +261,7 @@ func (e *Etcd) Update(ctx api.Context, obj runtime.Object) (runtime.Object, bool
 		}
 		if version == 0 {
 			if !e.UpdateStrategy.AllowCreateOnUpdate() {
-				return nil, 0, kubeerr.NewNotFound(e.EndpointName, name)
+				return nil, 0, lmktfyerr.NewNotFound(e.EndpointName, name)
 			}
 			creating = true
 			if err := rest.BeforeCreate(e.CreateStrategy, ctx, obj); err != nil {
@@ -284,7 +284,7 @@ func (e *Etcd) Update(ctx api.Context, obj runtime.Object) (runtime.Object, bool
 		}
 		if newVersion != version {
 			// TODO: return the most recent version to a client?
-			return nil, 0, kubeerr.NewConflict(e.EndpointName, name, fmt.Errorf("the resource was updated to %d", version))
+			return nil, 0, lmktfyerr.NewConflict(e.EndpointName, name, fmt.Errorf("the resource was updated to %d", version))
 		}
 		if err := rest.BeforeUpdate(e.UpdateStrategy, ctx, obj, existing); err != nil {
 			return nil, 0, err

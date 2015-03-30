@@ -28,12 +28,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/version"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api/latest"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/runtime"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/version"
 )
 
-// Config holds the common attributes that can be passed to a Kubernetes client on
+// Config holds the common attributes that can be passed to a LMKTFY client on
 // initialization.
 type Config struct {
 	// Host must be a host string, a host:port pair, or a URL to the base of the API.
@@ -46,9 +46,9 @@ type Config struct {
 	// code version.
 	Version string
 	// LegacyBehavior defines whether the RESTClient should follow conventions that
-	// existed prior to v1beta3 in Kubernetes - namely, namespace (if specified)
+	// existed prior to v1beta3 in LMKTFY - namely, namespace (if specified)
 	// not being part of the path, and resource names allowing mixed case. Set to
-	// true when using Kubernetes v1beta1 or v1beta2.
+	// true when using LMKTFY v1beta1 or v1beta2.
 	LegacyBehavior bool
 	// Codec specifies the encoding and decoding behavior for runtime.Objects passed
 	// to a RESTClient or Client. Required when initializing a RESTClient, optional
@@ -79,15 +79,15 @@ type Config struct {
 	Transport http.RoundTripper
 }
 
-type KubeletConfig struct {
-	// ToDo: Add support for different kubelet instances exposing different ports
+type LMKTFYletConfig struct {
+	// ToDo: Add support for different lmktfylet instances exposing different ports
 	Port        uint
 	EnableHttps bool
 
 	// TLSClientConfig contains settings to enable transport layer security
 	TLSClientConfig
 
-	// HTTPTimeout is used by the client to timeout http requests to Kubelet.
+	// HTTPTimeout is used by the client to timeout http requests to LMKTFYlet.
 	HTTPTimeout time.Duration
 }
 
@@ -111,13 +111,13 @@ type TLSClientConfig struct {
 	CAData []byte
 }
 
-// New creates a Kubernetes client for the given config. This client works with pods,
+// New creates a LMKTFY client for the given config. This client works with pods,
 // replication controllers and services. It allows operations such as list, get, update
 // and delete on these objects. An error is returned if the provided configuration
 // is not valid.
 func New(c *Config) (*Client, error) {
 	config := *c
-	if err := SetKubernetesDefaults(&config); err != nil {
+	if err := SetLMKTFYDefaults(&config); err != nil {
 		return nil, err
 	}
 	client, err := RESTClientFor(&config)
@@ -145,7 +145,7 @@ func MatchesServerVersion(c *Config) error {
 	return nil
 }
 
-// NewOrDie creates a Kubernetes client and panics if the provided API version is not recognized.
+// NewOrDie creates a LMKTFY client and panics if the provided API version is not recognized.
 func NewOrDie(c *Config) *Client {
 	client, err := New(c)
 	if err != nil {
@@ -154,14 +154,14 @@ func NewOrDie(c *Config) *Client {
 	return client
 }
 
-// SetKubernetesDefaults sets default values on the provided client config for accessing the
-// Kubernetes API or returns an error if any of the defaults are impossible or invalid.
-func SetKubernetesDefaults(config *Config) error {
+// SetLMKTFYDefaults sets default values on the provided client config for accessing the
+// LMKTFY API or returns an error if any of the defaults are impossible or invalid.
+func SetLMKTFYDefaults(config *Config) error {
 	if config.Prefix == "" {
 		config.Prefix = "/api"
 	}
 	if len(config.UserAgent) == 0 {
-		config.UserAgent = DefaultKubernetesUserAgent()
+		config.UserAgent = DefaultLMKTFYUserAgent()
 	}
 	if len(config.Version) == 0 {
 		config.Version = defaultVersionFor(config)
@@ -181,7 +181,7 @@ func SetKubernetesDefaults(config *Config) error {
 // RESTClientFor returns a RESTClient that satisfies the requested attributes on a client Config
 // object. Note that a RESTClient may require fields that are optional when initializing a Client.
 // A RESTClient created by this method is generic - it expects to operate on an API that follows
-// the Kubernetes conventions, but may not be the Kubernetes API.
+// the LMKTFY conventions, but may not be the LMKTFY API.
 func RESTClientFor(config *Config) (*RESTClient, error) {
 	if len(config.Version) == 0 {
 		return nil, fmt.Errorf("version is required when initializing a RESTClient")
@@ -278,7 +278,7 @@ func HTTPWrappersForConfig(config *Config, rt http.RoundTripper) (http.RoundTrip
 
 // DefaultServerURL converts a host, host:port, or URL string to the default base server API path
 // to use with a Client at a given API version following the standard conventions for a
-// Kubernetes API.
+// LMKTFY API.
 func DefaultServerURL(host, prefix, version string, defaultTLS bool) (*url.URL, error) {
 	if host == "" {
 		return nil, fmt.Errorf("host must be a URL or a host:port pair")
@@ -364,8 +364,8 @@ func defaultVersionFor(config *Config) string {
 	return version
 }
 
-// DefaultKubernetesUserAgent returns the default user agent that clients can use.
-func DefaultKubernetesUserAgent() string {
+// DefaultLMKTFYUserAgent returns the default user agent that clients can use.
+func DefaultLMKTFYUserAgent() string {
 	commit := version.Get().GitCommit
 	if len(commit) > 7 {
 		commit = commit[:7]
@@ -376,5 +376,5 @@ func DefaultKubernetesUserAgent() string {
 	version := version.Get().GitVersion
 	seg := strings.SplitN(version, "-", 2)
 	version = seg[0]
-	return fmt.Sprintf("%s/%s (%s/%s) kubernetes/%s", path.Base(os.Args[0]), version, gruntime.GOOS, gruntime.GOARCH, commit)
+	return fmt.Sprintf("%s/%s (%s/%s) lmktfy/%s", path.Base(os.Args[0]), version, gruntime.GOOS, gruntime.GOARCH, commit)
 }

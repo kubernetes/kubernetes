@@ -21,9 +21,9 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/rest"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api/errors"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api/rest"
 
 	"github.com/golang/glog"
 )
@@ -38,10 +38,10 @@ func (m *Master) serviceWriterLoop(stop chan struct{}) {
 			glog.Errorf("Can't create master namespace: %v", err)
 		}
 		if m.serviceReadWriteIP != nil {
-			if err := m.createMasterServiceIfNeeded("kubernetes", m.serviceReadWriteIP, m.serviceReadWritePort); err != nil {
+			if err := m.createMasterServiceIfNeeded("lmktfy", m.serviceReadWriteIP, m.serviceReadWritePort); err != nil {
 				glog.Errorf("Can't create rw service: %v", err)
 			}
-			if err := m.setEndpoints("kubernetes", m.clusterIP, m.publicReadWritePort); err != nil {
+			if err := m.setEndpoints("lmktfy", m.clusterIP, m.publicReadWritePort); err != nil {
 				glog.Errorf("Can't create rw endpoints: %v", err)
 			}
 		}
@@ -63,10 +63,10 @@ func (m *Master) roServiceWriterLoop(stop chan struct{}) {
 			glog.Errorf("Can't create master namespace: %v", err)
 		}
 		if m.serviceReadOnlyIP != nil {
-			if err := m.createMasterServiceIfNeeded("kubernetes-ro", m.serviceReadOnlyIP, m.serviceReadOnlyPort); err != nil {
+			if err := m.createMasterServiceIfNeeded("lmktfy-ro", m.serviceReadOnlyIP, m.serviceReadOnlyPort); err != nil {
 				glog.Errorf("Can't create ro service: %v", err)
 			}
-			if err := m.setEndpoints("kubernetes-ro", m.clusterIP, m.publicReadOnlyPort); err != nil {
+			if err := m.setEndpoints("lmktfy-ro", m.clusterIP, m.publicReadOnlyPort); err != nil {
 				glog.Errorf("Can't create ro endpoints: %v", err)
 			}
 		}
@@ -111,7 +111,7 @@ func (m *Master) createMasterServiceIfNeeded(serviceName string, serviceIP net.I
 		ObjectMeta: api.ObjectMeta{
 			Name:      serviceName,
 			Namespace: api.NamespaceDefault,
-			Labels:    map[string]string{"provider": "kubernetes", "component": "apiserver"},
+			Labels:    map[string]string{"provider": "lmktfy", "component": "apiserver"},
 		},
 		Spec: api.ServiceSpec{
 			Port: servicePort,

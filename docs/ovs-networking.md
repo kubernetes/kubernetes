@@ -1,11 +1,11 @@
-# Kubernetes OpenVSwitch GRE/VxLAN networking
+# LMKTFY OpenVSwitch GRE/VxLAN networking
 
 This document describes how OpenVSwitch is used to setup networking between pods across minions.
 The tunnel type could be GRE or VxLAN. VxLAN is preferable when large scale isolation needs to be performed within the network.
 
 ![ovs-networking](./ovs-networking.png "OVS Networking")
 
-The vagrant setup in Kubernetes does the following:
+The vagrant setup in LMKTFY does the following:
 
 The docker bridge is replaced with a brctl generated linux bridge (kbr0) with a 256 address space subnet. Basically, a node gets 10.244.x.0/24 subnet and docker is configured to use that bridge instead of the default docker0 bridge.
 

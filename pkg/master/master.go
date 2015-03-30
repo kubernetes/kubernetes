@@ -28,38 +28,38 @@ import (
 	"strings"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/admission"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/rest"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta2"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta3"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/authenticator"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/authorizer"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/handlers"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/master/ports"
-	controlleretcd "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/controller/etcd"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/endpoint"
-	endpointsetcd "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/endpoint/etcd"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/etcd"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/event"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/limitrange"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/minion"
-	nodeetcd "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/minion/etcd"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/namespace"
-	namespaceetcd "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/namespace/etcd"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/pod"
-	podetcd "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/pod/etcd"
-	resourcequotaetcd "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/resourcequota/etcd"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/secret"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/service"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/ui"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/admission"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api/latest"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api/rest"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api/v1beta1"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api/v1beta2"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api/v1beta3"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/apiserver"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/auth/authenticator"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/auth/authorizer"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/auth/handlers"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/client"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/cloudprovider"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/master/ports"
+	controlleretcd "github.com/GoogleCloudPlatform/lmktfy/pkg/registry/controller/etcd"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/registry/endpoint"
+	endpointsetcd "github.com/GoogleCloudPlatform/lmktfy/pkg/registry/endpoint/etcd"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/registry/etcd"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/registry/event"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/registry/limitrange"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/registry/minion"
+	nodeetcd "github.com/GoogleCloudPlatform/lmktfy/pkg/registry/minion/etcd"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/registry/namespace"
+	namespaceetcd "github.com/GoogleCloudPlatform/lmktfy/pkg/registry/namespace/etcd"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/registry/pod"
+	podetcd "github.com/GoogleCloudPlatform/lmktfy/pkg/registry/pod/etcd"
+	resourcequotaetcd "github.com/GoogleCloudPlatform/lmktfy/pkg/registry/resourcequota/etcd"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/registry/secret"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/registry/service"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/tools"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/ui"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/util"
 
 	"github.com/emicklei/go-restful"
 	"github.com/emicklei/go-restful/swagger"
@@ -72,7 +72,7 @@ type Config struct {
 	EtcdHelper        tools.EtcdHelper
 	EventTTL          time.Duration
 	MinionRegexp      string
-	KubeletClient     client.KubeletClient
+	LMKTFYletClient     client.LMKTFYletClient
 	PortalNet         *net.IPNet
 	EnableLogsSupport bool
 	EnableUISupport   bool
@@ -121,7 +121,7 @@ type Config struct {
 	ClusterName string
 }
 
-// Master contains state for a Kubernetes cluster master/api server.
+// Master contains state for a LMKTFY cluster master/api server.
 type Master struct {
 	// "Inputs", Copied from Config
 	portalNet    *net.IPNet
@@ -233,7 +233,7 @@ func setDefaults(c *Config) {
 //   ReadWritePort
 //   PublicAddress
 // Certain config fields must be specified, including:
-//   KubeletClient
+//   LMKTFYletClient
 // Public fields:
 //   Handler -- The returned master has a field TopHandler which is an
 //   http.Handler which handles all the endpoints provided by the master,
@@ -250,8 +250,8 @@ func setDefaults(c *Config) {
 //   any unhandled paths to "Handler".
 func New(c *Config) *Master {
 	setDefaults(c)
-	if c.KubeletClient == nil {
-		glog.Fatalf("master.New() called with config.KubeletClient == nil")
+	if c.LMKTFYletClient == nil {
+		glog.Fatalf("master.New() called with config.LMKTFYletClient == nil")
 	}
 
 	// Select the first two valid IPs from portalNet to use as the master service portalIPs
@@ -370,7 +370,7 @@ func (m *Master) init(c *Config) {
 	endpointsStorage := endpointsetcd.NewStorage(c.EtcdHelper)
 	m.endpointRegistry = endpoint.NewRegistry(endpointsStorage)
 
-	nodeStorage := nodeetcd.NewStorage(c.EtcdHelper, c.KubeletClient)
+	nodeStorage := nodeetcd.NewStorage(c.EtcdHelper, c.LMKTFYletClient)
 	m.nodeRegistry = minion.NewRegistry(nodeStorage)
 
 	// TODO: split me up into distinct storage registries
@@ -497,8 +497,8 @@ func (m *Master) init(c *Config) {
 }
 
 // InstallSwaggerAPI installs the /swaggerapi/ endpoint to allow schema discovery
-// and traversal.  It is optional to allow consumers of the Kubernetes master to
-// register their own web services into the Kubernetes mux prior to initialization
+// and traversal.  It is optional to allow consumers of the LMKTFY master to
+// register their own web services into the LMKTFY mux prior to initialization
 // of swagger, so that other resource types show up in the documentation.
 func (m *Master) InstallSwaggerAPI() {
 	hostAndPort := m.externalHost
@@ -561,7 +561,7 @@ func (m *Master) getServersToValidate(c *Config) map[string]apiserver.Server {
 		glog.Errorf("Failed to list minions: %v", err)
 	}
 	for ix, node := range nodes.Items {
-		serversToValidate[fmt.Sprintf("node-%d", ix)] = apiserver.Server{Addr: node.Name, Port: ports.KubeletPort, Path: "/healthz"}
+		serversToValidate[fmt.Sprintf("node-%d", ix)] = apiserver.Server{Addr: node.Name, Port: ports.LMKTFYletPort, Path: "/healthz"}
 	}
 	return serversToValidate
 }

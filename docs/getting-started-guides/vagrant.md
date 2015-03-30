@@ -1,6 +1,6 @@
 ## Getting started with Vagrant
 
-Running kubernetes with Vagrant (and VirtualBox) is an easy way to run/test/develop on your local machine (Linux, Mac OS X).
+Running lmktfy with Vagrant (and VirtualBox) is an easy way to run/test/develop on your local machine (Linux, Mac OS X).
 
 ### Prerequisites
 1. Install latest version >= 1.6.2 of vagrant from http://www.vagrantup.com/downloads.html
@@ -11,24 +11,24 @@ Running kubernetes with Vagrant (and VirtualBox) is an easy way to run/test/deve
 Setting up a cluster is as simple as running:
 
 ```
-export KUBERNETES_PROVIDER=vagrant
-curl -sS https://get.k8s.io | bash
+export LMKTFYRNETES_PROVIDER=vagrant
+curl -sS https://get.lmktfy.io | bash
 ```
 
-The `KUBERNETES_PROVIDER` environment variable tells all of the various cluster management scripts which variant to use.  If you forget to set this, the assumption is you are running on Google Compute Engine.
+The `LMKTFYRNETES_PROVIDER` environment variable tells all of the various cluster management scripts which variant to use.  If you forget to set this, the assumption is you are running on Google Compute Engine.
 
-By default, the Vagrant setup will create a single kubernetes-master and 1 kubernetes-minion. Each VM will take 1 GB, so make sure you have at least 2GB to 4GB of free memory (plus appropriate free disk space). To start your local cluster, open a shell and run:
+By default, the Vagrant setup will create a single lmktfy-master and 1 lmktfy-minion. Each VM will take 1 GB, so make sure you have at least 2GB to 4GB of free memory (plus appropriate free disk space). To start your local cluster, open a shell and run:
 
 ```
-cd kubernetes
+cd lmktfy
 
-export KUBERNETES_PROVIDER=vagrant
-cluster/kube-up.sh
+export LMKTFYRNETES_PROVIDER=vagrant
+cluster/lmktfy-up.sh
 ```
 
-Vagrant will provision each machine in the cluster with all the necessary components to run Kubernetes.  The initial setup can take a few minutes to complete on each machine.
+Vagrant will provision each machine in the cluster with all the necessary components to run LMKTFY.  The initial setup can take a few minutes to complete on each machine.
 
-By default, each VM in the cluster is running Fedora, and all of the Kubernetes services are installed into systemd.
+By default, each VM in the cluster is running Fedora, and all of the LMKTFY services are installed into systemd.
 
 To access the master or any minion:
 
@@ -44,41 +44,41 @@ vagrant ssh minion-2
 vagrant ssh minion-3
 ```
 
-To view the service status and/or logs on the kubernetes-master:
+To view the service status and/or logs on the lmktfy-master:
 ```
 vagrant ssh master
-[vagrant@kubernetes-master ~] $ sudo systemctl status kube-apiserver
-[vagrant@kubernetes-master ~] $ sudo journalctl -r -u kube-apiserver
+[vagrant@lmktfy-master ~] $ sudo systemctl status lmktfy-apiserver
+[vagrant@lmktfy-master ~] $ sudo journalctl -r -u lmktfy-apiserver
 
-[vagrant@kubernetes-master ~] $ sudo systemctl status kube-controller-manager
-[vagrant@kubernetes-master ~] $ sudo journalctl -r -u kube-controller-manager
+[vagrant@lmktfy-master ~] $ sudo systemctl status lmktfy-controller-manager
+[vagrant@lmktfy-master ~] $ sudo journalctl -r -u lmktfy-controller-manager
 
-[vagrant@kubernetes-master ~] $ sudo systemctl status etcd
-[vagrant@kubernetes-master ~] $ sudo systemctl status nginx
+[vagrant@lmktfy-master ~] $ sudo systemctl status etcd
+[vagrant@lmktfy-master ~] $ sudo systemctl status nginx
 ```
 
-To view the services on any of the kubernetes-minion(s):
+To view the services on any of the lmktfy-minion(s):
 ```
 vagrant ssh minion-1
-[vagrant@kubernetes-minion-1] $ sudo systemctl status docker
-[vagrant@kubernetes-minion-1] $ sudo journalctl -r -u docker
-[vagrant@kubernetes-minion-1] $ sudo systemctl status kubelet
-[vagrant@kubernetes-minion-1] $ sudo journalctl -r -u kubelet
+[vagrant@lmktfy-minion-1] $ sudo systemctl status docker
+[vagrant@lmktfy-minion-1] $ sudo journalctl -r -u docker
+[vagrant@lmktfy-minion-1] $ sudo systemctl status lmktfylet
+[vagrant@lmktfy-minion-1] $ sudo journalctl -r -u lmktfylet
 ```
 
-### Interacting with your Kubernetes cluster with Vagrant.
+### Interacting with your LMKTFY cluster with Vagrant.
 
-With your Kubernetes cluster up, you can manage the nodes in your cluster with the regular Vagrant commands.
+With your LMKTFY cluster up, you can manage the nodes in your cluster with the regular Vagrant commands.
 
-To push updates to new Kubernetes code after making source changes:
+To push updates to new LMKTFY code after making source changes:
 ```
-cluster/kube-push.sh
+cluster/lmktfy-push.sh
 ```
 
 To stop and then restart the cluster:
 ```
 vagrant halt
-cluster/kube-up.sh
+cluster/lmktfy-up.sh
 ```
 
 To destroy the cluster:
@@ -86,12 +86,12 @@ To destroy the cluster:
 vagrant destroy
 ```
 
-Once your Vagrant machines are up and provisioned, the first thing to do is to check that you can use the `kubectl.sh` script.
+Once your Vagrant machines are up and provisioned, the first thing to do is to check that you can use the `lmktfyctl.sh` script.
 
 You may need to build the binaries first, you can do this with ```make```
 
 ```
-$ ./cluster/kubectl.sh get minions
+$ ./cluster/lmktfyctl.sh get minions
 
 NAME                LABELS
 10.245.1.4          <none>
@@ -100,58 +100,58 @@ NAME                LABELS
 
 ```
 
-### Interacting with your Kubernetes cluster with the `kube-*` scripts.
+### Interacting with your LMKTFY cluster with the `lmktfy-*` scripts.
 
-Alternatively to using the vagrant commands, you can also use the `cluster/kube-*.sh` scripts to interact with the vagrant based provider just like any other hosting platform for kubernetes.
+Alternatively to using the vagrant commands, you can also use the `cluster/lmktfy-*.sh` scripts to interact with the vagrant based provider just like any other hosting platform for lmktfy.
 
-All of these commands assume you have set `KUBERNETES_PROVIDER` appropriately:
+All of these commands assume you have set `LMKTFYRNETES_PROVIDER` appropriately:
 
 ```
-export KUBERNETES_PROVIDER=vagrant
+export LMKTFYRNETES_PROVIDER=vagrant
 ```
 
 Bring up a vagrant cluster
 
 ```
-cluster/kube-up.sh
+cluster/lmktfy-up.sh
 ```
 
 Destroy the vagrant cluster
 
 ```
-cluster/kube-down.sh
+cluster/lmktfy-down.sh
 ```
 
 Update the vagrant cluster after you make changes (only works when building your own releases locally):
 
 ```
-cluster/kube-push.sh
+cluster/lmktfy-push.sh
 ```
 
 Interact with the cluster
 
 ```
-cluster/kubectl.sh
+cluster/lmktfyctl.sh
 ```
 
 ### Authenticating with your master
 
-When using the vagrant provider in Kubernetes, the `cluster/kubectl.sh` script will cache your credentials in a `~/.kubernetes_vagrant_auth` file so you will not be prompted for them in the future.
+When using the vagrant provider in LMKTFY, the `cluster/lmktfyctl.sh` script will cache your credentials in a `~/.lmktfy_vagrant_auth` file so you will not be prompted for them in the future.
 
 ```
-cat ~/.kubernetes_vagrant_auth
+cat ~/.lmktfy_vagrant_auth
 { "User": "vagrant",
   "Password": "vagrant"
-  "CAFile": "/home/k8s_user/.kubernetes.vagrant.ca.crt",
-  "CertFile": "/home/k8s_user/.kubecfg.vagrant.crt",
-  "KeyFile": "/home/k8s_user/.kubecfg.vagrant.key"
+  "CAFile": "/home/lmktfy_user/.lmktfy.vagrant.ca.crt",
+  "CertFile": "/home/lmktfy_user/.lmktfycfg.vagrant.crt",
+  "KeyFile": "/home/lmktfy_user/.lmktfycfg.vagrant.key"
 }
 ```
 
-You should now be set to use the `cluster/kubectl.sh` script. For example try to list the minions that you have started with:
+You should now be set to use the `cluster/lmktfyctl.sh` script. For example try to list the minions that you have started with:
 
 ```
-cluster/kubectl.sh get minions
+cluster/lmktfyctl.sh get minions
 ```
 
 ### Running containers
@@ -159,7 +159,7 @@ cluster/kubectl.sh get minions
 Your cluster is running, you can list the minions in your cluster:
 
 ```
-$ cluster/kubectl.sh get minions
+$ cluster/lmktfyctl.sh get minions
 
 NAME                 LABELS
 10.245.2.4           <none>
@@ -170,30 +170,30 @@ NAME                 LABELS
 
 Now start running some containers!
 
-You can now use any of the cluster/kube-*.sh commands to interact with your VM machines.
+You can now use any of the cluster/lmktfy-*.sh commands to interact with your VM machines.
 Before starting a container there will be no pods, services and replication controllers.
 
 ```
-$ cluster/kubectl.sh get pods
+$ cluster/lmktfyctl.sh get pods
 NAME   IMAGE(S)   HOST   LABELS   STATUS
 
-$ cluster/kubectl.sh get services
+$ cluster/lmktfyctl.sh get services
 NAME   LABELS   SELECTOR   IP   PORT
 
-$ cluster/kubectl.sh get replicationControllers
+$ cluster/lmktfyctl.sh get replicationControllers
 NAME   IMAGE(S   SELECTOR   REPLICAS
 ```
 
 Start a container running nginx with a replication controller and three replicas
 
 ```
-$ cluster/kubectl.sh run-container my-nginx --image=dockerfile/nginx --replicas=3 --port=80
+$ cluster/lmktfyctl.sh run-container my-nginx --image=dockerfile/nginx --replicas=3 --port=80
 ```
 
 When listing the pods, you will see that three containers have been started and are in Waiting state:
 
 ```
-$ cluster/kubectl.sh get pods
+$ cluster/lmktfyctl.sh get pods
 NAME                                   IMAGE(S)            HOST                    LABELS         STATUS
 781191ff-3ffe-11e4-9036-0800279696e1   dockerfile/nginx    10.245.2.4/10.245.2.4   name=myNginx   Waiting
 7813c8bd-3ffe-11e4-9036-0800279696e1   dockerfile/nginx    10.245.2.2/10.245.2.2   name=myNginx   Waiting
@@ -204,38 +204,38 @@ You need to wait for the provisioning to complete, you can monitor the minions b
 
 ```
 $ sudo salt '*minion-1' cmd.run 'docker images'
-kubernetes-minion-1:
+lmktfy-minion-1:
     REPOSITORY          TAG                 IMAGE ID            CREATED             VIRTUAL SIZE
     <none>              <none>              96864a7d2df3        26 hours ago        204.4 MB
     google/cadvisor     latest              e0575e677c50        13 days ago         12.64 MB
-    kubernetes/pause    latest              6c4579af347b        8 weeks ago         239.8 kB
+    lmktfy/pause    latest              6c4579af347b        8 weeks ago         239.8 kB
 ```
 
 Once the docker image for nginx has been downloaded, the container will start and you can list it:
 
 ```
 $ sudo salt '*minion-1' cmd.run 'docker ps'
-kubernetes-minion-1:
+lmktfy-minion-1:
     CONTAINER ID        IMAGE                     COMMAND                CREATED             STATUS              PORTS                    NAMES
-    dbe79bf6e25b        dockerfile/nginx:latest   "nginx"                21 seconds ago      Up 19 seconds                                k8s--mynginx.8c5b8a3a--7813c8bd_-_3ffe_-_11e4_-_9036_-_0800279696e1.etcd--7813c8bd_-_3ffe_-_11e4_-_9036_-_0800279696e1--fcfa837f
-    fa0e29c94501        kubernetes/pause:latest   "/pause"               8 minutes ago       Up 8 minutes        0.0.0.0:8080->80/tcp     k8s--net.a90e7ce4--7813c8bd_-_3ffe_-_11e4_-_9036_-_0800279696e1.etcd--7813c8bd_-_3ffe_-_11e4_-_9036_-_0800279696e1--baf5b21b
-    aa2ee3ed844a        google/cadvisor:latest    "/usr/bin/cadvisor -   38 minutes ago      Up 38 minutes                                k8s--cadvisor.9e90d182--cadvisor_-_agent.file--4626b3a2
-    65a3a926f357        kubernetes/pause:latest   "/pause"               39 minutes ago      Up 39 minutes       0.0.0.0:4194->8080/tcp   k8s--net.c5ba7f0e--cadvisor_-_agent.file--342fd561
+    dbe79bf6e25b        dockerfile/nginx:latest   "nginx"                21 seconds ago      Up 19 seconds                                lmktfy--mynginx.8c5b8a3a--7813c8bd_-_3ffe_-_11e4_-_9036_-_0800279696e1.etcd--7813c8bd_-_3ffe_-_11e4_-_9036_-_0800279696e1--fcfa837f
+    fa0e29c94501        lmktfy/pause:latest   "/pause"               8 minutes ago       Up 8 minutes        0.0.0.0:8080->80/tcp     lmktfy--net.a90e7ce4--7813c8bd_-_3ffe_-_11e4_-_9036_-_0800279696e1.etcd--7813c8bd_-_3ffe_-_11e4_-_9036_-_0800279696e1--baf5b21b
+    aa2ee3ed844a        google/cadvisor:latest    "/usr/bin/cadvisor -   38 minutes ago      Up 38 minutes                                lmktfy--cadvisor.9e90d182--cadvisor_-_agent.file--4626b3a2
+    65a3a926f357        lmktfy/pause:latest   "/pause"               39 minutes ago      Up 39 minutes       0.0.0.0:4194->8080/tcp   lmktfy--net.c5ba7f0e--cadvisor_-_agent.file--342fd561
 ```
 
 Going back to listing the pods, services and replicationControllers, you now have:
 
 ```
-$ cluster/kubectl.sh get pods
+$ cluster/lmktfyctl.sh get pods
 NAME                                   IMAGE(S)            HOST                    LABELS         STATUS
 781191ff-3ffe-11e4-9036-0800279696e1   dockerfile/nginx    10.245.2.4/10.245.2.4   name=myNginx   Running
 7813c8bd-3ffe-11e4-9036-0800279696e1   dockerfile/nginx    10.245.2.2/10.245.2.2   name=myNginx   Running
 78140853-3ffe-11e4-9036-0800279696e1   dockerfile/nginx    10.245.2.3/10.245.2.3   name=myNginx   Running
 
-$ cluster/kubectl.sh get services
+$ cluster/lmktfyctl.sh get services
 NAME   LABELS   SELECTOR   IP   PORT
 
-$ cluster/kubectl.sh get replicationControllers
+$ cluster/lmktfyctl.sh get replicationControllers
 NAME      IMAGE(S            SELECTOR       REPLICAS
 myNginx   dockerfile/nginx   name=my-nginx   3
 ```
@@ -245,8 +245,8 @@ Check the [guestbook](../../examples/guestbook/README.md) application to learn h
 You can already play with resizing the replicas with:
 
 ```
-$ cluster/kubectl.sh resize rc my-nginx --replicas=2
-$ cluster/kubectl.sh get pods
+$ cluster/lmktfyctl.sh resize rc my-nginx --replicas=2
+$ cluster/lmktfyctl.sh get pods
 NAME                                   IMAGE(S)            HOST                    LABELS         STATUS
 7813c8bd-3ffe-11e4-9036-0800279696e1   dockerfile/nginx    10.245.2.2/10.245.2.2   name=myNginx   Running
 78140853-3ffe-11e4-9036-0800279696e1   dockerfile/nginx    10.245.2.3/10.245.2.3   name=myNginx   Running
@@ -258,27 +258,27 @@ Congratulations!
 
 #### I keep downloading the same (large) box all the time!
 
-By default the Vagrantfile will download the box from S3.  You can change this (and cache the box locally) by providing an alternate URL when calling `kube-up.sh`
+By default the Vagrantfile will download the box from S3.  You can change this (and cache the box locally) by providing an alternate URL when calling `lmktfy-up.sh`
 
 ```bash
-export KUBERNETES_BOX_URL=path_of_your_kuber_box
-export KUBERNETES_PROVIDER=vagrant
-cluster/kube-up.sh
+export LMKTFYRNETES_BOX_URL=path_of_your_lmktfyr_box
+export LMKTFYRNETES_PROVIDER=vagrant
+cluster/lmktfy-up.sh
 ```
 
 
 #### I just created the cluster, but I am getting authorization errors!
 
-You probably have an incorrect ~/.kubernetes_vagrant_auth file for the cluster you are attempting to contact.
+You probably have an incorrect ~/.lmktfy_vagrant_auth file for the cluster you are attempting to contact.
 
 ```
-rm ~/.kubernetes_vagrant_auth
+rm ~/.lmktfy_vagrant_auth
 ```
 
-After using kubectl.sh make sure that the correct credentials are set:
+After using lmktfyctl.sh make sure that the correct credentials are set:
 
 ```
-cat ~/.kubernetes_vagrant_auth
+cat ~/.lmktfy_vagrant_auth
 {
   "User": "vagrant",
   "Password": "vagrant"
@@ -287,9 +287,9 @@ cat ~/.kubernetes_vagrant_auth
 
 #### I just created the cluster, but I do not see my container running !
 
-If this is your first time creating the cluster, the kubelet on each minion schedules a number of docker pull requests to fetch prerequisite images.  This can take some time and as a result may delay your initial pod getting provisioned.
+If this is your first time creating the cluster, the lmktfylet on each minion schedules a number of docker pull requests to fetch prerequisite images.  This can take some time and as a result may delay your initial pod getting provisioned.
 
-#### I want to make changes to Kubernetes code !
+#### I want to make changes to LMKTFY code !
 
 To set up a vagrant cluster for hacking, follow the [vagrant developer guide](../devel/developer-guides/vagrant.md).
 
@@ -307,11 +307,11 @@ export NUM_MINIONS=1
 
 #### I want my VMs to have more memory !
 
-You can control the memory allotted to virtual machines with the `KUBERNETES_MEMORY` environment variable.
+You can control the memory allotted to virtual machines with the `LMKTFYRNETES_MEMORY` environment variable.
 Just set it to the number of megabytes you would like the machines to have. For example:
 
 ```
-export KUBERNETES_MEMORY=2048
+export LMKTFYRNETES_MEMORY=2048
 ```
 
 #### I ran vagrant suspend and nothing works!

@@ -5,6 +5,6 @@ containerPort: 80
 port: 5601
 labels:
   name: kibana-logging
-  kubernetes.io/cluster-service: "true"
+  lmktfy.io/cluster-service: "true"
 selector:
   name: kibana-logging

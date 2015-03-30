@@ -29,9 +29,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api/resource"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/cloudprovider"
 
 	compute "code.google.com/p/google-api-go-client/compute/v1"
 	container "code.google.com/p/google-api-go-client/container/v1beta1"
@@ -214,7 +214,7 @@ func (gce *GCECloud) TCPLoadBalancerExists(name, region string) (bool, error) {
 	return false, err
 }
 
-//translate from what K8s supports to what the cloud provider supports for session affinity.
+//translate from what LMKTFY supports to what the cloud provider supports for session affinity.
 func translateAffinityType(affinityType api.AffinityType) GCEAffinityType {
 	switch affinityType {
 	case api.AffinityTypeClientIP:
@@ -300,8 +300,8 @@ func (gce *GCECloud) DeleteTCPLoadBalancer(name, region string) error {
 }
 
 // Take a GCE instance 'hostname' and break it down to something that can be fed
-// to the GCE API client library.  Basically this means reducing 'kubernetes-
-// minion-2.c.my-proj.internal' to 'kubernetes-minion-2' if necessary.
+// to the GCE API client library.  Basically this means reducing 'lmktfy-
+// minion-2.c.my-proj.internal' to 'lmktfy-minion-2' if necessary.
 func canonicalizeInstanceName(name string) string {
 	ix := strings.Index(name, ".")
 	if ix != -1 {
@@ -368,8 +368,8 @@ func fqdnSuffix() (string, error) {
 // List is an implementation of Instances.List.
 func (gce *GCECloud) List(filter string) ([]string, error) {
 	// GCE gives names without their fqdn suffix, so get that here for appending.
-	// This is needed because the kubelet looks for its jobs in /registry/hosts/<fqdn>/pods
-	// We should really just replace this convention, with a negotiated naming protocol for kubelet's
+	// This is needed because the lmktfylet looks for its jobs in /registry/hosts/<fqdn>/pods
+	// We should really just replace this convention, with a negotiated naming protocol for lmktfylet's
 	// to register with the master.
 	suffix, err := fqdnSuffix()
 	if err != nil {
@@ -522,5 +522,5 @@ func (gce *GCECloud) ListClusters() ([]string, error) {
 }
 
 func (gce *GCECloud) Master(clusterName string) (string, error) {
-	return "k8s-" + clusterName + "-master.internal", nil
+	return "lmktfy-" + clusterName + "-master.internal", nil
 }

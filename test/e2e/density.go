@@ -21,11 +21,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/wait"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/client"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/labels"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/util"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/util/wait"
 
 	"github.com/golang/glog"
 	. "github.com/onsi/ginkgo"
@@ -220,7 +220,7 @@ var _ = Describe("Density", func() {
 				defer wg.Done()
 				for i := 0; i < 10; i++ {
 					name := "my-hostname-thrash-" + string(util.NewUUID())
-					RunRC(c, name, ns, "kubernetes/pause", 10*minionCount)
+					RunRC(c, name, ns, "lmktfy/pause", 10*minionCount)
 				}
 			}()
 		}

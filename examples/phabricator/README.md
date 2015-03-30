@@ -1,15 +1,15 @@
 ## Phabricator example
 
-This example shows how to build a simple multi-tier web application using Kubernetes and Docker.
+This example shows how to build a simple multi-tier web application using LMKTFY and Docker.
 
 The example combines a web frontend and an external service that provides MySQL database. We use CloudSQL on Google Cloud Platform in this example, but in principle any approach to running MySQL should work.
 
 ### Step Zero: Prerequisites
 
-This example assumes that you have a basic understanding of kubernetes services and that you have forked the repository and [turned up a Kubernetes cluster](https://github.com/GoogleCloudPlatform/kubernetes#contents):
+This example assumes that you have a basic understanding of lmktfy services and that you have forked the repository and [turned up a LMKTFY cluster](https://github.com/GoogleCloudPlatform/lmktfy#contents):
 
 ```shell
-$ cd kubernetes
+$ cd lmktfy
 $ hack/dev-build-and-up.sh
 ```
 
@@ -38,7 +38,7 @@ To start Phabricator server use the file `examples/phabricator/phabricator-contr
           "id": "phabricator-pod",
           "containers": [{
             "name": "phabricator",
-            "image": "kubernetes/example-php-phabricator",
+            "image": "lmktfy/example-php-phabricator",
             "env": [
               {"name": "MYSQL_SERVICE_IP", "value": "173.194.242.66"},
               {"name": "MYSQL_SERVICE_PORT", "value": "3306"},
@@ -56,33 +56,33 @@ To start Phabricator server use the file `examples/phabricator/phabricator-contr
 }
 ```
 
-Create the phabricator pod in your Kubernetes cluster by running:
+Create the phabricator pod in your LMKTFY cluster by running:
 
 ```shell
-$ cluster/kubectl.sh create -f examples/phabricator/phabricator-controller.json
+$ cluster/lmktfyctl.sh create -f examples/phabricator/phabricator-controller.json
 ```
 
 Once that's up you can list the pods in the cluster, to verify that it is running:
 
 ```shell
-cluster/kubectl.sh get pods
+cluster/lmktfyctl.sh get pods
 ```
 
 You'll see a single phabricator pod. It will also display the machine that the pod is running on once it gets placed (may take up to thirty seconds):
 
 ```
 POD                           IP           CONTAINER(S)  IMAGE(S)                  HOST                                                      LABELS                                   STATUS
-phabricator-controller-02qp4  10.244.1.34  phabricator   fgrzadkowski/phabricator  kubernetes-minion-2.c.myproject.internal/130.211.141.151  name=phabricator
+phabricator-controller-02qp4  10.244.1.34  phabricator   fgrzadkowski/phabricator  lmktfy-minion-2.c.myproject.internal/130.211.141.151  name=phabricator
 ```
 
 If you ssh to that machine, you can run `docker ps` to see the actual pod:
 
 ```shell
-me@workstation$ gcloud compute ssh --zone us-central1-b kubernetes-minion-2
+me@workstation$ gcloud compute ssh --zone us-central1-b lmktfy-minion-2
 
 $ sudo docker ps
 CONTAINER ID        IMAGE                             COMMAND     CREATED       STATUS      PORTS   NAMES
-54983bc33494        fgrzadkowski/phabricator:latest   "/run.sh"   2 hours ago   Up 2 hours          k8s_phabricator.d6b45054_phabricator-controller-02qp4.default.api_eafb1e53-b6a9-11e4-b1ae-42010af05ea6_01c2c4ca                     
+54983bc33494        fgrzadkowski/phabricator:latest   "/run.sh"   2 hours ago   Up 2 hours          lmktfy_phabricator.d6b45054_phabricator-controller-02qp4.default.api_eafb1e53-b6a9-11e4-b1ae-42010af05ea6_01c2c4ca                     
 ```
 
 (Note that initial `docker pull` may take a few minutes, depending on network conditions.  During this time, the `get pods` command will return `Pending` because the container has not yet started )
@@ -92,7 +92,7 @@ CONTAINER ID        IMAGE                             COMMAND     CREATED       
 If you read logs of the phabricator container you will notice the following error message:
 
 ```bash
-$ cluster/kubectl.sh log phabricator-controller-02qp4
+$ cluster/lmktfyctl.sh log phabricator-controller-02qp4
 [...]
 Raw MySQL Error: Attempt to connect to root@173.194.252.142 failed with error
 #2013: Lost connection to MySQL server at 'reading initial communication
@@ -123,7 +123,7 @@ To automate this process and make sure that a proper host is authorized even if 
           "id": "authenticator-pod",
           "containers": [{
             "name": "authenticator",
-            "image": "kubernetes/example-cloudsql-authenticator",
+            "image": "lmktfy/example-cloudsql-authenticator",
             "env": [
               {"name": "SELECTOR", "value": "name=phabricator"},
               {"name": "CLOUDSQL_DB", "value": "phabricator-db"}
@@ -142,13 +142,13 @@ To automate this process and make sure that a proper host is authorized even if 
 To create the pod run:
 
 ```shell
-$ cluster/kubectl.sh create -f examples/phabricator/authenticator-controller.json
+$ cluster/lmktfyctl.sh create -f examples/phabricator/authenticator-controller.json
 ```
 
 
 ### Step Four: Turn up the phabricator service
 
-A Kubernetes 'service' is a named load balancer that proxies traffic to one or more containers. The services in a Kubernetes cluster are discoverable inside other containers via *environment variables*. Services find the containers to load balance based on pod labels.  These environment variables are typically referenced in application code, shell scripts, or other places where one node needs to talk to another in a distributed system.  You should catch up on [kubernetes services](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/services.md) before proceeding.
+A LMKTFY 'service' is a named load balancer that proxies traffic to one or more containers. The services in a LMKTFY cluster are discoverable inside other containers via *environment variables*. Services find the containers to load balance based on pod labels.  These environment variables are typically referenced in application code, shell scripts, or other places where one node needs to talk to another in a distributed system.  You should catch up on [lmktfy services](https://github.com/GoogleCloudPlatform/lmktfy/blob/master/docs/services.md) before proceeding.
 
 The pod that you created in Step One has the label `name=phabricator`. The selector field of the service determines which pods will receive the traffic sent to the service. Since we are setting up a service for an external application we also need to request external static IP address (otherwise it will be assigned dynamically):
 
@@ -177,20 +177,20 @@ Use the file `examples/phabricator/phabricator-service.json`:
 To create the service run:
 
 ```shell
-$ cluster/kubectl.sh create -f examples/phabricator/phabricator-service.json
+$ cluster/lmktfyctl.sh create -f examples/phabricator/phabricator-service.json
 phabricator
 ```
 
-Note that it will also create an external load balancer so that we can access it from outside. You may need to open the firewall for port 80 using the [console][cloud-console] or the `gcloud` tool. The following command will allow traffic from any source to instances tagged `kubernetes-minion`:
+Note that it will also create an external load balancer so that we can access it from outside. You may need to open the firewall for port 80 using the [console][cloud-console] or the `gcloud` tool. The following command will allow traffic from any source to instances tagged `lmktfy-minion`:
 
 ```shell
-$ gcloud compute firewall-rules create phabricator-node-80 --allow=tcp:80 --target-tags kubernetes-minion
+$ gcloud compute firewall-rules create phabricator-node-80 --allow=tcp:80 --target-tags lmktfy-minion
 ```
 
 ### Step Six: Cleanup
 
-To turn down a Kubernetes cluster:
+To turn down a LMKTFY cluster:
 
 ```shell
-$ cluster/kube-down.sh
+$ cluster/lmktfy-down.sh
 ```

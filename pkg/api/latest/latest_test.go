@@ -20,9 +20,9 @@ import (
 	"encoding/json"
 	"testing"
 
-	internal "github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
-	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta2"
+	internal "github.com/GoogleCloudPlatform/lmktfy/pkg/api"
+	_ "github.com/GoogleCloudPlatform/lmktfy/pkg/api/v1beta1"
+	_ "github.com/GoogleCloudPlatform/lmktfy/pkg/api/v1beta2"
 )
 
 func TestResourceVersioner(t *testing.T) {

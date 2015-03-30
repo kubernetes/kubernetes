@@ -19,7 +19,7 @@ package cache
 import (
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/util"
 	"github.com/golang/glog"
 )
 

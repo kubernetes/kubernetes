@@ -17,8 +17,8 @@ limitations under the License.
 package latest
 
 import (
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd/api/v1"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/client/clientcmd/api/v1"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/runtime"
 )
 
 // Version is the string that represents the current external default version.
@@ -37,5 +37,5 @@ var Versions = []string{"v1"}
 // Codec is the default codec for serializing output that should use
 // the latest supported version.  Use this Codec when writing to
 // disk, a data store that is not dynamically versioned, or in tests.
-// This codec can decode any object that Kubernetes is aware of.
+// This codec can decode any object that LMKTFY is aware of.
 var Codec = runtime.YAMLDecoder(v1.Codec)

@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 // Package runtime includes helper functions for working with API objects
-// that follow the kubernetes API object conventions, which are:
+// that follow the lmktfy API object conventions, which are:
 //
 // 0. Your API objects have a common metadata struct member, TypeMeta.
 // 1. Your code refers to an internal set of API objects.

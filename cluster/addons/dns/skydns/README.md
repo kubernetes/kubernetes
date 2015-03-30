@@ -1,4 +1,4 @@
-# skydns for kubernetes
+# skydns for lmktfy
 =======================
 
 This container only exists until skydns itself is reduced in some way.  At the

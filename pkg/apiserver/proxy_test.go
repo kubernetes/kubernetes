@@ -28,7 +28,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/rest"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api/rest"
 	"golang.org/x/net/html"
 	"golang.org/x/net/websocket"
 )
@@ -78,66 +78,66 @@ func TestProxyTransport(t *testing.T) {
 
 	table := map[string]Item{
 		"normal": {
-			input:        `<pre><a href="kubelet.log">kubelet.log</a><a href="/google.log">google.log</a></pre>`,
+			input:        `<pre><a href="lmktfylet.log">lmktfylet.log</a><a href="/google.log">google.log</a></pre>`,
 			sourceURL:    "http://myminion.com/logs/log.log",
 			transport:    testTransport,
-			output:       `<pre><a href="http://foo.com/proxy/minion/minion1:10250/logs/kubelet.log">kubelet.log</a><a href="http://foo.com/proxy/minion/minion1:10250/google.log">google.log</a></pre>`,
+			output:       `<pre><a href="http://foo.com/proxy/minion/minion1:10250/logs/lmktfylet.log">lmktfylet.log</a><a href="http://foo.com/proxy/minion/minion1:10250/google.log">google.log</a></pre>`,
 			contentType:  "text/html",
 			forwardedURI: "/proxy/minion/minion1:10250/logs/log.log",
 		},
 		"trailing slash": {
-			input:        `<pre><a href="kubelet.log">kubelet.log</a><a href="/google.log/">google.log</a></pre>`,
+			input:        `<pre><a href="lmktfylet.log">lmktfylet.log</a><a href="/google.log/">google.log</a></pre>`,
 			sourceURL:    "http://myminion.com/logs/log.log",
 			transport:    testTransport,
-			output:       `<pre><a href="http://foo.com/proxy/minion/minion1:10250/logs/kubelet.log">kubelet.log</a><a href="http://foo.com/proxy/minion/minion1:10250/google.log/">google.log</a></pre>`,
+			output:       `<pre><a href="http://foo.com/proxy/minion/minion1:10250/logs/lmktfylet.log">lmktfylet.log</a><a href="http://foo.com/proxy/minion/minion1:10250/google.log/">google.log</a></pre>`,
 			contentType:  "text/html",
 			forwardedURI: "/proxy/minion/minion1:10250/logs/log.log",
 		},
 		"content-type charset": {
-			input:        `<pre><a href="kubelet.log">kubelet.log</a><a href="/google.log">google.log</a></pre>`,
+			input:        `<pre><a href="lmktfylet.log">lmktfylet.log</a><a href="/google.log">google.log</a></pre>`,
 			sourceURL:    "http://myminion.com/logs/log.log",
 			transport:    testTransport,
-			output:       `<pre><a href="http://foo.com/proxy/minion/minion1:10250/logs/kubelet.log">kubelet.log</a><a href="http://foo.com/proxy/minion/minion1:10250/google.log">google.log</a></pre>`,
+			output:       `<pre><a href="http://foo.com/proxy/minion/minion1:10250/logs/lmktfylet.log">lmktfylet.log</a><a href="http://foo.com/proxy/minion/minion1:10250/google.log">google.log</a></pre>`,
 			contentType:  "text/html; charset=utf-8",
 			forwardedURI: "/proxy/minion/minion1:10250/logs/log.log",
 		},
 		"content-type passthrough": {
-			input:        `<pre><a href="kubelet.log">kubelet.log</a><a href="/google.log">google.log</a></pre>`,
+			input:        `<pre><a href="lmktfylet.log">lmktfylet.log</a><a href="/google.log">google.log</a></pre>`,
 			sourceURL:    "http://myminion.com/logs/log.log",
 			transport:    testTransport,
-			output:       `<pre><a href="kubelet.log">kubelet.log</a><a href="/google.log">google.log</a></pre>`,
+			output:       `<pre><a href="lmktfylet.log">lmktfylet.log</a><a href="/google.log">google.log</a></pre>`,
 			contentType:  "text/plain",
 			forwardedURI: "/proxy/minion/minion1:10250/logs/log.log",
 		},
 		"subdir": {
-			input:        `<a href="kubelet.log">kubelet.log</a><a href="/google.log">google.log</a>`,
+			input:        `<a href="lmktfylet.log">lmktfylet.log</a><a href="/google.log">google.log</a>`,
 			sourceURL:    "http://myminion.com/whatever/apt/somelog.log",
 			transport:    testTransport2,
-			output:       `<a href="https://foo.com/proxy/minion/minion1:8080/whatever/apt/kubelet.log">kubelet.log</a><a href="https://foo.com/proxy/minion/minion1:8080/google.log">google.log</a>`,
+			output:       `<a href="https://foo.com/proxy/minion/minion1:8080/whatever/apt/lmktfylet.log">lmktfylet.log</a><a href="https://foo.com/proxy/minion/minion1:8080/google.log">google.log</a>`,
 			contentType:  "text/html",
 			forwardedURI: "/proxy/minion/minion1:8080/whatever/apt/somelog.log",
 		},
 		"image": {
-			input:        `<pre><img src="kubernetes.jpg"/></pre>`,
+			input:        `<pre><img src="lmktfy.jpg"/></pre>`,
 			sourceURL:    "http://myminion.com/",
 			transport:    testTransport,
-			output:       `<pre><img src="http://foo.com/proxy/minion/minion1:10250/kubernetes.jpg"/></pre>`,
+			output:       `<pre><img src="http://foo.com/proxy/minion/minion1:10250/lmktfy.jpg"/></pre>`,
 			contentType:  "text/html",
 			forwardedURI: "/proxy/minion/minion1:10250/",
 		},
 		"abs": {
-			input:        `<script src="http://google.com/kubernetes.js"/>`,
+			input:        `<script src="http://google.com/lmktfy.js"/>`,
 			sourceURL:    "http://myminion.com/any/path/",
 			transport:    testTransport,
-			output:       `<script src="http://google.com/kubernetes.js"/>`,
+			output:       `<script src="http://google.com/lmktfy.js"/>`,
 			contentType:  "text/html",
 			forwardedURI: "/proxy/minion/minion1:10250/any/path/",
 		},
 		"abs but same host": {
-			input:        `<script src="http://myminion.com/kubernetes.js"/>`,
+			input:        `<script src="http://myminion.com/lmktfy.js"/>`,
 			sourceURL:    "http://myminion.com/any/path/",
 			transport:    testTransport,
-			output:       `<script src="http://foo.com/proxy/minion/minion1:10250/kubernetes.js"/>`,
+			output:       `<script src="http://foo.com/proxy/minion/minion1:10250/lmktfy.js"/>`,
 			contentType:  "text/html",
 			forwardedURI: "/proxy/minion/minion1:10250/any/path/",
 		},

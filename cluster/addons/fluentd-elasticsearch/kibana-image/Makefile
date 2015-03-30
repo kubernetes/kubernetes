@@ -3,7 +3,7 @@
 TAG = 1.1
 
 build:	
-	docker build -t kubernetes/kibana:$(TAG) .
+	docker build -t lmktfy/kibana:$(TAG) .
 
 push:	
-	docker push kubernetes/kibana:$(TAG)
+	docker push lmktfy/kibana:$(TAG)

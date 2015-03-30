@@ -20,21 +20,21 @@ import (
 	"os"
 	"path"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/client"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/types"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/util"
 )
 
 // fakeVolumeHost is useful for testing volume plugins.
 type fakeVolumeHost struct {
 	rootDir    string
-	kubeClient client.Interface
+	lmktfyClient client.Interface
 	pluginMgr  VolumePluginMgr
 }
 
-func NewFakeVolumeHost(rootDir string, kubeClient client.Interface, plugins []VolumePlugin) *fakeVolumeHost {
-	host := &fakeVolumeHost{rootDir: rootDir, kubeClient: kubeClient}
+func NewFakeVolumeHost(rootDir string, lmktfyClient client.Interface, plugins []VolumePlugin) *fakeVolumeHost {
+	host := &fakeVolumeHost{rootDir: rootDir, lmktfyClient: lmktfyClient}
 	host.pluginMgr.InitPlugins(plugins, host)
 	return host
 }
@@ -51,8 +51,8 @@ func (f *fakeVolumeHost) GetPodPluginDir(podUID types.UID, pluginName string) st
 	return path.Join(f.rootDir, "pods", string(podUID), "plugins", pluginName)
 }
 
-func (f *fakeVolumeHost) GetKubeClient() client.Interface {
-	return f.kubeClient
+func (f *fakeVolumeHost) GetLMKTFYClient() client.Interface {
+	return f.lmktfyClient
 }
 
 func (f *fakeVolumeHost) NewWrapperBuilder(spec *api.Volume, podRef *api.ObjectReference) (Builder, error) {

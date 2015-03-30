@@ -1,6 +1,6 @@
 #!/bin/bash
 
-KUBE_HOOKS_DIR="$(dirname "$(test -L "$0" && echo "$(dirname $0)/$(readlink "$0")" || echo "$0")")"
+LMKTFY_HOOKS_DIR="$(dirname "$(test -L "$0" && echo "$(dirname $0)/$(readlink "$0")" || echo "$0")")"
 
 files_need_gofmt=()
 files_need_boilerplate=()
@@ -13,7 +13,7 @@ for file in $(git diff --cached --name-only --diff-filter ACM | grep "\.go" | gr
   fi
 
   # Check for files without the required boilerplate.
-  boilerplate=$("${KUBE_HOOKS_DIR}/boilerplate.sh" "${file}")
+  boilerplate=$("${LMKTFY_HOOKS_DIR}/boilerplate.sh" "${file}")
   if [[ "$boilerplate" -eq "0" ]]; then
     files_need_boilerplate+=("${file}")
   fi
@@ -22,7 +22,7 @@ done
 # Check sh files for boilerplate
 for file in $(git diff --cached --name-only --diff-filter ACM | grep "\.sh" | grep -v -e "third_party" -e "Godeps"); do
   # Check for files without the required boilerplate.
-  boilerplate=$("${KUBE_HOOKS_DIR}/boilerplate.sh" "${file}")
+  boilerplate=$("${LMKTFY_HOOKS_DIR}/boilerplate.sh" "${file}")
   if [[ "$boilerplate" -eq "0" ]]; then
     files_need_boilerplate+=("${file}")
   fi
@@ -32,7 +32,7 @@ done
 # TODO: Check v1beta3, once it is documented
 for file in $(git diff --cached --name-only --diff-filter ACM | egrep "pkg/api/v.[^/]*/types\.go" | grep -v "third_party" | grep -v v1beta3); do
   # Check for files with fields without description tags
-  descriptionless=$("${KUBE_HOOKS_DIR}/description.sh" "${file}")
+  descriptionless=$("${LMKTFY_HOOKS_DIR}/description.sh" "${file}")
   if [[ "$descriptionless" -eq "0" ]]; then
     files_need_description+=("${file}")
   fi
@@ -85,7 +85,7 @@ if ! hack/verify-gendocs.sh > /dev/null; then
   (
     echo
     echo "# *** ERROR: *** docs are out of sync between cli and markdown"
-    echo "# run hack/run-gendocs.sh > docs/kubectl.md to regenerate"
+    echo "# run hack/run-gendocs.sh > docs/lmktfyctl.md to regenerate"
     echo
     echo "#"
     echo "# Your commit will be aborted unless you regenerate docs."

@@ -4,10 +4,10 @@ server: server.go
 	CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -ldflags '-w' ./server.go
 
 container: server
-	docker build -t kubernetes/liveness .
+	docker build -t lmktfy/liveness .
 
 push: container
-	docker push kubernetes/liveness
+	docker push lmktfy/liveness
 
 clean:
 	rm -f server

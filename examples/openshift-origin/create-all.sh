@@ -14,24 +14,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Generates secret, creates secret on kube, creates pod on kube
+# Generates secret, creates secret on lmktfy, creates pod on lmktfy
 
 set -o errexit
 set -o nounset
 set -o pipefail
 
 ORIGIN=$(dirname "${BASH_SOURCE}")
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
+LMKTFY_ROOT=$(dirname "${BASH_SOURCE}")/../..
 
 ## Generate resources
 ${ORIGIN}/resource-generator.sh
 
 ## Create the secret
-${KUBE_ROOT}/cluster/kubectl.sh create -f ${ORIGIN}/secret.json
+${LMKTFY_ROOT}/cluster/lmktfyctl.sh create -f ${ORIGIN}/secret.json
 
 ## Create the pod
-${KUBE_ROOT}/cluster/kubectl.sh create -f ${ORIGIN}/pod.json
+${LMKTFY_ROOT}/cluster/lmktfyctl.sh create -f ${ORIGIN}/pod.json
 
 ## Create the services
-${KUBE_ROOT}/cluster/kubectl.sh create -f ${ORIGIN}/api-service.json
-${KUBE_ROOT}/cluster/kubectl.sh create -f ${ORIGIN}/ui-service.json
+${LMKTFY_ROOT}/cluster/lmktfyctl.sh create -f ${ORIGIN}/api-service.json
+${LMKTFY_ROOT}/cluster/lmktfyctl.sh create -f ${ORIGIN}/ui-service.json

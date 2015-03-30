@@ -16,6 +16,6 @@ WORKDIR /gopath/src/
 RUN go get main
 #RUN go build main
 
-# Expected that you will override this in production kubernetes.
+# Expected that you will override this in production lmktfyrnetes.
 ENV STATIC_FILES /tmp/static
 CMD /gopath/bin/main

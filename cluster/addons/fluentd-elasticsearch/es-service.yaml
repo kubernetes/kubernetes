@@ -5,6 +5,6 @@ port: 9200
 containerPort: 9200
 labels:
   name: elasticsearch-logging
-  kubernetes.io/cluster-service: "true"
+  lmktfy.io/cluster-service: "true"
 selector:
   name: elasticsearch-logging

@@ -1,5 +1,5 @@
-# Bare Metal CoreOS with Kubernetes (OFFLINE)
-Deploy a CoreOS running Kubernetes environment. This particular guild is made to help those in an OFFLINE system, wither for testing a POC before the real deal, or you are restricted to be totally offline for your applications.
+# Bare Metal CoreOS with LMKTFY (OFFLINE)
+Deploy a CoreOS running LMKTFY environment. This particular guild is made to help those in an OFFLINE system, wither for testing a POC before the real deal, or you are restricted to be totally offline for your applications.
 
 
 ## High Level Design
@@ -10,7 +10,7 @@ Deploy a CoreOS running Kubernetes environment. This particular guild is made to
 3. Update the DHCP config to reflect the host needing deployment
 4. Setup nodes to deploy CoreOS creating a etcd cluster. 
 5. Have no access to the public [etcd discovery tool](https://discovery.etcd.io/). 
-6. Installing the CoreOS slaves to become Kubernetes minions.
+6. Installing the CoreOS slaves to become LMKTFY minions.
 
 ## Pre-requisites
 1. Installed *CentOS 6* for PXE server
@@ -19,7 +19,7 @@ Deploy a CoreOS running Kubernetes environment. This particular guild is made to
 ## This Guides variables
 | Node Description              | MAC               | IP          |
 | :---------------------------- | :---------------: | :---------: |
-| CoreOS/etcd/Kubernetes Master | d0:00:67:13:0d:00 | 10.20.30.40 |
+| CoreOS/etcd/LMKTFY Master | d0:00:67:13:0d:00 | 10.20.30.40 |
 | CoreOS Slave 1                | d0:00:67:13:0d:01 | 10.20.30.41 |
 | CoreOS Slave 2                | d0:00:67:13:0d:02 | 10.20.30.42 |
 
@@ -159,43 +159,43 @@ This section covers configuring the DHCP server to hand out our new images. In t
 
 We will be specifying the node configuration later in the guide.
 
-# Kubernetes
+# LMKTFY
 To deploy our configuration we need to create an ```etcd``` master. To do so we want to pxe CoreOS with a specific cloud-config.yml. There are two options we have here. 
 1. Is to template the cloud config file and programmatically create new static configs for different cluster setups.
 2. Have a service discovery protocol running in our stack to do auto discovery.
 
-This demo we just make a static single ```etcd``` server to host our Kubernetes and ```etcd``` master servers.
+This demo we just make a static single ```etcd``` server to host our LMKTFY and ```etcd``` master servers.
 
-Since we are OFFLINE here most of the helping processes in CoreOS and Kubernetes are then limited. To do our setup we will then have to download and serve up our binaries for Kubernetes in our local environment.
+Since we are OFFLINE here most of the helping processes in CoreOS and LMKTFY are then limited. To do our setup we will then have to download and serve up our binaries for LMKTFY in our local environment.
 
 An easy solution is to host a small web server on the DHCP/TFTP host for all our binaries to make them available to the local CoreOS PXE machines.
 
-To get this up and running we are going to setup a simple ```apache``` server to serve our binaries needed to bootstrap Kubernetes.
+To get this up and running we are going to setup a simple ```apache``` server to serve our binaries needed to bootstrap LMKTFY.
 
 This is on the PXE server from the previous section:
 
     rm /etc/httpd/conf.d/welcome.conf
     cd /var/www/html/
-    wget -O kube-register https://github.com/jeffbean/kube-register/releases/download/v0.5/kube-register
+    wget -O lmktfy-register https://github.com/jeffbean/lmktfy-register/releases/download/v0.5/lmktfy-register
     wget -O setup-network-environment https://github.com/kelseyhightower/setup-network-environment/releases/download/v1.0.0/setup-network-environment
-    wget https://storage.googleapis.com/kubernetes-release/release/v0.10.1/bin/linux/amd64/kubernetes --no-check-certificate
-    wget https://storage.googleapis.com/kubernetes-release/release/v0.10.1/bin/linux/amd64/kube-apiserver --no-check-certificate
-    wget https://storage.googleapis.com/kubernetes-release/release/v0.10.1/bin/linux/amd64/kube-controller-manager --no-check-certificate
-    wget https://storage.googleapis.com/kubernetes-release/release/v0.10.1/bin/linux/amd64/kube-scheduler --no-check-certificate
-    wget https://storage.googleapis.com/kubernetes-release/release/v0.10.1/bin/linux/amd64/kubectl --no-check-certificate
-    wget https://storage.googleapis.com/kubernetes-release/release/v0.10.1/bin/linux/amd64/kubecfg --no-check-certificate
-    wget https://storage.googleapis.com/kubernetes-release/release/v0.10.1/bin/linux/amd64/kubelet --no-check-certificate
-    wget https://storage.googleapis.com/kubernetes-release/release/v0.10.1/bin/linux/amd64/kube-proxy --no-check-certificate
-    wget -O flanneld https://storage.googleapis.com/k8s/flanneld --no-check-certificate
+    wget https://storage.googleapis.com/lmktfy-release/release/v0.10.1/bin/linux/amd64/lmktfy --no-check-certificate
+    wget https://storage.googleapis.com/lmktfy-release/release/v0.10.1/bin/linux/amd64/lmktfy-apiserver --no-check-certificate
+    wget https://storage.googleapis.com/lmktfy-release/release/v0.10.1/bin/linux/amd64/lmktfy-controller-manager --no-check-certificate
+    wget https://storage.googleapis.com/lmktfy-release/release/v0.10.1/bin/linux/amd64/lmktfy-scheduler --no-check-certificate
+    wget https://storage.googleapis.com/lmktfy-release/release/v0.10.1/bin/linux/amd64/lmktfyctl --no-check-certificate
+    wget https://storage.googleapis.com/lmktfy-release/release/v0.10.1/bin/linux/amd64/lmktfycfg --no-check-certificate
+    wget https://storage.googleapis.com/lmktfy-release/release/v0.10.1/bin/linux/amd64/lmktfylet --no-check-certificate
+    wget https://storage.googleapis.com/lmktfy-release/release/v0.10.1/bin/linux/amd64/lmktfy-proxy --no-check-certificate
+    wget -O flanneld https://storage.googleapis.com/lmktfy/flanneld --no-check-certificate
 
-This sets up our binaries we need to run Kubernetes. This would need to be enhanced to download from the Internet for updates in the future.
+This sets up our binaries we need to run LMKTFY. This would need to be enhanced to download from the Internet for updates in the future.
 
 Now for the good stuff!
 
 ## Cloud Configs
-The following config files are tailored for the OFFLINE version of a Kubernetes deployment.
+The following config files are tailored for the OFFLINE version of a LMKTFY deployment.
 
-These are based on the work found here: [master.yml](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/getting-started-guides/coreos/cloud-configs/master.yaml), [node.yml](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/getting-started-guides/coreos/cloud-configs/node.yaml)
+These are based on the work found here: [master.yml](https://github.com/GoogleCloudPlatform/lmktfy/blob/master/docs/getting-started-guides/coreos/cloud-configs/master.yaml), [node.yml](https://github.com/GoogleCloudPlatform/lmktfy/blob/master/docs/getting-started-guides/coreos/cloud-configs/node.yaml)
 
 
 ### master.yml
@@ -210,14 +210,14 @@ On the PXE server make and fill in the variables ```vi /var/www/html/coreos/pxe-
         content: |
           #! /usr/bin/bash
           until curl http://127.0.0.1:4001/v2/machines; do sleep 2; done
-      - path: /opt/bin/kubernetes-download.sh
+      - path: /opt/bin/lmktfy-download.sh
         owner: root
         permissions: 0755
         content: |
           #! /usr/bin/bash
-          /usr/bin/wget -N -P "/opt/bin" "http://<pxe-server-ip>/kubectl"
-          /usr/bin/wget -N -P "/opt/bin" "http://<pxe-server-ip>/kubernetes"
-          /usr/bin/wget -N -P "/opt/bin" "http://<pxe-server-ip>/kubecfg"
+          /usr/bin/wget -N -P "/opt/bin" "http://<pxe-server-ip>/lmktfyctl"
+          /usr/bin/wget -N -P "/opt/bin" "http://<pxe-server-ip>/lmktfy"
+          /usr/bin/wget -N -P "/opt/bin" "http://<pxe-server-ip>/lmktfycfg"
           chmod +x /opt/bin/*
       - path: /etc/profile.d/opt-path.sh
         owner: root
@@ -241,13 +241,13 @@ On the PXE server make and fill in the variables ```vi /var/www/html/coreos/pxe-
             Name=en*
             [Network]
             DHCP=none
-        - name: get-kube-tools.service
+        - name: get-lmktfy-tools.service
           runtime: true
           command: start
           content: |
             [Service]
             ExecStartPre=-/usr/bin/mkdir -p /opt/bin
-            ExecStart=/opt/bin/kubernetes-download.sh
+            ExecStart=/opt/bin/lmktfy-download.sh
             RemainAfterExit=yes
             Type=oneshot
         - name: setup-network-environment.service
@@ -341,19 +341,19 @@ On the PXE server make and fill in the variables ```vi /var/www/html/coreos/pxe-
             ExecStartPre=/usr/bin/chmod +x /opt/bin/flanneld
             ExecStartPre=-/usr/bin/etcdctl mk /coreos.com/network/config '{"Network":"10.100.0.0/16", "Backend": {"Type": "vxlan"}}'
             ExecStart=/opt/bin/flanneld
-        - name: kube-apiserver.service
+        - name: lmktfy-apiserver.service
           command: start
           content: |
             [Unit]
-            Description=Kubernetes API Server
-            Documentation=https://github.com/GoogleCloudPlatform/kubernetes
+            Description=LMKTFY API Server
+            Documentation=https://github.com/GoogleCloudPlatform/lmktfy
             Requires=etcd.service
             After=etcd.service
             [Service]
             ExecStartPre=-/usr/bin/mkdir -p /opt/bin
-            ExecStartPre=/usr/bin/wget -N -P /opt/bin http://<pxe-server-ip>/kube-apiserver
-            ExecStartPre=/usr/bin/chmod +x /opt/bin/kube-apiserver
-            ExecStart=/opt/bin/kube-apiserver \
+            ExecStartPre=/usr/bin/wget -N -P /opt/bin http://<pxe-server-ip>/lmktfy-apiserver
+            ExecStartPre=/usr/bin/chmod +x /opt/bin/lmktfy-apiserver
+            ExecStart=/opt/bin/lmktfy-apiserver \
             --address=0.0.0.0 \
             --port=8080 \
             --portal_net=10.100.0.0/16 \
@@ -361,50 +361,50 @@ On the PXE server make and fill in the variables ```vi /var/www/html/coreos/pxe-
             --logtostderr=true
             Restart=always
             RestartSec=10
-        - name: kube-controller-manager.service 
+        - name: lmktfy-controller-manager.service 
           command: start
           content: |
             [Unit]
-            Description=Kubernetes Controller Manager
-            Documentation=https://github.com/GoogleCloudPlatform/kubernetes
-            Requires=kube-apiserver.service
-            After=kube-apiserver.service
+            Description=LMKTFY Controller Manager
+            Documentation=https://github.com/GoogleCloudPlatform/lmktfy
+            Requires=lmktfy-apiserver.service
+            After=lmktfy-apiserver.service
             [Service]
-            ExecStartPre=/usr/bin/wget -N -P /opt/bin http://<pxe-server-ip>/kube-controller-manager
-            ExecStartPre=/usr/bin/chmod +x /opt/bin/kube-controller-manager
-            ExecStart=/opt/bin/kube-controller-manager \
+            ExecStartPre=/usr/bin/wget -N -P /opt/bin http://<pxe-server-ip>/lmktfy-controller-manager
+            ExecStartPre=/usr/bin/chmod +x /opt/bin/lmktfy-controller-manager
+            ExecStart=/opt/bin/lmktfy-controller-manager \
             --master=127.0.0.1:8080 \
             --logtostderr=true
             Restart=always
             RestartSec=10
-        - name: kube-scheduler.service
+        - name: lmktfy-scheduler.service
           command: start
           content: |
             [Unit]
-            Description=Kubernetes Scheduler
-            Documentation=https://github.com/GoogleCloudPlatform/kubernetes
-            Requires=kube-apiserver.service
-            After=kube-apiserver.service
+            Description=LMKTFY Scheduler
+            Documentation=https://github.com/GoogleCloudPlatform/lmktfy
+            Requires=lmktfy-apiserver.service
+            After=lmktfy-apiserver.service
             [Service]
-            ExecStartPre=/usr/bin/wget -N -P /opt/bin http://<pxe-server-ip>/kube-scheduler
-            ExecStartPre=/usr/bin/chmod +x /opt/bin/kube-scheduler
-            ExecStart=/opt/bin/kube-scheduler --master=127.0.0.1:8080
+            ExecStartPre=/usr/bin/wget -N -P /opt/bin http://<pxe-server-ip>/lmktfy-scheduler
+            ExecStartPre=/usr/bin/chmod +x /opt/bin/lmktfy-scheduler
+            ExecStart=/opt/bin/lmktfy-scheduler --master=127.0.0.1:8080
             Restart=always
             RestartSec=10
-        - name: kube-register.service
+        - name: lmktfy-register.service
           command: start
           content: |
             [Unit]
-            Description=Kubernetes Registration Service
-            Documentation=https://github.com/kelseyhightower/kube-register
-            Requires=kube-apiserver.service
-            After=kube-apiserver.service
+            Description=LMKTFY Registration Service
+            Documentation=https://github.com/kelseyhightower/lmktfy-register
+            Requires=lmktfy-apiserver.service
+            After=lmktfy-apiserver.service
             Requires=fleet.service
             After=fleet.service
             [Service]
-            ExecStartPre=/usr/bin/wget -N -P /opt/bin http://<pxe-server-ip>/kube-register
-            ExecStartPre=/usr/bin/chmod +x /opt/bin/kube-register
-            ExecStart=/opt/bin/kube-register \
+            ExecStartPre=/usr/bin/wget -N -P /opt/bin http://<pxe-server-ip>/lmktfy-register
+            ExecStartPre=/usr/bin/chmod +x /opt/bin/lmktfy-register
+            ExecStart=/opt/bin/lmktfy-register \
             --metadata=role=node \
             --fleet-endpoint=unix:///var/run/fleet.sock \
             --api-endpoint=http://127.0.0.1:8080
@@ -506,35 +506,35 @@ On the PXE server make and fill in the variables ```vi /var/www/html/coreos/pxe-
             ExecStart=/opt/bin/setup-network-environment
             RemainAfterExit=yes
             Type=oneshot
-        - name: kube-proxy.service
+        - name: lmktfy-proxy.service
           command: start
           content: |
             [Unit]
-            Description=Kubernetes Proxy
-            Documentation=https://github.com/GoogleCloudPlatform/kubernetes
+            Description=LMKTFY Proxy
+            Documentation=https://github.com/GoogleCloudPlatform/lmktfy
             Requires=setup-network-environment.service
             After=setup-network-environment.service
             [Service]
-            ExecStartPre=/usr/bin/wget -N -P /opt/bin http://<pxe server ip>/kube-proxy
-            ExecStartPre=/usr/bin/chmod +x /opt/bin/kube-proxy
-            ExecStart=/opt/bin/kube-proxy \
+            ExecStartPre=/usr/bin/wget -N -P /opt/bin http://<pxe server ip>/lmktfy-proxy
+            ExecStartPre=/usr/bin/chmod +x /opt/bin/lmktfy-proxy
+            ExecStart=/opt/bin/lmktfy-proxy \
             --etcd_servers=http://10.20.30.40:4001 \
             --logtostderr=true
             Restart=always
             RestartSec=10
-        - name: kube-kubelet.service
+        - name: lmktfy-lmktfylet.service
           command: start
           content: |
             [Unit]
-            Description=Kubernetes Kubelet
-            Documentation=https://github.com/GoogleCloudPlatform/kubernetes
+            Description=LMKTFY LMKTFYlet
+            Documentation=https://github.com/GoogleCloudPlatform/lmktfy
             Requires=setup-network-environment.service
             After=setup-network-environment.service
             [Service]
             EnvironmentFile=/etc/network-environment
-            ExecStartPre=/usr/bin/wget -N -P /opt/bin http://<pxe server ip>/kubelet
-            ExecStartPre=/usr/bin/chmod +x /opt/bin/kubelet
-            ExecStart=/opt/bin/kubelet \
+            ExecStartPre=/usr/bin/wget -N -P /opt/bin http://<pxe server ip>/lmktfylet
+            ExecStartPre=/usr/bin/chmod +x /opt/bin/lmktfylet
+            ExecStart=/opt/bin/lmktfylet \
             --address=0.0.0.0 \
             --port=10250 \
             --hostname_override=${DEFAULT_IPV4} \
@@ -590,12 +590,12 @@ Refer to the MAC address table in the beginning of this guide. Documentation for
 Reboot these servers to get the images PXEd and ready for running containers!
 
 ## Creating test pod
-Now that the CoreOS with Kubernetes installed is up and running lets spin up some Kubernetes pods to demonstrate the system.
+Now that the CoreOS with LMKTFY installed is up and running lets spin up some LMKTFY pods to demonstrate the system.
 
-Here is a fork where you can do a full walk through by using [Kubernetes docs](https://github.com/GoogleCloudPlatform/kubernetes/tree/master/examples/walkthrough), or use the following example for a quick test.
+Here is a fork where you can do a full walk through by using [LMKTFY docs](https://github.com/GoogleCloudPlatform/lmktfy/tree/master/examples/walkthrough), or use the following example for a quick test.
 
 
-On the Kubernetes Master node lets create a '''nginx.yml'''
+On the LMKTFY Master node lets create a '''nginx.yml'''
     
     apiVersion: v1beta1
     kind: Pod
@@ -626,9 +626,9 @@ Now for the service: ```nginx-service.yml```
     # (e.g. 'www') or a number (e.g. 80)
     containerPort: 80
 
-Now add the pod to Kubernetes:
+Now add the pod to LMKTFY:
 
-     kubectl create -f nginx.yml
+     lmktfyctl create -f nginx.yml
 
 This might take a while to download depending on the environment.
     
@@ -643,12 +643,12 @@ List fleet machines
 
     fleetctl list-machines
 
-List Kubernetes
+List LMKTFY
 
-    kubectl get pods
-    kubectl grt minions
+    lmktfyctl get pods
+    lmktfyctl grt minions
 
 
 Kill all pods:
 
-    for i in `kubectl get pods | awk '{print $1}'`; do kubectl stop pod $i; done
+    for i in `lmktfyctl get pods | awk '{print $1}'`; do lmktfyctl stop pod $i; done

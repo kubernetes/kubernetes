@@ -21,13 +21,13 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
-source "${KUBE_ROOT}/hack/lib/init.sh"
+LMKTFY_ROOT=$(dirname "${BASH_SOURCE}")/..
+source "${LMKTFY_ROOT}/hack/lib/init.sh"
 
-KUBE_BUILD_PLATFORMS=("${KUBE_SERVER_PLATFORMS[@]}")
-kube::golang::build_binaries "${KUBE_SERVER_TARGETS[@]}"
+LMKTFY_BUILD_PLATFORMS=("${LMKTFY_SERVER_PLATFORMS[@]}")
+lmktfy::golang::build_binaries "${LMKTFY_SERVER_TARGETS[@]}"
 
-KUBE_BUILD_PLATFORMS=("${KUBE_CLIENT_PLATFORMS[@]}")
-kube::golang::build_binaries "${KUBE_CLIENT_TARGETS[@]}" "${KUBE_TEST_TARGETS[@]}"
+LMKTFY_BUILD_PLATFORMS=("${LMKTFY_CLIENT_PLATFORMS[@]}")
+lmktfy::golang::build_binaries "${LMKTFY_CLIENT_TARGETS[@]}" "${LMKTFY_TEST_TARGETS[@]}"
 
-kube::golang::place_bins
+lmktfy::golang::place_bins

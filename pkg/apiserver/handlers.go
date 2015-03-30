@@ -24,12 +24,12 @@ import (
 	"runtime/debug"
 	"strings"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/authorizer"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/httplog"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api/errors"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api/meta"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/auth/authorizer"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/httplog"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/util"
 	"github.com/golang/glog"
 )
 
@@ -205,7 +205,7 @@ func WithAuthorizationCheck(handler http.Handler, getAttribs RequestAttributeGet
 
 // APIRequestInfo holds information parsed from the http.Request
 type APIRequestInfo struct {
-	// Verb is the kube verb associated with the request, not the http verb.  This includes things like list and watch.
+	// Verb is the lmktfy verb associated with the request, not the http verb.  This includes things like list and watch.
 	Verb       string
 	APIVersion string
 	Namespace  string

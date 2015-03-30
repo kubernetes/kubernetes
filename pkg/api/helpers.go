@@ -19,11 +19,11 @@ package api
 import (
 	"reflect"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/conversion"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api/resource"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/conversion"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/fields"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/labels"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/util"
 
 	"github.com/davecgh/go-spew/spew"
 )
@@ -106,7 +106,7 @@ func IsServiceIPRequested(service *Service) bool {
 }
 
 var standardFinalizers = util.NewStringSet(
-	string(FinalizerKubernetes))
+	string(FinalizerLMKTFY))
 
 func IsStandardFinalizerName(str string) bool {
 	return standardFinalizers.Has(str)

@@ -32,10 +32,10 @@ func TestHandler(t *testing.T) {
 	want.WriteHeader(http.StatusOK)
 	mux := http.NewServeMux()
 	handler := Handler(mux, DefaultStacktracePred)
-	mux.HandleFunc("/kube", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/lmktfy", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
-	req, err := http.NewRequest("GET", "http://example.com/kube", nil)
+	req, err := http.NewRequest("GET", "http://example.com/lmktfy", nil)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}

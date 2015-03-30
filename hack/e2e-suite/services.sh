@@ -20,16 +20,16 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
+LMKTFY_ROOT=$(dirname "${BASH_SOURCE}")/../..
 
-: ${KUBE_VERSION_ROOT:=${KUBE_ROOT}}
-: ${KUBECTL:="${KUBE_VERSION_ROOT}/cluster/kubectl.sh"}
-: ${KUBE_CONFIG_FILE:="config-test.sh"}
+: ${LMKTFY_VERSION_ROOT:=${LMKTFY_ROOT}}
+: ${LMKTFYCTL:="${LMKTFY_VERSION_ROOT}/cluster/lmktfyctl.sh"}
+: ${LMKTFY_CONFIG_FILE:="config-test.sh"}
 
-export KUBECTL KUBE_CONFIG_FILE
+export LMKTFYCTL LMKTFY_CONFIG_FILE
 
-source "${KUBE_ROOT}/cluster/kube-env.sh"
-source "${KUBE_VERSION_ROOT}/cluster/${KUBERNETES_PROVIDER}/util.sh"
+source "${LMKTFY_ROOT}/cluster/lmktfy-env.sh"
+source "${LMKTFY_VERSION_ROOT}/cluster/${LMKTFYRNETES_PROVIDER}/util.sh"
 
 prepare-e2e
 
@@ -72,7 +72,7 @@ function do_teardown() {
 function start_service() {
   echo "Starting service '$1' on port $2 with $3 replicas"
   svcs_to_clean+=("$1")
-  ${KUBECTL} create -f - << __EOF__
+  ${LMKTFYCTL} create -f - << __EOF__
       {
           "kind": "ReplicationController",
           "apiVersion": "v1beta1",
@@ -90,7 +90,7 @@ function start_service() {
                           "containers": [
                               {
                                   "name": "$1",
-                                  "image": "kubernetes/serve_hostname:1.1",
+                                  "image": "lmktfy/serve_hostname:1.1",
                                   "ports": [
                                       {
                                           "containerPort": 9376,
@@ -114,7 +114,7 @@ __EOF__
     ips_array+=("\"${ip}\"")
   done
   public_ips=$(join ", " "${ips_array[@]:+${ips_array[@]}}")
-  ${KUBECTL} create -f - << __EOF__
+  ${LMKTFYCTL} create -f - << __EOF__
       {
           "kind": "Service",
           "apiVersion": "v1beta1",
@@ -138,8 +138,8 @@ __EOF__
 #   $1: service name
 function stop_service() {
   echo "Stopping service '$1'"
-  ${KUBECTL} stop rc "$1" || true
-  ${KUBECTL} delete services "$1" || true
+  ${LMKTFYCTL} stop rc "$1" || true
+  ${LMKTFYCTL} delete services "$1" || true
 }
 
 # Args:
@@ -150,7 +150,7 @@ function query_pods() {
   local pods_unsorted=()
   local i
   for i in $(seq 1 10); do
-    pods_unsorted=($(${KUBECTL} get pods -o template \
+    pods_unsorted=($(${LMKTFYCTL} get pods -o template \
         '--template={{range.items}}{{.id}} {{end}}' \
         -l name="$1"))
     found="${#pods_unsorted[*]}"
@@ -185,7 +185,7 @@ function wait_for_pods() {
     echo "Waiting for ${pods_needed} pods to become 'running'"
     pods_needed="$2"
     for id in ${pods_sorted}; do
-      status=$(${KUBECTL} get pods "${id}" -o template --template='{{.currentState.status}}')
+      status=$(${LMKTFYCTL} get pods "${id}" -o template --template='{{.currentState.status}}')
       if [[ "${status}" == "Running" ]]; then
         pods_needed=$((pods_needed-1))
       fi
@@ -311,9 +311,9 @@ svc1_pods=$(query_pods "${svc1_name}" "${svc1_count}")
 svc2_pods=$(query_pods "${svc2_name}" "${svc2_count}")
 
 # Get the portal IPs.
-svc1_ip=$(${KUBECTL} get services -o template '--template={{.portalIP}}' "${svc1_name}")
+svc1_ip=$(${LMKTFYCTL} get services -o template '--template={{.portalIP}}' "${svc1_name}")
 test -n "${svc1_ip}" || error "Service1 IP is blank"
-svc2_ip=$(${KUBECTL} get services -o template '--template={{.portalIP}}' "${svc2_name}")
+svc2_ip=$(${LMKTFYCTL} get services -o template '--template={{.portalIP}}' "${svc2_name}")
 test -n "${svc2_ip}" || error "Service2 IP is blank"
 if [[ "${svc1_ip}" == "${svc2_ip}" ]]; then
   error "Portal IPs conflict: ${svc1_ip}"
@@ -346,8 +346,8 @@ verify_from_container "${svc2_name}" "${svc2_ip}" "${svc2_port}" \
 # Test 2: Bounce the proxy and make sure the portal comes back.
 #
 echo "Test 2: Bounce the proxy and make sure the portal comes back."
-echo "Restarting kube-proxy"
-restart-kube-proxy "${test_node}"
+echo "Restarting lmktfy-proxy"
+restart-lmktfy-proxy "${test_node}"
 echo "Verifying the portals from the host"
 wait_for_service_up "${svc1_name}" "${svc1_ip}" "${svc1_port}" \
     "${svc1_count}" "${svc1_pods}"
@@ -383,7 +383,7 @@ wait_for_pods "${svc3_name}" "${svc3_count}"
 svc3_pods=$(query_pods "${svc3_name}" "${svc3_count}")
 
 # Get the portal IP.
-svc3_ip=$(${KUBECTL} get services -o template '--template={{.portalIP}}' "${svc3_name}")
+svc3_ip=$(${LMKTFYCTL} get services -o template '--template={{.portalIP}}' "${svc3_name}")
 test -n "${svc3_ip}" || error "Service3 IP is blank"
 
 echo "Verifying the portals from the host"
@@ -398,10 +398,10 @@ verify_from_container "${svc3_name}" "${svc3_ip}" "${svc3_port}" \
 #
 echo "Test 5: Remove the iptables rules, make sure they come back."
 echo "Manually removing iptables rules"
-# Remove both the new and old style chains, in case we're testing on an old kubelet
-ssh-to-node "${test_node}" "sudo iptables -t nat -F KUBE-PORTALS-HOST || true"
-ssh-to-node "${test_node}" "sudo iptables -t nat -F KUBE-PORTALS-CONTAINER || true"
-ssh-to-node "${test_node}" "sudo iptables -t nat -F KUBE-PROXY || true"
+# Remove both the new and old style chains, in case we're testing on an old lmktfylet
+ssh-to-node "${test_node}" "sudo iptables -t nat -F LMKTFY-PORTALS-HOST || true"
+ssh-to-node "${test_node}" "sudo iptables -t nat -F LMKTFY-PORTALS-CONTAINER || true"
+ssh-to-node "${test_node}" "sudo iptables -t nat -F LMKTFY-PROXY || true"
 echo "Verifying the portals from the host"
 wait_for_service_up "${svc3_name}" "${svc3_ip}" "${svc3_port}" \
     "${svc3_count}" "${svc3_pods}"
@@ -439,7 +439,7 @@ wait_for_pods "${svc4_name}" "${svc4_count}"
 svc4_pods=$(query_pods "${svc4_name}" "${svc4_count}")
 
 # Get the portal IP.
-svc4_ip=$(${KUBECTL} get services -o template '--template={{.portalIP}}' "${svc4_name}")
+svc4_ip=$(${LMKTFYCTL} get services -o template '--template={{.portalIP}}' "${svc4_name}")
 test -n "${svc4_ip}" || error "Service4 IP is blank"
 if [[ "${svc4_ip}" == "${svc2_ip}" || "${svc4_ip}" == "${svc3_ip}" ]]; then
   error "Portal IPs conflict: ${svc4_ip}"

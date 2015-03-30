@@ -20,11 +20,11 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/mount"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/types"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/util"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/util/mount"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/volume"
 )
 
 // This is the primary entrypoint for volume plugins.
@@ -50,7 +50,7 @@ type emptyDirPlugin struct {
 var _ volume.VolumePlugin = &emptyDirPlugin{}
 
 const (
-	emptyDirPluginName       = "kubernetes.io/empty-dir"
+	emptyDirPluginName       = "lmktfy.io/empty-dir"
 	emptyDirPluginLegacyName = "empty"
 )
 

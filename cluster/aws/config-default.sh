@@ -15,22 +15,22 @@
 # limitations under the License.
 
 # TODO: the zone isn't quite piped into all the right places...
-ZONE=${KUBE_AWS_ZONE:-us-west-2}
+ZONE=${LMKTFY_AWS_ZONE:-us-west-2}
 MASTER_SIZE=${MASTER_SIZE:-t2.micro}
 MINION_SIZE=${MINION_SIZE:-t2.micro}
 NUM_MINIONS=${NUM_MINIONS:-4}
 
 # Optional: Set AWS_S3_BUCKET to the name of an S3 bucket to use for uploading binaries
 # (otherwise a unique bucket name will be generated for you)
-#  AWS_S3_BUCKET=kubernetes-artifacts
+#  AWS_S3_BUCKET=lmktfy-artifacts
 
 # Because regions are globally named, we want to create in a single region; default to us-east-1
 AWS_S3_REGION=${AWS_S3_REGION:-us-east-1}
 
-INSTANCE_PREFIX="${KUBE_AWS_INSTANCE_PREFIX:-kubernetes}"
-AWS_SSH_KEY=${AWS_SSH_KEY:-$HOME/.ssh/kube_aws_rsa}
-IAM_PROFILE_MASTER="kubernetes-master"
-IAM_PROFILE_MINION="kubernetes-minion"
+INSTANCE_PREFIX="${LMKTFY_AWS_INSTANCE_PREFIX:-lmktfy}"
+AWS_SSH_KEY=${AWS_SSH_KEY:-$HOME/.ssh/lmktfy_aws_rsa}
+IAM_PROFILE_MASTER="lmktfy-master"
+IAM_PROFILE_MINION="lmktfy-minion"
 
 LOG="/dev/null"
 
@@ -49,17 +49,17 @@ MASTER_IP_RANGE="${MASTER_IP_RANGE:-10.246.0.0/24}"
 ENABLE_DOCKER_REGISTRY_CACHE=true
 
 # Optional: Install node monitoring.
-ENABLE_NODE_MONITORING="${KUBE_ENABLE_NODE_MONITORING:-true}"
+ENABLE_NODE_MONITORING="${LMKTFY_ENABLE_NODE_MONITORING:-true}"
 
 # Optional: When set to true, heapster, Influxdb and Grafana will be setup as part of the cluster bring up.
-ENABLE_CLUSTER_MONITORING="${KUBE_ENABLE_CLUSTER_MONITORING:-true}"
+ENABLE_CLUSTER_MONITORING="${LMKTFY_ENABLE_CLUSTER_MONITORING:-true}"
 
 # Optional: Enable node logging.
-ENABLE_NODE_LOGGING="${KUBE_ENABLE_NODE_LOGGING:-true}"
-LOGGING_DESTINATION="${KUBE_LOGGING_DESTINATION:-elasticsearch}" # options: elasticsearch, gcp
+ENABLE_NODE_LOGGING="${LMKTFY_ENABLE_NODE_LOGGING:-true}"
+LOGGING_DESTINATION="${LMKTFY_LOGGING_DESTINATION:-elasticsearch}" # options: elasticsearch, gcp
 
 # Optional: When set to true, Elasticsearch and Kibana will be setup as part of the cluster bring up.
-ENABLE_CLUSTER_LOGGING="${KUBE_ENABLE_CLUSTER_LOGGING:-true}"
+ENABLE_CLUSTER_LOGGING="${LMKTFY_ENABLE_CLUSTER_LOGGING:-true}"
 ELASTICSEARCH_LOGGING_REPLICAS=1
 
 # Don't require https for registries in our local RFC1918 network
@@ -68,7 +68,7 @@ EXTRA_DOCKER_OPTS="--insecure-registry 10.0.0.0/8"
 # Optional: Install cluster DNS.
 ENABLE_CLUSTER_DNS=true
 DNS_SERVER_IP="10.0.0.10"
-DNS_DOMAIN="kubernetes.local"
+DNS_DOMAIN="lmktfy.local"
 DNS_REPLICAS=1
 
 # Admission Controllers to invoke prior to persisting objects in cluster

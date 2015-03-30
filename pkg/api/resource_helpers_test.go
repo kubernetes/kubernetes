@@ -19,7 +19,7 @@ package api
 import (
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api/resource"
 )
 
 func TestResourceHelpers(t *testing.T) {
@@ -29,7 +29,7 @@ func TestResourceHelpers(t *testing.T) {
 		Limits: ResourceList{
 			"cpu":             cpuLimit,
 			"memory":          memoryLimit,
-			"kube.io/storage": memoryLimit,
+			"lmktfy.io/storage": memoryLimit,
 		},
 	}
 	if res := resourceSpec.Limits.Cpu(); *res != cpuLimit {
@@ -41,7 +41,7 @@ func TestResourceHelpers(t *testing.T) {
 	resourceSpec = ResourceRequirements{
 		Limits: ResourceList{
 			"memory":          memoryLimit,
-			"kube.io/storage": memoryLimit,
+			"lmktfy.io/storage": memoryLimit,
 		},
 	}
 	if res := resourceSpec.Limits.Cpu(); res.Value() != 0 {

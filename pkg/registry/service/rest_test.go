@@ -22,14 +22,14 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/rest"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/rest/resttest"
-	cloud "github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/fake"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/registrytest"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api/errors"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api/rest"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api/rest/resttest"
+	cloud "github.com/GoogleCloudPlatform/lmktfy/pkg/cloudprovider/fake"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/fields"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/labels"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/registry/registrytest"
 )
 
 func NewTestREST(t *testing.T, endpoints *api.EndpointsList) (*REST, *registrytest.ServiceRegistry, *cloud.FakeCloud) {
@@ -40,7 +40,7 @@ func NewTestREST(t *testing.T, endpoints *api.EndpointsList) (*REST, *registryte
 		Endpoints: endpoints,
 	}
 	nodeRegistry := registrytest.NewMinionRegistry(machines, api.NodeResources{})
-	storage := NewStorage(registry, fakeCloud, nodeRegistry, endpointRegistry, makeIPNet(t), "kubernetes")
+	storage := NewStorage(registry, fakeCloud, nodeRegistry, endpointRegistry, makeIPNet(t), "lmktfy")
 	return storage, registry, fakeCloud
 }
 
@@ -234,7 +234,7 @@ func TestServiceRegistryExternalService(t *testing.T) {
 	if srv == nil {
 		t.Errorf("Failed to find service: %s", svc.Name)
 	}
-	if len(fakeCloud.Balancers) != 1 || fakeCloud.Balancers[0].Name != "kubernetes-default-foo" || fakeCloud.Balancers[0].Port != 6502 {
+	if len(fakeCloud.Balancers) != 1 || fakeCloud.Balancers[0].Name != "lmktfy-default-foo" || fakeCloud.Balancers[0].Port != 6502 {
 		t.Errorf("Unexpected balancer created: %v", fakeCloud.Balancers)
 	}
 }
@@ -638,7 +638,7 @@ func TestServiceRegistryIPExternalLoadBalancer(t *testing.T) {
 	if err != nil {
 		t.Errorf("Unexpected error %v", err)
 	}
-	if len(fakeCloud.Balancers) != 1 || fakeCloud.Balancers[0].Name != "kubernetes-default-foo" || fakeCloud.Balancers[0].Port != 6502 {
+	if len(fakeCloud.Balancers) != 1 || fakeCloud.Balancers[0].Name != "lmktfy-default-foo" || fakeCloud.Balancers[0].Port != 6502 {
 		t.Errorf("Unexpected balancer created: %v", fakeCloud.Balancers)
 	}
 }
@@ -649,7 +649,7 @@ func TestServiceRegistryIPReloadFromStorage(t *testing.T) {
 	machines := []string{"foo", "bar", "baz"}
 	nodeRegistry := registrytest.NewMinionRegistry(machines, api.NodeResources{})
 	endpoints := &registrytest.EndpointRegistry{}
-	rest1 := NewStorage(registry, fakeCloud, nodeRegistry, endpoints, makeIPNet(t), "kubernetes")
+	rest1 := NewStorage(registry, fakeCloud, nodeRegistry, endpoints, makeIPNet(t), "lmktfy")
 	rest1.portalMgr.randomAttempts = 0
 
 	svc := &api.Service{
@@ -676,7 +676,7 @@ func TestServiceRegistryIPReloadFromStorage(t *testing.T) {
 
 	// This will reload from storage, finding the previous 2
 	nodeRegistry = registrytest.NewMinionRegistry(machines, api.NodeResources{})
-	rest2 := NewStorage(registry, fakeCloud, nodeRegistry, endpoints, makeIPNet(t), "kubernetes")
+	rest2 := NewStorage(registry, fakeCloud, nodeRegistry, endpoints, makeIPNet(t), "lmktfy")
 	rest2.portalMgr.randomAttempts = 0
 
 	svc = &api.Service{

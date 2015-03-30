@@ -19,7 +19,7 @@ package clientcmd
 import (
 	"github.com/spf13/pflag"
 
-	clientcmdapi "github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd/api"
+	clientcmdapi "github.com/GoogleCloudPlatform/lmktfy/pkg/client/clientcmd/api"
 )
 
 // ConfigOverrides holds values that should override whatever information is pulled from the actual Config object.  You can't
@@ -140,7 +140,7 @@ func BindAuthInfoFlags(authInfo *clientcmdapi.AuthInfo, flags *pflag.FlagSet, fl
 
 // BindClusterFlags is a convenience method to bind the specified flags to their associated variables
 func BindClusterFlags(clusterInfo *clientcmdapi.Cluster, flags *pflag.FlagSet, flagNames ClusterOverrideFlags) {
-	flags.StringVarP(&clusterInfo.Server, flagNames.APIServer, flagNames.APIServerShort, "", "The address and port of the Kubernetes API server")
+	flags.StringVarP(&clusterInfo.Server, flagNames.APIServer, flagNames.APIServerShort, "", "The address and port of the LMKTFY API server")
 	flags.StringVar(&clusterInfo.APIVersion, flagNames.APIVersion, "", "The API version to use when talking to the server")
 	flags.StringVar(&clusterInfo.CertificateAuthority, flagNames.CertificateAuthority, "", "Path to a cert. file for the certificate authority.")
 	flags.BoolVar(&clusterInfo.InsecureSkipTLSVerify, flagNames.InsecureSkipTLSVerify, false, "If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure.")
@@ -151,12 +151,12 @@ func BindOverrideFlags(overrides *ConfigOverrides, flags *pflag.FlagSet, flagNam
 	BindAuthInfoFlags(&overrides.AuthInfo, flags, flagNames.AuthOverrideFlags)
 	BindClusterFlags(&overrides.ClusterInfo, flags, flagNames.ClusterOverrideFlags)
 	BindContextFlags(&overrides.Context, flags, flagNames.ContextOverrideFlags)
-	flags.StringVar(&overrides.CurrentContext, flagNames.CurrentContext, "", "The name of the kubeconfig context to use")
+	flags.StringVar(&overrides.CurrentContext, flagNames.CurrentContext, "", "The name of the lmktfyconfig context to use")
 }
 
 // BindFlags is a convenience method to bind the specified flags to their associated variables
 func BindContextFlags(contextInfo *clientcmdapi.Context, flags *pflag.FlagSet, flagNames ContextOverrideFlags) {
-	flags.StringVar(&contextInfo.Cluster, flagNames.ClusterName, "", "The name of the kubeconfig cluster to use")
-	flags.StringVar(&contextInfo.AuthInfo, flagNames.AuthInfoName, "", "The name of the kubeconfig user to use")
+	flags.StringVar(&contextInfo.Cluster, flagNames.ClusterName, "", "The name of the lmktfyconfig cluster to use")
+	flags.StringVar(&contextInfo.AuthInfo, flagNames.AuthInfoName, "", "The name of the lmktfyconfig user to use")
 	flags.StringVarP(&contextInfo.Namespace, flagNames.Namespace, flagNames.NamespaceShort, "", "If present, the namespace scope for this CLI request.")
 }

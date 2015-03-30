@@ -56,14 +56,14 @@ usermod -a -G libvirtd $USER
 
 #### ² Qemu will run with a specific user. It must have access to the VMs drives
 
-All the disk drive resources needed by the VM (CoreOS disk image, kubernetes binaries, cloud-init files, etc.) are put inside `./cluster/libvirt-coreos/libvirt_storage_pool`.
+All the disk drive resources needed by the VM (CoreOS disk image, lmktfy binaries, cloud-init files, etc.) are put inside `./cluster/libvirt-coreos/libvirt_storage_pool`.
 
 As we’re using the `qemu:///system` instance of libvirt, qemu will run with a specific `user:group` distinct from your user. It is configured in `/etc/libvirt/qemu.conf`. That qemu user must have access to that libvirt storage pool.
 
-If your `$HOME` is world readable, everything is fine. If your $HOME is private, `cluster/kube-up.sh` will fail with an error message like:
+If your `$HOME` is world readable, everything is fine. If your $HOME is private, `cluster/lmktfy-up.sh` will fail with an error message like:
 
 ```
-error: Cannot access storage file '$HOME/.../kubernetes/cluster/libvirt-coreos/libvirt_storage_pool/kubernetes_master.img' (as uid:99, gid:78): Permission denied
+error: Cannot access storage file '$HOME/.../lmktfy/cluster/libvirt-coreos/libvirt_storage_pool/lmktfy_master.img' (as uid:99, gid:78): Permission denied
 ```
 
 In order to fix that issue, you have several possibilities:
@@ -81,24 +81,24 @@ setfacl -m g:kvm:--x ~
 
 ### Setup
 
-By default, the libvirt-coreos setup will create a single kubernetes master and 3 kubernetes minions. Because the VM drives use Copy-on-Write and because of memory ballooning and KSM, there is a lot of resource over-allocation.
+By default, the libvirt-coreos setup will create a single lmktfy master and 3 lmktfy minions. Because the VM drives use Copy-on-Write and because of memory ballooning and KSM, there is a lot of resource over-allocation.
 
 To start your local cluster, open a shell and run:
 
 ```shell
-cd kubernetes
+cd lmktfy
 
-export KUBERNETES_PROVIDER=libvirt-coreos
-cluster/kube-up.sh
+export LMKTFYRNETES_PROVIDER=libvirt-coreos
+cluster/lmktfy-up.sh
 ```
 
-The `KUBERNETES_PROVIDER` environment variable tells all of the various cluster management scripts which variant to use.  If you forget to set this, the assumption is you are running on Google Compute Engine.
+The `LMKTFYRNETES_PROVIDER` environment variable tells all of the various cluster management scripts which variant to use.  If you forget to set this, the assumption is you are running on Google Compute Engine.
 
 The `NUM_MINIONS` environment variable may be set to specify the number of minions to start. If it is not set, the number of minions defaults to 3.
 
-The `KUBE_PUSH` environment variable may be set to specify which kubernetes binaries must be deployed on the cluster. Its possible values are:
+The `LMKTFY_PUSH` environment variable may be set to specify which lmktfy binaries must be deployed on the cluster. Its possible values are:
 
-* `release` (default if `KUBE_PUSH` is not set) will deploy the binaries of `_output/release-tars/kubernetes-server-….tar.gz`. This is built with `make release` or `make release-skip-tests`.
+* `release` (default if `LMKTFY_PUSH` is not set) will deploy the binaries of `_output/release-tars/lmktfy-server-….tar.gz`. This is built with `make release` or `make release-skip-tests`.
 * `local` will deploy the binaries of `_output/local/go/bin`. These are built with `make`.
 
 You can check that your machines are there and running with:
@@ -107,16 +107,16 @@ You can check that your machines are there and running with:
 virsh -c qemu:///system list
  Id    Name                           State
 ----------------------------------------------------
- 15    kubernetes_master              running
- 16    kubernetes_minion-01           running
- 17    kubernetes_minion-02           running
- 18    kubernetes_minion-03           running
+ 15    lmktfy_master              running
+ 16    lmktfy_minion-01           running
+ 17    lmktfy_minion-02           running
+ 18    lmktfy_minion-03           running
  ```
 
-You can check that the kubernetes cluster is working with:
+You can check that the lmktfy cluster is working with:
 
 ```
-$ ./cluster/kubectl.sh get minions
+$ ./cluster/lmktfyctl.sh get minions
 NAME                LABELS              STATUS
 192.168.10.2        <none>              Ready
 192.168.10.3        <none>              Ready
@@ -129,56 +129,56 @@ The user to use to connect to the VM is `core`.
 The IP to connect to the master is 192.168.10.1.
 The IPs to connect to the minions are 192.168.10.2 and onwards.
 
-Connect to `kubernetes_master`:
+Connect to `lmktfy_master`:
 ```
 ssh core@192.168.10.1
 ```
 
-Connect to `kubernetes_minion-01`:
+Connect to `lmktfy_minion-01`:
 ```
 ssh core@192.168.10.2
 ```
 
-### Interacting with your Kubernetes cluster with the `kube-*` scripts.
+### Interacting with your LMKTFY cluster with the `lmktfy-*` scripts.
 
-All of the following commands assume you have set `KUBERNETES_PROVIDER` appropriately:
+All of the following commands assume you have set `LMKTFYRNETES_PROVIDER` appropriately:
 
 ```
-export KUBERNETES_PROVIDER=libvirt-coreos
+export LMKTFYRNETES_PROVIDER=libvirt-coreos
 ```
 
 Bring up a libvirt-CoreOS cluster of 5 minions
 
 ```
-NUM_MINIONS=5 cluster/kube-up.sh
+NUM_MINIONS=5 cluster/lmktfy-up.sh
 ```
 
 Destroy the libvirt-CoreOS cluster
 
 ```
-cluster/kube-down.sh
+cluster/lmktfy-down.sh
 ```
 
-Update the libvirt-CoreOS cluster with a new Kubernetes release produced by `make release` or `make release-skip-tests`:
+Update the libvirt-CoreOS cluster with a new LMKTFY release produced by `make release` or `make release-skip-tests`:
 
 ```
-cluster/kube-push.sh
+cluster/lmktfy-push.sh
 ```
 
-Update the libvirt-CoreOS cluster with the locally built Kubernetes binaries produced by `make`:
+Update the libvirt-CoreOS cluster with the locally built LMKTFY binaries produced by `make`:
 ```
-KUBE_PUSH=local cluster/kube-push.sh
+LMKTFY_PUSH=local cluster/lmktfy-push.sh
 ```
 
 Interact with the cluster
 
 ```
-cluster/kubectl.sh
+cluster/lmktfyctl.sh
 ```
 
 ### Troubleshooting
 
-#### !!! Cannot find kubernetes-server-linux-amd64.tar.gz
+#### !!! Cannot find lmktfy-server-linux-amd64.tar.gz
 
 Build the release tarballs:
 

@@ -21,9 +21,9 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/client"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/util"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -43,7 +43,7 @@ var _ = Describe("Networking", func() {
 
 	It("should function for pods", func() {
 		if testContext.provider == "vagrant" {
-			By("Skipping test which is broken for vagrant (See https://github.com/GoogleCloudPlatform/kubernetes/issues/3580)")
+			By("Skipping test which is broken for vagrant (See https://github.com/GoogleCloudPlatform/lmktfy/issues/3580)")
 			return
 		}
 
@@ -113,7 +113,7 @@ var _ = Describe("Networking", func() {
 					Containers: []api.Container{
 						{
 							Name:  "webserver",
-							Image: "kubernetes/nettest:1.1",
+							Image: "lmktfy/nettest:1.1",
 							Command: []string{
 								"-service=" + name,
 								fmt.Sprintf("-peers=%d", peers),

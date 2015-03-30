@@ -17,8 +17,8 @@ limitations under the License.
 package limitranger
 
 import (
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/runtime"
 )
 
 // LimitFunc is a pluggable function to enforce limits on the object

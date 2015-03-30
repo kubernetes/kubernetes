@@ -16,7 +16,7 @@ limitations under the License.
 
 package abac
 
-// Policy authorizes Kubernetes API actions using an Attribute-based access
+// Policy authorizes LMKTFY API actions using an Attribute-based access
 // control scheme.
 
 import (
@@ -25,7 +25,7 @@ import (
 	"errors"
 	"os"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/authorizer"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/auth/authorizer"
 )
 
 // TODO: make this into a real API object.  Note that when that happens, it

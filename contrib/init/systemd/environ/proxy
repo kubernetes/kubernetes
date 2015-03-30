@@ -1,7 +1,7 @@
 ###
-# kubernetes proxy config
+# lmktfyrnetes proxy config
 
 # default config should be adequate
 
 # Add your own!
-KUBE_PROXY_ARGS=""
+LMKTFY_PROXY_ARGS=""

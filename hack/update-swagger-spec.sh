@@ -21,46 +21,46 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
-SWAGGER_ROOT_DIR="${KUBE_ROOT}/api/swagger-spec"
-source "${KUBE_ROOT}/hack/lib/init.sh"
+LMKTFY_ROOT=$(dirname "${BASH_SOURCE}")/..
+SWAGGER_ROOT_DIR="${LMKTFY_ROOT}/api/swagger-spec"
+source "${LMKTFY_ROOT}/hack/lib/init.sh"
 
 function cleanup()
 {
     [[ -n ${APISERVER_PID-} ]] && kill ${APISERVER_PID} 1>&2 2>/dev/null
 
-    kube::etcd::cleanup
+    lmktfy::etcd::cleanup
 
-    kube::log::status "Clean up complete"
+    lmktfy::log::status "Clean up complete"
 }
 
 trap cleanup EXIT SIGINT
 
-kube::etcd::start
+lmktfy::etcd::start
 
 ETCD_HOST=${ETCD_HOST:-127.0.0.1}
 ETCD_PORT=${ETCD_PORT:-4001}
 API_PORT=${API_PORT:-8050}
 API_HOST=${API_HOST:-127.0.0.1}
-KUBELET_PORT=${KUBELET_PORT:-10250}
+LMKTFYLET_PORT=${LMKTFYLET_PORT:-10250}
 
-# Start kube-apiserver
-kube::log::status "Starting kube-apiserver"
-"${KUBE_OUTPUT_HOSTBIN}/kube-apiserver" \
+# Start lmktfy-apiserver
+lmktfy::log::status "Starting lmktfy-apiserver"
+"${LMKTFY_OUTPUT_HOSTBIN}/lmktfy-apiserver" \
   --address="127.0.0.1" \
   --public_address_override="127.0.0.1" \
   --port="${API_PORT}" \
   --etcd_servers="http://${ETCD_HOST}:${ETCD_PORT}" \
   --public_address_override="127.0.0.1" \
-  --kubelet_port=${KUBELET_PORT} \
+  --lmktfylet_port=${LMKTFYLET_PORT} \
   --runtime_config=api/v1beta3 \
   --portal_net="10.0.0.0/24" 1>&2 &
 APISERVER_PID=$!
 
-kube::util::wait_for_url "http://127.0.0.1:${API_PORT}/healthz" "apiserver: "
+lmktfy::util::wait_for_url "http://127.0.0.1:${API_PORT}/healthz" "apiserver: "
 
 SWAGGER_API_PATH="http://127.0.0.1:${API_PORT}/swaggerapi/"
-kube::log::status "Updating " ${SWAGGER_ROOT_DIR}
+lmktfy::log::status "Updating " ${SWAGGER_ROOT_DIR}
 curl ${SWAGGER_API_PATH} > ${SWAGGER_ROOT_DIR}/resourceListing.json
 curl ${SWAGGER_API_PATH}version > ${SWAGGER_ROOT_DIR}/version.json
 curl ${SWAGGER_API_PATH}api > ${SWAGGER_ROOT_DIR}/api.json
@@ -68,4 +68,4 @@ curl ${SWAGGER_API_PATH}api/v1beta1 > ${SWAGGER_ROOT_DIR}/v1beta1.json
 curl ${SWAGGER_API_PATH}api/v1beta2 > ${SWAGGER_ROOT_DIR}/v1beta2.json
 curl ${SWAGGER_API_PATH}api/v1beta3 > ${SWAGGER_ROOT_DIR}/v1beta3.json
 
-kube::log::status "SUCCESS"
+lmktfy::log::status "SUCCESS"

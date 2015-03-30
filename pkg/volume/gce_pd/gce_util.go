@@ -23,16 +23,16 @@ import (
 	"path"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/gce"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/exec"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/mount"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/cloudprovider"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/cloudprovider/gce"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/util/exec"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/util/mount"
 	"github.com/golang/glog"
 )
 
 type GCEDiskUtil struct{}
 
-// Attaches a disk specified by a volume.GCEPersistentDisk to the current kubelet.
+// Attaches a disk specified by a volume.GCEPersistentDisk to the current lmktfylet.
 // Mounts the disk to it's global path.
 func (util *GCEDiskUtil) AttachAndMountDisk(pd *gcePersistentDisk, globalPDPath string) error {
 	gce, err := cloudprovider.GetCloudProvider("gce", nil)
@@ -89,7 +89,7 @@ func (util *GCEDiskUtil) AttachAndMountDisk(pd *gcePersistentDisk, globalPDPath 
 	return nil
 }
 
-// Unmounts the device and detaches the disk from the kubelet's host machine.
+// Unmounts the device and detaches the disk from the lmktfylet's host machine.
 func (util *GCEDiskUtil) DetachDisk(pd *gcePersistentDisk) error {
 	// Unmount the global PD mount, which should be the only one.
 	globalPDPath := makeGlobalPDName(pd.plugin.host, pd.pdName)

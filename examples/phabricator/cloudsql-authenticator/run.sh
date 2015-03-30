@@ -4,7 +4,7 @@
 #       should only send updates if something changes. We should be able to do
 #       this by comparing pod creation time with the last scan time.
 while true; do
-  hostport="${KUBERNETES_RO_SERVICE_HOST}:${KUBERNETES_RO_SERVICE_PORT}"
+  hostport="${LMKTFYRNETES_RO_SERVICE_HOST}:${LMKTFYRNETES_RO_SERVICE_PORT}"
   path="api/v1beta1/pods"
   query="labels=$SELECTOR"
   ips_json=`curl ${hostport}/${path}?${query} 2>/dev/null | grep hostIP`

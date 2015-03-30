@@ -3,7 +3,7 @@ kind: ReplicationController
 metadata: 
   labels: 
     name: heapster
-    kubernetes.io/cluster-service: "true"
+    lmktfy.io/cluster-service: "true"
   name: monitoring-heapster-controller
 spec: 
   replicas: 1
@@ -13,7 +13,7 @@ spec:
     metadata: 
       labels: 
         name: heapster
-        kubernetes.io/cluster-service: "true"
+        lmktfy.io/cluster-service: "true"
     spec: 
       containers: 
         - image: gcr.io/google-containers/heapster:v0.9

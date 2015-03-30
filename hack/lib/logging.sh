@@ -16,7 +16,7 @@
 
 # Handler for when we exit automatically on an error.
 # Borrowed from https://gist.github.com/ahendrix/7030300
-kube::log::errexit() {
+lmktfy::log::errexit() {
   local err="${PIPESTATUS[@]}"
 
   # If the shell we are in doesn't have errexit set (common in subshells) then
@@ -25,13 +25,13 @@ kube::log::errexit() {
 
   set +o xtrace
   local code="${1:-1}"
-  kube::log::error_exit "'${BASH_COMMAND}' exited with status $err" "${1:-1}" 1
+  lmktfy::log::error_exit "'${BASH_COMMAND}' exited with status $err" "${1:-1}" 1
 }
 
-kube::log::install_errexit() {
+lmktfy::log::install_errexit() {
   # trap ERR to provide an error handler whenever a command exits nonzero  this
   # is a more verbose version of set -o errexit
-  trap 'kube::log::errexit' ERR
+  trap 'lmktfy::log::errexit' ERR
 
   # setting errtrace allows our ERR trap handler to be propagated to functions,
   # expansions and subshells
@@ -42,7 +42,7 @@ kube::log::install_errexit() {
 #
 # Args:
 #   $1 The number of stack frames to skip when printing.
-kube::log::stack() {
+lmktfy::log::stack() {
   local stack_skip=${1:-0}
   stack_skip=$((stack_skip + 1))
   if [[ ${#FUNCNAME[@]} -gt $stack_skip ]]; then
@@ -64,7 +64,7 @@ kube::log::stack() {
 #   $1 Message to log with the error
 #   $2 The error code to return
 #   $3 The number of stack frames to skip when printing.
-kube::log::error_exit() {
+lmktfy::log::error_exit() {
   local message="${1:-}"
   local code="${2:-1}"
   local stack_skip="${3:-0}"
@@ -77,14 +77,14 @@ kube::log::error_exit() {
     echo "  ${1}" >&2
   }
 
-  kube::log::stack $stack_skip
+  lmktfy::log::stack $stack_skip
 
   echo "Exiting with status ${code}" >&2
   exit "${code}"
 }
 
 # Log an error but keep going.  Don't dump the stack or exit.
-kube::log::error() {
+lmktfy::log::error() {
   timestamp=$(date +"[%m%d %H:%M:%S]")
   echo "!!! $timestamp ${1-}" >&2
   shift
@@ -94,7 +94,7 @@ kube::log::error() {
 }
 
 # Print an usage message to stderr.  The arguments are printed directly.
-kube::log::usage() {
+lmktfy::log::usage() {
   echo >&2
   local message
   for message; do
@@ -103,33 +103,33 @@ kube::log::usage() {
   echo >&2
 }
 
-kube::log::usage_from_stdin() {
+lmktfy::log::usage_from_stdin() {
   local messages=()
   while read -r line; do
     messages+=$line
   done
 
-  kube::log::usage "${messages[@]}"
+  lmktfy::log::usage "${messages[@]}"
 }
 
 # Print out some info that isn't a top level status line
-kube::log::info() {
+lmktfy::log::info() {
   for message; do
     echo "$message"
   done
 }
 
-kube::log::info_from_stdin() {
+lmktfy::log::info_from_stdin() {
   local messages=()
   while read -r line; do
     messages+=$line
   done
 
-  kube::log::info "${messages[@]}"
+  lmktfy::log::info "${messages[@]}"
 }
 
 # Print a status line.  Formatted to show up in a stream of output.
-kube::log::status() {
+lmktfy::log::status() {
   timestamp=$(date +"[%m%d %H:%M:%S]")
   echo "+++ $timestamp $1"
   shift

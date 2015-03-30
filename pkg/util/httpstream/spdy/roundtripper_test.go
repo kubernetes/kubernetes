@@ -32,7 +32,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/httpstream"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/util/httpstream"
 )
 
 func TestRoundTripAndNewConnection(t *testing.T) {

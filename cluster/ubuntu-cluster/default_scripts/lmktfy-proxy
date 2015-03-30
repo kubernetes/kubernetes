@@ -1,0 +1,10 @@
+# LMKTFY-Proxy Upstart and SysVinit configuration file
+
+# Customize lmktfy-proxy binary location 
+# LMKTFY_PROXY="/opt/bin/lmktfy-proxy"
+
+# Use LMKTFY_PROXY_OPTS to modify the start/restart options
+LMKTFY_PROXY_OPTS="--master=http://MASTER_IP:8080 \
+--logtostderr=true"
+
+# Add more envionrment settings used by lmktfy-apiserver here

@@ -19,7 +19,7 @@ package api_test
 import (
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api"
 )
 
 // TestNamespaceContext validates that a namespace can be get/set on a context object

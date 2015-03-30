@@ -14,6 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package master contains code for setting up and running a Kubernetes
+// Package master contains code for setting up and running a LMKTFY
 // cluster master.
 package master

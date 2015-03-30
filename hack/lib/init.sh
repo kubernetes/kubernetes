@@ -19,24 +19,24 @@ set -o nounset
 set -o pipefail
 
 # The root of the build/dist directory
-KUBE_ROOT=$(
+LMKTFY_ROOT=$(
   unset CDPATH
-  kube_root=$(dirname "${BASH_SOURCE}")/../..
-  cd "${kube_root}"
+  lmktfy_root=$(dirname "${BASH_SOURCE}")/../..
+  cd "${lmktfy_root}"
   pwd
 )
 
-KUBE_OUTPUT_SUBPATH="${KUBE_OUTPUT_SUBPATH:-_output/local}"
-KUBE_OUTPUT="${KUBE_ROOT}/${KUBE_OUTPUT_SUBPATH}"
-KUBE_OUTPUT_BINPATH="${KUBE_OUTPUT}/bin"
+LMKTFY_OUTPUT_SUBPATH="${LMKTFY_OUTPUT_SUBPATH:-_output/local}"
+LMKTFY_OUTPUT="${LMKTFY_ROOT}/${LMKTFY_OUTPUT_SUBPATH}"
+LMKTFY_OUTPUT_BINPATH="${LMKTFY_OUTPUT}/bin"
 
-source "${KUBE_ROOT}/hack/lib/util.sh"
-source "${KUBE_ROOT}/hack/lib/logging.sh"
+source "${LMKTFY_ROOT}/hack/lib/util.sh"
+source "${LMKTFY_ROOT}/hack/lib/logging.sh"
 
-kube::log::install_errexit
+lmktfy::log::install_errexit
 
-source "${KUBE_ROOT}/hack/lib/version.sh"
-source "${KUBE_ROOT}/hack/lib/golang.sh"
-source "${KUBE_ROOT}/hack/lib/etcd.sh"
+source "${LMKTFY_ROOT}/hack/lib/version.sh"
+source "${LMKTFY_ROOT}/hack/lib/golang.sh"
+source "${LMKTFY_ROOT}/hack/lib/etcd.sh"
 
-KUBE_OUTPUT_HOSTBIN="${KUBE_OUTPUT_BINPATH}/$(kube::util::host_platform)"
+LMKTFY_OUTPUT_HOSTBIN="${LMKTFY_OUTPUT_BINPATH}/$(lmktfy::util::host_platform)"

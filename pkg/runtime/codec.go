@@ -17,7 +17,7 @@ limitations under the License.
 package runtime
 
 import (
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/yaml"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/util/yaml"
 )
 
 // CodecFor returns a Codec that invokes Encode with the provided version.

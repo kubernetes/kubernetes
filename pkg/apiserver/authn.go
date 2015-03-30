@@ -17,9 +17,9 @@ limitations under the License.
 package apiserver
 
 import (
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/authenticator"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/authenticator/bearertoken"
-	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/auth/authenticator/token/tokenfile"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/auth/authenticator"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/auth/authenticator/bearertoken"
+	"github.com/GoogleCloudPlatform/lmktfy/plugin/pkg/auth/authenticator/token/tokenfile"
 )
 
 // NewAuthenticatorFromTokenFile returns an authenticator.Request or an error

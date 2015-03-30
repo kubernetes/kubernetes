@@ -22,7 +22,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/httpstream"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/util/httpstream"
 	"github.com/docker/spdystream"
 	"github.com/golang/glog"
 )

@@ -19,10 +19,10 @@ package namespace
 import (
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/cache"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/client"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/client/cache"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/util"
 )
 
 func TestFinalized(t *testing.T) {
@@ -48,7 +48,7 @@ func TestFinalize(t *testing.T) {
 			ResourceVersion: "1",
 		},
 		Spec: api.NamespaceSpec{
-			Finalizers: []api.FinalizerName{"kubernetes", "other"},
+			Finalizers: []api.FinalizerName{"lmktfy", "other"},
 		},
 	}
 	finalize(mockClient, testNamespace)
@@ -62,7 +62,7 @@ func TestFinalize(t *testing.T) {
 
 func TestSyncNamespaceThatIsTerminating(t *testing.T) {
 	mockClient := &client.Fake{}
-	nm := NamespaceManager{kubeClient: mockClient, store: cache.NewStore(cache.MetaNamespaceKeyFunc)}
+	nm := NamespaceManager{lmktfyClient: mockClient, store: cache.NewStore(cache.MetaNamespaceKeyFunc)}
 	now := util.Now()
 	testNamespace := api.Namespace{
 		ObjectMeta: api.ObjectMeta{
@@ -71,7 +71,7 @@ func TestSyncNamespaceThatIsTerminating(t *testing.T) {
 			DeletionTimestamp: &now,
 		},
 		Spec: api.NamespaceSpec{
-			Finalizers: []api.FinalizerName{"kubernetes"},
+			Finalizers: []api.FinalizerName{"lmktfy"},
 		},
 		Status: api.NamespaceStatus{
 			Phase: api.NamespaceTerminating,
@@ -102,14 +102,14 @@ func TestSyncNamespaceThatIsTerminating(t *testing.T) {
 
 func TestSyncNamespaceThatIsActive(t *testing.T) {
 	mockClient := &client.Fake{}
-	nm := NamespaceManager{kubeClient: mockClient, store: cache.NewStore(cache.MetaNamespaceKeyFunc)}
+	nm := NamespaceManager{lmktfyClient: mockClient, store: cache.NewStore(cache.MetaNamespaceKeyFunc)}
 	testNamespace := api.Namespace{
 		ObjectMeta: api.ObjectMeta{
 			Name:            "test",
 			ResourceVersion: "1",
 		},
 		Spec: api.NamespaceSpec{
-			Finalizers: []api.FinalizerName{"kubernetes"},
+			Finalizers: []api.FinalizerName{"lmktfy"},
 		},
 		Status: api.NamespaceStatus{
 			Phase: api.NamespaceActive,

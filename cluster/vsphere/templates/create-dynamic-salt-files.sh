@@ -15,7 +15,7 @@
 # limitations under the License.
 
 # Create the overlay files for the salt tree.  We create these in a separate
-# place so that we can blow away the rest of the salt configs on a kube-push and
+# place so that we can blow away the rest of the salt configs on a lmktfy-push and
 # re-apply these.
 
 mkdir -p /srv/salt-overlay/pillar

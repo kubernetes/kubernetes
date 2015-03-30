@@ -23,7 +23,7 @@ export NUM_MINIONS
 # The IP of the master
 export MASTER_IP="192.168.10.1"
 
-export INSTANCE_PREFIX=kubernetes
+export INSTANCE_PREFIX=lmktfy
 export MASTER_NAME="${INSTANCE_PREFIX}-master"
 
 # Map out the IPs, names and container subnets of each minion
@@ -58,5 +58,5 @@ LOGGING_DESTINATION=elasticsearch
 # Optional: Install cluster DNS.
 ENABLE_CLUSTER_DNS=true
 DNS_SERVER_IP="10.11.0.254"
-DNS_DOMAIN="kubernetes.local"
+DNS_DOMAIN="lmktfy.local"
 DNS_REPLICAS=1

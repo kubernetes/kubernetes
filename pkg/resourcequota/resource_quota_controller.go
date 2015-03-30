@@ -20,17 +20,17 @@ import (
 	"sync"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api/resource"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/client"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/labels"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/util"
 	"github.com/golang/glog"
 )
 
 // ResourceQuotaManager is responsible for tracking quota usage status in the system
 type ResourceQuotaManager struct {
-	kubeClient client.Interface
+	lmktfyClient client.Interface
 	syncTime   <-chan time.Time
 
 	// To allow injection of syncUsage for testing.
@@ -38,10 +38,10 @@ type ResourceQuotaManager struct {
 }
 
 // NewResourceQuotaManager creates a new ResourceQuotaManager
-func NewResourceQuotaManager(kubeClient client.Interface) *ResourceQuotaManager {
+func NewResourceQuotaManager(lmktfyClient client.Interface) *ResourceQuotaManager {
 
 	rm := &ResourceQuotaManager{
-		kubeClient: kubeClient,
+		lmktfyClient: lmktfyClient,
 	}
 
 	// set the synchronization handler
@@ -57,7 +57,7 @@ func (rm *ResourceQuotaManager) Run(period time.Duration) {
 
 func (rm *ResourceQuotaManager) synchronize() {
 	var resourceQuotas []api.ResourceQuota
-	list, err := rm.kubeClient.ResourceQuotas(api.NamespaceAll).List(labels.Everything())
+	list, err := rm.lmktfyClient.ResourceQuotas(api.NamespaceAll).List(labels.Everything())
 	if err != nil {
 		glog.Errorf("Synchronization error: %v (%#v)", err, err)
 	}
@@ -143,7 +143,7 @@ func (rm *ResourceQuotaManager) syncResourceQuota(quota api.ResourceQuota) (err 
 
 	pods := &api.PodList{}
 	if set[api.ResourcePods] || set[api.ResourceMemory] || set[api.ResourceCPU] {
-		pods, err = rm.kubeClient.Pods(usage.Namespace).List(labels.Everything())
+		pods, err = rm.lmktfyClient.Pods(usage.Namespace).List(labels.Everything())
 		if err != nil {
 			return err
 		}
@@ -178,19 +178,19 @@ func (rm *ResourceQuotaManager) syncResourceQuota(quota api.ResourceQuota) (err 
 			}
 			value = resource.NewMilliQuantity(int64(val), resource.DecimalSI)
 		case api.ResourceServices:
-			items, err := rm.kubeClient.Services(usage.Namespace).List(labels.Everything())
+			items, err := rm.lmktfyClient.Services(usage.Namespace).List(labels.Everything())
 			if err != nil {
 				return err
 			}
 			value = resource.NewQuantity(int64(len(items.Items)), resource.DecimalSI)
 		case api.ResourceReplicationControllers:
-			items, err := rm.kubeClient.ReplicationControllers(usage.Namespace).List(labels.Everything())
+			items, err := rm.lmktfyClient.ReplicationControllers(usage.Namespace).List(labels.Everything())
 			if err != nil {
 				return err
 			}
 			value = resource.NewQuantity(int64(len(items.Items)), resource.DecimalSI)
 		case api.ResourceQuotas:
-			items, err := rm.kubeClient.ResourceQuotas(usage.Namespace).List(labels.Everything())
+			items, err := rm.lmktfyClient.ResourceQuotas(usage.Namespace).List(labels.Everything())
 			if err != nil {
 				return err
 			}
@@ -208,7 +208,7 @@ func (rm *ResourceQuotaManager) syncResourceQuota(quota api.ResourceQuota) (err 
 
 	// update the usage only if it changed
 	if dirty {
-		_, err = rm.kubeClient.ResourceQuotas(usage.Namespace).UpdateStatus(&usage)
+		_, err = rm.lmktfyClient.ResourceQuotas(usage.Namespace).UpdateStatus(&usage)
 		return err
 	}
 	return nil

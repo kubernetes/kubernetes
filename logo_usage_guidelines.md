@@ -1,15 +1,15 @@
-# Kubernetes Branding Guidelines
+# LMKTFY Branding Guidelines
 
-These guidelines provide you with guidance for using the Kubernetes logo. You can use the logo on your website or in print without pre-approval, provided you follow these basic guidelines.
+These guidelines provide you with guidance for using the LMKTFY logo. You can use the logo on your website or in print without pre-approval, provided you follow these basic guidelines.
 
-You may display, modify or use the Kubernetes logo only in connection with compliant implementations of Kubernetes and related uses in the following ways.  A compliant implementation is an implementation of the unmodified Google version of Kubernetes found at https://github.com/GoogleCloudPlatform/kubernetes and compatible branches thereof, together with published specifications, APIs and operational patterns.  Acceptable related uses include display, modify or use of the Kubernetes logo in connection with your compliant implementation, your integration with a compliant implementation, your support for a compliant implementation, your Kubernetes-compatible product, or in collateral, presentations, and marketing materials relating to compliant implementations of Kubernetes.
+You may display, modify or use the LMKTFY logo only in connection with compliant implementations of LMKTFY and related uses in the following ways.  A compliant implementation is an implementation of the unmodified Google version of LMKTFY found at https://github.com/GoogleCloudPlatform/lmktfy and compatible branches thereof, together with published specifications, APIs and operational patterns.  Acceptable related uses include display, modify or use of the LMKTFY logo in connection with your compliant implementation, your integration with a compliant implementation, your support for a compliant implementation, your LMKTFY-compatible product, or in collateral, presentations, and marketing materials relating to compliant implementations of LMKTFY.
 
-Use of the Kubernetes logo or other Google brands in ways not expressly covered by this document is not allowed without prior written consent from Google -- see Google's [Guidelines for Third Party Use of Google Brand Features](http://www.google.com/intl/en/permissions/guidelines.html) for more information.
+Use of the LMKTFY logo or other Google brands in ways not expressly covered by this document is not allowed without prior written consent from Google -- see Google's [Guidelines for Third Party Use of Google Brand Features](http://www.google.com/intl/en/permissions/guidelines.html) for more information.
 
 ## Links to logo images
 
-[SVG format](https://github.com/GoogleCloudPlatform/kubernetes/raw/master/logo.svg)
+[SVG format](https://github.com/GoogleCloudPlatform/lmktfy/raw/master/logo.svg)
 
-[PNG format](https://github.com/GoogleCloudPlatform/kubernetes/raw/master/logo.png)
+[PNG format](https://github.com/GoogleCloudPlatform/lmktfy/raw/master/logo.png)
 
-[PDF format](https://github.com/GoogleCloudPlatform/kubernetes/raw/master/logo.pdf)
+[PDF format](https://github.com/GoogleCloudPlatform/lmktfy/raw/master/logo.pdf)

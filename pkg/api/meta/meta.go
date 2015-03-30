@@ -20,9 +20,9 @@ import (
 	"fmt"
 	"reflect"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/conversion"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/conversion"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/runtime"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/types"
 )
 
 // Accessor takes an arbitary object pointer and returns meta.Interface.
@@ -77,7 +77,7 @@ func Accessor(obj interface{}) (Interface, error) {
 // TypeAccessor returns an interface that allows retrieving and modifying the APIVersion
 // and Kind of an in-memory internal object.
 // TODO: this interface is used to test code that does not have ObjectMeta or ListMeta
-// in round tripping (objects which can use apiVersion/kind, but do not fit the Kube
+// in round tripping (objects which can use apiVersion/kind, but do not fit the LMKTFY
 // api conventions).
 func TypeAccessor(obj interface{}) (TypeInterface, error) {
 	v, err := conversion.EnforcePtr(obj)

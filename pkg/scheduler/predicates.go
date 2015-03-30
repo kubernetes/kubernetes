@@ -19,9 +19,9 @@ package scheduler
 import (
 	"fmt"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/client"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/labels"
 )
 
 type NodeInfo interface {
@@ -364,7 +364,7 @@ func MapPodsToMachines(lister PodLister) (map[string][]api.Pod, error) {
 		//       based on spec.Host or status.Host. It has been decided that
 		//       spec.Host is the canonical location of the pod. Status.Host
 		//       will either be removed, be a copy, or in theory it could be
-		//       used as a signal that kubelet has agreed to run the pod.
+		//       used as a signal that lmktfylet has agreed to run the pod.
 		//
 		//       This could be fixed now, but just requires someone to try it
 		//       and verify that e2e still passes.

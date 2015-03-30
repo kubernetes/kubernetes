@@ -27,8 +27,8 @@ import (
 	neturl "net/url"
 	"sort"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/cloudprovider"
 )
 
 // VagrantCloud is an implementation of Interface, TCPLoadBalancer and Instances for developer managed Vagrant cluster.
@@ -109,7 +109,7 @@ func (v *VagrantCloud) getInstanceByAddress(address string) (*SaltMinion, error)
 	if err != nil {
 		return nil, err
 	}
-	filteredMinions := v.saltMinionsByRole(minions, "kubernetes-pool")
+	filteredMinions := v.saltMinionsByRole(minions, "lmktfy-pool")
 	for _, minion := range filteredMinions {
 		// Due to vagrant not running with a dedicated DNS setup, we return the IP address of a minion as its hostname at this time
 		if minion.IP == address {
@@ -226,7 +226,7 @@ func (v *VagrantCloud) List(filter string) ([]string, error) {
 		return nil, err
 	}
 
-	filteredMinions := v.saltMinionsByRole(minions, "kubernetes-pool")
+	filteredMinions := v.saltMinionsByRole(minions, "lmktfy-pool")
 	var instances []string
 	for _, instance := range filteredMinions {
 		// With no dedicated DNS setup in cluster, IP address is used as hostname

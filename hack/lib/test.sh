@@ -22,16 +22,16 @@ readonly black=$(tput setaf 0)
 readonly   red=$(tput setaf 1)
 readonly green=$(tput setaf 2)
 
-kube::test::clear_all() {
-  kubectl delete "${kube_flags[@]}" rc,pods --all
+lmktfy::test::clear_all() {
+  lmktfyctl delete "${lmktfy_flags[@]}" rc,pods --all
 }
 
-kube::test::get_object_assert() {
+lmktfy::test::get_object_assert() {
   local object=$1
   local request=$2
   local expected=$3
 
-  res=$(eval kubectl get "${kube_flags[@]}" $object -o template -t "$request")
+  res=$(eval lmktfyctl get "${lmktfy_flags[@]}" $object -o template -t "$request")
 
   if [[ "$res" =~ ^$expected$ ]]; then
       echo -n ${green}
@@ -51,12 +51,12 @@ kube::test::get_object_assert() {
   fi
 }
 
-kube::test::describe_object_assert() {
+lmktfy::test::describe_object_assert() {
   local resource=$1
   local object=$2
   local matches=${@:3}
 
-  result=$(eval kubectl describe "${kube_flags[@]}" $resource $object)
+  result=$(eval lmktfyctl describe "${lmktfy_flags[@]}" $resource $object)
 
   for match in ${matches}; do
     if [[ ! $(echo "$result" | grep ${match}) ]]; then

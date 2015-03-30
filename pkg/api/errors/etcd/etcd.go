@@ -17,8 +17,8 @@ limitations under the License.
 package etcd
 
 import (
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api/errors"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/tools"
 )
 
 // InterpretGetError converts a generic etcd error on a retrieval

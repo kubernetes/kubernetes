@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# attempt to warn user about kube and etcd binaries
+# attempt to warn user about lmktfy and etcd binaries
 PATH=$PATH:/opt/bin:
 
 if ! $(grep Ubuntu /etc/lsb-release > /dev/null 2>&1)
@@ -27,9 +27,9 @@ then
     echo "warning: etcd binary is not found in the PATH: $PATH"
 fi
 
-if ! $(which kube-apiserver > /dev/null) && ! $(which kubelet > /dev/null)
+if ! $(which lmktfy-apiserver > /dev/null) && ! $(which lmktfylet > /dev/null)
 then
-    echo "warning: kube binaries are not found in the $PATH"
+    echo "warning: lmktfy binaries are not found in the $PATH"
 fi
 
 # copy /etc/init files

@@ -14,7 +14,7 @@ spec:
         version: nautilus
     spec:
       containers:
-      - image: kubernetes/update-demo:nautilus
+      - image: lmktfy/update-demo:nautilus
         name: update-demo
         ports:
         - containerPort: 80

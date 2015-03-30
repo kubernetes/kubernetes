@@ -1,0 +1,12 @@
+[Unit]
+Description=LMKTFYrnetes Scheduler Plugin
+Documentation=https://github.com/GoogleCloudPlatform/lmktfyrnetes
+
+[Service]
+Type=simple
+EnvironmentFile=-/etc/sysconfig/lmktfy-scheduler
+ExecStart=/usr/local/bin/lmktfy-scheduler "$DAEMON_ARGS"
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

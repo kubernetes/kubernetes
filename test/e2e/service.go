@@ -24,9 +24,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/client"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/util"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -43,7 +43,7 @@ var _ = Describe("Services", func() {
 
 	It("should provide DNS for the cluster", func() {
 		if testContext.provider == "vagrant" {
-			By("Skipping test which is broken for vagrant (See https://github.com/GoogleCloudPlatform/kubernetes/issues/3580)")
+			By("Skipping test which is broken for vagrant (See https://github.com/GoogleCloudPlatform/lmktfy/issues/3580)")
 			return
 		}
 
@@ -53,9 +53,9 @@ var _ = Describe("Services", func() {
 
 		// All the names we need to be able to resolve.
 		namesToResolve := []string{
-			"kubernetes-ro",
-			"kubernetes-ro.default",
-			"kubernetes-ro.default.kubernetes.local",
+			"lmktfy-ro",
+			"lmktfy-ro.default",
+			"lmktfy-ro.default.lmktfy.local",
 			"google.com",
 		}
 
@@ -87,7 +87,7 @@ var _ = Describe("Services", func() {
 				Containers: []api.Container{
 					{
 						Name:  "webserver",
-						Image: "kubernetes/test-webserver",
+						Image: "lmktfy/test-webserver",
 						VolumeMounts: []api.VolumeMount{
 							{
 								Name:      "results",
@@ -110,7 +110,7 @@ var _ = Describe("Services", func() {
 			},
 		}
 
-		By("submitting the pod to kuberenetes")
+		By("submitting the pod to lmktfyrenetes")
 		defer func() {
 			By("deleting the pod")
 			defer GinkgoRecover()
@@ -163,7 +163,7 @@ var _ = Describe("Services", func() {
 		svc := api.ServiceList{}
 		err := c.Get().
 			Namespace("default").
-			AbsPath("/api/v1beta1/proxy/services/kubernetes-ro/api/v1beta1/services").
+			AbsPath("/api/v1beta1/proxy/services/lmktfy-ro/api/v1beta1/services").
 			Do().
 			Into(&svc)
 		if err != nil {
@@ -171,10 +171,10 @@ var _ = Describe("Services", func() {
 		}
 		var foundRW, foundRO bool
 		for i := range svc.Items {
-			if svc.Items[i].Name == "kubernetes" {
+			if svc.Items[i].Name == "lmktfy" {
 				foundRW = true
 			}
-			if svc.Items[i].Name == "kubernetes-ro" {
+			if svc.Items[i].Name == "lmktfy-ro" {
 				foundRO = true
 			}
 		}
@@ -298,7 +298,7 @@ var _ = Describe("Services", func() {
 				Containers: []api.Container{
 					{
 						Name:  "webserver",
-						Image: "kubernetes/test-webserver",
+						Image: "lmktfy/test-webserver",
 					},
 				},
 			},
@@ -452,7 +452,7 @@ func addEndpointPodOrFail(c *client.Client, ns, name string, labels map[string]s
 			Containers: []api.Container{
 				{
 					Name:  "test",
-					Image: "kubernetes/pause",
+					Image: "lmktfy/pause",
 					Ports: []api.ContainerPort{{ContainerPort: 80}},
 				},
 			},

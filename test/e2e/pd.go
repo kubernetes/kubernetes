@@ -22,9 +22,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/client"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/util"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
@@ -78,7 +78,7 @@ var _ = Describe("PD", func() {
 			deletePD(diskName, testContext.gceConfig.Zone)
 		}()
 
-		By("submitting host0Pod to kubernetes")
+		By("submitting host0Pod to lmktfy")
 		_, err := podClient.Create(host0Pod)
 		expectNoError(err, fmt.Sprintf("Failed to create host0Pod: %v", err))
 
@@ -87,7 +87,7 @@ var _ = Describe("PD", func() {
 		By("deleting host0Pod")
 		expectNoError(podClient.Delete(host0Pod.Name), "Failed to delete host0Pod")
 
-		By("submitting host1Pod to kubernetes")
+		By("submitting host1Pod to lmktfy")
 		_, err = podClient.Create(host1Pod)
 		expectNoError(err, "Failed to create host1Pod")
 
@@ -141,11 +141,11 @@ var _ = Describe("PD", func() {
 		expectNoError(waitForPodRunning(c, rwPod.Name))
 		expectNoError(podClient.Delete(rwPod.Name), "Failed to delete host0Pod")
 
-		By("submitting host0ROPod to kubernetes")
+		By("submitting host0ROPod to lmktfy")
 		_, err = podClient.Create(host0ROPod)
 		expectNoError(err, "Failed to create host0ROPod")
 
-		By("submitting host1ROPod to kubernetes")
+		By("submitting host1ROPod to lmktfy")
 		_, err = podClient.Create(host1ROPod)
 		expectNoError(err, "Failed to create host1ROPod")
 
@@ -212,7 +212,7 @@ func testPDPod(diskName, targetHost string, readOnly bool) *api.Pod {
 			Containers: []api.Container{
 				{
 					Name:  "testpd",
-					Image: "kubernetes/pause",
+					Image: "lmktfy/pause",
 					VolumeMounts: []api.VolumeMount{
 						{
 							Name:      "testpd",

@@ -1,4 +1,4 @@
-/etc/kubernetes/manifests/fluentd-gcp.manifest:
+/etc/lmktfyrnetes/manifests/fluentd-gcp.manifest:
   file.managed:
     - source: salt://fluentd-gcp/fluentd-gcp.manifest
     - user: root

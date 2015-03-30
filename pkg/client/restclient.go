@@ -21,16 +21,16 @@ import (
 	"strings"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/runtime"
 )
 
-// RESTClient imposes common Kubernetes API conventions on a set of resource paths.
+// RESTClient imposes common LMKTFY API conventions on a set of resource paths.
 // The baseURL is expected to point to an HTTP or HTTPS path that is the parent
 // of one or more resources.  The server should return a decodable API resource
 // object, or an api.Status object which contains information about the reason for
 // any failure.
 //
-// Most consumers should use client.New() to get a Kubernetes API client.
+// Most consumers should use client.New() to get a LMKTFY API client.
 type RESTClient struct {
 	baseURL *url.URL
 	// A string identifying the version of the API this client is expected to use.
@@ -38,7 +38,7 @@ type RESTClient struct {
 
 	// LegacyBehavior controls if URLs should encode the namespace as a query param,
 	// and if resource case is preserved for supporting older API conventions of
-	// Kubernetes.  Newer clients should leave this false.
+	// LMKTFY.  Newer clients should leave this false.
 	LegacyBehavior bool
 
 	// Codec is the encoding and decoding scheme that applies to a particular set of
@@ -55,7 +55,7 @@ type RESTClient struct {
 // NewRESTClient creates a new RESTClient. This client performs generic REST functions
 // such as Get, Put, Post, and Delete on specified paths.  Codec controls encoding and
 // decoding of responses from the server. If this client should use the older, legacy
-// API conventions from Kubernetes API v1beta1 and v1beta2, set legacyBehavior true.
+// API conventions from LMKTFY API v1beta1 and v1beta2, set legacyBehavior true.
 func NewRESTClient(baseURL *url.URL, apiVersion string, c runtime.Codec, legacyBehavior bool) *RESTClient {
 	base := *baseURL
 	if !strings.HasSuffix(base.Path, "/") {

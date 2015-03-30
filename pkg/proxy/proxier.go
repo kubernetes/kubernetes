@@ -26,11 +26,11 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/errors"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/iptables"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/types"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/util"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/util/errors"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/util/iptables"
 	"github.com/golang/glog"
 )
 
@@ -618,9 +618,9 @@ func (proxier *Proxier) closeOnePortal(portalIP net.IP, portalPort int, protocol
 
 // See comments in the *PortalArgs() functions for some details about why we
 // use two chains.
-var iptablesContainerPortalChain iptables.Chain = "KUBE-PORTALS-CONTAINER"
-var iptablesHostPortalChain iptables.Chain = "KUBE-PORTALS-HOST"
-var iptablesOldPortalChain iptables.Chain = "KUBE-PROXY"
+var iptablesContainerPortalChain iptables.Chain = "LMKTFY-PORTALS-CONTAINER"
+var iptablesHostPortalChain iptables.Chain = "LMKTFY-PORTALS-HOST"
+var iptablesOldPortalChain iptables.Chain = "LMKTFY-PROXY"
 
 // Ensure that the iptables infrastructure we use is set up.  This can safely be called periodically.
 func iptablesInit(ipt iptables.Interface) error {

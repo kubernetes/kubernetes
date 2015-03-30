@@ -14,13 +14,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-cert_dir=/srv/kubernetes
-cert_group=kube-cert
+cert_dir=/srv/lmktfy
+cert_group=lmktfy-cert
 
 mkdir -p "$cert_dir"
 
 openssl req -new -newkey rsa:4096 -days 365 -nodes -x509 \
-  -subj "/CN=kubernetes.invalid/O=Kubernetes" \
+  -subj "/CN=lmktfy.invalid/O=LMKTFY" \
   -keyout "${cert_dir}/server.key" -out "${cert_dir}/server.cert"
 chgrp $cert_group "${cert_dir}/server.key" "${cert_dir}/server.cert"
 chmod 660 "${cert_dir}/server.key" "${cert_dir}/server.cert"

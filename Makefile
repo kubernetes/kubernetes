@@ -9,8 +9,8 @@
 OUT_DIR = _output
 GODEPS_PKG_DIR = Godeps/_workspace/pkg
 
-KUBE_GOFLAGS = $(GOFLAGS)
-export KUBE_GOFLAGS
+LMKTFY_GOFLAGS = $(GOFLAGS)
+export LMKTFY_GOFLAGS
 
 # Build code.
 #
@@ -23,7 +23,7 @@ export KUBE_GOFLAGS
 # Example:
 #   make
 #   make all
-#   make all WHAT=cmd/kubelet GOFLAGS=-v
+#   make all WHAT=cmd/lmktfylet GOFLAGS=-v
 all:
 	hack/build-go.sh $(WHAT)
 .PHONY: all
@@ -39,7 +39,7 @@ all:
 # Example:
 #   make check
 #   make test
-#   make check WHAT=pkg/kubelet GOFLAGS=-v
+#   make check WHAT=pkg/lmktfylet GOFLAGS=-v
 check test:
 	hack/test-go.sh $(WHAT) $(TESTS)
 .PHONY: check test
@@ -81,7 +81,7 @@ clean:
 #
 # Example:
 #   make vet
-#   make vet WHAT=pkg/kubelet
+#   make vet WHAT=pkg/lmktfylet
 vet:
 	hack/vet-go.sh $(WHAT) $(TESTS)
 .PHONY: vet
@@ -99,6 +99,6 @@ release:
 # Example:
 #   make release-skip-tests
 release-skip-tests quick-release:
-	KUBE_RELEASE_RUN_TESTS=n build/release.sh
+	LMKTFY_RELEASE_RUN_TESTS=n build/release.sh
 .PHONY: release-skip-tests quick-release
 

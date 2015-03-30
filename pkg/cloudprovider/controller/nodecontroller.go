@@ -24,30 +24,30 @@ import (
 	"sync"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	apierrors "github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/probe"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api"
+	apierrors "github.com/GoogleCloudPlatform/lmktfy/pkg/api/errors"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/client"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/client/record"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/cloudprovider"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/labels"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/probe"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/types"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/util"
 	"github.com/golang/glog"
 )
 
 const (
 	// The constant is used if sync_nodes_status=False. NodeController will not proactively
-	// sync node status in this case, but will monitor node status updated from kubelet. If
+	// sync node status in this case, but will monitor node status updated from lmktfylet. If
 	// it doesn't receive update for this amount of time, it will start posting "NodeReady==
 	// ConditionUnknown". The amount of time before which NodeController start evicting pods
 	// is controlled via flag 'pod_eviction_timeout'.
 	// Note: be cautious when changing the constant, it must work with nodeStatusUpdateFrequency
-	// in kubelet. There are several constraints:
+	// in lmktfylet. There are several constraints:
 	// 1. nodeMonitorGracePeriod must be N times more than nodeStatusUpdateFrequency, where
-	//    N means number of retries allowed for kubelet to post node status. It is pointless
+	//    N means number of retries allowed for lmktfylet to post node status. It is pointless
 	//    to make nodeMonitorGracePeriod be less than nodeStatusUpdateFrequency, since there
-	//    will only be fresh values from Kubelet at an interval of nodeStatusUpdateFrequency.
+	//    will only be fresh values from LMKTFYlet at an interval of nodeStatusUpdateFrequency.
 	//    The constant must be less than podEvictionTimeout.
 	// 2. nodeMonitorGracePeriod can't be too large for user experience - larger value takes
 	//    longer for user to see up-to-date node status.
@@ -56,7 +56,7 @@ const (
 	// is just created, e.g. cluster bootstrap or node creation, we give a longer grace period.
 	nodeStartupGracePeriod = 30 * time.Second
 	// The constant is used if sync_nodes_status=False. It controls NodeController monitoring
-	// period, i.e. how often does NodeController check node status posted from kubelet.
+	// period, i.e. how often does NodeController check node status posted from lmktfylet.
 	// Theoretically, this value should be lower than nodeMonitorGracePeriod.
 	// TODO: Change node status monitor to watch based.
 	nodeMonitorPeriod = 5 * time.Second
@@ -73,8 +73,8 @@ type NodeController struct {
 	matchRE            string
 	staticResources    *api.NodeResources
 	nodes              []string
-	kubeClient         client.Interface
-	kubeletClient      client.KubeletClient
+	lmktfyClient         client.Interface
+	lmktfyletClient      client.LMKTFYletClient
 	recorder           record.EventRecorder
 	registerRetryCount int
 	podEvictionTimeout time.Duration
@@ -89,8 +89,8 @@ func NewNodeController(
 	matchRE string,
 	nodes []string,
 	staticResources *api.NodeResources,
-	kubeClient client.Interface,
-	kubeletClient client.KubeletClient,
+	lmktfyClient client.Interface,
+	lmktfyletClient client.LMKTFYletClient,
 	recorder record.EventRecorder,
 	registerRetryCount int,
 	podEvictionTimeout time.Duration) *NodeController {
@@ -99,8 +99,8 @@ func NewNodeController(
 		matchRE:            matchRE,
 		nodes:              nodes,
 		staticResources:    staticResources,
-		kubeClient:         kubeClient,
-		kubeletClient:      kubeletClient,
+		lmktfyClient:         lmktfyClient,
+		lmktfyletClient:      lmktfyletClient,
 		recorder:           recorder,
 		registerRetryCount: registerRetryCount,
 		podEvictionTimeout: podEvictionTimeout,
@@ -116,16 +116,16 @@ func NewNodeController(
 //    node addresses.
 // 2. SyncCloudNodes() is called periodically (if enabled) to sync instances from cloudprovider.
 //    Node created here will only have specs.
-// 3. Depending on how k8s is configured, there are two ways of syncing the node status:
-//   3.1 SyncProbedNodeStatus() is called periodically to trigger master to probe kubelet,
+// 3. Depending on how lmktfy is configured, there are two ways of syncing the node status:
+//   3.1 SyncProbedNodeStatus() is called periodically to trigger master to probe lmktfylet,
 //       and incorporate the resulting node status.
 //   3.2 MonitorNodeStatus() is called periodically to incorporate the results of node status
-//       pushed from kubelet to master.
+//       pushed from lmktfylet to master.
 func (nc *NodeController) Run(period time.Duration, syncNodeList, syncNodeStatus bool) {
 	// Register intial set of nodes with their status set.
 	var nodes *api.NodeList
 	var err error
-	record.StartRecording(nc.kubeClient.Events(""))
+	record.StartRecording(nc.lmktfyClient.Events(""))
 	if nc.isRunningCloudProvider() {
 		if syncNodeList {
 			if nodes, err = nc.GetCloudNodesWithSpec(); err != nil {
@@ -184,7 +184,7 @@ func (nc *NodeController) RegisterNodes(nodes *api.NodeList, retryCount int, ret
 			if registered.Has(node.Name) {
 				continue
 			}
-			_, err := nc.kubeClient.Nodes().Create(&node)
+			_, err := nc.lmktfyClient.Nodes().Create(&node)
 			if err == nil || apierrors.IsAlreadyExists(err) {
 				registered.Insert(node.Name)
 				glog.Infof("Registered node in registry: %s", node.Name)
@@ -211,7 +211,7 @@ func (nc *NodeController) SyncCloudNodes() error {
 	if err != nil {
 		return err
 	}
-	nodes, err := nc.kubeClient.Nodes().List()
+	nodes, err := nc.lmktfyClient.Nodes().List()
 	if err != nil {
 		return err
 	}
@@ -221,11 +221,11 @@ func (nc *NodeController) SyncCloudNodes() error {
 		nodeMap[node.Name] = &node
 	}
 
-	// Create nodes which have been created in cloud, but not in kubernetes cluster.
+	// Create nodes which have been created in cloud, but not in lmktfy cluster.
 	for _, node := range matches.Items {
 		if _, ok := nodeMap[node.Name]; !ok {
 			glog.Infof("Create node in registry: %s", node.Name)
-			_, err = nc.kubeClient.Nodes().Create(&node)
+			_, err = nc.lmktfyClient.Nodes().Create(&node)
 			if err != nil {
 				glog.Errorf("Create node %s error: %v", node.Name, err)
 			}
@@ -233,10 +233,10 @@ func (nc *NodeController) SyncCloudNodes() error {
 		delete(nodeMap, node.Name)
 	}
 
-	// Delete nodes which have been deleted from cloud, but not from kubernetes cluster.
+	// Delete nodes which have been deleted from cloud, but not from lmktfy cluster.
 	for nodeID := range nodeMap {
 		glog.Infof("Delete node from registry: %s", nodeID)
-		err = nc.kubeClient.Nodes().Delete(nodeID)
+		err = nc.lmktfyClient.Nodes().Delete(nodeID)
 		if err != nil {
 			glog.Errorf("Delete node %s error: %v", nodeID, err)
 		}
@@ -248,7 +248,7 @@ func (nc *NodeController) SyncCloudNodes() error {
 
 // SyncProbedNodeStatus synchronizes cluster nodes status to master server.
 func (nc *NodeController) SyncProbedNodeStatus() error {
-	nodes, err := nc.kubeClient.Nodes().List()
+	nodes, err := nc.lmktfyClient.Nodes().List()
 	if err != nil {
 		return err
 	}
@@ -261,7 +261,7 @@ func (nc *NodeController) SyncProbedNodeStatus() error {
 		// useful after we introduce per-probe status field, e.g. 'LastProbeTime', which will
 		// differ in every call of the sync loop.
 		glog.V(2).Infof("updating node %v", node.Name)
-		_, err = nc.kubeClient.Nodes().Update(&node)
+		_, err = nc.lmktfyClient.Nodes().Update(&node)
 		if err != nil {
 			glog.Errorf("error updating node %s: %v", node.Name, err)
 		}
@@ -286,9 +286,9 @@ func (nc *NodeController) PopulateNodesStatus(nodes *api.NodeList) (*api.NodeLis
 	return nc.PopulateAddresses(nodes)
 }
 
-// populateNodeInfo gets node info from kubelet and update the node.
+// populateNodeInfo gets node info from lmktfylet and update the node.
 func (nc *NodeController) populateNodeInfo(node *api.Node) error {
-	nodeInfo, err := nc.kubeletClient.GetNodeInfo(node.Name)
+	nodeInfo, err := nc.lmktfyletClient.GetNodeInfo(node.Name)
 	if err != nil {
 		return err
 	}
@@ -363,7 +363,7 @@ func (nc *NodeController) checkNodeSchedulable(node *api.Node) *api.NodeConditio
 
 // checkNodeReady checks raw node ready condition, without transition timestamp set.
 func (nc *NodeController) checkNodeReady(node *api.Node) *api.NodeCondition {
-	switch status, err := nc.kubeletClient.HealthCheck(node.Name); {
+	switch status, err := nc.lmktfyletClient.HealthCheck(node.Name); {
 	case err != nil:
 		glog.V(2).Infof("NodeController: node %s health check error: %v", node.Name, err)
 		return &api.NodeCondition{
@@ -376,14 +376,14 @@ func (nc *NodeController) checkNodeReady(node *api.Node) *api.NodeCondition {
 		return &api.NodeCondition{
 			Type:          api.NodeReady,
 			Status:        api.ConditionFalse,
-			Reason:        fmt.Sprintf("Node health check failed: kubelet /healthz endpoint returns not ok"),
+			Reason:        fmt.Sprintf("Node health check failed: lmktfylet /healthz endpoint returns not ok"),
 			LastProbeTime: nc.now(),
 		}
 	default:
 		return &api.NodeCondition{
 			Type:          api.NodeReady,
 			Status:        api.ConditionTrue,
-			Reason:        fmt.Sprintf("Node health check succeeded: kubelet /healthz endpoint returns ok"),
+			Reason:        fmt.Sprintf("Node health check succeeded: lmktfylet /healthz endpoint returns ok"),
 			LastProbeTime: nc.now(),
 		}
 	}
@@ -440,11 +440,11 @@ func (nc *NodeController) recordNodeOfflineEvent(node *api.Node) {
 	nc.recorder.Eventf(ref, "offline", "Node %s is now offline", node.Name)
 }
 
-// MonitorNodeStatus verifies node status are constantly updated by kubelet, and if not,
+// MonitorNodeStatus verifies node status are constantly updated by lmktfylet, and if not,
 // post "NodeReady==ConditionUnknown". It also evicts all pods if node is not ready or
 // not reachable for a long period of time.
 func (nc *NodeController) MonitorNodeStatus() error {
-	nodes, err := nc.kubeClient.Nodes().List()
+	nodes, err := nc.lmktfyClient.Nodes().List()
 	if err != nil {
 		return err
 	}
@@ -454,7 +454,7 @@ func (nc *NodeController) MonitorNodeStatus() error {
 		node := &nodes.Items[i]
 		readyCondition := nc.getCondition(node, api.NodeReady)
 		if readyCondition == nil {
-			// If ready condition is nil, then kubelet (or nodecontroller) never posted node status.
+			// If ready condition is nil, then lmktfylet (or nodecontroller) never posted node status.
 			// A fake ready condition is created, where LastProbeTime and LastTransitionTime is set
 			// to node.CreationTimestamp to avoid handle the corner case.
 			lastReadyCondition = api.NodeCondition{
@@ -473,13 +473,13 @@ func (nc *NodeController) MonitorNodeStatus() error {
 		// Check last time when NodeReady was updated.
 		if nc.now().After(lastReadyCondition.LastProbeTime.Add(gracePeriod)) {
 			// NodeReady condition was last set longer ago than gracePeriod, so update it to Unknown
-			// (regardless of its current value) in the master, without contacting kubelet.
+			// (regardless of its current value) in the master, without contacting lmktfylet.
 			if readyCondition == nil {
-				glog.V(2).Infof("node %v is never updated by kubelet")
+				glog.V(2).Infof("node %v is never updated by lmktfylet")
 				node.Status.Conditions = append(node.Status.Conditions, api.NodeCondition{
 					Type:               api.NodeReady,
 					Status:             api.ConditionUnknown,
-					Reason:             fmt.Sprintf("Kubelet never posted node status"),
+					Reason:             fmt.Sprintf("LMKTFYlet never posted node status"),
 					LastProbeTime:      node.CreationTimestamp,
 					LastTransitionTime: nc.now(),
 				})
@@ -488,8 +488,8 @@ func (nc *NodeController) MonitorNodeStatus() error {
 					node.Name, nc.now().Time.Sub(lastReadyCondition.LastProbeTime.Time), lastReadyCondition)
 				if lastReadyCondition.Status != api.ConditionUnknown {
 					readyCondition.Status = api.ConditionUnknown
-					readyCondition.Reason = fmt.Sprintf("Kubelet stopped posting node status")
-					// LastProbeTime is the last time we heard from kubelet.
+					readyCondition.Reason = fmt.Sprintf("LMKTFYlet stopped posting node status")
+					// LastProbeTime is the last time we heard from lmktfylet.
 					readyCondition.LastProbeTime = lastReadyCondition.LastProbeTime
 					readyCondition.LastTransitionTime = nc.now()
 				}
@@ -498,7 +498,7 @@ func (nc *NodeController) MonitorNodeStatus() error {
 					nc.recordNodeOfflineEvent(node)
 				}
 			}
-			_, err = nc.kubeClient.Nodes().Update(node)
+			_, err = nc.lmktfyClient.Nodes().Update(node)
 			if err != nil {
 				glog.Errorf("error updating node %s: %v", node.Name, err)
 			}
@@ -583,7 +583,7 @@ func (nc *NodeController) GetCloudNodesWithSpec() (*api.NodeList, error) {
 func (nc *NodeController) deletePods(nodeID string) error {
 	glog.V(2).Infof("Delete all pods from %v", nodeID)
 	// TODO: We don't yet have field selectors from client, see issue #1362.
-	pods, err := nc.kubeClient.Pods(api.NamespaceAll).List(labels.Everything())
+	pods, err := nc.lmktfyClient.Pods(api.NamespaceAll).List(labels.Everything())
 	if err != nil {
 		return err
 	}
@@ -592,7 +592,7 @@ func (nc *NodeController) deletePods(nodeID string) error {
 			continue
 		}
 		glog.V(2).Infof("Delete pod %v", pod.Name)
-		if err := nc.kubeClient.Pods(pod.Namespace).Delete(pod.Name); err != nil {
+		if err := nc.lmktfyClient.Pods(pod.Namespace).Delete(pod.Name); err != nil {
 			glog.Errorf("Error deleting pod %v: %v", pod.Name, err)
 		}
 	}

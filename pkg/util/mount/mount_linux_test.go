@@ -95,11 +95,11 @@ func slicesEqual(a, b []string) bool {
 func TestGetMountRefs(t *testing.T) {
 	fm := &FakeMounter{
 		MountPoints: []MountPoint{
-			{Device: "/dev/sdb", Path: "/var/lib/kubelet/plugins/kubernetes.io/gce-pd/mounts/gce-pd"},
-			{Device: "/dev/sdb", Path: "/var/lib/kubelet/pods/some-pod/volumes/kubernetes.io~gce-pd/gce-pd-in-pod"},
-			{Device: "/dev/sdc", Path: "/var/lib/kubelet/plugins/kubernetes.io/gce-pd/mounts/gce-pd2"},
-			{Device: "/dev/sdc", Path: "/var/lib/kubelet/pods/some-pod/volumes/kubernetes.io~gce-pd/gce-pd2-in-pod"},
-			{Device: "/dev/sdc", Path: "/var/lib/kubelet/pods/some-pod/volumes/kubernetes.io~gce-pd/gce-pd2-in-pod2"},
+			{Device: "/dev/sdb", Path: "/var/lib/lmktfylet/plugins/lmktfy.io/gce-pd/mounts/gce-pd"},
+			{Device: "/dev/sdb", Path: "/var/lib/lmktfylet/pods/some-pod/volumes/lmktfy.io~gce-pd/gce-pd-in-pod"},
+			{Device: "/dev/sdc", Path: "/var/lib/lmktfylet/plugins/lmktfy.io/gce-pd/mounts/gce-pd2"},
+			{Device: "/dev/sdc", Path: "/var/lib/lmktfylet/pods/some-pod/volumes/lmktfy.io~gce-pd/gce-pd2-in-pod"},
+			{Device: "/dev/sdc", Path: "/var/lib/lmktfylet/pods/some-pod/volumes/lmktfy.io~gce-pd/gce-pd2-in-pod2"},
 		},
 	}
 
@@ -108,16 +108,16 @@ func TestGetMountRefs(t *testing.T) {
 		expectedRefs []string
 	}{
 		{
-			"/var/lib/kubelet/pods/some-pod/volumes/kubernetes.io~gce-pd/gce-pd-in-pod",
+			"/var/lib/lmktfylet/pods/some-pod/volumes/lmktfy.io~gce-pd/gce-pd-in-pod",
 			[]string{
-				"/var/lib/kubelet/plugins/kubernetes.io/gce-pd/mounts/gce-pd",
+				"/var/lib/lmktfylet/plugins/lmktfy.io/gce-pd/mounts/gce-pd",
 			},
 		},
 		{
-			"/var/lib/kubelet/pods/some-pod/volumes/kubernetes.io~gce-pd/gce-pd2-in-pod",
+			"/var/lib/lmktfylet/pods/some-pod/volumes/lmktfy.io~gce-pd/gce-pd2-in-pod",
 			[]string{
-				"/var/lib/kubelet/pods/some-pod/volumes/kubernetes.io~gce-pd/gce-pd2-in-pod2",
-				"/var/lib/kubelet/plugins/kubernetes.io/gce-pd/mounts/gce-pd2",
+				"/var/lib/lmktfylet/pods/some-pod/volumes/lmktfy.io~gce-pd/gce-pd2-in-pod2",
+				"/var/lib/lmktfylet/plugins/lmktfy.io/gce-pd/mounts/gce-pd2",
 			},
 		},
 	}

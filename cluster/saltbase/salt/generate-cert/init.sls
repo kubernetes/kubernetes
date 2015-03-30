@@ -26,13 +26,13 @@
   {% set certgen="make-ca-cert.sh" %}
 {% endif %}
 
-kube-cert:
+lmktfy-cert:
   group.present:
     - system: True
 
-kubernetes-cert:
+lmktfyrnetes-cert:
   cmd.script:
-    - unless: test -f /srv/kubernetes/server.cert
+    - unless: test -f /srv/lmktfyrnetes/server.cert
     - source: salt://generate-cert/{{certgen}}
 {% if cert_ip is defined %}
     - args: {{cert_ip}}
@@ -45,31 +45,31 @@ kubernetes-cert:
     - shell: /bin/bash
 
 # These are introduced to ensure backwards compatability with older gcloud tools in GKE
-kubernetes-old-key:
+lmktfyrnetes-old-key:
   file.copy:
-    - name: /usr/share/nginx/kubecfg.key
-    - source: /srv/kubernetes/kubecfg.key
+    - name: /usr/share/nginx/lmktfycfg.key
+    - source: /srv/lmktfyrnetes/lmktfycfg.key
     - makedirs: True
     - preserve: True
     - require:
-      - cmd: kubernetes-cert
+      - cmd: lmktfyrnetes-cert
 
 
-kubernetes-old-cert:
+lmktfyrnetes-old-cert:
   file.copy:
-    - name: /usr/share/nginx/kubecfg.crt
-    - source: /srv/kubernetes/kubecfg.crt
+    - name: /usr/share/nginx/lmktfycfg.crt
+    - source: /srv/lmktfyrnetes/lmktfycfg.crt
     - makedirs: True
     - preserve: True
     - require:
-      - cmd: kubernetes-cert
+      - cmd: lmktfyrnetes-cert
 
 
-kubernetes-old-ca:
+lmktfyrnetes-old-ca:
   file.copy:
     - name: /usr/share/nginx/ca.crt
-    - source: /srv/kubernetes/ca.crt
+    - source: /srv/lmktfyrnetes/ca.crt
     - makedirs: True
     - preserve: True
     - require:
-      - cmd: kubernetes-cert
+      - cmd: lmktfyrnetes-cert

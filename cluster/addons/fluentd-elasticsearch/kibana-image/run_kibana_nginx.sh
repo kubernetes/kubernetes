@@ -15,7 +15,7 @@
 # limitations under the License.
 
 # This code below is designed to support two specific scenarios for
-# using Elasticsearch and Kibana with Kubernetes. In both cases the
+# using Elasticsearch and Kibana with LMKTFY. In both cases the
 # environment variables PROXY_HOST and PROXY_PORT identify the instance
 # of Elasticsearch to be used by Kibana. The default value for ES_HOST
 # identifies the location that served the Javascript for Kibana and
@@ -25,12 +25,12 @@
 #    case PROXY_HOST is set to the local host i.e. 127.0.0.1 and the
 #    PROXY_PORT is set to 9200 because Elasticsearch is running on the
 #    same name as Kibana. If KIBANA_IP is the external IP address of
-#    the Kubernetes Kibna service then all requests to:
+#    the LMKTFY Kibna service then all requests to:
 #       KIBANA_LOGGING_SERVICE:$ES_PORT/elasticsearch/XXX
 #    are proxied to:
 #       http://127.0.0.1:9200/XXX
 # 2. Elasticsearch and Kibana are run in separate pods and Elasticsearch
-#    has an IP and port exposed via a Kubernetes service. In this case
+#    has an IP and port exposed via a LMKTFY service. In this case
 #    the Elasticsearch service *must* be called 'elasticsearch' and then
 #    all requests sent to:
 #       KIBANA_LOGGING_SERVICE:$ES_PORT/elasticsearch/XXX

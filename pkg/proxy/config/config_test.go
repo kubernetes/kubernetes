@@ -22,8 +22,8 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	. "github.com/GoogleCloudPlatform/kubernetes/pkg/proxy/config"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api"
+	. "github.com/GoogleCloudPlatform/lmktfy/pkg/proxy/config"
 )
 
 const TomcatPort int = 8080

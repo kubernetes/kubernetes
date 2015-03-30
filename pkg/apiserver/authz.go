@@ -19,8 +19,8 @@ package apiserver
 import (
 	"errors"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/authorizer"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/authorizer/abac"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/auth/authorizer"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/auth/authorizer/abac"
 )
 
 // Attributes implements authorizer.Attributes interface.
@@ -30,7 +30,7 @@ type Attributes struct {
 
 // alwaysAllowAuthorizer is an implementation of authorizer.Attributes
 // which always says yes to an authorization request.
-// It is useful in tests and when using kubernetes in an open manner.
+// It is useful in tests and when using lmktfy in an open manner.
 type alwaysAllowAuthorizer struct{}
 
 func (alwaysAllowAuthorizer) Authorize(a authorizer.Attributes) (err error) {

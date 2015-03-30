@@ -5,6 +5,6 @@ port: 80
 containerPort: 8082
 labels:
   name: heapster
-  kubernetes.io/cluster-service: "true"
+  lmktfy.io/cluster-service: "true"
 selector: 
   name: heapster

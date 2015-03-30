@@ -20,10 +20,10 @@ import (
 	"net/url"
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api/testapi"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/fields"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/labels"
 )
 
 func TestNamespaceCreate(t *testing.T) {
@@ -119,7 +119,7 @@ func TestNamespaceUpdate(t *testing.T) {
 			},
 		},
 		Spec: api.NamespaceSpec{
-			Finalizers: []api.FinalizerName{api.FinalizerKubernetes},
+			Finalizers: []api.FinalizerName{api.FinalizerLMKTFY},
 		},
 	}
 	c := &testClient{
@@ -143,7 +143,7 @@ func TestNamespaceFinalize(t *testing.T) {
 			},
 		},
 		Spec: api.NamespaceSpec{
-			Finalizers: []api.FinalizerName{api.FinalizerKubernetes},
+			Finalizers: []api.FinalizerName{api.FinalizerLMKTFY},
 		},
 	}
 	c := &testClient{

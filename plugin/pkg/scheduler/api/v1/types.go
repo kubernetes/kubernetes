@@ -17,7 +17,7 @@ limitations under the License.
 package v1
 
 import (
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta3"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api/v1beta3"
 )
 
 type Policy struct {
@@ -31,7 +31,7 @@ type Policy struct {
 type PredicatePolicy struct {
 	// Identifier of the predicate policy
 	// For a custom predicate, the name can be user-defined
-	// For the Kubernetes provided predicates, the name is the identifier of the pre-defined predicate
+	// For the LMKTFY provided predicates, the name is the identifier of the pre-defined predicate
 	Name string `json:"name"`
 	// Holds the parameters to configure the given predicate
 	Argument *PredicateArgument `json:"argument"`
@@ -40,7 +40,7 @@ type PredicatePolicy struct {
 type PriorityPolicy struct {
 	// Identifier of the priority policy
 	// For a custom priority, the name can be user-defined
-	// For the Kubernetes provided priority functions, the name is the identifier of the pre-defined priority function
+	// For the LMKTFY provided priority functions, the name is the identifier of the pre-defined priority function
 	Name string `json:"name"`
 	// The numeric multiplier for the minion scores that the priority function generates
 	Weight int `json:"weight"`

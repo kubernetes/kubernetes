@@ -19,9 +19,9 @@ package host_path
 import (
 	"fmt"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/types"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/volume"
 )
 
 // This is the primary entrypoint for volume plugins.
@@ -36,7 +36,7 @@ type hostPathPlugin struct {
 var _ volume.VolumePlugin = &hostPathPlugin{}
 
 const (
-	hostPathPluginName = "kubernetes.io/host-path"
+	hostPathPluginName = "lmktfy.io/host-path"
 )
 
 func (plugin *hostPathPlugin) Init(host volume.VolumeHost) {

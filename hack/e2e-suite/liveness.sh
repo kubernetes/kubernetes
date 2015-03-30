@@ -21,22 +21,22 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
+LMKTFY_ROOT=$(dirname "${BASH_SOURCE}")/../..
 
-: ${KUBE_VERSION_ROOT:=${KUBE_ROOT}}
-: ${KUBECTL:="${KUBE_VERSION_ROOT}/cluster/kubectl.sh"}
-: ${KUBE_CONFIG_FILE:="config-test.sh"}
+: ${LMKTFY_VERSION_ROOT:=${LMKTFY_ROOT}}
+: ${LMKTFYCTL:="${LMKTFY_VERSION_ROOT}/cluster/lmktfyctl.sh"}
+: ${LMKTFY_CONFIG_FILE:="config-test.sh"}
 
-export KUBECTL KUBE_CONFIG_FILE
+export LMKTFYCTL LMKTFY_CONFIG_FILE
 
-source "${KUBE_ROOT}/cluster/kube-env.sh"
-source "${KUBE_VERSION_ROOT}/cluster/${KUBERNETES_PROVIDER}/util.sh"
+source "${LMKTFY_ROOT}/cluster/lmktfy-env.sh"
+source "${LMKTFY_VERSION_ROOT}/cluster/${LMKTFYRNETES_PROVIDER}/util.sh"
 
 prepare-e2e
 
 liveness_tests="http exec"
-if [[ ${KUBERNETES_PROVIDER} == "gke" ]]; then
-  server_version=$(kube_server_version)
+if [[ ${LMKTFYRNETES_PROVIDER} == "gke" ]]; then
+  server_version=$(lmktfy_server_version)
   if [[ ${server_version} -le 702 ]]; then
     echo "GKE server version <= 0.7.2, limiting test to http (version = ${server_version})"
     liveness_tests="http"
@@ -46,12 +46,12 @@ fi
 function teardown() {
   echo "Cleaning up test artifacts"
   for test in ${liveness_tests}; do
-    ${KUBECTL} delete pods liveness-${test}
+    ${LMKTFYCTL} delete pods liveness-${test}
   done
 }
 
 function waitForNotPending() {
-  pod_id_list=$(${KUBECTL} get pods -o template '--template={{range.items}}{{.id}} {{end}}' -l test=liveness)
+  pod_id_list=$(${LMKTFYCTL} get pods -o template '--template={{range.items}}{{.id}} {{end}}' -l test=liveness)
   # Pod turn up on a clean cluster can take a while for the docker image pull.
   all_running=0
   for i in $(seq 1 24); do
@@ -59,7 +59,7 @@ function waitForNotPending() {
     sleep 5
     all_running=1
     for id in $pod_id_list; do
-      current_status=$(${KUBECTL} get pods $id -o template '--template={{.currentState.status}}') || true
+      current_status=$(${LMKTFYCTL} get pods $id -o template '--template={{.currentState.status}}') || true
       if [[ "$current_status" == "Pending" ]]; then
         all_running=0
         break
@@ -79,18 +79,18 @@ trap "teardown" EXIT
 
 for test in ${liveness_tests}; do
   echo "Liveness test: ${test}"
-  ${KUBECTL} create -f ${KUBE_ROOT}/examples/liveness/${test}-liveness.yaml
+  ${LMKTFYCTL} create -f ${LMKTFY_ROOT}/examples/liveness/${test}-liveness.yaml
   waitForNotPending
 
-  before=$(${KUBECTL} get pods "liveness-${test}" -o template '--template={{.currentState.info.liveness.restartCount}}')
+  before=$(${LMKTFYCTL} get pods "liveness-${test}" -o template '--template={{.currentState.info.liveness.restartCount}}')
   while [[ "${before}" == "<no value>" ]]; do
-    before=$(${KUBECTL} get pods "liveness-${test}" -o template '--template={{.currentState.info.liveness.restartCount}}')
+    before=$(${LMKTFYCTL} get pods "liveness-${test}" -o template '--template={{.currentState.info.liveness.restartCount}}')
   done
 
   echo "Waiting for restarts."
   for i in $(seq 1 24); do
     sleep 10
-    after=$(${KUBECTL} get pods "liveness-${test}" -o template '--template={{.currentState.info.liveness.restartCount}}')
+    after=$(${LMKTFYCTL} get pods "liveness-${test}" -o template '--template={{.currentState.info.liveness.restartCount}}')
     echo "Restarts: ${after} > ${before}"
     if [[ "${after}" == "<no value>" ]]; then
       continue

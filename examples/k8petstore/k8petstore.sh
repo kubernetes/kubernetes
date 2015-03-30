@@ -1,8 +1,8 @@
-echo "WRITING KUBE FILES , will overwrite the jsons, then testing pods. is kube clean ready to go?"
+echo "WRITING LMKTFY FILES , will overwrite the jsons, then testing pods. is lmktfy clean ready to go?"
 
 #for dev/test you can use:
-#kubectl=$GOPATH/src/github.com/GoogleCloudPlatform/kubernetes/cluster/kubectl.sh"
-kubectl="kubectl"
+#lmktfyctl=$GOPATH/src/github.com/GoogleCloudPlatform/lmktfy/cluster/lmktfyctl.sh"
+lmktfyctl="lmktfyctl"
 VERSION="r.2.8.19"
 PUBLIC_IP="127.0.0.1" # ip which we use to access the Web server.
 SECONDS=1000          # number of seconds to measure throughput.
@@ -172,15 +172,15 @@ cat << EOF > slave-rc.json
   "labels": {"name": "redisslave"}
 }
 EOF
-$kubectl create -f rm.json --api-version=v1beta1
-$kubectl create -f rm-s.json --api-version=v1beta1
+$lmktfyctl create -f rm.json --api-version=v1beta1
+$lmktfyctl create -f rm-s.json --api-version=v1beta1
 sleep 3 # precaution to prevent fe from spinning up too soon.
-$kubectl create -f slave-rc.json --api-version=v1beta1
-$kubectl create -f rs-s.json --api-version=v1beta1
+$lmktfyctl create -f slave-rc.json --api-version=v1beta1
+$lmktfyctl create -f rs-s.json --api-version=v1beta1
 sleep 3 # see above comment.
-$kubectl create -f fe-rc.json --api-version=v1beta1 
-$kubectl create -f fe-s.json --api-version=v1beta1
-$kubectl create -f bps-load-gen-rc.json --api-version=v1beta1
+$lmktfyctl create -f fe-rc.json --api-version=v1beta1 
+$lmktfyctl create -f fe-s.json --api-version=v1beta1
+$lmktfyctl create -f bps-load-gen-rc.json --api-version=v1beta1
 }
 
 function test { 

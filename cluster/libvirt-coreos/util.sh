@@ -14,15 +14,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# A library of helper functions that each provider hosting Kubernetes must implement to use cluster/kube-*.sh scripts.
+# A library of helper functions that each provider hosting LMKTFY must implement to use cluster/lmktfy-*.sh scripts.
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
+LMKTFY_ROOT=$(dirname "${BASH_SOURCE}")/../..
 readonly ROOT=$(dirname "${BASH_SOURCE}")
-source $ROOT/${KUBE_CONFIG_FILE:-"config-default.sh"}
+source $ROOT/${LMKTFY_CONFIG_FILE:-"config-default.sh"}
 
 export LIBVIRT_DEFAULT_URI=qemu:///system
 
-readonly POOL=kubernetes
+readonly POOL=lmktfy
 readonly POOL_PATH="$(cd $ROOT && pwd)/libvirt_storage_pool"
 
 # join <delim> <list...>
@@ -38,16 +38,16 @@ function join {
 
 # Must ensure that the following ENV vars are set
 function detect-master {
-  KUBE_MASTER_IP=$MASTER_IP
-  KUBE_MASTER=$MASTER_NAME
-  export KUBERNETES_MASTER=http://$KUBE_MASTER_IP:8080
-  echo "KUBE_MASTER_IP: $KUBE_MASTER_IP"
-  echo "KUBE_MASTER: $KUBE_MASTER"
+  LMKTFY_MASTER_IP=$MASTER_IP
+  LMKTFY_MASTER=$MASTER_NAME
+  export LMKTFYRNETES_MASTER=http://$LMKTFY_MASTER_IP:8080
+  echo "LMKTFY_MASTER_IP: $LMKTFY_MASTER_IP"
+  echo "LMKTFY_MASTER: $LMKTFY_MASTER"
 }
 
-# Get minion IP addresses and store in KUBE_MINION_IP_ADDRESSES[]
+# Get minion IP addresses and store in LMKTFY_MINION_IP_ADDRESSES[]
 function detect-minions {
-  KUBE_MINION_IP_ADDRESSES=("${MINION_IPS[@]}")
+  LMKTFY_MINION_IP_ADDRESSES=("${MINION_IPS[@]}")
 }
 
 # Verify prereqs on host machine
@@ -85,10 +85,10 @@ function verify-prereqs {
 function destroy-pool {
   virsh pool-info $POOL >/dev/null 2>&1 || return
 
-  rm -rf "$POOL_PATH"/kubernetes/*
-  rm -rf "$POOL_PATH"/kubernetes_config*/*
+  rm -rf "$POOL_PATH"/lmktfy/*
+  rm -rf "$POOL_PATH"/lmktfy_config*/*
   local vol
-  virsh vol-list $POOL | awk 'NR>2 && !/^$/ && $1 ~ /^kubernetes/ {print $1}' | \
+  virsh vol-list $POOL | awk 'NR>2 && !/^$/ && $1 ~ /^lmktfy/ {print $1}' | \
       while read vol; do
         virsh vol-delete $vol --pool $POOL
       done
@@ -104,7 +104,7 @@ function destroy-pool {
 
 # Creates the libvirt storage pool and populate it with
 # - the CoreOS base image
-# - the kubernetes binaries
+# - the lmktfy binaries
 function initialize-pool {
   mkdir -p "$POOL_PATH"
   if ! virsh pool-info $POOL >/dev/null 2>&1; then
@@ -122,22 +122,22 @@ function initialize-pool {
   #     virsh vol-upload coreos_base.img "$ROOT/coreos_production_qemu_image.img" --pool $POOL
   # fi
 
-  mkdir -p "$POOL_PATH/kubernetes"
-  kube-push-internal
+  mkdir -p "$POOL_PATH/lmktfy"
+  lmktfy-push-internal
 
-  mkdir -p "$POOL_PATH/kubernetes/manifests"
+  mkdir -p "$POOL_PATH/lmktfy/manifests"
   if [[ "$ENABLE_NODE_LOGGING" == "true" ]]; then
       if [[ "$LOGGING_DESTINATION" == "elasticsearch" ]]; then
-          cp "$KUBE_ROOT/cluster/saltbase/salt/fluentd-es/fluentd-es.manifest" "$POOL_PATH/kubernetes/manifests"
+          cp "$LMKTFY_ROOT/cluster/saltbase/salt/fluentd-es/fluentd-es.manifest" "$POOL_PATH/lmktfy/manifests"
       elif [[ "$LOGGING_DESTINATION" == "gcp" ]]; then
-          cp "$KUBE_ROOT/cluster/saltbase/salt/fluentd-gcp/fluentd-gcp.manifest" "$POOL_PATH/kubernetes/manifests"
+          cp "$LMKTFY_ROOT/cluster/saltbase/salt/fluentd-gcp/fluentd-gcp.manifest" "$POOL_PATH/lmktfy/manifests"
       fi
   fi
 
-  mkdir -p "$POOL_PATH/kubernetes/addons"
+  mkdir -p "$POOL_PATH/lmktfy/addons"
   if [[ "$ENABLE_CLUSTER_DNS" == "true" ]]; then
-      render-template "$ROOT/skydns-svc.yaml" > "$POOL_PATH/kubernetes/addons/skydns-svc.yaml"
-      render-template "$ROOT/skydns-rc.yaml"  > "$POOL_PATH/kubernetes/addons/skydns-rc.yaml"
+      render-template "$ROOT/skydns-svc.yaml" > "$POOL_PATH/lmktfy/addons/skydns-svc.yaml"
+      render-template "$ROOT/skydns-rc.yaml"  > "$POOL_PATH/lmktfy/addons/skydns-rc.yaml"
   fi
 
   virsh pool-refresh $POOL
@@ -145,14 +145,14 @@ function initialize-pool {
 
 function destroy-network {
   set +e
-  virsh net-destroy kubernetes_global
-  virsh net-destroy kubernetes_pods
+  virsh net-destroy lmktfy_global
+  virsh net-destroy lmktfy_pods
   set -e
 }
 
 function initialize-network {
-  virsh net-create "$ROOT/network_kubernetes_global.xml"
-  virsh net-create "$ROOT/network_kubernetes_pods.xml"
+  virsh net-create "$ROOT/network_lmktfy_global.xml"
+  virsh net-create "$ROOT/network_lmktfy_pods.xml"
 }
 
 function render-template {
@@ -161,11 +161,11 @@ function render-template {
 
 function wait-cluster-readiness {
   echo "Wait for cluster readiness"
-  local kubectl="${KUBE_ROOT}/cluster/kubectl.sh"
+  local lmktfyctl="${LMKTFY_ROOT}/cluster/lmktfyctl.sh"
 
   local timeout=50
   while [[ $timeout -ne 0 ]]; do
-    nb_ready_minions=$("${kubectl}" get minions -o template -t "{{range.items}}{{range.status.conditions}}{{.kind}}{{end}}:{{end}}" 2>/dev/null | tr ':' '\n' | grep -c Ready || true)
+    nb_ready_minions=$("${lmktfyctl}" get minions -o template -t "{{range.items}}{{range.status.conditions}}{{.kind}}{{end}}:{{end}}" 2>/dev/null | tr ':' '\n' | grep -c Ready || true)
     echo "Nb ready minions: $nb_ready_minions / $NUM_MINIONS"
     if [[ "$nb_ready_minions" -eq "$NUM_MINIONS" ]]; then
         return 0
@@ -178,18 +178,18 @@ function wait-cluster-readiness {
   return 1
 }
 
-# Instantiate a kubernetes cluster
-function kube-up {
+# Instantiate a lmktfy cluster
+function lmktfy-up {
   detect-master
   detect-minions
   initialize-pool keep_base_image
   initialize-network
 
   readonly ssh_keys="$(cat ~/.ssh/id_*.pub | sed 's/^/  - /')"
-  readonly kubernetes_dir="$POOL_PATH/kubernetes"
+  readonly lmktfy_dir="$POOL_PATH/lmktfy"
   readonly discovery=$(curl -s https://discovery.etcd.io/new)
 
-  readonly machines=$(join , "${KUBE_MINION_IP_ADDRESSES[@]}")
+  readonly machines=$(join , "${LMKTFY_MINION_IP_ADDRESSES[@]}")
 
   etcd_servers=( $MASTER_IP ${MINION_IPS[@]} )
   for (( i=0; i<${#etcd_servers[@]}; i++ )); do
@@ -209,7 +209,7 @@ function kube-up {
       public_ip=${MINION_IPS[$i]}
     fi
     image=$name.img
-    config=kubernetes_config_$type
+    config=lmktfy_config_$type
 
     virsh vol-create-as $POOL $image 10G --format qcow2 --backing-vol coreos_base.img --backing-vol-format qcow2
 
@@ -223,26 +223,26 @@ function kube-up {
     rm $domain_xml
   done
 
-  export KUBECONFIG="${HOME}/.kube/.kubeconfig"
-  local kubectl="${KUBE_ROOT}/cluster/kubectl.sh"
+  export LMKTFYCONFIG="${HOME}/.lmktfy/.lmktfyconfig"
+  local lmktfyctl="${LMKTFY_ROOT}/cluster/lmktfyctl.sh"
 
-  "${kubectl}" config set-cluster libvirt-coreos --server=http://${KUBE_MASTER_IP-}:8080
-  "${kubectl}" config set-context libvirt-coreos --cluster=libvirt-coreos
-  "${kubectl}" config use-context libvirt-coreos --cluster=libvirt-coreos
+  "${lmktfyctl}" config set-cluster libvirt-coreos --server=http://${LMKTFY_MASTER_IP-}:8080
+  "${lmktfyctl}" config set-context libvirt-coreos --cluster=libvirt-coreos
+  "${lmktfyctl}" config use-context libvirt-coreos --cluster=libvirt-coreos
 
   wait-cluster-readiness
 
-  echo "Kubernetes cluster is running. The master is running at:"
+  echo "LMKTFY cluster is running. The master is running at:"
   echo
-  echo "  http://${KUBE_MASTER_IP}:8080"
+  echo "  http://${LMKTFY_MASTER_IP}:8080"
   echo
-  echo "You can control the Kubernetes cluster with: 'cluster/kubectl.sh'"
-  echo "You can connect on the master with: 'ssh core@${KUBE_MASTER_IP}'"
+  echo "You can control the LMKTFY cluster with: 'cluster/lmktfyctl.sh'"
+  echo "You can connect on the master with: 'ssh core@${LMKTFY_MASTER_IP}'"
 }
 
-# Delete a kubernetes cluster
-function kube-down {
-  virsh list | awk 'NR>2 && !/^$/ && $2 ~ /^kubernetes/ {print $2}' | \
+# Delete a lmktfy cluster
+function lmktfy-down {
+  virsh list | awk 'NR>2 && !/^$/ && $2 ~ /^lmktfy/ {print $2}' | \
       while read dom; do
         virsh destroy $dom
       done
@@ -251,55 +251,55 @@ function kube-down {
 }
 
 function find-release-tars {
-  SERVER_BINARY_TAR="${KUBE_ROOT}/server/kubernetes-server-linux-amd64.tar.gz"
+  SERVER_BINARY_TAR="${LMKTFY_ROOT}/server/lmktfy-server-linux-amd64.tar.gz"
   if [[ ! -f "$SERVER_BINARY_TAR" ]]; then
-    SERVER_BINARY_TAR="${KUBE_ROOT}/_output/release-tars/kubernetes-server-linux-amd64.tar.gz"
+    SERVER_BINARY_TAR="${LMKTFY_ROOT}/_output/release-tars/lmktfy-server-linux-amd64.tar.gz"
   fi
   if [[ ! -f "$SERVER_BINARY_TAR" ]]; then
-    echo "!!! Cannot find kubernetes-server-linux-amd64.tar.gz"
+    echo "!!! Cannot find lmktfy-server-linux-amd64.tar.gz"
     exit 1
   fi
 }
 
-# The kubernetes binaries are pushed to a host directory which is exposed to the VM
+# The lmktfy binaries are pushed to a host directory which is exposed to the VM
 function upload-server-tars {
-  tar -x -C "$POOL_PATH/kubernetes" -f "$SERVER_BINARY_TAR" kubernetes
-  rm -rf "$POOL_PATH/kubernetes/bin"
-  mv "$POOL_PATH/kubernetes/kubernetes/server/bin" "$POOL_PATH/kubernetes/bin"
-  rmdir "$POOL_PATH/kubernetes/kubernetes/server" "$POOL_PATH/kubernetes/kubernetes"
+  tar -x -C "$POOL_PATH/lmktfy" -f "$SERVER_BINARY_TAR" lmktfy
+  rm -rf "$POOL_PATH/lmktfy/bin"
+  mv "$POOL_PATH/lmktfy/lmktfy/server/bin" "$POOL_PATH/lmktfy/bin"
+  rmdir "$POOL_PATH/lmktfy/lmktfy/server" "$POOL_PATH/lmktfy/lmktfy"
 }
 
-# Update a kubernetes cluster with latest source
-function kube-push {
-  kube-push-internal
-  ssh-to-node "$MASTER_NAME" "sudo systemctl restart kube-apiserver kube-controller-manager kube-scheduler"
+# Update a lmktfy cluster with latest source
+function lmktfy-push {
+  lmktfy-push-internal
+  ssh-to-node "$MASTER_NAME" "sudo systemctl restart lmktfy-apiserver lmktfy-controller-manager lmktfy-scheduler"
   for ((i=0; i < NUM_MINIONS; i++)); do
-    ssh-to-node "${MINION_NAMES[$i]}" "sudo systemctl restart kubelet kube-proxy"
+    ssh-to-node "${MINION_NAMES[$i]}" "sudo systemctl restart lmktfylet lmktfy-proxy"
   done
   wait-cluster-readiness
 }
 
-function kube-push-internal {
-  case "${KUBE_PUSH:-release}" in
+function lmktfy-push-internal {
+  case "${LMKTFY_PUSH:-release}" in
     release)
-      kube-push-release;;
+      lmktfy-push-release;;
     local)
-      kube-push-local;;
+      lmktfy-push-local;;
     *)
-      echo "The only known push methods are \"release\" to use the relase tarball or \"local\" to use the binaries built by make. KUBE_PUSH is set \"$KUBE_PUSH\"" >&2
+      echo "The only known push methods are \"release\" to use the relase tarball or \"local\" to use the binaries built by make. LMKTFY_PUSH is set \"$LMKTFY_PUSH\"" >&2
       return 1;;
   esac
 }
 
-function kube-push-release {
+function lmktfy-push-release {
   find-release-tars
   upload-server-tars
 }
 
-function kube-push-local {
-  rm -rf "$POOL_PATH/kubernetes/bin/*"
-  mkdir -p "$POOL_PATH/kubernetes/bin"
-  cp "${KUBE_ROOT}/_output/local/go/bin"/* "$POOL_PATH/kubernetes/bin"
+function lmktfy-push-local {
+  rm -rf "$POOL_PATH/lmktfy/bin/*"
+  mkdir -p "$POOL_PATH/lmktfy/bin"
+  cp "${LMKTFY_ROOT}/_output/local/go/bin"/* "$POOL_PATH/lmktfy/bin"
 }
 
 # Execute prior to running tests to build a release if required for env
@@ -314,12 +314,12 @@ function test-setup {
 
 # Execute after running tests to perform any required clean-up
 function test-teardown {
-  kube-down
+  lmktfy-down
 }
 
-# Set the {KUBE_USER} and {KUBE_PASSWORD} environment values required to interact with provider
+# Set the {LMKTFY_USER} and {LMKTFY_PASSWORD} environment values required to interact with provider
 function get-password {
-  export KUBE_USER=core
+  export LMKTFY_USER=core
   echo "TODO get-password"
 }
 
@@ -347,14 +347,14 @@ function ssh-to-node {
   ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ControlMaster=no "core@$machine" "$cmd"
 }
 
-# Restart the kube-proxy on a node ($1)
-function restart-kube-proxy {
-  ssh-to-node "$1" "sudo systemctl restart kube-proxy"
+# Restart the lmktfy-proxy on a node ($1)
+function restart-lmktfy-proxy {
+  ssh-to-node "$1" "sudo systemctl restart lmktfy-proxy"
 }
 
 # Restart the apiserver
 function restart-apiserver {
-  ssh-to-node "$1" "sudo systemctl restart kube-apiserver"
+  ssh-to-node "$1" "sudo systemctl restart lmktfy-apiserver"
 }
 
 # Perform preparations required to run e2e tests

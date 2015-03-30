@@ -23,7 +23,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/conversion"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/conversion"
 )
 
 // JSONKeyMapper uses the struct tags on a conversion to determine the key value for

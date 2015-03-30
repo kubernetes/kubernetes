@@ -14,22 +14,22 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package testapi provides a helper for retrieving the KUBE_API_VERSION environment variable.
+// Package testapi provides a helper for retrieving the LMKTFY_API_VERSION environment variable.
 package testapi
 
 import (
 	"fmt"
 	"os"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api/latest"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api/meta"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/runtime"
 )
 
-// Version returns the API version to test against, as set by the KUBE_API_VERSION env var.
+// Version returns the API version to test against, as set by the LMKTFY_API_VERSION env var.
 func Version() string {
-	version := os.Getenv("KUBE_API_VERSION")
+	version := os.Getenv("LMKTFY_API_VERSION")
 	if version == "" {
 		version = latest.Version
 	}
@@ -37,7 +37,7 @@ func Version() string {
 }
 
 // Codec returns the codec for the API version to test against, as set by the
-// KUBE_API_VERSION env var.
+// LMKTFY_API_VERSION env var.
 func Codec() runtime.Codec {
 	interfaces, err := latest.InterfacesFor(Version())
 	if err != nil {
@@ -47,7 +47,7 @@ func Codec() runtime.Codec {
 }
 
 // Converter returns the api.Scheme for the API version to test against, as set by the
-// KUBE_API_VERSION env var.
+// LMKTFY_API_VERSION env var.
 func Converter() runtime.ObjectConvertor {
 	interfaces, err := latest.InterfacesFor(Version())
 	if err != nil {
@@ -57,7 +57,7 @@ func Converter() runtime.ObjectConvertor {
 }
 
 // MetadataAccessor returns the MetadataAccessor for the API version to test against,
-// as set by the KUBE_API_VERSION env var.
+// as set by the LMKTFY_API_VERSION env var.
 func MetadataAccessor() meta.MetadataAccessor {
 	interfaces, err := latest.InterfacesFor(Version())
 	if err != nil {

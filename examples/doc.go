@@ -14,5 +14,5 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Examples contains sample applications for trying out the concepts in Kubernetes.
+// Examples contains sample applications for trying out the concepts in LMKTFY.
 package examples

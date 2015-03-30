@@ -19,8 +19,8 @@ package exec
 import (
 	"strings"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/probe"
-	uexec "github.com/GoogleCloudPlatform/kubernetes/pkg/util/exec"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/probe"
+	uexec "github.com/GoogleCloudPlatform/lmktfy/pkg/util/exec"
 
 	"github.com/golang/glog"
 )

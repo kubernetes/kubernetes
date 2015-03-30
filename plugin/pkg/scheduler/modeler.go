@@ -21,10 +21,10 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/cache"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
-	algorithm "github.com/GoogleCloudPlatform/kubernetes/pkg/scheduler"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/client/cache"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/labels"
+	algorithm "github.com/GoogleCloudPlatform/lmktfy/pkg/scheduler"
 
 	"github.com/golang/glog"
 )

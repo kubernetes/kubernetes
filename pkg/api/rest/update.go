@@ -17,14 +17,14 @@ limitations under the License.
 package rest
 
 import (
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/fielderrors"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/api/errors"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/runtime"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/util/fielderrors"
 )
 
 // RESTUpdateStrategy defines the minimum validation, accepted input, and
-// name generation behavior to update an object that follows Kubernetes
+// name generation behavior to update an object that follows LMKTFY
 // API conventions. A resource may have many UpdateStrategies, depending on
 // the call pattern in use.
 type RESTUpdateStrategy interface {

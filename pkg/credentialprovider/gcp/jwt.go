@@ -20,7 +20,7 @@ import (
 	"io/ioutil"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/credentialprovider"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/credentialprovider"
 	"github.com/golang/glog"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"

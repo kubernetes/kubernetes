@@ -21,8 +21,8 @@ import (
 	"os"
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/authorizer"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/user"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/auth/authorizer"
+	"github.com/GoogleCloudPlatform/lmktfy/pkg/auth/user"
 )
 
 func TestEmptyFile(t *testing.T) {
@@ -60,8 +60,8 @@ func NotTestAuthorize(t *testing.T) {
 	a, err := newWithContents(t, `{                     "readonly": true, "kind": "events"}
 {"user":"scheduler",  "readonly": true, "kind": "pods"}
 {"user":"scheduler",              "kind": "bindings"}
-{"user":"kubelet",    "readonly": true, "kind": "bindings"}
-{"user":"kubelet",                "kind": "events"}
+{"user":"lmktfylet",    "readonly": true, "kind": "bindings"}
+{"user":"lmktfylet",                "kind": "events"}
 {"user":"alice",                                     "ns": "projectCaribou"}
 {"user":"bob",        "readonly": true,                    "ns": "projectCaribou"}
 `)
