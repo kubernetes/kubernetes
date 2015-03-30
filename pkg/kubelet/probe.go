@@ -85,7 +85,7 @@ func (kl *Kubelet) probeContainerLiveness(pod *api.Pod, status api.PodStatus, co
 	return kl.runProbeWithRetries(p, pod, status, container, maxProbeRetries)
 }
 
-// probeContainerLiveness probes the readiness of a container.
+// probeContainerReadiness probes the readiness of a container.
 // If the initial delay on the readiness probe has not passed the probe will return probe.Failure.
 func (kl *Kubelet) probeContainerReadiness(pod *api.Pod, status api.PodStatus, container api.Container, createdAt int64) (probe.Result, error) {
 	p := container.ReadinessProbe
