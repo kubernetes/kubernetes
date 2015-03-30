@@ -1,5 +1,5 @@
 check process etcd with pidfile /var/run/etcd.pid
-group etcd 
+group etcd
 start program = "/etc/init.d/etcd start"
 stop program = "/etc/init.d/etcd stop"
 if failed
