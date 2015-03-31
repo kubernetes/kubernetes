@@ -17,15 +17,35 @@ limitations under the License.
 package cache
 
 import (
-	"fmt"
 	"sync"
 )
+
+// Queue is exactly like a Store, but has a Pop() method too.
+type Queue interface {
+	Store
+
+	// Pop blocks until it has something to return.
+	Pop() interface{}
+
+	// AddIfNotPresent adds a value previously
+	// returned by Pop back into the queue as long
+	// as nothing else (presumably more recent)
+	// has since been added.
+	AddIfNotPresent(interface{}) error
+}
 
 // FIFO receives adds and updates from a Reflector, and puts them in a queue for
 // FIFO order processing. If multiple adds/updates of a single item happen while
 // an item is in the queue before it has been processed, it will only be
 // processed once, and when it is processed, the most recent version will be
 // processed. This can't be done with a channel.
+//
+// FIFO solves this use case:
+//  * You want to process every object (exactly) once.
+//  * You want to process the most recent version of the object when you process it.
+//  * You do not want to process deleted objects, they should be removed from the queue.
+//  * You do not want to periodically reprocess objects.
+// Compare with DeltaFIFO for other use cases.
 type FIFO struct {
 	lock sync.RWMutex
 	cond sync.Cond
@@ -37,12 +57,16 @@ type FIFO struct {
 	keyFunc KeyFunc
 }
 
+var (
+	_ = Queue(&FIFO{}) // FIFO is a Queue
+)
+
 // Add inserts an item, and puts it in the queue. The item is only enqueued
 // if it doesn't already exist in the set.
 func (f *FIFO) Add(obj interface{}) error {
 	id, err := f.keyFunc(obj)
 	if err != nil {
-		return fmt.Errorf("couldn't create key for object: %v", err)
+		return KeyError{obj, err}
 	}
 	f.lock.Lock()
 	defer f.lock.Unlock()
@@ -63,7 +87,7 @@ func (f *FIFO) Add(obj interface{}) error {
 func (f *FIFO) AddIfNotPresent(obj interface{}) error {
 	id, err := f.keyFunc(obj)
 	if err != nil {
-		return fmt.Errorf("couldn't create key for object: %v", err)
+		return KeyError{obj, err}
 	}
 	f.lock.Lock()
 	defer f.lock.Unlock()
@@ -88,7 +112,7 @@ func (f *FIFO) Update(obj interface{}) error {
 func (f *FIFO) Delete(obj interface{}) error {
 	id, err := f.keyFunc(obj)
 	if err != nil {
-		return fmt.Errorf("couldn't create key for object: %v", err)
+		return KeyError{obj, err}
 	}
 	f.lock.Lock()
 	defer f.lock.Unlock()
@@ -107,11 +131,23 @@ func (f *FIFO) List() []interface{} {
 	return list
 }
 
+// ListKeys returns a list of all the keys of the objects currently
+// in the FIFO.
+func (f *FIFO) ListKeys() []string {
+	f.lock.RLock()
+	defer f.lock.RUnlock()
+	list := make([]string, 0, len(f.items))
+	for key := range f.items {
+		list = append(list, key)
+	}
+	return list
+}
+
 // Get returns the requested item, or sets exists=false.
 func (f *FIFO) Get(obj interface{}) (item interface{}, exists bool, err error) {
 	key, err := f.keyFunc(obj)
 	if err != nil {
-		return nil, false, fmt.Errorf("couldn't create key for object: %v", err)
+		return nil, false, KeyError{obj, err}
 	}
 	return f.GetByKey(key)
 }
@@ -127,7 +163,8 @@ func (f *FIFO) GetByKey(key string) (item interface{}, exists bool, err error) {
 // Pop waits until an item is ready and returns it. If multiple items are
 // ready, they are returned in the order in which they were added/updated.
 // The item is removed from the queue (and the store) before it is returned,
-// so if you don't succesfully process it, you need to add it back with Add().
+// so if you don't succesfully process it, you need to add it back with
+// AddIfNotPresent().
 func (f *FIFO) Pop() interface{} {
 	f.lock.Lock()
 	defer f.lock.Unlock()
@@ -156,7 +193,7 @@ func (f *FIFO) Replace(list []interface{}) error {
 	for _, item := range list {
 		key, err := f.keyFunc(item)
 		if err != nil {
-			return fmt.Errorf("couldn't create key for object: %v", err)
+			return KeyError{item, err}
 		}
 		items[key] = item
 	}

@@ -49,6 +49,18 @@ type Store interface {
 // KeyFunc knows how to make a key from an object. Implementations should be deterministic.
 type KeyFunc func(obj interface{}) (string, error)
 
+// KeyError will be returned any time a KeyFunc gives an error; it includes the object
+// at fault.
+type KeyError struct {
+	Obj interface{}
+	Err error
+}
+
+// Error gives a human-readable description of the error.
+func (k KeyError) Error() string {
+	return fmt.Sprintf("couldn't create key for object %+v: %v", k.Obj, k.Err)
+}
+
 // MetaNamespaceKeyFunc is a convenient default KeyFunc which knows how to make
 // keys for API objects which implement meta.Interface.
 // The key uses the format: <namespace>/<name>
@@ -79,7 +91,7 @@ type cache struct {
 func (c *cache) Add(obj interface{}) error {
 	key, err := c.keyFunc(obj)
 	if err != nil {
-		return fmt.Errorf("couldn't create key for object: %v", err)
+		return KeyError{obj, err}
 	}
 	// keep a pointer to whatever could have been there previously
 	c.lock.Lock()
@@ -148,7 +160,7 @@ func (c *cache) deleteFromIndices(obj interface{}) error {
 func (c *cache) Update(obj interface{}) error {
 	key, err := c.keyFunc(obj)
 	if err != nil {
-		return fmt.Errorf("couldn't create key for object: %v", err)
+		return KeyError{obj, err}
 	}
 	c.lock.Lock()
 	defer c.lock.Unlock()
@@ -162,7 +174,7 @@ func (c *cache) Update(obj interface{}) error {
 func (c *cache) Delete(obj interface{}) error {
 	key, err := c.keyFunc(obj)
 	if err != nil {
-		return fmt.Errorf("couldn't create key for object: %v", err)
+		return KeyError{obj, err}
 	}
 	c.lock.Lock()
 	defer c.lock.Unlock()
@@ -212,7 +224,7 @@ func (c *cache) Index(indexName string, obj interface{}) ([]interface{}, error) 
 func (c *cache) Get(obj interface{}) (item interface{}, exists bool, err error) {
 	key, _ := c.keyFunc(obj)
 	if err != nil {
-		return nil, false, fmt.Errorf("couldn't create key for object: %v", err)
+		return nil, false, KeyError{obj, err}
 	}
 	return c.GetByKey(key)
 }
@@ -234,7 +246,7 @@ func (c *cache) Replace(list []interface{}) error {
 	for _, item := range list {
 		key, err := c.keyFunc(item)
 		if err != nil {
-			return fmt.Errorf("couldn't create key for object: %v", err)
+			return KeyError{item, err}
 		}
 		items[key] = item
 	}
