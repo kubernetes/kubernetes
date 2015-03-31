@@ -340,7 +340,7 @@ func describeService(service *api.Service, endpoints *api.Endpoints, events *api
 			if name == "" {
 				name = "<unnamed>"
 			}
-			fmt.Fprintf(out, "Port:\t%s\t%d/%s\n", sp.Name, sp.Port, sp.Protocol)
+			fmt.Fprintf(out, "Port:\t%s\t%d/%s\n", name, sp.Port, sp.Protocol)
 		}
 		fmt.Fprintf(out, "Endpoints:\t%s\n", formatEndpoints(endpoints))
 		fmt.Fprintf(out, "Session Affinity:\t%s\n", service.Spec.SessionAffinity)

@@ -865,6 +865,7 @@ func ValidateServiceUpdate(oldService, service *api.Service) errs.ValidationErro
 		allErrs = append(allErrs, errs.NewFieldInvalid("spec.portalIP", service.Spec.PortalIP, "field is immutable"))
 	}
 
+	allErrs = append(allErrs, ValidateService(service)...)
 	return allErrs
 }
 
