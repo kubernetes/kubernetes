@@ -84,12 +84,61 @@ func newReplicationController(replicas int) api.ReplicationController {
 	}
 }
 
+func newReplicationControllerByRestartPolicy(replicas int, restartPolicy api.RestartPolicy) api.ReplicationController {
+	return api.ReplicationController{
+		TypeMeta:   api.TypeMeta{APIVersion: testapi.Version()},
+		ObjectMeta: api.ObjectMeta{Name: "foobar", Namespace: api.NamespaceDefault, ResourceVersion: "18"},
+		Spec: api.ReplicationControllerSpec{
+			Replicas: replicas,
+			Template: &api.PodTemplateSpec{
+				ObjectMeta: api.ObjectMeta{
+					Labels: map[string]string{
+						"name": "foo",
+						"type": "production",
+					},
+				},
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{
+							Image: "foo/bar",
+							TerminationMessagePath: api.TerminationMessagePathDefault,
+							ImagePullPolicy:        api.PullIfNotPresent,
+						},
+					},
+					RestartPolicy: restartPolicy,
+					DNSPolicy:     api.DNSDefault,
+					NodeSelector: map[string]string{
+						"baz": "blah",
+					},
+				},
+			},
+		},
+	}
+}
+
 func newPodList(count int) *api.PodList {
 	pods := []api.Pod{}
 	for i := 0; i < count; i++ {
 		pods = append(pods, api.Pod{
 			ObjectMeta: api.ObjectMeta{
 				Name: fmt.Sprintf("pod%d", i),
+			},
+		})
+	}
+	return &api.PodList{
+		Items: pods,
+	}
+}
+
+func newPodListByPodPhaseList(count int, podPhaseList []api.PodPhase) *api.PodList {
+	pods := []api.Pod{}
+	for i := 0; i < count; i++ {
+		pods = append(pods, api.Pod{
+			ObjectMeta: api.ObjectMeta{
+				Name: fmt.Sprintf("pod%d", i),
+			},
+			Status: api.PodStatus{
+				Phase: podPhaseList[i],
 			},
 		})
 	}
@@ -211,6 +260,132 @@ func TestSyncReplicationControllerCreates(t *testing.T) {
 		t.Errorf("Unexpected updates for controller via %v",
 			fakeUpdateHandler.RequestReceived.URL)
 	}
+}
+
+func TestSyncReplicationControllerWithRestartPolicyNeverDoesNothing(t *testing.T) {
+	body, _ := latest.Codec.Encode(newPodListByPodPhaseList(5, []api.PodPhase{api.PodPending, api.PodRunning, api.PodSucceeded, api.PodFailed, api.PodUnknown}))
+	fakeHandler := util.FakeHandler{
+		StatusCode:   200,
+		ResponseBody: string(body),
+	}
+	testServer := httptest.NewServer(&fakeHandler)
+	defer testServer.Close()
+	client := client.NewOrDie(&client.Config{Host: testServer.URL, Version: testapi.Version()})
+
+	fakePodControl := FakePodControl{}
+
+	manager := NewReplicationManager(client)
+	manager.podControl = &fakePodControl
+
+	controllerSpec := newReplicationControllerByRestartPolicy(5, api.RestartPolicyNever)
+
+	manager.syncReplicationController(controllerSpec)
+	validateSyncReplication(t, &fakePodControl, 0, 0)
+}
+
+func TestSyncReplicationControllerWithRestartPolicyNeverDeletes(t *testing.T) {
+	body, _ := latest.Codec.Encode(newPodListByPodPhaseList(5, []api.PodPhase{api.PodPending, api.PodRunning, api.PodSucceeded, api.PodFailed, api.PodUnknown}))
+	fakeHandler := util.FakeHandler{
+		StatusCode:   200,
+		ResponseBody: string(body),
+	}
+	testServer := httptest.NewServer(&fakeHandler)
+	defer testServer.Close()
+	client := client.NewOrDie(&client.Config{Host: testServer.URL, Version: testapi.Version()})
+
+	fakePodControl := FakePodControl{}
+
+	manager := NewReplicationManager(client)
+	manager.podControl = &fakePodControl
+
+	controllerSpec := newReplicationControllerByRestartPolicy(3, api.RestartPolicyNever)
+
+	manager.syncReplicationController(controllerSpec)
+	validateSyncReplication(t, &fakePodControl, 0, 2)
+}
+
+func TestSyncReplicationControllerWithRestartPolicyNeverCreates(t *testing.T) {
+	body, _ := latest.Codec.Encode(newPodListByPodPhaseList(5, []api.PodPhase{api.PodPending, api.PodRunning, api.PodSucceeded, api.PodFailed, api.PodUnknown}))
+	fakeHandler := util.FakeHandler{
+		StatusCode:   200,
+		ResponseBody: string(body),
+	}
+	testServer := httptest.NewServer(&fakeHandler)
+	defer testServer.Close()
+	client := client.NewOrDie(&client.Config{Host: testServer.URL, Version: testapi.Version()})
+
+	fakePodControl := FakePodControl{}
+
+	manager := NewReplicationManager(client)
+	manager.podControl = &fakePodControl
+
+	controllerSpec := newReplicationControllerByRestartPolicy(7, api.RestartPolicyNever)
+
+	manager.syncReplicationController(controllerSpec)
+	validateSyncReplication(t, &fakePodControl, 2, 0)
+}
+
+func TestSyncReplicationControllerWithRestartPolicyOnFailureDoesNothing(t *testing.T) {
+	body, _ := latest.Codec.Encode(newPodListByPodPhaseList(4, []api.PodPhase{api.PodPending, api.PodRunning, api.PodSucceeded, api.PodUnknown}))
+	fakeHandler := util.FakeHandler{
+		StatusCode:   200,
+		ResponseBody: string(body),
+	}
+	testServer := httptest.NewServer(&fakeHandler)
+	defer testServer.Close()
+	client := client.NewOrDie(&client.Config{Host: testServer.URL, Version: testapi.Version()})
+
+	fakePodControl := FakePodControl{}
+
+	manager := NewReplicationManager(client)
+	manager.podControl = &fakePodControl
+
+	controllerSpec := newReplicationControllerByRestartPolicy(4, api.RestartPolicyOnFailure)
+
+	manager.syncReplicationController(controllerSpec)
+	validateSyncReplication(t, &fakePodControl, 0, 0)
+}
+
+func TestSyncReplicationControllerWithRestartPolicyOnFailureDeletes(t *testing.T) {
+	body, _ := latest.Codec.Encode(newPodListByPodPhaseList(5, []api.PodPhase{api.PodPending, api.PodRunning, api.PodSucceeded, api.PodFailed, api.PodUnknown}))
+	fakeHandler := util.FakeHandler{
+		StatusCode:   200,
+		ResponseBody: string(body),
+	}
+	testServer := httptest.NewServer(&fakeHandler)
+	defer testServer.Close()
+	client := client.NewOrDie(&client.Config{Host: testServer.URL, Version: testapi.Version()})
+
+	fakePodControl := FakePodControl{}
+
+	manager := NewReplicationManager(client)
+	manager.podControl = &fakePodControl
+
+	controllerSpec := newReplicationControllerByRestartPolicy(3, api.RestartPolicyOnFailure)
+
+	manager.syncReplicationController(controllerSpec)
+	validateSyncReplication(t, &fakePodControl, 0, 1)
+}
+
+func TestSyncReplicationControllerWithRestartPolicyOnFailureCreates(t *testing.T) {
+	body, _ := latest.Codec.Encode(newPodListByPodPhaseList(5, []api.PodPhase{api.PodPending, api.PodRunning, api.PodSucceeded, api.PodFailed, api.PodUnknown}))
+	fakeHandler := util.FakeHandler{
+		StatusCode:   200,
+		ResponseBody: string(body),
+	}
+	testServer := httptest.NewServer(&fakeHandler)
+	defer testServer.Close()
+	client := client.NewOrDie(&client.Config{Host: testServer.URL, Version: testapi.Version()})
+
+	fakePodControl := FakePodControl{}
+
+	manager := NewReplicationManager(client)
+	manager.podControl = &fakePodControl
+
+	controllerSpec := newReplicationControllerByRestartPolicy(7, api.RestartPolicyOnFailure)
+
+	manager.syncReplicationController(controllerSpec)
+	validateSyncReplication(t, &fakePodControl, 3, 0)
 }
 
 func TestCreateReplica(t *testing.T) {
