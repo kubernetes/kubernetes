@@ -24,6 +24,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -76,6 +77,8 @@ type APIServer struct {
 	KubeletConfig              client.KubeletConfig
 	ClusterName                string
 	EnableProfiling            bool
+	MaxRequestsInFlight        int
+	LongRunningRequestRE       string
 }
 
 // NewAPIServer creates a new APIServer object with default parameters
@@ -155,6 +158,8 @@ func (s *APIServer) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.ClusterName, "cluster_name", s.ClusterName, "The instance prefix for the cluster")
 	fs.BoolVar(&s.EnableProfiling, "profiling", false, "Enable profiling via web interface host:port/debug/pprof/")
 	fs.StringVar(&s.ExternalHost, "external_hostname", "", "The hostname to use when generating externalized URLs for this master (e.g. Swagger API Docs.)")
+	fs.IntVar(&s.MaxRequestsInFlight, "max_requests_inflight", 20, "The maximum number of requests in flight at a given time.  When the server exceeds this, it rejects requests.  Zero for no limit.")
+	fs.StringVar(&s.LongRunningRequestRE, "long_running_request_regexp", "[.*\\/watch$][^\\/proxy.*]", "A regular expression matching long running requests which should be excluded from maximum inflight request handling.")
 }
 
 // TODO: Longer term we should read this from some config store, rather than a flag.
@@ -294,12 +299,19 @@ func (s *APIServer) Run(_ []string) error {
 
 	// See the flag commentary to understand our assumptions when opening the read-only and read-write ports.
 
+	var sem chan bool
+	if s.MaxRequestsInFlight > 0 {
+		sem = make(chan bool, s.MaxRequestsInFlight)
+	}
+
+	longRunningRE := regexp.MustCompile(s.LongRunningRequestRE)
+
 	if roLocation != "" {
 		// Default settings allow 1 read-only request per second, allow up to 20 in a burst before enforcing.
 		rl := util.NewTokenBucketRateLimiter(s.APIRate, s.APIBurst)
 		readOnlyServer := &http.Server{
 			Addr:           roLocation,
-			Handler:        apiserver.RecoverPanics(apiserver.ReadOnly(apiserver.RateLimit(rl, m.InsecureHandler))),
+			Handler:        apiserver.MaxInFlightLimit(sem, longRunningRE, apiserver.RecoverPanics(apiserver.ReadOnly(apiserver.RateLimit(rl, m.InsecureHandler)))),
 			ReadTimeout:    5 * time.Minute,
 			WriteTimeout:   5 * time.Minute,
 			MaxHeaderBytes: 1 << 20,
@@ -319,7 +331,7 @@ func (s *APIServer) Run(_ []string) error {
 	if secureLocation != "" {
 		secureServer := &http.Server{
 			Addr:           secureLocation,
-			Handler:        apiserver.RecoverPanics(m.Handler),
+			Handler:        apiserver.MaxInFlightLimit(sem, longRunningRE, apiserver.RecoverPanics(m.Handler)),
 			ReadTimeout:    5 * time.Minute,
 			WriteTimeout:   5 * time.Minute,
 			MaxHeaderBytes: 1 << 20,
