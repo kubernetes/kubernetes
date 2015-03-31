@@ -29,7 +29,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
 	nodeControllerPkg "github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/controller"
 	replicationControllerPkg "github.com/GoogleCloudPlatform/kubernetes/pkg/controller"
@@ -178,8 +177,7 @@ func (s *CMServer) Run(_ []string) error {
 	}
 
 	nodeController := nodeControllerPkg.NewNodeController(cloud, s.MinionRegexp, s.MachineList, nodeResources,
-		kubeClient, kubeletClient, record.FromSource(api.EventSource{Component: "controllermanager"}),
-		s.RegisterRetryCount, s.PodEvictionTimeout)
+		kubeClient, kubeletClient, s.RegisterRetryCount, s.PodEvictionTimeout)
 	nodeController.Run(s.NodeSyncPeriod, s.SyncNodeList, s.SyncNodeStatus)
 
 	resourceQuotaManager := resourcequota.NewResourceQuotaManager(kubeClient)

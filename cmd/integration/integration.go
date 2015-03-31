@@ -204,6 +204,9 @@ func startComponents(firstManifestURL, secondManifestURL, apiVersion string) (st
 	if err != nil {
 		glog.Fatalf("Couldn't create scheduler config: %v", err)
 	}
+	eventBroadcaster := record.NewBroadcaster()
+	schedulerConfig.Recorder = eventBroadcaster.NewRecorder(api.EventSource{Component: "scheduler"})
+	eventBroadcaster.StartRecordingToSink(cl.Events(""))
 	scheduler.New(schedulerConfig).Run()
 
 	endpoints := service.NewEndpointController(cl)
@@ -221,8 +224,7 @@ func startComponents(firstManifestURL, secondManifestURL, apiVersion string) (st
 			api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
 		}}
 
-	nodeController := nodeControllerPkg.NewNodeController(nil, "", machineList, nodeResources, cl, fakeKubeletClient{},
-		record.FromSource(api.EventSource{Component: "controllermanager"}), 10, 5*time.Minute)
+	nodeController := nodeControllerPkg.NewNodeController(nil, "", machineList, nodeResources, cl, fakeKubeletClient{}, 10, 5*time.Minute)
 	nodeController.Run(5*time.Second, true, false)
 	cadvisorInterface := new(cadvisor.Fake)
 

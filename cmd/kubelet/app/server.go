@@ -341,13 +341,15 @@ func SimpleKubelet(client *client.Client,
 // Eventually, #2 will be replaced with instances of #3
 func RunKubelet(kcfg *KubeletConfig) {
 	kcfg.Hostname = util.GetHostname(kcfg.HostnameOverride)
-	kcfg.Recorder = record.FromSource(api.EventSource{Component: "kubelet", Host: kcfg.Hostname})
+	eventBroadcaster := record.NewBroadcaster()
+	kcfg.Recorder = eventBroadcaster.NewRecorder(api.EventSource{Component: "kubelet", Host: kcfg.Hostname})
+	eventBroadcaster.StartLogging(glog.Infof)
 	if kcfg.KubeClient != nil {
-		kubelet.SetupEventSending(kcfg.KubeClient, kcfg.Hostname)
+		glog.Infof("Sending events to api server.")
+		eventBroadcaster.StartRecordingToSink(kcfg.KubeClient.Events(""))
 	} else {
-		glog.Infof("No api server defined - no events will be sent.")
+		glog.Infof("No api server defined - no events will be sent to API server.")
 	}
-	kubelet.SetupLogging()
 	kubelet.SetupCapabilities(kcfg.AllowPrivileged, kcfg.HostNetworkSources)
 
 	credentialprovider.SetPreferredDockercfgPath(kcfg.RootDirectory)
