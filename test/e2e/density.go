@@ -18,6 +18,7 @@ package e2e
 
 import (
 	"fmt"
+	"strconv"
 	"sync"
 	"time"
 
@@ -206,12 +207,21 @@ var _ = Describe("Density", func() {
 		}
 	})
 
-	It("should allow starting 100 pods per node", func() {
-		RCName = "my-hostname-density100-" + string(util.NewUUID())
-		RunRC(c, RCName, ns, "dockerfile/nginx", 100*minionCount)
-	})
+	// Tests with "Skipped" substring in their name will be skipped when running
+	// e2e test suite without --ginkgo.focus & --ginkgo.skip flags.
 
-	It("should have master components that can handle many short-lived pods", func() {
+	for _, count := range []int{30, 50, 100} {
+		name := fmt.Sprintf("should allow starting %d pods per node", count)
+		if count > 30 {
+			name = "[Skipped] " + name
+		}
+		It(name, func() {
+			RCName = "my-hostname-density" + strconv.Itoa(count) + "-" + string(util.NewUUID())
+			RunRC(c, RCName, ns, "kubernetes/pause:go", count*minionCount)
+		})
+	}
+
+	It("[Skipped] should have master components that can handle many short-lived pods", func() {
 		threads := 5
 		var wg sync.WaitGroup
 		wg.Add(threads)
@@ -220,7 +230,7 @@ var _ = Describe("Density", func() {
 				defer wg.Done()
 				for i := 0; i < 10; i++ {
 					name := "my-hostname-thrash-" + string(util.NewUUID())
-					RunRC(c, name, ns, "kubernetes/pause", 10*minionCount)
+					RunRC(c, name, ns, "kubernetes/pause:go", 10*minionCount)
 				}
 			}()
 		}
