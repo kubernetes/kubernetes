@@ -1216,7 +1216,7 @@ func (kl *Kubelet) syncPod(pod *api.Pod, mirrorPod *api.Pod, runningPod kubecont
 			}
 			continue
 		}
-		if kl.shouldContainerBeRestarted(&container, pod) {
+		if kl.shouldContainerBeRestarted(&container, pod, &podStatus) {
 			// If we are here it means that the container is dead and sould be restarted, or never existed and should
 			// be created. We may be inserting this ID again if the container has changed and it has
 			// RestartPolicy::Always, but it's not a big deal.
