@@ -115,12 +115,13 @@ func (d *LimitRangeDescriber) Describe(namespace, name string) (string, error) {
 func describeLimitRange(limitRange *api.LimitRange) (string, error) {
 	return tabbedString(func(out io.Writer) error {
 		fmt.Fprintf(out, "Name:\t%s\n", limitRange.Name)
-		fmt.Fprintf(out, "Type\tResource\tMin\tMax\n")
-		fmt.Fprintf(out, "----\t--------\t---\t---\n")
+		fmt.Fprintf(out, "Type\tResource\tMin\tMax\tDefault\n")
+		fmt.Fprintf(out, "----\t--------\t---\t---\t---\n")
 		for i := range limitRange.Spec.Limits {
 			item := limitRange.Spec.Limits[i]
 			maxResources := item.Max
 			minResources := item.Min
+			defaultResources := item.Default
 
 			set := map[api.ResourceName]bool{}
 			for k := range maxResources {
@@ -129,11 +130,15 @@ func describeLimitRange(limitRange *api.LimitRange) (string, error) {
 			for k := range minResources {
 				set[k] = true
 			}
+			for k := range defaultResources {
+				set[k] = true
+			}
 
 			for k := range set {
 				// if no value is set, we output -
 				maxValue := "-"
 				minValue := "-"
+				defaultValue := "-"
 
 				maxQuantity, maxQuantityFound := maxResources[k]
 				if maxQuantityFound {
@@ -145,8 +150,13 @@ func describeLimitRange(limitRange *api.LimitRange) (string, error) {
 					minValue = minQuantity.String()
 				}
 
-				msg := "%v\t%v\t%v\t%v\n"
-				fmt.Fprintf(out, msg, item.Type, k, minValue, maxValue)
+				defaultQuantity, defaultQuantityFound := defaultResources[k]
+				if defaultQuantityFound {
+					defaultValue = defaultQuantity.String()
+				}
+
+				msg := "%v\t%v\t%v\t%v\t%v\n"
+				fmt.Fprintf(out, msg, item.Type, k, minValue, maxValue, defaultValue)
 			}
 		}
 		return nil

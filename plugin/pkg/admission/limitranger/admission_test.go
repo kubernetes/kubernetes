@@ -17,27 +17,33 @@ limitations under the License.
 package limitranger
 
 import (
+	"strconv"
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
 )
 
-func getResourceRequirements(cpu, memory string) api.ResourceRequirements {
-	res := api.ResourceRequirements{}
-	res.Limits = api.ResourceList{}
+func getResourceList(cpu, memory string) api.ResourceList {
+	res := api.ResourceList{}
 	if cpu != "" {
-		res.Limits[api.ResourceCPU] = resource.MustParse(cpu)
+		res[api.ResourceCPU] = resource.MustParse(cpu)
 	}
 	if memory != "" {
-		res.Limits[api.ResourceMemory] = resource.MustParse(memory)
+		res[api.ResourceMemory] = resource.MustParse(memory)
 	}
-
 	return res
 }
 
-func TestPodLimitFunc(t *testing.T) {
-	limitRange := &api.LimitRange{
+func getResourceRequirements(limits, requests api.ResourceList) api.ResourceRequirements {
+	res := api.ResourceRequirements{}
+	res.Limits = limits
+	res.Requests = requests
+	return res
+}
+
+func validLimitRange() api.LimitRange {
+	return api.LimitRange{
 		ObjectMeta: api.ObjectMeta{
 			Name: "abc",
 		},
@@ -45,177 +51,147 @@ func TestPodLimitFunc(t *testing.T) {
 			Limits: []api.LimitRangeItem{
 				{
 					Type: api.LimitTypePod,
-					Max:  getResourceRequirements("200m", "4Gi").Limits,
-					Min:  getResourceRequirements("50m", "2Mi").Limits,
+					Max:  getResourceList("200m", "4Gi"),
+					Min:  getResourceList("50m", "2Mi"),
 				},
 				{
-					Type: api.LimitTypeContainer,
-					Max:  getResourceRequirements("100m", "2Gi").Limits,
-					Min:  getResourceRequirements("25m", "1Mi").Limits,
+					Type:    api.LimitTypeContainer,
+					Max:     getResourceList("100m", "2Gi"),
+					Min:     getResourceList("25m", "1Mi"),
+					Default: getResourceList("50m", "5Mi"),
 				},
 			},
 		},
 	}
+}
 
+func validPod(name string, numContainers int, resources api.ResourceRequirements) api.Pod {
+	pod := api.Pod{
+		ObjectMeta: api.ObjectMeta{Name: name},
+		Spec:       api.PodSpec{},
+	}
+	pod.Spec.Containers = make([]api.Container, 0, numContainers)
+	for i := 0; i < numContainers; i++ {
+		pod.Spec.Containers = append(pod.Spec.Containers, api.Container{
+			Image:     "foo:V" + strconv.Itoa(i),
+			Resources: resources,
+		})
+	}
+	return pod
+}
+
+func TestDefaultContainerResourceRequirements(t *testing.T) {
+	limitRange := validLimitRange()
+	expected := api.ResourceRequirements{
+		Limits:   getResourceList("50m", "5Mi"),
+		Requests: getResourceList("25m", "1Mi"),
+	}
+
+	actual := defaultContainerResourceRequirements(&limitRange)
+	if !api.Semantic.DeepEqual(expected, actual) {
+		t.Errorf("actual.Limits != expected.Limits; %v != %v", actual.Limits, expected.Limits)
+		t.Errorf("actual.Requests != expected.Requests; %v != %v", actual.Requests, expected.Requests)
+		t.Errorf("expected != actual; %v != %v", expected, actual)
+	}
+}
+
+func TestMergePodResourceRequirements(t *testing.T) {
+	limitRange := validLimitRange()
+
+	// pod with no resources enumerated should get each resource from default
+	expected := getResourceRequirements(getResourceList("", ""), getResourceList("", ""))
+	pod := validPod("empty-resources", 1, expected)
+	defaultRequirements := defaultContainerResourceRequirements(&limitRange)
+	mergePodResourceRequirements(&pod, &defaultRequirements)
+	for i := range pod.Spec.Containers {
+		actual := pod.Spec.Containers[i].Resources
+		if !api.Semantic.DeepEqual(expected, actual) {
+			t.Errorf("pod %v, expected != actual; %v != %v", pod.Name, expected, actual)
+		}
+	}
+
+	// pod with some resources enumerated should only merge empty
+	input := getResourceRequirements(getResourceList("", "512Mi"), getResourceList("", ""))
+	pod = validPod("limit-memory", 1, input)
+	expected = api.ResourceRequirements{
+		Limits: api.ResourceList{
+			api.ResourceCPU:    defaultRequirements.Limits[api.ResourceCPU],
+			api.ResourceMemory: resource.MustParse("512Mi"),
+		},
+		Requests: api.ResourceList{
+			api.ResourceCPU:    defaultRequirements.Requests[api.ResourceCPU],
+			api.ResourceMemory: defaultRequirements.Requests[api.ResourceMemory],
+		},
+	}
+	mergePodResourceRequirements(&pod, &defaultRequirements)
+	for i := range pod.Spec.Containers {
+		actual := pod.Spec.Containers[i].Resources
+		if !api.Semantic.DeepEqual(expected, actual) {
+			t.Errorf("pod %v, expected != actual; %v != %v", pod.Name, expected, actual)
+		}
+	}
+}
+
+func TestPodLimitFunc(t *testing.T) {
+	limitRange := validLimitRange()
 	successCases := []api.Pod{
-		{
-			ObjectMeta: api.ObjectMeta{Name: "foo"},
-			Spec: api.PodSpec{
-				Containers: []api.Container{
-					{
-						Image:     "foo:V1",
-						Resources: getResourceRequirements("100m", "2Gi"),
-					},
-					{
-						Image:     "boo:V1",
-						Resources: getResourceRequirements("100m", "2Gi"),
-					},
-				},
-			},
-		},
-		{
-			ObjectMeta: api.ObjectMeta{Name: "bar"},
-			Spec: api.PodSpec{
-				Containers: []api.Container{
-					{
-						Image:     "boo:V1",
-						Resources: getResourceRequirements("100m", "2Gi"),
-					},
-				},
-			},
-		},
+		validPod("foo", 2, getResourceRequirements(getResourceList("100m", "2Gi"), getResourceList("", ""))),
+		validPod("bar", 1, getResourceRequirements(getResourceList("100m", "2Gi"), getResourceList("", ""))),
 	}
 
 	errorCases := map[string]api.Pod{
-		"min-container-cpu": {
-			ObjectMeta: api.ObjectMeta{Name: "foo"},
-			Spec: api.PodSpec{
-				Containers: []api.Container{
-					{
-						Image:     "boo:V1",
-						Resources: getResourceRequirements("25m", "2Gi"),
-					},
-				},
-			},
-		},
-		"max-container-cpu": {
-			ObjectMeta: api.ObjectMeta{Name: "foo"},
-			Spec: api.PodSpec{
-				Containers: []api.Container{
-					{
-						Image:     "boo:V1",
-						Resources: getResourceRequirements("110m", "1Gi"),
-					},
-				},
-			},
-		},
-		"min-container-mem": {
-			ObjectMeta: api.ObjectMeta{Name: "foo"},
-			Spec: api.PodSpec{
-				Containers: []api.Container{
-					{
-						Image:     "boo:V1",
-						Resources: getResourceRequirements("30m", "0"),
-					},
-				},
-			},
-		},
-		"max-container-mem": {
-			ObjectMeta: api.ObjectMeta{Name: "foo"},
-			Spec: api.PodSpec{
-				Containers: []api.Container{
-					{
-						Image:     "boo:V1",
-						Resources: getResourceRequirements("30m", "3Gi"),
-					},
-				},
-			},
-		},
-		"min-pod-cpu": {
-			ObjectMeta: api.ObjectMeta{Name: "foo"},
-			Spec: api.PodSpec{
-				Containers: []api.Container{
-					{
-						Image:     "boo:V1",
-						Resources: getResourceRequirements("40m", "2Gi"),
-					},
-				},
-			},
-		},
-		"max-pod-cpu": {
-			ObjectMeta: api.ObjectMeta{Name: "foo"},
-			Spec: api.PodSpec{
-				Containers: []api.Container{
-					{
-						Image:     "boo:V1",
-						Resources: getResourceRequirements("60m", "1Mi"),
-					},
-					{
-						Image:     "boo:V2",
-						Resources: getResourceRequirements("60m", "1Mi"),
-					},
-					{
-						Image:     "boo:V3",
-						Resources: getResourceRequirements("60m", "1Mi"),
-					},
-					{
-						Image:     "boo:V4",
-						Resources: getResourceRequirements("60m", "1Mi"),
-					},
-				},
-			},
-		},
-		"max-pod-memory": {
-			ObjectMeta: api.ObjectMeta{Name: "foo"},
-			Spec: api.PodSpec{
-				Containers: []api.Container{
-					{
-						Image:     "boo:V1",
-						Resources: getResourceRequirements("60m", "2Gi"),
-					},
-					{
-						Image:     "boo:V2",
-						Resources: getResourceRequirements("60m", "2Gi"),
-					},
-					{
-						Image:     "boo:V3",
-						Resources: getResourceRequirements("60m", "2Gi"),
-					},
-				},
-			},
-		},
-		"min-pod-memory": {
-			ObjectMeta: api.ObjectMeta{Name: "foo"},
-			Spec: api.PodSpec{
-				Containers: []api.Container{
-					{
-						Image:     "boo:V1",
-						Resources: getResourceRequirements("60m", "0"),
-					},
-					{
-						Image:     "boo:V2",
-						Resources: getResourceRequirements("60m", "0"),
-					},
-					{
-						Image:     "boo:V3",
-						Resources: getResourceRequirements("60m", "0"),
-					},
-				},
-			},
-		},
+		"min-container-cpu": validPod("foo", 1, getResourceRequirements(getResourceList("25m", "2Gi"), getResourceList("", ""))),
+		"max-container-cpu": validPod("foo", 1, getResourceRequirements(getResourceList("110m", "1Gi"), getResourceList("", ""))),
+		"min-container-mem": validPod("foo", 1, getResourceRequirements(getResourceList("30m", "0"), getResourceList("", ""))),
+		"max-container-mem": validPod("foo", 1, getResourceRequirements(getResourceList("30m", "3Gi"), getResourceList("", ""))),
+		"min-pod-cpu":       validPod("foo", 1, getResourceRequirements(getResourceList("40m", "2Gi"), getResourceList("", ""))),
+		"max-pod-cpu":       validPod("foo", 4, getResourceRequirements(getResourceList("60m", "1Mi"), getResourceList("", ""))),
+		"max-pod-memory":    validPod("foo", 3, getResourceRequirements(getResourceList("60m", "2Gi"), getResourceList("", ""))),
+		"min-pod-memory":    validPod("foo", 3, getResourceRequirements(getResourceList("60m", "0"), getResourceList("", ""))),
 	}
 
 	for i := range successCases {
-		err := PodLimitFunc(limitRange, "pods", &successCases[i])
+		err := PodLimitFunc(&limitRange, &successCases[i])
 		if err != nil {
 			t.Errorf("Unexpected error for valid pod: %v, %v", successCases[i].Name, err)
 		}
 	}
 
 	for k, v := range errorCases {
-		err := PodLimitFunc(limitRange, "pods", &v)
+		err := PodLimitFunc(&limitRange, &v)
 		if err == nil {
 			t.Errorf("Expected error for %s", k)
+		}
+	}
+}
+
+func TestPodLimitFuncApplyDefault(t *testing.T) {
+	limitRange := validLimitRange()
+	testPod := validPod("foo", 1, getResourceRequirements(api.ResourceList{}, api.ResourceList{}))
+	err := PodLimitFunc(&limitRange, &testPod)
+	if err != nil {
+		t.Errorf("Unexpected error for valid pod: %v, %v", testPod.Name, err)
+	}
+
+	for i := range testPod.Spec.Containers {
+		container := testPod.Spec.Containers[i]
+		memory := testPod.Spec.Containers[i].Resources.Limits.Memory().String()
+		cpu := testPod.Spec.Containers[i].Resources.Limits.Cpu().String()
+		switch container.Image {
+		case "boo:V1":
+			if memory != "100Mi" {
+				t.Errorf("Unexpected memory value %s", memory)
+			}
+			if cpu != "50m" {
+				t.Errorf("Unexpected cpu value %s", cpu)
+			}
+		case "foo:V1":
+			if memory != "2Gi" {
+				t.Errorf("Unexpected memory value %s", memory)
+			}
+			if cpu != "100m" {
+				t.Errorf("Unexpected cpu value %s", cpu)
+			}
 		}
 	}
 }
