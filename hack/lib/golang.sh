@@ -258,7 +258,7 @@ kube::golang::exit_if_stdlib_not_installed() {
   kube::log::status "+++ Error. stdlib pkg with cgo flag not found."; 
   kube::log::status "+++ Error. stdlib pkg cannot be rebuilt since ${go_root_dir}/pkg is not writable by `whoami`"; 
   kube::log::status "+++ Error. Make ${go_root_dir}/pkg writable for `whoami` for a one-time stdlib install, Or"
-  kube::log::status "+++ Error. Rebuild stdlib using the command 'CGO_ENABLED=0 go install -a installsuffix cgo std'";
+  kube::log::status "+++ Error. Rebuild stdlib using the command 'CGO_ENABLED=0 go install -a -installsuffix cgo std'";
   
   exit 0;
 }
