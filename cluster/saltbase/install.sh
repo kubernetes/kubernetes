@@ -15,7 +15,7 @@
 # limitations under the License.
 
 # This script will set up the salt directory on the target server.  It takes one
-# argument that is a tarball with the pre-compiled kuberntes server binaries.
+# argument that is a tarball with the pre-compiled kubernetes server binaries.
 
 set -o errexit
 set -o nounset
