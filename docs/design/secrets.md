@@ -21,7 +21,7 @@ Goals of this design:
 ## Constraints and Assumptions
 
 *  This design does not prescribe a method for storing secrets; storage of secrets should be
-   pluggable to accomodate different use-cases
+   pluggable to accommodate different use-cases
 *  Encryption of secret data and node security are orthogonal concerns
 *  It is assumed that node and master are secure and that compromising their security could also
    compromise secrets:
@@ -375,7 +375,7 @@ a tmpfs file system of that size to store secret data.  Rough accounting of spec
 For use-cases where the Kubelet's behavior is affected by the secrets associated with a pod's
 `ServiceAccount`, the Kubelet will need to be changed.  For example, if secrets of type
 `docker-reg-auth` affect how the pod's images are pulled, the Kubelet will need to be changed
-to accomodate this.  Subsequent proposals can address this on a type-by-type basis.
+to accommodate this.  Subsequent proposals can address this on a type-by-type basis.
 
 ## Examples
 
