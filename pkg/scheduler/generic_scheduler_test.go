@@ -250,7 +250,7 @@ func TestFindFitAllError(t *testing.T) {
 	_, predicateMap, err := findNodesThatFit(api.Pod{}, FakePodLister([]api.Pod{}), predicates, makeNodeList(nodes))
 
 	if err != nil {
-		t.Errorf("unexpected error: %v")
+		t.Errorf("unexpected error: %v", err)
 	}
 
 	if len(predicateMap) != len(nodes) {
@@ -275,7 +275,7 @@ func TestFindFitSomeError(t *testing.T) {
 	_, predicateMap, err := findNodesThatFit(pod, FakePodLister([]api.Pod{}), predicates, makeNodeList(nodes))
 
 	if err != nil {
-		t.Errorf("unexpected error: %v")
+		t.Errorf("unexpected error: %v", err)
 	}
 
 	if len(predicateMap) != (len(nodes) - 1) {

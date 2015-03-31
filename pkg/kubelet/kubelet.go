@@ -1562,7 +1562,7 @@ func checkHostPortConflicts(pods []api.Pod) (fitting []api.Pod, notFitting []api
 func (kl *Kubelet) checkCapacityExceeded(pods []api.Pod) (fitting []api.Pod, notFitting []api.Pod) {
 	info, err := kl.GetCachedMachineInfo()
 	if err != nil {
-		glog.Error("error getting machine info: %v", err)
+		glog.Errorf("error getting machine info: %v", err)
 		return pods, []api.Pod{}
 	}
 
@@ -1780,7 +1780,7 @@ func (kl *Kubelet) tryUpdateNodeStatus() error {
 	// cAdvisor locally, e.g. for test-cmd.sh, and in integration test.
 	info, err := kl.GetCachedMachineInfo()
 	if err != nil {
-		glog.Error("error getting machine info: %v", err)
+		glog.Errorf("error getting machine info: %v", err)
 	} else {
 		node.Status.NodeInfo.MachineID = info.MachineID
 		node.Status.NodeInfo.SystemUUID = info.SystemUUID
@@ -1797,7 +1797,7 @@ func (kl *Kubelet) tryUpdateNodeStatus() error {
 
 	verinfo, err := kl.cadvisor.VersionInfo()
 	if err != nil {
-		glog.Error("error getting version info: %v", err)
+		glog.Errorf("error getting version info: %v", err)
 	} else {
 		node.Status.NodeInfo.KernelVersion = verinfo.KernelVersion
 		node.Status.NodeInfo.OsImage = verinfo.ContainerOsVersion

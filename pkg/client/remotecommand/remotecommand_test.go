@@ -282,7 +282,7 @@ func TestRequestExecuteRemoteCommand(t *testing.T) {
 		}
 
 		if !conn.closeCalled {
-			t.Fatalf("%d: expected upgraded connection to get closed")
+			t.Fatalf("%d: expected upgraded connection to get closed", i)
 		}
 	}
 }

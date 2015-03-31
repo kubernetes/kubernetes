@@ -448,7 +448,7 @@ func TestPodsInfo(t *testing.T) {
 	}
 	result := string(body)
 	if !strings.Contains(result, "pod level status currently unimplemented") {
-		t.Errorf("expected body contains %s, got %d", "pod level status currently unimplemented", result)
+		t.Errorf("expected body contains pod level status currently unimplemented, got %s", result)
 	}
 }
 
@@ -477,7 +477,7 @@ func TestHealthCheck(t *testing.T) {
 	}
 	result := string(body)
 	if !strings.Contains(result, "ok") {
-		t.Errorf("expected body contains %s, got %d", "ok", result)
+		t.Errorf("expected body contains ok, got %s", result)
 	}
 
 	//Test with incorrect hostname
@@ -822,7 +822,7 @@ func TestServeExecInContainer(t *testing.T) {
 		}
 
 		if e, a := test.responseStatusCode, resp.StatusCode; e != a {
-			t.Fatalf("%d: response status: expected %v, got %v", e, a)
+			t.Fatalf("%d: response status: expected %v, got %v", i, e, a)
 		}
 
 		if test.responseStatusCode != http.StatusSwitchingProtocols {
@@ -987,7 +987,7 @@ func TestServePortForward(t *testing.T) {
 
 			p, err := strconv.ParseUint(test.port, 10, 16)
 			if err != nil {
-				t.Fatalf("%d: error parsing port string '%s': %v", i, port, err)
+				t.Fatalf("%d: error parsing port string '%s': %v", i, test.port, err)
 			}
 			if e, a := uint16(p), port; e != a {
 				t.Fatalf("%d: port: expected '%v', got '%v'", i, e, a)
@@ -1035,7 +1035,7 @@ func TestServePortForward(t *testing.T) {
 			t.Fatalf("Unexpected error creating streaming connection: %s", err)
 		}
 		if conn == nil {
-			t.Fatal("%d: Unexpected nil connection", i)
+			t.Fatalf("%d: Unexpected nil connection", i)
 		}
 		defer conn.Close()
 

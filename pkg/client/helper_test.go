@@ -307,7 +307,7 @@ func TestSetKubernetesDefaults(t *testing.T) {
 func TestSetKubernetesDefaultsUserAgent(t *testing.T) {
 	config := &Config{}
 	if err := SetKubernetesDefaults(config); err != nil {
-		t.Errorf("unexpected error: %v")
+		t.Errorf("unexpected error: %v", err)
 	}
 	if !strings.Contains(config.UserAgent, "kubernetes/") {
 		t.Errorf("no user agent set: %#v", config)

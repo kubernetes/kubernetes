@@ -79,7 +79,7 @@ func TestReplicationControllerResize(t *testing.T) {
 		t.Errorf("unexpected action: %v, expected get-controller %s", fake.Actions[0], name)
 	}
 	if fake.Actions[1].Action != "update-controller" || fake.Actions[1].Value.(*api.ReplicationController).Spec.Replicas != int(count) {
-		t.Errorf("unexpected action %v, expected update-controller with replicas = %d", count)
+		t.Errorf("unexpected action %v, expected update-controller with replicas = %d", fake.Actions[1], count)
 	}
 }
 

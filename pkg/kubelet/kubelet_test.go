@@ -2858,7 +2858,7 @@ func TestHandlePortConflicts(t *testing.T) {
 	// Check pod status stored in the status map.
 	status, err := kl.GetPodStatus(conflictedPodName)
 	if err != nil {
-		t.Fatalf("status of pod %q is not found in the status map: ", conflictedPodName, err)
+		t.Fatalf("status of pod %q is not found in the status map: %#v", conflictedPodName, err)
 	}
 	if status.Phase != api.PodFailed {
 		t.Fatalf("expected pod status %q. Got %q.", api.PodFailed, status.Phase)
@@ -2964,7 +2964,7 @@ func TestHandleMemExceeded(t *testing.T) {
 	// Check pod status stored in the status map.
 	status, err := kl.GetPodStatus(notfittingPodName)
 	if err != nil {
-		t.Fatalf("status of pod %q is not found in the status map: ", notfittingPodName, err)
+		t.Fatalf("status of pod %q is not found in the status map: %#v", notfittingPodName, err)
 	}
 	if status.Phase != api.PodFailed {
 		t.Fatalf("expected pod status %q. Got %q.", api.PodFailed, status.Phase)
@@ -2974,7 +2974,7 @@ func TestHandleMemExceeded(t *testing.T) {
 	kl.podManager.SetPods(pods)
 	status, err = kl.GetPodStatus(notfittingPodName)
 	if err != nil {
-		t.Fatalf("unable to retrieve pod status for pod %q: #v.", notfittingPodName, err)
+		t.Fatalf("unable to retrieve pod status for pod %q: %#v.", notfittingPodName, err)
 	}
 	if status.Phase != api.PodFailed {
 		t.Fatalf("expected pod status %q. Got %q.", api.PodFailed, status.Phase)
@@ -3269,7 +3269,7 @@ func TestUpdateNodeStatusError(t *testing.T) {
 	kubeClient.MinionsList = api.NodeList{Items: []api.Node{}}
 
 	if err := kubelet.updateNodeStatus(); err == nil {
-		t.Errorf("unexpected non error: %v")
+		t.Errorf("unexpected non error: %v", err)
 	}
 	if len(kubeClient.Actions) != nodeStatusUpdateRetry {
 		t.Errorf("unexpected actions: %v", kubeClient.Actions)

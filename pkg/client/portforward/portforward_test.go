@@ -299,11 +299,11 @@ func TestForwardPorts(t *testing.T) {
 		// wait for r.ForwardPorts to actually return
 		err = <-doneChan
 		if err != nil {
-			t.Fatalf("%d: unexpected error: %s", err)
+			t.Fatalf("%d: unexpected error: %s", i, err)
 		}
 
 		if e, a := len(testCase.Send), len(conn.streams); e != a {
-			t.Fatalf("%d: expected %d streams to be created, got %d", e, a)
+			t.Fatalf("%d: expected %d streams to be created, got %d", i, e, a)
 		}
 
 		if !conn.closeCalled {

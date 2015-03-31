@@ -708,7 +708,7 @@ func TestServiceRegistryIPUpdate(t *testing.T) {
 
 	_, _, err := rest.Update(ctx, update)
 	if err == nil || !errors.IsInvalid(err) {
-		t.Error("Unexpected error type: %v", err)
+		t.Errorf("Unexpected error type: %v", err)
 	}
 }
 
