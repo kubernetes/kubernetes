@@ -218,7 +218,7 @@ var _ = Describe("Density", func() {
 		}
 		It(name, func() {
 			RCName = "my-hostname-density" + strconv.Itoa(count) + "-" + string(util.NewUUID())
-			RunRC(c, RCName, ns, "kubernetes/pause:go", count*minionCount)
+			RunRC(c, RCName, ns, "gcr.io/google_containers/pause:go", count*minionCount)
 		})
 	}
 
@@ -231,7 +231,7 @@ var _ = Describe("Density", func() {
 				defer wg.Done()
 				for i := 0; i < 10; i++ {
 					name := "my-hostname-thrash-" + string(util.NewUUID())
-					RunRC(c, name, ns, "kubernetes/pause:go", 10*minionCount)
+					RunRC(c, name, ns, "gcr.io/google_containers/pause:go", 10*minionCount)
 				}
 			}()
 		}

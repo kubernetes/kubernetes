@@ -7,7 +7,7 @@ metadata:
 spec:
   containers:
     - name: testpd
-      image: kubernetes/pause
+      image: gcr.io/google_containers/pause
       volumeMounts:
           # name must match the volume name below
         - name: testpd

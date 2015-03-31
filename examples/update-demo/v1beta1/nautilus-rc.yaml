@@ -11,7 +11,7 @@ desiredState:
       manifest:
         containers:
         - name: update-demo
-          image: kubernetes/update-demo:nautilus
+          image: gcr.io/google_containers/update-demo:nautilus
           ports:
           - containerPort: 80
             protocol: TCP

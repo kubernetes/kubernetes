@@ -212,7 +212,7 @@ func testPDPod(diskName, targetHost string, readOnly bool) *api.Pod {
 			Containers: []api.Container{
 				{
 					Name:  "testpd",
-					Image: "kubernetes/pause",
+					Image: "gcr.io/google_containers/pause",
 					VolumeMounts: []api.VolumeMount{
 						{
 							Name:      "testpd",

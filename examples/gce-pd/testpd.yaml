@@ -2,7 +2,7 @@ apiVersion: v1beta1
 desiredState:
   manifest:
     containers:
-      - image: kubernetes/pause
+      - image: gcr.io/google_containers/pause
         name: testpd
         volumeMounts:
           - mountPath: "/testpd"

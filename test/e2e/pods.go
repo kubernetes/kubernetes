@@ -107,7 +107,7 @@ var _ = Describe("Pods", func() {
 				Containers: []api.Container{
 					{
 						Name:  "nginx",
-						Image: "dockerfile/nginx",
+						Image: "gcr.io/google_containers/nginx",
 						Ports: []api.ContainerPort{{ContainerPort: 80}},
 						LivenessProbe: &api.Probe{
 							Handler: api.Handler{
@@ -207,7 +207,7 @@ var _ = Describe("Pods", func() {
 				Containers: []api.Container{
 					{
 						Name:  "nginx",
-						Image: "dockerfile/nginx",
+						Image: "gcr.io/google_containers/nginx",
 						Ports: []api.ContainerPort{{ContainerPort: 80}},
 						LivenessProbe: &api.Probe{
 							Handler: api.Handler{
@@ -277,7 +277,7 @@ var _ = Describe("Pods", func() {
 				Containers: []api.Container{
 					{
 						Name:  "srv",
-						Image: "kubernetes/serve_hostname",
+						Image: "gcr.io/google_containers/serve_hostname",
 						Ports: []api.ContainerPort{{ContainerPort: 9376}},
 					},
 				},
@@ -332,7 +332,7 @@ var _ = Describe("Pods", func() {
 				Containers: []api.Container{
 					{
 						Name:    "env3cont",
-						Image:   "busybox",
+						Image:   "gcr.io/google_containers/busybox",
 						Command: []string{"sh", "-c", "env"},
 					},
 				},
@@ -361,7 +361,7 @@ var _ = Describe("Pods", func() {
 				Containers: []api.Container{
 					{
 						Name:    "liveness",
-						Image:   "busybox",
+						Image:   "gcr.io/google_containers/busybox",
 						Command: []string{"/bin/sh", "-c", "echo ok >/tmp/health; sleep 10; echo fail >/tmp/health; sleep 600"},
 						LivenessProbe: &api.Probe{
 							Handler: api.Handler{
@@ -387,7 +387,7 @@ var _ = Describe("Pods", func() {
 				Containers: []api.Container{
 					{
 						Name:    "liveness",
-						Image:   "kubernetes/liveness",
+						Image:   "gcr.io/google_containers/liveness",
 						Command: []string{"/server"},
 						LivenessProbe: &api.Probe{
 							Handler: api.Handler{

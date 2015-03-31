@@ -84,7 +84,7 @@ var _ = Describe("Secrets", func() {
 				Containers: []api.Container{
 					{
 						Name:    "catcont",
-						Image:   "busybox",
+						Image:   "gcr.io/google_containers/busybox",
 						Command: []string{"sh", "-c", "cat /etc/secret-volume/data-1"},
 						VolumeMounts: []api.VolumeMount{
 							{

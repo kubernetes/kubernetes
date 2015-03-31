@@ -16,7 +16,7 @@ spec:
       containers: 
         - command: 
             - "/server"
-          image: kubernetes/liveness
+          image: gcr.io/google_containers/liveness
           livenessProbe: 
             httpGet: 
               path: "/healthz"

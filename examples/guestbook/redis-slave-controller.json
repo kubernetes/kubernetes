@@ -12,7 +12,7 @@
            "id": "redis-slave",
            "containers": [{
              "name": "redis-slave",
-             "image": "kubernetes/redis-slave:v2",
+             "image": "gcr.io/google_containers/redis-slave:v2",
              "ports": [{"containerPort": 6379}]
            }]
          }
