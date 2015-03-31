@@ -17,10 +17,6 @@ limitations under the License.
 package e2e
 
 import (
-	"fmt"
-	"strings"
-	"time"
-
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -39,7 +35,7 @@ var _ = Describe("Docker Containers", func() {
 	})
 
 	It("should use the image defaults if command and args are blank", func() {
-		runEntrypointTest("use defaults", c, entrypointTestPod(), []string{
+		testContainerOutput("use defaults", c, entrypointTestPod(), []string{
 			"[/ep default arguments]",
 		})
 	})
@@ -48,7 +44,7 @@ var _ = Describe("Docker Containers", func() {
 		pod := entrypointTestPod()
 		pod.Spec.Containers[0].Args = []string{"override", "arguments"}
 
-		runEntrypointTest("override arguments", c, pod, []string{
+		testContainerOutput("override arguments", c, pod, []string{
 			"[/ep override arguments]",
 		})
 	})
@@ -59,7 +55,7 @@ var _ = Describe("Docker Containers", func() {
 		pod := entrypointTestPod()
 		pod.Spec.Containers[0].Command = []string{"/ep-2"}
 
-		runEntrypointTest("override command", c, pod, []string{
+		testContainerOutput("override command", c, pod, []string{
 			"[/ep-2]",
 		})
 	})
@@ -69,7 +65,7 @@ var _ = Describe("Docker Containers", func() {
 		pod.Spec.Containers[0].Command = []string{"/ep-2"}
 		pod.Spec.Containers[0].Args = []string{"override", "arguments"}
 
-		runEntrypointTest("override all", c, pod, []string{
+		testContainerOutput("override all", c, pod, []string{
 			"[/ep-2 override arguments]",
 		})
 	})
@@ -94,52 +90,5 @@ func entrypointTestPod() *api.Pod {
 			},
 			RestartPolicy: api.RestartPolicyNever,
 		},
-	}
-}
-
-// pod must have a container named 'test-container'
-func runEntrypointTest(scenarioName string, c *client.Client, pod *api.Pod, expectedOutput []string) {
-	ns := api.NamespaceDefault
-	By(fmt.Sprintf("Creating a pod to test %v", scenarioName))
-
-	defer c.Pods(ns).Delete(pod.Name)
-	if _, err := c.Pods(ns).Create(pod); err != nil {
-		Failf("Failed to create pod: %v", err)
-	}
-	// Wait for client pod to complete.
-	expectNoError(waitForPodSuccess(c, pod.Name, testContainerName))
-
-	// Grab its logs.  Get host first.
-	podStatus, err := c.Pods(ns).Get(pod.Name)
-	if err != nil {
-		Failf("Failed to get pod to know host: %v", err)
-	}
-	By(fmt.Sprintf("Trying to get logs from host %s pod %s container %s: %v",
-		podStatus.Status.Host, podStatus.Name, podStatus.Spec.Containers[0].Name, err))
-	var logs []byte
-	start := time.Now()
-
-	// Sometimes the actual containers take a second to get started, try to get logs for 60s
-	for time.Now().Sub(start) < (60 * time.Second) {
-		logs, err = c.Get().
-			Prefix("proxy").
-			Resource("minions").
-			Name(podStatus.Status.Host).
-			Suffix("containerLogs", ns, podStatus.Name, podStatus.Spec.Containers[0].Name).
-			Do().
-			Raw()
-		fmt.Sprintf("pod logs:%v\n", string(logs))
-		By(fmt.Sprintf("pod logs:%v\n", string(logs)))
-		if strings.Contains(string(logs), "Internal Error") {
-			By(fmt.Sprintf("Failed to get logs from host %s pod %s container %s: %v",
-				podStatus.Status.Host, podStatus.Name, podStatus.Spec.Containers[0].Name, string(logs)))
-			time.Sleep(5 * time.Second)
-			continue
-		}
-		break
-	}
-
-	for _, m := range expectedOutput {
-		Expect(string(logs)).To(ContainSubstring(m), "%q in container output", m)
 	}
 }

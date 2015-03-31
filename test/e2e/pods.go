@@ -19,7 +19,6 @@ package e2e
 import (
 	"fmt"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -322,65 +321,26 @@ var _ = Describe("Pods", func() {
 			Fail(fmt.Sprintf("Failed to create service: %v", err))
 		}
 
-		// TODO: we don't have a way to wait for a service to be "running".  // If this proves flaky, then we will need to retry the clientPod or insert a sleep.
-
 		// Make a client pod that verifies that it has the service environment variables.
-		clientName := "client-envvars-" + string(util.NewUUID())
-		clientPod := &api.Pod{
+		podName := "client-envvars-" + string(util.NewUUID())
+		pod := &api.Pod{
 			ObjectMeta: api.ObjectMeta{
-				Name:   clientName,
-				Labels: map[string]string{"name": clientName},
+				Name:   podName,
+				Labels: map[string]string{"name": podName},
 			},
 			Spec: api.PodSpec{
 				Containers: []api.Container{
 					{
 						Name:    "env3cont",
 						Image:   "busybox",
-						Command: []string{"sh", "-c", "env; sleep 600"},
+						Command: []string{"sh", "-c", "env"},
 					},
 				},
 				RestartPolicy: api.RestartPolicyNever,
 			},
 		}
-		defer c.Pods(api.NamespaceDefault).Delete(clientPod.Name)
-		_, err = c.Pods(api.NamespaceDefault).Create(clientPod)
-		if err != nil {
-			Fail(fmt.Sprintf("Failed to create pod: %v", err))
-		}
 
-		expectNoError(waitForPodRunning(c, clientPod.Name))
-
-		// Grab its logs.  Get host first.
-		clientPodStatus, err := c.Pods(api.NamespaceDefault).Get(clientPod.Name)
-		if err != nil {
-			Fail(fmt.Sprintf("Failed to get clientPod to know host: %v", err))
-		}
-		By(fmt.Sprintf("Trying to get logs from host %s pod %s container %s: %v",
-			clientPodStatus.Status.Host, clientPodStatus.Name, clientPodStatus.Spec.Containers[0].Name, err))
-		var logs []byte
-		start := time.Now()
-
-		// Sometimes the actual containers take a second to get started, try to get logs for 60s
-		for time.Now().Sub(start) < (60 * time.Second) {
-			logs, err = c.Get().
-				Prefix("proxy").
-				Resource("minions").
-				Name(clientPodStatus.Status.Host).
-				Suffix("containerLogs", api.NamespaceDefault, clientPodStatus.Name, clientPodStatus.Spec.Containers[0].Name).
-				Do().
-				Raw()
-			fmt.Sprintf("clientPod logs:%v\n", string(logs))
-			By(fmt.Sprintf("clientPod logs:%v\n", string(logs)))
-			if strings.Contains(string(logs), "Internal Error") {
-				By(fmt.Sprintf("Failed to get logs from host %s pod %s container %s: %v",
-					clientPodStatus.Status.Host, clientPodStatus.Name, clientPodStatus.Spec.Containers[0].Name, string(logs)))
-				time.Sleep(5 * time.Second)
-				continue
-			}
-			break
-		}
-
-		toFind := []string{
+		testContainerOutput("service env", c, pod, []string{
 			"FOOSERVICE_SERVICE_HOST=",
 			"FOOSERVICE_SERVICE_PORT=",
 			"FOOSERVICE_PORT=",
@@ -388,13 +348,7 @@ var _ = Describe("Pods", func() {
 			"FOOSERVICE_PORT_8765_TCP_PROTO=",
 			"FOOSERVICE_PORT_8765_TCP=",
 			"FOOSERVICE_PORT_8765_TCP_ADDR=",
-		}
-
-		for _, m := range toFind {
-			Expect(string(logs)).To(ContainSubstring(m), "%q in client env vars", m)
-		}
-
-		// We could try a wget the service from the client pod.  But services.sh e2e test covers that pretty well.
+		})
 	})
 
 	It("should be restarted with a docker exec \"cat /tmp/health\" liveness probe", func() {

@@ -18,8 +18,6 @@ package e2e
 
 import (
 	"fmt"
-	"strings"
-	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
@@ -68,8 +66,6 @@ var _ = Describe("Secrets", func() {
 			Failf("unable to create test secret %s: %v", secret.Name, err)
 		}
 
-		By(fmt.Sprintf("Creating a pod to consume secret %v", secret.Name))
-		// Make a pod that verifies that it has the service environment variables.
 		pod := &api.Pod{
 			ObjectMeta: api.ObjectMeta{
 				Name: "pod-secrets-" + string(util.NewUUID()),
@@ -103,51 +99,8 @@ var _ = Describe("Secrets", func() {
 			},
 		}
 
-		defer c.Pods(ns).Delete(pod.Name)
-		if _, err := c.Pods(ns).Create(pod); err != nil {
-			Failf("Failed to create pod: %v", err)
-		}
-		// Wait for client pod to complete.
-		expectNoError(waitForPodSuccess(c, pod.Name, "catcont"))
-
-		// Grab its logs.  Get host first.
-		podStatus, err := c.Pods(ns).Get(pod.Name)
-		if err != nil {
-			Failf("Failed to get pod to know host: %v", err)
-		}
-		By(fmt.Sprintf("Trying to get logs from host %s pod %s container %s: %v",
-			podStatus.Status.Host, podStatus.Name, podStatus.Spec.Containers[0].Name, err))
-		var logs []byte
-		start := time.Now()
-
-		// Sometimes the actual containers take a second to get started, try to get logs for 60s
-		for time.Now().Sub(start) < (60 * time.Second) {
-			logs, err = c.Get().
-				Prefix("proxy").
-				Resource("minions").
-				Name(podStatus.Status.Host).
-				Suffix("containerLogs", ns, podStatus.Name, podStatus.Spec.Containers[0].Name).
-				Do().
-				Raw()
-			fmt.Sprintf("pod logs:%v\n", string(logs))
-			By(fmt.Sprintf("pod logs:%v\n", string(logs)))
-			if strings.Contains(string(logs), "Internal Error") {
-				By(fmt.Sprintf("Failed to get logs from host %s pod %s container %s: %v",
-					podStatus.Status.Host, podStatus.Name, podStatus.Spec.Containers[0].Name, string(logs)))
-				time.Sleep(5 * time.Second)
-				continue
-			}
-			break
-		}
-
-		toFind := []string{
+		testContainerOutput("consume secrets", c, pod, []string{
 			"value-1",
-		}
-
-		for _, m := range toFind {
-			Expect(string(logs)).To(ContainSubstring(m), "%q in secret data", m)
-		}
-
-		// We could try a wget the service from the client pod.  But services.sh e2e test covers that pretty well.
+		})
 	})
 })
