@@ -32,7 +32,7 @@ function verify-prereqs {
   for cmd in gcloud gsutil; do
     if ! which "${cmd}" >/dev/null; then
       local resp
-      if [[ "${KUBE_PROMPT_FOR_UPDATE" == "y" ]]; then
+      if [[ "${KUBE_PROMPT_FOR_UPDATE}" == "y" ]]; then
         echo "Can't find ${cmd} in PATH.  Do you wish to install the Google Cloud SDK? [Y/n]"
         read resp
       else
