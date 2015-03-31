@@ -47,6 +47,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/network"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/version"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume"
 	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/volume/host_path"
 	"github.com/fsouza/go-dockerclient"
@@ -3063,6 +3064,12 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 		MemoryCapacity: 1024,
 	}
 	mockCadvisor.On("MachineInfo").Return(machineInfo, nil)
+	versionInfo := &cadvisorApi.VersionInfo{
+		KernelVersion:      "3.16.0-0.bpo.4-amd64",
+		ContainerOsVersion: "Debian GNU/Linux 7 (wheezy)",
+		DockerVersion:      "1.5.0",
+	}
+	mockCadvisor.On("VersionInfo").Return(versionInfo, nil)
 	expectedNode := &api.Node{
 		ObjectMeta: api.ObjectMeta{Name: "testnode"},
 		Spec:       api.NodeSpec{},
@@ -3077,9 +3084,14 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 				},
 			},
 			NodeInfo: api.NodeSystemInfo{
-				MachineID:  "123",
-				SystemUUID: "abc",
-				BootID:     "1b3",
+				MachineID:               "123",
+				SystemUUID:              "abc",
+				BootID:                  "1b3",
+				KernelVersion:           "3.16.0-0.bpo.4-amd64",
+				OsImage:                 "Debian GNU/Linux 7 (wheezy)",
+				ContainerRuntimeVersion: "docker://1.5.0",
+				KubeletVersion:          version.Get().String(),
+				KubeProxyVersion:        version.Get().String(),
 			},
 			Capacity: api.ResourceList{
 				api.ResourceCPU:    *resource.NewMilliQuantity(2000, resource.DecimalSI),
@@ -3145,6 +3157,12 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 		MemoryCapacity: 1024,
 	}
 	mockCadvisor.On("MachineInfo").Return(machineInfo, nil)
+	versionInfo := &cadvisorApi.VersionInfo{
+		KernelVersion:      "3.16.0-0.bpo.4-amd64",
+		ContainerOsVersion: "Debian GNU/Linux 7 (wheezy)",
+		DockerVersion:      "1.5.0",
+	}
+	mockCadvisor.On("VersionInfo").Return(versionInfo, nil)
 	expectedNode := &api.Node{
 		ObjectMeta: api.ObjectMeta{Name: "testnode"},
 		Spec:       api.NodeSpec{},
@@ -3159,9 +3177,14 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 				},
 			},
 			NodeInfo: api.NodeSystemInfo{
-				MachineID:  "123",
-				SystemUUID: "abc",
-				BootID:     "1b3",
+				MachineID:               "123",
+				SystemUUID:              "abc",
+				BootID:                  "1b3",
+				KernelVersion:           "3.16.0-0.bpo.4-amd64",
+				OsImage:                 "Debian GNU/Linux 7 (wheezy)",
+				ContainerRuntimeVersion: "docker://1.5.0",
+				KubeletVersion:          version.Get().String(),
+				KubeProxyVersion:        version.Get().String(),
 			},
 			Capacity: api.ResourceList{
 				api.ResourceCPU:    *resource.NewMilliQuantity(2000, resource.DecimalSI),

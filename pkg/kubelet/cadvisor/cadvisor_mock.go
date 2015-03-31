@@ -46,6 +46,11 @@ func (c *Mock) MachineInfo() (*cadvisorApi.MachineInfo, error) {
 	return args.Get(0).(*cadvisorApi.MachineInfo), args.Error(1)
 }
 
+func (c *Mock) VersionInfo() (*cadvisorApi.VersionInfo, error) {
+	args := c.Called()
+	return args.Get(0).(*cadvisorApi.VersionInfo), args.Error(1)
+}
+
 func (c *Mock) DockerImagesFsInfo() (cadvisorApiV2.FsInfo, error) {
 	args := c.Called()
 	return args.Get(0).(cadvisorApiV2.FsInfo), args.Error(1)

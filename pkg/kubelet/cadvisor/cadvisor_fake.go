@@ -39,6 +39,10 @@ func (c *Fake) MachineInfo() (*cadvisorApi.MachineInfo, error) {
 	return new(cadvisorApi.MachineInfo), nil
 }
 
+func (c *Fake) VersionInfo() (*cadvisorApi.VersionInfo, error) {
+	return new(cadvisorApi.VersionInfo), nil
+}
+
 func (c *Fake) DockerImagesFsInfo() (cadvisorApiV2.FsInfo, error) {
 	return cadvisorApiV2.FsInfo{}, nil
 }

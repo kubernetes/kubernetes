@@ -51,6 +51,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	utilErrors "github.com/GoogleCloudPlatform/kubernetes/pkg/util/errors"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/version"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 	"github.com/fsouza/go-dockerclient"
@@ -1781,6 +1782,19 @@ func (kl *Kubelet) tryUpdateNodeStatus() error {
 				"Node %s has been rebooted, boot id: %s", kl.hostname, info.BootID)
 		}
 		node.Status.NodeInfo.BootID = info.BootID
+	}
+
+	verinfo, err := kl.cadvisor.VersionInfo()
+	if err != nil {
+		glog.Error("error getting version info: %v", err)
+	} else {
+		node.Status.NodeInfo.KernelVersion = verinfo.KernelVersion
+		node.Status.NodeInfo.OsImage = verinfo.ContainerOsVersion
+		// TODO: Determine the runtime is docker or rocket
+		node.Status.NodeInfo.ContainerRuntimeVersion = "docker://" + verinfo.DockerVersion
+		node.Status.NodeInfo.KubeletVersion = version.Get().String()
+		// TODO: kube-proxy might be different version from kubelet in the future
+		node.Status.NodeInfo.KubeProxyVersion = version.Get().String()
 	}
 
 	currentTime := util.Now()
