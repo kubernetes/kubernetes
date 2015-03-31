@@ -1123,7 +1123,7 @@ func TestSyncPodsBadHash(t *testing.T) {
 		},
 		{
 			// pod infra container
-			Names: []string{"/k8s_POD_foo_new_12345678_42"},
+			Names: []string{"/k8s_POD." + strconv.FormatUint(generatePodInfraContainerHash(&pods[0]), 16) + "_foo_new_12345678_42"},
 			ID:    "9876",
 		},
 	}
@@ -1150,7 +1150,80 @@ func TestSyncPodsBadHash(t *testing.T) {
 
 	verifyCalls(t, fakeDocker, []string{
 		"list", "list",
-		"inspect_container", "stop", "stop", "create", "start", "inspect_container", // Kill the pods and restart the pod infra container.
+		"inspect_container",                              // Check the pod infra container.
+		"list", "inspect_container", "inspect_container", // Get pod status.
+		"stop", "create", "start", // Kill and restart the bad hash container.
+		"list", "inspect_container", "inspect_container"}) // Get pod status.
+
+	// A map interation is used to delete containers, so must not depend on
+	// order here.
+	expectedToStop := map[string]bool{
+		"1234": true,
+	}
+	if len(fakeDocker.Stopped) != 1 ||
+		!expectedToStop[fakeDocker.Stopped[0]] {
+		t.Errorf("Wrong containers were stopped: %v", fakeDocker.Stopped)
+	}
+}
+
+func TestSyncPodsBadPodInfraContainerHash(t *testing.T) {
+	testKubelet := newTestKubelet(t)
+	testKubelet.fakeCadvisor.On("MachineInfo").Return(&cadvisorApi.MachineInfo{}, nil)
+	kubelet := testKubelet.kubelet
+	fakeDocker := testKubelet.fakeDocker
+	waitGroup := testKubelet.waitGroup
+
+	pods := []api.Pod{
+		{
+			ObjectMeta: api.ObjectMeta{
+				UID:       "12345678",
+				Name:      "foo",
+				Namespace: "new",
+			},
+			Spec: api.PodSpec{
+				Containers: []api.Container{
+					{Name: "bar"},
+				},
+			},
+		},
+	}
+
+	fakeDocker.ContainerList = []docker.APIContainers{
+		{
+			// the k8s prefix is required for the kubelet to manage the container
+			Names: []string{"/k8s_bar.1234_foo_new_12345678_42"},
+			ID:    "1234",
+		},
+		{
+			// pod infra container
+			Names: []string{"/k8s_POD.1234_foo_new_12345678_42"},
+			ID:    "9876",
+		},
+	}
+	fakeDocker.ContainerMap = map[string]*docker.Container{
+		"1234": {
+			ID:         "1234",
+			Config:     &docker.Config{},
+			HostConfig: &docker.HostConfig{},
+		},
+		"9876": {
+			ID:         "9876",
+			Config:     &docker.Config{},
+			HostConfig: &docker.HostConfig{},
+		},
+	}
+
+	kubelet.podManager.SetPods(pods)
+	waitGroup.Add(1)
+	err := kubelet.SyncPods(pods, emptyPodUIDs, map[string]api.Pod{}, time.Now())
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	waitGroup.Wait()
+
+	verifyCalls(t, fakeDocker, []string{
+		"list", "list",
+		"inspect_container", "stop", "stop", "create", "start", "inspect_container", // Kill existing container and create pod infra container.
 		"list", "inspect_container", "inspect_image", // Get pod status.
 		"create", "start", // Start the killed container.
 		"list", "inspect_container", "inspect_container"}) // Get pod status.
@@ -1162,8 +1235,8 @@ func TestSyncPodsBadHash(t *testing.T) {
 		"9876": true,
 	}
 	if len(fakeDocker.Stopped) != 2 ||
-		(!expectedToStop[fakeDocker.Stopped[0]] &&
-			!expectedToStop[fakeDocker.Stopped[1]]) {
+		!expectedToStop[fakeDocker.Stopped[0]] ||
+		!expectedToStop[fakeDocker.Stopped[1]] {
 		t.Errorf("Wrong containers were stopped: %v", fakeDocker.Stopped)
 	}
 }
