@@ -505,8 +505,10 @@ type Container struct {
 	Name string `json:"name"`
 	// Required.
 	Image string `json:"image"`
-	// Optional: Defaults to whatever is defined in the image.
+	// Optional: The docker image's entrypoint is used if this is not provided; cannot be updated.
 	Command []string `json:"command,omitempty"`
+	// Optional: The docker image's cmd is used if this is not provided; cannot be updated.
+	Args []string `json:"args,omitempty"`
 	// Optional: Defaults to Docker's default.
 	WorkingDir string          `json:"workingDir,omitempty"`
 	Ports      []ContainerPort `json:"ports,omitempty"`

@@ -140,6 +140,7 @@ func TestRunOnce(t *testing.T) {
 		t: t,
 	}
 	kb.dockerPuller = &dockertools.FakeDockerPuller{}
+	kb.containerRunner = &dockertools.DockerContainerRunner{kb.dockerClient, kb.recorder}
 	results, err := kb.runOnce([]api.Pod{
 		{
 			ObjectMeta: api.ObjectMeta{

@@ -317,13 +317,15 @@ func init() {
 			if err := s.Convert(&in.Image, &out.Image, 0); err != nil {
 				return err
 			}
-			if err := s.Convert(&in.Command, &out.Command, 0); err != nil {
+			if err := s.Convert(&in.Command, &out.Entrypoint, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.Args, &out.Command, 0); err != nil {
 				return err
 			}
 			if err := s.Convert(&in.WorkingDir, &out.WorkingDir, 0); err != nil {
 				return err
 			}
-
 			if err := s.Convert(&in.Ports, &out.Ports, 0); err != nil {
 				return err
 			}
@@ -403,7 +405,10 @@ func init() {
 			if err := s.Convert(&in.Image, &out.Image, 0); err != nil {
 				return err
 			}
-			if err := s.Convert(&in.Command, &out.Command, 0); err != nil {
+			if err := s.Convert(&in.Command, &out.Args, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.Entrypoint, &out.Command, 0); err != nil {
 				return err
 			}
 			if err := s.Convert(&in.WorkingDir, &out.WorkingDir, 0); err != nil {
