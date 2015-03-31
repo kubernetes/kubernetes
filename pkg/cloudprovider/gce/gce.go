@@ -33,6 +33,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
 
+	"code.google.com/p/gcfg"
 	compute "code.google.com/p/google-api-go-client/compute/v1"
 	container "code.google.com/p/google-api-go-client/container/v1beta1"
 	"github.com/golang/glog"
@@ -55,8 +56,15 @@ type GCECloud struct {
 	metadataAccess func(string) (string, error)
 }
 
+type Config struct {
+	Global struct {
+		TokenURL  string `gcfg:"token-url"`
+		ProjectID string `gcfg:"project-id"`
+	}
+}
+
 func init() {
-	cloudprovider.RegisterCloudProvider("gce", func(config io.Reader) (cloudprovider.Interface, error) { return newGCECloud() })
+	cloudprovider.RegisterCloudProvider("gce", func(config io.Reader) (cloudprovider.Interface, error) { return newGCECloud(config) })
 }
 
 func getMetadata(url string) (string, error) {
@@ -103,7 +111,7 @@ func getInstanceID() (string, error) {
 }
 
 // newGCECloud creates a new instance of GCECloud.
-func newGCECloud() (*GCECloud, error) {
+func newGCECloud(config io.Reader) (*GCECloud, error) {
 	projectID, zone, err := getProjectAndZone()
 	if err != nil {
 		return nil, err
@@ -115,7 +123,18 @@ func newGCECloud() (*GCECloud, error) {
 	if err != nil {
 		return nil, err
 	}
-	client := oauth2.NewClient(oauth2.NoContext, google.ComputeTokenSource(""))
+	tokenSource := google.ComputeTokenSource("")
+	if config != nil {
+		var cfg Config
+		if err := gcfg.ReadInto(&cfg, config); err != nil {
+			return nil, err
+		}
+		if cfg.Global.ProjectID != "" && cfg.Global.TokenURL != "" {
+			projectID = cfg.Global.ProjectID
+			tokenSource = newAltTokenSource(cfg.Global.TokenURL)
+		}
+	}
+	client := oauth2.NewClient(oauth2.NoContext, tokenSource)
 	svc, err := compute.New(client)
 	if err != nil {
 		return nil, err
@@ -337,6 +356,18 @@ func (gce *GCECloud) getInstanceByName(name string) (*compute.Instance, error) {
 
 // NodeAddresses is an implementation of Instances.NodeAddresses.
 func (gce *GCECloud) NodeAddresses(instance string) ([]api.NodeAddress, error) {
+	externalIP, err := gce.metadataAccess(EXTERNAL_IP_METADATA_URL)
+	if err != nil {
+		return nil, err
+	}
+	nodeAddresses := []api.NodeAddress{{Type: api.NodeExternalIP, Address: externalIP}}
+	if legacyHostAddress, err := gce.getLegacyHostAddress(instance); err == nil {
+		nodeAddresses = append(nodeAddresses, *legacyHostAddress)
+	}
+	return nodeAddresses, nil
+}
+
+func (gce *GCECloud) getLegacyHostAddress(instance string) (*api.NodeAddress, error) {
 	inst, err := gce.getInstanceByName(instance)
 	if err != nil {
 		return nil, err
@@ -345,16 +376,7 @@ func (gce *GCECloud) NodeAddresses(instance string) ([]api.NodeAddress, error) {
 	if ip == nil {
 		return nil, fmt.Errorf("invalid network IP: %s", inst.NetworkInterfaces[0].AccessConfigs[0].NatIP)
 	}
-
-	externalIP, err := gce.metadataAccess(EXTERNAL_IP_METADATA_URL)
-	if err != nil {
-		return nil, err
-	}
-
-	return []api.NodeAddress{
-		{Type: api.NodeExternalIP, Address: externalIP},
-		{Type: api.NodeLegacyHostIP, Address: ip.String()},
-	}, nil
+	return &api.NodeAddress{Type: api.NodeLegacyHostIP, Address: ip.String()}, nil
 }
 
 // ExternalID returns the cloud provider ID of the specified instance.

@@ -300,6 +300,16 @@ grains:
   cbr-cidr: ${MASTER_IP_RANGE}
   cloud: gce
 EOF
+  if ! [[ -z "${PROJECT_ID:-}" ]] && ! [[ -z "${TOKEN_URL:-}" ]]; then
+    cat <<EOF >/etc/gce.conf
+[global]
+token-url = ${TOKEN_URL}
+project-id = ${PROJECT_ID}
+EOF
+    cat <<EOF >>/etc/salt/minion.d/grains.conf
+  cloud_config: /etc/gce.conf
+EOF
+  fi
 }
 
 function salt-node-role() {
