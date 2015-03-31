@@ -353,6 +353,19 @@ func TestValidatePersistentVolumeClaim(t *testing.T) {
 				},
 			}),
 		},
+		"invalid-resource-requests": {
+			isExpectedFailure: true,
+			claim: testVolumeClaim("foo", "ns", api.PersistentVolumeClaimSpec{
+				AccessModes: []api.AccessModeType{
+					api.ReadWriteOnce,
+				},
+				Resources: api.ResourceRequirements{
+					Requests: api.ResourceList{
+						api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
+					},
+				},
+			}),
+		},
 	}
 
 	for name, scenario := range scenarios {

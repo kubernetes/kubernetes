@@ -422,8 +422,8 @@ func ValidatePersistentVolumeClaim(pvc *api.PersistentVolumeClaim) errs.Validati
 	if len(pvc.Spec.AccessModes) == 0 {
 		allErrs = append(allErrs, errs.NewFieldInvalid("persistentVolumeClaim.Spec.AccessModes", pvc.Spec.AccessModes, "at least 1 AccessModeType is required"))
 	}
-	if len(pvc.Spec.Resources.Requests) == 0 {
-		allErrs = append(allErrs, errs.NewFieldInvalid("persistentVolumeClaim.Spec.Resources.Requests", pvc.Spec.Resources.Requests, "No Resource.Requests specified"))
+	if _, ok := pvc.Spec.Resources.Requests[api.ResourceStorage]; !ok {
+		allErrs = append(allErrs, errs.NewFieldInvalid("persistentVolumeClaim.Spec.Resources.Requests", pvc.Spec.Resources.Requests, "No Storage size specified"))
 	}
 	return allErrs
 }
