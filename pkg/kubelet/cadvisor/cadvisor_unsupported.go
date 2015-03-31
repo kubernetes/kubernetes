@@ -48,6 +48,10 @@ func (self *cadvisorUnsupported) MachineInfo() (*cadvisorApi.MachineInfo, error)
 	return nil, unsupportedErr
 }
 
+func (self *cadvisorUnsupported) VersionInfo() (*cadvisorApi.VersionInfo, error) {
+	return nil, unsupportedErr
+}
+
 func (self *cadvisorUnsupported) DockerImagesFsInfo() (cadvisorApiV2.FsInfo, error) {
 	return cadvisorApiV2.FsInfo{}, unsupportedErr
 }

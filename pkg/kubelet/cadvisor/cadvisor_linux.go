@@ -109,6 +109,10 @@ func (self *cadvisorClient) ContainerInfo(name string, req *cadvisorApi.Containe
 	return self.GetContainerInfo(name, req)
 }
 
+func (self *cadvisorClient) VersionInfo() (*cadvisorApi.VersionInfo, error) {
+	return self.GetVersionInfo()
+}
+
 func (self *cadvisorClient) MachineInfo() (*cadvisorApi.MachineInfo, error) {
 	return self.GetMachineInfo()
 }

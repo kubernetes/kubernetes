@@ -27,6 +27,8 @@ type Interface interface {
 	ContainerInfo(name string, req *cadvisorApi.ContainerInfoRequest) (*cadvisorApi.ContainerInfo, error)
 	MachineInfo() (*cadvisorApi.MachineInfo, error)
 
+	VersionInfo() (*cadvisorApi.VersionInfo, error)
+
 	// Returns usage information about the filesystem holding Docker images.
 	DockerImagesFsInfo() (cadvisorApiV2.FsInfo, error)
 }
