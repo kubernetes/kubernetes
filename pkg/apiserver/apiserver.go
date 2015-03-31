@@ -139,14 +139,7 @@ func (g *APIGroupVersion) InstallREST(container *restful.Container) error {
 
 // TODO: Convert to go-restful
 func InstallValidator(mux Mux, servers func() map[string]Server) {
-	validator, err := NewValidator(servers)
-	if err != nil {
-		glog.Errorf("failed to set up validator: %v", err)
-		return
-	}
-	if validator != nil {
-		mux.Handle("/validate", validator)
-	}
+	mux.Handle("/validate", NewValidator(servers))
 }
 
 // TODO: document all handlers
