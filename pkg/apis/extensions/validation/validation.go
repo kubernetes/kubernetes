@@ -17,6 +17,7 @@ limitations under the License.
 package validation
 
 import (
+	"fmt"
 	"net"
 	"regexp"
 	"strconv"
@@ -590,6 +591,36 @@ func ValidateScale(scale *extensions.Scale) field.ErrorList {
 	if scale.Spec.Replicas < 0 {
 		allErrs = append(allErrs, field.Invalid(field.NewPath("spec", "replicas"), scale.Spec.Replicas, "must be non-negative"))
 	}
+
+	return allErrs
+}
+
+// ValidateConfigMapName can be used to check whether the given ConfigMap name is valid.
+// Prefix indicates this name will be used as part of generation, in which case
+// trailing dashes are allowed.
+func ValidateConfigMapName(name string, prefix bool) (bool, string) {
+	return apivalidation.NameIsDNSSubdomain(name, prefix)
+}
+
+// ValidateConfigMap tests whether required fields in the ConfigMap are set.
+func ValidateConfigMap(cfg *extensions.ConfigMap) field.ErrorList {
+	allErrs := field.ErrorList{}
+	allErrs = append(allErrs, apivalidation.ValidateObjectMeta(&cfg.ObjectMeta, true, ValidateConfigMapName, field.NewPath("metadata"))...)
+
+	for key := range cfg.Data {
+		if !apivalidation.IsSecretKey(key) {
+			allErrs = append(allErrs, field.Invalid(field.NewPath("data").Key(key), key, fmt.Sprintf("must have at most %d characters and match regex %s", validation.DNS1123SubdomainMaxLength, apivalidation.SecretKeyFmt)))
+		}
+	}
+
+	return allErrs
+}
+
+// ValidateConfigMapUpdate tests if required fields in the ConfigMap are set.
+func ValidateConfigMapUpdate(newCfg, oldCfg *extensions.ConfigMap) field.ErrorList {
+	allErrs := field.ErrorList{}
+	allErrs = append(allErrs, apivalidation.ValidateObjectMetaUpdate(&newCfg.ObjectMeta, &oldCfg.ObjectMeta, field.NewPath("metadata"))...)
+	allErrs = append(allErrs, ValidateConfigMap(newCfg)...)
 
 	return allErrs
 }
