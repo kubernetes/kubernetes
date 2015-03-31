@@ -56,7 +56,7 @@ func NewStorage(h tools.EtcdHelper) *REST {
 	}
 
 	store.CreateStrategy = persistentvolumeclaim.Strategy
-	store.UpdateStrategy = persistentvolumeclaim.Strategy
+	store.UpdateStrategy = persistentvolumeclaim.StatusStrategy
 	store.ReturnDeletedObject = true
 
 	return &REST{store}

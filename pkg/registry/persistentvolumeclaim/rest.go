@@ -57,7 +57,7 @@ func (persistentvolumeclaimStrategy) PrepareForUpdate(obj, old runtime.Object) {
 }
 
 // Validate validates a new persistentvolumeclaim.
-func (persistentvolumeclaimStrategy) Validate(obj runtime.Object) fielderrors.ValidationErrorList {
+func (persistentvolumeclaimStrategy) Validate(ctx api.Context, obj runtime.Object) fielderrors.ValidationErrorList {
 	pvc := obj.(*api.PersistentVolumeClaim)
 	return validation.ValidatePersistentVolumeClaim(pvc)
 }
@@ -65,11 +65,6 @@ func (persistentvolumeclaimStrategy) Validate(obj runtime.Object) fielderrors.Va
 // AllowCreateOnUpdate is false for persistentvolumeclaims.
 func (persistentvolumeclaimStrategy) AllowCreateOnUpdate() bool {
 	return false
-}
-
-// ValidateUpdate is the default update validation for an end user.
-func (persistentvolumeclaimStrategy) ValidateUpdate(obj, old runtime.Object) fielderrors.ValidationErrorList {
-	return validation.ValidatePersistentVolumeClaimUpdate(obj.(*api.PersistentVolumeClaim), old.(*api.PersistentVolumeClaim))
 }
 
 type persistentvolumeclaimStatusStrategy struct {
@@ -84,7 +79,7 @@ func (persistentvolumeclaimStatusStrategy) PrepareForUpdate(obj, old runtime.Obj
 	newPvc.Spec = oldPvc.Spec
 }
 
-func (persistentvolumeclaimStatusStrategy) ValidateUpdate(obj, old runtime.Object) fielderrors.ValidationErrorList {
+func (persistentvolumeclaimStatusStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) fielderrors.ValidationErrorList {
 	return validation.ValidatePersistentVolumeClaimStatusUpdate(obj.(*api.PersistentVolumeClaim), old.(*api.PersistentVolumeClaim))
 }
 

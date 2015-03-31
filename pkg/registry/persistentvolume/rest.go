@@ -49,15 +49,8 @@ func (persistentvolumeStrategy) PrepareForCreate(obj runtime.Object) {
 	pv.Status = api.PersistentVolumeStatus{}
 }
 
-// PrepareForUpdate clears fields that are not allowed to be set by end users on update.
-func (persistentvolumeStrategy) PrepareForUpdate(obj, old runtime.Object) {
-	newPv := obj.(*api.PersistentVolume)
-	oldPv := obj.(*api.PersistentVolume)
-	newPv.Status = oldPv.Status
-}
-
 // Validate validates a new persistentvolume.
-func (persistentvolumeStrategy) Validate(obj runtime.Object) fielderrors.ValidationErrorList {
+func (persistentvolumeStrategy) Validate(ctx api.Context, obj runtime.Object) fielderrors.ValidationErrorList {
 	persistentvolume := obj.(*api.PersistentVolume)
 	return validation.ValidatePersistentVolume(persistentvolume)
 }
@@ -65,11 +58,6 @@ func (persistentvolumeStrategy) Validate(obj runtime.Object) fielderrors.Validat
 // AllowCreateOnUpdate is false for persistentvolumes.
 func (persistentvolumeStrategy) AllowCreateOnUpdate() bool {
 	return false
-}
-
-// ValidateUpdate is the default update validation for an end user.
-func (persistentvolumeStrategy) ValidateUpdate(obj, old runtime.Object) fielderrors.ValidationErrorList {
-	return validation.ValidatePersistentVolumeUpdate(obj.(*api.PersistentVolume), old.(*api.PersistentVolume))
 }
 
 type persistentvolumeStatusStrategy struct {
@@ -84,7 +72,7 @@ func (persistentvolumeStatusStrategy) PrepareForUpdate(obj, old runtime.Object) 
 	newPv.Spec = oldPv.Spec
 }
 
-func (persistentvolumeStatusStrategy) ValidateUpdate(obj, old runtime.Object) fielderrors.ValidationErrorList {
+func (persistentvolumeStatusStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) fielderrors.ValidationErrorList {
 	return validation.ValidatePersistentVolumeStatusUpdate(obj.(*api.PersistentVolume), old.(*api.PersistentVolume))
 }
 
