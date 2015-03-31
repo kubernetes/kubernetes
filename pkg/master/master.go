@@ -78,8 +78,8 @@ type Config struct {
 	EnableUISupport   bool
 	// allow downstream consumers to disable swagger
 	EnableSwaggerSupport bool
-	// allow v1beta3 to be conditionally enabled
-	EnableV1Beta3 bool
+	// allow v1beta3 to be conditionally disabled
+	DisableV1Beta3 bool
 	// allow downstream consumers to disable the index route
 	EnableIndex            bool
 	EnableProfiling        bool
@@ -277,7 +277,7 @@ func New(c *Config) *Master {
 		authenticator:         c.Authenticator,
 		authorizer:            c.Authorizer,
 		admissionControl:      c.AdmissionControl,
-		v1beta3:               c.EnableV1Beta3,
+		v1beta3:               !c.DisableV1Beta3,
 		requestContextMapper:  c.RequestContextMapper,
 
 		cacheTimeout: c.CacheTimeout,
@@ -409,7 +409,7 @@ func (m *Master) init(c *Config) {
 	if err := m.api_v1beta2().InstallREST(m.handlerContainer); err != nil {
 		glog.Fatalf("Unable to setup API v1beta2: %v", err)
 	}
-	if c.EnableV1Beta3 {
+	if m.v1beta3 {
 		if err := m.api_v1beta3().InstallREST(m.handlerContainer); err != nil {
 			glog.Fatalf("Unable to setup API v1beta3: %v", err)
 		}
