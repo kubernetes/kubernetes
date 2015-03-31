@@ -144,7 +144,8 @@ func verifyStringArrayEquals(t *testing.T, actual, expected []string) {
 }
 
 func verifyStringArrayEqualsAnyOrder(t *testing.T, actual, expected []string) {
-	var act, exp []string
+	act := make([]string, len(actual))
+	exp := make([]string, len(expected))
 	copy(act, actual)
 	copy(exp, expected)
 
