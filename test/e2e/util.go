@@ -302,3 +302,60 @@ func runKubectl(args ...string) string {
 	// TODO: trimspace should be unnecessary after switching to use kubectl binary directly
 	return strings.TrimSpace(stdout.String())
 }
+
+// testContainerOutput runs testContainerOutputInNamespace with the default namespace.
+func testContainerOutput(scenarioName string, c *client.Client, pod *api.Pod, expectedOutput []string) {
+	testContainerOutputInNamespace(api.NamespaceDefault, scenarioName, c, pod, expectedOutput)
+}
+
+// testContainerOutputInNamespace runs the given pod in the given namespace and waits
+// for the first container in the podSpec to move into the 'Success' status.  It retrieves
+// the container log and searches for lines of expected output.
+func testContainerOutputInNamespace(ns, scenarioName string, c *client.Client, pod *api.Pod, expectedOutput []string) {
+	By(fmt.Sprintf("Creating a pod to test %v", scenarioName))
+
+	defer c.Pods(ns).Delete(pod.Name)
+	if _, err := c.Pods(ns).Create(pod); err != nil {
+		Failf("Failed to create pod: %v", err)
+	}
+
+	containerName := pod.Spec.Containers[0].Name
+
+	// Wait for client pod to complete.
+	expectNoError(waitForPodSuccess(c, pod.Name, containerName))
+
+	// Grab its logs.  Get host first.
+	podStatus, err := c.Pods(ns).Get(pod.Name)
+	if err != nil {
+		Failf("Failed to get pod status: %v", err)
+	}
+
+	By(fmt.Sprintf("Trying to get logs from host %s pod %s container %s: %v",
+		podStatus.Status.Host, podStatus.Name, containerName, err))
+	var logs []byte
+	start := time.Now()
+
+	// Sometimes the actual containers take a second to get started, try to get logs for 60s
+	for time.Now().Sub(start) < (60 * time.Second) {
+		logs, err = c.Get().
+			Prefix("proxy").
+			Resource("minions").
+			Name(podStatus.Status.Host).
+			Suffix("containerLogs", ns, podStatus.Name, containerName).
+			Do().
+			Raw()
+		fmt.Sprintf("pod logs:%v\n", string(logs))
+		By(fmt.Sprintf("pod logs:%v\n", string(logs)))
+		if strings.Contains(string(logs), "Internal Error") {
+			By(fmt.Sprintf("Failed to get logs from host %q pod %q container %q: %v",
+				podStatus.Status.Host, podStatus.Name, containerName, string(logs)))
+			time.Sleep(5 * time.Second)
+			continue
+		}
+		break
+	}
+
+	for _, m := range expectedOutput {
+		Expect(string(logs)).To(ContainSubstring(m), "%q in container output", m)
+	}
+}
