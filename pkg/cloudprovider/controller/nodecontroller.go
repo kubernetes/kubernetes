@@ -68,6 +68,12 @@ var (
 	ErrCloudInstance  = errors.New("cloud provider doesn't support instances.")
 )
 
+type NodeStatusData struct {
+	probeTimestamp           util.Time
+	readyTransitionTimestamp util.Time
+	status                   api.NodeStatus
+}
+
 type NodeController struct {
 	cloud                   cloudprovider.Interface
 	matchRE                 string
@@ -78,7 +84,10 @@ type NodeController struct {
 	registerRetryCount      int
 	podEvictionTimeout      time.Duration
 	deletingPodsRateLimiter util.RateLimiter
-
+	// per Node map storing last observed Status togheter with a local time when it was observed.
+	// This timestamp is to be used instead of LastProbeTime stored in Condition. We do this
+	// to aviod the problem with time skew across the cluster.
+	nodeStatusMap map[string]NodeStatusData
 	// Method for easy mocking in unittest.
 	lookupIP func(host string) ([]net.IP, error)
 	now      func() util.Time
@@ -105,6 +114,7 @@ func NewNodeController(
 		registerRetryCount:      registerRetryCount,
 		podEvictionTimeout:      podEvictionTimeout,
 		deletingPodsRateLimiter: deletingPodsRateLimiter,
+		nodeStatusMap:           make(map[string]NodeStatusData),
 		lookupIP:                net.LookupIP,
 		now:                     util.Now,
 	}
@@ -315,7 +325,7 @@ func (nc *NodeController) DoCheck(node *api.Node) []api.NodeCondition {
 	var conditions []api.NodeCondition
 
 	// Check Condition: NodeReady. TODO: More node conditions.
-	oldReadyCondition := nc.getCondition(node, api.NodeReady)
+	oldReadyCondition := nc.getCondition(&node.Status, api.NodeReady)
 	newReadyCondition := nc.checkNodeReady(node)
 	nc.updateLastTransitionTime(oldReadyCondition, newReadyCondition)
 	if newReadyCondition.Status != api.ConditionTrue {
@@ -330,7 +340,7 @@ func (nc *NodeController) DoCheck(node *api.Node) []api.NodeCondition {
 	conditions = append(conditions, *newReadyCondition)
 
 	// Check Condition: NodeSchedulable
-	oldSchedulableCondition := nc.getCondition(node, api.NodeSchedulable)
+	oldSchedulableCondition := nc.getCondition(&node.Status, api.NodeSchedulable)
 	newSchedulableCondition := nc.checkNodeSchedulable(node)
 	nc.updateLastTransitionTime(oldSchedulableCondition, newSchedulableCondition)
 	conditions = append(conditions, *newSchedulableCondition)
@@ -436,11 +446,13 @@ func (nc *NodeController) PopulateAddresses(nodes *api.NodeList) (*api.NodeList,
 	return nodes, nil
 }
 
-func (nc NodeController) tryUpdateNodeStatus(node *api.Node) (error, time.Duration, api.NodeCondition) {
+// For a given node checks its conditions and tries to update it. Returns grace period to which given node
+// is entitled, state of current and last observed Ready Condition, and an error if it ocured.
+func (nc *NodeController) tryUpdateNodeStatus(node *api.Node) (time.Duration, api.NodeCondition, *api.NodeCondition, error) {
 	var err error
 	var gracePeriod time.Duration
 	var lastReadyCondition api.NodeCondition
-	readyCondition := nc.getCondition(node, api.NodeReady)
+	readyCondition := nc.getCondition(&node.Status, api.NodeReady)
 	if readyCondition == nil {
 		// If ready condition is nil, then kubelet (or nodecontroller) never posted node status.
 		// A fake ready condition is created, where LastProbeTime and LastTransitionTime is set
@@ -452,14 +464,80 @@ func (nc NodeController) tryUpdateNodeStatus(node *api.Node) (error, time.Durati
 			LastTransitionTime: node.CreationTimestamp,
 		}
 		gracePeriod = nodeStartupGracePeriod
+		nc.nodeStatusMap[node.Name] = NodeStatusData{
+			status:                   node.Status,
+			probeTimestamp:           node.CreationTimestamp,
+			readyTransitionTimestamp: node.CreationTimestamp,
+		}
 	} else {
 		// If ready condition is not nil, make a copy of it, since we may modify it in place later.
 		lastReadyCondition = *readyCondition
 		gracePeriod = nodeMonitorGracePeriod
 	}
 
-	// Check last time when NodeReady was updated.
-	if nc.now().After(lastReadyCondition.LastProbeTime.Add(gracePeriod)) {
+	savedNodeStatus, found := nc.nodeStatusMap[node.Name]
+	// There are following cases to check:
+	// - both saved and new status have no Ready Condition set - we leave everything as it is,
+	// - saved status have no Ready Condition, but current one does - NodeController was restarted with Node data already present in etcd,
+	// - saved status have some Ready Condition, but current one does not - it's an error, but we fill it up because that's probably a good thing to do,
+	// - both saved and current statuses have Ready Conditions and they have the same LastProbeTime - nothing happened on that Node, it may be
+	//   unresponsive, so we leave it as it is,
+	// - both saved and current statuses have Ready Conditions, they have different LastProbeTimes, but the same Ready Condition State -
+	//   everything's in order, no transition occurred, we update only probeTimestamp,
+	// - both saved and current statuses have Ready Conditions, different LastProbeTimes and different Ready Condition State -
+	//   Ready Condition changed it state since we last seen it, so we update both probeTimestamp and readyTransitionTimestamp.
+	// TODO: things to consider:
+	//   - if 'LastProbeTime' have gone back in time its probably and error, currently we ignore it,
+	//   - currently only correct Ready State transition outside of Node Controller is marking it ready by Kubelet, we don't check
+	//     if that's the case, but it does not seem necessary.
+	savedCondition := nc.getCondition(&savedNodeStatus.status, api.NodeReady)
+	observedCondition := nc.getCondition(&node.Status, api.NodeReady)
+	if !found {
+		glog.Warningf("Missing timestamp for Node %s. Assuming now as a timestamp.", node.Name)
+		savedNodeStatus = NodeStatusData{
+			status:                   node.Status,
+			probeTimestamp:           nc.now(),
+			readyTransitionTimestamp: nc.now(),
+		}
+		nc.nodeStatusMap[node.Name] = savedNodeStatus
+	} else if savedCondition == nil && observedCondition != nil {
+		glog.V(1).Infof("Creating timestamp entry for newly observed Node %s", node.Name)
+		savedNodeStatus = NodeStatusData{
+			status:                   node.Status,
+			probeTimestamp:           nc.now(),
+			readyTransitionTimestamp: nc.now(),
+		}
+		nc.nodeStatusMap[node.Name] = savedNodeStatus
+	} else if savedCondition != nil && observedCondition == nil {
+		glog.Errorf("ReadyCondition was removed from Status of Node %s", node.Name)
+		// TODO: figure out what to do in this case. For now we do the same thing as above.
+		savedNodeStatus = NodeStatusData{
+			status:                   node.Status,
+			probeTimestamp:           nc.now(),
+			readyTransitionTimestamp: nc.now(),
+		}
+		nc.nodeStatusMap[node.Name] = savedNodeStatus
+	} else if savedCondition != nil && observedCondition != nil && savedCondition.LastProbeTime != observedCondition.LastProbeTime {
+		var transitionTime util.Time
+		// If ReadyCondition changed since the last time we checked, we update the transition timestamp to "now",
+		// otherwise we leave it as it is.
+		if savedCondition.LastTransitionTime != observedCondition.LastTransitionTime {
+			glog.V(3).Infof("ReadyCondition for Node %s transitioned from %v to %v", node.Name, savedCondition.Status, observedCondition)
+
+			transitionTime = nc.now()
+		} else {
+			transitionTime = savedNodeStatus.readyTransitionTimestamp
+		}
+		glog.V(3).Infof("Nodes ReadyCondition updated. Updating timestamp: %+v\n vs %+v.", savedNodeStatus.status, node.Status)
+		savedNodeStatus = NodeStatusData{
+			status:                   node.Status,
+			probeTimestamp:           nc.now(),
+			readyTransitionTimestamp: transitionTime,
+		}
+		nc.nodeStatusMap[node.Name] = savedNodeStatus
+	}
+
+	if nc.now().After(savedNodeStatus.probeTimestamp.Add(gracePeriod)) {
 		// NodeReady condition was last set longer ago than gracePeriod, so update it to Unknown
 		// (regardless of its current value) in the master, without contacting kubelet.
 		if readyCondition == nil {
@@ -467,13 +545,13 @@ func (nc NodeController) tryUpdateNodeStatus(node *api.Node) (error, time.Durati
 			node.Status.Conditions = append(node.Status.Conditions, api.NodeCondition{
 				Type:               api.NodeReady,
 				Status:             api.ConditionUnknown,
-				Reason:             fmt.Sprintf("Kubelet never posted node status"),
+				Reason:             fmt.Sprintf("Kubelet never posted node status."),
 				LastProbeTime:      node.CreationTimestamp,
 				LastTransitionTime: nc.now(),
 			})
 		} else {
 			glog.V(2).Infof("node %v hasn't been updated for %+v. Last ready condition is: %+v",
-				node.Name, nc.now().Time.Sub(lastReadyCondition.LastProbeTime.Time), lastReadyCondition)
+				node.Name, nc.now().Time.Sub(savedNodeStatus.probeTimestamp.Time), lastReadyCondition)
 			if lastReadyCondition.Status != api.ConditionUnknown {
 				readyCondition.Status = api.ConditionUnknown
 				readyCondition.Reason = fmt.Sprintf("Kubelet stopped posting node status.")
@@ -482,15 +560,22 @@ func (nc NodeController) tryUpdateNodeStatus(node *api.Node) (error, time.Durati
 				readyCondition.LastTransitionTime = nc.now()
 			}
 		}
-		_, err = nc.kubeClient.Nodes().Update(node)
-		if err != nil {
-			glog.Errorf("Error updating node %s: %v", node.Name, err)
-		} else {
-			return nil, gracePeriod, lastReadyCondition
+		if !api.Semantic.DeepEqual(nc.getCondition(&node.Status, api.NodeReady), lastReadyCondition) {
+			if _, err = nc.kubeClient.Nodes().Update(node); err != nil {
+				glog.Errorf("Error updating node %s: %v", node.Name, err)
+				return gracePeriod, lastReadyCondition, readyCondition, err
+			} else {
+				nc.nodeStatusMap[node.Name] = NodeStatusData{
+					status:                   node.Status,
+					probeTimestamp:           nc.nodeStatusMap[node.Name].probeTimestamp,
+					readyTransitionTimestamp: nc.now(),
+				}
+				return gracePeriod, lastReadyCondition, readyCondition, nil
+			}
 		}
 	}
 
-	return err, gracePeriod, lastReadyCondition
+	return gracePeriod, lastReadyCondition, readyCondition, err
 }
 
 // MonitorNodeStatus verifies node status are constantly updated by kubelet, and if not,
@@ -504,17 +589,17 @@ func (nc *NodeController) MonitorNodeStatus() error {
 	for i := range nodes.Items {
 		var gracePeriod time.Duration
 		var lastReadyCondition api.NodeCondition
+		var readyCondition *api.NodeCondition
 		node := &nodes.Items[i]
 		for rep := 0; rep < nodeStatusUpdateRetry; rep++ {
-			err, gracePeriod, lastReadyCondition = nc.tryUpdateNodeStatus(node)
+			gracePeriod, lastReadyCondition, readyCondition, err = nc.tryUpdateNodeStatus(node)
+			if err == nil {
+				break
+			}
+			name := node.Name
+			node, err = nc.kubeClient.Nodes().Get(name)
 			if err != nil {
-				name := node.Name
-				node, err = nc.kubeClient.Nodes().Get(name)
-				if err != nil {
-					glog.Errorf("Failed while getting a Node to retry updating NodeStatus. Probably Node %s was deleted.", name)
-					break
-				}
-			} else {
+				glog.Errorf("Failed while getting a Node to retry updating NodeStatus. Probably Node %s was deleted.", name)
 				break
 			}
 		}
@@ -524,11 +609,10 @@ func (nc *NodeController) MonitorNodeStatus() error {
 			continue
 		}
 
-		readyCondition := nc.getCondition(node, api.NodeReady)
 		if readyCondition != nil {
 			// Check eviction timeout.
 			if lastReadyCondition.Status == api.ConditionFalse &&
-				nc.now().After(lastReadyCondition.LastTransitionTime.Add(nc.podEvictionTimeout)) {
+				nc.now().After(nc.nodeStatusMap[node.Name].readyTransitionTimestamp.Add(nc.podEvictionTimeout)) {
 				// Node stays in not ready for at least 'podEvictionTimeout' - evict all pods on the unhealthy node.
 				// Makes sure we are not removing pods from to many nodes in the same time.
 				if nc.deletingPodsRateLimiter.CanAccept() {
@@ -536,7 +620,7 @@ func (nc *NodeController) MonitorNodeStatus() error {
 				}
 			}
 			if lastReadyCondition.Status == api.ConditionUnknown &&
-				nc.now().After(lastReadyCondition.LastProbeTime.Add(nc.podEvictionTimeout-gracePeriod)) {
+				nc.now().After(nc.nodeStatusMap[node.Name].probeTimestamp.Add(nc.podEvictionTimeout-gracePeriod)) {
 				// Same as above. Note however, since condition unknown is posted by node controller, which means we
 				// need to substract monitoring grace period in order to get the real 'podEvictionTimeout'.
 				if nc.deletingPodsRateLimiter.CanAccept() {
@@ -641,10 +725,13 @@ func (nc *NodeController) canonicalizeName(nodes *api.NodeList) *api.NodeList {
 
 // getCondition returns a condition object for the specific condition
 // type, nil if the condition is not set.
-func (nc *NodeController) getCondition(node *api.Node, conditionType api.NodeConditionType) *api.NodeCondition {
-	for i := range node.Status.Conditions {
-		if node.Status.Conditions[i].Type == conditionType {
-			return &node.Status.Conditions[i]
+func (nc *NodeController) getCondition(status *api.NodeStatus, conditionType api.NodeConditionType) *api.NodeCondition {
+	if status == nil {
+		return nil
+	}
+	for i := range status.Conditions {
+		if status.Conditions[i].Type == conditionType {
+			return &status.Conditions[i]
 		}
 	}
 	return nil
