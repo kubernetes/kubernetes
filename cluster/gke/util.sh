@@ -71,7 +71,7 @@ function test-build-release() {
 function verify-prereqs() {
   if ! which gcloud >/dev/null; then
     local resp
-    if [[ "${KUBE_PROMPT_FOR_UPDATE" == "y" ]]; then
+    if [[ "${KUBE_PROMPT_FOR_UPDATE}" == "y" ]]; then
       echo "Can't find gcloud in PATH.  Do you wish to install the Google Cloud SDK? [Y/n]"
       read resp
     else
@@ -85,7 +85,7 @@ function verify-prereqs() {
       echo "SDK can be downloaded from https://cloud.google.com/sdk/."
       exit 1
     fi
-  fi 
+  fi
   # update and install components as needed
   if [[ "${KUBE_PROMPT_FOR_UPDATE}" != "y" ]]; then
     gcloud_prompt="-q"
