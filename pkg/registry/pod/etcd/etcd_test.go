@@ -1058,10 +1058,12 @@ func TestEtcdUpdateScheduled(t *testing.T) {
 			Namespace: api.NamespaceDefault,
 		},
 		Spec: api.PodSpec{
-			//			Host: "machine",
 			Containers: []api.Container{
 				{
-					Image: "foo:v1",
+					Name:                   "c",
+					Image:                  "foo:v1",
+					ImagePullPolicy:        api.PullIfNotPresent,
+					TerminationMessagePath: api.TerminationMessagePathDefault,
 				},
 			},
 		},
@@ -1081,6 +1083,7 @@ func TestEtcdUpdateScheduled(t *testing.T) {
 		Spec: api.PodSpec{
 			Containers: []api.Container{
 				{
+					Name:                   "c",
 					Image:                  "foo:v2",
 					ImagePullPolicy:        api.PullIfNotPresent,
 					TerminationMessagePath: api.TerminationMessagePathDefault,
@@ -1123,7 +1126,10 @@ func TestEtcdUpdateStatus(t *testing.T) {
 		Spec: api.PodSpec{
 			Containers: []api.Container{
 				{
-					Image: "foo:v1",
+					Name:                   "c",
+					Image:                  "foo:v1",
+					ImagePullPolicy:        api.PullIfNotPresent,
+					TerminationMessagePath: api.TerminationMessagePathDefault,
 				},
 			},
 		},
@@ -1145,6 +1151,7 @@ func TestEtcdUpdateStatus(t *testing.T) {
 		Spec: api.PodSpec{
 			Containers: []api.Container{
 				{
+					Name:                   "c",
 					Image:                  "foo:v2",
 					ImagePullPolicy:        api.PullIfNotPresent,
 					TerminationMessagePath: api.TerminationMessagePathDefault,
