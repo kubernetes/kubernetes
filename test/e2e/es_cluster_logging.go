@@ -71,7 +71,7 @@ func ClusterLevelLoggingWithElasticsearch(c *client.Client) {
 	// Make a few attempts to connect. This makes the test robust against
 	// being run as the first e2e test just after the e2e cluster has been created.
 	var err error
-	const graceTime = 5 * time.Minute
+	const graceTime = 10 * time.Minute
 	for start := time.Now(); time.Since(start) < graceTime; time.Sleep(5 * time.Second) {
 		if _, err = s.Get("elasticsearch-logging"); err == nil {
 			break
