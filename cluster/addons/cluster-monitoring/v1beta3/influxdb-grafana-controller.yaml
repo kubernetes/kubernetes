@@ -16,7 +16,7 @@ spec:
         kubernetes.io/cluster-service: "true"
     spec: 
       containers: 
-        - image: gcr.io/google-containers/heapster_influxdb:v0.3
+        - image: gcr.io/google_containers/heapster_influxdb:v0.3
           name: influxdb
           ports: 
             - containerPort: 8083
@@ -24,7 +24,7 @@ spec:
             - containerPort: 8086
               hostPort: 8086
         - name: grafana
-          image: gcr.io/google-containers/heapster_grafana:v0.5
+          image: gcr.io/google_containers/heapster_grafana:v0.5
           ports:
               - containerPort: 80
           env: 

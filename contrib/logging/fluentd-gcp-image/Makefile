@@ -8,9 +8,9 @@
 
 TAG = 1.2
 
-build:	
+build:
 	docker build -t gcr.io/google_containers/fluentd-gcp:$(TAG) .
 
-push:	
+push:
 	gcloud preview docker push gcr.io/google_containers/fluentd-gcp:$(TAG)
 
