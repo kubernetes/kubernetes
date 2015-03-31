@@ -23,6 +23,7 @@ import (
 	"math/rand"
 	"net"
 	"net/http"
+	"path"
 	"strconv"
 	"strings"
 	"time"
@@ -91,6 +92,7 @@ type KubeletServer struct {
 	CloudConfigFile                string
 	TLSCertFile                    string
 	TLSPrivateKeyFile              string
+	CertDirectory                  string
 }
 
 // NewKubeletServer will create a new KubeletServer with default values.
@@ -118,6 +120,7 @@ func NewKubeletServer() *KubeletServer {
 		ImageGCLowThresholdPercent:  80,
 		NetworkPluginName:           "",
 		HostNetworkSources:          kubelet.FileSource,
+		CertDirectory:               "/var/run/kubernetes",
 	}
 }
 
@@ -134,8 +137,9 @@ func (s *KubeletServer) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.TLSCertFile, "tls_cert_file", s.TLSCertFile, ""+
 		"File containing x509 Certificate for HTTPS.  (CA cert, if any, concatenated after server cert). "+
 		"If --tls_cert_file and --tls_private_key_file are not provided, a self-signed certificate and key "+
-		"are generated for the public address and saved to /var/run/kubernetes.")
+		"are generated for the public address and saved to the directory passed to --cert_dir.")
 	fs.StringVar(&s.TLSPrivateKeyFile, "tls_private_key_file", s.TLSPrivateKeyFile, "File containing x509 private key matching --tls_cert_file.")
+	fs.StringVar(&s.CertDirectory, "cert_dir", s.CertDirectory, "The directory where the TLS certs are located (by default /var/run/kubernetes)")
 	fs.StringVar(&s.HostnameOverride, "hostname_override", s.HostnameOverride, "If non-empty, will use this string as identification instead of the actual hostname.")
 	fs.StringVar(&s.PodInfraContainerImage, "pod_infra_container_image", s.PodInfraContainerImage, "The image whose network/ipc namespaces containers in each pod will use.")
 	fs.StringVar(&s.DockerEndpoint, "docker_endpoint", s.DockerEndpoint, "If non-empty, use this for the docker endpoint to communicate with")
@@ -204,8 +208,8 @@ func (s *KubeletServer) Run(_ []string) error {
 	}
 
 	if s.TLSCertFile == "" && s.TLSPrivateKeyFile == "" {
-		s.TLSCertFile = "/var/run/kubernetes/kubelet.crt"
-		s.TLSPrivateKeyFile = "/var/run/kubernetes/kubelet.key"
+		s.TLSCertFile = path.Join(s.CertDirectory, "kubelet.crt")
+		s.TLSPrivateKeyFile = path.Join(s.CertDirectory, "kubelet.key")
 		if err := util.GenerateSelfSignedCert(util.GetHostname(s.HostnameOverride), s.TLSCertFile, s.TLSPrivateKeyFile); err != nil {
 			glog.Fatalf("Unable to generate self signed cert: %v", err)
 		}
