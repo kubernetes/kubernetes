@@ -51,7 +51,7 @@ The following enumerates the set of defined key/value pairs that are supported t
 
 Key | Value
 ------------- | -------------
-`apiservers` | (Optional) The IP address / host name where a kubelet can get read-only access to kube-apiserver
+`api_servers` | (Optional) The IP address / host name where a kubelet can get read-only access to kube-apiserver
 `cbr-cidr` | (Optional) The minion IP address range used for the docker container bridge.
 `cloud` | (Optional) Which IaaS platform is used to host kubernetes, *gce*, *azure*, *aws*, *vagrant*
 `cloud_provider` | (Optional) The cloud_provider used by apiserver: *gce*, *azure*, *vagrant*

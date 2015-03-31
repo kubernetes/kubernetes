@@ -3,14 +3,16 @@
   {% set daemon_args = "" -%}
 {% endif -%}
 
-{% if grains.apiservers is defined -%}
-  {% set apiservers = "--api_servers=https://" + grains.apiservers + ":6443" -%}
+{% if grains.api_servers is defined -%}
+  {% set api_servers = "--api_servers=https://" + grains.api_servers + ":6443" -%}
+{% elif grains.apiservers is defined -%} # TODO(remove after 0.16.0): Deprecated form
+  {% set api_servers = "--api_servers=https://" + grains.apiservers + ":6443" -%}
 {% elif grains['roles'][0] == 'kubernetes-master' -%}
   {% set master_ipv4 = salt['grains.get']('fqdn_ip4')[0] -%}
-  {% set apiservers = "--api_servers=https://" + master_ipv4 + ":6443" -%}
+  {% set api_servers = "--api_servers=https://" + master_ipv4 + ":6443" -%}
 {% else -%}
   {% set ips = salt['mine.get']('roles:kubernetes-master', 'network.ip_addrs', 'grain').values() -%}
-  {% set apiservers = "--api_servers=https://" + ips[0][0] + ":6443" -%}
+  {% set api_servers = "--api_servers=https://" + ips[0][0] + ":6443" -%}
 {% endif -%}
 
 {% set address = "--address=0.0.0.0" -%}
@@ -31,4 +33,4 @@
   {% set cluster_domain = "--cluster_domain=" + pillar['dns_domain'] %}
 {% endif %}
 
-DAEMON_ARGS="{{daemon_args}} {{apiservers}} {{auth_path}} {{hostname_override}} {{address}} {{config}} --allow_privileged={{pillar['allow_privileged']}} {{pillar['log_level']}} {{cluster_dns}} {{cluster_domain}}"
+DAEMON_ARGS="{{daemon_args}} {{api_servers}} {{auth_path}} {{hostname_override}} {{address}} {{config}} --allow_privileged={{pillar['allow_privileged']}} {{pillar['log_level']}} {{cluster_dns}} {{cluster_domain}}"
