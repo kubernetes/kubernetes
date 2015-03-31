@@ -393,9 +393,11 @@ type Container struct {
 	Name string `json:"name" description:"name of the container; must be a DNS_LABEL and unique within the pod; cannot be updated"`
 	// Required.
 	Image string `json:"image" description:"Docker image name"`
-	// Optional: Defaults to whatever is defined in the image.
-	Command []string `json:"command,omitempty" description:"command argv array; not executed within a shell; defaults to entrypoint or command in the image; cannot be updated"`
-	// Optional: Defaults to Docker's default.
+	// Optional: The image's entrypoint is used if this is not provided; cannot be updated.
+	Entrypoint []string `json:"entrypoint:omitempty" description:"entrypoint array; not executed within a shell; the image's entrypoint is used if this is not provided; cannot be updated"`
+	// Optional: The image's cmd is used if this is not provided; cannot be updated.
+	Command []string `json:"command,omitempty" description:"command argv array; not executed within a shell; the image's cmd is used if this is not provided; cannot be updated"`
+	// Optional: Docker's default is used if this is not provided.
 	WorkingDir string               `json:"workingDir,omitempty" description:"container's working directory; defaults to image's default; cannot be updated"`
 	Ports      []ContainerPort      `json:"ports,omitempty" description:"list of ports to expose from the container; cannot be updated"`
 	Env        []EnvVar             `json:"env,omitempty" description:"list of environment variables to set in the container; cannot be updated"`

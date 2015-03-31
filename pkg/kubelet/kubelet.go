@@ -215,6 +215,10 @@ func NewMainKubelet(
 		return nil, fmt.Errorf("failed to initialize image manager: %v", err)
 	}
 	statusManager := newStatusManager(kubeClient)
+	containerRunner := &dockertools.DockerContainerRunner{
+		Client:   dockerClient,
+		Recorder: recorder,
+	}
 
 	klet := &Kubelet{
 		hostname:               hostname,
@@ -244,6 +248,7 @@ func NewMainKubelet(
 		statusManager:                  statusManager,
 		cloud:                          cloud,
 		nodeRef:                        nodeRef,
+		containerRunner:                containerRunner,
 	}
 
 	klet.podManager = newBasicPodManager(klet.kubeClient)
@@ -359,6 +364,9 @@ type Kubelet struct {
 
 	// Syncs pods statuses with apiserver; also used as a cache of statuses.
 	statusManager *statusManager
+
+	// Knows how to run a container in a pod
+	containerRunner kubecontainer.ContainerRunner
 
 	//Cloud provider interface
 	cloud cloudprovider.Interface
@@ -650,7 +658,7 @@ func (kl *Kubelet) generateRunContainerOptions(pod *api.Pod, container *api.Cont
 
 // Run a single container from a pod. Returns the docker container ID
 func (kl *Kubelet) runContainer(pod *api.Pod, container *api.Container, podVolumes volumeMap, netMode, ipcMode string) (dockertools.DockerID, error) {
-	ref, err := kl.containerRefManager.GenerateContainerRef(pod, container)
+	ref, err := kubecontainer.GenerateContainerRef(pod, container)
 	if err != nil {
 		glog.Errorf("Couldn't make a ref to pod %v, container %v: '%v'", pod.Name, container.Name, err)
 	}
@@ -660,11 +668,14 @@ func (kl *Kubelet) runContainer(pod *api.Pod, container *api.Container, podVolum
 		return "", err
 	}
 
-	// TODO(yifan): Replace with RunContainerInPod, so we can eliminate 'netMode', 'ipcMode'
-	// by handling the pod infra container in the container runtime's implementation.
-	id, err := dockertools.RunContainer(kl.dockerClient, container, pod, opts, kl.containerRefManager, ref, kl.recorder)
+	id, err := kl.containerRunner.RunContainer(pod, container, opts)
 	if err != nil {
 		return "", err
+	}
+
+	// Remember this reference so we can report events about this container
+	if ref != nil {
+		kl.containerRefManager.SetRef(id, ref)
 	}
 
 	if container.Lifecycle != nil && container.Lifecycle.PostStart != nil {
@@ -886,7 +897,7 @@ func (kl *Kubelet) createPodInfraContainer(pod *api.Pod) (dockertools.DockerID, 
 		Image: kl.podInfraContainerImage,
 		Ports: ports,
 	}
-	ref, err := kl.containerRefManager.GenerateContainerRef(pod, container)
+	ref, err := kubecontainer.GenerateContainerRef(pod, container)
 	if err != nil {
 		glog.Errorf("Couldn't make a ref to pod %v, container %v: '%v'", pod.Name, container.Name, err)
 	}
@@ -1037,7 +1048,7 @@ func (kl *Kubelet) getPodInfraContainer(podFullName string, uid types.UID,
 func (kl *Kubelet) pullImageAndRunContainer(pod *api.Pod, container *api.Container, podVolumes *volumeMap,
 	podInfraContainerID dockertools.DockerID) (dockertools.DockerID, error) {
 	podFullName := kubecontainer.GetPodFullName(pod)
-	ref, err := kl.containerRefManager.GenerateContainerRef(pod, container)
+	ref, err := kubecontainer.GenerateContainerRef(pod, container)
 	if err != nil {
 		glog.Errorf("Couldn't make a ref to pod %v, container %v: '%v'", pod.Name, container.Name, err)
 	}

@@ -17,7 +17,6 @@ limitations under the License.
 package container
 
 import (
-	"fmt"
 	"sync"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -61,42 +60,4 @@ func (c *RefManager) GetRef(id string) (ref *api.ObjectReference, ok bool) {
 	defer c.RUnlock()
 	ref, ok = c.containerIDToRef[id]
 	return ref, ok
-}
-
-// fieldPath returns a fieldPath locating container within pod.
-// Returns an error if the container isn't part of the pod.
-func fieldPath(pod *api.Pod, container *api.Container) (string, error) {
-	for i := range pod.Spec.Containers {
-		here := &pod.Spec.Containers[i]
-		if here.Name == container.Name {
-			if here.Name == "" {
-				return fmt.Sprintf("spec.containers[%d]", i), nil
-			} else {
-				return fmt.Sprintf("spec.containers{%s}", here.Name), nil
-			}
-		}
-	}
-	return "", fmt.Errorf("container %#v not found in pod %#v", container, pod)
-}
-
-// GenerateContainerRef returns an *api.ObjectReference which references the given container within the
-// given pod. Returns an error if the reference can't be constructed or the container doesn't
-// actually belong to the pod.
-// TODO: Pods that came to us by static config or over HTTP have no selfLink set, which makes
-// this fail and log an error. Figure out how we want to identify these pods to the rest of the
-// system.
-// TODO(yifan): Revisit this function later, for current case it does not need to use RefManager
-// as a receiver.
-func (c *RefManager) GenerateContainerRef(pod *api.Pod, container *api.Container) (*api.ObjectReference, error) {
-	fieldPath, err := fieldPath(pod, container)
-	if err != nil {
-		// TODO: figure out intelligent way to refer to containers that we implicitly
-		// start (like the pod infra container). This is not a good way, ugh.
-		fieldPath = "implicitly required container " + container.Name
-	}
-	ref, err := api.GetPartialReference(pod, fieldPath)
-	if err != nil {
-		return nil, err
-	}
-	return ref, nil
 }
