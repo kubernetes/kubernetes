@@ -69,11 +69,10 @@ var _ = Describe("Secrets", func() {
 		}
 
 		By(fmt.Sprintf("Creating a pod to consume secret %v", secret.Name))
-		// Make a client pod that verifies that it has the service environment variables.
-		clientName := "client-secrets-" + string(util.NewUUID())
-		clientPod := &api.Pod{
+		// Make a pod that verifies that it has the service environment variables.
+		pod := &api.Pod{
 			ObjectMeta: api.ObjectMeta{
-				Name: clientName,
+				Name: "pod-secrets-" + string(util.NewUUID()),
 			},
 			Spec: api.PodSpec{
 				Volumes: []api.Volume{
@@ -90,7 +89,7 @@ var _ = Describe("Secrets", func() {
 					{
 						Name:    "catcont",
 						Image:   "busybox",
-						Command: []string{"sh", "-c", "cat /etc/secret-volume/data-1; sleep 600"},
+						Command: []string{"sh", "-c", "cat /etc/secret-volume/data-1"},
 						VolumeMounts: []api.VolumeMount{
 							{
 								Name:      volumeName,
@@ -104,20 +103,20 @@ var _ = Describe("Secrets", func() {
 			},
 		}
 
-		defer c.Pods(ns).Delete(clientPod.Name)
-		if _, err := c.Pods(ns).Create(clientPod); err != nil {
+		defer c.Pods(ns).Delete(pod.Name)
+		if _, err := c.Pods(ns).Create(pod); err != nil {
 			Failf("Failed to create pod: %v", err)
 		}
 		// Wait for client pod to complete.
-		expectNoError(waitForPodRunning(c, clientPod.Name))
+		expectNoError(waitForPodSuccess(c, pod.Name, "catcont"))
 
 		// Grab its logs.  Get host first.
-		clientPodStatus, err := c.Pods(ns).Get(clientPod.Name)
+		podStatus, err := c.Pods(ns).Get(pod.Name)
 		if err != nil {
-			Failf("Failed to get clientPod to know host: %v", err)
+			Failf("Failed to get pod to know host: %v", err)
 		}
 		By(fmt.Sprintf("Trying to get logs from host %s pod %s container %s: %v",
-			clientPodStatus.Status.Host, clientPodStatus.Name, clientPodStatus.Spec.Containers[0].Name, err))
+			podStatus.Status.Host, podStatus.Name, podStatus.Spec.Containers[0].Name, err))
 		var logs []byte
 		start := time.Now()
 
@@ -126,15 +125,15 @@ var _ = Describe("Secrets", func() {
 			logs, err = c.Get().
 				Prefix("proxy").
 				Resource("minions").
-				Name(clientPodStatus.Status.Host).
-				Suffix("containerLogs", ns, clientPodStatus.Name, clientPodStatus.Spec.Containers[0].Name).
+				Name(podStatus.Status.Host).
+				Suffix("containerLogs", ns, podStatus.Name, podStatus.Spec.Containers[0].Name).
 				Do().
 				Raw()
-			fmt.Sprintf("clientPod logs:%v\n", string(logs))
-			By(fmt.Sprintf("clientPod logs:%v\n", string(logs)))
+			fmt.Sprintf("pod logs:%v\n", string(logs))
+			By(fmt.Sprintf("pod logs:%v\n", string(logs)))
 			if strings.Contains(string(logs), "Internal Error") {
 				By(fmt.Sprintf("Failed to get logs from host %s pod %s container %s: %v",
-					clientPodStatus.Status.Host, clientPodStatus.Name, clientPodStatus.Spec.Containers[0].Name, string(logs)))
+					podStatus.Status.Host, podStatus.Name, podStatus.Spec.Containers[0].Name, string(logs)))
 				time.Sleep(5 * time.Second)
 				continue
 			}
