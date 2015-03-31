@@ -55,9 +55,9 @@ var _ = Describe("PD", func() {
 	})
 
 	It("should schedule a pod w/ a RW PD, remove it, then schedule it on another host", func() {
-		if testContext.provider != "gce" {
+		if testContext.Provider != "gce" {
 			By(fmt.Sprintf("Skipping PD test, which is only supported for provider gce (not %s)",
-				testContext.provider))
+				testContext.Provider))
 			return
 		}
 
@@ -65,7 +65,7 @@ var _ = Describe("PD", func() {
 		host1Pod := testPDPod(diskName, host1Name, false)
 
 		By(fmt.Sprintf("creating PD %q", diskName))
-		expectNoError(createPD(diskName, testContext.gceConfig.Zone), "Error creating PD")
+		expectNoError(createPD(diskName, testContext.GCEConfig.Zone), "Error creating PD")
 
 		defer func() {
 			By("cleaning up PD-RW test environment")
@@ -73,9 +73,9 @@ var _ = Describe("PD", func() {
 			// Teardown should do nothing unless test failed.
 			podClient.Delete(host0Pod.Name)
 			podClient.Delete(host1Pod.Name)
-			detachPD(host0Name, diskName, testContext.gceConfig.Zone)
-			detachPD(host1Name, diskName, testContext.gceConfig.Zone)
-			deletePD(diskName, testContext.gceConfig.Zone)
+			detachPD(host0Name, diskName, testContext.GCEConfig.Zone)
+			detachPD(host1Name, diskName, testContext.GCEConfig.Zone)
+			deletePD(diskName, testContext.GCEConfig.Zone)
 		}()
 
 		By("submitting host0Pod to kubernetes")
@@ -98,7 +98,7 @@ var _ = Describe("PD", func() {
 
 		By(fmt.Sprintf("deleting PD %q", diskName))
 		for start := time.Now(); time.Since(start) < 180*time.Second; time.Sleep(5 * time.Second) {
-			if err = deletePD(diskName, testContext.gceConfig.Zone); err != nil {
+			if err = deletePD(diskName, testContext.GCEConfig.Zone); err != nil {
 				Logf("Couldn't delete PD. Sleeping 5 seconds")
 				continue
 			}
@@ -110,9 +110,9 @@ var _ = Describe("PD", func() {
 	})
 
 	It("should schedule a pod w/ a readonly PD on two hosts, then remove both.", func() {
-		if testContext.provider != "gce" {
+		if testContext.Provider != "gce" {
 			By(fmt.Sprintf("Skipping PD test, which is only supported for provider gce (not %s)",
-				testContext.provider))
+				testContext.Provider))
 			return
 		}
 
@@ -127,13 +127,13 @@ var _ = Describe("PD", func() {
 			podClient.Delete(rwPod.Name)
 			podClient.Delete(host0ROPod.Name)
 			podClient.Delete(host1ROPod.Name)
-			detachPD(host0Name, diskName, testContext.gceConfig.Zone)
-			detachPD(host1Name, diskName, testContext.gceConfig.Zone)
-			deletePD(diskName, testContext.gceConfig.Zone)
+			detachPD(host0Name, diskName, testContext.GCEConfig.Zone)
+			detachPD(host1Name, diskName, testContext.GCEConfig.Zone)
+			deletePD(diskName, testContext.GCEConfig.Zone)
 		}()
 
 		By(fmt.Sprintf("creating PD %q", diskName))
-		expectNoError(createPD(diskName, testContext.gceConfig.Zone), "Error creating PD")
+		expectNoError(createPD(diskName, testContext.GCEConfig.Zone), "Error creating PD")
 
 		By("submitting rwPod to ensure PD is formatted")
 		_, err := podClient.Create(rwPod)
@@ -161,7 +161,7 @@ var _ = Describe("PD", func() {
 
 		By(fmt.Sprintf("deleting PD %q", diskName))
 		for start := time.Now(); time.Since(start) < 180*time.Second; time.Sleep(5 * time.Second) {
-			if err = deletePD(diskName, testContext.gceConfig.Zone); err != nil {
+			if err = deletePD(diskName, testContext.GCEConfig.Zone); err != nil {
 				Logf("Couldn't delete PD. Sleeping 5 seconds")
 				continue
 			}

@@ -42,7 +42,7 @@ var _ = Describe("Networking", func() {
 	ns := "nettest-" + randomSuffix()
 
 	It("should function for pods", func() {
-		if testContext.provider == "vagrant" {
+		if testContext.Provider == "vagrant" {
 			By("Skipping test which is broken for vagrant (See https://github.com/GoogleCloudPlatform/kubernetes/issues/3580)")
 			return
 		}

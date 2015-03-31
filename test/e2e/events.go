@@ -41,7 +41,7 @@ var _ = Describe("Events", func() {
 	})
 
 	It("should be sent by kubelets and the scheduler about pods scheduling and running", func() {
-		provider := testContext.provider
+		provider := testContext.Provider
 		if len(provider) > 0 && provider != "gce" && provider != "gke" && provider != "aws" {
 			By(fmt.Sprintf("skipping TestKubeletSendsEvent on cloud provider %s", provider))
 			return

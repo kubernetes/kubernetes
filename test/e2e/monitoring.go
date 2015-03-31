@@ -40,9 +40,9 @@ var _ = Describe("Monitoring", func() {
 	})
 
 	It("verify monitoring pods and all cluster nodes are available on influxdb using heapster.", func() {
-		if testContext.provider != "gce" {
+		if testContext.Provider != "gce" {
 			By(fmt.Sprintf("Skipping Monitoring test, which is only supported for provider gce (not %s)",
-				testContext.provider))
+				testContext.Provider))
 			return
 		}
 		testMonitoringUsingHeapsterInfluxdb(c)
@@ -192,7 +192,7 @@ func validatePodsAndNodes(influxdbClient *influxdb.Client, expectedPods, expecte
 }
 
 func getMasterHost() string {
-	masterUrl, err := url.Parse(testContext.host)
+	masterUrl, err := url.Parse(testContext.Host)
 	expectNoError(err)
 	return masterUrl.Host
 }
