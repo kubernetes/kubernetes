@@ -710,6 +710,7 @@ func init() {
 			}
 
 			// Produce legacy fields.
+			out.Protocol = ProtocolTCP
 			if len(in.Spec.Ports) > 0 {
 				out.PortName = in.Spec.Ports[0].Name
 				out.Port = in.Spec.Ports[0].Port
