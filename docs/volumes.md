@@ -17,7 +17,7 @@ and to select the type of media to use, for clusters that have several media typ
 
 ## Types of Volumes
 
-Kubernetes currently supports three types of Volumes, but more may be added in the future.
+Kubernetes currently supports multiple types of Volumes. The community welcomes additional contributions.
 
 ### EmptyDir
 
@@ -84,4 +84,8 @@ desiredState:
 id: testpd
 kind: Pod
 ```
+### NFS
 
+Kubernetes NFS volumes allow an existing NFS share to be made available to containers within a pod. 
+
+[The NFS Pod example](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/examples/nfs/test.yaml) demonstrates how to specify the usage of an NFS volume within a pod. In this example one can see that a volumeMount called "myshare" is being mounted onto /var/www/html/mount-test in the container "testpd". The volume "myshare" is defined as type nfs, with the NFS server serving from 172.17.0.2 and exporting directory /tmp as the share. The mount being created in this example is not read only. 
