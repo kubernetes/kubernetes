@@ -57,6 +57,10 @@ type CMServer struct {
 	MachineList             util.StringList
 	SyncNodeList            bool
 	SyncNodeStatus          bool
+	NodeMonitorGracePeriod  time.Duration
+	NodeStartupGracePeriod  time.Duration
+	NodeMonitorPeriod       time.Duration
+	NodeStatusUpdateRetry   int
 	PodEvictionTimeout      time.Duration
 	DeletingPodsQps         float32
 	DeletingPodsBurst       int
@@ -115,6 +119,10 @@ func (s *CMServer) AddFlags(fs *pflag.FlagSet) {
 	fs.BoolVar(&s.SyncNodeStatus, "sync_node_status", s.SyncNodeStatus, ""+
 		"If true, node controller sends probes to kubelet and updates NodeStatus."+
 		"If false, Kubelet posts NodeStatus to API server.")
+	fs.DurationVar(&s.NodeMonitorGracePeriod, "node_monitor_grace_period", 8*time.Second, "Amount of time which we allow running Node to be unresponsive before marking it unhealty."+
+		"Must be N times more than kubelet's nodeStatusUpdateFrequency, where N means number of retries allowed for kubelet to post node status.")
+	fs.DurationVar(&s.NodeStartupGracePeriod, "node_startup_grace_period", 30*time.Second, "Amount of time which we allow starting Node to be unresponsive before marking it unhealty.")
+	fs.DurationVar(&s.NodeMonitorPeriod, "node_monitor_period", 5*time.Second, "The period for syncing NodeStatus in NodeController.")
 	// TODO: Discover these by pinging the host machines, and rip out these flags.
 	// TODO: in the meantime, use resource.QuantityFlag() instead of these
 	fs.Int64Var(&s.NodeMilliCPU, "node_milli_cpu", s.NodeMilliCPU, "The amount of MilliCPU provisioned on each node")
@@ -181,7 +189,8 @@ func (s *CMServer) Run(_ []string) error {
 	}
 
 	nodeController := nodeControllerPkg.NewNodeController(cloud, s.MinionRegexp, s.MachineList, nodeResources,
-		kubeClient, kubeletClient, s.RegisterRetryCount, s.PodEvictionTimeout, util.NewTokenBucketRateLimiter(s.DeletingPodsQps, s.DeletingPodsBurst))
+		kubeClient, kubeletClient, s.RegisterRetryCount, s.PodEvictionTimeout, util.NewTokenBucketRateLimiter(s.DeletingPodsQps, s.DeletingPodsBurst),
+		s.NodeMonitorGracePeriod, s.NodeStartupGracePeriod, s.NodeMonitorPeriod)
 	nodeController.Run(s.NodeSyncPeriod, s.SyncNodeList, s.SyncNodeStatus)
 
 	resourceQuotaManager := resourcequota.NewResourceQuotaManager(kubeClient)
