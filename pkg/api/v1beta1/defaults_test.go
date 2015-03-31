@@ -20,6 +20,7 @@ import (
 	"reflect"
 	"testing"
 
+	newer "github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	current "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 )
@@ -30,13 +31,18 @@ func roundTrip(t *testing.T, obj runtime.Object) runtime.Object {
 		t.Errorf("%v\n %#v", err, obj)
 		return nil
 	}
-	obj2 := reflect.New(reflect.TypeOf(obj).Elem()).Interface().(runtime.Object)
-	err = current.Codec.DecodeInto(data, obj2)
+	obj2, err := newer.Codec.Decode(data)
 	if err != nil {
 		t.Errorf("%v\nData: %s\nSource: %#v", err, string(data), obj)
 		return nil
 	}
-	return obj2
+	obj3 := reflect.New(reflect.TypeOf(obj).Elem()).Interface().(runtime.Object)
+	err = newer.Scheme.Convert(obj2, obj3)
+	if err != nil {
+		t.Errorf("%v\nSource: %#v", err, obj2)
+		return nil
+	}
+	return obj3
 }
 
 func TestSetDefaultService(t *testing.T) {
