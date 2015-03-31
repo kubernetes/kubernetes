@@ -407,6 +407,14 @@ func describeNode(node *api.Node, pods []api.Pod, events *api.EventList) (string
 				fmt.Fprintf(out, " %s:\t%s\n", resource, value.String())
 			}
 		}
+
+		fmt.Fprintf(out, "Version:\n")
+		fmt.Fprintf(out, " Kernel Version:\t%s\n", node.Status.NodeInfo.KernelVersion)
+		fmt.Fprintf(out, " OS Image:\t%s\n", node.Status.NodeInfo.OsImage)
+		fmt.Fprintf(out, " Container Runtime Version:\t%s\n", node.Status.NodeInfo.ContainerRuntimeVersion)
+		fmt.Fprintf(out, " Kubelet Version:\t%s\n", node.Status.NodeInfo.KubeletVersion)
+		fmt.Fprintf(out, " Kube-Proxy Version:\t%s\n", node.Status.NodeInfo.KubeProxyVersion)
+
 		if len(node.Spec.PodCIDR) > 0 {
 			fmt.Fprintf(out, "PodCIDR:\t%s\n", node.Spec.PodCIDR)
 		}
