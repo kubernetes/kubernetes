@@ -70,7 +70,6 @@ grains:
   etcd_servers: '$(echo "$MASTER_IP" | sed -e "s/'/''/g")'
   api_servers: '$(echo "$MASTER_IP" | sed -e "s/'/''/g")'
   networkInterfaceName: eth1
-  apiservers: '$(echo "$MASTER_IP" | sed -e "s/'/''/g")'
   roles:
     - kubernetes-pool
   cbr-cidr: '$(echo "$CONTAINER_SUBNET" | sed -e "s/'/''/g")'

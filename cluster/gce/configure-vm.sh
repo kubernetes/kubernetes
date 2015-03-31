@@ -343,7 +343,6 @@ function salt-set-apiserver() {
 
   cat <<EOF >>/etc/salt/minion.d/grains.conf
   api_servers: '${kube_master_fqdn}'
-  apiservers: '${kube_master_fqdn}'
 EOF
 }
 
