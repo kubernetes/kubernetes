@@ -99,20 +99,16 @@ func finalized(namespace api.Namespace) bool {
 
 // finalize will finalize the namespace for kubernetes
 func finalize(kubeClient client.Interface, namespace api.Namespace) (*api.Namespace, error) {
-	namespaceFinalize := api.Namespace{
-		ObjectMeta: api.ObjectMeta{
-			Name:            namespace.Name,
-			ResourceVersion: namespace.ResourceVersion,
-		},
-		Spec: api.NamespaceSpec{},
-	}
+	namespaceFinalize := api.Namespace{}
+	namespaceFinalize.ObjectMeta = namespace.ObjectMeta
+	namespaceFinalize.Spec = namespace.Spec
 	finalizerSet := util.NewStringSet()
 	for i := range namespace.Spec.Finalizers {
 		if namespace.Spec.Finalizers[i] != api.FinalizerKubernetes {
 			finalizerSet.Insert(string(namespace.Spec.Finalizers[i]))
 		}
 	}
-	namespaceFinalize.Spec.Finalizers = make([]api.FinalizerName, len(finalizerSet), len(finalizerSet))
+	namespaceFinalize.Spec.Finalizers = make([]api.FinalizerName, 0, len(finalizerSet))
 	for _, value := range finalizerSet.List() {
 		namespaceFinalize.Spec.Finalizers = append(namespaceFinalize.Spec.Finalizers, api.FinalizerName(value))
 	}

@@ -23,6 +23,7 @@ import (
 )
 
 func TestNamespaceStrategy(t *testing.T) {
+	ctx := api.NewDefaultContext()
 	if Strategy.NamespaceScoped() {
 		t.Errorf("Namespaces should not be namespace scoped")
 	}
@@ -30,11 +31,100 @@ func TestNamespaceStrategy(t *testing.T) {
 		t.Errorf("Namespaces should not allow create on update")
 	}
 	namespace := &api.Namespace{
-		ObjectMeta: api.ObjectMeta{Name: "foo"},
+		ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "10"},
 		Status:     api.NamespaceStatus{Phase: api.NamespaceTerminating},
 	}
 	Strategy.PrepareForCreate(namespace)
 	if namespace.Status.Phase != api.NamespaceActive {
 		t.Errorf("Namespaces do not allow setting phase on create")
+	}
+	if len(namespace.Spec.Finalizers) != 1 || namespace.Spec.Finalizers[0] != api.FinalizerKubernetes {
+		t.Errorf("Prepare For Create should have added kubernetes finalizer")
+	}
+	errs := Strategy.Validate(ctx, namespace)
+	if len(errs) != 0 {
+		t.Errorf("Unexpected error validating %v", errs)
+	}
+	invalidNamespace := &api.Namespace{
+		ObjectMeta: api.ObjectMeta{Name: "bar", ResourceVersion: "4"},
+	}
+	// ensure we copy spec.finalizers from old to new
+	Strategy.PrepareForUpdate(invalidNamespace, namespace)
+	if len(invalidNamespace.Spec.Finalizers) != 1 || invalidNamespace.Spec.Finalizers[0] != api.FinalizerKubernetes {
+		t.Errorf("PrepareForUpdate should have preserved old.spec.finalizers")
+	}
+	errs = Strategy.ValidateUpdate(ctx, invalidNamespace, namespace)
+	if len(errs) == 0 {
+		t.Errorf("Expected a validation error")
+	}
+	if invalidNamespace.ResourceVersion != "4" {
+		t.Errorf("Incoming resource version on update should not be mutated")
+	}
+}
+
+func TestNamespaceStatusStrategy(t *testing.T) {
+	ctx := api.NewDefaultContext()
+	if StatusStrategy.NamespaceScoped() {
+		t.Errorf("Namespaces should not be namespace scoped")
+	}
+	if StatusStrategy.AllowCreateOnUpdate() {
+		t.Errorf("Namespaces should not allow create on update")
+	}
+	oldNamespace := &api.Namespace{
+		ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "10"},
+		Spec:       api.NamespaceSpec{Finalizers: []api.FinalizerName{"kubernetes"}},
+		Status:     api.NamespaceStatus{Phase: api.NamespaceActive},
+	}
+	namespace := &api.Namespace{
+		ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "9"},
+		Status:     api.NamespaceStatus{Phase: api.NamespaceTerminating},
+	}
+	StatusStrategy.PrepareForUpdate(namespace, oldNamespace)
+	if namespace.Status.Phase != api.NamespaceTerminating {
+		t.Errorf("Namespace status updates should allow change of phase: %v", namespace.Status.Phase)
+	}
+	if len(namespace.Spec.Finalizers) != 1 || namespace.Spec.Finalizers[0] != api.FinalizerKubernetes {
+		t.Errorf("PrepareForUpdate should have preserved old finalizers")
+	}
+	errs := StatusStrategy.ValidateUpdate(ctx, namespace, oldNamespace)
+	if len(errs) != 0 {
+		t.Errorf("Unexpected error %v", errs)
+	}
+	if namespace.ResourceVersion != "9" {
+		t.Errorf("Incoming resource version on update should not be mutated")
+	}
+}
+
+func TestNamespaceFinalizeStrategy(t *testing.T) {
+	ctx := api.NewDefaultContext()
+	if FinalizeStrategy.NamespaceScoped() {
+		t.Errorf("Namespaces should not be namespace scoped")
+	}
+	if FinalizeStrategy.AllowCreateOnUpdate() {
+		t.Errorf("Namespaces should not allow create on update")
+	}
+	oldNamespace := &api.Namespace{
+		ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "10"},
+		Spec:       api.NamespaceSpec{Finalizers: []api.FinalizerName{"kubernetes", "example.com/org"}},
+		Status:     api.NamespaceStatus{Phase: api.NamespaceActive},
+	}
+	namespace := &api.Namespace{
+		ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "9"},
+		Spec:       api.NamespaceSpec{Finalizers: []api.FinalizerName{"example.com/foo"}},
+		Status:     api.NamespaceStatus{Phase: api.NamespaceTerminating},
+	}
+	FinalizeStrategy.PrepareForUpdate(namespace, oldNamespace)
+	if namespace.Status.Phase != api.NamespaceActive {
+		t.Errorf("finalize updates should not allow change of phase: %v", namespace.Status.Phase)
+	}
+	if len(namespace.Spec.Finalizers) != 1 || string(namespace.Spec.Finalizers[0]) != "example.com/foo" {
+		t.Errorf("PrepareForUpdate should have modified finalizers")
+	}
+	errs := StatusStrategy.ValidateUpdate(ctx, namespace, oldNamespace)
+	if len(errs) != 0 {
+		t.Errorf("Unexpected error %v", errs)
+	}
+	if namespace.ResourceVersion != "9" {
+		t.Errorf("Incoming resource version on update should not be mutated")
 	}
 }
