@@ -43,6 +43,7 @@ type PriorityPolicy struct {
 	// For the Kubernetes provided priority functions, the name is the identifier of the pre-defined priority function
 	Name string `json:"name"`
 	// The numeric multiplier for the minion scores that the priority function generates
+	// The weight should be non-zero and can be a positive or a negative integer
 	Weight int `json:"weight"`
 	// Holds the parameters to configure the given priority function
 	Argument *PriorityArgument `json:"argument"`
