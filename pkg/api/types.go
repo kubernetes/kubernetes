@@ -1507,7 +1507,8 @@ type ContainerManifest struct {
 	Containers    []Container   `json:"containers"`
 	RestartPolicy RestartPolicy `json:"restartPolicy,omitempty"`
 	// Required: Set DNS policy.
-	DNSPolicy DNSPolicy `json:"dnsPolicy"`
+	DNSPolicy   DNSPolicy `json:"dnsPolicy"`
+	HostNetwork bool      `json:"hostNetwork,omitempty"`
 }
 
 // ContainerManifestList is used to communicate container manifests to kubelet.
