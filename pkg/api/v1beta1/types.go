@@ -1451,7 +1451,7 @@ type Secret struct {
 	// representing the arbitrary (possibly non-string) data value here.
 	Data map[string][]byte `json:"data,omitempty" description:"data contains the secret data.  Each key must be a valid DNS_SUBDOMAIN.  Each value must be a base64 encoded string"`
 
-	// Used to facilitate programatic handling of secret data.
+	// Used to facilitate programmatic handling of secret data.
 	Type SecretType `json:"type,omitempty" description:"type facilitates programmatic handling of secret data"`
 }
 

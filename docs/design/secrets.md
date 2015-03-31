@@ -277,7 +277,7 @@ type Secret struct {
     // representing the arbitrary (possibly non-string) data value here.
     Data map[string][]byte `json:"data,omitempty"`
 
-    // Used to facilitate programatic handling of secret data.
+    // Used to facilitate programmatic handling of secret data.
     Type SecretType `json:"type,omitempty"`
 }
 
