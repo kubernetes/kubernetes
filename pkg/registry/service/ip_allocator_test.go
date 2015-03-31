@@ -267,11 +267,11 @@ func TestGetIndexedIPSubnetTooSmall(t *testing.T) {
 		_, subnet, _ := net.ParseCIDR(testCase.subnet)
 		secondIP, err := GetIndexedIP(subnet, 2)
 		if err == nil {
-			t.Errorf("Expected error but no error occured for subnet: ", testCase.subnet)
+			t.Errorf("Expected error but no error occured for subnet: %s", testCase.subnet)
 		}
 		thirdIP, err := GetIndexedIP(subnet, 3)
 		if err == nil {
-			t.Errorf("Expected error but no error occured for subnet: ", testCase.subnet)
+			t.Errorf("Expected error but no error occured for subnet: %s", testCase.subnet)
 		}
 		if secondIP != nil {
 			t.Errorf("Unexpected second IP: Expected nil Actual <%q>", thirdIP.String())

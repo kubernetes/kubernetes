@@ -63,7 +63,7 @@ func TestSemantic(t *testing.T) {
 
 	for index, item := range table {
 		if e, a := item.shouldEqual, Semantic.DeepEqual(item.a, item.b); e != a {
-			t.Errorf("expected %v, got %v.", index, e, a)
+			t.Errorf("case[%d], expected %v, got %v.", index, e, a)
 		}
 	}
 }

@@ -322,7 +322,7 @@ func TestToString(t *testing.T) {
 	}
 	for _, ts := range toStringTests {
 		if out := ts.In.String(); out == "" && ts.Valid {
-			t.Errorf("%+v.String() => '%v' expected no error", ts.In)
+			t.Errorf("%+v.String() => '%v' expected no error", ts.In, out)
 		} else if out != ts.Out {
 			t.Errorf("%+v.String() => '%v' want '%v'", ts.In, out, ts.Out)
 		}

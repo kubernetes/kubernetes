@@ -340,7 +340,7 @@ func TestPolicy(t *testing.T) {
 	for _, test := range tests {
 		matches := test.policy.matches(test.attr)
 		if test.matches != matches {
-			t.Errorf("unexpected value for %s, expected: %s, saw: %s", test.name, test.matches, matches)
+			t.Errorf("unexpected value for %s, expected: %t, saw: %t", test.name, test.matches, matches)
 		}
 	}
 }

@@ -644,11 +644,11 @@ func TestRequestUpgrade(t *testing.T) {
 		}
 
 		if testCase.AuthBasicHeader && !strings.Contains(rt.req.Header.Get("Authorization"), "Basic") {
-			t.Errorf("%d: expected basic auth header, got: %s", rt.req.Header.Get("Authorization"))
+			t.Errorf("%d: expected basic auth header, got: %s", i, rt.req.Header.Get("Authorization"))
 		}
 
 		if testCase.AuthBearerHeader && !strings.Contains(rt.req.Header.Get("Authorization"), "Bearer") {
-			t.Errorf("%d: expected bearer auth header, got: %s", rt.req.Header.Get("Authorization"))
+			t.Errorf("%d: expected bearer auth header, got: %s", i, rt.req.Header.Get("Authorization"))
 		}
 
 		if e, a := expectedConn, conn; e != a {

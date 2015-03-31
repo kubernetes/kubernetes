@@ -78,7 +78,7 @@ func verifyUpdates(t *testing.T, manager *statusManager, expectedUpdates int) {
 	}
 
 	if numUpdates != expectedUpdates {
-		t.Errorf("unexpected number of updates %d, expected %s", numUpdates, expectedUpdates)
+		t.Errorf("unexpected number of updates %d, expected %d", numUpdates, expectedUpdates)
 	}
 }
 

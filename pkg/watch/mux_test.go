@@ -147,7 +147,7 @@ func TestBroadcasterDropIfChannelFull(t *testing.T) {
 			defer wg.Done()
 			e1, ok := <-w.ResultChan()
 			if !ok {
-				t.Error("Watcher %v failed to retrieve first event.")
+				t.Errorf("Watcher %v failed to retrieve first event.", watcher)
 				return
 			}
 			if e, a := event1, e1; !reflect.DeepEqual(e, a) {
@@ -158,7 +158,7 @@ func TestBroadcasterDropIfChannelFull(t *testing.T) {
 			}
 			e2, ok := <-w.ResultChan()
 			if ok {
-				t.Error("Watcher %v received second event (%v, %#v) even though it shouldn't have.",
+				t.Errorf("Watcher %v received second event (%v, %#v) even though it shouldn't have.",
 					watcher, e2.Type, e2.Object)
 			}
 		}(i, watches[i])

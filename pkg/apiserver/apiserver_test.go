@@ -653,7 +653,7 @@ func TestList(t *testing.T) {
 		if resp.StatusCode != http.StatusOK {
 			t.Errorf("%d: unexpected status: %d, Expected: %d, %#v", i, resp.StatusCode, http.StatusOK, resp)
 			body, _ := ioutil.ReadAll(resp.Body)
-			t.Logf("%d: body: %s", string(body))
+			t.Logf("%d: body: %s", i, string(body))
 			continue
 		}
 		// TODO: future, restore get links

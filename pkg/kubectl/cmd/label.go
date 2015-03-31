@@ -110,7 +110,7 @@ func parseLabels(spec []string) (map[string]string, []string, error) {
 		} else if strings.HasSuffix(labelSpec, "-") {
 			remove = append(remove, labelSpec[:len(labelSpec)-1])
 		} else {
-			return nil, nil, fmt.Errorf("unknown label spec: %v")
+			return nil, nil, fmt.Errorf("unknown label spec: %v", labelSpec)
 		}
 	}
 	for _, removeLabel := range remove {
