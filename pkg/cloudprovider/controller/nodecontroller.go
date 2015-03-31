@@ -220,7 +220,8 @@ func (nc *NodeController) SyncCloudNodes() error {
 		nodeMap[node.Name] = &node
 	}
 
-	// Create nodes which have been created in cloud, but not in kubernetes cluster.
+	// Create nodes which have been created in cloud, but not in kubernetes cluster
+	// Skip nodes if we hit an error while trying to get their addresses.
 	for _, node := range matches.Items {
 		if _, ok := nodeMap[node.Name]; !ok {
 			glog.V(3).Infof("Querying addresses for new node: %s", node.Name)

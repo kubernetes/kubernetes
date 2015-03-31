@@ -412,6 +412,7 @@ func TestSyncCloudNodes(t *testing.T) {
 		expectedRequestCount int
 		expectedNameCreated  []string
 		expectedExtIDCreated []string
+		expectedAddrsCreated []string
 		expectedDeleted      []string
 	}{
 		{
@@ -425,11 +426,13 @@ func TestSyncCloudNodes(t *testing.T) {
 					"node0": "ext-node0",
 					"node1": "ext-node1",
 				},
+				Addresses: []api.NodeAddress{{Type: api.NodeLegacyHostIP, Address: "1.2.3.4"}},
 			},
 			matchRE:              ".*",
 			expectedRequestCount: 1, // List
 			expectedNameCreated:  []string{},
 			expectedExtIDCreated: []string{},
+			expectedAddrsCreated: []string{},
 			expectedDeleted:      []string{},
 		},
 		{
@@ -443,11 +446,13 @@ func TestSyncCloudNodes(t *testing.T) {
 					"node0": "ext-node0",
 					"node1": "ext-node1",
 				},
+				Addresses: []api.NodeAddress{{Type: api.NodeLegacyHostIP, Address: "1.2.3.4"}},
 			},
 			matchRE:              ".*",
 			expectedRequestCount: 2, // List + Create
 			expectedNameCreated:  []string{"node1"},
 			expectedExtIDCreated: []string{"ext-node1"},
+			expectedAddrsCreated: []string{"1.2.3.4"},
 			expectedDeleted:      []string{},
 		},
 		{
@@ -461,11 +466,13 @@ func TestSyncCloudNodes(t *testing.T) {
 					"node0": "ext-node0",
 					"node1": "ext-node1",
 				},
+				Addresses: []api.NodeAddress{{Type: api.NodeLegacyHostIP, Address: "1.2.3.4"}},
 			},
 			matchRE:              ".*",
 			expectedRequestCount: 2, // List + Delete
 			expectedNameCreated:  []string{},
 			expectedExtIDCreated: []string{},
+			expectedAddrsCreated: []string{},
 			expectedDeleted:      []string{"node1"},
 		},
 		{
@@ -480,11 +487,13 @@ func TestSyncCloudNodes(t *testing.T) {
 					"node1": "ext-node1",
 					"fake":  "ext-fake",
 				},
+				Addresses: []api.NodeAddress{{Type: api.NodeLegacyHostIP, Address: "1.2.3.4"}},
 			},
 			matchRE:              "node[0-9]+",
 			expectedRequestCount: 2, // List + Create
 			expectedNameCreated:  []string{"node1"},
 			expectedExtIDCreated: []string{"ext-node1"},
+			expectedAddrsCreated: []string{"1.2.3.4"},
 			expectedDeleted:      []string{},
 		},
 	}
@@ -504,6 +513,10 @@ func TestSyncCloudNodes(t *testing.T) {
 		nodeExtIDs := sortedNodeExternalIDs(item.fakeNodeHandler.CreatedNodes)
 		if !reflect.DeepEqual(item.expectedExtIDCreated, nodeExtIDs) {
 			t.Errorf("expected node external id list %+v, got %+v", item.expectedExtIDCreated, nodeExtIDs)
+		}
+		nodeAddrs := sortedNodeAddresses(item.fakeNodeHandler.CreatedNodes)
+		if !reflect.DeepEqual(item.expectedAddrsCreated, nodeAddrs) {
+			t.Errorf("expected node address list %+v, got %+v", item.expectedAddrsCreated, nodeAddrs)
 		}
 		nodes = sortedNodeNames(item.fakeNodeHandler.DeletedNodes)
 		if !reflect.DeepEqual(item.expectedDeleted, nodes) {
@@ -1444,6 +1457,17 @@ func sortedNodeNames(nodes []*api.Node) []string {
 	}
 	sort.Strings(nodeNames)
 	return nodeNames
+}
+
+func sortedNodeAddresses(nodes []*api.Node) []string {
+	nodeAddresses := []string{}
+	for _, node := range nodes {
+		for _, addr := range node.Status.Addresses {
+			nodeAddresses = append(nodeAddresses, addr.Address)
+		}
+	}
+	sort.Strings(nodeAddresses)
+	return nodeAddresses
 }
 
 func sortedNodeExternalIDs(nodes []*api.Node) []string {
