@@ -47,4 +47,8 @@ Only the kubernetes nodes:
 
 `INVENTORY=myinventory ./setup.sh`
 
+Only flannel:
+
+    $ ./setup.sh --tags=flannel
+
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/contrib/ansible/README.md?pixel)]()

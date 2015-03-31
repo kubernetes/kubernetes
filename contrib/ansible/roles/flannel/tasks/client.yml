@@ -1,0 +1,17 @@
+---
+- name: Install flannel
+  action: "{{ ansible_pkg_mgr }}"
+  args:
+        name: flannel
+        state: latest
+  when: not is_atomic
+
+- name: Install Flannel config file
+  template: src=flanneld.j2 dest=/etc/sysconfig/flanneld
+  notify:
+          - restart flannel
+
+- name: Launch Flannel
+  service: name=flanneld state=started enabled=yes
+  notify:
+          - restart flannel

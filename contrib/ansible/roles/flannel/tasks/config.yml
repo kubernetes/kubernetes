@@ -1,0 +1,23 @@
+---
+- name: Set facts about etcdctl command
+  set_fact:
+    peers: "{% for hostname in groups['etcd'] %}http://{{ hostname }}:2379{% if not loop.last %},{% endif %}{% endfor %}"
+    conf_file: "/tmp/flannel-conf.json"
+    conf_loc: "/{{ cluster_name }}/network/config"
+  run_once: true
+  delegate_to: "{{ groups['etcd'][0] }}"
+
+- name: Create flannel config file to go in etcd
+  template: src=flannel-conf.json.j2 dest={{ conf_file }}
+  run_once: true
+  delegate_to: "{{ groups['etcd'][0] }}"
+
+- name: Load the flannel config file into etcd
+  shell: "/usr/bin/etcdctl --no-sync --peers={{ peers }} set {{ conf_loc }} < {{ conf_file }}"
+  run_once: true
+  delegate_to: "{{ groups['etcd'][0] }}"
+
+- name: Clean up the flannel config file
+  file: path=/tmp/flannel-config.json state=absent
+  run_once: true
+  delegate_to: "{{ groups['etcd'][0] }}"

@@ -8,6 +8,17 @@
   tags:
         - etcd
 
+# install flannel
+- hosts:
+        - etcd
+        - masters
+        - nodes
+  sudo: yes
+  roles:
+        - flannel
+  tags:
+        - flannel
+
 # install kube master services
 - hosts: masters
   sudo: yes

@@ -1,3 +1,7 @@
+# Only used for the location to store flannel info in etcd, but may be used
+# for dns purposes and cluster id purposes in the future.
+cluster_name: kube.local
+
 # Account name of remote user. Ansible will use this user account to ssh into
 # the managed machines. The user must be able to use sudo without asking
 # for password unless ansible_sudo_pass is set
@@ -15,3 +19,18 @@ ansible_ssh_user: root
 # This range must not conflict with anything in your infrastructure. These
 # addresses do not need to be routable and must just be an unused block of space.
 kube_service_addresses: 10.254.0.0/16
+
+# Flannel internal network (optional). When flannel is used, it will assign IP
+# addresses from this range to individual pods.
+# This network must be unused in your network infrastructure!
+flannel_subnet: 172.16.0.0
+
+# Flannel internal network total size (optional). This is the prefix of the
+# entire flannel overlay network.  So the entirety of 172.16.0.0/12 must be
+# unused in your environment.
+flannel_prefix: 12
+
+# Flannel internal network (optional). This is the size allocation that flannel
+# will give to each node on your network.  With these defaults you should have
+# room for 4096 nodes with 254 pods per node.
+flannel_host_prefix: 24
