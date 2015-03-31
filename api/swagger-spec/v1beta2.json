@@ -53,8 +53,40 @@
        {
         "type": "string",
         "paramType": "query",
+        "name": "fields",
+        "description": "a selector to restrict the list of returned objects by their fields; defaults to everything",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "labels",
+        "description": "a selector to restrict the list of returned objects by their labels; defaults to everything",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
         "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "resourceVersion",
+        "description": "when specified with a watch call, shows changes that occur after that particular version of a resource; defaults to changes from the beginning of history",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "bool",
+        "paramType": "query",
+        "name": "watch",
+        "description": "watch for changes to the described resources and return them as a stream of add, update, and remove notifications; specify resourceVersion",
         "required": false,
         "allowMultiple": false
        }
@@ -103,16 +135,48 @@
     "description": "API at /api/v1beta2 version v1beta2",
     "operations": [
      {
-      "type": "v1beta2.EndpointsList",
+      "type": "*json.watchEvent",
       "method": "GET",
-      "summary": "watch a list of Endpoints",
+      "summary": "watch individual changes to a list of Endpoints",
       "nickname": "watchEndpointslist",
       "parameters": [
        {
         "type": "string",
         "paramType": "query",
+        "name": "fields",
+        "description": "a selector to restrict the list of returned objects by their fields; defaults to everything",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "labels",
+        "description": "a selector to restrict the list of returned objects by their labels; defaults to everything",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
         "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "resourceVersion",
+        "description": "when specified with a watch call, shows changes that occur after that particular version of a resource; defaults to changes from the beginning of history",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "bool",
+        "paramType": "query",
+        "name": "watch",
+        "description": "watch for changes to the described resources and return them as a stream of add, update, and remove notifications; specify resourceVersion",
         "required": false,
         "allowMultiple": false
        }
@@ -281,9 +345,9 @@
     "description": "API at /api/v1beta2 version v1beta2",
     "operations": [
      {
-      "type": "v1beta2.Endpoints",
+      "type": "*json.watchEvent",
       "method": "GET",
-      "summary": "watch a particular Endpoints",
+      "summary": "watch changes to an object of kind Endpoints",
       "nickname": "watchEndpoints",
       "parameters": [
        {
@@ -297,8 +361,40 @@
        {
         "type": "string",
         "paramType": "query",
+        "name": "fields",
+        "description": "a selector to restrict the list of returned objects by their fields; defaults to everything",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "labels",
+        "description": "a selector to restrict the list of returned objects by their labels; defaults to everything",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
         "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "resourceVersion",
+        "description": "when specified with a watch call, shows changes that occur after that particular version of a resource; defaults to changes from the beginning of history",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "bool",
+        "paramType": "query",
+        "name": "watch",
+        "description": "watch for changes to the described resources and return them as a stream of add, update, and remove notifications; specify resourceVersion",
         "required": false,
         "allowMultiple": false
        }
@@ -325,8 +421,40 @@
        {
         "type": "string",
         "paramType": "query",
+        "name": "fields",
+        "description": "a selector to restrict the list of returned objects by their fields; defaults to everything",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "labels",
+        "description": "a selector to restrict the list of returned objects by their labels; defaults to everything",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
         "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "resourceVersion",
+        "description": "when specified with a watch call, shows changes that occur after that particular version of a resource; defaults to changes from the beginning of history",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "bool",
+        "paramType": "query",
+        "name": "watch",
+        "description": "watch for changes to the described resources and return them as a stream of add, update, and remove notifications; specify resourceVersion",
         "required": false,
         "allowMultiple": false
        }
@@ -375,16 +503,48 @@
     "description": "API at /api/v1beta2 version v1beta2",
     "operations": [
      {
-      "type": "v1beta2.EventList",
+      "type": "*json.watchEvent",
       "method": "GET",
-      "summary": "watch a list of Event",
+      "summary": "watch individual changes to a list of Event",
       "nickname": "watchEventlist",
       "parameters": [
        {
         "type": "string",
         "paramType": "query",
+        "name": "fields",
+        "description": "a selector to restrict the list of returned objects by their fields; defaults to everything",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "labels",
+        "description": "a selector to restrict the list of returned objects by their labels; defaults to everything",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
         "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "resourceVersion",
+        "description": "when specified with a watch call, shows changes that occur after that particular version of a resource; defaults to changes from the beginning of history",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "bool",
+        "paramType": "query",
+        "name": "watch",
+        "description": "watch for changes to the described resources and return them as a stream of add, update, and remove notifications; specify resourceVersion",
         "required": false,
         "allowMultiple": false
        }
@@ -545,9 +705,9 @@
     "description": "API at /api/v1beta2 version v1beta2",
     "operations": [
      {
-      "type": "v1beta2.Event",
+      "type": "*json.watchEvent",
       "method": "GET",
-      "summary": "watch a particular Event",
+      "summary": "watch changes to an object of kind Event",
       "nickname": "watchEvent",
       "parameters": [
        {
@@ -561,8 +721,40 @@
        {
         "type": "string",
         "paramType": "query",
+        "name": "fields",
+        "description": "a selector to restrict the list of returned objects by their fields; defaults to everything",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "labels",
+        "description": "a selector to restrict the list of returned objects by their labels; defaults to everything",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
         "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "resourceVersion",
+        "description": "when specified with a watch call, shows changes that occur after that particular version of a resource; defaults to changes from the beginning of history",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "bool",
+        "paramType": "query",
+        "name": "watch",
+        "description": "watch for changes to the described resources and return them as a stream of add, update, and remove notifications; specify resourceVersion",
         "required": false,
         "allowMultiple": false
        }
@@ -589,8 +781,40 @@
        {
         "type": "string",
         "paramType": "query",
+        "name": "fields",
+        "description": "a selector to restrict the list of returned objects by their fields; defaults to everything",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "labels",
+        "description": "a selector to restrict the list of returned objects by their labels; defaults to everything",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
         "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "resourceVersion",
+        "description": "when specified with a watch call, shows changes that occur after that particular version of a resource; defaults to changes from the beginning of history",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "bool",
+        "paramType": "query",
+        "name": "watch",
+        "description": "watch for changes to the described resources and return them as a stream of add, update, and remove notifications; specify resourceVersion",
         "required": false,
         "allowMultiple": false
        }
@@ -639,16 +863,48 @@
     "description": "API at /api/v1beta2 version v1beta2",
     "operations": [
      {
-      "type": "v1beta2.LimitRangeList",
+      "type": "*json.watchEvent",
       "method": "GET",
-      "summary": "watch a list of LimitRange",
+      "summary": "watch individual changes to a list of LimitRange",
       "nickname": "watchLimitRangelist",
       "parameters": [
        {
         "type": "string",
         "paramType": "query",
+        "name": "fields",
+        "description": "a selector to restrict the list of returned objects by their fields; defaults to everything",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "labels",
+        "description": "a selector to restrict the list of returned objects by their labels; defaults to everything",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
         "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "resourceVersion",
+        "description": "when specified with a watch call, shows changes that occur after that particular version of a resource; defaults to changes from the beginning of history",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "bool",
+        "paramType": "query",
+        "name": "watch",
+        "description": "watch for changes to the described resources and return them as a stream of add, update, and remove notifications; specify resourceVersion",
         "required": false,
         "allowMultiple": false
        }
@@ -809,9 +1065,9 @@
     "description": "API at /api/v1beta2 version v1beta2",
     "operations": [
      {
-      "type": "v1beta2.LimitRange",
+      "type": "*json.watchEvent",
       "method": "GET",
-      "summary": "watch a particular LimitRange",
+      "summary": "watch changes to an object of kind LimitRange",
       "nickname": "watchLimitRange",
       "parameters": [
        {
@@ -825,8 +1081,40 @@
        {
         "type": "string",
         "paramType": "query",
+        "name": "fields",
+        "description": "a selector to restrict the list of returned objects by their fields; defaults to everything",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "labels",
+        "description": "a selector to restrict the list of returned objects by their labels; defaults to everything",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
         "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "resourceVersion",
+        "description": "when specified with a watch call, shows changes that occur after that particular version of a resource; defaults to changes from the beginning of history",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "bool",
+        "paramType": "query",
+        "name": "watch",
+        "description": "watch for changes to the described resources and return them as a stream of add, update, and remove notifications; specify resourceVersion",
         "required": false,
         "allowMultiple": false
        }
@@ -849,7 +1137,40 @@
       "method": "GET",
       "summary": "list objects of kind Node",
       "nickname": "listNode",
-      "parameters": [],
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "fields",
+        "description": "a selector to restrict the list of returned objects by their fields; defaults to everything",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "labels",
+        "description": "a selector to restrict the list of returned objects by their labels; defaults to everything",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "resourceVersion",
+        "description": "when specified with a watch call, shows changes that occur after that particular version of a resource; defaults to changes from the beginning of history",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "bool",
+        "paramType": "query",
+        "name": "watch",
+        "description": "watch for changes to the described resources and return them as a stream of add, update, and remove notifications; specify resourceVersion",
+        "required": false,
+        "allowMultiple": false
+       }
+      ],
       "produces": [
        "application/json"
       ],
@@ -886,11 +1207,44 @@
     "description": "API at /api/v1beta2 version v1beta2",
     "operations": [
      {
-      "type": "v1beta2.MinionList",
+      "type": "*json.watchEvent",
       "method": "GET",
-      "summary": "watch a list of Node",
+      "summary": "watch individual changes to a list of Node",
       "nickname": "watchNodelist",
-      "parameters": [],
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "fields",
+        "description": "a selector to restrict the list of returned objects by their fields; defaults to everything",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "labels",
+        "description": "a selector to restrict the list of returned objects by their labels; defaults to everything",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "resourceVersion",
+        "description": "when specified with a watch call, shows changes that occur after that particular version of a resource; defaults to changes from the beginning of history",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "bool",
+        "paramType": "query",
+        "name": "watch",
+        "description": "watch for changes to the described resources and return them as a stream of add, update, and remove notifications; specify resourceVersion",
+        "required": false,
+        "allowMultiple": false
+       }
+      ],
       "produces": [
        "application/json"
       ],
@@ -1023,9 +1377,9 @@
     "description": "API at /api/v1beta2 version v1beta2",
     "operations": [
      {
-      "type": "v1beta2.Minion",
+      "type": "*json.watchEvent",
       "method": "GET",
-      "summary": "watch a particular Node",
+      "summary": "watch changes to an object of kind Node",
       "nickname": "watchNode",
       "parameters": [
        {
@@ -1034,6 +1388,38 @@
         "name": "name",
         "description": "name of the Node",
         "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "fields",
+        "description": "a selector to restrict the list of returned objects by their fields; defaults to everything",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "labels",
+        "description": "a selector to restrict the list of returned objects by their labels; defaults to everything",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "resourceVersion",
+        "description": "when specified with a watch call, shows changes that occur after that particular version of a resource; defaults to changes from the beginning of history",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "bool",
+        "paramType": "query",
+        "name": "watch",
+        "description": "watch for changes to the described resources and return them as a stream of add, update, and remove notifications; specify resourceVersion",
+        "required": false,
         "allowMultiple": false
        }
       ],
@@ -1271,7 +1657,40 @@
       "method": "GET",
       "summary": "list objects of kind Namespace",
       "nickname": "listNamespace",
-      "parameters": [],
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "fields",
+        "description": "a selector to restrict the list of returned objects by their fields; defaults to everything",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "labels",
+        "description": "a selector to restrict the list of returned objects by their labels; defaults to everything",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "resourceVersion",
+        "description": "when specified with a watch call, shows changes that occur after that particular version of a resource; defaults to changes from the beginning of history",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "bool",
+        "paramType": "query",
+        "name": "watch",
+        "description": "watch for changes to the described resources and return them as a stream of add, update, and remove notifications; specify resourceVersion",
+        "required": false,
+        "allowMultiple": false
+       }
+      ],
       "produces": [
        "application/json"
       ],
@@ -1308,11 +1727,44 @@
     "description": "API at /api/v1beta2 version v1beta2",
     "operations": [
      {
-      "type": "v1beta2.NamespaceList",
+      "type": "*json.watchEvent",
       "method": "GET",
-      "summary": "watch a list of Namespace",
+      "summary": "watch individual changes to a list of Namespace",
       "nickname": "watchNamespacelist",
-      "parameters": [],
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "fields",
+        "description": "a selector to restrict the list of returned objects by their fields; defaults to everything",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "labels",
+        "description": "a selector to restrict the list of returned objects by their labels; defaults to everything",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "resourceVersion",
+        "description": "when specified with a watch call, shows changes that occur after that particular version of a resource; defaults to changes from the beginning of history",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "bool",
+        "paramType": "query",
+        "name": "watch",
+        "description": "watch for changes to the described resources and return them as a stream of add, update, and remove notifications; specify resourceVersion",
+        "required": false,
+        "allowMultiple": false
+       }
+      ],
       "produces": [
        "application/json"
       ],
@@ -1445,9 +1897,9 @@
     "description": "API at /api/v1beta2 version v1beta2",
     "operations": [
      {
-      "type": "v1beta2.Namespace",
+      "type": "*json.watchEvent",
       "method": "GET",
-      "summary": "watch a particular Namespace",
+      "summary": "watch changes to an object of kind Namespace",
       "nickname": "watchNamespace",
       "parameters": [
        {
@@ -1456,6 +1908,38 @@
         "name": "name",
         "description": "name of the Namespace",
         "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "fields",
+        "description": "a selector to restrict the list of returned objects by their fields; defaults to everything",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "labels",
+        "description": "a selector to restrict the list of returned objects by their labels; defaults to everything",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "resourceVersion",
+        "description": "when specified with a watch call, shows changes that occur after that particular version of a resource; defaults to changes from the beginning of history",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "bool",
+        "paramType": "query",
+        "name": "watch",
+        "description": "watch for changes to the described resources and return them as a stream of add, update, and remove notifications; specify resourceVersion",
+        "required": false,
         "allowMultiple": false
        }
       ],
@@ -1549,7 +2033,40 @@
       "method": "GET",
       "summary": "list objects of kind Node",
       "nickname": "listNode",
-      "parameters": [],
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "fields",
+        "description": "a selector to restrict the list of returned objects by their fields; defaults to everything",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "labels",
+        "description": "a selector to restrict the list of returned objects by their labels; defaults to everything",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "resourceVersion",
+        "description": "when specified with a watch call, shows changes that occur after that particular version of a resource; defaults to changes from the beginning of history",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "bool",
+        "paramType": "query",
+        "name": "watch",
+        "description": "watch for changes to the described resources and return them as a stream of add, update, and remove notifications; specify resourceVersion",
+        "required": false,
+        "allowMultiple": false
+       }
+      ],
       "produces": [
        "application/json"
       ],
@@ -1586,11 +2103,44 @@
     "description": "API at /api/v1beta2 version v1beta2",
     "operations": [
      {
-      "type": "v1beta2.MinionList",
+      "type": "*json.watchEvent",
       "method": "GET",
-      "summary": "watch a list of Node",
+      "summary": "watch individual changes to a list of Node",
       "nickname": "watchNodelist",
-      "parameters": [],
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "fields",
+        "description": "a selector to restrict the list of returned objects by their fields; defaults to everything",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "labels",
+        "description": "a selector to restrict the list of returned objects by their labels; defaults to everything",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "resourceVersion",
+        "description": "when specified with a watch call, shows changes that occur after that particular version of a resource; defaults to changes from the beginning of history",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "bool",
+        "paramType": "query",
+        "name": "watch",
+        "description": "watch for changes to the described resources and return them as a stream of add, update, and remove notifications; specify resourceVersion",
+        "required": false,
+        "allowMultiple": false
+       }
+      ],
       "produces": [
        "application/json"
       ],
@@ -1723,9 +2273,9 @@
     "description": "API at /api/v1beta2 version v1beta2",
     "operations": [
      {
-      "type": "v1beta2.Minion",
+      "type": "*json.watchEvent",
       "method": "GET",
-      "summary": "watch a particular Node",
+      "summary": "watch changes to an object of kind Node",
       "nickname": "watchNode",
       "parameters": [
        {
@@ -1734,6 +2284,38 @@
         "name": "name",
         "description": "name of the Node",
         "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "fields",
+        "description": "a selector to restrict the list of returned objects by their fields; defaults to everything",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "labels",
+        "description": "a selector to restrict the list of returned objects by their labels; defaults to everything",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "resourceVersion",
+        "description": "when specified with a watch call, shows changes that occur after that particular version of a resource; defaults to changes from the beginning of history",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "bool",
+        "paramType": "query",
+        "name": "watch",
+        "description": "watch for changes to the described resources and return them as a stream of add, update, and remove notifications; specify resourceVersion",
+        "required": false,
         "allowMultiple": false
        }
       ],
@@ -1975,8 +2557,40 @@
        {
         "type": "string",
         "paramType": "query",
+        "name": "fields",
+        "description": "a selector to restrict the list of returned objects by their fields; defaults to everything",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "labels",
+        "description": "a selector to restrict the list of returned objects by their labels; defaults to everything",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
         "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "resourceVersion",
+        "description": "when specified with a watch call, shows changes that occur after that particular version of a resource; defaults to changes from the beginning of history",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "bool",
+        "paramType": "query",
+        "name": "watch",
+        "description": "watch for changes to the described resources and return them as a stream of add, update, and remove notifications; specify resourceVersion",
         "required": false,
         "allowMultiple": false
        }
@@ -2025,16 +2639,48 @@
     "description": "API at /api/v1beta2 version v1beta2",
     "operations": [
      {
-      "type": "v1beta2.PodList",
+      "type": "*json.watchEvent",
       "method": "GET",
-      "summary": "watch a list of Pod",
+      "summary": "watch individual changes to a list of Pod",
       "nickname": "watchPodlist",
       "parameters": [
        {
         "type": "string",
         "paramType": "query",
+        "name": "fields",
+        "description": "a selector to restrict the list of returned objects by their fields; defaults to everything",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "labels",
+        "description": "a selector to restrict the list of returned objects by their labels; defaults to everything",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
         "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "resourceVersion",
+        "description": "when specified with a watch call, shows changes that occur after that particular version of a resource; defaults to changes from the beginning of history",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "bool",
+        "paramType": "query",
+        "name": "watch",
+        "description": "watch for changes to the described resources and return them as a stream of add, update, and remove notifications; specify resourceVersion",
         "required": false,
         "allowMultiple": false
        }
@@ -2203,9 +2849,9 @@
     "description": "API at /api/v1beta2 version v1beta2",
     "operations": [
      {
-      "type": "v1beta2.Pod",
+      "type": "*json.watchEvent",
       "method": "GET",
-      "summary": "watch a particular Pod",
+      "summary": "watch changes to an object of kind Pod",
       "nickname": "watchPod",
       "parameters": [
        {
@@ -2219,8 +2865,40 @@
        {
         "type": "string",
         "paramType": "query",
+        "name": "fields",
+        "description": "a selector to restrict the list of returned objects by their fields; defaults to everything",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "labels",
+        "description": "a selector to restrict the list of returned objects by their labels; defaults to everything",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
         "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "resourceVersion",
+        "description": "when specified with a watch call, shows changes that occur after that particular version of a resource; defaults to changes from the beginning of history",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "bool",
+        "paramType": "query",
+        "name": "watch",
+        "description": "watch for changes to the described resources and return them as a stream of add, update, and remove notifications; specify resourceVersion",
         "required": false,
         "allowMultiple": false
        }
@@ -2615,8 +3293,40 @@
        {
         "type": "string",
         "paramType": "query",
+        "name": "fields",
+        "description": "a selector to restrict the list of returned objects by their fields; defaults to everything",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "labels",
+        "description": "a selector to restrict the list of returned objects by their labels; defaults to everything",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
         "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "resourceVersion",
+        "description": "when specified with a watch call, shows changes that occur after that particular version of a resource; defaults to changes from the beginning of history",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "bool",
+        "paramType": "query",
+        "name": "watch",
+        "description": "watch for changes to the described resources and return them as a stream of add, update, and remove notifications; specify resourceVersion",
         "required": false,
         "allowMultiple": false
        }
@@ -2665,16 +3375,48 @@
     "description": "API at /api/v1beta2 version v1beta2",
     "operations": [
      {
-      "type": "v1beta2.ReplicationControllerList",
+      "type": "*json.watchEvent",
       "method": "GET",
-      "summary": "watch a list of ReplicationController",
+      "summary": "watch individual changes to a list of ReplicationController",
       "nickname": "watchReplicationControllerlist",
       "parameters": [
        {
         "type": "string",
         "paramType": "query",
+        "name": "fields",
+        "description": "a selector to restrict the list of returned objects by their fields; defaults to everything",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "labels",
+        "description": "a selector to restrict the list of returned objects by their labels; defaults to everything",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
         "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "resourceVersion",
+        "description": "when specified with a watch call, shows changes that occur after that particular version of a resource; defaults to changes from the beginning of history",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "bool",
+        "paramType": "query",
+        "name": "watch",
+        "description": "watch for changes to the described resources and return them as a stream of add, update, and remove notifications; specify resourceVersion",
         "required": false,
         "allowMultiple": false
        }
@@ -2843,9 +3585,9 @@
     "description": "API at /api/v1beta2 version v1beta2",
     "operations": [
      {
-      "type": "v1beta2.ReplicationController",
+      "type": "*json.watchEvent",
       "method": "GET",
-      "summary": "watch a particular ReplicationController",
+      "summary": "watch changes to an object of kind ReplicationController",
       "nickname": "watchReplicationController",
       "parameters": [
        {
@@ -2859,8 +3601,40 @@
        {
         "type": "string",
         "paramType": "query",
+        "name": "fields",
+        "description": "a selector to restrict the list of returned objects by their fields; defaults to everything",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "labels",
+        "description": "a selector to restrict the list of returned objects by their labels; defaults to everything",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
         "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "resourceVersion",
+        "description": "when specified with a watch call, shows changes that occur after that particular version of a resource; defaults to changes from the beginning of history",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "bool",
+        "paramType": "query",
+        "name": "watch",
+        "description": "watch for changes to the described resources and return them as a stream of add, update, and remove notifications; specify resourceVersion",
         "required": false,
         "allowMultiple": false
        }
@@ -2887,8 +3661,40 @@
        {
         "type": "string",
         "paramType": "query",
+        "name": "fields",
+        "description": "a selector to restrict the list of returned objects by their fields; defaults to everything",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "labels",
+        "description": "a selector to restrict the list of returned objects by their labels; defaults to everything",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
         "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "resourceVersion",
+        "description": "when specified with a watch call, shows changes that occur after that particular version of a resource; defaults to changes from the beginning of history",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "bool",
+        "paramType": "query",
+        "name": "watch",
+        "description": "watch for changes to the described resources and return them as a stream of add, update, and remove notifications; specify resourceVersion",
         "required": false,
         "allowMultiple": false
        }
@@ -2937,16 +3743,48 @@
     "description": "API at /api/v1beta2 version v1beta2",
     "operations": [
      {
-      "type": "v1beta2.ResourceQuotaList",
+      "type": "*json.watchEvent",
       "method": "GET",
-      "summary": "watch a list of ResourceQuota",
+      "summary": "watch individual changes to a list of ResourceQuota",
       "nickname": "watchResourceQuotalist",
       "parameters": [
        {
         "type": "string",
         "paramType": "query",
+        "name": "fields",
+        "description": "a selector to restrict the list of returned objects by their fields; defaults to everything",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "labels",
+        "description": "a selector to restrict the list of returned objects by their labels; defaults to everything",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
         "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "resourceVersion",
+        "description": "when specified with a watch call, shows changes that occur after that particular version of a resource; defaults to changes from the beginning of history",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "bool",
+        "paramType": "query",
+        "name": "watch",
+        "description": "watch for changes to the described resources and return them as a stream of add, update, and remove notifications; specify resourceVersion",
         "required": false,
         "allowMultiple": false
        }
@@ -3115,9 +3953,9 @@
     "description": "API at /api/v1beta2 version v1beta2",
     "operations": [
      {
-      "type": "v1beta2.ResourceQuota",
+      "type": "*json.watchEvent",
       "method": "GET",
-      "summary": "watch a particular ResourceQuota",
+      "summary": "watch changes to an object of kind ResourceQuota",
       "nickname": "watchResourceQuota",
       "parameters": [
        {
@@ -3131,8 +3969,40 @@
        {
         "type": "string",
         "paramType": "query",
+        "name": "fields",
+        "description": "a selector to restrict the list of returned objects by their fields; defaults to everything",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "labels",
+        "description": "a selector to restrict the list of returned objects by their labels; defaults to everything",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
         "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "resourceVersion",
+        "description": "when specified with a watch call, shows changes that occur after that particular version of a resource; defaults to changes from the beginning of history",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "bool",
+        "paramType": "query",
+        "name": "watch",
+        "description": "watch for changes to the described resources and return them as a stream of add, update, and remove notifications; specify resourceVersion",
         "required": false,
         "allowMultiple": false
        }
@@ -3203,8 +4073,40 @@
        {
         "type": "string",
         "paramType": "query",
+        "name": "fields",
+        "description": "a selector to restrict the list of returned objects by their fields; defaults to everything",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "labels",
+        "description": "a selector to restrict the list of returned objects by their labels; defaults to everything",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
         "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "resourceVersion",
+        "description": "when specified with a watch call, shows changes that occur after that particular version of a resource; defaults to changes from the beginning of history",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "bool",
+        "paramType": "query",
+        "name": "watch",
+        "description": "watch for changes to the described resources and return them as a stream of add, update, and remove notifications; specify resourceVersion",
         "required": false,
         "allowMultiple": false
        }
@@ -3253,16 +4155,48 @@
     "description": "API at /api/v1beta2 version v1beta2",
     "operations": [
      {
-      "type": "v1beta2.SecretList",
+      "type": "*json.watchEvent",
       "method": "GET",
-      "summary": "watch a list of Secret",
+      "summary": "watch individual changes to a list of Secret",
       "nickname": "watchSecretlist",
       "parameters": [
        {
         "type": "string",
         "paramType": "query",
+        "name": "fields",
+        "description": "a selector to restrict the list of returned objects by their fields; defaults to everything",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "labels",
+        "description": "a selector to restrict the list of returned objects by their labels; defaults to everything",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
         "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "resourceVersion",
+        "description": "when specified with a watch call, shows changes that occur after that particular version of a resource; defaults to changes from the beginning of history",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "bool",
+        "paramType": "query",
+        "name": "watch",
+        "description": "watch for changes to the described resources and return them as a stream of add, update, and remove notifications; specify resourceVersion",
         "required": false,
         "allowMultiple": false
        }
@@ -3423,9 +4357,9 @@
     "description": "API at /api/v1beta2 version v1beta2",
     "operations": [
      {
-      "type": "v1beta2.Secret",
+      "type": "*json.watchEvent",
       "method": "GET",
-      "summary": "watch a particular Secret",
+      "summary": "watch changes to an object of kind Secret",
       "nickname": "watchSecret",
       "parameters": [
        {
@@ -3439,8 +4373,40 @@
        {
         "type": "string",
         "paramType": "query",
+        "name": "fields",
+        "description": "a selector to restrict the list of returned objects by their fields; defaults to everything",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "labels",
+        "description": "a selector to restrict the list of returned objects by their labels; defaults to everything",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
         "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "resourceVersion",
+        "description": "when specified with a watch call, shows changes that occur after that particular version of a resource; defaults to changes from the beginning of history",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "bool",
+        "paramType": "query",
+        "name": "watch",
+        "description": "watch for changes to the described resources and return them as a stream of add, update, and remove notifications; specify resourceVersion",
         "required": false,
         "allowMultiple": false
        }
@@ -3467,8 +4433,40 @@
        {
         "type": "string",
         "paramType": "query",
+        "name": "fields",
+        "description": "a selector to restrict the list of returned objects by their fields; defaults to everything",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "labels",
+        "description": "a selector to restrict the list of returned objects by their labels; defaults to everything",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
         "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "resourceVersion",
+        "description": "when specified with a watch call, shows changes that occur after that particular version of a resource; defaults to changes from the beginning of history",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "bool",
+        "paramType": "query",
+        "name": "watch",
+        "description": "watch for changes to the described resources and return them as a stream of add, update, and remove notifications; specify resourceVersion",
         "required": false,
         "allowMultiple": false
        }
@@ -3517,16 +4515,48 @@
     "description": "API at /api/v1beta2 version v1beta2",
     "operations": [
      {
-      "type": "v1beta2.ServiceList",
+      "type": "*json.watchEvent",
       "method": "GET",
-      "summary": "watch a list of Service",
+      "summary": "watch individual changes to a list of Service",
       "nickname": "watchServicelist",
       "parameters": [
        {
         "type": "string",
         "paramType": "query",
+        "name": "fields",
+        "description": "a selector to restrict the list of returned objects by their fields; defaults to everything",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "labels",
+        "description": "a selector to restrict the list of returned objects by their labels; defaults to everything",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
         "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "resourceVersion",
+        "description": "when specified with a watch call, shows changes that occur after that particular version of a resource; defaults to changes from the beginning of history",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "bool",
+        "paramType": "query",
+        "name": "watch",
+        "description": "watch for changes to the described resources and return them as a stream of add, update, and remove notifications; specify resourceVersion",
         "required": false,
         "allowMultiple": false
        }
@@ -3687,9 +4717,9 @@
     "description": "API at /api/v1beta2 version v1beta2",
     "operations": [
      {
-      "type": "v1beta2.Service",
+      "type": "*json.watchEvent",
       "method": "GET",
-      "summary": "watch a particular Service",
+      "summary": "watch changes to an object of kind Service",
       "nickname": "watchService",
       "parameters": [
        {
@@ -3703,8 +4733,40 @@
        {
         "type": "string",
         "paramType": "query",
+        "name": "fields",
+        "description": "a selector to restrict the list of returned objects by their fields; defaults to everything",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "labels",
+        "description": "a selector to restrict the list of returned objects by their labels; defaults to everything",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
         "name": "namespace",
         "description": "object name and auth scope, such as for teams and projects",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "resourceVersion",
+        "description": "when specified with a watch call, shows changes that occur after that particular version of a resource; defaults to changes from the beginning of history",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "bool",
+        "paramType": "query",
+        "name": "watch",
+        "description": "watch for changes to the described resources and return them as a stream of add, update, and remove notifications; specify resourceVersion",
         "required": false,
         "allowMultiple": false
        }
@@ -4008,6 +5070,10 @@
    }
   ],
   "models": {
+   "*json.watchEvent": {
+    "id": "*json.watchEvent",
+    "properties": {}
+   },
    "*v1beta2.DeleteOptions": {
     "id": "*v1beta2.DeleteOptions",
     "properties": {}
@@ -4279,6 +5345,22 @@
      }
     }
    },
+   "v1beta2.EndpointAddress": {
+    "id": "v1beta2.EndpointAddress",
+    "required": [
+     "IP"
+    ],
+    "properties": {
+     "IP": {
+      "type": "string",
+      "description": "IP address of the endpoint"
+     },
+     "targetRef": {
+      "$ref": "v1beta2.ObjectReference",
+      "description": "reference to object providing the endpoint"
+     }
+    }
+   },
    "v1beta2.EndpointObjectReference": {
     "id": "v1beta2.EndpointObjectReference",
     "required": [
@@ -4319,10 +5401,51 @@
      }
     }
    },
+   "v1beta2.EndpointPort": {
+    "id": "v1beta2.EndpointPort",
+    "required": [
+     "port"
+    ],
+    "properties": {
+     "name": {
+      "type": "string",
+      "description": "name of this port"
+     },
+     "port": {
+      "type": "integer",
+      "format": "int32",
+      "description": "port number of the endpoint"
+     },
+     "protocol": {
+      "$ref": "v1beta2.Protocol",
+      "description": "protocol for this port; must be UDP or TCP; TCP if unspecified"
+     }
+    }
+   },
+   "v1beta2.EndpointSubset": {
+    "id": "v1beta2.EndpointSubset",
+    "properties": {
+     "addresses": {
+      "type": "array",
+      "items": {
+       "$ref": "v1beta2.EndpointAddress"
+      },
+      "description": "IP addresses which offer the related ports"
+     },
+     "ports": {
+      "type": "array",
+      "items": {
+       "$ref": "v1beta2.EndpointPort"
+      },
+      "description": "port numbers available on the related IP addresses"
+     }
+    }
+   },
    "v1beta2.Endpoints": {
     "id": "v1beta2.Endpoints",
     "required": [
-     "endpoints"
+     "endpoints",
+     "subsets"
     ],
     "properties": {
      "annotations": {
@@ -4346,7 +5469,7 @@
       "items": {
        "type": "string"
       },
-      "description": "list of endpoints corresponding to a service, of the form address:port, such as 10.10.1.1:1909"
+      "description": "first set of endpoints corresponding to a service, of the form address:port, such as 10.10.1.1:1909"
      },
      "generateName": {
       "type": "string",
@@ -4366,7 +5489,7 @@
      },
      "protocol": {
       "$ref": "v1beta2.Protocol",
-      "description": "IP protocol for endpoint ports; must be UDP or TCP; TCP if unspecified"
+      "description": "IP protocol for the first set of endpoint ports; must be UDP or TCP; TCP if unspecified"
      },
      "resourceVersion": {
       "$ref": "uint64",
@@ -4375,6 +5498,13 @@
      "selfLink": {
       "type": "string",
       "description": "URL for the object; populated by the system, read-only"
+     },
+     "subsets": {
+      "type": "array",
+      "items": {
+       "$ref": "v1beta2.EndpointSubset"
+      },
+      "description": "sets of addresses and ports that comprise a service"
      },
      "targetRefs": {
       "type": "array",
@@ -5297,12 +6427,42 @@
     "id": "v1beta2.NodeSystemInfo",
     "required": [
      "machineID",
-     "systemUUID"
+     "systemUUID",
+     "bootID",
+     "kernelVersion",
+     "osImage",
+     "containerRuntimeVersion",
+     "kubeletVersion",
+     "KubeProxyVersion"
     ],
     "properties": {
+     "KubeProxyVersion": {
+      "type": "string",
+      "description": "Kube-proxy version reported by the node"
+     },
+     "bootID": {
+      "type": "string",
+      "description": "boot id is the boot-id reported by the node"
+     },
+     "containerRuntimeVersion": {
+      "type": "string",
+      "description": "Container runtime version reported by the node through runtime remote API (e.g. docker://1.5.0)"
+     },
+     "kernelVersion": {
+      "type": "string",
+      "description": "Kernel version reported by the node from 'uname -r' (e.g. 3.16.0-0.bpo.4-amd64)"
+     },
+     "kubeletVersion": {
+      "type": "string",
+      "description": "Kubelet version reported by the node"
+     },
      "machineID": {
       "type": "string",
       "description": "machine id is the machine-id reported by the node"
+     },
+     "osImage": {
+      "type": "string",
+      "description": "OS image used reported by the node from /etc/os-release (e.g. Debian GNU/Linux 7 (wheezy))"
      },
      "systemUUID": {
       "type": "string",
@@ -6038,7 +7198,8 @@
     "id": "v1beta2.Service",
     "required": [
      "port",
-     "selector"
+     "selector",
+     "ports"
     ],
     "properties": {
      "annotations": {
@@ -6090,9 +7251,20 @@
       "format": "int32",
       "description": "port exposed by the service"
      },
+     "portName": {
+      "type": "string",
+      "description": "the name of the first port; optional"
+     },
      "portalIP": {
       "type": "string",
       "description": "IP address of the service; usually assigned by the system; if specified, it will be allocated to the service if unused, and creation of the service will fail otherwise; cannot be updated; 'None' can be specified for a headless service when proxying is not required"
+     },
+     "ports": {
+      "type": "array",
+      "items": {
+       "$ref": "v1beta2.ServicePort"
+      },
+      "description": "ports to be exposed on the service"
      },
      "protocol": {
       "$ref": "v1beta2.Protocol",
@@ -6196,6 +7368,34 @@
      "uid": {
       "$ref": "types.UID",
       "description": "unique UUID across space and time; populated by the system, read-only"
+     }
+    }
+   },
+   "v1beta2.ServicePort": {
+    "id": "v1beta2.ServicePort",
+    "required": [
+     "name",
+     "protocol",
+     "port",
+     "containerPort"
+    ],
+    "properties": {
+     "containerPort": {
+      "type": "string",
+      "description": "the port to access on the containers belonging to pods targeted by the service; defaults to the service port"
+     },
+     "name": {
+      "type": "string",
+      "description": "the name of this port; optional if only one port is defined"
+     },
+     "port": {
+      "type": "integer",
+      "format": "int32",
+      "description": "the port number that is exposed"
+     },
+     "protocol": {
+      "$ref": "v1beta2.Protocol",
+      "description": "the protocol used by this port; must be UDP or TCP; TCP if unspecified"
      }
     }
    },

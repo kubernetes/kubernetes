@@ -720,25 +720,27 @@ type Service struct {
 
 	// Required.
 	Port int `json:"port" description:"port exposed by the service"`
+	// Optional: The name of the first port.
+	PortName string `json:"portName,omitempty" description:"the name of the first port; optional"`
 	// Optional: Defaults to "TCP".
 	Protocol Protocol `json:"protocol,omitempty" description:"protocol for port; must be UDP or TCP; TCP if unspecified"`
+	// ContainerPort is the name or number of the port on the container to direct traffic to.
+	// This is useful if the containers the service points to have multiple open ports.
+	// Optional: If unspecified, the first port on the container will be used.
+	ContainerPort util.IntOrString `json:"containerPort,omitempty" description:"number or name of the port to access on the containers belonging to pods targeted by the service; defaults to the container's first open port"`
 
 	// This service's labels.
 	Labels map[string]string `json:"labels,omitempty" description:"map of string keys and values that can be used to organize and categorize services"`
 
 	// This service will route traffic to pods having labels matching this selector. If null, no endpoints will be automatically created. If empty, all pods will be selected.
 	Selector map[string]string `json:"selector" description:"label keys and values that must match in order to receive traffic for this service; if empty, all pods are selected, if not specified, endpoints must be manually specified"`
+
 	// An external load balancer should be set up via the cloud-provider
 	CreateExternalLoadBalancer bool `json:"createExternalLoadBalancer,omitempty" description:"set up a cloud-provider-specific load balancer on an external IP"`
 
 	// PublicIPs are used by external load balancers, or can be set by
 	// users to handle external traffic that arrives at a node.
 	PublicIPs []string `json:"publicIPs,omitempty" description:"externally visible IPs (e.g. load balancers) that should be proxied to this service"`
-
-	// ContainerPort is the name or number of the port on the container to direct traffic to.
-	// This is useful if the containers the service points to have multiple open ports.
-	// Optional: If unspecified, the first port on the container will be used.
-	ContainerPort util.IntOrString `json:"containerPort,omitempty" description:"number or name of the port to access on the containers belonging to pods targeted by the service; defaults to the container's first open port"`
 
 	// PortalIP is usually assigned by the master.  If specified by the user
 	// we will try to respect it or else fail the request.  This field can
@@ -752,6 +754,35 @@ type Service struct {
 
 	// Optional: Supports "ClientIP" and "None".  Used to maintain session affinity.
 	SessionAffinity AffinityType `json:"sessionAffinity,omitempty" description:"enable client IP based session affinity; must be ClientIP or None; defaults to None"`
+
+	// Optional: Ports to expose on the service.  If this field is
+	// specified, the legacy fields (Port, PortName, Protocol, and
+	// ContainerPort) will be overwritten by the first member of this
+	// array.  If this field is not specified, it will be populated from
+	// the legacy fields.
+	Ports []ServicePort `json:"ports" description:"ports to be exposed on the service; if this field is specified, the legacy fields (Port, PortName, Protocol, and ContainerPort) will be overwritten by the first member of this array; if this field is not specified, it will be populated from the legacy fields"`
+}
+
+type ServicePort struct {
+	// Required: The name of this port within the service.  This must be a
+	// DNS_LABEL.  All ports within a ServiceSpec must have unique names.
+	// This maps to the 'Name' field in EndpointPort objects.
+	Name string `json:"name" description:"the name of this port; optional if only one port is defined"`
+
+	// Optional: The IP protocol for this port.  Supports "TCP" and "UDP",
+	// default is TCP.
+	Protocol Protocol `json:"protocol" description:"the protocol used by this port; must be UDP or TCP; TCP if unspecified"`
+
+	// Required: The port that will be exposed.
+	Port int `json:"port" description:"the port number that is exposed"`
+
+	// Optional: The port number on the target pod to direct traffic to.
+	// This is useful if the containers the service points to have multiple
+	// open ports.  If this is a string, it will be looked up as a named
+	// port in the target Pod's container ports.  If unspecified, the value
+	// of Port is used (an identity map) - note this is a different default
+	// than Service.ContainerPort.
+	ContainerPort util.IntOrString `json:"containerPort" description:"the port to access on the containers belonging to pods targeted by the service; defaults to the service port"`
 }
 
 // EndpointObjectReference is a reference to an object exposing the endpoint

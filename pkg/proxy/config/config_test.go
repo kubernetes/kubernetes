@@ -136,7 +136,10 @@ func TestNewServiceAddedAndNotified(t *testing.T) {
 	handler := NewServiceHandlerMock()
 	handler.Wait(1)
 	config.RegisterHandler(handler)
-	serviceUpdate := CreateServiceUpdate(ADD, api.Service{ObjectMeta: api.ObjectMeta{Namespace: "testnamespace", Name: "foo"}, Spec: api.ServiceSpec{Port: 10}})
+	serviceUpdate := CreateServiceUpdate(ADD, api.Service{
+		ObjectMeta: api.ObjectMeta{Namespace: "testnamespace", Name: "foo"},
+		Spec:       api.ServiceSpec{Ports: []api.ServicePort{{Protocol: "TCP", Port: 10}}},
+	})
 	channel <- serviceUpdate
 	handler.ValidateServices(t, serviceUpdate.Services)
 
@@ -147,24 +150,35 @@ func TestServiceAddedRemovedSetAndNotified(t *testing.T) {
 	channel := config.Channel("one")
 	handler := NewServiceHandlerMock()
 	config.RegisterHandler(handler)
-	serviceUpdate := CreateServiceUpdate(ADD, api.Service{ObjectMeta: api.ObjectMeta{Namespace: "testnamespace", Name: "foo"}, Spec: api.ServiceSpec{Port: 10}})
+	serviceUpdate := CreateServiceUpdate(ADD, api.Service{
+		ObjectMeta: api.ObjectMeta{Namespace: "testnamespace", Name: "foo"},
+		Spec:       api.ServiceSpec{Ports: []api.ServicePort{{Protocol: "TCP", Port: 10}}},
+	})
 	handler.Wait(1)
 	channel <- serviceUpdate
 	handler.ValidateServices(t, serviceUpdate.Services)
 
-	serviceUpdate2 := CreateServiceUpdate(ADD, api.Service{ObjectMeta: api.ObjectMeta{Namespace: "testnamespace", Name: "bar"}, Spec: api.ServiceSpec{Port: 20}})
+	serviceUpdate2 := CreateServiceUpdate(ADD, api.Service{
+		ObjectMeta: api.ObjectMeta{Namespace: "testnamespace", Name: "bar"},
+		Spec:       api.ServiceSpec{Ports: []api.ServicePort{{Protocol: "TCP", Port: 20}}},
+	})
 	handler.Wait(1)
 	channel <- serviceUpdate2
 	services := []api.Service{serviceUpdate2.Services[0], serviceUpdate.Services[0]}
 	handler.ValidateServices(t, services)
 
-	serviceUpdate3 := CreateServiceUpdate(REMOVE, api.Service{ObjectMeta: api.ObjectMeta{Namespace: "testnamespace", Name: "foo"}})
+	serviceUpdate3 := CreateServiceUpdate(REMOVE, api.Service{
+		ObjectMeta: api.ObjectMeta{Namespace: "testnamespace", Name: "foo"},
+	})
 	handler.Wait(1)
 	channel <- serviceUpdate3
 	services = []api.Service{serviceUpdate2.Services[0]}
 	handler.ValidateServices(t, services)
 
-	serviceUpdate4 := CreateServiceUpdate(SET, api.Service{ObjectMeta: api.ObjectMeta{Namespace: "testnamespace", Name: "foobar"}, Spec: api.ServiceSpec{Port: 99}})
+	serviceUpdate4 := CreateServiceUpdate(SET, api.Service{
+		ObjectMeta: api.ObjectMeta{Namespace: "testnamespace", Name: "foobar"},
+		Spec:       api.ServiceSpec{Ports: []api.ServicePort{{Protocol: "TCP", Port: 99}}},
+	})
 	handler.Wait(1)
 	channel <- serviceUpdate4
 	services = []api.Service{serviceUpdate4.Services[0]}
@@ -180,8 +194,14 @@ func TestNewMultipleSourcesServicesAddedAndNotified(t *testing.T) {
 	}
 	handler := NewServiceHandlerMock()
 	config.RegisterHandler(handler)
-	serviceUpdate1 := CreateServiceUpdate(ADD, api.Service{ObjectMeta: api.ObjectMeta{Namespace: "testnamespace", Name: "foo"}, Spec: api.ServiceSpec{Port: 10}})
-	serviceUpdate2 := CreateServiceUpdate(ADD, api.Service{ObjectMeta: api.ObjectMeta{Namespace: "testnamespace", Name: "bar"}, Spec: api.ServiceSpec{Port: 20}})
+	serviceUpdate1 := CreateServiceUpdate(ADD, api.Service{
+		ObjectMeta: api.ObjectMeta{Namespace: "testnamespace", Name: "foo"},
+		Spec:       api.ServiceSpec{Ports: []api.ServicePort{{Protocol: "TCP", Port: 10}}},
+	})
+	serviceUpdate2 := CreateServiceUpdate(ADD, api.Service{
+		ObjectMeta: api.ObjectMeta{Namespace: "testnamespace", Name: "bar"},
+		Spec:       api.ServiceSpec{Ports: []api.ServicePort{{Protocol: "TCP", Port: 20}}},
+	})
 	handler.Wait(2)
 	channelOne <- serviceUpdate1
 	channelTwo <- serviceUpdate2
@@ -197,8 +217,14 @@ func TestNewMultipleSourcesServicesMultipleHandlersAddedAndNotified(t *testing.T
 	handler2 := NewServiceHandlerMock()
 	config.RegisterHandler(handler)
 	config.RegisterHandler(handler2)
-	serviceUpdate1 := CreateServiceUpdate(ADD, api.Service{ObjectMeta: api.ObjectMeta{Namespace: "testnamespace", Name: "foo"}, Spec: api.ServiceSpec{Port: 10}})
-	serviceUpdate2 := CreateServiceUpdate(ADD, api.Service{ObjectMeta: api.ObjectMeta{Namespace: "testnamespace", Name: "bar"}, Spec: api.ServiceSpec{Port: 20}})
+	serviceUpdate1 := CreateServiceUpdate(ADD, api.Service{
+		ObjectMeta: api.ObjectMeta{Namespace: "testnamespace", Name: "foo"},
+		Spec:       api.ServiceSpec{Ports: []api.ServicePort{{Protocol: "TCP", Port: 10}}},
+	})
+	serviceUpdate2 := CreateServiceUpdate(ADD, api.Service{
+		ObjectMeta: api.ObjectMeta{Namespace: "testnamespace", Name: "bar"},
+		Spec:       api.ServiceSpec{Ports: []api.ServicePort{{Protocol: "TCP", Port: 20}}},
+	})
 	handler.Wait(2)
 	handler2.Wait(2)
 	channelOne <- serviceUpdate1

@@ -865,12 +865,8 @@ type ServiceStatus struct{}
 
 // ServiceSpec describes the attributes that a user creates on a service
 type ServiceSpec struct {
-	// Port is the TCP or UDP port that will be made available to each pod for connecting to the pods
-	// proxied by this service.
-	Port int `json:"port"`
-
-	// Required: Supports "TCP" and "UDP".
-	Protocol Protocol `json:"protocol,omitempty"`
+	// Required: The list of ports that are exposed by this service.
+	Ports []ServicePort `json:"ports"`
 
 	// This service will route traffic to pods having labels matching this selector. If empty or not present,
 	// the service is assumed to have endpoints set by an external process and Kubernetes will not modify
@@ -893,15 +889,30 @@ type ServiceSpec struct {
 	// For hostnames, the user will use a CNAME record (instead of using an A record with the IP)
 	PublicIPs []string `json:"publicIPs,omitempty"`
 
-	// TargetPort is the name or number of the port on the container to direct traffic to.
-	// This is useful if the containers the service points to have multiple open ports.
-	// Optional: If unspecified, the first port on the container will be used.
-	// As of v1beta3 this field will become required in the internal API,
-	// and the versioned APIs must provide a default value.
-	TargetPort util.IntOrString `json:"targetPort,omitempty"`
-
 	// Required: Supports "ClientIP" and "None".  Used to maintain session affinity.
 	SessionAffinity AffinityType `json:"sessionAffinity,omitempty"`
+}
+
+type ServicePort struct {
+	// Optional if only one ServicePort is defined on this service: The
+	// name of this port within the service.  This must be a DNS_LABEL.
+	// All ports within a ServiceSpec must have unique names.  This maps to
+	// the 'Name' field in EndpointPort objects.
+	Name string `json:"name"`
+
+	// The IP protocol for this port.  Supports "TCP" and "UDP".
+	Protocol Protocol `json:"protocol"`
+
+	// The port that will be exposed on the service.
+	Port int `json:"port"`
+
+	// Optional: The target port on pods selected by this service.  If this
+	// is a string, it will be looked up as a named port in the target
+	// Pod's container ports.  If this is not specified, the first port on
+	// the destination pod will be used.  This behavior is deprecated.  As
+	// of v1beta3 the default value is the sames as the Port field (an
+	// identity map).
+	TargetPort util.IntOrString `json:"targetPort"`
 }
 
 // Service is a named abstraction of software service (for example, mysql) consisting of local port

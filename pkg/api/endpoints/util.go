@@ -97,10 +97,25 @@ func (set addressSet) Insert(addr *api.EndpointAddress) {
 
 func hashAddresses(addrs addressSet) string {
 	// Flatten the list of addresses into a string so it can be used as a
-	// map key.
+	// map key.  Unfortunately, DeepHashObject is implemented in terms of
+	// spew, and spew does not handle non-primitive map keys well.  So
+	// first we collapse it into a slice, sort the slice, then hash that.
+	slice := []*api.EndpointAddress{}
+	for k := range addrs {
+		slice = append(slice, k)
+	}
+	sort.Sort(addrPtrsByIP(slice))
 	hasher := md5.New()
-	util.DeepHashObject(hasher, addrs)
+	util.DeepHashObject(hasher, slice)
 	return hex.EncodeToString(hasher.Sum(nil)[0:])
+}
+
+type addrPtrsByIP []*api.EndpointAddress
+
+func (sl addrPtrsByIP) Len() int      { return len(sl) }
+func (sl addrPtrsByIP) Swap(i, j int) { sl[i], sl[j] = sl[j], sl[i] }
+func (sl addrPtrsByIP) Less(i, j int) bool {
+	return bytes.Compare([]byte(sl[i].IP), []byte(sl[j].IP)) < 0
 }
 
 // SortSubsets sorts an array of EndpointSubset objects in place.  For ease of

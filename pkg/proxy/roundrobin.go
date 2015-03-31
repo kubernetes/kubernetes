@@ -50,20 +50,10 @@ type affinityPolicy struct {
 	ttlMinutes   int
 }
 
-// servicePort is the type that the balancer uses to key stored state.
-type servicePort struct {
-	types.NamespacedName
-	port string
-}
-
-func (sp servicePort) String() string {
-	return fmt.Sprintf("%s:%s", sp.NamespacedName, sp.port)
-}
-
 // LoadBalancerRR is a round-robin load balancer.
 type LoadBalancerRR struct {
 	lock     sync.RWMutex
-	services map[servicePort]*balancerState
+	services map[ServicePortName]*balancerState
 }
 
 // Ensure this implements LoadBalancer.
@@ -86,13 +76,11 @@ func newAffinityPolicy(affinityType api.AffinityType, ttlMinutes int) *affinityP
 // NewLoadBalancerRR returns a new LoadBalancerRR.
 func NewLoadBalancerRR() *LoadBalancerRR {
 	return &LoadBalancerRR{
-		services: map[servicePort]*balancerState{},
+		services: map[ServicePortName]*balancerState{},
 	}
 }
 
-func (lb *LoadBalancerRR) NewService(service types.NamespacedName, port string, affinityType api.AffinityType, ttlMinutes int) error {
-	svcPort := servicePort{service, port}
-
+func (lb *LoadBalancerRR) NewService(svcPort ServicePortName, affinityType api.AffinityType, ttlMinutes int) error {
 	lb.lock.Lock()
 	defer lb.lock.Unlock()
 	lb.newServiceInternal(svcPort, affinityType, ttlMinutes)
@@ -100,7 +88,7 @@ func (lb *LoadBalancerRR) NewService(service types.NamespacedName, port string, 
 }
 
 // This assumes that lb.lock is already held.
-func (lb *LoadBalancerRR) newServiceInternal(svcPort servicePort, affinityType api.AffinityType, ttlMinutes int) *balancerState {
+func (lb *LoadBalancerRR) newServiceInternal(svcPort ServicePortName, affinityType api.AffinityType, ttlMinutes int) *balancerState {
 	if ttlMinutes == 0 {
 		ttlMinutes = 180 //default to 3 hours if not specified.  Should 0 be unlimeted instead????
 	}
@@ -123,9 +111,7 @@ func isSessionAffinity(affinity *affinityPolicy) bool {
 
 // NextEndpoint returns a service endpoint.
 // The service endpoint is chosen using the round-robin algorithm.
-func (lb *LoadBalancerRR) NextEndpoint(service types.NamespacedName, port string, srcAddr net.Addr) (string, error) {
-	svcPort := servicePort{service, port}
-
+func (lb *LoadBalancerRR) NextEndpoint(svcPort ServicePortName, srcAddr net.Addr) (string, error) {
 	// Coarse locking is simple.  We can get more fine-grained if/when we
 	// can prove it matters.
 	lb.lock.Lock()
@@ -202,7 +188,7 @@ func flattenValidEndpoints(endpoints []hostPortPair) []string {
 }
 
 // Remove any session affinity records associated to a particular endpoint (for example when a pod goes down).
-func removeSessionAffinityByEndpoint(state *balancerState, svcPort servicePort, endpoint string) {
+func removeSessionAffinityByEndpoint(state *balancerState, svcPort ServicePortName, endpoint string) {
 	for _, affinity := range state.affinity.affinityMap {
 		if affinity.endpoint == endpoint {
 			glog.V(4).Infof("Removing client: %s from affinityMap for service %q", affinity.endpoint, svcPort)
@@ -214,7 +200,7 @@ func removeSessionAffinityByEndpoint(state *balancerState, svcPort servicePort, 
 // Loop through the valid endpoints and then the endpoints associated with the Load Balancer.
 // Then remove any session affinity records that are not in both lists.
 // This assumes the lb.lock is held.
-func (lb *LoadBalancerRR) updateAffinityMap(svcPort servicePort, newEndpoints []string) {
+func (lb *LoadBalancerRR) updateAffinityMap(svcPort ServicePortName, newEndpoints []string) {
 	allEndpoints := map[string]int{}
 	for _, newEndpoint := range newEndpoints {
 		allEndpoints[newEndpoint] = 1
@@ -238,7 +224,7 @@ func (lb *LoadBalancerRR) updateAffinityMap(svcPort servicePort, newEndpoints []
 // Registered endpoints are updated if found in the update set or
 // unregistered if missing from the update set.
 func (lb *LoadBalancerRR) OnUpdate(allEndpoints []api.Endpoints) {
-	registeredEndpoints := make(map[servicePort]bool)
+	registeredEndpoints := make(map[ServicePortName]bool)
 	lb.lock.Lock()
 	defer lb.lock.Unlock()
 
@@ -262,7 +248,7 @@ func (lb *LoadBalancerRR) OnUpdate(allEndpoints []api.Endpoints) {
 		}
 
 		for portname := range portsToEndpoints {
-			svcPort := servicePort{types.NamespacedName{svcEndpoints.Namespace, svcEndpoints.Name}, portname}
+			svcPort := ServicePortName{types.NamespacedName{svcEndpoints.Namespace, svcEndpoints.Name}, portname}
 			state, exists := lb.services[svcPort]
 			curEndpoints := []string{}
 			if state != nil {
@@ -305,15 +291,12 @@ func slicesEquiv(lhs, rhs []string) bool {
 	return false
 }
 
-func (lb *LoadBalancerRR) CleanupStaleStickySessions(service types.NamespacedName, port string) {
-	svcPort := servicePort{service, port}
-
+func (lb *LoadBalancerRR) CleanupStaleStickySessions(svcPort ServicePortName) {
 	lb.lock.Lock()
 	defer lb.lock.Unlock()
 
 	state, exists := lb.services[svcPort]
 	if !exists {
-		glog.Warning("CleanupStaleStickySessions called for non-existent balancer key %q", svcPort)
 		return
 	}
 	for ip, affinity := range state.affinity.affinityMap {

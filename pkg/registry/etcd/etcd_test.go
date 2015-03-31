@@ -576,7 +576,6 @@ func TestEtcdUpdateService(t *testing.T) {
 			Selector: map[string]string{
 				"baz": "bar",
 			},
-			Protocol:        "TCP",
 			SessionAffinity: "None",
 		},
 	}

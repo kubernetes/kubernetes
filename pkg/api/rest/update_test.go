@@ -23,96 +23,86 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 )
 
+func makeValidService() api.Service {
+	return api.Service{
+		ObjectMeta: api.ObjectMeta{
+			Name:            "valid",
+			Namespace:       "default",
+			Labels:          map[string]string{},
+			Annotations:     map[string]string{},
+			ResourceVersion: "1",
+		},
+		Spec: api.ServiceSpec{
+			Selector:        map[string]string{"key": "val"},
+			SessionAffinity: "None",
+			Ports:           []api.ServicePort{{Name: "p", Protocol: "TCP", Port: 8675}},
+		},
+	}
+}
+
+// TODO: This should be done on types that are not part of our API
 func TestBeforeUpdate(t *testing.T) {
-	tests := []struct {
-		old       runtime.Object
-		obj       runtime.Object
+	testCases := []struct {
+		name      string
+		tweakSvc  func(oldSvc, newSvc *api.Service) // given basic valid services, each test case can customize them
 		expectErr bool
 	}{
 		{
-			obj: &api.Service{
-				ObjectMeta: api.ObjectMeta{
-					Name:            "foo",
-					ResourceVersion: "1",
-					Namespace:       "#$%%invalid",
-				},
+			name: "no change",
+			tweakSvc: func(oldSvc, newSvc *api.Service) {
+				// nothing
 			},
-			old:       &api.Service{},
-			expectErr: true,
+			expectErr: false,
 		},
 		{
-			obj: &api.Service{
-				ObjectMeta: api.ObjectMeta{
-					Name:            "foo",
-					ResourceVersion: "1",
-					Namespace:       "valid",
-				},
+			name: "change port",
+			tweakSvc: func(oldSvc, newSvc *api.Service) {
+				newSvc.Spec.Ports[0].Port++
 			},
-			old: &api.Service{
-				ObjectMeta: api.ObjectMeta{
-					Name:            "bar",
-					ResourceVersion: "1",
-					Namespace:       "valid",
-				},
+			expectErr: false,
+		},
+		{
+			name: "bad namespace",
+			tweakSvc: func(oldSvc, newSvc *api.Service) {
+				newSvc.Namespace = "#$%%invalid"
 			},
 			expectErr: true,
 		},
 		{
-			obj: &api.Service{
-				ObjectMeta: api.ObjectMeta{
-					Name:            "foo",
-					ResourceVersion: "1",
-					Namespace:       "valid",
-				},
-				Spec: api.ServiceSpec{
-					PortalIP: "1.2.3.4",
-				},
-			},
-			old: &api.Service{
-				ObjectMeta: api.ObjectMeta{
-					Name:            "foo",
-					ResourceVersion: "1",
-					Namespace:       "valid",
-				},
-				Spec: api.ServiceSpec{
-					PortalIP: "4.3.2.1",
-				},
+			name: "change name",
+			tweakSvc: func(oldSvc, newSvc *api.Service) {
+				newSvc.Name += "2"
 			},
 			expectErr: true,
 		},
 		{
-			obj: &api.Service{
-				ObjectMeta: api.ObjectMeta{
-					Name:            "foo",
-					ResourceVersion: "1",
-					Namespace:       api.NamespaceDefault,
-				},
-				Spec: api.ServiceSpec{
-					PortalIP: "1.2.3.4",
-					Selector: map[string]string{"foo": "bar"},
-				},
+			name: "change portal IP",
+			tweakSvc: func(oldSvc, newSvc *api.Service) {
+				oldSvc.Spec.PortalIP = "1.2.3.4"
+				newSvc.Spec.PortalIP = "4.3.2.1"
 			},
-			old: &api.Service{
-				ObjectMeta: api.ObjectMeta{
-					Name:            "foo",
-					ResourceVersion: "1",
-					Namespace:       api.NamespaceDefault,
-				},
-				Spec: api.ServiceSpec{
-					PortalIP: "1.2.3.4",
-					Selector: map[string]string{"bar": "foo"},
-				},
+			expectErr: true,
+		},
+		{
+			name: "change selectpor",
+			tweakSvc: func(oldSvc, newSvc *api.Service) {
+				newSvc.Spec.Selector = map[string]string{"newkey": "newvalue"}
 			},
+			expectErr: false,
 		},
 	}
-	for _, test := range tests {
+
+	for _, tc := range testCases {
+		oldSvc := makeValidService()
+		newSvc := makeValidService()
+		tc.tweakSvc(&oldSvc, &newSvc)
 		ctx := api.NewDefaultContext()
-		err := BeforeUpdate(Services, ctx, test.obj, test.old)
-		if test.expectErr && err == nil {
-			t.Errorf("unexpected non-error for %v", test)
+		err := BeforeUpdate(Services, ctx, runtime.Object(&oldSvc), runtime.Object(&newSvc))
+		if tc.expectErr && err == nil {
+			t.Errorf("unexpected non-error for %q", tc.name)
 		}
-		if !test.expectErr && err != nil {
-			t.Errorf("unexpected error: %v for %v -> %v", err, test.obj, test.old)
+		if !tc.expectErr && err != nil {
+			t.Errorf("unexpected error for %q: %v", tc.name, err)
 		}
 	}
 }

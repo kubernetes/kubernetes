@@ -228,7 +228,7 @@ func (h *HumanReadablePrinter) validatePrintHandlerFunc(printFunc reflect.Value)
 
 var podColumns = []string{"POD", "IP", "CONTAINER(S)", "IMAGE(S)", "HOST", "LABELS", "STATUS", "CREATED"}
 var replicationControllerColumns = []string{"CONTROLLER", "CONTAINER(S)", "IMAGE(S)", "SELECTOR", "REPLICAS"}
-var serviceColumns = []string{"NAME", "LABELS", "SELECTOR", "IP", "PORT"}
+var serviceColumns = []string{"NAME", "LABELS", "SELECTOR", "IP", "PORT(S)"}
 var endpointColumns = []string{"NAME", "ENDPOINTS"}
 var nodeColumns = []string{"NAME", "LABELS", "STATUS"}
 var statusColumns = []string{"STATUS"}
@@ -390,9 +390,18 @@ func printReplicationControllerList(list *api.ReplicationControllerList, w io.Wr
 }
 
 func printService(svc *api.Service, w io.Writer) error {
-	_, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%d\n", svc.Name, formatLabels(svc.Labels),
-		formatLabels(svc.Spec.Selector), svc.Spec.PortalIP, svc.Spec.Port)
-	return err
+	if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%d/%s\n", svc.Name, formatLabels(svc.Labels),
+		formatLabels(svc.Spec.Selector), svc.Spec.PortalIP, svc.Spec.Ports[0].Port, svc.Spec.Ports[0].Protocol); err != nil {
+		return err
+	}
+	for i := 1; i < len(svc.Spec.Ports); i++ {
+		// Lay out additional ports.
+		if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%d/%s\n", "", "", "", "", svc.Spec.Ports[i].Port, svc.Spec.Ports[i].Protocol); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func printServiceList(list *api.ServiceList, w io.Writer) error {

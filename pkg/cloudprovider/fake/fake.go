@@ -29,7 +29,7 @@ type FakeBalancer struct {
 	Name       string
 	Region     string
 	ExternalIP net.IP
-	Port       int
+	Ports      []int
 	Hosts      []string
 }
 
@@ -95,9 +95,9 @@ func (f *FakeCloud) TCPLoadBalancerExists(name, region string) (bool, error) {
 
 // CreateTCPLoadBalancer is a test-spy implementation of TCPLoadBalancer.CreateTCPLoadBalancer.
 // It adds an entry "create" into the internal method call record.
-func (f *FakeCloud) CreateTCPLoadBalancer(name, region string, externalIP net.IP, port int, hosts []string, affinityType api.AffinityType) (string, error) {
+func (f *FakeCloud) CreateTCPLoadBalancer(name, region string, externalIP net.IP, ports []int, hosts []string, affinityType api.AffinityType) (string, error) {
 	f.addCall("create")
-	f.Balancers = append(f.Balancers, FakeBalancer{name, region, externalIP, port, hosts})
+	f.Balancers = append(f.Balancers, FakeBalancer{name, region, externalIP, ports, hosts})
 	return f.ExternalIP.String(), f.Err
 }
 

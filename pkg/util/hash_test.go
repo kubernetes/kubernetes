@@ -17,9 +17,105 @@ limitations under the License.
 package util
 
 import (
+	"fmt"
 	"hash/adler32"
 	"testing"
+
+	"github.com/davecgh/go-spew/spew"
 )
+
+type A struct {
+	x int
+	y string
+}
+
+type B struct {
+	x []int
+	y map[string]bool
+}
+
+type C struct {
+	x int
+	y string
+}
+
+func (c C) String() string {
+	return fmt.Sprintf("%d:%s", c.x, c.y)
+}
+
+func TestDeepHashObject(t *testing.T) {
+	// These types are known to fail object hashing because of how spew implements map keys.
+	// http://github.com/davecgh/go-spew/issues/30
+	failureCases := []func() interface{}{
+		func() interface{} { return map[A]bool{A{8675309, "Jenny"}: true, A{9765683, "!Jenny"}: false} },
+		func() interface{} { return map[C]bool{C{8675309, "Jenny"}: true, C{9765683, "!Jenny"}: false} },
+		func() interface{} { return map[*A]bool{&A{8675309, "Jenny"}: true, &A{9765683, "!Jenny"}: false} },
+		func() interface{} { return map[*C]bool{&C{8675309, "Jenny"}: true, &C{9765683, "!Jenny"}: false} },
+	}
+	for _, tc := range failureCases {
+		hasher := adler32.New()
+		DeepHashObject(hasher, tc())
+		first := hasher.Sum32()
+		alwaysSame := false
+		for i := 0; i < 100; i++ {
+			DeepHashObject(hasher, tc())
+			if hasher.Sum32() != first {
+				alwaysSame = false
+				break
+			}
+		}
+		if alwaysSame {
+			t.Errorf("expected failure for %q", toString(tc()))
+		}
+	}
+
+	successCases := []func() interface{}{
+		func() interface{} { return 8675309 },
+		func() interface{} { return "Jenny, I got your number" },
+		func() interface{} { return []string{"eight", "six", "seven"} },
+		func() interface{} { return [...]int{5, 3, 0, 9} },
+		func() interface{} { return map[int]string{8: "8", 6: "6", 7: "7"} },
+		func() interface{} { return map[string]int{"5": 5, "3": 3, "0": 0, "9": 9} },
+		func() interface{} { return A{867, "5309"} },
+		func() interface{} { return &A{867, "5309"} },
+		func() interface{} {
+			return B{[]int{8, 6, 7}, map[string]bool{"5": true, "3": true, "0": true, "9": true}}
+		},
+	}
+
+	for _, tc := range successCases {
+		hasher1 := adler32.New()
+		DeepHashObject(hasher1, tc())
+		hash1 := hasher1.Sum32()
+		DeepHashObject(hasher1, tc())
+		hash2 := hasher1.Sum32()
+		if hash1 != hash2 {
+			t.Fatalf("hash of the same object (%q) produced different results: %d vs %d", toString(tc()), hash1, hash2)
+		}
+		for i := 0; i < 100; i++ {
+			hasher2 := adler32.New()
+
+			DeepHashObject(hasher1, tc())
+			hash1a := hasher1.Sum32()
+			DeepHashObject(hasher2, tc())
+			hash2a := hasher2.Sum32()
+
+			if hash1a != hash1 {
+				t.Errorf("repeated hash of the same object (%q) produced different results: %d vs %d", toString(tc()), hash1, hash1a)
+			}
+			if hash2a != hash2 {
+				t.Errorf("repeated hash of the same object (%q) produced different results: %d vs %d", toString(tc()), hash2, hash2a)
+			}
+			if hash1a != hash2a {
+				t.Errorf("hash of the same object produced (%q) different results: %d vs %d", toString(tc()), hash1a, hash2a)
+			}
+		}
+	}
+}
+
+func toString(obj interface{}) string {
+	return spew.Sprintf("%#v", obj)
+}
 
 type wheel struct {
 	radius uint32

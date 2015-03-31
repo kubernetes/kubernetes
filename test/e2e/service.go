@@ -204,9 +204,11 @@ var _ = Describe("Services", func() {
 				Name: serviceName,
 			},
 			Spec: api.ServiceSpec{
-				Port:       80,
-				Selector:   labels,
-				TargetPort: util.NewIntOrStringFromInt(80),
+				Selector: labels,
+				Ports: []api.ServicePort{{
+					Port:       80,
+					TargetPort: util.NewIntOrStringFromInt(80),
+				}},
 			},
 		}
 		_, err := c.Services(ns).Create(service)
@@ -264,9 +266,11 @@ var _ = Describe("Services", func() {
 				Name: serviceName,
 			},
 			Spec: api.ServiceSpec{
-				Port:                       80,
-				Selector:                   labels,
-				TargetPort:                 util.NewIntOrStringFromInt(80),
+				Selector: labels,
+				Ports: []api.ServicePort{{
+					Port:       80,
+					TargetPort: util.NewIntOrStringFromInt(80),
+				}},
 				CreateExternalLoadBalancer: true,
 			},
 		}
@@ -287,7 +291,7 @@ var _ = Describe("Services", func() {
 			Failf("got unexpected number (%d) of public IPs for externally load balanced service: %v", result.Spec.PublicIPs, result)
 		}
 		ip := result.Spec.PublicIPs[0]
-		port := result.Spec.Port
+		port := result.Spec.Ports[0].Port
 
 		pod := &api.Pod{
 			TypeMeta: api.TypeMeta{
@@ -351,9 +355,11 @@ var _ = Describe("Services", func() {
 		service := &api.Service{
 			ObjectMeta: api.ObjectMeta{},
 			Spec: api.ServiceSpec{
-				Port:                       80,
-				Selector:                   labels,
-				TargetPort:                 util.NewIntOrStringFromInt(80),
+				Selector: labels,
+				Ports: []api.ServicePort{{
+					Port:       80,
+					TargetPort: util.NewIntOrStringFromInt(80),
+				}},
 				CreateExternalLoadBalancer: true,
 			},
 		}

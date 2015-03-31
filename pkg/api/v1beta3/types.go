@@ -855,12 +855,8 @@ type ServiceStatus struct{}
 
 // ServiceSpec describes the attributes that a user creates on a service
 type ServiceSpec struct {
-	// Port is the TCP or UDP port that will be made available to each pod for connecting to the pods
-	// proxied by this service.
-	Port int `json:"port" description:"port exposed by the service"`
-
-	// Optional: Supports "TCP" and "UDP".  Defaults to "TCP".
-	Protocol Protocol `json:"protocol,omitempty" description:"protocol for port; must be UDP or TCP; TCP if unspecified"`
+	// Required: The list of ports that are exposed by this service.
+	Ports []ServicePort `json:"ports" description:"ports exposed by the service"`
 
 	// This service will route traffic to pods having labels matching this selector. If null, no endpoints will be automatically created. If empty, all pods will be selected.
 	Selector map[string]string `json:"selector" description:"label keys and values that must match in order to receive traffic for this service; if empty, all pods are selected, if not specified, endpoints must be manually specified"`
@@ -879,13 +875,29 @@ type ServiceSpec struct {
 	// users to handle external traffic that arrives at a node.
 	PublicIPs []string `json:"publicIPs,omitempty" description:"externally visible IPs (e.g. load balancers) that should be proxied to this service"`
 
-	// TargetPort is the name or number of the port on the container to direct traffic to.
-	// This is useful if the containers the service points to have multiple open ports.
-	// Optional: If unspecified, the service port is used (an identity map).
-	TargetPort util.IntOrString `json:"targetPort,omitempty" description:"number or name of the port to access on the containers belonging to pods targeted by the service; defaults to the container's first open port"`
-
 	// Optional: Supports "ClientIP" and "None".  Used to maintain session affinity.
 	SessionAffinity AffinityType `json:"sessionAffinity,omitempty" description:"enable client IP based session affinity; must be ClientIP or None; defaults to None"`
+}
+
+type ServicePort struct {
+	// Optional if only one ServicePort is defined on this service: The
+	// name of this port within the service.  This must be a DNS_LABEL.
+	// All ports within a ServiceSpec must have unique names.  This maps to
+	// the 'Name' field in EndpointPort objects.
+	Name string `json:"name" description:"the name of this port; optional if only one port is defined"`
+
+	// Optional: The IP protocol for this port.  Supports "TCP" and "UDP",
+	// default is TCP.
+	Protocol Protocol `json:"protocol" description:"the protocol used by this port; must be UDP or TCP; TCP if unspecified"`
+
+	// Required: The port that will be exposed by this service.
+	Port int `json:"port" description:"the port number that is exposed"`
+
+	// Optional: The target port on pods selected by this service.
+	// If this is a string, it will be looked up as a named port in the
+	// target Pod's container ports.  If this is not specified, the value
+	// of Port is used (an identity map).
+	TargetPort util.IntOrString `json:"targetPort" description:"the port to access on the pods targeted by the service; defaults to the service port"`
 }
 
 // Service is a named abstraction of software service (for example, mysql) consisting of local port

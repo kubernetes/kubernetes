@@ -333,7 +333,15 @@ func describeService(service *api.Service, endpoints *api.Endpoints, events *api
 			list := strings.Join(service.Spec.PublicIPs, ", ")
 			fmt.Fprintf(out, "Public IPs:\t%s\n", list)
 		}
-		fmt.Fprintf(out, "Port:\t%d\n", service.Spec.Port)
+		for i := range service.Spec.Ports {
+			sp := &service.Spec.Ports[i]
+
+			name := sp.Name
+			if name == "" {
+				name = "<unnamed>"
+			}
+			fmt.Fprintf(out, "Port:\t%s\t%d/%s\n", name, sp.Port, sp.Protocol)
+		}
 		fmt.Fprintf(out, "Endpoints:\t%s\n", formatEndpoints(endpoints))
 		fmt.Fprintf(out, "Session Affinity:\t%s\n", service.Spec.SessionAffinity)
 		if events != nil {

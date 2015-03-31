@@ -1789,97 +1789,139 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 		{
 			ObjectMeta: api.ObjectMeta{Name: "kubernetes", Namespace: api.NamespaceDefault},
 			Spec: api.ServiceSpec{
-				Port:     8081,
+				Ports: []api.ServicePort{{
+					Protocol: "TCP",
+					Port:     8081,
+				}},
 				PortalIP: "1.2.3.1",
 			},
 		},
 		{
 			ObjectMeta: api.ObjectMeta{Name: "kubernetes-ro", Namespace: api.NamespaceDefault},
 			Spec: api.ServiceSpec{
-				Port:     8082,
+				Ports: []api.ServicePort{{
+					Protocol: "TCP",
+					Port:     8082,
+				}},
 				PortalIP: "1.2.3.2",
 			},
 		},
 		{
 			ObjectMeta: api.ObjectMeta{Name: "kubernetes-ro", Namespace: api.NamespaceDefault},
 			Spec: api.ServiceSpec{
-				Port:     8082,
+				Ports: []api.ServicePort{{
+					Protocol: "TCP",
+					Port:     8082,
+				}},
 				PortalIP: "None",
 			},
 		},
 		{
 			ObjectMeta: api.ObjectMeta{Name: "kubernetes-ro", Namespace: api.NamespaceDefault},
 			Spec: api.ServiceSpec{
-				Port:     8082,
+				Ports: []api.ServicePort{{
+					Protocol: "TCP",
+					Port:     8082,
+				}},
 				PortalIP: "",
 			},
 		},
 		{
 			ObjectMeta: api.ObjectMeta{Name: "test", Namespace: "test1"},
 			Spec: api.ServiceSpec{
-				Port:     8083,
+				Ports: []api.ServicePort{{
+					Protocol: "TCP",
+					Port:     8083,
+				}},
 				PortalIP: "1.2.3.3",
 			},
 		},
 		{
 			ObjectMeta: api.ObjectMeta{Name: "kubernetes", Namespace: "test2"},
 			Spec: api.ServiceSpec{
-				Port:     8084,
+				Ports: []api.ServicePort{{
+					Protocol: "TCP",
+					Port:     8084,
+				}},
 				PortalIP: "1.2.3.4",
 			},
 		},
 		{
 			ObjectMeta: api.ObjectMeta{Name: "test", Namespace: "test2"},
 			Spec: api.ServiceSpec{
-				Port:     8085,
+				Ports: []api.ServicePort{{
+					Protocol: "TCP",
+					Port:     8085,
+				}},
 				PortalIP: "1.2.3.5",
 			},
 		},
 		{
 			ObjectMeta: api.ObjectMeta{Name: "test", Namespace: "test2"},
 			Spec: api.ServiceSpec{
-				Port:     8085,
+				Ports: []api.ServicePort{{
+					Protocol: "TCP",
+					Port:     8085,
+				}},
 				PortalIP: "None",
 			},
 		},
 		{
 			ObjectMeta: api.ObjectMeta{Name: "test", Namespace: "test2"},
 			Spec: api.ServiceSpec{
-				Port: 8085,
+				Ports: []api.ServicePort{{
+					Protocol: "TCP",
+					Port:     8085,
+				}},
 			},
 		},
 		{
 			ObjectMeta: api.ObjectMeta{Name: "kubernetes", Namespace: "kubernetes"},
 			Spec: api.ServiceSpec{
-				Port:     8086,
+				Ports: []api.ServicePort{{
+					Protocol: "TCP",
+					Port:     8086,
+				}},
 				PortalIP: "1.2.3.6",
 			},
 		},
 		{
 			ObjectMeta: api.ObjectMeta{Name: "kubernetes-ro", Namespace: "kubernetes"},
 			Spec: api.ServiceSpec{
-				Port:     8087,
+				Ports: []api.ServicePort{{
+					Protocol: "TCP",
+					Port:     8087,
+				}},
 				PortalIP: "1.2.3.7",
 			},
 		},
 		{
 			ObjectMeta: api.ObjectMeta{Name: "not-special", Namespace: "kubernetes"},
 			Spec: api.ServiceSpec{
-				Port:     8088,
+				Ports: []api.ServicePort{{
+					Protocol: "TCP",
+					Port:     8088,
+				}},
 				PortalIP: "1.2.3.8",
 			},
 		},
 		{
 			ObjectMeta: api.ObjectMeta{Name: "not-special", Namespace: "kubernetes"},
 			Spec: api.ServiceSpec{
-				Port:     8088,
+				Ports: []api.ServicePort{{
+					Protocol: "TCP",
+					Port:     8088,
+				}},
 				PortalIP: "None",
 			},
 		},
 		{
 			ObjectMeta: api.ObjectMeta{Name: "not-special", Namespace: "kubernetes"},
 			Spec: api.ServiceSpec{
-				Port:     8088,
+				Ports: []api.ServicePort{{
+					Protocol: "TCP",
+					Port:     8088,
+				}},
 				PortalIP: "",
 			},
 		},

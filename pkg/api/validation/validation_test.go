@@ -1223,220 +1223,254 @@ func TestValidatePodUpdate(t *testing.T) {
 	}
 }
 
+func makeValidService() api.Service {
+	return api.Service{
+		ObjectMeta: api.ObjectMeta{
+			Name:            "valid",
+			Namespace:       "valid",
+			Labels:          map[string]string{},
+			Annotations:     map[string]string{},
+			ResourceVersion: "1",
+		},
+		Spec: api.ServiceSpec{
+			Selector:        map[string]string{"key": "val"},
+			SessionAffinity: "None",
+			Ports:           []api.ServicePort{{Name: "p", Protocol: "TCP", Port: 8675}},
+		},
+	}
+}
+
 func TestValidateService(t *testing.T) {
 	testCases := []struct {
-		name    string
-		makeSvc func(svc *api.Service) // given a basic valid service, each test case can customize it
-		numErrs int
+		name     string
+		tweakSvc func(svc *api.Service) // given a basic valid service, each test case can customize it
+		numErrs  int
 	}{
 		{
 			name: "missing namespace",
-			makeSvc: func(s *api.Service) {
+			tweakSvc: func(s *api.Service) {
 				s.Namespace = ""
 			},
 			numErrs: 1,
 		},
 		{
 			name: "invalid namespace",
-			makeSvc: func(s *api.Service) {
+			tweakSvc: func(s *api.Service) {
 				s.Namespace = "-123"
 			},
 			numErrs: 1,
 		},
 		{
 			name: "missing name",
-			makeSvc: func(s *api.Service) {
+			tweakSvc: func(s *api.Service) {
 				s.Name = ""
 			},
 			numErrs: 1,
 		},
 		{
 			name: "invalid name",
-			makeSvc: func(s *api.Service) {
+			tweakSvc: func(s *api.Service) {
 				s.Name = "-123"
 			},
 			numErrs: 1,
 		},
 		{
 			name: "too long name",
-			makeSvc: func(s *api.Service) {
+			tweakSvc: func(s *api.Service) {
 				s.Name = strings.Repeat("a", 25)
 			},
 			numErrs: 1,
 		},
 		{
 			name: "invalid generateName",
-			makeSvc: func(s *api.Service) {
+			tweakSvc: func(s *api.Service) {
 				s.GenerateName = "-123"
 			},
 			numErrs: 1,
 		},
 		{
 			name: "too long generateName",
-			makeSvc: func(s *api.Service) {
+			tweakSvc: func(s *api.Service) {
 				s.GenerateName = strings.Repeat("a", 25)
 			},
 			numErrs: 1,
 		},
 		{
 			name: "invalid label",
-			makeSvc: func(s *api.Service) {
+			tweakSvc: func(s *api.Service) {
 				s.Labels["NoUppercaseOrSpecialCharsLike=Equals"] = "bar"
 			},
 			numErrs: 1,
 		},
 		{
 			name: "invalid annotation",
-			makeSvc: func(s *api.Service) {
+			tweakSvc: func(s *api.Service) {
 				s.Annotations["NoSpecialCharsLike=Equals"] = "bar"
 			},
 			numErrs: 1,
 		},
 		{
+			name: "nil selector",
+			tweakSvc: func(s *api.Service) {
+				s.Spec.Selector = nil
+			},
+			numErrs: 0,
+		},
+		{
 			name: "invalid selector",
-			makeSvc: func(s *api.Service) {
+			tweakSvc: func(s *api.Service) {
 				s.Spec.Selector["NoSpecialCharsLike=Equals"] = "bar"
 			},
 			numErrs: 1,
 		},
 		{
 			name: "missing session affinity",
-			makeSvc: func(s *api.Service) {
+			tweakSvc: func(s *api.Service) {
 				s.Spec.SessionAffinity = ""
 			},
 			numErrs: 1,
 		},
 		{
+			name: "missing ports",
+			tweakSvc: func(s *api.Service) {
+				s.Spec.Ports = nil
+			},
+			numErrs: 1,
+		},
+		{
+			name: "empty port[0] name",
+			tweakSvc: func(s *api.Service) {
+				s.Spec.Ports[0].Name = ""
+			},
+			numErrs: 0,
+		},
+		{
+			name: "empty port[1] name",
+			tweakSvc: func(s *api.Service) {
+				s.Spec.Ports = append(s.Spec.Ports, api.ServicePort{Name: "", Protocol: "TCP", Port: 12345})
+			},
+			numErrs: 1,
+		},
+		{
+			name: "invalid port name",
+			tweakSvc: func(s *api.Service) {
+				s.Spec.Ports[0].Name = "INVALID"
+			},
+			numErrs: 1,
+		},
+		{
 			name: "missing protocol",
-			makeSvc: func(s *api.Service) {
-				s.Spec.Protocol = ""
+			tweakSvc: func(s *api.Service) {
+				s.Spec.Ports[0].Protocol = ""
 			},
 			numErrs: 1,
 		},
 		{
 			name: "invalid protocol",
-			makeSvc: func(s *api.Service) {
-				s.Spec.Protocol = "INVALID"
+			tweakSvc: func(s *api.Service) {
+				s.Spec.Ports[0].Protocol = "INVALID"
 			},
 			numErrs: 1,
 		},
 		{
 			name: "invalid portal ip",
-			makeSvc: func(s *api.Service) {
+			tweakSvc: func(s *api.Service) {
 				s.Spec.PortalIP = "invalid"
 			},
 			numErrs: 1,
 		},
 		{
 			name: "missing port",
-			makeSvc: func(s *api.Service) {
-				s.Spec.Port = 0
+			tweakSvc: func(s *api.Service) {
+				s.Spec.Ports[0].Port = 0
 			},
 			numErrs: 1,
 		},
 		{
 			name: "invalid port",
-			makeSvc: func(s *api.Service) {
-				s.Spec.Port = 65536
+			tweakSvc: func(s *api.Service) {
+				s.Spec.Ports[0].Port = 65536
 			},
 			numErrs: 1,
 		},
 		{
-			name: "missing targetPort string",
-			makeSvc: func(s *api.Service) {
-				s.Spec.TargetPort = util.NewIntOrStringFromString("")
-			},
-			numErrs: 1,
-		},
-		{
-			name: "invalid targetPort int",
-			makeSvc: func(s *api.Service) {
-				s.Spec.TargetPort = util.NewIntOrStringFromInt(65536)
+			name: "invalid TargetPort int",
+			tweakSvc: func(s *api.Service) {
+				s.Spec.Ports[0].TargetPort = util.NewIntOrStringFromInt(65536)
 			},
 			numErrs: 1,
 		},
 		{
 			name: "invalid publicIPs localhost",
-			makeSvc: func(s *api.Service) {
+			tweakSvc: func(s *api.Service) {
 				s.Spec.PublicIPs = []string{"127.0.0.1"}
 			},
 			numErrs: 1,
 		},
 		{
 			name: "invalid publicIPs",
-			makeSvc: func(s *api.Service) {
+			tweakSvc: func(s *api.Service) {
 				s.Spec.PublicIPs = []string{"0.0.0.0"}
 			},
 			numErrs: 1,
 		},
 		{
 			name: "valid publicIPs host",
-			makeSvc: func(s *api.Service) {
+			tweakSvc: func(s *api.Service) {
 				s.Spec.PublicIPs = []string{"myhost.mydomain"}
 			},
 			numErrs: 0,
 		},
 		{
-			name: "nil selector",
-			makeSvc: func(s *api.Service) {
-				s.Spec.Selector = nil
+			name: "dup port name",
+			tweakSvc: func(s *api.Service) {
+				s.Spec.Ports[0].Name = "p"
+				s.Spec.Ports = append(s.Spec.Ports, api.ServicePort{Name: "p", Port: 12345})
 			},
-			numErrs: 0,
+			numErrs: 1,
 		},
 		{
 			name: "valid 1",
-			makeSvc: func(s *api.Service) {
+			tweakSvc: func(s *api.Service) {
 				// do nothing
 			},
 			numErrs: 0,
 		},
 		{
 			name: "valid 2",
-			makeSvc: func(s *api.Service) {
-				s.Spec.Protocol = "UDP"
-				s.Spec.TargetPort = util.NewIntOrStringFromInt(12345)
+			tweakSvc: func(s *api.Service) {
+				s.Spec.Ports[0].Protocol = "UDP"
+				s.Spec.Ports[0].TargetPort = util.NewIntOrStringFromInt(12345)
 			},
 			numErrs: 0,
 		},
 		{
 			name: "valid 3",
-			makeSvc: func(s *api.Service) {
-				s.Spec.TargetPort = util.NewIntOrStringFromString("http")
+			tweakSvc: func(s *api.Service) {
+				s.Spec.Ports[0].TargetPort = util.NewIntOrStringFromString("http")
 			},
 			numErrs: 0,
 		},
 		{
 			name: "valid portal ip - none ",
-			makeSvc: func(s *api.Service) {
+			tweakSvc: func(s *api.Service) {
 				s.Spec.PortalIP = "None"
 			},
 			numErrs: 0,
 		},
 		{
 			name: "valid portal ip - empty",
-			makeSvc: func(s *api.Service) {
+			tweakSvc: func(s *api.Service) {
 				s.Spec.PortalIP = ""
+				s.Spec.Ports[0].TargetPort = util.NewIntOrStringFromString("http")
 			},
 			numErrs: 0,
 		},
 	}
 
 	for _, tc := range testCases {
-		svc := api.Service{
-			ObjectMeta: api.ObjectMeta{
-				Name:        "valid",
-				Namespace:   "valid",
-				Labels:      map[string]string{},
-				Annotations: map[string]string{},
-			},
-			Spec: api.ServiceSpec{
-				Selector:        map[string]string{"key": "val"},
-				SessionAffinity: "None",
-				Port:            8675,
-				Protocol:        "TCP",
-			},
-		}
-		tc.makeSvc(&svc)
+		svc := makeValidService()
+		tc.tweakSvc(&svc)
 		errs := ValidateService(&svc)
 		if len(errs) != tc.numErrs {
 			t.Errorf("Unexpected error list for case %q: %v", tc.name, utilerrors.NewAggregate(errs))
@@ -2144,172 +2178,85 @@ func TestValidateMinionUpdate(t *testing.T) {
 }
 
 func TestValidateServiceUpdate(t *testing.T) {
-	tests := []struct {
-		oldService api.Service
-		service    api.Service
-		valid      bool
+	testCases := []struct {
+		name     string
+		tweakSvc func(oldSvc, newSvc *api.Service) // given basic valid services, each test case can customize them
+		numErrs  int
 	}{
-		{ // 0
-			api.Service{},
-			api.Service{},
-			true},
-		{ // 1
-			api.Service{
-				ObjectMeta: api.ObjectMeta{
-					Name: "foo"}},
-			api.Service{
-				ObjectMeta: api.ObjectMeta{
-					Name: "bar"},
-			}, false},
-		{ // 2
-			api.Service{
-				ObjectMeta: api.ObjectMeta{
-					Name:   "foo",
-					Labels: map[string]string{"foo": "bar"},
-				},
+		{
+			name: "no change",
+			tweakSvc: func(oldSvc, newSvc *api.Service) {
+				// do nothing
 			},
-			api.Service{
-				ObjectMeta: api.ObjectMeta{
-					Name:   "foo",
-					Labels: map[string]string{"foo": "baz"},
-				},
-			}, true},
-		{ // 3
-			api.Service{
-				ObjectMeta: api.ObjectMeta{
-					Name: "foo",
-				},
+			numErrs: 0,
+		},
+		{
+			name: "change name",
+			tweakSvc: func(oldSvc, newSvc *api.Service) {
+				newSvc.Name += "2"
 			},
-			api.Service{
-				ObjectMeta: api.ObjectMeta{
-					Name:   "foo",
-					Labels: map[string]string{"foo": "baz"},
-				},
-			}, true},
-		{ // 4
-			api.Service{
-				ObjectMeta: api.ObjectMeta{
-					Name:   "foo",
-					Labels: map[string]string{"bar": "foo"},
-				},
+			numErrs: 1,
+		},
+		{
+			name: "change namespace",
+			tweakSvc: func(oldSvc, newSvc *api.Service) {
+				newSvc.Namespace += "2"
 			},
-			api.Service{
-				ObjectMeta: api.ObjectMeta{
-					Name:   "foo",
-					Labels: map[string]string{"foo": "baz"},
-				},
-			}, true},
-		{ // 5
-			api.Service{
-				ObjectMeta: api.ObjectMeta{
-					Name:        "foo",
-					Annotations: map[string]string{"bar": "foo"},
-				},
+			numErrs: 1,
+		},
+		{
+			name: "change label valid",
+			tweakSvc: func(oldSvc, newSvc *api.Service) {
+				newSvc.Labels["key"] = "other-value"
 			},
-			api.Service{
-				ObjectMeta: api.ObjectMeta{
-					Name:        "foo",
-					Annotations: map[string]string{"foo": "baz"},
-				},
-			}, true},
-		{ // 6
-			api.Service{
-				ObjectMeta: api.ObjectMeta{
-					Name: "foo",
-				},
-				Spec: api.ServiceSpec{
-					Selector: map[string]string{"foo": "baz"},
-				},
+			numErrs: 0,
+		},
+		{
+			name: "add label",
+			tweakSvc: func(oldSvc, newSvc *api.Service) {
+				newSvc.Labels["key2"] = "value2"
 			},
-			api.Service{
-				ObjectMeta: api.ObjectMeta{
-					Name: "foo",
-				},
-				Spec: api.ServiceSpec{
-					Selector: map[string]string{"foo": "baz"},
-				},
-			}, true},
-		{ // 7
-			api.Service{
-				ObjectMeta: api.ObjectMeta{
-					Name:   "foo",
-					Labels: map[string]string{"bar": "foo"},
-				},
-				Spec: api.ServiceSpec{
-					PortalIP: "127.0.0.1",
-				},
+			numErrs: 0,
+		},
+		{
+			name: "change portal IP",
+			tweakSvc: func(oldSvc, newSvc *api.Service) {
+				oldSvc.Spec.PortalIP = "1.2.3.4"
+				newSvc.Spec.PortalIP = "8.6.7.5"
 			},
-			api.Service{
-				ObjectMeta: api.ObjectMeta{
-					Name:   "foo",
-					Labels: map[string]string{"bar": "fooobaz"},
-				},
-				Spec: api.ServiceSpec{
-					PortalIP: "new",
-				},
-			}, false},
-		{ // 8
-			api.Service{
-				ObjectMeta: api.ObjectMeta{
-					Name:   "foo",
-					Labels: map[string]string{"bar": "foo"},
-				},
-				Spec: api.ServiceSpec{
-					PortalIP: "127.0.0.1",
-				},
+			numErrs: 1,
+		},
+		{
+			name: "remove portal IP",
+			tweakSvc: func(oldSvc, newSvc *api.Service) {
+				oldSvc.Spec.PortalIP = "1.2.3.4"
+				newSvc.Spec.PortalIP = ""
 			},
-			api.Service{
-				ObjectMeta: api.ObjectMeta{
-					Name:   "foo",
-					Labels: map[string]string{"bar": "fooobaz"},
-				},
-				Spec: api.ServiceSpec{
-					PortalIP: "",
-				},
-			}, false},
-		{ // 9
-			api.Service{
-				ObjectMeta: api.ObjectMeta{
-					Name:   "foo",
-					Labels: map[string]string{"bar": "foo"},
-				},
-				Spec: api.ServiceSpec{
-					PortalIP: "127.0.0.1",
-				},
+			numErrs: 1,
+		},
+		{
+			name: "change affinity",
+			tweakSvc: func(oldSvc, newSvc *api.Service) {
+				newSvc.Spec.SessionAffinity = "ClientIP"
 			},
-			api.Service{
-				ObjectMeta: api.ObjectMeta{
-					Name:   "foo",
-					Labels: map[string]string{"bar": "fooobaz"},
-				},
-				Spec: api.ServiceSpec{
-					PortalIP: "127.0.0.2",
-				},
-			}, false},
-		{ // 10
-			api.Service{
-				ObjectMeta: api.ObjectMeta{
-					Name:   "foo",
-					Labels: map[string]string{"foo": "baz"},
-				},
+			numErrs: 0,
+		},
+		{
+			name: "remove affinity",
+			tweakSvc: func(oldSvc, newSvc *api.Service) {
+				newSvc.Spec.SessionAffinity = ""
 			},
-			api.Service{
-				ObjectMeta: api.ObjectMeta{
-					Name:   "foo",
-					Labels: map[string]string{"Foo": "baz"},
-				},
-			}, true},
+			numErrs: 1,
+		},
 	}
-	for i, test := range tests {
-		test.oldService.ObjectMeta.ResourceVersion = "1"
-		test.service.ObjectMeta.ResourceVersion = "1"
-		errs := ValidateServiceUpdate(&test.oldService, &test.service)
-		if test.valid && len(errs) > 0 {
-			t.Errorf("%d: Unexpected error: %v", i, errs)
-			t.Logf("%#v vs %#v", test.oldService.ObjectMeta, test.service.ObjectMeta)
-		}
-		if !test.valid && len(errs) == 0 {
-			t.Errorf("%d: Unexpected non-error", i)
+
+	for _, tc := range testCases {
+		oldSvc := makeValidService()
+		newSvc := makeValidService()
+		tc.tweakSvc(&oldSvc, &newSvc)
+		errs := ValidateServiceUpdate(&oldSvc, &newSvc)
+		if len(errs) != tc.numErrs {
+			t.Errorf("Unexpected error list for case %q: %v", tc.name, utilerrors.NewAggregate(errs))
 		}
 	}
 }

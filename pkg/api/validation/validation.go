@@ -786,18 +786,12 @@ func ValidateService(service *api.Service) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 	allErrs = append(allErrs, ValidateObjectMeta(&service.ObjectMeta, true, ValidateServiceName).Prefix("metadata")...)
 
-	if !util.IsValidPortNum(service.Spec.Port) {
-		allErrs = append(allErrs, errs.NewFieldInvalid("spec.port", service.Spec.Port, portRangeErrorMsg))
+	if len(service.Spec.Ports) == 0 {
+		allErrs = append(allErrs, errs.NewFieldRequired("spec.ports"))
 	}
-	if len(service.Spec.Protocol) == 0 {
-		allErrs = append(allErrs, errs.NewFieldRequired("spec.protocol"))
-	} else if !supportedPortProtocols.Has(strings.ToUpper(string(service.Spec.Protocol))) {
-		allErrs = append(allErrs, errs.NewFieldNotSupported("spec.protocol", service.Spec.Protocol))
-	}
-	if service.Spec.TargetPort.Kind == util.IntstrInt && service.Spec.TargetPort.IntVal != 0 && !util.IsValidPortNum(service.Spec.TargetPort.IntVal) {
-		allErrs = append(allErrs, errs.NewFieldInvalid("spec.containerPort", service.Spec.Port, portRangeErrorMsg))
-	} else if service.Spec.TargetPort.Kind == util.IntstrString && len(service.Spec.TargetPort.StrVal) == 0 {
-		allErrs = append(allErrs, errs.NewFieldRequired("spec.containerPort"))
+	allPortNames := util.StringSet{}
+	for i := range service.Spec.Ports {
+		allErrs = append(allErrs, validateServicePort(&service.Spec.Ports[i], i, &allPortNames).PrefixIndex(i).Prefix("spec.ports")...)
 	}
 
 	if service.Spec.Selector != nil {
@@ -827,6 +821,39 @@ func ValidateService(service *api.Service) errs.ValidationErrorList {
 	return allErrs
 }
 
+func validateServicePort(sp *api.ServicePort, index int, allNames *util.StringSet) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+
+	if len(sp.Name) == 0 {
+		// Allow empty names if they are the first port (mostly for compat).
+		if index != 0 {
+			allErrs = append(allErrs, errs.NewFieldRequired("name"))
+		}
+	} else if !util.IsDNS1123Label(sp.Name) {
+		allErrs = append(allErrs, errs.NewFieldInvalid("name", sp.Name, dns1123LabelErrorMsg))
+	} else if allNames.Has(sp.Name) {
+		allErrs = append(allErrs, errs.NewFieldDuplicate("name", sp.Name))
+	}
+
+	if !util.IsValidPortNum(sp.Port) {
+		allErrs = append(allErrs, errs.NewFieldInvalid("port", sp.Port, portRangeErrorMsg))
+	}
+
+	if len(sp.Protocol) == 0 {
+		allErrs = append(allErrs, errs.NewFieldRequired("protocol"))
+	} else if !supportedPortProtocols.Has(strings.ToUpper(string(sp.Protocol))) {
+		allErrs = append(allErrs, errs.NewFieldNotSupported("protocol", sp.Protocol))
+	}
+
+	if sp.TargetPort != util.NewIntOrStringFromInt(0) && sp.TargetPort != util.NewIntOrStringFromString("") {
+		if sp.TargetPort.Kind == util.IntstrInt && !util.IsValidPortNum(sp.TargetPort.IntVal) {
+			allErrs = append(allErrs, errs.NewFieldInvalid("targetPort", sp.TargetPort, portRangeErrorMsg))
+		}
+	}
+
+	return allErrs
+}
+
 // ValidateServiceUpdate tests if required fields in the service are set during an update
 func ValidateServiceUpdate(oldService, service *api.Service) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
@@ -838,6 +865,7 @@ func ValidateServiceUpdate(oldService, service *api.Service) errs.ValidationErro
 		allErrs = append(allErrs, errs.NewFieldInvalid("spec.portalIP", service.Spec.PortalIP, "field is immutable"))
 	}
 
+	allErrs = append(allErrs, ValidateService(service)...)
 	return allErrs
 }
 

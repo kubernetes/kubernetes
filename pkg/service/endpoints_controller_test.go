@@ -51,7 +51,8 @@ func newPodList(nPods int, nPorts int) *api.PodList {
 			},
 		}
 		for j := 0; j < nPorts; j++ {
-			p.Spec.Containers[0].Ports = append(p.Spec.Containers[0].Ports, api.ContainerPort{ContainerPort: 8080 + j})
+			p.Spec.Containers[0].Ports = append(p.Spec.Containers[0].Ports,
+				api.ContainerPort{Name: fmt.Sprintf("port%d", i), ContainerPort: 8080 + j})
 		}
 		pods = append(pods, p)
 	}
@@ -203,7 +204,7 @@ func TestFindPort(t *testing.T) {
 
 	for _, tc := range testCases {
 		port, err := findPort(&api.Pod{Spec: api.PodSpec{Containers: tc.containers}},
-			&api.Service{Spec: api.ServiceSpec{Protocol: "TCP", Port: servicePort, TargetPort: tc.port}})
+			&api.ServicePort{Protocol: "TCP", Port: servicePort, TargetPort: tc.port})
 		if err != nil && tc.pass {
 			t.Errorf("unexpected error for %s: %v", tc.name, err)
 		}
@@ -277,7 +278,7 @@ func TestSyncEndpointsItemsPreserveNoSelector(t *testing.T) {
 		Items: []api.Service{
 			{
 				ObjectMeta: api.ObjectMeta{Name: "foo"},
-				Spec:       api.ServiceSpec{},
+				Spec:       api.ServiceSpec{Ports: []api.ServicePort{{Port: 80}}},
 			},
 		},
 	}
@@ -310,7 +311,7 @@ func TestSyncEndpointsProtocolTCP(t *testing.T) {
 				ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "other"},
 				Spec: api.ServiceSpec{
 					Selector: map[string]string{},
-					Protocol: api.ProtocolTCP,
+					Ports:    []api.ServicePort{{Port: 80}},
 				},
 			},
 		},
@@ -344,7 +345,7 @@ func TestSyncEndpointsProtocolUDP(t *testing.T) {
 				ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "other"},
 				Spec: api.ServiceSpec{
 					Selector: map[string]string{},
-					Protocol: api.ProtocolUDP,
+					Ports:    []api.ServicePort{{Port: 80}},
 				},
 			},
 		},
@@ -378,6 +379,7 @@ func TestSyncEndpointsItemsEmptySelectorSelectsAll(t *testing.T) {
 				ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "other"},
 				Spec: api.ServiceSpec{
 					Selector: map[string]string{},
+					Ports:    []api.ServicePort{{Port: 80, Protocol: "TCP", TargetPort: util.NewIntOrStringFromInt(8080)}},
 				},
 			},
 		},
@@ -417,9 +419,8 @@ func TestSyncEndpointsItemsPreexisting(t *testing.T) {
 			{
 				ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "bar"},
 				Spec: api.ServiceSpec{
-					Selector: map[string]string{
-						"foo": "bar",
-					},
+					Selector: map[string]string{"foo": "bar"},
+					Ports:    []api.ServicePort{{Port: 80, Protocol: "TCP", TargetPort: util.NewIntOrStringFromInt(8080)}},
 				},
 			},
 		},
@@ -462,9 +463,8 @@ func TestSyncEndpointsItemsPreexistingIdentical(t *testing.T) {
 			{
 				ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: api.NamespaceDefault},
 				Spec: api.ServiceSpec{
-					Selector: map[string]string{
-						"foo": "bar",
-					},
+					Selector: map[string]string{"foo": "bar"},
+					Ports:    []api.ServicePort{{Port: 80, Protocol: "TCP", TargetPort: util.NewIntOrStringFromInt(8080)}},
 				},
 			},
 		},
@@ -496,8 +496,10 @@ func TestSyncEndpointsItems(t *testing.T) {
 			{
 				ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "other"},
 				Spec: api.ServiceSpec{
-					Selector: map[string]string{
-						"foo": "bar",
+					Selector: map[string]string{"foo": "bar"},
+					Ports: []api.ServicePort{
+						{Name: "port0", Port: 80, Protocol: "TCP", TargetPort: util.NewIntOrStringFromInt(8080)},
+						{Name: "port1", Port: 88, Protocol: "TCP", TargetPort: util.NewIntOrStringFromInt(8088)},
 					},
 				},
 			},
@@ -520,7 +522,8 @@ func TestSyncEndpointsItems(t *testing.T) {
 			{IP: "1.2.3.6", TargetRef: &api.ObjectReference{Kind: "Pod", Name: "pod2"}},
 		},
 		Ports: []api.EndpointPort{
-			{Port: 8080, Protocol: "TCP"},
+			{Name: "port0", Port: 8080, Protocol: "TCP"},
+			{Name: "port1", Port: 8088, Protocol: "TCP"},
 		},
 	}}
 	data := runtime.EncodeOrDie(testapi.Codec(), &api.Endpoints{
@@ -540,9 +543,8 @@ func TestSyncEndpointsPodError(t *testing.T) {
 			{
 				ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: api.NamespaceDefault},
 				Spec: api.ServiceSpec{
-					Selector: map[string]string{
-						"foo": "bar",
-					},
+					Selector: map[string]string{"foo": "bar"},
+					Ports:    []api.ServicePort{{Port: 80, Protocol: "TCP", TargetPort: util.NewIntOrStringFromInt(8080)}},
 				},
 			},
 		},

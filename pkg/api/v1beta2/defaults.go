@@ -68,6 +68,15 @@ func init() {
 			if obj.SessionAffinity == "" {
 				obj.SessionAffinity = AffinityTypeNone
 			}
+			for i := range obj.Ports {
+				sp := &obj.Ports[i]
+				if sp.Protocol == "" {
+					sp.Protocol = ProtocolTCP
+				}
+				if sp.ContainerPort == util.NewIntOrStringFromInt(0) || sp.ContainerPort == util.NewIntOrStringFromString("") {
+					sp.ContainerPort = util.NewIntOrStringFromInt(sp.Port)
+				}
+			}
 		},
 		func(obj *PodSpec) {
 			if obj.DNSPolicy == "" {

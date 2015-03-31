@@ -709,14 +709,28 @@ func init() {
 				return err
 			}
 
-			out.Port = in.Spec.Port
-			out.Protocol = Protocol(in.Spec.Protocol)
+			// Produce legacy fields.
+			if len(in.Spec.Ports) > 0 {
+				out.PortName = in.Spec.Ports[0].Name
+				out.Port = in.Spec.Ports[0].Port
+				out.Protocol = Protocol(in.Spec.Ports[0].Protocol)
+				out.ContainerPort = in.Spec.Ports[0].TargetPort
+			}
+			// Copy modern fields.
+			for i := range in.Spec.Ports {
+				out.Ports = append(out.Ports, ServicePort{
+					Name:          in.Spec.Ports[i].Name,
+					Port:          in.Spec.Ports[i].Port,
+					Protocol:      Protocol(in.Spec.Ports[i].Protocol),
+					ContainerPort: in.Spec.Ports[i].TargetPort,
+				})
+			}
+
 			if err := s.Convert(&in.Spec.Selector, &out.Selector, 0); err != nil {
 				return err
 			}
 			out.CreateExternalLoadBalancer = in.Spec.CreateExternalLoadBalancer
 			out.PublicIPs = in.Spec.PublicIPs
-			out.ContainerPort = in.Spec.TargetPort
 			out.PortalIP = in.Spec.PortalIP
 			if err := s.Convert(&in.Spec.SessionAffinity, &out.SessionAffinity, 0); err != nil {
 				return err
@@ -735,14 +749,31 @@ func init() {
 				return err
 			}
 
-			out.Spec.Port = in.Port
-			out.Spec.Protocol = newer.Protocol(in.Protocol)
+			if len(in.Ports) == 0 && in.Port != 0 {
+				// Use legacy fields to produce modern fields.
+				out.Spec.Ports = append(out.Spec.Ports, newer.ServicePort{
+					Name:       in.PortName,
+					Port:       in.Port,
+					Protocol:   newer.Protocol(in.Protocol),
+					TargetPort: in.ContainerPort,
+				})
+			} else {
+				// Use modern fields, ignore legacy.
+				for i := range in.Ports {
+					out.Spec.Ports = append(out.Spec.Ports, newer.ServicePort{
+						Name:       in.Ports[i].Name,
+						Port:       in.Ports[i].Port,
+						Protocol:   newer.Protocol(in.Ports[i].Protocol),
+						TargetPort: in.Ports[i].ContainerPort,
+					})
+				}
+			}
+
 			if err := s.Convert(&in.Selector, &out.Spec.Selector, 0); err != nil {
 				return err
 			}
 			out.Spec.CreateExternalLoadBalancer = in.CreateExternalLoadBalancer
 			out.Spec.PublicIPs = in.PublicIPs
-			out.Spec.TargetPort = in.ContainerPort
 			out.Spec.PortalIP = in.PortalIP
 			if err := s.Convert(&in.SessionAffinity, &out.Spec.SessionAffinity, 0); err != nil {
 				return err

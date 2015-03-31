@@ -114,11 +114,10 @@ func (m *Master) createMasterServiceIfNeeded(serviceName string, serviceIP net.I
 			Labels:    map[string]string{"provider": "kubernetes", "component": "apiserver"},
 		},
 		Spec: api.ServiceSpec{
-			Port: servicePort,
+			Ports: []api.ServicePort{{Port: servicePort, Protocol: api.ProtocolTCP}},
 			// maintained by this code, not by the pod selector
 			Selector:        nil,
 			PortalIP:        serviceIP.String(),
-			Protocol:        api.ProtocolTCP,
 			SessionAffinity: api.AffinityTypeNone,
 		},
 	}

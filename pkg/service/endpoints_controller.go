@@ -73,44 +73,49 @@ func (e *EndpointController) SyncServiceEndpoints() error {
 		for i := range pods.Items {
 			pod := &pods.Items[i]
 
-			// TODO: Once v1beta1 and v1beta2 are EOL'ed, this can
-			// assume that service.Spec.TargetPort is populated.
-			_ = v1beta1.Dependency
-			_ = v1beta2.Dependency
-			// TODO: Add multiple-ports to Service and expose them here.
-			portName := ""
-			portProto := service.Spec.Protocol
-			portNum, err := findPort(pod, service)
-			if err != nil {
-				glog.Errorf("Failed to find port for service %s/%s: %v", service.Namespace, service.Name, err)
-				continue
-			}
-			if len(pod.Status.PodIP) == 0 {
-				glog.Errorf("Failed to find an IP for pod %s/%s", pod.Namespace, pod.Name)
-				continue
-			}
+			for i := range service.Spec.Ports {
+				servicePort := &service.Spec.Ports[i]
 
-			inService := false
-			for _, c := range pod.Status.Conditions {
-				if c.Type == api.PodReady && c.Status == api.ConditionTrue {
-					inService = true
-					break
+				// TODO: Once v1beta1 and v1beta2 are EOL'ed,
+				// this can safely assume that TargetPort is
+				// populated, and findPort() can be removed.
+				_ = v1beta1.Dependency
+				_ = v1beta2.Dependency
+
+				portName := servicePort.Name
+				portProto := servicePort.Protocol
+				portNum, err := findPort(pod, servicePort)
+				if err != nil {
+					glog.Errorf("Failed to find port for service %s/%s: %v", service.Namespace, service.Name, err)
+					continue
 				}
-			}
-			if !inService {
-				glog.V(5).Infof("Pod is out of service: %v/%v", pod.Namespace, pod.Name)
-				continue
-			}
+				if len(pod.Status.PodIP) == 0 {
+					glog.Errorf("Failed to find an IP for pod %s/%s", pod.Namespace, pod.Name)
+					continue
+				}
 
-			epp := api.EndpointPort{Name: portName, Port: portNum, Protocol: portProto}
-			epa := api.EndpointAddress{IP: pod.Status.PodIP, TargetRef: &api.ObjectReference{
-				Kind:            "Pod",
-				Namespace:       pod.ObjectMeta.Namespace,
-				Name:            pod.ObjectMeta.Name,
-				UID:             pod.ObjectMeta.UID,
-				ResourceVersion: pod.ObjectMeta.ResourceVersion,
-			}}
-			subsets = append(subsets, api.EndpointSubset{Addresses: []api.EndpointAddress{epa}, Ports: []api.EndpointPort{epp}})
+				inService := false
+				for _, c := range pod.Status.Conditions {
+					if c.Type == api.PodReady && c.Status == api.ConditionTrue {
+						inService = true
+						break
+					}
+				}
+				if !inService {
+					glog.V(5).Infof("Pod is out of service: %v/%v", pod.Namespace, pod.Name)
+					continue
+				}
+
+				epp := api.EndpointPort{Name: portName, Port: portNum, Protocol: portProto}
+				epa := api.EndpointAddress{IP: pod.Status.PodIP, TargetRef: &api.ObjectReference{
+					Kind:            "Pod",
+					Namespace:       pod.ObjectMeta.Namespace,
+					Name:            pod.ObjectMeta.Name,
+					UID:             pod.ObjectMeta.UID,
+					ResourceVersion: pod.ObjectMeta.ResourceVersion,
+				}}
+				subsets = append(subsets, api.EndpointSubset{Addresses: []api.EndpointAddress{epa}, Ports: []api.EndpointPort{epp}})
+			}
 		}
 		subsets = endpoints.RepackSubsets(subsets)
 
@@ -169,24 +174,24 @@ func findDefaultPort(pod *api.Pod, servicePort int, proto api.Protocol) int {
 // the service's port.  If the targetPort is a non-empty string, look that
 // string up in all named ports in all containers in the target pod.  If no
 // match is found, fail.
-func findPort(pod *api.Pod, service *api.Service) (int, error) {
-	portName := service.Spec.TargetPort
+func findPort(pod *api.Pod, svcPort *api.ServicePort) (int, error) {
+	portName := svcPort.TargetPort
 	switch portName.Kind {
 	case util.IntstrString:
 		if len(portName.StrVal) == 0 {
-			return findDefaultPort(pod, service.Spec.Port, service.Spec.Protocol), nil
+			return findDefaultPort(pod, svcPort.Port, svcPort.Protocol), nil
 		}
 		name := portName.StrVal
 		for _, container := range pod.Spec.Containers {
 			for _, port := range container.Ports {
-				if port.Name == name && port.Protocol == service.Spec.Protocol {
+				if port.Name == name && port.Protocol == svcPort.Protocol {
 					return port.ContainerPort, nil
 				}
 			}
 		}
 	case util.IntstrInt:
 		if portName.IntVal == 0 {
-			return findDefaultPort(pod, service.Spec.Port, service.Spec.Protocol), nil
+			return findDefaultPort(pod, svcPort.Port, svcPort.Protocol), nil
 		}
 		return portName.IntVal, nil
 	}

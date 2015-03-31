@@ -8,9 +8,13 @@
       }
    },
    "spec":{
-      "port":6379,
-      "containerPort":6379,
-      "protocol":"TCP",
+      "ports": [
+        {
+          "port":6379,
+          "targetPort":6379,
+          "protocol":"TCP"
+        }
+      ],
       "selector":{
          "name":"redis-slave"
       }
