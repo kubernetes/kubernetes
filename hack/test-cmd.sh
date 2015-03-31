@@ -503,7 +503,7 @@ __EOF__
   # Pre-condition: frontend replication controller is running
   kube::test::get_object_assert rc "{{range.items}}{{$id_field}}:{{end}}" 'frontend-controller:'
   # Command
-  kubectl delete rc frontend-controller "${kube_flags[@]}"
+  kubectl stop rc frontend-controller "${kube_flags[@]}"
   # Post-condition: no replication controller is running
   kube::test::get_object_assert rc "{{range.items}}{{$id_field}}:{{end}}" ''
 
@@ -520,7 +520,7 @@ __EOF__
   # Pre-condition: frontend and redis-slave
   kube::test::get_object_assert rc "{{range.items}}{{$id_field}}:{{end}}" 'frontend-controller:redis-slave-controller:'
   # Command
-  kubectl delete rc frontend-controller redis-slave-controller "${kube_flags[@]}" # delete multiple controllers at once
+  kubectl stop rc frontend-controller redis-slave-controller "${kube_flags[@]}" # delete multiple controllers at once
   # Post-condition: no replication controller is running
   kube::test::get_object_assert rc "{{range.items}}{{$id_field}}:{{end}}" ''
 
