@@ -64,26 +64,29 @@ func GetCloudProvider(name string, config io.Reader) (Interface, error) {
 
 // InitCloudProvider creates an instance of the named cloud provider.
 func InitCloudProvider(name string, configFilePath string) Interface {
-	var config *os.File
+	var cloud Interface
 
 	if name == "" {
 		glog.Info("No cloud provider specified.")
 		return nil
 	}
 
+	var err error
 	if configFilePath != "" {
-		var err error
-
-		config, err = os.Open(configFilePath)
+		config, err := os.Open(configFilePath)
 		if err != nil {
 			glog.Fatalf("Couldn't open cloud provider configuration %s: %#v",
 				configFilePath, err)
 		}
 
 		defer config.Close()
+		cloud, err = GetCloudProvider(name, config)
+	} else {
+		// Pass explicit nil so plugins can actually check for nil. See
+		// "Why is my nil error value not equal to nil?" in golang.org/doc/faq.
+		cloud, err = GetCloudProvider(name, nil)
 	}
 
-	cloud, err := GetCloudProvider(name, config)
 	if err != nil {
 		glog.Fatalf("Couldn't init cloud provider %q: %v", name, err)
 	}
