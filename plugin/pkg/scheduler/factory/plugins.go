@@ -137,7 +137,7 @@ func RegisterPriorityFunction(name string, function algorithm.PriorityFunction, 
 		Function: func(PluginFactoryArgs) algorithm.PriorityFunction {
 			return function
 		},
-		Weight: 1,
+		Weight: weight,
 	})
 }
 

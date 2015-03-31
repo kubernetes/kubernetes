@@ -25,6 +25,10 @@ import (
 
 func init() {
 	factory.RegisterAlgorithmProvider(factory.DefaultProvider, defaultPredicates(), defaultPriorities())
+	// EqualPriority is a prioritizer function that gives an equal weight of one to all minions
+	// Register the priority function so that its available
+	// but do not include it as part of the default priorities
+	factory.RegisterPriorityFunction("EqualPriority", algorithm.EqualPriority, 1)
 }
 
 func defaultPredicates() util.StringSet {
@@ -66,7 +70,5 @@ func defaultPriorities() util.StringSet {
 				Weight: 1,
 			},
 		),
-		// EqualPriority is a prioritizer function that gives an equal weight of one to all minions
-		factory.RegisterPriorityFunction("EqualPriority", algorithm.EqualPriority, 0),
 	)
 }

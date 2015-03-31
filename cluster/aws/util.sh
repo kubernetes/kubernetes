@@ -238,8 +238,8 @@ function upload-server-tars() {
 
   local s3_bucket_location=$(aws --output text s3api get-bucket-location --bucket ${AWS_S3_BUCKET})
   local s3_url_base=https://s3-${s3_bucket_location}.amazonaws.com
-  if [[ "${s3_bucket_location}" == "us-east-1" ]]; then
-    # us-east-1 does not follow the pattern
+  if [[ "${s3_bucket_location}" == "None" ]]; then
+    # "US Classic" does not follow the pattern
     s3_url_base=https://s3.amazonaws.com
   fi
 

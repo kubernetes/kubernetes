@@ -76,7 +76,8 @@ func CreatePodUpdate(op kubelet.PodOperation, source string, pods ...api.Pod) ku
 }
 
 func createPodConfigTester(mode PodConfigNotificationMode) (chan<- interface{}, <-chan kubelet.PodUpdate, *PodConfig) {
-	config := NewPodConfig(mode, record.FromSource(api.EventSource{Component: "kubelet"}))
+	eventBroadcaster := record.NewBroadcaster()
+	config := NewPodConfig(mode, eventBroadcaster.NewRecorder(api.EventSource{Component: "kubelet"}))
 	channel := config.Channel(TestSource)
 	ch := config.Updates()
 	return channel, ch, config

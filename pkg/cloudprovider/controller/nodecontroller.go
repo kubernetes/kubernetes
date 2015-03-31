@@ -91,9 +91,16 @@ func NewNodeController(
 	staticResources *api.NodeResources,
 	kubeClient client.Interface,
 	kubeletClient client.KubeletClient,
-	recorder record.EventRecorder,
 	registerRetryCount int,
 	podEvictionTimeout time.Duration) *NodeController {
+	eventBroadcaster := record.NewBroadcaster()
+	recorder := eventBroadcaster.NewRecorder(api.EventSource{Component: "controllermanager"})
+	if kubeClient != nil {
+		glog.Infof("Sending events to api server.")
+		eventBroadcaster.StartRecordingToSink(kubeClient.Events(""))
+	} else {
+		glog.Infof("No api server defined - no events will be sent to API server.")
+	}
 	return &NodeController{
 		cloud:              cloud,
 		matchRE:            matchRE,
@@ -125,7 +132,6 @@ func (nc *NodeController) Run(period time.Duration, syncNodeList, syncNodeStatus
 	// Register intial set of nodes with their status set.
 	var nodes *api.NodeList
 	var err error
-	record.StartRecording(nc.kubeClient.Events(""))
 	if nc.isRunningCloudProvider() {
 		if syncNodeList {
 			if nodes, err = nc.GetCloudNodesWithSpec(); err != nil {

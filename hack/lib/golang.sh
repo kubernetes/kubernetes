@@ -242,6 +242,27 @@ kube::golang::place_bins() {
   done
 }
 
+kube::golang::exit_if_stdlib_not_installed() {
+  local go_root_dir=$(go env GOROOT);
+  local go_host_os=$(go env GOHOSTOS);
+  local go_host_arch=$(go env GOHOSTARCH);
+  local cgo_pkg_dir=${go_root_dir}/pkg/${go_host_os}_${go_host_arch}_cgo;
+  if [ -e ${cgo_pkg_dir} ]; then
+    return 0;
+  fi
+
+  if [ -w ${go_root_dir}/pkg ]; then
+    return 0;
+  fi
+
+  kube::log::status "+++ Error. stdlib pkg with cgo flag not found."; 
+  kube::log::status "+++ Error. stdlib pkg cannot be rebuilt since ${go_root_dir}/pkg is not writable by `whoami`"; 
+  kube::log::status "+++ Error. Make ${go_root_dir}/pkg writable for `whoami` for a one-time stdlib install, Or"
+  kube::log::status "+++ Error. Rebuild stdlib using the command 'CGO_ENABLED=0 go install -a installsuffix cgo std'";
+  
+  exit 0;
+}
+
 # Build binaries targets specified
 #
 # Input:
@@ -310,6 +331,7 @@ kube::golang::build_binaries() {
           fi
           
           if kube::golang::is_statically_linked_library "${binary}"; then
+            kube::golang::exit_if_stdlib_not_installed;
             CGO_ENABLED=0 go build -installsuffix cgo -o "${output_path}/${bin}" \
               "${goflags[@]:+${goflags[@]}}" \
               -ldflags "${version_ldflags}" \
@@ -324,6 +346,7 @@ kube::golang::build_binaries() {
       else
         for binary in "${binaries[@]}"; do
           if kube::golang::is_statically_linked_library "${binary}"; then
+            kube::golang::exit_if_stdlib_not_installed;
             CGO_ENABLED=0 go install -installsuffix cgo "${goflags[@]:+${goflags[@]}}" \
               -ldflags "${version_ldflags}" \
               "${binary}"

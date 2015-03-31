@@ -21,6 +21,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/cadvisor"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/dockertools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -42,6 +43,7 @@ func newRealImageManager(policy ImageGCPolicy) (*realImageManager, *dockertools.
 		policy:       policy,
 		imageRecords: make(map[string]*imageRecord),
 		cadvisor:     mockCadvisor,
+		recorder:     &record.FakeRecorder{},
 	}, fakeDocker, mockCadvisor
 }
 

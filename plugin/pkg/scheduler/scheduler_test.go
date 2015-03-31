@@ -56,7 +56,8 @@ func (es mockScheduler) Schedule(pod api.Pod, ml scheduler.MinionLister) (string
 }
 
 func TestScheduler(t *testing.T) {
-	defer record.StartLogging(t.Logf).Stop()
+	eventBroadcaster := record.NewBroadcaster()
+	defer eventBroadcaster.StartLogging(t.Logf).Stop()
 	errS := errors.New("scheduler")
 	errB := errors.New("binder")
 
@@ -119,11 +120,11 @@ func TestScheduler(t *testing.T) {
 			NextPod: func() *api.Pod {
 				return item.sendPod
 			},
-			Recorder: record.FromSource(api.EventSource{Component: "scheduler"}),
+			Recorder: eventBroadcaster.NewRecorder(api.EventSource{Component: "scheduler"}),
 		}
 		s := New(c)
 		called := make(chan struct{})
-		events := record.GetEvents(func(e *api.Event) {
+		events := eventBroadcaster.StartEventWatcher(func(e *api.Event) {
 			if e, a := item.eventReason, e.Reason; e != a {
 				t.Errorf("%v: expected %v, got %v", i, e, a)
 			}

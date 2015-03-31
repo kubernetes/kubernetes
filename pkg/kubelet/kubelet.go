@@ -195,11 +195,21 @@ func NewMainKubelet(
 	}
 	nodeLister := &cache.StoreToNodeLister{nodeStore}
 
+	// TODO: get the real minion object of ourself,
+	// and use the real minion name and UID.
+	// TODO: what is namespace for node?
+	nodeRef := &api.ObjectReference{
+		Kind:      "Node",
+		Name:      hostname,
+		UID:       types.UID(hostname),
+		Namespace: "",
+	}
+
 	containerGC, err := newContainerGC(dockerClient, containerGCPolicy)
 	if err != nil {
 		return nil, err
 	}
-	imageManager, err := newImageManager(dockerClient, cadvisorInterface, imageGCPolicy)
+	imageManager, err := newImageManager(dockerClient, cadvisorInterface, recorder, nodeRef, imageGCPolicy)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize image manager: %v", err)
 	}
@@ -232,6 +242,7 @@ func NewMainKubelet(
 		imageManager:                   imageManager,
 		statusManager:                  statusManager,
 		cloud:                          cloud,
+		nodeRef:                        nodeRef,
 	}
 
 	klet.podManager = newBasicPodManager(klet.kubeClient)
@@ -350,6 +361,9 @@ type Kubelet struct {
 
 	//Cloud provider interface
 	cloud cloudprovider.Interface
+
+	// Reference to this node.
+	nodeRef *api.ObjectReference
 }
 
 // getRootDir returns the full path to the directory under which kubelet can
@@ -1737,7 +1751,7 @@ func (kl *Kubelet) updateNodeStatus() error {
 func (kl *Kubelet) recordNodeOnlineEvent() {
 	// TODO: This requires a transaction, either both node status is updated
 	// and event is recorded or neither should happen, see issue #6055.
-	kl.recorder.Eventf(kl.getNodeReference(), "online", "Node %s is now online", kl.hostname)
+	kl.recorder.Eventf(kl.nodeRef, "online", "Node %s is now online", kl.hostname)
 }
 
 // tryUpdateNodeStatus tries to update node status to master.
@@ -1763,7 +1777,7 @@ func (kl *Kubelet) tryUpdateNodeStatus() error {
 			node.Status.NodeInfo.BootID != info.BootID {
 			// TODO: This requires a transaction, either both node status is updated
 			// and event is recorded or neither should happen, see issue #6055.
-			kl.recorder.Eventf(kl.getNodeReference(), "rebooted",
+			kl.recorder.Eventf(kl.nodeRef, "rebooted",
 				"Node %s has been rebooted, boot id: %s", kl.hostname, info.BootID)
 		}
 		node.Status.NodeInfo.BootID = info.BootID
@@ -2013,22 +2027,10 @@ func (kl *Kubelet) PortForward(podFullName string, uid types.UID, port uint16, s
 	return kl.runner.PortForward(podInfraContainer.ID, port, stream)
 }
 
-func (kl *Kubelet) getNodeReference() *api.ObjectReference {
-	// and use the real minion name and UID.
-	// TODO: what is namespace for node?
-	return &api.ObjectReference{
-		Kind:      "Node",
-		Name:      kl.hostname,
-		UID:       types.UID(kl.hostname),
-		Namespace: "",
-	}
-}
-
 // BirthCry sends an event that the kubelet has started up.
 func (kl *Kubelet) BirthCry() {
 	// Make an event that kubelet restarted.
-	// TODO: get the real minion object of ourself,
-	kl.recorder.Eventf(kl.getNodeReference(), "starting", "Starting kubelet.")
+	kl.recorder.Eventf(kl.nodeRef, "starting", "Starting kubelet.")
 }
 
 func (kl *Kubelet) StreamingConnectionIdleTimeout() time.Duration {

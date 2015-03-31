@@ -85,7 +85,7 @@ func (kl *Kubelet) probeContainerLiveness(pod *api.Pod, status api.PodStatus, co
 	return kl.runProbeWithRetries(p, pod, status, container, maxProbeRetries)
 }
 
-// probeContainerLiveness probes the readiness of a container.
+// probeContainerReadiness probes the readiness of a container.
 // If the initial delay on the readiness probe has not passed the probe will return probe.Failure.
 func (kl *Kubelet) probeContainerReadiness(pod *api.Pod, status api.PodStatus, container api.Container, createdAt int64) (probe.Result, error) {
 	p := container.ReadinessProbe
@@ -115,6 +115,7 @@ func (kl *Kubelet) runProbeWithRetries(p *api.Probe, pod *api.Pod, status api.Po
 func (kl *Kubelet) runProbe(p *api.Probe, pod *api.Pod, status api.PodStatus, container api.Container) (probe.Result, error) {
 	timeout := time.Duration(p.TimeoutSeconds) * time.Second
 	if p.Exec != nil {
+		glog.V(4).Infof("Exec-Probe Pod: %v, Container: %v", pod, container)
 		return kl.prober.exec.Probe(kl.newExecInContainer(pod, container))
 	}
 	if p.HTTPGet != nil {
@@ -123,6 +124,7 @@ func (kl *Kubelet) runProbe(p *api.Probe, pod *api.Pod, status api.PodStatus, co
 			return probe.Unknown, err
 		}
 		host, port, path := extractGetParams(p.HTTPGet, status, port)
+		glog.V(4).Infof("HTTP-Probe Host: %v, Port: %v, Path: %v", host, port, path)
 		return kl.prober.http.Probe(host, port, path, timeout)
 	}
 	if p.TCPSocket != nil {
@@ -130,6 +132,7 @@ func (kl *Kubelet) runProbe(p *api.Probe, pod *api.Pod, status api.PodStatus, co
 		if err != nil {
 			return probe.Unknown, err
 		}
+		glog.V(4).Infof("TCP-Probe PodIP: %v, Port: %v, Timeout: %v", status.PodIP, port, timeout)
 		return kl.prober.tcp.Probe(status.PodIP, port, timeout)
 	}
 	glog.Warningf("Failed to find probe builder for %s %+v", container.Name, container.LivenessProbe)

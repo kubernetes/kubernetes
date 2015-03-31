@@ -45,10 +45,10 @@ func (t *testRESTStrategy) AllowCreateOnUpdate() bool { return t.allowCreateOnUp
 
 func (t *testRESTStrategy) PrepareForCreate(obj runtime.Object)      {}
 func (t *testRESTStrategy) PrepareForUpdate(obj, old runtime.Object) {}
-func (t *testRESTStrategy) Validate(obj runtime.Object) fielderrors.ValidationErrorList {
+func (t *testRESTStrategy) Validate(ctx api.Context, obj runtime.Object) fielderrors.ValidationErrorList {
 	return nil
 }
-func (t *testRESTStrategy) ValidateUpdate(obj, old runtime.Object) fielderrors.ValidationErrorList {
+func (t *testRESTStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) fielderrors.ValidationErrorList {
 	return nil
 }
 

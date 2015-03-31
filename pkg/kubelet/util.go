@@ -20,9 +20,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/capabilities"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
-	"github.com/golang/glog"
 	cadvisorApi "github.com/google/cadvisor/info/v1"
 )
 
@@ -32,17 +29,6 @@ func SetupCapabilities(allowPrivileged bool, hostNetworkSources []string) {
 		AllowPrivileged:    allowPrivileged,
 		HostNetworkSources: hostNetworkSources,
 	})
-}
-
-// TODO: Split this up?
-func SetupLogging() {
-	// Log the events locally too.
-	record.StartLogging(glog.Infof)
-}
-
-func SetupEventSending(client *client.Client, hostname string) {
-	glog.Infof("Sending events to api server.")
-	record.StartRecording(client.Events(""))
 }
 
 func CapacityFromMachineInfo(info *cadvisorApi.MachineInfo) api.ResourceList {

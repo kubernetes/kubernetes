@@ -71,7 +71,8 @@ func (f *FakeDockerClient) AssertUnorderedCalls(calls []string) (err error) {
 	f.Lock()
 	defer f.Unlock()
 
-	var actual, expected []string
+	actual := make([]string, len(calls))
+	expected := make([]string, len(f.called))
 	copy(actual, calls)
 	copy(expected, f.called)
 
