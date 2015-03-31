@@ -31,6 +31,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler"
 	schedulerapi "github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler/api"
+	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler/api/validation"
 
 	"github.com/golang/glog"
 )
@@ -86,6 +87,11 @@ func (f *ConfigFactory) CreateFromProvider(providerName string) (*scheduler.Conf
 // Creates a scheduler from the configuration file
 func (f *ConfigFactory) CreateFromConfig(policy schedulerapi.Policy) (*scheduler.Config, error) {
 	glog.V(2).Infof("creating scheduler from configuration: %v", policy)
+
+	// validate the policy configuration
+	if err := validation.ValidatePolicy(policy); err != nil {
+		return nil, err
+	}
 
 	predicateKeys := util.NewStringSet()
 	for _, predicate := range policy.Predicates {
