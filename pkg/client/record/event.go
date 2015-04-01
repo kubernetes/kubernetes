@@ -136,6 +136,17 @@ func (eventBroadcaster *eventBroadcasterImpl) StartRecordingToSink(sink EventSin
 		})
 }
 
+func isKeyNotFoundError(err error) bool {
+	statusErr, _ := err.(*errors.StatusError)
+	// At the moment the server is returning 500 instead of a more specific
+	// error. When changing this remember that it should be backward compatible
+	// with old api servers that may be still returning 500.
+	if statusErr != nil && statusErr.Status().Code == 500 {
+		return true
+	}
+	return false
+}
+
 // recordEvent attempts to write event to a sink. It returns true if the event
 // was successfully recorded or discarded, false if it should be retried.
 // If updateExistingEvent is false, it creates a new event, otherwise it updates
@@ -145,7 +156,11 @@ func recordEvent(sink EventSink, event *api.Event, updateExistingEvent bool) boo
 	var err error
 	if updateExistingEvent {
 		newEvent, err = sink.Update(event)
-	} else {
+	}
+	// Update can fail because the event may have been removed and it no longer exists.
+	if !updateExistingEvent || (updateExistingEvent && isKeyNotFoundError(err)) {
+		// Making sure that ResourceVersion is empty on creation
+		event.ResourceVersion = ""
 		newEvent, err = sink.Create(event)
 	}
 	if err == nil {
