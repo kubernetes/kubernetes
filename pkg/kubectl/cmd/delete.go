@@ -59,7 +59,7 @@ func (f *Factory) NewCmdDelete(out io.Writer) *cobra.Command {
 	var filenames util.StringList
 	cmd := &cobra.Command{
 		Use:     "delete ([-f FILENAME] | (RESOURCE [(ID | -l label | --all)]",
-		Short:   "Delete a resource by filename, stdin, or resource and ID.",
+		Short:   "Delete a resource by filename, stdin, resource and ID, or by resources and label selector.",
 		Long:    delete_long,
 		Example: delete_example,
 		Run: func(cmd *cobra.Command, args []string) {
