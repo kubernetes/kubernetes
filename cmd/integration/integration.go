@@ -389,13 +389,13 @@ containers:
 			}
 			// Delete the mirror pod, and wait for it to be recreated.
 			c.Pods(namespace).Delete(podName)
-			if err = wait.Poll(time.Second, time.Second*30,
+			if err = wait.Poll(time.Second, time.Minute*1,
 				podRunning(c, namespace, podName)); err != nil {
 				glog.Fatalf("%s FAILED: mirror pod has not been re-created or is not running: %v", desc, err)
 			}
 			// Remove the manifest file, and wait for the mirror pod to be deleted.
 			os.Remove(manifestFile.Name())
-			if err = wait.Poll(time.Second, time.Second*30,
+			if err = wait.Poll(time.Second, time.Minute*1,
 				podNotFound(c, namespace, podName)); err != nil {
 				glog.Fatalf("%s FAILED: mirror pod has not been deleted: %v", desc, err)
 			}
@@ -851,7 +851,7 @@ func runSchedulerNoPhantomPodsTest(client *client.Client) {
 	if err != nil {
 		glog.Fatalf("Failed to create pod: %v, %v", pod, err)
 	}
-	if err := wait.Poll(time.Second, time.Second*10, podRunning(client, foo.Namespace, foo.Name)); err != nil {
+	if err := wait.Poll(time.Second, time.Second*30, podRunning(client, foo.Namespace, foo.Name)); err != nil {
 		glog.Fatalf("FAILED: pod never started running %v", err)
 	}
 
@@ -860,7 +860,7 @@ func runSchedulerNoPhantomPodsTest(client *client.Client) {
 	if err != nil {
 		glog.Fatalf("Failed to create pod: %v, %v", pod, err)
 	}
-	if err := wait.Poll(time.Second, time.Second*10, podRunning(client, bar.Namespace, bar.Name)); err != nil {
+	if err := wait.Poll(time.Second, time.Second*30, podRunning(client, bar.Namespace, bar.Name)); err != nil {
 		glog.Fatalf("FAILED: pod never started running %v", err)
 	}
 
@@ -875,7 +875,7 @@ func runSchedulerNoPhantomPodsTest(client *client.Client) {
 	if err != nil {
 		glog.Fatalf("Failed to create pod: %v, %v", pod, err)
 	}
-	if err := wait.Poll(time.Second, time.Second*10, podRunning(client, baz.Namespace, baz.Name)); err != nil {
+	if err := wait.Poll(time.Second, time.Second*30, podRunning(client, baz.Namespace, baz.Name)); err != nil {
 		glog.Fatalf("FAILED: (Scheduler probably didn't process deletion of 'phantom.bar') Pod never started running: %v", err)
 	}
 
