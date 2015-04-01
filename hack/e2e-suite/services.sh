@@ -90,7 +90,7 @@ function start_service() {
                           "containers": [
                               {
                                   "name": "$1",
-                                  "image": "kubernetes/serve_hostname:1.1",
+                                  "image": "gcr.io/google_containers/serve_hostname:1.1",
                                   "ports": [
                                       {
                                           "containerPort": 9376,
