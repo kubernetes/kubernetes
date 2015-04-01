@@ -296,7 +296,7 @@ function find-vagrant-name-by-ip {
   echo "minion-$((${BASH_REMATCH[1]} - 1))"
 }
 
-# Find the vagrant machien name based on the host name of the minion
+# Find the vagrant machine name based on the host name of the minion
 function find-vagrant-name-by-minion-name {
   local ip="$1"
   if [[ "$ip" == "${INSTANCE_PREFIX}-master" ]]; then
