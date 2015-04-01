@@ -187,3 +187,14 @@ func TestSetDefaultServicePort(t *testing.T) {
 		t.Errorf("Expected port %d, got %v", in.Ports[0].Port, out.Ports[0].ContainerPort)
 	}
 }
+
+func TestSetDefaultMinionExternalID(t *testing.T) {
+	name := "node0"
+	m := &current.Minion{}
+	m.ID = name
+	obj2 := roundTrip(t, runtime.Object(m))
+	m2 := obj2.(*current.Minion)
+	if m2.ExternalID != name {
+		t.Errorf("Expected default External ID: %s, got: %s", name, m2.ExternalID)
+	}
+}

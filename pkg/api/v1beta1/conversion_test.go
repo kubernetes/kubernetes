@@ -175,10 +175,15 @@ func TestVolumeMountConversionToNew(t *testing.T) {
 
 func TestMinionListConversionToNew(t *testing.T) {
 	oldMinion := func(id string) current.Minion {
-		return current.Minion{TypeMeta: current.TypeMeta{ID: id}}
+		return current.Minion{
+			TypeMeta:   current.TypeMeta{ID: id},
+			ExternalID: id}
 	}
 	newNode := func(id string) newer.Node {
-		return newer.Node{ObjectMeta: newer.ObjectMeta{Name: id}}
+		return newer.Node{
+			ObjectMeta: newer.ObjectMeta{Name: id},
+			Spec:       newer.NodeSpec{ExternalID: id},
+		}
 	}
 	oldMinions := []current.Minion{
 		oldMinion("foo"),
