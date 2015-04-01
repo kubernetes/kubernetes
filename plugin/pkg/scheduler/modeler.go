@@ -19,6 +19,7 @@ package scheduler
 import (
 	"fmt"
 	"strings"
+	"sync"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/cache"
@@ -40,15 +41,37 @@ type ExtendedPodLister interface {
 	Exists(pod *api.Pod) (bool, error)
 }
 
+// actionLocker implements lockedAction (so the fake and SimpleModeler can both
+// use it)
+type actionLocker struct {
+	sync.Mutex
+}
+
+// LockedAction serializes calls of whatever is passed as 'do'.
+func (a *actionLocker) LockedAction(do func()) {
+	a.Lock()
+	defer a.Unlock()
+	do()
+}
+
 // FakeModeler implements the SystemModeler interface.
 type FakeModeler struct {
 	AssumePodFunc func(pod *api.Pod)
+	ForgetPodFunc func(pod *api.Pod)
+	actionLocker
 }
 
 // AssumePod calls the function variable if it is not nil.
 func (f *FakeModeler) AssumePod(pod *api.Pod) {
 	if f.AssumePodFunc != nil {
 		f.AssumePodFunc(pod)
+	}
+}
+
+// ForgetPod calls the function variable if it is not nil.
+func (f *FakeModeler) ForgetPod(pod *api.Pod) {
+	if f.ForgetPodFunc != nil {
+		f.ForgetPodFunc(pod)
 	}
 }
 
@@ -61,6 +84,8 @@ type SimpleModeler struct {
 	// haven't yet shown up in the scheduledPods variable.
 	// TODO: periodically clear this.
 	assumedPods *cache.StoreToPodLister
+
+	actionLocker
 }
 
 // NewSimpleModeler returns a new SimpleModeler.
@@ -76,6 +101,10 @@ func NewSimpleModeler(queuedPods, scheduledPods ExtendedPodLister) *SimpleModele
 
 func (s *SimpleModeler) AssumePod(pod *api.Pod) {
 	s.assumedPods.Add(pod)
+}
+
+func (s *SimpleModeler) ForgetPod(pod *api.Pod) {
+	s.assumedPods.Delete(pod)
 }
 
 // Extract names for readable logging.
