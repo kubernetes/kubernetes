@@ -49,7 +49,7 @@ func NewAuthenticator(clientCAFile string, tokenFile string) (authenticator.Requ
 		return nil, nil
 	}
 	if len(authenticators) == 1 {
-		return authenticators[1], nil
+		return authenticators[0], nil
 	}
 	return union.New(authenticators...), nil
 
