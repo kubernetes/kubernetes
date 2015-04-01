@@ -15,16 +15,11 @@
   {% set api_servers = "--api_servers=https://" + ips[0][0] + ":6443" -%}
 {% endif -%}
 
-{% set address = "--address=0.0.0.0" -%}
 {% set config = "--config=/etc/kubernetes/manifests" -%}
 {% set hostname_override = "" -%}
 {% if grains.minion_ip is defined -%}
   {% set hostname_override = " --hostname_override=" + grains.minion_ip -%}
 {% endif -%}
-
-{% set auth_path = "--auth_path=/var/lib/kubelet/kubernetes_auth" -%}
-
-{% set registry_qps = "--registry_qps=0.1" %}
 
 {% set cluster_dns = "" %}
 {% set cluster_domain = "" %}
@@ -33,4 +28,4 @@
   {% set cluster_domain = "--cluster_domain=" + pillar['dns_domain'] %}
 {% endif %}
 
-DAEMON_ARGS="{{daemon_args}} {{api_servers}} {{auth_path}} {{hostname_override}} {{address}} {{config}} --allow_privileged={{pillar['allow_privileged']}} {{pillar['log_level']}} {{cluster_dns}} {{cluster_domain}}"
+DAEMON_ARGS="{{daemon_args}} {{api_servers}} {{hostname_override}} {{config}} --allow_privileged={{pillar['allow_privileged']}} {{pillar['log_level']}} {{cluster_dns}} {{cluster_domain}}"
