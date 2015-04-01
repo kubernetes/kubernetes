@@ -117,7 +117,7 @@ var _ = Describe("Networking", func() {
 						{
 							Name:  "webserver",
 							Image: "kubernetes/nettest:1.1",
-							Command: []string{
+							Args: []string{
 								"-service=" + name,
 								fmt.Sprintf("-peers=%d", peers),
 								"-namespace=" + ns},

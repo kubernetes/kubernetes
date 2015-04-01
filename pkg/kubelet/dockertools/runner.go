@@ -69,6 +69,8 @@ func (r *DockerContainerRunner) RunContainer(pod *api.Pod, container *api.Contai
 
 	setEntrypointAndCommand(container, &dockerOpts)
 
+	glog.V(3).Infof("Container %v/%v/%v: setting entrypoint \"%v\" and command \"%v\"", pod.Namespace, pod.Name, container.Name, dockerOpts.Config.Entrypoint, dockerOpts.Config.Cmd)
+
 	dockerContainer, err := r.Client.CreateContainer(dockerOpts)
 	if err != nil {
 		if ref != nil {
