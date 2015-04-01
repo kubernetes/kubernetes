@@ -66,10 +66,14 @@ func (kl *Kubelet) probeContainer(pod *api.Pod, status api.PodStatus, container 
 	ref, ok := kl.containerRefManager.GetRef(containerID)
 	if !ok {
 		glog.Warningf("No ref for pod '%v' - '%v'", containerID, container.Name)
-	} else {
-		kl.recorder.Eventf(ref, "unhealthy", "Liveness Probe Failed %v - %v", containerID, container.Name)
+		return probe.Success, err
 	}
-	return ready, err
+
+	if ready != probe.Success {
+		kl.recorder.Eventf(ref, "unhealthy", "Readiness Probe Failed %v - %v", containerID, container.Name)
+	}
+
+	return probe.Success, nil
 }
 
 // probeContainerLiveness probes the liveness of a container.
