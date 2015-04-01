@@ -1317,6 +1317,7 @@ func mapToInstanceIds(instances []*ec2.Instance) []string {
 
 // Makes sure the security group allows ingress on the specified ports (with sourceIp & protocol)
 // Returns true iff changes were made
+// The security group must already exist
 func (self *AWSCloud) ensureSecurityGroupIngess(securityGroupId string, sourceIp string, protocol string, ports []int) (bool, error) {
 	groups, err := self.ec2.DescribeSecurityGroups([]string{securityGroupId}, "", "")
 	if err != nil {
@@ -1325,9 +1326,11 @@ func (self *AWSCloud) ensureSecurityGroupIngess(securityGroupId string, sourceIp
 	}
 
 	if len(groups) == 0 {
+		// We require that the security group already exist
 		return false, fmt.Errorf("security group not found")
 	}
 	if len(groups) != 1 {
+		// This should not be possible - ids should be unique
 		return false, fmt.Errorf("multiple security groups found with same id")
 	}
 	group := groups[0]
