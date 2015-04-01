@@ -61,12 +61,6 @@ type EC2 interface {
 	CreateVolume(request *ec2.CreateVolume) (resp *ec2.CreateVolumeResp, err error)
 	// Delete an EBS volume
 	DeleteVolume(volumeID string) (resp *ec2.SimpleResp, err error)
-}
-
-// Abstraction over the AWS metadata service
-type AWSMetadata interface {
-	// Query the EC2 metadata service (used to discover instance-id etc)
-	GetMetaData(key string) ([]byte, error)
 
 	// TODO: It is weird that these take a region.  I suspect it won't work cross-region anwyay.
 	// TODO: Refactor to use a load balancer object?
@@ -93,6 +87,12 @@ type AWSMetadata interface {
 
 	// List VPCs
 	ListVPCs(filterName string) ([]ec2.VPC, error)
+}
+
+// Abstraction over the AWS metadata service
+type AWSMetadata interface {
+	// Query the EC2 metadata service (used to discover instance-id etc)
+	GetMetaData(key string) ([]byte, error)
 }
 
 type VolumeOptions struct {
@@ -158,12 +158,7 @@ type goamzEC2 struct {
 	elbClients map[string]*elb.ELB
 }
 
-func newGoamzEC2(auth aws.Auth, regionName string) (*goamzEC2, error) {
-	region, ok := aws.Regions[regionName]
-	if !ok {
-		return nil, fmt.Errorf("not a valid AWS region: %s", regionName)
-	}
-
+func newGoamzEC2(auth aws.Auth, region aws.Region) (*goamzEC2, error) {
 	self := &goamzEC2{}
 	self.ec2 = ec2.New(auth, region)
 	self.auth = auth
@@ -538,10 +533,10 @@ func newAWSCloud(config io.Reader, authFunc AuthFunc, metadata AWSMetadata) (*AW
 		return nil, fmt.Errorf("not a valid AWS zone (unknown region): %s", zone)
 	}
 
-	ec2 := &goamzEC2{}
-	ec2.ec2 = ec2.New(auth, region)
-	ec2.auth = auth
-	ec2.elbClients = make(map[string]*elb.ELB)
+	ec2, err := newGoamzEC2(auth, region)
+	if err != nil {
+		return nil, err
+	}
 
 	awsCloud := &AWSCloud{
 		ec2:              ec2,
@@ -1316,7 +1311,9 @@ func mapToInstanceIds(instances []*ec2.Instance) []string {
 	return ids
 }
 
-func (self *AWSCloud) ensureSecurityGroupIngess(securityGroupId string, sourceIp string, protocol string, fromPort, toPort int) (bool, error) {
+// Makes sure the security group allows ingress on the specified ports (with sourceIp & protocol)
+// Returns true iff changes were made
+func (self *AWSCloud) ensureSecurityGroupIngess(securityGroupId string, sourceIp string, protocol string, ports []int) (bool, error) {
 	groups, err := self.ec2.DescribeSecurityGroups([]string{securityGroupId}, "", "")
 	if err != nil {
 		glog.Warning("error retrieving security group", err)
@@ -1326,39 +1323,50 @@ func (self *AWSCloud) ensureSecurityGroupIngess(securityGroupId string, sourceIp
 	if len(groups) == 0 {
 		return false, fmt.Errorf("security group not found")
 	}
-
 	if len(groups) != 1 {
 		return false, fmt.Errorf("multiple security groups found with same id")
 	}
-
 	group := groups[0]
 
-	for _, permission := range group.IPPerms {
-		if permission.FromPort != fromPort {
-			continue
+	newPermissions := []ec2.IPPerm{}
+
+	for _, port := range ports {
+		found := false
+		for _, permission := range group.IPPerms {
+			if permission.FromPort != port {
+				continue
+			}
+			if permission.ToPort != port {
+				continue
+			}
+			if permission.Protocol != protocol {
+				continue
+			}
+			if len(permission.SourceIPs) != 1 {
+				continue
+			}
+			if permission.SourceIPs[0] != sourceIp {
+				continue
+			}
+			found = true
+			break
 		}
-		if permission.ToPort != toPort {
-			continue
+
+		if !found {
+			newPermission := ec2.IPPerm{}
+			newPermission.FromPort = port
+			newPermission.ToPort = port
+			newPermission.SourceIPs = []string{sourceIp}
+			newPermission.Protocol = protocol
+
+			newPermissions = append(newPermissions, newPermission)
 		}
-		if permission.Protocol != protocol {
-			continue
-		}
-		if len(permission.SourceIPs) != 1 {
-			continue
-		}
-		if permission.SourceIPs[0] != sourceIp {
-			continue
-		}
+	}
+
+	if len(newPermissions) == 0 {
 		return false, nil
 	}
 
-	newPermission := ec2.IPPerm{}
-	newPermission.FromPort = fromPort
-	newPermission.ToPort = toPort
-	newPermission.SourceIPs = []string{sourceIp}
-	newPermission.Protocol = protocol
-
-	newPermissions := []ec2.IPPerm{newPermission}
 	_, err = self.ec2.AuthorizeSecurityGroupIngress(securityGroupId, newPermissions)
 	if err != nil {
 		glog.Warning("error authorizing security group ingress", err)
@@ -1369,8 +1377,8 @@ func (self *AWSCloud) ensureSecurityGroupIngess(securityGroupId string, sourceIp
 }
 
 // CreateTCPLoadBalancer implements TCPLoadBalancer.CreateTCPLoadBalancer
-func (self *AWSCloud) CreateTCPLoadBalancer(name, region string, externalIP net.IP, port int, hosts []string, affinity api.AffinityType) (string, error) {
-	glog.V(2).Infof("CreateTCPLoadBalancer(%v, %v, %v, %v, %v)", name, region, externalIP, port, hosts)
+func (self *AWSCloud) CreateTCPLoadBalancer(name, region string, externalIP net.IP, ports []int, hosts []string, affinity api.AffinityType) (string, error) {
+	glog.V(2).Infof("CreateTCPLoadBalancer(%v, %v, %v, %v, %v)", name, region, externalIP, ports, hosts)
 
 	if affinity != api.AffinityTypeNone {
 		// ELB supports sticky sessions, but only when configured for HTTP/HTTPS
@@ -1432,12 +1440,18 @@ func (self *AWSCloud) CreateTCPLoadBalancer(name, region string, externalIP net.
 			}
 			createRequest.LoadBalancerName = awsId
 
-			listener := elb.Listener{}
-			listener.InstancePort = int64(port)
-			listener.LoadBalancerPort = int64(port)
-			listener.Protocol = "tcp"
-			listener.InstanceProtocol = "tcp"
-			createRequest.Listeners = []elb.Listener{listener}
+			listeners := []elb.Listener{}
+			for _, port := range ports {
+				listener := elb.Listener{}
+				listener.InstancePort = int64(port)
+				listener.LoadBalancerPort = int64(port)
+				listener.Protocol = "tcp"
+				listener.InstanceProtocol = "tcp"
+
+				listeners = append(listeners, listener)
+			}
+
+			createRequest.Listeners = listeners
 
 			// TODO: Should we use a better identifier (the kubernetes uuid?)
 			//	nameTag := &elb.Tag{ Key: "Name", Value: name}
@@ -1469,7 +1483,7 @@ func (self *AWSCloud) CreateTCPLoadBalancer(name, region string, externalIP net.
 						return "", err
 					}
 				}
-				_, err = self.ensureSecurityGroupIngess(securityGroupId, "0.0.0.0/0", "tcp", port, port)
+				_, err = self.ensureSecurityGroupIngess(securityGroupId, "0.0.0.0/0", "tcp", ports)
 				if err != nil {
 					return "", err
 				}
