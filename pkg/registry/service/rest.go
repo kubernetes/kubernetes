@@ -29,7 +29,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/rest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/validation"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/endpoint"
@@ -42,9 +41,7 @@ import (
 
 // REST adapts a service registry into apiserver's RESTStorage model.
 type REST struct {
-	registry Registry
-	// TODO(a-robinson): Remove cloud
-	cloud       cloudprovider.Interface
+	registry    Registry
 	machines    minion.Registry
 	endpoints   endpoint.Registry
 	portalMgr   *ipAllocator
@@ -52,7 +49,7 @@ type REST struct {
 }
 
 // NewStorage returns a new REST.
-func NewStorage(registry Registry, cloud cloudprovider.Interface, machines minion.Registry, endpoints endpoint.Registry, portalNet *net.IPNet,
+func NewStorage(registry Registry, machines minion.Registry, endpoints endpoint.Registry, portalNet *net.IPNet,
 	clusterName string) *REST {
 	// TODO: Before we can replicate masters, this has to be synced (e.g. lives in etcd)
 	ipa := newIPAllocator(portalNet)
@@ -63,7 +60,6 @@ func NewStorage(registry Registry, cloud cloudprovider.Interface, machines minio
 
 	return &REST{
 		registry:    registry,
-		cloud:       cloud,
 		machines:    machines,
 		endpoints:   endpoints,
 		portalMgr:   ipa,

@@ -27,22 +27,20 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/rest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/rest/resttest"
-	cloud "github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/fake"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/registrytest"
 )
 
-func NewTestREST(t *testing.T, endpoints *api.EndpointsList) (*REST, *registrytest.ServiceRegistry, *cloud.FakeCloud) {
+func NewTestREST(t *testing.T, endpoints *api.EndpointsList) (*REST, *registrytest.ServiceRegistry) {
 	registry := registrytest.NewServiceRegistry()
-	fakeCloud := &cloud.FakeCloud{}
 	machines := []string{"foo", "bar", "baz"}
 	endpointRegistry := &registrytest.EndpointRegistry{
 		Endpoints: endpoints,
 	}
 	nodeRegistry := registrytest.NewMinionRegistry(machines, api.NodeResources{})
-	storage := NewStorage(registry, fakeCloud, nodeRegistry, endpointRegistry, makeIPNet(t), "kubernetes")
-	return storage, registry, fakeCloud
+	storage := NewStorage(registry, nodeRegistry, endpointRegistry, makeIPNet(t), "kubernetes")
+	return storage, registry
 }
 
 func makeIPNet(t *testing.T) *net.IPNet {
@@ -64,7 +62,7 @@ func deepCloneService(svc *api.Service) *api.Service {
 }
 
 func TestServiceRegistryCreate(t *testing.T) {
-	storage, registry, fakeCloud := NewTestREST(t, nil)
+	storage, registry := NewTestREST(t, nil)
 	storage.portalMgr.randomAttempts = 0
 
 	svc := &api.Service{
@@ -96,9 +94,6 @@ func TestServiceRegistryCreate(t *testing.T) {
 	if created_service.Spec.PortalIP != "1.2.3.1" {
 		t.Errorf("Unexpected PortalIP: %s", created_service.Spec.PortalIP)
 	}
-	if len(fakeCloud.Calls) != 0 {
-		t.Errorf("Unexpected call(s): %#v", fakeCloud.Calls)
-	}
 	srv, err := registry.GetService(ctx, svc.Name)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -109,7 +104,7 @@ func TestServiceRegistryCreate(t *testing.T) {
 }
 
 func TestServiceStorageValidatesCreate(t *testing.T) {
-	storage, _, _ := NewTestREST(t, nil)
+	storage, _ := NewTestREST(t, nil)
 	failureCases := map[string]api.Service{
 		"empty ID": {
 			ObjectMeta: api.ObjectMeta{Name: ""},
@@ -147,7 +142,7 @@ func TestServiceStorageValidatesCreate(t *testing.T) {
 
 func TestServiceRegistryUpdate(t *testing.T) {
 	ctx := api.NewDefaultContext()
-	storage, registry, _ := NewTestREST(t, nil)
+	storage, registry := NewTestREST(t, nil)
 	svc, err := registry.CreateService(ctx, &api.Service{
 		ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "1", Namespace: api.NamespaceDefault},
 		Spec: api.ServiceSpec{
@@ -195,7 +190,7 @@ func TestServiceRegistryUpdate(t *testing.T) {
 
 func TestServiceStorageValidatesUpdate(t *testing.T) {
 	ctx := api.NewDefaultContext()
-	storage, registry, _ := NewTestREST(t, nil)
+	storage, registry := NewTestREST(t, nil)
 	registry.CreateService(ctx, &api.Service{
 		ObjectMeta: api.ObjectMeta{Name: "foo"},
 		Spec: api.ServiceSpec{
@@ -243,7 +238,7 @@ func TestServiceStorageValidatesUpdate(t *testing.T) {
 
 func TestServiceRegistryExternalService(t *testing.T) {
 	ctx := api.NewDefaultContext()
-	storage, registry, fakeCloud := NewTestREST(t, nil)
+	storage, registry := NewTestREST(t, nil)
 	svc := &api.Service{
 		ObjectMeta: api.ObjectMeta{Name: "foo"},
 		Spec: api.ServiceSpec{
@@ -260,9 +255,6 @@ func TestServiceRegistryExternalService(t *testing.T) {
 	if err != nil {
 		t.Errorf("Failed to create service: %#v", err)
 	}
-	if len(fakeCloud.Calls) != 0 {
-		t.Errorf("Unexpected call(s): %#v", fakeCloud.Calls)
-	}
 	srv, err := registry.GetService(ctx, svc.Name)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
@@ -270,14 +262,11 @@ func TestServiceRegistryExternalService(t *testing.T) {
 	if srv == nil {
 		t.Errorf("Failed to find service: %s", svc.Name)
 	}
-	if len(fakeCloud.Balancers) != 0 {
-		t.Errorf("Unexpected balancer created: %v", fakeCloud.Balancers)
-	}
 }
 
 func TestServiceRegistryDelete(t *testing.T) {
 	ctx := api.NewDefaultContext()
-	storage, registry, fakeCloud := NewTestREST(t, nil)
+	storage, registry := NewTestREST(t, nil)
 	svc := &api.Service{
 		ObjectMeta: api.ObjectMeta{Name: "foo"},
 		Spec: api.ServiceSpec{
@@ -291,9 +280,6 @@ func TestServiceRegistryDelete(t *testing.T) {
 	}
 	registry.CreateService(ctx, svc)
 	storage.Delete(ctx, svc.Name)
-	if len(fakeCloud.Calls) != 0 {
-		t.Errorf("Unexpected call(s): %#v", fakeCloud.Calls)
-	}
 	if e, a := "foo", registry.DeletedID; e != a {
 		t.Errorf("Expected %v, but got %v", e, a)
 	}
@@ -301,7 +287,7 @@ func TestServiceRegistryDelete(t *testing.T) {
 
 func TestServiceRegistryDeleteExternal(t *testing.T) {
 	ctx := api.NewDefaultContext()
-	storage, registry, fakeCloud := NewTestREST(t, nil)
+	storage, registry := NewTestREST(t, nil)
 	svc := &api.Service{
 		ObjectMeta: api.ObjectMeta{Name: "foo"},
 		Spec: api.ServiceSpec{
@@ -316,9 +302,6 @@ func TestServiceRegistryDeleteExternal(t *testing.T) {
 	}
 	registry.CreateService(ctx, svc)
 	storage.Delete(ctx, svc.Name)
-	if len(fakeCloud.Calls) != 0 {
-		t.Errorf("Unexpected call(s): %#v", fakeCloud.Calls)
-	}
 	if e, a := "foo", registry.DeletedID; e != a {
 		t.Errorf("Expected %v, but got %v", e, a)
 	}
@@ -326,7 +309,7 @@ func TestServiceRegistryDeleteExternal(t *testing.T) {
 
 func TestServiceRegistryUpdateExternalService(t *testing.T) {
 	ctx := api.NewDefaultContext()
-	storage, _, fakeCloud := NewTestREST(t, nil)
+	storage, _ := NewTestREST(t, nil)
 
 	// Create non-external load balancer.
 	svc1 := &api.Service{
@@ -344,18 +327,12 @@ func TestServiceRegistryUpdateExternalService(t *testing.T) {
 	if _, err := storage.Create(ctx, svc1); err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
-	if len(fakeCloud.Calls) != 0 {
-		t.Errorf("Unexpected call(s): %#v", fakeCloud.Calls)
-	}
 
 	// Modify load balancer to be external.
 	svc2 := deepCloneService(svc1)
 	svc2.Spec.CreateExternalLoadBalancer = true
 	if _, _, err := storage.Update(ctx, svc2); err != nil {
 		t.Fatalf("Unexpected error: %v", err)
-	}
-	if len(fakeCloud.Calls) != 0 {
-		t.Errorf("Unexpected call(s): %#v", fakeCloud.Calls)
 	}
 
 	// Change port.
@@ -364,14 +341,11 @@ func TestServiceRegistryUpdateExternalService(t *testing.T) {
 	if _, _, err := storage.Update(ctx, svc3); err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
-	if len(fakeCloud.Calls) != 0 {
-		t.Errorf("Unexpected call(s): %#v", fakeCloud.Calls)
-	}
 }
 
 func TestServiceRegistryUpdateMultiPortExternalService(t *testing.T) {
 	ctx := api.NewDefaultContext()
-	storage, _, fakeCloud := NewTestREST(t, nil)
+	storage, _ := NewTestREST(t, nil)
 
 	// Create external load balancer.
 	svc1 := &api.Service{
@@ -394,9 +368,6 @@ func TestServiceRegistryUpdateMultiPortExternalService(t *testing.T) {
 	if _, err := storage.Create(ctx, svc1); err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
-	if len(fakeCloud.Calls) != 0 {
-		t.Errorf("Unexpected call(s): %#v", fakeCloud.Calls)
-	}
 
 	// Modify ports
 	svc2 := deepCloneService(svc1)
@@ -404,14 +375,11 @@ func TestServiceRegistryUpdateMultiPortExternalService(t *testing.T) {
 	if _, _, err := storage.Update(ctx, svc2); err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
-	if len(fakeCloud.Calls) != 0 {
-		t.Errorf("Unexpected call(s): %#v", fakeCloud.Calls)
-	}
 }
 
 func TestServiceRegistryGet(t *testing.T) {
 	ctx := api.NewDefaultContext()
-	storage, registry, fakeCloud := NewTestREST(t, nil)
+	storage, registry := NewTestREST(t, nil)
 	registry.CreateService(ctx, &api.Service{
 		ObjectMeta: api.ObjectMeta{Name: "foo"},
 		Spec: api.ServiceSpec{
@@ -419,9 +387,6 @@ func TestServiceRegistryGet(t *testing.T) {
 		},
 	})
 	storage.Get(ctx, "foo")
-	if len(fakeCloud.Calls) != 0 {
-		t.Errorf("Unexpected call(s): %#v", fakeCloud.Calls)
-	}
 	if e, a := "foo", registry.GottenID; e != a {
 		t.Errorf("Expected %v, but got %v", e, a)
 	}
@@ -443,7 +408,7 @@ func TestServiceRegistryResourceLocation(t *testing.T) {
 			},
 		},
 	}
-	storage, registry, _ := NewTestREST(t, endpoints)
+	storage, registry := NewTestREST(t, endpoints)
 	registry.CreateService(ctx, &api.Service{
 		ObjectMeta: api.ObjectMeta{Name: "foo"},
 		Spec: api.ServiceSpec{
@@ -490,7 +455,7 @@ func TestServiceRegistryResourceLocation(t *testing.T) {
 
 func TestServiceRegistryList(t *testing.T) {
 	ctx := api.NewDefaultContext()
-	storage, registry, fakeCloud := NewTestREST(t, nil)
+	storage, registry := NewTestREST(t, nil)
 	registry.CreateService(ctx, &api.Service{
 		ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: api.NamespaceDefault},
 		Spec: api.ServiceSpec{
@@ -506,9 +471,6 @@ func TestServiceRegistryList(t *testing.T) {
 	registry.List.ResourceVersion = "1"
 	s, _ := storage.List(ctx, labels.Everything(), fields.Everything())
 	sl := s.(*api.ServiceList)
-	if len(fakeCloud.Calls) != 0 {
-		t.Errorf("Unexpected call(s): %#v", fakeCloud.Calls)
-	}
 	if len(sl.Items) != 2 {
 		t.Fatalf("Expected 2 services, but got %v", len(sl.Items))
 	}
@@ -524,7 +486,7 @@ func TestServiceRegistryList(t *testing.T) {
 }
 
 func TestServiceRegistryIPAllocation(t *testing.T) {
-	rest, _, _ := NewTestREST(t, nil)
+	rest, _ := NewTestREST(t, nil)
 	rest.portalMgr.randomAttempts = 0
 
 	svc1 := &api.Service{
@@ -589,7 +551,7 @@ func TestServiceRegistryIPAllocation(t *testing.T) {
 }
 
 func TestServiceRegistryIPReallocation(t *testing.T) {
-	rest, _, _ := NewTestREST(t, nil)
+	rest, _ := NewTestREST(t, nil)
 	rest.portalMgr.randomAttempts = 0
 
 	svc1 := &api.Service{
@@ -638,7 +600,7 @@ func TestServiceRegistryIPReallocation(t *testing.T) {
 }
 
 func TestServiceRegistryIPUpdate(t *testing.T) {
-	rest, _, _ := NewTestREST(t, nil)
+	rest, _ := NewTestREST(t, nil)
 	rest.portalMgr.randomAttempts = 0
 
 	svc := &api.Service{
@@ -682,7 +644,7 @@ func TestServiceRegistryIPUpdate(t *testing.T) {
 }
 
 func TestServiceRegistryIPExternalLoadBalancer(t *testing.T) {
-	rest, _, fakeCloud := NewTestREST(t, nil)
+	rest, _ := NewTestREST(t, nil)
 	rest.portalMgr.randomAttempts = 0
 
 	svc := &api.Service{
@@ -713,18 +675,14 @@ func TestServiceRegistryIPExternalLoadBalancer(t *testing.T) {
 	if err != nil {
 		t.Errorf("Unexpected error %v", err)
 	}
-	if len(fakeCloud.Balancers) != 0 {
-		t.Errorf("Unexpected balancer created: %v", fakeCloud.Balancers)
-	}
 }
 
 func TestServiceRegistryIPReloadFromStorage(t *testing.T) {
 	registry := registrytest.NewServiceRegistry()
-	fakeCloud := &cloud.FakeCloud{}
 	machines := []string{"foo", "bar", "baz"}
 	nodeRegistry := registrytest.NewMinionRegistry(machines, api.NodeResources{})
 	endpoints := &registrytest.EndpointRegistry{}
-	rest1 := NewStorage(registry, fakeCloud, nodeRegistry, endpoints, makeIPNet(t), "kubernetes")
+	rest1 := NewStorage(registry, nodeRegistry, endpoints, makeIPNet(t), "kubernetes")
 	rest1.portalMgr.randomAttempts = 0
 
 	svc := &api.Service{
@@ -755,7 +713,7 @@ func TestServiceRegistryIPReloadFromStorage(t *testing.T) {
 
 	// This will reload from storage, finding the previous 2
 	nodeRegistry = registrytest.NewMinionRegistry(machines, api.NodeResources{})
-	rest2 := NewStorage(registry, fakeCloud, nodeRegistry, endpoints, makeIPNet(t), "kubernetes")
+	rest2 := NewStorage(registry, nodeRegistry, endpoints, makeIPNet(t), "kubernetes")
 	rest2.portalMgr.randomAttempts = 0
 
 	svc = &api.Service{
@@ -814,7 +772,7 @@ func TestUpdateServiceWithConflictingNamespace(t *testing.T) {
 }
 
 func TestCreate(t *testing.T) {
-	rest, registry, _ := NewTestREST(t, nil)
+	rest, registry := NewTestREST(t, nil)
 	rest.portalMgr.randomAttempts = 0
 
 	test := resttest.New(t, rest, registry.SetError)

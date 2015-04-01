@@ -272,7 +272,6 @@ func (s *APIServer) Run(_ []string) error {
 	}
 
 	config := &master.Config{
-		Cloud:                  cloud,
 		EtcdHelper:             helper,
 		EventTTL:               s.EventTTL,
 		KubeletClient:          kubeletClient,
