@@ -12,7 +12,7 @@ Definitions
 -----------
 * P0 - something broken for users, build broken, or critical security issue.  Someone must drop everything and work on it.
 * P1 - must fix for earliest possible binary release (every two weeks)
-* P2 - should be fixed in next major relase version
+* P2 - should be fixed in next major release version
 * P3 - default priority for lower importance bugs that we still want to track and plan to fix at some point
 * design - priority/design is for issues that are used to track design discussions
 * support - priority/support is used for issues tracking user support requests
