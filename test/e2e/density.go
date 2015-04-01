@@ -212,7 +212,8 @@ var _ = Describe("Density", func() {
 
 	for _, count := range []int{30, 50, 100} {
 		name := fmt.Sprintf("should allow starting %d pods per node", count)
-		if count > 30 {
+		// TODO(wojtek-t): Don't skip 30 pods per node test once #6059 if fixed.
+		if count > 0 {
 			name = "[Skipped] " + name
 		}
 		It(name, func() {
