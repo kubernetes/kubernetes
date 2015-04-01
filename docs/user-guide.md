@@ -34,6 +34,10 @@ kubernetes API, or to contribute directly to the kubernetes project.
   attached to objects, such as pods. Labels can be used to organize and to 
   select subsets of objects. 
 
+* **Secrets** ([secrets.md](secrets.md)): A Secret stores sensitive data
+  (e.g. ssh keys, passwords) separately from the Pods that use them, protecting
+  the sensitive data from proliferation by tools that process pods.
+
 * **Accessing the API** ([accessing_the_api.md](accessing_the_api.md)):
   Ports, IPs, proxies, and firewall rules.
 
