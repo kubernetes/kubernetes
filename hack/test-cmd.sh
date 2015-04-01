@@ -63,7 +63,7 @@ kube::log::status "Starting kubelet in masterless mode"
   --address="127.0.0.1" \
   --port="$KUBELET_PORT" 1>&2 &
 KUBELET_PID=$!
-kube::util::wait_for_url "http://127.0.0.1:${KUBELET_PORT}/healthz" "kubelet: "
+kube::util::wait_for_url "http://127.0.0.1:${KUBELET_PORT}/healthz" "kubelet: " 0.2 25
 kill ${KUBELET_PID} 1>&2 2>/dev/null
 
 kube::log::status "Starting kubelet in masterful mode"
@@ -78,7 +78,7 @@ kube::log::status "Starting kubelet in masterful mode"
   --port="$KUBELET_PORT" 1>&2 &
 KUBELET_PID=$!
 
-kube::util::wait_for_url "http://127.0.0.1:${KUBELET_PORT}/healthz" "kubelet: "
+kube::util::wait_for_url "http://127.0.0.1:${KUBELET_PORT}/healthz" "kubelet: " 0.2 25
 
 # Start kube-apiserver
 kube::log::status "Starting kube-apiserver"
