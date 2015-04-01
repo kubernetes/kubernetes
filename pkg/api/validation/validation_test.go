@@ -2227,10 +2227,18 @@ func TestValidateServiceUpdate(t *testing.T) {
 			numErrs: 1,
 		},
 		{
-			name: "remove portal IP",
+			name: "portal IP not given",
 			tweakSvc: func(oldSvc, newSvc *api.Service) {
 				oldSvc.Spec.PortalIP = "1.2.3.4"
 				newSvc.Spec.PortalIP = ""
+			},
+			numErrs: 0,
+		},
+		{
+			name: "remove portal IP",
+			tweakSvc: func(oldSvc, newSvc *api.Service) {
+				oldSvc.Spec.PortalIP = "1.2.3.4"
+				newSvc.Spec.PortalIP = "None"
 			},
 			numErrs: 1,
 		},
