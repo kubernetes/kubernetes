@@ -80,7 +80,6 @@ grains:
   etcd_servers: '$(echo "$MASTER_IP" | sed -e "s/'/''/g")'
   api_servers: '$(echo "$MASTER_IP" | sed -e "s/'/''/g")'
   cloud: vagrant
-  cloud_provider: vagrant
   roles:
     - kubernetes-master
   runtime_config: '$(echo "$RUNTIME_CONFIG" | sed -e "s/'/''/g")'
