@@ -61,7 +61,7 @@ func NewProxyServer() *ProxyServer {
 // AddFlags adds flags for a specific ProxyServer to the specified FlagSet
 func (s *ProxyServer) AddFlags(fs *pflag.FlagSet) {
 	fs.Var(&s.BindAddress, "bind_address", "The IP address for the proxy server to serve on (set to 0.0.0.0 for all interfaces)")
-	fs.Var(&s.PublicAddress, "public_address", "The public IP address for exported services")
+	fs.Var(&s.PublicAddress, "public_address", "The IP address for the proxy server to serve on, for externally load balanced services using NAT")
 	client.BindClientConfigFlags(fs, &s.ClientConfig)
 	fs.IntVar(&s.HealthzPort, "healthz_port", s.HealthzPort, "The port to bind the health check server. Use 0 to disable.")
 	fs.Var(&s.HealthzBindAddress, "healthz_bind_address", "The IP address for the health check server to serve on, defaulting to 127.0.0.1 (set to 0.0.0.0 for all interfaces)")
