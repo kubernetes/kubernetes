@@ -18,9 +18,19 @@ limitations under the License.
 
 package empty_dir
 
+import (
+	"fmt"
+)
+
 // realMountDetector pretends to implement mediumer.
 type realMountDetector struct{}
 
 func (m *realMountDetector) GetMountMedium(path string) (storageMedium, bool, error) {
 	return mediumUnknown, false, nil
+}
+
+// There should be no call sites that reach this point on unsupported platforms;
+// return an error.
+func (ed *emptyDir) getTmpfsMountOptions() (string, error) {
+	return "", fmt.Errorf("Unsupported platform")
 }
