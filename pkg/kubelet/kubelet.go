@@ -858,7 +858,7 @@ func (kl *Kubelet) killContainerByID(ID string) error {
 }
 
 const (
-	PodInfraContainerImage = "kubernetes/pause:latest"
+	PodInfraContainerImage = "gcr.io/google_containers/pause:0.8.0"
 )
 
 // Determined whether the specified pod is allowed to use host networking
