@@ -183,26 +183,38 @@ func (pf *PortForwarder) forward() error {
 	return nil
 }
 
-// listenOnPort creates a new listener on port and waits for new connections
+// listenOnPort delegates listener creation and waits for new connections
 // in the background.
 func (pf *PortForwarder) listenOnPort(port *ForwardedPort) error {
-	listener, err := net.Listen("tcp", fmt.Sprintf("localhost:%d", port.Local))
+	listener, err := pf.getListener("tcp", "localhost", port)
 	if err != nil {
 		return err
 	}
-	parts := strings.Split(listener.Addr().String(), ":")
-	localPort, err := strconv.ParseUint(parts[1], 10, 16)
-	if err != nil {
-		return fmt.Errorf("Error parsing local part: %s", err)
-	}
-	port.Local = uint16(localPort)
-	glog.Infof("Forwarding from %d -> %d", localPort, port.Remote)
-
 	pf.listeners = append(pf.listeners, listener)
 
 	go pf.waitForConnection(listener, *port)
 
 	return nil
+}
+
+// creates a listener on the interface targeted by the given hostname
+func (pf *PortForwarder) getListener(protocol string, hostname string, port *ForwardedPort) (net.Listener, error) {
+	listener, err := net.Listen(protocol, fmt.Sprintf("%s:%d", hostname, port.Local))
+	if err != nil {
+		glog.Errorf("Unable to create listener: Error %s", err)
+		return nil, err
+	}
+	listenerAddress := listener.Addr().String()
+	host, localPort, err := net.SplitHostPort(listenerAddress)
+	localPortUInt, err := strconv.ParseUint(localPort, 10, 16)
+
+	if err != nil {
+		return nil, fmt.Errorf("Error parsing local port: %s from %s (%s)", err, listenerAddress, host)
+	}
+	port.Local = uint16(localPortUInt)
+	glog.Infof("Forwarding from %d -> %d", localPortUInt, port.Remote)
+
+	return listener, nil
 }
 
 // waitForConnection waits for new connections to listener and handles them in
