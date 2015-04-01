@@ -1489,10 +1489,6 @@ func (self *AWSCloud) CreateTCPLoadBalancer(name, region string, externalIP net.
 				createRequest.SecurityGroups = []string{securityGroupId}
 			}
 
-			if len(externalIP) > 0 {
-				return "", fmt.Errorf("External IP cannot be specified for AWS ELB")
-			}
-
 			glog.Info("Creating load balancer with name: ", createRequest.LoadBalancerName)
 			createdDnsName, err := self.ec2.CreateLoadBalancer(region, createRequest)
 			if err != nil {
