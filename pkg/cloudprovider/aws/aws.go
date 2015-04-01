@@ -158,11 +158,24 @@ type goamzEC2 struct {
 	elbClients map[string]*elb.ELB
 }
 
-// Find the kubernetes vpc
+func newGoamzEC2(auth aws.Auth, regionName string) (*goamzEC2, error) {
+	region, ok := aws.Regions[regionName]
+	if !ok {
+		return nil, fmt.Errorf("not a valid AWS region: %s", regionName)
+	}
+
+	self := &goamzEC2{}
+	self.ec2 = ec2.New(auth, region)
+	self.auth = auth
+	self.elbClients = make(map[string]*elb.ELB)
+	return self, nil
+}
+
+// Find the VPC with the given name
 func (self *goamzEC2) ListVpcs(filterName string) ([]ec2.VPC, error) {
 	client := self.ec2
 
-	// TODO: How do we want to identify our VPC?
+	// TODO: How do we want to identify our VPC?  Issue #6006
 	filter := ec2.NewFilter()
 	filter.Add("tag:Name", filterName)
 
