@@ -1475,6 +1475,9 @@ func (self *AWSCloud) CreateTCPLoadBalancer(name, region string, externalIP net.
 				}
 				var securityGroupId string
 				for _, securityGroup := range securityGroups {
+					if securityGroupId != "" {
+						glog.Warning("Found multiple security groups with name:", sgName)
+					}
 					securityGroupId = securityGroup.Id
 				}
 				if securityGroupId == "" {
