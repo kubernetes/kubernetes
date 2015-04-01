@@ -32,6 +32,7 @@ type fakeRL bool
 
 func (fakeRL) Stop()             {}
 func (f fakeRL) CanAccept() bool { return bool(f) }
+func (f fakeRL) Accept()         {}
 
 func TestRateLimit(t *testing.T) {
 	for _, allow := range []bool{true, false} {

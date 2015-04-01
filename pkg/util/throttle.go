@@ -24,6 +24,8 @@ import (
 type RateLimiter interface {
 	// CanAccept returns true if the rate is below the limit, false otherwise
 	CanAccept() bool
+	// Accept returns once a token becomes available.
+	Accept()
 	// Stop stops the rate limiter, subsequent calls to CanAccept will return false
 	Stop()
 }
@@ -71,6 +73,11 @@ func (t *tickRateLimiter) CanAccept() bool {
 	default:
 		return false
 	}
+}
+
+// Accept will block until a token becomes available
+func (t *tickRateLimiter) Accept() {
+	<-t.tokens
 }
 
 func (t *tickRateLimiter) Stop() {
