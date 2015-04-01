@@ -258,49 +258,51 @@ func (self *goamzEC2) DescribeLoadBalancers(region string, findName string) (map
 	}
 
 	loadBalancersByName := map[string]elb.LoadBalancer{}
-	if len(loadBalancersByAwsId) != 0 {
-		describeTagsRequest := &elb.DescribeTags{}
-		describeTagsRequest.LoadBalancerNames = []string{}
-		for awsId := range loadBalancersByAwsId {
-			describeTagsRequest.LoadBalancerNames = append(describeTagsRequest.LoadBalancerNames, awsId)
+	if len(loadBalancersByAwsId) == 0 {
+		return loadBalancersByName, nil
+	}
+
+	describeTagsRequest := &elb.DescribeTags{}
+	describeTagsRequest.LoadBalancerNames = []string{}
+	for awsId := range loadBalancersByAwsId {
+		describeTagsRequest.LoadBalancerNames = append(describeTagsRequest.LoadBalancerNames, awsId)
+	}
+	describeTagsResponse, err := client.DescribeTags(describeTagsRequest)
+	if err != nil {
+		glog.Error("error describing tags for load balancers: ", err)
+		return nil, err
+	}
+
+	if describeTagsResponse.NextToken != "" {
+		// TODO: Implement this
+		err := fmt.Errorf("error describing tags for load balancers - pagination not implemented")
+		return nil, err
+	}
+
+	for _, loadBalancerTag := range describeTagsResponse.LoadBalancerTags {
+		awsId := loadBalancerTag.LoadBalancerName
+		name := ""
+		for _, tag := range loadBalancerTag.Tags {
+			if tag.Key == LOADBALANCER_TAG_NAME {
+				name = tag.Value
+			}
 		}
-		describeTagsResponse, err := client.DescribeTags(describeTagsRequest)
-		if err != nil {
-			glog.Error("error describing tags for load balancers: ", err)
-			return nil, err
+		if name == "" {
+			glog.Warning("Ignoring load balancer with no k8s name tag: ", awsId)
+			continue
 		}
 
-		if describeTagsResponse.NextToken != "" {
-			// TODO: Implement this
-			err := fmt.Errorf("error describing tags for load balancers - pagination not implemented")
-			return nil, err
+		if findName != "" && name != findName {
+			continue
 		}
 
-		for _, loadBalancerTag := range describeTagsResponse.LoadBalancerTags {
-			awsId := loadBalancerTag.LoadBalancerName
-			name := ""
-			for _, tag := range loadBalancerTag.Tags {
-				if tag.Key == LOADBALANCER_TAG_NAME {
-					name = tag.Value
-				}
-			}
-			if name == "" {
-				glog.Warning("Ignoring load balancer with no k8s name tag: ", awsId)
-				continue
-			}
-
-			if findName != "" && name != findName {
-				continue
-			}
-
-			loadBalancer, ok := loadBalancersByAwsId[awsId]
-			if !ok {
-				// This might almost be panic-worthy!
-				glog.Error("unexpected internal error - did not find load balancer")
-				continue
-			}
-			loadBalancersByName[name] = loadBalancer
+		loadBalancer, ok := loadBalancersByAwsId[awsId]
+		if !ok {
+			// This might almost be panic-worthy!
+			glog.Error("unexpected internal error - did not find load balancer")
+			continue
 		}
+		loadBalancersByName[name] = loadBalancer
 	}
 	return loadBalancersByName, nil
 }
