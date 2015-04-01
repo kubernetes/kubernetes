@@ -262,7 +262,7 @@ func TestRegisterNodes(t *testing.T) {
 			nodes.Items = append(nodes.Items, *newNode(machine))
 		}
 		nodeController := NewNodeController(nil, "", item.machines, &api.NodeResources{}, item.fakeNodeHandler, nil, 10, time.Minute,
-			util.NewFakeRateLimiter(), testNodeMonitorGracePeriod, testNodeStartupGracePeriod, testNodeMonitorPeriod)
+			util.NewFakeRateLimiter(), testNodeMonitorGracePeriod, testNodeStartupGracePeriod, testNodeMonitorPeriod, "")
 		err := nodeController.RegisterNodes(&nodes, item.retryCount, time.Millisecond)
 		if !item.expectedFail && err != nil {
 			t.Errorf("unexpected error: %v", err)
@@ -348,7 +348,7 @@ func TestCreateGetStaticNodesWithSpec(t *testing.T) {
 	}
 	for _, item := range table {
 		nodeController := NewNodeController(nil, "", item.machines, &resources, nil, nil, 10, time.Minute,
-			util.NewFakeRateLimiter(), testNodeMonitorGracePeriod, testNodeStartupGracePeriod, testNodeMonitorPeriod)
+			util.NewFakeRateLimiter(), testNodeMonitorGracePeriod, testNodeStartupGracePeriod, testNodeMonitorPeriod, "")
 		nodes, err := nodeController.GetStaticNodesWithSpec()
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
@@ -410,7 +410,7 @@ func TestCreateGetCloudNodesWithSpec(t *testing.T) {
 
 	for _, item := range table {
 		nodeController := NewNodeController(item.fakeCloud, ".*", nil, &api.NodeResources{}, nil, nil, 10, time.Minute,
-			util.NewFakeRateLimiter(), testNodeMonitorGracePeriod, testNodeStartupGracePeriod, testNodeMonitorPeriod)
+			util.NewFakeRateLimiter(), testNodeMonitorGracePeriod, testNodeStartupGracePeriod, testNodeMonitorPeriod, "")
 		nodes, err := nodeController.GetCloudNodesWithSpec()
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
@@ -520,7 +520,7 @@ func TestSyncCloudNodes(t *testing.T) {
 			item.fakeNodeHandler.Fake = testclient.NewSimpleFake()
 		}
 		nodeController := NewNodeController(item.fakeCloud, item.matchRE, nil, &api.NodeResources{}, item.fakeNodeHandler, nil, 10, time.Minute,
-			util.NewFakeRateLimiter(), testNodeMonitorGracePeriod, testNodeStartupGracePeriod, testNodeMonitorPeriod)
+			util.NewFakeRateLimiter(), testNodeMonitorGracePeriod, testNodeStartupGracePeriod, testNodeMonitorPeriod, "")
 		if err := nodeController.SyncCloudNodes(); err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -581,7 +581,7 @@ func TestSyncCloudNodesEvictPods(t *testing.T) {
 			matchRE:              ".*",
 			expectedRequestCount: 2, // List + Delete
 			expectedDeleted:      []string{"node1"},
-			expectedActions:      []testclient.FakeAction{{Action: "list-pods"}, {Action: "delete-pod", Value: "pod0"}},
+			expectedActions:      []testclient.FakeAction{{Action: "list-pods"}, {Action: "delete-pod", Value: "pod0"}, {Action: "list-services"}},
 		},
 		{
 			// Delete node1, but pod0 is running on node0.
@@ -595,7 +595,7 @@ func TestSyncCloudNodesEvictPods(t *testing.T) {
 			matchRE:              ".*",
 			expectedRequestCount: 2, // List + Delete
 			expectedDeleted:      []string{"node1"},
-			expectedActions:      []testclient.FakeAction{{Action: "list-pods"}},
+			expectedActions:      []testclient.FakeAction{{Action: "list-pods"}, {Action: "list-services"}},
 		},
 	}
 
@@ -604,7 +604,7 @@ func TestSyncCloudNodesEvictPods(t *testing.T) {
 			item.fakeNodeHandler.Fake = testclient.NewSimpleFake()
 		}
 		nodeController := NewNodeController(item.fakeCloud, item.matchRE, nil, &api.NodeResources{}, item.fakeNodeHandler, nil, 10, time.Minute,
-			util.NewFakeRateLimiter(), testNodeMonitorGracePeriod, testNodeStartupGracePeriod, testNodeMonitorPeriod)
+			util.NewFakeRateLimiter(), testNodeMonitorGracePeriod, testNodeStartupGracePeriod, testNodeMonitorPeriod, "")
 		if err := nodeController.SyncCloudNodes(); err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -617,6 +617,71 @@ func TestSyncCloudNodesEvictPods(t *testing.T) {
 		}
 		if !reflect.DeepEqual(item.expectedActions, item.fakeNodeHandler.Actions) {
 			t.Errorf("time out waiting for deleting pods, expected %+v, got %+v", item.expectedActions, item.fakeNodeHandler.Actions)
+		}
+	}
+}
+
+func TestSyncCloudNodesReconcilesExternalService(t *testing.T) {
+	table := []struct {
+		fakeNodeHandler       *FakeNodeHandler
+		fakeCloud             *fake_cloud.FakeCloud
+		matchRE               string
+		expectedClientActions []testclient.FakeAction
+		expectedUpdateCalls   []fake_cloud.FakeUpdateBalancerCall
+	}{
+		{
+			// Set of nodes does not change: do nothing.
+			fakeNodeHandler: &FakeNodeHandler{
+				Existing: []*api.Node{newNode("node0"), newNode("node1")},
+				Fake: testclient.NewSimpleFake(&api.ServiceList{Items: []api.Service{*newService("service0", true), *newService("service1", false)}})},
+			fakeCloud: &fake_cloud.FakeCloud{
+				Machines: []string{"node0", "node1"},
+			},
+			matchRE:               ".*",
+			expectedClientActions: nil,
+			expectedUpdateCalls:   nil,
+		},
+		{
+			// Delete "node1", target pool for "service0" should shrink.
+			fakeNodeHandler: &FakeNodeHandler{
+				Existing: []*api.Node{newNode("node0"), newNode("node1")},
+				Fake: testclient.NewSimpleFake(&api.ServiceList{Items: []api.Service{*newService("service0", true), *newService("service1", false)}})},
+			fakeCloud: &fake_cloud.FakeCloud{
+				Machines: []string{"node0"},
+			},
+			matchRE:               ".*",
+			expectedClientActions: []testclient.FakeAction{{Action: "list-pods"}, {Action: "list-services"}},
+			expectedUpdateCalls: []fake_cloud.FakeUpdateBalancerCall{
+				{Name: "kubernetes-namespace-service0", Hosts: []string{"node0"}},
+			},
+		},
+		{
+			// Add "node1", target pool for "service0" should grow.
+			fakeNodeHandler: &FakeNodeHandler{
+				Existing: []*api.Node{newNode("node0")},
+				Fake: testclient.NewSimpleFake(&api.ServiceList{Items: []api.Service{*newService("service0", true), *newService("service1", false)}})},
+			fakeCloud: &fake_cloud.FakeCloud{
+				Machines: []string{"node0", "node1"},
+			},
+			matchRE:               ".*",
+			expectedClientActions: []testclient.FakeAction{{Action: "list-services"}},
+			expectedUpdateCalls: []fake_cloud.FakeUpdateBalancerCall{
+				{Name: "kubernetes-namespace-service0", Hosts: []string{"node0", "node1"}},
+			},
+		},
+	}
+
+	for _, item := range table {
+		nodeController := NewNodeController(item.fakeCloud, item.matchRE, nil, &api.NodeResources{}, item.fakeNodeHandler, nil,
+			10, time.Minute, util.NewFakeRateLimiter(), testNodeMonitorGracePeriod, testNodeStartupGracePeriod, testNodeMonitorPeriod, "kubernetes")
+		if err := nodeController.SyncCloudNodes(); err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		if !reflect.DeepEqual(item.expectedClientActions, item.fakeNodeHandler.Actions) {
+			t.Errorf("expected client actions mismatch, expected %+v, got %+v", item.expectedClientActions, item.fakeNodeHandler.Actions)
+		}
+		if !reflect.DeepEqual(item.expectedUpdateCalls, item.fakeCloud.UpdateCalls) {
+			t.Errorf("expected update calls mismatch, expected %+v, got %+v", item.expectedUpdateCalls, item.fakeCloud.UpdateCalls)
 		}
 	}
 }
@@ -644,7 +709,7 @@ func TestPopulateNodeAddresses(t *testing.T) {
 
 	for _, item := range table {
 		nodeController := NewNodeController(item.fakeCloud, ".*", nil, nil, nil, nil, 10, time.Minute,
-			util.NewFakeRateLimiter(), testNodeMonitorGracePeriod, testNodeStartupGracePeriod, testNodeMonitorPeriod)
+			util.NewFakeRateLimiter(), testNodeMonitorGracePeriod, testNodeStartupGracePeriod, testNodeMonitorPeriod, "")
 		result, err := nodeController.PopulateAddresses(item.nodes)
 		// In case of IP querying error, we should continue.
 		if err != nil {
@@ -844,7 +909,7 @@ func TestMonitorNodeStatusEvictPods(t *testing.T) {
 	for _, item := range table {
 		nodeController := NewNodeController(nil, "", []string{"node0"}, nil, item.fakeNodeHandler, nil, 10,
 			evictionTimeout, util.NewFakeRateLimiter(), testNodeMonitorGracePeriod,
-			testNodeStartupGracePeriod, testNodeMonitorPeriod)
+			testNodeStartupGracePeriod, testNodeMonitorPeriod, "")
 		nodeController.now = func() util.Time { return fakeNow }
 		if err := nodeController.MonitorNodeStatus(); err != nil {
 			t.Errorf("unexpected error: %v", err)
@@ -1046,7 +1111,7 @@ func TestMonitorNodeStatusUpdateStatus(t *testing.T) {
 
 	for _, item := range table {
 		nodeController := NewNodeController(nil, "", []string{"node0"}, nil, item.fakeNodeHandler, nil, 10, 5*time.Minute, util.NewFakeRateLimiter(),
-			testNodeMonitorGracePeriod, testNodeStartupGracePeriod, testNodeMonitorPeriod)
+			testNodeMonitorGracePeriod, testNodeStartupGracePeriod, testNodeMonitorPeriod, "")
 		nodeController.now = func() util.Time { return fakeNow }
 		if err := nodeController.MonitorNodeStatus(); err != nil {
 			t.Errorf("unexpected error: %v", err)
@@ -1085,6 +1150,10 @@ func newNode(name string) *api.Node {
 
 func newPod(name, host string) *api.Pod {
 	return &api.Pod{ObjectMeta: api.ObjectMeta{Name: name}, Spec: api.PodSpec{Host: host}}
+}
+
+func newService(name string, external bool) *api.Service {
+	return &api.Service{ObjectMeta: api.ObjectMeta{Name: name, Namespace: "namespace"}, Spec: api.ServiceSpec{CreateExternalLoadBalancer: external}}
 }
 
 func sortedNodeNames(nodes []*api.Node) []string {

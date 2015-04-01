@@ -88,6 +88,7 @@ type NodeController struct {
 	// check node status posted from kubelet. This value should be lower than nodeMonitorGracePeriod.
 	// TODO: Change node status monitor to watch based.
 	nodeMonitorPeriod time.Duration
+	clusterName   string
 	// Method for easy mocking in unittest.
 	lookupIP func(host string) ([]net.IP, error)
 	now      func() util.Time
@@ -106,7 +107,8 @@ func NewNodeController(
 	deletingPodsRateLimiter util.RateLimiter,
 	nodeMonitorGracePeriod time.Duration,
 	nodeStartupGracePeriod time.Duration,
-	nodeMonitorPeriod time.Duration) *NodeController {
+	nodeMonitorPeriod time.Duration,
+	clusterName string) *NodeController {
 	eventBroadcaster := record.NewBroadcaster()
 	recorder := eventBroadcaster.NewRecorder(api.EventSource{Component: "controllermanager"})
 	if kubeClient != nil {
@@ -132,6 +134,7 @@ func NewNodeController(
 		nodeStartupGracePeriod:  nodeStartupGracePeriod,
 		lookupIP:                net.LookupIP,
 		now:                     util.Now,
+		clusterName:             clusterName,
 	}
 }
 
@@ -219,6 +222,58 @@ func (nc *NodeController) RegisterNodes(nodes *api.NodeList, retryCount int, ret
 	}
 }
 
+// reconcileExternalServices updates balancers for external services, so that they will match the nodes given.
+func (nc *NodeController) reconcileExternalServices(nodes *api.NodeList) {
+	balancer, ok := nc.cloud.TCPLoadBalancer()
+	if !ok {
+		glog.Error("The cloud provider does not support external TCP load balancers.")
+		return
+	}
+
+	zones, ok := nc.cloud.Zones()
+	if !ok {
+		glog.Error("The cloud provider does not support zone enumeration.")
+		return
+	}
+	zone, err := zones.GetZone()
+	if err != nil {
+		glog.Errorf("Error while getting zone: %v", err)
+		return
+	}
+
+	hosts := []string{}
+	for _, node := range nodes.Items {
+		hosts = append(hosts, node.Name)
+	}
+
+	services, err := nc.kubeClient.Services(api.NamespaceAll).List(labels.Everything())
+	if err != nil {
+		glog.Errorf("Error while listing services: %v", err)
+		return
+	}
+	for _, service := range services.Items {
+		if service.Spec.CreateExternalLoadBalancer {
+			nonTCPPort := false
+			for i := range service.Spec.Ports {
+				if service.Spec.Ports[i].Protocol != api.ProtocolTCP {
+					nonTCPPort = true
+					break
+				}
+			}
+			if nonTCPPort {
+				// TODO: Support UDP here.
+				glog.Errorf("External load balancers for non TCP services are not currently supported: %v.", service)
+				continue
+			}
+			name := cloudprovider.GetLoadBalancerName(nc.clusterName, service.Namespace, service.Name)
+			err := balancer.UpdateTCPLoadBalancer(name, zone.Region, hosts)
+			if err != nil {
+				glog.Errorf("External error while updating TCP load balancer: %v.", err)
+			}
+		}
+	}
+}
+
 // SyncCloudNodes synchronizes the list of instances from cloudprovider to master server.
 func (nc *NodeController) SyncCloudNodes() error {
 	matches, err := nc.GetCloudNodesWithSpec()
@@ -237,6 +292,7 @@ func (nc *NodeController) SyncCloudNodes() error {
 
 	// Create nodes which have been created in cloud, but not in kubernetes cluster
 	// Skip nodes if we hit an error while trying to get their addresses.
+	nodesChanged := false
 	for _, node := range matches.Items {
 		if _, ok := nodeMap[node.Name]; !ok {
 			glog.V(3).Infof("Querying addresses for new node: %s", node.Name)
@@ -254,6 +310,7 @@ func (nc *NodeController) SyncCloudNodes() error {
 			if err != nil {
 				glog.Errorf("Create node %s error: %v", node.Name, err)
 			}
+			nodesChanged = true
 		}
 		delete(nodeMap, node.Name)
 	}
@@ -266,6 +323,12 @@ func (nc *NodeController) SyncCloudNodes() error {
 			glog.Errorf("Delete node %s error: %v", nodeID, err)
 		}
 		nc.deletePods(nodeID)
+		nodesChanged = true
+	}
+
+	// Make external services aware of nodes currently present in the cluster.
+	if nodesChanged {
+		nc.reconcileExternalServices(matches)
 	}
 
 	return nil
