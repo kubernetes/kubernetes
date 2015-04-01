@@ -553,7 +553,7 @@ func newAWSCloud(config io.Reader, authFunc AuthFunc, metadata AWSMetadata) (*AW
 	return awsCloud, nil
 }
 
-func (aws *AWSCloud) Clusters() (cloudprovider.Clusters, bool) {
+func (self *AWSCloud) Clusters() (cloudprovider.Clusters, bool) {
 	return nil, false
 }
 
@@ -563,18 +563,18 @@ func (self *AWSCloud) TCPLoadBalancer() (cloudprovider.TCPLoadBalancer, bool) {
 }
 
 // Instances returns an implementation of Instances for Amazon Web Services.
-func (aws *AWSCloud) Instances() (cloudprovider.Instances, bool) {
-	return aws, true
+func (self *AWSCloud) Instances() (cloudprovider.Instances, bool) {
+	return self, true
 }
 
 // Zones returns an implementation of Zones for Amazon Web Services.
-func (aws *AWSCloud) Zones() (cloudprovider.Zones, bool) {
-	return aws, true
+func (self *AWSCloud) Zones() (cloudprovider.Zones, bool) {
+	return self, true
 }
 
 // NodeAddresses is an implementation of Instances.NodeAddresses.
-func (aws *AWSCloud) NodeAddresses(name string) ([]api.NodeAddress, error) {
-	inst, err := aws.getInstanceByDnsName(name)
+func (self *AWSCloud) NodeAddresses(name string) ([]api.NodeAddress, error) {
+	inst, err := self.getInstanceByDnsName(name)
 	if err != nil {
 		return nil, err
 	}
@@ -587,8 +587,8 @@ func (aws *AWSCloud) NodeAddresses(name string) ([]api.NodeAddress, error) {
 }
 
 // ExternalID returns the cloud provider ID of the specified instance.
-func (aws *AWSCloud) ExternalID(name string) (string, error) {
-	inst, err := aws.getInstanceByDnsName(name)
+func (self *AWSCloud) ExternalID(name string) (string, error) {
+	inst, err := self.getInstanceByDnsName(name)
 	if err != nil {
 		return "", err
 	}
@@ -596,11 +596,11 @@ func (aws *AWSCloud) ExternalID(name string) (string, error) {
 }
 
 // Return the instances matching the relevant private dns name.
-func (aws *AWSCloud) getInstanceByDnsName(name string) (*ec2.Instance, error) {
+func (self *AWSCloud) getInstanceByDnsName(name string) (*ec2.Instance, error) {
 	f := &ec2InstanceFilter{}
 	f.PrivateDNSName = name
 
-	resp, err := aws.ec2.Instances(nil, f)
+	resp, err := self.ec2.Instances(nil, f)
 	if err != nil {
 		return nil, err
 	}
@@ -663,8 +663,8 @@ func (self *AWSCloud) getInstancesByDnsNames(names []string) ([]*ec2.Instance, e
 }
 
 // Return a list of instances matching regex string.
-func (aws *AWSCloud) getInstancesByRegex(regex string) ([]string, error) {
-	resp, err := aws.ec2.Instances(nil, nil)
+func (self *AWSCloud) getInstancesByRegex(regex string) ([]string, error) {
+	resp, err := self.ec2.Instances(nil, nil)
 	if err != nil {
 		return []string{}, err
 	}
@@ -717,14 +717,14 @@ func (aws *AWSCloud) getInstancesByRegex(regex string) ([]string, error) {
 }
 
 // List is an implementation of Instances.List.
-func (aws *AWSCloud) List(filter string) ([]string, error) {
+func (self *AWSCloud) List(filter string) ([]string, error) {
 	// TODO: Should really use tag query. No need to go regexp.
-	return aws.getInstancesByRegex(filter)
+	return self.getInstancesByRegex(filter)
 }
 
 // GetNodeResources implements Instances.GetNodeResources
-func (aws *AWSCloud) GetNodeResources(name string) (*api.NodeResources, error) {
-	instance, err := aws.getInstanceByDnsName(name)
+func (self *AWSCloud) GetNodeResources(name string) (*api.NodeResources, error) {
+	instance, err := self.getInstanceByDnsName(name)
 	if err != nil {
 		return nil, err
 	}
