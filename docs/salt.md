@@ -38,7 +38,6 @@ An example file is presented below using the Vagrant based environment.
 ```
 [root@kubernetes-master] $ cat /etc/salt/minion.d/grains.conf
 grains:
-  master_ip: $MASTER_IP
   etcd_servers: $MASTER_IP
   cloud_provider: vagrant
   roles:
@@ -57,7 +56,6 @@ Key | Value
 `cloud_provider` | (Optional) The cloud_provider used by apiserver: *gce*, *azure*, *vagrant*
 `etcd_servers` | (Optional) Comma-delimited list of IP addresses the kube-apiserver and kubelet use to reach etcd.  Uses the IP of the first machine in the kubernetes_master role.
 `hostnamef` | (Optional) The full host name of the machine, i.e. hostname -f
-`master_ip` | (Optional) The IP address that the kube-apiserver will bind against
 `node_ip` | (Optional) The IP address to use to address this node
 `minion_ip` | (Optional) Mapped to the kubelet hostname_override, K8S TODO - change this name
 `network_mode` | (Optional) Networking model to use among nodes: *openvswitch*
