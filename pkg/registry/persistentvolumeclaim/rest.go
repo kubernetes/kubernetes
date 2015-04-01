@@ -38,49 +38,34 @@ type persistentvolumeclaimStrategy struct {
 // objects via the REST API.
 var Strategy = persistentvolumeclaimStrategy{api.Scheme, api.SimpleNameGenerator}
 
-// NamespaceScoped is true for persistentvolumeclaims.
 func (persistentvolumeclaimStrategy) NamespaceScoped() bool {
 	return true
 }
 
-// ResetBeforeCreate clears fields that are not allowed to be set by end users on creation.
+// PrepareForCreate clears the Status field which is not allowed to be set by end users on creation.
 func (persistentvolumeclaimStrategy) PrepareForCreate(obj runtime.Object) {
 	pv := obj.(*api.PersistentVolumeClaim)
 	pv.Status = api.PersistentVolumeClaimStatus{}
 }
 
-// PrepareForUpdate clears fields that are not allowed to be set by end users on update.
+func (persistentvolumeclaimStrategy) Validate(ctx api.Context, obj runtime.Object) fielderrors.ValidationErrorList {
+	pvc := obj.(*api.PersistentVolumeClaim)
+	return validation.ValidatePersistentVolumeClaim(pvc)
+}
+
+func (persistentvolumeclaimStrategy) AllowCreateOnUpdate() bool {
+	return false
+}
+
+// PrepareForUpdate sets the Status field which is not allowed to be set by end users on update
 func (persistentvolumeclaimStrategy) PrepareForUpdate(obj, old runtime.Object) {
 	newPvc := obj.(*api.PersistentVolumeClaim)
 	oldPvc := obj.(*api.PersistentVolumeClaim)
 	newPvc.Status = oldPvc.Status
 }
 
-// Validate validates a new persistentvolumeclaim.
-func (persistentvolumeclaimStrategy) Validate(ctx api.Context, obj runtime.Object) fielderrors.ValidationErrorList {
-	pvc := obj.(*api.PersistentVolumeClaim)
-	return validation.ValidatePersistentVolumeClaim(pvc)
-}
-
-// AllowCreateOnUpdate is false for persistentvolumeclaims.
-func (persistentvolumeclaimStrategy) AllowCreateOnUpdate() bool {
-	return false
-}
-
-type persistentvolumeclaimStatusStrategy struct {
-	persistentvolumeclaimStrategy
-}
-
-var StatusStrategy = persistentvolumeclaimStatusStrategy{Strategy}
-
-func (persistentvolumeclaimStatusStrategy) PrepareForUpdate(obj, old runtime.Object) {
-	newPvc := obj.(*api.PersistentVolumeClaim)
-	oldPvc := obj.(*api.PersistentVolumeClaim)
-	newPvc.Spec = oldPvc.Spec
-}
-
-func (persistentvolumeclaimStatusStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) fielderrors.ValidationErrorList {
-	return validation.ValidatePersistentVolumeClaimStatusUpdate(obj.(*api.PersistentVolumeClaim), old.(*api.PersistentVolumeClaim))
+func (persistentvolumeclaimStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) fielderrors.ValidationErrorList {
+	return validation.ValidatePersistentVolumeClaimUpdate(obj.(*api.PersistentVolumeClaim), old.(*api.PersistentVolumeClaim))
 }
 
 // MatchPersistentVolumeClaim returns a generic matcher for a given label and field selector.

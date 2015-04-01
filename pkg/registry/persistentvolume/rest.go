@@ -38,26 +38,34 @@ type persistentvolumeStrategy struct {
 // objects via the REST API.
 var Strategy = persistentvolumeStrategy{api.Scheme, api.SimpleNameGenerator}
 
-// NamespaceScoped is false for persistentvolumes.
 func (persistentvolumeStrategy) NamespaceScoped() bool {
 	return false
 }
 
-// ResetBeforeCreate clears fields that are not allowed to be set by end users on creation.
+// ResetBeforeCreate clears the Status field which is not allowed to be set by end users on creation.
 func (persistentvolumeStrategy) PrepareForCreate(obj runtime.Object) {
 	pv := obj.(*api.PersistentVolume)
 	pv.Status = api.PersistentVolumeStatus{}
 }
 
-// Validate validates a new persistentvolume.
 func (persistentvolumeStrategy) Validate(ctx api.Context, obj runtime.Object) fielderrors.ValidationErrorList {
 	persistentvolume := obj.(*api.PersistentVolume)
 	return validation.ValidatePersistentVolume(persistentvolume)
 }
 
-// AllowCreateOnUpdate is false for persistentvolumes.
 func (persistentvolumeStrategy) AllowCreateOnUpdate() bool {
 	return false
+}
+
+// PrepareForUpdate sets the Status fields which is not allowed to be set by an end user updating a PV
+func (persistentvolumeStrategy) PrepareForUpdate(obj, old runtime.Object) {
+	newPv := obj.(*api.PersistentVolume)
+	oldPv := obj.(*api.PersistentVolume)
+	newPv.Status = oldPv.Status
+}
+
+func (persistentvolumeStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) fielderrors.ValidationErrorList {
+	return validation.ValidatePersistentVolumeUpdate(obj.(*api.PersistentVolume), old.(*api.PersistentVolume))
 }
 
 type persistentvolumeStatusStrategy struct {
@@ -66,6 +74,7 @@ type persistentvolumeStatusStrategy struct {
 
 var StatusStrategy = persistentvolumeStatusStrategy{Strategy}
 
+// PrepareForUpdate sets the Spec field which is not allowed to be changed when updating a PV's Status
 func (persistentvolumeStatusStrategy) PrepareForUpdate(obj, old runtime.Object) {
 	newPv := obj.(*api.PersistentVolume)
 	oldPv := obj.(*api.PersistentVolume)
