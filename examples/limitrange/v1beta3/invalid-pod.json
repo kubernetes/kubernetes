@@ -10,7 +10,7 @@
   "spec": {
       "containers": [{
         "name": "kubernetes-serve-hostname",
-        "image": "kubernetes/serve_hostname"        
+        "image": "gcr.io/google_containers/serve_hostname"
       }]
     }
 }

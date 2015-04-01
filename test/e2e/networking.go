@@ -116,7 +116,7 @@ var _ = Describe("Networking", func() {
 					Containers: []api.Container{
 						{
 							Name:  "webserver",
-							Image: "kubernetes/nettest:1.1",
+							Image: "gcr.io/google_containers/nettest:1.1",
 							Args: []string{
 								"-service=" + name,
 								fmt.Sprintf("-peers=%d", peers),

@@ -2,7 +2,7 @@ apiVersion: v1beta1
 desiredState:
   manifest:
     containers:
-      - image: kubernetes/liveness
+      - image: gcr.io/google_containers/liveness
         name: liveness
         livenessProbe:
           httpGet:

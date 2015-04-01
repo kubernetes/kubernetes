@@ -64,7 +64,7 @@ var _ = Describe("Events", func() {
 				Containers: []api.Container{
 					{
 						Name:  "p",
-						Image: "kubernetes/serve_hostname",
+						Image: "gcr.io/google_containers/serve_hostname",
 						Ports: []api.ContainerPort{{ContainerPort: 80}},
 					},
 				},

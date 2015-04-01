@@ -2,7 +2,7 @@ apiVersion: v1beta1
 desiredState:
   manifest:
     containers:
-      - image: busybox
+      - image: gcr.io/google_containers/busybox
         name: liveness
         livenessProbe:
           exec:

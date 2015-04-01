@@ -15,14 +15,14 @@ desiredState:
         id: monitoring-influx-grafana
         containers: 
           - name: influxdb
-            image: gcr.io/google-containers/heapster_influxdb:v0.3
+            image: gcr.io/google_containers/heapster_influxdb:v0.3
             ports: 
               - containerPort: 8083
                 hostPort: 8083
               - containerPort: 8086
                 hostPort: 8086
           - name: grafana
-            image: gcr.io/google-containers/heapster_grafana:v0.5
+            image: gcr.io/google_containers/heapster_grafana:v0.5
             env: 
               - name: "HTTP_USER"
                 value: "admin"

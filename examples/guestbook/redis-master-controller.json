@@ -12,7 +12,7 @@
           "id": "redis-master",
           "containers": [{
             "name": "redis-master",
-            "image": "dockerfile/redis",
+            "image": "gcr.io/google_containers/redis",
             "ports": [{"containerPort": 6379}]
           }]
         }
