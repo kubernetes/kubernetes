@@ -206,6 +206,102 @@ func (s *fakeUpgradeStream) Headers() http.Header {
 	return http.Header{}
 }
 
+func TestGetListener(t *testing.T) {
+	stopChan := make(chan struct{}, 1)
+	pf, err := New(&client.Request{}, &client.Config{}, []string{"15000", "15000"}, stopChan)
+	if err != nil {
+		t.Logf("Cannot create PortForwarder %v: %v", pf, err)
+
+	}
+	upgrader := fakeUpgrader{conn: newFakeUpgradeConnection()}
+	pf.upgrader = &upgrader
+	testCases := []struct {
+		Hostname                  string
+		Protocol                  string
+		Ports                     ForwardedPort
+		ShouldRaiseError          bool
+		ExecpectedListenerAddress string
+		ExecpectedListenerPort    string
+	}{
+		{
+			Hostname:                  "localhost",
+			Protocol:                  "tcp4",
+			Ports:                     ForwardedPort{15001, 15001},
+			ShouldRaiseError:          false,
+			ExecpectedListenerAddress: "127.0.0.1",
+			ExecpectedListenerPort:    "15001",
+		},
+		{
+			Hostname:                  "127.0.0.1",
+			Protocol:                  "tcp4",
+			Ports:                     ForwardedPort{15002, 15002},
+			ShouldRaiseError:          false,
+			ExecpectedListenerAddress: "127.0.0.1",
+			ExecpectedListenerPort:    "15002",
+		},
+		{
+			Hostname:                  "[::1]",
+			Protocol:                  "tcp6",
+			Ports:                     ForwardedPort{15003, 15003},
+			ShouldRaiseError:          false,
+			ExecpectedListenerAddress: "::1",
+			ExecpectedListenerPort:    "15003",
+		},
+		{
+			Hostname:                  "localhost",
+			Protocol:                  "tcp6",
+			Ports:                     ForwardedPort{15004, 15004},
+			ShouldRaiseError:          false,
+			ExecpectedListenerAddress: "::1",
+			ExecpectedListenerPort:    "15004",
+		},
+		{
+			Hostname:         "[::1]",
+			Protocol:         "tcp4",
+			Ports:            ForwardedPort{16001, 16001},
+			ShouldRaiseError: true,
+		},
+
+		{
+			Hostname:         "www.google.com",
+			Protocol:         "tcp4",
+			Ports:            ForwardedPort{16002, 16002},
+			ShouldRaiseError: true,
+		},
+		{
+			Hostname:         "1.1.1.1",
+			Protocol:         "tcp4",
+			Ports:            ForwardedPort{16003, 16003},
+			ShouldRaiseError: true,
+		},
+	}
+
+	for i, testCase := range testCases {
+		listener, err := pf.getListener(testCase.Protocol, testCase.Hostname, &testCase.Ports)
+		errorRaised := err != nil
+
+		if testCase.ShouldRaiseError != errorRaised {
+			t.Fatalf("Test case #%d failed: Data %v an error has been raised(%t) where it should not (or reciprocally): %v", i, testCase, testCase.ShouldRaiseError, err)
+		}
+		if listener != nil {
+			host, port, err := net.SplitHostPort(listener.Addr().String())
+			t.Logf("Asked a %s forward for: %s:%v, got listener %s:%s", testCase.Protocol, testCase.Hostname, testCase.Ports, host, port)
+			if err != nil {
+				if testCase.ExecpectedListenerAddress != host {
+					t.Fatalf("Listener does not listen on exepected address: asked %v got %v", testCase.ExecpectedListenerAddress, host)
+				}
+				if testCase.ExecpectedListenerPort != port {
+					t.Fatalf("Listener does not listen on exepected port: asked %v got %v", testCase.ExecpectedListenerPort, port)
+				}
+			}
+		} else {
+			t.Logf("PortForwarder: %v , asked forward for: %s:%v, got nil listener ", pf.ports, testCase.Hostname, testCase.Ports)
+		}
+
+	}
+
+}
+
 func TestForwardPorts(t *testing.T) {
 	testCases := []struct {
 		Upgrader *fakeUpgrader
@@ -310,4 +406,5 @@ func TestForwardPorts(t *testing.T) {
 			t.Fatalf("%d: expected conn closure", i)
 		}
 	}
+
 }
