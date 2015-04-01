@@ -11,7 +11,7 @@ if ARGV.first == "up" && ENV['USING_LMKTFY_SCRIPTS'] != 'true'
   raise Vagrant::Errors::VagrantError.new, <<END
 Calling 'vagrant up' directly is not supported.  Instead, please run the following:
 
-  export LMKTFYRNETES_PROVIDER=vagrant
+  export LMKTFY_PROVIDER=vagrant
   ./cluster/lmktfy-up.sh
 END
 end
