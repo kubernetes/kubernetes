@@ -1458,11 +1458,6 @@ func (self *AWSCloud) CreateTCPLoadBalancer(name, region string, externalIP net.
 			createRequest.Listeners = listeners
 
 			// TODO: Should we use a better identifier (the kubernetes uuid?)
-			//	nameTag := &elb.Tag{ Key: "Name", Value: name}
-			//	createRequest.Tags = []Tag { nameTag }
-
-			//	zones := []string{"us-east-1a"}
-			//	createRequest.AvailZone = removeDuplicates(zones)
 
 			// We are supposed to specify one subnet per AZ.
 			// TODO: What happens if we have more than one subnet per AZ?
