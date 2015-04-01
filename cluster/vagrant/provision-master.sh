@@ -74,7 +74,6 @@ EOF
 cat <<EOF >/etc/salt/minion.d/grains.conf
 grains:
   node_ip: '$(echo "$MASTER_IP" | sed -e "s/'/''/g")'
-  master_ip: '$(echo "$MASTER_IP" | sed -e "s/'/''/g")'
   publicAddressOverride: '$(echo "$MASTER_IP" | sed -e "s/'/''/g")'
   network_mode: openvswitch
   networkInterfaceName: eth1
