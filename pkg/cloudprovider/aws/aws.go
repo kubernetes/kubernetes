@@ -234,8 +234,7 @@ func (self *goamzEC2) DescribeLoadBalancers(region string, findName string) (map
 	}
 
 	request := &elb.DescribeLoadBalancer{}
-	// Names are limited to 32 characters, so we must use tags
-	//request.Names = []string{findName}
+	// Names are limited to 32 characters, so we must use tags (instead of filtering by name)
 	response, err := client.DescribeLoadBalancers(request)
 	if err != nil {
 		elbError, ok := err.(*elb.Error)
