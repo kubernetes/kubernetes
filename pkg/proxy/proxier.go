@@ -639,9 +639,23 @@ func (proxier *Proxier) openOnePortal(portalIP net.IP, portalPort int, protocol 
 func (proxier *Proxier) closePortal(service ServicePortName, info *serviceInfo) error {
 	// Collect errors and report them all at the end.
 	el := proxier.closeOnePortal(info.portalIP, info.portalPort, info.protocol, proxier.listenIP, info.proxyPort, service)
+
+	// This is the inverse of openPortal; see comments there
+	publicIpCount := 0
 	for _, publicIP := range info.publicIPs {
-		el = append(el, proxier.closeOnePortal(net.ParseIP(publicIP), info.portalPort, info.protocol, proxier.listenIP, info.proxyPort, service)...)
+		ip := net.ParseIP(publicIP)
+		if ip == nil {
+			continue
+		}
+		publicIpCount++
+		errs := proxier.closeOnePortal(ip, info.portalPort, info.protocol, proxier.listenIP, info.proxyPort, service)
+		el = append(el, errs...)
 	}
+	if info.externalLoadBalancer && publicIpCount == 0 {
+		errs := proxier.closeOnePortal(proxier.hostIP, info.portalPort, info.protocol, proxier.listenIP, info.proxyPort, service)
+		el = append(el, errs...)
+	}
+
 	if len(el) == 0 {
 		glog.Infof("Closed iptables portals for service %q", service)
 	} else {
