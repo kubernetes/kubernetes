@@ -34,3 +34,7 @@ func (mounter *Mounter) Unmount(target string, flags int) error {
 func (mounter *Mounter) List() ([]MountPoint, error) {
 	return []MountPoint{}, nil
 }
+
+func (mounter *Mounter) IsMountPoint(file string) (bool, error) {
+	return false, nil
+}

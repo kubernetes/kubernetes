@@ -27,10 +27,12 @@ import (
 const linuxTmpfsMagic = 0x01021994
 
 // realMountDetector implements mountDetector in terms of syscalls.
-type realMountDetector struct{}
+type realMountDetector struct {
+	mounter mount.Interface
+}
 
 func (m *realMountDetector) GetMountMedium(path string) (storageMedium, bool, error) {
-	isMnt, err := mount.IsMountPoint(path)
+	isMnt, err := m.mounter.IsMountPoint(path)
 	if err != nil {
 		return 0, false, fmt.Errorf("IsMountPoint(%q): %v", path, err)
 	}

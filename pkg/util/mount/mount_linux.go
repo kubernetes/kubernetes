@@ -34,15 +34,16 @@ import (
 const FlagBind = syscall.MS_BIND
 const FlagReadOnly = syscall.MS_RDONLY
 
+// Mounter implements mount.Interface for linux platform.
 type Mounter struct{}
 
-// Wraps syscall.Mount()
+// Mount wraps syscall.Mount()
 func (mounter *Mounter) Mount(source string, target string, fstype string, flags uintptr, data string) error {
 	glog.V(5).Infof("Mounting %s %s %s %d %s", source, target, fstype, flags, data)
 	return syscall.Mount(source, target, fstype, flags, data)
 }
 
-// Wraps syscall.Unmount()
+// Unmount wraps syscall.Unmount()
 func (mounter *Mounter) Unmount(target string, flags int) error {
 	return syscall.Unmount(target, flags)
 }
@@ -50,6 +51,7 @@ func (mounter *Mounter) Unmount(target string, flags int) error {
 // How many times to retry for a consistent read of /proc/mounts.
 const maxListTries = 3
 
+// List returns a list of all mounted filesystems.
 func (*Mounter) List() ([]MountPoint, error) {
 	hash1, err := readProcMounts(nil)
 	if err != nil {
@@ -71,11 +73,27 @@ func (*Mounter) List() ([]MountPoint, error) {
 	return nil, fmt.Errorf("failed to get a consistent snapshot of /proc/mounts after %d tries", maxListTries)
 }
 
+// IsMountPoint determines if a directory is a mountpoint, by comparing the device for the
+// directory with the device for it's parent.  If they are the same, it's not a mountpoint,
+// if they're different, it is.
+func (mounter *Mounter) IsMountPoint(file string) (bool, error) {
+	stat, err := os.Stat(file)
+	if err != nil {
+		return false, err
+	}
+	rootStat, err := os.Lstat(file + "/..")
+	if err != nil {
+		return false, err
+	}
+	// If the directory has the same device as parent, then it's not a mountpoint.
+	return stat.Sys().(*syscall.Stat_t).Dev != rootStat.Sys().(*syscall.Stat_t).Dev, nil
+}
+
 // As per the fstab man page.
 const expectedNumFieldsPerLine = 6
 
-// Read /proc/mounts and produces a hash of the contents.  If the out argument
-// is not nil, this fills it with MountPoint structs.
+// readProcMounts reads /proc/mounts and produces a hash of the contents.  If the out
+// argument is not nil, this fills it with MountPoint structs.
 func readProcMounts(out *[]MountPoint) (uint32, error) {
 	file, err := os.Open("/proc/mounts")
 	if err != nil {

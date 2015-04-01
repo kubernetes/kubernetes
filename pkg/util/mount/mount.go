@@ -24,20 +24,15 @@ package mount
 type Interface interface {
 	// Mount wraps syscall.Mount().
 	Mount(source string, target string, fstype string, flags uintptr, data string) error
-
 	// Umount wraps syscall.Mount().
 	Unmount(target string, flags int) error
-
 	// List returns a list of all mounted filesystems.  This can be large.
 	// On some platforms, reading mounts is not guaranteed consistent (i.e.
 	// it could change between chunked reads). This is guaranteed to be
 	// consistent.
 	List() ([]MountPoint, error)
-}
-
-// New returns a mount.Interface for the current system.
-func New() Interface {
-	return &Mounter{}
+	// IsMountPoint determines if a directory is a mountpoint.
+	IsMountPoint(file string) (bool, error)
 }
 
 // This represents a single line in /proc/mounts or /etc/fstab.
@@ -50,7 +45,12 @@ type MountPoint struct {
 	Pass   int
 }
 
-// Examines /proc/mounts to find all other references to the device referenced
+// New returns a mount.Interface for the current system.
+func New() Interface {
+	return &Mounter{}
+}
+
+// GetMountRefs finds all other references to the device referenced
 // by mountPath; returns a list of paths.
 func GetMountRefs(mounter Interface, mountPath string) ([]string, error) {
 	mps, err := mounter.List()
