@@ -18,12 +18,10 @@ limitations under the License.
 package app
 
 import (
-	"crypto/tls"
 	"fmt"
 	"math/rand"
 	"net"
 	"net/http"
-	"path"
 	"strconv"
 	"strings"
 	"time"
@@ -90,9 +88,6 @@ type KubeletServer struct {
 	NetworkPluginName              string
 	CloudProvider                  string
 	CloudConfigFile                string
-	TLSCertFile                    string
-	TLSPrivateKeyFile              string
-	CertDirectory                  string
 }
 
 // NewKubeletServer will create a new KubeletServer with default values.
@@ -120,7 +115,6 @@ func NewKubeletServer() *KubeletServer {
 		ImageGCLowThresholdPercent:  80,
 		NetworkPluginName:           "",
 		HostNetworkSources:          kubelet.FileSource,
-		CertDirectory:               "/var/run/kubernetes",
 	}
 }
 
@@ -134,12 +128,6 @@ func (s *KubeletServer) AddFlags(fs *pflag.FlagSet) {
 	fs.BoolVar(&s.EnableServer, "enable_server", s.EnableServer, "Enable the info server")
 	fs.Var(&s.Address, "address", "The IP address for the info server to serve on (set to 0.0.0.0 for all interfaces)")
 	fs.UintVar(&s.Port, "port", s.Port, "The port for the info server to serve on")
-	fs.StringVar(&s.TLSCertFile, "tls_cert_file", s.TLSCertFile, ""+
-		"File containing x509 Certificate for HTTPS.  (CA cert, if any, concatenated after server cert). "+
-		"If --tls_cert_file and --tls_private_key_file are not provided, a self-signed certificate and key "+
-		"are generated for the public address and saved to the directory passed to --cert_dir.")
-	fs.StringVar(&s.TLSPrivateKeyFile, "tls_private_key_file", s.TLSPrivateKeyFile, "File containing x509 private key matching --tls_cert_file.")
-	fs.StringVar(&s.CertDirectory, "cert_dir", s.CertDirectory, "The directory where the TLS certs are located (by default /var/run/kubernetes)")
 	fs.StringVar(&s.HostnameOverride, "hostname_override", s.HostnameOverride, "If non-empty, will use this string as identification instead of the actual hostname.")
 	fs.StringVar(&s.PodInfraContainerImage, "pod_infra_container_image", s.PodInfraContainerImage, "The image whose network/ipc namespaces containers in each pod will use.")
 	fs.StringVar(&s.DockerEndpoint, "docker_endpoint", s.DockerEndpoint, "If non-empty, use this for the docker endpoint to communicate with")
@@ -206,26 +194,6 @@ func (s *KubeletServer) Run(_ []string) error {
 	if err != nil {
 		return err
 	}
-
-	if s.TLSCertFile == "" && s.TLSPrivateKeyFile == "" {
-		s.TLSCertFile = path.Join(s.CertDirectory, "kubelet.crt")
-		s.TLSPrivateKeyFile = path.Join(s.CertDirectory, "kubelet.key")
-		if err := util.GenerateSelfSignedCert(util.GetHostname(s.HostnameOverride), s.TLSCertFile, s.TLSPrivateKeyFile); err != nil {
-			glog.Fatalf("Unable to generate self signed cert: %v", err)
-		}
-		glog.Infof("Using self-signed cert (%s, %s)", s.TLSCertFile, s.TLSPrivateKeyFile)
-	}
-	tlsOptions := &kubelet.TLSOptions{
-		Config: &tls.Config{
-			// Change default from SSLv3 to TLSv1.0 (because of POODLE vulnerability).
-			MinVersion: tls.VersionTLS10,
-			// Populate PeerCertificates in requests, but don't yet reject connections without certificates.
-			ClientAuth: tls.RequestClientCert,
-		},
-		CertFile: s.TLSCertFile,
-		KeyFile:  s.TLSPrivateKeyFile,
-	}
-
 	kcfg := KubeletConfig{
 		Address:                        s.Address,
 		AllowPrivileged:                s.AllowPrivileged,
@@ -257,7 +225,6 @@ func (s *KubeletServer) Run(_ []string) error {
 		NetworkPlugins:                 ProbeNetworkPlugins(),
 		NetworkPluginName:              s.NetworkPluginName,
 		StreamingConnectionIdleTimeout: s.StreamingConnectionIdleTimeout,
-		TLSOptions:                     tlsOptions,
 		ImageGCPolicy:                  imageGCPolicy,
 		Cloud:                          cloud,
 	}

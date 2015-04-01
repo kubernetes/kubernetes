@@ -48,7 +48,6 @@ ETCD_PORT=${ETCD_PORT:-4001}
 API_PORT=${API_PORT:-8080}
 API_HOST=${API_HOST:-127.0.0.1}
 KUBELET_PORT=${KUBELET_PORT:-10250}
-KUBELET_HEALTHZ_PORT=${KUBELET_HEALTHZ_PORT:-10248}
 CTLRMGR_PORT=${CTLRMGR_PORT:-10252}
 
 # Check kubectl
@@ -59,31 +58,27 @@ kube::log::status "Starting kubelet in masterless mode"
 "${KUBE_OUTPUT_HOSTBIN}/kubelet" \
   --really_crash_for_testing=true \
   --root_dir=/tmp/kubelet.$$ \
-  --cert_dir="${TMPDIR:-/tmp/}" \
   --docker_endpoint="fake://" \
   --hostname_override="127.0.0.1" \
   --address="127.0.0.1" \
-  --port="$KUBELET_PORT" \
-  --healthz_port="${KUBELET_HEALTHZ_PORT}" 1>&2 &
+  --port="$KUBELET_PORT" 1>&2 &
 KUBELET_PID=$!
-kube::util::wait_for_url "http://127.0.0.1:${KUBELET_HEALTHZ_PORT}/healthz" "kubelet: "
+kube::util::wait_for_url "http://127.0.0.1:${KUBELET_PORT}/healthz" "kubelet: "
 kill ${KUBELET_PID} 1>&2 2>/dev/null
 
 kube::log::status "Starting kubelet in masterful mode"
 "${KUBE_OUTPUT_HOSTBIN}/kubelet" \
   --really_crash_for_testing=true \
   --root_dir=/tmp/kubelet.$$ \
-  --cert_dir="${TMPDIR:-/tmp/}" \
   --docker_endpoint="fake://" \
   --hostname_override="127.0.0.1" \
   --address="127.0.0.1" \
   --api_servers="${API_HOST}:${API_PORT}" \
   --auth_path="${KUBE_ROOT}/hack/.test-cmd-auth" \
-  --port="$KUBELET_PORT" \
-  --healthz_port="${KUBELET_HEALTHZ_PORT}" 1>&2 &
+  --port="$KUBELET_PORT" 1>&2 &
 KUBELET_PID=$!
 
-kube::util::wait_for_url "http://127.0.0.1:${KUBELET_HEALTHZ_PORT}/healthz" "kubelet: "
+kube::util::wait_for_url "http://127.0.0.1:${KUBELET_PORT}/healthz" "kubelet: "
 
 # Start kube-apiserver
 kube::log::status "Starting kube-apiserver"
