@@ -926,9 +926,9 @@ type NodeConditionKind string
 // node condition. In the future, we will add more. The proposed set of conditions are:
 // NodeReachable, NodeLive, NodeReady, NodeSchedulable, NodeRunnable.
 const (
-	// NodeReachable means the node can be reached (in the sense of HTTP connection) from node controller.
+	// NodeReachable means the node can be reached (in the sense of HTTP connection) within cluster.
 	NodeReachable NodeConditionKind = "Reachable"
-	// NodeReady means the node returns StatusOK for HTTP health check.
+	// NodeReady means kubelet is healthy and ready to accept pods.
 	NodeReady NodeConditionKind = "Ready"
 	// NodeSchedulable means the node is ready to accept new pods.
 	NodeSchedulable NodeConditionKind = "Schedulable"
@@ -938,7 +938,7 @@ const (
 //
 // https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/node.md#node-condition
 type NodeCondition struct {
-	Kind               NodeConditionKind `json:"kind" description:"kind of the condition, one of Reachable, Ready"`
+	Kind               NodeConditionKind `json:"kind" description:"kind of the condition, one of Reachable, Ready, Schedulable"`
 	Status             ConditionStatus   `json:"status" description:"status of the condition, one of Full, None, Unknown"`
 	LastProbeTime      util.Time         `json:"lastProbeTime,omitempty" description:"last time the condition was probed"`
 	LastTransitionTime util.Time         `json:"lastTransitionTime,omitempty" description:"last time the condition transit from one status to another"`

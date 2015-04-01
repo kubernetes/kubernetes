@@ -256,14 +256,10 @@ func (factory *ConfigFactory) pollMinions() (cache.Enumerator, error) {
 			if condition.Status == api.ConditionTrue {
 				nodes.Items = append(nodes.Items, node)
 			}
-		} else if condition, ok := conditionMap[api.NodeReachable]; ok {
-			if condition.Status == api.ConditionTrue {
-				nodes.Items = append(nodes.Items, node)
-			}
 		} else {
 			// If no condition is set, we get unknown node condition. In such cases,
-			// do not add the node
-			glog.V(2).Infof("Minion %s is not available.  Skipping", node.Name)
+			// do not add the node.
+			glog.V(2).Infof("Minion %s is not available. Skipping", node.Name)
 		}
 	}
 	return &nodeEnumerator{nodes}, nil

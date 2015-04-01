@@ -83,7 +83,7 @@
         "allowMultiple": false
        },
        {
-        "type": "bool",
+        "type": "boolean",
         "paramType": "query",
         "name": "watch",
         "description": "watch for changes to the described resources and return them as a stream of add, update, and remove notifications; specify resourceVersion",
@@ -173,7 +173,7 @@
         "allowMultiple": false
        },
        {
-        "type": "bool",
+        "type": "boolean",
         "paramType": "query",
         "name": "watch",
         "description": "watch for changes to the described resources and return them as a stream of add, update, and remove notifications; specify resourceVersion",
@@ -391,7 +391,7 @@
         "allowMultiple": false
        },
        {
-        "type": "bool",
+        "type": "boolean",
         "paramType": "query",
         "name": "watch",
         "description": "watch for changes to the described resources and return them as a stream of add, update, and remove notifications; specify resourceVersion",
@@ -443,7 +443,7 @@
         "allowMultiple": false
        },
        {
-        "type": "bool",
+        "type": "boolean",
         "paramType": "query",
         "name": "watch",
         "description": "watch for changes to the described resources and return them as a stream of add, update, and remove notifications; specify resourceVersion",
@@ -495,7 +495,7 @@
         "allowMultiple": false
        },
        {
-        "type": "bool",
+        "type": "boolean",
         "paramType": "query",
         "name": "watch",
         "description": "watch for changes to the described resources and return them as a stream of add, update, and remove notifications; specify resourceVersion",
@@ -555,7 +555,7 @@
         "allowMultiple": false
        },
        {
-        "type": "bool",
+        "type": "boolean",
         "paramType": "query",
         "name": "watch",
         "description": "watch for changes to the described resources and return them as a stream of add, update, and remove notifications; specify resourceVersion",
@@ -645,7 +645,7 @@
         "allowMultiple": false
        },
        {
-        "type": "bool",
+        "type": "boolean",
         "paramType": "query",
         "name": "watch",
         "description": "watch for changes to the described resources and return them as a stream of add, update, and remove notifications; specify resourceVersion",
@@ -855,7 +855,7 @@
         "allowMultiple": false
        },
        {
-        "type": "bool",
+        "type": "boolean",
         "paramType": "query",
         "name": "watch",
         "description": "watch for changes to the described resources and return them as a stream of add, update, and remove notifications; specify resourceVersion",
@@ -907,7 +907,7 @@
         "allowMultiple": false
        },
        {
-        "type": "bool",
+        "type": "boolean",
         "paramType": "query",
         "name": "watch",
         "description": "watch for changes to the described resources and return them as a stream of add, update, and remove notifications; specify resourceVersion",
@@ -959,7 +959,7 @@
         "allowMultiple": false
        },
        {
-        "type": "bool",
+        "type": "boolean",
         "paramType": "query",
         "name": "watch",
         "description": "watch for changes to the described resources and return them as a stream of add, update, and remove notifications; specify resourceVersion",
@@ -1019,7 +1019,7 @@
         "allowMultiple": false
        },
        {
-        "type": "bool",
+        "type": "boolean",
         "paramType": "query",
         "name": "watch",
         "description": "watch for changes to the described resources and return them as a stream of add, update, and remove notifications; specify resourceVersion",
@@ -1109,7 +1109,7 @@
         "allowMultiple": false
        },
        {
-        "type": "bool",
+        "type": "boolean",
         "paramType": "query",
         "name": "watch",
         "description": "watch for changes to the described resources and return them as a stream of add, update, and remove notifications; specify resourceVersion",
@@ -1319,7 +1319,7 @@
         "allowMultiple": false
        },
        {
-        "type": "bool",
+        "type": "boolean",
         "paramType": "query",
         "name": "watch",
         "description": "watch for changes to the described resources and return them as a stream of add, update, and remove notifications; specify resourceVersion",
@@ -1371,7 +1371,7 @@
         "allowMultiple": false
        },
        {
-        "type": "bool",
+        "type": "boolean",
         "paramType": "query",
         "name": "watch",
         "description": "watch for changes to the described resources and return them as a stream of add, update, and remove notifications; specify resourceVersion",
@@ -1423,7 +1423,7 @@
         "allowMultiple": false
        },
        {
-        "type": "bool",
+        "type": "boolean",
         "paramType": "query",
         "name": "watch",
         "description": "watch for changes to the described resources and return them as a stream of add, update, and remove notifications; specify resourceVersion",
@@ -1475,7 +1475,7 @@
         "allowMultiple": false
        },
        {
-        "type": "bool",
+        "type": "boolean",
         "paramType": "query",
         "name": "watch",
         "description": "watch for changes to the described resources and return them as a stream of add, update, and remove notifications; specify resourceVersion",
@@ -1549,7 +1549,7 @@
         "allowMultiple": false
        },
        {
-        "type": "bool",
+        "type": "boolean",
         "paramType": "query",
         "name": "watch",
         "description": "watch for changes to the described resources and return them as a stream of add, update, and remove notifications; specify resourceVersion",
@@ -1727,7 +1727,7 @@
         "allowMultiple": false
        },
        {
-        "type": "bool",
+        "type": "boolean",
         "paramType": "query",
         "name": "watch",
         "description": "watch for changes to the described resources and return them as a stream of add, update, and remove notifications; specify resourceVersion",
@@ -1851,7 +1851,7 @@
         "allowMultiple": false
        },
        {
-        "type": "bool",
+        "type": "boolean",
         "paramType": "query",
         "name": "watch",
         "description": "watch for changes to the described resources and return them as a stream of add, update, and remove notifications; specify resourceVersion",
@@ -1925,7 +1925,7 @@
         "allowMultiple": false
        },
        {
-        "type": "bool",
+        "type": "boolean",
         "paramType": "query",
         "name": "watch",
         "description": "watch for changes to the described resources and return them as a stream of add, update, and remove notifications; specify resourceVersion",
@@ -2103,7 +2103,7 @@
         "allowMultiple": false
        },
        {
-        "type": "bool",
+        "type": "boolean",
         "paramType": "query",
         "name": "watch",
         "description": "watch for changes to the described resources and return them as a stream of add, update, and remove notifications; specify resourceVersion",
@@ -2165,6 +2165,14 @@
         "description": "name of the Node",
         "required": true,
         "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "path:*",
+        "description": "path to the resource",
+        "required": true,
+        "allowMultiple": false
        }
       ],
       "produces": [
@@ -2185,6 +2193,14 @@
         "paramType": "path",
         "name": "name",
         "description": "name of the Node",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "path:*",
+        "description": "path to the resource",
         "required": true,
         "allowMultiple": false
        }
@@ -2209,6 +2225,14 @@
         "description": "name of the Node",
         "required": true,
         "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "path:*",
+        "description": "path to the resource",
+        "required": true,
+        "allowMultiple": false
        }
       ],
       "produces": [
@@ -2229,6 +2253,14 @@
         "paramType": "path",
         "name": "name",
         "description": "name of the Node",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "path:*",
+        "description": "path to the resource",
         "required": true,
         "allowMultiple": false
        }
@@ -2379,7 +2411,7 @@
         "allowMultiple": false
        },
        {
-        "type": "bool",
+        "type": "boolean",
         "paramType": "query",
         "name": "watch",
         "description": "watch for changes to the described resources and return them as a stream of add, update, and remove notifications; specify resourceVersion",
@@ -2469,7 +2501,7 @@
         "allowMultiple": false
        },
        {
-        "type": "bool",
+        "type": "boolean",
         "paramType": "query",
         "name": "watch",
         "description": "watch for changes to the described resources and return them as a stream of add, update, and remove notifications; specify resourceVersion",
@@ -2687,7 +2719,7 @@
         "allowMultiple": false
        },
        {
-        "type": "bool",
+        "type": "boolean",
         "paramType": "query",
         "name": "watch",
         "description": "watch for changes to the described resources and return them as a stream of add, update, and remove notifications; specify resourceVersion",
@@ -2765,6 +2797,14 @@
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "path:*",
+        "description": "path to the resource",
+        "required": true,
+        "allowMultiple": false
        }
       ],
       "produces": [
@@ -2793,6 +2833,14 @@
         "paramType": "path",
         "name": "namespaces",
         "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "path:*",
+        "description": "path to the resource",
         "required": true,
         "allowMultiple": false
        }
@@ -2825,6 +2873,14 @@
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "path:*",
+        "description": "path to the resource",
+        "required": true,
+        "allowMultiple": false
        }
       ],
       "produces": [
@@ -2853,6 +2909,14 @@
         "paramType": "path",
         "name": "namespaces",
         "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "path:*",
+        "description": "path to the resource",
         "required": true,
         "allowMultiple": false
        }
@@ -3027,7 +3091,7 @@
         "allowMultiple": false
        },
        {
-        "type": "bool",
+        "type": "boolean",
         "paramType": "query",
         "name": "watch",
         "description": "watch for changes to the described resources and return them as a stream of add, update, and remove notifications; specify resourceVersion",
@@ -3079,7 +3143,7 @@
         "allowMultiple": false
        },
        {
-        "type": "bool",
+        "type": "boolean",
         "paramType": "query",
         "name": "watch",
         "description": "watch for changes to the described resources and return them as a stream of add, update, and remove notifications; specify resourceVersion",
@@ -3106,6 +3170,14 @@
       "summary": "create a Binding",
       "nickname": "createBinding",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Binding",
+        "required": true,
+        "allowMultiple": false
+       },
        {
         "type": "string",
         "paramType": "path",
@@ -3219,7 +3291,7 @@
         "allowMultiple": false
        },
        {
-        "type": "bool",
+        "type": "boolean",
         "paramType": "query",
         "name": "watch",
         "description": "watch for changes to the described resources and return them as a stream of add, update, and remove notifications; specify resourceVersion",
@@ -3309,7 +3381,7 @@
         "allowMultiple": false
        },
        {
-        "type": "bool",
+        "type": "boolean",
         "paramType": "query",
         "name": "watch",
         "description": "watch for changes to the described resources and return them as a stream of add, update, and remove notifications; specify resourceVersion",
@@ -3527,7 +3599,7 @@
         "allowMultiple": false
        },
        {
-        "type": "bool",
+        "type": "boolean",
         "paramType": "query",
         "name": "watch",
         "description": "watch for changes to the described resources and return them as a stream of add, update, and remove notifications; specify resourceVersion",
@@ -3579,7 +3651,7 @@
         "allowMultiple": false
        },
        {
-        "type": "bool",
+        "type": "boolean",
         "paramType": "query",
         "name": "watch",
         "description": "watch for changes to the described resources and return them as a stream of add, update, and remove notifications; specify resourceVersion",
@@ -3631,7 +3703,7 @@
         "allowMultiple": false
        },
        {
-        "type": "bool",
+        "type": "boolean",
         "paramType": "query",
         "name": "watch",
         "description": "watch for changes to the described resources and return them as a stream of add, update, and remove notifications; specify resourceVersion",
@@ -3691,7 +3763,7 @@
         "allowMultiple": false
        },
        {
-        "type": "bool",
+        "type": "boolean",
         "paramType": "query",
         "name": "watch",
         "description": "watch for changes to the described resources and return them as a stream of add, update, and remove notifications; specify resourceVersion",
@@ -3781,7 +3853,7 @@
         "allowMultiple": false
        },
        {
-        "type": "bool",
+        "type": "boolean",
         "paramType": "query",
         "name": "watch",
         "description": "watch for changes to the described resources and return them as a stream of add, update, and remove notifications; specify resourceVersion",
@@ -3999,7 +4071,7 @@
         "allowMultiple": false
        },
        {
-        "type": "bool",
+        "type": "boolean",
         "paramType": "query",
         "name": "watch",
         "description": "watch for changes to the described resources and return them as a stream of add, update, and remove notifications; specify resourceVersion",
@@ -4051,7 +4123,7 @@
         "allowMultiple": false
        },
        {
-        "type": "bool",
+        "type": "boolean",
         "paramType": "query",
         "name": "watch",
         "description": "watch for changes to the described resources and return them as a stream of add, update, and remove notifications; specify resourceVersion",
@@ -4103,7 +4175,7 @@
         "allowMultiple": false
        },
        {
-        "type": "bool",
+        "type": "boolean",
         "paramType": "query",
         "name": "watch",
         "description": "watch for changes to the described resources and return them as a stream of add, update, and remove notifications; specify resourceVersion",
@@ -4207,7 +4279,7 @@
         "allowMultiple": false
        },
        {
-        "type": "bool",
+        "type": "boolean",
         "paramType": "query",
         "name": "watch",
         "description": "watch for changes to the described resources and return them as a stream of add, update, and remove notifications; specify resourceVersion",
@@ -4297,7 +4369,7 @@
         "allowMultiple": false
        },
        {
-        "type": "bool",
+        "type": "boolean",
         "paramType": "query",
         "name": "watch",
         "description": "watch for changes to the described resources and return them as a stream of add, update, and remove notifications; specify resourceVersion",
@@ -4507,7 +4579,7 @@
         "allowMultiple": false
        },
        {
-        "type": "bool",
+        "type": "boolean",
         "paramType": "query",
         "name": "watch",
         "description": "watch for changes to the described resources and return them as a stream of add, update, and remove notifications; specify resourceVersion",
@@ -4559,7 +4631,7 @@
         "allowMultiple": false
        },
        {
-        "type": "bool",
+        "type": "boolean",
         "paramType": "query",
         "name": "watch",
         "description": "watch for changes to the described resources and return them as a stream of add, update, and remove notifications; specify resourceVersion",
@@ -4611,7 +4683,7 @@
         "allowMultiple": false
        },
        {
-        "type": "bool",
+        "type": "boolean",
         "paramType": "query",
         "name": "watch",
         "description": "watch for changes to the described resources and return them as a stream of add, update, and remove notifications; specify resourceVersion",
@@ -4671,7 +4743,7 @@
         "allowMultiple": false
        },
        {
-        "type": "bool",
+        "type": "boolean",
         "paramType": "query",
         "name": "watch",
         "description": "watch for changes to the described resources and return them as a stream of add, update, and remove notifications; specify resourceVersion",
@@ -4761,7 +4833,7 @@
         "allowMultiple": false
        },
        {
-        "type": "bool",
+        "type": "boolean",
         "paramType": "query",
         "name": "watch",
         "description": "watch for changes to the described resources and return them as a stream of add, update, and remove notifications; specify resourceVersion",
@@ -4971,7 +5043,7 @@
         "allowMultiple": false
        },
        {
-        "type": "bool",
+        "type": "boolean",
         "paramType": "query",
         "name": "watch",
         "description": "watch for changes to the described resources and return them as a stream of add, update, and remove notifications; specify resourceVersion",
@@ -5049,6 +5121,14 @@
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "path:*",
+        "description": "path to the resource",
+        "required": true,
+        "allowMultiple": false
        }
       ],
       "produces": [
@@ -5077,6 +5157,14 @@
         "paramType": "path",
         "name": "namespaces",
         "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "path:*",
+        "description": "path to the resource",
         "required": true,
         "allowMultiple": false
        }
@@ -5109,6 +5197,14 @@
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "path:*",
+        "description": "path to the resource",
+        "required": true,
+        "allowMultiple": false
        }
       ],
       "produces": [
@@ -5137,6 +5233,14 @@
         "paramType": "path",
         "name": "namespaces",
         "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "path:*",
+        "description": "path to the resource",
         "required": true,
         "allowMultiple": false
        }
@@ -5311,7 +5415,7 @@
         "allowMultiple": false
        },
        {
-        "type": "bool",
+        "type": "boolean",
         "paramType": "query",
         "name": "watch",
         "description": "watch for changes to the described resources and return them as a stream of add, update, and remove notifications; specify resourceVersion",
@@ -5363,7 +5467,7 @@
         "allowMultiple": false
        },
        {
-        "type": "bool",
+        "type": "boolean",
         "paramType": "query",
         "name": "watch",
         "description": "watch for changes to the described resources and return them as a stream of add, update, and remove notifications; specify resourceVersion",
@@ -5397,7 +5501,7 @@
     ],
     "properties": {
      "annotations": {
-      "$ref": "v1beta3.ObjectMeta.annotations",
+      "type": "any",
       "description": "map of string keys and values that can be used by external tooling to store and retrieve arbitrary metadata about objects"
      },
      "apiVersion": {
@@ -5421,7 +5525,7 @@
       "description": "kind of object, in CamelCase; cannot be updated"
      },
      "labels": {
-      "$ref": "v1beta3.ObjectMeta.labels",
+      "type": "any",
       "description": "map of string keys and values that can be used to organize and categorize objects; may match selectors of replication controllers and services"
      },
      "name": {
@@ -5445,7 +5549,7 @@
       "description": "an object to bind to"
      },
      "uid": {
-      "$ref": "types.UID",
+      "type": "string",
       "description": "unique UUID across space and time; populated by the system; read-only"
      }
     }
@@ -5481,6 +5585,13 @@
      "imagePullPolicy"
     ],
     "properties": {
+     "args": {
+      "type": "array",
+      "items": {
+       "type": "string"
+      },
+      "description": "command array; the docker image's cmd is used if this is not provided; arguments to the entrypoint; cannot be updated"
+     },
      "capabilities": {
       "$ref": "v1beta3.Capabilities",
       "description": "capabilities for container; cannot be updated"
@@ -5490,7 +5601,7 @@
       "items": {
        "type": "string"
       },
-      "description": "command argv array; not executed within a shell; defaults to entrypoint or command in the image; cannot be updated"
+      "description": "entrypoint array; not executed within a shell; the docker image's entrypoint is used if this is not provided; cannot be updated"
      },
      "env": {
       "type": "array",
@@ -5504,7 +5615,7 @@
       "description": "Docker image name"
      },
      "imagePullPolicy": {
-      "$ref": "v1beta3.PullPolicy",
+      "type": "string",
       "description": "image pull policy; one of PullAlways, PullNever, PullIfNotPresent; defaults to PullAlways if :latest tag is specified, or PullIfNotPresent otherwise; cannot be updated"
      },
      "lifecycle": {
@@ -5580,7 +5691,7 @@
       "description": "name for the port that can be referred to by services; must be a DNS_LABEL and unique without the pod"
      },
      "protocol": {
-      "$ref": "v1beta3.Protocol",
+      "type": "string",
       "description": "protocol for port; must be UDP or TCP; TCP if unspecified"
      }
     }
@@ -5703,6 +5814,18 @@
      }
     }
    },
+   "v1beta3.EmptyDirVolumeSource": {
+    "id": "v1beta3.EmptyDirVolumeSource",
+    "required": [
+     "medium"
+    ],
+    "properties": {
+     "medium": {
+      "type": "string",
+      "description": "type of storage used to back the volume; must be an empty string (default) or Memory"
+     }
+    }
+   },
    "v1beta3.EndpointAddress": {
     "id": "v1beta3.EndpointAddress",
     "required": [
@@ -5735,7 +5858,7 @@
       "description": "port number of the endpoint"
      },
      "protocol": {
-      "$ref": "v1beta3.Protocol",
+      "type": "string",
       "description": "protocol for this port; must be UDP or TCP; TCP if unspecified"
      }
     }
@@ -5766,7 +5889,7 @@
     ],
     "properties": {
      "annotations": {
-      "$ref": "v1beta3.ObjectMeta.annotations",
+      "type": "any",
       "description": "map of string keys and values that can be used by external tooling to store and retrieve arbitrary metadata about objects"
      },
      "apiVersion": {
@@ -5790,7 +5913,7 @@
       "description": "kind of object, in CamelCase; cannot be updated"
      },
      "labels": {
-      "$ref": "v1beta3.ObjectMeta.labels",
+      "type": "any",
       "description": "map of string keys and values that can be used to organize and categorize objects; may match selectors of replication controllers and services"
      },
      "name": {
@@ -5817,7 +5940,7 @@
       "description": "sets of addresses and ports that comprise a service"
      },
      "uid": {
-      "$ref": "types.UID",
+      "type": "string",
       "description": "unique UUID across space and time; populated by the system; read-only"
      }
     }
@@ -5873,7 +5996,7 @@
     "id": "v1beta3.Event",
     "properties": {
      "annotations": {
-      "$ref": "v1beta3.ObjectMeta.annotations",
+      "type": "any",
       "description": "map of string keys and values that can be used by external tooling to store and retrieve arbitrary metadata about objects"
      },
      "apiVersion": {
@@ -5910,7 +6033,7 @@
       "description": "kind of object, in CamelCase; cannot be updated"
      },
      "labels": {
-      "$ref": "v1beta3.ObjectMeta.labels",
+      "type": "any",
       "description": "map of string keys and values that can be used to organize and categorize objects; may match selectors of replication controllers and services"
      },
      "lastTimestamp": {
@@ -5946,7 +6069,7 @@
       "description": "component reporting this event"
      },
      "uid": {
-      "$ref": "types.UID",
+      "type": "string",
       "description": "unique UUID across space and time; populated by the system; read-only"
      }
     }
@@ -6011,6 +6134,48 @@
     "id": "v1beta3.FinalizerName",
     "properties": {}
    },
+   "v1beta3.GCEPersistentDiskVolumeSource": {
+    "id": "v1beta3.GCEPersistentDiskVolumeSource",
+    "required": [
+     "pdName"
+    ],
+    "properties": {
+     "fsType": {
+      "type": "string",
+      "description": "file system type to mount, such as ext4, xfs, ntfs"
+     },
+     "partition": {
+      "type": "integer",
+      "format": "int32",
+      "description": "partition on the disk to mount (e.g., '1' for /dev/sda1); if omitted the plain device name (e.g., /dev/sda) will be mounted"
+     },
+     "pdName": {
+      "type": "string",
+      "description": "unique name of the PD resource in GCE"
+     },
+     "readOnly": {
+      "type": "boolean",
+      "description": "read-only if true, read-write otherwise (false or unspecified)"
+     }
+    }
+   },
+   "v1beta3.GitRepoVolumeSource": {
+    "id": "v1beta3.GitRepoVolumeSource",
+    "required": [
+     "repository",
+     "revision"
+    ],
+    "properties": {
+     "repository": {
+      "type": "string",
+      "description": "repository URL"
+     },
+     "revision": {
+      "type": "string",
+      "description": "commit hash for the specified revision"
+     }
+    }
+   },
    "v1beta3.HTTPGetAction": {
     "id": "v1beta3.HTTPGetAction",
     "properties": {
@@ -6045,6 +6210,18 @@
      }
     }
    },
+   "v1beta3.HostPathVolumeSource": {
+    "id": "v1beta3.HostPathVolumeSource",
+    "required": [
+     "path"
+    ],
+    "properties": {
+     "path": {
+      "type": "string",
+      "description": "path of the directory on the host"
+     }
+    }
+   },
    "v1beta3.Lifecycle": {
     "id": "v1beta3.Lifecycle",
     "properties": {
@@ -6062,7 +6239,7 @@
     "id": "v1beta3.LimitRange",
     "properties": {
      "annotations": {
-      "$ref": "v1beta3.ObjectMeta.annotations",
+      "type": "any",
       "description": "map of string keys and values that can be used by external tooling to store and retrieve arbitrary metadata about objects"
      },
      "apiVersion": {
@@ -6086,7 +6263,7 @@
       "description": "kind of object, in CamelCase; cannot be updated"
      },
      "labels": {
-      "$ref": "v1beta3.ObjectMeta.labels",
+      "type": "any",
       "description": "map of string keys and values that can be used to organize and categorize objects; may match selectors of replication controllers and services"
      },
      "name": {
@@ -6110,7 +6287,7 @@
       "description": "spec defines the limits enforced; https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#spec-and-status"
      },
      "uid": {
-      "$ref": "types.UID",
+      "type": "string",
       "description": "unique UUID across space and time; populated by the system; read-only"
      }
     }
@@ -6119,15 +6296,15 @@
     "id": "v1beta3.LimitRangeItem",
     "properties": {
      "max": {
-      "$ref": "v1beta3.ResourceList",
+      "type": "any",
       "description": "max usage constraints on this kind by resource name"
      },
      "min": {
-      "$ref": "v1beta3.ResourceList",
+      "type": "any",
       "description": "min usage constraints on this kind by resource name"
      },
      "type": {
-      "$ref": "v1beta3.LimitType",
+      "type": "string",
       "description": "type of resource that this limit applies to"
      }
     }
@@ -6178,11 +6355,32 @@
      }
     }
    },
+   "v1beta3.NFSVolumeSource": {
+    "id": "v1beta3.NFSVolumeSource",
+    "required": [
+     "server",
+     "path"
+    ],
+    "properties": {
+     "path": {
+      "type": "string",
+      "description": "the path that is exported by the NFS server"
+     },
+     "readOnly": {
+      "type": "boolean",
+      "description": "forces the NFS export to be mounted with read-only permissions"
+     },
+     "server": {
+      "type": "string",
+      "description": "the hostname or IP address of the NFS server"
+     }
+    }
+   },
    "v1beta3.Namespace": {
     "id": "v1beta3.Namespace",
     "properties": {
      "annotations": {
-      "$ref": "v1beta3.ObjectMeta.annotations",
+      "type": "any",
       "description": "map of string keys and values that can be used by external tooling to store and retrieve arbitrary metadata about objects"
      },
      "apiVersion": {
@@ -6206,7 +6404,7 @@
       "description": "kind of object, in CamelCase; cannot be updated"
      },
      "labels": {
-      "$ref": "v1beta3.ObjectMeta.labels",
+      "type": "any",
       "description": "map of string keys and values that can be used to organize and categorize objects; may match selectors of replication controllers and services"
      },
      "name": {
@@ -6234,7 +6432,7 @@
       "description": "status describes the current status of a Namespace; https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#spec-and-status"
      },
      "uid": {
-      "$ref": "types.UID",
+      "type": "string",
       "description": "unique UUID across space and time; populated by the system; read-only"
      }
     }
@@ -6286,7 +6484,7 @@
     "id": "v1beta3.NamespaceStatus",
     "properties": {
      "phase": {
-      "$ref": "v1beta3.NamespacePhase",
+      "type": "string",
       "description": "phase is the current lifecycle phase of the namespace"
      }
     }
@@ -6295,7 +6493,7 @@
     "id": "v1beta3.Node",
     "properties": {
      "annotations": {
-      "$ref": "v1beta3.ObjectMeta.annotations",
+      "type": "any",
       "description": "map of string keys and values that can be used by external tooling to store and retrieve arbitrary metadata about objects"
      },
      "apiVersion": {
@@ -6319,7 +6517,7 @@
       "description": "kind of object, in CamelCase; cannot be updated"
      },
      "labels": {
-      "$ref": "v1beta3.ObjectMeta.labels",
+      "type": "any",
       "description": "map of string keys and values that can be used to organize and categorize objects; may match selectors of replication controllers and services"
      },
      "name": {
@@ -6347,7 +6545,7 @@
       "description": "most recently observed status of the node; populated by the system, read-only; https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#spec-and-status"
      },
      "uid": {
-      "$ref": "types.UID",
+      "type": "string",
       "description": "unique UUID across space and time; populated by the system; read-only"
      }
     }
@@ -6363,7 +6561,7 @@
       "type": "string"
      },
      "type": {
-      "$ref": "v1beta3.NodeAddressType"
+      "type": "string"
      }
     }
    },
@@ -6391,12 +6589,12 @@
       "description": "(brief) reason for the condition's last transition"
      },
      "status": {
-      "$ref": "v1beta3.ConditionStatus",
+      "type": "string",
       "description": "status of the condition, one of Full, None, Unknown"
      },
      "type": {
-      "$ref": "v1beta3.NodeConditionType",
-      "description": "type of node condition, one of Reachable, Ready"
+      "type": "string",
+      "description": "type of node condition, one of Ready, Schedulable"
      }
     }
    },
@@ -6459,7 +6657,7 @@
       "description": "list of addresses reachable to the node"
      },
      "capacity": {
-      "$ref": "v1beta3.ResourceList",
+      "type": "any",
       "description": "compute resource capacity of the node; https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/resources.md"
      },
      "conditions": {
@@ -6473,7 +6671,7 @@
       "$ref": "v1beta3.NodeSystemInfo"
      },
      "phase": {
-      "$ref": "v1beta3.NodePhase",
+      "type": "string",
       "description": "most recently observed lifecycle phase of the node"
      }
     }
@@ -6551,7 +6749,7 @@
       "description": "specific resourceVersion to which this reference is made, if any: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
      },
      "uid": {
-      "$ref": "types.UID",
+      "type": "string",
       "description": "uid of the referent"
      }
     }
@@ -6560,7 +6758,7 @@
     "id": "v1beta3.Pod",
     "properties": {
      "annotations": {
-      "$ref": "v1beta3.ObjectMeta.annotations",
+      "type": "any",
       "description": "map of string keys and values that can be used by external tooling to store and retrieve arbitrary metadata about objects"
      },
      "apiVersion": {
@@ -6584,7 +6782,7 @@
       "description": "kind of object, in CamelCase; cannot be updated"
      },
      "labels": {
-      "$ref": "v1beta3.ObjectMeta.labels",
+      "type": "any",
       "description": "map of string keys and values that can be used to organize and categorize objects; may match selectors of replication controllers and services"
      },
      "name": {
@@ -6612,7 +6810,7 @@
       "description": "most recently observed status of the pod; populated by the system, read-only; https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#spec-and-status"
      },
      "uid": {
-      "$ref": "types.UID",
+      "type": "string",
       "description": "unique UUID across space and time; populated by the system; read-only"
      }
     }
@@ -6625,11 +6823,11 @@
     ],
     "properties": {
      "status": {
-      "$ref": "v1beta3.ConditionStatus",
+      "type": "string",
       "description": "status of the condition, one of Full, None, Unknown"
      },
      "type": {
-      "$ref": "v1beta3.PodConditionType",
+      "type": "string",
       "description": "kind of the condition"
      }
     }
@@ -6680,7 +6878,7 @@
       "description": "list of containers belonging to the pod; cannot be updated; containers cannot currently be added or removed; there must be at least one container in a Pod"
      },
      "dnsPolicy": {
-      "$ref": "v1beta3.DNSPolicy",
+      "type": "string",
       "description": "DNS policy for containers within the pod; one of 'ClusterFirst' or 'Default'"
      },
      "host": {
@@ -6692,11 +6890,11 @@
       "description": "host networking requested for this pod"
      },
      "nodeSelector": {
-      "$ref": "v1beta3.PodSpec.nodeSelector",
+      "type": "any",
       "description": "selector which must match a node's labels for the pod to be scheduled on that node"
      },
      "restartPolicy": {
-      "$ref": "v1beta3.RestartPolicy",
+      "type": "string",
       "description": "restart policy for all containers within the pod; one of RestartPolicyAlways, RestartPolicyOnFailure, RestartPolicyNever"
      },
      "volumes": {
@@ -6707,10 +6905,6 @@
       "description": "list of volumes that can be mounted by containers belonging to the pod"
      }
     }
-   },
-   "v1beta3.PodSpec.nodeSelector": {
-    "id": "v1beta3.PodSpec.nodeSelector",
-    "properties": {}
    },
    "v1beta3.PodStatus": {
     "id": "v1beta3.PodStatus",
@@ -6742,7 +6936,7 @@
       "description": "human readable message indicating details about why the pod is in this condition"
      },
      "phase": {
-      "$ref": "v1beta3.PodPhase",
+      "type": "string",
       "description": "current condition of the pod."
      },
      "podIP": {
@@ -6755,7 +6949,7 @@
     "id": "v1beta3.PodTemplateSpec",
     "properties": {
      "annotations": {
-      "$ref": "v1beta3.ObjectMeta.annotations",
+      "type": "any",
       "description": "map of string keys and values that can be used by external tooling to store and retrieve arbitrary metadata about objects"
      },
      "creationTimestamp": {
@@ -6771,7 +6965,7 @@
       "description": "an optional prefix to use to generate a unique name; has the same validation rules as name; optional, and is applied only name if is not specified"
      },
      "labels": {
-      "$ref": "v1beta3.ObjectMeta.labels",
+      "type": "any",
       "description": "map of string keys and values that can be used to organize and categorize objects; may match selectors of replication controllers and services"
      },
      "name": {
@@ -6795,7 +6989,7 @@
       "description": "specification of the desired behavior of the pod; https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#spec-and-status"
      },
      "uid": {
-      "$ref": "types.UID",
+      "type": "string",
       "description": "unique UUID across space and time; populated by the system; read-only"
      }
     }
@@ -6831,7 +7025,7 @@
     "id": "v1beta3.ReplicationController",
     "properties": {
      "annotations": {
-      "$ref": "v1beta3.ObjectMeta.annotations",
+      "type": "any",
       "description": "map of string keys and values that can be used by external tooling to store and retrieve arbitrary metadata about objects"
      },
      "apiVersion": {
@@ -6855,7 +7049,7 @@
       "description": "kind of object, in CamelCase; cannot be updated"
      },
      "labels": {
-      "$ref": "v1beta3.ObjectMeta.labels",
+      "type": "any",
       "description": "map of string keys and values that can be used to organize and categorize objects; may match selectors of replication controllers and services"
      },
      "name": {
@@ -6883,7 +7077,7 @@
       "description": "most recently observed status of the replication controller; populated by the system, read-only; https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#spec-and-status"
      },
      "uid": {
-      "$ref": "types.UID",
+      "type": "string",
       "description": "unique UUID across space and time; populated by the system; read-only"
      }
     }
@@ -6931,7 +7125,7 @@
       "description": "number of replicas desired"
      },
      "selector": {
-      "$ref": "v1beta3.ReplicationControllerSpec.selector",
+      "type": "any",
       "description": "label keys and values that must match in order to be controlled by this replication controller"
      },
      "template": {
@@ -6943,10 +7137,6 @@
       "description": "reference to an object that describes the pod that will be created if insufficient replicas are detected"
      }
     }
-   },
-   "v1beta3.ReplicationControllerSpec.selector": {
-    "id": "v1beta3.ReplicationControllerSpec.selector",
-    "properties": {}
    },
    "v1beta3.ReplicationControllerStatus": {
     "id": "v1beta3.ReplicationControllerStatus",
@@ -6965,7 +7155,7 @@
     "id": "v1beta3.ResourceQuota",
     "properties": {
      "annotations": {
-      "$ref": "v1beta3.ObjectMeta.annotations",
+      "type": "any",
       "description": "map of string keys and values that can be used by external tooling to store and retrieve arbitrary metadata about objects"
      },
      "apiVersion": {
@@ -6989,7 +7179,7 @@
       "description": "kind of object, in CamelCase; cannot be updated"
      },
      "labels": {
-      "$ref": "v1beta3.ObjectMeta.labels",
+      "type": "any",
       "description": "map of string keys and values that can be used to organize and categorize objects; may match selectors of replication controllers and services"
      },
      "name": {
@@ -7017,7 +7207,7 @@
       "description": "status defines the actual enforced quota and current usage; https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#spec-and-status"
      },
      "uid": {
-      "$ref": "types.UID",
+      "type": "string",
       "description": "unique UUID across space and time; populated by the system; read-only"
      }
     }
@@ -7057,7 +7247,7 @@
     "id": "v1beta3.ResourceQuotaSpec",
     "properties": {
      "hard": {
-      "$ref": "v1beta3.ResourceList",
+      "type": "any",
       "description": "hard is the set of desired hard limits for each named resource"
      }
     }
@@ -7066,11 +7256,11 @@
     "id": "v1beta3.ResourceQuotaStatus",
     "properties": {
      "hard": {
-      "$ref": "v1beta3.ResourceList",
+      "type": "any",
       "description": "hard is the set of enforced hard limits for each named resource"
      },
      "used": {
-      "$ref": "v1beta3.ResourceList",
+      "type": "any",
       "description": "used is the current observed total usage of the resource in the namespace"
      }
     }
@@ -7079,11 +7269,11 @@
     "id": "v1beta3.ResourceRequirements",
     "properties": {
      "limits": {
-      "$ref": "v1beta3.ResourceList",
+      "type": "any",
       "description": "Maximum amount of compute resources allowed"
      },
      "requests": {
-      "$ref": "v1beta3.ResourceList",
+      "type": "any",
       "description": "Minimum amount of resources requested"
      }
     }
@@ -7092,7 +7282,7 @@
     "id": "v1beta3.Secret",
     "properties": {
      "annotations": {
-      "$ref": "v1beta3.ObjectMeta.annotations",
+      "type": "any",
       "description": "map of string keys and values that can be used by external tooling to store and retrieve arbitrary metadata about objects"
      },
      "apiVersion": {
@@ -7104,7 +7294,7 @@
       "description": "RFC 3339 date and time at which the object was created; populated by the system, read-only; null for lists"
      },
      "data": {
-      "$ref": "v1beta3.Secret.data",
+      "type": "any",
       "description": "data contains the secret data.  Each key must be a valid DNS_SUBDOMAIN.  Each value must be a base64 encoded string"
      },
      "deletionTimestamp": {
@@ -7120,7 +7310,7 @@
       "description": "kind of object, in CamelCase; cannot be updated"
      },
      "labels": {
-      "$ref": "v1beta3.ObjectMeta.labels",
+      "type": "any",
       "description": "map of string keys and values that can be used to organize and categorize objects; may match selectors of replication controllers and services"
      },
      "name": {
@@ -7140,18 +7330,14 @@
       "description": "URL for the object; populated by the system, read-only"
      },
      "type": {
-      "$ref": "v1beta3.SecretType",
+      "type": "string",
       "description": "type facilitates programmatic handling of secret data"
      },
      "uid": {
-      "$ref": "types.UID",
+      "type": "string",
       "description": "unique UUID across space and time; populated by the system; read-only"
      }
     }
-   },
-   "v1beta3.Secret.data": {
-    "id": "v1beta3.Secret.data",
-    "properties": {}
    },
    "v1beta3.SecretList": {
     "id": "v1beta3.SecretList",
@@ -7184,11 +7370,23 @@
      }
     }
    },
+   "v1beta3.SecretVolumeSource": {
+    "id": "v1beta3.SecretVolumeSource",
+    "required": [
+     "secretName"
+    ],
+    "properties": {
+     "secretName": {
+      "type": "string",
+      "description": "secretName is the name of a secret in the pod's namespace"
+     }
+    }
+   },
    "v1beta3.Service": {
     "id": "v1beta3.Service",
     "properties": {
      "annotations": {
-      "$ref": "v1beta3.ObjectMeta.annotations",
+      "type": "any",
       "description": "map of string keys and values that can be used by external tooling to store and retrieve arbitrary metadata about objects"
      },
      "apiVersion": {
@@ -7212,7 +7410,7 @@
       "description": "kind of object, in CamelCase; cannot be updated"
      },
      "labels": {
-      "$ref": "v1beta3.ObjectMeta.labels",
+      "type": "any",
       "description": "map of string keys and values that can be used to organize and categorize objects; may match selectors of replication controllers and services"
      },
      "name": {
@@ -7240,7 +7438,7 @@
       "description": "most recently observed status of the service; populated by the system, read-only; https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#spec-and-status"
      },
      "uid": {
-      "$ref": "types.UID",
+      "type": "string",
       "description": "unique UUID across space and time; populated by the system; read-only"
      }
     }
@@ -7295,7 +7493,7 @@
       "description": "the port number that is exposed"
      },
      "protocol": {
-      "$ref": "v1beta3.Protocol",
+      "type": "string",
       "description": "the protocol used by this port; must be UDP or TCP; TCP if unspecified"
      },
      "targetPort": {
@@ -7334,18 +7532,14 @@
       "description": "externally visible IPs (e.g. load balancers) that should be proxied to this service"
      },
      "selector": {
-      "$ref": "v1beta3.ServiceSpec.selector",
+      "type": "any",
       "description": "label keys and values that must match in order to receive traffic for this service; if empty, all pods are selected, if not specified, endpoints must be manually specified"
      },
      "sessionAffinity": {
-      "$ref": "v1beta3.AffinityType",
+      "type": "string",
       "description": "enable client IP based session affinity; must be ClientIP or None; defaults to None"
      }
     }
-   },
-   "v1beta3.ServiceSpec.selector": {
-    "id": "v1beta3.ServiceSpec.selector",
-    "properties": {}
    },
    "v1beta3.ServiceStatus": {
     "id": "v1beta3.ServiceStatus",
@@ -7364,12 +7558,12 @@
     "id": "v1beta3.Volume",
     "required": [
      "name",
-     "hostPath",
-     "emptyDir",
-     "gcePersistentDisk",
      "gitRepo",
      "secret",
-     "nfs"
+     "nfs",
+     "hostPath",
+     "emptyDir",
+     "gcePersistentDisk"
     ],
     "properties": {
      "emptyDir": {
