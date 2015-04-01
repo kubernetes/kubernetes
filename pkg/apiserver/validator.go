@@ -17,6 +17,7 @@ limitations under the License.
 package apiserver
 
 import (
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -34,21 +35,26 @@ type httpGet interface {
 }
 
 type Server struct {
-	Addr string
-	Port int
-	Path string
+	Addr        string
+	Port        int
+	Path        string
+	EnableHTTPS bool
 }
 
 // validator is responsible for validating the cluster and serving
 type validator struct {
 	// a list of servers to health check
 	servers func() map[string]Server
-	client  httpGet
+	rt      http.RoundTripper
 }
 
 // TODO: can this use pkg/probe/http
 func (s *Server) check(client httpGet) (probe.Result, string, error) {
-	resp, err := client.Get("http://" + net.JoinHostPort(s.Addr, strconv.Itoa(s.Port)) + s.Path)
+	scheme := "http://"
+	if s.EnableHTTPS {
+		scheme = "https://"
+	}
+	resp, err := client.Get(scheme + net.JoinHostPort(s.Addr, strconv.Itoa(s.Port)) + s.Path)
 	if err != nil {
 		return probe.Unknown, "", err
 	}
@@ -81,7 +87,22 @@ func (v *validator) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	reply := []ServerStatus{}
 	for name, server := range v.servers() {
-		status, msg, err := server.check(v.client)
+		transport := v.rt
+		if server.EnableHTTPS {
+			// TODO(roberthbailey): The servers that use HTTPS are currently the
+			// kubelets, and we should be using a standard kubelet client library
+			// to talk to them rather than a separate http client.
+			transport = &http.Transport{
+				Proxy: http.ProxyFromEnvironment,
+				Dial: (&net.Dialer{
+					Timeout:   30 * time.Second,
+					KeepAlive: 30 * time.Second,
+				}).Dial,
+				TLSHandshakeTimeout: 10 * time.Second,
+				TLSClientConfig:     &tls.Config{InsecureSkipVerify: true},
+			}
+		}
+		status, msg, err := server.check(&http.Client{Transport: transport})
 		var errorMsg string
 		if err != nil {
 			errorMsg = err.Error()
@@ -103,30 +124,6 @@ func (v *validator) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 // NewValidator creates a validator for a set of servers.
-func NewValidator(servers func() map[string]Server) (http.Handler, error) {
-	return &validator{
-		servers: servers,
-		client:  &http.Client{},
-	}, nil
-}
-
-func makeTestValidator(servers map[string]string, get httpGet) (http.Handler, error) {
-	result := map[string]Server{}
-	for name, value := range servers {
-		host, port, err := net.SplitHostPort(value)
-		if err != nil {
-			return nil, fmt.Errorf("invalid server spec: %s (%v)", value, err)
-		}
-		val, err := strconv.Atoi(port)
-		if err != nil {
-			return nil, fmt.Errorf("invalid server spec: %s (%v)", port, err)
-		}
-		result[name] = Server{Addr: host, Port: val, Path: "/healthz"}
-	}
-
-	v, e := NewValidator(func() map[string]Server { return result })
-	if e == nil {
-		v.(*validator).client = get
-	}
-	return v, e
+func NewValidator(servers func() map[string]Server) http.Handler {
+	return &validator{servers: servers, rt: http.DefaultTransport}
 }

@@ -75,9 +75,14 @@ type HTTPKubeletClient struct {
 func NewKubeletClient(config *KubeletConfig) (KubeletClient, error) {
 	transport := http.DefaultTransport
 
-	tlsConfig, err := TLSConfigFor(&Config{
-		TLSClientConfig: config.TLSClientConfig,
-	})
+	cfg := &Config{TLSClientConfig: config.TLSClientConfig}
+	if config.EnableHttps {
+		hasCA := len(config.CAFile) > 0 || len(config.CAData) > 0
+		if !hasCA {
+			cfg.Insecure = true
+		}
+	}
+	tlsConfig, err := TLSConfigFor(cfg)
 	if err != nil {
 		return nil, err
 	}
