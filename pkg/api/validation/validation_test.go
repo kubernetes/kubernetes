@@ -1904,73 +1904,6 @@ func TestValidateMinion(t *testing.T) {
 				},
 			},
 		},
-		"missing-capacity": {
-			ObjectMeta: api.ObjectMeta{
-				Name:   "abc-123",
-				Labels: validSelector,
-			},
-			Spec: api.NodeSpec{
-				ExternalID: "external",
-			},
-		},
-		"missing-memory": {
-			ObjectMeta: api.ObjectMeta{
-				Name:   "abc-123",
-				Labels: validSelector,
-			},
-			Status: api.NodeStatus{
-				Capacity: api.ResourceList{
-					api.ResourceName(api.ResourceCPU): resource.MustParse("10"),
-				},
-			},
-			Spec: api.NodeSpec{
-				ExternalID: "external",
-			},
-		},
-		"missing-cpu": {
-			ObjectMeta: api.ObjectMeta{
-				Name:   "abc-123",
-				Labels: validSelector,
-			},
-			Status: api.NodeStatus{
-				Capacity: api.ResourceList{
-					api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
-				},
-			},
-			Spec: api.NodeSpec{
-				ExternalID: "external",
-			},
-		},
-		"invalid-memory": {
-			ObjectMeta: api.ObjectMeta{
-				Name:   "abc-123",
-				Labels: validSelector,
-			},
-			Status: api.NodeStatus{
-				Capacity: api.ResourceList{
-					api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
-					api.ResourceName(api.ResourceMemory): resource.MustParse("-10G"),
-				},
-			},
-			Spec: api.NodeSpec{
-				ExternalID: "external",
-			},
-		},
-		"invalid-cpu": {
-			ObjectMeta: api.ObjectMeta{
-				Name:   "abc-123",
-				Labels: validSelector,
-			},
-			Status: api.NodeStatus{
-				Capacity: api.ResourceList{
-					api.ResourceName(api.ResourceCPU):    resource.MustParse("-10"),
-					api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
-				},
-			},
-			Spec: api.NodeSpec{
-				ExternalID: "external",
-			},
-		},
 	}
 	for k, v := range errorCases {
 		errs := ValidateMinion(&v)
@@ -1980,14 +1913,11 @@ func TestValidateMinion(t *testing.T) {
 		for i := range errs {
 			field := errs[i].(*errors.ValidationError).Field
 			expectedFields := map[string]bool{
-				"metadata.name":           true,
-				"metadata.labels":         true,
-				"metadata.annotations":    true,
-				"metadata.namespace":      true,
-				"status.Capacity":         true,
-				"status.Capacity[memory]": true,
-				"status.Capacity[cpu]":    true,
-				"spec.ExternalID":         true,
+				"metadata.name":        true,
+				"metadata.labels":      true,
+				"metadata.annotations": true,
+				"metadata.namespace":   true,
+				"spec.ExternalID":      true,
 			}
 			if expectedFields[field] == false {
 				t.Errorf("%s: missing prefix for: %v", k, errs[i])
