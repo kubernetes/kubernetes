@@ -610,8 +610,8 @@ type ContainerStatus struct {
 	RestartCount int `json:"restartCount"`
 	// TODO(dchen1107): Need to decide how to represent this in v1beta3
 	Image       string `json:"image"`
-	ImageID     string `json:"imageID" description:"ID of the container's image"`
-	ContainerID string `json:"containerID,omitempty" description:"container's ID in the format 'docker://<container_id>'"`
+	ImageID     string `json:"imageID"`
+	ContainerID string `json:"containerID,omitempty"`
 }
 
 // PodPhase is a label for the condition of a pod at the current time.
