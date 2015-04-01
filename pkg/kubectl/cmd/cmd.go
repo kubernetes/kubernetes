@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strconv"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
@@ -71,10 +72,22 @@ type Factory struct {
 	// PodSelectorForResource returns the pod selector associated with the provided resource name
 	// or an error.
 	PodSelectorForResource func(mapping *meta.RESTMapping, namespace, name string) (string, error)
+	// PortForResource returns the ports associated with the provided resource name or an error
+	PortsForResource func(mapping *meta.RESTMapping, namespace, name string) ([]string, error)
 	// Returns a schema that can validate objects stored on disk.
 	Validator func() (validation.Schema, error)
 	// Returns the default namespace to use in cases where no other namespace is specified
 	DefaultNamespace func() (string, error)
+}
+
+func getPorts(spec api.PodSpec) []string {
+	result := []string{}
+	for _, container := range spec.Containers {
+		for _, port := range container.Ports {
+			result = append(result, strconv.Itoa(port.ContainerPort))
+		}
+	}
+	return result
 }
 
 // NewFactory creates a factory with the default Kubernetes resources defined
@@ -166,6 +179,29 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 				return kubectl.MakeLabels(rc.Spec.Selector), nil
 			default:
 				return "", fmt.Errorf("it is not possible to get a pod selector from %s", mapping.Kind)
+			}
+		},
+		PortsForResource: func(mapping *meta.RESTMapping, namespace, name string) ([]string, error) {
+			// TODO: replace with a swagger schema based approach (identify pod selector via schema introspection)
+			client, err := clients.ClientForVersion("")
+			if err != nil {
+				return nil, err
+			}
+			switch mapping.Kind {
+			case "ReplicationController":
+				rc, err := client.ReplicationControllers(namespace).Get(name)
+				if err != nil {
+					return nil, err
+				}
+				return getPorts(rc.Spec.Template.Spec), nil
+			case "Pod":
+				pod, err := client.Pods(namespace).Get(name)
+				if err != nil {
+					return nil, err
+				}
+				return getPorts(pod.Spec), nil
+			default:
+				return nil, fmt.Errorf("it is not possible to get ports from %s", mapping.Kind)
 			}
 		},
 		Resizer: func(mapping *meta.RESTMapping) (kubectl.Resizer, error) {

@@ -93,9 +93,6 @@ func RunExpose(f *Factory, out io.Writer, cmd *cobra.Command, args []string) err
 	if !found {
 		return util.UsageError(cmd, fmt.Sprintf("generator %q not found.", generator))
 	}
-	if util.GetFlagInt(cmd, "port") < 1 {
-		return util.UsageError(cmd, "--port is required and must be a positive integer.")
-	}
 	names := generator.ParamNames()
 	params := kubectl.MakeParams(cmd, names)
 	if len(util.GetFlagString(cmd, "service-name")) == 0 {
@@ -103,7 +100,7 @@ func RunExpose(f *Factory, out io.Writer, cmd *cobra.Command, args []string) err
 	} else {
 		params["name"] = util.GetFlagString(cmd, "service-name")
 	}
-	if s, found := params["selector"]; !found || len(s) == 0 {
+	if s, found := params["selector"]; !found || len(s) == 0 || util.GetFlagInt(cmd, "port") < 1 {
 		mapper, _ := f.Object()
 		v, k, err := mapper.VersionAndKindForResource(resource)
 		if err != nil {
@@ -113,11 +110,26 @@ func RunExpose(f *Factory, out io.Writer, cmd *cobra.Command, args []string) err
 		if err != nil {
 			return err
 		}
-		s, err := f.PodSelectorForResource(mapping, namespace, name)
-		if err != nil {
-			return err
+		if len(s) == 0 {
+			s, err := f.PodSelectorForResource(mapping, namespace, name)
+			if err != nil {
+				return err
+			}
+			params["selector"] = s
 		}
-		params["selector"] = s
+		if util.GetFlagInt(cmd, "port") < 0 {
+			ports, err := f.PortsForResource(mapping, namespace, name)
+			if err != nil {
+				return err
+			}
+			if len(ports) == 0 {
+				return util.UsageError(cmd, "couldn't find a suitable port via --port flag or introspection")
+			}
+			if len(ports) > 1 {
+				return util.UsageError(cmd, "more than one port to choose from, please explicitly specify a port using the --port flag.")
+			}
+			params["port"] = ports[0]
+		}
 	}
 	if util.GetFlagBool(cmd, "create-external-load-balancer") {
 		params["create-external-load-balancer"] = "true"
