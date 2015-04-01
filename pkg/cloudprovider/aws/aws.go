@@ -64,7 +64,9 @@ type EC2 interface {
 
 	// TODO: It is weird that these take a region.  I suspect it won't work cross-region anwyay.
 	// TODO: Refactor to use a load balancer object?
-	// List load balancers
+	// List load balancers; returns a map of the kubernetes name to the load balancer
+	// Note that the k8s name is not the AWS name, because the AWS name is limited to 32 chars,
+	// and the k8s name is not (the k8s name may also allow more characters).
 	DescribeLoadBalancers(region string, name string) (map[string]elb.LoadBalancer, error)
 	// Create load balancer
 	CreateLoadBalancer(region string, request *elb.CreateLoadBalancer) (string, error)
