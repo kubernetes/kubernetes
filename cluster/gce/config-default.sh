@@ -27,7 +27,7 @@ MINION_DISK_SIZE=100GB
 # for containervm image, so that gcloud will expand this
 # to the latest supported image.
 IMAGE=container-vm-v20150317
-IMAGE_PROJECT=google-containers
+IMAGE_PROJECT=google_containers
 NETWORK=${KUBE_GCE_NETWORK:-default}
 INSTANCE_PREFIX="${KUBE_GCE_INSTANCE_PREFIX:-kubernetes}"
 MASTER_NAME="${INSTANCE_PREFIX}-master"
