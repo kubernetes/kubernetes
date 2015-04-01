@@ -598,6 +598,8 @@ func (proxier *Proxier) openPortal(service ServicePortName, info *serviceInfo) e
 	// This indicates that the load balancer is acting as TCP relay, targeting the machine's IP.
 	// We also treat DNS names the same way, because DNS names are used when we have multiple
 	// addresses for the external load balancer (e.g. AWS ELB)
+	// TODO: This is basically a hack.  If we create load balancers asynchronously it'll likely break.
+	// We probably need to specify the cloud as an argument to kube-proxy.
 	if info.externalLoadBalancer && publicIpCount == 0 {
 		glog.V(2).Info("Forwarding node public ip for service:", service.Name)
 		err = proxier.openOnePortal(proxier.hostIP, info.portalPort, info.protocol, proxier.listenIP, info.proxyPort, service)
