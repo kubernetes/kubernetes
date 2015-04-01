@@ -334,6 +334,7 @@ func (self *goamzEC2) DeleteLoadBalancer(region string, name string) error {
 
 	_, err = client.DeleteLoadBalancer(request)
 	if err != nil {
+		// TODO: Check if error was because load balancer was concurrently deleted
 		glog.Error("error deleting load balancer: ", err)
 		return err
 	}
