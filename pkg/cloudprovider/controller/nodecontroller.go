@@ -60,6 +60,8 @@ const (
 	// Theoretically, this value should be lower than nodeMonitorGracePeriod.
 	// TODO: Change node status monitor to watch based.
 	nodeMonitorPeriod = 5 * time.Second
+	// Constant controlling number of retries of writing NodeStatus update.
+	nodeStatusUpdateRetry = 5
 )
 
 var (
@@ -457,6 +459,67 @@ func (nc *NodeController) recordNodeOfflineEvent(node *api.Node) {
 	nc.recorder.Eventf(ref, "offline", "Node %s is now offline", node.Name)
 }
 
+func (nc NodeController) tryUpdateNodeStatus(node *api.Node) (error, time.Duration, api.NodeCondition) {
+	var err error
+	var gracePeriod time.Duration
+	var lastReadyCondition api.NodeCondition
+	readyCondition := nc.getCondition(node, api.NodeReady)
+	if readyCondition == nil {
+		// If ready condition is nil, then kubelet (or nodecontroller) never posted node status.
+		// A fake ready condition is created, where LastProbeTime and LastTransitionTime is set
+		// to node.CreationTimestamp to avoid handle the corner case.
+		lastReadyCondition = api.NodeCondition{
+			Type:               api.NodeReady,
+			Status:             api.ConditionUnknown,
+			LastProbeTime:      node.CreationTimestamp,
+			LastTransitionTime: node.CreationTimestamp,
+		}
+		gracePeriod = nodeStartupGracePeriod
+	} else {
+		// If ready condition is not nil, make a copy of it, since we may modify it in place later.
+		lastReadyCondition = *readyCondition
+		gracePeriod = nodeMonitorGracePeriod
+	}
+
+	// Check last time when NodeReady was updated.
+	if nc.now().After(lastReadyCondition.LastProbeTime.Add(gracePeriod)) {
+		// NodeReady condition was last set longer ago than gracePeriod, so update it to Unknown
+		// (regardless of its current value) in the master, without contacting kubelet.
+		if readyCondition == nil {
+			glog.V(2).Infof("node %v is never updated by kubelet")
+			node.Status.Conditions = append(node.Status.Conditions, api.NodeCondition{
+				Type:               api.NodeReady,
+				Status:             api.ConditionUnknown,
+				Reason:             fmt.Sprintf("Kubelet never posted node status"),
+				LastProbeTime:      node.CreationTimestamp,
+				LastTransitionTime: nc.now(),
+			})
+		} else {
+			glog.V(2).Infof("node %v hasn't been updated for %+v. Last ready condition is: %+v",
+				node.Name, nc.now().Time.Sub(lastReadyCondition.LastProbeTime.Time), lastReadyCondition)
+			if lastReadyCondition.Status != api.ConditionUnknown {
+				readyCondition.Status = api.ConditionUnknown
+				readyCondition.Reason = fmt.Sprintf("Kubelet stopped posting node status.")
+				// LastProbeTime is the last time we heard from kubelet.
+				readyCondition.LastProbeTime = lastReadyCondition.LastProbeTime
+				readyCondition.LastTransitionTime = nc.now()
+			}
+			if readyCondition.Status != api.ConditionTrue &&
+				lastReadyCondition.Status == api.ConditionTrue {
+				nc.recordNodeOfflineEvent(node)
+			}
+		}
+		_, err = nc.kubeClient.Nodes().Update(node)
+		if err != nil {
+			glog.Errorf("Error updating node %s: %v", node.Name, err)
+		} else {
+			return nil, gracePeriod, lastReadyCondition
+		}
+	}
+
+	return err, gracePeriod, lastReadyCondition
+}
+
 // MonitorNodeStatus verifies node status are constantly updated by kubelet, and if not,
 // post "NodeReady==ConditionUnknown". It also evicts all pods if node is not ready or
 // not reachable for a long period of time.
@@ -469,58 +532,26 @@ func (nc *NodeController) MonitorNodeStatus() error {
 		var gracePeriod time.Duration
 		var lastReadyCondition api.NodeCondition
 		node := &nodes.Items[i]
-		readyCondition := nc.getCondition(node, api.NodeReady)
-		if readyCondition == nil {
-			// If ready condition is nil, then kubelet (or nodecontroller) never posted node status.
-			// A fake ready condition is created, where LastProbeTime and LastTransitionTime is set
-			// to node.CreationTimestamp to avoid handle the corner case.
-			lastReadyCondition = api.NodeCondition{
-				Type:               api.NodeReady,
-				Status:             api.ConditionUnknown,
-				LastProbeTime:      node.CreationTimestamp,
-				LastTransitionTime: node.CreationTimestamp,
-			}
-			gracePeriod = nodeStartupGracePeriod
-		} else {
-			// If ready condition is not nil, make a copy of it, since we may modify it in place later.
-			lastReadyCondition = *readyCondition
-			gracePeriod = nodeMonitorGracePeriod
-		}
-
-		// Check last time when NodeReady was updated.
-		if nc.now().After(lastReadyCondition.LastProbeTime.Add(gracePeriod)) {
-			// NodeReady condition was last set longer ago than gracePeriod, so update it to Unknown
-			// (regardless of its current value) in the master, without contacting kubelet.
-			if readyCondition == nil {
-				glog.V(2).Infof("node %v is never updated by kubelet")
-				node.Status.Conditions = append(node.Status.Conditions, api.NodeCondition{
-					Type:               api.NodeReady,
-					Status:             api.ConditionUnknown,
-					Reason:             fmt.Sprintf("Kubelet never posted node status"),
-					LastProbeTime:      node.CreationTimestamp,
-					LastTransitionTime: nc.now(),
-				})
-			} else {
-				glog.V(2).Infof("node %v hasn't been updated for %+v. Last ready condition is: %+v",
-					node.Name, nc.now().Time.Sub(lastReadyCondition.LastProbeTime.Time), lastReadyCondition)
-				if lastReadyCondition.Status != api.ConditionUnknown {
-					readyCondition.Status = api.ConditionUnknown
-					readyCondition.Reason = fmt.Sprintf("Kubelet stopped posting node status")
-					// LastProbeTime is the last time we heard from kubelet.
-					readyCondition.LastProbeTime = lastReadyCondition.LastProbeTime
-					readyCondition.LastTransitionTime = nc.now()
-				}
-				if readyCondition.Status != api.ConditionTrue &&
-					lastReadyCondition.Status == api.ConditionTrue {
-					nc.recordNodeOfflineEvent(node)
-				}
-			}
-			_, err = nc.kubeClient.Nodes().Update(node)
+		for rep := 0; rep < nodeStatusUpdateRetry; rep++ {
+			err, gracePeriod, lastReadyCondition = nc.tryUpdateNodeStatus(node)
 			if err != nil {
-				glog.Errorf("error updating node %s: %v", node.Name, err)
+				name := node.Name
+				node, err = nc.kubeClient.Nodes().Get(name)
+				if err != nil {
+					glog.Errorf("Failed while getting a Node to retry updating NodeStatus. Probably Node %s was deleted.", name)
+					break
+				}
+			} else {
+				break
 			}
 		}
+		if err != nil {
+			glog.Errorf("Update status  of Node %v from NodeController exceeds retry count."+
+				"Skipping - no pods will be evicted.", node.Name)
+			continue
+		}
 
+		readyCondition := nc.getCondition(node, api.NodeReady)
 		if readyCondition != nil {
 			// Check eviction timeout.
 			if lastReadyCondition.Status == api.ConditionFalse &&

@@ -1361,7 +1361,7 @@ func TestMonitorNodeStatusUpdateStatus(t *testing.T) {
 							{
 								Type:               api.NodeReady,
 								Status:             api.ConditionUnknown,
-								Reason:             fmt.Sprintf("Kubelet stopped posting node status"),
+								Reason:             fmt.Sprintf("Kubelet stopped posting node status."),
 								LastProbeTime:      util.Date(2015, 1, 1, 11, 0, 0, 0, time.UTC),
 								LastTransitionTime: fakeNow,
 							},
