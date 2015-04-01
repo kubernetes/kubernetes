@@ -1,6 +1,6 @@
 ## kubectl delete
 
-Delete a resource by filename, stdin, or resource and ID.
+Delete a resource by filename, stdin, resource and ID, or by resources and label selector.
 
 ### Synopsis
 
