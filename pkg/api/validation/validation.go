@@ -859,6 +859,11 @@ func ValidateServiceUpdate(oldService, service *api.Service) errs.ValidationErro
 	allErrs := errs.ValidationErrorList{}
 	allErrs = append(allErrs, ValidateObjectMetaUpdate(&oldService.ObjectMeta, &service.ObjectMeta).Prefix("metadata")...)
 
+	// if portalIP is not given when updating, consider it uses the exsiting one.
+	if service.Spec.PortalIP == "" {
+		service.Spec.PortalIP = oldService.Spec.PortalIP
+	}
+
 	// TODO: PortalIP should be a Status field, since the system can set a value != to the user's value
 	// once PortalIP is set, it cannot be unset.
 	if api.IsServiceIPSet(oldService) && service.Spec.PortalIP != oldService.Spec.PortalIP {
