@@ -85,7 +85,7 @@ type EC2 interface {
 	// Create security group and return the id
 	CreateSecurityGroup(vpcId string, name string, description string) (string, error)
 	// Authorize security group ingress
-	AuthorizeSecurityGroupIngress(securityGroupId string, perms []ec2.IPPerm) (resp *ec2.SimpleResp, err error)
+	AuthorizeSecurityGroupIngress(securityGroupId string, perms []ec2.IPPerm) (*ec2.SimpleResp, error)
 
 	// List VPCs
 	ListVPCs(filterName string) ([]ec2.VPC, error)
@@ -429,7 +429,7 @@ func (self *goamzEC2) CreateSecurityGroup(vpcId string, name string, description
 }
 
 // Implements EC2.AuthorizeSecurityGroupIngess
-func (self *goamzEC2) AuthorizeSecurityGroupIngress(securityGroupId string, perms []ec2.IPPerm) (resp *ec2.SimpleResp, err error) {
+func (self *goamzEC2) AuthorizeSecurityGroupIngress(securityGroupId string, perms []ec2.IPPerm) (*ec2.SimpleResp, error) {
 	groupSpec := ec2.SecurityGroup{Id: securityGroupId}
 
 	response, err := self.ec2.AuthorizeSecurityGroup(groupSpec, perms)
