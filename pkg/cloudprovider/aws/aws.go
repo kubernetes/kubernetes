@@ -82,17 +82,17 @@ type AWSMetadata interface {
 	DeleteLoadBalancer(region string, name string) error
 
 	// List subnets
-	DescribeSubnets(subnetIds []string, filterVpcId string) ([]ec2.Subnet, error)
+	DescribeSubnets(subnetIds []string, filterVPCId string) ([]ec2.Subnet, error)
 
 	// List security groups
-	DescribeSecurityGroups(groupIds []string, filterName string, filterVpcId string) ([]ec2.SecurityGroupInfo, error)
+	DescribeSecurityGroups(groupIds []string, filterName string, filterVPCId string) ([]ec2.SecurityGroupInfo, error)
 	// Create security group and return the id
 	CreateSecurityGroup(vpcId string, name string, description string) (string, error)
 	// Authorize security group ingress
 	AuthorizeSecurityGroupIngress(securityGroupId string, perms []ec2.IPPerm) (resp *ec2.SimpleResp, err error)
 
 	// List VPCs
-	ListVpcs(filterName string) ([]ec2.VPC, error)
+	ListVPCs(filterName string) ([]ec2.VPC, error)
 }
 
 type VolumeOptions struct {
@@ -172,7 +172,7 @@ func newGoamzEC2(auth aws.Auth, regionName string) (*goamzEC2, error) {
 }
 
 // Find the VPC with the given name
-func (self *goamzEC2) ListVpcs(filterName string) ([]ec2.VPC, error) {
+func (self *goamzEC2) ListVPCs(filterName string) ([]ec2.VPC, error) {
 	client := self.ec2
 
 	// TODO: How do we want to identify our VPC?  Issue #6006
@@ -191,7 +191,7 @@ func (self *goamzEC2) ListVpcs(filterName string) ([]ec2.VPC, error) {
 }
 
 // Builds an ELB client for the specified region
-func (self *goamzEC2) getElbClient(regionName string) (*elb.ELB, error) {
+func (self *goamzEC2) getELBClient(regionName string) (*elb.ELB, error) {
 	self.mutex.Lock()
 	defer self.mutex.Unlock()
 
@@ -233,7 +233,7 @@ func (self *goamzMetadata) GetMetaData(key string) ([]byte, error) {
 
 // Implements EC2.DescribeLoadBalancers
 func (self *goamzEC2) DescribeLoadBalancers(region string, findName string) (map[string]elb.LoadBalancer, error) {
-	client, err := self.getElbClient(region)
+	client, err := self.getELBClient(region)
 	if err != nil {
 		return nil, err
 	}
@@ -313,7 +313,7 @@ func (self *goamzEC2) DescribeLoadBalancers(region string, findName string) (map
 
 // Implements EC2.CreateLoadBalancer
 func (self *goamzEC2) CreateLoadBalancer(region string, request *elb.CreateLoadBalancer) (string, error) {
-	client, err := self.getElbClient(region)
+	client, err := self.getELBClient(region)
 	if err != nil {
 		return "", err
 	}
@@ -328,7 +328,7 @@ func (self *goamzEC2) CreateLoadBalancer(region string, request *elb.CreateLoadB
 
 // Implements EC2.DeleteLoadBalancer
 func (self *goamzEC2) DeleteLoadBalancer(region string, name string) error {
-	client, err := self.getElbClient(region)
+	client, err := self.getELBClient(region)
 	if err != nil {
 		return err
 	}
@@ -346,7 +346,7 @@ func (self *goamzEC2) DeleteLoadBalancer(region string, name string) error {
 
 // Implements EC2.RegisterInstancesWithLoadBalancer
 func (self *goamzEC2) RegisterInstancesWithLoadBalancer(region string, request *elb.RegisterInstancesWithLoadBalancer) ([]elb.Instance, error) {
-	client, err := self.getElbClient(region)
+	client, err := self.getELBClient(region)
 	if err != nil {
 		return nil, err
 	}
@@ -361,7 +361,7 @@ func (self *goamzEC2) RegisterInstancesWithLoadBalancer(region string, request *
 
 // Implements EC2.DeregisterInstancesFromLoadBalancer
 func (self *goamzEC2) DeregisterInstancesFromLoadBalancer(region string, request *elb.DeregisterInstancesFromLoadBalancer) ([]elb.Instance, error) {
-	client, err := self.getElbClient(region)
+	client, err := self.getELBClient(region)
 	if err != nil {
 		return nil, err
 	}
@@ -375,10 +375,10 @@ func (self *goamzEC2) DeregisterInstancesFromLoadBalancer(region string, request
 }
 
 // Implements EC2.DescribeSubnets
-func (self *goamzEC2) DescribeSubnets(subnetIds []string, filterVpcId string) ([]ec2.Subnet, error) {
+func (self *goamzEC2) DescribeSubnets(subnetIds []string, filterVPCId string) ([]ec2.Subnet, error) {
 	filter := ec2.NewFilter()
-	if filterVpcId != "" {
-		filter.Add("vpc-id", filterVpcId)
+	if filterVPCId != "" {
+		filter.Add("vpc-id", filterVPCId)
 	}
 	response, err := self.ec2.DescribeSubnets(subnetIds, filter)
 	if err != nil {
@@ -389,13 +389,13 @@ func (self *goamzEC2) DescribeSubnets(subnetIds []string, filterVpcId string) ([
 }
 
 // Implements EC2.DescribeSecurityGroups
-func (self *goamzEC2) DescribeSecurityGroups(securityGroupIds []string, filterName string, filterVpcId string) ([]ec2.SecurityGroupInfo, error) {
+func (self *goamzEC2) DescribeSecurityGroups(securityGroupIds []string, filterName string, filterVPCId string) ([]ec2.SecurityGroupInfo, error) {
 	filter := ec2.NewFilter()
 	if filterName != "" {
 		filter.Add("group-name", filterName)
 	}
-	if filterVpcId != "" {
-		filter.Add("vpc-id", filterVpcId)
+	if filterVPCId != "" {
+		filter.Add("vpc-id", filterVPCId)
 	}
 	var findGroups []ec2.SecurityGroup
 	if securityGroupIds != nil {
@@ -1292,10 +1292,10 @@ func (self *AWSCloud) TCPLoadBalancerExists(name, region string) (bool, error) {
 	return false, nil
 }
 
-// Find the kubernetes vpc
-func (self *AWSCloud) findVpc() (*ec2.VPC, error) {
+// Find the kubernetes VPC
+func (self *AWSCloud) findVPC() (*ec2.VPC, error) {
 	name := "kubernetes-vpc"
-	vpcs, err := self.ec2.ListVpcs(name)
+	vpcs, err := self.ec2.ListVPCs(name)
 	if err != nil {
 		return nil, err
 	}
@@ -1386,13 +1386,13 @@ func (self *AWSCloud) CreateTCPLoadBalancer(name, region string, externalIP net.
 		return "", err
 	}
 
-	vpc, err := self.findVpc()
+	vpc, err := self.findVPC()
 	if err != nil {
-		glog.Error("error finding vpc", err)
+		glog.Error("error finding VPC", err)
 		return "", err
 	}
 	if vpc == nil {
-		return "", fmt.Errorf("Unable to find vpc")
+		return "", fmt.Errorf("Unable to find VPC")
 	}
 
 	// Construct list of configured subnets
