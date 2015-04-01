@@ -312,13 +312,26 @@ kube::golang::build_binaries() {
 
     local binaries
     binaries=($(kube::golang::binaries_from_targets "${targets[@]}"))
-    
+
     local platform
     for platform in "${platforms[@]}"; do
       kube::golang::set_platform_envs "${platform}"
       kube::log::status "Building go targets for ${platform}:" "${targets[@]}"
+
+      local -a statics=()
+      local -a nonstatics=()
+      for binary in "${binaries[@]}"; do
+        if kube::golang::is_statically_linked_library "${binary}"; then
+          kube::golang::exit_if_stdlib_not_installed;
+          statics+=($binary)
+        else
+          nonstatics+=($binary)
+        fi
+      done
+
       if [[ -n ${use_go_build:-} ]]; then
-        # Try and replicate the native binary placement of go install without calling go install
+        # Try and replicate the native binary placement of go install without
+        # calling go install.  This means we have to iterate each binary.
         local output_path="${KUBE_GOPATH}/bin"
         if [[ $platform != $host_platform ]]; then
           output_path="${output_path}/${platform//\//_}"
@@ -329,7 +342,7 @@ kube::golang::build_binaries() {
           if [[ ${GOOS} == "windows" ]]; then
             bin="${bin}.exe"
           fi
-          
+
           if kube::golang::is_statically_linked_library "${binary}"; then
             kube::golang::exit_if_stdlib_not_installed;
             CGO_ENABLED=0 go build -installsuffix cgo -o "${output_path}/${bin}" \
@@ -344,18 +357,17 @@ kube::golang::build_binaries() {
           fi
         done
       else
-        for binary in "${binaries[@]}"; do
-          if kube::golang::is_statically_linked_library "${binary}"; then
-            kube::golang::exit_if_stdlib_not_installed;
+          # Use go install.
+          if [[ "${#nonstatics[@]}" != 0 ]]; then
+            go install "${goflags[@]:+${goflags[@]}}" \
+                -ldflags "${version_ldflags}" \
+                "${nonstatics[@]:+${nonstatics[@]}}"
+          fi
+          if [[ "${#statics[@]}" != 0 ]]; then
             CGO_ENABLED=0 go install -installsuffix cgo "${goflags[@]:+${goflags[@]}}" \
               -ldflags "${version_ldflags}" \
-              "${binary}"
-          else
-            go install "${goflags[@]:+${goflags[@]}}" \
-              -ldflags "${version_ldflags}" \
-              "${binary}"
+                "${statics[@]:+${statics[@]}}"
           fi
-        done
       fi
     done
   )
