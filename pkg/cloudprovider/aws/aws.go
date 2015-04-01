@@ -1436,7 +1436,8 @@ func (self *AWSCloud) CreateTCPLoadBalancer(name, region string, externalIP net.
 
 		if loadBalancer == nil {
 			createRequest := &elb.CreateLoadBalancer{}
-			// TODO: Is there a k8s UUID that it would make sense to use?
+			// TODO: Does k8s keep a UUID for the load balancer, which we could use instead of
+			// a random UUID?
 			uuid := strings.Replace(string(util.NewUUID()), "-", "", -1)
 			awsId := LOADBALANCER_NAME_PREFIX + uuid
 			if len(awsId) > LOADBALANCER_NAME_MAXLEN {
