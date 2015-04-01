@@ -2450,6 +2450,9 @@ func TestValidateNamespace(t *testing.T) {
 		},
 		{
 			ObjectMeta: api.ObjectMeta{Name: "abc-123"},
+			Spec: api.NamespaceSpec{
+				Finalizers: []api.FinalizerName{"example.com/something", "example.com/other"},
+			},
 		},
 	}
 	for _, successCase := range successCases {
@@ -2513,6 +2516,20 @@ func TestValidateNamespaceFinalizeUpdate(t *testing.T) {
 					Finalizers: []api.FinalizerName{"foo.com/bar", "what.com/bar"},
 				},
 			}, true},
+		{api.Namespace{
+			ObjectMeta: api.ObjectMeta{
+				Name: "fooemptyfinalizer"},
+			Spec: api.NamespaceSpec{
+				Finalizers: []api.FinalizerName{"foo.com/bar"},
+			},
+		},
+			api.Namespace{
+				ObjectMeta: api.ObjectMeta{
+					Name: "fooemptyfinalizer"},
+				Spec: api.NamespaceSpec{
+					Finalizers: []api.FinalizerName{"", "foo.com/bar", "what.com/bar"},
+				},
+			}, false},
 	}
 	for i, test := range tests {
 		test.namespace.ObjectMeta.ResourceVersion = "1"
@@ -2579,59 +2596,76 @@ func TestValidateNamespaceUpdate(t *testing.T) {
 		{api.Namespace{}, api.Namespace{}, true},
 		{api.Namespace{
 			ObjectMeta: api.ObjectMeta{
-				Name: "foo"}},
+				Name: "foo1"}},
 			api.Namespace{
 				ObjectMeta: api.ObjectMeta{
-					Name: "bar"},
+					Name: "bar1"},
 			}, false},
 		{api.Namespace{
 			ObjectMeta: api.ObjectMeta{
-				Name:   "foo",
+				Name:   "foo2",
 				Labels: map[string]string{"foo": "bar"},
 			},
 		}, api.Namespace{
 			ObjectMeta: api.ObjectMeta{
-				Name:   "foo",
+				Name:   "foo2",
 				Labels: map[string]string{"foo": "baz"},
 			},
 		}, true},
 		{api.Namespace{
 			ObjectMeta: api.ObjectMeta{
-				Name: "foo",
+				Name: "foo3",
 			},
 		}, api.Namespace{
 			ObjectMeta: api.ObjectMeta{
-				Name:   "foo",
+				Name:   "foo3",
 				Labels: map[string]string{"foo": "baz"},
 			},
 		}, true},
 		{api.Namespace{
 			ObjectMeta: api.ObjectMeta{
-				Name:   "foo",
+				Name:   "foo4",
 				Labels: map[string]string{"bar": "foo"},
 			},
 		}, api.Namespace{
 			ObjectMeta: api.ObjectMeta{
-				Name:   "foo",
+				Name:   "foo4",
 				Labels: map[string]string{"foo": "baz"},
 			},
 		}, true},
 		{api.Namespace{
 			ObjectMeta: api.ObjectMeta{
-				Name:   "foo",
+				Name:   "foo5",
 				Labels: map[string]string{"foo": "baz"},
 			},
 		}, api.Namespace{
 			ObjectMeta: api.ObjectMeta{
-				Name:   "foo",
+				Name:   "foo5",
 				Labels: map[string]string{"Foo": "baz"},
+			},
+		}, true},
+		{api.Namespace{
+			ObjectMeta: api.ObjectMeta{
+				Name:   "foo6",
+				Labels: map[string]string{"foo": "baz"},
+			},
+		}, api.Namespace{
+			ObjectMeta: api.ObjectMeta{
+				Name:   "foo6",
+				Labels: map[string]string{"Foo": "baz"},
+			},
+			Spec: api.NamespaceSpec{
+				Finalizers: []api.FinalizerName{"kubernetes"},
+			},
+			Status: api.NamespaceStatus{
+				Phase: api.NamespaceTerminating,
 			},
 		}, true},
 	}
 	for i, test := range tests {
 		test.namespace.ObjectMeta.ResourceVersion = "1"
 		test.oldNamespace.ObjectMeta.ResourceVersion = "1"
-		errs := ValidateNamespaceUpdate(&test.oldNamespace, &test.namespace)
+		errs := ValidateNamespaceUpdate(&test.namespace, &test.oldNamespace)
 		if test.valid && len(errs) > 0 {
 			t.Errorf("%d: Unexpected error: %v", i, errs)
 			t.Logf("%#v vs %#v", test.oldNamespace.ObjectMeta, test.namespace.ObjectMeta)

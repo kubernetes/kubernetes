@@ -1149,21 +1149,13 @@ func validateFinalizerName(stringValue string) errs.ValidationErrorList {
 	return errs.ValidationErrorList{}
 }
 
-// ValidateNamespaceUpdate tests to make sure a namespace update can be applied.  Modifies oldNamespace.
-func ValidateNamespaceUpdate(oldNamespace *api.Namespace, namespace *api.Namespace) errs.ValidationErrorList {
+// ValidateNamespaceUpdate tests to make sure a namespace update can be applied.
+// newNamespace is updated with fields that cannot be changed
+func ValidateNamespaceUpdate(newNamespace *api.Namespace, oldNamespace *api.Namespace) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
-	allErrs = append(allErrs, ValidateObjectMetaUpdate(&oldNamespace.ObjectMeta, &namespace.ObjectMeta).Prefix("metadata")...)
-
-	// TODO: move reset function to its own location
-	// Ignore metadata changes now that they have been tested
-	oldNamespace.ObjectMeta = namespace.ObjectMeta
-	oldNamespace.Spec.Finalizers = namespace.Spec.Finalizers
-
-	// TODO: Add a 'real' ValidationError type for this error and provide print actual diffs.
-	if !api.Semantic.DeepEqual(oldNamespace, namespace) {
-		glog.V(4).Infof("Update failed validation %#v vs %#v", oldNamespace, namespace)
-		allErrs = append(allErrs, fmt.Errorf("update contains more than labels or annotation changes"))
-	}
+	allErrs = append(allErrs, ValidateObjectMetaUpdate(&oldNamespace.ObjectMeta, &newNamespace.ObjectMeta).Prefix("metadata")...)
+	newNamespace.Spec.Finalizers = oldNamespace.Spec.Finalizers
+	newNamespace.Status = oldNamespace.Status
 	return allErrs
 }
 
@@ -1176,15 +1168,14 @@ func ValidateNamespaceStatusUpdate(newNamespace, oldNamespace *api.Namespace) er
 	return allErrs
 }
 
-// ValidateNamespaceFinalizeUpdate tests to see if the update is legal for an end user to make. newNamespace is updated with fields
-// that cannot be changed.
+// ValidateNamespaceFinalizeUpdate tests to see if the update is legal for an end user to make.
+// newNamespace is updated with fields that cannot be changed.
 func ValidateNamespaceFinalizeUpdate(newNamespace, oldNamespace *api.Namespace) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 	allErrs = append(allErrs, ValidateObjectMetaUpdate(&oldNamespace.ObjectMeta, &newNamespace.ObjectMeta).Prefix("metadata")...)
 	for i := range newNamespace.Spec.Finalizers {
 		allErrs = append(allErrs, validateFinalizerName(string(newNamespace.Spec.Finalizers[i]))...)
 	}
-	newNamespace.ObjectMeta = oldNamespace.ObjectMeta
 	newNamespace.Status = oldNamespace.Status
 	return allErrs
 }

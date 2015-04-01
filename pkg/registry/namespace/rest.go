@@ -118,6 +118,13 @@ func (namespaceFinalizeStrategy) ValidateUpdate(ctx api.Context, obj, old runtim
 	return validation.ValidateNamespaceFinalizeUpdate(obj.(*api.Namespace), old.(*api.Namespace))
 }
 
+// PrepareForUpdate clears fields that are not allowed to be set by end users on update.
+func (namespaceFinalizeStrategy) PrepareForUpdate(obj, old runtime.Object) {
+	newNamespace := obj.(*api.Namespace)
+	oldNamespace := old.(*api.Namespace)
+	newNamespace.Status = oldNamespace.Status
+}
+
 // MatchNamespace returns a generic matcher for a given label and field selector.
 func MatchNamespace(label labels.Selector, field fields.Selector) generic.Matcher {
 	return generic.MatcherFunc(func(obj runtime.Object) (bool, error) {
