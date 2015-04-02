@@ -61,6 +61,8 @@ var (
 	nodeMemory             = flag.Int64("node_memory", 3*1024*1024*1024, "The amount of memory (in bytes) provisioned on each node")
 	masterServiceNamespace = flag.String("master_service_namespace", api.NamespaceDefault, "The namespace from which the kubernetes master services should be injected into pods")
 	enableProfiling        = flag.Bool("profiling", false, "Enable profiling via web interface host:port/debug/pprof/")
+	deletingPodsQps        = flag.Float32("deleting_pods_qps", 0.1, "")
+	deletingPodsBurst      = flag.Int("deleting_pods_burst", 10, "")
 )
 
 type delegateHandler struct {
@@ -128,7 +130,8 @@ func runControllerManager(machineList []string, cl *client.Client, nodeMilliCPU,
 	}
 	kubeClient := &client.HTTPKubeletClient{Client: http.DefaultClient, Port: ports.KubeletPort}
 
-	nodeController := nodeControllerPkg.NewNodeController(nil, "", machineList, nodeResources, cl, kubeClient, 10, 5*time.Minute)
+	nodeController := nodeControllerPkg.NewNodeController(
+		nil, "", machineList, nodeResources, cl, kubeClient, 10, 5*time.Minute, util.NewTokenBucketRateLimiter(*deletingPodsQps, *deletingPodsBurst))
 	nodeController.Run(10*time.Second, true, true)
 
 	endpoints := service.NewEndpointController(cl)

@@ -71,15 +71,17 @@ var (
 )
 
 type NodeController struct {
-	cloud              cloudprovider.Interface
-	matchRE            string
-	staticResources    *api.NodeResources
-	nodes              []string
-	kubeClient         client.Interface
-	kubeletClient      client.KubeletClient
-	recorder           record.EventRecorder
-	registerRetryCount int
-	podEvictionTimeout time.Duration
+	cloud                   cloudprovider.Interface
+	matchRE                 string
+	staticResources         *api.NodeResources
+	nodes                   []string
+	kubeClient              client.Interface
+	kubeletClient           client.KubeletClient
+	recorder                record.EventRecorder
+	registerRetryCount      int
+	podEvictionTimeout      time.Duration
+	deletingPodsRateLimiter util.RateLimiter
+
 	// Method for easy mocking in unittest.
 	lookupIP func(host string) ([]net.IP, error)
 	now      func() util.Time
@@ -94,7 +96,8 @@ func NewNodeController(
 	kubeClient client.Interface,
 	kubeletClient client.KubeletClient,
 	registerRetryCount int,
-	podEvictionTimeout time.Duration) *NodeController {
+	podEvictionTimeout time.Duration,
+	deletingPodsRateLimiter util.RateLimiter) *NodeController {
 	eventBroadcaster := record.NewBroadcaster()
 	recorder := eventBroadcaster.NewRecorder(api.EventSource{Component: "controllermanager"})
 	if kubeClient != nil {
@@ -104,17 +107,18 @@ func NewNodeController(
 		glog.Infof("No api server defined - no events will be sent to API server.")
 	}
 	return &NodeController{
-		cloud:              cloud,
-		matchRE:            matchRE,
-		nodes:              nodes,
-		staticResources:    staticResources,
-		kubeClient:         kubeClient,
-		kubeletClient:      kubeletClient,
-		recorder:           recorder,
-		registerRetryCount: registerRetryCount,
-		podEvictionTimeout: podEvictionTimeout,
-		lookupIP:           net.LookupIP,
-		now:                util.Now,
+		cloud:                   cloud,
+		matchRE:                 matchRE,
+		nodes:                   nodes,
+		staticResources:         staticResources,
+		kubeClient:              kubeClient,
+		kubeletClient:           kubeletClient,
+		recorder:                recorder,
+		registerRetryCount:      registerRetryCount,
+		podEvictionTimeout:      podEvictionTimeout,
+		deletingPodsRateLimiter: deletingPodsRateLimiter,
+		lookupIP:                net.LookupIP,
+		now:                     util.Now,
 	}
 }
 
@@ -558,13 +562,18 @@ func (nc *NodeController) MonitorNodeStatus() error {
 			if lastReadyCondition.Status == api.ConditionFalse &&
 				nc.now().After(lastReadyCondition.LastTransitionTime.Add(nc.podEvictionTimeout)) {
 				// Node stays in not ready for at least 'podEvictionTimeout' - evict all pods on the unhealthy node.
-				nc.deletePods(node.Name)
+				// Makes sure we are not removing pods from to many nodes in the same time.
+				if nc.deletingPodsRateLimiter.CanAccept() {
+					nc.deletePods(node.Name)
+				}
 			}
 			if lastReadyCondition.Status == api.ConditionUnknown &&
 				nc.now().After(lastReadyCondition.LastProbeTime.Add(nc.podEvictionTimeout-gracePeriod)) {
 				// Same as above. Note however, since condition unknown is posted by node controller, which means we
 				// need to substract monitoring grace period in order to get the real 'podEvictionTimeout'.
-				nc.deletePods(node.Name)
+				if nc.deletingPodsRateLimiter.CanAccept() {
+					nc.deletePods(node.Name)
+				}
 			}
 		}
 	}

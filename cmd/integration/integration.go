@@ -223,7 +223,8 @@ func startComponents(firstManifestURL, secondManifestURL, apiVersion string) (st
 			api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
 		}}
 
-	nodeController := nodeControllerPkg.NewNodeController(nil, "", machineList, nodeResources, cl, fakeKubeletClient{}, 10, 5*time.Minute)
+	nodeController := nodeControllerPkg.NewNodeController(
+		nil, "", machineList, nodeResources, cl, fakeKubeletClient{}, 10, 5*time.Minute, util.NewFakeRateLimiter())
 	nodeController.Run(5*time.Second, true, false)
 	cadvisorInterface := new(cadvisor.Fake)
 

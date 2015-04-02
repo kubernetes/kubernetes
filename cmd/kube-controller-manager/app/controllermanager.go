@@ -58,6 +58,8 @@ type CMServer struct {
 	SyncNodeList            bool
 	SyncNodeStatus          bool
 	PodEvictionTimeout      time.Duration
+	DeletingPodsQps         float32
+	DeletingPodsBurst       int
 
 	// TODO: Discover these by pinging the host machines, and rip out these params.
 	NodeMilliCPU int64
@@ -104,6 +106,8 @@ func (s *CMServer) AddFlags(fs *pflag.FlagSet) {
 	fs.DurationVar(&s.ResourceQuotaSyncPeriod, "resource_quota_sync_period", s.ResourceQuotaSyncPeriod, "The period for syncing quota usage status in the system")
 	fs.DurationVar(&s.NamespaceSyncPeriod, "namespace_sync_period", s.NamespaceSyncPeriod, "The period for syncing namespace life-cycle updates")
 	fs.DurationVar(&s.PodEvictionTimeout, "pod_eviction_timeout", s.PodEvictionTimeout, "The grace peroid for deleting pods on failed nodes.")
+	fs.Float32Var(&s.DeletingPodsQps, "deleting_pods_qps", 0.1, "Number of nodes per second on which pods are deleted in case of node failure.")
+	fs.IntVar(&s.DeletingPodsBurst, "deleting_pods_burst", 10, "Number of nodes on which pods are bursty deleted in case of node failure. For more details look into RateLimiter.")
 	fs.IntVar(&s.RegisterRetryCount, "register_retry_count", s.RegisterRetryCount, ""+
 		"The number of retries for initial node registration.  Retry interval equals node_sync_period.")
 	fs.Var(&s.MachineList, "machines", "List of machines to schedule onto, comma separated.")
@@ -177,7 +181,7 @@ func (s *CMServer) Run(_ []string) error {
 	}
 
 	nodeController := nodeControllerPkg.NewNodeController(cloud, s.MinionRegexp, s.MachineList, nodeResources,
-		kubeClient, kubeletClient, s.RegisterRetryCount, s.PodEvictionTimeout)
+		kubeClient, kubeletClient, s.RegisterRetryCount, s.PodEvictionTimeout, util.NewTokenBucketRateLimiter(s.DeletingPodsQps, s.DeletingPodsBurst))
 	nodeController.Run(s.NodeSyncPeriod, s.SyncNodeList, s.SyncNodeStatus)
 
 	resourceQuotaManager := resourcequota.NewResourceQuotaManager(kubeClient)
