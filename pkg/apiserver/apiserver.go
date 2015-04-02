@@ -30,8 +30,11 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/admission"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	apierror "github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/rest"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/authorizer"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/healthz"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -86,6 +89,84 @@ func monitorFilter(action, resource string) restful.FilterFunction {
 	}
 }
 
+func apiAuthorizationFilter(apiAuthorizer authorizer.APIAuthorizer, attributeExtensionBuilder authorizer.APIAttributeExtensionBuilder, scope RequestScope) restful.FilterFunction {
+	return func(req *restful.Request, res *restful.Response, chain *restful.FilterChain) {
+		if apiAuthorizer == nil {
+			chain.ProcessFilter(req, res)
+			return
+		}
+
+		namespace, err := scope.Namer.Namespace(req)
+		if err != nil {
+			forbiddenAPIRequest(err.Error(), scope, res, req)
+			return
+		}
+		ctx := scope.ContextFunc(req)
+		ctx = api.WithNamespace(ctx, namespace)
+
+		user, _ := api.UserFrom(ctx)
+
+		var extendedAttributes interface{}
+		if attributeExtensionBuilder != nil {
+			extendedAttributes, err = attributeExtensionBuilder.GetExtendedInfo(req.Request)
+			if err != nil {
+				forbiddenAPIRequest(err.Error(), scope, res, req)
+				return
+			}
+		}
+
+		// names are not always available
+		_, name, _ := scope.Namer.Name(req)
+
+		authorizationAttributes := authorizer.APIAttributesRecord{
+			UserInfo:     user,
+			Verb:         strings.ToLower(scope.Verb),
+			Resource:     scope.Resource,
+			Subresource:  scope.Subresource,
+			Kind:         scope.Kind,
+			ResourceName: name,
+			ExtendedInfo: extendedAttributes,
+		}
+
+		if err := apiAuthorizer.AuthorizeAPIRequest(authorizationAttributes); err != nil {
+			forbiddenAPIRequest(err.Error(), scope, res, req)
+			return
+		}
+
+		chain.ProcessFilter(req, res)
+	}
+}
+
+// forbidden renders a simple forbidden error
+func forbiddenAPIRequest(reason string, scope RequestScope, res *restful.Response, req *restful.Request) {
+	// names are not always available
+	_, name, _ := scope.Namer.Name(req)
+
+	// Reason is an opaque string that describes why access is allowed or forbidden (forbidden by the time we reach here).
+	// We don't have direct access to kind or name (not that those apply either in the general case)
+	// We create a NewForbidden to stay close the API, but then we override the message to get a serialization
+	// that makes sense when a human reads it.
+	forbiddenError, _ := apierror.NewForbidden(scope.Kind, name, fmt.Errorf("%q is forbidden because %s", req.Request.RequestURI, reason)).(*apierror.StatusError)
+
+	formatted := &bytes.Buffer{}
+
+	if versionInterface, err := latest.InterfacesFor(scope.APIVersion); err != nil {
+		fmt.Fprintf(formatted, "%s", forbiddenError.Error())
+
+	} else if output, err := versionInterface.Codec.Encode(&forbiddenError.ErrStatus); err != nil {
+		fmt.Fprintf(formatted, "%s", forbiddenError.Error())
+
+	} else {
+		_ = json.Indent(formatted, output, "", "  ")
+
+	}
+
+	res.ResponseWriter.Header().Set("Content-Type", "application/json")
+	res.ResponseWriter.WriteHeader(http.StatusForbidden)
+	res.ResponseWriter.Write(formatted.Bytes())
+}
+
+// TODO this looks silly.  Why not use http.ServeMux?
 // mux is an object that can register http handlers.
 type Mux interface {
 	Handle(pattern string, handler http.Handler)
@@ -116,8 +197,10 @@ type APIGroupVersion struct {
 	Convertor runtime.ObjectConvertor
 	Linker    runtime.SelfLinker
 
-	Admit   admission.Interface
-	Context api.RequestContextMapper
+	Admit                        admission.Interface
+	Context                      api.RequestContextMapper
+	Authorizer                   authorizer.APIAuthorizer
+	APIAttributeExtensionBuilder authorizer.APIAttributeExtensionBuilder
 }
 
 // InstallREST registers the REST handlers (storage, watch, proxy and redirect) into a restful Container.
@@ -128,9 +211,11 @@ func (g *APIGroupVersion) InstallREST(container *restful.Container) error {
 
 	prefix := path.Join(g.Root, g.Version)
 	installer := &APIInstaller{
-		group:  g,
-		info:   info,
-		prefix: prefix,
+		group:                     g,
+		info:                      info,
+		prefix:                    prefix,
+		authorizer:                g.Authorizer,
+		attributeExtensionBuilder: g.APIAttributeExtensionBuilder,
 	}
 	ws, registrationErrors := installer.Install()
 	container.Add(ws)
@@ -168,7 +253,7 @@ func InstallLogsSupport(mux Mux) {
 }
 
 // Adds a service to return the supported api versions.
-func AddApiWebService(container *restful.Container, apiPrefix string, versions []string) {
+func AddAPIWebService(container *restful.Container, apiPrefix string, versions []string) {
 	// TODO: InstallREST should register each version automatically
 
 	versionHandler := APIVersionHandler(versions[:]...)

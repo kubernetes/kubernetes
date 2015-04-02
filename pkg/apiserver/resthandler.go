@@ -66,9 +66,11 @@ type RequestScope struct {
 	Creater   runtime.ObjectCreater
 	Convertor runtime.ObjectConvertor
 
-	Resource   string
-	Kind       string
-	APIVersion string
+	Verb        string
+	Resource    string
+	Subresource string
+	Kind        string
+	APIVersion  string
 
 	// The version of apiserver resources to use
 	ServerAPIVersion string
