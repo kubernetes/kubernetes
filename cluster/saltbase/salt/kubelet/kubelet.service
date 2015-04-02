@@ -7,7 +7,7 @@ Requires=docker.service
 [Service]
 EnvironmentFile=/etc/sysconfig/kubelet
 ExecStart=/usr/local/bin/kubelet "$DAEMON_ARGS"
-Restart=on-failure
+Restart=always
 
 [Install]
 WantedBy=multi-user.target
