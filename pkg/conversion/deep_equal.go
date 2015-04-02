@@ -71,23 +71,6 @@ func (e Equalities) AddFunc(eqFunc interface{}) error {
 	return nil
 }
 
-// Equal return true if a matching equality function thinks a == b;
-// if there is no matching equality function, it calls the standard
-// go == operator.
-func (e Equalities) Equal(a, b interface{}) bool {
-	av, bv := reflect.ValueOf(a), reflect.ValueOf(a)
-	if !av.IsValid() || !av.IsValid() {
-		return av.IsValid() == av.IsValid()
-	}
-	if av.Type() != av.Type() {
-		return false
-	}
-	if fv, ok := e[av.Type()]; ok {
-		return fv.Call([]reflect.Value{av, bv})[0].Bool()
-	}
-	return av.Interface() == bv.Interface()
-}
-
 // Below here is forked from go's reflect/deepequal.go
 
 // During deepValueEqual, must keep track of checks that are
