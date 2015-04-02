@@ -454,6 +454,7 @@ func (nc *NodeController) recordNodeOfflineEvent(node *api.Node) {
 		UID:       types.UID(node.Name),
 		Namespace: "",
 	}
+	glog.V(2).Infof("Recording offline event message for node %s", node.Name)
 	// TODO: This requires a transaction, either both node status is updated
 	// and event is recorded or neither should happen, see issue #6055.
 	nc.recorder.Eventf(ref, "offline", "Node %s is now offline", node.Name)

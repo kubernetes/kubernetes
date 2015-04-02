@@ -136,6 +136,17 @@ func (eventBroadcaster *eventBroadcasterImpl) StartRecordingToSink(sink EventSin
 		})
 }
 
+func isKeyNotFoundError(err error) bool {
+	statusErr, _ := err.(*errors.StatusError)
+	// At the moment the server is returning 500 instead of a more specific
+	// error. When changing this remember that it should be backward compatible
+	// with old api servers that may be still returning 500.
+	if statusErr != nil && statusErr.Status().Code == 500 {
+		return true
+	}
+	return false
+}
+
 // recordEvent attempts to write event to a sink. It returns true if the event
 // was successfully recorded or discarded, false if it should be retried.
 // If updateExistingEvent is false, it creates a new event, otherwise it updates
@@ -145,7 +156,11 @@ func recordEvent(sink EventSink, event *api.Event, updateExistingEvent bool) boo
 	var err error
 	if updateExistingEvent {
 		newEvent, err = sink.Update(event)
-	} else {
+	}
+	// Update can fail because the event may have been removed and it no longer exists.
+	if !updateExistingEvent || (updateExistingEvent && isKeyNotFoundError(err)) {
+		// Making sure that ResourceVersion is empty on creation
+		event.ResourceVersion = ""
 		newEvent, err = sink.Create(event)
 	}
 	if err == nil {
@@ -155,23 +170,19 @@ func recordEvent(sink EventSink, event *api.Event, updateExistingEvent bool) boo
 
 	// If we can't contact the server, then hold everything while we keep trying.
 	// Otherwise, something about the event is malformed and we should abandon it.
-	giveUp := false
 	switch err.(type) {
 	case *client.RequestConstructionError:
 		// We will construct the request the same next time, so don't keep trying.
-		giveUp = true
+		glog.Errorf("Unable to construct event '%#v': '%v' (will not retry!)", event, err)
+		return true
 	case *errors.StatusError:
-		// This indicates that the server understood and rejected our request.
-		giveUp = true
+		glog.Errorf("Server rejected event '%#v': '%v' (will not retry!)", event, err)
+		return true
 	case *errors.UnexpectedObjectError:
 		// We don't expect this; it implies the server's response didn't match a
 		// known pattern. Go ahead and retry.
 	default:
 		// This case includes actual http transport errors. Go ahead and retry.
-	}
-	if giveUp {
-		glog.Errorf("Unable to write event '%#v': '%v' (will not retry!)", event, err)
-		return true
 	}
 	glog.Errorf("Unable to write event: '%v' (may retry after sleeping)", err)
 	return false
