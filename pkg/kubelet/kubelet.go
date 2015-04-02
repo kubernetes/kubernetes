@@ -1760,6 +1760,18 @@ func (kl *Kubelet) recordNodeOnlineEvent() {
 	kl.recorder.Eventf(kl.nodeRef, "online", "Node %s is now online", kl.hostname)
 }
 
+func (kl *Kubelet) recordNodeUnschedulableEvent() {
+	// TODO: This requires a transaction, either both node status is updated
+	// and event is recorded or neither should happen, see issue #6055.
+	kl.recorder.Eventf(kl.nodeRef, "unschedulable", "Node %s is now unschedulable", kl.hostname)
+}
+
+func (kl *Kubelet) recordNodeSchedulableEvent() {
+	// TODO: This requires a transaction, either both node status is updated
+	// and event is recorded or neither should happen, see issue #6055.
+	kl.recorder.Eventf(kl.nodeRef, "schedulable", "Node %s is now schedulable", kl.hostname)
+}
+
 // tryUpdateNodeStatus tries to update node status to master.
 func (kl *Kubelet) tryUpdateNodeStatus() error {
 	node, err := kl.kubeClient.Nodes().Get(kl.hostname)
@@ -1803,27 +1815,66 @@ func (kl *Kubelet) tryUpdateNodeStatus() error {
 	}
 
 	currentTime := util.Now()
-	newCondition := api.NodeCondition{
+	newReadyCondition := api.NodeCondition{
 		Type:          api.NodeReady,
 		Status:        api.ConditionTrue,
 		Reason:        fmt.Sprintf("kubelet is posting ready status"),
 		LastProbeTime: currentTime,
 	}
-	updated := false
+	newSchedulableCondition := api.NodeCondition{
+		Type:          api.NodeSchedulable,
+		LastProbeTime: currentTime,
+	}
+	readyCondUpdated := false
+	schedulableCondUpdated := false
 	for i := range node.Status.Conditions {
-		if node.Status.Conditions[i].Type == api.NodeReady {
-			newCondition.LastTransitionTime = node.Status.Conditions[i].LastTransitionTime
+		switch node.Status.Conditions[i].Type {
+		case api.NodeReady:
+			newReadyCondition.LastTransitionTime = node.Status.Conditions[i].LastTransitionTime
 			if node.Status.Conditions[i].Status != api.ConditionTrue {
 				kl.recordNodeOnlineEvent()
 			}
-			node.Status.Conditions[i] = newCondition
-			updated = true
+			node.Status.Conditions[i] = newReadyCondition
+			readyCondUpdated = true
+		case api.NodeSchedulable:
+			if node.Spec.Unschedulable && (node.Status.Conditions[i].Status != api.ConditionFalse) {
+				newSchedulableCondition.Status = api.ConditionFalse
+				newSchedulableCondition.LastTransitionTime = currentTime
+				newSchedulableCondition.Reason = fmt.Sprintf("user marked unschedulable during node update")
+				kl.recordNodeUnschedulableEvent()
+				node.Status.Conditions[i] = newSchedulableCondition
+			} else if !node.Spec.Unschedulable && (node.Status.Conditions[i].Status != api.ConditionTrue) {
+				newSchedulableCondition.Status = api.ConditionTrue
+				newSchedulableCondition.LastTransitionTime = currentTime
+				newSchedulableCondition.Reason = fmt.Sprintf("user marked schedulable during node update")
+				kl.recordNodeSchedulableEvent()
+				node.Status.Conditions[i] = newSchedulableCondition
+			} else {
+				newSchedulableCondition.Status = node.Status.Conditions[i].Status
+				newSchedulableCondition.LastTransitionTime = node.Status.Conditions[i].LastTransitionTime
+				newSchedulableCondition.Reason = node.Status.Conditions[i].Reason
+				node.Status.Conditions[i] = newSchedulableCondition
+			}
+			schedulableCondUpdated = true
 		}
 	}
-	if !updated {
-		newCondition.LastTransitionTime = currentTime
-		node.Status.Conditions = append(node.Status.Conditions, newCondition)
+	if !readyCondUpdated {
+		newReadyCondition.LastTransitionTime = currentTime
+		node.Status.Conditions = append(node.Status.Conditions, newReadyCondition)
 		kl.recordNodeOnlineEvent()
+	}
+	if !schedulableCondUpdated {
+		newSchedulableCondition.LastTransitionTime = currentTime
+		if node.Spec.Unschedulable {
+			newSchedulableCondition.Status = api.ConditionFalse
+			newSchedulableCondition.Reason = fmt.Sprintf("user marked unschedulable during node create/update")
+			kl.recordNodeUnschedulableEvent()
+		} else {
+			newSchedulableCondition.Status = api.ConditionTrue
+			newSchedulableCondition.Reason = fmt.Sprintf("node is schedulable by default")
+			kl.recordNodeSchedulableEvent()
+		}
+		node.Status.Conditions = append(node.Status.Conditions, newSchedulableCondition)
 	}
 
 	_, err = kl.kubeClient.Nodes().Update(node)

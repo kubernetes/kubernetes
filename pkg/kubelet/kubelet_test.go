@@ -3076,9 +3076,10 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 	kubelet := testKubelet.kubelet
 	kubeClient := testKubelet.fakeKubeClient
 	mockCadvisor := testKubelet.fakeCadvisor
-	kubeClient.MinionsList = api.NodeList{Items: []api.Node{
-		{ObjectMeta: api.ObjectMeta{Name: "testnode"}},
-	}}
+	existingNodeList := []api.Node{
+		{ObjectMeta: api.ObjectMeta{Name: "testnode1"}},
+		{ObjectMeta: api.ObjectMeta{Name: "testnode2"}, Spec: api.NodeSpec{Unschedulable: true}},
+	}
 	machineInfo := &cadvisorApi.MachineInfo{
 		MachineID:      "123",
 		SystemUUID:     "abc",
@@ -3093,56 +3094,92 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 		DockerVersion:      "1.5.0",
 	}
 	mockCadvisor.On("VersionInfo").Return(versionInfo, nil)
-	expectedNode := &api.Node{
-		ObjectMeta: api.ObjectMeta{Name: "testnode"},
-		Spec:       api.NodeSpec{},
-		Status: api.NodeStatus{
-			Conditions: []api.NodeCondition{
-				{
-					Type:               api.NodeReady,
-					Status:             api.ConditionTrue,
-					Reason:             fmt.Sprintf("kubelet is posting ready status"),
-					LastProbeTime:      util.Time{},
-					LastTransitionTime: util.Time{},
+	expectedNodeInfo := api.NodeSystemInfo{
+		MachineID:               "123",
+		SystemUUID:              "abc",
+		BootID:                  "1b3",
+		KernelVersion:           "3.16.0-0.bpo.4-amd64",
+		OsImage:                 "Debian GNU/Linux 7 (wheezy)",
+		ContainerRuntimeVersion: "docker://1.5.0",
+		KubeletVersion:          version.Get().String(),
+		KubeProxyVersion:        version.Get().String(),
+	}
+	expectedCapacity := api.ResourceList{
+		api.ResourceCPU:    *resource.NewMilliQuantity(2000, resource.DecimalSI),
+		api.ResourceMemory: *resource.NewQuantity(1024, resource.BinarySI),
+	}
+	expectedReadyCondition := api.NodeCondition{
+		Type:               api.NodeReady,
+		Status:             api.ConditionTrue,
+		Reason:             fmt.Sprintf("kubelet is posting ready status"),
+		LastProbeTime:      util.Time{},
+		LastTransitionTime: util.Time{},
+	}
+	expectedNodeList := []api.Node{
+		{
+			ObjectMeta: api.ObjectMeta{Name: "testnode1"},
+			Spec:       api.NodeSpec{},
+			Status: api.NodeStatus{
+				Conditions: []api.NodeCondition{
+					expectedReadyCondition,
+					{
+						Type:               api.NodeSchedulable,
+						Status:             api.ConditionTrue,
+						Reason:             fmt.Sprintf("node is schedulable by default"),
+						LastProbeTime:      util.Time{},
+						LastTransitionTime: util.Time{},
+					},
 				},
+				NodeInfo: expectedNodeInfo,
+				Capacity: expectedCapacity,
 			},
-			NodeInfo: api.NodeSystemInfo{
-				MachineID:               "123",
-				SystemUUID:              "abc",
-				BootID:                  "1b3",
-				KernelVersion:           "3.16.0-0.bpo.4-amd64",
-				OsImage:                 "Debian GNU/Linux 7 (wheezy)",
-				ContainerRuntimeVersion: "docker://1.5.0",
-				KubeletVersion:          version.Get().String(),
-				KubeProxyVersion:        version.Get().String(),
-			},
-			Capacity: api.ResourceList{
-				api.ResourceCPU:    *resource.NewMilliQuantity(2000, resource.DecimalSI),
-				api.ResourceMemory: *resource.NewQuantity(1024, resource.BinarySI),
+		},
+		{
+			ObjectMeta: api.ObjectMeta{Name: "testnode2"},
+			Spec:       api.NodeSpec{Unschedulable: true},
+			Status: api.NodeStatus{
+				Conditions: []api.NodeCondition{
+					expectedReadyCondition,
+					{
+						Type:               api.NodeSchedulable,
+						Status:             api.ConditionFalse,
+						Reason:             fmt.Sprintf("user marked unschedulable during node create/update"),
+						LastProbeTime:      util.Time{},
+						LastTransitionTime: util.Time{},
+					},
+				},
+				NodeInfo: expectedNodeInfo,
+				Capacity: expectedCapacity,
 			},
 		},
 	}
 
-	if err := kubelet.updateNodeStatus(); err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	if len(kubeClient.Actions) != 2 {
-		t.Errorf("unexpected actions: %v", kubeClient.Actions)
-	}
-	updatedNode, ok := kubeClient.Actions[1].Value.(*api.Node)
-	if !ok {
-		t.Errorf("unexpected object type")
-	}
-	if updatedNode.Status.Conditions[0].LastProbeTime.IsZero() {
-		t.Errorf("unexpected zero last probe timestamp")
-	}
-	if updatedNode.Status.Conditions[0].LastTransitionTime.IsZero() {
-		t.Errorf("unexpected zero last transition timestamp")
-	}
-	updatedNode.Status.Conditions[0].LastProbeTime = util.Time{}
-	updatedNode.Status.Conditions[0].LastTransitionTime = util.Time{}
-	if !reflect.DeepEqual(expectedNode, updatedNode) {
-		t.Errorf("expected \n%v\n, got \n%v", expectedNode, updatedNode)
+	for i := 0; i < len(kubeClient.MinionsList.Items); i++ {
+		kubelet.hostname = existingNodeList[i].ObjectMeta.Name
+		kubeClient.MinionsList = api.NodeList{Items: []api.Node{existingNodeList[i]}}
+		if err := kubelet.updateNodeStatus(); err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		if len(kubeClient.Actions) != 2 { // Get + Update on node
+			t.Errorf("unexpected actions: %v", kubeClient.Actions)
+		}
+		updatedNode, ok := kubeClient.Actions[1].Value.(*api.Node)
+		if !ok {
+			t.Errorf("unexpected object type")
+		}
+		for idx, condition := range updatedNode.Status.Conditions {
+			if condition.LastProbeTime.IsZero() {
+				t.Errorf("unexpected zero last probe timestamp for condition type: ", condition.Type)
+			}
+			if condition.LastTransitionTime.IsZero() {
+				t.Errorf("unexpected zero last transition timestamp for condition type: ", condition.Type)
+			}
+			updatedNode.Status.Conditions[idx].LastProbeTime = util.Time{}
+			updatedNode.Status.Conditions[idx].LastTransitionTime = util.Time{}
+		}
+		if !reflect.DeepEqual(expectedNodeList[i], *updatedNode) {
+			t.Errorf("expected \n%v\n, got \n%v", expectedNodeList[i], *updatedNode)
+		}
 	}
 }
 
@@ -3151,27 +3188,76 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 	kubelet := testKubelet.kubelet
 	kubeClient := testKubelet.fakeKubeClient
 	mockCadvisor := testKubelet.fakeCadvisor
-	kubeClient.MinionsList = api.NodeList{Items: []api.Node{
+	existingCapacity := api.ResourceList{
+		api.ResourceCPU:    *resource.NewMilliQuantity(3000, resource.DecimalSI),
+		api.ResourceMemory: *resource.NewQuantity(2048, resource.BinarySI),
+	}
+	existingReadyCondition := api.NodeCondition{
+		Type:               api.NodeReady,
+		Status:             api.ConditionTrue,
+		Reason:             fmt.Sprintf("kubelet is posting ready status"),
+		LastProbeTime:      util.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+		LastTransitionTime: util.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+	}
+	existingNodeList := []api.Node{
 		{
-			ObjectMeta: api.ObjectMeta{Name: "testnode"},
+			// Existing: node is ready and schedulable
+			// New updates: nothing
+			ObjectMeta: api.ObjectMeta{Name: "testnode1"},
 			Spec:       api.NodeSpec{},
 			Status: api.NodeStatus{
 				Conditions: []api.NodeCondition{
+					existingReadyCondition,
 					{
-						Type:               api.NodeReady,
+						Type:               api.NodeSchedulable,
 						Status:             api.ConditionTrue,
-						Reason:             fmt.Sprintf("kubelet is posting ready status"),
+						Reason:             fmt.Sprintf("node is schedulable by default"),
 						LastProbeTime:      util.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
 						LastTransitionTime: util.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
 					},
 				},
-				Capacity: api.ResourceList{
-					api.ResourceCPU:    *resource.NewMilliQuantity(3000, resource.DecimalSI),
-					api.ResourceMemory: *resource.NewQuantity(2048, resource.BinarySI),
-				},
+				Capacity: existingCapacity,
 			},
 		},
-	}}
+		{
+			// Existing: node is ready and schedulable
+			// New updates: node marked unschedulable
+			ObjectMeta: api.ObjectMeta{Name: "testnode2"},
+			Spec:       api.NodeSpec{Unschedulable: true},
+			Status: api.NodeStatus{
+				Conditions: []api.NodeCondition{
+					existingReadyCondition,
+					{
+						Type:               api.NodeSchedulable,
+						Status:             api.ConditionTrue,
+						Reason:             fmt.Sprintf("node is schedulable by default"),
+						LastProbeTime:      util.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+						LastTransitionTime: util.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+					},
+				},
+				Capacity: existingCapacity,
+			},
+		},
+		{
+			// Existing: node is ready and unschedulable
+			// New updates: node marked schedulable
+			ObjectMeta: api.ObjectMeta{Name: "testnode3"},
+			Spec:       api.NodeSpec{Unschedulable: false},
+			Status: api.NodeStatus{
+				Conditions: []api.NodeCondition{
+					existingReadyCondition,
+					{
+						Type:               api.NodeSchedulable,
+						Status:             api.ConditionFalse,
+						Reason:             fmt.Sprintf("user marked unschedulable during node update"),
+						LastProbeTime:      util.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+						LastTransitionTime: util.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+					},
+				},
+				Capacity: existingCapacity,
+			},
+		},
+	}
 	machineInfo := &cadvisorApi.MachineInfo{
 		MachineID:      "123",
 		SystemUUID:     "abc",
@@ -3186,58 +3272,112 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 		DockerVersion:      "1.5.0",
 	}
 	mockCadvisor.On("VersionInfo").Return(versionInfo, nil)
-	expectedNode := &api.Node{
-		ObjectMeta: api.ObjectMeta{Name: "testnode"},
-		Spec:       api.NodeSpec{},
-		Status: api.NodeStatus{
-			Conditions: []api.NodeCondition{
-				{
-					Type:               api.NodeReady,
-					Status:             api.ConditionTrue,
-					Reason:             fmt.Sprintf("kubelet is posting ready status"),
-					LastProbeTime:      util.Time{}, // placeholder
-					LastTransitionTime: util.Time{}, // placeholder
+	expectedNodeInfo := api.NodeSystemInfo{
+		MachineID:               "123",
+		SystemUUID:              "abc",
+		BootID:                  "1b3",
+		KernelVersion:           "3.16.0-0.bpo.4-amd64",
+		OsImage:                 "Debian GNU/Linux 7 (wheezy)",
+		ContainerRuntimeVersion: "docker://1.5.0",
+		KubeletVersion:          version.Get().String(),
+		KubeProxyVersion:        version.Get().String(),
+	}
+	expectedCapacity := api.ResourceList{
+		api.ResourceCPU:    *resource.NewMilliQuantity(2000, resource.DecimalSI),
+		api.ResourceMemory: *resource.NewQuantity(1024, resource.BinarySI),
+	}
+	expectedReadyCondition := api.NodeCondition{
+		Type:               api.NodeReady,
+		Status:             api.ConditionTrue,
+		Reason:             fmt.Sprintf("kubelet is posting ready status"),
+		LastProbeTime:      util.Time{}, // placeholder
+		LastTransitionTime: util.Time{}, // placeholder
+	}
+	expectedNodeList := []api.Node{
+		{
+			ObjectMeta: api.ObjectMeta{Name: "testnode1"},
+			Spec:       api.NodeSpec{},
+			Status: api.NodeStatus{
+				Conditions: []api.NodeCondition{
+					expectedReadyCondition,
+					{
+						Type:               api.NodeSchedulable,
+						Status:             api.ConditionTrue,
+						Reason:             fmt.Sprintf("node is schedulable by default"),
+						LastProbeTime:      util.Time{}, // placeholder
+						LastTransitionTime: util.Time{}, // placeholder
+					},
 				},
+				NodeInfo: expectedNodeInfo,
+				Capacity: expectedCapacity,
 			},
-			NodeInfo: api.NodeSystemInfo{
-				MachineID:               "123",
-				SystemUUID:              "abc",
-				BootID:                  "1b3",
-				KernelVersion:           "3.16.0-0.bpo.4-amd64",
-				OsImage:                 "Debian GNU/Linux 7 (wheezy)",
-				ContainerRuntimeVersion: "docker://1.5.0",
-				KubeletVersion:          version.Get().String(),
-				KubeProxyVersion:        version.Get().String(),
+		},
+		{
+			ObjectMeta: api.ObjectMeta{Name: "testnode2"},
+			Spec:       api.NodeSpec{Unschedulable: true},
+			Status: api.NodeStatus{
+				Conditions: []api.NodeCondition{
+					expectedReadyCondition,
+					{
+						Type:               api.NodeSchedulable,
+						Status:             api.ConditionFalse,
+						Reason:             fmt.Sprintf("user marked unschedulable during node update"),
+						LastProbeTime:      util.Time{}, // placeholder
+						LastTransitionTime: util.Time{}, // placeholder
+					},
+				},
+				NodeInfo: expectedNodeInfo,
+				Capacity: expectedCapacity,
 			},
-			Capacity: api.ResourceList{
-				api.ResourceCPU:    *resource.NewMilliQuantity(2000, resource.DecimalSI),
-				api.ResourceMemory: *resource.NewQuantity(1024, resource.BinarySI),
+		},
+		{
+			ObjectMeta: api.ObjectMeta{Name: "testnode3"},
+			Spec:       api.NodeSpec{Unschedulable: false},
+			Status: api.NodeStatus{
+				Conditions: []api.NodeCondition{
+					expectedReadyCondition,
+					{
+						Type:               api.NodeSchedulable,
+						Status:             api.ConditionTrue,
+						Reason:             fmt.Sprintf("user marked schedulable during node update"),
+						LastProbeTime:      util.Time{}, // placeholder
+						LastTransitionTime: util.Time{}, // placeholder
+					},
+				},
+				NodeInfo: expectedNodeInfo,
+				Capacity: expectedCapacity,
 			},
 		},
 	}
 
-	if err := kubelet.updateNodeStatus(); err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	if len(kubeClient.Actions) != 2 {
-		t.Errorf("unexpected actions: %v", kubeClient.Actions)
-	}
-	updatedNode, ok := kubeClient.Actions[1].Value.(*api.Node)
-	if !ok {
-		t.Errorf("unexpected object type")
-	}
-	// Expect LastProbeTime to be updated to Now, while LastTransitionTime to be the same.
-	if reflect.DeepEqual(updatedNode.Status.Conditions[0].LastProbeTime, util.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC)) {
-		t.Errorf("expected \n%v\n, got \n%v", util.Now(), util.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC))
-	}
-	if !reflect.DeepEqual(updatedNode.Status.Conditions[0].LastTransitionTime, util.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC)) {
-		t.Errorf("expected \n%v\n, got \n%v", updatedNode.Status.Conditions[0].LastTransitionTime,
-			util.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC))
-	}
-	updatedNode.Status.Conditions[0].LastProbeTime = util.Time{}
-	updatedNode.Status.Conditions[0].LastTransitionTime = util.Time{}
-	if !reflect.DeepEqual(expectedNode, updatedNode) {
-		t.Errorf("expected \n%v\n, got \n%v", expectedNode, updatedNode)
+	for i := 0; i < len(kubeClient.MinionsList.Items); i++ {
+		kubelet.hostname = existingNodeList[i].ObjectMeta.Name
+		kubeClient.MinionsList = api.NodeList{Items: []api.Node{existingNodeList[i]}}
+		if err := kubelet.updateNodeStatus(); err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		if len(kubeClient.Actions) != 2 { // Get + Update on node
+			t.Errorf("unexpected actions: %v", kubeClient.Actions)
+		}
+		updatedNode, ok := kubeClient.Actions[1].Value.(*api.Node)
+		if !ok {
+			t.Errorf("unexpected object type")
+		}
+		for idx, condition := range updatedNode.Status.Conditions {
+			// Expect LastProbeTime to be updated to Now, while LastTransitionTime to be the same.
+			if reflect.DeepEqual(condition.LastProbeTime, util.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC)) {
+				t.Errorf("expected \n%v\n, got \n%v", util.Now(), util.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC))
+			}
+			if !reflect.DeepEqual(condition.LastTransitionTime, util.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC)) {
+				t.Errorf("expected \n%v\n, got \n%v", condition.LastTransitionTime,
+					util.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC))
+			}
+			updatedNode.Status.Conditions[idx].LastProbeTime = util.Time{}
+			updatedNode.Status.Conditions[idx].LastTransitionTime = util.Time{}
+		}
+		if !reflect.DeepEqual(expectedNodeList[i], *updatedNode) {
+			t.Errorf("expected \n%v\n, got \n%v", expectedNodeList[i], *updatedNode)
+		}
 	}
 }
 
