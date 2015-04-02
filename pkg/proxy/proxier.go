@@ -308,9 +308,9 @@ type Proxier struct {
 	listenIP      net.IP
 	iptables      iptables.Interface
 	hostIP        net.IP
-	extIf        string
-	intIf	     string
-	extName	     string
+	extIf         string
+	intIf         string
+	extName       string
 }
 
 // NewProxier returns a new Proxier given a LoadBalancer and an address on
@@ -352,8 +352,8 @@ func CreateProxier(loadBalancer LoadBalancer, listenIP net.IP, iptables iptables
 		listenIP:     listenIP,
 		iptables:     iptables,
 		hostIP:       hostIP,
-		extIf:	      extIf,
-		intIf:	      intIf,
+		extIf:        extIf,
+		intIf:        intIf,
 		extName:      extName,
 	}
 }
@@ -464,6 +464,23 @@ func (proxier *Proxier) addServiceOnPort(service ServicePortName, protocol api.P
 // How long we leave idle UDP connections open.
 const udpIdleTimeout = 1 * time.Minute
 
+func (proxier *Proxier) updateExternalService(service api.Service) {
+	_, exists := proxier.getServiceInfo(types.NamespacedName{service.Namespace, service.Name})
+	glog.V(4).Infof("Noted a External IP service for service name %s\n", service.Name)
+
+	if exists {
+		glog.V(4).Infof("Service Already Mapped, skipping\n")
+		return
+	}
+
+	//
+	// NH - Add check for new service that has a pre-assigned ip that we own here
+	//
+	if service.Spec.Selector["node"] == proxier.extName {
+		glog.Infof("New External Map request for me!\n")
+	}
+}
+
 // OnUpdate manages the active set of service proxies.
 // Active service proxies are reinitialized if found in the update set or
 // shutdown if missing from the update set.
@@ -472,6 +489,11 @@ func (proxier *Proxier) OnUpdate(services []api.Service) {
 	activeServices := make(map[ServicePortName]bool) // use a map as a set
 	for i := range services {
 		service := &services[i]
+		if service.Spec.ExternalMapping == true {
+			activeServices[types.NamespacedName{service.Namespace, service.Name}] = true
+			proxier.updateExternalService(service)
+			continue
+		}
 
 		// if PortalIP is "None" or empty, skip proxying
 		if !api.IsServiceIPSet(service) {
@@ -521,6 +543,7 @@ func (proxier *Proxier) OnUpdate(services []api.Service) {
 			proxier.loadBalancer.NewService(serviceName, info.sessionAffinityType, info.stickyMaxAgeMinutes)
 		}
 	}
+
 	proxier.mu.Lock()
 	defer proxier.mu.Unlock()
 	for name, info := range proxier.serviceMap {
