@@ -107,7 +107,7 @@ var _ = Describe("Pods", func() {
 				Containers: []api.Container{
 					{
 						Name:  "nginx",
-						Image: "gcr.io/google_containers/nginx",
+						Image: "gcr.io/google_containers/nginx:1.7.9",
 						Ports: []api.ContainerPort{{ContainerPort: 80}},
 						LivenessProbe: &api.Probe{
 							Handler: api.Handler{
@@ -207,7 +207,7 @@ var _ = Describe("Pods", func() {
 				Containers: []api.Container{
 					{
 						Name:  "nginx",
-						Image: "gcr.io/google_containers/nginx",
+						Image: "gcr.io/google_containers/nginx:1.7.9",
 						Ports: []api.ContainerPort{{ContainerPort: 80}},
 						LivenessProbe: &api.Probe{
 							Handler: api.Handler{
