@@ -212,10 +212,7 @@ func NewMainKubelet(
 		return nil, fmt.Errorf("failed to initialize image manager: %v", err)
 	}
 	statusManager := newStatusManager(kubeClient)
-	containerRunner := &dockertools.DockerContainerRunner{
-		Client:   dockerClient,
-		Recorder: recorder,
-	}
+	containerManager := dockertools.NewDockerManager(dockerClient, recorder)
 
 	klet := &Kubelet{
 		hostname:               hostname,
@@ -245,7 +242,7 @@ func NewMainKubelet(
 		statusManager:                  statusManager,
 		cloud:                          cloud,
 		nodeRef:                        nodeRef,
-		containerRunner:                containerRunner,
+		containerManager:               containerManager,
 	}
 
 	klet.podManager = newBasicPodManager(klet.kubeClient)
@@ -362,14 +359,14 @@ type Kubelet struct {
 	// Syncs pods statuses with apiserver; also used as a cache of statuses.
 	statusManager *statusManager
 
-	// Knows how to run a container in a pod
-	containerRunner kubecontainer.ContainerRunner
-
 	//Cloud provider interface
 	cloud cloudprovider.Interface
 
 	// Reference to this node.
 	nodeRef *api.ObjectReference
+
+	// Manage containers.
+	containerManager *dockertools.DockerManager
 }
 
 // getRootDir returns the full path to the directory under which kubelet can
@@ -665,7 +662,7 @@ func (kl *Kubelet) runContainer(pod *api.Pod, container *api.Container, podVolum
 		return "", err
 	}
 
-	id, err := kl.containerRunner.RunContainer(pod, container, opts)
+	id, err := kl.containerManager.RunContainer(pod, container, opts)
 	if err != nil {
 		return "", err
 	}
@@ -1002,7 +999,7 @@ func (kl *Kubelet) makePodDataDirs(pod *api.Pod) error {
 func (kl *Kubelet) shouldContainerBeRestarted(container *api.Container, pod *api.Pod) bool {
 	podFullName := kubecontainer.GetPodFullName(pod)
 	// Check RestartPolicy for dead container
-	recentContainers, err := dockertools.GetRecentDockerContainersWithNameAndUUID(kl.dockerClient, podFullName, pod.UID, container.Name)
+	recentContainers, err := kl.containerManager.GetRecentDockerContainersWithNameAndUUID(podFullName, pod.UID, container.Name)
 	if err != nil {
 		glog.Errorf("Error listing recent containers for pod %q: %v", podFullName, err)
 		// TODO(dawnchen): error handling here?
@@ -1497,7 +1494,7 @@ func (kl *Kubelet) SyncPods(allPods []api.Pod, podSyncTypes map[types.UID]metric
 		}
 	}
 
-	running, err := dockertools.GetRunningContainers(kl.dockerClient, killed)
+	running, err := kl.containerManager.GetRunningContainers(killed)
 	if err != nil {
 		glog.Errorf("Failed to poll container state: %v", err)
 		return err
@@ -1697,7 +1694,7 @@ func (kl *Kubelet) GetKubeletContainerLogs(podFullName, containerName, tail stri
 	if err != nil {
 		return err
 	}
-	return dockertools.GetKubeletDockerContainerLogs(kl.dockerClient, dockerContainerID, tail, follow, stdout, stderr)
+	return kl.containerManager.GetKubeletDockerContainerLogs(dockerContainerID, tail, follow, stdout, stderr)
 }
 
 // GetHostname Returns the hostname as the kubelet sees it.
@@ -1946,7 +1943,7 @@ func (kl *Kubelet) generatePodStatusByPod(pod *api.Pod) (api.PodStatus, error) {
 	glog.V(3).Infof("Generating status for %q", podFullName)
 
 	spec := &pod.Spec
-	podStatus, err := dockertools.GetDockerPodStatus(kl.dockerClient, *spec, podFullName, pod.UID)
+	podStatus, err := kl.containerManager.GetPodStatus(pod)
 
 	if err != nil {
 		// Error handling
