@@ -12,7 +12,7 @@ desiredState:
         id: monitoring-heapster
         containers:
           - name: heapster
-            image: gcr.io/google_containers/heapster:v0.9
+            image: gcr.io/google_containers/heapster:v0.10.0
             env: 
               - name: "INFLUXDB_HOST"
                 value: "monitoring-influxdb"

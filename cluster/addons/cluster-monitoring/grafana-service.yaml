@@ -2,7 +2,7 @@ apiVersion: v1beta1
 kind: Service
 id: monitoring-grafana
 port: 80
-containerPort: 80
+containerPort: 8080
 labels:
   name: grafana
   kubernetes.io/cluster-service: "true"

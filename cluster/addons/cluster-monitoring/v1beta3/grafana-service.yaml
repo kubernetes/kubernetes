@@ -8,7 +8,7 @@ metadata:
 spec: 
   ports:
     - port: 80
-      targetPort: 80
+      targetPort: 8080
   selector: 
     name: influxGrafana
     kubernetes.io/cluster-service: "true"
