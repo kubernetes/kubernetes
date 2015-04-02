@@ -25,29 +25,28 @@ import (
 func TestValidatePriorityWithNoWeight(t *testing.T) {
 	policy := api.Policy{Priorities: []api.PriorityPolicy{{Name: "NoWeightPriority"}}}
 	if ValidatePolicy(policy) == nil {
-		t.Errorf("Expected error about priority weight being zero")
+		t.Errorf("Expected error about priority weight not being positive")
 	}
 }
 
 func TestValidatePriorityWithZeroWeight(t *testing.T) {
 	policy := api.Policy{Priorities: []api.PriorityPolicy{{Name: "NoWeightPriority", Weight: 0}}}
 	if ValidatePolicy(policy) == nil {
-		t.Errorf("Expected error about priority weight being zero")
+		t.Errorf("Expected error about priority weight not being positive")
 	}
 }
 
 func TestValidatePriorityWithNonZeroWeight(t *testing.T) {
 	policy := api.Policy{Priorities: []api.PriorityPolicy{{Name: "WeightPriority", Weight: 2}}}
 	errs := ValidatePolicy(policy)
-	if ValidatePolicy(policy) != nil {
+	if errs != nil {
 		t.Errorf("Unexpected errors %v", errs)
 	}
 }
 
 func TestValidatePriorityWithNegativeWeight(t *testing.T) {
 	policy := api.Policy{Priorities: []api.PriorityPolicy{{Name: "WeightPriority", Weight: -2}}}
-	errs := ValidatePolicy(policy)
-	if ValidatePolicy(policy) != nil {
-		t.Errorf("Unexpected errors %v", errs)
+	if ValidatePolicy(policy) == nil {
+		t.Errorf("Expected error about priority weight not being positive")
 	}
 }
