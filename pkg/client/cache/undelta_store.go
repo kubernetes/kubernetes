@@ -49,6 +49,7 @@ func (u *UndeltaStore) Add(obj interface{}) error {
 	u.PushFunc(u.ActualStore.List())
 	return nil
 }
+
 func (u *UndeltaStore) Update(obj interface{}) error {
 	if err := u.ActualStore.Update(obj); err != nil {
 		return err
@@ -56,6 +57,7 @@ func (u *UndeltaStore) Update(obj interface{}) error {
 	u.PushFunc(u.ActualStore.List())
 	return nil
 }
+
 func (u *UndeltaStore) Delete(obj interface{}) error {
 	if err := u.ActualStore.Delete(obj); err != nil {
 		return err
@@ -63,15 +65,23 @@ func (u *UndeltaStore) Delete(obj interface{}) error {
 	u.PushFunc(u.ActualStore.List())
 	return nil
 }
+
 func (u *UndeltaStore) List() []interface{} {
 	return u.ActualStore.List()
 }
+
+func (u *UndeltaStore) ListKeys() []string {
+	return u.ActualStore.ListKeys()
+}
+
 func (u *UndeltaStore) Get(obj interface{}) (item interface{}, exists bool, err error) {
 	return u.ActualStore.Get(obj)
 }
+
 func (u *UndeltaStore) GetByKey(key string) (item interface{}, exists bool, err error) {
 	return u.ActualStore.GetByKey(key)
 }
+
 func (u *UndeltaStore) Replace(list []interface{}) error {
 	if err := u.ActualStore.Replace(list); err != nil {
 		return err
