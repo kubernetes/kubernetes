@@ -179,17 +179,14 @@ func NewMainKubelet(
 	if kubeClient != nil {
 		// TODO: cache.NewListWatchFromClient is limited as it takes a client implementation rather
 		// than an interface. There is no way to construct a list+watcher using resource name.
+		fieldSelector := fields.Set{"name": hostname}.AsSelector()
 		listWatch := &cache.ListWatch{
-			// TODO: currently, we are watching all nodes. To make it more efficient,
-			// we should be watching only a node with Name equal to kubelet's Hostname.
-			// To make it possible, we need to add field selector to ListFunc and WatchFunc,
-			// and selection by field needs to be implemented in WatchMinions function in pkg/registry/etcd.
 			ListFunc: func() (runtime.Object, error) {
+				// TODO: Use List() with fieldSelector when it is supported.
 				return kubeClient.Nodes().List()
 			},
 			WatchFunc: func(resourceVersion string) (watch.Interface, error) {
-				return kubeClient.Nodes().Watch(
-					labels.Everything(), fields.Everything(), resourceVersion)
+				return kubeClient.Nodes().Watch(labels.Everything(), fieldSelector, resourceVersion)
 			},
 		}
 		cache.NewReflector(listWatch, &api.Node{}, nodeStore, 0).Run()

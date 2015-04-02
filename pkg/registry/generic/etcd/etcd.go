@@ -65,6 +65,10 @@ type Etcd struct {
 	// Called for Create/Update/Get/Delete
 	KeyFunc func(ctx api.Context, name string) (string, error)
 
+	// If field.Selector of Watch contains a label with such name, this will be
+	// translated to watching a single object (not all objects of that type).
+	WatchSingleFieldName string
+
 	// Called to get the name of an object
 	ObjectNameFunc func(obj runtime.Object) (string, error)
 
@@ -404,19 +408,29 @@ func (e *Etcd) finalizeDelete(obj runtime.Object, runHooks bool) (runtime.Object
 }
 
 // WatchPredicate starts a watch for the items that m matches.
-// TODO: Detect if m references a single object instead of a list.
 func (e *Etcd) Watch(ctx api.Context, label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
-	return e.WatchPredicate(ctx, e.PredicateFunc(label, field), resourceVersion)
+	if value, found := field.RequiresExactMatch(e.WatchSingleFieldName); found && len(e.WatchSingleFieldName) > 0 {
+		key, err := e.KeyFunc(ctx, value)
+		if err != nil {
+			return nil, err
+		}
+		return e.watchPredicate(key, e.PredicateFunc(label, field), resourceVersion)
+	}
+	return e.watchPredicate(e.KeyRootFunc(ctx), e.PredicateFunc(label, field), resourceVersion)
 }
 
 // WatchPredicate starts a watch for the items that m matches.
 // TODO: Detect if m references a single object instead of a list.
 func (e *Etcd) WatchPredicate(ctx api.Context, m generic.Matcher, resourceVersion string) (watch.Interface, error) {
+	return e.watchPredicate(e.KeyRootFunc(ctx), m, resourceVersion)
+}
+
+func (e *Etcd) watchPredicate(key string, m generic.Matcher, resourceVersion string) (watch.Interface, error) {
 	version, err := tools.ParseWatchResourceVersion(resourceVersion, e.EndpointName)
 	if err != nil {
 		return nil, err
 	}
-	return e.Helper.WatchList(e.KeyRootFunc(ctx), version, func(obj runtime.Object) bool {
+	return e.Helper.WatchList(key, version, func(obj runtime.Object) bool {
 		matches, err := m.Matches(obj)
 		if err != nil {
 			glog.Errorf("unable to match watch: %v", err)

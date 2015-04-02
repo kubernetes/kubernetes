@@ -1545,6 +1545,19 @@ func init() {
 		// If one of the conversion functions is malformed, detect it immediately.
 		panic(err)
 	}
+	err = newer.Scheme.AddFieldLabelConversionFunc("v1beta1", "Minion",
+		func(label, value string) (string, string, error) {
+			switch label {
+			case "name":
+				return "name", value, nil
+			default:
+				return "", "", fmt.Errorf("field label not supported: %s", label)
+			}
+		})
+	if err != nil {
+		// If one of the conversion functions is malformed, detect it immediately.
+		panic(err)
+	}
 	err = newer.Scheme.AddFieldLabelConversionFunc("v1beta1", "ReplicationController",
 		func(label, value string) (string, string, error) {
 			switch label {

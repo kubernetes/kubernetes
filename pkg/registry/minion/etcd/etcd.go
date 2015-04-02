@@ -49,6 +49,7 @@ func NewStorage(h tools.EtcdHelper, connection client.ConnectionInfoGetter) *RES
 		KeyFunc: func(ctx api.Context, name string) (string, error) {
 			return prefix + "/" + name, nil
 		},
+		WatchSingleFieldName: "name",
 		ObjectNameFunc: func(obj runtime.Object) (string, error) {
 			return obj.(*api.Node).Name, nil
 		},
