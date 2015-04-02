@@ -192,7 +192,6 @@ func init() {
 				return err
 			}
 			out.Message = in.Message
-			out.Host = in.Host
 			out.HostIP = in.HostIP
 			out.PodIP = in.PodIP
 			return nil
@@ -209,7 +208,6 @@ func init() {
 			}
 
 			out.Message = in.Message
-			out.Host = in.Host
 			out.HostIP = in.HostIP
 			out.PodIP = in.PodIP
 			return nil
@@ -368,6 +366,7 @@ func init() {
 				return err
 			}
 			out.DesiredState.Host = in.Spec.Host
+			out.CurrentState.Host = in.Spec.Host
 			if err := s.Convert(&in.Status, &out.CurrentState, 0); err != nil {
 				return err
 			}

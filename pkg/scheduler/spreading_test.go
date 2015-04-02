@@ -33,10 +33,10 @@ func TestServiceSpreadPriority(t *testing.T) {
 		"bar": "foo",
 		"baz": "blah",
 	}
-	zone1Status := api.PodStatus{
+	zone1Spec := api.PodSpec{
 		Host: "machine1",
 	}
-	zone2Status := api.PodStatus{
+	zone2Spec := api.PodSpec{
 		Host: "machine2",
 	}
 	tests := []struct {
@@ -54,14 +54,14 @@ func TestServiceSpreadPriority(t *testing.T) {
 		},
 		{
 			pod:          api.Pod{ObjectMeta: api.ObjectMeta{Labels: labels1}},
-			pods:         []api.Pod{{Status: zone1Status}},
+			pods:         []api.Pod{{Spec: zone1Spec}},
 			nodes:        []string{"machine1", "machine2"},
 			expectedList: []HostPriority{{"machine1", 10}, {"machine2", 10}},
 			test:         "no services",
 		},
 		{
 			pod:          api.Pod{ObjectMeta: api.ObjectMeta{Labels: labels1}},
-			pods:         []api.Pod{{Status: zone1Status, ObjectMeta: api.ObjectMeta{Labels: labels2}}},
+			pods:         []api.Pod{{Spec: zone1Spec, ObjectMeta: api.ObjectMeta{Labels: labels2}}},
 			nodes:        []string{"machine1", "machine2"},
 			services:     []api.Service{{Spec: api.ServiceSpec{Selector: map[string]string{"key": "value"}}}},
 			expectedList: []HostPriority{{"machine1", 10}, {"machine2", 10}},
@@ -70,8 +70,8 @@ func TestServiceSpreadPriority(t *testing.T) {
 		{
 			pod: api.Pod{ObjectMeta: api.ObjectMeta{Labels: labels1}},
 			pods: []api.Pod{
-				{Status: zone1Status, ObjectMeta: api.ObjectMeta{Labels: labels2}},
-				{Status: zone2Status, ObjectMeta: api.ObjectMeta{Labels: labels1}},
+				{Spec: zone1Spec, ObjectMeta: api.ObjectMeta{Labels: labels2}},
+				{Spec: zone2Spec, ObjectMeta: api.ObjectMeta{Labels: labels1}},
 			},
 			nodes:        []string{"machine1", "machine2"},
 			services:     []api.Service{{Spec: api.ServiceSpec{Selector: labels1}}},
@@ -81,11 +81,11 @@ func TestServiceSpreadPriority(t *testing.T) {
 		{
 			pod: api.Pod{ObjectMeta: api.ObjectMeta{Labels: labels1}},
 			pods: []api.Pod{
-				{Status: zone1Status, ObjectMeta: api.ObjectMeta{Labels: labels2}},
-				{Status: zone1Status, ObjectMeta: api.ObjectMeta{Labels: labels1, Namespace: api.NamespaceDefault}},
-				{Status: zone1Status, ObjectMeta: api.ObjectMeta{Labels: labels1, Namespace: "ns1"}},
-				{Status: zone2Status, ObjectMeta: api.ObjectMeta{Labels: labels1}},
-				{Status: zone2Status, ObjectMeta: api.ObjectMeta{Labels: labels2}},
+				{Spec: zone1Spec, ObjectMeta: api.ObjectMeta{Labels: labels2}},
+				{Spec: zone1Spec, ObjectMeta: api.ObjectMeta{Labels: labels1, Namespace: api.NamespaceDefault}},
+				{Spec: zone1Spec, ObjectMeta: api.ObjectMeta{Labels: labels1, Namespace: "ns1"}},
+				{Spec: zone2Spec, ObjectMeta: api.ObjectMeta{Labels: labels1}},
+				{Spec: zone2Spec, ObjectMeta: api.ObjectMeta{Labels: labels2}},
 			},
 			nodes:        []string{"machine1", "machine2"},
 			services:     []api.Service{{Spec: api.ServiceSpec{Selector: labels1}}},
@@ -95,10 +95,10 @@ func TestServiceSpreadPriority(t *testing.T) {
 		{
 			pod: api.Pod{ObjectMeta: api.ObjectMeta{Labels: labels1, Namespace: api.NamespaceDefault}},
 			pods: []api.Pod{
-				{Status: zone1Status, ObjectMeta: api.ObjectMeta{Labels: labels1}},
-				{Status: zone1Status, ObjectMeta: api.ObjectMeta{Labels: labels1, Namespace: "ns1"}},
-				{Status: zone2Status, ObjectMeta: api.ObjectMeta{Labels: labels1, Namespace: api.NamespaceDefault}},
-				{Status: zone2Status, ObjectMeta: api.ObjectMeta{Labels: labels2}},
+				{Spec: zone1Spec, ObjectMeta: api.ObjectMeta{Labels: labels1}},
+				{Spec: zone1Spec, ObjectMeta: api.ObjectMeta{Labels: labels1, Namespace: "ns1"}},
+				{Spec: zone2Spec, ObjectMeta: api.ObjectMeta{Labels: labels1, Namespace: api.NamespaceDefault}},
+				{Spec: zone2Spec, ObjectMeta: api.ObjectMeta{Labels: labels2}},
 			},
 			nodes:        []string{"machine1", "machine2"},
 			services:     []api.Service{{Spec: api.ServiceSpec{Selector: labels1}, ObjectMeta: api.ObjectMeta{Namespace: api.NamespaceDefault}}},
@@ -108,11 +108,11 @@ func TestServiceSpreadPriority(t *testing.T) {
 		{
 			pod: api.Pod{ObjectMeta: api.ObjectMeta{Labels: labels1, Namespace: "ns1"}},
 			pods: []api.Pod{
-				{Status: zone1Status, ObjectMeta: api.ObjectMeta{Labels: labels1}},
-				{Status: zone1Status, ObjectMeta: api.ObjectMeta{Labels: labels1, Namespace: api.NamespaceDefault}},
-				{Status: zone1Status, ObjectMeta: api.ObjectMeta{Labels: labels1, Namespace: "ns2"}},
-				{Status: zone2Status, ObjectMeta: api.ObjectMeta{Labels: labels1, Namespace: "ns1"}},
-				{Status: zone2Status, ObjectMeta: api.ObjectMeta{Labels: labels2}},
+				{Spec: zone1Spec, ObjectMeta: api.ObjectMeta{Labels: labels1}},
+				{Spec: zone1Spec, ObjectMeta: api.ObjectMeta{Labels: labels1, Namespace: api.NamespaceDefault}},
+				{Spec: zone1Spec, ObjectMeta: api.ObjectMeta{Labels: labels1, Namespace: "ns2"}},
+				{Spec: zone2Spec, ObjectMeta: api.ObjectMeta{Labels: labels1, Namespace: "ns1"}},
+				{Spec: zone2Spec, ObjectMeta: api.ObjectMeta{Labels: labels2}},
 			},
 			nodes:        []string{"machine1", "machine2"},
 			services:     []api.Service{{Spec: api.ServiceSpec{Selector: labels1}, ObjectMeta: api.ObjectMeta{Namespace: "ns1"}}},
@@ -122,9 +122,9 @@ func TestServiceSpreadPriority(t *testing.T) {
 		{
 			pod: api.Pod{ObjectMeta: api.ObjectMeta{Labels: labels1}},
 			pods: []api.Pod{
-				{Status: zone1Status, ObjectMeta: api.ObjectMeta{Labels: labels2}},
-				{Status: zone1Status, ObjectMeta: api.ObjectMeta{Labels: labels1}},
-				{Status: zone2Status, ObjectMeta: api.ObjectMeta{Labels: labels1}},
+				{Spec: zone1Spec, ObjectMeta: api.ObjectMeta{Labels: labels2}},
+				{Spec: zone1Spec, ObjectMeta: api.ObjectMeta{Labels: labels1}},
+				{Spec: zone2Spec, ObjectMeta: api.ObjectMeta{Labels: labels1}},
 			},
 			nodes:        []string{"machine1", "machine2"},
 			services:     []api.Service{{Spec: api.ServiceSpec{Selector: labels1}}},
@@ -134,10 +134,10 @@ func TestServiceSpreadPriority(t *testing.T) {
 		{
 			pod: api.Pod{ObjectMeta: api.ObjectMeta{Labels: labels1}},
 			pods: []api.Pod{
-				{Status: zone1Status, ObjectMeta: api.ObjectMeta{Labels: labels2}},
-				{Status: zone1Status, ObjectMeta: api.ObjectMeta{Labels: labels1}},
-				{Status: zone2Status, ObjectMeta: api.ObjectMeta{Labels: labels1}},
-				{Status: zone2Status, ObjectMeta: api.ObjectMeta{Labels: labels1}},
+				{Spec: zone1Spec, ObjectMeta: api.ObjectMeta{Labels: labels2}},
+				{Spec: zone1Spec, ObjectMeta: api.ObjectMeta{Labels: labels1}},
+				{Spec: zone2Spec, ObjectMeta: api.ObjectMeta{Labels: labels1}},
+				{Spec: zone2Spec, ObjectMeta: api.ObjectMeta{Labels: labels1}},
 			},
 			nodes:        []string{"machine1", "machine2"},
 			services:     []api.Service{{Spec: api.ServiceSpec{Selector: labels1}}},
@@ -147,9 +147,9 @@ func TestServiceSpreadPriority(t *testing.T) {
 		{
 			pod: api.Pod{ObjectMeta: api.ObjectMeta{Labels: labels1}},
 			pods: []api.Pod{
-				{Status: zone1Status, ObjectMeta: api.ObjectMeta{Labels: labels2}},
-				{Status: zone1Status, ObjectMeta: api.ObjectMeta{Labels: labels1}},
-				{Status: zone2Status, ObjectMeta: api.ObjectMeta{Labels: labels1}},
+				{Spec: zone1Spec, ObjectMeta: api.ObjectMeta{Labels: labels2}},
+				{Spec: zone1Spec, ObjectMeta: api.ObjectMeta{Labels: labels1}},
+				{Spec: zone2Spec, ObjectMeta: api.ObjectMeta{Labels: labels1}},
 			},
 			nodes:        []string{"machine1", "machine2"},
 			services:     []api.Service{{Spec: api.ServiceSpec{Selector: map[string]string{"baz": "blah"}}}},
@@ -188,13 +188,13 @@ func TestZoneSpreadPriority(t *testing.T) {
 	nozone := map[string]string{
 		"name": "value",
 	}
-	zone0Status := api.PodStatus{
+	zone0Spec := api.PodSpec{
 		Host: "machine01",
 	}
-	zone1Status := api.PodStatus{
+	zone1Spec := api.PodSpec{
 		Host: "machine11",
 	}
-	zone2Status := api.PodStatus{
+	zone2Spec := api.PodSpec{
 		Host: "machine21",
 	}
 	labeledNodes := map[string]map[string]string{
@@ -219,7 +219,7 @@ func TestZoneSpreadPriority(t *testing.T) {
 		},
 		{
 			pod:   api.Pod{ObjectMeta: api.ObjectMeta{Labels: labels1}},
-			pods:  []api.Pod{{Status: zone1Status}},
+			pods:  []api.Pod{{Spec: zone1Spec}},
 			nodes: labeledNodes,
 			expectedList: []HostPriority{{"machine11", 10}, {"machine12", 10},
 				{"machine21", 10}, {"machine22", 10},
@@ -228,7 +228,7 @@ func TestZoneSpreadPriority(t *testing.T) {
 		},
 		{
 			pod:      api.Pod{ObjectMeta: api.ObjectMeta{Labels: labels1}},
-			pods:     []api.Pod{{Status: zone1Status, ObjectMeta: api.ObjectMeta{Labels: labels2}}},
+			pods:     []api.Pod{{Spec: zone1Spec, ObjectMeta: api.ObjectMeta{Labels: labels2}}},
 			nodes:    labeledNodes,
 			services: []api.Service{{Spec: api.ServiceSpec{Selector: map[string]string{"key": "value"}}}},
 			expectedList: []HostPriority{{"machine11", 10}, {"machine12", 10},
@@ -239,9 +239,9 @@ func TestZoneSpreadPriority(t *testing.T) {
 		{
 			pod: api.Pod{ObjectMeta: api.ObjectMeta{Labels: labels1}},
 			pods: []api.Pod{
-				{Status: zone0Status, ObjectMeta: api.ObjectMeta{Labels: labels2}},
-				{Status: zone1Status, ObjectMeta: api.ObjectMeta{Labels: labels2}},
-				{Status: zone2Status, ObjectMeta: api.ObjectMeta{Labels: labels1}},
+				{Spec: zone0Spec, ObjectMeta: api.ObjectMeta{Labels: labels2}},
+				{Spec: zone1Spec, ObjectMeta: api.ObjectMeta{Labels: labels2}},
+				{Spec: zone2Spec, ObjectMeta: api.ObjectMeta{Labels: labels1}},
 			},
 			nodes:    labeledNodes,
 			services: []api.Service{{Spec: api.ServiceSpec{Selector: labels1}}},
@@ -253,9 +253,9 @@ func TestZoneSpreadPriority(t *testing.T) {
 		{
 			pod: api.Pod{ObjectMeta: api.ObjectMeta{Labels: labels1}},
 			pods: []api.Pod{
-				{Status: zone1Status, ObjectMeta: api.ObjectMeta{Labels: labels2}},
-				{Status: zone1Status, ObjectMeta: api.ObjectMeta{Labels: labels1}},
-				{Status: zone2Status, ObjectMeta: api.ObjectMeta{Labels: labels1}},
+				{Spec: zone1Spec, ObjectMeta: api.ObjectMeta{Labels: labels2}},
+				{Spec: zone1Spec, ObjectMeta: api.ObjectMeta{Labels: labels1}},
+				{Spec: zone2Spec, ObjectMeta: api.ObjectMeta{Labels: labels1}},
 			},
 			nodes:    labeledNodes,
 			services: []api.Service{{Spec: api.ServiceSpec{Selector: labels1}}},
@@ -267,10 +267,10 @@ func TestZoneSpreadPriority(t *testing.T) {
 		{
 			pod: api.Pod{ObjectMeta: api.ObjectMeta{Labels: labels1, Namespace: api.NamespaceDefault}},
 			pods: []api.Pod{
-				{Status: zone1Status, ObjectMeta: api.ObjectMeta{Labels: labels1}},
-				{Status: zone1Status, ObjectMeta: api.ObjectMeta{Labels: labels1, Namespace: api.NamespaceDefault}},
-				{Status: zone2Status, ObjectMeta: api.ObjectMeta{Labels: labels1}},
-				{Status: zone2Status, ObjectMeta: api.ObjectMeta{Labels: labels1, Namespace: "ns1"}},
+				{Spec: zone1Spec, ObjectMeta: api.ObjectMeta{Labels: labels1}},
+				{Spec: zone1Spec, ObjectMeta: api.ObjectMeta{Labels: labels1, Namespace: api.NamespaceDefault}},
+				{Spec: zone2Spec, ObjectMeta: api.ObjectMeta{Labels: labels1}},
+				{Spec: zone2Spec, ObjectMeta: api.ObjectMeta{Labels: labels1, Namespace: "ns1"}},
 			},
 			nodes:    labeledNodes,
 			services: []api.Service{{Spec: api.ServiceSpec{Selector: labels1}, ObjectMeta: api.ObjectMeta{Namespace: api.NamespaceDefault}}},
@@ -282,10 +282,10 @@ func TestZoneSpreadPriority(t *testing.T) {
 		{
 			pod: api.Pod{ObjectMeta: api.ObjectMeta{Labels: labels1}},
 			pods: []api.Pod{
-				{Status: zone1Status, ObjectMeta: api.ObjectMeta{Labels: labels2}},
-				{Status: zone1Status, ObjectMeta: api.ObjectMeta{Labels: labels1}},
-				{Status: zone2Status, ObjectMeta: api.ObjectMeta{Labels: labels1}},
-				{Status: zone2Status, ObjectMeta: api.ObjectMeta{Labels: labels1}},
+				{Spec: zone1Spec, ObjectMeta: api.ObjectMeta{Labels: labels2}},
+				{Spec: zone1Spec, ObjectMeta: api.ObjectMeta{Labels: labels1}},
+				{Spec: zone2Spec, ObjectMeta: api.ObjectMeta{Labels: labels1}},
+				{Spec: zone2Spec, ObjectMeta: api.ObjectMeta{Labels: labels1}},
 			},
 			nodes:    labeledNodes,
 			services: []api.Service{{Spec: api.ServiceSpec{Selector: labels1}}},
@@ -297,9 +297,9 @@ func TestZoneSpreadPriority(t *testing.T) {
 		{
 			pod: api.Pod{ObjectMeta: api.ObjectMeta{Labels: labels1}},
 			pods: []api.Pod{
-				{Status: zone1Status, ObjectMeta: api.ObjectMeta{Labels: labels2}},
-				{Status: zone1Status, ObjectMeta: api.ObjectMeta{Labels: labels1}},
-				{Status: zone2Status, ObjectMeta: api.ObjectMeta{Labels: labels1}},
+				{Spec: zone1Spec, ObjectMeta: api.ObjectMeta{Labels: labels2}},
+				{Spec: zone1Spec, ObjectMeta: api.ObjectMeta{Labels: labels1}},
+				{Spec: zone2Spec, ObjectMeta: api.ObjectMeta{Labels: labels1}},
 			},
 			nodes:    labeledNodes,
 			services: []api.Service{{Spec: api.ServiceSpec{Selector: map[string]string{"baz": "blah"}}}},
@@ -311,10 +311,10 @@ func TestZoneSpreadPriority(t *testing.T) {
 		{
 			pod: api.Pod{ObjectMeta: api.ObjectMeta{Labels: labels1}},
 			pods: []api.Pod{
-				{Status: zone0Status, ObjectMeta: api.ObjectMeta{Labels: labels1}},
-				{Status: zone1Status, ObjectMeta: api.ObjectMeta{Labels: labels1}},
-				{Status: zone2Status, ObjectMeta: api.ObjectMeta{Labels: labels1}},
-				{Status: zone2Status, ObjectMeta: api.ObjectMeta{Labels: labels1}},
+				{Spec: zone0Spec, ObjectMeta: api.ObjectMeta{Labels: labels1}},
+				{Spec: zone1Spec, ObjectMeta: api.ObjectMeta{Labels: labels1}},
+				{Spec: zone2Spec, ObjectMeta: api.ObjectMeta{Labels: labels1}},
+				{Spec: zone2Spec, ObjectMeta: api.ObjectMeta{Labels: labels1}},
 			},
 			nodes:    labeledNodes,
 			services: []api.Service{{Spec: api.ServiceSpec{Selector: labels1}}},

@@ -262,7 +262,7 @@ func podsOnMinions(c *client.Client, pods api.PodList) wait.ConditionFunc {
 	podInfo := fakeKubeletClient{}
 	return func() (bool, error) {
 		for i := range pods.Items {
-			host, id, namespace := pods.Items[i].Status.Host, pods.Items[i].Name, pods.Items[i].Namespace
+			host, id, namespace := pods.Items[i].Spec.Host, pods.Items[i].Name, pods.Items[i].Namespace
 			glog.Infof("Check whether pod %s.%s exists on node %q", id, namespace, host)
 			if len(host) == 0 {
 				glog.Infof("Pod %s.%s is not bound to a host yet", id, namespace)

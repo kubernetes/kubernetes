@@ -46,16 +46,17 @@ func TestLeastRequested(t *testing.T) {
 		"bar": "foo",
 		"baz": "blah",
 	}
-	machine1Status := api.PodStatus{
+	machine1Spec := api.PodSpec{
 		Host: "machine1",
 	}
-	machine2Status := api.PodStatus{
+	machine2Spec := api.PodSpec{
 		Host: "machine2",
 	}
 	noResources := api.PodSpec{
 		Containers: []api.Container{},
 	}
 	cpuOnly := api.PodSpec{
+		Host: "machine1",
 		Containers: []api.Container{
 			{
 				Resources: api.ResourceRequirements{
@@ -73,7 +74,10 @@ func TestLeastRequested(t *testing.T) {
 			},
 		},
 	}
+	cpuOnly2 := cpuOnly
+	cpuOnly2.Host = "machine2"
 	cpuAndMemory := api.PodSpec{
+		Host: "machine2",
 		Containers: []api.Container{
 			{
 				Resources: api.ResourceRequirements{
@@ -151,10 +155,10 @@ func TestLeastRequested(t *testing.T) {
 			expectedList: []HostPriority{{"machine1", 10}, {"machine2", 10}},
 			test:         "no resources requested, pods scheduled",
 			pods: []api.Pod{
-				{Status: machine1Status, ObjectMeta: api.ObjectMeta{Labels: labels2}},
-				{Status: machine1Status, ObjectMeta: api.ObjectMeta{Labels: labels1}},
-				{Status: machine2Status, ObjectMeta: api.ObjectMeta{Labels: labels1}},
-				{Status: machine2Status, ObjectMeta: api.ObjectMeta{Labels: labels1}},
+				{Spec: machine1Spec, ObjectMeta: api.ObjectMeta{Labels: labels2}},
+				{Spec: machine1Spec, ObjectMeta: api.ObjectMeta{Labels: labels1}},
+				{Spec: machine2Spec, ObjectMeta: api.ObjectMeta{Labels: labels1}},
+				{Spec: machine2Spec, ObjectMeta: api.ObjectMeta{Labels: labels1}},
 			},
 		},
 		{
@@ -174,10 +178,10 @@ func TestLeastRequested(t *testing.T) {
 			expectedList: []HostPriority{{"machine1", 7}, {"machine2", 5}},
 			test:         "no resources requested, pods scheduled with resources",
 			pods: []api.Pod{
-				{Spec: cpuOnly, Status: machine1Status, ObjectMeta: api.ObjectMeta{Labels: labels2}},
-				{Spec: cpuOnly, Status: machine1Status, ObjectMeta: api.ObjectMeta{Labels: labels1}},
-				{Spec: cpuOnly, Status: machine2Status, ObjectMeta: api.ObjectMeta{Labels: labels1}},
-				{Spec: cpuAndMemory, Status: machine2Status, ObjectMeta: api.ObjectMeta{Labels: labels1}},
+				{Spec: cpuOnly, ObjectMeta: api.ObjectMeta{Labels: labels2}},
+				{Spec: cpuOnly, ObjectMeta: api.ObjectMeta{Labels: labels1}},
+				{Spec: cpuOnly2, ObjectMeta: api.ObjectMeta{Labels: labels1}},
+				{Spec: cpuAndMemory, ObjectMeta: api.ObjectMeta{Labels: labels1}},
 			},
 		},
 		{
@@ -197,8 +201,8 @@ func TestLeastRequested(t *testing.T) {
 			expectedList: []HostPriority{{"machine1", 5}, {"machine2", 4}},
 			test:         "resources requested, pods scheduled with resources",
 			pods: []api.Pod{
-				{Spec: cpuOnly, Status: machine1Status},
-				{Spec: cpuAndMemory, Status: machine2Status},
+				{Spec: cpuOnly},
+				{Spec: cpuAndMemory},
 			},
 		},
 		{
@@ -218,8 +222,8 @@ func TestLeastRequested(t *testing.T) {
 			expectedList: []HostPriority{{"machine1", 5}, {"machine2", 6}},
 			test:         "resources requested, pods scheduled with resources, differently sized machines",
 			pods: []api.Pod{
-				{Spec: cpuOnly, Status: machine1Status},
-				{Spec: cpuAndMemory, Status: machine2Status},
+				{Spec: cpuOnly},
+				{Spec: cpuAndMemory},
 			},
 		},
 		{
@@ -239,8 +243,8 @@ func TestLeastRequested(t *testing.T) {
 			expectedList: []HostPriority{{"machine1", 5}, {"machine2", 2}},
 			test:         "requested resources exceed minion capacity",
 			pods: []api.Pod{
-				{Spec: cpuOnly, Status: machine1Status},
-				{Spec: cpuAndMemory, Status: machine2Status},
+				{Spec: cpuOnly},
+				{Spec: cpuAndMemory},
 			},
 		},
 		{

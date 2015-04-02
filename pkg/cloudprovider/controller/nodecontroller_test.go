@@ -1447,7 +1447,7 @@ func newNode(name string) *api.Node {
 }
 
 func newPod(name, host string) *api.Pod {
-	return &api.Pod{ObjectMeta: api.ObjectMeta{Name: name}, Status: api.PodStatus{Host: host}}
+	return &api.Pod{ObjectMeta: api.ObjectMeta{Name: name}, Spec: api.PodSpec{Host: host}}
 }
 
 func sortedNodeNames(nodes []*api.Node) []string {

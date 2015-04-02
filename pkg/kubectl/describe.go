@@ -238,7 +238,7 @@ func describePod(pod *api.Pod, rcs []api.ReplicationController, events *api.Even
 	return tabbedString(func(out io.Writer) error {
 		fmt.Fprintf(out, "Name:\t%s\n", pod.Name)
 		fmt.Fprintf(out, "Image(s):\t%s\n", makeImageList(&pod.Spec))
-		fmt.Fprintf(out, "Host:\t%s\n", pod.Status.Host+"/"+pod.Status.HostIP)
+		fmt.Fprintf(out, "Host:\t%s\n", pod.Spec.Host+"/"+pod.Status.HostIP)
 		fmt.Fprintf(out, "Labels:\t%s\n", formatLabels(pod.Labels))
 		fmt.Fprintf(out, "Status:\t%s\n", string(pod.Status.Phase))
 		fmt.Fprintf(out, "Replication Controllers:\t%s\n", printReplicationControllersByLabels(rcs))
@@ -369,7 +369,7 @@ func (d *NodeDescriber) Describe(namespace, name string) (string, error) {
 		return "", err
 	}
 	for _, pod := range allPods.Items {
-		if pod.Status.Host != name {
+		if pod.Spec.Host != name {
 			continue
 		}
 		pods = append(pods, pod)

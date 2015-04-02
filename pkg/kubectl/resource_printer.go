@@ -329,7 +329,7 @@ func printPod(pod *api.Pod, w io.Writer) error {
 		pod.Status.PodIP,
 		firstContainer.Name,
 		firstContainer.Image,
-		podHostString(pod.Status.Host, pod.Status.HostIP),
+		podHostString(pod.Spec.Host, pod.Status.HostIP),
 		formatLabels(pod.Labels),
 		pod.Status.Phase,
 		units.HumanDuration(time.Now().Sub(pod.CreationTimestamp.Time)))

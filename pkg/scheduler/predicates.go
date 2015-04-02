@@ -290,7 +290,7 @@ func (s *ServiceAffinity) CheckServiceAffinity(pod api.Pod, existingPods []api.P
 			}
 			if len(nsServicePods) > 0 {
 				// consider any service pod and fetch the minion its hosted on
-				otherMinion, err := s.nodeInfo.GetNodeInfo(nsServicePods[0].Status.Host)
+				otherMinion, err := s.nodeInfo.GetNodeInfo(nsServicePods[0].Spec.Host)
 				if err != nil {
 					return false, err
 				}
@@ -359,16 +359,7 @@ func MapPodsToMachines(lister PodLister) (map[string][]api.Pod, error) {
 		return map[string][]api.Pod{}, err
 	}
 	for _, scheduledPod := range pods {
-		// TODO: switch to Spec.Host! There was some confusion previously
-		//       about whether components should judge a pod's location
-		//       based on spec.Host or status.Host. It has been decided that
-		//       spec.Host is the canonical location of the pod. Status.Host
-		//       will either be removed, be a copy, or in theory it could be
-		//       used as a signal that kubelet has agreed to run the pod.
-		//
-		//       This could be fixed now, but just requires someone to try it
-		//       and verify that e2e still passes.
-		host := scheduledPod.Status.Host
+		host := scheduledPod.Spec.Host
 		machineToPods[host] = append(machineToPods[host], scheduledPod)
 	}
 	return machineToPods, nil

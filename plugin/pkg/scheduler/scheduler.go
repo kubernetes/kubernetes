@@ -128,7 +128,6 @@ func (s *Scheduler) scheduleOne() {
 		// tell the model to assume that this binding took effect.
 		assumed := *pod
 		assumed.Spec.Host = dest
-		assumed.Status.Host = dest
 		s.config.Modeler.AssumePod(&assumed)
 	})
 }
