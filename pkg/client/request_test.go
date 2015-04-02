@@ -251,7 +251,7 @@ func TestTransformResponse(t *testing.T) {
 			},
 			Error: true,
 			ErrFn: func(err error) bool {
-				return err.Error() == "aaaaa" && apierrors.IsUnauthorized(err)
+				return strings.Contains(err.Error(), "server has asked for the client to provide") && apierrors.IsUnauthorized(err)
 			},
 		},
 		{Response: &http.Response{StatusCode: 403}, Error: true},

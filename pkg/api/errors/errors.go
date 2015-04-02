@@ -17,6 +17,7 @@ limitations under the License.
 package errors
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
@@ -56,6 +57,14 @@ func (e *StatusError) Error() string {
 // of StatusError. Used by pkg/apiserver.
 func (e *StatusError) Status() api.Status {
 	return e.ErrStatus
+}
+
+// DebugError reports extended info about the error to debug output.
+func (e *StatusError) DebugError() (string, []interface{}) {
+	if out, err := json.MarshalIndent(e.ErrStatus, "", "  "); err == nil {
+		return "server response object: %s", []interface{}{string(out)}
+	}
+	return "server response object: %#v", []interface{}{e.ErrStatus}
 }
 
 // UnexpectedObjectError can be returned by FromObject if it's passed a non-status object.
@@ -355,16 +364,26 @@ func IsServerTimeout(err error) bool {
 	return reasonForError(err) == api.StatusReasonServerTimeout
 }
 
-// IsStatusError determines if err is an API Status error received from the master.
-func IsStatusError(err error) bool {
-	_, ok := err.(*StatusError)
-	return ok
+// IsUnexpectedServerError returns true if the server response was not in the expected API format,
+// and may be the result of another HTTP actor.
+func IsUnexpectedServerError(err error) bool {
+	switch t := err.(type) {
+	case *StatusError:
+		if d := t.Status().Details; d != nil {
+			for _, cause := range d.Causes {
+				if cause.Type == api.CauseTypeUnexpectedServerResponse {
+					return true
+				}
+			}
+		}
+	}
+	return false
 }
 
 // IsUnexpectedObjectError determines if err is due to an unexpected object from the master.
 func IsUnexpectedObjectError(err error) bool {
 	_, ok := err.(*UnexpectedObjectError)
-	return ok
+	return err != nil && ok
 }
 
 // SuggestsClientDelay returns true if this error suggests a client delay as well as the
