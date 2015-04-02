@@ -81,7 +81,7 @@ else
         exit 1
     fi
 
-    # sudo gcloud components update -q
+    sudo gcloud components update -q
 
     GITHASH=$(gsutil cat gs://kubernetes-release/ci/latest.txt)
     gsutil -m cp gs://kubernetes-release/ci/${GITHASH}/kubernetes.tar.gz gs://kubernetes-release/ci/${GITHASH}/kubernetes-test.tar.gz .
