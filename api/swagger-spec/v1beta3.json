@@ -5501,7 +5501,7 @@
     ],
     "properties": {
      "annotations": {
-      "type": "any",
+      "$ref": "v1beta3.ObjectMeta.annotations",
       "description": "map of string keys and values that can be used by external tooling to store and retrieve arbitrary metadata about objects"
      },
      "apiVersion": {
@@ -5525,7 +5525,7 @@
       "description": "kind of object, in CamelCase; cannot be updated"
      },
      "labels": {
-      "type": "any",
+      "$ref": "v1beta3.ObjectMeta.labels",
       "description": "map of string keys and values that can be used to organize and categorize objects; may match selectors of replication controllers and services"
      },
      "name": {
@@ -5549,7 +5549,7 @@
       "description": "an object to bind to"
      },
      "uid": {
-      "type": "string",
+      "$ref": "types.UID",
       "description": "unique UUID across space and time; populated by the system; read-only"
      }
     }
@@ -5615,7 +5615,7 @@
       "description": "Docker image name"
      },
      "imagePullPolicy": {
-      "type": "string",
+      "$ref": "v1beta3.PullPolicy",
       "description": "image pull policy; one of PullAlways, PullNever, PullIfNotPresent; defaults to PullAlways if :latest tag is specified, or PullIfNotPresent otherwise; cannot be updated"
      },
      "lifecycle": {
@@ -5691,7 +5691,7 @@
       "description": "name for the port that can be referred to by services; must be a DNS_LABEL and unique without the pod"
      },
      "protocol": {
-      "type": "string",
+      "$ref": "v1beta3.Protocol",
       "description": "protocol for port; must be UDP or TCP; TCP if unspecified"
      }
     }
@@ -5814,18 +5814,6 @@
      }
     }
    },
-   "v1beta3.EmptyDirVolumeSource": {
-    "id": "v1beta3.EmptyDirVolumeSource",
-    "required": [
-     "medium"
-    ],
-    "properties": {
-     "medium": {
-      "type": "string",
-      "description": "type of storage used to back the volume; must be an empty string (default) or Memory"
-     }
-    }
-   },
    "v1beta3.EndpointAddress": {
     "id": "v1beta3.EndpointAddress",
     "required": [
@@ -5858,7 +5846,7 @@
       "description": "port number of the endpoint"
      },
      "protocol": {
-      "type": "string",
+      "$ref": "v1beta3.Protocol",
       "description": "protocol for this port; must be UDP or TCP; TCP if unspecified"
      }
     }
@@ -5889,7 +5877,7 @@
     ],
     "properties": {
      "annotations": {
-      "type": "any",
+      "$ref": "v1beta3.ObjectMeta.annotations",
       "description": "map of string keys and values that can be used by external tooling to store and retrieve arbitrary metadata about objects"
      },
      "apiVersion": {
@@ -5913,7 +5901,7 @@
       "description": "kind of object, in CamelCase; cannot be updated"
      },
      "labels": {
-      "type": "any",
+      "$ref": "v1beta3.ObjectMeta.labels",
       "description": "map of string keys and values that can be used to organize and categorize objects; may match selectors of replication controllers and services"
      },
      "name": {
@@ -5940,7 +5928,7 @@
       "description": "sets of addresses and ports that comprise a service"
      },
      "uid": {
-      "type": "string",
+      "$ref": "types.UID",
       "description": "unique UUID across space and time; populated by the system; read-only"
      }
     }
@@ -5996,7 +5984,7 @@
     "id": "v1beta3.Event",
     "properties": {
      "annotations": {
-      "type": "any",
+      "$ref": "v1beta3.ObjectMeta.annotations",
       "description": "map of string keys and values that can be used by external tooling to store and retrieve arbitrary metadata about objects"
      },
      "apiVersion": {
@@ -6033,7 +6021,7 @@
       "description": "kind of object, in CamelCase; cannot be updated"
      },
      "labels": {
-      "type": "any",
+      "$ref": "v1beta3.ObjectMeta.labels",
       "description": "map of string keys and values that can be used to organize and categorize objects; may match selectors of replication controllers and services"
      },
      "lastTimestamp": {
@@ -6069,7 +6057,7 @@
       "description": "component reporting this event"
      },
      "uid": {
-      "type": "string",
+      "$ref": "types.UID",
       "description": "unique UUID across space and time; populated by the system; read-only"
      }
     }
@@ -6134,48 +6122,6 @@
     "id": "v1beta3.FinalizerName",
     "properties": {}
    },
-   "v1beta3.GCEPersistentDiskVolumeSource": {
-    "id": "v1beta3.GCEPersistentDiskVolumeSource",
-    "required": [
-     "pdName"
-    ],
-    "properties": {
-     "fsType": {
-      "type": "string",
-      "description": "file system type to mount, such as ext4, xfs, ntfs"
-     },
-     "partition": {
-      "type": "integer",
-      "format": "int32",
-      "description": "partition on the disk to mount (e.g., '1' for /dev/sda1); if omitted the plain device name (e.g., /dev/sda) will be mounted"
-     },
-     "pdName": {
-      "type": "string",
-      "description": "unique name of the PD resource in GCE"
-     },
-     "readOnly": {
-      "type": "boolean",
-      "description": "read-only if true, read-write otherwise (false or unspecified)"
-     }
-    }
-   },
-   "v1beta3.GitRepoVolumeSource": {
-    "id": "v1beta3.GitRepoVolumeSource",
-    "required": [
-     "repository",
-     "revision"
-    ],
-    "properties": {
-     "repository": {
-      "type": "string",
-      "description": "repository URL"
-     },
-     "revision": {
-      "type": "string",
-      "description": "commit hash for the specified revision"
-     }
-    }
-   },
    "v1beta3.HTTPGetAction": {
     "id": "v1beta3.HTTPGetAction",
     "properties": {
@@ -6210,18 +6156,6 @@
      }
     }
    },
-   "v1beta3.HostPathVolumeSource": {
-    "id": "v1beta3.HostPathVolumeSource",
-    "required": [
-     "path"
-    ],
-    "properties": {
-     "path": {
-      "type": "string",
-      "description": "path of the directory on the host"
-     }
-    }
-   },
    "v1beta3.Lifecycle": {
     "id": "v1beta3.Lifecycle",
     "properties": {
@@ -6239,7 +6173,7 @@
     "id": "v1beta3.LimitRange",
     "properties": {
      "annotations": {
-      "type": "any",
+      "$ref": "v1beta3.ObjectMeta.annotations",
       "description": "map of string keys and values that can be used by external tooling to store and retrieve arbitrary metadata about objects"
      },
      "apiVersion": {
@@ -6263,7 +6197,7 @@
       "description": "kind of object, in CamelCase; cannot be updated"
      },
      "labels": {
-      "type": "any",
+      "$ref": "v1beta3.ObjectMeta.labels",
       "description": "map of string keys and values that can be used to organize and categorize objects; may match selectors of replication controllers and services"
      },
      "name": {
@@ -6287,7 +6221,7 @@
       "description": "spec defines the limits enforced; https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#spec-and-status"
      },
      "uid": {
-      "type": "string",
+      "$ref": "types.UID",
       "description": "unique UUID across space and time; populated by the system; read-only"
      }
     }
@@ -6296,15 +6230,15 @@
     "id": "v1beta3.LimitRangeItem",
     "properties": {
      "max": {
-      "type": "any",
+      "$ref": "v1beta3.ResourceList",
       "description": "max usage constraints on this kind by resource name"
      },
      "min": {
-      "type": "any",
+      "$ref": "v1beta3.ResourceList",
       "description": "min usage constraints on this kind by resource name"
      },
      "type": {
-      "type": "string",
+      "$ref": "v1beta3.LimitType",
       "description": "type of resource that this limit applies to"
      }
     }
@@ -6355,32 +6289,11 @@
      }
     }
    },
-   "v1beta3.NFSVolumeSource": {
-    "id": "v1beta3.NFSVolumeSource",
-    "required": [
-     "server",
-     "path"
-    ],
-    "properties": {
-     "path": {
-      "type": "string",
-      "description": "the path that is exported by the NFS server"
-     },
-     "readOnly": {
-      "type": "boolean",
-      "description": "forces the NFS export to be mounted with read-only permissions"
-     },
-     "server": {
-      "type": "string",
-      "description": "the hostname or IP address of the NFS server"
-     }
-    }
-   },
    "v1beta3.Namespace": {
     "id": "v1beta3.Namespace",
     "properties": {
      "annotations": {
-      "type": "any",
+      "$ref": "v1beta3.ObjectMeta.annotations",
       "description": "map of string keys and values that can be used by external tooling to store and retrieve arbitrary metadata about objects"
      },
      "apiVersion": {
@@ -6404,7 +6317,7 @@
       "description": "kind of object, in CamelCase; cannot be updated"
      },
      "labels": {
-      "type": "any",
+      "$ref": "v1beta3.ObjectMeta.labels",
       "description": "map of string keys and values that can be used to organize and categorize objects; may match selectors of replication controllers and services"
      },
      "name": {
@@ -6432,7 +6345,7 @@
       "description": "status describes the current status of a Namespace; https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#spec-and-status"
      },
      "uid": {
-      "type": "string",
+      "$ref": "types.UID",
       "description": "unique UUID across space and time; populated by the system; read-only"
      }
     }
@@ -6484,7 +6397,7 @@
     "id": "v1beta3.NamespaceStatus",
     "properties": {
      "phase": {
-      "type": "string",
+      "$ref": "v1beta3.NamespacePhase",
       "description": "phase is the current lifecycle phase of the namespace"
      }
     }
@@ -6493,7 +6406,7 @@
     "id": "v1beta3.Node",
     "properties": {
      "annotations": {
-      "type": "any",
+      "$ref": "v1beta3.ObjectMeta.annotations",
       "description": "map of string keys and values that can be used by external tooling to store and retrieve arbitrary metadata about objects"
      },
      "apiVersion": {
@@ -6517,7 +6430,7 @@
       "description": "kind of object, in CamelCase; cannot be updated"
      },
      "labels": {
-      "type": "any",
+      "$ref": "v1beta3.ObjectMeta.labels",
       "description": "map of string keys and values that can be used to organize and categorize objects; may match selectors of replication controllers and services"
      },
      "name": {
@@ -6545,7 +6458,7 @@
       "description": "most recently observed status of the node; populated by the system, read-only; https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#spec-and-status"
      },
      "uid": {
-      "type": "string",
+      "$ref": "types.UID",
       "description": "unique UUID across space and time; populated by the system; read-only"
      }
     }
@@ -6561,7 +6474,7 @@
       "type": "string"
      },
      "type": {
-      "type": "string"
+      "$ref": "v1beta3.NodeAddressType"
      }
     }
    },
@@ -6589,11 +6502,11 @@
       "description": "(brief) reason for the condition's last transition"
      },
      "status": {
-      "type": "string",
+      "$ref": "v1beta3.ConditionStatus",
       "description": "status of the condition, one of Full, None, Unknown"
      },
      "type": {
-      "type": "string",
+      "$ref": "v1beta3.NodeConditionType",
       "description": "type of node condition, one of Ready, Schedulable"
      }
     }
@@ -6634,7 +6547,7 @@
     "properties": {
      "externalID": {
       "type": "string",
-      "description": "external ID assigned to the node by some machine database (e.g. a cloud provider)"
+      "description": "external ID assigned to the node by some machine database (e.g. a cloud provider). Defaults to node name when empty."
      },
      "podCIDR": {
       "type": "string",
@@ -6657,7 +6570,7 @@
       "description": "list of addresses reachable to the node"
      },
      "capacity": {
-      "type": "any",
+      "$ref": "v1beta3.ResourceList",
       "description": "compute resource capacity of the node; https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/resources.md"
      },
      "conditions": {
@@ -6671,7 +6584,7 @@
       "$ref": "v1beta3.NodeSystemInfo"
      },
      "phase": {
-      "type": "string",
+      "$ref": "v1beta3.NodePhase",
       "description": "most recently observed lifecycle phase of the node"
      }
     }
@@ -6749,7 +6662,7 @@
       "description": "specific resourceVersion to which this reference is made, if any: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
      },
      "uid": {
-      "type": "string",
+      "$ref": "types.UID",
       "description": "uid of the referent"
      }
     }
@@ -6758,7 +6671,7 @@
     "id": "v1beta3.Pod",
     "properties": {
      "annotations": {
-      "type": "any",
+      "$ref": "v1beta3.ObjectMeta.annotations",
       "description": "map of string keys and values that can be used by external tooling to store and retrieve arbitrary metadata about objects"
      },
      "apiVersion": {
@@ -6782,7 +6695,7 @@
       "description": "kind of object, in CamelCase; cannot be updated"
      },
      "labels": {
-      "type": "any",
+      "$ref": "v1beta3.ObjectMeta.labels",
       "description": "map of string keys and values that can be used to organize and categorize objects; may match selectors of replication controllers and services"
      },
      "name": {
@@ -6810,7 +6723,7 @@
       "description": "most recently observed status of the pod; populated by the system, read-only; https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#spec-and-status"
      },
      "uid": {
-      "type": "string",
+      "$ref": "types.UID",
       "description": "unique UUID across space and time; populated by the system; read-only"
      }
     }
@@ -6823,11 +6736,11 @@
     ],
     "properties": {
      "status": {
-      "type": "string",
+      "$ref": "v1beta3.ConditionStatus",
       "description": "status of the condition, one of Full, None, Unknown"
      },
      "type": {
-      "type": "string",
+      "$ref": "v1beta3.PodConditionType",
       "description": "kind of the condition"
      }
     }
@@ -6878,7 +6791,7 @@
       "description": "list of containers belonging to the pod; cannot be updated; containers cannot currently be added or removed; there must be at least one container in a Pod"
      },
      "dnsPolicy": {
-      "type": "string",
+      "$ref": "v1beta3.DNSPolicy",
       "description": "DNS policy for containers within the pod; one of 'ClusterFirst' or 'Default'"
      },
      "host": {
@@ -6890,11 +6803,11 @@
       "description": "host networking requested for this pod"
      },
      "nodeSelector": {
-      "type": "any",
+      "$ref": "v1beta3.PodSpec.nodeSelector",
       "description": "selector which must match a node's labels for the pod to be scheduled on that node"
      },
      "restartPolicy": {
-      "type": "string",
+      "$ref": "v1beta3.RestartPolicy",
       "description": "restart policy for all containers within the pod; one of RestartPolicyAlways, RestartPolicyOnFailure, RestartPolicyNever"
      },
      "volumes": {
@@ -6905,6 +6818,10 @@
       "description": "list of volumes that can be mounted by containers belonging to the pod"
      }
     }
+   },
+   "v1beta3.PodSpec.nodeSelector": {
+    "id": "v1beta3.PodSpec.nodeSelector",
+    "properties": {}
    },
    "v1beta3.PodStatus": {
     "id": "v1beta3.PodStatus",
@@ -6936,7 +6853,7 @@
       "description": "human readable message indicating details about why the pod is in this condition"
      },
      "phase": {
-      "type": "string",
+      "$ref": "v1beta3.PodPhase",
       "description": "current condition of the pod."
      },
      "podIP": {
@@ -6949,7 +6866,7 @@
     "id": "v1beta3.PodTemplateSpec",
     "properties": {
      "annotations": {
-      "type": "any",
+      "$ref": "v1beta3.ObjectMeta.annotations",
       "description": "map of string keys and values that can be used by external tooling to store and retrieve arbitrary metadata about objects"
      },
      "creationTimestamp": {
@@ -6965,7 +6882,7 @@
       "description": "an optional prefix to use to generate a unique name; has the same validation rules as name; optional, and is applied only name if is not specified"
      },
      "labels": {
-      "type": "any",
+      "$ref": "v1beta3.ObjectMeta.labels",
       "description": "map of string keys and values that can be used to organize and categorize objects; may match selectors of replication controllers and services"
      },
      "name": {
@@ -6989,7 +6906,7 @@
       "description": "specification of the desired behavior of the pod; https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#spec-and-status"
      },
      "uid": {
-      "type": "string",
+      "$ref": "types.UID",
       "description": "unique UUID across space and time; populated by the system; read-only"
      }
     }
@@ -7025,7 +6942,7 @@
     "id": "v1beta3.ReplicationController",
     "properties": {
      "annotations": {
-      "type": "any",
+      "$ref": "v1beta3.ObjectMeta.annotations",
       "description": "map of string keys and values that can be used by external tooling to store and retrieve arbitrary metadata about objects"
      },
      "apiVersion": {
@@ -7049,7 +6966,7 @@
       "description": "kind of object, in CamelCase; cannot be updated"
      },
      "labels": {
-      "type": "any",
+      "$ref": "v1beta3.ObjectMeta.labels",
       "description": "map of string keys and values that can be used to organize and categorize objects; may match selectors of replication controllers and services"
      },
      "name": {
@@ -7077,7 +6994,7 @@
       "description": "most recently observed status of the replication controller; populated by the system, read-only; https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#spec-and-status"
      },
      "uid": {
-      "type": "string",
+      "$ref": "types.UID",
       "description": "unique UUID across space and time; populated by the system; read-only"
      }
     }
@@ -7125,7 +7042,7 @@
       "description": "number of replicas desired"
      },
      "selector": {
-      "type": "any",
+      "$ref": "v1beta3.ReplicationControllerSpec.selector",
       "description": "label keys and values that must match in order to be controlled by this replication controller"
      },
      "template": {
@@ -7137,6 +7054,10 @@
       "description": "reference to an object that describes the pod that will be created if insufficient replicas are detected"
      }
     }
+   },
+   "v1beta3.ReplicationControllerSpec.selector": {
+    "id": "v1beta3.ReplicationControllerSpec.selector",
+    "properties": {}
    },
    "v1beta3.ReplicationControllerStatus": {
     "id": "v1beta3.ReplicationControllerStatus",
@@ -7155,7 +7076,7 @@
     "id": "v1beta3.ResourceQuota",
     "properties": {
      "annotations": {
-      "type": "any",
+      "$ref": "v1beta3.ObjectMeta.annotations",
       "description": "map of string keys and values that can be used by external tooling to store and retrieve arbitrary metadata about objects"
      },
      "apiVersion": {
@@ -7179,7 +7100,7 @@
       "description": "kind of object, in CamelCase; cannot be updated"
      },
      "labels": {
-      "type": "any",
+      "$ref": "v1beta3.ObjectMeta.labels",
       "description": "map of string keys and values that can be used to organize and categorize objects; may match selectors of replication controllers and services"
      },
      "name": {
@@ -7207,7 +7128,7 @@
       "description": "status defines the actual enforced quota and current usage; https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#spec-and-status"
      },
      "uid": {
-      "type": "string",
+      "$ref": "types.UID",
       "description": "unique UUID across space and time; populated by the system; read-only"
      }
     }
@@ -7247,7 +7168,7 @@
     "id": "v1beta3.ResourceQuotaSpec",
     "properties": {
      "hard": {
-      "type": "any",
+      "$ref": "v1beta3.ResourceList",
       "description": "hard is the set of desired hard limits for each named resource"
      }
     }
@@ -7256,11 +7177,11 @@
     "id": "v1beta3.ResourceQuotaStatus",
     "properties": {
      "hard": {
-      "type": "any",
+      "$ref": "v1beta3.ResourceList",
       "description": "hard is the set of enforced hard limits for each named resource"
      },
      "used": {
-      "type": "any",
+      "$ref": "v1beta3.ResourceList",
       "description": "used is the current observed total usage of the resource in the namespace"
      }
     }
@@ -7269,11 +7190,11 @@
     "id": "v1beta3.ResourceRequirements",
     "properties": {
      "limits": {
-      "type": "any",
+      "$ref": "v1beta3.ResourceList",
       "description": "Maximum amount of compute resources allowed"
      },
      "requests": {
-      "type": "any",
+      "$ref": "v1beta3.ResourceList",
       "description": "Minimum amount of resources requested"
      }
     }
@@ -7282,7 +7203,7 @@
     "id": "v1beta3.Secret",
     "properties": {
      "annotations": {
-      "type": "any",
+      "$ref": "v1beta3.ObjectMeta.annotations",
       "description": "map of string keys and values that can be used by external tooling to store and retrieve arbitrary metadata about objects"
      },
      "apiVersion": {
@@ -7294,7 +7215,7 @@
       "description": "RFC 3339 date and time at which the object was created; populated by the system, read-only; null for lists"
      },
      "data": {
-      "type": "any",
+      "$ref": "v1beta3.Secret.data",
       "description": "data contains the secret data.  Each key must be a valid DNS_SUBDOMAIN.  Each value must be a base64 encoded string"
      },
      "deletionTimestamp": {
@@ -7310,7 +7231,7 @@
       "description": "kind of object, in CamelCase; cannot be updated"
      },
      "labels": {
-      "type": "any",
+      "$ref": "v1beta3.ObjectMeta.labels",
       "description": "map of string keys and values that can be used to organize and categorize objects; may match selectors of replication controllers and services"
      },
      "name": {
@@ -7330,14 +7251,18 @@
       "description": "URL for the object; populated by the system, read-only"
      },
      "type": {
-      "type": "string",
+      "$ref": "v1beta3.SecretType",
       "description": "type facilitates programmatic handling of secret data"
      },
      "uid": {
-      "type": "string",
+      "$ref": "types.UID",
       "description": "unique UUID across space and time; populated by the system; read-only"
      }
     }
+   },
+   "v1beta3.Secret.data": {
+    "id": "v1beta3.Secret.data",
+    "properties": {}
    },
    "v1beta3.SecretList": {
     "id": "v1beta3.SecretList",
@@ -7370,23 +7295,11 @@
      }
     }
    },
-   "v1beta3.SecretVolumeSource": {
-    "id": "v1beta3.SecretVolumeSource",
-    "required": [
-     "secretName"
-    ],
-    "properties": {
-     "secretName": {
-      "type": "string",
-      "description": "secretName is the name of a secret in the pod's namespace"
-     }
-    }
-   },
    "v1beta3.Service": {
     "id": "v1beta3.Service",
     "properties": {
      "annotations": {
-      "type": "any",
+      "$ref": "v1beta3.ObjectMeta.annotations",
       "description": "map of string keys and values that can be used by external tooling to store and retrieve arbitrary metadata about objects"
      },
      "apiVersion": {
@@ -7410,7 +7323,7 @@
       "description": "kind of object, in CamelCase; cannot be updated"
      },
      "labels": {
-      "type": "any",
+      "$ref": "v1beta3.ObjectMeta.labels",
       "description": "map of string keys and values that can be used to organize and categorize objects; may match selectors of replication controllers and services"
      },
      "name": {
@@ -7438,7 +7351,7 @@
       "description": "most recently observed status of the service; populated by the system, read-only; https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#spec-and-status"
      },
      "uid": {
-      "type": "string",
+      "$ref": "types.UID",
       "description": "unique UUID across space and time; populated by the system; read-only"
      }
     }
@@ -7493,7 +7406,7 @@
       "description": "the port number that is exposed"
      },
      "protocol": {
-      "type": "string",
+      "$ref": "v1beta3.Protocol",
       "description": "the protocol used by this port; must be UDP or TCP; TCP if unspecified"
      },
      "targetPort": {
@@ -7532,14 +7445,18 @@
       "description": "externally visible IPs (e.g. load balancers) that should be proxied to this service"
      },
      "selector": {
-      "type": "any",
+      "$ref": "v1beta3.ServiceSpec.selector",
       "description": "label keys and values that must match in order to receive traffic for this service; if empty, all pods are selected, if not specified, endpoints must be manually specified"
      },
      "sessionAffinity": {
-      "type": "string",
+      "$ref": "v1beta3.AffinityType",
       "description": "enable client IP based session affinity; must be ClientIP or None; defaults to None"
      }
     }
+   },
+   "v1beta3.ServiceSpec.selector": {
+    "id": "v1beta3.ServiceSpec.selector",
+    "properties": {}
    },
    "v1beta3.ServiceStatus": {
     "id": "v1beta3.ServiceStatus",
