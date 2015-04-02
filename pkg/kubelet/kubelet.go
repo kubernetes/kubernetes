@@ -275,6 +275,14 @@ func NewMainKubelet(
 		klet.networkPlugin = plug
 	}
 
+	klet.shmVolumeAdder = func(pod *api.Pod) {
+		shmVolume := api.Volume{
+			Name:         "shm",
+			VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{Medium: api.StorageTypeMemory}},
+		}
+		pod.Spec.Volumes = append(pod.Spec.Volumes, shmVolume)
+	}
+
 	return klet, nil
 }
 
@@ -290,6 +298,8 @@ type nodeLister interface {
 	List() (machines api.NodeList, err error)
 	GetNodeInfo(id string) (*api.Node, error)
 }
+
+type shmVolumeAdder func(pod *api.Pod)
 
 // Kubelet is the main kubelet implementation.
 type Kubelet struct {
@@ -373,6 +383,9 @@ type Kubelet struct {
 
 	// Reference to this node.
 	nodeRef *api.ObjectReference
+
+	// Shm Volume adder interface
+	shmVolumeAdder shmVolumeAdder
 }
 
 // getRootDir returns the full path to the directory under which kubelet can
@@ -585,6 +598,11 @@ func (kl *Kubelet) syncNodeStatus() {
 
 func makeBinds(container *api.Container, podVolumes volumeMap) []string {
 	binds := []string{}
+
+	// Add default /dev/shm mount
+	shmVolumeMount := api.VolumeMount{Name: "shm", MountPath: "/dev/shm"}
+	container.VolumeMounts = append(container.VolumeMounts, shmVolumeMount)
+
 	for _, mount := range container.VolumeMounts {
 		vol, ok := podVolumes[mount.Name]
 		if !ok {
@@ -1068,6 +1086,7 @@ func (kl *Kubelet) pullImageAndRunContainer(pod *api.Pod, container *api.Contain
 			}
 		}
 	}
+
 	// TODO(dawnchen): Check RestartPolicy.DelaySeconds before restart a container
 	namespaceMode := fmt.Sprintf("container:%v", podInfraContainerID)
 	containerID, err := kl.runContainer(pod, container, *podVolumes, namespaceMode, namespaceMode)
@@ -1305,6 +1324,11 @@ func (kl *Kubelet) syncPod(pod *api.Pod, mirrorPod *api.Pod, runningPod kubecont
 		}
 	}
 
+	// Add default /dev/shm volume
+	if kl.shmVolumeAdder != nil {
+		kl.shmVolumeAdder(pod)
+	}
+
 	// Mount volumes
 	podVolumes, err = kl.mountExternalVolumes(pod)
 	if err != nil {
@@ -1322,6 +1346,8 @@ func (kl *Kubelet) syncPod(pod *api.Pod, mirrorPod *api.Pod, runningPod kubecont
 		kl.pullImageAndRunContainer(pod, &pod.Spec.Containers[container], &podVolumes, podInfraContainerID)
 	}
 
+	// Remove references to shm from pod object
+	removeShmVolume(pod)
 	if mirrorPod == nil && isStaticPod(pod) {
 		glog.V(4).Infof("Creating a mirror pod %q", podFullName)
 		// To make sure we will properly update static pod status we need to delete
@@ -1329,12 +1355,36 @@ func (kl *Kubelet) syncPod(pod *api.Pod, mirrorPod *api.Pod, runningPod kubecont
 		// deletion of mirror pod in apiserver and will never reset its status to
 		// Running after recreating it.
 		kl.statusManager.DeletePodStatus(podFullName)
+
 		if err := kl.podManager.CreateMirrorPod(*pod, kl.hostname); err != nil {
 			glog.Errorf("Failed creating a mirror pod %q: %#v", podFullName, err)
 		}
 	}
 
 	return nil
+}
+
+func removeShmVolume(pod *api.Pod) {
+	var vols []api.Volume
+	for _, v := range pod.Spec.Volumes {
+		if v.Name == "shm" {
+			continue
+		}
+		vols = append(vols, v)
+	}
+	pod.Spec.Volumes = vols
+
+	for i := range pod.Spec.Containers {
+		c := &pod.Spec.Containers[i]
+		var vmounts []api.VolumeMount
+		for _, vm := range c.VolumeMounts {
+			if vm.Name == "shm" {
+				continue
+			}
+			vmounts = append(vmounts, vm)
+		}
+		c.VolumeMounts = vmounts
+	}
 }
 
 // Stores all volumes defined by the set of pods into a map.
