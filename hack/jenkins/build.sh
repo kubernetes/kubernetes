@@ -34,15 +34,17 @@ export PATH=$PATH:/usr/local/go/bin
 export KUBE_RELEASE_RUN_TESTS=n
 export KUBE_SKIP_CONFIRMATIONS=y
 
-# Clean stuff out. Assume the worst - the last build may have left the
-# tree in an odd state. There's a Jenkins git clean plugin, but we
-# have the docker images to worry about as well, so be really pedantic
-# about cleaning.
+# Clean stuff out. Assume the last build left the tree in an odd
+# state.
 rm -rf ~/.kube*
 make clean
 git clean -fdx
-docker ps -aq | xargs -r docker rm
-docker images -q | xargs -r docker rmi
+
+# Uncomment if you want to purge the Docker cache completely each
+# build. It costs about 150s each build to pull the golang image and
+# rebuild the kube-build:cross image, but these rarely change.
+# docker ps -aq | xargs -r docker rm
+# docker images -q | xargs -r docker rmi
 
 # Build
 go run ./hack/e2e.go -v --build
