@@ -18,6 +18,8 @@ limitations under the License.
 package config
 
 import (
+	"time"
+
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/cache"
@@ -40,7 +42,9 @@ func newSourceApiserverFromLW(lw cache.ListerWatcher, updates chan<- interface{}
 		}
 		updates <- kubelet.PodUpdate{pods, kubelet.SET, kubelet.ApiserverSource}
 	}
-	cache.NewReflector(lw, &api.Pod{}, cache.NewUndeltaStore(send, cache.MetaNamespaceKeyFunc), 0).Run()
+	// TODO: the 30 second poll loop is here to mitigate #6059 and
+	// shouldn't be neeeded once that is resolved.
+	cache.NewReflector(lw, &api.Pod{}, cache.NewUndeltaStore(send, cache.MetaNamespaceKeyFunc), 30*time.Second).Run()
 }
 
 func getHostFieldLabel(apiVersion string) string {
