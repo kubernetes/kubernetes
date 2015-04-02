@@ -313,10 +313,11 @@ kube::golang::build_binaries() {
     local binaries
     binaries=($(kube::golang::binaries_from_targets "${targets[@]}"))
 
+    kube::log::status "Building go targets for ${platforms[@]} in parallel (output will appear in a burst when complete):" "${targets[@]}"
     local platform
-    for platform in "${platforms[@]}"; do
+    for platform in "${platforms[@]}"; do (
       kube::golang::set_platform_envs "${platform}"
-      kube::log::status "Building go targets for ${platform}:" "${targets[@]}"
+      kube::log::status "${platform}: Parallel go build started"
 
       local -a statics=()
       local -a nonstatics=()
@@ -369,6 +370,19 @@ kube::golang::build_binaries() {
                 "${statics[@]:+${statics[@]}}"
           fi
       fi
+      kube::log::status "${platform}: Parallel go build finished"
+      ) &> "/tmp//${platform//\//_}.build" &
     done
+
+    local fails=0
+    for job in $(jobs -p); do
+      wait ${job} || let "fails+=1"
+    done
+
+    for platform in "${platforms[@]}"; do
+      cat "/tmp//${platform//\//_}.build"
+    done
+
+    exit ${fails}
   )
 }
