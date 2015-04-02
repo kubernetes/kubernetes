@@ -26,7 +26,11 @@
       "min": {
         "memory": "1Mi",
         "cpu": "250m"
-      }
+      },
+      "default": {
+        "memory": "1Mi",
+        "cpu": "250m"
+      }       
     }
     ]
   }

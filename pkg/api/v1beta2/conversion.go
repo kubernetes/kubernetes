@@ -853,6 +853,9 @@ func init() {
 			if err := s.Convert(&in.Min, &out.Min, 0); err != nil {
 				return err
 			}
+			if err := s.Convert(&in.Default, &out.Default, 0); err != nil {
+				return err
+			}
 			return nil
 		},
 		func(in *LimitRangeItem, out *newer.LimitRangeItem, s conversion.Scope) error {
@@ -862,6 +865,9 @@ func init() {
 				return err
 			}
 			if err := s.Convert(&in.Min, &out.Min, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.Default, &out.Default, 0); err != nil {
 				return err
 			}
 			return nil

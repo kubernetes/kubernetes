@@ -25,6 +25,8 @@ type LimitRangeItem struct {
   Max ResourceList `json:"max,omitempty"`
   // Min usage constraints on this kind by resource name
   Min ResourceList `json:"min,omitempty"`
+  // Default usage constraints on this kind by resource name
+  Default ResourceList `json:"default,omitempty"`
 }
 
 // LimitRangeSpec defines a min/max usage limit for resources that match on kind
@@ -74,6 +76,14 @@ The following min/max limits are imposed:
 | cpu | Min/Max amount of cpu per pod |
 | memory | Min/Max amount of memory per pod |
 
+If a resource specifies a default value, it may get applied on the incoming resource.  For example, if a default
+value is provided for container cpu, it is set on the incoming container if and only if the incoming container
+does not specify a resource requirements limit field.
+
+If a resource specifies a min value, it may get applied on the incoming resource.  For example, if a min
+value is provided for container cpu, it is set on the incoming container if and only if the incoming container does
+not specify a resource requirements requests field.
+
 If the incoming object would cause a violation of the enumerated constraints, the request is denied with a set of
 messages explaining what constraints were the source of the denial.
 
@@ -105,12 +115,12 @@ NAME
 limits
 $ kubectl describe limits limits
 Name:           limits
-Type            Resource        Min     Max
-----            --------        ---     ---
-Pod             memory          1Mi     1Gi
-Pod             cpu             250m    2
-Container       memory          1Mi     1Gi
-Container       cpu             250m    2
+Type            Resource        Min     Max     Default
+----            --------        ---     ---     ---
+Pod             memory          1Mi     1Gi     -
+Pod             cpu             250m    2       -
+Container       memory          1Mi     1Gi     1Mi
+Container       cpu             250m    250m    250m
 ```
 
 ## Future Enhancements: Define limits for a particular pod or container.

@@ -1459,6 +1459,8 @@ type LimitRangeItem struct {
 	Max ResourceList `json:"max,omitempty" description:"max usage constraints on this kind by resource name"`
 	// Min usage constraints on this kind by resource name
 	Min ResourceList `json:"min,omitempty" description:"min usage constraints on this kind by resource name"`
+	// Default usage constraints on this kind by resource name
+	Default ResourceList `json:"default,omitempty" description:"default values on this kind by resource name if omitted"`
 }
 
 // LimitRangeSpec defines a min/max usage limit for resources that match on kind
