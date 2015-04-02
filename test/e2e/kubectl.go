@@ -24,6 +24,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 
 	. "github.com/onsi/ginkgo"
@@ -140,6 +141,7 @@ func waitForGuestbookResponse(c *client.Client, cmd, arg, expectedResponse strin
 func makeRequestToGuestbook(c *client.Client, cmd, value string) (string, error) {
 	result, err := c.Get().
 		Prefix("proxy").
+		Namespace(api.NamespaceDefault).
 		Resource("services").
 		Name("frontend").
 		Suffix("/index.php").
@@ -165,6 +167,7 @@ func getUDData(jpgExpected string) func(*client.Client, string) error {
 		Logf("validating pod %s", podID)
 		body, err := c.Get().
 			Prefix("proxy").
+			Namespace(api.NamespaceDefault).
 			Resource("pods").
 			Name(podID).
 			Suffix("data.json").

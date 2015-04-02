@@ -125,7 +125,7 @@ for version in "${kube_api_versions[@]}"; do
       -s "http://127.0.0.1:${API_PORT}"
       --match-server-version
     )
-    [ "$(kubectl get minions -t $'{{ .apiVersion }}' "${kube_flags[@]}")" == "v1beta1" ]
+    [ "$(kubectl get minions -t $'{{ .apiVersion }}' "${kube_flags[@]}")" == "v1beta3" ]
   else
     kube_flags=(
       -s "http://127.0.0.1:${API_PORT}"
@@ -134,17 +134,17 @@ for version in "${kube_api_versions[@]}"; do
     )
     [ "$(kubectl get minions -t $'{{ .apiVersion }}' "${kube_flags[@]}")" == "${version}" ]
   fi
-  id_field=".id"
-  labels_field=".labels"
-  service_selector_field=".selector"
-  rc_replicas_field=".desiredState.replicas"
-  port_field=".port"
-  if [ "$version" = "v1beta3" ]; then
-    id_field=".metadata.name"
-    labels_field=".metadata.labels"
-    service_selector_field=".spec.selector"
-    rc_replicas_field=".spec.replicas"
-    port_field="(index .spec.ports 0).port"
+  id_field=".metadata.name"
+  labels_field=".metadata.labels"
+  service_selector_field=".spec.selector"
+  rc_replicas_field=".spec.replicas"
+  port_field="(index .spec.ports 0).port"
+  if [ "${version}" = "v1beta1" ] || [ "${version}" = "v1beta2" ]; then
+    id_field=".id"
+    labels_field=".labels"
+    service_selector_field=".selector"
+    rc_replicas_field=".desiredState.replicas"
+    port_field=".port"
   fi
 
   # Passing no arguments to create is an error

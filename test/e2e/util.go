@@ -231,7 +231,7 @@ func validateController(c *client.Client, containerImage string, replicas int, c
 
 	By(fmt.Sprintf("waiting for all containers in %s pods to come up.", testname)) //testname should be selector
 	for start := time.Now(); time.Since(start) < podStartTimeout; time.Sleep(5 * time.Second) {
-		getPodsOutput := runKubectl("get", "pods", "-o", "template", getPodsTemplate, "-l", testname)
+		getPodsOutput := runKubectl("get", "pods", "-o", "template", getPodsTemplate, "--api-version=v1beta1", "-l", testname)
 		pods := strings.Fields(getPodsOutput)
 		if numPods := len(pods); numPods != replicas {
 			By(fmt.Sprintf("Replicas for %s: expected=%d actual=%d", testname, replicas, numPods))
@@ -239,13 +239,13 @@ func validateController(c *client.Client, containerImage string, replicas int, c
 		}
 		var runningPods []string
 		for _, podID := range pods {
-			running := runKubectl("get", "pods", podID, "-o", "template", getContainerStateTemplate)
+			running := runKubectl("get", "pods", podID, "-o", "template", getContainerStateTemplate, "--api-version=v1beta1")
 			if running == "false" {
 				Logf("%s is created but not running", podID)
 				continue
 			}
 
-			currentImage := runKubectl("get", "pods", podID, "-o", "template", getImageTemplate)
+			currentImage := runKubectl("get", "pods", podID, "-o", "template", getImageTemplate, "--api-version=v1beta1")
 			if currentImage != containerImage {
 				Logf("%s is created but running wrong image; expected: %s, actual: %s", podID, containerImage, currentImage)
 				continue
@@ -345,7 +345,7 @@ func testContainerOutputInNamespace(ns, scenarioName string, c *client.Client, p
 	for time.Now().Sub(start) < (60 * time.Second) {
 		logs, err = c.Get().
 			Prefix("proxy").
-			Resource("minions").
+			Resource("nodes").
 			Name(podStatus.Spec.Host).
 			Suffix("containerLogs", ns, podStatus.Name, containerName).
 			Do().

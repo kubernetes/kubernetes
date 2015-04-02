@@ -58,7 +58,7 @@ until [[ ${all_running} == 1 ]]; do
     echo "All pods never 'Running' in time." >&2
     exit 1
   fi
-  statuses=($(${KUBECTL} get pods --template='{{range.items}}{{.currentState.status}} {{end}}'))
+  statuses=($(${KUBECTL} get pods --template='{{range.items}}{{.currentState.status}} {{end}}' --api-version=v1beta1))
 
   # Ensure that we have enough pods.
   echo "Found ${#statuses[@]} pods with statuses: ${statuses[@]}" >&2

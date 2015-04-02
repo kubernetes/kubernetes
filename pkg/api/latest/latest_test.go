@@ -72,10 +72,11 @@ func TestInterfacesFor(t *testing.T) {
 }
 
 func TestRESTMapper(t *testing.T) {
-	if v, k, err := RESTMapper.VersionAndKindForResource("replicationControllers"); err != nil || v != Version || k != "ReplicationController" {
+	// TODO: This test does not seem right. The version returned here depends on the order in which API versions were registered. This will just return the API version that was registered first. Fix this.
+	if v, k, err := RESTMapper.VersionAndKindForResource("replicationControllers"); err != nil || v != "v1beta1" || k != "ReplicationController" {
 		t.Errorf("unexpected version mapping: %s %s %v", v, k, err)
 	}
-	if v, k, err := RESTMapper.VersionAndKindForResource("replicationcontrollers"); err != nil || v != Version || k != "ReplicationController" {
+	if v, k, err := RESTMapper.VersionAndKindForResource("replicationcontrollers"); err != nil || v != "v1beta1" || k != "ReplicationController" {
 		t.Errorf("unexpected version mapping: %s %s %v", v, k, err)
 	}
 
