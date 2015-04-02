@@ -275,6 +275,9 @@ func kubectlCmd(args ...string) *exec.Cmd {
 	defaultArgs := []string{}
 	if testContext.KubeConfig != "" {
 		defaultArgs = append(defaultArgs, "--"+clientcmd.RecommendedConfigPathFlag+"="+testContext.KubeConfig)
+		if testContext.KubeContext != "" {
+			defaultArgs = append(defaultArgs, "--"+clientcmd.FlagContext+"="+testContext.KubeContext)
+		}
 	} else {
 		defaultArgs = append(defaultArgs, "--"+clientcmd.FlagAuthPath+"="+testContext.AuthConfig)
 		if testContext.CertDir != "" {
@@ -285,10 +288,7 @@ func kubectlCmd(args ...string) *exec.Cmd {
 		}
 	}
 	kubectlArgs := append(defaultArgs, args...)
-	// TODO: Remove this once gcloud writes a proper entry in the kubeconfig file.
-	if testContext.Provider == "gke" {
-		kubectlArgs = append(kubectlArgs, "--server="+testContext.Host)
-	}
+
 	//TODO: the "kubectl" path string might be worth externalizing into an (optional) ginko arg.
 	cmd := exec.Command("kubectl", kubectlArgs...)
 	Logf("Running '%s %s'", cmd.Path, strings.Join(cmd.Args, " "))
