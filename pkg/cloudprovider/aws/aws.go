@@ -858,7 +858,7 @@ func (aws *AWSCloud) AttachDisk(instanceName string, diskName string, readOnly b
 	if !alreadyAttached {
 		attachResponse, err := aws.ec2.AttachVolume(disk.awsId, awsInstance.awsId, mountDevice)
 		if err != nil {
-			// TODO: Check if already attached?
+			// TODO: Check if concurrently attached?
 			return fmt.Errorf("Error attaching EBS volume: %v", err)
 		}
 
