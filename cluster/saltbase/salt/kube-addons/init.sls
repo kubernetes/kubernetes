@@ -48,6 +48,13 @@
     - makedirs: True
 {% endif %}
 
+/etc/kubernetes/kube-addons.sh:
+  file.managed:
+    - source: salt://kube-addons/kube-addons.sh
+    - user: root
+    - group: root
+    - mode: 755
+
 {% if grains['os_family'] == 'RedHat' %}
 
 /usr/lib/systemd/system/kube-addons.service:
@@ -55,13 +62,6 @@
     - source: salt://kube-addons/kube-addons.service
     - user: root
     - group: root
-
-/etc/kubernetes/kube-addons.sh:
-  file.managed:
-    - source: salt://kube-addons/kube-addons.sh
-    - user: root
-    - group: root
-    - mode: 755
 
 {% else %}
 
