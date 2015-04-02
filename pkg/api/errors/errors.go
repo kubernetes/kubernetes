@@ -19,6 +19,7 @@ package errors
 import (
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
@@ -236,6 +237,72 @@ func NewTimeoutError(message string, retryAfterSeconds int) error {
 		Details: &api.StatusDetails{
 			RetryAfterSeconds: retryAfterSeconds,
 		},
+	}}
+}
+
+// NewGenericServerResponse returns a new error for server responses that are not in a recognizable form.
+func NewGenericServerResponse(code int, verb, kind, name, serverMessage string, retryAfterSeconds int) error {
+	reason := api.StatusReasonUnknown
+	message := fmt.Sprintf("the server responded with the status code %d but did not return more information", code)
+	switch code {
+	case http.StatusConflict:
+		if verb == "POST" {
+			reason = api.StatusReasonAlreadyExists
+		} else {
+			reason = api.StatusReasonConflict
+		}
+		message = "the server reported a conflict"
+	case http.StatusNotFound:
+		reason = api.StatusReasonNotFound
+		message = "the server could not find the requested resource"
+	case http.StatusBadRequest:
+		reason = api.StatusReasonBadRequest
+		message = "the server rejected our request for an unknown reason"
+	case http.StatusUnauthorized:
+		reason = api.StatusReasonUnauthorized
+		message = "the server has asked for the client to provide credentials"
+	case http.StatusForbidden:
+		reason = api.StatusReasonForbidden
+		message = "the server does not allow access to the requested resource"
+	case StatusUnprocessableEntity:
+		reason = api.StatusReasonInvalid
+		message = "the server rejected our request due to an error in our request"
+	case StatusServerTimeout:
+		reason = api.StatusReasonServerTimeout
+		message = "the server cannot complete the requested operation at this time, try again later"
+	case StatusTooManyRequests:
+		reason = api.StatusReasonTimeout
+		message = "the server has received too many requests and has asked us to try again later"
+	default:
+		if code >= 500 {
+			reason = api.StatusReasonInternalError
+			message = "an error on the server has prevented the request from succeeding"
+		}
+	}
+	switch {
+	case len(kind) > 0 && len(name) > 0:
+		message = fmt.Sprintf("%s (%s %s %s)", message, strings.ToLower(verb), kind, name)
+	case len(kind) > 0:
+		message = fmt.Sprintf("%s (%s %s)", message, strings.ToLower(verb), kind)
+	}
+	return &StatusError{api.Status{
+		Status: api.StatusFailure,
+		Code:   code,
+		Reason: reason,
+		Details: &api.StatusDetails{
+			Kind: kind,
+			ID:   name,
+
+			Causes: []api.StatusCause{
+				{
+					Type:    api.CauseTypeUnexpectedServerResponse,
+					Message: serverMessage,
+				},
+			},
+
+			RetryAfterSeconds: retryAfterSeconds,
+		},
+		Message: message,
 	}}
 }
 
