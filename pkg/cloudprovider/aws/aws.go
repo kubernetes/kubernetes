@@ -119,14 +119,14 @@ func getAuth() (auth aws.Auth, err error) {
 
 // readAWSCloudConfig reads an instance of AWSCloudConfig from config reader.
 func readAWSCloudConfig(config io.Reader, metadata AWSMetadata) (*AWSCloudConfig, error) {
-	if config == nil {
-		return nil, fmt.Errorf("no AWS cloud provider config file given")
-	}
-
 	var cfg AWSCloudConfig
-	err := gcfg.ReadInto(&cfg, config)
-	if err != nil {
-		return nil, err
+	var err error
+
+	if config != nil {
+		err = gcfg.ReadInto(&cfg, config)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	if cfg.Global.Zone == "" {
