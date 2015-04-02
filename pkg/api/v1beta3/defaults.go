@@ -70,6 +70,9 @@ func init() {
 			if obj.DNSPolicy == "" {
 				obj.DNSPolicy = DNSClusterFirst
 			}
+			if obj.NodeFailurePolicy == "" {
+				obj.NodeFailurePolicy = NodeFailurePolicyReschedule
+			}
 			if obj.RestartPolicy == "" {
 				obj.RestartPolicy = RestartPolicyAlways
 			}

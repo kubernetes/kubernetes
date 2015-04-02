@@ -667,6 +667,19 @@ type PodCondition struct {
 	Status ConditionStatus `json:"status" description:"status of the condition, one of Full, None, Unknown"`
 }
 
+// NodeFailurePolicy describes what should happen when when the pod is
+// unable to run on its bound node, such as when that node is marked
+// as failed or removed from the cluster.  Only one of the following
+// policies may be specified.  If none are specified, the default is
+// NodeFailurePolicyReschedule.
+type NodeFailurePolicy string
+
+const (
+	NodeFailurePolicyReschedule NodeFailurePolicy = "Reschedule"
+	NodeFailurePolicyDelete     NodeFailurePolicy = "Delete"
+	NodeFailurePolicyIgnore     NodeFailurePolicy = "Ignore"
+)
+
 // RestartPolicy describes how the container should be restarted.
 // Only one of the following restart policies may be specified.
 // If none of the following policies is specified, the default one
@@ -697,8 +710,13 @@ const (
 type PodSpec struct {
 	Volumes []Volume `json:"volumes" description:"list of volumes that can be mounted by containers belonging to the pod"`
 	// Required: there must be at least one container in a pod.
-	Containers    []Container   `json:"containers" description:"list of containers belonging to the pod; cannot be updated; containers cannot currently be added or removed; there must be at least one container in a Pod"`
-	RestartPolicy RestartPolicy `json:"restartPolicy,omitempty" description:"restart policy for all containers within the pod; one of RestartPolicyAlways, RestartPolicyOnFailure, RestartPolicyNever"`
+	Containers []Container `json:"containers" description:"list of containers belonging to the pod; cannot be updated; containers cannot currently be added or removed; there must be at least one container in a Pod"`
+	// Optional: Set NodeFailurePolicy for when the pod is unable
+	// to run on its bound node, such as when that node is marked
+	// as failed or removed from the cluster.  Defaults to
+	// "Reschedule"
+	NodeFailurePolicy NodeFailurePolicy `json:"nodeFailurePolicy,omitempty" description:"node failure policy when the pod is unable to run on its bound node; one of NodeFailurePolicyReschedule, NodeFailurePolicyDelete, NodeFailurePolicyIgnore"`
+	RestartPolicy     RestartPolicy     `json:"restartPolicy,omitempty" description:"restart policy for all containers within the pod; one of RestartPolicyAlways, RestartPolicyOnFailure, RestartPolicyNever"`
 	// Optional: Set DNS policy.  Defaults to "ClusterFirst"
 	DNSPolicy DNSPolicy `json:"dnsPolicy,omitempty" description:"DNS policy for containers within the pod; one of 'ClusterFirst' or 'Default'"`
 	// NodeSelector is a selector which must be true for the pod to fit on a node
