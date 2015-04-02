@@ -733,6 +733,7 @@ func init() {
 			out.CreateExternalLoadBalancer = in.Spec.CreateExternalLoadBalancer
 			out.PublicIPs = in.Spec.PublicIPs
 			out.PortalIP = in.Spec.PortalIP
+			out.ExternalMapping = in.Spec.ExternalMapping
 			if err := s.Convert(&in.Spec.SessionAffinity, &out.SessionAffinity, 0); err != nil {
 				return err
 			}
@@ -776,6 +777,7 @@ func init() {
 			out.Spec.CreateExternalLoadBalancer = in.CreateExternalLoadBalancer
 			out.Spec.PublicIPs = in.PublicIPs
 			out.Spec.PortalIP = in.PortalIP
+			out.Spec.ExternalMapping = in.ExternalMapping
 			if err := s.Convert(&in.SessionAffinity, &out.Spec.SessionAffinity, 0); err != nil {
 				return err
 			}

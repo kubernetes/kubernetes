@@ -83,6 +83,9 @@ func reloadIPsFromStorage(ipa *ipAllocator, registry Registry) {
 		if !api.IsServiceIPSet(service) {
 			continue
 		}
+		if (service.Spec.ExternalMapping == true) {
+			continue
+		}
 		if err := ipa.Allocate(net.ParseIP(service.Spec.PortalIP)); err != nil {
 			// This is really bad.
 			glog.Errorf("service %q PortalIP %s could not be allocated: %v", service.Name, service.Spec.PortalIP, err)
@@ -97,18 +100,20 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (runtime.Object, err
 		return nil, err
 	}
 
-	if api.IsServiceIPRequested(service) {
-		// Allocate next available.
-		ip, err := rs.portalMgr.AllocateNext()
-		if err != nil {
-			return nil, err
-		}
-		service.Spec.PortalIP = ip.String()
-	} else if api.IsServiceIPSet(service) {
-		// Try to respect the requested IP.
-		if err := rs.portalMgr.Allocate(net.ParseIP(service.Spec.PortalIP)); err != nil {
-			el := fielderrors.ValidationErrorList{fielderrors.NewFieldInvalid("spec.portalIP", service.Spec.PortalIP, err.Error())}
-			return nil, errors.NewInvalid("Service", service.Name, el)
+	if (service.Spec.ExternalMapping == false) {
+		if api.IsServiceIPRequested(service) {
+			// Allocate next available.
+			ip, err := rs.portalMgr.AllocateNext()
+			if err != nil {
+				return nil, err
+			}
+			service.Spec.PortalIP = ip.String()
+		} else if api.IsServiceIPSet(service) {
+			// Try to respect the requested IP.
+			if err := rs.portalMgr.Allocate(net.ParseIP(service.Spec.PortalIP)); err != nil {
+				el := fielderrors.ValidationErrorList{fielderrors.NewFieldInvalid("spec.portalIP", service.Spec.PortalIP, err.Error())}
+				return nil, errors.NewInvalid("Service", service.Name, el)
+			}
 		}
 	}
 

@@ -880,6 +880,11 @@ type ServiceSpec struct {
 	// None can be specified for headless services when proxying is not required
 	PortalIP string `json:"portalIP,omitempty"`
 
+	// ExternalMapping indicates that this isn't an internal service, but rather just a mapping of an external 
+	// address to a pod. If this is set to true, then PortalIP will contain a single string, filled in 
+	// by the claiming kube-proxy daemon, and the destination pod must be specified in the Selector map
+	ExternalMapping bool `json:"externalMapping,omitempty"`
+
 	// CreateExternalLoadBalancer indicates whether a load balancer should be created for this service.
 	CreateExternalLoadBalancer bool `json:"createExternalLoadBalancer,omitempty"`
 	// PublicIPs are used by external load balancers, or can be set by

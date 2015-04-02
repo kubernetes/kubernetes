@@ -24,6 +24,7 @@ import (
 	"io/ioutil"
 	"reflect"
 	"sort"
+	"strconv"
 	"strings"
 	"text/tabwriter"
 	"text/template"
@@ -228,7 +229,7 @@ func (h *HumanReadablePrinter) validatePrintHandlerFunc(printFunc reflect.Value)
 
 var podColumns = []string{"POD", "IP", "CONTAINER(S)", "IMAGE(S)", "HOST", "LABELS", "STATUS", "CREATED"}
 var replicationControllerColumns = []string{"CONTROLLER", "CONTAINER(S)", "IMAGE(S)", "SELECTOR", "REPLICAS"}
-var serviceColumns = []string{"NAME", "LABELS", "SELECTOR", "IP", "PORT(S)"}
+var serviceColumns = []string{"NAME", "LABELS", "SELECTOR", "IP", "EXTERNAL", "PORT"}
 var endpointColumns = []string{"NAME", "ENDPOINTS"}
 var nodeColumns = []string{"NAME", "LABELS", "STATUS"}
 var statusColumns = []string{"STATUS"}
@@ -390,8 +391,16 @@ func printReplicationControllerList(list *api.ReplicationControllerList, w io.Wr
 }
 
 func printService(svc *api.Service, w io.Writer) error {
-	if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%d/%s\n", svc.Name, formatLabels(svc.Labels),
-		formatLabels(svc.Spec.Selector), svc.Spec.PortalIP, svc.Spec.Ports[0].Port, svc.Spec.Ports[0].Protocol); err != nil {
+	var portval string
+	var external string
+	portval = strconv.Itoa(svc.Spec.Ports[0].Port)
+	external = "false"
+	if svc.Spec.ExternalMapping == true {
+		portval = "N/A"
+		external = "true"
+	}
+	if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%d/%s\n", svc.Name, formatLabels(svc.Labels),
+		formatLabels(svc.Spec.Selector), svc.Spec.PortalIP, external, portval, svc.Spec.Ports[0].Protocol); err != nil {
 		return err
 	}
 	for i := 1; i < len(svc.Spec.Ports); i++ {

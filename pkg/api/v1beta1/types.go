@@ -734,6 +734,10 @@ type Service struct {
 
 	// This service will route traffic to pods having labels matching this selector. If null, no endpoints will be automatically created. If empty, all pods will be selected.
 	Selector map[string]string `json:"selector" description:"label keys and values that must match in order to receive traffic for this service; if empty, all pods are selected, if not specified, endpoints must be manually specified"`
+	// ExternalMapping indicates that this isn't an internal service, but rather just a mapping of an external
+	// address to a pod. If this is set to true, then PortalIP will contain a single string, filled in
+	// by the claiming kube-proxy daemon, and the destination pod must be specified in the Selector map
+	ExternalMapping bool `json:"externalMapping,omitempty"`
 
 	// An external load balancer should be set up via the cloud-provider
 	CreateExternalLoadBalancer bool `json:"createExternalLoadBalancer,omitempty" description:"set up a cloud-provider-specific load balancer on an external IP"`

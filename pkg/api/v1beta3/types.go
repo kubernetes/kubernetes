@@ -868,6 +868,11 @@ type ServiceSpec struct {
 	// None can be specified for headless services when proxying is not required
 	PortalIP string `json:"portalIP,omitempty description: IP address of the service; usually assigned by the system; if specified, it will be allocated to the service if unused, and creation of the service will fail otherwise; cannot be updated; 'None' can be specified for a headless service when proxying is not required"`
 
+	// ExternalMapping indicates that this isn't an internal service, but rather just a mapping of an external 
+	// address to a pod. If this is set to true, then PublicIPs will contain a single string, filled in 
+	// by the claiming kube-proxy daemon, and the destination pod must be specified in the Selector map
+	ExternalMapping bool `json:"externalMapping,omitempty"`
+
 	// CreateExternalLoadBalancer indicates whether a load balancer should be created for this service.
 	CreateExternalLoadBalancer bool `json:"createExternalLoadBalancer,omitempty" description:"set up a cloud-provider-specific load balancer on an external IP"`
 
