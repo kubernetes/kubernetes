@@ -511,35 +511,30 @@ function kube::release::package_client_tarballs() {
    # Find all of the built client binaries
   local platform platforms
   platforms=($(cd "${LOCAL_OUTPUT_BINPATH}" ; echo */*))
-  for platform in "${platforms[@]}"; do
+  for platform in "${platforms[@]}" ; do
     local platform_tag=${platform/\//-} # Replace a "/" for a "-"
-    kube::log::status "Starting tarball: client $platform_tag"
+    kube::log::status "Building tarball: client $platform_tag"
 
-    (
-      local release_stage="${RELEASE_STAGE}/client/${platform_tag}/kubernetes"
-      rm -rf "${release_stage}"
-      mkdir -p "${release_stage}/client/bin"
+    local release_stage="${RELEASE_STAGE}/client/${platform_tag}/kubernetes"
+    rm -rf "${release_stage}"
+    mkdir -p "${release_stage}/client/bin"
 
-      local client_bins=("${KUBE_CLIENT_BINARIES[@]}")
-      if [[ "${platform%/*}" == "windows" ]]; then
-        client_bins=("${KUBE_CLIENT_BINARIES_WIN[@]}")
-      fi
+    local client_bins=("${KUBE_CLIENT_BINARIES[@]}")
+    if [[ "${platform%/*}" == "windows" ]]; then
+      client_bins=("${KUBE_CLIENT_BINARIES_WIN[@]}")
+    fi
 
-      # This fancy expression will expand to prepend a path
-      # (${LOCAL_OUTPUT_BINPATH}/${platform}/) to every item in the
-      # KUBE_CLIENT_BINARIES array.
-      cp "${client_bins[@]/#/${LOCAL_OUTPUT_BINPATH}/${platform}/}" \
-        "${release_stage}/client/bin/"
+    # This fancy expression will expand to prepend a path
+    # (${LOCAL_OUTPUT_BINPATH}/${platform}/) to every item in the
+    # KUBE_CLIENT_BINARIES array.
+    cp "${client_bins[@]/#/${LOCAL_OUTPUT_BINPATH}/${platform}/}" \
+      "${release_stage}/client/bin/"
 
-      kube::release::clean_cruft
+    kube::release::clean_cruft
 
-      local package_name="${RELEASE_DIR}/kubernetes-client-${platform_tag}.tar.gz"
-      kube::release::create_tarball "${package_name}" "${release_stage}/.."
-    ) &
+    local package_name="${RELEASE_DIR}/kubernetes-client-${platform_tag}.tar.gz"
+    kube::release::create_tarball "${package_name}" "${release_stage}/.."
   done
-
-  kube::log::status "Waiting on tarballs"
-  wait || { kube::log::error "client tarball creation failed"; exit 1; }
 }
 
 # Package up all of the server binaries
