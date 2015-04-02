@@ -19,22 +19,31 @@
 # managed result is of that. Start everything below that directory.
 KUBECTL=/usr/local/bin/kubectl
 
-function create-object() {
-  obj=$1
-
-  for tries in {1..5}; do
-    if ${KUBECTL} --server="127.0.0.1:8080" create --validate=true -f ${obj}; then
-      return
-    fi
-    echo "++ ${obj} failed, attempt ${try} (sleeping 5) ++"
-    sleep 5
+# $1 addon to start.
+# $2 count of tries to start the addon.
+# $3 delay in seconds between two consecutive tries
+function start_addon() {
+  addon=$1;
+  tries=$2;
+  delay=$3;
+  while [ ${tries} -gt 0 ]; do
+    ${KUBECTL} create -f ${addon} && \
+        echo "== Successfully started ${addon} at $(date -Is)" && \
+        return 0;
+    let tries=tries-1;
+    echo "== Failed to start ${addon} at $(date -Is). ${tries} tries remaining. =="
+    sleep ${delay};
   done
+  return 1;
 }
 
+# The business logic for whether a given object should be created
+# was already enforced by salt, and /etc/kubernetes/addons is the
+# managed result is of that. Start everything below that directory.
 echo "== Kubernetes addon manager started at $(date -Is) =="
 for obj in $(find /etc/kubernetes/addons -name \*.yaml); do
-  create-object ${obj} &
-  echo "++ addon ${obj} started in pid $! ++"
+  start_addon ${obj} 100 10 &
+  echo "++ addon ${obj} starting in pid $! ++"
 done
 noerrors="true"
 for pid in $(jobs -p); do

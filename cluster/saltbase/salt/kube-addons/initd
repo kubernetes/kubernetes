@@ -19,56 +19,14 @@ NAME=kube-addons
 DAEMON_LOG_FILE=/var/log/$NAME.log
 PIDFILE=/var/run/$NAME.pid
 SCRIPTNAME=/etc/init.d/$NAME
-KUBECTL=/usr/local/bin/kubectl
+KUBE_ADDONS_SH=/etc/kubernetes/kube-addons.sh
 
 # Define LSB log_* functions.
 # Depend on lsb-base (>= 3.2-14) to ensure that this file is present
 # and status_of_proc is working.
 . /lib/lsb/init-functions
 
-# $1 addon to start.
-# $2 count of tries to start the addon.
-# $3 delay in seconds between two consecutive tries
-function start_addon() {
-  addon=$1;
-  tries=$2;
-  delay=$3;
-  while [ ${tries} -gt 0 ]; do
-    ${KUBECTL} create -f ${addon} && \
-        echo "== Successfully started ${addon} at $(date -Is)" && \
-        return 0;
-    let tries=tries-1;
-    echo "== Failed to start ${addon} at $(date -Is). ${tries} tries remaining. =="
-    sleep ${delay};
-  done
-  return 1;
-}
 
-function addon_manager_async() {
-    # The business logic for whether a given object should be created
-    # was already enforced by salt, and /etc/kubernetes/addons is the
-    # managed result is of that. Start everything below that directory.
-    echo "== Kubernetes addon manager started at $(date -Is) =="
-    for obj in $(find /etc/kubernetes/addons -name \*.yaml); do
-        start_addon ${obj} 100 10 &
-        echo "++ addon ${obj} starting in pid $! ++"
-    done
-    noerrors="true"
-    for pid in $(jobs -p); do
-	    wait ${pid} || noerrors="false"
-	    echo "++ pid ${pid} complete ++"
-    done
-    if [ ${noerrors} == "true" ]; then
-	    echo "== Kubernetes addon manager completed successfully at $(date -Is) =="
-    else
-	    echo "== Kubernetes addon manager completed with errors at $(date -Is) =="
-    fi
-
-    # We stay around so that status checks by salt make it look like
-    # the service is good. (We could do this is other ways, but this
-    # is simple.)
-    sleep infinity
-}
 
 
 #
@@ -76,7 +34,7 @@ function addon_manager_async() {
 #
 do_start()
 {
-    addon_manager_async </dev/null >>${DAEMON_LOG_FILE} 2>&1 &
+    ${KUBE_ADDONS_SH} </dev/null >>${DAEMON_LOG_FILE} 2>&1 &
     echo $! > ${PIDFILE}
     disown
 }
