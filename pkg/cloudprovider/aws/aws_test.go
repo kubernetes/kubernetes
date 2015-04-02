@@ -112,17 +112,17 @@ func TestNewAWSCloud(t *testing.T) {
 	}{
 		{
 			"No config reader",
-			nil, fakeAuthFunc, nil,
+			nil, fakeAuthFunc, &FakeMetadata{},
 			true, "",
 		},
 		{
 			"Config specified invalid zone",
-			strings.NewReader("[global]\nzone = blahonga"), fakeAuthFunc, nil,
+			strings.NewReader("[global]\nzone = blahonga"), fakeAuthFunc, &FakeMetadata{},
 			true, "",
 		},
 		{
 			"Config specifies valid zone",
-			strings.NewReader("[global]\nzone = eu-west-1a"), fakeAuthFunc, nil,
+			strings.NewReader("[global]\nzone = eu-west-1a"), fakeAuthFunc, &FakeMetadata{},
 			false, "eu-west-1a",
 		},
 		{
@@ -143,7 +143,8 @@ func TestNewAWSCloud(t *testing.T) {
 
 	for _, test := range tests {
 		t.Logf("Running test case %s", test.name)
-		c, err := newAWSCloud(test.reader, test.authFunc, test.metadata)
+		selfInstanceId := "self-instance"
+		c, err := newAWSCloud(test.reader, test.authFunc, selfInstanceId, test.metadata)
 		if test.expectError {
 			if err == nil {
 				t.Errorf("Should error for case %s", test.name)
