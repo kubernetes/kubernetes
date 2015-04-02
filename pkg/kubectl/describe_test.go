@@ -17,6 +17,7 @@ limitations under the License.
 package kubectl
 
 import (
+	"bytes"
 	"fmt"
 	"reflect"
 	"strings"
@@ -105,6 +106,83 @@ func TestPodDescribeResultsSorted(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 	VerifyDatesInOrder(out, "\n" /* rowDelimiter */, "\t" /* columnDelimiter */, t)
+}
+
+func TestDescribeContainers(t *testing.T) {
+	testCases := []struct {
+		input            api.ContainerStatus
+		expectedElements []string
+	}{
+		// Running state.
+		{
+			input: api.ContainerStatus{
+				Name: "test",
+				State: api.ContainerState{
+					Running: &api.ContainerStateRunning{
+						StartedAt: util.NewTime(time.Now()),
+					},
+				},
+				Ready:        true,
+				RestartCount: 7,
+				Image:        "image",
+			},
+			expectedElements: []string{"test", "State", "Running", "Ready", "True", "Restart Count", "7", "Image", "image", "Started"},
+		},
+		// Waiting state.
+		{
+			input: api.ContainerStatus{
+				Name: "test",
+				State: api.ContainerState{
+					Waiting: &api.ContainerStateWaiting{
+						Reason: "potato",
+					},
+				},
+				Ready:        true,
+				RestartCount: 7,
+				Image:        "image",
+			},
+			expectedElements: []string{"test", "State", "Waiting", "Ready", "True", "Restart Count", "7", "Image", "image", "Reason", "potato"},
+		},
+		// Terminated state.
+		{
+			input: api.ContainerStatus{
+				Name: "test",
+				State: api.ContainerState{
+					Termination: &api.ContainerStateTerminated{
+						StartedAt:  util.NewTime(time.Now()),
+						FinishedAt: util.NewTime(time.Now()),
+						Reason:     "potato",
+						ExitCode:   2,
+					},
+				},
+				Ready:        true,
+				RestartCount: 7,
+				Image:        "image",
+			},
+			expectedElements: []string{"test", "State", "Terminated", "Ready", "True", "Restart Count", "7", "Image", "image", "Reason", "potato", "Started", "Finished", "Exit Code", "2"},
+		},
+		// No state defaults to waiting.
+		{
+			input: api.ContainerStatus{
+				Name:         "test",
+				Ready:        true,
+				RestartCount: 7,
+				Image:        "image",
+			},
+			expectedElements: []string{"test", "State", "Waiting", "Ready", "True", "Restart Count", "7", "Image", "image"},
+		},
+	}
+
+	for i, testCase := range testCases {
+		out := new(bytes.Buffer)
+		describeContainers([]api.ContainerStatus{testCase.input}, out)
+		output := out.String()
+		for _, expected := range testCase.expectedElements {
+			if !strings.Contains(output, expected) {
+				t.Errorf("Test case %d: expected to find %q in output: %q", i, expected, output)
+			}
+		}
+	}
 }
 
 func TestDescribers(t *testing.T) {

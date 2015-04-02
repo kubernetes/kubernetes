@@ -242,6 +242,8 @@ func describePod(pod *api.Pod, rcs []api.ReplicationController, events *api.Even
 		fmt.Fprintf(out, "Labels:\t%s\n", formatLabels(pod.Labels))
 		fmt.Fprintf(out, "Status:\t%s\n", string(pod.Status.Phase))
 		fmt.Fprintf(out, "Replication Controllers:\t%s\n", printReplicationControllersByLabels(rcs))
+		fmt.Fprintf(out, "Containers:\n")
+		describeContainers(pod.Status.ContainerStatuses, out)
 		if len(pod.Status.Conditions) > 0 {
 			fmt.Fprint(out, "Conditions:\n  Type\tStatus\n")
 			for _, c := range pod.Status.Conditions {
@@ -255,6 +257,50 @@ func describePod(pod *api.Pod, rcs []api.ReplicationController, events *api.Even
 		}
 		return nil
 	})
+}
+
+func describeContainers(containers []api.ContainerStatus, out io.Writer) {
+	for _, container := range containers {
+		fmt.Fprintf(out, "  %v:\n", container.Name)
+		fmt.Fprintf(out, "    Image:\t%s\n", container.Image)
+		switch {
+		case container.State.Running != nil:
+			fmt.Fprintf(out, "    State:\tRunning\n")
+			fmt.Fprintf(out, "      Started:\t%v\n", container.State.Running.StartedAt.Time.Format(time.RFC1123Z))
+		case container.State.Waiting != nil:
+			fmt.Fprintf(out, "    State:\tWaiting\n")
+			if container.State.Waiting.Reason != "" {
+				fmt.Fprintf(out, "      Reason:\t%s\n", container.State.Waiting.Reason)
+			}
+		case container.State.Termination != nil:
+			fmt.Fprintf(out, "    State:\tTerminated\n")
+			if container.State.Termination.Reason != "" {
+				fmt.Fprintf(out, "      Reason:\t%s\n", container.State.Termination.Reason)
+			}
+			if container.State.Termination.Message != "" {
+				fmt.Fprintf(out, "      Message:\t%s\n", container.State.Termination.Message)
+			}
+			fmt.Fprintf(out, "      Exit Code:\t%d\n", container.State.Termination.ExitCode)
+			if container.State.Termination.Signal > 0 {
+				fmt.Fprintf(out, "      Signal:\t%d\n", container.State.Termination.Signal)
+			}
+			fmt.Fprintf(out, "      Started:\t%s\n", container.State.Termination.StartedAt.Time.Format(time.RFC1123Z))
+			fmt.Fprintf(out, "      Finished:\t%s\n", container.State.Termination.FinishedAt.Time.Format(time.RFC1123Z))
+		default:
+			fmt.Fprintf(out, "    State:\tWaiting\n")
+		}
+
+		fmt.Fprintf(out, "    Ready:\t%v\n", printBool(container.Ready))
+		fmt.Fprintf(out, "    Restart Count:\t%d\n", container.RestartCount)
+	}
+}
+
+func printBool(value bool) string {
+	if value {
+		return "True"
+	}
+
+	return "False"
 }
 
 // ReplicationControllerDescriber generates information about a replication controller
