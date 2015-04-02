@@ -72,6 +72,11 @@ readonly KUBE_CLIENT_PLATFORMS=(
   windows/amd64
 )
 
+# Gigabytes desired for parallel platform builds. 8 is fairly
+# arbitrary, but is a reasonable splitting point for 2015
+# laptops-versus-not.
+readonly KUBE_PARALLEL_BUILD_MEMORY=8
+
 readonly KUBE_ALL_TARGETS=(
   "${KUBE_SERVER_TARGETS[@]}"
   "${KUBE_CLIENT_TARGETS[@]}"
@@ -321,6 +326,29 @@ kube::golang::build_binaries_for_platform() {
 
 }
 
+# Return approximate physical memory in gigabytes.
+kube::golang::get_physmem() {
+  local mem
+
+  # Linux, in kb
+  if mem=$(grep MemTotal /proc/meminfo | awk '{ print $2 }'); then
+    echo $(( ${mem} / 1048576 ))
+    return
+  fi
+
+  # OS X, in bytes. Note that get_physmem, as used, should only ever
+  # run in a Linux container (because it's only used in the multiple
+  # platform case, which is a Dockerized build), but this is provided
+  # for completeness.
+  if mem=$(sysctl -n hw.memsize 2>/dev/null); then
+    echo $(( ${mem} / 1073741824 ))
+    return
+  fi
+
+  # If we can't infer it, just give up and assume a low memory system
+  echo 1
+}
+
 # Build binaries targets specified
 #
 # Input:
@@ -371,25 +399,47 @@ kube::golang::build_binaries() {
     local binaries
     binaries=($(kube::golang::binaries_from_targets "${targets[@]}"))
 
-    kube::log::status "Building go targets for ${platforms[@]} in parallel (output will appear in a burst when complete):" "${targets[@]}"
-    local platform
-    for platform in "${platforms[@]}"; do (
+    local parallel=false
+    if [[ ${#platforms[@]} -gt 1 ]]; then
+      local gigs
+      gigs=$(kube::golang::get_physmem)
+
+      if [[ ${gigs} -gt ${KUBE_PARALLEL_BUILD_MEMORY} ]]; then
+        kube::log::status "Multiple platforms requested and available ${gigs}G > threshold ${KUBE_PARALLEL_BUILD_MEMORY}G, building platforms in parallel"
+        parallel=true
+      else
+        kube::log::status "Multiple platforms requested, but available ${gigs}G < threshold ${KUBE_PARALLEL_BUILD_MEMORY}G, building platforms in serial"
+        parallel=false
+      fi
+    fi
+
+    if [[ "${parallel}" == "true" ]]; then
+      kube::log::status "Building go targets for ${platforms[@]} in parallel (output will appear in a burst when complete):" "${targets[@]}"
+      local platform
+      for platform in "${platforms[@]}"; do (
+          kube::golang::set_platform_envs "${platform}"
+          kube::log::status "${platform}: go build started"
+          kube::golang::build_binaries_for_platform ${platform} ${use_go_build:-}
+          kube::log::status "${platform}: go build finished"
+        ) &> "/tmp//${platform//\//_}.build" &
+      done
+
+      local fails=0
+      for job in $(jobs -p); do
+        wait ${job} || let "fails+=1"
+      done
+
+      for platform in "${platforms[@]}"; do
+        cat "/tmp//${platform//\//_}.build"
+      done
+
+      exit ${fails}
+    else
+      for platform in "${platforms[@]}"; do
+        kube::log::status "Building go targets for ${platform}:" "${targets[@]}"
         kube::golang::set_platform_envs "${platform}"
-        kube::log::status "${platform}: Parallel go build started"
         kube::golang::build_binaries_for_platform ${platform} ${use_go_build:-}
-        kube::log::status "${platform}: Parallel go build finished"
-      ) &> "/tmp//${platform//\//_}.build" &
-    done
-
-    local fails=0
-    for job in $(jobs -p); do
-      wait ${job} || let "fails+=1"
-    done
-
-    for platform in "${platforms[@]}"; do
-      cat "/tmp//${platform//\//_}.build"
-    done
-
-    exit ${fails}
+      done
+    fi
   )
 }
