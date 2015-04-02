@@ -138,7 +138,9 @@ func (f *ConfigFactory) CreateFromKeys(predicateKeys, priorityKeys util.StringSe
 	}
 
 	// Watch and queue pods that need scheduling.
-	cache.NewReflector(f.createUnassignedPodLW(), &api.Pod{}, f.PodQueue, 0).Run()
+	// TODO: the 30 second poll loop is here to mitigate #6059 and
+	// shouldn't be neeeded once that is resolved.
+	cache.NewReflector(f.createUnassignedPodLW(), &api.Pod{}, f.PodQueue, 30*time.Second).Run()
 
 	// Pass through all events to the scheduled pod store, but on a deletion,
 	// also remove from the assumed pods.
