@@ -231,7 +231,10 @@ func (pd *awsPersistentDisk) SetUpAt(dir string) error {
 }
 
 func makeGlobalPDName(host volume.VolumeHost, devName string) string {
-	return path.Join(host.GetPluginDir(awsPersistentDiskPluginName), "mounts", devName)
+	// Clean up the URI to be more fs-friendly
+	name := devName
+	name = strings.Replace(name, "://", "/", -1)
+	return path.Join(host.GetPluginDir(awsPersistentDiskPluginName), "mounts", name)
 }
 
 func (pd *awsPersistentDisk) GetPath() string {

@@ -20,7 +20,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"path"
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/exec"
@@ -41,12 +40,12 @@ func (util *AWSDiskUtil) AttachAndMountDisk(pd *awsPersistentDisk, globalPDPath 
 	if pd.readOnly {
 		flags = mount.FlagReadOnly
 	}
-	if err := volumes.AttachDisk("", pd.pdName, pd.readOnly); err != nil {
+	devicePath, err := volumes.AttachDisk("", pd.pdName, pd.readOnly)
+	if err != nil {
 		return err
 	}
-	devicePath := path.Join("/dev/disk/by-id/", "aws-"+pd.pdName)
 	if pd.partition != "" {
-		devicePath = devicePath + "-part" + pd.partition
+		devicePath = devicePath + pd.partition
 	}
 	//TODO(jonesdl) There should probably be better method than busy-waiting here.
 	numTries := 0
@@ -60,7 +59,7 @@ func (util *AWSDiskUtil) AttachAndMountDisk(pd *awsPersistentDisk, globalPDPath 
 		}
 		numTries++
 		if numTries == 10 {
-			return errors.New("Could not attach disk: Timeout after 10s")
+			return errors.New("Could not attach disk: Timeout after 10s (" + devicePath + ")")
 		}
 		time.Sleep(time.Second)
 	}

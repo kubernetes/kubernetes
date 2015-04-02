@@ -70,7 +70,8 @@ type VolumeOptions struct {
 type Volumes interface {
 	// Attach the disk to the specified instance
 	// instanceName can be empty to mean "the instance on which we are running"
-	AttachDisk(instanceName string, volumeName string, readOnly bool) error
+	// Returns the device (e.g. /dev/xvdf) where we attached the volume
+	AttachDisk(instanceName string, volumeName string, readOnly bool) (string, error)
 	// Detach the disk from the specified instance
 	// instanceName can be empty to mean "the instance on which we are running"
 	DetachDisk(instanceName string, volumeName string) error
@@ -819,10 +820,10 @@ func (aws *AWSCloud) getSelfAwsInstance() *awsInstance {
 }
 
 // Implements Volumes.AttachDisk
-func (aws *AWSCloud) AttachDisk(instanceName string, diskName string, readOnly bool) error {
+func (aws *AWSCloud) AttachDisk(instanceName string, diskName string, readOnly bool) (string, error) {
 	disk, err := newAwsDisk(aws.ec2, diskName)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	var awsInstance *awsInstance
@@ -831,7 +832,7 @@ func (aws *AWSCloud) AttachDisk(instanceName string, diskName string, readOnly b
 	} else {
 		instance, err := aws.getInstancesByDnsName(instanceName)
 		if err != nil {
-			return fmt.Errorf("Error finding instance: %v", err)
+			return "", fmt.Errorf("Error finding instance: %v", err)
 		}
 
 		awsInstance = newAwsInstance(aws.ec2, instance.InstanceId)
@@ -840,12 +841,12 @@ func (aws *AWSCloud) AttachDisk(instanceName string, diskName string, readOnly b
 	if readOnly {
 		// TODO: We could enforce this when we mount the volume (?)
 		// TODO: We could also snapshot the volume and attach copies of it
-		return errors.New("AWS volumes cannot be mounted read-only")
+		return "", errors.New("AWS volumes cannot be mounted read-only")
 	}
 
 	mountDevice, alreadyAttached, err := awsInstance.assignMountDevice(disk.awsId)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	attached := false
@@ -858,8 +859,8 @@ func (aws *AWSCloud) AttachDisk(instanceName string, diskName string, readOnly b
 	if !alreadyAttached {
 		attachResponse, err := aws.ec2.AttachVolume(disk.awsId, awsInstance.awsId, mountDevice)
 		if err != nil {
-			// TODO: Check if concurrently attached?
-			return fmt.Errorf("Error attaching EBS volume: %v", err)
+			// TODO: Check if the volume was concurrently attached?
+			return "", fmt.Errorf("Error attaching EBS volume: %v", err)
 		}
 
 		glog.V(2).Info("AttachVolume request returned %v", attachResponse)
@@ -867,13 +868,17 @@ func (aws *AWSCloud) AttachDisk(instanceName string, diskName string, readOnly b
 
 	err = disk.waitForAttachmentStatus("attached")
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	attached = true
 
-	// TODO: Return device name (and note that it might look like /dev/xvdf, not /dev/sdf)
-	return nil
+	hostDevice := mountDevice
+	if strings.HasPrefix(hostDevice, "/dev/sd") {
+		// Inside the instance, the mountpoint /dev/sdf looks like /dev/xvdf
+		hostDevice = "/dev/xvd" + hostDevice[7:]
+	}
+	return hostDevice, nil
 }
 
 // Implements Volumes.DetachDisk
