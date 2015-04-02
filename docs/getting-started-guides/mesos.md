@@ -122,8 +122,10 @@ Lastly, use the Mesos CLI tool to validate the Kubernetes scheduler framework ha
 $ mesos state | grep "Kubernetes"
          "name": "Kubernetes",
 ```
-Or, open the Mesos web GUI, go to the Frameworks tab, and look for an active
-framework named "Kubernetes".
+Or, look for Kubernetes in the Mesos web GUI. You can get there by clicking the
+Mesos logo on the Mesosphere launchpad page, or by pointing your browser to
+`http://${mesos_master}`. Make sure you have an active [VPN connection][6].
+Go to the Frameworks tab, and look for an active framework named "Kubernetes".
 
 ## Spin up a pod
 
