@@ -23,6 +23,7 @@ import (
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/credentialprovider"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -394,6 +395,8 @@ func TestIsImagePresent(t *testing.T) {
 
 func TestGetRunningContainers(t *testing.T) {
 	fakeDocker := &FakeDockerClient{}
+	fakeRecorder := &record.FakeRecorder{}
+	containerManager := NewDockerManager(fakeDocker, fakeRecorder)
 	tests := []struct {
 		containers  map[string]*docker.Container
 		inputIDs    []string
@@ -476,7 +479,7 @@ func TestGetRunningContainers(t *testing.T) {
 	for _, test := range tests {
 		fakeDocker.ContainerMap = test.containers
 		fakeDocker.Err = test.err
-		if results, err := GetRunningContainers(fakeDocker, test.inputIDs); err == nil {
+		if results, err := containerManager.GetRunningContainers(test.inputIDs); err == nil {
 			resultIDs := []string{}
 			for _, result := range results {
 				resultIDs = append(resultIDs, result.ID)
