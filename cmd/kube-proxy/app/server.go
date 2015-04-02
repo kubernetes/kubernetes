@@ -23,6 +23,7 @@ import (
 	"net/http"
 	"strconv"
 	"time"
+	"os"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
@@ -83,7 +84,8 @@ func (s *ProxyServer) Run(_ []string) error {
 		protocol = iptables.ProtocolIpv6
 	}
 	loadBalancer := proxy.NewLoadBalancerRR()
-	proxier := proxy.NewProxier(loadBalancer, net.IP(s.BindAddress), iptables.New(exec.New(), protocol), s.extIf, s.intIf, "")
+	hostname, _ := os.Hostname()
+	proxier := proxy.NewProxier(loadBalancer, net.IP(s.BindAddress), iptables.New(exec.New(), protocol), s.extIf, s.intIf, hostname, &s.ClientConfig)
 	if proxier == nil {
 		glog.Fatalf("failed to create proxier, aborting")
 	}

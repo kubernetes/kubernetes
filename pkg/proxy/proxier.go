@@ -27,6 +27,8 @@ import (
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/errors"
@@ -44,6 +46,8 @@ type serviceInfo struct {
 	publicIPs           []string // TODO: make this net.IP
 	sessionAffinityType api.AffinityType
 	stickyMaxAgeMinutes int
+	external            bool
+	podName             string
 }
 
 // How long we wait for a connection to a backend in seconds
@@ -91,6 +95,10 @@ func (tcp *tcpProxySocket) ProxyLoop(service ServicePortName, myInfo *serviceInf
 	for {
 		if info, exists := proxier.getServiceInfo(service); !exists || info != myInfo {
 			// The service port was closed or replaced.
+			break
+		}
+
+		if myInfo.external == true {
 			break
 		}
 
@@ -170,7 +178,9 @@ func (udp *udpProxySocket) ProxyLoop(service ServicePortName, myInfo *serviceInf
 			// The service port was closed or replaced.
 			break
 		}
-
+		if myInfo.external == true {
+			break
+		}
 		// Block until data arrives.
 		// TODO: Accumulate a histogram of n or something, to fine tune the buffer size.
 		n, cliAddr, err := udp.ReadFrom(buffer[0:])
@@ -311,12 +321,13 @@ type Proxier struct {
 	extIf         string
 	intIf         string
 	extName       string
+	kubeClient    *client.Client
 }
 
 // NewProxier returns a new Proxier given a LoadBalancer and an address on
 // which to listen.  Because of the iptables logic, It is assumed that there
 // is only a single Proxier active on a machine.
-func NewProxier(loadBalancer LoadBalancer, listenIP net.IP, iptables iptables.Interface, extIf string, intIf string, extName string) *Proxier {
+func NewProxier(loadBalancer LoadBalancer, listenIP net.IP, iptables iptables.Interface, extIf string, intIf string, extName string, config *client.Config) *Proxier {
 	if listenIP.Equal(localhostIPv4) || listenIP.Equal(localhostIPv6) {
 		glog.Errorf("Can't proxy only on localhost - iptables can't do it")
 		return nil
@@ -328,10 +339,10 @@ func NewProxier(loadBalancer LoadBalancer, listenIP net.IP, iptables iptables.In
 		return nil
 	}
 	glog.Infof("Setting Proxy IP to %v", hostIP)
-	return CreateProxier(loadBalancer, listenIP, iptables, hostIP, extIf, intIf, extName)
+	return CreateProxier(loadBalancer, listenIP, iptables, hostIP, extIf, intIf, extName, config)
 }
 
-func CreateProxier(loadBalancer LoadBalancer, listenIP net.IP, iptables iptables.Interface, hostIP net.IP, extIf string, intIf string, extName string) *Proxier {
+func CreateProxier(loadBalancer LoadBalancer, listenIP net.IP, iptables iptables.Interface, hostIP net.IP, extIf string, intIf string, extName string, config *client.Config) *Proxier {
 	glog.Infof("Initializing iptables")
 	// Clean up old messes.  Ignore erors.
 	iptablesDeleteOld(iptables)
@@ -346,6 +357,13 @@ func CreateProxier(loadBalancer LoadBalancer, listenIP net.IP, iptables iptables
 		glog.Errorf("Failed to flush iptables: %v", err)
 		return nil
 	}
+
+	kc := client.NewOrDie(config)
+	if kc == nil {
+		glog.Errorf("Proxier failed to create api server connection\n")
+		return nil
+	}
+
 	return &Proxier{
 		loadBalancer: loadBalancer,
 		serviceMap:   make(map[ServicePortName]*serviceInfo),
@@ -355,6 +373,7 @@ func CreateProxier(loadBalancer LoadBalancer, listenIP net.IP, iptables iptables
 		extIf:        extIf,
 		intIf:        intIf,
 		extName:      extName,
+		kubeClient:   kc,
 	}
 }
 
@@ -382,6 +401,9 @@ func (proxier *Proxier) ensurePortals() {
 	defer proxier.mu.Unlock()
 	// NB: This does not remove rules that should not be present.
 	for name, info := range proxier.serviceMap {
+		if info.external == true {
+			continue
+		}
 		err := proxier.openPortal(name, info)
 		if err != nil {
 			glog.Errorf("Failed to ensure portal for %q: %v", name, err)
@@ -461,11 +483,37 @@ func (proxier *Proxier) addServiceOnPort(service ServicePortName, protocol api.P
 	return si, nil
 }
 
+func (proxier *Proxier) addExternalMapingService(service api.Service, podname string, podip string) (*serviceInfo, error) {
+
+	svc := ServicePortName{types.NamespacedName{service.Namespace, service.Name}, service.Name}
+
+	si := &serviceInfo{
+		timeout:  0,
+		external: true,
+		publicIPs: []string{service.Spec.PortalIP},
+		podName:  podname,
+		portalIP: net.IP(podip),
+	}
+
+	proxier.setServiceInfo(ServicePortName(svc), si)
+
+	return si, nil
+}
+
 // How long we leave idle UDP connections open.
 const udpIdleTimeout = 1 * time.Minute
 
-func (proxier *Proxier) updateExternalService(service api.Service) {
-	_, exists := proxier.getServiceInfo(types.NamespacedName{service.Namespace, service.Name})
+func (proxier *Proxier) updateExternalService(service *api.Service) {
+	var pod *api.Pod
+	var dnatchain iptables.Chain = iptables.Chain(service.Spec.Selector["pod"] + "-DNAT")
+	var snatchain iptables.Chain = iptables.Chain(service.Spec.Selector["pod"] + "-SNAT")
+	var dargs []string
+	var sargs []string
+	var dfilter []string
+	var sfilter []string
+
+	_, exists := proxier.getServiceInfo(ServicePortName{types.NamespacedName{service.Namespace, service.Name}, service.Name})
+
 	glog.V(4).Infof("Noted a External IP service for service name %s\n", service.Name)
 
 	if exists {
@@ -473,12 +521,151 @@ func (proxier *Proxier) updateExternalService(service api.Service) {
 		return
 	}
 
-	//
-	// NH - Add check for new service that has a pre-assigned ip that we own here
-	//
-	if service.Spec.Selector["node"] == proxier.extName {
-		glog.Infof("New External Map request for me!\n")
+	// Find the pod we need to map to and grab its ip address
+	ns := api.NamespaceAll
+	pdi := proxier.kubeClient.Pods(ns)
+	plist, _ := pdi.List(labels.Everything())
+	pod = nil
+	for p := range plist.Items {
+
+		if plist.Items[p].Name == service.Spec.Selector["pod"] {
+			pod = &plist.Items[p]
+			break
+		}
 	}
+
+	if pod == nil {
+		glog.Infof("Unable to find pod %s for external proxying, skipping\n", service.Spec.Selector["pod"])
+		goto out
+	}
+
+	if service.Spec.Selector["node"] == proxier.extName {
+		glog.Infof("New External Map request for pod %s\n", service.Spec.Selector["pod"])
+
+		// Create a new chain for this mapping
+
+		glog.Infof("Creating DNAT chain\n")
+		_, err := proxier.iptables.EnsureChain(iptables.TableNAT, dnatchain)
+		if err != nil {
+			glog.Infof("Could not create DNAT chain for mapping %s\n", service.Name)
+			goto out
+		}
+
+		glog.Infof("Creating SNAT chain\n")
+		_, err = proxier.iptables.EnsureChain(iptables.TableNAT, snatchain)
+		if err != nil {
+			glog.Infof("Could not create SNAT chain for mapping %s\n", service.Name)
+			goto out_dnat
+		}
+
+		glog.Infof("Populating DNAT chain\n")
+		dargs = []string{
+			"-m", "comment",
+			"--comment", "service: " + service.Name,
+			"-i", proxier.extIf,
+			"-j", "DNAT",
+			"--to-destination", pod.Status.PodIP,
+		}
+		_, err = proxier.iptables.EnsureRule(iptables.TableNAT, dnatchain, dargs...)
+		if err != nil {
+			glog.Infof("Could not add rule to DNAT chain: %s\n", err)
+			goto out_snat
+		}
+
+		glog.Infof("Populating SNAT chain with intIF %s\n", proxier.intIf)
+		sargs = []string{
+			"-m", "comment",
+			"--comment", "service: " + service.Name,
+			"-o", proxier.intIf,
+			"-j", "MASQUERADE",
+		}
+		_, err = proxier.iptables.EnsureRule(iptables.TableNAT, snatchain, sargs...)
+		if err != nil {
+			glog.Infof("Could not add rule to SNAT chain: %s\n", err)
+			goto out_drule
+
+		}
+
+		glog.Infof("Attaching SNAT chain\n")
+		sfilter = []string{
+			"-m", "comment",
+			"--comment", "service: " + service.Name,
+			"--destination", pod.Status.PodIP + "/32",
+			"-j", string(snatchain),
+		}
+		_, err = proxier.iptables.EnsureRule(iptables.TableNAT, "POSTROUTING", sfilter...)
+		if err != nil {
+			glog.Infof("Could not attach rule to POSTROUTING chain: %s\n", err)
+			goto out_srule
+		}
+
+		glog.Infof("ATtaching DNAT chain\n")
+		dfilter = []string{
+			"-m", "comment",
+			"--comment", "service: " + service.Name,
+			"--destination", service.Spec.PortalIP + "/32",
+			"-j", string(dnatchain),
+		}
+		_, err = proxier.iptables.EnsureRule(iptables.TableNAT, "PREROUTING", dfilter...)
+		if err != nil {
+			glog.Infof("Could not attach rule to PREROUTING chain: %s\n", err)
+			goto out_sattach
+		}
+
+	}
+
+	glog.Infof("Adding service to list\n")
+	proxier.addExternalMapingService(*service, service.Spec.Selector["pod"], pod.Status.PodIP)
+	goto out
+
+out_sattach:
+	proxier.iptables.DeleteRule(iptables.TableNAT, "POSTROUTING", sfilter...)
+out_srule:
+	proxier.iptables.DeleteRule(iptables.TableNAT, snatchain, sargs...)
+out_drule:
+	proxier.iptables.DeleteRule(iptables.TableNAT, dnatchain, dargs...)
+out_snat:
+	proxier.iptables.DeleteChain(iptables.TableNAT, snatchain)
+out_dnat:
+	proxier.iptables.DeleteChain(iptables.TableNAT, dnatchain)
+out:
+	return
+
+}
+
+func (proxier *Proxier) closeExtMap(service ServicePortName, info *serviceInfo) error {
+	var dnatchain iptables.Chain = iptables.Chain(info.podName + "-DNAT")
+	var snatchain iptables.Chain = iptables.Chain(info.podName + "-SNAT")
+
+	proxier.iptables.FlushChain(iptables.TableNAT, dnatchain)
+
+	proxier.iptables.FlushChain(iptables.TableNAT, snatchain)
+
+	glog.Infof("Detaching DNAT chain for %s: %s\n", service, info.podName)
+	dfilter := []string{
+		"-m", "comment",
+		"--comment", "service: " + service.Name,
+		"--destination", info.publicIPs[0] + "/32",
+		"-j", string(dnatchain),
+	}
+
+	proxier.iptables.DeleteRule(iptables.TableNAT, "PREROUTING", dfilter...)
+
+	glog.Infof("Detaching SNAT chain for %s: %s\n", service, info.podName)
+	sfilter := []string{
+		"-m", "comment",
+		"--comment", "service: " + service.Name,
+		"--destination", string(info.portalIP) + "/32",
+		"-j", string(snatchain),
+	}
+	proxier.iptables.DeleteRule(iptables.TableNAT, "POSTROUTING", sfilter...)
+
+	glog.Infof("Removing chains for %s:%s\n", service, info.podName)
+	proxier.iptables.DeleteChain(iptables.TableNAT, dnatchain)
+	proxier.iptables.DeleteChain(iptables.TableNAT, snatchain)
+
+	delete(proxier.serviceMap, service)
+	return nil
 }
 
 // OnUpdate manages the active set of service proxies.
@@ -490,7 +677,7 @@ func (proxier *Proxier) OnUpdate(services []api.Service) {
 	for i := range services {
 		service := &services[i]
 		if service.Spec.ExternalMapping == true {
-			activeServices[types.NamespacedName{service.Namespace, service.Name}] = true
+			activeServices[ServicePortName{types.NamespacedName{service.Namespace, service.Name},service.Name}] = true
 			proxier.updateExternalService(service)
 			continue
 		}
@@ -548,6 +735,11 @@ func (proxier *Proxier) OnUpdate(services []api.Service) {
 	defer proxier.mu.Unlock()
 	for name, info := range proxier.serviceMap {
 		if !activeServices[name] {
+			if info.external == true {
+				glog.V(1).Infof("Tearing down external mapping for %s\n", name)
+				proxier.closeExtMap(name, info)
+				continue
+			}
 			glog.V(1).Infof("Stopping service %q", name)
 			err := proxier.closePortal(name, info)
 			if err != nil {
