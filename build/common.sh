@@ -505,11 +505,14 @@ function kube::release::package_tarballs() {
   # Clean out any old releases
   rm -rf "${RELEASE_DIR}"
   mkdir -p "${RELEASE_DIR}"
-  kube::release::package_client_tarballs
-  kube::release::package_server_tarballs
-  kube::release::package_salt_tarball
-  kube::release::package_test_tarball
-  kube::release::package_full_tarball
+  kube::release::package_client_tarballs &
+  kube::release::package_server_tarballs &
+  kube::release::package_salt_tarball &
+  wait || { kube::log::error "previous tarball phase failed"; return 1; }
+
+  kube::release::package_full_tarball & # _full depends on all the previous phases
+  kube::release::package_test_tarball & # _test doesn't depend on anything
+  wait || { kube::log::error "previous tarball phase failed"; return 1; }
 }
 
 # Package up all of the cross compiled clients.  Over time this should grow into
