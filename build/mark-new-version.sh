@@ -24,6 +24,12 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 
 NEW_VERSION=${1-}
 
+fetch_url=$(git remote -v | grep GoogleCloudPlatform/kubernetes.git | grep fetch | awk '{ print $2 }')
+if ! push_url=$(git remote -v | grep GoogleCloudPlatform/kubernetes.git | grep push | awk '{ print $2 }'); then
+  push_url="https://github.com/GoogleCloudPlatform/kubernetes.git"
+fi
+fetch_remote=$(git remote -v | grep GoogleCloudPlatform/kubernetes.git | grep fetch | awk '{ print $1 }')
+
 VERSION_REGEX="^v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"
 [[ ${NEW_VERSION} =~ $VERSION_REGEX ]] || {
   echo "!!! You must specify the version in the form of '$VERSION_REGEX'" >&2
@@ -51,19 +57,19 @@ if [[ "${VERSION_PATCH}" != "0" ]]; then
   # sorry, no going back in time, pull latest from upstream
   git remote update > /dev/null 2>&1
 
-  if git ls-remote --tags --exit-code git@github.com:GoogleCloudPlatform/kubernetes.git refs/tags/${NEW_VERSION} > /dev/null; then
+  if git ls-remote --tags --exit-code ${fetch_url} refs/tags/${NEW_VERSION} > /dev/null; then
     echo "!!! You are trying to tag ${NEW_VERSION} but it already exists.  Stop it!"
     exit 1
   fi
 
   last_version="v${VERSION_MAJOR}.${VERSION_MINOR}.$((VERSION_PATCH-1))"
-  if ! git ls-remote --tags --exit-code git@github.com:GoogleCloudPlatform/kubernetes.git refs/tags/${last_version} > /dev/null; then
+  if ! git ls-remote --tags --exit-code ${fetch_url} refs/tags/${last_version} > /dev/null; then
     echo "!!! You are trying to tag ${NEW_VERSION} but ${last_version} doesn't even exist!"
     exit 1
   fi
 
   # this is rather magic.  This checks that HEAD is a descendant of the github branch release-x.y
-  branches=$(git branch --contains $(git ls-remote --heads git@github.com:GoogleCloudPlatform/kubernetes.git refs/heads/${release_branch} | cut -f1) ${current_branch})
+  branches=$(git branch --contains $(git ls-remote --heads ${fetch_url} refs/heads/${release_branch} | cut -f1) ${current_branch})
   if [[ $? -ne 0 ]]; then
     echo "!!! git failed, I dunno...."
     exit 1
@@ -113,7 +119,7 @@ echo ""
 echo "Success you must now:"
 echo ""
 echo "- Push the tag:"
-echo "   git push git@github.com:GoogleCloudPlatform/kubernetes.git v${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH}"
+echo "   git push ${push_url} v${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH}"
 echo "   - Please note you are pushing the tag live BEFORE your PRs."
 echo "       You need this so the builds pick up the right tag info."
 echo "       If something goes wrong further down please fix the tag!"
@@ -125,7 +131,7 @@ if [[ "${VERSION_PATCH}" == "0" ]]; then
   echo "- Send branch: ${current_branch} as a PR to master"
   echo "- Get someone to review and merge that PR"
   echo "- Push the new release branch"
-  echo "   git push git@github.com:GoogleCloudPlatform/kubernetes.git ${current_branch}:${release_branch}"
+  echo "   git push ${push_url} ${current_branch}:${release_branch}"
 else
   echo "- Send branch: ${current_branch} as a PR to ${release_branch}"
   echo "- Get someone to review and merge that PR"
@@ -142,13 +148,13 @@ else
   echo "pushed as an ancestor of master, even though the tag is on on a release"
   echo "branch. The tag will thus be found by tools like git describe"
   echo ""
-  echo "- Update so you see that merge in origin"
+  echo "- Update so you see that merge in ${fetch_remote}"
   echo "   git remote update"
   echo "- Create and check out a new branch based on master"
-  echo "   git checkout -b merge-${release_branch}-to-master origin/master"
-  echo "- Merge the ${release_branch} into your merge-${release_branch}-to-master branch"
-  echo "   git merge ${release_branch}"
-  echo "   - It's possible you have merge conflicts."
+  echo "   git checkout -b merge-${release_branch}-to-master ${fetch_remote}/master"
+  echo "- Merge the ${release_branch} into your merge-${release_branch}-to-master branch:"
+  echo "   git merge -s recursive -X ours ${fetch_remote}/${release_branch}"
+  echo "   - It's possible you have merge conflicts that weren't resolved by the merge strategy."
   echo "     - You will almost always want to take what is in HEAD"
   echo "   - If you are not SURE how to solve these correctly, ask for help."
   echo "   - It is possible to break other people's work if you didn't understand why"
