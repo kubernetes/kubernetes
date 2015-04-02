@@ -25,15 +25,22 @@ import (
 	"github.com/emicklei/go-restful"
 )
 
-func IndexHandler(container *restful.Container, muxHelper *MuxHelper) func(http.ResponseWriter, *http.Request) {
+func IndexHandler(containers []*restful.Container, muxHelpers []*MuxHelper) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var handledPaths []string
+
 		// Extract the paths handled using restful.WebService
-		for _, ws := range container.RegisteredWebServices() {
-			handledPaths = append(handledPaths, ws.RootPath())
+		for _, container := range containers {
+			for _, ws := range container.RegisteredWebServices() {
+				handledPaths = append(handledPaths, ws.RootPath())
+			}
 		}
+
 		// Extract the paths handled using mux handler.
-		handledPaths = append(handledPaths, muxHelper.RegisteredPaths...)
+		for _, muxHelper := range muxHelpers {
+			handledPaths = append(handledPaths, muxHelper.RegisteredPaths...)
+		}
+
 		sort.Strings(handledPaths)
 		writeRawJSON(http.StatusOK, api.RootPaths{Paths: handledPaths}, w)
 	}

@@ -38,7 +38,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/authenticator"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/authorizer"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/handlers"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/master/ports"
@@ -353,8 +352,7 @@ func logStackOnRecover(panicReason interface{}, httpWriter http.ResponseWriter) 
 	glog.Errorln(buffer.String())
 }
 
-// init initializes master.
-func (m *Master) init(c *Config) {
+func (m *Master) InstallAPI(c *Config, container *restful.Container, insecure bool) {
 	podStorage, bindingStorage, podStatusStorage := podetcd.NewStorage(c.EtcdHelper)
 	podRegistry := pod.NewRegistry(podStorage)
 
@@ -402,95 +400,124 @@ func (m *Master) init(c *Config) {
 		"secrets":               secret.NewStorage(secretRegistry),
 	}
 
-	apiVersions := []string{"v1beta1", "v1beta2"}
-	if err := m.api_v1beta1().InstallREST(m.handlerContainer); err != nil {
+	authorizer := m.authorizer
+	if insecure {
+		authorizer = nil
+	}
+
+	if err := m.api_v1beta1(authorizer).InstallREST(container); err != nil {
 		glog.Fatalf("Unable to setup API v1beta1: %v", err)
 	}
-	if err := m.api_v1beta2().InstallREST(m.handlerContainer); err != nil {
+	if err := m.api_v1beta2(authorizer).InstallREST(container); err != nil {
 		glog.Fatalf("Unable to setup API v1beta2: %v", err)
 	}
 	if m.v1beta3 {
-		if err := m.api_v1beta3().InstallREST(m.handlerContainer); err != nil {
+		if err := m.api_v1beta3(authorizer).InstallREST(container); err != nil {
 			glog.Fatalf("Unable to setup API v1beta3: %v", err)
 		}
-		apiVersions = []string{"v1beta1", "v1beta2", "v1beta3"}
 	}
 
-	apiserver.InstallSupport(m.muxHelper, m.rootWebService)
-	apiserver.AddApiWebService(m.handlerContainer, c.APIPrefix, apiVersions)
+}
+
+func (m *Master) GetAPIVersions() []string {
+	if m.v1beta3 {
+		return []string{"v1beta1", "v1beta2", "v1beta3"}
+	}
+
+	return []string{"v1beta1", "v1beta2"}
+}
+
+func (m *Master) BuildGenericallyAuthorizedMux(c *Config, apiContainer *restful.Container) *http.ServeMux {
+	// all these things are secured behind a generic authorizer
+	genericallyAuthorizedMux := http.NewServeMux()
+	genericallyAuthorizedMuxHelper := &apiserver.MuxHelper{genericallyAuthorizedMux, []string{}}
+	genericContainer := NewHandlerContainer(genericallyAuthorizedMux)
+	rootWebService := new(restful.WebService)
+	apiserver.InstallSupport(genericallyAuthorizedMuxHelper, rootWebService)
+	genericContainer.Add(rootWebService)
+	apiserver.AddAPIWebService(NewHandlerContainer(genericallyAuthorizedMux), c.APIPrefix, m.GetAPIVersions())
 
 	// Register root handler.
 	// We do not register this using restful Webservice since we do not want to surface this in api docs.
 	// Allow master to be embedded in contexts which already have something registered at the root
 	if c.EnableIndex {
-		m.mux.HandleFunc("/", apiserver.IndexHandler(m.handlerContainer, m.muxHelper))
+		genericallyAuthorizedMux.HandleFunc("/", apiserver.IndexHandler([]*restful.Container{apiContainer, genericContainer}, []*apiserver.MuxHelper{genericallyAuthorizedMuxHelper}))
 	}
 
-	// TODO: use go-restful
-	apiserver.InstallValidator(m.muxHelper, func() map[string]apiserver.Server { return m.getServersToValidate(c) })
+	apiserver.InstallValidator(genericallyAuthorizedMuxHelper, func() map[string]apiserver.Server { return m.getServersToValidate(c) })
 	if c.EnableLogsSupport {
-		apiserver.InstallLogsSupport(m.muxHelper)
+		apiserver.InstallLogsSupport(genericallyAuthorizedMuxHelper)
 	}
 	if c.EnableUISupport {
-		ui.InstallSupport(m.muxHelper, m.enableSwaggerSupport)
+		// TODO split swagger off so we don't protect it
+		ui.InstallSupport(genericallyAuthorizedMuxHelper, m.enableSwaggerSupport)
 	}
 
 	if c.EnableProfiling {
-		m.mux.HandleFunc("/debug/pprof/", pprof.Index)
-		m.mux.HandleFunc("/debug/pprof/profile", pprof.Profile)
-		m.mux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
+		genericallyAuthorizedMuxHelper.HandleFunc("/debug/pprof/", pprof.Index)
+		genericallyAuthorizedMuxHelper.HandleFunc("/debug/pprof/profile", pprof.Profile)
+		genericallyAuthorizedMuxHelper.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
 	}
-
-	handler := http.Handler(m.mux.(*http.ServeMux))
-
-	// TODO: handle CORS and auth using go-restful
-	// See github.com/emicklei/go-restful/blob/master/examples/restful-CORS-filter.go, and
-	// github.com/emicklei/go-restful/blob/master/examples/restful-basic-authentication.go
-
-	if len(c.CorsAllowedOriginList) > 0 {
-		allowedOriginRegexps, err := util.CompileRegexps(c.CorsAllowedOriginList)
-		if err != nil {
-			glog.Fatalf("Invalid CORS allowed origin, --cors_allowed_origins flag was set to %v - %v", strings.Join(c.CorsAllowedOriginList, ","), err)
-		}
-		handler = apiserver.CORS(handler, allowedOriginRegexps, nil, nil, "true")
-	}
-
-	m.InsecureHandler = handler
-
-	attributeGetter := apiserver.NewRequestAttributeGetter(m.requestContextMapper, latest.RESTMapper, "api")
-	handler = apiserver.WithAuthorizationCheck(handler, attributeGetter, m.authorizer)
-
-	// Install Authenticator
-	if c.Authenticator != nil {
-		authenticatedHandler, err := handlers.NewRequestAuthenticator(m.requestContextMapper, c.Authenticator, handlers.Unauthorized, handler)
-		if err != nil {
-			glog.Fatalf("Could not initialize authenticator: %v", err)
-		}
-		handler = authenticatedHandler
-	}
-
-	// Install root web services
-	m.handlerContainer.Add(m.rootWebService)
-
-	// TODO: Make this optional?  Consumers of master depend on this currently.
-	m.Handler = handler
 
 	if m.enableSwaggerSupport {
-		m.InstallSwaggerAPI()
+		m.InstallSwaggerAPI(NewHandlerContainer(genericallyAuthorizedMux))
 	}
 
-	// After all wrapping is done, put a context filter around both handlers
-	if handler, err := api.NewRequestContextFilter(m.requestContextMapper, m.Handler); err != nil {
+	return genericallyAuthorizedMux
+}
+
+func (m *Master) BuildAuthenticatedMux(c *Config, apiContainer *restful.Container, delegate http.Handler) *http.ServeMux {
+	authenticatedMux := http.NewServeMux()
+	authenticatedMux.Handle("/", delegate)
+	authenticatedMux.Handle(c.APIPrefix, delegate)
+	authenticatedMux.Handle(c.APIPrefix+"/", http.Handler(apiContainer))
+
+	return authenticatedMux
+}
+
+func (m *Master) BuildOpenMux(c *Config, delegate http.Handler) *http.ServeMux {
+	openMux := http.NewServeMux()
+	openMux.Handle("/", delegate)
+
+	return openMux
+}
+
+// init initializes master.
+func (m *Master) init(c *Config) {
+	secureAPIContainer := NewHandlerContainer(http.NewServeMux())
+	m.InstallAPI(c, secureAPIContainer, false)
+
+	genericallyAuthorizedMux := m.BuildGenericallyAuthorizedMux(c, secureAPIContainer)
+	genericallyAuthorizedHandler := http.Handler(genericallyAuthorizedMux)
+	genericallyAuthorizedHandler = apiserver.WithGenericAuthorizationCheck(genericallyAuthorizedHandler, m.requestContextMapper, m.authorizer)
+
+	authenticatedMux := m.BuildAuthenticatedMux(c, secureAPIContainer, genericallyAuthorizedHandler)
+	authenticatedHandler := http.Handler(authenticatedMux)
+	authenticatedHandler = apiserver.WithAuthenticationCheck(authenticatedHandler, c.Authenticator, m.requestContextMapper)
+
+	openMux := m.BuildOpenMux(c, authenticatedHandler)
+	openHandler := http.Handler(openMux)
+	openHandler = apiserver.WithCORS(openHandler, c.CorsAllowedOriginList)
+	openHandler, err := api.NewRequestContextFilter(m.requestContextMapper, openHandler)
+	if err != nil {
 		glog.Fatalf("Could not initialize request context filter: %v", err)
-	} else {
-		m.Handler = handler
 	}
 
-	if handler, err := api.NewRequestContextFilter(m.requestContextMapper, m.InsecureHandler); err != nil {
+	m.Handler = openHandler
+
+	// put together the parts for the insecure version.
+	insecureAPIContainer := NewHandlerContainer(http.NewServeMux())
+	m.InstallAPI(c, insecureAPIContainer, true)
+
+	insecureHandler := http.Handler(genericallyAuthorizedMux)
+	insecureHandler = http.Handler(m.BuildAuthenticatedMux(c, insecureAPIContainer, insecureHandler))
+	insecureHandler = http.Handler(m.BuildOpenMux(c, insecureHandler))
+	insecureHandler = apiserver.WithCORS(insecureHandler, c.CorsAllowedOriginList)
+	insecureHandler, err = api.NewRequestContextFilter(m.requestContextMapper, insecureHandler)
+	if err != nil {
 		glog.Fatalf("Could not initialize request context filter: %v", err)
-	} else {
-		m.InsecureHandler = handler
 	}
+	m.InsecureHandler = insecureHandler
 
 	// TODO: Attempt clean shutdown?
 	m.masterServices.Start()
@@ -500,7 +527,7 @@ func (m *Master) init(c *Config) {
 // and traversal.  It is optional to allow consumers of the Kubernetes master to
 // register their own web services into the Kubernetes mux prior to initialization
 // of swagger, so that other resource types show up in the documentation.
-func (m *Master) InstallSwaggerAPI() {
+func (m *Master) InstallSwaggerAPI(container *restful.Container) {
 	hostAndPort := m.externalHost
 	protocol := "https://"
 
@@ -526,7 +553,7 @@ func (m *Master) InstallSwaggerAPI() {
 		SwaggerPath:     "/swaggerui/",
 		SwaggerFilePath: "/swagger-ui/",
 	}
-	swagger.RegisterSwaggerService(swaggerConfig, m.handlerContainer)
+	swagger.RegisterSwaggerService(swaggerConfig, container)
 }
 
 func (m *Master) getServersToValidate(c *Config) map[string]apiserver.Server {
@@ -583,7 +610,7 @@ func (m *Master) defaultAPIGroupVersion() *apiserver.APIGroupVersion {
 }
 
 // api_v1beta1 returns the resources and codec for API version v1beta1.
-func (m *Master) api_v1beta1() *apiserver.APIGroupVersion {
+func (m *Master) api_v1beta1(authorizer authorizer.APIAuthorizer) *apiserver.APIGroupVersion {
 	storage := make(map[string]rest.Storage)
 	for k, v := range m.storage {
 		storage[k] = v
@@ -592,11 +619,12 @@ func (m *Master) api_v1beta1() *apiserver.APIGroupVersion {
 	version.Storage = storage
 	version.Version = "v1beta1"
 	version.Codec = v1beta1.Codec
+	version.Authorizer = authorizer
 	return version
 }
 
 // api_v1beta2 returns the resources and codec for API version v1beta2.
-func (m *Master) api_v1beta2() *apiserver.APIGroupVersion {
+func (m *Master) api_v1beta2(authorizer authorizer.APIAuthorizer) *apiserver.APIGroupVersion {
 	storage := make(map[string]rest.Storage)
 	for k, v := range m.storage {
 		storage[k] = v
@@ -605,11 +633,12 @@ func (m *Master) api_v1beta2() *apiserver.APIGroupVersion {
 	version.Storage = storage
 	version.Version = "v1beta2"
 	version.Codec = v1beta2.Codec
+	version.Authorizer = authorizer
 	return version
 }
 
 // api_v1beta3 returns the resources and codec for API version v1beta3.
-func (m *Master) api_v1beta3() *apiserver.APIGroupVersion {
+func (m *Master) api_v1beta3(authorizer authorizer.APIAuthorizer) *apiserver.APIGroupVersion {
 	storage := make(map[string]rest.Storage)
 	for k, v := range m.storage {
 		if k == "minions" {
@@ -621,5 +650,6 @@ func (m *Master) api_v1beta3() *apiserver.APIGroupVersion {
 	version.Storage = storage
 	version.Version = "v1beta3"
 	version.Codec = v1beta3.Codec
+	version.Authorizer = authorizer
 	return version
 }
