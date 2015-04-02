@@ -28,6 +28,7 @@
   changed_when: false
   with_items:
           groups['minions']
+  when: inventory_hostname == groups['masters'][0]
 
 - name: Load minion definition into master
   command: /usr/bin/kubectl create -f /tmp/node-{{ item }}.json
@@ -36,12 +37,14 @@
   changed_when: "command_result.rc == 0"
   with_items:
           groups['minions']
+  when: inventory_hostname == groups['masters'][0]
 
 - name: Delete minion definitions from master
   file: path=/tmp/node-{{ item }}.json state=absent
   changed_when: false
   with_items:
           groups['minions']
+  when: inventory_hostname == groups['masters'][0]
 
 - include: firewalld.yml
   when: has_firewalld
