@@ -67,5 +67,6 @@ func (mounter *nfsMounter) List() ([]mount.MountPoint, error) {
 }
 
 func (mounter *nfsMounter) IsMountPoint(dir string) (bool, error) {
-	return mount.IsMountPoint(dir)
+	isMounter := mount.New()
+	return isMounter.IsMountPoint(dir)
 }

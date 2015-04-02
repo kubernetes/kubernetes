@@ -39,15 +39,32 @@ func (f *FakeMounter) ResetLog() {
 }
 
 func (f *FakeMounter) Mount(source string, target string, fstype string, flags uintptr, data string) error {
+	f.MountPoints = append(f.MountPoints, MountPoint{Device: source, Path: target, Type: fstype})
 	f.Log = append(f.Log, FakeAction{Action: FakeActionMount, Target: target, Source: source, FSType: fstype})
 	return nil
 }
 
 func (f *FakeMounter) Unmount(target string, flags int) error {
+	newMountpoints := []MountPoint{}
+	for _, mp := range f.MountPoints {
+		if mp.Path != target {
+			newMountpoints = append(newMountpoints, MountPoint{Device: mp.Device, Path: mp.Path, Type: mp.Type})
+		}
+	}
+	f.MountPoints = newMountpoints
 	f.Log = append(f.Log, FakeAction{Action: FakeActionUnmount, Target: target})
 	return nil
 }
 
 func (f *FakeMounter) List() ([]MountPoint, error) {
 	return f.MountPoints, nil
+}
+
+func (f *FakeMounter) IsMountPoint(file string) (bool, error) {
+	for _, mp := range f.MountPoints {
+		if mp.Path == file {
+			return true, nil
+		}
+	}
+	return false, nil
 }
