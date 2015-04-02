@@ -104,9 +104,8 @@ download-or-bust() {
   local -r url="$1"
   local -r file="${url##*/}"
   rm -f "$file"
-  until [[ -e "${1##*/}" ]]; do
-    echo "Downloading file ($1)"
-    curl --ipv4 -Lo "$file" --connect-timeout 20 --retry 6 --retry-delay 10 "$1"
+  until curl --ipv4 -Lo "$file" --connect-timeout 20 --retry 6 --retry-delay 10 "$1"; do
+    echo "Failed to download file ($1). Retrying."
   done
 }
 
