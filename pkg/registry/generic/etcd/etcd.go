@@ -62,12 +62,9 @@ type Etcd struct {
 	// Used for listing/watching; should not include trailing "/"
 	KeyRootFunc func(ctx api.Context) string
 
-	// Called for Create/Update/Get/Delete
+	// Called for Create/Update/Get/Delete. Note that 'namespace' can be
+	// gotten from ctx.
 	KeyFunc func(ctx api.Context, name string) (string, error)
-
-	// If field.Selector of Watch contains a label with such name, this will be
-	// translated to watching a single object (not all objects of that type).
-	WatchSingleFieldName string
 
 	// Called to get the name of an object
 	ObjectNameFunc func(obj runtime.Object) (string, error)
@@ -407,30 +404,32 @@ func (e *Etcd) finalizeDelete(obj runtime.Object, runHooks bool) (runtime.Object
 	return &api.Status{Status: api.StatusSuccess}, nil
 }
 
-// WatchPredicate starts a watch for the items that m matches.
+// Watch makes a matcher for the given label and field, and calls
+// WatchPredicate. If possible, you should customize PredicateFunc to produre a
+// matcher that matches by key.
 func (e *Etcd) Watch(ctx api.Context, label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
-	if value, found := field.RequiresExactMatch(e.WatchSingleFieldName); found && len(e.WatchSingleFieldName) > 0 {
-		key, err := e.KeyFunc(ctx, value)
-		if err != nil {
-			return nil, err
-		}
-		return e.watchPredicate(key, e.PredicateFunc(label, field), resourceVersion)
-	}
-	return e.watchPredicate(e.KeyRootFunc(ctx), e.PredicateFunc(label, field), resourceVersion)
+	return e.WatchPredicate(ctx, e.PredicateFunc(label, field), resourceVersion)
 }
 
 // WatchPredicate starts a watch for the items that m matches.
-// TODO: Detect if m references a single object instead of a list.
 func (e *Etcd) WatchPredicate(ctx api.Context, m generic.Matcher, resourceVersion string) (watch.Interface, error) {
-	return e.watchPredicate(e.KeyRootFunc(ctx), m, resourceVersion)
-}
-
-func (e *Etcd) watchPredicate(key string, m generic.Matcher, resourceVersion string) (watch.Interface, error) {
 	version, err := tools.ParseWatchResourceVersion(resourceVersion, e.EndpointName)
 	if err != nil {
 		return nil, err
 	}
-	return e.Helper.WatchList(key, version, func(obj runtime.Object) bool {
+
+	var watchKey string
+	if name, ok := m.MatchesSingle(); ok {
+		key, err := e.KeyFunc(ctx, name)
+		if err != nil {
+			return nil, err
+		}
+		watchKey = key
+	} else {
+		watchKey = e.KeyRootFunc(ctx)
+	}
+
+	return e.Helper.WatchList(watchKey, version, func(obj runtime.Object) bool {
 		matches, err := m.Matches(obj)
 		if err != nil {
 			glog.Errorf("unable to match watch: %v", err)

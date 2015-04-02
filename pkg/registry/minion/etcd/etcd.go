@@ -23,9 +23,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/rest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/generic"
 	etcdgeneric "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/generic/etcd"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/minion"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
@@ -49,14 +46,11 @@ func NewStorage(h tools.EtcdHelper, connection client.ConnectionInfoGetter) *RES
 		KeyFunc: func(ctx api.Context, name string) (string, error) {
 			return prefix + "/" + name, nil
 		},
-		WatchSingleFieldName: "name",
 		ObjectNameFunc: func(obj runtime.Object) (string, error) {
 			return obj.(*api.Node).Name, nil
 		},
-		PredicateFunc: func(label labels.Selector, field fields.Selector) generic.Matcher {
-			return minion.MatchNode(label, field)
-		},
-		EndpointName: "minion",
+		PredicateFunc: minion.MatchNode,
+		EndpointName:  "minion",
 
 		CreateStrategy: minion.Strategy,
 		UpdateStrategy: minion.Strategy,
