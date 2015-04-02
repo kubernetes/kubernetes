@@ -153,6 +153,11 @@ func init() {
 				obj.Phase = NamespaceActive
 			}
 		},
+		func(obj *Minion) {
+			if obj.ExternalID == "" {
+				obj.ExternalID = obj.ID
+			}
+		},
 	)
 }
 

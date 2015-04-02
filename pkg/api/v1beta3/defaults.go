@@ -108,6 +108,11 @@ func init() {
 				obj.Phase = NamespaceActive
 			}
 		},
+		func(obj *Node) {
+			if obj.Spec.ExternalID == "" {
+				obj.Spec.ExternalID = obj.Name
+			}
+		},
 	)
 }
 
