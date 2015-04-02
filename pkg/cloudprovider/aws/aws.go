@@ -640,10 +640,12 @@ func (self *awsInstance) getInfo() (*ec2.Instance, error) {
 	return &resp.Reservations[0].Instances[0], nil
 }
 
-func (self *awsInstance) assignMountDevice(volumeId string) (string, error) {
+// Assigns an unused mount device for the specified volume.
+// If the volume is already assigned, this will return the existing mount device and true
+func (self *awsInstance) assignMountDevice(volumeId string) (mountDevice string, alreadyAttached bool, err error) {
 	instanceType := self.getInstanceType()
 	if instanceType == nil {
-		return "", fmt.Errorf("could not get instance type for instance: %s", self.awsId)
+		return "", false, fmt.Errorf("could not get instance type for instance: %s", self.awsId)
 	}
 
 	// We lock to prevent concurrent mounts from conflicting
@@ -656,7 +658,7 @@ func (self *awsInstance) assignMountDevice(volumeId string) (string, error) {
 	if self.deviceMappings == nil {
 		info, err := self.getInfo()
 		if err != nil {
-			return "", err
+			return "", false, err
 		}
 		deviceMappings := map[string]string{}
 		for _, blockDevice := range info.BlockDevices {
@@ -669,7 +671,7 @@ func (self *awsInstance) assignMountDevice(volumeId string) (string, error) {
 	for deviceName, mappingVolumeId := range self.deviceMappings {
 		if volumeId == mappingVolumeId {
 			glog.Warningf("Got assignment call for already-assigned volume: %s@%s", deviceName, mappingVolumeId)
-			return deviceName, nil
+			return deviceName, true, nil
 		}
 	}
 
@@ -686,13 +688,13 @@ func (self *awsInstance) assignMountDevice(volumeId string) (string, error) {
 
 	if chosen == "" {
 		glog.Warningf("Could not assign a mount device (all in use?).  mappings=%v, valid=%v", self.deviceMappings, valid)
-		return "", nil
+		return "", false, nil
 	}
 
 	self.deviceMappings[chosen] = volumeId
 	glog.V(2).Infof("Assigned mount device %s -> volume %s", chosen, volumeId)
 
-	return chosen, nil
+	return chosen, false, nil
 }
 
 func (self *awsInstance) releaseMountDevice(volumeId string, mountDevice string) {
@@ -841,7 +843,7 @@ func (aws *AWSCloud) AttachDisk(instanceName string, diskName string, readOnly b
 		return errors.New("AWS volumes cannot be mounted read-only")
 	}
 
-	mountDevice, err := awsInstance.assignMountDevice(disk.awsId)
+	mountDevice, alreadyAttached, err := awsInstance.assignMountDevice(disk.awsId)
 	if err != nil {
 		return err
 	}
@@ -853,13 +855,15 @@ func (aws *AWSCloud) AttachDisk(instanceName string, diskName string, readOnly b
 		}
 	}()
 
-	attachResponse, err := aws.ec2.AttachVolume(disk.awsId, awsInstance.awsId, mountDevice)
-	if err != nil {
-		// TODO: Check if already attached?
-		return fmt.Errorf("Error attaching EBS volume: %v", err)
-	}
+	if !alreadyAttached {
+		attachResponse, err := aws.ec2.AttachVolume(disk.awsId, awsInstance.awsId, mountDevice)
+		if err != nil {
+			// TODO: Check if already attached?
+			return fmt.Errorf("Error attaching EBS volume: %v", err)
+		}
 
-	glog.V(2).Info("AttachVolume request returned %v", attachResponse)
+		glog.V(2).Info("AttachVolume request returned %v", attachResponse)
+	}
 
 	err = disk.waitForAttachmentStatus("attached")
 	if err != nil {
