@@ -308,12 +308,15 @@ type Proxier struct {
 	listenIP      net.IP
 	iptables      iptables.Interface
 	hostIP        net.IP
+	extIf        string
+	intIf	     string
+	extName	     string
 }
 
 // NewProxier returns a new Proxier given a LoadBalancer and an address on
 // which to listen.  Because of the iptables logic, It is assumed that there
 // is only a single Proxier active on a machine.
-func NewProxier(loadBalancer LoadBalancer, listenIP net.IP, iptables iptables.Interface) *Proxier {
+func NewProxier(loadBalancer LoadBalancer, listenIP net.IP, iptables iptables.Interface, extIf string, intIf string, extName string) *Proxier {
 	if listenIP.Equal(localhostIPv4) || listenIP.Equal(localhostIPv6) {
 		glog.Errorf("Can't proxy only on localhost - iptables can't do it")
 		return nil
@@ -325,10 +328,10 @@ func NewProxier(loadBalancer LoadBalancer, listenIP net.IP, iptables iptables.In
 		return nil
 	}
 	glog.Infof("Setting Proxy IP to %v", hostIP)
-	return CreateProxier(loadBalancer, listenIP, iptables, hostIP)
+	return CreateProxier(loadBalancer, listenIP, iptables, hostIP, extIf, intIf, extName)
 }
 
-func CreateProxier(loadBalancer LoadBalancer, listenIP net.IP, iptables iptables.Interface, hostIP net.IP) *Proxier {
+func CreateProxier(loadBalancer LoadBalancer, listenIP net.IP, iptables iptables.Interface, hostIP net.IP, extIf string, intIf string, extName string) *Proxier {
 	glog.Infof("Initializing iptables")
 	// Clean up old messes.  Ignore erors.
 	iptablesDeleteOld(iptables)
@@ -349,6 +352,9 @@ func CreateProxier(loadBalancer LoadBalancer, listenIP net.IP, iptables iptables
 		listenIP:     listenIP,
 		iptables:     iptables,
 		hostIP:       hostIP,
+		extIf:	      extIf,
+		intIf:	      intIf,
+		extName:      extName,
 	}
 }
 

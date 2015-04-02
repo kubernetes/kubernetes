@@ -43,6 +43,9 @@ type ProxyServer struct {
 	HealthzPort        int
 	HealthzBindAddress util.IP
 	OOMScoreAdj        int
+	extIf		   string
+	intIf		   string
+	extName		   string
 }
 
 // NewProxyServer creates a new ProxyServer object with default parameters
@@ -62,6 +65,8 @@ func (s *ProxyServer) AddFlags(fs *pflag.FlagSet) {
 	fs.IntVar(&s.HealthzPort, "healthz_port", s.HealthzPort, "The port to bind the health check server. Use 0 to disable.")
 	fs.Var(&s.HealthzBindAddress, "healthz_bind_address", "The IP address for the health check server to serve on, defaulting to 127.0.0.1 (set to 0.0.0.0 for all interfaces)")
 	fs.IntVar(&s.OOMScoreAdj, "oom_score_adj", s.OOMScoreAdj, "The oom_score_adj value for kube-proxy process. Values must be within the range [-1000, 1000]")
+	fs.StringVar(&s.extIf, "external_iface", "", "The interface (if any) that serves as the external interface to proxy external mappings on")
+	fs.StringVar(&s.intIf, "internal_iface", "", "The interface (if any) that serves as the internal interface to proxy external mappings on")
 }
 
 // Run runs the specified ProxyServer.  This should never exit.
@@ -78,7 +83,7 @@ func (s *ProxyServer) Run(_ []string) error {
 		protocol = iptables.ProtocolIpv6
 	}
 	loadBalancer := proxy.NewLoadBalancerRR()
-	proxier := proxy.NewProxier(loadBalancer, net.IP(s.BindAddress), iptables.New(exec.New(), protocol))
+	proxier := proxy.NewProxier(loadBalancer, net.IP(s.BindAddress), iptables.New(exec.New(), protocol), s.extIf, s.intIf, "")
 	if proxier == nil {
 		glog.Fatalf("failed to create proxier, aborting")
 	}
