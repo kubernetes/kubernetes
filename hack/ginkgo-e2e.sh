@@ -95,12 +95,12 @@ if [[ -z "${AUTH_CONFIG:-}" ]];  then
         "--kubeconfig=${HOME}/.kubernetes_vagrant_kubeconfig"
       )
     elif [[ "${KUBERNETES_PROVIDER}" == "gke" ]]; then
-      # With GKE, our auth and certs are in gcloud's config directory.
+      # GKE stores its own kubeconfig in gcloud's config directory.
       detect-project &> /dev/null
-      cfg_dir="${GCLOUD_CONFIG_DIR}/${PROJECT}.${ZONE}.${CLUSTER_NAME}"
       auth_config=(
-        "--auth_config=${cfg_dir}/kubernetes_auth"
-        "--cert_dir=${cfg_dir}"
+        "--kubeconfig=${GCLOUD_CONFIG_DIR}/kubeconfig"
+        # gcloud doesn't set the current-context, so we have to set it
+        "--context=gke_${PROJECT}_${ZONE}_${CLUSTER_NAME}"
       )
     elif [[ "${KUBERNETES_PROVIDER}" == "gce" ]]; then
       auth_config=(

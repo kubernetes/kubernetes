@@ -60,8 +60,8 @@ func ClusterLevelLoggingWithElasticsearch(c *client.Client) {
 	// TODO: For now assume we are only testing cluster logging with Elasticsearch
 	// on GCE. Once we are sure that Elasticsearch cluster level logging
 	// works for other providers we should widen this scope of this test.
-	if testContext.provider != "gce" {
-		Logf("Skipping cluster level logging test for provider %s", testContext.provider)
+	if testContext.Provider != "gce" {
+		Logf("Skipping cluster level logging test for provider %s", testContext.Provider)
 		return
 	}
 

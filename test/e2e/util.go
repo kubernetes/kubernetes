@@ -41,17 +41,18 @@ const (
 	podStartTimeout = 5 * time.Minute
 )
 
-type testContextType struct {
-	kubeConfig string
-	authConfig string
-	certDir    string
-	host       string
-	repoRoot   string
-	provider   string
-	gceConfig  GCEConfig
+type TestContextType struct {
+	KubeConfig  string
+	KubeContext string
+	AuthConfig  string
+	CertDir     string
+	Host        string
+	RepoRoot    string
+	Provider    string
+	GCEConfig   GCEConfig
 }
 
-var testContext testContextType
+var testContext TestContextType
 
 func Logf(format string, a ...interface{}) {
 	fmt.Fprintf(GinkgoWriter, "INFO: "+format+"\n", a...)
@@ -133,32 +134,37 @@ func waitForPodSuccess(c *client.Client, podName string, contName string) error 
 
 func loadConfig() (*client.Config, error) {
 	switch {
-	case testContext.kubeConfig != "":
-		fmt.Printf(">>> testContext.kubeConfig: %s\n", testContext.kubeConfig)
-		c, err := clientcmd.LoadFromFile(testContext.kubeConfig)
+	case testContext.KubeConfig != "":
+		fmt.Printf(">>> testContext.KubeConfig: %s\n", testContext.KubeConfig)
+		c, err := clientcmd.LoadFromFile(testContext.KubeConfig)
 		if err != nil {
-			return nil, fmt.Errorf("error loading kubeConfig: %v", err.Error())
+			return nil, fmt.Errorf("error loading KubeConfig: %v", err.Error())
+		}
+		if testContext.KubeContext != "" {
+			fmt.Printf(">>> testContext.KubeContext: %s\n", testContext.KubeContext)
+			c.CurrentContext = testContext.KubeContext
 		}
 		return clientcmd.NewDefaultClientConfig(*c, &clientcmd.ConfigOverrides{}).ClientConfig()
-	case testContext.authConfig != "":
+	case testContext.AuthConfig != "":
+		fmt.Printf(">>> testContext.AuthConfig: %s\n", testContext.AuthConfig)
 		config := &client.Config{
-			Host: testContext.host,
+			Host: testContext.Host,
 		}
-		info, err := clientauth.LoadFromFile(testContext.authConfig)
+		info, err := clientauth.LoadFromFile(testContext.AuthConfig)
 		if err != nil {
-			return nil, fmt.Errorf("error loading authConfig: %v", err.Error())
+			return nil, fmt.Errorf("error loading AuthConfig: %v", err.Error())
 		}
 		// If the certificate directory is provided, set the cert paths to be there.
-		if testContext.certDir != "" {
-			Logf("Expecting certs in %v.", testContext.certDir)
-			info.CAFile = filepath.Join(testContext.certDir, "ca.crt")
-			info.CertFile = filepath.Join(testContext.certDir, "kubecfg.crt")
-			info.KeyFile = filepath.Join(testContext.certDir, "kubecfg.key")
+		if testContext.CertDir != "" {
+			Logf("Expecting certs in %v.", testContext.CertDir)
+			info.CAFile = filepath.Join(testContext.CertDir, "ca.crt")
+			info.CertFile = filepath.Join(testContext.CertDir, "kubecfg.crt")
+			info.KeyFile = filepath.Join(testContext.CertDir, "kubecfg.key")
 		}
 		mergedConfig, err := info.MergeWithConfig(*config)
 		return &mergedConfig, err
 	default:
-		return nil, fmt.Errorf("either kubeConfig or authConfig must be specified to load client config")
+		return nil, fmt.Errorf("either KubeConfig or AuthConfig must be specified to load client config")
 	}
 }
 
@@ -267,21 +273,21 @@ func validateController(c *client.Client, containerImage string, replicas int, c
 // kubectlCmd runs the kubectl executable.
 func kubectlCmd(args ...string) *exec.Cmd {
 	defaultArgs := []string{}
-	if testContext.kubeConfig != "" {
-		defaultArgs = append(defaultArgs, "--"+clientcmd.RecommendedConfigPathFlag+"="+testContext.kubeConfig)
+	if testContext.KubeConfig != "" {
+		defaultArgs = append(defaultArgs, "--"+clientcmd.RecommendedConfigPathFlag+"="+testContext.KubeConfig)
 	} else {
-		defaultArgs = append(defaultArgs, "--"+clientcmd.FlagAuthPath+"="+testContext.authConfig)
-		if testContext.certDir != "" {
+		defaultArgs = append(defaultArgs, "--"+clientcmd.FlagAuthPath+"="+testContext.AuthConfig)
+		if testContext.CertDir != "" {
 			defaultArgs = append(defaultArgs,
-				fmt.Sprintf("--certificate-authority=%s", filepath.Join(testContext.certDir, "ca.crt")),
-				fmt.Sprintf("--client-certificate=%s", filepath.Join(testContext.certDir, "kubecfg.crt")),
-				fmt.Sprintf("--client-key=%s", filepath.Join(testContext.certDir, "kubecfg.key")))
+				fmt.Sprintf("--certificate-authority=%s", filepath.Join(testContext.CertDir, "ca.crt")),
+				fmt.Sprintf("--client-certificate=%s", filepath.Join(testContext.CertDir, "kubecfg.crt")),
+				fmt.Sprintf("--client-key=%s", filepath.Join(testContext.CertDir, "kubecfg.key")))
 		}
 	}
 	kubectlArgs := append(defaultArgs, args...)
 	// TODO: Remove this once gcloud writes a proper entry in the kubeconfig file.
-	if testContext.provider == "gke" {
-		kubectlArgs = append(kubectlArgs, "--server="+testContext.host)
+	if testContext.Provider == "gke" {
+		kubectlArgs = append(kubectlArgs, "--server="+testContext.Host)
 	}
 	//TODO: the "kubectl" path string might be worth externalizing into an (optional) ginko arg.
 	cmd := exec.Command("kubectl", kubectlArgs...)

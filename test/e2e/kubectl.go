@@ -53,7 +53,7 @@ var _ = Describe("kubectl", func() {
 
 	Describe("update-demo", func() {
 		var (
-			updateDemoRoot = filepath.Join(testContext.repoRoot, "examples/update-demo/v1beta1")
+			updateDemoRoot = filepath.Join(testContext.RepoRoot, "examples/update-demo/v1beta1")
 			nautilusPath   = filepath.Join(updateDemoRoot, "nautilus-rc.yaml")
 			kittenPath     = filepath.Join(updateDemoRoot, "kitten-rc.yaml")
 		)
@@ -94,7 +94,7 @@ var _ = Describe("kubectl", func() {
 	})
 
 	Describe("guestbook", func() {
-		var guestbookPath = filepath.Join(testContext.repoRoot, "examples/guestbook")
+		var guestbookPath = filepath.Join(testContext.RepoRoot, "examples/guestbook")
 
 		It("should create and stop a working application", func() {
 			defer cleanup(guestbookPath, frontendSelector, redisMasterSelector, redisSlaveSelector)

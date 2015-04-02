@@ -108,7 +108,7 @@ if [[ "$KUBERNETES_PROVIDER" == "gke" ]]; then
   kubectl="${GCLOUD}"
   # GKE runs kubectl through gcloud.
   config=(
-    "preview"
+    "alpha"
     "container"
     "kubectl"
     "--project=${PROJECT}"

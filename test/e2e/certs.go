@@ -32,14 +32,14 @@ var _ = Describe("MasterCerts", func() {
 	})
 
 	It("should have all expected certs on the master", func() {
-		if testContext.provider != "gce" && testContext.provider != "gke" {
-			By(fmt.Sprintf("Skipping MasterCerts test for cloud provider %s (only supported for gce and gke)", testContext.provider))
+		if testContext.Provider != "gce" && testContext.Provider != "gke" {
+			By(fmt.Sprintf("Skipping MasterCerts test for cloud provider %s (only supported for gce and gke)", testContext.Provider))
 			return
 		}
 
 		for _, certFile := range []string{"kubecfg.key", "kubecfg.crt", "ca.crt"} {
-			cmd := exec.Command("gcloud", "compute", "ssh", "--project", testContext.gceConfig.ProjectID,
-				"--zone", testContext.gceConfig.Zone, testContext.gceConfig.MasterName,
+			cmd := exec.Command("gcloud", "compute", "ssh", "--project", testContext.GCEConfig.ProjectID,
+				"--zone", testContext.GCEConfig.Zone, testContext.GCEConfig.MasterName,
 				"--command", fmt.Sprintf("ls /srv/kubernetes/%s", certFile))
 			if _, err := cmd.CombinedOutput(); err != nil {
 				Fail(fmt.Sprintf("Error checking for cert file %s on master: %v", certFile, err))

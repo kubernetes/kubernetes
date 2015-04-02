@@ -46,7 +46,7 @@ var _ = Describe("Services", func() {
 	})
 
 	It("should provide DNS for the cluster", func() {
-		if testContext.provider == "vagrant" {
+		if testContext.Provider == "vagrant" {
 			By("Skipping test which is broken for vagrant (See https://github.com/GoogleCloudPlatform/kubernetes/issues/3580)")
 			return
 		}

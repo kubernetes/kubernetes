@@ -28,29 +28,34 @@ import (
 )
 
 var (
-	kubeConfig = flag.String(clientcmd.RecommendedConfigPathFlag, "", "Path to kubeconfig containing embeded authinfo. Will use cluster/user info from 'current-context'")
-	authConfig = flag.String("auth_config", "", "Path to the auth info file.")
-	certDir    = flag.String("cert_dir", "", "Path to the directory containing the certs. Default is empty, which doesn't use certs.")
-	gceProject = flag.String("gce_project", "", "The GCE project being used, if applicable")
-	gceZone    = flag.String("gce_zone", "", "GCE zone being used, if applicable")
-	host       = flag.String("host", "", "The host to connect to")
-	masterName = flag.String("kube_master", "", "Name of the kubernetes master. Only required if provider is gce or gke")
-	provider   = flag.String("provider", "", "The name of the Kubernetes provider")
-	orderseed  = flag.Int64("orderseed", 0, "If non-zero, seed of random test shuffle order. (Otherwise random.)")
-	repoRoot   = flag.String("repo_root", "./", "Root directory of kubernetes repository, for finding test files. Default assumes working directory is repository root")
-	reportDir  = flag.String("report_dir", "", "Path to the directory where the JUnit XML reports should be saved. Default is empty, which doesn't generate these reports.")
-	times      = flag.Int("times", 1, "Number of times each test is eligible to be run. Individual order is determined by shuffling --times instances of each test using --orderseed (like a multi-deck shoe of cards).")
-	testList   util.StringList
+	context   = &e2e.TestContextType{}
+	gceConfig = &context.GCEConfig
+
+	orderseed = flag.Int64("orderseed", 0, "If non-zero, seed of random test shuffle order. (Otherwise random.)")
+	reportDir = flag.String("report_dir", "", "Path to the directory where the JUnit XML reports should be saved. Default is empty, which doesn't generate these reports.")
+	times     = flag.Int("times", 1, "Number of times each test is eligible to be run. Individual order is determined by shuffling --times instances of each test using --orderseed (like a multi-deck shoe of cards).")
+	testList  util.StringList
 )
 
 func init() {
 	flag.VarP(&testList, "test", "t", "Test to execute (may be repeated or comma separated list of tests.) Defaults to running all tests.")
+
+	flag.StringVar(&context.KubeConfig, clientcmd.RecommendedConfigPathFlag, "", "Path to kubeconfig containing embeded authinfo.")
+	flag.StringVar(&context.KubeContext, clientcmd.FlagContext, "", "kubeconfig context to use/override. If unset, will use value from 'current-context'")
+	flag.StringVar(&context.AuthConfig, "auth_config", "", "Path to the auth info file.")
+	flag.StringVar(&context.CertDir, "cert_dir", "", "Path to the directory containing the certs. Default is empty, which doesn't use certs.")
+	flag.StringVar(&context.Host, "host", "", "The host to connect to")
+	flag.StringVar(&context.RepoRoot, "repo_root", "./", "Root directory of kubernetes repository, for finding test files. Default assumes working directory is repository root")
+	flag.StringVar(&context.Provider, "provider", "", "The name of the Kubernetes provider")
+	flag.StringVar(&gceConfig.MasterName, "kube_master", "", "Name of the kubernetes master. Only required if provider is gce or gke")
+	flag.StringVar(&gceConfig.ProjectID, "gce_project", "", "The GCE project being used, if applicable")
+	flag.StringVar(&gceConfig.Zone, "gce_zone", "", "GCE zone being used, if applicable")
 }
 
 func main() {
 	util.InitFlags()
 	goruntime.GOMAXPROCS(goruntime.NumCPU())
-	if *provider == "" {
+	if context.Provider == "" {
 		glog.Info("The --provider flag is not set.  Treating as a conformance test.  Some tests may not be run.")
 		os.Exit(1)
 	}
@@ -58,10 +63,5 @@ func main() {
 		glog.Error("Invalid --times (negative or no testing requested)!")
 		os.Exit(1)
 	}
-	gceConfig := &e2e.GCEConfig{
-		ProjectID:  *gceProject,
-		Zone:       *gceZone,
-		MasterName: *masterName,
-	}
-	e2e.RunE2ETests(*kubeConfig, *authConfig, *certDir, *host, *repoRoot, *provider, gceConfig, *orderseed, *times, *reportDir, testList)
+	e2e.RunE2ETests(context, *orderseed, *times, *reportDir, testList)
 }

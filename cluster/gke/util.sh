@@ -91,6 +91,7 @@ function verify-prereqs() {
     gcloud_prompt="-q"
   fi
   gcloud ${gcloud_prompt:-} components update preview || true
+  gcloud ${gcloud_prompt:-} components update alpha || true
   gcloud ${gcloud_prompt:-} components update || true
 }
 
@@ -128,7 +129,7 @@ function kube-up() {
   fi
 
   # Bring up the cluster.
-  "${GCLOUD}" preview container clusters create "${CLUSTER_NAME}" \
+  "${GCLOUD}" alpha container clusters create "${CLUSTER_NAME}" \
     --zone="${ZONE}" \
     --project="${PROJECT}" \
     --cluster-api-version="${CLUSTER_API_VERSION:-}" \
@@ -175,10 +176,10 @@ function test-setup() {
 function get-password() {
   echo "... in get-password()" >&2
   detect-project >&2
-  KUBE_USER=$("${GCLOUD}" preview container clusters describe \
+  KUBE_USER=$("${GCLOUD}" alpha container clusters describe \
     --project="${PROJECT}" --zone="${ZONE}" "${CLUSTER_NAME}" \
     | grep user | cut -f 4 -d ' ')
-  KUBE_PASSWORD=$("${GCLOUD}" preview container clusters describe \
+  KUBE_PASSWORD=$("${GCLOUD}" alpha container clusters describe \
     --project="${PROJECT}" --zone="${ZONE}" "${CLUSTER_NAME}" \
     | grep password | cut -f 4 -d ' ')
 }
@@ -195,7 +196,7 @@ function detect-master() {
   echo "... in detect-master()" >&2
   detect-project >&2
   KUBE_MASTER="k8s-${CLUSTER_NAME}-master"
-  KUBE_MASTER_IP=$("${GCLOUD}" preview container clusters describe \
+  KUBE_MASTER_IP=$("${GCLOUD}" alpha container clusters describe \
     --project="${PROJECT}" --zone="${ZONE}" "${CLUSTER_NAME}" \
     | grep endpoint | cut -f 2 -d ' ')
 }
@@ -218,7 +219,7 @@ function detect-minions() {
 function detect-minion-names {
   detect-project
   export MINION_NAMES=""
-  count=$("${GCLOUD}" preview container clusters describe --project="${PROJECT}" --zone="${ZONE}" "${CLUSTER_NAME}" | grep numNodes | cut -f 2 -d ' ')
+  count=$("${GCLOUD}" alpha container clusters describe --project="${PROJECT}" --zone="${ZONE}" "${CLUSTER_NAME}" | grep numNodes | cut -f 2 -d ' ')
   for x in $(seq 1 $count); do
     export MINION_NAMES="${MINION_NAMES} k8s-${CLUSTER_NAME}-node-${x} ";
   done
@@ -286,6 +287,6 @@ function test-teardown() {
 function kube-down() {
   echo "... in kube-down()" >&2
   detect-project >&2
-  "${GCLOUD}" preview container clusters delete --project="${PROJECT}" \
+  "${GCLOUD}" alpha container clusters delete --project="${PROJECT}" \
     --zone="${ZONE}" "${CLUSTER_NAME}"
 }
