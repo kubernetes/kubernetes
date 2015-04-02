@@ -52,7 +52,7 @@ kubectl
 * [kubectl-delete](kubectl-delete.md)
 * [kubectl-namespace](kubectl-namespace.md)
 * [kubectl-log](kubectl-log.md)
-* [kubectl-rollingupdate](kubectl-rollingupdate.md)
+* [kubectl-rolling-update](kubectl-rolling-update.md)
 * [kubectl-resize](kubectl-resize.md)
 * [kubectl-exec](kubectl-exec.md)
 * [kubectl-port-forward](kubectl-port-forward.md)
@@ -62,7 +62,7 @@ kubectl
 * [kubectl-expose](kubectl-expose.md)
 * [kubectl-label](kubectl-label.md)
 * [kubectl-config](kubectl-config.md)
-* [kubectl-clusterinfo](kubectl-clusterinfo.md)
-* [kubectl-apiversions](kubectl-apiversions.md)
+* [kubectl-cluster-info](kubectl-cluster-info.md)
+* [kubectl-api-versions](kubectl-api-versions.md)
 * [kubectl-version](kubectl-version.md)
 

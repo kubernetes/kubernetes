@@ -61,9 +61,9 @@ If you go back to the [demo website](http://localhost:8001/static/index.html) yo
 We will now update the docker image to serve a different image by doing a rolling update to a new Docker image.
 
 ```bash
-$ ./cluster/kubectl.sh rollingupdate update-demo-nautilus --update-period=10s -f examples/update-demo/v1beta1/kitten-rc.yaml
+$ ./cluster/kubectl.sh rolling-update update-demo-nautilus --update-period=10s -f examples/update-demo/v1beta1/kitten-rc.yaml
 ```
-The rollingupdate command in kubectl will do 2 things:
+The rolling-update command in kubectl will do 2 things:
 
 1. Create a new replication controller with a pod template that uses the new image (`gcr.io/google_containers/update-demo:kitten`)
 2. Resize the old and new replication controllers until the new controller replaces the old. This will kill the current pods one at a time, spinnning up new ones to replace them.

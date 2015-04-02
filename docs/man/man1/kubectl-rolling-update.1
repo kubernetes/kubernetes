@@ -3,23 +3,44 @@
 
 .SH NAME
 .PP
-kubectl apiversions \- Print available API versions.
+kubectl rolling\-update \- Perform a rolling update of the given ReplicationController.
 
 
 .SH SYNOPSIS
 .PP
-\fBkubectl apiversions\fP [OPTIONS]
+\fBkubectl rolling\-update\fP [OPTIONS]
 
 
 .SH DESCRIPTION
 .PP
-Print available API versions.
+Perform a rolling update of the given ReplicationController.
+
+.PP
+Replaces the specified controller with new controller, updating one pod at a time to use the
+new PodTemplate. The new\-controller.json must specify the same namespace as the
+existing controller and overwrite at least one (common) label in its replicaSelector.
 
 
 .SH OPTIONS
 .PP
+\fB\-f\fP, \fB\-\-filename\fP=""
+    Filename or URL to file to use to create the new controller.
+
+.PP
 \fB\-h\fP, \fB\-\-help\fP=false
-    help for apiversions
+    help for rolling\-update
+
+.PP
+\fB\-\-poll\-interval\fP="3s"
+    Time delay between polling controller status after update. Valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".
+
+.PP
+\fB\-\-timeout\fP="5m0s"
+    Max time to wait for a controller to update before giving up. Valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".
+
+.PP
+\fB\-\-update\-period\fP="1m0s"
+    Time to wait between updating pods. Valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".
 
 
 .SH OPTIONS INHERITED FROM PARENT COMMANDS
@@ -122,6 +143,21 @@ Print available API versions.
 .PP
 \fB\-\-vmodule\fP=
     comma\-separated list of pattern=N settings for file\-filtered logging
+
+
+.SH EXAMPLE
+.PP
+.RS
+
+.nf
+// Update pods of frontend\-v1 using new controller data in frontend\-v2.json.
+$ kubectl rolling\-update frontend\-v1 \-f frontend\-v2.json
+
+// Update pods of frontend\-v1 using JSON data passed into stdin.
+$ cat frontend\-v2.json | kubectl rolling\-update frontend\-v1 \-f \-
+
+.fi
+.RE
 
 
 .SH SEE ALSO
