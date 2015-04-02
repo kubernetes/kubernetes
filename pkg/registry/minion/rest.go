@@ -82,6 +82,13 @@ type ResourceGetter interface {
 	Get(api.Context, string) (runtime.Object, error)
 }
 
+// NodeToSelectableFields returns a label set that represents the object.
+func NodeToSelectableFields(node *api.Node) labels.Set {
+	return labels.Set{
+		"name": node.Name,
+	}
+}
+
 // MatchNode returns a generic matcher for a given label and field selector.
 func MatchNode(label labels.Selector, field fields.Selector) generic.Matcher {
 	return generic.MatcherFunc(func(obj runtime.Object) (bool, error) {
@@ -89,8 +96,8 @@ func MatchNode(label labels.Selector, field fields.Selector) generic.Matcher {
 		if !ok {
 			return false, fmt.Errorf("not a node")
 		}
-		// TODO: Add support for filtering based on field, once NodeStatus is defined.
-		return label.Matches(labels.Set(nodeObj.Labels)), nil
+		fields := NodeToSelectableFields(nodeObj)
+		return label.Matches(labels.Set(nodeObj.Labels)) && field.Matches(fields), nil
 	})
 }
 

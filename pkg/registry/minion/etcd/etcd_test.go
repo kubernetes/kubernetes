@@ -34,6 +34,11 @@ import (
 	"github.com/coreos/go-etcd/etcd"
 )
 
+const (
+	PASS = iota
+	FAIL
+)
+
 type fakeConnectionInfoGetter struct {
 }
 
@@ -340,6 +345,59 @@ func TestEtcdWatchNodesMatch(t *testing.T) {
 		t.Error("unexpected timeout from result channel")
 	}
 	watching.Stop()
+}
+
+func TestEtcdWatchNodesFields(t *testing.T) {
+	ctx := api.NewDefaultContext()
+	storage, fakeClient := newStorage(t)
+	node := validNewNode()
+	nodeBytes, _ := latest.Codec.Encode(node)
+
+	testFieldMap := map[int][]fields.Set{
+		PASS: {
+			{"name": "foo"},
+		},
+		FAIL: {
+			{"name": "bar"},
+		},
+	}
+
+	for _, singleWatchField := range []string{"", "name"} {
+		storage.WatchSingleFieldName = singleWatchField
+		for expectedResult, fieldSet := range testFieldMap {
+			for _, field := range fieldSet {
+				watching, err := storage.Watch(ctx,
+					labels.Everything(),
+					field.AsSelector(),
+					"1",
+				)
+				if err != nil {
+					t.Fatalf("unexpected error: %v", err)
+				}
+				fakeClient.WaitForWatchCompletion()
+				fakeClient.WatchResponse <- &etcd.Response{
+					Action: "create",
+					Node: &etcd.Node{
+						Value: string(nodeBytes),
+					},
+				}
+				select {
+				case r, ok := <-watching.ResultChan():
+					if expectedResult == FAIL {
+						t.Errorf("unexpected result from channel %#v", r)
+					}
+					if !ok {
+						t.Errorf("watching channel should be open")
+					}
+				case <-time.After(time.Millisecond * 100):
+					if expectedResult == PASS {
+						t.Errorf("unexpected timeout from result channel")
+					}
+				}
+				watching.Stop()
+			}
+		}
+	}
 }
 
 func TestEtcdWatchNodesNotMatch(t *testing.T) {
