@@ -16,7 +16,7 @@
             "env": [
               {"name": "MYSQL_SERVICE_IP", "value": "173.194.242.66"},
               {"name": "MYSQL_SERVICE_PORT", "value": "3306"},
-              {"name": "MYSQL_PASSWORD", "value": "1234"},
+              {"name": "MYSQL_PASSWORD", "value": "1234"}
             ],
             "ports": [{"name": "http-server", "containerPort": 80}],
             "imagePullPolicy": "Always"
