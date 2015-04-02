@@ -20,10 +20,14 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"reflect"
+	"regexp"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
@@ -32,6 +36,68 @@ type fakeRL bool
 
 func (fakeRL) Stop()             {}
 func (f fakeRL) CanAccept() bool { return bool(f) }
+
+func expectHTTP(url string, code int, t *testing.T) {
+	r, err := http.Get(url)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if r.StatusCode != code {
+		t.Errorf("unexpected response: %v", r.StatusCode)
+	}
+}
+
+func TestMaxInFlight(t *testing.T) {
+	const Iterations = 3
+	block := sync.WaitGroup{}
+	block.Add(1)
+	sem := make(chan bool, Iterations)
+
+	re := regexp.MustCompile("[.*\\/watch][^\\/proxy.*]")
+
+	server := httptest.NewServer(MaxInFlightLimit(sem, re, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.Contains(r.URL.Path, "dontwait") {
+			return
+		}
+		block.Wait()
+	})))
+	defer server.Close()
+
+	// These should hang, but not affect accounting.
+	for i := 0; i < Iterations; i++ {
+		// These should hang waiting on block...
+		go func() {
+			expectHTTP(server.URL+"/foo/bar/watch", http.StatusOK, t)
+		}()
+	}
+	for i := 0; i < Iterations; i++ {
+		// These should hang waiting on block...
+		go func() {
+			expectHTTP(server.URL+"/proxy/foo/bar", http.StatusOK, t)
+		}()
+	}
+	expectHTTP(server.URL+"/dontwait", http.StatusOK, t)
+
+	for i := 0; i < Iterations; i++ {
+		// These should hang waiting on block...
+		go func() {
+			expectHTTP(server.URL, http.StatusOK, t)
+		}()
+	}
+	// There's really no more elegant way to do this.  I could use a WaitGroup, but even then
+	// it'd still be racy.
+	time.Sleep(1 * time.Second)
+	expectHTTP(server.URL+"/dontwait/watch", http.StatusOK, t)
+
+	// Do this multiple times to show that it rate limit rejected requests don't block.
+	for i := 0; i < 2; i++ {
+		expectHTTP(server.URL, errors.StatusTooManyRequests, t)
+	}
+	block.Done()
+
+	// Show that we recover from being blocked up.
+	expectHTTP(server.URL, http.StatusOK, t)
+}
 
 func TestRateLimit(t *testing.T) {
 	for _, allow := range []bool{true, false} {

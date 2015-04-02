@@ -43,6 +43,10 @@ var specialVerbs = map[string]bool{
 	"watch":    true,
 }
 
+// Constant for the retry-after interval on rate limiting.
+// TODO: maybe make this dynamic? or user-adjustable?
+const RetryAfter = "1"
+
 // IsReadOnlyReq() is true for any (or at least many) request which has no observable
 // side effects on state of apiserver (though there may be internal side effects like
 // caching and logging).
@@ -66,6 +70,27 @@ func ReadOnly(handler http.Handler) http.Handler {
 	})
 }
 
+// MaxInFlight limits the number of in-flight requests to buffer size of the passed in channel.
+func MaxInFlightLimit(c chan bool, longRunningRequestRE *regexp.Regexp, handler http.Handler) http.Handler {
+	if c == nil {
+		return handler
+	}
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if longRunningRequestRE.MatchString(r.URL.Path) {
+			// Skip tracking long running events.
+			handler.ServeHTTP(w, r)
+			return
+		}
+		select {
+		case c <- true:
+			defer func() { <-c }()
+			handler.ServeHTTP(w, r)
+		default:
+			tooManyRequests(w)
+		}
+	})
+}
+
 // RateLimit uses rl to rate limit accepting requests to 'handler'.
 func RateLimit(rl util.RateLimiter, handler http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
@@ -73,11 +98,15 @@ func RateLimit(rl util.RateLimiter, handler http.Handler) http.Handler {
 			handler.ServeHTTP(w, req)
 			return
 		}
-		// Return a 429 status indicating "Too Many Requests"
-		w.Header().Set("Retry-After", "1")
-		w.WriteHeader(errors.StatusTooManyRequests)
-		fmt.Fprintf(w, "Rate limit is 10 QPS or a burst of 200")
+		tooManyRequests(w)
 	})
+}
+
+func tooManyRequests(w http.ResponseWriter) {
+	// Return a 429 status indicating "Too Many Requests"
+	w.Header().Set("Retry-After", RetryAfter)
+	w.WriteHeader(errors.StatusTooManyRequests)
+	fmt.Fprintf(w, "Too many requests, please try again later.")
 }
 
 // RecoverPanics wraps an http Handler to recover and log panics.
