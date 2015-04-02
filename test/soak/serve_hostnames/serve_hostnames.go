@@ -44,6 +44,7 @@ var (
 	podsPerNode    = flag.Int("pods_per_node", 1, "Number of serve_hostname pods per node")
 	upTo           = flag.Int("up_to", 1, "Number of iterations or -1 for no limit")
 	maxPar         = flag.Int("max_par", 500, "Maximum number of queries in flight")
+	gke            = flag.String("gke_context", "", "Target GKE cluster with context gke_{project}_{zone}_{cluster-name}")
 )
 
 const (
@@ -61,9 +62,18 @@ func main() {
 	glog.Infof("Starting serve_hostnames soak test with queries=%d and podsPerNode=%d upTo=%d",
 		*queriesAverage, *podsPerNode, *upTo)
 
-	settings, err := clientcmd.LoadFromFile(filepath.Join(os.Getenv("HOME"), ".kube", ".kubeconfig"))
+	var spec string
+	if *gke != "" {
+		spec = filepath.Join(os.Getenv("HOME"), ".config", "gcloud", "kubernetes", "kubeconfig")
+	} else {
+		spec = filepath.Join(os.Getenv("HOME"), ".kube", ".kubeconfig")
+	}
+	settings, err := clientcmd.LoadFromFile(spec)
 	if err != nil {
 		glog.Fatalf("Error loading configuration: %v", err.Error())
+	}
+	if *gke != "" {
+		settings.CurrentContext = *gke
 	}
 	config, err := clientcmd.NewDefaultClientConfig(*settings, &clientcmd.ConfigOverrides{}).ClientConfig()
 	if err != nil {
@@ -209,7 +219,7 @@ func main() {
 		for start := time.Now(); time.Since(start) < podStartTimeout; time.Sleep(5 * time.Second) {
 			pod, err = c.Pods(ns).Get(podName)
 			if err != nil {
-				glog.Infof("Get pod %s/%s failed, ignoring for %v: %v", ns, podName, err, podStartTimeout)
+				glog.Warningf("Get pod %s/%s failed, ignoring for %v: %v", ns, podName, err, podStartTimeout)
 				continue
 			}
 			if pod.Status.Phase == api.PodRunning {
