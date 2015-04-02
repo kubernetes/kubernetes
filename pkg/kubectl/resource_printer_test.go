@@ -619,3 +619,119 @@ func contains(fields []string, field string) bool {
 	}
 	return false
 }
+
+func TestPrintHumanReadableService(t *testing.T) {
+	tests := []api.Service{
+		{
+			Spec: api.ServiceSpec{
+				PortalIP: "1.2.3.4",
+				PublicIPs: []string{
+					"2.3.4.5",
+					"3.4.5.6",
+				},
+				Ports: []api.ServicePort{
+					{
+						Port:     80,
+						Protocol: "TCP",
+					},
+				},
+			},
+		},
+		{
+			Spec: api.ServiceSpec{
+				PortalIP: "1.2.3.4",
+				Ports: []api.ServicePort{
+					{
+						Port:     80,
+						Protocol: "TCP",
+					},
+					{
+						Port:     8090,
+						Protocol: "UDP",
+					},
+					{
+						Port:     8000,
+						Protocol: "TCP",
+					},
+				},
+			},
+		},
+		{
+			Spec: api.ServiceSpec{
+				PortalIP: "1.2.3.4",
+				PublicIPs: []string{
+					"2.3.4.5",
+				},
+				Ports: []api.ServicePort{
+					{
+						Port:     80,
+						Protocol: "TCP",
+					},
+					{
+						Port:     8090,
+						Protocol: "UDP",
+					},
+					{
+						Port:     8000,
+						Protocol: "TCP",
+					},
+				},
+			},
+		},
+		{
+			Spec: api.ServiceSpec{
+				PortalIP: "1.2.3.4",
+				PublicIPs: []string{
+					"2.3.4.5",
+					"4.5.6.7",
+					"5.6.7.8",
+				},
+				Ports: []api.ServicePort{
+					{
+						Port:     80,
+						Protocol: "TCP",
+					},
+					{
+						Port:     8090,
+						Protocol: "UDP",
+					},
+					{
+						Port:     8000,
+						Protocol: "TCP",
+					},
+				},
+			},
+		},
+	}
+
+	for _, svc := range tests {
+		buff := bytes.Buffer{}
+		printService(&svc, &buff)
+		output := string(buff.Bytes())
+		ip := svc.Spec.PortalIP
+		if !strings.Contains(output, ip) {
+			t.Errorf("expected to contain portal ip %s, but doesn't: %s", ip, output)
+		}
+
+		for _, ip = range svc.Spec.PublicIPs {
+			if !strings.Contains(output, ip) {
+				t.Errorf("expected to contain public ip %s, but doesn't: %s", ip, output)
+			}
+		}
+
+		for _, port := range svc.Spec.Ports {
+			portSpec := fmt.Sprintf("%d/%s", port.Port, port.Protocol)
+			if !strings.Contains(output, portSpec) {
+				t.Errorf("expected to contain port: %s, but doesn't: %s", portSpec, output)
+			}
+		}
+		// Max of # ports and (# public ip + portal ip)
+		count := len(svc.Spec.Ports)
+		if len(svc.Spec.PublicIPs)+1 > count {
+			count = len(svc.Spec.PublicIPs) + 1
+		}
+		if count != strings.Count(output, "\n") {
+			t.Errorf("expected %d newlines, found %d", count, strings.Count(output, "\n"))
+		}
+	}
+}
