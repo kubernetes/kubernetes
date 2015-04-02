@@ -316,61 +316,61 @@ kube::golang::build_binaries() {
     kube::log::status "Building go targets for ${platforms[@]} in parallel (output will appear in a burst when complete):" "${targets[@]}"
     local platform
     for platform in "${platforms[@]}"; do (
-      kube::golang::set_platform_envs "${platform}"
-      kube::log::status "${platform}: Parallel go build started"
+        kube::golang::set_platform_envs "${platform}"
+        kube::log::status "${platform}: Parallel go build started"
 
-      local -a statics=()
-      local -a nonstatics=()
-      for binary in "${binaries[@]}"; do
-        if kube::golang::is_statically_linked_library "${binary}"; then
-          kube::golang::exit_if_stdlib_not_installed;
-          statics+=($binary)
-        else
-          nonstatics+=($binary)
-        fi
-      done
-
-      if [[ -n ${use_go_build:-} ]]; then
-        # Try and replicate the native binary placement of go install without
-        # calling go install.  This means we have to iterate each binary.
-        local output_path="${KUBE_GOPATH}/bin"
-        if [[ $platform != $host_platform ]]; then
-          output_path="${output_path}/${platform//\//_}"
-        fi
-
+        local -a statics=()
+        local -a nonstatics=()
         for binary in "${binaries[@]}"; do
-          local bin=$(basename "${binary}")
-          if [[ ${GOOS} == "windows" ]]; then
-            bin="${bin}.exe"
-          fi
-
           if kube::golang::is_statically_linked_library "${binary}"; then
             kube::golang::exit_if_stdlib_not_installed;
-            CGO_ENABLED=0 go build -installsuffix cgo -o "${output_path}/${bin}" \
-              "${goflags[@]:+${goflags[@]}}" \
-              -ldflags "${version_ldflags}" \
-              "${binary}"
+            statics+=($binary)
           else
-            go build -o "${output_path}/${bin}" \
-              "${goflags[@]:+${goflags[@]}}" \
-              -ldflags "${version_ldflags}" \
-              "${binary}"
+            nonstatics+=($binary)
           fi
         done
-      else
+
+        if [[ -n ${use_go_build:-} ]]; then
+          # Try and replicate the native binary placement of go install without
+          # calling go install.  This means we have to iterate each binary.
+          local output_path="${KUBE_GOPATH}/bin"
+          if [[ $platform != $host_platform ]]; then
+            output_path="${output_path}/${platform//\//_}"
+          fi
+
+          for binary in "${binaries[@]}"; do
+            local bin=$(basename "${binary}")
+            if [[ ${GOOS} == "windows" ]]; then
+              bin="${bin}.exe"
+            fi
+
+            if kube::golang::is_statically_linked_library "${binary}"; then
+              kube::golang::exit_if_stdlib_not_installed;
+              CGO_ENABLED=0 go build -installsuffix cgo -o "${output_path}/${bin}" \
+                "${goflags[@]:+${goflags[@]}}" \
+                -ldflags "${version_ldflags}" \
+                "${binary}"
+            else
+              go build -o "${output_path}/${bin}" \
+                "${goflags[@]:+${goflags[@]}}" \
+                -ldflags "${version_ldflags}" \
+                "${binary}"
+            fi
+          done
+        else
           # Use go install.
           if [[ "${#nonstatics[@]}" != 0 ]]; then
             go install "${goflags[@]:+${goflags[@]}}" \
-                -ldflags "${version_ldflags}" \
-                "${nonstatics[@]:+${nonstatics[@]}}"
+              -ldflags "${version_ldflags}" \
+              "${nonstatics[@]:+${nonstatics[@]}}"
           fi
           if [[ "${#statics[@]}" != 0 ]]; then
             CGO_ENABLED=0 go install -installsuffix cgo "${goflags[@]:+${goflags[@]}}" \
               -ldflags "${version_ldflags}" \
-                "${statics[@]:+${statics[@]}}"
+              "${statics[@]:+${statics[@]}}"
           fi
-      fi
-      kube::log::status "${platform}: Parallel go build finished"
+        fi
+        kube::log::status "${platform}: Parallel go build finished"
       ) &> "/tmp//${platform//\//_}.build" &
     done
 
