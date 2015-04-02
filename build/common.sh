@@ -91,6 +91,13 @@ readonly DOCKER_DATA_MOUNT_ARGS=(
 readonly RELEASE_STAGE="${LOCAL_OUTPUT_ROOT}/release-stage"
 readonly RELEASE_DIR="${LOCAL_OUTPUT_ROOT}/release-tars"
 
+# The set of master binaries that run in Docker (on Linux)
+readonly KUBE_DOCKER_WRAPPED_BINARIES=(
+  kube-apiserver
+  kube-controller-manager
+  kube-scheduler
+)
+
 # ---------------------------------------------------------------------------
 # Basic setup functions
 
@@ -553,6 +560,8 @@ function kube::release::package_server_tarballs() {
     # KUBE_SERVER_BINARIES array.
     cp "${KUBE_SERVER_BINARIES[@]/#/${LOCAL_OUTPUT_BINPATH}/${platform}/}" \
       "${release_stage}/server/bin/"
+    
+    kube::release::create_docker_images_for_server "${release_stage}/server/bin";
 
     # Include the client binaries here too as they are useful debugging tools.
     local client_bins=("${KUBE_CLIENT_BINARIES[@]}")
@@ -567,6 +576,30 @@ function kube::release::package_server_tarballs() {
     local package_name="${RELEASE_DIR}/kubernetes-server-${platform_tag}.tar.gz"
     kube::release::create_tarball "${package_name}" "${release_stage}/.."
   done
+}
+
+# This will take binaries that run on master and creates Docker images
+# that wrap the binary in them. (One docker image per binary)
+function kube::release::create_docker_images_for_server() {
+  # Create a sub-shell so that we don't pollute the outer environment
+  (
+    local binary_name;
+    for binary_name in "${KUBE_DOCKER_WRAPPED_BINARIES[@]}"; do
+      echo "+++ Building docker image: ${binary_name}";
+      local docker_file_path="$1/Dockerfile";
+      local binary_file_path="$1/${binary_name}";
+      if [ -f ${docker_file_path} ]; then
+        rm ${docker_file_path};
+      fi;
+      printf " FROM scratch \n ADD ${binary_name} /${binary_name} \n ENTRYPOINT [ \"/${binary_name}\" ]\n" >> ${docker_file_path};
+      local md5_sum=$(md5sum ${binary_file_path} | awk '{print $1}')
+      local docker_image_tag=gcr.io/google_containers/$binary_name:$md5_sum
+      docker build -t "${docker_image_tag}" ${1};
+      docker save ${docker_image_tag} > ${1}/${binary_name}.tar;
+      echo $md5_sum > ${1}/${binary_name}.docker_tag;
+      rm ${docker_file_path};
+    done
+  )
 }
 
 # Package up the salt configuration tree.  This is an optional helper to getting

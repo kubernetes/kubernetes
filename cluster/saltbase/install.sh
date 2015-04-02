@@ -24,6 +24,12 @@ set -o pipefail
 SALT_ROOT=$(dirname "${BASH_SOURCE}")
 readonly SALT_ROOT
 
+readonly KUBE_DOCKER_WRAPPED_BINARIES=(
+      kube-apiserver
+      kube-controller-manager
+      kube-scheduler
+)
+    
 readonly SERVER_BIN_TAR=${1-}
 if [[ -z "$SERVER_BIN_TAR" ]]; then
   echo "!!! No binaries specified"
@@ -59,6 +65,15 @@ echo "+++ Install binaries from tar: $1"
 tar -xz -C "${KUBE_TEMP}" -f "$1"
 mkdir -p /srv/salt-new/salt/kube-bins
 cp -v "${KUBE_TEMP}/kubernetes/server/bin/"* /srv/salt-new/salt/kube-bins/
+
+kube_bin_dir="/srv/salt-new/salt/kube-bins";
+docker_images_sls_file="/srv/salt-new/pillar/docker-images.sls";
+for docker_file in "${KUBE_DOCKER_WRAPPED_BINARIES[@]}"; do
+  docker load -i "${kube_bin_dir}/${docker_file}.tar";
+  docker_tag=$(cat ${kube_bin_dir}/${docker_file}.docker_tag);
+  sed -i "s/#${docker_file}_docker_tag_value#/${docker_tag}/" "${docker_images_sls_file}";
+done
+
 
 echo "+++ Swapping in new configs"
 for dir in "${SALTDIRS[@]}"; do
