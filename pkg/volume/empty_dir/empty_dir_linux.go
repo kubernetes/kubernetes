@@ -21,6 +21,7 @@ import (
 	"syscall"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/mount"
+	"github.com/docker/libcontainer/selinux"
 )
 
 // Defined by Linux - the type number for tmpfs mounts.
@@ -29,6 +30,8 @@ const linuxTmpfsMagic = 0x01021994
 // realMountDetector implements mountDetector in terms of syscalls.
 type realMountDetector struct{}
 
+// GetMountMedium returns the storgeMedium for the given path and a
+// bool indicating whether or not the path is a mountpoint, or an error.
 func (m *realMountDetector) GetMountMedium(path string) (storageMedium, bool, error) {
 	isMnt, err := mount.IsMountPoint(path)
 	if err != nil {
@@ -42,4 +45,36 @@ func (m *realMountDetector) GetMountMedium(path string) (storageMedium, bool, er
 		return mediumMemory, isMnt, nil
 	}
 	return mediumUnknown, isMnt, nil
+}
+
+// getTmpfsMountOptions returns the option string to be passed to the mount
+// system call in order to set the SELinux context of the tmpfs mount to
+// the same as the kubelet root directory. The rootcontext mount option
+// is used so that files created within the mount will have the same
+// SELinux context by default as the mountpoint itself.
+//
+// If SELinux is not enabled, returns an empty string.
+func (ed *emptyDir) getTmpfsMountOptions() (string, error) {
+	// If SELinux is not enabled, rootcontext is not a valid option;
+	// return an empty string.
+	if !selinux.SelinuxEnabled() {
+		return "", nil
+	}
+
+	// Get the SELinux context of the Kubelet rootDir.
+	rootContext, err := selinux.Getfilecon(ed.rootDir)
+	if err != nil {
+		return "", err
+	}
+
+	// There is a libcontainer bug where the null byte is not stripped from
+	// the result of reading some selinux xattrs; strip it.
+	//
+	// TODO: remove when https://github.com/docker/libcontainer/issues/499
+	// is fixed
+	rootContext = rootContext[:len(rootContext)-1]
+
+	// The rootcontext mount option sets the context of the mount and
+	// the default context for all files created within it.
+	return fmt.Sprintf("rootcontext=\"%v\"", rootContext), nil
 }

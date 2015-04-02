@@ -39,6 +39,10 @@ func NewFakeVolumeHost(rootDir string, kubeClient client.Interface, plugins []Vo
 	return host
 }
 
+func (f *fakeVolumeHost) GetRootDir() string {
+	return f.rootDir
+}
+
 func (f *fakeVolumeHost) GetPluginDir(podUID string) string {
 	return path.Join(f.rootDir, "plugins", podUID)
 }

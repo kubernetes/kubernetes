@@ -38,6 +38,10 @@ type volumeHost struct {
 	kubelet *Kubelet
 }
 
+func (vh *volumeHost) GetRootDir() string {
+	return vh.kubelet.getRootDir()
+}
+
 func (vh *volumeHost) GetPluginDir(pluginName string) string {
 	return vh.kubelet.getPluginDir(pluginName)
 }

@@ -69,6 +69,17 @@ type PersistentVolumePlugin interface {
 
 // VolumeHost is an interface that plugins can use to access the kubelet.
 type VolumeHost interface {
+	// GetRootDir returns the absolute path to the kubelet's root directory.
+	// We shouldn't really be exposing this information to plugins, but it is
+	// needed at this point in time for the emptyDir plugin to get information
+	// about the root directory SELinux context.  In the future there will be
+	// SecurityContext information passed from the kubelet to the volume plugin
+	// to allow setting the context correctly where necessary.
+	//
+	// TODO: remove this call from the interface once necessary security context
+	// work has been done.
+	GetRootDir() string
+
 	// GetPluginDir returns the absolute path to a directory under which
 	// a given plugin may store data.  This directory might not actually
 	// exist on disk yet.  For plugin data that is per-pod, see
