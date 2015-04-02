@@ -38,6 +38,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler/factory"
 
 	"github.com/golang/glog"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/spf13/pflag"
 )
 
@@ -80,11 +81,11 @@ func (s *SchedulerServer) Run(_ []string) error {
 
 	go func() {
 		if s.EnableProfiling {
-			mux := http.NewServeMux()
-			mux.HandleFunc("/debug/pprof/", pprof.Index)
-			mux.HandleFunc("/debug/pprof/profile", pprof.Profile)
-			mux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
+			http.HandleFunc("/debug/pprof/", pprof.Index)
+			http.HandleFunc("/debug/pprof/profile", pprof.Profile)
+			http.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
 		}
+		http.Handle("/metrics", prometheus.Handler())
 		http.ListenAndServe(net.JoinHostPort(s.Address.String(), strconv.Itoa(s.Port)), nil)
 	}()
 
