@@ -61,6 +61,7 @@ type KubeletServer struct {
 	EnableServer                   bool
 	Address                        util.IP
 	Port                           uint
+	ReadOnlyPort                   uint
 	HostnameOverride               string
 	PodInfraContainerImage         string
 	DockerEndpoint                 string
@@ -98,12 +99,13 @@ type KubeletServer struct {
 // NewKubeletServer will create a new KubeletServer with default values.
 func NewKubeletServer() *KubeletServer {
 	return &KubeletServer{
-		SyncFrequency:      10 * time.Second,
-		FileCheckFrequency: 20 * time.Second,
-		HTTPCheckFrequency: 20 * time.Second,
-		EnableServer:       true,
-		Address:            util.IP(net.ParseIP("0.0.0.0")),
-		Port:               ports.KubeletPort,
+		SyncFrequency:               10 * time.Second,
+		FileCheckFrequency:          20 * time.Second,
+		HTTPCheckFrequency:          20 * time.Second,
+		EnableServer:                true,
+		Address:                     util.IP(net.ParseIP("0.0.0.0")),
+		Port:                        ports.KubeletPort,
+		ReadOnlyPort:                ports.KubeletReadOnlyPort,
 		PodInfraContainerImage:      kubelet.PodInfraContainerImage,
 		RootDirectory:               defaultRootDir,
 		RegistryBurst:               10,
@@ -135,6 +137,7 @@ func (s *KubeletServer) AddFlags(fs *pflag.FlagSet) {
 	fs.BoolVar(&s.EnableServer, "enable_server", s.EnableServer, "Enable the info server")
 	fs.Var(&s.Address, "address", "The IP address for the info server to serve on (set to 0.0.0.0 for all interfaces)")
 	fs.UintVar(&s.Port, "port", s.Port, "The port for the info server to serve on")
+	fs.UintVar(&s.ReadOnlyPort, "read_only_port", s.ReadOnlyPort, "The read-only port for the info server to serve on (set to 0 to disable)")
 	fs.StringVar(&s.TLSCertFile, "tls_cert_file", s.TLSCertFile, ""+
 		"File containing x509 Certificate for HTTPS.  (CA cert, if any, concatenated after server cert). "+
 		"If --tls_cert_file and --tls_private_key_file are not provided, a self-signed certificate and key "+
@@ -248,6 +251,7 @@ func (s *KubeletServer) Run(_ []string) error {
 		ClusterDNS:                     s.ClusterDNS,
 		Runonce:                        s.RunOnce,
 		Port:                           s.Port,
+		ReadOnlyPort:                   s.ReadOnlyPort,
 		CadvisorInterface:              cadvisorInterface,
 		EnableServer:                   s.EnableServer,
 		EnableDebuggingHandlers:        s.EnableDebuggingHandlers,
@@ -414,6 +418,11 @@ func startKubelet(k *kubelet.Kubelet, podCfg *config.PodConfig, kc *KubeletConfi
 			kubelet.ListenAndServeKubeletServer(k, net.IP(kc.Address), kc.Port, kc.TLSOptions, kc.EnableDebuggingHandlers)
 		}, 0)
 	}
+	if kc.ReadOnlyPort > 0 {
+		go util.Forever(func() {
+			kubelet.ListenAndServeKubeletReadOnlyServer(k, net.IP(kc.Address), kc.ReadOnlyPort)
+		}, 0)
+	}
 }
 
 func makePodSourceConfig(kc *KubeletConfig) *config.PodConfig {
@@ -466,6 +475,7 @@ type KubeletConfig struct {
 	EnableServer                   bool
 	EnableDebuggingHandlers        bool
 	Port                           uint
+	ReadOnlyPort                   uint
 	Runonce                        bool
 	MasterServiceNamespace         string
 	VolumePlugins                  []volume.VolumePlugin

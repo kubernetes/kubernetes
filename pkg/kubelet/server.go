@@ -76,6 +76,24 @@ func ListenAndServeKubeletServer(host HostInterface, address net.IP, port uint, 
 	}
 }
 
+// ListenAndServeKubeletReadOnlyServer initializes a server to respond to HTTP network requests on the Kubelet.
+func ListenAndServeKubeletReadOnlyServer(host HostInterface, address net.IP, port uint) {
+	glog.V(1).Infof("Starting to listen read-only on %s:%d", address, port)
+	s := &Server{host, http.NewServeMux()}
+	healthz.InstallHandler(s.mux)
+	s.mux.HandleFunc("/stats/", s.handleStats)
+	s.mux.Handle("/metrics", prometheus.Handler())
+
+	server := &http.Server{
+		Addr:           net.JoinHostPort(address.String(), strconv.FormatUint(uint64(port), 10)),
+		Handler:        s,
+		ReadTimeout:    5 * time.Minute,
+		WriteTimeout:   5 * time.Minute,
+		MaxHeaderBytes: 1 << 20,
+	}
+	glog.Fatal(server.ListenAndServe())
+}
+
 // HostInterface contains all the kubelet methods required by the server.
 // For testablitiy.
 type HostInterface interface {
