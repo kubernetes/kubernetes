@@ -37,9 +37,16 @@ type RESTUpdateStrategy interface {
 	// the object.  For example: remove fields that are not to be persisted,
 	// sort order-insensitive list fields, etc.
 	PrepareForUpdate(obj, old runtime.Object)
-	// ValidateUpdate is invoked after default fields in the object have been filled in before
-	// the object is persisted.
+	// ValidateUpdate is invoked after default fields in the object have
+	// been filled in, but before the object is persisted.  This method is
+	// responsible for ensuring that any disallowed changes are flagged.
+	// For example: changing immutable fields.  It does not need to
+	// re-validate the whole object - that is what Validate() is for.
 	ValidateUpdate(ctx api.Context, obj, old runtime.Object) fielderrors.ValidationErrorList
+	// Validate is invoked after default fields in the object have been
+	// filled in and after the update itself has been validated, but before
+	// the object is persisted.
+	Validate(ctx api.Context, obj runtime.Object) fielderrors.ValidationErrorList
 }
 
 // BeforeUpdate ensures that common operations for all resources are performed on update. It only returns
@@ -59,6 +66,13 @@ func BeforeUpdate(strategy RESTUpdateStrategy, ctx api.Context, obj, old runtime
 	}
 	strategy.PrepareForUpdate(obj, old)
 	if errs := strategy.ValidateUpdate(ctx, obj, old); len(errs) > 0 {
+		return errors.NewInvalid(kind, objectMeta.Name, errs)
+	}
+	// This is called after ValidateUpdate() so that more-specialized
+	// errors can trigger first.  E.g. "field X is immutable" is a more
+	// useful error than "field X has an invalid value", even if both might
+	// be true.
+	if errs := strategy.Validate(ctx, obj); len(errs) > 0 {
 		return errors.NewInvalid(kind, objectMeta.Name, errs)
 	}
 	return nil

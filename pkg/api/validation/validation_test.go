@@ -2164,20 +2164,6 @@ func TestValidateServiceUpdate(t *testing.T) {
 			},
 			numErrs: 1,
 		},
-		{
-			name: "change affinity",
-			tweakSvc: func(oldSvc, newSvc *api.Service) {
-				newSvc.Spec.SessionAffinity = "ClientIP"
-			},
-			numErrs: 0,
-		},
-		{
-			name: "remove affinity",
-			tweakSvc: func(oldSvc, newSvc *api.Service) {
-				newSvc.Spec.SessionAffinity = ""
-			},
-			numErrs: 1,
-		},
 	}
 
 	for _, tc := range testCases {
