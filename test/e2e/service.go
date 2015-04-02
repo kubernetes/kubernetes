@@ -114,7 +114,7 @@ var _ = Describe("Services", func() {
 			},
 		}
 
-		By("submitting the pod to kuberenetes")
+		By("submitting the pod to kubernetes")
 		defer func() {
 			By("deleting the pod")
 			defer GinkgoRecover()
