@@ -78,9 +78,9 @@ func NewFromFile(path string) (policyList, error) {
 
 	scanner := bufio.NewScanner(file)
 	pl := make(policyList, 0)
-	var p policy
 
 	for scanner.Scan() {
+		var p policy
 		b := scanner.Bytes()
 		// TODO: skip comment lines.
 		err = json.Unmarshal(b, &p)
