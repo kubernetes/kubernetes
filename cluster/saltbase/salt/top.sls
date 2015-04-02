@@ -45,6 +45,7 @@ base:
 {% endif %}
 {% if grains['cloud'] is defined and grains['cloud'] == 'vagrant' %}
     - docker
+    - kubelet
     - sdn
 {% endif %}
 {% if grains['cloud'] is defined and grains['cloud'] == 'aws' %}

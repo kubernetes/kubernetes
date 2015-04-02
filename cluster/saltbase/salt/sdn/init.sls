@@ -6,6 +6,7 @@ sdn:
     - source: /kubernetes-vagrant/network_closure.sh
     - require:
       - pkg: docker-io
+      - sls: kubelet
     - cwd: /
     - user: root
     - group: root

@@ -90,6 +90,7 @@ ifconfig | grep -q kbr0 || {
   echo "OPTIONS='-b=kbr0 --selinux-enabled ${DOCKER_OPTS}'" >/etc/sysconfig/docker
   systemctl daemon-reload
   systemctl start docker
+  systemctl restart kubelet
 
 }
 EOF
