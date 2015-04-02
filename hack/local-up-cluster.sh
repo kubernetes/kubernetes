@@ -49,6 +49,16 @@ API_CORS_ALLOWED_ORIGINS=${API_CORS_ALLOWED_ORIGINS:-"/127.0.0.1(:[0-9]+)?$,/loc
 KUBELET_PORT=${KUBELET_PORT:-10250}
 LOG_LEVEL=${LOG_LEVEL:-3}
 
+# For the common local scenario, fail fast if server is already running.
+# this can happen if you run local-up-cluster.sh twice and kill etcd in between.
+curl $API_HOST:$API_PORT
+if [ ! $? -eq 0 ]; then
+    echo "API SERVER port is free, proceeding..."
+else
+    echo "ERROR starting API SERVER, exiting.  Some host on $API_HOST is serving already on $API_PORT"
+    exit 1
+fi
+
 # Detect the OS name/arch so that we can find our binary
 case "$(uname -s)" in
   Darwin)
