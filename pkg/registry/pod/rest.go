@@ -54,7 +54,6 @@ func (podStrategy) NamespaceScoped() bool {
 func (podStrategy) PrepareForCreate(obj runtime.Object) {
 	pod := obj.(*api.Pod)
 	pod.Status = api.PodStatus{
-		Host:  pod.Spec.Host,
 		Phase: api.PodPending,
 	}
 }

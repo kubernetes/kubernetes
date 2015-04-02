@@ -40,9 +40,6 @@ func podWithID(id, desiredHost string) *api.Pod {
 		Spec: api.PodSpec{
 			Host: desiredHost,
 		},
-		Status: api.PodStatus{
-			Host: desiredHost,
-		},
 	}
 }
 

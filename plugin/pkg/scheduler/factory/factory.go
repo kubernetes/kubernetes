@@ -288,7 +288,7 @@ func (factory *ConfigFactory) makeDefaultErrorFunc(backoff *podBackoff, podQueue
 				glog.Errorf("Error getting pod %v for retry: %v; abandoning", podID, err)
 				return
 			}
-			if pod.Status.Host == "" {
+			if pod.Spec.Host == "" {
 				podQueue.Add(pod)
 			}
 		}()

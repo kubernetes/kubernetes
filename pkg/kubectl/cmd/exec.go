@@ -135,7 +135,7 @@ func RunExec(f *Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *cobra.C
 	req := client.RESTClient.Get().
 		Prefix("proxy").
 		Resource("minions").
-		Name(pod.Status.Host).
+		Name(pod.Spec.Host).
 		Suffix("exec", namespace, podName, containerName)
 
 	e := remotecommand.New(req, config, args, stdin, cmdOut, cmdErr, tty)

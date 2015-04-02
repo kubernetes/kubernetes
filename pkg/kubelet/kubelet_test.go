@@ -2169,14 +2169,12 @@ func failedState(cName string) api.ContainerStatus {
 
 func TestPodPhaseWithRestartAlways(t *testing.T) {
 	desiredState := api.PodSpec{
+		Host: "machine",
 		Containers: []api.Container{
 			{Name: "containerA"},
 			{Name: "containerB"},
 		},
 		RestartPolicy: api.RestartPolicyAlways,
-	}
-	currentState := api.PodStatus{
-		Host: "machine",
 	}
 
 	tests := []struct {
@@ -2184,7 +2182,7 @@ func TestPodPhaseWithRestartAlways(t *testing.T) {
 		status api.PodPhase
 		test   string
 	}{
-		{&api.Pod{Spec: desiredState, Status: currentState}, api.PodPending, "waiting"},
+		{&api.Pod{Spec: desiredState, Status: api.PodStatus{}}, api.PodPending, "waiting"},
 		{
 			&api.Pod{
 				Spec: desiredState,
@@ -2193,7 +2191,6 @@ func TestPodPhaseWithRestartAlways(t *testing.T) {
 						runningState("containerA"),
 						runningState("containerB"),
 					},
-					Host: "machine",
 				},
 			},
 			api.PodRunning,
@@ -2207,7 +2204,6 @@ func TestPodPhaseWithRestartAlways(t *testing.T) {
 						stoppedState("containerA"),
 						stoppedState("containerB"),
 					},
-					Host: "machine",
 				},
 			},
 			api.PodRunning,
@@ -2221,7 +2217,6 @@ func TestPodPhaseWithRestartAlways(t *testing.T) {
 						runningState("containerA"),
 						stoppedState("containerB"),
 					},
-					Host: "machine",
 				},
 			},
 			api.PodRunning,
@@ -2234,7 +2229,6 @@ func TestPodPhaseWithRestartAlways(t *testing.T) {
 					ContainerStatuses: []api.ContainerStatus{
 						runningState("containerA"),
 					},
-					Host: "machine",
 				},
 			},
 			api.PodPending,
@@ -2250,14 +2244,12 @@ func TestPodPhaseWithRestartAlways(t *testing.T) {
 
 func TestPodPhaseWithRestartNever(t *testing.T) {
 	desiredState := api.PodSpec{
+		Host: "machine",
 		Containers: []api.Container{
 			{Name: "containerA"},
 			{Name: "containerB"},
 		},
 		RestartPolicy: api.RestartPolicyNever,
-	}
-	currentState := api.PodStatus{
-		Host: "machine",
 	}
 
 	tests := []struct {
@@ -2265,7 +2257,7 @@ func TestPodPhaseWithRestartNever(t *testing.T) {
 		status api.PodPhase
 		test   string
 	}{
-		{&api.Pod{Spec: desiredState, Status: currentState}, api.PodPending, "waiting"},
+		{&api.Pod{Spec: desiredState, Status: api.PodStatus{}}, api.PodPending, "waiting"},
 		{
 			&api.Pod{
 				Spec: desiredState,
@@ -2274,7 +2266,6 @@ func TestPodPhaseWithRestartNever(t *testing.T) {
 						runningState("containerA"),
 						runningState("containerB"),
 					},
-					Host: "machine",
 				},
 			},
 			api.PodRunning,
@@ -2288,7 +2279,6 @@ func TestPodPhaseWithRestartNever(t *testing.T) {
 						succeededState("containerA"),
 						succeededState("containerB"),
 					},
-					Host: "machine",
 				},
 			},
 			api.PodSucceeded,
@@ -2302,7 +2292,6 @@ func TestPodPhaseWithRestartNever(t *testing.T) {
 						failedState("containerA"),
 						failedState("containerB"),
 					},
-					Host: "machine",
 				},
 			},
 			api.PodFailed,
@@ -2316,7 +2305,6 @@ func TestPodPhaseWithRestartNever(t *testing.T) {
 						runningState("containerA"),
 						succeededState("containerB"),
 					},
-					Host: "machine",
 				},
 			},
 			api.PodRunning,
@@ -2329,7 +2317,6 @@ func TestPodPhaseWithRestartNever(t *testing.T) {
 					ContainerStatuses: []api.ContainerStatus{
 						runningState("containerA"),
 					},
-					Host: "machine",
 				},
 			},
 			api.PodPending,
@@ -2345,14 +2332,12 @@ func TestPodPhaseWithRestartNever(t *testing.T) {
 
 func TestPodPhaseWithRestartOnFailure(t *testing.T) {
 	desiredState := api.PodSpec{
+		Host: "machine",
 		Containers: []api.Container{
 			{Name: "containerA"},
 			{Name: "containerB"},
 		},
 		RestartPolicy: api.RestartPolicyOnFailure,
-	}
-	currentState := api.PodStatus{
-		Host: "machine",
 	}
 
 	tests := []struct {
@@ -2360,7 +2345,7 @@ func TestPodPhaseWithRestartOnFailure(t *testing.T) {
 		status api.PodPhase
 		test   string
 	}{
-		{&api.Pod{Spec: desiredState, Status: currentState}, api.PodPending, "waiting"},
+		{&api.Pod{Spec: desiredState, Status: api.PodStatus{}}, api.PodPending, "waiting"},
 		{
 			&api.Pod{
 				Spec: desiredState,
@@ -2369,7 +2354,6 @@ func TestPodPhaseWithRestartOnFailure(t *testing.T) {
 						runningState("containerA"),
 						runningState("containerB"),
 					},
-					Host: "machine",
 				},
 			},
 			api.PodRunning,
@@ -2383,7 +2367,6 @@ func TestPodPhaseWithRestartOnFailure(t *testing.T) {
 						succeededState("containerA"),
 						succeededState("containerB"),
 					},
-					Host: "machine",
 				},
 			},
 			api.PodSucceeded,
@@ -2397,7 +2380,6 @@ func TestPodPhaseWithRestartOnFailure(t *testing.T) {
 						failedState("containerA"),
 						failedState("containerB"),
 					},
-					Host: "machine",
 				},
 			},
 			api.PodRunning,
@@ -2411,7 +2393,6 @@ func TestPodPhaseWithRestartOnFailure(t *testing.T) {
 						runningState("containerA"),
 						succeededState("containerB"),
 					},
-					Host: "machine",
 				},
 			},
 			api.PodRunning,
@@ -2424,7 +2405,6 @@ func TestPodPhaseWithRestartOnFailure(t *testing.T) {
 					ContainerStatuses: []api.ContainerStatus{
 						runningState("containerA"),
 					},
-					Host: "machine",
 				},
 			},
 			api.PodPending,

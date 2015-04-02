@@ -63,10 +63,10 @@ func (s *ServiceSpread) CalculateSpreadPriority(pod api.Pod, podLister PodLister
 	counts := map[string]int{}
 	if len(nsServicePods) > 0 {
 		for _, pod := range nsServicePods {
-			counts[pod.Status.Host]++
+			counts[pod.Spec.Host]++
 			// Compute the maximum number of pods hosted on any minion
-			if counts[pod.Status.Host] > maxCount {
-				maxCount = counts[pod.Status.Host]
+			if counts[pod.Spec.Host] > maxCount {
+				maxCount = counts[pod.Spec.Host]
 			}
 		}
 	}
@@ -140,7 +140,7 @@ func (s *ServiceAntiAffinity) CalculateAntiAffinityPriority(pod api.Pod, podList
 
 	podCounts := map[string]int{}
 	for _, pod := range nsServicePods {
-		label, exists := labeledMinions[pod.Status.Host]
+		label, exists := labeledMinions[pod.Spec.Host]
 		if !exists {
 			continue
 		}

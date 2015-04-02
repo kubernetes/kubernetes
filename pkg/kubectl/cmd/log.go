@@ -116,7 +116,7 @@ func RunLog(f *Factory, out io.Writer, cmd *cobra.Command, args []string) error 
 	readCloser, err := client.RESTClient.Get().
 		Prefix("proxy").
 		Resource("minions").
-		Name(pod.Status.Host).
+		Name(pod.Spec.Host).
 		Suffix("containerLogs", namespace, podID, container).
 		Param("follow", strconv.FormatBool(follow)).
 		Stream()

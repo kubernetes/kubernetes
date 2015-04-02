@@ -150,7 +150,7 @@ func RunRC(c *client.Client, name string, ns, image string, replicas int) {
 			if p.Status.Phase == api.PodRunning {
 				current++
 			} else if p.Status.Phase == api.PodPending {
-				if p.Status.Host == "" {
+				if p.Spec.Host == "" {
 					waiting++
 				} else {
 					pending++

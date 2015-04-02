@@ -337,7 +337,7 @@ func testContainerOutputInNamespace(ns, scenarioName string, c *client.Client, p
 	}
 
 	By(fmt.Sprintf("Trying to get logs from host %s pod %s container %s: %v",
-		podStatus.Status.Host, podStatus.Name, containerName, err))
+		podStatus.Spec.Host, podStatus.Name, containerName, err))
 	var logs []byte
 	start := time.Now()
 
@@ -346,7 +346,7 @@ func testContainerOutputInNamespace(ns, scenarioName string, c *client.Client, p
 		logs, err = c.Get().
 			Prefix("proxy").
 			Resource("minions").
-			Name(podStatus.Status.Host).
+			Name(podStatus.Spec.Host).
 			Suffix("containerLogs", ns, podStatus.Name, containerName).
 			Do().
 			Raw()
@@ -354,7 +354,7 @@ func testContainerOutputInNamespace(ns, scenarioName string, c *client.Client, p
 		By(fmt.Sprintf("pod logs:%v\n", string(logs)))
 		if strings.Contains(string(logs), "Internal Error") {
 			By(fmt.Sprintf("Failed to get logs from host %q pod %q container %q: %v",
-				podStatus.Status.Host, podStatus.Name, containerName, string(logs)))
+				podStatus.Spec.Host, podStatus.Name, containerName, string(logs)))
 			time.Sleep(5 * time.Second)
 			continue
 		}

@@ -1957,7 +1957,6 @@ func (kl *Kubelet) generatePodStatusByPod(pod *api.Pod) (api.PodStatus, error) {
 		} else {
 			pendingStatus := api.PodStatus{
 				Phase:   api.PodPending,
-				Host:    kl.GetHostname(),
 				Message: fmt.Sprintf("Query docker container info failed with error (%v)", err),
 			}
 			return pendingStatus, nil
@@ -1976,7 +1975,6 @@ func (kl *Kubelet) generatePodStatusByPod(pod *api.Pod) (api.PodStatus, error) {
 		}
 	}
 	podStatus.Conditions = append(podStatus.Conditions, getPodReadyCondition(spec, podStatus.ContainerStatuses)...)
-	podStatus.Host = kl.GetHostname()
 	hostIP, err := kl.GetHostIP()
 	if err != nil {
 		glog.Errorf("Cannot get host IP: %v", err)
