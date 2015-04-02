@@ -19,7 +19,12 @@
 {% if grains.cloud is defined -%}
 {% set cloud_provider = "--cloud_provider=" + grains.cloud -%}
 
-{% if grains.cloud == 'aws' -%}
+{% if grains.cloud == 'gce' -%}
+  {% if grains.cloud_config is defined -%}
+    {% set cloud_config = "--cloud_config=" + grains.cloud_config -%}
+  {% endif -%}
+
+{% elif grains.cloud == 'aws' -%}
   {% set cloud_config = "--cloud_config=/etc/aws.conf" -%}
   {% set machines = "--machines=" + ','.join(salt['mine.get']('roles:kubernetes-pool', 'network.ip_addrs', expr_form='grain').keys()) -%}
 
