@@ -40,7 +40,7 @@ import (
 )
 
 var (
-	queriesAverage = flag.Int("queries", 20, "Number of hostname queries to make in each iteration per pod on average")
+	queriesAverage = flag.Int("queries", 100, "Number of hostname queries to make in each iteration per pod on average")
 	podsPerNode    = flag.Int("pods_per_node", 1, "Number of serve_hostname pods per node")
 	upTo           = flag.Int("up_to", 1, "Number of iterations or -1 for no limit")
 	maxPar         = flag.Int("max_par", 500, "Maximum number of queries in flight")
@@ -264,7 +264,7 @@ func main() {
 		inFlight := make(chan struct{}, *maxPar)
 		start := time.Now()
 		for q := 0; q < queries; q++ {
-			go func() {
+			go func(i int, query int) {
 				inFlight <- struct{}{}
 				t := time.Now()
 				hostname, err := c.Get().
@@ -274,8 +274,6 @@ func main() {
 					Name("serve-hostnames").
 					DoRaw()
 				glog.V(4).Infof("Proxy call in namespace %s took %v", ns, time.Since(t))
-				i := iteration
-				query := q
 				if err != nil {
 					glog.Warningf("Call failed during iteration %d query %d : %v", i, query, err)
 					// If the query failed return a string which starts with a character
@@ -285,7 +283,7 @@ func main() {
 					responseChan <- string(hostname)
 				}
 				<-inFlight
-			}()
+			}(iteration, q)
 		}
 		responses := make(map[string]int, *podsPerNode*len(nodes.Items))
 		missing := 0
@@ -312,6 +310,7 @@ func main() {
 				}
 			}
 		}
-		glog.Infof("Iteration %d took %v for %d queries (%.2f QPS)", iteration, time.Since(start), queries, float64(queries)/time.Since(start).Seconds())
+		glog.Infof("Iteration %d took %v for %d queries (%.2f QPS) with %d missing",
+			iteration, time.Since(start), queries-missing, float64(queries-missing)/time.Since(start).Seconds(), missing)
 	}
 }
