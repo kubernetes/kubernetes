@@ -56,9 +56,9 @@ var _ = Describe("PD", func() {
 	})
 
 	It("should schedule a pod w/ a RW PD, remove it, then schedule it on another host", func() {
-		if testContext.provider != "gce" && testContext.provider != "aws" {
+		if testContext.Provider != "gce" && testContext.Provider != "aws" {
 			By(fmt.Sprintf("Skipping PD test, which is only supported for providers gce & aws (not %s)",
-				testContext.provider))
+				testContext.Provider))
 			return
 		}
 
@@ -176,10 +176,10 @@ var _ = Describe("PD", func() {
 })
 
 func createPD() (string, error) {
-	if testContext.provider == "gce" {
+	if testContext.Provider == "gce" {
 		pdName := fmt.Sprintf("e2e-%s", string(util.NewUUID()))
 
-		zone := testContext.cloudConfig.Zone
+		zone := testContext.CloudConfig.Zone
 		// TODO: make this hit the compute API directly instread of shelling out to gcloud.
 		err := exec.Command("gcloud", "compute", "disks", "create", "--zone="+zone, "--size=10GB", pdName).Run()
 		if err != nil {
@@ -187,7 +187,7 @@ func createPD() (string, error) {
 		}
 		return pdName, nil
 	} else {
-		volumes, ok := testContext.cloudConfig.Provider.(aws_cloud.Volumes)
+		volumes, ok := testContext.CloudConfig.Provider.(aws_cloud.Volumes)
 		if !ok {
 			return "", fmt.Errorf("Provider does not support volumes")
 		}
@@ -198,36 +198,35 @@ func createPD() (string, error) {
 }
 
 func deletePD(pdName string) error {
-	if testContext.provider == "gce" {
-		zone := testContext.cloudConfig.Zone
+	if testContext.Provider == "gce" {
+		zone := testContext.CloudConfig.Zone
 
 		// TODO: make this hit the compute API directly.
 		return exec.Command("gcloud", "compute", "disks", "delete", "--zone="+zone, pdName).Run()
 	} else {
-		volumes, ok := testContext.cloudConfig.Provider.(aws_cloud.Volumes)
+		volumes, ok := testContext.CloudConfig.Provider.(aws_cloud.Volumes)
 		if !ok {
-			return "", fmt.Errorf("Provider does not support volumes")
+			return fmt.Errorf("Provider does not support volumes")
 		}
 		return volumes.DeleteVolume(pdName)
 	}
 }
 
 func detachPD(hostName, pdName string) error {
-	if testContext.provider == "gce" {
+	if testContext.Provider == "gce" {
 		instanceName := strings.Split(hostName, ".")[0]
 
-		zone := testContext.cloudConfig.Zone
+		zone := testContext.CloudConfig.Zone
 
 		// TODO: make this hit the compute API directly.
 		return exec.Command("gcloud", "compute", "instances", "detach-disk", "--zone="+zone, "--disk="+pdName, instanceName).Run()
 	} else {
-		volumes, ok := testContext.cloudConfig.Provider.(aws_cloud.Volumes)
+		volumes, ok := testContext.CloudConfig.Provider.(aws_cloud.Volumes)
 		if !ok {
-			return "", fmt.Errorf("Provider does not support volumes")
+			return fmt.Errorf("Provider does not support volumes")
 		}
 		return volumes.DetachDisk(hostName, pdName)
 	}
-
 }
 
 func testPDPod(diskName, targetHost string, readOnly bool) *api.Pod {
@@ -256,7 +255,7 @@ func testPDPod(diskName, targetHost string, readOnly bool) *api.Pod {
 		},
 	}
 
-	if testContext.provider == "gce" {
+	if testContext.Provider == "gce" {
 		pod.Spec.Volumes = []api.Volume{
 			{
 				Name: "testpd",
@@ -269,7 +268,7 @@ func testPDPod(diskName, targetHost string, readOnly bool) *api.Pod {
 				},
 			},
 		}
-	} else if testContext.provider == "aws" {
+	} else if testContext.Provider == "aws" {
 		pod.Spec.Volumes = []api.Volume{
 			{
 				Name: "testpd",
@@ -283,7 +282,7 @@ func testPDPod(diskName, targetHost string, readOnly bool) *api.Pod {
 			},
 		}
 	} else {
-		panic("Unknown provider: " + testContext.provider)
+		panic("Unknown provider: " + testContext.Provider)
 	}
 
 	return pod

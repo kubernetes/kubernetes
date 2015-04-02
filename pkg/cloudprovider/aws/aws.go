@@ -166,7 +166,7 @@ func (s *goamzEC2) DeleteVolume(volumeId string) (resp *ec2.SimpleResp, err erro
 func init() {
 	cloudprovider.RegisterCloudProvider("aws", func(config io.Reader) (cloudprovider.Interface, error) {
 		metadata := &goamzMetadata{}
-		return newAWSCloud(config, getAuth, metadata)
+		return newAWSCloud(config, getAuth, "", metadata)
 	})
 }
 
