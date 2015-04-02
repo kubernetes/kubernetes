@@ -585,7 +585,7 @@ func (self *awsInstanceType) getEbsMountDevices() []string {
 	// See: https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/block-device-mapping-concepts.html
 	devices := []string{}
 	for c := 'f'; c <= 'p'; c++ {
-		devices = append(devices, fmt.Sprintf("/dev/sd%s", c))
+		devices = append(devices, fmt.Sprintf("/dev/sd%c", c))
 	}
 	return devices
 }
