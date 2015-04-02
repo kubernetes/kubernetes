@@ -17,11 +17,14 @@ limitations under the License.
 package scheduler
 
 import (
+	"time"
+
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
 	// TODO: move everything from pkg/scheduler into this package. Remove references from registry.
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/scheduler"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler/metrics"
 
 	"github.com/golang/glog"
 )
@@ -89,6 +92,7 @@ func New(c *Config) *Scheduler {
 	s := &Scheduler{
 		config: c,
 	}
+	metrics.Register()
 	return s
 }
 
@@ -100,7 +104,12 @@ func (s *Scheduler) Run() {
 func (s *Scheduler) scheduleOne() {
 	pod := s.config.NextPod()
 	glog.V(3).Infof("Attempting to schedule: %v", pod)
+	start := time.Now()
+	defer func() {
+		metrics.E2eSchedulingLatency.Observe(metrics.SinceInMicroseconds(start))
+	}()
 	dest, err := s.config.Algorithm.Schedule(*pod, s.config.MinionLister)
+	metrics.SchedulingAlgorithmLatency.Observe(metrics.SinceInMicroseconds(start))
 	if err != nil {
 		glog.V(1).Infof("Failed to schedule: %v", pod)
 		s.config.Recorder.Eventf(pod, "failedScheduling", "Error scheduling: %v", err)
@@ -118,7 +127,10 @@ func (s *Scheduler) scheduleOne() {
 	// We want to add the pod to the model iff the bind succeeds, but we don't want to race
 	// with any deletions, which happen asyncronously.
 	s.config.Modeler.LockedAction(func() {
-		if err := s.config.Binder.Bind(b); err != nil {
+		bindingStart := time.Now()
+		err := s.config.Binder.Bind(b)
+		metrics.BindingLatency.Observe(metrics.SinceInMicroseconds(bindingStart))
+		if err != nil {
 			glog.V(1).Infof("Failed to bind pod: %v", err)
 			s.config.Recorder.Eventf(pod, "failedScheduling", "Binding rejected: %v", err)
 			s.config.Error(pod, err)
