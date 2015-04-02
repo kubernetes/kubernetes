@@ -733,7 +733,12 @@ func newAwsDisk(ec2 EC2, name string) (*awsDisk, error) {
 	if url.Scheme != "aws" {
 		return nil, fmt.Errorf("Invalid scheme for AWS volume (%s)", name)
 	}
+
 	awsId := url.Path
+	if len(awsId) > 1 && awsId[0] == '/' {
+		awsId = awsId[1:]
+	}
+
 	// TODO: Regex match?
 	if strings.Contains(awsId, "/") || !strings.HasPrefix(awsId, "vol-") {
 		return nil, fmt.Errorf("Invalid format for AWS volume (%s)", name)
