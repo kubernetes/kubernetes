@@ -254,18 +254,22 @@ func (pd *awsPersistentDisk) TearDown() error {
 func (pd *awsPersistentDisk) TearDownAt(dir string) error {
 	mountpoint, err := mount.IsMountPoint(dir)
 	if err != nil {
+		glog.V(2).Info("Error checking if mountpoint ", dir, ": ", err)
 		return err
 	}
 	if !mountpoint {
+		glog.V(2).Info("Not mountpoint, deleting")
 		return os.Remove(dir)
 	}
 
 	refs, err := mount.GetMountRefs(pd.mounter, dir)
 	if err != nil {
+		glog.V(2).Info("Error getting mountrefs for ", dir, ": ", err)
 		return err
 	}
 	// Unmount the bind-mount inside this pod
 	if err := pd.mounter.Unmount(dir, 0); err != nil {
+		glog.V(2).Info("Error unmounting dir ", dir, ": ", err)
 		return err
 	}
 	// If len(refs) is 1, then all bind mounts have been removed, and the
@@ -274,6 +278,7 @@ func (pd *awsPersistentDisk) TearDownAt(dir string) error {
 		// pd.pdName is not initially set for volume-cleaners, so set it here.
 		pd.pdName = path.Base(refs[0])
 		if err := pd.manager.DetachDisk(pd); err != nil {
+			glog.V(2).Info("Error detaching disk ", pd.pdName, ": ", err)
 			return err
 		}
 	}
@@ -284,6 +289,7 @@ func (pd *awsPersistentDisk) TearDownAt(dir string) error {
 	}
 	if !mountpoint {
 		if err := os.Remove(dir); err != nil {
+			glog.V(2).Info("Error removing mountpoint ", dir, ": ", err)
 			return err
 		}
 	}

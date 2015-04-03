@@ -91,17 +91,21 @@ func (util *AWSDiskUtil) DetachDisk(pd *awsPersistentDisk) error {
 	// Unmount the global PD mount, which should be the only one.
 	globalPDPath := makeGlobalPDName(pd.plugin.host, pd.pdName)
 	if err := pd.mounter.Unmount(globalPDPath, 0); err != nil {
+		glog.V(2).Info("Error unmount dir ", globalPDPath, ": ", err)
 		return err
 	}
 	if err := os.Remove(globalPDPath); err != nil {
+		glog.V(2).Info("Error removing dir ", globalPDPath, ": ", err)
 		return err
 	}
 	// Detach the disk
 	volumes, err := pd.getVolumeProvider()
 	if err != nil {
+		glog.V(2).Info("Error getting volume provider for pd ",  pd.pdName, ": ", err)
 		return err
 	}
 	if err := volumes.DetachDisk("", pd.pdName); err != nil {
+		glog.V(2).Info("Error detaching disk ",  pd.pdName, ": ", err)
 		return err
 	}
 	return nil
