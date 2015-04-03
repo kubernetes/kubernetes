@@ -297,7 +297,9 @@
        "application/json"
       ],
       "consumes": [
-       "*/*"
+       "application/json-patch+json",
+       "application/merge-patch+json",
+       "application/strategic-merge-patch+json"
       ]
      },
      {
@@ -665,7 +667,9 @@
        "application/json"
       ],
       "consumes": [
-       "*/*"
+       "application/json-patch+json",
+       "application/merge-patch+json",
+       "application/strategic-merge-patch+json"
       ]
      },
      {
@@ -1025,7 +1029,9 @@
        "application/json"
       ],
       "consumes": [
-       "*/*"
+       "application/json-patch+json",
+       "application/merge-patch+json",
+       "application/strategic-merge-patch+json"
       ]
      },
      {
@@ -1337,7 +1343,9 @@
        "application/json"
       ],
       "consumes": [
-       "*/*"
+       "application/json-patch+json",
+       "application/merge-patch+json",
+       "application/strategic-merge-patch+json"
       ]
      },
      {
@@ -1889,7 +1897,9 @@
        "application/json"
       ],
       "consumes": [
-       "*/*"
+       "application/json-patch+json",
+       "application/merge-patch+json",
+       "application/strategic-merge-patch+json"
       ]
      },
      {
@@ -2265,7 +2275,9 @@
        "application/json"
       ],
       "consumes": [
-       "*/*"
+       "application/json-patch+json",
+       "application/merge-patch+json",
+       "application/strategic-merge-patch+json"
       ]
      },
      {
@@ -2609,6 +2621,718 @@
     ]
    },
    {
+    "path": "/api/v1beta1/persistentVolumeClaims",
+    "description": "API at /api/v1beta1 version v1beta1",
+    "operations": [
+     {
+      "type": "v1beta1.PersistentVolumeClaimList",
+      "method": "GET",
+      "summary": "list objects of kind PersistentVolumeClaim",
+      "nickname": "listPersistentVolumeClaim",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "fields",
+        "description": "a selector to restrict the list of returned objects by their fields; defaults to everything",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "labels",
+        "description": "a selector to restrict the list of returned objects by their labels; defaults to everything",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "resourceVersion",
+        "description": "when specified with a watch call, shows changes that occur after that particular version of a resource; defaults to changes from the beginning of history",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "watch",
+        "description": "watch for changes to the described resources and return them as a stream of add, update, and remove notifications; specify resourceVersion",
+        "required": false,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "void",
+      "method": "POST",
+      "summary": "create a PersistentVolumeClaim",
+      "nickname": "createPersistentVolumeClaim",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1beta1.PersistentVolumeClaim",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/api/v1beta1/watch/persistentVolumeClaims",
+    "description": "API at /api/v1beta1 version v1beta1",
+    "operations": [
+     {
+      "type": "*json.watchEvent",
+      "method": "GET",
+      "summary": "watch individual changes to a list of PersistentVolumeClaim",
+      "nickname": "watchPersistentVolumeClaimlist",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "fields",
+        "description": "a selector to restrict the list of returned objects by their fields; defaults to everything",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "labels",
+        "description": "a selector to restrict the list of returned objects by their labels; defaults to everything",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "resourceVersion",
+        "description": "when specified with a watch call, shows changes that occur after that particular version of a resource; defaults to changes from the beginning of history",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "watch",
+        "description": "watch for changes to the described resources and return them as a stream of add, update, and remove notifications; specify resourceVersion",
+        "required": false,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/api/v1beta1/persistentVolumeClaims/{name}",
+    "description": "API at /api/v1beta1 version v1beta1",
+    "operations": [
+     {
+      "type": "v1beta1.PersistentVolumeClaim",
+      "method": "GET",
+      "summary": "read the specified PersistentVolumeClaim",
+      "nickname": "readPersistentVolumeClaim",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the PersistentVolumeClaim",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": false,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "void",
+      "method": "PUT",
+      "summary": "replace the specified PersistentVolumeClaim",
+      "nickname": "replacePersistentVolumeClaim",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the PersistentVolumeClaim",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1beta1.PersistentVolumeClaim",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "void",
+      "method": "PATCH",
+      "summary": "partially update the specified PersistentVolumeClaim",
+      "nickname": "patchPersistentVolumeClaim",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the PersistentVolumeClaim",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1beta1.PersistentVolumeClaim",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "application/json-patch+json",
+       "application/merge-patch+json",
+       "application/strategic-merge-patch+json"
+      ]
+     },
+     {
+      "type": "void",
+      "method": "DELETE",
+      "summary": "delete a PersistentVolumeClaim",
+      "nickname": "deletePersistentVolumeClaim",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the PersistentVolumeClaim",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "*v1beta1.DeleteOptions",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/api/v1beta1/watch/persistentVolumeClaims/{name}",
+    "description": "API at /api/v1beta1 version v1beta1",
+    "operations": [
+     {
+      "type": "*json.watchEvent",
+      "method": "GET",
+      "summary": "watch changes to an object of kind PersistentVolumeClaim",
+      "nickname": "watchPersistentVolumeClaim",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the PersistentVolumeClaim",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "fields",
+        "description": "a selector to restrict the list of returned objects by their fields; defaults to everything",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "labels",
+        "description": "a selector to restrict the list of returned objects by their labels; defaults to everything",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "resourceVersion",
+        "description": "when specified with a watch call, shows changes that occur after that particular version of a resource; defaults to changes from the beginning of history",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "watch",
+        "description": "watch for changes to the described resources and return them as a stream of add, update, and remove notifications; specify resourceVersion",
+        "required": false,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/api/v1beta1/persistentVolumes",
+    "description": "API at /api/v1beta1 version v1beta1",
+    "operations": [
+     {
+      "type": "v1beta1.PersistentVolumeList",
+      "method": "GET",
+      "summary": "list objects of kind PersistentVolume",
+      "nickname": "listPersistentVolume",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "fields",
+        "description": "a selector to restrict the list of returned objects by their fields; defaults to everything",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "labels",
+        "description": "a selector to restrict the list of returned objects by their labels; defaults to everything",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "resourceVersion",
+        "description": "when specified with a watch call, shows changes that occur after that particular version of a resource; defaults to changes from the beginning of history",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "watch",
+        "description": "watch for changes to the described resources and return them as a stream of add, update, and remove notifications; specify resourceVersion",
+        "required": false,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "void",
+      "method": "POST",
+      "summary": "create a PersistentVolume",
+      "nickname": "createPersistentVolume",
+      "parameters": [
+       {
+        "type": "v1beta1.PersistentVolume",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/api/v1beta1/watch/persistentVolumes",
+    "description": "API at /api/v1beta1 version v1beta1",
+    "operations": [
+     {
+      "type": "*json.watchEvent",
+      "method": "GET",
+      "summary": "watch individual changes to a list of PersistentVolume",
+      "nickname": "watchPersistentVolumelist",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "fields",
+        "description": "a selector to restrict the list of returned objects by their fields; defaults to everything",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "labels",
+        "description": "a selector to restrict the list of returned objects by their labels; defaults to everything",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "resourceVersion",
+        "description": "when specified with a watch call, shows changes that occur after that particular version of a resource; defaults to changes from the beginning of history",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "watch",
+        "description": "watch for changes to the described resources and return them as a stream of add, update, and remove notifications; specify resourceVersion",
+        "required": false,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/api/v1beta1/persistentVolumes/{name}",
+    "description": "API at /api/v1beta1 version v1beta1",
+    "operations": [
+     {
+      "type": "v1beta1.PersistentVolume",
+      "method": "GET",
+      "summary": "read the specified PersistentVolume",
+      "nickname": "readPersistentVolume",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the PersistentVolume",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "void",
+      "method": "PUT",
+      "summary": "replace the specified PersistentVolume",
+      "nickname": "replacePersistentVolume",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the PersistentVolume",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1beta1.PersistentVolume",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "void",
+      "method": "PATCH",
+      "summary": "partially update the specified PersistentVolume",
+      "nickname": "patchPersistentVolume",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the PersistentVolume",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1beta1.PersistentVolume",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "application/json-patch+json",
+       "application/merge-patch+json",
+       "application/strategic-merge-patch+json"
+      ]
+     },
+     {
+      "type": "void",
+      "method": "DELETE",
+      "summary": "delete a PersistentVolume",
+      "nickname": "deletePersistentVolume",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the PersistentVolume",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "*v1beta1.DeleteOptions",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/api/v1beta1/watch/persistentVolumes/{name}",
+    "description": "API at /api/v1beta1 version v1beta1",
+    "operations": [
+     {
+      "type": "*json.watchEvent",
+      "method": "GET",
+      "summary": "watch changes to an object of kind PersistentVolume",
+      "nickname": "watchPersistentVolume",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the PersistentVolume",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "fields",
+        "description": "a selector to restrict the list of returned objects by their fields; defaults to everything",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "labels",
+        "description": "a selector to restrict the list of returned objects by their labels; defaults to everything",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "resourceVersion",
+        "description": "when specified with a watch call, shows changes that occur after that particular version of a resource; defaults to changes from the beginning of history",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "watch",
+        "description": "watch for changes to the described resources and return them as a stream of add, update, and remove notifications; specify resourceVersion",
+        "required": false,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/api/v1beta1/persistentVolumes/{name}/status",
+    "description": "API at /api/v1beta1 version v1beta1",
+    "operations": [
+     {
+      "type": "void",
+      "method": "PUT",
+      "summary": "replace the specified PersistentVolume",
+      "nickname": "replacePersistentVolume",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the PersistentVolume",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1beta1.PersistentVolume",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
     "path": "/api/v1beta1/pods",
     "description": "API at /api/v1beta1 version v1beta1",
     "operations": [
@@ -2865,7 +3589,9 @@
        "application/json"
       ],
       "consumes": [
-       "*/*"
+       "application/json-patch+json",
+       "application/merge-patch+json",
+       "application/strategic-merge-patch+json"
       ]
      },
      {
@@ -3633,7 +4359,9 @@
        "application/json"
       ],
       "consumes": [
-       "*/*"
+       "application/json-patch+json",
+       "application/merge-patch+json",
+       "application/strategic-merge-patch+json"
       ]
      },
      {
@@ -4001,7 +4729,9 @@
        "application/json"
       ],
       "consumes": [
-       "*/*"
+       "application/json-patch+json",
+       "application/merge-patch+json",
+       "application/strategic-merge-patch+json"
       ]
      },
      {
@@ -4413,7 +5143,9 @@
        "application/json"
       ],
       "consumes": [
-       "*/*"
+       "application/json-patch+json",
+       "application/merge-patch+json",
+       "application/strategic-merge-patch+json"
       ]
      },
      {
@@ -4773,7 +5505,9 @@
        "application/json"
       ],
       "consumes": [
-       "*/*"
+       "application/json-patch+json",
+       "application/merge-patch+json",
+       "application/strategic-merge-patch+json"
       ]
      },
      {
@@ -5206,6 +5940,14 @@
     "id": "*v1beta1.DeleteOptions",
     "properties": {}
    },
+   "uint64": {
+    "id": "",
+    "properties": null
+   },
+   "v1beta1.AccessModeType": {
+    "id": "v1beta1.AccessModeType",
+    "properties": {}
+   },
    "v1beta1.Binding": {
     "id": "v1beta1.Binding",
     "required": [
@@ -5214,7 +5956,7 @@
     ],
     "properties": {
      "annotations": {
-      "$ref": "v1beta1.TypeMeta.annotations",
+      "type": "any",
       "description": "map of string keys and values that can be used by external tooling to store and retrieve arbitrary metadata about the object"
      },
      "apiVersion": {
@@ -5262,7 +6004,7 @@
       "description": "URL for the object; populated by the system, read-only"
      },
      "uid": {
-      "$ref": "types.UID",
+      "type": "string",
       "description": "unique UUID across space and time; populated by the system, read-only; cannot be updated"
      }
     }
@@ -5334,7 +6076,7 @@
       "description": "Docker image name"
      },
      "imagePullPolicy": {
-      "$ref": "v1beta1.PullPolicy",
+      "type": "string",
       "description": "image pull policy; one of PullAlways, PullNever, PullIfNotPresent; defaults to PullAlways if :latest tag is specified, or PullIfNotPresent otherwise; cannot be updated"
      },
      "lifecycle": {
@@ -5407,7 +6149,7 @@
       "description": "list of containers belonging to the pod; containers cannot currently be added or removed"
      },
      "dnsPolicy": {
-      "$ref": "v1beta1.DNSPolicy",
+      "type": "string",
       "description": "DNS policy for containers within the pod; one of 'ClusterFirst' or 'Default'"
      },
      "hostNetwork": {
@@ -5423,7 +6165,7 @@
       "description": "restart policy for all containers within the pod; one of RestartPolicyAlways, RestartPolicyOnFailure, RestartPolicyNever"
      },
      "uuid": {
-      "$ref": "types.UID",
+      "type": "string",
       "description": "manifest UUID, populated by the system, read-only"
      },
      "version": {
@@ -5464,7 +6206,7 @@
       "description": "name for the port that can be referred to by services; must be a DNS_LABEL and unique without the pod"
      },
      "protocol": {
-      "$ref": "v1beta1.Protocol",
+      "type": "string",
       "description": "protocol for port; must be UDP or TCP; TCP if unspecified"
      }
     }
@@ -5476,7 +6218,7 @@
     ],
     "properties": {
      "medium": {
-      "$ref": "v1beta1.StorageType",
+      "type": "string",
       "description": "type of storage used to back the volume; must be an empty string (default) or Memory"
      }
     }
@@ -5532,7 +6274,7 @@
       "description": "specific resourceVersion to which this reference is made, if any: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
      },
      "uid": {
-      "$ref": "types.UID",
+      "type": "string",
       "description": "uid of the referent"
      }
     }
@@ -5553,7 +6295,7 @@
       "description": "port number of the endpoint"
      },
      "protocol": {
-      "$ref": "v1beta1.Protocol",
+      "type": "string",
       "description": "protocol for this port; must be UDP or TCP; TCP if unspecified"
      }
     }
@@ -5585,7 +6327,7 @@
     ],
     "properties": {
      "annotations": {
-      "$ref": "v1beta1.TypeMeta.annotations",
+      "type": "any",
       "description": "map of string keys and values that can be used by external tooling to store and retrieve arbitrary metadata about the object"
      },
      "apiVersion": {
@@ -5624,7 +6366,7 @@
       "description": "namespace to which the object belongs; must be a DNS_SUBDOMAIN; 'default' by default; cannot be updated"
      },
      "protocol": {
-      "$ref": "v1beta1.Protocol",
+      "type": "string",
       "description": "IP protocol for the first set of endpoint ports; must be UDP or TCP; TCP if unspecified"
      },
      "resourceVersion": {
@@ -5650,7 +6392,7 @@
       "description": "list of references to objects providing the endpoints"
      },
      "uid": {
-      "$ref": "types.UID",
+      "type": "string",
       "description": "unique UUID across space and time; populated by the system, read-only; cannot be updated"
      }
     }
@@ -5662,7 +6404,7 @@
     ],
     "properties": {
      "annotations": {
-      "$ref": "v1beta1.TypeMeta.annotations",
+      "type": "any",
       "description": "map of string keys and values that can be used by external tooling to store and retrieve arbitrary metadata about the object"
      },
      "apiVersion": {
@@ -5709,7 +6451,7 @@
       "description": "URL for the object; populated by the system, read-only"
      },
      "uid": {
-      "$ref": "types.UID",
+      "type": "string",
       "description": "unique UUID across space and time; populated by the system, read-only; cannot be updated"
      }
     }
@@ -5738,7 +6480,7 @@
     "id": "v1beta1.Event",
     "properties": {
      "annotations": {
-      "$ref": "v1beta1.TypeMeta.annotations",
+      "type": "any",
       "description": "map of string keys and values that can be used by external tooling to store and retrieve arbitrary metadata about the object"
      },
      "apiVersion": {
@@ -5819,7 +6561,7 @@
       "description": "time at which the client recorded the event"
      },
      "uid": {
-      "$ref": "types.UID",
+      "type": "string",
       "description": "unique UUID across space and time; populated by the system, read-only; cannot be updated"
      }
     }
@@ -5831,7 +6573,7 @@
     ],
     "properties": {
      "annotations": {
-      "$ref": "v1beta1.TypeMeta.annotations",
+      "type": "any",
       "description": "map of string keys and values that can be used by external tooling to store and retrieve arbitrary metadata about the object"
      },
      "apiVersion": {
@@ -5878,7 +6620,7 @@
       "description": "URL for the object; populated by the system, read-only"
      },
      "uid": {
-      "$ref": "types.UID",
+      "type": "string",
       "description": "unique UUID across space and time; populated by the system, read-only; cannot be updated"
      }
     }
@@ -6004,7 +6746,7 @@
     "id": "v1beta1.LimitRange",
     "properties": {
      "annotations": {
-      "$ref": "v1beta1.TypeMeta.annotations",
+      "type": "any",
       "description": "map of string keys and values that can be used by external tooling to store and retrieve arbitrary metadata about the object"
      },
      "apiVersion": {
@@ -6048,7 +6790,7 @@
       "description": "spec defines the limits enforced"
      },
      "uid": {
-      "$ref": "types.UID",
+      "type": "string",
       "description": "unique UUID across space and time; populated by the system, read-only; cannot be updated"
      }
     }
@@ -6056,16 +6798,20 @@
    "v1beta1.LimitRangeItem": {
     "id": "v1beta1.LimitRangeItem",
     "properties": {
+     "default": {
+      "type": "any",
+      "description": "default values on this kind by resource name if omitted"
+     },
      "max": {
-      "$ref": "v1beta1.ResourceList",
+      "type": "any",
       "description": "max usage constraints on this kind by resource name"
      },
      "min": {
-      "$ref": "v1beta1.ResourceList",
+      "type": "any",
       "description": "min usage constraints on this kind by resource name"
      },
      "type": {
-      "$ref": "v1beta1.LimitType",
+      "type": "string",
       "description": "type of resource that this limit applies to"
      }
     }
@@ -6077,7 +6823,7 @@
     ],
     "properties": {
      "annotations": {
-      "$ref": "v1beta1.TypeMeta.annotations",
+      "type": "any",
       "description": "map of string keys and values that can be used by external tooling to store and retrieve arbitrary metadata about the object"
      },
      "apiVersion": {
@@ -6124,7 +6870,7 @@
       "description": "URL for the object; populated by the system, read-only"
      },
      "uid": {
-      "$ref": "types.UID",
+      "type": "string",
       "description": "unique UUID across space and time; populated by the system, read-only; cannot be updated"
      }
     }
@@ -6175,7 +6921,7 @@
     "id": "v1beta1.Minion",
     "properties": {
      "annotations": {
-      "$ref": "v1beta1.TypeMeta.annotations",
+      "type": "any",
       "description": "map of string keys and values that can be used by external tooling to store and retrieve arbitrary metadata about the object"
      },
      "apiVersion": {
@@ -6211,7 +6957,7 @@
       "description": "kind of object, in CamelCase; cannot be updated"
      },
      "labels": {
-      "$ref": "v1beta1.Minion.labels",
+      "type": "any",
       "description": "map of string keys and values that can be used to organize and categorize minions; labels of a minion assigned by the scheduler must match the scheduled pod's nodeSelector"
      },
      "namespace": {
@@ -6239,7 +6985,7 @@
       "description": "current status of node"
      },
      "uid": {
-      "$ref": "types.UID",
+      "type": "string",
       "description": "unique UUID across space and time; populated by the system, read-only; cannot be updated"
      },
      "unschedulable": {
@@ -6248,10 +6994,6 @@
      }
     }
    },
-   "v1beta1.Minion.labels": {
-    "id": "v1beta1.Minion.labels",
-    "properties": {}
-   },
    "v1beta1.MinionList": {
     "id": "v1beta1.MinionList",
     "required": [
@@ -6259,7 +7001,7 @@
     ],
     "properties": {
      "annotations": {
-      "$ref": "v1beta1.TypeMeta.annotations",
+      "type": "any",
       "description": "map of string keys and values that can be used by external tooling to store and retrieve arbitrary metadata about the object"
      },
      "apiVersion": {
@@ -6313,7 +7055,7 @@
       "description": "URL for the object; populated by the system, read-only"
      },
      "uid": {
-      "$ref": "types.UID",
+      "type": "string",
       "description": "unique UUID across space and time; populated by the system, read-only; cannot be updated"
      }
     }
@@ -6343,7 +7085,7 @@
     "id": "v1beta1.Namespace",
     "properties": {
      "annotations": {
-      "$ref": "v1beta1.TypeMeta.annotations",
+      "type": "any",
       "description": "map of string keys and values that can be used by external tooling to store and retrieve arbitrary metadata about the object"
      },
      "apiVersion": {
@@ -6371,7 +7113,7 @@
       "description": "kind of object, in CamelCase; cannot be updated"
      },
      "labels": {
-      "$ref": "v1beta1.Namespace.labels",
+      "type": "any",
       "description": "map of string keys and values that can be used to organize and categorize namespaces"
      },
      "namespace": {
@@ -6395,14 +7137,10 @@
       "description": "status describes the current status of a Namespace; read-only"
      },
      "uid": {
-      "$ref": "types.UID",
+      "type": "string",
       "description": "unique UUID across space and time; populated by the system, read-only; cannot be updated"
      }
     }
-   },
-   "v1beta1.Namespace.labels": {
-    "id": "v1beta1.Namespace.labels",
-    "properties": {}
    },
    "v1beta1.NamespaceList": {
     "id": "v1beta1.NamespaceList",
@@ -6411,7 +7149,7 @@
     ],
     "properties": {
      "annotations": {
-      "$ref": "v1beta1.TypeMeta.annotations",
+      "type": "any",
       "description": "map of string keys and values that can be used by external tooling to store and retrieve arbitrary metadata about the object"
      },
      "apiVersion": {
@@ -6458,7 +7196,7 @@
       "description": "URL for the object; populated by the system, read-only"
      },
      "uid": {
-      "$ref": "types.UID",
+      "type": "string",
       "description": "unique UUID across space and time; populated by the system, read-only; cannot be updated"
      }
     }
@@ -6479,7 +7217,7 @@
     "id": "v1beta1.NamespaceStatus",
     "properties": {
      "phase": {
-      "$ref": "v1beta1.NamespacePhase",
+      "type": "string",
       "description": "phase is the current lifecycle phase of the namespace"
      }
     }
@@ -6496,7 +7234,7 @@
       "description": "string representation of the address"
      },
      "type": {
-      "$ref": "v1beta1.NodeAddressType",
+      "type": "string",
       "description": "type of the node address, e.g. external ip, internal ip, hostname, etc"
      }
     }
@@ -6509,7 +7247,7 @@
     ],
     "properties": {
      "kind": {
-      "$ref": "v1beta1.NodeConditionKind",
+      "type": "string",
       "description": "kind of the condition, one of Reachable, Ready, Schedulable"
      },
      "lastProbeTime": {
@@ -6529,7 +7267,7 @@
       "description": "(brief) reason for the condition's last transition"
      },
      "status": {
-      "$ref": "v1beta1.ConditionStatus",
+      "type": "string",
       "description": "status of the condition, one of Full, None, Unknown"
      }
     }
@@ -6538,7 +7276,7 @@
     "id": "v1beta1.NodeResources",
     "properties": {
      "capacity": {
-      "$ref": "v1beta1.ResourceList",
+      "type": "any",
       "description": "resource capacity of a node represented as a map of resource name to quantity of resource"
      }
     }
@@ -6565,7 +7303,7 @@
       "description": "node identity is a set of ids/uuids to uniquely identify the node"
      },
      "phase": {
-      "$ref": "v1beta1.NodePhase",
+      "type": "string",
       "description": "node phase is the current lifecycle phase of the node"
      }
     }
@@ -6645,8 +7383,313 @@
       "description": "specific resourceVersion to which this reference is made, if any: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
      },
      "uid": {
-      "$ref": "types.UID",
+      "type": "string",
       "description": "uid of the referent"
+     }
+    }
+   },
+   "v1beta1.PersistentVolume": {
+    "id": "v1beta1.PersistentVolume",
+    "properties": {
+     "annotations": {
+      "type": "any",
+      "description": "map of string keys and values that can be used by external tooling to store and retrieve arbitrary metadata about the object"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "version of the schema the object should have"
+     },
+     "creationTimestamp": {
+      "type": "string",
+      "description": "RFC 3339 date and time at which the object was created; populated by the system, read-only; null for lists"
+     },
+     "deletionTimestamp": {
+      "type": "string",
+      "description": "RFC 3339 date and time at which the object will be deleted; populated by the system when a graceful deletion is requested, read-only; if not set, graceful deletion of the object has not been requested"
+     },
+     "generateName": {
+      "type": "string",
+      "description": "an optional prefix to use to generate a unique name; has the same validation rules as name; optional, and is applied only name if is not specified"
+     },
+     "id": {
+      "type": "string",
+      "description": "name of the object; must be a DNS_SUBDOMAIN and unique among all objects of the same kind within the same namespace; used in resource URLs; cannot be updated"
+     },
+     "kind": {
+      "type": "string",
+      "description": "kind of object, in CamelCase; cannot be updated"
+     },
+     "namespace": {
+      "type": "string",
+      "description": "namespace to which the object belongs; must be a DNS_SUBDOMAIN; 'default' by default; cannot be updated"
+     },
+     "resourceVersion": {
+      "$ref": "uint64",
+      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
+     },
+     "selfLink": {
+      "type": "string",
+      "description": "URL for the object; populated by the system, read-only"
+     },
+     "spec": {
+      "$ref": "v1beta1.PersistentVolumeSpec",
+      "description": "specification of a persistent volume as provisioned by an administrator"
+     },
+     "status": {
+      "$ref": "v1beta1.PersistentVolumeStatus",
+      "description": "current status of a persistent volume; populated by the system, read-only"
+     },
+     "uid": {
+      "type": "string",
+      "description": "unique UUID across space and time; populated by the system, read-only; cannot be updated"
+     }
+    }
+   },
+   "v1beta1.PersistentVolumeClaim": {
+    "id": "v1beta1.PersistentVolumeClaim",
+    "properties": {
+     "annotations": {
+      "type": "any",
+      "description": "map of string keys and values that can be used by external tooling to store and retrieve arbitrary metadata about the object"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "version of the schema the object should have"
+     },
+     "creationTimestamp": {
+      "type": "string",
+      "description": "RFC 3339 date and time at which the object was created; populated by the system, read-only; null for lists"
+     },
+     "deletionTimestamp": {
+      "type": "string",
+      "description": "RFC 3339 date and time at which the object will be deleted; populated by the system when a graceful deletion is requested, read-only; if not set, graceful deletion of the object has not been requested"
+     },
+     "generateName": {
+      "type": "string",
+      "description": "an optional prefix to use to generate a unique name; has the same validation rules as name; optional, and is applied only name if is not specified"
+     },
+     "id": {
+      "type": "string",
+      "description": "name of the object; must be a DNS_SUBDOMAIN and unique among all objects of the same kind within the same namespace; used in resource URLs; cannot be updated"
+     },
+     "kind": {
+      "type": "string",
+      "description": "kind of object, in CamelCase; cannot be updated"
+     },
+     "namespace": {
+      "type": "string",
+      "description": "namespace to which the object belongs; must be a DNS_SUBDOMAIN; 'default' by default; cannot be updated"
+     },
+     "resourceVersion": {
+      "$ref": "uint64",
+      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
+     },
+     "selfLink": {
+      "type": "string",
+      "description": "URL for the object; populated by the system, read-only"
+     },
+     "spec": {
+      "$ref": "v1beta1.PersistentVolumeClaimSpec"
+     },
+     "status": {
+      "$ref": "v1beta1.PersistentVolumeClaimStatus",
+      "description": "the current status of a persistent volume claim; read-only"
+     },
+     "uid": {
+      "type": "string",
+      "description": "unique UUID across space and time; populated by the system, read-only; cannot be updated"
+     }
+    }
+   },
+   "v1beta1.PersistentVolumeClaimList": {
+    "id": "v1beta1.PersistentVolumeClaimList",
+    "properties": {
+     "annotations": {
+      "type": "any",
+      "description": "map of string keys and values that can be used by external tooling to store and retrieve arbitrary metadata about the object"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "version of the schema the object should have"
+     },
+     "creationTimestamp": {
+      "type": "string",
+      "description": "RFC 3339 date and time at which the object was created; populated by the system, read-only; null for lists"
+     },
+     "deletionTimestamp": {
+      "type": "string",
+      "description": "RFC 3339 date and time at which the object will be deleted; populated by the system when a graceful deletion is requested, read-only; if not set, graceful deletion of the object has not been requested"
+     },
+     "generateName": {
+      "type": "string",
+      "description": "an optional prefix to use to generate a unique name; has the same validation rules as name; optional, and is applied only name if is not specified"
+     },
+     "id": {
+      "type": "string",
+      "description": "name of the object; must be a DNS_SUBDOMAIN and unique among all objects of the same kind within the same namespace; used in resource URLs; cannot be updated"
+     },
+     "items": {
+      "type": "array",
+      "items": {
+       "$ref": "v1beta1.PersistentVolumeClaim"
+      }
+     },
+     "kind": {
+      "type": "string",
+      "description": "kind of object, in CamelCase; cannot be updated"
+     },
+     "namespace": {
+      "type": "string",
+      "description": "namespace to which the object belongs; must be a DNS_SUBDOMAIN; 'default' by default; cannot be updated"
+     },
+     "resourceVersion": {
+      "$ref": "uint64",
+      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
+     },
+     "selfLink": {
+      "type": "string",
+      "description": "URL for the object; populated by the system, read-only"
+     },
+     "uid": {
+      "type": "string",
+      "description": "unique UUID across space and time; populated by the system, read-only; cannot be updated"
+     }
+    }
+   },
+   "v1beta1.PersistentVolumeClaimSpec": {
+    "id": "v1beta1.PersistentVolumeClaimSpec",
+    "properties": {
+     "accessModes": {
+      "type": "array",
+      "items": {
+       "$ref": "v1beta1.AccessModeType"
+      },
+      "description": "the desired access modes the volume should have"
+     },
+     "resources": {
+      "$ref": "v1beta1.ResourceRequirements",
+      "description": "the desired resources the volume should have"
+     }
+    }
+   },
+   "v1beta1.PersistentVolumeClaimStatus": {
+    "id": "v1beta1.PersistentVolumeClaimStatus",
+    "properties": {
+     "accessModes": {
+      "type": "array",
+      "items": {
+       "$ref": "v1beta1.AccessModeType"
+      },
+      "description": "the actual access modes the volume has"
+     },
+     "capacity": {
+      "type": "any",
+      "description": "the actual resources the volume has"
+     },
+     "phase": {
+      "type": "string",
+      "description": "the current phase of the claim"
+     },
+     "volumeRef": {
+      "$ref": "v1beta1.ObjectReference",
+      "description": "a reference to the backing persistent volume, when bound"
+     }
+    }
+   },
+   "v1beta1.PersistentVolumeList": {
+    "id": "v1beta1.PersistentVolumeList",
+    "properties": {
+     "annotations": {
+      "type": "any",
+      "description": "map of string keys and values that can be used by external tooling to store and retrieve arbitrary metadata about the object"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "version of the schema the object should have"
+     },
+     "creationTimestamp": {
+      "type": "string",
+      "description": "RFC 3339 date and time at which the object was created; populated by the system, read-only; null for lists"
+     },
+     "deletionTimestamp": {
+      "type": "string",
+      "description": "RFC 3339 date and time at which the object will be deleted; populated by the system when a graceful deletion is requested, read-only; if not set, graceful deletion of the object has not been requested"
+     },
+     "generateName": {
+      "type": "string",
+      "description": "an optional prefix to use to generate a unique name; has the same validation rules as name; optional, and is applied only name if is not specified"
+     },
+     "id": {
+      "type": "string",
+      "description": "name of the object; must be a DNS_SUBDOMAIN and unique among all objects of the same kind within the same namespace; used in resource URLs; cannot be updated"
+     },
+     "items": {
+      "type": "array",
+      "items": {
+       "$ref": "v1beta1.PersistentVolume"
+      },
+      "description": "list of persistent volumes"
+     },
+     "kind": {
+      "type": "string",
+      "description": "kind of object, in CamelCase; cannot be updated"
+     },
+     "namespace": {
+      "type": "string",
+      "description": "namespace to which the object belongs; must be a DNS_SUBDOMAIN; 'default' by default; cannot be updated"
+     },
+     "resourceVersion": {
+      "$ref": "uint64",
+      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
+     },
+     "selfLink": {
+      "type": "string",
+      "description": "URL for the object; populated by the system, read-only"
+     },
+     "uid": {
+      "type": "string",
+      "description": "unique UUID across space and time; populated by the system, read-only; cannot be updated"
+     }
+    }
+   },
+   "v1beta1.PersistentVolumeSpec": {
+    "id": "v1beta1.PersistentVolumeSpec",
+    "required": [
+     "persistentDisk",
+     "hostPath"
+    ],
+    "properties": {
+     "accessModes": {
+      "type": "array",
+      "items": {
+       "$ref": "v1beta1.AccessModeType"
+      },
+      "description": "all ways the volume can be mounted"
+     },
+     "capacity": {
+      "type": "any",
+      "description": "a description of the persistent volume's resources and capacity"
+     },
+     "claimRef": {
+      "$ref": "v1beta1.ObjectReference",
+      "description": "the binding reference to a persistent volume claim"
+     },
+     "hostPath": {
+      "$ref": "v1beta1.HostPathVolumeSource",
+      "description": "a HostPath provisioned by a developer or tester; for develment use only"
+     },
+     "persistentDisk": {
+      "$ref": "v1beta1.GCEPersistentDiskVolumeSource",
+      "description": "GCE disk resource provisioned by an admin"
+     }
+    }
+   },
+   "v1beta1.PersistentVolumeStatus": {
+    "id": "v1beta1.PersistentVolumeStatus",
+    "properties": {
+     "phase": {
+      "type": "string",
+      "description": "the current phase of a persistent volume"
      }
     }
    },
@@ -6654,7 +7697,7 @@
     "id": "v1beta1.Pod",
     "properties": {
      "annotations": {
-      "$ref": "v1beta1.TypeMeta.annotations",
+      "type": "any",
       "description": "map of string keys and values that can be used by external tooling to store and retrieve arbitrary metadata about the object"
      },
      "apiVersion": {
@@ -6690,7 +7733,7 @@
       "description": "kind of object, in CamelCase; cannot be updated"
      },
      "labels": {
-      "$ref": "v1beta1.Pod.labels",
+      "type": "any",
       "description": "map of string keys and values that can be used to organize and categorize pods; may match selectors of replication controllers and services"
      },
      "namespace": {
@@ -6698,7 +7741,7 @@
       "description": "namespace to which the object belongs; must be a DNS_SUBDOMAIN; 'default' by default; cannot be updated"
      },
      "nodeSelector": {
-      "$ref": "v1beta1.Pod.nodeSelector",
+      "type": "any",
       "description": "selector which must match a node's labels for the pod to be scheduled on that node"
      },
      "resourceVersion": {
@@ -6710,18 +7753,10 @@
       "description": "URL for the object; populated by the system, read-only"
      },
      "uid": {
-      "$ref": "types.UID",
+      "type": "string",
       "description": "unique UUID across space and time; populated by the system, read-only; cannot be updated"
      }
     }
-   },
-   "v1beta1.Pod.labels": {
-    "id": "v1beta1.Pod.labels",
-    "properties": {}
-   },
-   "v1beta1.Pod.nodeSelector": {
-    "id": "v1beta1.Pod.nodeSelector",
-    "properties": {}
    },
    "v1beta1.PodCondition": {
     "id": "v1beta1.PodCondition",
@@ -6731,11 +7766,11 @@
     ],
     "properties": {
      "kind": {
-      "$ref": "v1beta1.PodConditionKind",
+      "type": "string",
       "description": "kind of the condition, currently only Ready"
      },
      "status": {
-      "$ref": "v1beta1.ConditionStatus",
+      "type": "string",
       "description": "status of the condition, one of Full, None, Unknown"
      }
     }
@@ -6747,7 +7782,7 @@
     ],
     "properties": {
      "annotations": {
-      "$ref": "v1beta1.TypeMeta.annotations",
+      "type": "any",
       "description": "map of string keys and values that can be used by external tooling to store and retrieve arbitrary metadata about the object"
      },
      "apiVersion": {
@@ -6794,7 +7829,7 @@
       "description": "URL for the object; populated by the system, read-only"
      },
      "uid": {
-      "$ref": "types.UID",
+      "type": "string",
       "description": "unique UUID across space and time; populated by the system, read-only; cannot be updated"
      }
     }
@@ -6818,7 +7853,7 @@
       "description": "IP address of the host to which the pod is assigned; empty if not yet scheduled"
      },
      "info": {
-      "$ref": "v1beta1.PodInfo",
+      "type": "any",
       "description": "map of container name to container status"
      },
      "manifest": {
@@ -6834,7 +7869,7 @@
       "description": "IP address allocated to the pod; routable at least within the cluster; empty if not yet allocated"
      },
      "status": {
-      "$ref": "v1beta1.PodStatus",
+      "type": "string",
       "description": "current condition of the pod, Waiting, Running, or Terminated"
      }
     }
@@ -6843,7 +7878,7 @@
     "id": "v1beta1.PodTemplate",
     "properties": {
      "annotations": {
-      "$ref": "v1beta1.PodTemplate.annotations",
+      "type": "any",
       "description": "map of string keys and values that can be used by external tooling to store and retrieve arbitrary metadata about pods created from the template"
      },
      "desiredState": {
@@ -6851,32 +7886,20 @@
       "description": "specification of the desired state of pods created from this template"
      },
      "labels": {
-      "$ref": "v1beta1.PodTemplate.labels",
+      "type": "any",
       "description": "map of string keys and values that can be used to organize and categorize the pods created from the template; must match the selector of the replication controller to which the template belongs; may match selectors of services"
      },
      "nodeSelector": {
-      "$ref": "v1beta1.PodTemplate.nodeSelector",
+      "type": "any",
       "description": "a selector which must be true for the pod to fit on a node"
      }
     }
-   },
-   "v1beta1.PodTemplate.annotations": {
-    "id": "v1beta1.PodTemplate.annotations",
-    "properties": {}
-   },
-   "v1beta1.PodTemplate.labels": {
-    "id": "v1beta1.PodTemplate.labels",
-    "properties": {}
-   },
-   "v1beta1.PodTemplate.nodeSelector": {
-    "id": "v1beta1.PodTemplate.nodeSelector",
-    "properties": {}
    },
    "v1beta1.ReplicationController": {
     "id": "v1beta1.ReplicationController",
     "properties": {
      "annotations": {
-      "$ref": "v1beta1.TypeMeta.annotations",
+      "type": "any",
       "description": "map of string keys and values that can be used by external tooling to store and retrieve arbitrary metadata about the object"
      },
      "apiVersion": {
@@ -6912,7 +7935,7 @@
       "description": "kind of object, in CamelCase; cannot be updated"
      },
      "labels": {
-      "$ref": "v1beta1.ReplicationController.labels",
+      "type": "any",
       "description": "map of string keys and values that can be used to organize and categorize replication controllers"
      },
      "namespace": {
@@ -6928,14 +7951,10 @@
       "description": "URL for the object; populated by the system, read-only"
      },
      "uid": {
-      "$ref": "types.UID",
+      "type": "string",
       "description": "unique UUID across space and time; populated by the system, read-only; cannot be updated"
      }
     }
-   },
-   "v1beta1.ReplicationController.labels": {
-    "id": "v1beta1.ReplicationController.labels",
-    "properties": {}
    },
    "v1beta1.ReplicationControllerList": {
     "id": "v1beta1.ReplicationControllerList",
@@ -6944,7 +7963,7 @@
     ],
     "properties": {
      "annotations": {
-      "$ref": "v1beta1.TypeMeta.annotations",
+      "type": "any",
       "description": "map of string keys and values that can be used by external tooling to store and retrieve arbitrary metadata about the object"
      },
      "apiVersion": {
@@ -6991,7 +8010,7 @@
       "description": "URL for the object; populated by the system, read-only"
      },
      "uid": {
-      "$ref": "types.UID",
+      "type": "string",
       "description": "unique UUID across space and time; populated by the system, read-only; cannot be updated"
      }
     }
@@ -7007,7 +8026,7 @@
       "description": "template for pods to be created by this replication controller when the observed number of replicas is less than the desired number of replicas"
      },
      "replicaSelector": {
-      "$ref": "v1beta1.ReplicationControllerState.replicaSelector",
+      "type": "any",
       "description": "label keys and values that must match in order to be controlled by this replication controller"
      },
      "replicas": {
@@ -7017,15 +8036,11 @@
      }
     }
    },
-   "v1beta1.ReplicationControllerState.replicaSelector": {
-    "id": "v1beta1.ReplicationControllerState.replicaSelector",
-    "properties": {}
-   },
    "v1beta1.ResourceQuota": {
     "id": "v1beta1.ResourceQuota",
     "properties": {
      "annotations": {
-      "$ref": "v1beta1.TypeMeta.annotations",
+      "type": "any",
       "description": "map of string keys and values that can be used by external tooling to store and retrieve arbitrary metadata about the object"
      },
      "apiVersion": {
@@ -7053,7 +8068,7 @@
       "description": "kind of object, in CamelCase; cannot be updated"
      },
      "labels": {
-      "$ref": "v1beta1.ResourceQuota.labels",
+      "type": "any",
       "description": "map of string keys and values that can be used to organize and categorize resource quotas"
      },
      "namespace": {
@@ -7077,14 +8092,10 @@
       "description": "status defines the actual enforced quota and current usage"
      },
      "uid": {
-      "$ref": "types.UID",
+      "type": "string",
       "description": "unique UUID across space and time; populated by the system, read-only; cannot be updated"
      }
     }
-   },
-   "v1beta1.ResourceQuota.labels": {
-    "id": "v1beta1.ResourceQuota.labels",
-    "properties": {}
    },
    "v1beta1.ResourceQuotaList": {
     "id": "v1beta1.ResourceQuotaList",
@@ -7093,7 +8104,7 @@
     ],
     "properties": {
      "annotations": {
-      "$ref": "v1beta1.TypeMeta.annotations",
+      "type": "any",
       "description": "map of string keys and values that can be used by external tooling to store and retrieve arbitrary metadata about the object"
      },
      "apiVersion": {
@@ -7140,7 +8151,7 @@
       "description": "URL for the object; populated by the system, read-only"
      },
      "uid": {
-      "$ref": "types.UID",
+      "type": "string",
       "description": "unique UUID across space and time; populated by the system, read-only; cannot be updated"
      }
     }
@@ -7149,7 +8160,7 @@
     "id": "v1beta1.ResourceQuotaSpec",
     "properties": {
      "hard": {
-      "$ref": "v1beta1.ResourceList",
+      "type": "any",
       "description": "hard is the set of desired hard limits for each named resource"
      }
     }
@@ -7158,11 +8169,11 @@
     "id": "v1beta1.ResourceQuotaStatus",
     "properties": {
      "hard": {
-      "$ref": "v1beta1.ResourceList",
+      "type": "any",
       "description": "hard is the set of enforced hard limits for each named resource"
      },
      "used": {
-      "$ref": "v1beta1.ResourceList",
+      "type": "any",
       "description": "used is the current observed total usage of the resource in the namespace"
      }
     }
@@ -7171,11 +8182,11 @@
     "id": "v1beta1.ResourceRequirements",
     "properties": {
      "limits": {
-      "$ref": "v1beta1.ResourceList",
+      "type": "any",
       "description": "Maximum amount of compute resources allowed"
      },
      "requests": {
-      "$ref": "v1beta1.ResourceList",
+      "type": "any",
       "description": "Minimum amount of resources requested"
      }
     }
@@ -7213,7 +8224,7 @@
     "id": "v1beta1.Secret",
     "properties": {
      "annotations": {
-      "$ref": "v1beta1.TypeMeta.annotations",
+      "type": "any",
       "description": "map of string keys and values that can be used by external tooling to store and retrieve arbitrary metadata about the object"
      },
      "apiVersion": {
@@ -7225,7 +8236,7 @@
       "description": "RFC 3339 date and time at which the object was created; populated by the system, read-only; null for lists"
      },
      "data": {
-      "$ref": "v1beta1.Secret.data",
+      "type": "any",
       "description": "data contains the secret data.  Each key must be a valid DNS_SUBDOMAIN.  Each value must be a base64 encoded string"
      },
      "deletionTimestamp": {
@@ -7257,18 +8268,14 @@
       "description": "URL for the object; populated by the system, read-only"
      },
      "type": {
-      "$ref": "v1beta1.SecretType",
+      "type": "string",
       "description": "type facilitates programmatic handling of secret data"
      },
      "uid": {
-      "$ref": "types.UID",
+      "type": "string",
       "description": "unique UUID across space and time; populated by the system, read-only; cannot be updated"
      }
     }
-   },
-   "v1beta1.Secret.data": {
-    "id": "v1beta1.Secret.data",
-    "properties": {}
    },
    "v1beta1.SecretList": {
     "id": "v1beta1.SecretList",
@@ -7277,7 +8284,7 @@
     ],
     "properties": {
      "annotations": {
-      "$ref": "v1beta1.TypeMeta.annotations",
+      "type": "any",
       "description": "map of string keys and values that can be used by external tooling to store and retrieve arbitrary metadata about the object"
      },
      "apiVersion": {
@@ -7324,7 +8331,7 @@
       "description": "URL for the object; populated by the system, read-only"
      },
      "uid": {
-      "$ref": "types.UID",
+      "type": "string",
       "description": "unique UUID across space and time; populated by the system, read-only; cannot be updated"
      }
     }
@@ -7350,7 +8357,7 @@
     ],
     "properties": {
      "annotations": {
-      "$ref": "v1beta1.TypeMeta.annotations",
+      "type": "any",
       "description": "map of string keys and values that can be used by external tooling to store and retrieve arbitrary metadata about the object"
      },
      "apiVersion": {
@@ -7386,7 +8393,7 @@
       "description": "kind of object, in CamelCase; cannot be updated"
      },
      "labels": {
-      "$ref": "v1beta1.Service.labels",
+      "type": "any",
       "description": "map of string keys and values that can be used to organize and categorize services"
      },
      "namespace": {
@@ -7414,7 +8421,7 @@
       "description": "ports to be exposed on the service; if this field is specified, the legacy fields (Port, PortName, Protocol, and ContainerPort) will be overwritten by the first member of this array; if this field is not specified, it will be populated from the legacy fields"
      },
      "protocol": {
-      "$ref": "v1beta1.Protocol",
+      "type": "string",
       "description": "protocol for port; must be UDP or TCP; TCP if unspecified"
      },
      "proxyPort": {
@@ -7434,7 +8441,7 @@
       "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
      },
      "selector": {
-      "$ref": "v1beta1.Service.selector",
+      "type": "any",
       "description": "label keys and values that must match in order to receive traffic for this service; if empty, all pods are selected, if not specified, endpoints must be manually specified"
      },
      "selfLink": {
@@ -7442,22 +8449,14 @@
       "description": "URL for the object; populated by the system, read-only"
      },
      "sessionAffinity": {
-      "$ref": "v1beta1.AffinityType",
+      "type": "string",
       "description": "enable client IP based session affinity; must be ClientIP or None; defaults to None"
      },
      "uid": {
-      "$ref": "types.UID",
+      "type": "string",
       "description": "unique UUID across space and time; populated by the system, read-only; cannot be updated"
      }
     }
-   },
-   "v1beta1.Service.labels": {
-    "id": "v1beta1.Service.labels",
-    "properties": {}
-   },
-   "v1beta1.Service.selector": {
-    "id": "v1beta1.Service.selector",
-    "properties": {}
    },
    "v1beta1.ServiceList": {
     "id": "v1beta1.ServiceList",
@@ -7466,7 +8465,7 @@
     ],
     "properties": {
      "annotations": {
-      "$ref": "v1beta1.TypeMeta.annotations",
+      "type": "any",
       "description": "map of string keys and values that can be used by external tooling to store and retrieve arbitrary metadata about the object"
      },
      "apiVersion": {
@@ -7513,7 +8512,7 @@
       "description": "URL for the object; populated by the system, read-only"
      },
      "uid": {
-      "$ref": "types.UID",
+      "type": "string",
       "description": "unique UUID across space and time; populated by the system, read-only; cannot be updated"
      }
     }
@@ -7541,7 +8540,7 @@
       "description": "the port number that is exposed"
      },
      "protocol": {
-      "$ref": "v1beta1.Protocol",
+      "type": "string",
       "description": "the protocol used by this port; must be UDP or TCP; TCP if unspecified"
      }
     }
