@@ -12,7 +12,7 @@ desiredState:
         id: kibana-viewer
         containers:
           - name: kibana-logging
-            image: gcr.io/google_containers/kibana:1.1
+            image: gcr.io/google_containers/kibana:1.2
             env: 
               - name: "ES_SCHEME"
                 value: "https"
