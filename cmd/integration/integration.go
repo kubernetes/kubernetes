@@ -598,6 +598,10 @@ func runAtomicPutTest(c *client.Client) {
 }
 
 func runPatchTest(c *client.Client) {
+	if c.APIVersion() != "v1beta1" {
+		glog.Info("Skipping PATCH tests for non-v1beta1 for now.")
+		return
+	}
 	name := "patchservice"
 	resource := "services"
 	svcBody := api.Service{
