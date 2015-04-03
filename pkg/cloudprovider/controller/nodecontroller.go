@@ -161,7 +161,7 @@ func (nc *NodeController) Run(period time.Duration, syncNodeList, syncNodeStatus
 	// Start syncing node list from cloudprovider.
 	if syncNodeList && nc.isRunningCloudProvider() {
 		go util.Forever(func() {
-			if err = nc.SyncCloudNodes(); err != nil {
+			if err := nc.SyncCloudNodes(); err != nil {
 				glog.Errorf("Error syncing cloud: %v", err)
 			}
 		}, period)
@@ -170,13 +170,13 @@ func (nc *NodeController) Run(period time.Duration, syncNodeList, syncNodeStatus
 	// Start syncing or monitoring node status.
 	if syncNodeStatus {
 		go util.Forever(func() {
-			if err = nc.SyncProbedNodeStatus(); err != nil {
+			if err := nc.SyncProbedNodeStatus(); err != nil {
 				glog.Errorf("Error syncing status: %v", err)
 			}
 		}, period)
 	} else {
 		go util.Forever(func() {
-			if err = nc.MonitorNodeStatus(); err != nil {
+			if err := nc.MonitorNodeStatus(); err != nil {
 				glog.Errorf("Error monitoring node status: %v", err)
 			}
 		}, nodeMonitorPeriod)
