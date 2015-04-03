@@ -784,7 +784,7 @@ func (self *awsDisk) waitForAttachmentStatus(status string) error {
 		if len(info.Attachments) > 1 {
 			glog.Warningf("Found multiple attachments for volume: %v", info)
 		}
-		attachmentStatus := ""
+		attachmentStatus := "detached"
 		for _, attachment := range info.Attachments {
 			if attachment.Status == status {
 				return nil
