@@ -836,11 +836,11 @@ function kube::release::gcs::copy_release_artifacts() {
   fi
 
   # Now upload everything in release directory
-  gsutil -m "${gcs_options[@]+${gcs_options[@]}}" cp -r "${RELEASE_DIR}"/* "${gcs_destination}"
+  gsutil -q -m "${gcs_options[@]+${gcs_options[@]}}" cp -r "${RELEASE_DIR}"/* "${gcs_destination}"
 
   # Having the "template" scripts from the GCE cluster deploy hosted with the
   # release is useful for GKE.  Copy everything from that directory up also.
-  gsutil -m "${gcs_options[@]+${gcs_options[@]}}" cp \
+  gsutil "${gcs_options[@]+${gcs_options[@]}}" cp \
     "${RELEASE_STAGE}/full/kubernetes/cluster/gce/configure-vm.sh" \
     "${gcs_destination}extra/gce/"
 
@@ -855,7 +855,7 @@ function kube::release::gcs::copy_release_artifacts() {
     if [[ -d "${RELEASE_STAGE}/server/${platform}" ]]; then
       src="${RELEASE_STAGE}/server/${platform}/kubernetes/server/bin/*"
     fi
-    gsutil -m "${gcs_options[@]+${gcs_options[@]}}" cp \
+    gsutil -q -m "${gcs_options[@]+${gcs_options[@]}}" cp \
       "$src" "$dst"
   done
 
@@ -866,7 +866,7 @@ function kube::release::gcs::copy_release_artifacts() {
 
   if [[ ${KUBE_GCS_MAKE_PUBLIC} =~ ^[yY]$ ]]; then
     kube::log::status "Marking all uploaded objects public"
-    gsutil acl ch -R -g all:R "${gcs_destination}" >/dev/null 2>&1
+    gsutil -q acl ch -R -g all:R "${gcs_destination}" >/dev/null 2>&1
   fi
 
   gsutil ls -lhr "${gcs_destination}"
