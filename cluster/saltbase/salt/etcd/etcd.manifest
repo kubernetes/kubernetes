@@ -1,4 +1,8 @@
-{% set ipv4_addr = salt['grains.get']('fqdn_ip4')[0] -%}
+{% if grains.cloud is defined and grains.cloud == 'gce' -%}
+  {% set etcd_addr = "127.0.0.1" -%}
+{% else -%}
+  {% set etcd_addr = salt['grains.get']('fqdn_ip4')[0] -%}
+{% endif -%}
 
 {
 "apiVersion": "v1beta3",
@@ -13,9 +17,9 @@
     "command": [
               "/usr/local/bin/etcd",
 	      "--addr",
-	      "{{ipv4_addr}}:4001",
+	      "{{etcd_addr}}:4001",
 	      "--bind-addr",
-	      "0.0.0.0:4001",
+	      "{{etcd_addr}}:4001",
 	      "--data-dir",
 	      "/var/etcd/data"
             ],
