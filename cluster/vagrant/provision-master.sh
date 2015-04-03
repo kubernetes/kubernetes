@@ -77,7 +77,6 @@ grains:
   publicAddressOverride: '$(echo "$MASTER_IP" | sed -e "s/'/''/g")'
   network_mode: openvswitch
   networkInterfaceName: eth1
-  etcd_servers: '$(echo "$MASTER_IP" | sed -e "s/'/''/g")'
   api_servers: '$(echo "$MASTER_IP" | sed -e "s/'/''/g")'
   cloud: vagrant
   roles:
