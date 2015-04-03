@@ -166,7 +166,6 @@ var _ = Describe("Services", func() {
 	It("should provide RW and RO services", func() {
 		svc := api.ServiceList{}
 		err := c.Get().
-			Namespace(api.NamespaceDefault).
 			AbsPath("/api/v1beta1/proxy/services/kubernetes-ro/api/v1beta1/services").
 			Do().
 			Into(&svc)

@@ -39,7 +39,7 @@ func TestSetsCodec(t *testing.T) {
 		Codec  runtime.Codec
 	}{
 		"v1beta1": {false, "/api/v1beta1/", v1beta1.Codec},
-		"":        {false, "/api/v1beta1/", v1beta1.Codec},
+		"":        {false, "/api/" + latest.Version + "/", latest.Codec},
 		"v1beta2": {false, "/api/v1beta2/", v1beta2.Codec},
 		"v1beta3": {false, "/api/v1beta3/", v1beta3.Codec},
 		"v1beta4": {true, "", nil},

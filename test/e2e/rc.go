@@ -165,6 +165,7 @@ func ServeImageOrFail(c *client.Client, test string, image string) {
 	for i, pod := range pods.Items {
 		body, err := c.Get().
 			Prefix("proxy").
+			Namespace(api.NamespaceDefault).
 			Resource("pods").
 			Name(string(pod.Name)).
 			Do().

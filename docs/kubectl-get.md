@@ -30,7 +30,7 @@ $ kubectl get replicationController web
 $ kubectl get -o json pod web-pod-13je7
 
 // Return only the status value of the specified pod.
-$ kubectl get -o template web-pod-13je7 --template={{.currentState.status}}
+$ kubectl get -o template web-pod-13je7 --template={{.currentState.status}} --api-version=v1beta1
 
 // List all replication controllers and services together in ps output format.
 $ kubectl get rc,services

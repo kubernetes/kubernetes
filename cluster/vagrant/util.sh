@@ -165,7 +165,7 @@ function verify-cluster {
     local count="0"
     until [[ "$count" == "1" ]]; do
       local minions
-      minions=$("${KUBE_ROOT}/cluster/kubectl.sh" get minions -o template -t '{{range.items}}{{.id}}:{{end}}')
+      minions=$("${KUBE_ROOT}/cluster/kubectl.sh" get minions -o template -t '{{range.items}}{{.id}}:{{end}}' --api-version=v1beta1)
       count=$(echo $minions | grep -c "${MINION_IPS[i]}") || {
         printf "."
         sleep 2
@@ -179,7 +179,7 @@ function verify-cluster {
   vagrant ssh master --command "kubectl get pods" || {
     echo "WARNING: kubectl to localhost failed.  This could mean localhost is not bound to an IP"
   }
-  
+
   (
     echo
     echo "Kubernetes cluster is running.  The master is running at:"

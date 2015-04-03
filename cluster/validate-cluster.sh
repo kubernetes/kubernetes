@@ -37,7 +37,7 @@ trap 'rm -rf "${MINIONS_FILE}"' EXIT
 # Make several attempts to deal with slow cluster birth.
 attempt=0
 while true; do
-  "${KUBE_ROOT}/cluster/kubectl.sh" get minions -o template -t $'{{range.items}}{{.id}}\n{{end}}' > "${MINIONS_FILE}"
+  "${KUBE_ROOT}/cluster/kubectl.sh" get nodes -o template -t $'{{range.items}}{{.metadata.name}}\n{{end}}' --api-version=v1beta3 > "${MINIONS_FILE}"
   found=$(grep -c . "${MINIONS_FILE}")
   if [[ ${found} == "${NUM_MINIONS}" ]]; then
     break
