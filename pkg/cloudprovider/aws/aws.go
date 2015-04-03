@@ -773,6 +773,7 @@ func (self *awsDisk) getInfo() (*ec2.Volume, error) {
 }
 
 func (self *awsDisk) waitForAttachmentStatus(status string) error {
+	// TODO: There may be a faster way to get this when we're attaching locally
 	attempt := 0
 	maxAttempts := 60
 
