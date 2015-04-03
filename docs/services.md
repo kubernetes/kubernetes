@@ -198,18 +198,31 @@ simple as setting the `createExternalLoadBalancer` flag of the `Service` to
 directed at the backend `Pods`, though exactly how that works depends on the
 cloud provider.
 
-For cloud providers which do not support external load balancers, there is
-another approach that is a bit more "do-it-yourself" - the `publicIPs` field.
-Any address you put into the `publicIPs` array will be handled the same as the
-portal IP - the kube-proxy will install iptables rules which proxy traffic
-through to the backends.  You are then responsible for ensuring that traffic to
-those IPs gets sent to one or more Kubernetes `Nodes`.  As long as the traffic
-arrives at a Node, it will be be subject to the iptables rules.
+For pods which wish to be completely exposed to the larger public internet,
+there is also the ExternalMapping field of a service.  Setting the
+ExternalMapping field to true allows a kubernetes cluster admin to assign a node
+the responsibiilty of mapping an externally available address to an internally
+available podi.  Using a bit of json such as the following:
 
-An example situation might be when a `Node` has both internal and an external
-network interfaces.  If you assign that `Node`'s external IP as a `publicIP`, you
-can then aim traffic at the `Service` port on that `Node` and it will be proxied
-to the backends.
+{
+  "kind": "Service",
+  "apiVersion": "v1beta1",
+  "id": "ext-map1",
+  "selector": {
+    "pod": "MySshPod",
+    "node": "foo.domain.com"
+  },
+  "port": 0,
+  "ExternalMapping": True,
+  "PortalIP": "10.16.185.126",
+}
+
+We can inform our node at hostname foo.domain.com, that we wish it to forward
+all incomming requests to ip address 10.16.185.125 (which foo.domain.com should
+already own), to the internal pod address of the pod named MySshPod.  This
+allows for a pod to behave as though it is a stand-alone system with an
+publically reachable ip address, even though it may actually exist only on a
+virtual overlay network.
 
 ## Choosing your own PortalIP address
 A user can specify their own ```PortalIP``` address as part of a service creation
