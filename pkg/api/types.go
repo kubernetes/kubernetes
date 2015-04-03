@@ -1003,6 +1003,16 @@ type NodeSpec struct {
 
 	// Unschedulable controls node schedulability of new pods. By default node is schedulable.
 	Unschedulable bool `json:"unschedulable,omitempty"`
+
+	// Certificate is the public x.509 certificate tied to the node contained
+	// in a PEM-encoded byte array. It is presented by the node when it asks to
+	// join the cluster and can be refreshed if the certificate on the node is
+	// rotated. The node certificate is checked when initiating a connection to
+	// the node (to verify that the connection isn't being intercepted) and is
+	// presented by the node when it connects to the master (as a client
+	// certificate) to establish that the connection is coming from a trusted
+	// and identifiable source.
+	Certificate []byte `json:certificate,omitempty"`
 }
 
 // NodeSystemInfo is a set of ids/uuids to uniquely identify the node.

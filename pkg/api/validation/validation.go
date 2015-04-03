@@ -950,6 +950,20 @@ func ValidateMinion(node *api.Node) errs.ValidationErrorList {
 		allErrs = append(allErrs, errs.NewFieldRequired("spec.ExternalID"))
 	}
 
+	// If certificate is present it must contain a valid x.509 certificate in a
+	// PEM-encoded byte array.
+	if len(node.Spec.Certificate) > 0 {
+		certs, err := util.CertsFromPEM(node.Spec.Certificate)
+		if err != nil {
+			allErrs = append(allErrs, errs.NewFieldInvalid("spec.Certificate", false, fmt.Sprintf("%v", err)))
+		}
+		if len(certs) != 1 {
+			// TODO log an error here in addition to returning one through the api?
+			allErrs = append(allErrs, errs.NewFieldInvalid("spec.Certificate", false, "must provide exactly one certificate"))
+		}
+		// TODO We may want to also check that the CN in the cert matches something.
+	}
+
 	// TODO(rjnagal): Ignore PodCIDR till its completely implemented.
 	return allErrs
 }
