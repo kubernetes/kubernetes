@@ -1,9 +1,3 @@
-{% if grains.cloud is defined and grains.cloud == 'gce' -%}
-  {% set etcd_addr = "127.0.0.1" -%}
-{% else -%}
-  {% set etcd_addr = salt['grains.get']('fqdn_ip4')[0] -%}
-{% endif -%}
-
 {
 "apiVersion": "v1beta3",
 "kind": "Pod",
@@ -17,9 +11,9 @@
     "command": [
               "/usr/local/bin/etcd",
 	      "--addr",
-	      "{{etcd_addr}}:4001",
+	      "127.0.0.1:4001",
 	      "--bind-addr",
-	      "{{etcd_addr}}:4001",
+	      "127.0.0.1:4001",
 	      "--data-dir",
 	      "/var/etcd/data"
             ],
