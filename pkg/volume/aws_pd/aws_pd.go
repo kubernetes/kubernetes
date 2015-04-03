@@ -238,6 +238,23 @@ func makeGlobalPDName(host volume.VolumeHost, devName string) string {
 	return path.Join(host.GetPluginDir(awsPersistentDiskPluginName), "mounts", name)
 }
 
+func getPdNameFromGlobalMount(host volume.VolumeHost, globalPath string) (string, error) {
+	basePath := path.Join(host.GetPluginDir(awsPersistentDiskPluginName), "mounts")
+	rel, err := filepath.Rel(basePath, globalPath)
+	if err != nil {
+		return "", err
+	}
+	if strings.Contains(rel, "../") {
+		return "", fmt.Errorf("Unexpected mount path: " + globalPath)
+	}
+	// Reverse the :// replacement done in makeGlobalPDName
+	name := rel
+	if strings.HasPrefix(name, "aws/") {
+		name = strings.Replace(name, "aws/", "aws://")
+	}
+	return name, nil
+}
+
 func (pd *awsPersistentDisk) GetPath() string {
 	name := awsPersistentDiskPluginName
 	return pd.plugin.host.GetPodVolumeDir(pd.podUID, util.EscapeQualifiedNameForDisk(name), pd.volName)
@@ -276,7 +293,11 @@ func (pd *awsPersistentDisk) TearDownAt(dir string) error {
 	// remaining reference is the global mount. It is safe to detach.
 	if len(refs) == 1 {
 		// pd.pdName is not initially set for volume-cleaners, so set it here.
-		pd.pdName = path.Base(refs[0])
+		pd.pdName, err = getPdNameFromGlobalMount(refs[0])
+		if err != nil {
+			glog.V(2).Info("Could not determine pdName from mountpoint ", refs[0], ": ", err)
+			return err
+		}
 		if err := pd.manager.DetachDisk(pd); err != nil {
 			glog.V(2).Info("Error detaching disk ", pd.pdName, ": ", err)
 			return err

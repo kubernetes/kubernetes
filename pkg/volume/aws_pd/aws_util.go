@@ -101,11 +101,11 @@ func (util *AWSDiskUtil) DetachDisk(pd *awsPersistentDisk) error {
 	// Detach the disk
 	volumes, err := pd.getVolumeProvider()
 	if err != nil {
-		glog.V(2).Info("Error getting volume provider for pd ",  pd.pdName, ": ", err)
+		glog.V(2).Info("Error getting volume provider for pd ", pd.pdName, ": ", err)
 		return err
 	}
 	if err := volumes.DetachDisk("", pd.pdName); err != nil {
-		glog.V(2).Info("Error detaching disk ",  pd.pdName, ": ", err)
+		glog.V(2).Info("Error detaching disk ", pd.pdName, ": ", err)
 		return err
 	}
 	return nil
