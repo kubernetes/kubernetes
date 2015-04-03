@@ -20,6 +20,9 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/golang/glog"
+	info "github.com/google/cadvisor/info/v1"
 )
 
 // EventManager is implemented by Events. It provides two ways to monitor
@@ -27,13 +30,15 @@ import (
 type EventManager interface {
 	// Watch checks if events fed to it by the caller of AddEvent satisfy the
 	// request and if so sends the event back to the caller on outChannel
-	WatchEvents(outChannel chan *Event, request *Request) error
+	WatchEvents(request *Request) (*EventChannel, error)
 	// GetEvents() returns a slice of all events detected that have passed
 	// the *Request object parameters to the caller
 	GetEvents(request *Request) (EventSlice, error)
 	// AddEvent allows the caller to add an event to an EventManager
 	// object
-	AddEvent(e *Event) error
+	AddEvent(e *info.Event) error
+	// Removes a watch instance from the EventManager's watchers map
+	StopWatch(watch_id int)
 }
 
 // Events  holds a slice of *Event objects with a potential field
@@ -47,11 +52,14 @@ type events struct {
 	// linked to different calls of WatchEvents. When new events are found that
 	// satisfy the request of a given watch object in watchers, the event
 	// is sent over the channel to that caller of WatchEvents
-	watchers []*watch
+	watchers map[int]*watch
 	// lock that blocks eventlist from being accessed until a writer releases it
 	eventsLock sync.RWMutex
 	// lock that blocks watchers from being accessed until a writer releases it
 	watcherLock sync.RWMutex
+	// receives notices when a watch event ends and needs to be removed from
+	// the watchers list
+	lastId int
 }
 
 // initialized by a call to WatchEvents(), a watch struct will then be added
@@ -66,26 +74,14 @@ type watch struct {
 	request *Request
 	// a channel created by the caller through which events satisfying the
 	// request are sent to the caller
-	channel chan *Event
+	eventChannel *EventChannel
+	// unique identifier of a watch that is used as a key in events' watchers
+	// map
+	id int
 }
 
 // typedef of a slice of Event pointers
-type EventSlice []*Event
-
-// Event contains information general to events such as the time at which they
-// occurred, their specific type, and the actual event. Event types are
-// differentiated by the EventType field of Event.
-type Event struct {
-	// the absolute container name for which the event occurred
-	ContainerName string
-	// the time at which the event occurred
-	Timestamp time.Time
-	// the type of event. EventType is an enumerated type
-	EventType EventType
-	// the original event object and all of its extraneous data, ex. an
-	// OomInstance
-	EventData EventDataInterface
-}
+type EventSlice []*info.Event
 
 // Request holds a set of parameters by which Event objects may be screened.
 // The caller may want events that occurred within a specific timeframe
@@ -99,7 +95,7 @@ type Request struct {
 	// must be left blank in calls to WatchEvents
 	EndTime time.Time
 	// EventType is a map that specifies the type(s) of events wanted
-	EventType map[EventType]bool
+	EventType map[info.EventType]bool
 	// allows the caller to put a limit on how many
 	// events they receive. If there are more events than MaxEventsReturned
 	// then the most chronologically recent events in the time period
@@ -112,43 +108,49 @@ type Request struct {
 	IncludeSubcontainers bool
 }
 
-// EventType is an enumerated type which lists the categories under which
-// events may fall. The Event field EventType is populated by this enum.
-type EventType int
+type EventChannel struct {
+	watchId int
+	channel chan *info.Event
+}
 
-const (
-	TypeOom EventType = iota
-	TypeContainerCreation
-	TypeContainerDeletion
-)
-
-// a general interface which populates the Event field EventData. The actual
-// object, such as an OomInstance, is set as an Event's EventData
-type EventDataInterface interface {
+func NewEventChannel(watchId int) *EventChannel {
+	return &EventChannel{
+		watchId: watchId,
+		channel: make(chan *info.Event, 10),
+	}
 }
 
 // returns a pointer to an initialized Events object
 func NewEventManager() *events {
 	return &events{
 		eventlist: make(EventSlice, 0),
-		watchers:  []*watch{},
+		watchers:  make(map[int]*watch),
 	}
 }
 
 // returns a pointer to an initialized Request object
 func NewRequest() *Request {
 	return &Request{
-		EventType:            map[EventType]bool{},
+		EventType:            map[info.EventType]bool{},
 		IncludeSubcontainers: false,
+		MaxEventsReturned:    10,
 	}
 }
 
 // returns a pointer to an initialized watch object
-func newWatch(request *Request, outChannel chan *Event) *watch {
+func newWatch(request *Request, eventChannel *EventChannel) *watch {
 	return &watch{
-		request: request,
-		channel: outChannel,
+		request:      request,
+		eventChannel: eventChannel,
 	}
+}
+
+func (self *EventChannel) GetChannel() chan *info.Event {
+	return self.channel
+}
+
+func (self *EventChannel) GetWatchId() int {
+	return self.watchId
 }
 
 // function necessary to implement the sort interface on the Events struct
@@ -180,7 +182,7 @@ func getMaxEventsReturned(request *Request, eSlice EventSlice) EventSlice {
 // container path is a prefix of the event container path.  Otherwise,
 // it checks that the container paths of the event and request are
 // equivalent
-func checkIfIsSubcontainer(request *Request, event *Event) bool {
+func checkIfIsSubcontainer(request *Request, event *info.Event) bool {
 	if request.IncludeSubcontainers == true {
 		return strings.HasPrefix(event.ContainerName+"/", request.ContainerName+"/")
 	}
@@ -188,7 +190,7 @@ func checkIfIsSubcontainer(request *Request, event *Event) bool {
 }
 
 // determines if an event occurs within the time set in the request object and is the right type
-func checkIfEventSatisfiesRequest(request *Request, event *Event) bool {
+func checkIfEventSatisfiesRequest(request *Request, event *info.Event) bool {
 	startTime := request.StartTime
 	endTime := request.EndTime
 	eventTime := event.Timestamp
@@ -234,29 +236,30 @@ func (self *events) GetEvents(request *Request) (EventSlice, error) {
 // Request object it is fed to the channel. The StartTime and EndTime of the watch
 // request should be uninitialized because the purpose is to watch indefinitely
 // for events that will happen in the future
-func (self *events) WatchEvents(outChannel chan *Event, request *Request) error {
+func (self *events) WatchEvents(request *Request) (*EventChannel, error) {
 	if !request.StartTime.IsZero() || !request.EndTime.IsZero() {
-		return errors.New(
+		return nil, errors.New(
 			"for a call to watch, request.StartTime and request.EndTime must be uninitialized")
 	}
-	newWatcher := newWatch(request, outChannel)
 	self.watcherLock.Lock()
 	defer self.watcherLock.Unlock()
-	self.watchers = append(self.watchers, newWatcher)
-	return nil
+	new_id := self.lastId + 1
+	returnEventChannel := NewEventChannel(new_id)
+	newWatcher := newWatch(request, returnEventChannel)
+	self.watchers[new_id] = newWatcher
+	self.lastId = new_id
+	return returnEventChannel, nil
 }
 
 // helper function to update the event manager's eventlist
-func (self *events) updateEventList(e *Event) {
+func (self *events) updateEventList(e *info.Event) {
 	self.eventsLock.Lock()
 	defer self.eventsLock.Unlock()
 	self.eventlist = append(self.eventlist, e)
 }
 
-func (self *events) findValidWatchers(e *Event) []*watch {
+func (self *events) findValidWatchers(e *info.Event) []*watch {
 	watchesToSend := make([]*watch, 0)
-	self.watcherLock.RLock()
-	defer self.watcherLock.RUnlock()
 	for _, watcher := range self.watchers {
 		watchRequest := watcher.request
 		if checkIfEventSatisfiesRequest(watchRequest, e) {
@@ -269,11 +272,25 @@ func (self *events) findValidWatchers(e *Event) []*watch {
 // method of Events object that adds the argument Event object to the
 // eventlist. It also feeds the event to a set of watch channels
 // held by the manager if it satisfies the request keys of the channels
-func (self *events) AddEvent(e *Event) error {
+func (self *events) AddEvent(e *info.Event) error {
 	self.updateEventList(e)
+	self.watcherLock.RLock()
+	defer self.watcherLock.RUnlock()
 	watchesToSend := self.findValidWatchers(e)
 	for _, watchObject := range watchesToSend {
-		watchObject.channel <- e
+		watchObject.eventChannel.GetChannel() <- e
 	}
 	return nil
+}
+
+// Removes a watch instance from the EventManager's watchers map
+func (self *events) StopWatch(watchId int) {
+	self.watcherLock.Lock()
+	defer self.watcherLock.Unlock()
+	_, ok := self.watchers[watchId]
+	if !ok {
+		glog.Errorf("Could not find watcher instance %v", watchId)
+	}
+	close(self.watchers[watchId].eventChannel.GetChannel())
+	delete(self.watchers, watchId)
 }

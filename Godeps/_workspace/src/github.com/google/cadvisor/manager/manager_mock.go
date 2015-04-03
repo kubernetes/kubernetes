@@ -70,14 +70,14 @@ func (c *ManagerMock) GetRequestedContainersInfo(containerName string, options v
 	return args.Get(0).(map[string]*info.ContainerInfo), args.Error(1)
 }
 
-func (c *ManagerMock) WatchForEvents(queryuest *events.Request, passedChannel chan *events.Event) error {
+func (c *ManagerMock) WatchForEvents(queryuest *events.Request, passedChannel chan *info.Event) error {
 	args := c.Called(queryuest, passedChannel)
 	return args.Error(0)
 }
 
-func (c *ManagerMock) GetPastEvents(queryuest *events.Request) (events.EventSlice, error) {
+func (c *ManagerMock) GetPastEvents(queryuest *events.Request) ([]*info.Event, error) {
 	args := c.Called(queryuest)
-	return args.Get(0).(events.EventSlice), args.Error(1)
+	return args.Get(0).([]*info.Event), args.Error(1)
 }
 
 func (c *ManagerMock) GetMachineInfo() (*info.MachineInfo, error) {

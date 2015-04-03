@@ -473,3 +473,33 @@ func calculateCpuUsage(prev, cur uint64) uint64 {
 	}
 	return cur - prev
 }
+
+// Event contains information general to events such as the time at which they
+// occurred, their specific type, and the actual event. Event types are
+// differentiated by the EventType field of Event.
+type Event struct {
+	// the absolute container name for which the event occurred
+	ContainerName string
+	// the time at which the event occurred
+	Timestamp time.Time
+	// the type of event. EventType is an enumerated type
+	EventType EventType
+	// the original event object and all of its extraneous data, ex. an
+	// OomInstance
+	EventData EventDataInterface
+}
+
+// EventType is an enumerated type which lists the categories under which
+// events may fall. The Event field EventType is populated by this enum.
+type EventType int
+
+const (
+	EventOom EventType = iota
+	EventContainerCreation
+	EventContainerDeletion
+)
+
+// a general interface which populates the Event field EventData. The actual
+// object, such as an OomInstance, is set as an Event's EventData
+type EventDataInterface interface {
+}

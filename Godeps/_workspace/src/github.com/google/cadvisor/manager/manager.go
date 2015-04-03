@@ -83,10 +83,12 @@ type Manager interface {
 	GetFsInfo(label string) ([]v2.FsInfo, error)
 
 	// Get events streamed through passedChannel that fit the request.
-	WatchForEvents(request *events.Request, passedChannel chan *events.Event) error
+	WatchForEvents(request *events.Request) (*events.EventChannel, error)
 
 	// Get past events that have been detected and that fit the request.
-	GetPastEvents(request *events.Request) (events.EventSlice, error)
+	GetPastEvents(request *events.Request) ([]*info.Event, error)
+
+	CloseEventChannel(watch_id int)
 }
 
 // New takes a memory storage and returns a new manager.
@@ -669,11 +671,11 @@ func (m *manager) createContainer(containerName string) error {
 			return err
 		}
 
-		newEvent := &events.Event{
+		newEvent := &info.Event{
 			ContainerName: contRef.Name,
 			EventData:     contSpecs,
 			Timestamp:     contSpecs.CreationTime,
-			EventType:     events.TypeContainerCreation,
+			EventType:     info.EventContainerCreation,
 		}
 		err = m.eventHandler.AddEvent(newEvent)
 		if err != nil {
@@ -721,10 +723,10 @@ func (m *manager) destroyContainer(containerName string) error {
 		return err
 	}
 
-	newEvent := &events.Event{
+	newEvent := &info.Event{
 		ContainerName: contRef.Name,
 		Timestamp:     time.Now(),
-		EventType:     events.TypeContainerDeletion,
+		EventType:     info.EventContainerDeletion,
 	}
 	err = m.eventHandler.AddEvent(newEvent)
 	if err != nil {
@@ -868,22 +870,20 @@ func (self *manager) watchForNewOoms() error {
 	if err != nil {
 		return err
 	}
-	err = oomLog.StreamOoms(outStream)
-	if err != nil {
-		return err
-	}
+	go oomLog.StreamOoms(outStream)
+
 	go func() {
 		for oomInstance := range outStream {
-			newEvent := &events.Event{
+			newEvent := &info.Event{
 				ContainerName: oomInstance.ContainerName,
 				Timestamp:     oomInstance.TimeOfDeath,
-				EventType:     events.TypeOom,
+				EventType:     info.EventOom,
 				EventData:     oomInstance,
 			}
 			glog.V(1).Infof("Created an oom event: %v", newEvent)
 			err := self.eventHandler.AddEvent(newEvent)
 			if err != nil {
-				glog.Errorf("Failed to add event %v, got error: %v", newEvent, err)
+				glog.Errorf("failed to add event %v, got error: %v", newEvent, err)
 			}
 		}
 	}()
@@ -891,11 +891,16 @@ func (self *manager) watchForNewOoms() error {
 }
 
 // can be called by the api which will take events returned on the channel
-func (self *manager) WatchForEvents(request *events.Request, passedChannel chan *events.Event) error {
-	return self.eventHandler.WatchEvents(passedChannel, request)
+func (self *manager) WatchForEvents(request *events.Request) (*events.EventChannel, error) {
+	return self.eventHandler.WatchEvents(request)
 }
 
 // can be called by the api which will return all events satisfying the request
-func (self *manager) GetPastEvents(request *events.Request) (events.EventSlice, error) {
+func (self *manager) GetPastEvents(request *events.Request) ([]*info.Event, error) {
 	return self.eventHandler.GetEvents(request)
+}
+
+// called by the api when a client is no longer listening to the channel
+func (self *manager) CloseEventChannel(watch_id int) {
+	self.eventHandler.StopWatch(watch_id)
 }

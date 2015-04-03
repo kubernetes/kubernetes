@@ -31,10 +31,7 @@ func main() {
 	if err != nil {
 		glog.Infof("Couldn't make a new oomparser. %v", err)
 	} else {
-		err := oomLog.StreamOoms(outStream)
-		if err != nil {
-			glog.Errorf("%v", err)
-		}
+		go oomLog.StreamOoms(outStream)
 		// demonstration of how to get oomLog's list of oomInstances or access
 		// the user-declared oomInstance channel, here called outStream
 		for oomInstance := range outStream {

@@ -20,7 +20,6 @@ import (
 	"strconv"
 
 	"github.com/golang/glog"
-	"github.com/google/cadvisor/events"
 	info "github.com/google/cadvisor/info/v1"
 	"github.com/google/cadvisor/info/v2"
 	"github.com/google/cadvisor/manager"
@@ -58,7 +57,7 @@ func getApiVersions() []ApiVersion {
 	v1_1 := newVersion1_1(v1_0)
 	v1_2 := newVersion1_2(v1_1)
 	v1_3 := newVersion1_3(v1_2)
-	v2_0 := newVersion2_0(v1_3)
+	v2_0 := newVersion2_0()
 
 	return []ApiVersion{v1_0, v1_1, v1_2, v1_3, v2_0}
 
@@ -262,40 +261,40 @@ func (self *version1_3) SupportedRequestTypes() []string {
 func (self *version1_3) HandleRequest(requestType string, request []string, m manager.Manager, w http.ResponseWriter, r *http.Request) error {
 	switch requestType {
 	case eventsApi:
-		query, eventsFromAllTime, err := getEventRequest(r)
-		if err != nil {
-			return err
-		}
-		glog.V(2).Infof("Api - Events(%v)", query)
-		if eventsFromAllTime {
-			pastEvents, err := m.GetPastEvents(query)
-			if err != nil {
-				return err
-			}
-			return writeResult(pastEvents, w)
-		}
-		eventsChannel := make(chan *events.Event, 10)
-		err = m.WatchForEvents(query, eventsChannel)
-		if err != nil {
-			return err
-		}
-		return streamResults(eventsChannel, w, r)
+		return handleEventRequest(m, w, r)
 	default:
 		return self.baseVersion.HandleRequest(requestType, request, m, w, r)
 	}
 }
 
-// API v2.0
+func handleEventRequest(m manager.Manager, w http.ResponseWriter, r *http.Request) error {
+	query, stream, err := getEventRequest(r)
+	if err != nil {
+		return err
+	}
+	glog.V(2).Infof("Api - Events(%v)", query)
+	if !stream {
+		pastEvents, err := m.GetPastEvents(query)
+		if err != nil {
+			return err
+		}
+		return writeResult(pastEvents, w)
+	}
+	eventChannel, err := m.WatchForEvents(query)
+	if err != nil {
+		return err
+	}
+	return streamResults(eventChannel, w, r, m)
 
-// v2.0 builds on v1.3
-type version2_0 struct {
-	baseVersion *version1_3
 }
 
-func newVersion2_0(v *version1_3) *version2_0 {
-	return &version2_0{
-		baseVersion: v,
-	}
+// API v2.0
+
+type version2_0 struct {
+}
+
+func newVersion2_0() *version2_0 {
+	return &version2_0{}
 }
 
 func (self *version2_0) Version() string {
@@ -303,7 +302,7 @@ func (self *version2_0) Version() string {
 }
 
 func (self *version2_0) SupportedRequestTypes() []string {
-	return append(self.baseVersion.SupportedRequestTypes(), summaryApi)
+	return []string{versionApi, attributesApi, eventsApi, machineApi, summaryApi, statsApi, specApi, storageApi}
 }
 
 func (self *version2_0) HandleRequest(requestType string, request []string, m manager.Manager, w http.ResponseWriter, r *http.Request) error {
@@ -388,8 +387,10 @@ func (self *version2_0) HandleRequest(requestType string, request []string, m ma
 			}
 		}
 		return writeResult(fi, w)
+	case eventsApi:
+		return handleEventRequest(m, w, r)
 	default:
-		return self.baseVersion.HandleRequest(requestType, request, m, w, r)
+		return fmt.Errorf("unknown request type %q", requestType)
 	}
 }
 
