@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package rocket
+package rkt
 
 import (
 	"encoding/json"
@@ -35,22 +35,30 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume"
 	"github.com/coreos/go-systemd/dbus"
 	"github.com/coreos/go-systemd/unit"
+	schema "github.com/coreos/rkt/Godeps/_workspace/src/github.com/appc/spec/schema"
+	appctypes "github.com/coreos/rkt/Godeps/_workspace/src/github.com/appc/spec/schema/types" // TODO(yifan): Fix this.
+	"github.com/coreos/rkt/cas"
 	"github.com/golang/glog"
 )
 
 const (
+	acversion            = "0.5.1"
 	kubernetesUnitPrefix = "k8s"
 	systemdServiceDir    = "/run/systemd/system"
+	tmpPodManifestDir    = "/tmp"
 
 	unitKubernetesSection = "X-Kubernetes"
 	unitPodName           = "POD"
-	unitRocketID          = "RocketID"
+	unitRktID             = "RktID"
+
+	// TODO(yifan): Export in rkt?
+	defaultDataDir = "/var/lib/rkt"
 )
 
 const (
-	rocketBinName = "rkt"
+	rktBinName = "rkt"
 
-	// TODO(yifan): Figure out a way to sync up upstream's spec.
+	// TODO(yifan): Replace theses.
 	podStateEmbryo    = "embryo"
 	podStatePreparing = "preparing"
 	podStatePrepared  = "prepared"
@@ -60,7 +68,7 @@ const (
 	podStateGone      = "gone"
 )
 
-// Runtime implements the ContainerRuntime for rocket. The implementation
+// Runtime implements the ContainerRuntime for rkt. The implementation
 // uses systemd, so in order to run this runtime, systemd must be installed
 // on the machine.
 type Runtime struct {
@@ -69,12 +77,12 @@ type Runtime struct {
 	config  *Config
 }
 
-// Config stores the global configuration for the rocket runtime.
+// Config stores the global configuration for the rkt runtime.
 // Run 'rkt' for more details.
 type Config struct {
-	// The debug flag for rocket.
+	// The debug flag for rkt.
 	Debug bool
-	// The rocket data directory
+	// The rkt data directory
 	Dir string
 	// This flag controls whether we skip image or key verification.
 	InsecureSkipVerify bool
@@ -95,16 +103,16 @@ func (c *Config) buildGlobalOptions() []string {
 	return result
 }
 
-// New creates the rocket container runtime which implements the container runtime interface.
-// It will test if the rocket binary is in the $PATH, and whether we can get the
-// version of it. If so, creates the rocket container runtime, otherwise returns an error.
+// New creates the rkt container runtime which implements the container runtime interface.
+// It will test if the rkt binary is in the $PATH, and whether we can get the
+// version of it. If so, creates the rkt container runtime, otherwise returns an error.
 func New(config *Config) (*Runtime, error) {
 	systemd, err := dbus.New()
 	if err != nil {
 		return nil, err
 	}
-	// Test if rocket binary is in $PATH.
-	absPath, err := exec.LookPath(rocketBinName)
+	// Test if rkt binary is in $PATH.
+	absPath, err := exec.LookPath(rktBinName)
 	if err != nil {
 		return nil, err
 	}
@@ -119,14 +127,14 @@ func New(config *Config) (*Runtime, error) {
 	if err != nil {
 		return nil, err
 	}
-	if _, found := result[rocketBinName]; !found {
-		return nil, fmt.Errorf("rocket: cannot get the version of rocket")
+	if _, found := result[rktBinName]; !found {
+		return nil, fmt.Errorf("rkt: cannot get the version of rkt")
 	}
-	glog.V(4).Infof("Rocket version: %v.", result)
+	glog.V(4).Infof("Rkt version: %v.", result)
 	return rkt, nil
 }
 
-// Version invokes 'rkt version' to get the version information of the rocket
+// Version invokes 'rkt version' to get the version information of the rkt
 // runtime on the machine.
 // The return values are a map of component:version.
 //
@@ -158,7 +166,7 @@ func (r *Runtime) Version() (map[string]string, error) {
 // GetPods runs 'systemctl list-unit' and 'rkt list' to get the list of all the appcs.
 // Then it will use the result to contruct list of pods.
 func (r *Runtime) GetPods() ([]*kubecontainer.Pod, error) {
-	glog.V(4).Infof("Rocket getting pods.")
+	glog.V(4).Infof("Rkt getting pods.")
 
 	units, err := r.systemd.ListUnits()
 	if err != nil {
@@ -187,7 +195,7 @@ func (r *Runtime) GetPods() ([]*kubecontainer.Pod, error) {
 // RunPod first creates the unit file for a pod, and then calls
 // StartUnit over d-bus.
 func (r *Runtime) RunPod(pod *api.Pod, volumeMap map[string]volume.Volume) error {
-	glog.V(4).Infof("Rocket starts to run pod: name %q.", pod.Name)
+	glog.V(4).Infof("Rkt starts to run pod: name %q.", pod.Name)
 
 	name, needReload, err := r.preparePod(pod, volumeMap)
 	if err != nil {
@@ -210,7 +218,7 @@ func (r *Runtime) RunPod(pod *api.Pod, volumeMap map[string]volume.Volume) error
 
 // KillPod invokes 'systemctl kill' to kill the unit that runs the pod.
 func (r *Runtime) KillPod(pod *api.Pod) error {
-	glog.V(4).Infof("Rocket is killing pod: name %q.", pod.Name)
+	glog.V(4).Infof("Rkt is killing pod: name %q.", pod.Name)
 
 	serviceName := makePodServiceFileName(pod.Name, pod.Namespace)
 
@@ -258,13 +266,13 @@ func (r *Runtime) KillContainerInPod(container api.Container, pod *api.Pod) erro
 	return r.RunPod(pod, nil)
 }
 
-// RunCommand invokes rocket binary with arguments and returns the result
+// RunCommand invokes rkt binary with arguments and returns the result
 // from stdout in a list of strings.
 // TODO(yifan): Do not export this.
 func (r *Runtime) RunCommand(args ...string) ([]string, error) {
 	glog.V(4).Info("Run rkt command:", args)
 
-	cmd := exec.Command(rocketBinName)
+	cmd := exec.Command(rktBinName)
 	cmd.Args = append(cmd.Args, r.config.buildGlobalOptions()...)
 	cmd.Args = append(cmd.Args, args...)
 
@@ -296,7 +304,7 @@ func (p *podInfo) getIP() string {
 	return ""
 }
 
-// getContainerStatus converts the rocket pod state to the api.containerStatus.
+// getContainerStatus converts the rkt pod state to the api.containerStatus.
 // TODO(yifan): Get more detailed info such as Image, ImageID, etc.
 func (p *podInfo) getContainerStatus(container *kubecontainer.Container) api.ContainerStatus {
 	var status api.ContainerStatus
@@ -406,7 +414,7 @@ func (r *Runtime) makePod(unitName string, podInfos map[string]*podInfo) (*kubec
 		return nil, err
 	}
 
-	var rocketID string
+	var rktID string
 	for _, opt := range opts {
 		if opt.Section != unitKubernetesSection {
 			continue
@@ -419,19 +427,19 @@ func (r *Runtime) makePod(unitName string, podInfos map[string]*podInfo) (*kubec
 			if err != nil {
 				return nil, err
 			}
-		case unitRocketID:
-			rocketID = opt.Value
+		case unitRktID:
+			rktID = opt.Value
 		default:
 			glog.Warningf("unexpected key: %q", opt.Name)
 		}
 	}
 
-	if len(rocketID) == 0 {
-		return nil, fmt.Errorf("rocket: cannot find rocket ID of pod %v, unit file is broken", pod)
+	if len(rktID) == 0 {
+		return nil, fmt.Errorf("rkt: cannot find rkt ID of pod %v, unit file is broken", pod)
 	}
-	info, found := podInfos[rocketID]
+	info, found := podInfos[rktID]
 	if !found {
-		glog.Warningf("Cannot find info for pod %q, rocket uuid: %q", pod.Name, rocketID)
+		glog.Warningf("Cannot find info for pod %q, rkt uuid: %q", pod.Name, rktID)
 		return &pod, nil
 	}
 	pod.Status = info.toPodStatus(&pod)
@@ -448,6 +456,162 @@ func makePodServiceFileName(podName, podNamespace string) string {
 
 func newUnitOption(section, name, value string) *unit.UnitOption {
 	return &unit.UnitOption{Section: section, Name: name, Value: value}
+}
+
+// setApp overrides the app's fields if any of them are specified in the
+// container's spec.
+func setApp(app *appctypes.App, c *api.Container) error {
+	// Override the exec.
+	// TOOD(yifan): Revisit this for the overriding rule.
+	if len(c.Command) > 0 || len(c.Args) > 0 {
+		app.Exec = append(c.Command, c.Args)
+	}
+
+	// TODO(yifan): Use non-root user in the future?
+	// Currently it's a bug as reported https://github.com/coreos/rkt/issues/539.
+	// However since we cannot get the user/group information from the container
+	// spec, maybe we use the file path to set the user/group?
+	app.User, app.Group = "0", "0"
+
+	// Override the working directory.
+	if len(c.WorkingDir) > 0 {
+		app.WorkingDirectory = c.WorkingDir
+	}
+
+	// Override the environment.
+	if len(c.Env) > 0 {
+		app.Environment = []appctypes.EnvironmentVariable{}
+	}
+	for _, env := range c.Env {
+		app.Environment = append(app.Environment, appctypes.EnvironmentVariable{
+			Name:  env.Name,
+			Value: env.Value,
+		})
+	}
+
+	// Override the mount points.
+	if len(c.VolumeMounts) > 0 {
+		app.MountPoints = []appctypes.MountPoint{}
+	}
+	for _, m := range c.VolumeMounts {
+		mountPointName, err := appctypes.NewACName(m.Name)
+		if err != nil {
+			glog.Errorf("Cannot use the volume mount's name %q as ACName: %v", m.Name, err)
+			return err
+		}
+		app.MountPoints = append(app.MountPoints, appctypes.MountPoint{
+			Name:     *mountPointName,
+			Path:     m.MountPath,
+			ReadOnly: m.ReadOnly,
+		})
+	}
+
+	// Override the ports.
+	if len(c.Ports) > 0 {
+		app.Ports = []appctypes.Port{}
+	}
+	for _, p := range c.Ports {
+		portName, err := appctypes.NewACName(p.Name)
+		if err != nil {
+			glog.Errorf("Cannot use the port's name %q as ACName: %v", p.Name, err)
+			return err
+		}
+		app.Ports = append(app.Ports, appctypes.Port{
+			Name:     *portName,
+			Protocol: string(p.Protocol),
+			Port:     uint(p.ContainerPort),
+		})
+	}
+	// TODO(yifan): Isolators.
+	return nil
+}
+
+// makePodManifest transforms a kubelet pod spec to the rkt pod manifest.
+func makePodManifest(pod *api.Pod, volumeMap map[string]volume.Volume) (*schema.PodManifest, error) {
+	manifest := schema.BlankPodManifest()
+
+	// Get the image manifests, assume they are already in the cas,
+	// and extract the app field from the image and to be the 'base app'.
+	//
+	// We do this is because we will fully replace the image manifest's app
+	// with the pod manifest's app in rkt runtime. See below:
+	//
+	// https://github.com/coreos/rkt/issues/723.
+	//
+	ds, err := cas.NewStore(defaultDataDir)
+	if err != nil {
+		glog.Errorf("Cannot open store: %v", err)
+		return nil, err
+	}
+	for _, c := range pod.Spec.Containers {
+		h, err := appctypes.NewHash(c.Image)
+		if err != nil {
+			return nil, err
+		}
+		fullKey, err := ds.ResolveKey(c.Image)
+		if err != nil {
+			return nil, fmt.Errorf("cannot resolve key: %v", err)
+		}
+		hash, err := appctypes.NewHash(fullKey)
+		if err != nil {
+			glog.Errorf("impossible: cannot create hash from full key: %v", err)
+			return nil, err
+		}
+		im, err := ds.GetImageManifest((*hash).String())
+		if err != nil {
+			glog.Errorf("Cannot get image manifest: %v", err)
+			return nil, err
+		}
+
+		// Override the image manifest's app and store it in the pod manifest.
+		app := im.App
+		if err := setApp(app, &c); err != nil {
+			return nil, err
+		}
+
+		appName, err := appctypes.NewACName(c.Name)
+		if err != nil {
+			glog.Errorf("Cannot use the container's name %q as ACName: %v", c.Name, err)
+			return nil, err
+		}
+
+		manifest.Apps = append(manifest.Apps, schema.RuntimeApp{
+			Name:  *appName,
+			Image: schema.RuntimeImage{ID: *hash},
+			App:   app,
+		})
+	}
+
+	// Set global volumes.
+	for name, volume := range volumeMap {
+		volName, err := appctypes.NewACName(name)
+		if err != nil {
+			glog.Errorf("Cannot use the volume's name %q as ACName: %v", name, err)
+			return nil, err
+		}
+		manifest.Volumes = append(manifest.Volumes, appctypes.Volume{
+			Name:   *volName,
+			Kind:   "host",
+			Source: volume.GetPath(),
+		})
+	}
+
+	// Set global ports.
+	for _, c := range pod.Spec.Containers {
+		for _, port := range c.Ports {
+			portName, err := appctypes.NewACName(port.Name)
+			if err != nil {
+				glog.Errorf("Cannot use the volume's name %q as ACName: %v", port.Name, err)
+				return nil, err
+			}
+			manifest.Ports = append(manifest.Ports, appctypes.ExposedPort{
+				Name:     *portName,
+				HostPort: uint(port.HostPort),
+			})
+		}
+	}
+	// TODO(yifan): Set pod-level isolators once it's supported in kubernetes.
+	return manifest, nil
 }
 
 func apiPodToRuntimePod(uuid string, pod *api.Pod) *kubecontainer.Pod {
@@ -486,7 +650,7 @@ func buildContainerID(c *containerID) types.UID {
 func parseContainerID(id types.UID) (*containerID, error) {
 	tuples := strings.Split(string(id), ":")
 	if len(tuples) != 2 {
-		return nil, fmt.Errorf("rocket: cannot parse container ID for: %v", id)
+		return nil, fmt.Errorf("rkt: cannot parse container ID for: %v", id)
 	}
 	return &containerID{
 		uuid:    tuples[0],
@@ -516,7 +680,7 @@ func (r *Runtime) preparePod(pod *api.Pod, volumeMap map[string]volume.Volume) (
 		return "", false, err
 	}
 	if len(output) != 1 {
-		return "", false, fmt.Errorf("rocket: cannot get uuid from 'rkt prepare'")
+		return "", false, fmt.Errorf("rkt: cannot get uuid from 'rkt prepare'")
 	}
 	uuid := output[0]
 	glog.V(4).Infof("'rkt prepare' returns %q.", uuid)
@@ -524,13 +688,13 @@ func (r *Runtime) preparePod(pod *api.Pod, volumeMap map[string]volume.Volume) (
 	p := apiPodToRuntimePod(uuid, pod)
 	b, err := json.Marshal(p)
 	if err != nil {
-		glog.Errorf("rocket: cannot marshal pod `%s_%s`: %v", p.Name, p.Namespace, err)
+		glog.Errorf("rkt: cannot marshal pod `%s_%s`: %v", p.Name, p.Namespace, err)
 		return "", false, err
 	}
 
 	runPrepared := fmt.Sprintf("%s run-prepared --private-net --spawn-metadata-svc %s", r.absPath, uuid)
 	units := []*unit.UnitOption{
-		newUnitOption(unitKubernetesSection, unitRocketID, uuid),
+		newUnitOption(unitKubernetesSection, unitRktID, uuid),
 		newUnitOption(unitKubernetesSection, unitPodName, string(b)),
 		newUnitOption("Service", "ExecStart", runPrepared),
 	}
@@ -555,14 +719,14 @@ func (r *Runtime) preparePod(pod *api.Pod, volumeMap map[string]volume.Volume) (
 	return unitName, needReload, nil
 }
 
-// Note: In rocket, the container ID is in the form of "UUID_ImageID".
+// Note: In rkt, the container ID is in the form of "UUID_ImageID".
 func (r *Runtime) RunInContainer(containerID string, cmd []string) ([]byte, error) {
 	id, err := parseContainerID(types.UID(containerID))
 	if err != nil {
 		return nil, err
 	}
 	// TODO(yifan): Currently, store image ID in appName.
-	// This will change in the future, see https://github.com/coreos/rocket/pull/640
+	// This will change in the future, see https://github.com/coreos/rkt/pull/640
 	args := append([]string{}, "enter", "--imageid", id.appName, id.uuid)
 	args = append(args, cmd...)
 	result, err := r.RunCommand(args...)
