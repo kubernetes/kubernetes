@@ -313,7 +313,7 @@ func podRunningReady(p *api.Pod) (bool, error) {
 // check if a Pod is controlled by a Replication Controller in the List
 func hasReplicationControllersForPod(rcs *api.ReplicationControllerList, pod api.Pod) bool {
 	for _, rc := range rcs.Items {
-		selector := labels.SelectorFromSet(rc.Spec.Selector)
+		selector := rc.Spec.Selector
 		if selector.Matches(labels.Set(pod.ObjectMeta.Labels)) {
 			return true
 		}
@@ -1186,9 +1186,7 @@ func RunRC(config RCConfig) error {
 		},
 		Spec: api.ReplicationControllerSpec{
 			Replicas: config.Replicas,
-			Selector: map[string]string{
-				"name": config.Name,
-			},
+			Selector: labels.NewSelectorOrDie("name=" + config.Name),
 			Template: &api.PodTemplateSpec{
 				ObjectMeta: api.ObjectMeta{
 					Labels: map[string]string{"name": config.Name},

@@ -844,7 +844,7 @@ func describeReplicationController(controller *api.ReplicationController, events
 		} else {
 			fmt.Fprintf(out, "Image(s):\t%s\n", "<no template>")
 		}
-		fmt.Fprintf(out, "Selector:\t%s\n", labels.FormatLabels(controller.Spec.Selector))
+		fmt.Fprintf(out, "Selector:\t%s\n", controller.Spec.Selector.String())
 		fmt.Fprintf(out, "Labels:\t%s\n", labels.FormatLabels(controller.Labels))
 		fmt.Fprintf(out, "Replicas:\t%d current / %d desired\n", controller.Status.Replicas, controller.Spec.Replicas)
 		fmt.Fprintf(out, "Pods Status:\t%d Running / %d Waiting / %d Succeeded / %d Failed\n", running, waiting, succeeded, failed)
@@ -1026,7 +1026,7 @@ func describeService(service *api.Service, endpoints *api.Endpoints, events *api
 		fmt.Fprintf(out, "Name:\t%s\n", service.Name)
 		fmt.Fprintf(out, "Namespace:\t%s\n", service.Namespace)
 		fmt.Fprintf(out, "Labels:\t%s\n", labels.FormatLabels(service.Labels))
-		fmt.Fprintf(out, "Selector:\t%s\n", labels.FormatLabels(service.Spec.Selector))
+		fmt.Fprintf(out, "Selector:\t%s\n", service.Spec.Selector.String())
 		fmt.Fprintf(out, "Type:\t%s\n", service.Spec.Type)
 		fmt.Fprintf(out, "IP:\t%s\n", service.Spec.ClusterIP)
 		if len(service.Status.LoadBalancer.Ingress) > 0 {
@@ -1434,7 +1434,7 @@ func getReplicationControllersForLabels(c client.ReplicationControllerInterface,
 	// Find the ones that match labelsToMatch.
 	var matchingRCs []api.ReplicationController
 	for _, controller := range rcs.Items {
-		selector := labels.SelectorFromSet(controller.Spec.Selector)
+		selector := controller.Spec.Selector
 		if selector.Matches(labelsToMatch) {
 			matchingRCs = append(matchingRCs, controller)
 		}

@@ -117,9 +117,7 @@ func svcByName(name string) *api.Service {
 			Name: "test-service",
 		},
 		Spec: api.ServiceSpec{
-			Selector: map[string]string{
-				"name": name,
-			},
+			Selector: labels.NewSelectorOrDie("name=" + name),
 			Ports: []api.ServicePort{{
 				Port:       9376,
 				TargetPort: util.NewIntOrStringFromInt(9376),
@@ -180,9 +178,9 @@ func rcByNamePort(name string, replicas int, image string, port int, labels map[
 	})
 }
 
-func rcByNameContainer(name string, replicas int, image string, labels map[string]string, c api.Container) *api.ReplicationController {
+func rcByNameContainer(name string, replicas int, image string, l map[string]string, c api.Container) *api.ReplicationController {
 	// Add "name": name to the labels, overwriting if it exists.
-	labels["name"] = name
+	l["name"] = name
 	return &api.ReplicationController{
 		TypeMeta: unversioned.TypeMeta{
 			Kind:       "ReplicationController",
@@ -193,12 +191,10 @@ func rcByNameContainer(name string, replicas int, image string, labels map[strin
 		},
 		Spec: api.ReplicationControllerSpec{
 			Replicas: replicas,
-			Selector: map[string]string{
-				"name": name,
-			},
+			Selector: labels.NewSelectorOrDie("name=" + name),
 			Template: &api.PodTemplateSpec{
 				ObjectMeta: api.ObjectMeta{
-					Labels: labels,
+					Labels: l,
 				},
 				Spec: api.PodSpec{
 					Containers: []api.Container{c},

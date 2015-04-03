@@ -17,6 +17,8 @@ limitations under the License.
 package api
 
 import (
+	"fmt"
+
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/conversion"
@@ -79,6 +81,31 @@ func init() {
 				return nil
 			}
 			*out = (*in).String()
+			return nil
+		},
+		func(in *labels.Selector, out *map[string]string, s conversion.Scope) error {
+			if in != nil {
+				m := make(map[string]string)
+				for _, r := range *in {
+					switch r.Operator {
+					case labels.EqualsOperator, labels.DoubleEqualsOperator, labels.InOperator:
+						m[r.Key] = r.StrValues.List()[0]
+					default:
+						return fmt.Errorf("selector with operators other than '=', 'in', '==' cannot be converted to older api version (map[string]string)")
+					}
+				}
+				*out = m
+			}
+			return nil
+		},
+		func(in *map[string]string, out *labels.Selector, s conversion.Scope) error {
+			if *in != nil {
+				selector := labels.Selector{}
+				for key, value := range *in {
+					selector = selector.Add(key, labels.EqualsOperator, []string{value})
+				}
+				*out = selector
+			}
 			return nil
 		},
 		func(in *resource.Quantity, out *resource.Quantity, s conversion.Scope) error {

@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"reflect"
 	"time"
 
 	"github.com/golang/glog"
@@ -249,10 +250,13 @@ func RunRollingUpdate(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, arg
 	// by at least one selector. Every new pod should have the selector and every
 	// old pod should not have the selector.
 	var hasLabel bool
-	for key, oldValue := range oldRc.Spec.Selector {
-		if newValue, ok := newRc.Spec.Selector[key]; ok && newValue != oldValue {
-			hasLabel = true
-			break
+oldRcSelectorLoop:
+	for _, oldReq := range oldRc.Spec.Selector {
+		for _, newReq := range newRc.Spec.Selector {
+			if oldReq.Key == newReq.Key && !reflect.DeepEqual(oldReq.StrValues, newReq.StrValues) {
+				hasLabel = true // values are different for the same key
+				break oldRcSelectorLoop
+			}
 		}
 	}
 	if !hasLabel {

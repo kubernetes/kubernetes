@@ -31,6 +31,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	cadvisorApi "github.com/google/cadvisor/info/v1"
 	cadvisorApiv2 "github.com/google/cadvisor/info/v2"
 	"k8s.io/kubernetes/pkg/api"
@@ -2168,7 +2169,7 @@ func TestHandleNodeSelector(t *testing.T) {
 				Name:      "podA",
 				Namespace: "foo",
 			},
-			Spec: api.PodSpec{NodeSelector: map[string]string{"key": "A"}},
+			Spec: api.PodSpec{NodeSelector: labels.NewSelectorOrDie("key=A")},
 		},
 		{
 			ObjectMeta: api.ObjectMeta{
@@ -2176,7 +2177,7 @@ func TestHandleNodeSelector(t *testing.T) {
 				Name:      "podB",
 				Namespace: "foo",
 			},
-			Spec: api.PodSpec{NodeSelector: map[string]string{"key": "B"}},
+			Spec: api.PodSpec{NodeSelector: labels.NewSelectorOrDie("key=B")},
 		},
 	}
 	// The first pod should be rejected.

@@ -152,9 +152,7 @@ func main() {
 					Port:       9376,
 					TargetPort: util.NewIntOrStringFromInt(9376),
 				}},
-				Selector: map[string]string{
-					"name": "serve-hostname",
-				},
+				Selector: labels.NewSelectorOrDie("name=serve-hostname"),
 			},
 		})
 		glog.V(4).Infof("Service create %s/server-hostnames took %v", ns, time.Since(t))

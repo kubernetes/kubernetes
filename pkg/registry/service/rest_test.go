@@ -73,7 +73,7 @@ func TestServiceRegistryCreate(t *testing.T) {
 	svc := &api.Service{
 		ObjectMeta: api.ObjectMeta{Name: "foo"},
 		Spec: api.ServiceSpec{
-			Selector:        map[string]string{"bar": "baz"},
+			Selector:        labels.NewSelectorOrDie("bar=baz"),
 			SessionAffinity: api.ServiceAffinityNone,
 			Type:            api.ServiceTypeClusterIP,
 			Ports: []api.ServicePort{{
@@ -116,7 +116,7 @@ func TestServiceStorageValidatesCreate(t *testing.T) {
 		"empty ID": {
 			ObjectMeta: api.ObjectMeta{Name: ""},
 			Spec: api.ServiceSpec{
-				Selector:        map[string]string{"bar": "baz"},
+				Selector:        labels.NewSelectorOrDie("bar=baz"),
 				SessionAffinity: api.ServiceAffinityNone,
 				Type:            api.ServiceTypeClusterIP,
 				Ports: []api.ServicePort{{
@@ -129,7 +129,7 @@ func TestServiceStorageValidatesCreate(t *testing.T) {
 		"empty port": {
 			ObjectMeta: api.ObjectMeta{Name: "foo"},
 			Spec: api.ServiceSpec{
-				Selector:        map[string]string{"bar": "baz"},
+				Selector:        labels.NewSelectorOrDie("bar=baz"),
 				SessionAffinity: api.ServiceAffinityNone,
 				Type:            api.ServiceTypeClusterIP,
 				Ports: []api.ServicePort{{
@@ -140,7 +140,7 @@ func TestServiceStorageValidatesCreate(t *testing.T) {
 		"missing targetPort": {
 			ObjectMeta: api.ObjectMeta{Name: "foo"},
 			Spec: api.ServiceSpec{
-				Selector:        map[string]string{"bar": "baz"},
+				Selector:        labels.NewSelectorOrDie("bar=baz"),
 				SessionAffinity: api.ServiceAffinityNone,
 				Type:            api.ServiceTypeClusterIP,
 				Ports: []api.ServicePort{{
@@ -168,7 +168,7 @@ func TestServiceRegistryUpdate(t *testing.T) {
 	svc, err := registry.CreateService(ctx, &api.Service{
 		ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "1", Namespace: api.NamespaceDefault},
 		Spec: api.ServiceSpec{
-			Selector: map[string]string{"bar": "baz1"},
+			Selector: labels.NewSelectorOrDie("bar=baz1"),
 			Ports: []api.ServicePort{{
 				Port:       6502,
 				Protocol:   api.ProtocolTCP,
@@ -185,7 +185,7 @@ func TestServiceRegistryUpdate(t *testing.T) {
 			Name:            "foo",
 			ResourceVersion: svc.ResourceVersion},
 		Spec: api.ServiceSpec{
-			Selector:        map[string]string{"bar": "baz2"},
+			Selector:        labels.NewSelectorOrDie("bar=baz"),
 			SessionAffinity: api.ServiceAffinityNone,
 			Type:            api.ServiceTypeClusterIP,
 			Ports: []api.ServicePort{{
@@ -219,7 +219,7 @@ func TestServiceStorageValidatesUpdate(t *testing.T) {
 	registry.CreateService(ctx, &api.Service{
 		ObjectMeta: api.ObjectMeta{Name: "foo"},
 		Spec: api.ServiceSpec{
-			Selector: map[string]string{"bar": "baz"},
+			Selector: labels.NewSelectorOrDie("bar=baz"),
 			Ports: []api.ServicePort{{
 				Port:     6502,
 				Protocol: api.ProtocolTCP,
@@ -230,7 +230,7 @@ func TestServiceStorageValidatesUpdate(t *testing.T) {
 		"empty ID": {
 			ObjectMeta: api.ObjectMeta{Name: ""},
 			Spec: api.ServiceSpec{
-				Selector:        map[string]string{"bar": "baz"},
+				Selector:        labels.NewSelectorOrDie("bar=baz"),
 				SessionAffinity: api.ServiceAffinityNone,
 				Type:            api.ServiceTypeClusterIP,
 				Ports: []api.ServicePort{{
@@ -243,7 +243,7 @@ func TestServiceStorageValidatesUpdate(t *testing.T) {
 		"invalid selector": {
 			ObjectMeta: api.ObjectMeta{Name: "foo"},
 			Spec: api.ServiceSpec{
-				Selector:        map[string]string{"ThisSelectorFailsValidation": "ok"},
+				Selector:        labels.Selector{{"ThisSeThisSelectorFailsValidation", labels.EqualsOperator, util.NewStringSet("ok")}},
 				SessionAffinity: api.ServiceAffinityNone,
 				Type:            api.ServiceTypeClusterIP,
 				Ports: []api.ServicePort{{
@@ -271,7 +271,7 @@ func TestServiceRegistryExternalService(t *testing.T) {
 	svc := &api.Service{
 		ObjectMeta: api.ObjectMeta{Name: "foo"},
 		Spec: api.ServiceSpec{
-			Selector:        map[string]string{"bar": "baz"},
+			Selector:        labels.NewSelectorOrDie("bar=baz"),
 			SessionAffinity: api.ServiceAffinityNone,
 			Type:            api.ServiceTypeLoadBalancer,
 			Ports: []api.ServicePort{{
@@ -300,7 +300,7 @@ func TestServiceRegistryDelete(t *testing.T) {
 	svc := &api.Service{
 		ObjectMeta: api.ObjectMeta{Name: "foo"},
 		Spec: api.ServiceSpec{
-			Selector:        map[string]string{"bar": "baz"},
+			Selector:        labels.NewSelectorOrDie("bar=baz"),
 			SessionAffinity: api.ServiceAffinityNone,
 			Type:            api.ServiceTypeClusterIP,
 			Ports: []api.ServicePort{{
@@ -322,7 +322,7 @@ func TestServiceRegistryDeleteExternal(t *testing.T) {
 	svc := &api.Service{
 		ObjectMeta: api.ObjectMeta{Name: "foo"},
 		Spec: api.ServiceSpec{
-			Selector:        map[string]string{"bar": "baz"},
+			Selector:        labels.NewSelectorOrDie("bar=baz"),
 			SessionAffinity: api.ServiceAffinityNone,
 			Type:            api.ServiceTypeLoadBalancer,
 			Ports: []api.ServicePort{{
@@ -346,7 +346,7 @@ func TestServiceRegistryUpdateExternalService(t *testing.T) {
 	svc1 := &api.Service{
 		ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "1"},
 		Spec: api.ServiceSpec{
-			Selector:        map[string]string{"bar": "baz"},
+			Selector:        labels.NewSelectorOrDie("bar=baz"),
 			SessionAffinity: api.ServiceAffinityNone,
 			Type:            api.ServiceTypeClusterIP,
 			Ports: []api.ServicePort{{
@@ -383,7 +383,7 @@ func TestServiceRegistryUpdateMultiPortExternalService(t *testing.T) {
 	svc1 := &api.Service{
 		ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "1"},
 		Spec: api.ServiceSpec{
-			Selector:        map[string]string{"bar": "baz"},
+			Selector:        labels.NewSelectorOrDie("bar=baz"),
 			SessionAffinity: api.ServiceAffinityNone,
 			Type:            api.ServiceTypeLoadBalancer,
 			Ports: []api.ServicePort{{
@@ -417,7 +417,7 @@ func TestServiceRegistryGet(t *testing.T) {
 	registry.CreateService(ctx, &api.Service{
 		ObjectMeta: api.ObjectMeta{Name: "foo"},
 		Spec: api.ServiceSpec{
-			Selector: map[string]string{"bar": "baz"},
+			Selector: labels.NewSelectorOrDie("bar=baz"),
 		},
 	})
 	storage.Get(ctx, "foo")
@@ -446,7 +446,7 @@ func TestServiceRegistryResourceLocation(t *testing.T) {
 	registry.CreateService(ctx, &api.Service{
 		ObjectMeta: api.ObjectMeta{Name: "foo"},
 		Spec: api.ServiceSpec{
-			Selector: map[string]string{"bar": "baz"},
+			Selector: labels.NewSelectorOrDie("bar=baz"),
 		},
 	})
 	redirector := rest.Redirector(storage)
@@ -493,13 +493,13 @@ func TestServiceRegistryList(t *testing.T) {
 	registry.CreateService(ctx, &api.Service{
 		ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: api.NamespaceDefault},
 		Spec: api.ServiceSpec{
-			Selector: map[string]string{"bar": "baz"},
+			Selector: labels.NewSelectorOrDie("bar=baz"),
 		},
 	})
 	registry.CreateService(ctx, &api.Service{
 		ObjectMeta: api.ObjectMeta{Name: "foo2", Namespace: api.NamespaceDefault},
 		Spec: api.ServiceSpec{
-			Selector: map[string]string{"bar2": "baz2"},
+			Selector: labels.NewSelectorOrDie("bar2=baz2"),
 		},
 	})
 	registry.List.ResourceVersion = "1"
@@ -525,7 +525,7 @@ func TestServiceRegistryIPAllocation(t *testing.T) {
 	svc1 := &api.Service{
 		ObjectMeta: api.ObjectMeta{Name: "foo"},
 		Spec: api.ServiceSpec{
-			Selector:        map[string]string{"bar": "baz"},
+			Selector:        labels.NewSelectorOrDie("bar=baz"),
 			SessionAffinity: api.ServiceAffinityNone,
 			Type:            api.ServiceTypeClusterIP,
 			Ports: []api.ServicePort{{
@@ -548,7 +548,7 @@ func TestServiceRegistryIPAllocation(t *testing.T) {
 	svc2 := &api.Service{
 		ObjectMeta: api.ObjectMeta{Name: "bar"},
 		Spec: api.ServiceSpec{
-			Selector:        map[string]string{"bar": "baz"},
+			Selector:        labels.NewSelectorOrDie("bar=baz"),
 			SessionAffinity: api.ServiceAffinityNone,
 			Type:            api.ServiceTypeClusterIP,
 			Ports: []api.ServicePort{{
@@ -579,7 +579,7 @@ func TestServiceRegistryIPAllocation(t *testing.T) {
 	svc3 := &api.Service{
 		ObjectMeta: api.ObjectMeta{Name: "quux"},
 		Spec: api.ServiceSpec{
-			Selector:        map[string]string{"bar": "baz"},
+			Selector:        labels.NewSelectorOrDie("bar=baz"),
 			ClusterIP:       testIP,
 			SessionAffinity: api.ServiceAffinityNone,
 			Type:            api.ServiceTypeClusterIP,
@@ -607,7 +607,7 @@ func TestServiceRegistryIPReallocation(t *testing.T) {
 	svc1 := &api.Service{
 		ObjectMeta: api.ObjectMeta{Name: "foo"},
 		Spec: api.ServiceSpec{
-			Selector:        map[string]string{"bar": "baz"},
+			Selector:        labels.NewSelectorOrDie("bar=baz"),
 			SessionAffinity: api.ServiceAffinityNone,
 			Type:            api.ServiceTypeClusterIP,
 			Ports: []api.ServicePort{{
@@ -635,7 +635,7 @@ func TestServiceRegistryIPReallocation(t *testing.T) {
 	svc2 := &api.Service{
 		ObjectMeta: api.ObjectMeta{Name: "bar"},
 		Spec: api.ServiceSpec{
-			Selector:        map[string]string{"bar": "baz"},
+			Selector:        labels.NewSelectorOrDie("bar=baz"),
 			SessionAffinity: api.ServiceAffinityNone,
 			Type:            api.ServiceTypeClusterIP,
 			Ports: []api.ServicePort{{
@@ -662,7 +662,7 @@ func TestServiceRegistryIPUpdate(t *testing.T) {
 	svc := &api.Service{
 		ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "1"},
 		Spec: api.ServiceSpec{
-			Selector:        map[string]string{"bar": "baz"},
+			Selector:        labels.NewSelectorOrDie("bar=baz"),
 			SessionAffinity: api.ServiceAffinityNone,
 			Type:            api.ServiceTypeClusterIP,
 			Ports: []api.ServicePort{{
@@ -716,7 +716,7 @@ func TestServiceRegistryIPLoadBalancer(t *testing.T) {
 	svc := &api.Service{
 		ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "1"},
 		Spec: api.ServiceSpec{
-			Selector:        map[string]string{"bar": "baz"},
+			Selector:        labels.NewSelectorOrDie("bar=baz"),
 			SessionAffinity: api.ServiceAffinityNone,
 			Type:            api.ServiceTypeLoadBalancer,
 			Ports: []api.ServicePort{{

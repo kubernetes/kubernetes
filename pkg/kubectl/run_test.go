@@ -22,6 +22,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/kubernetes/pkg/labels"
 )
 
 func TestGenerate(t *testing.T) {
@@ -44,7 +45,7 @@ func TestGenerate(t *testing.T) {
 				},
 				Spec: api.ReplicationControllerSpec{
 					Replicas: 1,
-					Selector: map[string]string{"run": "foo"},
+					Selector: labels.NewSelectorOrDie("run=foo"),
 					Template: &api.PodTemplateSpec{
 						ObjectMeta: api.ObjectMeta{
 							Labels: map[string]string{"run": "foo"},
@@ -186,7 +187,7 @@ func TestGenerate(t *testing.T) {
 				},
 				Spec: api.ReplicationControllerSpec{
 					Replicas: 1,
-					Selector: map[string]string{"run": "foo"},
+					Selector: labels.NewSelectorOrDie("run=foo"),
 					Template: &api.PodTemplateSpec{
 						ObjectMeta: api.ObjectMeta{
 							Labels: map[string]string{"run": "foo"},
@@ -223,7 +224,7 @@ func TestGenerate(t *testing.T) {
 				},
 				Spec: api.ReplicationControllerSpec{
 					Replicas: 1,
-					Selector: map[string]string{"run": "foo"},
+					Selector: labels.NewSelectorOrDie("run=foo"),
 					Template: &api.PodTemplateSpec{
 						ObjectMeta: api.ObjectMeta{
 							Labels: map[string]string{"run": "foo"},
@@ -270,7 +271,7 @@ func TestGenerate(t *testing.T) {
 				},
 				Spec: api.ReplicationControllerSpec{
 					Replicas: 1,
-					Selector: map[string]string{"foo": "bar", "baz": "blah"},
+					Selector: labels.NewSelectorOrDie("foo=bar,baz=blah"),
 					Template: &api.PodTemplateSpec{
 						ObjectMeta: api.ObjectMeta{
 							Labels: map[string]string{"foo": "bar", "baz": "blah"},

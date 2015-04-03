@@ -25,6 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/fake"
+	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
 )
@@ -83,7 +84,7 @@ func TestRunExposeService(t *testing.T) {
 			input: &api.Service{
 				ObjectMeta: api.ObjectMeta{Name: "baz", Namespace: "test", ResourceVersion: "12"},
 				Spec: api.ServiceSpec{
-					Selector: map[string]string{"app": "go"},
+					Selector: labels.NewSelectorOrDie("app=go"),
 				},
 			},
 			flags: map[string]string{"selector": "func=stream", "protocol": "UDP", "port": "14", "name": "foo", "labels": "svc=test"},
@@ -97,7 +98,7 @@ func TestRunExposeService(t *testing.T) {
 							TargetPort: util.NewIntOrStringFromInt(14),
 						},
 					},
-					Selector: map[string]string{"func": "stream"},
+					Selector: labels.NewSelectorOrDie("func=stream"),
 				},
 			},
 			expected: "service \"foo\" exposed",
@@ -114,7 +115,7 @@ func TestRunExposeService(t *testing.T) {
 			input: &api.Service{
 				ObjectMeta: api.ObjectMeta{Name: "mayor", Namespace: "default", ResourceVersion: "12"},
 				Spec: api.ServiceSpec{
-					Selector: map[string]string{"run": "this"},
+					Selector: labels.NewSelectorOrDie("run=this"),
 				},
 			},
 			// No --name flag specified below. Service will use the rc's name passed via the 'default-name' parameter
@@ -129,7 +130,7 @@ func TestRunExposeService(t *testing.T) {
 							TargetPort: util.NewIntOrStringFromInt(80),
 						},
 					},
-					Selector: map[string]string{"run": "this"},
+					Selector: labels.NewSelectorOrDie("run=this"),
 				},
 			},
 			expected: "service \"mayor\" exposed",
@@ -146,7 +147,7 @@ func TestRunExposeService(t *testing.T) {
 			input: &api.Service{
 				ObjectMeta: api.ObjectMeta{Name: "baz", Namespace: "test", ResourceVersion: "12"},
 				Spec: api.ServiceSpec{
-					Selector: map[string]string{"app": "go"},
+					Selector: labels.NewSelectorOrDie("app=go"),
 				},
 			},
 			flags: map[string]string{"selector": "func=stream", "protocol": "UDP", "port": "14", "name": "foo", "labels": "svc=test", "create-external-load-balancer": "true"},
@@ -160,7 +161,7 @@ func TestRunExposeService(t *testing.T) {
 							TargetPort: util.NewIntOrStringFromInt(14),
 						},
 					},
-					Selector: map[string]string{"func": "stream"},
+					Selector: labels.NewSelectorOrDie("fun=stream"),
 					Type:     api.ServiceTypeLoadBalancer,
 				},
 			},

@@ -364,6 +364,9 @@ func FuzzerFor(t *testing.T, version string, src rand.Source) *fuzz.Fuzzer {
 			// string, which will cause tests failure.
 			s.APIGroup = "something"
 		},
+		func(l *labels.Selector, c fuzz.Continue) {
+			*l = labels.Everything()
+		},
 	)
 	return f
 }

@@ -676,7 +676,7 @@ func printReplicationController(controller *api.ReplicationController, w io.Writ
 		name,
 		firstContainer.Name,
 		firstContainer.Image,
-		labels.FormatLabels(controller.Spec.Selector),
+		controller.Spec.Selector.String(),
 		controller.Spec.Replicas,
 		translateTimestamp(controller.CreationTimestamp),
 	); err != nil {
@@ -793,7 +793,7 @@ func printService(svc *api.Service, w io.Writer, withNamespace bool, wide bool, 
 		internalIP,
 		externalIP,
 		makePortString(svc.Spec.Ports),
-		labels.FormatLabels(svc.Spec.Selector),
+		svc.Spec.Selector.String(),
 		translateTimestamp(svc.CreationTimestamp),
 	); err != nil {
 		return err

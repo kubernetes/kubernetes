@@ -80,10 +80,11 @@ var _ = Describe("Services", func() {
 	It("should serve a basic endpoint from pods", func() {
 		serviceName := "endpoint-test2"
 		ns := namespaces[0]
-		labels := map[string]string{
+		labelsMap := map[string]string{
 			"foo": "bar",
 			"baz": "blah",
 		}
+		selector := labels.Set(labelsMap).AsSelector()
 
 		defer func() {
 			err := c.Services(ns).Delete(serviceName)
@@ -95,7 +96,7 @@ var _ = Describe("Services", func() {
 				Name: serviceName,
 			},
 			Spec: api.ServiceSpec{
-				Selector: labels,
+				Selector: selector,
 				Ports: []api.ServicePort{{
 					Port:       80,
 					TargetPort: util.NewIntOrStringFromInt(80),
@@ -116,13 +117,13 @@ var _ = Describe("Services", func() {
 		}()
 
 		name1 := "test1"
-		addEndpointPodOrFail(c, ns, name1, labels, []api.ContainerPort{{ContainerPort: 80}})
+		addEndpointPodOrFail(c, ns, name1, labelsMap, []api.ContainerPort{{ContainerPort: 80}})
 		names = append(names, name1)
 
 		validateEndpointsOrFail(c, ns, serviceName, PortsByPodName{name1: {80}})
 
 		name2 := "test2"
-		addEndpointPodOrFail(c, ns, name2, labels, []api.ContainerPort{{ContainerPort: 80}})
+		addEndpointPodOrFail(c, ns, name2, labelsMap, []api.ContainerPort{{ContainerPort: 80}})
 		names = append(names, name2)
 
 		validateEndpointsOrFail(c, ns, serviceName, PortsByPodName{name1: {80}, name2: {80}})
@@ -150,7 +151,7 @@ var _ = Describe("Services", func() {
 			Expect(err).NotTo(HaveOccurred())
 		}()
 
-		labels := map[string]string{"foo": "bar"}
+		labelsMap := map[string]string{"foo": "bar"}
 
 		svc1port := "svc1"
 		svc2port := "svc2"
@@ -160,7 +161,7 @@ var _ = Describe("Services", func() {
 				Name: serviceName,
 			},
 			Spec: api.ServiceSpec{
-				Selector: labels,
+				Selector: labels.Set(labelsMap).AsSelector(),
 				Ports: []api.ServicePort{
 					{
 						Name:       "portname1",
@@ -203,17 +204,17 @@ var _ = Describe("Services", func() {
 		}
 
 		podname1 := "podname1"
-		addEndpointPodOrFail(c, ns, podname1, labels, containerPorts1)
+		addEndpointPodOrFail(c, ns, podname1, labelsMap, containerPorts1)
 		names = append(names, podname1)
 		validateEndpointsOrFail(c, ns, serviceName, PortsByPodName{podname1: {port1}})
 
 		podname2 := "podname2"
-		addEndpointPodOrFail(c, ns, podname2, labels, containerPorts2)
+		addEndpointPodOrFail(c, ns, podname2, labelsMap, containerPorts2)
 		names = append(names, podname2)
 		validateEndpointsOrFail(c, ns, serviceName, PortsByPodName{podname1: {port1}, podname2: {port2}})
 
 		podname3 := "podname3"
-		addEndpointPodOrFail(c, ns, podname3, labels, append(containerPorts1, containerPorts2...))
+		addEndpointPodOrFail(c, ns, podname3, labelsMap, append(containerPorts1, containerPorts2...))
 		names = append(names, podname3)
 		validateEndpointsOrFail(c, ns, serviceName, PortsByPodName{podname1: {port1}, podname2: {port2}, podname3: {port1, port2}})
 
@@ -988,14 +989,11 @@ var _ = Describe("Services", func() {
 		SkipUnlessProviderIs("gce", "gke", "aws")
 
 		serviceNames := []string{"s0"} // Could add more here, but then it takes longer.
-		labels := map[string]string{
-			"key0": "value0",
-			"key1": "value1",
-		}
+		selector := labels.NewSelectorOrDie("key0=value0,key1=value1")
 		service := &api.Service{
 			ObjectMeta: api.ObjectMeta{},
 			Spec: api.ServiceSpec{
-				Selector: labels,
+				Selector: selector,
 				Ports: []api.ServicePort{{
 					Port:       80,
 					TargetPort: util.NewIntOrStringFromInt(80),
@@ -1536,7 +1534,7 @@ func (t *WebserverTest) BuildServiceSpec() *api.Service {
 			Name: t.ServiceName,
 		},
 		Spec: api.ServiceSpec{
-			Selector: t.Labels,
+			Selector: labels.SelectorFromSet(t.Labels),
 			Ports: []api.ServicePort{{
 				Port:       80,
 				TargetPort: util.NewIntOrStringFromInt(80),

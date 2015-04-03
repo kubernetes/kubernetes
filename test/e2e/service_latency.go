@@ -321,7 +321,7 @@ func singleServiceLatency(f *Framework, name string, q *endpointQueries) (time.D
 		},
 		Spec: api.ServiceSpec{
 			Ports:           []api.ServicePort{{Protocol: api.ProtocolTCP, Port: 80}},
-			Selector:        map[string]string{"name": name},
+			Selector:        labels.NewSelectorOrDie("name=" + name),
 			Type:            api.ServiceTypeClusterIP,
 			SessionAffinity: api.ServiceAffinityNone,
 		},

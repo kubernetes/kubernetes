@@ -35,6 +35,7 @@ import (
 	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
 	"k8s.io/kubernetes/pkg/client/unversioned/fake"
 	"k8s.io/kubernetes/pkg/kubectl"
+	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
 )
@@ -62,9 +63,7 @@ func TestPodSelectorForObject(t *testing.T) {
 	svc := &api.Service{
 		ObjectMeta: api.ObjectMeta{Name: "baz", Namespace: "test"},
 		Spec: api.ServiceSpec{
-			Selector: map[string]string{
-				"foo": "bar",
-			},
+			Selector: labels.NewSelectorOrDie("foo=bar"),
 		},
 	}
 

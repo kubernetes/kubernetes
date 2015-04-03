@@ -23,6 +23,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/validation"
 )
@@ -163,15 +164,15 @@ func (BasicReplicationController) Generate(genericParams map[string]interface{})
 	}
 	// TODO: extract this flag to a central location.
 	labelString, found := params["labels"]
-	var labels map[string]string
+	var labelsMap map[string]string
 	var err error
 	if found && len(labelString) > 0 {
-		labels, err = ParseLabels(labelString)
+		labelsMap, err = ParseLabels(labelString)
 		if err != nil {
 			return nil, err
 		}
 	} else {
-		labels = map[string]string{
+		labelsMap = map[string]string{
 			"run": name,
 		}
 	}
@@ -203,14 +204,14 @@ func (BasicReplicationController) Generate(genericParams map[string]interface{})
 	controller := api.ReplicationController{
 		ObjectMeta: api.ObjectMeta{
 			Name:   name,
-			Labels: labels,
+			Labels: labelsMap,
 		},
 		Spec: api.ReplicationControllerSpec{
 			Replicas: count,
-			Selector: labels,
+			Selector: labels.Set(labelsMap).AsSelector(),
 			Template: &api.PodTemplateSpec{
 				ObjectMeta: api.ObjectMeta{
-					Labels: labels,
+					Labels: labelsMap,
 				},
 				Spec: *podSpec,
 			},

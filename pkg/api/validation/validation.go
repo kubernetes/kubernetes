@@ -76,6 +76,22 @@ func ValidateLabels(labels map[string]string, field string) errs.ValidationError
 	return allErrs
 }
 
+func ValidateLabelsSelector(selector labels.Selector, field string) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+	for _, r := range selector {
+		if !util.IsQualifiedName(r.Key) {
+			allErrs = append(allErrs, errs.NewFieldInvalid(field, r.Key, qualifiedNameErrorMsg))
+		}
+		for v := range r.StrValues {
+			if !util.IsValidLabelValue(v) {
+				allErrs = append(allErrs, errs.NewFieldInvalid(field, v, labelValueErrorMsg))
+			}
+		}
+	}
+	return allErrs
+
+}
+
 // ValidateAnnotations validates that a set of annotations are correctly defined.
 func ValidateAnnotations(annotations map[string]string, field string) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
@@ -1078,7 +1094,7 @@ func ValidatePodSpec(spec *api.PodSpec) errs.ValidationErrorList {
 	allErrs = append(allErrs, validateContainers(spec.Containers, allVolumes).Prefix("containers")...)
 	allErrs = append(allErrs, validateRestartPolicy(&spec.RestartPolicy).Prefix("restartPolicy")...)
 	allErrs = append(allErrs, validateDNSPolicy(&spec.DNSPolicy).Prefix("dnsPolicy")...)
-	allErrs = append(allErrs, ValidateLabels(spec.NodeSelector, "nodeSelector")...)
+	allErrs = append(allErrs, ValidateLabelsSelector(spec.NodeSelector, "nodeSelector")...)
 	allErrs = append(allErrs, validateHostNetwork(spec.HostNetwork, spec.Containers).Prefix("hostNetwork")...)
 	allErrs = append(allErrs, validateImagePullSecrets(spec.ImagePullSecrets).Prefix("imagePullSecrets")...)
 	if len(spec.ServiceAccountName) > 0 {
@@ -1185,7 +1201,7 @@ func ValidateService(service *api.Service) errs.ValidationErrorList {
 	}
 
 	if service.Spec.Selector != nil {
-		allErrs = append(allErrs, ValidateLabels(service.Spec.Selector, "spec.selector")...)
+		allErrs = append(allErrs, ValidateLabelsSelector(service.Spec.Selector, "spec.selector")...)
 	}
 
 	if service.Spec.SessionAffinity == "" {

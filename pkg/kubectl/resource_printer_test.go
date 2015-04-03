@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/experimental"
+	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/sets"
@@ -821,9 +822,7 @@ func TestPrintHumanReadableWithNamespace(t *testing.T) {
 							},
 							RestartPolicy: api.RestartPolicyAlways,
 							DNSPolicy:     api.DNSDefault,
-							NodeSelector: map[string]string{
-								"baz": "blah",
-							},
+							NodeSelector:  labels.NewSelectorOrDie("baz=blah"),
 						},
 					},
 				},

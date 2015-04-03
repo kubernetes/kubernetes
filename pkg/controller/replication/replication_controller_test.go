@@ -110,7 +110,7 @@ func newReplicationController(replicas int) *api.ReplicationController {
 		},
 		Spec: api.ReplicationControllerSpec{
 			Replicas: replicas,
-			Selector: map[string]string{"foo": "bar"},
+			Selector: labels.NewSelectorOrDie("foo=bar"),
 			Template: &api.PodTemplateSpec{
 				ObjectMeta: api.ObjectMeta{
 					Labels: map[string]string{
@@ -129,9 +129,7 @@ func newReplicationController(replicas int) *api.ReplicationController {
 					},
 					RestartPolicy: api.RestartPolicyAlways,
 					DNSPolicy:     api.DNSDefault,
-					NodeSelector: map[string]string{
-						"baz": "blah",
-					},
+					NodeSelector:  labels.NewSelectorOrDie("baz=blah"),
 				},
 			},
 		},
@@ -146,7 +144,7 @@ func newPodList(store cache.Store, count int, status api.PodPhase, rc *api.Repli
 		newPod := api.Pod{
 			ObjectMeta: api.ObjectMeta{
 				Name:      fmt.Sprintf("pod%d", i),
-				Labels:    rc.Spec.Selector,
+				Labels:    labels.MakeMapFromSelectorOrDie(rc.Spec.Selector),
 				Namespace: rc.Namespace,
 			},
 			Status: api.PodStatus{Phase: status},
@@ -461,7 +459,7 @@ func TestPodControllerLookup(t *testing.T) {
 				{
 					ObjectMeta: api.ObjectMeta{Name: "foo"},
 					Spec: api.ReplicationControllerSpec{
-						Selector: map[string]string{"foo": "bar"},
+						Selector: labels.NewSelectorOrDie("foo=bar"),
 					},
 				},
 			},
@@ -476,7 +474,7 @@ func TestPodControllerLookup(t *testing.T) {
 				{
 					ObjectMeta: api.ObjectMeta{Name: "bar", Namespace: "ns"},
 					Spec: api.ReplicationControllerSpec{
-						Selector: map[string]string{"foo": "bar"},
+						Selector: labels.NewSelectorOrDie("foo=bar"),
 					},
 				},
 			},
@@ -619,14 +617,14 @@ func TestUpdatePods(t *testing.T) {
 	testControllerSpec1 := newReplicationController(1)
 	manager.rcStore.Store.Add(testControllerSpec1)
 	testControllerSpec2 := *testControllerSpec1
-	testControllerSpec2.Spec.Selector = map[string]string{"bar": "foo"}
+	testControllerSpec2.Spec.Selector = labels.NewSelectorOrDie("bar=foo")
 	testControllerSpec2.Name = "barfoo"
 	manager.rcStore.Store.Add(&testControllerSpec2)
 
 	// Put one pod in the podStore
 	pod1 := newPodList(manager.podStore.Store, 1, api.PodRunning, testControllerSpec1).Items[0]
 	pod2 := pod1
-	pod2.Labels = testControllerSpec2.Spec.Selector
+	pod2.Labels = labels.MakeMapFromSelectorOrDie(testControllerSpec2.Spec.Selector)
 
 	// Send an update of the same pod with modified labels, and confirm we get a sync request for
 	// both controllers

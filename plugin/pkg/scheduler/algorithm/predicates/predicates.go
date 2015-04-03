@@ -195,7 +195,7 @@ func PodMatchesNodeLabels(pod *api.Pod, node *api.Node) bool {
 	if len(pod.Spec.NodeSelector) == 0 {
 		return true
 	}
-	selector := labels.SelectorFromSet(pod.Spec.NodeSelector)
+	selector := pod.Spec.NodeSelector
 	return selector.Matches(labels.Set(node.Labels))
 }
 
@@ -278,7 +278,42 @@ func NewServiceAffinityPredicate(podLister algorithm.PodLister, serviceLister al
 	return affinity.CheckServiceAffinity
 }
 
+// TODO:@sdminonne: remove it once checked with @agupta
+func copyValueIfKeyEquals(key string, affinityLabels map[string]string, nodeSelector labels.Selector) bool {
+	for _, r := range nodeSelector {
+		if key == r.Key {
+			switch r.Operator {
+			case labels.EqualsOperator, labels.DoubleEqualsOperator, labels.InOperator:
+				affinityLabels[key] = r.StrValues.List()[0] // TODO: @sdminonne what about other values?
+				return true
+				// requirement to be added as https://github.com/GoogleCloudPlatform/kubernetes/pull/7053#discussion_r28839286
+
+			default:
+				continue
+			}
+		}
+	}
+	return false
+}
+
 // CheckServiceAffinity ensures that only the nodes that match the specified labels are considered for scheduling.
+func copyValueIfKeyEquals(key string, affinityLabels map[string]string, nodeSelector labels.Selector) bool {
+	for _, r := range nodeSelector {
+		if key == r.Key {
+			switch r.Operator {
+			case labels.EqualsOperator, labels.DoubleEqualsOperator, labels.InOperator:
+				affinityLabels[key] = r.StrValues.List()[0] // TODO: @sdminonne what about other values?
+				return true
+				// requirement to be added as https://github.com/GoogleCloudPlatform/kubernetes/pull/7053#discussion_r28839286
+
+			default:
+				continue
+			}
+		}
+	}
+	return false
+}
+
 // The set of labels to be considered are provided to the struct (ServiceAffinity).
 // The pod is checked for the labels and any missing labels are then checked in the node
 // that hosts the service pods (peers) for the given pod.
@@ -292,12 +327,11 @@ func (s *ServiceAffinity) CheckServiceAffinity(pod *api.Pod, existingPods []*api
 
 	// check if the pod being scheduled has the affinity labels specified in its NodeSelector
 	affinityLabels := map[string]string{}
-	nodeSelector := labels.Set(pod.Spec.NodeSelector)
+	nodeSelector := pod.Spec.NodeSelector
 	labelsExist := true
 	for _, l := range s.labels {
-		if nodeSelector.Has(l) {
-			affinityLabels[l] = nodeSelector.Get(l)
-		} else {
+		//TODO: @sdminonne check with @agupta if there's a better way...
+		if copied := copyValueIfKeyEquals(l, affinityLabels, nodeSelector); !copied {
 			// the current pod does not specify all the labels, look in the existing service pods
 			labelsExist = false
 		}
@@ -309,7 +343,7 @@ func (s *ServiceAffinity) CheckServiceAffinity(pod *api.Pod, existingPods []*api
 		if err == nil {
 			// just use the first service and get the other pods within the service
 			// TODO: a separate predicate can be created that tries to handle all services for the pod
-			selector := labels.SelectorFromSet(services[0].Spec.Selector)
+			selector := services[0].Spec.Selector
 			servicePods, err := s.podLister.List(selector)
 			if err != nil {
 				return false, err

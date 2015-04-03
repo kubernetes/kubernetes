@@ -2245,13 +2245,8 @@ func convert_api_ServiceSpec_To_v1_ServiceSpec(in *api.ServiceSpec, out *Service
 	} else {
 		out.Ports = nil
 	}
-	if in.Selector != nil {
-		out.Selector = make(map[string]string)
-		for key, val := range in.Selector {
-			out.Selector[key] = val
-		}
-	} else {
-		out.Selector = nil
+	if err := s.Convert(&in.Selector, &out.Selector, 0); err != nil {
+		return err
 	}
 	out.ClusterIP = in.ClusterIP
 	if in.ExternalIPs != nil {
@@ -4653,13 +4648,8 @@ func convert_v1_ServiceSpec_To_api_ServiceSpec(in *ServiceSpec, out *api.Service
 	} else {
 		out.Ports = nil
 	}
-	if in.Selector != nil {
-		out.Selector = make(map[string]string)
-		for key, val := range in.Selector {
-			out.Selector[key] = val
-		}
-	} else {
-		out.Selector = nil
+	if err := s.Convert(&in.Selector, &out.Selector, 0); err != nil {
+		return err
 	}
 	out.ClusterIP = in.ClusterIP
 	out.Type = api.ServiceType(in.Type)

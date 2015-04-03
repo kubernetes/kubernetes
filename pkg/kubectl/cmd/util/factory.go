@@ -168,7 +168,7 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 			// TODO: replace with a swagger schema based approach (identify pod selector via schema introspection)
 			switch t := object.(type) {
 			case *api.ReplicationController:
-				return kubectl.MakeLabels(t.Spec.Selector), nil
+				return t.Spec.Selector.String(), nil
 			case *api.Pod:
 				if len(t.Labels) == 0 {
 					return "", fmt.Errorf("the pod has no labels and cannot be exposed")
@@ -178,7 +178,7 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 				if t.Spec.Selector == nil {
 					return "", fmt.Errorf("the service has no pod selector set")
 				}
-				return kubectl.MakeLabels(t.Spec.Selector), nil
+				return t.Spec.Selector.String(), nil
 			default:
 				_, kind, err := api.Scheme.ObjectVersionAndKind(object)
 				if err != nil {

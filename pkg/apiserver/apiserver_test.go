@@ -871,10 +871,11 @@ func TestList(t *testing.T) {
 		} else if simpleStorage.actualNamespace != testCase.namespace {
 			t.Errorf("%d: unexpected resource namespace: %s", i, simpleStorage.actualNamespace)
 		}
-		if simpleStorage.requestedLabelSelector == nil || simpleStorage.requestedLabelSelector.String() != testCase.label {
-			t.Errorf("%d: unexpected label selector: %v", i, simpleStorage.requestedLabelSelector)
+		if simpleStorage.requestedLabelSelector.String() != testCase.label {
+			t.Errorf("%d: unexpected label selector: %v'", i, simpleStorage.requestedLabelSelector)
+
 		}
-		if simpleStorage.requestedFieldSelector == nil || simpleStorage.requestedFieldSelector.String() != testCase.field {
+		if simpleStorage.requestedFieldSelector.String() != testCase.field {
 			t.Errorf("%d: unexpected field selector: %v", i, simpleStorage.requestedFieldSelector)
 		}
 	}

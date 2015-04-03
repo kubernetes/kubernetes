@@ -418,9 +418,7 @@ var _ = Describe("Pods", func() {
 					Port:       8765,
 					TargetPort: util.NewIntOrStringFromInt(8080),
 				}},
-				Selector: map[string]string{
-					"name": serverName,
-				},
+				Selector: labels.NewSelectorOrDie("name=" + serverName),
 			},
 		}
 		defer framework.Client.Services(framework.Namespace.Name).Delete(svc.Name)

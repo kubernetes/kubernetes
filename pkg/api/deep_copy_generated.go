@@ -804,12 +804,15 @@ func deepCopy_api_ListOptions(in ListOptions, out *ListOptions, c *conversion.Cl
 	if err := deepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
 		return err
 	}
-	if newVal, err := c.DeepCopy(in.LabelSelector); err != nil {
-		return err
+	if in.LabelSelector != nil {
+		out.LabelSelector = make([]labels.Requirement, len(in.LabelSelector))
+		for i := range in.LabelSelector {
+			if err := deepCopy_labels_Requirement(in.LabelSelector[i], &out.LabelSelector[i], c); err != nil {
+				return err
 	} else if newVal == nil {
 		out.LabelSelector = nil
 	} else {
-		out.LabelSelector = newVal.(labels.Selector)
+		out.LabelSelector = nil
 	}
 	if newVal, err := c.DeepCopy(in.FieldSelector); err != nil {
 		return err
@@ -1477,9 +1480,11 @@ func deepCopy_api_PodSpec(in PodSpec, out *PodSpec, c *conversion.Cloner) error 
 	}
 	out.DNSPolicy = in.DNSPolicy
 	if in.NodeSelector != nil {
-		out.NodeSelector = make(map[string]string)
-		for key, val := range in.NodeSelector {
-			out.NodeSelector[key] = val
+		out.NodeSelector = make([]labels.Requirement, len(in.NodeSelector))
+		for i := range in.NodeSelector {
+			if err := deepCopy_labels_Requirement(in.NodeSelector[i], &out.NodeSelector[i], c); err != nil {
+				return err
+			}
 		}
 	} else {
 		out.NodeSelector = nil
@@ -1687,9 +1692,11 @@ func deepCopy_api_ReplicationControllerList(in ReplicationControllerList, out *R
 func deepCopy_api_ReplicationControllerSpec(in ReplicationControllerSpec, out *ReplicationControllerSpec, c *conversion.Cloner) error {
 	out.Replicas = in.Replicas
 	if in.Selector != nil {
-		out.Selector = make(map[string]string)
-		for key, val := range in.Selector {
-			out.Selector[key] = val
+		out.Selector = make([]labels.Requirement, len(in.Selector))
+		for i := range in.Selector {
+			if err := deepCopy_labels_Requirement(in.Selector[i], &out.Selector[i], c); err != nil {
+				return err
+			}
 		}
 	} else {
 		out.Selector = nil
@@ -2028,9 +2035,11 @@ func deepCopy_api_ServiceSpec(in ServiceSpec, out *ServiceSpec, c *conversion.Cl
 		out.Ports = nil
 	}
 	if in.Selector != nil {
-		out.Selector = make(map[string]string)
-		for key, val := range in.Selector {
-			out.Selector[key] = val
+		out.Selector = make([]labels.Requirement, len(in.Selector))
+		for i := range in.Selector {
+			if err := deepCopy_labels_Requirement(in.Selector[i], &out.Selector[i], c); err != nil {
+				return err
+			}
 		}
 	} else {
 		out.Selector = nil
@@ -2221,6 +2230,47 @@ func deepCopy_resource_Quantity(in resource.Quantity, out *resource.Quantity, c 
 func deepCopy_unversioned_ListMeta(in unversioned.ListMeta, out *unversioned.ListMeta, c *conversion.Cloner) error {
 	out.SelfLink = in.SelfLink
 	out.ResourceVersion = in.ResourceVersion
+	if in.StrValues != nil {
+		out.StrValues = make(map[string]util.Empty)
+		for key, val := range in.StrValues {
+			newVal := new(util.Empty)
+			if err := deepCopy_util_Empty(val, newVal, c); err != nil {
+				return err
+			}
+			out.StrValues[key] = *newVal
+		}
+	} else {
+		out.StrValues = nil
+	}
+	return nil
+}
+
+func deepCopy_util_Empty(in util.Empty, out *util.Empty, c *conversion.Cloner) error {
+	return nil
+}
+
+	return nil
+}
+
+func deepCopy_labels_Requirement(in labels.Requirement, out *labels.Requirement, c *conversion.Cloner) error {
+	out.Key = in.Key
+	out.Operator = in.Operator
+	if in.StrValues != nil {
+		out.StrValues = make(map[string]util.Empty)
+		for key, val := range in.StrValues {
+			newVal := new(util.Empty)
+			if err := deepCopy_util_Empty(val, newVal, c); err != nil {
+				return err
+			}
+			out.StrValues[key] = *newVal
+		}
+	} else {
+		out.StrValues = nil
+	}
+	return nil
+}
+
+func deepCopy_util_Empty(in util.Empty, out *util.Empty, c *conversion.Cloner) error {
 	return nil
 }
 
@@ -2370,6 +2420,8 @@ func init() {
 		deepCopy_unversioned_Time,
 		deepCopy_unversioned_TypeMeta,
 		deepCopy_util_IntOrString,
+		deepCopy_labels_Requirement,
+		deepCopy_util_Empty,
 	)
 	if err != nil {
 		// if one of the deep copy functions is malformed, detect it immediately.

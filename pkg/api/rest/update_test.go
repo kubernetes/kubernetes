@@ -20,11 +20,12 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
 )
 
-func makeValidService() api.Service {
+func makeValidService(t *testing.T) api.Service {
 	return api.Service{
 		ObjectMeta: api.ObjectMeta{
 			Name:            "valid",
@@ -34,7 +35,7 @@ func makeValidService() api.Service {
 			ResourceVersion: "1",
 		},
 		Spec: api.ServiceSpec{
-			Selector:        map[string]string{"key": "val"},
+			Selector:        labels.NewSelectorOrDie("key=val"),
 			SessionAffinity: "None",
 			Type:            api.ServiceTypeClusterIP,
 			Ports:           []api.ServicePort{{Name: "p", Protocol: "TCP", Port: 8675, TargetPort: util.NewIntOrStringFromInt(8675)}},
@@ -88,15 +89,15 @@ func TestBeforeUpdate(t *testing.T) {
 		{
 			name: "change selectpor",
 			tweakSvc: func(oldSvc, newSvc *api.Service) {
-				newSvc.Spec.Selector = map[string]string{"newkey": "newvalue"}
+				newSvc.Spec.Selector = labels.NewSelectorOrDie("newkey=newvalue")
 			},
 			expectErr: false,
 		},
 	}
 
 	for _, tc := range testCases {
-		oldSvc := makeValidService()
-		newSvc := makeValidService()
+		oldSvc := makeValidService(t)
+		newSvc := makeValidService(t)
 		tc.tweakSvc(&oldSvc, &newSvc)
 		ctx := api.NewDefaultContext()
 		err := BeforeUpdate(Services, ctx, runtime.Object(&oldSvc), runtime.Object(&newSvc))

@@ -240,9 +240,7 @@ var _ = Describe("DNS", func() {
 
 		// Create a test headless service.
 		By("Creating a test headless service")
-		testServiceSelector := map[string]string{
-			"dns-test": "true",
-		}
+		testServiceSelector := labels.NewSelectorOrDie("dns-test=true")
 		headlessService := &api.Service{
 			ObjectMeta: api.ObjectMeta{
 				Name: "test-service",
@@ -301,7 +299,7 @@ var _ = Describe("DNS", func() {
 		// Run a pod which probes DNS and exposes the results by HTTP.
 		By("creating a pod to probe DNS")
 		pod := createDNSPod(f.Namespace.Name, wheezyProbeCmd, jessieProbeCmd)
-		pod.ObjectMeta.Labels = testServiceSelector
+		pod.ObjectMeta.Labels = labels.MakeMapFromSelectorOrDie(testServiceSelector)
 
 		validateDNSResults(f, pod, append(wheezyFileNames, jessieFileNames...))
 	})

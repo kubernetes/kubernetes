@@ -38,6 +38,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
 )
@@ -289,7 +290,7 @@ func ExamplePrintReplicationControllerWithNamespace() {
 		},
 		Spec: api.ReplicationControllerSpec{
 			Replicas: 1,
-			Selector: map[string]string{"foo": "bar"},
+			Selector: labels.NewSelectorOrDie("foo=bar"),
 			Template: &api.PodTemplateSpec{
 				ObjectMeta: api.ObjectMeta{
 					Labels: map[string]string{"foo": "bar"},
@@ -507,9 +508,7 @@ func ExamplePrintServiceWithNamespacesAndLabels() {
 						{Protocol: "UDP", Port: 53},
 						{Protocol: "TCP", Port: 53},
 					},
-					Selector: map[string]string{
-						"s": "magic",
-					},
+					Selector:  labels.NewSelectorOrDie("s=magic"),
 					ClusterIP: "10.1.1.1",
 				},
 				Status: api.ServiceStatus{},
@@ -528,9 +527,7 @@ func ExamplePrintServiceWithNamespacesAndLabels() {
 						{Protocol: "TCP", Port: 80},
 						{Protocol: "TCP", Port: 8080},
 					},
-					Selector: map[string]string{
-						"s": "kazam",
-					},
+					Selector:  labels.NewSelectorOrDie("s=kazam"),
 					ClusterIP: "10.1.1.2",
 				},
 				Status: api.ServiceStatus{},

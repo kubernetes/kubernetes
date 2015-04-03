@@ -119,9 +119,7 @@ var _ = Describe("Networking", func() {
 					Port:       8080,
 					TargetPort: util.NewIntOrStringFromInt(8080),
 				}},
-				Selector: map[string]string{
-					"name": svcname,
-				},
+				Selector: labels.NewSelectorOrDie("name=" + svcname),
 			},
 		})
 		if err != nil {

@@ -965,7 +965,7 @@ type PodSpec struct {
 	// Required: Set DNS policy.
 	DNSPolicy DNSPolicy `json:"dnsPolicy,omitempty"`
 	// NodeSelector is a selector which must be true for the pod to fit on a node
-	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
+	NodeSelector labels.Selector `json:"nodeSelector,omitempty"`
 
 	// ServiceAccountName is the name of the ServiceAccount to use to run this pod
 	// The pod will be allowed to use secrets referenced by the ServiceAccount
@@ -1069,7 +1069,7 @@ type ReplicationControllerSpec struct {
 	Replicas int `json:"replicas"`
 
 	// Selector is a label query over pods that should match the Replicas count.
-	Selector map[string]string `json:"selector"`
+	Selector labels.Selector `json:"selector"`
 
 	// TemplateRef is a reference to an object that describes the pod that will be created if
 	// insufficient replicas are detected. This reference is ignored if a Template is set.
@@ -1194,7 +1194,7 @@ type ServiceSpec struct {
 	// This service will route traffic to pods having labels matching this selector. If empty or not present,
 	// the service is assumed to have endpoints set by an external process and Kubernetes will not modify
 	// those endpoints.
-	Selector map[string]string `json:"selector"`
+	Selector labels.Selector `json:"selector"`
 
 	// ClusterIP is usually assigned by the master.  If specified by the user
 	// we will try to respect it or else fail the request.  This field can

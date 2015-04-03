@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util"
 )
 
@@ -33,7 +34,7 @@ func TestGenerateService(t *testing.T) {
 		{
 			generator: ServiceGeneratorV2{},
 			params: map[string]interface{}{
-				"selector":       "foo=bar,baz=blah",
+				"selector":       "baz=blah,foo=bar",
 				"name":           "test",
 				"port":           "80",
 				"protocol":       "TCP",
@@ -44,10 +45,7 @@ func TestGenerateService(t *testing.T) {
 					Name: "test",
 				},
 				Spec: api.ServiceSpec{
-					Selector: map[string]string{
-						"foo": "bar",
-						"baz": "blah",
-					},
+					Selector: labels.NewSelectorOrDie("baz=blah,foo=bar"),
 					Ports: []api.ServicePort{
 						{
 							Port:       80,
@@ -62,7 +60,7 @@ func TestGenerateService(t *testing.T) {
 
 			generator: ServiceGeneratorV2{},
 			params: map[string]interface{}{
-				"selector":       "foo=bar,baz=blah",
+				"selector":       "baz=blah,foo=bar",
 				"name":           "test",
 				"port":           "80",
 				"protocol":       "UDP",
@@ -73,10 +71,7 @@ func TestGenerateService(t *testing.T) {
 					Name: "test",
 				},
 				Spec: api.ServiceSpec{
-					Selector: map[string]string{
-						"foo": "bar",
-						"baz": "blah",
-					},
+					Selector: labels.NewSelectorOrDie("baz=blah,foo=bar"),
 					Ports: []api.ServicePort{
 						{
 							Port:       80,
@@ -90,7 +85,7 @@ func TestGenerateService(t *testing.T) {
 		{
 			generator: ServiceGeneratorV2{},
 			params: map[string]interface{}{
-				"selector":       "foo=bar,baz=blah",
+				"selector":       "baz=blah,foo=bar",
 				"labels":         "key1=value1,key2=value2",
 				"name":           "test",
 				"port":           "80",
@@ -106,10 +101,7 @@ func TestGenerateService(t *testing.T) {
 					},
 				},
 				Spec: api.ServiceSpec{
-					Selector: map[string]string{
-						"foo": "bar",
-						"baz": "blah",
-					},
+					Selector: labels.NewSelectorOrDie("baz=blah,foo=bar"),
 					Ports: []api.ServicePort{
 						{
 							Port:       80,
@@ -123,7 +115,7 @@ func TestGenerateService(t *testing.T) {
 		{
 			generator: ServiceGeneratorV2{},
 			params: map[string]interface{}{
-				"selector":       "foo=bar,baz=blah",
+				"selector":       "baz=blah,foo=bar",
 				"name":           "test",
 				"port":           "80",
 				"protocol":       "UDP",
@@ -135,10 +127,7 @@ func TestGenerateService(t *testing.T) {
 					Name: "test",
 				},
 				Spec: api.ServiceSpec{
-					Selector: map[string]string{
-						"foo": "bar",
-						"baz": "blah",
-					},
+					Selector: labels.NewSelectorOrDie("baz=blah,foo=bar"),
 					Ports: []api.ServicePort{
 						{
 							Port:       80,
@@ -153,7 +142,7 @@ func TestGenerateService(t *testing.T) {
 		{
 			generator: ServiceGeneratorV2{},
 			params: map[string]interface{}{
-				"selector":                      "foo=bar,baz=blah",
+				"selector":                      "baz=blah,foo=bar",
 				"name":                          "test",
 				"port":                          "80",
 				"protocol":                      "UDP",
@@ -166,10 +155,7 @@ func TestGenerateService(t *testing.T) {
 					Name: "test",
 				},
 				Spec: api.ServiceSpec{
-					Selector: map[string]string{
-						"foo": "bar",
-						"baz": "blah",
-					},
+					Selector: labels.NewSelectorOrDie("baz=blah,foo=bar"),
 					Ports: []api.ServicePort{
 						{
 							Port:       80,
@@ -197,10 +183,7 @@ func TestGenerateService(t *testing.T) {
 					Name: "test",
 				},
 				Spec: api.ServiceSpec{
-					Selector: map[string]string{
-						"foo": "bar",
-						"baz": "blah",
-					},
+					Selector: labels.NewSelectorOrDie("foo=bar,baz=blah"),
 					Ports: []api.ServicePort{
 						{
 							Port:       80,
@@ -228,10 +211,7 @@ func TestGenerateService(t *testing.T) {
 					Name: "test",
 				},
 				Spec: api.ServiceSpec{
-					Selector: map[string]string{
-						"foo": "bar",
-						"baz": "blah",
-					},
+					Selector: labels.NewSelectorOrDie("foo=bar,baz=blah"),
 					Ports: []api.ServicePort{
 						{
 							Port:       80,
@@ -257,10 +237,7 @@ func TestGenerateService(t *testing.T) {
 					Name: "test",
 				},
 				Spec: api.ServiceSpec{
-					Selector: map[string]string{
-						"foo": "bar",
-						"baz": "blah",
-					},
+					Selector: labels.NewSelectorOrDie("foo=bar,baz=blah"),
 					Ports: []api.ServicePort{
 						{
 							Name:       "default",

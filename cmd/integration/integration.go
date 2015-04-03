@@ -28,6 +28,7 @@ import (
 	"os"
 	"reflect"
 	"runtime"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -459,7 +460,7 @@ func runReplicationControllerTest(c *client.Client) {
 	//	- The assignment must reflect in a `List` operation against the apiserver, for labels matching the selector
 	//  - We need to be able to query the kubelet on that minion for information about the pod
 	if err := wait.Poll(
-		time.Second, time.Second*30, podsOnMinions(c, "test", labels.Set(updated.Spec.Selector).AsSelector())); err != nil {
+		time.Second, time.Second*30, podsOnMinions(c, "test", updated.Spec.Selector)); err != nil {
 		glog.Fatalf("FAILED: pods never started running %v", err)
 	}
 
@@ -493,9 +494,7 @@ func runSelfLinkTestOnNamespace(c *client.Client, namespace string) {
 		},
 		Spec: api.ServiceSpec{
 			// This is here because validation requires it.
-			Selector: map[string]string{
-				"foo": "bar",
-			},
+			Selector: labels.NewSelectorOrDie("foo=bar"),
 			Ports: []api.ServicePort{{
 				Port:     12345,
 				Protocol: "TCP",
@@ -557,9 +556,7 @@ func runAtomicPutTest(c *client.Client) {
 		},
 		Spec: api.ServiceSpec{
 			// This is here because validation requires it.
-			Selector: map[string]string{
-				"foo": "bar",
-			},
+			Selector: labels.NewSelectorOrDie("foo=bar"),
 			Ports: []api.ServicePort{{
 				Port:     12345,
 				Protocol: "TCP",
@@ -576,13 +573,14 @@ func runAtomicPutTest(c *client.Client) {
 	testLabels := labels.Set{
 		"foo": "bar",
 	}
+	testSelector := testLabels.AsSelector()
 	for i := 0; i < 5; i++ {
 		// a: z, b: y, etc...
-		testLabels[string([]byte{byte('a' + i)})] = string([]byte{byte('z' - i)})
+		testSelector = testSelector.Add(string([]byte{byte('a' + i)}), labels.EqualsOperator, []string{string([]byte{byte('z' - i)})})
 	}
 	var wg sync.WaitGroup
-	wg.Add(len(testLabels))
-	for label, value := range testLabels {
+	wg.Add(len(testSelector))
+	for _, r := range testSelector {
 		go func(l, v string) {
 			for {
 				glog.Infof("Starting to update (%s, %s)", l, v)
@@ -592,10 +590,17 @@ func runAtomicPutTest(c *client.Client) {
 					continue
 				}
 				if tmpSvc.Spec.Selector == nil {
-					tmpSvc.Spec.Selector = map[string]string{l: v}
+					tmpSvc.Spec.Selector = labels.NewSelectorOrDie(l + "=" + v)
 				} else {
-					tmpSvc.Spec.Selector[l] = v
+					i := sort.Search(len(tmpSvc.Spec.Selector), func(i int) bool { return tmpSvc.Spec.Selector[i].Key == l })
+					if i < len(tmpSvc.Spec.Selector) {
+						tmpSvc.Spec.Selector[i].StrValues.Delete(tmpSvc.Spec.Selector[i].StrValues.List()...)
+						tmpSvc.Spec.Selector[i].StrValues.Insert(v)
+					} else {
+						tmpSvc.Spec.Selector = tmpSvc.Spec.Selector.Add(l, labels.EqualsOperator, []string{v})
+					}
 				}
+
 				glog.Infof("Posting update (%s, %s)", l, v)
 				tmpSvc, err = services.Update(tmpSvc)
 				if err != nil {
@@ -611,15 +616,16 @@ func runAtomicPutTest(c *client.Client) {
 			}
 			glog.Infof("Done update (%s, %s)", l, v)
 			wg.Done()
-		}(label, value)
+		}(r.Key, r.StrValues.List()[0])
 	}
 	wg.Wait()
 	svc, err = services.Get(svc.Name)
 	if err != nil {
 		glog.Fatalf("Failed getting atomicService after writers are complete: %v", err)
 	}
-	if !reflect.DeepEqual(testLabels, labels.Set(svc.Spec.Selector)) {
-		glog.Fatalf("Selector PUTs were not atomic: wanted %v, got %v", testLabels, svc.Spec.Selector)
+
+	if !reflect.DeepEqual(testSelector, svc.Spec.Selector) {
+		glog.Fatalf("Selector PUTs were not atomic: wanted %v, got %v", testSelector, svc.Spec.Selector)
 	}
 	glog.Info("Atomic PUTs work.")
 }
@@ -637,9 +643,7 @@ func runPatchTest(c *client.Client) {
 		},
 		Spec: api.ServiceSpec{
 			// This is here because validation requires it.
-			Selector: map[string]string{
-				"foo": "bar",
-			},
+			Selector: labels.NewSelectorOrDie("foo=bar"),
 			Ports: []api.ServicePort{{
 				Port:     12345,
 				Protocol: "TCP",
@@ -797,9 +801,7 @@ func runServiceTest(client *client.Client) {
 	svc1 := &api.Service{
 		ObjectMeta: api.ObjectMeta{Name: "service1"},
 		Spec: api.ServiceSpec{
-			Selector: map[string]string{
-				"name": "thisisalonglabel",
-			},
+			Selector: labels.NewSelectorOrDie("name=thisisalonglabel"),
 			Ports: []api.ServicePort{{
 				Port:     8080,
 				Protocol: "TCP",
@@ -816,9 +818,7 @@ func runServiceTest(client *client.Client) {
 	svc3 := &api.Service{
 		ObjectMeta: api.ObjectMeta{Name: "service1"},
 		Spec: api.ServiceSpec{
-			Selector: map[string]string{
-				"name": "thisisalonglabel",
-			},
+			Selector: labels.NewSelectorOrDie("name=thisisalonglabel"),
 			Ports: []api.ServicePort{{
 				Port:     8080,
 				Protocol: "TCP",
@@ -839,9 +839,7 @@ func runServiceTest(client *client.Client) {
 	svc2 := &api.Service{
 		ObjectMeta: api.ObjectMeta{Name: "service2"},
 		Spec: api.ServiceSpec{
-			Selector: map[string]string{
-				"name": "thisisalonglabel",
-			},
+			Selector: labels.NewSelectorOrDie("name=thisisalonglabel"),
 			Ports: []api.ServicePort{{
 				Port:     8080,
 				Protocol: "TCP",
