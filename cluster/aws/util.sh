@@ -386,7 +386,7 @@ function kube-up {
   SUBNET_ID=$($AWS_CMD describe-subnets | get_subnet_id $VPC_ID)
   if [[ -z "$SUBNET_ID" ]]; then
 	  echo "Creating subnet."
-	  SUBNET_ID=$($AWS_CMD create-subnet --cidr-block 172.20.0.0/24 --vpc-id $VPC_ID | json_val '["Subnet"]["SubnetId"]')
+	  SUBNET_ID=$($AWS_CMD create-subnet --cidr-block 172.20.0.0/24 --vpc-id $VPC_ID --availability-zone ${ZONE} | json_val '["Subnet"]["SubnetId"]')
   fi
 
   echo "Using subnet $SUBNET_ID"
