@@ -1459,7 +1459,7 @@ func init() {
 		func(label, value string) (string, string, error) {
 			switch label {
 			case "name":
-				return "name", value, nil
+				return "metadata.name", value, nil
 			case "DesiredState.Host":
 				return "spec.host", value, nil
 			case "DesiredState.Status":
@@ -1479,7 +1479,7 @@ func init() {
 		func(label, value string) (string, string, error) {
 			switch label {
 			case "name":
-				return "name", value, nil
+				return "metadata.name", value, nil
 			default:
 				return "", "", fmt.Errorf("field label not supported: %s", label)
 			}
@@ -1492,7 +1492,7 @@ func init() {
 		func(label, value string) (string, string, error) {
 			switch label {
 			case "name":
-				return "name", value, nil
+				return "metadata.name", value, nil
 			case "currentState.replicas":
 				return "status.replicas", value, nil
 			default:

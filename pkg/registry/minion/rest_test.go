@@ -26,7 +26,7 @@ import (
 func TestMatchNode(t *testing.T) {
 	testFieldMap := map[bool][]fields.Set{
 		true: {
-			{"name": "foo"},
+			{"metadata.name": "foo"},
 		},
 		false: {
 			{"foo": "bar"},

@@ -544,14 +544,15 @@ func TestEtcdWatchControllersFields(t *testing.T) {
 	testFieldMap := map[int][]fields.Set{
 		PASS: {
 			{"status.replicas": "0"},
-			{"name": "foo"},
-			{"status.replicas": "0", "name": "foo"},
+			{"metadata.name": "foo"},
+			{"status.replicas": "0", "metadata.name": "foo"},
 		},
 		FAIL: {
 			{"status.replicas": "10"},
-			{"name": "bar"},
-			{"status.replicas": "10", "name": "foo"},
-			{"status.replicas": "0", "name": "bar"},
+			{"metadata.name": "bar"},
+			{"name": "foo"},
+			{"status.replicas": "10", "metadata.name": "foo"},
+			{"status.replicas": "0", "metadata.name": "bar"},
 		},
 	}
 	testEtcdActions := []string{

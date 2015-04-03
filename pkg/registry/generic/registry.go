@@ -53,7 +53,7 @@ func (s *SelectionPredicate) Matches(obj runtime.Object) (bool, error) {
 // name.
 func (s *SelectionPredicate) MatchesSingle() (string, bool) {
 	// TODO: should be namespace.name
-	if name, ok := s.Field.RequiresExactMatch("name"); ok {
+	if name, ok := s.Field.RequiresExactMatch("metadata.name"); ok {
 		return name, true
 	}
 	return "", false

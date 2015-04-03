@@ -68,9 +68,9 @@ func TestSelectionPredicate(t *testing.T) {
 			shouldMatch:   false,
 		},
 		"D": {
-			fieldSelector:  "name=12345",
+			fieldSelector:  "metadata.name=12345",
 			labels:         labels.Set{},
-			fields:         fields.Set{"name": "12345"},
+			fields:         fields.Set{"metadata.name": "12345"},
 			shouldMatch:    true,
 			matchSingleKey: "12345",
 		},

@@ -105,23 +105,26 @@ func (podStatusStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object
 
 // MatchPod returns a generic matcher for a given label and field selector.
 func MatchPod(label labels.Selector, field fields.Selector) generic.Matcher {
-	return generic.MatcherFunc(func(obj runtime.Object) (bool, error) {
-		podObj, ok := obj.(*api.Pod)
-		if !ok {
-			return false, fmt.Errorf("not a pod")
-		}
-		fields := PodToSelectableFields(podObj)
-		return label.Matches(labels.Set(podObj.Labels)) && field.Matches(fields), nil
-	})
+	return &generic.SelectionPredicate{
+		Label: label,
+		Field: field,
+		GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, error) {
+			pod, ok := obj.(*api.Pod)
+			if !ok {
+				return nil, nil, fmt.Errorf("not a pod")
+			}
+			return labels.Set(pod.ObjectMeta.Labels), PodToSelectableFields(pod), nil
+		},
+	}
 }
 
 // PodToSelectableFields returns a label set that represents the object
 // TODO: fields are not labels, and the validation rules for them do not apply.
-func PodToSelectableFields(pod *api.Pod) labels.Set {
-	return labels.Set{
-		"name":         pod.Name,
-		"spec.host":    pod.Spec.Host,
-		"status.phase": string(pod.Status.Phase),
+func PodToSelectableFields(pod *api.Pod) fields.Set {
+	return fields.Set{
+		"metadata.name": pod.Name,
+		"spec.host":     pod.Spec.Host,
+		"status.phase":  string(pod.Status.Phase),
 	}
 }
 

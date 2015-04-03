@@ -85,7 +85,7 @@ type ResourceGetter interface {
 // NodeToSelectableFields returns a label set that represents the object.
 func NodeToSelectableFields(node *api.Node) fields.Set {
 	return fields.Set{
-		"name": node.Name,
+		"metadata.name": node.Name,
 	}
 }
 
