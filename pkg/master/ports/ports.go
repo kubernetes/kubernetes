@@ -32,4 +32,10 @@ const (
 	// ControllerManagerPort is the default port for the controller manager status server.
 	// May be overridden by a flag at startup.
 	ControllerManagerPort = 10252
+	// KubeletReadOnlyPort exposes basic read-only services from the kubelet.
+	// May be overridden by a flag at startup.
+	// This is necessary for heapster to collect monitoring stats from the kubelet
+	// until heapster can transition to using the SSL endpoint.
+	// TODO(roberthbailey): Remove this once we have a better solution for heapster.
+	KubeletReadOnlyPort = 10255
 )
