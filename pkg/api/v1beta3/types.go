@@ -1088,8 +1088,6 @@ type NodeConditionType string
 const (
 	// NodeReady means kubelet is healthy and ready to accept pods.
 	NodeReady NodeConditionType = "Ready"
-	// NodeSchedulable means the node is ready to accept new pods.
-	NodeSchedulable NodeConditionType = "Schedulable"
 )
 
 type NodeCondition struct {

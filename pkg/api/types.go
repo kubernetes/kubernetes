@@ -1087,12 +1087,10 @@ type NodeConditionType string
 
 // These are valid conditions of node. Currently, we don't have enough information to decide
 // node condition. In the future, we will add more. The proposed set of conditions are:
-// NodeReachable, NodeLive, NodeReady, NodeSchedulable, NodeRunnable.
+// NodeReady, NodeReachable
 const (
 	// NodeReady means kubelet is healthy and ready to accept pods.
 	NodeReady NodeConditionType = "Ready"
-	// NodeSchedulable means the node is ready to accept new pods.
-	NodeSchedulable NodeConditionType = "Schedulable"
 )
 
 type NodeCondition struct {
