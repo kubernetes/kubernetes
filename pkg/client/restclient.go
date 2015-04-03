@@ -21,6 +21,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
@@ -114,8 +115,8 @@ func (c *RESTClient) Put() *Request {
 }
 
 // Patch begins a PATCH request. Short for c.Verb("Patch").
-func (c *RESTClient) Patch() *Request {
-	return c.Verb("PATCH")
+func (c *RESTClient) Patch(pt api.PatchType) *Request {
+	return c.Verb("PATCH").SetHeader("Content-Type", string(pt))
 }
 
 // Get begins a GET request. Short for c.Verb("GET").

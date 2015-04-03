@@ -526,10 +526,10 @@ type Container struct {
 	Args []string `json:"args,omitempty" description:"command array; the docker image's cmd is used if this is not provided; arguments to the entrypoint; cannot be updated"`
 	// Optional: Defaults to Docker's default.
 	WorkingDir     string               `json:"workingDir,omitempty" description:"container's working directory; defaults to image's default; cannot be updated"`
-	Ports          []ContainerPort      `json:"ports,omitempty" description:"list of ports to expose from the container; cannot be updated"`
-	Env            []EnvVar             `json:"env,omitempty" description:"list of environment variables to set in the container; cannot be updated"`
+	Ports          []ContainerPort      `json:"ports,omitempty" description:"list of ports to expose from the container; cannot be updated" patchStrategy:"merge" patchMergeKey:"containerPort"`
+	Env            []EnvVar             `json:"env,omitempty" description:"list of environment variables to set in the container; cannot be updated" patchStrategy:"merge" patchMergeKey:"name"`
 	Resources      ResourceRequirements `json:"resources,omitempty" description:"Compute Resources required by this container; cannot be updated"`
-	VolumeMounts   []VolumeMount        `json:"volumeMounts,omitempty" description:"pod volumes to mount into the container's filesyste; cannot be updated"`
+	VolumeMounts   []VolumeMount        `json:"volumeMounts,omitempty" description:"pod volumes to mount into the container's filesyste; cannot be updated" patchStrategy:"merge" patchMergeKey:"name"`
 	LivenessProbe  *Probe               `json:"livenessProbe,omitempty" description:"periodic probe of container liveness; container will be restarted if the probe fails; cannot be updated"`
 	ReadinessProbe *Probe               `json:"readinessProbe,omitempty" description:"periodic probe of container service readiness; container will be removed from service endpoints if the probe fails; cannot be updated"`
 	Lifecycle      *Lifecycle           `json:"lifecycle,omitempty" description:"actions that the management system should take in response to container lifecycle events; cannot be updated"`
@@ -695,9 +695,9 @@ const (
 
 // PodSpec is a description of a pod
 type PodSpec struct {
-	Volumes []Volume `json:"volumes" description:"list of volumes that can be mounted by containers belonging to the pod"`
+	Volumes []Volume `json:"volumes" description:"list of volumes that can be mounted by containers belonging to the pod" patchStrategy:"merge" patchMergeKey:"name"`
 	// Required: there must be at least one container in a pod.
-	Containers    []Container   `json:"containers" description:"list of containers belonging to the pod; cannot be updated; containers cannot currently be added or removed; there must be at least one container in a Pod"`
+	Containers    []Container   `json:"containers" description:"list of containers belonging to the pod; cannot be updated; containers cannot currently be added or removed; there must be at least one container in a Pod" patchStrategy:"merge" patchMergeKey:"name"`
 	RestartPolicy RestartPolicy `json:"restartPolicy,omitempty" description:"restart policy for all containers within the pod; one of RestartPolicyAlways, RestartPolicyOnFailure, RestartPolicyNever"`
 	// Optional: Set DNS policy.  Defaults to "ClusterFirst"
 	DNSPolicy DNSPolicy `json:"dnsPolicy,omitempty" description:"DNS policy for containers within the pod; one of 'ClusterFirst' or 'Default'"`
@@ -718,7 +718,7 @@ type PodSpec struct {
 // state of a system.
 type PodStatus struct {
 	Phase      PodPhase       `json:"phase,omitempty" description:"current condition of the pod."`
-	Conditions []PodCondition `json:"Condition,omitempty" description:"current service state of pod"`
+	Conditions []PodCondition `json:"Condition,omitempty" description:"current service state of pod" patchStrategy:"merge" patchMergeKey:"type"`
 	// A human readable message indicating details about why the pod is in this state.
 	Message string `json:"message,omitempty" description:"human readable message indicating details about why the pod is in this condition"`
 
@@ -1029,9 +1029,9 @@ type NodeStatus struct {
 	// NodePhase is the current lifecycle phase of the node.
 	Phase NodePhase `json:"phase,omitempty" description:"most recently observed lifecycle phase of the node"`
 	// Conditions is an array of current node conditions.
-	Conditions []NodeCondition `json:"conditions,omitempty" description:"list of node conditions observed"`
+	Conditions []NodeCondition `json:"conditions,omitempty" description:"list of node conditions observed" patchStrategy:"merge" patchMergeKey:"type"`
 	// Queried from cloud provider, if available.
-	Addresses []NodeAddress `json:"addresses,omitempty" description:"list of addresses reachable to the node"`
+	Addresses []NodeAddress `json:"addresses,omitempty" description:"list of addresses reachable to the node" patchStrategy:"merge" patchMergeKey:"type"`
 	// NodeSystemInfo is a set of ids/uuids to uniquely identify the node
 	NodeInfo NodeSystemInfo `json:"nodeInfo,omitempty"`
 }

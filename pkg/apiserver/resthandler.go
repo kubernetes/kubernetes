@@ -28,6 +28,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/rest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/strategicpatch"
 
 	"github.com/emicklei/go-restful"
 	"github.com/evanphx/json-patch"
@@ -210,11 +211,13 @@ func CreateResource(r rest.Creater, scope RequestScope, typer runtime.ObjectType
 
 // PatchResource returns a function that will handle a resource patch
 // TODO: Eventually PatchResource should just use AtomicUpdate and this routine should be a bit cleaner
-func PatchResource(r rest.Patcher, scope RequestScope, typer runtime.ObjectTyper, admit admission.Interface) restful.RouteFunction {
+func PatchResource(r rest.Patcher, scope RequestScope, typer runtime.ObjectTyper, admit admission.Interface, converter runtime.ObjectConvertor) restful.RouteFunction {
 	return func(req *restful.Request, res *restful.Response) {
 		w := res.ResponseWriter
 
-		// TODO: we either want to remove timeout or document it (if we document, move timeout out of this function and declare it in api_installer)
+		// TODO: we either want to remove timeout or document it (if we
+		// document, move timeout out of this function and declare it in
+		// api_installer)
 		timeout := parseTimeout(req.Request.URL.Query().Get("timeout"))
 
 		namespace, name, err := scope.Namer.Name(req)
@@ -234,29 +237,36 @@ func PatchResource(r rest.Patcher, scope RequestScope, typer runtime.ObjectTyper
 		ctx := scope.ContextFunc(req)
 		ctx = api.WithNamespace(ctx, namespace)
 
+		versionedObj, err := converter.ConvertToVersion(obj, scope.APIVersion)
+		if err != nil {
+			errorJSON(err, scope.Codec, w)
+			return
+		}
+
 		original, err := r.Get(ctx, name)
 		if err != nil {
 			errorJSON(err, scope.Codec, w)
 			return
 		}
 
-		originalObjJs, err := scope.Codec.Encode(original)
+		originalObjJS, err := scope.Codec.Encode(original)
 		if err != nil {
 			errorJSON(err, scope.Codec, w)
 			return
 		}
-		patchJs, err := readBody(req.Request)
+		patchJS, err := readBody(req.Request)
 		if err != nil {
 			errorJSON(err, scope.Codec, w)
 			return
 		}
-		patchedObjJs, err := jsonpatch.MergePatch(originalObjJs, patchJs)
+		contentType := req.HeaderParameter("Content-Type")
+		patchedObjJS, err := getPatchedJS(contentType, originalObjJS, patchJS, versionedObj)
 		if err != nil {
 			errorJSON(err, scope.Codec, w)
 			return
 		}
 
-		if err := scope.Codec.DecodeInto(patchedObjJs, obj); err != nil {
+		if err := scope.Codec.DecodeInto(patchedObjJS, obj); err != nil {
 			errorJSON(err, scope.Codec, w)
 			return
 		}
@@ -502,12 +512,17 @@ func setSelfLink(obj runtime.Object, req *restful.Request, namer ScopeNamer) err
 // checkName checks the provided name against the request
 func checkName(obj runtime.Object, name, namespace string, namer ScopeNamer) error {
 	if objNamespace, objName, err := namer.ObjectName(obj); err == nil {
+		if err != nil {
+			return err
+		}
 		if objName != name {
-			return errors.NewBadRequest("the name of the object does not match the name on the URL")
+			return errors.NewBadRequest(fmt.Sprintf(
+				"the name of the object (%s) does not match the name on the URL (%s)", objName, name))
 		}
 		if len(namespace) > 0 {
 			if len(objNamespace) > 0 && objNamespace != namespace {
-				return errors.NewBadRequest("the namespace of the object does not match the namespace on the request")
+				return errors.NewBadRequest(fmt.Sprintf(
+					"the namespace of the object (%s) does not match the namespace on the request (%s)", objNamespace, namespace))
 			}
 		}
 	}
@@ -547,4 +562,23 @@ func setListSelfLink(obj runtime.Object, req *restful.Request, namer ScopeNamer)
 	}
 	return runtime.SetList(obj, items)
 
+}
+
+func getPatchedJS(contentType string, originalJS, patchJS []byte, obj runtime.Object) ([]byte, error) {
+	patchType := api.PatchType(contentType)
+	switch patchType {
+	case api.JSONPatchType:
+		patchObj, err := jsonpatch.DecodePatch(patchJS)
+		if err != nil {
+			return nil, err
+		}
+		return patchObj.Apply(originalJS)
+	case api.MergePatchType:
+		return jsonpatch.MergePatch(originalJS, patchJS)
+	case api.StrategicMergePatchType:
+		return strategicpatch.StrategicMergePatchData(originalJS, patchJS, obj)
+	default:
+		// only here as a safety net - go-restful filters content-type
+		return nil, fmt.Errorf("unknown Content-Type header for patch: %s", contentType)
+	}
 }

@@ -1688,6 +1688,17 @@ const (
 	PortHeader = "port"
 )
 
+// Similarly to above, these are constants to support HTTP PATCH utilized by
+// both the client and server that didn't make sense for a whole package to be
+// dedicated to.
+type PatchType string
+
+const (
+	JSONPatchType           PatchType = "application/json-patch+json"
+	MergePatchType          PatchType = "application/merge-patch+json"
+	StrategicMergePatchType PatchType = "application/strategic-merge-patch+json"
+)
+
 // Appends the NodeAddresses to the passed-by-pointer slice, only if they do not already exist
 func AddToNodeAddresses(addresses *[]NodeAddress, addAddresses ...NodeAddress) {
 	for _, add := range addAddresses {

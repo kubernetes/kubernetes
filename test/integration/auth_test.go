@@ -328,7 +328,7 @@ func TestAuthModeAlwaysAllow(t *testing.T) {
 		var bodyStr string
 		if r.body != "" {
 			sub := ""
-			if r.verb == "PUT" && r.body != "" {
+			if r.verb == "PUT" {
 				// For update operations, insert previous resource version
 				if resVersion := previousResourceVersion[getPreviousResourceVersionKey(r.URL, "")]; resVersion != 0 {
 					sub += fmt.Sprintf(",\r\n\"resourceVersion\": %v", resVersion)
@@ -344,6 +344,9 @@ func TestAuthModeAlwaysAllow(t *testing.T) {
 		if err != nil {
 			t.Logf("case %v", r)
 			t.Fatalf("unexpected error: %v", err)
+		}
+		if r.verb == "PATCH" {
+			req.Header.Set("Content-Type", "application/merge-patch+json")
 		}
 		func() {
 			resp, err := transport.RoundTrip(req)
@@ -500,7 +503,7 @@ func TestAliceNotForbiddenOrUnauthorized(t *testing.T) {
 		var bodyStr string
 		if r.body != "" {
 			sub := ""
-			if r.verb == "PUT" && r.body != "" {
+			if r.verb == "PUT" {
 				// For update operations, insert previous resource version
 				if resVersion := previousResourceVersion[getPreviousResourceVersionKey(r.URL, "")]; resVersion != 0 {
 					sub += fmt.Sprintf(",\r\n\"resourceVersion\": %v", resVersion)
@@ -517,6 +520,9 @@ func TestAliceNotForbiddenOrUnauthorized(t *testing.T) {
 			t.Fatalf("unexpected error: %v", err)
 		}
 		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
+		if r.verb == "PATCH" {
+			req.Header.Set("Content-Type", "application/merge-patch+json")
+		}
 
 		func() {
 			resp, err := transport.RoundTrip(req)
