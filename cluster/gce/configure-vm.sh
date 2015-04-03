@@ -21,6 +21,8 @@ set -o pipefail
 # If we have any arguments at all, this is a push and not just setup.
 is_push=$@
 
+readonly KNOWN_TOKENS_FILE="/srv/salt-overlay/salt/kube-apiserver/known_tokens.csv"
+
 function ensure-install-dir() {
   INSTALL_DIR="/var/cache/kubernetes-install"
   mkdir -p ${INSTALL_DIR}
@@ -55,17 +57,6 @@ for k,v in yaml.load(sys.stdin).iteritems():
   print "readonly {var}={value}".format(var = k, value = pipes.quote(str(v)))
 ''' < "${kube_env_yaml}")
 
-  # We bake the KUBELET_TOKEN in separately to avoid auth information
-  # having to be re-communicated on kube-push. (Otherwise the client
-  # has to keep the bearer token around to handle generating a valid
-  # kube-env.)
-  if [[ -z "${KUBELET_TOKEN:-}" ]]; then
-    until KUBELET_TOKEN=$(curl-metadata kube-token); do
-      echo 'Waiting for metadata KUBELET_TOKEN...'
-      sleep 3
-    done
-  fi
-
   # Infer master status from presence in node pool
   if [[ $(hostname) = ${NODE_INSTANCE_PREFIX}* ]]; then
     KUBERNETES_MASTER="false"
@@ -77,6 +68,19 @@ for k,v in yaml.load(sys.stdin).iteritems():
     # This block of code should go away once the master can allocate CIDRs
     until MINION_IP_RANGE=$(curl-metadata node-ip-range); do
       echo 'Waiting for metadata MINION_IP_RANGE...'
+      sleep 3
+    done
+  fi
+}
+
+function ensure-kube-token() {
+  # We bake the KUBELET_TOKEN in separately to avoid auth information
+  # having to be re-communicated on kube-push. (Otherwise the client
+  # has to keep the bearer token around to handle generating a valid
+  # kube-env.)
+  if [[ -z "${KUBELET_TOKEN:-}" ]] && [[ ! -e "${KNOWN_TOKENS_FILE}" ]]; then
+    until KUBELET_TOKEN=$(curl-metadata kube-token); do
+      echo 'Waiting for metadata KUBELET_TOKEN...'
       sleep 3
     done
   fi
@@ -240,27 +244,41 @@ admission_control: '$(echo "$ADMISSION_CONTROL" | sed -e "s/'/''/g")'
 EOF
 }
 
-# This should only happen on cluster initialization
+# This should only happen on cluster initialization. Uses
+# MASTER_HTPASSWORD to generate the nginx/htpasswd file, and the
+# KUBELET_TOKEN, plus /dev/urandom, to generate known_tokens.csv
+# (KNOWN_TOKENS_FILE). After the first boot and on upgrade, these
+# files exist on the master-pd and should never be touched again
+# (except perhaps an additional service account, see NB below.)
 function create-salt-auth() {
-  mkdir -p /srv/salt-overlay/salt/nginx
-  echo "${MASTER_HTPASSWD}" > /srv/salt-overlay/salt/nginx/htpasswd
+  local -r htpasswd_file="/srv/salt-overlay/salt/nginx/htpasswd"
 
-  mkdir -p /srv/salt-overlay/salt/kube-apiserver
-  known_tokens_file="/srv/salt-overlay/salt/kube-apiserver/known_tokens.csv"
-  (umask 077;
-    echo "${KUBELET_TOKEN},kubelet,kubelet" > "${known_tokens_file}")
+  if [ ! -e "${htpasswd_file}" ]; then
+    mkdir -p /srv/salt-overlay/salt/nginx
+    echo "${MASTER_HTPASSWD}" > "${htpasswd_file}"
+  fi
 
-  mkdir -p /srv/salt-overlay/salt/kubelet
-  kubelet_auth_file="/srv/salt-overlay/salt/kubelet/kubernetes_auth"
-  (umask 077;
-    echo "{\"BearerToken\": \"${KUBELET_TOKEN}\", \"Insecure\": true }" > "${kubelet_auth_file}")
+  if [ ! -e "${KNOWN_TOKENS_FILE}" ]; then
+    mkdir -p /srv/salt-overlay/salt/kube-apiserver
+    (umask 077;
+      echo "${KUBELET_TOKEN},kubelet,kubelet" > "${KNOWN_TOKENS_FILE}")
 
-  # Generate tokens for other "service accounts".  Append to known_tokens.
-  local -r service_accounts=("system:scheduler" "system:controller_manager" "system:logging" "system:monitoring" "system:dns")
-  for account in "${service_accounts[@]}"; do
-    token=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
-    echo "${token},${account},${account}" >> "${known_tokens_file}"
-  done
+    mkdir -p /srv/salt-overlay/salt/kubelet
+    kubelet_auth_file="/srv/salt-overlay/salt/kubelet/kubernetes_auth"
+    (umask 077;
+      echo "{\"BearerToken\": \"${KUBELET_TOKEN}\", \"Insecure\": true }" > "${kubelet_auth_file}")
+
+    # Generate tokens for other "service accounts".  Append to known_tokens.
+    #
+    # NB: If this list ever changes, this script actually has to
+    # change to detect the existence of this file, kill any deleted
+    # old tokens and add any new tokens (to handle the upgrade case).
+    local -r service_accounts=("system:scheduler" "system:controller_manager" "system:logging" "system:monitoring" "system:dns")
+    for account in "${service_accounts[@]}"; do
+      token=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
+      echo "${token},${account},${account}" >> "${KNOWN_TOKENS_FILE}"
+    done
+  fi
 }
 
 function download-release() {
@@ -390,6 +408,7 @@ if [[ -z "${is_push}" ]]; then
   ensure-install-dir
   set-kube-env
   [[ "${KUBERNETES_MASTER}" == "true" ]] && mount-master-pd
+  ensure-kube-token
   create-salt-pillar
   create-salt-auth
   download-release
