@@ -1,1 +1,5 @@
-kube_service_addresses: 10.254.0.0/16 # MUST be defined as a range not used in your infrastructure
+# Kubernetes internal network for services.
+# Kubernetes services will get fake IP addresses from this range.
+# This range must not conflict with anything in your infrastructure. These
+# addresses do not need to be routable and must just be an unused block of space.
+kube_service_addresses: 10.254.0.0/16
