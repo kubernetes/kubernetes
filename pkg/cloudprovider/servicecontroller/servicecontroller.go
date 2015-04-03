@@ -385,7 +385,6 @@ func (s *ServiceController) loadBalancerName(service *api.Service) string {
 	return s.cloud.GetLoadBalancerName(s.clusterName, service.Namespace, service.Name)
 }
 
-// TODO: Deduplicate this with the copy in pkg/registry/service/rest.go.
 func getTCPPorts(service *api.Service) ([]int, error) {
 	ports := []int{}
 	for i := range service.Spec.Ports {

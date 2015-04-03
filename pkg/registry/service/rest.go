@@ -94,14 +94,6 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (runtime.Object, err
 		return nil, err
 	}
 
-	// Make sure that we'll be able to create a load balancer for the service,
-	// even though it'll be created by the ServiceController.
-	if service.Spec.CreateExternalLoadBalancer {
-		if _, err := getTCPPorts(service); err != nil {
-			return nil, err
-		}
-	}
-
 	releaseServiceIP := false
 	defer func() {
 		if releaseServiceIP {
@@ -250,18 +242,4 @@ func (rs *REST) ResourceLocation(ctx api.Context, id string) (*url.URL, http.Rou
 		}
 	}
 	return nil, nil, fmt.Errorf("no endpoints available for %q", id)
-}
-
-// TODO: Deduplicate with the copy of this in pkg/registry/service/rest.go
-func getTCPPorts(service *api.Service) ([]int, error) {
-	ports := []int{}
-	for i := range service.Spec.Ports {
-		sp := &service.Spec.Ports[i]
-		if sp.Protocol != api.ProtocolTCP {
-			// TODO: Support UDP here too.
-			return nil, fmt.Errorf("external load balancers for non TCP services are not currently supported.")
-		}
-		ports = append(ports, sp.Port)
-	}
-	return ports, nil
 }
