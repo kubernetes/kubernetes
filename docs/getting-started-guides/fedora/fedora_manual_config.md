@@ -77,6 +77,11 @@ KUBE_SERVICE_ADDRESSES="--portal_net=10.254.0.0/16"
 KUBE_API_ARGS=""
 ```
 
+* Edit /etc/etcd/etcd.conf,let the etcd to listen all the ip instead of 127.0.0.1,if not ,you will get the error like "connection refused"
+```
+ETCD_LISTEN_CLIENT_URLS="http://0.0.0.0:4001"
+```
+
 * Start the appropriate services on master:
 
 ```
