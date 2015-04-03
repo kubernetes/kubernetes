@@ -4,7 +4,7 @@ echo "WRITING KUBE FILES , will overwrite the jsons, then testing pods. is kube 
 #kubectl=$GOPATH/src/github.com/GoogleCloudPlatform/kubernetes/cluster/kubectl.sh"
 kubectl="kubectl"
 VERSION="r.2.8.19"
-PUBLIC_IP="127.0.0.1" # ip which we use to access the Web server.
+PUBLIC_IP="10.1.4.89" # ip which we use to access the Web server.
 SECONDS=1000          # number of seconds to measure throughput.
 FE="1"                # amount of Web server  
 LG="1"                # amount of load generators
@@ -76,7 +76,7 @@ cat << EOF > fe-s.json
   "apiVersion": "v1beta1",
   "port": 3000,
   "containerPort": 3000,
-  "publicIPs":["$PUBLIC_IP","$PUBLIC_IP2", "10.1.4.89","127.0.0.1","10.1.4.82"],
+  "publicIPs":["$PUBLIC_IP","10.1.4.89"],
   "selector": {
     "name": "frontend"
   },
