@@ -135,13 +135,6 @@ kubectl get nodes
 NAME                LABELS              STATUS
 fed-node            <none>              Ready
 ```
-* Deletion of nodes:
-
-To delete _fed-node_ from your kubernetes cluster, one should run the following on fed-master (Please do not do it, it is just for information):
-
-```
-$ kubectl delete -f node.json
-```
 
 *You should be finished!*
 
