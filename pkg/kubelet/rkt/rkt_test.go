@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package rocket
+package rkt
 
 import (
 	"flag"
@@ -37,7 +37,7 @@ var enableTests bool
 func init() {
 	// Disabled by default since these tests require root privilege.
 	rand.Seed(time.Now().UnixNano())
-	flag.BoolVar(&enableTests, "enable-rocket-tests", false, "Whether the rocket tests should be enabled")
+	flag.BoolVar(&enableTests, "enable-rkt-tests", false, "Whether the rkt tests should be enabled")
 }
 
 const (
@@ -50,21 +50,21 @@ var (
 	defaultTestTimeout = time.Second * 5
 )
 
-func newRocketOrFail(t *testing.T) *Runtime {
+func newRktOrFail(t *testing.T) *Runtime {
 	rkt, err := New(&Config{
 		InsecureSkipVerify: true,
 	})
 	if err != nil {
-		t.Fatalf("Cannot create rocket: %v", err)
+		t.Fatalf("Cannot create rkt: %v", err)
 	}
 	return rkt
 }
 
 func TestVersion(t *testing.T) {
-	rkt := newRocketOrFail(t)
+	rkt := newRktOrFail(t)
 	_, err := rkt.Version()
 	if err != nil {
-		t.Errorf("Cannot get rocket version: %v", err)
+		t.Errorf("Cannot get rkt version: %v", err)
 	}
 }
 
@@ -209,11 +209,11 @@ func TestRunListKillListPod(t *testing.T) {
 	if !enableTests {
 		return
 	}
-	rkt := newRocketOrFail(t)
+	rkt := newRktOrFail(t)
 
 	pod := &api.Pod{
 		ObjectMeta: api.ObjectMeta{
-			UID:       types.UID(fmt.Sprintf("testRocket_%d", rand.Int())),
+			UID:       types.UID(fmt.Sprintf("testRkt_%d", rand.Int())),
 			Name:      "foo",
 			Namespace: "default",
 		},
@@ -249,7 +249,7 @@ func TestKillAndRunContainerInPod(t *testing.T) {
 	if !enableTests {
 		return
 	}
-	rkt := newRocketOrFail(t)
+	rkt := newRktOrFail(t)
 
 	containers := []api.Container{
 		{
@@ -264,7 +264,7 @@ func TestKillAndRunContainerInPod(t *testing.T) {
 
 	pod := &api.Pod{
 		ObjectMeta: api.ObjectMeta{
-			UID:         types.UID(fmt.Sprintf("testRocket_%d", rand.Int())),
+			UID:         types.UID(fmt.Sprintf("testRkt_%d", rand.Int())),
 			Name:        "foo",
 			Namespace:   "default",
 			Annotations: make(map[string]string),
@@ -321,11 +321,11 @@ func TestRunPodWithMountVolumes(t *testing.T) {
 		"outputBar.txt",
 	}
 
-	rkt := newRocketOrFail(t)
+	rkt := newRktOrFail(t)
 
 	pod := &api.Pod{
 		ObjectMeta: api.ObjectMeta{
-			UID:         types.UID(fmt.Sprintf("testRocket_%d", rand.Int())),
+			UID:         types.UID(fmt.Sprintf("testRkt_%d", rand.Int())),
 			Name:        "foo",
 			Namespace:   "default",
 			Annotations: make(map[string]string),

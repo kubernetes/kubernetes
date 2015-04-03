@@ -464,7 +464,7 @@ func setApp(app *appctypes.App, c *api.Container) error {
 	// Override the exec.
 	// TOOD(yifan): Revisit this for the overriding rule.
 	if len(c.Command) > 0 || len(c.Args) > 0 {
-		app.Exec = append(c.Command, c.Args)
+		app.Exec = append(c.Command, c.Args...)
 	}
 
 	// TODO(yifan): Use non-root user in the future?
@@ -544,10 +544,6 @@ func makePodManifest(pod *api.Pod, volumeMap map[string]volume.Volume) (*schema.
 		return nil, err
 	}
 	for _, c := range pod.Spec.Containers {
-		h, err := appctypes.NewHash(c.Image)
-		if err != nil {
-			return nil, err
-		}
 		fullKey, err := ds.ResolveKey(c.Image)
 		if err != nil {
 			return nil, fmt.Errorf("cannot resolve key: %v", err)
