@@ -30,7 +30,7 @@ import (
 type FailedPredicateMap map[string]util.StringSet
 
 type FitError struct {
-	Pod              api.Pod
+	Pod              *api.Pod
 	FailedPredicates FailedPredicateMap
 }
 
@@ -51,7 +51,7 @@ type genericScheduler struct {
 	randomLock   sync.Mutex
 }
 
-func (g *genericScheduler) Schedule(pod api.Pod, minionLister MinionLister) (string, error) {
+func (g *genericScheduler) Schedule(pod *api.Pod, minionLister MinionLister) (string, error) {
 	minions, err := minionLister.List()
 	if err != nil {
 		return "", err
@@ -97,7 +97,7 @@ func (g *genericScheduler) selectHost(priorityList HostPriorityList) (string, er
 
 // Filters the minions to find the ones that fit based on the given predicate functions
 // Each minion is passed through the predicate functions to determine if it is a fit
-func findNodesThatFit(pod api.Pod, podLister PodLister, predicates map[string]FitPredicate, nodes api.NodeList) (api.NodeList, FailedPredicateMap, error) {
+func findNodesThatFit(pod *api.Pod, podLister PodLister, predicates map[string]FitPredicate, nodes api.NodeList) (api.NodeList, FailedPredicateMap, error) {
 	filtered := []api.Node{}
 	machineToPods, err := MapPodsToMachines(podLister)
 	failedPredicateMap := FailedPredicateMap{}
@@ -133,7 +133,7 @@ func findNodesThatFit(pod api.Pod, podLister PodLister, predicates map[string]Fi
 // Each priority function can also have its own weight
 // The minion scores returned by the priority function are multiplied by the weights to get weighted scores
 // All scores are finally combined (added) to get the total weighted scores of all minions
-func prioritizeNodes(pod api.Pod, podLister PodLister, priorityConfigs []PriorityConfig, minionLister MinionLister) (HostPriorityList, error) {
+func prioritizeNodes(pod *api.Pod, podLister PodLister, priorityConfigs []PriorityConfig, minionLister MinionLister) (HostPriorityList, error) {
 	result := HostPriorityList{}
 
 	// If no priority configs are provided, then the EqualPriority function is applied
@@ -177,7 +177,7 @@ func getBestHosts(list HostPriorityList) []string {
 }
 
 // EqualPriority is a prioritizer function that gives an equal weight of one to all nodes
-func EqualPriority(pod api.Pod, podLister PodLister, minionLister MinionLister) (HostPriorityList, error) {
+func EqualPriority(_ *api.Pod, podLister PodLister, minionLister MinionLister) (HostPriorityList, error) {
 	nodes, err := minionLister.List()
 	if err != nil {
 		fmt.Errorf("failed to list nodes: %v", err)

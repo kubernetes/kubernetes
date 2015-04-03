@@ -39,7 +39,7 @@ func calculateScore(requested, capacity int64, node string) int {
 
 // Calculate the occupancy on a node.  'node' has information about the resources on the node.
 // 'pods' is a list of pods currently scheduled on the node.
-func calculateOccupancy(pod api.Pod, node api.Node, pods []api.Pod) HostPriority {
+func calculateOccupancy(pod *api.Pod, node api.Node, pods []*api.Pod) HostPriority {
 	totalMilliCPU := int64(0)
 	totalMemory := int64(0)
 	for _, existingPod := range pods {
@@ -78,7 +78,7 @@ func calculateOccupancy(pod api.Pod, node api.Node, pods []api.Pod) HostPriority
 // It calculates the percentage of memory and CPU requested by pods scheduled on the node, and prioritizes
 // based on the minimum of the average of the fraction of requested to capacity.
 // Details: (Sum(requested cpu) / Capacity + Sum(requested memory) / Capacity) * 50
-func LeastRequestedPriority(pod api.Pod, podLister PodLister, minionLister MinionLister) (HostPriorityList, error) {
+func LeastRequestedPriority(pod *api.Pod, podLister PodLister, minionLister MinionLister) (HostPriorityList, error) {
 	nodes, err := minionLister.List()
 	if err != nil {
 		return HostPriorityList{}, err
@@ -108,7 +108,7 @@ func NewNodeLabelPriority(label string, presence bool) PriorityFunction {
 // CalculateNodeLabelPriority checks whether a particular label exists on a minion or not, regardless of its value.
 // If presence is true, prioritizes minions that have the specified label, regardless of value.
 // If presence is false, prioritizes minions that do not have the specified label.
-func (n *NodeLabelPrioritizer) CalculateNodeLabelPriority(pod api.Pod, podLister PodLister, minionLister MinionLister) (HostPriorityList, error) {
+func (n *NodeLabelPrioritizer) CalculateNodeLabelPriority(pod *api.Pod, podLister PodLister, minionLister MinionLister) (HostPriorityList, error) {
 	var score int
 	minions, err := minionLister.List()
 	if err != nil {
@@ -141,7 +141,7 @@ func (n *NodeLabelPrioritizer) CalculateNodeLabelPriority(pod api.Pod, podLister
 // close the two metrics are to each other.
 // Detail: score = 10 - abs(cpuFraction-memoryFraction)*10. The algorithm is partly inspired by:
 // "Wei Huang et al. An Energy Efficient Virtual Machine Placement Algorithm with Balanced Resource Utilization"
-func BalancedResourceAllocation(pod api.Pod, podLister PodLister, minionLister MinionLister) (HostPriorityList, error) {
+func BalancedResourceAllocation(pod *api.Pod, podLister PodLister, minionLister MinionLister) (HostPriorityList, error) {
 	nodes, err := minionLister.List()
 	if err != nil {
 		return HostPriorityList{}, err
@@ -155,7 +155,7 @@ func BalancedResourceAllocation(pod api.Pod, podLister PodLister, minionLister M
 	return list, nil
 }
 
-func calculateBalancedResourceAllocation(pod api.Pod, node api.Node, pods []api.Pod) HostPriority {
+func calculateBalancedResourceAllocation(pod *api.Pod, node api.Node, pods []*api.Pod) HostPriority {
 	totalMilliCPU := int64(0)
 	totalMemory := int64(0)
 	score := int(0)

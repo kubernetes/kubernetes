@@ -59,7 +59,7 @@ type mockScheduler struct {
 	err     error
 }
 
-func (es mockScheduler) Schedule(pod api.Pod, ml scheduler.MinionLister) (string, error) {
+func (es mockScheduler) Schedule(pod *api.Pod, ml scheduler.MinionLister) (string, error) {
 	return es.machine, es.err
 }
 

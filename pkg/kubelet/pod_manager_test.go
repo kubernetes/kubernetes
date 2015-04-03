@@ -34,7 +34,7 @@ func newFakePodManager() (*basicPodManager, *fakeMirrorClient) {
 // Tests that pods/maps are properly set after the pod update, and the basic
 // methods work correctly.
 func TestGetSetPods(t *testing.T) {
-	mirrorPod := api.Pod{
+	mirrorPod := &api.Pod{
 		ObjectMeta: api.ObjectMeta{
 			UID:       "987654321",
 			Name:      "bar",
@@ -45,7 +45,7 @@ func TestGetSetPods(t *testing.T) {
 			},
 		},
 	}
-	staticPod := api.Pod{
+	staticPod := &api.Pod{
 		ObjectMeta: api.ObjectMeta{
 			UID:         "123456789",
 			Name:        "bar",
@@ -54,7 +54,7 @@ func TestGetSetPods(t *testing.T) {
 		},
 	}
 
-	expectedPods := []api.Pod{
+	expectedPods := []*api.Pod{
 		{
 			ObjectMeta: api.ObjectMeta{
 				UID:         "999999999",
@@ -98,11 +98,11 @@ func TestGetSetPods(t *testing.T) {
 
 	// Test the basic Get methods.
 	actualPod, ok := podManager.GetPodByFullName("bar_default")
-	if !ok || !reflect.DeepEqual(actualPod, &staticPod) {
+	if !ok || !reflect.DeepEqual(actualPod, staticPod) {
 		t.Errorf("unable to get pod by full name; expected: %#v, got: %#v", staticPod, actualPod)
 	}
 	actualPod, ok = podManager.GetPodByName("default", "bar")
-	if !ok || !reflect.DeepEqual(actualPod, &staticPod) {
+	if !ok || !reflect.DeepEqual(actualPod, staticPod) {
 		t.Errorf("unable to get pod by name; expected: %#v, got: %#v", staticPod, actualPod)
 	}
 

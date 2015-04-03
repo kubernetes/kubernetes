@@ -91,7 +91,7 @@ type SyncHandler interface {
 	// Syncs current state to match the specified pods. SyncPodType specified what
 	// type of sync is occuring per pod. StartTime specifies the time at which
 	// syncing began (for use in monitoring).
-	SyncPods(pods []api.Pod, podSyncTypes map[types.UID]metrics.SyncPodType, mirrorPods map[string]api.Pod,
+	SyncPods(pods []*api.Pod, podSyncTypes map[types.UID]metrics.SyncPodType, mirrorPods map[string]api.Pod,
 		startTime time.Time) error
 }
 
@@ -1319,7 +1319,7 @@ func (kl *Kubelet) syncPod(pod *api.Pod, mirrorPod *api.Pod, runningPod kubecont
 
 // Stores all volumes defined by the set of pods into a map.
 // Keys for each entry are in the format (POD_ID)/(VOLUME_NAME)
-func getDesiredVolumes(pods []api.Pod) map[string]api.Volume {
+func getDesiredVolumes(pods []*api.Pod) map[string]api.Volume {
 	desiredVolumes := make(map[string]api.Volume)
 	for _, pod := range pods {
 		for _, volume := range pod.Spec.Volumes {
@@ -1330,10 +1330,10 @@ func getDesiredVolumes(pods []api.Pod) map[string]api.Volume {
 	return desiredVolumes
 }
 
-func (kl *Kubelet) cleanupOrphanedPods(pods []api.Pod) error {
+func (kl *Kubelet) cleanupOrphanedPods(pods []*api.Pod) error {
 	desired := util.NewStringSet()
-	for i := range pods {
-		desired.Insert(string(pods[i].UID))
+	for _, pod := range pods {
+		desired.Insert(string(pod.UID))
 	}
 	found, err := kl.listPodsFromDisk()
 	if err != nil {
@@ -1353,7 +1353,7 @@ func (kl *Kubelet) cleanupOrphanedPods(pods []api.Pod) error {
 
 // Compares the map of current volumes to the map of desired volumes.
 // If an active volume does not have a respective desired volume, clean it up.
-func (kl *Kubelet) cleanupOrphanedVolumes(pods []api.Pod, running []*docker.Container) error {
+func (kl *Kubelet) cleanupOrphanedVolumes(pods []*api.Pod, running []*docker.Container) error {
 	desiredVolumes := getDesiredVolumes(pods)
 	currentVolumes := kl.getPodVolumesFromDisk()
 	runningSet := util.StringSet{}
@@ -1388,7 +1388,7 @@ func (kl *Kubelet) cleanupOrphanedVolumes(pods []api.Pod, running []*docker.Cont
 }
 
 // SyncPods synchronizes the configured list of pods (desired state) with the host current state.
-func (kl *Kubelet) SyncPods(allPods []api.Pod, podSyncTypes map[types.UID]metrics.SyncPodType,
+func (kl *Kubelet) SyncPods(allPods []*api.Pod, podSyncTypes map[types.UID]metrics.SyncPodType,
 	mirrorPods map[string]api.Pod, start time.Time) error {
 	defer func() {
 		metrics.SyncPodsLatency.Observe(metrics.SinceInMicroseconds(start))
@@ -1397,15 +1397,15 @@ func (kl *Kubelet) SyncPods(allPods []api.Pod, podSyncTypes map[types.UID]metric
 	// Remove obsolete entries in podStatus where the pod is no longer considered bound to this node.
 	podFullNames := make(map[string]bool)
 	for _, pod := range allPods {
-		podFullNames[kubecontainer.GetPodFullName(&pod)] = true
+		podFullNames[kubecontainer.GetPodFullName(pod)] = true
 	}
 	kl.statusManager.RemoveOrphanedStatuses(podFullNames)
 
 	// Filter out the rejected pod. They don't have running containers.
 	kl.handleNotFittingPods(allPods)
-	var pods []api.Pod
+	var pods []*api.Pod
 	for _, pod := range allPods {
-		status, ok := kl.statusManager.GetPodStatus(kubecontainer.GetPodFullName(&pod))
+		status, ok := kl.statusManager.GetPodStatus(kubecontainer.GetPodFullName(pod))
 		if ok && status.Phase == api.PodFailed {
 			continue
 		}
@@ -1423,8 +1423,7 @@ func (kl *Kubelet) SyncPods(allPods []api.Pod, podSyncTypes map[types.UID]metric
 	}
 
 	// Check for any containers that need starting
-	for ix := range pods {
-		pod := &pods[ix]
+	for _, pod := range pods {
 		podFullName := kubecontainer.GetPodFullName(pod)
 		uid := pod.UID
 		desiredPods[uid] = empty{}
@@ -1504,7 +1503,7 @@ func (kl *Kubelet) SyncPods(allPods []api.Pod, podSyncTypes map[types.UID]metric
 	return err
 }
 
-type podsByCreationTime []api.Pod
+type podsByCreationTime []*api.Pod
 
 func (s podsByCreationTime) Len() int {
 	return len(s)
@@ -1519,31 +1518,30 @@ func (s podsByCreationTime) Less(i, j int) bool {
 }
 
 // checkHostPortConflicts detects pods with conflicted host ports.
-func checkHostPortConflicts(pods []api.Pod) (fitting []api.Pod, notFitting []api.Pod) {
+func checkHostPortConflicts(pods []*api.Pod) (fitting []*api.Pod, notFitting []*api.Pod) {
 	ports := map[int]bool{}
 	extract := func(p *api.ContainerPort) int { return p.HostPort }
 
 	// Respect the pod creation order when resolving conflicts.
 	sort.Sort(podsByCreationTime(pods))
 
-	for i := range pods {
-		pod := &pods[i]
+	for _, pod := range pods {
 		if errs := validation.AccumulateUniquePorts(pod.Spec.Containers, ports, extract); len(errs) != 0 {
 			glog.Errorf("Pod %q: HostPort is already allocated, ignoring: %v", kubecontainer.GetPodFullName(pod), errs)
-			notFitting = append(notFitting, *pod)
+			notFitting = append(notFitting, pod)
 			continue
 		}
-		fitting = append(fitting, *pod)
+		fitting = append(fitting, pod)
 	}
 	return
 }
 
 // checkCapacityExceeded detects pods that exceeds node's resources.
-func (kl *Kubelet) checkCapacityExceeded(pods []api.Pod) (fitting []api.Pod, notFitting []api.Pod) {
+func (kl *Kubelet) checkCapacityExceeded(pods []*api.Pod) (fitting []*api.Pod, notFitting []*api.Pod) {
 	info, err := kl.GetCachedMachineInfo()
 	if err != nil {
 		glog.Errorf("error getting machine info: %v", err)
-		return pods, []api.Pod{}
+		return pods, nil
 	}
 
 	// Respect the pod creation order when resolving conflicts.
@@ -1554,14 +1552,14 @@ func (kl *Kubelet) checkCapacityExceeded(pods []api.Pod) (fitting []api.Pod, not
 }
 
 // checkNodeSelectorMatching detects pods that do not match node's labels.
-func (kl *Kubelet) checkNodeSelectorMatching(pods []api.Pod) (fitting []api.Pod, notFitting []api.Pod) {
+func (kl *Kubelet) checkNodeSelectorMatching(pods []*api.Pod) (fitting []*api.Pod, notFitting []*api.Pod) {
 	node, err := kl.GetNode()
 	if err != nil {
 		glog.Errorf("error getting node: %v", err)
-		return pods, []api.Pod{}
+		return pods, nil
 	}
 	for _, pod := range pods {
-		if !scheduler.PodMatchesNodeLabels(&pod, node) {
+		if !scheduler.PodMatchesNodeLabels(pod, node) {
 			notFitting = append(notFitting, pod)
 			continue
 		}
@@ -1572,25 +1570,25 @@ func (kl *Kubelet) checkNodeSelectorMatching(pods []api.Pod) (fitting []api.Pod,
 
 // handleNotfittingPods handles pods that do not fit on the node.
 // Currently conflicts on Port.HostPort values, matching node's labels and exceeding node's capacity are handled.
-func (kl *Kubelet) handleNotFittingPods(pods []api.Pod) {
+func (kl *Kubelet) handleNotFittingPods(pods []*api.Pod) {
 	fitting, notFitting := checkHostPortConflicts(pods)
 	for _, pod := range notFitting {
-		kl.recorder.Eventf(&pod, "hostPortConflict", "Cannot start the pod due to host port conflict.")
-		kl.statusManager.SetPodStatus(&pod, api.PodStatus{
+		kl.recorder.Eventf(pod, "hostPortConflict", "Cannot start the pod due to host port conflict.")
+		kl.statusManager.SetPodStatus(pod, api.PodStatus{
 			Phase:   api.PodFailed,
 			Message: "Pod cannot be started due to host port conflict"})
 	}
 	fitting, notFitting = kl.checkNodeSelectorMatching(fitting)
 	for _, pod := range notFitting {
-		kl.recorder.Eventf(&pod, "nodeSelectorMismatching", "Cannot start the pod due to node selector mismatch.")
-		kl.statusManager.SetPodStatus(&pod, api.PodStatus{
+		kl.recorder.Eventf(pod, "nodeSelectorMismatching", "Cannot start the pod due to node selector mismatch.")
+		kl.statusManager.SetPodStatus(pod, api.PodStatus{
 			Phase:   api.PodFailed,
 			Message: "Pod cannot be started due to node selector mismatch"})
 	}
 	fitting, notFitting = kl.checkCapacityExceeded(fitting)
 	for _, pod := range notFitting {
-		kl.recorder.Eventf(&pod, "capacityExceeded", "Cannot start the pod due to exceeded capacity.")
-		kl.statusManager.SetPodStatus(&pod, api.PodStatus{
+		kl.recorder.Eventf(pod, "capacityExceeded", "Cannot start the pod due to exceeded capacity.")
+		kl.statusManager.SetPodStatus(pod, api.PodStatus{
 			Phase:   api.PodFailed,
 			Message: "Pod cannot be started due to exceeded capacity"})
 	}
@@ -1716,7 +1714,7 @@ func (kl *Kubelet) GetHostIP() (net.IP, error) {
 
 // GetPods returns all pods bound to the kubelet and their spec, and the mirror
 // pods.
-func (kl *Kubelet) GetPods() []api.Pod {
+func (kl *Kubelet) GetPods() []*api.Pod {
 	return kl.podManager.GetPods()
 }
 

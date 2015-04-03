@@ -31,7 +31,7 @@ type schedulerTester struct {
 }
 
 // Call if you know exactly where pod should get scheduled.
-func (st *schedulerTester) expectSchedule(pod api.Pod, expected string) {
+func (st *schedulerTester) expectSchedule(pod *api.Pod, expected string) {
 	actual, err := st.scheduler.Schedule(pod, st.minionLister)
 	if err != nil {
 		st.t.Errorf("Unexpected error %v\nTried to scheduler: %#v", err, pod)
@@ -43,7 +43,7 @@ func (st *schedulerTester) expectSchedule(pod api.Pod, expected string) {
 }
 
 // Call if you can't predict where pod will be scheduled.
-func (st *schedulerTester) expectSuccess(pod api.Pod) {
+func (st *schedulerTester) expectSuccess(pod *api.Pod) {
 	_, err := st.scheduler.Schedule(pod, st.minionLister)
 	if err != nil {
 		st.t.Errorf("Unexpected error %v\nTried to scheduler: %#v", err, pod)
@@ -52,19 +52,19 @@ func (st *schedulerTester) expectSuccess(pod api.Pod) {
 }
 
 // Call if pod should *not* schedule.
-func (st *schedulerTester) expectFailure(pod api.Pod) {
+func (st *schedulerTester) expectFailure(pod *api.Pod) {
 	_, err := st.scheduler.Schedule(pod, st.minionLister)
 	if err == nil {
 		st.t.Error("Unexpected non-error")
 	}
 }
 
-func newPod(host string, hostPorts ...int) api.Pod {
+func newPod(host string, hostPorts ...int) *api.Pod {
 	networkPorts := []api.ContainerPort{}
 	for _, port := range hostPorts {
 		networkPorts = append(networkPorts, api.ContainerPort{HostPort: port})
 	}
-	return api.Pod{
+	return &api.Pod{
 		Spec: api.PodSpec{
 			Host: host,
 			Containers: []api.Container{

@@ -42,11 +42,11 @@ type StoreToPodLister struct {
 // TODO Get rid of the selector because that is confusing because the user might not realize that there has already been
 // some selection at the caching stage.  Also, consistency will facilitate code generation.  However, the pkg/client
 // is inconsistent too.
-func (s *StoreToPodLister) List(selector labels.Selector) (pods []api.Pod, err error) {
+func (s *StoreToPodLister) List(selector labels.Selector) (pods []*api.Pod, err error) {
 	for _, m := range s.Store.List() {
 		pod := m.(*api.Pod)
 		if selector.Matches(labels.Set(pod.Labels)) {
-			pods = append(pods, *pod)
+			pods = append(pods, pod)
 		}
 	}
 	return pods, nil
@@ -106,7 +106,7 @@ func (s *StoreToServiceLister) List() (services api.ServiceList, err error) {
 
 // TODO: Move this back to scheduler as a helper function that takes a Store,
 // rather than a method of StoreToServiceLister.
-func (s *StoreToServiceLister) GetPodServices(pod api.Pod) (services []api.Service, err error) {
+func (s *StoreToServiceLister) GetPodServices(pod *api.Pod) (services []api.Service, err error) {
 	var selector labels.Selector
 	var service api.Service
 

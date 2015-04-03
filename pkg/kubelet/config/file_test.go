@@ -83,7 +83,7 @@ func TestReadFromFile(t *testing.T) {
 					"id": "test",
 					"containers": [{ "name": "image", "image": "test/image", "imagePullPolicy": "PullAlways"}]
 				}`,
-			expected: CreatePodUpdate(kubelet.SET, kubelet.FileSource, api.Pod{
+			expected: CreatePodUpdate(kubelet.SET, kubelet.FileSource, &api.Pod{
 				ObjectMeta: api.ObjectMeta{
 					Name:      "test-" + hostname,
 					UID:       "12345",
@@ -109,7 +109,7 @@ func TestReadFromFile(t *testing.T) {
 					"uuid": "12345",
 					"containers": [{ "name": "image", "image": "test/image", "imagePullPolicy": "PullAlways"}]
 				}`,
-			expected: CreatePodUpdate(kubelet.SET, kubelet.FileSource, api.Pod{
+			expected: CreatePodUpdate(kubelet.SET, kubelet.FileSource, &api.Pod{
 				ObjectMeta: api.ObjectMeta{
 					Name:      "12345-" + hostname,
 					UID:       "12345",
@@ -136,7 +136,7 @@ func TestReadFromFile(t *testing.T) {
 					"id": "test",
 					"containers": [{ "name": "image", "image": "test/image", "imagePullPolicy": "PullAlways"}]
 				}`,
-			expected: CreatePodUpdate(kubelet.SET, kubelet.FileSource, api.Pod{
+			expected: CreatePodUpdate(kubelet.SET, kubelet.FileSource, &api.Pod{
 				ObjectMeta: api.ObjectMeta{
 					Name:      "test-" + hostname,
 					UID:       "12345",
@@ -169,7 +169,7 @@ func TestReadFromFile(t *testing.T) {
 						}
 					}
 				}`,
-			expected: CreatePodUpdate(kubelet.SET, kubelet.FileSource, api.Pod{
+			expected: CreatePodUpdate(kubelet.SET, kubelet.FileSource, &api.Pod{
 				ObjectMeta: api.ObjectMeta{
 					Name:      "test-" + hostname,
 					UID:       "12345",
@@ -200,7 +200,7 @@ func TestReadFromFile(t *testing.T) {
 						}
 					}
 				}`,
-			expected: CreatePodUpdate(kubelet.SET, kubelet.FileSource, api.Pod{
+			expected: CreatePodUpdate(kubelet.SET, kubelet.FileSource, &api.Pod{
 				ObjectMeta: api.ObjectMeta{
 					Name:      "12345-" + hostname,
 					UID:       "12345",
@@ -232,7 +232,7 @@ func TestReadFromFile(t *testing.T) {
 						"containers": [{ "name": "image", "image": "test/image" }]
 					}
 				}`,
-			expected: CreatePodUpdate(kubelet.SET, kubelet.FileSource, api.Pod{
+			expected: CreatePodUpdate(kubelet.SET, kubelet.FileSource, &api.Pod{
 				ObjectMeta: api.ObjectMeta{
 					Name:      "test-" + hostname,
 					UID:       "12345",
@@ -264,7 +264,7 @@ func TestReadFromFile(t *testing.T) {
 			case got := <-ch:
 				update := got.(kubelet.PodUpdate)
 				for _, pod := range update.Pods {
-					if errs := validation.ValidatePod(&pod); len(errs) > 0 {
+					if errs := validation.ValidatePod(pod); len(errs) > 0 {
 						t.Errorf("%s: Invalid pod %#v, %#v", testCase.desc, pod, errs)
 					}
 				}
@@ -335,7 +335,7 @@ func TestExtractFromEmptyDir(t *testing.T) {
 	}
 }
 
-func ExampleManifestAndPod(id string) (v1beta1.ContainerManifest, api.Pod) {
+func ExampleManifestAndPod(id string) (v1beta1.ContainerManifest, *api.Pod) {
 	hostname := "an-example-host"
 
 	manifest := v1beta1.ContainerManifest{
@@ -358,7 +358,7 @@ func ExampleManifestAndPod(id string) (v1beta1.ContainerManifest, api.Pod) {
 			},
 		},
 	}
-	expectedPod := api.Pod{
+	expectedPod := &api.Pod{
 		ObjectMeta: api.ObjectMeta{
 			Name:      id + "-" + hostname,
 			UID:       types.UID(id),
@@ -391,7 +391,7 @@ func TestExtractFromDir(t *testing.T) {
 	manifest2, expectedPod2 := ExampleManifestAndPod("2")
 
 	manifests := []v1beta1.ContainerManifest{manifest, manifest2}
-	pods := []api.Pod{expectedPod, expectedPod2}
+	pods := []*api.Pod{expectedPod, expectedPod2}
 	files := make([]*os.File, len(manifests))
 
 	dirName, err := ioutil.TempDir("", "foo")
@@ -433,9 +433,9 @@ func TestExtractFromDir(t *testing.T) {
 	if !api.Semantic.DeepDerivative(expected, update) {
 		t.Fatalf("Expected %#v, Got %#v", expected, update)
 	}
-	for i := range update.Pods {
-		if errs := validation.ValidatePod(&update.Pods[i]); len(errs) != 0 {
-			t.Errorf("Expected no validation errors on %#v, Got %q", update.Pods[i], errs)
+	for _, pod := range update.Pods {
+		if errs := validation.ValidatePod(pod); len(errs) != 0 {
+			t.Errorf("Expected no validation errors on %#v, Got %q", pod, errs)
 		}
 	}
 }
