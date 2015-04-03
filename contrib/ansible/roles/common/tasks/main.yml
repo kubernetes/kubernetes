@@ -13,6 +13,6 @@
     is_atomic: true
   when: s.stat.exists
 
-- name: Collect fact about what RPM's are installed
-  rpm_facts:
+# collect information about what packages are installed
+- include: rpm.yml
   when: ansible_pkg_mgr == "yum"
