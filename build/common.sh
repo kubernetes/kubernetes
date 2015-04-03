@@ -601,8 +601,10 @@ function kube::release::create_docker_images_for_server() {
   (
     local binary_name
     for binary_name in "${KUBE_DOCKER_WRAPPED_BINARIES[@]}"; do
-      kube::log::status "Building docker image: ${binary_name}"
-      local docker_file_path="$1/Dockerfile"
+      kube::log::status "Starting Docker build for image: ${binary_name}"
+
+      (
+      local docker_file_path="$1/${binary_name}.Dockerfile"
       local binary_file_path="$1/${binary_name}"
       if [ -f ${docker_file_path} ]; then
         rm ${docker_file_path}
@@ -610,11 +612,15 @@ function kube::release::create_docker_images_for_server() {
       printf " FROM scratch \n ADD ${binary_name} /${binary_name} \n ENTRYPOINT [ \"/${binary_name}\" ]\n" >> ${docker_file_path}
       local md5_sum=$(kube::release::md5 ${binary_file_path})
       local docker_image_tag=gcr.io/google_containers/$binary_name:$md5_sum
-      docker build -q -t "${docker_image_tag}" ${1} >/dev/null
+      docker build -q -f "${docker_file_path}" -t "${docker_image_tag}" ${1} >/dev/null
       docker save ${docker_image_tag} > ${1}/${binary_name}.tar
       echo $md5_sum > ${1}/${binary_name}.docker_tag
       rm ${docker_file_path}
+      ) &
     done
+
+    wait || { kube::log::error "previous Docker build failed"; return 1; }
+    kube::log::status "Docker builds done"
   )
 }
 
