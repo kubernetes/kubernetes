@@ -49,14 +49,37 @@ func (s *SelectionPredicate) Matches(obj runtime.Object) (bool, error) {
 	return s.Label.Matches(labels) && s.Field.Matches(fields), nil
 }
 
+// MatchesSingle will return (name, true) iff s.Field matches on the object's
+// name.
+func (s *SelectionPredicate) MatchesSingle() (string, bool) {
+	// TODO: should be namespace.name
+	if name, ok := s.Field.RequiresExactMatch("metadata.name"); ok {
+		return name, true
+	}
+	return "", false
+}
+
 // Matcher can return true if an object matches the Matcher's selection
-// criteria.
+// criteria. If it is known that the matcher will match only a single object
+// then MatchesSingle should return the key of that object and true. This is an
+// optimization only--Matches() should continue to work.
 type Matcher interface {
-	Matches(obj runtime.Object) (bool, error)
+	// Matches should return true if obj matches this matcher's requirements.
+	Matches(obj runtime.Object) (matchesThisObject bool, err error)
+
+	// If this matcher matches a single object, return the key for that
+	// object and true here. This will greatly increase efficiency. You
+	// must still implement Matches(). Note that key does NOT need to
+	// include the object's namespace.
+	MatchesSingle() (key string, matchesSingleObject bool)
+
+	// TODO: when we start indexing objects, add something like the below:
+	//         MatchesIndices() (indexName []string, indexValue []string)
+	//       where indexName/indexValue are the same length.
 }
 
 // MatcherFunc makes a matcher from the provided function. For easy definition
-// of matchers for testing.
+// of matchers for testing. Note: use SelectionPredicate above for real code!
 func MatcherFunc(f func(obj runtime.Object) (bool, error)) Matcher {
 	return matcherFunc(f)
 }
@@ -67,6 +90,36 @@ type matcherFunc func(obj runtime.Object) (bool, error)
 func (m matcherFunc) Matches(obj runtime.Object) (bool, error) {
 	return m(obj)
 }
+
+// MatchesSingle always returns "", false-- because this is a predicate
+// implementation of Matcher.
+func (m matcherFunc) MatchesSingle() (string, bool) {
+	return "", false
+}
+
+// MatchOnKey returns a matcher that will send only the object matching key
+// through the matching function f. For testing!
+// Note: use SelectionPredicate above for real code!
+func MatchOnKey(key string, f func(obj runtime.Object) (bool, error)) Matcher {
+	return matchKey{key, f}
+}
+
+type matchKey struct {
+	key string
+	matcherFunc
+}
+
+// MatchesSingle always returns its key, true.
+func (m matchKey) MatchesSingle() (string, bool) {
+	return m.key, true
+}
+
+var (
+	// Assert implementations match the interface.
+	_ = Matcher(matchKey{})
+	_ = Matcher(&SelectionPredicate{})
+	_ = Matcher(matcherFunc(nil))
+)
 
 // DecoratorFunc can mutate the provided object prior to being returned.
 type DecoratorFunc func(obj runtime.Object) error

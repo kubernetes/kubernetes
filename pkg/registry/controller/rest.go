@@ -75,9 +75,9 @@ func (rcStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) field
 }
 
 // ControllerToSelectableFields returns a label set that represents the object.
-func ControllerToSelectableFields(controller *api.ReplicationController) labels.Set {
-	return labels.Set{
-		"name":            controller.Name,
+func ControllerToSelectableFields(controller *api.ReplicationController) fields.Set {
+	return fields.Set{
+		"metadata.name":   controller.Name,
 		"status.replicas": strconv.Itoa(controller.Status.Replicas),
 	}
 }
@@ -86,13 +86,15 @@ func ControllerToSelectableFields(controller *api.ReplicationController) labels.
 // watch events from etcd to clients of the apiserver only interested in specific
 // labels/fields.
 func MatchController(label labels.Selector, field fields.Selector) generic.Matcher {
-	return generic.MatcherFunc(
-		func(obj runtime.Object) (bool, error) {
-			controllerObj, ok := obj.(*api.ReplicationController)
+	return &generic.SelectionPredicate{
+		Label: label,
+		Field: field,
+		GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, error) {
+			rc, ok := obj.(*api.ReplicationController)
 			if !ok {
-				return false, fmt.Errorf("Given object is not a replication controller.")
+				return nil, nil, fmt.Errorf("Given object is not a replication controller.")
 			}
-			fields := ControllerToSelectableFields(controllerObj)
-			return label.Matches(labels.Set(controllerObj.Labels)) && field.Matches(fields), nil
-		})
+			return labels.Set(rc.ObjectMeta.Labels), ControllerToSelectableFields(rc), nil
+		},
+	}
 }

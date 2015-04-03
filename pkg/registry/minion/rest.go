@@ -83,22 +83,25 @@ type ResourceGetter interface {
 }
 
 // NodeToSelectableFields returns a label set that represents the object.
-func NodeToSelectableFields(node *api.Node) labels.Set {
-	return labels.Set{
-		"name": node.Name,
+func NodeToSelectableFields(node *api.Node) fields.Set {
+	return fields.Set{
+		"metadata.name": node.Name,
 	}
 }
 
 // MatchNode returns a generic matcher for a given label and field selector.
 func MatchNode(label labels.Selector, field fields.Selector) generic.Matcher {
-	return generic.MatcherFunc(func(obj runtime.Object) (bool, error) {
-		nodeObj, ok := obj.(*api.Node)
-		if !ok {
-			return false, fmt.Errorf("not a node")
-		}
-		fields := NodeToSelectableFields(nodeObj)
-		return label.Matches(labels.Set(nodeObj.Labels)) && field.Matches(fields), nil
-	})
+	return &generic.SelectionPredicate{
+		Label: label,
+		Field: field,
+		GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, error) {
+			nodeObj, ok := obj.(*api.Node)
+			if !ok {
+				return nil, nil, fmt.Errorf("not a node")
+			}
+			return labels.Set(nodeObj.ObjectMeta.Labels), NodeToSelectableFields(nodeObj), nil
+		},
+	}
 }
 
 // ResourceLocation returns a URL to which one can send traffic for the specified node.

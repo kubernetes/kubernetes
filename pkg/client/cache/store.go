@@ -63,7 +63,8 @@ func (k KeyError) Error() string {
 
 // MetaNamespaceKeyFunc is a convenient default KeyFunc which knows how to make
 // keys for API objects which implement meta.Interface.
-// The key uses the format: <namespace>/<name>
+// The key uses the format <namespace>/<name> unless <namespace> is empty, then
+// it's just <name>.
 func MetaNamespaceKeyFunc(obj interface{}) (string, error) {
 	meta, err := meta.Accessor(obj)
 	if err != nil {
