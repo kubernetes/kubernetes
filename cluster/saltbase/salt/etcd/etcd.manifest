@@ -9,7 +9,7 @@
 "containers":[
     {
     "name": "etcd-container",
-    "image": "kubernetes/etcd:2.0.5.1",
+    "image": "gcr.io/google_containers/etcd:2.0.8",
     "command": [
               "/usr/local/bin/etcd",
 	      "--addr",
