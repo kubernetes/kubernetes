@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -248,11 +249,12 @@ func getPdNameFromGlobalMount(host volume.VolumeHost, globalPath string) (string
 		return "", fmt.Errorf("Unexpected mount path: " + globalPath)
 	}
 	// Reverse the :// replacement done in makeGlobalPDName
-	name := rel
-	if strings.HasPrefix(name, "aws/") {
-		name = strings.Replace(name, "aws/", "aws://")
+	pdName := rel
+	if strings.HasPrefix(pdName, "aws/") {
+		pdName = strings.Replace(pdName, "aws/", "aws://", 1)
 	}
-	return name, nil
+	glog.V(2).Info("Mapping mount dir ", globalPath, " to pdName ", pdName)
+	return pdName, nil
 }
 
 func (pd *awsPersistentDisk) GetPath() string {
@@ -293,7 +295,7 @@ func (pd *awsPersistentDisk) TearDownAt(dir string) error {
 	// remaining reference is the global mount. It is safe to detach.
 	if len(refs) == 1 {
 		// pd.pdName is not initially set for volume-cleaners, so set it here.
-		pd.pdName, err = getPdNameFromGlobalMount(refs[0])
+		pd.pdName, err = getPdNameFromGlobalMount(pd.plugin.host, refs[0])
 		if err != nil {
 			glog.V(2).Info("Could not determine pdName from mountpoint ", refs[0], ": ", err)
 			return err
