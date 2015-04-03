@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
 // RESTClient imposes common Kubernetes API conventions on a set of resource paths.
@@ -50,13 +51,16 @@ type RESTClient struct {
 	Client HTTPClient
 
 	Timeout time.Duration
+
+	// TODO extract this into a wrapper interface via the RESTClient interface in kubectl.
+	Throttle util.RateLimiter
 }
 
 // NewRESTClient creates a new RESTClient. This client performs generic REST functions
 // such as Get, Put, Post, and Delete on specified paths.  Codec controls encoding and
 // decoding of responses from the server. If this client should use the older, legacy
 // API conventions from Kubernetes API v1beta1 and v1beta2, set legacyBehavior true.
-func NewRESTClient(baseURL *url.URL, apiVersion string, c runtime.Codec, legacyBehavior bool) *RESTClient {
+func NewRESTClient(baseURL *url.URL, apiVersion string, c runtime.Codec, legacyBehavior bool, maxQPS float32) *RESTClient {
 	base := *baseURL
 	if !strings.HasSuffix(base.Path, "/") {
 		base.Path += "/"
@@ -64,6 +68,10 @@ func NewRESTClient(baseURL *url.URL, apiVersion string, c runtime.Codec, legacyB
 	base.RawQuery = ""
 	base.Fragment = ""
 
+	var throttle util.RateLimiter
+	if maxQPS > 0 {
+		throttle = util.NewTokenBucketRateLimiter(maxQPS, 10)
+	}
 	return &RESTClient{
 		baseURL:    &base,
 		apiVersion: apiVersion,
@@ -71,6 +79,8 @@ func NewRESTClient(baseURL *url.URL, apiVersion string, c runtime.Codec, legacyB
 		Codec: c,
 
 		LegacyBehavior: legacyBehavior,
+
+		Throttle: throttle,
 	}
 }
 
@@ -87,11 +97,9 @@ func NewRESTClient(baseURL *url.URL, apiVersion string, c runtime.Codec, legacyB
 // list, ok := resp.(*api.PodList)
 //
 func (c *RESTClient) Verb(verb string) *Request {
-	// TODO: uncomment when Go 1.2 support is dropped
-	//var timeout time.Duration = 0
-	// if c.Client != nil {
-	// 	timeout = c.Client.Timeout
-	// }
+	if c.Throttle != nil {
+		c.Throttle.Accept()
+	}
 	return NewRequest(c.Client, verb, c.baseURL, c.apiVersion, c.Codec, c.LegacyBehavior, c.LegacyBehavior).Timeout(c.Timeout)
 }
 

@@ -77,6 +77,9 @@ type Config struct {
 	// Transport may be used for custom HTTP behavior. This attribute may not
 	// be specified with the TLS client certificate options.
 	Transport http.RoundTripper
+
+	// QPS indicates the maximum QPS to the master from this client.  If zero, QPS is unlimited.
+	QPS float32
 }
 
 type KubeletConfig struct {
@@ -175,6 +178,9 @@ func SetKubernetesDefaults(config *Config) error {
 		config.Codec = versionInterfaces.Codec
 	}
 	config.LegacyBehavior = (version == "v1beta1" || version == "v1beta2")
+	if config.QPS == 0.0 {
+		config.QPS = 5.0
+	}
 	return nil
 }
 
@@ -195,7 +201,7 @@ func RESTClientFor(config *Config) (*RESTClient, error) {
 		return nil, err
 	}
 
-	client := NewRESTClient(baseURL, config.Version, config.Codec, config.LegacyBehavior)
+	client := NewRESTClient(baseURL, config.Version, config.Codec, config.LegacyBehavior, config.QPS)
 
 	transport, err := TransportFor(config)
 	if err != nil {
