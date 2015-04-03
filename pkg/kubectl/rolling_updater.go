@@ -65,7 +65,8 @@ const (
 func (r *RollingUpdater) Update(out io.Writer, oldRc, newRc *api.ReplicationController, updatePeriod, interval, timeout time.Duration) error {
 	oldName := oldRc.ObjectMeta.Name
 	newName := newRc.ObjectMeta.Name
-
+	retry := &RetryParams{interval, timeout}
+	waitForReplicas := &RetryParams{interval, timeout}
 	if newRc.Spec.Replicas <= 0 {
 		return fmt.Errorf("Invalid controller spec for %s; required: > 0 replicas, actual: %s\n", newName, newRc.Spec)
 	}
@@ -104,35 +105,50 @@ func (r *RollingUpdater) Update(out io.Writer, oldRc, newRc *api.ReplicationCont
 	for newRc.Spec.Replicas < desired && oldRc.Spec.Replicas != 0 {
 		newRc.Spec.Replicas += 1
 		oldRc.Spec.Replicas -= 1
+		fmt.Printf("At beginning of loop: %s replicas: %d, %s replicas: %d\n",
+			oldName, oldRc.Spec.Replicas,
+			newName, newRc.Spec.Replicas)
 		fmt.Fprintf(out, "Updating %s replicas: %d, %s replicas: %d\n",
 			oldName, oldRc.Spec.Replicas,
 			newName, newRc.Spec.Replicas)
 
-		newRc, err = r.updateAndWait(newRc, interval, timeout)
+		newRc, err = r.resizeAndWait(newRc, retry, waitForReplicas)
 		if err != nil {
 			return err
 		}
 		time.Sleep(updatePeriod)
-		oldRc, err = r.updateAndWait(oldRc, interval, timeout)
+		oldRc, err = r.resizeAndWait(oldRc, retry, waitForReplicas)
 		if err != nil {
 			return err
 		}
+		fmt.Printf("At end of loop: %s replicas: %d, %s replicas: %d\n",
+			oldName, oldRc.Spec.Replicas,
+			newName, newRc.Spec.Replicas)
 	}
 	// delete remaining replicas on oldRc
 	if oldRc.Spec.Replicas != 0 {
 		fmt.Fprintf(out, "Stopping %s replicas: %d -> %d\n",
 			oldName, oldRc.Spec.Replicas, 0)
 		oldRc.Spec.Replicas = 0
-		oldRc, err = r.updateAndWait(oldRc, interval, timeout)
+		oldRc, err = r.resizeAndWait(oldRc, retry, waitForReplicas)
+		// oldRc, err = r.resizeAndWait(oldRc, interval, timeout)
 		if err != nil {
 			return err
 		}
 	}
-	// add remaining replicas on newRc, cleanup annotations
+	// add remaining replicas on newRc
 	if newRc.Spec.Replicas != desired {
 		fmt.Fprintf(out, "Resizing %s replicas: %d -> %d\n",
 			newName, newRc.Spec.Replicas, desired)
 		newRc.Spec.Replicas = desired
+		newRc, err = r.resizeAndWait(newRc, retry, waitForReplicas)
+		if err != nil {
+			return err
+		}
+	}
+	// Clean up annotations
+	if newRc, err = r.c.ReplicationControllers(r.ns).Get(newName); err != nil {
+		return err
 	}
 	delete(newRc.ObjectMeta.Annotations, sourceIdAnnotation)
 	delete(newRc.ObjectMeta.Annotations, desiredReplicasAnnotation)
@@ -160,12 +176,23 @@ func (r *RollingUpdater) getExistingNewRc(sourceId, name string) (rc *api.Replic
 	return
 }
 
+func (r *RollingUpdater) resizeAndWait(rc *api.ReplicationController, retry *RetryParams, wait *RetryParams) (*api.ReplicationController, error) {
+	resizer, err := ResizerFor("ReplicationController", r.c)
+	if err != nil {
+		return nil, err
+	}
+	if err := resizer.Resize(rc.Namespace, rc.Name, uint(rc.Spec.Replicas), &ResizePrecondition{-1, ""}, retry, wait); err != nil {
+		return nil, err
+	}
+	return r.c.ReplicationControllers(r.ns).Get(rc.ObjectMeta.Name)
+}
+
 func (r *RollingUpdater) updateAndWait(rc *api.ReplicationController, interval, timeout time.Duration) (*api.ReplicationController, error) {
 	rc, err := r.c.ReplicationControllers(r.ns).Update(rc)
 	if err != nil {
 		return nil, err
 	}
-	if err := wait.Poll(interval, timeout,
+	if err = wait.Poll(interval, timeout,
 		client.ControllerHasDesiredReplicas(r.c, rc)); err != nil {
 		return nil, err
 	}

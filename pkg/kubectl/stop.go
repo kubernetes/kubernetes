@@ -22,7 +22,6 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/wait"
 )
 
 const (
@@ -66,22 +65,13 @@ type objInterface interface {
 
 func (reaper *ReplicationControllerReaper) Stop(namespace, name string) (string, error) {
 	rc := reaper.ReplicationControllers(namespace)
-	controller, err := rc.Get(name)
-	if err != nil {
-		return "", err
-	}
 	resizer, err := ResizerFor("ReplicationController", *reaper)
 	if err != nil {
 		return "", err
 	}
-	cond := ResizeCondition(resizer, &ResizePrecondition{-1, ""}, namespace, name, 0)
-	if err = wait.Poll(shortInterval, reaper.timeout, cond); err != nil {
-		return "", err
-	}
-	if err := wait.Poll(reaper.pollInterval, reaper.timeout,
-		client.ControllerHasDesiredReplicas(reaper, controller)); err != nil {
-		return "", err
-	}
+	retry := &RetryParams{shortInterval, reaper.timeout}
+	waitForReplicas := &RetryParams{reaper.pollInterval, reaper.timeout}
+	err = resizer.Resize(namespace, name, 0, nil, retry, waitForReplicas)
 	if err := rc.Delete(name); err != nil {
 		return "", err
 	}
