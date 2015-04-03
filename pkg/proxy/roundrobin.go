@@ -214,7 +214,7 @@ func (lb *LoadBalancerRR) updateAffinityMap(svcPort ServicePortName, newEndpoint
 	}
 	for mKey, mVal := range allEndpoints {
 		if mVal == 1 {
-			glog.V(3).Infof("Delete endpoint %s for service %q", mKey, svcPort)
+			glog.V(2).Infof("Delete endpoint %s for service %q", mKey, svcPort)
 			removeSessionAffinityByEndpoint(state, svcPort, mKey)
 		}
 	}
@@ -257,7 +257,7 @@ func (lb *LoadBalancerRR) OnUpdate(allEndpoints []api.Endpoints) {
 			newEndpoints := flattenValidEndpoints(portsToEndpoints[portname])
 
 			if !exists || state == nil || len(curEndpoints) != len(newEndpoints) || !slicesEquiv(slice.CopyStrings(curEndpoints), newEndpoints) {
-				glog.V(3).Infof("LoadBalancerRR: Setting endpoints for %s to %+v", svcPort, newEndpoints)
+				glog.V(1).Infof("LoadBalancerRR: Setting endpoints for %s to %+v", svcPort, newEndpoints)
 				lb.updateAffinityMap(svcPort, newEndpoints)
 				// OnUpdate can be called without NewService being called externally.
 				// To be safe we will call it here.  A new service will only be created
@@ -274,7 +274,7 @@ func (lb *LoadBalancerRR) OnUpdate(allEndpoints []api.Endpoints) {
 	// Remove endpoints missing from the update.
 	for k := range lb.services {
 		if _, exists := registeredEndpoints[k]; !exists {
-			glog.V(3).Infof("LoadBalancerRR: Removing endpoints for %s", k)
+			glog.V(2).Infof("LoadBalancerRR: Removing endpoints for %s", k)
 			delete(lb.services, k)
 		}
 	}

@@ -360,7 +360,7 @@ func (proxier *Proxier) SyncLoop() {
 	for {
 		select {
 		case <-time.After(syncInterval):
-			glog.V(2).Infof("Periodic sync")
+			glog.V(3).Infof("Periodic sync")
 			if err := iptablesInit(proxier.iptables); err != nil {
 				glog.Errorf("Failed to ensure iptables: %v", err)
 			}
