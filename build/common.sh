@@ -505,11 +505,14 @@ function kube::release::package_tarballs() {
   # Clean out any old releases
   rm -rf "${RELEASE_DIR}"
   mkdir -p "${RELEASE_DIR}"
-  kube::release::package_client_tarballs
-  kube::release::package_server_tarballs
-  kube::release::package_salt_tarball
-  kube::release::package_test_tarball
-  kube::release::package_full_tarball
+  kube::release::package_client_tarballs &
+  kube::release::package_server_tarballs &
+  kube::release::package_salt_tarball &
+  wait || { kube::log::error "previous tarball phase failed"; return 1; }
+
+  kube::release::package_full_tarball & # _full depends on all the previous phases
+  kube::release::package_test_tarball & # _test doesn't depend on anything
+  wait || { kube::log::error "previous tarball phase failed"; return 1; }
 }
 
 # Package up all of the cross compiled clients.  Over time this should grow into
@@ -518,30 +521,35 @@ function kube::release::package_client_tarballs() {
    # Find all of the built client binaries
   local platform platforms
   platforms=($(cd "${LOCAL_OUTPUT_BINPATH}" ; echo */*))
-  for platform in "${platforms[@]}" ; do
+  for platform in "${platforms[@]}"; do
     local platform_tag=${platform/\//-} # Replace a "/" for a "-"
-    kube::log::status "Building tarball: client $platform_tag"
+    kube::log::status "Starting tarball: client $platform_tag"
 
-    local release_stage="${RELEASE_STAGE}/client/${platform_tag}/kubernetes"
-    rm -rf "${release_stage}"
-    mkdir -p "${release_stage}/client/bin"
+    (
+      local release_stage="${RELEASE_STAGE}/client/${platform_tag}/kubernetes"
+      rm -rf "${release_stage}"
+      mkdir -p "${release_stage}/client/bin"
 
-    local client_bins=("${KUBE_CLIENT_BINARIES[@]}")
-    if [[ "${platform%/*}" == "windows" ]]; then
-      client_bins=("${KUBE_CLIENT_BINARIES_WIN[@]}")
-    fi
+      local client_bins=("${KUBE_CLIENT_BINARIES[@]}")
+      if [[ "${platform%/*}" == "windows" ]]; then
+        client_bins=("${KUBE_CLIENT_BINARIES_WIN[@]}")
+      fi
 
-    # This fancy expression will expand to prepend a path
-    # (${LOCAL_OUTPUT_BINPATH}/${platform}/) to every item in the
-    # KUBE_CLIENT_BINARIES array.
-    cp "${client_bins[@]/#/${LOCAL_OUTPUT_BINPATH}/${platform}/}" \
-      "${release_stage}/client/bin/"
+      # This fancy expression will expand to prepend a path
+      # (${LOCAL_OUTPUT_BINPATH}/${platform}/) to every item in the
+      # KUBE_CLIENT_BINARIES array.
+      cp "${client_bins[@]/#/${LOCAL_OUTPUT_BINPATH}/${platform}/}" \
+        "${release_stage}/client/bin/"
 
-    kube::release::clean_cruft
+      kube::release::clean_cruft
 
-    local package_name="${RELEASE_DIR}/kubernetes-client-${platform_tag}.tar.gz"
-    kube::release::create_tarball "${package_name}" "${release_stage}/.."
+      local package_name="${RELEASE_DIR}/kubernetes-client-${platform_tag}.tar.gz"
+      kube::release::create_tarball "${package_name}" "${release_stage}/.."
+    ) &
   done
+
+  kube::log::status "Waiting on tarballs"
+  wait || { kube::log::error "client tarball creation failed"; exit 1; }
 }
 
 # Package up all of the server binaries
@@ -578,27 +586,41 @@ function kube::release::package_server_tarballs() {
   done
 }
 
+function kube::release::md5() {
+  if which md5 >/dev/null 2>&1; then
+    md5 -q "$1"
+  else
+    md5sum "$1" | awk '{ print $1 }'
+  fi
+}
+
 # This will take binaries that run on master and creates Docker images
 # that wrap the binary in them. (One docker image per binary)
 function kube::release::create_docker_images_for_server() {
   # Create a sub-shell so that we don't pollute the outer environment
   (
-    local binary_name;
+    local binary_name
     for binary_name in "${KUBE_DOCKER_WRAPPED_BINARIES[@]}"; do
-      echo "+++ Building docker image: ${binary_name}";
-      local docker_file_path="$1/Dockerfile";
-      local binary_file_path="$1/${binary_name}";
-      if [ -f ${docker_file_path} ]; then
-        rm ${docker_file_path};
-      fi;
-      printf " FROM scratch \n ADD ${binary_name} /${binary_name} \n ENTRYPOINT [ \"/${binary_name}\" ]\n" >> ${docker_file_path};
-      local md5_sum=$(md5sum ${binary_file_path} | awk '{print $1}')
-      local docker_image_tag=gcr.io/google_containers/$binary_name:$md5_sum
-      docker build -t "${docker_image_tag}" ${1};
-      docker save ${docker_image_tag} > ${1}/${binary_name}.tar;
-      echo $md5_sum > ${1}/${binary_name}.docker_tag;
-      rm ${docker_file_path};
+      kube::log::status "Starting Docker build for image: ${binary_name}"
+
+      (
+        local docker_file_path="$1/${binary_name}.Dockerfile"
+        local binary_file_path="$1/${binary_name}"
+        if [ -f ${docker_file_path} ]; then
+          rm ${docker_file_path}
+        fi
+        printf " FROM scratch \n ADD ${binary_name} /${binary_name} \n ENTRYPOINT [ \"/${binary_name}\" ]\n" >> ${docker_file_path}
+        local md5_sum=$(kube::release::md5 ${binary_file_path})
+        local docker_image_tag=gcr.io/google_containers/$binary_name:$md5_sum
+        docker build -q -f "${docker_file_path}" -t "${docker_image_tag}" ${1} >/dev/null
+        docker save ${docker_image_tag} > ${1}/${binary_name}.tar
+        echo $md5_sum > ${1}/${binary_name}.docker_tag
+        rm ${docker_file_path}
+      ) &
     done
+
+    wait || { kube::log::error "previous Docker build failed"; return 1; }
+    kube::log::status "Docker builds done"
   )
 }
 
