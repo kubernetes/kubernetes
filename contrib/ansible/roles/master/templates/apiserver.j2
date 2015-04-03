@@ -17,7 +17,7 @@ KUBE_API_ADDRESS="--address=0.0.0.0"
 KUBE_SERVICE_ADDRESSES="--portal_net={{ kube_service_addresses }}"
 
 # Location of the etcd cluster
-KUBE_ETCD_SERVERS="--etcd_servers=http://{{ groups['etcd'][0] }}:4001"
+KUBE_ETCD_SERVERS="--etcd_servers=http://{{ groups['etcd'][0] }}:2379"
 
 # default admission control policies
 KUBE_ADMISSION_CONTROL="--admission_control=NamespaceAutoProvision,LimitRanger,ResourceQuota"

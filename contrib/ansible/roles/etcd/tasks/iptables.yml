@@ -8,10 +8,10 @@
   service: name=iptables enabled=yes state=started
 
 - name: Open etcd client port with iptables
-  command: /sbin/iptables -I INPUT 1 -p tcp --dport {{ item }} -j ACCEPT -m comment --comment "etcd_client"
-  when: etcd_client not in iptablesrules.stdout
+  command: /sbin/iptables -I INPUT 1 -p tcp --dport {{ item }} -j ACCEPT -m comment --comment "etcd"
+  when: etcd not in iptablesrules.stdout
   notify:
           - Save iptables rules
   with_items:
-          - 4001
-          - 7001
+          - 2379
+          - 2380
