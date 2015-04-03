@@ -325,10 +325,10 @@ func NewProxier(loadBalancer LoadBalancer, listenIP net.IP, iptables iptables.In
 		return nil
 	}
 	glog.Infof("Setting Proxy IP to %v", hostIP)
-	return CreateProxier(loadBalancer, listenIP, iptables, hostIP)
+	return createProxier(loadBalancer, listenIP, iptables, hostIP)
 }
 
-func CreateProxier(loadBalancer LoadBalancer, listenIP net.IP, iptables iptables.Interface, hostIP net.IP) *Proxier {
+func createProxier(loadBalancer LoadBalancer, listenIP net.IP, iptables iptables.Interface, hostIP net.IP) *Proxier {
 	glog.Infof("Initializing iptables")
 	// Clean up old messes.  Ignore erors.
 	iptablesDeleteOld(iptables)
