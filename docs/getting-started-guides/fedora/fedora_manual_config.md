@@ -133,7 +133,7 @@ done
 ```
 kubectl get nodes
 NAME                LABELS              STATUS
-fed-node          name=fed-node-label     Ready
+fed-node            <none>              Ready
 ```
 * Deletion of nodes:
 
