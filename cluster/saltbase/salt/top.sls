@@ -14,11 +14,10 @@ base:
     - cadvisor
     - kubelet
     - kube-proxy
-{% if pillar.get('enable_node_logging', '').lower() == 'true' %}
-  {% if pillar['logging_destination'] is defined and pillar['logging_destination'] == 'elasticsearch' %}
+{% if pillar.get('enable_node_logging', '').lower() == 'true' and pillar['logging_destination'] is defined %}
+  {% if pillar['logging_destination'] == 'elasticsearch' %}
     - fluentd-es
-  {% endif %}
-  {% if pillar['logging_destination'] is defined and pillar['logging_destination'] == 'gcp' %}
+  {% elif pillar['logging_destination'] == 'gcp' %}
     - fluentd-gcp
   {% endif %}
 {% endif %}
@@ -57,6 +56,13 @@ base:
     - kubelet
 {% endif %}
 
+{% if pillar.get('enable_node_logging', '').lower() == 'true' and pillar['logging_destination'] is defined %}
+  {% if pillar['logging_destination'] == 'elasticsearch' %}
+    - fluentd-es
+  {% elif pillar['logging_destination'] == 'gcp' %}
+    - fluentd-gcp
+  {% endif %}
+{% endif %}
 
   'roles:kubernetes-pool-vsphere':
     - match: grain
