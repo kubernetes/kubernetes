@@ -18,16 +18,13 @@ limitations under the License.
 
 package mount
 
-const FlagBind = 0
-const FlagReadOnly = 0
-
 type Mounter struct{}
 
-func (mounter *Mounter) Mount(source string, target string, fstype string, flags uintptr, data string) error {
+func (mounter *Mounter) Mount(source string, target string, fstype string, options []string) error {
 	return nil
 }
 
-func (mounter *Mounter) Unmount(target string, flags int) error {
+func (mounter *Mounter) Unmount(target string) error {
 	return nil
 }
 

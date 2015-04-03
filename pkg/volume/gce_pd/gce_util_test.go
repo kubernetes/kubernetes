@@ -64,7 +64,7 @@ func TestSafeFormatAndMount(t *testing.T) {
 			runner: &fake,
 		}
 
-		err := mounter.Mount("/dev/foo", "/mnt/bar", test.fstype, 0, "")
+		err := mounter.Mount("/dev/foo", "/mnt/bar", test.fstype, nil)
 		if test.err == nil && err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}

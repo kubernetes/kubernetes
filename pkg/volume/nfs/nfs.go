@@ -17,23 +17,25 @@ limitations under the License.
 package nfs
 
 import (
+	"fmt"
 	"os"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/mount"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume"
 	"github.com/golang/glog"
 )
 
 // This is the primary entrypoint for volume plugins.
 func ProbeVolumePlugins() []volume.VolumePlugin {
-	return []volume.VolumePlugin{&nfsPlugin{nil, newNFSMounter()}}
+	return []volume.VolumePlugin{&nfsPlugin{nil, mount.New()}}
 }
 
 type nfsPlugin struct {
 	host    volume.VolumeHost
-	mounter nfsMountInterface
+	mounter mount.Interface
 }
 
 var _ volume.VolumePlugin = &nfsPlugin{}
@@ -66,7 +68,7 @@ func (plugin *nfsPlugin) NewBuilder(spec *volume.Spec, podRef *api.ObjectReferen
 	return plugin.newBuilderInternal(spec, podRef, plugin.mounter)
 }
 
-func (plugin *nfsPlugin) newBuilderInternal(spec *volume.Spec, podRef *api.ObjectReference, mounter nfsMountInterface) (volume.Builder, error) {
+func (plugin *nfsPlugin) newBuilderInternal(spec *volume.Spec, podRef *api.ObjectReference, mounter mount.Interface) (volume.Builder, error) {
 	return &nfs{
 		volName:    spec.Name,
 		server:     spec.VolumeSource.NFS.Server,
@@ -82,7 +84,7 @@ func (plugin *nfsPlugin) NewCleaner(volName string, podUID types.UID) (volume.Cl
 	return plugin.newCleanerInternal(volName, podUID, plugin.mounter)
 }
 
-func (plugin *nfsPlugin) newCleanerInternal(volName string, podUID types.UID, mounter nfsMountInterface) (volume.Cleaner, error) {
+func (plugin *nfsPlugin) newCleanerInternal(volName string, podUID types.UID, mounter mount.Interface) (volume.Cleaner, error) {
 	return &nfs{
 		volName:    volName,
 		server:     "",
@@ -101,7 +103,7 @@ type nfs struct {
 	server     string
 	exportPath string
 	readOnly   bool
-	mounter    nfsMountInterface
+	mounter    mount.Interface
 	plugin     *nfsPlugin
 }
 
@@ -119,9 +121,13 @@ func (nfsVolume *nfs) SetUpAt(dir string) error {
 	if mountpoint {
 		return nil
 	}
-	exportDir := nfsVolume.exportPath
 	os.MkdirAll(dir, 0750)
-	err = nfsVolume.mounter.Mount(nfsVolume.server, exportDir, dir, nfsVolume.readOnly)
+	source := fmt.Sprintf("%s:%s", nfsVolume.server, nfsVolume.exportPath)
+	options := []string{}
+	if nfsVolume.readOnly {
+		options = append(options, "ro")
+	}
+	err = nfsVolume.mounter.Mount(source, dir, "nfs", options)
 	if err != nil {
 		mountpoint, mntErr := nfsVolume.mounter.IsMountPoint(dir)
 		if mntErr != nil {

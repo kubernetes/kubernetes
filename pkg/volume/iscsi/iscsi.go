@@ -110,6 +110,11 @@ func (plugin *ISCSIPlugin) newCleanerInternal(volName string, podUID types.UID, 
 	}, nil
 }
 
+func (plugin *ISCSIPlugin) execCommand(command string, args []string) ([]byte, error) {
+	cmd := plugin.exe.Command(command, args...)
+	return cmd.CombinedOutput()
+}
+
 type iscsiDisk struct {
 	volName  string
 	podUID   types.UID
@@ -142,15 +147,13 @@ func (iscsi *iscsiDisk) SetUpAt(dir string) error {
 		return err
 	}
 	globalPDPath := iscsi.manager.MakeGlobalPDName(*iscsi)
-	// make mountpoint rw/ro work as expected
-	//FIXME revisit pkg/util/mount and ensure rw/ro is implemented as expected
-	mode := "rw"
+	var options []string
 	if iscsi.readOnly {
-		mode = "ro"
+		options = []string{"remount", "ro"}
+	} else {
+		options = []string{"remount", "rw"}
 	}
-	iscsi.plugin.execCommand("mount", []string{"-o", "remount," + mode, globalPDPath, dir})
-
-	return nil
+	return iscsi.mounter.Mount(globalPDPath, dir, "", options)
 }
 
 // Unmounts the bind mount, and detaches the disk only if the disk
@@ -161,9 +164,4 @@ func (iscsi *iscsiDisk) TearDown() error {
 
 func (iscsi *iscsiDisk) TearDownAt(dir string) error {
 	return diskTearDown(iscsi.manager, *iscsi, dir, iscsi.mounter)
-}
-
-func (plugin *ISCSIPlugin) execCommand(command string, args []string) ([]byte, error) {
-	cmd := plugin.exe.Command(command, args...)
-	return cmd.CombinedOutput()
 }

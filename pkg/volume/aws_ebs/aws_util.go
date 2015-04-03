@@ -36,10 +36,6 @@ func (util *AWSDiskUtil) AttachAndMountDisk(pd *awsElasticBlockStore, globalPDPa
 	if err != nil {
 		return err
 	}
-	flags := uintptr(0)
-	if pd.readOnly {
-		flags = mount.FlagReadOnly
-	}
 	devicePath, err := volumes.AttachDisk("", pd.volumeID, pd.readOnly)
 	if err != nil {
 		return err
@@ -76,8 +72,12 @@ func (util *AWSDiskUtil) AttachAndMountDisk(pd *awsElasticBlockStore, globalPDPa
 			return err
 		}
 	}
+	options := []string{}
+	if pd.readOnly {
+		options = append(options, "ro")
+	}
 	if !mountpoint {
-		err = pd.diskMounter.Mount(devicePath, globalPDPath, pd.fsType, flags, "")
+		err = pd.diskMounter.Mount(devicePath, globalPDPath, pd.fsType, options)
 		if err != nil {
 			os.Remove(globalPDPath)
 			return err
@@ -90,7 +90,7 @@ func (util *AWSDiskUtil) AttachAndMountDisk(pd *awsElasticBlockStore, globalPDPa
 func (util *AWSDiskUtil) DetachDisk(pd *awsElasticBlockStore) error {
 	// Unmount the global PD mount, which should be the only one.
 	globalPDPath := makeGlobalPDPath(pd.plugin.host, pd.volumeID)
-	if err := pd.mounter.Unmount(globalPDPath, 0); err != nil {
+	if err := pd.mounter.Unmount(globalPDPath); err != nil {
 		glog.V(2).Info("Error unmount dir ", globalPDPath, ": ", err)
 		return err
 	}
@@ -121,18 +121,21 @@ type awsSafeFormatAndMount struct {
 }
 
 // uses /usr/share/google/safe_format_and_mount to optionally mount, and format a disk
-func (mounter *awsSafeFormatAndMount) Mount(source string, target string, fstype string, flags uintptr, data string) error {
+func (mounter *awsSafeFormatAndMount) Mount(source string, target string, fstype string, options []string) error {
 	// Don't attempt to format if mounting as readonly. Go straight to mounting.
-	if (flags & mount.FlagReadOnly) != 0 {
-		return mounter.Interface.Mount(source, target, fstype, flags, data)
+	// Don't attempt to format if mounting as readonly. Go straight to mounting.
+	for _, option := range options {
+		if option == "ro" {
+			return mounter.Interface.Mount(source, target, fstype, options)
+		}
 	}
 	args := []string{}
 	// ext4 is the default for safe_format_and_mount
 	if len(fstype) > 0 && fstype != "ext4" {
 		args = append(args, "-m", fmt.Sprintf("mkfs.%s", fstype))
 	}
+	args = append(args, options...)
 	args = append(args, source, target)
-	// TODO: Accept other options here?
 	glog.V(5).Infof("exec-ing: /usr/share/google/safe_format_and_mount %v", args)
 	cmd := mounter.runner.Command("/usr/share/google/safe_format_and_mount", args...)
 	dataOut, err := cmd.CombinedOutput()

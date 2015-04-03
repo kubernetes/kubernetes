@@ -201,11 +201,6 @@ func (pd *gcePersistentDisk) SetUpAt(dir string) error {
 		return err
 	}
 
-	flags := uintptr(0)
-	if pd.readOnly {
-		flags = mount.FlagReadOnly
-	}
-
 	if err := os.MkdirAll(dir, 0750); err != nil {
 		// TODO: we should really eject the attach/detach out into its own control loop.
 		detachDiskLogError(pd)
@@ -213,7 +208,11 @@ func (pd *gcePersistentDisk) SetUpAt(dir string) error {
 	}
 
 	// Perform a bind mount to the full path to allow duplicate mounts of the same PD.
-	err = pd.mounter.Mount(globalPDPath, dir, "", mount.FlagBind|flags, "")
+	options := []string{"bind"}
+	if pd.readOnly {
+		options = append(options, "ro")
+	}
+	err = pd.mounter.Mount(globalPDPath, dir, "", options)
 	if err != nil {
 		mountpoint, mntErr := pd.mounter.IsMountPoint(dir)
 		if mntErr != nil {
@@ -221,7 +220,7 @@ func (pd *gcePersistentDisk) SetUpAt(dir string) error {
 			return err
 		}
 		if mountpoint {
-			if mntErr = pd.mounter.Unmount(dir, 0); mntErr != nil {
+			if mntErr = pd.mounter.Unmount(dir); mntErr != nil {
 				glog.Errorf("Failed to unmount: %v", mntErr)
 				return err
 			}
@@ -279,7 +278,7 @@ func (pd *gcePersistentDisk) TearDownAt(dir string) error {
 		return err
 	}
 	// Unmount the bind-mount inside this pod
-	if err := pd.mounter.Unmount(dir, 0); err != nil {
+	if err := pd.mounter.Unmount(dir); err != nil {
 		return err
 	}
 	// If len(refs) is 1, then all bind mounts have been removed, and the

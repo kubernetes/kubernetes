@@ -55,7 +55,7 @@ func (fake *fakeDiskManager) AttachDisk(disk iscsiDisk) error {
 	}
 	// Simulate the global mount so that the fakeMounter returns the
 	// expected number of mounts for the attached disk.
-	disk.mounter.Mount(globalPath, globalPath, disk.fsType, 0, "")
+	disk.mounter.Mount(globalPath, globalPath, disk.fsType, nil)
 
 	fake.attachCalled = true
 	return nil

@@ -55,11 +55,11 @@ func diskSetUp(manager diskManager, disk iscsiDisk, volPath string, mounter moun
 		return err
 	}
 	// Perform a bind mount to the full path to allow duplicate mounts of the same disk.
-	flags := uintptr(0)
+	options := []string{"bind"}
 	if disk.readOnly {
-		flags = mount.FlagReadOnly
+		options = append(options, "ro")
 	}
-	err = mounter.Mount(globalPDPath, volPath, "", mount.FlagBind|flags, "")
+	err = mounter.Mount(globalPDPath, volPath, "", options)
 	if err != nil {
 		glog.Errorf("failed to bind mount:%s", globalPDPath)
 		return err
@@ -83,8 +83,8 @@ func diskTearDown(manager diskManager, disk iscsiDisk, volPath string, mounter m
 		glog.Errorf("failed to get reference count %s", volPath)
 		return err
 	}
-	if err := mounter.Unmount(volPath, 0); err != nil {
-		glog.Errorf("failed to umount %s", volPath)
+	if err := mounter.Unmount(volPath); err != nil {
+		glog.Errorf("failed to unmount %s", volPath)
 		return err
 	}
 	// If len(refs) is 1, then all bind mounts have been removed, and the
