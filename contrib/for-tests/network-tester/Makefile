@@ -6,10 +6,10 @@ webserver: webserver.go
 	CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -ldflags '-w' ./webserver.go
 
 container: webserver
-	sudo docker build -t kubernetes/nettest:$(TAG) .
+	docker build -t gcr.io/google_containers/nettest:$(TAG) .
 
 push: container
-	sudo docker push kubernetes/nettest:$(TAG)
+	gcloud preview docker push gcr.io/google_containers/nettest:$(TAG)
 
 clean:
 	rm -f webserver
