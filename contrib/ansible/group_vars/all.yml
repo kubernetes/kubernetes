@@ -9,3 +9,9 @@ ansible_ssh_user: root
 
 # If a password is needed to sudo to root that password must be set here
 #ansible_sudo_pass: password
+
+# Kubernetes internal network for services.
+# Kubernetes services will get fake IP addresses from this range.
+# This range must not conflict with anything in your infrastructure. These
+# addresses do not need to be routable and must just be an unused block of space.
+kube_service_addresses: 10.254.0.0/16
