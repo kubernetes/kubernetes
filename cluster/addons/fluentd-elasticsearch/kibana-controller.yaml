@@ -13,6 +13,11 @@ desiredState:
         containers:
           - name: kibana-logging
             image: gcr.io/google_containers/kibana:1.1
+            env: 
+              - name: "ES_SCHEME"
+                value: "https"
+              - name: "ES_HOST"
+                value: "\"+window.location.hostname+\"/api/v1beta1/proxy/services/elasticsearch-logging"
             ports:
               - name: kibana-port
                 containerPort: 80
