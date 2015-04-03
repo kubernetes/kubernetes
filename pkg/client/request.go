@@ -32,6 +32,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/metrics"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
@@ -125,6 +126,7 @@ type Request struct {
 // NewRequest creates a new request helper object for accessing runtime.Objects on a server.
 func NewRequest(client HTTPClient, verb string, baseURL *url.URL, apiVersion string,
 	codec runtime.Codec, namespaceInQuery bool, preserveResourceCase bool) *Request {
+	metrics.Register()
 	return &Request{
 		client:  client,
 		verb:    verb,
@@ -405,7 +407,10 @@ func (r *Request) finalURL() string {
 		p = path.Join(p, r.resourceName, r.subresource, r.subpath)
 	}
 
-	finalURL := *r.baseURL
+	finalURL := url.URL{}
+	if r.baseURL != nil {
+		finalURL = *r.baseURL
+	}
 	finalURL.Path = p
 
 	query := url.Values{}
@@ -425,6 +430,15 @@ func (r *Request) finalURL() string {
 	}
 	finalURL.RawQuery = query.Encode()
 	return finalURL.String()
+}
+
+// Similar to finalURL(), but if the request contains name of an object
+// (e.g. GET for a specific Pod) it will be substited with "<name>".
+func (r Request) finalURLTemplate() string {
+	if len(r.resourceName) != 0 {
+		r.resourceName = "<name>"
+	}
+	return r.finalURL()
 }
 
 // Watch attempts to begin watching the requested location.
@@ -599,6 +613,10 @@ func (r *Request) DoRaw() ([]byte, error) {
 //  * If the status code and body don't make sense together: *UnexpectedStatusError
 //  * http.Client.Do errors are returned directly.
 func (r *Request) Do() Result {
+	start := time.Now()
+	defer func() {
+		metrics.RequestLatency.WithLabelValues(r.verb, r.finalURLTemplate()).Observe(metrics.SinceInMicroseconds(start))
+	}()
 	body, err := r.DoRaw()
 	if err != nil {
 		return Result{err: err}
