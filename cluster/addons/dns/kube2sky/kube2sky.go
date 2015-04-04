@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2015 Google Inc. All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -15,8 +15,8 @@ limitations under the License.
 */
 
 // kube2sky is a bridge between Kubernetes and SkyDNS.  It watches the
-// Kubernetes master for changes in Services and manifests them into etcd for
-// SkyDNS to serve as DNS records.
+// Kubernetes master for changes in Services and Pods and manifests them
+// into etcd for SkyDNS to serve as DNS records.
 package main
 
 import (
@@ -25,105 +25,48 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 	"time"
 
 	kapi "github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	kclient "github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	kfields "github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	klabels "github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
-	tools "github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
+	kutil "github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	kwatch "github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 	etcd "github.com/coreos/go-etcd/etcd"
 	skymsg "github.com/skynetservices/skydns/msg"
 )
 
 var (
-	domain                = flag.String("domain", "kubernetes.local", "domain under which to create names")
-	etcd_mutation_timeout = flag.Duration("etcd_mutation_timeout", 10*time.Second, "crash after retrying etcd mutation for a specified duration")
-	etcd_server           = flag.String("etcd-server", "http://127.0.0.1:4001", "URL to etcd server")
-	verbose               = flag.Bool("verbose", false, "log extra information")
+	_            = flag.Duration("etcd_mutation_timeout", 0, "deprecated")
+	etcdServers  = flag.String("etcd-server", "http://127.0.0.1:4001", "comma separated list of etcd server URLs")
+	svcDomain    = flag.String("domain", "kubernetes.local", "domain under which to create names corresponding to services")
+	podDomain    = flag.String("pod_domain", "", "domain under which to create names corresponding to running pods")
+	pollInterval = flag.Duration("poll_interval", 10*time.Second, "don't rely on watch API, and poll services and pods at this interval (0 to disable)")
+	verbose      = flag.Bool("verbose", false, "log extra information")
 )
 
-func removeDNS(record string, etcdClient *etcd.Client) error {
-	log.Printf("Removing %s from DNS", record)
-	_, err := etcdClient.Delete(skymsg.Path(record), true)
-	return err
-}
+const (
+	dnsPriority = 10
+	dnsWeight   = 10
+	dnsTTL      = 30
+	retryWatch  = 1 * time.Second
+)
 
-func addDNS(record string, service *kapi.Service, etcdClient *etcd.Client) error {
-	// if PortalIP is not set, a DNS entry should not be created
-	if !kapi.IsServiceIPSet(service) {
-		log.Printf("Skipping dns record for headless service: %s\n", service.Name)
-		return nil
+func newDNSRecord(ip string, port int) string {
+	svc := skymsg.Service{
+		Host:     ip,
+		Port:     port,
+		Priority: dnsPriority,
+		Weight:   dnsWeight,
+		Ttl:      dnsTTL,
 	}
-
-	for i := range service.Spec.Ports {
-		svc := skymsg.Service{
-			Host:     service.Spec.PortalIP,
-			Port:     service.Spec.Ports[i].Port,
-			Priority: 10,
-			Weight:   10,
-			Ttl:      30,
-		}
-		b, err := json.Marshal(svc)
-		if err != nil {
-			return err
-		}
-		// Set with no TTL, and hope that kubernetes events are accurate.
-
-		log.Printf("Setting DNS record: %v -> %s:%d\n", record, service.Spec.PortalIP, service.Spec.Ports[i].Port)
-		_, err = etcdClient.Set(skymsg.Path(record), string(b), uint64(0))
-		if err != nil {
-			return err
-		}
+	b, err := json.Marshal(svc)
+	if err != nil {
+		log.Fatalf("error marshalling skymsg.Service: %v", err)
 	}
-	return nil
-}
-
-// Implements retry logic for arbitrary mutator. Crashes after retrying for
-// etcd_mutation_timeout.
-func mutateEtcdOrDie(mutator func() error) {
-	timeout := time.After(*etcd_mutation_timeout)
-	for {
-		select {
-		case <-timeout:
-			log.Fatalf("Failed to mutate etcd for %v using mutator: %v", *etcd_mutation_timeout, mutator)
-		default:
-			if err := mutator(); err != nil {
-				delay := 50 * time.Millisecond
-				log.Printf("Failed to mutate etcd using mutator: %v due to: %v. Will retry in: %v", mutator, err, delay)
-				time.Sleep(delay)
-			} else {
-				return
-			}
-		}
-	}
-}
-
-func newEtcdClient() (client *etcd.Client) {
-	maxConnectRetries := 12
-	for maxConnectRetries > 0 {
-		if _, _, err := tools.GetEtcdVersion(*etcd_server); err != nil {
-			log.Fatalf("Failed to connect to etcd server: %v, error: %v", *etcd_server, err)
-			if maxConnectRetries > 0 {
-				log.Println("Retrying request after 5 second sleep.")
-				time.Sleep(5 * time.Second)
-				maxConnectRetries--
-			} else {
-				return nil
-			}
-		} else {
-			log.Printf("Etcd server found: %v", *etcd_server)
-			break
-		}
-	}
-	client = etcd.NewClient([]string{*etcd_server})
-	if client == nil {
-		return nil
-	}
-	client.SyncCluster()
-
-	return client
+	return string(b)
 }
 
 // TODO: evaluate using pkg/client/clientcmd
@@ -139,159 +82,334 @@ func newKubeClient() (*kclient.Client, error) {
 		log.Fatalf("KUBERNETES_RO_SERVICE_PORT is not defined")
 	}
 	config.Host = fmt.Sprintf("http://%s:%s", masterHost, masterPort)
-	log.Printf("Using %s for kubernetes master", config.Host)
+	if *verbose {
+		log.Printf("Using %s for kubernetes master", config.Host)
+	}
 
 	config.Version = "v1beta1"
-	log.Printf("Using kubernetes API %s", config.Version)
+	if *verbose {
+		log.Printf("Using kubernetes API %s", config.Version)
+	}
 
 	return kclient.New(config)
 }
 
-func buildNameString(service, namespace, domain string) string {
-	return fmt.Sprintf("%s.%s.%s.", service, namespace, domain)
+func buildServiceName(port, service, namespace, domain string) string {
+	if port != "" {
+		port += "."
+	}
+	return skymsg.Path(fmt.Sprintf("%s%s.%s.%s.", port, service, namespace, domain))
 }
 
-func watchOnce(etcdClient *etcd.Client, kubeClient *kclient.Client) {
-	// Start the goroutine to produce update events.
-	updates := make(chan serviceUpdate)
-	startWatching(kubeClient.Services(kapi.NamespaceAll), updates)
+func buildPodName(pod, port, service, namespace, domain string) string {
+	if port != "" {
+		port += "."
+	}
+	return skymsg.Path(fmt.Sprintf("%s.%s%s.%s.%s.", pod, port, service, namespace, domain))
+}
 
-	// This loop will break if the channel closes, which is how the
-	// goroutine signals an error.
-	for ev := range updates {
-		if *verbose {
-			log.Printf("Received update event: %#v", ev)
-		}
-		switch ev.Op {
-		case SetServices, AddService:
-			for i := range ev.Services {
-				s := &ev.Services[i]
-				name := buildNameString(s.Name, s.Namespace, *domain)
-				mutateEtcdOrDie(func() error { return addDNS(name, s, etcdClient) })
+func buildExistingHosts(hosts map[string]string, node *etcd.Node) {
+	if node.Value != "" {
+		hosts[node.Key] = node.Value
+	}
+	for _, n := range node.Nodes {
+		buildExistingHosts(hosts, n)
+	}
+}
+
+type etcdInterface interface {
+	Set(string, string, uint64) (*etcd.Response, error)
+	Delete(string, bool) (*etcd.Response, error)
+}
+
+type updater struct {
+	etcd        etcdInterface
+	ch          chan interface{}
+	services    map[string]*kapi.Service
+	pods        map[string]*kapi.Pod
+	existingDNS map[string]string
+	err         chan error
+	stopChan    chan struct{}
+}
+
+func newUpdater(etcd etcdInterface) *updater {
+	u := &updater{
+		etcd:     etcd,
+		ch:       make(chan interface{}, 1024),
+		err:      make(chan error, 1),
+		stopChan: make(chan struct{}),
+	}
+	go u.process()
+	return u
+}
+
+type runCmd struct {
+	existingDNS map[string]string
+}
+
+type stopCmd struct{}
+
+// process runs main updater goroutine. This goroutine is responsible for bookkeeping services,
+// pods, existingDNS maps. It receives events from watchers, and when it has all necessary
+// information (existing services, existing pods, existing DNS entries), it starts doing useful
+// work (compare target vs existing DNS entries, and applying the difference).
+func (u *updater) process() {
+	for {
+		select {
+		case req := <-u.ch:
+			// Process first request in blocking mode.
+			u.processOnce(req)
+			// Process everything remaining in the queue.
+			for len(u.ch) > 0 {
+				u.processOnce(<-u.ch)
 			}
-		case RemoveService:
-			for i := range ev.Services {
-				s := &ev.Services[i]
-				name := buildNameString(s.Name, s.Namespace, *domain)
-				mutateEtcdOrDie(func() error { return removeDNS(name, etcdClient) })
+			// Commit everything at once (only after everything is loaded).
+			if u.existingDNS != nil && u.services != nil && u.pods != nil {
+				u.commit()
+			}
+		case <-u.stopChan:
+			return
+		}
+	}
+}
+
+func (u *updater) processOnce(req interface{}) {
+	switch r := req.(type) {
+	case []kapi.Pod:
+		u.pods = make(map[string]*kapi.Pod)
+		for i, p := range r {
+			u.pods[p.Name] = &r[i]
+		}
+	case []kapi.Service:
+		u.services = make(map[string]*kapi.Service)
+		for i, s := range r {
+			u.services[s.Name] = &r[i]
+		}
+	case kwatch.Event:
+		if r.Type == kwatch.Error {
+			log.Printf("Watch error: %+v", r)
+			return
+		}
+		switch o := r.Object.(type) {
+		case *kapi.Service:
+			if *verbose {
+				log.Printf("%s service %s", r.Type, o.Name)
+			}
+			if r.Type == kwatch.Deleted {
+				delete(u.services, o.Name)
+				break
+			}
+			u.services[o.Name] = o
+		case *kapi.Pod:
+			if *verbose {
+				log.Printf("%s pod %s", r.Type, o.Name)
+			}
+			if r.Type == kwatch.Deleted {
+				delete(u.pods, o.Name)
+				break
+			}
+			u.pods[o.Name] = o
+		default:
+			log.Printf("Unexpected object type in the event: %T", r)
+		}
+	case runCmd:
+		u.existingDNS = r.existingDNS
+	case stopCmd:
+		u.err <- nil
+		return
+	case error:
+		u.err <- r
+		return
+	default:
+		log.Printf("Unexpected request of type %T", req)
+	}
+}
+
+func (u *updater) watchServices(svcService kclient.ServiceInterface) {
+	for {
+		services, err := svcService.List(klabels.Everything())
+		if err != nil {
+			u.ch <- err
+			return
+		}
+		u.ch <- services.Items
+		retry, err := u.watch(svcService, services.ResourceVersion)
+		if err != nil {
+			u.ch <- err
+			return
+		}
+		if !retry {
+			break
+		}
+		time.Sleep(retryWatch)
+	}
+}
+
+func (u *updater) watchPods(podService kclient.PodInterface) {
+	for {
+		pods, err := podService.List(klabels.Everything())
+		if err != nil {
+			u.ch <- err
+			return
+		}
+		u.ch <- pods.Items
+		retry, err := u.watch(podService, pods.ResourceVersion)
+		if err != nil {
+			u.ch <- err
+			return
+		}
+		if !retry {
+			break
+		}
+		time.Sleep(retryWatch)
+	}
+}
+
+type watcher interface {
+	Watch(klabels.Selector, kfields.Selector, string) (kwatch.Interface, error)
+}
+
+func (u *updater) watch(storage watcher, version string) (retry bool, err error) {
+	watcher, err := storage.Watch(klabels.Everything(), kfields.Everything(), version)
+	if err != nil {
+		return false, err
+	}
+	var nextPoll <-chan time.Time
+	if *pollInterval > 0 {
+		nextPoll = time.After(*pollInterval)
+	}
+	for {
+		select {
+		case <-u.stopChan:
+			watcher.Stop()
+			return false, nil
+		case <-nextPoll:
+			watcher.Stop()
+			return true, nil
+		case e, ok := <-watcher.ResultChan():
+			if !ok {
+				return true, nil
+			}
+			u.ch <- e
+		}
+	}
+}
+
+func (u *updater) stop() {
+	u.ch <- stopCmd{}
+}
+
+func (u *updater) run(existingDNS map[string]string) error {
+	u.ch <- runCmd{existingDNS}
+	defer close(u.stopChan)
+	return <-u.err
+}
+
+func (u *updater) commit() {
+	target := make(map[string]string)
+	for _, s := range u.services {
+		// DNS record for the service.
+		if *svcDomain != "" {
+			for _, port := range s.Spec.Ports {
+				target[buildServiceName(port.Name, s.Name, s.Namespace, *svcDomain)] = newDNSRecord(s.Spec.PortalIP, port.Port)
+			}
+		}
+
+		// FIXME: This is the workaround for builtin "kubernetes" and "kubernetes-ro" services with empty selectors.
+		if len(s.Spec.Selector) == 0 {
+			continue
+		}
+
+		if *podDomain == "" {
+			continue
+		}
+		for _, p := range u.pods {
+			if p.Status.Phase != kapi.PodRunning {
+				continue
+			}
+			if p.Namespace != s.Namespace {
+				continue
+			}
+			labels := p.ObjectMeta.Labels
+			match := true
+			for k, v := range s.Spec.Selector {
+				if labels[k] != v {
+					match = false
+					break
+				}
+			}
+			if !match {
+				continue
+			}
+			// DNS record for the pod matching this service.
+			for _, port := range s.Spec.Ports {
+				target[buildPodName(p.Name, port.Name, s.Name, s.Namespace, *podDomain)] = newDNSRecord(p.Status.PodIP, port.Port)
 			}
 		}
 	}
-	//TODO: fully resync periodically.
+
+	for k := range u.existingDNS {
+		if target[k] == "" {
+			if *verbose {
+				log.Printf("Deleting DNS record: %s", skymsg.Domain(k))
+			}
+			if _, err := u.etcd.Delete(k, false); err != nil {
+				log.Print(err)
+				continue
+			}
+			delete(u.existingDNS, k)
+		}
+	}
+	for k, v := range target {
+		if u.existingDNS[k] != v {
+			if *verbose {
+				log.Printf("Setting DNS record: %s = %s", skymsg.Domain(k), v)
+			}
+			if _, err := u.etcd.Set(k, v, uint64(0)); err != nil {
+				log.Print(err)
+				continue
+			}
+			u.existingDNS[k] = v
+		}
+	}
 }
 
 func main() {
 	flag.Parse()
 
-	etcdClient := newEtcdClient()
-	if etcdClient == nil {
-		log.Fatal("Failed to create etcd client")
-	}
-
+	// Connect to the cluster services.
+	etcdClient := etcd.NewClient(strings.Split(*etcdServers, ","))
+	etcdClient.SyncCluster()
 	kubeClient, err := newKubeClient()
 	if err != nil {
-		log.Fatalf("Failed to create a kubernetes client: %v", err)
+		log.Fatalf("Failed to create kubernetes client: %v", err)
+		os.Exit(2)
 	}
 
-	// In case of error, the watch will be aborted.  At that point we just
-	// retry.
-	for {
-		watchOnce(etcdClient, kubeClient)
-	}
-}
-
-//FIXME: make the below part of the k8s client lib?
-
-// servicesWatcher is capable of listing and watching for changes to services
-// across ALL namespaces
-type servicesWatcher interface {
-	List(label klabels.Selector) (*kapi.ServiceList, error)
-	Watch(label klabels.Selector, field kfields.Selector, resourceVersion string) (kwatch.Interface, error)
-}
-
-type operation int
-
-// These are the available operation types.
-const (
-	SetServices operation = iota
-	AddService
-	RemoveService
-)
-
-// serviceUpdate describes an operation of services, sent on the channel.
-//
-// You can add or remove a single service by sending an array of size one with
-// Op == AddService|RemoveService.  For setting the state of the system to a given state, just
-// set Services as desired and Op to SetServices, which will reset the system
-// state to that specified in this operation for this source channel. To remove
-// all services, set Services to empty array and Op to SetServices
-type serviceUpdate struct {
-	Services []kapi.Service
-	Op       operation
-}
-
-// startWatching launches a goroutine that watches for changes to services.
-func startWatching(watcher servicesWatcher, updates chan<- serviceUpdate) {
-	serviceVersion := ""
-	go watchLoop(watcher, updates, &serviceVersion)
-}
-
-// watchLoop loops forever looking for changes to services.  If an error occurs
-// it will close the channel and return.
-func watchLoop(svcWatcher servicesWatcher, updates chan<- serviceUpdate, resourceVersion *string) {
-	defer close(updates)
-
-	if len(*resourceVersion) == 0 {
-		services, err := svcWatcher.List(klabels.Everything())
+	// Load existing DNS records.
+	existingDNS := make(map[string]string)
+	for _, domain := range []string{*svcDomain, *podDomain} {
+		if domain == "" {
+			continue
+		}
+		paths, err := etcdClient.Get(skymsg.Path(domain), false, true)
 		if err != nil {
-			log.Printf("Failed to load services: %v", err)
-			return
+			log.Printf("Couldn't get list of existing DNS entries in %s: %v", domain, err)
+			continue
 		}
-		*resourceVersion = services.ResourceVersion
-		updates <- serviceUpdate{Op: SetServices, Services: services.Items}
+		buildExistingHosts(existingDNS, paths.Node)
 	}
 
-	watcher, err := svcWatcher.Watch(klabels.Everything(), kfields.Everything(), *resourceVersion)
-	if err != nil {
-		log.Printf("Failed to watch for service changes: %v", err)
-		return
-	}
-	defer watcher.Stop()
+	// Load initial state and register watchers.
+	upd := newUpdater(etcdClient)
+	svcService := kubeClient.Services(kapi.NamespaceAll)
+	podService := kubeClient.Pods(kapi.NamespaceAll)
+	go kutil.Forever(func() { upd.watchServices(svcService) }, retryWatch)
+	go kutil.Forever(func() { upd.watchPods(podService) }, retryWatch)
 
-	ch := watcher.ResultChan()
-	for {
-		select {
-		case event, ok := <-ch:
-			if !ok {
-				log.Printf("watchLoop channel closed")
-				return
-			}
-
-			if event.Type == kwatch.Error {
-				if status, ok := event.Object.(*kapi.Status); ok {
-					log.Printf("Error during watch: %#v", status)
-					return
-				}
-				log.Fatalf("Received unexpected error: %#v", event.Object)
-			}
-
-			if service, ok := event.Object.(*kapi.Service); ok {
-				sendUpdate(updates, event, service, resourceVersion)
-				continue
-			}
-		}
-	}
-}
-
-func sendUpdate(updates chan<- serviceUpdate, event kwatch.Event, service *kapi.Service, resourceVersion *string) {
-	*resourceVersion = service.ResourceVersion
-
-	switch event.Type {
-	case kwatch.Added, kwatch.Modified:
-		updates <- serviceUpdate{Op: AddService, Services: []kapi.Service{*service}}
-	case kwatch.Deleted:
-		updates <- serviceUpdate{Op: RemoveService, Services: []kapi.Service{*service}}
-	default:
-		log.Fatalf("Unknown event.Type: %v", event.Type)
+	// Run.
+	if err := upd.run(existingDNS); err != nil {
+		log.Print(err)
+		os.Exit(6)
 	}
 }
