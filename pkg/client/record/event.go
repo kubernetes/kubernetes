@@ -176,7 +176,11 @@ func recordEvent(sink EventSink, event *api.Event, updateExistingEvent bool) boo
 		glog.Errorf("Unable to construct event '%#v': '%v' (will not retry!)", event, err)
 		return true
 	case *errors.StatusError:
-		glog.Errorf("Server rejected event '%#v': '%v' (will not retry!)", event, err)
+		if errors.IsAlreadyExists(err) {
+			glog.V(5).Infof("Server rejected event '%#v': '%v' (will not retry!)", event, err)
+		} else {
+			glog.Errorf("Server rejected event '%#v': '%v' (will not retry!)", event, err)
+		}
 		return true
 	case *errors.UnexpectedObjectError:
 		// We don't expect this; it implies the server's response didn't match a
