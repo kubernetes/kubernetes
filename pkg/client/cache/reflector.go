@@ -18,8 +18,10 @@ package cache
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"reflect"
+	"sync"
 	"time"
 
 	apierrs "github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
@@ -39,6 +41,72 @@ type ListerWatcher interface {
 	Watch(resourceVersion string) (watch.Interface, error)
 }
 
+// CancellationController transmits cancellation signals in the following way:
+// New (closed) -> Renew (open) -> Cancel (send stop, closed) -> Renew (open) ..
+// Note:
+// - A call to renew an open cancellation channel will fail
+// - Once a cancellation channel is created it might be passed around to
+//   multiple callers, so a call to close a closed channel will no-op.
+// - A slow receiver can retrieve a stop signal off a channel even after the
+//   controller has been renewed.
+type CancellationController struct {
+
+	// Period after which an automatic stop signal is sent down the
+	// cancellationChannel. Defaults to 0, which opts the client out
+	// of receiving the auto-signal.
+	resyncPeriod time.Duration
+
+	// Conduit for stop signals
+	cancellationCh chan interface{}
+	sync.Mutex
+
+	// False by default, all controller start off closed
+	open bool
+}
+
+// CancelAfter will send a stop signal after t Duration on the cancel channel.
+// If the cancellation channel is closed after t Duration from the time of
+// invocation, this method just no-ops.
+func (c *CancellationController) CancelAfter(t time.Duration) {
+	cancellationTimeStamp := <-time.After(t)
+	c.Cancel(cancellationTimeStamp)
+}
+
+// Cancel immediately sends a stop signal down the cancellation channel
+// and closes it. If the cancellation channel is already closed this
+// method just no-ops. If the stopSignal is nil this method just closes
+// the channel.
+func (c *CancellationController) Cancel(stopSignal interface{}) {
+	c.Lock()
+	defer c.Unlock()
+	if c.open {
+		if stopSignal != nil {
+			c.cancellationCh <- stopSignal
+		}
+		if c.cancellationCh != nil {
+			close(c.cancellationCh)
+		}
+		c.open = false
+	}
+}
+
+// RenewCancellationChan returns a channel on which one sends a cancel signal.
+// If the cancellationController has a non-zero resyncPeriod, this method
+// kicks off a goroutine that sends a cancel signal after resyncPeriod.
+func (c *CancellationController) RenewCancellationChan() (chan interface{}, error) {
+	c.Lock()
+	defer c.Unlock()
+	if c.open {
+		return nil, fmt.Errorf("Cannot renew an open cancellation controller.")
+	}
+	c.cancellationCh = make(chan interface{})
+	c.open = true
+	if c.resyncPeriod > 0 {
+		go c.CancelAfter(c.resyncPeriod)
+	}
+	return c.cancellationCh, nil
+}
+
 // Reflector watches a specified resource and causes all changes to be reflected in the given store.
 type Reflector struct {
 	// The type of object we expect to place in the store.
@@ -49,12 +117,17 @@ type Reflector struct {
 	listerWatcher ListerWatcher
 	// period controls timing between one watch ending and
 	// the beginning of the next one.
-	period       time.Duration
-	resyncPeriod time.Duration
+	period time.Duration
+
 	// lastSyncResourceVersion is the resource version token last
 	// observed when doing a sync with the underlying store
 	// it is not thread safe as it is not synchronized with access to the store
 	lastSyncResourceVersion string
+
+	// Resyncing the reflector effectively boils down to sending a stop signal
+	// through the cancellation controller and waiting for a util.Forever/Until
+	// wrapper to invoke listwatch again.
+	*CancellationController
 }
 
 // NewNamespaceKeyedIndexerAndReflector creates an Indexer and a Reflector
@@ -73,13 +146,19 @@ func NewNamespaceKeyedIndexerAndReflector(lw ListerWatcher, expectedType interfa
 // incrementally processing the things that change.
 func NewReflector(lw ListerWatcher, expectedType interface{}, store Store, resyncPeriod time.Duration) *Reflector {
 	r := &Reflector{
-		listerWatcher: lw,
-		store:         store,
-		expectedType:  reflect.TypeOf(expectedType),
-		period:        time.Second,
-		resyncPeriod:  resyncPeriod,
+		listerWatcher:          lw,
+		store:                  store,
+		expectedType:           reflect.TypeOf(expectedType),
+		period:                 time.Second,
+		CancellationController: &CancellationController{resyncPeriod: resyncPeriod},
 	}
 	return r
+}
+
+// WatchForEdgeTrigger watches the resource tracked by the given listwatcher for a single
+// update till the given timeout.
+func WatchForEdgeTrigger(lw ListerWatcher, expectedType interface{}, timeout time.Duration) interface{} {
+	return struct{}{}
 }
 
 // Run starts a watch and handles watch events. Will restart the watch if it is closed.
@@ -96,23 +175,24 @@ func (r *Reflector) RunUntil(stopCh <-chan struct{}) {
 
 var (
 	// nothing will ever be sent down this channel
-	neverExitWatch <-chan time.Time = make(chan time.Time)
+	neverExitWatch <-chan interface{} = make(chan interface{})
 
 	// Used to indicate that watching stopped so that a resync could happen.
 	errorResyncRequested = errors.New("resync channel fired")
 )
 
-// resyncChan returns a channel which will receive something when a resync is required.
-func (r *Reflector) resyncChan() <-chan time.Time {
-	if r.resyncPeriod == 0 {
-		return neverExitWatch
-	}
-	return time.After(r.resyncPeriod)
-}
-
 func (r *Reflector) listAndWatch() {
 	var resourceVersion string
-	exitWatch := r.resyncChan()
+
+	// Calling cancel with a nil stop signal is idempotent, and we always want
+	// to close the cancellation channel before returning.
+	defer r.Cancel(nil)
+
+	exitWatch, err := r.RenewCancellationChan()
+	if err != nil {
+		glog.V(2).Infof("Unexpected error %+v, closing cancellation channel and returning.", err)
+		return
+	}
 
 	list, err := r.listerWatcher.List()
 	if err != nil {
@@ -169,14 +249,18 @@ func (r *Reflector) syncWith(items []runtime.Object) error {
 }
 
 // watchHandler watches w and keeps *resourceVersion up to date.
-func (r *Reflector) watchHandler(w watch.Interface, resourceVersion *string, exitWatch <-chan time.Time) error {
+func (r *Reflector) watchHandler(w watch.Interface, resourceVersion *string, exitWatch <-chan interface{}) error {
 	start := time.Now()
 	eventCount := 0
+
+	// Stopping the watcher should be idempotent and if we return from this function there's no way
+	// we're coming back in with the same watch interface.
+	defer w.Stop()
+
 loop:
 	for {
 		select {
 		case <-exitWatch:
-			w.Stop()
 			return errorResyncRequested
 		case event, ok := <-w.ResultChan():
 			if !ok {

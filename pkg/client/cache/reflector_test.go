@@ -18,6 +18,7 @@ package cache
 
 import (
 	"fmt"
+	"reflect"
 	"strconv"
 	"testing"
 	"time"
@@ -37,15 +38,92 @@ func (t *testLW) Watch(resourceVersion string) (watch.Interface, error) {
 	return t.WatchFunc(resourceVersion)
 }
 
+type stopFunc func(w *watch.FakeWatcher, r *Reflector)
+
+func TestTimeoutReflector(t *testing.T) {
+	s := NewFIFO(MetaNamespaceKeyFunc)
+	r := NewReflector(&testLW{}, &api.Pod{}, s, 0)
+
+	// Test at least 2 pods to confirm we aren't trying to do something like
+	// send down a closed channel.
+	pod1 := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "bar"}}
+	pod2 := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
+	newPods := map[*api.Pod]stopFunc{
+		pod1: func(w *watch.FakeWatcher, r *Reflector) { w.Error(pod1) },
+		pod2: func(w *watch.FakeWatcher, r *Reflector) { w.Error(pod1) },
+		pod1: func(w *watch.FakeWatcher, r *Reflector) { r.Cancel(nil) },
+		pod2: func(w *watch.FakeWatcher, r *Reflector) { r.Cancel(nil) },
+	}
+	for p, stopper := range newPods {
+		fw := watch.NewFake()
+		r.listerWatcher = &testLW{
+			WatchFunc: func(rv string) (watch.Interface, error) {
+				return fw, nil
+			},
+			ListFunc: func() (runtime.Object, error) {
+				return &api.PodList{ListMeta: api.ListMeta{ResourceVersion: "1"}}, nil
+			},
+		}
+		go r.listAndWatch()
+		fw.Add(p)
+		if !r.open || fw.Stopped {
+			t.Errorf("Channels should only be stopped on cancellation, r")
+		}
+		// This error should force a cancellation of the listWatch above,
+		// wait for it, then check if the channel is closed.
+		stopper(fw, r)
+		cOpen, wOpen := true, true
+		for cOpen && wOpen {
+			select {
+			case _, ok := <-r.cancellationCh:
+				if ok {
+					t.Errorf("Cancellation channel left open after cancellation")
+				}
+				cOpen = false
+			case _, ok := <-fw.ResultChan():
+				if ok {
+					t.Errorf("Watch channel left open after cancellation")
+				}
+				wOpen = false
+			case <-time.After(100 * time.Millisecond):
+				t.Errorf("the cancellation is at least 99 milliseconds late")
+				break
+			}
+		}
+
+		// Get the inserted pod out of the fifo, but give up if it takes too long.
+		podCh := make(chan interface{})
+		go func() {
+			podCh <- s.Pop()
+			close(podCh)
+		}()
+		select {
+		case pod, ok := <-podCh:
+			if !reflect.DeepEqual(p, pod.(*api.Pod)) {
+				t.Errorf("Unexpected pod retrieved from fifo")
+			}
+			fmt.Printf("Retrieved pod %+v with ok %+v", pod, ok)
+		case <-time.After(100 * time.Millisecond):
+			s.Replace([]interface{}{})
+			if _, ok := <-podCh; ok {
+				t.Errorf("Expected a closed pod channel on timeout")
+			}
+			t.Errorf("Retrieving inserted pod from fifo took too long")
+		}
+	}
+	fmt.Printf("\nCancelled reflector, ending test %+v", r.store)
+}
+
 func TestReflector_resyncChan(t *testing.T) {
 	s := NewStore(MetaNamespaceKeyFunc)
 	g := NewReflector(&testLW{}, &api.Pod{}, s, time.Millisecond)
-	a, b := g.resyncChan(), time.After(100*time.Millisecond)
+	a, _ := g.RenewCancellationChan()
+	b := time.After(100 * time.Millisecond)
 	select {
 	case <-a:
 		t.Logf("got timeout as expected")
 	case <-b:
-		t.Errorf("resyncChan() is at least 99 milliseconds late??")
+		t.Errorf("the cancellation channel is at least 99 milliseconds late??")
 	}
 }
 
@@ -124,7 +202,7 @@ func TestReflector_watchHandlerTimeout(t *testing.T) {
 	g := NewReflector(&testLW{}, &api.Pod{}, s, 0)
 	fw := watch.NewFake()
 	var resumeRV string
-	exit := make(chan time.Time, 1)
+	exit := make(chan interface{}, 1)
 	exit <- time.Now()
 	err := g.watchHandler(fw, &resumeRV, exit)
 	if err != errorResyncRequested {
