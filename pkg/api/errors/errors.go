@@ -17,8 +17,10 @@ limitations under the License.
 package errors
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
@@ -55,6 +57,14 @@ func (e *StatusError) Error() string {
 // of StatusError. Used by pkg/apiserver.
 func (e *StatusError) Status() api.Status {
 	return e.ErrStatus
+}
+
+// DebugError reports extended info about the error to debug output.
+func (e *StatusError) DebugError() (string, []interface{}) {
+	if out, err := json.MarshalIndent(e.ErrStatus, "", "  "); err == nil {
+		return "server response object: %s", []interface{}{string(out)}
+	}
+	return "server response object: %#v", []interface{}{e.ErrStatus}
 }
 
 // UnexpectedObjectError can be returned by FromObject if it's passed a non-status object.
@@ -239,6 +249,72 @@ func NewTimeoutError(message string, retryAfterSeconds int) error {
 	}}
 }
 
+// NewGenericServerResponse returns a new error for server responses that are not in a recognizable form.
+func NewGenericServerResponse(code int, verb, kind, name, serverMessage string, retryAfterSeconds int) error {
+	reason := api.StatusReasonUnknown
+	message := fmt.Sprintf("the server responded with the status code %d but did not return more information", code)
+	switch code {
+	case http.StatusConflict:
+		if verb == "POST" {
+			reason = api.StatusReasonAlreadyExists
+		} else {
+			reason = api.StatusReasonConflict
+		}
+		message = "the server reported a conflict"
+	case http.StatusNotFound:
+		reason = api.StatusReasonNotFound
+		message = "the server could not find the requested resource"
+	case http.StatusBadRequest:
+		reason = api.StatusReasonBadRequest
+		message = "the server rejected our request for an unknown reason"
+	case http.StatusUnauthorized:
+		reason = api.StatusReasonUnauthorized
+		message = "the server has asked for the client to provide credentials"
+	case http.StatusForbidden:
+		reason = api.StatusReasonForbidden
+		message = "the server does not allow access to the requested resource"
+	case StatusUnprocessableEntity:
+		reason = api.StatusReasonInvalid
+		message = "the server rejected our request due to an error in our request"
+	case StatusServerTimeout:
+		reason = api.StatusReasonServerTimeout
+		message = "the server cannot complete the requested operation at this time, try again later"
+	case StatusTooManyRequests:
+		reason = api.StatusReasonTimeout
+		message = "the server has received too many requests and has asked us to try again later"
+	default:
+		if code >= 500 {
+			reason = api.StatusReasonInternalError
+			message = "an error on the server has prevented the request from succeeding"
+		}
+	}
+	switch {
+	case len(kind) > 0 && len(name) > 0:
+		message = fmt.Sprintf("%s (%s %s %s)", message, strings.ToLower(verb), kind, name)
+	case len(kind) > 0:
+		message = fmt.Sprintf("%s (%s %s)", message, strings.ToLower(verb), kind)
+	}
+	return &StatusError{api.Status{
+		Status: api.StatusFailure,
+		Code:   code,
+		Reason: reason,
+		Details: &api.StatusDetails{
+			Kind: kind,
+			ID:   name,
+
+			Causes: []api.StatusCause{
+				{
+					Type:    api.CauseTypeUnexpectedServerResponse,
+					Message: serverMessage,
+				},
+			},
+
+			RetryAfterSeconds: retryAfterSeconds,
+		},
+		Message: message,
+	}}
+}
+
 // IsNotFound returns true if the specified error was created by NewNotFoundErr.
 func IsNotFound(err error) bool {
 	return reasonForError(err) == api.StatusReasonNotFound
@@ -288,16 +364,26 @@ func IsServerTimeout(err error) bool {
 	return reasonForError(err) == api.StatusReasonServerTimeout
 }
 
-// IsStatusError determines if err is an API Status error received from the master.
-func IsStatusError(err error) bool {
-	_, ok := err.(*StatusError)
-	return ok
+// IsUnexpectedServerError returns true if the server response was not in the expected API format,
+// and may be the result of another HTTP actor.
+func IsUnexpectedServerError(err error) bool {
+	switch t := err.(type) {
+	case *StatusError:
+		if d := t.Status().Details; d != nil {
+			for _, cause := range d.Causes {
+				if cause.Type == api.CauseTypeUnexpectedServerResponse {
+					return true
+				}
+			}
+		}
+	}
+	return false
 }
 
 // IsUnexpectedObjectError determines if err is due to an unexpected object from the master.
 func IsUnexpectedObjectError(err error) bool {
 	_, ok := err.(*UnexpectedObjectError)
-	return ok
+	return err != nil && ok
 }
 
 // SuggestsClientDelay returns true if this error suggests a client delay as well as the

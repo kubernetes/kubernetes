@@ -26,7 +26,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	clientcmdapi "github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/clientauth"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/errors"
 )
 
 var (
@@ -261,7 +260,7 @@ func (config DirectClientConfig) ConfirmUsable() error {
 	validationErrors = append(validationErrors, validateAuthInfo(config.getAuthInfoName(), config.getAuthInfo())...)
 	validationErrors = append(validationErrors, validateClusterInfo(config.getClusterName(), config.getCluster())...)
 
-	return errors.NewAggregate(validationErrors)
+	return newErrConfigurationInvalid(validationErrors)
 }
 
 func (config DirectClientConfig) getContextName() string {

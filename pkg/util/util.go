@@ -407,12 +407,12 @@ func chooseHostInterfaceNativeGo() (net.IP, error) {
 	if i == len(intfs) {
 		return nil, err
 	}
-	glog.V(2).Infof("Choosing interface %s for from-host portals", intfs[i].Name)
+	glog.V(4).Infof("Choosing interface %s for from-host portals", intfs[i].Name)
 	addrs, err := intfs[i].Addrs()
 	if err != nil {
 		return nil, err
 	}
-	glog.V(2).Infof("Interface %s = %s", intfs[i].Name, addrs[0].String())
+	glog.V(4).Infof("Interface %s = %s", intfs[i].Name, addrs[0].String())
 	ip, _, err := net.ParseCIDR(addrs[0].String())
 	if err != nil {
 		return nil, err

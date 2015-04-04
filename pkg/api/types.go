@@ -1428,6 +1428,10 @@ const (
 	// CauseTypeFieldValueNotSupported is used to report valid (as per formatting rules)
 	// values that can not be handled (e.g. an enumerated string).
 	CauseTypeFieldValueNotSupported CauseType = "FieldValueNotSupported"
+	// CauseTypeUnexpectedServerResponse is used to report when the server responded to the client
+	// without the expected return type. The presence of this cause indicates the error may be
+	// due to an intervening proxy or the server software malfunctioning.
+	CauseTypeUnexpectedServerResponse CauseType = "UnexpectedServerResponse"
 )
 
 // ObjectReference contains enough information to let you inspect or modify the referred object.

@@ -52,25 +52,6 @@ type HTTPClient interface {
 	Do(req *http.Request) (*http.Response, error)
 }
 
-// UnexpectedStatusError is returned as an error if a response's body and HTTP code don't
-// make sense together.
-type UnexpectedStatusError struct {
-	Request  *http.Request
-	Response *http.Response
-	Body     string
-}
-
-// Error returns a textual description of 'u'.
-func (u *UnexpectedStatusError) Error() string {
-	return fmt.Sprintf("request [%+v] failed (%d) %s: %s", u.Request, u.Response.StatusCode, u.Response.Status, u.Body)
-}
-
-// IsUnexpectedStatusError determines if err is due to an unexpected status from the server.
-func IsUnexpectedStatusError(err error) bool {
-	_, ok := err.(*UnexpectedStatusError)
-	return ok
-}
-
 // RequestConstructionError is returned when there's an error assembling a request.
 type RequestConstructionError struct {
 	Err error
@@ -689,7 +670,6 @@ func (r *Request) transformResponse(resp *http.Response, req *http.Request, body
 //    initial contact, the presence of mismatched body contents from posted content types
 //    - Give these a separate distinct error type and capture as much as possible of the original message
 //
-// TODO: introduce further levels of refinement that allow a client to distinguish between 1 and 2-3.
 // TODO: introduce transformation of generic http.Client.Do() errors that separates 4.
 func (r *Request) transformUnstructuredResponseError(resp *http.Response, req *http.Request, body []byte) error {
 	if body == nil && resp.Body != nil {
@@ -697,43 +677,12 @@ func (r *Request) transformUnstructuredResponseError(resp *http.Response, req *h
 			body = data
 		}
 	}
-	var err error = &UnexpectedStatusError{
-		Request:  req,
-		Response: resp,
-		Body:     string(body),
-	}
 	message := "unknown"
 	if isTextResponse(resp) {
 		message = strings.TrimSpace(string(body))
 	}
-	// TODO: handle other error classes we know about
-	switch resp.StatusCode {
-	case http.StatusConflict:
-		if req.Method == "POST" {
-			err = errors.NewAlreadyExists(r.resource, r.resourceName)
-		} else {
-			err = errors.NewConflict(r.resource, r.resourceName, err)
-		}
-	case http.StatusNotFound:
-		err = errors.NewNotFound(r.resource, r.resourceName)
-	case http.StatusBadRequest:
-		err = errors.NewBadRequest(message)
-	case http.StatusUnauthorized:
-		err = errors.NewUnauthorized(message)
-	case http.StatusForbidden:
-		err = errors.NewForbidden(r.resource, r.resourceName, err)
-	case errors.StatusUnprocessableEntity:
-		err = errors.NewInvalid(r.resource, r.resourceName, nil)
-	case errors.StatusServerTimeout:
-		retryAfterSeconds, _ := retryAfterSeconds(resp)
-		err = errors.NewServerTimeout(r.resource, r.verb, retryAfterSeconds)
-	case errors.StatusTooManyRequests:
-		retryAfterSeconds, _ := retryAfterSeconds(resp)
-		err = errors.NewServerTimeout(r.resource, r.verb, retryAfterSeconds)
-	case http.StatusInternalServerError:
-		err = errors.NewInternalError(fmt.Errorf(message))
-	}
-	return err
+	retryAfter, _ := retryAfterSeconds(resp)
+	return errors.NewGenericServerResponse(resp.StatusCode, req.Method, r.resource, r.resourceName, message, retryAfter)
 }
 
 // isTextResponse returns true if the response appears to be a textual media type.

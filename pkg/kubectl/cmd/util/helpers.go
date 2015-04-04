@@ -17,11 +17,13 @@ limitations under the License.
 package util
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -30,7 +32,9 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	utilerrors "github.com/GoogleCloudPlatform/kubernetes/pkg/util/errors"
 	"github.com/evanphx/json-patch"
 
 	"github.com/golang/glog"
@@ -38,19 +42,67 @@ import (
 	"github.com/spf13/pflag"
 )
 
+type debugError interface {
+	DebugError() (msg string, args []interface{})
+}
+
 func CheckErr(err error) {
 	if err != nil {
-		if errors.IsStatusError(err) {
-			glog.FatalDepth(1, fmt.Sprintf("Error received from API: %s", err.Error()))
+		if debugErr, ok := err.(debugError); ok {
+			glog.V(4).Infof(debugErr.DebugError())
 		}
-		if errors.IsUnexpectedObjectError(err) {
-			glog.FatalDepth(1, fmt.Sprintf("Unexpected object received from server: %s", err.Error()))
+		_, isStatus := err.(client.APIStatus)
+		switch {
+		case clientcmd.IsConfigurationInvalid(err):
+			fatal(MultilineError("Error in configuration: ", err))
+		case isStatus:
+			fatal(fmt.Sprintf("Error from server: %s", err.Error()))
+		case errors.IsUnexpectedObjectError(err):
+			fatal(fmt.Sprintf("Server returned an unexpected response: %s", err.Error()))
 		}
-		if client.IsUnexpectedStatusError(err) {
-			glog.FatalDepth(1, fmt.Sprintf("Unexpected status received from server: %s", err.Error()))
+		switch t := err.(type) {
+		case *url.Error:
+			glog.V(4).Infof("Connection error: %s %s: %v", t.Op, t.URL, t.Err)
+			switch {
+			case strings.Contains(t.Err.Error(), "connection refused"):
+				host := t.URL
+				if server, err := url.Parse(t.URL); err == nil {
+					host = server.Host
+				}
+				fatal(fmt.Sprintf("The connection to the server %s was refused - did you specify the right host or port?", host))
+			}
+			fatal(fmt.Sprintf("Unable to connect to the server: %v", t.Err))
 		}
-		glog.FatalDepth(1, fmt.Sprintf("Client error: %s", err.Error()))
+		fatal(fmt.Sprintf("Error: %s", err.Error()))
 	}
+}
+
+func MultilineError(prefix string, err error) string {
+	if agg, ok := err.(utilerrors.Aggregate); ok {
+		errs := agg.Errors()
+		buf := &bytes.Buffer{}
+		switch len(errs) {
+		case 0:
+			return fmt.Sprintf("%s%v", prefix, err)
+		case 1:
+			return fmt.Sprintf("%s%v", prefix, errs[0])
+		default:
+			fmt.Fprintln(buf, prefix)
+			for _, err := range errs {
+				fmt.Fprintf(buf, "* %v\n", err)
+			}
+			return buf.String()
+		}
+	}
+	return fmt.Sprintf("%s%s", prefix, err)
+}
+
+func fatal(msg string) {
+	if glog.V(2) {
+		glog.FatalDepth(2, msg)
+	}
+	fmt.Fprintln(os.Stderr, msg)
+	os.Exit(1)
 }
 
 func UsageError(cmd *cobra.Command, format string, args ...interface{}) error {
