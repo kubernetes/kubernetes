@@ -27,11 +27,9 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	apierrors "github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/probe"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/golang/glog"
 )
@@ -77,7 +75,6 @@ type NodeController struct {
 	nodes                   []string
 	kubeClient              client.Interface
 	kubeletClient           client.KubeletClient
-	recorder                record.EventRecorder
 	registerRetryCount      int
 	podEvictionTimeout      time.Duration
 	deletingPodsRateLimiter util.RateLimiter
@@ -98,14 +95,6 @@ func NewNodeController(
 	registerRetryCount int,
 	podEvictionTimeout time.Duration,
 	deletingPodsRateLimiter util.RateLimiter) *NodeController {
-	eventBroadcaster := record.NewBroadcaster()
-	recorder := eventBroadcaster.NewRecorder(api.EventSource{Component: "controllermanager"})
-	if kubeClient != nil {
-		glog.Infof("Sending events to api server.")
-		eventBroadcaster.StartRecordingToSink(kubeClient.Events(""))
-	} else {
-		glog.Infof("No api server defined - no events will be sent to API server.")
-	}
 	return &NodeController{
 		cloud:                   cloud,
 		matchRE:                 matchRE,
@@ -113,7 +102,6 @@ func NewNodeController(
 		staticResources:         staticResources,
 		kubeClient:              kubeClient,
 		kubeletClient:           kubeletClient,
-		recorder:                recorder,
 		registerRetryCount:      registerRetryCount,
 		podEvictionTimeout:      podEvictionTimeout,
 		deletingPodsRateLimiter: deletingPodsRateLimiter,
@@ -338,9 +326,6 @@ func (nc *NodeController) DoCheck(node *api.Node) []api.NodeCondition {
 			// status. Keep listing pods to sanity check if pods are all deleted makes more sense.
 			nc.deletePods(node.Name)
 		}
-		if oldReadyCondition != nil && oldReadyCondition.Status == api.ConditionTrue {
-			nc.recordNodeOfflineEvent(node)
-		}
 	}
 	conditions = append(conditions, *newReadyCondition)
 
@@ -451,19 +436,6 @@ func (nc *NodeController) PopulateAddresses(nodes *api.NodeList) (*api.NodeList,
 	return nodes, nil
 }
 
-func (nc *NodeController) recordNodeOfflineEvent(node *api.Node) {
-	ref := &api.ObjectReference{
-		Kind:      "Node",
-		Name:      node.Name,
-		UID:       types.UID(node.Name),
-		Namespace: "",
-	}
-	glog.V(2).Infof("Recording offline event message for node %s", node.Name)
-	// TODO: This requires a transaction, either both node status is updated
-	// and event is recorded or neither should happen, see issue #6055.
-	nc.recorder.Eventf(ref, "offline", "Node %s is now offline", node.Name)
-}
-
 func (nc NodeController) tryUpdateNodeStatus(node *api.Node) (error, time.Duration, api.NodeCondition) {
 	var err error
 	var gracePeriod time.Duration
@@ -508,10 +480,6 @@ func (nc NodeController) tryUpdateNodeStatus(node *api.Node) (error, time.Durati
 				// LastProbeTime is the last time we heard from kubelet.
 				readyCondition.LastProbeTime = lastReadyCondition.LastProbeTime
 				readyCondition.LastTransitionTime = nc.now()
-			}
-			if readyCondition.Status != api.ConditionTrue &&
-				lastReadyCondition.Status == api.ConditionTrue {
-				nc.recordNodeOfflineEvent(node)
 			}
 		}
 		_, err = nc.kubeClient.Nodes().Update(node)
