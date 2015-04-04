@@ -26,6 +26,19 @@ import (
 	"github.com/google/gofuzz"
 )
 
+func TestConverter_byteSlice(t *testing.T) {
+	c := NewConverter()
+	src := []byte{1, 2, 3}
+	dest := []byte{}
+	err := c.Convert(&src, &dest, 0, nil)
+	if err != nil {
+		t.Fatalf("expected no error")
+	}
+	if e, a := src, dest; !reflect.DeepEqual(e, a) {
+		t.Errorf("expected %#v, got %#v", e, a)
+	}
+}
+
 func TestConverter_DefaultConvert(t *testing.T) {
 	type A struct {
 		Foo string
