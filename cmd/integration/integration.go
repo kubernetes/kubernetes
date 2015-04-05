@@ -811,7 +811,8 @@ func runServiceTest(client *client.Client) {
 		glog.Fatalf("Failed to create service: %v, %v", svc3, err)
 	}
 
-	if err := wait.Poll(time.Second, time.Second*30, endpointsSet(client, svc1.Namespace, svc1.Name, 1)); err != nil {
+	// TODO Reduce the timeouts in this test when endpoints controller is sped up. See #6045.
+	if err := wait.Poll(time.Second, time.Second*60, endpointsSet(client, svc1.Namespace, svc1.Name, 1)); err != nil {
 		glog.Fatalf("FAILED: unexpected endpoints: %v", err)
 	}
 	// A second service with the same port.
@@ -832,12 +833,12 @@ func runServiceTest(client *client.Client) {
 	if err != nil {
 		glog.Fatalf("Failed to create service: %v, %v", svc2, err)
 	}
-	if err := wait.Poll(time.Second, time.Second*30, endpointsSet(client, svc2.Namespace, svc2.Name, 1)); err != nil {
+	if err := wait.Poll(time.Second, time.Second*60, endpointsSet(client, svc2.Namespace, svc2.Name, 1)); err != nil {
 		glog.Fatalf("FAILED: unexpected endpoints: %v", err)
 	}
 
-	if ok, err := endpointsSet(client, svc3.Namespace, svc3.Name, 0)(); !ok || err != nil {
-		glog.Fatalf("FAILED: service in other namespace should have no endpoints: %v %v", ok, err)
+	if err := wait.Poll(time.Second, time.Second*60, endpointsSet(client, svc3.Namespace, svc3.Name, 0)); err != nil {
+		glog.Fatalf("FAILED: service in other namespace should have no endpoints: %v", err)
 	}
 
 	svcList, err := client.Services(api.NamespaceAll).List(labels.Everything())
