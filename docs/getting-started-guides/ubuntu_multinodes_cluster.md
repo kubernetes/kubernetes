@@ -114,8 +114,10 @@ If you want a node acts as **both running the master and minion**, please choose
 2. On any node:
 	
 	`$ /opt/bin/etcdctl mk /coreos.com/network/config '{"Network":"10.0.0.0/16"}'`
+
+	Note the `10.0.0.0/16` is a virtual network address. It has nothing to do with master and minions IP addresses assigned by the cloud provider. In other words even if your master and minions use address from another network (e.g. 172.16.0x) you can still use `10.0.0.0/16` for your virtual network.
 	
-	> You can use the below command on another node to comfirm if the network setting is correct.
+	> You can use the below command on another node to confirm if the network setting is correct.
 	
 	> `$ /opt/bin/etcdctl get /coreos.com/network/config`
 	
