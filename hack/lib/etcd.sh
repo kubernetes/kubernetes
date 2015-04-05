@@ -48,8 +48,16 @@ kube::etcd::start() {
   curl -X PUT "http://${host}:${port}/v2/keys/_test"
 }
 
-kube::etcd::cleanup() {
+kube::etcd::stop() {
   kill "${ETCD_PID-}" >/dev/null 2>&1 || :
   wait "${ETCD_PID-}" >/dev/null 2>&1 || :
+}
+
+kube::etcd::clean_etcd_dir() {
   rm -rf "${ETCD_DIR-}"
+}
+
+kube::etcd::cleanup() {
+  kube::etcd::stop
+  kube::etcd::clean_etcd_dir
 }
