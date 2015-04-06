@@ -91,8 +91,8 @@ function get-kubeconfig-basicauth() {
   # is missing.
   # Note: we save dot ('.') to $root because the 'with' action overrides it.
   # See http://golang.org/pkg/text/template/.
-  local username='{{$root := .}}{{with index $root "current-context"}}{{with index $root "contexts" .}}{{with index . "user"}}{{with index $root "users" .}}{{index . "username"}}{{end}}{{end}}{{end}}{{end}}'
-  local password='{{$root := .}}{{with index $root "current-context"}}{{with index $root "contexts" .}}{{with index . "user"}}{{with index $root "users" .}}{{index . "password"}}{{end}}{{end}}{{end}}{{end}}'
+  local username='{{$dot := .}}{{with $ctx := index $dot "current-context"}}{{range $element := (index $dot "contexts")}}{{ if eq .name $ctx }}{{ with $user := .context.user }}{{range $element := (index $dot "users")}}{{ if eq .name $user }}{{ index . "user" "username" }}{{end}}{{end}}{{end}}{{end}}{{end}}{{end}}'
+  local password='{{$dot := .}}{{with $ctx := index $dot "current-context"}}{{range $element := (index $dot "contexts")}}{{ if eq .name $ctx }}{{ with $user := .context.user }}{{range $element := (index $dot "users")}}{{ if eq .name $user }}{{ index . "user" "password" }}{{end}}{{end}}{{end}}{{end}}{{end}}{{end}}'
   KUBE_USER=$("${KUBE_ROOT}/cluster/kubectl.sh" config view -o template --template="${username}")
   KUBE_PASSWORD=$("${KUBE_ROOT}/cluster/kubectl.sh" config view -o template --template="${password}")
   # Handle empty/missing username|password

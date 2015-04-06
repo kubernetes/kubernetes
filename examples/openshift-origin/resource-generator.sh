@@ -41,19 +41,19 @@ fi
 TEMPLATE="--template=\"{{ index . \"current-context\" }}\""
 CURRENT_CONTEXT=$( "${kubectl}" "${config[@]:+${config[@]}}" config view -o template "${TEMPLATE}" )
 
-TEMPLATE="--template=\"{{ index . \"contexts\" ${CURRENT_CONTEXT} \"cluster\" }}\""
+TEMPLATE="--template=\"{{range .contexts}}{{ if eq .name ${CURRENT_CONTEXT} }}{{ .context.cluster }}{{end}}{{end}}\""
 CURRENT_CLUSTER=$( "${kubectl}" "${config[@]:+${config[@]}}" config view -o template "${TEMPLATE}" )
 
-TEMPLATE="--template=\"{{ index . \"contexts\" ${CURRENT_CONTEXT} \"user\" }}\""
+TEMPLATE="--template=\"{{range .contexts}}{{ if eq .name ${CURRENT_CONTEXT} }}{{ .context.user }}{{end}}{{end}}\""
 CURRENT_USER=$( "${kubectl}" "${config[@]:+${config[@]}}" config view -o template "${TEMPLATE}" )
 
-TEMPLATE="--template={{ index . \"clusters\" ${CURRENT_CLUSTER} \"certificate-authority\" }}"
+TEMPLATE="--template=\"{{range .clusters}}{{ if eq .name ${CURRENT_CLUSTER} }}{{ index . \"cluster\" \"certificate-authority\" }}{{end}}{{end}}\""
 CERTIFICATE_AUTHORITY=$( "${kubectl}" "${config[@]:+${config[@]}}" config view -o template "${TEMPLATE}" )
 
-TEMPLATE="--template={{ index . \"clusters\" ${CURRENT_CLUSTER} \"server\" }}"
+TEMPLATE="--template=\"{{range .clusters}}{{ if eq .name ${CURRENT_CLUSTER} }}{{ .cluster.server }}{{end}}{{end}}\""
 KUBE_MASTER=$( "${kubectl}" "${config[@]:+${config[@]}}" config view -o template "${TEMPLATE}" )
 
-TEMPLATE="--template={{ index . \"users\" ${CURRENT_USER} \"auth-path\" }}"
+TEMPLATE="--template=\"{{range .users}}{{ if eq .name ${CURRENT_USER} }}{{ index . \"user\" \"auth-path\" }}{{end}}{{end}}\""
 AUTH_PATH=$( "${kubectl}" "${config[@]:+${config[@]}}" config view -o template "${TEMPLATE}" )
 
 # Build an auth_path file to embed as a secret
