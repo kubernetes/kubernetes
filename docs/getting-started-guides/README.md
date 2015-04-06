@@ -1,6 +1,8 @@
 If you are not sure what OSes and infrastructure is supported, the table below lists all the combinations which have
 been tested recently.
 
+For the easiest "kick the tires" experience, please try the [local docker](docker.md) guide.
+
 If you are considering contributing a new guide, please read the
 [guidelines](../../docs/devel/writing-a-getting-started-guide.md).
 
@@ -23,6 +25,7 @@ Vmware         | CoreOS       | CoreOS | flannel     | [docs](../../docs/getting
 Azure          | Saltstack    | Ubuntu | OpenVPN     | [docs](../../docs/getting-started-guides/azure.md)     | Community (@jeffmendoza)     |
 Bare-metal     | custom       | Ubuntu | _none_      | [docs](../../docs/getting-started-guides/ubuntu_single_node.md) | Community (@jainvipin)       |
 Bare-metal     | custom       | Ubuntu Cluster | flannel | [docs](../../docs/getting-started-guides/ubuntu_multinodes_cluster.md) | Community (@resouer @WIZARD-CXY) | use k8s version 0.12.0
+Docker         | custom       | N/A    | local       | [docs](docker.md) | Project (@brendandburns) | Tested @ 0.14.1 |
 Local          |              |        | _none_      | [docs](../../docs/getting-started-guides/locally.md)   | Community (@preillyme)                     |
 Ovirt          |              |        |             | [docs](../../docs/getting-started-guides/ovirt.md)     | Inactive                     |
 Rackspace      | CoreOS       | CoreOS | Rackspace   | [docs](../../docs/getting-started-guides/rackspace.md) | Inactive                     |
