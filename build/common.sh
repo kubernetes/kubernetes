@@ -620,7 +620,8 @@ function kube::release::create_docker_images_for_server() {
         docker build -q -t "${docker_image_tag}" ${docker_build_path} >/dev/null
         docker save ${docker_image_tag} > ${1}/${binary_name}.tar
         echo $md5_sum > ${1}/${binary_name}.docker_tag
-        rm ${docker_file_path}
+
+        rm -rf ${docker_build_path}
       ) &
     done
 
