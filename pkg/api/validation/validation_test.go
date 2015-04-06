@@ -353,6 +353,19 @@ func TestValidatePersistentVolumeClaim(t *testing.T) {
 				},
 			}),
 		},
+		"invalid-resource-requests": {
+			isExpectedFailure: true,
+			claim: testVolumeClaim("foo", "ns", api.PersistentVolumeClaimSpec{
+				AccessModes: []api.AccessModeType{
+					api.ReadWriteOnce,
+				},
+				Resources: api.ResourceRequirements{
+					Requests: api.ResourceList{
+						api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
+					},
+				},
+			}),
+		},
 	}
 
 	for name, scenario := range scenarios {
@@ -364,6 +377,136 @@ func TestValidatePersistentVolumeClaim(t *testing.T) {
 			t.Errorf("Unexpected failure for scenario: %s - %+v", name, errs)
 		}
 	}
+}
+
+func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
+
+	pvcA := &api.PersistentVolumeClaim{
+		ObjectMeta: api.ObjectMeta{
+			Name:      "foo",
+			Namespace: "ns",
+			Labels: map[string]string{
+				"nice-label": "fizzbuzz",
+			},
+		},
+		Spec: api.PersistentVolumeClaimSpec{
+			AccessModes: []api.AccessModeType{
+				api.ReadWriteOnce,
+			},
+			Resources: api.ResourceRequirements{
+				Requests: api.ResourceList{
+					api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
+				},
+			},
+		},
+	}
+
+	// AccessModes differ from pvcA
+	pvcB := &api.PersistentVolumeClaim{
+		ObjectMeta: api.ObjectMeta{
+			Name:      "foo",
+			Namespace: "ns",
+			Labels: map[string]string{
+				"nice-label": "fizzbuzz",
+			},
+		},
+		Spec: api.PersistentVolumeClaimSpec{
+			AccessModes: []api.AccessModeType{
+				api.ReadWriteMany,
+			},
+			Resources: api.ResourceRequirements{
+				Requests: api.ResourceList{
+					api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
+				},
+			},
+		},
+	}
+
+	// Resources differ from pvcA
+	pvcC := &api.PersistentVolumeClaim{
+		ObjectMeta: api.ObjectMeta{
+			Name:      "foo",
+			Namespace: "ns",
+			Labels: map[string]string{
+				"nice-label": "fizzbuzz",
+			},
+		},
+		Spec: api.PersistentVolumeClaimSpec{
+			AccessModes: []api.AccessModeType{
+				api.ReadWriteOnce,
+			},
+			Resources: api.ResourceRequirements{
+				Requests: api.ResourceList{
+					api.ResourceName(api.ResourceStorage): resource.MustParse("7G"),
+				},
+			},
+		},
+	}
+
+	// Labels differ from pvcA
+	pvcD := &api.PersistentVolumeClaim{
+		ObjectMeta: api.ObjectMeta{
+			Name:      "foo",
+			Namespace: "ns",
+			Labels: map[string]string{
+				"nice-label": "buzzfizz",
+			},
+		},
+		Spec: api.PersistentVolumeClaimSpec{
+			AccessModes: []api.AccessModeType{
+				api.ReadWriteOnce,
+			},
+			Resources: api.ResourceRequirements{
+				Requests: api.ResourceList{
+					api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
+				},
+			},
+		},
+	}
+
+	scenarios := map[string]struct {
+		isExpectedFailure bool
+		oldClaim          *api.PersistentVolumeClaim
+		newClaim          *api.PersistentVolumeClaim
+	}{
+		"invalid-accessmodes-change": {
+			isExpectedFailure: true,
+			oldClaim:          pvcA,
+			newClaim:          pvcB,
+		},
+		"invalid-resources-change": {
+			isExpectedFailure: true,
+			oldClaim:          pvcA,
+			newClaim:          pvcC,
+		},
+		"valid-label-change": {
+			isExpectedFailure: false,
+			oldClaim:          pvcA,
+			newClaim:          pvcD,
+		},
+	}
+
+	// validation errors on Update only occur if the Claim is already bound.
+	// failures are only expected after binding
+	for name, scenario := range scenarios {
+		errs := ValidatePersistentVolumeClaimUpdate(scenario.newClaim, scenario.oldClaim)
+		if len(errs) > 0 && !scenario.isExpectedFailure {
+			t.Errorf("Unexpected failure for scenario: %s - %+v", name, errs)
+		}
+	}
+
+	// 2 of 3 scenarios above are invalid if the old PVC has a bound PV
+	for name, scenario := range scenarios {
+		scenario.oldClaim.Status.VolumeRef = &api.ObjectReference{Name: "foo", Namespace: "ns"}
+		errs := ValidatePersistentVolumeClaimUpdate(scenario.newClaim, scenario.oldClaim)
+		if len(errs) == 0 && scenario.isExpectedFailure {
+			t.Errorf("Unexpected success for scenario: %s", name)
+		}
+		if len(errs) > 0 && !scenario.isExpectedFailure {
+			t.Errorf("Unexpected failure for scenario: %s - %+v", name, errs)
+		}
+	}
+
 }
 
 func TestValidateVolumes(t *testing.T) {

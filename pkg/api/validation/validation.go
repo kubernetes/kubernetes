@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"net"
 	"path"
+	"reflect"
 	"strings"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -28,6 +29,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	errs "github.com/GoogleCloudPlatform/kubernetes/pkg/util/fielderrors"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume"
 
 	"github.com/golang/glog"
 )
@@ -364,11 +366,12 @@ func validateNFS(nfs *api.NFSVolumeSource) errs.ValidationErrorList {
 }
 
 func ValidatePersistentVolumeName(name string, prefix bool) (bool, string) {
-	return util.IsDNS1123Label(name), name
+	return nameIsDNSSubdomain(name, prefix)
 }
 
 func ValidatePersistentVolume(pv *api.PersistentVolume) errs.ValidationErrorList {
-	allErrs := ValidateObjectMeta(&pv.ObjectMeta, false, ValidatePersistentVolumeName)
+	allErrs := errs.ValidationErrorList{}
+	allErrs = append(allErrs, ValidateObjectMeta(&pv.ObjectMeta, false, ValidatePersistentVolumeName).Prefix("metadata")...)
 
 	if len(pv.Spec.Capacity) == 0 {
 		allErrs = append(allErrs, errs.NewFieldRequired("persistentVolume.Capacity"))
@@ -393,14 +396,62 @@ func ValidatePersistentVolume(pv *api.PersistentVolume) errs.ValidationErrorList
 	return allErrs
 }
 
+// ValidatePersistentVolumeUpdate tests to see if the update is legal for an end user to make.
+// newPv is updated with fields that cannot be changed.
+func ValidatePersistentVolumeUpdate(newPv, oldPv *api.PersistentVolume) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+	allErrs = ValidatePersistentVolume(newPv)
+	newPv.Status = oldPv.Status
+	return allErrs
+}
+
+// ValidatePersistentVolumeStatusUpdate tests to see if the status update is legal for an end user to make.
+// newPv is updated with fields that cannot be changed.
+func ValidatePersistentVolumeStatusUpdate(newPv, oldPv *api.PersistentVolume) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+	allErrs = append(allErrs, ValidateObjectMetaUpdate(&oldPv.ObjectMeta, &newPv.ObjectMeta).Prefix("metadata")...)
+	if newPv.ResourceVersion == "" {
+		allErrs = append(allErrs, fmt.Errorf("ResourceVersion must be specified"))
+	}
+	newPv.Spec = oldPv.Spec
+	return allErrs
+}
+
 func ValidatePersistentVolumeClaim(pvc *api.PersistentVolumeClaim) errs.ValidationErrorList {
 	allErrs := ValidateObjectMeta(&pvc.ObjectMeta, true, ValidatePersistentVolumeName)
 	if len(pvc.Spec.AccessModes) == 0 {
 		allErrs = append(allErrs, errs.NewFieldInvalid("persistentVolumeClaim.Spec.AccessModes", pvc.Spec.AccessModes, "at least 1 AccessModeType is required"))
 	}
-	if len(pvc.Spec.Resources.Requests) == 0 {
-		allErrs = append(allErrs, errs.NewFieldInvalid("persistentVolumeClaim.Spec.Resources.Requests", pvc.Spec.AccessModes, "No Resource.Requests specified"))
+	if _, ok := pvc.Spec.Resources.Requests[api.ResourceStorage]; !ok {
+		allErrs = append(allErrs, errs.NewFieldInvalid("persistentVolumeClaim.Spec.Resources.Requests", pvc.Spec.Resources.Requests, "No Storage size specified"))
 	}
+	return allErrs
+}
+
+func ValidatePersistentVolumeClaimUpdate(newPvc, oldPvc *api.PersistentVolumeClaim) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+	allErrs = ValidatePersistentVolumeClaim(newPvc)
+	if oldPvc.Status.VolumeRef != nil {
+		oldModesAsString := volume.GetAccessModesAsString(oldPvc.Spec.AccessModes)
+		newModesAsString := volume.GetAccessModesAsString(newPvc.Spec.AccessModes)
+		if oldModesAsString != newModesAsString {
+			allErrs = append(allErrs, errs.NewFieldInvalid("spec.AccessModes", oldPvc.Spec.AccessModes, "field is immutable"))
+		}
+		if !reflect.DeepEqual(oldPvc.Spec.Resources, newPvc.Spec.Resources) {
+			allErrs = append(allErrs, errs.NewFieldInvalid("spec.Resources", oldPvc.Spec.Resources, "field is immutable"))
+		}
+	}
+	newPvc.Status = oldPvc.Status
+	return allErrs
+}
+
+func ValidatePersistentVolumeClaimStatusUpdate(newPvc, oldPvc *api.PersistentVolumeClaim) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+	allErrs = append(allErrs, ValidateObjectMetaUpdate(&oldPvc.ObjectMeta, &newPvc.ObjectMeta).Prefix("metadata")...)
+	if newPvc.ResourceVersion == "" {
+		allErrs = append(allErrs, fmt.Errorf("ResourceVersion must be specified"))
+	}
+	newPvc.Spec = oldPvc.Spec
 	return allErrs
 }
 
