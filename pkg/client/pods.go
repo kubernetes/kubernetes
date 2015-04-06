@@ -57,7 +57,7 @@ func newPods(c *Client, namespace string) *pods {
 // List takes a selector, and returns the list of pods that match that selector.
 func (c *pods) List(selector labels.Selector) (result *api.PodList, err error) {
 	result = &api.PodList{}
-	err = c.r.Get().Namespace(c.ns).Resource("pods").LabelsSelectorParam(api.LabelSelectorQueryParam(c.r.APIVersion()), selector).Do().Into(result)
+	err = c.r.Get().Namespace(c.ns).Resource("pods").LabelsSelectorParam(selector).Do().Into(result)
 	return
 }
 
@@ -94,8 +94,8 @@ func (c *pods) Watch(label labels.Selector, field fields.Selector, resourceVersi
 		Namespace(c.ns).
 		Resource("pods").
 		Param("resourceVersion", resourceVersion).
-		LabelsSelectorParam(api.LabelSelectorQueryParam(c.r.APIVersion()), label).
-		FieldsSelectorParam(api.LabelSelectorQueryParam(c.r.APIVersion()), field).
+		LabelsSelectorParam(label).
+		FieldsSelectorParam(field).
 		Watch()
 }
 

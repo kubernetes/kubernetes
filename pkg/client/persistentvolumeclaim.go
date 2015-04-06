@@ -57,8 +57,8 @@ func (c *persistentVolumeClaims) List(label labels.Selector, field fields.Select
 	err = c.client.Get().
 		Namespace(c.namespace).
 		Resource("persistentVolumeClaims").
-		LabelsSelectorParam(api.LabelSelectorQueryParam(c.client.APIVersion()), label).
-		FieldsSelectorParam(api.FieldSelectorQueryParam(c.client.APIVersion()), field).
+		LabelsSelectorParam(label).
+		FieldsSelectorParam(field).
 		Do().
 		Into(result)
 
@@ -97,7 +97,7 @@ func (c *persistentVolumeClaims) Watch(label labels.Selector, field fields.Selec
 		Namespace(c.namespace).
 		Resource("persistentVolumeClaims").
 		Param("resourceVersion", resourceVersion).
-		LabelsSelectorParam(api.LabelSelectorQueryParam(c.client.APIVersion()), label).
-		FieldsSelectorParam(api.FieldSelectorQueryParam(c.client.APIVersion()), field).
+		LabelsSelectorParam(label).
+		FieldsSelectorParam(field).
 		Watch()
 }

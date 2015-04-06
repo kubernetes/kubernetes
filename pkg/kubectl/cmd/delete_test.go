@@ -22,6 +22,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 )
 
@@ -187,12 +189,12 @@ func TestDeleteMultipleSelector(t *testing.T) {
 		Client: client.HTTPClientFunc(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
 			case p == "/namespaces/test/pods" && m == "GET":
-				if req.URL.Query().Get("labels") != "a=b" {
+				if req.URL.Query().Get(api.LabelSelectorQueryParam(testapi.Version())) != "a=b" {
 					t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 				}
 				return &http.Response{StatusCode: 200, Body: objBody(codec, pods)}, nil
 			case p == "/namespaces/test/services" && m == "GET":
-				if req.URL.Query().Get("labels") != "a=b" {
+				if req.URL.Query().Get(api.LabelSelectorQueryParam(testapi.Version())) != "a=b" {
 					t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 				}
 				return &http.Response{StatusCode: 200, Body: objBody(codec, svc)}, nil

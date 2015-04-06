@@ -63,7 +63,7 @@ func (c *endpoints) List(selector labels.Selector) (result *api.EndpointsList, e
 	err = c.r.Get().
 		Namespace(c.ns).
 		Resource("endpoints").
-		LabelsSelectorParam(api.LabelSelectorQueryParam(c.r.APIVersion()), selector).
+		LabelsSelectorParam(selector).
 		Do().
 		Into(result)
 	return
@@ -83,8 +83,8 @@ func (c *endpoints) Watch(label labels.Selector, field fields.Selector, resource
 		Namespace(c.ns).
 		Resource("endpoints").
 		Param("resourceVersion", resourceVersion).
-		LabelsSelectorParam(api.LabelSelectorQueryParam(c.r.APIVersion()), label).
-		FieldsSelectorParam(api.FieldSelectorQueryParam(c.r.APIVersion()), field).
+		LabelsSelectorParam(label).
+		FieldsSelectorParam(field).
 		Watch()
 }
 

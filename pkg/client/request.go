@@ -110,10 +110,11 @@ func NewRequest(client HTTPClient, verb string, baseURL *url.URL, apiVersion str
 	codec runtime.Codec, namespaceInQuery bool, preserveResourceCase bool) *Request {
 	metrics.Register()
 	return &Request{
-		client:  client,
-		verb:    verb,
-		baseURL: baseURL,
-		path:    baseURL.Path,
+		client:     client,
+		verb:       verb,
+		baseURL:    baseURL,
+		path:       baseURL.Path,
+		apiVersion: apiVersion,
 
 		codec:                codec,
 		namespaceInQuery:     namespaceInQuery,
@@ -247,6 +248,7 @@ func (r *Request) RequestURI(uri string) *Request {
 	return r
 }
 
+/*
 // ParseSelectorParam parses the given string as a resource selector.
 // This is a convenience function so you don't have to first check that it's a
 // validly formatted selector.
@@ -275,28 +277,28 @@ func (r *Request) ParseSelectorParam(paramName, item string) *Request {
 		return r
 	}
 	return r.setParam(paramName, selector)
-}
+}*/
 
 // FieldsSelectorParam adds the given selector as a query parameter with the name paramName.
-func (r *Request) FieldsSelectorParam(paramName string, s fields.Selector) *Request {
+func (r *Request) FieldsSelectorParam(s fields.Selector) *Request {
 	if r.err != nil {
 		return r
 	}
 	if s.Empty() {
 		return r
 	}
-	return r.setParam(paramName, s.String())
+	return r.setParam(api.FieldSelectorQueryParam(r.apiVersion), s.String())
 }
 
 // LabelsSelectorParam adds the given selector as a query parameter
-func (r *Request) LabelsSelectorParam(paramName string, s labels.Selector) *Request {
+func (r *Request) LabelsSelectorParam(s labels.Selector) *Request {
 	if r.err != nil {
 		return r
 	}
 	if s.Empty() {
 		return r
 	}
-	return r.setParam(paramName, s.String())
+	return r.setParam(api.LabelSelectorQueryParam(r.apiVersion), s.String())
 }
 
 // UintParam creates a query parameter with the given value.

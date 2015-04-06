@@ -61,7 +61,7 @@ func (c *services) List(selector labels.Selector) (result *api.ServiceList, err 
 	err = c.r.Get().
 		Namespace(c.ns).
 		Resource("services").
-		LabelsSelectorParam(api.LabelSelectorQueryParam(c.r.APIVersion()), selector).
+		LabelsSelectorParam(selector).
 		Do().
 		Into(result)
 	return
@@ -100,7 +100,7 @@ func (c *services) Watch(label labels.Selector, field fields.Selector, resourceV
 		Namespace(c.ns).
 		Resource("services").
 		Param("resourceVersion", resourceVersion).
-		LabelsSelectorParam(api.LabelSelectorQueryParam(c.r.APIVersion()), label).
-		FieldsSelectorParam(api.FieldSelectorQueryParam(c.r.APIVersion()), field).
+		LabelsSelectorParam(label).
+		FieldsSelectorParam(field).
 		Watch()
 }

@@ -69,8 +69,8 @@ func (s *secrets) List(label labels.Selector, field fields.Selector) (*api.Secre
 	err := s.client.Get().
 		Namespace(s.namespace).
 		Resource("secrets").
-		LabelsSelectorParam(api.LabelSelectorQueryParam(s.client.APIVersion()), label).
-		FieldsSelectorParam(api.FieldSelectorQueryParam(s.client.APIVersion()), field).
+		LabelsSelectorParam(label).
+		FieldsSelectorParam(field).
 		Do().
 		Into(result)
 
@@ -97,8 +97,8 @@ func (s *secrets) Watch(label labels.Selector, field fields.Selector, resourceVe
 		Namespace(s.namespace).
 		Resource("secrets").
 		Param("resourceVersion", resourceVersion).
-		LabelsSelectorParam(api.LabelSelectorQueryParam(s.client.APIVersion()), label).
-		FieldsSelectorParam(api.FieldSelectorQueryParam(s.client.APIVersion()), field).
+		LabelsSelectorParam(label).
+		FieldsSelectorParam(field).
 		Watch()
 }
 

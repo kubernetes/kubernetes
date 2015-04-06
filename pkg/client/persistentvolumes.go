@@ -52,8 +52,8 @@ func (c *persistentVolumes) List(label labels.Selector, field fields.Selector) (
 	result = &api.PersistentVolumeList{}
 	err = c.client.Get().
 		Resource("persistentVolumes").
-		LabelsSelectorParam(api.LabelSelectorQueryParam(c.client.APIVersion()), label).
-		FieldsSelectorParam(api.FieldSelectorQueryParam(c.client.APIVersion()), field).
+		LabelsSelectorParam(label).
+		FieldsSelectorParam(field).
 		Do().
 		Into(result)
 
@@ -91,7 +91,7 @@ func (c *persistentVolumes) Watch(label labels.Selector, field fields.Selector, 
 		Prefix("watch").
 		Resource("persistentVolumes").
 		Param("resourceVersion", resourceVersion).
-		LabelsSelectorParam(api.LabelSelectorQueryParam(c.client.APIVersion()), label).
-		FieldsSelectorParam(api.FieldSelectorQueryParam(c.client.APIVersion()), field).
+		LabelsSelectorParam(label).
+		FieldsSelectorParam(field).
 		Watch()
 }
