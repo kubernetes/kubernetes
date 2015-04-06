@@ -125,7 +125,8 @@ func (e *EndpointController) SyncServiceEndpoints() error {
 			if errors.IsNotFound(err) {
 				currentEndpoints = &api.Endpoints{
 					ObjectMeta: api.ObjectMeta{
-						Name: service.Name,
+						Name:   service.Name,
+						Labels: service.Labels,
 					},
 				}
 			} else {
@@ -133,12 +134,13 @@ func (e *EndpointController) SyncServiceEndpoints() error {
 				continue
 			}
 		}
-		if reflect.DeepEqual(currentEndpoints.Subsets, subsets) {
+		if reflect.DeepEqual(currentEndpoints.Subsets, subsets) && reflect.DeepEqual(currentEndpoints.Labels, service.Labels) {
 			glog.V(5).Infof("endpoints are equal for %s/%s, skipping update", service.Namespace, service.Name)
 			continue
 		}
 		newEndpoints := currentEndpoints
 		newEndpoints.Subsets = subsets
+		newEndpoints.Labels = service.Labels
 
 		if len(currentEndpoints.ResourceVersion) == 0 {
 			// No previous endpoints, create them

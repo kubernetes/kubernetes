@@ -560,3 +560,111 @@ func TestSyncEndpointsPodError(t *testing.T) {
 		t.Error("Unexpected non-error")
 	}
 }
+
+func TestSyncEndpointsItemsWithLabels(t *testing.T) {
+	serviceList := api.ServiceList{
+		Items: []api.Service{
+			{
+				ObjectMeta: api.ObjectMeta{
+					Name:      "foo",
+					Namespace: "other",
+					Labels: map[string]string{
+						"foo": "bar",
+					},
+				},
+				Spec: api.ServiceSpec{
+					Selector: map[string]string{"foo": "bar"},
+					Ports: []api.ServicePort{
+						{Name: "port0", Port: 80, Protocol: "TCP", TargetPort: util.NewIntOrStringFromInt(8080)},
+						{Name: "port1", Port: 88, Protocol: "TCP", TargetPort: util.NewIntOrStringFromInt(8088)},
+					},
+				},
+			},
+		},
+	}
+	testServer, endpointsHandler := makeTestServer(t, "other",
+		serverResponse{http.StatusOK, newPodList(3, 2)},
+		serverResponse{http.StatusOK, &serviceList},
+		serverResponse{http.StatusOK, &api.Endpoints{}})
+	defer testServer.Close()
+	client := client.NewOrDie(&client.Config{Host: testServer.URL, Version: testapi.Version()})
+	endpoints := NewEndpointController(client)
+	if err := endpoints.SyncServiceEndpoints(); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	expectedSubsets := []api.EndpointSubset{{
+		Addresses: []api.EndpointAddress{
+			{IP: "1.2.3.4", TargetRef: &api.ObjectReference{Kind: "Pod", Name: "pod0"}},
+			{IP: "1.2.3.5", TargetRef: &api.ObjectReference{Kind: "Pod", Name: "pod1"}},
+			{IP: "1.2.3.6", TargetRef: &api.ObjectReference{Kind: "Pod", Name: "pod2"}},
+		},
+		Ports: []api.EndpointPort{
+			{Name: "port0", Port: 8080, Protocol: "TCP"},
+			{Name: "port1", Port: 8088, Protocol: "TCP"},
+		},
+	}}
+	data := runtime.EncodeOrDie(testapi.Codec(), &api.Endpoints{
+		ObjectMeta: api.ObjectMeta{
+			ResourceVersion: "",
+			Labels:          serviceList.Items[0].Labels,
+		},
+		Subsets: endptspkg.SortSubsets(expectedSubsets),
+	})
+	// endpointsHandler should get 2 requests - one for "GET" and the next for "POST".
+	endpointsHandler.ValidateRequestCount(t, 2)
+	endpointsHandler.ValidateRequest(t, testapi.ResourcePathWithQueryParams("endpoints", "other", ""), "POST", &data)
+}
+
+func TestSyncEndpointsItemsPreexistingLabelsChange(t *testing.T) {
+	serviceList := api.ServiceList{
+		Items: []api.Service{
+			{
+				ObjectMeta: api.ObjectMeta{
+					Name:      "foo",
+					Namespace: "bar",
+					Labels: map[string]string{
+						"baz": "blah",
+					},
+				},
+				Spec: api.ServiceSpec{
+					Selector: map[string]string{"foo": "bar"},
+					Ports:    []api.ServicePort{{Port: 80, Protocol: "TCP", TargetPort: util.NewIntOrStringFromInt(8080)}},
+				},
+			},
+		},
+	}
+	testServer, endpointsHandler := makeTestServer(t, "bar",
+		serverResponse{http.StatusOK, newPodList(1, 1)},
+		serverResponse{http.StatusOK, &serviceList},
+		serverResponse{http.StatusOK, &api.Endpoints{
+			ObjectMeta: api.ObjectMeta{
+				Name:            "foo",
+				ResourceVersion: "1",
+				Labels: map[string]string{
+					"foo": "bar",
+				},
+			},
+			Subsets: []api.EndpointSubset{{
+				Addresses: []api.EndpointAddress{{IP: "6.7.8.9"}},
+				Ports:     []api.EndpointPort{{Port: 1000}},
+			}},
+		}})
+	defer testServer.Close()
+	client := client.NewOrDie(&client.Config{Host: testServer.URL, Version: testapi.Version()})
+	endpoints := NewEndpointController(client)
+	if err := endpoints.SyncServiceEndpoints(); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	data := runtime.EncodeOrDie(testapi.Codec(), &api.Endpoints{
+		ObjectMeta: api.ObjectMeta{
+			Name:            "foo",
+			ResourceVersion: "1",
+			Labels:          serviceList.Items[0].Labels,
+		},
+		Subsets: []api.EndpointSubset{{
+			Addresses: []api.EndpointAddress{{IP: "1.2.3.4", TargetRef: &api.ObjectReference{Kind: "Pod", Name: "pod0"}}},
+			Ports:     []api.EndpointPort{{Port: 8080, Protocol: "TCP"}},
+		}},
+	})
+	endpointsHandler.ValidateRequest(t, testapi.ResourcePathWithQueryParams("endpoints", "bar", "foo"), "PUT", &data)
+}
