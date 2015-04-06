@@ -210,31 +210,87 @@ var _ = Describe("Density", func() {
 	// Tests with "Skipped" substring in their name will be skipped when running
 	// e2e test suite without --ginkgo.focus & --ginkgo.skip flags.
 
-	for _, count := range []int{30, 50, 100} {
-		name := fmt.Sprintf("should allow starting %d pods per node", count)
-		// TODO(wojtek-t): Don't skip 30 pods per node test once #6059 if fixed.
-		if count > 0 {
-			name = "[Skipped] " + name
-		}
-		It(name, func() {
-			RCName = "my-hostname-density" + strconv.Itoa(count) + "-" + string(util.NewUUID())
-			RunRC(c, RCName, ns, "gcr.io/google_containers/pause:go", count*minionCount)
-		})
+	type Density struct {
+		skip          bool
+		totalPods     int
+		podsPerMinion int
+		rcsPerThread  int
 	}
 
-	It("[Skipped] should have master components that can handle many short-lived pods", func() {
-		threads := 5
-		var wg sync.WaitGroup
-		wg.Add(threads)
-		for i := 0; i < threads; i++ {
-			go func() {
-				defer wg.Done()
-				for i := 0; i < 10; i++ {
-					name := "my-hostname-thrash-" + string(util.NewUUID())
-					RunRC(c, name, ns, "gcr.io/google_containers/pause:go", 10*minionCount)
+	//This test should always run, even if larger densities are skipped.
+	d3 := Density{totalPods: 3, podsPerMinion: 0, rcsPerThread: 1, skip: false}
+
+	//These tests are varied and customizable.
+	//TODO (wojtek-t):don't skip d30 after #6059
+	d30 := Density{totalPods: 30, podsPerMinion: 0, rcsPerThread: 1, skip: true}
+	d50 := Density{totalPods: 50, podsPerMinion: 0, rcsPerThread: 1, skip: true}
+	d100 := Density{totalPods: 100, podsPerMinion: 0, rcsPerThread: 1, skip: true}
+	d500t5 := Density{totalPods: 500, podsPerMinion: 10, rcsPerThread: 5, skip: true}
+	d500t25 := Density{totalPods: 500, podsPerMinion: 10, rcsPerThread: 25, skip: true}
+
+	dtests := []Density{d3, d30, d50, d100, d500t5, d500t25}
+
+	//Run each test in the array which isn't skipped.
+	for i := range dtests {
+
+		//cannot do a range iterator over structs.
+		dtest := dtests[i]
+
+		glog.Info("Density test parameters: %v", dtest)
+
+		//if ppm==0, its a raw density test.
+		//otherwise, we continue launching n nodes per pod in threads till we meet the totalPods #.
+		if dtest.podsPerMinion == 0 {
+			//basic density tests
+			name := fmt.Sprintf("should allow starting %d pods per node", dtest.totalPods)
+
+			if dtest.skip {
+				name = "[Skipped] " + name
+			}
+			It(name, func() {
+				RCName = "my-hostname-density" + strconv.Itoa(dtest.totalPods) + "-" + string(util.NewUUID())
+				RunRC(c, RCName, ns, "gcr.io/google_containers/pause:go", dtest.totalPods)
+			})
+			glog.Info("moving on, test already finished....")
+		} else {
+			// # of threads calibrate to totalPods
+			threads := (dtest.totalPods / (dtest.podsPerMinion * dtest.rcsPerThread))
+
+			name := fmt.Sprintf(
+				"[Skipped] should be able to launch %v pods, %v per minion, in %v rcs/thread.",
+				dtest.totalPods, dtest.podsPerMinion, dtest.rcsPerThread)
+
+			if dtest.skip {
+				name = "[Skipped] " + name
+			}
+
+			podsLaunched := 0
+			It(name, func() {
+
+				var wg sync.WaitGroup
+
+				//count down latch.., once all threads are launched, we wait for
+				//it to decrement down to zero.
+				wg.Add(threads)
+
+				//create queue of pending requests on the api server.
+				for i := 0; i < threads; i++ {
+					go func() {
+						// call to wg.Done will serve as a count down latch.
+						defer wg.Done()
+						for i := 0; i < dtest.rcsPerThread; i++ {
+							name := "my-short-lived-pod" + string(util.NewUUID())
+							n := dtest.podsPerMinion * minionCount
+							RunRC(c, name, ns, "gcr.io/google_containers/pause:go", n)
+							podsLaunched += n
+							glog.Info("Launched %v pods so far...", podsLaunched)
+						}
+					}()
 				}
-			}()
+				//Wait for all the pods from all the RC's to return.
+				wg.Wait()
+				glog.Info("%v pods out of %v launched", podsLaunched, dtest.totalPods)
+			})
 		}
-		wg.Wait()
-	})
+	}
 })
