@@ -3,12 +3,12 @@
 
 .SH NAME
 .PP
-kubectl rolling\-update \- Perform a rolling update of the given ReplicationController.
+kubectl rollingupdate \- Perform a rolling update of the given ReplicationController.
 
 
 .SH SYNOPSIS
 .PP
-\fBkubectl rolling\-update\fP [OPTIONS]
+\fBkubectl rollingupdate\fP [OPTIONS]
 
 
 .SH DESCRIPTION
@@ -28,7 +28,7 @@ existing controller and overwrite at least one (common) label in its replicaSele
 
 .PP
 \fB\-h\fP, \fB\-\-help\fP=false
-    help for rolling\-update
+    help for rollingupdate
 
 .PP
 \fB\-\-poll\-interval\fP="3s"
@@ -151,10 +151,10 @@ existing controller and overwrite at least one (common) label in its replicaSele
 
 .nf
 // Update pods of frontend\-v1 using new controller data in frontend\-v2.json.
-$ kubectl rolling\-update frontend\-v1 \-f frontend\-v2.json
+$ kubectl rollingupdate frontend\-v1 \-f frontend\-v2.json
 
 // Update pods of frontend\-v1 using JSON data passed into stdin.
-$ cat frontend\-v2.json | kubectl rolling\-update frontend\-v1 \-f \-
+$ cat frontend\-v2.json | kubectl rollingupdate frontend\-v1 \-f \-
 
 .fi
 .RE
