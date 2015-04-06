@@ -17,11 +17,12 @@ limitations under the License.
 package strategicpatch
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"reflect"
 	"sort"
+
+	forkedjson "github.com/GoogleCloudPlatform/kubernetes/third_party/forked/json"
 )
 
 // An alternate implementation of JSON Merge Patch
@@ -101,7 +102,7 @@ func mergeMap(original, patch map[string]interface{}, t reflect.Type) (map[strin
 		}
 		// If they're both maps or lists, recurse into the value.
 		// First find the fieldPatchStrategy and fieldPatchMergeKey.
-		fieldType, fieldPatchStrategy, fieldPatchMergeKey, err := lookupPatchMetadata(t, k)
+		fieldType, fieldPatchStrategy, fieldPatchMergeKey, err := forkedjson.LookupPatchMetadata(t, k)
 		if err != nil {
 			return nil, err
 		}
@@ -268,7 +269,7 @@ func sortMergeListsByName(mapJSON []byte, dataStruct interface{}) ([]byte, error
 func sortMergeListsByNameMap(s map[string]interface{}, t reflect.Type) (map[string]interface{}, error) {
 	newS := map[string]interface{}{}
 	for k, v := range s {
-		fieldType, fieldPatchStrategy, fieldPatchMergeKey, err := lookupPatchMetadata(t, k)
+		fieldType, fieldPatchStrategy, fieldPatchMergeKey, err := forkedjson.LookupPatchMetadata(t, k)
 		if err != nil {
 			return nil, err
 		}
@@ -430,40 +431,4 @@ func sliceElementType(slices ...[]interface{}) (reflect.Type, error) {
 		return nil, fmt.Errorf("no elements in any given slices")
 	}
 	return prevType, nil
-}
-
-// Finds the patchStrategy and patchMergeKey struct tag fields on a given
-// struct field given the struct type and the JSON name of the field.
-func lookupPatchMetadata(t reflect.Type, jsonField string) (reflect.Type, string, string, error) {
-	if t.Kind() == reflect.Map {
-		return t.Elem(), "", "", nil
-	}
-	if t.Kind() != reflect.Struct {
-		return nil, "", "", fmt.Errorf("merging an object in json but data type is not map or struct, instead is: %s",
-			t.Kind().String())
-	}
-	jf := []byte(jsonField)
-	// Find the field that the JSON library would use.
-	var f *field
-	fields := cachedTypeFields(t)
-	for i := range fields {
-		ff := &fields[i]
-		if bytes.Equal(ff.nameBytes, jf) {
-			f = ff
-			break
-		}
-		// Do case-insensitive comparison.
-		if f == nil && ff.equalFold(ff.nameBytes, jf) {
-			f = ff
-		}
-	}
-	if f != nil {
-		// Find the reflect.Value of the most preferential
-		// struct field.
-		tjf := t.Field(f.index[0])
-		patchStrategy := tjf.Tag.Get("patchStrategy")
-		patchMergeKey := tjf.Tag.Get("patchMergeKey")
-		return tjf.Type, patchStrategy, patchMergeKey, nil
-	}
-	return nil, "", "", fmt.Errorf("unable to find api field in struct %s for the json field %q", t.Name(), jsonField)
 }

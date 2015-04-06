@@ -1,29 +1,14 @@
-/*
-Copyright 2014 Google Inc. All rights reserved.
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
-
-// NOTE: The below is taken from the Go standard library to enable us to find
-// the field of a struct that a given JSON key maps to.
-//
 // Copyright 2013 The Go Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
-package strategicpatch
+
+// Package json is forked from the Go standard library to enable us to find the
+// field of a struct that a given JSON key maps to.
+package json
 
 import (
 	"bytes"
+	"fmt"
 	"reflect"
 	"sort"
 	"strings"
@@ -31,6 +16,43 @@ import (
 	"unicode"
 	"unicode/utf8"
 )
+
+// Finds the patchStrategy and patchMergeKey struct tag fields on a given
+// struct field given the struct type and the JSON name of the field.
+// TODO: fix the returned errors to be introspectable.
+func LookupPatchMetadata(t reflect.Type, jsonField string) (reflect.Type, string, string, error) {
+	if t.Kind() == reflect.Map {
+		return t.Elem(), "", "", nil
+	}
+	if t.Kind() != reflect.Struct {
+		return nil, "", "", fmt.Errorf("merging an object in json but data type is not map or struct, instead is: %s",
+			t.Kind().String())
+	}
+	jf := []byte(jsonField)
+	// Find the field that the JSON library would use.
+	var f *field
+	fields := cachedTypeFields(t)
+	for i := range fields {
+		ff := &fields[i]
+		if bytes.Equal(ff.nameBytes, jf) {
+			f = ff
+			break
+		}
+		// Do case-insensitive comparison.
+		if f == nil && ff.equalFold(ff.nameBytes, jf) {
+			f = ff
+		}
+	}
+	if f != nil {
+		// Find the reflect.Value of the most preferential
+		// struct field.
+		tjf := t.Field(f.index[0])
+		patchStrategy := tjf.Tag.Get("patchStrategy")
+		patchMergeKey := tjf.Tag.Get("patchMergeKey")
+		return tjf.Type, patchStrategy, patchMergeKey, nil
+	}
+	return nil, "", "", fmt.Errorf("unable to find api field in struct %s for the json field %q", t.Name(), jsonField)
+}
 
 // A field represents a single field found in a struct.
 type field struct {
