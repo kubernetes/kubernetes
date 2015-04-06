@@ -61,7 +61,8 @@ func (c *FakeNamespaces) Watch(label labels.Selector, field fields.Selector, res
 
 func (c *FakeNamespaces) Finalize(namespace *api.Namespace) (*api.Namespace, error) {
 	c.Fake.Actions = append(c.Fake.Actions, FakeAction{Action: "finalize-namespace", Value: namespace.Name})
-	return &api.Namespace{}, nil
+	c.Fake.Namespace = *namespace
+	return namespace, nil
 }
 
 func (c *FakeNamespaces) Status(namespace *api.Namespace) (*api.Namespace, error) {
