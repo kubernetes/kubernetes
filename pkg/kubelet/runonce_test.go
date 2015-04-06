@@ -81,6 +81,7 @@ func TestRunOnce(t *testing.T) {
 		nodeLister:          testNodeLister{},
 		statusManager:       newStatusManager(nil),
 		containerRefManager: kubecontainer.NewRefManager(),
+		readinessManager:    kubecontainer.NewReadinessManager(),
 	}
 
 	kb.networkPlugin, _ = network.InitNetworkPlugin([]network.NetworkPlugin{}, "", network.NewFakeHost(nil))
