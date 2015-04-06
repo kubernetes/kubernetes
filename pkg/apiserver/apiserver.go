@@ -121,6 +121,7 @@ func apiAuthorizationFilter(apiAuthorizer authorizer.APIAuthorizer, attributeExt
 		authorizationAttributes := authorizer.APIAttributesRecord{
 			UserInfo:     user,
 			Verb:         strings.ToLower(scope.Verb),
+			Namespace:    namespace,
 			Resource:     scope.Resource,
 			Subresource:  scope.Subresource,
 			Kind:         scope.Kind,
