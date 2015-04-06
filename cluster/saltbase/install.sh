@@ -69,7 +69,6 @@ cp -v "${KUBE_TEMP}/kubernetes/server/bin/"* /srv/salt-new/salt/kube-bins/
 kube_bin_dir="/srv/salt-new/salt/kube-bins";
 docker_images_sls_file="/srv/salt-new/pillar/docker-images.sls";
 for docker_file in "${KUBE_DOCKER_WRAPPED_BINARIES[@]}"; do
-  docker load -i "${kube_bin_dir}/${docker_file}.tar";
   docker_tag=$(cat ${kube_bin_dir}/${docker_file}.docker_tag);
   sed -i "s/#${docker_file}_docker_tag_value#/${docker_tag}/" "${docker_images_sls_file}";
 done
