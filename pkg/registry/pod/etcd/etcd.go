@@ -35,13 +35,20 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/fielderrors"
 )
 
-// rest implements a RESTStorage for pods against etcd
+// PodStorage includes storage for pods and all sub resources
+type PodStorage struct {
+	Pod     *REST
+	Binding *BindingREST
+	Status  *StatusREST
+}
+
+// REST implements a RESTStorage for pods against etcd
 type REST struct {
 	etcdgeneric.Etcd
 }
 
 // NewStorage returns a RESTStorage object that will work against pods.
-func NewStorage(h tools.EtcdHelper) (*REST, *BindingREST, *StatusREST) {
+func NewStorage(h tools.EtcdHelper) PodStorage {
 	prefix := "/registry/pods"
 	store := &etcdgeneric.Etcd{
 		NewFunc:     func() runtime.Object { return &api.Pod{} },
@@ -74,7 +81,11 @@ func NewStorage(h tools.EtcdHelper) (*REST, *BindingREST, *StatusREST) {
 
 	statusStore.UpdateStrategy = pod.StatusStrategy
 
-	return &REST{*store}, &BindingREST{store: store}, &StatusREST{store: &statusStore}
+	return PodStorage{
+		Pod:     &REST{*store},
+		Binding: &BindingREST{store: store},
+		Status:  &StatusREST{store: &statusStore},
+	}
 }
 
 // Implement Redirector.
@@ -90,6 +101,7 @@ type BindingREST struct {
 	store *etcdgeneric.Etcd
 }
 
+// New creates a new binding resource
 func (r *BindingREST) New() runtime.Object {
 	return &api.Binding{}
 }
@@ -165,6 +177,7 @@ type StatusREST struct {
 	store *etcdgeneric.Etcd
 }
 
+// New creates a new pod resource
 func (r *StatusREST) New() runtime.Object {
 	return &api.Pod{}
 }
