@@ -1993,60 +1993,68 @@ func (kl *Kubelet) ServeLogs(w http.ResponseWriter, req *http.Request) {
 	kl.logServer.ServeHTTP(w, req)
 }
 
+// findContainer finds and returns the container with the given pod ID, full name, and container name.
+// It returns nil if not found.
+// TODO(yifan): Move this to runtime once GetPods() has the same signature as the runtime.GetPods().
+func (kl *Kubelet) findContainer(podFullName string, podUID types.UID, containerName string) (*kubecontainer.Container, error) {
+	pods, err := dockertools.GetPods(kl.dockerClient, false)
+	if err != nil {
+		return nil, err
+	}
+	pod := kubecontainer.Pods(pods).FindPod(podFullName, podUID)
+	return pod.FindContainerByName(containerName), nil
+}
+
 // Run a command in a container, returns the combined stdout, stderr as an array of bytes
-func (kl *Kubelet) RunInContainer(podFullName string, uid types.UID, container string, cmd []string) ([]byte, error) {
-	uid = kl.podManager.TranslatePodUID(uid)
+func (kl *Kubelet) RunInContainer(podFullName string, podUID types.UID, containerName string, cmd []string) ([]byte, error) {
+	podUID = kl.podManager.TranslatePodUID(podUID)
 
 	if kl.runner == nil {
 		return nil, fmt.Errorf("no runner specified.")
 	}
-	dockerContainers, err := dockertools.GetKubeletDockerContainers(kl.dockerClient, false)
+	container, err := kl.findContainer(podFullName, podUID, containerName)
 	if err != nil {
 		return nil, err
 	}
-	dockerContainer, found, _ := dockerContainers.FindPodContainer(podFullName, uid, container)
-	if !found {
-		return nil, fmt.Errorf("container not found (%q)", container)
+	if container == nil {
+		return nil, fmt.Errorf("container not found (%q)", containerName)
 	}
-	return kl.runner.RunInContainer(dockerContainer.ID, cmd)
+	return kl.runner.RunInContainer(string(container.ID), cmd)
 }
 
 // ExecInContainer executes a command in a container, connecting the supplied
 // stdin/stdout/stderr to the command's IO streams.
-func (kl *Kubelet) ExecInContainer(podFullName string, uid types.UID, container string, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool) error {
-	uid = kl.podManager.TranslatePodUID(uid)
+func (kl *Kubelet) ExecInContainer(podFullName string, podUID types.UID, containerName string, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool) error {
+	podUID = kl.podManager.TranslatePodUID(podUID)
 
 	if kl.runner == nil {
 		return fmt.Errorf("no runner specified.")
 	}
-	dockerContainers, err := dockertools.GetKubeletDockerContainers(kl.dockerClient, false)
+	container, err := kl.findContainer(podFullName, podUID, containerName)
 	if err != nil {
 		return err
 	}
-	dockerContainer, found, _ := dockerContainers.FindPodContainer(podFullName, uid, container)
-	if !found {
-		return fmt.Errorf("container not found (%q)", container)
+	if container == nil {
+		return fmt.Errorf("container not found (%q)", containerName)
 	}
-	return kl.runner.ExecInContainer(dockerContainer.ID, cmd, stdin, stdout, stderr, tty)
+	return kl.runner.ExecInContainer(string(container.ID), cmd, stdin, stdout, stderr, tty)
 }
 
 // PortForward connects to the pod's port and copies data between the port
 // and the stream.
-func (kl *Kubelet) PortForward(podFullName string, uid types.UID, port uint16, stream io.ReadWriteCloser) error {
-	uid = kl.podManager.TranslatePodUID(uid)
+func (kl *Kubelet) PortForward(podFullName string, podUID types.UID, port uint16, stream io.ReadWriteCloser) error {
+	podUID = kl.podManager.TranslatePodUID(podUID)
 
 	if kl.runner == nil {
 		return fmt.Errorf("no runner specified.")
 	}
-	dockerContainers, err := dockertools.GetKubeletDockerContainers(kl.dockerClient, false)
+
+	pods, err := dockertools.GetPods(kl.dockerClient, false)
 	if err != nil {
 		return err
 	}
-	podInfraContainer, found, _ := dockerContainers.FindPodContainer(podFullName, uid, dockertools.PodInfraContainerName)
-	if !found {
-		return fmt.Errorf("Unable to find pod infra container for pod %q, uid %v", podFullName, uid)
-	}
-	return kl.runner.PortForward(podInfraContainer.ID, port, stream)
+	pod := kubecontainer.Pods(pods).FindPod(podFullName, podUID)
+	return kl.runner.PortForward(&pod, port, stream)
 }
 
 // BirthCry sends an event that the kubelet has started up.

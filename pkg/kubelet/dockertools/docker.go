@@ -173,6 +173,7 @@ func (d *dockerContainerCommandRunner) runInContainerUsingNsinit(containerID str
 }
 
 // RunInContainer uses nsinit to run the command inside the container identified by containerID
+// TODO(yifan): Use strong type for containerID.
 func (d *dockerContainerCommandRunner) RunInContainer(containerID string, cmd []string) ([]byte, error) {
 	// If native exec support does not exist in the local docker daemon use nsinit.
 	useNativeExec, err := d.nativeExecSupportExists()
@@ -217,6 +218,7 @@ func (d *dockerContainerCommandRunner) RunInContainer(containerID string, cmd []
 //  - match cgroups of container
 //  - should we support `docker exec`?
 //  - should we support nsenter in a container, running with elevated privs and --pid=host?
+//  - use strong type for containerId
 func (d *dockerContainerCommandRunner) ExecInContainer(containerId string, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool) error {
 	container, err := d.client.InspectContainer(containerId)
 	if err != nil {
@@ -303,8 +305,12 @@ func (d *dockerContainerCommandRunner) ExecInContainer(containerId string, cmd [
 //  - match cgroups of container
 //  - should we support nsenter + socat on the host? (current impl)
 //  - should we support nsenter + socat in a container, running with elevated privs and --pid=host?
-func (d *dockerContainerCommandRunner) PortForward(podInfraContainerID string, port uint16, stream io.ReadWriteCloser) error {
-	container, err := d.client.InspectContainer(podInfraContainerID)
+func (d *dockerContainerCommandRunner) PortForward(pod *kubecontainer.Pod, port uint16, stream io.ReadWriteCloser) error {
+	podInfraContainer := pod.FindContainerByName(PodInfraContainerName)
+	if podInfraContainer == nil {
+		return fmt.Errorf("cannot find pod infra container in pod %q", kubecontainer.BuildPodFullName(pod.Name, pod.Namespace))
+	}
+	container, err := d.client.InspectContainer(string(podInfraContainer.ID))
 	if err != nil {
 		return err
 	}
@@ -527,11 +533,12 @@ func ConnectToDockerOrDie(dockerEndpoint string) DockerInterface {
 	return client
 }
 
+// TODO(yifan): Move this to container.Runtime.
 type ContainerCommandRunner interface {
 	RunInContainer(containerID string, cmd []string) ([]byte, error)
 	GetDockerServerVersion() ([]uint, error)
 	ExecInContainer(containerID string, cmd []string, in io.Reader, out, err io.WriteCloser, tty bool) error
-	PortForward(podInfraContainerID string, port uint16, stream io.ReadWriteCloser) error
+	PortForward(pod *kubecontainer.Pod, port uint16, stream io.ReadWriteCloser) error
 }
 
 func milliCPUToShares(milliCPU int64) int64 {
