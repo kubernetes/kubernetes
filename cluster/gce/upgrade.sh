@@ -79,23 +79,7 @@ function upgrade-master() {
     --zone "${ZONE}" \
     "${MASTER_NAME}"
 
-  write-master-env
-  gcloud compute instances create "${MASTER_NAME}" \
-    --address "${MASTER_NAME}-ip" \
-    --project "${PROJECT}" \
-    --zone "${ZONE}" \
-    --machine-type "${MASTER_SIZE}" \
-    --image-project="${IMAGE_PROJECT}" \
-    --image "${IMAGE}" \
-    --tags "${MASTER_TAG}" \
-    --network "${NETWORK}" \
-    --scopes "storage-ro" "compute-rw" \
-    --can-ip-forward \
-    --metadata-from-file \
-      "startup-script=${KUBE_ROOT}/cluster/gce/configure-vm.sh" \
-      "kube-env=${KUBE_TEMP}/master-kube-env.yaml" \
-    --disk name="${MASTER_NAME}-pd" device-name=master-pd mode=rw boot=no auto-delete=no
-
+  create-master-instance "${MASTER_NAME}-ip"
   wait-for-master
 }
 
