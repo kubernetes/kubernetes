@@ -47,6 +47,7 @@ type Fake struct {
 	ResourceQuotaStatus       api.ResourceQuota
 	ResourceQuotasList        api.ResourceQuotaList
 	NamespacesList            api.NamespaceList
+	Namespace                 api.Namespace
 	SecretList                api.SecretList
 	Secret                    api.Secret
 	Err                       error

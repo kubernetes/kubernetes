@@ -58,6 +58,13 @@ func TestFinalize(t *testing.T) {
 	if mockClient.Actions[0].Action != "finalize-namespace" {
 		t.Errorf("Expected finalize-namespace action %v", mockClient.Actions[0].Action)
 	}
+	finalizers := mockClient.Namespace.Spec.Finalizers
+	if len(finalizers) != 1 {
+		t.Errorf("There should be a single finalizer remaining")
+	}
+	if "other" != string(finalizers[0]) {
+		t.Errorf("Unexpected finalizer value, %v", finalizers[0])
+	}
 }
 
 func TestSyncNamespaceThatIsTerminating(t *testing.T) {
