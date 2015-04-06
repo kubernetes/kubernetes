@@ -114,13 +114,17 @@ func init() {
 	// api.Status is returned in errors
 
 	// "internal" version
-	api.Scheme.AddKnownTypes("", &Simple{}, &SimpleList{}, &api.Status{}, &api.ListOptions{})
+	api.Scheme.AddKnownTypes("", &Simple{}, &SimpleList{}, &api.Status{}, &api.ListOptions{}, &SimpleGetOptions{})
 	// "version" version
 	// TODO: Use versioned api objects?
-	api.Scheme.AddKnownTypes(testVersion, &Simple{}, &SimpleList{}, &v1beta1.Status{})
+	api.Scheme.AddKnownTypes(testVersion, &Simple{}, &SimpleList{}, &v1beta1.Status{}, &SimpleGetOptions{})
 	// "version2" version
 	// TODO: Use versioned api objects?
-	api.Scheme.AddKnownTypes(testVersion2, &Simple{}, &SimpleList{}, &v1beta3.Status{})
+	api.Scheme.AddKnownTypes(testVersion2, &Simple{}, &SimpleList{}, &v1beta3.Status{}, &SimpleGetOptions{})
+
+	// Register SimpleGetOptions with the server versions to convert query params to it
+	api.Scheme.AddKnownTypes("v1beta1", &SimpleGetOptions{})
+	api.Scheme.AddKnownTypes("v1beta3", &SimpleGetOptions{})
 
 	nsMapper := newMapper()
 	legacyNsMapper := newMapper()
@@ -231,6 +235,14 @@ type Simple struct {
 
 func (*Simple) IsAnAPIObject() {}
 
+type SimpleGetOptions struct {
+	api.TypeMeta `json:",inline"`
+	Param1       string `json:"param1"`
+	Param2       string `json:"param2"`
+}
+
+func (*SimpleGetOptions) IsAnAPIObject() {}
+
 type SimpleList struct {
 	api.TypeMeta `json:",inline"`
 	api.ListMeta `json:"metadata,inline"`
@@ -241,6 +253,21 @@ func (*SimpleList) IsAnAPIObject() {}
 
 func TestSimpleSetupRight(t *testing.T) {
 	s := &Simple{ObjectMeta: api.ObjectMeta{Name: "aName"}}
+	wire, err := codec.Encode(s)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s2, err := codec.Decode(wire)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(s, s2) {
+		t.Fatalf("encode/decode broken:\n%#v\n%#v\n", s, s2)
+	}
+}
+
+func TestSimpleOptionsSetupRight(t *testing.T) {
+	s := &SimpleGetOptions{}
 	wire, err := codec.Encode(s)
 	if err != nil {
 		t.Fatal(err)
@@ -314,10 +341,10 @@ func (s *SimpleStream) Close() error {
 
 func (s *SimpleStream) IsAnAPIObject() {}
 
-func (s *SimpleStream) InputStream(version, accept string) (io.ReadCloser, string, error) {
+func (s *SimpleStream) InputStream(version, accept string) (io.ReadCloser, bool, string, error) {
 	s.version = version
 	s.accept = accept
-	return s, s.contentType, s.err
+	return s, false, s.contentType, s.err
 }
 
 func (storage *SimpleRESTStorage) Get(ctx api.Context, id string) (runtime.Object, error) {
@@ -430,6 +457,23 @@ type MetadataRESTStorage struct {
 
 func (m *MetadataRESTStorage) ProducesMIMETypes(method string) []string {
 	return m.types
+}
+
+type GetWithOptionsRESTStorage struct {
+	*SimpleRESTStorage
+	optionsReceived runtime.Object
+}
+
+func (r *GetWithOptionsRESTStorage) Get(ctx api.Context, name string, options runtime.Object) (runtime.Object, error) {
+	if _, ok := options.(*SimpleGetOptions); !ok {
+		return nil, fmt.Errorf("Unexpected options object: %#v", options)
+	}
+	r.optionsReceived = options
+	return r.SimpleRESTStorage.Get(ctx, name)
+}
+
+func (r *GetWithOptionsRESTStorage) NewGetOptions() runtime.Object {
+	return &SimpleGetOptions{}
 }
 
 func extractBody(response *http.Response, object runtime.Object) (string, error) {
@@ -875,6 +919,47 @@ func TestGetBinary(t *testing.T) {
 	if !stream.closed || stream.version != "version" || stream.accept != "text/other, */*" ||
 		resp.Header.Get("Content-Type") != stream.contentType || string(body) != "response data" {
 		t.Errorf("unexpected stream: %#v", stream)
+	}
+}
+
+func TestGetWithOptions(t *testing.T) {
+	storage := map[string]rest.Storage{}
+	simpleStorage := GetWithOptionsRESTStorage{
+		SimpleRESTStorage: &SimpleRESTStorage{
+			item: Simple{
+				Other: "foo",
+			},
+		},
+	}
+	storage["simple"] = &simpleStorage
+	handler := handle(storage)
+	server := httptest.NewServer(handler)
+	defer server.Close()
+
+	resp, err := http.Get(server.URL + "/api/version/simple/id?param1=test1&param2=test2")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("unexpected response: %#v", resp)
+	}
+	var itemOut Simple
+	body, err := extractBody(resp, &itemOut)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	if itemOut.Name != simpleStorage.item.Name {
+		t.Errorf("Unexpected data: %#v, expected %#v (%s)", itemOut, simpleStorage.item, string(body))
+	}
+
+	opts, ok := simpleStorage.optionsReceived.(*SimpleGetOptions)
+	if !ok {
+		t.Errorf("Unexpected options object received: %#v", simpleStorage.optionsReceived)
+		return
+	}
+	if opts.Param1 != "test1" || opts.Param2 != "test2" {
+		t.Errorf("Did not receive expected options: %#v", opts)
 	}
 }
 

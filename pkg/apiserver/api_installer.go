@@ -130,6 +130,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	creater, isCreater := storage.(rest.Creater)
 	lister, isLister := storage.(rest.Lister)
 	getter, isGetter := storage.(rest.Getter)
+	getterWithOptions, isGetterWithOptions := storage.(rest.GetterWithOptions)
 	deleter, isDeleter := storage.(rest.Deleter)
 	gracefulDeleter, isGracefulDeleter := storage.(rest.GracefulDeleter)
 	updater, isUpdater := storage.(rest.Updater)
@@ -168,6 +169,17 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		isDeleter = true
 	case isDeleter:
 		gracefulDeleter = rest.GracefulDeleteAdapter{deleter}
+	}
+
+	var getOptions runtime.Object
+	var getOptionsKind string
+	if isGetterWithOptions {
+		getOptions = getterWithOptions.NewGetOptions()
+		_, getOptionsKind, err = a.group.Typer.ObjectVersionAndKind(getOptions)
+		if err != nil {
+			return err
+		}
+		isGetter = true
 	}
 
 	var ctxFn ContextFunc
@@ -316,12 +328,23 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		m := monitorFilter(action.Verb, resource)
 		switch action.Verb {
 		case "GET": // Get a resource.
-			route := ws.GET(action.Path).To(GetResource(getter, reqScope)).
+			var handler restful.RouteFunction
+			if isGetterWithOptions {
+				handler = GetResourceWithOptions(getterWithOptions, reqScope, getOptionsKind)
+			} else {
+				handler = GetResource(getter, reqScope)
+			}
+			route := ws.GET(action.Path).To(handler).
 				Filter(m).
 				Doc("read the specified " + kind).
 				Operation("read" + kind).
 				Produces(append(storageMeta.ProducesMIMETypes(action.Verb), "application/json")...).
 				Writes(versionedObject)
+			if isGetterWithOptions {
+				if err := addObjectParams(ws, route, getOptions); err != nil {
+					return err
+				}
+			}
 			addParams(route, action.Params)
 			ws.Route(route)
 		case "LIST": // List all resources of a kind.

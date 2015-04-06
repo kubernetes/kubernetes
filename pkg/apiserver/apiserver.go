@@ -36,6 +36,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/errors"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/flushwriter"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/version"
 
 	"github.com/emicklei/go-restful"
@@ -204,9 +205,14 @@ func APIVersionHandler(versions ...string) restful.RouteFunction {
 // be "application/octet-stream". All other objects are sent to standard JSON serialization.
 func write(statusCode int, apiVersion string, codec runtime.Codec, object runtime.Object, w http.ResponseWriter, req *http.Request) {
 	if stream, ok := object.(rest.ResourceStreamer); ok {
-		out, contentType, err := stream.InputStream(apiVersion, req.Header.Get("Accept"))
+		out, flush, contentType, err := stream.InputStream(apiVersion, req.Header.Get("Accept"))
 		if err != nil {
 			errorJSONFatal(err, codec, w)
+			return
+		}
+		if out == nil {
+			// No output provided - return StatusNoContent
+			w.WriteHeader(http.StatusNoContent)
 			return
 		}
 		defer out.Close()
@@ -215,7 +221,11 @@ func write(statusCode int, apiVersion string, codec runtime.Codec, object runtim
 		}
 		w.Header().Set("Content-Type", contentType)
 		w.WriteHeader(statusCode)
-		io.Copy(w, out)
+		writer := w.(io.Writer)
+		if flush {
+			writer = flushwriter.Wrap(w)
+		}
+		io.Copy(writer, out)
 		return
 	}
 	writeJSON(statusCode, codec, object, w)
