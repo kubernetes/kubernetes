@@ -40,10 +40,11 @@ source "${KUBE_ROOT}/cluster/${KUBERNETES_PROVIDER}/util.sh"
 function usage() {
   echo "!!! EXPERIMENTAL !!!"
   echo ""
-  echo "${0} [-M|-N] <release or continuous integration version>"
+  echo "${0} [-M|-N] -l | <release or continuous integration version>"
   echo "  Upgrades master and nodes by default"
   echo "  -M:  Upgrade master only"
   echo "  -N:  Upgrade nodes only"
+  echo "  -l:  Use local(dev) binaries"
   echo ""
   echo "(... Fetching current release versions ...)"
   echo ""
@@ -63,10 +64,8 @@ function usage() {
 }
 
 function upgrade-master() {
-  echo "== Upgrading master to ${SERVER_BINARY_TAR_URL}. Do not interrupt, deleting master instance. =="
+  echo "== Upgrading master to '${SERVER_BINARY_TAR_URL}'. Do not interrupt, deleting master instance. =="
 
-  ensure-temp-dir
-  detect-project
   detect-master
   get-password
   set-master-htpasswd
@@ -95,10 +94,26 @@ function wait-for-master() {
   echo "== Done =="
 }
 
-function upgrade-nodes() {
-  echo "== Upgrading nodes to ${SERVER_BINARY_TAR_URL}. =="
+# Perform common upgrade setup tasks
+#
+# Assumed vars
+#   local_binaries
+#   binary_version
+function prepare-upgrade() {
   ensure-temp-dir
   detect-project
+
+  if [[ "${local_binaries}" == "true" ]]; then
+    find-release-tars
+    upload-server-tars
+  else
+    tars_from_version ${binary_version}
+  fi
+}
+
+function upgrade-nodes() {
+  echo "== Upgrading nodes to ${SERVER_BINARY_TAR_URL}. =="
+
   detect-minion-names
   get-password
   set-master-htpasswd
@@ -130,14 +145,18 @@ function tars_from_version() {
 
 master_upgrade=true
 node_upgrade=true
+local_binaries=false
 
-while getopts ":MNh" opt; do
+while getopts ":MNlh" opt; do
   case ${opt} in
     M)
       node_upgrade=false
       ;;
     N)
       master_upgrade=false
+      ;;
+    l)
+      local_binaries=true
       ;;
     h)
       usage
@@ -152,7 +171,7 @@ while getopts ":MNh" opt; do
 done
 shift $((OPTIND-1))
 
-if [[ $# -lt 1 ]]; then
+if [[ $# -lt 1 ]] && [[ "${local_binaries}" == "false" ]]; then
   usage
   exit 1
 fi
@@ -162,7 +181,11 @@ if [[ "${master_upgrade}" == "false" ]] && [[ "${node_upgrade}" == "false" ]]; t
   exit 1
 fi
 
-tars_from_version ${1}
+if [[ "${local_binaries}" == "false" ]]; then
+  binary_version=${1}
+fi
+
+prepare-upgrade
 
 if [[ "${master_upgrade}" == "true" ]]; then
   upgrade-master
