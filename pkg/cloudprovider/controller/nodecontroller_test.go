@@ -30,6 +30,7 @@ import (
 	apierrors "github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/testclient"
 	fake_cloud "github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/fake"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
@@ -49,7 +50,7 @@ const (
 // PodsInterface and PodInterface to test list & delet pods, which is implemented in
 // the embeded client.Fake field.
 type FakeNodeHandler struct {
-	client.Fake
+	*testclient.Fake
 
 	// Input: Hooks determine if request is valid or not
 	CreateHook func(*FakeNodeHandler, *api.Node) bool
@@ -508,6 +509,9 @@ func TestSyncCloudNodes(t *testing.T) {
 	}
 
 	for _, item := range table {
+		if item.fakeNodeHandler.Fake == nil {
+			item.fakeNodeHandler.Fake = testclient.NewSimpleFake()
+		}
 		nodeController := NewNodeController(item.fakeCloud, item.matchRE, nil, &api.NodeResources{}, item.fakeNodeHandler, nil, 10, time.Minute,
 			util.NewFakeRateLimiter(), testNodeMonitorGracePeriod, testNodeStartupGracePeriod, testNodeMonitorPeriod)
 		if err := nodeController.SyncCloudNodes(); err != nil {
@@ -542,15 +546,13 @@ func TestSyncCloudNodesEvictPods(t *testing.T) {
 		matchRE              string
 		expectedRequestCount int
 		expectedDeleted      []string
-		expectedActions      []client.FakeAction
+		expectedActions      []testclient.FakeAction
 	}{
 		{
 			// No node to delete: do nothing.
 			fakeNodeHandler: &FakeNodeHandler{
 				Existing: []*api.Node{newNode("node0"), newNode("node1")},
-				Fake: client.Fake{
-					PodsList: api.PodList{Items: []api.Pod{*newPod("pod0", "node0"), *newPod("pod1", "node1")}},
-				},
+				Fake:     testclient.NewSimpleFake(&api.PodList{Items: []api.Pod{*newPod("pod0", "node0"), *newPod("pod1", "node1")}}),
 			},
 			fakeCloud: &fake_cloud.FakeCloud{
 				Machines: []string{"node0", "node1"},
@@ -564,9 +566,7 @@ func TestSyncCloudNodesEvictPods(t *testing.T) {
 			// Delete node1, and pod0 is running on it.
 			fakeNodeHandler: &FakeNodeHandler{
 				Existing: []*api.Node{newNode("node0"), newNode("node1")},
-				Fake: client.Fake{
-					PodsList: api.PodList{Items: []api.Pod{*newPod("pod0", "node1")}},
-				},
+				Fake:     testclient.NewSimpleFake(&api.PodList{Items: []api.Pod{*newPod("pod0", "node1")}}),
 			},
 			fakeCloud: &fake_cloud.FakeCloud{
 				Machines: []string{"node0"},
@@ -574,15 +574,13 @@ func TestSyncCloudNodesEvictPods(t *testing.T) {
 			matchRE:              ".*",
 			expectedRequestCount: 2, // List + Delete
 			expectedDeleted:      []string{"node1"},
-			expectedActions:      []client.FakeAction{{Action: "list-pods"}, {Action: "delete-pod", Value: "pod0"}},
+			expectedActions:      []testclient.FakeAction{{Action: "list-pods"}, {Action: "delete-pod", Value: "pod0"}},
 		},
 		{
 			// Delete node1, but pod0 is running on node0.
 			fakeNodeHandler: &FakeNodeHandler{
 				Existing: []*api.Node{newNode("node0"), newNode("node1")},
-				Fake: client.Fake{
-					PodsList: api.PodList{Items: []api.Pod{*newPod("pod0", "node0")}},
-				},
+				Fake:     testclient.NewSimpleFake(&api.PodList{Items: []api.Pod{*newPod("pod0", "node0")}}),
 			},
 			fakeCloud: &fake_cloud.FakeCloud{
 				Machines: []string{"node0"},
@@ -590,11 +588,14 @@ func TestSyncCloudNodesEvictPods(t *testing.T) {
 			matchRE:              ".*",
 			expectedRequestCount: 2, // List + Delete
 			expectedDeleted:      []string{"node1"},
-			expectedActions:      []client.FakeAction{{Action: "list-pods"}},
+			expectedActions:      []testclient.FakeAction{{Action: "list-pods"}},
 		},
 	}
 
 	for _, item := range table {
+		if item.fakeNodeHandler.Fake == nil {
+			item.fakeNodeHandler.Fake = testclient.NewSimpleFake()
+		}
 		nodeController := NewNodeController(item.fakeCloud, item.matchRE, nil, &api.NodeResources{}, item.fakeNodeHandler, nil, 10, time.Minute,
 			util.NewFakeRateLimiter(), testNodeMonitorGracePeriod, testNodeStartupGracePeriod, testNodeMonitorPeriod)
 		if err := nodeController.SyncCloudNodes(); err != nil {
@@ -915,7 +916,7 @@ func TestSyncProbedNodeStatusEvictPods(t *testing.T) {
 		fakeNodeHandler      *FakeNodeHandler
 		fakeKubeletClient    *FakeKubeletClient
 		expectedRequestCount int
-		expectedActions      []client.FakeAction
+		expectedActions      []testclient.FakeAction
 	}{
 		{
 			// Existing node is healthy, current probe is healthy too.
@@ -935,9 +936,7 @@ func TestSyncProbedNodeStatusEvictPods(t *testing.T) {
 						},
 					},
 				},
-				Fake: client.Fake{
-					PodsList: api.PodList{Items: []api.Pod{*newPod("pod0", "node1")}},
-				},
+				Fake: testclient.NewSimpleFake(&api.PodList{Items: []api.Pod{*newPod("pod0", "node1")}}),
 			},
 			fakeKubeletClient: &FakeKubeletClient{
 				Status: probe.Success,
@@ -965,9 +964,7 @@ func TestSyncProbedNodeStatusEvictPods(t *testing.T) {
 						},
 					},
 				},
-				Fake: client.Fake{
-					PodsList: api.PodList{Items: []api.Pod{*newPod("pod0", "node0")}},
-				},
+				Fake: testclient.NewSimpleFake(&api.PodList{Items: []api.Pod{*newPod("pod0", "node0")}}),
 			},
 			fakeKubeletClient: &FakeKubeletClient{
 				Status: probe.Failure,
@@ -997,9 +994,7 @@ func TestSyncProbedNodeStatusEvictPods(t *testing.T) {
 						},
 					},
 				},
-				Fake: client.Fake{
-					PodsList: api.PodList{Items: []api.Pod{*newPod("pod0", "node0")}},
-				},
+				Fake: testclient.NewSimpleFake(&api.PodList{Items: []api.Pod{*newPod("pod0", "node0")}}),
 			},
 			fakeKubeletClient: &FakeKubeletClient{
 				Status: probe.Failure,
@@ -1030,16 +1025,14 @@ func TestSyncProbedNodeStatusEvictPods(t *testing.T) {
 						},
 					},
 				},
-				Fake: client.Fake{
-					PodsList: api.PodList{Items: []api.Pod{*newPod("pod0", "node0")}},
-				},
+				Fake: testclient.NewSimpleFake(&api.PodList{Items: []api.Pod{*newPod("pod0", "node0")}}),
 			},
 			fakeKubeletClient: &FakeKubeletClient{
 				Status: probe.Failure,
 				Err:    nil,
 			},
 			expectedRequestCount: 2, // List+Update
-			expectedActions:      []client.FakeAction{{Action: "list-pods"}, {Action: "delete-pod", Value: "pod0"}},
+			expectedActions:      []testclient.FakeAction{{Action: "list-pods"}, {Action: "delete-pod", Value: "pod0"}},
 		},
 	}
 
@@ -1081,9 +1074,7 @@ func TestMonitorNodeStatusEvictPods(t *testing.T) {
 						},
 					},
 				},
-				Fake: client.Fake{
-					PodsList: api.PodList{Items: []api.Pod{*newPod("pod0", "node0")}},
-				},
+				Fake: testclient.NewSimpleFake(&api.PodList{Items: []api.Pod{*newPod("pod0", "node0")}}),
 			},
 			timeToPass:        0,
 			newNodeStatus:     api.NodeStatus{},
@@ -1111,9 +1102,7 @@ func TestMonitorNodeStatusEvictPods(t *testing.T) {
 						},
 					},
 				},
-				Fake: client.Fake{
-					PodsList: api.PodList{Items: []api.Pod{*newPod("pod0", "node0")}},
-				},
+				Fake: testclient.NewSimpleFake(&api.PodList{Items: []api.Pod{*newPod("pod0", "node0")}}),
 			},
 			timeToPass: evictionTimeout,
 			newNodeStatus: api.NodeStatus{
@@ -1151,9 +1140,7 @@ func TestMonitorNodeStatusEvictPods(t *testing.T) {
 						},
 					},
 				},
-				Fake: client.Fake{
-					PodsList: api.PodList{Items: []api.Pod{*newPod("pod0", "node0")}},
-				},
+				Fake: testclient.NewSimpleFake(&api.PodList{Items: []api.Pod{*newPod("pod0", "node0")}}),
 			},
 			timeToPass: time.Hour,
 			newNodeStatus: api.NodeStatus{
@@ -1191,9 +1178,7 @@ func TestMonitorNodeStatusEvictPods(t *testing.T) {
 						},
 					},
 				},
-				Fake: client.Fake{
-					PodsList: api.PodList{Items: []api.Pod{*newPod("pod0", "node0")}},
-				},
+				Fake: testclient.NewSimpleFake(&api.PodList{Items: []api.Pod{*newPod("pod0", "node0")}}),
 			},
 			timeToPass: evictionTimeout - testNodeMonitorGracePeriod,
 			newNodeStatus: api.NodeStatus{
@@ -1231,9 +1216,7 @@ func TestMonitorNodeStatusEvictPods(t *testing.T) {
 						},
 					},
 				},
-				Fake: client.Fake{
-					PodsList: api.PodList{Items: []api.Pod{*newPod("pod0", "node0")}},
-				},
+				Fake: testclient.NewSimpleFake(&api.PodList{Items: []api.Pod{*newPod("pod0", "node0")}}),
 			},
 			timeToPass: 60 * time.Minute,
 			newNodeStatus: api.NodeStatus{
@@ -1302,9 +1285,7 @@ func TestMonitorNodeStatusUpdateStatus(t *testing.T) {
 						},
 					},
 				},
-				Fake: client.Fake{
-					PodsList: api.PodList{Items: []api.Pod{*newPod("pod0", "node0")}},
-				},
+				Fake: testclient.NewSimpleFake(&api.PodList{Items: []api.Pod{*newPod("pod0", "node0")}}),
 			},
 			expectedRequestCount: 2, // List+Update
 			expectedNodes: []*api.Node{
@@ -1339,9 +1320,7 @@ func TestMonitorNodeStatusUpdateStatus(t *testing.T) {
 						},
 					},
 				},
-				Fake: client.Fake{
-					PodsList: api.PodList{Items: []api.Pod{*newPod("pod0", "node0")}},
-				},
+				Fake: testclient.NewSimpleFake(&api.PodList{Items: []api.Pod{*newPod("pod0", "node0")}}),
 			},
 			expectedRequestCount: 1, // List
 			expectedNodes:        nil,
@@ -1376,9 +1355,7 @@ func TestMonitorNodeStatusUpdateStatus(t *testing.T) {
 						},
 					},
 				},
-				Fake: client.Fake{
-					PodsList: api.PodList{Items: []api.Pod{*newPod("pod0", "node0")}},
-				},
+				Fake: testclient.NewSimpleFake(&api.PodList{Items: []api.Pod{*newPod("pod0", "node0")}}),
 			},
 			expectedRequestCount: 3, // (List+)List+Update
 			timeToPass:           time.Hour,
@@ -1454,9 +1431,7 @@ func TestMonitorNodeStatusUpdateStatus(t *testing.T) {
 						},
 					},
 				},
-				Fake: client.Fake{
-					PodsList: api.PodList{Items: []api.Pod{*newPod("pod0", "node0")}},
-				},
+				Fake: testclient.NewSimpleFake(&api.PodList{Items: []api.Pod{*newPod("pod0", "node0")}}),
 			},
 			expectedRequestCount: 1, // List
 			expectedNodes:        nil,

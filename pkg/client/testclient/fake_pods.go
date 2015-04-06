@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package client
+package testclient
 
 import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -31,28 +31,28 @@ type FakePods struct {
 }
 
 func (c *FakePods) List(selector labels.Selector) (*api.PodList, error) {
-	c.Fake.Actions = append(c.Fake.Actions, FakeAction{Action: "list-pods"})
-	return api.Scheme.CopyOrDie(&c.Fake.PodsList).(*api.PodList), nil
+	obj, err := c.Fake.Invokes(FakeAction{Action: "list-pods"}, &api.PodList{})
+	return obj.(*api.PodList), err
 }
 
 func (c *FakePods) Get(name string) (*api.Pod, error) {
-	c.Fake.Actions = append(c.Fake.Actions, FakeAction{Action: "get-pod", Value: name})
-	return &api.Pod{ObjectMeta: api.ObjectMeta{Name: name, Namespace: c.Namespace}}, nil
+	obj, err := c.Fake.Invokes(FakeAction{Action: "get-pod", Value: name}, &api.Pod{})
+	return obj.(*api.Pod), err
 }
 
 func (c *FakePods) Delete(name string) error {
-	c.Fake.Actions = append(c.Fake.Actions, FakeAction{Action: "delete-pod", Value: name})
-	return nil
+	_, err := c.Fake.Invokes(FakeAction{Action: "delete-pod", Value: name}, &api.Pod{})
+	return err
 }
 
 func (c *FakePods) Create(pod *api.Pod) (*api.Pod, error) {
-	c.Fake.Actions = append(c.Fake.Actions, FakeAction{Action: "create-pod"})
-	return &api.Pod{}, nil
+	obj, err := c.Fake.Invokes(FakeAction{Action: "create-pod"}, &api.Pod{})
+	return obj.(*api.Pod), err
 }
 
 func (c *FakePods) Update(pod *api.Pod) (*api.Pod, error) {
-	c.Fake.Actions = append(c.Fake.Actions, FakeAction{Action: "update-pod", Value: pod.Name})
-	return &api.Pod{}, nil
+	obj, err := c.Fake.Invokes(FakeAction{Action: "update-pod", Value: pod.Name}, &api.Pod{})
+	return obj.(*api.Pod), err
 }
 
 func (c *FakePods) Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
@@ -66,6 +66,6 @@ func (c *FakePods) Bind(bind *api.Binding) error {
 }
 
 func (c *FakePods) UpdateStatus(pod *api.Pod) (*api.Pod, error) {
-	c.Fake.Actions = append(c.Fake.Actions, FakeAction{Action: "update-status-pod", Value: pod.Name})
-	return &api.Pod{}, nil
+	obj, err := c.Fake.Invokes(FakeAction{Action: "update-status-pod", Value: pod.Name}, &api.Pod{})
+	return obj.(*api.Pod), err
 }

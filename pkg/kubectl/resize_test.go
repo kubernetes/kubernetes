@@ -22,10 +22,11 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/testclient"
 )
 
 type ErrorReplicationControllers struct {
-	client.FakeReplicationControllers
+	testclient.FakeReplicationControllers
 }
 
 func (c *ErrorReplicationControllers) Update(controller *api.ReplicationController) (*api.ReplicationController, error) {
@@ -33,15 +34,15 @@ func (c *ErrorReplicationControllers) Update(controller *api.ReplicationControll
 }
 
 type ErrorReplicationControllerClient struct {
-	client.Fake
+	testclient.Fake
 }
 
 func (c *ErrorReplicationControllerClient) ReplicationControllers(namespace string) client.ReplicationControllerInterface {
-	return &ErrorReplicationControllers{client.FakeReplicationControllers{Fake: &c.Fake, Namespace: namespace}}
+	return &ErrorReplicationControllers{testclient.FakeReplicationControllers{Fake: &c.Fake, Namespace: namespace}}
 }
 
 func TestReplicationControllerResizeRetry(t *testing.T) {
-	fake := &ErrorReplicationControllerClient{Fake: client.Fake{}}
+	fake := &ErrorReplicationControllerClient{Fake: testclient.Fake{}}
 	resizer := ReplicationControllerResizer{fake}
 	preconditions := ResizePrecondition{-1, ""}
 	count := uint(3)
@@ -65,7 +66,7 @@ func TestReplicationControllerResizeRetry(t *testing.T) {
 }
 
 func TestReplicationControllerResize(t *testing.T) {
-	fake := &client.Fake{}
+	fake := &testclient.Fake{}
 	resizer := ReplicationControllerResizer{fake}
 	preconditions := ResizePrecondition{-1, ""}
 	count := uint(3)
@@ -75,22 +76,20 @@ func TestReplicationControllerResize(t *testing.T) {
 	if len(fake.Actions) != 2 {
 		t.Errorf("unexpected actions: %v, expected 2 actions (get, update)", fake.Actions)
 	}
-	if fake.Actions[0].Action != "get-controller" || fake.Actions[0].Value != name {
-		t.Errorf("unexpected action: %v, expected get-controller %s", fake.Actions[0], name)
+	if fake.Actions[0].Action != "get-replicationController" || fake.Actions[0].Value != name {
+		t.Errorf("unexpected action: %v, expected get-replicationController %s", fake.Actions[0], name)
 	}
-	if fake.Actions[1].Action != "update-controller" || fake.Actions[1].Value.(*api.ReplicationController).Spec.Replicas != int(count) {
-		t.Errorf("unexpected action %v, expected update-controller with replicas = %d", fake.Actions[1], count)
+	if fake.Actions[1].Action != "update-replicationController" || fake.Actions[1].Value.(*api.ReplicationController).Spec.Replicas != int(count) {
+		t.Errorf("unexpected action %v, expected update-replicationController with replicas = %d", fake.Actions[1], count)
 	}
 }
 
 func TestReplicationControllerResizeFailsPreconditions(t *testing.T) {
-	fake := &client.Fake{
-		Ctrl: api.ReplicationController{
-			Spec: api.ReplicationControllerSpec{
-				Replicas: 10,
-			},
+	fake := testclient.NewSimpleFake(&api.ReplicationController{
+		Spec: api.ReplicationControllerSpec{
+			Replicas: 10,
 		},
-	}
+	})
 	resizer := ReplicationControllerResizer{fake}
 	preconditions := ResizePrecondition{2, ""}
 	count := uint(3)
@@ -100,8 +99,8 @@ func TestReplicationControllerResizeFailsPreconditions(t *testing.T) {
 	if len(fake.Actions) != 1 {
 		t.Errorf("unexpected actions: %v, expected 2 actions (get, update)", fake.Actions)
 	}
-	if fake.Actions[0].Action != "get-controller" || fake.Actions[0].Value != name {
-		t.Errorf("unexpected action: %v, expected get-controller %s", fake.Actions[0], name)
+	if fake.Actions[0].Action != "get-replicationController" || fake.Actions[0].Value != name {
+		t.Errorf("unexpected action: %v, expected get-replicationController %s", fake.Actions[0], name)
 	}
 }
 

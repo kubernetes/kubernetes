@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package client
+package testclient
 
 import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -31,31 +31,31 @@ type FakeReplicationControllers struct {
 }
 
 func (c *FakeReplicationControllers) List(selector labels.Selector) (*api.ReplicationControllerList, error) {
-	c.Fake.Actions = append(c.Fake.Actions, FakeAction{Action: "list-controllers"})
-	return api.Scheme.CopyOrDie(&c.Fake.CtrlList).(*api.ReplicationControllerList), nil
+	obj, err := c.Fake.Invokes(FakeAction{Action: "list-replicationControllers"}, &api.ReplicationControllerList{})
+	return obj.(*api.ReplicationControllerList), err
 }
 
 func (c *FakeReplicationControllers) Get(name string) (*api.ReplicationController, error) {
-	c.Fake.Actions = append(c.Fake.Actions, FakeAction{Action: "get-controller", Value: name})
-	return api.Scheme.CopyOrDie(&c.Fake.Ctrl).(*api.ReplicationController), nil
+	obj, err := c.Fake.Invokes(FakeAction{Action: "get-replicationController", Value: name}, &api.ReplicationController{})
+	return obj.(*api.ReplicationController), err
 }
 
 func (c *FakeReplicationControllers) Create(controller *api.ReplicationController) (*api.ReplicationController, error) {
-	c.Fake.Actions = append(c.Fake.Actions, FakeAction{Action: "create-controller", Value: controller})
-	return &api.ReplicationController{}, nil
+	obj, err := c.Fake.Invokes(FakeAction{Action: "create-replicationController", Value: controller}, &api.ReplicationController{})
+	return obj.(*api.ReplicationController), err
 }
 
 func (c *FakeReplicationControllers) Update(controller *api.ReplicationController) (*api.ReplicationController, error) {
-	c.Fake.Actions = append(c.Fake.Actions, FakeAction{Action: "update-controller", Value: controller})
-	return &api.ReplicationController{}, nil
+	obj, err := c.Fake.Invokes(FakeAction{Action: "update-replicationController", Value: controller}, &api.ReplicationController{})
+	return obj.(*api.ReplicationController), err
 }
 
-func (c *FakeReplicationControllers) Delete(controller string) error {
-	c.Fake.Actions = append(c.Fake.Actions, FakeAction{Action: "delete-controller", Value: controller})
-	return nil
+func (c *FakeReplicationControllers) Delete(name string) error {
+	_, err := c.Fake.Invokes(FakeAction{Action: "delete-replicationController", Value: name}, &api.ReplicationController{})
+	return err
 }
 
 func (c *FakeReplicationControllers) Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
-	c.Fake.Actions = append(c.Fake.Actions, FakeAction{Action: "watch-controllers", Value: resourceVersion})
+	c.Fake.Actions = append(c.Fake.Actions, FakeAction{Action: "watch-replicationController", Value: resourceVersion})
 	return c.Fake.Watch, nil
 }

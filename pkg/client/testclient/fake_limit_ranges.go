@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package client
+package testclient
 
 import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -31,28 +31,28 @@ type FakeLimitRanges struct {
 }
 
 func (c *FakeLimitRanges) List(selector labels.Selector) (*api.LimitRangeList, error) {
-	c.Fake.Actions = append(c.Fake.Actions, FakeAction{Action: "list-limitRanges"})
-	return api.Scheme.CopyOrDie(&c.Fake.LimitRangesList).(*api.LimitRangeList), nil
+	obj, err := c.Fake.Invokes(FakeAction{Action: "list-limitRanges"}, &api.LimitRangeList{})
+	return obj.(*api.LimitRangeList), err
 }
 
 func (c *FakeLimitRanges) Get(name string) (*api.LimitRange, error) {
-	c.Fake.Actions = append(c.Fake.Actions, FakeAction{Action: "get-limitRange", Value: name})
-	return &api.LimitRange{ObjectMeta: api.ObjectMeta{Name: name, Namespace: c.Namespace}}, nil
+	obj, err := c.Fake.Invokes(FakeAction{Action: "get-limitRange", Value: name}, &api.LimitRange{})
+	return obj.(*api.LimitRange), err
 }
 
 func (c *FakeLimitRanges) Delete(name string) error {
-	c.Fake.Actions = append(c.Fake.Actions, FakeAction{Action: "delete-limitRange", Value: name})
-	return nil
+	_, err := c.Fake.Invokes(FakeAction{Action: "delete-limitRange", Value: name}, &api.LimitRange{})
+	return err
 }
 
 func (c *FakeLimitRanges) Create(limitRange *api.LimitRange) (*api.LimitRange, error) {
-	c.Fake.Actions = append(c.Fake.Actions, FakeAction{Action: "create-limitRange"})
-	return &api.LimitRange{}, nil
+	obj, err := c.Fake.Invokes(FakeAction{Action: "create-limitRange"}, &api.LimitRange{})
+	return obj.(*api.LimitRange), err
 }
 
 func (c *FakeLimitRanges) Update(limitRange *api.LimitRange) (*api.LimitRange, error) {
-	c.Fake.Actions = append(c.Fake.Actions, FakeAction{Action: "update-limitRange", Value: limitRange.Name})
-	return &api.LimitRange{}, nil
+	obj, err := c.Fake.Invokes(FakeAction{Action: "update-limitRange", Value: limitRange.Name}, &api.LimitRange{})
+	return obj.(*api.LimitRange), err
 }
 
 func (c *FakeLimitRanges) Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
