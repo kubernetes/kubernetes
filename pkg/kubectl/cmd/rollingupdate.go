@@ -38,15 +38,15 @@ Replaces the specified controller with new controller, updating one pod at a tim
 new PodTemplate. The new-controller.json must specify the same namespace as the
 existing controller and overwrite at least one (common) label in its replicaSelector.`
 	rollingUpdate_example = `// Update pods of frontend-v1 using new controller data in frontend-v2.json.
-$ kubectl rolling-update frontend-v1 -f frontend-v2.json
+$ kubectl rollingupdate frontend-v1 -f frontend-v2.json
 
 // Update pods of frontend-v1 using JSON data passed into stdin.
-$ cat frontend-v2.json | kubectl rolling-update frontend-v1 -f -`
+$ cat frontend-v2.json | kubectl rollingupdate frontend-v1 -f -`
 )
 
 func (f *Factory) NewCmdRollingUpdate(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use: "rolling-update OLD_CONTROLLER_NAME -f NEW_CONTROLLER_SPEC",
+		Use: "rollingupdate OLD_CONTROLLER_NAME -f NEW_CONTROLLER_SPEC",
 		// rollingupdate is deprecated.
 		Aliases: []string{"rollingupdate"},
 		Short:   "Perform a rolling update of the given ReplicationController.",
