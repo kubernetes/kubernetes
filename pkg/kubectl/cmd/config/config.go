@@ -122,14 +122,13 @@ func (o *pathOptions) getStartingConfig() (*clientcmdapi.Config, string, error) 
 
 // getConfigFromFileOrDie tries to read a kubeconfig file and if it can't, it calls exit.  One exception, missing files result in empty configs, not an exit
 func getConfigFromFileOrDie(filename string) *clientcmdapi.Config {
-	var err error
 	config, err := clientcmd.LoadFromFile(filename)
 	if err != nil && !os.IsNotExist(err) {
 		glog.FatalDepth(1, err)
 	}
 
 	if config == nil {
-		config = clientcmdapi.NewConfig()
+		return clientcmdapi.NewConfig()
 	}
 
 	return config
