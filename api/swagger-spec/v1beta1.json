@@ -6683,6 +6683,32 @@
      }
     }
    },
+   "v1beta1.ISCSIVolumeSource": {
+    "id": "v1beta1.ISCSIVolumeSource",
+    "properties": {
+     "fsType": {
+      "type": "string",
+      "description": "file system type to mount, such as ext4, xfs, ntfs"
+     },
+     "iqn": {
+      "type": "string",
+      "description": "iSCSI Qualified Name"
+     },
+     "lun": {
+      "type": "integer",
+      "format": "int32",
+      "description": "iscsi target lun number"
+     },
+     "readOnly": {
+      "type": "boolean",
+      "description": "read-only if true, read-write otherwise (false or unspecified)"
+     },
+     "targetPortal": {
+      "type": "string",
+      "description": "iSCSI target portal"
+     }
+    }
+   },
    "v1beta1.HTTPGetAction": {
     "id": "v1beta1.HTTPGetAction",
     "properties": {
@@ -8607,6 +8633,7 @@
      "persistentDisk",
      "gitRepo",
      "secret",
+     "iscsi",
      "nfs"
     ],
     "properties": {
@@ -8629,6 +8656,10 @@
      "persistentDisk": {
       "$ref": "v1beta1.GCEPersistentDiskVolumeSource",
       "description": "GCE disk resource attached to the host machine on demand"
+     },
+     "iscsi": {
+      "$ref": "v1beta1.ISCSIVolumeSource",
+      "description": "iSCSI disk attached to host machine on demand"
      },
      "secret": {
       "$ref": "v1beta1.SecretVolumeSource",

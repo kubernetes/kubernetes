@@ -151,3 +151,32 @@ func setEquivalent(set1, set2 []string) bool {
 	}
 	return true
 }
+
+func TestGetDeviceNameFromMount(t *testing.T) {
+	fm := &FakeMounter{
+		MountPoints: []MountPoint{
+			{Device: "/dev/disk/by-path/prefix-lun-1",
+				Path: "/mnt/111"},
+			{Device: "/dev/disk/by-path/prefix-lun-1",
+				Path: "/mnt/222"},
+		},
+	}
+
+	tests := []struct {
+		mountPath      string
+		expectedDevice string
+		expectedRefs   int
+	}{
+		{
+			"/mnt/222",
+			"/dev/disk/by-path/prefix-lun-1",
+			2,
+		},
+	}
+
+	for i, test := range tests {
+		if device, refs, err := GetDeviceNameFromMount(fm, test.mountPath); err != nil || test.expectedRefs != refs || test.expectedDevice != device {
+			t.Errorf("%d. GetDeviceNameFromMount(%s) = (%s, %d), %v; expected (%s,%d), nil", i, test.mountPath, device, refs, err, test.expectedDevice, test.expectedRefs)
+		}
+	}
+}
