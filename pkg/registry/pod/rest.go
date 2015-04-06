@@ -26,6 +26,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/validation"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/generic"
@@ -133,6 +134,18 @@ type ResourceGetter interface {
 	Get(api.Context, string) (runtime.Object, error)
 }
 
+func getPod(getter ResourceGetter, ctx api.Context, name string) (*api.Pod, error) {
+	obj, err := getter.Get(ctx, name)
+	if err != nil {
+		return nil, err
+	}
+	pod := obj.(*api.Pod)
+	if pod == nil {
+		return nil, fmt.Errorf("Unexpected object type: %#v", pod)
+	}
+	return pod, nil
+}
+
 // ResourceLocation returns a URL to which one can send traffic for the specified pod.
 func ResourceLocation(getter ResourceGetter, ctx api.Context, id string) (*url.URL, http.RoundTripper, error) {
 	// Allow ID as "podname" or "podname:port".  If port is not specified,
@@ -148,13 +161,9 @@ func ResourceLocation(getter ResourceGetter, ctx api.Context, id string) (*url.U
 		port = parts[1]
 	}
 
-	obj, err := getter.Get(ctx, name)
+	pod, err := getPod(getter, ctx, name)
 	if err != nil {
 		return nil, nil, err
-	}
-	pod := obj.(*api.Pod)
-	if pod == nil {
-		return nil, nil, nil
 	}
 
 	// Try to figure out a port.
@@ -176,4 +185,44 @@ func ResourceLocation(getter ResourceGetter, ctx api.Context, id string) (*url.U
 		loc.Host = net.JoinHostPort(pod.Status.PodIP, port)
 	}
 	return loc, nil, nil
+}
+
+// LogLocation returns a the log URL for a pod container. If opts.Container is blank
+// and only one container is present in the pod, that container is used.
+func LogLocation(getter ResourceGetter, connInfo client.ConnectionInfoGetter, ctx api.Context, name string, opts *api.PodLogOptions) (*url.URL, http.RoundTripper, error) {
+
+	pod, err := getPod(getter, ctx, name)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// Try to figure out a container
+	container := opts.Container
+	if container == "" {
+		if len(pod.Spec.Containers) == 1 {
+			container = pod.Spec.Containers[0].Name
+		} else {
+			return nil, nil, fmt.Errorf("a container name must be specified for pod %s", name)
+		}
+	}
+	nodeHost := pod.Status.HostIP
+	if len(nodeHost) == 0 {
+		// If pod has not been assigned a host, return an empty location
+		return nil, nil, nil
+	}
+	nodeScheme, nodePort, nodeTransport, err := connInfo.GetConnectionInfo(nodeHost)
+	if err != nil {
+		return nil, nil, err
+	}
+	params := url.Values{}
+	if opts.Follow {
+		params.Add("follow", "true")
+	}
+	loc := &url.URL{
+		Scheme:   nodeScheme,
+		Host:     fmt.Sprintf("%s:%d", nodeHost, nodePort),
+		Path:     fmt.Sprintf("/containerLogs/%s/%s/%s", pod.Namespace, name, container),
+		RawQuery: params.Encode(),
+	}
+	return loc, nodeTransport, nil
 }

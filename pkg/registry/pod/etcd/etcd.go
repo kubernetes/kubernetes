@@ -25,10 +25,12 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	etcderr "github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors/etcd"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/rest"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/generic"
 	etcdgeneric "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/generic/etcd"
+	genericrest "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/generic/rest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/pod"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
@@ -40,6 +42,7 @@ type PodStorage struct {
 	Pod     *REST
 	Binding *BindingREST
 	Status  *StatusREST
+	Log     *LogREST
 }
 
 // REST implements a RESTStorage for pods against etcd
@@ -48,7 +51,7 @@ type REST struct {
 }
 
 // NewStorage returns a RESTStorage object that will work against pods.
-func NewStorage(h tools.EtcdHelper) PodStorage {
+func NewStorage(h tools.EtcdHelper, k client.ConnectionInfoGetter) PodStorage {
 	prefix := "/registry/pods"
 	store := &etcdgeneric.Etcd{
 		NewFunc:     func() runtime.Object { return &api.Pod{} },
@@ -85,6 +88,7 @@ func NewStorage(h tools.EtcdHelper) PodStorage {
 		Pod:     &REST{*store},
 		Binding: &BindingREST{store: store},
 		Status:  &StatusREST{store: &statusStore},
+		Log:     &LogREST{store: store, kubeletConn: k},
 	}
 }
 
@@ -185,4 +189,38 @@ func (r *StatusREST) New() runtime.Object {
 // Update alters the status subset of an object.
 func (r *StatusREST) Update(ctx api.Context, obj runtime.Object) (runtime.Object, bool, error) {
 	return r.store.Update(ctx, obj)
+}
+
+// LogREST implements the log endpoint for a Pod
+type LogREST struct {
+	store       *etcdgeneric.Etcd
+	kubeletConn client.ConnectionInfoGetter
+}
+
+// New creates a new Pod log options object
+func (r *LogREST) New() runtime.Object {
+	return &api.PodLogOptions{}
+}
+
+// Get retrieves a runtime.Object that will stream the contents of the pod log
+func (r *LogREST) Get(ctx api.Context, name string, opts runtime.Object) (runtime.Object, error) {
+	logOpts, ok := opts.(*api.PodLogOptions)
+	if !ok {
+		return nil, fmt.Errorf("Invalid options object: %#v", opts)
+	}
+	location, transport, err := pod.LogLocation(r.store, r.kubeletConn, ctx, name, logOpts)
+	if err != nil {
+		return nil, err
+	}
+	return &genericrest.LocationStreamer{
+		Location:    location,
+		Transport:   transport,
+		ContentType: "text/plain",
+		Flush:       logOpts.Follow,
+	}, nil
+}
+
+// NewGetOptions creates a new options object
+func (r *LogREST) NewGetOptions() runtime.Object {
+	return &api.PodLogOptions{}
 }

@@ -357,7 +357,7 @@ func logStackOnRecover(panicReason interface{}, httpWriter http.ResponseWriter) 
 
 // init initializes master.
 func (m *Master) init(c *Config) {
-	podStorage := podetcd.NewStorage(c.EtcdHelper)
+	podStorage := podetcd.NewStorage(c.EtcdHelper, c.KubeletClient)
 	podRegistry := pod.NewRegistry(podStorage.Pod)
 
 	eventRegistry := event.NewEtcdRegistry(c.EtcdHelper, uint64(c.EventTTL.Seconds()))
@@ -387,6 +387,7 @@ func (m *Master) init(c *Config) {
 	m.storage = map[string]rest.Storage{
 		"pods":         podStorage.Pod,
 		"pods/status":  podStorage.Status,
+		"pods/log":     podStorage.Log,
 		"pods/binding": podStorage.Binding,
 		"bindings":     podStorage.Binding,
 
