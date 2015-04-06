@@ -729,6 +729,18 @@ func (r *Runtime) RunInContainer(containerID string, cmd []string) ([]byte, erro
 	return []byte(strings.Join(result, "\n")), err
 }
 
+// PullImage invokes 'rkt fetch' to download an aci.
+func (r *Runtime) PullImage(img string) error {
+	_, err := r.RunCommand("fetch", img)
+	return err
+}
+
+// IsImagePresent returns true if the image is available on the machine.
+// TODO(yifan): Not implemented yet.
+func (r *Runtime) IsImagePresent(img string) (bool, error) {
+	return false, nil
+}
+
 // TODO(yifan): Move this duplicated function to container runtime.
 // HashContainer computes the hash of one api.Container.
 func HashContainer(container *api.Container) uint64 {
