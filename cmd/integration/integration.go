@@ -598,10 +598,6 @@ func runAtomicPutTest(c *client.Client) {
 }
 
 func runPatchTest(c *client.Client) {
-	if c.APIVersion() != "v1beta1" {
-		glog.Info("Skipping PATCH tests for non-v1beta1 for now.")
-		return
-	}
 	name := "patchservice"
 	resource := "services"
 	svcBody := api.Service{
@@ -630,31 +626,61 @@ func runPatchTest(c *client.Client) {
 		glog.Fatalf("Failed creating patchservice: %v", err)
 	}
 
-	patchBodies := map[api.PatchType]struct {
+	patchBodies := map[string]map[api.PatchType]struct {
 		AddLabelBody        []byte
 		RemoveLabelBody     []byte
 		RemoveAllLabelsBody []byte
 	}{
-		api.JSONPatchType: {
-			[]byte(`[{"op":"add","path":"/labels","value":{"foo":"bar","baz":"qux"}}]`),
-			[]byte(`[{"op":"remove","path":"/labels/foo"}]`),
-			[]byte(`[{"op":"remove","path":"/labels"}]`),
+		"v1beta1": {
+			api.JSONPatchType: {
+				[]byte(`[{"op":"add","path":"/labels","value":{"foo":"bar","baz":"qux"}}]`),
+				[]byte(`[{"op":"remove","path":"/labels/foo"}]`),
+				[]byte(`[{"op":"remove","path":"/labels"}]`),
+			},
+			api.MergePatchType: {
+				[]byte(`{"labels":{"foo":"bar","baz":"qux"}}`),
+				[]byte(`{"labels":{"foo":null}}`),
+				[]byte(`{"labels":null}`),
+			},
+			api.StrategicMergePatchType: {
+				[]byte(`{"labels":{"foo":"bar","baz":"qux"}}`),
+				[]byte(`{"labels":{"foo":null}}`),
+				[]byte(`{"labels":{"$patch":"replace"}}`),
+			},
 		},
-		api.MergePatchType: {
-			[]byte(`{"labels":{"foo":"bar","baz":"qux"}}`),
-			[]byte(`{"labels":{"foo":null}}`),
-			[]byte(`{"labels":null}`),
-		},
-		api.StrategicMergePatchType: {
-			[]byte(`{"labels":{"foo":"bar","baz":"qux"}}`),
-			[]byte(`{"labels":{"foo":null}}`),
-			[]byte(`{"labels":{"$patch":"replace"}}`),
+		"v1beta3": {
+			api.JSONPatchType: {
+				[]byte(`[{"op":"add","path":"/metadata/labels","value":{"foo":"bar","baz":"qux"}}]`),
+				[]byte(`[{"op":"remove","path":"/metadata/labels/foo"}]`),
+				[]byte(`[{"op":"remove","path":"/metadata/labels"}]`),
+			},
+			api.MergePatchType: {
+				[]byte(`{"metadata":{"labels":{"foo":"bar","baz":"qux"}}}`),
+				[]byte(`{"metadata":{"labels":{"foo":null}}}`),
+				[]byte(`{"metadata":{"labels":null}}`),
+			},
+			api.StrategicMergePatchType: {
+				[]byte(`{"metadata":{"labels":{"foo":"bar","baz":"qux"}}}`),
+				[]byte(`{"metadata":{"labels":{"foo":null}}}`),
+				[]byte(`{"metadata":{"labels":{"$patch":"replace"}}}`),
+			},
 		},
 	}
 
-	for k, v := range patchBodies {
+	pb := patchBodies[c.APIVersion()]
+
+	execPatch := func(pt api.PatchType, body []byte) error {
+		return c.Patch(pt).
+			Resource(resource).
+			Namespace(api.NamespaceDefault).
+			Name(name).
+			Body(body).
+			Do().
+			Error()
+	}
+	for k, v := range pb {
 		// add label
-		_, err := c.Patch(k).Resource(resource).Name(name).Body(v.AddLabelBody).Do().Get()
+		err := execPatch(k, v.AddLabelBody)
 		if err != nil {
 			glog.Fatalf("Failed updating patchservice with patch type %s: %v", k, err)
 		}
@@ -667,7 +693,7 @@ func runPatchTest(c *client.Client) {
 		}
 
 		// remove one label
-		_, err = c.Patch(k).Resource(resource).Name(name).Body(v.RemoveLabelBody).Do().Get()
+		err = execPatch(k, v.RemoveLabelBody)
 		if err != nil {
 			glog.Fatalf("Failed updating patchservice with patch type %s: %v", k, err)
 		}
@@ -680,7 +706,7 @@ func runPatchTest(c *client.Client) {
 		}
 
 		// remove all labels
-		_, err = c.Patch(k).Resource(resource).Name(name).Body(v.RemoveAllLabelsBody).Do().Get()
+		err = execPatch(k, v.RemoveAllLabelsBody)
 		if err != nil {
 			glog.Fatalf("Failed updating patchservice with patch type %s: %v", k, err)
 		}
