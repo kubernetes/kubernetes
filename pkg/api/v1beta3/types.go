@@ -1236,6 +1236,17 @@ type ListOptions struct {
 	ResourceVersion string `json:"resourceVersion" description:"when specified with a watch call, shows changes that occur after that particular version of a resource; defaults to changes from the beginning of history"`
 }
 
+// PodLogOptions is the query options for a Pod's logs REST call
+type PodLogOptions struct {
+	TypeMeta `json:",inline"`
+
+	// Container for which to return logs
+	Container string `json:"container,omitempty" description:"the container for which to stream logs; defaults to only container if there is one container in the pod"`
+
+	// If true, follow the logs for the pod
+	Follow bool `json:"follow,omitempty" description:"follow the log stream of the pod; defaults to false"`
+}
+
 // Status is a return value for calls that don't return other objects.
 type Status struct {
 	TypeMeta `json:",inline"`
