@@ -33,7 +33,7 @@ type REST struct {
 }
 
 // NewREST returns a RESTStorage object that will work against PersistentVolumeClaim objects.
-func NewStorage(h tools.EtcdHelper) *REST {
+func NewStorage(h tools.EtcdHelper) (*REST, *StatusREST) {
 	prefix := "/registry/persistentvolumeclaims"
 	store := &etcdgeneric.Etcd{
 		NewFunc:     func() runtime.Object { return &api.PersistentVolumeClaim{} },
@@ -59,5 +59,22 @@ func NewStorage(h tools.EtcdHelper) *REST {
 	store.UpdateStrategy = persistentvolumeclaim.Strategy
 	store.ReturnDeletedObject = true
 
-	return &REST{store}
+	statusStore := *store
+	statusStore.UpdateStrategy = persistentvolumeclaim.StatusStrategy
+
+	return &REST{store}, &StatusREST{store: &statusStore}
+}
+
+// StatusREST implements the REST endpoint for changing the status of a persistentvolumeclaim.
+type StatusREST struct {
+	store *etcdgeneric.Etcd
+}
+
+func (r *StatusREST) New() runtime.Object {
+	return &api.PersistentVolumeClaim{}
+}
+
+// Update alters the status subset of an object.
+func (r *StatusREST) Update(ctx api.Context, obj runtime.Object) (runtime.Object, bool, error) {
+	return r.store.Update(ctx, obj)
 }

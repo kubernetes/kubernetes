@@ -37,12 +37,12 @@ type testRegistry struct {
 	*registrytest.GenericRegistry
 }
 
-func newStorage(t *testing.T) (*REST, *tools.FakeEtcdClient, tools.EtcdHelper) {
+func newStorage(t *testing.T) (*REST, *StatusREST, *tools.FakeEtcdClient, tools.EtcdHelper) {
 	fakeEtcdClient := tools.NewFakeEtcdClient(t)
 	fakeEtcdClient.TestIndex = true
 	helper := tools.NewEtcdHelper(fakeEtcdClient, latest.Codec)
-	storage := NewStorage(helper)
-	return storage, fakeEtcdClient, helper
+	storage, statusStorage := NewStorage(helper)
+	return storage, statusStorage, fakeEtcdClient, helper
 }
 
 func validNewPersistentVolumeClaim(name, ns string) *api.PersistentVolumeClaim {
@@ -71,7 +71,7 @@ func validChangedPersistentVolumeClaim() *api.PersistentVolumeClaim {
 
 func TestCreate(t *testing.T) {
 
-	registry, fakeEtcdClient, _ := newStorage(t)
+	registry, _, fakeEtcdClient, _ := newStorage(t)
 	test := resttest.New(t, registry, fakeEtcdClient.SetError)
 	pv := validNewPersistentVolumeClaim("foo", api.NamespaceDefault)
 	pv.ObjectMeta = api.ObjectMeta{}
@@ -85,9 +85,9 @@ func TestCreate(t *testing.T) {
 	)
 }
 
-func TestDelete2(t *testing.T) {
+func TestDelete(t *testing.T) {
 	ctx := api.NewDefaultContext()
-	storage, fakeEtcdClient, _ := newStorage(t)
+	storage, _, fakeEtcdClient, _ := newStorage(t)
 	test := resttest.New(t, storage, fakeEtcdClient.SetError)
 
 	pv := validChangedPersistentVolumeClaim()
@@ -112,36 +112,9 @@ func TestDelete2(t *testing.T) {
 	test.TestDeleteNoGraceful(createFn, gracefulSetFn)
 }
 
-func TestDelete(t *testing.T) {
-	ctx := api.NewDefaultContext()
-	registry, fakeEtcdClient, _ := newStorage(t)
-	test := resttest.New(t, registry, fakeEtcdClient.SetError)
-
-	pvc := validChangedPersistentVolumeClaim()
-	key, _ := registry.KeyFunc(ctx, pvc.Name)
-	createFn := func() runtime.Object {
-		fakeEtcdClient.Data[key] = tools.EtcdResponseWithError{
-			R: &etcd.Response{
-				Node: &etcd.Node{
-					Value:         runtime.EncodeOrDie(latest.Codec, pvc),
-					ModifiedIndex: 1,
-				},
-			},
-		}
-		return pvc
-	}
-	gracefulSetFn := func() bool {
-		if fakeEtcdClient.Data[key].R.Node == nil {
-			return false
-		}
-		return fakeEtcdClient.Data[key].R.Node.TTL == 30
-	}
-	test.TestDeleteNoGraceful(createFn, gracefulSetFn)
-}
-
 func TestEtcdListPersistentVolumeClaims(t *testing.T) {
 	ctx := api.NewDefaultContext()
-	registry, fakeClient, _ := newStorage(t)
+	registry, _, fakeClient, _ := newStorage(t)
 	key := registry.KeyRootFunc(ctx)
 	fakeClient.Data[key] = tools.EtcdResponseWithError{
 		R: &etcd.Response{
@@ -172,7 +145,7 @@ func TestEtcdListPersistentVolumeClaims(t *testing.T) {
 
 func TestEtcdGetPersistentVolumeClaims(t *testing.T) {
 	ctx := api.NewDefaultContext()
-	registry, fakeClient, _ := newStorage(t)
+	registry, _, fakeClient, _ := newStorage(t)
 	persistentVolume := validNewPersistentVolumeClaim("foo", api.NamespaceDefault)
 	name := persistentVolume.Name
 	key, _ := registry.KeyFunc(ctx, name)
@@ -202,7 +175,7 @@ func TestEtcdGetPersistentVolumeClaims(t *testing.T) {
 
 func TestListEmptyPersistentVolumeClaimsList(t *testing.T) {
 	ctx := api.NewDefaultContext()
-	registry, fakeClient, _ := newStorage(t)
+	registry, _, fakeClient, _ := newStorage(t)
 	fakeClient.ChangeIndex = 1
 	key := registry.KeyRootFunc(ctx)
 	fakeClient.Data[key] = tools.EtcdResponseWithError{
@@ -225,7 +198,7 @@ func TestListEmptyPersistentVolumeClaimsList(t *testing.T) {
 
 func TestListPersistentVolumeClaimsList(t *testing.T) {
 	ctx := api.NewDefaultContext()
-	registry, fakeClient, _ := newStorage(t)
+	registry, _, fakeClient, _ := newStorage(t)
 	fakeClient.ChangeIndex = 1
 	key := registry.KeyRootFunc(ctx)
 	fakeClient.Data[key] = tools.EtcdResponseWithError{
@@ -265,7 +238,7 @@ func TestListPersistentVolumeClaimsList(t *testing.T) {
 }
 
 func TestPersistentVolumeClaimsDecode(t *testing.T) {
-	registry, _, _ := newStorage(t)
+	registry, _, _, _ := newStorage(t)
 	expected := validNewPersistentVolumeClaim("foo", api.NamespaceDefault)
 	body, err := latest.Codec.Encode(expected)
 	if err != nil {
@@ -284,7 +257,7 @@ func TestPersistentVolumeClaimsDecode(t *testing.T) {
 
 func TestEtcdUpdatePersistentVolumeClaims(t *testing.T) {
 	ctx := api.NewDefaultContext()
-	registry, fakeClient, _ := newStorage(t)
+	registry, _, fakeClient, _ := newStorage(t)
 	persistentVolume := validChangedPersistentVolumeClaim()
 
 	key, _ := registry.KeyFunc(ctx, "foo")
@@ -313,15 +286,15 @@ func TestEtcdUpdatePersistentVolumeClaims(t *testing.T) {
 
 func TestDeletePersistentVolumeClaims(t *testing.T) {
 	ctx := api.NewDefaultContext()
-	registry, fakeClient, _ := newStorage(t)
-	persistentVolume := validNewPersistentVolumeClaim("foo", api.NamespaceDefault)
-	name := persistentVolume.Name
+	registry, _, fakeClient, _ := newStorage(t)
+	pvClaim := validNewPersistentVolumeClaim("foo", api.NamespaceDefault)
+	name := pvClaim.Name
 	key, _ := registry.KeyFunc(ctx, name)
 	fakeClient.ChangeIndex = 1
 	fakeClient.Data[key] = tools.EtcdResponseWithError{
 		R: &etcd.Response{
 			Node: &etcd.Node{
-				Value:         runtime.EncodeOrDie(latest.Codec, persistentVolume),
+				Value:         runtime.EncodeOrDie(latest.Codec, pvClaim),
 				ModifiedIndex: 1,
 				CreatedIndex:  1,
 			},
@@ -330,5 +303,43 @@ func TestDeletePersistentVolumeClaims(t *testing.T) {
 	_, err := registry.Delete(ctx, name, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestEtcdUpdateStatus(t *testing.T) {
+	storage, statusStorage, fakeClient, helper := newStorage(t)
+	ctx := api.NewDefaultContext()
+	fakeClient.TestIndex = true
+
+	key, _ := storage.KeyFunc(ctx, "foo")
+	pvcStart := validNewPersistentVolumeClaim("foo", api.NamespaceDefault)
+	fakeClient.Set(key, runtime.EncodeOrDie(latest.Codec, pvcStart), 1)
+
+	pvIn := &api.PersistentVolumeClaim{
+		ObjectMeta: api.ObjectMeta{
+			Name:            "foo",
+			Namespace:       api.NamespaceDefault,
+			ResourceVersion: "1",
+		},
+		Status: api.PersistentVolumeClaimStatus{
+			Phase: api.ClaimBound,
+		},
+	}
+
+	expected := *pvcStart
+	expected.ResourceVersion = "2"
+	expected.Labels = pvIn.Labels
+	expected.Status = pvIn.Status
+
+	_, _, err := statusStorage.Update(ctx, pvIn)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	var pvcOut api.PersistentVolumeClaim
+	if err := helper.ExtractObj(key, &pvcOut, false); err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	if !api.Semantic.DeepEqual(expected, pvcOut) {
+		t.Errorf("unexpected object: %s", util.ObjectDiff(expected, pvcOut))
 	}
 }
