@@ -36,9 +36,6 @@ if [ "$?" != "0" ]; then
   exit 1
 fi
 
-echo "Starting etcd"
-kube::etcd::start
-
 # Shut down anyway if there's an error.
 set +e
 
@@ -106,13 +103,16 @@ cleanup()
     [[ -n "${PROXY_PID-}" ]] && sudo kill "${PROXY_PID}"
     [[ -n "${SCHEDULER_PID-}" ]] && sudo kill "${SCHEDULER_PID}"
 
-    [[ -n "${ETCD_PID-}" ]] && kill "${ETCD_PID}"
-    [[ -n "${ETCD_DIR-}" ]] && rm -rf "${ETCD_DIR}"
+    [[ -n "${ETCD_PID-}" ]] && kube::etcd::stop
+    [[ -n "${ETCD_DIR-}" ]] && kube::etcd::clean_etcd_dir
 
     exit 0
 }
 
 trap cleanup EXIT
+
+echo "Starting etcd"
+kube::etcd::start
 
 APISERVER_LOG=/tmp/kube-apiserver.log
 sudo -E "${GO_OUT}/kube-apiserver" \
