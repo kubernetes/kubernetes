@@ -236,8 +236,6 @@ var _ = Describe("Density", func() {
 		//cannot do a range iterator over structs.
 		dtest := dtests[i]
 
-		glog.Info("Density test parameters: %v", dtest)
-
 		//if ppm==0, its a raw density test.
 		//otherwise, we continue launching n nodes per pod in threads till we meet the totalPods #.
 		if dtest.podsPerMinion == 0 {
@@ -248,10 +246,10 @@ var _ = Describe("Density", func() {
 				name = "[Skipped] " + name
 			}
 			It(name, func() {
+				glog.Info("Density test parameters: %v", dtest)
 				RCName = "my-hostname-density" + strconv.Itoa(dtest.totalPods) + "-" + string(util.NewUUID())
 				RunRC(c, RCName, ns, "gcr.io/google_containers/pause:go", dtest.totalPods)
 			})
-			glog.Info("moving on, test already finished....")
 		} else {
 			// # of threads calibrate to totalPods
 			threads := (dtest.totalPods / (dtest.podsPerMinion * dtest.rcsPerThread))
