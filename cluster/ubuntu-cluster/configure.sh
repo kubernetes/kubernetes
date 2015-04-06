@@ -202,6 +202,7 @@ while true; do
             # set MINION IP in default_scripts/kubelet
             sed -i "s/MY_IP/${myIP}/g" default_scripts/kubelet
             sed -i "s/MASTER_IP/${masterIP}/g" default_scripts/kubelet
+            sed -i "s/MASTER_IP/${masterIP}/g" default_scripts/kube-proxy
 	        cpMinion
 	        break
 	        ;;
