@@ -229,7 +229,6 @@ function detect-minions () {
 # Vars set:
 #   KUBE_MASTER
 #   KUBE_MASTER_IP
-#   KUBE_MASTER_IP_INTERNAL
 function detect-master () {
   detect-project
   KUBE_MASTER=${MASTER_NAME}
@@ -488,6 +487,42 @@ function write-node-env {
   build-kube-env false "${KUBE_TEMP}/node-kube-env.yaml"
 }
 
+# create-master-instance creates the master instance. If called with
+# an argument, the argument is used as the name to a reserved IP
+# address for the master. (In the case of upgrade/repair, we re-use
+# the same IP.)
+#
+# It requires a whole slew of assumed variables, partially due to to
+# the call to write-master-env. Listing them would be rather
+# futile. Instead, we list the required calls to ensure any additional
+# variables are set:
+#   ensure-temp-dir
+#   detect-project
+#   get-password
+#   set-master-htpasswd
+#
+function create-master-instance {
+  local address_opt=""
+  [[ -n ${1:-} ]] && address_opt="--address ${1}"
+
+  write-master-env
+  gcloud compute instances create "${MASTER_NAME}" \
+    ${address_opt} \
+    --project "${PROJECT}" \
+    --zone "${ZONE}" \
+    --machine-type "${MASTER_SIZE}" \
+    --image-project="${IMAGE_PROJECT}" \
+    --image "${IMAGE}" \
+    --tags "${MASTER_TAG}" \
+    --network "${NETWORK}" \
+    --scopes "storage-ro" "compute-rw" \
+    --can-ip-forward \
+    --metadata-from-file \
+      "startup-script=${KUBE_ROOT}/cluster/gce/configure-vm.sh" \
+      "kube-env=${KUBE_TEMP}/master-kube-env.yaml" \
+    --disk name="${MASTER_NAME}-pd" device-name=master-pd mode=rw boot=no auto-delete=no
+}
+
 # Instantiate a kubernetes cluster
 #
 # Assumed vars
@@ -547,21 +582,7 @@ function kube-up {
   # https://github.com/GoogleCloudPlatform/kubernetes/issues/3168
   KUBELET_TOKEN=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
 
-  write-master-env
-  gcloud compute instances create "${MASTER_NAME}" \
-    --project "${PROJECT}" \
-    --zone "${ZONE}" \
-    --machine-type "${MASTER_SIZE}" \
-    --image-project="${IMAGE_PROJECT}" \
-    --image "${IMAGE}" \
-    --tags "${MASTER_TAG}" \
-    --network "${NETWORK}" \
-    --scopes "storage-ro" "compute-rw" \
-    --can-ip-forward \
-    --metadata-from-file \
-      "startup-script=${KUBE_ROOT}/cluster/gce/configure-vm.sh" \
-      "kube-env=${KUBE_TEMP}/master-kube-env.yaml" \
-    --disk name="${MASTER_NAME}-pd" device-name=master-pd mode=rw boot=no auto-delete=no &
+  create-master-instance &
 
   # Create a single firewall rule for all minions.
   create-firewall-rule "${MINION_TAG}-all" "${CLUSTER_IP_RANGE}" "${MINION_TAG}" &
@@ -835,22 +856,7 @@ function kube-push {
   echo "Pushing to master (log at ${OUTPUT}/kube-push-${KUBE_MASTER}.log) ..."
   cat ${KUBE_ROOT}/cluster/gce/configure-vm.sh | gcloud compute ssh --ssh-flag="-o LogLevel=quiet" --project "${PROJECT}" --zone "${ZONE}" "${KUBE_MASTER}" --command "sudo bash -s -- --push" &> ${OUTPUT}/kube-push-"${KUBE_MASTER}".log
 
-  echo "Pushing metadata to minions... "
-  write-node-env
-  for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
-    add-instance-metadata-from-file "${MINION_NAMES[$i]}" "kube-env=${KUBE_TEMP}/node-kube-env.yaml" &
-  done
-  wait-for-jobs
-  echo "Done"
-
-  for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
-    echo "Starting push to node (log at ${OUTPUT}/kube-push-${MINION_NAMES[$i]}.log) ..."
-    cat ${KUBE_ROOT}/cluster/gce/configure-vm.sh | gcloud compute ssh --ssh-flag="-o LogLevel=quiet" --project "${PROJECT}" --zone "${ZONE}" "${MINION_NAMES[$i]}" --command "sudo bash -s -- --push" &> ${OUTPUT}/kube-push-"${MINION_NAMES[$i]}".log &
-  done
-
-  echo -n "Waiting for node pushes... "
-  wait-for-jobs
-  echo "Done"
+  kube-update-nodes push
 
   # TODO(zmerlynn): Re-create instance-template with the new
   # node-kube-env. This isn't important until the node-ip-range issue
@@ -867,6 +873,43 @@ function kube-push {
   echo
   echo "The user name and password to use is located in ~/.kubernetes_auth."
   echo
+}
+
+# Push or upgrade nodes.
+#
+# TODO: This really needs to trampoline somehow to the configure-vm.sh
+# from the .tar.gz that we're actually pushing onto the node, because
+# that configuration shifts over versions. Right now, we're blasting
+# the configure-vm from our version instead.
+#
+# Assumed vars:
+#  KUBE_ROOT
+#  MINION_NAMES
+#  KUBE_TEMP
+#  PROJECT
+#  ZONE
+function kube-update-nodes() {
+  action=${1}
+
+  OUTPUT=${KUBE_ROOT}/_output/logs
+  mkdir -p ${OUTPUT}
+
+  echo "Updating node metadata... "
+  write-node-env
+  for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
+    add-instance-metadata-from-file "${MINION_NAMES[$i]}" "kube-env=${KUBE_TEMP}/node-kube-env.yaml" &
+  done
+  wait-for-jobs
+  echo "Done"
+
+  for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
+    echo "Starting ${action} on node (log at ${OUTPUT}/kube-${action}-${MINION_NAMES[$i]}.log) ..."
+    cat ${KUBE_ROOT}/cluster/gce/configure-vm.sh | gcloud compute ssh --ssh-flag="-o LogLevel=quiet" --project "${PROJECT}" --zone "${ZONE}" "${MINION_NAMES[$i]}" --command "sudo bash -s -- --push" &> ${OUTPUT}/kube-${action}-"${MINION_NAMES[$i]}".log &
+  done
+
+  echo -n "Waiting..."
+  wait-for-jobs
+  echo "Done"
 }
 
 # -----------------------------------------------------------------------------
