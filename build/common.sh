@@ -604,15 +604,20 @@ function kube::release::create_docker_images_for_server() {
       kube::log::status "Starting Docker build for image: ${binary_name}"
 
       (
-        local docker_file_path="$1/${binary_name}.Dockerfile"
+        local md5_sum
+        md5_sum=$(kube::release::md5 "$1/${binary_name}")
+
+        local docker_build_path="$1/${binary_name}.dockerbuild"
+        local docker_file_path="${docker_build_path}/Dockerfile"
         local binary_file_path="$1/${binary_name}"
-        if [ -f ${docker_file_path} ]; then
-          rm ${docker_file_path}
-        fi
-        printf " FROM scratch \n ADD ${binary_name} /${binary_name} \n ENTRYPOINT [ \"/${binary_name}\" ]\n" >> ${docker_file_path}
-        local md5_sum=$(kube::release::md5 ${binary_file_path})
+
+        rm -rf ${docker_build_path}
+        mkdir -p ${docker_build_path}
+        ln $1/${binary_name} ${docker_build_path}/${binary_name}
+        printf " FROM scratch \n ADD ${binary_name} /${binary_name} \n ENTRYPOINT [ \"/${binary_name}\" ]\n" > ${docker_file_path}
+
         local docker_image_tag=gcr.io/google_containers/$binary_name:$md5_sum
-        docker build -q -f "${docker_file_path}" -t "${docker_image_tag}" ${1} >/dev/null
+        docker build -q -t "${docker_image_tag}" ${docker_build_path} >/dev/null
         docker save ${docker_image_tag} > ${1}/${binary_name}.tar
         echo $md5_sum > ${1}/${binary_name}.docker_tag
         rm ${docker_file_path}
