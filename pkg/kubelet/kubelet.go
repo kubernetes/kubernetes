@@ -179,7 +179,7 @@ func NewMainKubelet(
 	if kubeClient != nil {
 		// TODO: cache.NewListWatchFromClient is limited as it takes a client implementation rather
 		// than an interface. There is no way to construct a list+watcher using resource name.
-		fieldSelector := fields.Set{"name": hostname}.AsSelector()
+		fieldSelector := fields.Set{"metadata.name": hostname}.AsSelector()
 		listWatch := &cache.ListWatch{
 			ListFunc: func() (runtime.Object, error) {
 				// TODO: Use List() with fieldSelector when it is supported.
