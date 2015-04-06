@@ -20,14 +20,24 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/authenticator"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/authenticator/bearertoken"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/auth/authenticator/password/passwordfile"
+	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/auth/authenticator/request/basicauth"
 	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/auth/authenticator/request/union"
 	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/auth/authenticator/request/x509"
 	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/auth/authenticator/token/tokenfile"
 )
 
 // NewAuthenticator returns an authenticator.Request or an error
-func NewAuthenticator(clientCAFile string, tokenFile string) (authenticator.Request, error) {
-	authenticators := []authenticator.Request{}
+func NewAuthenticator(basicAuthFile, clientCAFile, tokenFile string) (authenticator.Request, error) {
+	var authenticators []authenticator.Request
+
+	if len(basicAuthFile) > 0 {
+		basicAuth, err := newAuthenticatorFromBasicAuthFile(basicAuthFile)
+		if err != nil {
+			return nil, err
+		}
+		authenticators = append(authenticators, basicAuth)
+	}
 
 	if len(clientCAFile) > 0 {
 		certAuth, err := newAuthenticatorFromClientCAFile(clientCAFile)
@@ -45,14 +55,24 @@ func NewAuthenticator(clientCAFile string, tokenFile string) (authenticator.Requ
 		authenticators = append(authenticators, tokenAuth)
 	}
 
-	if len(authenticators) == 0 {
+	switch len(authenticators) {
+	case 0:
 		return nil, nil
-	}
-	if len(authenticators) == 1 {
+	case 1:
 		return authenticators[0], nil
+	default:
+		return union.New(authenticators...), nil
 	}
-	return union.New(authenticators...), nil
+}
 
+// newAuthenticatorFromBasicAuthFile returns an authenticator.Request or an error
+func newAuthenticatorFromBasicAuthFile(basicAuthFile string) (authenticator.Request, error) {
+	basicAuthenticator, err := passwordfile.NewCSV(basicAuthFile)
+	if err != nil {
+		return nil, err
+	}
+
+	return basicauth.New(basicAuthenticator), nil
 }
 
 // newAuthenticatorFromTokenFile returns an authenticator.Request or an error
