@@ -47,7 +47,7 @@ $ export KUBERNETES_MASTER=http://${servicehost}:8888
 Start etcd and verify that it is running:
 
 ```bash
-$ sudo docker run -d --hostname $(hostname -f) --name etcd -p 4001:4001 -p 7001:7001 coreos/etcd
+$ sudo docker run -d --hostname $(uname -n) --name etcd -p 4001:4001 -p 7001:7001 coreos/etcd
 ```
 
 ```bash
