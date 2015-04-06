@@ -74,3 +74,5 @@ Note that you will need run this curl command on your boot2docker VM if you are 
 ### A note on turning down your cluster
 Many of these containers run under the management of the ```kubelet``` binary, which attempts to keep containers running, even if they fail.  So, in order to turn down
 the cluster, you need to first kill the kubelet container, and then any other containers.
+
+You may use ```docker ps -a | awk '{print $1}' | xargs docker kill```, note this removes _all_ containers running under Docker, so use with caution.
