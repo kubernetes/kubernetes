@@ -116,44 +116,6 @@ func TestCheckIfStartOfMessages(t *testing.T) {
 	}
 }
 
-func TestAnalyzeLinesContainerOom(t *testing.T) {
-	expectedContainerOomInstance := createExpectedContainerOomInstance(t)
-	helpTestAnalyzeLines(expectedContainerOomInstance, containerLogFile, t)
-}
-
-func TestAnalyzeLinesSystemOom(t *testing.T) {
-	expectedSystemOomInstance := createExpectedSystemOomInstance(t)
-	helpTestAnalyzeLines(expectedSystemOomInstance, systemLogFile, t)
-}
-
-func helpTestAnalyzeLines(oomCheckInstance *OomInstance, sysFile string, t *testing.T) {
-	outStream := make(chan *OomInstance)
-	oomLog := new(OomParser)
-	oomLog.systemFile = sysFile
-	file, err := os.Open(oomLog.systemFile)
-	if err != nil {
-		t.Errorf("couldn't open test log: %v", err)
-	}
-	ioreader := bufio.NewReader(file)
-	timeout := make(chan bool, 1)
-	go func() {
-		time.Sleep(1 * time.Second)
-		timeout <- true
-	}()
-	go oomLog.analyzeLines(ioreader, outStream)
-	select {
-	case oomInstance := <-outStream:
-		if *oomCheckInstance != *oomInstance {
-			t.Errorf("wrong instance returned. Expected %v and got %v",
-				oomCheckInstance, oomInstance)
-			t.Errorf("Container of one was %v and the other %v", oomCheckInstance.ContainerName, oomInstance.ContainerName)
-		}
-	case <-timeout:
-		t.Error(
-			"timeout happened before oomInstance was found in test file")
-	}
-}
-
 func TestStreamOomsContainer(t *testing.T) {
 	expectedContainerOomInstance := createExpectedContainerOomInstance(t)
 	helpTestStreamOoms(expectedContainerOomInstance, containerLogFile, t)
@@ -166,18 +128,14 @@ func TestStreamOomsSystem(t *testing.T) {
 
 func helpTestStreamOoms(oomCheckInstance *OomInstance, sysFile string, t *testing.T) {
 	outStream := make(chan *OomInstance)
-	oomLog := new(OomParser)
-	oomLog.systemFile = sysFile
+	oomLog := mockOomParser(sysFile, t)
 	timeout := make(chan bool, 1)
 	go func() {
 		time.Sleep(1 * time.Second)
 		timeout <- true
 	}()
 
-	err := oomLog.StreamOoms(outStream)
-	if err != nil {
-		t.Errorf("had an error opening file: %v", err)
-	}
+	go oomLog.StreamOoms(outStream)
 
 	select {
 	case oomInstance := <-outStream:
@@ -191,9 +149,12 @@ func helpTestStreamOoms(oomCheckInstance *OomInstance, sysFile string, t *testin
 	}
 }
 
-func TestNew(t *testing.T) {
-	_, err := New()
+func mockOomParser(sysFile string, t *testing.T) *OomParser {
+	file, err := os.Open(sysFile)
 	if err != nil {
-		t.Errorf("function New() had error %v", err)
+		t.Errorf("had an error opening file: %v", err)
+	}
+	return &OomParser{
+		ioreader: bufio.NewReader(file),
 	}
 }
