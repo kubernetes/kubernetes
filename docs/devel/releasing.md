@@ -150,3 +150,16 @@ not present in Docker `v1.2.0`:
   (Non-empty output here means the commit is not present on v1.2.0.)
 ```
 
+## Release Notes
+
+No official release should be made final without properly matching release notes.
+
+There should be made available, per release, a small summary, preamble, of the
+major changes, both in terms of feature improvements/bug fixes and notes about
+functional feature changes (if any) regarding the previous released version so
+that the BOM regarding updating to it gets as obvious and trouble free as possible.
+
+After this summary, preamble, all the relevant PRs/issues that got in that
+version should be listed and linked together with a small summary understandable
+by plain mortals (in a perfect world PR/issue's title would be enough but often
+it is just too cryptic/geeky/domain-specific that it isn't).
