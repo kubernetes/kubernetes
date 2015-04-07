@@ -220,6 +220,11 @@ func (d *dockerContainerCommandRunner) RunInContainer(containerID string, cmd []
 //  - should we support nsenter in a container, running with elevated privs and --pid=host?
 //  - use strong type for containerId
 func (d *dockerContainerCommandRunner) ExecInContainer(containerId string, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool) error {
+	nsenter, err := exec.LookPath("nsenter")
+	if err != nil {
+		return fmt.Errorf("exec unavailable - unable to locate nsenter")
+	}
+
 	container, err := d.client.InspectContainer(containerId)
 	if err != nil {
 		return err
@@ -236,8 +241,7 @@ func (d *dockerContainerCommandRunner) ExecInContainer(containerId string, cmd [
 	args = append(args, fmt.Sprintf("HOSTNAME=%s", container.Config.Hostname))
 	args = append(args, container.Config.Env...)
 	args = append(args, cmd...)
-	command := exec.Command("nsenter", args...)
-	// TODO use exec.LookPath
+	command := exec.Command(nsenter, args...)
 	if tty {
 		p, err := StartPty(command)
 		if err != nil {
@@ -258,39 +262,24 @@ func (d *dockerContainerCommandRunner) ExecInContainer(containerId string, cmd [
 
 		return command.Wait()
 	} else {
-		cp := func(dst io.WriteCloser, src io.Reader, closeDst bool) {
-			defer func() {
-				if closeDst {
-					dst.Close()
-				}
-			}()
-			io.Copy(dst, src)
-		}
 		if stdin != nil {
-			inPipe, err := command.StdinPipe()
+			// Use an os.Pipe here as it returns true *os.File objects.
+			// This way, if you run 'kubectl exec -p <pod> -i bash' (no tty) and type 'exit',
+			// the call below to command.Run() can unblock because its Stdin is the read half
+			// of the pipe.
+			r, w, err := os.Pipe()
 			if err != nil {
 				return err
 			}
-			go func() {
-				cp(inPipe, stdin, false)
-				inPipe.Close()
-			}()
-		}
+			go io.Copy(w, stdin)
 
+			command.Stdin = r
+		}
 		if stdout != nil {
-			outPipe, err := command.StdoutPipe()
-			if err != nil {
-				return err
-			}
-			go cp(stdout, outPipe, true)
+			command.Stdout = stdout
 		}
-
 		if stderr != nil {
-			errPipe, err := command.StderrPipe()
-			if err != nil {
-				return err
-			}
-			go cp(stderr, errPipe, true)
+			command.Stderr = stderr
 		}
 
 		return command.Run()
@@ -324,16 +313,8 @@ func (d *dockerContainerCommandRunner) PortForward(pod *kubecontainer.Pod, port 
 	args := []string{"-t", fmt.Sprintf("%d", containerPid), "-n", "socat", "-", fmt.Sprintf("TCP4:localhost:%d", port)}
 	// TODO use exec.LookPath
 	command := exec.Command("nsenter", args...)
-	in, err := command.StdinPipe()
-	if err != nil {
-		return err
-	}
-	out, err := command.StdoutPipe()
-	if err != nil {
-		return err
-	}
-	go io.Copy(in, stream)
-	go io.Copy(stream, out)
+	command.Stdin = stream
+	command.Stdout = stream
 	return command.Run()
 }
 
