@@ -1425,8 +1425,12 @@ func (f *fakeContainerCommandRunner) ExecInContainer(id string, cmd []string, in
 	return f.E
 }
 
-func (f *fakeContainerCommandRunner) PortForward(podInfraContainerID string, port uint16, stream io.ReadWriteCloser) error {
-	f.ID = podInfraContainerID
+func (f *fakeContainerCommandRunner) PortForward(pod *kubecontainer.Pod, port uint16, stream io.ReadWriteCloser) error {
+	podInfraContainer := pod.FindContainerByName(dockertools.PodInfraContainerName)
+	if podInfraContainer == nil {
+		return fmt.Errorf("cannot find pod infra container in pod %q", kubecontainer.BuildPodFullName(pod.Name, pod.Namespace))
+	}
+	f.ID = string(podInfraContainer.ID)
 	f.Port = port
 	f.Stream = stream
 	return nil
