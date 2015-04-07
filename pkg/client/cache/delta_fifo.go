@@ -58,7 +58,7 @@ func NewDeltaFIFO(keyFunc KeyFunc, compressor DeltaCompressor, knownObjectKeys K
 // DeltaFIFO is like FIFO, but allows you to process deletes.
 //
 // DeltaFIFO is a producer-consumer queue, where a Reflector is
-// indended to be the producer, and the consumer is whatever calls
+// intended to be the producer, and the consumer is whatever calls
 // the Pop() method.
 //
 // DeltaFIFO solves this use case:
