@@ -30,6 +30,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/capabilities"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
 	kubecontainer "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/fsouza/go-dockerclient"
 	"github.com/golang/glog"
@@ -48,6 +49,40 @@ var _ kubecontainer.ContainerRunner = new(DockerManager)
 
 func NewDockerManager(client DockerInterface, recorder record.EventRecorder) *DockerManager {
 	return &DockerManager{client: client, recorder: recorder}
+}
+
+// GetRecentDockerContainersWithNameAndUUID returns a list of dead docker containers which matches the name
+// and uid given.
+func (self *DockerManager) GetRecentDockerContainersWithNameAndUUID(podFullName string, uid types.UID,
+	containerName string) ([]*docker.Container, error) {
+	var result []*docker.Container
+	containers, err := self.client.ListContainers(docker.ListContainersOptions{All: true})
+	if err != nil {
+		return nil, err
+	}
+	for _, dockerContainer := range containers {
+		if len(dockerContainer.Names) == 0 {
+			continue
+		}
+		dockerName, _, err := ParseDockerName(dockerContainer.Names[0])
+		if err != nil {
+			continue
+		}
+		if dockerName.PodFullName != podFullName {
+			continue
+		}
+		if uid != "" && dockerName.PodUID != uid {
+			continue
+		}
+		if dockerName.ContainerName != containerName {
+			continue
+		}
+		inspectResult, _ := self.client.InspectContainer(dockerContainer.ID)
+		if inspectResult != nil && !inspectResult.State.Running && !inspectResult.State.Paused {
+			result = append(result, inspectResult)
+		}
+	}
+	return result, nil
 }
 
 // GetKubeletDockerContainerLogs returns logs of a specific container. By
