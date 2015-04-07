@@ -1,0 +1,16 @@
+{
+    "apiVersion": "v1beta3",
+    "kind": "Node",
+    "metadata": {
+        "name": "{{ item }}"
+    },
+    "spec": {
+        "externalID": "{{ item }}"
+    },
+    "status": {
+        "capacity": {
+            "cpu": "1",
+            "memory": "1"
+        }
+    }
+}
