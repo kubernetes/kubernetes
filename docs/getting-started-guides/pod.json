@@ -18,8 +18,8 @@
           "type": "http",
           "initialDelaySeconds": 30,
           "httpGet": {
-            "path": "/index.html",
-            "port": "8081"
+            "path": "/",
+            "port": "80"
           }
         }
       }]
