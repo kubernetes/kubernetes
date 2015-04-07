@@ -50,6 +50,7 @@ type APIServer struct {
 	ExternalHost               string
 	Address                    util.IP
 	PublicAddressOverride      util.IP
+	ListenAllInterfaces        bool
 	ReadOnlyPort               int
 	APIRate                    float32
 	APIBurst                   int
@@ -88,6 +89,7 @@ func NewAPIServer() *APIServer {
 		WideOpenPort:           8080,
 		Address:                util.IP(net.ParseIP("127.0.0.1")),
 		PublicAddressOverride:  util.IP(net.ParseIP("")),
+		ListenAllInterfaces:    false,
 		ReadOnlyPort:           7080,
 		APIRate:                10.0,
 		APIBurst:               200,
@@ -125,6 +127,8 @@ func (s *APIServer) AddFlags(fs *pflag.FlagSet) {
 		"Read only port will be opened on this address, and it is assumed that port "+
 		"443 at this address will be proxied/redirected to '-address':'-port'. If "+
 		"blank, the address in the first listed interface will be used.")
+	fs.BoolVar(&s.ListenAllInterfaces, "listen_all_interfaces", s.ListenAllInterfaces, ""+
+		"If true, read only port and secure port will be opened on 0.0.0.0 for all interfaces.")
 	fs.IntVar(&s.ReadOnlyPort, "read_only_port", s.ReadOnlyPort, ""+
 		"The port from which to serve read-only resources. If 0, don't serve on a "+
 		"read-only address. It is assumed that firewall rules are set up such that "+
@@ -293,13 +297,17 @@ func (s *APIServer) Run(_ []string) error {
 	m := master.New(config)
 
 	// We serve on 3 ports.  See docs/accessing_the_api.md
+	publicAddress := config.PublicAddress.String()
+	if s.ListenAllInterfaces {
+		publicAddress = "0.0.0.0"
+	}
 	roLocation := ""
 	if s.ReadOnlyPort != 0 {
-		roLocation = net.JoinHostPort(config.PublicAddress.String(), strconv.Itoa(s.ReadOnlyPort))
+		roLocation = net.JoinHostPort(publicAddress, strconv.Itoa(s.ReadOnlyPort))
 	}
 	secureLocation := ""
 	if s.SecurePort != 0 {
-		secureLocation = net.JoinHostPort(config.PublicAddress.String(), strconv.Itoa(s.SecurePort))
+		secureLocation = net.JoinHostPort(publicAddress, strconv.Itoa(s.SecurePort))
 	}
 	wideOpenLocation := net.JoinHostPort(s.Address.String(), strconv.Itoa(s.WideOpenPort))
 
