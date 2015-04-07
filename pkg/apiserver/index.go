@@ -17,21 +17,24 @@ limitations under the License.
 package apiserver
 
 import (
-	"fmt"
 	"net/http"
+	"sort"
+
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 
 	"github.com/emicklei/go-restful"
 )
 
-// handleIndex is the root index page for Kubernetes.
-func handleIndex(req *restful.Request, resp *restful.Response) {
-	// TODO: use restful's Request/Response methods
-	if req.Request.URL.Path != "/" && req.Request.URL.Path != "/index.html" {
-		notFound(resp.ResponseWriter, req.Request)
-		return
+func IndexHandler(container *restful.Container, muxHelper *MuxHelper) func(http.ResponseWriter, *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var handledPaths []string
+		// Extract the paths handled using restful.WebService
+		for _, ws := range container.RegisteredWebServices() {
+			handledPaths = append(handledPaths, ws.RootPath())
+		}
+		// Extract the paths handled using mux handler.
+		handledPaths = append(handledPaths, muxHelper.RegisteredPaths...)
+		sort.Strings(handledPaths)
+		writeRawJSON(http.StatusOK, api.RootPaths{Paths: handledPaths}, w)
 	}
-	resp.ResponseWriter.WriteHeader(http.StatusOK)
-	// TODO: serve this out of a file
-	data := "<html><body>Welcome to Kubernetes</body></html>"
-	fmt.Fprint(resp.ResponseWriter, data)
 }

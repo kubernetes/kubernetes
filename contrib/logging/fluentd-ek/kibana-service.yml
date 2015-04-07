@@ -1,9 +1,0 @@
-apiVersion: v1beta1
-kind: Service
-id: kibana
-containerPort: kibana-port
-port: 5601
-selector:
-  app: kibana-viewer
-createExternalLoadBalancer: true
- 

@@ -1,0 +1,3 @@
+#!/bin/sh -e
+
+go test -v ./...

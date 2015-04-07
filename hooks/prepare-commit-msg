@@ -20,7 +20,7 @@ for file in $(git diff --cached --name-only --diff-filter ACM | grep "\.go" | gr
 done
 
 # Check sh files for boilerplate
-for file in $(git diff --cached --name-only --diff-filter ACM | grep "\.sh" | grep -v "third_party"); do
+for file in $(git diff --cached --name-only --diff-filter ACM | grep "\.sh" | grep -v -e "third_party" -e "Godeps"); do
   # Check for files without the required boilerplate.
   boilerplate=$("${KUBE_HOOKS_DIR}/boilerplate.sh" "${file}")
   if [[ "$boilerplate" -eq "0" ]]; then
@@ -77,6 +77,19 @@ if [[ "${#files_need_description[@]}" -ne 0 ]]; then
     echo "#"
     echo "# Your commit will be aborted unless you fix these."
     echo "#   COMMIT_BLOCKED_ON_DESCRIPTION"
+    echo
+  ) >> $1
+fi
+
+if ! hack/verify-gendocs.sh > /dev/null; then
+  (
+    echo
+    echo "# *** ERROR: *** docs are out of sync between cli and markdown"
+    echo "# run hack/run-gendocs.sh > docs/kubectl.md to regenerate"
+    echo
+    echo "#"
+    echo "# Your commit will be aborted unless you regenerate docs."
+    echo "    COMMIT_BLOCKED_ON_GENDOCS"
     echo
   ) >> $1
 fi

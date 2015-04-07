@@ -20,6 +20,7 @@ import (
 	"fmt"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
@@ -33,9 +34,9 @@ type EndpointsNamespacer interface {
 type EndpointsInterface interface {
 	Create(endpoints *api.Endpoints) (*api.Endpoints, error)
 	List(selector labels.Selector) (*api.EndpointsList, error)
-	Get(id string) (*api.Endpoints, error)
+	Get(name string) (*api.Endpoints, error)
 	Update(endpoints *api.Endpoints) (*api.Endpoints, error)
-	Watch(label, field labels.Selector, resourceVersion string) (watch.Interface, error)
+	Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error)
 }
 
 // endpoints implements EndpointsInterface
@@ -52,33 +53,38 @@ func newEndpoints(c *Client, namespace string) *endpoints {
 // Create creates a new endpoint.
 func (c *endpoints) Create(endpoints *api.Endpoints) (*api.Endpoints, error) {
 	result := &api.Endpoints{}
-	err := c.r.Post().Namespace(c.ns).Path("endpoints").Body(endpoints).Do().Into(result)
+	err := c.r.Post().Namespace(c.ns).Resource("endpoints").Body(endpoints).Do().Into(result)
 	return result, err
 }
 
 // List takes a selector, and returns the list of endpoints that match that selector
 func (c *endpoints) List(selector labels.Selector) (result *api.EndpointsList, err error) {
 	result = &api.EndpointsList{}
-	err = c.r.Get().Namespace(c.ns).Path("endpoints").SelectorParam("labels", selector).Do().Into(result)
+	err = c.r.Get().
+		Namespace(c.ns).
+		Resource("endpoints").
+		LabelsSelectorParam(selector).
+		Do().
+		Into(result)
 	return
 }
 
 // Get returns information about the endpoints for a particular service.
-func (c *endpoints) Get(id string) (result *api.Endpoints, err error) {
+func (c *endpoints) Get(name string) (result *api.Endpoints, err error) {
 	result = &api.Endpoints{}
-	err = c.r.Get().Namespace(c.ns).Path("endpoints").Path(id).Do().Into(result)
+	err = c.r.Get().Namespace(c.ns).Resource("endpoints").Name(name).Do().Into(result)
 	return
 }
 
 // Watch returns a watch.Interface that watches the requested endpoints for a service.
-func (c *endpoints) Watch(label, field labels.Selector, resourceVersion string) (watch.Interface, error) {
+func (c *endpoints) Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
 	return c.r.Get().
+		Prefix("watch").
 		Namespace(c.ns).
-		Path("watch").
-		Path("endpoints").
+		Resource("endpoints").
 		Param("resourceVersion", resourceVersion).
-		SelectorParam("labels", label).
-		SelectorParam("fields", field).
+		LabelsSelectorParam(label).
+		FieldsSelectorParam(field).
 		Watch()
 }
 
@@ -89,8 +95,8 @@ func (c *endpoints) Update(endpoints *api.Endpoints) (*api.Endpoints, error) {
 	}
 	err := c.r.Put().
 		Namespace(c.ns).
-		Path("endpoints").
-		Path(endpoints.Name).
+		Resource("endpoints").
+		Name(endpoints.Name).
 		Body(endpoints).
 		Do().
 		Into(result)

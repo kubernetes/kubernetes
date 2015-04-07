@@ -21,8 +21,9 @@ import (
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/rest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/registrytest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -35,7 +36,7 @@ type testRegistry struct {
 
 func NewTestREST() (testRegistry, *REST) {
 	reg := testRegistry{registrytest.NewGeneric(nil)}
-	return reg, NewREST(reg)
+	return reg, NewStorage(reg)
 }
 
 func testEvent(name string) *api.Event {
@@ -73,11 +74,11 @@ func TestRESTCreate(t *testing.T) {
 	}
 
 	for _, item := range table {
-		_, rest := NewTestREST()
-		c, err := rest.Create(item.ctx, item.event)
+		_, storage := NewTestREST()
+		c, err := storage.Create(item.ctx, item.event)
 		if !item.valid {
 			if err == nil {
-				ctxNS := api.Namespace(item.ctx)
+				ctxNS := api.NamespaceValue(item.ctx)
 				t.Errorf("unexpected non-error for %v (%v, %v)", item.event.Name, ctxNS, item.event.Namespace)
 			}
 			continue
@@ -89,27 +90,55 @@ func TestRESTCreate(t *testing.T) {
 		if !api.HasObjectMetaSystemFieldValues(&item.event.ObjectMeta) {
 			t.Errorf("storage did not populate object meta field values")
 		}
-		if e, a := item.event, (<-c).Object; !reflect.DeepEqual(e, a) {
+		if e, a := item.event, c; !reflect.DeepEqual(e, a) {
 			t.Errorf("diff: %s", util.ObjectDiff(e, a))
 		}
 		// Ensure we implement the interface
-		_ = apiserver.ResourceWatcher(rest)
+		_ = rest.Watcher(storage)
 	}
+}
+
+func TestRESTUpdate(t *testing.T) {
+	_, rest := NewTestREST()
+	eventA := testEvent("foo")
+	_, err := rest.Create(api.NewDefaultContext(), eventA)
+	if err != nil {
+		t.Fatalf("Unexpected error %v", err)
+	}
+	got, err := rest.Get(api.NewDefaultContext(), eventA.Name)
+	if err != nil {
+		t.Fatalf("Unexpected error %v", err)
+	}
+	if e, a := eventA, got; !reflect.DeepEqual(e, a) {
+		t.Errorf("diff: %s", util.ObjectDiff(e, a))
+	}
+	eventB := testEvent("bar")
+	_, _, err = rest.Update(api.NewDefaultContext(), eventB)
+	if err != nil {
+		t.Fatalf("Unexpected error %v", err)
+	}
+	got2, err := rest.Get(api.NewDefaultContext(), eventB.Name)
+	if err != nil {
+		t.Fatalf("Unexpected error %v", err)
+	}
+	if e, a := eventB, got2; !reflect.DeepEqual(e, a) {
+		t.Errorf("diff: %s", util.ObjectDiff(e, a))
+	}
+
 }
 
 func TestRESTDelete(t *testing.T) {
 	_, rest := NewTestREST()
 	eventA := testEvent("foo")
-	c, err := rest.Create(api.NewDefaultContext(), eventA)
+	_, err := rest.Create(api.NewDefaultContext(), eventA)
 	if err != nil {
 		t.Fatalf("Unexpected error %v", err)
 	}
-	<-c
-	c, err = rest.Delete(api.NewDefaultContext(), eventA.Name)
+	c, err := rest.Delete(api.NewDefaultContext(), eventA.Name)
 	if err != nil {
 		t.Fatalf("Unexpected error %v", err)
 	}
-	if stat := (<-c).Object.(*api.Status); stat.Status != api.StatusSuccess {
+	if stat := c.(*api.Status); stat.Status != api.StatusSuccess {
 		t.Errorf("unexpected status: %v", stat)
 	}
 }
@@ -117,11 +146,10 @@ func TestRESTDelete(t *testing.T) {
 func TestRESTGet(t *testing.T) {
 	_, rest := NewTestREST()
 	eventA := testEvent("foo")
-	c, err := rest.Create(api.NewDefaultContext(), eventA)
+	_, err := rest.Create(api.NewDefaultContext(), eventA)
 	if err != nil {
 		t.Fatalf("Unexpected error %v", err)
 	}
-	<-c
 	got, err := rest.Get(api.NewDefaultContext(), eventA.Name)
 	if err != nil {
 		t.Fatalf("Unexpected error %v", err)
@@ -143,9 +171,8 @@ func TestRESTgetAttrs(t *testing.T) {
 			ResourceVersion: "0",
 			FieldPath:       "",
 		},
-		Status: "tested",
-		Reason: "forTesting",
-		Source: "test",
+		Reason: "ForTesting",
+		Source: api.EventSource{Component: "test"},
 	}
 	label, field, err := rest.getAttrs(eventA)
 	if err != nil {
@@ -154,7 +181,7 @@ func TestRESTgetAttrs(t *testing.T) {
 	if e, a := label, (labels.Set{}); !reflect.DeepEqual(e, a) {
 		t.Errorf("diff: %s", util.ObjectDiff(e, a))
 	}
-	expect := labels.Set{
+	expect := fields.Set{
 		"involvedObject.kind":            "Pod",
 		"involvedObject.name":            "foo",
 		"involvedObject.namespace":       "baz",
@@ -162,26 +189,11 @@ func TestRESTgetAttrs(t *testing.T) {
 		"involvedObject.apiVersion":      testapi.Version(),
 		"involvedObject.resourceVersion": "0",
 		"involvedObject.fieldPath":       "",
-		"status":                         "tested",
-		"reason":                         "forTesting",
+		"reason":                         "ForTesting",
 		"source":                         "test",
 	}
 	if e, a := expect, field; !reflect.DeepEqual(e, a) {
 		t.Errorf("diff: %s", util.ObjectDiff(e, a))
-	}
-}
-
-func TestRESTUpdate(t *testing.T) {
-	_, rest := NewTestREST()
-	eventA := testEvent("foo")
-	c, err := rest.Create(api.NewDefaultContext(), eventA)
-	if err != nil {
-		t.Fatalf("Unexpected error %v", err)
-	}
-	<-c
-	_, err = rest.Update(api.NewDefaultContext(), eventA)
-	if err == nil {
-		t.Errorf("unexpected non-error")
 	}
 }
 
@@ -196,8 +208,8 @@ func TestRESTList(t *testing.T) {
 			ResourceVersion: "0",
 			FieldPath:       "",
 		},
-		Status: "tested",
-		Reason: "forTesting",
+		Reason: "ForTesting",
+		Source: api.EventSource{Component: "GoodSource"},
 	}
 	eventB := &api.Event{
 		InvolvedObject: api.ObjectReference{
@@ -208,8 +220,8 @@ func TestRESTList(t *testing.T) {
 			ResourceVersion: "0",
 			FieldPath:       "",
 		},
-		Status: "tested",
-		Reason: "forTesting",
+		Reason: "ForTesting",
+		Source: api.EventSource{Component: "GoodSource"},
 	}
 	eventC := &api.Event{
 		InvolvedObject: api.ObjectReference{
@@ -220,13 +232,13 @@ func TestRESTList(t *testing.T) {
 			ResourceVersion: "0",
 			FieldPath:       "",
 		},
-		Status: "untested",
-		Reason: "forTesting",
+		Reason: "ForTesting",
+		Source: api.EventSource{Component: "OtherSource"},
 	}
 	reg.ObjectList = &api.EventList{
 		Items: []api.Event{*eventA, *eventB, *eventC},
 	}
-	got, err := rest.List(api.NewContext(), labels.Everything(), labels.Set{"status": "tested"}.AsSelector())
+	got, err := rest.List(api.NewContext(), labels.Everything(), fields.Set{"source": "GoodSource"}.AsSelector())
 	if err != nil {
 		t.Fatalf("Unexpected error %v", err)
 	}
@@ -248,16 +260,15 @@ func TestRESTWatch(t *testing.T) {
 			ResourceVersion: "0",
 			FieldPath:       "",
 		},
-		Status: "tested",
-		Reason: "forTesting",
+		Reason: "ForTesting",
 	}
 	reg, rest := NewTestREST()
-	wi, err := rest.Watch(api.NewContext(), labels.Everything(), labels.Everything(), "0")
+	wi, err := rest.Watch(api.NewContext(), labels.Everything(), fields.Everything(), "0")
 	if err != nil {
 		t.Fatalf("Unexpected error %v", err)
 	}
 	go func() {
-		reg.Mux.Action(watch.Added, eventA)
+		reg.Broadcaster.Action(watch.Added, eventA)
 	}()
 	got := <-wi.ResultChan()
 	if e, a := eventA, got.Object; !reflect.DeepEqual(e, a) {

@@ -66,9 +66,20 @@ func (dk *BasicDockerKeyring) Add(cfg DockerConfig) {
 			continue
 		}
 
-		registry := parsed.Host + parsed.Path
-		dk.creds[registry] = creds
-		dk.index = append(dk.index, registry)
+		// The docker client allows exact matches:
+		//    foo.bar.com/namespace
+		// Or hostname matches:
+		//    foo.bar.com
+		// See ResolveAuthConfig in docker/registry/auth.go.
+		if parsed.Host != "" {
+			// NOTE: foo.bar.com comes through as Path.
+			dk.creds[parsed.Host] = creds
+			dk.index = append(dk.index, parsed.Host)
+		}
+		if parsed.Path != "/" {
+			dk.creds[parsed.Host+parsed.Path] = creds
+			dk.index = append(dk.index, parsed.Host+parsed.Path)
+		}
 	}
 
 	// Update the index used to identify which credentials to use for a given
@@ -131,4 +142,13 @@ func (dk *lazyDockerKeyring) Lookup(image string) (docker.AuthConfiguration, boo
 	}
 
 	return keyring.Lookup(image)
+}
+
+type FakeKeyring struct {
+	auth docker.AuthConfiguration
+	ok   bool
+}
+
+func (f *FakeKeyring) Lookup(image string) (docker.AuthConfiguration, bool) {
+	return f.auth, f.ok
 }

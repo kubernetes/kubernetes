@@ -1,0 +1,16 @@
+id: hazelcast
+kind: Pod
+apiVersion: v1beta1
+desiredState:
+  manifest:
+    version: v1beta1
+    id: hazelcast
+    containers:
+      - name: hazelcast
+        image: pires/hazelcast-k8s
+        cpu: 1000
+        ports:
+          - name: hazelcast
+            containerPort: 5701
+labels:
+  name: hazelcast

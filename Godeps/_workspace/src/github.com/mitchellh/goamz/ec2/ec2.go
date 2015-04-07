@@ -127,7 +127,7 @@ type xmlErrors struct {
 var timeNow = time.Now
 
 func (ec2 *EC2) query(params map[string]string, resp interface{}) error {
-	params["Version"] = "2014-05-01"
+	params["Version"] = "2014-06-15"
 	params["Timestamp"] = timeNow().In(time.UTC).Format(time.RFC3339)
 	endpoint, err := url.Parse(ec2.Region.EC2Endpoint)
 	if err != nil {
@@ -178,7 +178,7 @@ func buildError(r *http.Response) error {
 	err.RequestId = errors.RequestId
 	err.StatusCode = r.StatusCode
 	if err.Message == "" {
-		err.Message = r.Status
+		err.Message = err.Code
 	}
 	return &err
 }
@@ -203,29 +203,32 @@ func addBlockDeviceParams(prename string, params map[string]string, blockdevices
 		if k.DeviceName != "" {
 			params[prefix+"DeviceName"] = k.DeviceName
 		}
+
 		if k.VirtualName != "" {
 			params[prefix+"VirtualName"] = k.VirtualName
-		}
-		if k.SnapshotId != "" {
-			params[prefix+"Ebs.SnapshotId"] = k.SnapshotId
-		}
-		if k.VolumeType != "" {
-			params[prefix+"Ebs.VolumeType"] = k.VolumeType
-		}
-		if k.IOPS != 0 {
-			params[prefix+"Ebs.Iops"] = strconv.FormatInt(k.IOPS, 10)
-		}
-		if k.VolumeSize != 0 {
-			params[prefix+"Ebs.VolumeSize"] = strconv.FormatInt(k.VolumeSize, 10)
-		}
-		if k.DeleteOnTermination {
-			params[prefix+"Ebs.DeleteOnTermination"] = "true"
-		}
-		if k.Encrypted {
-			params[prefix+"Ebs.Encrypted"] = "true"
-		}
-		if k.NoDevice {
+		} else if k.NoDevice {
 			params[prefix+"NoDevice"] = ""
+		} else {
+			if k.SnapshotId != "" {
+				params[prefix+"Ebs.SnapshotId"] = k.SnapshotId
+			}
+			if k.VolumeType != "" {
+				params[prefix+"Ebs.VolumeType"] = k.VolumeType
+			}
+			if k.IOPS != 0 {
+				params[prefix+"Ebs.Iops"] = strconv.FormatInt(k.IOPS, 10)
+			}
+			if k.VolumeSize != 0 {
+				params[prefix+"Ebs.VolumeSize"] = strconv.FormatInt(k.VolumeSize, 10)
+			}
+			if k.DeleteOnTermination {
+				params[prefix+"Ebs.DeleteOnTermination"] = "true"
+			} else {
+				params[prefix+"Ebs.DeleteOnTermination"] = "false"
+			}
+			if k.Encrypted {
+				params[prefix+"Ebs.Encrypted"] = "true"
+			}
 		}
 	}
 }
@@ -253,9 +256,11 @@ type RunInstances struct {
 	SubnetId                 string
 	AssociatePublicIpAddress bool
 	DisableAPITermination    bool
+	EbsOptimized             bool
 	ShutdownBehavior         string
 	PrivateIPAddress         string
 	BlockDevices             []BlockDeviceMapping
+	Tenancy                  string
 }
 
 // Response to a RunInstances request.
@@ -267,6 +272,15 @@ type RunInstancesResp struct {
 	OwnerId        string          `xml:"ownerId"`
 	SecurityGroups []SecurityGroup `xml:"groupSet>item"`
 	Instances      []Instance      `xml:"instancesSet>item"`
+}
+
+// BlockDevice represents the association of a block device with an instance.
+type BlockDevice struct {
+	DeviceName          string `xml:"deviceName"`
+	VolumeId            string `xml:"ebs>volumeId"`
+	Status              string `xml:"ebs>status"`
+	AttachTime          string `xml:"ebs>attachTime"`
+	DeleteOnTermination bool   `xml:"ebs>deleteOnTermination"`
 }
 
 // Instance encapsulates a running instance in EC2.
@@ -284,6 +298,7 @@ type Instance struct {
 	VirtType           string          `xml:"virtualizationType"`
 	Monitoring         string          `xml:"monitoring>state"`
 	AvailZone          string          `xml:"placement>availabilityZone"`
+	Tenancy            string          `xml:"placement>tenancy"`
 	PlacementGroupName string          `xml:"placement>groupName"`
 	State              InstanceState   `xml:"instanceState"`
 	Tags               []Tag           `xml:"tagSet>item"`
@@ -296,6 +311,8 @@ type Instance struct {
 	LaunchTime         time.Time       `xml:"launchTime"`
 	SourceDestCheck    bool            `xml:"sourceDestCheck"`
 	SecurityGroups     []SecurityGroup `xml:"groupSet>item"`
+	EbsOptimized       string          `xml:"ebsOptimized"`
+	BlockDevices       []BlockDevice   `xml:"blockDeviceMapping>item"`
 }
 
 // RunInstances starts new instances in EC2.
@@ -350,6 +367,9 @@ func (ec2 *EC2) RunInstances(options *RunInstances) (resp *RunInstancesResp, err
 	if options.Monitoring {
 		params["Monitoring.Enabled"] = "true"
 	}
+	if options.Tenancy != "" {
+		params["Placement.Tenancy"] = options.Tenancy
+	}
 	if options.SubnetId != "" && options.AssociatePublicIpAddress {
 		// If we have a non-default VPC / Subnet specified, we can flag
 		// AssociatePublicIpAddress to get a Public IP assigned. By default these are not provided.
@@ -362,6 +382,10 @@ func (ec2 *EC2) RunInstances(options *RunInstances) (resp *RunInstancesResp, err
 		params["NetworkInterface.0.AssociatePublicIpAddress"] = "true"
 		params["NetworkInterface.0.SubnetId"] = options.SubnetId
 
+		if options.PrivateIPAddress != "" {
+			params["NetworkInterface.0.PrivateIpAddress"] = options.PrivateIPAddress
+		}
+
 		i := 1
 		for _, g := range options.SecurityGroups {
 			// We only have SecurityGroupId's on NetworkInterface's, no SecurityGroup params.
@@ -373,6 +397,10 @@ func (ec2 *EC2) RunInstances(options *RunInstances) (resp *RunInstancesResp, err
 	} else {
 		if options.SubnetId != "" {
 			params["SubnetId"] = options.SubnetId
+		}
+
+		if options.PrivateIPAddress != "" {
+			params["PrivateIpAddress"] = options.PrivateIPAddress
 		}
 
 		i, j := 1, 1
@@ -392,11 +420,11 @@ func (ec2 *EC2) RunInstances(options *RunInstances) (resp *RunInstancesResp, err
 	if options.DisableAPITermination {
 		params["DisableApiTermination"] = "true"
 	}
+	if options.EbsOptimized {
+		params["EbsOptimized"] = "true"
+	}
 	if options.ShutdownBehavior != "" {
 		params["InstanceInitiatedShutdownBehavior"] = options.ShutdownBehavior
-	}
-	if options.PrivateIPAddress != "" {
-		params["PrivateIpAddress"] = options.PrivateIPAddress
 	}
 	addBlockDeviceParams("", params, options.BlockDevices)
 
@@ -417,6 +445,111 @@ func clientToken() (string, error) {
 		return "", err
 	}
 	return hex.EncodeToString(buf), nil
+}
+
+// The GetConsoleOutput type encapsulates options for the respective request in EC2.
+//
+// See http://goo.gl/EY70zb for more details.
+type GetConsoleOutput struct {
+	InstanceId string
+}
+
+// Response to a GetConsoleOutput request. Note that Output is base64-encoded,
+// as in the underlying AWS API.
+//
+// See http://goo.gl/EY70zb for more details.
+type GetConsoleOutputResp struct {
+	RequestId  string    `xml:"requestId"`
+	InstanceId string    `xml:"instanceId"`
+	Timestamp  time.Time `xml:"timestamp"`
+	Output     string    `xml:"output"`
+}
+
+// GetConsoleOutput returns the console output for the sepcified instance. Note
+// that console output is base64-encoded, as in the underlying AWS API.
+//
+// See http://goo.gl/EY70zb for more details.
+func (ec2 *EC2) GetConsoleOutput(options *GetConsoleOutput) (resp *GetConsoleOutputResp, err error) {
+	params := makeParams("GetConsoleOutput")
+	params["InstanceId"] = options.InstanceId
+	resp = &GetConsoleOutputResp{}
+	err = ec2.query(params, resp)
+	if err != nil {
+		return nil, err
+	}
+	return
+}
+
+// ----------------------------------------------------------------------------
+// Instance events and status functions and types.
+
+// The DescribeInstanceStatus type encapsulates options for the respective request in EC2.
+//
+// See http://goo.gl/DFySJY for more details.
+type EventsSet struct {
+	Code        string `xml:"code"`
+	Description string `xml:"description"`
+	NotBefore   string `xml:"notBefore"`
+	NotAfter    string `xml:"notAfter"`
+}
+
+type StatusDetails struct {
+	Name          string `xml:"name"`
+	Status        string `xml:"status"`
+	ImpairedSince string `xml:"impairedSince"`
+}
+
+type Status struct {
+	Status  string          `xml:"status"`
+	Details []StatusDetails `xml:"details>item"`
+}
+
+type InstanceStatusSet struct {
+	InstanceId       string        `xml:"instanceId"`
+	AvailabilityZone string        `xml:"availabilityZone"`
+	InstanceState    InstanceState `xml:"instanceState"`
+	SystemStatus     Status        `xml:"systemStatus"`
+	InstanceStatus   Status        `xml:"instanceStatus"`
+	Events           []EventsSet   `xml:"eventsSet>item"`
+}
+
+type DescribeInstanceStatusResp struct {
+	RequestId      string              `xml:"requestId"`
+	InstanceStatus []InstanceStatusSet `xml:"instanceStatusSet>item"`
+}
+
+type DescribeInstanceStatus struct {
+	InstanceIds         []string
+	IncludeAllInstances bool
+	MaxResults          int64
+	NextToken           string
+}
+
+func (ec2 *EC2) DescribeInstanceStatus(options *DescribeInstanceStatus, filter *Filter) (resp *DescribeInstanceStatusResp, err error) {
+	params := makeParams("DescribeInstanceStatus")
+	if options.IncludeAllInstances {
+		params["IncludeAllInstances"] = "true"
+	}
+	if len(options.InstanceIds) > 0 {
+		addParamsList(params, "InstanceId", options.InstanceIds)
+	}
+	if options.MaxResults > 0 {
+		params["MaxResults"] = strconv.FormatInt(options.MaxResults, 10)
+	}
+	if options.NextToken != "" {
+		params["NextToken"] = options.NextToken
+	}
+	if filter != nil {
+		filter.addParams(params)
+	}
+
+	resp = &DescribeInstanceStatusResp{}
+	err = ec2.query(params, resp)
+	if err != nil {
+		return nil, err
+	}
+
+	return
 }
 
 // ----------------------------------------------------------------------------
@@ -640,6 +773,61 @@ func (ec2 *EC2) CancelSpotRequests(spotrequestIds []string) (resp *CancelSpotReq
 	if err != nil {
 		return nil, err
 	}
+	return
+}
+
+type DescribeSpotPriceHistory struct {
+	InstanceType       []string
+	ProductDescription []string
+	AvailabilityZone   string
+	StartTime, EndTime time.Time
+}
+
+// Response to a DescribeSpotPriceHisotyr request.
+//
+// See http://goo.gl/3BKHj for more details.
+type DescribeSpotPriceHistoryResp struct {
+	RequestId string             `xml:"requestId"`
+	History   []SpotPriceHistory `xml:"spotPriceHistorySet>item"`
+}
+
+type SpotPriceHistory struct {
+	InstanceType       string    `xml:"instanceType"`
+	ProductDescription string    `xml:"productDescription"`
+	SpotPrice          string    `xml:"spotPrice"`
+	Timestamp          time.Time `xml:"timestamp"`
+	AvailabilityZone   string    `xml:"availabilityZone"`
+}
+
+// DescribeSpotPriceHistory gets the spot pricing history.
+//
+// See http://goo.gl/3BKHj for more details.
+func (ec2 *EC2) DescribeSpotPriceHistory(o *DescribeSpotPriceHistory) (resp *DescribeSpotPriceHistoryResp, err error) {
+	params := makeParams("DescribeSpotPriceHistory")
+	if o.AvailabilityZone != "" {
+		params["AvailabilityZone"] = o.AvailabilityZone
+	}
+
+	if !o.StartTime.IsZero() {
+		params["StartTime"] = o.StartTime.In(time.UTC).Format(time.RFC3339)
+	}
+	if !o.EndTime.IsZero() {
+		params["EndTime"] = o.EndTime.In(time.UTC).Format(time.RFC3339)
+	}
+
+	if len(o.InstanceType) > 0 {
+		addParamsList(params, "InstanceType", o.InstanceType)
+	}
+	if len(o.ProductDescription) > 0 {
+		addParamsList(params, "ProductDescription", o.ProductDescription)
+	}
+
+	resp = &DescribeSpotPriceHistoryResp{}
+	err = ec2.query(params, resp)
+	if err != nil {
+		return nil, err
+	}
+
 	return
 }
 
@@ -872,6 +1060,47 @@ func (ec2 *EC2) Volumes(volIds []string, filter *Filter) (resp *VolumesResp, err
 }
 
 // ----------------------------------------------------------------------------
+// Availability zone management functions and types.
+// See http://goo.gl/ylxT4R for more details.
+
+// DescribeAvailabilityZonesResp represents a response to a DescribeAvailabilityZones
+// request in EC2.
+type DescribeAvailabilityZonesResp struct {
+	RequestId string                 `xml:"requestId"`
+	Zones     []AvailabilityZoneInfo `xml:"availabilityZoneInfo>item"`
+}
+
+// AvailabilityZoneInfo encapsulates details for an availability zone in EC2.
+type AvailabilityZoneInfo struct {
+	AvailabilityZone
+	State      string   `xml:"zoneState"`
+	MessageSet []string `xml:"messageSet>item"`
+}
+
+// AvailabilityZone represents an EC2 availability zone.
+type AvailabilityZone struct {
+	Name   string `xml:"zoneName"`
+	Region string `xml:"regionName"`
+}
+
+// DescribeAvailabilityZones returns details about availability zones in EC2.
+// The filter parameter is optional, and if provided will limit the
+// availability zones returned to those matching the given filtering
+// rules.
+//
+// See http://goo.gl/ylxT4R for more details.
+func (ec2 *EC2) DescribeAvailabilityZones(filter *Filter) (resp *DescribeAvailabilityZonesResp, err error) {
+	params := makeParams("DescribeAvailabilityZones")
+	filter.addParams(params)
+	resp = &DescribeAvailabilityZonesResp{}
+	err = ec2.query(params, resp)
+	if err != nil {
+		return nil, err
+	}
+	return
+}
+
+// ----------------------------------------------------------------------------
 // ElasticIp management (for VPC)
 
 // The AllocateAddress request parameters
@@ -993,6 +1222,20 @@ func (ec2 *EC2) AssociateAddress(options *AssociateAddress) (resp *AssociateAddr
 func (ec2 *EC2) DisassociateAddress(id string) (resp *SimpleResp, err error) {
 	params := makeParams("DisassociateAddress")
 	params["AssociationId"] = id
+
+	resp = &SimpleResp{}
+	err = ec2.query(params, resp)
+	if err != nil {
+		return nil, err
+	}
+
+	return
+}
+
+// Disassociate an address from a VPC instance.
+func (ec2 *EC2) DisassociateAddressClassic(ip string) (resp *SimpleResp, err error) {
+	params := makeParams("DisassociateAddress")
+	params["PublicIp"] = ip
 
 	resp = &SimpleResp{}
 	err = ec2.query(params, resp)
@@ -1683,6 +1926,7 @@ type SecurityGroup struct {
 	Name        string `xml:"groupName"`
 	Description string `xml:"groupDescription"`
 	VpcId       string `xml:"vpcId"`
+	Tags        []Tag  `xml:"tagSet>item"`
 }
 
 // SecurityGroupNames is a convenience function that
@@ -1838,6 +2082,28 @@ func (ec2 *EC2) CreateTags(resourceIds []string, tags []Tag) (resp *SimpleResp, 
 	if err != nil {
 		return nil, err
 	}
+	return resp, nil
+}
+
+// DeleteTags deletes tags.
+func (ec2 *EC2) DeleteTags(resourceIds []string, tags []Tag) (resp *SimpleResp, err error) {
+	params := makeParams("DeleteTags")
+	addParamsList(params, "ResourceId", resourceIds)
+
+	for j, tag := range tags {
+		params["Tag."+strconv.Itoa(j+1)+".Key"] = tag.Key
+
+		if tag.Value != "" {
+			params["Tag."+strconv.Itoa(j+1)+".Value"] = tag.Value
+		}
+	}
+
+	resp = &SimpleResp{}
+	err = ec2.query(params, resp)
+	if err != nil {
+		return nil, err
+	}
+
 	return resp, nil
 }
 
@@ -2125,6 +2391,38 @@ type CreateSubnetResp struct {
 	Subnet    Subnet `xml:"subnet"`
 }
 
+// The ModifySubnetAttribute request parameters
+//
+// http://docs.aws.amazon.com/AWSEC2/latest/APIReference/ApiReference-query-ModifySubnetAttribute.html
+type ModifySubnetAttribute struct {
+	SubnetId            string
+	MapPublicIpOnLaunch bool
+}
+
+type ModifySubnetAttributeResp struct {
+	RequestId string `xml:"requestId"`
+	Return    bool   `xml:"return"`
+}
+
+// The CreateNetworkAcl request parameters
+//
+// http://goo.gl/BZmCRF
+type CreateNetworkAcl struct {
+	VpcId string
+}
+
+// Response to a CreateNetworkAcl request
+type CreateNetworkAclResp struct {
+	RequestId  string     `xml:"requestId"`
+	NetworkAcl NetworkAcl `xml:"networkAcl"`
+}
+
+// Response to CreateNetworkAclEntry request
+type CreateNetworkAclEntryResp struct {
+	RequestId string `xml:"requestId"`
+	Return    bool   `xml:"return"`
+}
+
 // Response to a DescribeInternetGateways request.
 type InternetGatewaysResp struct {
 	RequestId        string            `xml:"requestId"`
@@ -2193,6 +2491,52 @@ type Subnet struct {
 	DefaultForAZ            bool   `xml:"defaultForAz"`
 	MapPublicIpOnLaunch     bool   `xml:"mapPublicIpOnLaunch"`
 	Tags                    []Tag  `xml:"tagSet>item"`
+}
+
+// NetworkAcl represent network acl
+type NetworkAcl struct {
+	NetworkAclId   string                  `xml:"networkAclId"`
+	VpcId          string                  `xml:"vpcId"`
+	Default        string                  `xml:"default"`
+	EntrySet       []NetworkAclEntry       `xml:"entrySet>item"`
+	AssociationSet []NetworkAclAssociation `xml:"associationSet>item"`
+	Tags           []Tag                   `xml:"tagSet>item"`
+}
+
+// NetworkAclAssociation
+type NetworkAclAssociation struct {
+	NetworkAclAssociationId string `xml:"networkAclAssociationId"`
+	NetworkAclId            string `xml:"networkAclId"`
+	SubnetId                string `xml:"subnetId"`
+}
+
+// NetworkAclEntry represent a rule within NetworkAcl
+type NetworkAclEntry struct {
+	RuleNumber int       `xml:"ruleNumber"`
+	Protocol   int       `xml:"protocol"`
+	RuleAction string    `xml:"ruleAction"`
+	Egress     bool      `xml:"egress"`
+	CidrBlock  string    `xml:"cidrBlock"`
+	IcmpCode   IcmpCode  `xml:"icmpTypeCode"`
+	PortRange  PortRange `xml:"portRange"`
+}
+
+// IcmpCode
+type IcmpCode struct {
+	Code int `xml:"code"`
+	Type int `xml:"type"`
+}
+
+// PortRange
+type PortRange struct {
+	From int `xml:"from"`
+	To   int `xml:"to"`
+}
+
+// Response to describe NetworkAcls
+type NetworkAclsResp struct {
+	RequestId   string       `xml:"requestId"`
+	NetworkAcls []NetworkAcl `xml:"networkAclSet>item"`
 }
 
 // VPC represents a single VPC.
@@ -2331,6 +2675,26 @@ func (ec2 *EC2) DeleteSubnet(id string) (resp *SimpleResp, err error) {
 	return
 }
 
+// ModifySubnetAttribute
+//
+// http://docs.aws.amazon.com/AWSEC2/latest/APIReference/ApiReference-query-ModifySubnetAttribute.html
+func (ec2 *EC2) ModifySubnetAttribute(options *ModifySubnetAttribute) (resp *ModifySubnetAttributeResp, err error) {
+	params := makeParams("ModifySubnetAttribute")
+	params["SubnetId"] = options.SubnetId
+	if options.MapPublicIpOnLaunch {
+		params["MapPublicIpOnLaunch.Value"] = "true"
+	} else {
+		params["MapPublicIpOnLaunch.Value"] = "false"
+	}
+
+	resp = &ModifySubnetAttributeResp{}
+	err = ec2.query(params, resp)
+	if err != nil {
+		return nil, err
+	}
+	return
+}
+
 // DescribeSubnets
 //
 // http://docs.aws.amazon.com/AWSEC2/latest/APIReference/ApiReference-query-DescribeSubnets.html
@@ -2346,6 +2710,130 @@ func (ec2 *EC2) DescribeSubnets(ids []string, filter *Filter) (resp *SubnetsResp
 	}
 
 	return
+}
+
+// CreateNetworkAcl creates a network ACL in a VPC.
+//
+// http://goo.gl/51X7db
+func (ec2 *EC2) CreateNetworkAcl(options *CreateNetworkAcl) (resp *CreateNetworkAclResp, err error) {
+	params := makeParams("CreateNetworkAcl")
+	params["VpcId"] = options.VpcId
+
+	resp = &CreateNetworkAclResp{}
+	err = ec2.query(params, resp)
+	if err != nil {
+		return nil, err
+	}
+
+	return
+}
+
+// CreateNetworkAclEntry creates an entry (a rule) in a network ACL with the specified rule number.
+//
+// http://goo.gl/BtXhtj
+func (ec2 *EC2) CreateNetworkAclEntry(networkAclId string, options *NetworkAclEntry) (resp *CreateNetworkAclEntryResp, err error) {
+
+	params := makeParams("CreateNetworkAclEntry")
+	params["NetworkAclId"] = networkAclId
+	params["RuleNumber"] = strconv.Itoa(options.RuleNumber)
+	params["Protocol"] = strconv.Itoa(options.Protocol)
+	params["RuleAction"] = options.RuleAction
+	params["Egress"] = strconv.FormatBool(options.Egress)
+	params["CidrBlock"] = options.CidrBlock
+	if params["Protocol"] == "-1" {
+		params["Icmp.Type"] = strconv.Itoa(options.IcmpCode.Type)
+		params["Icmp.Code"] = strconv.Itoa(options.IcmpCode.Code)
+	}
+	params["PortRange.From"] = strconv.Itoa(options.PortRange.From)
+	params["PortRange.To"] = strconv.Itoa(options.PortRange.To)
+
+	resp = &CreateNetworkAclEntryResp{}
+	err = ec2.query(params, resp)
+	if err != nil {
+		return nil, err
+	}
+
+	return resp, nil
+}
+
+// NetworkAcls describes one or more of your network ACLs for given filter.
+//
+// http://goo.gl/mk9RsV
+func (ec2 *EC2) NetworkAcls(networkAclIds []string, filter *Filter) (resp *NetworkAclsResp, err error) {
+	params := makeParams("DescribeNetworkAcls")
+	addParamsList(params, "NetworkAclId", networkAclIds)
+	filter.addParams(params)
+	resp = &NetworkAclsResp{}
+	if err = ec2.query(params, resp); err != nil {
+		return nil, err
+	}
+
+	return resp, nil
+}
+
+// Response to a DeleteNetworkAcl request.
+type DeleteNetworkAclResp struct {
+	RequestId string `xml:"requestId"`
+	Return    bool   `xml:"return"`
+}
+
+// DeleteNetworkAcl deletes the network ACL with specified id.
+//
+// http://goo.gl/nC78Wx
+func (ec2 *EC2) DeleteNetworkAcl(id string) (resp *DeleteNetworkAclResp, err error) {
+	params := makeParams("DeleteNetworkAcl")
+	params["NetworkAclId"] = id
+
+	resp = &DeleteNetworkAclResp{}
+	err = ec2.query(params, resp)
+	if err != nil {
+		return nil, err
+	}
+	return resp, nil
+}
+
+// Response to a DeleteNetworkAclEntry request.
+type DeleteNetworkAclEntryResp struct {
+	RequestId string `xml:"requestId"`
+	Return    bool   `xml:"return"`
+}
+
+// DeleteNetworkAclEntry deletes the specified ingress or egress entry (rule) from the specified network ACL.
+//
+// http://goo.gl/moQbE2
+func (ec2 *EC2) DeleteNetworkAclEntry(id string, ruleNumber int, egress bool) (resp *DeleteNetworkAclEntryResp, err error) {
+	params := makeParams("DeleteNetworkAclEntry")
+	params["NetworkAclId"] = id
+	params["RuleNumber"] = strconv.Itoa(ruleNumber)
+	params["Egress"] = strconv.FormatBool(egress)
+
+	resp = &DeleteNetworkAclEntryResp{}
+	err = ec2.query(params, resp)
+	if err != nil {
+		return nil, err
+	}
+	return resp, nil
+}
+
+type ReplaceNetworkAclAssociationResponse struct {
+	RequestId        string `xml:"requestId"`
+	NewAssociationId string `xml:"newAssociationId"`
+}
+
+// ReplaceNetworkAclAssociation changes which network ACL a subnet is associated with.
+//
+// http://goo.gl/ar0MH5
+func (ec2 *EC2) ReplaceNetworkAclAssociation(associationId string, networkAclId string) (resp *ReplaceNetworkAclAssociationResponse, err error) {
+	params := makeParams("ReplaceNetworkAclAssociation")
+	params["NetworkAclId"] = networkAclId
+	params["AssociationId"] = associationId
+
+	resp = &ReplaceNetworkAclAssociationResponse{}
+	err = ec2.query(params, resp)
+	if err != nil {
+		return nil, err
+	}
+	return resp, nil
 }
 
 // Create a new internet gateway.

@@ -19,6 +19,8 @@ package util
 import (
 	"encoding/json"
 	"time"
+
+	"github.com/google/gofuzz"
 )
 
 // Time is a wrapper around time.Time which supports correct
@@ -26,6 +28,11 @@ import (
 // of the factory methods that the time package offers.
 type Time struct {
 	time.Time
+}
+
+// NewTime returns a wrapped instance of the provided time
+func NewTime(time time.Time) Time {
+	return Time{time}
 }
 
 // Date returns the Time corresponding to the supplied parameters
@@ -37,6 +44,19 @@ func Date(year int, month time.Month, day, hour, min, sec, nsec int, loc *time.L
 // Now returns the current local time.
 func Now() Time {
 	return Time{time.Now()}
+}
+
+// IsZero returns true if the value is nil or time is zero.
+func (t *Time) IsZero() bool {
+	if t == nil {
+		return true
+	}
+	return t.Time.IsZero()
+}
+
+// Before reports whether the time instant t is before u.
+func (t Time) Before(u Time) bool {
+	return t.Time.Before(u.Time)
 }
 
 // Unix returns the local time corresponding to the given Unix time
@@ -66,7 +86,7 @@ func (t *Time) UnmarshalJSON(b []byte) error {
 		return err
 	}
 
-	t.Time = pt
+	t.Time = pt.Local()
 	return nil
 }
 
@@ -77,37 +97,18 @@ func (t Time) MarshalJSON() ([]byte, error) {
 		return []byte("null"), nil
 	}
 
-	return json.Marshal(t.Format(time.RFC3339))
+	return json.Marshal(t.UTC().Format(time.RFC3339))
 }
 
-// SetYAML implements the yaml.Setter interface.
-func (t *Time) SetYAML(tag string, value interface{}) bool {
-	if value == nil {
-		t.Time = time.Time{}
-		return true
-	}
-
-	str, ok := value.(string)
-	if !ok {
-		return false
-	}
-
-	pt, err := time.Parse(time.RFC3339, str)
-	if err != nil {
-		return false
-	}
-
-	t.Time = pt
-	return true
-}
-
-// GetYAML implements the yaml.Getter interface.
-func (t Time) GetYAML() (tag string, value interface{}) {
-	if t.IsZero() {
-		value = "null"
+// Fuzz satisfies fuzz.Interface.
+func (t *Time) Fuzz(c fuzz.Continue) {
+	if t == nil {
 		return
 	}
-
-	value = t.Format(time.RFC3339)
-	return tag, value
+	// Allow for about 1000 years of randomness.  Leave off nanoseconds
+	// because JSON doesn't represent them so they can't round-trip
+	// properly.
+	t.Time = time.Unix(c.Rand.Int63n(1000*365*24*60*60), 0)
 }
+
+var _ fuzz.Interface = &Time{}

@@ -1,0 +1,9 @@
+{
+  "id": "zookeeper",
+  "kind": "Service",
+  "apiVersion": "v1beta1",
+  "port": 2181,
+  "containerPort": 2181,
+  "selector": { "name": "zookeeper" },
+  "labels": { "name": "zookeeper" }
+}

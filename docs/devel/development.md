@@ -8,7 +8,7 @@ Official releases are built in Docker containers.  Details are [here](../../buil
 
 Kubernetes is written in [Go](http://golang.org) programming language. If you haven't set up Go development environment, please follow [this instruction](http://golang.org/doc/code.html) to install go tool and set up GOPATH. Ensure your version of Go is at least 1.3.
 
-## Put kubernetes into GOPATH
+## Clone kubernetes into GOPATH
 
 We highly recommend to put kubernetes' code into your GOPATH. For example, the following commands will download kubernetes' code under the current user's GOPATH (Assuming there's only one directory in GOPATH.):
 
@@ -22,7 +22,9 @@ $ git clone https://github.com/GoogleCloudPlatform/kubernetes.git
 
 The commands above will not work if there are more than one directory in ``$GOPATH``.
 
-(Obviously, clone your own fork of Kubernetes if you plan to do development.)
+If you plan to do development, read about the
+[Kubernetes Github Flow](https://docs.google.com/presentation/d/1HVxKSnvlc2WJJq8b9KCYtact5ZRrzDzkWgKEfm0QO_o/pub?start=false&loop=false&delayms=3000),
+and then clone your own fork of Kubernetes as described there.
 
 ## godep and dependency management
 
@@ -31,30 +33,70 @@ Kubernetes uses [godep](https://github.com/tools/godep) to manage dependencies. 
 ### Installing godep
 There are many ways to build and host go binaries. Here is an easy way to get utilities like ```godep``` installed:
 
-1. Ensure that [mercurial](http://mercurial.selenic.com/wiki/Download) is installed on your system. (some of godep's dependencies use the mercurial
+1) Ensure that [mercurial](http://mercurial.selenic.com/wiki/Download) is installed on your system. (some of godep's dependencies use the mercurial
 source control system).  Use ```apt-get install mercurial``` or ```yum install mercurial``` on Linux, or [brew.sh](http://brew.sh) on OS X, or download
 directly from mercurial.
-2. Create a new GOPATH for your tools and install godep:
+
+2) Create a new GOPATH for your tools and install godep:
 ```
 export GOPATH=$HOME/go-tools
 mkdir -p $GOPATH
 go get github.com/tools/godep
 ```
 
-3. Add $GOPATH/bin to your path. Typically you'd add this to your ~/.profile:
+3) Add $GOPATH/bin to your path. Typically you'd add this to your ~/.profile:
 ```
 export GOPATH=$HOME/go-tools
 export PATH=$PATH:$GOPATH/bin
 ```
 
 ### Using godep
-Here is a quick summary of `godep`.  `godep` helps manage third party dependencies by copying known versions into Godeps/_workspace.  You can use `godep` in three ways:
+Here's a quick walkthrough of one way to use godeps to add or update a Kubernetes dependency into Godeps/_workspace. For more details, please see the instructions in [godep's documentation](https://github.com/tools/godep).
 
-1. Use `godep` to call your `go` commands.  For example: `godep go test ./...`
-2. Use `godep` to modify your `$GOPATH` so that other tools know where to find the dependencies.  Specifically: `export GOPATH=$GOPATH:$(godep path)`
-3. Use `godep` to copy the saved versions of packages into your `$GOPATH`.  This is done with `godep restore`.
+1) Devote a directory to this endeavor:
+```
+export KPATH=$HOME/code/kubernetes
+mkdir -p $KPATH/src/github.com/GoogleCloudPlatform/kubernetes
+cd $KPATH/src/github.com/GoogleCloudPlatform/kubernetes
+git clone https://path/to/your/fork .
+# Or copy your existing local repo here. IMPORTANT: making a symlink doesn't work.
+```
 
-We recommend using options #1 or #2.
+2) Set up your GOPATH.
+```
+# Option A: this will let your builds see packages that exist elsewhere on your system.
+export GOPATH=$KPATH:$GOPATH
+# Option B: This will *not* let your local builds see packages that exist elsewhere on your system.
+export GOPATH=$KPATH
+# Option B is recommended if you're going to mess with the dependencies.
+```
+
+3) Populate your new GOPATH.
+```
+cd $KPATH/src/github.com/GoogleCloudPlatform/kubernetes
+godep restore
+```
+
+4) Next, you can either add a new dependency or update an existing one.
+```
+# To add a new dependency, do:
+cd $KPATH/src/github.com/GoogleCloudPlatform/kubernetes
+go get path/to/dependency
+# Change code in Kubernetes to use the dependency.
+godep save ./...
+
+# To update an existing dependency, do:
+cd $KPATH/src/github.com/GoogleCloudPlatform/kubernetes
+go get -u path/to/dependency
+# Change code in Kubernetes accordingly if necessary.
+godep update path/to/dependency
+```
+
+5) Before sending your PR, it's a good idea to sanity check that your Godeps.json file is ok by re-restoring: ```godep restore```
+
+It is sometimes expedient to manually fix the /Godeps/godeps.json file to minimize the changes.
+
+Please send dependency updates in separate commits within your PR, for easier reviewing.
 
 ## Hooks
 
@@ -93,14 +135,35 @@ ok      github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet   0.317s
 ```
 
 ## Coverage
+
+Currently, collecting coverage is only supported for the Go unit tests.
+
+To run all unit tests and generate an HTML coverage report, run the following:
+
 ```
 cd kubernetes
-godep go tool cover -html=target/c.out
+KUBE_COVER=y hack/test-go.sh
 ```
+
+At the end of the run, an the HTML report will be generated with the path printed to stdout.
+
+To run tests and collect coverage in only one package, pass its relative path under the `kubernetes` directory as an argument, for example:
+```
+cd kubernetes
+KUBE_COVER=y hack/test-go.sh pkg/kubectl
+```
+
+Multiple arguments can be passed, in which case the coverage results will be combined for all tests run.
+
+Coverage results for the project can also be viewed on [Coveralls](https://coveralls.io/r/GoogleCloudPlatform/kubernetes), and are continuously updated as commits are merged. Additionally, all pull requests which spawn a Travis build will report unit test coverage results to Coveralls.
 
 ## Integration tests
 
-You need an [etcd](https://github.com/coreos/etcd/releases/tag/v0.4.6) in your path, please make sure it is installed and in your ``$PATH``.
+You need an [etcd](https://github.com/coreos/etcd/releases/tag/v2.0.0) in your path, please make sure it is installed and in your ``$PATH``.
+```
+cd kubernetes
+hack/test-integration.sh
+```
 
 ## End-to-End tests
 
@@ -112,33 +175,71 @@ hack/e2e-test.sh
 
 Pressing control-C should result in an orderly shutdown but if something goes wrong and you still have some VMs running you can force a cleanup with this command:
 ```
-go run e2e.go --down
+go run hack/e2e.go --down
 ```
 
-See the flag definitions in `hack/e2e.go` for more options, such as reusing an existing cluster.
+### Flag options
+See the flag definitions in `hack/e2e.go` for more options, such as reusing an existing cluster, here is an overview:
+
+```sh
+# Build binaries for testing
+go run hack/e2e.go --build
+
+# Create a fresh cluster.  Deletes a cluster first, if it exists
+go run hack/e2e.go --up
+
+# Create a fresh cluster at a specific release version.
+go run hack/e2e.go --up --version=0.7.0
+
+# Test if a cluster is up.
+go run hack/e2e.go --isup
+
+# Push code to an existing cluster
+go run hack/e2e.go --push
+
+# Push to an existing cluster, or bring up a cluster if it's down.
+go run hack/e2e.go --pushup
+
+# Run all tests
+go run hack/e2e.go --test
+
+# Run tests matching the regex "Pods.*env"
+go run hack/e2e.go -v -test --test_args="--ginkgo.focus=Pods.*env"
+
+# Alternately, if you have the e2e cluster up and no desire to see the event stream, you can run ginkgo-e2e.sh directly:
+hack/ginkgo-e2e.sh --ginkgo.focus=Pods.*env
+```
+
+### Combining flags
+```sh
+# Flags can be combined, and their actions will take place in this order:
+# -build, -push|-up|-pushup, -test|-tests=..., -down
+# e.g.:
+go run hack/e2e.go -build -pushup -test -down
+
+# -v (verbose) can be added if you want streaming output instead of only
+# seeing the output of failed commands.
+
+# -ctl can be used to quickly call kubectl against your e2e cluster. Useful for
+# cleaning up after a failed test or viewing logs. Use -v to avoid supressing
+# kubectl output.
+go run hack/e2e.go -v -ctl='get events'
+go run hack/e2e.go -v -ctl='delete pod foobar'
+```
+
+## Conformance testing
+End-to-end testing, as described above, is for [development
+distributions](../../docs/devel/writing-a-getting-started-guide.md).  A conformance test is used on
+a [versioned distro](../../docs/devel/writing-a-getting-started-guide.md).
+
+The conformance test runs a subset of the e2e-tests against a manually-created cluster.  It does not
+require support for up/push/down and other operations.  To run a conformance test, you need to know the
+IP of the master for your cluster and the authorization arguments to use.  The conformance test is
+intended to run against a cluster at a specific binary release of Kubernetes.
+See [conformance-test.sh](../../hack/conformance-test.sh).
 
 ## Testing out flaky tests
-[Instructions here](docs/devel/flaky-tests.md)
-
-## Add/Update dependencies
-
-Kubernetes uses [godep](https://github.com/tools/godep) to manage dependencies. To add or update a package, please follow the instructions on [godep's document](https://github.com/tools/godep).
-
-To add a new package ``foo/bar``:
-
-- Make sure the kubernetes' root directory is in $GOPATH/github.com/GoogleCloudPlatform/kubernetes
-- Run ``godep restore`` to make sure you have all dependancies pulled.
-- Download foo/bar into the first directory in GOPATH: ``go get foo/bar``.
-- Change code in kubernetes to use ``foo/bar``.
-- Run ``godep save ./...`` under kubernetes' root directory.
-
-To update a package ``foo/bar``:
-
-- Make sure the kubernetes' root directory is in $GOPATH/github.com/GoogleCloudPlatform/kubernetes
-- Run ``godep restore`` to make sure you have all dependancies pulled.
-- Update the package with ``go get -u foo/bar``.
-- Change code in kubernetes accordingly if necessary.
-- Run ``godep update foo/bar`` under kubernetes' root directory.
+[Instructions here](flaky-tests.md)
 
 ## Keeping your development fork in sync
 
@@ -155,16 +256,8 @@ git fetch upstream
 git rebase upstream/master
 ```
 
-## Regenerating the API documentation
+## Regenerating the CLI documentation
 
 ```
-cd kubernetes/api
-sudo docker build -t kubernetes/raml2html .
-sudo docker run --name="docgen" kubernetes/raml2html
-sudo docker cp docgen:/data/kubernetes.html .
-```
-
-View the API documentation using htmlpreview (works on your fork, too):
-```
-http://htmlpreview.github.io/?https://github.com/GoogleCloudPlatform/kubernetes/blob/master/api/kubernetes.html
+hack/run-gendocs.sh
 ```

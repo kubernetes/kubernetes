@@ -102,6 +102,14 @@ func TestListContainersParams(t *testing.T) {
 			ListContainersOptions{All: true, Limit: 10, Since: "adf9983", Before: "abdeef"},
 			map[string][]string{"all": {"1"}, "limit": {"10"}, "since": {"adf9983"}, "before": {"abdeef"}},
 		},
+		{
+			ListContainersOptions{Filters: map[string][]string{"status": {"paused", "running"}}},
+			map[string][]string{"filters": {"{\"status\":[\"paused\",\"running\"]}"}},
+		},
+		{
+			ListContainersOptions{All: true, Filters: map[string][]string{"exited": {"0"}, "status": {"exited"}}},
+			map[string][]string{"all": {"1"}, "filters": {"{\"exited\":[\"0\"],\"status\":[\"exited\"]}"}},
+		},
 	}
 	fakeRT := &FakeRoundTripper{message: "[]", status: http.StatusOK}
 	client := newTestClient(fakeRT)
@@ -437,6 +445,27 @@ func TestCreateContainerImageNotFound(t *testing.T) {
 	}
 	if !reflect.DeepEqual(err, ErrNoSuchImage) {
 		t.Errorf("CreateContainer: Wrong error type. Want %#v. Got %#v.", ErrNoSuchImage, err)
+	}
+}
+
+func TestCreateContainerWithHostConfig(t *testing.T) {
+	fakeRT := &FakeRoundTripper{message: "{}", status: http.StatusOK}
+	client := newTestClient(fakeRT)
+	config := Config{}
+	hostConfig := HostConfig{PublishAllPorts: true}
+	opts := CreateContainerOptions{Name: "TestCreateContainerWithHostConfig", Config: &config, HostConfig: &hostConfig}
+	_, err := client.CreateContainer(opts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req := fakeRT.requests[0]
+	var gotBody map[string]interface{}
+	err = json.NewDecoder(req.Body).Decode(&gotBody)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := gotBody["HostConfig"]; !ok {
+		t.Errorf("CreateContainer: wrong body. HostConfig was not serialized")
 	}
 }
 
@@ -1251,7 +1280,7 @@ func TestLogsNoContainer(t *testing.T) {
 }
 
 func TestNoSuchContainerError(t *testing.T) {
-	var err error = &NoSuchContainer{ID: "i345"}
+	var err = &NoSuchContainer{ID: "i345"}
 	expected := "No such container: i345"
 	if got := err.Error(); got != expected {
 		t.Errorf("NoSuchContainer: wrong message. Want %q. Got %q.", expected, got)

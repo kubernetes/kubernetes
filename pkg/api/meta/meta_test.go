@@ -26,19 +26,19 @@ import (
 
 func TestGenericTypeMeta(t *testing.T) {
 	type TypeMeta struct {
-		Kind              string            `json:"kind,omitempty" yaml:"kind,omitempty"`
-		Namespace         string            `json:"namespace,omitempty" yaml:"namespace,omitempty"`
-		Name              string            `json:"name,omitempty" yaml:"name,omitempty"`
-		UID               string            `json:"uid,omitempty" yaml:"uid,omitempty"`
-		CreationTimestamp util.Time         `json:"creationTimestamp,omitempty" yaml:"creationTimestamp,omitempty"`
-		SelfLink          string            `json:"selfLink,omitempty" yaml:"selfLink,omitempty"`
-		ResourceVersion   string            `json:"resourceVersion,omitempty" yaml:"resourceVersion,omitempty"`
-		APIVersion        string            `json:"apiVersion,omitempty" yaml:"apiVersion,omitempty"`
-		Labels            map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
-		Annotations       map[string]string `json:"annotations,omitempty" yaml:"annotations,omitempty"`
+		Kind              string            `json:"kind,omitempty"`
+		Namespace         string            `json:"namespace,omitempty"`
+		Name              string            `json:"name,omitempty"`
+		UID               string            `json:"uid,omitempty"`
+		CreationTimestamp util.Time         `json:"creationTimestamp,omitempty"`
+		SelfLink          string            `json:"selfLink,omitempty"`
+		ResourceVersion   string            `json:"resourceVersion,omitempty"`
+		APIVersion        string            `json:"apiVersion,omitempty"`
+		Labels            map[string]string `json:"labels,omitempty"`
+		Annotations       map[string]string `json:"annotations,omitempty"`
 	}
 	type Object struct {
-		TypeMeta `json:",inline" yaml:",inline"`
+		TypeMeta `json:",inline"`
 	}
 	j := Object{
 		TypeMeta{
@@ -63,7 +63,7 @@ func TestGenericTypeMeta(t *testing.T) {
 	if e, a := "foo", accessor.Name(); e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
-	if e, a := "uid", accessor.UID(); e != a {
+	if e, a := "uid", string(accessor.UID()); e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
 	if e, a := "a", accessor.APIVersion(); e != a {
@@ -76,6 +76,17 @@ func TestGenericTypeMeta(t *testing.T) {
 		t.Errorf("expected %v, got %v", e, a)
 	}
 	if e, a := "some/place/only/we/know", accessor.SelfLink(); e != a {
+		t.Errorf("expected %v, got %v", e, a)
+	}
+
+	typeAccessor, err := TypeAccessor(&j)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if e, a := "a", accessor.APIVersion(); e != a {
+		t.Errorf("expected %v, got %v", e, a)
+	}
+	if e, a := "b", accessor.Kind(); e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
 
@@ -109,22 +120,31 @@ func TestGenericTypeMeta(t *testing.T) {
 	if e, a := "google.com", j.SelfLink; e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
+
+	typeAccessor.SetAPIVersion("d")
+	typeAccessor.SetKind("e")
+	if e, a := "d", j.APIVersion; e != a {
+		t.Errorf("expected %v, got %v", e, a)
+	}
+	if e, a := "e", j.Kind; e != a {
+		t.Errorf("expected %v, got %v", e, a)
+	}
 }
 
 type InternalTypeMeta struct {
-	Kind              string            `json:"kind,omitempty" yaml:"kind,omitempty"`
-	Namespace         string            `json:"namespace,omitempty" yaml:"namespace,omitempty"`
-	Name              string            `json:"name,omitempty" yaml:"name,omitempty"`
-	UID               string            `json:"uid,omitempty" yaml:"uid,omitempty"`
-	CreationTimestamp util.Time         `json:"creationTimestamp,omitempty" yaml:"creationTimestamp,omitempty"`
-	SelfLink          string            `json:"selfLink,omitempty" yaml:"selfLink,omitempty"`
-	ResourceVersion   string            `json:"resourceVersion,omitempty" yaml:"resourceVersion,omitempty"`
-	APIVersion        string            `json:"apiVersion,omitempty" yaml:"apiVersion,omitempty"`
-	Labels            map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
-	Annotations       map[string]string `json:"annotations,omitempty" yaml:"annotations,omitempty"`
+	Kind              string            `json:"kind,omitempty"`
+	Namespace         string            `json:"namespace,omitempty"`
+	Name              string            `json:"name,omitempty"`
+	UID               string            `json:"uid,omitempty"`
+	CreationTimestamp util.Time         `json:"creationTimestamp,omitempty"`
+	SelfLink          string            `json:"selfLink,omitempty"`
+	ResourceVersion   string            `json:"resourceVersion,omitempty"`
+	APIVersion        string            `json:"apiVersion,omitempty"`
+	Labels            map[string]string `json:"labels,omitempty"`
+	Annotations       map[string]string `json:"annotations,omitempty"`
 }
 type InternalObject struct {
-	TypeMeta InternalTypeMeta `json:",inline" yaml:",inline"`
+	TypeMeta InternalTypeMeta `json:",inline"`
 }
 
 func (*InternalObject) IsAnAPIObject() {}
@@ -162,7 +182,7 @@ func TestGenericTypeMetaAccessor(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	if e, a := "uid", uid; e != a {
+	if e, a := "uid", string(uid); e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
 	apiVersion, err := accessor.APIVersion(j)
@@ -269,22 +289,22 @@ func TestGenericTypeMetaAccessor(t *testing.T) {
 
 func TestGenericObjectMeta(t *testing.T) {
 	type TypeMeta struct {
-		Kind       string `json:"kind,omitempty" yaml:"kind,omitempty"`
-		APIVersion string `json:"apiVersion,omitempty" yaml:"apiVersion,omitempty"`
+		Kind       string `json:"kind,omitempty"`
+		APIVersion string `json:"apiVersion,omitempty"`
 	}
 	type ObjectMeta struct {
-		Namespace         string            `json:"namespace,omitempty" yaml:"namespace,omitempty"`
-		Name              string            `json:"name,omitempty" yaml:"name,omitempty"`
-		UID               string            `json:"uid,omitempty" yaml:"uid,omitempty"`
-		CreationTimestamp util.Time         `json:"creationTimestamp,omitempty" yaml:"creationTimestamp,omitempty"`
-		SelfLink          string            `json:"selfLink,omitempty" yaml:"selfLink,omitempty"`
-		ResourceVersion   string            `json:"resourceVersion,omitempty" yaml:"resourceVersion,omitempty"`
-		Labels            map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
-		Annotations       map[string]string `json:"annotations,omitempty" yaml:"annotations,omitempty"`
+		Namespace         string            `json:"namespace,omitempty"`
+		Name              string            `json:"name,omitempty"`
+		UID               string            `json:"uid,omitempty"`
+		CreationTimestamp util.Time         `json:"creationTimestamp,omitempty"`
+		SelfLink          string            `json:"selfLink,omitempty"`
+		ResourceVersion   string            `json:"resourceVersion,omitempty"`
+		Labels            map[string]string `json:"labels,omitempty"`
+		Annotations       map[string]string `json:"annotations,omitempty"`
 	}
 	type Object struct {
-		TypeMeta   `json:",inline" yaml:",inline"`
-		ObjectMeta `json:"metadata" yaml:"metadata"`
+		TypeMeta   `json:",inline"`
+		ObjectMeta `json:"metadata"`
 	}
 	j := Object{
 		TypeMeta{
@@ -311,7 +331,7 @@ func TestGenericObjectMeta(t *testing.T) {
 	if e, a := "foo", accessor.Name(); e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
-	if e, a := "uid", accessor.UID(); e != a {
+	if e, a := "uid", string(accessor.UID()); e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
 	if e, a := "a", accessor.APIVersion(); e != a {
@@ -375,16 +395,16 @@ func TestGenericObjectMeta(t *testing.T) {
 
 func TestGenericListMeta(t *testing.T) {
 	type TypeMeta struct {
-		Kind       string `json:"kind,omitempty" yaml:"kind,omitempty"`
-		APIVersion string `json:"apiVersion,omitempty" yaml:"apiVersion,omitempty"`
+		Kind       string `json:"kind,omitempty"`
+		APIVersion string `json:"apiVersion,omitempty"`
 	}
 	type ListMeta struct {
-		SelfLink        string `json:"selfLink,omitempty" yaml:"selfLink,omitempty"`
-		ResourceVersion string `json:"resourceVersion,omitempty" yaml:"resourceVersion,omitempty"`
+		SelfLink        string `json:"selfLink,omitempty"`
+		ResourceVersion string `json:"resourceVersion,omitempty"`
 	}
 	type Object struct {
-		TypeMeta `json:",inline" yaml:",inline"`
-		ListMeta `json:"metadata" yaml:"metadata"`
+		TypeMeta `json:",inline"`
+		ListMeta `json:"metadata"`
 	}
 	j := Object{
 		TypeMeta{
@@ -403,7 +423,7 @@ func TestGenericListMeta(t *testing.T) {
 	if e, a := "", accessor.Name(); e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
-	if e, a := "", accessor.UID(); e != a {
+	if e, a := "", string(accessor.UID()); e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
 	if e, a := "a", accessor.APIVersion(); e != a {
@@ -442,7 +462,7 @@ func TestGenericListMeta(t *testing.T) {
 }
 
 type MyAPIObject struct {
-	TypeMeta InternalTypeMeta `json:",inline" yaml:",inline"`
+	TypeMeta InternalTypeMeta `json:",inline"`
 }
 
 func (*MyAPIObject) IsAnAPIObject() {}

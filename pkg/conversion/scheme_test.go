@@ -18,7 +18,6 @@ package conversion
 
 import (
 	"encoding/json"
-	"flag"
 	"fmt"
 	"reflect"
 	"strings"
@@ -26,73 +25,74 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 
+	"github.com/ghodss/yaml"
 	"github.com/google/gofuzz"
-	"gopkg.in/v1/yaml"
+	flag "github.com/spf13/pflag"
 )
 
 var fuzzIters = flag.Int("fuzz_iters", 50, "How many fuzzing iterations to do.")
 
 // Test a weird version/kind embedding format.
 type MyWeirdCustomEmbeddedVersionKindField struct {
-	ID         string `yaml:"ID,omitempty" json:"ID,omitempty"`
-	APIVersion string `json:"myVersionKey,omitempty" yaml:"myVersionKey,omitempty"`
-	ObjectKind string `json:"myKindKey,omitempty" yaml:"myKindKey,omitempty"`
-	Z          string `yaml:"Z,omitempty" json:"Z,omitempty"`
-	Y          uint64 `yaml:"Y,omitempty" json:"Y,omitempty"`
+	ID         string `json:"ID,omitempty"`
+	APIVersion string `json:"myVersionKey,omitempty"`
+	ObjectKind string `json:"myKindKey,omitempty"`
+	Z          string `json:"Z,omitempty"`
+	Y          uint64 `json:"Y,omitempty"`
 }
 
 type TestType1 struct {
-	MyWeirdCustomEmbeddedVersionKindField `json:",inline" yaml:",inline"`
-	A                                     string               `yaml:"A,omitempty" json:"A,omitempty"`
-	B                                     int                  `yaml:"B,omitempty" json:"B,omitempty"`
-	C                                     int8                 `yaml:"C,omitempty" json:"C,omitempty"`
-	D                                     int16                `yaml:"D,omitempty" json:"D,omitempty"`
-	E                                     int32                `yaml:"E,omitempty" json:"E,omitempty"`
-	F                                     int64                `yaml:"F,omitempty" json:"F,omitempty"`
-	G                                     uint                 `yaml:"G,omitempty" json:"G,omitempty"`
-	H                                     uint8                `yaml:"H,omitempty" json:"H,omitempty"`
-	I                                     uint16               `yaml:"I,omitempty" json:"I,omitempty"`
-	J                                     uint32               `yaml:"J,omitempty" json:"J,omitempty"`
-	K                                     uint64               `yaml:"K,omitempty" json:"K,omitempty"`
-	L                                     bool                 `yaml:"L,omitempty" json:"L,omitempty"`
-	M                                     map[string]int       `yaml:"M,omitempty" json:"M,omitempty"`
-	N                                     map[string]TestType2 `yaml:"N,omitempty" json:"N,omitempty"`
-	O                                     *TestType2           `yaml:"O,omitempty" json:"O,omitempty"`
-	P                                     []TestType2          `yaml:"Q,omitempty" json:"Q,omitempty"`
+	MyWeirdCustomEmbeddedVersionKindField `json:",inline"`
+	A                                     string               `json:"A,omitempty"`
+	B                                     int                  `json:"B,omitempty"`
+	C                                     int8                 `json:"C,omitempty"`
+	D                                     int16                `json:"D,omitempty"`
+	E                                     int32                `json:"E,omitempty"`
+	F                                     int64                `json:"F,omitempty"`
+	G                                     uint                 `json:"G,omitempty"`
+	H                                     uint8                `json:"H,omitempty"`
+	I                                     uint16               `json:"I,omitempty"`
+	J                                     uint32               `json:"J,omitempty"`
+	K                                     uint64               `json:"K,omitempty"`
+	L                                     bool                 `json:"L,omitempty"`
+	M                                     map[string]int       `json:"M,omitempty"`
+	N                                     map[string]TestType2 `json:"N,omitempty"`
+	O                                     *TestType2           `json:"O,omitempty"`
+	P                                     []TestType2          `json:"Q,omitempty"`
 }
 
 type TestType2 struct {
-	A string `yaml:"A,omitempty" json:"A,omitempty"`
-	B int    `yaml:"B,omitempty" json:"B,omitempty"`
+	A string `json:"A,omitempty"`
+	B int    `json:"B,omitempty"`
 }
 
 type ExternalTestType2 struct {
-	A string `yaml:"A,omitempty" json:"A,omitempty"`
-	B int    `yaml:"B,omitempty" json:"B,omitempty"`
+	A string `json:"A,omitempty"`
+	B int    `json:"B,omitempty"`
 }
 type ExternalTestType1 struct {
-	MyWeirdCustomEmbeddedVersionKindField `json:",inline" yaml:",inline"`
-	A                                     string                       `yaml:"A,omitempty" json:"A,omitempty"`
-	B                                     int                          `yaml:"B,omitempty" json:"B,omitempty"`
-	C                                     int8                         `yaml:"C,omitempty" json:"C,omitempty"`
-	D                                     int16                        `yaml:"D,omitempty" json:"D,omitempty"`
-	E                                     int32                        `yaml:"E,omitempty" json:"E,omitempty"`
-	F                                     int64                        `yaml:"F,omitempty" json:"F,omitempty"`
-	G                                     uint                         `yaml:"G,omitempty" json:"G,omitempty"`
-	H                                     uint8                        `yaml:"H,omitempty" json:"H,omitempty"`
-	I                                     uint16                       `yaml:"I,omitempty" json:"I,omitempty"`
-	J                                     uint32                       `yaml:"J,omitempty" json:"J,omitempty"`
-	K                                     uint64                       `yaml:"K,omitempty" json:"K,omitempty"`
-	L                                     bool                         `yaml:"L,omitempty" json:"L,omitempty"`
-	M                                     map[string]int               `yaml:"M,omitempty" json:"M,omitempty"`
-	N                                     map[string]ExternalTestType2 `yaml:"N,omitempty" json:"N,omitempty"`
-	O                                     *ExternalTestType2           `yaml:"O,omitempty" json:"O,omitempty"`
-	P                                     []ExternalTestType2          `yaml:"Q,omitempty" json:"Q,omitempty"`
+	MyWeirdCustomEmbeddedVersionKindField `json:",inline"`
+	A                                     string                       `json:"A,omitempty"`
+	B                                     int                          `json:"B,omitempty"`
+	C                                     int8                         `json:"C,omitempty"`
+	D                                     int16                        `json:"D,omitempty"`
+	E                                     int32                        `json:"E,omitempty"`
+	F                                     int64                        `json:"F,omitempty"`
+	G                                     uint                         `json:"G,omitempty"`
+	H                                     uint8                        `json:"H,omitempty"`
+	I                                     uint16                       `json:"I,omitempty"`
+	J                                     uint32                       `json:"J,omitempty"`
+	K                                     uint64                       `json:"K,omitempty"`
+	L                                     bool                         `json:"L,omitempty"`
+	M                                     map[string]int               `json:"M,omitempty"`
+	N                                     map[string]ExternalTestType2 `json:"N,omitempty"`
+	O                                     *ExternalTestType2           `json:"O,omitempty"`
+	P                                     []ExternalTestType2          `json:"Q,omitempty"`
 }
 
 type ExternalInternalSame struct {
-	MyWeirdCustomEmbeddedVersionKindField `json:",inline" yaml:",inline"`
-	A                                     TestType2 `yaml:"A,omitempty" json:"A,omitempty"`
+	MyWeirdCustomEmbeddedVersionKindField `json:",inline"`
+	A                                     TestType2 `json:"A,omitempty"`
 }
 
 // TestObjectFuzzer can randomly populate all the above objects.
@@ -103,18 +103,6 @@ var TestObjectFuzzer = fuzz.New().NilChance(.5).NumElements(1, 100).Funcs(
 		j.APIVersion = ""
 		j.ObjectKind = ""
 		j.ID = c.RandString()
-	},
-	func(u *uint64, c fuzz.Continue) {
-		// TODO: Fix JSON/YAML packages and/or write custom encoding
-		// for uint64's. Somehow the LS *byte* of this is lost, but
-		// only when all 8 bytes are set.
-		*u = c.RandUint64() >> 8
-	},
-	func(u *uint, c fuzz.Continue) {
-		// TODO: Fix JSON/YAML packages and/or write custom encoding
-		// for uint64's. Somehow the LS *byte* of this is lost, but
-		// only when all 8 bytes are set.
-		*u = uint(c.RandUint64() >> 8)
 	},
 )
 
@@ -139,8 +127,8 @@ type testMetaFactory struct{}
 
 func (testMetaFactory) Interpret(data []byte) (version, kind string, err error) {
 	findKind := struct {
-		APIVersion string `json:"myVersionKey,omitempty" yaml:"myVersionKey,omitempty"`
-		ObjectKind string `json:"myKindKey,omitempty" yaml:"myKindKey,omitempty"`
+		APIVersion string `json:"myVersionKey,omitempty"`
+		ObjectKind string `json:"myKindKey,omitempty"`
 	}{}
 	// yaml is a superset of json, so we use it to decode here. That way,
 	// we understand both.
@@ -237,6 +225,43 @@ func TestMultipleNames(t *testing.T) {
 	}
 	if !strings.Contains(string(out), `"myKindKey":"TestType1"`) {
 		t.Errorf("unexpected encoded output: %s", string(out))
+	}
+}
+
+func TestConvertTypesWhenDefaultNamesMatch(t *testing.T) {
+	s := NewScheme()
+	// create two names internally, with TestType1 being preferred
+	s.AddKnownTypeWithName("", "TestType1", &TestType1{})
+	s.AddKnownTypeWithName("", "OtherType1", &TestType1{})
+	// create two names externally, with TestType1 being preferred
+	s.AddKnownTypeWithName("v1", "TestType1", &ExternalTestType1{})
+	s.AddKnownTypeWithName("v1", "OtherType1", &ExternalTestType1{})
+	s.MetaFactory = testMetaFactory{}
+
+	ext := &ExternalTestType1{}
+	ext.APIVersion = "v1"
+	ext.ObjectKind = "OtherType1"
+	ext.A = "test"
+	data, err := json.Marshal(ext)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	expect := &TestType1{A: "test"}
+
+	obj, err := s.Decode(data)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !reflect.DeepEqual(expect, obj) {
+		t.Errorf("unexpected object: %#v", obj)
+	}
+
+	into := &TestType1{}
+	if err := s.DecodeInto(data, into); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !reflect.DeepEqual(expect, obj) {
+		t.Errorf("unexpected object: %#v", obj)
 	}
 }
 

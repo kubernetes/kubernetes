@@ -19,7 +19,6 @@ limitations under the License.
 package factory
 
 import (
-	"fmt"
 	"math/rand"
 	"sync"
 	"time"
@@ -27,12 +26,12 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/cache"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	algorithm "github.com/GoogleCloudPlatform/kubernetes/pkg/scheduler"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler"
+	schedulerapi "github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler/api"
+	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler/api/validation"
 
 	"github.com/golang/glog"
 )
@@ -40,143 +39,240 @@ import (
 // ConfigFactory knows how to fill out a scheduler config with its support functions.
 type ConfigFactory struct {
 	Client *client.Client
+	// queue for pods that need scheduling
+	PodQueue *cache.FIFO
+	// a means to list all known scheduled pods.
+	ScheduledPodLister *cache.StoreToPodLister
+	// a means to list all known scheduled pods and pods assumed to have been scheduled.
+	PodLister algorithm.PodLister
+	// a means to list all minions
+	NodeLister *cache.StoreToNodeLister
+	// a means to list all services
+	ServiceLister *cache.StoreToServiceLister
+
+	modeler scheduler.SystemModeler
 }
 
-// Create creates a scheduler and all support functions.
-func (factory *ConfigFactory) Create() *scheduler.Config {
+// Initializes the factory.
+func NewConfigFactory(client *client.Client) *ConfigFactory {
+	c := &ConfigFactory{
+		Client:             client,
+		PodQueue:           cache.NewFIFO(cache.MetaNamespaceKeyFunc),
+		ScheduledPodLister: &cache.StoreToPodLister{cache.NewStore(cache.MetaNamespaceKeyFunc)},
+		NodeLister:         &cache.StoreToNodeLister{cache.NewStore(cache.MetaNamespaceKeyFunc)},
+		ServiceLister:      &cache.StoreToServiceLister{cache.NewStore(cache.MetaNamespaceKeyFunc)},
+	}
+	modeler := scheduler.NewSimpleModeler(&cache.StoreToPodLister{c.PodQueue}, c.ScheduledPodLister)
+	c.modeler = modeler
+	c.PodLister = modeler.PodLister()
+	return c
+}
+
+// Create creates a scheduler with the default algorithm provider.
+func (f *ConfigFactory) Create() (*scheduler.Config, error) {
+	return f.CreateFromProvider(DefaultProvider)
+}
+
+// Creates a scheduler from the name of a registered algorithm provider.
+func (f *ConfigFactory) CreateFromProvider(providerName string) (*scheduler.Config, error) {
+	glog.V(2).Infof("creating scheduler from algorithm provider '%v'", providerName)
+	provider, err := GetAlgorithmProvider(providerName)
+	if err != nil {
+		return nil, err
+	}
+
+	return f.CreateFromKeys(provider.FitPredicateKeys, provider.PriorityFunctionKeys)
+}
+
+// Creates a scheduler from the configuration file
+func (f *ConfigFactory) CreateFromConfig(policy schedulerapi.Policy) (*scheduler.Config, error) {
+	glog.V(2).Infof("creating scheduler from configuration: %v", policy)
+
+	// validate the policy configuration
+	if err := validation.ValidatePolicy(policy); err != nil {
+		return nil, err
+	}
+
+	predicateKeys := util.NewStringSet()
+	for _, predicate := range policy.Predicates {
+		glog.V(2).Infof("Registering predicate: %s", predicate.Name)
+		predicateKeys.Insert(RegisterCustomFitPredicate(predicate))
+	}
+
+	priorityKeys := util.NewStringSet()
+	for _, priority := range policy.Priorities {
+		glog.V(2).Infof("Registering priority: %s", priority.Name)
+		priorityKeys.Insert(RegisterCustomPriorityFunction(priority))
+	}
+
+	return f.CreateFromKeys(predicateKeys, priorityKeys)
+}
+
+// ReflectorDeletionHook passes all operations through to Store, but calls
+// OnDelete in a goroutine if there is a deletion.
+type ReflectorDeletionHook struct {
+	cache.Store
+	OnDelete func(obj interface{})
+}
+
+func (r ReflectorDeletionHook) Delete(obj interface{}) error {
+	go func() {
+		defer util.HandleCrash()
+		r.OnDelete(obj)
+	}()
+	return r.Store.Delete(obj)
+}
+
+// Creates a scheduler from a set of registered fit predicate keys and priority keys.
+func (f *ConfigFactory) CreateFromKeys(predicateKeys, priorityKeys util.StringSet) (*scheduler.Config, error) {
+	glog.V(2).Infof("creating scheduler with fit predicates '%v' and priority functions '%v", predicateKeys, priorityKeys)
+	pluginArgs := PluginFactoryArgs{
+		PodLister:     f.PodLister,
+		ServiceLister: f.ServiceLister,
+		NodeLister:    f.NodeLister,
+		NodeInfo:      f.NodeLister,
+	}
+	predicateFuncs, err := getFitPredicateFunctions(predicateKeys, pluginArgs)
+	if err != nil {
+		return nil, err
+	}
+
+	priorityConfigs, err := getPriorityFunctionConfigs(priorityKeys, pluginArgs)
+	if err != nil {
+		return nil, err
+	}
+
 	// Watch and queue pods that need scheduling.
-	podQueue := cache.NewFIFO()
-	cache.NewReflector(factory.createUnassignedPodLW(), &api.Pod{}, podQueue).Run()
+	// TODO: the 30 second poll loop is here to mitigate #6059 and
+	// shouldn't be neeeded once that is resolved.
+	cache.NewReflector(f.createUnassignedPodLW(), &api.Pod{}, f.PodQueue, 30*time.Second).Run()
+
+	// Pass through all events to the scheduled pod store, but on a deletion,
+	// also remove from the assumed pods.
+	assumedPodDeleter := ReflectorDeletionHook{
+		Store: f.ScheduledPodLister.Store,
+		OnDelete: func(obj interface{}) {
+			if pod, ok := obj.(*api.Pod); ok {
+				f.modeler.LockedAction(func() {
+					f.modeler.ForgetPod(pod)
+				})
+			}
+		},
+	}
 
 	// Watch and cache all running pods. Scheduler needs to find all pods
 	// so it knows where it's safe to place a pod. Cache this locally.
-	podCache := cache.NewStore()
-	cache.NewReflector(factory.createAssignedPodLW(), &api.Pod{}, podCache).Run()
+	cache.NewReflector(f.createAssignedPodLW(), &api.Pod{}, assumedPodDeleter, 0).Run()
 
 	// Watch minions.
 	// Minions may be listed frequently, so provide a local up-to-date cache.
-	minionCache := cache.NewStore()
 	if false {
-		// Disable this code until minions support watches.
-		cache.NewReflector(factory.createMinionLW(), &api.Minion{}, minionCache).Run()
+		// Disable this code until minions support watches. Note when this code is enabled,
+		// we need to make sure minion ListWatcher has proper FieldSelector.
+		cache.NewReflector(f.createMinionLW(), &api.Node{}, f.NodeLister.Store, 0).Run()
 	} else {
-		cache.NewPoller(factory.pollMinions, 10*time.Second, minionCache).Run()
+		cache.NewPoller(f.pollMinions, 10*time.Second, f.NodeLister.Store).Run()
 	}
 
-	r := rand.New(rand.NewSource(time.Now().UnixNano()))
-	minionLister := &storeToMinionLister{minionCache}
+	// Watch and cache all service objects. Scheduler needs to find all pods
+	// created by the same service, so that it can spread them correctly.
+	// Cache this locally.
+	cache.NewReflector(f.createServiceLW(), &api.Service{}, f.ServiceLister.Store, 0).Run()
 
-	algo := algorithm.NewGenericScheduler(
-		[]algorithm.FitPredicate{
-			// Fit is defined based on the absence of port conflicts.
-			algorithm.PodFitsPorts,
-			// Fit is determined by resource availability
-			algorithm.NewResourceFitPredicate(minionLister),
-			// Fit is determined by non-conflicting disk volumes
-			algorithm.NoDiskConflict,
-			// Fit is determined by node selector query
-			algorithm.NewSelectorMatchPredicate(minionLister),
-		},
-		// Prioritize nodes by least requested utilization.
-		algorithm.LeastRequestedPriority,
-		&storeToPodLister{podCache}, r)
+	r := rand.New(rand.NewSource(time.Now().UnixNano()))
+
+	algo := algorithm.NewGenericScheduler(predicateFuncs, priorityConfigs, f.PodLister, r)
 
 	podBackoff := podBackoff{
 		perPodBackoff: map[string]*backoffEntry{},
 		clock:         realClock{},
+
+		defaultDuration: 1 * time.Second,
+		maxDuration:     60 * time.Second,
 	}
 
 	return &scheduler.Config{
-		MinionLister: minionLister,
+		Modeler:      f.modeler,
+		MinionLister: f.NodeLister,
 		Algorithm:    algo,
-		Binder:       &binder{factory.Client},
+		Binder:       &binder{f.Client},
 		NextPod: func() *api.Pod {
-			pod := podQueue.Pop().(*api.Pod)
-			glog.V(2).Infof("About to try and schedule pod %v\n"+
-				"\tknown minions: %v\n"+
-				"\tknown scheduled pods: %v\n",
-				pod.Name, minionCache.ContainedIDs(), podCache.ContainedIDs())
+			pod := f.PodQueue.Pop().(*api.Pod)
+			glog.V(2).Infof("About to try and schedule pod %v", pod.Name)
 			return pod
 		},
-		Error: factory.makeDefaultErrorFunc(&podBackoff, podQueue),
-	}
+		Error: f.makeDefaultErrorFunc(&podBackoff, f.PodQueue),
+	}, nil
 }
 
-type listWatch struct {
-	client        *client.Client
-	fieldSelector labels.Selector
-	resource      string
-}
-
-func (lw *listWatch) List() (runtime.Object, error) {
-	return lw.client.
-		Get().
-		Path(lw.resource).
-		SelectorParam("fields", lw.fieldSelector).
-		Do().
-		Get()
-}
-
-func (lw *listWatch) Watch(resourceVersion string) (watch.Interface, error) {
-	return lw.client.
-		Get().
-		Path("watch").
-		Path(lw.resource).
-		SelectorParam("fields", lw.fieldSelector).
-		Param("resourceVersion", resourceVersion).
-		Watch()
-}
-
-// createUnassignedPodLW returns a listWatch that finds all pods that need to be
+// Returns a cache.ListWatch that finds all pods that need to be
 // scheduled.
-func (factory *ConfigFactory) createUnassignedPodLW() *listWatch {
-	return &listWatch{
-		client:        factory.Client,
-		fieldSelector: labels.Set{"DesiredState.Host": ""}.AsSelector(),
-		resource:      "pods",
-	}
+func (factory *ConfigFactory) createUnassignedPodLW() *cache.ListWatch {
+	return cache.NewListWatchFromClient(factory.Client, "pods", api.NamespaceAll, fields.Set{getHostFieldLabel(factory.Client.APIVersion()): ""}.AsSelector())
 }
 
-func parseSelectorOrDie(s string) labels.Selector {
-	selector, err := labels.ParseSelector(s)
+func parseSelectorOrDie(s string) fields.Selector {
+	selector, err := fields.ParseSelector(s)
 	if err != nil {
 		panic(err)
 	}
 	return selector
 }
 
-// createAssignedPodLW returns a listWatch that finds all pods that are
+// Returns a cache.ListWatch that finds all pods that are
 // already scheduled.
-func (factory *ConfigFactory) createAssignedPodLW() *listWatch {
-	return &listWatch{
-		client:        factory.Client,
-		fieldSelector: parseSelectorOrDie("DesiredState.Host!="),
-		resource:      "pods",
-	}
+// TODO: return a ListerWatcher interface instead?
+func (factory *ConfigFactory) createAssignedPodLW() *cache.ListWatch {
+	return cache.NewListWatchFromClient(factory.Client, "pods", api.NamespaceAll,
+		parseSelectorOrDie(getHostFieldLabel(factory.Client.APIVersion())+"!="))
 }
 
-// createMinionLW returns a listWatch that gets all changes to minions.
-func (factory *ConfigFactory) createMinionLW() *listWatch {
-	return &listWatch{
-		client:        factory.Client,
-		fieldSelector: parseSelectorOrDie(""),
-		resource:      "minions",
-	}
+// createMinionLW returns a cache.ListWatch that gets all changes to minions.
+func (factory *ConfigFactory) createMinionLW() *cache.ListWatch {
+	return cache.NewListWatchFromClient(factory.Client, "minions", api.NamespaceAll, parseSelectorOrDie(""))
 }
 
-// pollMinions lists all minions and returns an enumerator for cache.Poller.
+// Lists all minions and filter out unhealthy ones, then returns
+// an enumerator for cache.Poller.
 func (factory *ConfigFactory) pollMinions() (cache.Enumerator, error) {
-	list := &api.MinionList{}
-	err := factory.Client.Get().Path("minions").Do().Into(list)
+	allNodes, err := factory.Client.Nodes().List()
 	if err != nil {
 		return nil, err
 	}
-	return &minionEnumerator{list}, nil
+	nodes := &api.NodeList{
+		TypeMeta: allNodes.TypeMeta,
+		ListMeta: allNodes.ListMeta,
+	}
+	for _, node := range allNodes.Items {
+		conditionMap := make(map[api.NodeConditionType]*api.NodeCondition)
+		for i := range node.Status.Conditions {
+			cond := node.Status.Conditions[i]
+			conditionMap[cond.Type] = &cond
+		}
+		if node.Spec.Unschedulable {
+			continue
+		}
+		if condition, ok := conditionMap[api.NodeReady]; ok {
+			if condition.Status == api.ConditionTrue {
+				nodes.Items = append(nodes.Items, node)
+			}
+		} else {
+			// If no condition is set, we get unknown node condition. In such cases,
+			// do not add the node.
+			glog.V(2).Infof("Minion %s is not available. Skipping", node.Name)
+		}
+	}
+	return &nodeEnumerator{nodes}, nil
+}
+
+// Returns a cache.ListWatch that gets all changes to services.
+func (factory *ConfigFactory) createServiceLW() *cache.ListWatch {
+	return cache.NewListWatchFromClient(factory.Client, "services", api.NamespaceAll, parseSelectorOrDie(""))
 }
 
 func (factory *ConfigFactory) makeDefaultErrorFunc(backoff *podBackoff, podQueue *cache.FIFO) func(pod *api.Pod, err error) {
 	return func(pod *api.Pod, err error) {
-		glog.Errorf("Error scheduling %v: %v; retrying", pod.Name, err)
+		glog.Errorf("Error scheduling %v %v: %v; retrying", pod.Namespace, pod.Name, err)
 		backoff.gc()
 		// Retry asynchronously.
 		// Note that this is extremely rudimentary and we need a more real error handling path.
@@ -187,69 +283,43 @@ func (factory *ConfigFactory) makeDefaultErrorFunc(backoff *podBackoff, podQueue
 			backoff.wait(podID)
 			// Get the pod again; it may have changed/been scheduled already.
 			pod = &api.Pod{}
-			err := factory.Client.Get().Namespace(podNamespace).Path("pods").Path(podID).Do().Into(pod)
+			err := factory.Client.Get().Namespace(podNamespace).Resource("pods").Name(podID).Do().Into(pod)
 			if err != nil {
 				glog.Errorf("Error getting pod %v for retry: %v; abandoning", podID, err)
 				return
 			}
-			if pod.Status.Host == "" {
-				podQueue.Add(pod.Name, pod)
+			if pod.Spec.Host == "" {
+				podQueue.Add(pod)
 			}
 		}()
 	}
 }
 
-// storeToMinionLister turns a store into a minion lister. The store must contain (only) minions.
-type storeToMinionLister struct {
-	cache.Store
-}
-
-func (s *storeToMinionLister) List() (machines api.MinionList, err error) {
-	for _, m := range s.Store.List() {
-		machines.Items = append(machines.Items, *(m.(*api.Minion)))
+func getHostFieldLabel(apiVersion string) string {
+	switch apiVersion {
+	case "v1beta1", "v1beta2":
+		return "DesiredState.Host"
+	default:
+		return "spec.host"
 	}
-	return machines, nil
 }
 
-// GetNodeInfo returns cached data for the minion 'id'.
-func (s *storeToMinionLister) GetNodeInfo(id string) (*api.Minion, error) {
-	if minion, ok := s.Get(id); ok {
-		return minion.(*api.Minion), nil
-	}
-	return nil, fmt.Errorf("minion '%v' is not in cache", id)
+// nodeEnumerator allows a cache.Poller to enumerate items in an api.NodeList
+type nodeEnumerator struct {
+	*api.NodeList
 }
 
-// storeToPodLister turns a store into a pod lister. The store must contain (only) pods.
-type storeToPodLister struct {
-	cache.Store
-}
-
-func (s *storeToPodLister) ListPods(selector labels.Selector) (pods []api.Pod, err error) {
-	for _, m := range s.List() {
-		pod := m.(*api.Pod)
-		if selector.Matches(labels.Set(pod.Labels)) {
-			pods = append(pods, *pod)
-		}
-	}
-	return pods, nil
-}
-
-// minionEnumerator allows a cache.Poller to enumerate items in an api.PodList
-type minionEnumerator struct {
-	*api.MinionList
-}
-
-// Len returns the number of items in the pod list.
-func (me *minionEnumerator) Len() int {
-	if me.MinionList == nil {
+// Len returns the number of items in the node list.
+func (ne *nodeEnumerator) Len() int {
+	if ne.NodeList == nil {
 		return 0
 	}
-	return len(me.Items)
+	return len(ne.Items)
 }
 
 // Get returns the item (and ID) with the particular index.
-func (me *minionEnumerator) Get(index int) (string, interface{}) {
-	return me.Items[index].Name, &me.Items[index]
+func (ne *nodeEnumerator) Get(index int) interface{} {
+	return &ne.Items[index]
 }
 
 type binder struct {
@@ -258,9 +328,11 @@ type binder struct {
 
 // Bind just does a POST binding RPC.
 func (b *binder) Bind(binding *api.Binding) error {
-	glog.V(2).Infof("Attempting to bind %v to %v", binding.PodID, binding.Host)
+	glog.V(2).Infof("Attempting to bind %v to %v", binding.Name, binding.Target.Name)
 	ctx := api.WithNamespace(api.NewContext(), binding.Namespace)
-	return b.Post().Namespace(api.Namespace(ctx)).Path("bindings").Body(binding).Do().Error()
+	return b.Post().Namespace(api.NamespaceValue(ctx)).Resource("bindings").Body(binding).Do().Error()
+	// TODO: use Pods interface for binding once clusters are upgraded
+	// return b.Pods(binding.Namespace).Bind(binding)
 }
 
 type clock interface {
@@ -279,9 +351,11 @@ type backoffEntry struct {
 }
 
 type podBackoff struct {
-	perPodBackoff map[string]*backoffEntry
-	lock          sync.Mutex
-	clock         clock
+	perPodBackoff   map[string]*backoffEntry
+	lock            sync.Mutex
+	clock           clock
+	defaultDuration time.Duration
+	maxDuration     time.Duration
 }
 
 func (p *podBackoff) getEntry(podID string) *backoffEntry {
@@ -289,7 +363,7 @@ func (p *podBackoff) getEntry(podID string) *backoffEntry {
 	defer p.lock.Unlock()
 	entry, ok := p.perPodBackoff[podID]
 	if !ok {
-		entry = &backoffEntry{backoff: 1 * time.Second}
+		entry = &backoffEntry{backoff: p.defaultDuration}
 		p.perPodBackoff[podID] = entry
 	}
 	entry.lastUpdate = p.clock.Now()
@@ -300,8 +374,8 @@ func (p *podBackoff) getBackoff(podID string) time.Duration {
 	entry := p.getEntry(podID)
 	duration := entry.backoff
 	entry.backoff *= 2
-	if entry.backoff > 60*time.Second {
-		entry.backoff = 60 * time.Second
+	if entry.backoff > p.maxDuration {
+		entry.backoff = p.maxDuration
 	}
 	glog.V(4).Infof("Backing off %s for pod %s", duration.String(), podID)
 	return duration
@@ -316,7 +390,7 @@ func (p *podBackoff) gc() {
 	defer p.lock.Unlock()
 	now := p.clock.Now()
 	for podID, entry := range p.perPodBackoff {
-		if now.Sub(entry.lastUpdate) > 60*time.Second {
+		if now.Sub(entry.lastUpdate) > p.maxDuration {
 			delete(p.perPodBackoff, podID)
 		}
 	}

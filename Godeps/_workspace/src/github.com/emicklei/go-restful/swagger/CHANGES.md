@@ -1,5 +1,9 @@
 Change history of swagger
 =
+2015-03-17
+- preserve order of Routes per WebService in Swagger listing
+- fix use of $ref and type in Swagger models
+- add api version to listing
 
 2014-11-14
 - operation parameters are now sorted using ordering path,query,form,header,body

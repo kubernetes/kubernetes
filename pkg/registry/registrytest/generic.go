@@ -25,63 +25,68 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
 
-// GenericRegistry knows how to store & list any runtime.Object. Events don't require
-// any non-generic features from the storage layer.
+// GenericRegistry knows how to store & list any runtime.Object.
 type GenericRegistry struct {
 	Err        error
 	Object     runtime.Object
 	ObjectList runtime.Object
 	sync.Mutex
 
-	Mux *watch.Mux
+	Broadcaster *watch.Broadcaster
 }
 
 func NewGeneric(list runtime.Object) *GenericRegistry {
 	return &GenericRegistry{
-		ObjectList: list,
-		Mux:        watch.NewMux(0),
+		ObjectList:  list,
+		Broadcaster: watch.NewBroadcaster(0, watch.WaitIfChannelFull),
 	}
 }
 
-func (r *GenericRegistry) List(ctx api.Context, m generic.Matcher) (runtime.Object, error) {
+func (r *GenericRegistry) ListPredicate(ctx api.Context, m generic.Matcher) (runtime.Object, error) {
 	r.Lock()
 	defer r.Unlock()
 	if r.Err != nil {
 		return nil, r.Err
 	}
-	return generic.FilterList(r.ObjectList, m)
+	return generic.FilterList(r.ObjectList, m, nil)
 }
 
-func (r *GenericRegistry) Watch(ctx api.Context, m generic.Matcher, resourceVersion string) (watch.Interface, error) {
+func (r *GenericRegistry) WatchPredicate(ctx api.Context, m generic.Matcher, resourceVersion string) (watch.Interface, error) {
 	// TODO: wire filter down into the mux; it needs access to current and previous state :(
-	return r.Mux.Watch(), nil
+	return r.Broadcaster.Watch(), nil
 }
 
 func (r *GenericRegistry) Get(ctx api.Context, id string) (runtime.Object, error) {
 	r.Lock()
 	defer r.Unlock()
-	return r.Object, r.Err
+	if r.Err != nil {
+		return nil, r.Err
+	}
+	if r.Object != nil {
+		return r.Object, nil
+	}
+	panic("generic registry should either have an object or an error for Get")
 }
 
-func (r *GenericRegistry) Create(ctx api.Context, id string, obj runtime.Object) error {
+func (r *GenericRegistry) CreateWithName(ctx api.Context, id string, obj runtime.Object) error {
 	r.Lock()
 	defer r.Unlock()
 	r.Object = obj
-	r.Mux.Action(watch.Added, obj)
+	r.Broadcaster.Action(watch.Added, obj)
 	return r.Err
 }
 
-func (r *GenericRegistry) Update(ctx api.Context, id string, obj runtime.Object) error {
+func (r *GenericRegistry) UpdateWithName(ctx api.Context, id string, obj runtime.Object) error {
 	r.Lock()
 	defer r.Unlock()
 	r.Object = obj
-	r.Mux.Action(watch.Modified, obj)
+	r.Broadcaster.Action(watch.Modified, obj)
 	return r.Err
 }
 
-func (r *GenericRegistry) Delete(ctx api.Context, id string) error {
+func (r *GenericRegistry) Delete(ctx api.Context, id string, options *api.DeleteOptions) (runtime.Object, error) {
 	r.Lock()
 	defer r.Unlock()
-	r.Mux.Action(watch.Deleted, r.Object)
-	return r.Err
+	r.Broadcaster.Action(watch.Deleted, r.Object)
+	return &api.Status{Status: api.StatusSuccess}, r.Err
 }

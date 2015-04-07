@@ -1,18 +1,29 @@
 ## Getting started with Vagrant
 
+Running kubernetes with Vagrant (and VirtualBox) is an easy way to run/test/develop on your local machine (Linux, Mac OS X).
+
 ### Prerequisites
 1. Install latest version >= 1.6.2 of vagrant from http://www.vagrantup.com/downloads.html
 2. Install latest version of Virtual Box from https://www.virtualbox.org/wiki/Downloads
-3. Install the `net-tools` package for your distribution for VirtualBox's private networks.
-4. Get or build a [binary release](binary_release.md)
 
 ### Setup
 
-By default, the Vagrant setup will create a single kubernetes-master and 3 kubernetes-minions. Each VM will take 512 MB, so make sure you have at least 2 GB of free memory. To start your local cluster, open a shell and run:
+Setting up a cluster is as simple as running:
+
+```
+export KUBERNETES_PROVIDER=vagrant
+curl -sS https://get.k8s.io | bash
+```
+
+The `KUBERNETES_PROVIDER` environment variable tells all of the various cluster management scripts which variant to use.  If you forget to set this, the assumption is you are running on Google Compute Engine.
+
+By default, the Vagrant setup will create a single kubernetes-master and 1 kubernetes-minion. Each VM will take 1 GB, so make sure you have at least 2GB to 4GB of free memory (plus appropriate free disk space). To start your local cluster, open a shell and run:
 
 ```
 cd kubernetes
-vagrant up
+
+export KUBERNETES_PROVIDER=vagrant
+cluster/kube-up.sh
 ```
 
 Vagrant will provision each machine in the cluster with all the necessary components to run Kubernetes.  The initial setup can take a few minutes to complete on each machine.
@@ -24,6 +35,11 @@ To access the master or any minion:
 ```
 vagrant ssh master
 vagrant ssh minion-1
+```
+
+If you are running more than one minion, you can access the others by:
+
+```
 vagrant ssh minion-2
 vagrant ssh minion-3
 ```
@@ -56,13 +72,13 @@ With your Kubernetes cluster up, you can manage the nodes in your cluster with t
 
 To push updates to new Kubernetes code after making source changes:
 ```
-vagrant provision
+cluster/kube-push.sh
 ```
 
 To stop and then restart the cluster:
 ```
 vagrant halt
-vagrant up
+cluster/kube-up.sh
 ```
 
 To destroy the cluster:
@@ -70,19 +86,18 @@ To destroy the cluster:
 vagrant destroy
 ```
 
-Once your Vagrant machines are up and provisioned, the first thing to do is to check that you can use the `kubecfg.sh` script.
-Set the `KUBERNETES_PROVIDER` environment variable and try to list the minions:
+Once your Vagrant machines are up and provisioned, the first thing to do is to check that you can use the `kubectl.sh` script.
 
 You may need to build the binaries first, you can do this with ```make```
 
 ```
-$ export KUBERNETES_PROVIDER=vagrant
-$ ./cluster/kubecfg.sh list /minions
-Minion identifier    Labels
-----------           ----------
-10.245.2.4           <none>
-10.245.2.3           <none>
-10.245.2.2           <none>
+$ ./cluster/kubectl.sh get minions
+
+NAME                LABELS
+10.245.1.4          <none>
+10.245.1.5          <none>
+10.245.1.3          <none>
+
 ```
 
 ### Interacting with your Kubernetes cluster with the `kube-*` scripts.
@@ -116,23 +131,27 @@ cluster/kube-push.sh
 Interact with the cluster
 
 ```
-cluster/kubecfg.sh
+cluster/kubectl.sh
 ```
 
 ### Authenticating with your master
 
-When using the vagrant provider in Kubernetes, the `cluster/kubecfg.sh` script will cache your credentials in a `~/.kubernetes_vagrant_auth` file so you will not be prompted for them in the future.
+When using the vagrant provider in Kubernetes, the `cluster/kubectl.sh` script will cache your credentials in a `~/.kubernetes_vagrant_auth` file so you will not be prompted for them in the future.
 
 ```
 cat ~/.kubernetes_vagrant_auth
 { "User": "vagrant",
-  "Password": "vagrant"}
+  "Password": "vagrant"
+  "CAFile": "/home/k8s_user/.kubernetes.vagrant.ca.crt",
+  "CertFile": "/home/k8s_user/.kubecfg.vagrant.crt",
+  "KeyFile": "/home/k8s_user/.kubecfg.vagrant.key"
+}
 ```
 
-You should now be set to use the `cluster/kubecfg.sh` script. For example try to list the minions that you have started with:
+You should now be set to use the `cluster/kubectl.sh` script. For example try to list the minions that you have started with:
 
 ```
-cluster/kubecfg.sh list minions
+cluster/kubectl.sh get minions
 ```
 
 ### Running containers
@@ -140,12 +159,13 @@ cluster/kubecfg.sh list minions
 Your cluster is running, you can list the minions in your cluster:
 
 ```
-$ cluster/kubecfg.sh list /minions
-Minion identifier    Labels
-----------           ----------
+$ cluster/kubectl.sh get minions
+
+NAME                 LABELS
 10.245.2.4           <none>
 10.245.2.3           <none>
 10.245.2.2           <none>
+
 ```
 
 Now start running some containers!
@@ -154,34 +174,30 @@ You can now use any of the cluster/kube-*.sh commands to interact with your VM m
 Before starting a container there will be no pods, services and replication controllers.
 
 ```
-$ cluster/kubecfg.sh list /pods
-ID                  Image(s)            Host                Labels              Status
-----------          ----------          ----------          ----------          ----------
+$ cluster/kubectl.sh get pods
+NAME   IMAGE(S)   HOST   LABELS   STATUS
 
-$ cluster/kubecfg.sh list /services
-ID                  Labels              Selector            Port
-----------          ----------          ----------          ----------
+$ cluster/kubectl.sh get services
+NAME   LABELS   SELECTOR   IP   PORT
 
-$ cluster/kubecfg.sh list /replicationControllers
-ID                  Image(s)            Selector            Replicas
-----------          ----------          ----------          ----------
+$ cluster/kubectl.sh get replicationControllers
+NAME   IMAGE(S   SELECTOR   REPLICAS
 ```
 
-Start a container running nginx with a replication controller and three replicas:
+Start a container running nginx with a replication controller and three replicas
 
 ```
-$ cluster/kubecfg.sh -p 8080:80 run dockerfile/nginx 3 myNginx
+$ cluster/kubectl.sh run-container my-nginx --image=dockerfile/nginx --replicas=3 --port=80
 ```
 
 When listing the pods, you will see that three containers have been started and are in Waiting state:
 
 ```
-$ cluster/kubecfg.sh list /pods
-ID                                     Image(s)            Host                    Labels                          Status
-----------                             ----------          ----------              ----------                      ----------
-781191ff-3ffe-11e4-9036-0800279696e1   dockerfile/nginx    10.245.2.4/10.245.2.4   replicationController=myNginx   Waiting
-7813c8bd-3ffe-11e4-9036-0800279696e1   dockerfile/nginx    10.245.2.2/10.245.2.2   replicationController=myNginx   Waiting
-78140853-3ffe-11e4-9036-0800279696e1   dockerfile/nginx    10.245.2.3/10.245.2.3   replicationController=myNginx   Waiting
+$ cluster/kubectl.sh get pods
+NAME                                   IMAGE(S)            HOST                    LABELS         STATUS
+781191ff-3ffe-11e4-9036-0800279696e1   dockerfile/nginx    10.245.2.4/10.245.2.4   name=myNginx   Waiting
+7813c8bd-3ffe-11e4-9036-0800279696e1   dockerfile/nginx    10.245.2.2/10.245.2.2   name=myNginx   Waiting
+78140853-3ffe-11e4-9036-0800279696e1   dockerfile/nginx    10.245.2.3/10.245.2.3   name=myNginx   Waiting
 ```
 
 You need to wait for the provisioning to complete, you can monitor the minions by doing:
@@ -210,47 +226,46 @@ kubernetes-minion-1:
 Going back to listing the pods, services and replicationControllers, you now have:
 
 ```
-$ cluster/kubecfg.sh list /pods
-ID                                     Image(s)            Host                    Labels                          Status
-----------                             ----------          ----------              ----------                      ----------
-781191ff-3ffe-11e4-9036-0800279696e1   dockerfile/nginx    10.245.2.4/10.245.2.4   replicationController=myNginx   Running
-7813c8bd-3ffe-11e4-9036-0800279696e1   dockerfile/nginx    10.245.2.2/10.245.2.2   replicationController=myNginx   Running
-78140853-3ffe-11e4-9036-0800279696e1   dockerfile/nginx    10.245.2.3/10.245.2.3   replicationController=myNginx   Running
+$ cluster/kubectl.sh get pods
+NAME                                   IMAGE(S)            HOST                    LABELS         STATUS
+781191ff-3ffe-11e4-9036-0800279696e1   dockerfile/nginx    10.245.2.4/10.245.2.4   name=myNginx   Running
+7813c8bd-3ffe-11e4-9036-0800279696e1   dockerfile/nginx    10.245.2.2/10.245.2.2   name=myNginx   Running
+78140853-3ffe-11e4-9036-0800279696e1   dockerfile/nginx    10.245.2.3/10.245.2.3   name=myNginx   Running
 
-$ cluster/kubecfg.sh list /services
-ID                  Labels              Selector            Port
-----------          ----------          ----------          ----------
+$ cluster/kubectl.sh get services
+NAME   LABELS   SELECTOR   IP   PORT
 
-$ cluster/kubecfg.sh list /replicationControllers
-ID                  Image(s)            Selector                        Replicas
-----------          ----------          ----------                      ----------
-myNginx             dockerfile/nginx    replicationController=myNginx   3
+$ cluster/kubectl.sh get replicationControllers
+NAME      IMAGE(S            SELECTOR       REPLICAS
+myNginx   dockerfile/nginx   name=my-nginx   3
 ```
 
-We did not start any services, hence there is none listed. But we see three replicas displayed properly.
+We did not start any services, hence there are none listed. But we see three replicas displayed properly.
 Check the [guestbook](../../examples/guestbook/README.md) application to learn how to create a service.
 You can already play with resizing the replicas with:
 
 ```
-$ cluster/kubecfg.sh resize myNginx 2
-$ cluster/kubecfg.sh list /pods
-ID                                     Image(s)            Host                    Labels                          Status
-----------                             ----------          ----------              ----------                      ----------
-7813c8bd-3ffe-11e4-9036-0800279696e1   dockerfile/nginx    10.245.2.2/10.245.2.2   replicationController=myNginx   Running
-78140853-3ffe-11e4-9036-0800279696e1   dockerfile/nginx    10.245.2.3/10.245.2.3   replicationController=myNginx   Running
+$ cluster/kubectl.sh resize rc my-nginx --replicas=2
+$ cluster/kubectl.sh get pods
+NAME                                   IMAGE(S)            HOST                    LABELS         STATUS
+7813c8bd-3ffe-11e4-9036-0800279696e1   dockerfile/nginx    10.245.2.2/10.245.2.2   name=myNginx   Running
+78140853-3ffe-11e4-9036-0800279696e1   dockerfile/nginx    10.245.2.3/10.245.2.3   name=myNginx   Running
 ```
 
 Congratulations!
 
-### Testing
-
-The following will run all of the end-to-end testing scenarios assuming you set your environment in cluster/kube-env.sh
-
-```
-hack/e2e-test.sh
-```
-
 ### Troubleshooting
+
+#### I keep downloading the same (large) box all the time!
+
+By default the Vagrantfile will download the box from S3.  You can change this (and cache the box locally) by providing an alternate URL when calling `kube-up.sh`
+
+```bash
+export KUBERNETES_BOX_URL=path_of_your_kuber_box
+export KUBERNETES_PROVIDER=vagrant
+cluster/kube-up.sh
+```
+
 
 #### I just created the cluster, but I am getting authorization errors!
 
@@ -260,7 +275,7 @@ You probably have an incorrect ~/.kubernetes_vagrant_auth file for the cluster y
 rm ~/.kubernetes_vagrant_auth
 ```
 
-After using kubecfg.sh make sure that the correct credentials are set:
+After using kubectl.sh make sure that the correct credentials are set:
 
 ```
 cat ~/.kubernetes_vagrant_auth
@@ -274,19 +289,30 @@ cat ~/.kubernetes_vagrant_auth
 
 If this is your first time creating the cluster, the kubelet on each minion schedules a number of docker pull requests to fetch prerequisite images.  This can take some time and as a result may delay your initial pod getting provisioned.
 
-#### I changed Kubernetes code, but it's not running !
+#### I want to make changes to Kubernetes code !
 
-Are you sure there was no build error?  After running `$ vagrant provision`, scroll up and ensure that each Salt state was completed successfully on each box in the cluster.
-It's very likely you see a build error due to an error in your source files!
+To set up a vagrant cluster for hacking, follow the [vagrant developer guide](../devel/developer-guides/vagrant.md).
 
 #### I have brought Vagrant up but the minions won't validate !
 
-Are you sure you built a release first? Did you install `net-tools`? For more clues, login to one of the minions (`vagrant ssh minion-1`) and inspect the salt minion log (`sudo cat /var/log/salt/minion`).
+Log on to one of the minions (`vagrant ssh minion-1`) and inspect the salt minion log (`sudo cat /var/log/salt/minion`).
 
 #### I want to change the number of minions !
 
-You can control the number of minions that are instantiated via the environment variable `KUBERNETES_NUM_MINIONS` on your host machine.  If you plan to work with replicas, we strongly encourage you to work with enough minions to satisfy your largest intended replica size.  If you do not plan to work with replicas, you can save some system resources by running with a single minion. You do this, by setting `KUBERNETES_NUM_MINIONS` to 1 like so:
+You can control the number of minions that are instantiated via the environment variable `NUM_MINIONS` on your host machine.  If you plan to work with replicas, we strongly encourage you to work with enough minions to satisfy your largest intended replica size.  If you do not plan to work with replicas, you can save some system resources by running with a single minion. You do this, by setting `NUM_MINIONS` to 1 like so:
 
 ```
-export KUBERNETES_NUM_MINIONS=1
+export NUM_MINIONS=1
 ```
+
+#### I want my VMs to have more memory !
+
+You can control the memory allotted to virtual machines with the `KUBERNETES_MEMORY` environment variable.
+Just set it to the number of megabytes you would like the machines to have. For example:
+
+```
+export KUBERNETES_MEMORY=2048
+```
+
+#### I ran vagrant suspend and nothing works!
+```vagrant suspend``` seems to mess up the network.  It's not supported at this time.

@@ -27,11 +27,12 @@ type Response struct {
 	routeProduces []string // mime-types what the Route says it can produce
 	statusCode    int      // HTTP status code that has been written explicity (if zero then net/http has written 200)
 	contentLength int      // number of bytes written for the response body
+	prettyPrint   bool     // controls the indentation feature of XML and JSON serialization. It is initialized using var PrettyPrintResponses.
 }
 
 // Creates a new response based on a http ResponseWriter.
 func NewResponse(httpWriter http.ResponseWriter) *Response {
-	return &Response{httpWriter, "", []string{}, http.StatusOK, 0} // empty content-types
+	return &Response{httpWriter, "", []string{}, http.StatusOK, 0, PrettyPrintResponses} // empty content-types
 }
 
 // If Accept header matching fails, fall back to this type, otherwise
@@ -48,6 +49,11 @@ func DefaultResponseContentType(mime string) {
 func (r Response) InternalServerError() Response {
 	r.WriteHeader(http.StatusInternalServerError)
 	return r
+}
+
+// PrettyPrint changes whether this response must produce pretty (line-by-line, indented) JSON or XML output.
+func (r *Response) PrettyPrint(bePretty bool) {
+	r.prettyPrint = bePretty
 }
 
 // AddHeader is a shortcut for .Header().Add(header,value)
@@ -119,7 +125,7 @@ func (r *Response) WriteAsXml(value interface{}) error {
 	if value == nil { // do not write a nil representation
 		return nil
 	}
-	if PrettyPrintResponses {
+	if r.prettyPrint {
 		output, err = xml.MarshalIndent(value, " ", " ")
 	} else {
 		output, err = xml.Marshal(value)
@@ -144,13 +150,18 @@ func (r *Response) WriteAsXml(value interface{}) error {
 
 // WriteAsJson is a convenience method for writing a value in json
 func (r *Response) WriteAsJson(value interface{}) error {
+	return r.WriteJson(value, MIME_JSON) // no charset
+}
+
+// WriteJson is a convenience method for writing a value in Json with a given Content-Type
+func (r *Response) WriteJson(value interface{}, contentType string) error {
 	var output []byte
 	var err error
 
 	if value == nil { // do not write a nil representation
 		return nil
 	}
-	if PrettyPrintResponses {
+	if r.prettyPrint {
 		output, err = json.MarshalIndent(value, " ", " ")
 	} else {
 		output, err = json.Marshal(value)
@@ -159,7 +170,7 @@ func (r *Response) WriteAsJson(value interface{}) error {
 	if err != nil {
 		return r.WriteErrorString(http.StatusInternalServerError, err.Error())
 	}
-	r.Header().Set(HEADER_ContentType, MIME_JSON)
+	r.Header().Set(HEADER_ContentType, contentType)
 	if r.statusCode > 0 { // a WriteHeader was intercepted
 		r.ResponseWriter.WriteHeader(r.statusCode)
 	}
@@ -192,13 +203,15 @@ func (r *Response) WriteErrorString(status int, errorReason string) error {
 
 // WriteHeader is overridden to remember the Status Code that has been written.
 // Note that using this method, the status value is only written when
-// - calling WriteEntity
-// - or directly WriteAsXml,WriteAsJson.
-// - or if the status is 204 (http.StatusNoContent)
+// - calling WriteEntity,
+// - or directly calling WriteAsXml or WriteAsJson,
+// - or if the status is one for which no response is allowed (i.e.,
+//   204 (http.StatusNoContent) or 304 (http.StatusNotModified))
 func (r *Response) WriteHeader(httpStatus int) {
 	r.statusCode = httpStatus
 	// if 204 then WriteEntity will not be called so we need to pass this code
-	if http.StatusNoContent == httpStatus {
+	if http.StatusNoContent == httpStatus ||
+		http.StatusNotModified == httpStatus {
 		r.ResponseWriter.WriteHeader(httpStatus)
 	}
 }

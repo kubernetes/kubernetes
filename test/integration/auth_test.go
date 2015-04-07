@@ -24,12 +24,14 @@ package integration
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
@@ -40,6 +42,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/user"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/master"
+	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/admission/admit"
 	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/auth/authenticator/token/tokentest"
 )
 
@@ -60,77 +63,6 @@ func getTestTokenAuth() authenticator.Request {
 	return bearertoken.New(tokenAuthenticator)
 }
 
-// TestWhoAmI passes a known Bearer Token to the master's /_whoami endpoint and checks that
-// the master authenticates the user.
-func TestWhoAmI(t *testing.T) {
-	deleteAllEtcdKeys()
-
-	// Set up a master
-
-	helper, err := master.NewEtcdHelper(newEtcdClient(), "v1beta1")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	m := master.New(&master.Config{
-		EtcdHelper:        helper,
-		KubeletClient:     client.FakeKubeletClient{},
-		EnableLogsSupport: false,
-		EnableUISupport:   false,
-		APIPrefix:         "/api",
-		Authenticator:     getTestTokenAuth(),
-		Authorizer:        apiserver.NewAlwaysAllowAuthorizer(),
-	})
-
-	s := httptest.NewServer(m.Handler)
-	defer s.Close()
-
-	// TODO: also test TLS, using e.g NewUnsafeTLSTransport() and NewClientCertTLSTransport() (see pkg/client/helper.go)
-	transport := http.DefaultTransport
-
-	testCases := []struct {
-		name     string
-		token    string
-		expected string
-		succeeds bool
-	}{
-		{"Valid token", AliceToken, "AUTHENTICATED AS alice", true},
-		{"Unknown token", UnknownToken, "", false},
-		{"No token", "", "", false},
-	}
-	for _, tc := range testCases {
-		req, err := http.NewRequest("GET", s.URL+"/_whoami", nil)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", tc.token))
-		func() {
-			resp, err := transport.RoundTrip(req)
-			defer resp.Body.Close()
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-
-			if tc.succeeds {
-				body, err := ioutil.ReadAll(resp.Body)
-				if err != nil {
-					t.Fatalf("unexpected error: %v", err)
-				}
-
-				actual := string(body)
-				if tc.expected != actual {
-					t.Errorf("case: %s expected: %v got: %v", tc.name, tc.expected, actual)
-				}
-			} else {
-				if resp.StatusCode != http.StatusUnauthorized {
-					t.Errorf("case: %s expected Unauthorized, got: %v", tc.name, resp.StatusCode)
-				}
-
-			}
-		}()
-	}
-}
-
 // Bodies for requests used in subsequent tests.
 var aPod string = `
 {
@@ -141,9 +73,9 @@ var aPod string = `
     "manifest": {
       "version": "v1beta1",
       "id": "a",
-      "containers": [{ "name": "foo", "image": "bar/foo", }]
+      "containers": [{ "name": "foo", "image": "bar/foo" }]
     }
-  },
+  }%s
 }
 `
 var aRC string = `
@@ -156,18 +88,19 @@ var aRC string = `
     "replicaSelector": {"name": "a"},
     "podTemplate": {
       "desiredState": {
-         "manifest": {
-           "version": "v1beta1",
-           "id": "a",
-           "containers": [{
-             "name": "foo",
-             "image": "bar/foo",
-           }]
-         }
-       },
-       "labels": {"name": "a"}
-      }},
-  "labels": {"name": "a"}
+        "manifest": {
+          "version": "v1beta1",
+          "id": "a",
+          "containers": [{
+            "name": "foo",
+            "image": "bar/foo"
+          }]
+        }
+      },
+      "labels": {"name": "a"}
+    }
+  },
+  "labels": {"name": "a"}%s
 }
 `
 var aService string = `
@@ -176,8 +109,9 @@ var aService string = `
   "apiVersion": "v1beta1",
   "id": "a",
   "port": 8000,
+  "portalIP": "10.0.0.100",
   "labels": { "name": "a" },
-  "selector": { "name": "a" }
+  "selector": { "name": "a" }%s
 }
 `
 var aMinion string = `
@@ -185,7 +119,11 @@ var aMinion string = `
   "kind": "Minion",
   "apiVersion": "v1beta1",
   "id": "a",
-  "hostIP": "10.10.10.10",
+  "resources": {
+	"capacity": { "memory": "10", "cpu": "10"}
+  },
+  "externalID": "external",
+  "hostIP": "10.10.10.10"%s
 }
 `
 
@@ -193,14 +131,13 @@ var aEvent string = `
 {
   "kind": "Event",
   "apiVersion": "v1beta1",
-  "namespace": "default",
   "id": "a",
   "involvedObject": {
     "kind": "Minion",
     "name": "a",
     "namespace": "default",
-    "apiVersion": "v1beta1",
-  }
+    "apiVersion": "v1beta1"
+  }%s
 }
 `
 
@@ -210,7 +147,7 @@ var aBinding string = `
   "apiVersion": "v1beta1",
   "id": "a",
   "host": "10.10.10.10",
-  "podID": "a"
+  "podID": "a"%s
 }
 `
 
@@ -219,17 +156,25 @@ var aEndpoints string = `
   "kind": "Endpoints",
   "apiVersion": "v1beta1",
   "id": "a",
-  "endpoints": ["10.10.1.1:1909"],
+  "endpoints": ["10.10.1.1:1909"]%s
 }
 `
 
-// To ensure that a POST completes before a dependent GET, make operations
-// effectively synchronous with the following parameters.
-var syncFlags = "?sync=true&timeout=60s"
+var deleteNow string = `
+{
+	"kind": "DeleteOptions",
+	"apiVersion": "v1beta1",
+	"gracePeriod": 0%s
+}
+`
+
+// To ensure that a POST completes before a dependent GET, set a timeout.
+var timeoutFlag = "?timeout=60s"
 
 // Requests to try.  Each one should be forbidden or not forbidden
 // depending on the authentication and authorization setup of the master.
 var code200 = map[int]bool{200: true}
+var code201 = map[int]bool{201: true}
 var code400 = map[int]bool{400: true}
 var code403 = map[int]bool{403: true}
 var code404 = map[int]bool{404: true}
@@ -252,16 +197,16 @@ func getTestRequests() []struct {
 	}{
 		// Normal methods on pods
 		{"GET", "/api/v1beta1/pods", "", code200},
-		{"POST", "/api/v1beta1/pods" + syncFlags, aPod, code200},
-		{"PUT", "/api/v1beta1/pods/a" + syncFlags, aPod, code500}, // See #2114 about why 500
+		{"POST", "/api/v1beta1/pods" + timeoutFlag, aPod, code201},
+		{"PUT", "/api/v1beta1/pods/a" + timeoutFlag, aPod, code200},
 		{"GET", "/api/v1beta1/pods", "", code200},
 		{"GET", "/api/v1beta1/pods/a", "", code200},
-		{"DELETE", "/api/v1beta1/pods/a" + syncFlags, "", code200},
+		{"PATCH", "/api/v1beta1/pods/a", "{%v}", code200},
+		{"DELETE", "/api/v1beta1/pods/a" + timeoutFlag, deleteNow, code200},
 
 		// Non-standard methods (not expected to work,
 		// but expected to pass/fail authorization prior to
 		// failing validation.
-		{"PATCH", "/api/v1beta1/pods/a", "", code405},
 		{"OPTIONS", "/api/v1beta1/pods", "", code405},
 		{"OPTIONS", "/api/v1beta1/pods/a", "", code405},
 		{"HEAD", "/api/v1beta1/pods", "", code405},
@@ -272,53 +217,53 @@ func getTestRequests() []struct {
 
 		// Normal methods on services
 		{"GET", "/api/v1beta1/services", "", code200},
-		{"POST", "/api/v1beta1/services" + syncFlags, aService, code200},
-		{"PUT", "/api/v1beta1/services/a" + syncFlags, aService, code409}, // TODO: GET and put back server-provided fields to avoid a 422
+		{"POST", "/api/v1beta1/services" + timeoutFlag, aService, code201},
+		{"PUT", "/api/v1beta1/services/a" + timeoutFlag, aService, code200},
 		{"GET", "/api/v1beta1/services", "", code200},
 		{"GET", "/api/v1beta1/services/a", "", code200},
-		{"DELETE", "/api/v1beta1/services/a" + syncFlags, "", code200},
+		{"DELETE", "/api/v1beta1/services/a" + timeoutFlag, "", code200},
 
 		// Normal methods on replicationControllers
 		{"GET", "/api/v1beta1/replicationControllers", "", code200},
-		{"POST", "/api/v1beta1/replicationControllers" + syncFlags, aRC, code200},
-		{"PUT", "/api/v1beta1/replicationControllers/a" + syncFlags, aRC, code409}, // See #2115 about why 409
+		{"POST", "/api/v1beta1/replicationControllers" + timeoutFlag, aRC, code201},
+		{"PUT", "/api/v1beta1/replicationControllers/a" + timeoutFlag, aRC, code200},
 		{"GET", "/api/v1beta1/replicationControllers", "", code200},
 		{"GET", "/api/v1beta1/replicationControllers/a", "", code200},
-		{"DELETE", "/api/v1beta1/replicationControllers/a" + syncFlags, "", code200},
+		{"DELETE", "/api/v1beta1/replicationControllers/a" + timeoutFlag, "", code200},
 
 		// Normal methods on endpoints
 		{"GET", "/api/v1beta1/endpoints", "", code200},
-		{"POST", "/api/v1beta1/endpoints" + syncFlags, aEndpoints, code200},
-		{"PUT", "/api/v1beta1/endpoints/a" + syncFlags, aEndpoints, code200},
+		{"POST", "/api/v1beta1/endpoints" + timeoutFlag, aEndpoints, code201},
+		{"PUT", "/api/v1beta1/endpoints/a" + timeoutFlag, aEndpoints, code200},
 		{"GET", "/api/v1beta1/endpoints", "", code200},
 		{"GET", "/api/v1beta1/endpoints/a", "", code200},
-		{"DELETE", "/api/v1beta1/endpoints/a" + syncFlags, "", code400},
+		{"DELETE", "/api/v1beta1/endpoints/a" + timeoutFlag, "", code200},
 
 		// Normal methods on minions
 		{"GET", "/api/v1beta1/minions", "", code200},
-		{"POST", "/api/v1beta1/minions" + syncFlags, aMinion, code200},
-		{"PUT", "/api/v1beta1/minions/a" + syncFlags, aMinion, code422}, // TODO: GET and put back server-provided fields to avoid a 422
+		{"POST", "/api/v1beta1/minions" + timeoutFlag, aMinion, code201},
+		{"PUT", "/api/v1beta1/minions/a" + timeoutFlag, aMinion, code200},
 		{"GET", "/api/v1beta1/minions", "", code200},
 		{"GET", "/api/v1beta1/minions/a", "", code200},
-		{"DELETE", "/api/v1beta1/minions/a" + syncFlags, "", code200},
+		{"DELETE", "/api/v1beta1/minions/a" + timeoutFlag, "", code200},
 
 		// Normal methods on events
 		{"GET", "/api/v1beta1/events", "", code200},
-		{"POST", "/api/v1beta1/events" + syncFlags, aEvent, code200},
-		{"PUT", "/api/v1beta1/events/a" + syncFlags, aEvent, code500}, // See #2114 about why 500
+		{"POST", "/api/v1beta1/events" + timeoutFlag, aEvent, code201},
+		{"PUT", "/api/v1beta1/events/a" + timeoutFlag, aEvent, code200},
 		{"GET", "/api/v1beta1/events", "", code200},
 		{"GET", "/api/v1beta1/events", "", code200},
 		{"GET", "/api/v1beta1/events/a", "", code200},
-		{"DELETE", "/api/v1beta1/events/a" + syncFlags, "", code200},
+		{"DELETE", "/api/v1beta1/events/a" + timeoutFlag, "", code200},
 
 		// Normal methods on bindings
-		{"GET", "/api/v1beta1/bindings", "", code405},            // Bindings are write-only
-		{"POST", "/api/v1beta1/pods" + syncFlags, aPod, code200}, // Need a pod to bind or you get a 404
-		{"POST", "/api/v1beta1/bindings" + syncFlags, aBinding, code200},
-		{"PUT", "/api/v1beta1/bindings/a" + syncFlags, aBinding, code500}, // See #2114 about why 500
+		{"GET", "/api/v1beta1/bindings", "", code405},              // Bindings are write-only
+		{"POST", "/api/v1beta1/pods" + timeoutFlag, aPod, code201}, // Need a pod to bind or you get a 404
+		{"POST", "/api/v1beta1/bindings" + timeoutFlag, aBinding, code201},
+		{"PUT", "/api/v1beta1/bindings/a" + timeoutFlag, aBinding, code404},
 		{"GET", "/api/v1beta1/bindings", "", code405},
 		{"GET", "/api/v1beta1/bindings/a", "", code404}, // No bindings instances
-		{"DELETE", "/api/v1beta1/bindings/a" + syncFlags, "", code404},
+		{"DELETE", "/api/v1beta1/bindings/a" + timeoutFlag, "", code404},
 
 		// Non-existent object type.
 		{"GET", "/api/v1beta1/foo", "", code404},
@@ -326,14 +271,9 @@ func getTestRequests() []struct {
 		{"PUT", "/api/v1beta1/foo/a", `{"foo": "foo"}`, code404},
 		{"GET", "/api/v1beta1/foo", "", code404},
 		{"GET", "/api/v1beta1/foo/a", "", code404},
-		{"DELETE", "/api/v1beta1/foo" + syncFlags, "", code404},
-
-		// Operations
-		{"GET", "/api/v1beta1/operations", "", code200},
-		{"GET", "/api/v1beta1/operations/1234567890", "", code404},
+		{"DELETE", "/api/v1beta1/foo" + timeoutFlag, "", code404},
 
 		// Special verbs on nodes
-		// TODO: Will become 405 once these are converted to go-restful
 		{"GET", "/api/v1beta1/proxy/minions/a", "", code404},
 		{"GET", "/api/v1beta1/redirect/minions/a", "", code404},
 		// TODO: test .../watch/..., which doesn't end before the test timeout.
@@ -341,6 +281,7 @@ func getTestRequests() []struct {
 
 		// Non-object endpoints
 		{"GET", "/", "", code200},
+		{"GET", "/api", "", code200},
 		{"GET", "/healthz", "", code200},
 		{"GET", "/version", "", code200},
 	}
@@ -363,39 +304,100 @@ func TestAuthModeAlwaysAllow(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	m := master.New(&master.Config{
+	var m *master.Master
+	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		m.Handler.ServeHTTP(w, req)
+	}))
+	defer s.Close()
+
+	m = master.New(&master.Config{
 		EtcdHelper:        helper,
 		KubeletClient:     client.FakeKubeletClient{},
 		EnableLogsSupport: false,
 		EnableUISupport:   false,
+		EnableIndex:       true,
 		APIPrefix:         "/api",
 		Authorizer:        apiserver.NewAlwaysAllowAuthorizer(),
+		AdmissionControl:  admit.NewAlwaysAdmit(),
 	})
 
-	s := httptest.NewServer(m.Handler)
-	defer s.Close()
 	transport := http.DefaultTransport
+	previousResourceVersion := make(map[string]float64)
 
 	for _, r := range getTestRequests() {
-		t.Logf("case %v", r)
-		bodyBytes := bytes.NewReader([]byte(r.body))
+		var bodyStr string
+		if r.body != "" {
+			sub := ""
+			if r.verb == "PUT" {
+				// For update operations, insert previous resource version
+				if resVersion := previousResourceVersion[getPreviousResourceVersionKey(r.URL, "")]; resVersion != 0 {
+					sub += fmt.Sprintf(",\r\n\"resourceVersion\": %v", resVersion)
+				}
+				namespace := "default"
+				sub += fmt.Sprintf(",\r\n\"namespace\": %q", namespace)
+			}
+			bodyStr = fmt.Sprintf(r.body, sub)
+		}
+		r.body = bodyStr
+		bodyBytes := bytes.NewReader([]byte(bodyStr))
 		req, err := http.NewRequest(r.verb, s.URL+r.URL, bodyBytes)
 		if err != nil {
+			t.Logf("case %v", r)
 			t.Fatalf("unexpected error: %v", err)
+		}
+		if r.verb == "PATCH" {
+			req.Header.Set("Content-Type", "application/merge-patch+json")
 		}
 		func() {
 			resp, err := transport.RoundTrip(req)
 			defer resp.Body.Close()
 			if err != nil {
+				t.Logf("case %v", r)
 				t.Fatalf("unexpected error: %v", err)
 			}
+			b, _ := ioutil.ReadAll(resp.Body)
 			if _, ok := r.statusCodes[resp.StatusCode]; !ok {
+				t.Logf("case %v", r)
 				t.Errorf("Expected status one of %v, but got %v", r.statusCodes, resp.StatusCode)
-				b, _ := ioutil.ReadAll(resp.Body)
 				t.Errorf("Body: %v", string(b))
+			} else {
+				if r.verb == "POST" {
+					// For successful create operations, extract resourceVersion
+					id, currentResourceVersion, err := parseResourceVersion(b)
+					if err == nil {
+						key := getPreviousResourceVersionKey(r.URL, id)
+						previousResourceVersion[key] = currentResourceVersion
+					}
+				}
 			}
 		}()
 	}
+}
+
+func parseResourceVersion(response []byte) (string, float64, error) {
+	var resultBodyMap map[string]interface{}
+	err := json.Unmarshal(response, &resultBodyMap)
+	if err != nil {
+		return "", 0, fmt.Errorf("unexpected error unmarshaling resultBody: %v", err)
+	}
+	id, ok := resultBodyMap["id"].(string)
+	if !ok {
+		return "", 0, fmt.Errorf("unexpected error, id not found in JSON response: %v", string(response))
+	}
+	resourceVersion, ok := resultBodyMap["resourceVersion"].(float64)
+	if !ok {
+		return "", 0, fmt.Errorf("unexpected error, resourceVersion not found in JSON response: %v", string(response))
+	}
+	return id, resourceVersion, nil
+}
+
+func getPreviousResourceVersionKey(url, id string) string {
+	baseUrl := strings.Split(url, "?")[0]
+	key := baseUrl
+	if id != "" {
+		key = fmt.Sprintf("%s/%v", baseUrl, id)
+	}
+	return key
 }
 
 func TestAuthModeAlwaysDeny(t *testing.T) {
@@ -408,33 +410,41 @@ func TestAuthModeAlwaysDeny(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	m := master.New(&master.Config{
+	var m *master.Master
+	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		m.Handler.ServeHTTP(w, req)
+	}))
+	defer s.Close()
+
+	m = master.New(&master.Config{
 		EtcdHelper:        helper,
 		KubeletClient:     client.FakeKubeletClient{},
 		EnableLogsSupport: false,
 		EnableUISupport:   false,
+		EnableIndex:       true,
 		APIPrefix:         "/api",
 		Authorizer:        apiserver.NewAlwaysDenyAuthorizer(),
+		AdmissionControl:  admit.NewAlwaysAdmit(),
 	})
 
-	s := httptest.NewServer(m.Handler)
-	defer s.Close()
 	transport := http.DefaultTransport
 
 	for _, r := range getTestRequests() {
-		t.Logf("case %v", r)
 		bodyBytes := bytes.NewReader([]byte(r.body))
 		req, err := http.NewRequest(r.verb, s.URL+r.URL, bodyBytes)
 		if err != nil {
+			t.Logf("case %v", r)
 			t.Fatalf("unexpected error: %v", err)
 		}
 		func() {
 			resp, err := transport.RoundTrip(req)
 			defer resp.Body.Close()
 			if err != nil {
+				t.Logf("case %v", r)
 				t.Fatalf("unexpected error: %v", err)
 			}
 			if resp.StatusCode != http.StatusForbidden {
+				t.Logf("case %v", r)
 				t.Errorf("Expected status Forbidden but got status %v", resp.Status)
 			}
 		}()
@@ -467,39 +477,76 @@ func TestAliceNotForbiddenOrUnauthorized(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	m := master.New(&master.Config{
+	var m *master.Master
+	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		m.Handler.ServeHTTP(w, req)
+	}))
+	defer s.Close()
+
+	m = master.New(&master.Config{
 		EtcdHelper:        helper,
 		KubeletClient:     client.FakeKubeletClient{},
 		EnableLogsSupport: false,
 		EnableUISupport:   false,
+		EnableIndex:       true,
 		APIPrefix:         "/api",
 		Authenticator:     getTestTokenAuth(),
 		Authorizer:        allowAliceAuthorizer{},
+		AdmissionControl:  admit.NewAlwaysAdmit(),
 	})
 
-	s := httptest.NewServer(m.Handler)
-	defer s.Close()
+	previousResourceVersion := make(map[string]float64)
 	transport := http.DefaultTransport
 
 	for _, r := range getTestRequests() {
 		token := AliceToken
-		t.Logf("case %v", r)
-		bodyBytes := bytes.NewReader([]byte(r.body))
+		var bodyStr string
+		if r.body != "" {
+			sub := ""
+			if r.verb == "PUT" {
+				// For update operations, insert previous resource version
+				if resVersion := previousResourceVersion[getPreviousResourceVersionKey(r.URL, "")]; resVersion != 0 {
+					sub += fmt.Sprintf(",\r\n\"resourceVersion\": %v", resVersion)
+				}
+				namespace := "default"
+				sub += fmt.Sprintf(",\r\n\"namespace\": %q", namespace)
+			}
+			bodyStr = fmt.Sprintf(r.body, sub)
+		}
+		r.body = bodyStr
+		bodyBytes := bytes.NewReader([]byte(bodyStr))
 		req, err := http.NewRequest(r.verb, s.URL+r.URL, bodyBytes)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
 		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
+		if r.verb == "PATCH" {
+			req.Header.Set("Content-Type", "application/merge-patch+json")
+		}
 
 		func() {
 			resp, err := transport.RoundTrip(req)
 			defer resp.Body.Close()
 			if err != nil {
+				t.Logf("case %v", r)
 				t.Fatalf("unexpected error: %v", err)
 			}
+			b, _ := ioutil.ReadAll(resp.Body)
 			if _, ok := r.statusCodes[resp.StatusCode]; !ok {
+				t.Logf("case %v", r)
 				t.Errorf("Expected status one of %v, but got %v", r.statusCodes, resp.StatusCode)
+				t.Errorf("Body: %v", string(b))
+			} else {
+				if r.verb == "POST" {
+					// For successful create operations, extract resourceVersion
+					id, currentResourceVersion, err := parseResourceVersion(b)
+					if err == nil {
+						key := getPreviousResourceVersionKey(r.URL, id)
+						previousResourceVersion[key] = currentResourceVersion
+					}
+				}
 			}
+
 		}()
 	}
 }
@@ -519,23 +566,28 @@ func TestBobIsForbidden(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	m := master.New(&master.Config{
+	var m *master.Master
+	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		m.Handler.ServeHTTP(w, req)
+	}))
+	defer s.Close()
+
+	m = master.New(&master.Config{
 		EtcdHelper:        helper,
 		KubeletClient:     client.FakeKubeletClient{},
 		EnableLogsSupport: false,
 		EnableUISupport:   false,
+		EnableIndex:       true,
 		APIPrefix:         "/api",
 		Authenticator:     getTestTokenAuth(),
 		Authorizer:        allowAliceAuthorizer{},
+		AdmissionControl:  admit.NewAlwaysAdmit(),
 	})
 
-	s := httptest.NewServer(m.Handler)
-	defer s.Close()
 	transport := http.DefaultTransport
 
 	for _, r := range getTestRequests() {
 		token := BobToken
-		t.Logf("case %v", r)
 		bodyBytes := bytes.NewReader([]byte(r.body))
 		req, err := http.NewRequest(r.verb, s.URL+r.URL, bodyBytes)
 		if err != nil {
@@ -547,10 +599,12 @@ func TestBobIsForbidden(t *testing.T) {
 			resp, err := transport.RoundTrip(req)
 			defer resp.Body.Close()
 			if err != nil {
+				t.Logf("case %v", r)
 				t.Fatalf("unexpected error: %v", err)
 			}
 			// Expect all of bob's actions to return Forbidden
 			if resp.StatusCode != http.StatusForbidden {
+				t.Logf("case %v", r)
 				t.Errorf("Expected not status Forbidden, but got %s", resp.Status)
 			}
 		}()
@@ -573,23 +627,28 @@ func TestUnknownUserIsUnauthorized(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	m := master.New(&master.Config{
+	var m *master.Master
+	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		m.Handler.ServeHTTP(w, req)
+	}))
+	defer s.Close()
+
+	m = master.New(&master.Config{
 		EtcdHelper:        helper,
 		KubeletClient:     client.FakeKubeletClient{},
 		EnableLogsSupport: false,
 		EnableUISupport:   false,
+		EnableIndex:       true,
 		APIPrefix:         "/api",
 		Authenticator:     getTestTokenAuth(),
 		Authorizer:        allowAliceAuthorizer{},
+		AdmissionControl:  admit.NewAlwaysAdmit(),
 	})
 
-	s := httptest.NewServer(m.Handler)
-	defer s.Close()
 	transport := http.DefaultTransport
 
 	for _, r := range getTestRequests() {
 		token := UnknownToken
-		t.Logf("case %v", r)
 		bodyBytes := bytes.NewReader([]byte(r.body))
 		req, err := http.NewRequest(r.verb, s.URL+r.URL, bodyBytes)
 		if err != nil {
@@ -600,10 +659,12 @@ func TestUnknownUserIsUnauthorized(t *testing.T) {
 			resp, err := transport.RoundTrip(req)
 			defer resp.Body.Close()
 			if err != nil {
+				t.Logf("case %v", r)
 				t.Fatalf("unexpected error: %v", err)
 			}
 			// Expect all of unauthenticated user's request to be "Unauthorized"
 			if resp.StatusCode != http.StatusUnauthorized {
+				t.Logf("case %v", r)
 				t.Errorf("Expected status %v, but got %v", http.StatusUnauthorized, resp.StatusCode)
 				b, _ := ioutil.ReadAll(resp.Body)
 				t.Errorf("Body: %v", string(b))
@@ -645,49 +706,75 @@ func TestNamespaceAuthorization(t *testing.T) {
 
 	a := newAuthorizerWithContents(t, `{"namespace": "foo"}
 `)
-	m := master.New(&master.Config{
+
+	var m *master.Master
+	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		m.Handler.ServeHTTP(w, req)
+	}))
+	defer s.Close()
+
+	m = master.New(&master.Config{
 		EtcdHelper:        helper,
 		KubeletClient:     client.FakeKubeletClient{},
 		EnableLogsSupport: false,
 		EnableUISupport:   false,
+		EnableIndex:       true,
 		APIPrefix:         "/api",
 		Authenticator:     getTestTokenAuth(),
 		Authorizer:        a,
+		AdmissionControl:  admit.NewAlwaysAdmit(),
 	})
 
-	s := httptest.NewServer(m.Handler)
-	defer s.Close()
+	previousResourceVersion := make(map[string]float64)
 	transport := http.DefaultTransport
 
 	requests := []struct {
 		verb        string
 		URL         string
+		namespace   string
 		body        string
 		statusCodes map[int]bool // allowed status codes.
 	}{
 
-		{"POST", "/api/v1beta1/pods" + syncFlags + "&namespace=foo", aPod, code200},
-		{"GET", "/api/v1beta1/pods?namespace=foo", "", code200},
-		{"GET", "/api/v1beta1/pods/a?namespace=foo", "", code200},
-		{"DELETE", "/api/v1beta1/pods/a" + syncFlags + "&namespace=foo", "", code200},
+		{"POST", "/api/v1beta1/pods" + timeoutFlag + "&namespace=foo", "foo", aPod, code201},
+		{"GET", "/api/v1beta1/pods?namespace=foo", "foo", "", code200},
+		{"GET", "/api/v1beta1/pods/a?namespace=foo", "foo", "", code200},
+		{"DELETE", "/api/v1beta1/pods/a" + timeoutFlag + "&namespace=foo", "foo", "", code200},
 
-		{"POST", "/api/v1beta1/pods" + syncFlags + "&namespace=bar", aPod, code403},
-		{"GET", "/api/v1beta1/pods?namespace=bar", "", code403},
-		{"GET", "/api/v1beta1/pods/a?namespace=bar", "", code403},
-		{"DELETE", "/api/v1beta1/pods/a" + syncFlags + "&namespace=bar", "", code403},
+		{"POST", "/api/v1beta1/pods" + timeoutFlag + "&namespace=bar", "bar", aPod, code403},
+		{"GET", "/api/v1beta1/pods?namespace=bar", "bar", "", code403},
+		{"GET", "/api/v1beta1/pods/a?namespace=bar", "bar", "", code403},
+		{"DELETE", "/api/v1beta1/pods/a" + timeoutFlag + "&namespace=bar", "bar", "", code403},
 
-		{"POST", "/api/v1beta1/pods" + syncFlags, aPod, code403},
-		{"GET", "/api/v1beta1/pods", "", code403},
-		{"GET", "/api/v1beta1/pods/a", "", code403},
-		{"DELETE", "/api/v1beta1/pods/a" + syncFlags, "", code403},
+		{"POST", "/api/v1beta1/pods" + timeoutFlag, "", aPod, code403},
+		{"GET", "/api/v1beta1/pods", "", "", code403},
+		{"GET", "/api/v1beta1/pods/a", "", "", code403},
+		{"DELETE", "/api/v1beta1/pods/a" + timeoutFlag, "", "", code403},
 	}
 
 	for _, r := range requests {
 		token := BobToken
-		t.Logf("case %v", r)
-		bodyBytes := bytes.NewReader([]byte(r.body))
+		var bodyStr string
+		if r.body != "" {
+			sub := ""
+			if r.verb == "PUT" && r.body != "" {
+				// For update operations, insert previous resource version
+				if resVersion := previousResourceVersion[getPreviousResourceVersionKey(r.URL, "")]; resVersion != 0 {
+					sub += fmt.Sprintf(",\r\n\"resourceVersion\": %v", resVersion)
+				}
+				namespace := r.namespace
+				if len(namespace) == 0 {
+					namespace = "default"
+				}
+				sub += fmt.Sprintf(",\r\n\"namespace\": %q", namespace)
+			}
+			bodyStr = fmt.Sprintf(r.body, sub)
+		}
+		r.body = bodyStr
+		bodyBytes := bytes.NewReader([]byte(bodyStr))
 		req, err := http.NewRequest(r.verb, s.URL+r.URL, bodyBytes)
 		if err != nil {
+			t.Logf("case %v", r)
 			t.Fatalf("unexpected error: %v", err)
 		}
 		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
@@ -695,11 +782,25 @@ func TestNamespaceAuthorization(t *testing.T) {
 			resp, err := transport.RoundTrip(req)
 			defer resp.Body.Close()
 			if err != nil {
+				t.Logf("case %v", r)
 				t.Fatalf("unexpected error: %v", err)
 			}
+			b, _ := ioutil.ReadAll(resp.Body)
 			if _, ok := r.statusCodes[resp.StatusCode]; !ok {
+				t.Logf("case %v", r)
 				t.Errorf("Expected status one of %v, but got %v", r.statusCodes, resp.StatusCode)
+				t.Errorf("Body: %v", string(b))
+			} else {
+				if r.verb == "POST" {
+					// For successful create operations, extract resourceVersion
+					id, currentResourceVersion, err := parseResourceVersion(b)
+					if err == nil {
+						key := getPreviousResourceVersionKey(r.URL, id)
+						previousResourceVersion[key] = currentResourceVersion
+					}
+				}
 			}
+
 		}()
 	}
 }
@@ -718,20 +819,28 @@ func TestKindAuthorization(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	a := newAuthorizerWithContents(t, `{"kind": "services"}
+	a := newAuthorizerWithContents(t, `{"resource": "services"}
 `)
-	m := master.New(&master.Config{
+
+	var m *master.Master
+	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		m.Handler.ServeHTTP(w, req)
+	}))
+	defer s.Close()
+
+	m = master.New(&master.Config{
 		EtcdHelper:        helper,
 		KubeletClient:     client.FakeKubeletClient{},
 		EnableLogsSupport: false,
 		EnableUISupport:   false,
+		EnableIndex:       true,
 		APIPrefix:         "/api",
 		Authenticator:     getTestTokenAuth(),
 		Authorizer:        a,
+		AdmissionControl:  admit.NewAlwaysAdmit(),
 	})
 
-	s := httptest.NewServer(m.Handler)
-	defer s.Close()
+	previousResourceVersion := make(map[string]float64)
 	transport := http.DefaultTransport
 
 	requests := []struct {
@@ -740,23 +849,35 @@ func TestKindAuthorization(t *testing.T) {
 		body        string
 		statusCodes map[int]bool // allowed status codes.
 	}{
-		{"POST", "/api/v1beta1/services" + syncFlags, aService, code200},
+		{"POST", "/api/v1beta1/services" + timeoutFlag, aService, code201},
 		{"GET", "/api/v1beta1/services", "", code200},
 		{"GET", "/api/v1beta1/services/a", "", code200},
-		{"DELETE", "/api/v1beta1/services/a" + syncFlags, "", code200},
+		{"DELETE", "/api/v1beta1/services/a" + timeoutFlag, "", code200},
 
-		{"POST", "/api/v1beta1/pods" + syncFlags, aPod, code403},
+		{"POST", "/api/v1beta1/pods" + timeoutFlag, aPod, code403},
 		{"GET", "/api/v1beta1/pods", "", code403},
 		{"GET", "/api/v1beta1/pods/a", "", code403},
-		{"DELETE", "/api/v1beta1/pods/a" + syncFlags, "", code403},
+		{"DELETE", "/api/v1beta1/pods/a" + timeoutFlag, "", code403},
 	}
 
 	for _, r := range requests {
 		token := BobToken
-		t.Logf("case %v", r)
-		bodyBytes := bytes.NewReader([]byte(r.body))
+		var bodyStr string
+		if r.body != "" {
+			bodyStr = fmt.Sprintf(r.body, "")
+			if r.verb == "PUT" && r.body != "" {
+				// For update operations, insert previous resource version
+				if resVersion := previousResourceVersion[getPreviousResourceVersionKey(r.URL, "")]; resVersion != 0 {
+					resourceVersionJson := fmt.Sprintf(",\r\n\"resourceVersion\": %v", resVersion)
+					bodyStr = fmt.Sprintf(r.body, resourceVersionJson)
+				}
+			}
+		}
+		r.body = bodyStr
+		bodyBytes := bytes.NewReader([]byte(bodyStr))
 		req, err := http.NewRequest(r.verb, s.URL+r.URL, bodyBytes)
 		if err != nil {
+			t.Logf("case %v", r)
 			t.Fatalf("unexpected error: %v", err)
 		}
 		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
@@ -764,11 +885,25 @@ func TestKindAuthorization(t *testing.T) {
 			resp, err := transport.RoundTrip(req)
 			defer resp.Body.Close()
 			if err != nil {
+				t.Logf("case %v", r)
 				t.Fatalf("unexpected error: %v", err)
 			}
+			b, _ := ioutil.ReadAll(resp.Body)
 			if _, ok := r.statusCodes[resp.StatusCode]; !ok {
+				t.Logf("case %v", r)
 				t.Errorf("Expected status one of %v, but got %v", r.statusCodes, resp.StatusCode)
+				t.Errorf("Body: %v", string(b))
+			} else {
+				if r.verb == "POST" {
+					// For successful create operations, extract resourceVersion
+					id, currentResourceVersion, err := parseResourceVersion(b)
+					if err == nil {
+						key := getPreviousResourceVersionKey(r.URL, id)
+						previousResourceVersion[key] = currentResourceVersion
+					}
+				}
 			}
+
 		}
 	}
 }
@@ -789,18 +924,25 @@ func TestReadOnlyAuthorization(t *testing.T) {
 
 	a := newAuthorizerWithContents(t, `{"readonly": true}
 `)
-	m := master.New(&master.Config{
+
+	var m *master.Master
+	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		m.Handler.ServeHTTP(w, req)
+	}))
+	defer s.Close()
+
+	m = master.New(&master.Config{
 		EtcdHelper:        helper,
 		KubeletClient:     client.FakeKubeletClient{},
 		EnableLogsSupport: false,
 		EnableUISupport:   false,
+		EnableIndex:       true,
 		APIPrefix:         "/api",
 		Authenticator:     getTestTokenAuth(),
 		Authorizer:        a,
+		AdmissionControl:  admit.NewAlwaysAdmit(),
 	})
 
-	s := httptest.NewServer(m.Handler)
-	defer s.Close()
 	transport := http.DefaultTransport
 
 	requests := []struct {
@@ -816,7 +958,6 @@ func TestReadOnlyAuthorization(t *testing.T) {
 
 	for _, r := range requests {
 		token := BobToken
-		t.Logf("case %v", r)
 		bodyBytes := bytes.NewReader([]byte(r.body))
 		req, err := http.NewRequest(r.verb, s.URL+r.URL, bodyBytes)
 		if err != nil {
@@ -827,10 +968,14 @@ func TestReadOnlyAuthorization(t *testing.T) {
 			resp, err := transport.RoundTrip(req)
 			defer resp.Body.Close()
 			if err != nil {
+				t.Logf("case %v", r)
 				t.Fatalf("unexpected error: %v", err)
 			}
 			if _, ok := r.statusCodes[resp.StatusCode]; !ok {
+				t.Logf("case %v", r)
 				t.Errorf("Expected status one of %v, but got %v", r.statusCodes, resp.StatusCode)
+				b, _ := ioutil.ReadAll(resp.Body)
+				t.Errorf("Body: %v", string(b))
 			}
 		}()
 	}

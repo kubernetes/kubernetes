@@ -19,7 +19,7 @@
 // the year of their birth or an error, you might write this:
 //
 //     func (o *MyTestObject) SavePersonDetails(firstname, lastname string, age int) (int, error) {
-//       args := o.Mock.Called(firstname, lastname, age)
+//       args := o.Called(firstname, lastname, age)
 //       return args.Int(0), args.Error(1)
 //     }
 //

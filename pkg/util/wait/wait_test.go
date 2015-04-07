@@ -68,6 +68,13 @@ func TestPoll(t *testing.T) {
 	if invocations == 0 {
 		t.Errorf("Expected at least one invocation, got zero")
 	}
+	expectedError := errors.New("Expected error")
+	f = ConditionFunc(func() (bool, error) {
+		return false, expectedError
+	})
+	if err := Poll(time.Microsecond, time.Microsecond, f); err == nil || err != expectedError {
+		t.Fatalf("Expected error %v, got none %v", expectedError, err)
+	}
 }
 
 func TestPollForever(t *testing.T) {

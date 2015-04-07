@@ -17,8 +17,13 @@ limitations under the License.
 package util
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"strings"
+	"text/tabwriter"
+
+	"github.com/davecgh/go-spew/spew"
 )
 
 // StringDiff diffs a and b and returns a human readable diff.
@@ -56,13 +61,61 @@ func ObjectDiff(a, b interface{}) string {
 	return StringDiff(string(ab), string(bb))
 }
 
-// ObjectGoPrintDiff is like ObjectDiff, but uses go's %#v formatter to print the
-// objects, in case json isn't showing you the difference. (reflect.DeepEqual makes
-// a distinction between nil and empty slices, for example, even though nothing else
-// really does.)
+// ObjectGoPrintDiff is like ObjectDiff, but uses go-spew to print the objects,
+// which shows absolutely everything by recursing into every single pointer
+// (go's %#v formatters OTOH stop at a certain point). This is needed when you
+// can't figure out why reflect.DeepEqual is returning false and nothing is
+// showing you differences. This will.
 func ObjectGoPrintDiff(a, b interface{}) string {
+	s := spew.ConfigState{DisableMethods: true}
 	return StringDiff(
-		fmt.Sprintf("%#v", a),
-		fmt.Sprintf("%#v", b),
+		s.Sprintf("%#v", a),
+		s.Sprintf("%#v", b),
 	)
+}
+
+// ObjectGoPrintSideBySide prints a and b as textual dumps side by side,
+// enabling easy visual scanning for mismatches.
+func ObjectGoPrintSideBySide(a, b interface{}) string {
+	s := spew.ConfigState{
+		Indent: " ",
+		// Extra deep spew.
+		DisableMethods: true,
+	}
+	sA := s.Sdump(a)
+	sB := s.Sdump(b)
+
+	linesA := strings.Split(sA, "\n")
+	linesB := strings.Split(sB, "\n")
+	width := 0
+	for _, s := range linesA {
+		l := len(s)
+		if l > width {
+			width = l
+		}
+	}
+	for _, s := range linesB {
+		l := len(s)
+		if l > width {
+			width = l
+		}
+	}
+	buf := &bytes.Buffer{}
+	w := tabwriter.NewWriter(buf, width, 0, 1, ' ', 0)
+	max := len(linesA)
+	if len(linesB) > max {
+		max = len(linesB)
+	}
+	for i := 0; i < max; i++ {
+		var a, b string
+		if i < len(linesA) {
+			a = linesA[i]
+		}
+		if i < len(linesB) {
+			b = linesB[i]
+		}
+		fmt.Fprintf(w, "%s\t%s\n", a, b)
+	}
+	w.Flush()
+	return buf.String()
 }

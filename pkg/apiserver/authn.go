@@ -19,18 +19,61 @@ package apiserver
 import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/authenticator"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/authenticator/bearertoken"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/auth/authenticator/request/union"
+	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/auth/authenticator/request/x509"
 	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/auth/authenticator/token/tokenfile"
 )
 
-// NewAuthenticatorFromTokenFile returns an authenticator.Request or an error
-func NewAuthenticatorFromTokenFile(tokenAuthFile string) (authenticator.Request, error) {
-	var authenticator authenticator.Request
-	if len(tokenAuthFile) != 0 {
-		tokenAuthenticator, err := tokenfile.NewCSV(tokenAuthFile)
+// NewAuthenticator returns an authenticator.Request or an error
+func NewAuthenticator(clientCAFile string, tokenFile string) (authenticator.Request, error) {
+	authenticators := []authenticator.Request{}
+
+	if len(clientCAFile) > 0 {
+		certAuth, err := newAuthenticatorFromClientCAFile(clientCAFile)
 		if err != nil {
 			return nil, err
 		}
-		authenticator = bearertoken.New(tokenAuthenticator)
+		authenticators = append(authenticators, certAuth)
 	}
-	return authenticator, nil
+
+	if len(tokenFile) > 0 {
+		tokenAuth, err := newAuthenticatorFromTokenFile(tokenFile)
+		if err != nil {
+			return nil, err
+		}
+		authenticators = append(authenticators, tokenAuth)
+	}
+
+	if len(authenticators) == 0 {
+		return nil, nil
+	}
+	if len(authenticators) == 1 {
+		return authenticators[0], nil
+	}
+	return union.New(authenticators...), nil
+
+}
+
+// newAuthenticatorFromTokenFile returns an authenticator.Request or an error
+func newAuthenticatorFromTokenFile(tokenAuthFile string) (authenticator.Request, error) {
+	tokenAuthenticator, err := tokenfile.NewCSV(tokenAuthFile)
+	if err != nil {
+		return nil, err
+	}
+
+	return bearertoken.New(tokenAuthenticator), nil
+}
+
+// newAuthenticatorFromClientCAFile returns an authenticator.Request or an error
+func newAuthenticatorFromClientCAFile(clientCAFile string) (authenticator.Request, error) {
+	roots, err := util.CertPoolFromFile(clientCAFile)
+	if err != nil {
+		return nil, err
+	}
+
+	opts := x509.DefaultVerifyOptions()
+	opts.Roots = roots
+
+	return x509.New(opts, x509.CommonNameUserConversion), nil
 }

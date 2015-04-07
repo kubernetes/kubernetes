@@ -20,11 +20,19 @@
 
 mkdir -p /srv/salt-overlay/pillar
 cat <<EOF >/srv/salt-overlay/pillar/cluster-params.sls
+instance_prefix: '$(echo "$INSTANCE_PREFIX" | sed -e "s/'/''/g")'
 node_instance_prefix: $NODE_INSTANCE_PREFIX
 portal_net: $PORTAL_NET
+enable_cluster_monitoring: $ENABLE_CLUSTER_MONITORING
 enable_node_monitoring: $ENABLE_NODE_MONITORING
+enable_cluster_logging: $ENABLE_CLUSTER_LOGGING
 enable_node_logging: $ENABLE_NODE_LOGGING
 logging_destination: $LOGGING_DESTINATION
+elasticsearch_replicas: $ELASTICSEARCH_LOGGING_REPLICAS
+enable_cluster_dns: $ENABLE_CLUSTER_DNS
+dns_replicas: $DNS_REPLICAS
+dns_server: $DNS_SERVER_IP
+dns_domain: $DNS_DOMAIN
 EOF
 
 mkdir -p /srv/salt-overlay/salt/nginx

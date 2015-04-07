@@ -76,6 +76,13 @@ func (sw *StreamWatcher) Stop() {
 	}
 }
 
+// stopping returns true if Stop() was called previously.
+func (sw *StreamWatcher) stopping() bool {
+	sw.Lock()
+	defer sw.Unlock()
+	return sw.stopped
+}
+
 // receive reads result from the decoder in a loop and sends down the result channel.
 func (sw *StreamWatcher) receive() {
 	defer close(sw.result)
@@ -84,7 +91,16 @@ func (sw *StreamWatcher) receive() {
 	for {
 		action, obj, err := sw.source.Decode()
 		if err != nil {
-			if err != io.EOF {
+			// Ignore expected error.
+			if sw.stopping() {
+				return
+			}
+			switch err {
+			case io.EOF:
+				// watch closed normally
+			case io.ErrUnexpectedEOF:
+				glog.V(1).Infof("Unexpected EOF during watch stream event decoding: %v", err)
+			default:
 				glog.Errorf("Unable to decode an event from the watch stream: %v", err)
 			}
 			return

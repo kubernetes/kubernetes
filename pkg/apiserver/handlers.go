@@ -19,12 +19,15 @@ package apiserver
 import (
 	"fmt"
 	"net/http"
+	"path"
 	"regexp"
 	"runtime/debug"
 	"strings"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/authorizer"
-	authhandlers "github.com/GoogleCloudPlatform/kubernetes/pkg/auth/handlers"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/httplog"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/golang/glog"
@@ -40,23 +43,9 @@ var specialVerbs = map[string]bool{
 	"watch":    true,
 }
 
-// KindFromRequest returns Kind if Kind can be extracted from the request.  Otherwise, the empty string.
-func KindFromRequest(req http.Request) string {
-	// TODO: find a way to keep this code's assumptions about paths up to date with changes in the code.  Maybe instead
-	// of directly adding handler's code to the master's Mux, have a function which forces the structure when adding
-	// them.
-	parts := splitPath(req.URL.Path)
-	if len(parts) > 2 && parts[0] == "api" {
-		if _, ok := specialVerbs[parts[2]]; ok {
-			if len(parts) > 3 {
-				return parts[3]
-			}
-		} else {
-			return parts[2]
-		}
-	}
-	return ""
-}
+// Constant for the retry-after interval on rate limiting.
+// TODO: maybe make this dynamic? or user-adjustable?
+const RetryAfter = "1"
 
 // IsReadOnlyReq() is true for any (or at least many) request which has no observable
 // side effects on state of apiserver (though there may be internal side effects like
@@ -81,6 +70,27 @@ func ReadOnly(handler http.Handler) http.Handler {
 	})
 }
 
+// MaxInFlight limits the number of in-flight requests to buffer size of the passed in channel.
+func MaxInFlightLimit(c chan bool, longRunningRequestRE *regexp.Regexp, handler http.Handler) http.Handler {
+	if c == nil {
+		return handler
+	}
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if longRunningRequestRE.MatchString(r.URL.Path) {
+			// Skip tracking long running events.
+			handler.ServeHTTP(w, r)
+			return
+		}
+		select {
+		case c <- true:
+			defer func() { <-c }()
+			handler.ServeHTTP(w, r)
+		default:
+			tooManyRequests(w)
+		}
+	})
+}
+
 // RateLimit uses rl to rate limit accepting requests to 'handler'.
 func RateLimit(rl util.RateLimiter, handler http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
@@ -88,9 +98,15 @@ func RateLimit(rl util.RateLimiter, handler http.Handler) http.Handler {
 			handler.ServeHTTP(w, req)
 			return
 		}
-		w.WriteHeader(http.StatusServiceUnavailable)
-		fmt.Fprintf(w, "Rate limit exceeded.")
+		tooManyRequests(w)
 	})
+}
+
+func tooManyRequests(w http.ResponseWriter) {
+	// Return a 429 status indicating "Too Many Requests"
+	w.Header().Set("Retry-After", RetryAfter)
+	w.WriteHeader(errors.StatusTooManyRequests)
+	fmt.Fprintf(w, "Too many requests, please try again later.")
 }
 
 // RecoverPanics wraps an http Handler to recover and log panics.
@@ -112,7 +128,8 @@ func RecoverPanics(handler http.Handler) http.Handler {
 				http.StatusTemporaryRedirect,
 				http.StatusConflict,
 				http.StatusNotFound,
-				StatusUnprocessableEntity,
+				errors.StatusUnprocessableEntity,
+				http.StatusSwitchingProtocols,
 			),
 		).Log()
 
@@ -167,32 +184,38 @@ type RequestAttributeGetter interface {
 }
 
 type requestAttributeGetter struct {
-	userContexts authhandlers.RequestContext
+	requestContextMapper   api.RequestContextMapper
+	apiRequestInfoResolver *APIRequestInfoResolver
 }
 
 // NewAttributeGetter returns an object which implements the RequestAttributeGetter interface.
-func NewRequestAttributeGetter(userContexts authhandlers.RequestContext) RequestAttributeGetter {
-	return &requestAttributeGetter{userContexts}
+func NewRequestAttributeGetter(requestContextMapper api.RequestContextMapper, restMapper meta.RESTMapper, apiRoots ...string) RequestAttributeGetter {
+	return &requestAttributeGetter{requestContextMapper, &APIRequestInfoResolver{util.NewStringSet(apiRoots...), restMapper}}
 }
 
 func (r *requestAttributeGetter) GetAttribs(req *http.Request) authorizer.Attributes {
 	attribs := authorizer.AttributesRecord{}
 
-	user, ok := r.userContexts.Get(req)
+	ctx, ok := r.requestContextMapper.Get(req)
 	if ok {
-		attribs.User = user
+		user, ok := api.UserFrom(ctx)
+		if ok {
+			attribs.User = user
+		}
 	}
 
 	attribs.ReadOnly = IsReadOnlyReq(*req)
 
+	apiRequestInfo, _ := r.apiRequestInfoResolver.GetAPIRequestInfo(req)
+
 	// If a path follows the conventions of the REST object store, then
-	// we can extract the object Kind.  Otherwise, not.
-	attribs.Kind = KindFromRequest(*req)
+	// we can extract the resource.  Otherwise, not.
+	attribs.Resource = apiRequestInfo.Resource
 
 	// If the request specifies a namespace, then the namespace is filled in.
 	// Assumes there is no empty string namespace.  Unspecified results
 	// in empty (does not understand defaulting rules.)
-	attribs.Namespace = req.URL.Query().Get("namespace")
+	attribs.Namespace = apiRequestInfo.Namespace
 
 	return &attribs
 }
@@ -207,4 +230,161 @@ func WithAuthorizationCheck(handler http.Handler, getAttribs RequestAttributeGet
 		}
 		forbidden(w, req)
 	})
+}
+
+// APIRequestInfo holds information parsed from the http.Request
+type APIRequestInfo struct {
+	// Verb is the kube verb associated with the request, not the http verb.  This includes things like list and watch.
+	Verb       string
+	APIVersion string
+	Namespace  string
+	// Resource is the name of the resource being requested.  This is not the kind.  For example: pods
+	Resource string
+	// Kind is the type of object being manipulated.  For example: Pod
+	Kind string
+	// Name is empty for some verbs, but if the request directly indicates a name (not in body content) then this field is filled in.
+	Name string
+	// Parts are the path parts for the request, always starting with /{resource}/{name}
+	Parts []string
+	// Raw is the unparsed form of everything other than parts.
+	// Raw + Parts = complete URL path
+	Raw []string
+}
+
+// URLPath returns the URL path for this request, including /{resource}/{name} if present but nothing
+// following that.
+func (info APIRequestInfo) URLPath() string {
+	p := info.Parts
+	if n := len(p); n > 2 {
+		// Only take resource and name
+		p = p[:2]
+	}
+	return path.Join("/", path.Join(info.Raw...), path.Join(p...))
+}
+
+type APIRequestInfoResolver struct {
+	APIPrefixes util.StringSet
+	RestMapper  meta.RESTMapper
+}
+
+// GetAPIRequestInfo returns the information from the http request.  If error is not nil, APIRequestInfo holds the information as best it is known before the failure
+// Valid Inputs:
+// Storage paths
+// /namespaces
+// /namespaces/{namespace}
+// /namespaces/{namespace}/{resource}
+// /namespaces/{namespace}/{resource}/{resourceName}
+// /{resource}
+// /{resource}/{resourceName}
+// /{resource}/{resourceName}?namespace={namespace}
+// /{resource}?namespace={namespace}
+//
+// Special verbs:
+// /proxy/{resource}/{resourceName}
+// /proxy/namespaces/{namespace}/{resource}/{resourceName}
+// /redirect/namespaces/{namespace}/{resource}/{resourceName}
+// /redirect/{resource}/{resourceName}
+// /watch/{resource}
+// /watch/namespaces/{namespace}/{resource}
+//
+// Fully qualified paths for above:
+// /api/{version}/*
+// /api/{version}/*
+func (r *APIRequestInfoResolver) GetAPIRequestInfo(req *http.Request) (APIRequestInfo, error) {
+	requestInfo := APIRequestInfo{
+		Raw: splitPath(req.URL.Path),
+	}
+
+	currentParts := requestInfo.Raw
+	if len(currentParts) < 1 {
+		return requestInfo, fmt.Errorf("Unable to determine kind and namespace from an empty URL path")
+	}
+
+	for _, currPrefix := range r.APIPrefixes.List() {
+		// handle input of form /api/{version}/* by adjusting special paths
+		if currentParts[0] == currPrefix {
+			if len(currentParts) > 1 {
+				requestInfo.APIVersion = currentParts[1]
+			}
+
+			if len(currentParts) > 2 {
+				currentParts = currentParts[2:]
+			} else {
+				return requestInfo, fmt.Errorf("Unable to determine kind and namespace from url, %v", req.URL)
+			}
+		}
+	}
+
+	// handle input of form /{specialVerb}/*
+	if _, ok := specialVerbs[currentParts[0]]; ok {
+		requestInfo.Verb = currentParts[0]
+
+		if len(currentParts) > 1 {
+			currentParts = currentParts[1:]
+		} else {
+			return requestInfo, fmt.Errorf("Unable to determine kind and namespace from url, %v", req.URL)
+		}
+	} else {
+		switch req.Method {
+		case "POST":
+			requestInfo.Verb = "create"
+		case "GET":
+			requestInfo.Verb = "get"
+		case "PUT":
+			requestInfo.Verb = "update"
+		case "DELETE":
+			requestInfo.Verb = "delete"
+		}
+
+	}
+
+	// URL forms: /namespaces/{namespace}/{kind}/*, where parts are adjusted to be relative to kind
+	if currentParts[0] == "namespaces" {
+		if len(currentParts) < 3 {
+			requestInfo.Resource = "namespaces"
+			if len(currentParts) > 1 {
+				requestInfo.Namespace = currentParts[1]
+			}
+		} else {
+			requestInfo.Resource = currentParts[2]
+			requestInfo.Namespace = currentParts[1]
+			currentParts = currentParts[2:]
+		}
+	} else {
+		// URL forms: /{resource}/*
+		// URL forms: POST /{resource} is a legacy API convention to create in "default" namespace
+		// URL forms: /{resource}/{resourceName} use the "default" namespace if omitted from query param
+		// URL forms: /{resource} assume cross-namespace operation if omitted from query param
+		requestInfo.Resource = currentParts[0]
+		requestInfo.Namespace = req.URL.Query().Get("namespace")
+		if len(requestInfo.Namespace) == 0 {
+			if len(currentParts) > 1 || req.Method == "POST" {
+				requestInfo.Namespace = api.NamespaceDefault
+			} else {
+				requestInfo.Namespace = api.NamespaceAll
+			}
+		}
+	}
+
+	// parsing successful, so we now know the proper value for .Parts
+	requestInfo.Parts = currentParts
+	// Raw should have everything not in Parts
+	requestInfo.Raw = requestInfo.Raw[:len(requestInfo.Raw)-len(currentParts)]
+
+	// if there's another part remaining after the kind, then that's the resource name
+	if len(requestInfo.Parts) >= 2 {
+		requestInfo.Name = requestInfo.Parts[1]
+	}
+
+	// if there's no name on the request and we thought it was a get before, then the actual verb is a list
+	if len(requestInfo.Name) == 0 && requestInfo.Verb == "get" {
+		requestInfo.Verb = "list"
+	}
+
+	// if we have a resource, we have a good shot at being able to determine kind
+	if len(requestInfo.Resource) > 0 {
+		_, requestInfo.Kind, _ = r.RestMapper.VersionAndKindForResource(requestInfo.Resource)
+	}
+
+	return requestInfo, nil
 }

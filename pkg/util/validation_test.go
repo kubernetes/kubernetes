@@ -21,13 +21,14 @@ import (
 	"testing"
 )
 
-func TestIsDNSLabel(t *testing.T) {
+func TestIsDNS1123Label(t *testing.T) {
 	goodValues := []string{
 		"a", "ab", "abc", "a1", "a-1", "a--1--2--b",
 		"0", "01", "012", "1a", "1-a", "1--a--b--2",
+		strings.Repeat("a", 63),
 	}
 	for _, val := range goodValues {
-		if !IsDNSLabel(val) {
+		if !IsDNS1123Label(val) {
 			t.Errorf("expected true for '%s'", val)
 		}
 	}
@@ -41,13 +42,13 @@ func TestIsDNSLabel(t *testing.T) {
 		strings.Repeat("a", 64),
 	}
 	for _, val := range badValues {
-		if IsDNSLabel(val) {
+		if IsDNS1123Label(val) {
 			t.Errorf("expected false for '%s'", val)
 		}
 	}
 }
 
-func TestIsDNSSubdomain(t *testing.T) {
+func TestIsDNS1123Subdomain(t *testing.T) {
 	goodValues := []string{
 		"a", "ab", "abc", "a1", "a-1", "a--1--2--b",
 		"0", "01", "012", "1a", "1-a", "1--a--b--2",
@@ -56,9 +57,10 @@ func TestIsDNSSubdomain(t *testing.T) {
 		"0.a", "01.a", "012.a", "1a.a", "1-a.a", "1--a--b--2",
 		"0.1", "01.1", "012.1", "1a.1", "1-a.1", "1--a--b--2.1",
 		"a.b.c.d.e", "aa.bb.cc.dd.ee", "1.2.3.4.5", "11.22.33.44.55",
+		strings.Repeat("a", 253),
 	}
 	for _, val := range goodValues {
-		if !IsDNSSubdomain(val) {
+		if !IsDNS1123Subdomain(val) {
 			t.Errorf("expected true for '%s'", val)
 		}
 	}
@@ -78,7 +80,34 @@ func TestIsDNSSubdomain(t *testing.T) {
 		strings.Repeat("a", 254),
 	}
 	for _, val := range badValues {
-		if IsDNSSubdomain(val) {
+		if IsDNS1123Subdomain(val) {
+			t.Errorf("expected false for '%s'", val)
+		}
+	}
+}
+
+func TestIsDNS952Label(t *testing.T) {
+	goodValues := []string{
+		"a", "ab", "abc", "a1", "a-1", "a--1--2--b",
+		strings.Repeat("a", 24),
+	}
+	for _, val := range goodValues {
+		if !IsDNS952Label(val) {
+			t.Errorf("expected true for '%s'", val)
+		}
+	}
+
+	badValues := []string{
+		"0", "01", "012", "1a", "1-a", "1--a--b--2",
+		"", "A", "ABC", "aBc", "A1", "A-1", "1-A",
+		"-", "a-", "-a", "1-", "-1",
+		"_", "a_", "_a", "a_b", "1_", "_1", "1_2",
+		".", "a.", ".a", "a.b", "1.", ".1", "1.2",
+		" ", "a ", " a", "a b", "1 ", " 1", "1 2",
+		strings.Repeat("a", 25),
+	}
+	for _, val := range badValues {
+		if IsDNS952Label(val) {
 			t.Errorf("expected false for '%s'", val)
 		}
 	}
@@ -125,25 +154,101 @@ func TestIsValidPortNum(t *testing.T) {
 	}
 }
 
-func TestIsDNS952(t *testing.T) {
+func TestIsQualifiedName(t *testing.T) {
+	successCases := []string{
+		"simple",
+		"now-with-dashes",
+		"1-starts-with-num",
+		"1234",
+		"simple/simple",
+		"now-with-dashes/simple",
+		"now-with-dashes/now-with-dashes",
+		"now.with.dots/simple",
+		"now-with.dashes-and.dots/simple",
+		"1-num.2-num/3-num",
+		"1234/5678",
+		"1.2.3.4/5678",
+		"UppercaseIsOK123",
+	}
+	for i := range successCases {
+		if !IsQualifiedName(successCases[i]) {
+			t.Errorf("case[%d] expected success", i)
+		}
+	}
+
+	errorCases := []string{
+		"nospecialchars%^=@",
+		"cantendwithadash-",
+		"only/one/slash",
+		strings.Repeat("a", 254),
+		"-cantstartwithadash",
+	}
+	for i := range errorCases {
+		if IsQualifiedName(errorCases[i]) {
+			t.Errorf("case[%d] expected failure", i)
+		}
+	}
+}
+
+func TestIsValidLabelValue(t *testing.T) {
+	successCases := []string{
+		"simple",
+		"now-with-dashes",
+		"1-starts-with-num",
+		"end-with-num-1",
+		"1234",                  // only num
+		strings.Repeat("a", 63), // to the limit
+		"", // empty value
+	}
+	for i := range successCases {
+		if !IsValidLabelValue(successCases[i]) {
+			t.Errorf("case %s expected success", successCases[i])
+		}
+	}
+
+	errorCases := []string{
+		"nospecialchars%^=@",
+		"Tama-nui-te-rā.is.Māori.sun",
+		"\\backslashes\\are\\bad",
+		"-starts-with-dash",
+		"ends-with-dash-",
+		".starts.with.dot",
+		"ends.with.dot.",
+		strings.Repeat("a", 64), // over the limit
+	}
+	for i := range errorCases {
+		if IsValidLabelValue(errorCases[i]) {
+			t.Errorf("case[%d] expected failure", i)
+		}
+	}
+}
+
+func TestIsValidIP(t *testing.T) {
 	goodValues := []string{
-		"a", "ab", "abc", "a1", "a-b", "a-1", "a-1-2-b", "abc-123",
+		"1.1.1.1",
+		"1.1.1.01",
+		"255.0.0.1",
+		"1.0.0.0",
+		"0.0.0.0",
 	}
 	for _, val := range goodValues {
-		if !IsDNS952Label(val) {
-			t.Errorf("expected true for '%s'", val)
+		if !IsValidIP(val) {
+			t.Errorf("expected true for %q", val)
 		}
 	}
 
 	badValues := []string{
-		"", "1", "123", "1a",
-		"-", "a-", "-a", "1-", "-1", "1-2",
-		" ", "a ", " a", "a b", "1 ", " 1", "1 2",
-		"A", "AB", "AbC", "A1", "A-B", "A-1", "A-1-2-B",
+		"2a00:79e0:2:0:f1c3:e797:93c1:df80", // This is valid IPv6
+		"a",
+		"myhost.mydomain",
+		"-1.0.0.0",
+		"1.0.0.256",
+		"1.0.0.1.1",
+		"1.0.0.1.",
 	}
 	for _, val := range badValues {
-		if IsDNS952Label(val) {
-			t.Errorf("expected false for '%s'", val)
+		if IsValidIP(val) {
+			t.Errorf("expected false for %q", val)
 		}
 	}
 }

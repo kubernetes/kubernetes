@@ -19,11 +19,10 @@ package config
 import (
 	"fmt"
 
-	errs "github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	errs "github.com/GoogleCloudPlatform/kubernetes/pkg/util/fielderrors"
 )
 
 type RESTClientPoster interface {
@@ -37,8 +36,8 @@ type ClientPosterFunc func(mapping *meta.RESTMapping) (RESTClientPoster, error)
 // be valid API type. It requires ObjectTyper to parse the Version and Kind and
 // RESTMapper to get the resource URI and REST client that knows how to create
 // given type
-func CreateObjects(typer runtime.ObjectTyper, mapper meta.RESTMapper, clientFor ClientPosterFunc, objects []runtime.Object) util.ErrorList {
-	allErrors := util.ErrorList{}
+func CreateObjects(typer runtime.ObjectTyper, mapper meta.RESTMapper, clientFor ClientPosterFunc, objects []runtime.Object) []error {
+	var allErrors []error
 	for i, obj := range objects {
 		version, kind, err := typer.ObjectVersionAndKind(obj)
 		if err != nil {
@@ -46,7 +45,7 @@ func CreateObjects(typer runtime.ObjectTyper, mapper meta.RESTMapper, clientFor 
 			continue
 		}
 
-		mapping, err := mapper.RESTMapping(version, kind)
+		mapping, err := mapper.RESTMapping(kind, version)
 		if err != nil {
 			allErrors = append(allErrors, fmt.Errorf("Config.item[%d] mapping: %v", i, err))
 			continue
@@ -72,16 +71,16 @@ func CreateObjects(typer runtime.ObjectTyper, mapper meta.RESTMapper, clientFor 
 func CreateObject(client RESTClientPoster, mapping *meta.RESTMapping, obj runtime.Object) *errs.ValidationError {
 	name, err := mapping.MetadataAccessor.Name(obj)
 	if err != nil || name == "" {
-		return errs.NewFieldRequired("name", err)
+		return errs.NewFieldRequired("name")
 	}
 
 	namespace, err := mapping.Namespace(obj)
 	if err != nil {
-		return errs.NewFieldRequired("namespace", err)
+		return errs.NewFieldRequired("namespace")
 	}
 
 	// TODO: This should be using RESTHelper
-	err = client.Post().Path(mapping.Resource).Namespace(namespace).Body(obj).Do().Error()
+	err = client.Post().Resource(mapping.Resource).Namespace(namespace).Body(obj).Do().Error()
 	if err != nil {
 		return errs.NewFieldInvalid(name, obj, err.Error())
 	}

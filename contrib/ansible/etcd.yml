@@ -1,0 +1,6 @@
+---
+- hosts: etcd
+  sudo: yes
+  roles:
+          - common
+          - etcd

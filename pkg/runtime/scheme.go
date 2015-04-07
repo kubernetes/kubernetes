@@ -18,6 +18,7 @@ package runtime
 
 import (
 	"fmt"
+	"net/url"
 	"reflect"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/conversion"
@@ -27,7 +28,13 @@ import (
 // is an adaptation of conversion's Scheme for our API objects.
 type Scheme struct {
 	raw *conversion.Scheme
+	// Map from version and resource to the corresponding func to convert
+	// resource field labels in that version to internal version.
+	fieldLabelConversionFuncs map[string]map[string]FieldLabelConversionFunc
 }
+
+// Function to convert a field selector to internal representation.
+type FieldLabelConversionFunc func(label, value string) (internalLabel, internalValue string, err error)
 
 // fromScope gets the input version, desired output version, and desired Scheme
 // from a conversion.Scope.
@@ -40,7 +47,7 @@ func (self *Scheme) fromScope(s conversion.Scope) (inVersion, outVersion string,
 
 // emptyPlugin is used to copy the Kind field to and from plugin objects.
 type emptyPlugin struct {
-	PluginBase `json:",inline" yaml:",inline"`
+	PluginBase `json:",inline"`
 }
 
 // embeddedObjectToRawExtension does the conversion you would expect from the name, using the information
@@ -95,7 +102,7 @@ func (self *Scheme) embeddedObjectToRawExtension(in *EmbeddedObject, out *RawExt
 // given in conversion.Scope. It's placed in all schemes as a ConversionFunc to enable plugins;
 // see the comment for RawExtension.
 func (self *Scheme) rawExtensionToEmbeddedObject(in *RawExtension, out *EmbeddedObject, s conversion.Scope) error {
-	if len(in.RawJSON) == 4 && string(in.RawJSON) == "null" {
+	if len(in.RawJSON) == 0 || (len(in.RawJSON) == 4 && string(in.RawJSON) == "null") {
 		out.Object = nil
 		return nil
 	}
@@ -140,15 +147,87 @@ func (self *Scheme) rawExtensionToEmbeddedObject(in *RawExtension, out *Embedded
 	return nil
 }
 
+// runtimeObjectToRawExtensionArray takes a list of objects and encodes them as RawExtension in the output version
+// defined by the conversion.Scope. If objects must be encoded to different schema versions you should set them as
+// runtime.Unknown in the internal version instead.
+func (self *Scheme) runtimeObjectToRawExtensionArray(in *[]Object, out *[]RawExtension, s conversion.Scope) error {
+	src := *in
+	dest := make([]RawExtension, len(src))
+
+	_, outVersion, scheme := self.fromScope(s)
+
+	for i := range src {
+		switch t := src[i].(type) {
+		case *Unknown:
+			dest[i].RawJSON = t.RawJSON
+		default:
+			data, err := scheme.EncodeToVersion(src[i], outVersion)
+			if err != nil {
+				return err
+			}
+			dest[i].RawJSON = data
+		}
+	}
+	*out = dest
+	return nil
+}
+
+// rawExtensionToRuntimeObjectArray attempts to decode objects from the array - if they are unrecognized objects,
+// they are added as Unknown.
+func (self *Scheme) rawExtensionToRuntimeObjectArray(in *[]RawExtension, out *[]Object, s conversion.Scope) error {
+	src := *in
+	dest := make([]Object, len(src))
+
+	_, _, scheme := self.fromScope(s)
+
+	for i := range src {
+		data := src[i].RawJSON
+		obj, err := scheme.Decode(data)
+		if err != nil {
+			if !IsNotRegisteredError(err) {
+				return err
+			}
+			version, kind, err := scheme.raw.DataVersionAndKind(data)
+			if err != nil {
+				return err
+			}
+			obj = &Unknown{
+				TypeMeta: TypeMeta{
+					APIVersion: version,
+					Kind:       kind,
+				},
+				RawJSON: data,
+			}
+		}
+		dest[i] = obj
+	}
+	*out = dest
+	return nil
+}
+
 // NewScheme creates a new Scheme. This scheme is pluggable by default.
 func NewScheme() *Scheme {
-	s := &Scheme{conversion.NewScheme()}
+	s := &Scheme{conversion.NewScheme(), map[string]map[string]FieldLabelConversionFunc{}}
 	s.raw.InternalVersion = ""
 	s.raw.MetaFactory = conversion.SimpleMetaFactory{BaseFields: []string{"TypeMeta"}, VersionField: "APIVersion", KindField: "Kind"}
-	s.raw.AddConversionFuncs(
+	if err := s.raw.AddConversionFuncs(
 		s.embeddedObjectToRawExtension,
 		s.rawExtensionToEmbeddedObject,
-	)
+		s.runtimeObjectToRawExtensionArray,
+		s.rawExtensionToRuntimeObjectArray,
+	); err != nil {
+		panic(err)
+	}
+	// Enable map[string][]string conversions by default
+	if err := s.raw.AddConversionFuncs(DefaultStringConversions...); err != nil {
+		panic(err)
+	}
+	if err := s.raw.RegisterInputDefaults(&map[string][]string{}, JSONKeyMapper, conversion.AllowDifferentFieldTypeNames|conversion.IgnoreMissingFields); err != nil {
+		panic(err)
+	}
+	if err := s.raw.RegisterInputDefaults(&url.Values{}, JSONKeyMapper, conversion.AllowDifferentFieldTypeNames|conversion.IgnoreMissingFields); err != nil {
+		panic(err)
+	}
 	return s
 }
 
@@ -203,7 +282,8 @@ func (s *Scheme) Log(l conversion.DebugLogger) {
 
 // AddConversionFuncs adds a function to the list of conversion functions. The given
 // function should know how to convert between two API objects. We deduce how to call
-// it from the types of its two parameters; see the comment for Converter.Register.
+// it from the types of its two parameters; see the comment for
+// Converter.RegisterConversionFunction.
 //
 // Note that, if you need to copy sub-objects that didn't change, it's safe to call
 // Convert() inside your conversionFuncs, as long as you don't start a conversion
@@ -217,6 +297,17 @@ func (s *Scheme) AddConversionFuncs(conversionFuncs ...interface{}) error {
 	return s.raw.AddConversionFuncs(conversionFuncs...)
 }
 
+// AddFieldLabelConversionFunc adds a conversion function to convert field selectors
+// of the given kind from the given version to internal version representation.
+func (s *Scheme) AddFieldLabelConversionFunc(version, kind string, conversionFunc FieldLabelConversionFunc) error {
+	if s.fieldLabelConversionFuncs[version] == nil {
+		s.fieldLabelConversionFuncs[version] = map[string]FieldLabelConversionFunc{}
+	}
+
+	s.fieldLabelConversionFuncs[version][kind] = conversionFunc
+	return nil
+}
+
 // AddStructFieldConversion allows you to specify a mechanical copy for a moved
 // or renamed struct field without writing an entire conversion function. See
 // the comment in conversion.Converter.SetStructFieldCopy for parameter details.
@@ -225,11 +316,31 @@ func (s *Scheme) AddStructFieldConversion(srcFieldType interface{}, srcFieldName
 	return s.raw.AddStructFieldConversion(srcFieldType, srcFieldName, destFieldType, destFieldName)
 }
 
+// AddDefaultingFuncs adds a function to the list of value-defaulting functions.
+// We deduce how to call it from the types of its two parameters; see the
+// comment for Converter.RegisterDefaultingFunction.
+func (s *Scheme) AddDefaultingFuncs(defaultingFuncs ...interface{}) error {
+	return s.raw.AddDefaultingFuncs(defaultingFuncs...)
+}
+
 // Convert will attempt to convert in into out. Both must be pointers.
 // For easy testing of conversion functions. Returns an error if the conversion isn't
 // possible.
 func (s *Scheme) Convert(in, out interface{}) error {
 	return s.raw.Convert(in, out)
+}
+
+// Converts the given field label and value for an kind field selector from
+// versioned representation to an unversioned one.
+func (s *Scheme) ConvertFieldLabel(version, kind, label, value string) (string, string, error) {
+	if s.fieldLabelConversionFuncs[version] == nil {
+		return "", "", fmt.Errorf("No conversion function found for version: %s", version)
+	}
+	conversionFunc, ok := s.fieldLabelConversionFuncs[version][kind]
+	if !ok {
+		return "", "", fmt.Errorf("No conversion function found for version %s and kind %s", version, kind)
+	}
+	return conversionFunc(label, value)
 }
 
 // ConvertToVersion attempts to convert an input object to its matching Kind in another
@@ -298,12 +409,17 @@ func (s *Scheme) Decode(data []byte) (Object, error) {
 // pointer to an api type.
 // If obj's APIVersion doesn't match that in data, an attempt will be made to convert
 // data into obj's version.
+// TODO: allow Decode/DecodeInto to take a default apiVersion and a default kind, to
+// be applied if the provided object does not have either field (integrate external
+// apis into the decoding scheme).
 func (s *Scheme) DecodeInto(data []byte, obj Object) error {
 	return s.raw.DecodeInto(data, obj)
 }
 
 // Copy does a deep copy of an API object.  Useful mostly for tests.
 // TODO(dbsmith): implement directly instead of via Encode/Decode
+// TODO(claytonc): Copy cannot be used for objects which do not encode type information, such
+// as lists of runtime.Objects
 func (s *Scheme) Copy(obj Object) (Object, error) {
 	data, err := s.EncodeToVersion(obj, "")
 	if err != nil {

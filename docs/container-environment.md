@@ -59,7 +59,7 @@ This hook is called immediately before a container is terminated.  This event h
 A single parameter named reason is passed to the handler which contains the reason for termination.  Currently the valid values for reason are:
 * ●	```Delete``` - indicating an API call to delete the pod containing this container.
 * ●	```Health``` - indicating that a health check of the container failed.
-* ●	```Dependency``` - indicating that a dependency for the container or the pod is missing, and thus, the container needs to be restarted.  Examples include, the network container crashing, or persistent disk failing for a container that mounts PD.
+* ●	```Dependency``` - indicating that a dependency for the container or the pod is missing, and thus, the container needs to be restarted.  Examples include, the pod infra container crashing, or persistent disk failing for a container that mounts PD.
 
 Eventually, user specified reasons may be [added to the API](https://github.com/GoogleCloudPlatform/kubernetes/issues/137).
 
@@ -72,7 +72,7 @@ For hooks which have parameters, these parameters are passed to the event handle
 ### Hook Handler Implementations
 Hook handlers are the way that hooks are surfaced to containers.  Containers can select the type of hook handler they would like to implement.  Kubernetes currently supports two different hook handler types:
 
-   * Exec - Executes a specific command (e.g. pre-stop.sh) inside the cgroup and namespaces of the container.  Resources consumed by the command are counted against the container.  Commands which return non-zero values are treated as container failures (and will cause kubelet to forcibly restart the container).  Parameters are passed to the command as traditional linux command line flags (e.g. pre-stop.sh --reason=HEALTH)
+   * Exec - Executes a specific command (e.g. pre-stop.sh) inside the cgroup and namespaces of the container.  Resources consumed by the command are counted against the container.  Commands which print "ok" to standard out (stdout) are treated as healthy, any other output is treated as container failures (and will cause kubelet to forcibly restart the container).  Parameters are passed to the command as traditional linux command line flags (e.g. pre-stop.sh --reason=HEALTH)
 
    * HTTP - Executes an HTTP request against a specific endpoint on the container.  HTTP error codes (5xx) and non-response/failure to connect are treated as container failures. Parameters are passed to the http endpoint as query args (e.g. http://some.server.com/some/path?reason=HEALTH)
 

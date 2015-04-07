@@ -29,10 +29,11 @@ func (sl *StringList) String() string {
 
 func (sl *StringList) Set(value string) error {
 	for _, s := range strings.Split(value, ",") {
-		if len(s) == 0 {
-			return fmt.Errorf("value should not be an empty string")
-		}
 		*sl = append(*sl, s)
 	}
 	return nil
+}
+
+func (*StringList) Type() string {
+	return "stringList"
 }

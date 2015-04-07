@@ -23,18 +23,19 @@ ENV GOOS    linux
 ENV GOARCH  amd64
 
 # Get the code coverage tool and godep
-RUN go get code.google.com/p/go.tools/cmd/cover github.com/tools/godep
+RUN go get golang.org/x/tools/cmd/cover github.com/tools/godep
 
 # We use rsync to copy some binaries around.  It is faster (0.3s vs. 1.1s) on my
 # machine vs. `install`
-RUN apt-get update && apt-get install -y rsync
+RUN rm -rf /var/lib/apt/lists/
+RUN apt-get -o Acquire::Check-Valid-Until=false update && apt-get install -y rsync
 
 # Download and symlink etcd.  We need this for our integration tests.
 RUN mkdir -p /usr/local/src/etcd &&\
     cd /usr/local/src/etcd &&\
-    curl -L -O -s https://github.com/coreos/etcd/releases/download/v0.4.6/etcd-v0.4.6-linux-amd64.tar.gz &&\
-    tar xzf etcd-v0.4.6-linux-amd64.tar.gz &&\
-    ln -s ../src/etcd/etcd-v0.4.6-linux-amd64/etcd /usr/local/bin/
+    curl -L -O -s https://github.com/coreos/etcd/releases/download/v2.0.0/etcd-v2.0.0-linux-amd64.tar.gz &&\
+    tar xzf etcd-v2.0.0-linux-amd64.tar.gz &&\
+    ln -s ../src/etcd/etcd-v2.0.0-linux-amd64/etcd /usr/local/bin/
 
 # Mark this as a kube-build container
 RUN touch /kube-build-image

@@ -78,45 +78,57 @@ func (b modelBuilder) buildProperty(field reflect.StructField, model *Model, mod
 		return "", prop
 	}
 	fieldType := field.Type
-	fieldKind := fieldType.Kind()
 
-	if jsonTag := field.Tag.Get("json"); jsonTag != "" {
-		s := strings.Split(jsonTag, ",")
-		if len(s) > 1 && s[1] == "string" {
-			fieldType = reflect.TypeOf("")
-		}
-	}
-
-	var pType = b.jsonSchemaType(fieldType.String()) // may include pkg path
-	prop.Type = &pType
-	if b.isPrimitiveType(fieldType.String()) {
-		prop.Format = b.jsonSchemaFormat(fieldType.String())
-		return jsonName, prop
-	}
-
+	// check if type is doing its own marshalling
 	marshalerType := reflect.TypeOf((*json.Marshaler)(nil)).Elem()
 	if fieldType.Implements(marshalerType) {
 		var pType = "string"
 		prop.Type = &pType
+		prop.Format = b.jsonSchemaFormat(fieldType.String())
 		return jsonName, prop
 	}
 
-	if fieldKind == reflect.Struct {
+	// check if annotation says it is a string
+	if jsonTag := field.Tag.Get("json"); jsonTag != "" {
+		s := strings.Split(jsonTag, ",")
+		if len(s) > 1 && s[1] == "string" {
+			stringt := "string"
+			prop.Type = &stringt
+			return jsonName, prop
+		}
+	}
+
+	fieldKind := fieldType.Kind()
+	switch {
+	case fieldKind == reflect.Struct:
 		return b.buildStructTypeProperty(field, jsonName, model)
-	}
-
-	if fieldKind == reflect.Slice || fieldKind == reflect.Array {
+	case fieldKind == reflect.Slice || fieldKind == reflect.Array:
 		return b.buildArrayTypeProperty(field, jsonName, modelName)
+	case fieldKind == reflect.Ptr:
+		return b.buildPointerTypeProperty(field, jsonName, modelName)
+	case fieldKind == reflect.String:
+	     	stringt := "string"
+		prop.Type = &stringt
+		return jsonName, prop
+	case fieldKind == reflect.Map:
+                // if it's a map, it's unstructured, and swagger 1.2 can't handle it
+	        anyt := "any"
+		prop.Type = &anyt
+		return jsonName, prop
 	}
 
-	if fieldKind == reflect.Ptr {
-		return b.buildPointerTypeProperty(field, jsonName, modelName)
+	if b.isPrimitiveType(fieldType.String()) {
+		mapped := b.jsonSchemaType(fieldType.String())
+		prop.Type = &mapped
+		prop.Format = b.jsonSchemaFormat(fieldType.String())
+		return jsonName, prop
 	}
+	modelType := fieldType.String()
+	prop.Ref = &modelType
 
 	if fieldType.Name() == "" { // override type of anonymous structs
 		nestedTypeName := modelName + "." + jsonName
-		var pType = nestedTypeName
-		prop.Type = &pType
+		prop.Ref = &nestedTypeName
 		b.addModel(fieldType, nestedTypeName)
 	}
 	return jsonName, prop
@@ -129,7 +141,7 @@ func (b modelBuilder) buildStructTypeProperty(field reflect.StructField, jsonNam
 		// anonymous
 		anonType := model.Id + "." + jsonName
 		b.addModel(fieldType, anonType)
-		prop.Type = &anonType
+		prop.Ref = &anonType
 		return jsonName, prop
 	}
 	if field.Name == fieldType.Name() && field.Anonymous {
@@ -152,6 +164,10 @@ func (b modelBuilder) buildStructTypeProperty(field reflect.StructField, jsonNam
 			if required {
 				model.Required = append(model.Required, k)
 			}
+			// Add the model type to the global model list
+			if v.Ref != nil {
+				b.Models[*v.Ref] = sub.Models[*v.Ref]
+			}
 		}
 		// empty name signals skip property
 		return "", prop
@@ -159,7 +175,7 @@ func (b modelBuilder) buildStructTypeProperty(field reflect.StructField, jsonNam
 	// simple struct
 	b.addModel(fieldType, "")
 	var pType = fieldType.String()
-	prop.Type = &pType
+	prop.Ref = &pType
 	return jsonName, prop
 }
 
@@ -167,10 +183,19 @@ func (b modelBuilder) buildArrayTypeProperty(field reflect.StructField, jsonName
 	fieldType := field.Type
 	var pType = "array"
 	prop.Type = &pType
-	elemName := b.getElementTypeName(modelName, jsonName, fieldType.Elem())
-	prop.Items = []Item{Item{Ref: &elemName}}
+	elemTypeName := b.getElementTypeName(modelName, jsonName, fieldType.Elem())
+	prop.Items = new(Item)
+	if b.isPrimitiveType(elemTypeName) {
+		mapped := b.jsonSchemaType(elemTypeName)
+		prop.Items.Type = &mapped
+	} else {
+		prop.Items.Ref = &elemTypeName
+	}
 	// add|overwrite model for element type
-	b.addModel(fieldType.Elem(), elemName)
+	if fieldType.Elem().Kind() == reflect.Ptr {
+		fieldType = fieldType.Elem()
+	}
+	b.addModel(fieldType.Elem(), elemTypeName)
 	return jsonName, prop
 }
 
@@ -182,17 +207,17 @@ func (b modelBuilder) buildPointerTypeProperty(field reflect.StructField, jsonNa
 		var pType = "array"
 		prop.Type = &pType
 		elemName := b.getElementTypeName(modelName, jsonName, fieldType.Elem().Elem())
-		prop.Items = []Item{Item{Ref: &elemName}}
+		prop.Items = &Item{Ref: &elemName}
 		// add|overwrite model for element type
 		b.addModel(fieldType.Elem().Elem(), elemName)
 	} else {
 		// non-array, pointer type
 		var pType = fieldType.String()[1:] // no star, include pkg path
-		prop.Type = &pType
+		prop.Ref = &pType
 		elemName := ""
 		if fieldType.Elem().Name() == "" {
 			elemName = modelName + "." + jsonName
-			prop.Type = &elemName
+			prop.Ref = &elemName
 		}
 		b.addModel(fieldType.Elem(), elemName)
 	}
@@ -200,6 +225,9 @@ func (b modelBuilder) buildPointerTypeProperty(field reflect.StructField, jsonNa
 }
 
 func (b modelBuilder) getElementTypeName(modelName, jsonName string, t reflect.Type) string {
+	if t.Kind() == reflect.Ptr {
+		return t.String()[1:]
+	}
 	if t.Name() == "" {
 		return modelName + "." + jsonName
 	}
@@ -243,6 +271,7 @@ func (b modelBuilder) jsonSchemaType(modelName string) string {
 		"int":       "integer",
 		"int32":     "integer",
 		"int64":     "integer",
+                "uint64":    "integer",
 		"byte":      "string",
 		"float64":   "number",
 		"float32":   "number",

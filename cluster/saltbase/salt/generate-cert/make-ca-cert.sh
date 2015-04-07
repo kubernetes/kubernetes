@@ -61,7 +61,7 @@ tar xzf easy-rsa.tar.gz > /dev/null 2>&1
 
 cd easy-rsa-master/easyrsa3
 ./easyrsa init-pki > /dev/null 2>&1
-./easyrsa --batch build-ca nopass > /dev/null 2>&1
+./easyrsa --batch "--req-cn=$cert_ip@`date +%s`" build-ca nopass > /dev/null 2>&1
 if [ $use_cn = "true" ]; then
     ./easyrsa build-server-full $cert_ip nopass > /dev/null 2>&1
     cp -p pki/issued/$cert_ip.crt "${cert_dir}/server.cert" > /dev/null 2>&1

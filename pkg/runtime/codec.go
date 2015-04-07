@@ -16,9 +16,45 @@ limitations under the License.
 
 package runtime
 
+import (
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/yaml"
+)
+
 // CodecFor returns a Codec that invokes Encode with the provided version.
 func CodecFor(scheme *Scheme, version string) Codec {
 	return &codecWrapper{scheme, version}
+}
+
+// yamlCodec converts YAML passed to the Decoder methods to JSON.
+type yamlCodec struct {
+	// a Codec for JSON
+	Codec
+}
+
+// yamlCodec implements Codec
+var _ Codec = yamlCodec{}
+
+// YAMLDecoder adds YAML decoding support to a codec that supports JSON.
+func YAMLDecoder(codec Codec) Codec {
+	return &yamlCodec{codec}
+}
+
+func (c yamlCodec) Decode(data []byte) (Object, error) {
+	out, err := yaml.ToJSON(data)
+	if err != nil {
+		return nil, err
+	}
+	data = out
+	return c.Codec.Decode(data)
+}
+
+func (c yamlCodec) DecodeInto(data []byte, obj Object) error {
+	out, err := yaml.ToJSON(data)
+	if err != nil {
+		return err
+	}
+	data = out
+	return c.Codec.DecodeInto(data, obj)
 }
 
 // EncodeOrDie is a version of Encode which will panic instead of returning an error. For tests.

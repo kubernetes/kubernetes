@@ -94,14 +94,14 @@ func TestSimpleMetaFactoryUpdateStruct(t *testing.T) {
 
 func TestMetaValues(t *testing.T) {
 	type InternalSimple struct {
-		APIVersion string `json:"apiVersion,omitempty" yaml:"apiVersion,omitempty"`
-		Kind       string `json:"kind,omitempty" yaml:"kind,omitempty"`
-		TestString string `json:"testString" yaml:"testString"`
+		APIVersion string `json:"apiVersion,omitempty"`
+		Kind       string `json:"kind,omitempty"`
+		TestString string `json:"testString"`
 	}
 	type ExternalSimple struct {
-		APIVersion string `json:"apiVersion,omitempty" yaml:"apiVersion,omitempty"`
-		Kind       string `json:"kind,omitempty" yaml:"kind,omitempty"`
-		TestString string `json:"testString" yaml:"testString"`
+		APIVersion string `json:"apiVersion,omitempty"`
+		Kind       string `json:"kind,omitempty"`
+		TestString string `json:"testString"`
 	}
 	s := NewScheme()
 	s.AddKnownTypeWithName("", "Simple", &InternalSimple{})
@@ -194,14 +194,14 @@ func TestMetaValues(t *testing.T) {
 
 func TestMetaValuesUnregisteredConvert(t *testing.T) {
 	type InternalSimple struct {
-		Version    string `json:"apiVersion,omitempty" yaml:"apiVersion,omitempty"`
-		Kind       string `json:"kind,omitempty" yaml:"kind,omitempty"`
-		TestString string `json:"testString" yaml:"testString"`
+		Version    string `json:"apiVersion,omitempty"`
+		Kind       string `json:"kind,omitempty"`
+		TestString string `json:"testString"`
 	}
 	type ExternalSimple struct {
-		Version    string `json:"apiVersion,omitempty" yaml:"apiVersion,omitempty"`
-		Kind       string `json:"kind,omitempty" yaml:"kind,omitempty"`
-		TestString string `json:"testString" yaml:"testString"`
+		Version    string `json:"apiVersion,omitempty"`
+		Kind       string `json:"kind,omitempty"`
+		TestString string `json:"testString"`
 	}
 	s := NewScheme()
 	s.InternalVersion = ""

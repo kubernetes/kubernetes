@@ -17,7 +17,9 @@ limitations under the License.
 package httplog
 
 import (
+	"bufio"
 	"fmt"
+	"net"
 	"net/http"
 	"runtime"
 	"time"
@@ -46,6 +48,10 @@ type logger interface {
 
 // Add a layer on top of ResponseWriter, so we can track latency and error
 // message sources.
+//
+// TODO now that we're using go-restful, we shouldn't need to be wrapping
+// the http.ResponseWriter. We can recover panics from go-restful, and
+// the logging value is questionable.
 type respLogger struct {
 	status      int
 	statusStack string
@@ -63,12 +69,12 @@ type passthroughLogger struct{}
 
 // Addf logs info immediately.
 func (passthroughLogger) Addf(format string, data ...interface{}) {
-	glog.Infof(format, data...)
+	glog.InfoDepth(1, fmt.Sprintf(format, data...))
 }
 
 // DefaultStacktracePred is the default implementation of StacktracePred.
 func DefaultStacktracePred(status int) bool {
-	return status < http.StatusOK || status >= http.StatusBadRequest
+	return (status < http.StatusOK || status >= http.StatusInternalServerError) && status != http.StatusSwitchingProtocols
 }
 
 // NewLogged turns a normal response writer into a logged response writer.
@@ -148,7 +154,9 @@ func (rl *respLogger) Addf(format string, data ...interface{}) {
 // Log is intended to be called once at the end of your request handler, via defer
 func (rl *respLogger) Log() {
 	latency := time.Since(rl.startTime)
-	glog.V(2).Infof("%s %s: (%v) %v%v%v", rl.req.Method, rl.req.RequestURI, latency, rl.status, rl.statusStack, rl.addedInfo)
+	if glog.V(2) {
+		glog.InfoDepth(1, fmt.Sprintf("%s %s: (%v) %v%v%v [%s %s]", rl.req.Method, rl.req.RequestURI, latency, rl.status, rl.statusStack, rl.addedInfo, rl.req.Header["User-Agent"], rl.req.RemoteAddr))
+	}
 }
 
 // Header implements http.ResponseWriter.
@@ -166,8 +174,8 @@ func (rl *respLogger) Write(b []byte) (int, error) {
 func (rl *respLogger) Flush() {
 	if flusher, ok := rl.w.(http.Flusher); ok {
 		flusher.Flush()
-	} else {
-		glog.V(2).Infof("Unable to convert %v into http.Flusher", rl.w)
+	} else if glog.V(2) {
+		glog.InfoDepth(1, fmt.Sprintf("Unable to convert %+v into http.Flusher", rl.w))
 	}
 }
 
@@ -183,4 +191,9 @@ func (rl *respLogger) WriteHeader(status int) {
 		rl.statusStack = ""
 	}
 	rl.w.WriteHeader(status)
+}
+
+// Hijack implements http.Hijacker.
+func (rl *respLogger) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	return rl.w.(http.Hijacker).Hijack()
 }

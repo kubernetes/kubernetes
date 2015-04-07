@@ -5,6 +5,7 @@ Documentation=https://github.com/GoogleCloudPlatform/kubernetes
 [Service]
 EnvironmentFile=/etc/sysconfig/kube-apiserver
 ExecStart=/usr/local/bin/kube-apiserver "$DAEMON_ARGS"
+Restart=on-failure
 
 [Install]
 WantedBy=multi-user.target

@@ -466,7 +466,7 @@ func (f *FlagSet) parseLongArg(s string, args []string) (a []string, err error) 
 		return
 	}
 	if len(split) == 1 {
-		if _, ok := flag.Value.(*boolValue); !ok {
+		if bv, ok := flag.Value.(boolFlag); !ok || !bv.IsBoolFlag() {
 			err = f.failf("flag needs an argument: %s", s)
 			return
 		}
@@ -498,9 +498,10 @@ func (f *FlagSet) parseShortArg(s string, args []string) (a []string, err error)
 			if len(args) == 0 {
 				return
 			}
+			return
 		}
 		if alreadythere {
-			if _, ok := flag.Value.(*boolValue); ok {
+			if bv, ok := flag.Value.(boolFlag); ok && bv.IsBoolFlag() {
 				f.setFlag(flag, "true", s)
 				continue
 			}
@@ -543,8 +544,16 @@ func (f *FlagSet) parseArgs(args []string) (err error) {
 
 		if s[1] == '-' {
 			args, err = f.parseLongArg(s, args)
+
+			if len(s) == 2 {
+				// stop parsing after --
+				break
+			}
 		} else {
 			args, err = f.parseShortArg(s, args)
+		}
+		if err != nil {
+		   return
 		}
 	}
 	return

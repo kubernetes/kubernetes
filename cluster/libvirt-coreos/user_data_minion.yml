@@ -1,0 +1,45 @@
+#cloud-config
+
+coreos:
+  units:
+    - name: kubelet.service
+      command: start
+      content: |
+        [Unit]
+        After=opt-kubernetes.mount etcd.service docker.socket
+        ConditionFileIsExecutable=/opt/kubernetes/bin/kubelet
+        Description=Kubernetes Kubelet
+        Documentation=https://github.com/GoogleCloudPlatform/kubernetes
+        Requires=opt-kubernetes.mount etcd.service docker.socket
+
+        [Service]
+        ExecStart=/opt/kubernetes/bin/kubelet \
+        --address=0.0.0.0 \
+        --hostname_override=${MINION_IPS[$i]} \
+        --api_servers=http://${MASTER_IP}:8080 \
+        $( [[ "$ENABLE_CLUSTER_DNS" == "true" ]] && echo "--cluster_dns=${DNS_SERVER_IP}" ) \
+        $( [[ "$ENABLE_CLUSTER_DNS" == "true" ]] && echo "--cluster_domain=${DNS_DOMAIN}" ) \
+        --config=/opt/kubernetes/manifests
+        Restart=always
+        RestartSec=2
+
+        [Install]
+        WantedBy=multi-user.target
+    - name: kube-proxy.service
+      command: start
+      content: |
+        [Unit]
+        After=opt-kubernetes.mount etcd.service
+        ConditionFileIsExecutable=/opt/kubernetes/bin/kube-proxy
+        Description=Kubernetes Proxy
+        Documentation=https://github.com/GoogleCloudPlatform/kubernetes
+        Requires=opt-kubernetes.mount etcd.service
+
+        [Service]
+        ExecStart=/opt/kubernetes/bin/kube-proxy \
+        --master=http://${MASTER_IP}:7080
+        Restart=always
+        RestartSec=2
+
+        [Install]
+        WantedBy=multi-user.target

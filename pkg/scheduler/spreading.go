@@ -17,38 +17,152 @@ limitations under the License.
 package scheduler
 
 import (
-	"math/rand"
-
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 )
 
-// CalculateSpreadPriority spreads pods by minimizing the number of pods on the same machine with the same labels.
-// Importantly, if there are services in the system that span multiple heterogenous sets of pods, this spreading priority
-// may not provide optimal spreading for the members of that Service.
-// TODO: consider if we want to include Service label sets in the scheduling priority.
-func CalculateSpreadPriority(pod api.Pod, podLister PodLister, minionLister MinionLister) (HostPriorityList, error) {
-	pods, err := podLister.ListPods(labels.SelectorFromSet(pod.Labels))
-	if err != nil {
-		return nil, err
+type ServiceSpread struct {
+	serviceLister ServiceLister
+}
+
+func NewServiceSpreadPriority(serviceLister ServiceLister) PriorityFunction {
+	serviceSpread := &ServiceSpread{
+		serviceLister: serviceLister,
 	}
+	return serviceSpread.CalculateSpreadPriority
+}
+
+// CalculateSpreadPriority spreads pods by minimizing the number of pods belonging to the same service
+// on the same machine.
+func (s *ServiceSpread) CalculateSpreadPriority(pod api.Pod, podLister PodLister, minionLister MinionLister) (HostPriorityList, error) {
+	var maxCount int
+	var nsServicePods []api.Pod
+
+	services, err := s.serviceLister.GetPodServices(pod)
+	if err == nil {
+		// just use the first service and get the other pods within the service
+		// TODO: a separate predicate can be created that tries to handle all services for the pod
+		selector := labels.SelectorFromSet(services[0].Spec.Selector)
+		pods, err := podLister.List(selector)
+		if err != nil {
+			return nil, err
+		}
+		// consider only the pods that belong to the same namespace
+		for _, nsPod := range pods {
+			if nsPod.Namespace == pod.Namespace {
+				nsServicePods = append(nsServicePods, nsPod)
+			}
+		}
+	}
+
 	minions, err := minionLister.List()
 	if err != nil {
 		return nil, err
 	}
 
 	counts := map[string]int{}
-	for _, pod := range pods {
-		counts[pod.Status.Host]++
+	if len(nsServicePods) > 0 {
+		for _, pod := range nsServicePods {
+			counts[pod.Spec.Host]++
+			// Compute the maximum number of pods hosted on any minion
+			if counts[pod.Spec.Host] > maxCount {
+				maxCount = counts[pod.Spec.Host]
+			}
+		}
 	}
 
 	result := []HostPriority{}
+	//score int - scale of 0-10
+	// 0 being the lowest priority and 10 being the highest
 	for _, minion := range minions.Items {
-		result = append(result, HostPriority{host: minion.Name, score: counts[minion.Name]})
+		// initializing to the default/max minion score of 10
+		fScore := float32(10)
+		if maxCount > 0 {
+			fScore = 10 * (float32(maxCount-counts[minion.Name]) / float32(maxCount))
+		}
+		result = append(result, HostPriority{host: minion.Name, score: int(fScore)})
 	}
 	return result, nil
 }
 
-func NewSpreadingScheduler(podLister PodLister, minionLister MinionLister, predicates []FitPredicate, random *rand.Rand) Scheduler {
-	return NewGenericScheduler(predicates, CalculateSpreadPriority, podLister, random)
+type ServiceAntiAffinity struct {
+	serviceLister ServiceLister
+	label         string
+}
+
+func NewServiceAntiAffinityPriority(serviceLister ServiceLister, label string) PriorityFunction {
+	antiAffinity := &ServiceAntiAffinity{
+		serviceLister: serviceLister,
+		label:         label,
+	}
+	return antiAffinity.CalculateAntiAffinityPriority
+}
+
+// CalculateAntiAffinityPriority spreads pods by minimizing the number of pods belonging to the same service
+// on machines with the same value for a particular label.
+// The label to be considered is provided to the struct (ServiceAntiAffinity).
+func (s *ServiceAntiAffinity) CalculateAntiAffinityPriority(pod api.Pod, podLister PodLister, minionLister MinionLister) (HostPriorityList, error) {
+	var nsServicePods []api.Pod
+
+	services, err := s.serviceLister.GetPodServices(pod)
+	if err == nil {
+		// just use the first service and get the other pods within the service
+		// TODO: a separate predicate can be created that tries to handle all services for the pod
+		selector := labels.SelectorFromSet(services[0].Spec.Selector)
+		pods, err := podLister.List(selector)
+		if err != nil {
+			return nil, err
+		}
+		// consider only the pods that belong to the same namespace
+		for _, nsPod := range pods {
+			if nsPod.Namespace == pod.Namespace {
+				nsServicePods = append(nsServicePods, nsPod)
+			}
+		}
+	}
+
+	minions, err := minionLister.List()
+	if err != nil {
+		return nil, err
+	}
+
+	// separate out the minions that have the label from the ones that don't
+	otherMinions := []string{}
+	labeledMinions := map[string]string{}
+	for _, minion := range minions.Items {
+		if labels.Set(minion.Labels).Has(s.label) {
+			label := labels.Set(minion.Labels).Get(s.label)
+			labeledMinions[minion.Name] = label
+		} else {
+			otherMinions = append(otherMinions, minion.Name)
+		}
+	}
+
+	podCounts := map[string]int{}
+	for _, pod := range nsServicePods {
+		label, exists := labeledMinions[pod.Spec.Host]
+		if !exists {
+			continue
+		}
+		podCounts[label]++
+	}
+
+	numServicePods := len(nsServicePods)
+	result := []HostPriority{}
+	//score int - scale of 0-10
+	// 0 being the lowest priority and 10 being the highest
+	for minion := range labeledMinions {
+		// initializing to the default/max minion score of 10
+		fScore := float32(10)
+		if numServicePods > 0 {
+			fScore = 10 * (float32(numServicePods-podCounts[labeledMinions[minion]]) / float32(numServicePods))
+		}
+		result = append(result, HostPriority{host: minion, score: int(fScore)})
+	}
+	// add the open minions with a score of 0
+	for _, minion := range otherMinions {
+		result = append(result, HostPriority{host: minion, score: 0})
+	}
+
+	return result, nil
 }

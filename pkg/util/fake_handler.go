@@ -73,6 +73,15 @@ func (f *FakeHandler) ServeHTTP(response http.ResponseWriter, request *http.Requ
 	f.RequestBody = string(bodyReceived)
 }
 
+func (f *FakeHandler) ValidateRequestCount(t TestInterface, count int) {
+	f.lock.Lock()
+	defer f.lock.Unlock()
+	if f.requestCount != count {
+		t.Logf("Expected %d call, but got %d. Only the last call is recorded and checked.", count, f.requestCount)
+	}
+	f.hasBeenChecked = true
+}
+
 // ValidateRequest verifies that FakeHandler received a request with expected path, method, and body.
 func (f *FakeHandler) ValidateRequest(t TestInterface, expectedPath, expectedMethod string, body *string) {
 	f.lock.Lock()

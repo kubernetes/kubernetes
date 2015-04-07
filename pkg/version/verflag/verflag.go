@@ -19,12 +19,12 @@ limitations under the License.
 package verflag
 
 import (
-	"flag"
 	"fmt"
 	"os"
 	"strconv"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/version"
+	flag "github.com/spf13/pflag"
 )
 
 type versionValue int
@@ -64,6 +64,11 @@ func (v *versionValue) String() string {
 		return strRawVersion
 	}
 	return fmt.Sprintf("%v", bool(*v == VersionTrue))
+}
+
+// The type of the flag as requred by the pflag.Value interface
+func (v *versionValue) Type() string {
+	return "version"
 }
 
 func VersionVar(p *versionValue, name string, value versionValue, usage string) {

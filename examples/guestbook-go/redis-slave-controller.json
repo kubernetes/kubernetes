@@ -13,7 +13,7 @@
           "containers": [{
             "name": "redis-slave",
             "image": "gurpartap/redis",
-            "command": ["sh", "-c", "redis-server /etc/redis/redis.conf --slaveof $REDIS_MASTER_SERVICE_HOST $REDIS_MASTER_SERVICE_PORT"],
+            "command": ["sh", "-c", "redis-server /etc/redis/redis.conf --slaveof redis-master 6379"],
             "ports": [{ "name": "redis-server", "containerPort": 6379 }]
           }]
         }

@@ -17,9 +17,6 @@
 # exit on any error
 set -e
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
-source "${KUBE_ROOT}/cluster/vagrant/provision-config.sh"
-
 function release_not_found() {
   echo "It looks as if you don't have a compiled version of Kubernetes.  If you" >&2
   echo "are running from a clone of the git repo, please run ./build/release.sh." >&2
@@ -50,41 +47,59 @@ fi
 
 
 # Setup hosts file to support ping by hostname to each minion in the cluster from apiserver
-minion_ip_array=(${MINION_IPS//,/ })
 for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
   minion=${MINION_NAMES[$i]}
-  ip=${minion_ip_array[$i]}
+  ip=${MINION_IPS[$i]}
   if [ ! "$(cat /etc/hosts | grep $minion)" ]; then
     echo "Adding $minion to hosts file"
     echo "$ip $minion" >> /etc/hosts
   fi
+  echo "127.0.0.1 localhost" >> /etc/hosts # enables cmds like 'kubectl get pods' on master.
 done
 
 # Update salt configuration
 mkdir -p /etc/salt/minion.d
-echo "master: $MASTER_NAME" > /etc/salt/minion.d/master.conf
+cat <<EOF >/etc/salt/minion.d/master.conf
+master: '$(echo "$MASTER_NAME" | sed -e "s/'/''/g")'
+master: '$(echo "$MASTER_NAME" | sed -e "s/'/''/g")'
+auth_timeout: 10
+auth_tries: 2
+auth_safemode: True
+ping_interval: 1
+random_reauth_delay: 3
+state_aggregrate:
+  - pkg
+EOF
 
 cat <<EOF >/etc/salt/minion.d/grains.conf
 grains:
-  node_ip: $MASTER_IP
-  master_ip: $MASTER_IP
-  publicAddressOverride: $MASTER_IP
+  node_ip: '$(echo "$MASTER_IP" | sed -e "s/'/''/g")'
+  publicAddressOverride: '$(echo "$MASTER_IP" | sed -e "s/'/''/g")'
   network_mode: openvswitch
   networkInterfaceName: eth1
-  etcd_servers: $MASTER_IP
+  api_servers: '$(echo "$MASTER_IP" | sed -e "s/'/''/g")'
   cloud: vagrant
-  cloud_provider: vagrant
   roles:
     - kubernetes-master
+  runtime_config: '$(echo "$RUNTIME_CONFIG" | sed -e "s/'/''/g")'
 EOF
 
 mkdir -p /srv/salt-overlay/pillar
 cat <<EOF >/srv/salt-overlay/pillar/cluster-params.sls
-  portal_net: $PORTAL_NET
-  cert_ip: $MASTER_IP
-  enable_node_monitoring: $ENABLE_NODE_MONITORING
-  enable_node_logging: $ENABLE_NODE_LOGGING
-  logging_destination: $LOGGING_DESTINATION
+  portal_net: '$(echo "$PORTAL_NET" | sed -e "s/'/''/g")'
+  cert_ip: '$(echo "$MASTER_IP" | sed -e "s/'/''/g")'
+  enable_cluster_monitoring: '$(echo "$ENABLE_CLUSTER_MONITORING" | sed -e "s/'/''/g")'
+  enable_node_monitoring: '$(echo "$ENABLE_NODE_MONITORING" | sed -e "s/'/''/g")'
+  enable_cluster_logging: '$(echo "$ENABLE_CLUSTER_LOGGING" | sed -e "s/'/''/g")'
+  enable_node_logging: '$(echo "$ENABLE_NODE_LOGGING" | sed -e "s/'/''/g")'
+  logging_destination: '$(echo "$LOGGING_DESTINATION" | sed -e "s/'/''/g")'
+  elasticsearch_replicas: '$(echo "$ELASTICSEARCH_LOGGING_REPLICAS" | sed -e "s/'/''/g")'
+  enable_cluster_dns: '$(echo "$ENABLE_CLUSTER_DNS" | sed -e "s/'/''/g")'
+  dns_replicas: '$(echo "$DNS_REPLICAS" | sed -e "s/'/''/g")'
+  dns_server: '$(echo "$DNS_SERVER_IP" | sed -e "s/'/''/g")'
+  dns_domain: '$(echo "$DNS_DOMAIN" | sed -e "s/'/''/g")'
+  instance_prefix: '$(echo "$INSTANCE_PREFIX" | sed -e "s/'/''/g")'
+  admission_control: '$(echo "$ADMISSION_CONTROL" | sed -e "s/'/''/g")'  
 EOF
 
 # Configure the salt-master
@@ -106,14 +121,39 @@ cat <<EOF >/etc/salt/master.d/salt-output.conf
 # Minimize the amount of output to terminal
 state_verbose: False
 state_output: mixed
+log_level: debug
+log_level_logfile: debug
 EOF
 
+cat <<EOF >/etc/salt/minion.d/log-level-debug.conf
+log_level: debug
+log_level_logfile: debug
+EOF
+
+
+# Generate and distribute a shared secret (bearer token) to
+# apiserver and kubelet so that kubelet can authenticate to
+# apiserver to send events.
+known_tokens_file="/srv/salt-overlay/salt/kube-apiserver/known_tokens.csv"
+if [[ ! -f "${known_tokens_file}" ]]; then
+  kubelet_token=$(cat /dev/urandom | base64 | tr -d "=+/" | dd bs=32 count=1 2> /dev/null)
+
+  mkdir -p /srv/salt-overlay/salt/kube-apiserver
+  known_tokens_file="/srv/salt-overlay/salt/kube-apiserver/known_tokens.csv"
+  (umask u=rw,go= ; echo "$kubelet_token,kubelet,kubelet" > $known_tokens_file)
+
+  mkdir -p /srv/salt-overlay/salt/kubelet
+  kubelet_auth_file="/srv/salt-overlay/salt/kubelet/kubernetes_auth"
+  (umask u=rw,go= ; echo "{\"BearerToken\": \"$kubelet_token\", \"Insecure\": true }" > $kubelet_auth_file)
+fi
+
 # Configure nginx authorization
-mkdir -p "$KUBE_TEMP"
 mkdir -p /srv/salt-overlay/salt/nginx
-python "${KUBE_ROOT}/third_party/htpasswd/htpasswd.py" -b -c "${KUBE_TEMP}/htpasswd" "$MASTER_USER" "$MASTER_PASSWD"
-MASTER_HTPASSWD=$(cat "${KUBE_TEMP}/htpasswd")
-echo $MASTER_HTPASSWD > /srv/salt-overlay/salt/nginx/htpasswd
+if [[ ! -f /srv/salt-overlay/salt/nginx/htpasswd ]]; then
+  python "${KUBE_ROOT}/third_party/htpasswd/htpasswd.py" \
+    -b -c "/srv/salt-overlay/salt/nginx/htpasswd" \
+    "$MASTER_USER" "$MASTER_PASSWD"
+fi
 
 echo "Running release install script"
 rm -rf /kube-install
@@ -125,7 +165,7 @@ pushd /kube-install
 popd
 
 # we will run provision to update code each time we test, so we do not want to do salt installs each time
-if ! which salt-master >/dev/null 2>&1; then
+if ! which salt-master &>/dev/null; then
 
   # Configure the salt-api
   cat <<EOF >/etc/salt/master.d/salt-api.conf
@@ -141,7 +181,6 @@ rest_cherrypy:
   webhook_disable_auth: True
 EOF
 
-
   # Install Salt Master
   #
   # -M installs the master
@@ -150,13 +189,14 @@ EOF
 
   # Install salt-api
   #
+  # This is used to provide the network transport for salt-api
+  yum install -y python-cherrypy
   # This is used to inform the cloud provider used in the vagrant cluster
   yum install -y salt-api
   # Set log level to a level higher than "info" to prevent the message about
   # enabling the service (which is not an error) from being printed to stderr.
   SYSTEMD_LOG_LEVEL=notice systemctl enable salt-api
   systemctl start salt-api
-
 fi
 
 if ! which salt-minion >/dev/null 2>&1; then
@@ -169,5 +209,5 @@ else
   # set up to run highstate as new minions join for the first time.
   echo "Executing configuration"
   salt '*' mine.update
-  salt --force-color '*' state.highstate
+  salt --show-timeout --force-color '*' state.highstate
 fi

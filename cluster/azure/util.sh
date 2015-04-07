@@ -145,7 +145,7 @@ function upload-server-tars() {
     echo "==> SERVER_BINARY_TAR_URL: $SERVER_BINARY_TAR_URL"
     echo "==> SALT_TAR_URL: $SALT_TAR_URL"
 
-    echo "--> Checking storage exsists..."
+    echo "--> Checking storage exists..."
     if [[ -z "$(azure_call storage account show $AZ_STG 2>/dev/null | \
     grep data)" ]]; then
         echo "--> Creating storage..."
@@ -156,7 +156,7 @@ function upload-server-tars() {
     stg_key=$(azure_call storage account keys list $AZ_STG --json | \
         json_val '["primaryKey"]')
 
-    echo "--> Checking storage container exsists..."
+    echo "--> Checking storage container exists..."
     if [[ -z "$(azure_call storage container show -a $AZ_STG -k "$stg_key" \
       $CONTAINER 2>/dev/null | grep data)" ]]; then
         echo "--> Creating storage container..."
@@ -343,11 +343,13 @@ function kube-up {
         echo "mkdir -p /var/cache/kubernetes-install"
         echo "cd /var/cache/kubernetes-install"
         echo "readonly MASTER_NAME='${MASTER_NAME}'"
+        echo "readonly INSTANCE_PREFIX='${INSTANCE_PREFIX}'"
         echo "readonly NODE_INSTANCE_PREFIX='${INSTANCE_PREFIX}-minion'"
         echo "readonly SERVER_BINARY_TAR_URL='${SERVER_BINARY_TAR_URL}'"
         echo "readonly SALT_TAR_URL='${SALT_TAR_URL}'"
         echo "readonly MASTER_HTPASSWD='${htpasswd}'"
         echo "readonly PORTAL_NET='${PORTAL_NET}'"
+        echo "readonly ADMISSION_CONTROL='${ADMISSION_CONTROL:-}'"        
         grep -v "^#" "${KUBE_ROOT}/cluster/azure/templates/common.sh"
         grep -v "^#" "${KUBE_ROOT}/cluster/azure/templates/create-dynamic-salt-files.sh"
         grep -v "^#" "${KUBE_ROOT}/cluster/azure/templates/download-release.sh"
@@ -363,16 +365,14 @@ function kube-up {
             -subj "/CN=azure-ssh-key"
     fi
 
-    if [[ -z "$(azure_call network vnet show $AZ_VNET 2>/dev/null | grep data)" ]]; then
-        #azure network vnet create with $AZ_SUBNET
-        #FIXME not working
+    if [[ -z "$(azure_call network vnet show "$AZ_VNET" 2>/dev/null | grep data)" ]]; then
         echo error create vnet $AZ_VNET with subnet $AZ_SUBNET
         exit 1
     fi
 
     echo "--> Starting VM"
     azure_call vm create \
-        -w $AZ_VNET \
+        -w "$AZ_VNET" \
         -n $MASTER_NAME \
         -l "$AZ_LOCATION" \
         -t $AZ_SSH_CERT \
@@ -399,7 +399,7 @@ function kube-up {
 
         echo "--> Starting VM"
         azure_call vm create \
-            -c -w $AZ_VNET \
+            -c -w "$AZ_VNET" \
             -n ${MINION_NAMES[$i]} \
             -l "$AZ_LOCATION" \
             -t $AZ_SSH_CERT \
@@ -409,7 +409,7 @@ function kube-up {
             $AZ_CS $AZ_IMAGE $USER
     done
 
-    echo "--> Createing endpoint"
+    echo "--> Creating endpoint"
     azure_call vm endpoint create $MASTER_NAME 443
 
     detect-master > /dev/null
@@ -557,11 +557,7 @@ function restart-kube-proxy {
     ssh-to-node "$1" "sudo /etc/init.d/kube-proxy restart"
 }
 
-# Setup monitoring using heapster and InfluxDB
-function setup-monitoring {
-    echo "not implemented"  >/dev/null
-}
-
-function teardown-monitoring {
-    echo "not implemented"  >/dev/null
+# Restart the kube-proxy on the master ($1)
+function restart-apiserver {
+    ssh-to-node "$1" "sudo /etc/init.d/kube-apiserver restart"
 }

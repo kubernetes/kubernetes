@@ -22,40 +22,108 @@ import (
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
-var scheme = runtime.NewScheme()
-var Codec = runtime.CodecFor(scheme, "v1test")
-
 type EmbeddedTest struct {
-	runtime.TypeMeta `yaml:",inline" json:",inline"`
-	ID               string                 `yaml:"id,omitempty" json:"id,omitempty"`
-	Object           runtime.EmbeddedObject `yaml:"object,omitempty" json:"object,omitempty"`
-	EmptyObject      runtime.EmbeddedObject `yaml:"emptyObject,omitempty" json:"emptyObject,omitempty"`
+	runtime.TypeMeta
+	ID          string
+	Object      runtime.EmbeddedObject
+	EmptyObject runtime.EmbeddedObject
 }
 
 type EmbeddedTestExternal struct {
-	runtime.TypeMeta `yaml:",inline" json:",inline"`
-	ID               string               `yaml:"id,omitempty" json:"id,omitempty"`
-	Object           runtime.RawExtension `yaml:"object,omitempty" json:"object,omitempty"`
-	EmptyObject      runtime.RawExtension `yaml:"emptyObject,omitempty" json:"emptyObject,omitempty"`
+	runtime.TypeMeta `json:",inline"`
+	ID               string               `json:"id,omitempty"`
+	Object           runtime.RawExtension `json:"object,omitempty"`
+	EmptyObject      runtime.RawExtension `json:"emptyObject,omitempty"`
 }
 
+type ObjectTest struct {
+	runtime.TypeMeta
+
+	ID    string
+	Items []runtime.Object
+}
+
+type ObjectTestExternal struct {
+	runtime.TypeMeta `yaml:",inline" json:",inline"`
+
+	ID    string                 `json:"id,omitempty"`
+	Items []runtime.RawExtension `json:"items,omitempty"`
+}
+
+func (*ObjectTest) IsAnAPIObject()           {}
+func (*ObjectTestExternal) IsAnAPIObject()   {}
 func (*EmbeddedTest) IsAnAPIObject()         {}
 func (*EmbeddedTestExternal) IsAnAPIObject() {}
 
+func TestDecodeEmptyRawExtensionAsObject(t *testing.T) {
+	s := runtime.NewScheme()
+	s.AddKnownTypes("", &ObjectTest{})
+	s.AddKnownTypeWithName("v1test", "ObjectTest", &ObjectTestExternal{})
+
+	_, err := s.Decode([]byte(`{"kind":"ObjectTest","apiVersion":"v1test","items":[{}]}`))
+	if err == nil {
+		t.Fatalf("unexpected non-error")
+	}
+}
+
+func TestArrayOfRuntimeObject(t *testing.T) {
+	s := runtime.NewScheme()
+	s.AddKnownTypes("", &EmbeddedTest{})
+	s.AddKnownTypeWithName("v1test", "EmbeddedTest", &EmbeddedTestExternal{})
+	s.AddKnownTypes("", &ObjectTest{})
+	s.AddKnownTypeWithName("v1test", "ObjectTest", &ObjectTestExternal{})
+
+	internal := &ObjectTest{
+		Items: []runtime.Object{
+			&EmbeddedTest{ID: "foo"},
+			&EmbeddedTest{ID: "bar"},
+			// TODO: until YAML is removed, this JSON must be in ascending key order to ensure consistent roundtrip serialization
+			&runtime.Unknown{RawJSON: []byte(`{"apiVersion":"unknown","foo":"bar","kind":"OtherTest"}`)},
+			&ObjectTest{
+				Items: []runtime.Object{
+					&EmbeddedTest{ID: "baz"},
+				},
+			},
+		},
+	}
+	wire, err := s.EncodeToVersion(internal, "v1test")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	t.Logf("Wire format is:\n%s\n", string(wire))
+
+	obj := &ObjectTestExternal{}
+	if err := json.Unmarshal(wire, obj); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	t.Logf("exact wire is: %#v", string(obj.Items[0].RawJSON))
+
+	decoded, err := s.Decode(wire)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	internal.Items[2].(*runtime.Unknown).Kind = "OtherTest"
+	internal.Items[2].(*runtime.Unknown).APIVersion = "unknown"
+	if e, a := internal, decoded; !reflect.DeepEqual(e, a) {
+		t.Log(string(decoded.(*ObjectTest).Items[2].(*runtime.Unknown).RawJSON))
+		t.Errorf("mismatched decoded: %s", util.ObjectDiff(e, a))
+	}
+}
+
 func TestEmbeddedObject(t *testing.T) {
-	s := scheme
+	s := runtime.NewScheme()
 	s.AddKnownTypes("", &EmbeddedTest{})
 	s.AddKnownTypeWithName("v1test", "EmbeddedTest", &EmbeddedTestExternal{})
 
 	outer := &EmbeddedTest{
-		TypeMeta: runtime.TypeMeta{Name: "outer"},
-		ID:       "outer",
+		ID: "outer",
 		Object: runtime.EmbeddedObject{
 			&EmbeddedTest{
-				TypeMeta: runtime.TypeMeta{Name: "inner"},
-				ID:       "inner",
+				ID: "inner",
 			},
 		},
 	}
@@ -83,7 +151,7 @@ func TestEmbeddedObject(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Unexpected decode error %v", err)
 	}
-	if externalViaJSON.Kind == "" || externalViaJSON.APIVersion == "" || externalViaJSON.Name != "outer" {
+	if externalViaJSON.Kind == "" || externalViaJSON.APIVersion == "" || externalViaJSON.ID != "outer" {
 		t.Errorf("Expected objects to have type info set, got %#v", externalViaJSON)
 	}
 	if !reflect.DeepEqual(externalViaJSON.EmptyObject.RawJSON, []byte("null")) || len(externalViaJSON.Object.RawJSON) == 0 {

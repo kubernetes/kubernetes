@@ -18,15 +18,14 @@ package util
 
 import (
 	"encoding/json"
-	"reflect"
 	"testing"
 	"time"
 
-	"gopkg.in/v1/yaml"
+	"github.com/ghodss/yaml"
 )
 
 type TimeHolder struct {
-	T Time `json:"t" yaml:"t"`
+	T Time `json:"t"`
 }
 
 func TestTimeMarshalYAML(t *testing.T) {
@@ -34,8 +33,8 @@ func TestTimeMarshalYAML(t *testing.T) {
 		input  Time
 		result string
 	}{
-		{Time{}, "t: \"null\"\n"},
-		{Date(1998, time.May, 5, 5, 5, 5, 50, time.UTC), "t: 1998-05-05T05:05:05Z\n"},
+		{Time{}, "t: null\n"},
+		{Date(1998, time.May, 5, 1, 5, 5, 50, time.FixedZone("test", -4*60*60)), "t: 1998-05-05T05:05:05Z\n"},
 		{Date(1998, time.May, 5, 5, 5, 5, 0, time.UTC), "t: 1998-05-05T05:05:05Z\n"},
 	}
 
@@ -56,8 +55,8 @@ func TestTimeUnmarshalYAML(t *testing.T) {
 		input  string
 		result Time
 	}{
-		{"t: \"null\"\n", Time{}},
-		{"t: 1998-05-05T05:05:05Z\n", Date(1998, time.May, 5, 5, 5, 5, 0, time.UTC)},
+		{"t: null\n", Time{}},
+		{"t: 1998-05-05T05:05:05Z\n", Time{Date(1998, time.May, 5, 5, 5, 5, 0, time.UTC).Local()}},
 	}
 
 	for _, c := range cases {
@@ -99,7 +98,7 @@ func TestTimeUnmarshalJSON(t *testing.T) {
 		result Time
 	}{
 		{"{\"t\":null}", Time{}},
-		{"{\"t\":\"1998-05-05T05:05:05Z\"}", Date(1998, time.May, 5, 5, 5, 5, 0, time.UTC)},
+		{"{\"t\":\"1998-05-05T05:05:05Z\"}", Time{Date(1998, time.May, 5, 5, 5, 5, 0, time.UTC).Local()}},
 	}
 
 	for _, c := range cases {
@@ -118,25 +117,31 @@ func TestTimeMarshalJSONUnmarshalYAML(t *testing.T) {
 		input Time
 	}{
 		{Time{}},
-		{Date(1998, time.May, 5, 5, 5, 5, 50, time.UTC).Rfc3339Copy()},
-		{Date(1998, time.May, 5, 5, 5, 5, 0, time.UTC).Rfc3339Copy()},
+		{Date(1998, time.May, 5, 5, 5, 5, 50, time.Local).Rfc3339Copy()},
+		{Date(1998, time.May, 5, 5, 5, 5, 0, time.Local).Rfc3339Copy()},
 	}
 
-	for _, c := range cases {
+	for i, c := range cases {
 		input := TimeHolder{c.input}
 		jsonMarshalled, err := json.Marshal(&input)
 		if err != nil {
-			t.Errorf("1: Failed to marshal input: '%v': %v", input, err)
+			t.Errorf("%d-1: Failed to marshal input: '%v': %v", i, input, err)
 		}
 
 		var result TimeHolder
 		err = yaml.Unmarshal(jsonMarshalled, &result)
 		if err != nil {
-			t.Errorf("2: Failed to unmarshal '%+v': %v", string(jsonMarshalled), err)
+			t.Errorf("%d-2: Failed to unmarshal '%+v': %v", i, string(jsonMarshalled), err)
 		}
 
-		if !reflect.DeepEqual(input, result) {
-			t.Errorf("3: Failed to marshal input '%+v': got %+v", input, result)
+		iN, iO := input.T.Zone()
+		oN, oO := result.T.Zone()
+		if iN != oN || iO != oO {
+			t.Errorf("%d-3: Time zones differ before and after serialization %s:%d %s:%d", i, iN, iO, oN, oO)
+		}
+
+		if input.T.UnixNano() != result.T.UnixNano() {
+			t.Errorf("%d-4: Failed to marshal input '%#v': got %#v", i, input, result)
 		}
 	}
 }

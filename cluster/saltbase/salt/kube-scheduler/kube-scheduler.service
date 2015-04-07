@@ -6,6 +6,7 @@ Documentation=https://github.com/GoogleCloudPlatform/kubernetes
 Type=simple
 EnvironmentFile=-/etc/sysconfig/kube-scheduler
 ExecStart=/usr/local/bin/kube-scheduler "$DAEMON_ARGS"
+Restart=on-failure
 
 [Install]
 WantedBy=multi-user.target

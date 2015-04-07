@@ -62,7 +62,7 @@ Docker allocates IP addresses from a bridge we create on each node, using its �
   - creates a new pair of veth devices and binds them to the netns
   - auto-assigns an IP from docker’s IP range
 
-2. Create the user containers and specify the name of the network container as their “net” argument. Docker finds the PID of the command running in the network container and attaches to the netns of that PID.
+2. Create the user containers and specify the name of the pod infra container as their “POD” argument. Docker finds the PID of the command running in the pod infra container and attaches to the netns and ipcns of that PID.
 
 ### Other networking implementation examples
 With the primary aim of providing IP-per-pod-model, other implementations exist to serve the purpose outside of GCE.
@@ -77,7 +77,7 @@ Right now, docker inspect doesn't show the networking configuration of the conta
 
 ### External IP assignment
 
-We want to be able to assign IP addresses externally from Docker ([Docker issue #6743](https://github.com/dotcloud/docker/issues/6743)) so that we don't need to statically allocate fixed-size IP ranges to each node, so that IP addresses can be made stable across network container restarts ([Docker issue #2801](https://github.com/dotcloud/docker/issues/2801)), and to facilitate pod migration. Right now, if the network container dies, all the user containers must be stopped and restarted because the netns of the network container will change on restart, and any subsequent user container restart will join that new netns, thereby not being able to see its peers. Additionally, a change in IP address would encounter DNS caching/TTL problems. External IP assignment would also simplify DNS support (see below).
+We want to be able to assign IP addresses externally from Docker ([Docker issue #6743](https://github.com/dotcloud/docker/issues/6743)) so that we don't need to statically allocate fixed-size IP ranges to each node, so that IP addresses can be made stable across pod infra container restarts ([Docker issue #2801](https://github.com/dotcloud/docker/issues/2801)), and to facilitate pod migration. Right now, if the pod infra container dies, all the user containers must be stopped and restarted because the netns of the pod infra container will change on restart, and any subsequent user container restart will join that new netns, thereby not being able to see its peers. Additionally, a change in IP address would encounter DNS caching/TTL problems. External IP assignment would also simplify DNS support (see below).
 
 ### Naming, discovery, and load balancing
 

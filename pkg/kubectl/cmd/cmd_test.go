@@ -14,20 +14,25 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package cmd_test
+package cmd
 
 import (
 	"bytes"
 	"fmt"
 	"io"
 	"io/ioutil"
+	"os"
+	"testing"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/validation"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl"
-	. "github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/cmd"
+	cmdutil "github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/cmd/util"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/resource"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-
-	"github.com/spf13/cobra"
 )
 
 type internalType struct {
@@ -60,18 +65,24 @@ func newExternalScheme() (*runtime.Scheme, meta.RESTMapper, runtime.Codec) {
 			MetadataAccessor: meta.NewAccessor(),
 		}, (version == "unlikelyversion")
 	})
-	mapper.Add(scheme, false, "unlikelyversion")
+	for _, version := range []string{"unlikelyversion"} {
+		for kind := range scheme.KnownTypes(version) {
+			mixedCase := false
+			scope := meta.RESTScopeNamespace
+			mapper.Add(scope, kind, version, mixedCase)
+		}
+	}
 
 	return scheme, mapper, codec
 }
 
 type testPrinter struct {
-	Obj runtime.Object
-	Err error
+	Objects []runtime.Object
+	Err     error
 }
 
 func (t *testPrinter) PrintObj(obj runtime.Object, out io.Writer) error {
-	t.Obj = obj
+	t.Objects = append(t.Objects, obj)
 	fmt.Fprintf(out, "%#v", obj)
 	return t.Err
 }
@@ -88,30 +99,146 @@ func (t *testDescriber) Describe(namespace, name string) (output string, err err
 }
 
 type testFactory struct {
-	Client    kubectl.RESTClient
-	Describer kubectl.Describer
-	Printer   kubectl.ResourcePrinter
-	Err       error
+	Mapper       meta.RESTMapper
+	Typer        runtime.ObjectTyper
+	Client       kubectl.RESTClient
+	Describer    kubectl.Describer
+	Printer      kubectl.ResourcePrinter
+	Validator    validation.Schema
+	Namespace    string
+	ClientConfig *client.Config
+	Err          error
 }
 
-func NewTestFactory() (*Factory, *testFactory, runtime.Codec) {
+func NewTestFactory() (*cmdutil.Factory, *testFactory, runtime.Codec) {
 	scheme, mapper, codec := newExternalScheme()
-	t := &testFactory{}
-	return &Factory{
-		Mapper: mapper,
-		Typer:  scheme,
-		Client: func(*cobra.Command, *meta.RESTMapping) (kubectl.RESTClient, error) {
+	t := &testFactory{
+		Validator: validation.NullSchema{},
+		Mapper:    mapper,
+		Typer:     scheme,
+	}
+	return &cmdutil.Factory{
+		Object: func() (meta.RESTMapper, runtime.ObjectTyper) {
+			return t.Mapper, t.Typer
+		},
+		RESTClient: func(*meta.RESTMapping) (resource.RESTClient, error) {
 			return t.Client, t.Err
 		},
-		Describer: func(*cobra.Command, *meta.RESTMapping) (kubectl.Describer, error) {
+		Describer: func(*meta.RESTMapping) (kubectl.Describer, error) {
 			return t.Describer, t.Err
 		},
-		Printer: func(cmd *cobra.Command, mapping *meta.RESTMapping, noHeaders bool) (kubectl.ResourcePrinter, error) {
+		Printer: func(mapping *meta.RESTMapping, noHeaders bool) (kubectl.ResourcePrinter, error) {
 			return t.Printer, t.Err
+		},
+		Validator: func() (validation.Schema, error) {
+			return t.Validator, t.Err
+		},
+		DefaultNamespace: func() (string, error) {
+			return t.Namespace, t.Err
+		},
+		ClientConfig: func() (*client.Config, error) {
+			return t.ClientConfig, t.Err
 		},
 	}, t, codec
 }
 
+func NewAPIFactory() (*cmdutil.Factory, *testFactory, runtime.Codec) {
+	t := &testFactory{
+		Validator: validation.NullSchema{},
+	}
+	return &cmdutil.Factory{
+		Object: func() (meta.RESTMapper, runtime.ObjectTyper) {
+			return latest.RESTMapper, api.Scheme
+		},
+		RESTClient: func(*meta.RESTMapping) (resource.RESTClient, error) {
+			return t.Client, t.Err
+		},
+		Describer: func(*meta.RESTMapping) (kubectl.Describer, error) {
+			return t.Describer, t.Err
+		},
+		Printer: func(mapping *meta.RESTMapping, noHeaders bool) (kubectl.ResourcePrinter, error) {
+			return t.Printer, t.Err
+		},
+		Validator: func() (validation.Schema, error) {
+			return t.Validator, t.Err
+		},
+		DefaultNamespace: func() (string, error) {
+			return t.Namespace, t.Err
+		},
+		ClientConfig: func() (*client.Config, error) {
+			return t.ClientConfig, t.Err
+		},
+	}, t, latest.Codec
+}
+
 func objBody(codec runtime.Codec, obj runtime.Object) io.ReadCloser {
 	return ioutil.NopCloser(bytes.NewReader([]byte(runtime.EncodeOrDie(codec, obj))))
+}
+
+func stringBody(body string) io.ReadCloser {
+	return ioutil.NopCloser(bytes.NewReader([]byte(body)))
+}
+
+// Verify that resource.RESTClients constructed from a factory respect mapping.APIVersion
+func TestClientVersions(t *testing.T) {
+	f := cmdutil.NewFactory(nil)
+
+	versions := []string{
+		"v1beta1",
+		"v1beta2",
+		"v1beta3",
+	}
+	for _, version := range versions {
+		mapping := &meta.RESTMapping{
+			APIVersion: version,
+		}
+		c, err := f.RESTClient(mapping)
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		client := c.(*client.RESTClient)
+		if client.APIVersion() != version {
+			t.Errorf("unexpected Client APIVersion: %s %v", client.APIVersion, client)
+		}
+	}
+}
+
+func ExamplePrintReplicationController() {
+	f, tf, codec := NewAPIFactory()
+	tf.Printer = kubectl.NewHumanReadablePrinter(false)
+	tf.Client = &client.FakeRESTClient{
+		Codec:  codec,
+		Client: nil,
+	}
+	cmd := NewCmdRunContainer(f, os.Stdout)
+	ctrl := &api.ReplicationController{
+		ObjectMeta: api.ObjectMeta{
+			Name:   "foo",
+			Labels: map[string]string{"foo": "bar"},
+		},
+		Spec: api.ReplicationControllerSpec{
+			Replicas: 1,
+			Selector: map[string]string{"foo": "bar"},
+			Template: &api.PodTemplateSpec{
+				ObjectMeta: api.ObjectMeta{
+					Labels: map[string]string{"foo": "bar"},
+				},
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{
+							Name:  "foo",
+							Image: "someimage",
+						},
+					},
+				},
+			},
+		},
+	}
+	err := f.PrintObject(cmd, ctrl, os.Stdout)
+	if err != nil {
+		fmt.Printf("Unexpected error: %v", err)
+	}
+	// Output:
+	// CONTROLLER   CONTAINER(S)   IMAGE(S)    SELECTOR   REPLICAS
+	// foo          foo            someimage   foo=bar    1
 }

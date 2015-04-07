@@ -25,16 +25,16 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/google/cadvisor/info"
+	cadvisorApi "github.com/google/cadvisor/info/v1"
 )
 
 type ContainerInfoGetter interface {
 	// GetContainerInfo returns information about a container.
-	GetContainerInfo(host, podID, containerID string, req *info.ContainerInfoRequest) (*info.ContainerInfo, error)
+	GetContainerInfo(host, podID, containerID string, req *cadvisorApi.ContainerInfoRequest) (*cadvisorApi.ContainerInfo, error)
 	// GetRootInfo returns information about the root container on a machine.
-	GetRootInfo(host string, req *info.ContainerInfoRequest) (*info.ContainerInfo, error)
+	GetRootInfo(host string, req *cadvisorApi.ContainerInfoRequest) (*cadvisorApi.ContainerInfo, error)
 	// GetMachineInfo returns the machine's information like number of cores, memory capacity.
-	GetMachineInfo(host string) (*info.MachineInfo, error)
+	GetMachineInfo(host string) (*cadvisorApi.MachineInfo, error)
 }
 
 type HTTPContainerInfoGetter struct {
@@ -42,7 +42,7 @@ type HTTPContainerInfoGetter struct {
 	Port   int
 }
 
-func (self *HTTPContainerInfoGetter) GetMachineInfo(host string) (*info.MachineInfo, error) {
+func (self *HTTPContainerInfoGetter) GetMachineInfo(host string) (*cadvisorApi.MachineInfo, error) {
 	request, err := http.NewRequest(
 		"GET",
 		fmt.Sprintf("http://%v/spec",
@@ -63,7 +63,7 @@ func (self *HTTPContainerInfoGetter) GetMachineInfo(host string) (*info.MachineI
 		return nil, fmt.Errorf("trying to get machine spec from %v; received status %v",
 			host, response.Status)
 	}
-	var minfo info.MachineInfo
+	var minfo cadvisorApi.MachineInfo
 	err = json.NewDecoder(response.Body).Decode(&minfo)
 	if err != nil {
 		return nil, err
@@ -71,7 +71,7 @@ func (self *HTTPContainerInfoGetter) GetMachineInfo(host string) (*info.MachineI
 	return &minfo, nil
 }
 
-func (self *HTTPContainerInfoGetter) getContainerInfo(host, path string, req *info.ContainerInfoRequest) (*info.ContainerInfo, error) {
+func (self *HTTPContainerInfoGetter) getContainerInfo(host, path string, req *cadvisorApi.ContainerInfoRequest) (*cadvisorApi.ContainerInfo, error) {
 	var body io.Reader
 	if req != nil {
 		content, err := json.Marshal(req)
@@ -102,7 +102,7 @@ func (self *HTTPContainerInfoGetter) getContainerInfo(host, path string, req *in
 		return nil, fmt.Errorf("trying to get info for %v from %v; received status %v",
 			path, host, response.Status)
 	}
-	var cinfo info.ContainerInfo
+	var cinfo cadvisorApi.ContainerInfo
 	err = json.NewDecoder(response.Body).Decode(&cinfo)
 	if err != nil {
 		return nil, err
@@ -110,7 +110,7 @@ func (self *HTTPContainerInfoGetter) getContainerInfo(host, path string, req *in
 	return &cinfo, nil
 }
 
-func (self *HTTPContainerInfoGetter) GetContainerInfo(host, podID, containerID string, req *info.ContainerInfoRequest) (*info.ContainerInfo, error) {
+func (self *HTTPContainerInfoGetter) GetContainerInfo(host, podID, containerID string, req *cadvisorApi.ContainerInfoRequest) (*cadvisorApi.ContainerInfo, error) {
 	return self.getContainerInfo(
 		host,
 		fmt.Sprintf("%v/%v", podID, containerID),
@@ -118,6 +118,6 @@ func (self *HTTPContainerInfoGetter) GetContainerInfo(host, podID, containerID s
 	)
 }
 
-func (self *HTTPContainerInfoGetter) GetRootInfo(host string, req *info.ContainerInfoRequest) (*info.ContainerInfo, error) {
+func (self *HTTPContainerInfoGetter) GetRootInfo(host string, req *cadvisorApi.ContainerInfoRequest) (*cadvisorApi.ContainerInfo, error) {
 	return self.getContainerInfo(host, "", req)
 }

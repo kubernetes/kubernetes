@@ -24,7 +24,13 @@ kube::util::wait_for_url() {
   local wait=${3:-0.2}
   local times=${4:-10}
 
+  which curl >/dev/null || {
+    kube::log::usage "curl must be installed"
+    exit 1
+  }
+
   local i
+
   for i in $(seq 1 $times); do
     local out
     if out=$(curl -fs $url 2>/dev/null); then
@@ -35,6 +41,16 @@ kube::util::wait_for_url() {
   done
   kube::log::error "Timed out waiting for ${url}"
   return 1
+}
+
+# Create a temp dir that'll be deleted at the end of this bash session.
+#
+# Vars set:
+#   KUBE_TEMP
+kube::util::ensure-temp-dir() {
+  if [[ -z ${KUBE_TEMP-} ]]; then
+    KUBE_TEMP=$(mktemp -d -t kubernetes.XXXXXX)
+  fi
 }
 
 # This figures out the host platform without relying on golang.  We need this as
@@ -78,4 +94,15 @@ kube::util::host_platform() {
       ;;
   esac
   echo "${host_os}/${host_arch}"
+}
+
+# Wait for background jobs to finish. Return with
+# an error status if any of the jobs failed.
+kube::util::wait-for-jobs() {
+  local fail=0
+  local job
+  for job in $(jobs -p); do
+    wait "${job}" || fail=$((fail + 1))
+  done
+  return ${fail}
 }

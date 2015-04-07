@@ -18,6 +18,7 @@ package meta
 
 import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 )
 
 // VersionInterfaces contains the interfaces one should use for dealing with types of a particular version.
@@ -31,17 +32,16 @@ type VersionInterfaces struct {
 // internal API objects. Attempting to set or retrieve a field on an object that does
 // not support that field (Name, UID, Namespace on lists) will be a no-op and return
 // a default value.
+// TODO: rename to ObjectInterface when we clear up these interfaces.
 type Interface interface {
+	TypeInterface
+
 	Namespace() string
 	SetNamespace(namespace string)
 	Name() string
 	SetName(name string)
-	UID() string
-	SetUID(uid string)
-	APIVersion() string
-	SetAPIVersion(version string)
-	Kind() string
-	SetKind(kind string)
+	UID() types.UID
+	SetUID(uid types.UID)
 	ResourceVersion() string
 	SetResourceVersion(version string)
 	SelfLink() string
@@ -50,6 +50,14 @@ type Interface interface {
 	SetLabels(labels map[string]string)
 	Annotations() map[string]string
 	SetAnnotations(annotations map[string]string)
+}
+
+// TypeInterface exposes the type and APIVersion of versioned or internal API objects.
+type TypeInterface interface {
+	APIVersion() string
+	SetAPIVersion(version string)
+	Kind() string
+	SetKind(kind string)
 }
 
 // MetadataAccessor lets you work with object and list metadata from any of the versioned or
@@ -71,8 +79,8 @@ type MetadataAccessor interface {
 	Name(obj runtime.Object) (string, error)
 	SetName(obj runtime.Object, name string) error
 
-	UID(obj runtime.Object) (string, error)
-	SetUID(obj runtime.Object, uid string) error
+	UID(obj runtime.Object) (types.UID, error)
+	SetUID(obj runtime.Object, uid types.UID) error
 
 	SelfLink(obj runtime.Object) (string, error)
 	SetSelfLink(obj runtime.Object, selfLink string) error
@@ -86,6 +94,30 @@ type MetadataAccessor interface {
 	runtime.ResourceVersioner
 }
 
+type RESTScopeName string
+
+const (
+	RESTScopeNameNamespace RESTScopeName = "namespace"
+	RESTScopeNameRoot      RESTScopeName = "root"
+)
+
+// RESTScope contains the information needed to deal with REST resources that are in a resource hierarchy
+// TODO After we deprecate v1beta1 and v1beta2, we can look a supporting removing the flexibility of supporting
+// either a query or path param, and instead just support path param
+type RESTScope interface {
+	// Name of the scope
+	Name() RESTScopeName
+	// ParamName is the optional name of the parameter that should be inserted in the resource url
+	// If empty, no param will be inserted
+	ParamName() string
+	// ParamPath is a boolean that controls how the parameter is manifested in resource paths
+	// If true, this parameter is encoded in path (i.e. /{paramName}/{paramValue})
+	// If false, this parameter is encoded in query (i.e. ?{paramName}={paramValue})
+	ParamPath() bool
+	// ParamDescription is the optional description to use to document the parameter in api documentation
+	ParamDescription() string
+}
+
 // RESTMapping contains the information needed to deal with objects of a specific
 // resource and kind in a RESTful manner.
 type RESTMapping struct {
@@ -95,6 +127,9 @@ type RESTMapping struct {
 	// for convenience for passing around a consistent mapping.
 	APIVersion string
 	Kind       string
+
+	// Scope contains the information needed to deal with REST Resources that are in a resource hierarchy
+	Scope RESTScope
 
 	runtime.Codec
 	runtime.ObjectConvertor
@@ -106,5 +141,5 @@ type RESTMapping struct {
 // consumers of Kubernetes compatible REST APIs as defined in docs/api-conventions.md.
 type RESTMapper interface {
 	VersionAndKindForResource(resource string) (defaultVersion, kind string, err error)
-	RESTMapping(version, kind string) (*RESTMapping, error)
+	RESTMapping(kind string, versions ...string) (*RESTMapping, error)
 }

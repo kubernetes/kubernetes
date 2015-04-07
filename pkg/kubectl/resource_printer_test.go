@@ -22,23 +22,26 @@ import (
 	"fmt"
 	"io"
 	"reflect"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 
-	"gopkg.in/v1/yaml"
+	"github.com/ghodss/yaml"
 )
 
 type testStruct struct {
-	api.TypeMeta   `yaml:",inline" json:",inline"`
-	api.ObjectMeta `yaml:"metadata,omitempty" json:"metadata,omitempty"`
-	Key            string         `yaml:"Key" json:"Key"`
-	Map            map[string]int `yaml:"Map" json:"Map"`
-	StringList     []string       `yaml:"StringList" json:"StringList"`
-	IntList        []int          `yaml:"IntList" json:"IntList"`
+	api.TypeMeta   `json:",inline"`
+	api.ObjectMeta `json:"metadata,omitempty"`
+	Key            string         `json:"Key"`
+	Map            map[string]int `json:"Map"`
+	StringList     []string       `json:"StringList"`
+	IntList        []int          `json:"IntList"`
 }
 
 func (ts *testStruct) IsAnAPIObject() {}
@@ -55,38 +58,56 @@ var testData = testStruct{
 	IntList:    []int{1, 2, 3},
 }
 
+func TestVersionedPrinter(t *testing.T) {
+	original := &testStruct{Key: "value"}
+	p := NewVersionedPrinter(
+		ResourcePrinterFunc(func(obj runtime.Object, w io.Writer) error {
+			if obj == original {
+				t.Fatalf("object should not be identical: %#v", obj)
+			}
+			if obj.(*testStruct).Key != "value" {
+				t.Fatalf("object was not converted: %#v", obj)
+			}
+			return nil
+		}),
+		api.Scheme,
+		testapi.Version(),
+	)
+	if err := p.PrintObj(original, nil); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+}
+
 func TestYAMLPrinter(t *testing.T) {
-	testPrinter(t, &YAMLPrinter{testapi.Version(), api.Scheme}, yaml.Unmarshal)
+	testPrinter(t, &YAMLPrinter{}, yaml.Unmarshal)
 }
 
 func TestJSONPrinter(t *testing.T) {
-	testPrinter(t, &JSONPrinter{testapi.Version(), api.Scheme}, json.Unmarshal)
+	testPrinter(t, &JSONPrinter{}, json.Unmarshal)
+}
+
+func TestPrintDefault(t *testing.T) {
+	printer, found, err := GetPrinter("", "")
+	if err != nil {
+		t.Fatalf("unexpected error: %#v", err)
+	}
+	if found {
+		t.Errorf("no printer should have been found: %#v / %v", printer, err)
+	}
 }
 
 type internalType struct {
 	Name string
-	Kind string
 }
 
-type externalType struct {
-	Name string
-	Kind string `json:"kind"`
+func (*internalType) IsAnAPIObject() {
+
 }
 
-func (*internalType) IsAnAPIObject() {}
-func (*externalType) IsAnAPIObject() {}
-
-func newExternalScheme() *runtime.Scheme {
-	scheme := runtime.NewScheme()
-	scheme.AddKnownTypeWithName("", "Type", &internalType{})
-	scheme.AddKnownTypeWithName("unlikelyversion", "Type", &externalType{})
-	return scheme
-}
-
-func TestPrintJSONForUnknownSchema(t *testing.T) {
+func TestPrintJSONForObject(t *testing.T) {
 	buf := bytes.NewBuffer([]byte{})
-	printer, err := GetPrinter("json", "", "unlikelyversion", newExternalScheme(), nil)
-	if err != nil {
+	printer, found, err := GetPrinter("json", "")
+	if err != nil || !found {
 		t.Fatalf("unexpected error: %#v", err)
 	}
 	if err := printer.PrintObj(&internalType{Name: "foo"}, buf); err != nil {
@@ -101,21 +122,10 @@ func TestPrintJSONForUnknownSchema(t *testing.T) {
 	}
 }
 
-func TestPrintJSONForUnknownSchemaAndWrongVersion(t *testing.T) {
-	buf := bytes.NewBuffer([]byte{})
-	printer, err := GetPrinter("json", "", "badversion", newExternalScheme(), nil)
-	if err != nil {
-		t.Fatalf("unexpected error: %#v", err)
-	}
-	if err := printer.PrintObj(&internalType{Name: "foo"}, buf); err == nil {
-		t.Errorf("unexpected non-error")
-	}
-}
-
 func TestPrintJSON(t *testing.T) {
 	buf := bytes.NewBuffer([]byte{})
-	printer, err := GetPrinter("json", "", testapi.Version(), api.Scheme, nil)
-	if err != nil {
+	printer, found, err := GetPrinter("json", "")
+	if err != nil || !found {
 		t.Fatalf("unexpected error: %#v", err)
 	}
 	printer.PrintObj(&api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}, buf)
@@ -127,8 +137,8 @@ func TestPrintJSON(t *testing.T) {
 
 func TestPrintYAML(t *testing.T) {
 	buf := bytes.NewBuffer([]byte{})
-	printer, err := GetPrinter("yaml", "", testapi.Version(), api.Scheme, nil)
-	if err != nil {
+	printer, found, err := GetPrinter("yaml", "")
+	if err != nil || !found {
 		t.Fatalf("unexpected error: %#v", err)
 	}
 	printer.PrintObj(&api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}, buf)
@@ -140,11 +150,11 @@ func TestPrintYAML(t *testing.T) {
 
 func TestPrintTemplate(t *testing.T) {
 	buf := bytes.NewBuffer([]byte{})
-	printer, err := GetPrinter("template", "{{.id}}", "v1beta1", api.Scheme, nil)
-	if err != nil {
+	printer, found, err := GetPrinter("template", "{{.id}}")
+	if err != nil || !found {
 		t.Fatalf("unexpected error: %#v", err)
 	}
-	err = printer.PrintObj(&api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}, buf)
+	err = printer.PrintObj(&v1beta1.Pod{TypeMeta: v1beta1.TypeMeta{ID: "foo"}}, buf)
 	if err != nil {
 		t.Fatalf("unexpected error: %#v", err)
 	}
@@ -154,19 +164,19 @@ func TestPrintTemplate(t *testing.T) {
 }
 
 func TestPrintEmptyTemplate(t *testing.T) {
-	if _, err := GetPrinter("template", "", testapi.Version(), api.Scheme, nil); err == nil {
+	if _, _, err := GetPrinter("template", ""); err == nil {
 		t.Errorf("unexpected non-error")
 	}
 }
 
 func TestPrintBadTemplate(t *testing.T) {
-	if _, err := GetPrinter("template", "{{ .Name", testapi.Version(), api.Scheme, nil); err == nil {
+	if _, _, err := GetPrinter("template", "{{ .Name"); err == nil {
 		t.Errorf("unexpected non-error")
 	}
 }
 
 func TestPrintBadTemplateFile(t *testing.T) {
-	if _, err := GetPrinter("templatefile", "", testapi.Version(), api.Scheme, nil); err == nil {
+	if _, _, err := GetPrinter("templatefile", ""); err == nil {
 		t.Errorf("unexpected non-error")
 	}
 }
@@ -186,7 +196,7 @@ func testPrinter(t *testing.T, printer ResourcePrinter, unmarshalFunc func(data 
 	}
 	// Use real decode function to undo the versioning process.
 	poutput = testStruct{}
-	err = testapi.Codec().DecodeInto(buf.Bytes(), &poutput)
+	err = runtime.YAMLDecoder(testapi.Codec()).DecodeInto(buf.Bytes(), &poutput)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -207,7 +217,7 @@ func testPrinter(t *testing.T, printer ResourcePrinter, unmarshalFunc func(data 
 	}
 	// Use real decode function to undo the versioning process.
 	objOut = api.Pod{}
-	err = testapi.Codec().DecodeInto(buf.Bytes(), &objOut)
+	err = runtime.YAMLDecoder(testapi.Codec()).DecodeInto(buf.Bytes(), &objOut)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -275,12 +285,17 @@ func TestUnknownTypePrinting(t *testing.T) {
 
 func TestTemplateEmitsVersionedObjects(t *testing.T) {
 	// kind is always blank in memory and set on the wire
-	printer, err := NewTemplatePrinter([]byte(`{{.kind}}`), testapi.Version(), api.Scheme)
+	printer, err := NewTemplatePrinter([]byte(`{{.kind}}`))
 	if err != nil {
 		t.Fatalf("tmpl fail: %v", err)
 	}
+	obj, err := api.Scheme.ConvertToVersion(&api.Pod{}, "v1beta1")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
 	buffer := &bytes.Buffer{}
-	err = printer.PrintObj(&api.Pod{}, buffer)
+	err = printer.PrintObj(obj, buffer)
 	if err != nil {
 		t.Fatalf("print fail: %v", err)
 	}
@@ -289,21 +304,164 @@ func TestTemplateEmitsVersionedObjects(t *testing.T) {
 	}
 }
 
+func TestTemplatePanic(t *testing.T) {
+	tmpl := `{{and ((index .currentState.info "foo").state.running.startedAt) .currentState.info.net.state.running.startedAt}}`
+	printer, err := NewTemplatePrinter([]byte(tmpl))
+	if err != nil {
+		t.Fatalf("tmpl fail: %v", err)
+	}
+	buffer := &bytes.Buffer{}
+	err = printer.PrintObj(&api.Pod{}, buffer)
+	if err == nil {
+		t.Fatalf("expected that template to crash")
+	}
+	if buffer.String() == "" {
+		t.Errorf("no debugging info was printed")
+	}
+}
+
+func TestTemplateStrings(t *testing.T) {
+	// This unit tests the "exists" function as well as the template from update.sh
+	table := map[string]struct {
+		pod    api.Pod
+		expect string
+	}{
+		"nilInfo":   {api.Pod{}, "false"},
+		"emptyInfo": {api.Pod{Status: api.PodStatus{ContainerStatuses: []api.ContainerStatus{}}}, "false"},
+		"fooExists": {
+			api.Pod{
+				Status: api.PodStatus{
+					ContainerStatuses: []api.ContainerStatus{
+						{
+							Name: "foo",
+						},
+					},
+				},
+			},
+			"false",
+		},
+		"barExists": {
+			api.Pod{
+				Status: api.PodStatus{
+					ContainerStatuses: []api.ContainerStatus{
+						{
+							Name: "bar",
+						},
+					},
+				},
+			},
+			"false",
+		},
+		"bothExist": {
+			api.Pod{
+				Status: api.PodStatus{
+					ContainerStatuses: []api.ContainerStatus{
+						{
+							Name: "foo",
+						},
+						{
+							Name: "bar",
+						},
+					},
+				},
+			},
+			"false",
+		},
+		"oneValid": {
+			api.Pod{
+				Status: api.PodStatus{
+					ContainerStatuses: []api.ContainerStatus{
+						{
+							Name: "foo",
+						},
+						{
+							Name: "bar",
+							State: api.ContainerState{
+								Running: &api.ContainerStateRunning{
+									StartedAt: util.Time{},
+								},
+							},
+						},
+					},
+				},
+			},
+			"false",
+		},
+		"bothValid": {
+			api.Pod{
+				Status: api.PodStatus{
+					ContainerStatuses: []api.ContainerStatus{
+						{
+							Name: "foo",
+							State: api.ContainerState{
+								Running: &api.ContainerStateRunning{
+									StartedAt: util.Time{},
+								},
+							},
+						},
+						{
+							Name: "bar",
+							State: api.ContainerState{
+								Running: &api.ContainerStateRunning{
+									StartedAt: util.Time{},
+								},
+							},
+						},
+					},
+				},
+			},
+			"true",
+		},
+	}
+
+	// The point of this test is to verify that the below template works. If you change this
+	// template, you need to update hack/e2e-suite/update.sh.
+	tmpl :=
+		`{{and (exists . "currentState" "info" "foo" "state" "running") (exists . "currentState" "info" "bar" "state" "running")}}`
+	useThisToDebug := `
+a: {{exists . "currentState"}}
+b: {{exists . "currentState" "info"}}
+c: {{exists . "currentState" "info" "foo"}}
+d: {{exists . "currentState" "info" "foo" "state"}}
+e: {{exists . "currentState" "info" "foo" "state" "running"}}
+f: {{exists . "currentState" "info" "foo" "state" "running" "startedAt"}}`
+	_ = useThisToDebug // don't complain about unused var
+
+	p, err := NewTemplatePrinter([]byte(tmpl))
+	if err != nil {
+		t.Fatalf("tmpl fail: %v", err)
+	}
+
+	printer := NewVersionedPrinter(p, api.Scheme, "v1beta1")
+
+	for name, item := range table {
+		buffer := &bytes.Buffer{}
+		err = printer.PrintObj(&item.pod, buffer)
+		if err != nil {
+			t.Errorf("%v: unexpected err: %v", name, err)
+			continue
+		}
+		if e, a := item.expect, buffer.String(); e != a {
+			t.Errorf("%v: expected %v, got %v", name, e, a)
+		}
+	}
+}
+
 func TestPrinters(t *testing.T) {
 	om := func(name string) api.ObjectMeta { return api.ObjectMeta{Name: name} }
-	templatePrinter, err := NewTemplatePrinter([]byte("{{.name}}"), testapi.Version(), api.Scheme)
+	templatePrinter, err := NewTemplatePrinter([]byte("{{.name}}"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	templatePrinter2, err := NewTemplatePrinter([]byte("{{len .items}}"), testapi.Version(), api.Scheme)
+	templatePrinter2, err := NewTemplatePrinter([]byte("{{len .items}}"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	printers := map[string]ResourcePrinter{
 		"humanReadable":        NewHumanReadablePrinter(true),
 		"humanReadableHeaders": NewHumanReadablePrinter(false),
-		"json":                 &JSONPrinter{testapi.Version(), api.Scheme},
-		"yaml":                 &YAMLPrinter{testapi.Version(), api.Scheme},
+		"json":                 &JSONPrinter{},
+		"yaml":                 &YAMLPrinter{},
 		"template":             templatePrinter,
 		"template2":            templatePrinter2,
 	}
@@ -311,10 +469,15 @@ func TestPrinters(t *testing.T) {
 		"pod":             &api.Pod{ObjectMeta: om("pod")},
 		"emptyPodList":    &api.PodList{},
 		"nonEmptyPodList": &api.PodList{Items: []api.Pod{{}}},
+		"endpoints": &api.Endpoints{
+			Subsets: []api.EndpointSubset{{
+				Addresses: []api.EndpointAddress{{IP: "127.0.0.1"}, {IP: "localhost"}},
+				Ports:     []api.EndpointPort{{Port: 8080}},
+			}}},
 	}
 	// map of printer name to set of objects it should fail on.
 	expectedErrors := map[string]util.StringSet{
-		"template2": util.NewStringSet("pod", "emptyPodList"),
+		"template2": util.NewStringSet("pod", "emptyPodList", "endpoints"),
 	}
 
 	for pName, p := range printers {
@@ -327,6 +490,230 @@ func TestPrinters(t *testing.T) {
 				}
 				t.Errorf("printer '%v', object '%v'; error: '%v'", pName, oName, err)
 			}
+		}
+	}
+}
+
+func TestPrintEventsResultSorted(t *testing.T) {
+	// Arrange
+	printer := NewHumanReadablePrinter(false /* noHeaders */)
+
+	obj := api.EventList{
+		Items: []api.Event{
+			{
+				Source:         api.EventSource{Component: "kubelet"},
+				Message:        "Item 1",
+				FirstTimestamp: util.NewTime(time.Date(2014, time.January, 15, 0, 0, 0, 0, time.UTC)),
+				LastTimestamp:  util.NewTime(time.Date(2014, time.January, 15, 0, 0, 0, 0, time.UTC)),
+				Count:          1,
+			},
+			{
+				Source:         api.EventSource{Component: "scheduler"},
+				Message:        "Item 2",
+				FirstTimestamp: util.NewTime(time.Date(1987, time.June, 17, 0, 0, 0, 0, time.UTC)),
+				LastTimestamp:  util.NewTime(time.Date(1987, time.June, 17, 0, 0, 0, 0, time.UTC)),
+				Count:          1,
+			},
+			{
+				Source:         api.EventSource{Component: "kubelet"},
+				Message:        "Item 3",
+				FirstTimestamp: util.NewTime(time.Date(2002, time.December, 25, 0, 0, 0, 0, time.UTC)),
+				LastTimestamp:  util.NewTime(time.Date(2002, time.December, 25, 0, 0, 0, 0, time.UTC)),
+				Count:          1,
+			},
+		},
+	}
+	buffer := &bytes.Buffer{}
+
+	// Act
+	err := printer.PrintObj(&obj, buffer)
+
+	// Assert
+	if err != nil {
+		t.Fatalf("An error occurred printing the EventList: %#v", err)
+	}
+	out := buffer.String()
+	VerifyDatesInOrder(out, "\n" /* rowDelimiter */, "  " /* columnDelimiter */, t)
+}
+
+func TestPrintMinionStatus(t *testing.T) {
+	printer := NewHumanReadablePrinter(false)
+	table := []struct {
+		minion api.Node
+		status string
+	}{
+		{
+			minion: api.Node{
+				ObjectMeta: api.ObjectMeta{Name: "foo1"},
+				Status:     api.NodeStatus{Conditions: []api.NodeCondition{{Type: api.NodeReady, Status: api.ConditionTrue}}},
+			},
+			status: "Ready",
+		},
+		{
+			minion: api.Node{
+				ObjectMeta: api.ObjectMeta{Name: "foo3"},
+				Status: api.NodeStatus{Conditions: []api.NodeCondition{
+					{Type: api.NodeReady, Status: api.ConditionTrue},
+					{Type: api.NodeReady, Status: api.ConditionTrue}}},
+			},
+			status: "Ready",
+		},
+		{
+			minion: api.Node{
+				ObjectMeta: api.ObjectMeta{Name: "foo4"},
+				Status:     api.NodeStatus{Conditions: []api.NodeCondition{{Type: api.NodeReady, Status: api.ConditionFalse}}},
+			},
+			status: "NotReady",
+		},
+		{
+			minion: api.Node{
+				ObjectMeta: api.ObjectMeta{Name: "foo5"},
+				Status:     api.NodeStatus{Conditions: []api.NodeCondition{{Type: "InvalidValue", Status: api.ConditionTrue}}},
+			},
+			status: "Unknown",
+		},
+		{
+			minion: api.Node{
+				ObjectMeta: api.ObjectMeta{Name: "foo6"},
+				Status:     api.NodeStatus{Conditions: []api.NodeCondition{{}}},
+			},
+			status: "Unknown",
+		},
+	}
+
+	for _, test := range table {
+		buffer := &bytes.Buffer{}
+		err := printer.PrintObj(&test.minion, buffer)
+		if err != nil {
+			t.Fatalf("An error occurred printing Minion: %#v", err)
+		}
+		if !contains(strings.Fields(buffer.String()), test.status) {
+			t.Fatalf("Expect printing minion %s with status %#v, got: %#v", test.minion.Name, test.status, buffer.String())
+		}
+	}
+}
+
+func contains(fields []string, field string) bool {
+	for _, v := range fields {
+		if v == field {
+			return true
+		}
+	}
+	return false
+}
+
+func TestPrintHumanReadableService(t *testing.T) {
+	tests := []api.Service{
+		{
+			Spec: api.ServiceSpec{
+				PortalIP: "1.2.3.4",
+				PublicIPs: []string{
+					"2.3.4.5",
+					"3.4.5.6",
+				},
+				Ports: []api.ServicePort{
+					{
+						Port:     80,
+						Protocol: "TCP",
+					},
+				},
+			},
+		},
+		{
+			Spec: api.ServiceSpec{
+				PortalIP: "1.2.3.4",
+				Ports: []api.ServicePort{
+					{
+						Port:     80,
+						Protocol: "TCP",
+					},
+					{
+						Port:     8090,
+						Protocol: "UDP",
+					},
+					{
+						Port:     8000,
+						Protocol: "TCP",
+					},
+				},
+			},
+		},
+		{
+			Spec: api.ServiceSpec{
+				PortalIP: "1.2.3.4",
+				PublicIPs: []string{
+					"2.3.4.5",
+				},
+				Ports: []api.ServicePort{
+					{
+						Port:     80,
+						Protocol: "TCP",
+					},
+					{
+						Port:     8090,
+						Protocol: "UDP",
+					},
+					{
+						Port:     8000,
+						Protocol: "TCP",
+					},
+				},
+			},
+		},
+		{
+			Spec: api.ServiceSpec{
+				PortalIP: "1.2.3.4",
+				PublicIPs: []string{
+					"2.3.4.5",
+					"4.5.6.7",
+					"5.6.7.8",
+				},
+				Ports: []api.ServicePort{
+					{
+						Port:     80,
+						Protocol: "TCP",
+					},
+					{
+						Port:     8090,
+						Protocol: "UDP",
+					},
+					{
+						Port:     8000,
+						Protocol: "TCP",
+					},
+				},
+			},
+		},
+	}
+
+	for _, svc := range tests {
+		buff := bytes.Buffer{}
+		printService(&svc, &buff)
+		output := string(buff.Bytes())
+		ip := svc.Spec.PortalIP
+		if !strings.Contains(output, ip) {
+			t.Errorf("expected to contain portal ip %s, but doesn't: %s", ip, output)
+		}
+
+		for _, ip = range svc.Spec.PublicIPs {
+			if !strings.Contains(output, ip) {
+				t.Errorf("expected to contain public ip %s, but doesn't: %s", ip, output)
+			}
+		}
+
+		for _, port := range svc.Spec.Ports {
+			portSpec := fmt.Sprintf("%d/%s", port.Port, port.Protocol)
+			if !strings.Contains(output, portSpec) {
+				t.Errorf("expected to contain port: %s, but doesn't: %s", portSpec, output)
+			}
+		}
+		// Max of # ports and (# public ip + portal ip)
+		count := len(svc.Spec.Ports)
+		if len(svc.Spec.PublicIPs)+1 > count {
+			count = len(svc.Spec.PublicIPs) + 1
+		}
+		if count != strings.Count(output, "\n") {
+			t.Errorf("expected %d newlines, found %d", count, strings.Count(output, "\n"))
 		}
 	}
 }

@@ -38,7 +38,8 @@ server {
 
         ssl_session_timeout 5m;
 
-        ssl_protocols SSLv3 TLSv1 TLSv1.1 TLSv1.2;
+        # don't use SSLv3 because of POODLE
+        ssl_protocols TLSv1 TLSv1.1 TLSv1.2;
         ssl_ciphers ECDH+AESGCM:DH+AESGCM:ECDH+AES256:DH+AES256:ECDH+AES128:DH+AES:ECDH+3DES:DH+3DES:RSA+AESGCM:RSA+AES:RSA+3DES:!aNULL:!MD5:!DSS;
         ssl_prefer_server_ciphers on;
 

@@ -6,6 +6,9 @@ import (
 	"github.com/emicklei/go-restful"
 )
 
+// PostBuildDeclarationMapFunc can be used to modify the api declaration map.
+type PostBuildDeclarationMapFunc func(apiDeclarationMap map[string]ApiDeclaration)
+
 type Config struct {
 	// url where the services are available, e.g. http://localhost:8080
 	// if left empty then the basePath of Swagger is taken from the actual request
@@ -22,4 +25,8 @@ type Config struct {
 	StaticHandler http.Handler
 	// [optional] on default CORS (Cross-Origin-Resource-Sharing) is enabled.
 	DisableCORS bool
+	// Top-level API version. Is reflected in the resource listing.
+	ApiVersion string
+	// If set then call this handler after building the complete ApiDeclaration Map
+	PostBuildHandler PostBuildDeclarationMapFunc
 }

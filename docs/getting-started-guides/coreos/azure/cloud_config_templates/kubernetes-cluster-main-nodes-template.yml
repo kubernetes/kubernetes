@@ -1,0 +1,326 @@
+## This file is used as input to deployment script, which ammends it as needed.
+## More specifically, we need to add environment files for as many nodes as we
+## are going to deploy.
+
+write_files:
+  - path: /opt/bin/register_minion.sh
+    permissions: '0755'
+    owner: root
+    content: |
+      #!/bin/sh -xe
+      minion_id="${1}"
+      master_url="${2}"
+      until healthcheck=$(curl --fail --silent "${master_url}/healthz")
+      do sleep 2
+      done
+      test -n "${healthcheck}"
+      test "${healthcheck}" = "ok"
+      printf '{ "id": "%s", "kind": "Minion", "apiVersion": "v1beta1", "labels": { "environment": "production" }  }' "${minion_id}" \
+        | /opt/bin/kubectl create -s "${master_url}" -f -
+
+coreos:
+  update:
+    group: stable
+  units:
+    - name: docker.service
+      drop-ins:
+        - name: 50-weave-kubernetes.conf
+          content: |
+            [Service]
+            Environment=DOCKER_OPTS='--bridge="weave" -r="false"'
+
+    - name: weave-network.target
+      enable: true
+      content: |
+        [Unit]
+        Description=Weave Network Setup Complete
+        Documentation=man:systemd.special(7)
+        RefuseManualStart=no
+        After=network-online.target
+        [Install]
+        WantedBy=multi-user.target
+        WantedBy=kubernetes-master.target
+        WantedBy=kubernetes-minion.target
+
+    - name: kubernetes-master.target
+      enable: true
+      command: start
+      content: |
+        [Unit]
+        Description=Kubernetes Cluster Master
+        Documentation=http://kubernetes.io/
+        RefuseManualStart=no
+        After=weave-network.target
+        Requires=weave-network.target
+        ConditionHost=kube-00
+        Wants=apiserver.service
+        Wants=scheduler.service
+        Wants=controller-manager.service
+        [Install]
+        WantedBy=multi-user.target
+
+    - name: kubernetes-minion.target
+      enable: true
+      command: start
+      content: |
+        [Unit]
+        Description=Kubernetes Cluster Minion
+        Documentation=http://kubernetes.io/
+        RefuseManualStart=no
+        After=weave-network.target
+        Requires=weave-network.target
+        ConditionHost=!kube-00
+        Wants=proxy.service
+        Wants=kubelet.service
+        [Install]
+        WantedBy=multi-user.target
+
+    - name: 10-weave.network
+      runtime: false
+      content: |
+        [Match]
+        Type=bridge
+        Name=weave*
+        [Network]
+
+    - name: install-weave.service
+      enable: true
+      content: |
+        [Unit]
+        After=network-online.target
+        Before=weave.service
+        Before=weave-helper.service
+        Before=docker.service
+        Description=Install Weave
+        Documentation=http://zettio.github.io/weave/
+        Requires=network-online.target
+        [Service]
+        Type=oneshot
+        RemainAfterExit=yes
+        ExecStartPre=/bin/mkdir -p /opt/bin/
+        ExecStartPre=/usr/bin/curl \
+          --silent \
+          --location \
+          https://github.com/zettio/weave/releases/download/latest_release/weave \
+          --output /opt/bin/weave
+        ExecStartPre=/usr/bin/curl \
+          --silent \
+          --location \
+          https://raw.github.com/errordeveloper/weave-demos/master/poseidon/weave-helper \
+          --output /opt/bin/weave-helper
+        ExecStartPre=/usr/bin/chmod +x /opt/bin/weave
+        ExecStartPre=/usr/bin/chmod +x /opt/bin/weave-helper
+        ExecStart=/bin/echo Weave Installed
+        [Install]
+        WantedBy=weave-network.target
+        WantedBy=weave.service
+
+    - name: weave-helper.service
+      enable: true
+      content: |
+        [Unit]
+        After=install-weave.service
+        After=docker.service
+        Description=Weave Network Router
+        Documentation=http://zettio.github.io/weave/
+        Requires=docker.service
+        Requires=install-weave.service
+        [Service]
+        ExecStart=/opt/bin/weave-helper
+        [Install]
+        WantedBy=weave-network.target
+
+    - name: weave.service
+      enable: true
+      content: |
+        [Unit]
+        After=install-weave.service
+        After=docker.service
+        Description=Weave Network Router
+        Documentation=http://zettio.github.io/weave/
+        Requires=docker.service
+        Requires=install-weave.service
+        [Service]
+        EnvironmentFile=/etc/weave.%H.env
+        ExecStartPre=/usr/bin/docker pull zettio/weave:latest
+        ExecStartPre=/usr/bin/docker pull zettio/weavetools:latest
+        ExecStartPre=/opt/bin/weave launch $WEAVE_PEERS
+        ExecStart=/usr/bin/docker attach weave
+        Restart=on-failure
+        ExecStop=/opt/bin/weave stop
+        [Install]
+        WantedBy=weave-network.target
+
+    - name: weave-create-bridge.service
+      enable: true
+      content: |
+        [Unit]
+        After=network.target
+        After=install-weave.service
+        Before=weave.service
+        Before=docker.service
+        Description=Docker Application Container Engine
+        Documentation=http://docs.docker.io
+        Requires=network.target
+        Requires=install-weave.service
+        [Service]
+        Type=oneshot
+        EnvironmentFile=/etc/weave.%H.env
+        ExecStart=/opt/bin/weave create-bridge
+        ExecStart=/usr/bin/ip addr add dev weave $BRIDGE_ADDRESS_CIDR
+        ExecStart=/usr/bin/ip route add $BREAKOUT_ROUTE dev weave scope link
+        ExecStart=/usr/bin/ip route add 224.0.0.0/4 dev weave
+        [Install]
+        WantedBy=multi-user.target
+        WantedBy=weave-network.target
+
+    - name: download-kubernetes.service
+      enable: true
+      content: |
+        [Unit]
+        After=network-online.target
+        Before=apiserver.service
+        Before=controller-manager.service
+        Before=kubelet.service
+        Before=proxy.service
+        Description=Download Kubernetes Binaries
+        Documentation=https://github.com/GoogleCloudPlatform/kubernetes
+        Requires=network-online.target
+        [Service]
+        Environment=KUBE_RELEASE_TARBALL=https://github.com/GoogleCloudPlatform/kubernetes/releases/download/v0.11.0/kubernetes.tar.gz
+        ExecStartPre=/bin/mkdir -p /opt/
+        ExecStart=/bin/bash -c "curl --silent --location $KUBE_RELEASE_TARBALL | tar xzv -C /tmp/"
+        ExecStart=/bin/tar xzvf /tmp/kubernetes/server/kubernetes-server-linux-amd64.tar.gz -C /opt
+        ExecStartPost=/bin/ln -s /opt/kubernetes/server/bin/kubectl /opt/bin/
+        ExecStartPost=/bin/mv /tmp/kubernetes/examples/guestbook /home/core/guestbook-example
+        ExecStartPost=/bin/rm -rf /tmp/kubernetes
+        RemainAfterExit=yes
+        Type=oneshot
+        [Install]
+        WantedBy=kubernetes-master.target
+        WantedBy=kubernetes-minion.target
+
+    - name: apiserver.service
+      enable: true
+      content: |
+        [Unit]
+        After=download-kubernetes.service
+        Before=controller-manager.service
+        Before=scheduler.service
+        ConditionFileIsExecutable=/opt/kubernetes/server/bin/kube-apiserver
+        Description=Kubernetes API Server
+        Documentation=https://github.com/GoogleCloudPlatform/kubernetes
+        Wants=download-kubernetes.service
+        ConditionHost=kube-00
+        [Service]
+        ExecStart=/opt/kubernetes/server/bin/kube-apiserver \
+            --address=0.0.0.0 \
+            --port=8080 \
+            --etcd_servers=http://etcd-00:4001,http://etcd-01:4001,http://etcd-02:4001 \
+            --portal_net=10.1.0.0/16 \
+            --cloud_provider=vagrant \
+            --logtostderr=true --v=3
+        Restart=always
+        RestartSec=10
+        [Install]
+        WantedBy=kubernetes-master.target
+
+    - name: scheduler.service
+      enable: true
+      content: |
+        [Unit]
+        After=apiserver.service
+        After=download-kubernetes.service
+        ConditionFileIsExecutable=/opt/kubernetes/server/bin/kube-scheduler
+        Description=Kubernetes Scheduler
+        Documentation=https://github.com/GoogleCloudPlatform/kubernetes
+        Wants=apiserver.service
+        ConditionHost=kube-00
+        [Service]
+        ExecStart=/opt/kubernetes/server/bin/kube-scheduler \
+            --logtostderr=true \
+            --master=127.0.0.1:8080
+        Restart=always
+        RestartSec=10
+        [Install]
+        WantedBy=kubernetes-master.target
+
+    - name: controller-manager.service
+      enable: true
+      content: |
+        [Unit]
+        After=download-kubernetes.service
+        After=apiserver.service
+        ConditionFileIsExecutable=/opt/kubernetes/server/bin/kube-controller-manager
+        Description=Kubernetes Controller Manager
+        Documentation=https://github.com/GoogleCloudPlatform/kubernetes
+        Wants=apiserver.service
+        Wants=download-kubernetes.service
+        ConditionHost=kube-00
+        [Service]
+        ExecStart=/opt/kubernetes/server/bin/kube-controller-manager \
+            --cloud_provider=vagrant \
+            --master=127.0.0.1:8080 \
+            --logtostderr=true
+        Restart=always
+        RestartSec=10
+        [Install]
+        WantedBy=kubernetes-master.target
+
+    - name: kubelet.service
+      enable: true
+      content: |
+        [Unit]
+        After=download-kubernetes.service
+        ConditionFileIsExecutable=/opt/kubernetes/server/bin/kubelet
+        Description=Kubernetes Kubelet
+        Documentation=https://github.com/GoogleCloudPlatform/kubernetes
+        Wants=download-kubernetes.service
+        ConditionHost=!kube-00
+        [Service]
+        ExecStart=/opt/kubernetes/server/bin/kubelet \
+            --address=0.0.0.0 \
+            --port=10250 \
+            --hostname_override=%H \
+            --api_servers=http://kube-00:8080 \
+            --logtostderr=true
+        Restart=always
+        RestartSec=10
+        [Install]
+        WantedBy=kubernetes-minion.target
+
+    - name: proxy.service
+      enable: true
+      content: |
+        [Unit]
+        After=download-kubernetes.service
+        ConditionFileIsExecutable=/opt/kubernetes/server/bin/kube-proxy
+        Description=Kubernetes Proxy
+        Documentation=https://github.com/GoogleCloudPlatform/kubernetes
+        Wants=download-kubernetes.service
+        ConditionHost=!kube-00
+        [Service]
+        ExecStart=/opt/kubernetes/server/bin/kube-proxy \
+             --master=http://kube-00:8080 \
+             --logtostderr=true
+        Restart=always
+        RestartSec=10
+        [Install]
+        WantedBy=kubernetes-minion.target
+
+    - name: kubectl-create-minion.service
+      enable: true
+      content: |
+        [Unit]
+        After=download-kubernetes.service
+        ConditionFileIsExecutable=/opt/kubernetes/server/bin/kubectl
+        ConditionFileIsExecutable=/opt/bin/register_minion.sh
+        Description=Kubernetes Create Minion
+        Documentation=https://github.com/GoogleCloudPlatform/kubernetes
+        Wants=download-kubernetes.service
+        ConditionHost=!kube-00
+        [Service]
+        ExecStart=/opt/bin/register_minion.sh %H http://kube-00:8080
+        Type=oneshot
+        [Install]
+        WantedBy=kubernetes-minion.target

@@ -1,0 +1,26 @@
+# Copyright 2014 Google Inc. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+FROM golang
+RUN go get -v github.com/spf13/hugo
+RUN git clone --recursive https://github.com/spf13/hugoThemes.git /themes
+VOLUME ["/src", "/dest"]
+EXPOSE 1313
+ENV HUGO_SRC /src
+ENV HUGO_DEST /dest
+ENV HUGO_THEME hyde
+ENV HUGO_BUILD_DRAFT false
+ENV HUGO_BASE_URL ""
+ADD run-hugo /run-hugo
+ENTRYPOINT ["/run-hugo"]
+CMD ["server", "--source=${HUGO_SRC}", "--theme=${HUGO_THEME}", "--buildDrafts=${HUGO_BUILD_DRAFT}", "--baseUrl=${HUGO_BASE_URL}", "--watch", "--destination=${HUGO_DEST}", "--appendPort=false"]

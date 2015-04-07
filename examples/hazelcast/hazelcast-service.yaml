@@ -1,0 +1,7 @@
+id: hazelcast
+kind: Service
+apiVersion: v1beta1
+port: 5701
+containerPort: 5701
+selector:
+  name: hazelcast

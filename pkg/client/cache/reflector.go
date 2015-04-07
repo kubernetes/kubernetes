@@ -18,7 +18,7 @@ package cache
 
 import (
 	"errors"
-	"fmt"
+	"io"
 	"reflect"
 	"time"
 
@@ -49,18 +49,31 @@ type Reflector struct {
 	listerWatcher ListerWatcher
 	// period controls timing between one watch ending and
 	// the beginning of the next one.
-	period time.Duration
+	period       time.Duration
+	resyncPeriod time.Duration
+}
+
+// NewNamespaceKeyedIndexerAndReflector creates an Indexer and a Reflector
+// The indexer is configured to key on namespace
+func NewNamespaceKeyedIndexerAndReflector(lw ListerWatcher, expectedType interface{}, resyncPeriod time.Duration) (indexer Indexer, reflector *Reflector) {
+	indexer = NewIndexer(MetaNamespaceKeyFunc, Indexers{"namespace": MetaNamespaceIndexFunc})
+	reflector = NewReflector(lw, expectedType, indexer, resyncPeriod)
+	return indexer, reflector
 }
 
 // NewReflector creates a new Reflector object which will keep the given store up to
 // date with the server's contents for the given resource. Reflector promises to
 // only put things in the store that have the type of expectedType.
-func NewReflector(lw ListerWatcher, expectedType interface{}, store Store) *Reflector {
+// If resyncPeriod is non-zero, then lists will be executed after every resyncPeriod,
+// so that you can use reflectors to periodically process everything as well as
+// incrementally processing the things that change.
+func NewReflector(lw ListerWatcher, expectedType interface{}, store Store, resyncPeriod time.Duration) *Reflector {
 	r := &Reflector{
 		listerWatcher: lw,
 		store:         store,
 		expectedType:  reflect.TypeOf(expectedType),
 		period:        time.Second,
+		resyncPeriod:  resyncPeriod,
 	}
 	return r
 }
@@ -71,8 +84,31 @@ func (r *Reflector) Run() {
 	go util.Forever(func() { r.listAndWatch() }, r.period)
 }
 
+// RunUntil starts a watch and handles watch events. Will restart the watch if it is closed.
+// RunUntil starts a goroutine and returns immediately. It will exit when stopCh is closed.
+func (r *Reflector) RunUntil(stopCh <-chan struct{}) {
+	go util.Until(func() { r.listAndWatch() }, r.period, stopCh)
+}
+
+var (
+	// nothing will ever be sent down this channel
+	neverExitWatch <-chan time.Time = make(chan time.Time)
+
+	// Used to indicate that watching stopped so that a resync could happen.
+	errorResyncRequested = errors.New("resync channel fired")
+)
+
+// resyncChan returns a channel which will receive something when a resync is required.
+func (r *Reflector) resyncChan() <-chan time.Time {
+	if r.resyncPeriod == 0 {
+		return neverExitWatch
+	}
+	return time.After(r.resyncPeriod)
+}
+
 func (r *Reflector) listAndWatch() {
 	var resourceVersion string
+	exitWatch := r.resyncChan()
 
 	list, err := r.listerWatcher.List()
 	if err != nil {
@@ -90,8 +126,7 @@ func (r *Reflector) listAndWatch() {
 		glog.Errorf("Unable to understand list result %#v (%v)", list, err)
 		return
 	}
-	err = r.syncWith(items)
-	if err != nil {
+	if err := r.syncWith(items); err != nil {
 		glog.Errorf("Unable to sync list result: %v", err)
 		return
 	}
@@ -99,11 +134,20 @@ func (r *Reflector) listAndWatch() {
 	for {
 		w, err := r.listerWatcher.Watch(resourceVersion)
 		if err != nil {
-			glog.Errorf("failed to watch %v: %v", r.expectedType, err)
+			switch err {
+			case io.EOF:
+				// watch closed normally
+			case io.ErrUnexpectedEOF:
+				glog.V(1).Infof("Watch for %v closed with unexpected EOF: %v", r.expectedType, err)
+			default:
+				glog.Errorf("Failed to watch %v: %v", r.expectedType, err)
+			}
 			return
 		}
-		if err := r.watchHandler(w, &resourceVersion); err != nil {
-			glog.Errorf("watch of %v ended with error: %v", r.expectedType, err)
+		if err := r.watchHandler(w, &resourceVersion, exitWatch); err != nil {
+			if err != errorResyncRequested {
+				glog.Errorf("watch of %v ended with error: %v", r.expectedType, err)
+			}
 			return
 		}
 	}
@@ -111,62 +155,63 @@ func (r *Reflector) listAndWatch() {
 
 // syncWith replaces the store's items with the given list.
 func (r *Reflector) syncWith(items []runtime.Object) error {
-	found := map[string]interface{}{}
+	found := make([]interface{}, 0, len(items))
 	for _, item := range items {
-		meta, err := meta.Accessor(item)
-		if err != nil {
-			return fmt.Errorf("unexpected item in list: %v", err)
-		}
-		found[meta.Name()] = item
+		found = append(found, item)
 	}
 
-	r.store.Replace(found)
-	return nil
+	return r.store.Replace(found)
 }
 
 // watchHandler watches w and keeps *resourceVersion up to date.
-func (r *Reflector) watchHandler(w watch.Interface, resourceVersion *string) error {
+func (r *Reflector) watchHandler(w watch.Interface, resourceVersion *string, exitWatch <-chan time.Time) error {
 	start := time.Now()
 	eventCount := 0
+loop:
 	for {
-		event, ok := <-w.ResultChan()
-		if !ok {
-			break
+		select {
+		case <-exitWatch:
+			w.Stop()
+			return errorResyncRequested
+		case event, ok := <-w.ResultChan():
+			if !ok {
+				break loop
+			}
+			if event.Type == watch.Error {
+				return apierrs.FromObject(event.Object)
+			}
+			if e, a := r.expectedType, reflect.TypeOf(event.Object); e != a {
+				glog.Errorf("expected type %v, but watch event object had type %v", e, a)
+				continue
+			}
+			meta, err := meta.Accessor(event.Object)
+			if err != nil {
+				glog.Errorf("unable to understand watch event %#v", event)
+				continue
+			}
+			switch event.Type {
+			case watch.Added:
+				r.store.Add(event.Object)
+			case watch.Modified:
+				r.store.Update(event.Object)
+			case watch.Deleted:
+				// TODO: Will any consumers need access to the "last known
+				// state", which is passed in event.Object? If so, may need
+				// to change this.
+				r.store.Delete(event.Object)
+			default:
+				glog.Errorf("unable to understand watch event %#v", event)
+			}
+			*resourceVersion = meta.ResourceVersion()
+			eventCount++
 		}
-		if event.Type == watch.Error {
-			return apierrs.FromObject(event.Object)
-		}
-		if e, a := r.expectedType, reflect.TypeOf(event.Object); e != a {
-			glog.Errorf("expected type %v, but watch event object had type %v", e, a)
-			continue
-		}
-		meta, err := meta.Accessor(event.Object)
-		if err != nil {
-			glog.Errorf("unable to understand watch event %#v", event)
-			continue
-		}
-		switch event.Type {
-		case watch.Added:
-			r.store.Add(meta.Name(), event.Object)
-		case watch.Modified:
-			r.store.Update(meta.Name(), event.Object)
-		case watch.Deleted:
-			// TODO: Will any consumers need access to the "last known
-			// state", which is passed in event.Object? If so, may need
-			// to change this.
-			r.store.Delete(meta.Name())
-		default:
-			glog.Errorf("unable to understand watch event %#v", event)
-		}
-		*resourceVersion = meta.ResourceVersion()
-		eventCount++
 	}
 
 	watchDuration := time.Now().Sub(start)
 	if watchDuration < 1*time.Second && eventCount == 0 {
-		glog.Errorf("unexpected watch close - watch lasted less than a second and no items received")
+		glog.V(4).Infof("Unexpected watch close - watch lasted less than a second and no items received")
 		return errors.New("very short watch")
 	}
-	glog.V(4).Infof("watch close - %v total items received", eventCount)
+	glog.V(4).Infof("Watch close - %v total %v items received", r.expectedType, eventCount)
 	return nil
 }

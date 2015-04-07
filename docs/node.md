@@ -11,9 +11,46 @@ doc for more details.
 
 ## Node Status
 
-Node Status is still under development. See:
-[#2164](https://github.com/GoogleCloudPlatform/kubernetes/issues/2164),
-[#2315](https://github.com/GoogleCloudPlatform/kubernetes/pull/2315).
+Node status describes current status of a node. For now, there are three
+pieces of information:
+
+### HostIP
+
+Host IP address is queried from cloudprovider and stored as part of node
+status. If kubernetes runs without cloudprovider, node's ID will be used.
+IP address can change, and there are different kind of IPs, e.g. public
+IP, private IP, dynamic IP, ipv6, etc. It makes more sense to save it as
+a status rather than spec.
+
+### Node Phase
+
+Node Phase is the current lifecycle phase of node, one of `Pending`,
+`Running` and `Terminated`. Node Phase management is under development,
+here is a brief overview: In kubernetes, node will be created in `Pending`
+phase, until it is discovered and checked in by kubernetes, at which time,
+kubernetes will mark it as `Running`. The end of a node's lifecycle is
+`Terminated`. A terminated node will not receive any scheduling request,
+and any running pods will be removed from the node.
+
+Node with `Running` phase is necessary but not sufficient requirement for
+scheduling Pods. For a node to be considered a scheduling candidate, it
+must have appropriate conditions, see below.
+
+### Node Condition
+Node Condition describes the conditions of `Running` nodes. Current valid
+condition is `NodeReady`. In the future, we plan to add more. 
+`NodeReady` means kubelet is healthy and ready to accept pods. Different 
+condition provides different level of understanding for node health. 
+Node condition is represented as a json object. For example, 
+the following conditions mean the node is in sane state:
+```json
+"conditions": [
+  {
+    "kind": "Ready",
+    "status": "True",
+    },
+]
+```
 
 ## Node Management
 
@@ -28,7 +65,7 @@ For example, if you try to create a node from the following content:
   "id": "10.1.2.3",
   "kind": "Minion",
   "apiVersion": "v1beta1",
-  "spec": {
+  "resources": {
     "capacity": {
       "cpu": 1000,
       "memory": 1073741824
@@ -58,7 +95,8 @@ objects. It performs two major functions: cluster-wide node synchronization
 and single node life-cycle management.
 
 Node controller has a sync loop that creates/deletes `Node`s from Kubernetes
-based on all matching VM instances listed from cloud provider. If a new instance
+based on all matching VM instances listed from cloud provider. The sync period
+can be controlled via flag "--node_sync_period". If a new instance
 gets created, Node Controller creates a representation for it. If an existing
 instance gets deleted, Node Controller deletes the representation. Note however,
 Node Controller is unable to provision the node for you, i.e. it won't install
@@ -66,9 +104,11 @@ any binary; therefore, to
 join Kubernetes cluster, you as an admin need to make sure proper services are
 running in the node. In the future, we plan to automatically provision some node
 services. In case of no cloud provider, Node Controller simply registers all
-machines from `-machines` flag, any futher interactions need to be done manually
-by using `kubectl`. If you are paranoid, leave `-machines` empty and create all
+machines from `--machines` flag, any futher interactions need to be done manually
+by using `kubectl`. If you are paranoid, leave `--machines` empty and create all
 machines from `kubectl` one by one - the two approaches are equivalent.
+Optionally you can skip cluster-wide node synchronization with
+'--sync_nodes=false' and can use REST api/kubectl cli to add/remove nodes.
 
 Node life-cycle management in the Node Controller is still under development, it
 is supposed to manage the Node Status Specification defined above.
@@ -79,3 +119,9 @@ A Kubernetes administrator typically uses `kubectl` to manage `Node`. Similar
 to Node Controller, `kubectl` command only creates/deletes node representation.
 Note if Kubernetes is running on cloud provider, `kubectl create` a node will
 be refused if Node Controller has already synchronized nodes from cloud provider.
+Admin can choose to make the node unschedulable using `kubectl`. Unscheduling the node
+will not affect any existing pods on the node but it will disable creation of
+any new pods on the node. Node unschedulable example:
+```
+kubectl update nodes 10.1.2.3 --patch='{"apiVersion": "v1beta1", "unschedulable": true}'
+```

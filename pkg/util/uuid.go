@@ -21,11 +21,8 @@ import (
 	"time"
 
 	"code.google.com/p/go-uuid/uuid"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 )
-
-type UUID interface {
-	String() string
-}
 
 var uuidLock sync.Mutex
 
@@ -35,12 +32,12 @@ var uuidLock sync.Mutex
  * Blocks in a go routine, so that the caller doesn't have to wait.
  * TODO: save old unused UUIDs so that no one has to block.
  */
-func NewUUID() UUID {
+func NewUUID() types.UID {
 	uuidLock.Lock()
 	result := uuid.NewUUID()
 	go func() {
 		time.Sleep(200 * time.Nanosecond)
 		uuidLock.Unlock()
 	}()
-	return result
+	return types.UID(result.String())
 }

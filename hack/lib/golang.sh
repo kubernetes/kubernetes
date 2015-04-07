@@ -24,6 +24,8 @@ readonly KUBE_SERVER_TARGETS=(
   cmd/kube-apiserver
   cmd/kube-controller-manager
   cmd/kubelet
+  cmd/hyperkube
+  cmd/kubernetes
   plugin/cmd/kube-scheduler
 )
 readonly KUBE_SERVER_BINARIES=("${KUBE_SERVER_TARGETS[@]##*/}")
@@ -35,9 +37,7 @@ readonly KUBE_SERVER_PLATFORMS=(
 
 # The set of client targets that we are building for all platforms
 readonly KUBE_CLIENT_TARGETS=(
-  cmd/kubecfg
   cmd/kubectl
-  cmd/kubernetes
 )
 readonly KUBE_CLIENT_BINARIES=("${KUBE_CLIENT_TARGETS[@]##*/}")
 readonly KUBE_CLIENT_BINARIES_WIN=("${KUBE_CLIENT_BINARIES[@]/%/.exe}")
@@ -46,8 +46,20 @@ readonly KUBE_CLIENT_BINARIES_WIN=("${KUBE_CLIENT_BINARIES[@]/%/.exe}")
 readonly KUBE_TEST_TARGETS=(
   cmd/e2e
   cmd/integration
+  cmd/gendocs
+  cmd/genman
+  examples/k8petstore/web-server
 )
 readonly KUBE_TEST_BINARIES=("${KUBE_TEST_TARGETS[@]##*/}")
+readonly KUBE_TEST_BINARIES_WIN=("${KUBE_TEST_BINARIES[@]/%/.exe}")
+readonly KUBE_TEST_PORTABLE=(
+  contrib/for-tests/network-tester/rc.json
+  contrib/for-tests/network-tester/service.json
+  hack/e2e.go
+  hack/e2e-suite
+  hack/e2e-internal
+  hack/ginkgo-e2e.sh
+)
 
 # If we update this we need to also update the set of golang compilers we build
 # in 'build/build-image/Dockerfile'
@@ -60,6 +72,11 @@ readonly KUBE_CLIENT_PLATFORMS=(
   windows/amd64
 )
 
+# Gigabytes desired for parallel platform builds. 8 is fairly
+# arbitrary, but is a reasonable splitting point for 2015
+# laptops-versus-not.
+readonly KUBE_PARALLEL_BUILD_MEMORY=8
+
 readonly KUBE_ALL_TARGETS=(
   "${KUBE_SERVER_TARGETS[@]}"
   "${KUBE_CLIENT_TARGETS[@]}"
@@ -67,6 +84,17 @@ readonly KUBE_ALL_TARGETS=(
 )
 readonly KUBE_ALL_BINARIES=("${KUBE_ALL_TARGETS[@]##*/}")
 
+readonly KUBE_STATIC_LIBRARIES=(
+  kube-apiserver
+  kube-controller-manager
+  kube-scheduler
+)
+
+kube::golang::is_statically_linked_library() {
+  local e
+  for e in "${KUBE_STATIC_LIBRARIES[@]}"; do [[ "$1" == *"/$e" ]] && return 0; done;
+  return 1;
+}
 
 # kube::binaries_from_targets take a list of build targets and return the
 # full go package to be built
@@ -219,6 +247,108 @@ kube::golang::place_bins() {
   done
 }
 
+kube::golang::exit_if_stdlib_not_installed() {
+  local go_root_dir=$(go env GOROOT);
+  local go_host_os=$(go env GOHOSTOS);
+  local go_host_arch=$(go env GOHOSTARCH);
+  local cgo_pkg_dir=${go_root_dir}/pkg/${go_host_os}_${go_host_arch}_cgo;
+  if [ -e ${cgo_pkg_dir} ]; then
+    return 0;
+  fi
+
+  if [ -w ${go_root_dir}/pkg ]; then
+    return 0;
+  fi
+
+  kube::log::status "+++ Error. stdlib pkg with cgo flag not found."; 
+  kube::log::status "+++ Error. stdlib pkg cannot be rebuilt since ${go_root_dir}/pkg is not writable by `whoami`"; 
+  kube::log::status "+++ Error. Make ${go_root_dir}/pkg writable for `whoami` for a one-time stdlib install, Or"
+  kube::log::status "+++ Error. Rebuild stdlib using the command 'CGO_ENABLED=0 go install -a -installsuffix cgo std'";
+  
+  exit 0;
+}
+
+kube::golang::build_binaries_for_platform() {
+  local platform=$1
+  local use_go_build=${2-}
+
+  local -a statics=()
+  local -a nonstatics=()
+  for binary in "${binaries[@]}"; do
+    if kube::golang::is_statically_linked_library "${binary}"; then
+      kube::golang::exit_if_stdlib_not_installed;
+      statics+=($binary)
+    else
+      nonstatics+=($binary)
+    fi
+  done
+
+  if [[ -n ${use_go_build:-} ]]; then
+    # Try and replicate the native binary placement of go install without
+    # calling go install.  This means we have to iterate each binary.
+    local output_path="${KUBE_GOPATH}/bin"
+    if [[ $platform != $host_platform ]]; then
+      output_path="${output_path}/${platform//\//_}"
+    fi
+
+    for binary in "${binaries[@]}"; do
+      local bin=$(basename "${binary}")
+      if [[ ${GOOS} == "windows" ]]; then
+        bin="${bin}.exe"
+      fi
+
+      if kube::golang::is_statically_linked_library "${binary}"; then
+        kube::golang::exit_if_stdlib_not_installed;
+        CGO_ENABLED=0 go build -installsuffix cgo -o "${output_path}/${bin}" \
+          "${goflags[@]:+${goflags[@]}}" \
+          -ldflags "${version_ldflags}" \
+          "${binary}"
+      else
+        go build -o "${output_path}/${bin}" \
+          "${goflags[@]:+${goflags[@]}}" \
+          -ldflags "${version_ldflags}" \
+          "${binary}"
+      fi
+    done
+  else
+    # Use go install.
+    if [[ "${#nonstatics[@]}" != 0 ]]; then
+      go install "${goflags[@]:+${goflags[@]}}" \
+        -ldflags "${version_ldflags}" \
+        "${nonstatics[@]:+${nonstatics[@]}}"
+    fi
+    if [[ "${#statics[@]}" != 0 ]]; then
+      CGO_ENABLED=0 go install -installsuffix cgo "${goflags[@]:+${goflags[@]}}" \
+        -ldflags "${version_ldflags}" \
+        "${statics[@]:+${statics[@]}}"
+    fi
+  fi
+
+}
+
+# Return approximate physical memory in gigabytes.
+kube::golang::get_physmem() {
+  local mem
+
+  # Linux, in kb
+  if mem=$(grep MemTotal /proc/meminfo | awk '{ print $2 }'); then
+    echo $(( ${mem} / 1048576 ))
+    return
+  fi
+
+  # OS X, in bytes. Note that get_physmem, as used, should only ever
+  # run in a Linux container (because it's only used in the multiple
+  # platform case, which is a Dockerized build), but this is provided
+  # for completeness.
+  if mem=$(sysctl -n hw.memsize 2>/dev/null); then
+    echo $(( ${mem} / 1073741824 ))
+    return
+  fi
+
+  # If we can't infer it, just give up and assume a low memory system
+  echo 1
+}
+
 # Build binaries targets specified
 #
 # Input:
@@ -269,32 +399,47 @@ kube::golang::build_binaries() {
     local binaries
     binaries=($(kube::golang::binaries_from_targets "${targets[@]}"))
 
-    local platform
-    for platform in "${platforms[@]}"; do
-      kube::golang::set_platform_envs "${platform}"
-      kube::log::status "Building go targets for ${platform}:" "${targets[@]}"
-      if [[ -n ${use_go_build:-} ]]; then
-        # Try and replicate the native binary placement of go install without calling go install
-        local output_path="${KUBE_GOPATH}/bin"
-        if [[ $platform != $host_platform ]]; then
-          output_path="${output_path}/${platform//\//_}"
-        fi
+    local parallel=false
+    if [[ ${#platforms[@]} -gt 1 ]]; then
+      local gigs
+      gigs=$(kube::golang::get_physmem)
 
-        for binary in "${binaries[@]}"; do
-          local bin=$(basename "${binary}")
-          if [[ ${GOOS} == "windows" ]]; then
-            bin="${bin}.exe"
-          fi
-          go build -o "${output_path}/${bin}" \
-              "${goflags[@]:+${goflags[@]}}" \
-              -ldflags "${version_ldflags}" \
-              "${binary}"
-        done
+      if [[ ${gigs} -gt ${KUBE_PARALLEL_BUILD_MEMORY} ]]; then
+        kube::log::status "Multiple platforms requested and available ${gigs}G > threshold ${KUBE_PARALLEL_BUILD_MEMORY}G, building platforms in parallel"
+        parallel=true
       else
-        go install "${goflags[@]:+${goflags[@]}}" \
-            -ldflags "${version_ldflags}" \
-            "${binaries[@]}"
+        kube::log::status "Multiple platforms requested, but available ${gigs}G < threshold ${KUBE_PARALLEL_BUILD_MEMORY}G, building platforms in serial"
+        parallel=false
       fi
-    done
+    fi
+
+    if [[ "${parallel}" == "true" ]]; then
+      kube::log::status "Building go targets for ${platforms[@]} in parallel (output will appear in a burst when complete):" "${targets[@]}"
+      local platform
+      for platform in "${platforms[@]}"; do (
+          kube::golang::set_platform_envs "${platform}"
+          kube::log::status "${platform}: go build started"
+          kube::golang::build_binaries_for_platform ${platform} ${use_go_build:-}
+          kube::log::status "${platform}: go build finished"
+        ) &> "/tmp//${platform//\//_}.build" &
+      done
+
+      local fails=0
+      for job in $(jobs -p); do
+        wait ${job} || let "fails+=1"
+      done
+
+      for platform in "${platforms[@]}"; do
+        cat "/tmp//${platform//\//_}.build"
+      done
+
+      exit ${fails}
+    else
+      for platform in "${platforms[@]}"; do
+        kube::log::status "Building go targets for ${platform}:" "${targets[@]}"
+        kube::golang::set_platform_envs "${platform}"
+        kube::golang::build_binaries_for_platform ${platform} ${use_go_build:-}
+      done
+    fi
   )
 }

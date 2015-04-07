@@ -48,7 +48,7 @@ func getFakeClient(t *testing.T, validURLs []string) (ClientPosterFunc, *httptes
 	return func(mapping *meta.RESTMapping) (RESTClientPoster, error) {
 		fakeCodec := runtime.CodecFor(api.Scheme, "v1beta1")
 		fakeUri, _ := url.Parse(server.URL + "/api/v1beta1")
-		return client.NewRESTClient(fakeUri, fakeCodec), nil
+		return client.NewRESTClient(fakeUri, "v1beta1", fakeCodec, true, 0), nil
 	}, server
 }
 
@@ -56,17 +56,15 @@ func TestCreateObjects(t *testing.T) {
 	items := []runtime.Object{}
 
 	items = append(items, &api.Pod{
-		TypeMeta:   api.TypeMeta{APIVersion: "v1beta1", Kind: "Pod"},
-		ObjectMeta: api.ObjectMeta{Name: "test-pod"},
+		ObjectMeta: api.ObjectMeta{Name: "test-pod", Namespace: "default"},
 	})
 
 	items = append(items, &api.Service{
-		TypeMeta:   api.TypeMeta{APIVersion: "v1beta1", Kind: "Service"},
-		ObjectMeta: api.ObjectMeta{Name: "test-service"},
+		ObjectMeta: api.ObjectMeta{Name: "test-service", Namespace: "default"},
 	})
 
 	typer, mapper := getTyperAndMapper()
-	client, s := getFakeClient(t, []string{"/api/v1beta1/pods", "/api/v1beta1/services"})
+	client, s := getFakeClient(t, []string{"/api/v1beta1/pods?namespace=default", "/api/v1beta1/services?namespace=default"})
 
 	errs := CreateObjects(typer, mapper, client, items)
 	s.Close()

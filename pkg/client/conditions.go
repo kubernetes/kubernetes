@@ -18,18 +18,17 @@ package client
 
 import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/wait"
 )
 
 // ControllerHasDesiredReplicas returns a condition that will be true iff the desired replica count
 // for a controller's ReplicaSelector equals the Replicas count.
-func (c *Client) ControllerHasDesiredReplicas(controller api.ReplicationController) wait.ConditionFunc {
+func ControllerHasDesiredReplicas(c Interface, controller *api.ReplicationController) wait.ConditionFunc {
 	return func() (bool, error) {
-		pods, err := c.Pods(controller.Namespace).List(labels.Set(controller.Spec.Selector).AsSelector())
+		ctrl, err := c.ReplicationControllers(controller.Namespace).Get(controller.Name)
 		if err != nil {
 			return false, err
 		}
-		return len(pods.Items) == controller.Spec.Replicas, nil
+		return ctrl.Status.Replicas == ctrl.Spec.Replicas, nil
 	}
 }

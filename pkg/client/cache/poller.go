@@ -27,7 +27,7 @@ import (
 // one object at a time.
 type Enumerator interface {
 	Len() int
-	Get(index int) (ID string, object interface{})
+	Get(index int) (object interface{})
 }
 
 // GetFunc should return an enumerator that you wish the Poller to proccess.
@@ -57,25 +57,30 @@ func NewPoller(getFunc GetFunc, period time.Duration, store Store) *Poller {
 
 // Run begins polling. It starts a goroutine and returns immediately.
 func (p *Poller) Run() {
-	go util.Forever(func() {
-		e, err := p.getFunc()
-		if err != nil {
-			glog.Errorf("failed to list: %v", err)
-			return
-		}
-		p.sync(e)
-	}, p.period)
+	go util.Forever(p.run, p.period)
+}
+
+// RunUntil begins polling. It starts a goroutine and returns immediately.
+// It will stop when the stopCh is closed.
+func (p *Poller) RunUntil(stopCh <-chan struct{}) {
+	go util.Until(p.run, p.period, stopCh)
+}
+
+func (p *Poller) run() {
+	e, err := p.getFunc()
+	if err != nil {
+		glog.Errorf("failed to list: %v", err)
+		return
+	}
+	p.sync(e)
 }
 
 func (p *Poller) sync(e Enumerator) {
-	current := p.store.ContainedIDs()
+	items := []interface{}{}
 	for i := 0; i < e.Len(); i++ {
-		id, object := e.Get(i)
-		p.store.Update(id, object)
-		current.Delete(id)
+		object := e.Get(i)
+		items = append(items, object)
 	}
-	// Delete all the objects not found.
-	for id := range current {
-		p.store.Delete(id)
-	}
+
+	p.store.Replace(items)
 }

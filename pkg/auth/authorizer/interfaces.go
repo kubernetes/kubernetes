@@ -26,7 +26,11 @@ type Attributes interface {
 	// The user string which the request was authenticated as, or empty if
 	// no authentication occured and the request was allowed to proceed.
 	GetUserName() string
-	// TODO: add groups, e.g. GetGroups() []string
+
+	// The list of group names the authenticated user is a member of. Can be
+	// empty if the authenticated user is not in any groups, or if no
+	// authentication occurred.
+	GetGroups() []string
 
 	// When IsReadOnly() == true, the request has no side effects, other than
 	// caching, logging, and other incidentals.
@@ -36,7 +40,7 @@ type Attributes interface {
 	GetNamespace() string
 
 	// The kind of object, if a request is for a REST object.
-	GetKind() string
+	GetResource() string
 }
 
 // Authorizer makes an authorization decision based on information gained by making
@@ -51,11 +55,15 @@ type AttributesRecord struct {
 	User      user.Info
 	ReadOnly  bool
 	Namespace string
-	Kind      string
+	Resource  string
 }
 
 func (a AttributesRecord) GetUserName() string {
 	return a.User.GetName()
+}
+
+func (a AttributesRecord) GetGroups() []string {
+	return a.User.GetGroups()
 }
 
 func (a AttributesRecord) IsReadOnly() bool {
@@ -66,6 +74,6 @@ func (a AttributesRecord) GetNamespace() string {
 	return a.Namespace
 }
 
-func (a AttributesRecord) GetKind() string {
-	return a.Kind
+func (a AttributesRecord) GetResource() string {
+	return a.Resource
 }

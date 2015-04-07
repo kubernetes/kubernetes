@@ -1,18 +1,10 @@
 package swagger
 
 import (
-	"encoding/json"
-	"fmt"
 	"testing"
 
 	"github.com/emicklei/go-restful"
 )
-
-// go test -v -test.run TestApi ...swagger
-func TestApi(t *testing.T) {
-	value := Api{Path: "/", Description: "Some Path", Operations: []Operation{}}
-	compareJson(t, true, value, `{"path":"/","description":"Some Path"}`)
-}
 
 // go test -v -test.run TestServiceToApi ...swagger
 func TestServiceToApi(t *testing.T) {
@@ -20,20 +12,44 @@ func TestServiceToApi(t *testing.T) {
 	ws.Path("/tests")
 	ws.Consumes(restful.MIME_JSON)
 	ws.Produces(restful.MIME_XML)
-	ws.Route(ws.GET("/all").To(dummy).Writes(sample{}))
+	ws.Route(ws.GET("/a").To(dummy).Writes(sample{}))
+	ws.Route(ws.PUT("/b").To(dummy).Writes(sample{}))
+	ws.Route(ws.POST("/c").To(dummy).Writes(sample{}))
+	ws.Route(ws.DELETE("/d").To(dummy).Writes(sample{}))
+
+	ws.Route(ws.GET("/d").To(dummy).Writes(sample{}))
+	ws.Route(ws.PUT("/c").To(dummy).Writes(sample{}))
+	ws.Route(ws.POST("/b").To(dummy).Writes(sample{}))
+	ws.Route(ws.DELETE("/a").To(dummy).Writes(sample{}))
 	ws.ApiVersion("1.2.3")
 	cfg := Config{
-		WebServicesUrl: "http://here.com",
-		ApiPath:        "/apipath",
-		WebServices:    []*restful.WebService{ws}}
+		WebServicesUrl:   "http://here.com",
+		ApiPath:          "/apipath",
+		WebServices:      []*restful.WebService{ws},
+		PostBuildHandler: func(in map[string]ApiDeclaration) {},
+	}
 	sws := newSwaggerService(cfg)
 	decl := sws.composeDeclaration(ws, "/tests")
-	data, err := json.MarshalIndent(decl, " ", " ")
-	if err != nil {
-		t.Fatal(err.Error())
+	// checks
+	if decl.ApiVersion != "1.2.3" {
+		t.Errorf("got %v want %v", decl.ApiVersion, "1.2.3")
 	}
-	// for visual inspection only
-	fmt.Println(string(data))
+	if decl.BasePath != "http://here.com" {
+		t.Errorf("got %v want %v", decl.BasePath, "http://here.com")
+	}
+	if len(decl.Apis) != 4 {
+		t.Errorf("got %v want %v", len(decl.Apis), 4)
+	}
+	pathOrder := ""
+	for _, each := range decl.Apis {
+		pathOrder += each.Path
+		for _, other := range each.Operations {
+			pathOrder += other.Method
+		}
+	}
+	if pathOrder != "/tests/aGETDELETE/tests/bPUTPOST/tests/cPOSTPUT/tests/dDELETEGET" {
+		t.Errorf("got %v want %v", pathOrder, "see test source")
+	}
 }
 
 func dummy(i *restful.Request, o *restful.Response) {}
@@ -103,10 +119,10 @@ func TestIssue78(t *testing.T) {
 		t.Fatal("wrong items type:" + *items.Type)
 	}
 	items_items := items.Items
-	if len(items_items) == 0 {
+	if items_items == nil {
 		t.Fatal("missing items->items")
 	}
-	ref := items_items[0].Ref
+	ref := items_items.Ref
 	if ref == nil {
 		t.Fatal("missing $ref")
 	}

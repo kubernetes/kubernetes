@@ -1,0 +1,44 @@
+kind: ReplicationController
+apiVersion: v1beta1
+id: skydns
+namespace: default
+labels:
+  k8s-app: skydns
+desiredState:
+  replicas: ${DNS_REPLICAS}
+  replicaSelector:
+    k8s-app: skydns
+  podTemplate:
+    labels:
+      k8s-app: skydns
+    desiredState:
+      manifest:
+        version: v1beta2
+        id: skydns
+        dnsPolicy: "Default"  # Don't use cluster DNS.
+        containers:
+          - name: etcd
+            image: quay.io/coreos/etcd:latest
+            command: [
+                    \"/etcd\",
+                    \"-bind-addr=127.0.0.1\",
+                    \"-peer-bind-addr=127.0.0.1\",
+            ]
+          - name: kube2sky
+            image: kubernetes/kube2sky:1.0
+            command: [
+                    # entrypoint = \"/kube2sky\",
+                    \"-domain=${DNS_DOMAIN}\",
+            ]
+          - name: skydns
+            image: kubernetes/skydns:2014-12-23-001
+            command: [
+                    # entrypoint = \"/skydns\",
+                    \"-machines=http://localhost:4001\",
+                    \"-addr=0.0.0.0:53\",
+                    \"-domain=${DNS_DOMAIN}.\",
+            ]
+            ports:
+              - name: dns
+                containerPort: 53
+                protocol: UDP

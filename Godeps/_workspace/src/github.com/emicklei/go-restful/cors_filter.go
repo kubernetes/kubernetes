@@ -32,7 +32,7 @@ func (c CrossOriginResourceSharing) Filter(req *Request, resp *Response, chain *
 	origin := req.Request.Header.Get(HEADER_Origin)
 	if len(origin) == 0 {
 		if trace {
-			traceLogger.Println("no Http header Origin set")
+			traceLogger.Print("no Http header Origin set")
 		}
 		chain.ProcessFilter(req, resp)
 		return
@@ -47,7 +47,7 @@ func (c CrossOriginResourceSharing) Filter(req *Request, resp *Response, chain *
 		}
 		if !included {
 			if trace {
-				traceLogger.Println("HTTP Origin:%s is not part of %v", origin, c.AllowedDomains)
+				traceLogger.Printf("HTTP Origin:%s is not part of %v", origin, c.AllowedDomains)
 			}
 			chain.ProcessFilter(req, resp)
 			return
@@ -62,6 +62,8 @@ func (c CrossOriginResourceSharing) Filter(req *Request, resp *Response, chain *
 		c.doPreflightRequest(req, resp)
 	} else {
 		c.doActualRequest(req, resp)
+		chain.ProcessFilter(req, resp)
+		return
 	}
 }
 
@@ -70,7 +72,7 @@ func (c CrossOriginResourceSharing) doActualRequest(req *Request, resp *Response
 	// continue processing the response
 }
 
-func (c CrossOriginResourceSharing) doPreflightRequest(req *Request, resp *Response) {
+func (c *CrossOriginResourceSharing) doPreflightRequest(req *Request, resp *Response) {
 	if len(c.AllowedMethods) == 0 {
 		c.AllowedMethods = c.Container.computeAllowedMethods(req)
 	}

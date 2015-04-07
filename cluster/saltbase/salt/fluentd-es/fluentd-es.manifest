@@ -2,19 +2,21 @@ version: v1beta2
 id: fluentd-to-elasticsearch
 containers:
   - name: fluentd-es
-    image: kubernetes/fluentd-elasticsearch
+    image: gcr.io/google_containers/fluentd-elasticsearch:1.3
+    env:
+      - name: FLUENTD_ARGS
+        value: -qq
     volumeMounts:
       - name: containers
         mountPath: /var/lib/docker/containers
-      - name: hosts
-        mountPath: /outerhost
-        readOnly: true
+      - name: varlog
+        mountPath: /varlog
 volumes:
   - name: containers
     source:
       hostDir:
         path: /var/lib/docker/containers
-  - name: hosts
+  - name: varlog
     source:
       hostDir:
-        path: /etc/hosts
+        path: /var/log

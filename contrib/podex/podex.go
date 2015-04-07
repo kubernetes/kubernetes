@@ -28,112 +28,273 @@ limitations under the License.
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"flag"
+	"fmt"
+	"io"
 	"log"
+	"net/http"
 	"os"
 	"strconv"
 	"strings"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
-	dockerclient "github.com/fsouza/go-dockerclient"
-	"gopkg.in/v1/yaml"
+	"github.com/ghodss/yaml"
+	goyaml "gopkg.in/yaml.v2"
 )
 
-const usage = "usage: podex [-json|-yaml] [-id PODNAME] IMAGES"
+const usage = "podex [-format=yaml|json] [-type=pod|container] [-id NAME] IMAGES..."
 
-var generateJSON = flag.Bool("json", false, "generate json manifest")
-var generateYAML = flag.Bool("yaml", false, "generate yaml manifest")
-var podName = flag.String("id", "", "set pod name")
+var flManifestFormat = flag.String("format", "yaml", "manifest format to output, `yaml` or `json`")
+var flManifestType = flag.String("type", "pod", "manifest type to output, `pod` or `container`")
+var flManifestName = flag.String("name", "", "manifest name, default to image base name")
+var flDaemon = flag.Bool("daemon", false, "daemon mode")
+
+func init() {
+	flag.Usage = func() {
+		fmt.Fprintf(os.Stderr, "Usage: %s\n", usage)
+		flag.PrintDefaults()
+	}
+}
+
+type image struct {
+	Host      string
+	Namespace string
+	Image     string
+	Tag       string
+}
 
 func main() {
 	flag.Parse()
 
+	if *flDaemon {
+		http.HandleFunc("/pods/", func(w http.ResponseWriter, r *http.Request) {
+			image := strings.TrimPrefix(r.URL.Path, "/pods/")
+			_, _, manifestName, _ := splitDockerImageName(image)
+			manifest, err := getManifest(manifestName, "pod", "json", image)
+			if err != nil {
+				errMessage := fmt.Sprintf("failed to generate pod manifest for image %q: %v", image, err)
+				log.Print(errMessage)
+				http.Error(w, errMessage, http.StatusInternalServerError)
+				return
+			}
+			io.Copy(w, manifest)
+		})
+		log.Fatal(http.ListenAndServe(":8080", nil))
+	}
+
 	if flag.NArg() < 1 {
-		log.Fatal(usage)
+		flag.Usage()
+		log.Fatal("pod: missing image argument")
 	}
-	if *podName == "" {
+	if *flManifestName == "" {
 		if flag.NArg() > 1 {
-			log.Fatal(usage)
+			flag.Usage()
+			log.Fatal("podex: -id arg is required when passing more than one image")
 		}
-		_, *podName = parseDockerImage(flag.Arg(0))
+		_, _, *flManifestName, _ = splitDockerImageName(flag.Arg(0))
+	}
+	if *flManifestType != "pod" && *flManifestType != "container" {
+		flag.Usage()
+		log.Fatalf("unsupported manifest type %q", *flManifestType)
+	}
+	if *flManifestFormat != "yaml" && *flManifestFormat != "json" {
+		flag.Usage()
+		log.Fatalf("unsupported manifest format %q", *flManifestFormat)
 	}
 
-	if (!*generateJSON && !*generateYAML) || (*generateJSON && *generateYAML) {
-		log.Fatal(usage)
-	}
-
-	dockerHost := os.Getenv("DOCKER_HOST")
-	if dockerHost == "" {
-		log.Fatalf("DOCKER_HOST is not set")
-	}
-	docker, err := dockerclient.NewClient(dockerHost)
+	manifest, err := getManifest(*flManifestName, *flManifestType, *flManifestFormat, flag.Args()...)
 	if err != nil {
-		log.Fatalf("failed to connect to %q: %v", dockerHost, err)
+		log.Fatalf("failed to generate %q manifest for %v: %v", *flManifestType, flag.Args(), err)
 	}
+	io.Copy(os.Stdout, manifest)
+}
 
-	podContainers := []v1beta1.Container{}
+// getManifest infers a pod (or container) manifest for a list of docker images.
+func getManifest(manifestName, manifestType, manifestFormat string, images ...string) (io.Reader, error) {
+	podContainers := []goyaml.MapSlice{}
 
-	for _, imageName := range flag.Args() {
-		parts, baseName := parseDockerImage(imageName)
-		container := v1beta1.Container{
-			Name:  baseName,
-			Image: imageName,
+	for _, imageName := range images {
+		host, namespace, repo, tag := splitDockerImageName(imageName)
+
+		container := goyaml.MapSlice{
+			{Key: "name", Value: repo},
+			{Key: "image", Value: imageName},
 		}
 
-		// TODO(proppy): use the regitry API instead of the remote API to get image metadata.
-		img, err := docker.InspectImage(imageName)
+		img, err := getImageMetadata(host, namespace, repo, tag)
+
 		if err != nil {
-			log.Fatalf("failed to inspect image %q: %v", imageName, err)
+			return nil, fmt.Errorf("failed to get image metadata %q: %v", imageName, err)
 		}
-		for p := range img.Config.ExposedPorts {
+		portSlice := []goyaml.MapSlice{}
+		for p := range img.ContainerConfig.ExposedPorts {
 			port, err := strconv.Atoi(p.Port())
 			if err != nil {
-				log.Fatalf("failed to parse port %q: %v", parts[0], err)
+				return nil, fmt.Errorf("failed to parse port %q: %v", p.Port(), err)
 			}
-			container.Ports = append(container.Ports, v1beta1.Port{
-				Name:          strings.Join([]string{baseName, p.Proto(), p.Port()}, "-"),
-				ContainerPort: port,
-				Protocol:      v1beta1.Protocol(strings.ToUpper(p.Proto())),
-			})
+			portEntry := goyaml.MapSlice{{
+				Key:   "name",
+				Value: strings.Join([]string{repo, p.Proto(), p.Port()}, "-"),
+			}, {
+				Key:   "containerPort",
+				Value: port,
+			}}
+			portSlice = append(portSlice, portEntry)
+			if p.Proto() != "tcp" {
+				portEntry = append(portEntry, goyaml.MapItem{Key: "protocol", Value: strings.ToUpper(p.Proto())})
+			}
+		}
+		if len(img.ContainerConfig.ExposedPorts) > 0 {
+			container = append(container, goyaml.MapItem{Key: "ports", Value: portSlice})
 		}
 		podContainers = append(podContainers, container)
 	}
 
 	// TODO(proppy): add flag to handle multiple version
-	manifest := v1beta1.ContainerManifest{
-		Version:    "v1beta1",
-		ID:         *podName + "-pod",
-		Containers: podContainers,
-		RestartPolicy: v1beta1.RestartPolicy{
-			Always: &v1beta1.RestartPolicyAlways{},
-		},
+	containerManifest := goyaml.MapSlice{
+		{Key: "version", Value: "v1beta2"},
+		{Key: "containers", Value: podContainers},
 	}
 
-	if *generateJSON {
-		bs, err := json.MarshalIndent(manifest, "", "  ")
-		if err != nil {
-			log.Fatalf("failed to render JSON container manifest: %v", err)
+	var data interface{}
+
+	switch manifestType {
+	case "container":
+		containerManifest = append(goyaml.MapSlice{
+			{Key: "id", Value: manifestName},
+		}, containerManifest...)
+		data = containerManifest
+	case "pod":
+		data = goyaml.MapSlice{
+			{Key: "id", Value: manifestName},
+			{Key: "kind", Value: "Pod"},
+			{Key: "apiVersion", Value: "v1beta1"},
+			{Key: "desiredState", Value: goyaml.MapSlice{
+				{Key: "manifest", Value: containerManifest},
+			}},
 		}
-		os.Stdout.Write(bs)
+	default:
+		return nil, fmt.Errorf("unsupported manifest type %q", manifestFormat)
 	}
-	if *generateYAML {
-		bs, err := yaml.Marshal(manifest)
+
+	yamlBytes, err := goyaml.Marshal(data)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal container manifest: %v", err)
+	}
+
+	switch manifestFormat {
+	case "yaml":
+		return bytes.NewBuffer(yamlBytes), nil
+	case "json":
+		jsonBytes, err := yaml.YAMLToJSON(yamlBytes)
 		if err != nil {
-			log.Fatalf("failed to render YAML container manifest: %v", err)
+			return nil, fmt.Errorf("failed to marshal container manifest into JSON: %v", err)
 		}
-		os.Stdout.Write(bs)
+		var jsonPretty bytes.Buffer
+		if err := json.Indent(&jsonPretty, jsonBytes, "", "  "); err != nil {
+			return nil, fmt.Errorf("failed to indent json %q: %v", string(jsonBytes), err)
+		}
+		return &jsonPretty, nil
+	default:
+		return nil, fmt.Errorf("unsupported manifest format %q", manifestFormat)
 	}
+
 }
 
-// parseDockerImage split a docker image name of the form [REGISTRYHOST/][USERNAME/]NAME[:TAG]
-// TODO: handle the TAG
-// Returns array of images name parts and base image name
-func parseDockerImage(imageName string) (parts []string, baseName string) {
-	// Parse docker image name
-	// IMAGE: [REGISTRYHOST/][USERNAME/]NAME[:TAG]
-	// NAME: [a-z0-9-_.]
-	parts = strings.Split(imageName, "/")
-	baseName = parts[len(parts)-1]
+// splitDockerImageName split a docker image name of the form [HOST/][NAMESPACE/]REPOSITORY[:TAG]
+func splitDockerImageName(imageName string) (host, namespace, repo, tag string) {
+	hostNamespaceImage := strings.Split(imageName, "/")
+	last := len(hostNamespaceImage) - 1
+	repoTag := strings.Split(hostNamespaceImage[last], ":")
+	repo = repoTag[0]
+	if len(repoTag) > 1 {
+		tag = repoTag[1]
+	}
+	switch len(hostNamespaceImage) {
+	case 2:
+		host = ""
+		namespace = hostNamespaceImage[0]
+	case 3:
+		host = hostNamespaceImage[0]
+		namespace = hostNamespaceImage[1]
+	}
 	return
+}
+
+type Port string
+
+func (p Port) Port() string {
+	parts := strings.Split(string(p), "/")
+	return parts[0]
+}
+
+func (p Port) Proto() string {
+	parts := strings.Split(string(p), "/")
+	if len(parts) == 1 {
+		return "tcp"
+	}
+	return parts[1]
+}
+
+type imageMetadata struct {
+	ID              string `json:"id"`
+	ContainerConfig struct {
+		ExposedPorts map[Port]struct{}
+	} `json:"container_config"`
+}
+
+func getImageMetadata(host, namespace, repo, tag string) (*imageMetadata, error) {
+	if host == "" {
+		host = "index.docker.io"
+	}
+	if namespace == "" {
+		namespace = "library"
+	}
+	if tag == "" {
+		tag = "latest"
+	}
+	req, err := http.NewRequest("GET", fmt.Sprintf("https://%s/v1/repositories/%s/%s/images", host, namespace, repo), nil)
+
+	if err != nil {
+		return nil, fmt.Errorf("error creating request: %v", err)
+	}
+	req.Header.Add("X-Docker-Token", "true")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("error making request to %q: %v", host, err)
+	}
+	if resp.StatusCode != 200 {
+		return nil, fmt.Errorf("error getting X-Docker-Token from %s: %q", host, resp.Status)
+	}
+
+	endpoints := resp.Header.Get("X-Docker-Endpoints")
+	token := resp.Header.Get("X-Docker-Token")
+	req, err = http.NewRequest("GET", fmt.Sprintf("https://%s/v1/repositories/%s/%s/tags/%s", endpoints, namespace, repo, tag), nil)
+	if err != nil {
+		return nil, fmt.Errorf("error creating request: %v", err)
+	}
+	req.Header.Add("Authorization", "Token "+token)
+	resp, err = http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("error getting image id for %s/%s:%s %v", namespace, repo, tag, err)
+	}
+	var imageID string
+	if err = json.NewDecoder(resp.Body).Decode(&imageID); err != nil {
+		return nil, fmt.Errorf("error decoding image id: %v", err)
+	}
+	req, err = http.NewRequest("GET", fmt.Sprintf("https://%s/v1/images/%s/json", endpoints, imageID), nil)
+	if err != nil {
+		return nil, fmt.Errorf("error creating request: %v", err)
+	}
+	req.Header.Add("Authorization", "Token "+token)
+	resp, err = http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("error getting json for image %q: %v", imageID, err)
+	}
+	var image imageMetadata
+	if err := json.NewDecoder(resp.Body).Decode(&image); err != nil {
+		return nil, fmt.Errorf("error decoding image %q metadata: %v", imageID, err)
+	}
+	return &image, nil
 }

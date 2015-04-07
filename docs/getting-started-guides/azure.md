@@ -12,7 +12,7 @@
 2. Get or build a [binary release](binary_release.md)
 3. If you want to build your own release, you need to have [Docker
 installed](https://docs.docker.com/installation/).  On Mac OS X you can use
-boot2docker.
+[boot2docker](http://boot2docker.io/).
 
 ### Setup
 The cluster setup scripts can setup Kubernetes for multiple targets. First modify `cluster/kube-env.sh` to specify azure:
@@ -34,21 +34,26 @@ can tweak some of these parameters by editing `cluster/azure/config-default.sh`.
 
 ### Running a container (simple version)
 
-The `cluster/kubecfg.sh` command below spins up two containers, running [Nginx](http://nginx.org/en/) and with port 80 mapped to 8080:
+Once you have your instances up and running, the `hack/build-go.sh` script sets up
+your Go workspace and builds the Go components.
 
-```
-cd kubernetes
-cluster/kubecfg.sh -p 8080:80 run dockerfile/nginx 2 myNginx
+The `kubectl.sh` line below spins up two containers running
+[Nginx](http://nginx.org/en/) running on port 80:
+
+```bash
+cluster/kubectl.sh run-container my-nginx --image=dockerfile/nginx --replicas=2 --port=80
 ```
 
 To stop the containers:
-```
-cluster/kubecfg.sh stop myNginx
+
+```bash
+cluster/kubectl.sh stop rc my-nginx
 ```
 
 To delete the containers:
-```
-cluster/kubecfg.sh rm myNginx
+
+```bash
+cluster/kubectl.sh delete rc my-nginx
 ```
 
 ### Running a container (more complete version)
@@ -59,7 +64,7 @@ You can create a pod like this:
 
 ```
 cd kubernetes
-cluster/kubecfg.sh -c api/examples/pod.json create /pods
+cluster/kubectl.sh create -f docs/getting-started-guides/pod.json
 ```
 
 Where pod.json contains something like:
@@ -86,7 +91,7 @@ Where pod.json contains something like:
           "initialDelaySeconds": 30,
           "httpGet": {
             "path": "/index.html",
-            "port": "8080"
+            "port": 8080
           }
         }
       }]
@@ -101,19 +106,18 @@ Where pod.json contains something like:
 You can see your cluster's pods:
 
 ```
-cluster/kubecfg.sh list pods
+cluster/kubectl.sh get pods
 ```
 
 and delete the pod you just created:
 
 ```
-cluster/kubecfg.sh delete pods/php
+cluster/kubectl.sh delete pods php
 ```
 
 Look in `api/examples/` for more examples
 
 ### Tearing down the cluster
 ```
-cd kubernetes
 cluster/kube-down.sh
 ```

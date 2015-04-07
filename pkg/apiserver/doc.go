@@ -14,5 +14,5 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package apiserver contains the code that provides a RESTful api service.
+// Package apiserver contains the code that provides a rest.ful api service.
 package apiserver

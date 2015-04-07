@@ -25,12 +25,21 @@ import (
 	"net/http"
 	"net/url"
 	"path"
+	"sort"
 	"strings"
 
 	"code.google.com/p/gcfg"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
 )
+
+type OVirtInstance struct {
+	UUID      string
+	Name      string
+	IPAddress string
+}
+
+type OVirtInstanceMap map[string]OVirtInstance
 
 type OVirtCloud struct {
 	VmsRequest   *url.URL
@@ -48,9 +57,16 @@ type OVirtApiConfig struct {
 	}
 }
 
+type XmlVmAddress struct {
+	Address string `xml:"address,attr"`
+}
+
 type XmlVmInfo struct {
-	Hostname string `xml:"guest_info>fqdn"`
-	State    string `xml:"status>state"`
+	UUID      string         `xml:"id,attr"`
+	Name      string         `xml:"name"`
+	Hostname  string         `xml:"guest_info>fqdn"`
+	Addresses []XmlVmAddress `xml:"guest_info>ips>ip"`
+	State     string         `xml:"status>state"`
 }
 
 type XmlVmsList struct {
@@ -114,13 +130,41 @@ func (v *OVirtCloud) Zones() (cloudprovider.Zones, bool) {
 	return nil, false
 }
 
-// IPAddress returns the address of a particular machine instance
-func (v *OVirtCloud) IPAddress(instance string) (net.IP, error) {
-	// since the instance now is the IP in the ovirt env, this is trivial no-op
-	return net.ParseIP(instance), nil
+// NodeAddresses returns the NodeAddresses of a particular machine instance
+func (v *OVirtCloud) NodeAddresses(name string) ([]api.NodeAddress, error) {
+	instance, err := v.fetchInstance(name)
+	if err != nil {
+		return nil, err
+	}
+
+	var address net.IP
+
+	if instance.IPAddress != "" {
+		address = net.ParseIP(instance.IPAddress)
+		if address == nil {
+			return nil, fmt.Errorf("couldn't parse address: %s", instance.IPAddress)
+		}
+	} else {
+		resolved, err := net.LookupIP(name)
+		if err != nil || len(resolved) < 1 {
+			return nil, fmt.Errorf("couldn't lookup address: %s", name)
+		}
+		address = resolved[0]
+	}
+
+	return []api.NodeAddress{{Type: api.NodeLegacyHostIP, Address: address.String()}}, nil
 }
 
-func getInstancesFromXml(body io.Reader) ([]string, error) {
+// ExternalID returns the cloud provider ID of the specified instance.
+func (v *OVirtCloud) ExternalID(name string) (string, error) {
+	instance, err := v.fetchInstance(name)
+	if err != nil {
+		return "", err
+	}
+	return instance.UUID, nil
+}
+
+func getInstancesFromXml(body io.Reader) (OVirtInstanceMap, error) {
 	if body == nil {
 		return nil, fmt.Errorf("ovirt rest-api response body is missing")
 	}
@@ -136,20 +180,28 @@ func getInstancesFromXml(body io.Reader) ([]string, error) {
 		return nil, err
 	}
 
-	var instances []string
+	instances := make(OVirtInstanceMap)
 
 	for _, vm := range vmlist.Vm {
 		// Always return only vms that are up and running
 		if vm.Hostname != "" && strings.ToLower(vm.State) == "up" {
-			instances = append(instances, vm.Hostname)
+			address := ""
+			if len(vm.Addresses) > 0 {
+				address = vm.Addresses[0].Address
+			}
+
+			instances[vm.Hostname] = OVirtInstance{
+				UUID:      vm.UUID,
+				Name:      vm.Name,
+				IPAddress: address,
+			}
 		}
 	}
 
 	return instances, nil
 }
 
-// List enumerates the set of minions instances known by the cloud provider
-func (v *OVirtCloud) List(filter string) ([]string, error) {
+func (v *OVirtCloud) fetchAllInstances() (OVirtInstanceMap, error) {
 	response, err := http.Get(v.VmsRequest.String())
 	if err != nil {
 		return nil, err
@@ -158,6 +210,41 @@ func (v *OVirtCloud) List(filter string) ([]string, error) {
 	defer response.Body.Close()
 
 	return getInstancesFromXml(response.Body)
+}
+
+func (v *OVirtCloud) fetchInstance(name string) (*OVirtInstance, error) {
+	allInstances, err := v.fetchAllInstances()
+	if err != nil {
+		return nil, err
+	}
+
+	instance, found := allInstances[name]
+	if !found {
+		return nil, fmt.Errorf("cannot find instance: %s", name)
+	}
+
+	return &instance, nil
+}
+
+func (m *OVirtInstanceMap) ListSortedNames() []string {
+	var names []string
+
+	for k := range *m {
+		names = append(names, k)
+	}
+
+	sort.Strings(names)
+
+	return names
+}
+
+// List enumerates the set of minions instances known by the cloud provider
+func (v *OVirtCloud) List(filter string) ([]string, error) {
+	instances, err := v.fetchAllInstances()
+	if err != nil {
+		return nil, err
+	}
+	return instances.ListSortedNames(), nil
 }
 
 func (v *OVirtCloud) GetNodeResources(name string) (*api.NodeResources, error) {

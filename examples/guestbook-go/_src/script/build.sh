@@ -20,5 +20,6 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+guestbook_version=${1:-latest}
 docker build --rm --force-rm -t kubernetes/guestbook-builder .
-docker run --rm kubernetes/guestbook-builder | docker build -t kubernetes/guestbook -
+docker run --rm kubernetes/guestbook-builder | docker build -t "kubernetes/guestbook:${guestbook_version}" -

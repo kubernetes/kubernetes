@@ -1,21 +1,24 @@
 #cloud-config
 
 write_files:
-  - path: /opt/bin/regen-minion-list.sh
-    permissions: 0755
+  - path: /etc/cloud.conf
+    permissions: 0600
     content: |
-      #!/bin/sh
-      m=$(echo $(etcdctl ls --recursive /corekube/minions | cut -d/ -f4 | sort) | tr ' ' ,)
-      echo "Found $m"
-      mkdir -p /run/kube-apiserver
-      echo "MINIONS=$m" > /run/kube-apiserver/minions.env
+      [Global]
+      auth-url = OS_AUTH_URL
+      username = OS_USERNAME
+      api-key = OS_PASSWORD
+      tenant-id = OS_TENANT_NAME
+      region = OS_REGION_NAME
+      [LoadBalancer]
+      subnet-id = 11111111-1111-1111-1111-111111111111
   - path: /opt/bin/git-kubernetes-nginx.sh
     permissions: 0755
     content: |
       #!/bin/bash
-      git clone https://github.com/doublerr/kubernetes_nginx /opt/kubernetes_nginx
+      git clone https://github.com/thommay/kubernetes_nginx /opt/kubernetes_nginx
       /usr/bin/cp /opt/.kubernetes_auth /opt/kubernetes_nginx/.kubernetes_auth
-      docker build -t kubernetes_nginx:latest /opt/kubernetes_nginx
+      /opt/kubernetes_nginx/git-kubernetes-nginx.sh
   - path: /opt/bin/download-release.sh
     permissions: 0755
     content: |
@@ -70,40 +73,13 @@ coreos:
         Documentation=https://github.com/GoogleCloudPlatform/kubernetes
         After=network-online.target
         Requires=network-online.target
-        After=minion-finder.service
-        Requires=minion-finder.service
         After=download-release.service
         Requires=download-release.service
         [Service]
-        EnvironmentFile=-/run/kube-apiserver/minions.env
         ExecStartPre=/usr/bin/ln -sf /opt/kubernetes/server/bin/kube-apiserver /opt/bin/kube-apiserver
-        ExecStart=/opt/bin/kube-apiserver --address=127.0.0.1 --port=8080 --etcd_servers=http://127.0.0.1:4001 --portal_net=PORTAL_NET --logtostderr=true
+        ExecStart=/opt/bin/kube-apiserver --address=127.0.0.1 --port=8080 --etcd_servers=http://127.0.0.1:4001 --portal_net=PORTAL_NET --logtostderr=true --cloud_provider=rackspace --cloud_config=/etc/cloud.conf --v=2
         Restart=always
         RestartSec=2
-    - name: master-apiserver-sighup.path
-      command: start
-      content: |
-        [Path]
-        PathChanged=/run/kube-apiserver/minions.env
-    - name: master-apiserver-sighup.service
-      command: start
-      content: |
-        [Service]
-        ExecStart=/usr/bin/pkill -SIGHUP -f kube-apiserver
-    - name: minion-finder.service
-      command: start
-      content: |
-        [Unit]
-        Description=Kubernetes Minion finder
-        After=network-online.target
-        Requires=network-online.target
-        After=etcd.service
-        Requires=etcd.service
-        [Service]
-        ExecStartPre=/opt/bin/regen-minion-list.sh
-        ExecStart=/usr/bin/etcdctl exec-watch --recursive /corekube/minions -- /opt/bin/regen-minion-list.sh
-        Restart=always
-        RestartSec=30
     - name: master-controller-manager.service
       command: start
       content: |
@@ -116,7 +92,7 @@ coreos:
         Requires=master-apiserver.service
         [Service]
         ExecStartPre=/usr/bin/ln -sf /opt/kubernetes/server/bin/kube-controller-manager /opt/bin/kube-controller-manager
-        ExecStart=/opt/bin/kube-controller-manager --master=127.0.0.1:8080 --machines=${MINIONS} --logtostderr=true
+        ExecStart=/opt/bin/kube-controller-manager --master=127.0.0.1:8080 --logtostderr=true --cloud_provider=rackspace --cloud_config=/etc/cloud.conf --v=2
         Restart=always
         RestartSec=2
     - name: master-scheduler.service
@@ -134,6 +110,22 @@ coreos:
         ExecStart=/opt/bin/kube-scheduler --master=127.0.0.1:8080 --logtostderr=true
         Restart=always
         RestartSec=10
+    - name: master-register.service
+      command: start
+      content: |
+        [Unit]
+        Description=Kubernetes Registration Service
+        Documentation=https://github.com/kelseyhightower/kube-register
+
+        [Service]
+        ExecStartPre=/usr/bin/wget -N -P /opt/bin http://storage.googleapis.com/kubernetes/kube-register
+        ExecStartPre=/usr/bin/chmod +x /opt/bin/kube-register
+        ExecStart=/opt/bin/kube-register \
+        --metadata=kubernetes_role=minion \
+        --fleet-endpoint=unix:///var/run/fleet.sock \
+        --api-endpoint=http://127.0.0.1:8080
+        Restart=always
+        RestartSec=10
     #Running nginx service with --net="host" is a necessary evil until running all k8s services in docker.
     - name: kubernetes-nginx.service
       command: start
@@ -146,6 +138,7 @@ coreos:
         Requires=docker.service
         [Service]
         ExecStartPre=/opt/bin/git-kubernetes-nginx.sh
+        ExecStartPre=-/usr/bin/docker rm kubernetes_nginx
         ExecStart=/usr/bin/docker run --rm --net="host" -p "443:443" -t --name "kubernetes_nginx" kubernetes_nginx
         ExecStop=/usr/bin/docker stop kubernetes_nginx
         Restart=always

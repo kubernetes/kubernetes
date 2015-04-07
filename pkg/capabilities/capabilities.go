@@ -24,6 +24,9 @@ import (
 // For now these are global.  Eventually they may be per-user
 type Capabilities struct {
 	AllowPrivileged bool
+
+	// List of pod sources for which using host network is allowed.
+	HostNetworkSources []string
 }
 
 var once sync.Once
@@ -46,7 +49,8 @@ func SetForTests(c Capabilities) {
 func Get() Capabilities {
 	if capabilities == nil {
 		Initialize(Capabilities{
-			AllowPrivileged: false,
+			AllowPrivileged:    false,
+			HostNetworkSources: []string{},
 		})
 	}
 	return *capabilities

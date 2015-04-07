@@ -1,0 +1,20 @@
+{
+  "id": "spark-master",
+  "kind": "Pod",
+  "apiVersion": "v1beta1",
+  "desiredState": {
+    "manifest": {
+      "version": "v1beta1",
+      "id": "spark-master",
+      "containers": [{
+        "name": "spark-master",
+        "image": "mattf/spark-master",
+        "cpu": 100,
+        "ports": [{ "containerPort": 7077 }]
+      }]
+    }
+  },
+  "labels": {
+    "name": "spark-master"
+  }
+}

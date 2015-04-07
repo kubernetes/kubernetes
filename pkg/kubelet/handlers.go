@@ -18,12 +18,11 @@ package kubelet
 
 import (
 	"fmt"
-	"io"
 	"net"
-	"net/http"
 	"strconv"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/golang/glog"
 )
@@ -32,8 +31,8 @@ type execActionHandler struct {
 	kubelet *Kubelet
 }
 
-func (e *execActionHandler) Run(podFullName, uuid string, container *api.Container, handler *api.Handler) error {
-	_, err := e.kubelet.RunInContainer(podFullName, uuid, container.Name, handler.Exec.Command)
+func (e *execActionHandler) Run(podFullName string, uid types.UID, container *api.Container, handler *api.Handler) error {
+	_, err := e.kubelet.RunInContainer(podFullName, uid, container.Name, handler.Exec.Command)
 	return err
 }
 
@@ -67,21 +66,18 @@ func ResolvePort(portReference util.IntOrString, container *api.Container) (int,
 	return -1, fmt.Errorf("couldn't find port: %v in %v", portReference, container)
 }
 
-func (h *httpActionHandler) Run(podFullName, uuid string, container *api.Container, handler *api.Handler) error {
+func (h *httpActionHandler) Run(podFullName string, uid types.UID, container *api.Container, handler *api.Handler) error {
 	host := handler.HTTPGet.Host
 	if len(host) == 0 {
-		var info api.PodInfo
-		info, err := h.kubelet.GetPodInfo(podFullName, uuid)
+		status, err := h.kubelet.GetPodStatus(podFullName)
 		if err != nil {
-			glog.Errorf("unable to get pod info, event handlers may be invalid.")
+			glog.Errorf("Unable to get pod info, event handlers may be invalid.")
 			return err
 		}
-		netInfo, found := info[networkContainerName]
-		if found {
-			host = netInfo.PodIP
-		} else {
-			return fmt.Errorf("failed to find networking container: %v", info)
+		if status.PodIP == "" {
+			return fmt.Errorf("failed to find networking container: %v", status)
 		}
+		host = status.PodIP
 	}
 	var port int
 	if handler.HTTPGet.Port.Kind == util.IntstrString && len(handler.HTTPGet.Port.StrVal) == 0 {
@@ -96,22 +92,4 @@ func (h *httpActionHandler) Run(podFullName, uuid string, container *api.Contain
 	url := fmt.Sprintf("http://%s/%s", net.JoinHostPort(host, strconv.Itoa(port)), handler.HTTPGet.Path)
 	_, err := h.client.Get(url)
 	return err
-}
-
-// FlushWriter provides wrapper for responseWriter with HTTP streaming capabilities
-type FlushWriter struct {
-	flusher http.Flusher
-	writer  io.Writer
-}
-
-// Write is a FlushWriter implementation of the io.Writer that sends any buffered data to the client.
-func (fw *FlushWriter) Write(p []byte) (n int, err error) {
-	n, err = fw.writer.Write(p)
-	if err != nil {
-		return
-	}
-	if fw.flusher != nil {
-		fw.flusher.Flush()
-	}
-	return
 }

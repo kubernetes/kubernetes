@@ -25,6 +25,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/scheduler"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
 type fakeBinder struct {
@@ -33,8 +34,13 @@ type fakeBinder struct {
 
 func (fb fakeBinder) Bind(binding *api.Binding) error { return fb.b(binding) }
 
-func podWithID(id string) *api.Pod {
-	return &api.Pod{ObjectMeta: api.ObjectMeta{Name: id, SelfLink: testapi.SelfLink("pods", id)}}
+func podWithID(id, desiredHost string) *api.Pod {
+	return &api.Pod{
+		ObjectMeta: api.ObjectMeta{Name: id, SelfLink: testapi.SelfLink("pods", id)},
+		Spec: api.PodSpec{
+			Host: desiredHost,
+		},
+	}
 }
 
 type mockScheduler struct {
@@ -47,37 +53,40 @@ func (es mockScheduler) Schedule(pod api.Pod, ml scheduler.MinionLister) (string
 }
 
 func TestScheduler(t *testing.T) {
-	defer record.StartLogging(t.Logf).Stop()
+	eventBroadcaster := record.NewBroadcaster()
+	defer eventBroadcaster.StartLogging(t.Logf).Stop()
 	errS := errors.New("scheduler")
 	errB := errors.New("binder")
 
 	table := []struct {
-		injectBindError error
-		sendPod         *api.Pod
-		algo            scheduler.Scheduler
-		expectErrorPod  *api.Pod
-		expectError     error
-		expectBind      *api.Binding
-		eventReason     string
+		injectBindError  error
+		sendPod          *api.Pod
+		algo             scheduler.Scheduler
+		expectErrorPod   *api.Pod
+		expectAssumedPod *api.Pod
+		expectError      error
+		expectBind       *api.Binding
+		eventReason      string
 	}{
 		{
-			sendPod:     podWithID("foo"),
-			algo:        mockScheduler{"machine1", nil},
-			expectBind:  &api.Binding{PodID: "foo", Host: "machine1"},
-			eventReason: "scheduled",
+			sendPod:          podWithID("foo", ""),
+			algo:             mockScheduler{"machine1", nil},
+			expectBind:       &api.Binding{ObjectMeta: api.ObjectMeta{Name: "foo"}, Target: api.ObjectReference{Kind: "Node", Name: "machine1"}},
+			expectAssumedPod: podWithID("foo", "machine1"),
+			eventReason:      "scheduled",
 		}, {
-			sendPod:        podWithID("foo"),
+			sendPod:        podWithID("foo", ""),
 			algo:           mockScheduler{"machine1", errS},
 			expectError:    errS,
-			expectErrorPod: podWithID("foo"),
+			expectErrorPod: podWithID("foo", ""),
 			eventReason:    "failedScheduling",
 		}, {
-			sendPod:         podWithID("foo"),
+			sendPod:         podWithID("foo", ""),
 			algo:            mockScheduler{"machine1", nil},
-			expectBind:      &api.Binding{PodID: "foo", Host: "machine1"},
+			expectBind:      &api.Binding{ObjectMeta: api.ObjectMeta{Name: "foo"}, Target: api.ObjectReference{Kind: "Node", Name: "machine1"}},
 			injectBindError: errB,
 			expectError:     errB,
-			expectErrorPod:  podWithID("foo"),
+			expectErrorPod:  podWithID("foo", ""),
 			eventReason:     "failedScheduling",
 		},
 	}
@@ -85,10 +94,16 @@ func TestScheduler(t *testing.T) {
 	for i, item := range table {
 		var gotError error
 		var gotPod *api.Pod
+		var gotAssumedPod *api.Pod
 		var gotBinding *api.Binding
 		c := &Config{
+			Modeler: &FakeModeler{
+				AssumePodFunc: func(pod *api.Pod) {
+					gotAssumedPod = pod
+				},
+			},
 			MinionLister: scheduler.FakeMinionLister(
-				api.MinionList{Items: []api.Minion{{ObjectMeta: api.ObjectMeta{Name: "machine1"}}}},
+				api.NodeList{Items: []api.Node{{ObjectMeta: api.ObjectMeta{Name: "machine1"}}}},
 			),
 			Algorithm: item.algo,
 			Binder: fakeBinder{func(b *api.Binding) error {
@@ -102,16 +117,20 @@ func TestScheduler(t *testing.T) {
 			NextPod: func() *api.Pod {
 				return item.sendPod
 			},
+			Recorder: eventBroadcaster.NewRecorder(api.EventSource{Component: "scheduler"}),
 		}
 		s := New(c)
 		called := make(chan struct{})
-		events := record.GetEvents(func(e *api.Event) {
+		events := eventBroadcaster.StartEventWatcher(func(e *api.Event) {
 			if e, a := item.eventReason, e.Reason; e != a {
 				t.Errorf("%v: expected %v, got %v", i, e, a)
 			}
 			close(called)
 		})
 		s.scheduleOne()
+		if e, a := item.expectAssumedPod, gotAssumedPod; !reflect.DeepEqual(e, a) {
+			t.Errorf("%v: assumed pod: wanted %v, got %v", i, e, a)
+		}
 		if e, a := item.expectErrorPod, gotPod; !reflect.DeepEqual(e, a) {
 			t.Errorf("%v: error pod: wanted %v, got %v", i, e, a)
 		}
@@ -119,7 +138,7 @@ func TestScheduler(t *testing.T) {
 			t.Errorf("%v: error: wanted %v, got %v", i, e, a)
 		}
 		if e, a := item.expectBind, gotBinding; !reflect.DeepEqual(e, a) {
-			t.Errorf("%v: error: wanted %v, got %v", i, e, a)
+			t.Errorf("%v: error: %s", i, util.ObjectDiff(e, a))
 		}
 		<-called
 		events.Stop()

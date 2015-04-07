@@ -14,7 +14,7 @@
    id="svg2"
    version="1.1"
    inkscape:version="0.48.3.1 r9886"
-   sodipodi:docname="services_detail.svg"
+   sodipodi:docname="services_overview.svg"
    inkscape:export-filename="/usr/local/google/home/thockin/src/kubernetes/docs/services_overview.png"
    inkscape:export-xdpi="76.910004"
    inkscape:export-ydpi="76.910004">
@@ -27,16 +27,16 @@
      borderopacity="1.0"
      inkscape:pageopacity="0.0"
      inkscape:pageshadow="2"
-     inkscape:zoom="0.49802083"
-     inkscape:cx="603.94479"
-     inkscape:cy="289.02363"
+     inkscape:zoom="1.0318369"
+     inkscape:cx="351.19865"
+     inkscape:cy="624.90035"
      inkscape:document-units="px"
-     inkscape:current-layer="layer1"
+     inkscape:current-layer="g4090"
      showgrid="false"
      inkscape:window-width="1228"
-     inkscape:window-height="880"
-     inkscape:window-x="440"
-     inkscape:window-y="166"
+     inkscape:window-height="848"
+     inkscape:window-x="364"
+     inkscape:window-y="24"
      inkscape:window-maximized="0" />
   <metadata
      id="metadata7">
@@ -46,7 +46,7 @@
         <dc:format>image/svg+xml</dc:format>
         <dc:type
            rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
-        <dc:title></dc:title>
+        <dc:title />
       </cc:Work>
     </rdf:RDF>
   </metadata>
@@ -159,7 +159,7 @@
                y="91.845612"
                x="36.710861"
                id="tspan3757"
-               sodipodi:role="line">Backend Pod</tspan></text>
+               sodipodi:role="line">Backend Pod 1</tspan></text>
           <text
              sodipodi:linespacing="125%"
              id="text3855"
@@ -204,7 +204,7 @@
                y="91.845612"
                x="36.710861"
                id="tspan3757-5"
-               sodipodi:role="line">Backend Pod</tspan></text>
+               sodipodi:role="line">Backend Pod 2</tspan></text>
           <text
              sodipodi:linespacing="125%"
              id="text3855-6"
@@ -249,7 +249,7 @@
                y="91.845612"
                x="36.710861"
                id="tspan3757-2"
-               sodipodi:role="line">Backend Pod</tspan></text>
+               sodipodi:role="line">Backend Pod 3</tspan></text>
           <text
              sodipodi:linespacing="125%"
              id="text3855-4"
@@ -338,17 +338,17 @@
         <text
            xml:space="preserve"
            style="font-size:40px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;line-height:125%;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;font-family:Ubuntu Mono;-inkscape-font-specification:Ubuntu Mono"
-           x="36.710861"
-           y="91.845612"
+           x="67.574867"
+           y="91.765617"
            id="text3755-32"
            sodipodi:linespacing="125%"
            inkscape:transform-center-x="-70"
            inkscape:transform-center-y="-11.264"><tspan
              sodipodi:role="line"
              id="tspan3757-9"
-             x="36.710861"
-             y="91.845612"
-             style="font-size:32px;text-align:start;text-anchor:start">Client Pod</tspan></text>
+             x="67.574867"
+             y="91.765617"
+             style="font-size:32px;text-align:start;text-anchor:start">Client </tspan></text>
       </g>
     </g>
     <g
@@ -367,17 +367,17 @@
         <text
            xml:space="preserve"
            style="font-size:40px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;line-height:125%;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;font-family:Ubuntu Mono;-inkscape-font-specification:Ubuntu Mono"
-           x="36.710861"
-           y="91.845612"
+           x="60.454861"
+           y="92.213608"
            id="text3755-32-8"
            sodipodi:linespacing="125%"
            inkscape:transform-center-x="-70"
            inkscape:transform-center-y="-11.264"><tspan
              sodipodi:role="line"
              id="tspan3757-9-4"
-             x="36.710861"
-             y="91.845612"
-             style="font-size:32px;text-align:start;text-anchor:start">Service Proxy</tspan></text>
+             x="60.454861"
+             y="92.213608"
+             style="font-size:32px;text-align:start;text-anchor:start">kube-proxy</tspan></text>
       </g>
     </g>
     <g

@@ -13,7 +13,7 @@ type DataTypeFields struct {
 	Enum         []string `json:"enum,omitempty"`
 	Minimum      string   `json:"minimum,omitempty"`
 	Maximum      string   `json:"maximum,omitempty"`
-	Items        []Item   `json:"items,omitempty"`
+	Items        *Item    `json:"items,omitempty"`
 	UniqueItems  *bool    `json:"uniqueItems,omitempty"`
 }
 

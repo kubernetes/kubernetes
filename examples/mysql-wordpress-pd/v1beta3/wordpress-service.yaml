@@ -1,0 +1,13 @@
+apiVersion: v1beta3
+kind: Service
+metadata: 
+  labels: 
+    name: wpfrontend
+  name: wpfrontend
+spec: 
+  ports:
+    - port: 80
+      targetPort: 80
+  selector: 
+    name: wpfrontend
+

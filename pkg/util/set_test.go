@@ -59,6 +59,29 @@ func TestStringSet(t *testing.T) {
 	}
 }
 
+func TestStringSetDeleteMultiples(t *testing.T) {
+	s := StringSet{}
+	s.Insert("a", "b", "c")
+	if len(s) != 3 {
+		t.Errorf("Expected len=3: %d", len(s))
+	}
+
+	s.Delete("a", "c")
+	if len(s) != 1 {
+		t.Errorf("Expected len=1: %d", len(s))
+	}
+	if s.Has("a") {
+		t.Errorf("Unexpected contents: %#v", s)
+	}
+	if s.Has("c") {
+		t.Errorf("Unexpected contents: %#v", s)
+	}
+	if !s.Has("b") {
+		t.Errorf("Missing contents: %#v", s)
+	}
+
+}
+
 func TestNewStringSet(t *testing.T) {
 	s := NewStringSet("a", "b", "c")
 	if len(s) != 3 {
@@ -73,5 +96,24 @@ func TestStringSetList(t *testing.T) {
 	s := NewStringSet("z", "y", "x", "a")
 	if !reflect.DeepEqual(s.List(), []string{"a", "x", "y", "z"}) {
 		t.Errorf("List gave unexpected result: %#v", s.List())
+	}
+}
+
+func TestStringSetDifference(t *testing.T) {
+	a := NewStringSet("1", "2", "3")
+	b := NewStringSet("1", "2", "4", "5")
+	c := a.Difference(b)
+	d := b.Difference(a)
+	if len(c) != 1 {
+		t.Errorf("Expected len=1: %d", len(c))
+	}
+	if !c.Has("3") {
+		t.Errorf("Unexpected contents: %#v", c.List())
+	}
+	if len(d) != 2 {
+		t.Errorf("Expected len=2: %d", len(d))
+	}
+	if !d.Has("4") || !d.Has("5") {
+		t.Errorf("Unexpected contents: %#v", d.List())
 	}
 }

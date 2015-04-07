@@ -120,7 +120,9 @@ In this example we are attaching it to the root, but commands can be attached at
 
 ### Assign flags to a command
 
-Since the flags are defined and used in different locations, we need to define a variable outside with the correct scope to assign the flag to work with.
+Since the flags are defined and used in different locations, we need to
+define a variable outside with the correct scope to assign the flag to
+work with.
 
     var Verbose bool
     var Source string
@@ -214,11 +216,11 @@ For a more complete example of a larger application, please checkout [Hugo](http
 
 ## The Help Command
 
-Cobra automatically adds a help command to your application.
+Cobra automatically adds a help command to your application when you have subcommands.
 This will be called when a user runs 'app help'. Additionally help will also
 support all other commands as input. Say for instance you have a command called
 'create' without any additional configuration cobra will work when 'app help
-create' is called.
+create' is called.  Every command will automatically have the '--help' flag added.
 
 ### Example
 

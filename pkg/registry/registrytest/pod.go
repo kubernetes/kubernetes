@@ -20,6 +20,7 @@ import (
 	"sync"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
@@ -30,14 +31,20 @@ type PodRegistry struct {
 	Pods *api.PodList
 	sync.Mutex
 
-	mux *watch.Mux
+	broadcaster *watch.Broadcaster
 }
 
 func NewPodRegistry(pods *api.PodList) *PodRegistry {
 	return &PodRegistry{
-		Pods: pods,
-		mux:  watch.NewMux(0),
+		Pods:        pods,
+		broadcaster: watch.NewBroadcaster(0, watch.WaitIfChannelFull),
 	}
+}
+
+func (r *PodRegistry) SetError(err error) {
+	r.Lock()
+	defer r.Unlock()
+	r.Err = err
 }
 
 func (r *PodRegistry) ListPodsPredicate(ctx api.Context, filter func(*api.Pod) bool) (*api.PodList, error) {
@@ -63,9 +70,8 @@ func (r *PodRegistry) ListPods(ctx api.Context, selector labels.Selector) (*api.
 	})
 }
 
-func (r *PodRegistry) WatchPods(ctx api.Context, resourceVersion string, filter func(*api.Pod) bool) (watch.Interface, error) {
-	// TODO: wire filter down into the mux; it needs access to current and previous state :(
-	return r.mux.Watch(), nil
+func (r *PodRegistry) WatchPods(ctx api.Context, label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
+	return r.broadcaster.Watch(), nil
 }
 
 func (r *PodRegistry) GetPod(ctx api.Context, podId string) (*api.Pod, error) {
@@ -78,7 +84,7 @@ func (r *PodRegistry) CreatePod(ctx api.Context, pod *api.Pod) error {
 	r.Lock()
 	defer r.Unlock()
 	r.Pod = pod
-	r.mux.Action(watch.Added, pod)
+	r.broadcaster.Action(watch.Added, pod)
 	return r.Err
 }
 
@@ -86,13 +92,13 @@ func (r *PodRegistry) UpdatePod(ctx api.Context, pod *api.Pod) error {
 	r.Lock()
 	defer r.Unlock()
 	r.Pod = pod
-	r.mux.Action(watch.Modified, pod)
+	r.broadcaster.Action(watch.Modified, pod)
 	return r.Err
 }
 
 func (r *PodRegistry) DeletePod(ctx api.Context, podId string) error {
 	r.Lock()
 	defer r.Unlock()
-	r.mux.Action(watch.Deleted, r.Pod)
+	r.broadcaster.Action(watch.Deleted, r.Pod)
 	return r.Err
 }

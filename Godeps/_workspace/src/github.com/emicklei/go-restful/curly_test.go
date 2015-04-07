@@ -32,7 +32,7 @@ func TestCurlyDetectWebService(t *testing.T) {
 	var wss = []*WebService{ws1, ws2, ws3, ws4, ws5, ws7}
 
 	for _, each := range wss {
-		t.Logf("path=%s,toks=%v\n", each.compiledPathExpression().Source, each.compiledPathExpression().tokens)
+		t.Logf("path=%s,toks=%v\n", each.pathExpr.Source, each.pathExpr.tokens)
 	}
 
 	router := CurlyRouter{}
@@ -79,7 +79,7 @@ func Test_detectWebService(t *testing.T) {
 		requestPath := fix.path
 		requestTokens := tokenizePath(requestPath)
 		for _, ws := range wss {
-			serviceTokens := ws.compiledPathExpression().tokens
+			serviceTokens := ws.pathExpr.tokens
 			matches, score := router.computeWebserviceScore(requestTokens, serviceTokens)
 			t.Logf("req=%s,toks:%v,ws=%s,toks:%v,score=%d,matches=%v", requestPath, requestTokens, ws.RootPath(), serviceTokens, score, matches)
 		}
@@ -189,6 +189,7 @@ func TestCurly_ISSUE_34_2(t *testing.T) {
 // clear && go test -v -test.run TestCurly_JsonHtml ...restful
 func TestCurly_JsonHtml(t *testing.T) {
 	ws1 := new(WebService)
+	ws1.Path("/")
 	ws1.Route(ws1.GET("/some.html").To(curlyDummy).Consumes("*/*").Produces("text/html"))
 	req, _ := http.NewRequest("GET", "/some.html", nil)
 	req.Header.Set("Accept", "application/json")
@@ -205,6 +206,7 @@ func TestCurly_JsonHtml(t *testing.T) {
 func TestCurly_ISSUE_137(t *testing.T) {
 	ws1 := new(WebService)
 	ws1.Route(ws1.GET("/hello").To(curlyDummy))
+	ws1.Path("/")
 	req, _ := http.NewRequest("GET", "/", nil)
 	_, route, _ := CurlyRouter{}.SelectRoute([]*WebService{ws1}, req)
 	t.Log(route)
@@ -217,6 +219,7 @@ func TestCurly_ISSUE_137(t *testing.T) {
 func TestCurly_ISSUE_137_2(t *testing.T) {
 	ws1 := new(WebService)
 	ws1.Route(ws1.GET("/hello").To(curlyDummy))
+	ws1.Path("/")
 	req, _ := http.NewRequest("GET", "/hello/bob", nil)
 	_, route, _ := CurlyRouter{}.SelectRoute([]*WebService{ws1}, req)
 	t.Log(route)

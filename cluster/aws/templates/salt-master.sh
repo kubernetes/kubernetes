@@ -16,21 +16,31 @@
 
 # Prepopulate the name of the Master
 mkdir -p /etc/salt/minion.d
-echo "master: $MASTER_NAME" > /etc/salt/minion.d/master.conf
+echo "master: $SALT_MASTER" > /etc/salt/minion.d/master.conf
 
 cat <<EOF >/etc/salt/minion.d/grains.conf
 grains:
   roles:
     - kubernetes-master
   cloud: aws
+  cbr-cidr: "${MASTER_IP_RANGE}"
 EOF
 
+if [[ -n "${DOCKER_OPTS}" ]]; then
+  cat <<EOF >>/etc/salt/minion.d/grains.conf
+  docker_opts: '$(echo "$DOCKER_OPTS" | sed -e "s/'/''/g")'
+EOF
+fi
+
+if [[ -n "${DOCKER_ROOT}" ]]; then
+  cat <<EOF >>/etc/salt/minion.d/grains.conf
+  docker_root: '$(echo "$DOCKER_ROOT" | sed -e "s/'/''/g")'
+EOF
+fi
+
 cat <<EOF > /etc/aws.conf
-{
-  "Global": {
-    "Region": "${AWS_ZONE}"
-  }
-}
+[Global]
+Zone = ${ZONE}
 EOF
 
 # Auto accept all keys from minions that try to join

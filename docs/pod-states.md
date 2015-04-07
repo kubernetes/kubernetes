@@ -34,7 +34,7 @@ The number and meanings of `PodStatus` values are tightly guarded.  Other than w
 
 ### pending
 
-The pod has been accepted by the system, but one or more of the containers has not been started.  This includes time before being schedule as well as time spent downloading images over the network, which could take a while.
+The pod has been accepted by the system, but one or more of the containers has not been started.  This includes time before being scheduled as well as time spent downloading images over the network, which could take a while.
 
 ### running
 

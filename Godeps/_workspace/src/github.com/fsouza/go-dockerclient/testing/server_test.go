@@ -120,6 +120,7 @@ func TestListContainers(t *testing.T) {
 			Created: container.Created.Unix(),
 			Status:  container.State.String(),
 			Ports:   container.NetworkSettings.PortMappingAPI(),
+			Names:   []string{"/" + container.Name},
 		}
 	}
 	var got []docker.APIContainers
@@ -473,6 +474,23 @@ func TestStopContainer(t *testing.T) {
 	}
 }
 
+func TestKillContainer(t *testing.T) {
+	server := DockerServer{}
+	addContainers(&server, 1)
+	server.containers[0].State.Running = true
+	server.buildMuxer()
+	recorder := httptest.NewRecorder()
+	path := fmt.Sprintf("/containers/%s/kill", server.containers[0].ID)
+	request, _ := http.NewRequest("POST", path, nil)
+	server.ServeHTTP(recorder, request)
+	if recorder.Code != http.StatusNoContent {
+		t.Errorf("KillContainer: wrong status code. Want %d. Got %d.", http.StatusNoContent, recorder.Code)
+	}
+	if server.containers[0].State.Running {
+		t.Error("KillContainer: did not stop the container")
+	}
+}
+
 func TestStopContainerWithNotifyChannel(t *testing.T) {
 	ch := make(chan *docker.Container, 1)
 	server := DockerServer{}
@@ -771,12 +789,38 @@ func TestPushImageNotFound(t *testing.T) {
 	}
 }
 
+func TestTagImage(t *testing.T) {
+	server := DockerServer{imgIDs: map[string]string{"tsuru/python": "a123"}}
+	server.buildMuxer()
+	recorder := httptest.NewRecorder()
+	request, _ := http.NewRequest("POST", "/images/tsuru/python/tag?repo=tsuru/new-python", nil)
+	server.ServeHTTP(recorder, request)
+	if recorder.Code != http.StatusCreated {
+		t.Errorf("TagImage: wrong status. Want %d. Got %d.", http.StatusCreated, recorder.Code)
+	}
+	if server.imgIDs["tsuru/python"] != server.imgIDs["tsuru/new-python"] {
+		t.Errorf("TagImage: did not tag the image")
+	}
+}
+
+func TestTagImageNotFound(t *testing.T) {
+	server := DockerServer{}
+	server.buildMuxer()
+	recorder := httptest.NewRecorder()
+	request, _ := http.NewRequest("POST", "/images/tsuru/python/tag", nil)
+	server.ServeHTTP(recorder, request)
+	if recorder.Code != http.StatusNotFound {
+		t.Errorf("TagImage: wrong status. Want %d. Got %d.", http.StatusNotFound, recorder.Code)
+	}
+}
+
 func addContainers(server *DockerServer, n int) {
 	server.cMut.Lock()
 	defer server.cMut.Unlock()
 	for i := 0; i < n; i++ {
 		date := time.Now().Add(time.Duration((rand.Int() % (i + 1))) * time.Hour)
 		container := docker.Container{
+			Name:    fmt.Sprintf("%x", rand.Int()%10000),
 			ID:      fmt.Sprintf("%x", rand.Int()%10000),
 			Created: date,
 			Path:    "ls",
@@ -893,6 +937,36 @@ func TestRemoveImageByName(t *testing.T) {
 	_, ok := server.imgIDs[imgName]
 	if ok {
 		t.Error("RemoveImage: did not remove image tag name.")
+	}
+}
+
+func TestRemoveImageWithMultipleTags(t *testing.T) {
+	server := DockerServer{}
+	addImages(&server, 1, true)
+	server.buildMuxer()
+	imgID := server.images[0].ID
+	imgName := "docker/python-" + imgID
+	server.imgIDs["docker/python-wat"] = imgID
+	recorder := httptest.NewRecorder()
+	path := fmt.Sprintf("/images/%s", imgName)
+	request, _ := http.NewRequest("DELETE", path, nil)
+	server.ServeHTTP(recorder, request)
+	_, ok := server.imgIDs[imgName]
+	if ok {
+		t.Error("RemoveImage: did not remove image tag name.")
+	}
+	id, ok := server.imgIDs["docker/python-wat"]
+	if !ok {
+		t.Error("RemoveImage: removed the wrong tag name.")
+	}
+	if id != imgID {
+		t.Error("RemoveImage: disassociated the wrong ID from the tag")
+	}
+	if len(server.images) < 1 {
+		t.Fatal("RemoveImage: removed the image, but should keep it")
+	}
+	if server.images[0].ID != imgID {
+		t.Error("RemoveImage: changed the ID of the image!")
 	}
 }
 
@@ -1013,5 +1087,85 @@ func TestDefaultHandler(t *testing.T) {
 	defer server.listener.Close()
 	if server.mux != server.DefaultHandler() {
 		t.Fatalf("DefaultHandler: Expected to return server.mux, got: %#v", server.DefaultHandler())
+	}
+}
+
+func TestCreateExecContainer(t *testing.T) {
+	server := DockerServer{}
+	addContainers(&server, 2)
+	server.buildMuxer()
+	recorder := httptest.NewRecorder()
+	body := `{"Cmd": ["bash", "-c", "ls"]}`
+	path := fmt.Sprintf("/containers/%s/exec", server.containers[0].ID)
+	request, _ := http.NewRequest("POST", path, strings.NewReader(body))
+	server.ServeHTTP(recorder, request)
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("CreateExec: wrong status. Want %d. Got %d.", http.StatusOK, recorder.Code)
+	}
+	serverExec := server.execs[0]
+	var got docker.Exec
+	err := json.NewDecoder(recorder.Body).Decode(&got)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.ID != serverExec.ID {
+		t.Errorf("CreateExec: wrong value. Want %#v. Got %#v.", serverExec.ID, got.ID)
+	}
+	expected := docker.ExecInspect{
+		ID: got.ID,
+		ProcessConfig: docker.ExecProcessConfig{
+			EntryPoint: "bash",
+			Arguments:  []string{"-c", "ls"},
+		},
+		Container: *server.containers[0],
+	}
+	if !reflect.DeepEqual(*serverExec, expected) {
+		t.Errorf("InspectContainer: wrong value. Want:\n%#v\nGot:\n%#v\n", expected, *serverExec)
+	}
+}
+
+func TestInspectExecContainer(t *testing.T) {
+	server := DockerServer{}
+	addContainers(&server, 1)
+	server.buildMuxer()
+	recorder := httptest.NewRecorder()
+	body := `{"Cmd": ["bash", "-c", "ls"]}`
+	path := fmt.Sprintf("/containers/%s/exec", server.containers[0].ID)
+	request, _ := http.NewRequest("POST", path, strings.NewReader(body))
+	server.ServeHTTP(recorder, request)
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("CreateExec: wrong status. Want %d. Got %d.", http.StatusOK, recorder.Code)
+	}
+	var got docker.Exec
+	err := json.NewDecoder(recorder.Body).Decode(&got)
+	if err != nil {
+		t.Fatal(err)
+	}
+	path = fmt.Sprintf("/exec/%s/json", got.ID)
+	request, _ = http.NewRequest("GET", path, nil)
+	server.ServeHTTP(recorder, request)
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("CreateExec: wrong status. Want %d. Got %d.", http.StatusOK, recorder.Code)
+	}
+	var got2 docker.ExecInspect
+	err = json.NewDecoder(recorder.Body).Decode(&got2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expected := docker.ExecInspect{
+		ID: got.ID,
+		ProcessConfig: docker.ExecProcessConfig{
+			EntryPoint: "bash",
+			Arguments:  []string{"-c", "ls"},
+		},
+		Container: *server.containers[0],
+	}
+	got2.Container.State.StartedAt = expected.Container.State.StartedAt
+	got2.Container.State.FinishedAt = expected.Container.State.FinishedAt
+	got2.Container.Config = expected.Container.Config
+	got2.Container.Created = expected.Container.Created
+	got2.Container.NetworkSettings = expected.Container.NetworkSettings
+	if !reflect.DeepEqual(got2, expected) {
+		t.Errorf("InspectContainer: wrong value. Want:\n%#v\nGot:\n%#v\n", expected, got2)
 	}
 }

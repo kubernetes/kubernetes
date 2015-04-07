@@ -18,51 +18,86 @@ package apiserver
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/rest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/httplog"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 )
 
 type RedirectHandler struct {
-	storage map[string]RESTStorage
-	codec   runtime.Codec
+	storage                map[string]rest.Storage
+	codec                  runtime.Codec
+	context                api.RequestContextMapper
+	apiRequestInfoResolver *APIRequestInfoResolver
 }
 
 func (r *RedirectHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-	ctx := api.NewDefaultContext()
-	namespace := req.URL.Query().Get("namespace")
-	if len(namespace) > 0 {
-		ctx = api.WithNamespace(ctx, namespace)
+	var verb string
+	var apiResource string
+	var httpCode int
+	reqStart := time.Now()
+	defer monitor("redirect", &verb, &apiResource, &httpCode, reqStart)
+
+	requestInfo, err := r.apiRequestInfoResolver.GetAPIRequestInfo(req)
+	if err != nil {
+		notFound(w, req)
+		httpCode = http.StatusNotFound
+		return
 	}
-	parts := splitPath(req.URL.Path)
+	verb = requestInfo.Verb
+	resource, parts := requestInfo.Resource, requestInfo.Parts
+	ctx, ok := r.context.Get(req)
+	if !ok {
+		ctx = api.NewContext()
+	}
+	ctx = api.WithNamespace(ctx, requestInfo.Namespace)
+
+	// redirection requires /resource/resourceName path parts
 	if len(parts) != 2 || req.Method != "GET" {
 		notFound(w, req)
+		httpCode = http.StatusNotFound
 		return
 	}
-	resourceName := parts[0]
 	id := parts[1]
-	storage, ok := r.storage[resourceName]
+	storage, ok := r.storage[resource]
 	if !ok {
-		httplog.LogOf(req, w).Addf("'%v' has no storage object", resourceName)
+		httplog.LogOf(req, w).Addf("'%v' has no storage object", resource)
 		notFound(w, req)
+		httpCode = http.StatusNotFound
+		return
+	}
+	apiResource = resource
+
+	redirector, ok := storage.(rest.Redirector)
+	if !ok {
+		httplog.LogOf(req, w).Addf("'%v' is not a redirector", resource)
+		httpCode = errorJSON(errors.NewMethodNotSupported(resource, "redirect"), r.codec, w)
 		return
 	}
 
-	redirector, ok := storage.(Redirector)
-	if !ok {
-		httplog.LogOf(req, w).Addf("'%v' is not a redirector", resourceName)
-		notFound(w, req)
-		return
-	}
-
-	location, err := redirector.ResourceLocation(ctx, id)
+	location, _, err := redirector.ResourceLocation(ctx, id)
 	if err != nil {
 		status := errToAPIStatus(err)
 		writeJSON(status.Code, r.codec, status, w)
+		httpCode = status.Code
+		return
+	}
+	if location == nil {
+		httplog.LogOf(req, w).Addf("ResourceLocation for %v returned nil", id)
+		notFound(w, req)
+		httpCode = http.StatusNotFound
 		return
 	}
 
-	w.Header().Set("Location", location)
+	// Default to http
+	if location.Scheme == "" {
+		location.Scheme = "http"
+	}
+
+	w.Header().Set("Location", location.String())
 	w.WriteHeader(http.StatusTemporaryRedirect)
+	httpCode = http.StatusTemporaryRedirect
 }

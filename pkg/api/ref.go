@@ -25,10 +25,17 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 )
 
-// ErrNilObject indicates an error that the obj passed to GetReference is nil.
-var ErrNilObject = errors.New("Can't reference a nil object")
+var (
+	// Errors that could be returned by GetReference.
+	ErrNilObject  = errors.New("can't reference a nil object")
+	ErrNoSelfLink = errors.New("selfLink was empty, can't make reference")
+)
 
 var versionFromSelfLink = regexp.MustCompile("/api/([^/]*)/")
+
+// ForTesting_ReferencesAllowBlankSelfLinks can be set to true in tests to avoid
+// "ErrNoSelfLink" errors.
+var ForTesting_ReferencesAllowBlankSelfLinks = false
 
 // GetReference returns an ObjectReference which refers to the given
 // object, or an error if the object doesn't follow the conventions
@@ -49,13 +56,22 @@ func GetReference(obj runtime.Object) (*ObjectReference, error) {
 	if err != nil {
 		return nil, err
 	}
-	version := versionFromSelfLink.FindStringSubmatch(meta.SelfLink())
-	if len(version) < 2 {
-		return nil, fmt.Errorf("unexpected self link format: '%v'; got version '%v'", meta.SelfLink(), version)
+	version := ""
+	parsedSelfLink := versionFromSelfLink.FindStringSubmatch(meta.SelfLink())
+	if len(parsedSelfLink) < 2 {
+		if ForTesting_ReferencesAllowBlankSelfLinks {
+			version = "testing"
+		} else if meta.SelfLink() == "" {
+			return nil, ErrNoSelfLink
+		} else {
+			return nil, fmt.Errorf("unexpected self link format: '%v'; got version '%v'", meta.SelfLink(), version)
+		}
+	} else {
+		version = parsedSelfLink[1]
 	}
 	return &ObjectReference{
 		Kind:            kind,
-		APIVersion:      version[1],
+		APIVersion:      version,
 		Name:            meta.Name(),
 		Namespace:       meta.Namespace(),
 		UID:             meta.UID(),

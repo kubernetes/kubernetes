@@ -16,11 +16,7 @@ limitations under the License.
 
 package runtime
 
-import (
-	"errors"
-
-	"gopkg.in/v1/yaml"
-)
+import "errors"
 
 func (re *RawExtension) UnmarshalJSON(in []byte) error {
 	if re == nil {
@@ -30,31 +26,8 @@ func (re *RawExtension) UnmarshalJSON(in []byte) error {
 	return nil
 }
 
-func (re *RawExtension) MarshalJSON() ([]byte, error) {
+// Marshal may get called on pointers or values, so implement MarshalJSON on value.
+// http://stackoverflow.com/questions/21390979/custom-marshaljson-never-gets-called-in-go
+func (re RawExtension) MarshalJSON() ([]byte, error) {
 	return re.RawJSON, nil
-}
-
-// SetYAML implements the yaml.Setter interface.
-func (re *RawExtension) SetYAML(tag string, value interface{}) bool {
-	if value == nil {
-		re.RawJSON = []byte("null")
-		return true
-	}
-	// Why does the yaml package send value as a map[interface{}]interface{}?
-	// It's especially frustrating because encoding/json does the right thing
-	// by giving a []byte. So here we do the embarrasing thing of re-encode and
-	// de-encode the right way.
-	// TODO: Write a version of Decode that uses reflect to turn this value
-	// into an API object.
-	b, err := yaml.Marshal(value)
-	if err != nil {
-		panic("yaml can't reverse its own object")
-	}
-	re.RawJSON = b
-	return true
-}
-
-// GetYAML implements the yaml.Getter interface.
-func (re *RawExtension) GetYAML() (tag string, value interface{}) {
-	return tag, re.RawJSON
 }

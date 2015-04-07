@@ -1,2 +1,0 @@
-{% set hostname = grains.host %}
-DAEMON_ARGS="-peer-addr {{hostname}}:7001 -name {{hostname}}"

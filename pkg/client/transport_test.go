@@ -23,9 +23,9 @@ import (
 )
 
 func TestUnsecuredTLSTransport(t *testing.T) {
-	transport := NewUnsafeTLSTransport()
-	if !transport.TLSClientConfig.InsecureSkipVerify {
-		t.Errorf("expected transport to be insecure")
+	cfg := NewUnsafeTLSConfig()
+	if !cfg.InsecureSkipVerify {
+		t.Errorf("expected config to be insecure")
 	}
 }
 
@@ -67,5 +67,35 @@ func TestBasicAuthRoundTripper(t *testing.T) {
 	}
 	if rt.Request.Header.Get("Authorization") != "Basic "+base64.StdEncoding.EncodeToString([]byte("user:pass")) {
 		t.Errorf("unexpected authorization header: %#v", rt.Request)
+	}
+}
+
+func TestUserAgentRoundTripper(t *testing.T) {
+	rt := &testRoundTripper{}
+	req := &http.Request{
+		Header: make(http.Header),
+	}
+	req.Header.Set("User-Agent", "other")
+	NewUserAgentRoundTripper("test", rt).RoundTrip(req)
+	if rt.Request == nil {
+		t.Fatalf("unexpected nil request: %v", rt)
+	}
+	if rt.Request != req {
+		t.Fatalf("round tripper should not have copied request object: %#v", rt.Request)
+	}
+	if rt.Request.Header.Get("User-Agent") != "other" {
+		t.Errorf("unexpected user agent header: %#v", rt.Request)
+	}
+
+	req = &http.Request{}
+	NewUserAgentRoundTripper("test", rt).RoundTrip(req)
+	if rt.Request == nil {
+		t.Fatalf("unexpected nil request: %v", rt)
+	}
+	if rt.Request == req {
+		t.Fatalf("round tripper should have copied request object: %#v", rt.Request)
+	}
+	if rt.Request.Header.Get("User-Agent") != "test" {
+		t.Errorf("unexpected user agent header: %#v", rt.Request)
 	}
 }

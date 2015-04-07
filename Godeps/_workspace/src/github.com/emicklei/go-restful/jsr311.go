@@ -55,22 +55,22 @@ func (r RouterJSR311) detectRoute(routes []Route, httpRequest *http.Request) (*R
 		return nil, NewError(http.StatusMethodNotAllowed, "405: Method Not Allowed")
 	}
 	inputMediaOk := methodOk
+
 	// content-type
 	contentType := httpRequest.Header.Get(HEADER_ContentType)
-	if httpRequest.ContentLength > 0 {
-		inputMediaOk = []Route{}
-		for _, each := range methodOk {
-			if each.matchesContentType(contentType) {
-				inputMediaOk = append(inputMediaOk, each)
-			}
-		}
-		if len(inputMediaOk) == 0 {
-			if trace {
-				traceLogger.Printf("no Route found (from %d) that matches HTTP Content-Type: %s\n", len(methodOk), contentType)
-			}
-			return nil, NewError(http.StatusUnsupportedMediaType, "415: Unsupported Media Type")
+	inputMediaOk = []Route{}
+	for _, each := range methodOk {
+		if each.matchesContentType(contentType) {
+			inputMediaOk = append(inputMediaOk, each)
 		}
 	}
+	if len(inputMediaOk) == 0 {
+		if trace {
+			traceLogger.Printf("no Route found (from %d) that matches HTTP Content-Type: %s\n", len(methodOk), contentType)
+		}
+		return nil, NewError(http.StatusUnsupportedMediaType, "415: Unsupported Media Type")
+	}
+
 	// accept
 	outputMediaOk := []Route{}
 	accept := httpRequest.Header.Get(HEADER_Accept)
@@ -135,11 +135,10 @@ func (r RouterJSR311) selectRoutes(dispatcher *WebService, pathRemainder string)
 func (r RouterJSR311) detectDispatcher(requestPath string, dispatchers []*WebService) (*WebService, string, error) {
 	filtered := &sortableDispatcherCandidates{}
 	for _, each := range dispatchers {
-		pathExpr := each.compiledPathExpression()
-		matches := pathExpr.Matcher.FindStringSubmatch(requestPath)
+		matches := each.pathExpr.Matcher.FindStringSubmatch(requestPath)
 		if matches != nil {
 			filtered.candidates = append(filtered.candidates,
-				dispatcherCandidate{each, matches[len(matches)-1], len(matches), pathExpr.LiteralCount, pathExpr.VarCount})
+				dispatcherCandidate{each, matches[len(matches)-1], len(matches), each.pathExpr.LiteralCount, each.pathExpr.VarCount})
 		}
 	}
 	if len(filtered.candidates) == 0 {

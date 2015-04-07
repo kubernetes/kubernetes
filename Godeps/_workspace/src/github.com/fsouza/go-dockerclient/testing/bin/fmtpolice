@@ -1,0 +1,38 @@
+#!/bin/bash
+
+readonly GOPATH="${GOPATH%%:*}"
+
+main() {
+  check_fmt
+  check_lint
+}
+
+check_fmt() {
+  eval "set -e"
+  for file in $(git ls-files '*.go') ; do
+    gofmt $file | diff -u $file -
+  done
+  eval "set +e"
+}
+
+check_lint() {
+  _install_linter
+
+  for file in $(git ls-files '*.go') ; do
+    if [[ ! "$(${GOPATH}/bin/golint $file)" =~ ^[[:blank:]]*$ ]] ; then
+      _lint_verbose && exit 1
+    fi
+  done
+}
+
+_lint_verbose() {
+  for file in $(git ls-files '*.go') ; do $GOPATH/bin/golint $file ; done
+}
+
+_install_linter() {
+  if [[ ! -x "${GOPATH}/bin/golint" ]] ; then
+    go get -u -f github.com/golang/lint/golint
+  fi
+}
+
+main "$@"

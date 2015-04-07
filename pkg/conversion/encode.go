@@ -67,11 +67,18 @@ func (s *Scheme) EncodeToVersion(obj interface{}, destVersion string) (data []by
 		if err != nil {
 			return nil, err
 		}
-		err = s.converter.Convert(obj, objOut, 0, s.generateConvertMeta(objVersion, destVersion))
+		flags, meta := s.generateConvertMeta(objVersion, destVersion, obj)
+		err = s.converter.Convert(obj, objOut, flags, meta)
 		if err != nil {
 			return nil, err
 		}
 		obj = objOut
+	}
+
+	// ensure the output object name comes from the destination type
+	_, objKind, err = s.ObjectVersionAndKind(obj)
+	if err != nil {
+		return nil, err
 	}
 
 	// Version and Kind should be set on the wire.

@@ -20,22 +20,29 @@ import (
 	"sync"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
 
+// MinionRegistry implements minion.Registry interface.
 type MinionRegistry struct {
 	Err     error
 	Minion  string
-	Minions api.MinionList
+	Minions api.NodeList
+
 	sync.Mutex
 }
 
-func MakeMinionList(minions []string, nodeResources api.NodeResources) *api.MinionList {
-	list := api.MinionList{
-		Items: make([]api.Minion, len(minions)),
+// MakeMinionList constructs api.MinionList from list of minion names and a NodeResource.
+func MakeMinionList(minions []string, nodeResources api.NodeResources) *api.NodeList {
+	list := api.NodeList{
+		Items: make([]api.Node, len(minions)),
 	}
 	for i := range minions {
 		list.Items[i].Name = minions[i]
-		list.Items[i].Spec.Capacity = nodeResources.Capacity
+		list.Items[i].Status.Capacity = nodeResources.Capacity
 	}
 	return &list
 }
@@ -46,13 +53,19 @@ func NewMinionRegistry(minions []string, nodeResources api.NodeResources) *Minio
 	}
 }
 
-func (r *MinionRegistry) ListMinions(ctx api.Context) (*api.MinionList, error) {
+func (r *MinionRegistry) SetError(err error) {
+	r.Lock()
+	defer r.Unlock()
+	r.Err = err
+}
+
+func (r *MinionRegistry) ListMinions(ctx api.Context) (*api.NodeList, error) {
 	r.Lock()
 	defer r.Unlock()
 	return &r.Minions, r.Err
 }
 
-func (r *MinionRegistry) CreateMinion(ctx api.Context, minion *api.Minion) error {
+func (r *MinionRegistry) CreateMinion(ctx api.Context, minion *api.Node) error {
 	r.Lock()
 	defer r.Unlock()
 	r.Minion = minion.Name
@@ -60,7 +73,7 @@ func (r *MinionRegistry) CreateMinion(ctx api.Context, minion *api.Minion) error
 	return r.Err
 }
 
-func (r *MinionRegistry) UpdateMinion(ctx api.Context, minion *api.Minion) error {
+func (r *MinionRegistry) UpdateMinion(ctx api.Context, minion *api.Node) error {
 	r.Lock()
 	defer r.Unlock()
 	for i, node := range r.Minions.Items {
@@ -72,26 +85,33 @@ func (r *MinionRegistry) UpdateMinion(ctx api.Context, minion *api.Minion) error
 	return r.Err
 }
 
-func (r *MinionRegistry) GetMinion(ctx api.Context, minionID string) (*api.Minion, error) {
+func (r *MinionRegistry) GetMinion(ctx api.Context, minionID string) (*api.Node, error) {
 	r.Lock()
 	defer r.Unlock()
+	if r.Err != nil {
+		return nil, r.Err
+	}
 	for _, node := range r.Minions.Items {
 		if node.Name == minionID {
-			return &node, r.Err
+			return &node, nil
 		}
 	}
-	return nil, r.Err
+	return nil, errors.NewNotFound("node", minionID)
 }
 
 func (r *MinionRegistry) DeleteMinion(ctx api.Context, minionID string) error {
 	r.Lock()
 	defer r.Unlock()
-	var newList []api.Minion
+	var newList []api.Node
 	for _, node := range r.Minions.Items {
 		if node.Name != minionID {
-			newList = append(newList, api.Minion{ObjectMeta: api.ObjectMeta{Name: node.Name}})
+			newList = append(newList, api.Node{ObjectMeta: api.ObjectMeta{Name: node.Name}})
 		}
 	}
 	r.Minions.Items = newList
 	return r.Err
+}
+
+func (r *MinionRegistry) WatchMinions(ctx api.Context, label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
+	return nil, r.Err
 }

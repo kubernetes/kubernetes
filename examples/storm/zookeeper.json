@@ -1,0 +1,20 @@
+{
+  "id": "zookeeper",
+  "kind": "Pod",
+  "apiVersion": "v1beta1",
+  "desiredState": {
+    "manifest": {
+      "version": "v1beta1",
+      "id": "zookeeper",
+      "containers": [{
+        "name": "zookeeper",
+        "image": "mattf/zookeeper",
+        "cpu": 100,
+        "ports": [{ "containerPort": 2181 }]
+      }]
+    }
+  },
+  "labels": {
+    "name": "zookeeper"
+  }
+}

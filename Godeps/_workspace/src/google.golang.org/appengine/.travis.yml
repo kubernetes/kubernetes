@@ -1,0 +1,14 @@
+language: go
+
+go:
+  - 1.4
+
+install:
+  - export GOPATH="$HOME/gopath"
+  - mkdir -p "$GOPATH/src/google.golang.org"
+  - mv "$TRAVIS_BUILD_DIR" "$GOPATH/src/google.golang.org/appengine"
+  - go get -v -t -d google.golang.org/appengine/...
+
+script:
+  - go test -v google.golang.org/appengine/...
+  - go test -v -race google.golang.org/appengine/...

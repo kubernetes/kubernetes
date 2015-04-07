@@ -27,23 +27,25 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta2"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta3"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
-func TestChecksCodec(t *testing.T) {
+func TestSetsCodec(t *testing.T) {
 	testCases := map[string]struct {
 		Err    bool
 		Prefix string
 		Codec  runtime.Codec
 	}{
-		"v1beta1": {false, "/v1beta1/", v1beta1.Codec},
-		"":        {false, "/v1beta1/", v1beta1.Codec},
-		"v1beta2": {false, "/v1beta2/", v1beta2.Codec},
-		"v1beta3": {true, "", nil},
+		"v1beta1": {false, "/api/v1beta1/", v1beta1.Codec},
+		"":        {false, "/api/" + latest.Version + "/", latest.Codec},
+		"v1beta2": {false, "/api/v1beta2/", v1beta2.Codec},
+		"v1beta3": {false, "/api/v1beta3/", v1beta3.Codec},
+		"v1beta4": {true, "", nil},
 	}
 	for version, expected := range testCases {
-		client, err := RESTClientFor(&Config{Host: "127.0.0.1", Version: version})
+		client, err := New(&Config{Host: "127.0.0.1", Version: version})
 		switch {
 		case err == nil && expected.Err:
 			t.Errorf("expected error but was nil")
@@ -54,12 +56,24 @@ func TestChecksCodec(t *testing.T) {
 		case err != nil:
 			continue
 		}
-		if e, a := expected.Prefix, client.baseURL.Path; e != a {
+		if e, a := expected.Prefix, client.RESTClient.baseURL.Path; e != a {
 			t.Errorf("expected %#v, got %#v", e, a)
 		}
-		if e, a := expected.Codec, client.Codec; e != a {
+		if e, a := expected.Codec, client.RESTClient.Codec; e != a {
 			t.Errorf("expected %#v, got %#v", e, a)
 		}
+	}
+}
+
+func TestRESTClientRequires(t *testing.T) {
+	if _, err := RESTClientFor(&Config{Host: "127.0.0.1", Version: "", Codec: testapi.Codec()}); err == nil {
+		t.Errorf("unexpected non-error")
+	}
+	if _, err := RESTClientFor(&Config{Host: "127.0.0.1", Version: "v1beta1"}); err == nil {
+		t.Errorf("unexpected non-error")
+	}
+	if _, err := RESTClientFor(&Config{Host: "127.0.0.1", Version: testapi.Version(), Codec: testapi.Codec()}); err != nil {
+		t.Errorf("unexpected error: %v", err)
 	}
 }
 
@@ -81,7 +95,7 @@ func TestValidatesHostParameter(t *testing.T) {
 		{"host/server", "", "", true},
 	}
 	for i, testCase := range testCases {
-		c, err := RESTClientFor(&Config{Host: testCase.Host, Prefix: testCase.Prefix, Version: "v1beta1"})
+		c, err := RESTClientFor(&Config{Host: testCase.Host, Prefix: testCase.Prefix, Version: "v1beta1", Codec: testapi.Codec()})
 		switch {
 		case err == nil && testCase.Err:
 			t.Errorf("expected error but was nil")
@@ -100,17 +114,24 @@ func TestValidatesHostParameter(t *testing.T) {
 }
 
 func TestDoRequestBearer(t *testing.T) {
-	status := &api.Status{Status: api.StatusWorking}
+	status := &api.Status{Status: api.StatusFailure}
 	expectedBody, _ := latest.Codec.Encode(status)
 	fakeHandler := util.FakeHandler{
-		StatusCode:   202,
+		StatusCode:   400,
 		ResponseBody: string(expectedBody),
 		T:            t,
 	}
 	testServer := httptest.NewServer(&fakeHandler)
 	defer testServer.Close()
 	request, _ := http.NewRequest("GET", testServer.URL, nil)
-	c, err := RESTClientFor(&Config{Host: testServer.URL, BearerToken: "test"})
+	c, err := RESTClientFor(&Config{
+		Host:           testServer.URL,
+		Version:        testapi.Version(),
+		Codec:          testapi.Codec(),
+		LegacyBehavior: true,
+
+		BearerToken: "test",
+	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -123,21 +144,28 @@ func TestDoRequestBearer(t *testing.T) {
 	}
 }
 
-func TestDoRequestAccepted(t *testing.T) {
-	status := &api.Status{Status: api.StatusWorking}
+func TestDoRequestWithoutPassword(t *testing.T) {
+	status := &api.Status{Status: api.StatusFailure}
 	expectedBody, _ := latest.Codec.Encode(status)
 	fakeHandler := util.FakeHandler{
-		StatusCode:   202,
+		StatusCode:   400,
 		ResponseBody: string(expectedBody),
 		T:            t,
 	}
 	testServer := httptest.NewServer(&fakeHandler)
 	defer testServer.Close()
-	c, err := RESTClientFor(&Config{Host: testServer.URL, Username: "test", Version: testapi.Version()})
+	c, err := RESTClientFor(&Config{
+		Host:           testServer.URL,
+		Version:        testapi.Version(),
+		Codec:          testapi.Codec(),
+		LegacyBehavior: true,
+
+		Username: "test",
+	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	body, err := c.Get().Path("test").Do().Raw()
+	body, err := c.Get().Prefix("test").Do().Raw()
 	if err == nil {
 		t.Fatalf("Unexpected non-error")
 	}
@@ -157,21 +185,29 @@ func TestDoRequestAccepted(t *testing.T) {
 	fakeHandler.ValidateRequest(t, "/"+testapi.Version()+"/test", "GET", nil)
 }
 
-func TestDoRequestAcceptedSuccess(t *testing.T) {
+func TestDoRequestSuccess(t *testing.T) {
 	status := &api.Status{Status: api.StatusSuccess}
 	expectedBody, _ := latest.Codec.Encode(status)
 	fakeHandler := util.FakeHandler{
-		StatusCode:   202,
+		StatusCode:   200,
 		ResponseBody: string(expectedBody),
 		T:            t,
 	}
 	testServer := httptest.NewServer(&fakeHandler)
 	defer testServer.Close()
-	c, err := RESTClientFor(&Config{Host: testServer.URL, Username: "user", Password: "pass", Version: testapi.Version()})
+	c, err := RESTClientFor(&Config{
+		Host:           testServer.URL,
+		Version:        testapi.Version(),
+		Codec:          testapi.Codec(),
+		LegacyBehavior: true,
+
+		Username: "user",
+		Password: "pass",
+	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	body, err := c.Get().Path("test").Do().Raw()
+	body, err := c.Get().Prefix("test").Do().Raw()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -189,7 +225,13 @@ func TestDoRequestAcceptedSuccess(t *testing.T) {
 }
 
 func TestDoRequestFailed(t *testing.T) {
-	status := &api.Status{Status: api.StatusFailure, Reason: api.StatusReasonInvalid, Details: &api.StatusDetails{ID: "test", Kind: "test"}}
+	status := &api.Status{
+		Code:    http.StatusNotFound,
+		Status:  api.StatusFailure,
+		Reason:  api.StatusReasonNotFound,
+		Message: " \"\" not found",
+		Details: &api.StatusDetails{},
+	}
 	expectedBody, _ := latest.Codec.Encode(status)
 	fakeHandler := util.FakeHandler{
 		StatusCode:   404,
@@ -198,7 +240,12 @@ func TestDoRequestFailed(t *testing.T) {
 	}
 	testServer := httptest.NewServer(&fakeHandler)
 	defer testServer.Close()
-	c, err := RESTClientFor(&Config{Host: testServer.URL})
+	c, err := RESTClientFor(&Config{
+		Host:           testServer.URL,
+		Version:        testapi.Version(),
+		Codec:          testapi.Codec(),
+		LegacyBehavior: true,
+	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -212,7 +259,7 @@ func TestDoRequestFailed(t *testing.T) {
 	}
 	actual := ss.Status()
 	if !reflect.DeepEqual(status, &actual) {
-		t.Errorf("Unexpected mis-match. Expected %#v.  Saw %#v", status, actual)
+		t.Errorf("Unexpected mis-match: %s", util.ObjectDiff(status, &actual))
 	}
 }
 
@@ -226,12 +273,20 @@ func TestDoRequestCreated(t *testing.T) {
 	}
 	testServer := httptest.NewServer(&fakeHandler)
 	defer testServer.Close()
-	c, err := RESTClientFor(&Config{Host: testServer.URL, Username: "user", Password: "pass", Version: testapi.Version()})
+	c, err := RESTClientFor(&Config{
+		Host:           testServer.URL,
+		Version:        testapi.Version(),
+		Codec:          testapi.Codec(),
+		LegacyBehavior: true,
+
+		Username: "user",
+		Password: "pass",
+	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	created := false
-	body, err := c.Get().Path("test").Do().WasCreated(&created).Raw()
+	body, err := c.Get().Prefix("test").Do().WasCreated(&created).Raw()
 	if err != nil {
 		t.Errorf("Unexpected error %#v", err)
 	}
@@ -246,11 +301,4 @@ func TestDoRequestCreated(t *testing.T) {
 		t.Errorf("Unexpected mis-match. Expected %#v.  Saw %#v", status, statusOut)
 	}
 	fakeHandler.ValidateRequest(t, "/"+testapi.Version()+"/test", "GET", nil)
-}
-
-func TestDefaultPoll(t *testing.T) {
-	c := &RESTClient{PollPeriod: 0}
-	if req, ok := c.DefaultPoll("test"); req != nil || ok {
-		t.Errorf("expected nil request and not poll")
-	}
 }

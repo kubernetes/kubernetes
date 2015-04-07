@@ -22,15 +22,16 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/authenticator"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/user"
 )
 
 func TestAuthenticateRequest(t *testing.T) {
 	success := make(chan struct{})
-	context := NewUserRequestContext()
-	auth := NewRequestAuthenticator(
-		context,
+	contextMapper := api.NewRequestContextMapper()
+	auth, err := NewRequestAuthenticator(
+		contextMapper,
 		authenticator.RequestFunc(func(req *http.Request) (user.Info, bool, error) {
 			return &user.DefaultInfo{Name: "user"}, true, nil
 		}),
@@ -38,8 +39,13 @@ func TestAuthenticateRequest(t *testing.T) {
 			t.Errorf("unexpected call to failed")
 		}),
 		http.HandlerFunc(func(_ http.ResponseWriter, req *http.Request) {
-			if user, ok := context.Get(req); user == nil || !ok {
-				t.Errorf("no user stored on context: %#v", context)
+			ctx, ok := contextMapper.Get(req)
+			if ctx == nil || !ok {
+				t.Errorf("no context stored on contextMapper: %#v", contextMapper)
+			}
+			user, ok := api.UserFrom(ctx)
+			if user == nil || !ok {
+				t.Errorf("no user stored in context: %#v", ctx)
 			}
 			close(success)
 		}),
@@ -48,16 +54,20 @@ func TestAuthenticateRequest(t *testing.T) {
 	auth.ServeHTTP(httptest.NewRecorder(), &http.Request{})
 
 	<-success
-	if len(context.requests) > 0 {
-		t.Errorf("context should have no stored requests: %v", context)
+	empty, err := api.IsEmpty(contextMapper)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !empty {
+		t.Fatalf("contextMapper should have no stored requests: %v", contextMapper)
 	}
 }
 
 func TestAuthenticateRequestFailed(t *testing.T) {
 	failed := make(chan struct{})
-	context := NewUserRequestContext()
-	auth := NewRequestAuthenticator(
-		context,
+	contextMapper := api.NewRequestContextMapper()
+	auth, err := NewRequestAuthenticator(
+		contextMapper,
 		authenticator.RequestFunc(func(req *http.Request) (user.Info, bool, error) {
 			return nil, false, nil
 		}),
@@ -72,16 +82,20 @@ func TestAuthenticateRequestFailed(t *testing.T) {
 	auth.ServeHTTP(httptest.NewRecorder(), &http.Request{})
 
 	<-failed
-	if len(context.requests) > 0 {
-		t.Errorf("context should have no stored requests: %v", context)
+	empty, err := api.IsEmpty(contextMapper)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !empty {
+		t.Fatalf("contextMapper should have no stored requests: %v", contextMapper)
 	}
 }
 
 func TestAuthenticateRequestError(t *testing.T) {
 	failed := make(chan struct{})
-	context := NewUserRequestContext()
-	auth := NewRequestAuthenticator(
-		context,
+	contextMapper := api.NewRequestContextMapper()
+	auth, err := NewRequestAuthenticator(
+		contextMapper,
 		authenticator.RequestFunc(func(req *http.Request) (user.Info, bool, error) {
 			return nil, false, errors.New("failure")
 		}),
@@ -96,7 +110,11 @@ func TestAuthenticateRequestError(t *testing.T) {
 	auth.ServeHTTP(httptest.NewRecorder(), &http.Request{})
 
 	<-failed
-	if len(context.requests) > 0 {
-		t.Errorf("context should have no stored requests: %v", context)
+	empty, err := api.IsEmpty(contextMapper)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !empty {
+		t.Fatalf("contextMapper should have no stored requests: %v", contextMapper)
 	}
 }

@@ -1,5 +1,0 @@
-Package colwriter provides a write filter that formats
-input lines in multiple columns.
-
-The package is a straightforward translation from
-/src/cmd/draw/mc.c in Plan 9 from User Space.

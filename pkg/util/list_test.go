@@ -30,13 +30,3 @@ func TestStringListSet(t *testing.T) {
 		t.Errorf("expected: %v, got: %v:", expected, sl)
 	}
 }
-
-func TestStringListSetErr(t *testing.T) {
-	var sl StringList
-	if err := sl.Set(""); err == nil {
-		t.Errorf("expected error for empty string")
-	}
-	if err := sl.Set(","); err == nil {
-		t.Errorf("expected error for list of empty strings")
-	}
-}

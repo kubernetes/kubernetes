@@ -25,16 +25,18 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
 
-// watchEvent objects are streamed from the api server in response to a watch request.
-// These are not API objects and are unversioned today.
-type watchEvent struct {
-	// The type of the watch event; added, modified, or deleted.
-	Type watch.EventType `json:"type,omitempty" yaml:"type,omitempty"`
+// WatchEvent objects are streamed from the api server in response to a watch request.
+// These are not API objects and may not be changed in a backward-incompatible way.
+// TODO: move to a public, versioned object now that RawExtension conversions are possible
+// in the schema.
+type WatchEvent struct {
+	// The type of the watch event; added, modified, deleted, or error.
+	Type watch.EventType `json:"type,omitempty" description:"the type of watch event; may be ADDED, MODIFIED, DELETED, or ERROR"`
 
 	// For added or modified objects, this is the new object; for deleted objects,
 	// it's the state of the object immediately prior to its deletion.
 	// For errors, it's an api.Status.
-	Object runtime.RawExtension `json:"object,omitempty" yaml:"object,omitempty"`
+	Object runtime.RawExtension `json:"object,omitempty" description:"the object being watched; will match the type of the resource endpoint or be a Status object if the type is ERROR"`
 }
 
 // Object converts a watch.Event into an appropriately serializable JSON object
@@ -47,5 +49,5 @@ func Object(codec runtime.Codec, event *watch.Event) (interface{}, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &watchEvent{event.Type, runtime.RawExtension{json.RawMessage(data)}}, nil
+	return &WatchEvent{event.Type, runtime.RawExtension{json.RawMessage(data)}}, nil
 }

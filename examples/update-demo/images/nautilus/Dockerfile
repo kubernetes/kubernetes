@@ -13,4 +13,5 @@
 # limitations under the License.
 
 FROM kubernetes/test-webserver
-ADD html/data.json html/nautilus.jpg /
+COPY html/nautilus.jpg nautilus.jpg
+COPY html/data.json data.json

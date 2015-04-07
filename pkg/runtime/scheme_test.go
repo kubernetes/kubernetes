@@ -25,18 +25,18 @@ import (
 )
 
 type TypeMeta struct {
-	Kind       string `json:"kind,omitempty" yaml:"kind,omitempty"`
-	APIVersion string `json:"apiVersion,omitempty" yaml:"apiVersion,omitempty"`
+	Kind       string `json:"kind,omitempty"`
+	APIVersion string `json:"apiVersion,omitempty"`
 }
 
 type InternalSimple struct {
-	TypeMeta   `json:",inline" yaml:",inline"`
-	TestString string `json:"testString" yaml:"testString"`
+	TypeMeta   `json:",inline"`
+	TestString string `json:"testString"`
 }
 
 type ExternalSimple struct {
-	TypeMeta   `json:",inline" yaml:",inline"`
-	TestString string `json:"testString" yaml:"testString"`
+	TypeMeta   `json:",inline"`
+	TestString string `json:"testString"`
 }
 
 func (*InternalSimple) IsAnAPIObject() {}
@@ -157,36 +157,82 @@ func TestBadJSONRejection(t *testing.T) {
 }
 
 type ExtensionA struct {
-	runtime.PluginBase `json:",inline" yaml:",inline"`
-	TestString         string `json:"testString" yaml:"testString"`
+	runtime.PluginBase `json:",inline"`
+	TestString         string `json:"testString"`
 }
 
 type ExtensionB struct {
-	runtime.PluginBase `json:",inline" yaml:",inline"`
-	TestString         string `json:"testString" yaml:"testString"`
+	runtime.PluginBase `json:",inline"`
+	TestString         string `json:"testString"`
 }
 
 type ExternalExtensionType struct {
-	TypeMeta  `json:",inline" yaml:",inline"`
-	Extension runtime.RawExtension `json:"extension" yaml:"extension"`
+	TypeMeta  `json:",inline"`
+	Extension runtime.RawExtension `json:"extension"`
 }
 
 type InternalExtensionType struct {
-	TypeMeta  `json:",inline" yaml:",inline"`
-	Extension runtime.EmbeddedObject `json:"extension" yaml:"extension"`
+	TypeMeta  `json:",inline"`
+	Extension runtime.EmbeddedObject `json:"extension"`
 }
 
-func (*ExtensionA) IsAnAPIObject()            {}
-func (*ExtensionB) IsAnAPIObject()            {}
-func (*ExternalExtensionType) IsAnAPIObject() {}
-func (*InternalExtensionType) IsAnAPIObject() {}
+type ExternalOptionalExtensionType struct {
+	TypeMeta  `json:",inline"`
+	Extension runtime.RawExtension `json:"extension,omitempty"`
+}
+
+type InternalOptionalExtensionType struct {
+	TypeMeta  `json:",inline"`
+	Extension runtime.EmbeddedObject `json:"extension,omitempty"`
+}
+
+func (*ExtensionA) IsAnAPIObject()                    {}
+func (*ExtensionB) IsAnAPIObject()                    {}
+func (*ExternalExtensionType) IsAnAPIObject()         {}
+func (*InternalExtensionType) IsAnAPIObject()         {}
+func (*ExternalOptionalExtensionType) IsAnAPIObject() {}
+func (*InternalOptionalExtensionType) IsAnAPIObject() {}
+
+func TestExternalToInternalMapping(t *testing.T) {
+	scheme := runtime.NewScheme()
+	scheme.AddKnownTypeWithName("", "OptionalExtensionType", &InternalOptionalExtensionType{})
+	scheme.AddKnownTypeWithName("testExternal", "OptionalExtensionType", &ExternalOptionalExtensionType{})
+
+	table := []struct {
+		obj     runtime.Object
+		encoded string
+	}{
+		{
+			&InternalOptionalExtensionType{Extension: runtime.EmbeddedObject{nil}},
+			`{"kind":"OptionalExtensionType","apiVersion":"testExternal"}`,
+		},
+	}
+
+	for _, item := range table {
+		gotDecoded, err := scheme.Decode([]byte(item.encoded))
+		if err != nil {
+			t.Errorf("unexpected error '%v' (%v)", err, item.encoded)
+		} else if e, a := item.obj, gotDecoded; !reflect.DeepEqual(e, a) {
+			var eEx, aEx runtime.Object
+			if obj, ok := e.(*InternalOptionalExtensionType); ok {
+				eEx = obj.Extension.Object
+			}
+			if obj, ok := a.(*InternalOptionalExtensionType); ok {
+				aEx = obj.Extension.Object
+			}
+			t.Errorf("expected %#v, got %#v (%#v, %#v)", e, a, eEx, aEx)
+		}
+	}
+}
 
 func TestExtensionMapping(t *testing.T) {
 	scheme := runtime.NewScheme()
 	scheme.AddKnownTypeWithName("", "ExtensionType", &InternalExtensionType{})
+	scheme.AddKnownTypeWithName("", "OptionalExtensionType", &InternalOptionalExtensionType{})
 	scheme.AddKnownTypeWithName("", "A", &ExtensionA{})
 	scheme.AddKnownTypeWithName("", "B", &ExtensionB{})
 	scheme.AddKnownTypeWithName("testExternal", "ExtensionType", &ExternalExtensionType{})
+	scheme.AddKnownTypeWithName("testExternal", "OptionalExtensionType", &ExternalOptionalExtensionType{})
 	scheme.AddKnownTypeWithName("testExternal", "A", &ExtensionA{})
 	scheme.AddKnownTypeWithName("testExternal", "B", &ExtensionB{})
 

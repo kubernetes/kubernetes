@@ -2,6 +2,10 @@
 
 Use the [standalone.yaml](cloud-configs/standalone.yaml) cloud-config to provision a single node Kubernetes cluster.
 
+*Attention:* This requires at least CoreOS version 593.0.0/598.0.0.
+
+### CoreOS image versions
+
 ### AWS
 
 ```
@@ -10,9 +14,11 @@ aws ec2 authorize-security-group-ingress --group-name kubernetes --protocol tcp 
 aws ec2 authorize-security-group-ingress --group-name kubernetes --source-security-group-name kubernetes
 ```
 
+*Attention:* Replace ```<ami_image_id>``` bellow for a [suitable version of CoreOS image for AWS](https://coreos.com/docs/running-coreos/cloud-providers/ec2/).
+
 ```
 aws ec2 run-instances \
---image-id ami-d92377e9 \
+--image-id <ami_image_id> \
 --key-name <keypair> \
 --region us-west-2 \
 --security-groups kubernetes \
@@ -22,15 +28,22 @@ aws ec2 run-instances \
 
 ### GCE
 
+*Attention:* Replace ```<gce_image_id>``` bellow for a [suitable version of CoreOS image for GCE](https://coreos.com/docs/running-coreos/cloud-providers/google-compute-engine/).
+
 ```
 gcloud compute instances create standalone \
 --image-project coreos-cloud \
---image coreos-alpha-509-1-0-v20141124 \
+--image <gce_image_id> \
 --boot-disk-size 200GB \
 --machine-type n1-standard-1 \
 --zone us-central1-a \
 --metadata-from-file user-data=standalone.yaml 
 ```
+
+Next, setup an ssh tunnel to the master so you can run kubectl from your local host.
+In one terminal, run `gcloud compute ssh master --ssh-flag="-L 8080:127.0.0.1:8080"` and in a second
+run `gcloud compute ssh master --ssh-flag="-R 8080:127.0.0.1:8080"`.
+
 
 ### VMware Fusion
 

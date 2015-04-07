@@ -166,6 +166,7 @@ var allRegions = []aws.Region{
 	aws.USEast,
 	aws.USWest,
 	aws.EUWest,
+	aws.EUCentral,
 	aws.APSoutheast,
 	aws.APNortheast,
 }

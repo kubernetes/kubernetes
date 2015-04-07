@@ -58,7 +58,7 @@ Example:
     clientConfig.Host = "example.com:4901"
     clientConfig = info.MergeWithConfig()
     client := client.New(clientConfig)
-    client.ListPods()
+    client.Pods(ns).List()
 */
 package clientauth
 
@@ -116,4 +116,10 @@ func (info Info) MergeWithConfig(c client.Config) (client.Config, error) {
 		config.Insecure = *info.Insecure
 	}
 	return config, nil
+}
+
+func (info Info) Complete() bool {
+	return len(info.User) > 0 ||
+		len(info.CertFile) > 0 ||
+		len(info.BearerToken) > 0
 }

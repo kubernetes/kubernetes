@@ -18,36 +18,57 @@ package scheduler
 
 import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/resources"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/golang/glog"
 )
 
-func calculatePercentage(requested, capacity int) int {
+// the unused capacity is calculated on a scale of 0-10
+// 0 being the lowest priority and 10 being the highest
+func calculateScore(requested, capacity int64, node string) int {
 	if capacity == 0 {
 		return 0
 	}
-	return (requested * 100) / capacity
+	if requested > capacity {
+		glog.Errorf("Combined requested resources from existing pods exceeds capacity on minion: %s", node)
+		return 0
+	}
+	return int(((capacity - requested) * 10) / capacity)
 }
 
 // Calculate the occupancy on a node.  'node' has information about the resources on the node.
 // 'pods' is a list of pods currently scheduled on the node.
-func calculateOccupancy(node api.Minion, pods []api.Pod) HostPriority {
-	totalCPU := 0
-	totalMemory := 0
-	for _, pod := range pods {
-		for _, container := range pod.Spec.Containers {
-			totalCPU += container.CPU
-			totalMemory += container.Memory
+func calculateOccupancy(pod api.Pod, node api.Node, pods []api.Pod) HostPriority {
+	totalMilliCPU := int64(0)
+	totalMemory := int64(0)
+	for _, existingPod := range pods {
+		for _, container := range existingPod.Spec.Containers {
+			totalMilliCPU += container.Resources.Limits.Cpu().MilliValue()
+			totalMemory += container.Resources.Limits.Memory().Value()
 		}
 	}
+	// Add the resources requested by the current pod being scheduled.
+	// This also helps differentiate between differently sized, but empty, minions.
+	for _, container := range pod.Spec.Containers {
+		totalMilliCPU += container.Resources.Limits.Cpu().MilliValue()
+		totalMemory += container.Resources.Limits.Memory().Value()
+	}
 
-	percentageCPU := calculatePercentage(totalCPU, resources.GetIntegerResource(node.Spec.Capacity, resources.CPU, 0))
-	percentageMemory := calculatePercentage(totalMemory, resources.GetIntegerResource(node.Spec.Capacity, resources.Memory, 0))
-	glog.V(4).Infof("Least Requested Priority, AbsoluteRequested: (%d, %d) Percentage:(%d\\%m, %d\\%)", totalCPU, totalMemory, percentageCPU, percentageMemory)
+	capacityMilliCPU := node.Status.Capacity.Cpu().MilliValue()
+	capacityMemory := node.Status.Capacity.Memory().Value()
+
+	cpuScore := calculateScore(totalMilliCPU, capacityMilliCPU, node.Name)
+	memoryScore := calculateScore(totalMemory, capacityMemory, node.Name)
+	glog.V(4).Infof(
+		"%v -> %v: Least Requested Priority, AbsoluteRequested: (%d, %d) / (%d, %d) Score: (%d, %d)",
+		pod.Name, node.Name,
+		totalMilliCPU, totalMemory,
+		capacityMilliCPU, capacityMemory,
+		cpuScore, memoryScore,
+	)
 
 	return HostPriority{
 		host:  node.Name,
-		score: int((percentageCPU + percentageMemory) / 2),
+		score: int((cpuScore + memoryScore) / 2),
 	}
 }
 
@@ -64,7 +85,50 @@ func LeastRequestedPriority(pod api.Pod, podLister PodLister, minionLister Minio
 
 	list := HostPriorityList{}
 	for _, node := range nodes.Items {
-		list = append(list, calculateOccupancy(node, podsToMachines[node.Name]))
+		list = append(list, calculateOccupancy(pod, node, podsToMachines[node.Name]))
 	}
 	return list, nil
+}
+
+type NodeLabelPrioritizer struct {
+	label    string
+	presence bool
+}
+
+func NewNodeLabelPriority(label string, presence bool) PriorityFunction {
+	labelPrioritizer := &NodeLabelPrioritizer{
+		label:    label,
+		presence: presence,
+	}
+	return labelPrioritizer.CalculateNodeLabelPriority
+}
+
+// CalculateNodeLabelPriority checks whether a particular label exists on a minion or not, regardless of its value.
+// If presence is true, prioritizes minions that have the specified label, regardless of value.
+// If presence is false, prioritizes minions that do not have the specified label.
+func (n *NodeLabelPrioritizer) CalculateNodeLabelPriority(pod api.Pod, podLister PodLister, minionLister MinionLister) (HostPriorityList, error) {
+	var score int
+	minions, err := minionLister.List()
+	if err != nil {
+		return nil, err
+	}
+
+	labeledMinions := map[string]bool{}
+	for _, minion := range minions.Items {
+		exists := labels.Set(minion.Labels).Has(n.label)
+		labeledMinions[minion.Name] = (exists && n.presence) || (!exists && !n.presence)
+	}
+
+	result := []HostPriority{}
+	//score int - scale of 0-10
+	// 0 being the lowest priority and 10 being the highest
+	for minionName, success := range labeledMinions {
+		if success {
+			score = 10
+		} else {
+			score = 0
+		}
+		result = append(result, HostPriority{host: minionName, score: score})
+	}
+	return result, nil
 }

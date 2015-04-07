@@ -21,6 +21,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 )
@@ -39,30 +40,39 @@ func (*IgnoredList) IsAnAPIObject() {}
 func TestSelectionPredicate(t *testing.T) {
 	table := map[string]struct {
 		labelSelector, fieldSelector string
-		labels, fields               labels.Set
+		labels                       labels.Set
+		fields                       fields.Set
 		err                          error
 		shouldMatch                  bool
+		matchSingleKey               string
 	}{
 		"A": {
 			labelSelector: "name=foo",
 			fieldSelector: "uid=12345",
 			labels:        labels.Set{"name": "foo"},
-			fields:        labels.Set{"uid": "12345"},
+			fields:        fields.Set{"uid": "12345"},
 			shouldMatch:   true,
 		},
 		"B": {
 			labelSelector: "name=foo",
 			fieldSelector: "uid=12345",
 			labels:        labels.Set{"name": "foo"},
-			fields:        labels.Set{},
+			fields:        fields.Set{},
 			shouldMatch:   false,
 		},
 		"C": {
 			labelSelector: "name=foo",
 			fieldSelector: "uid=12345",
 			labels:        labels.Set{},
-			fields:        labels.Set{"uid": "12345"},
+			fields:        fields.Set{"uid": "12345"},
 			shouldMatch:   false,
+		},
+		"D": {
+			fieldSelector:  "metadata.name=12345",
+			labels:         labels.Set{},
+			fields:         fields.Set{"metadata.name": "12345"},
+			shouldMatch:    true,
+			matchSingleKey: "12345",
 		},
 		"error": {
 			labelSelector: "name=foo",
@@ -73,18 +83,18 @@ func TestSelectionPredicate(t *testing.T) {
 	}
 
 	for name, item := range table {
-		parsedLabel, err := labels.ParseSelector(item.labelSelector)
+		parsedLabel, err := labels.Parse(item.labelSelector)
 		if err != nil {
 			panic(err)
 		}
-		parsedField, err := labels.ParseSelector(item.fieldSelector)
+		parsedField, err := fields.ParseSelector(item.fieldSelector)
 		if err != nil {
 			panic(err)
 		}
 		sp := &SelectionPredicate{
 			Label: parsedLabel,
 			Field: parsedField,
-			GetAttrs: func(runtime.Object) (label, field labels.Set, err error) {
+			GetAttrs: func(runtime.Object) (label labels.Set, field fields.Set, err error) {
 				return item.labels, item.fields, item.err
 			},
 		}
@@ -95,6 +105,15 @@ func TestSelectionPredicate(t *testing.T) {
 		}
 		if e, a := item.shouldMatch, got; e != a {
 			t.Errorf("%v: expected %v, got %v", name, e, a)
+		}
+		if key := item.matchSingleKey; key != "" {
+			got, ok := sp.MatchesSingle()
+			if !ok {
+				t.Errorf("%v: expected single match", name)
+			}
+			if e, a := key, got; e != a {
+				t.Errorf("%v: expected %v, got %v", name, e, a)
+			}
 		}
 	}
 }
@@ -116,20 +135,34 @@ func TestFilterList(t *testing.T) {
 		},
 	}
 
-	got, err := FilterList(try,
-		MatcherFunc(func(obj runtime.Object) (bool, error) {
-			i, ok := obj.(*Ignored)
-			if !ok {
-				return false, errors.New("wrong type")
-			}
-			return i.ID[0] == 'b', nil
-		}),
-	)
+	m := MatcherFunc(func(obj runtime.Object) (bool, error) {
+		i, ok := obj.(*Ignored)
+		if !ok {
+			return false, errors.New("wrong type")
+		}
+		return i.ID[0] == 'b', nil
+	})
+	if _, matchesSingleObject := m.MatchesSingle(); matchesSingleObject {
+		t.Errorf("matcher unexpectedly matches only a single object.")
+	}
+
+	got, err := FilterList(try, m, nil)
 	if err != nil {
 		t.Fatalf("Unexpected error %v", err)
 	}
 
 	if e, a := expect, got; !reflect.DeepEqual(e, a) {
+		t.Errorf("Expected %#v, got %#v", e, a)
+	}
+}
+
+func TestSingleMatch(t *testing.T) {
+	m := MatchOnKey("pod-name-here", func(obj runtime.Object) (bool, error) { return true, nil })
+	got, ok := m.MatchesSingle()
+	if !ok {
+		t.Errorf("Expected MatchesSingle to return true")
+	}
+	if e, a := "pod-name-here", got; e != a {
 		t.Errorf("Expected %#v, got %#v", e, a)
 	}
 }

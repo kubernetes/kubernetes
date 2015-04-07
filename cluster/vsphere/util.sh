@@ -289,11 +289,15 @@ function kube-up {
     grep -v "^#" "${KUBE_ROOT}/cluster/vsphere/templates/hostname.sh"
     echo "cd /home/kube/cache/kubernetes-install"
     echo "readonly MASTER_NAME='${MASTER_NAME}'"
+    echo "readonly INSTANCE_PREFIX='${INSTANCE_PREFIX}'"
     echo "readonly NODE_INSTANCE_PREFIX='${INSTANCE_PREFIX}-minion'"
     echo "readonly PORTAL_NET='${PORTAL_NET}'"
     echo "readonly ENABLE_NODE_MONITORING='${ENABLE_NODE_MONITORING:-false}'"
     echo "readonly ENABLE_NODE_LOGGING='${ENABLE_NODE_LOGGING:-false}'"
     echo "readonly LOGGING_DESTINATION='${LOGGING_DESTINATION:-}'"
+    echo "readonly ENABLE_CLUSTER_DNS='${ENABLE_CLUSTER_DNS:-false}'"
+    echo "readonly DNS_SERVER_IP='${DNS_SERVER_IP:-}'"
+    echo "readonly DNS_DOMAIN='${DNS_DOMAIN:-}'"
     echo "readonly SERVER_BINARY_TAR='${SERVER_BINARY_TAR##*/}'"
     echo "readonly SALT_TAR='${SALT_TAR##*/}'"
     echo "readonly MASTER_HTPASSWD='${htpasswd}'"
@@ -473,12 +477,4 @@ function test-setup {
 # Execute after running tests to perform any required clean-up
 function test-teardown {
 	echo "TODO"
-}
-
-function setup-monitoring {
-    echo "TODO"
-}
-
-function teardown-monitoring {
-  echo "TODO"
 }

@@ -93,7 +93,7 @@ The relevant specifications include:
 http://www.whatwg.org/specs/web-apps/current-work/multipage/syntax.html and
 http://www.whatwg.org/specs/web-apps/current-work/multipage/tokenization.html
 */
-package html
+package html // import "golang.org/x/net/html"
 
 // The tokenization algorithm implemented by this package is not a line-by-line
 // transliteration of the relatively verbose state-machine in the WHATWG

@@ -2,83 +2,76 @@
 
 The example below creates a Kubernetes cluster with 4 worker node Virtual Machines and a master Virtual Machine (i.e. 5 VMs in your cluster). This cluster is set up and controlled from your workstation (or wherever you find convenient).
 
-### Getting VMs
+### Before you start
 
-1. You need a Google Cloud Platform account with billing enabled. Visit
-   [http://cloud.google.com/console](http://cloud.google.com/console) for more details.
-2. Make sure you can start up a GCE VM.  At least make sure you can do the [Create an instance](https://developers.google.com/compute/docs/quickstart#addvm) part of the GCE Quickstart.
-3. Make sure you can ssh into the VM without interactive prompts.
-  * Your GCE SSH key must either have no passcode or you need to be using `ssh-agent`.
-  * Ensure the GCE firewall isn't blocking port 22 to your VMs.  By default, this should work but if you have edited firewall rules or created a new non-default network, you'll need to expose it: `gcloud compute firewall-rules create --network=<network-name> --description "SSH allowed from anywhere" --allow tcp:22 default-ssh`
-4. You need to have the Google Cloud Storage API, and the Google Cloud Storage JSON API enabled. This can be done in the Google Cloud Console.
+If you want a simplified getting started experience and GUI for managing clusters, please consider trying [Google Container Engine](https://cloud.google.com/container-engine/) for hosted cluster installation and management.  
 
+If you want to use custom binaries or pure open source Kubernetes, please continue with the instructions below.
 
-### Prerequisites for your workstation
+### Prerequisites
 
-1. Be running a Linux or Mac OS X.
-2. You must have the [Google Cloud SDK](https://developers.google.com/cloud/sdk/) installed.  This will get you `gcloud` and `gsutil`.
-3. Ensure that your `gcloud` components are up-to-date by running `gcloud components update`.
-4. If you want to build your own release, you need to have [Docker
-installed](https://docs.docker.com/installation/).  On Mac OS X you can use
-boot2docker.
-5. Get or build a [binary release](binary_release.md)
+1. You need a Google Cloud Platform account with billing enabled. Visit the [Google Developers Console](http://cloud.google.com/console) for more details.
+1. Make sure you can start up a GCE VM from the command line.  At least make sure you can do the [Create an instance](https://cloud.google.com/compute/docs/quickstart#create_an_instance) part of the GCE Quickstart.
+1. Make sure you have the `gcloud preview` command line component installed. Simply run `gcloud preview` at the command line - if it asks to install any components, go ahead and install them. If it simply shows help text, you're good to go.
+1. Make sure you can ssh into the VM without interactive prompts.  See the [Log in to the instance](https://cloud.google.com/compute/docs/quickstart#ssh) part of the GCE Quickstart.
 
 ### Starting a Cluster
 
+You can install a cluster with one of two one-liners:
+
 ```bash
-cluster/kube-up.sh
+curl -sS https://get.k8s.io | bash
 ```
 
-The script above relies on Google Storage to stage the Kubernetes release. It
-then will start (by default) a single master VM along with 4 worker VMs.  You
-can tweak some of these parameters by editing `cluster/gce/config-default.sh`
-You can view a transcript of a successful cluster creation
-[here](https://gist.github.com/satnam6502/fc689d1b46db9772adea).
+or
 
-The instances must be able to connect to each other using their private IP. The
-script uses the "default" network which should have a firewall rule called
-"default-allow-internal" which allows traffic on any port on the private IPs.
-If this rule is missing from the default network or if you change the network
-being used in `cluster/config-default.sh` create a new rule with the following
-field values:
+```bash
+wget -q -O - https://get.k8s.io | bash
+```
 
-* Source Ranges: `10.0.0.0/8`
-* Allowed Protocols and Port: `tcp:1-65535;udp:1-65535;icmp`
+### Installing the kubernetes client on your workstation
+
+This will leave you with a ```kubernetes``` directory on your workstation, and a running cluster.
+
+Feel free to move the ```kubernetes``` directory to the appropriate directory on your workstation (e.g. ```/opt/kubernetes```) then ```cd``` into that directory:
+
+```bash
+mv kubernetes ${SOME_DIR}/kubernetes
+cd ${SOME_DIR}/kubernetes
+```
+
+If you run into trouble please see the section on [troubleshooting](https://github.com/brendandburns/kubernetes/blob/docs/docs/getting-started-guides/gce.md#troubleshooting), or come ask questions on IRC at #google-containers on freenode.
+
 
 ### Running a container (simple version)
 
-Once you have your instances up and running, the `build-go.sh` script sets up
-your Go workspace and builds the Go components.
+Once you have your cluster created you can use ```${SOME_DIR}/kubernetes/cluster/kubectl.sh``` to access
+the kubernetes api.
 
-The `kubecfg.sh` line below spins up two containers running
-[Nginx](http://nginx.org/en/) with port 80 mapped to 8080:
+The `kubectl.sh` line below spins up two containers running
+[Nginx](http://nginx.org/en/) running on port 80:
 
 ```bash
-cluster/kubecfg.sh -p 8080:80 run dockerfile/nginx 2 myNginx
+cluster/kubectl.sh run-container my-nginx --image=dockerfile/nginx --replicas=2 --port=80
 ```
 
 To stop the containers:
 
 ```bash
-cluster/kubecfg.sh stop myNginx
+cluster/kubectl.sh stop rc my-nginx
 ```
 
 To delete the containers:
 
 ```bash
-cluster/kubecfg.sh rm myNginx
+cluster/kubectl.sh delete rc my-nginx
 ```
 
 ### Running a container (more complete version)
 
-
-Assuming you've run `hack/dev-build-and-up.sh` and `hack/build-go.sh`, you
-can create a pod like this:
-
-
 ```bash
 cd kubernetes
-cluster/kubecfg.sh -c api/examples/pod.json create /pods
+cluster/kubectl.sh create -f docs/getting-started-guides/pod.json
 ```
 
 Where pod.json contains something like:
@@ -97,7 +90,7 @@ Where pod.json contains something like:
         "image": "dockerfile/nginx",
         "ports": [{
           "containerPort": 80,
-          "hostPort": 8080
+          "hostPort": 8081
         }],
         "livenessProbe": {
           "enabled": true,
@@ -105,7 +98,7 @@ Where pod.json contains something like:
           "initialDelaySeconds": 30,
           "httpGet": {
             "path": "/index.html",
-            "port": "8080"
+            "port": 8081
           }
         }
       }]
@@ -120,19 +113,64 @@ Where pod.json contains something like:
 You can see your cluster's pods:
 
 ```bash
-cluster/kubecfg.sh list pods
+cluster/kubectl.sh get pods
 ```
 
 and delete the pod you just created:
 
 ```bash
-cluster/kubecfg.sh delete pods/php
+cluster/kubectl.sh delete pods php
 ```
+
+Since this pod is scheduled on a minion running in GCE, you will have to enable incoming tcp traffic via the port specified in the
+pod manifest before you see the nginx welcome page. After doing so, it should be visible at http://<external ip of minion running nginx>:<port from manifest>.
 
 Look in `examples/` for more examples
 
 ### Tearing down the cluster
+
 ```bash
 cd kubernetes
 cluster/kube-down.sh
 ```
+
+### Customizing
+
+The script above relies on Google Storage to stage the Kubernetes release. It
+then will start (by default) a single master VM along with 4 worker VMs.  You
+can tweak some of these parameters by editing `kubernetes/cluster/gce/config-default.sh`
+You can view a transcript of a successful cluster creation
+[here](https://gist.github.com/satnam6502/fc689d1b46db9772adea).
+
+### Troubleshooting
+
+#### Project settings
+
+You need to have the Google Cloud Storage API, and the Google Cloud Storage
+JSON API enabled. It is activated by default for new projects. Otherwise, it
+can be done in the Google Cloud Console.  See the [Google Cloud Storage JSON
+API Overview](https://cloud.google.com/storage/docs/json_api/) for more
+details.
+
+#### SSH
+
+If you're having trouble SSHing into your instances, ensure the GCE firewall
+isn't blocking port 22 to your VMs.  By default, this should work but if you
+have edited firewall rules or created a new non-default network, you'll need to
+expose it: `gcloud compute firewall-rules create --network=<network-name>
+--description "SSH allowed from anywhere" --allow tcp:22 default-ssh`
+
+Additionally, your GCE SSH key must either have no passcode or you need to be
+using `ssh-agent`.
+
+#### Networking
+
+The instances must be able to connect to each other using their private IP. The
+script uses the "default" network which should have a firewall rule called
+"default-allow-internal" which allows traffic on any port on the private IPs.
+If this rule is missing from the default network or if you change the network
+being used in `cluster/config-default.sh` create a new rule with the following
+field values:
+
+* Source Ranges: `10.0.0.0/8`
+* Allowed Protocols and Port: `tcp:1-65535;udp:1-65535;icmp`

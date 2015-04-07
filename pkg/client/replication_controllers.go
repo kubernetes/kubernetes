@@ -17,9 +17,8 @@ limitations under the License.
 package client
 
 import (
-	"fmt"
-
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
@@ -36,7 +35,7 @@ type ReplicationControllerInterface interface {
 	Create(ctrl *api.ReplicationController) (*api.ReplicationController, error)
 	Update(ctrl *api.ReplicationController) (*api.ReplicationController, error)
 	Delete(name string) error
-	Watch(label, field labels.Selector, resourceVersion string) (watch.Interface, error)
+	Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error)
 }
 
 // replicationControllers implements ReplicationControllersNamespacer interface
@@ -53,48 +52,44 @@ func newReplicationControllers(c *Client, namespace string) *replicationControll
 // List takes a selector, and returns the list of replication controllers that match that selector.
 func (c *replicationControllers) List(selector labels.Selector) (result *api.ReplicationControllerList, err error) {
 	result = &api.ReplicationControllerList{}
-	err = c.r.Get().Namespace(c.ns).Path("replicationControllers").SelectorParam("labels", selector).Do().Into(result)
+	err = c.r.Get().Namespace(c.ns).Resource("replicationControllers").LabelsSelectorParam(selector).Do().Into(result)
 	return
 }
 
 // Get returns information about a particular replication controller.
 func (c *replicationControllers) Get(name string) (result *api.ReplicationController, err error) {
 	result = &api.ReplicationController{}
-	err = c.r.Get().Namespace(c.ns).Path("replicationControllers").Path(name).Do().Into(result)
+	err = c.r.Get().Namespace(c.ns).Resource("replicationControllers").Name(name).Do().Into(result)
 	return
 }
 
 // Create creates a new replication controller.
 func (c *replicationControllers) Create(controller *api.ReplicationController) (result *api.ReplicationController, err error) {
 	result = &api.ReplicationController{}
-	err = c.r.Post().Namespace(c.ns).Path("replicationControllers").Body(controller).Do().Into(result)
+	err = c.r.Post().Namespace(c.ns).Resource("replicationControllers").Body(controller).Do().Into(result)
 	return
 }
 
 // Update updates an existing replication controller.
 func (c *replicationControllers) Update(controller *api.ReplicationController) (result *api.ReplicationController, err error) {
 	result = &api.ReplicationController{}
-	if len(controller.ResourceVersion) == 0 {
-		err = fmt.Errorf("invalid update object, missing resource version: %v", controller)
-		return
-	}
-	err = c.r.Put().Namespace(c.ns).Path("replicationControllers").Path(controller.Name).Body(controller).Do().Into(result)
+	err = c.r.Put().Namespace(c.ns).Resource("replicationControllers").Name(controller.Name).Body(controller).Do().Into(result)
 	return
 }
 
 // Delete deletes an existing replication controller.
 func (c *replicationControllers) Delete(name string) error {
-	return c.r.Delete().Namespace(c.ns).Path("replicationControllers").Path(name).Do().Error()
+	return c.r.Delete().Namespace(c.ns).Resource("replicationControllers").Name(name).Do().Error()
 }
 
 // Watch returns a watch.Interface that watches the requested controllers.
-func (c *replicationControllers) Watch(label, field labels.Selector, resourceVersion string) (watch.Interface, error) {
+func (c *replicationControllers) Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
 	return c.r.Get().
+		Prefix("watch").
 		Namespace(c.ns).
-		Path("watch").
-		Path("replicationControllers").
+		Resource("replicationControllers").
 		Param("resourceVersion", resourceVersion).
-		SelectorParam("labels", label).
-		SelectorParam("fields", field).
+		LabelsSelectorParam(label).
+		FieldsSelectorParam(field).
 		Watch()
 }

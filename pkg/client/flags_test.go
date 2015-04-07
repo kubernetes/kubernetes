@@ -18,6 +18,7 @@ package client
 
 import (
 	"testing"
+	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
@@ -57,6 +58,16 @@ func (f *fakeFlagSet) UintVar(p *uint, name string, value uint, usage string) {
 	f.set.Insert(name)
 }
 
+func (f *fakeFlagSet) DurationVar(p *time.Duration, name string, value time.Duration, usage string) {
+	if p == nil {
+		f.t.Errorf("unexpected nil pointer")
+	}
+	if usage == "" {
+		f.t.Errorf("unexpected empty usage")
+	}
+	f.set.Insert(name)
+}
+
 func TestBindClientConfigFlags(t *testing.T) {
 	flags := &fakeFlagSet{t, util.StringSet{}}
 	config := &Config{}
@@ -70,7 +81,7 @@ func TestBindKubeletClientConfigFlags(t *testing.T) {
 	flags := &fakeFlagSet{t, util.StringSet{}}
 	config := &KubeletConfig{}
 	BindKubeletClientConfigFlags(flags, config)
-	if len(flags.set) != 5 {
+	if len(flags.set) != 6 {
 		t.Errorf("unexpected flag set: %#v", flags)
 	}
 }

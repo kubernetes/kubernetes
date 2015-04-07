@@ -29,12 +29,11 @@ import (
 // ProxyServer is a http.Handler which proxies Kubernetes APIs to remote API server.
 type ProxyServer struct {
 	httputil.ReverseProxy
-	Port int
 }
 
 // NewProxyServer creates and installs a new ProxyServer.
 // It automatically registers the created ProxyServer to http.DefaultServeMux.
-func NewProxyServer(filebase string, cfg *client.Config, port int) (*ProxyServer, error) {
+func NewProxyServer(filebase string, apiProxyPrefix string, staticPrefix string, cfg *client.Config) (*ProxyServer, error) {
 	prefix := cfg.Prefix
 	if prefix == "" {
 		prefix = "/api"
@@ -47,14 +46,14 @@ func NewProxyServer(filebase string, cfg *client.Config, port int) (*ProxyServer
 	if proxy.Transport, err = client.TransportFor(cfg); err != nil {
 		return nil, err
 	}
-	http.Handle("/api/", http.StripPrefix("/api/", proxy))
-	http.Handle("/static/", newFileHandler("/static/", filebase))
+	http.Handle(apiProxyPrefix, http.StripPrefix(apiProxyPrefix, proxy))
+	http.Handle(staticPrefix, newFileHandler(staticPrefix, filebase))
 	return proxy, nil
 }
 
-// Serve starts the server (http.DefaultServeMux) on TCP port 8001, loops forever.
-func (s *ProxyServer) Serve() error {
-	addr := fmt.Sprintf(":%d", s.Port)
+// Serve starts the server (http.DefaultServeMux) on given port, loops forever.
+func (s *ProxyServer) Serve(port int) error {
+	addr := fmt.Sprintf(":%d", port)
 	return http.ListenAndServe(addr, nil)
 }
 

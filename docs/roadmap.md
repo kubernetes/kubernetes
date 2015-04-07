@@ -1,65 +1,102 @@
 # Kubernetes Roadmap
 
-Updated August 28, 2014
+Updated Feb 9, 2015
 
-This document is intended to capture the set of features, docs, and patterns that we feel are required to call Kubernetes “feature complete” for a 1.0 release candidate.  This list does not emphasize the bug fixes and stabilization that will be required to take it all the way to production ready.  This is a living document, and is certainly open for discussion.
+This document is intended to capture the set of supported use cases, features,
+docs, and patterns that we feel are required to call Kubernetes “feature
+complete” for a 1.0 release candidate.  This list does not emphasize the bug
+fixes and stabilization that will be required to take it all the way to
+production ready.  This is a living document, and is certainly open for
+discussion.
 
-## APIs
-1. ~~Versioned APIs:  Manage APIs for master components and kubelets with explicit versions, version-specific conversion routines, and component-to-component version checking.~~ **Done**
-2. Component-centric APIs:  Clarify which types belong in each component’s API and which ones are truly common.
-  1. Clarify the role of etcd in the cluster.
-3. Idempotency: Whenever possible APIs must be idempotent.
-4. Container restart policy: Policy for each pod or container stating whether and when it should be restarted upon termination.
-5. Life cycle events/hooks and notifications: Notify containers about what is happening to them.
-6. Re-think the network parts of the API: Find resolution on the the multiple issues around networking.
-  1. ~~Utility of HostPorts in ip-per-pod~~ **Done**
-  2. Services/Links/Portals/Ambassadors
-7. Durable volumes: Provide a model for data that survives some kinds of outages.
-8. Auth[nz] and ACLs: Have a plan for how the API and system will express:
-  1. Identity & authentication
-  2. Authorization & access control
-  3. Cluster subdivision, accounting, & isolation
+## Target workloads
 
-## Factoring and pluggability
-1. ~~Pluggable scheduling: Cleanly separate the scheduler from the apiserver.~~ **Done**
-2. Pluggable naming and discovery: Call-outs or hooks to enable external naming systems.
-3. Pluggable volumes: Allow new kinds of data sources as volumes.
-4. Replication controller: Make replication controller a standalone entity in the master stack.
-5. Pod templates: Proposal to make pod templates a first-class API object, rather than an artifact of replica controller
+Most realistic examples of production services include a load-balanced web
+frontend exposed to the public Internet, with a stateful backend, such as a
+clustered database or key-value store. We will target such workloads for our
+1.0 release.
 
-## Cluster features
-1. ~~Minion death: Cleanly handle the loss of a minion.~~ **Done**
-2. Configure DNS: Provide DNS service for k8s running pods, containers and services. Auto-populate it with the things we know.
-3. Resource requirements and scheduling: Use knowledge of resources available and resources required to do better scheduling.
-4. ~~True IP-per-pod: Get rid of last remnants of shared port spaces for pods.~~ **Done**
-5. IP-per-service: Proposal to make services cleaner.
-6. Basic deployment tools: This includes tools for higher-level deployments configs.
-7. Standard mechanisms for deploying k8s on k8s with a clear strategy for reusing the infrastructure for self-host.
+## APIs and core features
+1. Consistent v1 API
+  - Status: v1beta3 (#1519) is being developed as the release candidate for the v1 API.
+2. Multi-port services for apps which need more than one port on the same portal IP (#1802)
+  - Status: #2585 covers the design.
+3. Nominal services for applications which need one stable IP per pod instance (#260)
+  - Status: #2585 covers some design options.
+4. API input is scrubbed of status fields in favor of a new API to set status (#4248)
+  - Status: in progress
+5. Input validation reporting versioned field names (#2518)
+  - Status: in progress
+6. Error reporting: Report common problems in ways that users can discover
+  - Status:
+7. Event management: Make events usable and useful
+  - Status:
+8. Persistent storage support (#4055)
+  - Status: in progress
+9. Allow nodes to join/leave a cluster (#2303,#2435)
+  - Status: high level [design doc](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/design/clustering.md).
+10. Handle node death
+  - Status: mostly covered by nodes joining/leaving a cluster
+11. Allow live cluster upgrades (#2524)
+  - Status: design in progress
+12. Allow kernel upgrades
+  - Status: mostly covered by nodes joining/leaving a cluster, need demonstration
+13. Allow rolling-updates to fail gracefully (#1353)
+  - Status:
+14. Easy .dockercfg
+  - Status:
+15. Demonstrate cluster stability over time
+  - Status
+16. Kubelet use the kubernetes API to fetch jobs to run (instead of etcd) on supported platforms
+  - Status: DONE
 
-## Node features
-1. Container termination reasons: Capture and report exit codes and other termination reasons.
-2. Garbage collect old container images: Clean up old docker images that consume local disk. Maybe a TTL on images.
-3. Container logs: Expose stdout/stderr from containers without users having to SSH into minions.  Needs a rotation policy to avoid disks getting filled.
-4. Container performance information: Capture and report performance data for each container.
-5. Host log management: Make sure we don't kill nodes with full disks.
+## Reliability and performance
 
-## Global features
-2. Input validation: Stop bad input as early as possible.
-3. Error propagation: Report problems reliably and consistently.
-4. Consistent patterns of usage of IDs and names throughout the system.
-5. Binary release: Repeatable process to produce binaries for release.
+1. Restart system components in case of crash (#2884)
+  - Status: in progress
+2. Scale to 100 nodes (#3876)
+  - Status: in progress
+3. Scale to 30-50 pods (1-2 containers each) per node (#4188)
+  - Status:
+4. Scheduling throughput: 99% of scheduling decisions made in less than 1s on 100 node, 3000 pod cluster; linear time to number of nodes and pods (#3954)
+5. Startup time: 99% of end-to-end pod startup time with prepulled images is less than 5s on 100 node, 3000 pod cluster; linear time to number of nodes and pods (#3952, #3954)
+  - Status:
+6. API performance: 99% of API calls return in less than 1s; constant time to number of nodes and pods (#4521)
+  - Status:
+7. Manage and report disk space on nodes (#4135)
+  - Status: in progress
+8. API test coverage more than 85% in e2e tests
+  - Status:
 
-## Patterns, policies, and specifications
-1. Deprecation policy: Declare the project’s intentions with regards to expiring and removing features and interfaces.
-2. Compatibility policy: Declare the project’s intentions with regards to saved state and live upgrades of components.
-3. Naming/discovery: Demonstrate techniques for common patterns:
-  1. Master-elected services
-  2. DB replicas
-  3. Sharded services
-  4. Worker pools
-4. Health-checking: Specification for how it works and best practices.
-5. Logging: Demonstrate setting up log collection.
-6. ~~Monitoring: Demonstrate setting up cluster monitoring.~~ **Done**
-7. Rolling updates: Demo and best practices for live application upgrades.
-  1. Have a plan for how higher level deployment / update concepts should / should not fit into Kubernetes
-8. Minion requirements: Document the requirements and integrations between kubelet and minion machine environments.
+## Project
+1. Define a deprecation policy for expiring and removing features and interfaces, including the time non-beta APIs will be supported
+  - Status:
+2. Define a version numbering policy regarding point upgrades, support, compat, and release frequency.
+  - Status:
+3. Define an SLO that users can reasonable expect to hit in properly managed clusters
+  - Status:
+4. Accurate and complete API documentation
+  - Status:
+5. Accurate and complete getting-started-guides for supported platforms
+  - Status:
+
+## Platforms
+1. Possible for cloud partners / vendors to self-qualify Kubernetes on their platform.
+  - Status:
+2. Define the set of platforms that are supported by the core team.
+  - Status:
+
+## Beyond 1.0
+
+We acknowledge that there are a great many things that are not included in our 1.0 roadmap.  We intend to document the plans past 1.0 soon, but some of the things that are clearly in scope include:
+
+1. Scalability - more nodes, more pods
+2. HA masters
+3. Monitoring
+4. Authn and authz
+5. Enhanced resource management and isolation
+6. Better performance
+7. Easier plugins and add-ons
+8. More support for jobs that complete (compute, batch)
+9. More platforms
+10. Easier testing

@@ -1,0 +1,28 @@
+{
+  "id": "spark-worker-controller",
+  "kind": "ReplicationController",
+  "apiVersion": "v1beta1",
+  "desiredState": {
+    "replicas": 3,
+    "replicaSelector": {"name": "spark-worker"},
+    "podTemplate": {
+      "desiredState": {
+         "manifest": {
+           "version": "v1beta1",
+           "id": "spark-worker-controller",
+           "containers": [{
+             "name": "spark-worker",
+             "image": "mattf/spark-worker",
+             "cpu": 100,
+             "ports": [{"containerPort": 8888, "hostPort": 8888}]
+           }]
+         }
+      },
+      "labels": {
+        "name": "spark-worker",
+        "uses": "spark-master"
+      }
+    }
+  },
+  "labels": {"name": "spark-worker"}
+}

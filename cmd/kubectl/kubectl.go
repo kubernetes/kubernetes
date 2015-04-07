@@ -18,12 +18,16 @@ package main
 
 import (
 	"os"
+	"runtime"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/cmd"
+	cmdutil "github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/cmd/util"
 )
 
 func main() {
-	clientBuilder := clientcmd.NewBuilder(clientcmd.NewPromptingAuthLoader(os.Stdin))
-	cmd.NewFactory(clientBuilder).Run(os.Stdout)
+	runtime.GOMAXPROCS(runtime.NumCPU())
+	cmd := cmd.NewKubectlCommand(cmdutil.NewFactory(nil), os.Stdin, os.Stdout, os.Stderr)
+	if err := cmd.Execute(); err != nil {
+		os.Exit(1)
+	}
 }

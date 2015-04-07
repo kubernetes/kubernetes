@@ -174,6 +174,18 @@ func (ipa *ipAllocator) AllocateNext() (net.IP, error) {
 	return nil, fmt.Errorf("can't find a free IP in %s", ipa.subnet)
 }
 
+// Returns the index-th IP from the specified subnet range.
+// For example, subnet "10.0.0.0/24" with index "2" will return the IP "10.0.0.2".
+// TODO(saad-ali): Move this (and any other functions that are independent of ipAllocator) to some
+// place more generic.
+func GetIndexedIP(subnet *net.IPNet, index int) (net.IP, error) {
+	ip := ipAdd(subnet.IP, index /* offset */)
+	if !subnet.Contains(ip) {
+		return nil, fmt.Errorf("can't generate IP with index %d from subnet. subnet too small. subnet: %q", index, subnet)
+	}
+	return ip, nil
+}
+
 func (ipa *ipAllocator) createRandomIp() net.IP {
 	ip := ipa.subnet.IP
 	mask := ipa.subnet.Mask

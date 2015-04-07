@@ -7,6 +7,7 @@ import (
 	"reflect"
 	"runtime"
 	"strings"
+	"sync"
 )
 
 // TestingT is an interface wrapper around *testing.T
@@ -60,6 +61,8 @@ type Mock struct {
 	// TestData holds any data that might be useful for testing.  Testify ignores
 	// this data completely allowing you to do whatever you like with it.
 	testData objx.Map
+
+	mutex sync.Mutex
 }
 
 // TestData holds any data that might be useful for testing.  Testify ignores
@@ -178,6 +181,8 @@ func callString(method string, arguments Arguments, includeArgumentValues bool) 
 // of arguments to return.  Panics if the call is unexpected (i.e. not preceeded by
 // appropriate .On .Return() calls)
 func (m *Mock) Called(arguments ...interface{}) Arguments {
+	defer m.mutex.Unlock()
+	m.mutex.Lock()
 
 	// get the calling function's name
 	pc, _, _, ok := runtime.Caller(1)
@@ -296,11 +301,11 @@ func (m *Mock) AssertNotCalled(t TestingT, methodName string, arguments ...inter
 	return true
 }
 
-func (m *Mock) methodWasCalled(methodName string, arguments []interface{}) bool {
+func (m *Mock) methodWasCalled(methodName string, expected []interface{}) bool {
 	for _, call := range m.Calls {
 		if call.Method == methodName {
 
-			_, differences := call.Arguments.Diff(arguments)
+			_, differences := Arguments(expected).Diff(call.Arguments)
 
 			if differences == 0 {
 				// found the expected call
@@ -473,7 +478,7 @@ func (args Arguments) Int(index int) int {
 	var s int
 	var ok bool
 	if s, ok = args.Get(index).(int); !ok {
-		panic(fmt.Sprintf("assert: arguments: Int(%d) failed because object wasn't correct type: %s", index, args.Get(index)))
+		panic(fmt.Sprintf("assert: arguments: Int(%d) failed because object wasn't correct type: %v", index, args.Get(index)))
 	}
 	return s
 }
@@ -488,7 +493,7 @@ func (args Arguments) Error(index int) error {
 		return nil
 	}
 	if s, ok = obj.(error); !ok {
-		panic(fmt.Sprintf("assert: arguments: Error(%d) failed because object wasn't correct type: %s", index, args.Get(index)))
+		panic(fmt.Sprintf("assert: arguments: Error(%d) failed because object wasn't correct type: %v", index, args.Get(index)))
 	}
 	return s
 }
@@ -499,7 +504,7 @@ func (args Arguments) Bool(index int) bool {
 	var s bool
 	var ok bool
 	if s, ok = args.Get(index).(bool); !ok {
-		panic(fmt.Sprintf("assert: arguments: Bool(%d) failed because object wasn't correct type: %s", index, args.Get(index)))
+		panic(fmt.Sprintf("assert: arguments: Bool(%d) failed because object wasn't correct type: %v", index, args.Get(index)))
 	}
 	return s
 }

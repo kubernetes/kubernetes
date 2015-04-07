@@ -17,8 +17,12 @@ limitations under the License.
 package api
 
 import (
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/conversion"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
 // Codec is the identity codec for this package - it can only convert itself
@@ -26,42 +30,81 @@ import (
 var Codec = runtime.CodecFor(Scheme, "")
 
 func init() {
+	Scheme.AddDefaultingFuncs(
+		func(obj *ListOptions) {
+			obj.LabelSelector = labels.Everything()
+			obj.FieldSelector = fields.Everything()
+		},
+	)
 	Scheme.AddConversionFuncs(
-		// Convert ContainerManifest to BoundPod
-		func(in *ContainerManifest, out *BoundPod, s conversion.Scope) error {
+		func(in *util.Time, out *util.Time, s conversion.Scope) error {
+			// Cannot deep copy these, because time.Time has unexported fields.
+			*out = *in
+			return nil
+		},
+		func(in *string, out *labels.Selector, s conversion.Scope) error {
+			selector, err := labels.Parse(*in)
+			if err != nil {
+				return err
+			}
+			*out = selector
+			return nil
+		},
+		func(in *string, out *fields.Selector, s conversion.Scope) error {
+			selector, err := fields.ParseSelector(*in)
+			if err != nil {
+				return err
+			}
+			*out = selector
+			return nil
+		},
+		func(in *labels.Selector, out *string, s conversion.Scope) error {
+			if *in == nil {
+				return nil
+			}
+			*out = (*in).String()
+			return nil
+		},
+		func(in *fields.Selector, out *string, s conversion.Scope) error {
+			if *in == nil {
+				return nil
+			}
+			*out = (*in).String()
+			return nil
+		},
+		func(in *resource.Quantity, out *resource.Quantity, s conversion.Scope) error {
+			// Cannot deep copy these, because inf.Dec has unexported fields.
+			*out = *in.Copy()
+			return nil
+		},
+		// Convert ContainerManifest to Pod
+		func(in *ContainerManifest, out *Pod, s conversion.Scope) error {
 			out.Spec.Containers = in.Containers
 			out.Spec.Volumes = in.Volumes
 			out.Spec.RestartPolicy = in.RestartPolicy
+			out.Spec.DNSPolicy = in.DNSPolicy
 			out.Name = in.ID
 			out.UID = in.UUID
-			// TODO(dchen1107): Move this conversion to pkg/api/v1beta[123]/conversion.go
-			// along with fixing #1502
-			for i := range out.Spec.Containers {
-				ctr := &out.Spec.Containers[i]
-				if len(ctr.TerminationMessagePath) == 0 {
-					ctr.TerminationMessagePath = TerminationMessagePathDefault
-				}
+
+			if in.ID != "" {
+				out.SelfLink = "/api/v1beta1/pods/" + in.ID
 			}
+
 			return nil
 		},
-		func(in *BoundPod, out *ContainerManifest, s conversion.Scope) error {
+		func(in *Pod, out *ContainerManifest, s conversion.Scope) error {
 			out.Containers = in.Spec.Containers
 			out.Volumes = in.Spec.Volumes
 			out.RestartPolicy = in.Spec.RestartPolicy
+			out.DNSPolicy = in.Spec.DNSPolicy
 			out.Version = "v1beta2"
 			out.ID = in.Name
 			out.UUID = in.UID
-			for i := range out.Containers {
-				ctr := &out.Containers[i]
-				if len(ctr.TerminationMessagePath) == 0 {
-					ctr.TerminationMessagePath = TerminationMessagePathDefault
-				}
-			}
 			return nil
 		},
 
 		// ContainerManifestList
-		func(in *ContainerManifestList, out *BoundPods, s conversion.Scope) error {
+		func(in *ContainerManifestList, out *PodList, s conversion.Scope) error {
 			if err := s.Convert(&in.Items, &out.Items, 0); err != nil {
 				return err
 			}
@@ -71,25 +114,11 @@ func init() {
 			}
 			return nil
 		},
-		func(in *BoundPods, out *ContainerManifestList, s conversion.Scope) error {
+		func(in *PodList, out *ContainerManifestList, s conversion.Scope) error {
 			if err := s.Convert(&in.Items, &out.Items, 0); err != nil {
 				return err
 			}
 			out.ResourceVersion = in.ResourceVersion
-			return nil
-		},
-
-		// Convert Pod to BoundPod
-		func(in *Pod, out *BoundPod, s conversion.Scope) error {
-			if err := s.Convert(&in.Spec, &out.Spec, 0); err != nil {
-				return err
-			}
-			// Only copy a subset of fields, and override manifest attributes with the pod
-			// metadata
-			out.UID = in.UID
-			out.Name = in.Name
-			out.Namespace = in.Namespace
-			out.CreationTimestamp = in.CreationTimestamp
 			return nil
 		},
 
@@ -104,6 +133,7 @@ func init() {
 			if err := s.Convert(&in.RestartPolicy, &out.RestartPolicy, 0); err != nil {
 				return err
 			}
+			out.DNSPolicy = in.DNSPolicy
 			out.Version = "v1beta2"
 			return nil
 		},
@@ -117,6 +147,7 @@ func init() {
 			if err := s.Convert(&in.RestartPolicy, &out.RestartPolicy, 0); err != nil {
 				return err
 			}
+			out.DNSPolicy = in.DNSPolicy
 			return nil
 		},
 	)

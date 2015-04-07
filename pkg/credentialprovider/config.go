@@ -25,6 +25,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"github.com/golang/glog"
 )
@@ -40,35 +41,69 @@ type DockerConfigEntry struct {
 	Email    string
 }
 
-const (
-	dockerConfigFileLocation = ".dockercfg"
+var (
+	preferredPathLock sync.Mutex
+	preferredPath     = ""
+	workingDirPath    = ""
+	homeDirPath       = os.Getenv("HOME")
+	rootDirPath       = "/"
+
+	configFileName = ".dockercfg"
 )
 
-func ReadDockerConfigFile() (cfg DockerConfig, err error) {
-	// TODO(mattmoor): This causes the Kubelet to read /.dockercfg,
-	// which is incorrect.  It should come from $HOME/.dockercfg.
-	absDockerConfigFileLocation, err := filepath.Abs(dockerConfigFileLocation)
-	if err != nil {
-		glog.Errorf("while trying to canonicalize %s: %v", dockerConfigFileLocation, err)
-	}
-	absDockerConfigFileLocation, err = filepath.Abs(dockerConfigFileLocation)
-	glog.V(2).Infof("looking for .dockercfg at %s", absDockerConfigFileLocation)
-	contents, err := ioutil.ReadFile(absDockerConfigFileLocation)
-	if os.IsNotExist(err) {
-		return make(DockerConfig), nil
-	}
-	if err != nil {
-		glog.Errorf("while trying to read %s: %v", absDockerConfigFileLocation, err)
-		return nil, err
-	}
+func SetPreferredDockercfgPath(path string) {
+	preferredPathLock.Lock()
+	defer preferredPathLock.Unlock()
+	preferredPath = path
+}
 
-	return readDockerConfigFileFromBytes(contents)
+func GetPreferredDockercfgPath() string {
+	preferredPathLock.Lock()
+	defer preferredPathLock.Unlock()
+	return preferredPath
+}
+
+func ReadDockerConfigFile() (cfg DockerConfig, err error) {
+	dockerConfigFileLocations := []string{GetPreferredDockercfgPath(), workingDirPath, homeDirPath, rootDirPath}
+	for _, configPath := range dockerConfigFileLocations {
+		absDockerConfigFileLocation, err := filepath.Abs(filepath.Join(configPath, configFileName))
+		if err != nil {
+			glog.Errorf("while trying to canonicalize %s: %v", configPath, err)
+			continue
+		}
+		glog.V(4).Infof("looking for .dockercfg at %s", absDockerConfigFileLocation)
+		contents, err := ioutil.ReadFile(absDockerConfigFileLocation)
+		if os.IsNotExist(err) {
+			continue
+		}
+		if err != nil {
+			glog.V(4).Infof("while trying to read %s: %v", absDockerConfigFileLocation, err)
+			continue
+		}
+		cfg, err := readDockerConfigFileFromBytes(contents)
+		if err == nil {
+			glog.V(4).Infof("found .dockercfg at %s", absDockerConfigFileLocation)
+			return cfg, nil
+		}
+	}
+	return nil, fmt.Errorf("couldn't find valid .dockercfg after checking in %v", dockerConfigFileLocations)
+}
+
+// HttpError wraps a non-StatusOK error code as an error.
+type HttpError struct {
+	StatusCode int
+	Url        string
+}
+
+// Error implements error
+func (he *HttpError) Error() string {
+	return fmt.Sprintf("http status code: %d while fetching url %s",
+		he.StatusCode, he.Url)
 }
 
 func ReadUrl(url string, client *http.Client, header *http.Header) (body []byte, err error) {
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
-		glog.Errorf("while creating request to read %s: %v", url, err)
 		return nil, err
 	}
 	if header != nil {
@@ -76,21 +111,20 @@ func ReadUrl(url string, client *http.Client, header *http.Header) (body []byte,
 	}
 	resp, err := client.Do(req)
 	if err != nil {
-		glog.Errorf("while trying to read %s: %v", url, err)
 		return nil, err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		err := fmt.Errorf("http status code: %d while fetching url %s", resp.StatusCode, url)
-		glog.Errorf("while trying to read %s: %v", url, err)
 		glog.V(2).Infof("body of failing http response: %v", resp.Body)
-		return nil, err
+		return nil, &HttpError{
+			StatusCode: resp.StatusCode,
+			Url:        url,
+		}
 	}
 
 	contents, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		glog.Errorf("while trying to read %s: %v", url, err)
 		return nil, err
 	}
 

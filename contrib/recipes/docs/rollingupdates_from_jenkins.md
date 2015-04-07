@@ -42,8 +42,8 @@ Jenkins builds our container, tags it with the build number, and runs a couple r
     chmod +x kubecfg
 
     # Update the controller with your new image!
-    echo "*** ./kubecfg -image \"$REGISTRY_LOCATION$DOCKER_IMAGE:$BUILD_NUMBER\" -u $RESET_INTERVAL rollingupdate $CONTROLLER_NAME"
-    ./kubecfg -image "$REGISTRY_LOCATION$DOCKER_IMAGE:$BUILD_NUMBER" -u $RESET_INTERVAL rollingupdate $CONTROLLER_NAME
+    echo "*** ./kubecfg -image \"$REGISTRY_LOCATION$DOCKER_IMAGE:$BUILD_NUMBER\" -u $RESET_INTERVAL rolling-update $CONTROLLER_NAME"
+    ./kubecfg -image "$REGISTRY_LOCATION$DOCKER_IMAGE:$BUILD_NUMBER" -u $RESET_INTERVAL rolling-update $CONTROLLER_NAME
 ```
 
 Though basic, this implementation allows our Jenkins instance to push container updates to our Kubernetes cluster without much trouble.
