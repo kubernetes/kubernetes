@@ -114,6 +114,8 @@ type VolumeSource struct {
 	// ISCSI represents an ISCSI Disk resource that is attached to a
 	// kubelet's host machine and then exposed to the pod.
 	ISCSI *ISCSIVolumeSource `json:"iscsi" description:"iSCSI disk attached to host machine on demand"`
+	// Glusterfs represents a Glusterfs mount on the host that shares a pod's lifetime
+	Glusterfs *GlusterfsVolumeSource `json:"glusterfs" description:"Glusterfs volume that will be mounted on the host machine "`
 }
 
 // Similar to VolumeSource but meant for the administrator who creates PVs.
@@ -126,6 +128,8 @@ type PersistentVolumeSource struct {
 	// This is useful for development and testing only.
 	// on-host storage is not supported in any way.
 	HostPath *HostPathVolumeSource `json:"hostPath" description:"a HostPath provisioned by a developer or tester; for develment use only"`
+	// Glusterfs represents a Glusterfs volume that is attached to a host and exposed to the pod
+	Glusterfs *GlusterfsVolumeSource `json:"glusterfs" description:"Glusterfs volume resource provisioned by an admin"`
 }
 
 type PersistentVolume struct {
@@ -1504,4 +1508,17 @@ type SecretList struct {
 	TypeMeta `json:",inline"`
 
 	Items []Secret `json:"items" description:"items is a list of secret objects"`
+}
+
+// GlusterfsVolumeSource represents a Glusterfs Mount that lasts the lifetime of a pod
+type GlusterfsVolumeSource struct {
+	// Required: EndpointsName is the endpoint name that details Glusterfs topology
+	EndpointsName string `json:"endpoints" description:"gluster hosts endpoints name"`
+
+	// Required: Path is the Glusterfs volume path
+	Path string `json:"path" description:"path to gluster volume"`
+
+	// Optional: Defaults to false (read/write). ReadOnly here will force
+	// the Glusterfs volume to be mounted with read-only permissions
+	ReadOnly bool `json:"readOnly,omitempty" description:"Glusterfs volume to be mounted with read-only permissions"`
 }

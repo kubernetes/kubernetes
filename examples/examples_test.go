@@ -181,6 +181,9 @@ func TestExampleObjectSchemas(t *testing.T) {
 		"../examples/iscsi/v1beta3": {
 			"iscsi": &api.Pod{},
 		},
+		"../examples/glusterfs/v1beta3": {
+			"glusterfs": &api.Pod{},
+		},
 	}
 
 	for path, expected := range cases {
