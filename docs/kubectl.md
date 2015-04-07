@@ -52,7 +52,7 @@ kubectl
 * [kubectl-delete](kubectl-delete.md)
 * [kubectl-namespace](kubectl-namespace.md)
 * [kubectl-log](kubectl-log.md)
-* [kubectl-rolling-update](kubectl-rolling-update.md)
+* [kubectl-rollingupdate](kubectl-rollingupdate.md)
 * [kubectl-resize](kubectl-resize.md)
 * [kubectl-exec](kubectl-exec.md)
 * [kubectl-port-forward](kubectl-port-forward.md)
