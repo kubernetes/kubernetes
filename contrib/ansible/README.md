@@ -35,7 +35,7 @@ Only the kubernetes daemons:
 
 Only etcd:
 
-    $ ansible-playbootk -i inventory etcd.yml
+    $ ansible-playbook -i inventory etcd.yml
 
 Only flannel:
 
