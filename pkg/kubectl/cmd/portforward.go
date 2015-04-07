@@ -22,7 +22,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/portforward"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/cmd/util"
+	cmdutil "github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/cmd/util"
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
 )
@@ -42,7 +42,7 @@ $ kubectl port-forward -p mypod :5000
 $ kubectl port-forward -p mypod 0:5000`
 )
 
-func (f *Factory) NewCmdPortForward() *cobra.Command {
+func NewCmdPortForward(f *cmdutil.Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "port-forward -p POD [LOCAL_PORT:]REMOTE_PORT [...[LOCAL_PORT_N:]REMOTE_PORT_N]",
 		Short:   "Forward one or more local ports to a pod.",
@@ -50,7 +50,7 @@ func (f *Factory) NewCmdPortForward() *cobra.Command {
 		Example: portforward_example,
 		Run: func(cmd *cobra.Command, args []string) {
 			err := RunPortForward(f, cmd, args)
-			util.CheckErr(err)
+			cmdutil.CheckErr(err)
 		},
 	}
 	cmd.Flags().StringP("pod", "p", "", "Pod name")
@@ -58,14 +58,14 @@ func (f *Factory) NewCmdPortForward() *cobra.Command {
 	return cmd
 }
 
-func RunPortForward(f *Factory, cmd *cobra.Command, args []string) error {
-	podName := util.GetFlagString(cmd, "pod")
+func RunPortForward(f *cmdutil.Factory, cmd *cobra.Command, args []string) error {
+	podName := cmdutil.GetFlagString(cmd, "pod")
 	if len(podName) == 0 {
-		return util.UsageError(cmd, "POD is required for exec")
+		return cmdutil.UsageError(cmd, "POD is required for exec")
 	}
 
 	if len(args) < 1 {
-		return util.UsageError(cmd, "at least 1 PORT is required for port-forward")
+		return cmdutil.UsageError(cmd, "at least 1 PORT is required for port-forward")
 	}
 
 	namespace, err := f.DefaultNamespace()

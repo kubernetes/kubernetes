@@ -28,7 +28,7 @@ func TestExtraArgsFail(t *testing.T) {
 	buf := bytes.NewBuffer([]byte{})
 
 	f, _, _ := NewAPIFactory()
-	c := f.NewCmdCreate(buf)
+	c := NewCmdCreate(f, buf)
 	if ValidateArgs(c, []string{"rc"}) == nil {
 		t.Errorf("unexpected non-error")
 	}
@@ -55,7 +55,7 @@ func TestCreateObject(t *testing.T) {
 	tf.Namespace = "test"
 	buf := bytes.NewBuffer([]byte{})
 
-	cmd := f.NewCmdCreate(buf)
+	cmd := NewCmdCreate(f, buf)
 	cmd.Flags().Set("filename", "../../../examples/guestbook/redis-master-controller.json")
 	cmd.Run(cmd, []string{})
 
@@ -87,7 +87,7 @@ func TestCreateMultipleObject(t *testing.T) {
 	tf.Namespace = "test"
 	buf := bytes.NewBuffer([]byte{})
 
-	cmd := f.NewCmdCreate(buf)
+	cmd := NewCmdCreate(f, buf)
 	cmd.Flags().Set("filename", "../../../examples/guestbook/redis-master-controller.json")
 	cmd.Flags().Set("filename", "../../../examples/guestbook/frontend-service.json")
 	cmd.Run(cmd, []string{})
@@ -121,7 +121,7 @@ func TestCreateDirectory(t *testing.T) {
 	tf.Namespace = "test"
 	buf := bytes.NewBuffer([]byte{})
 
-	cmd := f.NewCmdCreate(buf)
+	cmd := NewCmdCreate(f, buf)
 	cmd.Flags().Set("filename", "../../../examples/guestbook")
 	cmd.Run(cmd, []string{})
 

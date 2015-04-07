@@ -22,7 +22,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/cmd/util"
+	cmdutil "github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/cmd/util"
 	"github.com/spf13/cobra"
 )
 
@@ -42,7 +42,7 @@ $ kubectl expose service nginx --port=443 --target-port=8443 --service-name=ngin
 $ kubectl expose streamer --port=4100 --protocol=udp --service-name=video-stream`
 )
 
-func (f *Factory) NewCmdExposeService(out io.Writer) *cobra.Command {
+func NewCmdExposeService(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "expose RESOURCE NAME --port=port [--protocol=TCP|UDP] [--target-port=number-or-name] [--service-name=name] [--public-ip=ip] [--create-external-load-balancer=bool]",
 		Short:   "Take a replicated application and expose it as Kubernetes Service",
@@ -50,10 +50,10 @@ func (f *Factory) NewCmdExposeService(out io.Writer) *cobra.Command {
 		Example: expose_example,
 		Run: func(cmd *cobra.Command, args []string) {
 			err := RunExpose(f, out, cmd, args)
-			util.CheckErr(err)
+			cmdutil.CheckErr(err)
 		},
 	}
-	util.AddPrinterFlags(cmd)
+	cmdutil.AddPrinterFlags(cmd)
 	cmd.Flags().String("generator", "service/v1", "The name of the API generator to use.  Default is 'service/v1'.")
 	cmd.Flags().String("protocol", "TCP", "The network protocol for the service to be created. Default is 'tcp'.")
 	cmd.Flags().Int("port", -1, "The port that the service should serve on. Required.")
@@ -69,13 +69,13 @@ func (f *Factory) NewCmdExposeService(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func RunExpose(f *Factory, out io.Writer, cmd *cobra.Command, args []string) error {
+func RunExpose(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string) error {
 	var name, resource string
 	switch l := len(args); {
 	case l == 2:
 		resource, name = args[0], args[1]
 	default:
-		return util.UsageError(cmd, "the type and name of a resource to expose are required arguments")
+		return cmdutil.UsageError(cmd, "the type and name of a resource to expose are required arguments")
 	}
 
 	namespace, err := f.DefaultNamespace()
@@ -87,20 +87,20 @@ func RunExpose(f *Factory, out io.Writer, cmd *cobra.Command, args []string) err
 		return err
 	}
 
-	generatorName := util.GetFlagString(cmd, "generator")
+	generatorName := cmdutil.GetFlagString(cmd, "generator")
 
 	generator, found := kubectl.Generators[generatorName]
 	if !found {
-		return util.UsageError(cmd, fmt.Sprintf("generator %q not found.", generator))
+		return cmdutil.UsageError(cmd, fmt.Sprintf("generator %q not found.", generator))
 	}
 	names := generator.ParamNames()
 	params := kubectl.MakeParams(cmd, names)
-	if len(util.GetFlagString(cmd, "service-name")) == 0 {
+	if len(cmdutil.GetFlagString(cmd, "service-name")) == 0 {
 		params["name"] = name
 	} else {
-		params["name"] = util.GetFlagString(cmd, "service-name")
+		params["name"] = cmdutil.GetFlagString(cmd, "service-name")
 	}
-	if s, found := params["selector"]; !found || len(s) == 0 || util.GetFlagInt(cmd, "port") < 1 {
+	if s, found := params["selector"]; !found || len(s) == 0 || cmdutil.GetFlagInt(cmd, "port") < 1 {
 		mapper, _ := f.Object()
 		v, k, err := mapper.VersionAndKindForResource(resource)
 		if err != nil {
@@ -117,21 +117,21 @@ func RunExpose(f *Factory, out io.Writer, cmd *cobra.Command, args []string) err
 			}
 			params["selector"] = s
 		}
-		if util.GetFlagInt(cmd, "port") < 0 {
+		if cmdutil.GetFlagInt(cmd, "port") < 0 {
 			ports, err := f.PortsForResource(mapping, namespace, name)
 			if err != nil {
 				return err
 			}
 			if len(ports) == 0 {
-				return util.UsageError(cmd, "couldn't find a suitable port via --port flag or introspection")
+				return cmdutil.UsageError(cmd, "couldn't find a suitable port via --port flag or introspection")
 			}
 			if len(ports) > 1 {
-				return util.UsageError(cmd, "more than one port to choose from, please explicitly specify a port using the --port flag.")
+				return cmdutil.UsageError(cmd, "more than one port to choose from, please explicitly specify a port using the --port flag.")
 			}
 			params["port"] = ports[0]
 		}
 	}
-	if util.GetFlagBool(cmd, "create-external-load-balancer") {
+	if cmdutil.GetFlagBool(cmd, "create-external-load-balancer") {
 		params["create-external-load-balancer"] = "true"
 	}
 
@@ -145,16 +145,16 @@ func RunExpose(f *Factory, out io.Writer, cmd *cobra.Command, args []string) err
 		return err
 	}
 
-	inline := util.GetFlagString(cmd, "overrides")
+	inline := cmdutil.GetFlagString(cmd, "overrides")
 	if len(inline) > 0 {
-		service, err = util.Merge(service, inline, "Service")
+		service, err = cmdutil.Merge(service, inline, "Service")
 		if err != nil {
 			return err
 		}
 	}
 
 	// TODO: extract this flag to a central location, when such a location exists.
-	if !util.GetFlagBool(cmd, "dry-run") {
+	if !cmdutil.GetFlagBool(cmd, "dry-run") {
 		service, err = client.Services(namespace).Create(service.(*api.Service))
 		if err != nil {
 			return err

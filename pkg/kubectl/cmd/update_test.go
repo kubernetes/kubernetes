@@ -47,7 +47,7 @@ func TestUpdateObject(t *testing.T) {
 	tf.Namespace = "test"
 	buf := bytes.NewBuffer([]byte{})
 
-	cmd := f.NewCmdUpdate(buf)
+	cmd := NewCmdUpdate(f, buf)
 	cmd.Flags().Set("filename", "../../../examples/guestbook/redis-master-controller.json")
 	cmd.Run(cmd, []string{})
 
@@ -83,7 +83,7 @@ func TestUpdateMultipleObject(t *testing.T) {
 	tf.Namespace = "test"
 	buf := bytes.NewBuffer([]byte{})
 
-	cmd := f.NewCmdUpdate(buf)
+	cmd := NewCmdUpdate(f, buf)
 	cmd.Flags().Set("filename", "../../../examples/guestbook/redis-master-controller.json")
 	cmd.Flags().Set("filename", "../../../examples/guestbook/frontend-service.json")
 	cmd.Run(cmd, []string{})
@@ -115,7 +115,7 @@ func TestUpdateDirectory(t *testing.T) {
 	tf.Namespace = "test"
 	buf := bytes.NewBuffer([]byte{})
 
-	cmd := f.NewCmdUpdate(buf)
+	cmd := NewCmdUpdate(f, buf)
 	cmd.Flags().Set("filename", "../../../examples/guestbook")
 	cmd.Flags().Set("namespace", "test")
 	cmd.Run(cmd, []string{})

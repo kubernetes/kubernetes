@@ -44,7 +44,7 @@ $ kubectl stop -f service.json
 $ kubectl stop -f path/to/resources`
 )
 
-func (f *Factory) NewCmdStop(out io.Writer) *cobra.Command {
+func NewCmdStop(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	flags := &struct {
 		Filenames util.StringList
 	}{}

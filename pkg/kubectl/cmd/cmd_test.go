@@ -30,6 +30,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/validation"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl"
+	cmdutil "github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/cmd/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/resource"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 )
@@ -109,14 +110,14 @@ type testFactory struct {
 	Err          error
 }
 
-func NewTestFactory() (*Factory, *testFactory, runtime.Codec) {
+func NewTestFactory() (*cmdutil.Factory, *testFactory, runtime.Codec) {
 	scheme, mapper, codec := newExternalScheme()
 	t := &testFactory{
 		Validator: validation.NullSchema{},
 		Mapper:    mapper,
 		Typer:     scheme,
 	}
-	return &Factory{
+	return &cmdutil.Factory{
 		Object: func() (meta.RESTMapper, runtime.ObjectTyper) {
 			return t.Mapper, t.Typer
 		},
@@ -141,11 +142,11 @@ func NewTestFactory() (*Factory, *testFactory, runtime.Codec) {
 	}, t, codec
 }
 
-func NewAPIFactory() (*Factory, *testFactory, runtime.Codec) {
+func NewAPIFactory() (*cmdutil.Factory, *testFactory, runtime.Codec) {
 	t := &testFactory{
 		Validator: validation.NullSchema{},
 	}
-	return &Factory{
+	return &cmdutil.Factory{
 		Object: func() (meta.RESTMapper, runtime.ObjectTyper) {
 			return latest.RESTMapper, api.Scheme
 		},
@@ -180,7 +181,7 @@ func stringBody(body string) io.ReadCloser {
 
 // Verify that resource.RESTClients constructed from a factory respect mapping.APIVersion
 func TestClientVersions(t *testing.T) {
-	f := NewFactory(nil)
+	f := cmdutil.NewFactory(nil)
 
 	versions := []string{
 		"v1beta1",
@@ -209,7 +210,7 @@ func ExamplePrintReplicationController() {
 		Codec:  codec,
 		Client: nil,
 	}
-	cmd := f.NewCmdRunContainer(os.Stdout)
+	cmd := NewCmdRunContainer(f, os.Stdout)
 	ctrl := &api.ReplicationController{
 		ObjectMeta: api.ObjectMeta{
 			Name:   "foo",

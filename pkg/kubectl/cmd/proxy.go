@@ -22,7 +22,7 @@ import (
 	"strings"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/cmd/util"
+	cmdutil "github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/cmd/util"
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
 )
@@ -36,7 +36,7 @@ $ kubectl proxy --port=8011 --www=./local/www/
 $ kubectl proxy --api-prefix=k8s-api`
 )
 
-func (f *Factory) NewCmdProxy(out io.Writer) *cobra.Command {
+func NewCmdProxy(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "proxy [--port=PORT] [--www=static-dir] [--www-prefix=prefix] [--api-prefix=prefix]",
 		Short:   "Run a proxy to the Kubernetes API server",
@@ -44,7 +44,7 @@ func (f *Factory) NewCmdProxy(out io.Writer) *cobra.Command {
 		Example: proxy_example,
 		Run: func(cmd *cobra.Command, args []string) {
 			err := RunProxy(f, out, cmd)
-			util.CheckErr(err)
+			cmdutil.CheckErr(err)
 		},
 	}
 	cmd.Flags().StringP("www", "w", "", "Also serve static files from the given directory under the specified prefix.")
@@ -54,8 +54,8 @@ func (f *Factory) NewCmdProxy(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func RunProxy(f *Factory, out io.Writer, cmd *cobra.Command) error {
-	port := util.GetFlagInt(cmd, "port")
+func RunProxy(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command) error {
+	port := cmdutil.GetFlagInt(cmd, "port")
 	fmt.Fprintf(out, "Starting to serve on localhost:%d", port)
 
 	clientConfig, err := f.ClientConfig()
@@ -63,16 +63,16 @@ func RunProxy(f *Factory, out io.Writer, cmd *cobra.Command) error {
 		return err
 	}
 
-	staticPrefix := util.GetFlagString(cmd, "www-prefix")
+	staticPrefix := cmdutil.GetFlagString(cmd, "www-prefix")
 	if !strings.HasSuffix(staticPrefix, "/") {
 		staticPrefix += "/"
 	}
 
-	apiProxyPrefix := util.GetFlagString(cmd, "api-prefix")
+	apiProxyPrefix := cmdutil.GetFlagString(cmd, "api-prefix")
 	if !strings.HasSuffix(apiProxyPrefix, "/") {
 		apiProxyPrefix += "/"
 	}
-	server, err := kubectl.NewProxyServer(util.GetFlagString(cmd, "www"), apiProxyPrefix, staticPrefix, clientConfig)
+	server, err := kubectl.NewProxyServer(cmdutil.GetFlagString(cmd, "www"), apiProxyPrefix, staticPrefix, clientConfig)
 	if err != nil {
 		return err
 	}

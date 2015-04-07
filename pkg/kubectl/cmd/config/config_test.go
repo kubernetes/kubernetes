@@ -26,6 +26,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd"
 	clientcmdapi "github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd/api"
+	cmdutil "github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/cmd/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
@@ -618,8 +619,9 @@ func testConfigCommand(args []string, startingConfig clientcmdapi.Config) (strin
 	argsToUse = append(argsToUse, args...)
 
 	buf := bytes.NewBuffer([]byte{})
+	f := cmdutil.NewFactory(nil)
 
-	cmd := NewCmdConfig(buf)
+	cmd := NewCmdConfig(f, buf)
 	cmd.SetArgs(argsToUse)
 	cmd.Execute()
 

@@ -40,7 +40,7 @@ $ cat pod.json | kubectl update -f -
 $ kubectl update pods my-pod --patch='{ "apiVersion": "v1beta1", "desiredState": { "manifest": [{ "cpu": 100 }]}}'`
 )
 
-func (f *Factory) NewCmdUpdate(out io.Writer) *cobra.Command {
+func NewCmdUpdate(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	var filenames util.StringList
 	cmd := &cobra.Command{
 		Use:     "update -f FILENAME",
@@ -57,7 +57,7 @@ func (f *Factory) NewCmdUpdate(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func RunUpdate(f *Factory, out io.Writer, cmd *cobra.Command, args []string, filenames util.StringList) error {
+func RunUpdate(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string, filenames util.StringList) error {
 	schema, err := f.Validator()
 	if err != nil {
 		return err
@@ -117,7 +117,7 @@ func RunUpdate(f *Factory, out io.Writer, cmd *cobra.Command, args []string, fil
 
 }
 
-func updateWithPatch(cmd *cobra.Command, args []string, f *Factory, patch string) (string, error) {
+func updateWithPatch(cmd *cobra.Command, args []string, f *cmdutil.Factory, patch string) (string, error) {
 	cmdNamespace, err := f.DefaultNamespace()
 	if err != nil {
 		return "", err

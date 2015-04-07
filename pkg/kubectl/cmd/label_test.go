@@ -294,7 +294,7 @@ func TestLabelErrors(t *testing.T) {
 		tf.ClientConfig = &client.Config{Version: "v1beta1"}
 
 		buf := bytes.NewBuffer([]byte{})
-		cmd := f.NewCmdLabel(buf)
+		cmd := NewCmdLabel(f, buf)
 		cmd.SetOutput(buf)
 
 		for k, v := range testCase.flags {
@@ -351,7 +351,7 @@ func TestLabelMultipleObjects(t *testing.T) {
 	tf.ClientConfig = &client.Config{Version: "v1beta1"}
 	buf := bytes.NewBuffer([]byte{})
 
-	cmd := f.NewCmdLabel(buf)
+	cmd := NewCmdLabel(f, buf)
 
 	cmd.Flags().Set("all", "true")
 	if err := RunLabel(f, buf, cmd, []string{"pods", "a=b"}); err != nil {
