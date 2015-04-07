@@ -62,12 +62,12 @@ func isVolumeConflict(volume api.Volume, pod *api.Pod) bool {
 		}
 	}
 	if volume.AWSPersistentDisk != nil {
-		pdName := volume.AWSPersistentDisk.PDName
+		volumeId := volume.AWSPersistentDisk.VolumeId
 
 		manifest := &(pod.Spec)
 		for ix := range manifest.Volumes {
 			if manifest.Volumes[ix].AWSPersistentDisk != nil &&
-				manifest.Volumes[ix].AWSPersistentDisk.PDName == pdName {
+				manifest.Volumes[ix].AWSPersistentDisk.VolumeId == volumeId {
 				return true
 			}
 		}

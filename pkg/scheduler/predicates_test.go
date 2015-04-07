@@ -327,7 +327,7 @@ func TestAWSDiskConflicts(t *testing.T) {
 			{
 				VolumeSource: api.VolumeSource{
 					AWSPersistentDisk: &api.AWSPersistentDiskVolumeSource{
-						PDName: "foo",
+						VolumeId: "foo",
 					},
 				},
 			},
@@ -338,7 +338,7 @@ func TestAWSDiskConflicts(t *testing.T) {
 			{
 				VolumeSource: api.VolumeSource{
 					AWSPersistentDisk: &api.AWSPersistentDiskVolumeSource{
-						PDName: "bar",
+						VolumeId: "bar",
 					},
 				},
 			},

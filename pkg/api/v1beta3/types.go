@@ -412,8 +412,8 @@ type GCEPersistentDiskVolumeSource struct {
 // The disk must also be in the same AWS zone as the kubelet.
 // A AWS PD can only be mounted on a single machine.
 type AWSPersistentDiskVolumeSource struct {
-	// Unique name of the PD resource. Used to identify the disk in AWS
-	PDName string `json:"pdName" description:"unique id of the PD resource in AWS"`
+	// Unique id of the PD resource. Used to identify the disk in AWS
+	VolumeId string `json:"volumeId" description:"unique id of the PD resource in AWS"`
 	// Required: Filesystem type to mount.
 	// Must be a filesystem type supported by the host operating system.
 	// Ex. "ext4", "xfs", "ntfs"

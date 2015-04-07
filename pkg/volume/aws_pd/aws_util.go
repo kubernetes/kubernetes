@@ -40,7 +40,7 @@ func (util *AWSDiskUtil) AttachAndMountDisk(pd *awsPersistentDisk, globalPDPath 
 	if pd.readOnly {
 		flags = mount.FlagReadOnly
 	}
-	devicePath, err := volumes.AttachDisk("", pd.pdName, pd.readOnly)
+	devicePath, err := volumes.AttachDisk("", pd.volumeId, pd.readOnly)
 	if err != nil {
 		return err
 	}
@@ -89,7 +89,7 @@ func (util *AWSDiskUtil) AttachAndMountDisk(pd *awsPersistentDisk, globalPDPath 
 // Unmounts the device and detaches the disk from the kubelet's host machine.
 func (util *AWSDiskUtil) DetachDisk(pd *awsPersistentDisk) error {
 	// Unmount the global PD mount, which should be the only one.
-	globalPDPath := makeGlobalPDName(pd.plugin.host, pd.pdName)
+	globalPDPath := makeGlobalPDPath(pd.plugin.host, pd.volumeId)
 	if err := pd.mounter.Unmount(globalPDPath, 0); err != nil {
 		glog.V(2).Info("Error unmount dir ", globalPDPath, ": ", err)
 		return err
@@ -101,11 +101,11 @@ func (util *AWSDiskUtil) DetachDisk(pd *awsPersistentDisk) error {
 	// Detach the disk
 	volumes, err := pd.getVolumeProvider()
 	if err != nil {
-		glog.V(2).Info("Error getting volume provider for pd ", pd.pdName, ": ", err)
+		glog.V(2).Info("Error getting volume provider for volumeId ", pd.volumeId, ": ", err)
 		return err
 	}
-	if err := volumes.DetachDisk("", pd.pdName); err != nil {
-		glog.V(2).Info("Error detaching disk ", pd.pdName, ": ", err)
+	if err := volumes.DetachDisk("", pd.volumeId); err != nil {
+		glog.V(2).Info("Error detaching disk ", pd.volumeId, ": ", err)
 		return err
 	}
 	return nil
@@ -113,7 +113,7 @@ func (util *AWSDiskUtil) DetachDisk(pd *awsPersistentDisk) error {
 
 // safe_format_and_mount is a utility script on AWS VMs that probes a persistent disk, and if
 // necessary formats it before mounting it.
-// This eliminates the necesisty to format a PD before it is used with a Pod on AWS.
+// This eliminates the necessity to format a PD before it is used with a Pod on AWS.
 // TODO: port this script into Go and use it for all Linux platforms
 type awsSafeFormatAndMount struct {
 	mount.Interface

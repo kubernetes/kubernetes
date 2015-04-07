@@ -274,7 +274,7 @@ func testPDPod(diskName, targetHost string, readOnly bool) *api.Pod {
 				Name: "testpd",
 				VolumeSource: api.VolumeSource{
 					AWSPersistentDisk: &api.AWSPersistentDiskVolumeSource{
-						PDName:   diskName,
+						VolumeId: diskName,
 						FSType:   "ext4",
 						ReadOnly: readOnly,
 					},

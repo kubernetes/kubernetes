@@ -77,7 +77,7 @@ func (plugin *awsPersistentDiskPlugin) NewBuilder(spec *api.Volume, podRef *api.
 }
 
 func (plugin *awsPersistentDiskPlugin) newBuilderInternal(spec *api.Volume, podUID types.UID, manager pdManager, mounter mount.Interface) (volume.Builder, error) {
-	pdName := spec.AWSPersistentDisk.PDName
+	volumeId := spec.AWSPersistentDisk.VolumeId
 	fsType := spec.AWSPersistentDisk.FSType
 	partition := ""
 	if spec.AWSPersistentDisk.Partition != 0 {
@@ -88,7 +88,7 @@ func (plugin *awsPersistentDiskPlugin) newBuilderInternal(spec *api.Volume, podU
 	return &awsPersistentDisk{
 		podUID:      podUID,
 		volName:     spec.Name,
-		pdName:      pdName,
+		volumeId:    volumeId,
 		fsType:      fsType,
 		partition:   partition,
 		readOnly:    readOnly,
@@ -128,8 +128,8 @@ type pdManager interface {
 type awsPersistentDisk struct {
 	volName string
 	podUID  types.UID
-	// Unique name of the PD, used to find the disk resource in the provider.
-	pdName string
+	// Unique id of the PD, used to find the disk resource in the provider.
+	volumeId string
 	// Filesystem type, optional.
 	fsType string
 	// Specifies the partition to mount
@@ -183,7 +183,7 @@ func (pd *awsPersistentDisk) SetUpAt(dir string) error {
 		return nil
 	}
 
-	globalPDPath := makeGlobalPDName(pd.plugin.host, pd.pdName)
+	globalPDPath := makeGlobalPDPath(pd.plugin.host, pd.volumeId)
 	if err := pd.manager.AttachAndMountDisk(pd, globalPDPath); err != nil {
 		return err
 	}
@@ -232,14 +232,14 @@ func (pd *awsPersistentDisk) SetUpAt(dir string) error {
 	return nil
 }
 
-func makeGlobalPDName(host volume.VolumeHost, devName string) string {
+func makeGlobalPDPath(host volume.VolumeHost, volumeId string) string {
 	// Clean up the URI to be more fs-friendly
-	name := devName
+	name := volumeId
 	name = strings.Replace(name, "://", "/", -1)
 	return path.Join(host.GetPluginDir(awsPersistentDiskPluginName), "mounts", name)
 }
 
-func getPdNameFromGlobalMount(host volume.VolumeHost, globalPath string) (string, error) {
+func getVolumeIdFromGlobalMount(host volume.VolumeHost, globalPath string) (string, error) {
 	basePath := path.Join(host.GetPluginDir(awsPersistentDiskPluginName), "mounts")
 	rel, err := filepath.Rel(basePath, globalPath)
 	if err != nil {
@@ -248,13 +248,13 @@ func getPdNameFromGlobalMount(host volume.VolumeHost, globalPath string) (string
 	if strings.Contains(rel, "../") {
 		return "", fmt.Errorf("Unexpected mount path: " + globalPath)
 	}
-	// Reverse the :// replacement done in makeGlobalPDName
-	pdName := rel
-	if strings.HasPrefix(pdName, "aws/") {
-		pdName = strings.Replace(pdName, "aws/", "aws://", 1)
+	// Reverse the :// replacement done in makeGlobalPDPath
+	volumeId := rel
+	if strings.HasPrefix(volumeId, "aws/") {
+		volumeId = strings.Replace(volumeId, "aws/", "aws://", 1)
 	}
-	glog.V(2).Info("Mapping mount dir ", globalPath, " to pdName ", pdName)
-	return pdName, nil
+	glog.V(2).Info("Mapping mount dir ", globalPath, " to volumeId ", volumeId)
+	return volumeId, nil
 }
 
 func (pd *awsPersistentDisk) GetPath() string {
@@ -294,14 +294,14 @@ func (pd *awsPersistentDisk) TearDownAt(dir string) error {
 	// If len(refs) is 1, then all bind mounts have been removed, and the
 	// remaining reference is the global mount. It is safe to detach.
 	if len(refs) == 1 {
-		// pd.pdName is not initially set for volume-cleaners, so set it here.
-		pd.pdName, err = getPdNameFromGlobalMount(pd.plugin.host, refs[0])
+		// pd.volumeId is not initially set for volume-cleaners, so set it here.
+		pd.volumeId, err = getVolumeIdFromGlobalMount(pd.plugin.host, refs[0])
 		if err != nil {
-			glog.V(2).Info("Could not determine pdName from mountpoint ", refs[0], ": ", err)
+			glog.V(2).Info("Could not determine volumeId from mountpoint ", refs[0], ": ", err)
 			return err
 		}
 		if err := pd.manager.DetachDisk(pd); err != nil {
-			glog.V(2).Info("Error detaching disk ", pd.pdName, ": ", err)
+			glog.V(2).Info("Error detaching disk ", pd.volumeId, ": ", err)
 			return err
 		}
 	}
