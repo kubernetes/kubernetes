@@ -18,12 +18,15 @@ package dockertools
 
 import (
 	"fmt"
+	"io"
 	"reflect"
 	"sort"
 	"sync"
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
+	kubecontainer "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/fsouza/go-dockerclient"
 )
@@ -32,7 +35,6 @@ import (
 type FakeDockerClient struct {
 	sync.Mutex
 	ContainerList []docker.APIContainers
-	Container     *docker.Container
 	ContainerMap  map[string]*docker.Container
 	Image         *docker.Image
 	Images        []docker.APIImages
@@ -105,7 +107,7 @@ func (f *FakeDockerClient) InspectContainer(id string) (*docker.Container, error
 			return container, f.Err
 		}
 	}
-	return f.Container, f.Err
+	return nil, fmt.Errorf("container not found for id: %q", id)
 }
 
 // InspectImage is a test-spy implementation of DockerInterface.InspectImage.
@@ -137,7 +139,10 @@ func (f *FakeDockerClient) StartContainer(id string, hostConfig *docker.HostConf
 	f.Lock()
 	defer f.Unlock()
 	f.called = append(f.called, "start")
-	f.Container = &docker.Container{
+	if f.ContainerMap == nil {
+		f.ContainerMap = make(map[string]*docker.Container)
+	}
+	f.ContainerMap[id] = &docker.Container{
 		ID:         id,
 		Name:       id, // For testing purpose, we set name to id
 		Config:     &docker.Config{Image: "testimage"},
@@ -274,5 +279,48 @@ func (f *FakeDockerCache) GetPods() ([]*container.Pod, error) {
 }
 
 func (f *FakeDockerCache) ForceUpdateIfOlder(time.Time) error {
+	return nil
+}
+
+type FakeContainerCommandRunner struct {
+	Cmd    []string
+	ID     string
+	E      error
+	Stdin  io.Reader
+	Stdout io.WriteCloser
+	Stderr io.WriteCloser
+	TTY    bool
+	Port   uint16
+	Stream io.ReadWriteCloser
+}
+
+func (f *FakeContainerCommandRunner) RunInContainer(id types.UID, cmd []string) ([]byte, error) {
+	f.Cmd = cmd
+	f.ID = rawContainerID(id)
+	return []byte{}, f.E
+}
+
+func (f *FakeContainerCommandRunner) GetDockerServerVersion() ([]uint, error) {
+	return nil, nil
+}
+
+func (f *FakeContainerCommandRunner) ExecInContainer(id types.UID, cmd []string, in io.Reader, out, err io.WriteCloser, tty bool) error {
+	f.Cmd = cmd
+	f.ID = rawContainerID(id)
+	f.Stdin = in
+	f.Stdout = out
+	f.Stderr = err
+	f.TTY = tty
+	return f.E
+}
+
+func (f *FakeContainerCommandRunner) PortForward(pod *kubecontainer.Pod, port uint16, stream io.ReadWriteCloser) error {
+	podInfraContainer := pod.FindContainerByName(PodInfraContainerName)
+	if podInfraContainer == nil {
+		return fmt.Errorf("cannot find pod infra container in pod %q", kubecontainer.BuildPodFullName(pod.Name, pod.Namespace))
+	}
+	f.ID = rawContainerID(podInfraContainer.ID)
+	f.Port = port
+	f.Stream = stream
 	return nil
 }

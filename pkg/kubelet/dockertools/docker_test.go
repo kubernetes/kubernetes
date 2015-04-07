@@ -62,8 +62,13 @@ func TestGetContainerID(t *testing.T) {
 			Names: []string{"/k8s_bar_qux_ns_2565_42"},
 		},
 	}
-	fakeDocker.Container = &docker.Container{
-		ID: "foobar",
+	fakeDocker.ContainerMap = map[string]*docker.Container{
+		"foobar": {
+			ID: "foobar",
+		},
+		"barbar": {
+			ID: "barbar",
+		},
 	}
 
 	dockerContainers, err := GetKubeletDockerContainers(fakeDocker, false)
@@ -399,7 +404,7 @@ func TestGetRunningContainers(t *testing.T) {
 	containerManager := NewDockerManager(fakeDocker, fakeRecorder)
 	tests := []struct {
 		containers  map[string]*docker.Container
-		inputIDs    []string
+		inputIDs    []types.UID
 		expectedIDs []string
 		err         error
 	}{
@@ -418,7 +423,7 @@ func TestGetRunningContainers(t *testing.T) {
 					},
 				},
 			},
-			inputIDs:    []string{"foobar", "baz"},
+			inputIDs:    []types.UID{DockerPrefix + "foobar", DockerPrefix + "baz"},
 			expectedIDs: []string{"baz"},
 		},
 		{
@@ -436,7 +441,7 @@ func TestGetRunningContainers(t *testing.T) {
 					},
 				},
 			},
-			inputIDs:    []string{"foobar", "baz"},
+			inputIDs:    []types.UID{DockerPrefix + "foobar", DockerPrefix + "baz"},
 			expectedIDs: []string{"foobar", "baz"},
 		},
 		{
@@ -454,7 +459,7 @@ func TestGetRunningContainers(t *testing.T) {
 					},
 				},
 			},
-			inputIDs:    []string{"foobar", "baz"},
+			inputIDs:    []types.UID{DockerPrefix + "foobar", DockerPrefix + "baz"},
 			expectedIDs: []string{},
 		},
 		{
@@ -472,7 +477,7 @@ func TestGetRunningContainers(t *testing.T) {
 					},
 				},
 			},
-			inputIDs: []string{"foobar", "baz"},
+			inputIDs: []types.UID{DockerPrefix + "foobar", DockerPrefix + "baz"},
 			err:      fmt.Errorf("test error"),
 		},
 	}

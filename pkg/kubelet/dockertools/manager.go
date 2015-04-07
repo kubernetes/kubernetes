@@ -30,9 +30,24 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/capabilities"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
 	kubecontainer "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/leaky"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/fsouza/go-dockerclient"
 	"github.com/golang/glog"
+)
+
+const (
+	PodInfraContainerName  = leaky.PodInfraContainerName
+	DockerPrefix           = "docker://"
+	PodInfraContainerImage = "gcr.io/google_containers/pause:0.8.0"
+)
+
+const (
+	// Taken from lmctfy https://github.com/google/lmctfy/blob/master/lmctfy/controllers/cpu_controller.cc
+	minShares     = 2
+	sharesPerCPU  = 1024
+	milliCPUToCPU = 1000
 )
 
 // Implements kubecontainer.ContainerRunner.
@@ -275,13 +290,14 @@ func (self *DockerManager) GetPodStatus(pod *api.Pod) (*api.PodStatus, error) {
 	return &podStatus, nil
 }
 
-func (self *DockerManager) GetRunningContainers(ids []string) ([]*docker.Container, error) {
+func (self *DockerManager) GetRunningContainers(ids []types.UID) ([]*docker.Container, error) {
 	result := []*docker.Container{}
 	if self.client == nil {
 		return nil, fmt.Errorf("unexpected nil docker client.")
 	}
 	for ix := range ids {
-		status, err := self.client.InspectContainer(ids[ix])
+		// TODO(yifan): Move the TrimPrefix work to the container runtime.
+		status, err := self.client.InspectContainer(strings.TrimPrefix(string(ids[ix]), DockerPrefix))
 		if err != nil {
 			return nil, err
 		}
@@ -292,7 +308,7 @@ func (self *DockerManager) GetRunningContainers(ids []string) ([]*docker.Contain
 	return result, nil
 }
 
-func (self *DockerManager) RunContainer(pod *api.Pod, container *api.Container, opts *kubecontainer.RunContainerOptions) (string, error) {
+func (self *DockerManager) RunContainer(pod *api.Pod, container *api.Container, opts *kubecontainer.RunContainerOptions) (types.UID, error) {
 	ref, err := kubecontainer.GenerateContainerRef(pod, container)
 	if err != nil {
 		glog.Errorf("Couldn't make a ref to pod %v, container %v: '%v'", pod.Name, container.Name, err)
@@ -393,7 +409,7 @@ func (self *DockerManager) RunContainer(pod *api.Pod, container *api.Container, 
 	if ref != nil {
 		self.recorder.Eventf(ref, "started", "Started with docker id %v", dockerContainer.ID)
 	}
-	return dockerContainer.ID, nil
+	return types.UID(DockerPrefix + dockerContainer.ID), nil
 }
 
 func setEntrypointAndCommand(container *api.Container, opts *docker.CreateContainerOptions) {
@@ -451,4 +467,41 @@ func makeCapabilites(capAdd []api.CapabilityType, capDrop []api.CapabilityType) 
 		dropCaps = append(dropCaps, string(cap))
 	}
 	return addCaps, dropCaps
+}
+
+// PodInfraContainer returns true if the pod infra container has changed.
+func PodInfraContainerChanged(client DockerInterface, pod *api.Pod, podInfraContainer *kubecontainer.Container) (bool, error) {
+	// Use host networking if specified and allowed.
+	networkMode := ""
+	var ports []api.ContainerPort
+
+	dockerPodInfraContainer, err := client.InspectContainer(strings.TrimPrefix(string(podInfraContainer.ID), DockerPrefix))
+	if err != nil {
+		return false, err
+	}
+
+	// Check network mode.
+	if dockerPodInfraContainer.HostConfig != nil {
+		networkMode = dockerPodInfraContainer.HostConfig.NetworkMode
+	}
+	if pod.Spec.HostNetwork && networkMode != "host" {
+		return true, nil
+	} else {
+		// Docker only exports ports from the pod infra container.  Let's
+		// collect all of the relevant ports and export them.
+		for _, container := range pod.Spec.Containers {
+			ports = append(ports, container.Ports...)
+		}
+	}
+	container := &api.Container{
+		Name:  PodInfraContainerName,
+		Image: PodInfraContainerImage,
+		Ports: ports,
+	}
+
+	expectedHash := HashContainer(container)
+	if podInfraContainer.Hash != expectedHash {
+		return true, nil
+	}
+	return false, nil
 }

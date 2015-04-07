@@ -24,6 +24,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	kubecontainer "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/probe"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/exec"
 
@@ -402,7 +403,7 @@ func TestProbeContainer(t *testing.T) {
 		} else {
 			kl = makeTestKubelet(test.expectedResult, nil)
 		}
-		result, err := kl.probeContainer(&api.Pod{}, api.PodStatus{}, test.testContainer, dc.ID, dc.Created)
+		result, err := kl.probeContainer(&api.Pod{}, api.PodStatus{}, test.testContainer, types.UID(dc.ID), dc.Created)
 		if test.expectError && err == nil {
 			t.Error("Expected error but did no error was returned.")
 		}
@@ -412,8 +413,8 @@ func TestProbeContainer(t *testing.T) {
 		if test.expectedResult != result {
 			t.Errorf("Expected result was %v but probeContainer() returned %v", test.expectedResult, result)
 		}
-		if test.expectedReadiness != kl.readinessManager.GetReadiness(dc.ID) {
-			t.Errorf("Expected readiness was %v but probeContainer() set %v", test.expectedReadiness, kl.readinessManager.GetReadiness(dc.ID))
+		if test.expectedReadiness != kl.readinessManager.GetReadiness(types.UID(dc.ID)) {
+			t.Errorf("Expected readiness was %v but probeContainer() set %v", test.expectedReadiness, kl.readinessManager.GetReadiness(types.UID(dc.ID)))
 		}
 	}
 }

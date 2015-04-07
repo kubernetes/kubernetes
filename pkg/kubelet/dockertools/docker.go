@@ -31,24 +31,11 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/credentialprovider"
 	kubecontainer "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/leaky"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/docker/docker/pkg/parsers"
 	docker "github.com/fsouza/go-dockerclient"
 	"github.com/golang/glog"
-)
-
-const (
-	PodInfraContainerName = leaky.PodInfraContainerName
-	DockerPrefix          = "docker://"
-)
-
-const (
-	// Taken from lmctfy https://github.com/google/lmctfy/blob/master/lmctfy/controllers/cpu_controller.cc
-	minShares     = 2
-	sharesPerCPU  = 1024
-	milliCPUToCPU = 1000
 )
 
 // DockerInterface is an abstract interface for testability.  It abstracts the interface of docker.Client.
@@ -173,18 +160,18 @@ func (d *dockerContainerCommandRunner) runInContainerUsingNsinit(containerID str
 }
 
 // RunInContainer uses nsinit to run the command inside the container identified by containerID
-// TODO(yifan): Use strong type for containerID.
-func (d *dockerContainerCommandRunner) RunInContainer(containerID string, cmd []string) ([]byte, error) {
+func (d *dockerContainerCommandRunner) RunInContainer(containerID types.UID, cmd []string) ([]byte, error) {
+	id := rawContainerID(containerID)
 	// If native exec support does not exist in the local docker daemon use nsinit.
 	useNativeExec, err := d.nativeExecSupportExists()
 	if err != nil {
 		return nil, err
 	}
 	if !useNativeExec {
-		return d.runInContainerUsingNsinit(containerID, cmd)
+		return d.runInContainerUsingNsinit(id, cmd)
 	}
 	createOpts := docker.CreateExecOptions{
-		Container:    containerID,
+		Container:    id,
 		Cmd:          cmd,
 		AttachStdin:  false,
 		AttachStdout: true,
@@ -218,9 +205,8 @@ func (d *dockerContainerCommandRunner) RunInContainer(containerID string, cmd []
 //  - match cgroups of container
 //  - should we support `docker exec`?
 //  - should we support nsenter in a container, running with elevated privs and --pid=host?
-//  - use strong type for containerId
-func (d *dockerContainerCommandRunner) ExecInContainer(containerId string, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool) error {
-	container, err := d.client.InspectContainer(containerId)
+func (d *dockerContainerCommandRunner) ExecInContainer(containerID types.UID, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool) error {
+	container, err := d.client.InspectContainer(rawContainerID(containerID))
 	if err != nil {
 		return err
 	}
@@ -310,7 +296,7 @@ func (d *dockerContainerCommandRunner) PortForward(pod *kubecontainer.Pod, port 
 	if podInfraContainer == nil {
 		return fmt.Errorf("cannot find pod infra container in pod %q", kubecontainer.BuildPodFullName(pod.Name, pod.Namespace))
 	}
-	container, err := d.client.InspectContainer(string(podInfraContainer.ID))
+	container, err := d.client.InspectContainer(rawContainerID(podInfraContainer.ID))
 	if err != nil {
 		return err
 	}
@@ -535,9 +521,9 @@ func ConnectToDockerOrDie(dockerEndpoint string) DockerInterface {
 
 // TODO(yifan): Move this to container.Runtime.
 type ContainerCommandRunner interface {
-	RunInContainer(containerID string, cmd []string) ([]byte, error)
+	RunInContainer(containerID types.UID, cmd []string) ([]byte, error)
 	GetDockerServerVersion() ([]uint, error)
-	ExecInContainer(containerID string, cmd []string, in io.Reader, out, err io.WriteCloser, tty bool) error
+	ExecInContainer(containerID types.UID, cmd []string, in io.Reader, out, err io.WriteCloser, tty bool) error
 	PortForward(pod *kubecontainer.Pod, port uint16, stream io.ReadWriteCloser) error
 }
 
@@ -617,7 +603,7 @@ func GetPods(client DockerInterface, all bool) ([]*kubecontainer.Pod, error) {
 			pods[dockerName.PodUID] = pod
 		}
 		pod.Containers = append(pod.Containers, &kubecontainer.Container{
-			ID:      types.UID(c.ID),
+			ID:      types.UID(DockerPrefix + c.ID),
 			Name:    dockerName.ContainerName,
 			Hash:    hash,
 			Created: c.Created,
@@ -629,4 +615,8 @@ func GetPods(client DockerInterface, all bool) ([]*kubecontainer.Pod, error) {
 		result = append(result, c)
 	}
 	return result, nil
+}
+
+func rawContainerID(containerID types.UID) string {
+	return strings.TrimPrefix(string(containerID), DockerPrefix)
 }
