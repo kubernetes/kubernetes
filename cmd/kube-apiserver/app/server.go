@@ -46,14 +46,14 @@ import (
 
 // APIServer runs a kubernetes api server.
 type APIServer struct {
-	WideOpenPort               int
-	ExternalHost               string
-	Address                    util.IP
-	PublicAddressOverride      util.IP
+	InsecureBindAddress        util.IP
+	InsecurePort               int
+	BindAddress                util.IP
 	ReadOnlyPort               int
+	SecurePort                 int
+	ExternalHost               string
 	APIRate                    float32
 	APIBurst                   int
-	SecurePort                 int
 	TLSCertFile                string
 	TLSPrivateKeyFile          string
 	APIPrefix                  string
@@ -85,13 +85,13 @@ type APIServer struct {
 // NewAPIServer creates a new APIServer object with default parameters
 func NewAPIServer() *APIServer {
 	s := APIServer{
-		WideOpenPort:           8080,
-		Address:                util.IP(net.ParseIP("127.0.0.1")),
-		PublicAddressOverride:  util.IP(net.ParseIP("")),
+		InsecurePort:           8080,
+		InsecureBindAddress:    util.IP(net.ParseIP("127.0.0.1")),
+		BindAddress:            util.IP(net.ParseIP("0.0.0.0")),
 		ReadOnlyPort:           7080,
+		SecurePort:             6443,
 		APIRate:                10.0,
 		APIBurst:               200,
-		SecurePort:             6443,
 		APIPrefix:              "/api",
 		EventTTL:               1 * time.Hour,
 		AuthorizationMode:      "AlwaysAllow",
@@ -115,24 +115,29 @@ func NewAPIServer() *APIServer {
 func (s *APIServer) AddFlags(fs *pflag.FlagSet) {
 	// Note: the weird ""+ in below lines seems to be the only way to get gofmt to
 	// arrange these text blocks sensibly. Grrr.
-	fs.IntVar(&s.WideOpenPort, "port", s.WideOpenPort, ""+
-		"The port to listen on. Default 8080. It is assumed that firewall rules are "+
-		"set up such that this port is not reachable from outside of the cluster. It is "+
-		"further assumed that port 443 on the cluster's public address is proxied to this "+
+	fs.IntVar(&s.InsecurePort, "insecure_port", s.InsecurePort, ""+
+		"The port on which to serve unsecured, unauthenticated access. Default 8080. It is assumed "+
+		"that firewall rules are set up such that this port is not reachable from outside of "+
+		"the cluster and that port 443 on the cluster's public address is proxied to this "+
 		"port. This is performed by nginx in the default setup.")
-	fs.Var(&s.Address, "address", "The IP address on to serve on (set to 0.0.0.0 for all interfaces)")
-	fs.Var(&s.PublicAddressOverride, "public_address_override", "Public serving address."+
-		"Read only port will be opened on this address, and it is assumed that port "+
-		"443 at this address will be proxied/redirected to '-address':'-port'. If "+
-		"blank, the address in the first listed interface will be used.")
+	fs.IntVar(&s.InsecurePort, "port", s.InsecurePort, "DEPRECATED: see --insecure_port instead")
+	fs.Var(&s.InsecureBindAddress, "insecure_bind_address", ""+
+		"The IP address on which to serve the --insecure_port (set to 0.0.0.0 for all interfaces). "+
+		"Defaults to localhost.")
+	fs.Var(&s.InsecureBindAddress, "address", "DEPRECATED: see --insecure_bind_address instead")
+	fs.Var(&s.BindAddress, "bind_address", ""+
+		"The IP address on which to serve the --read_only_port and --secure_port ports. This "+
+		"address must be reachable by the rest of the cluster. If blank, all interfaces will be used.")
+	fs.Var(&s.BindAddress, "public_address_override", "DEPRECATED: see --bind_address instead")
 	fs.IntVar(&s.ReadOnlyPort, "read_only_port", s.ReadOnlyPort, ""+
-		"The port from which to serve read-only resources. If 0, don't serve on a "+
-		"read-only address. It is assumed that firewall rules are set up such that "+
-		"this port is not reachable from outside of the cluster.")
+		"The port on which to serve read-only resources. If 0, don't serve read-only "+
+		"at all. It is assumed that firewall rules are set up such that this port is "+
+		"not reachable from outside of the cluster.")
+	fs.IntVar(&s.SecurePort, "secure_port", s.SecurePort, ""+
+		"The port on which to serve HTTPS with authentication and authorization. If 0, "+
+		"don't serve HTTPS at all.")
 	fs.Float32Var(&s.APIRate, "api_rate", s.APIRate, "API rate limit as QPS for the read only port")
 	fs.IntVar(&s.APIBurst, "api_burst", s.APIBurst, "API burst amount for the read only port")
-	fs.IntVar(&s.SecurePort, "secure_port", s.SecurePort,
-		"The port from which to serve HTTPS with authentication and authorization. If 0, don't serve HTTPS ")
 	fs.StringVar(&s.TLSCertFile, "tls_cert_file", s.TLSCertFile, ""+
 		"File containing x509 Certificate for HTTPS.  (CA cert, if any, concatenated after server cert). "+
 		"If HTTPS serving is enabled, and --tls_cert_file and --tls_private_key_file are not provided, "+
@@ -214,7 +219,7 @@ func (s *APIServer) Run(_ []string) error {
 
 	// TODO: expose same flags as client.BindClientConfigFlags but for a server
 	clientConfig := &client.Config{
-		Host:    net.JoinHostPort(s.Address.String(), strconv.Itoa(s.WideOpenPort)),
+		Host:    net.JoinHostPort(s.InsecureBindAddress.String(), strconv.Itoa(s.InsecurePort)),
 		Version: s.StorageVersion,
 	}
 	client, err := client.New(clientConfig)
@@ -281,7 +286,7 @@ func (s *APIServer) Run(_ []string) error {
 		CorsAllowedOriginList:  s.CorsAllowedOriginList,
 		ReadOnlyPort:           s.ReadOnlyPort,
 		ReadWritePort:          s.SecurePort,
-		PublicAddress:          net.IP(s.PublicAddressOverride),
+		PublicAddress:          net.IP(s.BindAddress),
 		Authenticator:          authenticator,
 		Authorizer:             authorizer,
 		AdmissionControl:       admissionController,
@@ -295,13 +300,13 @@ func (s *APIServer) Run(_ []string) error {
 	// We serve on 3 ports.  See docs/accessing_the_api.md
 	roLocation := ""
 	if s.ReadOnlyPort != 0 {
-		roLocation = net.JoinHostPort(config.PublicAddress.String(), strconv.Itoa(s.ReadOnlyPort))
+		roLocation = net.JoinHostPort(s.BindAddress.String(), strconv.Itoa(s.ReadOnlyPort))
 	}
 	secureLocation := ""
 	if s.SecurePort != 0 {
-		secureLocation = net.JoinHostPort(config.PublicAddress.String(), strconv.Itoa(s.SecurePort))
+		secureLocation = net.JoinHostPort(s.BindAddress.String(), strconv.Itoa(s.SecurePort))
 	}
-	wideOpenLocation := net.JoinHostPort(s.Address.String(), strconv.Itoa(s.WideOpenPort))
+	insecureLocation := net.JoinHostPort(s.InsecureBindAddress.String(), strconv.Itoa(s.InsecurePort))
 
 	// See the flag commentary to understand our assumptions when opening the read-only and read-write ports.
 
@@ -381,13 +386,13 @@ func (s *APIServer) Run(_ []string) error {
 	}
 
 	http := &http.Server{
-		Addr:           wideOpenLocation,
+		Addr:           insecureLocation,
 		Handler:        apiserver.RecoverPanics(m.InsecureHandler),
 		ReadTimeout:    5 * time.Minute,
 		WriteTimeout:   5 * time.Minute,
 		MaxHeaderBytes: 1 << 20,
 	}
-	glog.Infof("Serving insecurely on %s", wideOpenLocation)
+	glog.Infof("Serving insecurely on %s", insecureLocation)
 	glog.Fatal(http.ListenAndServe())
 	return nil
 }
