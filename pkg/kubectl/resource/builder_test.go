@@ -31,6 +31,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/errors"
@@ -364,9 +365,10 @@ func TestResourceByNameAndEmptySelector(t *testing.T) {
 
 func TestSelector(t *testing.T) {
 	pods, svc := testData()
+	labelKey := api.LabelSelectorQueryParam(testapi.Version())
 	b := NewBuilder(latest.RESTMapper, api.Scheme, fakeClientWith(t, map[string]string{
-		"/namespaces/test/pods?labels=a%3Db":     runtime.EncodeOrDie(latest.Codec, pods),
-		"/namespaces/test/services?labels=a%3Db": runtime.EncodeOrDie(latest.Codec, svc),
+		"/namespaces/test/pods?" + labelKey + "=a%3Db":     runtime.EncodeOrDie(latest.Codec, pods),
+		"/namespaces/test/services?" + labelKey + "=a%3Db": runtime.EncodeOrDie(latest.Codec, svc),
 	})).
 		SelectorParam("a=b").
 		NamespaceParam("test").
@@ -576,8 +578,9 @@ func TestSingularObject(t *testing.T) {
 
 func TestListObject(t *testing.T) {
 	pods, _ := testData()
+	labelKey := api.LabelSelectorQueryParam(testapi.Version())
 	b := NewBuilder(latest.RESTMapper, api.Scheme, fakeClientWith(t, map[string]string{
-		"/namespaces/test/pods?labels=a%3Db": runtime.EncodeOrDie(latest.Codec, pods),
+		"/namespaces/test/pods?" + labelKey + "=a%3Db": runtime.EncodeOrDie(latest.Codec, pods),
 	})).
 		SelectorParam("a=b").
 		NamespaceParam("test").
@@ -608,9 +611,10 @@ func TestListObject(t *testing.T) {
 
 func TestListObjectWithDifferentVersions(t *testing.T) {
 	pods, svc := testData()
+	labelKey := api.LabelSelectorQueryParam(testapi.Version())
 	obj, err := NewBuilder(latest.RESTMapper, api.Scheme, fakeClientWith(t, map[string]string{
-		"/namespaces/test/pods?labels=a%3Db":     runtime.EncodeOrDie(latest.Codec, pods),
-		"/namespaces/test/services?labels=a%3Db": runtime.EncodeOrDie(latest.Codec, svc),
+		"/namespaces/test/pods?" + labelKey + "=a%3Db":     runtime.EncodeOrDie(latest.Codec, pods),
+		"/namespaces/test/services?" + labelKey + "=a%3Db": runtime.EncodeOrDie(latest.Codec, svc),
 	})).
 		SelectorParam("a=b").
 		NamespaceParam("test").

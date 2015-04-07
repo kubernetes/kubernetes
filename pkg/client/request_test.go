@@ -47,10 +47,13 @@ import (
 )
 
 func TestRequestWithErrorWontChange(t *testing.T) {
-	original := Request{err: errors.New("test")}
+	original := Request{
+		err:        errors.New("test"),
+		apiVersion: testapi.Version(),
+	}
 	r := original
 	changed := r.Param("foo", "bar").
-		LabelsSelectorParam(api.LabelSelectorQueryParam(testapi.Version()), labels.Set{"a": "b"}.AsSelector()).
+		LabelsSelectorParam(labels.Set{"a": "b"}.AsSelector()).
 		UintParam("uint", 1).
 		AbsPath("/abs").
 		Prefix("test").
@@ -749,7 +752,7 @@ func TestDoRequestNewWayReader(t *testing.T) {
 		Resource("bar").
 		Name("baz").
 		Prefix("foo").
-		LabelsSelectorParam(api.LabelSelectorQueryParam(c.APIVersion()), labels.Set{"name": "foo"}.AsSelector()).
+		LabelsSelectorParam(labels.Set{"name": "foo"}.AsSelector()).
 		Timeout(time.Second).
 		Body(bytes.NewBuffer(reqBodyExpected)).
 		Do().Get()
@@ -789,7 +792,7 @@ func TestDoRequestNewWayObj(t *testing.T) {
 		Suffix("baz").
 		Name("bar").
 		Resource("foo").
-		LabelsSelectorParam(api.LabelSelectorQueryParam(c.APIVersion()), labels.Set{"name": "foo"}.AsSelector()).
+		LabelsSelectorParam(labels.Set{"name": "foo"}.AsSelector()).
 		Timeout(time.Second).
 		Body(reqObj).
 		Do().Get()

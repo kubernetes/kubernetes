@@ -62,8 +62,8 @@ func (c *namespaces) List(label labels.Selector, field fields.Selector) (*api.Na
 	result := &api.NamespaceList{}
 	err := c.r.Get().
 		Resource("namespaces").
-		LabelsSelectorParam(api.LabelSelectorQueryParam(c.r.APIVersion()), label).
-		FieldsSelectorParam(api.FieldSelectorQueryParam(c.r.APIVersion()), field).
+		LabelsSelectorParam(label).
+		FieldsSelectorParam(field).
 		Do().Into(result)
 	return result, err
 }
@@ -119,7 +119,7 @@ func (c *namespaces) Watch(label labels.Selector, field fields.Selector, resourc
 		Prefix("watch").
 		Resource("namespaces").
 		Param("resourceVersion", resourceVersion).
-		LabelsSelectorParam(api.LabelSelectorQueryParam(c.r.APIVersion()), label).
-		FieldsSelectorParam(api.FieldSelectorQueryParam(c.r.APIVersion()), field).
+		LabelsSelectorParam(label).
+		FieldsSelectorParam(field).
 		Watch()
 }

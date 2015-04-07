@@ -28,6 +28,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -280,7 +281,7 @@ func TestGetMultipleTypeObjectsWithSelector(t *testing.T) {
 	tf.Client = &client.FakeRESTClient{
 		Codec: codec,
 		Client: client.HTTPClientFunc(func(req *http.Request) (*http.Response, error) {
-			if req.URL.Query().Get("labels") != "a=b" {
+			if req.URL.Query().Get(api.LabelSelectorQueryParam(testapi.Version())) != "a=b" {
 				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 			}
 			switch req.URL.Path {
@@ -412,7 +413,7 @@ func TestWatchSelector(t *testing.T) {
 	tf.Client = &client.FakeRESTClient{
 		Codec: codec,
 		Client: client.HTTPClientFunc(func(req *http.Request) (*http.Response, error) {
-			if req.URL.Query().Get("labels") != "a=b" {
+			if req.URL.Query().Get(api.LabelSelectorQueryParam(testapi.Version())) != "a=b" {
 				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 			}
 			switch req.URL.Path {

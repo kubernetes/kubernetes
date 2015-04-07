@@ -56,7 +56,7 @@ func newResourceQuotas(c *Client, namespace string) *resourceQuotas {
 // List takes a selector, and returns the list of resourceQuotas that match that selector.
 func (c *resourceQuotas) List(selector labels.Selector) (result *api.ResourceQuotaList, err error) {
 	result = &api.ResourceQuotaList{}
-	err = c.r.Get().Namespace(c.ns).Resource("resourceQuotas").LabelsSelectorParam(api.LabelSelectorQueryParam(c.r.APIVersion()), selector).Do().Into(result)
+	err = c.r.Get().Namespace(c.ns).Resource("resourceQuotas").LabelsSelectorParam(selector).Do().Into(result)
 	return
 }
 
@@ -100,7 +100,7 @@ func (c *resourceQuotas) Watch(label labels.Selector, field fields.Selector, res
 		Namespace(c.ns).
 		Resource("resourceQuotas").
 		Param("resourceVersion", resourceVersion).
-		LabelsSelectorParam(api.LabelSelectorQueryParam(c.r.APIVersion()), label).
-		FieldsSelectorParam(api.FieldSelectorQueryParam(c.r.APIVersion()), field).
+		LabelsSelectorParam(label).
+		FieldsSelectorParam(field).
 		Watch()
 }

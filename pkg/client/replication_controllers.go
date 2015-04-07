@@ -52,7 +52,7 @@ func newReplicationControllers(c *Client, namespace string) *replicationControll
 // List takes a selector, and returns the list of replication controllers that match that selector.
 func (c *replicationControllers) List(selector labels.Selector) (result *api.ReplicationControllerList, err error) {
 	result = &api.ReplicationControllerList{}
-	err = c.r.Get().Namespace(c.ns).Resource("replicationControllers").LabelsSelectorParam(api.LabelSelectorQueryParam(c.r.APIVersion()), selector).Do().Into(result)
+	err = c.r.Get().Namespace(c.ns).Resource("replicationControllers").LabelsSelectorParam(selector).Do().Into(result)
 	return
 }
 
@@ -89,7 +89,7 @@ func (c *replicationControllers) Watch(label labels.Selector, field fields.Selec
 		Namespace(c.ns).
 		Resource("replicationControllers").
 		Param("resourceVersion", resourceVersion).
-		LabelsSelectorParam(api.LabelSelectorQueryParam(c.r.APIVersion()), label).
-		FieldsSelectorParam(api.FieldSelectorQueryParam(c.r.APIVersion()), field).
+		LabelsSelectorParam(label).
+		FieldsSelectorParam(field).
 		Watch()
 }

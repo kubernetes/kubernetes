@@ -101,7 +101,7 @@ func (c *nodes) Watch(label labels.Selector, field fields.Selector, resourceVers
 		Namespace(api.NamespaceAll).
 		Resource(c.resourceName()).
 		Param("resourceVersion", resourceVersion).
-		LabelsSelectorParam(api.LabelSelectorQueryParam(c.r.APIVersion()), label).
-		FieldsSelectorParam(api.FieldSelectorQueryParam(c.r.APIVersion()), field).
+		LabelsSelectorParam(label).
+		FieldsSelectorParam(field).
 		Watch()
 }
