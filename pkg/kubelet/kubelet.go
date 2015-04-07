@@ -1030,9 +1030,8 @@ func (kl *Kubelet) shouldContainerBeRestarted(container *api.Container, pod *api
 				return false
 			}
 		}
-		return true
 	}
-	return false
+	return true
 }
 
 // Finds an infra container for a pod given by podFullName and UID in dockerContainers. If there is an infra container
@@ -1112,13 +1111,6 @@ func (kl *Kubelet) computePodContainerChanges(pod *api.Pod, runningPod kubeconta
 	containersToStart := make(map[int]empty)
 	containersToKeep := make(map[dockertools.DockerID]int)
 	createPodInfraContainer := false
-	var podStatus api.PodStatus
-
-	podStatus, err := kl.GetPodStatus(podFullName)
-	if err != nil {
-		glog.Errorf("Unable to get pod with name %q and uid %q info with error(%v)", podFullName, uid, err)
-		return podContainerChangesSpec{}, nil
-	}
 
 	var podInfraContainerID dockertools.DockerID
 	podInfraContainer := runningPod.FindContainerByName(dockertools.PodInfraContainerName)
@@ -1130,6 +1122,12 @@ func (kl *Kubelet) computePodContainerChanges(pod *api.Pod, runningPod kubeconta
 	} else {
 		glog.V(2).Infof("No Infra Container for %q found. All containers will be restarted.", podFullName)
 		createPodInfraContainer = true
+	}
+
+	podStatus, err := kl.GetPodStatus(podFullName)
+	if err != nil {
+		glog.Errorf("Unable to get pod with name %q and uid %q info with error(%v)", podFullName, uid, err)
+		return podContainerChangesSpec{}, err
 	}
 
 	for index, container := range pod.Spec.Containers {

@@ -512,7 +512,7 @@ func TestSyncPodsWithTerminationLog(t *testing.T) {
 	}
 	waitGroup.Wait()
 	verifyCalls(t, fakeDocker, []string{
-		"list", "list", "create", "start", "inspect_container", "create", "start", "list", "inspect_container", "inspect_container"})
+		"list", "list", "list", "create", "start", "inspect_container", "create", "start", "list", "inspect_container", "inspect_container"})
 
 	fakeDocker.Lock()
 	parts := strings.Split(fakeDocker.Container.HostConfig.Binds[0], ":")
@@ -564,7 +564,7 @@ func TestSyncPodsCreatesNetAndContainer(t *testing.T) {
 	waitGroup.Wait()
 
 	verifyCalls(t, fakeDocker, []string{
-		"list", "list", "create", "start", "inspect_container", "create", "start", "list", "inspect_container", "inspect_container"})
+		"list", "list", "list", "create", "start", "inspect_container", "create", "start", "list", "inspect_container", "inspect_container"})
 
 	fakeDocker.Lock()
 
@@ -619,7 +619,7 @@ func TestSyncPodsCreatesNetAndContainerPullsImage(t *testing.T) {
 	waitGroup.Wait()
 
 	verifyCalls(t, fakeDocker, []string{
-		"list", "list", "create", "start", "inspect_container", "create", "start", "list", "inspect_container", "inspect_container"})
+		"list", "list", "list", "create", "start", "inspect_container", "create", "start", "list", "inspect_container", "inspect_container"})
 
 	fakeDocker.Lock()
 
@@ -801,7 +801,13 @@ func TestSyncPodsDeletesWithNoPodInfraContainer(t *testing.T) {
 	waitGroup.Wait()
 
 	verifyUnorderedCalls(t, fakeDocker, []string{
-		"list", "list", "list", "list", "inspect_container", "inspect_container", "list", "inspect_container", "inspect_container", "stop", "create", "start", "inspect_container", "create", "start", "list", "inspect_container", "inspect_container"})
+		"list",
+		// foo1
+		"list", "list", "inspect_container", "stop", "create", "start", "inspect_container", "create", "start", "list", "inspect_container", "inspect_container",
+
+		// foo2
+		"list", "list", "inspect_container", "inspect_container", "list", "inspect_container", "inspect_container",
+	})
 
 	// A map iteration is used to delete containers, so must not depend on
 	// order here.
@@ -1649,8 +1655,8 @@ func TestSyncPodsWithPullPolicy(t *testing.T) {
 	puller.HasImages = []string{"existing_one", "want:latest"}
 	kubelet.podInfraContainerImage = "custom_image_name"
 	fakeDocker.ContainerList = []docker.APIContainers{}
-	waitGroup.Add(1)
-	err := kubelet.SyncPods([]api.Pod{
+
+	pods := []api.Pod{
 		{
 			ObjectMeta: api.ObjectMeta{
 				UID:       "12345678",
@@ -1667,7 +1673,10 @@ func TestSyncPodsWithPullPolicy(t *testing.T) {
 				},
 			},
 		},
-	}, emptyPodUIDs, map[string]api.Pod{}, time.Now())
+	}
+	kubelet.podManager.SetPods(pods)
+	waitGroup.Add(1)
+	err := kubelet.SyncPods(pods, emptyPodUIDs, map[string]api.Pod{}, time.Now())
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -3442,6 +3451,7 @@ func TestHostNetworkAllowed(t *testing.T) {
 			HostNetwork: true,
 		},
 	}
+	kubelet.podManager.SetPods([]api.Pod{*pod})
 	err := kubelet.syncPod(pod, nil, container.Pod{})
 	if err != nil {
 		t.Errorf("expected pod infra creation to succeed: %v", err)
