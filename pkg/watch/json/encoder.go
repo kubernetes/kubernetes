@@ -25,7 +25,7 @@ import (
 )
 
 // Encoder implements the json.Encoder interface for io.Writers that
-// should serialize watchEvent objects into JSON. It will encode any object
+// should serialize WatchEvent objects into JSON. It will encode any object
 // registered in the supplied codec and return an error otherwies.
 type Encoder struct {
 	w       io.Writer

@@ -47,7 +47,7 @@
      {
       "type": "v1beta3.EndpointsList",
       "method": "GET",
-      "summary": "list objects of kind Endpoints",
+      "summary": "list or watch objects of kind Endpoints",
       "nickname": "listEndpoints",
       "parameters": [
        {
@@ -135,7 +135,7 @@
     "description": "API at /api/v1beta3 version v1beta3",
     "operations": [
      {
-      "type": "*json.watchEvent",
+      "type": "json.WatchEvent",
       "method": "GET",
       "summary": "watch individual changes to a list of Endpoints",
       "nickname": "watchEndpointslist",
@@ -347,7 +347,7 @@
     "description": "API at /api/v1beta3 version v1beta3",
     "operations": [
      {
-      "type": "*json.watchEvent",
+      "type": "json.WatchEvent",
       "method": "GET",
       "summary": "watch changes to an object of kind Endpoints",
       "nickname": "watchEndpoints",
@@ -417,7 +417,7 @@
      {
       "type": "v1beta3.EndpointsList",
       "method": "GET",
-      "summary": "list objects of kind Endpoints",
+      "summary": "list or watch objects of kind Endpoints",
       "nickname": "listEndpoints",
       "parameters": [
        {
@@ -467,7 +467,7 @@
     "description": "API at /api/v1beta3 version v1beta3",
     "operations": [
      {
-      "type": "*json.watchEvent",
+      "type": "json.WatchEvent",
       "method": "GET",
       "summary": "watch individual changes to a list of Endpoints",
       "nickname": "watchEndpointslist",
@@ -521,7 +521,7 @@
      {
       "type": "v1beta3.EventList",
       "method": "GET",
-      "summary": "list objects of kind Event",
+      "summary": "list or watch objects of kind Event",
       "nickname": "listEvent",
       "parameters": [
        {
@@ -609,7 +609,7 @@
     "description": "API at /api/v1beta3 version v1beta3",
     "operations": [
      {
-      "type": "*json.watchEvent",
+      "type": "json.WatchEvent",
       "method": "GET",
       "summary": "watch individual changes to a list of Event",
       "nickname": "watchEventlist",
@@ -813,7 +813,7 @@
     "description": "API at /api/v1beta3 version v1beta3",
     "operations": [
      {
-      "type": "*json.watchEvent",
+      "type": "json.WatchEvent",
       "method": "GET",
       "summary": "watch changes to an object of kind Event",
       "nickname": "watchEvent",
@@ -883,7 +883,7 @@
      {
       "type": "v1beta3.EventList",
       "method": "GET",
-      "summary": "list objects of kind Event",
+      "summary": "list or watch objects of kind Event",
       "nickname": "listEvent",
       "parameters": [
        {
@@ -933,7 +933,7 @@
     "description": "API at /api/v1beta3 version v1beta3",
     "operations": [
      {
-      "type": "*json.watchEvent",
+      "type": "json.WatchEvent",
       "method": "GET",
       "summary": "watch individual changes to a list of Event",
       "nickname": "watchEventlist",
@@ -987,7 +987,7 @@
      {
       "type": "v1beta3.LimitRangeList",
       "method": "GET",
-      "summary": "list objects of kind LimitRange",
+      "summary": "list or watch objects of kind LimitRange",
       "nickname": "listLimitRange",
       "parameters": [
        {
@@ -1075,7 +1075,7 @@
     "description": "API at /api/v1beta3 version v1beta3",
     "operations": [
      {
-      "type": "*json.watchEvent",
+      "type": "json.WatchEvent",
       "method": "GET",
       "summary": "watch individual changes to a list of LimitRange",
       "nickname": "watchLimitRangelist",
@@ -1279,7 +1279,7 @@
     "description": "API at /api/v1beta3 version v1beta3",
     "operations": [
      {
-      "type": "*json.watchEvent",
+      "type": "json.WatchEvent",
       "method": "GET",
       "summary": "watch changes to an object of kind LimitRange",
       "nickname": "watchLimitRange",
@@ -1349,7 +1349,7 @@
      {
       "type": "v1beta3.LimitRangeList",
       "method": "GET",
-      "summary": "list objects of kind LimitRange",
+      "summary": "list or watch objects of kind LimitRange",
       "nickname": "listLimitRange",
       "parameters": [
        {
@@ -1399,7 +1399,7 @@
     "description": "API at /api/v1beta3 version v1beta3",
     "operations": [
      {
-      "type": "*json.watchEvent",
+      "type": "json.WatchEvent",
       "method": "GET",
       "summary": "watch individual changes to a list of LimitRange",
       "nickname": "watchLimitRangelist",
@@ -1453,7 +1453,7 @@
      {
       "type": "v1beta3.NamespaceList",
       "method": "GET",
-      "summary": "list objects of kind Namespace",
+      "summary": "list or watch objects of kind Namespace",
       "nickname": "listNamespace",
       "parameters": [
        {
@@ -1525,7 +1525,7 @@
     "description": "API at /api/v1beta3 version v1beta3",
     "operations": [
      {
-      "type": "*json.watchEvent",
+      "type": "json.WatchEvent",
       "method": "GET",
       "summary": "watch individual changes to a list of Namespace",
       "nickname": "watchNamespacelist",
@@ -1697,7 +1697,7 @@
     "description": "API at /api/v1beta3 version v1beta3",
     "operations": [
      {
-      "type": "*json.watchEvent",
+      "type": "json.WatchEvent",
       "method": "GET",
       "summary": "watch changes to an object of kind Namespace",
       "nickname": "watchNamespace",
@@ -1831,7 +1831,7 @@
      {
       "type": "v1beta3.NodeList",
       "method": "GET",
-      "summary": "list objects of kind Node",
+      "summary": "list or watch objects of kind Node",
       "nickname": "listNode",
       "parameters": [
        {
@@ -1903,7 +1903,7 @@
     "description": "API at /api/v1beta3 version v1beta3",
     "operations": [
      {
-      "type": "*json.watchEvent",
+      "type": "json.WatchEvent",
       "method": "GET",
       "summary": "watch individual changes to a list of Node",
       "nickname": "watchNodelist",
@@ -2075,7 +2075,7 @@
     "description": "API at /api/v1beta3 version v1beta3",
     "operations": [
      {
-      "type": "*json.watchEvent",
+      "type": "json.WatchEvent",
       "method": "GET",
       "summary": "watch changes to an object of kind Node",
       "nickname": "watchNode",
@@ -2385,7 +2385,7 @@
      {
       "type": "v1beta3.PersistentVolumeClaimList",
       "method": "GET",
-      "summary": "list objects of kind PersistentVolumeClaim",
+      "summary": "list or watch objects of kind PersistentVolumeClaim",
       "nickname": "listPersistentVolumeClaim",
       "parameters": [
        {
@@ -2473,7 +2473,7 @@
     "description": "API at /api/v1beta3 version v1beta3",
     "operations": [
      {
-      "type": "*json.watchEvent",
+      "type": "json.WatchEvent",
       "method": "GET",
       "summary": "watch individual changes to a list of PersistentVolumeClaim",
       "nickname": "watchPersistentVolumeClaimlist",
@@ -2685,7 +2685,7 @@
     "description": "API at /api/v1beta3 version v1beta3",
     "operations": [
      {
-      "type": "*json.watchEvent",
+      "type": "json.WatchEvent",
       "method": "GET",
       "summary": "watch changes to an object of kind PersistentVolumeClaim",
       "nickname": "watchPersistentVolumeClaim",
@@ -2755,7 +2755,7 @@
      {
       "type": "v1beta3.PersistentVolumeClaimList",
       "method": "GET",
-      "summary": "list objects of kind PersistentVolumeClaim",
+      "summary": "list or watch objects of kind PersistentVolumeClaim",
       "nickname": "listPersistentVolumeClaim",
       "parameters": [
        {
@@ -2805,7 +2805,7 @@
     "description": "API at /api/v1beta3 version v1beta3",
     "operations": [
      {
-      "type": "*json.watchEvent",
+      "type": "json.WatchEvent",
       "method": "GET",
       "summary": "watch individual changes to a list of PersistentVolumeClaim",
       "nickname": "watchPersistentVolumeClaimlist",
@@ -2859,7 +2859,7 @@
      {
       "type": "v1beta3.PersistentVolumeList",
       "method": "GET",
-      "summary": "list objects of kind PersistentVolume",
+      "summary": "list or watch objects of kind PersistentVolume",
       "nickname": "listPersistentVolume",
       "parameters": [
        {
@@ -2931,7 +2931,7 @@
     "description": "API at /api/v1beta3 version v1beta3",
     "operations": [
      {
-      "type": "*json.watchEvent",
+      "type": "json.WatchEvent",
       "method": "GET",
       "summary": "watch individual changes to a list of PersistentVolume",
       "nickname": "watchPersistentVolumelist",
@@ -3103,7 +3103,7 @@
     "description": "API at /api/v1beta3 version v1beta3",
     "operations": [
      {
-      "type": "*json.watchEvent",
+      "type": "json.WatchEvent",
       "method": "GET",
       "summary": "watch changes to an object of kind PersistentVolume",
       "nickname": "watchPersistentVolume",
@@ -3201,7 +3201,7 @@
      {
       "type": "v1beta3.PodList",
       "method": "GET",
-      "summary": "list objects of kind Pod",
+      "summary": "list or watch objects of kind Pod",
       "nickname": "listPod",
       "parameters": [
        {
@@ -3289,7 +3289,7 @@
     "description": "API at /api/v1beta3 version v1beta3",
     "operations": [
      {
-      "type": "*json.watchEvent",
+      "type": "json.WatchEvent",
       "method": "GET",
       "summary": "watch individual changes to a list of Pod",
       "nickname": "watchPodlist",
@@ -3501,7 +3501,7 @@
     "description": "API at /api/v1beta3 version v1beta3",
     "operations": [
      {
-      "type": "*json.watchEvent",
+      "type": "json.WatchEvent",
       "method": "GET",
       "summary": "watch changes to an object of kind Pod",
       "nickname": "watchPod",
@@ -3891,7 +3891,7 @@
      {
       "type": "v1beta3.PodList",
       "method": "GET",
-      "summary": "list objects of kind Pod",
+      "summary": "list or watch objects of kind Pod",
       "nickname": "listPod",
       "parameters": [
        {
@@ -3941,7 +3941,7 @@
     "description": "API at /api/v1beta3 version v1beta3",
     "operations": [
      {
-      "type": "*json.watchEvent",
+      "type": "json.WatchEvent",
       "method": "GET",
       "summary": "watch individual changes to a list of Pod",
       "nickname": "watchPodlist",
@@ -4033,6 +4033,42 @@
     ]
    },
    {
+    "path": "/api/v1beta3/namespaces/{namespaces}/pods/{name}/log",
+    "description": "API at /api/v1beta3 version v1beta3",
+    "operations": [
+     {
+      "type": "v1beta3.PodLogOptions",
+      "method": "GET",
+      "summary": "read the specified PodLogOptions",
+      "nickname": "readPodLogOptions",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the PodLogOptions",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespaces",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
     "path": "/api/v1beta3/namespaces/{namespaces}/pods/{name}/status",
     "description": "API at /api/v1beta3 version v1beta3",
     "operations": [
@@ -4083,7 +4119,7 @@
      {
       "type": "v1beta3.ReplicationControllerList",
       "method": "GET",
-      "summary": "list objects of kind ReplicationController",
+      "summary": "list or watch objects of kind ReplicationController",
       "nickname": "listReplicationController",
       "parameters": [
        {
@@ -4171,7 +4207,7 @@
     "description": "API at /api/v1beta3 version v1beta3",
     "operations": [
      {
-      "type": "*json.watchEvent",
+      "type": "json.WatchEvent",
       "method": "GET",
       "summary": "watch individual changes to a list of ReplicationController",
       "nickname": "watchReplicationControllerlist",
@@ -4383,7 +4419,7 @@
     "description": "API at /api/v1beta3 version v1beta3",
     "operations": [
      {
-      "type": "*json.watchEvent",
+      "type": "json.WatchEvent",
       "method": "GET",
       "summary": "watch changes to an object of kind ReplicationController",
       "nickname": "watchReplicationController",
@@ -4453,7 +4489,7 @@
      {
       "type": "v1beta3.ReplicationControllerList",
       "method": "GET",
-      "summary": "list objects of kind ReplicationController",
+      "summary": "list or watch objects of kind ReplicationController",
       "nickname": "listReplicationController",
       "parameters": [
        {
@@ -4503,7 +4539,7 @@
     "description": "API at /api/v1beta3 version v1beta3",
     "operations": [
      {
-      "type": "*json.watchEvent",
+      "type": "json.WatchEvent",
       "method": "GET",
       "summary": "watch individual changes to a list of ReplicationController",
       "nickname": "watchReplicationControllerlist",
@@ -4557,7 +4593,7 @@
      {
       "type": "v1beta3.ResourceQuotaList",
       "method": "GET",
-      "summary": "list objects of kind ResourceQuota",
+      "summary": "list or watch objects of kind ResourceQuota",
       "nickname": "listResourceQuota",
       "parameters": [
        {
@@ -4645,7 +4681,7 @@
     "description": "API at /api/v1beta3 version v1beta3",
     "operations": [
      {
-      "type": "*json.watchEvent",
+      "type": "json.WatchEvent",
       "method": "GET",
       "summary": "watch individual changes to a list of ResourceQuota",
       "nickname": "watchResourceQuotalist",
@@ -4857,7 +4893,7 @@
     "description": "API at /api/v1beta3 version v1beta3",
     "operations": [
      {
-      "type": "*json.watchEvent",
+      "type": "json.WatchEvent",
       "method": "GET",
       "summary": "watch changes to an object of kind ResourceQuota",
       "nickname": "watchResourceQuota",
@@ -4927,7 +4963,7 @@
      {
       "type": "v1beta3.ResourceQuotaList",
       "method": "GET",
-      "summary": "list objects of kind ResourceQuota",
+      "summary": "list or watch objects of kind ResourceQuota",
       "nickname": "listResourceQuota",
       "parameters": [
        {
@@ -4977,7 +5013,7 @@
     "description": "API at /api/v1beta3 version v1beta3",
     "operations": [
      {
-      "type": "*json.watchEvent",
+      "type": "json.WatchEvent",
       "method": "GET",
       "summary": "watch individual changes to a list of ResourceQuota",
       "nickname": "watchResourceQuotalist",
@@ -5075,7 +5111,7 @@
      {
       "type": "v1beta3.SecretList",
       "method": "GET",
-      "summary": "list objects of kind Secret",
+      "summary": "list or watch objects of kind Secret",
       "nickname": "listSecret",
       "parameters": [
        {
@@ -5163,7 +5199,7 @@
     "description": "API at /api/v1beta3 version v1beta3",
     "operations": [
      {
-      "type": "*json.watchEvent",
+      "type": "json.WatchEvent",
       "method": "GET",
       "summary": "watch individual changes to a list of Secret",
       "nickname": "watchSecretlist",
@@ -5367,7 +5403,7 @@
     "description": "API at /api/v1beta3 version v1beta3",
     "operations": [
      {
-      "type": "*json.watchEvent",
+      "type": "json.WatchEvent",
       "method": "GET",
       "summary": "watch changes to an object of kind Secret",
       "nickname": "watchSecret",
@@ -5437,7 +5473,7 @@
      {
       "type": "v1beta3.SecretList",
       "method": "GET",
-      "summary": "list objects of kind Secret",
+      "summary": "list or watch objects of kind Secret",
       "nickname": "listSecret",
       "parameters": [
        {
@@ -5487,7 +5523,7 @@
     "description": "API at /api/v1beta3 version v1beta3",
     "operations": [
      {
-      "type": "*json.watchEvent",
+      "type": "json.WatchEvent",
       "method": "GET",
       "summary": "watch individual changes to a list of Secret",
       "nickname": "watchSecretlist",
@@ -5541,7 +5577,7 @@
      {
       "type": "v1beta3.ServiceList",
       "method": "GET",
-      "summary": "list objects of kind Service",
+      "summary": "list or watch objects of kind Service",
       "nickname": "listService",
       "parameters": [
        {
@@ -5629,7 +5665,7 @@
     "description": "API at /api/v1beta3 version v1beta3",
     "operations": [
      {
-      "type": "*json.watchEvent",
+      "type": "json.WatchEvent",
       "method": "GET",
       "summary": "watch individual changes to a list of Service",
       "nickname": "watchServicelist",
@@ -5833,7 +5869,7 @@
     "description": "API at /api/v1beta3 version v1beta3",
     "operations": [
      {
-      "type": "*json.watchEvent",
+      "type": "json.WatchEvent",
       "method": "GET",
       "summary": "watch changes to an object of kind Service",
       "nickname": "watchService",
@@ -6223,7 +6259,7 @@
      {
       "type": "v1beta3.ServiceList",
       "method": "GET",
-      "summary": "list objects of kind Service",
+      "summary": "list or watch objects of kind Service",
       "nickname": "listService",
       "parameters": [
        {
@@ -6273,7 +6309,7 @@
     "description": "API at /api/v1beta3 version v1beta3",
     "operations": [
      {
-      "type": "*json.watchEvent",
+      "type": "json.WatchEvent",
       "method": "GET",
       "summary": "watch individual changes to a list of Service",
       "nickname": "watchServicelist",
@@ -6322,13 +6358,22 @@
    }
   ],
   "models": {
-   "*json.watchEvent": {
-    "id": "*json.watchEvent",
-    "properties": {}
-   },
    "*v1beta3.DeleteOptions": {
     "id": "*v1beta3.DeleteOptions",
     "properties": {}
+   },
+   "json.WatchEvent": {
+    "id": "json.WatchEvent",
+    "properties": {
+     "object": {
+      "type": "string",
+      "description": "the object being watched; will match the type of the resource endpoint or be a Status object if the type is ERROR"
+     },
+     "type": {
+      "type": "string",
+      "description": "the type of watch event; may be ADDED, MODIFIED, DELETED, or ERROR"
+     }
+    }
    },
    "v1beta3.AccessModeType": {
     "id": "v1beta3.AccessModeType",
@@ -7016,32 +7061,6 @@
      }
     }
    },
-   "v1beta3.ISCSIVolumeSource": {
-    "id": "v1beta3.ISCSIVolumeSource",
-    "properties": {
-     "fsType": {
-      "type": "string",
-      "description": "file system type to mount, such as ext4, xfs, ntfs"
-     },
-     "iqn": {
-      "type": "string",
-      "description": "iSCSI Qualified Name"
-     },
-     "lun": {
-      "type": "integer",
-      "format": "int32",
-      "description": "iscsi target lun number"
-     },
-     "readOnly": {
-      "type": "boolean",
-      "description": "read-only if true, read-write otherwise (false or unspecified)"
-     },
-     "targetPortal": {
-      "type": "string",
-      "description": "iSCSI target portal"
-     }
-    }
-   },
    "v1beta3.HTTPGetAction": {
     "id": "v1beta3.HTTPGetAction",
     "properties": {
@@ -7085,6 +7104,32 @@
      "path": {
       "type": "string",
       "description": "path of the directory on the host"
+     }
+    }
+   },
+   "v1beta3.ISCSIVolumeSource": {
+    "id": "v1beta3.ISCSIVolumeSource",
+    "properties": {
+     "fsType": {
+      "type": "string",
+      "description": "file system type to mount, such as ext4, xfs, ntfs"
+     },
+     "iqn": {
+      "type": "string",
+      "description": "iSCSI Qualified Name"
+     },
+     "lun": {
+      "type": "integer",
+      "format": "int32",
+      "description": "iscsi target lun number"
+     },
+     "readOnly": {
+      "type": "boolean",
+      "description": "read-only if true, read-write otherwise (false or unspecified)"
+     },
+     "targetPortal": {
+      "type": "string",
+      "description": "iSCSI target portal"
      }
     }
    },
@@ -7843,8 +7888,8 @@
    "v1beta3.PersistentVolumeSpec": {
     "id": "v1beta3.PersistentVolumeSpec",
     "required": [
-     "gcePersistentDisk",
-     "hostPath"
+     "hostPath",
+     "gcePersistentDisk"
     ],
     "properties": {
      "accessModes": {
@@ -7987,6 +8032,27 @@
      "selfLink": {
       "type": "string",
       "description": "URL for the object; populated by the system, read-only"
+     }
+    }
+   },
+   "v1beta3.PodLogOptions": {
+    "id": "v1beta3.PodLogOptions",
+    "properties": {
+     "apiVersion": {
+      "type": "string",
+      "description": "version of the schema the object should have"
+     },
+     "container": {
+      "type": "string",
+      "description": "the container for which to stream logs; defaults to only container if there is one container in the pod"
+     },
+     "follow": {
+      "type": "boolean",
+      "description": "follow the log stream of the pod; defaults to false"
+     },
+     "kind": {
+      "type": "string",
+      "description": "kind of object, in CamelCase; cannot be updated"
      }
     }
    },
@@ -8681,13 +8747,13 @@
     "id": "v1beta3.Volume",
     "required": [
      "name",
+     "emptyDir",
      "gcePersistentDisk",
      "gitRepo",
      "secret",
      "nfs",
-     "hostPath",
      "iscsi",
-     "emptyDir"
+     "hostPath"
     ],
     "properties": {
      "emptyDir": {
@@ -8706,6 +8772,10 @@
       "$ref": "v1beta3.HostPathVolumeSource",
       "description": "pre-existing host file or directory; generally for privileged system daemons or other agents tied to the host"
      },
+     "iscsi": {
+      "$ref": "v1beta3.ISCSIVolumeSource",
+      "description": "iSCSI disk attached to host machine on demand"
+     },
      "name": {
       "type": "string",
       "description": "volume name; must be a DNS_LABEL and unique within the pod"
@@ -8714,10 +8784,6 @@
       "$ref": "v1beta3.NFSVolumeSource",
       "description": "NFS volume that will be mounted in the host machine"
      },
-     "iscsi": {
-      "$ref": "v1beta3.ISCSIVolumeSource",
-      "description": "iSCSI disk attached to host machine on demand"
-     },	
      "secret": {
       "$ref": "v1beta3.SecretVolumeSource",
       "description": "secret to populate volume"

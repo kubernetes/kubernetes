@@ -357,6 +357,12 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			if err := addObjectParams(ws, route, versionedListOptions); err != nil {
 				return err
 			}
+			switch {
+			case isLister && isWatcher:
+				route.Doc("list or watch objects of kind " + kind)
+			case isWatcher:
+				route.Doc("watch objects of kind " + kind)
+			}
 			addParams(route, action.Params)
 			ws.Route(route)
 		case "PUT": // Update a resource.
@@ -405,7 +411,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 				Doc("watch changes to an object of kind " + kind).
 				Operation("watch" + kind).
 				Produces("application/json").
-				Writes(watchjson.NewWatchEvent())
+				Writes(watchjson.WatchEvent{})
 			if err := addObjectParams(ws, route, versionedListOptions); err != nil {
 				return err
 			}
@@ -418,7 +424,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 				Doc("watch individual changes to a list of " + kind).
 				Operation("watch" + kind + "list").
 				Produces("application/json").
-				Writes(watchjson.NewWatchEvent())
+				Writes(watchjson.WatchEvent{})
 			if err := addObjectParams(ws, route, versionedListOptions); err != nil {
 				return err
 			}
