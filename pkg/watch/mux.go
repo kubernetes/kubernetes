@@ -89,6 +89,32 @@ func (m *Broadcaster) Watch() Interface {
 	return w
 }
 
+// WatchWithPrefix adds a new watcher to the list and returns an Interface for it. It sends
+// queuedEvents down the new watch before beginning to send ordinary events from Broadcaster.
+// The returned watch will have a queue length that is at least large enough to accomodate
+// all of the items in queuedEvents.
+func (m *Broadcaster) WatchWithPrefix(queuedEvents []Event) Interface {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+	id := m.nextWatcher
+	m.nextWatcher++
+	length := m.watchQueueLength
+	if n := len(queuedEvents) + 1; n > length {
+		length = n
+	}
+	w := &broadcasterWatcher{
+		result:  make(chan Event, length),
+		stopped: make(chan struct{}),
+		id:      id,
+		m:       m,
+	}
+	m.watchers[id] = w
+	for _, e := range queuedEvents {
+		w.result <- e
+	}
+	return w
+}
+
 // stopWatching stops the given watcher and removes it from the list.
 func (m *Broadcaster) stopWatching(id int64) {
 	m.lock.Lock()

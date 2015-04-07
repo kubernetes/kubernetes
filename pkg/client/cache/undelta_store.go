@@ -24,8 +24,8 @@ package cache
 // in one call to PushFunc, but sometimes PushFunc may be called twice with the same values.
 // PushFunc should be thread safe.
 type UndeltaStore struct {
-	ActualStore Store
-	PushFunc    func([]interface{})
+	Store
+	PushFunc func([]interface{})
 }
 
 // Assert that it implements the Store interface.
@@ -43,47 +43,41 @@ var _ Store = &UndeltaStore{}
 // 5                                         Store.List() -> [a,b]
 
 func (u *UndeltaStore) Add(obj interface{}) error {
-	if err := u.ActualStore.Add(obj); err != nil {
+	if err := u.Store.Add(obj); err != nil {
 		return err
 	}
-	u.PushFunc(u.ActualStore.List())
+	u.PushFunc(u.Store.List())
 	return nil
 }
+
 func (u *UndeltaStore) Update(obj interface{}) error {
-	if err := u.ActualStore.Update(obj); err != nil {
+	if err := u.Store.Update(obj); err != nil {
 		return err
 	}
-	u.PushFunc(u.ActualStore.List())
+	u.PushFunc(u.Store.List())
 	return nil
 }
+
 func (u *UndeltaStore) Delete(obj interface{}) error {
-	if err := u.ActualStore.Delete(obj); err != nil {
+	if err := u.Store.Delete(obj); err != nil {
 		return err
 	}
-	u.PushFunc(u.ActualStore.List())
+	u.PushFunc(u.Store.List())
 	return nil
 }
-func (u *UndeltaStore) List() []interface{} {
-	return u.ActualStore.List()
-}
-func (u *UndeltaStore) Get(obj interface{}) (item interface{}, exists bool, err error) {
-	return u.ActualStore.Get(obj)
-}
-func (u *UndeltaStore) GetByKey(key string) (item interface{}, exists bool, err error) {
-	return u.ActualStore.GetByKey(key)
-}
+
 func (u *UndeltaStore) Replace(list []interface{}) error {
-	if err := u.ActualStore.Replace(list); err != nil {
+	if err := u.Store.Replace(list); err != nil {
 		return err
 	}
-	u.PushFunc(u.ActualStore.List())
+	u.PushFunc(u.Store.List())
 	return nil
 }
 
 // NewUndeltaStore returns an UndeltaStore implemented with a Store.
 func NewUndeltaStore(pushFunc func([]interface{}), keyFunc KeyFunc) *UndeltaStore {
 	return &UndeltaStore{
-		ActualStore: NewStore(keyFunc),
-		PushFunc:    pushFunc,
+		Store:    NewStore(keyFunc),
+		PushFunc: pushFunc,
 	}
 }

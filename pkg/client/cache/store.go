@@ -37,6 +37,7 @@ type Store interface {
 	Update(obj interface{}) error
 	Delete(obj interface{}) error
 	List() []interface{}
+	ListKeys() []string
 	Get(obj interface{}) (item interface{}, exists bool, err error)
 	GetByKey(key string) (item interface{}, exists bool, err error)
 
@@ -192,6 +193,18 @@ func (c *cache) List() []interface{} {
 	list := make([]interface{}, 0, len(c.items))
 	for _, item := range c.items {
 		list = append(list, item)
+	}
+	return list
+}
+
+// ListKeys returns a list of all the keys of the objects currently
+// in the cache.
+func (c *cache) ListKeys() []string {
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+	list := make([]string, 0, len(c.items))
+	for key := range c.items {
+		list = append(list, key)
 	}
 	return list
 }
