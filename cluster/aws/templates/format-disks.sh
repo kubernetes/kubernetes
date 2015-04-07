@@ -60,7 +60,12 @@ else
   mount -t btrfs ${block_devices[0]} /mnt
 
   # Move docker to /mnt if we have it
+  if [[ -d /var/lib/docker ]]; then
+    mv /var/lib/docker /mnt/
+  fi
   mkdir -p /mnt/docker
+  ln -s /mnt/docker /var/lib/docker
+  DOCKER_ROOT="/mnt/docker"
   DOCKER_OPTS="${DOCKER_OPTS} -g /mnt/docker"
 fi
 

@@ -31,11 +31,18 @@ grains:
 EOF
 
 
-if [[ -n "{DOCKER_OPTS}" ]]; then
+if [[ -n "${DOCKER_OPTS}" ]]; then
   cat <<EOF >>/etc/salt/minion.d/grains.conf
   docker_opts: '$(echo "$DOCKER_OPTS" | sed -e "s/'/''/g")'
 EOF
 fi
+
+if [[ -n "${DOCKER_ROOT}" ]]; then
+  cat <<EOF >>/etc/salt/minion.d/grains.conf
+  docker_root: '$(echo "$DOCKER_ROOT" | sed -e "s/'/''/g")'
+EOF
+fi
+
 
 # Install Salt
 #
