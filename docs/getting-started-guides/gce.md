@@ -3,9 +3,17 @@
 The example below creates a Kubernetes cluster with 4 worker node Virtual Machines and a master Virtual Machine (i.e. 5 VMs in your cluster). This cluster is set up and controlled from your workstation (or wherever you find convenient).
 
 ### Before you start
+
 If you want a simplified getting started experience and GUI for managing clusters, please consider trying [Google Container Engine](https://cloud.google.com/container-engine/) for hosted cluster installation and management.  
 
 If you want to use custom binaries or pure open source Kubernetes, please continue with the instructions below.
+
+### Prerequisites
+
+1. You need a Google Cloud Platform account with billing enabled. Visit the [Google Developers Console](http://cloud.google.com/console) for more details.
+1. Make sure you can start up a GCE VM from the command line.  At least make sure you can do the [Create an instance](https://cloud.google.com/compute/docs/quickstart#create_an_instance) part of the GCE Quickstart.
+1. Make sure you have the `gcloud preview` command line component installed. Simply run `gcloud preview` at the command line - if it asks to install any components, go ahead and install them. If it simply shows help text, you're good to go.
+1. Make sure you can ssh into the VM without interactive prompts.  See the [Log in to the instance](https://cloud.google.com/compute/docs/quickstart#ssh) part of the GCE Quickstart.
 
 ### Starting a Cluster
 
@@ -120,12 +128,14 @@ pod manifest before you see the nginx welcome page. After doing so, it should be
 Look in `examples/` for more examples
 
 ### Tearing down the cluster
+
 ```bash
 cd kubernetes
 cluster/kube-down.sh
 ```
 
 ### Customizing
+
 The script above relies on Google Storage to stage the Kubernetes release. It
 then will start (by default) a single master VM along with 4 worker VMs.  You
 can tweak some of these parameters by editing `kubernetes/cluster/gce/config-default.sh`
@@ -133,18 +143,28 @@ You can view a transcript of a successful cluster creation
 [here](https://gist.github.com/satnam6502/fc689d1b46db9772adea).
 
 ### Troubleshooting
-#### Creating VMs
 
-1. You need a Google Cloud Platform account with billing enabled. Visit the [Google Developers Console](http://cloud.google.com/console) for more details.
-1. Make sure you can start up a GCE VM from the command line.  At least make sure you can do the [Create an instance](https://cloud.google.com/compute/docs/quickstart#create_an_instance) part of the GCE Quickstart.
-1. Make sure you have the `gcloud preview` command line component installed. Simply run `gcloud preview` at the command line - if it asks to install any components, go ahead and install them. If it simply shows help text, you're good to go.
-1. Make sure you can ssh into the VM without interactive prompts.  See the [Log in to the instance](https://cloud.google.com/compute/docs/quickstart#ssh) part of the GCE Quickstart.
-  * Your GCE SSH key must either have no passcode or you need to be using `ssh-agent`.
-  * Ensure the GCE firewall isn't blocking port 22 to your VMs.  By default, this should work but if you have edited firewall rules or created a new non-default network, you'll need to expose it: `gcloud compute firewall-rules create --network=<network-name> --description "SSH allowed from anywhere" --allow tcp:22 default-ssh`
-1. You need to have the Google Cloud Storage API, and the Google Cloud Storage JSON API enabled. It is activated by default for new projects. Otherwise, it can be done in the Google Cloud Console.  See the [Google Cloud Storage JSON API Overview](https://cloud.google.com/storage/docs/json_api/) for more details.
+#### Project settings
 
+You need to have the Google Cloud Storage API, and the Google Cloud Storage
+JSON API enabled. It is activated by default for new projects. Otherwise, it
+can be done in the Google Cloud Console.  See the [Google Cloud Storage JSON
+API Overview](https://cloud.google.com/storage/docs/json_api/) for more
+details.
+
+#### SSH
+
+If you're having trouble SSHing into your instances, ensure the GCE firewall
+isn't blocking port 22 to your VMs.  By default, this should work but if you
+have edited firewall rules or created a new non-default network, you'll need to
+expose it: `gcloud compute firewall-rules create --network=<network-name>
+--description "SSH allowed from anywhere" --allow tcp:22 default-ssh`
+
+Additionally, your GCE SSH key must either have no passcode or you need to be
+using `ssh-agent`.
 
 #### Networking
+
 The instances must be able to connect to each other using their private IP. The
 script uses the "default" network which should have a firewall rule called
 "default-allow-internal" which allows traffic on any port on the private IPs.
@@ -154,4 +174,3 @@ field values:
 
 * Source Ranges: `10.0.0.0/8`
 * Allowed Protocols and Port: `tcp:1-65535;udp:1-65535;icmp`
-
