@@ -211,7 +211,9 @@ func setDefaults(c *Config) {
 	if c.CacheTimeout == 0 {
 		c.CacheTimeout = 5 * time.Second
 	}
-	for c.PublicAddress == nil {
+	for c.PublicAddress == nil || c.PublicAddress.IsUnspecified() {
+		// TODO: This should be done in the caller and just require a
+		// valid value to be passed in.
 		hostIP, err := util.ChooseHostInterface()
 		if err != nil {
 			glog.Fatalf("Unable to find suitable network address.error='%v' . "+
