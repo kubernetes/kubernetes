@@ -18,6 +18,7 @@ package framework
 
 import (
 	"errors"
+	"math/rand"
 	"strconv"
 	"sync"
 
@@ -51,26 +52,49 @@ type nnu struct {
 // Add adds an object to the set and sends an add event to watchers.
 // obj's ResourceVersion is set.
 func (f *FakeControllerSource) Add(obj runtime.Object) {
-	f.change(watch.Event{watch.Added, obj})
+	f.Change(watch.Event{watch.Added, obj}, 1)
 }
 
 // Modify updates an object in the set and sends a modified event to watchers.
 // obj's ResourceVersion is set.
 func (f *FakeControllerSource) Modify(obj runtime.Object) {
-	f.change(watch.Event{watch.Modified, obj})
+	f.Change(watch.Event{watch.Modified, obj}, 1)
 }
 
 // Delete deletes an object from the set and sends a delete event to watchers.
 // obj's ResourceVersion is set.
 func (f *FakeControllerSource) Delete(lastValue runtime.Object) {
-	f.change(watch.Event{watch.Deleted, lastValue})
+	f.Change(watch.Event{watch.Deleted, lastValue}, 1)
+}
+
+// AddDropWatch adds an object to the set but forgets to send an add event to
+// watchers.
+// obj's ResourceVersion is set.
+func (f *FakeControllerSource) AddDropWatch(obj runtime.Object) {
+	f.Change(watch.Event{watch.Added, obj}, 0)
+}
+
+// ModifyDropWatch updates an object in the set but forgets to send a modify
+// event to watchers.
+// obj's ResourceVersion is set.
+func (f *FakeControllerSource) ModifyDropWatch(obj runtime.Object) {
+	f.Change(watch.Event{watch.Modified, obj}, 0)
+}
+
+// DeleteDropWatch deletes an object from the set but forgets to send a delete
+// event to watchers.
+// obj's ResourceVersion is set.
+func (f *FakeControllerSource) DeleteDropWatch(lastValue runtime.Object) {
+	f.Change(watch.Event{watch.Deleted, lastValue}, 0)
 }
 
 func (f *FakeControllerSource) key(meta *api.ObjectMeta) nnu {
 	return nnu{meta.Namespace, meta.Name, meta.UID}
 }
 
-func (f *FakeControllerSource) change(e watch.Event) {
+// Change records the given event (setting the object's resource version) and
+// sends a watch event with the specified probability.
+func (f *FakeControllerSource) Change(e watch.Event, watchProbability float64) {
 	f.lock.Lock()
 	defer f.lock.Unlock()
 
@@ -89,7 +113,10 @@ func (f *FakeControllerSource) change(e watch.Event) {
 	case watch.Deleted:
 		delete(f.items, key)
 	}
-	f.broadcaster.Action(e.Type, e.Object)
+
+	if rand.Float64() < watchProbability {
+		f.broadcaster.Action(e.Type, e.Object)
+	}
 }
 
 // List returns a list object, with its resource version set.

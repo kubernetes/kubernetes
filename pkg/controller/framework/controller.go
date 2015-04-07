@@ -102,3 +102,126 @@ func (c *Controller) processLoop() {
 		}
 	}
 }
+
+// ResourceEventHandler can handle notifications for events that happen to a
+// resource.  The events are informational only, so you can't return an
+// error.
+//  * OnAdd is called when an object is added.
+//  * OnUpdate is called when an object is modified. Note that oldObj is the
+//      last known state of the object-- it is possible that several changes
+//      were combined together, so you can't use this to see every single
+//      change. OnUpdate is also called when a re-list happens, and it will
+//      get called even if nothing changed. This is useful for periodically
+//      evaluating or syncing something.
+//  * OnDelete will get the final state of the item if it is known, otherwise
+//      it will get an object of type cache.DeletedFinalStateUnknown.
+type ResourceEventHandler interface {
+	OnAdd(obj interface{})
+	OnUpdate(oldObj, newObj interface{})
+	OnDelete(obj interface{})
+}
+
+// ResourceEventHandlerFuncs is an adaptor to let you easily specify as many or
+// as few of the notification functions as you want while still implementing
+// ResourceEventHandler.
+type ResourceEventHandlerFuncs struct {
+	AddFunc    func(obj interface{})
+	UpdateFunc func(oldObj, newObj interface{})
+	DeleteFunc func(obj interface{})
+}
+
+// OnAdd calls AddFunc if it's not nil.
+func (r ResourceEventHandlerFuncs) OnAdd(obj interface{}) {
+	if r.AddFunc != nil {
+		r.AddFunc(obj)
+	}
+}
+
+// OnUpdate calls UpdateFunc if it's not nil.
+func (r ResourceEventHandlerFuncs) OnUpdate(oldObj, newObj interface{}) {
+	if r.UpdateFunc != nil {
+		r.UpdateFunc(oldObj, newObj)
+	}
+}
+
+// OnDelete calls DeleteFunc if it's not nil.
+func (r ResourceEventHandlerFuncs) OnDelete(obj interface{}) {
+	if r.DeleteFunc != nil {
+		r.DeleteFunc(obj)
+	}
+}
+
+// DeletionHandlingMetaNamespaceKeyFunc checks for
+// cache.DeletedFinalStateUnknown objects before calling
+// cache.MetaNamespaceKeyFunc.
+func DeletionHandlingMetaNamespaceKeyFunc(obj interface{}) (string, error) {
+	if d, ok := obj.(cache.DeletedFinalStateUnknown); ok {
+		return d.Key, nil
+	}
+	return cache.MetaNamespaceKeyFunc(obj)
+}
+
+// NewInformer returns a cache.Store and a controller for populating the store
+// while also providing event notifications. You should only used the returned
+// cache.Store for Get/List operations; Add/Modify/Deletes will cause the event
+// notifications to be faulty.
+//
+// Parameters:
+//  * lw is list and watch functions for the source of the resource you want to
+//    be informed of.
+//  * objType is an object of the type that you expect to receieve.
+//  * resyncPeriod: if non-zero, will re-list this often (you will get OnUpdate
+//    calls, even if nothing changed). Otherwise, re-list will be delayed as
+//    long as possible (until the upstream source closes the watch or times out,
+//    or you stop the controller).
+//  * h is the object you want notifications sent to.
+//
+func NewInformer(
+	lw cache.ListerWatcher,
+	objType runtime.Object,
+	resyncPeriod time.Duration,
+	h ResourceEventHandler,
+) (cache.Store, *Controller) {
+	// This will hold the client state, as we know it.
+	clientState := cache.NewStore(DeletionHandlingMetaNamespaceKeyFunc)
+
+	// This will hold incoming changes. Note how we pass clientState in as a
+	// KeyLister, that way resync operations will result in the correct set
+	// of update/delete deltas.
+	fifo := cache.NewDeltaFIFO(cache.MetaNamespaceKeyFunc, nil, clientState)
+
+	cfg := &Config{
+		Queue:            fifo,
+		ListerWatcher:    lw,
+		ObjectType:       objType,
+		FullResyncPeriod: resyncPeriod,
+		RetryOnError:     false,
+
+		Process: func(obj interface{}) error {
+			// from oldest to newest
+			for _, d := range obj.(cache.Deltas) {
+				switch d.Type {
+				case cache.Sync, cache.Added, cache.Updated:
+					if old, exists, err := clientState.Get(d.Object); err == nil && exists {
+						if err := clientState.Update(d.Object); err != nil {
+							return err
+						}
+						h.OnUpdate(old, d.Object)
+					} else {
+						if err := clientState.Add(d.Object); err != nil {
+							return err
+						}
+						h.OnAdd(d.Object)
+					}
+				case cache.Deleted:
+					if err := clientState.Delete(d.Object); err != nil {
+						return err
+					}
+					h.OnDelete(d.Object)
+				}
+			}
+			return nil
+		},
+	}
+	return clientState, New(cfg)
+}
