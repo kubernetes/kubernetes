@@ -30,6 +30,7 @@ import (
 	apierrors "github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
 	fake_cloud "github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/fake"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
@@ -949,6 +950,7 @@ func TestSyncProbedNodeStatusEvictPods(t *testing.T) {
 		fakeKubeletClient    *FakeKubeletClient
 		expectedRequestCount int
 		expectedActions      []client.FakeAction
+		expectedEventSent    bool
 	}{
 		{
 			// Existing node is healthy, current probe is healthy too.
@@ -978,6 +980,7 @@ func TestSyncProbedNodeStatusEvictPods(t *testing.T) {
 			},
 			expectedRequestCount: 2, // List+Update
 			expectedActions:      nil,
+			expectedEventSent:    false,
 		},
 		{
 			// Existing node is healthy, current probe is unhealthy, i.e. node just becomes unhealthy.
@@ -1008,6 +1011,7 @@ func TestSyncProbedNodeStatusEvictPods(t *testing.T) {
 			},
 			expectedRequestCount: 2, // List+Update
 			expectedActions:      nil,
+			expectedEventSent:    true,
 		},
 		{
 			// Existing node unhealthy, current probe is unhealthy. Node is still within grace peroid.
@@ -1040,6 +1044,7 @@ func TestSyncProbedNodeStatusEvictPods(t *testing.T) {
 			},
 			expectedRequestCount: 2, // List+Update
 			expectedActions:      nil,
+			expectedEventSent:    false,
 		},
 		{
 			// Existing node unhealthy, current probe is unhealthy. Node exceeds grace peroid.
@@ -1073,12 +1078,19 @@ func TestSyncProbedNodeStatusEvictPods(t *testing.T) {
 			},
 			expectedRequestCount: 2, // List+Update
 			expectedActions:      []client.FakeAction{{Action: "list-pods"}, {Action: "delete-pod", Value: "pod0"}},
+			expectedEventSent:    false,
 		},
 	}
 
 	for _, item := range table {
 		nodeController := NewNodeController(nil, "", []string{"node0"}, nil, item.fakeNodeHandler, item.fakeKubeletClient, 10, 5*time.Minute, util.NewFakeRateLimiter())
+		eventBroadcaster := record.NewBroadcaster()
+		nodeController.recorder = eventBroadcaster.NewRecorder(api.EventSource{Component: "controllermanager"})
 		nodeController.lookupIP = func(host string) ([]net.IP, error) { return nil, fmt.Errorf("lookup %v: no such host", host) }
+		called := make(chan struct{})
+		events := eventBroadcaster.StartEventWatcher(func(e *api.Event) {
+			close(called)
+		})
 		if err := nodeController.SyncProbedNodeStatus(); err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -1088,6 +1100,10 @@ func TestSyncProbedNodeStatusEvictPods(t *testing.T) {
 		if !reflect.DeepEqual(item.expectedActions, item.fakeNodeHandler.Actions) {
 			t.Errorf("time out waiting for deleting pods, expected %+v, got %+v", item.expectedActions, item.fakeNodeHandler.Actions)
 		}
+		if item.expectedEventSent {
+			<-called
+		}
+		events.Stop()
 	}
 }
 
