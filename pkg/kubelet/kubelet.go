@@ -999,33 +999,28 @@ func (kl *Kubelet) makePodDataDirs(pod *api.Pod) error {
 	return nil
 }
 
-func (kl *Kubelet) shouldContainerBeRestarted(container *api.Container, pod *api.Pod, podStatus *api.PodStatus) bool {
+func (kl *Kubelet) shouldContainerBeRestarted(container *api.Container, pod *api.Pod) bool {
 	podFullName := kubecontainer.GetPodFullName(pod)
-
-	// Get all dead container status.
-	var resultStatus []*api.ContainerStatus
-	for i, containerStatus := range podStatus.ContainerStatuses {
-		if containerStatus.Name == container.Name && containerStatus.State.Termination != nil {
-			resultStatus = append(resultStatus, &podStatus.ContainerStatuses[i])
-		}
+	// Check RestartPolicy for dead container
+	recentContainers, err := kl.containerManager.GetRecentDockerContainersWithNameAndUUID(podFullName, pod.UID, container.Name)
+	if err != nil {
+		glog.Errorf("Error listing recent containers for pod %q: %v", podFullName, err)
+		// TODO(dawnchen): error handling here?
+	}
+	// set dead containers to unready state
+	for _, c := range recentContainers {
+		kl.readinessManager.RemoveReadiness(c.ID)
 	}
 
-	// Set dead containers to unready state.
-	for _, c := range resultStatus {
-		// TODO(yifan): Unify the format of container ID. (i.e. including docker:// as prefix).
-		kl.readinessManager.RemoveReadiness(strings.TrimPrefix(c.ContainerID, dockertools.DockerPrefix))
-	}
-
-	// Check RestartPolicy for dead container.
-	if len(resultStatus) > 0 {
+	if len(recentContainers) > 0 {
 		if pod.Spec.RestartPolicy == api.RestartPolicyNever {
 			glog.Infof("Already ran container %q of pod %q, do nothing", container.Name, podFullName)
 			return false
+
 		}
 		if pod.Spec.RestartPolicy == api.RestartPolicyOnFailure {
-			// Check the exit code of last run. Note: This assumes the result is sorted
-			// by the created time in reverse order.
-			if resultStatus[0].State.Termination.ExitCode == 0 {
+			// Check the exit code of last run
+			if recentContainers[0].State.ExitCode == 0 {
 				glog.Infof("Already successfully ran container %q of pod %q, do nothing", container.Name, podFullName)
 				return false
 			}
@@ -1181,7 +1176,7 @@ func (kl *Kubelet) computePodContainerChanges(pod *api.Pod, runningPod kubeconta
 				continue
 			}
 		} else {
-			if kl.shouldContainerBeRestarted(&container, pod, &podStatus) {
+			if kl.shouldContainerBeRestarted(&container, pod) {
 				// If we are here it means that the container is dead and sould be restarted, or never existed and should
 				// be created. We may be inserting this ID again if the container has changed and it has
 				// RestartPolicy::Always, but it's not a big deal.

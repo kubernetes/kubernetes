@@ -71,13 +71,13 @@ func (f *FakeDockerClient) AssertUnorderedCalls(calls []string) (err error) {
 	f.Lock()
 	defer f.Unlock()
 
-	expected := make([]string, len(calls))
-	actual := make([]string, len(f.called))
-	copy(expected, calls)
-	copy(actual, f.called)
+	actual := make([]string, len(calls))
+	expected := make([]string, len(f.called))
+	copy(actual, calls)
+	copy(expected, f.called)
 
-	sort.StringSlice(expected).Sort()
 	sort.StringSlice(actual).Sort()
+	sort.StringSlice(expected).Sort()
 
 	if !reflect.DeepEqual(actual, expected) {
 		err = fmt.Errorf("expected(sorted) %#v, got(sorted) %#v", expected, actual)
