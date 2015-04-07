@@ -33,11 +33,13 @@ var (
 )
 
 var _ = Describe("Shell", func() {
+
+	defer GinkgoRecover()
 	// Slurp up all the tests in hack/e2e-suite
 	bashE2ERoot := filepath.Join(root, "hack/e2e-suite")
 	files, err := ioutil.ReadDir(bashE2ERoot)
 	if err != nil {
-		Fail(err.Error())
+		Fail(fmt.Sprintf("Error reading test suites from %v %v", bashE2ERoot, err.Error()))
 	}
 
 	for _, file := range files {
