@@ -39,8 +39,8 @@ import (
 )
 
 const (
-	testNodeMonitorGracePeriod = 8 * time.Second
-	testNodeStartupGracePeriod = 30 * time.Second
+	testNodeMonitorGracePeriod = 40 * time.Second
+	testNodeStartupGracePeriod = 60 * time.Second
 	testNodeMonitorPeriod      = 5 * time.Second
 )
 

@@ -119,9 +119,9 @@ func (s *CMServer) AddFlags(fs *pflag.FlagSet) {
 	fs.BoolVar(&s.SyncNodeStatus, "sync_node_status", s.SyncNodeStatus, ""+
 		"If true, node controller sends probes to kubelet and updates NodeStatus."+
 		"If false, Kubelet posts NodeStatus to API server.")
-	fs.DurationVar(&s.NodeMonitorGracePeriod, "node_monitor_grace_period", 8*time.Second, "Amount of time which we allow running Node to be unresponsive before marking it unhealty."+
+	fs.DurationVar(&s.NodeMonitorGracePeriod, "node_monitor_grace_period", 40*time.Second, "Amount of time which we allow running Node to be unresponsive before marking it unhealty."+
 		"Must be N times more than kubelet's nodeStatusUpdateFrequency, where N means number of retries allowed for kubelet to post node status.")
-	fs.DurationVar(&s.NodeStartupGracePeriod, "node_startup_grace_period", 30*time.Second, "Amount of time which we allow starting Node to be unresponsive before marking it unhealty.")
+	fs.DurationVar(&s.NodeStartupGracePeriod, "node_startup_grace_period", 60*time.Second, "Amount of time which we allow starting Node to be unresponsive before marking it unhealty.")
 	fs.DurationVar(&s.NodeMonitorPeriod, "node_monitor_period", 5*time.Second, "The period for syncing NodeStatus in NodeController.")
 	// TODO: Discover these by pinging the host machines, and rip out these flags.
 	// TODO: in the meantime, use resource.QuantityFlag() instead of these
