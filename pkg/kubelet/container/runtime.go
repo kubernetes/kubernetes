@@ -57,7 +57,7 @@ type Runtime interface {
 //
 // TODO: eventually include this interface in Runtime
 type ContainerRunner interface {
-	RunContainer(pod *api.Pod, container *api.Container, opts *RunContainerOptions) (string, error)
+	RunContainer(pod *api.Pod, container *api.Container, opts *RunContainerOptions) (types.UID, error)
 }
 
 // Pod is a group of containers, with the status of the pod.

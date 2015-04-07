@@ -27,6 +27,7 @@ import (
 	execprobe "github.com/GoogleCloudPlatform/kubernetes/pkg/probe/exec"
 	httprobe "github.com/GoogleCloudPlatform/kubernetes/pkg/probe/http"
 	tcprobe "github.com/GoogleCloudPlatform/kubernetes/pkg/probe/tcp"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/exec"
 
@@ -38,7 +39,7 @@ const maxProbeRetries = 3
 // probeContainer probes the liveness/readiness of the given container.
 // If the container's liveness probe is unsuccessful, set readiness to false.
 // If liveness is successful, do a readiness check and set readiness accordingly.
-func (kl *Kubelet) probeContainer(pod *api.Pod, status api.PodStatus, container api.Container, containerID string, createdAt int64) (probe.Result, error) {
+func (kl *Kubelet) probeContainer(pod *api.Pod, status api.PodStatus, container api.Container, containerID types.UID, createdAt int64) (probe.Result, error) {
 	// Probe liveness.
 	live, err := kl.probeContainerLiveness(pod, status, container, createdAt)
 	if err != nil {

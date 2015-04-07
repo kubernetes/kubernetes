@@ -350,7 +350,7 @@ func TestKillContainerWithError(t *testing.T) {
 	testKubelet := newTestKubelet(t)
 	kubelet := testKubelet.kubelet
 	for _, c := range fakeDocker.ContainerList {
-		kubelet.readinessManager.SetReadiness(c.ID, true)
+		kubelet.readinessManager.SetReadiness(types.UID(c.ID), true)
 	}
 	kubelet.dockerClient = fakeDocker
 	c := apiContainerToContainer(fakeDocker.ContainerList[0])
@@ -361,11 +361,11 @@ func TestKillContainerWithError(t *testing.T) {
 	verifyCalls(t, fakeDocker, []string{"stop"})
 	killedContainer := containers[0]
 	liveContainer := containers[1]
-	ready := kubelet.readinessManager.GetReadiness(killedContainer.ID)
+	ready := kubelet.readinessManager.GetReadiness(types.UID(killedContainer.ID))
 	if ready {
 		t.Errorf("exepcted container entry ID '%v' to not be found. states: %+v", killedContainer.ID, ready)
 	}
-	ready = kubelet.readinessManager.GetReadiness(liveContainer.ID)
+	ready = kubelet.readinessManager.GetReadiness(types.UID(liveContainer.ID))
 	if !ready {
 		t.Errorf("exepcted container entry ID '%v' to be found. states: %+v", liveContainer.ID, ready)
 	}
@@ -388,7 +388,7 @@ func TestKillContainer(t *testing.T) {
 	fakeDocker.ContainerList = append([]docker.APIContainers{}, containers...)
 
 	for _, c := range fakeDocker.ContainerList {
-		kubelet.readinessManager.SetReadiness(c.ID, true)
+		kubelet.readinessManager.SetReadiness(types.UID(c.ID), true)
 	}
 
 	c := apiContainerToContainer(fakeDocker.ContainerList[0])
@@ -399,11 +399,11 @@ func TestKillContainer(t *testing.T) {
 	verifyCalls(t, fakeDocker, []string{"stop"})
 	killedContainer := containers[0]
 	liveContainer := containers[1]
-	ready := kubelet.readinessManager.GetReadiness(killedContainer.ID)
+	ready := kubelet.readinessManager.GetReadiness(types.UID(killedContainer.ID))
 	if ready {
 		t.Errorf("exepcted container entry ID '%v' to not be found. states: %+v", killedContainer.ID, ready)
 	}
-	ready = kubelet.readinessManager.GetReadiness(liveContainer.ID)
+	ready = kubelet.readinessManager.GetReadiness(types.UID(liveContainer.ID))
 	if !ready {
 		t.Errorf("exepcted container entry ID '%v' to be found. states: %+v", liveContainer.ID, ready)
 	}

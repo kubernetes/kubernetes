@@ -20,6 +20,7 @@ import (
 	"sync"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 )
 
 // RefManager manages the references for the containers.
@@ -28,18 +29,17 @@ import (
 // for the caller.
 type RefManager struct {
 	sync.RWMutex
-	// TODO(yifan): To use strong type.
-	containerIDToRef map[string]*api.ObjectReference
+	containerIDToRef map[types.UID]*api.ObjectReference
 }
 
 // NewRefManager creates and returns a container reference manager
 // with empty contents.
 func NewRefManager() *RefManager {
-	return &RefManager{containerIDToRef: make(map[string]*api.ObjectReference)}
+	return &RefManager{containerIDToRef: make(map[types.UID]*api.ObjectReference)}
 }
 
 // SetRef stores a reference to a pod's container, associating it with the given container ID.
-func (c *RefManager) SetRef(id string, ref *api.ObjectReference) {
+func (c *RefManager) SetRef(id types.UID, ref *api.ObjectReference) {
 	c.Lock()
 	defer c.Unlock()
 	c.containerIDToRef[id] = ref
@@ -48,14 +48,14 @@ func (c *RefManager) SetRef(id string, ref *api.ObjectReference) {
 // ClearRef forgets the given container id and its associated container reference.
 // TODO(yifan): This is currently never called. Consider to remove this function,
 // or figure out when to clear the references.
-func (c *RefManager) ClearRef(id string) {
+func (c *RefManager) ClearRef(id types.UID) {
 	c.Lock()
 	defer c.Unlock()
 	delete(c.containerIDToRef, id)
 }
 
 // GetRef returns the container reference of the given ID, or (nil, false) if none is stored.
-func (c *RefManager) GetRef(id string) (ref *api.ObjectReference, ok bool) {
+func (c *RefManager) GetRef(id types.UID) (ref *api.ObjectReference, ok bool) {
 	c.RLock()
 	defer c.RUnlock()
 	ref, ok = c.containerIDToRef[id]

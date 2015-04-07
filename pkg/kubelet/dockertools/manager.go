@@ -31,6 +31,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
 	kubecontainer "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/leaky"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/fsouza/go-dockerclient"
 	"github.com/golang/glog"
@@ -289,13 +290,14 @@ func (self *DockerManager) GetPodStatus(pod *api.Pod) (*api.PodStatus, error) {
 	return &podStatus, nil
 }
 
-func (self *DockerManager) GetRunningContainers(ids []string) ([]*docker.Container, error) {
+func (self *DockerManager) GetRunningContainers(ids []types.UID) ([]*docker.Container, error) {
 	result := []*docker.Container{}
 	if self.client == nil {
 		return nil, fmt.Errorf("unexpected nil docker client.")
 	}
 	for ix := range ids {
-		status, err := self.client.InspectContainer(ids[ix])
+		// TODO(yifan): Move the TrimPrefix work to the container runtime.
+		status, err := self.client.InspectContainer(strings.TrimPrefix(string(ids[ix]), DockerPrefix))
 		if err != nil {
 			return nil, err
 		}
@@ -306,7 +308,7 @@ func (self *DockerManager) GetRunningContainers(ids []string) ([]*docker.Contain
 	return result, nil
 }
 
-func (self *DockerManager) RunContainer(pod *api.Pod, container *api.Container, opts *kubecontainer.RunContainerOptions) (string, error) {
+func (self *DockerManager) RunContainer(pod *api.Pod, container *api.Container, opts *kubecontainer.RunContainerOptions) (types.UID, error) {
 	ref, err := kubecontainer.GenerateContainerRef(pod, container)
 	if err != nil {
 		glog.Errorf("Couldn't make a ref to pod %v, container %v: '%v'", pod.Name, container.Name, err)
@@ -407,7 +409,7 @@ func (self *DockerManager) RunContainer(pod *api.Pod, container *api.Container, 
 	if ref != nil {
 		self.recorder.Eventf(ref, "started", "Started with docker id %v", dockerContainer.ID)
 	}
-	return dockerContainer.ID, nil
+	return types.UID(DockerPrefix + dockerContainer.ID), nil
 }
 
 func setEntrypointAndCommand(container *api.Container, opts *docker.CreateContainerOptions) {
@@ -473,7 +475,7 @@ func PodInfraContainerChanged(client DockerInterface, pod *api.Pod, podInfraCont
 	networkMode := ""
 	var ports []api.ContainerPort
 
-	dockerPodInfraContainer, err := client.InspectContainer(string(podInfraContainer.ID))
+	dockerPodInfraContainer, err := client.InspectContainer(strings.TrimPrefix(string(podInfraContainer.ID), DockerPrefix))
 	if err != nil {
 		return false, err
 	}

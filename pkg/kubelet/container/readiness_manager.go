@@ -16,7 +16,11 @@ limitations under the License.
 
 package container
 
-import "sync"
+import (
+	"sync"
+
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
+)
 
 // ReadinessManager maintains the readiness information(probe results) of
 // containers over time to allow for implementation of health thresholds.
@@ -24,20 +28,19 @@ import "sync"
 type ReadinessManager struct {
 	// guards states
 	sync.RWMutex
-	// TODO(yifan): To use strong type.
-	states map[string]bool
+	states map[types.UID]bool
 }
 
 // NewReadinessManager creates ane returns a readiness manager with empty
 // contents.
 func NewReadinessManager() *ReadinessManager {
-	return &ReadinessManager{states: make(map[string]bool)}
+	return &ReadinessManager{states: make(map[types.UID]bool)}
 }
 
 // GetReadiness returns the readiness value for the container with the given ID.
 // If the readiness value is found, returns it.
 // If the readiness is not found, returns false.
-func (r *ReadinessManager) GetReadiness(id string) bool {
+func (r *ReadinessManager) GetReadiness(id types.UID) bool {
 	r.RLock()
 	defer r.RUnlock()
 	state, found := r.states[id]
@@ -45,14 +48,14 @@ func (r *ReadinessManager) GetReadiness(id string) bool {
 }
 
 // SetReadiness sets the readiness value for the container with the given ID.
-func (r *ReadinessManager) SetReadiness(id string, value bool) {
+func (r *ReadinessManager) SetReadiness(id types.UID, value bool) {
 	r.Lock()
 	defer r.Unlock()
 	r.states[id] = value
 }
 
 // RemoveReadiness clears the readiness value for the container with the given ID.
-func (r *ReadinessManager) RemoveReadiness(id string) {
+func (r *ReadinessManager) RemoveReadiness(id types.UID) {
 	r.Lock()
 	defer r.Unlock()
 	delete(r.states, id)

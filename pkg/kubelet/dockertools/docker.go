@@ -604,7 +604,7 @@ func GetPods(client DockerInterface, all bool) ([]*kubecontainer.Pod, error) {
 			pods[dockerName.PodUID] = pod
 		}
 		pod.Containers = append(pod.Containers, &kubecontainer.Container{
-			ID:      types.UID(c.ID),
+			ID:      types.UID(DockerPrefix + c.ID),
 			Name:    dockerName.ContainerName,
 			Hash:    hash,
 			Created: c.Created,
