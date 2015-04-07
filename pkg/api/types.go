@@ -390,6 +390,11 @@ type ISCSIVolumeSource struct {
 	IQN string `json:"iqn,omitempty"`
 	// Required: iSCSI target lun number
 	Lun int `json:"lun,omitempty"`
+	// Required: Filesystem type to mount.
+	// Must be a filesystem type supported by the host operating system.
+	// Ex. "ext4", "xfs", "ntfs"
+	// TODO: how do we prevent errors in the filesystem from compromising the machine
+	FSType string `json:"fsType,omitempty"`
 	// Optional: Defaults to false (read/write). ReadOnly here will force
 	// the ReadOnly setting in VolumeMounts.
 	ReadOnly bool `json:"readOnly,omitempty"`

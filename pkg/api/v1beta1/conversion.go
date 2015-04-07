@@ -1197,11 +1197,10 @@ func init() {
 			if err := s.Convert(&in.GCEPersistentDisk, &out.GCEPersistentDisk, 0); err != nil {
 				return err
 			}
-<<<<<<< HEAD
 			if err := s.Convert(&in.ISCSI, &out.ISCSI, 0); err != nil {
-=======
+				return err
+			}
 			if err := s.Convert(&in.AWSPersistentDisk, &out.AWSPersistentDisk, 0); err != nil {
->>>>>>> Add initial support for Volumes to AWS
 				return err
 			}
 			if err := s.Convert(&in.HostDir, &out.HostPath, 0); err != nil {
