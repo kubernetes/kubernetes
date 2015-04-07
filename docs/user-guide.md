@@ -38,6 +38,9 @@ kubernetes API, or to contribute directly to the kubernetes project.
   (e.g. ssh keys, passwords) separately from the Pods that use them, protecting
   the sensitive data from proliferation by tools that process pods.
 
+* **API Overview** ([api.md](api.md)): Pointers to API documentation on various topics
+  and explanation of Kubernetes's approaches to API changes and API versioning.
+
 * **Accessing the API** ([accessing_the_api.md](accessing_the_api.md)):
   Ports, IPs, proxies, and firewall rules.
 
