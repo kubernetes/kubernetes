@@ -84,7 +84,7 @@ type NodeController struct {
 	// is just created, e.g. cluster bootstrap or node creation, we give a longer grace period.
 	nodeStartupGracePeriod time.Duration
 	// Value controlling NodeController monitoring period, i.e. how often does NodeController
-	// check node status posted from kubelet. Theoretically, this value should be lower than nodeMonitorGracePeriod.
+	// check node status posted from kubelet. This value should be lower than nodeMonitorGracePeriod.
 	// TODO: Change node status monitor to watch based.
 	nodeMonitorPeriod time.Duration
 	// Method for easy mocking in unittest.
