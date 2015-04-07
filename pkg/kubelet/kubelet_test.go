@@ -20,7 +20,6 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -1659,51 +1658,8 @@ func TestGetContainerInfoWithNoMatchingContainers(t *testing.T) {
 	mockCadvisor.AssertExpectations(t)
 }
 
-type fakeContainerCommandRunner struct {
-	Cmd    []string
-	ID     string
-	E      error
-	Stdin  io.Reader
-	Stdout io.WriteCloser
-	Stderr io.WriteCloser
-	TTY    bool
-	Port   uint16
-	Stream io.ReadWriteCloser
-}
-
-func (f *fakeContainerCommandRunner) RunInContainer(id string, cmd []string) ([]byte, error) {
-	f.Cmd = cmd
-	f.ID = id
-	return []byte{}, f.E
-}
-
-func (f *fakeContainerCommandRunner) GetDockerServerVersion() ([]uint, error) {
-	return nil, nil
-}
-
-func (f *fakeContainerCommandRunner) ExecInContainer(id string, cmd []string, in io.Reader, out, err io.WriteCloser, tty bool) error {
-	f.Cmd = cmd
-	f.ID = id
-	f.Stdin = in
-	f.Stdout = out
-	f.Stderr = err
-	f.TTY = tty
-	return f.E
-}
-
-func (f *fakeContainerCommandRunner) PortForward(pod *kubecontainer.Pod, port uint16, stream io.ReadWriteCloser) error {
-	podInfraContainer := pod.FindContainerByName(dockertools.PodInfraContainerName)
-	if podInfraContainer == nil {
-		return fmt.Errorf("cannot find pod infra container in pod %q", kubecontainer.BuildPodFullName(pod.Name, pod.Namespace))
-	}
-	f.ID = string(podInfraContainer.ID)
-	f.Port = port
-	f.Stream = stream
-	return nil
-}
-
 func TestRunInContainerNoSuchPod(t *testing.T) {
-	fakeCommandRunner := fakeContainerCommandRunner{}
+	fakeCommandRunner := dockertools.FakeContainerCommandRunner{}
 	testKubelet := newTestKubelet(t)
 	kubelet := testKubelet.kubelet
 	fakeDocker := testKubelet.fakeDocker
@@ -1727,7 +1683,7 @@ func TestRunInContainerNoSuchPod(t *testing.T) {
 }
 
 func TestRunInContainer(t *testing.T) {
-	fakeCommandRunner := fakeContainerCommandRunner{}
+	fakeCommandRunner := dockertools.FakeContainerCommandRunner{}
 	testKubelet := newTestKubelet(t)
 	kubelet := testKubelet.kubelet
 	fakeDocker := testKubelet.fakeDocker
@@ -1769,7 +1725,7 @@ func TestRunInContainer(t *testing.T) {
 }
 
 func TestRunHandlerExec(t *testing.T) {
-	fakeCommandRunner := fakeContainerCommandRunner{}
+	fakeCommandRunner := dockertools.FakeContainerCommandRunner{}
 	testKubelet := newTestKubelet(t)
 	kubelet := testKubelet.kubelet
 	fakeDocker := testKubelet.fakeDocker
@@ -2815,7 +2771,7 @@ func TestGetPodReadyCondition(t *testing.T) {
 }
 
 func TestExecInContainerNoSuchPod(t *testing.T) {
-	fakeCommandRunner := fakeContainerCommandRunner{}
+	fakeCommandRunner := dockertools.FakeContainerCommandRunner{}
 	testKubelet := newTestKubelet(t)
 	kubelet := testKubelet.kubelet
 	fakeDocker := testKubelet.fakeDocker
@@ -2844,7 +2800,7 @@ func TestExecInContainerNoSuchPod(t *testing.T) {
 }
 
 func TestExecInContainerNoSuchContainer(t *testing.T) {
-	fakeCommandRunner := fakeContainerCommandRunner{}
+	fakeCommandRunner := dockertools.FakeContainerCommandRunner{}
 	testKubelet := newTestKubelet(t)
 	kubelet := testKubelet.kubelet
 	fakeDocker := testKubelet.fakeDocker
@@ -2898,7 +2854,7 @@ func (f *fakeReadWriteCloser) Close() error {
 }
 
 func TestExecInContainer(t *testing.T) {
-	fakeCommandRunner := fakeContainerCommandRunner{}
+	fakeCommandRunner := dockertools.FakeContainerCommandRunner{}
 	testKubelet := newTestKubelet(t)
 	kubelet := testKubelet.kubelet
 	fakeDocker := testKubelet.fakeDocker
@@ -2958,7 +2914,7 @@ func TestExecInContainer(t *testing.T) {
 }
 
 func TestPortForwardNoSuchPod(t *testing.T) {
-	fakeCommandRunner := fakeContainerCommandRunner{}
+	fakeCommandRunner := dockertools.FakeContainerCommandRunner{}
 	testKubelet := newTestKubelet(t)
 	kubelet := testKubelet.kubelet
 	fakeDocker := testKubelet.fakeDocker
@@ -2984,7 +2940,7 @@ func TestPortForwardNoSuchPod(t *testing.T) {
 }
 
 func TestPortForwardNoSuchContainer(t *testing.T) {
-	fakeCommandRunner := fakeContainerCommandRunner{}
+	fakeCommandRunner := dockertools.FakeContainerCommandRunner{}
 	testKubelet := newTestKubelet(t)
 	kubelet := testKubelet.kubelet
 	fakeDocker := testKubelet.fakeDocker
@@ -3020,7 +2976,7 @@ func TestPortForwardNoSuchContainer(t *testing.T) {
 }
 
 func TestPortForward(t *testing.T) {
-	fakeCommandRunner := fakeContainerCommandRunner{}
+	fakeCommandRunner := dockertools.FakeContainerCommandRunner{}
 	testKubelet := newTestKubelet(t)
 	kubelet := testKubelet.kubelet
 	fakeDocker := testKubelet.fakeDocker
