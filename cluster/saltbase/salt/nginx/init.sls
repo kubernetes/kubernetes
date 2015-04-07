@@ -48,8 +48,6 @@ stop_nginx-service:
   service.dead:
     - name: nginx
     - enable: None
-    - watch:
-      - file: /etc/kubernetes/manifests/nginx.json
 
 {% else %}
 nginx-service:
