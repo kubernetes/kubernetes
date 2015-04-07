@@ -1093,10 +1093,13 @@ func TestSyncProbedNodeStatusEvictPods(t *testing.T) {
 
 func TestMonitorNodeStatusEvictPods(t *testing.T) {
 	fakeNow := util.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC)
+	evictionTimeout := 30 * time.Minute
+
 	table := []struct {
 		fakeNodeHandler   *FakeNodeHandler
+		timeToPass        time.Duration
+		newNodeStatus     api.NodeStatus
 		expectedEvictPods bool
-		evictionTimeout   time.Duration
 	}{
 		// Node created recently, with no status (happens only at cluster startup).
 		{
@@ -1113,7 +1116,8 @@ func TestMonitorNodeStatusEvictPods(t *testing.T) {
 					PodsList: api.PodList{Items: []api.Pod{*newPod("pod0", "node0")}},
 				},
 			},
-			evictionTimeout:   30 * time.Minute,
+			timeToPass:        0,
+			newNodeStatus:     api.NodeStatus{},
 			expectedEvictPods: false,
 		},
 		// Node created long time ago, and kubelet posted NotReady for a short period of time.
@@ -1128,11 +1132,10 @@ func TestMonitorNodeStatusEvictPods(t *testing.T) {
 						Status: api.NodeStatus{
 							Conditions: []api.NodeCondition{
 								{
-									Type:   api.NodeReady,
-									Status: api.ConditionFalse,
-									// Node status has just been updated, and transited to NotReady for 10min.
-									LastProbeTime:      util.Date(2015, 1, 1, 11, 59, 0, 0, time.UTC),
-									LastTransitionTime: util.Date(2015, 1, 1, 11, 50, 0, 0, time.UTC),
+									Type:               api.NodeReady,
+									Status:             api.ConditionFalse,
+									LastProbeTime:      util.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+									LastTransitionTime: util.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
 								},
 							},
 						},
@@ -1142,7 +1145,18 @@ func TestMonitorNodeStatusEvictPods(t *testing.T) {
 					PodsList: api.PodList{Items: []api.Pod{*newPod("pod0", "node0")}},
 				},
 			},
-			evictionTimeout:   30 * time.Minute,
+			timeToPass: 10 * time.Minute,
+			newNodeStatus: api.NodeStatus{
+				Conditions: []api.NodeCondition{
+					{
+						Type:   api.NodeReady,
+						Status: api.ConditionFalse,
+						// Node status has just been updated, and is NotReady for 10min.
+						LastProbeTime:      util.Date(2015, 1, 1, 12, 9, 0, 0, time.UTC),
+						LastTransitionTime: util.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+					},
+				},
+			},
 			expectedEvictPods: false,
 		},
 		// Node created long time ago, and kubelet posted NotReady for a long period of time.
@@ -1157,11 +1171,10 @@ func TestMonitorNodeStatusEvictPods(t *testing.T) {
 						Status: api.NodeStatus{
 							Conditions: []api.NodeCondition{
 								{
-									Type:   api.NodeReady,
-									Status: api.ConditionFalse,
-									// Node status has just been updated, and transited to NotReady for 1hr.
-									LastProbeTime:      util.Date(2015, 1, 1, 11, 59, 0, 0, time.UTC),
-									LastTransitionTime: util.Date(2015, 1, 1, 11, 0, 0, 0, time.UTC),
+									Type:               api.NodeReady,
+									Status:             api.ConditionFalse,
+									LastProbeTime:      util.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+									LastTransitionTime: util.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
 								},
 							},
 						},
@@ -1171,7 +1184,18 @@ func TestMonitorNodeStatusEvictPods(t *testing.T) {
 					PodsList: api.PodList{Items: []api.Pod{*newPod("pod0", "node0")}},
 				},
 			},
-			evictionTimeout:   30 * time.Minute,
+			timeToPass: time.Hour,
+			newNodeStatus: api.NodeStatus{
+				Conditions: []api.NodeCondition{
+					{
+						Type:   api.NodeReady,
+						Status: api.ConditionFalse,
+						// Node status has just been updated, and is NotReady for 1hr.
+						LastProbeTime:      util.Date(2015, 1, 1, 12, 59, 0, 0, time.UTC),
+						LastTransitionTime: util.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+					},
+				},
+			},
 			expectedEvictPods: true,
 		},
 		// Node created long time ago, node controller posted Unknown for a short period of time.
@@ -1186,11 +1210,10 @@ func TestMonitorNodeStatusEvictPods(t *testing.T) {
 						Status: api.NodeStatus{
 							Conditions: []api.NodeCondition{
 								{
-									Type:   api.NodeReady,
-									Status: api.ConditionUnknown,
-									// Node status was updated by nodecontroller 10min ago
-									LastProbeTime:      util.Date(2015, 1, 1, 11, 50, 0, 0, time.UTC),
-									LastTransitionTime: util.Date(2015, 1, 1, 11, 50, 0, 0, time.UTC),
+									Type:               api.NodeReady,
+									Status:             api.ConditionUnknown,
+									LastProbeTime:      util.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+									LastTransitionTime: util.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
 								},
 							},
 						},
@@ -1200,7 +1223,18 @@ func TestMonitorNodeStatusEvictPods(t *testing.T) {
 					PodsList: api.PodList{Items: []api.Pod{*newPod("pod0", "node0")}},
 				},
 			},
-			evictionTimeout:   30 * time.Minute,
+			timeToPass: 10 * time.Minute,
+			newNodeStatus: api.NodeStatus{
+				Conditions: []api.NodeCondition{
+					{
+						Type:   api.NodeReady,
+						Status: api.ConditionUnknown,
+						// Node status was updated by nodecontroller 10min ago
+						LastProbeTime:      util.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+						LastTransitionTime: util.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+					},
+				},
+			},
 			expectedEvictPods: false,
 		},
 		// Node created long time ago, node controller posted Unknown for a long period of time.
@@ -1215,11 +1249,10 @@ func TestMonitorNodeStatusEvictPods(t *testing.T) {
 						Status: api.NodeStatus{
 							Conditions: []api.NodeCondition{
 								{
-									Type:   api.NodeReady,
-									Status: api.ConditionUnknown,
-									// Node status was updated by nodecontroller 1hr ago
-									LastProbeTime:      util.Date(2015, 1, 1, 11, 0, 0, 0, time.UTC),
-									LastTransitionTime: util.Date(2015, 1, 1, 11, 0, 0, 0, time.UTC),
+									Type:               api.NodeReady,
+									Status:             api.ConditionUnknown,
+									LastProbeTime:      util.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+									LastTransitionTime: util.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
 								},
 							},
 						},
@@ -1229,14 +1262,32 @@ func TestMonitorNodeStatusEvictPods(t *testing.T) {
 					PodsList: api.PodList{Items: []api.Pod{*newPod("pod0", "node0")}},
 				},
 			},
-			evictionTimeout:   30 * time.Minute,
+			timeToPass: 60 * time.Minute,
+			newNodeStatus: api.NodeStatus{
+				Conditions: []api.NodeCondition{
+					{
+						Type:   api.NodeReady,
+						Status: api.ConditionUnknown,
+						// Node status was updated by nodecontroller 1hr ago
+						LastProbeTime:      util.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+						LastTransitionTime: util.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+					},
+				},
+			},
 			expectedEvictPods: true,
 		},
 	}
 
 	for _, item := range table {
-		nodeController := NewNodeController(nil, "", []string{"node0"}, nil, item.fakeNodeHandler, nil, 10, item.evictionTimeout, util.NewFakeRateLimiter())
+		nodeController := NewNodeController(nil, "", []string{"node0"}, nil, item.fakeNodeHandler, nil, 10, evictionTimeout, util.NewFakeRateLimiter())
 		nodeController.now = func() util.Time { return fakeNow }
+		if err := nodeController.MonitorNodeStatus(); err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		if item.timeToPass > 0 {
+			nodeController.now = func() util.Time { return util.Time{Time: fakeNow.Add(item.timeToPass)} }
+			item.fakeNodeHandler.Existing[0].Status = item.newNodeStatus
+		}
 		if err := nodeController.MonitorNodeStatus(); err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -1256,6 +1307,9 @@ func TestMonitorNodeStatusUpdateStatus(t *testing.T) {
 	fakeNow := util.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC)
 	table := []struct {
 		fakeNodeHandler      *FakeNodeHandler
+		timeToPass           time.Duration
+		newNodeStatus        api.NodeStatus
+		expectedEvictPods    bool
 		expectedRequestCount int
 		expectedNodes        []*api.Node
 	}{
@@ -1287,7 +1341,7 @@ func TestMonitorNodeStatusUpdateStatus(t *testing.T) {
 							{
 								Type:               api.NodeReady,
 								Status:             api.ConditionUnknown,
-								Reason:             fmt.Sprintf("Kubelet never posted node status"),
+								Reason:             fmt.Sprintf("Kubelet never posted node status."),
 								LastProbeTime:      util.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
 								LastTransitionTime: fakeNow,
 							},
@@ -1331,8 +1385,8 @@ func TestMonitorNodeStatusUpdateStatus(t *testing.T) {
 									Type:   api.NodeReady,
 									Status: api.ConditionTrue,
 									// Node status hasn't been updated for 1hr.
-									LastProbeTime:      util.Date(2015, 1, 1, 11, 0, 0, 0, time.UTC),
-									LastTransitionTime: util.Date(2015, 1, 1, 11, 0, 0, 0, time.UTC),
+									LastProbeTime:      util.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+									LastTransitionTime: util.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
 								},
 							},
 							Capacity: api.ResourceList{
@@ -1349,7 +1403,23 @@ func TestMonitorNodeStatusUpdateStatus(t *testing.T) {
 					PodsList: api.PodList{Items: []api.Pod{*newPod("pod0", "node0")}},
 				},
 			},
-			expectedRequestCount: 2, // List+Update
+			expectedRequestCount: 3, // (List+)List+Update
+			timeToPass:           time.Hour,
+			newNodeStatus: api.NodeStatus{
+				Conditions: []api.NodeCondition{
+					{
+						Type:   api.NodeReady,
+						Status: api.ConditionTrue,
+						// Node status hasn't been updated for 1hr.
+						LastProbeTime:      util.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+						LastTransitionTime: util.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+					},
+				},
+				Capacity: api.ResourceList{
+					api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
+					api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
+				},
+			},
 			expectedNodes: []*api.Node{
 				{
 					ObjectMeta: api.ObjectMeta{
@@ -1362,8 +1432,8 @@ func TestMonitorNodeStatusUpdateStatus(t *testing.T) {
 								Type:               api.NodeReady,
 								Status:             api.ConditionUnknown,
 								Reason:             fmt.Sprintf("Kubelet stopped posting node status."),
-								LastProbeTime:      util.Date(2015, 1, 1, 11, 0, 0, 0, time.UTC),
-								LastTransitionTime: fakeNow,
+								LastProbeTime:      util.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+								LastTransitionTime: util.Time{util.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC).Add(time.Hour)},
 							},
 						},
 						Capacity: api.ResourceList{
@@ -1422,11 +1492,19 @@ func TestMonitorNodeStatusUpdateStatus(t *testing.T) {
 		if err := nodeController.MonitorNodeStatus(); err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
+		if item.timeToPass > 0 {
+			nodeController.now = func() util.Time { return util.Time{Time: fakeNow.Add(item.timeToPass)} }
+			item.fakeNodeHandler.Existing[0].Status = item.newNodeStatus
+			if err := nodeController.MonitorNodeStatus(); err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+		}
 		if item.expectedRequestCount != item.fakeNodeHandler.RequestCount {
 			t.Errorf("expected %v call, but got %v.", item.expectedRequestCount, item.fakeNodeHandler.RequestCount)
 		}
-		if !reflect.DeepEqual(item.expectedNodes, item.fakeNodeHandler.UpdatedNodes) {
-			t.Errorf("expected nodes %+v, got %+v", item.expectedNodes[0], item.fakeNodeHandler.UpdatedNodes[0])
+		if !api.Semantic.DeepEqual(item.expectedNodes, item.fakeNodeHandler.UpdatedNodes) {
+			t.Errorf("expected nodes %+v, got %+v", item.expectedNodes[0],
+				item.fakeNodeHandler.UpdatedNodes[0])
 		}
 	}
 }
