@@ -47,7 +47,7 @@ func (f *Factory) NewCmdCreate(out io.Writer) *cobra.Command {
 		Example: create_example,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(ValidateArgs(cmd, args))
-			cmdutil.CheckErr(RunCreate(f, out, cmd, filenames))
+			cmdutil.CheckErr(RunCreate(f, out, filenames))
 		},
 	}
 	cmd.Flags().VarP(&filenames, "filename", "f", "Filename, directory, or URL to file to use to create the resource")
@@ -61,7 +61,7 @@ func ValidateArgs(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func RunCreate(f *Factory, out io.Writer, cmd *cobra.Command, filenames util.StringList) error {
+func RunCreate(f *Factory, out io.Writer, filenames util.StringList) error {
 	schema, err := f.Validator()
 	if err != nil {
 		return err
