@@ -2,6 +2,11 @@
 
 The example below creates a Kubernetes cluster with 4 worker node Virtual Machines and a master Virtual Machine (i.e. 5 VMs in your cluster). This cluster is set up and controlled from your workstation (or wherever you find convenient).
 
+### Before you start
+If you want a simplified getting started experience and GUI for managing clusters, please consider trying [Google Container Engine](https://cloud.google.com/container-engine/) for hosted cluster installation and management.  
+
+If you want to use custom binaries or pure open source Kubernetes, please continue with the instructions below.
+
 ### Starting a Cluster
 
 You can install a cluster with one of two one-liners:
@@ -16,7 +21,11 @@ or
 wget -q -O - https://get.k8s.io | bash
 ```
 
-This will leave you with a ```kubernetes``` directory and a running cluster.  Feel free to move the ```kubernetes``` directory to the appropriate directory (e.g. ```/opt/kubernetes```) then cd into that directory.
+### Installing the kubernetes client on your workstation
+
+This will leave you with a ```kubernetes``` directory on your workstation, and a running cluster.
+
+Feel free to move the ```kubernetes``` directory to the appropriate directory on your workstation (e.g. ```/opt/kubernetes```) then ```cd``` into that directory:
 
 ```bash
 mv kubernetes ${SOME_DIR}/kubernetes
