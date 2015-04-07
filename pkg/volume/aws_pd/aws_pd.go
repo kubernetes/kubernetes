@@ -174,7 +174,7 @@ func (pd *awsElasticBlockStore) SetUp() error {
 // SetUpAt attaches the disk and bind mounts to the volume path.
 func (pd *awsElasticBlockStore) SetUpAt(dir string) error {
 	// TODO: handle failed mounts here.
-	mountpoint, err := mount.IsMountPoint(dir)
+	mountpoint, err := pd.mounter.IsMountPoint(dir)
 	glog.V(4).Infof("PersistentDisk set up: %s %v %v", dir, mountpoint, err)
 	if err != nil && !os.IsNotExist(err) {
 		return err
@@ -202,7 +202,7 @@ func (pd *awsElasticBlockStore) SetUpAt(dir string) error {
 	// Perform a bind mount to the full path to allow duplicate mounts of the same PD.
 	err = pd.mounter.Mount(globalPDPath, dir, "", mount.FlagBind|flags, "")
 	if err != nil {
-		mountpoint, mntErr := mount.IsMountPoint(dir)
+		mountpoint, mntErr := pd.mounter.IsMountPoint(dir)
 		if mntErr != nil {
 			glog.Errorf("isMountpoint check failed: %v", mntErr)
 			return err
@@ -212,7 +212,7 @@ func (pd *awsElasticBlockStore) SetUpAt(dir string) error {
 				glog.Errorf("Failed to unmount: %v", mntErr)
 				return err
 			}
-			mountpoint, mntErr := mount.IsMountPoint(dir)
+			mountpoint, mntErr := pd.mounter.IsMountPoint(dir)
 			if mntErr != nil {
 				glog.Errorf("isMountpoint check failed: %v", mntErr)
 				return err
@@ -271,7 +271,7 @@ func (pd *awsElasticBlockStore) TearDown() error {
 // Unmounts the bind mount, and detaches the disk only if the PD
 // resource was the last reference to that disk on the kubelet.
 func (pd *awsElasticBlockStore) TearDownAt(dir string) error {
-	mountpoint, err := mount.IsMountPoint(dir)
+	mountpoint, err := pd.mounter.IsMountPoint(dir)
 	if err != nil {
 		glog.V(2).Info("Error checking if mountpoint ", dir, ": ", err)
 		return err
@@ -305,7 +305,7 @@ func (pd *awsElasticBlockStore) TearDownAt(dir string) error {
 			return err
 		}
 	}
-	mountpoint, mntErr := mount.IsMountPoint(dir)
+	mountpoint, mntErr := pd.mounter.IsMountPoint(dir)
 	if mntErr != nil {
 		glog.Errorf("isMountpoint check failed: %v", mntErr)
 		return err
