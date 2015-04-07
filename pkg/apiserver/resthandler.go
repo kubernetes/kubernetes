@@ -74,8 +74,13 @@ type RequestScope struct {
 	ServerAPIVersion string
 }
 
-// GetResource returns a function that handles retrieving a single resource from a rest.Storage object.
-func GetResource(r rest.Getter, scope RequestScope) restful.RouteFunction {
+// getterFunc performs a get request with the given context and object name. The request
+// may be used to deserialize an options object to pass to the getter.
+type getterFunc func(ctx api.Context, name string, req *restful.Request) (runtime.Object, error)
+
+// getResourceHandler is an HTTP handler function for get requests. It delegates to the
+// passed-in getterFunc to perform the actual get.
+func getResourceHandler(scope RequestScope, getter getterFunc) restful.RouteFunction {
 	return func(req *restful.Request, res *restful.Response) {
 		w := res.ResponseWriter
 		namespace, name, err := scope.Namer.Name(req)
@@ -86,7 +91,7 @@ func GetResource(r rest.Getter, scope RequestScope) restful.RouteFunction {
 		ctx := scope.ContextFunc(req)
 		ctx = api.WithNamespace(ctx, namespace)
 
-		result, err := r.Get(ctx, name)
+		result, err := getter(ctx, name, req)
 		if err != nil {
 			errorJSON(err, scope.Codec, w)
 			return
@@ -97,6 +102,26 @@ func GetResource(r rest.Getter, scope RequestScope) restful.RouteFunction {
 		}
 		write(http.StatusOK, scope.APIVersion, scope.Codec, result, w, req.Request)
 	}
+}
+
+// GetResource returns a function that handles retrieving a single resource from a rest.Storage object.
+func GetResource(r rest.Getter, scope RequestScope) restful.RouteFunction {
+	return getResourceHandler(scope,
+		func(ctx api.Context, name string, req *restful.Request) (runtime.Object, error) {
+			return r.Get(ctx, name)
+		})
+}
+
+// GetResourceWithOptions returns a function that handles retrieving a single resource from a rest.Storage object.
+func GetResourceWithOptions(r rest.GetterWithOptions, scope RequestScope, getOptionsKind string) restful.RouteFunction {
+	return getResourceHandler(scope,
+		func(ctx api.Context, name string, req *restful.Request) (runtime.Object, error) {
+			opts, err := queryToObject(req.Request.URL.Query(), scope, getOptionsKind)
+			if err != nil {
+				return nil, err
+			}
+			return r.Get(ctx, name, opts)
+		})
 }
 
 // ListResource returns a function that handles retrieving a list of resources from a rest.Storage object.

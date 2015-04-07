@@ -58,6 +58,7 @@ func init() {
 		&PersistentVolumeClaimList{},
 		&DeleteOptions{},
 		&ListOptions{},
+		&PodLogOptions{},
 	)
 	// Legacy names are supported
 	Scheme.AddKnownTypeWithName("", "Minion", &Node{})
@@ -97,3 +98,4 @@ func (*PersistentVolumeClaim) IsAnAPIObject()     {}
 func (*PersistentVolumeClaimList) IsAnAPIObject() {}
 func (*DeleteOptions) IsAnAPIObject()             {}
 func (*ListOptions) IsAnAPIObject()               {}
+func (*PodLogOptions) IsAnAPIObject()             {}

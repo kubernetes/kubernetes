@@ -44,9 +44,9 @@ func NewTestEtcdRegistry(client tools.EtcdClient) *Registry {
 
 func NewTestEtcdRegistryWithPods(client tools.EtcdClient) *Registry {
 	helper := tools.NewEtcdHelper(client, latest.Codec)
-	podStorage, _, _ := podetcd.NewStorage(helper)
+	podStorage := podetcd.NewStorage(helper, nil)
 	endpointStorage := endpointetcd.NewStorage(helper)
-	registry := NewRegistry(helper, pod.NewRegistry(podStorage), endpoint.NewRegistry(endpointStorage))
+	registry := NewRegistry(helper, pod.NewRegistry(podStorage.Pod), endpoint.NewRegistry(endpointStorage))
 	return registry
 }
 

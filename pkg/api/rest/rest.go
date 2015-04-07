@@ -28,7 +28,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
 
-// RESTStorage is a generic interface for RESTful storage services.
+// Storage is a generic interface for RESTful storage services.
 // Resources which are exported to the RESTful API of apiserver need to implement this interface. It is expected
 // that objects may implement any of the below interfaces.
 type Storage interface {
@@ -52,6 +52,21 @@ type Getter interface {
 	// Although it can return an arbitrary error value, IsNotFound(err) is true for the
 	// returned error value err when the specified resource is not found.
 	Get(ctx api.Context, name string) (runtime.Object, error)
+}
+
+// GetterWithOptions is an object that retrieve a named RESTful resource and takes
+// additional options on the get request
+type GetterWithOptions interface {
+	// Get finds a resource in the storage by name and returns it.
+	// Although it can return an arbitrary error value, IsNotFound(err) is true for the
+	// returned error value err when the specified resource is not found.
+	// The options object passed to it is of the same type returned by the NewGetOptions
+	// method.
+	Get(ctx api.Context, name string, options runtime.Object) (runtime.Object, error)
+
+	// NewGetOptions returns an empty options object that will be used to pass
+	// options to the Get method.
+	NewGetOptions() runtime.Object
 }
 
 // Deleter is an object that can delete a named RESTful resource.
@@ -119,6 +134,7 @@ type CreaterUpdater interface {
 // CreaterUpdater must satisfy the Updater interface.
 var _ Updater = CreaterUpdater(nil)
 
+// Patcher is a storage object that supports both get and update.
 type Patcher interface {
 	Getter
 	Updater
@@ -153,11 +169,12 @@ type Redirector interface {
 // ResourceStreamer is an interface implemented by objects that prefer to be streamed from the server
 // instead of decoded directly.
 type ResourceStreamer interface {
-	// InputStream should return an io.Reader if the provided object supports streaming. The desired
+	// InputStream should return an io.ReadCloser if the provided object supports streaming. The desired
 	// api version and a accept header (may be empty) are passed to the call. If no error occurs,
-	// the caller may return a content type string with the reader that indicates the type of the
-	// stream.
-	InputStream(apiVersion, acceptHeader string) (io.ReadCloser, string, error)
+	// the caller may return a flag indicating whether the result should be flushed as writes occur
+	// and a content type string that indicates the type of the stream.
+	// If a null stream is returned, a StatusNoContent response wil be generated.
+	InputStream(apiVersion, acceptHeader string) (stream io.ReadCloser, flush bool, mimeType string, err error)
 }
 
 // StorageMetadata is an optional interface that callers can implement to provide additional

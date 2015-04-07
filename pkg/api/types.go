@@ -1249,6 +1249,17 @@ type ListOptions struct {
 	ResourceVersion string
 }
 
+// PodLogOptions is the query options for a Pod's logs REST call
+type PodLogOptions struct {
+	TypeMeta
+
+	// Container for which to return logs
+	Container string
+
+	// If true, follow the logs for the pod
+	Follow bool
+}
+
 // Status is a return value for calls that don't return other objects.
 // TODO: this could go in apiserver, but I'm including it here so clients needn't
 // import both.
