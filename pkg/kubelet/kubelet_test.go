@@ -433,32 +433,6 @@ func TestKillContainer(t *testing.T) {
 	}
 }
 
-type channelReader struct {
-	list [][]api.Pod
-	wg   sync.WaitGroup
-}
-
-func startReading(channel <-chan interface{}) *channelReader {
-	cr := &channelReader{}
-	cr.wg.Add(1)
-	go func() {
-		for {
-			update, ok := <-channel
-			if !ok {
-				break
-			}
-			cr.list = append(cr.list, update.(PodUpdate).Pods)
-		}
-		cr.wg.Done()
-	}()
-	return cr
-}
-
-func (cr *channelReader) GetList() [][]api.Pod {
-	cr.wg.Wait()
-	return cr.list
-}
-
 var emptyPodUIDs map[types.UID]metrics.SyncPodType
 
 func TestSyncPodsDoesNothing(t *testing.T) {
