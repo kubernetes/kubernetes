@@ -34,7 +34,7 @@ var _ = BeforeSuite(func() {
 	//Since this is not really a test of kubernetes in any way, we
 	//leave it as a pre-test assertion, rather than a Ginko test.
 
-	By("Executing a successfull http request from the external internet")
+	By("Executing a successful http request from the external internet")
 	resp, err := http.Get("http://google.com")
 	if err != nil {
 		Failf("Unable to connect/talk to the internet: %v", err)
