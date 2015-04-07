@@ -104,7 +104,7 @@ func RunPortForward(f *Factory, cmd *cobra.Command, args []string) error {
 
 	req := client.RESTClient.Get().
 		Prefix("proxy").
-		Resource("minions").
+		Resource("nodes").
 		Name(pod.Spec.Host).
 		Suffix("portForward", namespace, podName)
 
