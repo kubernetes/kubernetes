@@ -42,75 +42,19 @@ import (
 	"google.golang.org/cloud/compute/metadata"
 )
 
+//===================================================================================================
+// Cloud Provider Plugin Init and Registration
+// - Constants
+// - init
+// - New* Cloud function
+//===================================================================================================
+
 const EXTERNAL_IP_METADATA_URL = "http://169.254.169.254/computeMetadata/v1/instance/network-interfaces/0/access-configs/0/external-ip"
-
-// GCECloud is an implementation of Interface, TCPLoadBalancer and Instances for Google Compute Engine.
-type GCECloud struct {
-	service          *compute.Service
-	containerService *container.Service
-	projectID        string
-	zone             string
-	instanceID       string
-
-	// Used for accessing the metadata server
-	metadataAccess func(string) (string, error)
-}
-
-type Config struct {
-	Global struct {
-		TokenURL  string `gcfg:"token-url"`
-		ProjectID string `gcfg:"project-id"`
-	}
-}
 
 func init() {
 	cloudprovider.RegisterCloudProvider("gce", func(config io.Reader) (cloudprovider.Interface, error) { return newGCECloud(config) })
 }
 
-func getMetadata(url string) (string, error) {
-	client := http.Client{}
-	req, err := http.NewRequest("GET", url, nil)
-	if err != nil {
-		return "", err
-	}
-	req.Header.Add("X-Google-Metadata-Request", "True")
-	res, err := client.Do(req)
-	if err != nil {
-		return "", err
-	}
-	defer res.Body.Close()
-	data, err := ioutil.ReadAll(res.Body)
-	if err != nil {
-		return "", err
-	}
-	return string(data), nil
-}
-
-func getProjectAndZone() (string, string, error) {
-	result, err := metadata.Get("instance/zone")
-	if err != nil {
-		return "", "", err
-	}
-	parts := strings.Split(result, "/")
-	if len(parts) != 4 {
-		return "", "", fmt.Errorf("unexpected response: %s", result)
-	}
-	return parts[1], parts[3], nil
-}
-
-func getInstanceID() (string, error) {
-	result, err := metadata.Get("instance/hostname")
-	if err != nil {
-		return "", err
-	}
-	parts := strings.Split(result, ".")
-	if len(parts) == 0 {
-		return "", fmt.Errorf("unexpected response: %s", result)
-	}
-	return parts[0], nil
-}
-
-// newGCECloud creates a new instance of GCECloud.
 func newGCECloud(config io.Reader) (*GCECloud, error) {
 	projectID, zone, err := getProjectAndZone()
 	if err != nil {
@@ -153,6 +97,40 @@ func newGCECloud(config io.Reader) (*GCECloud, error) {
 	}, nil
 }
 
+//===================================================================================================
+// Cloud Provider Configuration Management
+// - Configuration Structs
+// - Load configuration files
+//===================================================================================================
+
+type Config struct {
+	Global struct {
+		TokenURL  string `gcfg:"token-url"`
+		ProjectID string `gcfg:"project-id"`
+	}
+}
+
+//===================================================================================================
+// cloudprovider Interface implementation
+// - Cloud specific struct
+// - Clusters
+// - TCPLoadBalancer
+// - Instances
+// - Zones
+//===================================================================================================
+
+// GCECloud is an implementation of Interface, TCPLoadBalancer and Instances for Google Compute Engine.
+type GCECloud struct {
+	service          *compute.Service
+	containerService *container.Service
+	projectID        string
+	zone             string
+	instanceID       string
+
+	// Used for accessing the metadata server
+	metadataAccess func(string) (string, error)
+}
+
 func (gce *GCECloud) Clusters() (cloudprovider.Clusters, bool) {
 	return gce, true
 }
@@ -172,78 +150,40 @@ func (gce *GCECloud) Zones() (cloudprovider.Zones, bool) {
 	return gce, true
 }
 
-func makeHostLink(projectID, zone, host string) string {
-	host = canonicalizeInstanceName(host)
-	return fmt.Sprintf("https://www.googleapis.com/compute/v1/projects/%s/zones/%s/instances/%s",
-		projectID, zone, host)
-}
+//===================================================================================================
+// cloudprovider Clusters implementation
+// - ListClusters
+// - Master
+//===================================================================================================
 
-// Session Affinity Type string
-type GCEAffinityType string
-
-const (
-	// AffinityTypeNone - no session affinity.
-	GCEAffinityTypeNone GCEAffinityType = "None"
-	// AffinityTypeClientIP is the Client IP based.
-	GCEAffinityTypeClientIP GCEAffinityType = "CLIENT_IP"
-	// AffinityTypeClientIP is the Client IP based.
-	GCEAffinityTypeClientIPProto GCEAffinityType = "CLIENT_IP_PROTO"
-)
-
-func (gce *GCECloud) makeTargetPool(name, region string, hosts []string, affinityType GCEAffinityType) (string, error) {
-	var instances []string
-	for _, host := range hosts {
-		instances = append(instances, makeHostLink(gce.projectID, gce.zone, host))
-	}
-	pool := &compute.TargetPool{
-		Name:            name,
-		Instances:       instances,
-		SessionAffinity: string(affinityType),
-	}
-	op, err := gce.service.TargetPools.Insert(gce.projectID, region, pool).Do()
+func (gce *GCECloud) ListClusters() ([]string, error) {
+	list, err := gce.containerService.Projects.Clusters.List(gce.projectID).Do()
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	if err = gce.waitForRegionOp(op, region); err != nil {
-		return "", err
+	result := []string{}
+	for _, cluster := range list.Clusters {
+		result = append(result, cluster.Name)
 	}
-	link := fmt.Sprintf("https://www.googleapis.com/compute/v1/projects/%s/regions/%s/targetPools/%s", gce.projectID, region, name)
-	return link, nil
+	return result, nil
 }
 
-func (gce *GCECloud) waitForRegionOp(op *compute.Operation, region string) error {
-	pollOp := op
-	for pollOp.Status != "DONE" {
-		var err error
-		time.Sleep(time.Second)
-		pollOp, err = gce.service.RegionOperations.Get(gce.projectID, region, op.Name).Do()
-		if err != nil {
-			return err
-		}
-	}
-	if pollOp.Error != nil && len(pollOp.Error.Errors) > 0 {
-		return errors.New(pollOp.Error.Errors[0].Message)
-	}
-	return nil
+func (gce *GCECloud) Master(clusterName string) (string, error) {
+	return "k8s-" + clusterName + "-master.internal", nil
 }
+
+//===================================================================================================
+// cloudprovider TCPLoadBalancer implementation
+// - TCPLoadBalancerExists
+// - CreateTCPLoadBalancer
+// - UpdateTCPLoadBalancer
+// - DeleteTCPLoadBalancer
+//===================================================================================================
 
 // TCPLoadBalancerExists is an implementation of TCPLoadBalancer.TCPLoadBalancerExists.
 func (gce *GCECloud) TCPLoadBalancerExists(name, region string) (bool, error) {
 	_, err := gce.service.ForwardingRules.Get(gce.projectID, region, name).Do()
 	return false, err
-}
-
-//translate from what K8s supports to what the cloud provider supports for session affinity.
-func translateAffinityType(affinityType api.AffinityType) GCEAffinityType {
-	switch affinityType {
-	case api.AffinityTypeClientIP:
-		return GCEAffinityTypeClientIP
-	case api.AffinityTypeNone:
-		return GCEAffinityTypeNone
-	default:
-		glog.Errorf("unexpected affinity type: %v", affinityType)
-		return GCEAffinityTypeNone
-	}
 }
 
 // CreateTCPLoadBalancer is an implementation of TCPLoadBalancer.CreateTCPLoadBalancer.
@@ -332,27 +272,13 @@ func (gce *GCECloud) DeleteTCPLoadBalancer(name, region string) error {
 	return err
 }
 
-// Take a GCE instance 'hostname' and break it down to something that can be fed
-// to the GCE API client library.  Basically this means reducing 'kubernetes-
-// minion-2.c.my-proj.internal' to 'kubernetes-minion-2' if necessary.
-func canonicalizeInstanceName(name string) string {
-	ix := strings.Index(name, ".")
-	if ix != -1 {
-		name = name[:ix]
-	}
-	return name
-}
-
-// Return the instances matching the relevant name.
-func (gce *GCECloud) getInstanceByName(name string) (*compute.Instance, error) {
-	name = canonicalizeInstanceName(name)
-	res, err := gce.service.Instances.Get(gce.projectID, gce.zone, name).Do()
-	if err != nil {
-		glog.Errorf("Failed to retrieve TargetInstance resource for instance:%s", name)
-		return nil, err
-	}
-	return res, nil
-}
+//===================================================================================================
+// cloudprovider Instances implementation
+// - NodeAddresses
+// - ExternalID
+// - List
+// - GetNodeResources
+//===================================================================================================
 
 // NodeAddresses is an implementation of Instances.NodeAddresses.
 func (gce *GCECloud) NodeAddresses(instance string) ([]api.NodeAddress, error) {
@@ -367,18 +293,6 @@ func (gce *GCECloud) NodeAddresses(instance string) ([]api.NodeAddress, error) {
 	return nodeAddresses, nil
 }
 
-func (gce *GCECloud) getLegacyHostAddress(instance string) (*api.NodeAddress, error) {
-	inst, err := gce.getInstanceByName(instance)
-	if err != nil {
-		return nil, err
-	}
-	ip := net.ParseIP(inst.NetworkInterfaces[0].AccessConfigs[0].NatIP)
-	if ip == nil {
-		return nil, fmt.Errorf("invalid network IP: %s", inst.NetworkInterfaces[0].AccessConfigs[0].NatIP)
-	}
-	return &api.NodeAddress{Type: api.NodeLegacyHostIP, Address: ip.String()}, nil
-}
-
 // ExternalID returns the cloud provider ID of the specified instance.
 func (gce *GCECloud) ExternalID(instance string) (string, error) {
 	inst, err := gce.getInstanceByName(instance)
@@ -386,19 +300,6 @@ func (gce *GCECloud) ExternalID(instance string) (string, error) {
 		return "", err
 	}
 	return strconv.FormatUint(inst.Id, 10), nil
-}
-
-// fqdnSuffix is hacky function to compute the delta between hostame and hostname -f.
-func fqdnSuffix() (string, error) {
-	fullHostname, err := exec.Command("hostname", "-f").Output()
-	if err != nil {
-		return "", err
-	}
-	hostname, err := exec.Command("hostname").Output()
-	if err != nil {
-		return "", err
-	}
-	return strings.TrimSpace(string(fullHostname)[len(string(hostname)):]), nil
 }
 
 // List is an implementation of Instances.List.
@@ -427,21 +328,6 @@ func (gce *GCECloud) List(filter string) ([]string, error) {
 		instances = append(instances, instance.Name+suffix)
 	}
 	return instances, nil
-}
-
-// cpu is in cores, memory is in GiB
-func makeResources(cpu float64, memory float64) *api.NodeResources {
-	return &api.NodeResources{
-		Capacity: api.ResourceList{
-			api.ResourceCPU:    *resource.NewMilliQuantity(int64(cpu*1000), resource.DecimalSI),
-			api.ResourceMemory: *resource.NewQuantity(int64(memory*1024*1024*1024), resource.BinarySI),
-		},
-	}
-}
-
-func canonicalizeMachineType(machineType string) string {
-	ix := strings.LastIndex(machineType, "/")
-	return machineType[ix+1:]
 }
 
 func (gce *GCECloud) GetNodeResources(name string) (*api.NodeResources, error) {
@@ -473,6 +359,11 @@ func (gce *GCECloud) GetNodeResources(name string) (*api.NodeResources, error) {
 	}
 }
 
+//===================================================================================================
+// cloudprovider Zones implementation
+// - GetZone
+//===================================================================================================
+
 func (gce *GCECloud) GetZone() (cloudprovider.Zone, error) {
 	region, err := getGceRegion(gce.zone)
 	if err != nil {
@@ -482,6 +373,185 @@ func (gce *GCECloud) GetZone() (cloudprovider.Zone, error) {
 		FailureDomain: gce.zone,
 		Region:        region,
 	}, nil
+}
+
+//===================================================================================================
+// support functions for cloudprovider implementation
+//===================================================================================================
+
+func getMetadata(url string) (string, error) {
+	client := http.Client{}
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return "", err
+	}
+	req.Header.Add("X-Google-Metadata-Request", "True")
+	res, err := client.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer res.Body.Close()
+	data, err := ioutil.ReadAll(res.Body)
+	if err != nil {
+		return "", err
+	}
+	return string(data), nil
+}
+
+func getProjectAndZone() (string, string, error) {
+	result, err := metadata.Get("instance/zone")
+	if err != nil {
+		return "", "", err
+	}
+	parts := strings.Split(result, "/")
+	if len(parts) != 4 {
+		return "", "", fmt.Errorf("unexpected response: %s", result)
+	}
+	return parts[1], parts[3], nil
+}
+
+func getInstanceID() (string, error) {
+	result, err := metadata.Get("instance/hostname")
+	if err != nil {
+		return "", err
+	}
+	parts := strings.Split(result, ".")
+	if len(parts) == 0 {
+		return "", fmt.Errorf("unexpected response: %s", result)
+	}
+	return parts[0], nil
+}
+
+// newGCECloud creates a new instance of GCECloud.
+
+func makeHostLink(projectID, zone, host string) string {
+	host = canonicalizeInstanceName(host)
+	return fmt.Sprintf("https://www.googleapis.com/compute/v1/projects/%s/zones/%s/instances/%s",
+		projectID, zone, host)
+}
+
+// Session Affinity Type string
+type GCEAffinityType string
+
+const (
+	// AffinityTypeNone - no session affinity.
+	GCEAffinityTypeNone GCEAffinityType = "None"
+	// AffinityTypeClientIP is the Client IP based.
+	GCEAffinityTypeClientIP GCEAffinityType = "CLIENT_IP"
+	// AffinityTypeClientIP is the Client IP based.
+	GCEAffinityTypeClientIPProto GCEAffinityType = "CLIENT_IP_PROTO"
+)
+
+func (gce *GCECloud) makeTargetPool(name, region string, hosts []string, affinityType GCEAffinityType) (string, error) {
+	var instances []string
+	for _, host := range hosts {
+		instances = append(instances, makeHostLink(gce.projectID, gce.zone, host))
+	}
+	pool := &compute.TargetPool{
+		Name:            name,
+		Instances:       instances,
+		SessionAffinity: string(affinityType),
+	}
+	op, err := gce.service.TargetPools.Insert(gce.projectID, region, pool).Do()
+	if err != nil {
+		return "", err
+	}
+	if err = gce.waitForRegionOp(op, region); err != nil {
+		return "", err
+	}
+	link := fmt.Sprintf("https://www.googleapis.com/compute/v1/projects/%s/regions/%s/targetPools/%s", gce.projectID, region, name)
+	return link, nil
+}
+
+func (gce *GCECloud) waitForRegionOp(op *compute.Operation, region string) error {
+	pollOp := op
+	for pollOp.Status != "DONE" {
+		var err error
+		time.Sleep(time.Second)
+		pollOp, err = gce.service.RegionOperations.Get(gce.projectID, region, op.Name).Do()
+		if err != nil {
+			return err
+		}
+	}
+	if pollOp.Error != nil && len(pollOp.Error.Errors) > 0 {
+		return errors.New(pollOp.Error.Errors[0].Message)
+	}
+	return nil
+}
+
+//translate from what K8s supports to what the cloud provider supports for session affinity.
+func translateAffinityType(affinityType api.AffinityType) GCEAffinityType {
+	switch affinityType {
+	case api.AffinityTypeClientIP:
+		return GCEAffinityTypeClientIP
+	case api.AffinityTypeNone:
+		return GCEAffinityTypeNone
+	default:
+		glog.Errorf("unexpected affinity type: %v", affinityType)
+		return GCEAffinityTypeNone
+	}
+}
+
+// Take a GCE instance 'hostname' and break it down to something that can be fed
+// to the GCE API client library.  Basically this means reducing 'kubernetes-
+// minion-2.c.my-proj.internal' to 'kubernetes-minion-2' if necessary.
+func canonicalizeInstanceName(name string) string {
+	ix := strings.Index(name, ".")
+	if ix != -1 {
+		name = name[:ix]
+	}
+	return name
+}
+
+// Return the instances matching the relevant name.
+func (gce *GCECloud) getInstanceByName(name string) (*compute.Instance, error) {
+	name = canonicalizeInstanceName(name)
+	res, err := gce.service.Instances.Get(gce.projectID, gce.zone, name).Do()
+	if err != nil {
+		glog.Errorf("Failed to retrieve TargetInstance resource for instance:%s", name)
+		return nil, err
+	}
+	return res, nil
+}
+
+func (gce *GCECloud) getLegacyHostAddress(instance string) (*api.NodeAddress, error) {
+	inst, err := gce.getInstanceByName(instance)
+	if err != nil {
+		return nil, err
+	}
+	ip := net.ParseIP(inst.NetworkInterfaces[0].AccessConfigs[0].NatIP)
+	if ip == nil {
+		return nil, fmt.Errorf("invalid network IP: %s", inst.NetworkInterfaces[0].AccessConfigs[0].NatIP)
+	}
+	return &api.NodeAddress{Type: api.NodeLegacyHostIP, Address: ip.String()}, nil
+}
+
+// fqdnSuffix is hacky function to compute the delta between hostame and hostname -f.
+func fqdnSuffix() (string, error) {
+	fullHostname, err := exec.Command("hostname", "-f").Output()
+	if err != nil {
+		return "", err
+	}
+	hostname, err := exec.Command("hostname").Output()
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(string(fullHostname)[len(string(hostname)):]), nil
+}
+
+// cpu is in cores, memory is in GiB
+func makeResources(cpu float64, memory float64) *api.NodeResources {
+	return &api.NodeResources{
+		Capacity: api.ResourceList{
+			api.ResourceCPU:    *resource.NewMilliQuantity(int64(cpu*1000), resource.DecimalSI),
+			api.ResourceMemory: *resource.NewQuantity(int64(memory*1024*1024*1024), resource.BinarySI),
+		},
+	}
+}
+
+func canonicalizeMachineType(machineType string) string {
+	ix := strings.LastIndex(machineType, "/")
+	return machineType[ix+1:]
 }
 
 func (gce *GCECloud) AttachDisk(diskName string, readOnly bool) error {
@@ -543,20 +613,4 @@ func (gce *GCECloud) convertDiskToAttachedDisk(disk *compute.Disk, readWrite str
 		Source:     "https://" + path.Join("www.googleapis.com/compute/v1/projects/", gce.projectID, "zones", gce.zone, "disks", disk.Name),
 		Type:       "PERSISTENT",
 	}
-}
-
-func (gce *GCECloud) ListClusters() ([]string, error) {
-	list, err := gce.containerService.Projects.Clusters.List(gce.projectID).Do()
-	if err != nil {
-		return nil, err
-	}
-	result := []string{}
-	for _, cluster := range list.Clusters {
-		result = append(result, cluster.Name)
-	}
-	return result, nil
-}
-
-func (gce *GCECloud) Master(clusterName string) (string, error) {
-	return "k8s-" + clusterName + "-master.internal", nil
 }

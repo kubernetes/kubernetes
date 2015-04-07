@@ -24,14 +24,27 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
 )
 
-// FakeBalancer is a fake storage of balancer information
-type FakeBalancer struct {
-	Name       string
-	Region     string
-	ExternalIP net.IP
-	Ports      []int
-	Hosts      []string
-}
+//===================================================================================================
+// Cloud Provider Plugin Init and Registration
+// - Constants
+// - init
+// - New* Cloud function
+//===================================================================================================
+
+//===================================================================================================
+// Cloud Provider Configuration Management
+// - Configuration Structs
+// - Load configuration files
+//===================================================================================================
+
+//===================================================================================================
+// cloudprovider Interface implementation
+// - Cloud specific struct
+// - Clusters
+// - TCPLoadBalancer
+// - Instances
+// - Zones
+//===================================================================================================
 
 // FakeCloud is a test-double implementation of Interface, TCPLoadBalancer and Instances. It is useful for testing.
 type FakeCloud struct {
@@ -48,23 +61,6 @@ type FakeCloud struct {
 	Balancers     []FakeBalancer
 
 	cloudprovider.Zone
-}
-
-func (f *FakeCloud) addCall(desc string) {
-	f.Calls = append(f.Calls, desc)
-}
-
-// ClearCalls clears internal record of method calls to this FakeCloud.
-func (f *FakeCloud) ClearCalls() {
-	f.Calls = []string{}
-}
-
-func (f *FakeCloud) ListClusters() ([]string, error) {
-	return f.ClusterList, f.Err
-}
-
-func (f *FakeCloud) Master(name string) (string, error) {
-	return f.MasterName, f.Err
 }
 
 func (f *FakeCloud) Clusters() (cloudprovider.Clusters, bool) {
@@ -87,6 +83,28 @@ func (f *FakeCloud) Instances() (cloudprovider.Instances, bool) {
 func (f *FakeCloud) Zones() (cloudprovider.Zones, bool) {
 	return f, true
 }
+
+//===================================================================================================
+// cloudprovider Clusters implementation
+// - ListClusters
+// - Master
+//===================================================================================================
+
+func (f *FakeCloud) ListClusters() ([]string, error) {
+	return f.ClusterList, f.Err
+}
+
+func (f *FakeCloud) Master(name string) (string, error) {
+	return f.MasterName, f.Err
+}
+
+//===================================================================================================
+// cloudprovider TCPLoadBalancer implementation
+// - TCPLoadBalancerExists
+// - CreateTCPLoadBalancer
+// - UpdateTCPLoadBalancer
+// - DeleteTCPLoadBalancer
+//===================================================================================================
 
 // TCPLoadBalancerExists is a stub implementation of TCPLoadBalancer.TCPLoadBalancerExists.
 func (f *FakeCloud) TCPLoadBalancerExists(name, region string) (bool, error) {
@@ -114,6 +132,14 @@ func (f *FakeCloud) DeleteTCPLoadBalancer(name, region string) error {
 	f.addCall("delete")
 	return f.Err
 }
+
+//===================================================================================================
+// cloudprovider Instances implementation
+// - NodeAddresses
+// - ExternalID
+// - List
+// - GetNodeResources
+//===================================================================================================
 
 // NodeAddresses is a test-spy implementation of Instances.NodeAddresses.
 // It adds an entry "node-addresses" into the internal method call record.
@@ -143,12 +169,39 @@ func (f *FakeCloud) List(filter string) ([]string, error) {
 	return result, f.Err
 }
 
+func (f *FakeCloud) GetNodeResources(name string) (*api.NodeResources, error) {
+	f.addCall("get-node-resources")
+	return f.NodeResources, f.Err
+}
+
+//===================================================================================================
+// cloudprovider Zones implementation
+// - GetZone
+//===================================================================================================
+
 func (f *FakeCloud) GetZone() (cloudprovider.Zone, error) {
 	f.addCall("get-zone")
 	return f.Zone, f.Err
 }
 
-func (f *FakeCloud) GetNodeResources(name string) (*api.NodeResources, error) {
-	f.addCall("get-node-resources")
-	return f.NodeResources, f.Err
+//===================================================================================================
+// support functions for cloudprovider implementation
+//===================================================================================================
+
+// FakeBalancer is a fake storage of balancer information
+type FakeBalancer struct {
+	Name       string
+	Region     string
+	ExternalIP net.IP
+	Ports      []int
+	Hosts      []string
+}
+
+func (f *FakeCloud) addCall(desc string) {
+	f.Calls = append(f.Calls, desc)
+}
+
+// ClearCalls clears internal record of method calls to this FakeCloud.
+func (f *FakeCloud) ClearCalls() {
+	f.Calls = []string{}
 }
