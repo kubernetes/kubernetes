@@ -23,10 +23,10 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/cmd/util"
+	cmdutil "github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/cmd/util"
 )
 
-func (f *Factory) NewCmdApiVersions(out io.Writer) *cobra.Command {
+func NewCmdApiVersions(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use: "api-versions",
 		// apiversions is deprecated.
@@ -34,13 +34,13 @@ func (f *Factory) NewCmdApiVersions(out io.Writer) *cobra.Command {
 		Short:   "Print available API versions.",
 		Run: func(cmd *cobra.Command, args []string) {
 			err := RunApiVersions(f, out)
-			util.CheckErr(err)
+			cmdutil.CheckErr(err)
 		},
 	}
 	return cmd
 }
 
-func RunApiVersions(f *Factory, out io.Writer) error {
+func RunApiVersions(f *cmdutil.Factory, out io.Writer) error {
 	if os.Args[1] == "apiversions" {
 		printDeprecationWarning("api-versions", "apiversions")
 	}

@@ -38,7 +38,7 @@ $ kubectl create -f pod.json
 $ cat pod.json | kubectl create -f -`
 )
 
-func (f *Factory) NewCmdCreate(out io.Writer) *cobra.Command {
+func NewCmdCreate(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	var filenames util.StringList
 	cmd := &cobra.Command{
 		Use:     "create -f FILENAME",
@@ -61,7 +61,7 @@ func ValidateArgs(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func RunCreate(f *Factory, out io.Writer, filenames util.StringList) error {
+func RunCreate(f *cmdutil.Factory, out io.Writer, filenames util.StringList) error {
 	schema, err := f.Validator()
 	if err != nil {
 		return err

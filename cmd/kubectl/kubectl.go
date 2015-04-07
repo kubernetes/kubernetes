@@ -21,11 +21,12 @@ import (
 	"runtime"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/cmd"
+	cmdutil "github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/cmd/util"
 )
 
 func main() {
 	runtime.GOMAXPROCS(runtime.NumCPU())
-	cmd := cmd.NewFactory(nil).NewKubectlCommand(os.Stdin, os.Stdout, os.Stderr)
+	cmd := cmd.NewKubectlCommand(cmdutil.NewFactory(nil), os.Stdin, os.Stdout, os.Stderr)
 	if err := cmd.Execute(); err != nil {
 		os.Exit(1)
 	}

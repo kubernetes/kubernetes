@@ -99,7 +99,7 @@ func TestGetUnknownSchemaObject(t *testing.T) {
 	tf.ClientConfig = &client.Config{Version: latest.Version}
 	buf := bytes.NewBuffer([]byte{})
 
-	cmd := f.NewCmdGet(buf)
+	cmd := NewCmdGet(f, buf)
 	cmd.SetOutput(buf)
 	cmd.Run(cmd, []string{"type", "foo"})
 
@@ -128,7 +128,7 @@ func TestGetSchemaObject(t *testing.T) {
 	tf.ClientConfig = &client.Config{Version: "v1beta3"}
 	buf := bytes.NewBuffer([]byte{})
 
-	cmd := f.NewCmdGet(buf)
+	cmd := NewCmdGet(f, buf)
 	cmd.Run(cmd, []string{"replicationcontrollers", "foo"})
 
 	if !strings.Contains(buf.String(), "\"foo\"") {
@@ -148,7 +148,7 @@ func TestGetObjects(t *testing.T) {
 	tf.Namespace = "test"
 	buf := bytes.NewBuffer([]byte{})
 
-	cmd := f.NewCmdGet(buf)
+	cmd := NewCmdGet(f, buf)
 	cmd.SetOutput(buf)
 	cmd.Run(cmd, []string{"pods", "foo"})
 
@@ -174,7 +174,7 @@ func TestGetListObjects(t *testing.T) {
 	tf.Namespace = "test"
 	buf := bytes.NewBuffer([]byte{})
 
-	cmd := f.NewCmdGet(buf)
+	cmd := NewCmdGet(f, buf)
 	cmd.SetOutput(buf)
 	cmd.Run(cmd, []string{"pods"})
 
@@ -210,7 +210,7 @@ func TestGetMultipleTypeObjects(t *testing.T) {
 	tf.Namespace = "test"
 	buf := bytes.NewBuffer([]byte{})
 
-	cmd := f.NewCmdGet(buf)
+	cmd := NewCmdGet(f, buf)
 	cmd.SetOutput(buf)
 	cmd.Run(cmd, []string{"pods,services"})
 
@@ -247,7 +247,7 @@ func TestGetMultipleTypeObjectsAsList(t *testing.T) {
 	tf.ClientConfig = &client.Config{Version: "v1beta1"}
 	buf := bytes.NewBuffer([]byte{})
 
-	cmd := f.NewCmdGet(buf)
+	cmd := NewCmdGet(f, buf)
 	cmd.SetOutput(buf)
 
 	cmd.Flags().Set("output", "json")
@@ -298,7 +298,7 @@ func TestGetMultipleTypeObjectsWithSelector(t *testing.T) {
 	tf.Namespace = "test"
 	buf := bytes.NewBuffer([]byte{})
 
-	cmd := f.NewCmdGet(buf)
+	cmd := NewCmdGet(f, buf)
 	cmd.SetOutput(buf)
 
 	cmd.Flags().Set("selector", "a=b")
@@ -344,7 +344,7 @@ func TestGetMultipleTypeObjectsWithDirectReference(t *testing.T) {
 	tf.Namespace = "test"
 	buf := bytes.NewBuffer([]byte{})
 
-	cmd := f.NewCmdGet(buf)
+	cmd := NewCmdGet(f, buf)
 	cmd.SetOutput(buf)
 
 	cmd.Run(cmd, []string{"services/bar", "node/foo"})
@@ -430,7 +430,7 @@ func TestWatchSelector(t *testing.T) {
 	tf.Namespace = "test"
 	buf := bytes.NewBuffer([]byte{})
 
-	cmd := f.NewCmdGet(buf)
+	cmd := NewCmdGet(f, buf)
 	cmd.SetOutput(buf)
 
 	cmd.Flags().Set("watch", "true")
@@ -469,7 +469,7 @@ func TestWatchResource(t *testing.T) {
 	tf.Namespace = "test"
 	buf := bytes.NewBuffer([]byte{})
 
-	cmd := f.NewCmdGet(buf)
+	cmd := NewCmdGet(f, buf)
 	cmd.SetOutput(buf)
 
 	cmd.Flags().Set("watch", "true")
@@ -507,7 +507,7 @@ func TestWatchOnlyResource(t *testing.T) {
 	tf.Namespace = "test"
 	buf := bytes.NewBuffer([]byte{})
 
-	cmd := f.NewCmdGet(buf)
+	cmd := NewCmdGet(f, buf)
 	cmd.SetOutput(buf)
 
 	cmd.Flags().Set("watch-only", "true")

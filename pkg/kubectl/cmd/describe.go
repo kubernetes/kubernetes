@@ -20,11 +20,11 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/cmd/util"
+	cmdutil "github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/cmd/util"
 	"github.com/spf13/cobra"
 )
 
-func (f *Factory) NewCmdDescribe(out io.Writer) *cobra.Command {
+func NewCmdDescribe(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "describe RESOURCE ID",
 		Short: "Show details of a specific resource",
@@ -34,13 +34,13 @@ This command joins many API calls together to form a detailed description of a
 given resource.`,
 		Run: func(cmd *cobra.Command, args []string) {
 			err := RunDescribe(f, out, cmd, args)
-			util.CheckErr(err)
+			cmdutil.CheckErr(err)
 		},
 	}
 	return cmd
 }
 
-func RunDescribe(f *Factory, out io.Writer, cmd *cobra.Command, args []string) error {
+func RunDescribe(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string) error {
 	cmdNamespace, err := f.DefaultNamespace()
 	if err != nil {
 		return err
@@ -48,7 +48,7 @@ func RunDescribe(f *Factory, out io.Writer, cmd *cobra.Command, args []string) e
 
 	mapper, _ := f.Object()
 	// TODO: use resource.Builder instead
-	mapping, namespace, name, err := util.ResourceFromArgs(cmd, args, mapper, cmdNamespace)
+	mapping, namespace, name, err := cmdutil.ResourceFromArgs(cmd, args, mapper, cmdNamespace)
 	if err != nil {
 		return err
 	}

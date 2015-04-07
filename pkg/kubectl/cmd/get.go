@@ -23,7 +23,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/cmd/util"
+	cmdutil "github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/cmd/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/resource"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 
@@ -59,7 +59,7 @@ $ kubectl get rc/web service/frontend pods/web-pod-13je7`
 
 // NewCmdGet creates a command object for the generic "get" action, which
 // retrieves one or more resources from a server.
-func (f *Factory) NewCmdGet(out io.Writer) *cobra.Command {
+func NewCmdGet(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "get [(-o|--output=)json|yaml|template|...] (RESOURCE [NAME] | RESOURCE/NAME ...)",
 		Short:   "Display one or many resources",
@@ -67,10 +67,10 @@ func (f *Factory) NewCmdGet(out io.Writer) *cobra.Command {
 		Example: get_example,
 		Run: func(cmd *cobra.Command, args []string) {
 			err := RunGet(f, out, cmd, args)
-			util.CheckErr(err)
+			cmdutil.CheckErr(err)
 		},
 	}
-	util.AddPrinterFlags(cmd)
+	cmdutil.AddPrinterFlags(cmd)
 	cmd.Flags().StringP("selector", "l", "", "Selector (label query) to filter on")
 	cmd.Flags().BoolP("watch", "w", false, "After listing/getting the requested object, watch for changes.")
 	cmd.Flags().Bool("watch-only", false, "Watch for changes to the requested object(s), without listing/getting first.")
@@ -79,8 +79,8 @@ func (f *Factory) NewCmdGet(out io.Writer) *cobra.Command {
 
 // RunGet implements the generic Get command
 // TODO: convert all direct flag accessors to a struct and pass that instead of cmd
-func RunGet(f *Factory, out io.Writer, cmd *cobra.Command, args []string) error {
-	selector := util.GetFlagString(cmd, "selector")
+func RunGet(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string) error {
+	selector := cmdutil.GetFlagString(cmd, "selector")
 	mapper, typer := f.Object()
 
 	cmdNamespace, err := f.DefaultNamespace()
@@ -89,7 +89,7 @@ func RunGet(f *Factory, out io.Writer, cmd *cobra.Command, args []string) error 
 	}
 
 	// handle watch separately since we cannot watch multiple resource types
-	isWatch, isWatchOnly := util.GetFlagBool(cmd, "watch"), util.GetFlagBool(cmd, "watch-only")
+	isWatch, isWatchOnly := cmdutil.GetFlagBool(cmd, "watch"), cmdutil.GetFlagBool(cmd, "watch-only")
 	if isWatch || isWatchOnly {
 		r := resource.NewBuilder(mapper, typer, f.ClientMapperForCommand()).
 			NamespaceParam(cmdNamespace).DefaultNamespace().
@@ -146,7 +146,7 @@ func RunGet(f *Factory, out io.Writer, cmd *cobra.Command, args []string) error 
 		ResourceTypeOrNameArgs(true, args...).
 		ContinueOnError().
 		Latest()
-	printer, generic, err := util.PrinterForCommand(cmd)
+	printer, generic, err := cmdutil.PrinterForCommand(cmd)
 	if err != nil {
 		return err
 	}
@@ -159,7 +159,7 @@ func RunGet(f *Factory, out io.Writer, cmd *cobra.Command, args []string) error 
 		defaultVersion := clientConfig.Version
 
 		// the outermost object will be converted to the output-version
-		version := util.OutputVersion(cmd, defaultVersion)
+		version := cmdutil.OutputVersion(cmd, defaultVersion)
 
 		r := b.Flatten().Do()
 		obj, err := r.Object()

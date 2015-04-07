@@ -24,7 +24,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/remotecommand"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/cmd/util"
+	cmdutil "github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/cmd/util"
 	"github.com/docker/docker/pkg/term"
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
@@ -38,7 +38,7 @@ $ kubectl exec -p 123456-7890 -c ruby-container date
 $ kubectl exec -p 123456-7890 -c ruby-container -i -t -- bash -il`
 )
 
-func (f *Factory) NewCmdExec(cmdIn io.Reader, cmdOut, cmdErr io.Writer) *cobra.Command {
+func NewCmdExec(f *cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "exec -p POD -c CONTAINER -- COMMAND [args...]",
 		Short:   "Execute a command in a container.",
@@ -46,7 +46,7 @@ func (f *Factory) NewCmdExec(cmdIn io.Reader, cmdOut, cmdErr io.Writer) *cobra.C
 		Example: exec_example,
 		Run: func(cmd *cobra.Command, args []string) {
 			err := RunExec(f, cmdIn, cmdOut, cmdErr, cmd, args)
-			util.CheckErr(err)
+			cmdutil.CheckErr(err)
 		},
 	}
 	cmd.Flags().StringP("pod", "p", "", "Pod name")
@@ -57,14 +57,14 @@ func (f *Factory) NewCmdExec(cmdIn io.Reader, cmdOut, cmdErr io.Writer) *cobra.C
 	return cmd
 }
 
-func RunExec(f *Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *cobra.Command, args []string) error {
-	podName := util.GetFlagString(cmd, "pod")
+func RunExec(f *cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *cobra.Command, args []string) error {
+	podName := cmdutil.GetFlagString(cmd, "pod")
 	if len(podName) == 0 {
-		return util.UsageError(cmd, "POD is required for exec")
+		return cmdutil.UsageError(cmd, "POD is required for exec")
 	}
 
 	if len(args) < 1 {
-		return util.UsageError(cmd, "COMMAND is required for exec")
+		return cmdutil.UsageError(cmd, "COMMAND is required for exec")
 	}
 
 	namespace, err := f.DefaultNamespace()
@@ -86,14 +86,14 @@ func RunExec(f *Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *cobra.C
 		glog.Fatalf("Unable to execute command because pod is not running. Current status=%v", pod.Status.Phase)
 	}
 
-	containerName := util.GetFlagString(cmd, "container")
+	containerName := cmdutil.GetFlagString(cmd, "container")
 	if len(containerName) == 0 {
 		containerName = pod.Spec.Containers[0].Name
 	}
 
 	var stdin io.Reader
-	tty := util.GetFlagBool(cmd, "tty")
-	if util.GetFlagBool(cmd, "stdin") {
+	tty := cmdutil.GetFlagBool(cmd, "tty")
+	if cmdutil.GetFlagBool(cmd, "stdin") {
 		stdin = cmdIn
 		if tty {
 			if file, ok := cmdIn.(*os.File); ok {

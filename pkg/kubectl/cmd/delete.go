@@ -55,7 +55,7 @@ $ kubectl delete pod 1234-56-7890-234234-456456
 $ kubectl delete pods --all`
 )
 
-func (f *Factory) NewCmdDelete(out io.Writer) *cobra.Command {
+func NewCmdDelete(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	var filenames util.StringList
 	cmd := &cobra.Command{
 		Use:     "delete ([-f FILENAME] | (RESOURCE [(ID | -l label | --all)]",
@@ -73,7 +73,7 @@ func (f *Factory) NewCmdDelete(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func RunDelete(f *Factory, out io.Writer, cmd *cobra.Command, args []string, filenames util.StringList) error {
+func RunDelete(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string, filenames util.StringList) error {
 	cmdNamespace, err := f.DefaultNamespace()
 	if err != nil {
 		return err

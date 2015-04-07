@@ -27,6 +27,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd"
 	clientcmdapi "github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd/api"
+	cmdutil "github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/cmd/util"
 )
 
 type pathOptions struct {
@@ -36,7 +37,7 @@ type pathOptions struct {
 	specifiedFile string
 }
 
-func NewCmdConfig(out io.Writer) *cobra.Command {
+func NewCmdConfig(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	pathOptions := &pathOptions{}
 
 	cmd := &cobra.Command{

@@ -22,7 +22,7 @@ import (
 	"strings"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/cmd/util"
+	cmdutil "github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/cmd/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/resource"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/spf13/cobra"
@@ -50,7 +50,7 @@ $ kubectl label pods foo status=unhealthy --resource-version=1
 $ kubectl label pods foo bar-`
 )
 
-func (f *Factory) NewCmdLabel(out io.Writer) *cobra.Command {
+func NewCmdLabel(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "label [--overwrite] RESOURCE NAME KEY_1=VAL_1 ... KEY_N=VAL_N [--resource-version=version]",
 		Short:   "Update the labels on a resource",
@@ -58,10 +58,10 @@ func (f *Factory) NewCmdLabel(out io.Writer) *cobra.Command {
 		Example: label_example,
 		Run: func(cmd *cobra.Command, args []string) {
 			err := RunLabel(f, out, cmd, args)
-			util.CheckErr(err)
+			cmdutil.CheckErr(err)
 		},
 	}
-	util.AddPrinterFlags(cmd)
+	cmdutil.AddPrinterFlags(cmd)
 	cmd.Flags().Bool("overwrite", false, "If true, allow labels to be overwritten, otherwise reject label updates that overwrite existing labels.")
 	cmd.Flags().StringP("selector", "l", "", "Selector (label query) to filter on")
 	cmd.Flags().Bool("all", false, "select all resources in the namespace of the specified resource types")
@@ -149,7 +149,7 @@ func labelFunc(obj runtime.Object, overwrite bool, resourceVersion string, label
 	return obj, nil
 }
 
-func RunLabel(f *Factory, out io.Writer, cmd *cobra.Command, args []string) error {
+func RunLabel(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string) error {
 	resources, labelArgs := []string{}, []string{}
 	first := true
 	for _, s := range args {
@@ -163,20 +163,20 @@ func RunLabel(f *Factory, out io.Writer, cmd *cobra.Command, args []string) erro
 		case first && !isLabel:
 			resources = append(resources, s)
 		case !first && !isLabel:
-			return util.UsageError(cmd, "all resources must be specified before label changes: %s", s)
+			return cmdutil.UsageError(cmd, "all resources must be specified before label changes: %s", s)
 		}
 	}
 	if len(resources) < 1 {
-		return util.UsageError(cmd, "one or more resources must be specified as <resource> <name> or <resource>/<name>")
+		return cmdutil.UsageError(cmd, "one or more resources must be specified as <resource> <name> or <resource>/<name>")
 	}
 	if len(labelArgs) < 1 {
-		return util.UsageError(cmd, "at least one label update is required")
+		return cmdutil.UsageError(cmd, "at least one label update is required")
 	}
 
-	selector := util.GetFlagString(cmd, "selector")
-	all := util.GetFlagBool(cmd, "all")
-	overwrite := util.GetFlagBool(cmd, "overwrite")
-	resourceVersion := util.GetFlagString(cmd, "resource-version")
+	selector := cmdutil.GetFlagString(cmd, "selector")
+	all := cmdutil.GetFlagBool(cmd, "all")
+	overwrite := cmdutil.GetFlagBool(cmd, "overwrite")
+	resourceVersion := cmdutil.GetFlagString(cmd, "resource-version")
 
 	cmdNamespace, err := f.DefaultNamespace()
 	if err != nil {
@@ -204,7 +204,7 @@ func RunLabel(f *Factory, out io.Writer, cmd *cobra.Command, args []string) erro
 	}
 	// only apply resource version locking on a single resource
 	if !one && len(resourceVersion) > 0 {
-		return util.UsageError(cmd, "--resource-version may only be used with a single resource")
+		return cmdutil.UsageError(cmd, "--resource-version may only be used with a single resource")
 	}
 
 	// TODO: support bulk generic output a la Get

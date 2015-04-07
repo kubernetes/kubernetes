@@ -25,6 +25,7 @@ import (
 	"strings"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/cmd"
+	cmdutil "github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/cmd/util"
 	"github.com/cpuguy83/go-md2man/mangen"
 	"github.com/russross/blackfriday"
 	"github.com/spf13/cobra"
@@ -63,7 +64,7 @@ func main() {
 	// regardless of where we run.
 	os.Setenv("HOME", "/home/username")
 	//TODO os.Stdin should really be something like ioutil.Discard, but a Reader
-	kubectl := cmd.NewFactory(nil).NewKubectlCommand(os.Stdin, ioutil.Discard, ioutil.Discard)
+	kubectl := cmd.NewKubectlCommand(cmdutil.NewFactory(nil), os.Stdin, ioutil.Discard, ioutil.Discard)
 	genMarkdown(kubectl, "", docsDir)
 	for _, c := range kubectl.Commands() {
 		genMarkdown(c, "kubectl", docsDir)
