@@ -34,38 +34,15 @@ import (
 	"github.com/golang/glog"
 )
 
-const (
-	// The constant is used if sync_nodes_status=False. NodeController will not proactively
-	// sync node status in this case, but will monitor node status updated from kubelet. If
-	// it doesn't receive update for this amount of time, it will start posting "NodeReady==
-	// ConditionUnknown". The amount of time before which NodeController start evicting pods
-	// is controlled via flag 'pod_eviction_timeout'.
-	// Note: be cautious when changing the constant, it must work with nodeStatusUpdateFrequency
-	// in kubelet. There are several constraints:
-	// 1. nodeMonitorGracePeriod must be N times more than nodeStatusUpdateFrequency, where
-	//    N means number of retries allowed for kubelet to post node status. It is pointless
-	//    to make nodeMonitorGracePeriod be less than nodeStatusUpdateFrequency, since there
-	//    will only be fresh values from Kubelet at an interval of nodeStatusUpdateFrequency.
-	//    The constant must be less than podEvictionTimeout.
-	// 2. nodeMonitorGracePeriod can't be too large for user experience - larger value takes
-	//    longer for user to see up-to-date node status.
-	nodeMonitorGracePeriod = 8 * time.Second
-	// The constant is used if sync_nodes_status=False, only for node startup. When node
-	// is just created, e.g. cluster bootstrap or node creation, we give a longer grace period.
-	nodeStartupGracePeriod = 30 * time.Second
-	// The constant is used if sync_nodes_status=False. It controls NodeController monitoring
-	// period, i.e. how often does NodeController check node status posted from kubelet.
-	// Theoretically, this value should be lower than nodeMonitorGracePeriod.
-	// TODO: Change node status monitor to watch based.
-	nodeMonitorPeriod = 5 * time.Second
-	// Constant controlling number of retries of writing NodeStatus update.
-	nodeStatusUpdateRetry = 5
-)
-
 var (
 	ErrRegistration   = errors.New("unable to register all nodes.")
 	ErrQueryIPAddress = errors.New("unable to query IP address.")
 	ErrCloudInstance  = errors.New("cloud provider doesn't support instances.")
+)
+
+const (
+	// Constant controlling number of retries of writing NodeStatus update.
+	nodeStatusUpdateRetry = 5
 )
 
 type NodeStatusData struct {
@@ -88,6 +65,28 @@ type NodeController struct {
 	// This timestamp is to be used instead of LastProbeTime stored in Condition. We do this
 	// to aviod the problem with time skew across the cluster.
 	nodeStatusMap map[string]NodeStatusData
+	// Value used if sync_nodes_status=False. NodeController will not proactively
+	// sync node status in this case, but will monitor node status updated from kubelet. If
+	// it doesn't receive update for this amount of time, it will start posting "NodeReady==
+	// ConditionUnknown". The amount of time before which NodeController start evicting pods
+	// is controlled via flag 'pod_eviction_timeout'.
+	// Note: be cautious when changing the constant, it must work with nodeStatusUpdateFrequency
+	// in kubelet. There are several constraints:
+	// 1. nodeMonitorGracePeriod must be N times more than nodeStatusUpdateFrequency, where
+	//    N means number of retries allowed for kubelet to post node status. It is pointless
+	//    to make nodeMonitorGracePeriod be less than nodeStatusUpdateFrequency, since there
+	//    will only be fresh values from Kubelet at an interval of nodeStatusUpdateFrequency.
+	//    The constant must be less than podEvictionTimeout.
+	// 2. nodeMonitorGracePeriod can't be too large for user experience - larger value takes
+	//    longer for user to see up-to-date node status.
+	nodeMonitorGracePeriod time.Duration
+	// Value used if sync_nodes_status=False, only for node startup. When node
+	// is just created, e.g. cluster bootstrap or node creation, we give a longer grace period.
+	nodeStartupGracePeriod time.Duration
+	// Value controlling NodeController monitoring period, i.e. how often does NodeController
+	// check node status posted from kubelet. Theoretically, this value should be lower than nodeMonitorGracePeriod.
+	// TODO: Change node status monitor to watch based.
+	nodeMonitorPeriod time.Duration
 	// Method for easy mocking in unittest.
 	lookupIP func(host string) ([]net.IP, error)
 	now      func() util.Time
@@ -103,7 +102,10 @@ func NewNodeController(
 	kubeletClient client.KubeletClient,
 	registerRetryCount int,
 	podEvictionTimeout time.Duration,
-	deletingPodsRateLimiter util.RateLimiter) *NodeController {
+	deletingPodsRateLimiter util.RateLimiter,
+	nodeMonitorGracePeriod time.Duration,
+	nodeStartupGracePeriod time.Duration,
+	nodeMonitorPeriod time.Duration) *NodeController {
 	return &NodeController{
 		cloud:                   cloud,
 		matchRE:                 matchRE,
@@ -115,6 +117,9 @@ func NewNodeController(
 		podEvictionTimeout:      podEvictionTimeout,
 		deletingPodsRateLimiter: deletingPodsRateLimiter,
 		nodeStatusMap:           make(map[string]NodeStatusData),
+		nodeMonitorGracePeriod:  nodeMonitorGracePeriod,
+		nodeMonitorPeriod:       nodeMonitorPeriod,
+		nodeStartupGracePeriod:  nodeStartupGracePeriod,
 		lookupIP:                net.LookupIP,
 		now:                     util.Now,
 	}
@@ -177,7 +182,7 @@ func (nc *NodeController) Run(period time.Duration, syncNodeList, syncNodeStatus
 			if err := nc.MonitorNodeStatus(); err != nil {
 				glog.Errorf("Error monitoring node status: %v", err)
 			}
-		}, nodeMonitorPeriod)
+		}, nc.nodeMonitorPeriod)
 	}
 }
 
@@ -438,7 +443,7 @@ func (nc *NodeController) tryUpdateNodeStatus(node *api.Node) (time.Duration, ap
 			LastProbeTime:      node.CreationTimestamp,
 			LastTransitionTime: node.CreationTimestamp,
 		}
-		gracePeriod = nodeStartupGracePeriod
+		gracePeriod = nc.nodeStartupGracePeriod
 		nc.nodeStatusMap[node.Name] = NodeStatusData{
 			status:                   node.Status,
 			probeTimestamp:           node.CreationTimestamp,
@@ -447,7 +452,7 @@ func (nc *NodeController) tryUpdateNodeStatus(node *api.Node) (time.Duration, ap
 	} else {
 		// If ready condition is not nil, make a copy of it, since we may modify it in place later.
 		lastReadyCondition = *readyCondition
-		gracePeriod = nodeMonitorGracePeriod
+		gracePeriod = nc.nodeMonitorGracePeriod
 	}
 
 	savedNodeStatus, found := nc.nodeStatusMap[node.Name]
@@ -590,6 +595,7 @@ func (nc *NodeController) MonitorNodeStatus() error {
 				nc.now().After(nc.nodeStatusMap[node.Name].readyTransitionTimestamp.Add(nc.podEvictionTimeout)) {
 				// Node stays in not ready for at least 'podEvictionTimeout' - evict all pods on the unhealthy node.
 				// Makes sure we are not removing pods from to many nodes in the same time.
+				glog.Infof("Evicting pods: %v is later than %v + %v", nc.now(), nc.nodeStatusMap[node.Name].readyTransitionTimestamp, nc.podEvictionTimeout)
 				if nc.deletingPodsRateLimiter.CanAccept() {
 					nc.deletePods(node.Name)
 				}
@@ -598,6 +604,7 @@ func (nc *NodeController) MonitorNodeStatus() error {
 				nc.now().After(nc.nodeStatusMap[node.Name].probeTimestamp.Add(nc.podEvictionTimeout-gracePeriod)) {
 				// Same as above. Note however, since condition unknown is posted by node controller, which means we
 				// need to substract monitoring grace period in order to get the real 'podEvictionTimeout'.
+				glog.Infof("Evicting pods2: %v is later than %v + %v", nc.now(), nc.nodeStatusMap[node.Name].readyTransitionTimestamp, nc.podEvictionTimeout-gracePeriod)
 				if nc.deletingPodsRateLimiter.CanAccept() {
 					nc.deletePods(node.Name)
 				}

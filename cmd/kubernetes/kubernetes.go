@@ -131,7 +131,7 @@ func runControllerManager(machineList []string, cl *client.Client, nodeMilliCPU,
 	kubeClient := &client.HTTPKubeletClient{Client: http.DefaultClient, Port: ports.KubeletPort}
 
 	nodeController := nodeControllerPkg.NewNodeController(
-		nil, "", machineList, nodeResources, cl, kubeClient, 10, 5*time.Minute, util.NewTokenBucketRateLimiter(*deletingPodsQps, *deletingPodsBurst))
+		nil, "", machineList, nodeResources, cl, kubeClient, 10, 5*time.Minute, util.NewTokenBucketRateLimiter(*deletingPodsQps, *deletingPodsBurst), 8*time.Second, 30*time.Second, 5*time.Second)
 	nodeController.Run(10*time.Second, true, true)
 
 	endpoints := service.NewEndpointController(cl)

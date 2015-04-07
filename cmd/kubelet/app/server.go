@@ -94,6 +94,7 @@ type KubeletServer struct {
 	TLSCertFile                    string
 	TLSPrivateKeyFile              string
 	CertDirectory                  string
+	NodeStatusUpdateFrequency      time.Duration
 }
 
 // bootstrapping interface for kubelet, targets the initialization protocol
@@ -137,6 +138,7 @@ func NewKubeletServer() *KubeletServer {
 		NetworkPluginName:           "",
 		HostNetworkSources:          kubelet.FileSource,
 		CertDirectory:               "/var/run/kubernetes",
+		NodeStatusUpdateFrequency:   2 * time.Second,
 	}
 }
 
@@ -181,6 +183,7 @@ func (s *KubeletServer) AddFlags(fs *pflag.FlagSet) {
 	fs.Var(&s.ClusterDNS, "cluster_dns", "IP address for a cluster DNS server.  If set, kubelet will configure all containers to use this for DNS resolution in addition to the host's DNS servers")
 	fs.BoolVar(&s.ReallyCrashForTesting, "really_crash_for_testing", s.ReallyCrashForTesting, "If true, crash with panics more often.")
 	fs.DurationVar(&s.StreamingConnectionIdleTimeout, "streaming_connection_idle_timeout", 0, "Maximum time a streaming connection can be idle before the connection is automatically closed.  Example: '5m'")
+	fs.DurationVar(&s.NodeStatusUpdateFrequency, "node_status_update_frequency", s.NodeStatusUpdateFrequency, "Specifies how often kubelet posts node status to master. Note: be cautious when changing the constant, it must work with nodeMonitorGracePeriod in nodecontroller. Default: 2s")
 	fs.IntVar(&s.ImageGCHighThresholdPercent, "image_gc_high_threshold", s.ImageGCHighThresholdPercent, "The percent of disk usage after which image garbage collection is always run. Default: 90%%")
 	fs.IntVar(&s.ImageGCLowThresholdPercent, "image_gc_low_threshold", s.ImageGCLowThresholdPercent, "The percent of disk usage before which image garbage collection is never run. Lowest disk usage to garbage collect to. Default: 80%%")
 	fs.StringVar(&s.NetworkPluginName, "network_plugin", s.NetworkPluginName, "<Warning: Alpha feature> The name of the network plugin to be invoked for various events in kubelet/pod lifecycle")
@@ -381,6 +384,7 @@ func SimpleKubelet(client *client.Client,
 		ConfigFile:              configFilePath,
 		ImageGCPolicy:           imageGCPolicy,
 		Cloud:                   cloud,
+		NodeStatusUpdateFrequency: 2 * time.Second,
 	}
 	return &kcfg
 }
@@ -501,6 +505,7 @@ type KubeletConfig struct {
 	TLSOptions                     *kubelet.TLSOptions
 	ImageGCPolicy                  kubelet.ImageGCPolicy
 	Cloud                          cloudprovider.Interface
+	NodeStatusUpdateFrequency      time.Duration
 }
 
 func createAndInitKubelet(kc *KubeletConfig) (k KubeletBootstrap, pc *config.PodConfig, err error) {
@@ -542,7 +547,8 @@ func createAndInitKubelet(kc *KubeletConfig) (k KubeletBootstrap, pc *config.Pod
 		kc.Recorder,
 		kc.CadvisorInterface,
 		kc.ImageGCPolicy,
-		kc.Cloud)
+		kc.Cloud,
+		kc.NodeStatusUpdateFrequency)
 
 	if err != nil {
 		return nil, nil, err
