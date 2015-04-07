@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package client
+package testclient
 
 import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -31,18 +31,18 @@ type FakeEndpoints struct {
 }
 
 func (c *FakeEndpoints) Create(endpoints *api.Endpoints) (*api.Endpoints, error) {
-	c.Fake.Actions = append(c.Fake.Actions, FakeAction{Action: "create-endpoints"})
-	return &api.Endpoints{}, nil
+	obj, err := c.Fake.Invokes(FakeAction{Action: "create-endpoints"}, &api.Endpoints{})
+	return obj.(*api.Endpoints), err
 }
 
 func (c *FakeEndpoints) List(selector labels.Selector) (*api.EndpointsList, error) {
-	c.Fake.Actions = append(c.Fake.Actions, FakeAction{Action: "list-endpoints"})
-	return api.Scheme.CopyOrDie(&c.Fake.EndpointsList).(*api.EndpointsList), c.Fake.Err
+	obj, err := c.Fake.Invokes(FakeAction{Action: "list-endpoints"}, &api.EndpointsList{})
+	return obj.(*api.EndpointsList), err
 }
 
 func (c *FakeEndpoints) Get(name string) (*api.Endpoints, error) {
-	c.Fake.Actions = append(c.Fake.Actions, FakeAction{Action: "get-endpoints"})
-	return &api.Endpoints{}, nil
+	obj, err := c.Fake.Invokes(FakeAction{Action: "get-endpoints", Value: name}, &api.Endpoints{})
+	return obj.(*api.Endpoints), err
 }
 
 func (c *FakeEndpoints) Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
@@ -51,6 +51,6 @@ func (c *FakeEndpoints) Watch(label labels.Selector, field fields.Selector, reso
 }
 
 func (c *FakeEndpoints) Update(endpoints *api.Endpoints) (*api.Endpoints, error) {
-	c.Fake.Actions = append(c.Fake.Actions, FakeAction{Action: "update-endpoints", Value: endpoints.Name})
-	return &api.Endpoints{}, nil
+	obj, err := c.Fake.Invokes(FakeAction{Action: "update-endpoints", Value: endpoints.Name}, &api.Endpoints{})
+	return obj.(*api.Endpoints), err
 }

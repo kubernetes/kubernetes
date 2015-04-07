@@ -26,6 +26,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/testclient"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/mount"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume"
@@ -86,9 +87,7 @@ func TestPlugin(t *testing.T) {
 		},
 	}
 
-	client := &client.Fake{
-		Secret: secret,
-	}
+	client := testclient.NewSimpleFake(&secret)
 
 	pluginMgr := volume.VolumePluginMgr{}
 	pluginMgr.InitPlugins(ProbeVolumePlugins(), newTestHost(t, client))

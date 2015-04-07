@@ -22,7 +22,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/admission"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/testclient"
 )
 
 func getResourceRequirements(cpu, memory string) api.ResourceRequirements {
@@ -40,7 +40,7 @@ func getResourceRequirements(cpu, memory string) api.ResourceRequirements {
 
 func TestAdmissionIgnoresDelete(t *testing.T) {
 	namespace := "default"
-	handler := NewResourceQuota(&client.Fake{})
+	handler := NewResourceQuota(&testclient.Fake{})
 	err := handler.Admit(admission.NewAttributesRecord(nil, namespace, "pods", "DELETE"))
 	if err != nil {
 		t.Errorf("ResourceQuota should admit all deletes", err)
@@ -49,19 +49,17 @@ func TestAdmissionIgnoresDelete(t *testing.T) {
 
 func TestIncrementUsagePods(t *testing.T) {
 	namespace := "default"
-	client := &client.Fake{
-		PodsList: api.PodList{
-			Items: []api.Pod{
-				{
-					ObjectMeta: api.ObjectMeta{Name: "123", Namespace: namespace},
-					Spec: api.PodSpec{
-						Volumes:    []api.Volume{{Name: "vol"}},
-						Containers: []api.Container{{Name: "ctr", Image: "image", Resources: getResourceRequirements("100m", "1Gi")}},
-					},
+	client := testclient.NewSimpleFake(&api.PodList{
+		Items: []api.Pod{
+			{
+				ObjectMeta: api.ObjectMeta{Name: "123", Namespace: namespace},
+				Spec: api.PodSpec{
+					Volumes:    []api.Volume{{Name: "vol"}},
+					Containers: []api.Container{{Name: "ctr", Image: "image", Resources: getResourceRequirements("100m", "1Gi")}},
 				},
 			},
 		},
-	}
+	})
 	status := &api.ResourceQuotaStatus{
 		Hard: api.ResourceList{},
 		Used: api.ResourceList{},
@@ -84,19 +82,17 @@ func TestIncrementUsagePods(t *testing.T) {
 
 func TestIncrementUsageMemory(t *testing.T) {
 	namespace := "default"
-	client := &client.Fake{
-		PodsList: api.PodList{
-			Items: []api.Pod{
-				{
-					ObjectMeta: api.ObjectMeta{Name: "123", Namespace: namespace},
-					Spec: api.PodSpec{
-						Volumes:    []api.Volume{{Name: "vol"}},
-						Containers: []api.Container{{Name: "ctr", Image: "image", Resources: getResourceRequirements("100m", "1Gi")}},
-					},
+	client := testclient.NewSimpleFake(&api.PodList{
+		Items: []api.Pod{
+			{
+				ObjectMeta: api.ObjectMeta{Name: "123", Namespace: namespace},
+				Spec: api.PodSpec{
+					Volumes:    []api.Volume{{Name: "vol"}},
+					Containers: []api.Container{{Name: "ctr", Image: "image", Resources: getResourceRequirements("100m", "1Gi")}},
 				},
 			},
 		},
-	}
+	})
 	status := &api.ResourceQuotaStatus{
 		Hard: api.ResourceList{},
 		Used: api.ResourceList{},
@@ -127,19 +123,17 @@ func TestIncrementUsageMemory(t *testing.T) {
 
 func TestExceedUsageMemory(t *testing.T) {
 	namespace := "default"
-	client := &client.Fake{
-		PodsList: api.PodList{
-			Items: []api.Pod{
-				{
-					ObjectMeta: api.ObjectMeta{Name: "123", Namespace: namespace},
-					Spec: api.PodSpec{
-						Volumes:    []api.Volume{{Name: "vol"}},
-						Containers: []api.Container{{Name: "ctr", Image: "image", Resources: getResourceRequirements("100m", "1Gi")}},
-					},
+	client := testclient.NewSimpleFake(&api.PodList{
+		Items: []api.Pod{
+			{
+				ObjectMeta: api.ObjectMeta{Name: "123", Namespace: namespace},
+				Spec: api.PodSpec{
+					Volumes:    []api.Volume{{Name: "vol"}},
+					Containers: []api.Container{{Name: "ctr", Image: "image", Resources: getResourceRequirements("100m", "1Gi")}},
 				},
 			},
 		},
-	}
+	})
 	status := &api.ResourceQuotaStatus{
 		Hard: api.ResourceList{},
 		Used: api.ResourceList{},
@@ -162,19 +156,17 @@ func TestExceedUsageMemory(t *testing.T) {
 
 func TestIncrementUsageCPU(t *testing.T) {
 	namespace := "default"
-	client := &client.Fake{
-		PodsList: api.PodList{
-			Items: []api.Pod{
-				{
-					ObjectMeta: api.ObjectMeta{Name: "123", Namespace: namespace},
-					Spec: api.PodSpec{
-						Volumes:    []api.Volume{{Name: "vol"}},
-						Containers: []api.Container{{Name: "ctr", Image: "image", Resources: getResourceRequirements("100m", "1Gi")}},
-					},
+	client := testclient.NewSimpleFake(&api.PodList{
+		Items: []api.Pod{
+			{
+				ObjectMeta: api.ObjectMeta{Name: "123", Namespace: namespace},
+				Spec: api.PodSpec{
+					Volumes:    []api.Volume{{Name: "vol"}},
+					Containers: []api.Container{{Name: "ctr", Image: "image", Resources: getResourceRequirements("100m", "1Gi")}},
 				},
 			},
 		},
-	}
+	})
 	status := &api.ResourceQuotaStatus{
 		Hard: api.ResourceList{},
 		Used: api.ResourceList{},
@@ -205,19 +197,17 @@ func TestIncrementUsageCPU(t *testing.T) {
 
 func TestExceedUsageCPU(t *testing.T) {
 	namespace := "default"
-	client := &client.Fake{
-		PodsList: api.PodList{
-			Items: []api.Pod{
-				{
-					ObjectMeta: api.ObjectMeta{Name: "123", Namespace: namespace},
-					Spec: api.PodSpec{
-						Volumes:    []api.Volume{{Name: "vol"}},
-						Containers: []api.Container{{Name: "ctr", Image: "image", Resources: getResourceRequirements("100m", "1Gi")}},
-					},
+	client := testclient.NewSimpleFake(&api.PodList{
+		Items: []api.Pod{
+			{
+				ObjectMeta: api.ObjectMeta{Name: "123", Namespace: namespace},
+				Spec: api.PodSpec{
+					Volumes:    []api.Volume{{Name: "vol"}},
+					Containers: []api.Container{{Name: "ctr", Image: "image", Resources: getResourceRequirements("100m", "1Gi")}},
 				},
 			},
 		},
-	}
+	})
 	status := &api.ResourceQuotaStatus{
 		Hard: api.ResourceList{},
 		Used: api.ResourceList{},
@@ -240,19 +230,17 @@ func TestExceedUsageCPU(t *testing.T) {
 
 func TestExceedUsagePods(t *testing.T) {
 	namespace := "default"
-	client := &client.Fake{
-		PodsList: api.PodList{
-			Items: []api.Pod{
-				{
-					ObjectMeta: api.ObjectMeta{Name: "123", Namespace: namespace},
-					Spec: api.PodSpec{
-						Volumes:    []api.Volume{{Name: "vol"}},
-						Containers: []api.Container{{Name: "ctr", Image: "image", Resources: getResourceRequirements("100m", "1Gi")}},
-					},
+	client := testclient.NewSimpleFake(&api.PodList{
+		Items: []api.Pod{
+			{
+				ObjectMeta: api.ObjectMeta{Name: "123", Namespace: namespace},
+				Spec: api.PodSpec{
+					Volumes:    []api.Volume{{Name: "vol"}},
+					Containers: []api.Container{{Name: "ctr", Image: "image", Resources: getResourceRequirements("100m", "1Gi")}},
 				},
 			},
 		},
-	}
+	})
 	status := &api.ResourceQuotaStatus{
 		Hard: api.ResourceList{},
 		Used: api.ResourceList{},
@@ -268,15 +256,13 @@ func TestExceedUsagePods(t *testing.T) {
 
 func TestIncrementUsageServices(t *testing.T) {
 	namespace := "default"
-	client := &client.Fake{
-		ServiceList: api.ServiceList{
-			Items: []api.Service{
-				{
-					ObjectMeta: api.ObjectMeta{Name: "123", Namespace: namespace},
-				},
+	client := testclient.NewSimpleFake(&api.ServiceList{
+		Items: []api.Service{
+			{
+				ObjectMeta: api.ObjectMeta{Name: "123", Namespace: namespace},
 			},
 		},
-	}
+	})
 	status := &api.ResourceQuotaStatus{
 		Hard: api.ResourceList{},
 		Used: api.ResourceList{},
@@ -299,15 +285,13 @@ func TestIncrementUsageServices(t *testing.T) {
 
 func TestExceedUsageServices(t *testing.T) {
 	namespace := "default"
-	client := &client.Fake{
-		ServiceList: api.ServiceList{
-			Items: []api.Service{
-				{
-					ObjectMeta: api.ObjectMeta{Name: "123", Namespace: namespace},
-				},
+	client := testclient.NewSimpleFake(&api.ServiceList{
+		Items: []api.Service{
+			{
+				ObjectMeta: api.ObjectMeta{Name: "123", Namespace: namespace},
 			},
 		},
-	}
+	})
 	status := &api.ResourceQuotaStatus{
 		Hard: api.ResourceList{},
 		Used: api.ResourceList{},
@@ -323,15 +307,13 @@ func TestExceedUsageServices(t *testing.T) {
 
 func TestIncrementUsageReplicationControllers(t *testing.T) {
 	namespace := "default"
-	client := &client.Fake{
-		CtrlList: api.ReplicationControllerList{
-			Items: []api.ReplicationController{
-				{
-					ObjectMeta: api.ObjectMeta{Name: "123", Namespace: namespace},
-				},
+	client := testclient.NewSimpleFake(&api.ReplicationControllerList{
+		Items: []api.ReplicationController{
+			{
+				ObjectMeta: api.ObjectMeta{Name: "123", Namespace: namespace},
 			},
 		},
-	}
+	})
 	status := &api.ResourceQuotaStatus{
 		Hard: api.ResourceList{},
 		Used: api.ResourceList{},
@@ -354,15 +336,13 @@ func TestIncrementUsageReplicationControllers(t *testing.T) {
 
 func TestExceedUsageReplicationControllers(t *testing.T) {
 	namespace := "default"
-	client := &client.Fake{
-		CtrlList: api.ReplicationControllerList{
-			Items: []api.ReplicationController{
-				{
-					ObjectMeta: api.ObjectMeta{Name: "123", Namespace: namespace},
-				},
+	client := testclient.NewSimpleFake(&api.ReplicationControllerList{
+		Items: []api.ReplicationController{
+			{
+				ObjectMeta: api.ObjectMeta{Name: "123", Namespace: namespace},
 			},
 		},
-	}
+	})
 	status := &api.ResourceQuotaStatus{
 		Hard: api.ResourceList{},
 		Used: api.ResourceList{},

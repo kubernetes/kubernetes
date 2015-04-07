@@ -28,6 +28,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/testclient"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
@@ -339,12 +340,12 @@ func TestControllerUpdateReplicas(t *testing.T) {
 
 type FakeWatcher struct {
 	w *watch.FakeWatcher
-	*client.Fake
+	*testclient.Fake
 }
 
 func TestWatchControllers(t *testing.T) {
 	fakeWatch := watch.NewFake()
-	client := &client.Fake{Watch: fakeWatch}
+	client := &testclient.Fake{Watch: fakeWatch}
 	manager := NewReplicationManager(client)
 	var testControllerSpec api.ReplicationController
 	received := make(chan struct{})

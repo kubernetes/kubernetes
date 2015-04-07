@@ -37,8 +37,8 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/capabilities"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/testclient"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/cadvisor"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
 	kubecontainer "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
@@ -63,7 +63,7 @@ type TestKubelet struct {
 	kubelet          *Kubelet
 	fakeDocker       *dockertools.FakeDockerClient
 	fakeCadvisor     *cadvisor.Mock
-	fakeKubeClient   *client.Fake
+	fakeKubeClient   *testclient.Fake
 	waitGroup        *sync.WaitGroup
 	fakeMirrorClient *fakeMirrorClient
 }
@@ -72,7 +72,7 @@ func newTestKubelet(t *testing.T) *TestKubelet {
 	fakeDocker := &dockertools.FakeDockerClient{RemovedImages: util.StringSet{}}
 	fakeDockerCache := dockertools.NewFakeDockerCache(fakeDocker)
 	fakeRecorder := &record.FakeRecorder{}
-	fakeKubeClient := &client.Fake{}
+	fakeKubeClient := &testclient.Fake{}
 
 	kubelet := &Kubelet{}
 	kubelet.dockerClient = fakeDocker
@@ -3053,10 +3053,9 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 	testKubelet := newTestKubelet(t)
 	kubelet := testKubelet.kubelet
 	kubeClient := testKubelet.fakeKubeClient
-	mockCadvisor := testKubelet.fakeCadvisor
-	kubeClient.MinionsList = api.NodeList{Items: []api.Node{
+	kubeClient.ReactFn = testclient.NewSimpleFake(&api.NodeList{Items: []api.Node{
 		{ObjectMeta: api.ObjectMeta{Name: "testnode"}},
-	}}
+	}}).ReactFn
 	machineInfo := &cadvisorApi.MachineInfo{
 		MachineID:      "123",
 		SystemUUID:     "abc",
@@ -3064,6 +3063,7 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 		NumCores:       2,
 		MemoryCapacity: 1024,
 	}
+	mockCadvisor := testKubelet.fakeCadvisor
 	mockCadvisor.On("MachineInfo").Return(machineInfo, nil)
 	versionInfo := &cadvisorApi.VersionInfo{
 		KernelVersion:      "3.16.0-0.bpo.4-amd64",
@@ -3104,8 +3104,8 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 	if err := kubelet.updateNodeStatus(); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	if len(kubeClient.Actions) != 2 {
-		t.Errorf("unexpected actions: %v", kubeClient.Actions)
+	if len(kubeClient.Actions) != 2 || kubeClient.Actions[1].Action != "update-node" {
+		t.Fatalf("unexpected actions: %v", kubeClient.Actions)
 	}
 	updatedNode, ok := kubeClient.Actions[1].Value.(*api.Node)
 	if !ok {
@@ -3120,7 +3120,7 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 	updatedNode.Status.Conditions[0].LastProbeTime = util.Time{}
 	updatedNode.Status.Conditions[0].LastTransitionTime = util.Time{}
 	if !reflect.DeepEqual(expectedNode, updatedNode) {
-		t.Errorf("expected \n%v\n, got \n%v", expectedNode, updatedNode)
+		t.Errorf("unexpected objects: %s", util.ObjectDiff(expectedNode, updatedNode))
 	}
 }
 
@@ -3128,8 +3128,7 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 	testKubelet := newTestKubelet(t)
 	kubelet := testKubelet.kubelet
 	kubeClient := testKubelet.fakeKubeClient
-	mockCadvisor := testKubelet.fakeCadvisor
-	kubeClient.MinionsList = api.NodeList{Items: []api.Node{
+	kubeClient.ReactFn = testclient.NewSimpleFake(&api.NodeList{Items: []api.Node{
 		{
 			ObjectMeta: api.ObjectMeta{Name: "testnode"},
 			Spec:       api.NodeSpec{},
@@ -3149,7 +3148,8 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 				},
 			},
 		},
-	}}
+	}}).ReactFn
+	mockCadvisor := testKubelet.fakeCadvisor
 	machineInfo := &cadvisorApi.MachineInfo{
 		MachineID:      "123",
 		SystemUUID:     "abc",
@@ -3205,11 +3205,11 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 		t.Errorf("unexpected object type")
 	}
 	// Expect LastProbeTime to be updated to Now, while LastTransitionTime to be the same.
-	if reflect.DeepEqual(updatedNode.Status.Conditions[0].LastProbeTime, util.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC)) {
+	if reflect.DeepEqual(updatedNode.Status.Conditions[0].LastProbeTime.Rfc3339Copy().UTC(), util.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC).Time) {
 		t.Errorf("expected \n%v\n, got \n%v", util.Now(), util.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC))
 	}
-	if !reflect.DeepEqual(updatedNode.Status.Conditions[0].LastTransitionTime, util.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC)) {
-		t.Errorf("expected \n%v\n, got \n%v", updatedNode.Status.Conditions[0].LastTransitionTime,
+	if !reflect.DeepEqual(updatedNode.Status.Conditions[0].LastTransitionTime.Rfc3339Copy().UTC(), util.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC).Time) {
+		t.Errorf("expected \n%#v\n, got \n%#v", updatedNode.Status.Conditions[0].LastTransitionTime.Rfc3339Copy(),
 			util.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC))
 	}
 	updatedNode.Status.Conditions[0].LastProbeTime = util.Time{}
@@ -3222,15 +3222,14 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 func TestUpdateNodeStatusError(t *testing.T) {
 	testKubelet := newTestKubelet(t)
 	kubelet := testKubelet.kubelet
-	kubeClient := testKubelet.fakeKubeClient
 	// No matching node for the kubelet
-	kubeClient.MinionsList = api.NodeList{Items: []api.Node{}}
+	testKubelet.fakeKubeClient.ReactFn = testclient.NewSimpleFake(&api.NodeList{Items: []api.Node{}}).ReactFn
 
 	if err := kubelet.updateNodeStatus(); err == nil {
 		t.Errorf("unexpected non error: %v", err)
 	}
-	if len(kubeClient.Actions) != nodeStatusUpdateRetry {
-		t.Errorf("unexpected actions: %v", kubeClient.Actions)
+	if len(testKubelet.fakeKubeClient.Actions) != nodeStatusUpdateRetry {
+		t.Errorf("unexpected actions: %v", testKubelet.fakeKubeClient.Actions)
 	}
 }
 

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package client
+package testclient
 
 import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -31,34 +31,33 @@ type FakeResourceQuotas struct {
 }
 
 func (c *FakeResourceQuotas) List(selector labels.Selector) (*api.ResourceQuotaList, error) {
-	c.Fake.Actions = append(c.Fake.Actions, FakeAction{Action: "list-resourceQuotas"})
-	return api.Scheme.CopyOrDie(&c.Fake.ResourceQuotasList).(*api.ResourceQuotaList), nil
+	obj, err := c.Fake.Invokes(FakeAction{Action: "list-resourceQuotas"}, &api.ResourceQuotaList{})
+	return obj.(*api.ResourceQuotaList), err
 }
 
 func (c *FakeResourceQuotas) Get(name string) (*api.ResourceQuota, error) {
-	c.Fake.Actions = append(c.Fake.Actions, FakeAction{Action: "get-resourceQuota", Value: name})
-	return &api.ResourceQuota{ObjectMeta: api.ObjectMeta{Name: name, Namespace: c.Namespace}}, nil
+	obj, err := c.Fake.Invokes(FakeAction{Action: "get-resourceQuota", Value: name}, &api.ResourceQuota{})
+	return obj.(*api.ResourceQuota), err
 }
 
 func (c *FakeResourceQuotas) Delete(name string) error {
-	c.Fake.Actions = append(c.Fake.Actions, FakeAction{Action: "delete-resourceQuota", Value: name})
-	return nil
+	_, err := c.Fake.Invokes(FakeAction{Action: "delete-resourceQuota", Value: name}, &api.ResourceQuota{})
+	return err
 }
 
 func (c *FakeResourceQuotas) Create(resourceQuota *api.ResourceQuota) (*api.ResourceQuota, error) {
-	c.Fake.Actions = append(c.Fake.Actions, FakeAction{Action: "create-resourceQuota"})
-	return &api.ResourceQuota{}, nil
+	obj, err := c.Fake.Invokes(FakeAction{Action: "create-resourceQuota", Value: resourceQuota}, &api.ResourceQuota{})
+	return obj.(*api.ResourceQuota), err
 }
 
 func (c *FakeResourceQuotas) Update(resourceQuota *api.ResourceQuota) (*api.ResourceQuota, error) {
-	c.Fake.Actions = append(c.Fake.Actions, FakeAction{Action: "update-resourceQuota", Value: resourceQuota.Name})
-	return &api.ResourceQuota{}, nil
+	obj, err := c.Fake.Invokes(FakeAction{Action: "update-resourceQuota", Value: resourceQuota}, &api.ResourceQuota{})
+	return obj.(*api.ResourceQuota), err
 }
 
 func (c *FakeResourceQuotas) UpdateStatus(resourceQuota *api.ResourceQuota) (*api.ResourceQuota, error) {
-	c.Fake.Actions = append(c.Fake.Actions, FakeAction{Action: "update-status-resourceQuota", Value: resourceQuota.Name})
-	c.Fake.ResourceQuotaStatus = *resourceQuota
-	return &api.ResourceQuota{}, nil
+	obj, err := c.Fake.Invokes(FakeAction{Action: "update-status-resourceQuota", Value: resourceQuota}, &api.ResourceQuota{})
+	return obj.(*api.ResourceQuota), err
 }
 
 func (c *FakeResourceQuotas) Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {

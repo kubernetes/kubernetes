@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package client
+package testclient
 
 import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -32,26 +32,26 @@ type FakeEvents struct {
 
 // Create makes a new event. Returns the copy of the event the server returns, or an error.
 func (c *FakeEvents) Create(event *api.Event) (*api.Event, error) {
-	c.Fake.Actions = append(c.Fake.Actions, FakeAction{Action: "get-event", Value: event.Name})
-	return &api.Event{}, nil
+	obj, err := c.Fake.Invokes(FakeAction{Action: "get-event", Value: event.Name}, &api.Event{})
+	return obj.(*api.Event), err
 }
 
 // Update replaces an existing event. Returns the copy of the event the server returns, or an error.
 func (c *FakeEvents) Update(event *api.Event) (*api.Event, error) {
-	c.Fake.Actions = append(c.Fake.Actions, FakeAction{Action: "update-event", Value: event.Name})
-	return &api.Event{}, nil
+	obj, err := c.Fake.Invokes(FakeAction{Action: "update-event", Value: event.Name}, &api.Event{})
+	return obj.(*api.Event), err
 }
 
 // List returns a list of events matching the selectors.
 func (c *FakeEvents) List(label labels.Selector, field fields.Selector) (*api.EventList, error) {
-	c.Fake.Actions = append(c.Fake.Actions, FakeAction{Action: "list-events"})
-	return &c.Fake.EventsList, nil
+	obj, err := c.Fake.Invokes(FakeAction{Action: "list-events"}, &api.EventList{})
+	return obj.(*api.EventList), err
 }
 
 // Get returns the given event, or an error.
 func (c *FakeEvents) Get(id string) (*api.Event, error) {
-	c.Fake.Actions = append(c.Fake.Actions, FakeAction{Action: "get-event", Value: id})
-	return &api.Event{}, nil
+	obj, err := c.Fake.Invokes(FakeAction{Action: "get-endpoints", Value: id}, &api.Event{})
+	return obj.(*api.Event), err
 }
 
 // Watch starts watching for events matching the given selectors.
@@ -62,13 +62,13 @@ func (c *FakeEvents) Watch(label labels.Selector, field fields.Selector, resourc
 
 // Search returns a list of events matching the specified object.
 func (c *FakeEvents) Search(objOrRef runtime.Object) (*api.EventList, error) {
-	c.Fake.Actions = append(c.Fake.Actions, FakeAction{Action: "search-events"})
-	return &c.Fake.EventsList, nil
+	obj, err := c.Fake.Invokes(FakeAction{Action: "search-events"}, &api.EventList{})
+	return obj.(*api.EventList), err
 }
 
 func (c *FakeEvents) Delete(name string) error {
-	c.Fake.Actions = append(c.Fake.Actions, FakeAction{Action: "delete-event", Value: name})
-	return nil
+	_, err := c.Fake.Invokes(FakeAction{Action: "delete-event", Value: name}, &api.Event{})
+	return err
 }
 
 func (c *FakeEvents) GetFieldSelector(involvedObjectName, involvedObjectNamespace, involvedObjectKind, involvedObjectUID *string) fields.Selector {

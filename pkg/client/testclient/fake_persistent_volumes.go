@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package client
+package testclient
 
 import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -24,32 +24,33 @@ import (
 )
 
 type FakePersistentVolumes struct {
-	Fake *Fake
+	Fake      *Fake
+	Namespace string
 }
 
-func (c *FakePersistentVolumes) List(labels labels.Selector, field fields.Selector) (*api.PersistentVolumeList, error) {
-	c.Fake.Actions = append(c.Fake.Actions, FakeAction{Action: "list-persistentVolumes"})
-	return api.Scheme.CopyOrDie(&c.Fake.PersistentVolumesList).(*api.PersistentVolumeList), nil
+func (c *FakePersistentVolumes) List(label labels.Selector, field fields.Selector) (*api.PersistentVolumeList, error) {
+	obj, err := c.Fake.Invokes(FakeAction{Action: "list-persistentVolumes"}, &api.PersistentVolumeList{})
+	return obj.(*api.PersistentVolumeList), err
 }
 
 func (c *FakePersistentVolumes) Get(name string) (*api.PersistentVolume, error) {
-	c.Fake.Actions = append(c.Fake.Actions, FakeAction{Action: "get-persistentVolume", Value: name})
-	return api.Scheme.CopyOrDie(&c.Fake.PersistentVolume).(*api.PersistentVolume), nil
+	obj, err := c.Fake.Invokes(FakeAction{Action: "get-persistentVolumes", Value: name}, &api.PersistentVolume{})
+	return obj.(*api.PersistentVolume), err
 }
 
 func (c *FakePersistentVolumes) Delete(name string) error {
-	c.Fake.Actions = append(c.Fake.Actions, FakeAction{Action: "delete-persistentVolume", Value: name})
-	return nil
+	_, err := c.Fake.Invokes(FakeAction{Action: "delete-persistentVolumes", Value: name}, &api.PersistentVolume{})
+	return err
 }
 
-func (c *FakePersistentVolumes) Create(persistentvolume *api.PersistentVolume) (*api.PersistentVolume, error) {
-	c.Fake.Actions = append(c.Fake.Actions, FakeAction{Action: "create-persistentVolume"})
-	return &api.PersistentVolume{}, nil
+func (c *FakePersistentVolumes) Create(persistentVolumes *api.PersistentVolume) (*api.PersistentVolume, error) {
+	obj, err := c.Fake.Invokes(FakeAction{Action: "create-persistentVolumes"}, &api.PersistentVolume{})
+	return obj.(*api.PersistentVolume), err
 }
 
-func (c *FakePersistentVolumes) Update(persistentvolume *api.PersistentVolume) (*api.PersistentVolume, error) {
-	c.Fake.Actions = append(c.Fake.Actions, FakeAction{Action: "update-persistentVolume", Value: persistentvolume.Name})
-	return &api.PersistentVolume{}, nil
+func (c *FakePersistentVolumes) Update(persistentVolumes *api.PersistentVolume) (*api.PersistentVolume, error) {
+	obj, err := c.Fake.Invokes(FakeAction{Action: "update-persistentVolumes", Value: persistentVolumes.Name}, &api.PersistentVolume{})
+	return obj.(*api.PersistentVolume), err
 }
 
 func (c *FakePersistentVolumes) Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {

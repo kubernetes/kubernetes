@@ -14,17 +14,19 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package client
+package testclient
 
 import (
 	"testing"
+
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 )
 
 // This test file just ensures that Fake and structs it is embedded in
 // implement Interface.
 
 func TestFakeImplementsInterface(t *testing.T) {
-	_ = Interface(&Fake{})
+	_ = client.Interface(&Fake{})
 }
 
 type MyFake struct {
@@ -32,6 +34,6 @@ type MyFake struct {
 }
 
 func TestEmbeddedFakeImplementsInterface(t *testing.T) {
-	_ = Interface(MyFake{&Fake{}})
-	_ = Interface(&MyFake{&Fake{}})
+	_ = client.Interface(MyFake{&Fake{}})
+	_ = client.Interface(&MyFake{&Fake{}})
 }

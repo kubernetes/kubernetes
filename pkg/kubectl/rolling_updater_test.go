@@ -24,10 +24,11 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/testclient"
 )
 
 type updaterFake struct {
-	*client.Fake
+	*testclient.Fake
 	ctrl client.ReplicationControllerInterface
 }
 
@@ -36,11 +37,11 @@ func (c *updaterFake) ReplicationControllers(namespace string) client.Replicatio
 }
 
 func fakeClientFor(namespace string, responses []fakeResponse) client.Interface {
-	fake := client.Fake{}
+	fake := testclient.Fake{}
 	return &updaterFake{
 		&fake,
 		&fakeRc{
-			&client.FakeReplicationControllers{
+			&testclient.FakeReplicationControllers{
 				Fake:      &fake,
 				Namespace: namespace,
 			},
@@ -55,12 +56,12 @@ type fakeResponse struct {
 }
 
 type fakeRc struct {
-	*client.FakeReplicationControllers
+	*testclient.FakeReplicationControllers
 	responses []fakeResponse
 }
 
 func (c *fakeRc) Get(name string) (*api.ReplicationController, error) {
-	action := client.FakeAction{Action: "get-controller", Value: name}
+	action := testclient.FakeAction{Action: "get-controller", Value: name}
 	if len(c.responses) == 0 {
 		return nil, fmt.Errorf("Unexpected Action: %s", action)
 	}
@@ -71,12 +72,12 @@ func (c *fakeRc) Get(name string) (*api.ReplicationController, error) {
 }
 
 func (c *fakeRc) Create(controller *api.ReplicationController) (*api.ReplicationController, error) {
-	c.Fake.Actions = append(c.Fake.Actions, client.FakeAction{Action: "create-controller", Value: controller.ObjectMeta.Name})
+	c.Fake.Actions = append(c.Fake.Actions, testclient.FakeAction{Action: "create-controller", Value: controller.ObjectMeta.Name})
 	return controller, nil
 }
 
 func (c *fakeRc) Update(controller *api.ReplicationController) (*api.ReplicationController, error) {
-	c.Fake.Actions = append(c.Fake.Actions, client.FakeAction{Action: "update-controller", Value: controller.ObjectMeta.Name})
+	c.Fake.Actions = append(c.Fake.Actions, testclient.FakeAction{Action: "update-controller", Value: controller.ObjectMeta.Name})
 	return controller, nil
 }
 

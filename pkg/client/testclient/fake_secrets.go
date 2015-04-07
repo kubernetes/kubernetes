@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package client
+package testclient
 
 import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -31,28 +31,28 @@ type FakeSecrets struct {
 }
 
 func (c *FakeSecrets) List(labels labels.Selector, field fields.Selector) (*api.SecretList, error) {
-	c.Fake.Actions = append(c.Fake.Actions, FakeAction{Action: "list-secrets"})
-	return &c.Fake.SecretList, c.Fake.Err
+	obj, err := c.Fake.Invokes(FakeAction{Action: "list-secrets"}, &api.SecretList{})
+	return obj.(*api.SecretList), err
 }
 
 func (c *FakeSecrets) Get(name string) (*api.Secret, error) {
-	c.Fake.Actions = append(c.Fake.Actions, FakeAction{Action: "get-secret", Value: name})
-	return api.Scheme.CopyOrDie(&c.Fake.Secret).(*api.Secret), nil
+	obj, err := c.Fake.Invokes(FakeAction{Action: "get-secret", Value: name}, &api.Secret{})
+	return obj.(*api.Secret), err
 }
 
 func (c *FakeSecrets) Create(secret *api.Secret) (*api.Secret, error) {
-	c.Fake.Actions = append(c.Fake.Actions, FakeAction{Action: "create-secret", Value: secret})
-	return &api.Secret{}, nil
+	obj, err := c.Fake.Invokes(FakeAction{Action: "create-secret", Value: secret}, &api.Secret{})
+	return obj.(*api.Secret), err
 }
 
 func (c *FakeSecrets) Update(secret *api.Secret) (*api.Secret, error) {
-	c.Fake.Actions = append(c.Fake.Actions, FakeAction{Action: "update-secret", Value: secret})
-	return &api.Secret{}, nil
+	obj, err := c.Fake.Invokes(FakeAction{Action: "update-secret", Value: secret}, &api.Secret{})
+	return obj.(*api.Secret), err
 }
 
-func (c *FakeSecrets) Delete(secret string) error {
-	c.Fake.Actions = append(c.Fake.Actions, FakeAction{Action: "delete-secret", Value: secret})
-	return nil
+func (c *FakeSecrets) Delete(name string) error {
+	_, err := c.Fake.Invokes(FakeAction{Action: "delete-secret", Value: name}, &api.Secret{})
+	return err
 }
 
 func (c *FakeSecrets) Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {

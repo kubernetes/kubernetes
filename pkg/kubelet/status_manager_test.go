@@ -23,6 +23,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/testclient"
 )
 
 var testPod *api.Pod = &api.Pod{
@@ -34,7 +35,7 @@ var testPod *api.Pod = &api.Pod{
 }
 
 func newTestStatusManager() *statusManager {
-	return newStatusManager(&client.Fake{})
+	return newStatusManager(&testclient.Fake{})
 }
 
 func generateRandomMessage() string {
@@ -48,7 +49,7 @@ func getRandomPodStatus() api.PodStatus {
 }
 
 func verifyActions(t *testing.T, kubeClient client.Interface, expectedActions []string) {
-	actions := kubeClient.(*client.Fake).Actions
+	actions := kubeClient.(*testclient.Fake).Actions
 	if len(actions) != len(expectedActions) {
 		t.Errorf("unexpected actions, got: %s expected: %s", actions, expectedActions)
 		return

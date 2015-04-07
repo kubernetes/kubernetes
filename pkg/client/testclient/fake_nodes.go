@@ -14,11 +14,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package client
+package testclient
 
 import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
@@ -31,36 +30,31 @@ type FakeNodes struct {
 }
 
 func (c *FakeNodes) Get(name string) (*api.Node, error) {
-	c.Fake.Actions = append(c.Fake.Actions, FakeAction{Action: "get-minion", Value: name})
-	for i := range c.Fake.MinionsList.Items {
-		if c.Fake.MinionsList.Items[i].Name == name {
-			return &c.Fake.MinionsList.Items[i], nil
-		}
-	}
-	return nil, errors.NewNotFound("Minions", name)
+	obj, err := c.Fake.Invokes(FakeAction{Action: "get-node", Value: name}, &api.Node{})
+	return obj.(*api.Node), err
 }
 
 func (c *FakeNodes) List() (*api.NodeList, error) {
-	c.Fake.Actions = append(c.Fake.Actions, FakeAction{Action: "list-minions", Value: nil})
-	return &c.Fake.MinionsList, nil
+	obj, err := c.Fake.Invokes(FakeAction{Action: "list-nodes"}, &api.NodeList{})
+	return obj.(*api.NodeList), err
 }
 
 func (c *FakeNodes) Create(minion *api.Node) (*api.Node, error) {
-	c.Fake.Actions = append(c.Fake.Actions, FakeAction{Action: "create-minion", Value: minion})
-	return &api.Node{}, nil
+	obj, err := c.Fake.Invokes(FakeAction{Action: "create-node", Value: minion}, &api.Node{})
+	return obj.(*api.Node), err
 }
 
-func (c *FakeNodes) Delete(id string) error {
-	c.Fake.Actions = append(c.Fake.Actions, FakeAction{Action: "delete-minion", Value: id})
-	return nil
+func (c *FakeNodes) Delete(name string) error {
+	_, err := c.Fake.Invokes(FakeAction{Action: "delete-node", Value: name}, &api.Node{})
+	return err
 }
 
 func (c *FakeNodes) Update(minion *api.Node) (*api.Node, error) {
-	c.Fake.Actions = append(c.Fake.Actions, FakeAction{Action: "update-minion", Value: minion})
-	return &api.Node{}, nil
+	obj, err := c.Fake.Invokes(FakeAction{Action: "update-node", Value: minion}, &api.Node{})
+	return obj.(*api.Node), err
 }
 
 func (c *FakeNodes) Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
-	c.Fake.Actions = append(c.Fake.Actions, FakeAction{Action: "watch-minions", Value: resourceVersion})
+	c.Fake.Actions = append(c.Fake.Actions, FakeAction{Action: "watch-nodes", Value: resourceVersion})
 	return c.Fake.Watch, c.Fake.Err
 }

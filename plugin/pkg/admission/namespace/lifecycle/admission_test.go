@@ -21,8 +21,8 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/admission"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/cache"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/testclient"
 )
 
 // TestAdmission
@@ -38,7 +38,7 @@ func TestAdmission(t *testing.T) {
 	}
 	store := cache.NewStore(cache.MetaNamespaceIndexFunc)
 	store.Add(namespaceObj)
-	mockClient := &client.Fake{}
+	mockClient := &testclient.Fake{}
 	handler := &lifecycle{
 		client: mockClient,
 		store:  store,

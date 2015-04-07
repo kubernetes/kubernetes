@@ -21,7 +21,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/testclient"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
@@ -150,17 +150,15 @@ func TestSyncResourceQuota(t *testing.T) {
 		},
 	}
 
-	kubeClient := &client.Fake{
-		PodsList: podList,
-	}
+	kubeClient := testclient.NewSimpleFake(&podList, &quota)
 
 	resourceQuotaManager := NewResourceQuotaManager(kubeClient)
 	err := resourceQuotaManager.syncResourceQuota(quota)
 	if err != nil {
-		t.Errorf("Unexpected error %v", err)
+		t.Fatalf("Unexpected error %v", err)
 	}
 
-	usage := kubeClient.ResourceQuotaStatus
+	usage := kubeClient.Actions[1].Value.(*api.ResourceQuota)
 
 	// ensure hard and used limits are what we expected
 	for k, v := range expectedUsage.Status.Hard {

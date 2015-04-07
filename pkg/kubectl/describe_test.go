@@ -26,6 +26,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/testclient"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
@@ -33,7 +34,7 @@ type describeClient struct {
 	T         *testing.T
 	Namespace string
 	Err       error
-	*client.Fake
+	client.Interface
 }
 
 func init() {
@@ -41,8 +42,13 @@ func init() {
 }
 
 func TestDescribePod(t *testing.T) {
-	fake := &client.Fake{}
-	c := &describeClient{T: t, Namespace: "foo", Fake: fake}
+	fake := testclient.NewSimpleFake(&api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			Name:      "bar",
+			Namespace: "foo",
+		},
+	})
+	c := &describeClient{T: t, Namespace: "foo", Interface: fake}
 	d := PodDescriber{c}
 	out, err := d.Describe("foo", "bar")
 	if err != nil {
@@ -54,8 +60,13 @@ func TestDescribePod(t *testing.T) {
 }
 
 func TestDescribeService(t *testing.T) {
-	fake := &client.Fake{}
-	c := &describeClient{T: t, Namespace: "foo", Fake: fake}
+	fake := testclient.NewSimpleFake(&api.Service{
+		ObjectMeta: api.ObjectMeta{
+			Name:      "bar",
+			Namespace: "foo",
+		},
+	})
+	c := &describeClient{T: t, Namespace: "foo", Interface: fake}
 	d := ServiceDescriber{c}
 	out, err := d.Describe("foo", "bar")
 	if err != nil {
@@ -68,34 +79,32 @@ func TestDescribeService(t *testing.T) {
 
 func TestPodDescribeResultsSorted(t *testing.T) {
 	// Arrange
-	fake := &client.Fake{
-		EventsList: api.EventList{
-			Items: []api.Event{
-				{
-					Source:         api.EventSource{Component: "kubelet"},
-					Message:        "Item 1",
-					FirstTimestamp: util.NewTime(time.Date(2014, time.January, 15, 0, 0, 0, 0, time.UTC)),
-					LastTimestamp:  util.NewTime(time.Date(2014, time.January, 15, 0, 0, 0, 0, time.UTC)),
-					Count:          1,
-				},
-				{
-					Source:         api.EventSource{Component: "scheduler"},
-					Message:        "Item 2",
-					FirstTimestamp: util.NewTime(time.Date(1987, time.June, 17, 0, 0, 0, 0, time.UTC)),
-					LastTimestamp:  util.NewTime(time.Date(1987, time.June, 17, 0, 0, 0, 0, time.UTC)),
-					Count:          1,
-				},
-				{
-					Source:         api.EventSource{Component: "kubelet"},
-					Message:        "Item 3",
-					FirstTimestamp: util.NewTime(time.Date(2002, time.December, 25, 0, 0, 0, 0, time.UTC)),
-					LastTimestamp:  util.NewTime(time.Date(2002, time.December, 25, 0, 0, 0, 0, time.UTC)),
-					Count:          1,
-				},
+	fake := testclient.NewSimpleFake(&api.EventList{
+		Items: []api.Event{
+			{
+				Source:         api.EventSource{Component: "kubelet"},
+				Message:        "Item 1",
+				FirstTimestamp: util.NewTime(time.Date(2014, time.January, 15, 0, 0, 0, 0, time.UTC)),
+				LastTimestamp:  util.NewTime(time.Date(2014, time.January, 15, 0, 0, 0, 0, time.UTC)),
+				Count:          1,
+			},
+			{
+				Source:         api.EventSource{Component: "scheduler"},
+				Message:        "Item 2",
+				FirstTimestamp: util.NewTime(time.Date(1987, time.June, 17, 0, 0, 0, 0, time.UTC)),
+				LastTimestamp:  util.NewTime(time.Date(1987, time.June, 17, 0, 0, 0, 0, time.UTC)),
+				Count:          1,
+			},
+			{
+				Source:         api.EventSource{Component: "kubelet"},
+				Message:        "Item 3",
+				FirstTimestamp: util.NewTime(time.Date(2002, time.December, 25, 0, 0, 0, 0, time.UTC)),
+				LastTimestamp:  util.NewTime(time.Date(2002, time.December, 25, 0, 0, 0, 0, time.UTC)),
+				Count:          1,
 			},
 		},
-	}
-	c := &describeClient{T: t, Namespace: "foo", Fake: fake}
+	})
+	c := &describeClient{T: t, Namespace: "foo", Interface: fake}
 	d := PodDescriber{c}
 
 	// Act
