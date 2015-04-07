@@ -1,106 +1,43 @@
 ### Running Multi-Node Kubernetes Using Docker
 
-_Note_: These instructions are somewhat significantly more advanced than the [single node](docker.md) instructions.  If you are
+_Note_:
+These instructions are somewhat significantly more advanced than the [single node](docker.md) instructions.  If you are
 interested in just starting to explore Kubernetes, we recommend that you start there.
 
+## Table of Contents
+  * [Overview](#overview)
+  * [Installing the master node](#master-node)
+  * [Installing a worker node](#adding-a-worker-node)
+  * [Testing your cluster](#testing-your-cluster)
+
+## Overview
+This guide will set up a 2-node kubernetes cluster, consisting of a _master_ node which hosts the API server and orchestrates work
+and a _worker_ node which receives work from the master.  You can repeat the process of adding worker nodes an arbitrary number of
+times to create larger clusters.
+
+Here's a diagram of what the final result will look like:
+![Kubernetes Single Node on Docker](k8s-docker.png)
+
+### Bootstrap Docker
+This guide also uses a pattern of running two instances of the Docker daemon
+   1) A _bootstrap_ Docker instance which is used to start system daemons like ```flanneld``` and ```etcd```
+   2) A _main_ Docker instance which is used for the Kubernetes infrastructure and user's scheduled containers
+
+This pattern is necessary because the ```flannel``` daemon is responsible for setting up and managing the network that interconnects
+all of the Docker containers created by Kubernetes.  To achieve this, it must run outside of the _main_ Docker daemon.  However,
+it is still useful to use containers for deployment and management, so we create a simpler _bootstrap_ daemon to achieve this.
 
 ## Master Node
-We'll begin by setting up the master node.  For the purposes of illustration, we'll assume that the IP of this machine is MASTER_IP
+The first step in the process is to initialize the master node.
 
-### Setup Docker-Bootstrap
-We're going to use ```flannel``` to set up networking between Docker daemons.  Flannel itself (and etcd on which it relies) will run inside of
-Docker containers themselves.  To achieve this, we need a separate "bootstrap" instance of the Docker daemon.  This daemon will be started with
-```--iptables=false``` so that it can only run containers with ```--net=host```.  That's sufficient to bootstrap our system.
+See [here](docker-multinode/master.md) for detailed instructions.
 
-Run:
-```sh
-sudo docker -d -H unix:///var/run/docker-bootstrap.sock -p /var/run/docker-bootstrap.pid --iptables=false >> /var/log/docker-bootstrap.log &&
-```
+## Adding a worker node
 
-### Startup etcd for flannel to use
-Run:
-```
-docker -H unix:///var/run/docker-bootstrap.sock run --net=host -d kubernetes/etcd:2.0.5.1 /usr/local/bin/etcd --addr=127.0.0.1:4001 --bind-addr=0.0.0.0:4001 --data-dir=/var/etcd/data
-```
+Once your master is up and running you can add one or more workers on different machines.
 
-Next,, you need to set a CIDR range for flannel.  This CIDR should be chosen to be non-overlapping with any existing network you are using:
+See [here](docker-multinode/worker.md) for detailed instructions.
 
-```sh
-docker -H unix:///var/run/docker-bootstrap.sock run --net=host kubernetes/etcd:2.0.5.1 etcdctl set /coreos.com/network/config '{ "Network": "10.1.0.0/16" }'
-```
+## Testing your cluster
 
-
-### Bring down Docker
-To re-configure Docker to use flannel, we need to take docker down, run flannel and then restart Docker.
-
-Turning down Docker is system dependent, it may be:
-
-```sh
-/etc/init.d/docker stop
-```
-
-or
-
-```sh
-systemctl stop docker
-```
-
-or it may be something else.
-
-### Run flannel
-
-Now run flanneld itself:
-```sh
-docker -H unix:///var/run/docker-bootstrap.sock run -d --net=host --privileged -v /dev/net:/dev/net quay.io/coreos/flannel:0.3.0
-```
-
-The previous command should have printed a really long hash, copy this hash.
-
-Now get the subnet settings from flannel:
-```
-docker exec <really-long-hash-from-above-here> cat /run/flannel/subnet.env
-```
-
-### Edit the docker configuration
-You now need to edit the docker configuration to activate new flags.  Again, this is system specific.
-
-This may be in ```/etc/docker/default``` or ```/etc/systemd/service/docker.service``` or it may be elsewhere.
-
-Regardless, you need to add the following to the docker comamnd line:
-```sh
---bip=${FLANNEL_SUBNET} --mtu=${FLANNEL_MTU}
-```
-
-### Remove the existing Docker bridge
-Docker creates a bridge named ```docker0``` by default.  You need to remove this:
-
-```sh
-sudo ifconfig docker0 down
-sudo brctl delbr docker0
-```
-
-### Restart Docker
-Again this is system dependent, it may be:
-
-```sh
-sudo /etc/init.d/docker start
-```
-
-it may be:
-```sh
-systemctl start docker
-```
-
-### Starting the Kubernetes Master
-Ok, now that your networking is set up, you can startup Kubernetes, this is the same as the single-node case:
-
-```sh
-docker run --net=host -d -v /var/run/docker.sock:/var/run/docker.sock  gcr.io/google_containers/hyperkube:v0.14.1 /hyperkube kubelet --api_servers=http://localhost:8080 --v=2 --address=0.0.0.0 --enable_server --hostname_override=127.0.0.1 --config=/etc/kubernetes/manifests
-```
-
-### Also run the service proxy
-```sh
-docker run -d --net=host --privileged gcr.io/google_containers/hyperkube:v0.14.1 /hyperkube proxy --master=http://127.0.0.1:8080 --v=2
-```
-
-### Adding a new node
+Once your cluster has been created you can [test it out](docker-multinode/testing.md)
