@@ -222,6 +222,8 @@ type VolumeSource struct {
 	Glusterfs *GlusterfsVolumeSource `json:"glusterfs,omitempty" description:"Glusterfs volume that will be mounted on the host machine "`
 	// PersistentVolumeClaimVolumeSource represents a reference to a PersistentVolumeClaim in the same namespace
 	PersistentVolumeClaimVolumeSource *PersistentVolumeClaimVolumeSource `json:"persistentVolumeClaim,omitempty" description:"a reference to a PersistentVolumeClaim in the same namespace"`
+	// RBD represents a Rados Block Device mount on the host that shares a pod's lifetime
+	RBD *RBDVolumeSource `json:"rbd" description:"rados block volume that will be mounted on the host machine"`
 }
 
 type PersistentVolumeClaimVolumeSource struct {
@@ -249,6 +251,8 @@ type PersistentVolumeSource struct {
 	Glusterfs *GlusterfsVolumeSource `json:"glusterfs,omitempty" description:"Glusterfs volume resource provisioned by an admin"`
 	// NFS represents an NFS mount on the host
 	NFS *NFSVolumeSource `json:"nfs,omitempty" description:"NFS volume resource provisioned by an admin"`
+	// RBD represents a Rados Block Device mount on the host that shares a pod's lifetime
+	RBD *RBDVolumeSource `json:"rbd" description:"rados block volume that will be mounted on the host machine"`
 }
 
 type PersistentVolume struct {
@@ -384,6 +388,30 @@ type GlusterfsVolumeSource struct {
 
 // StorageMedium defines ways that storage can be allocated to a volume.
 type StorageMedium string
+
+// RBDVolumeSource represents a Rados Block Device Mount that lasts the lifetime of a pod
+type RBDVolumeSource struct {
+	// Required: CephMonitors is a collection of Ceph monitors
+	CephMonitors []string `json:"monitors" description:"a collection of Ceph monitors"`
+	// Required: RBDImage is the rados image name
+	RBDImage string `json:"image" description:"rados image name"`
+	// Required: Filesystem type to mount.
+	// Must be a filesystem type supported by the host operating system.
+	// Ex. "ext4", "xfs", "ntfs"
+	// TODO: how do we prevent errors in the filesystem from compromising the machine
+	FSType string `json:"fsType,omitempty" description:"file system type to mount, such as ext4, xfs, ntfs"`
+	// Optional: RadosPool is the rados pool name,default is rbd
+	RBDPool string `json:"pool" description:"rados pool name; default is rbd; optional"`
+	// Optional: RBDUser is the rados user name, default is admin
+	RadosUser string `json:"user" description:"rados user name; default is admin; optional"`
+	// Optional: Keyring is the path to key ring for RBDUser, default is /etc/ceph/keyring
+	Keyring string `json:"keyring" description:"keyring is the path to key ring for rados user; default is /etc/ceph/keyring; optional"`
+	// Optional: SecretRef is name of the authentication secret for RBDUser, default is empty.
+	SecretRef *LocalObjectReference `json:"secretRef" description:"name of a secret to authenticate the RBD user; if provided overrides keyring; optional"`
+	// Optional: Defaults to false (read/write). ReadOnly here will force
+	// the ReadOnly setting in VolumeMounts.
+	ReadOnly bool `json:"readOnly,omitempty"  description:"rbd volume to be mounted with read-only permissions"`
+}
 
 const (
 	StorageMediumDefault StorageMedium = ""       // use whatever the default is for the node

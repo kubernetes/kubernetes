@@ -1157,6 +1157,9 @@ func addConversionFuncs() {
 			if err := s.Convert(&in.PersistentVolumeClaimVolumeSource, &out.PersistentVolumeClaimVolumeSource, 0); err != nil {
 				return err
 			}
+			if err := s.Convert(&in.RBD, &out.RBD, 0); err != nil {
+				return err
+			}
 			return nil
 		},
 		func(in *VolumeSource, out *api.VolumeSource, s conversion.Scope) error {
@@ -1188,6 +1191,9 @@ func addConversionFuncs() {
 				return err
 			}
 			if err := s.Convert(&in.Glusterfs, &out.Glusterfs, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.RBD, &out.RBD, 0); err != nil {
 				return err
 			}
 			return nil
