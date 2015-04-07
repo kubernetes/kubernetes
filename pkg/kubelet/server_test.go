@@ -112,18 +112,13 @@ func (fk *fakeKubelet) StreamingConnectionIdleTimeout() time.Duration {
 }
 
 type serverTestFramework struct {
-	updateChan      chan interface{}
-	updateReader    *channelReader
 	serverUnderTest *Server
 	fakeKubelet     *fakeKubelet
 	testHTTPServer  *httptest.Server
 }
 
 func newServerTest() *serverTestFramework {
-	fw := &serverTestFramework{
-		updateChan: make(chan interface{}),
-	}
-	fw.updateReader = startReading(fw.updateChan)
+	fw := &serverTestFramework{}
 	fw.fakeKubelet = &fakeKubelet{
 		podByNameFunc: func(namespace, name string) (*api.Pod, bool) {
 			return &api.Pod{
