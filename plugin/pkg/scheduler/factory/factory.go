@@ -208,7 +208,7 @@ func (f *ConfigFactory) CreateFromKeys(predicateKeys, priorityKeys util.StringSe
 // Returns a cache.ListWatch that finds all pods that need to be
 // scheduled.
 func (factory *ConfigFactory) createUnassignedPodLW() *cache.ListWatch {
-	return cache.NewListWatchFromClient(factory.Client, "pods", api.NamespaceAll, fields.Set{getHostFieldLabel(factory.Client.APIVersion()): ""}.AsSelector())
+	return cache.NewListWatchFromClient(factory.Client, "pods", api.NamespaceAll, fields.Set{client.PodHost: ""}.AsSelector())
 }
 
 func parseSelectorOrDie(s string) fields.Selector {
@@ -224,7 +224,7 @@ func parseSelectorOrDie(s string) fields.Selector {
 // TODO: return a ListerWatcher interface instead?
 func (factory *ConfigFactory) createAssignedPodLW() *cache.ListWatch {
 	return cache.NewListWatchFromClient(factory.Client, "pods", api.NamespaceAll,
-		parseSelectorOrDie(getHostFieldLabel(factory.Client.APIVersion())+"!="))
+		parseSelectorOrDie(client.PodHost+"!="))
 }
 
 // createMinionLW returns a cache.ListWatch that gets all changes to minions.
@@ -292,15 +292,6 @@ func (factory *ConfigFactory) makeDefaultErrorFunc(backoff *podBackoff, podQueue
 				podQueue.Add(pod)
 			}
 		}()
-	}
-}
-
-func getHostFieldLabel(apiVersion string) string {
-	switch apiVersion {
-	case "v1beta1", "v1beta2":
-		return "DesiredState.Host"
-	default:
-		return "spec.host"
 	}
 }
 
