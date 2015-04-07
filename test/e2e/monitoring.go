@@ -30,7 +30,8 @@ import (
 	. "github.com/onsi/ginkgo"
 )
 
-var _ = Describe("Monitoring", func() {
+// TODO: quinton: debug issue #6541 and then remove Pending flag here.
+var _ = PDescribe("Monitoring", func() {
 	var c *client.Client
 
 	BeforeEach(func() {
