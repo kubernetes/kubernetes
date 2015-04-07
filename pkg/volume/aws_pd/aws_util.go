@@ -29,9 +29,9 @@ import (
 
 type AWSDiskUtil struct{}
 
-// Attaches a disk specified by a volume.AWSPersistentDisk to the current kubelet.
+// Attaches a disk specified by a volume.AWSElasticBlockStore to the current kubelet.
 // Mounts the disk to it's global path.
-func (util *AWSDiskUtil) AttachAndMountDisk(pd *awsPersistentDisk, globalPDPath string) error {
+func (util *AWSDiskUtil) AttachAndMountDisk(pd *awsElasticBlockStore, globalPDPath string) error {
 	volumes, err := pd.getVolumeProvider()
 	if err != nil {
 		return err
@@ -87,7 +87,7 @@ func (util *AWSDiskUtil) AttachAndMountDisk(pd *awsPersistentDisk, globalPDPath 
 }
 
 // Unmounts the device and detaches the disk from the kubelet's host machine.
-func (util *AWSDiskUtil) DetachDisk(pd *awsPersistentDisk) error {
+func (util *AWSDiskUtil) DetachDisk(pd *awsElasticBlockStore) error {
 	// Unmount the global PD mount, which should be the only one.
 	globalPDPath := makeGlobalPDPath(pd.plugin.host, pd.volumeId)
 	if err := pd.mounter.Unmount(globalPDPath, 0); err != nil {

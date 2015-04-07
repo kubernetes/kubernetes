@@ -189,9 +189,9 @@ type VolumeSource struct {
 	// GCEPersistentDisk represents a GCE Disk resource that is attached to a
 	// kubelet's host machine and then exposed to the pod.
 	GCEPersistentDisk *GCEPersistentDiskVolumeSource `json:"gcePersistentDisk"`
-	// AWSPersistentDisk represents a AWS EBS disk that is attached to a
+	// AWSElasticBlockStore represents a AWS EBS disk that is attached to a
 	// kubelet's host machine and then exposed to the pod.
-	AWSPersistentDisk *AWSPersistentDiskVolumeSource `json:"awsPersistentDisk"`
+	AWSElasticBlockStore *AWSElasticBlockStoreVolumeSource `json:"awsElasticBlockStore"`
 	// GitRepo represents a git repository at a particular revision.
 	GitRepo *GitRepoVolumeSource `json:"gitRepo"`
 	// Secret represents a secret that should populate this volume.
@@ -211,9 +211,9 @@ type PersistentVolumeSource struct {
 	// GCEPersistentDisk represents a GCE Disk resource that is attached to a
 	// kubelet's host machine and then exposed to the pod.
 	GCEPersistentDisk *GCEPersistentDiskVolumeSource `json:"gcePersistentDisk"`
-	// AWSPersistentDisk represents a AWS EBS disk that is attached to a
+	// AWSElasticBlockStore represents a AWS EBS disk that is attached to a
 	// kubelet's host machine and then exposed to the pod.
-	AWSPersistentDisk *AWSPersistentDiskVolumeSource `json:"awsPersistentDisk"`
+	AWSElasticBlockStore *AWSElasticBlockStoreVolumeSource `json:"awsElasticBlockStore"`
 	// HostPath represents a directory on the host.
 	// This is useful for development and testing only.
 	// on-host storage is not supported in any way
@@ -400,12 +400,12 @@ type ISCSIVolumeSource struct {
 	ReadOnly bool `json:"readOnly,omitempty"`
 }
 
-// AWSPersistentDiskVolumeSource represents a Persistent Disk resource in AWS.
+// AWSElasticBlockStoreVolumeSource represents a Persistent Disk resource in AWS.
 //
 // An AWS EBS disk must exist and be formatted before mounting to a container.
 // The disk must also be in the same AWS zone as the kubelet.
 // A AWS EBS disk can only be mounted as read/write once.
-type AWSPersistentDiskVolumeSource struct {
+type AWSElasticBlockStoreVolumeSource struct {
 	// Unique id of the persistent disk resource. Used to identify the disk in AWS
 	VolumeId string `json:"volumeId"`
 	// Required: Filesystem type to mount.

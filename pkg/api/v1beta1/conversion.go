@@ -1170,7 +1170,7 @@ func init() {
 			if err := s.Convert(&in.ISCSI, &out.ISCSI, 0); err != nil {
 				return err
 			}
-			if err := s.Convert(&in.AWSPersistentDisk, &out.AWSPersistentDisk, 0); err != nil {
+			if err := s.Convert(&in.AWSElasticBlockStore, &out.AWSElasticBlockStore, 0); err != nil {
 				return err
 			}
 			if err := s.Convert(&in.HostPath, &out.HostDir, 0); err != nil {
@@ -1200,7 +1200,7 @@ func init() {
 			if err := s.Convert(&in.ISCSI, &out.ISCSI, 0); err != nil {
 				return err
 			}
-			if err := s.Convert(&in.AWSPersistentDisk, &out.AWSPersistentDisk, 0); err != nil {
+			if err := s.Convert(&in.AWSElasticBlockStore, &out.AWSElasticBlockStore, 0); err != nil {
 				return err
 			}
 			if err := s.Convert(&in.HostDir, &out.HostPath, 0); err != nil {

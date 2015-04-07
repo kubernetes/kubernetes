@@ -37,55 +37,55 @@ import (
 
 // This is the primary entrypoint for volume plugins.
 func ProbeVolumePlugins() []volume.VolumePlugin {
-	return []volume.VolumePlugin{&awsPersistentDiskPlugin{nil}}
+	return []volume.VolumePlugin{&awsElasticBlockStorePlugin{nil}}
 }
 
-type awsPersistentDiskPlugin struct {
+type awsElasticBlockStorePlugin struct {
 	host volume.VolumeHost
 }
 
-var _ volume.VolumePlugin = &awsPersistentDiskPlugin{}
+var _ volume.VolumePlugin = &awsElasticBlockStorePlugin{}
 
 const (
-	awsPersistentDiskPluginName = "kubernetes.io/aws-pd"
+	awsElasticBlockStorePluginName = "kubernetes.io/aws-ebs"
 )
 
-func (plugin *awsPersistentDiskPlugin) Init(host volume.VolumeHost) {
+func (plugin *awsElasticBlockStorePlugin) Init(host volume.VolumeHost) {
 	plugin.host = host
 }
 
-func (plugin *awsPersistentDiskPlugin) Name() string {
-	return awsPersistentDiskPluginName
+func (plugin *awsElasticBlockStorePlugin) Name() string {
+	return awsElasticBlockStorePluginName
 }
 
-func (plugin *awsPersistentDiskPlugin) CanSupport(spec *api.Volume) bool {
-	if spec.AWSPersistentDisk != nil {
+func (plugin *awsElasticBlockStorePlugin) CanSupport(spec *api.Volume) bool {
+	if spec.AWSElasticBlockStore != nil {
 		return true
 	}
 	return false
 }
 
-func (plugin *awsPersistentDiskPlugin) GetAccessModes() []api.AccessModeType {
+func (plugin *awsElasticBlockStorePlugin) GetAccessModes() []api.AccessModeType {
 	return []api.AccessModeType{
 		api.ReadWriteOnce,
 	}
 }
 
-func (plugin *awsPersistentDiskPlugin) NewBuilder(spec *api.Volume, podRef *api.ObjectReference) (volume.Builder, error) {
+func (plugin *awsElasticBlockStorePlugin) NewBuilder(spec *api.Volume, podRef *api.ObjectReference) (volume.Builder, error) {
 	// Inject real implementations here, test through the internal function.
 	return plugin.newBuilderInternal(spec, podRef.UID, &AWSDiskUtil{}, mount.New())
 }
 
-func (plugin *awsPersistentDiskPlugin) newBuilderInternal(spec *api.Volume, podUID types.UID, manager pdManager, mounter mount.Interface) (volume.Builder, error) {
-	volumeId := spec.AWSPersistentDisk.VolumeId
-	fsType := spec.AWSPersistentDisk.FSType
+func (plugin *awsElasticBlockStorePlugin) newBuilderInternal(spec *api.Volume, podUID types.UID, manager pdManager, mounter mount.Interface) (volume.Builder, error) {
+	volumeId := spec.AWSElasticBlockStore.VolumeId
+	fsType := spec.AWSElasticBlockStore.FSType
 	partition := ""
-	if spec.AWSPersistentDisk.Partition != 0 {
-		partition = strconv.Itoa(spec.AWSPersistentDisk.Partition)
+	if spec.AWSElasticBlockStore.Partition != 0 {
+		partition = strconv.Itoa(spec.AWSElasticBlockStore.Partition)
 	}
-	readOnly := spec.AWSPersistentDisk.ReadOnly
+	readOnly := spec.AWSElasticBlockStore.ReadOnly
 
-	return &awsPersistentDisk{
+	return &awsElasticBlockStore{
 		podUID:      podUID,
 		volName:     spec.Name,
 		volumeId:    volumeId,
@@ -99,13 +99,13 @@ func (plugin *awsPersistentDiskPlugin) newBuilderInternal(spec *api.Volume, podU
 	}, nil
 }
 
-func (plugin *awsPersistentDiskPlugin) NewCleaner(volName string, podUID types.UID) (volume.Cleaner, error) {
+func (plugin *awsElasticBlockStorePlugin) NewCleaner(volName string, podUID types.UID) (volume.Cleaner, error) {
 	// Inject real implementations here, test through the internal function.
 	return plugin.newCleanerInternal(volName, podUID, &AWSDiskUtil{}, mount.New())
 }
 
-func (plugin *awsPersistentDiskPlugin) newCleanerInternal(volName string, podUID types.UID, manager pdManager, mounter mount.Interface) (volume.Cleaner, error) {
-	return &awsPersistentDisk{
+func (plugin *awsElasticBlockStorePlugin) newCleanerInternal(volName string, podUID types.UID, manager pdManager, mounter mount.Interface) (volume.Cleaner, error) {
+	return &awsElasticBlockStore{
 		podUID:      podUID,
 		volName:     volName,
 		manager:     manager,
@@ -118,14 +118,14 @@ func (plugin *awsPersistentDiskPlugin) newCleanerInternal(volName string, podUID
 // Abstract interface to PD operations.
 type pdManager interface {
 	// Attaches the disk to the kubelet's host machine.
-	AttachAndMountDisk(pd *awsPersistentDisk, globalPDPath string) error
+	AttachAndMountDisk(pd *awsElasticBlockStore, globalPDPath string) error
 	// Detaches the disk from the kubelet's host machine.
-	DetachDisk(pd *awsPersistentDisk) error
+	DetachDisk(pd *awsElasticBlockStore) error
 }
 
-// awsPersistentDisk volumes are disk resources provided by Google Compute Engine
+// awsElasticBlockStore volumes are disk resources provided by Google Compute Engine
 // that are attached to the kubelet's host machine and exposed to the pod.
-type awsPersistentDisk struct {
+type awsElasticBlockStore struct {
 	volName string
 	podUID  types.UID
 	// Unique id of the PD, used to find the disk resource in the provider.
@@ -142,10 +142,10 @@ type awsPersistentDisk struct {
 	mounter mount.Interface
 	// diskMounter provides the interface that is used to mount the actual block device.
 	diskMounter mount.Interface
-	plugin      *awsPersistentDiskPlugin
+	plugin      *awsElasticBlockStorePlugin
 }
 
-func detachDiskLogError(pd *awsPersistentDisk) {
+func detachDiskLogError(pd *awsElasticBlockStore) {
 	err := pd.manager.DetachDisk(pd)
 	if err != nil {
 		glog.Warningf("Failed to detach disk: %v (%v)", pd, err)
@@ -153,7 +153,7 @@ func detachDiskLogError(pd *awsPersistentDisk) {
 }
 
 // getVolumeProvider returns the AWS Volumes interface
-func (pd *awsPersistentDisk) getVolumeProvider() (aws_cloud.Volumes, error) {
+func (pd *awsElasticBlockStore) getVolumeProvider() (aws_cloud.Volumes, error) {
 	name := "aws"
 	cloud, err := cloudprovider.GetCloudProvider(name, nil)
 	if err != nil {
@@ -167,12 +167,12 @@ func (pd *awsPersistentDisk) getVolumeProvider() (aws_cloud.Volumes, error) {
 }
 
 // SetUp attaches the disk and bind mounts to the volume path.
-func (pd *awsPersistentDisk) SetUp() error {
+func (pd *awsElasticBlockStore) SetUp() error {
 	return pd.SetUpAt(pd.GetPath())
 }
 
 // SetUpAt attaches the disk and bind mounts to the volume path.
-func (pd *awsPersistentDisk) SetUpAt(dir string) error {
+func (pd *awsElasticBlockStore) SetUpAt(dir string) error {
 	// TODO: handle failed mounts here.
 	mountpoint, err := mount.IsMountPoint(dir)
 	glog.V(4).Infof("PersistentDisk set up: %s %v %v", dir, mountpoint, err)
@@ -236,11 +236,11 @@ func makeGlobalPDPath(host volume.VolumeHost, volumeId string) string {
 	// Clean up the URI to be more fs-friendly
 	name := volumeId
 	name = strings.Replace(name, "://", "/", -1)
-	return path.Join(host.GetPluginDir(awsPersistentDiskPluginName), "mounts", name)
+	return path.Join(host.GetPluginDir(awsElasticBlockStorePluginName), "mounts", name)
 }
 
 func getVolumeIdFromGlobalMount(host volume.VolumeHost, globalPath string) (string, error) {
-	basePath := path.Join(host.GetPluginDir(awsPersistentDiskPluginName), "mounts")
+	basePath := path.Join(host.GetPluginDir(awsElasticBlockStorePluginName), "mounts")
 	rel, err := filepath.Rel(basePath, globalPath)
 	if err != nil {
 		return "", err
@@ -257,20 +257,20 @@ func getVolumeIdFromGlobalMount(host volume.VolumeHost, globalPath string) (stri
 	return volumeId, nil
 }
 
-func (pd *awsPersistentDisk) GetPath() string {
-	name := awsPersistentDiskPluginName
+func (pd *awsElasticBlockStore) GetPath() string {
+	name := awsElasticBlockStorePluginName
 	return pd.plugin.host.GetPodVolumeDir(pd.podUID, util.EscapeQualifiedNameForDisk(name), pd.volName)
 }
 
 // Unmounts the bind mount, and detaches the disk only if the PD
 // resource was the last reference to that disk on the kubelet.
-func (pd *awsPersistentDisk) TearDown() error {
+func (pd *awsElasticBlockStore) TearDown() error {
 	return pd.TearDownAt(pd.GetPath())
 }
 
 // Unmounts the bind mount, and detaches the disk only if the PD
 // resource was the last reference to that disk on the kubelet.
-func (pd *awsPersistentDisk) TearDownAt(dir string) error {
+func (pd *awsElasticBlockStore) TearDownAt(dir string) error {
 	mountpoint, err := mount.IsMountPoint(dir)
 	if err != nil {
 		glog.V(2).Info("Error checking if mountpoint ", dir, ": ", err)

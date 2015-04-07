@@ -1097,7 +1097,7 @@ func init() {
 			if err := s.Convert(&in.GCEPersistentDisk, &out.GCEPersistentDisk, 0); err != nil {
 				return err
 			}
-			if err := s.Convert(&in.AWSPersistentDisk, &out.AWSPersistentDisk, 0); err != nil {
+			if err := s.Convert(&in.AWSElasticBlockStore, &out.AWSElasticBlockStore, 0); err != nil {
 				return err
 			}
 			if err := s.Convert(&in.HostPath, &out.HostDir, 0); err != nil {

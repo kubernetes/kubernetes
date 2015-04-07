@@ -55,7 +55,7 @@ type Volume struct {
 	// Source represents the location and type of a volume to mount.
 	// This is optional for now. If not specified, the Volume is implied to be an EmptyDir.
 	// This implied behavior is deprecated and will be removed in a future version.
-	Source VolumeSource `json:"source,omitempty" description:"location and type of volume to mount; at most one of HostDir, EmptyDir, GCEPersistentDisk, AWSPersistentDisk, or GitRepo; default is EmptyDir"`
+	Source VolumeSource `json:"source,omitempty" description:"location and type of volume to mount; at most one of HostDir, EmptyDir, GCEPersistentDisk, AWSElasticBlockStore, or GitRepo; default is EmptyDir"`
 }
 
 // VolumeSource represents the source location of a volume to mount.
@@ -76,7 +76,7 @@ type VolumeSource struct {
 	GCEPersistentDisk *GCEPersistentDiskVolumeSource `json:"persistentDisk" description:"GCE disk resource attached to the host machine on demand"`
 	// An AWS persistent disk that is mounted to the
 	// kubelet's host machine and then exposed to the pod.
-	AWSPersistentDisk *AWSPersistentDiskVolumeSource `json:"awsPersistentDisk" description:"AWS disk resource attached to the host machine on demand"`
+	AWSElasticBlockStore *AWSElasticBlockStoreVolumeSource `json:"awsElasticBlockStore" description:"AWS disk resource attached to the host machine on demand"`
 	// GitRepo represents a git repository at a particular revision.
 	GitRepo *GitRepoVolumeSource `json:"gitRepo" description:"git repository at a particular revision"`
 	// Secret is a secret to populate the volume with
@@ -96,9 +96,9 @@ type PersistentVolumeSource struct {
 	// GCEPersistentDisk represents a GCE Disk resource that is attached to a
 	// kubelet's host machine and then exposed to the pod.
 	GCEPersistentDisk *GCEPersistentDiskVolumeSource `json:"persistentDisk" description:"GCE disk resource provisioned by an admin"`
-	// AWSPersistentDisk represents a AWS Disk resource that is attached to a
+	// AWSElasticBlockStore represents a AWS Disk resource that is attached to a
 	// kubelet's host machine and then exposed to the pod.
-	AWSPersistentDisk *AWSPersistentDiskVolumeSource `json:"awsPersistentDisk" description:"AWS disk resource provisioned by an admin"`
+	AWSElasticBlockStore *AWSElasticBlockStoreVolumeSource `json:"awsElasticBlockStore" description:"AWS disk resource provisioned by an admin"`
 	// HostPath represents a directory on the host.
 	// This is useful for development and testing only.
 	// on-host storage is not supported in any way.
@@ -290,12 +290,12 @@ type GCEPersistentDiskVolumeSource struct {
 	ReadOnly bool `json:"readOnly,omitempty" description:"read-only if true, read-write otherwise (false or unspecified)"`
 }
 
-// AWSPersistentDiskVolumeSource represents a Persistent Disk resource in AWS.
+// AWSElasticBlockStoreVolumeSource represents a Persistent Disk resource in AWS.
 //
 // An AWS PD must exist and be formatted before mounting to a container.
 // The disk must also be in the same AWS zone as the kubelet.
 // A AWS PD can only be mounted on a single machine.
-type AWSPersistentDiskVolumeSource struct {
+type AWSElasticBlockStoreVolumeSource struct {
 	// Unique id of the PD resource. Used to identify the disk in AWS
 	VolumeId string `json:"volumeId" description:"unique id of the PD resource in AWS"`
 	// Required: Filesystem type to mount.

@@ -30,14 +30,14 @@ func TestCanSupport(t *testing.T) {
 	plugMgr := volume.VolumePluginMgr{}
 	plugMgr.InitPlugins(ProbeVolumePlugins(), volume.NewFakeVolumeHost("/tmp/fake", nil, nil))
 
-	plug, err := plugMgr.FindPluginByName("kubernetes.io/aws-pd")
+	plug, err := plugMgr.FindPluginByName("kubernetes.io/aws-ebs")
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
 	}
-	if plug.Name() != "kubernetes.io/aws-pd" {
+	if plug.Name() != "kubernetes.io/aws-ebs" {
 		t.Errorf("Wrong name: %s", plug.Name())
 	}
-	if !plug.CanSupport(&api.Volume{VolumeSource: api.VolumeSource{AWSPersistentDisk: &api.AWSPersistentDiskVolumeSource{}}}) {
+	if !plug.CanSupport(&api.Volume{VolumeSource: api.VolumeSource{AWSElasticBlockStore: &api.AWSElasticBlockStoreVolumeSource{}}}) {
 		t.Errorf("Expected true")
 	}
 }
@@ -46,7 +46,7 @@ func TestGetAccessModes(t *testing.T) {
 	plugMgr := volume.VolumePluginMgr{}
 	plugMgr.InitPlugins(ProbeVolumePlugins(), volume.NewFakeVolumeHost("/tmp/fake", nil, nil))
 
-	plug, err := plugMgr.FindPersistentPluginByName("kubernetes.io/aws-pd")
+	plug, err := plugMgr.FindPersistentPluginByName("kubernetes.io/aws-ebs")
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
 	}
@@ -71,7 +71,7 @@ type fakePDManager struct{}
 
 // TODO(jonesdl) To fully test this, we could create a loopback device
 // and mount that instead.
-func (fake *fakePDManager) AttachAndMountDisk(pd *awsPersistentDisk, globalPDPath string) error {
+func (fake *fakePDManager) AttachAndMountDisk(pd *awsElasticBlockStore, globalPDPath string) error {
 	globalPath := makeGlobalPDPath(pd.plugin.host, pd.volumeId)
 	err := os.MkdirAll(globalPath, 0750)
 	if err != nil {
@@ -80,7 +80,7 @@ func (fake *fakePDManager) AttachAndMountDisk(pd *awsPersistentDisk, globalPDPat
 	return nil
 }
 
-func (fake *fakePDManager) DetachDisk(pd *awsPersistentDisk) error {
+func (fake *fakePDManager) DetachDisk(pd *awsElasticBlockStore) error {
 	globalPath := makeGlobalPDPath(pd.plugin.host, pd.volumeId)
 	err := os.RemoveAll(globalPath)
 	if err != nil {
@@ -93,20 +93,20 @@ func TestPlugin(t *testing.T) {
 	plugMgr := volume.VolumePluginMgr{}
 	plugMgr.InitPlugins(ProbeVolumePlugins(), volume.NewFakeVolumeHost("/tmp/fake", nil, nil))
 
-	plug, err := plugMgr.FindPluginByName("kubernetes.io/aws-pd")
+	plug, err := plugMgr.FindPluginByName("kubernetes.io/aws-ebs")
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
 	}
 	spec := &api.Volume{
 		Name: "vol1",
 		VolumeSource: api.VolumeSource{
-			AWSPersistentDisk: &api.AWSPersistentDiskVolumeSource{
+			AWSElasticBlockStore: &api.AWSElasticBlockStoreVolumeSource{
 				VolumeId: "pd",
 				FSType:   "ext4",
 			},
 		},
 	}
-	builder, err := plug.(*awsPersistentDiskPlugin).newBuilderInternal(spec, types.UID("poduid"), &fakePDManager{}, &mount.FakeMounter{})
+	builder, err := plug.(*awsElasticBlockStorePlugin).newBuilderInternal(spec, types.UID("poduid"), &fakePDManager{}, &mount.FakeMounter{})
 	if err != nil {
 		t.Errorf("Failed to make a new Builder: %v", err)
 	}
@@ -115,7 +115,7 @@ func TestPlugin(t *testing.T) {
 	}
 
 	path := builder.GetPath()
-	if path != "/tmp/fake/pods/poduid/volumes/kubernetes.io~aws-pd/vol1" {
+	if path != "/tmp/fake/pods/poduid/volumes/kubernetes.io~aws-ebs/vol1" {
 		t.Errorf("Got unexpected path: %s", path)
 	}
 
@@ -137,7 +137,7 @@ func TestPlugin(t *testing.T) {
 		}
 	}
 
-	cleaner, err := plug.(*awsPersistentDiskPlugin).newCleanerInternal("vol1", types.UID("poduid"), &fakePDManager{}, &mount.FakeMounter{})
+	cleaner, err := plug.(*awsElasticBlockStorePlugin).newCleanerInternal("vol1", types.UID("poduid"), &fakePDManager{}, &mount.FakeMounter{})
 	if err != nil {
 		t.Errorf("Failed to make a new Cleaner: %v", err)
 	}

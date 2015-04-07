@@ -299,9 +299,9 @@ func validateSource(source *api.VolumeSource) errs.ValidationErrorList {
 		numVolumes++
 		allErrs = append(allErrs, validateGCEPersistentDiskVolumeSource(source.GCEPersistentDisk).Prefix("persistentDisk")...)
 	}
-	if source.AWSPersistentDisk != nil {
+	if source.AWSElasticBlockStore != nil {
 		numVolumes++
-		allErrs = append(allErrs, validateAWSPersistentDiskVolumeSource(source.AWSPersistentDisk).Prefix("awsPersistentDisk")...)
+		allErrs = append(allErrs, validateAWSElasticBlockStoreVolumeSource(source.AWSElasticBlockStore).Prefix("awsElasticBlockStore")...)
 	}
 	if source.Secret != nil {
 		numVolumes++
@@ -372,7 +372,7 @@ func validateGCEPersistentDiskVolumeSource(PD *api.GCEPersistentDiskVolumeSource
 	return allErrs
 }
 
-func validateAWSPersistentDiskVolumeSource(PD *api.AWSPersistentDiskVolumeSource) errs.ValidationErrorList {
+func validateAWSElasticBlockStoreVolumeSource(PD *api.AWSElasticBlockStoreVolumeSource) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 	if PD.VolumeId == "" {
 		allErrs = append(allErrs, errs.NewFieldRequired("volumeId"))
@@ -444,9 +444,9 @@ func ValidatePersistentVolume(pv *api.PersistentVolume) errs.ValidationErrorList
 		numVolumes++
 		allErrs = append(allErrs, validateGCEPersistentDiskVolumeSource(pv.Spec.GCEPersistentDisk).Prefix("persistentDisk")...)
 	}
-	if pv.Spec.AWSPersistentDisk != nil {
+	if pv.Spec.AWSElasticBlockStore != nil {
 		numVolumes++
-		allErrs = append(allErrs, validateAWSPersistentDiskVolumeSource(pv.Spec.AWSPersistentDisk).Prefix("awsPersistentDisk")...)
+		allErrs = append(allErrs, validateAWSElasticBlockStoreVolumeSource(pv.Spec.AWSElasticBlockStore).Prefix("awsElasticBlockStore")...)
 	}
 	if numVolumes != 1 {
 		allErrs = append(allErrs, errs.NewFieldInvalid("", pv.Spec.PersistentVolumeSource, "exactly 1 volume type is required"))
