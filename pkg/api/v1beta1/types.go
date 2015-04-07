@@ -945,6 +945,7 @@ const (
 	// NodeReady means kubelet is healthy and ready to accept pods.
 	NodeReady NodeConditionKind = "Ready"
 	// NodeSchedulable means the node is ready to accept new pods.
+	// DEPRECATED: this kind of condition is unused and has no effect even if present.
 	NodeSchedulable NodeConditionKind = "Schedulable"
 )
 

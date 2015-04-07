@@ -625,13 +625,6 @@ func TestNodeConditionsCheck(t *testing.T) {
 					LastProbeTime:      fakeNow,
 					LastTransitionTime: fakeNow,
 				},
-				{
-					Type:               api.NodeSchedulable,
-					Status:             api.ConditionTrue,
-					Reason:             "Node is schedulable by default",
-					LastProbeTime:      fakeNow,
-					LastTransitionTime: fakeNow,
-				},
 			},
 		},
 		{
@@ -650,18 +643,10 @@ func TestNodeConditionsCheck(t *testing.T) {
 					LastProbeTime:      fakeNow,
 					LastTransitionTime: fakeNow,
 				},
-				{
-					Type:               api.NodeSchedulable,
-					Status:             api.ConditionTrue,
-					Reason:             "Node is schedulable by default",
-					LastProbeTime:      fakeNow,
-					LastTransitionTime: fakeNow,
-				},
 			},
 		},
 		{
-			// User specified node as unschedulable and kubelet /healthz probe returns failure with some error.
-			// Expected node condition to be not ready and marked unschedulable.
+			// Expected node condition to be not ready as marking Node Unschedulable does not impact Readiness.
 			node: &api.Node{ObjectMeta: api.ObjectMeta{Name: "node0"}, Spec: api.NodeSpec{Unschedulable: true}},
 			fakeKubeletClient: &FakeKubeletClient{
 				Status: probe.Failure,
@@ -672,13 +657,6 @@ func TestNodeConditionsCheck(t *testing.T) {
 					Type:               api.NodeReady,
 					Status:             api.ConditionUnknown,
 					Reason:             "Node health check error: Error",
-					LastProbeTime:      fakeNow,
-					LastTransitionTime: fakeNow,
-				},
-				{
-					Type:               api.NodeSchedulable,
-					Status:             api.ConditionFalse,
-					Reason:             "User marked unschedulable during node create/update",
 					LastProbeTime:      fakeNow,
 					LastTransitionTime: fakeNow,
 				},
@@ -764,13 +742,6 @@ func TestSyncProbedNodeStatus(t *testing.T) {
 								LastProbeTime:      fakeNow,
 								LastTransitionTime: fakeNow,
 							},
-							{
-								Type:               api.NodeSchedulable,
-								Status:             api.ConditionTrue,
-								Reason:             "Node is schedulable by default",
-								LastProbeTime:      fakeNow,
-								LastTransitionTime: fakeNow,
-							},
 						},
 						Addresses: []api.NodeAddress{
 							{Type: api.NodeLegacyHostIP, Address: "1.2.3.4"},
@@ -792,13 +763,6 @@ func TestSyncProbedNodeStatus(t *testing.T) {
 								Type:               api.NodeReady,
 								Status:             api.ConditionTrue,
 								Reason:             "Node health check succeeded: kubelet /healthz endpoint returns ok",
-								LastProbeTime:      fakeNow,
-								LastTransitionTime: fakeNow,
-							},
-							{
-								Type:               api.NodeSchedulable,
-								Status:             api.ConditionTrue,
-								Reason:             "Node is schedulable by default",
 								LastProbeTime:      fakeNow,
 								LastTransitionTime: fakeNow,
 							},
@@ -868,12 +832,6 @@ func TestSyncProbedNodeStatusTransitionTime(t *testing.T) {
 									Reason:             "Node health check succeeded: kubelet /healthz endpoint returns ok",
 									LastTransitionTime: util.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
 								},
-								{
-									Type:               api.NodeSchedulable,
-									Status:             api.ConditionTrue,
-									Reason:             "Node is schedulable by default",
-									LastTransitionTime: util.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
-								},
 							},
 						},
 					},
@@ -901,12 +859,6 @@ func TestSyncProbedNodeStatusTransitionTime(t *testing.T) {
 									Type:               api.NodeReady,
 									Status:             api.ConditionTrue,
 									Reason:             "Node health check succeeded: kubelet /healthz endpoint returns ok",
-									LastTransitionTime: util.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
-								},
-								{
-									Type:               api.NodeSchedulable,
-									Status:             api.ConditionTrue,
-									Reason:             "Node is schedulable by default",
 									LastTransitionTime: util.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
 								},
 							},

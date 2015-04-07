@@ -339,12 +339,6 @@ func (nc *NodeController) DoCheck(node *api.Node) []api.NodeCondition {
 	}
 	conditions = append(conditions, *newReadyCondition)
 
-	// Check Condition: NodeSchedulable
-	oldSchedulableCondition := nc.getCondition(&node.Status, api.NodeSchedulable)
-	newSchedulableCondition := nc.checkNodeSchedulable(node)
-	nc.updateLastTransitionTime(oldSchedulableCondition, newSchedulableCondition)
-	conditions = append(conditions, *newSchedulableCondition)
-
 	return conditions
 }
 
@@ -357,25 +351,6 @@ func (nc *NodeController) updateLastTransitionTime(oldCondition, newCondition *a
 		// Set transition time to Now() if node status changes or `oldCondition` is nil, which
 		// happens only when the node is checked for the first time.
 		newCondition.LastTransitionTime = nc.now()
-	}
-}
-
-// checkNodeSchedulable checks node schedulable condition, without transition timestamp set.
-func (nc *NodeController) checkNodeSchedulable(node *api.Node) *api.NodeCondition {
-	if node.Spec.Unschedulable {
-		return &api.NodeCondition{
-			Type:          api.NodeSchedulable,
-			Status:        api.ConditionFalse,
-			Reason:        "User marked unschedulable during node create/update",
-			LastProbeTime: nc.now(),
-		}
-	} else {
-		return &api.NodeCondition{
-			Type:          api.NodeSchedulable,
-			Status:        api.ConditionTrue,
-			Reason:        "Node is schedulable by default",
-			LastProbeTime: nc.now(),
-		}
 	}
 }
 
