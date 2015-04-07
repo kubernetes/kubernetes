@@ -26,6 +26,8 @@ import (
 	"os"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/authorizer"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/user"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
 // TODO: make this into a real API object.  Note that when that happens, it
@@ -66,6 +68,9 @@ type policy struct {
 
 type policyList []policy
 
+var ReadOnlyVerbs = util.NewStringSet("get", "list", "watch")
+var ReadOnlyMethods = util.NewStringSet("get")
+
 // TODO: Have policies be created via an API call and stored in REST storage.
 func NewFromFile(path string) (policyList, error) {
 	// File format is one map per line.  This allows easy concatentation of files,
@@ -97,9 +102,9 @@ func NewFromFile(path string) (policyList, error) {
 	return pl, nil
 }
 
-func (p policy) matches(a authorizer.Attributes) bool {
-	if p.subjectMatches(a) {
-		if p.Readonly == false || (p.Readonly == a.IsReadOnly()) {
+func (p policy) matchesAPIRequest(a authorizer.APIAttributes) bool {
+	if p.subjectMatches(a.GetUserInfo()) {
+		if p.Readonly == false || (p.Readonly == ReadOnlyVerbs.Has(a.GetVerb())) {
 			if p.Resource == "" || (p.Resource == a.GetResource()) {
 				if p.Namespace == "" || (p.Namespace == a.GetNamespace()) {
 					return true
@@ -109,18 +114,32 @@ func (p policy) matches(a authorizer.Attributes) bool {
 	}
 	return false
 }
+func (p policy) matchesGenericRequest(a authorizer.GenericAttributes) bool {
+	if p.Resource == "" && p.Namespace == "" {
+		if p.subjectMatches(a.GetUserInfo()) {
+			if p.Readonly == false || (p.Readonly == ReadOnlyVerbs.Has(a.GetMethod())) {
+				return true
+			}
+		}
+	}
+	return false
+}
 
-func (p policy) subjectMatches(a authorizer.Attributes) bool {
+func (p policy) subjectMatches(user user.Info) bool {
 	if p.User != "" {
 		// Require user match
-		if p.User != a.GetUserName() {
+		if (user == nil) || (p.User != user.GetName()) {
 			return false
 		}
 	}
 
 	if p.Group != "" {
 		// Require group match
-		for _, group := range a.GetGroups() {
+		if user == nil {
+			return false
+		}
+
+		for _, group := range user.GetGroups() {
 			if p.Group == group {
 				return true
 			}
@@ -132,9 +151,22 @@ func (p policy) subjectMatches(a authorizer.Attributes) bool {
 }
 
 // Authorizer implements authorizer.Authorize
-func (pl policyList) Authorize(a authorizer.Attributes) error {
+func (pl policyList) AuthorizeAPIRequest(a authorizer.APIAttributes) error {
 	for _, p := range pl {
-		if p.matches(a) {
+		if p.matchesAPIRequest(a) {
+			return nil
+		}
+	}
+	return errors.New("No policy matched.")
+	// TODO: Benchmark how much time policy matching takes with a medium size
+	// policy file, compared to other steps such as encoding/decoding.
+	// Then, add Caching only if needed.
+}
+
+// Authorizer implements authorizer.Authorize
+func (pl policyList) AuthorizeGenericRequest(a authorizer.GenericAttributes) error {
+	for _, p := range pl {
+		if p.matchesGenericRequest(a) {
 			return nil
 		}
 	}

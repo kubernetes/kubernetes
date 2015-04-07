@@ -69,60 +69,59 @@ func NotTestAuthorize(t *testing.T) {
 		t.Fatalf("unable to read policy file: %v", err)
 	}
 
-	uScheduler := user.DefaultInfo{Name: "scheduler", UID: "uid1"}
-	uAlice := user.DefaultInfo{Name: "alice", UID: "uid3"}
-	uChuck := user.DefaultInfo{Name: "chuck", UID: "uid5"}
+	uScheduler := &user.DefaultInfo{Name: "scheduler", UID: "uid1"}
+	uAlice := &user.DefaultInfo{Name: "alice", UID: "uid3"}
+	uChuck := &user.DefaultInfo{Name: "chuck", UID: "uid5"}
 
 	testCases := []struct {
-		User        user.DefaultInfo
-		RO          bool
-		Resource    string
-		NS          string
+		Attributes  authorizer.APIAttributesRecord
 		ExpectAllow bool
 	}{
 		// Scheduler can read pods
-		{User: uScheduler, RO: true, Resource: "pods", NS: "ns1", ExpectAllow: true},
-		{User: uScheduler, RO: true, Resource: "pods", NS: "", ExpectAllow: true},
+		{Attributes: authorizer.APIAttributesRecord{UserInfo: uScheduler, Verb: "get", Resource: "pods", Namespace: "ns1"}, ExpectAllow: true},
+		{Attributes: authorizer.APIAttributesRecord{UserInfo: uScheduler, Verb: "get", Resource: "pods", Namespace: ""}, ExpectAllow: true},
+		{Attributes: authorizer.APIAttributesRecord{UserInfo: uScheduler, Verb: "list", Resource: "pods", Namespace: "ns1"}, ExpectAllow: true},
+		{Attributes: authorizer.APIAttributesRecord{UserInfo: uScheduler, Verb: "list", Resource: "pods", Namespace: ""}, ExpectAllow: true},
+		{Attributes: authorizer.APIAttributesRecord{UserInfo: uScheduler, Verb: "watch", Resource: "pods", Namespace: "ns1"}, ExpectAllow: true},
+		{Attributes: authorizer.APIAttributesRecord{UserInfo: uScheduler, Verb: "watch", Resource: "pods", Namespace: ""}, ExpectAllow: true},
 		// Scheduler cannot write pods
-		{User: uScheduler, RO: false, Resource: "pods", NS: "ns1", ExpectAllow: false},
-		{User: uScheduler, RO: false, Resource: "pods", NS: "", ExpectAllow: false},
+		{Attributes: authorizer.APIAttributesRecord{UserInfo: uScheduler, Verb: "create", Resource: "pods", Namespace: "ns1"}, ExpectAllow: false},
+		{Attributes: authorizer.APIAttributesRecord{UserInfo: uScheduler, Verb: "create", Resource: "pods", Namespace: ""}, ExpectAllow: false},
+		{Attributes: authorizer.APIAttributesRecord{UserInfo: uScheduler, Verb: "update", Resource: "pods", Namespace: "ns1"}, ExpectAllow: false},
+		{Attributes: authorizer.APIAttributesRecord{UserInfo: uScheduler, Verb: "update", Resource: "pods", Namespace: ""}, ExpectAllow: false},
+		{Attributes: authorizer.APIAttributesRecord{UserInfo: uScheduler, Verb: "delete", Resource: "pods", Namespace: "ns1"}, ExpectAllow: false},
+		{Attributes: authorizer.APIAttributesRecord{UserInfo: uScheduler, Verb: "delete", Resource: "pods", Namespace: ""}, ExpectAllow: false},
 		// Scheduler can write bindings
-		{User: uScheduler, RO: true, Resource: "bindings", NS: "ns1", ExpectAllow: true},
-		{User: uScheduler, RO: true, Resource: "bindings", NS: "", ExpectAllow: true},
+		{Attributes: authorizer.APIAttributesRecord{UserInfo: uScheduler, Verb: "get", Resource: "bindings", Namespace: "ns1"}, ExpectAllow: true},
+		{Attributes: authorizer.APIAttributesRecord{UserInfo: uScheduler, Verb: "get", Resource: "bindings", Namespace: ""}, ExpectAllow: true},
 
 		// Alice can read and write anything in the right namespace.
-		{User: uAlice, RO: true, Resource: "pods", NS: "projectCaribou", ExpectAllow: true},
-		{User: uAlice, RO: true, Resource: "widgets", NS: "projectCaribou", ExpectAllow: true},
-		{User: uAlice, RO: true, Resource: "", NS: "projectCaribou", ExpectAllow: true},
-		{User: uAlice, RO: false, Resource: "pods", NS: "projectCaribou", ExpectAllow: true},
-		{User: uAlice, RO: false, Resource: "widgets", NS: "projectCaribou", ExpectAllow: true},
-		{User: uAlice, RO: false, Resource: "", NS: "projectCaribou", ExpectAllow: true},
+		{Attributes: authorizer.APIAttributesRecord{UserInfo: uAlice, Verb: "get", Resource: "pods", Namespace: "projectCaribou"}, ExpectAllow: true},
+		{Attributes: authorizer.APIAttributesRecord{UserInfo: uAlice, Verb: "get", Resource: "widgets", Namespace: "projectCaribou"}, ExpectAllow: true},
+		{Attributes: authorizer.APIAttributesRecord{UserInfo: uAlice, Verb: "get", Resource: "", Namespace: "projectCaribou"}, ExpectAllow: true},
+		{Attributes: authorizer.APIAttributesRecord{UserInfo: uAlice, Verb: "create", Resource: "pods", Namespace: "projectCaribou"}, ExpectAllow: true},
+		{Attributes: authorizer.APIAttributesRecord{UserInfo: uAlice, Verb: "create", Resource: "widgets", Namespace: "projectCaribou"}, ExpectAllow: true},
+		{Attributes: authorizer.APIAttributesRecord{UserInfo: uAlice, Verb: "create", Resource: "", Namespace: "projectCaribou"}, ExpectAllow: true},
 		// .. but not the wrong namespace.
-		{User: uAlice, RO: true, Resource: "pods", NS: "ns1", ExpectAllow: false},
-		{User: uAlice, RO: true, Resource: "widgets", NS: "ns1", ExpectAllow: false},
-		{User: uAlice, RO: true, Resource: "", NS: "ns1", ExpectAllow: false},
+		{Attributes: authorizer.APIAttributesRecord{UserInfo: uAlice, Verb: "get", Resource: "pods", Namespace: "ns1"}, ExpectAllow: false},
+		{Attributes: authorizer.APIAttributesRecord{UserInfo: uAlice, Verb: "get", Resource: "widgets", Namespace: "ns1"}, ExpectAllow: false},
+		{Attributes: authorizer.APIAttributesRecord{UserInfo: uAlice, Verb: "get", Resource: "", Namespace: "ns1"}, ExpectAllow: false},
 
 		// Chuck can read events, since anyone can.
-		{User: uChuck, RO: true, Resource: "events", NS: "ns1", ExpectAllow: true},
-		{User: uChuck, RO: true, Resource: "events", NS: "", ExpectAllow: true},
+		{Attributes: authorizer.APIAttributesRecord{UserInfo: uChuck, Verb: "get", Resource: "events", Namespace: "ns1"}, ExpectAllow: true},
+		{Attributes: authorizer.APIAttributesRecord{UserInfo: uChuck, Verb: "get", Resource: "events", Namespace: ""}, ExpectAllow: true},
 		// Chuck can't do other things.
-		{User: uChuck, RO: false, Resource: "events", NS: "ns1", ExpectAllow: false},
-		{User: uChuck, RO: true, Resource: "pods", NS: "ns1", ExpectAllow: false},
-		{User: uChuck, RO: true, Resource: "floop", NS: "ns1", ExpectAllow: false},
+		{Attributes: authorizer.APIAttributesRecord{UserInfo: uChuck, Verb: "create", Resource: "events", Namespace: "ns1"}, ExpectAllow: false},
+		{Attributes: authorizer.APIAttributesRecord{UserInfo: uChuck, Verb: "get", Resource: "pods", Namespace: "ns1"}, ExpectAllow: false},
+		{Attributes: authorizer.APIAttributesRecord{UserInfo: uChuck, Verb: "get", Resource: "floop", Namespace: "ns1"}, ExpectAllow: false},
 		// Chunk can't access things with no kind or namespace
 		// TODO: find a way to give someone access to miscelaneous endpoints, such as
 		// /healthz, /version, etc.
-		{User: uChuck, RO: true, Resource: "", NS: "", ExpectAllow: false},
+		{Attributes: authorizer.APIAttributesRecord{UserInfo: uChuck, Verb: "get", Resource: "", Namespace: ""}, ExpectAllow: false},
 	}
 	for _, tc := range testCases {
-		attr := authorizer.AttributesRecord{
-			User:      &tc.User,
-			ReadOnly:  tc.RO,
-			Resource:  tc.Resource,
-			Namespace: tc.NS,
-		}
-		t.Logf("tc: %v -> attr %v", tc, attr)
-		err := a.Authorize(attr)
+		t.Logf("tc: %v -> attr %v", tc, tc.Attributes)
+		err := a.AuthorizeAPIRequest(tc.Attributes)
 		actualAllow := bool(err == nil)
 		if tc.ExpectAllow != actualAllow {
 			t.Errorf("Expected allowed=%v but actually allowed=%v, for case %v",
@@ -240,10 +239,7 @@ func TestSubjectMatches(t *testing.T) {
 	}
 
 	for k, tc := range testCases {
-		attr := authorizer.AttributesRecord{
-			User: &tc.User,
-		}
-		actualMatch := policy{User: tc.PolicyUser, Group: tc.PolicyGroup}.subjectMatches(attr)
+		actualMatch := policy{User: tc.PolicyUser, Group: tc.PolicyGroup}.subjectMatches(&tc.User)
 		if tc.ExpectMatch != actualMatch {
 			t.Errorf("%v: Expected actorMatches=%v but actually got=%v",
 				k, tc.ExpectMatch, actualMatch)
@@ -267,16 +263,16 @@ func newWithContents(t *testing.T, contents string) (authorizer.Authorizer, erro
 	return pl, err
 }
 
-func TestPolicy(t *testing.T) {
+func TestAPIPolicy(t *testing.T) {
 	tests := []struct {
 		policy  policy
-		attr    authorizer.Attributes
+		attr    authorizer.APIAttributesRecord
 		matches bool
 		name    string
 	}{
 		{
 			policy:  policy{},
-			attr:    authorizer.AttributesRecord{},
+			attr:    authorizer.APIAttributesRecord{},
 			matches: true,
 			name:    "null",
 		},
@@ -284,7 +280,7 @@ func TestPolicy(t *testing.T) {
 			policy: policy{
 				Readonly: true,
 			},
-			attr:    authorizer.AttributesRecord{},
+			attr:    authorizer.APIAttributesRecord{},
 			matches: false,
 			name:    "read-only mismatch",
 		},
@@ -292,8 +288,8 @@ func TestPolicy(t *testing.T) {
 			policy: policy{
 				User: "foo",
 			},
-			attr: authorizer.AttributesRecord{
-				User: &user.DefaultInfo{
+			attr: authorizer.APIAttributesRecord{
+				UserInfo: &user.DefaultInfo{
 					Name: "bar",
 				},
 			},
@@ -304,7 +300,7 @@ func TestPolicy(t *testing.T) {
 			policy: policy{
 				Resource: "foo",
 			},
-			attr: authorizer.AttributesRecord{
+			attr: authorizer.APIAttributesRecord{
 				Resource: "bar",
 			},
 			matches: false,
@@ -316,8 +312,8 @@ func TestPolicy(t *testing.T) {
 				Resource:  "foo",
 				Namespace: "foo",
 			},
-			attr: authorizer.AttributesRecord{
-				User: &user.DefaultInfo{
+			attr: authorizer.APIAttributesRecord{
+				UserInfo: &user.DefaultInfo{
 					Name: "foo",
 				},
 				Resource:  "foo",
@@ -330,7 +326,7 @@ func TestPolicy(t *testing.T) {
 			policy: policy{
 				Namespace: "foo",
 			},
-			attr: authorizer.AttributesRecord{
+			attr: authorizer.APIAttributesRecord{
 				Namespace: "bar",
 			},
 			matches: false,
@@ -338,7 +334,49 @@ func TestPolicy(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		matches := test.policy.matches(test.attr)
+		matches := test.policy.matchesAPIRequest(test.attr)
+		if test.matches != matches {
+			t.Errorf("unexpected value for %s, expected: %t, saw: %t", test.name, test.matches, matches)
+		}
+	}
+}
+
+func TestGenericPolicy(t *testing.T) {
+	tests := []struct {
+		policy  policy
+		attr    authorizer.GenericAttributesRecord
+		matches bool
+		name    string
+	}{
+		{
+			policy:  policy{},
+			attr:    authorizer.GenericAttributesRecord{},
+			matches: true,
+			name:    "null",
+		},
+		{
+			policy: policy{
+				Readonly: true,
+			},
+			attr:    authorizer.GenericAttributesRecord{},
+			matches: false,
+			name:    "read-only mismatch",
+		},
+		{
+			policy: policy{
+				User: "foo",
+			},
+			attr: authorizer.GenericAttributesRecord{
+				UserInfo: &user.DefaultInfo{
+					Name: "bar",
+				},
+			},
+			matches: false,
+			name:    "user name mis-match",
+		},
+	}
+	for _, test := range tests {
+		matches := test.policy.matchesGenericRequest(test.attr)
 		if test.matches != matches {
 			t.Errorf("unexpected value for %s, expected: %t, saw: %t", test.name, test.matches, matches)
 		}

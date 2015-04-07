@@ -17,63 +17,113 @@ limitations under the License.
 package authorizer
 
 import (
+	"net/http"
+	"net/url"
+	"strings"
+
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/user"
 )
 
-// Attributes is an interface used by an Authorizer to get information about a request
+// APIAttributes is an interface used by an Authorizer to get information about a request
 // that is used to make an authorization decision.
-type Attributes interface {
-	// The user string which the request was authenticated as, or empty if
-	// no authentication occured and the request was allowed to proceed.
-	GetUserName() string
-
-	// The list of group names the authenticated user is a member of. Can be
-	// empty if the authenticated user is not in any groups, or if no
-	// authentication occurred.
-	GetGroups() []string
-
-	// When IsReadOnly() == true, the request has no side effects, other than
-	// caching, logging, and other incidentals.
-	IsReadOnly() bool
-
+type APIAttributes interface {
+	GetUserInfo() user.Info
+	// The verb of the object, if a request is for a REST object.
+	GetVerb() string
 	// The namespace of the object, if a request is for a REST object.
 	GetNamespace() string
-
-	// The kind of object, if a request is for a REST object.
+	// The resource of object, if a request is for a REST object.
 	GetResource() string
+	// The subresource of object, if a request is for a REST object.
+	GetSubresource() string
+	// The kind of object, if a request is for a REST object.
+	GetKind() string
+	GetResourceName() string
+
+	// GetExtendedInfo returns information that the attribute builder thought was useful.  It's type is dependent on the contract between the authorizer and the extension builder
+	GetExtendedInfo() interface{}
+}
+
+type GenericAttributes interface {
+	GetUserInfo() user.Info
+	GetURL() url.URL
+	GetMethod() string
 }
 
 // Authorizer makes an authorization decision based on information gained by making
 // zero or more calls to methods of the Attributes interface.  It returns nil when an action is
 // authorized, otherwise it returns an error.
 type Authorizer interface {
-	Authorize(a Attributes) (err error)
+	APIAuthorizer
+	GenericAuthorizer
+}
+type APIAuthorizer interface {
+	AuthorizeAPIRequest(a APIAttributes) (err error)
+}
+type GenericAuthorizer interface {
+	AuthorizeGenericRequest(a GenericAttributes) (err error)
 }
 
-// AttributesRecord implements Attributes interface.
-type AttributesRecord struct {
-	User      user.Info
-	ReadOnly  bool
-	Namespace string
-	Resource  string
+type APIAttributeExtensionBuilder interface {
+	GetExtendedInfo(request *http.Request) (interface{}, error)
 }
 
-func (a AttributesRecord) GetUserName() string {
-	return a.User.GetName()
+// APIAttributesRecord implements APIAttributes interface.
+type APIAttributesRecord struct {
+	UserInfo     user.Info
+	Verb         string
+	Namespace    string
+	Resource     string
+	Subresource  string
+	Kind         string
+	ResourceName string
+	ExtendedInfo interface{}
 }
 
-func (a AttributesRecord) GetGroups() []string {
-	return a.User.GetGroups()
+func (a APIAttributesRecord) GetUserInfo() user.Info {
+	return a.UserInfo
 }
 
-func (a AttributesRecord) IsReadOnly() bool {
-	return a.ReadOnly
+func (a APIAttributesRecord) GetVerb() string {
+	return strings.ToLower(a.Verb)
 }
 
-func (a AttributesRecord) GetNamespace() string {
-	return a.Namespace
+func (a APIAttributesRecord) GetNamespace() string {
+	return strings.ToLower(a.Namespace)
 }
 
-func (a AttributesRecord) GetResource() string {
-	return a.Resource
+func (a APIAttributesRecord) GetResource() string {
+	return strings.ToLower(a.Resource)
+}
+
+func (a APIAttributesRecord) GetSubresource() string {
+	return strings.ToLower(a.Subresource)
+}
+func (a APIAttributesRecord) GetKind() string {
+	return strings.ToLower(a.Kind)
+}
+func (a APIAttributesRecord) GetResourceName() string {
+	return strings.ToLower(a.ResourceName)
+}
+func (a APIAttributesRecord) GetExtendedInfo() interface{} {
+	return a.ExtendedInfo
+}
+
+// GenericAttributesRecord implements APIAttributes interface.
+type GenericAttributesRecord struct {
+	UserInfo user.Info
+	URL      url.URL
+	Method   string
+}
+
+func (a GenericAttributesRecord) GetUserInfo() user.Info {
+	return a.UserInfo
+}
+
+func (a GenericAttributesRecord) GetURL() url.URL {
+	return a.URL
+}
+
+func (a GenericAttributesRecord) GetMethod() string {
+	return strings.ToLower(a.Method)
 }

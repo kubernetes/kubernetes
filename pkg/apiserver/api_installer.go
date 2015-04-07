@@ -29,6 +29,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/rest"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/authorizer"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/conversion"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	watchjson "github.com/GoogleCloudPlatform/kubernetes/pkg/watch/json"
@@ -40,6 +41,9 @@ type APIInstaller struct {
 	group  *APIGroupVersion
 	info   *APIRequestInfoResolver
 	prefix string // Path prefix where API resources are to be registered.
+
+	authorizer                authorizer.APIAuthorizer
+	attributeExtensionBuilder authorizer.APIAttributeExtensionBuilder
 }
 
 // Struct capturing information about an action ("GET", "POST", "WATCH", PROXY", etc).
@@ -309,15 +313,20 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		APIVersion:       a.group.Version,
 		ServerAPIVersion: serverVersion,
 		Resource:         resource,
+		Subresource:      subresource,
 		Kind:             kind,
 	}
 	for _, action := range actions {
 		reqScope.Namer = action.Namer
+		reqScope.Verb = strings.ToLower(action.Verb)
+
 		m := monitorFilter(action.Verb, resource)
+		authorizationFilter := apiAuthorizationFilter(a.authorizer, a.attributeExtensionBuilder, reqScope)
 		switch action.Verb {
 		case "GET": // Get a resource.
 			route := ws.GET(action.Path).To(GetResource(getter, reqScope)).
 				Filter(m).
+				Filter(authorizationFilter).
 				Doc("read the specified " + kind).
 				Operation("read" + kind).
 				Produces(append(storageMeta.ProducesMIMETypes(action.Verb), "application/json")...).
@@ -327,6 +336,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		case "LIST": // List all resources of a kind.
 			route := ws.GET(action.Path).To(ListResource(lister, watcher, reqScope, false)).
 				Filter(m).
+				Filter(authorizationFilter).
 				Doc("list objects of kind " + kind).
 				Operation("list" + kind).
 				Produces("application/json").
@@ -339,6 +349,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		case "PUT": // Update a resource.
 			route := ws.PUT(action.Path).To(UpdateResource(updater, reqScope, a.group.Typer, admit)).
 				Filter(m).
+				Filter(authorizationFilter).
 				Doc("replace the specified " + kind).
 				Operation("replace" + kind).
 				Produces(append(storageMeta.ProducesMIMETypes(action.Verb), "application/json")...).
@@ -348,6 +359,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		case "PATCH": // Partially update a resource
 			route := ws.PATCH(action.Path).To(PatchResource(patcher, reqScope, a.group.Typer, admit, mapping.ObjectConvertor)).
 				Filter(m).
+				Filter(authorizationFilter).
 				Doc("partially update the specified "+kind).
 				Consumes(string(api.JSONPatchType), string(api.MergePatchType), string(api.StrategicMergePatchType)).
 				Operation("patch" + kind).
@@ -358,6 +370,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		case "POST": // Create a resource.
 			route := ws.POST(action.Path).To(CreateResource(creater, reqScope, a.group.Typer, admit)).
 				Filter(m).
+				Filter(authorizationFilter).
 				Doc("create a " + kind).
 				Operation("create" + kind).
 				Produces(append(storageMeta.ProducesMIMETypes(action.Verb), "application/json")...).
@@ -367,6 +380,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		case "DELETE": // Delete a resource.
 			route := ws.DELETE(action.Path).To(DeleteResource(gracefulDeleter, isGracefulDeleter, reqScope, admit)).
 				Filter(m).
+				Filter(authorizationFilter).
 				Doc("delete a " + kind).
 				Operation("delete" + kind).
 				Produces(append(storageMeta.ProducesMIMETypes(action.Verb), "application/json")...)
@@ -379,6 +393,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		case "WATCH": // Watch a resource.
 			route := ws.GET(action.Path).To(ListResource(lister, watcher, reqScope, true)).
 				Filter(m).
+				Filter(authorizationFilter).
 				Doc("watch changes to an object of kind " + kind).
 				Operation("watch" + kind).
 				Produces("application/json").
@@ -392,6 +407,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		case "WATCHLIST": // Watch all resources of a kind.
 			route := ws.GET(action.Path).To(ListResource(lister, watcher, reqScope, true)).
 				Filter(m).
+				Filter(authorizationFilter).
 				Doc("watch individual changes to a list of " + kind).
 				Operation("watch" + kind + "list").
 				Produces("application/json").
@@ -404,6 +420,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		case "REDIRECT": // Get the redirect URL for a resource.
 			route := ws.GET(action.Path).To(routeFunction(redirectHandler)).
 				Filter(m).
+				Filter(authorizationFilter).
 				Doc("redirect GET request to " + kind).
 				Operation("redirect" + kind).
 				Produces("*/*").
@@ -412,10 +429,10 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			ws.Route(route)
 		case "PROXY": // Proxy requests to a resource.
 			// Accept all methods as per https://github.com/GoogleCloudPlatform/kubernetes/issues/3996
-			addProxyRoute(ws, "GET", a.prefix, action.Path, proxyHandler, kind, resource, action.Params)
-			addProxyRoute(ws, "PUT", a.prefix, action.Path, proxyHandler, kind, resource, action.Params)
-			addProxyRoute(ws, "POST", a.prefix, action.Path, proxyHandler, kind, resource, action.Params)
-			addProxyRoute(ws, "DELETE", a.prefix, action.Path, proxyHandler, kind, resource, action.Params)
+			addProxyRoute(ws, "GET", a.prefix, action.Path, proxyHandler, kind, resource, action.Params, authorizationFilter)
+			addProxyRoute(ws, "PUT", a.prefix, action.Path, proxyHandler, kind, resource, action.Params, authorizationFilter)
+			addProxyRoute(ws, "POST", a.prefix, action.Path, proxyHandler, kind, resource, action.Params, authorizationFilter)
+			addProxyRoute(ws, "DELETE", a.prefix, action.Path, proxyHandler, kind, resource, action.Params, authorizationFilter)
 		default:
 			return fmt.Errorf("unrecognized action verb: %s", action.Verb)
 		}
@@ -659,9 +676,10 @@ func routeFunction(handler http.Handler) restful.RouteFunction {
 	}
 }
 
-func addProxyRoute(ws *restful.WebService, method string, prefix string, path string, proxyHandler http.Handler, kind, resource string, params []*restful.Parameter) {
+func addProxyRoute(ws *restful.WebService, method string, prefix string, path string, proxyHandler http.Handler, kind, resource string, params []*restful.Parameter, authorizationFilter restful.FilterFunction) {
 	proxyRoute := ws.Method(method).Path(path).To(routeFunction(proxyHandler)).
 		Filter(monitorFilter("PROXY", resource)).
+		Filter(authorizationFilter).
 		Doc("proxy " + method + " requests to " + kind).
 		Operation("proxy" + method + kind).
 		Produces("*/*").

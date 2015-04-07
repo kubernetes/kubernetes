@@ -455,8 +455,14 @@ func TestAuthModeAlwaysDeny(t *testing.T) {
 // TODO(etune): remove this test once a more comprehensive built-in authorizer is implemented.
 type allowAliceAuthorizer struct{}
 
-func (allowAliceAuthorizer) Authorize(a authorizer.Attributes) error {
-	if a.GetUserName() == "alice" {
+func (allowAliceAuthorizer) AuthorizeAPIRequest(a authorizer.APIAttributes) error {
+	if a.GetUserInfo().GetName() == "alice" {
+		return nil
+	}
+	return errors.New("I can't allow that.  Go ask alice.")
+}
+func (allowAliceAuthorizer) AuthorizeGenericRequest(a authorizer.GenericAttributes) error {
+	if a.GetUserInfo().GetName() == "alice" {
 		return nil
 	}
 	return errors.New("I can't allow that.  Go ask alice.")

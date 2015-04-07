@@ -17,6 +17,9 @@ limitations under the License.
 package apiserver
 
 import (
+	"bytes"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"path"
@@ -25,9 +28,13 @@ import (
 	"strings"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
+	apierrors "github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/authenticator"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/authorizer"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/handlers"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/user"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/httplog"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/golang/glog"
@@ -105,7 +112,7 @@ func RateLimit(rl util.RateLimiter, handler http.Handler) http.Handler {
 func tooManyRequests(w http.ResponseWriter) {
 	// Return a 429 status indicating "Too Many Requests"
 	w.Header().Set("Retry-After", RetryAfter)
-	w.WriteHeader(errors.StatusTooManyRequests)
+	w.WriteHeader(apierrors.StatusTooManyRequests)
 	fmt.Fprintf(w, "Too many requests, please try again later.")
 }
 
@@ -128,7 +135,7 @@ func RecoverPanics(handler http.Handler) http.Handler {
 				http.StatusTemporaryRedirect,
 				http.StatusConflict,
 				http.StatusNotFound,
-				errors.StatusUnprocessableEntity,
+				apierrors.StatusUnprocessableEntity,
 				http.StatusSwitchingProtocols,
 			),
 		).Log()
@@ -178,58 +185,77 @@ func CORS(handler http.Handler, allowedOriginPatterns []*regexp.Regexp, allowedM
 	})
 }
 
-// RequestAttributeGetter is a function that extracts authorizer.Attributes from an http.Request
-type RequestAttributeGetter interface {
-	GetAttribs(req *http.Request) (attribs authorizer.Attributes)
-}
-
-type requestAttributeGetter struct {
-	requestContextMapper   api.RequestContextMapper
-	apiRequestInfoResolver *APIRequestInfoResolver
-}
-
-// NewAttributeGetter returns an object which implements the RequestAttributeGetter interface.
-func NewRequestAttributeGetter(requestContextMapper api.RequestContextMapper, restMapper meta.RESTMapper, apiRoots ...string) RequestAttributeGetter {
-	return &requestAttributeGetter{requestContextMapper, &APIRequestInfoResolver{util.NewStringSet(apiRoots...), restMapper}}
-}
-
-func (r *requestAttributeGetter) GetAttribs(req *http.Request) authorizer.Attributes {
-	attribs := authorizer.AttributesRecord{}
-
-	ctx, ok := r.requestContextMapper.Get(req)
-	if ok {
-		user, ok := api.UserFrom(ctx)
-		if ok {
-			attribs.User = user
-		}
-	}
-
-	attribs.ReadOnly = IsReadOnlyReq(*req)
-
-	apiRequestInfo, _ := r.apiRequestInfoResolver.GetAPIRequestInfo(req)
-
-	// If a path follows the conventions of the REST object store, then
-	// we can extract the resource.  Otherwise, not.
-	attribs.Resource = apiRequestInfo.Resource
-
-	// If the request specifies a namespace, then the namespace is filled in.
-	// Assumes there is no empty string namespace.  Unspecified results
-	// in empty (does not understand defaulting rules.)
-	attribs.Namespace = apiRequestInfo.Namespace
-
-	return &attribs
-}
-
-// WithAuthorizationCheck passes all authorized requests on to handler, and returns a forbidden error otherwise.
-func WithAuthorizationCheck(handler http.Handler, getAttribs RequestAttributeGetter, a authorizer.Authorizer) http.Handler {
+// WithGenericAuthorizationCheck passes all authorized requests on to handler, and returns a forbidden error otherwise.
+func WithGenericAuthorizationCheck(handler http.Handler, requestContextMapper api.RequestContextMapper, a authorizer.GenericAuthorizer) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		err := a.Authorize(getAttribs.GetAttribs(req))
+		var userInfo user.Info
+
+		ctx, ok := requestContextMapper.Get(req)
+		if ok {
+			userInfo, ok = api.UserFrom(ctx)
+			if !ok {
+				userInfo = nil
+			}
+		}
+
+		genericRequestAttributes := authorizer.GenericAttributesRecord{
+			UserInfo: userInfo,
+			URL:      *req.URL,
+			Method:   req.Method,
+		}
+
+		err := a.AuthorizeGenericRequest(genericRequestAttributes)
 		if err == nil {
 			handler.ServeHTTP(w, req)
 			return
 		}
-		forbidden(w, req)
+		forbiddenGenericRequest(err.Error(), w, req)
 	})
+}
+
+func WithAuthenticationCheck(handler http.Handler, authenticator authenticator.Request, requestContextMapper api.RequestContextMapper) http.Handler {
+	if authenticator != nil {
+		authenticatedHandler, err := handlers.NewRequestAuthenticator(requestContextMapper, authenticator, handlers.Unauthorized, handler)
+		if err != nil {
+			glog.Fatalf("Could not initialize authenticator: %v", err)
+		}
+		return authenticatedHandler
+	}
+
+	return handler
+}
+
+func WithCORS(handler http.Handler, corsAllowedOriginList []string) http.Handler {
+	// TODO: handle CORS and auth using go-restful
+	// See github.com/emicklei/go-restful/blob/master/examples/restful-CORS-filter.go, and
+	// github.com/emicklei/go-restful/blob/master/examples/restful-basic-authentication.go
+	if len(corsAllowedOriginList) > 0 {
+		allowedOriginRegexps, err := util.CompileRegexps(corsAllowedOriginList)
+		if err != nil {
+			glog.Fatalf("Invalid CORS allowed origin, --cors_allowed_origins flag was set to %v - %v", strings.Join(corsAllowedOriginList, ","), err)
+		}
+		return CORS(handler, allowedOriginRegexps, nil, nil, "true")
+	}
+
+	return handler
+}
+
+// forbidden renders a simple forbidden error
+func forbiddenGenericRequest(reason string, w http.ResponseWriter, req *http.Request) {
+	forbiddenError, _ := apierrors.NewForbidden("", "", errors.New("")).(*apierrors.StatusError)
+	forbiddenError.ErrStatus.Message = fmt.Sprintf("%q is forbidden because %s", req.RequestURI, reason)
+
+	formatted := &bytes.Buffer{}
+	output, err := latest.Codec.Encode(&forbiddenError.ErrStatus)
+	if err != nil {
+		fmt.Fprintf(formatted, "%s", forbiddenError.Error())
+	} else {
+		_ = json.Indent(formatted, output, "", "  ")
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusForbidden)
+	w.Write(formatted.Bytes())
 }
 
 // APIRequestInfo holds information parsed from the http.Request
