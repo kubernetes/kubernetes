@@ -366,7 +366,7 @@ func (m *Master) init(c *Config) {
 	resourceQuotaStorage, resourceQuotaStatusStorage := resourcequotaetcd.NewStorage(c.EtcdHelper)
 	secretRegistry := secret.NewEtcdRegistry(c.EtcdHelper)
 	persistentVolumeStorage, persistentVolumeStatusStorage := pvetcd.NewStorage(c.EtcdHelper)
-	persistentVolumeClaimStorage := pvcetcd.NewStorage(c.EtcdHelper)
+	persistentVolumeClaimStorage, persistentVolumeClaimStatusStorage := pvcetcd.NewStorage(c.EtcdHelper)
 
 	namespaceStorage, namespaceStatusStorage, namespaceFinalizeStorage := namespaceetcd.NewStorage(c.EtcdHelper)
 	m.namespaceRegistry = namespace.NewRegistry(namespaceStorage)
@@ -398,16 +398,17 @@ func (m *Master) init(c *Config) {
 		"nodes":                  nodeStorage,
 		"events":                 event.NewStorage(eventRegistry),
 
-		"limitRanges":              limitrange.NewStorage(limitRangeRegistry),
-		"resourceQuotas":           resourceQuotaStorage,
-		"resourceQuotas/status":    resourceQuotaStatusStorage,
-		"namespaces":               namespaceStorage,
-		"namespaces/status":        namespaceStatusStorage,
-		"namespaces/finalize":      namespaceFinalizeStorage,
-		"secrets":                  secret.NewStorage(secretRegistry),
-		"persistentVolumes":        persistentVolumeStorage,
-		"persistentVolumes/status": persistentVolumeStatusStorage,
-		"persistentVolumeClaims":   persistentVolumeClaimStorage,
+		"limitRanges":                   limitrange.NewStorage(limitRangeRegistry),
+		"resourceQuotas":                resourceQuotaStorage,
+		"resourceQuotas/status":         resourceQuotaStatusStorage,
+		"namespaces":                    namespaceStorage,
+		"namespaces/status":             namespaceStatusStorage,
+		"namespaces/finalize":           namespaceFinalizeStorage,
+		"secrets":                       secret.NewStorage(secretRegistry),
+		"persistentVolumes":             persistentVolumeStorage,
+		"persistentVolumes/status":      persistentVolumeStatusStorage,
+		"persistentVolumeClaims":        persistentVolumeClaimStorage,
+		"persistentVolumeClaims/status": persistentVolumeClaimStatusStorage,
 	}
 
 	apiVersions := []string{"v1beta1", "v1beta2"}

@@ -68,6 +68,23 @@ func (persistentvolumeclaimStrategy) ValidateUpdate(ctx api.Context, obj, old ru
 	return validation.ValidatePersistentVolumeClaimUpdate(obj.(*api.PersistentVolumeClaim), old.(*api.PersistentVolumeClaim))
 }
 
+type persistentvolumeclaimStatusStrategy struct {
+	persistentvolumeclaimStrategy
+}
+
+var StatusStrategy = persistentvolumeclaimStatusStrategy{Strategy}
+
+// PrepareForUpdate sets the Spec field which is not allowed to be changed when updating a PV's Status
+func (persistentvolumeclaimStatusStrategy) PrepareForUpdate(obj, old runtime.Object) {
+	newPv := obj.(*api.PersistentVolumeClaim)
+	oldPv := obj.(*api.PersistentVolumeClaim)
+	newPv.Spec = oldPv.Spec
+}
+
+func (persistentvolumeclaimStatusStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) fielderrors.ValidationErrorList {
+	return validation.ValidatePersistentVolumeClaimStatusUpdate(obj.(*api.PersistentVolumeClaim), old.(*api.PersistentVolumeClaim))
+}
+
 // MatchPersistentVolumeClaim returns a generic matcher for a given label and field selector.
 func MatchPersistentVolumeClaim(label labels.Selector, field fields.Selector) generic.Matcher {
 	return generic.MatcherFunc(func(obj runtime.Object) (bool, error) {
