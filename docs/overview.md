@@ -18,7 +18,7 @@ Every resource in Kubernetes, such as a pod, is identified by a URI and has a UI
 
 Other details:
 
-* [API](api-conventions.md)
+* [API](api.md)
 * [Client libraries](client-libraries.md)
 * [Command-line interface](kubectl.md)
 * [UI](ui.md)
