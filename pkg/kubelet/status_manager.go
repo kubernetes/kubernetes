@@ -53,6 +53,7 @@ func newStatusManager(kubeClient client.Interface) *statusManager {
 
 func (s *statusManager) Start() {
 	// syncBatch blocks when no updates are available, we can run it in a tight loop.
+	glog.Info("Starting to sync pod status with apiserver")
 	go util.Forever(func() {
 		err := s.syncBatch()
 		if err != nil {
