@@ -20,8 +20,10 @@ import (
 	"fmt"
 	"io"
 
-	cmdutil "github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/cmd/util"
 	"github.com/spf13/cobra"
+
+	cmdutil "github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/cmd/util"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/resource"
 )
 
 func NewCmdDescribe(f *cmdutil.Factory, out io.Writer) *cobra.Command {
@@ -46,9 +48,18 @@ func RunDescribe(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []s
 		return err
 	}
 
-	mapper, _ := f.Object()
-	// TODO: use resource.Builder instead
-	mapping, namespace, name, err := cmdutil.ResourceFromArgs(cmd, args, mapper, cmdNamespace)
+	mapper, typer := f.Object()
+	r := resource.NewBuilder(mapper, typer, f.ClientMapperForCommand()).
+		ContinueOnError().
+		NamespaceParam(cmdNamespace).DefaultNamespace().
+		ResourceTypeOrNameArgs(false, args...).
+		Flatten().
+		Do()
+	err = r.Err()
+	if err != nil {
+		return err
+	}
+	mapping, err := r.ResourceMapping()
 	if err != nil {
 		return err
 	}
@@ -57,8 +68,13 @@ func RunDescribe(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []s
 	if err != nil {
 		return err
 	}
+	infos, err := r.Infos()
+	if err != nil {
+		return err
+	}
+	info := infos[0]
 
-	s, err := describer.Describe(namespace, name)
+	s, err := describer.Describe(info.Namespace, info.Name)
 	if err != nil {
 		return err
 	}
