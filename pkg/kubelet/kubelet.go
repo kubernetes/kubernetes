@@ -1126,7 +1126,11 @@ func (kl *Kubelet) computePodContainerChanges(pod *api.Pod, runningPod kubeconta
 
 	// Do not use the cache here since we need the newest status to check
 	// if we need to restart the container below.
-	podStatus, err := kl.generatePodStatus(podFullName)
+	pod, found := kl.GetPodByFullName(podFullName)
+	if !found {
+		return podContainerChangesSpec{}, fmt.Errorf("couldn't find pod %q", podFullName)
+	}
+	podStatus, err := kl.generatePodStatus(pod)
 	if err != nil {
 		glog.Errorf("Unable to get pod with name %q and uid %q info with error(%v)", podFullName, uid, err)
 		return podContainerChangesSpec{}, err
@@ -1238,7 +1242,7 @@ func (kl *Kubelet) syncPod(pod *api.Pod, mirrorPod *api.Pod, runningPod kubecont
 			// exist yet.
 			return
 		}
-		status, err := kl.generatePodStatusByPod(pod)
+		status, err := kl.generatePodStatus(pod)
 		if err != nil {
 			glog.Errorf("Unable to generate status for pod with name %q and uid %q info with error(%v)", podFullName, uid, err)
 		} else {
@@ -1938,20 +1942,16 @@ func (kl *Kubelet) GetPodStatus(podFullName string) (api.PodStatus, error) {
 		glog.V(3).Infof("Returning cached status for %q", podFullName)
 		return cachedPodStatus, nil
 	}
-	return kl.generatePodStatus(podFullName)
-}
-
-func (kl *Kubelet) generatePodStatus(podFullName string) (api.PodStatus, error) {
 	pod, found := kl.GetPodByFullName(podFullName)
 	if !found {
 		return api.PodStatus{}, fmt.Errorf("couldn't find pod %q", podFullName)
 	}
-	return kl.generatePodStatusByPod(pod)
+	return kl.generatePodStatus(pod)
 }
 
 // By passing the pod directly, this method avoids pod lookup, which requires
 // grabbing a lock.
-func (kl *Kubelet) generatePodStatusByPod(pod *api.Pod) (api.PodStatus, error) {
+func (kl *Kubelet) generatePodStatus(pod *api.Pod) (api.PodStatus, error) {
 	podFullName := kubecontainer.GetPodFullName(pod)
 	glog.V(3).Infof("Generating status for %q", podFullName)
 
