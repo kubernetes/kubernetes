@@ -425,6 +425,7 @@ func RunKubelet(kcfg *KubeletConfig, builder KubeletBuilder) {
 	} else {
 		startKubelet(k, podCfg, kcfg)
 	}
+	glog.Infof("Started kubelet")
 }
 
 func startKubelet(k KubeletBootstrap, podCfg *config.PodConfig, kc *KubeletConfig) {

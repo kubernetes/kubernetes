@@ -561,7 +561,7 @@ func (kl *Kubelet) syncNodeStatus() {
 	if kl.kubeClient == nil {
 		return
 	}
-
+	glog.Infof("Starting node status updates")
 	for feq := initialNodeStatusUpdateFrequency; feq < kl.nodeStatusUpdateFrequency; feq += nodeStatusUpdateFrequencyInc {
 		select {
 		case <-time.After(feq):
@@ -1628,6 +1628,7 @@ func (kl *Kubelet) handleNotFittingPods(pods []api.Pod) {
 // no changes are seen to the configuration, will synchronize the last known desired
 // state every sync_frequency seconds. Never returns.
 func (kl *Kubelet) syncLoop(updates <-chan PodUpdate, handler SyncHandler) {
+	glog.Info("Starting kubelet main sync loop.")
 	for {
 		unsyncedPod := false
 		podSyncTypes := make(map[types.UID]metrics.SyncPodType)

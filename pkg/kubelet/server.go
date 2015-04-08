@@ -60,7 +60,7 @@ type TLSOptions struct {
 
 // ListenAndServeKubeletServer initializes a server to respond to HTTP network requests on the Kubelet.
 func ListenAndServeKubeletServer(host HostInterface, address net.IP, port uint, tlsOptions *TLSOptions, enableDebuggingHandlers bool) {
-	glog.V(1).Infof("Starting to listen on %s:%d", address, port)
+	glog.Infof("Starting to listen on %s:%d", address, port)
 	handler := NewServer(host, enableDebuggingHandlers)
 	s := &http.Server{
 		Addr:           net.JoinHostPort(address.String(), strconv.FormatUint(uint64(port), 10)),
