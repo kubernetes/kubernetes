@@ -263,8 +263,6 @@ func shuffleStrings(strings []string, r *rand.Rand) {
 }
 
 func Test() bool {
-	defer runBashUntil("watchEvents", exec.Command(filepath.Join(*root, "hack/e2e-internal/e2e-watch-events.sh")))()
-
 	if !IsUp() {
 		log.Fatal("Testing requested, but e2e cluster not up!")
 	}
