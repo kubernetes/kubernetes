@@ -33,12 +33,18 @@ function detect-minions {
 # Verify prereqs on host machine  Also sets exports USING_KUBE_SCRIPTS=true so
 # that our Vagrantfile doesn't error out.
 function verify-prereqs {
-  for x in vagrant VBoxManage; do
-    if ! which "$x" >/dev/null; then
-      echo "Can't find $x in PATH, please fix and retry."
+  if ! which "vagrant" >/dev/null; then
+    echo "Can't find vagrant in PATH, please fix and retry."
+    exit 1
+  fi
+
+  # Check for VirtualBox or vagrant-libvirt
+  if ! which "VirtualBox" >/dev/null 2>/dev/null; then
+    if ! vagrant plugin list | grep vagrant-libvirt >/dev/null; then
+      echo "Can't find VirtualBox in PATH or vagrant-libvirt plugin, please fix and retry."
       exit 1
     fi
-  done
+  fi
 
   # Set VAGRANT_CWD to KUBE_ROOT so that we find the right Vagrantfile no
   # matter what directory the tools are called from.
