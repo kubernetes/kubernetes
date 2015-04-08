@@ -1,6 +1,13 @@
 # Authentication Plugins
 
-Kubernetes uses tokens or client certificates to authenticate users for API calls.
+Kubernetes uses http basic auth, tokens, or client certificates to authenticate users for API calls.
+
+Basic authentication is enabled by passing the `--basic_auth_file=SOMEFILE`
+option to apiserver. Currently, the basic auth credentials last indefinitely,
+and the password cannot be changed without restarting apiserver.
+
+The basic auth file format is implemented in `plugin/pkg/auth/authenticator/password/passwordfile/...`
+and is a csv file with 3 columns: password, user name, user id.
 
 Client certificate authentication is enabled by passing the `--client_ca_file=SOMEFILE`
 option to apiserver. The referenced file must contain one or more certificates authorities
