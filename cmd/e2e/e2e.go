@@ -80,7 +80,7 @@ func main() {
 		var err error
 		cloudConfig.Provider, err = cloudprovider.GetCloudProvider(context.Provider, strings.NewReader(awsConfig))
 		if err != nil {
-			glog.Error("Error building AWS provider: %v", err)
+			glog.Error("Error building AWS provider: ", err)
 			os.Exit(1)
 		}
 	}

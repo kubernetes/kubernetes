@@ -84,12 +84,15 @@ type Volumes interface {
 // AWSCloud is an implementation of Interface, TCPLoadBalancer and Instances for Amazon Web Services.
 type AWSCloud struct {
 	ec2              EC2
+	metadata         AWSMetadata
 	cfg              *AWSCloudConfig
 	availabilityZone string
 	region           aws.Region
 
 	// The AWS instance that we are running on
 	selfAwsInstance *awsInstance
+
+	mutex sync.Mutex
 }
 
 type AWSCloudConfig struct {
@@ -245,13 +248,8 @@ func newAWSCloud(config io.Reader, authFunc AuthFunc, instanceId string, metadat
 		cfg:              cfg,
 		region:           region,
 		availabilityZone: zone,
+		metadata:         metadata,
 	}
-
-	instanceIdBytes, err := metadata.GetMetaData("instance-id")
-	if err != nil {
-		return nil, fmt.Errorf("error fetching instance-id from ec2 metadata service: %v", err)
-	}
-	awsCloud.selfAwsInstance = newAwsInstance(ec2, string(instanceIdBytes))
 
 	return awsCloud, nil
 }
@@ -822,9 +820,23 @@ func (self *awsDisk) delete() error {
 
 // Gets the awsInstance for the EC2 instance on which we are running
 // may return nil in case of error
-func (aws *AWSCloud) getSelfAwsInstance() *awsInstance {
+func (aws *AWSCloud) getSelfAwsInstance() (*awsInstance, error) {
 	// Note that we cache some state in awsInstance (mountpoints), so we must preserve the instance
-	return aws.selfAwsInstance
+
+	aws.mutex.Lock()
+	defer aws.mutex.Unlock()
+
+	i := aws.selfAwsInstance
+	if i == nil {
+		instanceIdBytes, err := aws.metadata.GetMetaData("instance-id")
+		if err != nil {
+			return nil, fmt.Errorf("error fetching instance-id from ec2 metadata service: %v", err)
+		}
+		i = newAwsInstance(aws.ec2, string(instanceIdBytes))
+		aws.selfAwsInstance = i
+	}
+
+	return i, nil
 }
 
 // Implements Volumes.AttachDisk
@@ -836,7 +848,10 @@ func (aws *AWSCloud) AttachDisk(instanceName string, diskName string, readOnly b
 
 	var awsInstance *awsInstance
 	if instanceName == "" {
-		awsInstance = aws.selfAwsInstance
+		awsInstance, err = aws.getSelfAwsInstance()
+		if err != nil {
+			return "", fmt.Errorf("Error getting self-instance: %v", err)
+		}
 	} else {
 		instance, err := aws.getInstancesByDnsName(instanceName)
 		if err != nil {
