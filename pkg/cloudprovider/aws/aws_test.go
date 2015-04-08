@@ -143,8 +143,7 @@ func TestNewAWSCloud(t *testing.T) {
 
 	for _, test := range tests {
 		t.Logf("Running test case %s", test.name)
-		selfInstanceId := "self-instance"
-		c, err := newAWSCloud(test.reader, test.authFunc, selfInstanceId, test.metadata)
+		c, err := newAWSCloud(test.reader, test.authFunc, test.metadata)
 		if test.expectError {
 			if err == nil {
 				t.Errorf("Should error for case %s", test.name)

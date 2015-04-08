@@ -170,7 +170,7 @@ func (s *goamzEC2) DeleteVolume(volumeId string) (resp *ec2.SimpleResp, err erro
 func init() {
 	cloudprovider.RegisterCloudProvider("aws", func(config io.Reader) (cloudprovider.Interface, error) {
 		metadata := &goamzMetadata{}
-		return newAWSCloud(config, getAuth, "", metadata)
+		return newAWSCloud(config, getAuth, metadata)
 	})
 }
 
@@ -219,7 +219,7 @@ func getAvailabilityZone(metadata AWSMetadata) (string, error) {
 
 // newAWSCloud creates a new instance of AWSCloud.
 // authFunc and instanceId are primarily for tests
-func newAWSCloud(config io.Reader, authFunc AuthFunc, instanceId string, metadata AWSMetadata) (*AWSCloud, error) {
+func newAWSCloud(config io.Reader, authFunc AuthFunc, metadata AWSMetadata) (*AWSCloud, error) {
 	cfg, err := readAWSCloudConfig(config, metadata)
 	if err != nil {
 		return nil, fmt.Errorf("unable to read AWS cloud provider config file: %v", err)
