@@ -540,6 +540,8 @@ func isProbableEOF(err error) bool {
 
 // Stream formats and executes the request, and offers streaming of the response.
 // Returns io.ReadCloser which could be used for streaming of the response, or an error
+// Any non-2xx http status code causes an error.  If we get a non-2xx code, we try to convert the body into an APIStatus object.
+// If we can, we return that as an error.  Otherwise, we create an error that lists the http status and the content of the response.
 func (r *Request) Stream() (io.ReadCloser, error) {
 	if r.err != nil {
 		return nil, r.err
@@ -556,6 +558,30 @@ func (r *Request) Stream() (io.ReadCloser, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	switch {
+	case (resp.StatusCode >= 200) && (resp.StatusCode < 300):
+		return resp.Body, nil
+
+	default:
+		// we have a decent shot at taking the object returned, parsing it as a status object and returning a more normal error
+		bodyBytes, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			return nil, fmt.Errorf("%v while accessing %v", resp.Status, r.finalURL())
+		}
+
+		if runtimeObject, err := r.codec.Decode(bodyBytes); err == nil {
+			statusError := errors.FromObject(runtimeObject)
+
+			if _, ok := statusError.(APIStatus); ok {
+				return nil, statusError
+			}
+		}
+
+		bodyText := string(bodyBytes)
+		return nil, fmt.Errorf("%s while accessing %v: %s", resp.Status, r.finalURL(), bodyText)
+	}
+
 	return resp.Body, nil
 }
 

@@ -531,6 +531,22 @@ func TestRequestStream(t *testing.T) {
 			},
 			Err: true,
 		},
+		{
+			Request: &Request{
+				client: clientFunc(func(req *http.Request) (*http.Response, error) {
+					return &http.Response{
+						StatusCode: http.StatusUnauthorized,
+						Body: ioutil.NopCloser(bytes.NewReader([]byte(runtime.EncodeOrDie(testapi.Codec(), &api.Status{
+							Status: api.StatusFailure,
+							Reason: api.StatusReasonUnauthorized,
+						})))),
+					}, nil
+				}),
+				codec:   latest.Codec,
+				baseURL: &url.URL{},
+			},
+			Err: true,
+		},
 	}
 	for i, testCase := range testCases {
 		body, err := testCase.Request.Stream()
