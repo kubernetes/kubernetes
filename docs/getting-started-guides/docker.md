@@ -2,6 +2,9 @@
 
 The following instructions show you how to set up a simple, single node kubernetes cluster using Docker.
 
+Here's a diagram of what the final result will look like:
+![Kubernetes Single Node on Docker](k8s-singlenode-docker.png)
+
 ### Step One: Run etcd
 ```sh
 docker run --net=host -d kubernetes/etcd:2.0.5.1 /usr/local/bin/etcd --addr=127.0.0.1:4001 --bind-addr=0.0.0.0:4001 --data-dir=/var/etcd/data
@@ -74,3 +77,5 @@ Note that you will need run this curl command on your boot2docker VM if you are 
 ### A note on turning down your cluster
 Many of these containers run under the management of the ```kubelet``` binary, which attempts to keep containers running, even if they fail.  So, in order to turn down
 the cluster, you need to first kill the kubelet container, and then any other containers.
+
+You may use ```docker ps -a | awk '{print $1}' | xargs docker kill```, note this removes _all_ containers running under Docker, so use with caution.
