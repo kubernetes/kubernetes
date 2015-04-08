@@ -248,36 +248,85 @@ func (r *Request) RequestURI(uri string) *Request {
 	return r
 }
 
-/*
-// ParseSelectorParam parses the given string as a resource selector.
-// This is a convenience function so you don't have to first check that it's a
-// validly formatted selector.
-func (r *Request) ParseSelectorParam(paramName, item string) *Request {
-	if r.err != nil {
-		return r
+const (
+	// A constant that clients can use to refer in a field selector to the object name field.
+	// Will be automatically emitted as the correct name for the API version.
+	ObjectNameField = "metadata.name"
+	PodHost         = "spec.host"
+)
+
+type clientFieldNameToAPIVersionFieldName map[string]string
+
+func (c clientFieldNameToAPIVersionFieldName) filterField(field, value string) (newField, newValue string, err error) {
+	newFieldName, ok := c[field]
+	if !ok {
+		return "", "", fmt.Errorf("%v - %v - no field mapping defined", field, value)
 	}
-	var selector string
-	var err error
-	switch paramName {
-	case "labels":
-		var lsel labels.Selector
-		if lsel, err = labels.Parse(item); err == nil {
-			selector = lsel.String()
-		}
-	case "fields":
-		var fsel fields.Selector
-		if fsel, err = fields.ParseSelector(item); err == nil {
-			selector = fsel.String()
-		}
-	default:
-		err = fmt.Errorf("unknown parameter name '%s'", paramName)
+	return newFieldName, value, nil
+}
+
+type resourceTypeToFieldMapping map[string]clientFieldNameToAPIVersionFieldName
+
+func (r resourceTypeToFieldMapping) filterField(resourceType, field, value string) (newField, newValue string, err error) {
+	fMapping, ok := r[resourceType]
+	if !ok {
+		return "", "", fmt.Errorf("%v - %v - %v - no field mapping defined", resourceType, field, value)
 	}
+	return fMapping.filterField(field, value)
+}
+
+type versionToResourceToFieldMapping map[string]resourceTypeToFieldMapping
+
+func (v versionToResourceToFieldMapping) filterField(apiVersion, resourceType, field, value string) (newField, newValue string, err error) {
+	rMapping, ok := v[apiVersion]
+	if !ok {
+		glog.Warningf("field selector: %v - %v - %v - %v: need to check if this is versioned correctly.", apiVersion, resourceType, field, value)
+		return field, value, nil
+	}
+	newField, newValue, err = rMapping.filterField(resourceType, field, value)
 	if err != nil {
-		r.err = err
-		return r
+		// This is only a warning until we find and fix all of the client's usages.
+		glog.Warningf("field selector: %v - %v - %v - %v: need to check if this is versioned correctly.", apiVersion, resourceType, field, value)
+		return field, value, nil
 	}
-	return r.setParam(paramName, selector)
-}*/
+	return newField, newValue, nil
+}
+
+var fieldMappings = versionToResourceToFieldMapping{
+	"v1beta1": resourceTypeToFieldMapping{
+		"nodes": clientFieldNameToAPIVersionFieldName{
+			ObjectNameField: "name",
+		},
+		"minions": clientFieldNameToAPIVersionFieldName{
+			ObjectNameField: "name",
+		},
+		"pods": clientFieldNameToAPIVersionFieldName{
+			PodHost: "DesiredState.Host",
+		},
+	},
+	"v1beta2": resourceTypeToFieldMapping{
+		"nodes": clientFieldNameToAPIVersionFieldName{
+			ObjectNameField: "name",
+		},
+		"minions": clientFieldNameToAPIVersionFieldName{
+			ObjectNameField: "name",
+		},
+		"pods": clientFieldNameToAPIVersionFieldName{
+			PodHost: "DesiredState.Host",
+		},
+	},
+	"v1beta3": resourceTypeToFieldMapping{
+		"nodes": clientFieldNameToAPIVersionFieldName{
+			ObjectNameField: "metadata.name",
+		},
+		"minions": clientFieldNameToAPIVersionFieldName{
+			ObjectNameField: "metadata.name",
+		},
+		"pods": clientFieldNameToAPIVersionFieldName{
+			PodHost: "spec.host",
+		},
+	},
+}
 
 // FieldsSelectorParam adds the given selector as a query parameter with the name paramName.
 func (r *Request) FieldsSelectorParam(s fields.Selector) *Request {
@@ -287,7 +336,14 @@ func (r *Request) FieldsSelectorParam(s fields.Selector) *Request {
 	if s.Empty() {
 		return r
 	}
-	return r.setParam(api.FieldSelectorQueryParam(r.apiVersion), s.String())
+	s2, err := s.Transform(func(field, value string) (newField, newValue string, err error) {
+		return fieldMappings.filterField(r.apiVersion, r.resource, field, value)
+	})
+	if err != nil {
+		r.err = err
+		return r
+	}
+	return r.setParam(api.FieldSelectorQueryParam(r.apiVersion), s2.String())
 }
 
 // LabelsSelectorParam adds the given selector as a query parameter
