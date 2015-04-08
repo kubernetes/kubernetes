@@ -376,7 +376,7 @@ func (m *Master) init(c *Config) {
 	endpointsStorage := endpointsetcd.NewStorage(c.EtcdHelper)
 	m.endpointRegistry = endpoint.NewRegistry(endpointsStorage)
 
-	nodeStorage := nodeetcd.NewStorage(c.EtcdHelper, c.KubeletClient)
+	nodeStorage, nodeStatusStorage := nodeetcd.NewStorage(c.EtcdHelper, c.KubeletClient)
 	m.nodeRegistry = minion.NewRegistry(nodeStorage)
 
 	// TODO: split me up into distinct storage registries
@@ -397,7 +397,9 @@ func (m *Master) init(c *Config) {
 		"services":               service.NewStorage(m.serviceRegistry, c.Cloud, m.nodeRegistry, m.endpointRegistry, m.portalNet, c.ClusterName),
 		"endpoints":              endpointsStorage,
 		"minions":                nodeStorage,
+		"minions/status":         nodeStatusStorage,
 		"nodes":                  nodeStorage,
+		"nodes/status":           nodeStatusStorage,
 		"events":                 event.NewStorage(eventRegistry),
 
 		"limitRanges":                   limitrange.NewStorage(limitRangeRegistry),

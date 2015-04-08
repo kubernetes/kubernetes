@@ -56,14 +56,14 @@ func (nodeStrategy) AllowCreateOnUpdate() bool {
 // PrepareForCreate clears fields that are not allowed to be set by end users on creation.
 func (nodeStrategy) PrepareForCreate(obj runtime.Object) {
 	_ = obj.(*api.Node)
-	// Nodes allow *all* fields, including status, to be set.
+	// Nodes allow *all* fields, including status, to be set on create.
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
 func (nodeStrategy) PrepareForUpdate(obj, old runtime.Object) {
-	_ = obj.(*api.Node)
-	_ = old.(*api.Node)
-	// Nodes allow *all* fields, including status, to be set.
+	newNode := obj.(*api.Node)
+	oldNode := old.(*api.Node)
+	newNode.Status = oldNode.Status
 }
 
 // Validate validates a new node.
@@ -74,6 +74,27 @@ func (nodeStrategy) Validate(ctx api.Context, obj runtime.Object) fielderrors.Va
 
 // ValidateUpdate is the default update validation for an end user.
 func (nodeStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) fielderrors.ValidationErrorList {
+	return validation.ValidateMinionUpdate(old.(*api.Node), obj.(*api.Node))
+}
+
+type nodeStatusStrategy struct {
+	nodeStrategy
+}
+
+var StatusStrategy = nodeStatusStrategy{Strategy}
+
+func (nodeStatusStrategy) PrepareForCreate(obj runtime.Object) {
+	_ = obj.(*api.Node)
+	// Nodes allow *all* fields, including status, to be set on create.
+}
+
+func (nodeStatusStrategy) PrepareForUpdate(obj, old runtime.Object) {
+	newNode := obj.(*api.Node)
+	oldNode := old.(*api.Node)
+	newNode.Spec = oldNode.Spec
+}
+
+func (nodeStatusStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) fielderrors.ValidationErrorList {
 	return validation.ValidateMinionUpdate(old.(*api.Node), obj.(*api.Node))
 }
 

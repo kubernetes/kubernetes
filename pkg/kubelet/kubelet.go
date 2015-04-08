@@ -1843,7 +1843,7 @@ func (kl *Kubelet) tryUpdateNodeStatus() error {
 		kl.recordNodeOnlineEvent()
 	}
 
-	_, err = kl.kubeClient.Nodes().Update(node)
+	_, err = kl.kubeClient.Nodes().UpdateStatus(node)
 	return err
 }
 

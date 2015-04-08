@@ -43,7 +43,6 @@ type podStrategy struct {
 
 // Strategy is the default logic that applies when creating and updating Pod
 // objects via the REST API.
-// TODO: Create other strategies for updating status, bindings, etc
 var Strategy = podStrategy{api.Scheme, api.SimpleNameGenerator}
 
 // NamespaceScoped is true for pods.

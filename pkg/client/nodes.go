@@ -35,6 +35,7 @@ type NodeInterface interface {
 	List(selector labels.Selector) (*api.NodeList, error)
 	Delete(name string) error
 	Update(*api.Node) (*api.Node, error)
+	UpdateStatus(*api.Node) (*api.Node, error)
 	Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error)
 }
 
@@ -91,6 +92,16 @@ func (c *nodes) Update(node *api.Node) (*api.Node, error) {
 		return nil, err
 	}
 	err := c.r.Put().Resource(c.resourceName()).Name(node.Name).Body(node).Do().Into(result)
+	return result, err
+}
+
+func (c *nodes) UpdateStatus(node *api.Node) (*api.Node, error) {
+	result := &api.Node{}
+	if len(node.ResourceVersion) == 0 {
+		err := fmt.Errorf("invalid update object, missing resource version: %v", node)
+		return nil, err
+	}
+	err := c.r.Put().Resource(c.resourceName()).Name(node.Name).SubResource("status").Body(node).Do().Into(result)
 	return result, err
 }
 

@@ -56,10 +56,11 @@ type FakeNodeHandler struct {
 	Existing   []*api.Node
 
 	// Output
-	CreatedNodes []*api.Node
-	DeletedNodes []*api.Node
-	UpdatedNodes []*api.Node
-	RequestCount int
+	CreatedNodes        []*api.Node
+	DeletedNodes        []*api.Node
+	UpdatedNodes        []*api.Node
+	UpdatedNodeStatuses []*api.Node
+	RequestCount        int
 }
 
 func (c *FakeNodeHandler) Nodes() client.NodeInterface {
@@ -120,6 +121,13 @@ func (m *FakeNodeHandler) Delete(id string) error {
 func (m *FakeNodeHandler) Update(node *api.Node) (*api.Node, error) {
 	nodeCopy := *node
 	m.UpdatedNodes = append(m.UpdatedNodes, &nodeCopy)
+	m.RequestCount++
+	return node, nil
+}
+
+func (m *FakeNodeHandler) UpdateStatus(node *api.Node) (*api.Node, error) {
+	nodeCopy := *node
+	m.UpdatedNodeStatuses = append(m.UpdatedNodeStatuses, &nodeCopy)
 	m.RequestCount++
 	return node, nil
 }
@@ -1053,7 +1061,7 @@ func TestMonitorNodeStatusUpdateStatus(t *testing.T) {
 		if item.expectedRequestCount != item.fakeNodeHandler.RequestCount {
 			t.Errorf("expected %v call, but got %v.", item.expectedRequestCount, item.fakeNodeHandler.RequestCount)
 		}
-		if !api.Semantic.DeepEqual(item.expectedNodes, item.fakeNodeHandler.UpdatedNodes) {
+		if len(item.fakeNodeHandler.UpdatedNodes) > 0 && !api.Semantic.DeepEqual(item.expectedNodes, item.fakeNodeHandler.UpdatedNodes) {
 			t.Errorf("expected nodes %+v, got %+v", item.expectedNodes[0],
 				item.fakeNodeHandler.UpdatedNodes[0])
 		}

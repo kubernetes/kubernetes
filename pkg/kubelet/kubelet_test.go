@@ -3113,7 +3113,7 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 	if err := kubelet.updateNodeStatus(); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	if len(kubeClient.Actions) != 2 || kubeClient.Actions[1].Action != "update-node" {
+	if len(kubeClient.Actions) != 2 || kubeClient.Actions[1].Action != "update-status-node" {
 		t.Fatalf("unexpected actions: %v", kubeClient.Actions)
 	}
 	updatedNode, ok := kubeClient.Actions[1].Value.(*api.Node)
