@@ -101,9 +101,10 @@ var _ = Describe("PD", func() {
 		By(fmt.Sprintf("deleting PD %q", diskName))
 		for start := time.Now(); time.Since(start) < 180*time.Second; time.Sleep(5 * time.Second) {
 			if err = deletePD(diskName); err != nil {
-				Logf("Couldn't delete PD. Sleeping 5 seconds")
+				Logf("Couldn't delete PD. Sleeping 5 seconds (%v)", err)
 				continue
 			}
+			Logf("Deleted PD %v", diskName)
 			break
 		}
 		expectNoError(err, "Error deleting PD")
