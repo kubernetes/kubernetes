@@ -43,6 +43,7 @@ import (
 // also be removed.
 
 type podManager interface {
+	GetAllPods() []api.Pod
 	GetPods() []api.Pod
 	GetPodByFullName(podFullName string) (*api.Pod, bool)
 	GetPodByName(namespace, name string) (*api.Pod, bool)
@@ -51,6 +52,7 @@ type podManager interface {
 	UpdatePods(u PodUpdate, podSyncTypes map[types.UID]metrics.SyncPodType)
 	DeleteOrphanedMirrorPods()
 	TranslatePodUID(uid types.UID) types.UID
+	IsMirrorPodOf(mirrorPod, pod *api.Pod) bool
 	mirrorClient
 }
 
@@ -111,7 +113,7 @@ func (self *basicPodManager) UpdatePods(u PodUpdate, podSyncTypes map[types.UID]
 		for i := range u.Pods {
 			podSyncTypes[u.Pods[i].UID] = metrics.SyncPodUpdate
 		}
-		allPods := applyUpdates(u.Pods, self.getPods())
+		allPods := applyUpdates(u.Pods, self.GetAllPods())
 		self.setPods(allPods)
 	default:
 		panic("syncLoop does not support incremental changes")
@@ -178,9 +180,9 @@ func applyUpdates(changed []api.Pod, current []api.Pod) []api.Pod {
 	return updated
 }
 
-func (self *basicPodManager) getPods() []api.Pod {
-	pods := make([]api.Pod, 0, len(self.podByUID))
-	for _, pod := range self.podByUID {
+func (self *basicPodManager) convertMapToPods(UIDMap map[types.UID]*api.Pod) []api.Pod {
+	pods := make([]api.Pod, 0, len(UIDMap))
+	for _, pod := range UIDMap {
 		pods = append(pods, *pod)
 	}
 	return pods
@@ -190,7 +192,12 @@ func (self *basicPodManager) getPods() []api.Pod {
 func (self *basicPodManager) GetPods() []api.Pod {
 	self.lock.RLock()
 	defer self.lock.RUnlock()
-	return self.getPods()
+	return self.convertMapToPods(self.podByUID)
+}
+
+// Returns all pods (including mirror pods).
+func (self *basicPodManager) GetAllPods() []api.Pod {
+	return append(self.convertMapToPods(self.podByUID), self.convertMapToPods(self.mirrorPodByUID)...)
 }
 
 // GetPodsAndMirrorMap returns the a copy of the regular pods and the mirror
@@ -202,7 +209,7 @@ func (self *basicPodManager) GetPodsAndMirrorMap() ([]api.Pod, map[string]api.Po
 	for key, pod := range self.mirrorPodByFullName {
 		mirrorPods[key] = *pod
 	}
-	return self.getPods(), mirrorPods
+	return self.convertMapToPods(self.podByUID), mirrorPods
 }
 
 // GetPodByName provides the (non-mirror) pod that matches namespace and name,
@@ -263,11 +270,25 @@ func (self *basicPodManager) DeleteOrphanedMirrorPods() {
 }
 
 // Creates a mirror pod for the given pod.
-func (self *basicPodManager) CreateMirrorPod(pod api.Pod, hostname string) error {
-	return self.mirrorClient.CreateMirrorPod(pod, hostname)
+func (self *basicPodManager) CreateMirrorPod(pod api.Pod) error {
+	return self.mirrorClient.CreateMirrorPod(pod)
 }
 
 // Delete a mirror pod by name.
 func (self *basicPodManager) DeleteMirrorPod(podFullName string) error {
 	return self.mirrorClient.DeleteMirrorPod(podFullName)
+}
+
+// Update the mirror pod for the given pod.
+func (self *basicPodManager) UpdateMirrorPod(pod *api.Pod) error {
+	return self.mirrorClient.UpdateMirrorPod(pod)
+}
+
+// Returns true if mirrorPod is a correct representation of pod; false otherwise.
+func (self *basicPodManager) IsMirrorPodOf(mirrorPod, pod *api.Pod) bool {
+	// Check name and namespace first.
+	if pod.Name != mirrorPod.Name || pod.Namespace != mirrorPod.Namespace {
+		return false
+	}
+	return api.Semantic.DeepEqual(&pod.Spec, &mirrorPod.Spec)
 }

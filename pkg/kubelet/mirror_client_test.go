@@ -17,6 +17,7 @@ limitations under the License.
 package kubelet
 
 import (
+	"fmt"
 	"sync"
 	"testing"
 
@@ -32,9 +33,10 @@ type fakeMirrorClient struct {
 	mirrorPods   util.StringSet
 	createCounts map[string]int
 	deleteCounts map[string]int
+	updateCounts map[string]int
 }
 
-func (self *fakeMirrorClient) CreateMirrorPod(pod api.Pod, _ string) error {
+func (self *fakeMirrorClient) CreateMirrorPod(pod api.Pod) error {
 	self.mirrorPodLock.Lock()
 	defer self.mirrorPodLock.Unlock()
 	podFullName := kubecontainer.GetPodFullName(&pod)
@@ -51,11 +53,23 @@ func (self *fakeMirrorClient) DeleteMirrorPod(podFullName string) error {
 	return nil
 }
 
+func (self *fakeMirrorClient) UpdateMirrorPod(pod *api.Pod) error {
+	self.mirrorPodLock.Lock()
+	defer self.mirrorPodLock.Unlock()
+	podFullName := kubecontainer.GetPodFullName(pod)
+	if self.mirrorPods.Has(podFullName) {
+		return fmt.Errorf("unable to update; mirror pod %q does not exist!", podFullName)
+	}
+	self.updateCounts[podFullName]++
+	return nil
+}
+
 func newFakeMirrorClient() *fakeMirrorClient {
 	m := fakeMirrorClient{}
 	m.mirrorPods = util.NewStringSet()
 	m.createCounts = make(map[string]int)
 	m.deleteCounts = make(map[string]int)
+	m.updateCounts = make(map[string]int)
 	return &m
 }
 
@@ -77,10 +91,10 @@ func (self *fakeMirrorClient) GetPods() []string {
 	return self.mirrorPods.List()
 }
 
-func (self *fakeMirrorClient) GetCounts(podFullName string) (int, int) {
+func (self *fakeMirrorClient) GetCounts(podFullName string) (int, int, int) {
 	self.mirrorPodLock.RLock()
 	defer self.mirrorPodLock.RUnlock()
-	return self.createCounts[podFullName], self.deleteCounts[podFullName]
+	return self.createCounts[podFullName], self.deleteCounts[podFullName], self.updateCounts[podFullName]
 }
 
 func TestParsePodFullName(t *testing.T) {

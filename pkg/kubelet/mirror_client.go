@@ -28,8 +28,9 @@ import (
 // Mirror client is used to create/delete a mirror pod.
 
 type mirrorClient interface {
-	CreateMirrorPod(api.Pod, string) error
+	CreateMirrorPod(api.Pod) error
 	DeleteMirrorPod(string) error
+	UpdateMirrorPod(*api.Pod) error
 }
 
 type basicMirrorClient struct {
@@ -43,15 +44,29 @@ func newBasicMirrorClient(apiserverClient client.Interface) *basicMirrorClient {
 }
 
 // Creates a mirror pod.
-func (self *basicMirrorClient) CreateMirrorPod(pod api.Pod, hostname string) error {
+func (self *basicMirrorClient) CreateMirrorPod(pod api.Pod) error {
 	if self.apiserverClient == nil {
 		return nil
 	}
-	// Indicate that the pod should be scheduled to the current node.
-	pod.Spec.Host = hostname
 	pod.Annotations[ConfigMirrorAnnotationKey] = MirrorType
 
 	_, err := self.apiserverClient.Pods(NamespaceDefault).Create(&pod)
+	return err
+}
+
+// Update the mirror pod.
+func (self *basicMirrorClient) UpdateMirrorPod(pod *api.Pod) error {
+	if self.apiserverClient == nil {
+		return nil
+	}
+	// TODO: make me easier to express from client code.
+	mirrorPod, err := self.apiserverClient.Pods(pod.Namespace).Get(pod.Name)
+	if err != nil {
+		return err
+	}
+	mirrorPod.Spec = pod.Spec
+	_, err = self.apiserverClient.Pods(pod.Namespace).Update(mirrorPod)
+	// We choose not to retry here, and let the caller decide what to do.
 	return err
 }
 
