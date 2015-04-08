@@ -766,10 +766,7 @@ type PodStatus struct {
 	PodIP  string `json:"podIP,omitempty" description:"IP address allocated to the pod; routable at least within the cluster; empty if not yet allocated"`
 
 	// The list has one entry per container in the manifest. Each entry is currently the output
-	// of `docker inspect`. This output format is *not* final and should not be relied
-	// upon.
-	// TODO: Make real decisions about what our info should look like. Re-enable fuzz test
-	// when we have done this.
+	// of `docker inspect`.
 	ContainerStatuses []ContainerStatus `json:"containerStatuses,omitempty" description:"list of container statuses"`
 }
 
