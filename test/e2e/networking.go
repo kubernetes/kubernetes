@@ -25,9 +25,17 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
+
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
+
+//Namespace constants, implemented
+var svcname = "nettest"
+var ns = svcname + "-" + randomSuffix()
+var c *client.Client = nil
+var namespaceObj *api.Namespace
 
 var _ = BeforeSuite(func() {
 	//Assert basic external connectivity.
@@ -42,6 +50,33 @@ var _ = BeforeSuite(func() {
 	if resp.StatusCode != http.StatusOK {
 		Failf("Unexpected error code, expected 200, got, %v (%v)", resp.StatusCode, resp)
 	}
+
+	By("Building a namespace api object")
+	namespaceObj = &api.Namespace{
+		ObjectMeta: api.ObjectMeta{
+			Name:      ns,
+			Namespace: "",
+		},
+		Status: api.NamespaceStatus{},
+	}
+
+	By("Creating a kubernetes client")
+	c, err = loadClient()
+	Expect(err).NotTo(HaveOccurred())
+
+	By("Creating a namespace for this test suite")
+	_, err = c.Namespaces().Create(namespaceObj)
+	Expect(err).NotTo(HaveOccurred())
+
+})
+
+var _ = AfterSuite(func() {
+	By("Destroying namespace for this suite")
+	err := c.Namespaces().Delete(namespaceObj.ObjectMeta.Name)
+	if err != nil && !errors.IsAlreadyExists(err) {
+		Failf("Couldng make ns %s", err)
+	}
+
 })
 
 func LaunchNetTestPodPerNode(nodes *api.NodeList, name string, c *client.Client, ns string) []string {
@@ -86,13 +121,7 @@ func LaunchNetTestPodPerNode(nodes *api.NodeList, name string, c *client.Client,
 }
 
 var _ = Describe("Networking", func() {
-	var c *client.Client
-
-	BeforeEach(func() {
-		var err error
-		c, err = loadClient()
-		Expect(err).NotTo(HaveOccurred())
-	})
+	//var c *client.Client
 
 	// First test because it has no dependencies on variables created later on.
 	It("should provide unchanging, static URL paths for kubernetes api services.", func() {
@@ -117,20 +146,21 @@ var _ = Describe("Networking", func() {
 
 	// Create a unique namespace for this test.
 	ns := "nettest-" + randomSuffix()
-	name := "nettest"
 
+	//Now we can proceed with the test.
 	It("should function for intra-pod communication", func() {
+
 		if testContext.Provider == "vagrant" {
 			By("Skipping test which is broken for vagrant (See https://github.com/GoogleCloudPlatform/kubernetes/issues/3580)")
 			return
 		}
 
-		By(fmt.Sprintf("Creating a service named [%s] in namespace %s", name, ns))
+		By(fmt.Sprintf("Creating a service named [%s] in namespace %s", svcname, ns))
 		svc, err := c.Services(ns).Create(&api.Service{
 			ObjectMeta: api.ObjectMeta{
-				Name: name,
+				Name: svcname,
 				Labels: map[string]string{
-					"name": name,
+					"name": svcname,
 				},
 			},
 			Spec: api.ServiceSpec{
@@ -140,7 +170,7 @@ var _ = Describe("Networking", func() {
 					TargetPort: util.NewIntOrStringFromInt(8080),
 				}},
 				Selector: map[string]string{
-					"name": name,
+					"name": svcname,
 				},
 			},
 		})
@@ -164,7 +194,7 @@ var _ = Describe("Networking", func() {
 			Failf("Failed to list nodes: %v", err)
 		}
 
-		podNames := LaunchNetTestPodPerNode(nodes, name, c, ns)
+		podNames := LaunchNetTestPodPerNode(nodes, svcname, c, ns)
 
 		// Clean up the pods
 		defer func() {
