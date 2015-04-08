@@ -115,6 +115,9 @@ type Config struct {
 	// If nil, the first result from net.InterfaceAddrs will be used.
 	PublicAddress net.IP
 
+	// The address to advertise for internal services.
+	ServiceAddress net.IP
+
 	// Control the interval that pod, node IP, and node heath status caches
 	// expire.
 	CacheTimeout time.Duration
@@ -150,6 +153,7 @@ type Master struct {
 	externalHost string
 	// clusterIP is the IP address of the master within the cluster.
 	clusterIP            net.IP
+	serviceIP            net.IP
 	publicReadOnlyPort   int
 	publicReadWritePort  int
 	serviceReadOnlyIP    net.IP
@@ -223,6 +227,9 @@ func setDefaults(c *Config) {
 		c.PublicAddress = hostIP
 		glog.Infof("Will report %v as public IP address.", c.PublicAddress)
 	}
+	if c.ServiceAddress == nil {
+		c.ServiceAddress = c.PublicAddress
+	}
 	if c.RequestContextMapper == nil {
 		c.RequestContextMapper = api.NewRequestContextMapper()
 	}
@@ -289,6 +296,7 @@ func New(c *Config) *Master {
 		masterCount:         c.MasterCount,
 		externalHost:        c.ExternalHost,
 		clusterIP:           c.PublicAddress,
+		serviceIP:           c.ServiceAddress,
 		publicReadOnlyPort:  c.ReadOnlyPort,
 		publicReadWritePort: c.ReadWritePort,
 		serviceReadOnlyIP:   serviceReadOnlyIP,

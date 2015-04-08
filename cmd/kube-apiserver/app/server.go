@@ -49,6 +49,7 @@ type APIServer struct {
 	InsecureBindAddress        util.IP
 	InsecurePort               int
 	BindAddress                util.IP
+	ServiceAddressOverride     util.IP
 	ReadOnlyPort               int
 	SecurePort                 int
 	ExternalHost               string
@@ -88,6 +89,7 @@ func NewAPIServer() *APIServer {
 		InsecurePort:           8080,
 		InsecureBindAddress:    util.IP(net.ParseIP("127.0.0.1")),
 		BindAddress:            util.IP(net.ParseIP("0.0.0.0")),
+		ServiceAddressOverride: util.IP(net.ParseIP("")),
 		ReadOnlyPort:           7080,
 		SecurePort:             6443,
 		APIRate:                10.0,
@@ -142,6 +144,8 @@ func (s *APIServer) AddFlags(fs *pflag.FlagSet) {
 		"File containing x509 Certificate for HTTPS.  (CA cert, if any, concatenated after server cert). "+
 		"If HTTPS serving is enabled, and --tls_cert_file and --tls_private_key_file are not provided, "+
 		"a self-signed certificate and key are generated for the public address and saved to /var/run/kubernetes.")
+	fs.Var(&s.ServiceAddressOverride, "service_address_override", "The address "+
+		"that cluster services will use for the apiserver.")
 	fs.StringVar(&s.TLSPrivateKeyFile, "tls_private_key_file", s.TLSPrivateKeyFile, "File containing x509 private key matching --tls_cert_file.")
 	fs.StringVar(&s.APIPrefix, "api_prefix", s.APIPrefix, "The prefix for API requests on the server. Default '/api'.")
 	fs.StringVar(&s.StorageVersion, "storage_version", s.StorageVersion, "The version to store resources with. Defaults to server preferred")
@@ -287,6 +291,7 @@ func (s *APIServer) Run(_ []string) error {
 		ReadOnlyPort:           s.ReadOnlyPort,
 		ReadWritePort:          s.SecurePort,
 		PublicAddress:          net.IP(s.BindAddress),
+		ServiceAddress:         net.IP(s.ServiceAddressOverride),
 		Authenticator:          authenticator,
 		Authorizer:             authorizer,
 		AdmissionControl:       admissionController,
