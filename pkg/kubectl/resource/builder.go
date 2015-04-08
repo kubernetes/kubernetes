@@ -230,6 +230,7 @@ func (b *Builder) SelectAllParam(selectAll bool) *Builder {
 // When two or more arguments are received, they must be a single type and resource name(s).
 // The allowEmptySelector permits to select all the resources (via Everything func).
 func (b *Builder) ResourceTypeOrNameArgs(allowEmptySelector bool, args ...string) *Builder {
+	args = b.replaceAliases(args)
 	if ok, err := hasCombinedTypeArgs(args); ok {
 		if err != nil {
 			b.errs = append(b.errs, err)
@@ -267,6 +268,18 @@ func (b *Builder) ResourceTypeOrNameArgs(allowEmptySelector bool, args ...string
 		b.errs = append(b.errs, fmt.Errorf("when passing arguments, must be resource or resource and name"))
 	}
 	return b
+}
+
+func (b *Builder) replaceAliases(args []string) []string {
+	replaced := []string{}
+	for _, arg := range args {
+		if aliases, ok := b.mapper.AliasesForResource(arg); ok {
+			arg = strings.Join(aliases, ",")
+		}
+		replaced = append(replaced, arg)
+	}
+
+	return replaced
 }
 
 func hasCombinedTypeArgs(args []string) (bool, error) {
