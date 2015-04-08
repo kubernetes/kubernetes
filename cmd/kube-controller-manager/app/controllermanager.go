@@ -86,7 +86,6 @@ func NewCMServer() *CMServer {
 		NodeMilliCPU:            1000,
 		NodeMemory:              resource.MustParse("3Gi"),
 		SyncNodeList:            true,
-		SyncNodeStatus:          false,
 		KubeletConfig: client.KubeletConfig{
 			Port:        ports.KubeletPort,
 			EnableHttps: true,
@@ -116,13 +115,16 @@ func (s *CMServer) AddFlags(fs *pflag.FlagSet) {
 		"The number of retries for initial node registration.  Retry interval equals node_sync_period.")
 	fs.Var(&s.MachineList, "machines", "List of machines to schedule onto, comma separated.")
 	fs.BoolVar(&s.SyncNodeList, "sync_nodes", s.SyncNodeList, "If true, and --cloud_provider is specified, sync nodes from the cloud provider. Default true.")
-	fs.BoolVar(&s.SyncNodeStatus, "sync_node_status", s.SyncNodeStatus, ""+
-		"If true, node controller sends probes to kubelet and updates NodeStatus."+
-		"If false, Kubelet posts NodeStatus to API server.")
-	fs.DurationVar(&s.NodeMonitorGracePeriod, "node_monitor_grace_period", 40*time.Second, "Amount of time which we allow running Node to be unresponsive before marking it unhealty."+
-		"Must be N times more than kubelet's nodeStatusUpdateFrequency, where N means number of retries allowed for kubelet to post node status.")
-	fs.DurationVar(&s.NodeStartupGracePeriod, "node_startup_grace_period", 60*time.Second, "Amount of time which we allow starting Node to be unresponsive before marking it unhealty.")
-	fs.DurationVar(&s.NodeMonitorPeriod, "node_monitor_period", 5*time.Second, "The period for syncing NodeStatus in NodeController.")
+	fs.BoolVar(&s.SyncNodeStatus, "sync_node_status", s.SyncNodeStatus,
+		"DEPRECATED. Does not have any effect now and it will be removed in a later release.")
+	fs.DurationVar(&s.NodeMonitorGracePeriod, "node_monitor_grace_period", 40*time.Second,
+		"Amount of time which we allow running Node to be unresponsive before marking it unhealty. "+
+			"Must be N times more than kubelet's nodeStatusUpdateFrequency, "+
+			"where N means number of retries allowed for kubelet to post node status.")
+	fs.DurationVar(&s.NodeStartupGracePeriod, "node_startup_grace_period", 60*time.Second,
+		"Amount of time which we allow starting Node to be unresponsive before marking it unhealty.")
+	fs.DurationVar(&s.NodeMonitorPeriod, "node_monitor_period", 5*time.Second,
+		"The period for syncing NodeStatus in NodeController.")
 	// TODO: Discover these by pinging the host machines, and rip out these flags.
 	// TODO: in the meantime, use resource.QuantityFlag() instead of these
 	fs.Int64Var(&s.NodeMilliCPU, "node_milli_cpu", s.NodeMilliCPU, "The amount of MilliCPU provisioned on each node")
@@ -188,10 +190,14 @@ func (s *CMServer) Run(_ []string) error {
 		},
 	}
 
+	if s.SyncNodeStatus {
+		glog.Warning("DEPRECATION NOTICE: sync_node_status flag is being deprecated. It has no effect now and it will be removed in a future version.")
+	}
+
 	nodeController := nodeControllerPkg.NewNodeController(cloud, s.MinionRegexp, s.MachineList, nodeResources,
 		kubeClient, kubeletClient, s.RegisterRetryCount, s.PodEvictionTimeout, util.NewTokenBucketRateLimiter(s.DeletingPodsQps, s.DeletingPodsBurst),
 		s.NodeMonitorGracePeriod, s.NodeStartupGracePeriod, s.NodeMonitorPeriod)
-	nodeController.Run(s.NodeSyncPeriod, s.SyncNodeList, s.SyncNodeStatus)
+	nodeController.Run(s.NodeSyncPeriod, s.SyncNodeList)
 
 	resourceQuotaManager := resourcequota.NewResourceQuotaManager(kubeClient)
 	resourceQuotaManager.Run(s.ResourceQuotaSyncPeriod)

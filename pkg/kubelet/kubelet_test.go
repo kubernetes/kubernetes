@@ -3080,7 +3080,7 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 					Type:               api.NodeReady,
 					Status:             api.ConditionTrue,
 					Reason:             fmt.Sprintf("kubelet is posting ready status"),
-					LastProbeTime:      util.Time{},
+					LastHeartbeatTime:  util.Time{},
 					LastTransitionTime: util.Time{},
 				},
 			},
@@ -3111,13 +3111,13 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 	if !ok {
 		t.Errorf("unexpected object type")
 	}
-	if updatedNode.Status.Conditions[0].LastProbeTime.IsZero() {
+	if updatedNode.Status.Conditions[0].LastHeartbeatTime.IsZero() {
 		t.Errorf("unexpected zero last probe timestamp")
 	}
 	if updatedNode.Status.Conditions[0].LastTransitionTime.IsZero() {
 		t.Errorf("unexpected zero last transition timestamp")
 	}
-	updatedNode.Status.Conditions[0].LastProbeTime = util.Time{}
+	updatedNode.Status.Conditions[0].LastHeartbeatTime = util.Time{}
 	updatedNode.Status.Conditions[0].LastTransitionTime = util.Time{}
 	if !reflect.DeepEqual(expectedNode, updatedNode) {
 		t.Errorf("unexpected objects: %s", util.ObjectDiff(expectedNode, updatedNode))
@@ -3138,7 +3138,7 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 						Type:               api.NodeReady,
 						Status:             api.ConditionTrue,
 						Reason:             fmt.Sprintf("kubelet is posting ready status"),
-						LastProbeTime:      util.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+						LastHeartbeatTime:  util.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
 						LastTransitionTime: util.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
 					},
 				},
@@ -3173,7 +3173,7 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 					Type:               api.NodeReady,
 					Status:             api.ConditionTrue,
 					Reason:             fmt.Sprintf("kubelet is posting ready status"),
-					LastProbeTime:      util.Time{}, // placeholder
+					LastHeartbeatTime:  util.Time{}, // placeholder
 					LastTransitionTime: util.Time{}, // placeholder
 				},
 			},
@@ -3205,14 +3205,14 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 		t.Errorf("unexpected object type")
 	}
 	// Expect LastProbeTime to be updated to Now, while LastTransitionTime to be the same.
-	if reflect.DeepEqual(updatedNode.Status.Conditions[0].LastProbeTime.Rfc3339Copy().UTC(), util.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC).Time) {
+	if reflect.DeepEqual(updatedNode.Status.Conditions[0].LastHeartbeatTime.Rfc3339Copy().UTC(), util.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC).Time) {
 		t.Errorf("expected \n%v\n, got \n%v", util.Now(), util.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC))
 	}
 	if !reflect.DeepEqual(updatedNode.Status.Conditions[0].LastTransitionTime.Rfc3339Copy().UTC(), util.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC).Time) {
 		t.Errorf("expected \n%#v\n, got \n%#v", updatedNode.Status.Conditions[0].LastTransitionTime.Rfc3339Copy(),
 			util.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC))
 	}
-	updatedNode.Status.Conditions[0].LastProbeTime = util.Time{}
+	updatedNode.Status.Conditions[0].LastHeartbeatTime = util.Time{}
 	updatedNode.Status.Conditions[0].LastTransitionTime = util.Time{}
 	if !reflect.DeepEqual(expectedNode, updatedNode) {
 		t.Errorf("expected \n%v\n, got \n%v", expectedNode, updatedNode)

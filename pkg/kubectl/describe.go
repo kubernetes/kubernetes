@@ -496,12 +496,12 @@ func describeNode(node *api.Node, pods []api.Pod, events *api.EventList) (string
 		fmt.Fprintf(out, "Labels:\t%s\n", formatLabels(node.Labels))
 		fmt.Fprintf(out, "CreationTimestamp:\t%s\n", node.CreationTimestamp.Time.Format(time.RFC1123Z))
 		if len(node.Status.Conditions) > 0 {
-			fmt.Fprint(out, "Conditions:\n  Type\tStatus\tLastProbeTime\tLastTransitionTime\tReason\tMessage\n")
+			fmt.Fprint(out, "Conditions:\n  Type\tStatus\tLastHeartbeatTime\tLastTransitionTime\tReason\tMessage\n")
 			for _, c := range node.Status.Conditions {
 				fmt.Fprintf(out, "  %v \t%v \t%s \t%s \t%v \t%v\n",
 					c.Type,
 					c.Status,
-					c.LastProbeTime.Time.Format(time.RFC1123Z),
+					c.LastHeartbeatTime.Time.Format(time.RFC1123Z),
 					c.LastTransitionTime.Time.Format(time.RFC1123Z),
 					c.Reason,
 					c.Message)

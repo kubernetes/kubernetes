@@ -1110,7 +1110,7 @@ const (
 type NodeCondition struct {
 	Type               NodeConditionType `json:"type" description:"type of node condition, one of Ready, Schedulable"`
 	Status             ConditionStatus   `json:"status" description:"status of the condition, one of Full, None, Unknown"`
-	LastProbeTime      util.Time         `json:"lastProbeTime,omitempty" description:"last time the condition was probed"`
+	LastHeartbeatTime  util.Time         `json:"lastHeartbeatTime,omitempty" description:"last time we got an update on a given condition"`
 	LastTransitionTime util.Time         `json:"lastTransitionTime,omitempty" description:"last time the condition transit from one status to another"`
 	Reason             string            `json:"reason,omitempty" description:"(brief) reason for the condition's last transition"`
 	Message            string            `json:"message,omitempty" description:"human readable message indicating details about last transition"`

@@ -224,7 +224,7 @@ func startComponents(firstManifestURL, secondManifestURL, apiVersion string) (st
 		}}
 
 	nodeController := nodeControllerPkg.NewNodeController(nil, "", machineList, nodeResources, cl, fakeKubeletClient{}, 10, 5*time.Minute, util.NewFakeRateLimiter(), 40*time.Second, 60*time.Second, 5*time.Second)
-	nodeController.Run(5*time.Second, true, false)
+	nodeController.Run(5*time.Second, true)
 	cadvisorInterface := new(cadvisor.Fake)
 
 	// Kubelet (localhost)

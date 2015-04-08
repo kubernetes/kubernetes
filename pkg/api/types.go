@@ -1113,7 +1113,7 @@ const (
 type NodeCondition struct {
 	Type               NodeConditionType `json:"type"`
 	Status             ConditionStatus   `json:"status"`
-	LastProbeTime      util.Time         `json:"lastProbeTime,omitempty"`
+	LastHeartbeatTime  util.Time         `json:"lastHeartbeatTime,omitempty"`
 	LastTransitionTime util.Time         `json:"lastTransitionTime,omitempty"`
 	Reason             string            `json:"reason,omitempty"`
 	Message            string            `json:"message,omitempty"`
