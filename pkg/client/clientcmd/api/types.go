@@ -49,6 +49,8 @@ type Preferences struct {
 
 // Cluster contains information about how to communicate with a kubernetes cluster
 type Cluster struct {
+	// LocationOfOrigin indicates where this object came from.  It is used for round tripping config post-merge, but never serialized.
+	LocationOfOrigin string
 	// Server is the address of the kubernetes cluster (https://hostname:port).
 	Server string `json:"server"`
 	// APIVersion is the preferred api version for communicating with the kubernetes cluster (v1beta1, v1beta2, v1beta3, etc).
@@ -65,6 +67,8 @@ type Cluster struct {
 
 // AuthInfo contains information that describes identity information.  This is use to tell the kubernetes cluster who you are.
 type AuthInfo struct {
+	// LocationOfOrigin indicates where this object came from.  It is used for round tripping config post-merge, but never serialized.
+	LocationOfOrigin string
 	// AuthPath is the path to a kubernetes auth file (~/.kubernetes_auth).  If you provide an AuthPath, the other options specified are ignored
 	AuthPath string `json:"auth-path,omitempty"`
 	// ClientCertificate is the path to a client cert file for TLS.
@@ -87,6 +91,8 @@ type AuthInfo struct {
 
 // Context is a tuple of references to a cluster (how do I communicate with a kubernetes cluster), a user (how do I identify myself), and a namespace (what subset of resources do I want to work with)
 type Context struct {
+	// LocationOfOrigin indicates where this object came from.  It is used for round tripping config post-merge, but never serialized.
+	LocationOfOrigin string
 	// Cluster is the name of the cluster for this context
 	Cluster string `json:"cluster"`
 	// AuthInfo is the name of the authInfo for this context

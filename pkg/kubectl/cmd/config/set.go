@@ -24,8 +24,6 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
-
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd"
 )
 
 const (
@@ -34,21 +32,21 @@ const (
 )
 
 type setOptions struct {
-	pathOptions   *pathOptions
+	pathOptions   *PathOptions
 	propertyName  string
 	propertyValue string
 }
 
-const set_long = `Sets an individual value in a .kubeconfig file
+const set_long = `Sets an individual value in a kubeconfig file
 PROPERTY_NAME is a dot delimited name where each token represents either a attribute name or a map key.  Map keys may not contain dots.
 PROPERTY_VALUE is the new value you wish to set.`
 
-func NewCmdConfigSet(out io.Writer, pathOptions *pathOptions) *cobra.Command {
+func NewCmdConfigSet(out io.Writer, pathOptions *PathOptions) *cobra.Command {
 	options := &setOptions{pathOptions: pathOptions}
 
 	cmd := &cobra.Command{
 		Use:   "set PROPERTY_NAME PROPERTY_VALUE",
-		Short: "Sets an individual value in a .kubeconfig file",
+		Short: "Sets an individual value in a kubeconfig file",
 		Long:  set_long,
 		Run: func(cmd *cobra.Command, args []string) {
 			if !options.complete(cmd) {
@@ -71,15 +69,10 @@ func (o setOptions) run() error {
 		return err
 	}
 
-	config, filename, err := o.pathOptions.getStartingConfig()
+	config, err := o.pathOptions.getStartingConfig()
 	if err != nil {
 		return err
 	}
-
-	if len(filename) == 0 {
-		return errors.New("cannot set property without using a specific file")
-	}
-
 	steps, err := newNavigationSteps(o.propertyName)
 	if err != nil {
 		return err
@@ -89,8 +82,7 @@ func (o setOptions) run() error {
 		return err
 	}
 
-	err = clientcmd.WriteToFile(*config, filename)
-	if err != nil {
+	if err := o.pathOptions.ModifyConfig(*config); err != nil {
 		return err
 	}
 
@@ -118,7 +110,7 @@ func (o setOptions) validate() error {
 		return errors.New("You must specify a property")
 	}
 
-	return nil
+	return o.pathOptions.Validate()
 }
 
 func modifyConfig(curr reflect.Value, steps *navigationSteps, propertyValue string, unset bool) error {

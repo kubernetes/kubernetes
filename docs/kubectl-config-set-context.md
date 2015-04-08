@@ -1,11 +1,11 @@
 ## kubectl config set-context
 
-Sets a context entry in .kubeconfig
+Sets a context entry in kubeconfig
 
 ### Synopsis
 
 
-Sets a context entry in .kubeconfig
+Sets a context entry in kubeconfig
 Specifying a name that already exists will merge new fields on top of existing values for those fields.
 
 ```
@@ -22,10 +22,10 @@ $ kubectl config set-context gce --user=cluster-admin
 ### Options
 
 ```
-      --cluster=: cluster for the context entry in .kubeconfig
+      --cluster=: cluster for the context entry in kubeconfig
   -h, --help=false: help for set-context
-      --namespace=: namespace for the context entry in .kubeconfig
-      --user=: user for the context entry in .kubeconfig
+      --namespace=: namespace for the context entry in kubeconfig
+      --user=: user for the context entry in kubeconfig
 ```
 
 ### Options inherrited from parent commands
@@ -38,11 +38,11 @@ $ kubectl config set-context gce --user=cluster-admin
       --client-certificate="": Path to a client key file for TLS.
       --client-key="": Path to a client key file for TLS.
       --context="": The name of the kubeconfig context to use
-      --envvar=false: use the .kubeconfig from $KUBECONFIG
-      --global=false: use the .kubeconfig from /home/username
+      --envvar=false: use the kubeconfig from $KUBECONFIG
+      --global=false: use the kubeconfig from /home/username/.kube/.kubeconfig
       --insecure-skip-tls-verify=false: If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure.
-      --kubeconfig="": use a particular .kubeconfig file
-      --local=false: use the .kubeconfig in the current directory
+      --kubeconfig="": use a particular kubeconfig file
+      --local=false: use the kubeconfig in the current directory
       --log_backtrace_at=:0: when logging hits line file:N, emit a stack trace
       --log_dir=: If non-empty, write log files in this directory
       --log_flush_frequency=5s: Maximum number of seconds between log flushes

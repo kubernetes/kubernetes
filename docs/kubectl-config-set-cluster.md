@@ -1,11 +1,11 @@
 ## kubectl config set-cluster
 
-Sets a cluster entry in .kubeconfig
+Sets a cluster entry in kubeconfig
 
 ### Synopsis
 
 
-Sets a cluster entry in .kubeconfig.
+Sets a cluster entry in kubeconfig.
 Specifying a name that already exists will merge new fields on top of existing values for those fields.
 
 ```
@@ -28,12 +28,12 @@ $ kubectl config set-cluster e2e --insecure-skip-tls-verify=true
 ### Options
 
 ```
-      --api-version=: api-version for the cluster entry in .kubeconfig
-      --certificate-authority=: path to certificate-authority for the cluster entry in .kubeconfig
-      --embed-certs=false: embed-certs for the cluster entry in .kubeconfig
+      --api-version=: api-version for the cluster entry in kubeconfig
+      --certificate-authority=: path to certificate-authority for the cluster entry in kubeconfig
+      --embed-certs=false: embed-certs for the cluster entry in kubeconfig
   -h, --help=false: help for set-cluster
-      --insecure-skip-tls-verify=false: insecure-skip-tls-verify for the cluster entry in .kubeconfig
-      --server=: server for the cluster entry in .kubeconfig
+      --insecure-skip-tls-verify=false: insecure-skip-tls-verify for the cluster entry in kubeconfig
+      --server=: server for the cluster entry in kubeconfig
 ```
 
 ### Options inherrited from parent commands
@@ -45,10 +45,10 @@ $ kubectl config set-cluster e2e --insecure-skip-tls-verify=true
       --client-key="": Path to a client key file for TLS.
       --cluster="": The name of the kubeconfig cluster to use
       --context="": The name of the kubeconfig context to use
-      --envvar=false: use the .kubeconfig from $KUBECONFIG
-      --global=false: use the .kubeconfig from /home/username
-      --kubeconfig="": use a particular .kubeconfig file
-      --local=false: use the .kubeconfig in the current directory
+      --envvar=false: use the kubeconfig from $KUBECONFIG
+      --global=false: use the kubeconfig from /home/username/.kube/.kubeconfig
+      --kubeconfig="": use a particular kubeconfig file
+      --local=false: use the kubeconfig in the current directory
       --log_backtrace_at=:0: when logging hits line file:N, emit a stack trace
       --log_dir=: If non-empty, write log files in this directory
       --log_flush_frequency=5s: Maximum number of seconds between log flushes

@@ -29,7 +29,7 @@ import (
 )
 
 type createContextOptions struct {
-	pathOptions *pathOptions
+	pathOptions *PathOptions
 	name        string
 	cluster     util.StringFlag
 	authInfo    util.StringFlag
@@ -37,18 +37,18 @@ type createContextOptions struct {
 }
 
 const (
-	create_context_long = `Sets a context entry in .kubeconfig
+	create_context_long = `Sets a context entry in kubeconfig
 Specifying a name that already exists will merge new fields on top of existing values for those fields.`
 	create_context_example = `// Set the user field on the gce context entry without touching other values
 $ kubectl config set-context gce --user=cluster-admin`
 )
 
-func NewCmdConfigSetContext(out io.Writer, pathOptions *pathOptions) *cobra.Command {
+func NewCmdConfigSetContext(out io.Writer, pathOptions *PathOptions) *cobra.Command {
 	options := &createContextOptions{pathOptions: pathOptions}
 
 	cmd := &cobra.Command{
 		Use:     fmt.Sprintf("set-context NAME [--%v=cluster_nickname] [--%v=user_nickname] [--%v=namespace]", clientcmd.FlagClusterName, clientcmd.FlagAuthInfoName, clientcmd.FlagNamespace),
-		Short:   "Sets a context entry in .kubeconfig",
+		Short:   "Sets a context entry in kubeconfig",
 		Long:    create_context_long,
 		Example: create_context_example,
 		Run: func(cmd *cobra.Command, args []string) {
@@ -63,9 +63,9 @@ func NewCmdConfigSetContext(out io.Writer, pathOptions *pathOptions) *cobra.Comm
 		},
 	}
 
-	cmd.Flags().Var(&options.cluster, clientcmd.FlagClusterName, clientcmd.FlagClusterName+" for the context entry in .kubeconfig")
-	cmd.Flags().Var(&options.authInfo, clientcmd.FlagAuthInfoName, clientcmd.FlagAuthInfoName+" for the context entry in .kubeconfig")
-	cmd.Flags().Var(&options.namespace, clientcmd.FlagNamespace, clientcmd.FlagNamespace+" for the context entry in .kubeconfig")
+	cmd.Flags().Var(&options.cluster, clientcmd.FlagClusterName, clientcmd.FlagClusterName+" for the context entry in kubeconfig")
+	cmd.Flags().Var(&options.authInfo, clientcmd.FlagAuthInfoName, clientcmd.FlagAuthInfoName+" for the context entry in kubeconfig")
+	cmd.Flags().Var(&options.namespace, clientcmd.FlagNamespace, clientcmd.FlagNamespace+" for the context entry in kubeconfig")
 
 	return cmd
 }
@@ -76,7 +76,7 @@ func (o createContextOptions) run() error {
 		return err
 	}
 
-	config, filename, err := o.pathOptions.getStartingConfig()
+	config, err := o.pathOptions.getStartingConfig()
 	if err != nil {
 		return err
 	}
@@ -84,8 +84,7 @@ func (o createContextOptions) run() error {
 	context := o.modifyContext(config.Contexts[o.name])
 	config.Contexts[o.name] = context
 
-	err = clientcmd.WriteToFile(*config, filename)
-	if err != nil {
+	if err := o.pathOptions.ModifyConfig(*config); err != nil {
 		return err
 	}
 
@@ -124,5 +123,5 @@ func (o createContextOptions) validate() error {
 		return errors.New("You must specify a non-empty context name")
 	}
 
-	return nil
+	return o.pathOptions.Validate()
 }

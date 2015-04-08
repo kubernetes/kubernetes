@@ -1,11 +1,11 @@
 ## kubectl config
 
-config modifies .kubeconfig files
+config modifies kubeconfig files
 
 ### Synopsis
 
 
-config modifies .kubeconfig files using subcommands like "kubectl config set current-context my-context"
+config modifies kubeconfig files using subcommands like "kubectl config set current-context my-context"
 
 ```
 kubectl config SUBCOMMAND
@@ -14,11 +14,11 @@ kubectl config SUBCOMMAND
 ### Options
 
 ```
-      --envvar=false: use the .kubeconfig from $KUBECONFIG
-      --global=false: use the .kubeconfig from /home/username
+      --envvar=false: use the kubeconfig from $KUBECONFIG
+      --global=false: use the kubeconfig from /home/username/.kube/.kubeconfig
   -h, --help=false: help for config
-      --kubeconfig="": use a particular .kubeconfig file
-      --local=false: use the .kubeconfig in the current directory
+      --kubeconfig="": use a particular kubeconfig file
+      --local=false: use the kubeconfig in the current directory
 ```
 
 ### Options inherrited from parent commands

@@ -1,11 +1,11 @@
 ## kubectl config view
 
-displays merged .kubeconfig settings or a specified .kubeconfig file.
+displays merged kubeconfig settings or a specified kubeconfig file.
 
 ### Synopsis
 
 
-displays merged .kubeconfig settings or a specified .kubeconfig file.
+displays merged kubeconfig settings or a specified kubeconfig file.
 
 You can use --output=template --template=TEMPLATE to extract specific values.
 
@@ -16,10 +16,10 @@ kubectl config view
 ### Examples
 
 ```
-// Show merged .kubeconfig settings.
+// Show merged kubeconfig settings.
 $ kubectl config view
 
-// Show only local ./.kubeconfig settings
+// Show only local kubeconfig settings
 $ kubectl config view --local
 
 // Get the password for the e2e user
@@ -30,7 +30,7 @@ $ kubectl config view -o template --template='{{range .users}}{{ if eq .name "e2
 
 ```
   -h, --help=false: help for view
-      --merge=true: merge together the full hierarchy of .kubeconfig files
+      --merge=true: merge together the full hierarchy of kubeconfig files
       --no-headers=false: When using the default output, don't print headers.
   -o, --output="": Output format. One of: json|yaml|template|templatefile.
       --output-version="": Output the formatted object with the given version (default api-version).
@@ -48,11 +48,11 @@ $ kubectl config view -o template --template='{{range .users}}{{ if eq .name "e2
       --client-key="": Path to a client key file for TLS.
       --cluster="": The name of the kubeconfig cluster to use
       --context="": The name of the kubeconfig context to use
-      --envvar=false: use the .kubeconfig from $KUBECONFIG
-      --global=false: use the .kubeconfig from /home/username
+      --envvar=false: use the kubeconfig from $KUBECONFIG
+      --global=false: use the kubeconfig from /home/username/.kube/.kubeconfig
       --insecure-skip-tls-verify=false: If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure.
-      --kubeconfig="": use a particular .kubeconfig file
-      --local=false: use the .kubeconfig in the current directory
+      --kubeconfig="": use a particular kubeconfig file
+      --local=false: use the kubeconfig in the current directory
       --log_backtrace_at=:0: when logging hits line file:N, emit a stack trace
       --log_dir=: If non-empty, write log files in this directory
       --log_flush_frequency=5s: Maximum number of seconds between log flushes

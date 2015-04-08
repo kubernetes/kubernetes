@@ -3,7 +3,7 @@
 
 .SH NAME
 .PP
-kubectl config view \- displays merged .kubeconfig settings or a specified .kubeconfig file.
+kubectl config view \- displays merged kubeconfig settings or a specified kubeconfig file.
 
 
 .SH SYNOPSIS
@@ -13,7 +13,7 @@ kubectl config view \- displays merged .kubeconfig settings or a specified .kube
 
 .SH DESCRIPTION
 .PP
-displays merged .kubeconfig settings or a specified .kubeconfig file.
+displays merged kubeconfig settings or a specified kubeconfig file.
 
 .PP
 You can use \-\-output=template \-\-template=TEMPLATE to extract specific values.
@@ -26,7 +26,7 @@ You can use \-\-output=template \-\-template=TEMPLATE to extract specific values
 
 .PP
 \fB\-\-merge\fP=true
-    merge together the full hierarchy of .kubeconfig files
+    merge together the full hierarchy of kubeconfig files
 
 .PP
 \fB\-\-no\-headers\fP=false
@@ -81,11 +81,11 @@ You can use \-\-output=template \-\-template=TEMPLATE to extract specific values
 
 .PP
 \fB\-\-envvar\fP=false
-    use the .kubeconfig from $KUBECONFIG
+    use the kubeconfig from $KUBECONFIG
 
 .PP
 \fB\-\-global\fP=false
-    use the .kubeconfig from /home/username
+    use the kubeconfig from /home/username/.kube/.kubeconfig
 
 .PP
 \fB\-\-insecure\-skip\-tls\-verify\fP=false
@@ -93,11 +93,11 @@ You can use \-\-output=template \-\-template=TEMPLATE to extract specific values
 
 .PP
 \fB\-\-kubeconfig\fP=""
-    use a particular .kubeconfig file
+    use a particular kubeconfig file
 
 .PP
 \fB\-\-local\fP=false
-    use the .kubeconfig in the current directory
+    use the kubeconfig in the current directory
 
 .PP
 \fB\-\-log\_backtrace\_at\fP=:0
@@ -165,10 +165,10 @@ You can use \-\-output=template \-\-template=TEMPLATE to extract specific values
 .RS
 
 .nf
-// Show merged .kubeconfig settings.
+// Show merged kubeconfig settings.
 $ kubectl config view
 
-// Show only local ./.kubeconfig settings
+// Show only local kubeconfig settings
 $ kubectl config view \-\-local
 
 // Get the password for the e2e user

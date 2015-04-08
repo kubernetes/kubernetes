@@ -1,11 +1,11 @@
 ## kubectl config set-credentials
 
-Sets a user entry in .kubeconfig
+Sets a user entry in kubeconfig
 
 ### Synopsis
 
 
-Sets a user entry in .kubeconfig
+Sets a user entry in kubeconfig
 Specifying a name that already exists will merge new fields on top of existing values.
 
   Client-certificate flags:
@@ -41,14 +41,14 @@ $ kubectl set-credentials cluster-admin --client-certificate=~/.kube/admin.crt -
 ### Options
 
 ```
-      --auth-path=: auth-path for the user entry in .kubeconfig
-      --client-certificate=: path to client-certificate for the user entry in .kubeconfig
-      --client-key=: path to client-key for the user entry in .kubeconfig
-      --embed-certs=false: embed client cert/key for the user entry in .kubeconfig
+      --auth-path=: auth-path for the user entry in kubeconfig
+      --client-certificate=: path to client-certificate for the user entry in kubeconfig
+      --client-key=: path to client-key for the user entry in kubeconfig
+      --embed-certs=false: embed client cert/key for the user entry in kubeconfig
   -h, --help=false: help for set-credentials
-      --password=: password for the user entry in .kubeconfig
-      --token=: token for the user entry in .kubeconfig
-      --username=: username for the user entry in .kubeconfig
+      --password=: password for the user entry in kubeconfig
+      --token=: token for the user entry in kubeconfig
+      --username=: username for the user entry in kubeconfig
 ```
 
 ### Options inherrited from parent commands
@@ -59,11 +59,11 @@ $ kubectl set-credentials cluster-admin --client-certificate=~/.kube/admin.crt -
       --certificate-authority="": Path to a cert. file for the certificate authority.
       --cluster="": The name of the kubeconfig cluster to use
       --context="": The name of the kubeconfig context to use
-      --envvar=false: use the .kubeconfig from $KUBECONFIG
-      --global=false: use the .kubeconfig from /home/username
+      --envvar=false: use the kubeconfig from $KUBECONFIG
+      --global=false: use the kubeconfig from /home/username/.kube/.kubeconfig
       --insecure-skip-tls-verify=false: If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure.
-      --kubeconfig="": use a particular .kubeconfig file
-      --local=false: use the .kubeconfig in the current directory
+      --kubeconfig="": use a particular kubeconfig file
+      --local=false: use the kubeconfig in the current directory
       --log_backtrace_at=:0: when logging hits line file:N, emit a stack trace
       --log_dir=: If non-empty, write log files in this directory
       --log_flush_frequency=5s: Maximum number of seconds between log flushes
