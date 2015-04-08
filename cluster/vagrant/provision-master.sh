@@ -155,6 +155,11 @@ if [[ ! -f /srv/salt-overlay/salt/nginx/htpasswd ]]; then
     "$MASTER_USER" "$MASTER_PASSWD"
 fi
 
+# Install docker, needed by "release install script" below.
+yum install -y docker-io
+systemctl enable docker
+systemctl start docker
+
 echo "Running release install script"
 rm -rf /kube-install
 mkdir -p /kube-install
