@@ -1124,7 +1124,9 @@ func (kl *Kubelet) computePodContainerChanges(pod *api.Pod, runningPod kubeconta
 		createPodInfraContainer = true
 	}
 
-	podStatus, err := kl.GetPodStatus(podFullName)
+	// Do not use the cache here since we need the newest status to check
+	// if we need to restart the container below.
+	podStatus, err := kl.generatePodStatus(podFullName)
 	if err != nil {
 		glog.Errorf("Unable to get pod with name %q and uid %q info with error(%v)", podFullName, uid, err)
 		return podContainerChangesSpec{}, err
