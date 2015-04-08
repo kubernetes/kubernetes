@@ -223,6 +223,10 @@ func FuzzerFor(t *testing.T, version string, src rand.Source) *fuzz.Fuzzer {
 				ss.TargetPort.StrVal = "x" + ss.TargetPort.StrVal // non-empty
 			}
 		},
+		func(n *api.Node, c fuzz.Continue) {
+			c.FuzzNoCustom(n)
+			n.Spec.ExternalID = "external"
+		},
 	)
 	return f
 }

@@ -135,3 +135,14 @@ func TestSetDefaultPodSpecHostNetwork(t *testing.T) {
 		t.Errorf("Expected container port to be defaulted, was made %d instead of %d", hostPortNum, portNum)
 	}
 }
+
+func TestSetDefaultNodeExternalID(t *testing.T) {
+	name := "node0"
+	n := &current.Node{}
+	n.Name = name
+	obj2 := roundTrip(t, runtime.Object(n))
+	n2 := obj2.(*current.Node)
+	if n2.Spec.ExternalID != name {
+		t.Errorf("Expected default External ID: %s, got: %s", name, n2.Spec.ExternalID)
+	}
+}

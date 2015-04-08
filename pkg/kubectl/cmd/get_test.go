@@ -320,6 +320,9 @@ func TestGetMultipleTypeObjectsWithDirectReference(t *testing.T) {
 		ObjectMeta: api.ObjectMeta{
 			Name: "foo",
 		},
+		Spec: api.NodeSpec{
+			ExternalID: "ext",
+		},
 	}
 
 	f, tf, codec := NewAPIFactory()
