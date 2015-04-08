@@ -1036,6 +1036,8 @@ type NodeSpec struct {
 	ExternalID string `json:"externalID,omitempty" description:"external ID assigned to the node by some machine database (e.g. a cloud provider). Defaults to node name when empty."`
 	// Unschedulable controls node schedulability of new pods. By default node is schedulable.
 	Unschedulable bool `json:"unschedulable,omitempty" description:"disable pod scheduling on the node"`
+	// Certificate is the public x.509 certificate that the node presents when asking to join the cluster.
+	Certificate []byte `json:certificate,omitempty" description:"public certificate for the node"`
 }
 
 // NodeSystemInfo is a set of ids/uuids to uniquely identify the node.

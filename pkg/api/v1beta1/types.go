@@ -1009,6 +1009,8 @@ type Minion struct {
 	PodCIDR string `json:"podCIDR,omitempty" description:"IP range assigned to the node"`
 	// Unschedulable controls node schedulability of new pods. By default node is schedulable.
 	Unschedulable bool `json:"unschedulable,omitempty" description:"disable pod scheduling on the node"`
+	// Certificate is the public x.509 certificate that the node presents when asking to join the cluster.
+	Certificate []byte `json:certificate,omitempty" description:"public certificate for the node"`
 	// Status describes the current status of a node
 	Status NodeStatus `json:"status,omitempty" description:"current status of node"`
 	// Labels for the node

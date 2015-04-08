@@ -233,6 +233,8 @@ func FuzzerFor(t *testing.T, version string, src rand.Source) *fuzz.Fuzzer {
 		func(n *api.Node, c fuzz.Continue) {
 			c.FuzzNoCustom(n)
 			n.Spec.ExternalID = "external"
+			// TODO(roberthbailey): Use a valid x.509 cert here?
+			n.Spec.Certificate = []byte{}
 		},
 	)
 	return f
