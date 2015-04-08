@@ -127,7 +127,7 @@ APISERVER_PID=$!
 
 # Wait for kube-apiserver to come up before launching the rest of the components.
 echo "Waiting for apiserver to come up"
-kube::util::wait_for_url "http://${API_HOST}:${API_PORT}/api/v1beta1/pods" "apiserver: " 1 10 || exit 1
+kube::util::wait_for_url "http://${API_HOST}:${API_PORT}/api/v1beta3/pods" "apiserver: " 1 10 || exit 1
 
 CTLRMGR_LOG=/tmp/kube-controller-manager.log
 sudo -E "${GO_OUT}/kube-controller-manager" \

@@ -59,7 +59,7 @@ func (t *testEventSink) Update(e *api.Event) (*api.Event, error) {
 func TestEventf(t *testing.T) {
 	testPod := &api.Pod{
 		ObjectMeta: api.ObjectMeta{
-			SelfLink:  "/api/v1beta1/pods/foo",
+			SelfLink:  "/api/version/pods/foo",
 			Name:      "foo",
 			Namespace: "baz",
 			UID:       "bar",
@@ -67,13 +67,12 @@ func TestEventf(t *testing.T) {
 	}
 	testPod2 := &api.Pod{
 		ObjectMeta: api.ObjectMeta{
-			SelfLink:  "/api/v1beta1/pods/foo",
+			SelfLink:  "/api/version/pods/foo",
 			Name:      "foo",
 			Namespace: "baz",
 			UID:       "differentUid",
 		},
 	}
-
 	testRef, err := api.GetPartialReference(testPod, "desiredState.manifest.containers[2]")
 	testRef2, err := api.GetPartialReference(testPod2, "desiredState.manifest.containers[3]")
 	if err != nil {
@@ -103,7 +102,7 @@ func TestEventf(t *testing.T) {
 					Name:       "foo",
 					Namespace:  "baz",
 					UID:        "bar",
-					APIVersion: "v1beta1",
+					APIVersion: "version",
 					FieldPath:  "desiredState.manifest.containers[2]",
 				},
 				Reason:  "Started",
@@ -111,7 +110,7 @@ func TestEventf(t *testing.T) {
 				Source:  api.EventSource{Component: "eventTest"},
 				Count:   1,
 			},
-			expectLog:    `Event(api.ObjectReference{Kind:"Pod", Namespace:"baz", Name:"foo", UID:"bar", APIVersion:"v1beta1", ResourceVersion:"", FieldPath:"desiredState.manifest.containers[2]"}): reason: 'Started' some verbose message: 1`,
+			expectLog:    `Event(api.ObjectReference{Kind:"Pod", Namespace:"baz", Name:"foo", UID:"bar", APIVersion:"version", ResourceVersion:"", FieldPath:"desiredState.manifest.containers[2]"}): reason: 'Started' some verbose message: 1`,
 			expectUpdate: false,
 		},
 		{
@@ -129,14 +128,14 @@ func TestEventf(t *testing.T) {
 					Name:       "foo",
 					Namespace:  "baz",
 					UID:        "bar",
-					APIVersion: "v1beta1",
+					APIVersion: "version",
 				},
 				Reason:  "Killed",
 				Message: "some other verbose message: 1",
 				Source:  api.EventSource{Component: "eventTest"},
 				Count:   1,
 			},
-			expectLog:    `Event(api.ObjectReference{Kind:"Pod", Namespace:"baz", Name:"foo", UID:"bar", APIVersion:"v1beta1", ResourceVersion:"", FieldPath:""}): reason: 'Killed' some other verbose message: 1`,
+			expectLog:    `Event(api.ObjectReference{Kind:"Pod", Namespace:"baz", Name:"foo", UID:"bar", APIVersion:"version", ResourceVersion:"", FieldPath:""}): reason: 'Killed' some other verbose message: 1`,
 			expectUpdate: false,
 		},
 		{
@@ -154,7 +153,7 @@ func TestEventf(t *testing.T) {
 					Name:       "foo",
 					Namespace:  "baz",
 					UID:        "bar",
-					APIVersion: "v1beta1",
+					APIVersion: "version",
 					FieldPath:  "desiredState.manifest.containers[2]",
 				},
 				Reason:  "Started",
@@ -162,7 +161,7 @@ func TestEventf(t *testing.T) {
 				Source:  api.EventSource{Component: "eventTest"},
 				Count:   2,
 			},
-			expectLog:    `Event(api.ObjectReference{Kind:"Pod", Namespace:"baz", Name:"foo", UID:"bar", APIVersion:"v1beta1", ResourceVersion:"", FieldPath:"desiredState.manifest.containers[2]"}): reason: 'Started' some verbose message: 1`,
+			expectLog:    `Event(api.ObjectReference{Kind:"Pod", Namespace:"baz", Name:"foo", UID:"bar", APIVersion:"version", ResourceVersion:"", FieldPath:"desiredState.manifest.containers[2]"}): reason: 'Started' some verbose message: 1`,
 			expectUpdate: true,
 		},
 		{
@@ -180,7 +179,7 @@ func TestEventf(t *testing.T) {
 					Name:       "foo",
 					Namespace:  "baz",
 					UID:        "differentUid",
-					APIVersion: "v1beta1",
+					APIVersion: "version",
 					FieldPath:  "desiredState.manifest.containers[3]",
 				},
 				Reason:  "Started",
@@ -188,7 +187,7 @@ func TestEventf(t *testing.T) {
 				Source:  api.EventSource{Component: "eventTest"},
 				Count:   1,
 			},
-			expectLog:    `Event(api.ObjectReference{Kind:"Pod", Namespace:"baz", Name:"foo", UID:"differentUid", APIVersion:"v1beta1", ResourceVersion:"", FieldPath:"desiredState.manifest.containers[3]"}): reason: 'Started' some verbose message: 1`,
+			expectLog:    `Event(api.ObjectReference{Kind:"Pod", Namespace:"baz", Name:"foo", UID:"differentUid", APIVersion:"version", ResourceVersion:"", FieldPath:"desiredState.manifest.containers[3]"}): reason: 'Started' some verbose message: 1`,
 			expectUpdate: false,
 		},
 		{
@@ -206,7 +205,7 @@ func TestEventf(t *testing.T) {
 					Name:       "foo",
 					Namespace:  "baz",
 					UID:        "bar",
-					APIVersion: "v1beta1",
+					APIVersion: "version",
 					FieldPath:  "desiredState.manifest.containers[2]",
 				},
 				Reason:  "Started",
@@ -214,7 +213,7 @@ func TestEventf(t *testing.T) {
 				Source:  api.EventSource{Component: "eventTest"},
 				Count:   3,
 			},
-			expectLog:    `Event(api.ObjectReference{Kind:"Pod", Namespace:"baz", Name:"foo", UID:"bar", APIVersion:"v1beta1", ResourceVersion:"", FieldPath:"desiredState.manifest.containers[2]"}): reason: 'Started' some verbose message: 1`,
+			expectLog:    `Event(api.ObjectReference{Kind:"Pod", Namespace:"baz", Name:"foo", UID:"bar", APIVersion:"version", ResourceVersion:"", FieldPath:"desiredState.manifest.containers[2]"}): reason: 'Started' some verbose message: 1`,
 			expectUpdate: true,
 		},
 		{
@@ -232,7 +231,7 @@ func TestEventf(t *testing.T) {
 					Name:       "foo",
 					Namespace:  "baz",
 					UID:        "differentUid",
-					APIVersion: "v1beta1",
+					APIVersion: "version",
 					FieldPath:  "desiredState.manifest.containers[3]",
 				},
 				Reason:  "Stopped",
@@ -240,7 +239,7 @@ func TestEventf(t *testing.T) {
 				Source:  api.EventSource{Component: "eventTest"},
 				Count:   1,
 			},
-			expectLog:    `Event(api.ObjectReference{Kind:"Pod", Namespace:"baz", Name:"foo", UID:"differentUid", APIVersion:"v1beta1", ResourceVersion:"", FieldPath:"desiredState.manifest.containers[3]"}): reason: 'Stopped' some verbose message: 1`,
+			expectLog:    `Event(api.ObjectReference{Kind:"Pod", Namespace:"baz", Name:"foo", UID:"differentUid", APIVersion:"version", ResourceVersion:"", FieldPath:"desiredState.manifest.containers[3]"}): reason: 'Stopped' some verbose message: 1`,
 			expectUpdate: false,
 		},
 		{
@@ -258,7 +257,7 @@ func TestEventf(t *testing.T) {
 					Name:       "foo",
 					Namespace:  "baz",
 					UID:        "differentUid",
-					APIVersion: "v1beta1",
+					APIVersion: "version",
 					FieldPath:  "desiredState.manifest.containers[3]",
 				},
 				Reason:  "Stopped",
@@ -266,7 +265,7 @@ func TestEventf(t *testing.T) {
 				Source:  api.EventSource{Component: "eventTest"},
 				Count:   2,
 			},
-			expectLog:    `Event(api.ObjectReference{Kind:"Pod", Namespace:"baz", Name:"foo", UID:"differentUid", APIVersion:"v1beta1", ResourceVersion:"", FieldPath:"desiredState.manifest.containers[3]"}): reason: 'Stopped' some verbose message: 1`,
+			expectLog:    `Event(api.ObjectReference{Kind:"Pod", Namespace:"baz", Name:"foo", UID:"differentUid", APIVersion:"version", ResourceVersion:"", FieldPath:"desiredState.manifest.containers[3]"}): reason: 'Stopped' some verbose message: 1`,
 			expectUpdate: true,
 		},
 	}
@@ -350,7 +349,7 @@ func TestWriteEventError(t *testing.T) {
 		Name:       "foo",
 		Namespace:  "baz",
 		UID:        "bar",
-		APIVersion: "v1beta1",
+		APIVersion: "version",
 	}
 	type entry struct {
 		timesToSendError int
@@ -455,7 +454,7 @@ func TestLotsOfEvents(t *testing.T) {
 		Name:       "foo",
 		Namespace:  "baz",
 		UID:        "bar",
-		APIVersion: "v1beta1",
+		APIVersion: "version",
 	}
 	for i := 0; i < maxQueuedEvents; i++ {
 		go recorder.Eventf(ref, "Reason", strconv.Itoa(i))
