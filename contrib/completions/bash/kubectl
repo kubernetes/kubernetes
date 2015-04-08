@@ -122,7 +122,11 @@ __handle_command()
     __debug "${FUNCNAME}: c is $c words[c] is ${words[c]}"
 
     local next_command
-    next_command="_${last_command}_${words[c]}"
+    if [[ -n ${last_command} ]]; then
+        next_command="_${last_command}_${words[c]}"
+    else
+        next_command="_${words[c]}"
+    fi
     c=$((c+1))
     __debug "${FUNCNAME}: looking for ${next_command}"
     declare -F $next_command >/dev/null && $next_command
@@ -238,19 +242,19 @@ _kubectl_get()
 
     must_have_one_flag=()
     must_have_one_noun=()
-    must_have_one_noun+=("service")
-    must_have_one_noun+=("replicationcontroller")
-    must_have_one_noun+=("endpoints")
-    must_have_one_noun+=("node")
-    must_have_one_noun+=("secret")
-    must_have_one_noun+=("status")
     must_have_one_noun+=("limitrange")
-    must_have_one_noun+=("persistentvolumeclaim")
-    must_have_one_noun+=("persistentvolume")
-    must_have_one_noun+=("pod")
-    must_have_one_noun+=("event")
     must_have_one_noun+=("resourcequota")
+    must_have_one_noun+=("persistentvolume")
+    must_have_one_noun+=("service")
+    must_have_one_noun+=("event")
     must_have_one_noun+=("namespace")
+    must_have_one_noun+=("pod")
+    must_have_one_noun+=("secret")
+    must_have_one_noun+=("replicationcontroller")
+    must_have_one_noun+=("node")
+    must_have_one_noun+=("status")
+    must_have_one_noun+=("persistentvolumeclaim")
+    must_have_one_noun+=("endpoints")
 }
 
 _kubectl_describe()
@@ -268,15 +272,15 @@ _kubectl_describe()
 
     must_have_one_flag=()
     must_have_one_noun=()
-    must_have_one_noun+=("pod")
-    must_have_one_noun+=("service")
     must_have_one_noun+=("persistentvolume")
     must_have_one_noun+=("persistentvolumeclaim")
+    must_have_one_noun+=("pod")
+    must_have_one_noun+=("service")
+    must_have_one_noun+=("node")
+    must_have_one_noun+=("limitrange")
     must_have_one_noun+=("resourcequota")
     must_have_one_noun+=("replicationcontroller")
     must_have_one_noun+=("minion")
-    must_have_one_noun+=("node")
-    must_have_one_noun+=("limitrange")
 }
 
 _kubectl_create()
