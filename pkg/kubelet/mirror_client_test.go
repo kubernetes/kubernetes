@@ -34,7 +34,7 @@ type fakeMirrorClient struct {
 	deleteCounts map[string]int
 }
 
-func (self *fakeMirrorClient) CreateMirrorPod(pod api.Pod, _ string) error {
+func (self *fakeMirrorClient) CreateMirrorPod(pod api.Pod) error {
 	self.mirrorPodLock.Lock()
 	defer self.mirrorPodLock.Unlock()
 	podFullName := kubecontainer.GetPodFullName(&pod)
