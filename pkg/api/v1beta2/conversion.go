@@ -1124,6 +1124,9 @@ func init() {
 			if err := s.Convert(&in.GCEPersistentDisk, &out.GCEPersistentDisk, 0); err != nil {
 				return err
 			}
+			if err := s.Convert(&in.AWSElasticBlockStore, &out.AWSElasticBlockStore, 0); err != nil {
+				return err
+			}
 			if err := s.Convert(&in.ISCSI, &out.ISCSI, 0); err != nil {
 				return err
 			}
