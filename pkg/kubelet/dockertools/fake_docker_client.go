@@ -31,19 +31,20 @@ import (
 // FakeDockerClient is a simple fake docker client, so that kubelet can be run for testing without requiring a real docker setup.
 type FakeDockerClient struct {
 	sync.Mutex
-	ContainerList []docker.APIContainers
-	Container     *docker.Container
-	ContainerMap  map[string]*docker.Container
-	Image         *docker.Image
-	Images        []docker.APIImages
-	Err           error
-	called        []string
-	Stopped       []string
-	pulled        []string
-	Created       []string
-	Removed       []string
-	RemovedImages util.StringSet
-	VersionInfo   docker.Env
+	ContainerList       []docker.APIContainers
+	ExitedContainerList []docker.APIContainers
+	Container           *docker.Container
+	ContainerMap        map[string]*docker.Container
+	Image               *docker.Image
+	Images              []docker.APIImages
+	Err                 error
+	called              []string
+	Stopped             []string
+	pulled              []string
+	Created             []string
+	Removed             []string
+	RemovedImages       util.StringSet
+	VersionInfo         docker.Env
 }
 
 func (f *FakeDockerClient) ClearCalls() {
@@ -67,17 +68,48 @@ func (f *FakeDockerClient) AssertCalls(calls []string) (err error) {
 	return
 }
 
+func (f *FakeDockerClient) AssertCreated(created []string) error {
+	f.Lock()
+	defer f.Unlock()
+
+	actualCreated := []string{}
+	for _, c := range f.Created {
+		dockerName, _, err := ParseDockerName(c)
+		if err != nil {
+			return fmt.Errorf("unexpected error: %v", err)
+		}
+		actualCreated = append(actualCreated, dockerName.ContainerName)
+	}
+	sort.StringSlice(created).Sort()
+	sort.StringSlice(actualCreated).Sort()
+	if !reflect.DeepEqual(created, actualCreated) {
+		return fmt.Errorf("expected %#v, got %#v", created, actualCreated)
+	}
+	return nil
+}
+
+func (f *FakeDockerClient) AssertStopped(stopped []string) error {
+	f.Lock()
+	defer f.Unlock()
+	sort.StringSlice(stopped).Sort()
+	sort.StringSlice(f.Stopped).Sort()
+	if !reflect.DeepEqual(stopped, f.Stopped) {
+		return fmt.Errorf("expected %#v, got %#v", stopped, f.Stopped)
+	}
+	return nil
+}
+
 func (f *FakeDockerClient) AssertUnorderedCalls(calls []string) (err error) {
 	f.Lock()
 	defer f.Unlock()
 
-	actual := make([]string, len(calls))
-	expected := make([]string, len(f.called))
-	copy(actual, calls)
-	copy(expected, f.called)
+	expected := make([]string, len(calls))
+	actual := make([]string, len(f.called))
+	copy(expected, calls)
+	copy(actual, f.called)
 
-	sort.StringSlice(actual).Sort()
 	sort.StringSlice(expected).Sort()
+	sort.StringSlice(actual).Sort()
 
 	if !reflect.DeepEqual(actual, expected) {
 		err = fmt.Errorf("expected(sorted) %#v, got(sorted) %#v", expected, actual)
@@ -91,6 +123,10 @@ func (f *FakeDockerClient) ListContainers(options docker.ListContainersOptions) 
 	f.Lock()
 	defer f.Unlock()
 	f.called = append(f.called, "list")
+
+	if options.All {
+		return append(f.ContainerList, f.ExitedContainerList...), f.Err
+	}
 	return f.ContainerList, f.Err
 }
 

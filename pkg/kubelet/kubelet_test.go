@@ -671,7 +671,7 @@ func TestSyncPodsWithPodInfraCreatesContainer(t *testing.T) {
 	waitGroup.Wait()
 
 	verifyCalls(t, fakeDocker, []string{
-		"list", "list", "list", "inspect_container", "list", "create", "start", "list", "inspect_container", "inspect_container"})
+		"list", "list", "list", "inspect_container", "create", "start", "list", "inspect_container", "inspect_container"})
 
 	fakeDocker.Lock()
 	if len(fakeDocker.Created) != 1 ||
@@ -730,7 +730,7 @@ func TestSyncPodsWithPodInfraCreatesContainerCallsHandler(t *testing.T) {
 	waitGroup.Wait()
 
 	verifyCalls(t, fakeDocker, []string{
-		"list", "list", "list", "inspect_container", "list", "create", "start", "list", "inspect_container", "inspect_container"})
+		"list", "list", "list", "inspect_container", "create", "start", "list", "inspect_container", "inspect_container"})
 
 	fakeDocker.Lock()
 	if len(fakeDocker.Created) != 1 ||
@@ -801,7 +801,13 @@ func TestSyncPodsDeletesWithNoPodInfraContainer(t *testing.T) {
 	waitGroup.Wait()
 
 	verifyUnorderedCalls(t, fakeDocker, []string{
-		"list", "list", "list", "list", "inspect_container", "inspect_container", "list", "inspect_container", "inspect_container", "stop", "create", "start", "inspect_container", "create", "start", "list", "inspect_container", "inspect_container"})
+		"list",
+		// foo1
+		"list", "list", "inspect_container", "stop", "create", "start", "inspect_container", "create", "start", "list", "inspect_container", "inspect_container",
+
+		// foo2
+		"list", "list", "inspect_container", "inspect_container", "list", "inspect_container", "inspect_container",
+	})
 
 	// A map iteration is used to delete containers, so must not depend on
 	// order here.
@@ -1632,7 +1638,7 @@ func TestSyncPodEventHandlerFails(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	verifyCalls(t, fakeDocker, []string{"list", "list", "create", "start", "stop", "list"})
+	verifyCalls(t, fakeDocker, []string{"list", "create", "start", "stop", "list"})
 
 	if len(fakeDocker.Stopped) != 1 {
 		t.Errorf("Wrong containers were stopped: %v", fakeDocker.Stopped)
@@ -1649,8 +1655,8 @@ func TestSyncPodsWithPullPolicy(t *testing.T) {
 	puller.HasImages = []string{"existing_one", "want:latest"}
 	kubelet.podInfraContainerImage = "custom_image_name"
 	fakeDocker.ContainerList = []docker.APIContainers{}
-	waitGroup.Add(1)
-	err := kubelet.SyncPods([]api.Pod{
+
+	pods := []api.Pod{
 		{
 			ObjectMeta: api.ObjectMeta{
 				UID:       "12345678",
@@ -1667,7 +1673,10 @@ func TestSyncPodsWithPullPolicy(t *testing.T) {
 				},
 			},
 		},
-	}, emptyPodUIDs, map[string]api.Pod{}, time.Now())
+	}
+	kubelet.podManager.SetPods(pods)
+	waitGroup.Add(1)
+	err := kubelet.SyncPods(pods, emptyPodUIDs, map[string]api.Pod{}, time.Now())
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -3442,6 +3451,7 @@ func TestHostNetworkAllowed(t *testing.T) {
 			HostNetwork: true,
 		},
 	}
+	kubelet.podManager.SetPods([]api.Pod{*pod})
 	err := kubelet.syncPod(pod, nil, container.Pod{})
 	if err != nil {
 		t.Errorf("expected pod infra creation to succeed: %v", err)
@@ -3474,5 +3484,124 @@ func TestHostNetworkDisallowed(t *testing.T) {
 	err := kubelet.syncPod(pod, nil, container.Pod{})
 	if err == nil {
 		t.Errorf("expected pod infra creation to fail")
+	}
+}
+
+func TestSyncPodsWithRestartPolicy(t *testing.T) {
+	testKubelet := newTestKubelet(t)
+	testKubelet.fakeCadvisor.On("MachineInfo").Return(&cadvisorApi.MachineInfo{}, nil)
+	kubelet := testKubelet.kubelet
+	fakeDocker := testKubelet.fakeDocker
+	waitGroup := testKubelet.waitGroup
+
+	containers := []api.Container{
+		{Name: "succeeded"},
+		{Name: "failed"},
+	}
+
+	runningAPIContainers := []docker.APIContainers{
+		{
+			// pod infra container
+			Names: []string{"/k8s_POD_foo_new_12345678_0"},
+			ID:    "9876",
+		},
+	}
+	exitedAPIContainers := []docker.APIContainers{
+		{
+			// format is // k8s_<container-id>_<pod-fullname>_<pod-uid>
+			Names: []string{"/k8s_succeeded." + strconv.FormatUint(dockertools.HashContainer(&containers[0]), 16) + "_foo_new_12345678_0"},
+			ID:    "1234",
+		},
+		{
+			// format is // k8s_<container-id>_<pod-fullname>_<pod-uid>
+			Names: []string{"/k8s_failed." + strconv.FormatUint(dockertools.HashContainer(&containers[1]), 16) + "_foo_new_12345678_0"},
+			ID:    "5678",
+		},
+	}
+
+	containerMap := map[string]*docker.Container{
+		"1234": {
+			ID:     "1234",
+			Name:   "succeeded",
+			Config: &docker.Config{},
+			State: docker.State{
+				ExitCode:   0,
+				StartedAt:  time.Now(),
+				FinishedAt: time.Now(),
+			},
+		},
+		"5678": {
+			ID:     "5678",
+			Name:   "failed",
+			Config: &docker.Config{},
+			State: docker.State{
+				ExitCode:   42,
+				StartedAt:  time.Now(),
+				FinishedAt: time.Now(),
+			},
+		},
+	}
+
+	tests := []struct {
+		policy  api.RestartPolicy
+		calls   []string
+		created []string
+		stopped []string
+	}{
+		{
+			api.RestartPolicyAlways,
+			[]string{"list", "list", "list", "inspect_container", "inspect_container", "inspect_container", "create", "start", "create", "start", "list", "inspect_container", "inspect_container", "inspect_container"},
+			[]string{"succeeded", "failed"},
+			[]string{},
+		},
+		{
+			api.RestartPolicyOnFailure,
+			[]string{"list", "list", "list", "inspect_container", "inspect_container", "inspect_container", "create", "start", "list", "inspect_container", "inspect_container", "inspect_container"},
+			[]string{"failed"},
+			[]string{},
+		},
+		{
+			api.RestartPolicyNever,
+			[]string{"list", "list", "list", "inspect_container", "inspect_container", "inspect_container", "stop", "list", "inspect_container", "inspect_container"},
+			[]string{},
+			[]string{"9876"},
+		},
+	}
+
+	for i, tt := range tests {
+		fakeDocker.ContainerList = runningAPIContainers
+		fakeDocker.ExitedContainerList = exitedAPIContainers
+		fakeDocker.ContainerMap = containerMap
+		fakeDocker.ClearCalls()
+		pods := []api.Pod{
+			{
+				ObjectMeta: api.ObjectMeta{
+					UID:       "12345678",
+					Name:      "foo",
+					Namespace: "new",
+				},
+				Spec: api.PodSpec{
+					Containers:    containers,
+					RestartPolicy: tt.policy,
+				},
+			},
+		}
+		kubelet.podManager.SetPods(pods)
+		waitGroup.Add(1)
+		err := kubelet.SyncPods(pods, emptyPodUIDs, map[string]api.Pod{}, time.Now())
+		if err != nil {
+			t.Errorf("%d: unexpected error: %v", i, err)
+		}
+		waitGroup.Wait()
+
+		// 'stop' is because the pod infra container is killed when no container is running.
+		verifyCalls(t, fakeDocker, tt.calls)
+
+		if err := fakeDocker.AssertCreated(tt.created); err != nil {
+			t.Errorf("%d: %v", i, err)
+		}
+		if err := fakeDocker.AssertStopped(tt.stopped); err != nil {
+			t.Errorf("%d: %v", i, err)
+		}
 	}
 }

@@ -74,6 +74,9 @@ func (d *testDocker) InspectContainer(id string) (*docker.Container, error) {
 func TestRunOnce(t *testing.T) {
 	cadvisor := &cadvisor.Mock{}
 	cadvisor.On("MachineInfo").Return(&cadvisorApi.MachineInfo{}, nil)
+
+	podManager, _ := newFakePodManager()
+
 	kb := &Kubelet{
 		rootDirectory:       "/tmp/kubelet",
 		recorder:            &record.FakeRecorder{},
@@ -81,6 +84,8 @@ func TestRunOnce(t *testing.T) {
 		nodeLister:          testNodeLister{},
 		statusManager:       newStatusManager(nil),
 		containerRefManager: kubecontainer.NewRefManager(),
+		readinessManager:    kubecontainer.NewReadinessManager(),
+		podManager:          podManager,
 	}
 
 	kb.networkPlugin, _ = network.InitNetworkPlugin([]network.NetworkPlugin{}, "", network.NewFakeHost(nil))
@@ -141,7 +146,8 @@ func TestRunOnce(t *testing.T) {
 	}
 	kb.dockerPuller = &dockertools.FakeDockerPuller{}
 	kb.containerManager = dockertools.NewDockerManager(kb.dockerClient, kb.recorder)
-	results, err := kb.runOnce([]api.Pod{
+
+	pods := []api.Pod{
 		{
 			ObjectMeta: api.ObjectMeta{
 				UID:       "12345678",
@@ -154,7 +160,9 @@ func TestRunOnce(t *testing.T) {
 				},
 			},
 		},
-	}, time.Millisecond)
+	}
+	podManager.SetPods(pods)
+	results, err := kb.runOnce(pods, time.Millisecond)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
