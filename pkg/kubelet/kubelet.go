@@ -172,7 +172,7 @@ func NewMainKubelet(
 		listWatch := &cache.ListWatch{
 			ListFunc: func() (runtime.Object, error) {
 				// TODO: Use List() with fieldSelector when it is supported.
-				return kubeClient.Nodes().List()
+				return kubeClient.Nodes().List(labels.Everything())
 			},
 			WatchFunc: func(resourceVersion string) (watch.Interface, error) {
 				return kubeClient.Nodes().Watch(labels.Everything(), fieldSelector, resourceVersion)

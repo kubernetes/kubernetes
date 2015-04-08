@@ -163,7 +163,7 @@ func ClusterLevelLoggingWithElasticsearch(c *client.Client) {
 	}
 
 	// Obtain a list of nodes so we can place one synthetic logger on each node.
-	nodes, err := c.Nodes().List()
+	nodes, err := c.Nodes().List(labels.Everything())
 	if err != nil {
 		Failf("Failed to list nodes: %v", err)
 	}

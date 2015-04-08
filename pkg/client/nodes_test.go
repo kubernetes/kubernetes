@@ -17,11 +17,13 @@ limitations under the License.
 package client
 
 import (
+	"net/url"
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 )
 
 func getNodesResourceName() string {
@@ -30,6 +32,7 @@ func getNodesResourceName() string {
 	}
 	return "nodes"
 }
+
 func TestListMinions(t *testing.T) {
 	c := &testClient{
 		Request: testRequest{
@@ -38,8 +41,39 @@ func TestListMinions(t *testing.T) {
 		},
 		Response: Response{StatusCode: 200, Body: &api.NodeList{ListMeta: api.ListMeta{ResourceVersion: "1"}}},
 	}
-	response, err := c.Setup().Nodes().List()
+	response, err := c.Setup().Nodes().List(labels.Everything())
 	c.Validate(t, response, err)
+}
+
+func TestListMinionsLabels(t *testing.T) {
+	ns := api.NamespaceNone
+	labelSelectorQueryParamName := api.LabelSelectorQueryParam(testapi.Version())
+	c := &testClient{
+		Request: testRequest{
+			Method: "GET",
+			Path:   testapi.ResourcePath(getNodesResourceName(), "", ""),
+			Query:  buildQueryValues(ns, url.Values{labelSelectorQueryParamName: []string{"foo=bar,name=baz"}})},
+		Response: Response{
+			StatusCode: 200,
+			Body: &api.NodeList{
+				Items: []api.Node{
+					{
+						ObjectMeta: api.ObjectMeta{
+							Labels: map[string]string{
+								"foo":  "bar",
+								"name": "baz",
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	c.Setup()
+	c.QueryValidator[labelSelectorQueryParamName] = validateLabels
+	selector := labels.Set{"foo": "bar", "name": "baz"}.AsSelector()
+	receivedNodeList, err := c.Nodes().List(selector)
+	c.Validate(t, receivedNodeList, err)
 }
 
 func TestGetMinion(t *testing.T) {
@@ -56,12 +90,12 @@ func TestGetMinion(t *testing.T) {
 
 func TestGetMinionWithNoName(t *testing.T) {
 	c := &testClient{Error: true}
-	receivedPod, err := c.Setup().Nodes().Get("")
+	receivedNode, err := c.Setup().Nodes().Get("")
 	if (err != nil) && (err.Error() != nameRequiredError) {
 		t.Errorf("Expected error: %v, but got %v", nameRequiredError, err)
 	}
 
-	c.Validate(t, receivedPod, err)
+	c.Validate(t, receivedNode, err)
 }
 
 func TestCreateMinion(t *testing.T) {

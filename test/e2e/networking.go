@@ -23,6 +23,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 
 	. "github.com/onsi/ginkgo"
@@ -159,7 +160,7 @@ var _ = Describe("Networking", func() {
 
 		By("Creating a webserver (pending) pod on each node")
 
-		nodes, err := c.Nodes().List()
+		nodes, err := c.Nodes().List(labels.Everything())
 		if err != nil {
 			Failf("Failed to list nodes: %v", err)
 		}

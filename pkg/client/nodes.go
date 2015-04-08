@@ -32,7 +32,7 @@ type NodesInterface interface {
 type NodeInterface interface {
 	Get(name string) (result *api.Node, err error)
 	Create(node *api.Node) (*api.Node, error)
-	List() (*api.NodeList, error)
+	List(selector labels.Selector) (*api.NodeList, error)
 	Delete(name string) error
 	Update(*api.Node) (*api.Node, error)
 	Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error)
@@ -64,10 +64,10 @@ func (c *nodes) Create(node *api.Node) (*api.Node, error) {
 	return result, err
 }
 
-// List lists all the nodes in the cluster.
-func (c *nodes) List() (*api.NodeList, error) {
+// List takes a selector, and returns the list of nodes that match that selector in the cluster.
+func (c *nodes) List(selector labels.Selector) (*api.NodeList, error) {
 	result := &api.NodeList{}
-	err := c.r.Get().Resource(c.resourceName()).Do().Into(result)
+	err := c.r.Get().Resource(c.resourceName()).LabelsSelectorParam(selector).Do().Into(result)
 	return result, err
 }
 
