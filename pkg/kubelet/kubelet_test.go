@@ -882,18 +882,20 @@ func TestSyncPodsDeletesWithNoPodInfraContainer(t *testing.T) {
 	waitGroup.Wait()
 
 	verifyUnorderedCalls(t, fakeDocker, []string{
+		"list",
+
 		// foo1.
-		"list", "list",
+		"list",
 		"stop", "create", "start", "inspect_container", // Kill existing container and create pod infra container.
-		"list", "inspect_container", "inspect_image", // Get pod status.
-		"create", "start", "list", // Create container.
-		"inspect_container", "inspect_container", // Get pod status.
+		"list", "inspect_container", "inspect_container", // Get pod status.
+		"create", "start", // Create container.
+		"list", "inspect_container", "inspect_container", // Get pod status.
 
 		// foo2.
-		"list", "list",
+		"list",
 		"inspect_container",                              // Check pod infra container.
 		"list", "inspect_container", "inspect_container", // Get pod status.
-		"inspect_container", "inspect_container", // Get pod status.
+		"list", "inspect_container", "inspect_container", // Get pod status.
 	})
 
 	// A map iteration is used to delete containers, so must not depend on
@@ -1224,9 +1226,9 @@ func TestSyncPodsBadPodInfraContainerHash(t *testing.T) {
 	verifyCalls(t, fakeDocker, []string{
 		"list", "list",
 		"inspect_container", "stop", "stop", "create", "start", "inspect_container", // Kill existing container and create pod infra container.
-		"list", "inspect_container", "inspect_image", // Get pod status.
+		"list", "inspect_container", "inspect_container", "inspect_container", // Get pod status.
 		"create", "start", // Start the killed container.
-		"list", "inspect_container", "inspect_container"}) // Get pod status.
+		"list", "inspect_container", "inspect_container", "inspect_container"}) // Get pod status.
 
 	// A map interation is used to delete containers, so must not depend on
 	// order here.
@@ -1918,8 +1920,8 @@ func TestSyncPodsEventHandlerFails(t *testing.T) {
 		"inspect_container",         // Check pod infra container.
 		"list", "inspect_container", // Get pod status.
 		"create", "start", // Create container.
-		"stop",                       // Kill the container since event handler fails.
-		"list", "inspect_container"}) // Get pod status.
+		"stop",                                            // Kill the container since event handler fails.
+		"list", "inspect_container", "inspect_container"}) // Get pod status.
 
 	if len(fakeDocker.Stopped) != 1 {
 		t.Errorf("Wrong containers were stopped: %v", fakeDocker.Stopped)
@@ -3780,13 +3782,6 @@ func TestSyncPodsWithRestartPolicy(t *testing.T) {
 		{Name: "failed"},
 	}
 
-	runningAPIContainers := []docker.APIContainers{
-		{
-			// pod infra container
-			Names: []string{"/k8s_POD_foo_new_12345678_0"},
-			ID:    "9876",
-		},
-	}
 	exitedAPIContainers := []docker.APIContainers{
 		{
 			// format is // k8s_<container-id>_<pod-fullname>_<pod-uid>
@@ -3801,6 +3796,15 @@ func TestSyncPodsWithRestartPolicy(t *testing.T) {
 	}
 
 	containerMap := map[string]*docker.Container{
+		"9876": {
+			ID:     "9876",
+			Name:   "POD",
+			Config: &docker.Config{},
+			State: docker.State{
+				StartedAt: time.Now(),
+				Running:   true,
+			},
+		},
 		"1234": {
 			ID:     "1234",
 			Name:   "succeeded",
@@ -3831,26 +3835,39 @@ func TestSyncPodsWithRestartPolicy(t *testing.T) {
 	}{
 		{
 			api.RestartPolicyAlways,
-			[]string{"list", "list", "list", "inspect_container", "inspect_container", "inspect_container", "create", "start", "create", "start", "list", "inspect_container", "inspect_container", "inspect_container"},
+			[]string{"list", "list",
+				"inspect_container",                                                   // Check pod infra contianer.
+				"list", "inspect_container", "inspect_container", "inspect_container", // Get pod status.
+				"create", "start", // Restart container.
+				"create", "start", // Restart container.
+				"list", "inspect_container", "inspect_container", "inspect_container"}, // Get pod status.
 			[]string{"succeeded", "failed"},
 			[]string{},
 		},
 		{
 			api.RestartPolicyOnFailure,
-			[]string{"list", "list", "list", "inspect_container", "inspect_container", "inspect_container", "create", "start", "list", "inspect_container", "inspect_container", "inspect_container"},
+			[]string{"list", "list",
+				"inspect_container",                                                   // Check pod infra container.
+				"list", "inspect_container", "inspect_container", "inspect_container", // Get pod status.
+				"create", "start", // Restart container.
+				"list", "inspect_container", "inspect_container", "inspect_container"}, // Get pod status.
 			[]string{"failed"},
 			[]string{},
 		},
 		{
 			api.RestartPolicyNever,
-			[]string{"list", "list", "list", "inspect_container", "inspect_container", "inspect_container", "stop", "list", "inspect_container", "inspect_container"},
+			[]string{"list", "list",
+				"inspect_container",                                                   // Check pod infra container.
+				"list", "inspect_container", "inspect_container", "inspect_container", // Get pod status.
+				"stop",                                                                 // Kill the last pod infra container.
+				"list", "inspect_container", "inspect_container", "inspect_container"}, // Get pod status.
 			[]string{},
 			[]string{"9876"},
 		},
 	}
 
 	for i, tt := range tests {
-		fakeDocker.ContainerList = runningAPIContainers
+
 		fakeDocker.ExitedContainerList = exitedAPIContainers
 		fakeDocker.ContainerMap = containerMap
 		fakeDocker.ClearCalls()
@@ -3865,6 +3882,13 @@ func TestSyncPodsWithRestartPolicy(t *testing.T) {
 					Containers:    containers,
 					RestartPolicy: tt.policy,
 				},
+			},
+		}
+		fakeDocker.ContainerList = []docker.APIContainers{
+			{
+				// pod infra container
+				Names: []string{"/k8s_POD." + strconv.FormatUint(generatePodInfraContainerHash(&pods[0]), 16) + "_foo_new_12345678_0"},
+				ID:    "9876",
 			},
 		}
 		kubelet.podManager.SetPods(pods)

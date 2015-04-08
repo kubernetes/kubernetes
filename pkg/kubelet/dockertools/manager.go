@@ -200,7 +200,6 @@ func (self *DockerManager) GetPodStatus(pod *api.Pod) (*api.PodStatus, error) {
 	if err != nil {
 		return nil, err
 	}
-
 	for _, value := range containers {
 		if len(value.Names) == 0 {
 			continue
@@ -233,7 +232,7 @@ func (self *DockerManager) GetPodStatus(pod *api.Pod) (*api.PodStatus, error) {
 
 		result := self.inspectContainer(value.ID, dockerContainerName, terminationMessagePath)
 		if result.err != nil {
-			return nil, err
+			return nil, result.err
 		}
 
 		// Add user container information

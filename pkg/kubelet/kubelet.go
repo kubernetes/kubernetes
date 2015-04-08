@@ -1168,17 +1168,13 @@ func (kl *Kubelet) syncPod(pod *api.Pod, mirrorPod *api.Pod, runningPod kubecont
 		return err
 	}
 
-	containersToKill := make(map[types.UID]*kubecontainer.Container)
+	containersToKeep := make(map[types.UID]empty)
 	containersToStart := make(map[int]empty)
-	for _, c := range runningPod.Containers {
-		if c.Name != dockertools.PodInfraContainerName {
-			containersToKill[c.ID] = c
-		}
-	}
 
-	podStatus, err := kl.GetPodStatus(podFullName)
+	podStatus, err := kl.generatePodStatus(pod)
 	if err != nil {
 		glog.Errorf("Unable to get pod with name %q and uid %q info with error(%v)", podFullName, uid, err)
+		return err
 	}
 	ref, err := api.GetReference(pod)
 	if err != nil {
@@ -1199,12 +1195,12 @@ func (kl *Kubelet) syncPod(pod *api.Pod, mirrorPod *api.Pod, runningPod kubecont
 				if err != nil {
 					// TODO(vmarmol): examine this logic.
 					glog.V(2).Infof("probe no-error: %q", container.Name)
-					delete(containersToKill, c.ID)
+					containersToKeep[c.ID] = empty{}
 					continue
 				}
 				if result == probe.Success {
 					glog.V(4).Infof("probe success: %q", container.Name)
-					delete(containersToKill, c.ID)
+					containersToKeep[c.ID] = empty{}
 					continue
 				}
 				glog.Infof("pod %q container %q is unhealthy (probe result: %v). Container will be killed and re-created.", podFullName, container.Name, result)
@@ -1226,7 +1222,13 @@ func (kl *Kubelet) syncPod(pod *api.Pod, mirrorPod *api.Pod, runningPod kubecont
 	}
 
 	// Killing phase:
-	for _, c := range containersToKill {
+	if len(containersToKeep) > 0 || len(containersToStart) > 0 {
+		containersToKeep[types.UID(podInfraContainerID)] = empty{}
+	}
+	for _, c := range runningPod.Containers {
+		if _, ok := containersToKeep[c.ID]; ok {
+			continue
+		}
 		if err := kl.killContainer(c); err != nil {
 			glog.Errorf("Error killing container %v: %v", c, err)
 		}
