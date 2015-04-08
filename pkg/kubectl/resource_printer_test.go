@@ -367,7 +367,7 @@ func TestTemplateStrings(t *testing.T) {
 			},
 			"false",
 		},
-		"oneValid": {
+		"barValid": {
 			api.Pod{
 				Status: api.PodStatus{
 					ContainerStatuses: []api.ContainerStatus{
@@ -413,26 +413,28 @@ func TestTemplateStrings(t *testing.T) {
 			"true",
 		},
 	}
-
 	// The point of this test is to verify that the below template works. If you change this
 	// template, you need to update hack/e2e-suite/update.sh.
-	tmpl :=
-		`{{and (exists . "currentState" "info" "foo" "state" "running") (exists . "currentState" "info" "bar" "state" "running")}}`
-	useThisToDebug := `
+	tmpl := ``
+	if api.PreV1Beta3(testapi.Version()) {
+		tmpl = `{{exists . "currentState" "info" "foo" "state" "running"}}`
+		useThisToDebug := `
 a: {{exists . "currentState"}}
 b: {{exists . "currentState" "info"}}
 c: {{exists . "currentState" "info" "foo"}}
 d: {{exists . "currentState" "info" "foo" "state"}}
 e: {{exists . "currentState" "info" "foo" "state" "running"}}
 f: {{exists . "currentState" "info" "foo" "state" "running" "startedAt"}}`
-	_ = useThisToDebug // don't complain about unused var
-
+		_ = useThisToDebug // don't complain about unused var
+	} else {
+		tmpl = `{{if (exists . "status" "containerStatuses")}}{{range .status.containerStatuses}}{{if (and (eq .name "foo") (exists . "state" "running"))}}true{{end}}{{end}}{{end}}`
+	}
 	p, err := NewTemplatePrinter([]byte(tmpl))
 	if err != nil {
 		t.Fatalf("tmpl fail: %v", err)
 	}
 
-	printer := NewVersionedPrinter(p, api.Scheme, "v1beta1")
+	printer := NewVersionedPrinter(p, api.Scheme, testapi.Version())
 
 	for name, item := range table {
 		buffer := &bytes.Buffer{}
@@ -441,8 +443,12 @@ f: {{exists . "currentState" "info" "foo" "state" "running" "startedAt"}}`
 			t.Errorf("%v: unexpected err: %v", name, err)
 			continue
 		}
-		if e, a := item.expect, buffer.String(); e != a {
-			t.Errorf("%v: expected %v, got %v", name, e, a)
+		actual := buffer.String()
+		if len(actual) == 0 {
+			actual = "false"
+		}
+		if e := item.expect; e != actual {
+			t.Errorf("%v: expected %v, got %v", name, e, actual)
 		}
 	}
 }

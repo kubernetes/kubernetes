@@ -165,7 +165,7 @@ function wait-cluster-readiness {
 
   local timeout=50
   while [[ $timeout -ne 0 ]]; do
-    nb_ready_minions=$("${kubectl}" get minions -o template -t "{{range.items}}{{range.status.conditions}}{{.kind}}{{end}}:{{end}}" --api-version=v1beta1 2>/dev/null | tr ':' '\n' | grep -c Ready || true)
+    nb_ready_minions=$("${kubectl}" get nodes -o template -t "{{range.items}}{{range.status.conditions}}{{.kind}}{{end}}:{{end}}" --api-version=v1beta3 2>/dev/null | tr ':' '\n' | grep -c Ready || true)
     echo "Nb ready minions: $nb_ready_minions / $NUM_MINIONS"
     if [[ "$nb_ready_minions" -eq "$NUM_MINIONS" ]]; then
         return 0
