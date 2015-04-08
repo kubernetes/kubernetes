@@ -1987,6 +1987,7 @@ func (kl *Kubelet) generatePodStatus(pod *api.Pod) (api.PodStatus, error) {
 		}
 	}
 	podStatus.Conditions = append(podStatus.Conditions, getPodReadyCondition(spec, podStatus.ContainerStatuses)...)
+
 	hostIP, err := kl.GetHostIP()
 	if err != nil {
 		glog.Errorf("Cannot get host IP: %v", err)
