@@ -633,7 +633,7 @@ func TestSyncCloudNodesReconcilesExternalService(t *testing.T) {
 			// Set of nodes does not change: do nothing.
 			fakeNodeHandler: &FakeNodeHandler{
 				Existing: []*api.Node{newNode("node0"), newNode("node1")},
-				Fake: testclient.NewSimpleFake(&api.ServiceList{Items: []api.Service{*newService("service0", true), *newService("service1", false)}})},
+				Fake:     testclient.NewSimpleFake(&api.ServiceList{Items: []api.Service{*newService("service0", true), *newService("service1", false)}})},
 			fakeCloud: &fake_cloud.FakeCloud{
 				Machines: []string{"node0", "node1"},
 			},
@@ -645,7 +645,7 @@ func TestSyncCloudNodesReconcilesExternalService(t *testing.T) {
 			// Delete "node1", target pool for "service0" should shrink.
 			fakeNodeHandler: &FakeNodeHandler{
 				Existing: []*api.Node{newNode("node0"), newNode("node1")},
-				Fake: testclient.NewSimpleFake(&api.ServiceList{Items: []api.Service{*newService("service0", true), *newService("service1", false)}})},
+				Fake:     testclient.NewSimpleFake(&api.ServiceList{Items: []api.Service{*newService("service0", true), *newService("service1", false)}})},
 			fakeCloud: &fake_cloud.FakeCloud{
 				Machines: []string{"node0"},
 			},
@@ -659,7 +659,7 @@ func TestSyncCloudNodesReconcilesExternalService(t *testing.T) {
 			// Add "node1", target pool for "service0" should grow.
 			fakeNodeHandler: &FakeNodeHandler{
 				Existing: []*api.Node{newNode("node0")},
-				Fake: testclient.NewSimpleFake(&api.ServiceList{Items: []api.Service{*newService("service0", true), *newService("service1", false)}})},
+				Fake:     testclient.NewSimpleFake(&api.ServiceList{Items: []api.Service{*newService("service0", true), *newService("service1", false)}})},
 			fakeCloud: &fake_cloud.FakeCloud{
 				Machines: []string{"node0", "node1"},
 			},

@@ -201,7 +201,7 @@ func (s *CMServer) Run(_ []string) error {
 
 	nodeController := nodeControllerPkg.NewNodeController(cloud, s.MinionRegexp, s.MachineList, nodeResources,
 		kubeClient, kubeletClient, s.RegisterRetryCount, s.PodEvictionTimeout, util.NewTokenBucketRateLimiter(s.DeletingPodsQps, s.DeletingPodsBurst),
-		s.NodeMonitorGracePeriod, s.NodeStartupGracePeriod, s.NodeMonitorPeriod, s.ClusterName )
+		s.NodeMonitorGracePeriod, s.NodeStartupGracePeriod, s.NodeMonitorPeriod, s.ClusterName)
 	nodeController.Run(s.NodeSyncPeriod, s.SyncNodeList)
 
 	resourceQuotaManager := resourcequota.NewResourceQuotaManager(kubeClient)

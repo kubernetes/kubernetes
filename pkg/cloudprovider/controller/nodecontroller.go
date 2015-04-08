@@ -88,7 +88,9 @@ type NodeController struct {
 	// check node status posted from kubelet. This value should be lower than nodeMonitorGracePeriod.
 	// TODO: Change node status monitor to watch based.
 	nodeMonitorPeriod time.Duration
-	clusterName   string
+	clusterName       string
+	// Should external services be reconciled during syncing cloud nodes, even though the nodes were not changed.
+	reconcileServices bool
 	// Method for easy mocking in unittest.
 	lookupIP func(host string) ([]net.IP, error)
 	now      func() util.Time
@@ -223,22 +225,23 @@ func (nc *NodeController) RegisterNodes(nodes *api.NodeList, retryCount int, ret
 }
 
 // reconcileExternalServices updates balancers for external services, so that they will match the nodes given.
-func (nc *NodeController) reconcileExternalServices(nodes *api.NodeList) {
+// Returns true if something went wrong and we should call reconcile again.
+func (nc *NodeController) reconcileExternalServices(nodes *api.NodeList) (shouldRetry bool) {
 	balancer, ok := nc.cloud.TCPLoadBalancer()
 	if !ok {
 		glog.Error("The cloud provider does not support external TCP load balancers.")
-		return
+		return false
 	}
 
 	zones, ok := nc.cloud.Zones()
 	if !ok {
 		glog.Error("The cloud provider does not support zone enumeration.")
-		return
+		return false
 	}
 	zone, err := zones.GetZone()
 	if err != nil {
 		glog.Errorf("Error while getting zone: %v", err)
-		return
+		return false
 	}
 
 	hosts := []string{}
@@ -249,8 +252,9 @@ func (nc *NodeController) reconcileExternalServices(nodes *api.NodeList) {
 	services, err := nc.kubeClient.Services(api.NamespaceAll).List(labels.Everything())
 	if err != nil {
 		glog.Errorf("Error while listing services: %v", err)
-		return
+		return true
 	}
+	shouldRetry = false
 	for _, service := range services.Items {
 		if service.Spec.CreateExternalLoadBalancer {
 			nonTCPPort := false
@@ -269,9 +273,11 @@ func (nc *NodeController) reconcileExternalServices(nodes *api.NodeList) {
 			err := balancer.UpdateTCPLoadBalancer(name, zone.Region, hosts)
 			if err != nil {
 				glog.Errorf("External error while updating TCP load balancer: %v.", err)
+				shouldRetry = true
 			}
 		}
 	}
+	return shouldRetry
 }
 
 // SyncCloudNodes synchronizes the list of instances from cloudprovider to master server.
@@ -327,8 +333,11 @@ func (nc *NodeController) SyncCloudNodes() error {
 	}
 
 	// Make external services aware of nodes currently present in the cluster.
-	if nodesChanged {
-		nc.reconcileExternalServices(matches)
+	if nodesChanged || nc.reconcileServices {
+		nc.reconcileServices = nc.reconcileExternalServices(matches)
+		if nc.reconcileServices {
+			glog.Error("Reconcilation of external services failed and will be retried during the next sync.")
+		}
 	}
 
 	return nil
