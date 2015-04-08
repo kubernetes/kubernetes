@@ -74,8 +74,9 @@ func New(c *Config) *Controller {
 
 // Run begins processing items, and will continue until a value is sent down stopCh.
 // It's an error to call Run more than once.
-// Run does not block.
+// Run blocks; call via go.
 func (c *Controller) Run(stopCh <-chan struct{}) {
+	defer util.HandleCrash()
 	cache.NewReflector(
 		c.config.ListerWatcher,
 		c.config.ObjectType,
@@ -83,7 +84,7 @@ func (c *Controller) Run(stopCh <-chan struct{}) {
 		c.config.FullResyncPeriod,
 	).RunUntil(stopCh)
 
-	go util.Until(c.processLoop, time.Second, stopCh)
+	util.Until(c.processLoop, time.Second, stopCh)
 }
 
 // processLoop drains the work queue.

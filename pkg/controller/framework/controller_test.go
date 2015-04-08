@@ -94,7 +94,7 @@ func Example() {
 
 	// Create the controller and run it until we close stop.
 	stop := make(chan struct{})
-	framework.New(cfg).Run(stop)
+	go framework.New(cfg).Run(stop)
 
 	// Let's add a few objects to the source.
 	for _, name := range []string{"a-hello", "b-controller", "c-framework"} {
@@ -151,7 +151,7 @@ func ExampleInformer() {
 
 	// Run the controller and run it until we close stop.
 	stop := make(chan struct{})
-	controller.Run(stop)
+	go controller.Run(stop)
 
 	// Let's add a few objects to the source.
 	for _, name := range []string{"a-hello", "b-controller", "c-framework"} {

@@ -164,7 +164,7 @@ func (f *ConfigFactory) CreateFromKeys(predicateKeys, priorityKeys util.StringSe
 	cache.NewReflector(f.createUnassignedPodLW(), &api.Pod{}, f.PodQueue, 0).RunUntil(f.StopEverything)
 
 	// Begin populating scheduled pods.
-	f.scheduledPodPopulator.Run(f.StopEverything)
+	go f.scheduledPodPopulator.Run(f.StopEverything)
 
 	// Watch minions.
 	// Minions may be listed frequently, so provide a local up-to-date cache.
