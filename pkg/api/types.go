@@ -1705,6 +1705,10 @@ const (
 	ResourceReplicationControllers ResourceName = "replicationcontrollers"
 	// ResourceQuotas, number
 	ResourceQuotas ResourceName = "resourcequotas"
+	// ResourceSecrets, number
+	ResourceSecrets ResourceName = "secrets"
+	// ResourcePersistentVolumeClaims, number
+	ResourcePersistentVolumeClaims ResourceName = "persistentvolumeclaims"
 )
 
 // ResourceQuotaSpec defines the desired hard limits to enforce for Quota

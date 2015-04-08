@@ -355,3 +355,47 @@ func TestExceedUsageReplicationControllers(t *testing.T) {
 		t.Errorf("Expected error for exceeding hard limits")
 	}
 }
+
+func TestExceedUsageSecrets(t *testing.T) {
+	namespace := "default"
+	client := testclient.NewSimpleFake(&api.SecretList{
+		Items: []api.Secret{
+			{
+				ObjectMeta: api.ObjectMeta{Name: "123", Namespace: namespace},
+			},
+		},
+	})
+	status := &api.ResourceQuotaStatus{
+		Hard: api.ResourceList{},
+		Used: api.ResourceList{},
+	}
+	r := api.ResourceSecrets
+	status.Hard[r] = resource.MustParse("1")
+	status.Used[r] = resource.MustParse("1")
+	_, err := IncrementUsage(admission.NewAttributesRecord(&api.Secret{}, "Secret", namespace, "secrets", "CREATE"), status, client)
+	if err == nil {
+		t.Errorf("Expected error for exceeding hard limits")
+	}
+}
+
+func TestExceedUsagePersistentVolumeClaims(t *testing.T) {
+	namespace := "default"
+	client := testclient.NewSimpleFake(&api.PersistentVolumeClaimList{
+		Items: []api.PersistentVolumeClaim{
+			{
+				ObjectMeta: api.ObjectMeta{Name: "123", Namespace: namespace},
+			},
+		},
+	})
+	status := &api.ResourceQuotaStatus{
+		Hard: api.ResourceList{},
+		Used: api.ResourceList{},
+	}
+	r := api.ResourcePersistentVolumeClaims
+	status.Hard[r] = resource.MustParse("1")
+	status.Used[r] = resource.MustParse("1")
+	_, err := IncrementUsage(admission.NewAttributesRecord(&api.PersistentVolumeClaim{}, "PersistentVolumeClaim", namespace, "persistentVolumeClaims", "CREATE"), status, client)
+	if err == nil {
+		t.Errorf("Expected error for exceeding hard limits")
+	}
+}
