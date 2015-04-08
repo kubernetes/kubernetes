@@ -4,7 +4,17 @@ Running kubernetes with Vagrant (and VirtualBox) is an easy way to run/test/deve
 
 ### Prerequisites
 1. Install latest version >= 1.6.2 of vagrant from http://www.vagrantup.com/downloads.html
-2. Install latest version of Virtual Box from https://www.virtualbox.org/wiki/Downloads
+2. Install one of vagrant virtualization providers:
+  1. Install latest version of Virtual Box from https://www.virtualbox.org/wiki/Downloads (easier to use).
+  2. Alternatively, install libvirt and vagrant-libvirt and vagrant-mutate plugins. On Fedora 21, these commands can be used:
+          $ yum install vagrant vagrant-libvirt
+          $ vagrant plugin install vagrant-mutate
+
+      The base virtual machine image must be converted from VirtualBox format to libvirt format, e.g. by using these commands:
+          $ vagrant box add fedora20 http://opscode-vm-bento.s3.amazonaws.com/vagrant/virtualbox/opscode_fedora-20_chef-provisionerless.box
+          $ vagrant mutate fedora20 libvirt
+          $ vagrant box remove fedora20 --provider=virtualbox
+
 
 ### Setup
 
@@ -65,6 +75,17 @@ vagrant ssh minion-1
 [vagrant@kubernetes-minion-1] $ sudo systemctl status kubelet
 [vagrant@kubernetes-minion-1] $ sudo journalctl -r -u kubelet
 ```
+
+### Customization
+Following environment variables can be used to tun up your vagrant setup.
+
+Variable | Docs
+-------- | ----
+NUM_MINIONS | Number of minion nodes to create (default=`1`).
+KUBERNETES_MEMORY | Memory (in MB) available to each virtual machine (default=`1024`).
+KUBERNETES_BOX_URL | URL to base virtual image. If not set and the image is not already present the image will be downloaded automatically (default=/empty/).
+KUBERNETES_USE_NFS | If `true`, vagrant will use NFS to share files, such as Kubernetes binaries, between the host and the virtual machines. Otherwise default vagrant sharing will be used, which may be (slow) rsync under libvirt (default=`false`).
+KUBERNETES_NFS_EXPORT | Used only when KUBERNETES_USE_NFS is `true`. If set to `true`, vagrant will automatically modify your `/etc/exports` to export the right directory via NFS. Set to `false`, if you want to manage `/etc/exports` by yourselves (default=`true`).
 
 ### Interacting with your Kubernetes cluster with Vagrant.
 
