@@ -51,6 +51,10 @@ type Reflector struct {
 	// the beginning of the next one.
 	period       time.Duration
 	resyncPeriod time.Duration
+	// lastSyncResourceVersion is the resource version token last
+	// observed when doing a sync with the underlying store
+	// it is not thread safe as it is not synchronized with access to the store
+	lastSyncResourceVersion string
 }
 
 // NewNamespaceKeyedIndexerAndReflector creates an Indexer and a Reflector
@@ -130,6 +134,7 @@ func (r *Reflector) listAndWatch() {
 		glog.Errorf("Unable to sync list result: %v", err)
 		return
 	}
+	r.lastSyncResourceVersion = resourceVersion
 
 	for {
 		w, err := r.listerWatcher.Watch(resourceVersion)
@@ -203,6 +208,7 @@ loop:
 				glog.Errorf("unable to understand watch event %#v", event)
 			}
 			*resourceVersion = meta.ResourceVersion()
+			r.lastSyncResourceVersion = *resourceVersion
 			eventCount++
 		}
 	}
@@ -214,4 +220,10 @@ loop:
 	}
 	glog.V(4).Infof("Watch close - %v total %v items received", r.expectedType, eventCount)
 	return nil
+}
+
+// LastSyncResourceVersion is the resource version observed when last sync with the underlying store
+// The value returned is not synchronized with access to the underlying store and is not thread-safe
+func (r *Reflector) LastSyncResourceVersion() string {
+	return r.lastSyncResourceVersion
 }

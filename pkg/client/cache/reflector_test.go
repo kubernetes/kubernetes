@@ -112,6 +112,11 @@ func TestReflector_watchHandler(t *testing.T) {
 	if e, a := "32", resumeRV; e != a {
 		t.Errorf("expected %v, got %v", e, a)
 	}
+
+	// last sync resource version should be the last version synced with store
+	if e, a := "32", g.LastSyncResourceVersion(); e != a {
+		t.Errorf("expected %v, got %v", e, a)
+	}
 }
 
 func TestReflector_watchHandlerTimeout(t *testing.T) {
