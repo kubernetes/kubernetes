@@ -59,7 +59,7 @@ func (r *MinionRegistry) SetError(err error) {
 	r.Err = err
 }
 
-func (r *MinionRegistry) ListMinions(ctx api.Context) (*api.NodeList, error) {
+func (r *MinionRegistry) ListMinions(ctx api.Context, label labels.Selector, field fields.Selector) (*api.NodeList, error) {
 	r.Lock()
 	defer r.Unlock()
 	return &r.Minions, r.Err
