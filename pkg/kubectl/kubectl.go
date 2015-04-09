@@ -25,8 +25,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 )
 
-var apiVersionToUse = "v1beta1"
-
 const kubectlAnnotationPrefix = "kubectl.kubernetes.io/"
 
 type NamespaceInfo struct {

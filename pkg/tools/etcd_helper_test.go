@@ -47,8 +47,8 @@ var codec runtime.Codec
 func init() {
 	scheme = runtime.NewScheme()
 	scheme.AddKnownTypes("", &TestResource{})
-	scheme.AddKnownTypes("v1beta1", &TestResource{})
-	codec = runtime.CodecFor(scheme, "v1beta1")
+	scheme.AddKnownTypes(testapi.Version(), &TestResource{})
+	codec = runtime.CodecFor(scheme, testapi.Version())
 	scheme.AddConversionFuncs(
 		func(in *TestResource, out *TestResource, s conversion.Scope) error {
 			*out = *in
@@ -69,6 +69,14 @@ func TestIsEtcdNotFound(t *testing.T) {
 	try(fmt.Errorf("some other kind of error"), false)
 }
 
+// Returns an encoded version of api.Pod with the given name.
+func getEncodedPod(name string) string {
+	pod, _ := testapi.Codec().Encode(&api.Pod{
+		ObjectMeta: api.ObjectMeta{Name: name},
+	})
+	return string(pod)
+}
+
 func TestExtractToList(t *testing.T) {
 	fakeClient := NewFakeEtcdClient(t)
 	fakeClient.Data["/some/key"] = EtcdResponseWithError{
@@ -79,19 +87,19 @@ func TestExtractToList(t *testing.T) {
 				Nodes: []*etcd.Node{
 					{
 						Key:           "/foo",
-						Value:         `{"id":"foo","kind":"Pod","apiVersion":"v1beta1"}`,
+						Value:         getEncodedPod("foo"),
 						Dir:           false,
 						ModifiedIndex: 1,
 					},
 					{
 						Key:           "/bar",
-						Value:         `{"id":"bar","kind":"Pod","apiVersion":"v1beta1"}`,
+						Value:         getEncodedPod("bar"),
 						Dir:           false,
 						ModifiedIndex: 2,
 					},
 					{
 						Key:           "/baz",
-						Value:         `{"id":"baz","kind":"Pod","apiVersion":"v1beta1"}`,
+						Value:         getEncodedPod("baz"),
 						Dir:           false,
 						ModifiedIndex: 3,
 					},
@@ -153,13 +161,13 @@ func TestExtractToListAcrossDirectories(t *testing.T) {
 						Nodes: []*etcd.Node{
 							{
 								Key:           "/foo",
-								Value:         `{"id":"foo","kind":"Pod","apiVersion":"v1beta1"}`,
+								Value:         getEncodedPod("foo"),
 								Dir:           false,
 								ModifiedIndex: 1,
 							},
 							{
 								Key:           "/baz",
-								Value:         `{"id":"baz","kind":"Pod","apiVersion":"v1beta1"}`,
+								Value:         getEncodedPod("baz"),
 								Dir:           false,
 								ModifiedIndex: 1,
 							},
@@ -172,7 +180,7 @@ func TestExtractToListAcrossDirectories(t *testing.T) {
 						Nodes: []*etcd.Node{
 							{
 								Key:           "/bar",
-								Value:         `{"id":"bar","kind":"Pod","apiVersion":"v1beta1"}`,
+								Value:         getEncodedPod("bar"),
 								ModifiedIndex: 2,
 							},
 						},
@@ -230,17 +238,17 @@ func TestExtractToListExcludesDirectories(t *testing.T) {
 				Nodes: []*etcd.Node{
 					{
 						Key:           "/foo",
-						Value:         `{"id":"foo","kind":"Pod","apiVersion":"v1beta1"}`,
+						Value:         getEncodedPod("foo"),
 						ModifiedIndex: 1,
 					},
 					{
 						Key:           "/bar",
-						Value:         `{"id":"bar","kind":"Pod","apiVersion":"v1beta1"}`,
+						Value:         getEncodedPod("bar"),
 						ModifiedIndex: 2,
 					},
 					{
 						Key:           "/baz",
-						Value:         `{"id":"baz","kind":"Pod","apiVersion":"v1beta1"}`,
+						Value:         getEncodedPod("baz"),
 						ModifiedIndex: 3,
 					},
 					{
