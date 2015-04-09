@@ -136,7 +136,9 @@ function upload-server-tars() {
   else
     project_hash=$(echo -n "$PROJECT" | md5sum | awk '{ print $1 }')
   fi
-  project_hash=${project_hash:0:5}
+  # This requires 1 million projects before the probability of collision is 50%
+  # that's probably good enough for now :P
+  project_hash=${project_hash:0:10}
 
   local -r staging_bucket="gs://kubernetes-staging-${project_hash}"
 
