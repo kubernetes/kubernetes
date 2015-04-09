@@ -138,7 +138,10 @@ func (c *fakeUpgradeConnection) CreateStream(headers http.Header) (httpstream.St
 
 	stream := &fakeUpgradeStream{}
 	c.streams[headers.Get(api.PortHeader)] = stream
-	stream.data = c.portData[headers.Get(api.PortHeader)]
+	// only simulate data on the data stream for now, not the error stream
+	if headers.Get(api.StreamType) == api.StreamTypeData {
+		stream.data = c.portData[headers.Get(api.PortHeader)]
+	}
 
 	return stream, nil
 }
