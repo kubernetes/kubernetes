@@ -41,6 +41,8 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/handlers"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/master/ports"
 	controlleretcd "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/controller/etcd"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/endpoint"
@@ -567,7 +569,7 @@ func (m *Master) getServersToValidate(c *Config) map[string]apiserver.Server {
 		}
 		serversToValidate[fmt.Sprintf("etcd-%d", ix)] = apiserver.Server{Addr: addr, Port: port, Path: "/v2/keys/"}
 	}
-	nodes, err := m.nodeRegistry.ListMinions(api.NewDefaultContext())
+	nodes, err := m.nodeRegistry.ListMinions(api.NewDefaultContext(), labels.Everything(), fields.Everything())
 	if err != nil {
 		glog.Errorf("Failed to list minions: %v", err)
 	}

@@ -295,7 +295,7 @@ func (rs *REST) createExternalLoadBalancer(ctx api.Context, service *api.Service
 	if !ok {
 		return fmt.Errorf("the cloud provider does not support zone enumeration.")
 	}
-	hosts, err := rs.machines.ListMinions(ctx)
+	hosts, err := rs.machines.ListMinions(ctx, labels.Everything(), fields.Everything())
 	if err != nil {
 		return err
 	}
