@@ -50,7 +50,6 @@ type CMServer struct {
 	ClientConfig            client.Config
 	CloudProvider           string
 	CloudConfigFile         string
-	ClusterName             string
 	MinionRegexp            string
 	NodeSyncPeriod          time.Duration
 	ResourceQuotaSyncPeriod time.Duration
@@ -102,7 +101,6 @@ func (s *CMServer) AddFlags(fs *pflag.FlagSet) {
 	client.BindClientConfigFlags(fs, &s.ClientConfig)
 	fs.StringVar(&s.CloudProvider, "cloud_provider", s.CloudProvider, "The provider for cloud services.  Empty string for no provider.")
 	fs.StringVar(&s.CloudConfigFile, "cloud_config", s.CloudConfigFile, "The path to the cloud provider configuration file.  Empty string for no configuration file.")
-	fs.StringVar(&s.ClusterName, "cluster_name", s.ClusterName, "The instance prefix for the cluster")
 	fs.StringVar(&s.MinionRegexp, "minion_regexp", s.MinionRegexp, "If non empty, and --cloud_provider is specified, a regular expression for matching minion VMs.")
 	fs.DurationVar(&s.NodeSyncPeriod, "node_sync_period", s.NodeSyncPeriod, ""+
 		"The period for syncing nodes from cloudprovider. Longer periods will result in "+

@@ -42,6 +42,8 @@ type Clusters interface {
 	Master(clusterName string) (string, error)
 }
 
+// TODO(#6812): Use a shorter name that's less likely to be longer than cloud
+// providers' name length limits.
 func GetLoadBalancerName(clusterName, serviceNamespace, serviceName string) string {
 	return clusterName + "-" + serviceNamespace + "-" + serviceName
 }

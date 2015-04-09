@@ -22,6 +22,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/testclient"
 	fake_cloud "github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/fake"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 )
 
 const region = "us-central"
@@ -89,7 +90,7 @@ func TestCreateExternalLoadBalancer(t *testing.T) {
 		controller.init()
 		cloud.Calls = nil    // ignore any cloud calls made in init()
 		client.Actions = nil // ignore any client calls made in init()
-		err, _ := controller.createLoadBalancerIfNeeded(item.service)
+		err, _ := controller.createLoadBalancerIfNeeded(types.NamespacedName{"foo", "bar"}, item.service, nil)
 		if !item.expectErr && err != nil {
 			t.Errorf("unexpected error: %v", err)
 		} else if item.expectErr && err == nil {
