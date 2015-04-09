@@ -55,7 +55,7 @@ func newHelper(t *testing.T) (*tools.FakeEtcdClient, tools.EtcdHelper) {
 
 func newStorage(t *testing.T) (*REST, *tools.FakeEtcdClient) {
 	fakeEtcdClient, h := newHelper(t)
-	storage := NewStorage(h, fakeConnectionInfoGetter{})
+	storage, _ := NewStorage(h, fakeConnectionInfoGetter{})
 	return storage, fakeEtcdClient
 }
 

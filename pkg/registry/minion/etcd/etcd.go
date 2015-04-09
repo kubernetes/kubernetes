@@ -34,8 +34,22 @@ type REST struct {
 	connection client.ConnectionInfoGetter
 }
 
+// StatusREST implements the REST endpoint for changing the status of a pod.
+type StatusREST struct {
+	store *etcdgeneric.Etcd
+}
+
+func (r *StatusREST) New() runtime.Object {
+	return &api.Node{}
+}
+
+// Update alters the status subset of an object.
+func (r *StatusREST) Update(ctx api.Context, obj runtime.Object) (runtime.Object, bool, error) {
+	return r.store.Update(ctx, obj)
+}
+
 // NewStorage returns a RESTStorage object that will work against nodes.
-func NewStorage(h tools.EtcdHelper, connection client.ConnectionInfoGetter) *REST {
+func NewStorage(h tools.EtcdHelper, connection client.ConnectionInfoGetter) (*REST, *StatusREST) {
 	prefix := "/registry/minions"
 	store := &etcdgeneric.Etcd{
 		NewFunc:     func() runtime.Object { return &api.Node{} },
@@ -58,7 +72,10 @@ func NewStorage(h tools.EtcdHelper, connection client.ConnectionInfoGetter) *RES
 		Helper: h,
 	}
 
-	return &REST{store, connection}
+	statusStore := *store
+	statusStore.UpdateStrategy = minion.StatusStrategy
+
+	return &REST{store, connection}, &StatusREST{store: &statusStore}
 }
 
 // Implement Redirector.
