@@ -281,6 +281,7 @@ func (s *KubeletServer) Run(_ []string) error {
 		TLSOptions:                     tlsOptions,
 		ImageGCPolicy:                  imageGCPolicy,
 		Cloud:                          cloud,
+		NodeStatusUpdateFrequency: s.NodeStatusUpdateFrequency,
 	}
 
 	RunKubelet(&kcfg, nil)
