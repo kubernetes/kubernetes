@@ -26,59 +26,11 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
-
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
 
-//Namespace constants, implemented
-var svcname = "nettest"
-var ns = svcname + "-" + randomSuffix()
 var c *client.Client = nil
-var namespaceObj *api.Namespace
-
-var _ = BeforeSuite(func() {
-	//Assert basic external connectivity.
-	//Since this is not really a test of kubernetes in any way, we
-	//leave it as a pre-test assertion, rather than a Ginko test.
-
-	By("Executing a successful http request from the external internet")
-	resp, err := http.Get("http://google.com")
-	if err != nil {
-		Failf("Unable to connect/talk to the internet: %v", err)
-	}
-	if resp.StatusCode != http.StatusOK {
-		Failf("Unexpected error code, expected 200, got, %v (%v)", resp.StatusCode, resp)
-	}
-
-	By("Building a namespace api object")
-	namespaceObj = &api.Namespace{
-		ObjectMeta: api.ObjectMeta{
-			Name:      ns,
-			Namespace: "",
-		},
-		Status: api.NamespaceStatus{},
-	}
-
-	By("Creating a kubernetes client")
-	c, err = loadClient()
-	Expect(err).NotTo(HaveOccurred())
-
-	By("Creating a namespace for this test suite")
-	_, err = c.Namespaces().Create(namespaceObj)
-	Expect(err).NotTo(HaveOccurred())
-
-})
-
-var _ = AfterSuite(func() {
-	By("Destroying namespace for this suite")
-	err := c.Namespaces().Delete(namespaceObj.ObjectMeta.Name)
-	if err != nil && !errors.IsAlreadyExists(err) {
-		Failf("Couldng make ns %s", err)
-	}
-
-})
 
 func LaunchNetTestPodPerNode(nodes *api.NodeList, name string, c *client.Client, ns string) []string {
 	podNames := []string{}
@@ -122,7 +74,52 @@ func LaunchNetTestPodPerNode(nodes *api.NodeList, name string, c *client.Client,
 }
 
 var _ = Describe("Networking", func() {
-	//var c *client.Client
+
+	//This namespace is modified throughout the course of the test.
+	var namespaceObj *api.Namespace
+	var svcname = "nettest"
+	var c *client.Client = nil
+
+	BeforeEach(func() {
+		//Assert basic external connectivity.
+		//Since this is not really a test of kubernetes in any way, we
+		//leave it as a pre-test assertion, rather than a Ginko test.
+		By("Executing a successfull http request from the external internet")
+		resp, err := http.Get("http://google.com")
+		if err != nil {
+			Failf("Unable to connect/talk to the internet: %v", err)
+		}
+		if resp.StatusCode != http.StatusOK {
+			Failf("Unexpected error code, expected 200, got, %v (%v)", resp.StatusCode, resp)
+		}
+
+		By("Building a namespace api object")
+		var ns = svcname + "-" + randomSuffix()
+
+		namespaceObj = &api.Namespace{
+			ObjectMeta: api.ObjectMeta{
+				Name:      ns,
+				Namespace: "",
+			},
+			Status: api.NamespaceStatus{},
+		}
+
+		By("Creating a kubernetes client")
+		c, err = loadClient()
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Creating a namespace for this test suite")
+		_, err = c.Namespaces().Create(namespaceObj)
+		Expect(err).NotTo(HaveOccurred())
+
+	})
+
+	AfterEach(func() {
+		By("Destroying namespace for this suite")
+		if err := c.Namespaces().Delete(namespaceObj.Name); err != nil {
+			Failf("Couldn't delete ns %s", err)
+		}
+	})
 
 	// First test because it has no dependencies on variables created later on.
 	It("should provide unchanging, static URL paths for kubernetes api services.", func() {
