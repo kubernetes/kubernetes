@@ -54,8 +54,8 @@ for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
     echo "Adding $minion to hosts file"
     echo "$ip $minion" >> /etc/hosts
   fi
-  echo "127.0.0.1 localhost" >> /etc/hosts # enables cmds like 'kubectl get pods' on master.
 done
+echo "127.0.0.1 localhost" >> /etc/hosts # enables cmds like 'kubectl get pods' on master.
 
 # Update salt configuration
 mkdir -p /etc/salt/minion.d
