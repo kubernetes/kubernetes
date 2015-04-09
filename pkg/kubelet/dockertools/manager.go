@@ -219,7 +219,7 @@ func (self *DockerManager) GetPodStatus(pod *api.Pod) (*api.PodStatus, error) {
 
 		result := self.inspectContainer(value.ID, dockerContainerName, terminationMessagePath)
 		if result.err != nil {
-			return nil, err
+			return nil, result.err
 		}
 
 		// Add user container information
