@@ -36,6 +36,7 @@ type PersistentVolumeClaimInterface interface {
 	Get(name string) (*api.PersistentVolumeClaim, error)
 	Create(claim *api.PersistentVolumeClaim) (*api.PersistentVolumeClaim, error)
 	Update(claim *api.PersistentVolumeClaim) (*api.PersistentVolumeClaim, error)
+	UpdateStatus(claim *api.PersistentVolumeClaim) (*api.PersistentVolumeClaim, error)
 	Delete(name string) error
 	Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error)
 }
@@ -84,6 +85,12 @@ func (c *persistentVolumeClaims) Update(claim *api.PersistentVolumeClaim) (resul
 		return
 	}
 	err = c.client.Put().Namespace(c.namespace).Resource("persistentVolumeClaims").Name(claim.Name).Body(claim).Do().Into(result)
+	return
+}
+
+func (c *persistentVolumeClaims) UpdateStatus(claim *api.PersistentVolumeClaim) (result *api.PersistentVolumeClaim, err error) {
+	result = &api.PersistentVolumeClaim{}
+	err = c.client.Put().Namespace(c.namespace).Resource("persistentVolumeClaims").Name(claim.Name).SubResource("status").Body(claim).Do().Into(result)
 	return
 }
 
