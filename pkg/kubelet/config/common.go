@@ -74,6 +74,9 @@ func applyDefaults(pod *api.Pod, source string, isFile bool, hostname string) er
 	}
 	glog.V(5).Infof("Using namespace %q for pod %q from %s", pod.Namespace, pod.Name, source)
 
+	// Set the Host field to indicate this pod is scheduled on the current node.
+	pod.Spec.Host = hostname
+
 	// Currently just simply follow the same format in resthandler.go
 	pod.ObjectMeta.SelfLink =
 		fmt.Sprintf("/api/v1beta2/pods/%s?namespace=%s", pod.Name, pod.Namespace)

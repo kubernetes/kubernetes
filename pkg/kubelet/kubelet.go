@@ -1332,15 +1332,28 @@ func (kl *Kubelet) syncPod(pod *api.Pod, mirrorPod *api.Pod, runningPod kubecont
 		kl.pullImageAndRunContainer(pod, &pod.Spec.Containers[container], &podVolumes, podInfraContainerID)
 	}
 
-	if mirrorPod == nil && isStaticPod(pod) {
-		glog.V(4).Infof("Creating a mirror pod %q", podFullName)
-		// To make sure we will properly update static pod status we need to delete
-		// it from status manager. Otherwise it is possible that we will miss manual
-		// deletion of mirror pod in apiserver and will never reset its status to
-		// Running after recreating it.
-		kl.statusManager.DeletePodStatus(podFullName)
-		if err := kl.podManager.CreateMirrorPod(*pod, kl.hostname); err != nil {
-			glog.Errorf("Failed creating a mirror pod %q: %#v", podFullName, err)
+	if isStaticPod(pod) {
+		if mirrorPod == nil {
+			glog.V(3).Infof("Creating a mirror pod %q", podFullName)
+			if err := kl.podManager.CreateMirrorPod(*pod); err != nil {
+				glog.Errorf("Failed creating a mirror pod %q: %v", podFullName, err)
+			}
+			// Pod status update is edge-triggered. If there is any update of the
+			// mirror pod, we need to delete the existing status associated with
+			// the static pod to trigger an update.
+			kl.statusManager.DeletePodStatus(podFullName)
+		} else if !kl.podManager.IsMirrorPodOf(mirrorPod, pod) {
+			// The mirrorPod is semantically different from the static pod.
+			// Need to update the mirror pod.
+			glog.V(3).Infof("Updating mirror pod %q", podFullName)
+			if err := kl.podManager.UpdateMirrorPod(pod); err != nil {
+				// Kubelet does not check whether a static pod update is
+				// valid. However, API server validates the mirror pod update.
+				// Therefore, it is possible that apiserver would reject an
+				// update repeatedly. Surface the error through events.
+				glog.Errorf("Failed updating mirror pod %q: %v", podFullName, err)
+				kl.recorder.Eventf(mirrorPod, "mirrorPodUpdateFailed", err.Error())
+			}
 		}
 	}
 

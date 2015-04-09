@@ -3271,6 +3271,59 @@ func TestCreateMirrorPod(t *testing.T) {
 	}
 }
 
+// Tests that we update the mirror pod accordingly when detecting a static pod
+// change.
+func TestUpdateMirrorPod(t *testing.T) {
+	testKubelet := newTestKubelet(t)
+	testKubelet.fakeCadvisor.On("MachineInfo").Return(&cadvisorApi.MachineInfo{}, nil)
+	kl := testKubelet.kubelet
+	manager := testKubelet.fakeMirrorClient
+	pod := api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			UID:       "12345678",
+			Name:      "foo",
+			Namespace: "ns",
+			Annotations: map[string]string{
+				ConfigSourceAnnotationKey: "file",
+			},
+		},
+		Spec: api.PodSpec{
+			Containers: []api.Container{
+				{Name: "1234", Image: "foo"},
+			},
+		},
+	}
+	// Mirror pod has an outdated spec.
+	mirrorPod := api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			UID:       "11111111",
+			Name:      "foo",
+			Namespace: "ns",
+			Annotations: map[string]string{
+				ConfigSourceAnnotationKey: "api",
+				ConfigMirrorAnnotationKey: "mirror",
+			},
+		},
+		Spec: api.PodSpec{
+			Containers: []api.Container{
+				{Name: "1234", Image: "bar"},
+			},
+		},
+	}
+	pods := []api.Pod{pod, mirrorPod}
+	kl.podManager.SetPods(pods)
+	err := kl.syncPod(&pod, &mirrorPod, container.Pod{})
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	name := kubecontainer.GetPodFullName(&pod)
+	creates, deletes, updates := manager.GetCounts(name)
+	if creates != 0 || deletes != 0 || updates != 1 {
+		t.Errorf("expected 0 creation, 0 deletion, and 1 update of %q, got %d, %d, %d",
+			name, creates, deletes, updates)
+	}
+}
+
 func TestDeleteOrphanedMirrorPods(t *testing.T) {
 	testKubelet := newTestKubelet(t)
 	testKubelet.fakeCadvisor.On("MachineInfo").Return(&cadvisorApi.MachineInfo{}, nil)
@@ -3313,7 +3366,7 @@ func TestDeleteOrphanedMirrorPods(t *testing.T) {
 	}
 	for _, pod := range orphanPods {
 		name := kubecontainer.GetPodFullName(&pod)
-		creates, deletes := manager.GetCounts(name)
+		creates, deletes, _ := manager.GetCounts(name)
 		if creates != 0 || deletes != 1 {
 			t.Errorf("expected 0 creation and one deletion of %q, got %d, %d", name, creates, deletes)
 		}
