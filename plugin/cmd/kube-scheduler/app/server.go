@@ -69,7 +69,7 @@ func (s *SchedulerServer) AddFlags(fs *pflag.FlagSet) {
 	client.BindClientConfigFlags(fs, &s.ClientConfig)
 	fs.StringVar(&s.AlgorithmProvider, "algorithm_provider", s.AlgorithmProvider, "The scheduling algorithm provider to use")
 	fs.StringVar(&s.PolicyConfigFile, "policy_config_file", s.PolicyConfigFile, "File with scheduler policy configuration")
-	fs.BoolVar(&s.EnableProfiling, "profiling", false, "Enable profiling via web interface host:port/debug/pprof/")
+	fs.BoolVar(&s.EnableProfiling, "profiling", true, "Enable profiling via web interface host:port/debug/pprof/")
 }
 
 // Run runs the specified SchedulerServer.  This should never exit.
