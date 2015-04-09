@@ -434,7 +434,7 @@ type Container struct {
 	// Required.
 	Image string `json:"image" description:"Docker image name"`
 	// Optional: The image's entrypoint is used if this is not provided; cannot be updated.
-	Entrypoint []string `json:"entrypoint:omitempty" description:"entrypoint array; not executed within a shell; the image's entrypoint is used if this is not provided; cannot be updated"`
+	Entrypoint []string `json:"entrypoint,omitempty" description:"entrypoint array; not executed within a shell; the image's entrypoint is used if this is not provided; cannot be updated"`
 	// Optional: The image's cmd is used if this is not provided; cannot be updated.
 	Command []string `json:"command,omitempty" description:"command argv array; not executed within a shell; the image's cmd is used if this is not provided; cannot be updated"`
 	// Optional: Docker's default is used if this is not provided.
