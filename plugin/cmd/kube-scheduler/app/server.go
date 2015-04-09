@@ -29,6 +29,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/healthz"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/master/ports"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler"
@@ -69,7 +70,7 @@ func (s *SchedulerServer) AddFlags(fs *pflag.FlagSet) {
 	client.BindClientConfigFlags(fs, &s.ClientConfig)
 	fs.StringVar(&s.AlgorithmProvider, "algorithm_provider", s.AlgorithmProvider, "The scheduling algorithm provider to use")
 	fs.StringVar(&s.PolicyConfigFile, "policy_config_file", s.PolicyConfigFile, "File with scheduler policy configuration")
-	fs.BoolVar(&s.EnableProfiling, "profiling", false, "Enable profiling via web interface host:port/debug/pprof/")
+	fs.BoolVar(&s.EnableProfiling, "profiling", true, "Enable profiling via web interface host:port/debug/pprof/")
 }
 
 // Run runs the specified SchedulerServer.  This should never exit.
@@ -80,13 +81,20 @@ func (s *SchedulerServer) Run(_ []string) error {
 	}
 
 	go func() {
+		mux := http.NewServeMux()
+		healthz.InstallHandler(mux)
 		if s.EnableProfiling {
-			http.HandleFunc("/debug/pprof/", pprof.Index)
-			http.HandleFunc("/debug/pprof/profile", pprof.Profile)
-			http.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
+			mux.HandleFunc("/debug/pprof/", pprof.Index)
+			mux.HandleFunc("/debug/pprof/profile", pprof.Profile)
+			mux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
 		}
-		http.Handle("/metrics", prometheus.Handler())
-		http.ListenAndServe(net.JoinHostPort(s.Address.String(), strconv.Itoa(s.Port)), nil)
+		mux.Handle("/metrics", prometheus.Handler())
+
+		server := &http.Server{
+			Addr:    net.JoinHostPort(s.Address.String(), strconv.Itoa(s.Port)),
+			Handler: mux,
+		}
+		glog.Fatal(server.ListenAndServe())
 	}()
 
 	configFactory := factory.NewConfigFactory(kubeClient)
