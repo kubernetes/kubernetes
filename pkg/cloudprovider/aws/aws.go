@@ -580,7 +580,7 @@ type awsInstanceType struct {
 }
 
 // TODO: Also return number of mounts allowed?
-func (self *awsInstanceType) getEbsMountDevices() []string {
+func (self *awsInstanceType) getEBSMountDevices() []string {
 	// See: https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/block-device-mapping-concepts.html
 	devices := []string{}
 	for c := 'f'; c <= 'p'; c++ {
@@ -675,7 +675,7 @@ func (self *awsInstance) assignMountDevice(volumeId string) (mountDevice string,
 	}
 
 	// Check all the valid mountpoints to see if any of them are free
-	valid := instanceType.getEbsMountDevices()
+	valid := instanceType.getEBSMountDevices()
 	chosen := ""
 	for _, device := range valid {
 		_, found := self.deviceMappings[device]
