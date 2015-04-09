@@ -243,7 +243,7 @@ func TestPull(t *testing.T) {
 func TestDockerKeyringLookupFails(t *testing.T) {
 	fakeKeyring := &credentialprovider.FakeKeyring{}
 	fakeClient := &FakeDockerClient{
-		Err: fmt.Errorf("test error"),
+		Errors: map[string]error{"pull": fmt.Errorf("test error")},
 	}
 
 	dp := dockerPuller{
@@ -394,7 +394,7 @@ func TestIsImagePresent(t *testing.T) {
 }
 
 func TestGetRunningContainers(t *testing.T) {
-	fakeDocker := &FakeDockerClient{}
+	fakeDocker := &FakeDockerClient{Errors: make(map[string]error)}
 	fakeRecorder := &record.FakeRecorder{}
 	containerManager := NewDockerManager(fakeDocker, fakeRecorder, PodInfraContainerImage)
 	tests := []struct {
@@ -478,14 +478,16 @@ func TestGetRunningContainers(t *testing.T) {
 	}
 	for _, test := range tests {
 		fakeDocker.ContainerMap = test.containers
-		fakeDocker.Err = test.err
+		if test.err != nil {
+			fakeDocker.Errors["inspect_container"] = test.err
+		}
 		if results, err := containerManager.GetRunningContainers(test.inputIDs); err == nil {
 			resultIDs := []string{}
 			for _, result := range results {
 				resultIDs = append(resultIDs, result.ID)
 			}
 			if !reflect.DeepEqual(resultIDs, test.expectedIDs) {
-				t.Errorf("expected: %v, saw: %v", test.expectedIDs, resultIDs)
+				t.Errorf("expected: %#v, saw: %#v", test.expectedIDs, resultIDs)
 			}
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)

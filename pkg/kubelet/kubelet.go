@@ -1699,18 +1699,16 @@ func (kl *Kubelet) validateContainerStatus(podStatus *api.PodStatus, containerNa
 func (kl *Kubelet) GetKubeletContainerLogs(podFullName, containerName, tail string, follow bool, stdout, stderr io.Writer) error {
 	podStatus, err := kl.GetPodStatus(podFullName)
 	if err != nil {
-		if err == dockertools.ErrNoContainersInPod {
-			return fmt.Errorf("pod %q not found\n", podFullName)
-		} else {
-			return fmt.Errorf("failed to get status for pod %q - %v", podFullName, err)
-		}
+		return fmt.Errorf("failed to get status for pod %q - %v", podFullName, err)
 	}
-
 	if err := kl.validatePodPhase(&podStatus); err != nil {
+		// No log is available if pod is not in a "known" phase (e.g. Unknown).
 		return err
 	}
 	dockerContainerID, err := kl.validateContainerStatus(&podStatus, containerName)
 	if err != nil {
+		// No log is available if the container status is missing or is in the
+		// waiting state.
 		return err
 	}
 	return kl.containerManager.GetKubeletDockerContainerLogs(dockerContainerID, tail, follow, stdout, stderr)

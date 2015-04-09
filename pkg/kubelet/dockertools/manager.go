@@ -25,14 +25,21 @@ import (
 	"path"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/capabilities"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
 	kubecontainer "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/fsouza/go-dockerclient"
 	"github.com/golang/glog"
+	"github.com/golang/groupcache/lru"
+)
+
+const (
+	maxReasonCacheEntries = 200
 )
 
 // Implements kubecontainer.ContainerRunner.
@@ -44,13 +51,60 @@ type DockerManager struct {
 	// TODO(yifan): PodInfraContainerImage can be unexported once
 	// we move createPodInfraContainer into dockertools.
 	PodInfraContainerImage string
+	// reasonCache stores the failure reason of the last container creation
+	// and/or start in a string, keyed by <pod_UID>_<container_name>. The goal
+	// is to propagate this reason to the container status. This endeavor is
+	// "best-effort" for two reasons:
+	//   1. The cache is not persisted.
+	//   2. We use an LRU cache to avoid extra garbage collection work. This
+	//      means that some entries may be recycled before a pod has been
+	//      deleted.
+	reasonCache stringCache
 }
 
 // Ensures DockerManager implements ConatinerRunner.
 var _ kubecontainer.ContainerRunner = new(DockerManager)
 
 func NewDockerManager(client DockerInterface, recorder record.EventRecorder, podInfraContainerImage string) *DockerManager {
-	return &DockerManager{client: client, recorder: recorder, PodInfraContainerImage: podInfraContainerImage}
+	reasonCache := stringCache{cache: lru.New(maxReasonCacheEntries)}
+	return &DockerManager{
+		client:                 client,
+		recorder:               recorder,
+		PodInfraContainerImage: podInfraContainerImage,
+		reasonCache:            reasonCache}
+}
+
+// A cache which stores strings keyed by <pod_UID>_<container_name>.
+type stringCache struct {
+	lock  sync.RWMutex
+	cache *lru.Cache
+}
+
+func (self *stringCache) composeKey(uid types.UID, name string) string {
+	return fmt.Sprintf("%s_%s", uid, name)
+}
+
+func (self *stringCache) Add(uid types.UID, name string, value string) {
+	self.lock.Lock()
+	defer self.lock.Unlock()
+	self.cache.Add(self.composeKey(uid, name), value)
+}
+
+func (self *stringCache) Remove(uid types.UID, name string) {
+	self.lock.Lock()
+	defer self.lock.Unlock()
+	self.cache.Remove(self.composeKey(uid, name))
+}
+
+func (self *stringCache) Get(uid types.UID, name string) (string, bool) {
+	self.lock.RLock()
+	defer self.lock.RUnlock()
+	value, ok := self.cache.Get(self.composeKey(uid, name))
+	if ok {
+		return value.(string), ok
+	} else {
+		return "", ok
+	}
 }
 
 // GetKubeletDockerContainerLogs returns logs of a specific container. By
@@ -118,7 +172,6 @@ func (self *DockerManager) inspectContainer(dockerID, containerName, tPath strin
 		ContainerID: DockerPrefix + dockerID,
 	}
 
-	waiting := true
 	if inspectResult.State.Running {
 		result.status.State.Running = &api.ContainerStateRunning{
 			StartedAt: util.NewTime(inspectResult.State.StartedAt),
@@ -126,7 +179,6 @@ func (self *DockerManager) inspectContainer(dockerID, containerName, tPath strin
 		if containerName == PodInfraContainerName && inspectResult.NetworkSettings != nil {
 			result.ip = inspectResult.NetworkSettings.IPAddress
 		}
-		waiting = false
 	} else if !inspectResult.State.FinishedAt.IsZero() {
 		reason := ""
 		// Note: An application might handle OOMKilled gracefully.
@@ -155,13 +207,8 @@ func (self *DockerManager) inspectContainer(dockerID, containerName, tPath strin
 				}
 			}
 		}
-		waiting = false
-	}
-
-	if waiting {
+	} else {
 		// TODO(dchen1107): Separate issue docker/docker#8294 was filed
-		// TODO(dchen1107): Need to figure out why we are still waiting
-		// Check any issue to run container
 		result.status.State.Waiting = &api.ContainerStateWaiting{
 			Reason: ErrContainerCannotRun.Error(),
 		}
@@ -233,31 +280,27 @@ func (self *DockerManager) GetPodStatus(pod *api.Pod) (*api.PodStatus, error) {
 			return nil, result.err
 		}
 
-		// Add user container information
-		if dockerContainerName == PodInfraContainerName &&
-			result.status.State.Running != nil {
+		if dockerContainerName == PodInfraContainerName {
 			// Found network container
-			podStatus.PodIP = result.ip
+			if result.status.State.Running != nil {
+				podStatus.PodIP = result.ip
+			}
 		} else {
+			// Add user container information.
 			statuses[dockerContainerName] = result.status
 		}
 	}
 
-	if len(statuses) == 0 && podStatus.PodIP == "" {
-		return nil, ErrNoContainersInPod
-	}
-
-	// Not all containers expected are created, check if there are
-	// image related issues
-	if len(statuses) < len(manifest.Containers) {
+	for _, container := range manifest.Containers {
 		var containerStatus api.ContainerStatus
-		for _, container := range manifest.Containers {
-			if _, found := statuses[container.Name]; found {
-				continue
-			}
-
+		if status, found := statuses[container.Name]; found {
+			containerStatus = status
+		} else {
+			// The container has not been created yet. Check image is ready on
+			// the node or not.
+			// TODO: If we integrate DockerPuller into DockerManager, we can
+			// record the pull failure and eliminate the image checking below.
 			image := container.Image
-			// Check image is ready on the node or not
 			// TODO(dchen1107): docker/docker/issues/8365 to figure out if the image exists
 			_, err := self.client.InspectImage(image)
 			if err == nil {
@@ -268,14 +311,15 @@ func (self *DockerManager) GetPodStatus(pod *api.Pod) (*api.PodStatus, error) {
 				containerStatus.State.Waiting = &api.ContainerStateWaiting{
 					Reason: fmt.Sprintf("Image: %s is not ready on the node", image),
 				}
-			} else {
-				containerStatus.State.Waiting = &api.ContainerStateWaiting{
-					Reason: "",
-				}
 			}
-
-			statuses[container.Name] = containerStatus
 		}
+		if containerStatus.State.Waiting != nil {
+			// For containers in the waiting state, fill in a specific reason if it is recorded.
+			if reason, ok := self.reasonCache.Get(uid, container.Name); ok {
+				containerStatus.State.Waiting.Reason = reason
+			}
+		}
+		statuses[container.Name] = containerStatus
 	}
 
 	podStatus.ContainerStatuses = make([]api.ContainerStatus, 0)
@@ -304,6 +348,19 @@ func (self *DockerManager) GetRunningContainers(ids []string) ([]*docker.Contain
 }
 
 func (self *DockerManager) RunContainer(pod *api.Pod, container *api.Container, opts *kubecontainer.RunContainerOptions) (string, error) {
+	dockerID, err := self.runContainer(pod, container, opts)
+	if err != nil {
+		errString := err.Error()
+		if errString != "" {
+			self.reasonCache.Add(pod.UID, container.Name, errString)
+		} else {
+			self.reasonCache.Remove(pod.UID, container.Name)
+		}
+	}
+	return dockerID, err
+}
+
+func (self *DockerManager) runContainer(pod *api.Pod, container *api.Container, opts *kubecontainer.RunContainerOptions) (string, error) {
 	ref, err := kubecontainer.GenerateContainerRef(pod, container)
 	if err != nil {
 		glog.Errorf("Couldn't make a ref to pod %v, container %v: '%v'", pod.Name, container.Name, err)

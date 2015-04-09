@@ -69,7 +69,7 @@ type TestKubelet struct {
 }
 
 func newTestKubelet(t *testing.T) *TestKubelet {
-	fakeDocker := &dockertools.FakeDockerClient{RemovedImages: util.StringSet{}}
+	fakeDocker := &dockertools.FakeDockerClient{Errors: make(map[string]error), RemovedImages: util.StringSet{}}
 	fakeDockerCache := dockertools.NewFakeDockerCache(fakeDocker)
 	fakeRecorder := &record.FakeRecorder{}
 	fakeKubeClient := &testclient.Fake{}
@@ -366,7 +366,7 @@ func TestKillContainerWithError(t *testing.T) {
 		},
 	}
 	fakeDocker := &dockertools.FakeDockerClient{
-		Err:           fmt.Errorf("sample error"),
+		Errors:        make(map[string]error),
 		ContainerList: append([]docker.APIContainers{}, containers...),
 	}
 	testKubelet := newTestKubelet(t)
@@ -376,6 +376,7 @@ func TestKillContainerWithError(t *testing.T) {
 	}
 	kubelet.dockerClient = fakeDocker
 	c := apiContainerToContainer(fakeDocker.ContainerList[0])
+	fakeDocker.Errors["stop"] = fmt.Errorf("sample error")
 	err := kubelet.killContainer(&c)
 	if err == nil {
 		t.Errorf("expected error, found nil")
@@ -512,7 +513,7 @@ func TestSyncPodsWithTerminationLog(t *testing.T) {
 	}
 	waitGroup.Wait()
 	verifyCalls(t, fakeDocker, []string{
-		"list", "list", "list", "create", "start", "inspect_container", "create", "start", "list", "inspect_container", "inspect_container"})
+		"list", "list", "list", "inspect_image", "create", "start", "inspect_container", "create", "start", "list", "inspect_container", "inspect_container"})
 
 	fakeDocker.Lock()
 	parts := strings.Split(fakeDocker.Container.HostConfig.Binds[0], ":")
@@ -564,7 +565,7 @@ func TestSyncPodsCreatesNetAndContainer(t *testing.T) {
 	waitGroup.Wait()
 
 	verifyCalls(t, fakeDocker, []string{
-		"list", "list", "list", "create", "start", "inspect_container", "create", "start", "list", "inspect_container", "inspect_container"})
+		"list", "list", "list", "inspect_image", "create", "start", "inspect_container", "create", "start", "list", "inspect_container", "inspect_container"})
 
 	fakeDocker.Lock()
 
@@ -619,7 +620,7 @@ func TestSyncPodsCreatesNetAndContainerPullsImage(t *testing.T) {
 	waitGroup.Wait()
 
 	verifyCalls(t, fakeDocker, []string{
-		"list", "list", "list", "create", "start", "inspect_container", "create", "start", "list", "inspect_container", "inspect_container"})
+		"list", "list", "list", "inspect_image", "create", "start", "inspect_container", "create", "start", "list", "inspect_container", "inspect_container"})
 
 	fakeDocker.Lock()
 
@@ -671,7 +672,7 @@ func TestSyncPodsWithPodInfraCreatesContainer(t *testing.T) {
 	waitGroup.Wait()
 
 	verifyCalls(t, fakeDocker, []string{
-		"list", "list", "list", "inspect_container", "create", "start", "list", "inspect_container", "inspect_container"})
+		"list", "list", "list", "inspect_container", "inspect_image", "create", "start", "list", "inspect_container", "inspect_container"})
 
 	fakeDocker.Lock()
 	if len(fakeDocker.Created) != 1 ||
@@ -730,7 +731,7 @@ func TestSyncPodsWithPodInfraCreatesContainerCallsHandler(t *testing.T) {
 	waitGroup.Wait()
 
 	verifyCalls(t, fakeDocker, []string{
-		"list", "list", "list", "inspect_container", "create", "start", "list", "inspect_container", "inspect_container"})
+		"list", "list", "list", "inspect_container", "inspect_image", "create", "start", "list", "inspect_container", "inspect_container"})
 
 	fakeDocker.Lock()
 	if len(fakeDocker.Created) != 1 ||
@@ -948,7 +949,7 @@ func TestSyncPodDeletesDuplicate(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	verifyCalls(t, fakeDocker, []string{"list", "stop", "list"})
+	verifyCalls(t, fakeDocker, []string{"list", "inspect_image", "stop", "list", "inspect_image"})
 	// Expect one of the duplicates to be killed.
 	if len(fakeDocker.Stopped) != 1 || (fakeDocker.Stopped[0] != "1234" && fakeDocker.Stopped[0] != "4567") {
 		t.Errorf("Wrong containers were stopped: %v", fakeDocker.Stopped)
@@ -990,8 +991,8 @@ func TestSyncPodBadHash(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	//verifyCalls(t, fakeDocker, []string{"list", "stop", "list", "create", "start", "stop", "create", "start", "inspect_container"})
-	verifyCalls(t, fakeDocker, []string{"list", "stop", "stop", "create", "start", "inspect_container", "create", "start", "list", "inspect_container", "inspect_container"})
+	verifyCalls(t, fakeDocker, []string{"list", "inspect_image", "stop", "stop", "create", "start",
+		"inspect_container", "create", "start", "list", "inspect_container", "inspect_container"})
 
 	// A map interation is used to delete containers, so must not depend on
 	// order here.
@@ -1045,7 +1046,7 @@ func TestSyncPodUnhealthy(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	verifyCalls(t, fakeDocker, []string{"list", "stop", "create", "start", "list", "inspect_container"})
+	verifyCalls(t, fakeDocker, []string{"list", "inspect_image", "stop", "create", "start", "list", "inspect_container"})
 
 	// A map interation is used to delete containers, so must not depend on
 	// order here.
@@ -1638,7 +1639,7 @@ func TestSyncPodEventHandlerFails(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	verifyCalls(t, fakeDocker, []string{"list", "create", "start", "stop", "list"})
+	verifyCalls(t, fakeDocker, []string{"list", "inspect_image", "create", "start", "stop", "list", "inspect_image"})
 
 	if len(fakeDocker.Stopped) != 1 {
 		t.Errorf("Wrong containers were stopped: %v", fakeDocker.Stopped)
@@ -3789,6 +3790,47 @@ func TestGetPodStatusWithLastTermination(t *testing.T) {
 		}
 		if err := fakeDocker.AssertStopped(tt.stopped); err != nil {
 			t.Errorf("%d: %v", i, err)
+		}
+	}
+}
+
+func TestGetPodCreationFailureReason(t *testing.T) {
+	testKubelet := newTestKubelet(t)
+	kubelet := testKubelet.kubelet
+	fakeDocker := testKubelet.fakeDocker
+	failureReason := "creation failure"
+	fakeDocker.Errors["create"] = fmt.Errorf("%s", failureReason)
+	fakeDocker.ContainerList = []docker.APIContainers{}
+	pod := api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			UID:       "12345678",
+			Name:      "bar",
+			Namespace: "new",
+		},
+		Spec: api.PodSpec{
+			Containers: []api.Container{
+				{Name: "foo"},
+			},
+		},
+	}
+	pods := []api.Pod{pod}
+	kubelet.podManager.SetPods(pods)
+	_, err := kubelet.runContainer(&pod, &pod.Spec.Containers[0], make(map[string]volume.Volume), "", "")
+	if err == nil {
+		t.Errorf("expected error, found nil")
+	}
+	status, err := kubelet.GetPodStatus(kubecontainer.GetPodFullName(&pod))
+	if err != nil {
+		t.Errorf("unexpected error %v", err)
+	}
+	if len(status.ContainerStatuses) < 1 {
+		t.Errorf("expected 1 container status, got %d", len(status.ContainerStatuses))
+	} else {
+		state := status.ContainerStatuses[0].State
+		if state.Waiting == nil {
+			t.Errorf("expected waiting state, got %#v", state)
+		} else if state.Waiting.Reason != failureReason {
+			t.Errorf("expected reason %q, got %q", state.Waiting.Reason)
 		}
 	}
 }
