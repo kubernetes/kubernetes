@@ -91,6 +91,7 @@ func TestReadFromFile(t *testing.T) {
 					SelfLink:  "/api/v1beta2/pods/test-" + hostname + "?namespace=default",
 				},
 				Spec: api.PodSpec{
+					Host:          hostname,
 					RestartPolicy: api.RestartPolicyAlways,
 					DNSPolicy:     api.DNSClusterFirst,
 					Containers: []api.Container{{
@@ -116,6 +117,7 @@ func TestReadFromFile(t *testing.T) {
 					SelfLink:  "/api/v1beta2/pods/12345-" + hostname + "?namespace=default",
 				},
 				Spec: api.PodSpec{
+					Host:          hostname,
 					RestartPolicy: api.RestartPolicyAlways,
 					DNSPolicy:     api.DNSClusterFirst,
 					Containers: []api.Container{{
@@ -142,6 +144,7 @@ func TestReadFromFile(t *testing.T) {
 					SelfLink:  "/api/v1beta2/pods/test-" + hostname + "?namespace=default",
 				},
 				Spec: api.PodSpec{
+					Host:          hostname,
 					RestartPolicy: api.RestartPolicyAlways,
 					DNSPolicy:     api.DNSClusterFirst,
 					Containers: []api.Container{{
@@ -174,6 +177,7 @@ func TestReadFromFile(t *testing.T) {
 					SelfLink:  "/api/v1beta2/pods/test-" + hostname + "?namespace=mynamespace",
 				},
 				Spec: api.PodSpec{
+					Host:          hostname,
 					RestartPolicy: api.RestartPolicyAlways,
 					DNSPolicy:     api.DNSClusterFirst,
 					Containers: []api.Container{{
@@ -204,6 +208,7 @@ func TestReadFromFile(t *testing.T) {
 					SelfLink:  "/api/v1beta2/pods/12345-" + hostname + "?namespace=default",
 				},
 				Spec: api.PodSpec{
+					Host:          hostname,
 					RestartPolicy: api.RestartPolicyAlways,
 					DNSPolicy:     api.DNSClusterFirst,
 					Containers: []api.Container{{
@@ -235,6 +240,7 @@ func TestReadFromFile(t *testing.T) {
 					SelfLink:  "/api/v1beta2/pods/test-" + hostname + "?namespace=default",
 				},
 				Spec: api.PodSpec{
+					Host:          hostname,
 					RestartPolicy: api.RestartPolicyAlways,
 					DNSPolicy:     api.DNSClusterFirst,
 					Containers: []api.Container{{
@@ -360,6 +366,7 @@ func ExampleManifestAndPod(id string) (v1beta1.ContainerManifest, api.Pod) {
 			SelfLink:  "/api/v1beta2/pods/" + id + "-" + hostname + "?namespace=default",
 		},
 		Spec: api.PodSpec{
+			Host: hostname,
 			Containers: []api.Container{
 				{
 					Name:  "c" + id,

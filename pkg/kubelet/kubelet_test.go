@@ -3272,6 +3272,57 @@ func TestCreateMirrorPod(t *testing.T) {
 	}
 }
 
+func TestDeleteOutdatedMirrorPod(t *testing.T) {
+	testKubelet := newTestKubelet(t)
+	testKubelet.fakeCadvisor.On("MachineInfo").Return(&cadvisorApi.MachineInfo{}, nil)
+	kl := testKubelet.kubelet
+	manager := testKubelet.fakeMirrorClient
+	pod := api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			UID:       "12345678",
+			Name:      "foo",
+			Namespace: "ns",
+			Annotations: map[string]string{
+				ConfigSourceAnnotationKey: "file",
+			},
+		},
+		Spec: api.PodSpec{
+			Containers: []api.Container{
+				{Name: "1234", Image: "foo"},
+			},
+		},
+	}
+	// Mirror pod has an outdated spec.
+	mirrorPod := api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			UID:       "11111111",
+			Name:      "foo",
+			Namespace: "ns",
+			Annotations: map[string]string{
+				ConfigSourceAnnotationKey: "api",
+				ConfigMirrorAnnotationKey: "mirror",
+			},
+		},
+		Spec: api.PodSpec{
+			Containers: []api.Container{
+				{Name: "1234", Image: "bar"},
+			},
+		},
+	}
+
+	pods := []api.Pod{pod, mirrorPod}
+	kl.podManager.SetPods(pods)
+	err := kl.syncPod(&pod, &mirrorPod, container.Pod{})
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	name := kubecontainer.GetPodFullName(&pod)
+	creates, deletes := manager.GetCounts(name)
+	if creates != 0 || deletes != 1 {
+		t.Errorf("expected 0 creation and 1 deletion of %q, got %d, %d", name, creates, deletes)
+	}
+}
+
 func TestDeleteOrphanedMirrorPods(t *testing.T) {
 	testKubelet := newTestKubelet(t)
 	testKubelet.fakeCadvisor.On("MachineInfo").Return(&cadvisorApi.MachineInfo{}, nil)

@@ -28,7 +28,7 @@ import (
 // Mirror client is used to create/delete a mirror pod.
 
 type mirrorClient interface {
-	CreateMirrorPod(api.Pod, string) error
+	CreateMirrorPod(api.Pod) error
 	DeleteMirrorPod(string) error
 }
 
@@ -43,12 +43,10 @@ func newBasicMirrorClient(apiserverClient client.Interface) *basicMirrorClient {
 }
 
 // Creates a mirror pod.
-func (self *basicMirrorClient) CreateMirrorPod(pod api.Pod, hostname string) error {
+func (self *basicMirrorClient) CreateMirrorPod(pod api.Pod) error {
 	if self.apiserverClient == nil {
 		return nil
 	}
-	// Indicate that the pod should be scheduled to the current node.
-	pod.Spec.Host = hostname
 	pod.Annotations[ConfigMirrorAnnotationKey] = MirrorType
 
 	_, err := self.apiserverClient.Pods(NamespaceDefault).Create(&pod)
