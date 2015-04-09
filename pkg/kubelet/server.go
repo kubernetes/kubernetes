@@ -436,6 +436,8 @@ func (s *Server) handleRun(w http.ResponseWriter, req *http.Request) {
 	w.Write(data)
 }
 
+const streamCreationTimeout = 30 * time.Second
+
 // handleExec handles requests to run a command inside a container.
 func (s *Server) handleExec(w http.ResponseWriter, req *http.Request) {
 	u, err := url.ParseRequestURI(req.RequestURI)
@@ -491,9 +493,8 @@ func (s *Server) handleExec(w http.ResponseWriter, req *http.Request) {
 
 	conn.SetIdleTimeout(s.host.StreamingConnectionIdleTimeout())
 
-	// TODO find a good default timeout value
 	// TODO make it configurable?
-	expired := time.NewTimer(2 * time.Second)
+	expired := time.NewTimer(streamCreationTimeout)
 
 	var errorStream, stdinStream, stdoutStream, stderrStream httpstream.Stream
 	receivedStreams := 0
@@ -641,7 +642,7 @@ func waitForPortForwardDataStreamAndRun(pod string, uid types.UID, errorStream h
 
 	select {
 	case dataStream = <-dataStreamChan:
-	case <-time.After(1 * time.Second):
+	case <-time.After(streamCreationTimeout):
 		errorStream.Write([]byte("Timed out waiting for data stream"))
 		//TODO delete from dataStreamChans[port]
 		return
