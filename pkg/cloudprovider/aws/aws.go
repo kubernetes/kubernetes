@@ -90,7 +90,7 @@ type AWSCloud struct {
 	region           aws.Region
 
 	// The AWS instance that we are running on
-	selfAwsInstance *awsInstance
+	selfAWSInstance *awsInstance
 
 	mutex sync.Mutex
 }
@@ -602,7 +602,7 @@ type awsInstance struct {
 	deviceMappings map[string]string
 }
 
-func newAwsInstance(ec2 EC2, awsID string) *awsInstance {
+func newAWSInstance(ec2 EC2, awsID string) *awsInstance {
 	self := &awsInstance{ec2: ec2, awsID: awsID}
 
 	// We lazy-init deviceMappings
@@ -724,7 +724,7 @@ type awsDisk struct {
 	az string
 }
 
-func newAwsDisk(ec2 EC2, name string) (*awsDisk, error) {
+func newAWSDisk(ec2 EC2, name string) (*awsDisk, error) {
 	// name looks like aws://availability-zone/id
 	url, err := url.Parse(name)
 	if err != nil {
@@ -820,20 +820,20 @@ func (self *awsDisk) delete() error {
 
 // Gets the awsInstance for the EC2 instance on which we are running
 // may return nil in case of error
-func (aws *AWSCloud) getSelfAwsInstance() (*awsInstance, error) {
+func (aws *AWSCloud) getSelfAWSInstance() (*awsInstance, error) {
 	// Note that we cache some state in awsInstance (mountpoints), so we must preserve the instance
 
 	aws.mutex.Lock()
 	defer aws.mutex.Unlock()
 
-	i := aws.selfAwsInstance
+	i := aws.selfAWSInstance
 	if i == nil {
 		instanceIdBytes, err := aws.metadata.GetMetaData("instance-id")
 		if err != nil {
 			return nil, fmt.Errorf("error fetching instance-id from ec2 metadata service: %v", err)
 		}
-		i = newAwsInstance(aws.ec2, string(instanceIdBytes))
-		aws.selfAwsInstance = i
+		i = newAWSInstance(aws.ec2, string(instanceIdBytes))
+		aws.selfAWSInstance = i
 	}
 
 	return i, nil
@@ -841,14 +841,14 @@ func (aws *AWSCloud) getSelfAwsInstance() (*awsInstance, error) {
 
 // Implements Volumes.AttachDisk
 func (aws *AWSCloud) AttachDisk(instanceName string, diskName string, readOnly bool) (string, error) {
-	disk, err := newAwsDisk(aws.ec2, diskName)
+	disk, err := newAWSDisk(aws.ec2, diskName)
 	if err != nil {
 		return "", err
 	}
 
 	var awsInstance *awsInstance
 	if instanceName == "" {
-		awsInstance, err = aws.getSelfAwsInstance()
+		awsInstance, err = aws.getSelfAWSInstance()
 		if err != nil {
 			return "", fmt.Errorf("Error getting self-instance: %v", err)
 		}
@@ -858,7 +858,7 @@ func (aws *AWSCloud) AttachDisk(instanceName string, diskName string, readOnly b
 			return "", fmt.Errorf("Error finding instance: %v", err)
 		}
 
-		awsInstance = newAwsInstance(aws.ec2, instance.InstanceId)
+		awsInstance = newAWSInstance(aws.ec2, instance.InstanceId)
 	}
 
 	if readOnly {
@@ -906,7 +906,7 @@ func (aws *AWSCloud) AttachDisk(instanceName string, diskName string, readOnly b
 
 // Implements Volumes.DetachDisk
 func (aws *AWSCloud) DetachDisk(instanceName string, diskName string) error {
-	disk, err := newAwsDisk(aws.ec2, diskName)
+	disk, err := newAWSDisk(aws.ec2, diskName)
 	if err != nil {
 		return err
 	}
@@ -947,7 +947,7 @@ func (aws *AWSCloud) CreateVolume(volumeOptions *VolumeOptions) (string, error) 
 
 // Implements Volumes.DeleteVolume
 func (aws *AWSCloud) DeleteVolume(volumeName string) error {
-	awsDisk, err := newAwsDisk(aws.ec2, volumeName)
+	awsDisk, err := newAWSDisk(aws.ec2, volumeName)
 	if err != nil {
 		return err
 	}
