@@ -274,7 +274,7 @@ function upload-server-tars() {
 function get-password {
   # go template to extract the auth-path of the current-context user
   # Note: we save dot ('.') to $dot because the 'with' action overrides dot
-  local template='{{$dot := .}}{{with $ctx := index $dot "current-context"}}{{$user := index $dot "contexts" $ctx "user"}}{{index $dot "users" $user "auth-path"}}{{end}}'
+  local template='{{$dot := .}}{{with $ctx := index $dot "current-context"}}{{range $element := (index $dot "contexts")}}{{ if eq .name $ctx }}{{ with $user := .context.user }}{{range $element := (index $dot "users")}}{{ if eq .name $user }}{{ index . "user" "auth-path" }}{{end}}{{end}}{{end}}{{end}}{{end}}{{end}}'
   local file=$("${KUBE_ROOT}/cluster/kubectl.sh" config view -o template --template="${template}")
   if [[ ! -z "$file" && -r "$file" ]]; then
     KUBE_USER=$(cat "$file" | python -c 'import json,sys;print json.load(sys.stdin)["User"]')

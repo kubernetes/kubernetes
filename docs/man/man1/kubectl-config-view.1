@@ -172,7 +172,7 @@ $ kubectl config view
 $ kubectl config view \-\-local
 
 // Get the password for the e2e user
-$ kubectl config view \-o template \-\-template='\{\{ index . "users" "e2e" "password" \}\}'
+$ kubectl config view \-o template \-\-template='\{\{range .users\}\}\{\{ if eq .name "e2e" \}\}\{\{ index .user.password \}\}\{\{end\}\}\{\{end\}\}'
 
 .fi
 .RE
