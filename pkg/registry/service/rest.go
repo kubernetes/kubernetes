@@ -97,6 +97,15 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (runtime.Object, err
 		return nil, err
 	}
 
+	releaseServiceIP := false
+	defer func() {
+		if releaseServiceIP {
+			if api.IsServiceIPSet(service) {
+				rs.portalMgr.Release(net.ParseIP(service.Spec.PortalIP))
+			}
+		}
+	}()
+
 	if api.IsServiceIPRequested(service) {
 		// Allocate next available.
 		ip, err := rs.portalMgr.AllocateNext()
@@ -104,12 +113,14 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (runtime.Object, err
 			return nil, err
 		}
 		service.Spec.PortalIP = ip.String()
+		releaseServiceIP = true
 	} else if api.IsServiceIPSet(service) {
 		// Try to respect the requested IP.
 		if err := rs.portalMgr.Allocate(net.ParseIP(service.Spec.PortalIP)); err != nil {
 			el := fielderrors.ValidationErrorList{fielderrors.NewFieldInvalid("spec.portalIP", service.Spec.PortalIP, err.Error())}
 			return nil, errors.NewInvalid("Service", service.Name, el)
 		}
+		releaseServiceIP = true
 	}
 
 	// TODO: Move this to post-creation rectification loop, so that we make/remove external load balancers
@@ -117,20 +128,19 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (runtime.Object, err
 	if service.Spec.CreateExternalLoadBalancer {
 		err := rs.createExternalLoadBalancer(ctx, service)
 		if err != nil {
-			if api.IsServiceIPSet(service) {
-				rs.portalMgr.Release(net.ParseIP(service.Spec.PortalIP))
-			}
 			return nil, err
 		}
 	}
 
 	out, err := rs.registry.CreateService(ctx, service)
 	if err != nil {
-		if api.IsServiceIPSet(service) {
-			rs.portalMgr.Release(net.ParseIP(service.Spec.PortalIP))
-		}
 		err = rest.CheckGeneratedNameError(rest.Services, err, service)
 	}
+
+	if err == nil {
+		releaseServiceIP = false
+	}
+
 	return out, err
 }
 
