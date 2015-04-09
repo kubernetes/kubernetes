@@ -394,10 +394,7 @@ func fqdnSuffix() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	hostname, err := exec.Command("hostname").Output()
-	if err != nil {
-		return "", err
-	}
+	hostname := strings.Split(string(fullHostname), ".")[0]
 	return strings.TrimSpace(string(fullHostname)[len(string(hostname)):]), nil
 }
 
@@ -410,9 +407,6 @@ func (gce *GCECloud) List(filter string) ([]string, error) {
 	suffix, err := fqdnSuffix()
 	if err != nil {
 		return []string{}, err
-	}
-	if len(suffix) > 0 {
-		suffix = "." + suffix
 	}
 	listCall := gce.service.Instances.List(gce.projectID, gce.zone)
 	if len(filter) > 0 {
