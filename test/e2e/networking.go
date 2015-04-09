@@ -116,7 +116,7 @@ var _ = Describe("Networking", func() {
 
 	AfterEach(func() {
 		By("Destroying namespace for this suite")
-		if err := c.Namespaces().Delete(namespaceObj.ObjectMeta.Name); err != nil {
+		if err := c.Namespaces().Delete(namespaceObj.Name); err != nil {
 			Failf("Couldn't delete ns %s", err)
 		}
 	})
