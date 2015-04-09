@@ -26,8 +26,10 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	apierrors "github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/golang/glog"
 )
@@ -56,6 +58,7 @@ type NodeController struct {
 	nodes                   []string
 	kubeClient              client.Interface
 	kubeletClient           client.KubeletClient
+	recorder                record.EventRecorder
 	registerRetryCount      int
 	podEvictionTimeout      time.Duration
 	deletingPodsRateLimiter util.RateLimiter
@@ -104,6 +107,14 @@ func NewNodeController(
 	nodeMonitorGracePeriod time.Duration,
 	nodeStartupGracePeriod time.Duration,
 	nodeMonitorPeriod time.Duration) *NodeController {
+	eventBroadcaster := record.NewBroadcaster()
+	recorder := eventBroadcaster.NewRecorder(api.EventSource{Component: "controllermanager"})
+	if kubeClient != nil {
+		glog.Infof("Sending events to api server.")
+		eventBroadcaster.StartRecordingToSink(kubeClient.Events(""))
+	} else {
+		glog.Infof("No api server defined - no events will be sent to API server.")
+	}
 	return &NodeController{
 		cloud:                   cloud,
 		matchRE:                 matchRE,
@@ -111,6 +122,7 @@ func NewNodeController(
 		staticResources:         staticResources,
 		kubeClient:              kubeClient,
 		kubeletClient:           kubeletClient,
+		recorder:                recorder,
 		registerRetryCount:      registerRetryCount,
 		podEvictionTimeout:      podEvictionTimeout,
 		deletingPodsRateLimiter: deletingPodsRateLimiter,
@@ -298,6 +310,19 @@ func (nc *NodeController) PopulateAddresses(nodes *api.NodeList) (*api.NodeList,
 	return nodes, nil
 }
 
+func (nc *NodeController) recordNodeEvent(node *api.Node, event string) {
+	ref := &api.ObjectReference{
+		Kind:      "Node",
+		Name:      node.Name,
+		UID:       types.UID(node.Name),
+		Namespace: "",
+	}
+	glog.V(2).Infof("Recording %s event message for node %s", event, node.Name)
+	// TODO: This requires a transaction, either both node status is updated
+	// and event is recorded or neither should happen, see issue #6055.
+	nc.recorder.Eventf(ref, event, "Node %s is now %s", node.Name, event)
+}
+
 // For a given node checks its conditions and tries to update it. Returns grace period to which given node
 // is entitled, state of current and last observed Ready Condition, and an error if it ocured.
 func (nc *NodeController) tryUpdateNodeStatus(node *api.Node) (time.Duration, api.NodeCondition, *api.NodeCondition, error) {
@@ -480,6 +505,17 @@ func (nc *NodeController) MonitorNodeStatus() error {
 				if nc.deletingPodsRateLimiter.CanAccept() {
 					nc.deletePods(node.Name)
 				}
+			}
+
+			// Report node events.
+			if readyCondition.Status == api.ConditionTrue && lastReadyCondition.Status != api.ConditionTrue {
+				nc.recordNodeEvent(node, "ready")
+			}
+			if readyCondition.Status == api.ConditionFalse && lastReadyCondition.Status != api.ConditionFalse {
+				nc.recordNodeEvent(node, "not_ready")
+			}
+			if readyCondition.Status == api.ConditionUnknown && lastReadyCondition.Status != api.ConditionUnknown {
+				nc.recordNodeEvent(node, "unknown")
 			}
 		}
 	}
