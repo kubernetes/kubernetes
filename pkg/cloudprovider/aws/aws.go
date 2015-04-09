@@ -661,7 +661,7 @@ func (self *awsInstance) assignMountDevice(volumeID string) (mountDevice string,
 		}
 		deviceMappings := map[string]string{}
 		for _, blockDevice := range info.BlockDevices {
-			deviceMappings[blockDevice.DeviceName] = blockDevice.VolumeID
+			deviceMappings[blockDevice.DeviceName] = blockDevice.VolumeId
 		}
 		self.deviceMappings = deviceMappings
 	}
@@ -938,7 +938,7 @@ func (aws *AWSCloud) CreateVolume(volumeOptions *VolumeOptions) (string, error) 
 	}
 
 	az := response.AvailZone
-	awsID := response.VolumeID
+	awsID := response.VolumeId
 
 	volumeName := "aws://" + az + "/" + awsID
 
