@@ -84,8 +84,7 @@ func RunCreate(f *cmdutil.Factory, out io.Writer, filenames util.StringList) err
 		return err
 	}
 
-	count := 0
-	err = r.Visit(func(info *resource.Info) error {
+	return r.Visit(func(info *resource.Info) error {
 		data, err := info.Mapping.Codec.Encode(info.Object)
 		if err != nil {
 			return err
@@ -97,16 +96,9 @@ func RunCreate(f *cmdutil.Factory, out io.Writer, filenames util.StringList) err
 		if err != nil {
 			return err
 		}
-		count++
+
 		info.Refresh(obj, true)
 		fmt.Fprintf(out, "%s/%s\n", info.Mapping.Resource, info.Name)
 		return nil
 	})
-	if err != nil {
-		return err
-	}
-	if count == 0 {
-		return fmt.Errorf("no objects passed to create")
-	}
-	return nil
 }
