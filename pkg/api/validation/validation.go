@@ -900,7 +900,7 @@ func ValidateService(service *api.Service) errs.ValidationErrorList {
 	for _, ip := range service.Spec.PublicIPs {
 		if ip == "0.0.0.0" {
 			allErrs = append(allErrs, errs.NewFieldInvalid("spec.publicIPs", ip, "is not an IP address"))
-		} else if util.IsValidIP(ip) && net.ParseIP(ip).IsLoopback() {
+		} else if util.IsValidIPv4(ip) && net.ParseIP(ip).IsLoopback() {
 			allErrs = append(allErrs, errs.NewFieldInvalid("spec.publicIPs", ip, "publicIP cannot be a loopback"))
 		}
 	}
@@ -1277,17 +1277,51 @@ func validateEndpointSubsets(subsets []api.EndpointSubset) errs.ValidationErrorL
 		if len(ss.Ports) == 0 {
 			ssErrs = append(ssErrs, errs.NewFieldRequired("ports"))
 		}
-		// TODO: validate each address and port
+		for addr := range ss.Addresses {
+			ssErrs = append(ssErrs, validateEndpointAddress(&ss.Addresses[addr]).PrefixIndex(addr).Prefix("addresses")...)
+		}
+		for port := range ss.Ports {
+			ssErrs = append(ssErrs, validateEndpointPort(&ss.Ports[port], len(ss.Ports) > 1).PrefixIndex(port).Prefix("ports")...)
+		}
+
 		allErrs = append(allErrs, ssErrs.PrefixIndex(i)...)
 	}
 
 	return allErrs
 }
 
-// ValidateEndpointsUpdate tests to make sure an endpoints update can be applied.
-func ValidateEndpointsUpdate(oldEndpoints *api.Endpoints, endpoints *api.Endpoints) errs.ValidationErrorList {
+func validateEndpointAddress(address *api.EndpointAddress) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
-	allErrs = append(allErrs, ValidateObjectMetaUpdate(&oldEndpoints.ObjectMeta, &endpoints.ObjectMeta).Prefix("metadata")...)
-	allErrs = append(allErrs, validateEndpointSubsets(endpoints.Subsets).Prefix("subsets")...)
+	if !util.IsValidIPv4(address.IP) {
+		allErrs = append(allErrs, errs.NewFieldInvalid("ip", address.IP, "invalid IPv4 address"))
+	}
+	return allErrs
+}
+
+func validateEndpointPort(port *api.EndpointPort, requireName bool) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+	if requireName && port.Name == "" {
+		allErrs = append(allErrs, errs.NewFieldRequired("name"))
+	} else if port.Name != "" {
+		if !util.IsDNS1123Label(port.Name) {
+			allErrs = append(allErrs, errs.NewFieldInvalid("name", port.Name, dns1123LabelErrorMsg))
+		}
+	}
+	if !util.IsValidPortNum(port.Port) {
+		allErrs = append(allErrs, errs.NewFieldInvalid("port", port.Port, portRangeErrorMsg))
+	}
+	if len(port.Protocol) == 0 {
+		allErrs = append(allErrs, errs.NewFieldRequired("protocol"))
+	} else if !supportedPortProtocols.Has(strings.ToUpper(string(port.Protocol))) {
+		allErrs = append(allErrs, errs.NewFieldNotSupported("protocol", port.Protocol))
+	}
+	return allErrs
+}
+
+// ValidateEndpointsUpdate tests to make sure an endpoints update can be applied.
+func ValidateEndpointsUpdate(oldEndpoints, newEndpoints *api.Endpoints) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+	allErrs = append(allErrs, ValidateObjectMetaUpdate(&oldEndpoints.ObjectMeta, &newEndpoints.ObjectMeta).Prefix("metadata")...)
+	allErrs = append(allErrs, validateEndpointSubsets(newEndpoints.Subsets).Prefix("subsets")...)
 	return allErrs
 }

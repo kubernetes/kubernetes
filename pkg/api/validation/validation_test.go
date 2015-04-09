@@ -2812,5 +2812,178 @@ func TestValidateSecret(t *testing.T) {
 }
 
 func TestValidateEndpoints(t *testing.T) {
-	// TODO: implement this
+	successCases := map[string]api.Endpoints{
+		"simple endpoint": {
+			ObjectMeta: api.ObjectMeta{Name: "mysvc", Namespace: "namespace"},
+			Subsets: []api.EndpointSubset{
+				{
+					Addresses: []api.EndpointAddress{{IP: "10.10.1.1"}, {IP: "10.10.2.2"}},
+					Ports:     []api.EndpointPort{{Name: "a", Port: 8675, Protocol: "TCP"}, {Name: "b", Port: 309, Protocol: "TCP"}},
+				},
+				{
+					Addresses: []api.EndpointAddress{{IP: "10.10.3.3"}},
+					Ports:     []api.EndpointPort{{Name: "a", Port: 93, Protocol: "TCP"}, {Name: "b", Port: 76, Protocol: "TCP"}},
+				},
+			},
+		},
+		"empty subsets": {
+			ObjectMeta: api.ObjectMeta{Name: "mysvc", Namespace: "namespace"},
+		},
+		"no name required for singleton port": {
+			ObjectMeta: api.ObjectMeta{Name: "mysvc", Namespace: "namespace"},
+			Subsets: []api.EndpointSubset{
+				{
+					Addresses: []api.EndpointAddress{{IP: "10.10.1.1"}},
+					Ports:     []api.EndpointPort{{Port: 8675, Protocol: "TCP"}},
+				},
+			},
+		},
+	}
+
+	for k, v := range successCases {
+		if errs := ValidateEndpoints(&v); len(errs) != 0 {
+			t.Errorf("Expected success for %s, got %v", k, errs)
+		}
+	}
+
+	errorCases := map[string]struct {
+		endpoints   api.Endpoints
+		errorType   fielderrors.ValidationErrorType
+		errorDetail string
+	}{
+		"missing namespace": {
+			endpoints: api.Endpoints{ObjectMeta: api.ObjectMeta{Name: "mysvc"}},
+			errorType: "FieldValueRequired",
+		},
+		"missing name": {
+			endpoints: api.Endpoints{ObjectMeta: api.ObjectMeta{Namespace: "namespace"}},
+			errorType: "FieldValueRequired",
+		},
+		"invalid namespace": {
+			endpoints:   api.Endpoints{ObjectMeta: api.ObjectMeta{Name: "mysvc", Namespace: "no@#invalid.;chars\"allowed"}},
+			errorType:   "FieldValueInvalid",
+			errorDetail: dnsSubdomainErrorMsg,
+		},
+		"invalid name": {
+			endpoints:   api.Endpoints{ObjectMeta: api.ObjectMeta{Name: "-_Invliad^&Characters", Namespace: "namespace"}},
+			errorType:   "FieldValueInvalid",
+			errorDetail: dnsSubdomainErrorMsg,
+		},
+		"empty addresses": {
+			endpoints: api.Endpoints{
+				ObjectMeta: api.ObjectMeta{Name: "mysvc", Namespace: "namespace"},
+				Subsets: []api.EndpointSubset{
+					{
+						Ports: []api.EndpointPort{{Name: "a", Port: 93, Protocol: "TCP"}},
+					},
+				},
+			},
+			errorType: "FieldValueRequired",
+		},
+		"empty ports": {
+			endpoints: api.Endpoints{
+				ObjectMeta: api.ObjectMeta{Name: "mysvc", Namespace: "namespace"},
+				Subsets: []api.EndpointSubset{
+					{
+						Addresses: []api.EndpointAddress{{IP: "10.10.3.3"}},
+					},
+				},
+			},
+			errorType: "FieldValueRequired",
+		},
+		"invalid IP": {
+			endpoints: api.Endpoints{
+				ObjectMeta: api.ObjectMeta{Name: "mysvc", Namespace: "namespace"},
+				Subsets: []api.EndpointSubset{
+					{
+						Addresses: []api.EndpointAddress{{IP: "2001:0db8:85a3:0042:1000:8a2e:0370:7334"}},
+						Ports:     []api.EndpointPort{{Name: "a", Port: 93, Protocol: "TCP"}},
+					},
+				},
+			},
+			errorType:   "FieldValueInvalid",
+			errorDetail: "invalid IPv4 address",
+		},
+		"Multiple ports, one without name": {
+			endpoints: api.Endpoints{
+				ObjectMeta: api.ObjectMeta{Name: "mysvc", Namespace: "namespace"},
+				Subsets: []api.EndpointSubset{
+					{
+						Addresses: []api.EndpointAddress{{IP: "10.10.1.1"}},
+						Ports:     []api.EndpointPort{{Port: 8675, Protocol: "TCP"}, {Name: "b", Port: 309, Protocol: "TCP"}},
+					},
+				},
+			},
+			errorType: "FieldValueRequired",
+		},
+		"Invalid port number": {
+			endpoints: api.Endpoints{
+				ObjectMeta: api.ObjectMeta{Name: "mysvc", Namespace: "namespace"},
+				Subsets: []api.EndpointSubset{
+					{
+						Addresses: []api.EndpointAddress{{IP: "10.10.1.1"}},
+						Ports:     []api.EndpointPort{{Name: "a", Port: 66000, Protocol: "TCP"}},
+					},
+				},
+			},
+			errorType:   "FieldValueInvalid",
+			errorDetail: portRangeErrorMsg,
+		},
+		"Invalid protocol": {
+			endpoints: api.Endpoints{
+				ObjectMeta: api.ObjectMeta{Name: "mysvc", Namespace: "namespace"},
+				Subsets: []api.EndpointSubset{
+					{
+						Addresses: []api.EndpointAddress{{IP: "10.10.1.1"}},
+						Ports:     []api.EndpointPort{{Name: "a", Port: 93, Protocol: "Protocol"}},
+					},
+				},
+			},
+			errorType: "FieldValueNotSupported",
+		},
+		"Address missing IP": {
+			endpoints: api.Endpoints{
+				ObjectMeta: api.ObjectMeta{Name: "mysvc", Namespace: "namespace"},
+				Subsets: []api.EndpointSubset{
+					{
+						Addresses: []api.EndpointAddress{{}},
+						Ports:     []api.EndpointPort{{Name: "a", Port: 93, Protocol: "TCP"}},
+					},
+				},
+			},
+			errorType:   "FieldValueInvalid",
+			errorDetail: "invalid IPv4 address",
+		},
+		"Port missing number": {
+			endpoints: api.Endpoints{
+				ObjectMeta: api.ObjectMeta{Name: "mysvc", Namespace: "namespace"},
+				Subsets: []api.EndpointSubset{
+					{
+						Addresses: []api.EndpointAddress{{IP: "10.10.1.1"}},
+						Ports:     []api.EndpointPort{{Name: "a", Protocol: "TCP"}},
+					},
+				},
+			},
+			errorType:   "FieldValueInvalid",
+			errorDetail: portRangeErrorMsg,
+		},
+		"Port missing protocol": {
+			endpoints: api.Endpoints{
+				ObjectMeta: api.ObjectMeta{Name: "mysvc", Namespace: "namespace"},
+				Subsets: []api.EndpointSubset{
+					{
+						Addresses: []api.EndpointAddress{{IP: "10.10.1.1"}},
+						Ports:     []api.EndpointPort{{Name: "a", Port: 93}},
+					},
+				},
+			},
+			errorType: "FieldValueRequired",
+		},
+	}
+
+	for k, v := range errorCases {
+		if errs := ValidateEndpoints(&v.endpoints); len(errs) == 0 || errs[0].(*errors.ValidationError).Type != v.errorType || errs[0].(*errors.ValidationError).Detail != v.errorDetail {
+			t.Errorf("Expected error type %s with detail %s for %s, got %v", v.errorType, v.errorDetail, k, errs)
+		}
+	}
 }
