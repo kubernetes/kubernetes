@@ -9,7 +9,7 @@
     "description": "API at /api/v1beta2 version v1beta2",
     "operations": [
      {
-      "type": "void",
+      "type": "v1beta2.Binding",
       "method": "POST",
       "summary": "create a Binding",
       "nickname": "createBinding",
@@ -29,6 +29,13 @@
         "description": "",
         "required": true,
         "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta2.Binding"
        }
       ],
       "produces": [
@@ -91,6 +98,13 @@
         "allowMultiple": false
        }
       ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta2.EndpointsList"
+       }
+      ],
       "produces": [
        "application/json"
       ],
@@ -99,7 +113,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "v1beta2.Endpoints",
       "method": "POST",
       "summary": "create a Endpoints",
       "nickname": "createEndpoints",
@@ -119,6 +133,13 @@
         "description": "",
         "required": true,
         "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta2.Endpoints"
        }
       ],
       "produces": [
@@ -181,6 +202,13 @@
         "allowMultiple": false
        }
       ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "json.WatchEvent"
+       }
+      ],
       "produces": [
        "application/json"
       ],
@@ -217,6 +245,13 @@
         "allowMultiple": false
        }
       ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta2.Endpoints"
+       }
+      ],
       "produces": [
        "application/json"
       ],
@@ -225,7 +260,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "v1beta2.Endpoints",
       "method": "PUT",
       "summary": "replace the specified Endpoints",
       "nickname": "replaceEndpoints",
@@ -255,6 +290,13 @@
         "allowMultiple": false
        }
       ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta2.Endpoints"
+       }
+      ],
       "produces": [
        "application/json"
       ],
@@ -263,7 +305,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "v1beta2.Endpoints",
       "method": "PATCH",
       "summary": "partially update the specified Endpoints",
       "nickname": "patchEndpoints",
@@ -285,12 +327,19 @@
         "allowMultiple": false
        },
        {
-        "type": "v1beta2.Endpoints",
+        "type": "string",
         "paramType": "body",
         "name": "body",
         "description": "",
         "required": true,
         "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "string"
        }
       ],
       "produces": [
@@ -303,7 +352,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "v1beta2.Status",
       "method": "DELETE",
       "summary": "delete a Endpoints",
       "nickname": "deleteEndpoints",
@@ -325,12 +374,19 @@
         "allowMultiple": false
        },
        {
-        "type": "*v1beta2.DeleteOptions",
+        "type": "v1beta2.DeleteOptions",
         "paramType": "body",
         "name": "body",
         "description": "",
         "required": true,
         "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta2.Status"
        }
       ],
       "produces": [
@@ -401,6 +457,13 @@
         "allowMultiple": false
        }
       ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "json.WatchEvent"
+       }
+      ],
       "produces": [
        "application/json"
       ],
@@ -461,6 +524,13 @@
         "allowMultiple": false
        }
       ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta2.EventList"
+       }
+      ],
       "produces": [
        "application/json"
       ],
@@ -469,7 +539,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "v1beta2.Event",
       "method": "POST",
       "summary": "create a Event",
       "nickname": "createEvent",
@@ -489,6 +559,13 @@
         "description": "",
         "required": true,
         "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta2.Event"
        }
       ],
       "produces": [
@@ -551,6 +628,13 @@
         "allowMultiple": false
        }
       ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "json.WatchEvent"
+       }
+      ],
       "produces": [
        "application/json"
       ],
@@ -587,6 +671,13 @@
         "allowMultiple": false
        }
       ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta2.Event"
+       }
+      ],
       "produces": [
        "application/json"
       ],
@@ -595,7 +686,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "v1beta2.Event",
       "method": "PUT",
       "summary": "replace the specified Event",
       "nickname": "replaceEvent",
@@ -625,6 +716,13 @@
         "allowMultiple": false
        }
       ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta2.Event"
+       }
+      ],
       "produces": [
        "application/json"
       ],
@@ -633,7 +731,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "v1beta2.Event",
       "method": "PATCH",
       "summary": "partially update the specified Event",
       "nickname": "patchEvent",
@@ -655,12 +753,19 @@
         "allowMultiple": false
        },
        {
-        "type": "v1beta2.Event",
+        "type": "string",
         "paramType": "body",
         "name": "body",
         "description": "",
         "required": true,
         "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "string"
        }
       ],
       "produces": [
@@ -673,7 +778,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "v1beta2.Status",
       "method": "DELETE",
       "summary": "delete a Event",
       "nickname": "deleteEvent",
@@ -693,6 +798,13 @@
         "description": "object name and auth scope, such as for teams and projects",
         "required": false,
         "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta2.Status"
        }
       ],
       "produces": [
@@ -763,6 +875,13 @@
         "allowMultiple": false
        }
       ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "json.WatchEvent"
+       }
+      ],
       "produces": [
        "application/json"
       ],
@@ -823,6 +942,13 @@
         "allowMultiple": false
        }
       ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta2.LimitRangeList"
+       }
+      ],
       "produces": [
        "application/json"
       ],
@@ -831,7 +957,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "v1beta2.LimitRange",
       "method": "POST",
       "summary": "create a LimitRange",
       "nickname": "createLimitRange",
@@ -851,6 +977,13 @@
         "description": "",
         "required": true,
         "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta2.LimitRange"
        }
       ],
       "produces": [
@@ -913,6 +1046,13 @@
         "allowMultiple": false
        }
       ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "json.WatchEvent"
+       }
+      ],
       "produces": [
        "application/json"
       ],
@@ -949,6 +1089,13 @@
         "allowMultiple": false
        }
       ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta2.LimitRange"
+       }
+      ],
       "produces": [
        "application/json"
       ],
@@ -957,7 +1104,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "v1beta2.LimitRange",
       "method": "PUT",
       "summary": "replace the specified LimitRange",
       "nickname": "replaceLimitRange",
@@ -987,6 +1134,13 @@
         "allowMultiple": false
        }
       ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta2.LimitRange"
+       }
+      ],
       "produces": [
        "application/json"
       ],
@@ -995,7 +1149,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "v1beta2.LimitRange",
       "method": "PATCH",
       "summary": "partially update the specified LimitRange",
       "nickname": "patchLimitRange",
@@ -1017,12 +1171,19 @@
         "allowMultiple": false
        },
        {
-        "type": "v1beta2.LimitRange",
+        "type": "string",
         "paramType": "body",
         "name": "body",
         "description": "",
         "required": true,
         "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "string"
        }
       ],
       "produces": [
@@ -1035,7 +1196,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "v1beta2.Status",
       "method": "DELETE",
       "summary": "delete a LimitRange",
       "nickname": "deleteLimitRange",
@@ -1055,6 +1216,13 @@
         "description": "object name and auth scope, such as for teams and projects",
         "required": false,
         "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta2.Status"
        }
       ],
       "produces": [
@@ -1125,6 +1293,13 @@
         "allowMultiple": false
        }
       ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "json.WatchEvent"
+       }
+      ],
       "produces": [
        "application/json"
       ],
@@ -1177,6 +1352,13 @@
         "allowMultiple": false
        }
       ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta2.MinionList"
+       }
+      ],
       "produces": [
        "application/json"
       ],
@@ -1185,7 +1367,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "v1beta2.Minion",
       "method": "POST",
       "summary": "create a Node",
       "nickname": "createNode",
@@ -1197,6 +1379,13 @@
         "description": "",
         "required": true,
         "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta2.Minion"
        }
       ],
       "produces": [
@@ -1251,6 +1440,13 @@
         "allowMultiple": false
        }
       ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "json.WatchEvent"
+       }
+      ],
       "produces": [
        "application/json"
       ],
@@ -1279,6 +1475,13 @@
         "allowMultiple": false
        }
       ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta2.Minion"
+       }
+      ],
       "produces": [
        "application/json"
       ],
@@ -1287,7 +1490,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "v1beta2.Minion",
       "method": "PUT",
       "summary": "replace the specified Node",
       "nickname": "replaceNode",
@@ -1309,6 +1512,13 @@
         "allowMultiple": false
        }
       ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta2.Minion"
+       }
+      ],
       "produces": [
        "application/json"
       ],
@@ -1317,7 +1527,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "v1beta2.Minion",
       "method": "PATCH",
       "summary": "partially update the specified Node",
       "nickname": "patchNode",
@@ -1331,12 +1541,19 @@
         "allowMultiple": false
        },
        {
-        "type": "v1beta2.Minion",
+        "type": "string",
         "paramType": "body",
         "name": "body",
         "description": "",
         "required": true,
         "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "string"
        }
       ],
       "produces": [
@@ -1349,7 +1566,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "v1beta2.Status",
       "method": "DELETE",
       "summary": "delete a Node",
       "nickname": "deleteNode",
@@ -1363,12 +1580,19 @@
         "allowMultiple": false
        },
        {
-        "type": "*v1beta2.DeleteOptions",
+        "type": "v1beta2.DeleteOptions",
         "paramType": "body",
         "name": "body",
         "description": "",
         "required": true,
         "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta2.Status"
        }
       ],
       "produces": [
@@ -1431,6 +1655,13 @@
         "allowMultiple": false
        }
       ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "json.WatchEvent"
+       }
+      ],
       "produces": [
        "application/json"
       ],
@@ -1445,7 +1676,7 @@
     "description": "API at /api/v1beta2 version v1beta2",
     "operations": [
      {
-      "type": "void",
+      "type": "string",
       "method": "GET",
       "summary": "redirect GET request to Node",
       "nickname": "redirectNode",
@@ -1473,7 +1704,7 @@
     "description": "API at /api/v1beta2 version v1beta2",
     "operations": [
      {
-      "type": "void",
+      "type": "string",
       "method": "GET",
       "summary": "proxy GET requests to Node",
       "nickname": "proxyGETNode",
@@ -1503,7 +1734,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "string",
       "method": "PUT",
       "summary": "proxy PUT requests to Node",
       "nickname": "proxyPUTNode",
@@ -1533,7 +1764,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "string",
       "method": "POST",
       "summary": "proxy POST requests to Node",
       "nickname": "proxyPOSTNode",
@@ -1563,7 +1794,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "string",
       "method": "DELETE",
       "summary": "proxy DELETE requests to Node",
       "nickname": "proxyDELETENode",
@@ -1599,7 +1830,7 @@
     "description": "API at /api/v1beta2 version v1beta2",
     "operations": [
      {
-      "type": "void",
+      "type": "string",
       "method": "GET",
       "summary": "proxy GET requests to Node",
       "nickname": "proxyGETNode",
@@ -1621,7 +1852,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "string",
       "method": "PUT",
       "summary": "proxy PUT requests to Node",
       "nickname": "proxyPUTNode",
@@ -1643,7 +1874,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "string",
       "method": "POST",
       "summary": "proxy POST requests to Node",
       "nickname": "proxyPOSTNode",
@@ -1665,7 +1896,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "string",
       "method": "DELETE",
       "summary": "proxy DELETE requests to Node",
       "nickname": "proxyDELETENode",
@@ -1731,6 +1962,13 @@
         "allowMultiple": false
        }
       ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta2.NamespaceList"
+       }
+      ],
       "produces": [
        "application/json"
       ],
@@ -1739,7 +1977,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "v1beta2.Namespace",
       "method": "POST",
       "summary": "create a Namespace",
       "nickname": "createNamespace",
@@ -1751,6 +1989,13 @@
         "description": "",
         "required": true,
         "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta2.Namespace"
        }
       ],
       "produces": [
@@ -1805,6 +2050,13 @@
         "allowMultiple": false
        }
       ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "json.WatchEvent"
+       }
+      ],
       "produces": [
        "application/json"
       ],
@@ -1833,6 +2085,13 @@
         "allowMultiple": false
        }
       ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta2.Namespace"
+       }
+      ],
       "produces": [
        "application/json"
       ],
@@ -1841,7 +2100,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "v1beta2.Namespace",
       "method": "PUT",
       "summary": "replace the specified Namespace",
       "nickname": "replaceNamespace",
@@ -1863,6 +2122,13 @@
         "allowMultiple": false
        }
       ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta2.Namespace"
+       }
+      ],
       "produces": [
        "application/json"
       ],
@@ -1871,7 +2137,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "v1beta2.Namespace",
       "method": "PATCH",
       "summary": "partially update the specified Namespace",
       "nickname": "patchNamespace",
@@ -1885,12 +2151,19 @@
         "allowMultiple": false
        },
        {
-        "type": "v1beta2.Namespace",
+        "type": "string",
         "paramType": "body",
         "name": "body",
         "description": "",
         "required": true,
         "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "string"
        }
       ],
       "produces": [
@@ -1903,7 +2176,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "v1beta2.Status",
       "method": "DELETE",
       "summary": "delete a Namespace",
       "nickname": "deleteNamespace",
@@ -1917,12 +2190,19 @@
         "allowMultiple": false
        },
        {
-        "type": "*v1beta2.DeleteOptions",
+        "type": "v1beta2.DeleteOptions",
         "paramType": "body",
         "name": "body",
         "description": "",
         "required": true,
         "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta2.Status"
        }
       ],
       "produces": [
@@ -1985,6 +2265,13 @@
         "allowMultiple": false
        }
       ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "json.WatchEvent"
+       }
+      ],
       "produces": [
        "application/json"
       ],
@@ -1999,7 +2286,7 @@
     "description": "API at /api/v1beta2 version v1beta2",
     "operations": [
      {
-      "type": "void",
+      "type": "v1beta2.Namespace",
       "method": "PUT",
       "summary": "replace the specified Namespace",
       "nickname": "replaceNamespace",
@@ -2021,6 +2308,13 @@
         "allowMultiple": false
        }
       ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta2.Namespace"
+       }
+      ],
       "produces": [
        "application/json"
       ],
@@ -2035,7 +2329,7 @@
     "description": "API at /api/v1beta2 version v1beta2",
     "operations": [
      {
-      "type": "void",
+      "type": "v1beta2.Namespace",
       "method": "PUT",
       "summary": "replace the specified Namespace",
       "nickname": "replaceNamespace",
@@ -2055,6 +2349,13 @@
         "description": "",
         "required": true,
         "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta2.Namespace"
        }
       ],
       "produces": [
@@ -2109,6 +2410,13 @@
         "allowMultiple": false
        }
       ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta2.MinionList"
+       }
+      ],
       "produces": [
        "application/json"
       ],
@@ -2117,7 +2425,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "v1beta2.Minion",
       "method": "POST",
       "summary": "create a Node",
       "nickname": "createNode",
@@ -2129,6 +2437,13 @@
         "description": "",
         "required": true,
         "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta2.Minion"
        }
       ],
       "produces": [
@@ -2183,6 +2498,13 @@
         "allowMultiple": false
        }
       ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "json.WatchEvent"
+       }
+      ],
       "produces": [
        "application/json"
       ],
@@ -2211,6 +2533,13 @@
         "allowMultiple": false
        }
       ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta2.Minion"
+       }
+      ],
       "produces": [
        "application/json"
       ],
@@ -2219,7 +2548,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "v1beta2.Minion",
       "method": "PUT",
       "summary": "replace the specified Node",
       "nickname": "replaceNode",
@@ -2241,6 +2570,13 @@
         "allowMultiple": false
        }
       ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta2.Minion"
+       }
+      ],
       "produces": [
        "application/json"
       ],
@@ -2249,7 +2585,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "v1beta2.Minion",
       "method": "PATCH",
       "summary": "partially update the specified Node",
       "nickname": "patchNode",
@@ -2263,12 +2599,19 @@
         "allowMultiple": false
        },
        {
-        "type": "v1beta2.Minion",
+        "type": "string",
         "paramType": "body",
         "name": "body",
         "description": "",
         "required": true,
         "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "string"
        }
       ],
       "produces": [
@@ -2281,7 +2624,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "v1beta2.Status",
       "method": "DELETE",
       "summary": "delete a Node",
       "nickname": "deleteNode",
@@ -2295,12 +2638,19 @@
         "allowMultiple": false
        },
        {
-        "type": "*v1beta2.DeleteOptions",
+        "type": "v1beta2.DeleteOptions",
         "paramType": "body",
         "name": "body",
         "description": "",
         "required": true,
         "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta2.Status"
        }
       ],
       "produces": [
@@ -2363,6 +2713,13 @@
         "allowMultiple": false
        }
       ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "json.WatchEvent"
+       }
+      ],
       "produces": [
        "application/json"
       ],
@@ -2377,7 +2734,7 @@
     "description": "API at /api/v1beta2 version v1beta2",
     "operations": [
      {
-      "type": "void",
+      "type": "string",
       "method": "GET",
       "summary": "redirect GET request to Node",
       "nickname": "redirectNode",
@@ -2405,7 +2762,7 @@
     "description": "API at /api/v1beta2 version v1beta2",
     "operations": [
      {
-      "type": "void",
+      "type": "string",
       "method": "GET",
       "summary": "proxy GET requests to Node",
       "nickname": "proxyGETNode",
@@ -2435,7 +2792,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "string",
       "method": "PUT",
       "summary": "proxy PUT requests to Node",
       "nickname": "proxyPUTNode",
@@ -2465,7 +2822,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "string",
       "method": "POST",
       "summary": "proxy POST requests to Node",
       "nickname": "proxyPOSTNode",
@@ -2495,7 +2852,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "string",
       "method": "DELETE",
       "summary": "proxy DELETE requests to Node",
       "nickname": "proxyDELETENode",
@@ -2531,7 +2888,7 @@
     "description": "API at /api/v1beta2 version v1beta2",
     "operations": [
      {
-      "type": "void",
+      "type": "string",
       "method": "GET",
       "summary": "proxy GET requests to Node",
       "nickname": "proxyGETNode",
@@ -2553,7 +2910,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "string",
       "method": "PUT",
       "summary": "proxy PUT requests to Node",
       "nickname": "proxyPUTNode",
@@ -2575,7 +2932,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "string",
       "method": "POST",
       "summary": "proxy POST requests to Node",
       "nickname": "proxyPOSTNode",
@@ -2597,7 +2954,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "string",
       "method": "DELETE",
       "summary": "proxy DELETE requests to Node",
       "nickname": "proxyDELETENode",
@@ -2671,6 +3028,13 @@
         "allowMultiple": false
        }
       ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta2.PersistentVolumeClaimList"
+       }
+      ],
       "produces": [
        "application/json"
       ],
@@ -2679,7 +3043,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "v1beta2.PersistentVolumeClaim",
       "method": "POST",
       "summary": "create a PersistentVolumeClaim",
       "nickname": "createPersistentVolumeClaim",
@@ -2699,6 +3063,13 @@
         "description": "",
         "required": true,
         "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta2.PersistentVolumeClaim"
        }
       ],
       "produces": [
@@ -2761,6 +3132,13 @@
         "allowMultiple": false
        }
       ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "json.WatchEvent"
+       }
+      ],
       "produces": [
        "application/json"
       ],
@@ -2797,6 +3175,13 @@
         "allowMultiple": false
        }
       ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta2.PersistentVolumeClaim"
+       }
+      ],
       "produces": [
        "application/json"
       ],
@@ -2805,7 +3190,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "v1beta2.PersistentVolumeClaim",
       "method": "PUT",
       "summary": "replace the specified PersistentVolumeClaim",
       "nickname": "replacePersistentVolumeClaim",
@@ -2835,6 +3220,13 @@
         "allowMultiple": false
        }
       ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta2.PersistentVolumeClaim"
+       }
+      ],
       "produces": [
        "application/json"
       ],
@@ -2843,7 +3235,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "v1beta2.PersistentVolumeClaim",
       "method": "PATCH",
       "summary": "partially update the specified PersistentVolumeClaim",
       "nickname": "patchPersistentVolumeClaim",
@@ -2865,12 +3257,19 @@
         "allowMultiple": false
        },
        {
-        "type": "v1beta2.PersistentVolumeClaim",
+        "type": "string",
         "paramType": "body",
         "name": "body",
         "description": "",
         "required": true,
         "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "string"
        }
       ],
       "produces": [
@@ -2883,7 +3282,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "v1beta2.Status",
       "method": "DELETE",
       "summary": "delete a PersistentVolumeClaim",
       "nickname": "deletePersistentVolumeClaim",
@@ -2905,12 +3304,19 @@
         "allowMultiple": false
        },
        {
-        "type": "*v1beta2.DeleteOptions",
+        "type": "v1beta2.DeleteOptions",
         "paramType": "body",
         "name": "body",
         "description": "",
         "required": true,
         "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta2.Status"
        }
       ],
       "produces": [
@@ -2981,6 +3387,64 @@
         "allowMultiple": false
        }
       ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "json.WatchEvent"
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/api/v1beta2/persistentVolumeClaims/{name}/status",
+    "description": "API at /api/v1beta2 version v1beta2",
+    "operations": [
+     {
+      "type": "v1beta2.PersistentVolumeClaim",
+      "method": "PUT",
+      "summary": "replace the specified PersistentVolumeClaim",
+      "nickname": "replacePersistentVolumeClaim",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the PersistentVolumeClaim",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1beta2.PersistentVolumeClaim",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta2.PersistentVolumeClaim"
+       }
+      ],
       "produces": [
        "application/json"
       ],
@@ -3033,6 +3497,13 @@
         "allowMultiple": false
        }
       ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta2.PersistentVolumeList"
+       }
+      ],
       "produces": [
        "application/json"
       ],
@@ -3041,7 +3512,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "v1beta2.PersistentVolume",
       "method": "POST",
       "summary": "create a PersistentVolume",
       "nickname": "createPersistentVolume",
@@ -3053,6 +3524,13 @@
         "description": "",
         "required": true,
         "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta2.PersistentVolume"
        }
       ],
       "produces": [
@@ -3107,6 +3585,13 @@
         "allowMultiple": false
        }
       ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "json.WatchEvent"
+       }
+      ],
       "produces": [
        "application/json"
       ],
@@ -3135,6 +3620,13 @@
         "allowMultiple": false
        }
       ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta2.PersistentVolume"
+       }
+      ],
       "produces": [
        "application/json"
       ],
@@ -3143,7 +3635,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "v1beta2.PersistentVolume",
       "method": "PUT",
       "summary": "replace the specified PersistentVolume",
       "nickname": "replacePersistentVolume",
@@ -3165,6 +3657,13 @@
         "allowMultiple": false
        }
       ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta2.PersistentVolume"
+       }
+      ],
       "produces": [
        "application/json"
       ],
@@ -3173,7 +3672,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "v1beta2.PersistentVolume",
       "method": "PATCH",
       "summary": "partially update the specified PersistentVolume",
       "nickname": "patchPersistentVolume",
@@ -3187,12 +3686,19 @@
         "allowMultiple": false
        },
        {
-        "type": "v1beta2.PersistentVolume",
+        "type": "string",
         "paramType": "body",
         "name": "body",
         "description": "",
         "required": true,
         "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "string"
        }
       ],
       "produces": [
@@ -3205,7 +3711,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "v1beta2.Status",
       "method": "DELETE",
       "summary": "delete a PersistentVolume",
       "nickname": "deletePersistentVolume",
@@ -3219,12 +3725,19 @@
         "allowMultiple": false
        },
        {
-        "type": "*v1beta2.DeleteOptions",
+        "type": "v1beta2.DeleteOptions",
         "paramType": "body",
         "name": "body",
         "description": "",
         "required": true,
         "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta2.Status"
        }
       ],
       "produces": [
@@ -3287,6 +3800,13 @@
         "allowMultiple": false
        }
       ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "json.WatchEvent"
+       }
+      ],
       "produces": [
        "application/json"
       ],
@@ -3301,7 +3821,7 @@
     "description": "API at /api/v1beta2 version v1beta2",
     "operations": [
      {
-      "type": "void",
+      "type": "v1beta2.PersistentVolume",
       "method": "PUT",
       "summary": "replace the specified PersistentVolume",
       "nickname": "replacePersistentVolume",
@@ -3321,6 +3841,13 @@
         "description": "",
         "required": true,
         "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta2.PersistentVolume"
        }
       ],
       "produces": [
@@ -3383,6 +3910,13 @@
         "allowMultiple": false
        }
       ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta2.PodList"
+       }
+      ],
       "produces": [
        "application/json"
       ],
@@ -3391,7 +3925,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "v1beta2.Pod",
       "method": "POST",
       "summary": "create a Pod",
       "nickname": "createPod",
@@ -3411,6 +3945,13 @@
         "description": "",
         "required": true,
         "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta2.Pod"
        }
       ],
       "produces": [
@@ -3473,6 +4014,13 @@
         "allowMultiple": false
        }
       ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "json.WatchEvent"
+       }
+      ],
       "produces": [
        "application/json"
       ],
@@ -3509,6 +4057,13 @@
         "allowMultiple": false
        }
       ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta2.Pod"
+       }
+      ],
       "produces": [
        "application/json"
       ],
@@ -3517,7 +4072,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "v1beta2.Pod",
       "method": "PUT",
       "summary": "replace the specified Pod",
       "nickname": "replacePod",
@@ -3547,6 +4102,13 @@
         "allowMultiple": false
        }
       ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta2.Pod"
+       }
+      ],
       "produces": [
        "application/json"
       ],
@@ -3555,7 +4117,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "v1beta2.Pod",
       "method": "PATCH",
       "summary": "partially update the specified Pod",
       "nickname": "patchPod",
@@ -3577,12 +4139,19 @@
         "allowMultiple": false
        },
        {
-        "type": "v1beta2.Pod",
+        "type": "string",
         "paramType": "body",
         "name": "body",
         "description": "",
         "required": true,
         "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "string"
        }
       ],
       "produces": [
@@ -3595,7 +4164,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "v1beta2.Status",
       "method": "DELETE",
       "summary": "delete a Pod",
       "nickname": "deletePod",
@@ -3617,12 +4186,19 @@
         "allowMultiple": false
        },
        {
-        "type": "*v1beta2.DeleteOptions",
+        "type": "v1beta2.DeleteOptions",
         "paramType": "body",
         "name": "body",
         "description": "",
         "required": true,
         "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta2.Status"
        }
       ],
       "produces": [
@@ -3693,6 +4269,13 @@
         "allowMultiple": false
        }
       ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "json.WatchEvent"
+       }
+      ],
       "produces": [
        "application/json"
       ],
@@ -3707,7 +4290,7 @@
     "description": "API at /api/v1beta2 version v1beta2",
     "operations": [
      {
-      "type": "void",
+      "type": "string",
       "method": "GET",
       "summary": "redirect GET request to Pod",
       "nickname": "redirectPod",
@@ -3743,7 +4326,7 @@
     "description": "API at /api/v1beta2 version v1beta2",
     "operations": [
      {
-      "type": "void",
+      "type": "string",
       "method": "GET",
       "summary": "proxy GET requests to Pod",
       "nickname": "proxyGETPod",
@@ -3781,7 +4364,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "string",
       "method": "PUT",
       "summary": "proxy PUT requests to Pod",
       "nickname": "proxyPUTPod",
@@ -3819,7 +4402,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "string",
       "method": "POST",
       "summary": "proxy POST requests to Pod",
       "nickname": "proxyPOSTPod",
@@ -3857,7 +4440,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "string",
       "method": "DELETE",
       "summary": "proxy DELETE requests to Pod",
       "nickname": "proxyDELETEPod",
@@ -3901,7 +4484,7 @@
     "description": "API at /api/v1beta2 version v1beta2",
     "operations": [
      {
-      "type": "void",
+      "type": "string",
       "method": "GET",
       "summary": "proxy GET requests to Pod",
       "nickname": "proxyGETPod",
@@ -3931,7 +4514,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "string",
       "method": "PUT",
       "summary": "proxy PUT requests to Pod",
       "nickname": "proxyPUTPod",
@@ -3961,7 +4544,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "string",
       "method": "POST",
       "summary": "proxy POST requests to Pod",
       "nickname": "proxyPOSTPod",
@@ -3991,7 +4574,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "string",
       "method": "DELETE",
       "summary": "proxy DELETE requests to Pod",
       "nickname": "proxyDELETEPod",
@@ -4027,7 +4610,7 @@
     "description": "API at /api/v1beta2 version v1beta2",
     "operations": [
      {
-      "type": "void",
+      "type": "v1beta2.Binding",
       "method": "POST",
       "summary": "create a Binding",
       "nickname": "createBinding",
@@ -4047,6 +4630,13 @@
         "description": "",
         "required": true,
         "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta2.Binding"
        }
       ],
       "produces": [
@@ -4085,6 +4675,13 @@
         "allowMultiple": false
        }
       ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta2.PodLogOptions"
+       }
+      ],
       "produces": [
        "application/json"
       ],
@@ -4099,7 +4696,7 @@
     "description": "API at /api/v1beta2 version v1beta2",
     "operations": [
      {
-      "type": "void",
+      "type": "v1beta2.Pod",
       "method": "PUT",
       "summary": "replace the specified Pod",
       "nickname": "replacePod",
@@ -4127,6 +4724,13 @@
         "description": "",
         "required": true,
         "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta2.Pod"
        }
       ],
       "produces": [
@@ -4189,6 +4793,13 @@
         "allowMultiple": false
        }
       ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta2.ReplicationControllerList"
+       }
+      ],
       "produces": [
        "application/json"
       ],
@@ -4197,7 +4808,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "v1beta2.ReplicationController",
       "method": "POST",
       "summary": "create a ReplicationController",
       "nickname": "createReplicationController",
@@ -4217,6 +4828,13 @@
         "description": "",
         "required": true,
         "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta2.ReplicationController"
        }
       ],
       "produces": [
@@ -4279,6 +4897,13 @@
         "allowMultiple": false
        }
       ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "json.WatchEvent"
+       }
+      ],
       "produces": [
        "application/json"
       ],
@@ -4315,6 +4940,13 @@
         "allowMultiple": false
        }
       ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta2.ReplicationController"
+       }
+      ],
       "produces": [
        "application/json"
       ],
@@ -4323,7 +4955,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "v1beta2.ReplicationController",
       "method": "PUT",
       "summary": "replace the specified ReplicationController",
       "nickname": "replaceReplicationController",
@@ -4353,6 +4985,13 @@
         "allowMultiple": false
        }
       ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta2.ReplicationController"
+       }
+      ],
       "produces": [
        "application/json"
       ],
@@ -4361,7 +5000,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "v1beta2.ReplicationController",
       "method": "PATCH",
       "summary": "partially update the specified ReplicationController",
       "nickname": "patchReplicationController",
@@ -4383,12 +5022,19 @@
         "allowMultiple": false
        },
        {
-        "type": "v1beta2.ReplicationController",
+        "type": "string",
         "paramType": "body",
         "name": "body",
         "description": "",
         "required": true,
         "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "string"
        }
       ],
       "produces": [
@@ -4401,7 +5047,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "v1beta2.Status",
       "method": "DELETE",
       "summary": "delete a ReplicationController",
       "nickname": "deleteReplicationController",
@@ -4423,12 +5069,19 @@
         "allowMultiple": false
        },
        {
-        "type": "*v1beta2.DeleteOptions",
+        "type": "v1beta2.DeleteOptions",
         "paramType": "body",
         "name": "body",
         "description": "",
         "required": true,
         "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta2.Status"
        }
       ],
       "produces": [
@@ -4499,6 +5152,13 @@
         "allowMultiple": false
        }
       ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "json.WatchEvent"
+       }
+      ],
       "produces": [
        "application/json"
       ],
@@ -4559,6 +5219,13 @@
         "allowMultiple": false
        }
       ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta2.ResourceQuotaList"
+       }
+      ],
       "produces": [
        "application/json"
       ],
@@ -4567,7 +5234,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "v1beta2.ResourceQuota",
       "method": "POST",
       "summary": "create a ResourceQuota",
       "nickname": "createResourceQuota",
@@ -4587,6 +5254,13 @@
         "description": "",
         "required": true,
         "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta2.ResourceQuota"
        }
       ],
       "produces": [
@@ -4649,6 +5323,13 @@
         "allowMultiple": false
        }
       ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "json.WatchEvent"
+       }
+      ],
       "produces": [
        "application/json"
       ],
@@ -4685,6 +5366,13 @@
         "allowMultiple": false
        }
       ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta2.ResourceQuota"
+       }
+      ],
       "produces": [
        "application/json"
       ],
@@ -4693,7 +5381,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "v1beta2.ResourceQuota",
       "method": "PUT",
       "summary": "replace the specified ResourceQuota",
       "nickname": "replaceResourceQuota",
@@ -4723,6 +5411,13 @@
         "allowMultiple": false
        }
       ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta2.ResourceQuota"
+       }
+      ],
       "produces": [
        "application/json"
       ],
@@ -4731,7 +5426,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "v1beta2.ResourceQuota",
       "method": "PATCH",
       "summary": "partially update the specified ResourceQuota",
       "nickname": "patchResourceQuota",
@@ -4753,12 +5448,19 @@
         "allowMultiple": false
        },
        {
-        "type": "v1beta2.ResourceQuota",
+        "type": "string",
         "paramType": "body",
         "name": "body",
         "description": "",
         "required": true,
         "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "string"
        }
       ],
       "produces": [
@@ -4771,7 +5473,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "v1beta2.Status",
       "method": "DELETE",
       "summary": "delete a ResourceQuota",
       "nickname": "deleteResourceQuota",
@@ -4793,12 +5495,19 @@
         "allowMultiple": false
        },
        {
-        "type": "*v1beta2.DeleteOptions",
+        "type": "v1beta2.DeleteOptions",
         "paramType": "body",
         "name": "body",
         "description": "",
         "required": true,
         "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta2.Status"
        }
       ],
       "produces": [
@@ -4869,6 +5578,13 @@
         "allowMultiple": false
        }
       ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "json.WatchEvent"
+       }
+      ],
       "produces": [
        "application/json"
       ],
@@ -4883,7 +5599,7 @@
     "description": "API at /api/v1beta2 version v1beta2",
     "operations": [
      {
-      "type": "void",
+      "type": "v1beta2.ResourceQuota",
       "method": "PUT",
       "summary": "replace the specified ResourceQuota",
       "nickname": "replaceResourceQuota",
@@ -4911,6 +5627,13 @@
         "description": "",
         "required": true,
         "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta2.ResourceQuota"
        }
       ],
       "produces": [
@@ -4973,6 +5696,13 @@
         "allowMultiple": false
        }
       ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta2.SecretList"
+       }
+      ],
       "produces": [
        "application/json"
       ],
@@ -4981,7 +5711,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "v1beta2.Secret",
       "method": "POST",
       "summary": "create a Secret",
       "nickname": "createSecret",
@@ -5001,6 +5731,13 @@
         "description": "",
         "required": true,
         "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta2.Secret"
        }
       ],
       "produces": [
@@ -5063,6 +5800,13 @@
         "allowMultiple": false
        }
       ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "json.WatchEvent"
+       }
+      ],
       "produces": [
        "application/json"
       ],
@@ -5099,6 +5843,13 @@
         "allowMultiple": false
        }
       ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta2.Secret"
+       }
+      ],
       "produces": [
        "application/json"
       ],
@@ -5107,7 +5858,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "v1beta2.Secret",
       "method": "PUT",
       "summary": "replace the specified Secret",
       "nickname": "replaceSecret",
@@ -5137,6 +5888,13 @@
         "allowMultiple": false
        }
       ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta2.Secret"
+       }
+      ],
       "produces": [
        "application/json"
       ],
@@ -5145,7 +5903,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "v1beta2.Secret",
       "method": "PATCH",
       "summary": "partially update the specified Secret",
       "nickname": "patchSecret",
@@ -5167,12 +5925,19 @@
         "allowMultiple": false
        },
        {
-        "type": "v1beta2.Secret",
+        "type": "string",
         "paramType": "body",
         "name": "body",
         "description": "",
         "required": true,
         "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "string"
        }
       ],
       "produces": [
@@ -5185,7 +5950,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "v1beta2.Status",
       "method": "DELETE",
       "summary": "delete a Secret",
       "nickname": "deleteSecret",
@@ -5205,6 +5970,13 @@
         "description": "object name and auth scope, such as for teams and projects",
         "required": false,
         "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta2.Status"
        }
       ],
       "produces": [
@@ -5275,6 +6047,13 @@
         "allowMultiple": false
        }
       ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "json.WatchEvent"
+       }
+      ],
       "produces": [
        "application/json"
       ],
@@ -5335,6 +6114,13 @@
         "allowMultiple": false
        }
       ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta2.ServiceList"
+       }
+      ],
       "produces": [
        "application/json"
       ],
@@ -5343,7 +6129,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "v1beta2.Service",
       "method": "POST",
       "summary": "create a Service",
       "nickname": "createService",
@@ -5363,6 +6149,13 @@
         "description": "",
         "required": true,
         "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta2.Service"
        }
       ],
       "produces": [
@@ -5425,6 +6218,13 @@
         "allowMultiple": false
        }
       ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "json.WatchEvent"
+       }
+      ],
       "produces": [
        "application/json"
       ],
@@ -5461,6 +6261,13 @@
         "allowMultiple": false
        }
       ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta2.Service"
+       }
+      ],
       "produces": [
        "application/json"
       ],
@@ -5469,7 +6276,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "v1beta2.Service",
       "method": "PUT",
       "summary": "replace the specified Service",
       "nickname": "replaceService",
@@ -5499,6 +6306,13 @@
         "allowMultiple": false
        }
       ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta2.Service"
+       }
+      ],
       "produces": [
        "application/json"
       ],
@@ -5507,7 +6321,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "v1beta2.Service",
       "method": "PATCH",
       "summary": "partially update the specified Service",
       "nickname": "patchService",
@@ -5529,12 +6343,19 @@
         "allowMultiple": false
        },
        {
-        "type": "v1beta2.Service",
+        "type": "string",
         "paramType": "body",
         "name": "body",
         "description": "",
         "required": true,
         "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "string"
        }
       ],
       "produces": [
@@ -5547,7 +6368,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "v1beta2.Status",
       "method": "DELETE",
       "summary": "delete a Service",
       "nickname": "deleteService",
@@ -5567,6 +6388,13 @@
         "description": "object name and auth scope, such as for teams and projects",
         "required": false,
         "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta2.Status"
        }
       ],
       "produces": [
@@ -5637,6 +6465,13 @@
         "allowMultiple": false
        }
       ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "json.WatchEvent"
+       }
+      ],
       "produces": [
        "application/json"
       ],
@@ -5651,7 +6486,7 @@
     "description": "API at /api/v1beta2 version v1beta2",
     "operations": [
      {
-      "type": "void",
+      "type": "string",
       "method": "GET",
       "summary": "redirect GET request to Service",
       "nickname": "redirectService",
@@ -5687,7 +6522,7 @@
     "description": "API at /api/v1beta2 version v1beta2",
     "operations": [
      {
-      "type": "void",
+      "type": "string",
       "method": "GET",
       "summary": "proxy GET requests to Service",
       "nickname": "proxyGETService",
@@ -5725,7 +6560,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "string",
       "method": "PUT",
       "summary": "proxy PUT requests to Service",
       "nickname": "proxyPUTService",
@@ -5763,7 +6598,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "string",
       "method": "POST",
       "summary": "proxy POST requests to Service",
       "nickname": "proxyPOSTService",
@@ -5801,7 +6636,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "string",
       "method": "DELETE",
       "summary": "proxy DELETE requests to Service",
       "nickname": "proxyDELETEService",
@@ -5845,7 +6680,7 @@
     "description": "API at /api/v1beta2 version v1beta2",
     "operations": [
      {
-      "type": "void",
+      "type": "string",
       "method": "GET",
       "summary": "proxy GET requests to Service",
       "nickname": "proxyGETService",
@@ -5875,7 +6710,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "string",
       "method": "PUT",
       "summary": "proxy PUT requests to Service",
       "nickname": "proxyPUTService",
@@ -5905,7 +6740,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "string",
       "method": "POST",
       "summary": "proxy POST requests to Service",
       "nickname": "proxyPOSTService",
@@ -5935,7 +6770,7 @@
       ]
      },
      {
-      "type": "void",
+      "type": "string",
       "method": "DELETE",
       "summary": "proxy DELETE requests to Service",
       "nickname": "proxyDELETEService",
@@ -5968,10 +6803,6 @@
    }
   ],
   "models": {
-   "*v1beta2.DeleteOptions": {
-    "id": "*v1beta2.DeleteOptions",
-    "properties": {}
-   },
    "json.WatchEvent": {
     "id": "json.WatchEvent",
     "properties": {
@@ -6253,6 +7084,62 @@
      "protocol": {
       "type": "string",
       "description": "protocol for port; must be UDP or TCP; TCP if unspecified"
+     }
+    }
+   },
+   "v1beta2.DeleteOptions": {
+    "id": "v1beta2.DeleteOptions",
+    "required": [
+     "gracePeriodSeconds"
+    ],
+    "properties": {
+     "annotations": {
+      "type": "any",
+      "description": "map of string keys and values that can be used by external tooling to store and retrieve arbitrary metadata about the object"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "version of the schema the object should have"
+     },
+     "creationTimestamp": {
+      "type": "string",
+      "description": "RFC 3339 date and time at which the object was created; populated by the system, read-only; null for lists"
+     },
+     "deletionTimestamp": {
+      "type": "string",
+      "description": "RFC 3339 date and time at which the object will be deleted; populated by the system when a graceful deletion is requested, read-only; if not set, graceful deletion of the object has not been requested"
+     },
+     "generateName": {
+      "type": "string",
+      "description": "an optional prefix to use to generate a unique name; has the same validation rules as name; optional, and is applied only name if is not specified"
+     },
+     "gracePeriodSeconds": {
+      "$ref": "int64",
+      "description": "the duration in seconds to wait before deleting this object; defaults to a per object value if not specified; zero means delete immediately"
+     },
+     "id": {
+      "type": "string",
+      "description": "name of the object; must be a DNS_SUBDOMAIN and unique among all objects of the same kind within the same namespace; used in resource URLs; cannot be updated"
+     },
+     "kind": {
+      "type": "string",
+      "description": "kind of object, in CamelCase; cannot be updated"
+     },
+     "namespace": {
+      "type": "string",
+      "description": "namespace to which the object belongs; must be a DNS_SUBDOMAIN; 'default' by default; cannot be updated"
+     },
+     "resourceVersion": {
+      "$ref": "uint64",
+      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
+     },
+     "selfLink": {
+      "type": "string",
+      "description": "URL for the object; populated by the system, read-only"
+     },
+     "uid": {
+      "type": "string",
+      "description": "unique UUID across space and time; populated by the system, read-only"
      }
     }
    },
@@ -6721,6 +7608,27 @@
      "revision": {
       "type": "string",
       "description": "commit hash for the specified revision"
+     }
+    }
+   },
+   "v1beta2.GlusterfsVolumeSource": {
+    "id": "v1beta2.GlusterfsVolumeSource",
+    "required": [
+     "endpoints",
+     "path"
+    ],
+    "properties": {
+     "endpoints": {
+      "type": "string",
+      "description": "gluster hosts endpoints name"
+     },
+     "path": {
+      "type": "string",
+      "description": "path to gluster volume"
+     },
+     "readOnly": {
+      "type": "boolean",
+      "description": "glusterfs volume to be mounted with read-only permissions"
      }
     }
    },
@@ -7716,7 +8624,8 @@
     "id": "v1beta2.PersistentVolumeSpec",
     "required": [
      "persistentDisk",
-     "hostPath"
+     "hostPath",
+     "glusterfs"
     ],
     "properties": {
      "accessModes": {
@@ -7733,6 +8642,10 @@
      "claimRef": {
       "$ref": "v1beta2.ObjectReference",
       "description": "the binding reference to a persistent volume claim"
+     },
+     "glusterfs": {
+      "$ref": "v1beta2.GlusterfsVolumeSource",
+      "description": "Glusterfs volume resource provisioned by an admin"
      },
      "hostPath": {
       "$ref": "v1beta2.HostPathVolumeSource",
@@ -8662,6 +9575,118 @@
      }
     }
    },
+   "v1beta2.Status": {
+    "id": "v1beta2.Status",
+    "properties": {
+     "annotations": {
+      "type": "any",
+      "description": "map of string keys and values that can be used by external tooling to store and retrieve arbitrary metadata about the object"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "version of the schema the object should have"
+     },
+     "code": {
+      "type": "integer",
+      "format": "int32",
+      "description": "suggested HTTP return code for this status; 0 if not set"
+     },
+     "creationTimestamp": {
+      "type": "string",
+      "description": "RFC 3339 date and time at which the object was created; populated by the system, read-only; null for lists"
+     },
+     "deletionTimestamp": {
+      "type": "string",
+      "description": "RFC 3339 date and time at which the object will be deleted; populated by the system when a graceful deletion is requested, read-only; if not set, graceful deletion of the object has not been requested"
+     },
+     "details": {
+      "$ref": "v1beta2.StatusDetails",
+      "description": "extended data associated with the reason; each reason may define its own extended details; this field is optional and the data returned is not guaranteed to conform to any schema except that defined by the reason type"
+     },
+     "generateName": {
+      "type": "string",
+      "description": "an optional prefix to use to generate a unique name; has the same validation rules as name; optional, and is applied only name if is not specified"
+     },
+     "id": {
+      "type": "string",
+      "description": "name of the object; must be a DNS_SUBDOMAIN and unique among all objects of the same kind within the same namespace; used in resource URLs; cannot be updated"
+     },
+     "kind": {
+      "type": "string",
+      "description": "kind of object, in CamelCase; cannot be updated"
+     },
+     "message": {
+      "type": "string",
+      "description": "human-readable description of the status of this operation"
+     },
+     "namespace": {
+      "type": "string",
+      "description": "namespace to which the object belongs; must be a DNS_SUBDOMAIN; 'default' by default; cannot be updated"
+     },
+     "reason": {
+      "type": "string",
+      "description": "machine-readable description of why this operation is in the 'Failure' status; if this value is empty there is no information available; a reason clarifies an HTTP status code but does not override it"
+     },
+     "resourceVersion": {
+      "$ref": "uint64",
+      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
+     },
+     "selfLink": {
+      "type": "string",
+      "description": "URL for the object; populated by the system, read-only"
+     },
+     "status": {
+      "type": "string",
+      "description": "status of the operation; either Success or Failure"
+     },
+     "uid": {
+      "type": "string",
+      "description": "unique UUID across space and time; populated by the system, read-only"
+     }
+    }
+   },
+   "v1beta2.StatusCause": {
+    "id": "v1beta2.StatusCause",
+    "properties": {
+     "field": {
+      "type": "string",
+      "description": "field of the resource that has caused this error, as named by its JSON serialization; may include dot and postfix notation for nested attributes; arrays are zero-indexed; fields may appear more than once in an array of causes due to fields having multiple errors"
+     },
+     "message": {
+      "type": "string",
+      "description": "human-readable description of the cause of the error; this field may be presented as-is to a reader"
+     },
+     "reason": {
+      "type": "string",
+      "description": "machine-readable description of the cause of the error; if this value is empty there is no information available"
+     }
+    }
+   },
+   "v1beta2.StatusDetails": {
+    "id": "v1beta2.StatusDetails",
+    "properties": {
+     "causes": {
+      "type": "array",
+      "items": {
+       "$ref": "v1beta2.StatusCause"
+      },
+      "description": "the Causes array includes more details associated with the StatusReason failure; not all StatusReasons may provide detailed causes"
+     },
+     "id": {
+      "type": "string",
+      "description": "the ID attribute of the resource associated with the status StatusReason (when there is a single ID which can be described)"
+     },
+     "kind": {
+      "type": "string",
+      "description": "the kind attribute of the resource associated with the status StatusReason; on some operations may differ from the requested resource Kind"
+     },
+     "retryAfterSeconds": {
+      "type": "integer",
+      "format": "int32",
+      "description": "the number of seconds before the client should attempt to retry this operation"
+     }
+    }
+   },
    "v1beta2.TCPSocketAction": {
     "id": "v1beta2.TCPSocketAction",
     "properties": {
@@ -8717,7 +9742,8 @@
      "gitRepo",
      "secret",
      "nfs",
-     "iscsi"
+     "iscsi",
+     "glusterfs"
     ],
     "properties": {
      "emptyDir": {
@@ -8727,6 +9753,10 @@
      "gitRepo": {
       "$ref": "v1beta2.GitRepoVolumeSource",
       "description": "git repository at a particular revision"
+     },
+     "glusterfs": {
+      "$ref": "v1beta2.GlusterfsVolumeSource",
+      "description": "Glusterfs volume that will be mounted on the host machine "
      },
      "hostDir": {
       "$ref": "v1beta2.HostPathVolumeSource",

@@ -87,6 +87,7 @@ func (a *APIInstaller) newWebService() *restful.WebService {
 	ws.Consumes("*/*")
 	ws.Produces(restful.MIME_JSON)
 	ws.ApiVersion(a.group.Version)
+
 	return ws
 }
 
@@ -158,19 +159,24 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		return err
 	}
 
-	var versionedDeleterObject runtime.Object
+	var versionedDeleterObject interface{}
 	switch {
 	case isGracefulDeleter:
-		object, err := a.group.Creater.New(serverVersion, "DeleteOptions")
+		objectPtr, err := a.group.Creater.New(serverVersion, "DeleteOptions")
 		if err != nil {
 			return err
 		}
-		versionedDeleterObject = object
+		versionedDeleterObject = indirectArbitraryPointer(objectPtr)
 		isDeleter = true
 	case isDeleter:
 		gracefulDeleter = rest.GracefulDeleteAdapter{deleter}
 	}
 
+	versionedStatusPtr, err := a.group.Creater.New(serverVersion, "Status")
+	if err != nil {
+		return err
+	}
+	versionedStatus := indirectArbitraryPointer(versionedStatusPtr)
 	var getOptions runtime.Object
 	var getOptionsKind string
 	if isGetterWithOptions {
@@ -336,9 +342,10 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			}
 			route := ws.GET(action.Path).To(handler).
 				Filter(m).
-				Doc("read the specified " + kind).
-				Operation("read" + kind).
+				Doc("read the specified "+kind).
+				Operation("read"+kind).
 				Produces(append(storageMeta.ProducesMIMETypes(action.Verb), "application/json")...).
+				Returns(http.StatusOK, "OK", versionedObject).
 				Writes(versionedObject)
 			if isGetterWithOptions {
 				if err := addObjectParams(ws, route, getOptions); err != nil {
@@ -350,9 +357,10 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		case "LIST": // List all resources of a kind.
 			route := ws.GET(action.Path).To(ListResource(lister, watcher, reqScope, false)).
 				Filter(m).
-				Doc("list objects of kind " + kind).
-				Operation("list" + kind).
+				Doc("list objects of kind "+kind).
+				Operation("list"+kind).
 				Produces("application/json").
+				Returns(http.StatusOK, "OK", versionedList).
 				Writes(versionedList)
 			if err := addObjectParams(ws, route, versionedListOptions); err != nil {
 				return err
@@ -368,10 +376,12 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		case "PUT": // Update a resource.
 			route := ws.PUT(action.Path).To(UpdateResource(updater, reqScope, a.group.Typer, admit)).
 				Filter(m).
-				Doc("replace the specified " + kind).
-				Operation("replace" + kind).
+				Doc("replace the specified "+kind).
+				Operation("replace"+kind).
 				Produces(append(storageMeta.ProducesMIMETypes(action.Verb), "application/json")...).
-				Reads(versionedObject)
+				Returns(http.StatusOK, "OK", versionedObject).
+				Reads(versionedObject).
+				Writes(versionedObject)
 			addParams(route, action.Params)
 			ws.Route(route)
 		case "PATCH": // Partially update a resource
@@ -379,26 +389,32 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 				Filter(m).
 				Doc("partially update the specified "+kind).
 				Consumes(string(api.JSONPatchType), string(api.MergePatchType), string(api.StrategicMergePatchType)).
-				Operation("patch" + kind).
+				Operation("patch"+kind).
 				Produces(append(storageMeta.ProducesMIMETypes(action.Verb), "application/json")...).
-				Reads(versionedObject)
+				Returns(http.StatusOK, "OK", "string").
+				Reads("string").
+				Writes(versionedObject)
 			addParams(route, action.Params)
 			ws.Route(route)
 		case "POST": // Create a resource.
 			route := ws.POST(action.Path).To(CreateResource(creater, reqScope, a.group.Typer, admit)).
 				Filter(m).
-				Doc("create a " + kind).
-				Operation("create" + kind).
+				Doc("create a "+kind).
+				Operation("create"+kind).
 				Produces(append(storageMeta.ProducesMIMETypes(action.Verb), "application/json")...).
-				Reads(versionedObject)
+				Returns(http.StatusOK, "OK", versionedObject).
+				Reads(versionedObject).
+				Writes(versionedObject)
 			addParams(route, action.Params)
 			ws.Route(route)
 		case "DELETE": // Delete a resource.
 			route := ws.DELETE(action.Path).To(DeleteResource(gracefulDeleter, isGracefulDeleter, reqScope, admit)).
 				Filter(m).
-				Doc("delete a " + kind).
-				Operation("delete" + kind).
-				Produces(append(storageMeta.ProducesMIMETypes(action.Verb), "application/json")...)
+				Doc("delete a "+kind).
+				Operation("delete"+kind).
+				Produces(append(storageMeta.ProducesMIMETypes(action.Verb), "application/json")...).
+				Writes(versionedStatus).
+				Returns(http.StatusOK, "OK", versionedStatus)
 			if isGracefulDeleter {
 				route.Reads(versionedDeleterObject)
 			}
@@ -408,9 +424,10 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		case "WATCH": // Watch a resource.
 			route := ws.GET(action.Path).To(ListResource(lister, watcher, reqScope, true)).
 				Filter(m).
-				Doc("watch changes to an object of kind " + kind).
-				Operation("watch" + kind).
+				Doc("watch changes to an object of kind "+kind).
+				Operation("watch"+kind).
 				Produces("application/json").
+				Returns(http.StatusOK, "OK", watchjson.WatchEvent{}).
 				Writes(watchjson.WatchEvent{})
 			if err := addObjectParams(ws, route, versionedListOptions); err != nil {
 				return err
@@ -421,9 +438,10 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		case "WATCHLIST": // Watch all resources of a kind.
 			route := ws.GET(action.Path).To(ListResource(lister, watcher, reqScope, true)).
 				Filter(m).
-				Doc("watch individual changes to a list of " + kind).
-				Operation("watch" + kind + "list").
+				Doc("watch individual changes to a list of "+kind).
+				Operation("watch"+kind+"list").
 				Produces("application/json").
+				Returns(http.StatusOK, "OK", watchjson.WatchEvent{}).
 				Writes(watchjson.WatchEvent{})
 			if err := addObjectParams(ws, route, versionedListOptions); err != nil {
 				return err
@@ -436,7 +454,8 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 				Doc("redirect GET request to " + kind).
 				Operation("redirect" + kind).
 				Produces("*/*").
-				Consumes("*/*")
+				Consumes("*/*").
+				Writes("string")
 			addParams(route, action.Params)
 			ws.Route(route)
 		case "PROXY": // Proxy requests to a resource.
@@ -694,7 +713,8 @@ func addProxyRoute(ws *restful.WebService, method string, prefix string, path st
 		Doc("proxy " + method + " requests to " + kind).
 		Operation("proxy" + method + kind).
 		Produces("*/*").
-		Consumes("*/*")
+		Consumes("*/*").
+		Writes("string")
 	addParams(proxyRoute, params)
 	ws.Route(proxyRoute)
 }
@@ -711,7 +731,7 @@ func addParams(route *restful.RouteBuilder, params []*restful.Parameter) {
 // Go JSON behavior for omitting a field) become query parameters. The name of the query parameter is
 // the JSON field name. If a description struct tag is set on the field, that description is used on the
 // query parameter. In essence, it converts a standard JSON top level object into a query param schema.
-func addObjectParams(ws *restful.WebService, route *restful.RouteBuilder, obj runtime.Object) error {
+func addObjectParams(ws *restful.WebService, route *restful.RouteBuilder, obj interface{}) error {
 	sv, err := conversion.EnforcePtr(obj)
 	if err != nil {
 		return err
