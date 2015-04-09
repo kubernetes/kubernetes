@@ -130,7 +130,7 @@ func (s *CMServer) AddFlags(fs *pflag.FlagSet) {
 	fs.Int64Var(&s.NodeMilliCPU, "node_milli_cpu", s.NodeMilliCPU, "The amount of MilliCPU provisioned on each node")
 	fs.Var(resource.NewQuantityFlagValue(&s.NodeMemory), "node_memory", "The amount of memory (in bytes) provisioned on each node")
 	client.BindKubeletClientConfigFlags(fs, &s.KubeletConfig)
-	fs.BoolVar(&s.EnableProfiling, "profiling", false, "Enable profiling via web interface host:port/debug/pprof/")
+	fs.BoolVar(&s.EnableProfiling, "profiling", true, "Enable profiling via web interface host:port/debug/pprof/")
 }
 
 func (s *CMServer) verifyMinionFlags() {
