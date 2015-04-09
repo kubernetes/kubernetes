@@ -79,7 +79,8 @@ func (podStrategy) AllowCreateOnUpdate() bool {
 
 // ValidateUpdate is the default update validation for an end user.
 func (podStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) fielderrors.ValidationErrorList {
-	return validation.ValidatePodUpdate(obj.(*api.Pod), old.(*api.Pod))
+	errorList := validation.ValidatePod(obj.(*api.Pod))
+	return append(errorList, validation.ValidatePodUpdate(obj.(*api.Pod), old.(*api.Pod))...)
 }
 
 // CheckGracefulDelete allows a pod to be gracefully deleted.

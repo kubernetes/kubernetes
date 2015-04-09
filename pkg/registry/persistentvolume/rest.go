@@ -65,7 +65,8 @@ func (persistentvolumeStrategy) PrepareForUpdate(obj, old runtime.Object) {
 }
 
 func (persistentvolumeStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) fielderrors.ValidationErrorList {
-	return validation.ValidatePersistentVolumeUpdate(obj.(*api.PersistentVolume), old.(*api.PersistentVolume))
+	errorList := validation.ValidatePersistentVolume(obj.(*api.PersistentVolume))
+	return append(errorList, validation.ValidatePersistentVolumeUpdate(obj.(*api.PersistentVolume), old.(*api.PersistentVolume))...)
 }
 
 type persistentvolumeStatusStrategy struct {

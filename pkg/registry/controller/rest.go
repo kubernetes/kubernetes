@@ -71,7 +71,9 @@ func (rcStrategy) AllowCreateOnUpdate() bool {
 
 // ValidateUpdate is the default update validation for an end user.
 func (rcStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) fielderrors.ValidationErrorList {
-	return validation.ValidateReplicationControllerUpdate(old.(*api.ReplicationController), obj.(*api.ReplicationController))
+	validationErrorList := validation.ValidateReplicationController(obj.(*api.ReplicationController))
+	updateErrorList := validation.ValidateReplicationControllerUpdate(old.(*api.ReplicationController), obj.(*api.ReplicationController))
+	return append(validationErrorList, updateErrorList...)
 }
 
 // ControllerToSelectableFields returns a label set that represents the object.

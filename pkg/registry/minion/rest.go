@@ -74,7 +74,8 @@ func (nodeStrategy) Validate(ctx api.Context, obj runtime.Object) fielderrors.Va
 
 // ValidateUpdate is the default update validation for an end user.
 func (nodeStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) fielderrors.ValidationErrorList {
-	return validation.ValidateMinionUpdate(old.(*api.Node), obj.(*api.Node))
+	errorList := validation.ValidateMinion(obj.(*api.Node))
+	return append(errorList, validation.ValidateMinionUpdate(old.(*api.Node), obj.(*api.Node))...)
 }
 
 // ResourceGetter is an interface for retrieving resources by ResourceLocation.

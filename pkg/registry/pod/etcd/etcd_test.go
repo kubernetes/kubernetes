@@ -1062,6 +1062,7 @@ func TestEtcdUpdateScheduled(t *testing.T) {
 			Host: "machine",
 			Containers: []api.Container{
 				{
+					Name:  "foobar",
 					Image: "foo:v1",
 				},
 			},
@@ -1080,6 +1081,7 @@ func TestEtcdUpdateScheduled(t *testing.T) {
 			Host: "machine",
 			Containers: []api.Container{
 				{
+					Name:                   "foobar",
 					Image:                  "foo:v2",
 					ImagePullPolicy:        api.PullIfNotPresent,
 					TerminationMessagePath: api.TerminationMessagePathDefault,
