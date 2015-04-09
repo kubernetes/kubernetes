@@ -23,24 +23,22 @@ import (
 	"reflect"
 
 	"github.com/spf13/cobra"
-
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd"
 )
 
 type unsetOptions struct {
-	pathOptions  *pathOptions
+	pathOptions  *PathOptions
 	propertyName string
 }
 
-const unset_long = `Unsets an individual value in a .kubeconfig file
+const unset_long = `Unsets an individual value in a kubeconfig file
 PROPERTY_NAME is a dot delimited name where each token represents either a attribute name or a map key.  Map keys may not contain dots.`
 
-func NewCmdConfigUnset(out io.Writer, pathOptions *pathOptions) *cobra.Command {
+func NewCmdConfigUnset(out io.Writer, pathOptions *PathOptions) *cobra.Command {
 	options := &unsetOptions{pathOptions: pathOptions}
 
 	cmd := &cobra.Command{
 		Use:   "unset PROPERTY_NAME",
-		Short: "Unsets an individual value in a .kubeconfig file",
+		Short: "Unsets an individual value in a kubeconfig file",
 		Long:  unset_long,
 		Run: func(cmd *cobra.Command, args []string) {
 			if !options.complete(cmd) {
@@ -63,13 +61,9 @@ func (o unsetOptions) run() error {
 		return err
 	}
 
-	config, filename, err := o.pathOptions.getStartingConfig()
+	config, err := o.pathOptions.getStartingConfig()
 	if err != nil {
 		return err
-	}
-
-	if len(filename) == 0 {
-		return errors.New("cannot set property without using a specific file")
 	}
 
 	steps, err := newNavigationSteps(o.propertyName)
@@ -81,8 +75,7 @@ func (o unsetOptions) run() error {
 		return err
 	}
 
-	err = clientcmd.WriteToFile(*config, filename)
-	if err != nil {
+	if err := o.pathOptions.ModifyConfig(*config); err != nil {
 		return err
 	}
 
@@ -105,5 +98,5 @@ func (o unsetOptions) validate() error {
 		return errors.New("You must specify a property")
 	}
 
-	return nil
+	return o.pathOptions.Validate()
 }

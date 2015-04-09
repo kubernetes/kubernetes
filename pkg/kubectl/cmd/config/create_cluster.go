@@ -30,7 +30,7 @@ import (
 )
 
 type createClusterOptions struct {
-	pathOptions           *pathOptions
+	pathOptions           *PathOptions
 	name                  string
 	server                util.StringFlag
 	apiVersion            util.StringFlag
@@ -40,7 +40,7 @@ type createClusterOptions struct {
 }
 
 const (
-	create_cluster_long = `Sets a cluster entry in .kubeconfig.
+	create_cluster_long = `Sets a cluster entry in kubeconfig.
 Specifying a name that already exists will merge new fields on top of existing values for those fields.`
 	create_cluster_example = `// Set only the server field on the e2e cluster entry without touching other values.
 $ kubectl config set-cluster e2e --server=https://1.2.3.4
@@ -52,12 +52,12 @@ $ kubectl config set-cluster e2e --certificate-authority=~/.kube/e2e/kubernetes.
 $ kubectl config set-cluster e2e --insecure-skip-tls-verify=true`
 )
 
-func NewCmdConfigSetCluster(out io.Writer, pathOptions *pathOptions) *cobra.Command {
+func NewCmdConfigSetCluster(out io.Writer, pathOptions *PathOptions) *cobra.Command {
 	options := &createClusterOptions{pathOptions: pathOptions}
 
 	cmd := &cobra.Command{
 		Use:     fmt.Sprintf("set-cluster NAME [--%v=server] [--%v=path/to/certficate/authority] [--%v=apiversion] [--%v=true]", clientcmd.FlagAPIServer, clientcmd.FlagCAFile, clientcmd.FlagAPIVersion, clientcmd.FlagInsecure),
-		Short:   "Sets a cluster entry in .kubeconfig",
+		Short:   "Sets a cluster entry in kubeconfig",
 		Long:    create_cluster_long,
 		Example: create_cluster_example,
 		Run: func(cmd *cobra.Command, args []string) {
@@ -74,11 +74,11 @@ func NewCmdConfigSetCluster(out io.Writer, pathOptions *pathOptions) *cobra.Comm
 
 	options.insecureSkipTLSVerify.Default(false)
 
-	cmd.Flags().Var(&options.server, clientcmd.FlagAPIServer, clientcmd.FlagAPIServer+" for the cluster entry in .kubeconfig")
-	cmd.Flags().Var(&options.apiVersion, clientcmd.FlagAPIVersion, clientcmd.FlagAPIVersion+" for the cluster entry in .kubeconfig")
-	cmd.Flags().Var(&options.insecureSkipTLSVerify, clientcmd.FlagInsecure, clientcmd.FlagInsecure+" for the cluster entry in .kubeconfig")
-	cmd.Flags().Var(&options.certificateAuthority, clientcmd.FlagCAFile, "path to "+clientcmd.FlagCAFile+" for the cluster entry in .kubeconfig")
-	cmd.Flags().Var(&options.embedCAData, clientcmd.FlagEmbedCerts, clientcmd.FlagEmbedCerts+" for the cluster entry in .kubeconfig")
+	cmd.Flags().Var(&options.server, clientcmd.FlagAPIServer, clientcmd.FlagAPIServer+" for the cluster entry in kubeconfig")
+	cmd.Flags().Var(&options.apiVersion, clientcmd.FlagAPIVersion, clientcmd.FlagAPIVersion+" for the cluster entry in kubeconfig")
+	cmd.Flags().Var(&options.insecureSkipTLSVerify, clientcmd.FlagInsecure, clientcmd.FlagInsecure+" for the cluster entry in kubeconfig")
+	cmd.Flags().Var(&options.certificateAuthority, clientcmd.FlagCAFile, "path to "+clientcmd.FlagCAFile+" for the cluster entry in kubeconfig")
+	cmd.Flags().Var(&options.embedCAData, clientcmd.FlagEmbedCerts, clientcmd.FlagEmbedCerts+" for the cluster entry in kubeconfig")
 
 	return cmd
 }
@@ -89,20 +89,15 @@ func (o createClusterOptions) run() error {
 		return err
 	}
 
-	config, filename, err := o.pathOptions.getStartingConfig()
+	config, err := o.pathOptions.getStartingConfig()
 	if err != nil {
 		return err
-	}
-
-	if config.Clusters == nil {
-		config.Clusters = make(map[string]clientcmdapi.Cluster)
 	}
 
 	cluster := o.modifyCluster(config.Clusters[o.name])
 	config.Clusters[o.name] = cluster
 
-	err = clientcmd.WriteToFile(*config, filename)
-	if err != nil {
+	if err := o.pathOptions.ModifyConfig(*config); err != nil {
 		return err
 	}
 
@@ -174,5 +169,5 @@ func (o createClusterOptions) validate() error {
 		}
 	}
 
-	return nil
+	return o.pathOptions.Validate()
 }

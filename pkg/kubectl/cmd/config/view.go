@@ -17,7 +17,7 @@ limitations under the License.
 package config
 
 import (
-	"fmt"
+	"errors"
 	"io"
 
 	"github.com/golang/glog"
@@ -32,30 +32,30 @@ import (
 )
 
 type viewOptions struct {
-	pathOptions *pathOptions
+	pathOptions *PathOptions
 	merge       util.BoolFlag
 }
 
 const (
-	view_long = `displays merged .kubeconfig settings or a specified .kubeconfig file.
+	view_long = `displays merged kubeconfig settings or a specified kubeconfig file.
 
 You can use --output=template --template=TEMPLATE to extract specific values.`
-	view_example = `// Show merged .kubeconfig settings.
+	view_example = `// Show merged kubeconfig settings.
 $ kubectl config view
 
-// Show only local ./.kubeconfig settings
+// Show only local kubeconfig settings
 $ kubectl config view --local
 
 // Get the password for the e2e user
 $ kubectl config view -o template --template='{{range .users}}{{ if eq .name "e2e" }}{{ index .user.password }}{{end}}{{end}}'`
 )
 
-func NewCmdConfigView(out io.Writer, pathOptions *pathOptions) *cobra.Command {
+func NewCmdConfigView(out io.Writer, pathOptions *PathOptions) *cobra.Command {
 	options := &viewOptions{pathOptions: pathOptions}
 
 	cmd := &cobra.Command{
 		Use:     "view",
-		Short:   "displays merged .kubeconfig settings or a specified .kubeconfig file.",
+		Short:   "displays merged kubeconfig settings or a specified kubeconfig file.",
 		Long:    view_long,
 		Example: view_example,
 		Run: func(cmd *cobra.Command, args []string) {
@@ -85,13 +85,13 @@ func NewCmdConfigView(out io.Writer, pathOptions *pathOptions) *cobra.Command {
 	cmd.Flags().Set("output", "yaml")
 
 	options.merge.Default(true)
-	cmd.Flags().Var(&options.merge, "merge", "merge together the full hierarchy of .kubeconfig files")
+	cmd.Flags().Var(&options.merge, "merge", "merge together the full hierarchy of kubeconfig files")
 	return cmd
 }
 
 func (o *viewOptions) complete() bool {
 	// if --kubeconfig, --global, or --local is specified, then merging doesn't make sense since you're declaring precise intent
-	if (len(o.pathOptions.specifiedFile) > 0) || o.pathOptions.global || o.pathOptions.local {
+	if o.pathOptions.Global || o.pathOptions.Local || o.pathOptions.UseEnvVar {
 		if !o.merge.Provided() {
 			o.merge.Set("false")
 		}
@@ -106,29 +106,36 @@ func (o viewOptions) loadConfig() (*clientcmdapi.Config, error) {
 		return nil, err
 	}
 
-	config, _, err := o.getStartingConfig()
+	config, err := o.getStartingConfig()
 	return config, err
 }
 
 func (o viewOptions) validate() error {
-	return nil
+	return o.pathOptions.Validate()
 }
 
 // getStartingConfig returns the Config object built from the sources specified by the options, the filename read (only if it was a single file), and an error if something goes wrong
-func (o *viewOptions) getStartingConfig() (*clientcmdapi.Config, string, error) {
+func (o *viewOptions) getStartingConfig() (*clientcmdapi.Config, error) {
 	switch {
-	case o.merge.Value():
-		loadingRules := clientcmd.NewDefaultClientConfigLoadingRules()
-		loadingRules.ExplicitPath = o.pathOptions.specifiedFile
+	case !o.merge.Value():
+		switch {
+		case len(o.pathOptions.LoadingRules.ExplicitPath) > 0:
+			return clientcmd.LoadFromFile(o.pathOptions.LoadingRules.ExplicitPath)
 
-		overrides := &clientcmd.ConfigOverrides{}
-		clientConfig := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(loadingRules, overrides)
+		case o.pathOptions.Global:
+			return clientcmd.LoadFromFile(o.pathOptions.GlobalFile)
 
-		config, err := clientConfig.RawConfig()
-		if err != nil {
-			return nil, "", fmt.Errorf("Error getting config: %v", err)
+		case o.pathOptions.UseEnvVar:
+			return clientcmd.LoadFromFile(o.pathOptions.EnvVarFile)
+
+		case o.pathOptions.Local:
+			return clientcmd.LoadFromFile(o.pathOptions.LocalFile)
+
+		default:
+			return nil, errors.New("if merge==false a precise file must to specified")
+
 		}
-		return &config, "", nil
+
 	default:
 		return o.pathOptions.getStartingConfig()
 	}

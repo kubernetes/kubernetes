@@ -48,6 +48,10 @@ const (
 type ClientConfigLoadingRules struct {
 	ExplicitPath string
 	Precedence   []string
+
+	// DoNotResolvePaths indicates whether or not to resolve paths with respect to the originating files.  This is phrased as a negative so
+	// that a default object that doesn't set this will usually get the behavior it wants.
+	DoNotResolvePaths bool
 }
 
 // NewDefaultClientConfigLoadingRules returns a ClientConfigLoadingRules object with default fields filled in.  You are not required to
@@ -71,7 +75,6 @@ func NewDefaultClientConfigLoadingRules() *ClientConfigLoadingRules {
 // Relative paths inside of the .kubeconfig files are resolved against the .kubeconfig file's parent folder
 // and only absolute file paths are returned.
 func (rules *ClientConfigLoadingRules) Load() (*clientcmdapi.Config, error) {
-
 	errlist := []error{}
 
 	// Make sure a file we were explicitly told to use exists
@@ -90,8 +93,10 @@ func (rules *ClientConfigLoadingRules) Load() (*clientcmdapi.Config, error) {
 		if err := mergeConfigWithFile(mapConfig, file); err != nil {
 			errlist = append(errlist, err)
 		}
-		if err := ResolveLocalPaths(file, mapConfig); err != nil {
-			errlist = append(errlist, err)
+		if rules.ResolvePaths() {
+			if err := ResolveLocalPaths(file, mapConfig); err != nil {
+				errlist = append(errlist, err)
+			}
 		}
 	}
 
@@ -101,7 +106,9 @@ func (rules *ClientConfigLoadingRules) Load() (*clientcmdapi.Config, error) {
 	for i := len(kubeConfigFiles) - 1; i >= 0; i-- {
 		file := kubeConfigFiles[i]
 		mergeConfigWithFile(nonMapConfig, file)
-		ResolveLocalPaths(file, nonMapConfig)
+		if rules.ResolvePaths() {
+			ResolveLocalPaths(file, nonMapConfig)
+		}
 	}
 
 	// since values are overwritten, but maps values are not, we can merge the non-map config on top of the map config and
@@ -182,7 +189,26 @@ func LoadFromFile(filename string) (*clientcmdapi.Config, error) {
 	if err != nil {
 		return nil, err
 	}
-	return Load(kubeconfigBytes)
+	config, err := Load(kubeconfigBytes)
+	if err != nil {
+		return nil, err
+	}
+
+	// set LocationOfOrigin on every Cluster, User, and Context
+	for key, obj := range config.AuthInfos {
+		obj.LocationOfOrigin = filename
+		config.AuthInfos[key] = obj
+	}
+	for key, obj := range config.Clusters {
+		obj.LocationOfOrigin = filename
+		config.Clusters[key] = obj
+	}
+	for key, obj := range config.Contexts {
+		obj.LocationOfOrigin = filename
+		config.Contexts[key] = obj
+	}
+
+	return config, nil
 }
 
 // Load takes a byte slice and deserializes the contents into Config object.
@@ -225,4 +251,8 @@ func Write(config clientcmdapi.Config) ([]byte, error) {
 		return nil, err
 	}
 	return content, nil
+}
+
+func (rules ClientConfigLoadingRules) ResolvePaths() bool {
+	return !rules.DoNotResolvePaths
 }

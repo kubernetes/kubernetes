@@ -22,22 +22,20 @@ import (
 	"io"
 
 	"github.com/spf13/cobra"
-
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd"
 )
 
 type useContextOptions struct {
-	pathOptions *pathOptions
+	pathOptions *PathOptions
 	contextName string
 }
 
-func NewCmdConfigUseContext(out io.Writer, pathOptions *pathOptions) *cobra.Command {
+func NewCmdConfigUseContext(out io.Writer, pathOptions *PathOptions) *cobra.Command {
 	options := &useContextOptions{pathOptions: pathOptions}
 
 	cmd := &cobra.Command{
 		Use:   "use-context CONTEXT_NAME",
-		Short: "Sets the current-context in a .kubeconfig file",
-		Long:  `Sets the current-context in a .kubeconfig file`,
+		Short: "Sets the current-context in a kubeconfig file",
+		Long:  `Sets the current-context in a kubeconfig file`,
 		Run: func(cmd *cobra.Command, args []string) {
 			if !options.complete(cmd) {
 				return
@@ -59,19 +57,14 @@ func (o useContextOptions) run() error {
 		return err
 	}
 
-	config, filename, err := o.pathOptions.getStartingConfig()
+	config, err := o.pathOptions.getStartingConfig()
 	if err != nil {
 		return err
 	}
 
-	if len(filename) == 0 {
-		return errors.New("cannot set current-context without using a specific file")
-	}
-
 	config.CurrentContext = o.contextName
 
-	err = clientcmd.WriteToFile(*config, filename)
-	if err != nil {
+	if err := o.pathOptions.ModifyConfig(*config); err != nil {
 		return err
 	}
 
@@ -94,5 +87,5 @@ func (o useContextOptions) validate() error {
 		return errors.New("You must specify a current-context")
 	}
 
-	return nil
+	return o.pathOptions.Validate()
 }
