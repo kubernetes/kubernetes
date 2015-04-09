@@ -100,6 +100,7 @@ shift $((OPTIND - 1))
 
 # Use eval to preserve embedded quoted strings.
 eval "goflags=(${KUBE_GOFLAGS:-})"
+eval "testargs=(${KUBE_TEST_ARGS:-})"
 
 # Filter out arguments that start with "-" and move them to goflags.
 testcases=()
@@ -133,7 +134,8 @@ runTests() {
       count=0
       for i in $(seq 1 ${iterations}); do
         if go test "${goflags[@]:+${goflags[@]}}" \
-            ${KUBE_RACE} ${KUBE_TIMEOUT} "${pkg}"; then
+            ${KUBE_RACE} ${KUBE_TIMEOUT} "${pkg}" \
+            "${testargs[@]:+${testargs[@]}}"; then
           pass=$((pass + 1))
         else
           fails=$((fails + 1))
@@ -154,7 +156,8 @@ runTests() {
   if [[ ! ${KUBE_COVER} =~ ^[yY]$ ]]; then
     kube::log::status "Running unit tests without code coverage"
     go test "${goflags[@]:+${goflags[@]}}" \
-      ${KUBE_RACE} ${KUBE_TIMEOUT} "${@+${@/#/${KUBE_GO_PACKAGE}/}}"
+      ${KUBE_RACE} ${KUBE_TIMEOUT} "${@+${@/#/${KUBE_GO_PACKAGE}/}}" \
+     "${testargs[@]:+${testargs[@]}}"
     return 0
   fi
 
@@ -176,7 +179,8 @@ runTests() {
           -cover -covermode="${KUBE_COVERMODE}" \
           -coverprofile="${cover_report_dir}/{}/${cover_profile}" \
           "${cover_params[@]+${cover_params[@]}}" \
-          "${KUBE_GO_PACKAGE}/{}"
+          "${KUBE_GO_PACKAGE}/{}" \
+          "${testargs[@]:+${testargs[@]}}"
 
   COMBINED_COVER_PROFILE="${cover_report_dir}/combined-coverage.out"
   {

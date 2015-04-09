@@ -169,6 +169,14 @@ func NewReplicationManager(kubeClient client.Interface, burstReplicas int) *Repl
 	return rm
 }
 
+// SetEventRecorder replaces the event recorder used by the replication manager
+// with the given recorder. Only used for testing.
+func (rm *ReplicationManager) SetEventRecorder(recorder record.EventRecorder) {
+	// TODO: Hack. We can't cleanly shutdown the event recorder, so benchmarks
+	// need to pass in a fake.
+	rm.podControl = RealPodControl{rm.kubeClient, recorder}
+}
+
 // Run begins watching and syncing.
 func (rm *ReplicationManager) Run(workers int, stopCh <-chan struct{}) {
 	defer util.HandleCrash()
@@ -178,6 +186,7 @@ func (rm *ReplicationManager) Run(workers int, stopCh <-chan struct{}) {
 		go util.Until(rm.worker, time.Second, stopCh)
 	}
 	<-stopCh
+	glog.Infof("Shutting down RC Manager")
 	rm.queue.ShutDown()
 }
 
