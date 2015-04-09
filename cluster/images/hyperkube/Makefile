@@ -1,6 +1,6 @@
 # build the hyperkube image.
 
-VERSION=v0.14.1
+VERSION=v0.14.2
 
 all:
 #	cp ../../../_output/release-stage/server/linux-amd64/kubernetes/server/bin/hyperkube ./
