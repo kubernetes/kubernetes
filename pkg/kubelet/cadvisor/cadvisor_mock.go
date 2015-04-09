@@ -17,6 +17,7 @@ limitations under the License.
 package cadvisor
 
 import (
+	"github.com/google/cadvisor/events"
 	cadvisorApi "github.com/google/cadvisor/info/v1"
 	cadvisorApiV2 "github.com/google/cadvisor/info/v2"
 	"github.com/stretchr/testify/mock"
@@ -54,4 +55,9 @@ func (c *Mock) VersionInfo() (*cadvisorApi.VersionInfo, error) {
 func (c *Mock) DockerImagesFsInfo() (cadvisorApiV2.FsInfo, error) {
 	args := c.Called()
 	return args.Get(0).(cadvisorApiV2.FsInfo), args.Error(1)
+}
+
+func (c *Mock) GetPastEvents(request *events.Request) ([]*cadvisorApi.Event, error) {
+	args := c.Called()
+	return args.Get(0).([]*cadvisorApi.Event), args.Error(1)
 }
