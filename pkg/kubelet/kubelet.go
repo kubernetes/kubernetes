@@ -836,6 +836,7 @@ func parseResolvConf(reader io.Reader) (nameservers []string, searches []string,
 
 // Kill a docker container
 func (kl *Kubelet) killContainer(c *kubecontainer.Container) error {
+
 	return kl.killContainerByID(string(c.ID))
 }
 
@@ -853,10 +854,6 @@ func (kl *Kubelet) killContainerByID(ID string) error {
 	}
 	return err
 }
-
-const (
-	PodInfraContainerImage = "gcr.io/google_containers/pause:0.8.0"
-)
 
 // Determined whether the specified pod is allowed to use host networking
 func allowHostNetwork(pod *api.Pod) (bool, error) {
@@ -961,6 +958,13 @@ func (kl *Kubelet) killPod(runningPod kubecontainer.Pod) error {
 	for _, container := range runningPod.Containers {
 		wg.Add(1)
 		go func(container *kubecontainer.Container) {
+			// Call the networking plugin for teardown.
+			if container.Name == dockertools.PodInfraContainerName {
+				err := kl.networkPlugin.TearDownPod(runningPod.Namespace, runningPod.Name, dockertools.DockerID(container.ID))
+				if err != nil {
+					glog.Errorf("Network plugin pre-delete method returned an error: %v", err)
+				}
+			}
 			defer util.HandleCrash()
 			err := kl.killContainer(container)
 			if err != nil {
@@ -1081,141 +1085,6 @@ func (kl *Kubelet) pullImageAndRunContainer(pod *api.Pod, container *api.Contain
 	return containerID, nil
 }
 
-// Structure keeping information on changes that need to happen for a pod. The semantics is as follows:
-// - startInfraContainer is true if new Infra Containers have to be started and old one (if running) killed.
-//   Additionally if it is true then containersToKeep have to be empty
-// - infraContainerId have to be set iff startInfraContainer is false. It stores dockerID of running Infra Container
-// - containersToStart keeps indices of Specs of containers that have to be started.
-// - containersToKeep stores mapping from dockerIDs of running containers to indices of their Specs for containers that
-//   should be kept running. If startInfraContainer is false then it contains an entry for infraContainerId (mapped to -1).
-//   It shouldn't be the case where containersToStart is empty and containersToKeep contains only infraContainerId. In such case
-//   Infra Container should be killed, hence it's removed from this map.
-// - all running containers which are NOT contained in containersToKeep should be killed.
-type podContainerChangesSpec struct {
-	startInfraContainer bool
-	infraContainerId    dockertools.DockerID
-	containersToStart   map[int]empty
-	containersToKeep    map[dockertools.DockerID]int
-}
-
-func (kl *Kubelet) computePodContainerChanges(pod *api.Pod, runningPod kubecontainer.Pod) (podContainerChangesSpec, error) {
-	podFullName := kubecontainer.GetPodFullName(pod)
-	uid := pod.UID
-	glog.V(4).Infof("Syncing Pod %+v, podFullName: %q, uid: %q", pod, podFullName, uid)
-
-	err := kl.makePodDataDirs(pod)
-	if err != nil {
-		return podContainerChangesSpec{}, err
-	}
-
-	containersToStart := make(map[int]empty)
-	containersToKeep := make(map[dockertools.DockerID]int)
-	createPodInfraContainer := false
-
-	var podInfraContainerID dockertools.DockerID
-	podInfraContainer := runningPod.FindContainerByName(dockertools.PodInfraContainerName)
-	if podInfraContainer != nil {
-		glog.V(4).Infof("Found infra pod for %q", podFullName)
-		podInfraContainerID = dockertools.DockerID(podInfraContainer.ID)
-		containersToKeep[podInfraContainerID] = -1
-
-	} else {
-		glog.V(2).Infof("No Infra Container for %q found. All containers will be restarted.", podFullName)
-		createPodInfraContainer = true
-	}
-
-	// Do not use the cache here since we need the newest status to check
-	// if we need to restart the container below.
-	pod, found := kl.GetPodByFullName(podFullName)
-	if !found {
-		return podContainerChangesSpec{}, fmt.Errorf("couldn't find pod %q", podFullName)
-	}
-	podStatus, err := kl.generatePodStatus(pod)
-	if err != nil {
-		glog.Errorf("Unable to get pod with name %q and uid %q info with error(%v)", podFullName, uid, err)
-		return podContainerChangesSpec{}, err
-	}
-
-	for index, container := range pod.Spec.Containers {
-		expectedHash := dockertools.HashContainer(&container)
-
-		c := runningPod.FindContainerByName(container.Name)
-		if c != nil {
-			containerID := dockertools.DockerID(c.ID)
-			hash := c.Hash
-			glog.V(3).Infof("pod %q container %q exists as %v", podFullName, container.Name, containerID)
-
-			if !createPodInfraContainer {
-				// look for changes in the container.
-
-				containerChanged := hash != 0 && hash != expectedHash
-				if !containerChanged {
-					result, err := kl.probeContainer(pod, podStatus, container, string(c.ID), c.Created)
-					if err != nil {
-						// TODO(vmarmol): examine this logic.
-						glog.V(2).Infof("probe no-error: %q", container.Name)
-						containersToKeep[containerID] = index
-						continue
-					}
-					if result == probe.Success {
-						glog.V(4).Infof("probe success: %q", container.Name)
-						containersToKeep[containerID] = index
-						continue
-					}
-					glog.Infof("pod %q container %q is unhealthy (probe result: %v). Container will be killed and re-created.", podFullName, container.Name, result)
-					containersToStart[index] = empty{}
-				} else {
-					glog.Infof("pod %q container %q hash changed (%d vs %d). Pod will be killed and re-created.", podFullName, container.Name, hash, expectedHash)
-					createPodInfraContainer = true
-					delete(containersToKeep, podInfraContainerID)
-					// If we are to restart Infra Container then we move containersToKeep into containersToStart
-					// if RestartPolicy allows restarting failed containers.
-					if pod.Spec.RestartPolicy != api.RestartPolicyNever {
-						for _, v := range containersToKeep {
-							containersToStart[v] = empty{}
-						}
-					}
-					containersToStart[index] = empty{}
-					containersToKeep = make(map[dockertools.DockerID]int)
-				}
-			} else { // createPodInfraContainer == true and Container exists
-				// If we're creating infra containere everything will be killed anyway
-				// If RestartPolicy is Always or OnFailure we restart containers that were running before we
-				// killed them when restarting Infra Container.
-				if pod.Spec.RestartPolicy != api.RestartPolicyNever {
-					glog.V(1).Infof("Infra Container is being recreated. %q will be restarted.", container.Name)
-					containersToStart[index] = empty{}
-				}
-				continue
-			}
-		} else {
-			if kl.shouldContainerBeRestarted(&container, pod, &podStatus) {
-				// If we are here it means that the container is dead and sould be restarted, or never existed and should
-				// be created. We may be inserting this ID again if the container has changed and it has
-				// RestartPolicy::Always, but it's not a big deal.
-				glog.V(3).Infof("Container %+v is dead, but RestartPolicy says that we should restart it.", container)
-				containersToStart[index] = empty{}
-			}
-		}
-	}
-
-	// After the loop one of the following should be true:
-	// - createPodInfraContainer is true and containersToKeep is empty
-	// - createPodInfraContainer is false and containersToKeep contains at least ID of Infra Container
-
-	// If Infra container is the last running one, we don't want to keep it.
-	if !createPodInfraContainer && len(containersToStart) == 0 && len(containersToKeep) == 1 {
-		containersToKeep = make(map[dockertools.DockerID]int)
-	}
-
-	return podContainerChangesSpec{
-		startInfraContainer: createPodInfraContainer,
-		infraContainerId:    podInfraContainerID,
-		containersToStart:   containersToStart,
-		containersToKeep:    containersToKeep,
-	}, nil
-}
-
 // Check whether we can run the specified pod.
 func (kl *Kubelet) canRunPod(pod *api.Pod) error {
 	if pod.Spec.HostNetwork {
@@ -1229,6 +1098,39 @@ func (kl *Kubelet) canRunPod(pod *api.Pod) error {
 	}
 	// TODO(vmarmol): Check Privileged too.
 	return nil
+}
+
+// preparePod checks the pod infra container, if it exists and the spec hasn't changed, returns the id.
+// If it does not exist or has to be restarted, kill everything in the pod(including the
+// pod infra container), and start a new pod infra container. All previous containers are
+// removed from the running pod as well.
+// If it returns any errors, then the caller(syncPod()) should not continue.
+func (kl *Kubelet) preparePod(pod *api.Pod, runningPod *kubecontainer.Pod) (dockertools.DockerID, error) {
+	podInfraContainer := runningPod.FindContainerByName(dockertools.PodInfraContainerName)
+	if podInfraContainer != nil {
+		changed, err := dockertools.PodInfraContainerChanged(kl.dockerClient, pod, podInfraContainer)
+		if err != nil {
+			return "", err
+		}
+		if !changed {
+			return dockertools.DockerID(podInfraContainer.ID), nil
+		}
+	}
+	if err := kl.killPod(*runningPod); err != nil {
+		glog.Errorf("Error killing pod %q: %v", kubecontainer.GetPodFullName(pod), err)
+		return dockertools.DockerID(""), err
+	}
+	// Start pod infra container, update the runningPod.
+	id, err := kl.createPodInfraContainer(pod)
+	if err == nil {
+		err = kl.networkPlugin.SetUpPod(pod.Namespace, pod.Name, dockertools.DockerID(id))
+	}
+	if err != nil {
+		glog.Errorf("Error creating pod infra container for pod %q: %v", kubecontainer.GetPodFullName(pod), err)
+		return "", err
+	}
+	runningPod.Containers = []*kubecontainer.Container{}
+	return id, nil
 }
 
 func (kl *Kubelet) syncPod(pod *api.Pod, mirrorPod *api.Pod, runningPod kubecontainer.Pod) error {
@@ -1261,62 +1163,80 @@ func (kl *Kubelet) syncPod(pod *api.Pod, mirrorPod *api.Pod, runningPod kubecont
 		return err
 	}
 
-	containerChanges, err := kl.computePodContainerChanges(pod, runningPod)
-	glog.V(3).Infof("Got container changes for pod %q: %+v", podFullName, containerChanges)
+	podInfraContainerID, err := kl.preparePod(pod, &runningPod)
 	if err != nil {
 		return err
 	}
 
-	if containerChanges.startInfraContainer || (len(containerChanges.containersToKeep) == 0 && len(containerChanges.containersToStart) == 0) {
-		if len(containerChanges.containersToKeep) == 0 && len(containerChanges.containersToStart) == 0 {
-			glog.V(4).Infof("Killing Infra Container for %q becase all other containers are dead.", podFullName)
-		} else {
-			glog.V(4).Infof("Killing Infra Container for %q, will start new one", podFullName)
-		}
+	containersToKeep := make(map[types.UID]empty)
+	containersToStart := make(map[int]empty)
 
-		// Killing phase: if we want to start new infra container, or nothing is running kill everything (including infra container)
-		err = kl.killPod(runningPod)
-		if err != nil {
-			return err
-		}
-	} else {
-		// Otherwise kill any containers in this pod which are not specified as ones to keep.
-		for _, container := range runningPod.Containers {
-			_, keep := containerChanges.containersToKeep[dockertools.DockerID(container.ID)]
-			if !keep {
-				glog.V(3).Infof("Killing unwanted container %+v", container)
-				err = kl.killContainer(container)
+	podStatus, err := kl.generatePodStatus(pod)
+	if err != nil {
+		glog.Errorf("Unable to get pod with name %q and uid %q info with error(%v)", podFullName, uid, err)
+		return err
+	}
+	ref, err := api.GetReference(pod)
+	if err != nil {
+		glog.Errorf("Couldn't make a ref to pod %q: '%v'", podFullName, err)
+	}
+
+	// For each container in the spec:
+	// If it is running, healthy and not modified, remove it from the killing set.
+	// Otherwise, keep it in the killing set, and also add it to the starting set if
+	// its restart policy allows.
+	for index, container := range pod.Spec.Containers {
+		expectedHash := dockertools.HashContainer(&container)
+		c := runningPod.FindContainerByName(container.Name)
+		if c != nil {
+			containerChanged := c.Hash != 0 && c.Hash != expectedHash
+			if !containerChanged {
+				result, err := kl.probeContainer(pod, podStatus, container, string(c.ID), c.Created)
 				if err != nil {
-					glog.Errorf("Error killing container: %v", err)
+					// TODO(vmarmol): examine this logic.
+					glog.V(2).Infof("probe no-error: %q", container.Name)
+					containersToKeep[c.ID] = empty{}
+					continue
 				}
+				if result == probe.Success {
+					glog.V(4).Infof("probe success: %q", container.Name)
+					containersToKeep[c.ID] = empty{}
+					continue
+				}
+				glog.Infof("pod %q container %q is unhealthy (probe result: %v). Container will be killed and re-created.", podFullName, container.Name, result)
+			} else {
+				glog.Infof("pod %q container %q hash changed (%d vs %d). Container will be killed and re-created.", podFullName, container.Name, c.Hash, expectedHash)
 			}
+			if pod.Spec.RestartPolicy != api.RestartPolicyNever {
+				containersToStart[index] = empty{}
+			}
+			continue
+		}
+		if kl.shouldContainerBeRestarted(&container, pod, &podStatus) {
+			// If we are here it means that the container is dead and sould be restarted, or never existed and should
+			// be created. We may be inserting this ID again if the container has changed and it has
+			// RestartPolicy::Always, but it's not a big deal.
+			glog.V(3).Infof("Container %+v is dead, but RestartPolicy says that we should restart it.", container)
+			containersToStart[index] = empty{}
 		}
 	}
 
-	// Starting phase: if we should create infra container then we do it first
-	var ref *api.ObjectReference
-	var podVolumes volumeMap
-	podInfraContainerID := containerChanges.infraContainerId
-	if containerChanges.startInfraContainer && (len(containerChanges.containersToStart) > 0) {
-		ref, err = api.GetReference(pod)
-		if err != nil {
-			glog.Errorf("Couldn't make a ref to pod %q: '%v'", podFullName, err)
+	// Killing phase:
+	if len(containersToKeep) > 0 || len(containersToStart) > 0 {
+		containersToKeep[types.UID(podInfraContainerID)] = empty{}
+	}
+	for _, c := range runningPod.Containers {
+		if _, ok := containersToKeep[c.ID]; ok {
+			continue
 		}
-		glog.Infof("Creating pod infra container for %q", podFullName)
-		podInfraContainerID, err = kl.createPodInfraContainer(pod)
-
-		// Call the networking plugin
-		if err == nil {
-			err = kl.networkPlugin.SetUpPod(pod.Namespace, pod.Name, podInfraContainerID)
-		}
-		if err != nil {
-			glog.Errorf("Failed to create pod infra container: %v; Skipping pod %q", err, podFullName)
-			return err
+		if err := kl.killContainer(c); err != nil {
+			glog.Errorf("Error killing container %v: %v", c, err)
 		}
 	}
 
+	// Starting phase:
 	// Mount volumes
-	podVolumes, err = kl.mountExternalVolumes(pod)
+	podVolumes, err := kl.mountExternalVolumes(pod)
 	if err != nil {
 		if ref != nil {
 			kl.recorder.Eventf(ref, "failedMount",
@@ -1327,9 +1247,9 @@ func (kl *Kubelet) syncPod(pod *api.Pod, mirrorPod *api.Pod, runningPod kubecont
 	}
 
 	// Start everything
-	for container := range containerChanges.containersToStart {
-		glog.V(4).Infof("Creating container %+v", pod.Spec.Containers[container])
-		kl.pullImageAndRunContainer(pod, &pod.Spec.Containers[container], &podVolumes, podInfraContainerID)
+	for index := range containersToStart {
+		glog.V(4).Infof("Creating container %+v", pod.Spec.Containers[index])
+		kl.pullImageAndRunContainer(pod, &pod.Spec.Containers[index], &podVolumes, podInfraContainerID)
 	}
 
 	if mirrorPod == nil && isStaticPod(pod) {

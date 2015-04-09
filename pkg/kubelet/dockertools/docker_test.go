@@ -62,8 +62,13 @@ func TestGetContainerID(t *testing.T) {
 			Names: []string{"/k8s_bar_qux_ns_2565_42"},
 		},
 	}
-	fakeDocker.Container = &docker.Container{
-		ID: "foobar",
+	fakeDocker.ContainerMap = map[string]*docker.Container{
+		"foobar": {
+			ID: "foobar",
+		},
+		"barbar": {
+			ID: "barbar",
+		},
 	}
 
 	dockerContainers, err := GetKubeletDockerContainers(fakeDocker, false)

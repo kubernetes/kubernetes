@@ -141,7 +141,7 @@ func (f *FakeDockerClient) InspectContainer(id string) (*docker.Container, error
 			return container, f.Err
 		}
 	}
-	return f.Container, f.Err
+	return nil, fmt.Errorf("container not found for id: %q", id)
 }
 
 // InspectImage is a test-spy implementation of DockerInterface.InspectImage.
@@ -173,7 +173,10 @@ func (f *FakeDockerClient) StartContainer(id string, hostConfig *docker.HostConf
 	f.Lock()
 	defer f.Unlock()
 	f.called = append(f.called, "start")
-	f.Container = &docker.Container{
+	if f.ContainerMap == nil {
+		f.ContainerMap = make(map[string]*docker.Container)
+	}
+	f.ContainerMap[id] = &docker.Container{
 		ID:         id,
 		Name:       id, // For testing purpose, we set name to id
 		Config:     &docker.Config{Image: "testimage"},
@@ -196,9 +199,11 @@ func (f *FakeDockerClient) StopContainer(id string, timeout uint) error {
 	f.Stopped = append(f.Stopped, id)
 	var newList []docker.APIContainers
 	for _, container := range f.ContainerList {
-		if container.ID != id {
-			newList = append(newList, container)
+		if container.ID == id {
+			f.ExitedContainerList = append(f.ExitedContainerList, container)
+			continue
 		}
+		newList = append(newList, container)
 	}
 	f.ContainerList = newList
 	return f.Err

@@ -30,9 +30,23 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/capabilities"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
 	kubecontainer "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/leaky"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/fsouza/go-dockerclient"
 	"github.com/golang/glog"
+)
+
+const (
+	PodInfraContainerName  = leaky.PodInfraContainerName
+	DockerPrefix           = "docker://"
+	PodInfraContainerImage = "gcr.io/google_containers/pause:0.8.0"
+)
+
+const (
+	// Taken from lmctfy https://github.com/google/lmctfy/blob/master/lmctfy/controllers/cpu_controller.cc
+	minShares     = 2
+	sharesPerCPU  = 1024
+	milliCPUToCPU = 1000
 )
 
 // Implements kubecontainer.ContainerRunner.
@@ -186,7 +200,6 @@ func (self *DockerManager) GetPodStatus(pod *api.Pod) (*api.PodStatus, error) {
 	if err != nil {
 		return nil, err
 	}
-
 	for _, value := range containers {
 		if len(value.Names) == 0 {
 			continue
@@ -451,4 +464,41 @@ func makeCapabilites(capAdd []api.CapabilityType, capDrop []api.CapabilityType) 
 		dropCaps = append(dropCaps, string(cap))
 	}
 	return addCaps, dropCaps
+}
+
+// PodInfraContainer returns true if the pod infra container has changed.
+func PodInfraContainerChanged(client DockerInterface, pod *api.Pod, podInfraContainer *kubecontainer.Container) (bool, error) {
+	// Use host networking if specified and allowed.
+	networkMode := ""
+	var ports []api.ContainerPort
+
+	dockerPodInfraContainer, err := client.InspectContainer(string(podInfraContainer.ID))
+	if err != nil {
+		return false, err
+	}
+
+	// Check network mode.
+	if dockerPodInfraContainer.HostConfig != nil {
+		networkMode = dockerPodInfraContainer.HostConfig.NetworkMode
+	}
+	if pod.Spec.HostNetwork && networkMode != "host" {
+		return true, nil
+	} else {
+		// Docker only exports ports from the pod infra container.  Let's
+		// collect all of the relevant ports and export them.
+		for _, container := range pod.Spec.Containers {
+			ports = append(ports, container.Ports...)
+		}
+	}
+	container := &api.Container{
+		Name:  PodInfraContainerName,
+		Image: PodInfraContainerImage,
+		Ports: ports,
+	}
+
+	expectedHash := HashContainer(container)
+	if podInfraContainer.Hash != expectedHash {
+		return true, nil
+	}
+	return false, nil
 }
