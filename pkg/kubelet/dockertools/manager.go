@@ -41,13 +41,16 @@ import (
 type DockerManager struct {
 	client   DockerInterface
 	recorder record.EventRecorder
+	// TODO(yifan): PodInfraContainerImage can be unexported once
+	// we move createPodInfraContainer into dockertools.
+	PodInfraContainerImage string
 }
 
 // Ensures DockerManager implements ConatinerRunner.
 var _ kubecontainer.ContainerRunner = new(DockerManager)
 
-func NewDockerManager(client DockerInterface, recorder record.EventRecorder) *DockerManager {
-	return &DockerManager{client: client, recorder: recorder}
+func NewDockerManager(client DockerInterface, recorder record.EventRecorder, podInfraContainerImage string) *DockerManager {
+	return &DockerManager{client: client, recorder: recorder, PodInfraContainerImage: podInfraContainerImage}
 }
 
 // GetKubeletDockerContainerLogs returns logs of a specific container. By

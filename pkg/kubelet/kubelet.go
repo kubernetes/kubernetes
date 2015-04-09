@@ -201,7 +201,7 @@ func NewMainKubelet(
 		return nil, fmt.Errorf("failed to initialize image manager: %v", err)
 	}
 	statusManager := newStatusManager(kubeClient)
-	containerManager := dockertools.NewDockerManager(dockerClient, recorder)
+	containerManager := dockertools.NewDockerManager(dockerClient, recorder, podInfraContainerImage)
 
 	klet := &Kubelet{
 		hostname:               hostname,
@@ -209,7 +209,6 @@ func NewMainKubelet(
 		kubeClient:             kubeClient,
 		rootDirectory:          rootDirectory,
 		resyncInterval:         resyncInterval,
-		podInfraContainerImage: podInfraContainerImage,
 		containerRefManager:    kubecontainer.NewRefManager(),
 		readinessManager:       kubecontainer.NewReadinessManager(),
 		runner:                 dockertools.NewDockerContainerCommandRunner(dockerClient),
@@ -277,15 +276,14 @@ type nodeLister interface {
 
 // Kubelet is the main kubelet implementation.
 type Kubelet struct {
-	hostname               string
-	dockerClient           dockertools.DockerInterface
-	dockerCache            dockertools.DockerCache
-	kubeClient             client.Interface
-	rootDirectory          string
-	podInfraContainerImage string
-	podWorkers             *podWorkers
-	resyncInterval         time.Duration
-	sourcesReady           SourcesReadyFn
+	hostname       string
+	dockerClient   dockertools.DockerInterface
+	dockerCache    dockertools.DockerCache
+	kubeClient     client.Interface
+	rootDirectory  string
+	podWorkers     *podWorkers
+	resyncInterval time.Duration
+	sourcesReady   SourcesReadyFn
 
 	podManager podManager
 
@@ -854,10 +852,6 @@ func (kl *Kubelet) killContainerByID(ID string) error {
 	return err
 }
 
-const (
-	PodInfraContainerImage = "gcr.io/google_containers/pause:0.8.0"
-)
-
 // Determined whether the specified pod is allowed to use host networking
 func allowHostNetwork(pod *api.Pod) (bool, error) {
 	podSource, err := getPodSource(pod)
@@ -891,7 +885,7 @@ func (kl *Kubelet) createPodInfraContainer(pod *api.Pod) (dockertools.DockerID, 
 
 	container := &api.Container{
 		Name:  dockertools.PodInfraContainerName,
-		Image: kl.podInfraContainerImage,
+		Image: kl.containerManager.PodInfraContainerImage,
 		Ports: ports,
 	}
 	ref, err := kubecontainer.GenerateContainerRef(pod, container)

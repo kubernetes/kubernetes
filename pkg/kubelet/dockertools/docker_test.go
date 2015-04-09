@@ -396,7 +396,7 @@ func TestIsImagePresent(t *testing.T) {
 func TestGetRunningContainers(t *testing.T) {
 	fakeDocker := &FakeDockerClient{}
 	fakeRecorder := &record.FakeRecorder{}
-	containerManager := NewDockerManager(fakeDocker, fakeRecorder)
+	containerManager := NewDockerManager(fakeDocker, fakeRecorder, PodInfraContainerImage)
 	tests := []struct {
 		containers  map[string]*docker.Container
 		inputIDs    []string
