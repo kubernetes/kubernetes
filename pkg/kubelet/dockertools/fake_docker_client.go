@@ -18,6 +18,7 @@ package dockertools
 
 import (
 	"fmt"
+	"os"
 	"reflect"
 	"sort"
 	"sync"
@@ -180,7 +181,7 @@ func (f *FakeDockerClient) StartContainer(id string, hostConfig *docker.HostConf
 		HostConfig: hostConfig,
 		State: docker.State{
 			Running: true,
-			Pid:     42,
+			Pid:     os.Getpid(),
 		},
 		NetworkSettings: &docker.NetworkSettings{IPAddress: "1.2.3.4"},
 	}
