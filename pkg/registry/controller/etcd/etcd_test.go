@@ -139,9 +139,7 @@ func TestEtcdCreateControllerValidates(t *testing.T) {
 	storage, _ := newStorage(t)
 	emptyName := validController
 	emptyName.Name = ""
-	emptySelector := validController
-	emptySelector.Spec.Selector = map[string]string{}
-	failureCases := []api.ReplicationController{emptyName, emptySelector}
+	failureCases := []api.ReplicationController{emptyName}
 	for _, failureCase := range failureCases {
 		c, err := storage.Create(ctx, &failureCase)
 		if c != nil {

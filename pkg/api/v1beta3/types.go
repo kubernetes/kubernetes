@@ -833,7 +833,8 @@ type ReplicationControllerSpec struct {
 	Replicas int `json:"replicas" description:"number of replicas desired"`
 
 	// Selector is a label query over pods that should match the Replicas count.
-	Selector map[string]string `json:"selector,omitempty" description:"label keys and values that must match in order to be controlled by this replication controller"`
+	// If Selector is empty, it is defaulted to the labels present on the Pod template.
+	Selector map[string]string `json:"selector,omitempty" description:"label keys and values that must match in order to be controlled by this replication controller, if empty defaulted to labels on Pod template"`
 
 	// TemplateRef is a reference to an object that describes the pod that will be created if
 	// insufficient replicas are detected.
@@ -854,7 +855,8 @@ type ReplicationControllerStatus struct {
 
 // ReplicationController represents the configuration of a replication controller.
 type ReplicationController struct {
-	TypeMeta   `json:",inline"`
+	TypeMeta `json:",inline"`
+	// If the Labels of a ReplicationController are empty, they are defaulted to be the same as the Pod(s) that the replication controller manages.
 	ObjectMeta `json:"metadata,omitempty" description:"standard object metadata; see https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#metadata"`
 
 	// Spec defines the desired behavior of this replication controller.
