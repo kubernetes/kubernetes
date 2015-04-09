@@ -660,12 +660,12 @@ func (m *manager) createContainer(containerName string) error {
 	}
 	glog.V(2).Infof("Added container: %q (aliases: %v, namespace: %q)", containerName, cont.info.Aliases, cont.info.Namespace)
 
-	contSpecs, err := cont.handler.GetSpec()
+	contSpec, err := cont.handler.GetSpec()
 	if err != nil {
 		return err
 	}
 
-	if contSpecs.CreationTime.After(m.startupTime) {
+	if contSpec.CreationTime.After(m.startupTime) {
 		contRef, err := cont.handler.ContainerReference()
 		if err != nil {
 			return err
@@ -673,9 +673,13 @@ func (m *manager) createContainer(containerName string) error {
 
 		newEvent := &info.Event{
 			ContainerName: contRef.Name,
-			EventData:     contSpecs,
-			Timestamp:     contSpecs.CreationTime,
+			Timestamp:     contSpec.CreationTime,
 			EventType:     info.EventContainerCreation,
+			EventData: info.EventData{
+				Created: &info.CreatedEventData{
+					Spec: contSpec,
+				},
+			},
 		}
 		err = m.eventHandler.AddEvent(newEvent)
 		if err != nil {
@@ -847,7 +851,7 @@ func (self *manager) watchForNewContainers(quit chan error) error {
 					err = self.destroyContainer(event.Name)
 				}
 				if err != nil {
-					glog.Warning("Failed to process watch event: %v", err)
+					glog.Warningf("Failed to process watch event: %v", err)
 				}
 			case <-quit:
 				// Stop processing events if asked to quit.
@@ -878,7 +882,12 @@ func (self *manager) watchForNewOoms() error {
 				ContainerName: oomInstance.ContainerName,
 				Timestamp:     oomInstance.TimeOfDeath,
 				EventType:     info.EventOom,
-				EventData:     oomInstance,
+				EventData: info.EventData{
+					Oom: &info.OomEventData{
+						Pid:         oomInstance.Pid,
+						ProcessName: oomInstance.ProcessName,
+					},
+				},
 			}
 			glog.V(1).Infof("Created an oom event: %v", newEvent)
 			err := self.eventHandler.AddEvent(newEvent)
