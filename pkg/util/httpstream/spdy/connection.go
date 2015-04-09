@@ -71,7 +71,7 @@ func newConnection(conn *spdystream.Connection, newStreamHandler httpstream.NewS
 
 // createStreamResponseTimeout indicates how long to wait for the other side to
 // acknowledge the new stream before timing out.
-const createStreamResponseTimeout = 2 * time.Second
+const createStreamResponseTimeout = 30 * time.Second
 
 // Close first sends a reset for all of the connection's streams, and then
 // closes the underlying spdystream.Connection.

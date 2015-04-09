@@ -655,15 +655,6 @@ func TestServeExecInContainerIdleTimeout(t *testing.T) {
 	if conn == nil {
 		t.Fatal("Unexpected nil connection")
 	}
-	defer conn.Close()
-
-	h := http.Header{}
-	h.Set(api.StreamType, api.StreamTypeError)
-	stream, err := conn.CreateStream(h)
-	if err != nil {
-		t.Fatalf("error creating input stream: %v", err)
-	}
-	defer stream.Reset()
 
 	<-conn.CloseChan()
 }
