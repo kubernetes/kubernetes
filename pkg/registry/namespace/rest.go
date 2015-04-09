@@ -89,7 +89,8 @@ func (namespaceStrategy) AllowCreateOnUpdate() bool {
 
 // ValidateUpdate is the default update validation for an end user.
 func (namespaceStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) fielderrors.ValidationErrorList {
-	return validation.ValidateNamespaceUpdate(obj.(*api.Namespace), old.(*api.Namespace))
+	errorList := validation.ValidateNamespace(obj.(*api.Namespace))
+	return append(errorList, validation.ValidateNamespaceUpdate(obj.(*api.Namespace), old.(*api.Namespace))...)
 }
 
 type namespaceStatusStrategy struct {

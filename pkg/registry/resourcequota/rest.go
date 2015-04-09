@@ -69,7 +69,8 @@ func (resourcequotaStrategy) AllowCreateOnUpdate() bool {
 
 // ValidateUpdate is the default update validation for an end user.
 func (resourcequotaStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) fielderrors.ValidationErrorList {
-	return validation.ValidateResourceQuotaUpdate(obj.(*api.ResourceQuota), old.(*api.ResourceQuota))
+	errorList := validation.ValidateResourceQuota(obj.(*api.ResourceQuota))
+	return append(errorList, validation.ValidateResourceQuotaUpdate(obj.(*api.ResourceQuota), old.(*api.ResourceQuota))...)
 }
 
 type resourcequotaStatusStrategy struct {

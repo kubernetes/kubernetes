@@ -69,7 +69,8 @@ func (endpointsStrategy) AllowCreateOnUpdate() bool {
 
 // ValidateUpdate is the default update validation for an end user.
 func (endpointsStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) fielderrors.ValidationErrorList {
-	return validation.ValidateEndpointsUpdate(old.(*api.Endpoints), obj.(*api.Endpoints))
+	errorList := validation.ValidateEndpoints(obj.(*api.Endpoints))
+	return append(errorList, validation.ValidateEndpointsUpdate(old.(*api.Endpoints), obj.(*api.Endpoints))...)
 }
 
 // MatchEndpoints returns a generic matcher for a given label and field selector.
