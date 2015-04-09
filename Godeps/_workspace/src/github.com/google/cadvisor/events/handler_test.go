@@ -139,8 +139,8 @@ func TestAddEventAddsEventsToEventManager(t *testing.T) {
 
 	myEventHolder.AddEvent(fakeEvent)
 
-	checkNumberOfEvents(t, 1, myEventHolder.eventlist.Len())
-	ensureProperEventReturned(t, fakeEvent, myEventHolder.eventlist[0])
+	checkNumberOfEvents(t, 1, myEventHolder.eventList.Len())
+	ensureProperEventReturned(t, fakeEvent, myEventHolder.eventList[0])
 }
 
 func TestGetEventsForOneEvent(t *testing.T) {

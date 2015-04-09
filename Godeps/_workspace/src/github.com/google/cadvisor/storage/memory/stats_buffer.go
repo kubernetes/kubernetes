@@ -23,7 +23,7 @@ import (
 
 // A circular buffer for ContainerStats.
 type StatsBuffer struct {
-	buffer []info.ContainerStats
+	buffer []*info.ContainerStats
 	size   int
 	index  int
 }
@@ -31,7 +31,7 @@ type StatsBuffer struct {
 // Returns a new thread-compatible StatsBuffer.
 func NewStatsBuffer(size int) *StatsBuffer {
 	return &StatsBuffer{
-		buffer: make([]info.ContainerStats, size),
+		buffer: make([]*info.ContainerStats, size),
 		size:   0,
 		index:  size - 1,
 	}
@@ -43,7 +43,8 @@ func (self *StatsBuffer) Add(item *info.ContainerStats) {
 		self.size++
 	}
 	self.index = (self.index + 1) % len(self.buffer)
-	self.buffer[self.index] = *item
+	copied := *item
+	self.buffer[self.index] = &copied
 }
 
 // Returns up to maxResult elements in the specified time period (inclusive).
@@ -131,7 +132,7 @@ func (self *StatsBuffer) FirstN(n int) []*info.ContainerStats {
 	res := make([]*info.ContainerStats, n)
 	for i := 0; i < n; i++ {
 		index := (start + i) % len(self.buffer)
-		res[i] = &self.buffer[index]
+		res[i] = self.buffer[index]
 	}
 	return res
 }
@@ -142,7 +143,7 @@ func (self *StatsBuffer) Get(index int) *info.ContainerStats {
 	if calculatedIndex < 0 {
 		calculatedIndex += len(self.buffer)
 	}
-	return &self.buffer[calculatedIndex]
+	return self.buffer[calculatedIndex]
 }
 
 func (self *StatsBuffer) Size() int {

@@ -25,6 +25,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/golang/glog"
+	"github.com/google/cadvisor/events"
 	cadvisorFs "github.com/google/cadvisor/fs"
 	cadvisorHttp "github.com/google/cadvisor/http"
 	cadvisorApi "github.com/google/cadvisor/info/v1"
@@ -131,4 +132,8 @@ func (self *cadvisorClient) DockerImagesFsInfo() (cadvisorApiV2.FsInfo, error) {
 	}
 
 	return res[0], nil
+}
+
+func (self *cadvisorClient) GetPastEvents(request *events.Request) ([]*cadvisorApi.Event, error) {
+	return self.GetPastEvents(request)
 }
