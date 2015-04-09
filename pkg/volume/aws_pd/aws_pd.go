@@ -77,7 +77,7 @@ func (plugin *awsElasticBlockStorePlugin) NewBuilder(spec *api.Volume, podRef *a
 }
 
 func (plugin *awsElasticBlockStorePlugin) newBuilderInternal(spec *api.Volume, podUID types.UID, manager pdManager, mounter mount.Interface) (volume.Builder, error) {
-	volumeId := spec.AWSElasticBlockStore.VolumeId
+	volumeID := spec.AWSElasticBlockStore.VolumeID
 	fsType := spec.AWSElasticBlockStore.FSType
 	partition := ""
 	if spec.AWSElasticBlockStore.Partition != 0 {
@@ -88,7 +88,7 @@ func (plugin *awsElasticBlockStorePlugin) newBuilderInternal(spec *api.Volume, p
 	return &awsElasticBlockStore{
 		podUID:      podUID,
 		volName:     spec.Name,
-		volumeId:    volumeId,
+		volumeID:    volumeID,
 		fsType:      fsType,
 		partition:   partition,
 		readOnly:    readOnly,
@@ -129,7 +129,7 @@ type awsElasticBlockStore struct {
 	volName string
 	podUID  types.UID
 	// Unique id of the PD, used to find the disk resource in the provider.
-	volumeId string
+	volumeID string
 	// Filesystem type, optional.
 	fsType string
 	// Specifies the partition to mount
@@ -183,7 +183,7 @@ func (pd *awsElasticBlockStore) SetUpAt(dir string) error {
 		return nil
 	}
 
-	globalPDPath := makeGlobalPDPath(pd.plugin.host, pd.volumeId)
+	globalPDPath := makeGlobalPDPath(pd.plugin.host, pd.volumeID)
 	if err := pd.manager.AttachAndMountDisk(pd, globalPDPath); err != nil {
 		return err
 	}
@@ -232,14 +232,14 @@ func (pd *awsElasticBlockStore) SetUpAt(dir string) error {
 	return nil
 }
 
-func makeGlobalPDPath(host volume.VolumeHost, volumeId string) string {
+func makeGlobalPDPath(host volume.VolumeHost, volumeID string) string {
 	// Clean up the URI to be more fs-friendly
-	name := volumeId
+	name := volumeID
 	name = strings.Replace(name, "://", "/", -1)
 	return path.Join(host.GetPluginDir(awsElasticBlockStorePluginName), "mounts", name)
 }
 
-func getVolumeIdFromGlobalMount(host volume.VolumeHost, globalPath string) (string, error) {
+func getVolumeIDFromGlobalMount(host volume.VolumeHost, globalPath string) (string, error) {
 	basePath := path.Join(host.GetPluginDir(awsElasticBlockStorePluginName), "mounts")
 	rel, err := filepath.Rel(basePath, globalPath)
 	if err != nil {
@@ -249,12 +249,12 @@ func getVolumeIdFromGlobalMount(host volume.VolumeHost, globalPath string) (stri
 		return "", fmt.Errorf("Unexpected mount path: " + globalPath)
 	}
 	// Reverse the :// replacement done in makeGlobalPDPath
-	volumeId := rel
-	if strings.HasPrefix(volumeId, "aws/") {
-		volumeId = strings.Replace(volumeId, "aws/", "aws://", 1)
+	volumeID := rel
+	if strings.HasPrefix(volumeID, "aws/") {
+		volumeID = strings.Replace(volumeID, "aws/", "aws://", 1)
 	}
-	glog.V(2).Info("Mapping mount dir ", globalPath, " to volumeId ", volumeId)
-	return volumeId, nil
+	glog.V(2).Info("Mapping mount dir ", globalPath, " to volumeID ", volumeID)
+	return volumeID, nil
 }
 
 func (pd *awsElasticBlockStore) GetPath() string {
@@ -294,14 +294,14 @@ func (pd *awsElasticBlockStore) TearDownAt(dir string) error {
 	// If len(refs) is 1, then all bind mounts have been removed, and the
 	// remaining reference is the global mount. It is safe to detach.
 	if len(refs) == 1 {
-		// pd.volumeId is not initially set for volume-cleaners, so set it here.
-		pd.volumeId, err = getVolumeIdFromGlobalMount(pd.plugin.host, refs[0])
+		// pd.volumeID is not initially set for volume-cleaners, so set it here.
+		pd.volumeID, err = getVolumeIDFromGlobalMount(pd.plugin.host, refs[0])
 		if err != nil {
-			glog.V(2).Info("Could not determine volumeId from mountpoint ", refs[0], ": ", err)
+			glog.V(2).Info("Could not determine volumeID from mountpoint ", refs[0], ": ", err)
 			return err
 		}
 		if err := pd.manager.DetachDisk(pd); err != nil {
-			glog.V(2).Info("Error detaching disk ", pd.volumeId, ": ", err)
+			glog.V(2).Info("Error detaching disk ", pd.volumeID, ": ", err)
 			return err
 		}
 	}

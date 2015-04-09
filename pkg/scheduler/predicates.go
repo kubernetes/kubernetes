@@ -62,12 +62,12 @@ func isVolumeConflict(volume api.Volume, pod *api.Pod) bool {
 		}
 	}
 	if volume.AWSElasticBlockStore != nil {
-		volumeId := volume.AWSElasticBlockStore.VolumeId
+		volumeID := volume.AWSElasticBlockStore.VolumeID
 
 		manifest := &(pod.Spec)
 		for ix := range manifest.Volumes {
 			if manifest.Volumes[ix].AWSElasticBlockStore != nil &&
-				manifest.Volumes[ix].AWSElasticBlockStore.VolumeId == volumeId {
+				manifest.Volumes[ix].AWSElasticBlockStore.VolumeID == volumeID {
 				return true
 			}
 		}

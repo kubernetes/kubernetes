@@ -275,7 +275,7 @@ func testPDPod(diskName, targetHost string, readOnly bool) *api.Pod {
 				Name: "testpd",
 				VolumeSource: api.VolumeSource{
 					AWSElasticBlockStore: &api.AWSElasticBlockStoreVolumeSource{
-						VolumeId: diskName,
+						VolumeID: diskName,
 						FSType:   "ext4",
 						ReadOnly: readOnly,
 					},

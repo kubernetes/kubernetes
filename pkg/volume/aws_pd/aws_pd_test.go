@@ -72,7 +72,7 @@ type fakePDManager struct{}
 // TODO(jonesdl) To fully test this, we could create a loopback device
 // and mount that instead.
 func (fake *fakePDManager) AttachAndMountDisk(pd *awsElasticBlockStore, globalPDPath string) error {
-	globalPath := makeGlobalPDPath(pd.plugin.host, pd.volumeId)
+	globalPath := makeGlobalPDPath(pd.plugin.host, pd.volumeID)
 	err := os.MkdirAll(globalPath, 0750)
 	if err != nil {
 		return err
@@ -81,7 +81,7 @@ func (fake *fakePDManager) AttachAndMountDisk(pd *awsElasticBlockStore, globalPD
 }
 
 func (fake *fakePDManager) DetachDisk(pd *awsElasticBlockStore) error {
-	globalPath := makeGlobalPDPath(pd.plugin.host, pd.volumeId)
+	globalPath := makeGlobalPDPath(pd.plugin.host, pd.volumeID)
 	err := os.RemoveAll(globalPath)
 	if err != nil {
 		return err
@@ -101,7 +101,7 @@ func TestPlugin(t *testing.T) {
 		Name: "vol1",
 		VolumeSource: api.VolumeSource{
 			AWSElasticBlockStore: &api.AWSElasticBlockStoreVolumeSource{
-				VolumeId: "pd",
+				VolumeID: "pd",
 				FSType:   "ext4",
 			},
 		},

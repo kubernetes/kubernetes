@@ -374,8 +374,8 @@ func validateGCEPersistentDiskVolumeSource(PD *api.GCEPersistentDiskVolumeSource
 
 func validateAWSElasticBlockStoreVolumeSource(PD *api.AWSElasticBlockStoreVolumeSource) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
-	if PD.VolumeId == "" {
-		allErrs = append(allErrs, errs.NewFieldRequired("volumeId"))
+	if PD.VolumeID == "" {
+		allErrs = append(allErrs, errs.NewFieldRequired("volumeID"))
 	}
 	if PD.FSType == "" {
 		allErrs = append(allErrs, errs.NewFieldRequired("fsType"))

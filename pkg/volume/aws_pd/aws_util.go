@@ -40,7 +40,7 @@ func (util *AWSDiskUtil) AttachAndMountDisk(pd *awsElasticBlockStore, globalPDPa
 	if pd.readOnly {
 		flags = mount.FlagReadOnly
 	}
-	devicePath, err := volumes.AttachDisk("", pd.volumeId, pd.readOnly)
+	devicePath, err := volumes.AttachDisk("", pd.volumeID, pd.readOnly)
 	if err != nil {
 		return err
 	}
@@ -89,7 +89,7 @@ func (util *AWSDiskUtil) AttachAndMountDisk(pd *awsElasticBlockStore, globalPDPa
 // Unmounts the device and detaches the disk from the kubelet's host machine.
 func (util *AWSDiskUtil) DetachDisk(pd *awsElasticBlockStore) error {
 	// Unmount the global PD mount, which should be the only one.
-	globalPDPath := makeGlobalPDPath(pd.plugin.host, pd.volumeId)
+	globalPDPath := makeGlobalPDPath(pd.plugin.host, pd.volumeID)
 	if err := pd.mounter.Unmount(globalPDPath, 0); err != nil {
 		glog.V(2).Info("Error unmount dir ", globalPDPath, ": ", err)
 		return err
@@ -101,11 +101,11 @@ func (util *AWSDiskUtil) DetachDisk(pd *awsElasticBlockStore) error {
 	// Detach the disk
 	volumes, err := pd.getVolumeProvider()
 	if err != nil {
-		glog.V(2).Info("Error getting volume provider for volumeId ", pd.volumeId, ": ", err)
+		glog.V(2).Info("Error getting volume provider for volumeID ", pd.volumeID, ": ", err)
 		return err
 	}
-	if err := volumes.DetachDisk("", pd.volumeId); err != nil {
-		glog.V(2).Info("Error detaching disk ", pd.volumeId, ": ", err)
+	if err := volumes.DetachDisk("", pd.volumeID); err != nil {
+		glog.V(2).Info("Error detaching disk ", pd.volumeID, ": ", err)
 		return err
 	}
 	return nil

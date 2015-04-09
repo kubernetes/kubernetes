@@ -413,7 +413,7 @@ type GCEPersistentDiskVolumeSource struct {
 // A AWS PD can only be mounted on a single machine.
 type AWSElasticBlockStoreVolumeSource struct {
 	// Unique id of the PD resource. Used to identify the disk in AWS
-	VolumeId string `json:"volumeId" description:"unique id of the PD resource in AWS"`
+	VolumeID string `json:"volumeID" description:"unique id of the PD resource in AWS"`
 	// Required: Filesystem type to mount.
 	// Must be a filesystem type supported by the host operating system.
 	// Ex. "ext4", "xfs", "ntfs"

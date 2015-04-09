@@ -407,7 +407,7 @@ type ISCSIVolumeSource struct {
 // A AWS EBS disk can only be mounted as read/write once.
 type AWSElasticBlockStoreVolumeSource struct {
 	// Unique id of the persistent disk resource. Used to identify the disk in AWS
-	VolumeId string `json:"volumeId"`
+	VolumeID string `json:"volumeID"`
 	// Required: Filesystem type to mount.
 	// Must be a filesystem type supported by the host operating system.
 	// Ex. "ext4", "xfs", "ntfs"

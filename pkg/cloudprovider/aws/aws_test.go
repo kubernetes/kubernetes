@@ -191,15 +191,15 @@ func (self *FakeMetadata) GetMetaData(key string) ([]byte, error) {
 	}
 }
 
-func (ec2 *FakeEC2) AttachVolume(volumeId string, instanceId string, mountDevice string) (resp *ec2.AttachVolumeResp, err error) {
+func (ec2 *FakeEC2) AttachVolume(volumeID string, instanceId string, mountDevice string) (resp *ec2.AttachVolumeResp, err error) {
 	panic("Not implemented")
 }
 
-func (ec2 *FakeEC2) DetachVolume(volumeId string) (resp *ec2.SimpleResp, err error) {
+func (ec2 *FakeEC2) DetachVolume(volumeID string) (resp *ec2.SimpleResp, err error) {
 	panic("Not implemented")
 }
 
-func (ec2 *FakeEC2) Volumes(volumeIds []string, filter *ec2.Filter) (resp *ec2.VolumesResp, err error) {
+func (ec2 *FakeEC2) Volumes(volumeIDs []string, filter *ec2.Filter) (resp *ec2.VolumesResp, err error) {
 	panic("Not implemented")
 }
 
@@ -207,7 +207,7 @@ func (ec2 *FakeEC2) CreateVolume(request *ec2.CreateVolume) (resp *ec2.CreateVol
 	panic("Not implemented")
 }
 
-func (ec2 *FakeEC2) DeleteVolume(volumeId string) (resp *ec2.SimpleResp, err error) {
+func (ec2 *FakeEC2) DeleteVolume(volumeID string) (resp *ec2.SimpleResp, err error) {
 	panic("Not implemented")
 }
 

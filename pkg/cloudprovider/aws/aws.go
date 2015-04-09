@@ -44,16 +44,16 @@ type EC2 interface {
 	Instances(instIds []string, filter *ec2InstanceFilter) (resp *ec2.InstancesResp, err error)
 
 	// Attach a volume to an instance
-	AttachVolume(volumeId string, instanceId string, mountDevice string) (resp *ec2.AttachVolumeResp, err error)
+	AttachVolume(volumeID string, instanceId string, mountDevice string) (resp *ec2.AttachVolumeResp, err error)
 	// Detach a volume from whatever instance it is attached to
 	// TODO: We should specify the InstanceID and the Device, for safety
-	DetachVolume(volumeId string) (resp *ec2.SimpleResp, err error)
+	DetachVolume(volumeID string) (resp *ec2.SimpleResp, err error)
 	// Lists volumes
-	Volumes(volumeIds []string, filter *ec2.Filter) (resp *ec2.VolumesResp, err error)
+	Volumes(volumeIDs []string, filter *ec2.Filter) (resp *ec2.VolumesResp, err error)
 	// Create an EBS volume
 	CreateVolume(request *ec2.CreateVolume) (resp *ec2.CreateVolumeResp, err error)
 	// Delete an EBS volume
-	DeleteVolume(volumeId string) (resp *ec2.SimpleResp, err error)
+	DeleteVolume(volumeID string) (resp *ec2.SimpleResp, err error)
 }
 
 // Abstraction over the AWS metadata service
@@ -147,24 +147,24 @@ func (self *goamzMetadata) GetMetaData(key string) ([]byte, error) {
 
 type AuthFunc func() (auth aws.Auth, err error)
 
-func (s *goamzEC2) AttachVolume(volumeId string, instanceId string, device string) (resp *ec2.AttachVolumeResp, err error) {
-	return s.ec2.AttachVolume(volumeId, instanceId, device)
+func (s *goamzEC2) AttachVolume(volumeID string, instanceId string, device string) (resp *ec2.AttachVolumeResp, err error) {
+	return s.ec2.AttachVolume(volumeID, instanceId, device)
 }
 
-func (s *goamzEC2) DetachVolume(volumeId string) (resp *ec2.SimpleResp, err error) {
-	return s.ec2.DetachVolume(volumeId)
+func (s *goamzEC2) DetachVolume(volumeID string) (resp *ec2.SimpleResp, err error) {
+	return s.ec2.DetachVolume(volumeID)
 }
 
-func (s *goamzEC2) Volumes(volumeIds []string, filter *ec2.Filter) (resp *ec2.VolumesResp, err error) {
-	return s.ec2.Volumes(volumeIds, filter)
+func (s *goamzEC2) Volumes(volumeIDs []string, filter *ec2.Filter) (resp *ec2.VolumesResp, err error) {
+	return s.ec2.Volumes(volumeIDs, filter)
 }
 
 func (s *goamzEC2) CreateVolume(request *ec2.CreateVolume) (resp *ec2.CreateVolumeResp, err error) {
 	return s.ec2.CreateVolume(request)
 }
 
-func (s *goamzEC2) DeleteVolume(volumeId string) (resp *ec2.SimpleResp, err error) {
-	return s.ec2.DeleteVolume(volumeId)
+func (s *goamzEC2) DeleteVolume(volumeID string) (resp *ec2.SimpleResp, err error) {
+	return s.ec2.DeleteVolume(volumeID)
 }
 
 func init() {
@@ -641,7 +641,7 @@ func (self *awsInstance) getInfo() (*ec2.Instance, error) {
 
 // Assigns an unused mount device for the specified volume.
 // If the volume is already assigned, this will return the existing mount device and true
-func (self *awsInstance) assignMountDevice(volumeId string) (mountDevice string, alreadyAttached bool, err error) {
+func (self *awsInstance) assignMountDevice(volumeID string) (mountDevice string, alreadyAttached bool, err error) {
 	instanceType := self.getInstanceType()
 	if instanceType == nil {
 		return "", false, fmt.Errorf("could not get instance type for instance: %s", self.awsID)
@@ -661,15 +661,15 @@ func (self *awsInstance) assignMountDevice(volumeId string) (mountDevice string,
 		}
 		deviceMappings := map[string]string{}
 		for _, blockDevice := range info.BlockDevices {
-			deviceMappings[blockDevice.DeviceName] = blockDevice.VolumeId
+			deviceMappings[blockDevice.DeviceName] = blockDevice.VolumeID
 		}
 		self.deviceMappings = deviceMappings
 	}
 
 	// Check to see if this volume is already assigned a device on this machine
-	for deviceName, mappingVolumeId := range self.deviceMappings {
-		if volumeId == mappingVolumeId {
-			glog.Warningf("Got assignment call for already-assigned volume: %s@%s", deviceName, mappingVolumeId)
+	for deviceName, mappingVolumeID := range self.deviceMappings {
+		if volumeID == mappingVolumeID {
+			glog.Warningf("Got assignment call for already-assigned volume: %s@%s", deviceName, mappingVolumeID)
 			return deviceName, true, nil
 		}
 	}
@@ -690,26 +690,26 @@ func (self *awsInstance) assignMountDevice(volumeId string) (mountDevice string,
 		return "", false, nil
 	}
 
-	self.deviceMappings[chosen] = volumeId
-	glog.V(2).Infof("Assigned mount device %s -> volume %s", chosen, volumeId)
+	self.deviceMappings[chosen] = volumeID
+	glog.V(2).Infof("Assigned mount device %s -> volume %s", chosen, volumeID)
 
 	return chosen, false, nil
 }
 
-func (self *awsInstance) releaseMountDevice(volumeId string, mountDevice string) {
+func (self *awsInstance) releaseMountDevice(volumeID string, mountDevice string) {
 	self.mutex.Lock()
 	defer self.mutex.Unlock()
 
-	existingVolumeId, found := self.deviceMappings[mountDevice]
+	existingVolumeID, found := self.deviceMappings[mountDevice]
 	if !found {
 		glog.Errorf("releaseMountDevice on non-allocated device")
 		return
 	}
-	if volumeId != existingVolumeId {
+	if volumeID != existingVolumeID {
 		glog.Errorf("releaseMountDevice on device assigned to different volume")
 		return
 	}
-	glog.V(2).Infof("Releasing mount device mapping: %s -> volume %s", mountDevice, volumeId)
+	glog.V(2).Infof("Releasing mount device mapping: %s -> volume %s", mountDevice, volumeID)
 	delete(self.deviceMappings, mountDevice)
 }
 
@@ -938,7 +938,7 @@ func (aws *AWSCloud) CreateVolume(volumeOptions *VolumeOptions) (string, error) 
 	}
 
 	az := response.AvailZone
-	awsID := response.VolumeId
+	awsID := response.VolumeID
 
 	volumeName := "aws://" + az + "/" + awsID
 
