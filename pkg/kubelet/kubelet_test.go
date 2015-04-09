@@ -113,7 +113,7 @@ func newTestKubelet(t *testing.T) *TestKubelet {
 	podManager, fakeMirrorClient := newFakePodManager()
 	kubelet.podManager = podManager
 	kubelet.containerRefManager = kubecontainer.NewRefManager()
-	kubelet.containerManager = dockertools.NewDockerManager(fakeDocker, fakeRecorder)
+	kubelet.containerManager = dockertools.NewDockerManager(fakeDocker, fakeRecorder, dockertools.PodInfraContainerImage)
 	return &TestKubelet{kubelet, fakeDocker, mockCadvisor, fakeKubeClient, waitGroup, fakeMirrorClient}
 }
 
@@ -539,7 +539,7 @@ func TestSyncPodsCreatesNetAndContainer(t *testing.T) {
 	kubelet := testKubelet.kubelet
 	fakeDocker := testKubelet.fakeDocker
 	waitGroup := testKubelet.waitGroup
-	kubelet.podInfraContainerImage = "custom_image_name"
+	kubelet.containerManager.PodInfraContainerImage = "custom_image_name"
 	fakeDocker.ContainerList = []docker.APIContainers{}
 	pods := []api.Pod{
 		{
@@ -594,7 +594,7 @@ func TestSyncPodsCreatesNetAndContainerPullsImage(t *testing.T) {
 	waitGroup := testKubelet.waitGroup
 	puller := kubelet.dockerPuller.(*dockertools.FakeDockerPuller)
 	puller.HasImages = []string{}
-	kubelet.podInfraContainerImage = "custom_image_name"
+	kubelet.containerManager.PodInfraContainerImage = "custom_image_name"
 	fakeDocker.ContainerList = []docker.APIContainers{}
 	pods := []api.Pod{
 		{
@@ -1653,7 +1653,7 @@ func TestSyncPodsWithPullPolicy(t *testing.T) {
 	waitGroup := testKubelet.waitGroup
 	puller := kubelet.dockerPuller.(*dockertools.FakeDockerPuller)
 	puller.HasImages = []string{"existing_one", "want:latest"}
-	kubelet.podInfraContainerImage = "custom_image_name"
+	kubelet.containerManager.PodInfraContainerImage = "custom_image_name"
 	fakeDocker.ContainerList = []docker.APIContainers{}
 
 	pods := []api.Pod{
@@ -2728,13 +2728,14 @@ func TestPortForward(t *testing.T) {
 	var port uint16 = 5000
 	stream := &fakeReadWriteCloser{}
 
+	podInfraContainerImage := "POD"
 	infraContainerID := "infra"
-	kubelet.podInfraContainerImage = "POD"
+	kubelet.containerManager.PodInfraContainerImage = podInfraContainerImage
 
 	fakeDocker.ContainerList = []docker.APIContainers{
 		{
 			ID:    infraContainerID,
-			Names: []string{"/k8s_" + kubelet.podInfraContainerImage + "_" + podName + "_" + podNamespace + "_12345678_42"},
+			Names: []string{"/k8s_" + podInfraContainerImage + "_" + podName + "_" + podNamespace + "_12345678_42"},
 		},
 		{
 			ID:    containerID,
