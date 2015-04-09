@@ -89,10 +89,25 @@ Loop:
 			if timer != nil {
 				timer.Stop()
 			}
+
+			// Start a goroutine to drain resetChan. This is needed because we've seen
+			// some unit tests with large numbers of goroutines get into a situation
+			// where resetChan fills up, at least 1 call to Write() is still trying to
+			// send to resetChan, the connection gets closed, and this case statement
+			// attempts to grab the write lock that Write() already has, causing a
+			// deadlock.
+			//
+			// See https://github.com/docker/spdystream/issues/49 for more details.
+			go func() {
+				for _ = range resetChan {
+				}
+			}()
+
 			i.writeLock.Lock()
 			close(resetChan)
 			i.resetChan = nil
 			i.writeLock.Unlock()
+
 			break Loop
 		}
 	}
