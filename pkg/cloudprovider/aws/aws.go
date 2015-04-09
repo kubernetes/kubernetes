@@ -593,7 +593,7 @@ type awsInstance struct {
 	ec2 EC2
 
 	// id in AWS
-	awsId string
+	awsID string
 
 	mutex sync.Mutex
 
@@ -602,8 +602,8 @@ type awsInstance struct {
 	deviceMappings map[string]string
 }
 
-func newAwsInstance(ec2 EC2, awsId string) *awsInstance {
-	self := &awsInstance{ec2: ec2, awsId: awsId}
+func newAwsInstance(ec2 EC2, awsID string) *awsInstance {
+	self := &awsInstance{ec2: ec2, awsID: awsID}
 
 	// We lazy-init deviceMappings
 	self.deviceMappings = nil
@@ -620,21 +620,21 @@ func (self *awsInstance) getInstanceType() *awsInstanceType {
 
 // Gets the full information about this instance from the EC2 API
 func (self *awsInstance) getInfo() (*ec2.Instance, error) {
-	resp, err := self.ec2.Instances([]string{self.awsId}, nil)
+	resp, err := self.ec2.Instances([]string{self.awsID}, nil)
 	if err != nil {
 		return nil, fmt.Errorf("error querying ec2 for instance info: %v", err)
 	}
 	if len(resp.Reservations) == 0 {
-		return nil, fmt.Errorf("no reservations found for instance: %s", self.awsId)
+		return nil, fmt.Errorf("no reservations found for instance: %s", self.awsID)
 	}
 	if len(resp.Reservations) > 1 {
-		return nil, fmt.Errorf("multiple reservations found for instance: %s", self.awsId)
+		return nil, fmt.Errorf("multiple reservations found for instance: %s", self.awsID)
 	}
 	if len(resp.Reservations[0].Instances) == 0 {
-		return nil, fmt.Errorf("no instances found for instance: %s", self.awsId)
+		return nil, fmt.Errorf("no instances found for instance: %s", self.awsID)
 	}
 	if len(resp.Reservations[0].Instances) > 1 {
-		return nil, fmt.Errorf("multiple instances found for instance: %s", self.awsId)
+		return nil, fmt.Errorf("multiple instances found for instance: %s", self.awsID)
 	}
 	return &resp.Reservations[0].Instances[0], nil
 }
@@ -644,7 +644,7 @@ func (self *awsInstance) getInfo() (*ec2.Instance, error) {
 func (self *awsInstance) assignMountDevice(volumeId string) (mountDevice string, alreadyAttached bool, err error) {
 	instanceType := self.getInstanceType()
 	if instanceType == nil {
-		return "", false, fmt.Errorf("could not get instance type for instance: %s", self.awsId)
+		return "", false, fmt.Errorf("could not get instance type for instance: %s", self.awsID)
 	}
 
 	// We lock to prevent concurrent mounts from conflicting
@@ -719,7 +719,7 @@ type awsDisk struct {
 	// Name in k8s
 	name string
 	// id in AWS
-	awsId string
+	awsID string
 	// az which holds the volume
 	az string
 }
@@ -735,13 +735,13 @@ func newAwsDisk(ec2 EC2, name string) (*awsDisk, error) {
 		return nil, fmt.Errorf("Invalid scheme for AWS volume (%s)", name)
 	}
 
-	awsId := url.Path
-	if len(awsId) > 1 && awsId[0] == '/' {
-		awsId = awsId[1:]
+	awsID := url.Path
+	if len(awsID) > 1 && awsID[0] == '/' {
+		awsID = awsID[1:]
 	}
 
 	// TODO: Regex match?
-	if strings.Contains(awsId, "/") || !strings.HasPrefix(awsId, "vol-") {
+	if strings.Contains(awsID, "/") || !strings.HasPrefix(awsID, "vol-") {
 		return nil, fmt.Errorf("Invalid format for AWS volume (%s)", name)
 	}
 	az := url.Host
@@ -751,21 +751,21 @@ func newAwsDisk(ec2 EC2, name string) (*awsDisk, error) {
 	if az == "" {
 		return nil, fmt.Errorf("Invalid format for AWS volume (%s)", name)
 	}
-	disk := &awsDisk{ec2: ec2, name: name, awsId: awsId, az: az}
+	disk := &awsDisk{ec2: ec2, name: name, awsID: awsID, az: az}
 	return disk, nil
 }
 
 // Gets the full information about this volume from the EC2 API
 func (self *awsDisk) getInfo() (*ec2.Volume, error) {
-	resp, err := self.ec2.Volumes([]string{self.awsId}, nil)
+	resp, err := self.ec2.Volumes([]string{self.awsID}, nil)
 	if err != nil {
 		return nil, fmt.Errorf("error querying ec2 for volume info: %v", err)
 	}
 	if len(resp.Volumes) == 0 {
-		return nil, fmt.Errorf("no volumes found for volume: %s", self.awsId)
+		return nil, fmt.Errorf("no volumes found for volume: %s", self.awsID)
 	}
 	if len(resp.Volumes) > 1 {
-		return nil, fmt.Errorf("multiple volumes found for volume: %s", self.awsId)
+		return nil, fmt.Errorf("multiple volumes found for volume: %s", self.awsID)
 	}
 	return &resp.Volumes[0], nil
 }
@@ -811,7 +811,7 @@ func (self *awsDisk) waitForAttachmentStatus(status string) error {
 
 // Deletes the EBS disk
 func (self *awsDisk) delete() error {
-	_, err := self.ec2.DeleteVolume(self.awsId)
+	_, err := self.ec2.DeleteVolume(self.awsID)
 	if err != nil {
 		return fmt.Errorf("error delete EBS volumes: %v", err)
 	}
@@ -867,7 +867,7 @@ func (aws *AWSCloud) AttachDisk(instanceName string, diskName string, readOnly b
 		return "", errors.New("AWS volumes cannot be mounted read-only")
 	}
 
-	mountDevice, alreadyAttached, err := awsInstance.assignMountDevice(disk.awsId)
+	mountDevice, alreadyAttached, err := awsInstance.assignMountDevice(disk.awsID)
 	if err != nil {
 		return "", err
 	}
@@ -875,12 +875,12 @@ func (aws *AWSCloud) AttachDisk(instanceName string, diskName string, readOnly b
 	attached := false
 	defer func() {
 		if !attached {
-			awsInstance.releaseMountDevice(disk.awsId, mountDevice)
+			awsInstance.releaseMountDevice(disk.awsID, mountDevice)
 		}
 	}()
 
 	if !alreadyAttached {
-		attachResponse, err := aws.ec2.AttachVolume(disk.awsId, awsInstance.awsId, mountDevice)
+		attachResponse, err := aws.ec2.AttachVolume(disk.awsID, awsInstance.awsID, mountDevice)
 		if err != nil {
 			// TODO: Check if the volume was concurrently attached?
 			return "", fmt.Errorf("Error attaching EBS volume: %v", err)
@@ -912,7 +912,7 @@ func (aws *AWSCloud) DetachDisk(instanceName string, diskName string) error {
 	}
 
 	// TODO: We should specify the InstanceID and the Device, for safety
-	response, err := aws.ec2.DetachVolume(disk.awsId)
+	response, err := aws.ec2.DetachVolume(disk.awsID)
 	if err != nil {
 		return fmt.Errorf("error detaching EBS volume: %v", err)
 	}
@@ -938,9 +938,9 @@ func (aws *AWSCloud) CreateVolume(volumeOptions *VolumeOptions) (string, error) 
 	}
 
 	az := response.AvailZone
-	awsId := response.VolumeId
+	awsID := response.VolumeId
 
-	volumeName := "aws://" + az + "/" + awsId
+	volumeName := "aws://" + az + "/" + awsID
 
 	return volumeName, nil
 }
