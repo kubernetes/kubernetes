@@ -107,6 +107,11 @@ if [[ "$KUBERNETES_PROVIDER" == "gke" ]]; then
     "--kubeconfig=${HOME}/.config/gcloud/kubernetes/kubeconfig"
     "--context=gke_${PROJECT}_${ZONE}_${CLUSTER_NAME}"
   )
+elif [[ "$KUBERNETES_PROVIDER" == "ubuntu" ]]; then
+  detect-master > /dev/null
+  config=(
+    "--server=http://${KUBE_MASTER_IP}:8080"
+  )
 fi
 
 echo "current-context: \"$(${kubectl} "${config[@]:+${config[@]}}" config view -o template --template='{{index . "current-context"}}')\"" >&2

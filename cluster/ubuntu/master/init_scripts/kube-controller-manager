@@ -9,7 +9,7 @@ set -e
 # Should-Stop:        
 # Default-Start:      
 # Default-Stop:       
-# Short-Description:  Start distrubted key/value pair service
+# Short-Description:  Start kube-controller-managerservice
 # Description:
 #  http://www.github.com/GoogleCloudPlatform/Kubernetes
 ### END INIT INFO
