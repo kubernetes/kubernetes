@@ -67,6 +67,8 @@ var (
 	fakeDocker1, fakeDocker2 dockertools.FakeDockerClient
 	// API version that should be used by the client to talk to the server.
 	apiVersion string
+	// Limit the number of concurrent tests.
+	maxConcurrency int
 )
 
 type fakeKubeletClient struct{}
@@ -947,6 +949,8 @@ type testFunc func(*client.Client)
 
 func addFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&apiVersion, "apiVersion", latest.Version, "API version that should be used by the client for communicating with the server")
+	fs.IntVar(
+		&maxConcurrency, "maxConcurrency", -1, "Maximum number of tests to be run simultaneously. Unlimited if set to negative.")
 }
 
 func main() {
@@ -994,16 +998,26 @@ func main() {
 		},
 	}
 
-	var wg sync.WaitGroup
-	wg.Add(len(testFuncs))
-	for i := range testFuncs {
-		f := testFuncs[i]
-		go func() {
-			f(kubeClient)
-			wg.Done()
-		}()
+	// Only run at most maxConcurrency tests in parallel.
+	numFinishedTests := 0
+	for numFinishedTests < len(testFuncs) {
+		numTestsToRun := len(testFuncs) - numFinishedTests
+		if maxConcurrency > 0 && numTestsToRun > maxConcurrency {
+			numTestsToRun = maxConcurrency
+		}
+		glog.Infof("Running %d tests in parallel.", numTestsToRun)
+		var wg sync.WaitGroup
+		wg.Add(numTestsToRun)
+		for i := 0; i < numTestsToRun; i++ {
+			f := testFuncs[i+numFinishedTests]
+			go func() {
+				f(kubeClient)
+				wg.Done()
+			}()
+		}
+		wg.Wait()
+		numFinishedTests += numTestsToRun
 	}
-	wg.Wait()
 
 	// Check that kubelet tried to make the containers.
 	// Using a set to list unique creation attempts. Our fake is
