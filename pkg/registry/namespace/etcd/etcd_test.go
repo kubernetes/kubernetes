@@ -319,6 +319,62 @@ func TestDeleteNamespace(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+}
 
-	// TODO: when we add life-cycle, this will go to Terminating, and then we need to test Terminating to gone
+func TestDeleteNamespaceWithIncompleteFinalizers(t *testing.T) {
+	now := util.Now()
+	fakeEtcdClient, helper := newHelper(t)
+	fakeEtcdClient.ChangeIndex = 1
+	fakeEtcdClient.Data["/registry/namespaces/foo"] = tools.EtcdResponseWithError{
+		R: &etcd.Response{
+			Node: &etcd.Node{
+				Value: runtime.EncodeOrDie(latest.Codec, &api.Namespace{
+					ObjectMeta: api.ObjectMeta{
+						Name:              "foo",
+						DeletionTimestamp: &now,
+					},
+					Spec: api.NamespaceSpec{
+						Finalizers: []api.FinalizerName{api.FinalizerKubernetes},
+					},
+					Status: api.NamespaceStatus{Phase: api.NamespaceActive},
+				}),
+				ModifiedIndex: 1,
+				CreatedIndex:  1,
+			},
+		},
+	}
+	storage, _, _ := NewStorage(helper)
+	_, err := storage.Delete(api.NewDefaultContext(), "foo", nil)
+	if err == nil {
+		t.Fatalf("expected error: %v", err)
+	}
+}
+
+func TestDeleteNamespaceWithCompleteFinalizers(t *testing.T) {
+	now := util.Now()
+	fakeEtcdClient, helper := newHelper(t)
+	fakeEtcdClient.ChangeIndex = 1
+	fakeEtcdClient.Data["/registry/namespaces/foo"] = tools.EtcdResponseWithError{
+		R: &etcd.Response{
+			Node: &etcd.Node{
+				Value: runtime.EncodeOrDie(latest.Codec, &api.Namespace{
+					ObjectMeta: api.ObjectMeta{
+						Name:              "foo",
+						DeletionTimestamp: &now,
+					},
+					Spec: api.NamespaceSpec{
+						Finalizers: []api.FinalizerName{},
+					},
+					Status: api.NamespaceStatus{Phase: api.NamespaceActive},
+				}),
+				ModifiedIndex: 1,
+				CreatedIndex:  1,
+			},
+		},
+	}
+	storage, _, _ := NewStorage(helper)
+	_, err := storage.Delete(api.NewDefaultContext(), "foo", nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 }

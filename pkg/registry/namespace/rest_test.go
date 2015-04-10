@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
 func TestNamespaceStrategy(t *testing.T) {
@@ -70,13 +71,14 @@ func TestNamespaceStatusStrategy(t *testing.T) {
 	if StatusStrategy.AllowCreateOnUpdate() {
 		t.Errorf("Namespaces should not allow create on update")
 	}
+	now := util.Now()
 	oldNamespace := &api.Namespace{
 		ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "10"},
 		Spec:       api.NamespaceSpec{Finalizers: []api.FinalizerName{"kubernetes"}},
 		Status:     api.NamespaceStatus{Phase: api.NamespaceActive},
 	}
 	namespace := &api.Namespace{
-		ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "9"},
+		ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "9", DeletionTimestamp: &now},
 		Status:     api.NamespaceStatus{Phase: api.NamespaceTerminating},
 	}
 	StatusStrategy.PrepareForUpdate(namespace, oldNamespace)

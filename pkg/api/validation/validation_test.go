@@ -2629,12 +2629,29 @@ func TestValidateNamespaceFinalizeUpdate(t *testing.T) {
 }
 
 func TestValidateNamespaceStatusUpdate(t *testing.T) {
+	now := util.Now()
+
 	tests := []struct {
 		oldNamespace api.Namespace
 		namespace    api.Namespace
 		valid        bool
 	}{
-		{api.Namespace{}, api.Namespace{}, true},
+		{api.Namespace{}, api.Namespace{
+			Status: api.NamespaceStatus{
+				Phase: api.NamespaceActive,
+			},
+		}, true},
+		{api.Namespace{
+			ObjectMeta: api.ObjectMeta{
+				Name: "foo"}},
+			api.Namespace{
+				ObjectMeta: api.ObjectMeta{
+					Name:              "foo",
+					DeletionTimestamp: &now},
+				Status: api.NamespaceStatus{
+					Phase: api.NamespaceTerminating,
+				},
+			}, true},
 		{api.Namespace{
 			ObjectMeta: api.ObjectMeta{
 				Name: "foo"}},
@@ -2644,7 +2661,7 @@ func TestValidateNamespaceStatusUpdate(t *testing.T) {
 				Status: api.NamespaceStatus{
 					Phase: api.NamespaceTerminating,
 				},
-			}, true},
+			}, false},
 		{api.Namespace{
 			ObjectMeta: api.ObjectMeta{
 				Name: "foo"}},
@@ -2659,7 +2676,7 @@ func TestValidateNamespaceStatusUpdate(t *testing.T) {
 	for i, test := range tests {
 		test.namespace.ObjectMeta.ResourceVersion = "1"
 		test.oldNamespace.ObjectMeta.ResourceVersion = "1"
-		errs := ValidateNamespaceStatusUpdate(&test.oldNamespace, &test.namespace)
+		errs := ValidateNamespaceStatusUpdate(&test.namespace, &test.oldNamespace)
 		if test.valid && len(errs) > 0 {
 			t.Errorf("%d: Unexpected error: %v", i, errs)
 			t.Logf("%#v vs %#v", test.oldNamespace.ObjectMeta, test.namespace.ObjectMeta)
