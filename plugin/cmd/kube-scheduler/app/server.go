@@ -67,6 +67,8 @@ func NewSchedulerServer() *SchedulerServer {
 func (s *SchedulerServer) AddFlags(fs *pflag.FlagSet) {
 	fs.IntVar(&s.Port, "port", s.Port, "The port that the scheduler's http service runs on")
 	fs.Var(&s.Address, "address", "The IP address to serve on (set to 0.0.0.0 for all interfaces)")
+	s.ClientConfig.QPS = 20.0
+	s.ClientConfig.Burst = 100
 	client.BindClientConfigFlags(fs, &s.ClientConfig)
 	fs.StringVar(&s.AlgorithmProvider, "algorithm_provider", s.AlgorithmProvider, "The scheduling algorithm provider to use")
 	fs.StringVar(&s.PolicyConfigFile, "policy_config_file", s.PolicyConfigFile, "File with scheduler policy configuration")

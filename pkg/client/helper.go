@@ -80,6 +80,9 @@ type Config struct {
 
 	// QPS indicates the maximum QPS to the master from this client.  If zero, QPS is unlimited.
 	QPS float32
+
+	// Maximum burst for throttle
+	Burst int
 }
 
 type KubeletConfig struct {
@@ -181,6 +184,9 @@ func SetKubernetesDefaults(config *Config) error {
 	if config.QPS == 0.0 {
 		config.QPS = 5.0
 	}
+	if config.Burst == 0 {
+		config.Burst = 10
+	}
 	return nil
 }
 
@@ -201,7 +207,7 @@ func RESTClientFor(config *Config) (*RESTClient, error) {
 		return nil, err
 	}
 
-	client := NewRESTClient(baseURL, config.Version, config.Codec, config.LegacyBehavior, config.QPS)
+	client := NewRESTClient(baseURL, config.Version, config.Codec, config.LegacyBehavior, config.QPS, config.Burst)
 
 	transport, err := TransportFor(config)
 	if err != nil {
