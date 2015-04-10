@@ -21,7 +21,6 @@ import (
 	"strings"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"github.com/golang/glog"
 	"github.com/spf13/cobra"
 )
 
@@ -81,19 +80,18 @@ func MakeLabels(labels map[string]string) string {
 }
 
 // ParseLabels turns a string representation of a label set into a map[string]string
-func ParseLabels(labelString string) map[string]string {
+func ParseLabels(labelString string) (map[string]string, error) {
 	if len(labelString) == 0 {
-		return nil
+		return nil, fmt.Errorf("no label spec passed")
 	}
 	labels := map[string]string{}
 	labelSpecs := strings.Split(labelString, ",")
 	for ix := range labelSpecs {
 		labelSpec := strings.Split(labelSpecs[ix], "=")
 		if len(labelSpec) != 2 {
-			glog.Errorf("unexpected label spec: %s", labelSpecs[ix])
-			continue
+			return nil, fmt.Errorf("unexpected label spec: %s", labelSpecs[ix])
 		}
 		labels[labelSpec[0]] = labelSpec[1]
 	}
-	return labels
+	return labels, nil
 }
