@@ -344,3 +344,6 @@ threads can escape the cgroups.
 
 When the process is stopped, the process executor will try (in a best-effort way)
 to stop all its children and remove the sub-cgroups.
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/Godeps/_workspace/src/github.com/docker/libcontainer/SPEC.md?pixel)]()

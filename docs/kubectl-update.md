@@ -67,3 +67,6 @@ $ kubectl update pods my-pod --patch='{ "apiVersion": "v1beta1", "desiredState":
 ### SEE ALSO
 * [kubectl](kubectl.md)
 
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/kubectl-update.md?pixel)]()

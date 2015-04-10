@@ -68,3 +68,6 @@ shape = applish
 shape = square
 colour = blue
 ```
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/Godeps/_workspace/src/github.com/vaughan0/go-ini/README.md?pixel)]()

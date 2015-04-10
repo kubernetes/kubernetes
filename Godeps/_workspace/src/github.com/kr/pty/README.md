@@ -34,3 +34,6 @@ func main() {
 	io.Copy(os.Stdout, f)
 }
 ```
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/Godeps/_workspace/src/github.com/kr/pty/README.md?pixel)]()

@@ -37,3 +37,5 @@ For production usage, we recommend bigger instances, for example:
 export MASTER_SIZE=c4.large
 export MINION_SIZE=r3.large
 ```
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/cluster/aws/options.md?pixel)]()

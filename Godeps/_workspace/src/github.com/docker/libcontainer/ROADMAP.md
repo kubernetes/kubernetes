@@ -14,3 +14,6 @@ Our goal is to make libcontainer run everywhere, but currently libcontainer requ
 ## Cross-architecture support
 
 Our goal is to make libcontainer run everywhere. However currently libcontainer only runs on x86_64 systems. We plan on expanding architecture support, so that libcontainer containers can be created and used on more architectures.
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/Godeps/_workspace/src/github.com/docker/libcontainer/ROADMAP.md?pixel)]()

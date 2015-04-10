@@ -90,3 +90,6 @@ Version, license and author
 * License: MIT
 * Author: Alexander F Rødseth
 
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/Godeps/_workspace/src/github.com/xyproto/simpleredis/README.md?pixel)]()

@@ -49,3 +49,5 @@ Run *docker inspect* and I found the Containers mounted the host directory into 
     #docker inspect --format "\{\{\.Volumes\}\}" cc9bd22d9e9d
     map[/mnt/iscsipd:/var/lib/kubelet/pods/4ab78fdc-b927-11e4-ade6-d4bed9b39058/volumes/kubernetes.io~iscsi/iscsipd-rw /dev/termination-log:/var/lib/kubelet/pods/4ab78fdc-b927-11e4-ade6-d4bed9b39058/containers/iscsipd-rw/cc9bd22d9e9db3c88a150cadfdccd86e36c463629035b48bdcfc8ec534be8615]
 ```
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/iscsi/README.md?pixel)]()

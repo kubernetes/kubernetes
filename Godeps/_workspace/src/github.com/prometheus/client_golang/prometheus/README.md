@@ -51,3 +51,6 @@ func init() {
 # Documentation
 
 [![GoDoc](https://godoc.org/github.com/prometheus/client_golang?status.png)](https://godoc.org/github.com/prometheus/client_golang)
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/Godeps/_workspace/src/github.com/prometheus/client_golang/prometheus/README.md?pixel)]()

@@ -244,3 +244,6 @@ License
    [1]: http://daringfireball.net/projects/markdown/ "Markdown"
    [2]: http://golang.org/ "Go Language"
    [3]: http://github.com/tanoku/upskirt "Upskirt"
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/Godeps/_workspace/src/github.com/russross/blackfriday/README.md?pixel)]()

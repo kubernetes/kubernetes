@@ -9,3 +9,6 @@ metrics from the pseudo-filesystem proc.
 # Testing
 
     $ go test
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/Godeps/_workspace/src/github.com/prometheus/procfs/README.md?pixel)]()

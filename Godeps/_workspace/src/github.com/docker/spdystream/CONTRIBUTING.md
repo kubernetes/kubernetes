@@ -11,3 +11,6 @@ Otherwise, go read
 [Docker's contributions guidelines](https://github.com/dotcloud/docker/blob/master/CONTRIBUTING.md).
 
 Happy hacking!
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/Godeps/_workspace/src/github.com/docker/spdystream/CONTRIBUTING.md?pixel)]()

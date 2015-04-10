@@ -44,3 +44,6 @@ decoding of the JSON (reading the "type" first, and the rest later).
 However, it is much simpler to just decode this into a `map[string]interface{}`
 structure, read the "type" key, then use something like this library
 to decode it into the proper structure.
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/Godeps/_workspace/src/github.com/mitchellh/mapstructure/README.md?pixel)]()

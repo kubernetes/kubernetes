@@ -107,3 +107,6 @@ hack/local-up-cluster.sh
 #### kubectl claims to start a container but `get pods` and `docker ps` don't show it.
 
 One or more of the kubernetes daemons might've crashed. Tail the logs of each in /tmp.
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/getting-started-guides/locally.md?pixel)]()

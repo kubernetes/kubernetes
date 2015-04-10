@@ -76,3 +76,6 @@ func main() {
 
 Code and documentation copyright 2013-2014 Docker, inc. Code released under the Apache 2.0 license.
 Docs released under Creative commons.
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/Godeps/_workspace/src/github.com/docker/spdystream/README.md?pixel)]()

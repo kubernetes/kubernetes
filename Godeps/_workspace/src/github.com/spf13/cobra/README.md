@@ -397,3 +397,6 @@ Cobra is released under the Apache 2.0 license. See [LICENSE.txt](https://github
 
 [![Bitdeli Badge](https://d2weczhvl823v0.cloudfront.net/spf13/cobra/trend.png)](https://bitdeli.com/free "Bitdeli Badge")
 
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/Godeps/_workspace/src/github.com/spf13/cobra/README.md?pixel)]()

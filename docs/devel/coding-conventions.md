@@ -5,3 +5,6 @@ Coding style advice for contributors
     - https://github.com/golang/go/wiki/CodeReviewComments
     - https://gist.github.com/lavalamp/4bd23295a9f32706a48f
 
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/devel/coding-conventions.md?pixel)]()

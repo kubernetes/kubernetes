@@ -62,3 +62,6 @@ $ kubectl log -f 123456-7890 ruby-container
 ### SEE ALSO
 * [kubectl](kubectl.md)
 
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/kubectl-log.md?pixel)]()

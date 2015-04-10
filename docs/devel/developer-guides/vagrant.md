@@ -316,3 +316,6 @@ export KUBERNETES_MEMORY=2048
 
 #### I ran vagrant suspend and nothing works!
 ```vagrant suspend``` seems to mess up the network.  It's not supported at this time.
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/devel/developer-guides/vagrant.md?pixel)]()

@@ -55,3 +55,6 @@ kubectl config set PROPERTY_NAME PROPERTY_VALUE
 ### SEE ALSO
 * [kubectl-config](kubectl-config.md)
 
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/kubectl-config-set.md?pixel)]()

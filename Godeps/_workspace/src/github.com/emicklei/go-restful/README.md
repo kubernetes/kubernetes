@@ -70,3 +70,5 @@ func (u UserResource) findUser(request *restful.Request, response *restful.Respo
 (c) 2012 - 2015, http://ernestmicklei.com. MIT License
 
 Type ```git shortlog -s``` for a full list of contributors.
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/Godeps/_workspace/src/github.com/emicklei/go-restful/README.md?pixel)]()

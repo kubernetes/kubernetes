@@ -93,3 +93,6 @@ The kube-controller-manager has several options.
 # HISTORY
 October 2014, Originally compiled by Scott Collier (scollier at redhat dot com) based
  on the kubernetes source material and internal work.
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/man/kube-controller-manager.1.md?pixel)]()

@@ -59,3 +59,6 @@ with a call to `NewSentryHook`. This can be changed by assigning a value to the 
 hook, _ := logrus_sentry.NewSentryHook(...)
 hook.Timeout = 20*time.Seconds
 ```
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/Godeps/_workspace/src/github.com/Sirupsen/logrus/hooks/sentry/README.md?pixel)]()

@@ -64,3 +64,6 @@ Eventually you will have sufficient runs for your purposes. At that point you ca
 If you do a final check for flakes with ```docker ps -a```, ignore tasks that exited -1, since that's what happens when you stop the replication controller.
 
 Happy flake hunting!
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/devel/flaky-tests.md?pixel)]()

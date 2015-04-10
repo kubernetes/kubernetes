@@ -23,3 +23,6 @@ primarily a Contributor License Agreement (CLA):
 
 You can sign these electronically (just scroll to the bottom).
 After that, we'll be able to accept your pull requests.
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/Godeps/_workspace/src/golang.org/x/oauth2/CONTRIBUTING.md?pixel)]()

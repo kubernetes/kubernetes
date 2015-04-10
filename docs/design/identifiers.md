@@ -88,3 +88,6 @@ objectives.
    1. Each container is started up with enough metadata to distinguish the pod from whence it came.
    2. Each attempt to run a container is assigned a UID (a string) that is unique across time.
       1. This may correspond to Docker's container ID.
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/design/identifiers.md?pixel)]()

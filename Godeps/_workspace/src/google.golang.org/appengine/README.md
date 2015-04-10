@@ -63,3 +63,6 @@ This list summarises the differences:
 * `appengine.IsCapabilityDisabled` and `appengine/capability` are obsolete.
 * Most of `appengine/file` is deprecated. Use [Google Cloud Storage](https://godoc.org/google.golang.org/cloud/storage) instead.
 * `appengine/socket` is deprecated. Use the standard `net` package instead.
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/Godeps/_workspace/src/google.golang.org/appengine/README.md?pixel)]()

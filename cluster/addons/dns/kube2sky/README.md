@@ -23,3 +23,6 @@ example, if this is set to `kubernetes.io`, then a service named "nifty" in the
 
 '-etcd_mutation_timeout': For how long the application will keep retrying etcd 
 mutation (insertion or removal of a dns entry) before giving up and crashing.
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/cluster/addons/dns/kube2sky/README.md?pixel)]()

@@ -179,3 +179,6 @@ Here is a current list of Negroni compatible middlware. Feel free to put up a PR
 ## About
 
 Negroni is obsessively designed by none other than the [Code Gangsta](http://codegangsta.io/)
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/Godeps/_workspace/src/github.com/codegangsta/negroni/README.md?pixel)]()

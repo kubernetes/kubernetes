@@ -148,3 +148,6 @@ As there is no security currently built into the `apiserver`, the salt configura
 All communication within the cluster (worker nodes to the master, for instance) occurs on the internal virtual network and should be safe from eavesdropping.
 
 The password is generated randomly as part of the `kube-up.sh` script and stored in `~/.kubernetes_auth`.
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/DESIGN.md?pixel)]()

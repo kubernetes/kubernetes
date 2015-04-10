@@ -32,3 +32,6 @@ Accepts an optional tag (defaults to "latest")
 ###### Clean up
 
     ./script/clean.sh
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/guestbook-go/_src/README.md?pixel)]()

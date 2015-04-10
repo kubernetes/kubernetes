@@ -15,3 +15,6 @@ ChangeColor(Green, false, None, false)
 fmt.Println(...)
 ResetColor()
 ```
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/Godeps/_workspace/src/github.com/daviddengcn/go-colortext/README.md?pixel)]()

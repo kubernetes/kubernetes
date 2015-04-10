@@ -159,3 +159,6 @@ Go expert - all members of the community are welcome!
 If you're struggling with something or have spotted a potential bug, feel free
 to submit an issue to our [bug tracker](/issues) or e-mail us directly at
 [sdk-support@rackspace.com](mailto:sdk-support@rackspace.com).
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/Godeps/_workspace/src/github.com/rackspace/gophercloud/README.md?pixel)]()

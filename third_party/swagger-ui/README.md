@@ -20,3 +20,6 @@ https://github.com/swagger-api/swagger-ui#how-to-use-it
 
 LICENSE file has been created for compliance purposes.
 Not included in original distribution.
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/third_party/swagger-ui/README.md?pixel)]()

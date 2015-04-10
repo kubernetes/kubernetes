@@ -108,3 +108,6 @@ Major refactor:
 - Pull out Ginkgo's internal to `internal`
 - Rename `example` everywhere to `spec`
 - Much more!
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/Godeps/_workspace/src/github.com/onsi/ginkgo/CHANGELOG.md?pixel)]()

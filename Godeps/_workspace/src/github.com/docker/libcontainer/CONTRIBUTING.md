@@ -255,3 +255,6 @@ If you have any questions, please refer to the FAQ in the [docs](to be written)
 Don't forget: being a maintainer is a time investment. Make sure you will have time to make yourself available.
 You don't have to be a maintainer to make a difference on the project!
 
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/Godeps/_workspace/src/github.com/docker/libcontainer/CONTRIBUTING.md?pixel)]()

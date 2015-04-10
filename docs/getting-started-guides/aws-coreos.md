@@ -210,3 +210,6 @@ Visit the public IP address in your browser to view the running pod.
 ```
 kubectl delete pods hello
 ```
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/getting-started-guides/aws-coreos.md?pixel)]()
