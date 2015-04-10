@@ -999,25 +999,25 @@ func main() {
 	}
 
 	// Only run at most maxConcurrency tests in parallel.
-	numFinishedTests := 0
-	for numFinishedTests < len(testFuncs) {
-		numTestsToRun := len(testFuncs) - numFinishedTests
-		if maxConcurrency > 0 && numTestsToRun > maxConcurrency {
-			numTestsToRun = maxConcurrency
-		}
-		glog.Infof("Running %d tests in parallel.", numTestsToRun)
-		var wg sync.WaitGroup
-		wg.Add(numTestsToRun)
-		for i := 0; i < numTestsToRun; i++ {
-			f := testFuncs[i+numFinishedTests]
-			go func() {
-				f(kubeClient)
-				wg.Done()
-			}()
-		}
-		wg.Wait()
-		numFinishedTests += numTestsToRun
+	if maxConcurrency <= 0 {
+		maxConcurrency = len(testFuncs)
 	}
+	glog.Infof("Running %d tests in parallel.", maxConcurrency)
+	ch := make(chan struct{}, maxConcurrency)
+
+	var wg sync.WaitGroup
+	wg.Add(len(testFuncs))
+	for i := range testFuncs {
+		f := testFuncs[i]
+		go func() {
+			ch <- struct{}{}
+			f(kubeClient)
+			<-ch
+			wg.Done()
+		}()
+	}
+	wg.Wait()
+	close(ch)
 
 	// Check that kubelet tried to make the containers.
 	// Using a set to list unique creation attempts. Our fake is
