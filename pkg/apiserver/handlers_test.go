@@ -182,9 +182,7 @@ func TestGetAPIRequestInfo(t *testing.T) {
 
 		// subresource identification
 		{"GET", "/namespaces/other/pods/foo/status", "get", "", "other", "pods", "status", "Pod", "foo", []string{"pods", "foo", "status"}},
-		{"GET", "/namespaces/other/finalize", "get", "", "other", "namespaces", "finalize", "Namespace", "other", []string{"namespaces", "other", "finalize"}},
-		{"PUT", "/namespaces/other/status", "update", "", "other", "namespaces", "status", "Namespace", "other", []string{"namespaces", "other", "status"}},
-		{"PUT", "/namespaces/other/anything", "update", "", "other", "anything", "", "", "", []string{"anything"}},
+		{"PUT", "/namespaces/other/finalize", "update", "", "other", "finalize", "", "", "", []string{"finalize"}},
 	}
 
 	apiRequestInfoResolver := &APIRequestInfoResolver{util.NewStringSet("api"), latest.RESTMapper}
