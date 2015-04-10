@@ -1,9 +1,9 @@
-# Secrets 
+# Secrets
 
 Objects of type `secret` are intended to hold sensitive information, such as
 passwords, OAuth tokens, and ssh keys.  Putting this information in a `secret`
 is safer and more flexible than putting it verbatim in a `pod` definition or in
-a docker image. 
+a docker image.
 
 ### Creating and Using Secrets
 To make use of secrets requires at least two steps:
@@ -21,7 +21,7 @@ This is an example of a simple secret, in json format:
   "data": {
     "username": "dmFsdWUtMQ0K",
     "password": "dmFsdWUtMg0KDQo="
-    }
+  }
 }
 ```
 
@@ -110,7 +110,7 @@ To create a pod that uses an ssh key stored as a secret, we first need to create
 {
   "apiVersion": "v1beta2",
   "kind": "Secret",
-   "id": "ssh-key-secret",
+  "id": "ssh-key-secret",
   "data": {
     "id-rsa.pub": "dmFsdWUtMQ0K",
     "id-rsa": "dmFsdWUtMg0KDQo="
@@ -272,7 +272,7 @@ Note how the specs for the two pods differ only in one field;  this facilitates
 creating pods with different capabilities from a common pod config template.
 
 ### Use-case: Secret visible to one container in a pod
-<a name="use-case-two-containers"></a> 
+<a name="use-case-two-containers"></a>
 
 Consider a program that needs to handle HTTP requests, do some complex business
 logic, and then sign some messages with an HMAC.  Because it has complex
@@ -296,7 +296,7 @@ Because `secret` objects can be created independently of the `pods` that use
 them, there is less risk of the secret being exposed during the workflow of
 creating, viewing, and editing pods.  The system can also take additional
 precautions with `secret` objects, such as avoiding writing them to disk where
-possible. 
+possible.
 
 A secret is only sent to a node if a pod on that node requires it.  It is not
 written to disk.  It is stored in a tmpfs.  It is deleted once the pod that
@@ -308,7 +308,7 @@ Secrets are protected when transmitted over these channels.
 
 There may be secrets for several pods on the same node.  However, only the
 secrets that a pod requests are potentially visible within its containers.
-Therefore, one Pod does not have access to the secrets of another pod.  
+Therefore, one Pod does not have access to the secrets of another pod.
 
 There may be several containers in a pod.  However, each container in a pod has
 to request the secret volume in its `volumeMounts` for it to be visible within
@@ -318,16 +318,15 @@ Pod level](#use-case-two-containers).
 ### Risks
 
  - Applications still need to protect the value of secret after reading it from the volume,
-   such not accidentally logging it or transmitting it to an untrusted party.
+   such as not accidentally logging it or transmitting it to an untrusted party.
  - A user who can create a pod that uses a secret can also see the value of that secret.  Even
    if apiserver policy does not allow that user to read the secret object, the user could
    run a pod which exposes the secret.
    If multiple replicas of etcd are run, then the secrets will be shared between them.
    By default, etcd does not secure peer-to-peer communication with SSL/TLS, though this can be configured.
  - It is not possible currently to control which users of a kubernetes cluster can
-   access a secret.  Support for this is planned. 
+   access a secret.  Support for this is planned.
  - Currently, anyone with root on any node can read any secret from the apiserver,
    by impersonating the kubelet.  It is a planned feature to only send secrets to
    nodes that actually require them, to restrict the impact of a root exploit on a
    single node.
-
