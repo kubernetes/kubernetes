@@ -266,11 +266,8 @@ func TestTransformResponse(t *testing.T) {
 		if test.Response.Body == nil {
 			test.Response.Body = ioutil.NopCloser(bytes.NewReader([]byte{}))
 		}
-		body, err := ioutil.ReadAll(test.Response.Body)
-		if err != nil {
-			t.Errorf("failed to read body of response: %v", err)
-		}
-		response, created, err := r.transformResponse(test.Response, &http.Request{}, body)
+		result := r.transformResponse(test.Response, &http.Request{})
+		response, created, err := result.body, result.created, result.err
 		hasErr := err != nil
 		if hasErr != test.Error {
 			t.Errorf("%d: unexpected error: %t %v", i, test.Error, err)
@@ -356,11 +353,8 @@ func TestTransformUnstructuredError(t *testing.T) {
 			resourceName: testCase.Name,
 			resource:     testCase.Resource,
 		}
-		body, err := ioutil.ReadAll(testCase.Res.Body)
-		if err != nil {
-			t.Errorf("failed to read body: %v", err)
-		}
-		_, _, err = r.transformResponse(testCase.Res, testCase.Req, body)
+		result := r.transformResponse(testCase.Res, testCase.Req)
+		err := result.err
 		if !testCase.ErrFn(err) {
 			t.Errorf("unexpected error: %v", err)
 			continue
@@ -748,6 +742,64 @@ func TestDoRequestNewWay(t *testing.T) {
 	}
 }
 
+func TestCheckRetryClosesBody(t *testing.T) {
+	count := 0
+	ch := make(chan struct{})
+	testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		count++
+		t.Logf("attempt %d", count)
+		if count >= 5 {
+			w.WriteHeader(http.StatusOK)
+			close(ch)
+			return
+		}
+		w.Header().Set("Retry-After", "0")
+		w.WriteHeader(apierrors.StatusTooManyRequests)
+	}))
+	defer testServer.Close()
+
+	c := NewOrDie(&Config{Host: testServer.URL, Version: "v1beta2", Username: "user", Password: "pass"})
+	_, err := c.Verb("POST").
+		Prefix("foo", "bar").
+		Suffix("baz").
+		Timeout(time.Second).
+		Body([]byte(strings.Repeat("abcd", 1000))).
+		DoRaw()
+	if err != nil {
+		t.Fatalf("Unexpected error: %v %#v", err, err)
+	}
+	<-ch
+	if count != 5 {
+		t.Errorf("unexpected retries: %d", count)
+	}
+}
+
+func BenchmarkCheckRetryClosesBody(t *testing.B) {
+	count := 0
+	testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		count++
+		if count%3 == 0 {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+		w.Header().Set("Retry-After", "0")
+		w.WriteHeader(apierrors.StatusTooManyRequests)
+	}))
+	defer testServer.Close()
+
+	c := NewOrDie(&Config{Host: testServer.URL, Version: "v1beta2", Username: "user", Password: "pass"})
+	r := c.Verb("POST").
+		Prefix("foo", "bar").
+		Suffix("baz").
+		Timeout(time.Second).
+		Body([]byte(strings.Repeat("abcd", 1000)))
+
+	for i := 0; i < t.N; i++ {
+		if _, err := r.DoRaw(); err != nil {
+			t.Fatalf("Unexpected error: %v %#v", err, err)
+		}
+	}
+}
 func TestDoRequestNewWayReader(t *testing.T) {
 	reqObj := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
 	reqBodyExpected, _ := v1beta1.Codec.Encode(reqObj)
