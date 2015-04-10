@@ -898,7 +898,10 @@ const (
 )
 
 // ServiceStatus represents the current status of a service
-type ServiceStatus struct{}
+type ServiceStatus struct {
+	// If the service is assigned a cluster-wide port, it is set here
+	ServicePort int `json:"servicePort,omitempty"`
+}
 
 // ServiceSpec describes the attributes that a user creates on a service
 type ServiceSpec struct {

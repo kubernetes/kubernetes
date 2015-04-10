@@ -35,6 +35,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/endpoint"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/minion"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/fielderrors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 	"github.com/golang/glog"
@@ -47,18 +48,27 @@ type REST struct {
 	machines    minion.Registry
 	endpoints   endpoint.Registry
 	portalMgr   *ipAllocator
+	portMgr     *portAllocator
 	clusterName string
 }
 
 // NewStorage returns a new REST.
 func NewStorage(registry Registry, cloud cloudprovider.Interface, machines minion.Registry, endpoints endpoint.Registry, portalNet *net.IPNet,
+	portRange util.PortRange,
 	clusterName string) *REST {
 	// TODO: Before we can replicate masters, this has to be synced (e.g. lives in etcd)
 	ipa := newIPAllocator(portalNet)
 	if ipa == nil {
 		glog.Fatalf("Failed to create an IP allocator. Is subnet '%v' valid?", portalNet)
 	}
-	reloadIPsFromStorage(ipa, registry)
+
+	// TODO: Before we can replicate masters, this has to be synced (e.g. lives in etcd)
+	pa := newPortAllocator(portRange)
+	if pa == nil {
+		glog.Fatalf("Failed to create a port allocator. Is port-range '%v' valid?", portRange)
+	}
+
+	reloadServiceStateFromStorage(ipa, pa, registry)
 
 	return &REST{
 		registry:    registry,
@@ -66,12 +76,13 @@ func NewStorage(registry Registry, cloud cloudprovider.Interface, machines minio
 		machines:    machines,
 		endpoints:   endpoints,
 		portalMgr:   ipa,
+		portMgr:     pa,
 		clusterName: clusterName,
 	}
 }
 
-// Helper: mark all previously allocated IPs in the allocator.
-func reloadIPsFromStorage(ipa *ipAllocator, registry Registry) {
+// Helper: mark all previously allocated IPs & ports in the allocator.
+func reloadServiceStateFromStorage(ipa *ipAllocator, pa *portAllocator, registry Registry) {
 	services, err := registry.ListServices(api.NewContext())
 	if err != nil {
 		// This is really bad.
@@ -80,12 +91,17 @@ func reloadIPsFromStorage(ipa *ipAllocator, registry Registry) {
 	}
 	for i := range services.Items {
 		service := &services.Items[i]
-		if !api.IsServiceIPSet(service) {
-			continue
+		if api.IsServiceIPSet(service) {
+			if err := ipa.Allocate(net.ParseIP(service.Spec.PortalIP)); err != nil {
+				// This is really bad.
+				glog.Errorf("service %q PortalIP %s could not be allocated: %v", service.Name, service.Spec.PortalIP, err)
+			}
 		}
-		if err := ipa.Allocate(net.ParseIP(service.Spec.PortalIP)); err != nil {
-			// This is really bad.
-			glog.Errorf("service %q PortalIP %s could not be allocated: %v", service.Name, service.Spec.PortalIP, err)
+		if service.Status.ServicePort != 0 {
+			if err := pa.Allocate(service.Status.ServicePort); err != nil {
+				// This is really bad.
+				glog.Errorf("service %q ServicePort %s could not be allocated: %v", service.Name, service.Status.ServicePort, err)
+			}
 		}
 	}
 }
@@ -123,6 +139,22 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (runtime.Object, err
 		releaseServiceIp = true
 	}
 
+	releaseServicePort := false
+	defer func() {
+		if releaseServicePort {
+			rs.portMgr.Release(service.Status.ServicePort)
+		}
+	}()
+
+	if rs.needsServicePort(service) {
+		port, err := rs.portMgr.AllocateNext()
+		if err != nil {
+			return nil, err
+		}
+		service.Status.ServicePort = port
+		releaseServicePort = true
+	}
+
 	// TODO: Move this to post-creation rectification loop, so that we make/remove external load balancers
 	// correctly no matter what http operations happen.
 	if service.Spec.CreateExternalLoadBalancer {
@@ -139,6 +171,7 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (runtime.Object, err
 
 	if err == nil {
 		releaseServiceIp = false
+		releaseServicePort = false
 	}
 
 	return out, err
@@ -219,6 +252,34 @@ func (rs *REST) Update(ctx api.Context, obj runtime.Object) (runtime.Object, boo
 	if errs := validation.ValidateServiceUpdate(oldService, service); len(errs) > 0 {
 		return nil, false, errors.NewInvalid("service", service.Name, errs)
 	}
+
+	releaseServicePort := false
+	defer func() {
+		if releaseServicePort {
+			rs.portMgr.Release(service.Status.ServicePort)
+		}
+	}()
+
+	oldNeedsServicePort := rs.needsServicePort(oldService)
+	newNeedsServicePort := rs.needsServicePort(service)
+	if oldNeedsServicePort != newNeedsServicePort {
+		if newNeedsServicePort {
+			// Assign service port
+			port, err := rs.portMgr.AllocateNext()
+			if err != nil {
+				return nil, false, err
+			}
+			service.Status.ServicePort = port
+			releaseServicePort = true
+		} else {
+			// Release no-longer needed service port
+			err = rs.portMgr.Release(service.Status.ServicePort)
+			if err != nil {
+				return nil, false, err
+			}
+		}
+	}
+
 	// Recreate external load balancer if changed.
 	if externalLoadBalancerNeedsUpdate(oldService, service) {
 		// TODO: support updating existing balancers
@@ -236,6 +297,10 @@ func (rs *REST) Update(ctx api.Context, obj runtime.Object) (runtime.Object, boo
 		}
 	}
 	out, err := rs.registry.UpdateService(ctx, service)
+	if err == nil {
+		releaseServicePort = false
+	}
+
 	return out, false, err
 }
 
@@ -409,6 +474,19 @@ func externalLoadBalancerNeedsUpdate(oldService, newService *api.Service) bool {
 		if oldService.Spec.PublicIPs[i] != newService.Spec.PublicIPs[i] {
 			return true
 		}
+	}
+	return false
+}
+
+// Determine if the service needs a cluster-wide port assigned
+func (rs *REST) needsServicePort(service *api.Service) bool {
+	if service.Spec.CreateExternalLoadBalancer {
+		balancer, ok := rs.cloud.TCPLoadBalancer()
+		if !ok {
+			// This will fail, but we don't need a service port for it
+			return false
+		}
+		return balancer.NeedsClusterServicePort()
 	}
 	return false
 }

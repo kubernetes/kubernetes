@@ -233,6 +233,11 @@ func (gce *GCECloud) TCPLoadBalancerExists(name, region string) (bool, error) {
 	return false, err
 }
 
+// NeedsClusterServicePort is an implementation of TCPLoadBalancer.NeedsClusterServicePort.
+func (gce *GCECloud) NeedsClusterServicePort() bool {
+	return false
+}
+
 //translate from what K8s supports to what the cloud provider supports for session affinity.
 func translateAffinityType(affinityType api.AffinityType) GCEAffinityType {
 	switch affinityType {

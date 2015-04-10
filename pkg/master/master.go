@@ -72,14 +72,15 @@ import (
 
 // Config is a structure used to configure a Master.
 type Config struct {
-	Cloud             cloudprovider.Interface
-	EtcdHelper        tools.EtcdHelper
-	EventTTL          time.Duration
-	MinionRegexp      string
-	KubeletClient     client.KubeletClient
-	PortalNet         *net.IPNet
-	EnableLogsSupport bool
-	EnableUISupport   bool
+	Cloud              cloudprovider.Interface
+	EtcdHelper         tools.EtcdHelper
+	EventTTL           time.Duration
+	MinionRegexp       string
+	KubeletClient      client.KubeletClient
+	PortalNet          *net.IPNet
+	PortalServicePorts util.PortRange
+	EnableLogsSupport  bool
+	EnableUISupport    bool
 	// allow downstream consumers to disable swagger
 	EnableSwaggerSupport bool
 	// allow v1beta3 to be conditionally disabled
@@ -128,8 +129,9 @@ type Config struct {
 // Master contains state for a Kubernetes cluster master/api server.
 type Master struct {
 	// "Inputs", Copied from Config
-	portalNet    *net.IPNet
-	cacheTimeout time.Duration
+	portalNet          *net.IPNet
+	portalServicePorts util.PortRange
+	cacheTimeout       time.Duration
 
 	mux                   apiserver.Mux
 	muxHelper             *apiserver.MuxHelper
@@ -200,6 +202,11 @@ func setDefaults(c *Config) {
 		}
 		c.PortalNet = portalNet
 	}
+	if c.PortalServicePorts.Size() == 0 {
+		defaultPortRange := util.PortRange{MinInclusive: 10000, MaxExclusive: 11000}
+		glog.Warningf("Service port range unspecified. Defaulting to %v.", defaultPortRange)
+		c.PortalServicePorts = defaultPortRange
+	}
 	if c.MasterCount == 0 {
 		// Clearly, there will be at least one master.
 		c.MasterCount = 1
@@ -234,6 +241,7 @@ func setDefaults(c *Config) {
 // Certain config fields will be set to a default value if unset,
 // including:
 //   PortalNet
+//   PortalServicePorts
 //   MasterCount
 //   ReadOnlyPort
 //   ReadWritePort
@@ -273,6 +281,7 @@ func New(c *Config) *Master {
 
 	m := &Master{
 		portalNet:             c.PortalNet,
+		portalServicePorts:    c.PortalServicePorts,
 		rootWebService:        new(restful.WebService),
 		enableLogsSupport:     c.EnableLogsSupport,
 		enableUISupport:       c.EnableUISupport,
@@ -396,7 +405,7 @@ func (m *Master) init(c *Config) {
 		"bindings":     podStorage.Binding,
 
 		"replicationControllers": controllerStorage,
-		"services":               service.NewStorage(m.serviceRegistry, c.Cloud, m.nodeRegistry, m.endpointRegistry, m.portalNet, c.ClusterName),
+		"services":               service.NewStorage(m.serviceRegistry, c.Cloud, m.nodeRegistry, m.endpointRegistry, m.portalNet, m.portalServicePorts, c.ClusterName),
 		"endpoints":              endpointsStorage,
 		"minions":                nodeStorage,
 		"nodes":                  nodeStorage,
