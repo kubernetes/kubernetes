@@ -1,4 +1,4 @@
-## kubectl cluster-info
+## kubectl clusterinfo
 
 Display cluster info
 
@@ -8,7 +8,7 @@ Display cluster info
 Display addresses of the master and services with label kubernetes.io/cluster-service=true
 
 ```
-kubectl cluster-info
+kubectl clusterinfo
 ```
 
 ### Options
