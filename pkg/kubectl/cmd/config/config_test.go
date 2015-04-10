@@ -25,6 +25,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd"
 	clientcmdapi "github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -667,7 +668,7 @@ func (test configCommandTest) run(t *testing.T) string {
 	testSetNilMapsToEmpties(reflect.ValueOf(&actualConfig))
 	testClearLocationOfOrigin(&actualConfig)
 
-	if !reflect.DeepEqual(test.expectedConfig, actualConfig) {
+	if !api.Semantic.DeepEqual(test.expectedConfig, actualConfig) {
 		t.Errorf("diff: %v", util.ObjectDiff(test.expectedConfig, actualConfig))
 		t.Errorf("expected: %#v\n actual:   %#v", test.expectedConfig, actualConfig)
 	}
