@@ -49,7 +49,7 @@ type TestContextType struct {
 	Host        string
 	RepoRoot    string
 	Provider    string
-	GCEConfig   GCEConfig
+	CloudConfig CloudConfig
 }
 
 var testContext TestContextType

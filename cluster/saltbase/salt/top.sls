@@ -11,6 +11,7 @@ base:
 {% else %}
     - sdn
 {% endif %}
+    - helpers
     - cadvisor
     - kubelet
     - kube-proxy

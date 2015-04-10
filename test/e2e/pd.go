@@ -24,6 +24,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/aws"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -35,7 +36,6 @@ var _ = Describe("PD", func() {
 	var (
 		c         *client.Client
 		podClient client.PodInterface
-		diskName  string
 		host0Name string
 		host1Name string
 	)
@@ -51,23 +51,23 @@ var _ = Describe("PD", func() {
 		expectNoError(err, "Failed to list nodes for e2e cluster.")
 		Expect(len(nodes.Items) >= 2).To(BeTrue())
 
-		diskName = fmt.Sprintf("e2e-%s", string(util.NewUUID()))
 		host0Name = nodes.Items[0].ObjectMeta.Name
 		host1Name = nodes.Items[1].ObjectMeta.Name
 	})
 
 	It("should schedule a pod w/ a RW PD, remove it, then schedule it on another host", func() {
-		if testContext.Provider != "gce" {
-			By(fmt.Sprintf("Skipping PD test, which is only supported for provider gce (not %s)",
+		if testContext.Provider != "gce" && testContext.Provider != "aws" {
+			By(fmt.Sprintf("Skipping PD test, which is only supported for providers gce & aws (not %s)",
 				testContext.Provider))
 			return
 		}
 
+		By("creating PD")
+		diskName, err := createPD()
+		expectNoError(err, "Error creating PD")
+
 		host0Pod := testPDPod(diskName, host0Name, false)
 		host1Pod := testPDPod(diskName, host1Name, false)
-
-		By(fmt.Sprintf("creating PD %q", diskName))
-		expectNoError(createPD(diskName, testContext.GCEConfig.Zone), "Error creating PD")
 
 		defer func() {
 			By("cleaning up PD-RW test environment")
@@ -75,13 +75,13 @@ var _ = Describe("PD", func() {
 			// Teardown should do nothing unless test failed.
 			podClient.Delete(host0Pod.Name)
 			podClient.Delete(host1Pod.Name)
-			detachPD(host0Name, diskName, testContext.GCEConfig.Zone)
-			detachPD(host1Name, diskName, testContext.GCEConfig.Zone)
-			deletePD(diskName, testContext.GCEConfig.Zone)
+			detachPD(host0Name, diskName)
+			detachPD(host1Name, diskName)
+			deletePD(diskName)
 		}()
 
 		By("submitting host0Pod to kubernetes")
-		_, err := podClient.Create(host0Pod)
+		_, err = podClient.Create(host0Pod)
 		expectNoError(err, fmt.Sprintf("Failed to create host0Pod: %v", err))
 
 		expectNoError(waitForPodRunning(c, host0Pod.Name))
@@ -100,10 +100,11 @@ var _ = Describe("PD", func() {
 
 		By(fmt.Sprintf("deleting PD %q", diskName))
 		for start := time.Now(); time.Since(start) < 180*time.Second; time.Sleep(5 * time.Second) {
-			if err = deletePD(diskName, testContext.GCEConfig.Zone); err != nil {
-				Logf("Couldn't delete PD. Sleeping 5 seconds")
+			if err = deletePD(diskName); err != nil {
+				Logf("Couldn't delete PD. Sleeping 5 seconds (%v)", err)
 				continue
 			}
+			Logf("Deleted PD %v", diskName)
 			break
 		}
 		expectNoError(err, "Error deleting PD")
@@ -118,6 +119,10 @@ var _ = Describe("PD", func() {
 			return
 		}
 
+		By("creating PD")
+		diskName, err := createPD()
+		expectNoError(err, "Error creating PD")
+
 		rwPod := testPDPod(diskName, host0Name, false)
 		host0ROPod := testPDPod(diskName, host0Name, true)
 		host1ROPod := testPDPod(diskName, host1Name, true)
@@ -129,16 +134,14 @@ var _ = Describe("PD", func() {
 			podClient.Delete(rwPod.Name)
 			podClient.Delete(host0ROPod.Name)
 			podClient.Delete(host1ROPod.Name)
-			detachPD(host0Name, diskName, testContext.GCEConfig.Zone)
-			detachPD(host1Name, diskName, testContext.GCEConfig.Zone)
-			deletePD(diskName, testContext.GCEConfig.Zone)
+
+			detachPD(host0Name, diskName)
+			detachPD(host1Name, diskName)
+			deletePD(diskName)
 		}()
 
-		By(fmt.Sprintf("creating PD %q", diskName))
-		expectNoError(createPD(diskName, testContext.GCEConfig.Zone), "Error creating PD")
-
 		By("submitting rwPod to ensure PD is formatted")
-		_, err := podClient.Create(rwPod)
+		_, err = podClient.Create(rwPod)
 		expectNoError(err, "Failed to create rwPod")
 		expectNoError(waitForPodRunning(c, rwPod.Name))
 		expectNoError(podClient.Delete(rwPod.Name), "Failed to delete host0Pod")
@@ -163,7 +166,7 @@ var _ = Describe("PD", func() {
 
 		By(fmt.Sprintf("deleting PD %q", diskName))
 		for start := time.Now(); time.Since(start) < 180*time.Second; time.Sleep(5 * time.Second) {
-			if err = deletePD(diskName, testContext.GCEConfig.Zone); err != nil {
+			if err = deletePD(diskName); err != nil {
 				Logf("Couldn't delete PD. Sleeping 5 seconds")
 				continue
 			}
@@ -173,24 +176,62 @@ var _ = Describe("PD", func() {
 	})
 })
 
-func createPD(pdName, zone string) error {
-	// TODO: make this hit the compute API directly instread of shelling out to gcloud.
-	return exec.Command("gcloud", "compute", "disks", "create", "--zone="+zone, "--size=10GB", pdName).Run()
+func createPD() (string, error) {
+	if testContext.Provider == "gce" {
+		pdName := fmt.Sprintf("e2e-%s", string(util.NewUUID()))
+
+		zone := testContext.CloudConfig.Zone
+		// TODO: make this hit the compute API directly instread of shelling out to gcloud.
+		err := exec.Command("gcloud", "compute", "disks", "create", "--zone="+zone, "--size=10GB", pdName).Run()
+		if err != nil {
+			return "", err
+		}
+		return pdName, nil
+	} else {
+		volumes, ok := testContext.CloudConfig.Provider.(aws_cloud.Volumes)
+		if !ok {
+			return "", fmt.Errorf("Provider does not support volumes")
+		}
+		volumeOptions := &aws_cloud.VolumeOptions{}
+		volumeOptions.CapacityMB = 10 * 1024
+		return volumes.CreateVolume(volumeOptions)
+	}
 }
 
-func deletePD(pdName, zone string) error {
-	// TODO: make this hit the compute API directly.
-	return exec.Command("gcloud", "compute", "disks", "delete", "--zone="+zone, pdName).Run()
+func deletePD(pdName string) error {
+	if testContext.Provider == "gce" {
+		zone := testContext.CloudConfig.Zone
+
+		// TODO: make this hit the compute API directly.
+		return exec.Command("gcloud", "compute", "disks", "delete", "--zone="+zone, pdName).Run()
+	} else {
+		volumes, ok := testContext.CloudConfig.Provider.(aws_cloud.Volumes)
+		if !ok {
+			return fmt.Errorf("Provider does not support volumes")
+		}
+		return volumes.DeleteVolume(pdName)
+	}
 }
 
-func detachPD(hostName, pdName, zone string) error {
-	instanceName := strings.Split(hostName, ".")[0]
-	// TODO: make this hit the compute API directly.
-	return exec.Command("gcloud", "compute", "instances", "detach-disk", "--zone="+zone, "--disk="+pdName, instanceName).Run()
+func detachPD(hostName, pdName string) error {
+	if testContext.Provider == "gce" {
+		instanceName := strings.Split(hostName, ".")[0]
+
+		zone := testContext.CloudConfig.Zone
+
+		// TODO: make this hit the compute API directly.
+		return exec.Command("gcloud", "compute", "instances", "detach-disk", "--zone="+zone, "--disk="+pdName, instanceName).Run()
+	} else {
+		volumes, ok := testContext.CloudConfig.Provider.(aws_cloud.Volumes)
+		if !ok {
+			return fmt.Errorf("Provider does not support volumes")
+		}
+		return volumes.DetachDisk(hostName, pdName)
+	}
 }
 
 func testPDPod(diskName, targetHost string, readOnly bool) *api.Pod {
-	return &api.Pod{
+	pod := &api.Pod{
 		TypeMeta: api.TypeMeta{
 			Kind:       "Pod",
 			APIVersion: "v1beta1",
@@ -199,18 +240,6 @@ func testPDPod(diskName, targetHost string, readOnly bool) *api.Pod {
 			Name: "pd-test-" + string(util.NewUUID()),
 		},
 		Spec: api.PodSpec{
-			Volumes: []api.Volume{
-				{
-					Name: "testpd",
-					VolumeSource: api.VolumeSource{
-						GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{
-							PDName:   diskName,
-							FSType:   "ext4",
-							ReadOnly: readOnly,
-						},
-					},
-				},
-			},
 			Containers: []api.Container{
 				{
 					Name:  "testpd",
@@ -226,4 +255,36 @@ func testPDPod(diskName, targetHost string, readOnly bool) *api.Pod {
 			Host: targetHost,
 		},
 	}
+
+	if testContext.Provider == "gce" {
+		pod.Spec.Volumes = []api.Volume{
+			{
+				Name: "testpd",
+				VolumeSource: api.VolumeSource{
+					GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{
+						PDName:   diskName,
+						FSType:   "ext4",
+						ReadOnly: readOnly,
+					},
+				},
+			},
+		}
+	} else if testContext.Provider == "aws" {
+		pod.Spec.Volumes = []api.Volume{
+			{
+				Name: "testpd",
+				VolumeSource: api.VolumeSource{
+					AWSElasticBlockStore: &api.AWSElasticBlockStoreVolumeSource{
+						VolumeID: diskName,
+						FSType:   "ext4",
+						ReadOnly: readOnly,
+					},
+				},
+			},
+		}
+	} else {
+		panic("Unknown provider: " + testContext.Provider)
+	}
+
+	return pod
 }

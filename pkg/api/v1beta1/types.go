@@ -88,7 +88,7 @@ type Volume struct {
 	// Source represents the location and type of a volume to mount.
 	// This is optional for now. If not specified, the Volume is implied to be an EmptyDir.
 	// This implied behavior is deprecated and will be removed in a future version.
-	Source VolumeSource `json:"source,omitempty" description:"location and type of volume to mount; at most one of HostDir, EmptyDir, GCEPersistentDisk, or GitRepo; default is EmptyDir"`
+	Source VolumeSource `json:"source,omitempty" description:"location and type of volume to mount; at most one of HostDir, EmptyDir, GCEPersistentDisk, AWSElasticBlockStore, or GitRepo; default is EmptyDir"`
 }
 
 // VolumeSource represents the source location of a volume to mount.
@@ -105,6 +105,9 @@ type VolumeSource struct {
 	// GCEPersistentDisk represents a GCE Disk resource that is attached to a
 	// kubelet's host machine and then exposed to the pod.
 	GCEPersistentDisk *GCEPersistentDiskVolumeSource `json:"persistentDisk" description:"GCE disk resource attached to the host machine on demand"`
+	// AWSElasticBlockStore represents an AWS Disk resource that is attached to a
+	// kubelet's host machine and then exposed to the pod.
+	AWSElasticBlockStore *AWSElasticBlockStoreVolumeSource `json:"awsElasticBlockStore" description:"AWS disk resource attached to the host machine on demand"`
 	// GitRepo represents a git repository at a particular revision.
 	GitRepo *GitRepoVolumeSource `json:"gitRepo" description:"git repository at a particular revision"`
 	// Secret represents a secret to populate the volume with
@@ -124,6 +127,9 @@ type PersistentVolumeSource struct {
 	// GCEPersistentDisk represents a GCE Disk resource that is attached to a
 	// kubelet's host machine and then exposed to the pod.
 	GCEPersistentDisk *GCEPersistentDiskVolumeSource `json:"persistentDisk" description:"GCE disk resource provisioned by an admin"`
+	// AWSElasticBlockStore represents an AWS EBS volume that is attached to a
+	// kubelet's host machine and then exposed to the pod.
+	AWSElasticBlockStore *AWSElasticBlockStoreVolumeSource `json:"awsElasticBlockStore" description:"AWS disk resource provisioned by an admin"`
 	// HostPath represents a directory on the host.
 	// This is useful for development and testing only.
 	// on-host storage is not supported in any way.
@@ -297,6 +303,29 @@ type ISCSIVolumeSource struct {
 	// Ex. "ext4", "xfs", "ntfs"
 	// TODO: how do we prevent errors in the filesystem from compromising the machine
 	FSType string `json:"fsType,omitempty" description:"file system type to mount, such as ext4, xfs, ntfs"`
+	// Optional: Defaults to false (read/write). ReadOnly here will force
+	// the ReadOnly setting in VolumeMounts.
+	ReadOnly bool `json:"readOnly,omitempty" description:"read-only if true, read-write otherwise (false or unspecified)"`
+}
+
+// AWSElasticBlockStoreVolumeSource represents a Persistent Disk resource in AWS.
+//
+// An AWS PD must exist and be formatted before mounting to a container.
+// The disk must also be in the same AWS zone as the kubelet.
+// A AWS PD can only be mounted on a single machine.
+type AWSElasticBlockStoreVolumeSource struct {
+	// Unique id of the PD resource. Used to identify the disk in AWS
+	VolumeID string `json:"volumeID" description:"unique id of the PD resource in AWS"`
+	// Required: Filesystem type to mount.
+	// Must be a filesystem type supported by the host operating system.
+	// Ex. "ext4", "xfs", "ntfs"
+	// TODO: how do we prevent errors in the filesystem from compromising the machine
+	// TODO: why omitempty if required?
+	FSType string `json:"fsType,omitempty" description:"file system type to mount, such as ext4, xfs, ntfs"`
+	// Optional: Partition on the disk to mount.
+	// If omitted, kubelet will attempt to mount the device name.
+	// Ex. For /dev/sda1, this field is "1", for /dev/sda, this field 0 or empty.
+	Partition int `json:"partition,omitempty" description:"partition on the disk to mount (e.g., '1' for /dev/sda1); if omitted the plain device name (e.g., /dev/sda) will be mounted"`
 	// Optional: Defaults to false (read/write). ReadOnly here will force
 	// the ReadOnly setting in VolumeMounts.
 	ReadOnly bool `json:"readOnly,omitempty" description:"read-only if true, read-write otherwise (false or unspecified)"`

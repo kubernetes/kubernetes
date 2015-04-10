@@ -25,6 +25,7 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/golang/glog"
 	"github.com/onsi/ginkgo"
@@ -35,10 +36,12 @@ import (
 
 type testResult bool
 
-type GCEConfig struct {
+type CloudConfig struct {
 	ProjectID  string
 	Zone       string
 	MasterName string
+
+	Provider cloudprovider.Interface
 }
 
 func init() {

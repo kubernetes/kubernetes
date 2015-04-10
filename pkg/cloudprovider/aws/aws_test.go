@@ -112,17 +112,17 @@ func TestNewAWSCloud(t *testing.T) {
 	}{
 		{
 			"No config reader",
-			nil, fakeAuthFunc, nil,
+			nil, fakeAuthFunc, &FakeMetadata{},
 			true, "",
 		},
 		{
 			"Config specified invalid zone",
-			strings.NewReader("[global]\nzone = blahonga"), fakeAuthFunc, nil,
+			strings.NewReader("[global]\nzone = blahonga"), fakeAuthFunc, &FakeMetadata{},
 			true, "",
 		},
 		{
 			"Config specifies valid zone",
-			strings.NewReader("[global]\nzone = eu-west-1a"), fakeAuthFunc, nil,
+			strings.NewReader("[global]\nzone = eu-west-1a"), fakeAuthFunc, &FakeMetadata{},
 			false, "eu-west-1a",
 		},
 		{
@@ -178,14 +178,37 @@ func (self *FakeEC2) Instances(instanceIds []string, filter *ec2InstanceFilter) 
 
 type FakeMetadata struct {
 	availabilityZone string
+	instanceId       string
 }
 
 func (self *FakeMetadata) GetMetaData(key string) ([]byte, error) {
 	if key == "placement/availability-zone" {
 		return []byte(self.availabilityZone), nil
+	} else if key == "instance-id" {
+		return []byte(self.instanceId), nil
 	} else {
 		return nil, nil
 	}
+}
+
+func (ec2 *FakeEC2) AttachVolume(volumeID string, instanceId string, mountDevice string) (resp *ec2.AttachVolumeResp, err error) {
+	panic("Not implemented")
+}
+
+func (ec2 *FakeEC2) DetachVolume(volumeID string) (resp *ec2.SimpleResp, err error) {
+	panic("Not implemented")
+}
+
+func (ec2 *FakeEC2) Volumes(volumeIDs []string, filter *ec2.Filter) (resp *ec2.VolumesResp, err error) {
+	panic("Not implemented")
+}
+
+func (ec2 *FakeEC2) CreateVolume(request *ec2.CreateVolume) (resp *ec2.CreateVolumeResp, err error) {
+	panic("Not implemented")
+}
+
+func (ec2 *FakeEC2) DeleteVolume(volumeID string) (resp *ec2.SimpleResp, err error) {
+	panic("Not implemented")
 }
 
 func mockInstancesResp(instances []ec2.Instance) (aws *AWSCloud) {

@@ -17,10 +17,13 @@ limitations under the License.
 package main
 
 import (
+	"fmt"
 	"os"
 	goruntime "runtime"
+	"strings"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/test/e2e"
 	"github.com/golang/glog"
@@ -28,8 +31,8 @@ import (
 )
 
 var (
-	context   = &e2e.TestContextType{}
-	gceConfig = &context.GCEConfig
+	context     = &e2e.TestContextType{}
+	cloudConfig = &context.CloudConfig
 
 	orderseed = flag.Int64("orderseed", 0, "If non-zero, seed of random test shuffle order. (Otherwise random.)")
 	reportDir = flag.String("report_dir", "", "Path to the directory where the JUnit XML reports should be saved. Default is empty, which doesn't generate these reports.")
@@ -47,9 +50,11 @@ func init() {
 	flag.StringVar(&context.Host, "host", "", "The host, or apiserver, to connect to")
 	flag.StringVar(&context.RepoRoot, "repo_root", "./", "Root directory of kubernetes repository, for finding test files. Default assumes working directory is repository root")
 	flag.StringVar(&context.Provider, "provider", "", "The name of the Kubernetes provider (gce, gke, local, vagrant, etc.)")
-	flag.StringVar(&gceConfig.MasterName, "kube_master", "", "Name of the kubernetes master. Only required if provider is gce or gke")
-	flag.StringVar(&gceConfig.ProjectID, "gce_project", "", "The GCE project being used, if applicable")
-	flag.StringVar(&gceConfig.Zone, "gce_zone", "", "GCE zone being used, if applicable")
+
+	// TODO: Flags per provider?  Rename gce_project/gce_zone?
+	flag.StringVar(&cloudConfig.MasterName, "kube_master", "", "Name of the kubernetes master. Only required if provider is gce or gke")
+	flag.StringVar(&cloudConfig.ProjectID, "gce_project", "", "The GCE project being used, if applicable")
+	flag.StringVar(&cloudConfig.Zone, "gce_zone", "", "GCE zone being used, if applicable")
 }
 
 func main() {
@@ -63,5 +68,22 @@ func main() {
 		glog.Error("Invalid --times (negative or no testing requested)!")
 		os.Exit(1)
 	}
+
+	if context.Provider == "aws" {
+		awsConfig := "[Global]\n"
+		if cloudConfig.Zone == "" {
+			glog.Error("gce_zone must be specified for AWS")
+			os.Exit(1)
+		}
+		awsConfig += fmt.Sprintf("Zone=%s\n", cloudConfig.Zone)
+
+		var err error
+		cloudConfig.Provider, err = cloudprovider.GetCloudProvider(context.Provider, strings.NewReader(awsConfig))
+		if err != nil {
+			glog.Error("Error building AWS provider: ", err)
+			os.Exit(1)
+		}
+	}
+
 	e2e.RunE2ETests(context, *orderseed, *times, *reportDir, testList)
 }

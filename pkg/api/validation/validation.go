@@ -299,6 +299,10 @@ func validateSource(source *api.VolumeSource) errs.ValidationErrorList {
 		numVolumes++
 		allErrs = append(allErrs, validateGCEPersistentDiskVolumeSource(source.GCEPersistentDisk).Prefix("persistentDisk")...)
 	}
+	if source.AWSElasticBlockStore != nil {
+		numVolumes++
+		allErrs = append(allErrs, validateAWSElasticBlockStoreVolumeSource(source.AWSElasticBlockStore).Prefix("awsElasticBlockStore")...)
+	}
 	if source.Secret != nil {
 		numVolumes++
 		allErrs = append(allErrs, validateSecretVolumeSource(source.Secret).Prefix("secret")...)
@@ -368,6 +372,20 @@ func validateGCEPersistentDiskVolumeSource(PD *api.GCEPersistentDiskVolumeSource
 	return allErrs
 }
 
+func validateAWSElasticBlockStoreVolumeSource(PD *api.AWSElasticBlockStoreVolumeSource) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+	if PD.VolumeID == "" {
+		allErrs = append(allErrs, errs.NewFieldRequired("volumeID"))
+	}
+	if PD.FSType == "" {
+		allErrs = append(allErrs, errs.NewFieldRequired("fsType"))
+	}
+	if PD.Partition < 0 || PD.Partition > 255 {
+		allErrs = append(allErrs, errs.NewFieldInvalid("partition", PD.Partition, pdPartitionErrorMsg))
+	}
+	return allErrs
+}
+
 func validateSecretVolumeSource(secretSource *api.SecretVolumeSource) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 	if secretSource.SecretName == "" {
@@ -425,6 +443,10 @@ func ValidatePersistentVolume(pv *api.PersistentVolume) errs.ValidationErrorList
 	if pv.Spec.GCEPersistentDisk != nil {
 		numVolumes++
 		allErrs = append(allErrs, validateGCEPersistentDiskVolumeSource(pv.Spec.GCEPersistentDisk).Prefix("persistentDisk")...)
+	}
+	if pv.Spec.AWSElasticBlockStore != nil {
+		numVolumes++
+		allErrs = append(allErrs, validateAWSElasticBlockStoreVolumeSource(pv.Spec.AWSElasticBlockStore).Prefix("awsElasticBlockStore")...)
 	}
 	if numVolumes != 1 {
 		allErrs = append(allErrs, errs.NewFieldInvalid("", pv.Spec.PersistentVolumeSource, "exactly 1 volume type is required"))
@@ -1021,6 +1043,7 @@ func ValidateReadOnlyPersistentDisks(volumes []api.Volume) errs.ValidationErrorL
 				allErrs = append(allErrs, errs.NewFieldInvalid("GCEPersistentDisk.ReadOnly", false, "ReadOnly must be true for replicated pods > 1, as GCE PD can only be mounted on multiple machines if it is read-only."))
 			}
 		}
+		// TODO: What to do for AWS?  It doesn't support replicas
 	}
 	return allErrs
 }
