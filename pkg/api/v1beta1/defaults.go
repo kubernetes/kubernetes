@@ -28,6 +28,14 @@ import (
 
 func init() {
 	api.Scheme.AddDefaultingFuncs(
+		func(obj *ReplicationController) {
+			if len(obj.DesiredState.ReplicaSelector) == 0 {
+				obj.DesiredState.ReplicaSelector = obj.DesiredState.PodTemplate.Labels
+			}
+			if len(obj.Labels) == 0 {
+				obj.Labels = obj.DesiredState.PodTemplate.Labels
+			}
+		},
 		func(obj *Volume) {
 			if util.AllPtrFieldsNil(&obj.Source) {
 				obj.Source = VolumeSource{

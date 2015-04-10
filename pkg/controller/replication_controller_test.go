@@ -333,6 +333,10 @@ func TestControllerUpdateReplicas(t *testing.T) {
 
 	// Status.Replicas should go up from 2->4 even though we created 5-4=1 pod
 	rc.Status = api.ReplicationControllerStatus{Replicas: 4}
+	// These are set by default.
+	rc.Spec.Selector = rc.Spec.Template.Labels
+	rc.Labels = rc.Spec.Template.Labels
+
 	decRc := runtime.EncodeOrDie(testapi.Codec(), &rc)
 	fakeUpdateHandler.ValidateRequest(t, testapi.ResourcePathWithQueryParams(replicationControllerResourceName(), rc.Namespace, rc.Name), "PUT", &decRc)
 	validateSyncReplication(t, &fakePodControl, 1, 0)

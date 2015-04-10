@@ -46,6 +46,115 @@ func roundTrip(t *testing.T, obj runtime.Object) runtime.Object {
 	return obj3
 }
 
+func TestSetDefaultReplicationController(t *testing.T) {
+	tests := []struct {
+		rc             *current.ReplicationController
+		expectLabels   bool
+		expectSelector bool
+	}{
+		{
+			rc: &current.ReplicationController{
+				Spec: current.ReplicationControllerSpec{
+					Template: &current.PodTemplateSpec{
+						ObjectMeta: current.ObjectMeta{
+							Labels: map[string]string{
+								"foo": "bar",
+							},
+						},
+					},
+				},
+			},
+			expectLabels:   true,
+			expectSelector: true,
+		},
+		{
+			rc: &current.ReplicationController{
+				ObjectMeta: current.ObjectMeta{
+					Labels: map[string]string{
+						"bar": "foo",
+					},
+				},
+				Spec: current.ReplicationControllerSpec{
+					Template: &current.PodTemplateSpec{
+						ObjectMeta: current.ObjectMeta{
+							Labels: map[string]string{
+								"foo": "bar",
+							},
+						},
+					},
+				},
+			},
+			expectLabels:   false,
+			expectSelector: true,
+		},
+		{
+			rc: &current.ReplicationController{
+				ObjectMeta: current.ObjectMeta{
+					Labels: map[string]string{
+						"bar": "foo",
+					},
+				},
+				Spec: current.ReplicationControllerSpec{
+					Selector: map[string]string{
+						"some": "other",
+					},
+					Template: &current.PodTemplateSpec{
+						ObjectMeta: current.ObjectMeta{
+							Labels: map[string]string{
+								"foo": "bar",
+							},
+						},
+					},
+				},
+			},
+			expectLabels:   false,
+			expectSelector: false,
+		},
+		{
+			rc: &current.ReplicationController{
+				Spec: current.ReplicationControllerSpec{
+					Selector: map[string]string{
+						"some": "other",
+					},
+					Template: &current.PodTemplateSpec{
+						ObjectMeta: current.ObjectMeta{
+							Labels: map[string]string{
+								"foo": "bar",
+							},
+						},
+					},
+				},
+			},
+			expectLabels:   true,
+			expectSelector: false,
+		},
+	}
+
+	for _, test := range tests {
+		rc := test.rc
+		obj2 := roundTrip(t, runtime.Object(rc))
+		rc2, ok := obj2.(*current.ReplicationController)
+		if !ok {
+			t.Errorf("unexpected object: %v", rc2)
+			t.FailNow()
+		}
+		if test.expectSelector != reflect.DeepEqual(rc2.Spec.Selector, rc2.Spec.Template.Labels) {
+			if test.expectSelector {
+				t.Errorf("expected: %v, got: %v", rc2.Spec.Template.Labels, rc2.Spec.Selector)
+			} else {
+				t.Errorf("unexpected equality: %v", rc.Spec.Selector)
+			}
+		}
+		if test.expectLabels != reflect.DeepEqual(rc2.Labels, rc2.Spec.Template.Labels) {
+			if test.expectLabels {
+				t.Errorf("expected: %v, got: %v", rc2.Spec.Template.Labels, rc2.Labels)
+			} else {
+				t.Errorf("unexpected equality: %v", rc.Labels)
+			}
+		}
+	}
+}
+
 func TestSetDefaultService(t *testing.T) {
 	svc := &current.Service{}
 	obj2 := roundTrip(t, runtime.Object(svc))
