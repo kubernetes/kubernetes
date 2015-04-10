@@ -89,7 +89,7 @@ func (r *REST) Delete(ctx api.Context, name string, options *api.DeleteOptions) 
 	namespace := nsObj.(*api.Namespace)
 
 	// upon first request to delete, we switch the phase to start namespace termination
-	if namespace.DeletionTimestamp == nil {
+	if namespace.DeletionTimestamp.IsZero() {
 		now := util.Now()
 		namespace.DeletionTimestamp = &now
 		namespace.Status.Phase = api.NamespaceTerminating
@@ -99,7 +99,8 @@ func (r *REST) Delete(ctx api.Context, name string, options *api.DeleteOptions) 
 
 	// prior to final deletion, we must ensure that finalizers is empty
 	if len(namespace.Spec.Finalizers) != 0 {
-		err = fmt.Errorf("Unable to delete namespace %v because finalizers is not empty %v", namespace.Name, namespace.Spec.Finalizers)
+		err = fmt.Errorf("Namespace %v termination is in progress, waiting for %v", namespace.Name, namespace.Spec.Finalizers)
+		return nil, err
 	}
 	return r.Etcd.Delete(ctx, name, nil)
 }
