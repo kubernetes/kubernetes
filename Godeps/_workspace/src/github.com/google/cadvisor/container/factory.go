@@ -65,7 +65,7 @@ func NewContainerHandler(name string) (ContainerHandler, error) {
 	for _, factory := range factories {
 		canHandle, err := factory.CanHandle(name)
 		if err != nil {
-			glog.V(1).Infof("Error trying to work out if we can hande %s: %v", name, err)
+			glog.V(1).Infof("Error trying to work out if we can handle %s: %v", name, err)
 		}
 		if canHandle {
 			glog.V(1).Infof("Using factory %q for container %q", factory, name)
