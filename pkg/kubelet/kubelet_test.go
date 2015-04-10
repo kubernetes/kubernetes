@@ -3602,13 +3602,13 @@ func TestSyncPodsWithRestartPolicy(t *testing.T) {
 	}{
 		{
 			api.RestartPolicyAlways,
-			[]string{"list", "list", "list", "inspect_container", "inspect_container", "inspect_container", "create", "start", "create", "start", "list", "inspect_container", "inspect_container", "inspect_container"},
+			[]string{"list", "list", "list", "inspect_container", "inspect_container", "inspect_container", "create", "start", "create", "start", "list", "inspect_container", "inspect_container", "inspect_container", "inspect_container", "inspect_container"},
 			[]string{"succeeded", "failed"},
 			[]string{},
 		},
 		{
 			api.RestartPolicyOnFailure,
-			[]string{"list", "list", "list", "inspect_container", "inspect_container", "inspect_container", "create", "start", "list", "inspect_container", "inspect_container", "inspect_container"},
+			[]string{"list", "list", "list", "inspect_container", "inspect_container", "inspect_container", "create", "start", "list", "inspect_container", "inspect_container", "inspect_container", "inspect_container"},
 			[]string{"failed"},
 			[]string{},
 		},
@@ -3648,6 +3648,141 @@ func TestSyncPodsWithRestartPolicy(t *testing.T) {
 
 		// 'stop' is because the pod infra container is killed when no container is running.
 		verifyCalls(t, fakeDocker, tt.calls)
+
+		if err := fakeDocker.AssertCreated(tt.created); err != nil {
+			t.Errorf("%d: %v", i, err)
+		}
+		if err := fakeDocker.AssertStopped(tt.stopped); err != nil {
+			t.Errorf("%d: %v", i, err)
+		}
+	}
+}
+
+func TestGetPodStatusWithLastTermination(t *testing.T) {
+	testKubelet := newTestKubelet(t)
+	testKubelet.fakeCadvisor.On("MachineInfo").Return(&cadvisorApi.MachineInfo{}, nil)
+	kubelet := testKubelet.kubelet
+	fakeDocker := testKubelet.fakeDocker
+	waitGroup := testKubelet.waitGroup
+
+	containers := []api.Container{
+		{Name: "succeeded"},
+		{Name: "failed"},
+	}
+
+	runningAPIContainers := []docker.APIContainers{
+		{
+			// pod infra container
+			Names: []string{"/k8s_POD_foo_new_12345678_0"},
+			ID:    "9876",
+		},
+	}
+	exitedAPIContainers := []docker.APIContainers{
+		{
+			// format is // k8s_<container-id>_<pod-fullname>_<pod-uid>
+			Names: []string{"/k8s_succeeded." + strconv.FormatUint(dockertools.HashContainer(&containers[0]), 16) + "_foo_new_12345678_0"},
+			ID:    "1234",
+		},
+		{
+			// format is // k8s_<container-id>_<pod-fullname>_<pod-uid>
+			Names: []string{"/k8s_failed." + strconv.FormatUint(dockertools.HashContainer(&containers[1]), 16) + "_foo_new_12345678_0"},
+			ID:    "5678",
+		},
+	}
+
+	containerMap := map[string]*docker.Container{
+		"1234": {
+			ID:     "1234",
+			Name:   "succeeded",
+			Config: &docker.Config{},
+			State: docker.State{
+				ExitCode:   0,
+				StartedAt:  time.Now(),
+				FinishedAt: time.Now(),
+			},
+		},
+		"5678": {
+			ID:     "5678",
+			Name:   "failed",
+			Config: &docker.Config{},
+			State: docker.State{
+				ExitCode:   42,
+				StartedAt:  time.Now(),
+				FinishedAt: time.Now(),
+			},
+		},
+	}
+
+	tests := []struct {
+		policy           api.RestartPolicy
+		created          []string
+		stopped          []string
+		lastTerminations []string
+	}{
+		{
+			api.RestartPolicyAlways,
+			[]string{"succeeded", "failed"},
+			[]string{},
+			[]string{"docker://1234", "docker://5678"},
+		},
+		{
+			api.RestartPolicyOnFailure,
+			[]string{"failed"},
+			[]string{},
+			[]string{"docker://5678"},
+		},
+		{
+			api.RestartPolicyNever,
+			[]string{},
+			[]string{"9876"},
+			[]string{},
+		},
+	}
+
+	for i, tt := range tests {
+		fakeDocker.ContainerList = runningAPIContainers
+		fakeDocker.ExitedContainerList = exitedAPIContainers
+		fakeDocker.ContainerMap = containerMap
+		fakeDocker.ClearCalls()
+		pods := []api.Pod{
+			{
+				ObjectMeta: api.ObjectMeta{
+					UID:       "12345678",
+					Name:      "foo",
+					Namespace: "new",
+				},
+				Spec: api.PodSpec{
+					Containers:    containers,
+					RestartPolicy: tt.policy,
+				},
+			},
+		}
+		kubelet.podManager.SetPods(pods)
+		waitGroup.Add(1)
+		err := kubelet.SyncPods(pods, emptyPodUIDs, map[string]api.Pod{}, time.Now())
+		if err != nil {
+			t.Errorf("%d: unexpected error: %v", i, err)
+		}
+		waitGroup.Wait()
+
+		// Check if we can retrieve the pod status from GetPodStatus().
+		podName := kubecontainer.GetPodFullName(&pods[0])
+		status, err := kubelet.GetPodStatus(podName)
+		if err != nil {
+			t.Fatalf("unable to retrieve pod status for pod %q: %#v.", podName, err)
+		} else {
+			terminatedContainers := []string{}
+			for _, cs := range status.ContainerStatuses {
+				if cs.LastTerminationState.Termination != nil {
+					terminatedContainers = append(terminatedContainers, cs.LastTerminationState.Termination.ContainerID)
+				}
+			}
+			sort.StringSlice(terminatedContainers).Sort()
+			sort.StringSlice(tt.lastTerminations).Sort()
+			if !reflect.DeepEqual(terminatedContainers, tt.lastTerminations) {
+				t.Errorf("Expected(sorted): %#v, Actual(sorted): %#v", tt.lastTerminations, terminatedContainers)
+			}
+		}
 
 		if err := fakeDocker.AssertCreated(tt.created); err != nil {
 			t.Errorf("%d: %v", i, err)

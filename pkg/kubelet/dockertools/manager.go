@@ -138,10 +138,11 @@ func (self *DockerManager) inspectContainer(dockerID, containerName, tPath strin
 			reason = inspectResult.State.Error
 		}
 		result.status.State.Termination = &api.ContainerStateTerminated{
-			ExitCode:   inspectResult.State.ExitCode,
-			Reason:     reason,
-			StartedAt:  util.NewTime(inspectResult.State.StartedAt),
-			FinishedAt: util.NewTime(inspectResult.State.FinishedAt),
+			ExitCode:    inspectResult.State.ExitCode,
+			Reason:      reason,
+			StartedAt:   util.NewTime(inspectResult.State.StartedAt),
+			FinishedAt:  util.NewTime(inspectResult.State.FinishedAt),
+			ContainerID: DockerPrefix + dockerID,
 		}
 		if tPath != "" {
 			path, found := inspectResult.Volumes[tPath]
@@ -215,6 +216,13 @@ func (self *DockerManager) GetPodStatus(pod *api.Pod) (*api.PodStatus, error) {
 		}
 		// We assume docker return us a list of containers in time order
 		if containerStatus, found := statuses[dockerContainerName]; found {
+			// Populate last termination state
+			if containerStatus.LastTerminationState.Termination == nil {
+				result := self.inspectContainer(value.ID, dockerContainerName, terminationMessagePath)
+				if result.err == nil && result.status.State.Termination != nil {
+					containerStatus.LastTerminationState = result.status.State
+				}
+			}
 			containerStatus.RestartCount += 1
 			statuses[dockerContainerName] = containerStatus
 			continue
