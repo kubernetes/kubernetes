@@ -21,6 +21,7 @@ package app
 import (
 	"net"
 	"net/http"
+	_ "net/http/pprof"
 	"strconv"
 	"time"
 
