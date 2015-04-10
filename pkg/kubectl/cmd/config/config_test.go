@@ -39,6 +39,7 @@ func newRedFederalCowHammerConfig() clientcmdapi.Config {
 			"cow-cluster": {Server: "http://cow.org:8080"}},
 		Contexts: map[string]clientcmdapi.Context{
 			"federal-context": {AuthInfo: "red-user", Cluster: "cow-cluster"}},
+		CurrentContext: "federal-context",
 	}
 }
 
@@ -70,7 +71,7 @@ func ExampleView() {
 	//     cluster: cow-cluster
 	//     user: red-user
 	//   name: federal-context
-	// current-context: ""
+	// current-context: federal-context
 	// kind: Config
 	// preferences: {}
 	// users:
