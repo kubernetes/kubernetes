@@ -68,7 +68,7 @@ func (plugin *glusterfsPlugin) GetAccessModes() []api.AccessModeType {
 	}
 }
 
-func (plugin *glusterfsPlugin) NewBuilder(spec *api.Volume, podRef *api.ObjectReference) (volume.Builder, error) {
+func (plugin *glusterfsPlugin) NewBuilder(spec *api.Volume, podRef *api.ObjectReference, _ volume.VolumeOptions) (volume.Builder, error) {
 	ep_name := spec.VolumeSource.Glusterfs.EndpointsName
 	ns := api.NamespaceDefault
 	ep, err := plugin.host.GetKubeClient().Endpoints(ns).Get(ep_name)

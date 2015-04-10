@@ -60,7 +60,7 @@ func (plugin *hostPathPlugin) GetAccessModes() []api.AccessModeType {
 	}
 }
 
-func (plugin *hostPathPlugin) NewBuilder(spec *api.Volume, podRef *api.ObjectReference) (volume.Builder, error) {
+func (plugin *hostPathPlugin) NewBuilder(spec *api.Volume, podRef *api.ObjectReference, _ volume.VolumeOptions) (volume.Builder, error) {
 	return &hostPath{spec.HostPath.Path}, nil
 }
 

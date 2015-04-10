@@ -70,7 +70,7 @@ func (plugin *gitRepoPlugin) CanSupport(spec *api.Volume) bool {
 	return false
 }
 
-func (plugin *gitRepoPlugin) NewBuilder(spec *api.Volume, podRef *api.ObjectReference) (volume.Builder, error) {
+func (plugin *gitRepoPlugin) NewBuilder(spec *api.Volume, podRef *api.ObjectReference, opts volume.VolumeOptions) (volume.Builder, error) {
 	if plugin.legacyMode {
 		// Legacy mode instances can be cleaned up but not created anew.
 		return nil, fmt.Errorf("legacy mode: can not create new instances")
@@ -83,6 +83,7 @@ func (plugin *gitRepoPlugin) NewBuilder(spec *api.Volume, podRef *api.ObjectRefe
 		exec:       exec.New(),
 		plugin:     plugin,
 		legacyMode: false,
+		opts:       opts,
 	}, nil
 }
 
@@ -109,6 +110,7 @@ type gitRepo struct {
 	exec       exec.Interface
 	plugin     *gitRepoPlugin
 	legacyMode bool
+	opts       volume.VolumeOptions
 }
 
 // SetUp creates new directory and clones a git repo.
@@ -132,7 +134,7 @@ func (gr *gitRepo) SetUpAt(dir string) error {
 	}
 
 	// Wrap EmptyDir, let it do the setup.
-	wrapped, err := gr.plugin.host.NewWrapperBuilder(wrappedVolumeSpec, &gr.podRef)
+	wrapped, err := gr.plugin.host.NewWrapperBuilder(wrappedVolumeSpec, &gr.podRef, gr.opts)
 	if err != nil {
 		return err
 	}

@@ -29,6 +29,17 @@ import (
 	"github.com/golang/glog"
 )
 
+// VolumeOptions contains option information about a volume.
+//
+// Currently, this struct containers only a single field for the
+// rootcontext of the volume.  This is a temporary measure in order
+// to set the rootContext of tmpfs mounts correctly; it will be replaced
+// and expanded on by future SecurityContext work.
+type VolumeOptions struct {
+	// The rootcontext to use when performing mounts for a volume.
+	RootContext string
+}
+
 // VolumePlugin is an interface to volume plugins that can be used on a
 // kubernetes node (e.g. by kubelet) to instantiate and manage volumes.
 type VolumePlugin interface {
@@ -51,7 +62,7 @@ type VolumePlugin interface {
 	// Ownership of the spec pointer in *not* transferred.
 	// - spec: The api.Volume spec
 	// - podRef: a reference to the enclosing pod
-	NewBuilder(spec *api.Volume, podRef *api.ObjectReference) (Builder, error)
+	NewBuilder(spec *api.Volume, podRef *api.ObjectReference, opts VolumeOptions) (Builder, error)
 
 	// NewCleaner creates a new volume.Cleaner from recoverable state.
 	// - name: The volume name, as per the api.Volume spec.
@@ -94,7 +105,7 @@ type VolumeHost interface {
 	// the provided spec.  This is used to implement volume plugins which
 	// "wrap" other plugins.  For example, the "secret" volume is
 	// implemented in terms of the "emptyDir" volume.
-	NewWrapperBuilder(spec *api.Volume, podRef *api.ObjectReference) (Builder, error)
+	NewWrapperBuilder(spec *api.Volume, podRef *api.ObjectReference, opts VolumeOptions) (Builder, error)
 
 	// NewWrapperCleaner finds an appropriate plugin with which to handle
 	// the provided spec.  See comments on NewWrapperBuilder for more

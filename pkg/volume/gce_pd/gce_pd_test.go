@@ -167,7 +167,7 @@ func TestPluginLegacy(t *testing.T) {
 		t.Errorf("Expected false")
 	}
 
-	if _, err := plug.NewBuilder(&api.Volume{VolumeSource: api.VolumeSource{GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{}}}, &api.ObjectReference{UID: types.UID("poduid")}); err == nil {
+	if _, err := plug.NewBuilder(&api.Volume{VolumeSource: api.VolumeSource{GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{}}}, &api.ObjectReference{UID: types.UID("poduid")}, volume.VolumeOptions{""}); err == nil {
 		t.Errorf("Expected failiure")
 	}
 

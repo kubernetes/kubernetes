@@ -71,7 +71,7 @@ func (plugin *awsElasticBlockStorePlugin) GetAccessModes() []api.AccessModeType 
 	}
 }
 
-func (plugin *awsElasticBlockStorePlugin) NewBuilder(spec *api.Volume, podRef *api.ObjectReference) (volume.Builder, error) {
+func (plugin *awsElasticBlockStorePlugin) NewBuilder(spec *api.Volume, podRef *api.ObjectReference, _ volume.VolumeOptions) (volume.Builder, error) {
 	// Inject real implementations here, test through the internal function.
 	return plugin.newBuilderInternal(spec, podRef.UID, &AWSDiskUtil{}, mount.New())
 }

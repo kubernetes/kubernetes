@@ -25,6 +25,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/mount"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume"
+	"github.com/golang/glog"
 )
 
 // This is the primary entrypoint for volume plugins.
@@ -80,12 +81,12 @@ func (plugin *emptyDirPlugin) CanSupport(spec *api.Volume) bool {
 	return false
 }
 
-func (plugin *emptyDirPlugin) NewBuilder(spec *api.Volume, podRef *api.ObjectReference) (volume.Builder, error) {
+func (plugin *emptyDirPlugin) NewBuilder(spec *api.Volume, podRef *api.ObjectReference, opts volume.VolumeOptions) (volume.Builder, error) {
 	// Inject real implementations here, test through the internal function.
-	return plugin.newBuilderInternal(spec, podRef, plugin.mounter, &realMountDetector{plugin.mounter})
+	return plugin.newBuilderInternal(spec, podRef, plugin.mounter, &realMountDetector{plugin.mounter}, opts)
 }
 
-func (plugin *emptyDirPlugin) newBuilderInternal(spec *api.Volume, podRef *api.ObjectReference, mounter mount.Interface, mountDetector mountDetector) (volume.Builder, error) {
+func (plugin *emptyDirPlugin) newBuilderInternal(spec *api.Volume, podRef *api.ObjectReference, mounter mount.Interface, mountDetector mountDetector, opts volume.VolumeOptions) (volume.Builder, error) {
 	if plugin.legacyMode {
 		// Legacy mode instances can be cleaned up but not created anew.
 		return nil, fmt.Errorf("legacy mode: can not create new instances")
@@ -102,6 +103,7 @@ func (plugin *emptyDirPlugin) newBuilderInternal(spec *api.Volume, podRef *api.O
 		mountDetector: mountDetector,
 		plugin:        plugin,
 		legacyMode:    false,
+		rootContext:   opts.RootContext,
 	}, nil
 }
 
@@ -154,6 +156,7 @@ type emptyDir struct {
 	mountDetector mountDetector
 	plugin        *emptyDirPlugin
 	legacyMode    bool
+	rootContext   string
 }
 
 // SetUp creates new directory.
@@ -192,10 +195,29 @@ func (ed *emptyDir) setupTmpfs(dir string) error {
 	if err != nil {
 		return err
 	}
+	// If the directory is a mountpoint with medium memory, there is no
+	// work to do since we are already in the desired state.
 	if isMnt && medium == mediumMemory {
-		return nil // current state is what we expect
+		return nil
 	}
-	return ed.mounter.Mount("tmpfs", dir, "tmpfs", 0, "")
+	// By default a tmpfs mount will receive a different SELinux context
+	// from that of the Kubelet root directory which is not readable from
+	// the SELinux context of a docker container.
+	//
+	// getTmpfsMountOptions gets the mount option to set the context of
+	// the tmpfs mount so that it can be read from the SELinux context of
+	// the container.
+	opts := ed.getTmpfsMountOptions()
+	glog.V(3).Infof("pod %v: mounting tmpfs for volume %v with opts %v", ed.podUID, ed.volName, opts)
+	return ed.mounter.Mount("tmpfs", dir, "tmpfs", 0, opts)
+}
+
+func (ed *emptyDir) getTmpfsMountOptions() string {
+	if ed.rootContext == "" {
+		return ""
+	}
+
+	return fmt.Sprintf("rootcontext=\"%v\"", ed.rootContext)
 }
 
 func (ed *emptyDir) GetPath() string {

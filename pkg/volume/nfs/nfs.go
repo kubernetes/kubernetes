@@ -65,7 +65,7 @@ func (plugin *nfsPlugin) GetAccessModes() []api.AccessModeType {
 	}
 }
 
-func (plugin *nfsPlugin) NewBuilder(spec *api.Volume, podRef *api.ObjectReference) (volume.Builder, error) {
+func (plugin *nfsPlugin) NewBuilder(spec *api.Volume, podRef *api.ObjectReference, _ volume.VolumeOptions) (volume.Builder, error) {
 	return plugin.newBuilderInternal(spec, podRef, plugin.mounter)
 }
 

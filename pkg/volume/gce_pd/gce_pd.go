@@ -78,7 +78,7 @@ func (plugin *gcePersistentDiskPlugin) GetAccessModes() []api.AccessModeType {
 	}
 }
 
-func (plugin *gcePersistentDiskPlugin) NewBuilder(spec *api.Volume, podRef *api.ObjectReference) (volume.Builder, error) {
+func (plugin *gcePersistentDiskPlugin) NewBuilder(spec *api.Volume, podRef *api.ObjectReference, _ volume.VolumeOptions) (volume.Builder, error) {
 	// Inject real implementations here, test through the internal function.
 	return plugin.newBuilderInternal(spec, podRef.UID, &GCEDiskUtil{}, mount.New())
 }

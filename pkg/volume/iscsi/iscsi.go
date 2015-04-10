@@ -72,7 +72,7 @@ func (plugin *ISCSIPlugin) GetAccessModes() []api.AccessModeType {
 	}
 }
 
-func (plugin *ISCSIPlugin) NewBuilder(spec *api.Volume, podRef *api.ObjectReference) (volume.Builder, error) {
+func (plugin *ISCSIPlugin) NewBuilder(spec *api.Volume, podRef *api.ObjectReference, _ volume.VolumeOptions) (volume.Builder, error) {
 	// Inject real implementations here, test through the internal function.
 	return plugin.newBuilderInternal(spec, podRef.UID, &ISCSIUtil{}, mount.New())
 }
