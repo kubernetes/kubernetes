@@ -54,7 +54,7 @@ func (c *FakePersistentVolumeClaims) Update(claim *api.PersistentVolumeClaim) (*
 }
 
 func (c *FakePersistentVolumeClaims) UpdateStatus(claim *api.PersistentVolumeClaim) (*api.PersistentVolumeClaim, error) {
-	obj, err := c.Fake.Invokes(FakeAction{Action: "update-persistentVolumeClaims", Value: claim}, &api.PersistentVolumeClaim{})
+	obj, err := c.Fake.Invokes(FakeAction{Action: "update-status-persistentVolumeClaims", Value: claim}, &api.PersistentVolumeClaim{})
 	return obj.(*api.PersistentVolumeClaim), err
 }
 

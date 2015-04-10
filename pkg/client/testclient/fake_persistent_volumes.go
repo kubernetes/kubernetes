@@ -54,7 +54,7 @@ func (c *FakePersistentVolumes) Update(pv *api.PersistentVolume) (*api.Persisten
 }
 
 func (c *FakePersistentVolumes) UpdateStatus(pv *api.PersistentVolume) (*api.PersistentVolume, error) {
-	obj, err := c.Fake.Invokes(FakeAction{Action: "update-persistentVolumes", Value: pv}, &api.PersistentVolume{})
+	obj, err := c.Fake.Invokes(FakeAction{Action: "update-status-persistentVolumes", Value: pv}, &api.PersistentVolume{})
 	return obj.(*api.PersistentVolume), err
 }
 
