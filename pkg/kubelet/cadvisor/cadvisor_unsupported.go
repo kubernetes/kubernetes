@@ -58,5 +58,5 @@ func (self *cadvisorUnsupported) DockerImagesFsInfo() (cadvisorApiV2.FsInfo, err
 }
 
 func (self *cadvisorUnsupported) GetPastEvents(request *events.Request) ([]*cadvisorApi.Event, error) {
-	return cadvisorApi.Event{}, unsupportedErr
+	return []*cadvisorApi.Event{}, unsupportedErr
 }
