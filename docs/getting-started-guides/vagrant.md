@@ -76,7 +76,7 @@ vagrant ssh minion-1
 [vagrant@kubernetes-minion-1] $ sudo journalctl -r -u kubelet
 ```
 
-For some vagrant operations, environment variables form config-default.sh must be set up:
+For some vagrant operations, environment variables from config-default.sh must be set up:
 ```
 export NUM_MINIONS=3
 source cluster/vagrant/config-default.sh
@@ -84,7 +84,7 @@ vagrant status
 ```
 
 ### Customization
-Following environment variables can be used to tun up your vagrant setup.
+Following environment variables can be used to tune up your vagrant setup.
 
 Variable | Docs
 -------- | ----
