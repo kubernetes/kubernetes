@@ -73,6 +73,13 @@ func deepCopy_v1_Capabilities(in v1.Capabilities, out *v1.Capabilities, c *conve
 	return nil
 }
 
+func deepCopy_v1_CinderVolumeSource(in v1.CinderVolumeSource, out *v1.CinderVolumeSource, c *conversion.Cloner) error {
+	out.VolumeID = in.VolumeID
+	out.FSType = in.FSType
+	out.ReadOnly = in.ReadOnly
+	return nil
+}
+
 func deepCopy_v1_Container(in v1.Container, out *v1.Container, c *conversion.Cloner) error {
 	out.Name = in.Name
 	out.Image = in.Image
@@ -680,6 +687,14 @@ func deepCopy_v1_VolumeSource(in v1.VolumeSource, out *v1.VolumeSource, c *conve
 	} else {
 		out.RBD = nil
 	}
+	if in.Cinder != nil {
+		out.Cinder = new(v1.CinderVolumeSource)
+		if err := deepCopy_v1_CinderVolumeSource(*in.Cinder, out.Cinder, c); err != nil {
+			return err
+		}
+	} else {
+		out.Cinder = nil
+	}
 	return nil
 }
 
@@ -1053,6 +1068,7 @@ func init() {
 		deepCopy_resource_Quantity,
 		deepCopy_v1_AWSElasticBlockStoreVolumeSource,
 		deepCopy_v1_Capabilities,
+		deepCopy_v1_CinderVolumeSource,
 		deepCopy_v1_Container,
 		deepCopy_v1_ContainerPort,
 		deepCopy_v1_EmptyDirVolumeSource,
