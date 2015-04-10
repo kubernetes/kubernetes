@@ -218,8 +218,9 @@ func TestHammerController(t *testing.T) {
 	go controller.Run(stop)
 
 	wg := sync.WaitGroup{}
-	for i := 0; i < 10; i++ {
-		wg.Add(1)
+	const threads = 3
+	wg.Add(threads)
+	for i := 0; i < threads; i++ {
 		go func() {
 			defer wg.Done()
 			// Let's add a few objects to the source.
@@ -227,7 +228,7 @@ func TestHammerController(t *testing.T) {
 			rs := rand.NewSource(rand.Int63())
 			f := fuzz.New().NilChance(.5).NumElements(0, 2).RandSource(rs)
 			r := rand.New(rs) // Mustn't use r and f concurrently!
-			for i := 0; i < 750; i++ {
+			for i := 0; i < 100; i++ {
 				var name string
 				var isNew bool
 				if currentNames.Len() == 0 || r.Intn(3) == 1 {
@@ -335,48 +336,40 @@ func TestUpdate(t *testing.T) {
 		}
 	}
 
-	var wg sync.WaitGroup
 	tests := []func(string){
 		func(name string) {
-			defer wg.Done()
-			testDoneWG.Add(1)
 			name = "a-" + name
 			source.Add(pod(name, FROM))
 			source.Modify(pod(name, TO))
 		},
 		func(name string) {
-			defer wg.Done()
-			testDoneWG.Add(1)
 			name = "b-" + name
 			source.Add(pod(name, FROM))
 			source.ModifyDropWatch(pod(name, TO))
 		},
 		func(name string) {
-			defer wg.Done()
-			testDoneWG.Add(1)
 			name = "c-" + name
 			source.AddDropWatch(pod(name, FROM))
 			source.Modify(pod(name, ADD_MISSED))
 			source.Modify(pod(name, TO))
 		},
 		func(name string) {
-			defer wg.Done()
-			testDoneWG.Add(1)
 			name = "d-" + name
 			source.Add(pod(name, FROM))
 		},
 	}
 
 	// run every test a few times, in parallel
-	fuzzer := fuzz.New()
-	for i := 0; i < 20; i++ {
-		for _, f := range tests {
-			wg.Add(1)
-			var name string
-			for len(name) < 10 {
-				fuzzer.Fuzz(&name)
-			}
-			go f(name)
+	const threads = 3
+	var wg sync.WaitGroup
+	wg.Add(threads * len(tests))
+	testDoneWG.Add(threads * len(tests))
+	for i := 0; i < threads; i++ {
+		for j, f := range tests {
+			go func(name string, f func(string)) {
+				defer wg.Done()
+				f(name)
+			}(fmt.Sprintf("%v-%v", i, j), f)
 		}
 	}
 	wg.Wait()

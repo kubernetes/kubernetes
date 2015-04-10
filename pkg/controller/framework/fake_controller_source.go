@@ -23,6 +23,7 @@ import (
 	"sync"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/conversion"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
@@ -125,8 +126,15 @@ func (f *FakeControllerSource) List() (runtime.Object, error) {
 	defer f.lock.RUnlock()
 	list := make([]runtime.Object, 0, len(f.items))
 	for _, obj := range f.items {
-		// TODO: should copy obj first
-		list = append(list, obj)
+		// Must make a copy to allow clients to modify the object.
+		// Otherwise, if they make a change and write it back, they
+		// will inadvertantly change the our canonical copy (in
+		// addition to racing with other clients).
+		objCopy, err := conversion.DeepCopy(obj)
+		if err != nil {
+			return nil, err
+		}
+		list = append(list, objCopy.(runtime.Object))
 	}
 	listObj := &api.List{}
 	if err := runtime.SetList(listObj, list); err != nil {
@@ -151,7 +159,20 @@ func (f *FakeControllerSource) Watch(resourceVersion string) (watch.Interface, e
 		return nil, err
 	}
 	if rc < len(f.changes) {
-		return f.broadcaster.WatchWithPrefix(f.changes[rc:]), nil
+		changes := []watch.Event{}
+		for _, c := range f.changes[rc:] {
+			// Must make a copy to allow clients to modify the
+			// object.  Otherwise, if they make a change and write
+			// it back, they will inadvertantly change the our
+			// canonical copy (in addition to racing with other
+			// clients).
+			objCopy, err := conversion.DeepCopy(c.Object)
+			if err != nil {
+				return nil, err
+			}
+			changes = append(changes, watch.Event{c.Type, objCopy.(runtime.Object)})
+		}
+		return f.broadcaster.WatchWithPrefix(changes), nil
 	} else if rc > len(f.changes) {
 		return nil, errors.New("resource version in the future not supported by this fake")
 	}
