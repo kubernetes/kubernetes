@@ -24,6 +24,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	. "github.com/onsi/ginkgo"
@@ -46,7 +47,7 @@ var _ = Describe("PD", func() {
 
 		podClient = c.Pods(api.NamespaceDefault)
 
-		nodes, err := c.Nodes().List(labels.Everything())
+		nodes, err := c.Nodes().List(labels.Everything(), fields.Everything())
 		expectNoError(err, "Failed to list nodes for e2e cluster.")
 		Expect(len(nodes.Items) >= 2).To(BeTrue())
 

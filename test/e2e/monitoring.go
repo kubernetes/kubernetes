@@ -24,6 +24,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	influxdb "github.com/influxdb/influxdb/client"
 
@@ -121,7 +122,7 @@ func expectedServicesExist(c *client.Client) error {
 }
 
 func getAllNodesInCluster(c *client.Client) ([]string, error) {
-	nodeList, err := c.Nodes().List(labels.Everything())
+	nodeList, err := c.Nodes().List(labels.Everything(), fields.Everything())
 	if err != nil {
 		return nil, err
 	}

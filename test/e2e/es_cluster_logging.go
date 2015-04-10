@@ -25,6 +25,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 
 	. "github.com/onsi/ginkgo"
@@ -163,7 +164,7 @@ func ClusterLevelLoggingWithElasticsearch(c *client.Client) {
 	}
 
 	// Obtain a list of nodes so we can place one synthetic logger on each node.
-	nodes, err := c.Nodes().List(labels.Everything())
+	nodes, err := c.Nodes().List(labels.Everything(), fields.Everything())
 	if err != nil {
 		Failf("Failed to list nodes: %v", err)
 	}
