@@ -1,4 +1,4 @@
-// Copyright 2014 go-dockerclient authors. All rights reserved.
+// Copyright 2015 go-dockerclient authors. All rights reserved.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
@@ -90,7 +90,7 @@ type ExecInspect struct {
 // See http://goo.gl/8izrzI for more details
 func (c *Client) CreateExec(opts CreateExecOptions) (*Exec, error) {
 	path := fmt.Sprintf("/containers/%s/exec", opts.Container)
-	body, status, err := c.do("POST", path, opts)
+	body, status, err := c.do("POST", path, opts, false)
 	if status == http.StatusNotFound {
 		return nil, &NoSuchContainer{ID: opts.Container}
 	}
@@ -119,7 +119,7 @@ func (c *Client) StartExec(id string, opts StartExecOptions) error {
 	path := fmt.Sprintf("/exec/%s/start", id)
 
 	if opts.Detach {
-		_, status, err := c.do("POST", path, opts)
+		_, status, err := c.do("POST", path, opts, false)
 		if status == http.StatusNotFound {
 			return &NoSuchExec{ID: id}
 		}
@@ -143,7 +143,7 @@ func (c *Client) ResizeExecTTY(id string, height, width int) error {
 	params.Set("w", strconv.Itoa(width))
 
 	path := fmt.Sprintf("/exec/%s/resize?%s", id, params.Encode())
-	_, _, err := c.do("POST", path, nil)
+	_, _, err := c.do("POST", path, nil, false)
 	return err
 }
 
@@ -152,7 +152,7 @@ func (c *Client) ResizeExecTTY(id string, height, width int) error {
 // See http://goo.gl/ypQULN for more details
 func (c *Client) InspectExec(id string) (*ExecInspect, error) {
 	path := fmt.Sprintf("/exec/%s/json", id)
-	body, status, err := c.do("GET", path, nil)
+	body, status, err := c.do("GET", path, nil, false)
 	if status == http.StatusNotFound {
 		return nil, &NoSuchExec{ID: id}
 	}
