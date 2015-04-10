@@ -29,11 +29,11 @@ import (
 )
 
 type createContextOptions struct {
-	pathOptions *PathOptions
-	name        string
-	cluster     util.StringFlag
-	authInfo    util.StringFlag
-	namespace   util.StringFlag
+	configAccess ConfigAccess
+	name         string
+	cluster      util.StringFlag
+	authInfo     util.StringFlag
+	namespace    util.StringFlag
 }
 
 const (
@@ -43,8 +43,8 @@ Specifying a name that already exists will merge new fields on top of existing v
 $ kubectl config set-context gce --user=cluster-admin`
 )
 
-func NewCmdConfigSetContext(out io.Writer, pathOptions *PathOptions) *cobra.Command {
-	options := &createContextOptions{pathOptions: pathOptions}
+func NewCmdConfigSetContext(out io.Writer, configAccess ConfigAccess) *cobra.Command {
+	options := &createContextOptions{configAccess: configAccess}
 
 	cmd := &cobra.Command{
 		Use:     fmt.Sprintf("set-context NAME [--%v=cluster_nickname] [--%v=user_nickname] [--%v=namespace]", clientcmd.FlagClusterName, clientcmd.FlagAuthInfoName, clientcmd.FlagNamespace),
@@ -76,7 +76,7 @@ func (o createContextOptions) run() error {
 		return err
 	}
 
-	config, err := o.pathOptions.getStartingConfig()
+	config, err := o.configAccess.GetStartingConfig()
 	if err != nil {
 		return err
 	}
@@ -84,7 +84,7 @@ func (o createContextOptions) run() error {
 	context := o.modifyContext(config.Contexts[o.name])
 	config.Contexts[o.name] = context
 
-	if err := o.pathOptions.ModifyConfig(*config); err != nil {
+	if err := ModifyConfig(o.configAccess, *config); err != nil {
 		return err
 	}
 
@@ -123,5 +123,5 @@ func (o createContextOptions) validate() error {
 		return errors.New("You must specify a non-empty context name")
 	}
 
-	return o.pathOptions.Validate()
+	return nil
 }

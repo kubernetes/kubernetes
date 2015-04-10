@@ -286,11 +286,11 @@ func (c *clientSwaggerSchema) ValidateBytes(data []byte) error {
 
 // DefaultClientConfig creates a clientcmd.ClientConfig with the following hierarchy:
 //   1.  Use the kubeconfig builder.  The number of merges and overrides here gets a little crazy.  Stay with me.
-//       1.  Merge together the kubeconfig itself.  This is done with the following hierarchy and merge rules:
-//           1.  CommandLineLocation - this parsed from the command line, so it must be late bound
-//           2.  EnvVarLocation
-//           3.  CurrentDirectoryLocation
-//           4.  HomeDirectoryLocation
+//       1.  Merge together the kubeconfig itself.  This is done with the following hierarchy rules:
+//           1.  CommandLineLocation - this parsed from the command line, so it must be late bound.  If you specify this,
+//               then no other kubeconfig files are merged.  This file must exist.
+//           2.  If $KUBECONFIG is set, then it is treated as a list of files that should be merged.
+//			 3.  HomeDirectoryLocation
 //           Empty filenames are ignored.  Files with non-deserializable content produced errors.
 //           The first file to set a particular value or map key wins and the value or map key is never changed.
 //           This means that the first file to set CurrentContext will have its context preserved.  It also means
