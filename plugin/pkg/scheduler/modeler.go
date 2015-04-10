@@ -57,8 +57,9 @@ func (a *actionLocker) LockedAction(do func()) {
 
 // FakeModeler implements the SystemModeler interface.
 type FakeModeler struct {
-	AssumePodFunc func(pod *api.Pod)
-	ForgetPodFunc func(pod *api.Pod)
+	AssumePodFunc      func(pod *api.Pod)
+	ForgetPodFunc      func(pod *api.Pod)
+	ForgetPodByKeyFunc func(key string)
 	actionLocker
 }
 
@@ -73,6 +74,13 @@ func (f *FakeModeler) AssumePod(pod *api.Pod) {
 func (f *FakeModeler) ForgetPod(pod *api.Pod) {
 	if f.ForgetPodFunc != nil {
 		f.ForgetPodFunc(pod)
+	}
+}
+
+// ForgetPodByKey calls the function variable if it is not nil.
+func (f *FakeModeler) ForgetPodByKey(key string) {
+	if f.ForgetPodFunc != nil {
+		f.ForgetPodByKeyFunc(key)
 	}
 }
 
@@ -108,6 +116,10 @@ func (s *SimpleModeler) AssumePod(pod *api.Pod) {
 
 func (s *SimpleModeler) ForgetPod(pod *api.Pod) {
 	s.assumedPods.Delete(pod)
+}
+
+func (s *SimpleModeler) ForgetPodByKey(key string) {
+	s.assumedPods.Delete(cache.ExplicitKey(key))
 }
 
 // Extract names for readable logging.

@@ -51,6 +51,7 @@ type SystemModeler interface {
 	// show the absence of the given pod if the pod is in the scheduled
 	// pods list!)
 	ForgetPod(pod *api.Pod)
+	ForgetPodByKey(key string)
 
 	// For serializing calls to Assume/ForgetPod: imagine you want to add
 	// a pod iff a bind succeeds, but also remove a pod if it is deleted.
@@ -85,6 +86,9 @@ type Config struct {
 
 	// Recorder is the EventRecorder to use
 	Recorder record.EventRecorder
+
+	// Close this to shut down the scheduler.
+	StopEverything chan struct{}
 }
 
 // New returns a new scheduler.
@@ -98,7 +102,7 @@ func New(c *Config) *Scheduler {
 
 // Run begins watching and scheduling. It starts a goroutine and returns immediately.
 func (s *Scheduler) Run() {
-	go util.Forever(s.scheduleOne, 0)
+	go util.Until(s.scheduleOne, 0, s.config.StopEverything)
 }
 
 func (s *Scheduler) scheduleOne() {

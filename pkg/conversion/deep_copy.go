@@ -17,22 +17,27 @@ limitations under the License.
 package conversion
 
 import (
+	"bytes"
+	"encoding/gob"
 	"reflect"
 )
-
-var deepCopier = NewConverter()
 
 // DeepCopy makes a deep copy of source. Won't work for any private fields!
 // For nil slices, will return 0-length slices. These are equivilent in
 // basically every way except for the way that reflect.DeepEqual checks.
 func DeepCopy(source interface{}) (interface{}, error) {
-	src := reflect.ValueOf(source)
-	v := reflect.New(src.Type()).Elem()
-	s := &scope{
-		converter: deepCopier,
-	}
-	if err := deepCopier.convert(src, v, s); err != nil {
+	v := reflect.New(reflect.TypeOf(source))
+
+	buff := &bytes.Buffer{}
+	enc := gob.NewEncoder(buff)
+	dec := gob.NewDecoder(buff)
+	err := enc.Encode(source)
+	if err != nil {
 		return nil, err
 	}
-	return v.Interface(), nil
+	err = dec.Decode(v.Interface())
+	if err != nil {
+		return nil, err
+	}
+	return v.Elem().Interface(), nil
 }

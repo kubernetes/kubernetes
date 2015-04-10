@@ -59,11 +59,18 @@ func (k KeyError) Error() string {
 	return fmt.Sprintf("couldn't create key for object %+v: %v", k.Obj, k.Err)
 }
 
+// ExplicitKey can be passed to MetaNamespaceKeyFunc if you have the key for
+// the object but not the object itself.
+type ExplicitKey string
+
 // MetaNamespaceKeyFunc is a convenient default KeyFunc which knows how to make
 // keys for API objects which implement meta.Interface.
 // The key uses the format <namespace>/<name> unless <namespace> is empty, then
 // it's just <name>.
 func MetaNamespaceKeyFunc(obj interface{}) (string, error) {
+	if key, ok := obj.(ExplicitKey); ok {
+		return string(key), nil
+	}
 	meta, err := meta.Accessor(obj)
 	if err != nil {
 		return "", fmt.Errorf("object has no meta: %v", err)
