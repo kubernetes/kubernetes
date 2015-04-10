@@ -4,6 +4,9 @@
 ### Features
  - Various improvements to kubectl
  - Improvements to API Server caching
+ - Full control over container command (docker entrypoint) and arguments (docker cmd);
+   users of v1beta3 must change to use the Args field of the container for images that
+   set a default entrypoint
 
 ### Bug fixes
  - Disable image GC since it was causing docker pull problems
