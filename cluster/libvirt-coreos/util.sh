@@ -235,7 +235,7 @@ function kube-up {
     rm $domain_xml
   done
 
-  export KUBECONFIG="${HOME}/.kube/.kubeconfig"
+  export KUBECONFIG="${KUBECONFIG:-${HOME}/.kube/.kubeconfig}"
   local kubectl="${KUBE_ROOT}/cluster/kubectl.sh"
 
   "${kubectl}" config set-cluster libvirt-coreos --server=http://${KUBE_MASTER_IP-}:8080
