@@ -64,7 +64,10 @@ func contains(modes []api.AccessModeType, mode api.AccessModeType) bool {
 	return false
 }
 
-type fakePDManager struct{}
+type fakePDManager struct {
+	attachCalled bool
+	detachCalled bool
+}
 
 // TODO(jonesdl) To fully test this, we could create a loopback device
 // and mount that instead.
@@ -74,6 +77,10 @@ func (fake *fakePDManager) AttachAndMountDisk(pd *gcePersistentDisk, globalPDPat
 	if err != nil {
 		return err
 	}
+	fake.attachCalled = true
+	// Simulate the global mount so that the fakeMounter returns the
+	// expected number of mounts for the attached disk.
+	pd.mounter.Mount(globalPath, globalPath, pd.fsType, 0, "")
 	return nil
 }
 
@@ -83,6 +90,7 @@ func (fake *fakePDManager) DetachDisk(pd *gcePersistentDisk) error {
 	if err != nil {
 		return err
 	}
+	fake.detachCalled = true
 	return nil
 }
 
@@ -103,7 +111,9 @@ func TestPlugin(t *testing.T) {
 			},
 		},
 	}
-	builder, err := plug.(*gcePersistentDiskPlugin).newBuilderInternal(spec, types.UID("poduid"), &fakePDManager{}, &mount.FakeMounter{})
+	fakeManager := &fakePDManager{}
+	fakeMounter := &mount.FakeMounter{}
+	builder, err := plug.(*gcePersistentDiskPlugin).newBuilderInternal(spec, types.UID("poduid"), fakeManager, fakeMounter)
 	if err != nil {
 		t.Errorf("Failed to make a new Builder: %v", err)
 	}
@@ -133,8 +143,12 @@ func TestPlugin(t *testing.T) {
 			t.Errorf("SetUp() failed: %v", err)
 		}
 	}
+	if !fakeManager.attachCalled {
+		t.Errorf("Attach watch not called")
+	}
 
-	cleaner, err := plug.(*gcePersistentDiskPlugin).newCleanerInternal("vol1", types.UID("poduid"), &fakePDManager{}, &mount.FakeMounter{})
+	fakeManager = &fakePDManager{}
+	cleaner, err := plug.(*gcePersistentDiskPlugin).newCleanerInternal("vol1", types.UID("poduid"), fakeManager, fakeMounter)
 	if err != nil {
 		t.Errorf("Failed to make a new Cleaner: %v", err)
 	}
@@ -150,6 +164,10 @@ func TestPlugin(t *testing.T) {
 	} else if !os.IsNotExist(err) {
 		t.Errorf("SetUp() failed: %v", err)
 	}
+	if !fakeManager.detachCalled {
+		t.Errorf("Detach watch not called")
+	}
+
 }
 
 func TestPluginLegacy(t *testing.T) {
