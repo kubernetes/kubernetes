@@ -24,6 +24,7 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/errors"
@@ -121,6 +122,9 @@ type VolumeHost interface {
 	// the provided spec.  See comments on NewWrapperBuilder for more
 	// context.
 	NewWrapperCleaner(spec *Spec, podUID types.UID, mounter mount.Interface) (Cleaner, error)
+
+	//Get cloud provider from kubelet
+	GetCloudProvider() cloudprovider.Interface
 }
 
 // VolumePluginMgr tracks registered plugins.
