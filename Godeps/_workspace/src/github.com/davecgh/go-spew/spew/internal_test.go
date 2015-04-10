@@ -151,6 +151,6 @@ func TestAddedReflectValue(t *testing.T) {
 
 // SortValues makes the internal sortValues function available to the test
 // package.
-func SortValues(values []reflect.Value) {
-	sortValues(values)
+func SortValues(values []reflect.Value, cs *ConfigState) {
+	sortValues(values, cs)
 }

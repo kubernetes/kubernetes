@@ -69,9 +69,10 @@ package spew_test
 import (
 	"bytes"
 	"fmt"
-	"github.com/davecgh/go-spew/spew"
 	"testing"
 	"unsafe"
+
+	"github.com/davecgh/go-spew/spew"
 )
 
 // formatterTest is used to describe a test to be perfomed against NewFormatter.
@@ -1478,10 +1479,56 @@ func TestFormatter(t *testing.T) {
 	}
 }
 
+type testStruct struct {
+	x int
+}
+
+func (ts testStruct) String() string {
+	return fmt.Sprintf("ts.%d", ts.x)
+}
+
+type testStructP struct {
+	x int
+}
+
+func (ts *testStructP) String() string {
+	return fmt.Sprintf("ts.%d", ts.x)
+}
+
 func TestPrintSortedKeys(t *testing.T) {
 	cfg := spew.ConfigState{SortKeys: true}
 	s := cfg.Sprint(map[int]string{1: "1", 3: "3", 2: "2"})
 	expected := "map[1:1 2:2 3:3]"
+	if s != expected {
+		t.Errorf("Sorted keys mismatch:\n  %v %v", s, expected)
+	}
+
+	s = cfg.Sprint(map[stringer]int{"1": 1, "3": 3, "2": 2})
+	expected = "map[stringer 1:1 stringer 2:2 stringer 3:3]"
+	if s != expected {
+		t.Errorf("Sorted keys mismatch:\n  %v %v", s, expected)
+	}
+
+	s = cfg.Sprint(map[pstringer]int{pstringer("1"): 1, pstringer("3"): 3, pstringer("2"): 2})
+	expected = "map[stringer 1:1 stringer 2:2 stringer 3:3]"
+	if s != expected {
+		t.Errorf("Sorted keys mismatch:\n  %v %v", s, expected)
+	}
+
+	s = cfg.Sprint(map[testStruct]int{testStruct{1}: 1, testStruct{3}: 3, testStruct{2}: 2})
+	expected = "map[ts.1:1 ts.2:2 ts.3:3]"
+	if s != expected {
+		t.Errorf("Sorted keys mismatch:\n  %v %v", s, expected)
+	}
+
+	s = cfg.Sprint(map[testStructP]int{testStructP{1}: 1, testStructP{3}: 3, testStructP{2}: 2})
+	expected = "map[ts.1:1 ts.2:2 ts.3:3]"
+	if s != expected {
+		t.Errorf("Sorted keys mismatch:\n  %v %v", s, expected)
+	}
+
+	s = cfg.Sprint(map[customError]int{customError(1): 1, customError(3): 3, customError(2): 2})
+	expected = "map[error: 1:1 error: 2:2 error: 3:3]"
 	if s != expected {
 		t.Errorf("Sorted keys mismatch:\n  %v %v", s, expected)
 	}

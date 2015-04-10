@@ -64,9 +64,10 @@ package spew_test
 import (
 	"bytes"
 	"fmt"
-	"github.com/davecgh/go-spew/spew"
 	"testing"
 	"unsafe"
+
+	"github.com/davecgh/go-spew/spew"
 )
 
 // dumpTest is used to describe a test to be perfomed against the Dump method.
@@ -983,4 +984,38 @@ func TestDumpSortedKeys(t *testing.T) {
 	if s != expected {
 		t.Errorf("Sorted keys mismatch:\n  %v %v", s, expected)
 	}
+
+	s = cfg.Sdump(map[stringer]int{"1": 1, "3": 3, "2": 2})
+	expected = `(map[spew_test.stringer]int) (len=3) {
+(spew_test.stringer) (len=1) stringer 1: (int) 1,
+(spew_test.stringer) (len=1) stringer 2: (int) 2,
+(spew_test.stringer) (len=1) stringer 3: (int) 3
+}
+`
+	if s != expected {
+		t.Errorf("Sorted keys mismatch:\n  %v %v", s, expected)
+	}
+
+	s = cfg.Sdump(map[pstringer]int{pstringer("1"): 1, pstringer("3"): 3, pstringer("2"): 2})
+	expected = `(map[spew_test.pstringer]int) (len=3) {
+(spew_test.pstringer) (len=1) stringer 1: (int) 1,
+(spew_test.pstringer) (len=1) stringer 2: (int) 2,
+(spew_test.pstringer) (len=1) stringer 3: (int) 3
+}
+`
+	if s != expected {
+		t.Errorf("Sorted keys mismatch:\n  %v %v", s, expected)
+	}
+
+	s = cfg.Sdump(map[customError]int{customError(1): 1, customError(3): 3, customError(2): 2})
+	expected = `(map[spew_test.customError]int) (len=3) {
+(spew_test.customError) error: 1: (int) 1,
+(spew_test.customError) error: 2: (int) 2,
+(spew_test.customError) error: 3: (int) 3
+}
+`
+	if s != expected {
+		t.Errorf("Sorted keys mismatch:\n  %v %v", s, expected)
+	}
+
 }
