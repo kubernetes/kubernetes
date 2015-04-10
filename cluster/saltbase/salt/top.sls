@@ -35,6 +35,7 @@ base:
     - nginx
     - cadvisor
     - kube-client-tools
+    - kube-master-addons
 {% if grains['cloud'] is defined and grains['cloud'] != 'vagrant' %}
     - logrotate
 {% endif %}
