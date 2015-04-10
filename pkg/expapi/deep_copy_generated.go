@@ -56,6 +56,13 @@ func deepCopy_api_Capabilities(in api.Capabilities, out *api.Capabilities, c *co
 	return nil
 }
 
+func deepCopy_api_CinderVolumeSource(in api.CinderVolumeSource, out *api.CinderVolumeSource, c *conversion.Cloner) error {
+	out.VolumeID = in.VolumeID
+	out.FSType = in.FSType
+	out.ReadOnly = in.ReadOnly
+	return nil
+}
+
 func deepCopy_api_Container(in api.Container, out *api.Container, c *conversion.Cloner) error {
 	out.Name = in.Name
 	out.Image = in.Image
@@ -662,6 +669,14 @@ func deepCopy_api_VolumeSource(in api.VolumeSource, out *api.VolumeSource, c *co
 	} else {
 		out.RBD = nil
 	}
+	if in.Cinder != nil {
+		out.Cinder = new(api.CinderVolumeSource)
+		if err := deepCopy_api_CinderVolumeSource(*in.Cinder, out.Cinder, c); err != nil {
+			return err
+		}
+	} else {
+		out.Cinder = nil
+	}
 	return nil
 }
 
@@ -1045,6 +1060,7 @@ func init() {
 	err := api.Scheme.AddGeneratedDeepCopyFuncs(
 		deepCopy_api_AWSElasticBlockStoreVolumeSource,
 		deepCopy_api_Capabilities,
+		deepCopy_api_CinderVolumeSource,
 		deepCopy_api_Container,
 		deepCopy_api_ContainerPort,
 		deepCopy_api_EmptyDirVolumeSource,
