@@ -41,6 +41,13 @@ import (
 	"github.com/golang/glog"
 )
 
+//===================================================================================================
+// Cloud Provider Plugin Init and Registration
+// - Constants
+// - init
+// - New* Cloud function
+//===================================================================================================
+
 var ErrNotFound = errors.New("Failed to find object")
 var ErrMultipleResults = errors.New("Multiple results where only one expected")
 var ErrNoAddressFound = errors.New("No address found for host")
@@ -51,52 +58,6 @@ const (
 	GB  = 1000 * 1000 * 1000
 )
 
-// encoding.TextUnmarshaler interface for time.Duration
-type MyDuration struct {
-	time.Duration
-}
-
-func (d *MyDuration) UnmarshalText(text []byte) error {
-	res, err := time.ParseDuration(string(text))
-	if err != nil {
-		return err
-	}
-	d.Duration = res
-	return nil
-}
-
-type LoadBalancerOpts struct {
-	SubnetId          string     `gcfg:"subnet-id"` // required
-	CreateMonitor     bool       `gcfg:"create-monitor"`
-	MonitorDelay      MyDuration `gcfg:"monitor-delay"`
-	MonitorTimeout    MyDuration `gcfg:"monitor-timeout"`
-	MonitorMaxRetries uint       `gcfg:"monitor-max-retries"`
-}
-
-// OpenStack is an implementation of cloud provider Interface for OpenStack.
-type OpenStack struct {
-	provider *gophercloud.ProviderClient
-	authOpts gophercloud.AuthOptions
-	region   string
-	lbOpts   LoadBalancerOpts
-}
-
-type Config struct {
-	Global struct {
-		AuthUrl    string `gcfg:"auth-url"`
-		Username   string
-		UserId     string `gcfg:"user-id"`
-		Password   string
-		ApiKey     string `gcfg:"api-key"`
-		TenantId   string `gcfg:"tenant-id"`
-		TenantName string `gcfg:"tenant-name"`
-		DomainId   string `gcfg:"domain-id"`
-		DomainName string `gcfg:"domain-name"`
-		Region     string
-	}
-	LoadBalancer LoadBalancerOpts
-}
-
 func init() {
 	cloudprovider.RegisterCloudProvider("openstack", func(config io.Reader) (cloudprovider.Interface, error) {
 		cfg, err := readConfig(config)
@@ -105,36 +66,6 @@ func init() {
 		}
 		return newOpenStack(cfg)
 	})
-}
-
-func (cfg Config) toAuthOptions() gophercloud.AuthOptions {
-	return gophercloud.AuthOptions{
-		IdentityEndpoint: cfg.Global.AuthUrl,
-		Username:         cfg.Global.Username,
-		UserID:           cfg.Global.UserId,
-		Password:         cfg.Global.Password,
-		APIKey:           cfg.Global.ApiKey,
-		TenantID:         cfg.Global.TenantId,
-		TenantName:       cfg.Global.TenantName,
-
-		// Persistent service, so we need to be able to renew
-		// tokens.
-		// (gophercloud doesn't appear to actually reauth yet,
-		// hence the explicit openstack.Authenticate() calls
-		// below)
-		AllowReauth: true,
-	}
-}
-
-func readConfig(config io.Reader) (Config, error) {
-	if config == nil {
-		err := fmt.Errorf("no OpenStack cloud provider config file given")
-		return Config{}, err
-	}
-
-	var cfg Config
-	err := gcfg.ReadInto(&cfg, config)
-	return cfg, err
 }
 
 func newOpenStack(cfg Config) (*OpenStack, error) {
@@ -153,9 +84,88 @@ func newOpenStack(cfg Config) (*OpenStack, error) {
 	return &os, nil
 }
 
-type Instances struct {
-	compute            *gophercloud.ServiceClient
-	flavor_to_resource map[string]*api.NodeResources // keyed by flavor id
+//===================================================================================================
+// Cloud Provider Configuration Management
+// - Configuration Structs
+// - Load configuration files
+//===================================================================================================
+
+type Config struct {
+	Global struct {
+		AuthUrl    string `gcfg:"auth-url"`
+		Username   string
+		UserId     string `gcfg:"user-id"`
+		Password   string
+		ApiKey     string `gcfg:"api-key"`
+		TenantId   string `gcfg:"tenant-id"`
+		TenantName string `gcfg:"tenant-name"`
+		DomainId   string `gcfg:"domain-id"`
+		DomainName string `gcfg:"domain-name"`
+		Region     string
+	}
+	LoadBalancer LoadBalancerOpts
+}
+
+func readConfig(config io.Reader) (Config, error) {
+	if config == nil {
+		err := fmt.Errorf("no OpenStack cloud provider config file given")
+		return Config{}, err
+	}
+
+	var cfg Config
+	err := gcfg.ReadInto(&cfg, config)
+	return cfg, err
+}
+
+//===================================================================================================
+// cloudprovider Interface implementation
+// - Cloud specific struct
+// - Clusters
+// - TCPLoadBalancer
+// - Instances
+// - Zones
+//===================================================================================================
+
+// OpenStack is an implementation of cloud provider Interface for OpenStack.
+type OpenStack struct {
+	provider *gophercloud.ProviderClient
+	authOpts gophercloud.AuthOptions
+	region   string
+	lbOpts   LoadBalancerOpts
+}
+
+func (os *OpenStack) Clusters() (cloudprovider.Clusters, bool) {
+	return nil, false
+}
+
+func (os *OpenStack) TCPLoadBalancer() (cloudprovider.TCPLoadBalancer, bool) {
+	glog.V(4).Info("openstack.TCPLoadBalancer() called")
+
+	if err := openstack.Authenticate(os.provider, os.authOpts); err != nil {
+		glog.Warningf("Failed to reauthenticate: %v", err)
+		return nil, false
+	}
+
+	// TODO: Search for and support Rackspace loadbalancer API, and others.
+	network, err := openstack.NewNetworkV2(os.provider, gophercloud.EndpointOpts{
+		Region: os.region,
+	})
+	if err != nil {
+		glog.Warningf("Failed to find neutron endpoint: %v", err)
+		return nil, false
+	}
+
+	compute, err := openstack.NewComputeV2(os.provider, gophercloud.EndpointOpts{
+		Region: os.region,
+	})
+	if err != nil {
+		glog.Warningf("Failed to find compute endpoint: %v", err)
+		return nil, false
+	}
+
+	glog.V(1).Info("Claiming to support TCPLoadBalancer")
+
+	return &LoadBalancer{network, compute, os.lbOpts}, true
 }
 
 // Instances returns an implementation of Instances for OpenStack.
@@ -208,269 +218,27 @@ func (os *OpenStack) Instances() (cloudprovider.Instances, bool) {
 	return &Instances{compute, flavor_to_resource}, true
 }
 
-func (i *Instances) List(name_filter string) ([]string, error) {
-	glog.V(4).Infof("openstack List(%v) called", name_filter)
+func (os *OpenStack) Zones() (cloudprovider.Zones, bool) {
+	glog.V(1).Info("Claiming to support Zones")
 
-	opts := servers.ListOpts{
-		Name:   name_filter,
-		Status: "ACTIVE",
-	}
-	pager := servers.List(i.compute, opts)
-
-	ret := make([]string, 0)
-	err := pager.EachPage(func(page pagination.Page) (bool, error) {
-		sList, err := servers.ExtractServers(page)
-		if err != nil {
-			return false, err
-		}
-		for _, server := range sList {
-			ret = append(ret, server.Name)
-		}
-		return true, nil
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	glog.V(3).Infof("Found %v instances matching %v: %v",
-		len(ret), name_filter, ret)
-
-	return ret, nil
+	return os, true
 }
 
-func getServerByName(client *gophercloud.ServiceClient, name string) (*servers.Server, error) {
-	opts := servers.ListOpts{
-		Name:   fmt.Sprintf("^%s$", regexp.QuoteMeta(name)),
-		Status: "ACTIVE",
-	}
-	pager := servers.List(client, opts)
+//===================================================================================================
+// cloudprovider Clusters implementation
+// - ListClusters
+// - Master
+//===================================================================================================
 
-	serverList := make([]servers.Server, 0, 1)
+// Not implemented
 
-	err := pager.EachPage(func(page pagination.Page) (bool, error) {
-		s, err := servers.ExtractServers(page)
-		if err != nil {
-			return false, err
-		}
-		serverList = append(serverList, s...)
-		if len(serverList) > 1 {
-			return false, ErrMultipleResults
-		}
-		return true, nil
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	if len(serverList) == 0 {
-		return nil, ErrNotFound
-	} else if len(serverList) > 1 {
-		return nil, ErrMultipleResults
-	}
-
-	return &serverList[0], nil
-}
-
-func findAddrs(netblob interface{}) []string {
-	// Run-time types for the win :(
-	ret := []string{}
-	list, ok := netblob.([]interface{})
-	if !ok {
-		return ret
-	}
-	for _, item := range list {
-		props, ok := item.(map[string]interface{})
-		if !ok {
-			continue
-		}
-		tmp, ok := props["addr"]
-		if !ok {
-			continue
-		}
-		addr, ok := tmp.(string)
-		if !ok {
-			continue
-		}
-		ret = append(ret, addr)
-	}
-	return ret
-}
-
-func getAddressByName(api *gophercloud.ServiceClient, name string) (string, error) {
-	srv, err := getServerByName(api, name)
-	if err != nil {
-		return "", err
-	}
-
-	var s string
-	if s == "" {
-		if tmp := findAddrs(srv.Addresses["private"]); len(tmp) >= 1 {
-			s = tmp[0]
-		}
-	}
-	if s == "" {
-		if tmp := findAddrs(srv.Addresses["public"]); len(tmp) >= 1 {
-			s = tmp[0]
-		}
-	}
-	if s == "" {
-		s = srv.AccessIPv4
-	}
-	if s == "" {
-		s = srv.AccessIPv6
-	}
-	if s == "" {
-		return "", ErrNoAddressFound
-	}
-	return s, nil
-}
-
-func (i *Instances) NodeAddresses(name string) ([]api.NodeAddress, error) {
-	glog.V(4).Infof("NodeAddresses(%v) called", name)
-
-	srv, err := getServerByName(i.compute, name)
-	if err != nil {
-		return nil, err
-	}
-
-	addrs := []api.NodeAddress{}
-
-	for _, addr := range findAddrs(srv.Addresses["private"]) {
-		addrs = append(addrs, api.NodeAddress{
-			Type:    api.NodeInternalIP,
-			Address: addr,
-		})
-	}
-
-	for _, addr := range findAddrs(srv.Addresses["public"]) {
-		addrs = append(addrs, api.NodeAddress{
-			Type:    api.NodeExternalIP,
-			Address: addr,
-		})
-	}
-
-	// AccessIPs are usually duplicates of "public" addresses.
-	api.AddToNodeAddresses(&addrs,
-		api.NodeAddress{
-			Type:    api.NodeExternalIP,
-			Address: srv.AccessIPv6,
-		},
-		api.NodeAddress{
-			Type:    api.NodeExternalIP,
-			Address: srv.AccessIPv4,
-		},
-	)
-
-	glog.V(4).Infof("NodeAddresses(%v) => %v", name, addrs)
-	return addrs, nil
-}
-
-// ExternalID returns the cloud provider ID of the specified instance.
-func (i *Instances) ExternalID(name string) (string, error) {
-	srv, err := getServerByName(i.compute, name)
-	if err != nil {
-		return "", err
-	}
-	return srv.ID, nil
-}
-
-func (i *Instances) GetNodeResources(name string) (*api.NodeResources, error) {
-	glog.V(4).Infof("GetNodeResources(%v) called", name)
-
-	srv, err := getServerByName(i.compute, name)
-	if err != nil {
-		return nil, err
-	}
-
-	s, ok := srv.Flavor["id"]
-	if !ok {
-		return nil, ErrAttrNotFound
-	}
-	flavId, ok := s.(string)
-	if !ok {
-		return nil, ErrAttrNotFound
-	}
-	rsrc, ok := i.flavor_to_resource[flavId]
-	if !ok {
-		return nil, ErrNotFound
-	}
-
-	glog.V(4).Infof("GetNodeResources(%v) => %v", name, rsrc)
-
-	return rsrc, nil
-}
-
-func (os *OpenStack) Clusters() (cloudprovider.Clusters, bool) {
-	return nil, false
-}
-
-type LoadBalancer struct {
-	network *gophercloud.ServiceClient
-	compute *gophercloud.ServiceClient
-	opts    LoadBalancerOpts
-}
-
-func (os *OpenStack) TCPLoadBalancer() (cloudprovider.TCPLoadBalancer, bool) {
-	glog.V(4).Info("openstack.TCPLoadBalancer() called")
-
-	if err := openstack.Authenticate(os.provider, os.authOpts); err != nil {
-		glog.Warningf("Failed to reauthenticate: %v", err)
-		return nil, false
-	}
-
-	// TODO: Search for and support Rackspace loadbalancer API, and others.
-	network, err := openstack.NewNetworkV2(os.provider, gophercloud.EndpointOpts{
-		Region: os.region,
-	})
-	if err != nil {
-		glog.Warningf("Failed to find neutron endpoint: %v", err)
-		return nil, false
-	}
-
-	compute, err := openstack.NewComputeV2(os.provider, gophercloud.EndpointOpts{
-		Region: os.region,
-	})
-	if err != nil {
-		glog.Warningf("Failed to find compute endpoint: %v", err)
-		return nil, false
-	}
-
-	glog.V(1).Info("Claiming to support TCPLoadBalancer")
-
-	return &LoadBalancer{network, compute, os.lbOpts}, true
-}
-
-func getVipByName(client *gophercloud.ServiceClient, name string) (*vips.VirtualIP, error) {
-	opts := vips.ListOpts{
-		Name: name,
-	}
-	pager := vips.List(client, opts)
-
-	vipList := make([]vips.VirtualIP, 0, 1)
-
-	err := pager.EachPage(func(page pagination.Page) (bool, error) {
-		v, err := vips.ExtractVIPs(page)
-		if err != nil {
-			return false, err
-		}
-		vipList = append(vipList, v...)
-		if len(vipList) > 1 {
-			return false, ErrMultipleResults
-		}
-		return true, nil
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	if len(vipList) == 0 {
-		return nil, ErrNotFound
-	} else if len(vipList) > 1 {
-		return nil, ErrMultipleResults
-	}
-
-	return &vipList[0], nil
-}
+//===================================================================================================
+// cloudprovider TCPLoadBalancer implementation
+// - TCPLoadBalancerExists
+// - CreateTCPLoadBalancer
+// - UpdateTCPLoadBalancer
+// - DeleteTCPLoadBalancer
+//===================================================================================================
 
 func (lb *LoadBalancer) TCPLoadBalancerExists(name, region string) (bool, error) {
 	vip, err := getVipByName(lb.network, name)
@@ -659,13 +427,301 @@ func (lb *LoadBalancer) DeleteTCPLoadBalancer(name, region string) error {
 	return nil
 }
 
-func (os *OpenStack) Zones() (cloudprovider.Zones, bool) {
-	glog.V(1).Info("Claiming to support Zones")
+//===================================================================================================
+// cloudprovider Instances implementation
+// - NodeAddresses
+// - ExternalID
+// - List
+// - GetNodeResources
+//===================================================================================================
 
-	return os, true
+func (i *Instances) NodeAddresses(name string) ([]api.NodeAddress, error) {
+	glog.V(4).Infof("NodeAddresses(%v) called", name)
+
+	srv, err := getServerByName(i.compute, name)
+	if err != nil {
+		return nil, err
+	}
+
+	addrs := []api.NodeAddress{}
+
+	for _, addr := range findAddrs(srv.Addresses["private"]) {
+		addrs = append(addrs, api.NodeAddress{
+			Type:    api.NodeInternalIP,
+			Address: addr,
+		})
+	}
+
+	for _, addr := range findAddrs(srv.Addresses["public"]) {
+		addrs = append(addrs, api.NodeAddress{
+			Type:    api.NodeExternalIP,
+			Address: addr,
+		})
+	}
+
+	// AccessIPs are usually duplicates of "public" addresses.
+	api.AddToNodeAddresses(&addrs,
+		api.NodeAddress{
+			Type:    api.NodeExternalIP,
+			Address: srv.AccessIPv6,
+		},
+		api.NodeAddress{
+			Type:    api.NodeExternalIP,
+			Address: srv.AccessIPv4,
+		},
+	)
+
+	glog.V(4).Infof("NodeAddresses(%v) => %v", name, addrs)
+	return addrs, nil
 }
+
+// ExternalID returns the cloud provider ID of the specified instance.
+func (i *Instances) ExternalID(name string) (string, error) {
+	srv, err := getServerByName(i.compute, name)
+	if err != nil {
+		return "", err
+	}
+	return srv.ID, nil
+}
+
+func (i *Instances) List(name_filter string) ([]string, error) {
+	glog.V(4).Infof("openstack List(%v) called", name_filter)
+
+	opts := servers.ListOpts{
+		Name:   name_filter,
+		Status: "ACTIVE",
+	}
+	pager := servers.List(i.compute, opts)
+
+	ret := make([]string, 0)
+	err := pager.EachPage(func(page pagination.Page) (bool, error) {
+		sList, err := servers.ExtractServers(page)
+		if err != nil {
+			return false, err
+		}
+		for _, server := range sList {
+			ret = append(ret, server.Name)
+		}
+		return true, nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	glog.V(3).Infof("Found %v instances matching %v: %v",
+		len(ret), name_filter, ret)
+
+	return ret, nil
+}
+
+func (i *Instances) GetNodeResources(name string) (*api.NodeResources, error) {
+	glog.V(4).Infof("GetNodeResources(%v) called", name)
+
+	srv, err := getServerByName(i.compute, name)
+	if err != nil {
+		return nil, err
+	}
+
+	s, ok := srv.Flavor["id"]
+	if !ok {
+		return nil, ErrAttrNotFound
+	}
+	flavId, ok := s.(string)
+	if !ok {
+		return nil, ErrAttrNotFound
+	}
+	rsrc, ok := i.flavor_to_resource[flavId]
+	if !ok {
+		return nil, ErrNotFound
+	}
+
+	glog.V(4).Infof("GetNodeResources(%v) => %v", name, rsrc)
+
+	return rsrc, nil
+}
+
+//===================================================================================================
+// cloudprovider Zones implementation
+// - GetZone
+//===================================================================================================
+
 func (os *OpenStack) GetZone() (cloudprovider.Zone, error) {
 	glog.V(1).Infof("Current zone is %v", os.region)
 
 	return cloudprovider.Zone{Region: os.region}, nil
+}
+
+//===================================================================================================
+// support functions for cloudprovider implementation
+//===================================================================================================
+
+// encoding.TextUnmarshaler interface for time.Duration
+type MyDuration struct {
+	time.Duration
+}
+
+func (d *MyDuration) UnmarshalText(text []byte) error {
+	res, err := time.ParseDuration(string(text))
+	if err != nil {
+		return err
+	}
+	d.Duration = res
+	return nil
+}
+
+type LoadBalancerOpts struct {
+	SubnetId          string     `gcfg:"subnet-id"` // required
+	CreateMonitor     bool       `gcfg:"create-monitor"`
+	MonitorDelay      MyDuration `gcfg:"monitor-delay"`
+	MonitorTimeout    MyDuration `gcfg:"monitor-timeout"`
+	MonitorMaxRetries uint       `gcfg:"monitor-max-retries"`
+}
+
+func (cfg Config) toAuthOptions() gophercloud.AuthOptions {
+	return gophercloud.AuthOptions{
+		IdentityEndpoint: cfg.Global.AuthUrl,
+		Username:         cfg.Global.Username,
+		UserID:           cfg.Global.UserId,
+		Password:         cfg.Global.Password,
+		APIKey:           cfg.Global.ApiKey,
+		TenantID:         cfg.Global.TenantId,
+		TenantName:       cfg.Global.TenantName,
+
+		// Persistent service, so we need to be able to renew
+		// tokens.
+		// (gophercloud doesn't appear to actually reauth yet,
+		// hence the explicit openstack.Authenticate() calls
+		// below)
+		AllowReauth: true,
+	}
+}
+
+type Instances struct {
+	compute            *gophercloud.ServiceClient
+	flavor_to_resource map[string]*api.NodeResources // keyed by flavor id
+}
+
+func getServerByName(client *gophercloud.ServiceClient, name string) (*servers.Server, error) {
+	opts := servers.ListOpts{
+		Name:   fmt.Sprintf("^%s$", regexp.QuoteMeta(name)),
+		Status: "ACTIVE",
+	}
+	pager := servers.List(client, opts)
+
+	serverList := make([]servers.Server, 0, 1)
+
+	err := pager.EachPage(func(page pagination.Page) (bool, error) {
+		s, err := servers.ExtractServers(page)
+		if err != nil {
+			return false, err
+		}
+		serverList = append(serverList, s...)
+		if len(serverList) > 1 {
+			return false, ErrMultipleResults
+		}
+		return true, nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	if len(serverList) == 0 {
+		return nil, ErrNotFound
+	} else if len(serverList) > 1 {
+		return nil, ErrMultipleResults
+	}
+
+	return &serverList[0], nil
+}
+
+func findAddrs(netblob interface{}) []string {
+	// Run-time types for the win :(
+	ret := []string{}
+	list, ok := netblob.([]interface{})
+	if !ok {
+		return ret
+	}
+	for _, item := range list {
+		props, ok := item.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		tmp, ok := props["addr"]
+		if !ok {
+			continue
+		}
+		addr, ok := tmp.(string)
+		if !ok {
+			continue
+		}
+		ret = append(ret, addr)
+	}
+	return ret
+}
+
+func getAddressByName(api *gophercloud.ServiceClient, name string) (string, error) {
+	srv, err := getServerByName(api, name)
+	if err != nil {
+		return "", err
+	}
+
+	var s string
+	if s == "" {
+		if tmp := findAddrs(srv.Addresses["private"]); len(tmp) >= 1 {
+			s = tmp[0]
+		}
+	}
+	if s == "" {
+		if tmp := findAddrs(srv.Addresses["public"]); len(tmp) >= 1 {
+			s = tmp[0]
+		}
+	}
+	if s == "" {
+		s = srv.AccessIPv4
+	}
+	if s == "" {
+		s = srv.AccessIPv6
+	}
+	if s == "" {
+		return "", ErrNoAddressFound
+	}
+	return s, nil
+}
+
+type LoadBalancer struct {
+	network *gophercloud.ServiceClient
+	compute *gophercloud.ServiceClient
+	opts    LoadBalancerOpts
+}
+
+func getVipByName(client *gophercloud.ServiceClient, name string) (*vips.VirtualIP, error) {
+	opts := vips.ListOpts{
+		Name: name,
+	}
+	pager := vips.List(client, opts)
+
+	vipList := make([]vips.VirtualIP, 0, 1)
+
+	err := pager.EachPage(func(page pagination.Page) (bool, error) {
+		v, err := vips.ExtractVIPs(page)
+		if err != nil {
+			return false, err
+		}
+		vipList = append(vipList, v...)
+		if len(vipList) > 1 {
+			return false, ErrMultipleResults
+		}
+		return true, nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	if len(vipList) == 0 {
+		return nil, ErrNotFound
+	} else if len(vipList) > 1 {
+		return nil, ErrMultipleResults
+	}
+
+	return &vipList[0], nil
 }

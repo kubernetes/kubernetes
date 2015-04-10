@@ -34,6 +34,219 @@ import (
 	"github.com/golang/glog"
 )
 
+//===================================================================================================
+// Cloud Provider Plugin Init and Registration
+// - Constants
+// - init
+// - New* Cloud function
+//===================================================================================================
+
+func init() {
+	cloudprovider.RegisterCloudProvider("aws", func(config io.Reader) (cloudprovider.Interface, error) {
+		metadata := &goamzMetadata{}
+		return newAWSCloud(config, getAuth, metadata)
+	})
+}
+
+// newAWSCloud creates a new instance of AWSCloud.
+func newAWSCloud(config io.Reader, authFunc AuthFunc, metadata AWSMetadata) (*AWSCloud, error) {
+	cfg, err := readAWSCloudConfig(config, metadata)
+	if err != nil {
+		return nil, fmt.Errorf("unable to read AWS cloud provider config file: %v", err)
+	}
+
+	auth, err := authFunc()
+	if err != nil {
+		return nil, err
+	}
+
+	zone := cfg.Global.Zone
+	if len(zone) <= 1 {
+		return nil, fmt.Errorf("invalid AWS zone in config file: %s", zone)
+	}
+	regionName := zone[:len(zone)-1]
+
+	region, ok := aws.Regions[regionName]
+	if !ok {
+		return nil, fmt.Errorf("not a valid AWS zone (unknown region): %s", zone)
+	}
+
+	return &AWSCloud{
+		ec2:              &GoamzEC2{ec2: ec2.New(auth, region)},
+		cfg:              cfg,
+		region:           region,
+		availabilityZone: zone,
+	}, nil
+}
+
+//===================================================================================================
+// Cloud Provider Configuration Management
+// - Configuration Structs
+// - Load configuration files
+//===================================================================================================
+
+type AWSCloudConfig struct {
+	Global struct {
+		// TODO: Is there any use for this?  We can get it from the instance metadata service
+		Zone string
+	}
+}
+
+// readAWSCloudConfig reads an instance of AWSCloudConfig from config reader.
+func readAWSCloudConfig(config io.Reader, metadata AWSMetadata) (*AWSCloudConfig, error) {
+	var cfg AWSCloudConfig
+	var err error
+
+	if config != nil {
+		err = gcfg.ReadInto(&cfg, config)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if cfg.Global.Zone == "" {
+		if metadata != nil {
+			glog.Info("Zone not specified in configuration file; querying AWS metadata service")
+			cfg.Global.Zone, err = getAvailabilityZone(metadata)
+			if err != nil {
+				return nil, err
+			}
+		}
+		if cfg.Global.Zone == "" {
+			return nil, fmt.Errorf("no zone specified in configuration file")
+		}
+	}
+
+	return &cfg, nil
+}
+
+//===================================================================================================
+// cloudprovider Interface implementation
+// - Cloud specific struct
+// - Clusters
+// - TCPLoadBalancer
+// - Instances
+// - Zones
+//===================================================================================================
+
+// AWSCloud is an implementation of Interface, TCPLoadBalancer and Instances for Amazon Web Services.
+type AWSCloud struct {
+	ec2              EC2
+	cfg              *AWSCloudConfig
+	availabilityZone string
+	region           aws.Region
+}
+
+func (aws *AWSCloud) Clusters() (cloudprovider.Clusters, bool) {
+	return nil, false
+}
+
+// TCPLoadBalancer returns an implementation of TCPLoadBalancer for Amazon Web Services.
+func (aws *AWSCloud) TCPLoadBalancer() (cloudprovider.TCPLoadBalancer, bool) {
+	return nil, false
+}
+
+// Instances returns an implementation of Instances for Amazon Web Services.
+func (aws *AWSCloud) Instances() (cloudprovider.Instances, bool) {
+	return aws, true
+}
+
+// Zones returns an implementation of Zones for Amazon Web Services.
+func (aws *AWSCloud) Zones() (cloudprovider.Zones, bool) {
+	return aws, true
+}
+
+//===================================================================================================
+// cloudprovider Clusters implementation
+// - ListClusters
+// - Master
+//===================================================================================================
+
+// Not Implemented
+
+//===================================================================================================
+// cloudprovider TCPLoadBalancer implementation
+// - TCPLoadBalancerExists
+// - CreateTCPLoadBalancer
+// - UpdateTCPLoadBalancer
+// - DeleteTCPLoadBalancer
+//===================================================================================================
+
+// Not Implemented
+
+//===================================================================================================
+// cloudprovider Instances implementation
+// - NodeAddresses
+// - ExternalID
+// - List
+// - GetNodeResources
+//===================================================================================================
+
+// NodeAddresses is an implementation of Instances.NodeAddresses.
+func (aws *AWSCloud) NodeAddresses(name string) ([]api.NodeAddress, error) {
+	inst, err := aws.getInstancesByDnsName(name)
+	if err != nil {
+		return nil, err
+	}
+	ip := net.ParseIP(inst.PrivateIpAddress)
+	if ip == nil {
+		return nil, fmt.Errorf("invalid network IP: %s", inst.PrivateIpAddress)
+	}
+
+	return []api.NodeAddress{{Type: api.NodeLegacyHostIP, Address: ip.String()}}, nil
+}
+
+// ExternalID returns the cloud provider ID of the specified instance.
+func (aws *AWSCloud) ExternalID(name string) (string, error) {
+	inst, err := aws.getInstancesByDnsName(name)
+	if err != nil {
+		return "", err
+	}
+	return inst.InstanceId, nil
+}
+
+// List is an implementation of Instances.List.
+func (aws *AWSCloud) List(filter string) ([]string, error) {
+	// TODO: Should really use tag query. No need to go regexp.
+	return aws.getInstancesByRegex(filter)
+}
+
+// GetNodeResources implements Instances.GetNodeResources
+func (aws *AWSCloud) GetNodeResources(name string) (*api.NodeResources, error) {
+	instance, err := aws.getInstancesByDnsName(name)
+	if err != nil {
+		return nil, err
+	}
+
+	resources, err := getResourcesByInstanceType(instance.InstanceType)
+	if err != nil {
+		return nil, err
+	}
+
+	return resources, nil
+}
+
+//===================================================================================================
+// cloudprovider Zones implementation
+// - GetZone
+//===================================================================================================
+
+// GetZone implements Zones.GetZone
+func (self *AWSCloud) GetZone() (cloudprovider.Zone, error) {
+	if self.availabilityZone == "" {
+		// Should be unreachable
+		panic("availabilityZone not set")
+	}
+	return cloudprovider.Zone{
+		FailureDomain: self.availabilityZone,
+		Region:        self.region.Name,
+	}, nil
+}
+
+//===================================================================================================
+// support functions for cloudprovider implementation
+//===================================================================================================
+
 // Abstraction over EC2, to allow mocking/other implementations
 type EC2 interface {
 	// Query EC2 for instances matching the filter
@@ -44,21 +257,6 @@ type EC2 interface {
 type AWSMetadata interface {
 	// Query the EC2 metadata service (used to discover instance-id etc)
 	GetMetaData(key string) ([]byte, error)
-}
-
-// AWSCloud is an implementation of Interface, TCPLoadBalancer and Instances for Amazon Web Services.
-type AWSCloud struct {
-	ec2              EC2
-	cfg              *AWSCloudConfig
-	availabilityZone string
-	region           aws.Region
-}
-
-type AWSCloudConfig struct {
-	Global struct {
-		// TODO: Is there any use for this?  We can get it from the instance metadata service
-		Zone string
-	}
 }
 
 // Similar to ec2.Filter, but the filter values can be read from tests
@@ -106,43 +304,8 @@ func (self *goamzMetadata) GetMetaData(key string) ([]byte, error) {
 
 type AuthFunc func() (auth aws.Auth, err error)
 
-func init() {
-	cloudprovider.RegisterCloudProvider("aws", func(config io.Reader) (cloudprovider.Interface, error) {
-		metadata := &goamzMetadata{}
-		return newAWSCloud(config, getAuth, metadata)
-	})
-}
-
 func getAuth() (auth aws.Auth, err error) {
 	return aws.GetAuth("", "")
-}
-
-// readAWSCloudConfig reads an instance of AWSCloudConfig from config reader.
-func readAWSCloudConfig(config io.Reader, metadata AWSMetadata) (*AWSCloudConfig, error) {
-	var cfg AWSCloudConfig
-	var err error
-
-	if config != nil {
-		err = gcfg.ReadInto(&cfg, config)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	if cfg.Global.Zone == "" {
-		if metadata != nil {
-			glog.Info("Zone not specified in configuration file; querying AWS metadata service")
-			cfg.Global.Zone, err = getAvailabilityZone(metadata)
-			if err != nil {
-				return nil, err
-			}
-		}
-		if cfg.Global.Zone == "" {
-			return nil, fmt.Errorf("no zone specified in configuration file")
-		}
-	}
-
-	return &cfg, nil
 }
 
 func getAvailabilityZone(metadata AWSMetadata) (string, error) {
@@ -154,79 +317,6 @@ func getAvailabilityZone(metadata AWSMetadata) (string, error) {
 		return "", fmt.Errorf("Unable to determine availability-zone from instance metadata")
 	}
 	return string(availabilityZoneBytes), nil
-}
-
-// newAWSCloud creates a new instance of AWSCloud.
-func newAWSCloud(config io.Reader, authFunc AuthFunc, metadata AWSMetadata) (*AWSCloud, error) {
-	cfg, err := readAWSCloudConfig(config, metadata)
-	if err != nil {
-		return nil, fmt.Errorf("unable to read AWS cloud provider config file: %v", err)
-	}
-
-	auth, err := authFunc()
-	if err != nil {
-		return nil, err
-	}
-
-	zone := cfg.Global.Zone
-	if len(zone) <= 1 {
-		return nil, fmt.Errorf("invalid AWS zone in config file: %s", zone)
-	}
-	regionName := zone[:len(zone)-1]
-
-	region, ok := aws.Regions[regionName]
-	if !ok {
-		return nil, fmt.Errorf("not a valid AWS zone (unknown region): %s", zone)
-	}
-
-	return &AWSCloud{
-		ec2:              &GoamzEC2{ec2: ec2.New(auth, region)},
-		cfg:              cfg,
-		region:           region,
-		availabilityZone: zone,
-	}, nil
-}
-
-func (aws *AWSCloud) Clusters() (cloudprovider.Clusters, bool) {
-	return nil, false
-}
-
-// TCPLoadBalancer returns an implementation of TCPLoadBalancer for Amazon Web Services.
-func (aws *AWSCloud) TCPLoadBalancer() (cloudprovider.TCPLoadBalancer, bool) {
-	return nil, false
-}
-
-// Instances returns an implementation of Instances for Amazon Web Services.
-func (aws *AWSCloud) Instances() (cloudprovider.Instances, bool) {
-	return aws, true
-}
-
-// Zones returns an implementation of Zones for Amazon Web Services.
-func (aws *AWSCloud) Zones() (cloudprovider.Zones, bool) {
-	return aws, true
-}
-
-// NodeAddresses is an implementation of Instances.NodeAddresses.
-func (aws *AWSCloud) NodeAddresses(name string) ([]api.NodeAddress, error) {
-	inst, err := aws.getInstancesByDnsName(name)
-	if err != nil {
-		return nil, err
-	}
-	ip := net.ParseIP(inst.PrivateIpAddress)
-	if ip == nil {
-		return nil, fmt.Errorf("invalid network IP: %s", inst.PrivateIpAddress)
-	}
-
-	return []api.NodeAddress{{Type: api.NodeLegacyHostIP, Address: ip.String()}}, nil
-}
-
-// ExternalID returns the cloud provider ID of the specified instance.
-func (aws *AWSCloud) ExternalID(name string) (string, error) {
-	inst, err := aws.getInstancesByDnsName(name)
-	if err != nil {
-		return "", err
-	}
-	return inst.InstanceId, nil
 }
 
 // Return the instances matching the relevant private dns name.
@@ -332,27 +422,6 @@ func (aws *AWSCloud) getInstancesByRegex(regex string) ([]string, error) {
 	}
 	glog.V(2).Infof("Matched EC2 instances: %s", instances)
 	return instances, nil
-}
-
-// List is an implementation of Instances.List.
-func (aws *AWSCloud) List(filter string) ([]string, error) {
-	// TODO: Should really use tag query. No need to go regexp.
-	return aws.getInstancesByRegex(filter)
-}
-
-// GetNodeResources implements Instances.GetNodeResources
-func (aws *AWSCloud) GetNodeResources(name string) (*api.NodeResources, error) {
-	instance, err := aws.getInstancesByDnsName(name)
-	if err != nil {
-		return nil, err
-	}
-
-	resources, err := getResourcesByInstanceType(instance.InstanceType)
-	if err != nil {
-		return nil, err
-	}
-
-	return resources, nil
 }
 
 // Builds an api.NodeResources
@@ -493,16 +562,4 @@ func getResourcesByInstanceType(instanceType string) (*api.NodeResources, error)
 		glog.Errorf("unknown instanceType: %s", instanceType)
 		return nil, nil
 	}
-}
-
-// GetZone implements Zones.GetZone
-func (self *AWSCloud) GetZone() (cloudprovider.Zone, error) {
-	if self.availabilityZone == "" {
-		// Should be unreachable
-		panic("availabilityZone not set")
-	}
-	return cloudprovider.Zone{
-		FailureDomain: self.availabilityZone,
-		Region:        self.region.Name,
-	}, nil
 }

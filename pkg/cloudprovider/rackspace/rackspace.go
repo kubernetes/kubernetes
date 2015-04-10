@@ -38,39 +38,47 @@ import (
 	"github.com/golang/glog"
 )
 
+//===================================================================================================
+// Cloud Provider Plugin Init and Registration
+// - Constants
+// - init
+// - New* Cloud function
+//===================================================================================================
+
 var ErrNotFound = errors.New("Failed to find object")
 var ErrMultipleResults = errors.New("Multiple results where only one expected")
 var ErrNoAddressFound = errors.New("No address found for host")
 var ErrAttrNotFound = errors.New("Expected attribute not found")
 
-// encoding.TextUnmarshaler interface for time.Duration
-type MyDuration struct {
-	time.Duration
+func init() {
+	cloudprovider.RegisterCloudProvider("rackspace", func(config io.Reader) (cloudprovider.Interface, error) {
+		cfg, err := readConfig(config)
+		if err != nil {
+			return nil, err
+		}
+		return newRackspace(cfg)
+	})
 }
 
-func (d *MyDuration) UnmarshalText(text []byte) error {
-	res, err := time.ParseDuration(string(text))
+func newRackspace(cfg Config) (*Rackspace, error) {
+	provider, err := rackspace.AuthenticatedClient(cfg.toAuthOptions())
 	if err != nil {
-		return err
+		return nil, err
 	}
-	d.Duration = res
-	return nil
+
+	os := Rackspace{
+		provider: provider,
+		region:   cfg.Global.Region,
+		lbOpts:   cfg.LoadBalancer,
+	}
+	return &os, nil
 }
 
-type LoadBalancerOpts struct {
-	SubnetId          string     `gcfg:"subnet-id"` // required
-	CreateMonitor     bool       `gcfg:"create-monitor"`
-	MonitorDelay      MyDuration `gcfg:"monitor-delay"`
-	MonitorTimeout    MyDuration `gcfg:"monitor-timeout"`
-	MonitorMaxRetries uint       `gcfg:"monitor-max-retries"`
-}
-
-// Rackspace is an implementation of cloud provider Interface for Rackspace.
-type Rackspace struct {
-	provider *gophercloud.ProviderClient
-	region   string
-	lbOpts   LoadBalancerOpts
-}
+//===================================================================================================
+// Cloud Provider Configuration Management
+// - Configuration Structs
+// - Load configuration files
+//===================================================================================================
 
 type Config struct {
 	Global struct {
@@ -88,31 +96,6 @@ type Config struct {
 	LoadBalancer LoadBalancerOpts
 }
 
-func init() {
-	cloudprovider.RegisterCloudProvider("rackspace", func(config io.Reader) (cloudprovider.Interface, error) {
-		cfg, err := readConfig(config)
-		if err != nil {
-			return nil, err
-		}
-		return newRackspace(cfg)
-	})
-}
-
-func (cfg Config) toAuthOptions() gophercloud.AuthOptions {
-	return gophercloud.AuthOptions{
-		IdentityEndpoint: cfg.Global.AuthUrl,
-		Username:         cfg.Global.Username,
-		UserID:           cfg.Global.UserId,
-		Password:         cfg.Global.Password,
-		APIKey:           cfg.Global.ApiKey,
-		TenantID:         cfg.Global.TenantId,
-		TenantName:       cfg.Global.TenantName,
-
-		// Persistent service, so we need to be able to renew tokens
-		AllowReauth: true,
-	}
-}
-
 func readConfig(config io.Reader) (Config, error) {
 	if config == nil {
 		err := fmt.Errorf("no Rackspace cloud provider config file given")
@@ -124,23 +107,28 @@ func readConfig(config io.Reader) (Config, error) {
 	return cfg, err
 }
 
-func newRackspace(cfg Config) (*Rackspace, error) {
-	provider, err := rackspace.AuthenticatedClient(cfg.toAuthOptions())
-	if err != nil {
-		return nil, err
-	}
+//===================================================================================================
+// cloudprovider Interface implementation
+// - Cloud specific struct
+// - Clusters
+// - TCPLoadBalancer
+// - Instances
+// - Zones
+//===================================================================================================
 
-	os := Rackspace{
-		provider: provider,
-		region:   cfg.Global.Region,
-		lbOpts:   cfg.LoadBalancer,
-	}
-	return &os, nil
+// Rackspace is an implementation of cloud provider Interface for Rackspace.
+type Rackspace struct {
+	provider *gophercloud.ProviderClient
+	region   string
+	lbOpts   LoadBalancerOpts
 }
 
-type Instances struct {
-	compute            *gophercloud.ServiceClient
-	flavor_to_resource map[string]*api.NodeResources // keyed by flavor id
+func (os *Rackspace) Clusters() (cloudprovider.Clusters, bool) {
+	return nil, false
+}
+
+func (os *Rackspace) TCPLoadBalancer() (cloudprovider.TCPLoadBalancer, bool) {
+	return nil, false
 }
 
 // Instances returns an implementation of Instances for Rackspace.
@@ -188,6 +176,57 @@ func (os *Rackspace) Instances() (cloudprovider.Instances, bool) {
 	return &Instances{compute, flavor_to_resource}, true
 }
 
+func (os *Rackspace) Zones() (cloudprovider.Zones, bool) {
+	glog.V(1).Info("Claiming to support Zones")
+
+	return os, true
+}
+
+//===================================================================================================
+// cloudprovider Clusters implementation
+// - ListClusters
+// - Master
+//===================================================================================================
+
+// Not Implemented
+
+//===================================================================================================
+// cloudprovider TCPLoadBalancer implementation
+// - TCPLoadBalancerExists
+// - CreateTCPLoadBalancer
+// - UpdateTCPLoadBalancer
+// - DeleteTCPLoadBalancer
+//===================================================================================================
+
+// Not Implemented
+
+//===================================================================================================
+// cloudprovider Instances implementation
+// - NodeAddresses
+// - ExternalID
+// - List
+// - GetNodeResources
+//===================================================================================================
+
+func (i *Instances) NodeAddresses(name string) ([]api.NodeAddress, error) {
+	glog.V(2).Infof("NodeAddresses(%v) called", name)
+
+	ip, err := getAddressByName(i.compute, name)
+	if err != nil {
+		return nil, err
+	}
+
+	glog.V(2).Infof("NodeAddresses(%v) => %v", name, ip)
+
+	// net.ParseIP().String() is to maintain compatibility with the old code
+	return []api.NodeAddress{{Type: api.NodeLegacyHostIP, Address: net.ParseIP(ip).String()}}, nil
+}
+
+// ExternalID returns the cloud provider ID of the specified instance.
+func (i *Instances) ExternalID(name string) (string, error) {
+	return "", fmt.Errorf("unimplemented")
+}
+
 func (i *Instances) List(name_filter string) ([]string, error) {
 	glog.V(2).Infof("rackspace List(%v) called", name_filter)
 
@@ -215,6 +254,89 @@ func (i *Instances) List(name_filter string) ([]string, error) {
 	glog.V(2).Infof("Found %v entries: %v", len(ret), ret)
 
 	return ret, nil
+}
+
+func (i *Instances) GetNodeResources(name string) (*api.NodeResources, error) {
+	glog.V(2).Infof("GetNodeResources(%v) called", name)
+
+	srv, err := getServerByName(i.compute, name)
+	if err != nil {
+		return nil, err
+	}
+
+	s, ok := srv.Flavor["id"]
+	if !ok {
+		return nil, ErrAttrNotFound
+	}
+	flavId, ok := s.(string)
+	if !ok {
+		return nil, ErrAttrNotFound
+	}
+	rsrc, ok := i.flavor_to_resource[flavId]
+	if !ok {
+		return nil, ErrNotFound
+	}
+
+	glog.V(2).Infof("GetNodeResources(%v) => %v", name, rsrc)
+
+	return rsrc, nil
+}
+
+//===================================================================================================
+// cloudprovider Zones implementation
+// - GetZone
+//===================================================================================================
+
+func (os *Rackspace) GetZone() (cloudprovider.Zone, error) {
+	glog.V(1).Infof("Current zone is %v", os.region)
+
+	return cloudprovider.Zone{Region: os.region}, nil
+}
+
+//===================================================================================================
+// support functions for cloudprovider implementation
+//===================================================================================================
+
+// encoding.TextUnmarshaler interface for time.Duration
+type MyDuration struct {
+	time.Duration
+}
+
+func (d *MyDuration) UnmarshalText(text []byte) error {
+	res, err := time.ParseDuration(string(text))
+	if err != nil {
+		return err
+	}
+	d.Duration = res
+	return nil
+}
+
+type LoadBalancerOpts struct {
+	SubnetId          string     `gcfg:"subnet-id"` // required
+	CreateMonitor     bool       `gcfg:"create-monitor"`
+	MonitorDelay      MyDuration `gcfg:"monitor-delay"`
+	MonitorTimeout    MyDuration `gcfg:"monitor-timeout"`
+	MonitorMaxRetries uint       `gcfg:"monitor-max-retries"`
+}
+
+func (cfg Config) toAuthOptions() gophercloud.AuthOptions {
+	return gophercloud.AuthOptions{
+		IdentityEndpoint: cfg.Global.AuthUrl,
+		Username:         cfg.Global.Username,
+		UserID:           cfg.Global.UserId,
+		Password:         cfg.Global.Password,
+		APIKey:           cfg.Global.ApiKey,
+		TenantID:         cfg.Global.TenantId,
+		TenantName:       cfg.Global.TenantName,
+
+		// Persistent service, so we need to be able to renew tokens
+		AllowReauth: true,
+	}
+}
+
+type Instances struct {
+	compute            *gophercloud.ServiceClient
+	flavor_to_resource map[string]*api.NodeResources // keyed by flavor id
 }
 
 func serverHasAddress(srv os_servers.Server, ip string) bool {
@@ -348,68 +470,4 @@ func getAddressByName(api *gophercloud.ServiceClient, name string) (string, erro
 		return "", ErrNoAddressFound
 	}
 	return s, nil
-}
-
-func (i *Instances) NodeAddresses(name string) ([]api.NodeAddress, error) {
-	glog.V(2).Infof("NodeAddresses(%v) called", name)
-
-	ip, err := getAddressByName(i.compute, name)
-	if err != nil {
-		return nil, err
-	}
-
-	glog.V(2).Infof("NodeAddresses(%v) => %v", name, ip)
-
-	// net.ParseIP().String() is to maintain compatibility with the old code
-	return []api.NodeAddress{{Type: api.NodeLegacyHostIP, Address: net.ParseIP(ip).String()}}, nil
-}
-
-// ExternalID returns the cloud provider ID of the specified instance.
-func (i *Instances) ExternalID(name string) (string, error) {
-	return "", fmt.Errorf("unimplemented")
-}
-
-func (i *Instances) GetNodeResources(name string) (*api.NodeResources, error) {
-	glog.V(2).Infof("GetNodeResources(%v) called", name)
-
-	srv, err := getServerByName(i.compute, name)
-	if err != nil {
-		return nil, err
-	}
-
-	s, ok := srv.Flavor["id"]
-	if !ok {
-		return nil, ErrAttrNotFound
-	}
-	flavId, ok := s.(string)
-	if !ok {
-		return nil, ErrAttrNotFound
-	}
-	rsrc, ok := i.flavor_to_resource[flavId]
-	if !ok {
-		return nil, ErrNotFound
-	}
-
-	glog.V(2).Infof("GetNodeResources(%v) => %v", name, rsrc)
-
-	return rsrc, nil
-}
-
-func (os *Rackspace) Clusters() (cloudprovider.Clusters, bool) {
-	return nil, false
-}
-
-func (os *Rackspace) TCPLoadBalancer() (cloudprovider.TCPLoadBalancer, bool) {
-	return nil, false
-}
-
-func (os *Rackspace) Zones() (cloudprovider.Zones, bool) {
-	glog.V(1).Info("Claiming to support Zones")
-
-	return os, true
-}
-func (os *Rackspace) GetZone() (cloudprovider.Zone, error) {
-	glog.V(1).Infof("Current zone is %v", os.region)
-
-	return cloudprovider.Zone{Region: os.region}, nil
 }
