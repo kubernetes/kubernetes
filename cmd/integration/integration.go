@@ -103,10 +103,6 @@ func (fakeKubeletClient) GetPodStatus(host, podNamespace, podName string) (api.P
 	return r, nil
 }
 
-func (fakeKubeletClient) GetNodeInfo(host string) (api.NodeInfo, error) {
-	return api.NodeInfo{}, nil
-}
-
 func (fakeKubeletClient) GetConnectionInfo(host string) (string, uint, http.RoundTripper, error) {
 	return "", 0, nil, errors.New("Not Implemented")
 }

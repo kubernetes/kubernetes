@@ -34,7 +34,6 @@ func init() {
 		&Service{},
 		&NodeList{},
 		&Node{},
-		&NodeInfo{},
 		&Status{},
 		&Endpoints{},
 		&EndpointsList{},
@@ -75,7 +74,6 @@ func (*ServiceList) IsAnAPIObject()               {}
 func (*Endpoints) IsAnAPIObject()                 {}
 func (*EndpointsList) IsAnAPIObject()             {}
 func (*Node) IsAnAPIObject()                      {}
-func (*NodeInfo) IsAnAPIObject()                  {}
 func (*NodeList) IsAnAPIObject()                  {}
 func (*Binding) IsAnAPIObject()                   {}
 func (*Status) IsAnAPIObject()                    {}
