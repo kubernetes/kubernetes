@@ -136,7 +136,6 @@ func (s *Server) InstallDefaultHandlers() {
 	)
 	s.mux.HandleFunc("/podInfo", s.handlePodInfoOld)
 	s.mux.HandleFunc("/api/v1beta1/podInfo", s.handlePodInfoVersioned)
-	s.mux.HandleFunc("/api/v1beta1/nodeInfo", s.handleNodeInfoVersioned)
 	s.mux.HandleFunc("/pods", s.handlePods)
 	s.mux.HandleFunc("/stats/", s.handleStats)
 	s.mux.HandleFunc("/spec/", s.handleSpec)
@@ -344,31 +343,6 @@ func (s *Server) handleStats(w http.ResponseWriter, req *http.Request) {
 // handleLogs handles logs requests against the Kubelet.
 func (s *Server) handleLogs(w http.ResponseWriter, req *http.Request) {
 	s.host.ServeLogs(w, req)
-}
-
-// handleNodeInfoVersioned handles node info requests against the Kubelet.
-func (s *Server) handleNodeInfoVersioned(w http.ResponseWriter, req *http.Request) {
-	info, err := s.host.GetCachedMachineInfo()
-	if err != nil {
-		s.error(w, err)
-		return
-	}
-	capacity := CapacityFromMachineInfo(info)
-	data, err := json.Marshal(api.NodeInfo{
-		Capacity: capacity,
-		NodeSystemInfo: api.NodeSystemInfo{
-			MachineID:  info.MachineID,
-			SystemUUID: info.SystemUUID,
-			BootID:     info.BootID,
-		},
-	})
-
-	if err != nil {
-		s.error(w, err)
-		return
-	}
-	w.Header().Add("Content-type", "application/json")
-	w.Write(data)
 }
 
 // handleSpec handles spec requests against the Kubelet.

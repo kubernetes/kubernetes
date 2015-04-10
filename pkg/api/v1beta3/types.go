@@ -1073,15 +1073,6 @@ type NodeStatus struct {
 	NodeInfo NodeSystemInfo `json:"nodeInfo,omitempty"`
 }
 
-// NodeInfo is the information collected on the node.
-type NodeInfo struct {
-	TypeMeta `json:",inline"`
-	// Capacity represents the available resources of a node
-	Capacity ResourceList `json:"capacity,omitempty"`
-	// NodeSystemInfo is a set of ids/uuids to uniquely identify the node
-	NodeSystemInfo `json:",inline,omitempty"`
-}
-
 type NodePhase string
 
 // These are the valid phases of node.
