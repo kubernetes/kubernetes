@@ -480,6 +480,11 @@ func (lb *LoadBalancer) TCPLoadBalancerExists(name, region string) (bool, error)
 	return vip != nil, err
 }
 
+// NeedsClusterServicePort is an implementation of TCPLoadBalancer.NeedsClusterServicePort.
+func (lb *LoadBalancer) NeedsClusterServicePort() bool {
+	return false
+}
+
 // TODO: This code currently ignores 'region' and always creates a
 // loadbalancer in only the current OpenStack region.  We should take
 // a list of regions (from config) and query/create loadbalancers in

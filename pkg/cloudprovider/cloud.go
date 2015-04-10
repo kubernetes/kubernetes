@@ -53,6 +53,8 @@ type TCPLoadBalancer interface {
 	UpdateTCPLoadBalancer(name, region string, hosts []string) error
 	// DeleteTCPLoadBalancer deletes a specified load balancer.
 	DeleteTCPLoadBalancer(name, region string) error
+	// NeedsClusterServicePort returns whether we need a cluster-wide port allocation for load-balanced services
+	NeedsClusterServicePort() bool
 }
 
 // Instances is an abstract, pluggable interface for sets of instances.

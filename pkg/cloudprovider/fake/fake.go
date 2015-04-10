@@ -93,6 +93,11 @@ func (f *FakeCloud) TCPLoadBalancerExists(name, region string) (bool, error) {
 	return f.Exists, f.Err
 }
 
+// NeedsClusterServicePort is a stub implementation of TCPLoadBalancer.NeedsClusterServicePort.
+func (lb *FakeCloud) NeedsClusterServicePort() bool {
+	return false
+}
+
 // CreateTCPLoadBalancer is a test-spy implementation of TCPLoadBalancer.CreateTCPLoadBalancer.
 // It adds an entry "create" into the internal method call record.
 func (f *FakeCloud) CreateTCPLoadBalancer(name, region string, externalIP net.IP, ports []int, hosts []string, affinityType api.AffinityType) (string, error) {

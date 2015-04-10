@@ -72,6 +72,7 @@ type APIServer struct {
 	CorsAllowedOriginList      util.StringList
 	AllowPrivileged            bool
 	PortalNet                  util.IPNet // TODO: make this a list
+	PortalServicePorts         util.PortRange
 	EnableLogsSupport          bool
 	MasterServiceNamespace     string
 	RuntimeConfig              util.ConfigurationMap
@@ -159,6 +160,7 @@ func (s *APIServer) AddFlags(fs *pflag.FlagSet) {
 	fs.Var(&s.CorsAllowedOriginList, "cors_allowed_origins", "List of allowed origins for CORS, comma separated.  An allowed origin can be a regular expression to support subdomain matching.  If this list is empty CORS will not be enabled.")
 	fs.BoolVar(&s.AllowPrivileged, "allow_privileged", s.AllowPrivileged, "If true, allow privileged containers.")
 	fs.Var(&s.PortalNet, "portal_net", "A CIDR notation IP range from which to assign portal IPs. This must not overlap with any IP ranges assigned to nodes for pods.")
+	fs.Var(&s.PortalServicePorts, "portal_service_ports", "A port range from which to assign cluster-wide portal ports.")
 	fs.StringVar(&s.MasterServiceNamespace, "master_service_namespace", s.MasterServiceNamespace, "The namespace from which the kubernetes master services should be injected into pods")
 	fs.Var(&s.RuntimeConfig, "runtime_config", "A set of key=value pairs that describe runtime configuration that may be passed to the apiserver.")
 	client.BindKubeletClientConfigFlags(fs, &s.KubeletConfig)
@@ -277,6 +279,7 @@ func (s *APIServer) Run(_ []string) error {
 		EventTTL:               s.EventTTL,
 		KubeletClient:          kubeletClient,
 		PortalNet:              &n,
+		PortalServicePorts:     s.PortalServicePorts,
 		EnableLogsSupport:      s.EnableLogsSupport,
 		EnableUISupport:        true,
 		EnableSwaggerSupport:   true,
