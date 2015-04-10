@@ -115,7 +115,7 @@ func RunLog(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string
 
 	readCloser, err := client.RESTClient.Get().
 		Prefix("proxy").
-		Resource("minions").
+		Resource("nodes").
 		Name(pod.Spec.Host).
 		Suffix("containerLogs", namespace, podID, container).
 		Param("follow", strconv.FormatBool(follow)).
