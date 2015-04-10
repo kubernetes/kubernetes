@@ -24,6 +24,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/wait"
@@ -189,7 +190,7 @@ var _ = Describe("Density", func() {
 		var err error
 		c, err = loadClient()
 		expectNoError(err)
-		minions, err := c.Nodes().List(labels.Everything())
+		minions, err := c.Nodes().List(labels.Everything(), fields.Everything())
 		expectNoError(err)
 		minionCount = len(minions.Items)
 		Expect(minionCount).NotTo(BeZero())

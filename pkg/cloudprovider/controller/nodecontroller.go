@@ -28,6 +28,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -225,7 +226,7 @@ func (nc *NodeController) SyncCloudNodes() error {
 	if err != nil {
 		return err
 	}
-	nodes, err := nc.kubeClient.Nodes().List(labels.Everything())
+	nodes, err := nc.kubeClient.Nodes().List(labels.Everything(), fields.Everything())
 	if err != nil {
 		return err
 	}
@@ -459,7 +460,7 @@ func (nc *NodeController) tryUpdateNodeStatus(node *api.Node) (time.Duration, ap
 // post "NodeReady==ConditionUnknown". It also evicts all pods if node is not ready or
 // not reachable for a long period of time.
 func (nc *NodeController) MonitorNodeStatus() error {
-	nodes, err := nc.kubeClient.Nodes().List(labels.Everything())
+	nodes, err := nc.kubeClient.Nodes().List(labels.Everything(), fields.Everything())
 	if err != nil {
 		return err
 	}
