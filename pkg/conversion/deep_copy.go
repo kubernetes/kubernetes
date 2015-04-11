@@ -20,24 +20,49 @@ import (
 	"bytes"
 	"encoding/gob"
 	"reflect"
+	"sync"
 )
 
-// DeepCopy makes a deep copy of source. Won't work for any private fields!
-// For nil slices, will return 0-length slices. These are equivilent in
-// basically every way except for the way that reflect.DeepEqual checks.
+// pool is a pool of copiers
+var pool = sync.Pool{
+	New: func() interface{} { return newGobCopier() },
+}
+
+// DeepCopy makes a deep copy of source or returns an error.
 func DeepCopy(source interface{}) (interface{}, error) {
 	v := reflect.New(reflect.TypeOf(source))
 
-	buff := &bytes.Buffer{}
-	enc := gob.NewEncoder(buff)
-	dec := gob.NewDecoder(buff)
-	err := enc.Encode(source)
-	if err != nil {
+	c := pool.Get().(gobCopier)
+	defer pool.Put(c)
+	if err := c.CopyInto(v.Interface(), source); err != nil {
 		return nil, err
 	}
-	err = dec.Decode(v.Interface())
-	if err != nil {
-		return nil, err
-	}
+
 	return v.Elem().Interface(), nil
+}
+
+// gobCopier provides a copy mechanism for objects using Gob.
+// This object is not safe for multiple threads because buffer
+// is shared.
+type gobCopier struct {
+	enc *gob.Encoder
+	dec *gob.Decoder
+}
+
+func newGobCopier() gobCopier {
+	buf := &bytes.Buffer{}
+	return gobCopier{
+		enc: gob.NewEncoder(buf),
+		dec: gob.NewDecoder(buf),
+	}
+}
+
+func (c *gobCopier) CopyInto(dst, src interface{}) error {
+	if err := c.enc.Encode(src); err != nil {
+		return err
+	}
+	if err := c.dec.Decode(dst); err != nil {
+		return err
+	}
+	return nil
 }
