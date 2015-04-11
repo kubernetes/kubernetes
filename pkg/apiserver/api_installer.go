@@ -110,6 +110,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		// TODO: support deeper paths
 		return fmt.Errorf("api_installer allows only one or two segment paths (resource or resource/subresource)")
 	}
+	hasSubresource := len(subresource) > 0
 
 	object := storage.New()
 	_, kind, err := a.group.Typer.ObjectVersionAndKind(object)
@@ -177,10 +178,14 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		return err
 	}
 	versionedStatus := indirectArbitraryPointer(versionedStatusPtr)
-	var getOptions runtime.Object
-	var getOptionsKind string
+	var (
+		getOptions     runtime.Object
+		getOptionsKind string
+		getSubpath     bool
+		getSubpathKey  string
+	)
 	if isGetterWithOptions {
-		getOptions = getterWithOptions.NewGetOptions()
+		getOptions, getSubpath, getSubpathKey = getterWithOptions.NewGetOptions()
 		_, getOptionsKind, err = a.group.Typer.ObjectVersionAndKind(getOptions)
 		if err != nil {
 			return err
@@ -206,21 +211,26 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	// Get the list of actions for the given scope.
 	if scope.Name() != meta.RESTScopeNameNamespace {
 		resourcePath := resource
+		resourceParams := params
 		itemPath := resourcePath + "/{name}"
-		if len(subresource) > 0 {
-			itemPath = itemPath + "/" + subresource
-			resourcePath = itemPath
-		}
 		nameParams := append(params, nameParam)
 		proxyParams := append(nameParams, pathParam)
+		if hasSubresource {
+			itemPath = itemPath + "/" + subresource
+			resourcePath = itemPath
+			resourceParams = nameParams
+		}
 		namer := rootScopeNaming{scope, a.group.Linker, gpath.Join(a.prefix, itemPath)}
 
 		// Handler for standard REST verbs (GET, PUT, POST and DELETE).
-		actions = appendIf(actions, action{"LIST", resourcePath, params, namer}, isLister)
-		actions = appendIf(actions, action{"POST", resourcePath, params, namer}, isCreater)
-		actions = appendIf(actions, action{"WATCHLIST", "watch/" + resourcePath, params, namer}, allowWatchList)
+		actions = appendIf(actions, action{"LIST", resourcePath, resourceParams, namer}, isLister)
+		actions = appendIf(actions, action{"POST", resourcePath, resourceParams, namer}, isCreater)
+		actions = appendIf(actions, action{"WATCHLIST", "watch/" + resourcePath, resourceParams, namer}, allowWatchList)
 
 		actions = appendIf(actions, action{"GET", itemPath, nameParams, namer}, isGetter)
+		if getSubpath {
+			actions = appendIf(actions, action{"GET", itemPath + "/{path:*}", proxyParams, namer}, isGetter)
+		}
 		actions = appendIf(actions, action{"PUT", itemPath, nameParams, namer}, isUpdater)
 		actions = appendIf(actions, action{"PATCH", itemPath, nameParams, namer}, isPatcher)
 		actions = appendIf(actions, action{"DELETE", itemPath, nameParams, namer}, isDeleter)
@@ -238,25 +248,26 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			namespaceParams := []*restful.Parameter{namespaceParam}
 
 			resourcePath := namespacedPath
+			resourceParams := namespaceParams
 			itemPath := namespacedPath + "/{name}"
-			if len(subresource) > 0 {
-				itemPath = itemPath + "/" + subresource
-				resourcePath = itemPath
-			}
 			nameParams := append(namespaceParams, nameParam)
 			proxyParams := append(nameParams, pathParam)
+			if hasSubresource {
+				itemPath = itemPath + "/" + subresource
+				resourcePath = itemPath
+				resourceParams = nameParams
+			}
 			namer := scopeNaming{scope, a.group.Linker, gpath.Join(a.prefix, itemPath), false}
 
-			actions = appendIf(actions, action{"LIST", resourcePath, namespaceParams, namer}, isLister)
-			// Some paths ("/pods/{name}/binding", I'm looking at you) contain an embedded '{name}')
-			if strings.Contains(resourcePath, "{name}") {
-				actions = appendIf(actions, action{"POST", resourcePath, nameParams, namer}, isCreater)
-			} else {
-				actions = appendIf(actions, action{"POST", resourcePath, namespaceParams, namer}, isCreater)
-			}
-			actions = appendIf(actions, action{"WATCHLIST", "watch/" + resourcePath, namespaceParams, namer}, allowWatchList)
+			actions = appendIf(actions, action{"LIST", resourcePath, resourceParams, namer}, isLister)
+			actions = appendIf(actions, action{"POST", resourcePath, resourceParams, namer}, isCreater)
+			// DEPRECATED
+			actions = appendIf(actions, action{"WATCHLIST", "watch/" + resourcePath, resourceParams, namer}, allowWatchList)
 
 			actions = appendIf(actions, action{"GET", itemPath, nameParams, namer}, isGetter)
+			if getSubpath {
+				actions = appendIf(actions, action{"GET", itemPath + "/{path:*}", proxyParams, namer}, isGetter)
+			}
 			actions = appendIf(actions, action{"PUT", itemPath, nameParams, namer}, isUpdater)
 			actions = appendIf(actions, action{"PATCH", itemPath, nameParams, namer}, isPatcher)
 			actions = appendIf(actions, action{"DELETE", itemPath, nameParams, namer}, isDeleter)
@@ -278,20 +289,25 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 
 			basePath := resource
 			resourcePath := basePath
+			resourceParams := namespaceParams
 			itemPath := resourcePath + "/{name}"
-			if len(subresource) > 0 {
-				itemPath = itemPath + "/" + subresource
-				resourcePath = itemPath
-			}
 			nameParams := append(namespaceParams, nameParam)
 			proxyParams := append(nameParams, pathParam)
+			if hasSubresource {
+				itemPath = itemPath + "/" + subresource
+				resourcePath = itemPath
+				resourceParams = nameParams
+			}
 			namer := legacyScopeNaming{scope, a.group.Linker, gpath.Join(a.prefix, itemPath)}
 
-			actions = appendIf(actions, action{"LIST", resourcePath, namespaceParams, namer}, isLister)
-			actions = appendIf(actions, action{"POST", resourcePath, namespaceParams, namer}, isCreater)
-			actions = appendIf(actions, action{"WATCHLIST", "watch/" + resourcePath, namespaceParams, namer}, allowWatchList)
+			actions = appendIf(actions, action{"LIST", resourcePath, resourceParams, namer}, isLister)
+			actions = appendIf(actions, action{"POST", resourcePath, resourceParams, namer}, isCreater)
+			actions = appendIf(actions, action{"WATCHLIST", "watch/" + resourcePath, resourceParams, namer}, allowWatchList)
 
 			actions = appendIf(actions, action{"GET", itemPath, nameParams, namer}, isGetter)
+			if getSubpath {
+				actions = appendIf(actions, action{"GET", itemPath + "/{path:*}", proxyParams, namer}, isGetter)
+			}
 			actions = appendIf(actions, action{"PUT", itemPath, nameParams, namer}, isUpdater)
 			actions = appendIf(actions, action{"PATCH", itemPath, nameParams, namer}, isPatcher)
 			actions = appendIf(actions, action{"DELETE", itemPath, nameParams, namer}, isDeleter)
@@ -336,7 +352,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		case "GET": // Get a resource.
 			var handler restful.RouteFunction
 			if isGetterWithOptions {
-				handler = GetResourceWithOptions(getterWithOptions, reqScope, getOptionsKind)
+				handler = GetResourceWithOptions(getterWithOptions, reqScope, getOptionsKind, getSubpath, getSubpathKey)
 			} else {
 				handler = GetResource(getter, reqScope)
 			}
