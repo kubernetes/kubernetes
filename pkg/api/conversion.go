@@ -150,5 +150,17 @@ func init() {
 			out.DNSPolicy = in.DNSPolicy
 			return nil
 		},
+		func(input *int, out **int, s conversion.Scope) error {
+			*out = input
+			return nil
+		},
+		func(input **int, out *int, s conversion.Scope) error {
+			if *input == nil {
+				*out = 1
+				return nil
+			}
+			*out = **input
+			return nil
+		},
 	)
 }

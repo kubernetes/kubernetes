@@ -246,7 +246,7 @@ func init() {
 		},
 
 		func(in *newer.ReplicationControllerSpec, out *ReplicationControllerState, s conversion.Scope) error {
-			out.Replicas = in.Replicas
+			out.Replicas = in.DesiredReplicas()
 			if err := s.Convert(&in.Selector, &out.ReplicaSelector, 0); err != nil {
 				return err
 			}
@@ -265,7 +265,7 @@ func init() {
 			return nil
 		},
 		func(in *ReplicationControllerState, out *newer.ReplicationControllerSpec, s conversion.Scope) error {
-			out.Replicas = in.Replicas
+			out.Replicas = &in.Replicas
 			if err := s.Convert(&in.ReplicaSelector, &out.Selector, 0); err != nil {
 				return err
 			}

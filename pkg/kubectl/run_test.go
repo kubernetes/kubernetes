@@ -42,7 +42,7 @@ func TestGenerate(t *testing.T) {
 					Labels: map[string]string{"run-container": "foo"},
 				},
 				Spec: api.ReplicationControllerSpec{
-					Replicas: 1,
+					Replicas: api.Intp(1),
 					Selector: map[string]string{"run-container": "foo"},
 					Template: &api.PodTemplateSpec{
 						ObjectMeta: api.ObjectMeta{
@@ -73,7 +73,7 @@ func TestGenerate(t *testing.T) {
 					Labels: map[string]string{"run-container": "foo"},
 				},
 				Spec: api.ReplicationControllerSpec{
-					Replicas: 1,
+					Replicas: api.Intp(1),
 					Selector: map[string]string{"run-container": "foo"},
 					Template: &api.PodTemplateSpec{
 						ObjectMeta: api.ObjectMeta{
@@ -109,7 +109,7 @@ func TestGenerate(t *testing.T) {
 					Labels: map[string]string{"foo": "bar", "baz": "blah"},
 				},
 				Spec: api.ReplicationControllerSpec{
-					Replicas: 1,
+					Replicas: api.Intp(1),
 					Selector: map[string]string{"foo": "bar", "baz": "blah"},
 					Template: &api.PodTemplateSpec{
 						ObjectMeta: api.ObjectMeta{

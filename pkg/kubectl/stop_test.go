@@ -29,7 +29,7 @@ import (
 func TestReplicationControllerStop(t *testing.T) {
 	fake := testclient.NewSimpleFake(&api.ReplicationController{
 		Spec: api.ReplicationControllerSpec{
-			Replicas: 0,
+			Replicas: api.Intp(0),
 		},
 	})
 	reaper := ReplicationControllerReaper{fake, time.Millisecond, time.Millisecond}

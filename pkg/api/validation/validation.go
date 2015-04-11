@@ -1003,7 +1003,7 @@ func ValidateReplicationControllerSpec(spec *api.ReplicationControllerSpec) errs
 	if selector.Empty() {
 		allErrs = append(allErrs, errs.NewFieldRequired("selector"))
 	}
-	if spec.Replicas < 0 {
+	if spec.DesiredReplicas() < 0 {
 		allErrs = append(allErrs, errs.NewFieldInvalid("replicas", spec.Replicas, isNegativeErrorMsg))
 	}
 
@@ -1014,7 +1014,7 @@ func ValidateReplicationControllerSpec(spec *api.ReplicationControllerSpec) errs
 		if !selector.Matches(labels) {
 			allErrs = append(allErrs, errs.NewFieldInvalid("template.labels", spec.Template.Labels, "selector does not match template"))
 		}
-		allErrs = append(allErrs, ValidatePodTemplateSpec(spec.Template, spec.Replicas).Prefix("template")...)
+		allErrs = append(allErrs, ValidatePodTemplateSpec(spec.Template, spec.DesiredReplicas()).Prefix("template")...)
 		// RestartPolicy has already been first-order validated as per ValidatePodTemplateSpec().
 		if spec.Template.Spec.RestartPolicy != api.RestartPolicyAlways {
 			allErrs = append(allErrs, errs.NewFieldNotSupported("template.restartPolicy", spec.Template.Spec.RestartPolicy))

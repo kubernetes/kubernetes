@@ -217,7 +217,7 @@ func ExamplePrintReplicationController() {
 			Labels: map[string]string{"foo": "bar"},
 		},
 		Spec: api.ReplicationControllerSpec{
-			Replicas: 1,
+			Replicas: api.Intp(1),
 			Selector: map[string]string{"foo": "bar"},
 			Template: &api.PodTemplateSpec{
 				ObjectMeta: api.ObjectMeta{

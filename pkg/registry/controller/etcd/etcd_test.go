@@ -159,7 +159,7 @@ func TestCreateControllerWithGeneratedName(t *testing.T) {
 			GenerateName: "rc-",
 		},
 		Spec: api.ReplicationControllerSpec{
-			Replicas: 2,
+			Replicas: api.Intp(2),
 			Selector: map[string]string{"a": "b"},
 			Template: &validPodTemplate.Spec,
 		},
@@ -341,7 +341,7 @@ func TestEtcdUpdateController(t *testing.T) {
 	resp, _ := fakeClient.Set(key, runtime.EncodeOrDie(latest.Codec, &validController), 0)
 	update := validController
 	update.ResourceVersion = strconv.FormatUint(resp.Node.ModifiedIndex, 10)
-	update.Spec.Replicas = validController.Spec.Replicas + 1
+	update.Spec.Replicas = api.Intp(validController.Spec.DesiredReplicas() + 1)
 	_, created, err := storage.Update(ctx, &update)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -351,7 +351,7 @@ func TestEtcdUpdateController(t *testing.T) {
 	}
 	ctrl, err := storage.Get(ctx, validController.Name)
 	updatedController, _ := ctrl.(*api.ReplicationController)
-	if updatedController.Spec.Replicas != validController.Spec.Replicas+1 {
+	if updatedController.Spec.DesiredReplicas() != validController.Spec.DesiredReplicas()+1 {
 		t.Errorf("Unexpected controller: %#v", ctrl)
 	}
 }
@@ -661,7 +661,7 @@ func TestCreate(t *testing.T) {
 		// valid
 		&api.ReplicationController{
 			Spec: api.ReplicationControllerSpec{
-				Replicas: 2,
+				Replicas: api.Intp(2),
 				Selector: map[string]string{"a": "b"},
 				Template: &validPodTemplate.Spec,
 			},
@@ -669,7 +669,7 @@ func TestCreate(t *testing.T) {
 		// invalid
 		&api.ReplicationController{
 			Spec: api.ReplicationControllerSpec{
-				Replicas: 2,
+				Replicas: api.Intp(2),
 				Selector: map[string]string{},
 				Template: &validPodTemplate.Spec,
 			},

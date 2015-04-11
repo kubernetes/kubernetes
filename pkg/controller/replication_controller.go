@@ -198,7 +198,7 @@ func (rm *ReplicationManager) syncReplicationController(controller api.Replicati
 	}
 	filteredList := FilterActivePods(podList.Items)
 	activePods := len(filteredList)
-	diff := activePods - controller.Spec.Replicas
+	diff := activePods - controller.Spec.DesiredReplicas()
 	if diff < 0 {
 		diff *= -1
 		wait := sync.WaitGroup{}
