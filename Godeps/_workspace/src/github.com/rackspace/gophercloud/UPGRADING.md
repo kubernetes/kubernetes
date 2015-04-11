@@ -336,3 +336,6 @@ response := keypairs.Delete(client, "keypair_id")
 ## List IP addresses
 
 This operation is not currently supported.
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/Godeps/_workspace/src/github.com/rackspace/gophercloud/UPGRADING.md?pixel)]()

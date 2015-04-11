@@ -66,3 +66,6 @@ Written by [Dario Castañé](http://dario.im).
 ## License
 
 [BSD 3-Clause](http://opensource.org/licenses/BSD-3-Clause) license, as [Go language](http://golang.org/LICENSE).
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/Godeps/_workspace/src/github.com/imdario/mergo/README.md?pixel)]()

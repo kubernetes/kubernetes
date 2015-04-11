@@ -55,3 +55,6 @@ From the root directory, run:
 ```
 ./script/acceptancetest
 ```
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/Godeps/_workspace/src/github.com/rackspace/gophercloud/acceptance/README.md?pixel)]()

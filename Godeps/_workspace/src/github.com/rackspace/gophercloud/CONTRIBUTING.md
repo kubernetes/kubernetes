@@ -273,3 +273,6 @@ and acceptance tests. Untested code will not be merged because it introduces
 too much of a risk to end-users.
 
 Happy hacking!
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/Godeps/_workspace/src/github.com/rackspace/gophercloud/CONTRIBUTING.md?pixel)]()

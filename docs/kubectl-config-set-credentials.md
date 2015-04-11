@@ -81,3 +81,6 @@ $ kubectl set-credentials cluster-admin --client-certificate=~/.kube/admin.crt -
 ### SEE ALSO
 * [kubectl-config](kubectl-config.md)
 
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/kubectl-config-set-credentials.md?pixel)]()

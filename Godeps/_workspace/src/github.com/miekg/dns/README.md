@@ -138,3 +138,6 @@ Example programs can be found in the `github.com/miekg/exdns` repository.
 * NSEC(3) cover/match/closest enclose;
 * Replies with TC bit are not parsed to the end;
 * Create IsMsg to validate a message before fully parsing it.
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/Godeps/_workspace/src/github.com/miekg/dns/README.md?pixel)]()

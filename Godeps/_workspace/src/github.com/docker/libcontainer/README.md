@@ -60,3 +60,6 @@ If you're a *contributor* or aspiring contributor, you should read the [Contribu
 
 If you're a *maintainer* or aspiring maintainer, you should read the [Maintainers' Guide](MAINTAINERS_GUIDE.md) and
 "How can I become a maintainer?" in the Contributors' Guide.
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/Godeps/_workspace/src/github.com/docker/libcontainer/README.md?pixel)]()

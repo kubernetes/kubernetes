@@ -163,3 +163,6 @@ Aqui está uma lista atual de Middleware Compatíveis com Negroni. Sinta se livr
 
 ## Sobre
 Negroni é obsessivamente desenhado por ninguém menos que  [Code Gangsta](http://codegangsta.io/)
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/Godeps/_workspace/src/github.com/codegangsta/negroni/translations/README_pt_br.md?pixel)]()

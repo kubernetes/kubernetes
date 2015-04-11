@@ -68,3 +68,6 @@ $ kubectl port-forward -p mypod 0:5000
 ### SEE ALSO
 * [kubectl](kubectl.md)
 
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/kubectl-port-forward.md?pixel)]()

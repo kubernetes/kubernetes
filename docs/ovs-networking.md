@@ -12,3 +12,6 @@ The docker bridge is replaced with a brctl generated linux bridge (kbr0) with a 
 Also, an OVS bridge is created(obr0) and added as a port to the kbr0 bridge. All OVS bridges across all nodes are linked with GRE tunnels. So, each node has an outgoing GRE tunnel to all other nodes. It does not need to be a complete mesh really, just meshier the better. STP (spanning tree) mode is enabled in the bridges to prevent loops.
 
 Routing rules enable any 10.244.0.0/16 target to become reachable via the OVS bridge connected with the tunnels.
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/ovs-networking.md?pixel)]()

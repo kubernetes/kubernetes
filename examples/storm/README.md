@@ -168,3 +168,6 @@ Make sure the ZooKeeper Pod is running (use: ```kubectl get pods```).
 Make sure the Nimbus Pod is running.
 
 ```kubectl create -f storm-worker-controller.json```
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/storm/README.md?pixel)]()

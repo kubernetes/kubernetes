@@ -54,3 +54,6 @@ kubectl config unset PROPERTY_NAME
 ### SEE ALSO
 * [kubectl-config](kubectl-config.md)
 
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/kubectl-config-unset.md?pixel)]()

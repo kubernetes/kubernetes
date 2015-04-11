@@ -29,3 +29,5 @@ Change history of swagger
 
 2013-10-15
 - upgraded to spec version 1.2 (https://github.com/wordnik/swagger-core/wiki/1.2-transition)
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/Godeps/_workspace/src/github.com/emicklei/go-restful/swagger/CHANGES.md?pixel)]()

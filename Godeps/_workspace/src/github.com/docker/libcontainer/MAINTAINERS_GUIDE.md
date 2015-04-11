@@ -97,3 +97,6 @@ Michael has final `LGTM` approval for all pull requests to `MAINTAINERS` files.
 ### How is this process changed?
 
 Just like everything else: by making a pull request :)
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/Godeps/_workspace/src/github.com/docker/libcontainer/MAINTAINERS_GUIDE.md?pixel)]()

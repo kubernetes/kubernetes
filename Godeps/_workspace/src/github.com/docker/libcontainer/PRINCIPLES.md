@@ -17,3 +17,6 @@ In the design and development of libcontainer we try to follow these principles:
 * Don't document it unless you can keep it up-to-date.
 * Don't merge it unless you test it!
 * Everyone's problem is slightly different. Focus on the part that is the same for everyone, and solve that.
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/Godeps/_workspace/src/github.com/docker/libcontainer/PRINCIPLES.md?pixel)]()

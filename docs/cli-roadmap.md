@@ -76,3 +76,6 @@ Server-side support:
 1. Field selection [#1362](https://github.com/GoogleCloudPlatform/kubernetes/issues/1362)
 1. Field filtering [#1459](https://github.com/GoogleCloudPlatform/kubernetes/issues/1459)
 1. Operate on uids
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/cli-roadmap.md?pixel)]()

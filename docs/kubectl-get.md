@@ -85,3 +85,6 @@ $ kubectl get rc/web service/frontend pods/web-pod-13je7
 ### SEE ALSO
 * [kubectl](kubectl.md)
 
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/kubectl-get.md?pixel)]()

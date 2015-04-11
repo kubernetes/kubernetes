@@ -31,3 +31,6 @@ by executing it from the git checkout. Since Jenkins is an entity
 outside this repository, it's tricky to keep documentation for it up
 to date quickly. However, the scripts themselves attempt to provide
 color for the configuration(s) that each script runs in.
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/hack/jenkins/README.md?pixel)]()

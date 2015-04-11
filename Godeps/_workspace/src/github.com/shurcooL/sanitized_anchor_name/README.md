@@ -18,3 +18,6 @@ fmt.Println(anchorName)
 // Output:
 // this-is-a-header
 ```
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/Godeps/_workspace/src/github.com/shurcooL/sanitized_anchor_name/README.md?pixel)]()

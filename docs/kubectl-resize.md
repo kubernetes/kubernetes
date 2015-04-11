@@ -68,3 +68,6 @@ $ kubectl resize --current-replicas=2 --replicas=3 replicationcontrollers foo
 ### SEE ALSO
 * [kubectl](kubectl.md)
 
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/kubectl-resize.md?pixel)]()

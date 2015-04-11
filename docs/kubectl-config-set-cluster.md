@@ -68,3 +68,6 @@ $ kubectl config set-cluster e2e --insecure-skip-tls-verify=true
 ### SEE ALSO
 * [kubectl-config](kubectl-config.md)
 
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/kubectl-config-set-cluster.md?pixel)]()

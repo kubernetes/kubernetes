@@ -16,3 +16,6 @@ Use
         &assetfs.AssetFS{Asset: Asset, AssetDir: AssetDir, Prefix: "data"}))
 
 to serve files embedded from the `data` directory.
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/Godeps/_workspace/src/github.com/elazarl/go-bindata-assetfs/README.md?pixel)]()

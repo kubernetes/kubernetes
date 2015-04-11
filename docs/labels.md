@@ -99,3 +99,6 @@ Pods (and other objects) may belong to multiple sets simultaneously, which enabl
 ## Future developments
 
 Concerning API: we may extend such filtering to DELETE operations in the future.
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/labels.md?pixel)]()

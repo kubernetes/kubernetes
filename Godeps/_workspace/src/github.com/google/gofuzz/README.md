@@ -69,3 +69,6 @@ f.Fuzz(&myObject) // Type will correspond to whether A or B info is set.
 See more examples in ```example_test.go```.
 
 Happy testing!
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/Godeps/_workspace/src/github.com/google/gofuzz/README.md?pixel)]()

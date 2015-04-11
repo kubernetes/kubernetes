@@ -27,3 +27,6 @@ Provides the abiilty to modify and test a JSON according to a
 
   `jsonpatch.Equal(doca, docb)`
 
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/Godeps/_workspace/src/github.com/evanphx/json-patch/README.md?pixel)]()

@@ -350,3 +350,6 @@ entries. It should not be a feature of the application-level logger.
 
 
 [godoc]: https://godoc.org/github.com/Sirupsen/logrus
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/Godeps/_workspace/src/github.com/Sirupsen/logrus/README.md?pixel)]()

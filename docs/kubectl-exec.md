@@ -64,3 +64,6 @@ $ kubectl exec -p 123456-7890 -c ruby-container -i -t -- bash -il
 ### SEE ALSO
 * [kubectl](kubectl.md)
 
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/kubectl-exec.md?pixel)]()

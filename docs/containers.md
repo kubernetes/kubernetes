@@ -87,3 +87,6 @@ The relationship between Docker's capabilities and [Linux capabilities](http://m
 | SETFCAP |  CAP_SETFCAP |
 | WAKE_ALARM |  CAP_WAKE_ALARM |
 | BLOCK_SUSPEND |  CAP_BLOCK_SUSPEND |
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/containers.md?pixel)]()

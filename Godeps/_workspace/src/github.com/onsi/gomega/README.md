@@ -15,3 +15,6 @@ Learn more about Ginkgo [here](http://onsi.github.io/ginkgo/)
 Gomega is MIT-Licensed
 
 The `ConsistOf` matcher uses [goraph](https://github.com/amitkgupta/goraph) which is embedded in the source to simplify distribution.  goraph has an MIT license.
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/Godeps/_workspace/src/github.com/onsi/gomega/README.md?pixel)]()

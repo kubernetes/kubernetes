@@ -113,3 +113,6 @@ Go explore!
 ## License
 
 Ginkgo is MIT-Licensed
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/Godeps/_workspace/src/github.com/onsi/ginkgo/README.md?pixel)]()

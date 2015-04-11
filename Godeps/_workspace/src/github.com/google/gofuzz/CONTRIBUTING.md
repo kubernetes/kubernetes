@@ -65,3 +65,6 @@ again.
 [well-formed commit messages]: http://tbaggery.com/2008/04/19/a-note-about-git-commit-messages.html
 [squash]: http://git-scm.com/book/en/Git-Tools-Rewriting-History#Squashing-Commits
 [pull request]: https://help.github.com/articles/creating-a-pull-request
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/Godeps/_workspace/src/github.com/google/gofuzz/CONTRIBUTING.md?pixel)]()

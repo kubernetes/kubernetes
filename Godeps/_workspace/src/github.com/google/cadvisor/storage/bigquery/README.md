@@ -27,3 +27,6 @@ To run the current version, following flags need to be specified:
 ```
 
 See [Service account Authentication](https://developers.google.com/accounts/docs/OAuth2) for Oauth related details.
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/Godeps/_workspace/src/github.com/google/cadvisor/storage/bigquery/README.md?pixel)]()

@@ -73,3 +73,6 @@ $ kubectl config view -o template --template='{{range .users}}{{ if eq .name "e2
 ### SEE ALSO
 * [kubectl-config](kubectl-config.md)
 
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/kubectl-config-view.md?pixel)]()

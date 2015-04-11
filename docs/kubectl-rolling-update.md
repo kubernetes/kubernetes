@@ -68,3 +68,6 @@ $ cat frontend-v2.json | kubectl rolling-update frontend-v1 -f -
 ### SEE ALSO
 * [kubectl](kubectl.md)
 
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/kubectl-rolling-update.md?pixel)]()

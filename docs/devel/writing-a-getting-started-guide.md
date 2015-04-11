@@ -97,3 +97,6 @@ These guidelines say *what* to do.  See the Rationale section for *why*.
    if you use another Configuration Management tool -- you just have to do some manual steps
    during testing and deployment.
       
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/devel/writing-a-getting-started-guide.md?pixel)]()

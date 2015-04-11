@@ -134,3 +134,6 @@ Take a look at [next steps](https://github.com/GoogleCloudPlatform/kubernetes/tr
 
 ### Cloud Formation [optional]
 There is a contributed [example](aws-coreos.md) from [CoreOS](http://www.coreos.com) using Cloud Formation.
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/getting-started-guides/aws.md?pixel)]()

@@ -11,3 +11,6 @@ Contributors
 | Jamie Hannaford | <jamie.hannaford@rackspace.com>
 | Don Schenck | don.schenck@rackspace.com>
 | Joe Topjian | <joe@topjian.net>
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/Godeps/_workspace/src/github.com/rackspace/gophercloud/CONTRIBUTORS.md?pixel)]()

@@ -153,3 +153,6 @@ installation.
 
 [2]: http://localhost:6060/pkg/github.com/ogier/pflag
 [3]: http://godoc.org/github.com/ogier/pflag
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/Godeps/_workspace/src/github.com/spf13/pflag/README.md?pixel)]()

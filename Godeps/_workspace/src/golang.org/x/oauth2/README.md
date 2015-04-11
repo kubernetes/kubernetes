@@ -16,3 +16,6 @@ See godoc for further documentation and examples.
 * [godoc.org/golang.org/x/oauth2/google](http://godoc.org/golang.org/x/oauth2/google)
 
 
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/Godeps/_workspace/src/golang.org/x/oauth2/README.md?pixel)]()

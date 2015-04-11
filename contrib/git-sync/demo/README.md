@@ -28,3 +28,6 @@ kubectl services create config/pod.html
 ```
 
 Open the service external ip in your browser
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/contrib/git-sync/demo/README.md?pixel)]()
