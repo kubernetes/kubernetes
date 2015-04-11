@@ -38,7 +38,7 @@ type FakeDockerClient struct {
 	ContainerMap        map[string]*docker.Container
 	Image               *docker.Image
 	Images              []docker.APIImages
-	Err                 error
+	Errors              map[string]error
 	called              []string
 	Stopped             []string
 	pulled              []string
@@ -118,17 +118,30 @@ func (f *FakeDockerClient) AssertUnorderedCalls(calls []string) (err error) {
 	return
 }
 
+func (f *FakeDockerClient) popError(op string) error {
+	if f.Errors == nil {
+		return nil
+	}
+	err, ok := f.Errors[op]
+	if ok {
+		delete(f.Errors, op)
+		return err
+	} else {
+		return nil
+	}
+}
+
 // ListContainers is a test-spy implementation of DockerInterface.ListContainers.
 // It adds an entry "list" to the internal method call record.
 func (f *FakeDockerClient) ListContainers(options docker.ListContainersOptions) ([]docker.APIContainers, error) {
 	f.Lock()
 	defer f.Unlock()
 	f.called = append(f.called, "list")
-
+	err := f.popError("list")
 	if options.All {
-		return append(f.ContainerList, f.ExitedContainerList...), f.Err
+		return append(f.ContainerList, f.ExitedContainerList...), err
 	}
-	return f.ContainerList, f.Err
+	return f.ContainerList, err
 }
 
 // InspectContainer is a test-spy implementation of DockerInterface.InspectContainer.
@@ -137,12 +150,13 @@ func (f *FakeDockerClient) InspectContainer(id string) (*docker.Container, error
 	f.Lock()
 	defer f.Unlock()
 	f.called = append(f.called, "inspect_container")
+	err := f.popError("inspect_container")
 	if f.ContainerMap != nil {
 		if container, ok := f.ContainerMap[id]; ok {
-			return container, f.Err
+			return container, err
 		}
 	}
-	return f.Container, f.Err
+	return f.Container, err
 }
 
 // InspectImage is a test-spy implementation of DockerInterface.InspectImage.
@@ -151,7 +165,8 @@ func (f *FakeDockerClient) InspectImage(name string) (*docker.Image, error) {
 	f.Lock()
 	defer f.Unlock()
 	f.called = append(f.called, "inspect_image")
-	return f.Image, f.Err
+	err := f.popError("inspect_image")
+	return f.Image, err
 }
 
 // CreateContainer is a test-spy implementation of DockerInterface.CreateContainer.
@@ -160,12 +175,16 @@ func (f *FakeDockerClient) CreateContainer(c docker.CreateContainerOptions) (*do
 	f.Lock()
 	defer f.Unlock()
 	f.called = append(f.called, "create")
-	f.Created = append(f.Created, c.Name)
-	// This is not a very good fake. We'll just add this container's name to the list.
-	// Docker likes to add a '/', so copy that behavior.
-	name := "/" + c.Name
-	f.ContainerList = append(f.ContainerList, docker.APIContainers{ID: name, Names: []string{name}, Image: c.Config.Image})
-	return &docker.Container{ID: name}, nil
+	err := f.popError("create")
+	if err == nil {
+		f.Created = append(f.Created, c.Name)
+		// This is not a very good fake. We'll just add this container's name to the list.
+		// Docker likes to add a '/', so copy that behavior.
+		name := "/" + c.Name
+		f.ContainerList = append(f.ContainerList, docker.APIContainers{ID: name, Names: []string{name}, Image: c.Config.Image})
+		return &docker.Container{ID: name}, nil
+	}
+	return nil, err
 }
 
 // StartContainer is a test-spy implementation of DockerInterface.StartContainer.
@@ -174,18 +193,22 @@ func (f *FakeDockerClient) StartContainer(id string, hostConfig *docker.HostConf
 	f.Lock()
 	defer f.Unlock()
 	f.called = append(f.called, "start")
-	f.Container = &docker.Container{
-		ID:         id,
-		Name:       id, // For testing purpose, we set name to id
-		Config:     &docker.Config{Image: "testimage"},
-		HostConfig: hostConfig,
-		State: docker.State{
-			Running: true,
-			Pid:     os.Getpid(),
-		},
-		NetworkSettings: &docker.NetworkSettings{IPAddress: "1.2.3.4"},
+	err := f.popError("start")
+	if err == nil {
+
+		f.Container = &docker.Container{
+			ID:         id,
+			Name:       id, // For testing purpose, we set name to id
+			Config:     &docker.Config{Image: "testimage"},
+			HostConfig: hostConfig,
+			State: docker.State{
+				Running: true,
+				Pid:     os.Getpid(),
+			},
+			NetworkSettings: &docker.NetworkSettings{IPAddress: "1.2.3.4"},
+		}
 	}
-	return f.Err
+	return err
 }
 
 // StopContainer is a test-spy implementation of DockerInterface.StopContainer.
@@ -194,23 +217,29 @@ func (f *FakeDockerClient) StopContainer(id string, timeout uint) error {
 	f.Lock()
 	defer f.Unlock()
 	f.called = append(f.called, "stop")
-	f.Stopped = append(f.Stopped, id)
-	var newList []docker.APIContainers
-	for _, container := range f.ContainerList {
-		if container.ID != id {
-			newList = append(newList, container)
+	err := f.popError("stop")
+	if err == nil {
+		f.Stopped = append(f.Stopped, id)
+		var newList []docker.APIContainers
+		for _, container := range f.ContainerList {
+			if container.ID != id {
+				newList = append(newList, container)
+			}
 		}
+		f.ContainerList = newList
 	}
-	f.ContainerList = newList
-	return f.Err
+	return err
 }
 
 func (f *FakeDockerClient) RemoveContainer(opts docker.RemoveContainerOptions) error {
 	f.Lock()
 	defer f.Unlock()
 	f.called = append(f.called, "remove")
-	f.Removed = append(f.Removed, opts.ID)
-	return f.Err
+	err := f.popError("remove")
+	if err == nil {
+		f.Removed = append(f.Removed, opts.ID)
+	}
+	return err
 }
 
 // Logs is a test-spy implementation of DockerInterface.Logs.
@@ -219,7 +248,7 @@ func (f *FakeDockerClient) Logs(opts docker.LogsOptions) error {
 	f.Lock()
 	defer f.Unlock()
 	f.called = append(f.called, "logs")
-	return f.Err
+	return f.popError("logs")
 }
 
 // PullImage is a test-spy implementation of DockerInterface.StopContainer.
@@ -228,12 +257,15 @@ func (f *FakeDockerClient) PullImage(opts docker.PullImageOptions, auth docker.A
 	f.Lock()
 	defer f.Unlock()
 	f.called = append(f.called, "pull")
-	registry := opts.Registry
-	if len(registry) != 0 {
-		registry = registry + "/"
+	err := f.popError("pull")
+	if err == nil {
+		registry := opts.Registry
+		if len(registry) != 0 {
+			registry = registry + "/"
+		}
+		f.pulled = append(f.pulled, fmt.Sprintf("%s%s:%s", registry, opts.Repository, opts.Tag))
 	}
-	f.pulled = append(f.pulled, fmt.Sprintf("%s%s:%s", registry, opts.Repository, opts.Tag))
-	return f.Err
+	return err
 }
 
 func (f *FakeDockerClient) Version() (*docker.Env, error) {
@@ -249,12 +281,16 @@ func (f *FakeDockerClient) StartExec(_ string, _ docker.StartExecOptions) error 
 }
 
 func (f *FakeDockerClient) ListImages(opts docker.ListImagesOptions) ([]docker.APIImages, error) {
-	return f.Images, f.Err
+	err := f.popError("list_images")
+	return f.Images, err
 }
 
 func (f *FakeDockerClient) RemoveImage(image string) error {
-	f.RemovedImages.Insert(image)
-	return f.Err
+	err := f.popError("remove_image")
+	if err == nil {
+		f.RemovedImages.Insert(image)
+	}
+	return err
 }
 
 // FakeDockerPuller is a stub implementation of DockerPuller.
