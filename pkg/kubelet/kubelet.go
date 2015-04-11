@@ -53,6 +53,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/version"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
+	docker "github.com/fsouza/go-dockerclient"
 	"github.com/golang/glog"
 	cadvisorApi "github.com/google/cadvisor/info/v1"
 )
@@ -214,6 +215,8 @@ func NewMainKubelet(
 
 	volumeManager := newVolumeManager()
 
+	oomWatcher := NewOOMWatcher(cadvisorInterface, recorder)
+
 	klet := &Kubelet{
 		hostname:                       hostname,
 		dockerClient:                   dockerClient,
@@ -243,6 +246,7 @@ func NewMainKubelet(
 		nodeStatusUpdateFrequency:      nodeStatusUpdateFrequency,
 		resourceContainer:              resourceContainer,
 		os:                             osInterface,
+		oomWatcher:                     oomWatcher,
 	}
 
 	klet.podManager = newBasicPodManager(klet.kubeClient)
@@ -388,12 +392,12 @@ type Kubelet struct {
 	//    status. Kubelet may fail to update node status reliablly if the value is too small,
 	//    as it takes time to gather all necessary node information.
 	nodeStatusUpdateFrequency time.Duration
-
 	// The name of the resource-only container to run the Kubelet in (empty for no container).
 	// Name must be absolute.
 	resourceContainer string
 
-	os kubecontainer.OSInterface
+	os         kubecontainer.OSInterface
+	oomWatcher OOMWatcher
 }
 
 // getRootDir returns the full path to the directory under which kubelet can
@@ -583,8 +587,18 @@ func (kl *Kubelet) Run(updates <-chan PodUpdate) {
 	}
 
 	go kl.syncNodeStatus()
+	// Run the system oom watcher forever.
+	go util.Until(kl.runOOMWatcher, time.Second, util.NeverStop)
 	kl.statusManager.Start()
 	kl.syncLoop(updates, kl)
+}
+
+// Watches for system OOMs.
+func (kl *Kubelet) runOOMWatcher() {
+	glog.V(5).Infof("Starting to record system OOMs")
+	if err := kl.oomWatcher.RecordSysOOMs(kl.nodeRef); err != nil {
+		glog.Errorf("failed to record system OOMs - %v", err)
+	}
 }
 
 // syncNodeStatus periodically synchronizes node status to master.
@@ -1809,6 +1823,8 @@ func (kl *Kubelet) tryUpdateNodeStatus() error {
 		}
 		oldNodeUnschedulable = node.Spec.Unschedulable
 	}
+
+	// Update the current status on the API server
 	_, err = kl.kubeClient.Nodes().UpdateStatus(node)
 	return err
 }
