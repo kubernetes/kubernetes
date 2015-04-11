@@ -302,8 +302,9 @@ func TestUpdate(t *testing.T) {
 
 	var testDoneWG sync.WaitGroup
 
-	// Make a controller that immediately deletes anything added to it, and
-	// logs anything deleted.
+	// Make a controller that deletes things once it observes an update.
+	// It calls Done() on the wait group on deletions so we can tell when
+	// everything we've added has been deleted.
 	_, controller := framework.NewInformer(
 		source,
 		&api.Pod{},
