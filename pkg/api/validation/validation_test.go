@@ -1687,7 +1687,7 @@ func TestValidateReplicationControllerUpdate(t *testing.T) {
 			update: api.ReplicationController{
 				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 				Spec: api.ReplicationControllerSpec{
-					Replicas: 3,
+					Replicas: api.Intp(3),
 					Selector: validSelector,
 					Template: &validPodTemplate.Spec,
 				},
@@ -1704,7 +1704,7 @@ func TestValidateReplicationControllerUpdate(t *testing.T) {
 			update: api.ReplicationController{
 				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 				Spec: api.ReplicationControllerSpec{
-					Replicas: 1,
+					Replicas: api.Intp(1),
 					Selector: validSelector,
 					Template: &readWriteVolumePodTemplate.Spec,
 				},
@@ -1730,7 +1730,7 @@ func TestValidateReplicationControllerUpdate(t *testing.T) {
 			update: api.ReplicationController{
 				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 				Spec: api.ReplicationControllerSpec{
-					Replicas: 2,
+					Replicas: api.Intp(2),
 					Selector: validSelector,
 					Template: &readWriteVolumePodTemplate.Spec,
 				},
@@ -1747,7 +1747,7 @@ func TestValidateReplicationControllerUpdate(t *testing.T) {
 			update: api.ReplicationController{
 				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 				Spec: api.ReplicationControllerSpec{
-					Replicas: 2,
+					Replicas: api.Intp(2),
 					Selector: invalidSelector,
 					Template: &validPodTemplate.Spec,
 				},
@@ -1764,7 +1764,7 @@ func TestValidateReplicationControllerUpdate(t *testing.T) {
 			update: api.ReplicationController{
 				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 				Spec: api.ReplicationControllerSpec{
-					Replicas: 2,
+					Replicas: api.Intp(2),
 					Selector: validSelector,
 					Template: &invalidPodTemplate.Spec,
 				},
@@ -1781,7 +1781,7 @@ func TestValidateReplicationControllerUpdate(t *testing.T) {
 			update: api.ReplicationController{
 				ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 				Spec: api.ReplicationControllerSpec{
-					Replicas: -1,
+					Replicas: api.Intp(-1),
 					Selector: validSelector,
 					Template: &validPodTemplate.Spec,
 				},
@@ -1853,7 +1853,7 @@ func TestValidateReplicationController(t *testing.T) {
 		{
 			ObjectMeta: api.ObjectMeta{Name: "abc-123", Namespace: api.NamespaceDefault},
 			Spec: api.ReplicationControllerSpec{
-				Replicas: 1,
+				Replicas: api.Intp(1),
 				Selector: validSelector,
 				Template: &readWriteVolumePodTemplate.Spec,
 			},
@@ -1902,7 +1902,7 @@ func TestValidateReplicationController(t *testing.T) {
 		"read-write persistent disk with > 1 pod": {
 			ObjectMeta: api.ObjectMeta{Name: "abc"},
 			Spec: api.ReplicationControllerSpec{
-				Replicas: 2,
+				Replicas: api.Intp(2),
 				Selector: validSelector,
 				Template: &readWriteVolumePodTemplate.Spec,
 			},
@@ -1910,7 +1910,7 @@ func TestValidateReplicationController(t *testing.T) {
 		"negative_replicas": {
 			ObjectMeta: api.ObjectMeta{Name: "abc", Namespace: api.NamespaceDefault},
 			Spec: api.ReplicationControllerSpec{
-				Replicas: -1,
+				Replicas: api.Intp(-1),
 				Selector: validSelector,
 			},
 		},

@@ -131,8 +131,8 @@ func RunRollingUpdate(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, arg
 			filename, oldName)
 	}
 	// TODO: handle resizes during rolling update
-	if newRc.Spec.Replicas == 0 {
-		newRc.Spec.Replicas = oldRc.Spec.Replicas
+	if newRc.Spec.DesiredReplicas() == 0 {
+		newRc.Spec.Replicas = api.Intp(oldRc.Spec.DesiredReplicas())
 	}
 	err = updater.Update(out, oldRc, newRc, period, interval, timeout)
 	if err != nil {

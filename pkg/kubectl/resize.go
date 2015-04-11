@@ -70,8 +70,8 @@ func (c ControllerResizeError) Error() string {
 
 // Validate ensures that the preconditions match.  Returns nil if they are valid, an error otherwise
 func (precondition *ResizePrecondition) Validate(controller *api.ReplicationController) error {
-	if precondition.Size != -1 && controller.Spec.Replicas != precondition.Size {
-		return PreconditionError{"replicas", strconv.Itoa(precondition.Size), strconv.Itoa(controller.Spec.Replicas)}
+	if precondition.Size != -1 && controller.Spec.DesiredReplicas() != precondition.Size {
+		return PreconditionError{"replicas", strconv.Itoa(precondition.Size), strconv.Itoa(controller.Spec.DesiredReplicas())}
 	}
 	if precondition.ResourceVersion != "" && controller.ResourceVersion != precondition.ResourceVersion {
 		return PreconditionError{"resource version", precondition.ResourceVersion, controller.ResourceVersion}
@@ -132,7 +132,7 @@ func (resizer *ReplicationControllerResizer) ResizeSimple(namespace, name string
 			return "", err
 		}
 	}
-	controller.Spec.Replicas = int(newSize)
+	controller.Spec.Replicas = api.Intp(int(newSize))
 	// TODO: do retry on 409 errors here?
 	if _, err := rc.Update(controller); err != nil {
 		return "", ControllerResizeError{ControllerResizeUpdateFailure, controller.ResourceVersion, err}

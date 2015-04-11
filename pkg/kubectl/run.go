@@ -56,7 +56,7 @@ func (BasicReplicationController) Generate(params map[string]string) (runtime.Ob
 			Labels: labels,
 		},
 		Spec: api.ReplicationControllerSpec{
-			Replicas: count,
+			Replicas: api.Intp(count),
 			Selector: labels,
 			Template: &api.PodTemplateSpec{
 				ObjectMeta: api.ObjectMeta{

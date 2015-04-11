@@ -373,7 +373,7 @@ func printReplicationController(controller *api.ReplicationController, w io.Writ
 		firstContainer.Name,
 		firstContainer.Image,
 		formatLabels(controller.Spec.Selector),
-		controller.Spec.Replicas)
+		controller.Spec.DesiredReplicas())
 	if err != nil {
 		return err
 	}

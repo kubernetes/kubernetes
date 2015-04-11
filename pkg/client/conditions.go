@@ -29,6 +29,6 @@ func ControllerHasDesiredReplicas(c Interface, controller *api.ReplicationContro
 		if err != nil {
 			return false, err
 		}
-		return ctrl.Status.Replicas == ctrl.Spec.Replicas, nil
+		return ctrl.Status.Replicas == ctrl.Spec.DesiredReplicas(), nil
 	}
 }

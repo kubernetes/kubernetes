@@ -267,7 +267,7 @@ func TestEtcdUpdateController(t *testing.T) {
 	_, err := registry.UpdateController(ctx, &api.ReplicationController{
 		ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: strconv.FormatUint(resp.Node.ModifiedIndex, 10)},
 		Spec: api.ReplicationControllerSpec{
-			Replicas: 2,
+			Replicas: api.Intp(2),
 		},
 	})
 	if err != nil {
@@ -275,7 +275,7 @@ func TestEtcdUpdateController(t *testing.T) {
 	}
 
 	ctrl, err := registry.GetController(ctx, "foo")
-	if ctrl.Spec.Replicas != 2 {
+	if ctrl.Spec.DesiredReplicas() != 2 {
 		t.Errorf("Unexpected controller: %#v", ctrl)
 	}
 }

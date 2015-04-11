@@ -855,7 +855,8 @@ type PodTemplateList struct {
 // a TemplateRef or a Template set.
 type ReplicationControllerSpec struct {
 	// Replicas is the number of desired replicas.
-	Replicas int `json:"replicas"`
+	// A nil Replicas is the default value 1.
+	Replicas *int `json:"replicas"`
 
 	// Selector is a label query over pods that should match the Replicas count.
 	Selector map[string]string `json:"selector"`
@@ -870,6 +871,13 @@ type ReplicationControllerSpec struct {
 	// TemplateRef.
 	// Must be set before converting to a v1beta1 or v1beta2 API object.
 	Template *PodTemplateSpec `json:"template,omitempty"`
+}
+
+func (rcSpec ReplicationControllerSpec) DesiredReplicas() int {
+	if rcSpec.Replicas != nil {
+		return *rcSpec.Replicas
+	}
+	return 1
 }
 
 // ReplicationControllerStatus represents the current status of a replication
@@ -1785,4 +1793,8 @@ func AddToNodeAddresses(addresses *[]NodeAddress, addAddresses ...NodeAddress) {
 			*addresses = append(*addresses, add)
 		}
 	}
+}
+
+func Intp(i int) *int {
+	return &i
 }

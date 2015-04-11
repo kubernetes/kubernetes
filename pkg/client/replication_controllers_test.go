@@ -50,7 +50,7 @@ func TestListControllers(t *testing.T) {
 							},
 						},
 						Spec: api.ReplicationControllerSpec{
-							Replicas: 2,
+							Replicas: api.Intp(2),
 							Template: &api.PodTemplateSpec{},
 						},
 					},
@@ -78,7 +78,7 @@ func TestGetController(t *testing.T) {
 					},
 				},
 				Spec: api.ReplicationControllerSpec{
-					Replicas: 2,
+					Replicas: api.Intp(2),
 					Template: &api.PodTemplateSpec{},
 				},
 			},
@@ -117,7 +117,7 @@ func TestUpdateController(t *testing.T) {
 					},
 				},
 				Spec: api.ReplicationControllerSpec{
-					Replicas: 2,
+					Replicas: api.Intp(2),
 					Template: &api.PodTemplateSpec{},
 				},
 			},
@@ -155,7 +155,7 @@ func TestCreateController(t *testing.T) {
 					},
 				},
 				Spec: api.ReplicationControllerSpec{
-					Replicas: 2,
+					Replicas: api.Intp(2),
 					Template: &api.PodTemplateSpec{},
 				},
 			},

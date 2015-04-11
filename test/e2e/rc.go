@@ -72,7 +72,7 @@ func ServeImageOrFail(c *client.Client, test string, image string) {
 			Name: name,
 		},
 		Spec: api.ReplicationControllerSpec{
-			Replicas: replicas,
+			Replicas: api.Intp(replicas),
 			Selector: map[string]string{
 				"name": name,
 			},

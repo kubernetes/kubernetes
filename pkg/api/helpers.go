@@ -71,6 +71,16 @@ var Semantic = conversion.EqualitiesOrDie(
 	func(a, b fields.Selector) bool {
 		return a.String() == b.String()
 	},
+	// HACK: for default value intp value of json.
+	func(a, b *int) bool {
+		if a == nil {
+			return b == nil || *b == 1
+		}
+		if b == nil {
+			return a == nil || *a == 1
+		}
+		return *a == *b
+	},
 )
 
 var standardResources = util.NewStringSet(

@@ -67,10 +67,10 @@ func (r *RollingUpdater) Update(out io.Writer, oldRc, newRc *api.ReplicationCont
 	newName := newRc.ObjectMeta.Name
 	retry := &RetryParams{interval, timeout}
 	waitForReplicas := &RetryParams{interval, timeout}
-	if newRc.Spec.Replicas <= 0 {
+	if newRc.Spec.DesiredReplicas() <= 0 {
 		return fmt.Errorf("Invalid controller spec for %s; required: > 0 replicas, actual: %s\n", newName, newRc.Spec)
 	}
-	desired := newRc.Spec.Replicas
+	desired := newRc.Spec.DesiredReplicas()
 	sourceId := fmt.Sprintf("%s:%s", oldName, oldRc.ObjectMeta.UID)
 
 	// look for existing newRc, incase this update was previously started but interrupted
@@ -94,7 +94,7 @@ func (r *RollingUpdater) Update(out io.Writer, oldRc, newRc *api.ReplicationCont
 		}
 		newRc.ObjectMeta.Annotations[desiredReplicasAnnotation] = fmt.Sprintf("%d", desired)
 		newRc.ObjectMeta.Annotations[sourceIdAnnotation] = sourceId
-		newRc.Spec.Replicas = 0
+		*newRc.Spec.Replicas = 0
 		newRc, err = r.c.ReplicationControllers(r.ns).Create(newRc)
 		if err != nil {
 			return err
@@ -102,15 +102,15 @@ func (r *RollingUpdater) Update(out io.Writer, oldRc, newRc *api.ReplicationCont
 	}
 
 	// +1, -1 on oldRc, newRc until newRc has desired number of replicas or oldRc has 0 replicas
-	for newRc.Spec.Replicas < desired && oldRc.Spec.Replicas != 0 {
-		newRc.Spec.Replicas += 1
-		oldRc.Spec.Replicas -= 1
+	for newRc.Spec.DesiredReplicas() < desired && oldRc.Spec.DesiredReplicas() != 0 {
+		newRc.Spec.Replicas = api.Intp(newRc.Spec.DesiredReplicas() + 1)
+		oldRc.Spec.Replicas = api.Intp(oldRc.Spec.DesiredReplicas() - 1)
 		fmt.Printf("At beginning of loop: %s replicas: %d, %s replicas: %d\n",
-			oldName, oldRc.Spec.Replicas,
-			newName, newRc.Spec.Replicas)
+			oldName, oldRc.Spec.DesiredReplicas(),
+			newName, newRc.Spec.DesiredReplicas())
 		fmt.Fprintf(out, "Updating %s replicas: %d, %s replicas: %d\n",
-			oldName, oldRc.Spec.Replicas,
-			newName, newRc.Spec.Replicas)
+			oldName, oldRc.Spec.DesiredReplicas(),
+			newName, newRc.Spec.DesiredReplicas())
 
 		newRc, err = r.resizeAndWait(newRc, retry, waitForReplicas)
 		if err != nil {
@@ -122,14 +122,14 @@ func (r *RollingUpdater) Update(out io.Writer, oldRc, newRc *api.ReplicationCont
 			return err
 		}
 		fmt.Printf("At end of loop: %s replicas: %d, %s replicas: %d\n",
-			oldName, oldRc.Spec.Replicas,
-			newName, newRc.Spec.Replicas)
+			oldName, oldRc.Spec.DesiredReplicas(),
+			newName, newRc.Spec.DesiredReplicas())
 	}
 	// delete remaining replicas on oldRc
-	if oldRc.Spec.Replicas != 0 {
+	if oldRc.Spec.DesiredReplicas() != 0 {
 		fmt.Fprintf(out, "Stopping %s replicas: %d -> %d\n",
-			oldName, oldRc.Spec.Replicas, 0)
-		oldRc.Spec.Replicas = 0
+			oldName, oldRc.Spec.DesiredReplicas(), 0)
+		oldRc.Spec.Replicas = api.Intp(0)
 		oldRc, err = r.resizeAndWait(oldRc, retry, waitForReplicas)
 		// oldRc, err = r.resizeAndWait(oldRc, interval, timeout)
 		if err != nil {
@@ -137,10 +137,10 @@ func (r *RollingUpdater) Update(out io.Writer, oldRc, newRc *api.ReplicationCont
 		}
 	}
 	// add remaining replicas on newRc
-	if newRc.Spec.Replicas != desired {
+	if newRc.Spec.DesiredReplicas() != desired {
 		fmt.Fprintf(out, "Resizing %s replicas: %d -> %d\n",
-			newName, newRc.Spec.Replicas, desired)
-		newRc.Spec.Replicas = desired
+			newName, newRc.Spec.DesiredReplicas(), desired)
+		newRc.Spec.Replicas = api.Intp(desired)
 		newRc, err = r.resizeAndWait(newRc, retry, waitForReplicas)
 		if err != nil {
 			return err
@@ -181,7 +181,7 @@ func (r *RollingUpdater) resizeAndWait(rc *api.ReplicationController, retry *Ret
 	if err != nil {
 		return nil, err
 	}
-	if err := resizer.Resize(rc.Namespace, rc.Name, uint(rc.Spec.Replicas), &ResizePrecondition{-1, ""}, retry, wait); err != nil {
+	if err := resizer.Resize(rc.Namespace, rc.Name, uint(rc.Spec.DesiredReplicas()), &ResizePrecondition{-1, ""}, retry, wait); err != nil {
 		return nil, err
 	}
 	return r.c.ReplicationControllers(r.ns).Get(rc.ObjectMeta.Name)

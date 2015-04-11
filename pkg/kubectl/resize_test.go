@@ -79,7 +79,7 @@ func TestReplicationControllerResize(t *testing.T) {
 	if fake.Actions[0].Action != "get-replicationController" || fake.Actions[0].Value != name {
 		t.Errorf("unexpected action: %v, expected get-replicationController %s", fake.Actions[0], name)
 	}
-	if fake.Actions[1].Action != "update-replicationController" || fake.Actions[1].Value.(*api.ReplicationController).Spec.Replicas != int(count) {
+	if fake.Actions[1].Action != "update-replicationController" || fake.Actions[1].Value.(*api.ReplicationController).Spec.DesiredReplicas() != int(count) {
 		t.Errorf("unexpected action %v, expected update-replicationController with replicas = %d", fake.Actions[1], count)
 	}
 }
@@ -87,7 +87,7 @@ func TestReplicationControllerResize(t *testing.T) {
 func TestReplicationControllerResizeFailsPreconditions(t *testing.T) {
 	fake := testclient.NewSimpleFake(&api.ReplicationController{
 		Spec: api.ReplicationControllerSpec{
-			Replicas: 10,
+			Replicas: api.Intp(10),
 		},
 	})
 	resizer := ReplicationControllerResizer{fake}
@@ -123,7 +123,7 @@ func TestPreconditionValidate(t *testing.T) {
 					ResourceVersion: "foo",
 				},
 				Spec: api.ReplicationControllerSpec{
-					Replicas: 10,
+					Replicas: api.Intp(10),
 				},
 			},
 			expectError: false,
@@ -136,7 +136,7 @@ func TestPreconditionValidate(t *testing.T) {
 					ResourceVersion: "foo",
 				},
 				Spec: api.ReplicationControllerSpec{
-					Replicas: 0,
+					Replicas: api.Intp(0),
 				},
 			},
 			expectError: false,
@@ -149,7 +149,7 @@ func TestPreconditionValidate(t *testing.T) {
 					ResourceVersion: "foo",
 				},
 				Spec: api.ReplicationControllerSpec{
-					Replicas: 10,
+					Replicas: api.Intp(10),
 				},
 			},
 			expectError: false,
@@ -162,7 +162,7 @@ func TestPreconditionValidate(t *testing.T) {
 					ResourceVersion: "foo",
 				},
 				Spec: api.ReplicationControllerSpec{
-					Replicas: 10,
+					Replicas: api.Intp(10),
 				},
 			},
 			expectError: false,
@@ -175,7 +175,7 @@ func TestPreconditionValidate(t *testing.T) {
 					ResourceVersion: "foo",
 				},
 				Spec: api.ReplicationControllerSpec{
-					Replicas: 20,
+					Replicas: api.Intp(20),
 				},
 			},
 			expectError: true,
@@ -188,7 +188,7 @@ func TestPreconditionValidate(t *testing.T) {
 					ResourceVersion: "bar",
 				},
 				Spec: api.ReplicationControllerSpec{
-					Replicas: 10,
+					Replicas: api.Intp(10),
 				},
 			},
 			expectError: true,
@@ -201,7 +201,7 @@ func TestPreconditionValidate(t *testing.T) {
 					ResourceVersion: "bar",
 				},
 				Spec: api.ReplicationControllerSpec{
-					Replicas: 20,
+					Replicas: api.Intp(20),
 				},
 			},
 			expectError: true,

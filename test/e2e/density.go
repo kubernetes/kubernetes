@@ -41,7 +41,7 @@ func DeleteRC(c *client.Client, ns, name string) error {
 		return fmt.Errorf("Failed to find replication controller %s in namespace %s: %v", name, ns, err)
 	}
 
-	rc.Spec.Replicas = 0
+	rc.Spec.Replicas = api.Intp(0)
 
 	if _, err := c.ReplicationControllers(ns).Update(rc); err != nil {
 		return fmt.Errorf("Failed to resize replication controller %s to zero: %v", name, err)
@@ -79,7 +79,7 @@ func RunRC(c *client.Client, name string, ns, image string, replicas int) {
 			Name: name,
 		},
 		Spec: api.ReplicationControllerSpec{
-			Replicas: replicas,
+			Replicas: api.Intp(replicas),
 			Selector: map[string]string{
 				"name": name,
 			},
@@ -203,7 +203,7 @@ var _ = Describe("Density", func() {
 		// isn't 0.  This means the controller wasn't cleaned up
 		// during the test so clean it up here
 		rc, err := c.ReplicationControllers(ns).Get(RCName)
-		if err == nil && rc.Spec.Replicas != 0 {
+		if err == nil && rc.Spec.DesiredReplicas() != 0 {
 			DeleteRC(c, ns, RCName)
 		}
 	})

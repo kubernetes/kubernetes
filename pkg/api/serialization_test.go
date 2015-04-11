@@ -18,10 +18,10 @@ package api_test
 
 import (
 	"encoding/json"
+	"testing"
 
 	"math/rand"
 	"reflect"
-	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"

@@ -79,7 +79,7 @@ func testData() (*api.PodList, *api.ServiceList, *api.ReplicationControllerList)
 			{
 				ObjectMeta: api.ObjectMeta{Name: "rc1", Namespace: "test", ResourceVersion: "18"},
 				Spec: api.ReplicationControllerSpec{
-					Replicas: 1,
+					Replicas: api.Intp(1),
 				},
 			},
 		},

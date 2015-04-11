@@ -58,7 +58,7 @@ func newReplicationController(replicas int) api.ReplicationController {
 		TypeMeta:   api.TypeMeta{APIVersion: testapi.Version()},
 		ObjectMeta: api.ObjectMeta{Name: "foobar", Namespace: api.NamespaceDefault, ResourceVersion: "18"},
 		Spec: api.ReplicationControllerSpec{
-			Replicas: replicas,
+			Replicas: &replicas,
 			Template: &api.PodTemplateSpec{
 				ObjectMeta: api.ObjectMeta{
 					Labels: map[string]string{

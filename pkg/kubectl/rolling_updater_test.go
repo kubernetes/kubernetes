@@ -88,7 +88,7 @@ func oldRc(replicas int) *api.ReplicationController {
 			UID:  "7764ae47-9092-11e4-8393-42010af018ff",
 		},
 		Spec: api.ReplicationControllerSpec{
-			Replicas: replicas,
+			Replicas: api.Intp(replicas),
 			Selector: map[string]string{"version": "v1"},
 			Template: &api.PodTemplateSpec{
 				ObjectMeta: api.ObjectMeta{
