@@ -79,6 +79,9 @@ func tryConnect(service ServicePortName, srcAddr net.Addr, protocol string, prox
 		// and keep accepting inbound traffic.
 		outConn, err := net.DialTimeout(protocol, endpoint, retryTimeout*time.Second)
 		if err != nil {
+			if isTooManyFDsError(err) {
+				panic("Dial failed: " + err.Error())
+			}
 			glog.Errorf("Dial failed: %v", err)
 			continue
 		}
@@ -100,6 +103,9 @@ func (tcp *tcpProxySocket) ProxyLoop(service ServicePortName, myInfo *serviceInf
 			if info, exists := proxier.getServiceInfo(service); !exists || info != myInfo {
 				// Then the service port was just closed so the accept failure is to be expected.
 				break
+			}
+			if isTooManyFDsError(err) {
+				panic("Accept failed: " + err.Error())
 			}
 			glog.Errorf("Accept failed: %v", err)
 			continue
@@ -790,4 +796,8 @@ func (proxier *Proxier) iptablesHostPortalArgs(destIP net.IP, destPort int, prot
 	// TODO: Can we DNAT with IPv6?
 	args = append(args, "-j", "DNAT", "--to-destination", net.JoinHostPort(proxyIP.String(), strconv.Itoa(proxyPort)))
 	return args
+}
+
+func isTooManyFDsError(err error) bool {
+	return strings.Contains(err.Error(), "too many open files")
 }
