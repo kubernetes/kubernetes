@@ -19,17 +19,8 @@ package kubelet
 import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/capabilities"
 	cadvisorApi "github.com/google/cadvisor/info/v1"
 )
-
-// TODO: move this into pkg/capabilities
-func SetupCapabilities(allowPrivileged bool, hostNetworkSources []string) {
-	capabilities.Initialize(capabilities.Capabilities{
-		AllowPrivileged:    allowPrivileged,
-		HostNetworkSources: hostNetworkSources,
-	})
-}
 
 func CapacityFromMachineInfo(info *cadvisorApi.MachineInfo) api.ResourceList {
 	c := api.ResourceList{
