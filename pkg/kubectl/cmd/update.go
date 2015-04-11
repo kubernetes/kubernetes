@@ -114,7 +114,6 @@ func RunUpdate(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []str
 		fmt.Fprintf(out, "%s/%s\n", info.Mapping.Resource, info.Name)
 		return nil
 	})
-
 }
 
 func updateWithPatch(cmd *cobra.Command, args []string, f *cmdutil.Factory, patch string) (string, error) {
