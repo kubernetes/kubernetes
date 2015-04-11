@@ -18,7 +18,7 @@
   {% set cloud_config = "--cloud_config=/etc/aws.conf" -%}
 {% endif -%}
 
-{% endif -%}
+{% endif -%} # grains.cloud is defined
 
 {% set address = "--address=127.0.0.1" -%}
 
@@ -45,6 +45,7 @@
 
 {% if grains.cloud is defined -%}
 {% if grains.cloud in [ 'aws', 'gce', 'vagrant' ] -%}
+    # TODO: generate and distribute tokens for other cloud providers.
     {% set token_auth_file = "--token_auth_file=/srv/kubernetes/known_tokens.csv" -%}
 {% endif -%}
 {% endif -%}
@@ -59,56 +60,4 @@
  {% set runtime_config = "--runtime_config=" + grains.runtime_config -%}
 {% endif -%}
 
-{
-"apiVersion": "v1beta3",
-"kind": "Pod",
-"metadata": {"name":"kube-apiserver"},
-"spec":{
-"hostNetwork": true,
-"containers":[
-    {
-    "name": "kube-apiserver",
-    "image": "gcr.io/google_containers/kube-apiserver:{{pillar['kube-apiserver_docker_tag']}}",
-    "command": [
-                 "/kube-apiserver",
-                 "{{address}}",
-                 "{{etcd_servers}}",
-                 "{{ cloud_provider }}",
-                 "{{ cloud_config }}",
-                 "{{ runtime_config }}",
-                 "{{admission_control}}",
-                 "--allow_privileged={{pillar['allow_privileged']}}",
-                 "{{portal_net}}",
-                 "{{cluster_name}}",
-                 "{{cert_file}}",
-                 "{{key_file}}",
-                 "{{secure_port}}",
-                 "{{token_auth_file}}",
-                 "{{publicAddressOverride}}",
-                 "{{pillar['log_level']}}"
-               ],
-    "ports":[
-      { "name": "https",
-        "containerPort": 6443,
-        "hostPort": 6443},{
-       "name": "http",
-        "containerPort": 7080,
-        "hostPort": 7080},{
-       "name": "local",
-        "containerPort": 8080,
-        "hostPort": 8080}
-        ],
-    "volumeMounts": [
-      { "name": "srv-kubernetes",
-        "mountPath": "/srv/kubernetes",
-        "readOnly": true}
-        ]
-       }
-],
-"volumes":[
-  { "name": "srv-kubernetes",
-    "hostPath": {
-        "path": "/srv/kubernetes"}
-  }
-]
-}}
+DAEMON_ARGS="{{daemon_args}} {{address}} {{etcd_servers}} {{ cloud_provider }} {{ cloud_config }} {{ runtime_config }} {{admission_control}} --allow_privileged={{pillar['allow_privileged']}} {{portal_net}}  {{cluster_name}} {{cert_file}} {{key_file}} {{secure_port}} {{token_auth_file}} {{publicAddressOverride}} {{pillar['log_level']}}"
