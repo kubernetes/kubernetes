@@ -1634,6 +1634,7 @@ func (kl *Kubelet) syncLoop(updates <-chan PodUpdate, handler SyncHandler) {
 		select {
 		case u, ok := <-updates:
 			if !ok {
+				glog.Errorf("Update channel is closed. Exiting the sync loop.")
 				return
 			}
 			kl.podManager.UpdatePods(u, podSyncTypes)
