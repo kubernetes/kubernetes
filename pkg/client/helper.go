@@ -75,8 +75,14 @@ type Config struct {
 	UserAgent string
 
 	// Transport may be used for custom HTTP behavior. This attribute may not
-	// be specified with the TLS client certificate options.
+	// be specified with the TLS client certificate options. Use WrapTransport
+	// for most client level operations.
 	Transport http.RoundTripper
+	// WrapTransport will be invoked for custom HTTP behavior after the underlying
+	// transport is initialized (either the transport created from TLSClientConfig,
+	// Transport, or http.DefaultTransport). The config may layer other RoundTrippers
+	// on top of the returned RoundTripper.
+	WrapTransport func(rt http.RoundTripper) http.RoundTripper
 
 	// QPS indicates the maximum QPS to the master from this client.  If zero, QPS is unlimited.
 	QPS float32
@@ -254,6 +260,9 @@ func TransportFor(config *Config) (http.RoundTripper, error) {
 		} else {
 			transport = http.DefaultTransport
 		}
+	}
+	if config.WrapTransport != nil {
+		transport = config.WrapTransport(transport)
 	}
 
 	transport, err = HTTPWrappersForConfig(config, transport)
