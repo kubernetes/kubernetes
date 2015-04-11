@@ -20,10 +20,11 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/spf13/cobra"
+
 	cmdutil "github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/cmd/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/resource"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	"github.com/spf13/cobra"
 )
 
 const (
@@ -123,9 +124,18 @@ func updateWithPatch(cmd *cobra.Command, args []string, f *cmdutil.Factory, patc
 		return "", err
 	}
 
-	mapper, _ := f.Object()
-	// TODO: use resource.Builder instead
-	mapping, namespace, name, err := cmdutil.ResourceFromArgs(cmd, args, mapper, cmdNamespace)
+	mapper, typer := f.Object()
+	r := resource.NewBuilder(mapper, typer, f.ClientMapperForCommand()).
+		ContinueOnError().
+		NamespaceParam(cmdNamespace).DefaultNamespace().
+		ResourceTypeOrNameArgs(false, args...).
+		Flatten().
+		Do()
+	err = r.Err()
+	if err != nil {
+		return "", err
+	}
+	mapping, err := r.ResourceMapping()
 	if err != nil {
 		return "", err
 	}
@@ -133,6 +143,12 @@ func updateWithPatch(cmd *cobra.Command, args []string, f *cmdutil.Factory, patc
 	if err != nil {
 		return "", err
 	}
+
+	infos, err := r.Infos()
+	if err != nil {
+		return "", err
+	}
+	name, namespace := infos[0].Name, infos[0].Namespace
 
 	helper := resource.NewHelper(client, mapping)
 	obj, err := helper.Get(namespace, name)
