@@ -17,6 +17,7 @@ limitations under the License.
 package cloudprovider
 
 import (
+	"errors"
 	"net"
 	"strings"
 
@@ -85,6 +86,8 @@ type Instances interface {
 	// Delete all the configuration related to the instance, including other cloud resources
 	Release(name string) error
 }
+
+var InstanceNotFound = errors.New("instance not found")
 
 // Zone represents the location of a particular machine.
 type Zone struct {

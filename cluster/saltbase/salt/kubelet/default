@@ -22,6 +22,15 @@
   {% set api_servers_with_port = api_servers + ":6443" -%}
 {% endif -%}
 
+# Disable registration for the kubelet running on the master on GCE.
+# TODO(roberthbailey): Make this configurable via an env var in config-default.sh
+{% if grains.cloud == 'gce' -%}
+  {% if grains['roles'][0] == 'kubernetes-master' -%}
+    {% set api_servers_with_port = "" -%}
+  {% endif -%}
+{% endif -%}
+
+
 {% set config = "--config=/etc/kubernetes/manifests" -%}
 {% set hostname_override = "" -%}
 {% if grains.hostname_override is defined -%}
