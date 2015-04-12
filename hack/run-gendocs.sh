@@ -22,7 +22,7 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
 kube::golang::setup_env
-"${KUBE_ROOT}/hack/build-go.sh" cmd/gendocs cmd/genman
+"${KUBE_ROOT}/hack/build-go.sh" cmd/gendocs cmd/genman cmd/genbashcomp
 
 # Get the absolute path of the directory component of a file, i.e. the
 # absolute path of the dirname of $1.
@@ -67,28 +67,35 @@ case "$(uname -m)" in
 esac
 
 # Find binary
-doc_locations=(
+locations=(
   "${KUBE_ROOT}/_output/dockerized/bin/${host_os}/${host_arch}/gendocs"
   "${KUBE_ROOT}/_output/local/bin/${host_os}/${host_arch}/gendocs"
   "${KUBE_ROOT}/platforms/${host_os}/${host_arch}/gendocs"
 )
-gendocs=$( (ls -t "${doc_locations[@]}" 2>/dev/null || true) | head -1 )
-man_locations=(
+gendocs=$( (ls -t "${locations[@]}" 2>/dev/null || true) | head -1 )
+locations=(
   "${KUBE_ROOT}/_output/dockerized/bin/${host_os}/${host_arch}/genman"
   "${KUBE_ROOT}/_output/local/bin/${host_os}/${host_arch}/genman"
   "${KUBE_ROOT}/platforms/${host_os}/${host_arch}/genman"
 )
-genman=$( (ls -t "${man_locations[@]}" 2>/dev/null || true) | head -1 )
+genman=$( (ls -t "${locations[@]}" 2>/dev/null || true) | head -1 )
+locations=(
+  "${KUBE_ROOT}/_output/dockerized/bin/${host_os}/${host_arch}/genbashcomp"
+  "${KUBE_ROOT}/_output/local/bin/${host_os}/${host_arch}/genbashcomp"
+  "${KUBE_ROOT}/platforms/${host_os}/${host_arch}/genbashcomp"
+)
+genbashcomp=$( (ls -t "${locations[@]}" 2>/dev/null || true) | head -1 )
 
-if [[ ! -x "$gendocs" || ! -x "$genman" ]]; then
+if [[ ! -x "$gendocs" || ! -x "$genman" || ! -x "$genbashcomp" ]]; then
   {
-    echo "It looks as if you don't have a compiled gendocs or genman binary"
+    echo "It looks as if you don't have a compiled gendocs, genman, or genbashcomp binary"
     echo
     echo "If you are running from a clone of the git repo, please run"
-    echo "'./hack/build-go.sh cmd/gendocs cmd/genman'."
+    echo "'./hack/build-go.sh cmd/gendocs cmd/genman cmd/genbashcomp'."
   } >&2
   exit 1
 fi
 
 ${gendocs} "${KUBE_ROOT}/docs/"
 ${genman} "${KUBE_ROOT}/docs/man/man1/"
+${genbashcomp} "${KUBE_ROOT}/contrib/completions/bash/"
