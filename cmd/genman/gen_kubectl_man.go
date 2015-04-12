@@ -21,9 +21,9 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"path/filepath"
 	"strings"
 
+	"github.com/GoogleCloudPlatform/kubernetes/cmd/genutils"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/cmd"
 	cmdutil "github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/cmd/util"
 	"github.com/cpuguy83/go-md2man/mangen"
@@ -34,40 +34,28 @@ import (
 
 func main() {
 	// use os.Args instead of "flags" because "flags" will mess up the man pages!
-	docsDir := "docs/man/man1/"
+	path := "docs/man/man1"
 	if len(os.Args) == 2 {
-		docsDir = os.Args[1]
+		path = os.Args[1]
 	} else if len(os.Args) > 2 {
 		fmt.Fprintf(os.Stderr, "usage: %s [output directory]\n", os.Args[0])
 		os.Exit(1)
 	}
 
-	docsDir, err := filepath.Abs(docsDir)
+	outDir, err := genutils.OutDir(path)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, err.Error())
+		fmt.Fprintf(os.Stderr, "failed to get output directory: %v\n", err)
 		os.Exit(1)
 	}
-
-	stat, err := os.Stat(docsDir)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "output directory %s does not exist\n", docsDir)
-		os.Exit(1)
-	}
-
-	if !stat.IsDir() {
-		fmt.Fprintf(os.Stderr, "output directory %s is not a directory\n", docsDir)
-		os.Exit(1)
-	}
-	docsDir = docsDir + "/"
 
 	// Set environment variables used by kubectl so the output is consistent,
 	// regardless of where we run.
 	os.Setenv("HOME", "/home/username")
 	//TODO os.Stdin should really be something like ioutil.Discard, but a Reader
 	kubectl := cmd.NewKubectlCommand(cmdutil.NewFactory(nil), os.Stdin, ioutil.Discard, ioutil.Discard)
-	genMarkdown(kubectl, "", docsDir)
+	genMarkdown(kubectl, "", outDir)
 	for _, c := range kubectl.Commands() {
-		genMarkdown(c, "kubectl", docsDir)
+		genMarkdown(c, "kubectl", outDir)
 	}
 }
 
