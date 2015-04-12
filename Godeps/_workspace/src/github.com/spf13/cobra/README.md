@@ -2,7 +2,7 @@
 
 A Commander for modern go CLI interactions
 
-[![Build Status](https://travis-ci.org/spf13/cobra.png)](https://travis-ci.org/spf13/cobra)
+[![Build Status](https://travis-ci.org/spf13/cobra.svg)](https://travis-ci.org/spf13/cobra)
 
 ## Overview
 
@@ -142,6 +142,15 @@ global flags assign a flag as a persistent flag on the root.
 A flag can also be assigned locally which will only apply to that specific command.
 
 	HugoCmd.Flags().StringVarP(&Source, "source", "s", "", "Source directory to read from")
+
+### Remove a command from its parent
+
+Removing a command is not a common action is simple program but it allows 3rd parties to customize an existing command tree.
+
+In this exemple, we remove the existing `VersionCmd` command of an existing root command, and we replace it by our own version.
+
+	mainlib.RootCmd.RemoveCommand(mainlib.VersionCmd)
+	mainlib.RootCmd.AddCommand(versionCmd)
 
 ### Once all commands and flags are defined, Execute the commands
 
@@ -339,6 +348,13 @@ Like help the function and template are over ridable through public methods.
 
     command.SetUsageTemplate(s string)
 
+## Generating markdown formatted documentation for your command
+
+Cobra can generate a markdown formatted document based on the subcommands, flags, etc. A simple example of how to do this for your command can be found in [Markdown Docs](md_docs.md)
+
+## Generating bash completions for your command
+
+Cobra can generate a bash completions file. If you add more information to your command these completions can be amazingly powerful and flexible.  Read more about [Bash Completions](bash_completions.md)
 
 ## Debugging
 
