@@ -68,13 +68,21 @@ systemctl stop iptables-services firewalld
 KUBE_API_ADDRESS="--address=0.0.0.0"
 
 # Comma separated list of nodes in the etcd cluster
-KUBE_ETCD_SERVERS="--etcd_servers=http://fed-master:4001"
+KUBE_ETCD_SERVERS="--etcd_servers=http://127.0.0.1:4001"
 
 # Address range to use for services
 KUBE_SERVICE_ADDRESSES="--portal_net=10.254.0.0/16"
 
 # Add you own!
 KUBE_API_ARGS=""
+```
+
+* Edit /etc/kubernetes/controller-manager to add fed-node to the
+  KUBELET_ADDRESSES.
+
+```
+# Comma separated list of minions
+KUBELET_ADDRESSES="--machines=fed-node"
 ```
 
 * Start the appropriate services on master:
@@ -86,38 +94,6 @@ for SERVICES in etcd kube-apiserver kube-controller-manager kube-scheduler; do
 	systemctl status $SERVICES
 done
 ```
-
-* Addition of nodes:
-
-* Create following node.json file on kubernetes master node:
-
-```json
-{
-  "id": "fed-node",
-  "kind": "Minion",
-  "apiVersion": "v1beta1",
-  "labels": {
-    "name": "fed-node-label"
-  }
-}
-```
-
-Now create a node object internally in your kubernetes cluster by running:
-
-```
-$ kubectl create -f node.json
-
-$ kubectl get nodes
-NAME                LABELS              STATUS
-fed-node           name=fed-node-label     Unknown
-
-```
-
-Please note that in the above, it only creates a representation for the node
-_fed-node_ internally. It does not provision the actual _fed-node_. Also, it
-is assumed that _fed-node_ (as specified in `id`) can be resolved and is
-reachable from kubernetes master node. This guide will discuss how to provision
-a kubernetes node (fed-node) below.
 
 **Configure the kubernetes services on the node.**
 
@@ -157,14 +133,7 @@ done
 ```
 kubectl get nodes
 NAME                LABELS              STATUS
-fed-node          name=fed-node-label     Ready
-```
-* Deletion of nodes:
-
-To delete _fed-node_ from your kubernetes cluster, one should run the following on fed-master (Please do not do it, it is just for information):
-
-```
-$ kubectl delete -f node.json
+fed-node            <none>              Ready
 ```
 
 *You should be finished!*
