@@ -284,31 +284,33 @@ func (h *EtcdHelper) SetObj(key string, obj, out runtime.Object, ttl uint64) err
 	return err
 }
 
-// Pass an EtcdUpdateFunc to EtcdHelper.AtomicUpdate to make an atomic etcd update.
-// See the comment for AtomicUpdate for more detail.
+// Pass an EtcdUpdateFunc to EtcdHelper.GuaranteedUpdate to make an etcd update that is guaranteed to succeed.
+// See the comment for GuaranteedUpdate for more detail.
 type EtcdUpdateFunc func(input runtime.Object) (output runtime.Object, ttl uint64, err error)
 
-// AtomicUpdate generalizes the pattern that allows for making atomic updates to etcd objects.
-// Note, tryUpdate may be called more than once.
+// GuaranteedUpdate calls "tryUpdate()" to update key "key" that is of type "ptrToType". It keeps
+// calling tryUpdate() and retrying the update until success if there is etcd index conflict. Note that object
+// passed to tryUpdate() may change across invocations of tryUpdate() if other writers are simultaneously
+// updating it, so tryUpdate() needs to take into account the current contents of the object when
+// deciding how the updated object (that it returns) should look.
 //
 // Example:
 //
 // h := &util.EtcdHelper{client, encoding, versioning}
-// err := h.AtomicUpdate("myKey", &MyType{}, true, func(input runtime.Object) (runtime.Object, uint64, error) {
-//	// Before this function is called, currentObj has been reset to etcd's current
-//	// contents for "myKey".
+// err := h.GuaranteedUpdate("myKey", &MyType{}, true, func(input runtime.Object) (runtime.Object, uint64, error) {
+//	// Before each invocation of the user-defined function, "input" is reset to etcd's current contents for "myKey".
 //
-//	cur := input.(*MyType) // Guaranteed to work.
+//	cur := input.(*MyType) // Guaranteed to succeed.
 //
 //	// Make a *modification*.
 //	cur.Counter++
 //
 //	// Return the modified object. Return an error to stop iterating. Return a non-zero uint64 to set
-//  // the TTL on the object.
+//      // the TTL on the object.
 //	return cur, 0, nil
 // })
 //
-func (h *EtcdHelper) AtomicUpdate(key string, ptrToType runtime.Object, ignoreNotFound bool, tryUpdate EtcdUpdateFunc) error {
+func (h *EtcdHelper) GuaranteedUpdate(key string, ptrToType runtime.Object, ignoreNotFound bool, tryUpdate EtcdUpdateFunc) error {
 	v, err := conversion.EnforcePtr(ptrToType)
 	if err != nil {
 		// Panic is appropriate, because this is a programming error.
