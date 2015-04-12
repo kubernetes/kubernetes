@@ -41,44 +41,21 @@ fi
 TEMPLATE="--template=\"{{ index . \"current-context\" }}\""
 CURRENT_CONTEXT=$( "${kubectl}" "${config[@]:+${config[@]}}" config view -o template "${TEMPLATE}" )
 
-TEMPLATE="--template=\"{{range .contexts}}{{ if eq .name ${CURRENT_CONTEXT} }}{{ .context.cluster }}{{end}}{{end}}\""
+TEMPLATE="--template=\"{{index . \"contexts\" ${CURRENT_CONTEXT} \"cluster\"}}\""
 CURRENT_CLUSTER=$( "${kubectl}" "${config[@]:+${config[@]}}" config view -o template "${TEMPLATE}" )
 
-TEMPLATE="--template=\"{{range .contexts}}{{ if eq .name ${CURRENT_CONTEXT} }}{{ .context.user }}{{end}}{{end}}\""
+TEMPLATE="--template=\"{{index . \"contexts\" ${CURRENT_CONTEXT} \"user\"}}\""
 CURRENT_USER=$( "${kubectl}" "${config[@]:+${config[@]}}" config view -o template "${TEMPLATE}" )
 
-TEMPLATE="--template=\"{{range .clusters}}{{ if eq .name ${CURRENT_CLUSTER} }}{{ index . \"cluster\" \"certificate-authority\" }}{{end}}{{end}}\""
-CERTIFICATE_AUTHORITY=$( "${kubectl}" "${config[@]:+${config[@]}}" config view -o template "${TEMPLATE}" )
-
-TEMPLATE="--template=\"{{range .clusters}}{{ if eq .name ${CURRENT_CLUSTER} }}{{ .cluster.server }}{{end}}{{end}}\""
+TEMPLATE="--template=\"{{index . \"clusters\" ${CURRENT_CLUSTER} \"server\"}}\""
 KUBE_MASTER=$( "${kubectl}" "${config[@]:+${config[@]}}" config view -o template "${TEMPLATE}" )
 
-TEMPLATE="--template=\"{{range .users}}{{ if eq .name ${CURRENT_USER} }}{{ index . \"user\" \"auth-path\" }}{{end}}{{end}}\""
-AUTH_PATH=$( "${kubectl}" "${config[@]:+${config[@]}}" config view -o template "${TEMPLATE}" )
-
-# Build an auth_path file to embed as a secret
-AUTH_PATH_DATA=$(cat ${AUTH_PATH} )
-KUBE_USER=$( echo ${AUTH_PATH_DATA} | jq '.User' )
-KUBE_PASSWORD=$( echo ${AUTH_PATH_DATA} | jq '.Password' )
-KUBE_CERT_FILE=$( echo ${AUTH_PATH_DATA} | jq '.CertFile' )
-KUBE_KEY_FILE=$( echo ${AUTH_PATH_DATA} | jq '.KeyFile' )
-
-cat <<EOF >"${ORIGIN}/origin-auth-path"
-{
-  "User": ${KUBE_USER},
-  "Password": ${KUBE_PASSWORD},
-  "CAFile": "/etc/secret-volume/kube-ca",
-  "CertFile": "/etc/secret-volume/kube-cert",
-  "KeyFile": "/etc/secret-volume/kube-key"
-}
-EOF
+TEMPLATE="--template=\"{{index . \"users\" ${CURRENT_USER} \"client-key\"}}\""
+KUBE_CLIENT_KEY=$( "${kubectl}" "${config[@]:+${config[@]}}" config view -o template "${TEMPLATE}" )
 
 # Collect all the secrets and encode as base64
 ORIGIN_KUBECONFIG_DATA=$( cat ${ORIGIN}/origin-kubeconfig.yaml | base64 --wrap=0)
-ORIGIN_CERTIFICATE_AUTHORITY_DATA=$(cat ${CERTIFICATE_AUTHORITY} | base64 --wrap=0)
-ORIGIN_AUTH_PATH_DATA=$(cat ${ORIGIN}/origin-auth-path | base64 --wrap=0)
-ORIGIN_CERT_FILE=$( cat ${KUBE_CERT_FILE//\"/} | base64 --wrap=0)
-ORIGIN_KEY_FILE=$( cat ${KUBE_KEY_FILE//\"/}  | base64 --wrap=0)
+ORIGIN_CLIENT_KEY_FILE=$( cat ${KUBE_CLIENT_KEY//\"/}  | base64 --wrap=0)
 
 cat <<EOF >"${ORIGIN}/secret.json"
 {
@@ -87,10 +64,7 @@ cat <<EOF >"${ORIGIN}/secret.json"
   "id": "kubernetes-secret",
   "data": {
     "kubeconfig": "${ORIGIN_KUBECONFIG_DATA}",
-    "kube-ca": "${ORIGIN_CERTIFICATE_AUTHORITY_DATA}",
-    "kube-auth-path": "${ORIGIN_AUTH_PATH_DATA}",
-    "kube-cert": "${ORIGIN_CERT_FILE}",
-    "kube-key": "${ORIGIN_KEY_FILE}"
+    "kube-client-key": "${ORIGIN_CLIENT_KEY_FILE}"
   }
 }
 EOF
