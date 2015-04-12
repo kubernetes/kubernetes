@@ -182,7 +182,7 @@ For details about limiting traffic to specific sources, see the [GCE firewall do
 
 ### Step Seven: Cleanup
 
-You should delete the service which will remove any associated resources that were created e.g. load balancers, forwarding rules and target pools. All the resources (pods, replication controllers and service) can be deleted with a single command:
+You should delete the service which will remove any associated resources that were created e.g. load balancers, forwarding rules and target pools. All the resources (replication controllers and service) can be deleted with a single command:
 ```shell
 $ cluster/kubectl.sh delete -f examples/guestbook-go
 current-context: "kubernetes-satnam_kubernetes"
