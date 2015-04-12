@@ -194,6 +194,18 @@ redis-master
 redis-slave-controller
 redis-slave
 ```
+
+However, the command will not delete the pods created by the replication controller. You can delete the pods manually.
+If you want to delete the pods together, you can use the commands below instead.
+``` shell
+cluster/kubectl.sh stop -f examples/guestbook-go/guestbook-controller.json
+cluster/kubectl.sh stop -f examples/guestbook-go/redis-slave-controller.json
+cluster/kubectl.sh stop -f examples/guestbook-go/redis-master-controller.json
+cluster/kubectl.sh delete -f examples/guestbook-go/guestbook-service.json
+cluster/kubectl.sh delete -f examples/guestbook-go/redis-slave-service.json
+cluster/kubectl.sh delete -f examples/guestbook-go/redis-master-service.json
+```
+
 To turn down a Kubernetes cluster:
 
 ```shell
