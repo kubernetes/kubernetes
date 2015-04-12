@@ -94,18 +94,21 @@ func (tcp *tcpProxySocket) ProxyLoop(service ServicePortName, myInfo *serviceInf
 	for {
 		if info, exists := proxier.getServiceInfo(service); !exists || info != myInfo {
 			// The service port was closed or replaced.
-			break
+			return
 		}
-
 		// Block until a connection is made.
 		inConn, err := tcp.Accept()
 		if err != nil {
-			if info, exists := proxier.getServiceInfo(service); !exists || info != myInfo {
-				// Then the service port was just closed so the accept failure is to be expected.
-				break
-			}
 			if isTooManyFDsError(err) {
 				panic("Accept failed: " + err.Error())
+			}
+
+			if isClosedError(err) {
+				return
+			}
+			if info, exists := proxier.getServiceInfo(service); !exists || info != myInfo {
+				// Then the service port was just closed so the accept failure is to be expected.
+				return
 			}
 			glog.Errorf("Accept failed: %v", err)
 			continue
@@ -800,4 +803,11 @@ func (proxier *Proxier) iptablesHostPortalArgs(destIP net.IP, destPort int, prot
 
 func isTooManyFDsError(err error) bool {
 	return strings.Contains(err.Error(), "too many open files")
+}
+
+func isClosedError(err error) bool {
+	// A brief discussion about handling closed error here:
+	// https://code.google.com/p/go/issues/detail?id=4373#c14
+	// TODO: maybe create a stoppable TCP listener that returns a StoppedError
+	return strings.HasSuffix(err.Error(), "use of closed network connection")
 }
