@@ -140,7 +140,9 @@ var create_ssh_conf = function () {
 };
 
 var get_location = function () {
-  if (process.env['AZ_LOCATION']) {
+  if (process.env['AZ_AFFINITY']) {
+    return '--affinity-group=' + process.env['AZ_AFFINITY'];
+  } else if (process.env['AZ_LOCATION']) {
     return '--location=' + process.env['AZ_LOCATION'];
   } else {
     return '--location=West Europe';
