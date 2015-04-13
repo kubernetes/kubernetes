@@ -333,17 +333,15 @@ func (f *FakeDockerPuller) IsImagePresent(name string) (bool, error) {
 }
 
 type FakeDockerCache struct {
-	client DockerInterface
+	getter podsGetter
 }
 
-func NewFakeDockerCache(client DockerInterface) DockerCache {
-	return &FakeDockerCache{
-		client: client,
-	}
+func NewFakeDockerCache(getter podsGetter) DockerCache {
+	return &FakeDockerCache{getter: getter}
 }
 
 func (f *FakeDockerCache) GetPods() ([]*container.Pod, error) {
-	return GetPods(f.client, false)
+	return f.getter.GetPods(false)
 }
 
 func (f *FakeDockerCache) ForceUpdateIfOlder(time.Time) error {

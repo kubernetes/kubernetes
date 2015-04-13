@@ -234,7 +234,7 @@ func NewMainKubelet(
 
 	klet.podManager = newBasicPodManager(klet.kubeClient)
 
-	dockerCache, err := dockertools.NewDockerCache(dockerClient)
+	dockerCache, err := dockertools.NewDockerCache(containerManager)
 	if err != nil {
 		return nil, err
 	}
@@ -1973,9 +1973,9 @@ func (kl *Kubelet) ServeLogs(w http.ResponseWriter, req *http.Request) {
 
 // findContainer finds and returns the container with the given pod ID, full name, and container name.
 // It returns nil if not found.
-// TODO(yifan): Move this to runtime once GetPods() has the same signature as the runtime.GetPods().
+// TODO(yifan): Move this to runtime once the runtime interface has been all implemented.
 func (kl *Kubelet) findContainer(podFullName string, podUID types.UID, containerName string) (*kubecontainer.Container, error) {
-	pods, err := dockertools.GetPods(kl.dockerClient, false)
+	pods, err := kl.containerManager.GetPods(false)
 	if err != nil {
 		return nil, err
 	}
@@ -2027,7 +2027,7 @@ func (kl *Kubelet) PortForward(podFullName string, podUID types.UID, port uint16
 		return fmt.Errorf("no runner specified.")
 	}
 
-	pods, err := dockertools.GetPods(kl.dockerClient, false)
+	pods, err := kl.containerManager.GetPods(false)
 	if err != nil {
 		return err
 	}

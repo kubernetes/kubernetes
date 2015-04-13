@@ -520,3 +520,52 @@ func makeCapabilites(capAdd []api.CapabilityType, capDrop []api.CapabilityType) 
 	}
 	return addCaps, dropCaps
 }
+
+func (self *DockerManager) GetPods(all bool) ([]*kubecontainer.Pod, error) {
+	pods := make(map[types.UID]*kubecontainer.Pod)
+	var result []*kubecontainer.Pod
+
+	containers, err := GetKubeletDockerContainers(self.client, all)
+	if err != nil {
+		return nil, err
+	}
+
+	// Group containers by pod.
+	for _, c := range containers {
+		if len(c.Names) == 0 {
+			glog.Warningf("Cannot parse empty docker container name: %#v", c.Names)
+			continue
+		}
+		dockerName, hash, err := ParseDockerName(c.Names[0])
+		if err != nil {
+			glog.Warningf("Parse docker container name %q error: %v", c.Names[0], err)
+			continue
+		}
+		pod, found := pods[dockerName.PodUID]
+		if !found {
+			name, namespace, err := kubecontainer.ParsePodFullName(dockerName.PodFullName)
+			if err != nil {
+				glog.Warningf("Parse pod full name %q error: %v", dockerName.PodFullName, err)
+				continue
+			}
+			pod = &kubecontainer.Pod{
+				ID:        dockerName.PodUID,
+				Name:      name,
+				Namespace: namespace,
+			}
+			pods[dockerName.PodUID] = pod
+		}
+		pod.Containers = append(pod.Containers, &kubecontainer.Container{
+			ID:      types.UID(c.ID),
+			Name:    dockerName.ContainerName,
+			Hash:    hash,
+			Created: c.Created,
+		})
+	}
+
+	// Convert map to list.
+	for _, c := range pods {
+		result = append(result, c)
+	}
+	return result, nil
+}

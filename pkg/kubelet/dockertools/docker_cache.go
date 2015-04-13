@@ -20,32 +20,36 @@ import (
 	"sync"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
+	kubecontainer "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
 )
 
 type DockerCache interface {
-	GetPods() ([]*container.Pod, error)
+	GetPods() ([]*kubecontainer.Pod, error)
 	ForceUpdateIfOlder(time.Time) error
 }
 
-func NewDockerCache(client DockerInterface) (DockerCache, error) {
+type podsGetter interface {
+	GetPods(bool) ([]*kubecontainer.Pod, error)
+}
+
+func NewDockerCache(getter podsGetter) (DockerCache, error) {
 	return &dockerCache{
-		client:        client,
+		getter:        getter,
 		updatingCache: false,
 	}, nil
 }
 
 // dockerCache is a default implementation of DockerCache interface
+// TODO(yifan): Use runtime cache to replace this.
 type dockerCache struct {
-	// The underlying docker client used to update the cache.
-	client DockerInterface
-
+	// The narrowed interface for updating the cache.
+	getter podsGetter
 	// Mutex protecting all of the following fields.
 	lock sync.Mutex
 	// Last time when cache was updated.
 	cacheTime time.Time
 	// The content of the cache.
-	pods []*container.Pod
+	pods []*kubecontainer.Pod
 	// Whether the background thread updating the cache is running.
 	updatingCache bool
 	// Time when the background thread should be stopped.
@@ -55,11 +59,11 @@ type dockerCache struct {
 // Ensure that dockerCache abides by the DockerCache interface.
 var _ DockerCache = new(dockerCache)
 
-func (d *dockerCache) GetPods() ([]*container.Pod, error) {
+func (d *dockerCache) GetPods() ([]*kubecontainer.Pod, error) {
 	d.lock.Lock()
 	defer d.lock.Unlock()
 	if time.Since(d.cacheTime) > 2*time.Second {
-		pods, err := GetPods(d.client, false)
+		pods, err := d.getter.GetPods(false)
 		if err != nil {
 			return pods, err
 		}
@@ -79,7 +83,7 @@ func (d *dockerCache) ForceUpdateIfOlder(minExpectedCacheTime time.Time) error {
 	d.lock.Lock()
 	defer d.lock.Unlock()
 	if d.cacheTime.Before(minExpectedCacheTime) {
-		pods, err := GetPods(d.client, false)
+		pods, err := d.getter.GetPods(false)
 		if err != nil {
 			return err
 		}
@@ -93,7 +97,7 @@ func (d *dockerCache) startUpdatingCache() {
 	run := true
 	for run {
 		time.Sleep(100 * time.Millisecond)
-		pods, err := GetPods(d.client, false)
+		pods, err := d.getter.GetPods(false)
 		cacheTime := time.Now()
 		if err != nil {
 			continue
