@@ -30,63 +30,9 @@ get_absolute_dirname() {
   echo "$(cd "$(dirname "$1")" && pwd)"
 }
 
-# Detect the OS name/arch so that we can find our binary
-case "$(uname -s)" in
-  Darwin)
-    host_os=darwin
-    ;;
-  Linux)
-    host_os=linux
-    ;;
-  *)
-    echo "Unsupported host OS.  Must be Linux or Mac OS X." >&2
-    exit 1
-    ;;
-esac
-
-case "$(uname -m)" in
-  x86_64*)
-    host_arch=amd64
-    ;;
-  i?86_64*)
-    host_arch=amd64
-    ;;
-  amd64*)
-    host_arch=amd64
-    ;;
-  arm*)
-    host_arch=arm
-    ;;
-  i?86*)
-    host_arch=x86
-    ;;
-  *)
-    echo "Unsupported host arch. Must be x86_64, 386 or arm." >&2
-    exit 1
-    ;;
-esac
-
-# Find binary
-locations=(
-  "${KUBE_ROOT}/_output/dockerized/bin/${host_os}/${host_arch}/gendocs"
-  "${KUBE_ROOT}/_output/local/bin/${host_os}/${host_arch}/gendocs"
-  "${KUBE_ROOT}/platforms/${host_os}/${host_arch}/gendocs"
-)
-gendocs=$( (ls -t "${locations[@]}" 2>/dev/null || true) | head -1 )
-
-locations=(
-  "${KUBE_ROOT}/_output/dockerized/bin/${host_os}/${host_arch}/genman"
-  "${KUBE_ROOT}/_output/local/bin/${host_os}/${host_arch}/genman"
-  "${KUBE_ROOT}/platforms/${host_os}/${host_arch}/genman"
-)
-genman=$( (ls -t "${locations[@]}" 2>/dev/null || true) | head -1 )
-
-locations=(
-  "${KUBE_ROOT}/_output/dockerized/bin/${host_os}/${host_arch}/genbashcomp"
-  "${KUBE_ROOT}/_output/local/bin/${host_os}/${host_arch}/genbashcomp"
-  "${KUBE_ROOT}/platforms/${host_os}/${host_arch}/genbashcomp"
-)
-genbashcomp=$( (ls -t "${locations[@]}" 2>/dev/null || true) | head -1 )
+gendocs=$(kube::util::find-binary "gendocs")
+genman=$(kube::util::find-binary "genman")
+genbashcomp=$(kube::util::find-binary "genbashcomp")
 
 if [[ ! -x "$gendocs" || ! -x "$genman" || ! -x "$genbashcomp" ]]; then
   {
