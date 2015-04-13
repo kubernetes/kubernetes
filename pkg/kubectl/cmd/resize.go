@@ -21,11 +21,13 @@ import (
 	"io"
 	"time"
 
+	"github.com/spf13/cobra"
+
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/controller"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl"
 	cmdutil "github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/cmd/util"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/resource"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/wait"
-	"github.com/spf13/cobra"
 )
 
 const (
@@ -73,12 +75,27 @@ func RunResize(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []str
 		return err
 	}
 
-	mapper, _ := f.Object()
-	// TODO: use resource.Builder instead
-	mapping, namespace, name, err := cmdutil.ResourceFromArgs(cmd, args, mapper, cmdNamespace)
+	mapper, typer := f.Object()
+	r := resource.NewBuilder(mapper, typer, f.ClientMapperForCommand()).
+		ContinueOnError().
+		NamespaceParam(cmdNamespace).DefaultNamespace().
+		ResourceTypeOrNameArgs(false, args...).
+		Flatten().
+		Do()
+	err = r.Err()
 	if err != nil {
 		return err
 	}
+	mapping, err := r.ResourceMapping()
+	if err != nil {
+		return err
+	}
+
+	infos, err := r.Infos()
+	if err != nil {
+		return err
+	}
+	info := infos[0]
 
 	resizer, err := f.Resizer(mapping)
 	if err != nil {
@@ -88,7 +105,7 @@ func RunResize(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []str
 	resourceVersion := cmdutil.GetFlagString(cmd, "resource-version")
 	currentSize := cmdutil.GetFlagInt(cmd, "current-replicas")
 	precondition := &kubectl.ResizePrecondition{currentSize, resourceVersion}
-	cond := kubectl.ResizeCondition(resizer, precondition, namespace, name, uint(count))
+	cond := kubectl.ResizeCondition(resizer, precondition, info.Namespace, info.Name, uint(count))
 
 	msg := "resized"
 	if err = wait.Poll(retryFrequency, retryTimeout, cond); err != nil {
