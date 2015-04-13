@@ -199,7 +199,7 @@ func NewMainKubelet(
 		return nil, fmt.Errorf("failed to initialize image manager: %v", err)
 	}
 	statusManager := newStatusManager(kubeClient)
-	containerManager := dockertools.NewDockerManager(dockerClient, recorder, podInfraContainerImage)
+	containerManager := dockertools.NewDockerManager(dockerClient, recorder, podInfraContainerImage, pullQPS, pullBurst)
 
 	klet := &Kubelet{
 		hostname:               hostname,
@@ -211,8 +211,6 @@ func NewMainKubelet(
 		readinessManager:       kubecontainer.NewReadinessManager(),
 		runner:                 dockertools.NewDockerContainerCommandRunner(dockerClient),
 		httpClient:             &http.Client{},
-		pullQPS:                pullQPS,
-		pullBurst:              pullBurst,
 		sourcesReady:           sourcesReady,
 		clusterDomain:          clusterDomain,
 		clusterDNS:             clusterDNS,
@@ -289,18 +287,12 @@ type Kubelet struct {
 	// Tracks references for reporting events
 	containerRefManager *kubecontainer.RefManager
 
-	// Optional, defaults to simple Docker implementation
-	dockerPuller dockertools.DockerPuller
 	// Optional, defaults to /logs/ from /var/log
 	logServer http.Handler
 	// Optional, defaults to simple Docker implementation
 	runner dockertools.ContainerCommandRunner
 	// Optional, client for http requests, defaults to empty client
 	httpClient httpGetter
-	// Optional, maximum pull QPS from the docker registry, 0.0 means unlimited.
-	pullQPS float32
-	// Optional, maximum burst QPS from the docker registry, must be positive if QPS is > 0.0
-	pullBurst int
 
 	// cAdvisor used for container information.
 	cadvisor cadvisor.Interface
@@ -540,9 +532,6 @@ func (kl *Kubelet) StartGarbageCollection() {
 func (kl *Kubelet) Run(updates <-chan PodUpdate) {
 	if kl.logServer == nil {
 		kl.logServer = http.StripPrefix("/logs/", http.FileServer(http.Dir("/var/log/")))
-	}
-	if kl.dockerPuller == nil {
-		kl.dockerPuller = dockertools.NewDockerPuller(kl.dockerClient, kl.pullQPS, kl.pullBurst)
 	}
 	if kl.kubeClient == nil {
 		glog.Warning("No api server defined - no node status update will be sent.")
@@ -877,7 +866,7 @@ func (kl *Kubelet) createPodInfraContainer(pod *api.Pod) (dockertools.DockerID, 
 		glog.Errorf("Couldn't make a ref to pod %v, container %v: '%v'", pod.Name, container.Name, err)
 	}
 	// TODO: make this a TTL based pull (if image older than X policy, pull)
-	ok, err := kl.dockerPuller.IsImagePresent(container.Image)
+	ok, err := kl.containerManager.IsImagePresent(container.Image)
 	if err != nil {
 		if ref != nil {
 			kl.recorder.Eventf(ref, "failed", "Failed to inspect image %q: %v", container.Image, err)
@@ -919,7 +908,7 @@ func (kl *Kubelet) pullImage(img string, ref *api.ObjectReference) error {
 		metrics.ImagePullLatency.Observe(metrics.SinceInMicroseconds(start))
 	}()
 
-	if err := kl.dockerPuller.Pull(img); err != nil {
+	if err := kl.containerManager.Pull(img); err != nil {
 		if ref != nil {
 			kl.recorder.Eventf(ref, "failed", "Failed to pull image %q: %v", img, err)
 		}
@@ -1033,7 +1022,7 @@ func (kl *Kubelet) pullImageAndRunContainer(pod *api.Pod, container *api.Contain
 		glog.Errorf("Couldn't make a ref to pod %v, container %v: '%v'", pod.Name, container.Name, err)
 	}
 	if container.ImagePullPolicy != api.PullNever {
-		present, err := kl.dockerPuller.IsImagePresent(container.Image)
+		present, err := kl.containerManager.IsImagePresent(container.Image)
 		if err != nil {
 			if ref != nil {
 				kl.recorder.Eventf(ref, "failed", "Failed to inspect image %q: %v", container.Image, err)

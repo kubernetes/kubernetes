@@ -96,8 +96,8 @@ type throttledDockerPuller struct {
 	limiter util.RateLimiter
 }
 
-// NewDockerPuller creates a new instance of the default implementation of DockerPuller.
-func NewDockerPuller(client DockerInterface, qps float32, burst int) DockerPuller {
+// newDockerPuller creates a new instance of the default implementation of DockerPuller.
+func newDockerPuller(client DockerInterface, qps float32, burst int) DockerPuller {
 	dp := dockerPuller{
 		client:  client,
 		keyring: credentialprovider.NewDockerKeyring(),
