@@ -73,11 +73,10 @@ func newTestKubelet(t *testing.T) *TestKubelet {
 
 	fakeRecorder := &record.FakeRecorder{}
 	fakeKubeClient := &testclient.Fake{}
-
 	kubelet := &Kubelet{}
 	kubelet.dockerClient = fakeDocker
 	kubelet.kubeClient = fakeKubeClient
-	kubelet.dockerPuller = &dockertools.FakeDockerPuller{}
+
 	kubelet.hostname = "testnode"
 	kubelet.networkPlugin, _ = network.InitNetworkPlugin([]network.NetworkPlugin{}, "", network.NewFakeHost(nil))
 	if tempDir, err := ioutil.TempDir("/tmp", "kubelet_test."); err != nil {
@@ -104,7 +103,7 @@ func newTestKubelet(t *testing.T) *TestKubelet {
 	podManager, fakeMirrorClient := newFakePodManager()
 	kubelet.podManager = podManager
 	kubelet.containerRefManager = kubecontainer.NewRefManager()
-	kubelet.containerManager = dockertools.NewDockerManager(fakeDocker, fakeRecorder, dockertools.PodInfraContainerImage)
+	kubelet.containerManager = dockertools.NewDockerManager(fakeDocker, fakeRecorder, dockertools.PodInfraContainerImage, 0, 0)
 	kubelet.dockerCache = dockertools.NewFakeDockerCache(kubelet.containerManager)
 	kubelet.podWorkers = newPodWorkers(
 		kubelet.dockerCache,
@@ -114,6 +113,7 @@ func newTestKubelet(t *testing.T) *TestKubelet {
 			return err
 		},
 		fakeRecorder)
+	kubelet.containerManager.Puller = &dockertools.FakeDockerPuller{}
 	return &TestKubelet{kubelet, fakeDocker, mockCadvisor, fakeKubeClient, waitGroup, fakeMirrorClient}
 }
 
@@ -593,7 +593,7 @@ func TestSyncPodsCreatesNetAndContainerPullsImage(t *testing.T) {
 	kubelet := testKubelet.kubelet
 	fakeDocker := testKubelet.fakeDocker
 	waitGroup := testKubelet.waitGroup
-	puller := kubelet.dockerPuller.(*dockertools.FakeDockerPuller)
+	puller := kubelet.containerManager.Puller.(*dockertools.FakeDockerPuller)
 	puller.HasImages = []string{}
 	kubelet.containerManager.PodInfraContainerImage = "custom_image_name"
 	fakeDocker.ContainerList = []docker.APIContainers{}
@@ -1249,7 +1249,6 @@ func TestGetRootInfo(t *testing.T) {
 
 	kubelet := Kubelet{
 		dockerClient: &fakeDocker,
-		dockerPuller: &dockertools.FakeDockerPuller{},
 		cadvisor:     mockCadvisor,
 	}
 
@@ -1652,7 +1651,7 @@ func TestSyncPodsWithPullPolicy(t *testing.T) {
 	kubelet := testKubelet.kubelet
 	fakeDocker := testKubelet.fakeDocker
 	waitGroup := testKubelet.waitGroup
-	puller := kubelet.dockerPuller.(*dockertools.FakeDockerPuller)
+	puller := kubelet.containerManager.Puller.(*dockertools.FakeDockerPuller)
 	puller.HasImages = []string{"existing_one", "want:latest"}
 	kubelet.containerManager.PodInfraContainerImage = "custom_image_name"
 	fakeDocker.ContainerList = []docker.APIContainers{}

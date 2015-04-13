@@ -60,18 +60,25 @@ type DockerManager struct {
 	//      means that some entries may be recycled before a pod has been
 	//      deleted.
 	reasonCache stringCache
+	// TODO(yifan): We export this for testability, so when we have a fake
+	// container manager, then we can unexport this. Also at that time, we
+	// use the concrete type so that we can record the pull failure and eliminate
+	// the image checking in GetPodStatus().
+	Puller DockerPuller
 }
 
 // Ensures DockerManager implements ConatinerRunner.
 var _ kubecontainer.ContainerRunner = new(DockerManager)
 
-func NewDockerManager(client DockerInterface, recorder record.EventRecorder, podInfraContainerImage string) *DockerManager {
+func NewDockerManager(client DockerInterface, recorder record.EventRecorder, podInfraContainerImage string, qps float32, burst int) *DockerManager {
 	reasonCache := stringCache{cache: lru.New(maxReasonCacheEntries)}
 	return &DockerManager{
 		client:                 client,
 		recorder:               recorder,
 		PodInfraContainerImage: podInfraContainerImage,
-		reasonCache:            reasonCache}
+		reasonCache:            reasonCache,
+		Puller:                 newDockerPuller(client, qps, burst),
+	}
 }
 
 // A cache which stores strings keyed by <pod_UID>_<container_name>.
@@ -568,4 +575,12 @@ func (self *DockerManager) GetPods(all bool) ([]*kubecontainer.Pod, error) {
 		result = append(result, c)
 	}
 	return result, nil
+}
+
+func (self *DockerManager) Pull(image string) error {
+	return self.Puller.Pull(image)
+}
+
+func (self *DockerManager) IsImagePresent(image string) (bool, error) {
+	return self.Puller.IsImagePresent(image)
 }
