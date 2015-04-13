@@ -32,7 +32,7 @@ import (
 )
 
 // TODO: quinton: debug issue #6541 and then remove Pending flag here.
-var _ = PDescribe("Monitoring", func() {
+var _ = Describe("Monitoring", func() {
 	var c *client.Client
 
 	BeforeEach(func() {
