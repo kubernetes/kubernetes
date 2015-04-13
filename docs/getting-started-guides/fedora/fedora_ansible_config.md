@@ -27,7 +27,7 @@ A Kubernetes cluster reqiures etcd, a master, and n minions, so we will create a
  - has ansible
  - has git
 
-then we just clone down the kubernetes-ansible repositry** 
+**then we just clone down the kubernetes-ansible repository** 
 
 ```
    yum install -y ansible git
@@ -116,9 +116,9 @@ There are two ways to do this: via flannel, or using NetworkManager.
 
 Flannel is a cleaner mechanism to use, and is the recommended choice.
 
-- If you are using flannel, you should check the kubernetes-ansible repository above... Currently, 
+- If you are using flannel, you should check the kubernetes-ansible repository above. 
 
-you essentially have to (1) update group_vars/all.yml, and then (2) run
+Currently, you essentially have to (1) update group_vars/all.yml, and then (2) run
 ```
 ansible-playbook -i inventory flannel.yml
 ```
@@ -209,7 +209,7 @@ EOF
 kubectl get pods
 ```
 
-Important : Note that the ip of the pods IP fields are on the network which you created in the kube_ip_addr file.
+Important : Note that the IP of the pods IP fields are on the network which you created in the kube_ip_addr file.
 
 In this example, that was the 10.254 network.
 
@@ -228,4 +228,4 @@ docker images
 curl http://localhost
 ```
 
-Thats it !
+That's it !
