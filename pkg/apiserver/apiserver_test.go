@@ -239,6 +239,7 @@ type SimpleGetOptions struct {
 	api.TypeMeta `json:",inline"`
 	Param1       string `json:"param1"`
 	Param2       string `json:"param2"`
+	Path         string `json:"atAPath"`
 }
 
 func (*SimpleGetOptions) IsAnAPIObject() {}
@@ -459,9 +460,12 @@ func (m *MetadataRESTStorage) ProducesMIMETypes(method string) []string {
 	return m.types
 }
 
+var _ rest.StorageMetadata = &MetadataRESTStorage{}
+
 type GetWithOptionsRESTStorage struct {
 	*SimpleRESTStorage
 	optionsReceived runtime.Object
+	takesPath       string
 }
 
 func (r *GetWithOptionsRESTStorage) Get(ctx api.Context, name string, options runtime.Object) (runtime.Object, error) {
@@ -472,9 +476,14 @@ func (r *GetWithOptionsRESTStorage) Get(ctx api.Context, name string, options ru
 	return r.SimpleRESTStorage.Get(ctx, name)
 }
 
-func (r *GetWithOptionsRESTStorage) NewGetOptions() runtime.Object {
-	return &SimpleGetOptions{}
+func (r *GetWithOptionsRESTStorage) NewGetOptions() (runtime.Object, bool, string) {
+	if len(r.takesPath) > 0 {
+		return &SimpleGetOptions{}, true, r.takesPath
+	}
+	return &SimpleGetOptions{}, false, ""
 }
+
+var _ rest.GetterWithOptions = &GetWithOptionsRESTStorage{}
 
 func extractBody(response *http.Response, object runtime.Object) (string, error) {
 	defer response.Body.Close()
@@ -963,6 +972,47 @@ func TestGetWithOptions(t *testing.T) {
 	}
 }
 
+func TestGetWithOptionsAndPath(t *testing.T) {
+	storage := map[string]rest.Storage{}
+	simpleStorage := GetWithOptionsRESTStorage{
+		SimpleRESTStorage: &SimpleRESTStorage{
+			item: Simple{
+				Other: "foo",
+			},
+		},
+		takesPath: "atAPath",
+	}
+	storage["simple"] = &simpleStorage
+	handler := handle(storage)
+	server := httptest.NewServer(handler)
+	defer server.Close()
+
+	resp, err := http.Get(server.URL + "/api/version/simple/id/a/different/path?param1=test1&param2=test2&atAPath=not")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("unexpected response: %#v", resp)
+	}
+	var itemOut Simple
+	body, err := extractBody(resp, &itemOut)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	if itemOut.Name != simpleStorage.item.Name {
+		t.Errorf("Unexpected data: %#v, expected %#v (%s)", itemOut, simpleStorage.item, string(body))
+	}
+
+	opts, ok := simpleStorage.optionsReceived.(*SimpleGetOptions)
+	if !ok {
+		t.Errorf("Unexpected options object received: %#v", simpleStorage.optionsReceived)
+		return
+	}
+	if opts.Param1 != "test1" || opts.Param2 != "test2" || opts.Path != "a/different/path" {
+		t.Errorf("Did not receive expected options: %#v", opts)
+	}
+}
 func TestGetAlternateSelfLink(t *testing.T) {
 	storage := map[string]rest.Storage{}
 	simpleStorage := SimpleRESTStorage{
