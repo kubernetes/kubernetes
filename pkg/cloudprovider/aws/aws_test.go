@@ -248,7 +248,7 @@ func (ec2 *FakeEC2) AuthorizeSecurityGroupIngress(securityGroupId string, perms 
 	panic("Not implemented")
 }
 
-func (ec2 *FakeEC2) ListVpcs(filterName string) ([]ec2.VPC, error) {
+func (ec2 *FakeEC2) ListVPCs(filterName string) ([]ec2.VPC, error) {
 	panic("Not implemented")
 }
 
