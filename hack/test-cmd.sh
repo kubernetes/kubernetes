@@ -108,7 +108,7 @@ kube::log::status "Starting CONTROLLER-MANAGER"
 CTLRMGR_PID=$!
 
 kube::util::wait_for_url "http://127.0.0.1:${CTLRMGR_PORT}/healthz" "controller-manager: "
-kube::util::wait_for_url "http://127.0.0.1:${API_PORT}/api/v1beta1/minions/127.0.0.1" "apiserver(minions): " 0.2 25
+kube::util::wait_for_url "http://127.0.0.1:${API_PORT}/api/v1beta3/nodes/127.0.0.1" "apiserver(nodes): " 0.2 25
 
 # Expose kubectl directly for readability
 PATH="${KUBE_OUTPUT_HOSTBIN}":$PATH
@@ -170,7 +170,7 @@ for version in "${kube_api_versions[@]}"; do
   kube::test::describe_object_assert pods 'valid-pod' "Name:" "Image(s):" "Host:" "Labels:" "Status:" "Replication Controllers"
 
   ### Dump current valid-pod POD
-  output_pod=$(kubectl get pod valid-pod -o yaml --output-version=v1beta1 "${kube_flags[@]}")
+  output_pod=$(kubectl get pod valid-pod -o yaml --output-version=v1beta3 "${kube_flags[@]}")
 
   ### Delete POD valid-pod by id
   # Pre-condition: valid-pod POD is running
@@ -396,22 +396,29 @@ for version in "${kube_api_versions[@]}"; do
   kube::test::get_object_assert services "{{range.items}}{{$id_field}}:{{end}}" 'kubernetes:kubernetes-ro:redis-master:'
   # Command
   kubectl create -f - "${kube_flags[@]}" << __EOF__
+{
+  "kind": "Service",
+  "apiVersion": "v1beta3",
+  "metadata": {
+    "name": "service-${version}-test"
+  },
+  "spec": {
+    "ports": [
       {
-          "kind": "Service",
-          "apiVersion": "v1beta1",
-          "id": "service-${version}-test",
-          "port": 80,
-          "protocol": "TCP"
+        "protocol": "TCP",
+        "port": 80,
+        "targetPort": 80
       }
+    ]
+  }
+}
 __EOF__
   # Post-condition:redis-master-service service is running
   kube::test::get_object_assert services "{{range.items}}{{$id_field}}:{{end}}" 'kubernetes:kubernetes-ro:redis-master:service-.*-test:'
 
   # Command
-  kubectl update service "${kube_flags[@]}" service-${version}-test --patch="{\"selector\":{\"my\":\"test-label\"},\"apiVersion\":\"v1beta1\"}"
-  # Post-condition: selector.version == ${version}
-  # This test works only in v1beta1 and v1beta2
-  # https://github.com/GoogleCloudPlatform/kubernetes/issues/4771
+  kubectl update service "${kube_flags[@]}" service-${version}-test --patch="{\"spec\":{\"selector\":{\"my\":\"test-label\"}},\"apiVersion\":\"v1beta3\"}" --api-version=v1beta3
+  # Post-condition: selector has "test-label" label.
   kube::test::get_object_assert "service service-${version}-test" "{{range$service_selector_field}}{{.}}{{end}}" "test-label"
 
   ### Identity
