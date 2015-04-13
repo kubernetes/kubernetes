@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="utf-8" />
+	<title>popstate event test</title>
+</head>
+<body>
+
+<script>
+
+(function() {
+	var test_id;
+	
+	function showResult(r) {
+		if(test_id && window.parent.setResult) {
+			parent.setResult(test_id, r);
+		} else {
+			alert(r);
+		}
+	}
+	
+	if(location.hash.length) {
+		test_id = location.hash.substr(1);
+	}
+	
+	if(history.pushState) {
+		var rand = Math.random();
+		setTimeout(function() {
+			history.pushState({foo: 'bar'}, "title", './' + rand);
+			var result = (location.href.indexOf(rand) > -1);
+			showResult(result);
+		}, 100);
+	} 
+	
+})();
+
+</script>
+
+</body>
+</html>
