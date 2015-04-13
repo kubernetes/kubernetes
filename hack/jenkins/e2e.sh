@@ -41,13 +41,21 @@ fi
 GINKGO_TEST_ARGS=""
 
 if [[ "${SCALABILITY:-}" == "true" ]]; then
-    export MASTER_SIZE="n1-standard-4"
+    if [[ "${KUBERNETES_PROVIDER}" == "aws" ]]; then
+      export MASTER_SIZE="m3.xlarge"
+    else
+      export MASTER_SIZE="n1-standard-4"
+    fi
     # TODO(wojtek-t): Once we have enough quota for the project, increase
     # NUM_MINIONS to 100 (which is our v1.0 goal).
     export NUM_MINIONS="10"
     GINKGO_TEST_ARGS="--ginkgo.focus=Density "
 else
-    export MASTER_SIZE="g1-small"
+    if [[ "${KUBERNETES_PROVIDER}" == "aws" ]]; then
+      export MASTER_SIZE="t2.small"
+    else
+      export MASTER_SIZE="g1-small"
+    fi
     export NUM_MINIONS="2"
 fi
 
