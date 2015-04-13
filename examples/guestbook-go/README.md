@@ -182,7 +182,7 @@ For details about limiting traffic to specific sources, see the [GCE firewall do
 
 ### Step Seven: Cleanup
 
-You should delete the service which will remove any associated resources that were created e.g. load balancers, forwarding rules and target pools. All the resources (pods, replication controllers and service) can be deleted with a single command:
+You should delete the service which will remove any associated resources that were created e.g. load balancers, forwarding rules and target pools. All the resources (replication controllers and service) can be deleted with a single command:
 ```shell
 $ cluster/kubectl.sh delete -f examples/guestbook-go
 current-context: "kubernetes-satnam_kubernetes"
@@ -194,6 +194,18 @@ redis-master
 redis-slave-controller
 redis-slave
 ```
+
+However, the command will not delete the pods created by the replication controller. You can delete the pods manually.
+If you want to delete the pods together, you can use the commands below instead.
+``` shell
+cluster/kubectl.sh stop -f examples/guestbook-go/guestbook-controller.json
+cluster/kubectl.sh stop -f examples/guestbook-go/redis-slave-controller.json
+cluster/kubectl.sh stop -f examples/guestbook-go/redis-master-controller.json
+cluster/kubectl.sh delete -f examples/guestbook-go/guestbook-service.json
+cluster/kubectl.sh delete -f examples/guestbook-go/redis-slave-service.json
+cluster/kubectl.sh delete -f examples/guestbook-go/redis-master-service.json
+```
+
 To turn down a Kubernetes cluster:
 
 ```shell
