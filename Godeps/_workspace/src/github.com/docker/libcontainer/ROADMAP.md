@@ -13,4 +13,8 @@ Our goal is to make libcontainer run everywhere, but currently libcontainer requ
 
 ## Cross-architecture support
 
-Our goal is to make libcontainer run everywhere. However currently libcontainer only runs on x86_64 systems. We plan on expanding architecture support, so that libcontainer containers can be created and used on more architectures.
+Our goal is to make libcontainer run everywhere. Recently libcontainer has
+expanded from its initial support for x86_64 systems to include POWER (ppc64
+little and big endian variants), IBM System z (s390x 64-bit), and ARM. We plan
+to continue expanding architecture support such that libcontainer containers
+can be created and used on more architectures.

@@ -8,6 +8,26 @@ import (
 	"unsafe"
 )
 
+type ParentDeathSignal int
+
+func (p ParentDeathSignal) Restore() error {
+	if p == 0 {
+		return nil
+	}
+	current, err := GetParentDeathSignal()
+	if err != nil {
+		return err
+	}
+	if p == current {
+		return nil
+	}
+	return p.Set()
+}
+
+func (p ParentDeathSignal) Set() error {
+	return SetParentDeathSignal(uintptr(p))
+}
+
 func Execv(cmd string, args []string, env []string) error {
 	name, err := exec.LookPath(cmd)
 	if err != nil {
@@ -17,23 +37,20 @@ func Execv(cmd string, args []string, env []string) error {
 	return syscall.Exec(name, args, env)
 }
 
-func ParentDeathSignal(sig uintptr) error {
+func SetParentDeathSignal(sig uintptr) error {
 	if _, _, err := syscall.RawSyscall(syscall.SYS_PRCTL, syscall.PR_SET_PDEATHSIG, sig, 0); err != 0 {
 		return err
 	}
 	return nil
 }
 
-func GetParentDeathSignal() (int, error) {
+func GetParentDeathSignal() (ParentDeathSignal, error) {
 	var sig int
-
 	_, _, err := syscall.RawSyscall(syscall.SYS_PRCTL, syscall.PR_GET_PDEATHSIG, uintptr(unsafe.Pointer(&sig)), 0)
-
 	if err != 0 {
 		return -1, err
 	}
-
-	return sig, nil
+	return ParentDeathSignal(sig), nil
 }
 
 func SetKeepCaps() error {

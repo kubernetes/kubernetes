@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-func TestGetDeviceLstatFailure(t *testing.T) {
+func TestDeviceFromPathLstatFailure(t *testing.T) {
 	testError := errors.New("test error")
 
 	// Override os.Lstat to inject error.
@@ -14,13 +14,13 @@ func TestGetDeviceLstatFailure(t *testing.T) {
 		return nil, testError
 	}
 
-	_, err := GetDevice("", "")
+	_, err := DeviceFromPath("", "")
 	if err != testError {
 		t.Fatalf("Unexpected error %v, expected %v", err, testError)
 	}
 }
 
-func TestGetHostDeviceNodesIoutilReadDirFailure(t *testing.T) {
+func TestHostDevicesIoutilReadDirFailure(t *testing.T) {
 	testError := errors.New("test error")
 
 	// Override ioutil.ReadDir to inject error.
@@ -28,13 +28,13 @@ func TestGetHostDeviceNodesIoutilReadDirFailure(t *testing.T) {
 		return nil, testError
 	}
 
-	_, err := GetHostDeviceNodes()
+	_, err := HostDevices()
 	if err != testError {
 		t.Fatalf("Unexpected error %v, expected %v", err, testError)
 	}
 }
 
-func TestGetHostDeviceNodesIoutilReadDirDeepFailure(t *testing.T) {
+func TestHostDevicesIoutilReadDirDeepFailure(t *testing.T) {
 	testError := errors.New("test error")
 	called := false
 
@@ -54,7 +54,7 @@ func TestGetHostDeviceNodesIoutilReadDirDeepFailure(t *testing.T) {
 		return []os.FileInfo{fi}, nil
 	}
 
-	_, err := GetHostDeviceNodes()
+	_, err := HostDevices()
 	if err != testError {
 		t.Fatalf("Unexpected error %v, expected %v", err, testError)
 	}

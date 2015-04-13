@@ -22,19 +22,19 @@ const (
 
 // ErrIfaceNotFound is the error returned to peers who try to access properties
 // on interfaces that aren't found.
-var ErrIfaceNotFound = &dbus.Error{"org.freedesktop.DBus.Properties.Error.InterfaceNotFound", nil}
+var ErrIfaceNotFound = dbus.NewError("org.freedesktop.DBus.Properties.Error.InterfaceNotFound", nil)
 
 // ErrPropNotFound is the error returned to peers trying to access properties
 // that aren't found.
-var ErrPropNotFound = &dbus.Error{"org.freedesktop.DBus.Properties.Error.PropertyNotFound", nil}
+var ErrPropNotFound = dbus.NewError("org.freedesktop.DBus.Properties.Error.PropertyNotFound", nil)
 
 // ErrReadOnly is the error returned to peers trying to set a read-only
 // property.
-var ErrReadOnly = &dbus.Error{"org.freedesktop.DBus.Properties.Error.ReadOnly", nil}
+var ErrReadOnly = dbus.NewError("org.freedesktop.DBus.Properties.Error.ReadOnly", nil)
 
 // ErrInvalidArg is returned to peers if the type of the property that is being
 // changed and the argument don't match.
-var ErrInvalidArg = &dbus.Error{"org.freedesktop.DBus.Properties.Error.InvalidArg", nil}
+var ErrInvalidArg = dbus.NewError("org.freedesktop.DBus.Properties.Error.InvalidArg", nil)
 
 // The introspection data for the org.freedesktop.DBus.Properties interface.
 var IntrospectData = introspect.Interface{

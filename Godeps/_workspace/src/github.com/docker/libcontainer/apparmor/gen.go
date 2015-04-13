@@ -67,12 +67,12 @@ func generateProfile(out io.Writer) error {
 	data := &data{
 		Name: "docker-default",
 	}
-	if tuntablesExists() {
+	if tunablesExists() {
 		data.Imports = append(data.Imports, "#include <tunables/global>")
 	} else {
 		data.Imports = append(data.Imports, "@{PROC}=/proc/")
 	}
-	if abstrctionsEsists() {
+	if abstractionsExists() {
 		data.InnerImports = append(data.InnerImports, "#include <abstractions/base>")
 	}
 	if err := compiled.Execute(out, data); err != nil {
@@ -82,13 +82,13 @@ func generateProfile(out io.Writer) error {
 }
 
 // check if the tunables/global exist
-func tuntablesExists() bool {
+func tunablesExists() bool {
 	_, err := os.Stat("/etc/apparmor.d/tunables/global")
 	return err == nil
 }
 
 // check if abstractions/base exist
-func abstrctionsEsists() bool {
+func abstractionsExists() bool {
 	_, err := os.Stat("/etc/apparmor.d/abstractions/base")
 	return err == nil
 }

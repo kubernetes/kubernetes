@@ -153,7 +153,6 @@ func (self *OomParser) StreamOoms(outStream chan *OomInstance) {
 				line = <-lineChannel
 			}
 			in_oom_kernel_log = false
-			glog.V(1).Infof("Sending an oomInstance: %v", oomCurrentInstance)
 			outStream <- oomCurrentInstance
 		}
 	}

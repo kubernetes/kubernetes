@@ -24,7 +24,6 @@ func ApplyProfile(name string) error {
 	if name == "" {
 		return nil
 	}
-
 	cName := C.CString(name)
 	defer C.free(unsafe.Pointer(cName))
 

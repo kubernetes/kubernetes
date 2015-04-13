@@ -42,7 +42,8 @@ clone() {
 # the following lines are in sorted order, FYI
 clone git github.com/codegangsta/cli 1.1.0
 clone git github.com/coreos/go-systemd v2
-clone git github.com/godbus/dbus v1
-clone git github.com/syndtr/gocapability 3c85049eae
+clone git github.com/godbus/dbus v2
+clone git github.com/Sirupsen/logrus v0.6.6
+clone git github.com/syndtr/gocapability 8e4cdcb
 
 # intentionally not vendoring Docker itself...  that'd be a circle :)

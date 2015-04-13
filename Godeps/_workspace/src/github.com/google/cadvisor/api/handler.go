@@ -151,7 +151,7 @@ func streamResults(eventChannel *events.EventChannel, w http.ResponseWriter, r *
 	for {
 		select {
 		case <-cn.CloseNotify():
-			glog.V(3).Infof("Received CloseNotify event")
+			glog.V(3).Infof("Received CloseNotify event. About to return from api/handler:streamResults")
 			m.CloseEventChannel(eventChannel.GetWatchId())
 			return nil
 		case ev := <-eventChannel.GetChannel():

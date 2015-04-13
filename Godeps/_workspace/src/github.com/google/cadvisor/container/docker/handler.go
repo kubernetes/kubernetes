@@ -16,18 +16,15 @@
 package docker
 
 import (
-	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"math"
-	"os"
 	"path"
 	"strings"
 	"time"
 
-	"github.com/docker/libcontainer"
 	"github.com/docker/libcontainer/cgroups"
 	cgroup_fs "github.com/docker/libcontainer/cgroups/fs"
+	libcontainerConfigs "github.com/docker/libcontainer/configs"
 	"github.com/fsouza/go-dockerclient"
 	"github.com/google/cadvisor/container"
 	containerLibcontainer "github.com/google/cadvisor/container/libcontainer"
@@ -35,9 +32,6 @@ import (
 	info "github.com/google/cadvisor/info/v1"
 	"github.com/google/cadvisor/utils"
 )
-
-// Relative path from Docker root to the libcontainer per-container state.
-const pathToLibcontainerState = "execdriver/native"
 
 // Path to aufs dir where all the files exist.
 // aufs/layers is ignored here since it does not hold a lot of data.
@@ -65,7 +59,9 @@ type dockerContainerHandler struct {
 	// (e.g.: "cpu" -> "/sys/fs/cgroup/cpu/test")
 	cgroupPaths map[string]string
 
-	cgroup         cgroups.Cgroup
+	// Manager of this container's cgroups.
+	cgroupManager cgroups.Manager
+
 	usesAufsDriver bool
 	fsInfo         fs.FsInfo
 	storageDirs    []string
@@ -74,16 +70,11 @@ type dockerContainerHandler struct {
 	creationTime time.Time
 }
 
-func DockerStateDir() string {
-	return path.Join(*dockerRootDir, pathToLibcontainerState)
-}
-
 func newDockerContainerHandler(
 	client *docker.Client,
 	name string,
 	machineInfoFactory info.MachineInfoFactory,
 	fsInfo fs.FsInfo,
-	dockerRootDir string,
 	usesAufsDriver bool,
 	cgroupSubsystems *containerLibcontainer.CgroupSubsystems,
 ) (container.ContainerHandler, error) {
@@ -93,25 +84,26 @@ func newDockerContainerHandler(
 		cgroupPaths[key] = path.Join(val, name)
 	}
 
-	id := ContainerNameToDockerId(name)
-	stateDir := DockerStateDir()
-	handler := &dockerContainerHandler{
-		id:                     id,
-		client:                 client,
-		name:                   name,
-		machineInfoFactory:     machineInfoFactory,
-		libcontainerConfigPath: path.Join(stateDir, id, "container.json"),
-		libcontainerStatePath:  path.Join(stateDir, id, "state.json"),
-		libcontainerPidPath:    path.Join(stateDir, id, "pid"),
-		cgroupPaths:            cgroupPaths,
-		cgroup: cgroups.Cgroup{
-			Parent: "/",
-			Name:   name,
+	// Generate the equivalent cgroup manager for this container.
+	cgroupManager := &cgroup_fs.Manager{
+		Cgroups: &libcontainerConfigs.Cgroup{
+			Name: name,
 		},
-		usesAufsDriver: usesAufsDriver,
-		fsInfo:         fsInfo,
+		Paths: cgroupPaths,
 	}
-	handler.storageDirs = append(handler.storageDirs, path.Join(dockerRootDir, pathToAufsDir, id))
+
+	id := ContainerNameToDockerId(name)
+	handler := &dockerContainerHandler{
+		id:                 id,
+		client:             client,
+		name:               name,
+		machineInfoFactory: machineInfoFactory,
+		cgroupPaths:        cgroupPaths,
+		cgroupManager:      cgroupManager,
+		usesAufsDriver:     usesAufsDriver,
+		fsInfo:             fsInfo,
+	}
+	handler.storageDirs = append(handler.storageDirs, path.Join(*dockerRootDir, pathToAufsDir, id))
 
 	// We assume that if Inspect fails then the container is not known to docker.
 	ctnr, err := client.InspectContainer(id)
@@ -135,76 +127,23 @@ func (self *dockerContainerHandler) ContainerReference() (info.ContainerReferenc
 	}, nil
 }
 
-// TODO(vmarmol): Switch to getting this from libcontainer once we have a solid API.
-func (self *dockerContainerHandler) readLibcontainerConfig() (*libcontainer.Config, error) {
-	out, err := ioutil.ReadFile(self.libcontainerConfigPath)
+func (self *dockerContainerHandler) readLibcontainerConfig() (*libcontainerConfigs.Config, error) {
+	config, err := containerLibcontainer.ReadConfig(*dockerRootDir, *dockerRunDir, self.id)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read libcontainer config from %q: %v", self.libcontainerConfigPath, err)
-	}
-	var config libcontainer.Config
-	err = json.Unmarshal(out, &config)
-	if err != nil {
-		// TODO(vmarmol): Remove this once it becomes the standard.
-		// Try to parse the old config. The main difference is that namespaces used to be a map, now it is a slice of structs.
-		// The JSON marshaler will use the non-nested field before the nested one.
-		type oldLibcontainerConfig struct {
-			libcontainer.Config
-			OldNamespaces map[string]bool `json:"namespaces,omitempty"`
-		}
-		var oldConfig oldLibcontainerConfig
-		err2 := json.Unmarshal(out, &oldConfig)
-		if err2 != nil {
-			// Use original error.
-			return nil, fmt.Errorf("failed to parse libcontainer config at %q: %v", self.libcontainerConfigPath, err)
-		}
-
-		// Translate the old config into the new config.
-		config = oldConfig.Config
-		for ns := range oldConfig.OldNamespaces {
-			config.Namespaces = append(config.Namespaces, libcontainer.Namespace{
-				Type: libcontainer.NamespaceType(ns),
-			})
-		}
+		return nil, fmt.Errorf("failed to read libcontainer config: %v", err)
 	}
 
 	// Replace cgroup parent and name with our own since we may be running in a different context.
-	config.Cgroups.Name = self.cgroup.Name
-	config.Cgroups.Parent = self.cgroup.Parent
+	if config.Cgroups == nil {
+		config.Cgroups = new(libcontainerConfigs.Cgroup)
+	}
+	config.Cgroups.Name = self.name
+	config.Cgroups.Parent = "/"
 
-	return &config, nil
+	return config, nil
 }
 
-func (self *dockerContainerHandler) readLibcontainerState() (state *libcontainer.State, err error) {
-	// TODO(vmarmol): Remove this once we can depend on a newer Docker.
-	// Libcontainer changed how its state was stored, try the old way of a "pid" file
-	if !utils.FileExists(self.libcontainerStatePath) {
-		if utils.FileExists(self.libcontainerPidPath) {
-			// We don't need the old state, return an empty state and we'll gracefully degrade.
-			return &libcontainer.State{}, nil
-		}
-	}
-	f, err := os.Open(self.libcontainerStatePath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to open %s - %s\n", self.libcontainerStatePath, err)
-	}
-	defer f.Close()
-	d := json.NewDecoder(f)
-	retState := new(libcontainer.State)
-	err = d.Decode(retState)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse libcontainer state at %q: %v", self.libcontainerStatePath, err)
-	}
-	state = retState
-
-	// Create cgroup paths if they don't exist. This is since older Docker clients don't write it.
-	if len(state.CgroupPaths) == 0 {
-		state.CgroupPaths = self.cgroupPaths
-	}
-
-	return
-}
-
-func libcontainerConfigToContainerSpec(config *libcontainer.Config, mi *info.MachineInfo) info.ContainerSpec {
+func libcontainerConfigToContainerSpec(config *libcontainerConfigs.Config, mi *info.MachineInfo) info.ContainerSpec {
 	var spec info.ContainerSpec
 	spec.HasMemory = true
 	spec.Memory.Limit = math.MaxUint64
@@ -292,16 +231,44 @@ func (self *dockerContainerHandler) getFsStats(stats *info.ContainerStats) error
 	return nil
 }
 
-func (self *dockerContainerHandler) GetStats() (stats *info.ContainerStats, err error) {
-	state, err := self.readLibcontainerState()
+// TODO(vmarmol): Get from libcontainer API instead of cgroup manager when we don't have to support older Dockers.
+func (self *dockerContainerHandler) GetStats() (*info.ContainerStats, error) {
+	config, err := self.readLibcontainerConfig()
 	if err != nil {
 		return nil, err
 	}
 
-	stats, err = containerLibcontainer.GetStats(self.cgroupPaths, state)
+	var networkInterfaces []string
+	if len(config.Networks) > 0 {
+		// ContainerStats only reports stat for one network device.
+		// TODO(vmarmol): Handle multiple physical network devices.
+		for _, n := range config.Networks {
+			// Take the first non-loopback.
+			if n.Type != "loopback" {
+				networkInterfaces = []string{n.HostInterfaceName}
+				break
+			}
+		}
+	}
+	stats, err := containerLibcontainer.GetStats(self.cgroupManager, networkInterfaces)
 	if err != nil {
 		return stats, err
 	}
+
+	// TODO(rjnagal): Remove the conversion when network stats are read from libcontainer.
+	net := stats.Network
+	// Ingress for host veth is from the container.
+	// Hence tx_bytes stat on the host veth is actually number of bytes received by the container.
+	stats.Network.RxBytes = net.TxBytes
+	stats.Network.RxPackets = net.TxPackets
+	stats.Network.RxErrors = net.TxErrors
+	stats.Network.RxDropped = net.TxDropped
+	stats.Network.TxBytes = net.RxBytes
+	stats.Network.TxPackets = net.RxPackets
+	stats.Network.TxErrors = net.RxErrors
+	stats.Network.TxDropped = net.RxDropped
+
+	// Get filesystem stats.
 	err = self.getFsStats(stats)
 	if err != nil {
 		return stats, err
@@ -348,11 +315,13 @@ func (self *dockerContainerHandler) GetCgroupPath(resource string) (string, erro
 }
 
 func (self *dockerContainerHandler) ListThreads(listType container.ListType) ([]int, error) {
+	// TODO(vmarmol): Implement.
 	return nil, nil
 }
 
 func (self *dockerContainerHandler) ListProcesses(listType container.ListType) ([]int, error) {
-	return cgroup_fs.GetPids(&self.cgroup)
+	// TODO(vmarmol): Implement.
+	return nil, nil
 }
 
 func (self *dockerContainerHandler) WatchSubcontainers(events chan container.SubcontainerEvent) error {
@@ -365,6 +334,5 @@ func (self *dockerContainerHandler) StopWatchingSubcontainers() error {
 }
 
 func (self *dockerContainerHandler) Exists() bool {
-	// We consider the container existing if both libcontainer config and state files exist.
-	return utils.FileExists(self.libcontainerConfigPath) && utils.FileExists(self.libcontainerStatePath)
+	return containerLibcontainer.Exists(*dockerRootDir, *dockerRunDir, self.id)
 }
