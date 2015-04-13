@@ -283,10 +283,6 @@ func (rs *REST) ResourceLocation(ctx api.Context, id string) (*url.URL, http.Rou
 	return nil, nil, fmt.Errorf("no endpoints available for %q", id)
 }
 
-func (rs *REST) getLoadbalancerName(ctx api.Context, service *api.Service) string {
-	return rs.clusterName + "-" + api.NamespaceValue(ctx) + "-" + service.Name
-}
-
 func (rs *REST) createExternalLoadBalancer(ctx api.Context, service *api.Service) error {
 	if rs.cloud == nil {
 		return fmt.Errorf("requested an external service, but no cloud provider supplied.")
@@ -313,7 +309,7 @@ func (rs *REST) createExternalLoadBalancer(ctx api.Context, service *api.Service
 	if err != nil {
 		return err
 	}
-	name := rs.getLoadbalancerName(ctx, service)
+	name := cloudprovider.GetLoadBalancerName(rs.clusterName, api.NamespaceValue(ctx), service.Name)
 	var affinityType api.AffinityType = service.Spec.SessionAffinity
 	if len(service.Spec.PublicIPs) > 0 {
 		for _, publicIP := range service.Spec.PublicIPs {
@@ -386,7 +382,8 @@ func (rs *REST) deleteExternalLoadBalancer(ctx api.Context, service *api.Service
 	if err != nil {
 		return err
 	}
-	if err := balancer.DeleteTCPLoadBalancer(rs.getLoadbalancerName(ctx, service), zone.Region); err != nil {
+	name := cloudprovider.GetLoadBalancerName(rs.clusterName, api.NamespaceValue(ctx), service.Name)
+	if err := balancer.DeleteTCPLoadBalancer(name, zone.Region); err != nil {
 		return err
 	}
 	return nil

@@ -32,6 +32,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 
 	"code.google.com/p/gcfg"
 	compute "code.google.com/p/google-api-go-client/compute/v1"
@@ -95,7 +96,12 @@ func getProjectAndZone() (string, string, error) {
 	if len(parts) != 4 {
 		return "", "", fmt.Errorf("unexpected response: %s", result)
 	}
-	return parts[1], parts[3], nil
+	zone := parts[3]
+	projectID, err := metadata.ProjectID()
+	if err != nil {
+		return "", "", err
+	}
+	return projectID, zone, nil
 }
 
 func getInstanceID() (string, error) {
@@ -292,15 +298,41 @@ func (gce *GCECloud) CreateTCPLoadBalancer(name, region string, externalIP net.I
 
 // UpdateTCPLoadBalancer is an implementation of TCPLoadBalancer.UpdateTCPLoadBalancer.
 func (gce *GCECloud) UpdateTCPLoadBalancer(name, region string, hosts []string) error {
-	var refs []*compute.InstanceReference
-	for _, host := range hosts {
-		refs = append(refs, &compute.InstanceReference{host})
+	pool, err := gce.service.TargetPools.Get(gce.projectID, region, name).Do()
+	if err != nil {
+		return err
 	}
-	req := &compute.TargetPoolsAddInstanceRequest{
-		Instances: refs,
+	existing := util.NewStringSet(pool.Instances...)
+
+	var toAdd []*compute.InstanceReference
+	var toRemove []*compute.InstanceReference
+	for _, host := range hosts {
+		link := makeHostLink(gce.projectID, gce.zone, host)
+		if !existing.Has(link) {
+			toAdd = append(toAdd, &compute.InstanceReference{link})
+		}
+		existing.Delete(link)
+	}
+	for link := range existing {
+		toRemove = append(toRemove, &compute.InstanceReference{link})
 	}
 
-	op, err := gce.service.TargetPools.AddInstance(gce.projectID, region, name, req).Do()
+	add := &compute.TargetPoolsAddInstanceRequest{
+		Instances: toAdd,
+	}
+	op, err := gce.service.TargetPools.AddInstance(gce.projectID, region, name, add).Do()
+	if err != nil {
+		return err
+	}
+	err = gce.waitForRegionOp(op, region)
+	if err != nil {
+		return err
+	}
+
+	rm := &compute.TargetPoolsRemoveInstanceRequest{
+		Instances: toRemove,
+	}
+	op, err = gce.service.TargetPools.RemoveInstance(gce.projectID, region, name, rm).Do()
 	if err != nil {
 		return err
 	}

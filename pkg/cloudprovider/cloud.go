@@ -42,6 +42,10 @@ type Clusters interface {
 	Master(clusterName string) (string, error)
 }
 
+func GetLoadBalancerName(clusterName, serviceNamespace, serviceName string) string {
+	return clusterName + "-" + serviceNamespace + "-" + serviceName
+}
+
 // TCPLoadBalancer is an abstract, pluggable interface for TCP load balancers.
 type TCPLoadBalancer interface {
 	// TCPLoadBalancerExists returns whether the specified load balancer exists.
