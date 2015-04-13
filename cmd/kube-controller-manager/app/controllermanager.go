@@ -81,7 +81,7 @@ func NewCMServer() *CMServer {
 		Address:                 util.IP(net.ParseIP("127.0.0.1")),
 		NodeSyncPeriod:          10 * time.Second,
 		ResourceQuotaSyncPeriod: 10 * time.Second,
-		NamespaceSyncPeriod:     1 * time.Minute,
+		NamespaceSyncPeriod:     5 * time.Minute,
 		RegisterRetryCount:      10,
 		PodEvictionTimeout:      5 * time.Minute,
 		NodeMilliCPU:            1000,
@@ -207,8 +207,8 @@ func (s *CMServer) Run(_ []string) error {
 	resourceQuotaManager := resourcequota.NewResourceQuotaManager(kubeClient)
 	resourceQuotaManager.Run(s.ResourceQuotaSyncPeriod)
 
-	namespaceManager := namespace.NewNamespaceManager(kubeClient)
-	namespaceManager.Run(s.NamespaceSyncPeriod)
+	namespaceManager := namespace.NewNamespaceManager(kubeClient, s.NamespaceSyncPeriod)
+	namespaceManager.Run()
 
 	select {}
 	return nil
