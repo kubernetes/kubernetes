@@ -125,7 +125,7 @@ func (sv *secretVolume) SetUpAt(dir string) error {
 
 	for name, data := range secret.Data {
 		hostFilePath := path.Join(dir, name)
-		glog.V(3).Infof("Writing secret data %v/%v/%v (%v bytes) to host file %v", sv.podRef.Namespace, sv.secretName, len(data), hostFilePath)
+		glog.V(3).Infof("Writing secret data %v/%v/%v (%v bytes) to host file %v", sv.podRef.Namespace, sv.secretName, name, len(data), hostFilePath)
 		err := ioutil.WriteFile(hostFilePath, data, 0777)
 		if err != nil {
 			glog.Errorf("Error writing secret data to host path: %v, %v", hostFilePath, err)
