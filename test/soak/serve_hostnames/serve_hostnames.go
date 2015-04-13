@@ -23,7 +23,6 @@ a serivce
 package main
 
 import (
-	"encoding/json"
 	"flag"
 	"fmt"
 	"math/rand"
@@ -248,7 +247,7 @@ func main() {
 			continue
 		}
 		var r api.Status
-		if err := json.Unmarshal(hostname, &r); err != nil {
+		if err := api.Scheme.DecodeInto(hostname, &r); err != nil {
 			break
 		}
 		if r.Status == api.StatusFailure {
