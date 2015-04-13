@@ -1080,15 +1080,26 @@ func (kl *Kubelet) computePodContainerChanges(pod *api.Pod, runningPod kubeconta
 	createPodInfraContainer := false
 
 	var podInfraContainerID dockertools.DockerID
+	var changed bool
 	podInfraContainer := runningPod.FindContainerByName(dockertools.PodInfraContainerName)
 	if podInfraContainer != nil {
-		glog.V(4).Infof("Found infra pod for %q", podFullName)
+		glog.V(4).Infof("Found pod infra container for %q", podFullName)
+		changed, err = kl.containerManager.PodInfraContainerChanged(pod, podInfraContainer)
+		if err != nil {
+			return podContainerChangesSpec{}, err
+		}
+	}
+
+	createPodInfraContainer = true
+	if podInfraContainer == nil {
+		glog.V(2).Infof("Need to restart pod infra container for %q because it is not found", podFullName)
+	} else if changed {
+		glog.V(2).Infof("Need to restart pod infra container for %q because it is changed", podFullName)
+	} else {
+		glog.V(4).Infof("Pod infra container looks good, keep it %q", podFullName)
+		createPodInfraContainer = false
 		podInfraContainerID = dockertools.DockerID(podInfraContainer.ID)
 		containersToKeep[podInfraContainerID] = -1
-
-	} else {
-		glog.V(2).Infof("No Infra Container for %q found. All containers will be restarted.", podFullName)
-		createPodInfraContainer = true
 	}
 
 	// Do not use the cache here since we need the newest status to check
@@ -1129,22 +1140,11 @@ func (kl *Kubelet) computePodContainerChanges(pod *api.Pod, runningPod kubeconta
 						containersToKeep[containerID] = index
 						continue
 					}
-					glog.Infof("pod %q container %q is unhealthy (probe result: %v). Container will be killed and re-created.", podFullName, container.Name, result)
-					containersToStart[index] = empty{}
+					glog.Infof("pod %q container %q is unhealthy (probe result: %v), it will be killed and re-created.", podFullName, container.Name, result)
 				} else {
-					glog.Infof("pod %q container %q hash changed (%d vs %d). Pod will be killed and re-created.", podFullName, container.Name, hash, expectedHash)
-					createPodInfraContainer = true
-					delete(containersToKeep, podInfraContainerID)
-					// If we are to restart Infra Container then we move containersToKeep into containersToStart
-					// if RestartPolicy allows restarting failed containers.
-					if pod.Spec.RestartPolicy != api.RestartPolicyNever {
-						for _, v := range containersToKeep {
-							containersToStart[v] = empty{}
-						}
-					}
-					containersToStart[index] = empty{}
-					containersToKeep = make(map[dockertools.DockerID]int)
+					glog.Infof("pod %q container %q hash changed (%d vs %d), it will be killed and re-created.", podFullName, container.Name, hash, expectedHash)
 				}
+				containersToStart[index] = empty{}
 			} else { // createPodInfraContainer == true and Container exists
 				// If we're creating infra containere everything will be killed anyway
 				// If RestartPolicy is Always or OnFailure we restart containers that were running before we
@@ -1167,7 +1167,8 @@ func (kl *Kubelet) computePodContainerChanges(pod *api.Pod, runningPod kubeconta
 	}
 
 	// After the loop one of the following should be true:
-	// - createPodInfraContainer is true and containersToKeep is empty
+	// - createPodInfraContainer is true and containersToKeep is empty.
+	// (In fact, when createPodInfraContainer is false, containersToKeep will not be touched).
 	// - createPodInfraContainer is false and containersToKeep contains at least ID of Infra Container
 
 	// If Infra container is the last running one, we don't want to keep it.
@@ -1221,7 +1222,7 @@ func (kl *Kubelet) syncPod(pod *api.Pod, mirrorPod *api.Pod, runningPod kubecont
 
 	if containerChanges.startInfraContainer || (len(containerChanges.containersToKeep) == 0 && len(containerChanges.containersToStart) == 0) {
 		if len(containerChanges.containersToKeep) == 0 && len(containerChanges.containersToStart) == 0 {
-			glog.V(4).Infof("Killing Infra Container for %q becase all other containers are dead.", podFullName)
+			glog.V(4).Infof("Killing Infra Container for %q because all other containers are dead.", podFullName)
 		} else {
 			glog.V(4).Infof("Killing Infra Container for %q, will start new one", podFullName)
 		}
