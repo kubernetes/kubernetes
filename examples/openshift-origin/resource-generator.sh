@@ -22,14 +22,6 @@ set -o pipefail
 
 ORIGIN=$(dirname "${BASH_SOURCE}")
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
-source "${KUBE_ROOT}/cluster/kubectl.sh" > /dev/null 2>&1
-
-# Check all prerequisites are on the path
-HAVE_JQ=$(which jq)
-if [[ -z ${HAVE_JQ} ]]; then
- echo "Please install jq"
- exit 1
-fi
 
 HAVE_BASE64=$(which base64)
 if [[ -z ${HAVE_BASE64} ]]; then
@@ -39,19 +31,19 @@ fi
 
 # Capture information about your kubernetes cluster
 TEMPLATE="--template=\"{{ index . \"current-context\" }}\""
-CURRENT_CONTEXT=$( "${kubectl}" "${config[@]:+${config[@]}}" config view -o template "${TEMPLATE}" )
+CURRENT_CONTEXT=$( kubectl config view -o template "${TEMPLATE}" )
 
 TEMPLATE="--template=\"{{index . \"contexts\" ${CURRENT_CONTEXT} \"cluster\"}}\""
-CURRENT_CLUSTER=$( "${kubectl}" "${config[@]:+${config[@]}}" config view -o template "${TEMPLATE}" )
+CURRENT_CLUSTER=$( kubectl config view -o template "${TEMPLATE}" )
 
 TEMPLATE="--template=\"{{index . \"contexts\" ${CURRENT_CONTEXT} \"user\"}}\""
-CURRENT_USER=$( "${kubectl}" "${config[@]:+${config[@]}}" config view -o template "${TEMPLATE}" )
+CURRENT_USER=$( kubectl config view -o template "${TEMPLATE}" )
 
 TEMPLATE="--template=\"{{index . \"clusters\" ${CURRENT_CLUSTER} \"server\"}}\""
-KUBE_MASTER=$( "${kubectl}" "${config[@]:+${config[@]}}" config view -o template "${TEMPLATE}" )
+KUBE_MASTER=$( kubectl config view -o template "${TEMPLATE}" )
 
 TEMPLATE="--template=\"{{index . \"users\" ${CURRENT_USER} \"client-key\"}}\""
-KUBE_CLIENT_KEY=$( "${kubectl}" "${config[@]:+${config[@]}}" config view -o template "${TEMPLATE}" )
+KUBE_CLIENT_KEY=$( kubectl config view -o template "${TEMPLATE}" )
 
 # Collect all the secrets and encode as base64
 ORIGIN_KUBECONFIG_DATA=$( cat ${ORIGIN}/origin-kubeconfig.yaml | base64 --wrap=0)
