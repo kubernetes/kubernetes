@@ -29,6 +29,7 @@ import (
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/capabilities"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/clientauth"
@@ -406,7 +407,7 @@ func RunKubelet(kcfg *KubeletConfig, builder KubeletBuilder) {
 	} else {
 		glog.Infof("No api server defined - no events will be sent to API server.")
 	}
-	kubelet.SetupCapabilities(kcfg.AllowPrivileged, kcfg.HostNetworkSources)
+	capabilities.Setup(kcfg.AllowPrivileged, kcfg.HostNetworkSources)
 
 	credentialprovider.SetPreferredDockercfgPath(kcfg.RootDirectory)
 
