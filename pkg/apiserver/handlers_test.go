@@ -135,49 +135,54 @@ func TestReadOnly(t *testing.T) {
 
 func TestGetAPIRequestInfo(t *testing.T) {
 	successCases := []struct {
-		method             string
-		url                string
-		expectedVerb       string
-		expectedAPIVersion string
-		expectedNamespace  string
-		expectedResource   string
-		expectedKind       string
-		expectedName       string
-		expectedParts      []string
+		method              string
+		url                 string
+		expectedVerb        string
+		expectedAPIVersion  string
+		expectedNamespace   string
+		expectedResource    string
+		expectedSubresource string
+		expectedKind        string
+		expectedName        string
+		expectedParts       []string
 	}{
 
 		// resource paths
-		{"GET", "/namespaces", "list", "", "", "namespaces", "Namespace", "", []string{"namespaces"}},
-		{"GET", "/namespaces/other", "get", "", "other", "namespaces", "Namespace", "other", []string{"namespaces", "other"}},
+		{"GET", "/namespaces", "list", "", "", "namespaces", "", "Namespace", "", []string{"namespaces"}},
+		{"GET", "/namespaces/other", "get", "", "other", "namespaces", "", "Namespace", "other", []string{"namespaces", "other"}},
 
-		{"GET", "/namespaces/other/pods", "list", "", "other", "pods", "Pod", "", []string{"pods"}},
-		{"GET", "/namespaces/other/pods/foo", "get", "", "other", "pods", "Pod", "foo", []string{"pods", "foo"}},
-		{"GET", "/pods", "list", "", api.NamespaceAll, "pods", "Pod", "", []string{"pods"}},
-		{"POST", "/pods", "create", "", api.NamespaceDefault, "pods", "Pod", "", []string{"pods"}},
-		{"GET", "/pods/foo", "get", "", api.NamespaceDefault, "pods", "Pod", "foo", []string{"pods", "foo"}},
-		{"GET", "/pods/foo?namespace=other", "get", "", "other", "pods", "Pod", "foo", []string{"pods", "foo"}},
-		{"GET", "/pods?namespace=other", "list", "", "other", "pods", "Pod", "", []string{"pods"}},
+		{"GET", "/namespaces/other/pods", "list", "", "other", "pods", "", "Pod", "", []string{"pods"}},
+		{"GET", "/namespaces/other/pods/foo", "get", "", "other", "pods", "", "Pod", "foo", []string{"pods", "foo"}},
+		{"GET", "/pods", "list", "", api.NamespaceAll, "pods", "", "Pod", "", []string{"pods"}},
+		{"POST", "/pods", "create", "", api.NamespaceDefault, "pods", "", "Pod", "", []string{"pods"}},
+		{"GET", "/pods/foo", "get", "", api.NamespaceDefault, "pods", "", "Pod", "foo", []string{"pods", "foo"}},
+		{"GET", "/pods/foo?namespace=other", "get", "", "other", "pods", "", "Pod", "foo", []string{"pods", "foo"}},
+		{"GET", "/pods?namespace=other", "list", "", "other", "pods", "", "Pod", "", []string{"pods"}},
 
 		// special verbs
-		{"GET", "/proxy/namespaces/other/pods/foo", "proxy", "", "other", "pods", "Pod", "foo", []string{"pods", "foo"}},
-		{"GET", "/proxy/pods/foo", "proxy", "", api.NamespaceDefault, "pods", "Pod", "foo", []string{"pods", "foo"}},
-		{"GET", "/redirect/namespaces/other/pods/foo", "redirect", "", "other", "pods", "Pod", "foo", []string{"pods", "foo"}},
-		{"GET", "/redirect/pods/foo", "redirect", "", api.NamespaceDefault, "pods", "Pod", "foo", []string{"pods", "foo"}},
-		{"GET", "/watch/pods", "watch", "", api.NamespaceAll, "pods", "Pod", "", []string{"pods"}},
-		{"GET", "/watch/namespaces/other/pods", "watch", "", "other", "pods", "Pod", "", []string{"pods"}},
+		{"GET", "/proxy/namespaces/other/pods/foo", "proxy", "", "other", "pods", "", "Pod", "foo", []string{"pods", "foo"}},
+		{"GET", "/proxy/pods/foo", "proxy", "", api.NamespaceDefault, "pods", "", "Pod", "foo", []string{"pods", "foo"}},
+		{"GET", "/redirect/namespaces/other/pods/foo", "redirect", "", "other", "pods", "", "Pod", "foo", []string{"pods", "foo"}},
+		{"GET", "/redirect/pods/foo", "redirect", "", api.NamespaceDefault, "pods", "", "Pod", "foo", []string{"pods", "foo"}},
+		{"GET", "/watch/pods", "watch", "", api.NamespaceAll, "pods", "", "Pod", "", []string{"pods"}},
+		{"GET", "/watch/namespaces/other/pods", "watch", "", "other", "pods", "", "Pod", "", []string{"pods"}},
 
 		// fully-qualified paths
-		{"GET", "/api/v1beta1/namespaces/other/pods", "list", "v1beta1", "other", "pods", "Pod", "", []string{"pods"}},
-		{"GET", "/api/v1beta1/namespaces/other/pods/foo", "get", "v1beta1", "other", "pods", "Pod", "foo", []string{"pods", "foo"}},
-		{"GET", "/api/v1beta1/pods", "list", "v1beta1", api.NamespaceAll, "pods", "Pod", "", []string{"pods"}},
-		{"POST", "/api/v1beta1/pods", "create", "v1beta1", api.NamespaceDefault, "pods", "Pod", "", []string{"pods"}},
-		{"GET", "/api/v1beta1/pods/foo", "get", "v1beta1", api.NamespaceDefault, "pods", "Pod", "foo", []string{"pods", "foo"}},
-		{"GET", "/api/v1beta1/pods/foo?namespace=other", "get", "v1beta1", "other", "pods", "Pod", "foo", []string{"pods", "foo"}},
-		{"GET", "/api/v1beta1/pods?namespace=other", "list", "v1beta1", "other", "pods", "Pod", "", []string{"pods"}},
-		{"GET", "/api/v1beta1/proxy/pods/foo", "proxy", "v1beta1", api.NamespaceDefault, "pods", "Pod", "foo", []string{"pods", "foo"}},
-		{"GET", "/api/v1beta1/redirect/pods/foo", "redirect", "v1beta1", api.NamespaceDefault, "pods", "Pod", "foo", []string{"pods", "foo"}},
-		{"GET", "/api/v1beta1/watch/pods", "watch", "v1beta1", api.NamespaceAll, "pods", "Pod", "", []string{"pods"}},
-		{"GET", "/api/v1beta1/watch/namespaces/other/pods", "watch", "v1beta1", "other", "pods", "Pod", "", []string{"pods"}},
+		{"GET", "/api/v1beta1/namespaces/other/pods", "list", "v1beta1", "other", "pods", "", "Pod", "", []string{"pods"}},
+		{"GET", "/api/v1beta1/namespaces/other/pods/foo", "get", "v1beta1", "other", "pods", "", "Pod", "foo", []string{"pods", "foo"}},
+		{"GET", "/api/v1beta1/pods", "list", "v1beta1", api.NamespaceAll, "pods", "", "Pod", "", []string{"pods"}},
+		{"POST", "/api/v1beta1/pods", "create", "v1beta1", api.NamespaceDefault, "pods", "", "Pod", "", []string{"pods"}},
+		{"GET", "/api/v1beta1/pods/foo", "get", "v1beta1", api.NamespaceDefault, "pods", "", "Pod", "foo", []string{"pods", "foo"}},
+		{"GET", "/api/v1beta1/pods/foo?namespace=other", "get", "v1beta1", "other", "pods", "", "Pod", "foo", []string{"pods", "foo"}},
+		{"GET", "/api/v1beta1/pods?namespace=other", "list", "v1beta1", "other", "pods", "", "Pod", "", []string{"pods"}},
+		{"GET", "/api/v1beta1/proxy/pods/foo", "proxy", "v1beta1", api.NamespaceDefault, "pods", "", "Pod", "foo", []string{"pods", "foo"}},
+		{"GET", "/api/v1beta1/redirect/pods/foo", "redirect", "v1beta1", api.NamespaceDefault, "pods", "", "Pod", "foo", []string{"pods", "foo"}},
+		{"GET", "/api/v1beta1/watch/pods", "watch", "v1beta1", api.NamespaceAll, "pods", "", "Pod", "", []string{"pods"}},
+		{"GET", "/api/v1beta1/watch/namespaces/other/pods", "watch", "v1beta1", "other", "pods", "", "Pod", "", []string{"pods"}},
+
+		// subresource identification
+		{"GET", "/namespaces/other/pods/foo/status", "get", "", "other", "pods", "status", "Pod", "foo", []string{"pods", "foo", "status"}},
+		{"PUT", "/namespaces/other/finalize", "update", "", "other", "finalize", "", "", "", []string{"finalize"}},
 	}
 
 	apiRequestInfoResolver := &APIRequestInfoResolver{util.NewStringSet("api"), latest.RESTMapper}
@@ -204,14 +209,14 @@ func TestGetAPIRequestInfo(t *testing.T) {
 		if successCase.expectedResource != apiRequestInfo.Resource {
 			t.Errorf("Unexpected resource for url: %s, expected: %s, actual: %s", successCase.url, successCase.expectedResource, apiRequestInfo.Resource)
 		}
+		if successCase.expectedSubresource != apiRequestInfo.Subresource {
+			t.Errorf("Unexpected resource for url: %s, expected: %s, actual: %s", successCase.url, successCase.expectedSubresource, apiRequestInfo.Subresource)
+		}
 		if successCase.expectedName != apiRequestInfo.Name {
 			t.Errorf("Unexpected name for url: %s, expected: %s, actual: %s", successCase.url, successCase.expectedName, apiRequestInfo.Name)
 		}
 		if !reflect.DeepEqual(successCase.expectedParts, apiRequestInfo.Parts) {
 			t.Errorf("Unexpected parts for url: %s, expected: %v, actual: %v", successCase.url, successCase.expectedParts, apiRequestInfo.Parts)
-		}
-		if e, a := strings.Split(successCase.url, "?")[0], apiRequestInfo.URLPath(); e != a {
-			t.Errorf("Expected %v, got %v", e, a)
 		}
 	}
 
