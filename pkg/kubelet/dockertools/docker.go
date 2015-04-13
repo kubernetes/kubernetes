@@ -409,30 +409,6 @@ func (c DockerContainers) FindPodContainer(podFullName string, uid types.UID, co
 	return nil, false, 0
 }
 
-// RemoveContainerWithID removes the container with the given containerID.
-func (c DockerContainers) RemoveContainerWithID(containerID DockerID) {
-	delete(c, containerID)
-}
-
-// FindContainersByPod returns the containers that belong to the pod.
-func (c DockerContainers) FindContainersByPod(podUID types.UID, podFullName string) DockerContainers {
-	containers := make(DockerContainers)
-	for _, dockerContainer := range c {
-		if len(dockerContainer.Names) == 0 {
-			continue
-		}
-		dockerName, _, err := ParseDockerName(dockerContainer.Names[0])
-		if err != nil {
-			continue
-		}
-		if podUID == dockerName.PodUID ||
-			(podUID == "" && podFullName == dockerName.PodFullName) {
-			containers[DockerID(dockerContainer.ID)] = dockerContainer
-		}
-	}
-	return containers
-}
-
 const containerNamePrefix = "k8s"
 
 func HashContainer(container *api.Container) uint64 {
