@@ -70,13 +70,12 @@ type TestKubelet struct {
 
 func newTestKubelet(t *testing.T) *TestKubelet {
 	fakeDocker := &dockertools.FakeDockerClient{Errors: make(map[string]error), RemovedImages: util.StringSet{}}
-	fakeDockerCache := dockertools.NewFakeDockerCache(fakeDocker)
+
 	fakeRecorder := &record.FakeRecorder{}
 	fakeKubeClient := &testclient.Fake{}
 
 	kubelet := &Kubelet{}
 	kubelet.dockerClient = fakeDocker
-	kubelet.dockerCache = fakeDockerCache
 	kubelet.kubeClient = fakeKubeClient
 	kubelet.dockerPuller = &dockertools.FakeDockerPuller{}
 	kubelet.hostname = "testnode"
@@ -90,14 +89,6 @@ func newTestKubelet(t *testing.T) *TestKubelet {
 		t.Fatalf("can't mkdir(%q): %v", kubelet.rootDirectory, err)
 	}
 	waitGroup := new(sync.WaitGroup)
-	kubelet.podWorkers = newPodWorkers(
-		fakeDockerCache,
-		func(pod *api.Pod, mirrorPod *api.Pod, runningPod container.Pod) error {
-			err := kubelet.syncPod(pod, mirrorPod, runningPod)
-			waitGroup.Done()
-			return err
-		},
-		fakeRecorder)
 	kubelet.sourcesReady = func() bool { return true }
 	kubelet.masterServiceNamespace = api.NamespaceDefault
 	kubelet.serviceLister = testServiceLister{}
@@ -114,6 +105,15 @@ func newTestKubelet(t *testing.T) *TestKubelet {
 	kubelet.podManager = podManager
 	kubelet.containerRefManager = kubecontainer.NewRefManager()
 	kubelet.containerManager = dockertools.NewDockerManager(fakeDocker, fakeRecorder, dockertools.PodInfraContainerImage)
+	kubelet.dockerCache = dockertools.NewFakeDockerCache(kubelet.containerManager)
+	kubelet.podWorkers = newPodWorkers(
+		kubelet.dockerCache,
+		func(pod *api.Pod, mirrorPod *api.Pod, runningPod container.Pod) error {
+			err := kubelet.syncPod(pod, mirrorPod, runningPod)
+			waitGroup.Done()
+			return err
+		},
+		fakeRecorder)
 	return &TestKubelet{kubelet, fakeDocker, mockCadvisor, fakeKubeClient, waitGroup, fakeMirrorClient}
 }
 

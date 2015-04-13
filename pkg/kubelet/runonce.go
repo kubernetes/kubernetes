@@ -92,7 +92,7 @@ func (kl *Kubelet) runPod(pod api.Pod, retryDelay time.Duration) error {
 	delay := retryDelay
 	retry := 0
 	for {
-		pods, err := dockertools.GetPods(kl.dockerClient, false)
+		pods, err := kl.containerManager.GetPods(false)
 		if err != nil {
 			return fmt.Errorf("failed to get kubelet pods: %v", err)
 		}
