@@ -32,7 +32,6 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/validation"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/capabilities"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/cache"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
@@ -851,20 +850,6 @@ func (kl *Kubelet) killContainerByID(ID string) error {
 	return err
 }
 
-// Determined whether the specified pod is allowed to use host networking
-func allowHostNetwork(pod *api.Pod) (bool, error) {
-	podSource, err := getPodSource(pod)
-	if err != nil {
-		return false, err
-	}
-	for _, source := range capabilities.Get().HostNetworkSources {
-		if source == podSource {
-			return true, nil
-		}
-	}
-	return false, nil
-}
-
 // createPodInfraContainer starts the pod infra container for a pod. Returns the docker container ID of the newly created container.
 func (kl *Kubelet) createPodInfraContainer(pod *api.Pod) (dockertools.DockerID, error) {
 
@@ -1209,21 +1194,6 @@ func (kl *Kubelet) computePodContainerChanges(pod *api.Pod, runningPod kubeconta
 	}, nil
 }
 
-// Check whether we can run the specified pod.
-func (kl *Kubelet) canRunPod(pod *api.Pod) error {
-	if pod.Spec.HostNetwork {
-		allowed, err := allowHostNetwork(pod)
-		if err != nil {
-			return err
-		}
-		if !allowed {
-			return fmt.Errorf("pod with UID %q specified host networking, but is disallowed", pod.UID)
-		}
-	}
-	// TODO(vmarmol): Check Privileged too.
-	return nil
-}
-
 func (kl *Kubelet) syncPod(pod *api.Pod, mirrorPod *api.Pod, runningPod kubecontainer.Pod) error {
 	podFullName := kubecontainer.GetPodFullName(pod)
 	uid := pod.UID
@@ -1248,7 +1218,7 @@ func (kl *Kubelet) syncPod(pod *api.Pod, mirrorPod *api.Pod, runningPod kubecont
 	}()
 
 	// Kill pods we can't run.
-	err := kl.canRunPod(pod)
+	err := canRunPod(pod)
 	if err != nil {
 		kl.killPod(runningPod)
 		return err

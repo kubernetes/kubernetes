@@ -17,6 +17,8 @@ limitations under the License.
 package kubelet
 
 import (
+	"fmt"
+
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
 	cadvisorApi "github.com/google/cadvisor/info/v1"
@@ -32,4 +34,33 @@ func CapacityFromMachineInfo(info *cadvisorApi.MachineInfo) api.ResourceList {
 			resource.BinarySI),
 	}
 	return c
+}
+
+// Check whether we have the capabilities to run the specified pod.
+func canRunPod(pod *api.Pod) error {
+	if pod.Spec.HostNetwork {
+		allowed, err := allowHostNetwork(pod)
+		if err != nil {
+			return err
+		}
+		if !allowed {
+			return fmt.Errorf("pod with UID %q specified host networking, but is disallowed", pod.UID)
+		}
+	}
+	// TODO(vmarmol): Check Privileged too.
+	return nil
+}
+
+// Determined whether the specified pod is allowed to use host networking
+func allowHostNetwork(pod *api.Pod) (bool, error) {
+	podSource, err := getPodSource(pod)
+	if err != nil {
+		return false, err
+	}
+	for _, source := range capabilities.Get().HostNetworkSources {
+		if source == podSource {
+			return true, nil
+		}
+	}
+	return false, nil
 }
