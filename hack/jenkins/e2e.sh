@@ -37,6 +37,29 @@ else
     export HOME=${WORKSPACE} # Nothing should want Jenkins $HOME
 fi
 
+# Additional parameters that are passed to ginkgo runner.
+GINKGO_TEST_ARGS=""
+
+if [[ "${SCALABILITY:-}" == "true" ]]; then
+    if [[ "${KUBERNETES_PROVIDER}" == "aws" ]]; then
+      export MASTER_SIZE="m3.xlarge"
+    else
+      export MASTER_SIZE="n1-standard-4"
+    fi
+    # TODO(wojtek-t): Once we have enough quota for the project, increase
+    # NUM_MINIONS to 100 (which is our v1.0 goal).
+    export NUM_MINIONS="10"
+    GINKGO_TEST_ARGS="--ginkgo.focus=Density "
+else
+    if [[ "${KUBERNETES_PROVIDER}" == "aws" ]]; then
+      export MASTER_SIZE="t2.small"
+    else
+      export MASTER_SIZE="g1-small"
+    fi
+    export NUM_MINIONS="2"
+fi
+
+
 # Unlike the kubernetes-build script, we expect some environment
 # variables to be set. We echo these immediately and presume "set -o
 # nounset" will force the caller to set them: (The first several are
@@ -111,7 +134,7 @@ go run ./hack/e2e.go -v --ctl="version --match-server-version=false"
 ### Run tests ###
 # Jenkins will look at the junit*.xml files for test failures, so don't exit
 # with a nonzero error code if it was only tests that failed.
-go run ./hack/e2e.go ${E2E_OPT} -v --test --test_args="--ginkgo.noColor" || true
+go run ./hack/e2e.go ${E2E_OPT} -v --test --test_args="${GINKGO_TEST_ARGS}--ginkgo.noColor" || true
 
 ### Clean up ###
 go run ./hack/e2e.go ${E2E_OPT} -v --down

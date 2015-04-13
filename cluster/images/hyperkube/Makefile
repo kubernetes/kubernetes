@@ -1,9 +1,9 @@
 # build the hyperkube image.
 
-VERSION=v0.14.1
+VERSION=v0.14.2
 
 all:
-#	cp ../../../_output/release-stage/server/linux-amd64/kubernetes/server/bin/hyperkube ./
+	curl -O http://storage.googleapis.com/kubernetes-release/release/${VERSION}/bin/linux/amd64/hyperkube
 	docker build -t gcr.io/google_containers/hyperkube:${VERSION} .
 	gcloud preview docker push gcr.io/google_containers/hyperkube:${VERSION}
 

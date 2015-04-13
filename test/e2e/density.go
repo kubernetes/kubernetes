@@ -219,8 +219,9 @@ var _ = Describe("Density", func() {
 	densityTests := []Density{
 		// This test should always run, even if larger densities are skipped.
 		{podsPerMinion: 3, skip: false},
-		// TODO (wojtek-t):don't skip d30 after #6059
-		{podsPerMinion: 30, skip: true},
+		{podsPerMinion: 30, skip: false},
+		// More than 30 pods per node is outside our v1.0 goals.
+		// We might want to enable those tests in the future.
 		{podsPerMinion: 50, skip: true},
 		{podsPerMinion: 100, skip: true},
 	}
