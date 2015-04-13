@@ -1168,7 +1168,7 @@ func (aws *AWSCloud) AttachDisk(instanceName string, diskName string, readOnly b
 			return "", fmt.Errorf("Error getting self-instance: %v", err)
 		}
 	} else {
-		instance, err := aws.getInstancesByDnsName(instanceName)
+		instance, err := aws.getInstanceByDnsName(instanceName)
 		if err != nil {
 			return "", fmt.Errorf("Error finding instance: %v", err)
 		}
@@ -1516,7 +1516,8 @@ func (self *AWSCloud) CreateTCPLoadBalancer(name, region string, externalIP net.
 
 	attachedInstances, err := self.ec2.RegisterInstancesWithLoadBalancer(region, registerRequest)
 	if err != nil {
-		return err
+		// TODO: Is it better to delete the load balancer entirely?
+		glog.Warning("Error registering instances with load-balancer", name, err)
 	}
 
 	glog.V(1).Info("Updated instances registered with load-balancer", name, attachedInstances)
