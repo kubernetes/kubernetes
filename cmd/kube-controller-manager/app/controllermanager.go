@@ -69,7 +69,6 @@ type CMServer struct {
 	NodeMilliCPU int64
 	NodeMemory   resource.Quantity
 
-	KubeletConfig   client.KubeletConfig
 	ClusterName     string
 	EnableProfiling bool
 }
@@ -87,12 +86,7 @@ func NewCMServer() *CMServer {
 		NodeMilliCPU:            1000,
 		NodeMemory:              resource.MustParse("3Gi"),
 		SyncNodeList:            true,
-		KubeletConfig: client.KubeletConfig{
-			Port:        ports.KubeletPort,
-			EnableHttps: true,
-			HTTPTimeout: time.Duration(5) * time.Second,
-		},
-		ClusterName: "kubernetes",
+		ClusterName:             "kubernetes",
 	}
 	return &s
 }
@@ -133,7 +127,6 @@ func (s *CMServer) AddFlags(fs *pflag.FlagSet) {
 	// TODO: in the meantime, use resource.QuantityFlag() instead of these
 	fs.Int64Var(&s.NodeMilliCPU, "node_milli_cpu", s.NodeMilliCPU, "The amount of MilliCPU provisioned on each node")
 	fs.Var(resource.NewQuantityFlagValue(&s.NodeMemory), "node_memory", "The amount of memory (in bytes) provisioned on each node")
-	client.BindKubeletClientConfigFlags(fs, &s.KubeletConfig)
 	fs.StringVar(&s.ClusterName, "cluster_name", s.ClusterName, "The instance prefix for the cluster")
 	fs.BoolVar(&s.EnableProfiling, "profiling", false, "Enable profiling via web interface host:port/debug/pprof/")
 }
@@ -182,11 +175,6 @@ func (s *CMServer) Run(_ []string) error {
 	controllerManager := replicationControllerPkg.NewReplicationManager(kubeClient)
 	controllerManager.Run(replicationControllerPkg.DefaultSyncPeriod)
 
-	kubeletClient, err := client.NewKubeletClient(&s.KubeletConfig)
-	if err != nil {
-		glog.Fatalf("Failure to start kubelet client: %v", err)
-	}
-
 	cloud := cloudprovider.InitCloudProvider(s.CloudProvider, s.CloudConfigFile)
 	nodeResources := &api.NodeResources{
 		Capacity: api.ResourceList{
@@ -200,7 +188,7 @@ func (s *CMServer) Run(_ []string) error {
 	}
 
 	nodeController := nodeControllerPkg.NewNodeController(cloud, s.MinionRegexp, s.MachineList, nodeResources,
-		kubeClient, kubeletClient, s.RegisterRetryCount, s.PodEvictionTimeout, util.NewTokenBucketRateLimiter(s.DeletingPodsQps, s.DeletingPodsBurst),
+		kubeClient, s.RegisterRetryCount, s.PodEvictionTimeout, util.NewTokenBucketRateLimiter(s.DeletingPodsQps, s.DeletingPodsBurst),
 		s.NodeMonitorGracePeriod, s.NodeStartupGracePeriod, s.NodeMonitorPeriod, s.ClusterName)
 	nodeController.Run(s.NodeSyncPeriod, s.SyncNodeList)
 
