@@ -331,6 +331,9 @@ func (r *APIRequestInfoResolver) GetAPIRequestInfo(req *http.Request) (APIReques
 
 	}
 
+	// For types that aren't root scoped, we default to the "default" namespace if none is specified for backwards compatibility
+	namespaceUnlessRootScoped := ""
+
 	// URL forms: /namespaces/{namespace}/{kind}/*, where parts are adjusted to be relative to kind
 	if currentParts[0] == "namespaces" {
 		if len(currentParts) > 1 {
@@ -350,9 +353,9 @@ func (r *APIRequestInfoResolver) GetAPIRequestInfo(req *http.Request) (APIReques
 		requestInfo.Namespace = req.URL.Query().Get("namespace")
 		if len(requestInfo.Namespace) == 0 {
 			if len(currentParts) > 1 || req.Method == "POST" {
-				requestInfo.Namespace = api.NamespaceDefault
+				namespaceUnlessRootScoped = api.NamespaceDefault
 			} else {
-				requestInfo.Namespace = api.NamespaceAll
+				namespaceUnlessRootScoped = api.NamespaceAll
 			}
 		}
 	}
@@ -381,7 +384,23 @@ func (r *APIRequestInfoResolver) GetAPIRequestInfo(req *http.Request) (APIReques
 
 	// if we have a resource, we have a good shot at being able to determine kind
 	if len(requestInfo.Resource) > 0 {
-		_, requestInfo.Kind, _ = r.RestMapper.VersionAndKindForResource(requestInfo.Resource)
+		version, kind, err := r.RestMapper.VersionAndKindForResource(requestInfo.Resource)
+		if err == nil {
+			requestInfo.Kind = kind
+		}
+
+		if len(namespaceUnlessRootScoped) != 0 {
+			rootScoped := false
+			if len(requestInfo.APIVersion) > 0 {
+				version = requestInfo.APIVersion
+			}
+			if restMapping, err := r.RestMapper.RESTMapping(requestInfo.Kind, version); err == nil {
+				rootScoped = restMapping.Scope.Name() == meta.RESTScopeNameRoot
+			}
+			if !rootScoped {
+				requestInfo.Namespace = namespaceUnlessRootScoped
+			}
+		}
 	}
 
 	return requestInfo, nil

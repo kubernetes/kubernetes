@@ -38,11 +38,11 @@ func NewStorage(h tools.EtcdHelper) (*REST, *StatusREST) {
 	store := &etcdgeneric.Etcd{
 		NewFunc:     func() runtime.Object { return &api.PersistentVolume{} },
 		NewListFunc: func() runtime.Object { return &api.PersistentVolumeList{} },
-		KeyRootFunc: func(ctx api.Context) string {
-			return prefix
+		KeyRootFunc: func(ctx api.Context) (string, error) {
+			return etcdgeneric.NoNamespaceKeyRootFunc(ctx, prefix)
 		},
 		KeyFunc: func(ctx api.Context, name string) (string, error) {
-			return prefix + "/" + name, nil
+			return etcdgeneric.NoNamespaceKeyFunc(ctx, prefix, name)
 		},
 		ObjectNameFunc: func(obj runtime.Object) (string, error) {
 			return obj.(*api.PersistentVolume).Name, nil

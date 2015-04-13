@@ -95,7 +95,7 @@ func makeControllerKey(ctx api.Context, id string) (string, error) {
 
 // makeControllerListKey constructs etcd paths to the root of the resource,
 // not a specific controller resource
-func makeControllerListKey(ctx api.Context) string {
+func makeControllerListKey(ctx api.Context) (string, error) {
 	return etcdgeneric.NamespaceKeyRootFunc(ctx, controllerPrefix)
 }
 
@@ -381,7 +381,10 @@ func TestEtcdDeleteController(t *testing.T) {
 func TestEtcdListControllers(t *testing.T) {
 	storage, fakeClient := newStorage(t)
 	ctx := api.NewDefaultContext()
-	key := makeControllerListKey(ctx)
+	key, err := makeControllerListKey(ctx)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 	controller := validController
 	controller.Name = "bar"
 	fakeClient.Data[key] = tools.EtcdResponseWithError{
@@ -412,7 +415,10 @@ func TestEtcdListControllers(t *testing.T) {
 func TestEtcdListControllersNotFound(t *testing.T) {
 	storage, fakeClient := newStorage(t)
 	ctx := api.NewDefaultContext()
-	key := makeControllerListKey(ctx)
+	key, err := makeControllerListKey(ctx)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 	fakeClient.Data[key] = tools.EtcdResponseWithError{
 		R: &etcd.Response{},
 		E: tools.EtcdErrorNotFound,
@@ -430,7 +436,10 @@ func TestEtcdListControllersNotFound(t *testing.T) {
 func TestEtcdListControllersLabelsMatch(t *testing.T) {
 	storage, fakeClient := newStorage(t)
 	ctx := api.NewDefaultContext()
-	key := makeControllerListKey(ctx)
+	key, err := makeControllerListKey(ctx)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 
 	controller := validController
 	controller.Labels = map[string]string{"k": "v"}
@@ -494,7 +503,11 @@ func TestEtcdWatchController(t *testing.T) {
 func TestEtcdWatchControllersMatch(t *testing.T) {
 	ctx := api.WithNamespace(api.NewDefaultContext(), validController.Namespace)
 	storage, fakeClient := newStorage(t)
-	fakeClient.ExpectNotFoundGet(etcdgeneric.NamespaceKeyRootFunc(ctx, "/registry/pods"))
+	key, err := etcdgeneric.NamespaceKeyRootFunc(ctx, "/registry/pods")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	fakeClient.ExpectNotFoundGet(key)
 
 	watching, err := storage.Watch(ctx,
 		labels.SelectorFromSet(validController.Spec.Selector),
@@ -537,7 +550,11 @@ func TestEtcdWatchControllersMatch(t *testing.T) {
 func TestEtcdWatchControllersFields(t *testing.T) {
 	ctx := api.WithNamespace(api.NewDefaultContext(), validController.Namespace)
 	storage, fakeClient := newStorage(t)
-	fakeClient.ExpectNotFoundGet(etcdgeneric.NamespaceKeyRootFunc(ctx, "/registry/pods"))
+	key, err := etcdgeneric.NamespaceKeyRootFunc(ctx, "/registry/pods")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	fakeClient.ExpectNotFoundGet(key)
 
 	testFieldMap := map[int][]fields.Set{
 		PASS: {
@@ -618,7 +635,11 @@ func TestEtcdWatchControllersFields(t *testing.T) {
 func TestEtcdWatchControllersNotMatch(t *testing.T) {
 	ctx := api.NewDefaultContext()
 	storage, fakeClient := newStorage(t)
-	fakeClient.ExpectNotFoundGet(etcdgeneric.NamespaceKeyRootFunc(ctx, "/registry/pods"))
+	key, err := etcdgeneric.NamespaceKeyRootFunc(ctx, "/registry/pods")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	fakeClient.ExpectNotFoundGet(key)
 
 	watching, err := storage.Watch(ctx,
 		labels.SelectorFromSet(labels.Set{"name": "foo"}),

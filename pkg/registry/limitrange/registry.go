@@ -36,7 +36,7 @@ func NewEtcdRegistry(h tools.EtcdHelper) generic.Registry {
 			NewFunc:      func() runtime.Object { return &api.LimitRange{} },
 			NewListFunc:  func() runtime.Object { return &api.LimitRangeList{} },
 			EndpointName: "limitranges",
-			KeyRootFunc: func(ctx api.Context) string {
+			KeyRootFunc: func(ctx api.Context) (string, error) {
 				return etcdgeneric.NamespaceKeyRootFunc(ctx, "/registry/limitranges")
 			},
 			KeyFunc: func(ctx api.Context, id string) (string, error) {

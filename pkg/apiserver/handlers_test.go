@@ -151,6 +151,15 @@ func TestGetAPIRequestInfo(t *testing.T) {
 		{"GET", "/namespaces", "list", "", "", "namespaces", "", "Namespace", "", []string{"namespaces"}},
 		{"GET", "/namespaces/other", "get", "", "other", "namespaces", "", "Namespace", "other", []string{"namespaces", "other"}},
 
+		// root scope type paths
+		{"GET", "/minions", "list", "", "", "minions", "", "Minion", "", []string{"minions"}},
+		{"GET", "/minions/foo", "get", "", "", "minions", "", "Minion", "foo", []string{"minions", "foo"}},
+		{"PUT", "/minions/foo", "update", "", "", "minions", "", "Minion", "foo", []string{"minions", "foo"}},
+		{"POST", "/minions", "create", "", "", "minions", "", "Minion", "", []string{"minions"}},
+		{"DELETE", "/minions/foo", "delete", "", "", "minions", "", "Minion", "foo", []string{"minions", "foo"}},
+		{"GET", "/proxy/minions/foo", "proxy", "", "", "minions", "", "Minion", "foo", []string{"minions", "foo"}},
+		{"GET", "/redirect/minions/foo", "redirect", "", "", "minions", "", "Minion", "foo", []string{"minions", "foo"}},
+
 		{"GET", "/namespaces/other/pods", "list", "", "other", "pods", "", "Pod", "", []string{"pods"}},
 		{"GET", "/namespaces/other/pods/foo", "get", "", "other", "pods", "", "Pod", "foo", []string{"pods", "foo"}},
 		{"GET", "/pods", "list", "", api.NamespaceAll, "pods", "", "Pod", "", []string{"pods"}},
@@ -179,6 +188,15 @@ func TestGetAPIRequestInfo(t *testing.T) {
 		{"GET", "/api/v1beta1/redirect/pods/foo", "redirect", "v1beta1", api.NamespaceDefault, "pods", "", "Pod", "foo", []string{"pods", "foo"}},
 		{"GET", "/api/v1beta1/watch/pods", "watch", "v1beta1", api.NamespaceAll, "pods", "", "Pod", "", []string{"pods"}},
 		{"GET", "/api/v1beta1/watch/namespaces/other/pods", "watch", "v1beta1", "other", "pods", "", "Pod", "", []string{"pods"}},
+
+		// fully-qualified root scope type paths
+		{"GET", "/api/v1beta1/minions", "list", "v1beta1", "", "minions", "", "Minion", "", []string{"minions"}},
+		{"GET", "/api/v1beta1/minions/foo", "get", "v1beta1", "", "minions", "", "Minion", "foo", []string{"minions", "foo"}},
+		{"PUT", "/api/v1beta1/minions/foo", "update", "v1beta1", "", "minions", "", "Minion", "foo", []string{"minions", "foo"}},
+		{"POST", "/api/v1beta1/minions", "create", "v1beta1", "", "minions", "", "Minion", "", []string{"minions"}},
+		{"DELETE", "/api/v1beta1/minions/foo", "delete", "v1beta1", "", "minions", "", "Minion", "foo", []string{"minions", "foo"}},
+		{"GET", "/api/v1beta1/proxy/minions/foo", "proxy", "v1beta1", "", "minions", "", "Minion", "foo", []string{"minions", "foo"}},
+		{"GET", "/api/v1beta1/redirect/minions/foo", "redirect", "v1beta1", "", "minions", "", "Minion", "foo", []string{"minions", "foo"}},
 
 		// subresource identification
 		{"GET", "/namespaces/other/pods/foo/status", "get", "", "other", "pods", "status", "Pod", "foo", []string{"pods", "foo", "status"}},

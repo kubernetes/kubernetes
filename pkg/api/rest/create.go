@@ -57,7 +57,14 @@ func BeforeCreate(strategy RESTCreateStrategy, ctx api.Context, obj runtime.Obje
 			return errors.NewBadRequest("the namespace of the provided object does not match the namespace sent on the request")
 		}
 	} else {
-		objectMeta.Namespace = api.NamespaceNone
+		if ns, ok := api.NamespaceFrom(ctx); ok && ns != api.NamespaceNone {
+			return errors.NewBadRequest("namespace is not allowed on this type")
+		}
+		if objectMeta.Namespace != api.NamespaceNone {
+			return errors.NewInvalid(kind, objectMeta.Name, fielderrors.ValidationErrorList{
+				fielderrors.NewFieldInvalid("metadata.namespace", objectMeta.Namespace, "namespace is not allowed on this type"),
+			})
+		}
 	}
 	strategy.PrepareForCreate(obj)
 	api.FillObjectMetaSystemFields(ctx, objectMeta)

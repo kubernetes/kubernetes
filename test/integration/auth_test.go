@@ -411,8 +411,6 @@ func TestAuthModeAlwaysAllow(t *testing.T) {
 				if resVersion := previousResourceVersion[getPreviousResourceVersionKey(r.URL, "")]; resVersion != 0 {
 					sub += fmt.Sprintf(",\r\n\"resourceVersion\": \"%v\"", resVersion)
 				}
-				namespace := "default"
-				sub += fmt.Sprintf(",\r\n\"namespace\": %q", namespace)
 			}
 			bodyStr = fmt.Sprintf(r.body, sub)
 		}
@@ -620,8 +618,6 @@ func TestAliceNotForbiddenOrUnauthorized(t *testing.T) {
 				if resVersion := previousResourceVersion[getPreviousResourceVersionKey(r.URL, "")]; resVersion != 0 {
 					sub += fmt.Sprintf(",\r\n\"resourceVersion\": \"%v\"", resVersion)
 				}
-				namespace := "default"
-				sub += fmt.Sprintf(",\r\n\"namespace\": %q", namespace)
 			}
 			bodyStr = fmt.Sprintf(r.body, sub)
 		}

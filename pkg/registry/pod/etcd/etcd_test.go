@@ -1232,7 +1232,10 @@ func TestEtcdDeletePodMultipleContainers(t *testing.T) {
 func TestEtcdEmptyList(t *testing.T) {
 	registry, _, _, fakeClient, _ := newStorage(t)
 	ctx := api.NewDefaultContext()
-	key := registry.KeyRootFunc(ctx)
+	key, err := registry.KeyRootFunc(ctx)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 	fakeClient.Data[key] = tools.EtcdResponseWithError{
 		R: &etcd.Response{
 			Node: &etcd.Node{
@@ -1255,7 +1258,10 @@ func TestEtcdEmptyList(t *testing.T) {
 func TestEtcdListNotFound(t *testing.T) {
 	registry, _, _, fakeClient, _ := newStorage(t)
 	ctx := api.NewDefaultContext()
-	key := registry.KeyRootFunc(ctx)
+	key, err := registry.KeyRootFunc(ctx)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 	fakeClient.Data[key] = tools.EtcdResponseWithError{
 		R: &etcd.Response{},
 		E: tools.EtcdErrorNotFound,
@@ -1273,7 +1279,10 @@ func TestEtcdListNotFound(t *testing.T) {
 func TestEtcdList(t *testing.T) {
 	registry, _, _, fakeClient, _ := newStorage(t)
 	ctx := api.NewDefaultContext()
-	key := registry.KeyRootFunc(ctx)
+	key, err := registry.KeyRootFunc(ctx)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 	fakeClient.Data[key] = tools.EtcdResponseWithError{
 		R: &etcd.Response{
 			Node: &etcd.Node{

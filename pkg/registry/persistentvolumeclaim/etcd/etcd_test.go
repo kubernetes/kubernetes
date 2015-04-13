@@ -115,7 +115,10 @@ func TestDelete(t *testing.T) {
 func TestEtcdListPersistentVolumeClaims(t *testing.T) {
 	ctx := api.NewDefaultContext()
 	registry, _, fakeClient, _ := newStorage(t)
-	key := registry.KeyRootFunc(ctx)
+	key, err := registry.KeyRootFunc(ctx)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
 	fakeClient.Data[key] = tools.EtcdResponseWithError{
 		R: &etcd.Response{
 			Node: &etcd.Node{
@@ -177,7 +180,10 @@ func TestListEmptyPersistentVolumeClaimsList(t *testing.T) {
 	ctx := api.NewDefaultContext()
 	registry, _, fakeClient, _ := newStorage(t)
 	fakeClient.ChangeIndex = 1
-	key := registry.KeyRootFunc(ctx)
+	key, err := registry.KeyRootFunc(ctx)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
 	fakeClient.Data[key] = tools.EtcdResponseWithError{
 		R: &etcd.Response{},
 		E: fakeClient.NewError(tools.EtcdErrorCodeNotFound),
@@ -200,7 +206,10 @@ func TestListPersistentVolumeClaimsList(t *testing.T) {
 	ctx := api.NewDefaultContext()
 	registry, _, fakeClient, _ := newStorage(t)
 	fakeClient.ChangeIndex = 1
-	key := registry.KeyRootFunc(ctx)
+	key, err := registry.KeyRootFunc(ctx)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
 	fakeClient.Data[key] = tools.EtcdResponseWithError{
 		R: &etcd.Response{
 			Node: &etcd.Node{

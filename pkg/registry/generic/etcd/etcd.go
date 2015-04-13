@@ -18,6 +18,7 @@ package etcd
 
 import (
 	"fmt"
+	"path"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	kubeerr "github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
@@ -60,7 +61,7 @@ type Etcd struct {
 	EndpointName string
 
 	// Used for listing/watching; should not include trailing "/"
-	KeyRootFunc func(ctx api.Context) string
+	KeyRootFunc func(ctx api.Context) (string, error)
 
 	// Called for Create/Update/Get/Delete. Note that 'namespace' can be
 	// gotten from ctx.
@@ -103,19 +104,22 @@ type Etcd struct {
 }
 
 // NamespaceKeyRootFunc is the default function for constructing etcd paths to resource directories enforcing namespace rules.
-func NamespaceKeyRootFunc(ctx api.Context, prefix string) string {
+func NamespaceKeyRootFunc(ctx api.Context, prefix string) (string, error) {
 	key := prefix
 	ns, ok := api.NamespaceFrom(ctx)
 	if ok && len(ns) > 0 {
 		key = key + "/" + ns
 	}
-	return key
+	return key, nil
 }
 
 // NamespaceKeyFunc is the default function for constructing etcd paths to a resource relative to prefix enforcing namespace rules.
 // If no namespace is on context, it errors.
 func NamespaceKeyFunc(ctx api.Context, prefix string, name string) (string, error) {
-	key := NamespaceKeyRootFunc(ctx, prefix)
+	key, err := NamespaceKeyRootFunc(ctx, prefix)
+	if err != nil {
+		return "", err
+	}
 	ns, ok := api.NamespaceFrom(ctx)
 	if !ok || len(ns) == 0 {
 		return "", kubeerr.NewBadRequest("Namespace parameter required.")
@@ -125,6 +129,28 @@ func NamespaceKeyFunc(ctx api.Context, prefix string, name string) (string, erro
 	}
 	key = key + "/" + name
 	return key, nil
+}
+
+// NoNamespaceKeyRootFunc is the default function for constructing etcd paths to root-scoped resource directories.
+func NoNamespaceKeyRootFunc(ctx api.Context, prefix string) (string, error) {
+	ns, ok := api.NamespaceFrom(ctx)
+	if ok && len(ns) > 0 {
+		return "", kubeerr.NewBadRequest("Namespace parameter is not allowed.")
+	}
+	return prefix, nil
+}
+
+// NoNamespaceKeyFunc is the default function for constructing etcd paths to a root-scoped resource relative to prefix.
+// If a namespace is on context, it errors.
+func NoNamespaceKeyFunc(ctx api.Context, prefix string, name string) (string, error) {
+	ns, ok := api.NamespaceFrom(ctx)
+	if ok && len(ns) > 0 {
+		return "", kubeerr.NewBadRequest("Namespace parameter is not allowed.")
+	}
+	if len(name) == 0 {
+		return "", kubeerr.NewBadRequest("Name parameter required.")
+	}
+	return path.Join(prefix, name), nil
 }
 
 // New implements RESTStorage
@@ -155,7 +181,11 @@ func (e *Etcd) ListPredicate(ctx api.Context, m generic.Matcher) (runtime.Object
 			return nil, err
 		}
 	} else {
-		err := e.Helper.ExtractToList(e.KeyRootFunc(ctx), list)
+		key, err := e.KeyRootFunc(ctx)
+		if err != nil {
+			return nil, err
+		}
+		err = e.Helper.ExtractToList(key, list)
 		if err != nil {
 			return nil, err
 		}
@@ -437,7 +467,11 @@ func (e *Etcd) WatchPredicate(ctx api.Context, m generic.Matcher, resourceVersio
 		}
 		watchKey = key
 	} else {
-		watchKey = e.KeyRootFunc(ctx)
+		key, err := e.KeyRootFunc(ctx)
+		if err != nil {
+			return nil, err
+		}
+		watchKey = key
 	}
 
 	return e.Helper.WatchList(watchKey, version, func(obj runtime.Object) bool {

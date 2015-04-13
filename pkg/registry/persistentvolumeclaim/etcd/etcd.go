@@ -38,7 +38,7 @@ func NewStorage(h tools.EtcdHelper) (*REST, *StatusREST) {
 	store := &etcdgeneric.Etcd{
 		NewFunc:     func() runtime.Object { return &api.PersistentVolumeClaim{} },
 		NewListFunc: func() runtime.Object { return &api.PersistentVolumeClaimList{} },
-		KeyRootFunc: func(ctx api.Context) string {
+		KeyRootFunc: func(ctx api.Context) (string, error) {
 			return etcdgeneric.NamespaceKeyRootFunc(ctx, prefix)
 		},
 		KeyFunc: func(ctx api.Context, name string) (string, error) {

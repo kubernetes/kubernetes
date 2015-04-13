@@ -311,7 +311,11 @@ func TestEtcdWatchController(t *testing.T) {
 func TestEtcdWatchControllersMatch(t *testing.T) {
 	ctx := api.NewDefaultContext()
 	fakeClient := tools.NewFakeEtcdClient(t)
-	fakeClient.ExpectNotFoundGet(etcdgeneric.NamespaceKeyRootFunc(ctx, "/registry/pods"))
+	key, err := etcdgeneric.NamespaceKeyRootFunc(ctx, "/registry/pods")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	fakeClient.ExpectNotFoundGet(key)
 	registry := NewTestEtcdRegistryWithPods(fakeClient)
 	watching, err := registry.WatchControllers(ctx,
 		labels.SelectorFromSet(labels.Set{"name": "foo"}),
@@ -352,7 +356,11 @@ func TestEtcdWatchControllersMatch(t *testing.T) {
 func TestEtcdWatchControllersNotMatch(t *testing.T) {
 	ctx := api.NewDefaultContext()
 	fakeClient := tools.NewFakeEtcdClient(t)
-	fakeClient.ExpectNotFoundGet(etcdgeneric.NamespaceKeyRootFunc(ctx, "/registry/pods"))
+	key, err := etcdgeneric.NamespaceKeyRootFunc(ctx, "/registry/pods")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	fakeClient.ExpectNotFoundGet(key)
 	registry := NewTestEtcdRegistryWithPods(fakeClient)
 	watching, err := registry.WatchControllers(ctx,
 		labels.SelectorFromSet(labels.Set{"name": "foo"}),

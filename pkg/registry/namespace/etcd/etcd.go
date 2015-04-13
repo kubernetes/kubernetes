@@ -48,14 +48,15 @@ type FinalizeREST struct {
 
 // NewStorage returns a RESTStorage object that will work against namespaces
 func NewStorage(h tools.EtcdHelper) (*REST, *StatusREST, *FinalizeREST) {
+	prefix := "/registry/namespaces"
 	store := &etcdgeneric.Etcd{
 		NewFunc:     func() runtime.Object { return &api.Namespace{} },
 		NewListFunc: func() runtime.Object { return &api.NamespaceList{} },
-		KeyRootFunc: func(ctx api.Context) string {
-			return "/registry/namespaces"
+		KeyRootFunc: func(ctx api.Context) (string, error) {
+			return etcdgeneric.NoNamespaceKeyRootFunc(ctx, prefix)
 		},
 		KeyFunc: func(ctx api.Context, name string) (string, error) {
-			return "/registry/namespaces/" + name, nil
+			return etcdgeneric.NoNamespaceKeyFunc(ctx, prefix, name)
 		},
 		ObjectNameFunc: func(obj runtime.Object) (string, error) {
 			return obj.(*api.Namespace).Name, nil

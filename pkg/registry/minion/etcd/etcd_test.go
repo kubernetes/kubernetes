@@ -87,9 +87,10 @@ func validChangedNode() *api.Node {
 
 func TestCreate(t *testing.T) {
 	storage, fakeEtcdClient := newStorage(t)
-	test := resttest.New(t, storage, fakeEtcdClient.SetError)
+	test := resttest.New(t, storage, fakeEtcdClient.SetError).ClusterScope()
 	node := validNewNode()
-	node.ObjectMeta = api.ObjectMeta{}
+	node.Name = ""
+	node.GenerateName = "foo"
 	test.TestCreate(
 		// valid
 		node,
@@ -101,9 +102,9 @@ func TestCreate(t *testing.T) {
 }
 
 func TestDelete(t *testing.T) {
-	ctx := api.NewDefaultContext()
+	ctx := api.NewContext()
 	storage, fakeEtcdClient := newStorage(t)
-	test := resttest.New(t, storage, fakeEtcdClient.SetError)
+	test := resttest.New(t, storage, fakeEtcdClient.SetError).ClusterScope()
 
 	node := validChangedNode()
 	key, _ := storage.KeyFunc(ctx, node.Name)
@@ -130,7 +131,10 @@ func TestDelete(t *testing.T) {
 func TestEtcdListNodes(t *testing.T) {
 	ctx := api.NewContext()
 	storage, fakeClient := newStorage(t)
-	key := storage.KeyRootFunc(ctx)
+	key, err := storage.KeyRootFunc(ctx)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 	fakeClient.Data[key] = tools.EtcdResponseWithError{
 		R: &etcd.Response{
 			Node: &etcd.Node{
@@ -164,7 +168,10 @@ func TestEtcdListNodes(t *testing.T) {
 func TestEtcdListNodesMatch(t *testing.T) {
 	ctx := api.NewContext()
 	storage, fakeClient := newStorage(t)
-	key := storage.KeyRootFunc(ctx)
+	key, err := storage.KeyRootFunc(ctx)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 	fakeClient.Data[key] = tools.EtcdResponseWithError{
 		R: &etcd.Response{
 			Node: &etcd.Node{
@@ -288,7 +295,7 @@ func TestEtcdDeleteNode(t *testing.T) {
 }
 
 func TestEtcdWatchNode(t *testing.T) {
-	ctx := api.NewDefaultContext()
+	ctx := api.NewContext()
 	storage, fakeClient := newStorage(t)
 	watching, err := storage.Watch(ctx,
 		labels.Everything(),
@@ -315,7 +322,7 @@ func TestEtcdWatchNode(t *testing.T) {
 }
 
 func TestEtcdWatchNodesMatch(t *testing.T) {
-	ctx := api.NewDefaultContext()
+	ctx := api.NewContext()
 	storage, fakeClient := newStorage(t)
 	node := validNewNode()
 
@@ -348,7 +355,7 @@ func TestEtcdWatchNodesMatch(t *testing.T) {
 }
 
 func TestEtcdWatchNodesNotMatch(t *testing.T) {
-	ctx := api.NewDefaultContext()
+	ctx := api.NewContext()
 	storage, fakeClient := newStorage(t)
 	node := validNewNode()
 
