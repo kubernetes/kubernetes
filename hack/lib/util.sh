@@ -96,6 +96,18 @@ kube::util::host_platform() {
   echo "${host_os}/${host_arch}"
 }
 
+kube::util::find-binary() {
+  local lookfor="${1}"
+  local host_platform="$(kube::util::host_platform)"
+  local locations=(
+    "${KUBE_ROOT}/_output/dockerized/bin/${host_platform}/${lookfor}"
+    "${KUBE_ROOT}/_output/local/bin/${host_platform}/${lookfor}"
+    "${KUBE_ROOT}/platforms/${host_platform}/${lookfor}"
+  )
+  local bin=$( (ls -t "${locations[@]}" 2>/dev/null || true) | head -1 )
+  echo -n "${bin}"
+}
+
 # Wait for background jobs to finish. Return with
 # an error status if any of the jobs failed.
 kube::util::wait-for-jobs() {

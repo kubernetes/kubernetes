@@ -1,5 +1,5 @@
 /*
-Copyright 2014 Google Inc. All rights reserved.
+Copyright 2015 Google Inc. All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -24,12 +24,11 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/cmd/genutils"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/cmd"
 	cmdutil "github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/cmd/util"
-	"github.com/spf13/cobra"
 )
 
 func main() {
 	// use os.Args instead of "flags" because "flags" will mess up the man pages!
-	path := "docs/"
+	path := "contrib/completions/bash/"
 	if len(os.Args) == 2 {
 		path = os.Args[1]
 	} else if len(os.Args) > 2 {
@@ -42,11 +41,9 @@ func main() {
 		fmt.Fprintf(os.Stderr, "failed to get output directory: %v\n", err)
 		os.Exit(1)
 	}
+	outFile := outDir + "kubectl"
 
-	// Set environment variables used by kubectl so the output is consistent,
-	// regardless of where we run.
-	os.Setenv("HOME", "/home/username")
 	//TODO os.Stdin should really be something like ioutil.Discard, but a Reader
 	kubectl := cmd.NewKubectlCommand(cmdutil.NewFactory(nil), os.Stdin, ioutil.Discard, ioutil.Discard)
-	cobra.GenMarkdownTree(kubectl, outDir)
+	kubectl.GenBashCompletionFile(outFile)
 }

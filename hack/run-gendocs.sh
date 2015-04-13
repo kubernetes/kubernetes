@@ -22,7 +22,7 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
 kube::golang::setup_env
-"${KUBE_ROOT}/hack/build-go.sh" cmd/gendocs cmd/genman
+"${KUBE_ROOT}/hack/build-go.sh" cmd/gendocs cmd/genman cmd/genbashcomp
 
 # Get the absolute path of the directory component of a file, i.e. the
 # absolute path of the dirname of $1.
@@ -30,65 +30,21 @@ get_absolute_dirname() {
   echo "$(cd "$(dirname "$1")" && pwd)"
 }
 
-# Detect the OS name/arch so that we can find our binary
-case "$(uname -s)" in
-  Darwin)
-    host_os=darwin
-    ;;
-  Linux)
-    host_os=linux
-    ;;
-  *)
-    echo "Unsupported host OS.  Must be Linux or Mac OS X." >&2
-    exit 1
-    ;;
-esac
-
-case "$(uname -m)" in
-  x86_64*)
-    host_arch=amd64
-    ;;
-  i?86_64*)
-    host_arch=amd64
-    ;;
-  amd64*)
-    host_arch=amd64
-    ;;
-  arm*)
-    host_arch=arm
-    ;;
-  i?86*)
-    host_arch=x86
-    ;;
-  *)
-    echo "Unsupported host arch. Must be x86_64, 386 or arm." >&2
-    exit 1
-    ;;
-esac
-
 # Find binary
-doc_locations=(
-  "${KUBE_ROOT}/_output/dockerized/bin/${host_os}/${host_arch}/gendocs"
-  "${KUBE_ROOT}/_output/local/bin/${host_os}/${host_arch}/gendocs"
-  "${KUBE_ROOT}/platforms/${host_os}/${host_arch}/gendocs"
-)
-gendocs=$( (ls -t "${doc_locations[@]}" 2>/dev/null || true) | head -1 )
-man_locations=(
-  "${KUBE_ROOT}/_output/dockerized/bin/${host_os}/${host_arch}/genman"
-  "${KUBE_ROOT}/_output/local/bin/${host_os}/${host_arch}/genman"
-  "${KUBE_ROOT}/platforms/${host_os}/${host_arch}/genman"
-)
-genman=$( (ls -t "${man_locations[@]}" 2>/dev/null || true) | head -1 )
+gendocs=$(kube::util::find-binary "gendocs")
+genman=$(kube::util::find-binary "genman")
+genbashcomp=$(kube::util::find-binary "genbashcomp")
 
-if [[ ! -x "$gendocs" || ! -x "$genman" ]]; then
+if [[ ! -x "$gendocs" || ! -x "$genman" || ! -x "$genbashcomp" ]]; then
   {
-    echo "It looks as if you don't have a compiled gendocs or genman binary"
+    echo "It looks as if you don't have a compiled gendocs, genman, or genbashcomp binary"
     echo
     echo "If you are running from a clone of the git repo, please run"
-    echo "'./hack/build-go.sh cmd/gendocs cmd/genman'."
+    echo "'./hack/build-go.sh cmd/gendocs cmd/genman cmd/genbashcomp'."
   } >&2
   exit 1
 fi
 
 ${gendocs} "${KUBE_ROOT}/docs/"
 ${genman} "${KUBE_ROOT}/docs/man/man1/"
+${genbashcomp} "${KUBE_ROOT}/contrib/completions/bash/"
