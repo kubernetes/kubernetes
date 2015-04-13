@@ -20,7 +20,3 @@ func Major(devNumber int) int64 {
 func Minor(devNumber int) int64 {
 	return int64((devNumber & 0xff) | ((devNumber >> 12) & 0xfff00))
 }
-
-func Mkdev(majorNumber int64, minorNumber int64) int {
-	return int((majorNumber << 8) | (minorNumber & 0xff) | ((minorNumber & 0xfff00) << 12))
-}

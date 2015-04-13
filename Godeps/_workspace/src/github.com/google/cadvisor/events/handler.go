@@ -270,6 +270,7 @@ func (self *events) AddEvent(e *info.Event) error {
 	for _, watchObject := range watchesToSend {
 		watchObject.eventChannel.GetChannel() <- e
 	}
+	glog.V(1).Infof("Added event %v", e)
 	return nil
 }
 

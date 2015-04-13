@@ -889,7 +889,7 @@ func (self *manager) watchForNewOoms() error {
 					},
 				},
 			}
-			glog.V(1).Infof("Created an oom event: %v", newEvent)
+			glog.V(2).Infof("Created an oom event: %v", newEvent)
 			err := self.eventHandler.AddEvent(newEvent)
 			if err != nil {
 				glog.Errorf("failed to add event %v, got error: %v", newEvent, err)

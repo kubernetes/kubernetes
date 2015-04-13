@@ -1,41 +1,51 @@
 package fs
 
 import (
+	"fmt"
 	"strings"
 	"time"
 
 	"github.com/docker/libcontainer/cgroups"
+	"github.com/docker/libcontainer/configs"
 )
 
 type FreezerGroup struct {
 }
 
-func (s *FreezerGroup) Set(d *data) error {
-	switch d.c.Freezer {
-	case cgroups.Frozen, cgroups.Thawed:
-		dir, err := d.path("freezer")
-		if err != nil {
-			return err
-		}
+func (s *FreezerGroup) Apply(d *data) error {
+	dir, err := d.join("freezer")
+	if err != nil && !cgroups.IsNotFound(err) {
+		return err
+	}
 
-		if err := writeFile(dir, "freezer.state", string(d.c.Freezer)); err != nil {
+	if err := s.Set(dir, d.c); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (s *FreezerGroup) Set(path string, cgroup *configs.Cgroup) error {
+	switch cgroup.Freezer {
+	case configs.Frozen, configs.Thawed:
+		if err := writeFile(path, "freezer.state", string(cgroup.Freezer)); err != nil {
 			return err
 		}
 
 		for {
-			state, err := readFile(dir, "freezer.state")
+			state, err := readFile(path, "freezer.state")
 			if err != nil {
 				return err
 			}
-			if strings.TrimSpace(state) == string(d.c.Freezer) {
+			if strings.TrimSpace(state) == string(cgroup.Freezer) {
 				break
 			}
 			time.Sleep(1 * time.Millisecond)
 		}
+	case configs.Undefined:
+		return nil
 	default:
-		if _, err := d.join("freezer"); err != nil && !cgroups.IsNotFound(err) {
-			return err
-		}
+		return fmt.Errorf("Invalid argument '%s' to freezer.state", string(cgroup.Freezer))
 	}
 
 	return nil

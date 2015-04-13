@@ -3,37 +3,29 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 
 	"github.com/codegangsta/cli"
-	"github.com/docker/libcontainer"
 )
 
 var statsCommand = cli.Command{
-	Name:   "stats",
-	Usage:  "display statistics for the container",
-	Action: statsAction,
-}
-
-func statsAction(context *cli.Context) {
-	container, err := loadConfig()
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	state, err := libcontainer.GetState(dataPath)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	stats, err := libcontainer.GetStats(container, state)
-	if err != nil {
-		log.Fatal(err)
-	}
-	data, err := json.MarshalIndent(stats, "", "\t")
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	fmt.Printf("%s", data)
+	Name:  "stats",
+	Usage: "display statistics for the container",
+	Flags: []cli.Flag{
+		cli.StringFlag{Name: "id", Value: "nsinit", Usage: "specify the ID for a container"},
+	},
+	Action: func(context *cli.Context) {
+		container, err := getContainer(context)
+		if err != nil {
+			fatal(err)
+		}
+		stats, err := container.Stats()
+		if err != nil {
+			fatal(err)
+		}
+		data, err := json.MarshalIndent(stats, "", "\t")
+		if err != nil {
+			fatal(err)
+		}
+		fmt.Printf("%s", data)
+	},
 }

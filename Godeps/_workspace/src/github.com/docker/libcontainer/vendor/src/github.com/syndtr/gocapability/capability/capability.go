@@ -60,7 +60,8 @@ type Capabilities interface {
 	Apply(kind CapType) error
 }
 
-// NewPid create new initialized Capabilities object for given pid.
+// NewPid create new initialized Capabilities object for given pid when it
+// is nonzero, or for the current pid if pid is 0
 func NewPid(pid int) (Capabilities, error) {
 	return newPid(pid)
 }

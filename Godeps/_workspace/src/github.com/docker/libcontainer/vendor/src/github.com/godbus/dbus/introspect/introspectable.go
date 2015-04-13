@@ -4,6 +4,7 @@ import (
 	"encoding/xml"
 	"github.com/godbus/dbus"
 	"reflect"
+	"strings"
 )
 
 // Introspectable implements org.freedesktop.Introspectable.
@@ -31,7 +32,7 @@ func NewIntrospectable(n *Node) Introspectable {
 	if err != nil {
 		panic(err)
 	}
-	return Introspectable(b)
+	return Introspectable(strings.TrimSpace(IntrospectDeclarationString) + string(b))
 }
 
 // Introspect implements org.freedesktop.Introspectable.Introspect.
@@ -50,7 +51,7 @@ func Methods(v interface{}) []Method {
 		}
 		mt := t.Method(i).Type
 		if mt.NumOut() == 0 ||
-			mt.Out(mt.NumOut()-1) != reflect.TypeOf(&dbus.Error{"", nil}) {
+			mt.Out(mt.NumOut()-1) != reflect.TypeOf(&dbus.Error{}) {
 
 			continue
 		}

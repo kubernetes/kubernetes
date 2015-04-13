@@ -27,12 +27,10 @@ func TestNotifyOnOOM(t *testing.T) {
 		t.Fatal(err)
 	}
 	var eventFd, oomControlFd int
-	st := &State{
-		CgroupPaths: map[string]string{
-			"memory": memoryPath,
-		},
+	paths := map[string]string{
+		"memory": memoryPath,
 	}
-	ooms, err := NotifyOnOOM(st)
+	ooms, err := notifyOnOOM(paths)
 	if err != nil {
 		t.Fatal("expected no error, got:", err)
 	}

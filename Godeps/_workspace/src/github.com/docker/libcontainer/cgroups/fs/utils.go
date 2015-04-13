@@ -60,3 +60,13 @@ func getCgroupParamUint(cgroupPath, cgroupFile string) (uint64, error) {
 
 	return parseUint(strings.TrimSpace(string(contents)), 10, 64)
 }
+
+// Gets a string value from the specified cgroup file
+func getCgroupParamString(cgroupPath, cgroupFile string) (string, error) {
+	contents, err := ioutil.ReadFile(filepath.Join(cgroupPath, cgroupFile))
+	if err != nil {
+		return "", err
+	}
+
+	return strings.TrimSpace(string(contents)), nil
+}
