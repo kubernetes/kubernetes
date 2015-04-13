@@ -112,7 +112,7 @@ function initialize-pool {
   fi
 
   wget -N -P "$ROOT" http://${COREOS_CHANNEL:-alpha}.release.core-os.net/amd64-usr/current/coreos_production_qemu_image.img.bz2
-  if [ "$ROOT/coreos_production_qemu_image.img.bz2" -nt "$POOL_PATH/coreos_base.img" ]; then
+  if [[ "$ROOT/coreos_production_qemu_image.img.bz2" -nt "$POOL_PATH/coreos_base.img" ]]; then
       bunzip2 -f -k "$ROOT/coreos_production_qemu_image.img.bz2"
       virsh vol-delete coreos_base.img --pool $POOL 2> /dev/null || true
       mv "$ROOT/coreos_production_qemu_image.img" "$POOL_PATH/coreos_base.img"
@@ -163,9 +163,9 @@ function wait-cluster-readiness {
   echo "Wait for cluster readiness"
   local kubectl="${KUBE_ROOT}/cluster/kubectl.sh"
 
-  local timeout=50
+  local timeout=120
   while [[ $timeout -ne 0 ]]; do
-    nb_ready_minions=$("${kubectl}" get nodes -o template -t "{{range.items}}{{range.status.conditions}}{{.kind}}{{end}}:{{end}}" --api-version=v1beta3 2>/dev/null | tr ':' '\n' | grep -c Ready || true)
+    nb_ready_minions=$("${kubectl}" get nodes -o template -t "{{range.items}}{{range.status.conditions}}{{.type}}{{end}}:{{end}}" --api-version=v1beta3 2>/dev/null | tr ':' '\n' | grep -c Ready || true)
     echo "Nb ready minions: $nb_ready_minions / $NUM_MINIONS"
     if [[ "$nb_ready_minions" -eq "$NUM_MINIONS" ]]; then
         return 0
