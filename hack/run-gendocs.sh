@@ -45,6 +45,8 @@ if [[ ! -x "$gendocs" || ! -x "$genman" || ! -x "$genbashcomp" ]]; then
   exit 1
 fi
 
-${gendocs} "${KUBE_ROOT}/docs/"
-${genman} "${KUBE_ROOT}/docs/man/man1/"
-${genbashcomp} "${KUBE_ROOT}/contrib/completions/bash/"
+kube::util::gen-doc "${gendocs}" "${KUBE_ROOT}/docs/"
+kube::util::gen-doc "${genman}" "${KUBE_ROOT}/docs/man/man1"
+kube::util::gen-doc "${genbashcomp}" "${KUBE_ROOT}/contrib/completions/bash/"
+
+# ex: ts=2 sw=2 et filetype=sh

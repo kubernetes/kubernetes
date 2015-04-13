@@ -118,3 +118,31 @@ kube::util::wait-for-jobs() {
   done
   return ${fail}
 }
+
+# takes a binary to run $1 and then copies the results to $2
+kube::util::gen-doc() {
+  local cmd="$1"
+  local dest="$2"
+
+  # remove all old generated file from the destination
+  for file in $(cat "${dest}/.files_generated" 2>/dev/null); do
+    set +e
+    rm "${dest}/${file}"
+    set -e
+  done
+
+  # We do this in a tmpdir in case the dest has other non-autogenned files
+  # We don't want to include them in the list of gen'd files
+  local tmpdir="${KUBE_ROOT}/doc_tmp"
+  mkdir "${tmpdir}"
+  # generate the new files
+  ${cmd} "${tmpdir}"
+  # create the list of generated files
+  ls "${tmpdir}" | sort > "${tmpdir}/.files_generated"
+  # put the new generated file into the destination
+  find "${tmpdir}" -exec rsync -pt {} "${dest}" \; >/dev/null
+  #cleanup
+  rm -rf "${tmpdir}"
+}
+
+# ex: ts=2 sw=2 et filetype=sh
