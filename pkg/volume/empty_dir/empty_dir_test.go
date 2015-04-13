@@ -74,7 +74,7 @@ func TestPlugin(t *testing.T) {
 	}
 	mounter := mount.FakeMounter{}
 	mountDetector := fakeMountDetector{}
-	builder, err := plug.(*emptyDirPlugin).newBuilderInternal(spec, &api.ObjectReference{UID: types.UID("poduid")}, &mounter, &mountDetector)
+	builder, err := plug.(*emptyDirPlugin).newBuilderInternal(spec, &api.ObjectReference{UID: types.UID("poduid")}, &mounter, &mountDetector, volume.VolumeOptions{""})
 	if err != nil {
 		t.Errorf("Failed to make a new Builder: %v", err)
 	}
@@ -133,7 +133,7 @@ func TestPluginTmpfs(t *testing.T) {
 	}
 	mounter := mount.FakeMounter{}
 	mountDetector := fakeMountDetector{}
-	builder, err := plug.(*emptyDirPlugin).newBuilderInternal(spec, &api.ObjectReference{UID: types.UID("poduid")}, &mounter, &mountDetector)
+	builder, err := plug.(*emptyDirPlugin).newBuilderInternal(spec, &api.ObjectReference{UID: types.UID("poduid")}, &mounter, &mountDetector, volume.VolumeOptions{""})
 	if err != nil {
 		t.Errorf("Failed to make a new Builder: %v", err)
 	}
@@ -197,7 +197,7 @@ func TestPluginBackCompat(t *testing.T) {
 	spec := &api.Volume{
 		Name: "vol1",
 	}
-	builder, err := plug.NewBuilder(spec, &api.ObjectReference{UID: types.UID("poduid")})
+	builder, err := plug.NewBuilder(spec, &api.ObjectReference{UID: types.UID("poduid")}, volume.VolumeOptions{""})
 	if err != nil {
 		t.Errorf("Failed to make a new Builder: %v", err)
 	}
@@ -222,7 +222,7 @@ func TestPluginLegacy(t *testing.T) {
 	}
 
 	spec := api.Volume{VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}}
-	if _, err := plug.(*emptyDirPlugin).newBuilderInternal(&spec, &api.ObjectReference{UID: types.UID("poduid")}, &mount.FakeMounter{}, &fakeMountDetector{}); err == nil {
+	if _, err := plug.(*emptyDirPlugin).newBuilderInternal(&spec, &api.ObjectReference{UID: types.UID("poduid")}, &mount.FakeMounter{}, &fakeMountDetector{}, volume.VolumeOptions{""}); err == nil {
 		t.Errorf("Expected failiure")
 	}
 

@@ -83,9 +83,11 @@ var _ = Describe("Secrets", func() {
 				},
 				Containers: []api.Container{
 					{
-						Name:    "catcont",
-						Image:   "gcr.io/google_containers/busybox",
-						Command: []string{"sh", "-c", "cat /etc/secret-volume/data-1"},
+						Name:  "catcont",
+						Image: "kubernetes/mounttest:0.1",
+						Args: []string{
+							"--file_content=/etc/secret-volume/data-1",
+							"--file_mode=/etc/secret-volume/data-1"},
 						VolumeMounts: []api.VolumeMount{
 							{
 								Name:      volumeName,
@@ -100,7 +102,8 @@ var _ = Describe("Secrets", func() {
 		}
 
 		testContainerOutput("consume secrets", c, pod, []string{
-			"value-1",
+			"content of file \"/etc/secret-volume/data-1\": value-1",
+			"mode of file \"/etc/secret-volume/data-1\": -r--r--r--",
 		})
 	})
 })

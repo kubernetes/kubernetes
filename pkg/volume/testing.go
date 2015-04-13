@@ -55,12 +55,12 @@ func (f *fakeVolumeHost) GetKubeClient() client.Interface {
 	return f.kubeClient
 }
 
-func (f *fakeVolumeHost) NewWrapperBuilder(spec *api.Volume, podRef *api.ObjectReference) (Builder, error) {
+func (f *fakeVolumeHost) NewWrapperBuilder(spec *api.Volume, podRef *api.ObjectReference, opts VolumeOptions) (Builder, error) {
 	plug, err := f.pluginMgr.FindPluginBySpec(spec)
 	if err != nil {
 		return nil, err
 	}
-	return plug.NewBuilder(spec, podRef)
+	return plug.NewBuilder(spec, podRef, opts)
 }
 
 func (f *fakeVolumeHost) NewWrapperCleaner(spec *api.Volume, podUID types.UID) (Cleaner, error) {
@@ -95,7 +95,7 @@ func (plugin *FakeVolumePlugin) CanSupport(spec *api.Volume) bool {
 	return true
 }
 
-func (plugin *FakeVolumePlugin) NewBuilder(spec *api.Volume, podRef *api.ObjectReference) (Builder, error) {
+func (plugin *FakeVolumePlugin) NewBuilder(spec *api.Volume, podRef *api.ObjectReference, opts VolumeOptions) (Builder, error) {
 	return &FakeVolume{podRef.UID, spec.Name, plugin}, nil
 }
 
