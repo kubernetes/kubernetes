@@ -145,9 +145,20 @@ func (e *Etcd) List(ctx api.Context, label labels.Selector, field fields.Selecto
 // ListPredicate returns a list of all the items matching m.
 func (e *Etcd) ListPredicate(ctx api.Context, m generic.Matcher) (runtime.Object, error) {
 	list := e.NewListFunc()
-	err := e.Helper.ExtractToList(e.KeyRootFunc(ctx), list)
-	if err != nil {
-		return nil, err
+	if name, ok := m.MatchesSingle(); ok {
+		key, err := e.KeyFunc(ctx, name)
+		if err != nil {
+			return nil, err
+		}
+		err = e.Helper.ExtractObjToList(key, list)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		err := e.Helper.ExtractToList(e.KeyRootFunc(ctx), list)
+		if err != nil {
+			return nil, err
+		}
 	}
 	return generic.FilterList(list, m, generic.DecoratorFunc(e.Decorator))
 }
