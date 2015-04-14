@@ -59,16 +59,13 @@ func (plugin *gcePersistentDiskPlugin) Name() string {
 	return gcePersistentDiskPluginName
 }
 
-func (plugin *gcePersistentDiskPlugin) CanSupport(spec *api.Volume) bool {
+func (plugin *gcePersistentDiskPlugin) CanSupport(spec *volume.Spec) bool {
 	if plugin.legacyMode {
 		// Legacy mode instances can be cleaned up but not created anew.
 		return false
 	}
 
-	if spec.GCEPersistentDisk != nil {
-		return true
-	}
-	return false
+	return spec.VolumeSource.GCEPersistentDisk != nil || spec.PersistentVolumeSource.GCEPersistentDisk != nil
 }
 
 func (plugin *gcePersistentDiskPlugin) GetAccessModes() []api.AccessModeType {
@@ -78,24 +75,31 @@ func (plugin *gcePersistentDiskPlugin) GetAccessModes() []api.AccessModeType {
 	}
 }
 
-func (plugin *gcePersistentDiskPlugin) NewBuilder(spec *api.Volume, podRef *api.ObjectReference, _ volume.VolumeOptions) (volume.Builder, error) {
+func (plugin *gcePersistentDiskPlugin) NewBuilder(spec *volume.Spec, podRef *api.ObjectReference, _ volume.VolumeOptions) (volume.Builder, error) {
 	// Inject real implementations here, test through the internal function.
 	return plugin.newBuilderInternal(spec, podRef.UID, &GCEDiskUtil{}, mount.New())
 }
 
-func (plugin *gcePersistentDiskPlugin) newBuilderInternal(spec *api.Volume, podUID types.UID, manager pdManager, mounter mount.Interface) (volume.Builder, error) {
+func (plugin *gcePersistentDiskPlugin) newBuilderInternal(spec *volume.Spec, podUID types.UID, manager pdManager, mounter mount.Interface) (volume.Builder, error) {
 	if plugin.legacyMode {
 		// Legacy mode instances can be cleaned up but not created anew.
 		return nil, fmt.Errorf("legacy mode: can not create new instances")
 	}
 
-	pdName := spec.GCEPersistentDisk.PDName
-	fsType := spec.GCEPersistentDisk.FSType
-	partition := ""
-	if spec.GCEPersistentDisk.Partition != 0 {
-		partition = strconv.Itoa(spec.GCEPersistentDisk.Partition)
+	var gce *api.GCEPersistentDiskVolumeSource
+	if spec.VolumeSource.GCEPersistentDisk != nil {
+		gce = spec.VolumeSource.GCEPersistentDisk
+	} else {
+		gce = spec.PersistentVolumeSource.GCEPersistentDisk
 	}
-	readOnly := spec.GCEPersistentDisk.ReadOnly
+
+	pdName := gce.PDName
+	fsType := gce.FSType
+	partition := ""
+	if gce.Partition != 0 {
+		partition = strconv.Itoa(gce.Partition)
+	}
+	readOnly := gce.ReadOnly
 
 	return &gcePersistentDisk{
 		podUID:      podUID,

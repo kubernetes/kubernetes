@@ -55,7 +55,7 @@ func (f *fakeVolumeHost) GetKubeClient() client.Interface {
 	return f.kubeClient
 }
 
-func (f *fakeVolumeHost) NewWrapperBuilder(spec *api.Volume, podRef *api.ObjectReference, opts VolumeOptions) (Builder, error) {
+func (f *fakeVolumeHost) NewWrapperBuilder(spec *Spec, podRef *api.ObjectReference, opts VolumeOptions) (Builder, error) {
 	plug, err := f.pluginMgr.FindPluginBySpec(spec)
 	if err != nil {
 		return nil, err
@@ -63,7 +63,7 @@ func (f *fakeVolumeHost) NewWrapperBuilder(spec *api.Volume, podRef *api.ObjectR
 	return plug.NewBuilder(spec, podRef, opts)
 }
 
-func (f *fakeVolumeHost) NewWrapperCleaner(spec *api.Volume, podUID types.UID) (Cleaner, error) {
+func (f *fakeVolumeHost) NewWrapperCleaner(spec *Spec, podUID types.UID) (Cleaner, error) {
 	plug, err := f.pluginMgr.FindPluginBySpec(spec)
 	if err != nil {
 		return nil, err
@@ -90,12 +90,12 @@ func (plugin *FakeVolumePlugin) Name() string {
 	return plugin.PluginName
 }
 
-func (plugin *FakeVolumePlugin) CanSupport(spec *api.Volume) bool {
+func (plugin *FakeVolumePlugin) CanSupport(spec *Spec) bool {
 	// TODO: maybe pattern-match on spec.Name to decide?
 	return true
 }
 
-func (plugin *FakeVolumePlugin) NewBuilder(spec *api.Volume, podRef *api.ObjectReference, opts VolumeOptions) (Builder, error) {
+func (plugin *FakeVolumePlugin) NewBuilder(spec *Spec, podRef *api.ObjectReference, opts VolumeOptions) (Builder, error) {
 	return &FakeVolume{podRef.UID, spec.Name, plugin}, nil
 }
 

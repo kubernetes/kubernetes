@@ -66,34 +66,31 @@ func (plugin *emptyDirPlugin) Name() string {
 	return emptyDirPluginName
 }
 
-func (plugin *emptyDirPlugin) CanSupport(spec *api.Volume) bool {
+func (plugin *emptyDirPlugin) CanSupport(spec *volume.Spec) bool {
 	if plugin.legacyMode {
 		// Legacy mode instances can be cleaned up but not created anew.
 		return false
 	}
 
-	if util.AllPtrFieldsNil(&spec.VolumeSource) {
-		return true
-	}
-	if spec.EmptyDir != nil {
+	if spec.VolumeSource.EmptyDir != nil {
 		return true
 	}
 	return false
 }
 
-func (plugin *emptyDirPlugin) NewBuilder(spec *api.Volume, podRef *api.ObjectReference, opts volume.VolumeOptions) (volume.Builder, error) {
+func (plugin *emptyDirPlugin) NewBuilder(spec *volume.Spec, podRef *api.ObjectReference, opts volume.VolumeOptions) (volume.Builder, error) {
 	// Inject real implementations here, test through the internal function.
 	return plugin.newBuilderInternal(spec, podRef, plugin.mounter, &realMountDetector{plugin.mounter}, opts)
 }
 
-func (plugin *emptyDirPlugin) newBuilderInternal(spec *api.Volume, podRef *api.ObjectReference, mounter mount.Interface, mountDetector mountDetector, opts volume.VolumeOptions) (volume.Builder, error) {
+func (plugin *emptyDirPlugin) newBuilderInternal(spec *volume.Spec, podRef *api.ObjectReference, mounter mount.Interface, mountDetector mountDetector, opts volume.VolumeOptions) (volume.Builder, error) {
 	if plugin.legacyMode {
 		// Legacy mode instances can be cleaned up but not created anew.
 		return nil, fmt.Errorf("legacy mode: can not create new instances")
 	}
 	medium := api.StorageTypeDefault
-	if spec.EmptyDir != nil { // Support a non-specified source as EmptyDir.
-		medium = spec.EmptyDir.Medium
+	if spec.VolumeSource.EmptyDir != nil { // Support a non-specified source as EmptyDir.
+		medium = spec.VolumeSource.EmptyDir.Medium
 	}
 	return &emptyDir{
 		podUID:        podRef.UID,

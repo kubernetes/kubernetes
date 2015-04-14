@@ -58,11 +58,8 @@ func (plugin *awsElasticBlockStorePlugin) Name() string {
 	return awsElasticBlockStorePluginName
 }
 
-func (plugin *awsElasticBlockStorePlugin) CanSupport(spec *api.Volume) bool {
-	if spec.AWSElasticBlockStore != nil {
-		return true
-	}
-	return false
+func (plugin *awsElasticBlockStorePlugin) CanSupport(spec *volume.Spec) bool {
+	return spec.PersistentVolumeSource.AWSElasticBlockStore != nil || spec.VolumeSource.AWSElasticBlockStore != nil
 }
 
 func (plugin *awsElasticBlockStorePlugin) GetAccessModes() []api.AccessModeType {
@@ -71,19 +68,26 @@ func (plugin *awsElasticBlockStorePlugin) GetAccessModes() []api.AccessModeType 
 	}
 }
 
-func (plugin *awsElasticBlockStorePlugin) NewBuilder(spec *api.Volume, podRef *api.ObjectReference, _ volume.VolumeOptions) (volume.Builder, error) {
+func (plugin *awsElasticBlockStorePlugin) NewBuilder(spec *volume.Spec, podRef *api.ObjectReference, _ volume.VolumeOptions) (volume.Builder, error) {
 	// Inject real implementations here, test through the internal function.
 	return plugin.newBuilderInternal(spec, podRef.UID, &AWSDiskUtil{}, mount.New())
 }
 
-func (plugin *awsElasticBlockStorePlugin) newBuilderInternal(spec *api.Volume, podUID types.UID, manager pdManager, mounter mount.Interface) (volume.Builder, error) {
-	volumeID := spec.AWSElasticBlockStore.VolumeID
-	fsType := spec.AWSElasticBlockStore.FSType
-	partition := ""
-	if spec.AWSElasticBlockStore.Partition != 0 {
-		partition = strconv.Itoa(spec.AWSElasticBlockStore.Partition)
+func (plugin *awsElasticBlockStorePlugin) newBuilderInternal(spec *volume.Spec, podUID types.UID, manager pdManager, mounter mount.Interface) (volume.Builder, error) {
+	var ebs *api.AWSElasticBlockStoreVolumeSource
+	if spec.VolumeSource.AWSElasticBlockStore != nil {
+		ebs = spec.VolumeSource.AWSElasticBlockStore
+	} else {
+		ebs = spec.PersistentVolumeSource.AWSElasticBlockStore
 	}
-	readOnly := spec.AWSElasticBlockStore.ReadOnly
+
+	volumeID := ebs.VolumeID
+	fsType := ebs.FSType
+	partition := ""
+	if ebs.Partition != 0 {
+		partition = strconv.Itoa(ebs.Partition)
+	}
+	readOnly := ebs.ReadOnly
 
 	return &awsElasticBlockStore{
 		podUID:      podUID,

@@ -37,10 +37,10 @@ func TestCanSupport(t *testing.T) {
 	if plug.Name() != "kubernetes.io/nfs" {
 		t.Errorf("Wrong name: %s", plug.Name())
 	}
-	if !plug.CanSupport(&api.Volume{VolumeSource: api.VolumeSource{NFS: &api.NFSVolumeSource{}}}) {
+	if !plug.CanSupport(&volume.Spec{Name: "foo", VolumeSource: api.VolumeSource{NFS: &api.NFSVolumeSource{}}}) {
 		t.Errorf("Expected true")
 	}
-	if plug.CanSupport(&api.Volume{VolumeSource: api.VolumeSource{}}) {
+	if plug.CanSupport(&volume.Spec{Name: "foo", VolumeSource: api.VolumeSource{}}) {
 		t.Errorf("Expected false")
 	}
 }
@@ -108,7 +108,7 @@ func TestPlugin(t *testing.T) {
 		VolumeSource: api.VolumeSource{NFS: &api.NFSVolumeSource{"localhost", "/tmp", false}},
 	}
 	fake := &fakeNFSMounter{}
-	builder, err := plug.(*nfsPlugin).newBuilderInternal(spec, &api.ObjectReference{UID: types.UID("poduid")}, fake)
+	builder, err := plug.(*nfsPlugin).newBuilderInternal(volume.NewSpecFromVolume(spec), &api.ObjectReference{UID: types.UID("poduid")}, fake)
 	volumePath := builder.GetPath()
 	if err != nil {
 		t.Errorf("Failed to make a new Builder: %v", err)

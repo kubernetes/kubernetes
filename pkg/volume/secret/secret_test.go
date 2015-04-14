@@ -53,7 +53,7 @@ func TestCanSupport(t *testing.T) {
 	if plugin.Name() != secretPluginName {
 		t.Errorf("Wrong name: %s", plugin.Name())
 	}
-	if !plugin.CanSupport(&api.Volume{VolumeSource: api.VolumeSource{Secret: &api.SecretVolumeSource{SecretName: ""}}}) {
+	if !plugin.CanSupport(&volume.Spec{Name: "foo", VolumeSource: api.VolumeSource{Secret: &api.SecretVolumeSource{SecretName: ""}}}) {
 		t.Errorf("Expected true")
 	}
 }
@@ -97,7 +97,7 @@ func TestPlugin(t *testing.T) {
 		t.Errorf("Can't find the plugin by name")
 	}
 
-	builder, err := plugin.NewBuilder(volumeSpec, &api.ObjectReference{UID: types.UID(testPodUID)}, volume.VolumeOptions{})
+	builder, err := plugin.NewBuilder(volume.NewSpecFromVolume(volumeSpec), &api.ObjectReference{UID: types.UID(testPodUID)}, volume.VolumeOptions{})
 	if err != nil {
 		t.Errorf("Failed to make a new Builder: %v", err)
 	}
