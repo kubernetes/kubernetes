@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html class="+no-js no-js- no-js i-has-no-js">
+<head>
+  <meta charset="UTF-8">
+  <title>Modernizr Test Suite</title>
+  <link rel="stylesheet" href="qunit/qunit.css">
+  <style>
+     body { margin-bottom: 150px;}
+     #testbed { font-family: Helvetica; color: #444; padding-bottom: 100px;}
+     #testbed button { margin: 30px; font-size: 13px;}
+     .data-notes, .offScreen { display:none;}
+     table { width: 100%;}
+     tbody tr:nth-child(even) td, tbody tr:nth-child(even) th {  border: 1px solid #ccc; border-left: 0; border-right: 0;}
+     table td:nth-child(even), table th:nth-child(even) { background: #e6e6e6;}
+     table tbody tr:hover td, table tbody tr:hover th { background: #e1e100!important;}
+     td.wrong { background:red!important;}
+     #html5section { visibility: hidden; }
+     h1 label { display:none;}
+     .output { padding: 0 0 0 16px;}
+     .output ul { margin: 0;}
+     .output li { color: #854747; }
+     .output li.yes{color:#090;}
+     .output li b{color:#000;}
+     .output {font:14px/1.3 Inconsolata,Consolas,monospace;
+                    -webkit-column-count: 5;
+                       -moz-column-count: 5;
+                            column-count: 5;}
+      .output + .output { border-top: 5px solid #ccc; }
+      textarea { width: 100%; min-height: 75px;}
+      #caniusetrigger { font-size: 38px; font-family: monospace; display:block; }
+  </style>
+
+
+  <script>window.Modernizr || document.write('<script src="../modernizr.js"><\/script>')</script>
+
+  <script src="https://raw.github.com/Modernizr/Modernizr/master/modernizr.js"></script>
+
+  <script src="js/lib/polyfills.js"></script>
+  <script src="js/lib/detect-global.js"></script>
+
+  <script src="qunit/qunit.js"></script>
+  <script src="js/lib/jquery-1.7b2.js"></script>
+
+  <script src="js/lib/jsonselect.js"></script>
+  <script src="js/lib/uaparser.js"></script>
+  <script src="js/lib/github.js"></script>
+
+  <script src="js/setup.js"></script>
+
+  <script src="js/unit.js"></script>
+  <script src="js/unit-caniuse.js"></script>
+</head>
+<body>
+  <h1 id="qunit-header">Modernizr Test Suite</h1>
+  <h2 id="qunit-banner"></h2>
+  <div id="qunit-testrunner-toolbar"></div>
+  <h2 id="qunit-userAgent"></h2>
+
+  <ol id="qunit-tests"></ol>
+
+  <div id="mod-output" class=output></div>
+  <div id="mod-feattest-output" class=output></div>
+
+
+  <br>
+
+  <section><aside>this is an aside within a section</aside></section>
+
+
+
+
+  <h5>JSON.stringify(Modernizr)</h5>
+  <textarea></textarea>
+  <a href="#"   id="caniusetrigger"
+                onclick="return revealreftests(this)"
+                title="add a #caniuse hash to this page to make this automatic"
+                >Show the Ref Tests from Caniuse and Modernizr</a>
+
+
+  <script src="js/dumpdata.js"></script>
+  <script>
+    function revealreftests(a){
+
+        if (!a) a = document.getElementById('caniusetrigger');
+        a.parentNode && a.parentNode.removeChild(a);
+
+        var iframe = document.createElement('iframe');
+        iframe.src = 'caniuse.html';
+        iframe.style.cssText = 'width: 100%; height: 7000px; border: 15px double #F0C; \
+                                -moz-box-sizing: border-box; -webkit-box-sizing: border-box; box-sizing: border-box; ';
+        document.body.appendChild(iframe);
+
+        return false;
+    }
+
+    if (location.hash.replace(/^#/,'') == 'caniuse'){
+        setTimeout(revealreftests, 100);
+    }
+
+  </script>
+
+
+</body>
+</html>

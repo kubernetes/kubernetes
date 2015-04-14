@@ -1,0 +1,1451 @@
+<!DOCTYPE html>
+<!-- saved from url=(0025)http://tests.caniuse.com/ -->
+<html class=" no-js"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><title>WCIU test page</title>
+<meta charset="utf-8">
+
+<!-- pull in latest modernizr -->
+<script src="../modernizr.js"></script>
+
+<script src="./caniuse_files/jquery.min.js"></script>
+<link rel="stylesheet" type="text/css" href="./caniuse_files/style.css">
+
+<script>
+
+function setResult(id, result) {
+	$('#' + id).addClass(result ? 'pass' : 'fail');
+}
+
+</script>
+
+</head><body><h2>The <a href="http://caniuse.com/">When can I use...</a> test suite... <small>(originally from <a href="http://tests.caniuse.com/">tests.caniuse.com</a>)</small></h2> 
+<div id="intro">
+	<p>This is a basic test suite of various web technologies for the <a href="./caniuse_files/caniuse.html">When Can I Use</a> website.</p>
+	<p>It is used to quickly test basic support for features in upcoming browsers, rather than any full support of the feature's specification.</p>
+	<p>Results on this page generally match the results as they appear on the When Can I Use site, but <strong>may not always</strong> due to a variety of circumstances (test may pass but support is actually buggy, not tested well enough, has alternative method, etc).</p>
+	
+	<p>Four different types of tests are used:</p>
+	<dl>
+		<dt>Auto</dt>
+		<dd>Automated JS-based tests. (m) means <a href="http://modernizr.com/">Modernizr</a> is used.</dd>
+	
+		<dt>Visual</dt>
+		<dd>Requires visual confirmation/comparison to confirm</dd>
+	
+		<dt>Visual-square</dt>
+		<dd>Test must create a 30x30px green (lime) square</dd>
+	
+		<dt>Interactive</dt>
+		<dd>Requires interaction to confirm support</dd>
+	</dl>
+	
+	<p>If you are interested in contributing tests you can contact me at: when (at) caniuse (dotcom).</p>
+	
+</div>
+
+
+<div id="options">
+<form action="http://tests.caniuse.com/?" method="get"><label for="browser_list">Select browser to compare results with: </label><select id="ua" name="ua" autocomplete="false"><option value="">(none)</option><option value="and2.1">Android Browser 2.1</option><option value="and2.2">Android Browser 2.2</option><option value="and2.3">Android Browser 2.3</option><option value="and3">Android Browser 3</option><option value="chr10">Chrome 10</option><option value="chr11">Chrome 11</option><option value="chr12">Chrome 12</option><option value="chr13" selected="">Chrome 13</option><option value="chr4">Chrome 4</option><option value="chr5">Chrome 5</option><option value="chr6">Chrome 6</option><option value="chr7">Chrome 7</option><option value="chr8">Chrome 8</option><option value="chr9">Chrome 9</option><option value="ff2">Firefox 2</option><option value="ff3">Firefox 3</option><option value="ff3.5">Firefox 3.5</option><option value="ff3.6">Firefox 3.6</option><option value="ff4">Firefox 4</option><option value="ff5">Firefox 5</option><option value="ff6">Firefox 6</option><option value="ie10">IE 10</option><option value="ie5.5">IE 5.5</option><option value="ie6">IE 6</option><option value="ie7">IE 7</option><option value="ie8">IE 8</option><option value="ie9">IE 9</option><option value="ios3.2">iOS Safari 3.2</option><option value="ios4.1">iOS Safari 4.0-4.1</option><option value="ios4.2">iOS Safari 4.2-4.3</option><option value="op10.1">Opera 10.0-10.1</option><option value="op10.5">Opera 10.5</option><option value="op10.6">Opera 10.6</option><option value="op11">Opera 11</option><option value="op11.1">Opera 11.1</option><option value="op11.5">Opera 11.5</option><option value="op12">Opera 12</option><option value="op9">Opera 9</option><option value="op9.6">Opera 9.5-9.6</option><option value="omini5">Opera Mini 5.0-6.0</option><option value="omob10">Opera Mobile 10</option><option value="omob11">Opera Mobile 11</option><option value="saf3.1">Safari 3.1</option><option value="saf3.2">Safari 3.2</option><option value="saf4">Safari 4</option><option value="saf5">Safari 5</option><option value="saf6">Safari 6</option></select><div><label for="prefix">Select CSS prefix to use (does not affect modernizr or non-CSS tests): </label><select id="prefix" name="prefix" autocomplete="false"><option value="all" selected="">All combinations</option><option value="-webkit-">-webkit-</option><option value="-moz-">-moz-</option><option value="-ms-">-ms-</option><option value="-o-">-o-</option><option value="none">(no prefix)</option></select><input id="opt_submit" type="submit" value="Go"></div></form></div><table><caption>Tests</caption><thead><tr><th>Feature</th><th>chr13</th><th>Tests</th></tr></thead><tbody><tr><th><h3>Toolbar/context menu</h3><span class="links">[<a href="http://caniuse.com/menu">Table</a>] [<a href="http://tests.caniuse.com/?feat=menu&prefix=all">Single feat</a>]</span></th><td class="current unknown">&nbsp;</td><td>
+
+</td></tr>
+<tr><th><h3>Audio element</h3><span class="links">[<a href="http://caniuse.com/audio">Table</a>] [<a href="http://tests.caniuse.com/?feat=audio&prefix=all">Single feat</a>]</span></th><td class="current pass">&nbsp;</td><td>
+<div class="test_wrap"><h3>Auto</h3><div id="audio0" class="auto pass"></div><script>
+setResult('audio0', !!document.createElement('audio').canPlayType);
+</script><div class="info">document.createElement('audio').canPlayType</div></div>
+
+<div class="test_wrap"><h3>Interact</h3><div id="audio1" class="interact"></div><audio controls="">
+ <source src="mimeaud.php?type=.wav">
+ <source src="mimeaud.php?type=.mp3">
+ <source src="mimeaud.php?type=.ogg">
+ <source src="mimeaud.php?type=.aac">
+ <source src="mimeaud.php?type=.flac">
+ <source src="mimeaud.php?type=.wma">
+ Audio fail
+</audio>
+<div class="info">Audio element with 6 different sources (with MIME set)</div></div>
+
+<div class="test_wrap"><h3>Interact</h3><div id="audio2" class="interact"></div><audio controls="">
+ <source src="mimeaud.php?nomime=1&amp;type=.wav">
+ <source src="mimeaud.php?nomime=1&amp;type=.mp3">
+ <source src="mimeaud.php?nomime=1&amp;type=.ogg">
+ <source src="mimeaud.php?nomime=1&amp;type=.aac">
+ <source src="mimeaud.php?nomime=1&amp;type=.flac">
+ <source src="mimeaud.php?nomime=1&amp;type=.wma">
+--&gt;
+ Audio fail
+</audio>
+
+<div class="info">Audio element with 6 different sources (no MIME set)</div></div>
+
+</td></tr>
+<tr><th><h3>CSS3 Background-image options</h3><span class="links">[<a href="http://caniuse.com/background-img-opts">Table</a>] [<a href="http://tests.caniuse.com/?feat=background-img-opts&prefix=all">Single feat</a>]</span></th><td class="current pass">&nbsp;</td><td>
+<div class="test_wrap"><h3>Auto (m)</h3><div id="background-img-opts0" class="auto pass"></div><script>setResult('background-img-opts0', Modernizr.backgroundsize);</script><div class="info">Modernizr test for: "backgroundsize"</div></div>
+
+<div class="test_wrap"><h3>Visual-square</h3><div id="background-img-opts1" class="visual-square"></div><div class="square"><div style="width:30px;height:30px;background:lime">
+<div style="-webkit-background-clip:content-box;-moz-background-clip:content-box;-ms-background-clip:content-box;-o-background-clip:content-box;background-clip:content-box;padding:30px 30px 0 0;background-color:red"></div>
+</div>
+</div><div class="info">background-clip: content-box;</div></div>
+
+<div class="test_wrap"><h3>Visual-square</h3><div id="background-img-opts2" class="visual-square"></div><div class="square"><div style="width:30px;height:30px;background:lime">
+<div style="-webkit-background-origin:content-box;-moz-background-origin:content-box;-ms-background-origin:content-box;-o-background-origin:content-box;background-origin:content-box;padding:30px 30px 0 0;background-image:url(caniuse_files/red30x30.png);background-repeat: no-repeat;"></div>
+</div>
+</div><div class="info">background-origin: content-box;</div></div>
+
+<div class="test_wrap"><h3>Visual-square</h3><div id="background-img-opts2" class="visual-square"></div><div class="square"><div style="-webkit-background-size:30px 30px;-moz-background-size:30px 30px;-ms-background-size:30px 30px;-o-background-size:30px 30px;background-size:30px 30px;background-image:url(caniuse_files/green5x5.png);background-repeat: no-repeat;width:30px;height:30px;"></div>
+</div><div class="info">background-size: 30px 30px;</div></div>
+
+</td></tr>
+<tr><th><h3>CSS3 Border images</h3><span class="links">[<a href="http://caniuse.com/border-image">Table</a>] [<a href="http://tests.caniuse.com/?feat=border-image&prefix=all">Single feat</a>]</span></th><td class="current partial">&nbsp;<span>-pre-</span></td><td>
+<div class="test_wrap"><h3>Auto (m)</h3><div id="border-image0" class="auto pass"></div><script>setResult('border-image0', Modernizr.borderimage);</script><div class="info">Modernizr test for: "borderimage"</div></div>
+
+<div class="test_wrap"><h3>Visual-square</h3><div id="border-image1" class="visual-square"></div><div class="square"><div style="border-width: 15px;	-webkit-border-image-source: url(caniuse_files/green5x5.png);-moz-border-image-source: url(caniuse_files/green5x5.png);-ms-border-image-source: url(caniuse_files/green5x5.png);-o-border-image-source: url(caniuse_files/green5x5.png);border-image-source: url(caniuse_files/green5x5.png);-webkit-border-image-slice: 2;-moz-border-image-slice: 2;-ms-border-image-slice: 2;-o-border-image-slice: 2;border-image-slice: 2; width:0; height: 0;"></div></div><div class="info">Separate properties:
+border-image-source: url(caniuse_files/green5x5.png);
+border-image-slice: 2;</div></div>
+
+<div class="test_wrap"><h3>Visual-square</h3><div id="border-image3" class="visual-square"></div><div class="square"><div style="border-width: 15px;	-webkit-border-image: url(caniuse_files/green5x5.png) 2;-moz-border-image: url(caniuse_files/green5x5.png) 2;-ms-border-image: url(caniuse_files/green5x5.png) 2;-o-border-image: url(caniuse_files/green5x5.png) 2;border-image: url(caniuse_files/green5x5.png) 2; width:0; height: 0;"></div></div><div class="info">Shorthand syntax: border-image: url(caniuse_files/green5x5.png) 2;</div></div>
+
+</td></tr>
+<tr><th><h3>CSS3 Border-radius (rounded corners)</h3><span class="links">[<a href="http://caniuse.com/border-radius">Table</a>] [<a href="http://tests.caniuse.com/?feat=border-radius&prefix=all">Single feat</a>]</span></th><td class="current pass">&nbsp;</td><td>
+<div class="test_wrap"><h3>Auto (m)</h3><div id="border-radius0" class="auto pass"></div><script>setResult('border-radius0', Modernizr.borderradius);</script><div class="info">Modernizr test for: "borderradius"</div></div>
+
+<div class="test_wrap"><h3>Visual-square</h3><div id="border-radius1" class="visual-square"></div><div class="square"><div style="width:30px; height:30px; overflow:hidden; position:relative;">
+  <div style="background:lime; height: 40px; "></div>
+  <div style="background:red; position:absolute; z-index:10; top: 0;
+              height: 400px; width: 400px;
+              -webkit-border-radius: 150px;
+-moz-border-radius: 150px;
+-ms-border-radius: 150px;
+-o-border-radius: 150px;
+border-radius: 150px;
+
+"></div>
+</div></div></div>
+
+</td></tr>
+<tr><th><h3>Canvas (basic support)</h3><span class="links">[<a href="http://caniuse.com/canvas">Table</a>] [<a href="http://tests.caniuse.com/?feat=canvas&prefix=all">Single feat</a>]</span></th><td class="current pass">&nbsp;</td><td>
+<div class="test_wrap"><h3>Auto (m)</h3><div id="canvas0" class="auto pass"></div><script>setResult('canvas0', Modernizr.canvas);</script><div class="info">Modernizr test for: "canvas"</div></div>
+
+<div class="test_wrap"><h3>Visual-square</h3><div id="canvas1" class="visual-square"></div><div class="square"><canvas width="30" height="30" style="background:red;" id="canv_test"></canvas>
+
+<script>
+var canvas = $('#canv_test')[0], 
+    ctx    = canvas.getContext && canvas.getContext('2d');
+
+if (ctx){
+  ctx.fillStyle = '#00ff00';
+  ctx.fillRect(0,0,100,40);
+}
+</script></div><div class="info">Draw rect on canvas using fillStyle and fillRect</div></div>
+
+</td></tr>
+<tr><th><h3>classList (DOMTokenList )</h3><span class="links">[<a href="http://caniuse.com/classlist">Table</a>] [<a href="http://tests.caniuse.com/?feat=classlist&prefix=all">Single feat</a>]</span></th><td class="current pass">&nbsp;</td><td>
+<div class="test_wrap"><h3>Auto</h3><div id="classlist0" class="auto pass"></div><script>
+setResult('classlist0', "classList" in document.body);
+</script><div class="info">"classList" in document.body</div></div>
+
+<div class="test_wrap"><h3>Visual-square</h3><div id="classlist1" class="visual-square"></div><div class="square"><div id="classlisttest" class="pass" style="width:30px;height:30px;"></div>
+<script>
+try{
+  document.getElementById('classlisttest').classList.remove('fail');
+  document.getElementById('classlisttest').classList.add('pass');
+}catch(e){}
+
+
+</script></div></div>
+
+</td></tr>
+<tr><th><h3>Cross-Origin Resource Sharing</h3><span class="links">[<a href="http://caniuse.com/cors">Table</a>] [<a href="http://tests.caniuse.com/?feat=cors&prefix=all">Single feat</a>]</span></th><td class="current pass">&nbsp;</td><td>
+<div class="test_wrap"><h3>Auto</h3><div id="cors0" class="auto pass"></div><script>
+$(function() {
+	$.get('http://a.deveria.com/tests/cors/true.php', function(data) {
+		setResult('cors0', data);
+	});
+});
+
+</script><div class="info">Instant XHR request on page that should permit it.</div></div>
+
+</td></tr>
+<tr><th><h3>CSS3 Animation</h3><span class="links">[<a href="http://caniuse.com/css-animation">Table</a>] [<a href="http://tests.caniuse.com/?feat=css-animation&prefix=all">Single feat</a>]</span></th><td class="current pass">&nbsp;<span>-pre-</span></td><td>
+<div class="test_wrap"><h3>Auto (m)</h3><div id="css-animation0" class="auto pass"></div><script>setResult('css-animation0', Modernizr.cssanimations);</script><div class="info">Modernizr test for: "cssanimations"</div></div>
+
+<div class="test_wrap"><h3>Visual-square</h3><div id="css-animation1" class="visual-square"></div><div class="square"><style>
+ #css-animation1test {
+	-webkit-animation: staylime 60s infinite;
+-moz-animation: staylime 60s infinite;
+-ms-animation: staylime 60s infinite;
+-o-animation: staylime 60s infinite;
+animation: staylime 60s infinite;
+}
+
+@-webkit-keyframes staylime {
+	from { background-color: lime; }
+	to   { background-color: lime; }
+ }
+@-moz-keyframes staylime {
+	from { background-color: lime; }
+	to   { background-color: lime; }
+ }
+@-ms-keyframes staylime {
+	from { background-color: lime; }
+	to   { background-color: lime; }
+ }
+@-o-keyframes staylime {
+	from { background-color: lime; }
+	to   { background-color: lime; }
+ }
+@keyframes staylime {
+	from { background-color: lime; }
+	to   { background-color: lime; }
+ }
+
+
+</style>
+
+<div id="css-animation1test" style="width:30px;height:30px;"></div></div><div class="info">animation: staylime 60s infinite; 
+
+@keyframes staylime {
+	from { background-color: lime; }
+	to   { background-color: lime; }
+ }</div></div>
+
+</td></tr>
+<tr><th><h3>CSS3 Box-shadow</h3><span class="links">[<a href="http://caniuse.com/css-boxshadow">Table</a>] [<a href="http://tests.caniuse.com/?feat=css-boxshadow&prefix=all">Single feat</a>]</span></th><td class="current pass">&nbsp;</td><td>
+<div class="test_wrap"><h3>Auto (m)</h3><div id="css-boxshadow0" class="auto pass"></div><script>setResult('css-boxshadow0', Modernizr.boxshadow);</script><div class="info">Modernizr test for: "boxshadow"</div></div>
+
+<div class="test_wrap"><h3>Visual-square</h3><div id="css-boxshadow1" class="visual-square"></div><div class="square"><div style="background:red; width: 30px; height: 30px;
+            -webkit-box-shadow: inset lime 0px 0px 150px;
+-moz-box-shadow: inset lime 0px 0px 150px;
+-ms-box-shadow: inset lime 0px 0px 150px;
+-o-box-shadow: inset lime 0px 0px 150px;
+box-shadow: inset lime 0px 0px 150px;
+ "></div>
+</div><div class="info">Must be greenish, may not be entirely lime depending on the implementation.</div></div>
+
+</td></tr>
+<tr><th><h3>CSS position:fixed</h3><span class="links">[<a href="http://caniuse.com/css-fixed">Table</a>] [<a href="http://tests.caniuse.com/?feat=css-fixed&prefix=all">Single feat</a>]</span></th><td class="current pass">&nbsp;</td><td>
+
+<div class="test_wrap"><h3>Interact</h3><div id="css-fixed1" class="interact"></div><a href="http://tests.caniuse.com/fixed.html">Test here</a></div>
+
+</td></tr>
+<tr><th><h3>CSS Gradients</h3><span class="links">[<a href="http://caniuse.com/css-gradients">Table</a>] [<a href="http://tests.caniuse.com/?feat=css-gradients&prefix=all">Single feat</a>]</span></th><td class="current pass">&nbsp;<span>-pre-</span></td><td>
+<div class="test_wrap"><h3>Auto (m)</h3><div id="css-gradients0" class="auto pass"></div><script>setResult('css-gradients0', Modernizr.cssgradients);</script><div class="info">Modernizr test for: "cssgradients"</div></div>
+
+<div class="test_wrap"><h3>Visual-square</h3><div id="css-gradients1" class="visual-square"></div><div class="square"><div style="width:30px;height:30px;background-image: -webkit-linear-gradient(lime, lime);background-image: -moz-linear-gradient(lime, lime);background-image: -ms-linear-gradient(lime, lime);background-image: -o-linear-gradient(lime, lime);background-image: linear-gradient(lime, lime);"></div></div><div class="info">linear-gradient(lime, lime);</div></div>
+
+<div class="test_wrap"><h3>Visual-square</h3><div id="css-gradients2" class="visual-square"></div><div class="square"><div style="width:30px;height:30px;background-image:-webkit-radial-gradient(lime, lime);background-image:-moz-radial-gradient(lime, lime);background-image:-ms-radial-gradient(lime, lime);background-image:-o-radial-gradient(lime, lime);background-image:radial-gradient(lime, lime);"></div></div><div class="info">radial-gradient(lime, lime)</div></div>
+
+</td></tr>
+<tr><th><h3>CSS3 Opacity</h3><span class="links">[<a href="http://caniuse.com/css-opacity">Table</a>] [<a href="http://tests.caniuse.com/?feat=css-opacity&prefix=all">Single feat</a>]</span></th><td class="current pass">&nbsp;</td><td>
+<div class="test_wrap"><h3>Auto (m)</h3><div id="css-opacity0" class="auto pass"></div><script>setResult('css-opacity0', Modernizr.opacity);</script><div class="info">Modernizr test for: "opacity"</div></div>
+
+<div class="test_wrap"><h3>Visual-square</h3><div id="css-opacity1" class="visual-square"></div><div class="square"><div style="width:30px;height:30px;position:relative;background:lime">
+	<div style="width:30px;height:30px;background:red;-webkit-opacity:0;-moz-opacity:0;-ms-opacity:0;-o-opacity:0;opacity:0;"></div></div>
+</div>
+</div><div class="info">Test for opacity: 0</div>
+
+</td></tr>
+<tr><th><h3>CSS3 Text-shadow</h3><span class="links">[<a href="http://caniuse.com/css-textshadow">Table</a>] [<a href="http://tests.caniuse.com/?feat=css-textshadow&prefix=all">Single feat</a>]</span></th><td class="current pass">&nbsp;</td><td>
+<div class="test_wrap"><h3>Auto (m)</h3><div id="css-textshadow0" class="auto pass"></div><script>setResult('css-textshadow0', Modernizr.textshadow);</script><div class="info">Modernizr test for: "textshadow"</div></div>
+
+<div class="test_wrap"><h3>Visual</h3><div id="css-textshadow1" class="visual"></div><div class="vis_test"><div style="width:30px;height:30px;overflow:hidden" id="css-textshadow1">
+ 
+<div style="font:25px/25px Times New Roman, Times; color:white;-webkit-text-shadow:25px 0 3px lime;-moz-text-shadow:25px 0 3px lime;-ms-text-shadow:25px 0 3px lime;-o-text-shadow:25px 0 3px lime;text-shadow:25px 0 3px lime;position:relative; left:-25px;">A</div>
+
+</div></div><div class="vis_ref"><img src="./caniuse_files/text-shadow1.png"></div><div class="info">font-size: 25px;
+color: white;
+text-shadow: 25px 0 3px lime; position: relative;
+left: -25px;</div></div>
+
+<div class="test_wrap"><h3>Visual</h3><div id="css-textshadow2" class="visual"></div><div class="vis_test"><div style="width:40px;height:30px;overflow:hidden" id="css-textshadow2">
+ <div style="font:25px/25px Times New Roman, Times; color:white; -webkit-text-shadow:25px 0 3px #0F0, 35px 0 3px #0C0, 45px 0 3px #090;-moz-text-shadow:25px 0 3px #0F0, 35px 0 3px #0C0, 45px 0 3px #090;-ms-text-shadow:25px 0 3px #0F0, 35px 0 3px #0C0, 45px 0 3px #090;-o-text-shadow:25px 0 3px #0F0, 35px 0 3px #0C0, 45px 0 3px #090;text-shadow:25px 0 3px #0F0, 35px 0 3px #0C0, 45px 0 3px #090; position:relative; left:-35px;">A</div>
+</div>
+</div><div class="vis_ref"><img src="./caniuse_files/text-shadow2.png"></div><div class="info">Multiple shadow test</div></div>
+
+</td></tr>
+<tr><th><h3>CSS3 Transitions</h3><span class="links">[<a href="http://caniuse.com/css-transitions">Table</a>] [<a href="http://tests.caniuse.com/?feat=css-transitions&prefix=all">Single feat</a>]</span></th><td class="current pass">&nbsp;<span>-pre-</span></td><td>
+<div class="test_wrap"><h3>Auto (m)</h3><div id="css-transitions0" class="auto pass"></div><script>setResult('css-transitions0', Modernizr.csstransitions);</script><div class="info">Modernizr test for: "csstransitions"</div></div>
+
+<div class="test_wrap"><h3>Interact</h3><div id="css-transitions1" class="interact"></div><style>
+#css-transitions1wrap {
+	width: 30px;
+	height: 30px;
+	border: 1px solid;
+	overflow: hidden;
+	margin: 0 auto;
+}
+
+#css-transitions1test {
+	-webkit-transition-property: left;
+	-webkit-transition-duration: 3s;
+	-webkit-transition-timing-function: cubic-bezier(0, 1, 1, 0);
+-moz-transition-property: left;
+	-moz-transition-duration: 3s;
+	-moz-transition-timing-function: cubic-bezier(0, 1, 1, 0);
+-ms-transition-property: left;
+	-ms-transition-duration: 3s;
+	-ms-transition-timing-function: cubic-bezier(0, 1, 1, 0);
+-o-transition-property: left;
+	-o-transition-duration: 3s;
+	-o-transition-timing-function: cubic-bezier(0, 1, 1, 0);
+transition-property: left;
+	transition-duration: 3s;
+	transition-timing-function: cubic-bezier(0, 1, 1, 0);
+	background-color: lime;
+	position: relative;
+	left: -30px;
+	top: 0;
+}
+
+#css-transitions1wrap:hover #css-transitions1test {
+	left: 30px;
+}
+
+</style>
+<div id="css-transitions1wrap">
+	<div id="css-transitions1test" style="width:30px;height:30px;"></div>
+</div><p class="condition">Green square must (briefly) appear on hover</p><div class="info">5 second transition from left to right using cubic-bezier(0, 1, 1, 0); </div></div>
+
+</td></tr>
+<tr><th><h3>CSS3 Colors</h3><span class="links">[<a href="http://caniuse.com/css3-colors">Table</a>] [<a href="http://tests.caniuse.com/?feat=css3-colors&prefix=all">Single feat</a>]</span></th><td class="current pass">&nbsp;</td><td>
+<div class="test_wrap"><h3>Auto (m)</h3><div id="css3-colors0" class="auto pass"></div><script>setResult('css3-colors0', Modernizr.hsla);</script><div class="info">Modernizr test for: "hsla"</div></div>
+
+<div class="test_wrap"><h3>Visual-square</h3><div id="css3-colors1" class="visual-square"></div><div class="square"><div style="background-color: red;      width: 30px; height: 30px; background-color: hsl(120, 100%, 50%);"></div></div></div>
+
+<div class="test_wrap"><h3>Visual-square</h3><div id="css3-colors2" class="visual-square"></div><div class="square"><div style="background-color: red;      width: 30px; height: 30px; background-color: rgba(0, 255, 0, 1);"></div></div></div>
+
+</td></tr>
+<tr><th><h3>dataset &amp; data-* attributes</h3><span class="links">[<a href="http://caniuse.com/dataset">Table</a>] [<a href="http://tests.caniuse.com/?feat=dataset&prefix=all">Single feat</a>]</span></th><td class="current pass">&nbsp;</td><td>
+<div class="test_wrap"><h3>Auto</h3><div id="dataset0" class="auto pass" data-foo="bar"></div><script>
+var result = 'dataset' in document.body;
+if(result) {
+var elem = document.getElementById('dataset0'); elem.setAttribute('data-foo', 'bar');
+result = elem.dataset.foo == 'bar';
+}
+setResult('dataset0', result);
+</script><div class="info">Test for 'dataset' in document.body and getting the correct value returned from a data-foo attribute.</div></div>
+
+<div class="test_wrap"><h3>Interact</h3><div id="dataset1" class="interact"></div><a href="http://trac.webkit.org/export/66582/trunk/LayoutTests/fast/dom/dataset.html">Test here</a></div>
+
+</td></tr>
+<tr><th><h3>Details &amp; Summary elements</h3><span class="links">[<a href="http://caniuse.com/details">Table</a>] [<a href="http://tests.caniuse.com/?feat=details&prefix=all">Single feat</a>]</span></th><td class="current pass">&nbsp;</td><td>
+<div class="test_wrap"><h3>Auto</h3><div id="details0" class="auto pass"></div><script>
+setResult('details0', 'open' in document.createElement('details'));
+</script></div>
+
+<div class="test_wrap"><h3>Interact</h3><div id="details1" class="interact"></div><details>
+    <summary>(summary button)</summary>
+    <p>(detail contents)</p>
+</details><p class="condition">"(detail contents)" should be visible ONLY after clicking summary</p><div class="info">Basic details element with summary and paragraph as children.</div></div>
+
+</td></tr>
+<tr><th><h3>Server-sent DOM events</h3><span class="links">[<a href="http://caniuse.com/eventsource">Table</a>] [<a href="http://tests.caniuse.com/?feat=eventsource&prefix=all">Single feat</a>]</span></th><td class="current pass">&nbsp;</td><td>
+<div class="test_wrap"><h3>Auto</h3><div id="eventsource0" class="auto pass"></div><script>
+setResult('eventsource0', typeof EventSource !== 'undefined');
+</script></div>
+
+</td></tr>
+<tr><th><h3>File API</h3><span class="links">[<a href="http://caniuse.com/fileapi">Table</a>] [<a href="http://tests.caniuse.com/?feat=fileapi&prefix=all">Single feat</a>]</span></th><td class="current pass">&nbsp;</td><td>
+<div class="test_wrap"><h3>Auto</h3><div id="fileapi0" class="auto pass"></div><script>
+setResult('fileapi0', !!window.FileReader);
+</script></div>
+
+</td></tr>
+<tr><th><h3>Flexible Box Layout Module</h3><span class="links">[<a href="http://caniuse.com/flexbox">Table</a>] [<a href="http://tests.caniuse.com/?feat=flexbox&prefix=all">Single feat</a>]</span></th><td class="current pass">&nbsp;<span>-pre-</span></td><td>
+<div class="test_wrap"><h3>Auto (m)</h3><div id="flexbox0" class="auto pass"></div><script>setResult('flexbox0', Modernizr.flexbox);</script><div class="info">Modernizr test for: "flexbox"</div></div>
+
+</td></tr>
+<tr><th><h3>@font-face Web fonts</h3><span class="links">[<a href="http://caniuse.com/fontface">Table</a>] [<a href="http://tests.caniuse.com/?feat=fontface&prefix=all">Single feat</a>]</span></th><td class="current pass">&nbsp;</td><td>
+<div class="test_wrap"><h3>Auto (m)</h3><div id="fontface0" class="auto pass"></div><script>setResult('fontface0', Modernizr.fontface);</script><div class="info">Modernizr test for: "fontface"</div></div>
+
+</td></tr>
+<tr><th><h3>Geolocation</h3><span class="links">[<a href="http://caniuse.com/geolocation">Table</a>] [<a href="http://tests.caniuse.com/?feat=geolocation&prefix=all">Single feat</a>]</span></th><td class="current pass">&nbsp;</td><td>
+<div class="test_wrap"><h3>Auto (m)</h3><div id="geolocation0" class="auto pass"></div><script>setResult('geolocation0', Modernizr.geolocation);</script><div class="info">Modernizr test for: "geolocation"</div></div>
+
+<div class="test_wrap"><h3>Auto</h3><div id="geolocation1" class="auto pass"></div><script>
+(function() {
+	var result = false;
+	var geo = navigator.geolocation;
+	if(geo) {
+		result = (
+			"getCurrentPosition" in geo
+			&& "watchPosition" in geo
+			&& "clearWatch" in geo
+		);
+	}
+	setResult('geolocation1', result);
+}());
+</script><div class="info">Test for getCurrentPosition, watchPosition and clearWatch in navigator.geolocation</div></div>
+
+<div class="test_wrap"><h3>Interact</h3><div id="geolocation2" class="interact"></div><button id="geolocation2test">Get location</button>
+<script>
+(function() {
+	var btn = document.getElementById('geolocation2test');
+	if(!navigator.geolocation && !navigator.geolocation.getCurrentPosition) return false;
+	btn.onclick = function() {
+		var feat = document.getElementById('geolocation2');
+		navigator.geolocation.getCurrentPosition(function(pos) {
+			feat.innerHTML = '<p>Result:<br>LAT: ' + pos.coords.latitude + '<br>LON: ' + pos.coords.longitude + '</p>';
+		}, function(error) {
+			feat.innerHTML = '<p>Error:' + error.message + '</p>';
+		});
+		
+		feat.innerHTML = '<p>Waiting for response...</p>';
+		
+		return false;
+	}
+})();
+
+</script><p class="condition">Must provide LAT and LON info (may need to give permission first)</p><div class="info">Test for navigator.geolocation.getCurrentPosition on which position.coords.latitude and position.coords.longitude are expected. </div></div>
+
+</td></tr>
+<tr><th><h3>getElementsByClassName</h3><span class="links">[<a href="http://caniuse.com/getelementsbyclassname">Table</a>] [<a href="http://tests.caniuse.com/?feat=getelementsbyclassname&prefix=all">Single feat</a>]</span></th><td class="current pass">&nbsp;</td><td>
+<div class="test_wrap"><h3>Auto</h3><div id="getelementsbyclassname0" class="auto pass"></div><script>
+setResult('getelementsbyclassname0', typeof document.getElementsByClassName === 'function')
+</script></div>
+
+<div class="test_wrap"><h3>Visual-square</h3><div id="getelementsbyclassname1" class="visual-square"></div><div class="square"><div style="width: 30px; height: 30px; background-image: initial; background-attachment: initial; background-origin: initial; background-clip: initial; background-color: lime; background-position: initial initial; background-repeat: initial initial; " id="getelementsbyclassname1container">
+	<div id="getelementsbyclassname1test">
+		<div class="getelementsbyclassname1test"></div>
+		<div class="getelementsbyclassname1test altgetelementsbyclassname1test"></div>
+		<div class="altgetelementsbyclassname1test"></div>
+	</div>
+<script>
+(function() {
+	if(document.getElementsByClassName) {
+		var elems = document.getElementsByClassName('getelementsbyclassname1test');
+		var from_id = document.getElementById('getelementsbyclassname1test').getElementsByTagName('*');
+		if(elems.length && elems.length === 2) {
+			if(elems[0] === from_id[0] && elems[1] === from_id[1]) {
+				document.getElementById('getelementsbyclassname1container').style.background = 'lime';
+			}
+		}
+	}
+}());
+</script></div><div class="info">Test if two divs were correctly retrieved using getElementsByClassName</div></div>
+
+</div></td></tr>
+<tr><th><h3>Hashchange event</h3><span class="links">[<a href="http://caniuse.com/hashchange">Table</a>] [<a href="http://tests.caniuse.com/?feat=hashchange&prefix=all">Single feat</a>]</span></th><td class="current pass">&nbsp;</td><td>
+<div class="test_wrap"><h3>Auto (m)</h3><div id="hashchange0" class="auto pass"></div><script>setResult('hashchange0', Modernizr.hashchange);</script><div class="info">Modernizr test for: "hashchange"</div></div>
+
+<div class="test_wrap"><h3>Visual-square</h3><div id="hashchange1" class="visual-square"></div><div class="square"><iframe style="width:30px;height:30px;border:0" src="./caniuse_files/hashchange.html"></iframe></div><div class="info">iframe with addEventListener('hashchange', function() {
+	document.body.style.background = 'lime';
+}, false);
+</div></div>
+
+</td></tr>
+<tr><th><h3>Session history management</h3><span class="links">[<a href="http://caniuse.com/history">Table</a>] [<a href="http://tests.caniuse.com/?feat=history&prefix=all">Single feat</a>]</span></th><td class="current pass">&nbsp;</td><td>
+<div class="test_wrap"><h3>Auto (m)</h3><div id="history0" class="auto pass"></div><script>setResult('history0', Modernizr.history);</script><div class="info">Modernizr test for: "history"</div></div>
+
+<div class="test_wrap"><h3>Auto</h3><div id="history1" class="auto"></div><iframe src="./caniuse_files/pushstate.html#history1"  style="display:none"></iframe><div class="info">Test if history.pushState was successful</div></div>
+
+</td></tr>
+<tr><th><h3>IndexedDB</h3><span class="links">[<a href="http://caniuse.com/indexeddb">Table</a>] [<a href="http://tests.caniuse.com/?feat=indexeddb&prefix=all">Single feat</a>]</span></th><td class="current pass">&nbsp;</td><td>
+<div class="test_wrap"><h3>Auto (m)</h3><div id="indexeddb0" class="auto pass"></div><script>setResult('indexeddb0', Modernizr.indexeddb);</script><div class="info">Modernizr test for: "indexeddb"</div></div>
+
+</td></tr>
+<tr><th><h3>JSON parsing</h3><span class="links">[<a href="http://caniuse.com/json">Table</a>] [<a href="http://tests.caniuse.com/?feat=json&prefix=all">Single feat</a>]</span></th><td class="current pass">&nbsp;</td><td>
+<div class="test_wrap"><h3>Auto</h3><div id="json0" class="auto pass"></div><script>
+setResult('json0', 'JSON' in window)
+</script></div>
+
+<div class="test_wrap"><h3>Auto</h3><div id="json1" class="auto pass"></div><script>
+(function() {
+try {
+var obj = {
+	key1: 'my_str',
+	key2: ['my', 'array'],
+	key3: {
+		my: 'object',
+		with_numbers: [1, 2, 3, 4.5678],
+		and_also: 9
+	}
+};
+
+var str = JSON.stringify(obj);
+if(typeof str === 'string') {
+	var new_obj = JSON.parse(str);
+	if(
+		new_obj.key1 === 'my_str'
+		&& new_obj.key2.length === 2
+		&& new_obj.key2[1] === 'array'
+		&& new_obj.key3.with_numbers[3] === 4.5678
+		&& new_obj.key3.and_also === 9
+	) {
+		setResult('json1', true);
+	} else {
+		setResult('json1', false);
+	}
+} else {
+	setResult('json1', false);
+}
+} catch(e){
+setResult('json1', false);
+}
+}());
+</script><div class="info">Create a JS object, convert to JSON string, convert back to object and compare.</div></div>
+
+</td></tr>
+<tr><th><h3>CSS3 Multiple backgrounds</h3><span class="links">[<a href="http://caniuse.com/multibackgrounds">Table</a>] [<a href="http://tests.caniuse.com/?feat=multibackgrounds&prefix=all">Single feat</a>]</span></th><td class="current pass">&nbsp;</td><td>
+<div class="test_wrap"><h3>Auto (m)</h3><div id="multibackgrounds0" class="auto pass"></div><script>setResult('multibackgrounds0', Modernizr.multiplebgs);</script><div class="info">Modernizr test for: "multiplebgs"</div></div>
+
+<div class="test_wrap"><h3>Visual-square</h3><div id="multibackgrounds1" class="visual-square"></div><div class="square"><div style="background-repeat: repeat-x; background-image: url(caniuse_files/green5x5.png), url(caniuse_files/green5x5.png), url(caniuse_files/green5x5.png), url(caniuse_files/green5x5.png), url(caniuse_files/green5x5.png), url(caniuse_files/green5x5.png); background-position: 0 0, 0 5px, 0 10px, 0 15px, 0 20px, 0 25px; width:30px;height:30px;"></div></div><div class="info">background-repeat: repeat-x;
+background-image: url(caniuse_files/green5x5.png), url(caniuse_files/green5x5.png), url(caniuse_files/green5x5.png), url(caniuse_files/green5x5.png), url(caniuse_files/green5x5.png), url(caniuse_files/green5x5.png);
+background-position: 0 0, 0 5px, 0 10px, 0 15px, 0 20px, 0 25px;</div></div>
+
+</td></tr>
+<tr><th><h3>CSS3 Multiple column layout</h3><span class="links">[<a href="http://caniuse.com/multicolumn">Table</a>] [<a href="http://tests.caniuse.com/?feat=multicolumn&prefix=all">Single feat</a>]</span></th><td class="current pass">&nbsp;<span>-pre-</span></td><td>
+<div class="test_wrap"><h3>Auto (m)</h3><div id="multicolumn0" class="auto pass"></div><script>setResult('multicolumn0', Modernizr.csscolumns);</script><div class="info">Modernizr test for: "csscolumns"</div></div>
+
+<div class="test_wrap"><h3>Visual-square</h3><div id="multicolumn1" class="visual-square"></div><div class="square"><div style="-webkit-column-width: 15px; -webkit-column-gap: 0;-moz-column-width: 15px; -moz-column-gap: 0;-ms-column-width: 15px; -ms-column-gap: 0;-o-column-width: 15px; -o-column-gap: 0;column-width: 15px; column-gap: 0; width:30px;height:30px;background:red;">
+	<div style="inline-block;width:15px;height:30px;background:lime;"></div>
+	<div style="inline-block;width:15px;height:30px;background:lime;"></div>
+</div>
+</div><div class="info">column-width: 15px;
+column-gap: 0;</div></div>
+
+</td></tr>
+<tr><th><h3>Web Storage - name/value pairs</h3><span class="links">[<a href="http://caniuse.com/namevalue-storage">Table</a>] [<a href="http://tests.caniuse.com/?feat=namevalue-storage&prefix=all">Single feat</a>]</span></th><td class="current pass">&nbsp;</td><td>
+<div class="test_wrap"><h3>Auto (m)</h3><div id="namevalue-storage0" class="auto pass"></div><script>setResult('namevalue-storage0', Modernizr.localstorage);</script><div class="info">Modernizr test for: "localstorage"</div></div>
+
+<div class="test_wrap"><h3>Auto</h3><div id="namevalue-storage1" class="auto pass"></div><script>
+(function() {
+	var result = false;
+	if(window.localStorage) {
+		try {
+			localStorage.setItem('foo', 'bar');
+			if(localStorage.getItem('foo') === 'bar'
+				&& localStorage['foo'] === 'bar'
+				&& localStorage.foo === 'bar'
+			) {
+				localStorage.removeItem('foo');
+				if(localStorage.getItem('foo') === null) {
+					result = true;
+				}
+			}
+		} catch(e) {}
+	}
+	setResult('namevalue-storage1', result);
+})();
+
+</script><div class="info">Test if getItem, setItem and removeItem work.</div></div>
+
+</td></tr>
+<tr><th><h3>Web Notifications</h3><span class="links">[<a href="http://caniuse.com/notifications">Table</a>] [<a href="http://tests.caniuse.com/?feat=notifications&prefix=all">Single feat</a>]</span></th><td class="current pass">&nbsp;</td><td>
+<div class="test_wrap"><h3>Auto</h3><div id="notifications0" class="auto pass"></div><script>
+setResult('notifications0',
+"webkitNotifications" in window
+|| "mozNotifications" in window
+|| "oNotifications" in window
+|| "msNotifications" in window
+|| "khtmlNotifications" in window
+|| "notifications" in window
+);
+</script></div>
+
+</td></tr>
+<tr><th><h3>Offline web applications</h3><span class="links">[<a href="http://caniuse.com/offline-apps">Table</a>] [<a href="http://tests.caniuse.com/?feat=offline-apps&prefix=all">Single feat</a>]</span></th><td class="current pass">&nbsp;</td><td>
+<div class="test_wrap"><h3>Auto (m)</h3><div id="offline-apps0" class="auto pass"></div><script>setResult('offline-apps0', Modernizr.applicationcache);</script><div class="info">Modernizr test for: "applicationcache"</div></div>
+
+</td></tr>
+<tr><th><h3>querySelector/querySelectorAll</h3><span class="links">[<a href="http://caniuse.com/queryselector">Table</a>] [<a href="http://tests.caniuse.com/?feat=queryselector&prefix=all">Single feat</a>]</span></th><td class="current pass">&nbsp;</td><td>
+<div class="test_wrap"><h3>Auto</h3><div id="queryselector0" class="auto pass"></div><script>
+setResult('queryselector0', !!document.querySelectorAll && !!document.querySelector)
+</script></div>
+
+<div class="test_wrap"><h3>Auto</h3><div id="queryselector1" class="auto pass"></div>	<div id="queryselector1test">
+		<div data-foo="queryselector1"></div>
+		<div id="queryselector1target"></div>
+		<div class="altqueryselector1test"></div>
+	</div>
+<script>
+(function() {
+	if(document.querySelector) {
+		var elem = document.querySelector('[data-foo=queryselector1] + *');
+		var target = document.getElementById('queryselector1target');
+		setResult('queryselector1', elem === target);
+	}
+}());
+</script><div class="info">querySelector test on selector '[data-foo=bar] + *'</div></div>
+
+<div class="test_wrap"><h3>Auto</h3><div id="queryselector2" class="auto pass"></div>	<div id="queryselector2test">
+		<div data-foo="queryselector2"></div>
+		<div id="queryselector2target"></div>
+		<div class="altqueryselector2test"></div>
+	</div>
+<script>
+(function() {
+	if(document.querySelector) {
+		var elem = document.querySelector('[data-foo=queryselector2] + *');
+		var target = document.getElementById('queryselector2target');
+		setResult('queryselector2', elem === target);
+	}
+}());
+</script><div class="info">querySelectorAll test on selector '[data-foo=bar] + *'</div></div>
+
+</td></tr>
+<tr><th><h3>SVG (basic support)</h3><span class="links">[<a href="http://caniuse.com/svg">Table</a>] [<a href="http://tests.caniuse.com/?feat=svg&prefix=all">Single feat</a>]</span></th><td class="current pass">&nbsp;</td><td>
+<div class="test_wrap"><h3>Auto (m)</h3><div id="svg0" class="auto pass"></div><script>setResult('svg0', Modernizr.svg);</script><div class="info">Modernizr test for: "svg"</div></div>
+
+<div class="test_wrap"><h3>Visual-square</h3><div id="svg1" class="visual-square"></div><div class="square"><object type="image/svg+xml" width="30" height="30" data="./caniuse_files/svg-img.svg" style="overflow:visible"> SVG fail
+</object></div><div class="info">SVG in &lt;object&gt;</div></div>
+
+</td></tr>
+<tr><th><h3>SVG effects for HTML</h3><span class="links">[<a href="http://caniuse.com/svg-html">Table</a>] [<a href="http://tests.caniuse.com/?feat=svg-html&prefix=all">Single feat</a>]</span></th><td class="current partial">&nbsp;</td><td>
+
+<div class="test_wrap"><h3>Visual</h3><div id="svg-html1" class="visual"></div><div class="vis_test"> <object type="image/svg+xml" width="60" height="30" data="http://tests.caniuse.com/blur-html.svg"> SVG fail
+ </object></div><div class="vis_ref"><img src="./caniuse_files/svg-html-blur.png"></div><p class="condition">Text must appear blurry</p><div class="info">SVG with feGaussianBlur filter on foreignObject</div></div>
+
+</td></tr>
+<tr><th><h3>Inline SVG in HTML5</h3><span class="links">[<a href="http://caniuse.com/svg-html5">Table</a>] [<a href="http://tests.caniuse.com/?feat=svg-html5&prefix=all">Single feat</a>]</span></th><td class="current pass">&nbsp;</td><td>
+<div class="test_wrap"><h3>Auto (m)</h3><div id="svg-html50" class="auto pass"></div><script>setResult('svg-html50', Modernizr.inlinesvg);</script><div class="info">Modernizr test for: "inlinesvg"</div></div>
+
+<div class="test_wrap"><h3>Visual-square</h3><div id="svg-html51" class="visual-square"></div><div class="square"><svg width="30" height="30" xmlns="http://www.w3.org/2000/svg" style="background:red;"> 
+    <rect height="30" width="30" y="0" x="0" fill="#00ff00"></rect> 
+</svg>
+</div></div>
+
+</td></tr>
+<tr><th><h3>SVG SMIL animation</h3><span class="links">[<a href="http://caniuse.com/svg-smil">Table</a>] [<a href="http://tests.caniuse.com/?feat=svg-smil&prefix=all">Single feat</a>]</span></th><td class="current pass">&nbsp;</td><td>
+<div class="test_wrap"><h3>Auto (m)</h3><div id="svg-smil0" class="auto pass"></div><script>setResult('svg-smil0', Modernizr.smil);</script><div class="info">Modernizr test for: "smil"</div></div>
+
+<div class="test_wrap"><h3>Visual-square</h3><div id="svg-smil1" class="visual-square"></div><div class="square"><object type="image/svg+xml" width="30" height="30" data="http://tests.caniuse.com/svg-animate.svg" style="overflow:visible"> SVG fail
+</object></div><div class="info">SVG with animate element inside a rect</div></div>
+
+</td></tr>
+<tr><th><h3>Touch events</h3><span class="links">[<a href="http://caniuse.com/touch">Table</a>] [<a href="http://tests.caniuse.com/?feat=touch&prefix=all">Single feat</a>]</span></th><td class="current unknown">&nbsp;</td><td>
+<div class="test_wrap"><h3>Auto (m)</h3><div id="touch0" class="auto fail"></div><script>setResult('touch0', Modernizr.touch);</script><div class="info">Modernizr test for: "touch"</div></div>
+
+</td></tr>
+<tr><th><h3>CSS3 Transforms</h3><span class="links">[<a href="http://caniuse.com/transforms2d">Table</a>] [<a href="http://tests.caniuse.com/?feat=transforms2d&prefix=all">Single feat</a>]</span></th><td class="current pass">&nbsp;<span>-pre-</span></td><td>
+<div class="test_wrap"><h3>Auto (m)</h3><div id="transforms2d0" class="auto pass"></div><script>setResult('transforms2d0', Modernizr.csstransforms);</script><div class="info">Modernizr test for: "csstransforms"</div></div>
+
+<div class="test_wrap"><h3>Visual-square</h3><div id="transforms2d1" class="visual-square"></div><div class="square"><div style="width:30px;height:30px;background:red;overflow:hidden">
+	<div style="background:lime;width:30px;height:30px;position:relative;left:-30px;-webkit-transform: translate(30px);-moz-transform: translate(30px);-ms-transform: translate(30px);-o-transform: translate(30px);transform: translate(30px); "></div>
+</div>
+</div><div class="info">transform: translate(30px);</div></div>
+
+</td></tr>
+<tr><th><h3>CSS3 3D Transforms</h3><span class="links">[<a href="http://caniuse.com/transforms3d">Table</a>] [<a href="http://tests.caniuse.com/?feat=transforms3d&prefix=all">Single feat</a>]</span></th><td class="current unknown">&nbsp;</td><td>
+<div class="test_wrap"><h3>Auto (m)</h3><div id="transforms3d0" class="auto pass"></div><script>setResult('transforms3d0', Modernizr.csstransforms3d);</script><div class="info">Modernizr test for: "csstransforms3d"</div></div>
+
+<div class="test_wrap"><h3>Visual-square</h3><div id="transforms3d1" class="visual-square"></div><div class="square"><style>
+#transforms3d1container {
+	background: red;
+	width: 30px;
+	height: 30px;
+	overflow: hidden;
+	-webkit-perspective: 600;
+	-webkit-perspective-origin: 0 200px;
+	-moz-perspective: 600;
+	-moz-perspective-origin: 0 200px;
+	-ms-perspective: 600;
+	-ms-perspective-origin: 0 200px;
+	-o-perspective: 600;
+	-o-perspective-origin: 0 200px;
+	perspective: 600;
+	perspective-origin: 0 200px;
+
+}
+
+#transforms3d1test { 
+	width:400px; height:100px;
+	background: lime;
+	position: relative;
+	top: 30px;
+	-webkit-transform: translate3d(-234px, 0, 0) rotate3d(0, 1, 0, -70deg);
+	-moz-transform: translate3d(-234px, 0, 0) rotate3d(0, 1, 0, -70deg);
+	-ms-transform: translate3d(-234px, 0, 0) rotate3d(0, 1, 0, -70deg);
+	-o-transform: translate3d(-234px, 0, 0) rotate3d(0, 1, 0, -70deg);
+	transform: translate3d(-234px, 0, 0) rotate3d(0, 1, 0, -70deg);
+
+}
+</style>
+<div id="transforms3d1container">
+	<div id="transforms3d1test"></div>
+</div></div><div class="info">Parent:
+perspective: 600;
+perspective-origin: 0 200px;
+
+Child:
+
+transform: translate3d(-234px, 0, 0) rotate3d(0, 1, 0, -70deg);</div></div>
+
+</td></tr>
+<tr><th><h3>Video element</h3><span class="links">[<a href="http://caniuse.com/video">Table</a>] [<a href="http://tests.caniuse.com/?feat=video&prefix=all">Single feat</a>]</span></th><td class="current pass">&nbsp;</td><td>
+<div class="test_wrap"><h3>Auto</h3><div id="video0" class="auto pass"></div><script>
+setResult('video0', !!document.createElement('video').canPlayType);
+</script></div>
+
+<div class="test_wrap"><h3>Interact</h3><div id="video1" class="interact"></div><video width="160" height="120" controls="">
+	<source src="video.mp4" type="video/mp4">
+	<source src="video.ogv" type="video/ogv">
+	<source src="video.webm" type="video/webm">
+</video><div class="info">Video with controls and all three formats available.</div></div>
+
+<div class="test_wrap"><h3>Interact</h3><div id="video2" class="interact"></div><video width="160" height="120" controls="">
+	<source src="mimevid.php?type=.mp4" type="video/mp4">
+	<source src="mimevid.php?type=.ogv" type="video/ogg">
+	<source src="mimevid.php?type=.webm" type="video/webm">
+</video><div class="info">Video with controls and all three formats available (with MIME).</div></div>
+
+</td></tr>
+<tr><th><h3>Web Sockets</h3><span class="links">[<a href="http://caniuse.com/websockets">Table</a>] [<a href="http://tests.caniuse.com/?feat=websockets&prefix=all">Single feat</a>]</span></th><td class="current pass">&nbsp;</td><td>
+<div class="test_wrap"><h3>Auto (m)</h3><div id="websockets0" class="auto pass"></div><script>setResult('websockets0', Modernizr.websockets);</script><div class="info">Modernizr test for: "websockets"</div></div>
+
+</td></tr>
+<tr><th><h3>Web Workers</h3><span class="links">[<a href="http://caniuse.com/webworkers">Table</a>] [<a href="http://tests.caniuse.com/?feat=webworkers&prefix=all">Single feat</a>]</span></th><td class="current pass">&nbsp;</td><td>
+<div class="test_wrap"><h3>Auto (m)</h3><div id="webworkers0" class="auto pass"></div><script>setResult('webworkers0', Modernizr.webworkers);</script><div class="info">Modernizr test for: "webworkers"</div></div>
+
+<div class="test_wrap"><h3>Auto</h3><div id="webworkers1" class="auto pass"></div><script>
+(function() {
+
+try {
+
+	var w = new Worker('worker.js');
+	
+	w.onmessage = function (event) {
+	  var success = (event.data && event.data === 'worker works');
+	  setResult('webworkers1', success);
+	}
+	
+	w.postMessage('');
+
+} catch(e) {
+	setResult('webworkers1', false);
+}
+
+}());
+</script><div class="info">Create a new Worker using new Worker('worker.js');
+
+Then, test postMessage and onmessage event.</div></div>
+
+</td></tr>
+<tr><th><h3>Cross-document messaging</h3><span class="links">[<a href="http://caniuse.com/x-doc-messaging">Table</a>] [<a href="http://tests.caniuse.com/?feat=x-doc-messaging&prefix=all">Single feat</a>]</span></th><td class="current pass">&nbsp;</td><td>
+<div class="test_wrap"><h3>Auto (m)</h3><div id="x-doc-messaging0" class="auto pass"></div><script>setResult('x-doc-messaging0', Modernizr.postmessage);</script><div class="info">Modernizr test for: "postmessage"</div></div>
+
+</td></tr>
+<tr><th><h3>XMLHttpRequest 2</h3><span class="links">[<a href="http://caniuse.com/xhr2">Table</a>] [<a href="http://tests.caniuse.com/?feat=xhr2&prefix=all">Single feat</a>]</span></th><td class="current pass">&nbsp;</td><td>
+<div class="test_wrap"><h3>Auto</h3><div id="xhr20" class="auto pass"></div><script>
+var progEv = !!(window.ProgressEvent);
+var fdata = !!(window.FormData);
+setResult('xhr20', (progEv && fdata));
+</script></div>
+
+</td></tr>
+<tr><th><h3>XHTML served as application/xhtml+xml</h3><span class="links">[<a href="http://caniuse.com/xhtml">Table</a>] [<a href="http://tests.caniuse.com/?feat=xhtml&prefix=all">Single feat</a>]</span></th><td class="current pass">&nbsp;</td><td>
+<div class="test_wrap"><h3>Auto</h3><div id="xhtml0" class="auto pass"></div><iframe src="./caniuse_files/xhtml.html" width="15" height="15" style="display:none"></iframe></div>
+
+</td></tr>
+<tr><th><h3>CSS Generated content</h3><span class="links">[<a href="http://caniuse.com/css-gencontent">Table</a>] [<a href="http://tests.caniuse.com/?feat=css-gencontent&prefix=all">Single feat</a>]</span></th><td class="current pass">&nbsp;</td><td>
+<div class="test_wrap"><h3>Visual</h3><div id="css-gencontent0" class="visual"></div><div class="vis_test"><style>
+#gencontent:before {
+ content: 'A';
+}
+#gencontent:after {
+ content: 'Z';
+}
+</style>
+<span id="gencontent">-</span></div><div class="vis_ref"><img src="./caniuse_files/before-after.png"></div><div class="info">Element with CSS: 
+#gencontent:before {
+ content: 'A';
+}
+#gencontent:after {
+ content: 'Z';
+}</div></div>
+
+</td></tr>
+<tr><th><h3>CSS Table display</h3><span class="links">[<a href="http://caniuse.com/css-table">Table</a>] [<a href="http://tests.caniuse.com/?feat=css-table&prefix=all">Single feat</a>]</span></th><td class="current pass">&nbsp;</td><td>
+<div class="test_wrap"><h3>Visual</h3><div id="css-table0" class="visual"></div><div class="vis_test"><style>
+#table-test { display: table; }
+#table-test .table-tr { display: table-row; }
+#table-test .table-td { display: table-cell;border:1px solid; }
+</style>
+<div style="display:inline-block;vertical-align:middle">
+<div id="table-test">
+	<div class="table-tr">
+		<div class="table-td">topleft</div>
+		<div class="table-td">topright</div>
+	</div>
+	<div class="table-tr">
+		<div class="table-td">bottomleft</div>
+		<div class="table-td">bottomright</div>
+	</div>
+</div>
+</div></div><div class="vis_ref"><img src="./caniuse_files/table.png"></div><p class="condition">Should be 2x2 table</p></div>
+
+</td></tr>
+<tr><th><h3>HTML5 form features</h3><span class="links">[<a href="http://caniuse.com/forms">Table</a>] [<a href="http://tests.caniuse.com/?feat=forms&prefix=all">Single feat</a>]</span></th><td class="current partial">&nbsp;</td><td>
+<div class="test_wrap"><h3>Visual</h3><div id="forms0" class="visual"></div><div class="vis_test"><input type="date"><br><input type="time"><br><input type="range"><br><input type="number"></div><p class="condition">date/time/range/number widgets</p></div>
+
+</td></tr>
+<tr><th><h3>MathML</h3><span class="links">[<a href="http://caniuse.com/mathml">Table</a>] [<a href="http://tests.caniuse.com/?feat=mathml&prefix=all">Single feat</a>]</span></th><td class="current unknown">&nbsp;</td><td>
+<div class="test_wrap"><h3>Visual</h3><div id="mathml0" class="visual"></div><div class="vis_test"><iframe src="./caniuse_files/mathml.html" width="210" height="110" style="border:0;"></iframe></div><div class="vis_ref"><img src="./caniuse_files/mathml_ref.png"></div></div>
+
+</td></tr>
+<tr><th><h3>PNG alpha transparency</h3><span class="links">[<a href="http://caniuse.com/png-alpha">Table</a>] [<a href="http://tests.caniuse.com/?feat=png-alpha&prefix=all">Single feat</a>]</span></th><td class="current pass">&nbsp;</td><td>
+<div class="test_wrap"><h3>Visual</h3><div id="png-alpha0" class="visual"></div><div class="vis_test"><img src="./caniuse_files/alpha.png" style="background-color:lime"></div><div class="vis_ref"><img src="./caniuse_files/png_alpha_result.png"></div></div>
+
+</td></tr>
+<tr><th><h3>Ruby annotation</h3><span class="links">[<a href="http://caniuse.com/ruby">Table</a>] [<a href="http://tests.caniuse.com/?feat=ruby&prefix=all">Single feat</a>]</span></th><td class="current partial">&nbsp;</td><td>
+<div class="test_wrap"><h3>Visual</h3><div id="ruby0" class="visual"></div><div class="vis_test">
+<div style="display:inline-block;vertical-align:middle">
+<ruby>(bottom1)<rt>(top1)</rt>(bottom2)<rt>(top2)</rt></ruby>
+</div></div><div class="vis_ref"><img src="./caniuse_files/ruby.png"></div><p class="condition">Elements should be stacked on top of each other</p></div>
+
+</td></tr>
+<tr><th><h3>SVG filters</h3><span class="links">[<a href="http://caniuse.com/svg-filters">Table</a>] [<a href="http://tests.caniuse.com/?feat=svg-filters&prefix=all">Single feat</a>]</span></th><td class="current pass">&nbsp;</td><td>
+<div class="test_wrap"><h3>Visual</h3><div id="svg-filters0" class="visual"></div><div class="vis_test"><object data="http://tests.caniuse.com/blur.svg" type="image/svg+xml" height="70" width="70">
+	object SVG not supported
+</object>
+</div><div class="vis_ref"><img src="./caniuse_files/svg_blur.png"></div></div>
+
+<div class="test_wrap"><h3>Visual-square</h3><div id="svg-filters1" class="visual-square"></div><div class="square"><object type="image/svg+xml" width="30" height="30" data="http://tests.caniuse.com/fecolormatrix.svg" style="overflow:visible"> SVG fail
+</object></div><p class="condition">Must be green (not lime)</p><div class="info">SVG with &lt;feColorMatrix type="hueRotate" values="120"/&gt;</div></div>
+
+<div class="test_wrap"><h3>Visual-square</h3><div id="svg-filters2" class="visual-square"></div><div class="square"><object type="image/svg+xml" width="30" height="30" data="http://tests.caniuse.com/feflood.svg" style="overflow:visible"> SVG fail
+</object></div><div class="info">SVG with &lt;feFlood flood-color="lime"/&gt;</div></div>
+
+</td></tr>
+<tr><th><h3>CSS3 Word-wrap</h3><span class="links">[<a href="http://caniuse.com/wordwrap">Table</a>] [<a href="http://tests.caniuse.com/?feat=wordwrap&prefix=all">Single feat</a>]</span></th><td class="current pass">&nbsp;</td><td>
+<div class="test_wrap"><h3>Visual</h3><div id="wordwrap0" class="visual"></div><div class="vis_test"><style>
+#wordwraptest {
+  display: inline-block;
+  width: 30px;
+  word-wrap: break-word;
+}
+
+</style>
+<div id="wordwraptest">abcdefghijklmnopqrstuvwxyz</div>
+
+
+</div><p class="condition">Text should wrap</p></div>
+
+<div class="test_wrap"><h3>Visual</h3><div id="wordwrap1" class="visual"></div><div class="vis_test"><style>
+#wordwraptest2 {
+  display: inline-block;
+  width: 30px;
+  word-wrap: normal;
+}
+</style>
+
+<div id="wordwraptest2">abcdefghijklmnopqrstuvwxyz</div>
+</div><p class="condition">Text should overflow box</p></div>
+
+<div class="test_wrap"><h3>Visual-square</h3><div id="wordwrap2" class="visual-square"></div><div class="square"><div style="width:30px;height:30px;background:red;overflow:hidden">
+	<div style="color:lime;font-size:10px;line-height:10px;word-wrap:break-word;background:lime;">abcdefghijklmnop</div>
+</div>
+</div><div class="info">word-wrap: break-word;</div></div>
+
+</td></tr>
+<tr><th><h3>calc() as CSS unit value</h3><span class="links">[<a href="http://caniuse.com/calc">Table</a>] [<a href="http://tests.caniuse.com/?feat=calc&prefix=all">Single feat</a>]</span></th><td class="current unknown">&nbsp;</td><td>
+<div class="test_wrap"><h3>Visual-square</h3><div id="calc0" class="visual-square"></div><div class="square"><style>
+#calc0test {
+	width: 0px;
+	width: -webkit-calc(10px + 20px);
+	width: -moz-calc(10px + 20px);
+	width: -ms-calc(10px + 20px);
+	width: -o-calc(10px + 20px);
+	width: calc(10px + 20px);
+	height: 30px;
+	background: lime;
+}
+</style>
+<div id="calc0test"></div>
+</div><div class="info">width: calc(10px + 20px);</div></div>
+
+<div class="test_wrap"><h3>Visual-square</h3><div id="calc2" class="visual-square"></div><div class="square"><style>
+#calc2test {
+height:-webkit-calc(60px - 100%); width:-webkit-calc((100% / 2) + 15px - 0.5em); border-right:-webkit-calc(0.5em) solid lime;
+height:-moz-calc(60px - 100%); width:-moz-calc((100% / 2) + 15px - 0.5em); border-right:-moz-calc(0.5em) solid lime;
+height:-ms-calc(60px - 100%); width:-ms-calc((100% / 2) + 15px - 0.5em); border-right:-ms-calc(0.5em) solid lime;
+height:-o-calc(60px - 100%); width:-o-calc((100% / 2) + 15px - 0.5em); border-right:-o-calc(0.5em) solid lime;
+height:calc(60px - 100%); width:calc((100% / 2) + 15px - 0.5em); border-right:calc(0.5em) solid lime;
+
+background: lime;
+}
+</style>
+<div id="calc2test"></div>
+</div><div class="info">height: calc(60px - 100%);
+width: calc((100% / 2) + 15px - 0.5em);
+border-right: calc(0.5em) solid lime;</div></div>
+
+</td></tr>
+<tr><th><h3>CSS Grid Layout</h3><span class="links">[<a href="http://caniuse.com/css-grid">Table</a>] [<a href="http://tests.caniuse.com/?feat=css-grid&prefix=all">Single feat</a>]</span></th><td class="current unknown">&nbsp;</td><td>
+<div class="test_wrap"><h3>Visual-square</h3><div id="css-grid0" class="visual-square"></div><div class="square"><style>
+#css-grid0grid {
+	display: -webkit-grid; 	display: -moz-grid; 	display: -ms-grid; 	display: -o-grid; 	display: grid; 
+	-webkit-grid-columns: 15px 1fr; 	-moz-grid-columns: 15px 1fr; 	-ms-grid-columns: 15px 1fr; 	-o-grid-columns: 15px 1fr; 	grid-columns: 15px 1fr; 
+	-webkit-grid-rows: 15px 15px; 	-moz-grid-rows: 15px 15px; 	-ms-grid-rows: 15px 15px; 	-o-grid-rows: 15px 15px; 	grid-rows: 15px 15px; 
+
+}
+
+#css-grid0grid > div {
+	background: lime;
+}
+
+#css-grid0a {
+	-webkit-grid-row: 1; 	-moz-grid-row: 1; 	-ms-grid-row: 1; 	-o-grid-row: 1; 	grid-row: 1; 
+	-webkit-grid-column: 1; 	-moz-grid-column: 1; 	-ms-grid-column: 1; 	-o-grid-column: 1; 	grid-column: 1; 
+}
+
+#css-grid0b {
+	-webkit-grid-row: 1; 	-moz-grid-row: 1; 	-ms-grid-row: 1; 	-o-grid-row: 1; 	grid-row: 1; 
+	-webkit-grid-column: 2; 	-moz-grid-column: 2; 	-ms-grid-column: 2; 	-o-grid-column: 2; 	grid-column: 2; 
+}
+
+#css-grid0c {
+	-webkit-grid-row: 2; 	-moz-grid-row: 2; 	-ms-grid-row: 2; 	-o-grid-row: 2; 	grid-row: 2; 
+	-webkit-grid-column: 1; 	-moz-grid-column: 1; 	-ms-grid-column: 1; 	-o-grid-column: 1; 	grid-column: 1; 
+	-webkit-grid-column-span: 2; 	-moz-grid-column-span: 2; 	-ms-grid-column-span: 2; 	-o-grid-column-span: 2; 	grid-column-span: 2; 
+}
+</style>
+
+<div id="css-grid0grid">
+	 <div id="css-grid0a"></div>
+	 <div id="css-grid0b"></div>
+	 <div id="css-grid0c"></div>
+</div>
+
+</div><div class="info">Grid with two columns, two rows and three elements taking up space.</div></div>
+
+</td></tr>
+<tr><th><h3>CSS3 Media Queries</h3><span class="links">[<a href="http://caniuse.com/css-mediaqueries">Table</a>] [<a href="http://tests.caniuse.com/?feat=css-mediaqueries&prefix=all">Single feat</a>]</span></th><td class="current pass">&nbsp;</td><td>
+<div class="test_wrap"><h3>Visual-square</h3><div id="css-mediaqueries0" class="visual-square"></div><div class="square"><style>
+#mediaq1,#mediaq2,#mediaq3,#mediaq4 {
+ background: red;
+ float: left;
+ width: 15px;
+ height: 15px;
+}
+
+#mediaq3 {
+	clear: left;
+}
+
+@media all and (min-width: 0px) {
+ #mediaq1, #mediaq3 { background: lime; }
+}
+
+@media all and (max-width: 999999px) {
+ #mediaq2, #mediaq4 { background: lime; }
+}
+
+
+@media all and (min-width: 999999px) {
+ #mediaq3 { background: red; }
+}
+
+@media all and (max-width: 0px) {
+ #mediaq4 { background: red; }
+}
+
+</style>
+
+<div id="mediaq1"></div>
+<div id="mediaq2"></div>
+<div id="mediaq3"></div>
+<div id="mediaq4"></div></div></div>
+
+</td></tr>
+<tr><th><h3>CSS 2.1 selectors</h3><span class="links">[<a href="http://caniuse.com/css-sel2">Table</a>] [<a href="http://tests.caniuse.com/?feat=css-sel2&prefix=all">Single feat</a>]</span></th><td class="current pass">&nbsp;</td><td>
+<div class="test_wrap"><h3>Visual-square</h3><div id="css-sel20" class="visual-square"></div><div class="square"><style>
+#css-sel20test div {
+	width: 30px;
+	height: 30px;
+	background: red;
+}
+
+#css-sel20test > div {
+	background: lime;
+}
+</style>
+<div id="css-sel20test">
+	<div></div>
+</div>
+</div><div class="info">Test for child ( &gt; )selector</div></div>
+
+<div class="test_wrap"><h3>Visual-square</h3><div id="css-sel21" class="visual-square"></div><div class="square"><style>
+#css-sel21test + div { background: lime; width:30px; height:30px;}
+</style>
+<div id="css-sel21test"></div>
+<div></div>
+</div><div class="info">Adjacent sibling selector test ( + )</div></div>
+
+<div class="test_wrap"><h3>Visual-square</h3><div id="css-sel22" class="visual-square"></div><div class="square"><style>
+#css-sel22test[role="none"] { background: lime; width:30px; height:30px;}
+</style>
+<div id="css-sel22test" role="none"></div></div><div class="info">Attribute selector ( [role="none"] )</div></div>
+
+</td></tr>
+<tr><th><h3>CSS3 Box-sizing</h3><span class="links">[<a href="http://caniuse.com/css3-boxsizing">Table</a>] [<a href="http://tests.caniuse.com/?feat=css3-boxsizing&prefix=all">Single feat</a>]</span></th><td class="current pass">&nbsp;</td><td>
+<div class="test_wrap"><h3>Visual-square</h3><div id="css3-boxsizing0" class="visual-square"></div><div class="square"><style>
+#boxsizetest {
+   -webkit-box-sizing: border-box;
+-moz-box-sizing: border-box;
+-ms-box-sizing: border-box;
+-o-box-sizing: border-box;
+box-sizing: border-box;
+    background: red;
+    border-left: 30px solid lime;
+    display: inline-block;
+    height: 30px;
+    width: 30px;
+}
+</style>
+<div id="boxsizetest"></div>
+</div></div>
+
+</td></tr>
+<tr><th><h3>Data URLs</h3><span class="links">[<a href="http://caniuse.com/datauri">Table</a>] [<a href="http://tests.caniuse.com/?feat=datauri&prefix=all">Single feat</a>]</span></th><td class="current pass">&nbsp;</td><td>
+<div class="test_wrap"><h3>Visual-square</h3><div id="datauri0" class="visual-square"></div><div class="square"><div style="background-image: url(&#39;data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAMAAAAoyzS7AAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAAAAZQTFRFAP8AAAAAbwN%2BQwAAAAxJREFUeNpiYAAIMAAAAgABT21Z4QAAAABJRU5ErkJggg%3D%3D&#39;);width:30px;height:30px;"></div></div><div class="info">div with data URL as background image</div></div>
+
+</td></tr>
+<tr><th><h3>New semantic elements</h3><span class="links">[<a href="http://caniuse.com/html5semantic">Table</a>] [<a href="http://tests.caniuse.com/?feat=html5semantic&prefix=all">Single feat</a>]</span></th><td class="current pass">&nbsp;</td><td>
+<div class="test_wrap"><h3>Visual-square</h3><div id="html5semantic0" class="visual-square"></div><div class="square"><style>
+#html5semantic0test {
+	width: 30px;
+	height: 30px;
+	background: red;
+}
+
+#html5semantic0test * {
+	background: lime;
+	height: 4px;
+}
+
+#html5semantic0test section {
+	height: 6px;
+}
+</style>
+
+<div id="html5semantic0test">
+	<section></section>
+	<article></article>
+	<aside></aside>
+	<hgroup></hgroup>
+	<header></header>
+	<footer></footer>
+	<nav></nav>
+</div></div><div class="info">section, article, aside, hgroup, header, footer, nav tested for default "block" style.</div></div>
+
+</td></tr>
+<tr><th><h3>CSS inline-block</h3><span class="links">[<a href="http://caniuse.com/inline-block">Table</a>] [<a href="http://tests.caniuse.com/?feat=inline-block&prefix=all">Single feat</a>]</span></th><td class="current pass">&nbsp;</td><td>
+<div class="test_wrap"><h3>Visual-square</h3><div id="inline-block0" class="visual-square"></div><div class="square"><div style="background:lime;display:inline-block;width:15px;height:30px;"></div><div style="background:lime;display:inline-block;width:15px;height:30px;"></div></div></div>
+
+</td></tr>
+<tr><th><h3>CSS min/max-width/height</h3><span class="links">[<a href="http://caniuse.com/minmaxwh">Table</a>] [<a href="http://tests.caniuse.com/?feat=minmaxwh&prefix=all">Single feat</a>]</span></th><td class="current pass">&nbsp;</td><td>
+<div class="test_wrap"><h3>Visual-square</h3><div id="minmaxwh0" class="visual-square"></div><div class="square"><div style="width:200%;max-width:30px;height:30px;overflow:visible;background:lime"></div></div></div>
+
+<div class="test_wrap"><h3>Visual-square</h3><div id="minmaxwh1" class="visual-square"></div><div class="square"><div style="width:0;min-width:30px;height:30px;background:lime"></div></div></div>
+
+<div class="test_wrap"><h3>Visual-square</h3><div id="minmaxwh2" class="visual-square"></div><div class="square"><div style="height:100px;max-height:30px;width:30px;background:lime"></div></div></div>
+
+<div class="test_wrap"><h3>Visual-square</h3><div id="minmaxwh3" class="visual-square"></div><div class="square"><div style="height:0;min-height:30px;width:30px;background:lime"></div></div></div>
+
+</td></tr>
+<tr><th><h3>CSS3 object-fit/object-position</h3><span class="links">[<a href="http://caniuse.com/object-fit">Table</a>] [<a href="http://tests.caniuse.com/?feat=object-fit&prefix=all">Single feat</a>]</span></th><td class="current unknown">&nbsp;</td><td>
+<div class="test_wrap"><h3>Visual-square</h3><div id="object-fit0" class="visual-square"></div><div class="square"><style>
+#object-fit0test {
+	width: 30px;
+	height: 30px;
+	background: lime;
+	overflow: hidden;
+}
+
+#object-fit0test img {
+	-webkit-object-fit: contain;
+-moz-object-fit: contain;
+-ms-object-fit: contain;
+-o-object-fit: contain;
+object-fit: contain;
+
+}
+</style>
+
+<div id="object-fit0test">
+	<img src="./caniuse_files/red30x30.png" width="90" height="30">
+</div></div><div class="info">object-fit: contain</div></div>
+
+<div class="test_wrap"><h3>Visual-square</h3><div id="object-fit2" class="visual-square"></div><div class="square"><style>
+#object-fit2test {
+	width: 30px;
+	height: 30px;
+	background: lime;
+	overflow: hidden;
+}
+
+#object-fit2test img {
+	-webkit-object-position: 30px 30px;
+-moz-object-position: 30px 30px;
+-ms-object-position: 30px 30px;
+-o-object-position: 30px 30px;
+object-position: 30px 30px;
+
+}
+</style>
+
+<div id="object-fit2test">
+	<img src="./caniuse_files/red30x30.png" width="30" height="30">
+</div>
+</div><div class="info">object-position: 30px 30px;</div></div>
+
+</td></tr>
+<tr><th><h3>rem (root em) units</h3><span class="links">[<a href="http://caniuse.com/rem">Table</a>] [<a href="http://tests.caniuse.com/?feat=rem&prefix=all">Single feat</a>]</span></th><td class="current pass">&nbsp;</td><td>
+<div class="test_wrap"><h3>Visual-square</h3><div id="rem0" class="visual-square"></div><div class="square"><div style="background:red;width:30px;height:30px;position:relative;overflow:hidden;text-align:left">
+	<span style="font-size:1px;background:lime;color:lime;position:relative;left:-6px;line-height:30px;font-size:5rem;">A</span>
+</div></div><div class="info">span with single character and font-size: 5rem;</div></div>
+
+</td></tr>
+<tr><th><h3>SVG in CSS backgrounds</h3><span class="links">[<a href="http://caniuse.com/svg-css">Table</a>] [<a href="http://tests.caniuse.com/?feat=svg-css&prefix=all">Single feat</a>]</span></th><td class="current pass">&nbsp;</td><td>
+<div class="test_wrap"><h3>Visual-square</h3><div id="svg-css0" class="visual-square"></div><div class="square"><div style="width:30px;height:30px;background-image: url(caniuse_files/svg-img.svg)"></div>
+
+</div></div>
+
+</td></tr>
+<tr><th><h3>SVG in HTML img element</h3><span class="links">[<a href="http://caniuse.com/svg-img">Table</a>] [<a href="http://tests.caniuse.com/?feat=svg-img&prefix=all">Single feat</a>]</span></th><td class="current pass">&nbsp;</td><td>
+<div class="test_wrap"><h3>Visual-square</h3><div id="svg-img0" class="visual-square"></div><div class="square"><img src="./caniuse_files/svg-img.svg" width="30" height="30"></div></div>
+
+</td></tr>
+<tr><th><h3>contenteditable attribute (basic support)</h3><span class="links">[<a href="http://caniuse.com/contenteditable">Table</a>] [<a href="http://tests.caniuse.com/?feat=contenteditable&prefix=all">Single feat</a>]</span></th><td class="current pass">&nbsp;</td><td>
+<div class="test_wrap"><h3>Interact</h3><div id="contenteditable0" class="interact"></div><div contenteditable="true">
+<p>This element should be editable.</p>
+</div><div class="info">Div element with attribute  contenteditable="true"</div></div>
+
+</td></tr>
+<tr><th><h3>CSS3 selectors</h3><span class="links">[<a href="http://caniuse.com/css-sel3">Table</a>] [<a href="http://tests.caniuse.com/?feat=css-sel3&prefix=all">Single feat</a>]</span></th><td class="current pass">&nbsp;</td><td>
+<div class="test_wrap"><h3>Interact</h3><div id="css-sel30" class="interact"></div><a href="http://tools.css3.info/selectors-test/test.html" target="_blank">Test here</a></div>
+
+</td></tr>
+<tr><th><h3>Drag and Drop</h3><span class="links">[<a href="http://caniuse.com/dragndrop">Table</a>] [<a href="http://tests.caniuse.com/?feat=dragndrop&prefix=all">Single feat</a>]</span></th><td class="current pass">&nbsp;</td><td>
+<div class="test_wrap"><h3>Interact</h3><div id="dragndrop0" class="interact"></div><a href="http://html5demos.com/drag">Test here</a></div>
+
+</td></tr>
+<tr><th><h3>WAI-ARIA Accessibility features</h3><span class="links">[<a href="http://caniuse.com/wai-aria">Table</a>] [<a href="http://tests.caniuse.com/?feat=wai-aria&prefix=all">Single feat</a>]</span></th><td class="current partial">&nbsp;</td><td>
+
+</td></tr>
+<tr><th><h3>Text API for Canvas</h3><span class="links">[<a href="http://caniuse.com/canvas-text">Table</a>] [<a href="http://tests.caniuse.com/?feat=canvas-text&prefix=all">Single feat</a>]</span></th><td class="current pass">&nbsp;</td><td>
+<div class="test_wrap"><h3>Auto (m)</h3><div id="canvas-text0" class="auto pass"></div><script>setResult('canvas-text0', Modernizr.canvastext);</script><div class="info">Modernizr test for: "canvastext"</div></div>
+
+</td></tr>
+<tr><th><h3>WebGL - 3D Canvas graphics</h3><span class="links">[<a href="http://caniuse.com/webgl">Table</a>] [<a href="http://tests.caniuse.com/?feat=webgl&prefix=all">Single feat</a>]</span></th><td class="current partial">&nbsp;</td><td>
+<div class="test_wrap"><h3>Auto (m)</h3><div id="webgl0" class="auto pass"></div><script>setResult('webgl0', Modernizr.webgl);</script><div class="info">Modernizr test for: "webgl"</div></div>
+
+<div class="test_wrap"><h3>Visual-square</h3><div id="webgl1" class="visual-square"></div><div class="square"><canvas width="30" height="30" style="background:red;" id="webgl_canvas"></canvas>
+<script>
+var elem  = $('#webgl_canvas')[0], g;
+try {
+    g     = elem.getContext && elem.getContext('experimental-webgl');
+} catch(e){};
+
+if (g){    
+  g.clearColor(0,1,0,1);
+  g.clear(g.COLOR_BUFFER_BIT);
+}
+</script>
+</div></div>
+
+</td></tr>
+<tr><th><h3>SVG fonts</h3><span class="links">[<a href="http://caniuse.com/svg-fonts">Table</a>] [<a href="http://tests.caniuse.com/?feat=svg-fonts&prefix=all">Single feat</a>]</span></th><td class="current pass">&nbsp;</td><td>
+<div class="test_wrap"><h3>Visual</h3><div id="svg-fonts0" class="visual"></div><div class="vis_test"><style>
+@font-face { 
+  font-family: Windsong_svg; 
+  src: url(caniuse_files/Windsong-webfont.svg#webfontuOn4Eelr) format("svg");
+}
+#windsong_svg {
+	font: 18px Windsong_svg;
+	margin: 5px;
+}
+</style>
+<p id="windsong_svg">Windsong font</p>
+</div><div class="vis_ref"><img src="./caniuse_files/windsong_font.png"></div></div>
+
+</td></tr>
+<tr><th><h3>TTF/OTF - TrueType and OpenType font support</h3><span class="links">[<a href="http://caniuse.com/ttf">Table</a>] [<a href="http://tests.caniuse.com/?feat=ttf&prefix=all">Single feat</a>]</span></th><td class="current pass">&nbsp;</td><td>
+<div class="test_wrap"><h3>Visual</h3><div id="ttf0" class="visual"></div><div class="vis_test"><style>
+@font-face {
+	font-family: 'Windsong_otf';
+	src: url('caniuse_files/Windsong-webfont.otf');
+}
+
+#windsong_otf {
+	font: 18px Windsong_otf;
+	margin: 5px;
+}
+</style>
+<p id="windsong_otf">Windsong font</p>
+</div><div class="vis_ref"><img src="./caniuse_files/windsong_font.png"></div><div class="info">OTF font test</div></div>
+
+<div class="test_wrap"><h3>Visual</h3><div id="ttf1" class="visual"></div><div class="vis_test"><style>
+@font-face {
+	font-family: 'Windsong_ttf';
+	src: url('caniuse_files/Windsong-webfont.ttf');
+}
+
+#windsong_ttf {
+	font: 18px Windsong_ttf;
+	margin: 5px;
+}
+</style>
+<p id="windsong_ttf">Windsong font</p>
+</div><div class="vis_ref"><img src="./caniuse_files/windsong_font.png"></div><div class="info">TTF font test</div></div>
+
+</td></tr>
+<tr><th><h3>WOFF - Web Open Font Format</h3><span class="links">[<a href="http://caniuse.com/woff">Table</a>] [<a href="http://tests.caniuse.com/?feat=woff&prefix=all">Single feat</a>]</span></th><td class="current pass">&nbsp;</td><td>
+<div class="test_wrap"><h3>Visual</h3><div id="woff0" class="visual"></div><div class="vis_test"><style>
+@font-face {
+	font-family: 'Windsong_woff';
+	src: url('caniuse_files/Windsong-webfont.woff');
+}
+
+#windsong_woff {
+	font: 18px Windsong_woff;
+	margin: 5px;
+}
+</style>
+<p id="windsong_woff">Windsong font</p>
+</div><div class="vis_ref"><img src="./caniuse_files/windsong_font.png"></div></div>
+
+</td></tr>
+<tr><th><h3>Progress &amp; Meter</h3><span class="links">[<a href="http://caniuse.com/progressmeter">Table</a>] [<a href="http://tests.caniuse.com/?feat=progressmeter&prefix=all">Single feat</a>]</span></th><td class="current pass">&nbsp;</td><td>
+<div class="test_wrap"><h3>Visual</h3><div id="progressmeter0" class="visual"></div><div class="vis_test"><div style="display:inline-block;vertical-align:middle">
+<progress value="5" max="10">fail</progress>
+<meter value="5" max="10">fail</meter>
+</div></div><p class="condition">Progress and meter widgets at 50%</p></div>
+
+</td></tr>
+<tr><th><h3>Datalist element</h3><span class="links">[<a href="http://caniuse.com/datalist">Table</a>] [<a href="http://tests.caniuse.com/?feat=datalist&prefix=all">Single feat</a>]</span></th><td class="current unknown">&nbsp;</td><td>
+<div class="test_wrap"><h3>Interact</h3><div id="datalist0" class="interact"></div><input type="text" list="mydatalist">
+<datalist id="mydatalist">
+<option value="foo">foo</option>
+<option value="bar">bar</option>
+<option value="foobar">foobar</option>
+</datalist><p class="condition">Show "foo" and "foobar" as options when "f" is entered</p></div>
+
+</td></tr>
+<tr><th><h3>Form validation</h3><span class="links">[<a href="http://caniuse.com/form-validation">Table</a>] [<a href="http://tests.caniuse.com/?feat=form-validation&prefix=all">Single feat</a>]</span></th><td class="current pass">&nbsp;</td><td>
+<div class="test_wrap"><h3>Interact</h3><div id="form-validation0" class="interact"></div><iframe src="./caniuse_files/form_validation.html" width="300" height="80"></iframe><p class="condition">Form should show warning and NOT submit</p></div>
+
+</td></tr>
+<tr><th><h3>MPEG-4/H.264 video format</h3><span class="links">[<a href="http://caniuse.com/mpeg4">Table</a>] [<a href="http://tests.caniuse.com/?feat=mpeg4&prefix=all">Single feat</a>]</span></th><td class="current fail">&nbsp;</td><td>
+<div class="test_wrap"><h3>Auto</h3><div id="mpeg40" class="auto pass"></div><script>
+var v = document.createElement('video'); 
+setResult('mpeg40', !!(v.canPlayType && v.canPlayType('video/mp4; codecs="avc1.42E01E, mp4a.40.2"').replace(/no/, '')));
+</script></div>
+
+<div class="test_wrap"><h3>Interact</h3><div id="mpeg41" class="interact"></div><video src="video.mp4" width="160" height="120" controls="">fail</video><div class="info">Video, no MIME, no type attribute.</div></div>
+
+<div class="test_wrap"><h3>Interact</h3><div id="mpeg42" class="interact"></div><video width="160" height="120" controls="">
+ <source src="video.mp4" type="video/ogg; codecs=&quot;theora, vorbis&quot;">
+</video><div class="info">Video with source element</div></div>
+
+<div class="test_wrap"><h3>Interact</h3><div id="mpeg43" class="interact"></div><video width="160" height="120" controls="">
+ <source src="mimevid.php?type=.mp4" type="video/mp4; codecs=&quot;avc1.42E01E, mp4a.40.2&quot;">
+</video><div class="info">Video with source element and MIME set</div></div>
+
+</td></tr>
+<tr><th><h3>Ogg/Theora video format</h3><span class="links">[<a href="http://caniuse.com/ogv">Table</a>] [<a href="http://tests.caniuse.com/?feat=ogv&prefix=all">Single feat</a>]</span></th><td class="current pass">&nbsp;</td><td>
+<div class="test_wrap"><h3>Auto</h3><div id="ogv0" class="auto pass"></div><script>
+var v = document.createElement('video'); 
+setResult('ogv0', !!(v.canPlayType && v.canPlayType('video/ogg; codecs="theora"').replace(/no/, '')));
+</script></div>
+
+<div class="test_wrap"><h3>Interact</h3><div id="ogv1" class="interact"></div><video src="video.ogv" width="160" height="120" controls="">fail</video><div class="info">Video, no MIME, no type attribute.</div></div>
+
+<div class="test_wrap"><h3>Interact</h3><div id="ogv2" class="interact"></div><video width="160" height="120" controls="">
+ <source src="mimevid.php?type=.ogv" type="video/ogg; codecs=&quot;theora, vorbis&quot;">
+</video><div class="info">Video with source element and MIME set</div></div>
+
+<div class="test_wrap"><h3>Interact</h3><div id="ogv3" class="interact"></div><video width="160" height="120" controls="">
+ <source src="video.ogv" type="video/ogg; codecs=&quot;theora, vorbis&quot;">
+</video><div class="info">Video with source element</div></div>
+
+</td></tr>
+<tr><th><h3>WebM/VP8 video format</h3><span class="links">[<a href="http://caniuse.com/webm">Table</a>] [<a href="http://tests.caniuse.com/?feat=webm&prefix=all">Single feat</a>]</span></th><td class="current pass">&nbsp;</td><td>
+<div class="test_wrap"><h3>Auto</h3><div id="webm0" class="auto pass"></div><script>
+var v = document.createElement('video'); 
+setResult('webm0', !!(v.canPlayType && v.canPlayType('video/webm; codecs="vp8, vorbis"').replace(/no/, '')));
+</script></div>
+
+<div class="test_wrap"><h3>Interact</h3><div id="webm1" class="interact"></div><video src="video.webm" width="160" height="120" controls="">fail</video><div class="info">Video, no MIME, no type attribute.</div></div>
+
+<div class="test_wrap"><h3>Interact</h3><div id="webm2" class="interact"></div><video width="160" height="120" controls="">
+ <source src="video.webm" type="video/ogg; codecs=&quot;theora, vorbis&quot;">
+</video><div class="info">Video with source element</div></div>
+
+<div class="test_wrap"><h3>Interact</h3><div id="webm3" class="interact"></div><video width="160" height="120" controls="">
+ <source src="mimevid.php?type=.webm" type="video/webm; codecs=&quot;vp8, vorbis&quot;">
+</video><div class="info">Video with source element and MIME set</div></div>
+
+</td></tr>
+<tr><th><h3>Animated PNG (APNG) [unoff]</h3><span class="links">[<a href="http://caniuse.com/apng">Table</a>] [<a href="http://tests.caniuse.com/?feat=apng&prefix=all">Single feat</a>]</span></th><td class="current unknown">&nbsp;</td><td>
+<div class="test_wrap"><h3>Auto</h3><div id="apng0" class="auto fail"></div><script>
+(function() {
+	// From: http://eligrey.com/blog/post/apng-feature-detection
+	var apngTest = new Image();
+	var canv = document.createElement("canvas");
+	var apng_supported = null;
+	if(canv.getContext && canv.getContext("2d").drawImage) {
+		var ctx = canv.getContext("2d");
+		var apng_supported = false;
+		apngTest.onload = function () {
+			ctx.drawImage(apngTest, 0, 0);
+			apng_supported = ( ctx.getImageData(0, 0, 1, 1).data[3] === 0 );
+			setResult('apng0', apng_supported);
+		};
+		apngTest.src = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAACGFjVEwAAAABAAAAAcMq2TYAAAANSURBVAiZY2BgYPgPAAEEAQB9ssjfAAAAGmZjVEwAAAAAAAAAAQAAAAEAAAAAAAAAAAD6A+gBAbNU+2sAAAARZmRBVAAAAAEImWNgYGBgAAAABQAB6MzFdgAAAABJRU5ErkJggg==";
+	} else {
+		setResult('apng0', false);
+	}
+}());
+
+
+</script><div class="info">Test for second frame using Canvas element </div></div>
+
+<div class="test_wrap"><h3>Visual</h3><div id="apng1" class="visual"></div><div class="vis_test"><img src="./caniuse_files/apng_test.png" width="16" height="16"></div><p class="condition">Must animate</p></div>
+
+</td></tr>
+<tr><th><h3>CSS Canvas Drawings [unoff]</h3><span class="links">[<a href="http://caniuse.com/css-canvas">Table</a>] [<a href="http://tests.caniuse.com/?feat=css-canvas&prefix=all">Single feat</a>]</span></th><td class="current pass">&nbsp;<span>-pre-</span></td><td>
+<div class="test_wrap"><h3>Auto</h3><div id="css-canvas0" class="auto pass"></div><script>
+setResult('css-canvas0', 'getCSSCanvasContext' in document)
+</script><div class="info">'getCSSCanvasContext' in document</div></div>
+
+</td></tr>
+<tr><th><h3>CSS Reflections [unoff]</h3><span class="links">[<a href="http://caniuse.com/css-reflections">Table</a>] [<a href="http://tests.caniuse.com/?feat=css-reflections&prefix=all">Single feat</a>]</span></th><td class="current pass">&nbsp;<span>-pre-</span></td><td>
+<div class="test_wrap"><h3>Auto (m)</h3><div id="css-reflections0" class="auto pass"></div><script>setResult('css-reflections0', Modernizr.cssreflections);</script><div class="info">Modernizr test for: "cssreflections"</div></div>
+
+
+<div class="test_wrap"><h3>Visual-square</h3><div id="reflections1" class="visual-square"></div><div class="square">
+
+  <div style="width:30px; height:30px; overflow:hidden; position:relative; background:red;">
+ <div style="background: lime;
+            height: 30px;
+            position: relative;
+            top: -30px;
+            width: 30px;
+            -webkit-box-reflect: below 0;
+               -moz-box-reflect: below 0;
+                -ms-box-reflect: below 0;
+                 -o-box-reflect: below 0;
+                    box-reflect: below 0;
+            "></div>
+
+</div></div></div>
+
+
+</td></tr>
+<tr><th><h3>Web SQL Database [unoff]</h3><span class="links">[<a href="http://caniuse.com/sql-storage">Table</a>] [<a href="http://tests.caniuse.com/?feat=sql-storage&prefix=all">Single feat</a>]</span></th><td class="current pass">&nbsp;</td><td>
+<div class="test_wrap"><h3>Auto (m)</h3><div id="sql-storage0" class="auto pass"></div><script>setResult('sql-storage0', Modernizr.websqldatabase);</script><div class="info">Modernizr test for: "websqldatabase"</div></div>
+
+</td></tr>
+<tr><th><h3>Stream API [unoff]</h3><span class="links">[<a href="http://caniuse.com/stream">Table</a>] [<a href="http://tests.caniuse.com/?feat=stream&prefix=all">Single feat</a>]</span></th><td class="current unknown">&nbsp;</td><td>
+<div class="test_wrap"><h3>Auto</h3><div id="stream0" class="auto fail"></div><script>
+setResult('stream0', "getUserMedia" in navigator);
+</script><div class="info">Test for "getUserMedia" in navigator object</div></div>
+
+</td></tr>
+<tr><th><h3>CSS Masks [unoff]</h3><span class="links">[<a href="http://caniuse.com/css-masks">Table</a>] [<a href="http://tests.caniuse.com/?feat=css-masks&prefix=all">Single feat</a>]</span></th><td class="current pass">&nbsp;<span>-pre-</span></td><td>
+<div class="test_wrap"><h3>Visual</h3><div id="css-masks0" class="visual"></div><div class="vis_test"><style>
+#masktest {
+	-webkit-mask-image: url(caniuse_files/alpha.png);
+-moz-mask-image: url(caniuse_files/alpha.png);
+-ms-mask-image: url(caniuse_files/alpha.png);
+-o-mask-image: url(caniuse_files/alpha.png);
+mask-image: url(caniuse_files/alpha.png);
+    background: black;
+    height: 16px;
+    width: 32px;
+    display: inline-block;
+    margin-left: -32px;
+}
+#masktestbg {
+    display: inline-block;
+	background: lime;
+    height: 16px;
+    width: 32px;
+	left: -32px;
+}
+
+</style>
+<div id="masktestbg"></div><div id="masktest"></div>
+
+</div><div class="vis_ref"><img src="./caniuse_files/png_alpha_result.png"></div><div class="info">mask-image: url(caniuse_files/alpha.png);</div></div>
+
+</td></tr>
+<tr><th><h3>CSS3 Text-overflow [unoff]</h3><span class="links">[<a href="http://caniuse.com/text-overflow">Table</a>] [<a href="http://tests.caniuse.com/?feat=text-overflow&prefix=all">Single feat</a>]</span></th><td class="current pass">&nbsp;</td><td>
+<div class="test_wrap"><h3>Visual</h3><div id="text-overflow0" class="visual"></div><div class="vis_test"><style>
+#textof {
+ width: 4em;
+ display: inline-block;
+ overflow: hidden;
+ font: 16px courier, monospace;
+-webkit-text-overflow: ellipsis; 
+-moz-text-overflow: ellipsis; 
+-ms-text-overflow: ellipsis; 
+-o-text-overflow: ellipsis; 
+text-overflow: ellipsis; 
+
+ text-overflow: ellipsis; 
+}
+</style>
+
+<div id="textof">
+abcdefghijklmnopqrstuvwxyz
+</div></div><p class="condition">Should end with ellipsis</p><div class="info">text-overflow: ellipsis;</div></div>
+
+</td></tr>
+<tr><th><h3>CSS text-stroke [unoff]</h3><span class="links">[<a href="http://caniuse.com/text-stroke">Table</a>] [<a href="http://tests.caniuse.com/?feat=text-stroke&prefix=all">Single feat</a>]</span></th><td class="current pass">&nbsp;<span>-pre-</span></td><td>
+<div class="test_wrap"><h3>Visual</h3><div id="text-stroke0" class="visual"></div><div class="vis_test"><style>
+#textstroke {
+-webkit-text-stroke: 2px lime;
+-moz-text-stroke: 2px lime;
+-ms-text-stroke: 2px lime;
+-o-text-stroke: 2px lime;
+text-stroke: 2px lime;
+
+color: #000;
+font-size: 15px;
+padding: 5px;
+font-family: Times New Roman, Times, serif;
+}
+</style>
+
+<div id="textstroke">
+green stroked text
+</div></div><div class="vis_ref"><img src="./caniuse_files/stroked-text.png"></div><div class="info">text-stroke: 2px lime;</div></div>
+
+</td></tr>
+<tr><th><h3>EOT - Embedded OpenType fonts [unoff]</h3><span class="links">[<a href="http://caniuse.com/eot">Table</a>] [<a href="http://tests.caniuse.com/?feat=eot&prefix=all">Single feat</a>]</span></th><td class="current fail">&nbsp;</td><td>
+<div class="test_wrap"><h3>Visual</h3><div id="eot0" class="visual"></div><div class="vis_test"><style>
+@font-face {
+	font-family: 'Windsong_eot';
+	src: url('caniuse_files/Windsong-webfont.eot');
+}
+
+#windsong_eot {
+	font: 18px Windsong_eot;
+	margin: 5px;
+}
+</style>
+<p id="windsong_eot">Windsong font</p>
+</div><div class="vis_ref"><img src="./caniuse_files/windsong_font.png"></div></div>
+
+</td></tr>
+<tr><th><h3>XHTML+SMIL animation [unoff]</h3><span class="links">[<a href="http://caniuse.com/xhtmlsmil">Table</a>] [<a href="http://tests.caniuse.com/?feat=xhtmlsmil&prefix=all">Single feat</a>]</span></th><td class="current fail">&nbsp;</td><td>
+
+</td></tr>
+</tbody></table>
+<p>Most tests by <a href="http://a.deveria.com/">Alexis Deveria</a>, additional contributions by <a href="http://paulirish.com/">Paul Irish</a></p>
+
+<script>
+(function() {
+var gaJsHost = (("https:" == document.location.protocol) ? "https://ssl." : "http://www.");
+document.write(unescape("%3Cscript src='" + gaJsHost + "google-analytics.com/ga.js' type='text/javascript'%3E%3C/script%3E"));
+}());
+</script><script src="./caniuse_files/ga.js" type="text/javascript"></script>
+<script>
+(function() {
+try {
+var pageTracker = _gat._getTracker("UA-16085010-1");
+pageTracker._trackPageview();
+} catch(err) {}
+}());
+</script></body></html>

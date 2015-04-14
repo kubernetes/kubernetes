@@ -1,0 +1,55 @@
+/*!
+ * Angular Material Design
+ * https://github.com/angular/material
+ * @license MIT
+ * v0.7.0-rc3
+ */
+md-slider.md-THEME_NAME-theme .md-track {
+  background-color: '{{foreground-3}}'; }
+md-slider.md-THEME_NAME-theme .md-track-ticks {
+  background-color: '{{foreground-4}}'; }
+md-slider.md-THEME_NAME-theme .md-focus-thumb {
+  background-color: '{{foreground-2}}'; }
+md-slider.md-THEME_NAME-theme .md-focus-ring {
+  border-color: '{{foreground-4}}'; }
+md-slider.md-THEME_NAME-theme .md-disabled-thumb {
+  border-color: '{{background-hue-3}}'; }
+md-slider.md-THEME_NAME-theme.md-min .md-thumb:after {
+  background-color: '{{background-hue-3}}'; }
+md-slider.md-THEME_NAME-theme .md-track.md-track-fill {
+  background-color: '{{primary-color}}'; }
+md-slider.md-THEME_NAME-theme .md-thumb:after {
+  border-color: '{{primary-color}}';
+  background-color: '{{primary-color}}'; }
+md-slider.md-THEME_NAME-theme .md-sign {
+  background-color: '{{primary-color}}'; }
+  md-slider.md-THEME_NAME-theme .md-sign:after {
+    border-top-color: '{{primary-color}}'; }
+md-slider.md-THEME_NAME-theme .md-thumb-text {
+  color: '{{primary-contrast}}'; }
+md-slider.md-THEME_NAME-theme.md-warn .md-track-fill {
+  background-color: '{{warn-color}}'; }
+md-slider.md-THEME_NAME-theme.md-warn .md-thumb:after {
+  border-color: '{{warn-color}}';
+  background-color: '{{warn-color}}'; }
+md-slider.md-THEME_NAME-theme.md-warn .md-sign {
+  background-color: '{{warn-color}}'; }
+  md-slider.md-THEME_NAME-theme.md-warn .md-sign:after {
+    border-top-color: '{{warn-color}}'; }
+md-slider.md-THEME_NAME-theme.md-warn .md-thumb-text {
+  color: '{{warn-contrast}}'; }
+md-slider.md-THEME_NAME-theme.md-accent .md-track-fill {
+  background-color: '{{accent-color}}'; }
+md-slider.md-THEME_NAME-theme.md-accent .md-thumb:after {
+  border-color: '{{accent-color}}';
+  background-color: '{{accent-color}}'; }
+md-slider.md-THEME_NAME-theme.md-accent .md-sign {
+  background-color: '{{accent-color}}'; }
+  md-slider.md-THEME_NAME-theme.md-accent .md-sign:after {
+    border-top-color: '{{accent-color}}'; }
+md-slider.md-THEME_NAME-theme.md-accent .md-thumb-text {
+  color: '{{accent-contrast}}'; }
+md-slider.md-THEME_NAME-theme[disabled] .md-thumb:after {
+  border-color: '{{foreground-3}}'; }
+md-slider.md-THEME_NAME-theme[disabled]:not(.md-min) .md-thumb:after {
+  background-color: '{{foreground-3}}'; }
