@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"os"
+	"sort"
 	"strings"
 
 	"github.com/spf13/pflag"
@@ -282,6 +283,7 @@ func writeRequiredFlag(cmd *Command, out *bytes.Buffer) {
 
 func writeRequiredNoun(cmd *Command, out *bytes.Buffer) {
 	fmt.Fprintf(out, "    must_have_one_noun=()\n")
+	sort.Sort(sort.StringSlice(cmd.ValidArgs))
 	for _, value := range cmd.ValidArgs {
 		fmt.Fprintf(out, "    must_have_one_noun+=(%q)\n", value)
 	}
