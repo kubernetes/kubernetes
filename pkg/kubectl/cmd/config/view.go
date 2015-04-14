@@ -31,16 +31,18 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
-type viewOptions struct {
-	pathOptions *PathOptions
-	merge       util.BoolFlag
+type ViewOptions struct {
+	PathOptions *PathOptions
+	Merge       util.BoolFlag
+	Flatten     bool
+	Minify      bool
 }
 
 const (
-	view_long = `displays merged kubeconfig settings or a specified kubeconfig file.
+	view_long = `displays Merged kubeconfig settings or a specified kubeconfig file.
 
 You can use --output=template --template=TEMPLATE to extract specific values.`
-	view_example = `// Show merged kubeconfig settings.
+	view_example = `// Show Merged kubeconfig settings.
 $ kubectl config view
 
 // Show only local kubeconfig settings
@@ -50,16 +52,16 @@ $ kubectl config view --local
 $ kubectl config view -o template --template='{{range .users}}{{ if eq .name "e2e" }}{{ index .user.password }}{{end}}{{end}}'`
 )
 
-func NewCmdConfigView(out io.Writer, pathOptions *PathOptions) *cobra.Command {
-	options := &viewOptions{pathOptions: pathOptions}
+func NewCmdConfigView(out io.Writer, PathOptions *PathOptions) *cobra.Command {
+	options := &ViewOptions{PathOptions: PathOptions}
 
 	cmd := &cobra.Command{
 		Use:     "view",
-		Short:   "displays merged kubeconfig settings or a specified kubeconfig file.",
+		Short:   "displays Merged kubeconfig settings or a specified kubeconfig file.",
 		Long:    view_long,
 		Example: view_example,
 		Run: func(cmd *cobra.Command, args []string) {
-			options.complete()
+			options.Complete()
 
 			printer, _, err := cmdutil.PrinterForCommand(cmd)
 			if err != nil {
@@ -68,15 +70,10 @@ func NewCmdConfigView(out io.Writer, pathOptions *PathOptions) *cobra.Command {
 			version := cmdutil.OutputVersion(cmd, latest.Version)
 			printer = kubectl.NewVersionedPrinter(printer, clientcmdapi.Scheme, version)
 
-			config, err := options.loadConfig()
-			if err != nil {
+			if err := options.Run(out, printer); err != nil {
 				glog.FatalDepth(1, err)
 			}
 
-			err = printer.PrintObj(config, out)
-			if err != nil {
-				glog.FatalDepth(1, err)
-			}
 		},
 	}
 
@@ -84,24 +81,52 @@ func NewCmdConfigView(out io.Writer, pathOptions *PathOptions) *cobra.Command {
 	// Default to yaml
 	cmd.Flags().Set("output", "yaml")
 
-	options.merge.Default(true)
-	cmd.Flags().Var(&options.merge, "merge", "merge together the full hierarchy of kubeconfig files")
+	options.Merge.Default(true)
+	cmd.Flags().Var(&options.Merge, "merge", "merge together the full hierarchy of kubeconfig files")
+	cmd.Flags().BoolVar(&options.Flatten, "flatten", false, "flatten the resulting kubeconfig file into self contained output (useful for creating portable kubeconfig files)")
+	cmd.Flags().BoolVar(&options.Minify, "minify", false, "remove all information not used by current-context from the output")
 	return cmd
 }
 
-func (o *viewOptions) complete() bool {
+func (o ViewOptions) Run(out io.Writer, printer kubectl.ResourcePrinter) error {
+	config, err := o.loadConfig()
+	if err != nil {
+		return err
+	}
+
+	if o.Minify {
+		if err := clientcmdapi.MinifyConfig(config); err != nil {
+			return err
+		}
+	}
+
+	if o.Flatten {
+		if err := clientcmdapi.FlattenConfig(config); err != nil {
+			return err
+		}
+	}
+
+	err = printer.PrintObj(config, out)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (o *ViewOptions) Complete() bool {
 	// if --kubeconfig, --global, or --local is specified, then merging doesn't make sense since you're declaring precise intent
-	if o.pathOptions.Global || o.pathOptions.Local || o.pathOptions.UseEnvVar {
-		if !o.merge.Provided() {
-			o.merge.Set("false")
+	if o.PathOptions.Global || o.PathOptions.Local || o.PathOptions.UseEnvVar {
+		if !o.Merge.Provided() {
+			o.Merge.Set("false")
 		}
 	}
 
 	return true
 }
 
-func (o viewOptions) loadConfig() (*clientcmdapi.Config, error) {
-	err := o.validate()
+func (o ViewOptions) loadConfig() (*clientcmdapi.Config, error) {
+	err := o.Validate()
 	if err != nil {
 		return nil, err
 	}
@@ -110,33 +135,33 @@ func (o viewOptions) loadConfig() (*clientcmdapi.Config, error) {
 	return config, err
 }
 
-func (o viewOptions) validate() error {
-	return o.pathOptions.Validate()
+func (o ViewOptions) Validate() error {
+	return o.PathOptions.Validate()
 }
 
 // getStartingConfig returns the Config object built from the sources specified by the options, the filename read (only if it was a single file), and an error if something goes wrong
-func (o *viewOptions) getStartingConfig() (*clientcmdapi.Config, error) {
+func (o *ViewOptions) getStartingConfig() (*clientcmdapi.Config, error) {
 	switch {
-	case !o.merge.Value():
+	case !o.Merge.Value():
 		switch {
-		case len(o.pathOptions.LoadingRules.ExplicitPath) > 0:
-			return clientcmd.LoadFromFile(o.pathOptions.LoadingRules.ExplicitPath)
+		case len(o.PathOptions.LoadingRules.ExplicitPath) > 0:
+			return clientcmd.LoadFromFile(o.PathOptions.LoadingRules.ExplicitPath)
 
-		case o.pathOptions.Global:
-			return clientcmd.LoadFromFile(o.pathOptions.GlobalFile)
+		case o.PathOptions.Global:
+			return clientcmd.LoadFromFile(o.PathOptions.GlobalFile)
 
-		case o.pathOptions.UseEnvVar:
-			return clientcmd.LoadFromFile(o.pathOptions.EnvVarFile)
+		case o.PathOptions.UseEnvVar:
+			return clientcmd.LoadFromFile(o.PathOptions.EnvVarFile)
 
-		case o.pathOptions.Local:
-			return clientcmd.LoadFromFile(o.pathOptions.LocalFile)
+		case o.PathOptions.Local:
+			return clientcmd.LoadFromFile(o.PathOptions.LocalFile)
 
 		default:
-			return nil, errors.New("if merge==false a precise file must to specified")
+			return nil, errors.New("if Merge==false a precise file must to specified")
 
 		}
 
 	default:
-		return o.pathOptions.getStartingConfig()
+		return o.PathOptions.getStartingConfig()
 	}
 }

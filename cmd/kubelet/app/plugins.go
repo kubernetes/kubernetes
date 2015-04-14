@@ -33,6 +33,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume/host_path"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume/iscsi"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume/nfs"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume/persistent_claim"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume/secret"
 	//Cloud providers
 	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/aws"
@@ -59,6 +60,7 @@ func ProbeVolumePlugins() []volume.VolumePlugin {
 	allPlugins = append(allPlugins, secret.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, iscsi.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, glusterfs.ProbeVolumePlugins()...)
+	allPlugins = append(allPlugins, persistent_claim.ProbeVolumePlugins()...)
 
 	return allPlugins
 }

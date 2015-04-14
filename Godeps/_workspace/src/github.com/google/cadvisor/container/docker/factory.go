@@ -41,6 +41,13 @@ var DockerNamespace = "docker"
 
 // Basepath to all container specific information that libcontainer stores.
 var dockerRootDir = flag.String("docker_root", "/var/lib/docker", "Absolute path to the Docker state root directory (default: /var/lib/docker)")
+var dockerRunDir = flag.String("docker_run", "/var/run/docker", "Absolute path to the Docker run directory (default: /var/run/docker)")
+
+// TODO(vmarmol): Export run dir too for newer Dockers.
+// Directory holding Docker container state information.
+func DockerStateDir() string {
+	return libcontainer.DockerStateDir(*dockerRootDir)
+}
 
 // Whether the system is using Systemd.
 var useSystemd bool
@@ -97,7 +104,6 @@ func (self *dockerFactory) NewContainerHandler(name string) (handler container.C
 		name,
 		self.machineInfoFactory,
 		self.fsInfo,
-		*dockerRootDir,
 		self.usesAufsDriver,
 		&self.cgroupSubsystems,
 	)

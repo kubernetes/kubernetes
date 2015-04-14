@@ -2,89 +2,58 @@ package main
 
 import (
 	"encoding/json"
-	"log"
+	"fmt"
 	"os"
-	"path/filepath"
 
 	"github.com/codegangsta/cli"
 	"github.com/docker/libcontainer"
+	"github.com/docker/libcontainer/configs"
 )
 
-// rFunc is a function registration for calling after an execin
-type rFunc struct {
-	Usage  string
-	Action func(*libcontainer.Config, []string)
-}
-
-func loadConfig() (*libcontainer.Config, error) {
-	f, err := os.Open(filepath.Join(dataPath, "container.json"))
-	if err != nil {
-		return nil, err
-	}
-	defer f.Close()
-
-	var container *libcontainer.Config
-	if err := json.NewDecoder(f).Decode(&container); err != nil {
-		return nil, err
-	}
-
-	return container, nil
-}
-
-func openLog(name string) error {
-	f, err := os.OpenFile(name, os.O_CREATE|os.O_RDWR|os.O_APPEND, 0755)
-	if err != nil {
-		return err
-	}
-
-	log.SetOutput(f)
-
-	return nil
-}
-
-func findUserArgs() []string {
-	i := 0
-	for _, a := range os.Args {
-		i++
-
-		if a == "--" {
-			break
+func loadConfig(context *cli.Context) (*configs.Config, error) {
+	if path := context.String("config"); path != "" {
+		f, err := os.Open(path)
+		if err != nil {
+			return nil, err
 		}
+		defer f.Close()
+		var config *configs.Config
+		if err := json.NewDecoder(f).Decode(&config); err != nil {
+			return nil, err
+		}
+		return config, nil
 	}
-
-	return os.Args[i:]
-}
-
-// loadConfigFromFd loads a container's config from the sync pipe that is provided by
-// fd 3 when running a process
-func loadConfigFromFd() (*libcontainer.Config, error) {
-	pipe := os.NewFile(3, "pipe")
-	defer pipe.Close()
-
-	var config *libcontainer.Config
-	if err := json.NewDecoder(pipe).Decode(&config); err != nil {
-		return nil, err
-	}
+	config := getTemplate()
+	modify(config, context)
 	return config, nil
 }
 
-func preload(context *cli.Context) error {
-	if logPath != "" {
-		if err := openLog(logPath); err != nil {
-			return err
-		}
-	}
-
-	return nil
+func loadFactory(context *cli.Context) (libcontainer.Factory, error) {
+	return libcontainer.New(context.GlobalString("root"), libcontainer.Cgroupfs)
 }
 
-func runFunc(f *rFunc) {
-	userArgs := findUserArgs()
-
-	config, err := loadConfigFromFd()
+func getContainer(context *cli.Context) (libcontainer.Container, error) {
+	factory, err := loadFactory(context)
 	if err != nil {
-		log.Fatalf("unable to receive config from sync pipe: %s", err)
+		return nil, err
 	}
+	container, err := factory.Load(context.String("id"))
+	if err != nil {
+		return nil, err
+	}
+	return container, nil
+}
 
-	f.Action(config, userArgs)
+func fatal(err error) {
+	if lerr, ok := err.(libcontainer.Error); ok {
+		lerr.Detail(os.Stderr)
+		os.Exit(1)
+	}
+	fmt.Fprintln(os.Stderr, err)
+	os.Exit(1)
+}
+
+func fatalf(t string, v ...interface{}) {
+	fmt.Fprintf(os.Stderr, t, v...)
+	os.Exit(1)
 }

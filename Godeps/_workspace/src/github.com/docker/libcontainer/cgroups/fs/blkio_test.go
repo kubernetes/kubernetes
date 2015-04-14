@@ -1,6 +1,7 @@
 package fs
 
 import (
+	"strconv"
 	"testing"
 
 	"github.com/docker/libcontainer/cgroups"
@@ -70,6 +71,64 @@ Total 328`
 
 func appendBlkioStatEntry(blkioStatEntries *[]cgroups.BlkioStatEntry, major, minor, value uint64, op string) {
 	*blkioStatEntries = append(*blkioStatEntries, cgroups.BlkioStatEntry{Major: major, Minor: minor, Value: value, Op: op})
+}
+
+func TestBlkioSetWeight(t *testing.T) {
+	helper := NewCgroupTestUtil("blkio", t)
+	defer helper.cleanup()
+
+	const (
+		weightBefore = 100
+		weightAfter  = 200
+	)
+
+	helper.writeFileContents(map[string]string{
+		"blkio.weight": strconv.Itoa(weightBefore),
+	})
+
+	helper.CgroupData.c.BlkioWeight = weightAfter
+	blkio := &BlkioGroup{}
+	if err := blkio.Set(helper.CgroupPath, helper.CgroupData.c); err != nil {
+		t.Fatal(err)
+	}
+
+	value, err := getCgroupParamUint(helper.CgroupPath, "blkio.weight")
+	if err != nil {
+		t.Fatalf("Failed to parse blkio.weight - %s", err)
+	}
+
+	if value != weightAfter {
+		t.Fatal("Got the wrong value, set blkio.weight failed.")
+	}
+}
+
+func TestBlkioSetWeightDevice(t *testing.T) {
+	helper := NewCgroupTestUtil("blkio", t)
+	defer helper.cleanup()
+
+	const (
+		weightDeviceBefore = "8:0 400"
+		weightDeviceAfter  = "8:0 500"
+	)
+
+	helper.writeFileContents(map[string]string{
+		"blkio.weight_device": weightDeviceBefore,
+	})
+
+	helper.CgroupData.c.BlkioWeightDevice = weightDeviceAfter
+	blkio := &BlkioGroup{}
+	if err := blkio.Set(helper.CgroupPath, helper.CgroupData.c); err != nil {
+		t.Fatal(err)
+	}
+
+	value, err := getCgroupParamString(helper.CgroupPath, "blkio.weight_device")
+	if err != nil {
+		t.Fatalf("Failed to parse blkio.weight_device - %s", err)
+	}
+
+	if value != weightDeviceAfter {
+		t.Fatal("Got the wrong value, set blkio.weight_device failed.")
+	}
 }
 
 func TestBlkioStats(t *testing.T) {

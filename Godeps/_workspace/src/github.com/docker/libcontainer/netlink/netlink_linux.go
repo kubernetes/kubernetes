@@ -7,7 +7,6 @@ import (
 	"math/rand"
 	"net"
 	"os"
-	"path/filepath"
 	"sync/atomic"
 	"syscall"
 	"unsafe"
@@ -23,6 +22,7 @@ const (
 	IFLA_VLAN_ID      = 1
 	IFLA_NET_NS_FD    = 28
 	IFLA_ADDRESS      = 1
+	IFLA_BRPORT_MODE  = 4
 	SIOC_BRADDBR      = 0x89a0
 	SIOC_BRDELBR      = 0x89a1
 	SIOC_BRADDIF      = 0x89a2
@@ -659,7 +659,7 @@ func networkSetNsAction(iface *net.Interface, rtattr *RtAttr) error {
 }
 
 // Move a particular network interface to a particular network namespace
-// specified by PID. This is idential to running: ip link set dev $name netns $pid
+// specified by PID. This is identical to running: ip link set dev $name netns $pid
 func NetworkSetNsPid(iface *net.Interface, nspid int) error {
 	data := uint32Attr(syscall.IFLA_NET_NS_PID, uint32(nspid))
 	return networkSetNsAction(iface, data)
@@ -673,7 +673,7 @@ func NetworkSetNsFd(iface *net.Interface, fd int) error {
 	return networkSetNsAction(iface, data)
 }
 
-// Rname a particular interface to a different name
+// Rename a particular interface to a different name
 // !!! Note that you can't rename an active interface. You need to bring it down before renaming it.
 // This is identical to running: ip link set dev ${oldName} name ${newName}
 func NetworkChangeName(iface *net.Interface, newName string) error {
@@ -1253,25 +1253,33 @@ func SetMacAddress(name, addr string) error {
 }
 
 func SetHairpinMode(iface *net.Interface, enabled bool) error {
-	sysPath := filepath.Join("/sys/class/net", iface.Name, "brport/hairpin_mode")
-
-	sysFile, err := os.OpenFile(sysPath, os.O_WRONLY, 0)
+	s, err := getNetlinkSocket()
 	if err != nil {
 		return err
 	}
-	defer sysFile.Close()
+	defer s.Close()
+	req := newNetlinkRequest(syscall.RTM_SETLINK, syscall.NLM_F_ACK)
 
-	var writeVal []byte
+	msg := newIfInfomsg(syscall.AF_BRIDGE)
+	msg.Type = syscall.RTM_SETLINK
+	msg.Flags = syscall.NLM_F_REQUEST
+	msg.Index = int32(iface.Index)
+	msg.Change = DEFAULT_CHANGE
+	req.AddData(msg)
+
+	mode := []byte{0}
 	if enabled {
-		writeVal = []byte("1")
-	} else {
-		writeVal = []byte("0")
+		mode[0] = byte(1)
 	}
-	if _, err := sysFile.Write(writeVal); err != nil {
+
+	br := newRtAttr(syscall.IFLA_PROTINFO|syscall.NLA_F_NESTED, nil)
+	newRtAttrChild(br, IFLA_BRPORT_MODE, mode)
+	req.AddData(br)
+	if err := s.Send(req); err != nil {
 		return err
 	}
 
-	return nil
+	return s.HandleAck(req.Seq)
 }
 
 func ChangeName(iface *net.Interface, newName string) error {

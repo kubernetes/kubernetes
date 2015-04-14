@@ -29,6 +29,17 @@ import (
 	"github.com/golang/glog"
 )
 
+// VolumeOptions contains option information about a volume.
+//
+// Currently, this struct containers only a single field for the
+// rootcontext of the volume.  This is a temporary measure in order
+// to set the rootContext of tmpfs mounts correctly; it will be replaced
+// and expanded on by future SecurityContext work.
+type VolumeOptions struct {
+	// The rootcontext to use when performing mounts for a volume.
+	RootContext string
+}
+
 // VolumePlugin is an interface to volume plugins that can be used on a
 // kubernetes node (e.g. by kubelet) to instantiate and manage volumes.
 type VolumePlugin interface {
@@ -45,13 +56,13 @@ type VolumePlugin interface {
 	// CanSupport tests whether the plugin supports a given volume
 	// specification from the API.  The spec pointer should be considered
 	// const.
-	CanSupport(spec *api.Volume) bool
+	CanSupport(spec *Spec) bool
 
 	// NewBuilder creates a new volume.Builder from an API specification.
 	// Ownership of the spec pointer in *not* transferred.
 	// - spec: The api.Volume spec
 	// - podRef: a reference to the enclosing pod
-	NewBuilder(spec *api.Volume, podRef *api.ObjectReference) (Builder, error)
+	NewBuilder(spec *Spec, podRef *api.ObjectReference, opts VolumeOptions) (Builder, error)
 
 	// NewCleaner creates a new volume.Cleaner from recoverable state.
 	// - name: The volume name, as per the api.Volume spec.
@@ -94,18 +105,41 @@ type VolumeHost interface {
 	// the provided spec.  This is used to implement volume plugins which
 	// "wrap" other plugins.  For example, the "secret" volume is
 	// implemented in terms of the "emptyDir" volume.
-	NewWrapperBuilder(spec *api.Volume, podRef *api.ObjectReference) (Builder, error)
+	NewWrapperBuilder(spec *Spec, podRef *api.ObjectReference, opts VolumeOptions) (Builder, error)
 
 	// NewWrapperCleaner finds an appropriate plugin with which to handle
 	// the provided spec.  See comments on NewWrapperBuilder for more
 	// context.
-	NewWrapperCleaner(spec *api.Volume, podUID types.UID) (Cleaner, error)
+	NewWrapperCleaner(spec *Spec, podUID types.UID) (Cleaner, error)
 }
 
 // VolumePluginMgr tracks registered plugins.
 type VolumePluginMgr struct {
 	mutex   sync.Mutex
 	plugins map[string]VolumePlugin
+}
+
+// Spec is an internal representation of a volume.  All API volume types translate to Spec.
+type Spec struct {
+	Name                   string
+	VolumeSource           api.VolumeSource
+	PersistentVolumeSource api.PersistentVolumeSource
+}
+
+// NewSpecFromVolume creates an Spec from an api.Volume
+func NewSpecFromVolume(vs *api.Volume) *Spec {
+	return &Spec{
+		Name:         vs.Name,
+		VolumeSource: vs.VolumeSource,
+	}
+}
+
+// NewSpecFromPersistentVolume creates an Spec from an api.PersistentVolume
+func NewSpecFromPersistentVolume(pv *api.PersistentVolume) *Spec {
+	return &Spec{
+		Name: pv.Name,
+		PersistentVolumeSource: pv.Spec.PersistentVolumeSource,
+	}
 }
 
 // InitPlugins initializes each plugin.  All plugins must have unique names.
@@ -141,7 +175,7 @@ func (pm *VolumePluginMgr) InitPlugins(plugins []VolumePlugin, host VolumeHost) 
 // FindPluginBySpec looks for a plugin that can support a given volume
 // specification.  If no plugins can support or more than one plugin can
 // support it, return error.
-func (pm *VolumePluginMgr) FindPluginBySpec(spec *api.Volume) (VolumePlugin, error) {
+func (pm *VolumePluginMgr) FindPluginBySpec(spec *Spec) (VolumePlugin, error) {
 	pm.mutex.Lock()
 	defer pm.mutex.Unlock()
 

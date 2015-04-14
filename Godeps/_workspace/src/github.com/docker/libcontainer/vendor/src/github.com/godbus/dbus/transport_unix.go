@@ -1,3 +1,5 @@
+//+build !windows
+
 package dbus
 
 import (
@@ -56,6 +58,10 @@ func newUnixTransport(keys string) (transport, error) {
 	default:
 		return nil, errors.New("dbus: invalid address (both path and abstract set)")
 	}
+}
+
+func init() {
+	transports["unix"] = newUnixTransport
 }
 
 func (t *unixTransport) EnableUnixFDs() {

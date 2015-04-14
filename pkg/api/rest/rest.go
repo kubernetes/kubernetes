@@ -55,7 +55,8 @@ type Getter interface {
 }
 
 // GetterWithOptions is an object that retrieve a named RESTful resource and takes
-// additional options on the get request
+// additional options on the get request. It allows a caller to also receive the
+// subpath of the GET request.
 type GetterWithOptions interface {
 	// Get finds a resource in the storage by name and returns it.
 	// Although it can return an arbitrary error value, IsNotFound(err) is true for the
@@ -65,8 +66,12 @@ type GetterWithOptions interface {
 	Get(ctx api.Context, name string, options runtime.Object) (runtime.Object, error)
 
 	// NewGetOptions returns an empty options object that will be used to pass
-	// options to the Get method.
-	NewGetOptions() runtime.Object
+	// options to the Get method. It may return a bool and a string, if true, the
+	// value of the request path below the object will be included as the named
+	// string in the serialization of the runtime object. E.g., returning "path"
+	// will convert the trailing request scheme value to "path" in the map[string][]string
+	// passed to the convertor.
+	NewGetOptions() (runtime.Object, bool, string)
 }
 
 // Deleter is an object that can delete a named RESTful resource.

@@ -60,18 +60,25 @@ type DockerManager struct {
 	//      means that some entries may be recycled before a pod has been
 	//      deleted.
 	reasonCache stringCache
+	// TODO(yifan): We export this for testability, so when we have a fake
+	// container manager, then we can unexport this. Also at that time, we
+	// use the concrete type so that we can record the pull failure and eliminate
+	// the image checking in GetPodStatus().
+	Puller DockerPuller
 }
 
 // Ensures DockerManager implements ConatinerRunner.
 var _ kubecontainer.ContainerRunner = new(DockerManager)
 
-func NewDockerManager(client DockerInterface, recorder record.EventRecorder, podInfraContainerImage string) *DockerManager {
+func NewDockerManager(client DockerInterface, recorder record.EventRecorder, podInfraContainerImage string, qps float32, burst int) *DockerManager {
 	reasonCache := stringCache{cache: lru.New(maxReasonCacheEntries)}
 	return &DockerManager{
 		client:                 client,
 		recorder:               recorder,
 		PodInfraContainerImage: podInfraContainerImage,
-		reasonCache:            reasonCache}
+		reasonCache:            reasonCache,
+		Puller:                 newDockerPuller(client, qps, burst),
+	}
 }
 
 // A cache which stores strings keyed by <pod_UID>_<container_name>.
@@ -519,4 +526,95 @@ func makeCapabilites(capAdd []api.CapabilityType, capDrop []api.CapabilityType) 
 		dropCaps = append(dropCaps, string(cap))
 	}
 	return addCaps, dropCaps
+}
+
+func (self *DockerManager) GetPods(all bool) ([]*kubecontainer.Pod, error) {
+	pods := make(map[types.UID]*kubecontainer.Pod)
+	var result []*kubecontainer.Pod
+
+	containers, err := GetKubeletDockerContainers(self.client, all)
+	if err != nil {
+		return nil, err
+	}
+
+	// Group containers by pod.
+	for _, c := range containers {
+		if len(c.Names) == 0 {
+			glog.Warningf("Cannot parse empty docker container name: %#v", c.Names)
+			continue
+		}
+		dockerName, hash, err := ParseDockerName(c.Names[0])
+		if err != nil {
+			glog.Warningf("Parse docker container name %q error: %v", c.Names[0], err)
+			continue
+		}
+		pod, found := pods[dockerName.PodUID]
+		if !found {
+			name, namespace, err := kubecontainer.ParsePodFullName(dockerName.PodFullName)
+			if err != nil {
+				glog.Warningf("Parse pod full name %q error: %v", dockerName.PodFullName, err)
+				continue
+			}
+			pod = &kubecontainer.Pod{
+				ID:        dockerName.PodUID,
+				Name:      name,
+				Namespace: namespace,
+			}
+			pods[dockerName.PodUID] = pod
+		}
+		pod.Containers = append(pod.Containers, &kubecontainer.Container{
+			ID:      types.UID(c.ID),
+			Name:    dockerName.ContainerName,
+			Hash:    hash,
+			Created: c.Created,
+		})
+	}
+
+	// Convert map to list.
+	for _, c := range pods {
+		result = append(result, c)
+	}
+	return result, nil
+}
+
+func (self *DockerManager) Pull(image string) error {
+	return self.Puller.Pull(image)
+}
+
+func (self *DockerManager) IsImagePresent(image string) (bool, error) {
+	return self.Puller.IsImagePresent(image)
+}
+
+// PodInfraContainer returns true if the pod infra container has changed.
+func (self *DockerManager) PodInfraContainerChanged(pod *api.Pod, podInfraContainer *kubecontainer.Container) (bool, error) {
+	networkMode := ""
+	var ports []api.ContainerPort
+
+	dockerPodInfraContainer, err := self.client.InspectContainer(string(podInfraContainer.ID))
+	if err != nil {
+		return false, err
+	}
+
+	// Check network mode.
+	if dockerPodInfraContainer.HostConfig != nil {
+		networkMode = dockerPodInfraContainer.HostConfig.NetworkMode
+	}
+	if pod.Spec.HostNetwork {
+		if networkMode != "host" {
+			glog.V(4).Infof("host: %v, %v", pod.Spec.HostNetwork, networkMode)
+			return true, nil
+		}
+	} else {
+		// Docker only exports ports from the pod infra container. Let's
+		// collect all of the relevant ports and export them.
+		for _, container := range pod.Spec.Containers {
+			ports = append(ports, container.Ports...)
+		}
+	}
+	expectedPodInfraContainer := &api.Container{
+		Name:  PodInfraContainerName,
+		Image: self.PodInfraContainerImage,
+		Ports: ports,
+	}
+	return podInfraContainer.Hash != HashContainer(expectedPodInfraContainer), nil
 }

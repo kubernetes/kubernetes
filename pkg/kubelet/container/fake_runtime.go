@@ -42,15 +42,15 @@ type FakeRuntime struct {
 }
 
 type FakeRuntimeCache struct {
-	runtime Runtime
+	getter podsGetter
 }
 
-func NewFakeRuntimeCache(runtime Runtime) RuntimeCache {
-	return &FakeRuntimeCache{runtime}
+func NewFakeRuntimeCache(getter podsGetter) RuntimeCache {
+	return &FakeRuntimeCache{getter}
 }
 
 func (f *FakeRuntimeCache) GetPods() ([]*Pod, error) {
-	return f.runtime.GetPods(false)
+	return f.getter.GetPods(false)
 }
 
 func (f *FakeRuntimeCache) ForceUpdateIfOlder(time.Time) error {

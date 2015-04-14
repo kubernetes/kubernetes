@@ -1,0 +1,9 @@
+*.iml
+.DS_Store
+.idea
+temp
+node_modules
+pids
+reports
+target
+*.log

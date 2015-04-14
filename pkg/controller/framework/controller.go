@@ -172,7 +172,7 @@ func DeletionHandlingMetaNamespaceKeyFunc(obj interface{}) (string, error) {
 // Parameters:
 //  * lw is list and watch functions for the source of the resource you want to
 //    be informed of.
-//  * objType is an object of the type that you expect to receieve.
+//  * objType is an object of the type that you expect to receive.
 //  * resyncPeriod: if non-zero, will re-list this often (you will get OnUpdate
 //    calls, even if nothing changed). Otherwise, re-list will be delayed as
 //    long as possible (until the upstream source closes the watch or times out,

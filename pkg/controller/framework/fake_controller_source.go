@@ -158,6 +158,7 @@ func (f *FakeControllerSource) Watch(resourceVersion string) (watch.Interface, e
 	if err != nil {
 		return nil, err
 	}
+	rc++ // Don't re-send them a change they already have.
 	if rc < len(f.changes) {
 		changes := []watch.Event{}
 		for _, c := range f.changes[rc:] {

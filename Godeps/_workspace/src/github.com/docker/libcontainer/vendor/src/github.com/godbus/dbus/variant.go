@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"reflect"
+	"sort"
 	"strconv"
 )
 
@@ -89,18 +90,27 @@ func (v Variant) format() (string, bool) {
 			return "{}", false
 		}
 		unamb := true
-		buf := bytes.NewBuffer([]byte("{"))
+		var buf bytes.Buffer
+		kvs := make([]string, rv.Len())
 		for i, k := range rv.MapKeys() {
 			s, b := MakeVariant(k.Interface()).format()
 			unamb = unamb && b
+			buf.Reset()
 			buf.WriteString(s)
 			buf.WriteString(": ")
 			s, b = MakeVariant(rv.MapIndex(k).Interface()).format()
 			unamb = unamb && b
 			buf.WriteString(s)
-			if i != rv.Len()-1 {
+			kvs[i] = buf.String()
+		}
+		buf.Reset()
+		buf.WriteByte('{')
+		sort.Strings(kvs)
+		for i, kv := range kvs {
+			if i > 0 {
 				buf.WriteString(", ")
 			}
+			buf.WriteString(kv)
 		}
 		buf.WriteByte('}')
 		return buf.String(), unamb

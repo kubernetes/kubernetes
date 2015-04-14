@@ -228,6 +228,9 @@ var _ = Describe("Density", func() {
 
 	for _, testArg := range densityTests {
 		name := fmt.Sprintf("should allow starting %d pods per node", testArg.podsPerMinion)
+		if testArg.podsPerMinion <= 30 {
+			name = "[Performance suite] " + name
+		}
 		if testArg.skip {
 			name = "[Skipped] " + name
 		}

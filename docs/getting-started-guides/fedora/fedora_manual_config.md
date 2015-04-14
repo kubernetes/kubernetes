@@ -23,10 +23,10 @@ fed-node = 192.168.121.65
 ```
 yum -y install --enablerepo=updates-testing kubernetes
 ```
-* Install etcd
+* Install etcd and iptables
 
 ```
-yum -y install etcd
+yum -y install etcd iptables
 ```
 
 * Add master and node to /etc/hosts on all machines (not needed if hostnames already in DNS). Make sure that communication works between fed-master and fed-node by using a utility such as ping.
@@ -68,7 +68,7 @@ systemctl stop iptables-services firewalld
 KUBE_API_ADDRESS="--address=0.0.0.0"
 
 # Comma separated list of nodes in the etcd cluster
-KUBE_ETCD_SERVERS="--etcd_servers=http://fed-master:4001"
+KUBE_ETCD_SERVERS="--etcd_servers=http://127.0.0.1:4001"
 
 # Address range to use for services
 KUBE_SERVICE_ADDRESSES="--portal_net=10.254.0.0/16"
@@ -93,12 +93,14 @@ done
 
 ```json
 {
-  "id": "fed-node",
-  "kind": "Minion",
-  "apiVersion": "v1beta1",
-  "labels": {
-    "name": "fed-node-label"
-  }
+    "apiVersion": "v1beta3",
+    "kind": "Node",
+    "metadata": {
+        "name": "fed-node"
+    },
+    "spec": {
+        "externalID": "fed-node"
+    }
 }
 ```
 

@@ -81,7 +81,7 @@ func TestPlugin(t *testing.T) {
 			},
 		},
 	}
-	builder, err := plug.(*ISCSIPlugin).newBuilderInternal(spec, types.UID("poduid"), &fakeDiskManager{}, &mount.FakeMounter{})
+	builder, err := plug.(*ISCSIPlugin).newBuilderInternal(volume.NewSpecFromVolume(spec), types.UID("poduid"), &fakeDiskManager{}, &mount.FakeMounter{})
 	if err != nil {
 		t.Errorf("Failed to make a new Builder: %v", err)
 	}

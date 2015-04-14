@@ -1,4 +1,4 @@
-// Copyright 2014 go-dockerclient authors. All rights reserved.
+// Copyright 2015 go-dockerclient authors. All rights reserved.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
@@ -182,8 +182,8 @@ func (eventState *eventMonitoringState) monitorEvents(c *Client) {
 				eventState.terminate()
 				return
 			}
+			eventState.updateLastSeen(ev)
 			go eventState.sendEvent(ev)
-			go eventState.updateLastSeen(ev)
 		case err = <-eventState.errC:
 			if err == ErrNoListeners {
 				eventState.terminate()
@@ -227,7 +227,7 @@ func (eventState *eventMonitoringState) sendEvent(event *APIEvents) {
 	eventState.Add(1)
 	defer eventState.Done()
 	if eventState.isEnabled() {
-		if eventState.noListeners() {
+		if len(eventState.listeners) == 0 {
 			eventState.errC <- ErrNoListeners
 			return
 		}

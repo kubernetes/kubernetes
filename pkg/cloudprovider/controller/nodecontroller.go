@@ -58,7 +58,6 @@ type NodeController struct {
 	staticResources         *api.NodeResources
 	nodes                   []string
 	kubeClient              client.Interface
-	kubeletClient           client.KubeletClient
 	recorder                record.EventRecorder
 	registerRetryCount      int
 	podEvictionTimeout      time.Duration
@@ -104,7 +103,6 @@ func NewNodeController(
 	nodes []string,
 	staticResources *api.NodeResources,
 	kubeClient client.Interface,
-	kubeletClient client.KubeletClient,
 	registerRetryCount int,
 	podEvictionTimeout time.Duration,
 	deletingPodsRateLimiter util.RateLimiter,
@@ -126,7 +124,6 @@ func NewNodeController(
 		nodes:                   nodes,
 		staticResources:         staticResources,
 		kubeClient:              kubeClient,
-		kubeletClient:           kubeletClient,
 		recorder:                recorder,
 		registerRetryCount:      registerRetryCount,
 		podEvictionTimeout:      podEvictionTimeout,

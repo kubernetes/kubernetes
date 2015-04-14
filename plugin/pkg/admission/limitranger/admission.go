@@ -152,7 +152,13 @@ func defaultContainerResourceRequirements(limitRange *api.LimitRange) api.Resour
 // mergePodResourceRequirements merges enumerated requirements with default requirements
 func mergePodResourceRequirements(pod *api.Pod, defaultRequirements *api.ResourceRequirements) {
 	for i := range pod.Spec.Containers {
-		container := pod.Spec.Containers[i]
+		container := &pod.Spec.Containers[i]
+		if container.Resources.Limits == nil {
+			container.Resources.Limits = api.ResourceList{}
+		}
+		if container.Resources.Requests == nil {
+			container.Resources.Requests = api.ResourceList{}
+		}
 		for k, v := range defaultRequirements.Limits {
 			_, found := container.Resources.Limits[k]
 			if !found {
@@ -185,7 +191,7 @@ func PodLimitFunc(limitRange *api.LimitRange, pod *api.Pod) error {
 	maxContainerMem := int64(0)
 
 	for i := range pod.Spec.Containers {
-		container := pod.Spec.Containers[i]
+		container := &pod.Spec.Containers[i]
 		containerCPU := container.Resources.Limits.Cpu().MilliValue()
 		containerMem := container.Resources.Limits.Memory().Value()
 

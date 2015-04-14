@@ -25,23 +25,20 @@ import (
 	"time"
 
 	"code.google.com/p/go.exp/inotify"
-	dockerlibcontainer "github.com/docker/libcontainer"
 	"github.com/docker/libcontainer/cgroups"
 	cgroup_fs "github.com/docker/libcontainer/cgroups/fs"
-	"github.com/docker/libcontainer/network"
+	"github.com/docker/libcontainer/configs"
 	"github.com/golang/glog"
 	"github.com/google/cadvisor/container"
 	"github.com/google/cadvisor/container/libcontainer"
 	"github.com/google/cadvisor/fs"
 	info "github.com/google/cadvisor/info/v1"
 	"github.com/google/cadvisor/utils"
-	"github.com/google/cadvisor/utils/sysinfo"
 )
 
 type rawContainerHandler struct {
 	// Name of the container for this handler.
 	name               string
-	cgroup             *cgroups.Cgroup
 	cgroupSubsystems   *libcontainer.CgroupSubsystems
 	machineInfoFactory info.MachineInfoFactory
 
@@ -54,15 +51,15 @@ type rawContainerHandler struct {
 	// Containers being watched for new subcontainers.
 	watches map[string]struct{}
 
-	// Cgroup paths being watchd for new subcontainers
+	// Cgroup paths being watched for new subcontainers
 	cgroupWatches map[string]struct{}
 
 	// Absolute path to the cgroup hierarchies of this container.
 	// (e.g.: "cpu" -> "/sys/fs/cgroup/cpu/test")
 	cgroupPaths map[string]string
 
-	// Equivalent libcontainer state for this container.
-	libcontainerState dockerlibcontainer.State
+	// Manager of this container's cgroups.
+	cgroupManager cgroups.Manager
 
 	// Whether this container has network isolation enabled.
 	hasNetwork bool
@@ -83,38 +80,37 @@ func newRawContainerHandler(name string, cgroupSubsystems *libcontainer.CgroupSu
 		return nil, err
 	}
 
-	// Generate the equivalent libcontainer state for this container.
-	libcontainerState := dockerlibcontainer.State{
-		CgroupPaths: cgroupPaths,
+	// Generate the equivalent cgroup manager for this container.
+	cgroupManager := &cgroup_fs.Manager{
+		Cgroups: &configs.Cgroup{
+			Name: name,
+		},
+		Paths: cgroupPaths,
 	}
 
 	hasNetwork := false
 	var externalMounts []mount
 	for _, container := range cHints.AllHosts {
 		if name == container.FullName {
-			libcontainerState.NetworkState = network.NetworkState{
+			/*libcontainerState.NetworkState = network.NetworkState{
 				VethHost:  container.NetworkInterface.VethHost,
 				VethChild: container.NetworkInterface.VethChild,
 			}
-			hasNetwork = true
+			hasNetwork = true*/
 			externalMounts = container.Mounts
 			break
 		}
 	}
 
 	return &rawContainerHandler{
-		name: name,
-		cgroup: &cgroups.Cgroup{
-			Parent: "/",
-			Name:   name,
-		},
+		name:               name,
 		cgroupSubsystems:   cgroupSubsystems,
 		machineInfoFactory: machineInfoFactory,
 		stopWatcher:        make(chan error),
 		watches:            make(map[string]struct{}),
 		cgroupWatches:      make(map[string]struct{}),
 		cgroupPaths:        cgroupPaths,
-		libcontainerState:  libcontainerState,
+		cgroupManager:      cgroupManager,
 		fsInfo:             fsInfo,
 		hasNetwork:         hasNetwork,
 		externalMounts:     externalMounts,
@@ -311,29 +307,27 @@ func (self *rawContainerHandler) getFsStats(stats *info.ContainerStats) error {
 }
 
 func (self *rawContainerHandler) GetStats() (*info.ContainerStats, error) {
-	stats, err := libcontainer.GetStats(self.cgroupPaths, &self.libcontainerState)
+	var networkInterfaces []string
+	nd, err := self.GetRootNetworkDevices()
+	if err != nil {
+		return new(info.ContainerStats), err
+	}
+	if len(nd) != 0 {
+		// ContainerStats only reports stat for one network device.
+		// TODO(rjnagal): Handle multiple physical network devices.
+		networkInterfaces = []string{nd[0].Name}
+	}
+	stats, err := libcontainer.GetStats(self.cgroupManager, networkInterfaces)
 	if err != nil {
 		return stats, err
 	}
 
+	// Get filesystem stats.
 	err = self.getFsStats(stats)
 	if err != nil {
 		return stats, err
 	}
 
-	// Fill in network stats for root.
-	nd, err := self.GetRootNetworkDevices()
-	if err != nil {
-		return stats, err
-	}
-	if len(nd) != 0 {
-		// ContainerStats only reports stat for one network device.
-		// TODO(rjnagal): Handle multiple physical network devices.
-		stats.Network, err = sysinfo.GetNetworkStats(nd[0].Name)
-		if err != nil {
-			return stats, err
-		}
-	}
 	return stats, nil
 }
 
@@ -400,7 +394,8 @@ func (self *rawContainerHandler) ListThreads(listType container.ListType) ([]int
 }
 
 func (self *rawContainerHandler) ListProcesses(listType container.ListType) ([]int, error) {
-	return cgroup_fs.GetPids(self.cgroup)
+	// TODO(vmarmol): Implement
+	return nil, nil
 }
 
 func (self *rawContainerHandler) watchDirectory(dir string, containerName string) error {
