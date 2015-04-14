@@ -1939,44 +1939,6 @@ func TestValidateReplicationController(t *testing.T) {
 				Template: &invalidPodTemplate.Spec,
 			},
 		},
-		"invalid restart policy 1": {
-			ObjectMeta: api.ObjectMeta{
-				Name:      "abc-123",
-				Namespace: api.NamespaceDefault,
-			},
-			Spec: api.ReplicationControllerSpec{
-				Selector: validSelector,
-				Template: &api.PodTemplateSpec{
-					Spec: api.PodSpec{
-						RestartPolicy: api.RestartPolicyOnFailure,
-						DNSPolicy:     api.DNSClusterFirst,
-						Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
-					},
-					ObjectMeta: api.ObjectMeta{
-						Labels: validSelector,
-					},
-				},
-			},
-		},
-		"invalid restart policy 2": {
-			ObjectMeta: api.ObjectMeta{
-				Name:      "abc-123",
-				Namespace: api.NamespaceDefault,
-			},
-			Spec: api.ReplicationControllerSpec{
-				Selector: validSelector,
-				Template: &api.PodTemplateSpec{
-					Spec: api.PodSpec{
-						RestartPolicy: api.RestartPolicyNever,
-						DNSPolicy:     api.DNSClusterFirst,
-						Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
-					},
-					ObjectMeta: api.ObjectMeta{
-						Labels: validSelector,
-					},
-				},
-			},
-		},
 	}
 	for k, v := range errorCases {
 		errs := ValidateReplicationController(&v)

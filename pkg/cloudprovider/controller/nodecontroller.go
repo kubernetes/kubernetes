@@ -661,6 +661,13 @@ func (nc *NodeController) deletePods(nodeID string) error {
 		if pod.Spec.Host != nodeID {
 			continue
 		}
+		if api.RestartPolicyNever == pod.Spec.RestartPolicy {
+			continue
+		} else if api.RestartPolicyOnFailure == pod.Spec.RestartPolicy {
+			if api.PodSucceeded == pod.Status.Phase {
+				continue
+			}
+		}
 		glog.V(2).Infof("Delete pod %v", pod.Name)
 		if err := nc.kubeClient.Pods(pod.Namespace).Delete(pod.Name); err != nil {
 			glog.Errorf("Error deleting pod %v: %v", pod.Name, err)

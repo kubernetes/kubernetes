@@ -32,6 +32,8 @@ import (
 	"github.com/golang/glog"
 )
 
+type filterFunc func([]api.Pod) []api.Pod
+
 // ReplicationManager is responsible for synchronizing ReplicationController objects stored
 // in the system with actual running pods.
 type ReplicationManager struct {
@@ -40,7 +42,8 @@ type ReplicationManager struct {
 	syncTime   <-chan time.Time
 
 	// To allow injection of syncReplicationController for testing.
-	syncHandler func(controller api.ReplicationController) error
+	syncHandler        func(controller api.ReplicationController) error
+	policyToFilterFunc map[api.RestartPolicy]filterFunc
 }
 
 // PodControlInterface is an interface that knows how to add or delete pods
@@ -109,6 +112,7 @@ func NewReplicationManager(kubeClient client.Interface) *ReplicationManager {
 		},
 	}
 	rm.syncHandler = rm.syncReplicationController
+	rm.policyToFilterFunc = map[api.RestartPolicy]filterFunc{api.RestartPolicyAlways: FilterActivePods, api.RestartPolicyOnFailure: FilterHealthyPods, api.RestartPolicyNever: FilterAllPods}
 	return rm
 }
 
@@ -190,13 +194,27 @@ func FilterActivePods(pods []api.Pod) []api.Pod {
 	return result
 }
 
+func FilterHealthyPods(pods []api.Pod) []api.Pod {
+	var result []api.Pod
+	for _, value := range pods {
+		if api.PodFailed != value.Status.Phase {
+			result = append(result, value)
+		}
+	}
+	return result
+}
+
+func FilterAllPods(pods []api.Pod) []api.Pod {
+	return pods
+}
+
 func (rm *ReplicationManager) syncReplicationController(controller api.ReplicationController) error {
 	s := labels.Set(controller.Spec.Selector).AsSelector()
 	podList, err := rm.kubeClient.Pods(controller.Namespace).List(s)
 	if err != nil {
 		return err
 	}
-	filteredList := FilterActivePods(podList.Items)
+	filteredList := rm.policyToFilterFunc[controller.Spec.Template.Spec.RestartPolicy](podList.Items)
 	activePods := len(filteredList)
 	diff := activePods - controller.Spec.Replicas
 	if diff < 0 {
