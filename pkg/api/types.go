@@ -203,6 +203,8 @@ type VolumeSource struct {
 	ISCSI *ISCSIVolumeSource `json:"iscsi"`
 	// Glusterfs represents a Glusterfs mount on the host that shares a pod's lifetime
 	Glusterfs *GlusterfsVolumeSource `json:"glusterfs"`
+	// PersistentVolumeClaimVolumeSource represents a reference to a PersistentVolumeClaim in the same namespace
+	PersistentVolumeClaimVolumeSource *PersistentVolumeClaimVolumeSource `json:"persistentVolumeClaim,omitempty"`
 }
 
 // Similar to VolumeSource but meant for the administrator who creates PVs.
@@ -220,6 +222,14 @@ type PersistentVolumeSource struct {
 	HostPath *HostPathVolumeSource `json:"hostPath"`
 	// Glusterfs represents a Glusterfs volume that is attached to a host and exposed to the pod
 	Glusterfs *GlusterfsVolumeSource `json:"glusterfs"`
+}
+
+type PersistentVolumeClaimVolumeSource struct {
+	// ClaimName is the name of a PersistentVolumeClaim in the same namespace as the pod using this volume
+	ClaimName string `json:"claimName,omitempty" description:"the name of the claim in the same namespace to be mounted as a volume"`
+	// Optional: Defaults to false (read/write).  ReadOnly here
+	// will force the ReadOnly setting in VolumeMounts
+	ReadOnly bool `json:"readOnly,omitempty"`
 }
 
 type PersistentVolume struct {
