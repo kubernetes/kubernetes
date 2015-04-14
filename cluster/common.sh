@@ -46,7 +46,7 @@ function create-kubeconfig() {
     touch "${KUBECONFIG}"
   fi
   local cluster_args=(
-      "--server=https://${KUBE_MASTER_IP}"
+      "--server=${KUBE_SERVER:-https://${KUBE_MASTER_IP}}"
   )
   if [[ -z "${CA_CERT:-}" ]]; then
     cluster_args+=("--insecure-skip-tls-verify=true")
