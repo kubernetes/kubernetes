@@ -21,44 +21,79 @@
 
 set -e
 
+#clean all init/init.d/configs
+function do_backup_clean() {
+  #backup all config files
+  init_files=`ls init_conf`
+  for i in $init_files
+  do
+    if [ -f /etc/init/$i ]
+    then
+      mv /etc/init/${i} /etc/init/${i}.bak
+    fi
+  done
+  initd_files=`ls initd_scripts`
+  for i in $initd_files
+  do
+    if [ -f /etc/init.d/$i ]
+    then
+      mv /etc/init.d/${i} /etc/init.d/${i}.bak
+    fi
+  done
+  default_files=`ls default_scripts`
+  for i in $default_files
+  do
+    if [ -e /etc/default/$i ]
+    then
+      mv /etc/default/${i} /etc/default/${i}.bak
+    fi
+  done
+  # clean work dir 
+  if [ ! -d ./work ]
+  then
+    mkdir work
+  fi
+    cp -rf default_scripts init_conf initd_scripts work
+}
+
 function cpMaster(){
 	# copy /etc/init files
-    cp init_conf/etcd.conf /etc/init/
-    cp init_conf/kube-apiserver.conf /etc/init/
-    cp init_conf/kube-controller-manager.conf /etc/init/
-    cp init_conf/kube-scheduler.conf /etc/init/
+    cp work/init_conf/etcd.conf /etc/init/
+    cp work/init_conf/kube-apiserver.conf /etc/init/
+    cp work/init_conf/kube-controller-manager.conf /etc/init/
+    cp work/init_conf/kube-scheduler.conf /etc/init/
 
     # copy /etc/initd/ files
-    cp initd_scripts/etcd /etc/init.d/
-    cp initd_scripts/kube-apiserver /etc/init.d/
-    cp initd_scripts/kube-controller-manager /etc/init.d/
-    cp initd_scripts/kube-scheduler /etc/init.d/
+    cp work/initd_scripts/etcd /etc/init.d/
+    cp work/initd_scripts/kube-apiserver /etc/init.d/
+    cp work/initd_scripts/kube-controller-manager /etc/init.d/
+    cp work/initd_scripts/kube-scheduler /etc/init.d/
 
     # copy default configs
-    cp default_scripts/etcd /etc/default/
-    cp default_scripts/kube-apiserver /etc/default/
-    cp default_scripts/kube-scheduler /etc/default/
-    cp default_scripts/kube-controller-manager /etc/default/
+    cp work/default_scripts/etcd /etc/default/
+    cp work/default_scripts/kube-apiserver /etc/default/
+    cp work/default_scripts/kube-scheduler /etc/default/
+    cp work/default_scripts/kube-controller-manager /etc/default/
 }
 
 function cpMinion(){
 	# copy /etc/init files
-    cp init_conf/etcd.conf /etc/init/
-    cp init_conf/kubelet.conf /etc/init/
-    cp init_conf/flanneld.conf /etc/init/
-    cp init_conf/kube-proxy.conf /etc/init/
+    cp work/init_conf/etcd.conf /etc/init/etcd.conf
+    cp work/init_conf/kubelet.conf /etc/init/kubelet.conf
+    cp work/init_conf/flanneld.conf /etc/init/flanneld.conf
+    cp work/init_conf/kube-proxy.conf /etc/init/
 
     # copy /etc/initd/ files
-    cp initd_scripts/etcd /etc/init.d/
-    cp initd_scripts/flanneld /etc/init.d/
-    cp initd_scripts/kubelet /etc/init.d/
-    cp initd_scripts/kube-proxy /etc/init.d/
+    cp work/initd_scripts/etcd /etc/init.d/
+    cp work/initd_scripts/flanneld /etc/init.d/
+    cp work/initd_scripts/kubelet /etc/init.d/
+    cp work/initd_scripts/kube-proxy /etc/init.d/
 
     # copy default configs
-    cp default_scripts/etcd /etc/default/
-    cp default_scripts/flanneld /etc/default/
-    cp default_scripts/kube-proxy /etc/default
-    cp default_scripts/kubelet /etc/default/
+    cp work/default_scripts/etcd /etc/default/
+    cp work/default_scripts/flanneld /etc/default/
+    cp work/default_scripts/kube-proxy /etc/default
+    cp work/default_scripts/kubelet /etc/default/
 }
 
 # check if input IP in machine list
@@ -71,7 +106,7 @@ function inList(){
 
 # set values in ETCD_OPTS
 function configEtcd(){
-    echo ETCD_OPTS=\"-name $1 -initial-advertise-peer-urls http://$2:2380 -listen-peer-urls http://$2:2380 -initial-cluster-token etcd-cluster-1 -initial-cluster $3 -initial-cluster-state new\" > default_scripts/etcd	
+    echo ETCD_OPTS=\"-name $1 -initial-advertise-peer-urls http://$2:2380 -listen-peer-urls http://$2:2380 -initial-cluster-token etcd-cluster-1 -initial-cluster $3 -initial-cluster-state new\" > work/default_scripts/etcd	
 }
 
 # check root
@@ -115,6 +150,7 @@ if [ "$etcdVersion" != "2.0.0" ]; then
 	exit 1
 fi
 
+do_backup_clean
 
 # use an array to record name and ip
 declare -A mm
@@ -162,19 +198,19 @@ while true; do
             inList $etcdName $myIP
             configEtcd $etcdName $myIP $cluster
             # For minion set MINION IP in default_scripts/kubelet
-            sed -i "s/MY_IP/${myIP}/g" default_scripts/kubelet
-            sed -i "s/MASTER_IP/${masterIP}/g" default_scripts/kubelet         
-            sed -i "s/MASTER_IP/${masterIP}/g" default_scripts/kube-proxy        
+            sed -i "s/MY_IP/${myIP}/g" work/default_scripts/kubelet
+            sed -i "s/MASTER_IP/${masterIP}/g" work/default_scripts/kubelet
+            sed -i "s/MASTER_IP/${masterIP}/g" work/default_scripts/kube-proxy
             
             # For master set MINION IPs in kube-controller-manager
-            if [ -z "$minionIPs" ]; then
+	    if [ -z "$minionIPs" ]; then
                 #one node act as both minion and master role
                 minionIPs="$myIP"
             else
                 minionIPs="$minionIPs,$myIP"
             fi
 
-	        sed -i "s/MINION_IPS/${minionIPs}/g" default_scripts/kube-controller-manager
+	        sed -i "s/MINION_IPS/${minionIPs}/g" work/default_scripts/kube-controller-manager
 	        
 	        cpMaster
 	        cpMinion
@@ -188,7 +224,7 @@ while true; do
             inList $etcdName $myIP
             configEtcd $etcdName $myIP $cluster
             # set MINION IPs in kube-controller-manager
-            sed -i "s/MINION_IPS/${minionIPs}/g" default_scripts/kube-controller-manager
+            sed -i "s/MINION_IPS/${minionIPs}/g" work/default_scripts/kube-controller-manager
 	        cpMaster
 	        break
             ;;
@@ -200,9 +236,9 @@ while true; do
             inList $etcdName $myIP
             configEtcd $etcdName $myIP $cluster
             # set MINION IP in default_scripts/kubelet
-            sed -i "s/MY_IP/${myIP}/g" default_scripts/kubelet
-            sed -i "s/MASTER_IP/${masterIP}/g" default_scripts/kubelet
-            sed -i "s/MASTER_IP/${masterIP}/g" default_scripts/kube-proxy
+            sed -i "s/MY_IP/${myIP}/g" work/default_scripts/kubelet
+            sed -i "s/MASTER_IP/${masterIP}/g" work/default_scripts/kubelet
+            sed -i "s/MASTER_IP/${masterIP}/g" work/default_scripts/kube-proxy
 	        cpMinion
 	        break
 	        ;;
