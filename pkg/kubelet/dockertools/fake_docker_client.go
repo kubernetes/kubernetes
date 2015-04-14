@@ -22,9 +22,7 @@ import (
 	"reflect"
 	"sort"
 	"sync"
-	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/fsouza/go-dockerclient"
 )
@@ -330,20 +328,4 @@ func (f *FakeDockerPuller) IsImagePresent(name string) (bool, error) {
 		}
 	}
 	return false, nil
-}
-
-type FakeDockerCache struct {
-	getter podsGetter
-}
-
-func NewFakeDockerCache(getter podsGetter) DockerCache {
-	return &FakeDockerCache{getter: getter}
-}
-
-func (f *FakeDockerCache) GetPods() ([]*container.Pod, error) {
-	return f.getter.GetPods(false)
-}
-
-func (f *FakeDockerCache) ForceUpdateIfOlder(time.Time) error {
-	return nil
 }
