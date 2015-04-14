@@ -41,7 +41,7 @@ func getResourceRequirements(cpu, memory string) api.ResourceRequirements {
 func TestAdmissionIgnoresDelete(t *testing.T) {
 	namespace := "default"
 	handler := NewResourceQuota(&testclient.Fake{})
-	err := handler.Admit(admission.NewAttributesRecord(nil, namespace, "pods", "DELETE"))
+	err := handler.Admit(admission.NewAttributesRecord(nil, "Pod", namespace, "pods", "DELETE"))
 	if err != nil {
 		t.Errorf("ResourceQuota should admit all deletes", err)
 	}
@@ -67,7 +67,7 @@ func TestIncrementUsagePods(t *testing.T) {
 	r := api.ResourcePods
 	status.Hard[r] = resource.MustParse("2")
 	status.Used[r] = resource.MustParse("1")
-	dirty, err := IncrementUsage(admission.NewAttributesRecord(&api.Pod{}, namespace, "pods", "CREATE"), status, client)
+	dirty, err := IncrementUsage(admission.NewAttributesRecord(&api.Pod{}, "Pod", namespace, "pods", "CREATE"), status, client)
 	if err != nil {
 		t.Errorf("Unexpected error", err)
 	}
@@ -107,7 +107,7 @@ func TestIncrementUsageMemory(t *testing.T) {
 			Volumes:    []api.Volume{{Name: "vol"}},
 			Containers: []api.Container{{Name: "ctr", Image: "image", Resources: getResourceRequirements("100m", "1Gi")}},
 		}}
-	dirty, err := IncrementUsage(admission.NewAttributesRecord(newPod, namespace, "pods", "CREATE"), status, client)
+	dirty, err := IncrementUsage(admission.NewAttributesRecord(newPod, "Pod", namespace, "pods", "CREATE"), status, client)
 	if err != nil {
 		t.Errorf("Unexpected error", err)
 	}
@@ -148,7 +148,7 @@ func TestExceedUsageMemory(t *testing.T) {
 			Volumes:    []api.Volume{{Name: "vol"}},
 			Containers: []api.Container{{Name: "ctr", Image: "image", Resources: getResourceRequirements("100m", "3Gi")}},
 		}}
-	_, err := IncrementUsage(admission.NewAttributesRecord(newPod, namespace, "pods", "CREATE"), status, client)
+	_, err := IncrementUsage(admission.NewAttributesRecord(newPod, "Pod", namespace, "pods", "CREATE"), status, client)
 	if err == nil {
 		t.Errorf("Expected memory usage exceeded error")
 	}
@@ -181,7 +181,7 @@ func TestIncrementUsageCPU(t *testing.T) {
 			Volumes:    []api.Volume{{Name: "vol"}},
 			Containers: []api.Container{{Name: "ctr", Image: "image", Resources: getResourceRequirements("100m", "1Gi")}},
 		}}
-	dirty, err := IncrementUsage(admission.NewAttributesRecord(newPod, namespace, "pods", "CREATE"), status, client)
+	dirty, err := IncrementUsage(admission.NewAttributesRecord(newPod, "Pod", namespace, "pods", "CREATE"), status, client)
 	if err != nil {
 		t.Errorf("Unexpected error", err)
 	}
@@ -222,7 +222,7 @@ func TestExceedUsageCPU(t *testing.T) {
 			Volumes:    []api.Volume{{Name: "vol"}},
 			Containers: []api.Container{{Name: "ctr", Image: "image", Resources: getResourceRequirements("500m", "1Gi")}},
 		}}
-	_, err := IncrementUsage(admission.NewAttributesRecord(newPod, namespace, "pods", "CREATE"), status, client)
+	_, err := IncrementUsage(admission.NewAttributesRecord(newPod, "Pod", namespace, "pods", "CREATE"), status, client)
 	if err == nil {
 		t.Errorf("Expected CPU usage exceeded error")
 	}
@@ -248,7 +248,7 @@ func TestExceedUsagePods(t *testing.T) {
 	r := api.ResourcePods
 	status.Hard[r] = resource.MustParse("1")
 	status.Used[r] = resource.MustParse("1")
-	_, err := IncrementUsage(admission.NewAttributesRecord(&api.Pod{}, namespace, "pods", "CREATE"), status, client)
+	_, err := IncrementUsage(admission.NewAttributesRecord(&api.Pod{}, "Pod", namespace, "pods", "CREATE"), status, client)
 	if err == nil {
 		t.Errorf("Expected error because this would exceed your quota")
 	}
@@ -270,7 +270,7 @@ func TestIncrementUsageServices(t *testing.T) {
 	r := api.ResourceServices
 	status.Hard[r] = resource.MustParse("2")
 	status.Used[r] = resource.MustParse("1")
-	dirty, err := IncrementUsage(admission.NewAttributesRecord(&api.Service{}, namespace, "services", "CREATE"), status, client)
+	dirty, err := IncrementUsage(admission.NewAttributesRecord(&api.Service{}, "Service", namespace, "services", "CREATE"), status, client)
 	if err != nil {
 		t.Errorf("Unexpected error", err)
 	}
@@ -299,7 +299,7 @@ func TestExceedUsageServices(t *testing.T) {
 	r := api.ResourceServices
 	status.Hard[r] = resource.MustParse("1")
 	status.Used[r] = resource.MustParse("1")
-	_, err := IncrementUsage(admission.NewAttributesRecord(&api.Service{}, namespace, "services", "CREATE"), status, client)
+	_, err := IncrementUsage(admission.NewAttributesRecord(&api.Service{}, "Service", namespace, "services", "CREATE"), status, client)
 	if err == nil {
 		t.Errorf("Expected error because this would exceed usage")
 	}
@@ -321,7 +321,7 @@ func TestIncrementUsageReplicationControllers(t *testing.T) {
 	r := api.ResourceReplicationControllers
 	status.Hard[r] = resource.MustParse("2")
 	status.Used[r] = resource.MustParse("1")
-	dirty, err := IncrementUsage(admission.NewAttributesRecord(&api.ReplicationController{}, namespace, "replicationControllers", "CREATE"), status, client)
+	dirty, err := IncrementUsage(admission.NewAttributesRecord(&api.ReplicationController{}, "ReplicationController", namespace, "replicationControllers", "CREATE"), status, client)
 	if err != nil {
 		t.Errorf("Unexpected error", err)
 	}
@@ -350,7 +350,7 @@ func TestExceedUsageReplicationControllers(t *testing.T) {
 	r := api.ResourceReplicationControllers
 	status.Hard[r] = resource.MustParse("1")
 	status.Used[r] = resource.MustParse("1")
-	_, err := IncrementUsage(admission.NewAttributesRecord(&api.ReplicationController{}, namespace, "replicationControllers", "CREATE"), status, client)
+	_, err := IncrementUsage(admission.NewAttributesRecord(&api.ReplicationController{}, "ReplicationController", namespace, "replicationControllers", "CREATE"), status, client)
 	if err == nil {
 		t.Errorf("Expected error for exceeding hard limits")
 	}

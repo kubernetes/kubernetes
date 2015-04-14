@@ -178,6 +178,23 @@ func (resourceAccessor) SetName(obj runtime.Object, name string) error {
 	return nil
 }
 
+func (resourceAccessor) GenerateName(obj runtime.Object) (string, error) {
+	accessor, err := Accessor(obj)
+	if err != nil {
+		return "", err
+	}
+	return accessor.GenerateName(), nil
+}
+
+func (resourceAccessor) SetGenerateName(obj runtime.Object, name string) error {
+	accessor, err := Accessor(obj)
+	if err != nil {
+		return err
+	}
+	accessor.SetGenerateName(name)
+	return nil
+}
+
 func (resourceAccessor) UID(obj runtime.Object) (types.UID, error) {
 	accessor, err := Accessor(obj)
 	if err != nil {
@@ -268,6 +285,7 @@ func (resourceAccessor) SetResourceVersion(obj runtime.Object, version string) e
 type genericAccessor struct {
 	namespace       *string
 	name            *string
+	generateName    *string
 	uid             *types.UID
 	apiVersion      *string
 	kind            *string
@@ -303,6 +321,20 @@ func (a genericAccessor) SetName(name string) {
 		return
 	}
 	*a.name = name
+}
+
+func (a genericAccessor) GenerateName() string {
+	if a.generateName == nil {
+		return ""
+	}
+	return *a.generateName
+}
+
+func (a genericAccessor) SetGenerateName(generateName string) {
+	if a.generateName == nil {
+		return
+	}
+	*a.generateName = generateName
 }
 
 func (a genericAccessor) UID() types.UID {
@@ -390,6 +422,9 @@ func extractFromObjectMeta(v reflect.Value, a *genericAccessor) error {
 		return err
 	}
 	if err := runtime.FieldPtr(v, "Name", &a.name); err != nil {
+		return err
+	}
+	if err := runtime.FieldPtr(v, "GenerateName", &a.generateName); err != nil {
 		return err
 	}
 	if err := runtime.FieldPtr(v, "UID", &a.uid); err != nil {
