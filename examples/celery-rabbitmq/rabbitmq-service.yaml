@@ -1,0 +1,14 @@
+apiVersion: v1beta3
+kind: Service
+metadata:
+  labels:
+    name: rabbitmq
+  name: rabbitmq-service
+spec:
+  ports:
+  - port: 5672
+    protocol: TCP
+    targetPort: 5672
+  selector:
+    app: taskQueue
+    component: rabbitmq
