@@ -56,7 +56,8 @@ or
 sudo systemctl stop docker
 ```
 
-or it may be something else.
+and if you started the process above using sh, you will probably have to find the running process and kill it manually.
+
 
 #### Run flannel
 
@@ -71,6 +72,9 @@ Now get the subnet settings from flannel:
 ```
 sudo docker -H unix:///var/run/docker-bootstrap.sock exec <really-long-hash-from-above-here> cat /run/flannel/subnet.env
 ```
+
+_Note:_ if you ran your bootstrap environment using ps, you might need to run through the etcd steps again, in order for /run/flannel/* to exist. 
+
 
 #### Edit the docker configuration
 You now need to edit the docker configuration to activate new flags.  Again, this is system specific.
