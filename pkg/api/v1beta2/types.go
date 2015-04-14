@@ -496,7 +496,10 @@ type Container struct {
 	// Optional: Policy for pulling images for this container
 	ImagePullPolicy PullPolicy `json:"imagePullPolicy" description:"image pull policy; one of PullAlways, PullNever, PullIfNotPresent; defaults to PullAlways if :latest tag is specified, or PullIfNotPresent otherwise; cannot be updated"`
 	// Optional: Capabilities for container.
+	//TODO: refactor to SecurityContext
 	Capabilities Capabilities `json:"capabilities,omitempty" description:"capabilities for container; cannot be updated"`
+	// SecurityContext defines the security context the pod should run with
+	SecurityContext *SecurityContext `json:"securityContext,omitempty"`
 }
 
 const (
@@ -1688,3 +1691,100 @@ type ComponentStatusList struct {
 
 	Items []ComponentStatus `json:"items" description:"list of component status objects"`
 }
+
+// SecurityContext holds security configuration that will be applied to a container.  If a security context
+// is set on the container spec then it must comply with any constraints defined in the SecurityConstraints context
+// it is running in.  If a security context is not supplied and the pod is running under a SecurityConstraints context
+// then a default SecurityContext may be applied.
+type SecurityContext struct {
+	// Capabilities are the capabilities to add/drop when running the container
+	// TODO: will need to refactor this from the container spec to here
+	Capabilities *Capabilities `json:"capabilities,omitempty"`
+
+	// Run the container in privileged mode
+	// TODO: will need to refactor this from the container spec to here
+	Privileged bool `json:"privileged,omitempty"`
+
+	// SELinuxOptions are the labels to be applied to the container
+	// and volumes
+	SELinuxOptions *SELinuxOptions `json:"seLinuxOptions,omitempty"`
+}
+
+// SELinuxOptions are the labels to be applied to the container
+type SELinuxOptions struct {
+	// User --security-opt="label:user:USER"
+	User string `json:"user,omitempty"`
+
+	// Role --security-opt="label:role:ROLE"
+	Role string `json:"role,omitempty"`
+
+	// Type --security-opt="label:type:TYPE"
+	Type string `json:"type,omitempty"`
+
+	// Level --security-opt="label:level:LEVEL"
+	Level string `json:"level,omitempty"`
+
+	// Disabled --security-opt="label:disable"
+	Disabled bool `json:"disabled,omitempty"`
+}
+
+// SecurityConstraints provides the constraints that at security context provider will
+// ensure that applied SecurityContext requests follow.  When a setting is provided in the SecurityConstraints
+// that conflicts with an actual request it will be implementation specific whether that request is
+// ignored and the container is still run (without the requested constraint) or if the container will be failed
+type SecurityConstraints struct {
+	// EnforcementPolicy will drive behavior for how the constraints are enforce
+	EnforcementPolicy SecurityConstraintPolicy `json:"enforcementPolicy,omitempty"`
+
+	// AllowPrivileged indicates whether this context allows privileged mode containers
+	AllowPrivileged bool `json:"allowPrivileged,omitempty"`
+
+	// SELinux provides the security constraint options for selinux
+	SELinux *SELinuxSecurityConstraints `json:"seLinux,omitempty"`
+
+	// AllowCapabilities dictates if a container can request to add or drop capabilites
+	AllowCapabilities bool `json:"allowCapabilities,omitempty"`
+
+	// Capabilities represents, if AllowCapabilities is true, the caps that requests
+	// are allowed to add or drop.
+	Capabilities *Capabilities `json:"capabilities,omitempty"`
+
+	// DefaultSecurityContext is applied to any container that does not have a security context set.  It must
+	// also conform to the constraints defined in SecurityConstraints object
+	DefaultSecurityContext *SecurityContext `json:"defaultSecurityContext,omitempty"`
+}
+
+// SELinuxSecurityConstraints defines what is allowed in SecurityContext requests with regards to SELinux label options
+// that are currently supported by docker
+type SELinuxSecurityConstraints struct {
+	// AllowUserLabel --security-opt="label:user:USER"
+	AllowUserLabel bool `json:"allowUserLabel,omitempty"`
+
+	// AllowRoleLabel --security-opt="label:role:ROLE"
+	AllowRoleLabel bool `json:"allowRoleLabel,omitempty"`
+
+	// AllowTypeLabel --security-opt="label:type:TYPE"
+	AllowTypeLabel bool `json:"allowTypeLabel,omitempty"`
+
+	// AllowLevelLabel --security-opt="label:level:LEVEL"
+	AllowLevelLabel bool `json:"allowLevelLabel,omitempty"`
+
+	// AllowDisable --security-opt="label:disable"
+	AllowDisable bool `json:"allowDisable,omitempty"`
+}
+
+// SecurityConstraintPolicy dictates how the security context provider should behave with regards to contexts that
+// do not meet the requirements of the policy.
+type SecurityConstraintPolicy string
+
+const (
+	// SecurityConstraintPolicyDisabled means that any containers that do not meet policy constraints are still
+	// allowed to run and will be given their requested permissions.  This could be used if an admin needs to allow
+	// a pod to run for testing without deleting and recreating the policy.  Implementation may log warnings for
+	// permission requests that do not comply with the policy that would be enforced
+	SecurityConstraintPolicyDisable = "Disable"
+
+	// SecurityConstraintPolicyReject means that any containers that do not meet policy constraints will be rejected
+	// (in the case of the api server) or not run (in the case of the kubelet)
+	SecurityConstraintPolicyReject = "Reject"
+)

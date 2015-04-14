@@ -579,6 +579,9 @@ func init() {
 			if err := s.Convert(&in.Capabilities, &out.Capabilities, 0); err != nil {
 				return err
 			}
+			if err := s.Convert(&in.SecurityContext, &out.SecurityContext, 0); err != nil {
+				return err
+			}
 			return nil
 		},
 		// Internal API does not support CPU to be specified via an explicit field.
@@ -663,6 +666,9 @@ func init() {
 				return err
 			}
 			if err := s.Convert(&in.Capabilities, &out.Capabilities, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.SecurityContext, &out.SecurityContext, 0); err != nil {
 				return err
 			}
 			return nil
