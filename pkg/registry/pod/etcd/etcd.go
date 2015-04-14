@@ -204,7 +204,8 @@ var _ = rest.GetterWithOptions(&LogREST{})
 
 // New creates a new Pod log options object
 func (r *LogREST) New() runtime.Object {
-	return &api.PodLogOptions{}
+	// TODO - return a resource that represents a log
+	return &api.Pod{}
 }
 
 // Get retrieves a runtime.Object that will stream the contents of the pod log

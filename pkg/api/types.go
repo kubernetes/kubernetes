@@ -1304,6 +1304,37 @@ type PodLogOptions struct {
 	Follow bool
 }
 
+// PodExecOptions is the query options to a Pod's remote exec call
+type PodExecOptions struct {
+	TypeMeta
+
+	// Stdin if true indicates that stdin is to be redirected for the exec call
+	Stdin bool
+
+	// Stdout if true indicates that stdout is to be redirected for the exec call
+	Stdout bool
+
+	// Stderr if true indicates that stderr is to be redirected for the exec call
+	Stderr bool
+
+	// TTY if true indicates that a tty will be allocated for the exec call
+	TTY bool
+
+	// Container in which to execute the command.
+	Container string
+
+	// Command is the remote command to execute
+	Command string
+}
+
+// PodProxyOptions is the query options to a Pod's proxy call
+type PodProxyOptions struct {
+	TypeMeta
+
+	// Path is the URL path to use for the current proxy request
+	Path string
+}
+
 // Status is a return value for calls that don't return other objects.
 // TODO: this could go in apiserver, but I'm including it here so clients needn't
 // import both.

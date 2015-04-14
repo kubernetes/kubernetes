@@ -125,7 +125,14 @@ func init() {
 	}
 
 	// these kinds should be excluded from the list of resources
-	ignoredKinds := util.NewStringSet("ListOptions", "DeleteOptions", "Status", "ContainerManifest")
+	ignoredKinds := util.NewStringSet(
+		"ListOptions",
+		"DeleteOptions",
+		"Status",
+		"ContainerManifest",
+		"PodLogOptions",
+		"PodExecOptions",
+		"PodProxyOptions")
 
 	// enumerate all supported versions, get the kinds, and register with the mapper how to address our resources
 	for _, version := range versions {
