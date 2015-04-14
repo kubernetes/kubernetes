@@ -1001,17 +1001,6 @@ func (kl *Kubelet) shouldContainerBeRestarted(container *api.Container, pod *api
 	return true
 }
 
-// Finds an infra container for a pod given by podFullName and UID in dockerContainers. If there is an infra container
-// return its ID and true, otherwise it returns empty ID and false.
-func (kl *Kubelet) getPodInfraContainer(podFullName string, uid types.UID,
-	dockerContainers dockertools.DockerContainers) (dockertools.DockerID, bool) {
-	if podInfraDockerContainer, found, _ := dockerContainers.FindPodContainer(podFullName, uid, dockertools.PodInfraContainerName); found {
-		podInfraContainerID := dockertools.DockerID(podInfraDockerContainer.ID)
-		return podInfraContainerID, true
-	}
-	return "", false
-}
-
 // Attempts to start a container pulling the image before that if necessary. It returns DockerID of a started container
 // if it was successful, and a non-nil error otherwise.
 func (kl *Kubelet) pullImageAndRunContainer(pod *api.Pod, container *api.Container, podVolumes *volumeMap,
