@@ -78,7 +78,14 @@ func main() {
 	if err != nil {
 		log.Fatalf("Couldn't read from input: %q", err)
 	}
+	isYAML := isYAML(data)
 
+	if isYAML {
+		data, err = yaml.YAMLToJSON(data)
+		if err != nil {
+			log.Fatalf("Failed to convert YAML to JSON: %q", err)
+		}
+	}
 	obj, err := api.Scheme.Decode(data)
 	if err != nil {
 		log.Fatalf("Couldn't decode input: %q", err)
@@ -89,7 +96,7 @@ func main() {
 		log.Fatalf("Failed to encode to version %q: %q", *outputVersion, err)
 	}
 
-	if isYAML(data) {
+	if isYAML {
 		outData, err = yaml.JSONToYAML(outData)
 		if err != nil {
 			log.Fatalf("Failed to convert to YAML: %q", err)
