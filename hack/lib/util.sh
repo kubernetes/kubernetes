@@ -138,7 +138,7 @@ kube::util::gen-doc() {
   # generate the new files
   ${cmd} "${tmpdir}"
   # create the list of generated files
-  ls "${tmpdir}" | sort > "${tmpdir}/.files_generated"
+  ls "${tmpdir}" | LC_ALL=C sort > "${tmpdir}/.files_generated"
   # put the new generated file into the destination
   find "${tmpdir}" -exec rsync -pt {} "${dest}" \; >/dev/null
   #cleanup
