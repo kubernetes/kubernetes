@@ -39,10 +39,6 @@ nav:
    url: /community
    slug: community
    external: false
- - label: News
-   url: /news
-   slug: news
-   external: false
  - label: Events
    url: /events
    slug: events
