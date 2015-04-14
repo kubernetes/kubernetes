@@ -41,3 +41,6 @@ To rebuild the UI, run the following:
 ```sh
 hack/build-ui.sh
 ```
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/ui.md?pixel)]()

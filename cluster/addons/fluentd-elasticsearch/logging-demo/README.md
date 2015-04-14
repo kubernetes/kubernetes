@@ -162,3 +162,6 @@ $ curl http://104.154.81.135:9200
 }
 ```
 Visiting the URL `http://104.154.91.224:5601` should show the Kibana viewer for the logging information stored in the Elasticsearch service running at `http://104.154.81.135:9200`.
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/cluster/addons/fluentd-elasticsearch/logging-demo/README.md?pixel)]()

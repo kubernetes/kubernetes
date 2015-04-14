@@ -22,3 +22,6 @@ Possible information that could be recorded in annotations:
 * phone/pager number(s) of person(s) responsible, or directory entry where that info could be found, such as a team website
 
 Yes, this information could be stored in an external database or directory, but that would make it much harder to produce shared client libraries and tools for deployment, management, introspection, etc.
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/annotations.md?pixel)]()

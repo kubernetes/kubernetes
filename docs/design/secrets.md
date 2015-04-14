@@ -558,3 +558,6 @@ source.  Both containers will have the following files present on their filesyst
 
     /etc/secret-volume/username
     /etc/secret-volume/password
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/design/secrets.md?pixel)]()

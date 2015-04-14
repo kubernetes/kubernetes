@@ -61,3 +61,6 @@ $ kubectl config set-context gce --user=cluster-admin
 ### SEE ALSO
 * [kubectl-config](kubectl-config.md)
 
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/kubectl-config-set-context.md?pixel)]()

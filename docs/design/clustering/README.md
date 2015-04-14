@@ -24,3 +24,5 @@ If you are using boot2docker and get warnings about clock skew (or if things are
 ## Automatically rebuild on file changes
 
 If you have the fswatch utility installed, you can have it monitor the file system and automatically rebuild when files have changed.  Just do a `make watch`.
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/design/clustering/README.md?pixel)]()

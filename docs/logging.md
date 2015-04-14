@@ -45,3 +45,6 @@ When using Elasticsearch the number of Elasticsearch instances can be controlled
 variable `ELASTICSEARCH_LOGGING_REPLICAS` which has the default value of `1`. For large clusters
 or clusters that are generating log information at a high rate you may wish to use more
 Elasticsearch instances.
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/logging.md?pixel)]()

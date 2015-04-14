@@ -23,3 +23,6 @@ least one maintainer on relevant issues and PRs.
 ## hack/local-up-cluster.sh
 
 * [Clayton Coleman](https://github.com/smarterclayton)
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/MAINTAINERS.md?pixel)]()

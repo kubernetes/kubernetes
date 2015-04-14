@@ -78,3 +78,6 @@ $ kubectl run-container nginx --image=dockerfile/nginx --overrides='{ "apiVersio
 ### SEE ALSO
 * [kubectl](kubectl.md)
 
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/kubectl-run-container.md?pixel)]()

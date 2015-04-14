@@ -51,3 +51,6 @@ Definition of columns:
     - **Commercial**: A commercial offering with its own support arrangements.
     - **Community**: Actively supported by community contributions. May not work with more recent releases of kubernetes.
     - **Inactive**: No active maintainer.  Not recommended for first-time K8s users, and may be deleted soon.
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/getting-started-guides/README.md?pixel)]()

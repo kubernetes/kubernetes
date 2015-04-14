@@ -82,3 +82,6 @@ $ kubectl expose streamer --port=4100 --protocol=udp --service-name=video-stream
 ### SEE ALSO
 * [kubectl](kubectl.md)
 
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/kubectl-expose.md?pixel)]()
