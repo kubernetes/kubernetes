@@ -4,7 +4,10 @@ metadata:
   name: pv0003
 spec:
   capacity:
-    storage: 10
+    storage: 10Gi
+  accessModes:
+    - ReadWriteOnce
+      ReadOnlyMany
   gcePersistentDisk:
     pdName: "abc123"
     fsType: "ext4"
