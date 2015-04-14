@@ -4117,3 +4117,90 @@ func TestGetPodCreationFailureReason(t *testing.T) {
 		}
 	}
 }
+
+func TestGetRestartCount(t *testing.T) {
+	testKubelet := newTestKubelet(t)
+	testKubelet.fakeCadvisor.On("MachineInfo").Return(&cadvisorApi.MachineInfo{}, nil)
+	kubelet := testKubelet.kubelet
+	fakeDocker := testKubelet.fakeDocker
+
+	containers := []api.Container{
+		{Name: "bar"},
+	}
+	pod := api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			UID:       "12345678",
+			Name:      "foo",
+			Namespace: "new",
+		},
+		Spec: api.PodSpec{
+			Containers: containers,
+		},
+	}
+
+	// format is // k8s_<container-id>_<pod-fullname>_<pod-uid>
+	names := []string{"/k8s_bar." + strconv.FormatUint(dockertools.HashContainer(&containers[0]), 16) + "_foo_new_12345678_0"}
+	currTime := time.Now()
+	containerMap := map[string]*docker.Container{
+		"1234": {
+			ID:     "1234",
+			Name:   "bar",
+			Config: &docker.Config{},
+			State: docker.State{
+				ExitCode:   42,
+				StartedAt:  currTime.Add(-60 * time.Second),
+				FinishedAt: currTime.Add(-60 * time.Second),
+			},
+		},
+		"5678": {
+			ID:     "5678",
+			Name:   "bar",
+			Config: &docker.Config{},
+			State: docker.State{
+				ExitCode:   42,
+				StartedAt:  currTime.Add(-30 * time.Second),
+				FinishedAt: currTime.Add(-30 * time.Second),
+			},
+		},
+		"9101": {
+			ID:     "9101",
+			Name:   "bar",
+			Config: &docker.Config{},
+			State: docker.State{
+				ExitCode:   42,
+				StartedAt:  currTime.Add(30 * time.Minute),
+				FinishedAt: currTime.Add(30 * time.Minute),
+			},
+		},
+	}
+	fakeDocker.ContainerMap = containerMap
+
+	// Helper function for verifying the restart count.
+	verifyRestartCount := func(pod *api.Pod, expectedCount int) api.PodStatus {
+		status, err := kubelet.generatePodStatus(pod)
+		if err != nil {
+			t.Errorf("unexpected error %v", err)
+		}
+		restartCount := status.ContainerStatuses[0].RestartCount
+		if restartCount != expectedCount {
+			t.Errorf("expected %d restart count, got %d", expectedCount, restartCount)
+		}
+		return status
+	}
+
+	// Container "bar" has failed twice; create two dead docker containers.
+	// TODO: container lists are expected to be sorted reversely by time.
+	// We should fix FakeDockerClient to sort the list before returning.
+	fakeDocker.ExitedContainerList = []docker.APIContainers{{Names: names, ID: "5678"}, {Names: names, ID: "1234"}}
+	pod.Status = verifyRestartCount(&pod, 1)
+
+	// Found a new dead container. The restart count should be incremented.
+	fakeDocker.ExitedContainerList = []docker.APIContainers{
+		{Names: names, ID: "9101"}, {Names: names, ID: "5678"}, {Names: names, ID: "1234"}}
+	pod.Status = verifyRestartCount(&pod, 2)
+
+	// All dead containers have been GC'd. The restart count should persist
+	// (i.e., remain the same).
+	fakeDocker.ExitedContainerList = []docker.APIContainers{}
+	verifyRestartCount(&pod, 2)
+}

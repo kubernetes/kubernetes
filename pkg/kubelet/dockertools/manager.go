@@ -231,8 +231,17 @@ func (self *DockerManager) GetPodStatus(pod *api.Pod) (*api.PodStatus, error) {
 	uid := pod.UID
 	manifest := pod.Spec
 
+	oldStatuses := make(map[string]api.ContainerStatus, len(pod.Spec.Containers))
+	lastObservedTime := make(map[string]util.Time, len(pod.Spec.Containers))
+	for _, status := range pod.Status.ContainerStatuses {
+		oldStatuses[status.Name] = status
+		if status.LastTerminationState.Termination != nil {
+			lastObservedTime[status.Name] = status.LastTerminationState.Termination.FinishedAt
+		}
+	}
+
 	var podStatus api.PodStatus
-	statuses := make(map[string]api.ContainerStatus)
+	statuses := make(map[string]*api.ContainerStatus, len(pod.Spec.Containers))
 
 	expectedContainers := make(map[string]api.Container)
 	for _, container := range manifest.Containers {
@@ -245,6 +254,10 @@ func (self *DockerManager) GetPodStatus(pod *api.Pod) (*api.PodStatus, error) {
 		return nil, err
 	}
 
+	containerDone := util.NewStringSet()
+	// Loop through list of running and exited docker containers to construct
+	// the statuses. We assume docker returns a list of containers sorted in
+	// reverse by time.
 	for _, value := range containers {
 		if len(value.Names) == 0 {
 			continue
@@ -261,30 +274,44 @@ func (self *DockerManager) GetPodStatus(pod *api.Pod) (*api.PodStatus, error) {
 		}
 		dockerContainerName := dockerName.ContainerName
 		c, found := expectedContainers[dockerContainerName]
-		terminationMessagePath := ""
 		if !found {
-			// TODO(dchen1107): should figure out why not continue here
-			// continue
-		} else {
-			terminationMessagePath = c.TerminationMessagePath
+			continue
 		}
-		// We assume docker return us a list of containers in time order
-		if containerStatus, found := statuses[dockerContainerName]; found {
-			// Populate last termination state
-			if containerStatus.LastTerminationState.Termination == nil {
-				result := self.inspectContainer(value.ID, dockerContainerName, terminationMessagePath)
-				if result.err == nil && result.status.State.Termination != nil {
-					containerStatus.LastTerminationState = result.status.State
-				}
-			}
-			containerStatus.RestartCount += 1
-			statuses[dockerContainerName] = containerStatus
+		terminationMessagePath := c.TerminationMessagePath
+		if containerDone.Has(dockerContainerName) {
 			continue
 		}
 
+		var terminationState *api.ContainerState = nil
+		// Inspect the container.
 		result := self.inspectContainer(value.ID, dockerContainerName, terminationMessagePath)
 		if result.err != nil {
 			return nil, result.err
+		} else if result.status.State.Termination != nil {
+			terminationState = &result.status.State
+		}
+
+		if containerStatus, found := statuses[dockerContainerName]; found {
+			if containerStatus.LastTerminationState.Termination == nil && terminationState != nil {
+				// Populate the last termination state.
+				containerStatus.LastTerminationState = *terminationState
+			}
+			count := true
+			// Only count dead containers terminated after last time we observed,
+			if lastObservedTime, ok := lastObservedTime[dockerContainerName]; ok {
+				if terminationState != nil && terminationState.Termination.FinishedAt.After(lastObservedTime.Time) {
+					count = false
+				} else {
+					// The container finished before the last observation. No
+					// need to examine/count the older containers. Mark the
+					// container name as done.
+					containerDone.Insert(dockerContainerName)
+				}
+			}
+			if count {
+				containerStatus.RestartCount += 1
+			}
+			continue
 		}
 
 		if dockerContainerName == PodInfraContainerName {
@@ -294,44 +321,54 @@ func (self *DockerManager) GetPodStatus(pod *api.Pod) (*api.PodStatus, error) {
 			}
 		} else {
 			// Add user container information.
-			statuses[dockerContainerName] = result.status
+			if oldStatus, found := oldStatuses[dockerContainerName]; found {
+				// Use the last observed restart count if it's available.
+				result.status.RestartCount = oldStatus.RestartCount
+			}
+			statuses[dockerContainerName] = &result.status
 		}
 	}
 
+	// Handle the containers for which we cannot find any associated active or
+	// dead docker containers.
 	for _, container := range manifest.Containers {
+		if _, found := statuses[container.Name]; found {
+			continue
+		}
 		var containerStatus api.ContainerStatus
-		if status, found := statuses[container.Name]; found {
-			containerStatus = status
-		} else {
-			// The container has not been created yet. Check image is ready on
-			// the node or not.
-			// TODO: If we integrate DockerPuller into DockerManager, we can
-			// record the pull failure and eliminate the image checking below.
-			image := container.Image
-			// TODO(dchen1107): docker/docker/issues/8365 to figure out if the image exists
-			_, err := self.client.InspectImage(image)
-			if err == nil {
-				containerStatus.State.Waiting = &api.ContainerStateWaiting{
-					Reason: fmt.Sprintf("Image: %s is ready, container is creating", image),
-				}
-			} else if err == docker.ErrNoSuchImage {
-				containerStatus.State.Waiting = &api.ContainerStateWaiting{
-					Reason: fmt.Sprintf("Image: %s is not ready on the node", image),
-				}
+		if oldStatus, found := oldStatuses[container.Name]; found {
+			// Some states may be lost due to GC; apply the last observed
+			// values if possible.
+			containerStatus.RestartCount = oldStatus.RestartCount
+			containerStatus.LastTerminationState = oldStatus.LastTerminationState
+		}
+		//Check image is ready on the node or not.
+		// TODO: If we integrate DockerPuller into DockerManager, we can
+		// record the pull failure and eliminate the image checking below.
+		image := container.Image
+		// TODO(dchen1107): docker/docker/issues/8365 to figure out if the image exists
+		_, err := self.client.InspectImage(image)
+		if err == nil {
+			containerStatus.State.Waiting = &api.ContainerStateWaiting{
+				Reason: fmt.Sprintf("Image: %s is ready, container is creating", image),
+			}
+		} else if err == docker.ErrNoSuchImage {
+			containerStatus.State.Waiting = &api.ContainerStateWaiting{
+				Reason: fmt.Sprintf("Image: %s is not ready on the node", image),
 			}
 		}
-		if containerStatus.State.Waiting != nil {
-			// For containers in the waiting state, fill in a specific reason if it is recorded.
-			if reason, ok := self.reasonCache.Get(uid, container.Name); ok {
-				containerStatus.State.Waiting.Reason = reason
-			}
-		}
-		statuses[container.Name] = containerStatus
+		statuses[container.Name] = &containerStatus
 	}
 
 	podStatus.ContainerStatuses = make([]api.ContainerStatus, 0)
-	for _, status := range statuses {
-		podStatus.ContainerStatuses = append(podStatus.ContainerStatuses, status)
+	for containerName, status := range statuses {
+		if status.State.Waiting != nil {
+			// For containers in the waiting state, fill in a specific reason if it is recorded.
+			if reason, ok := self.reasonCache.Get(uid, containerName); ok {
+				status.State.Waiting.Reason = reason
+			}
+		}
+		podStatus.ContainerStatuses = append(podStatus.ContainerStatuses, *status)
 	}
 
 	return &podStatus, nil
