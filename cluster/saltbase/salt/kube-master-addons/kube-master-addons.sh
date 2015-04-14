@@ -14,11 +14,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
- while true; do
-  if which docker 1>/dev/null 2>&1; then
-    if docker load -i /srv/salt/kube-bins/kube-apiserver.tar 1>/dev/null 2>&1; then
-      break;
-    fi;
-  fi;
- done;
+# loadedImageFlags is a bit-flag to track which docker images loaded successfully.
+let loadedImageFlags=0;
+
+while true; do
+
+ if [ $loadedImageFlags == 3 ]; then break; fi;
+
+ if which docker 1>/dev/null 2>&1; then
+   if docker load -i /srv/salt/kube-bins/kube-apiserver.tar 1>/dev/null 2>&1; then
+     let loadedImageFlags="$loadedImageFlags|1";
+   fi;
+   if docker load -i /srv/salt/kube-bins/kube-scheduler.tar 1>/dev/null 2>&1; then
+     let loadedImageFlags="$loadedImageFlags|2";
+   fi;
+
+ fi;
+
+
+done;
 
