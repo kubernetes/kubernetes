@@ -72,3 +72,6 @@ SkyDNS to find.
 Kubernetes installs do not configure the nodes' resolv.conf files to use the
 cluster DNS by default, because that process is inherently distro-specific.
 This should probably be implemented eventually.
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/cluster/addons/dns/README.md?pixel)]()

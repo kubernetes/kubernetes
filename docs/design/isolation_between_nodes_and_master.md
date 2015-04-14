@@ -46,3 +46,6 @@ In general, option 4 is desirable in addition to option 3 as a mechanism to furt
 
 In all four options, compromise of a host will allow an attacker to imitate that host.  For attack vectors that are reproducible from inside containers (privilege escalation), an attacker can distribute himself to other hosts by requesting new containers be spun up.  In scenario 1, the cluster is totally compromised immediately.  In 2-1, the attacker can view all information about the cluster including keys or authorization data defined with pods.  In 2-2 and 3, the attacker must still distribute himself in order to get access to a large subset of information, and cannot see other data that is potentially located in etcd like side storage or system configuration.  For attack vectors that are not exploits, but instead allow network access to etcd, an attacker in 2ii has no ability to spread his influence, and is instead restricted to the subset of information on the host.  For 3-5, they can do nothing they could not do already (request access to the nodes / services endpoint) because the token is not visible to them on the host.
 
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/design/isolation_between_nodes_and_master.md?pixel)]()

@@ -104,3 +104,6 @@ That's it! Fleet will schedule the apiserver on one of your minions and once it'
 twitter @jeefy
 
 irc.freenode.net #kubernetes jeefy
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/contrib/recipes/docs/apiserver_hipache_registration.md?pixel)]()

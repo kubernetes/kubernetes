@@ -188,3 +188,6 @@ type IDMappingRange struct {
 #### Security Context Lifecycle
  
 The lifecycle of a security context will be tied to that of a service account. It is expected that a service account with a default security context will be created for every Kubernetes namespace (without administrator intervention). If resources need to be allocated when creating a security context (for example, assign a range of host uids/gids), a pattern such as [finalizers](https://github.com/GoogleCloudPlatform/kubernetes/issues/3585) can be used before declaring the security context / service account / namespace ready for use.
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/design/security_context.md?pixel)]()

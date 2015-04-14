@@ -41,3 +41,6 @@ the man pages inside the `docker/docs/man/man1` directory using
 Docker volumes. For more information on Docker volumes see the man page for
 `docker run` and also look at the article [Sharing Directories via Volumes]
 (http://docs.docker.com/use/working_with_volumes/).
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/man/README.md?pixel)]()

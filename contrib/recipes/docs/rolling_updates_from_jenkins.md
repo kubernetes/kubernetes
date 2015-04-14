@@ -55,3 +55,6 @@ When using a private docker registry as we are, the Jenkins slaves as well as th
 twitter @jeefy
 
 irc.freenode.net #kubernetes jeefy
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/contrib/recipes/docs/rolling_updates_from_jenkins.md?pixel)]()

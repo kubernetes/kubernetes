@@ -333,3 +333,5 @@ content associated from that namespace has been purged.  It performs a final DEL
 to remove that Namespace from the storage.
 
 At this point, all content associated with that Namespace, and the Namespace itself are gone.
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/design/namespaces.md?pixel)]()

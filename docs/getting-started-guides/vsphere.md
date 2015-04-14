@@ -78,3 +78,6 @@ The output of `kube-up.sh` displays the IP addresses of the VMs it deploys. You
 can log into any VM as the `kube` user to poke around and figure out what is
 going on (find yourself authorized with your SSH key, or use the password
 `kube` otherwise).
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/getting-started-guides/vsphere.md?pixel)]()

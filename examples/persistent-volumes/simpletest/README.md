@@ -67,3 +67,6 @@ myclaim-1           map[]                                   b16e91d6-c0ef-11e4-8
 myclaim-2           map[]                                   b41f4f0e-c0ef-11e4-8be4-80e6500a981e
 
 ```
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/persistent-volumes/simpletest/README.md?pixel)]()

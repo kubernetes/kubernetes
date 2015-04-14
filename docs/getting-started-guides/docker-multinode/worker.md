@@ -130,3 +130,6 @@ Make the API call to add the node, you should do this on the master node that yo
 ### Next steps
 
 Move on to [testing your cluster](testing.md) or [add another node](#adding-a-kubernetes-worker-node-via-docker)
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/getting-started-guides/docker-multinode/worker.md?pixel)]()
