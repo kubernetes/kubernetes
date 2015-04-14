@@ -222,9 +222,11 @@ func (f *FakeDockerClient) StopContainer(id string, timeout uint) error {
 		f.Stopped = append(f.Stopped, id)
 		var newList []docker.APIContainers
 		for _, container := range f.ContainerList {
-			if container.ID != id {
-				newList = append(newList, container)
+			if container.ID == id {
+				f.ExitedContainerList = append(f.ExitedContainerList, container)
+				continue
 			}
+			newList = append(newList, container)
 		}
 		f.ContainerList = newList
 	}

@@ -584,3 +584,37 @@ func (self *DockerManager) Pull(image string) error {
 func (self *DockerManager) IsImagePresent(image string) (bool, error) {
 	return self.Puller.IsImagePresent(image)
 }
+
+// PodInfraContainer returns true if the pod infra container has changed.
+func (self *DockerManager) PodInfraContainerChanged(pod *api.Pod, podInfraContainer *kubecontainer.Container) (bool, error) {
+	networkMode := ""
+	var ports []api.ContainerPort
+
+	dockerPodInfraContainer, err := self.client.InspectContainer(string(podInfraContainer.ID))
+	if err != nil {
+		return false, err
+	}
+
+	// Check network mode.
+	if dockerPodInfraContainer.HostConfig != nil {
+		networkMode = dockerPodInfraContainer.HostConfig.NetworkMode
+	}
+	if pod.Spec.HostNetwork {
+		if networkMode != "host" {
+			glog.V(4).Infof("host: %v, %v", pod.Spec.HostNetwork, networkMode)
+			return true, nil
+		}
+	} else {
+		// Docker only exports ports from the pod infra container. Let's
+		// collect all of the relevant ports and export them.
+		for _, container := range pod.Spec.Containers {
+			ports = append(ports, container.Ports...)
+		}
+	}
+	expectedPodInfraContainer := &api.Container{
+		Name:  PodInfraContainerName,
+		Image: self.PodInfraContainerImage,
+		Ports: ports,
+	}
+	return podInfraContainer.Hash != HashContainer(expectedPodInfraContainer), nil
+}
