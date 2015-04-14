@@ -966,6 +966,10 @@ func (kl *Kubelet) makePodDataDirs(pod *api.Pod) error {
 	return nil
 }
 
+// shouldContainerBeRestarted checks for the non-running containers and determines whether they should be
+// restart based on the exit state and restart policy. Currently if the spec changes after the container
+// has exited, then it will not be restarted.
+// TODO(yifan): Revisit this behaviour later.
 func (kl *Kubelet) shouldContainerBeRestarted(container *api.Container, pod *api.Pod, podStatus *api.PodStatus) bool {
 	podFullName := kubecontainer.GetPodFullName(pod)
 
@@ -1103,6 +1107,42 @@ func (kl *Kubelet) computePodContainerChanges(pod *api.Pod, runningPod kubeconta
 		return podContainerChangesSpec{}, err
 	}
 
+	// If we need to restart pod infra container, then we don't need to probe and check each
+	// container below because all containers will need to be restarted, except for those have
+	// run successfully.
+	if createPodInfraContainer {
+		// If restart policy is never, then we don't need to keep any containers,
+		// including the pod infra container.
+		// Note that containersToKeep and containersToStart are empty at this point.
+		if pod.Spec.RestartPolicy == api.RestartPolicyNever {
+			createPodInfraContainer = false
+		} else {
+			for index, container := range pod.Spec.Containers {
+				// Here are the cases where the container should be restarted:
+				// - It is running.
+				// - It has never existed.
+				// - It has exited and should be restarted.
+				// The last two cases are covered by shouldContainerBeRestarted().
+				c := runningPod.FindContainerByName(container.Name)
+				if c != nil || kl.shouldContainerBeRestarted(&container, pod, &podStatus) {
+					containersToStart[index] = empty{}
+				}
+			}
+			// If no container will be restarted, then we don't need to start the pod infra container.
+			// Currently this can happen when the spec changes after the containers have run successfully.
+			if len(containersToStart) == 0 {
+				createPodInfraContainer = false
+			}
+		}
+		return podContainerChangesSpec{
+			startInfraContainer: createPodInfraContainer,
+			infraContainerId:    podInfraContainerID,
+			containersToStart:   containersToStart,
+			containersToKeep:    containersToKeep,
+		}, nil
+	}
+
+	// After this point, createPodInfraContainer == false.
 	for index, container := range pod.Spec.Containers {
 		expectedHash := dockertools.HashContainer(&container)
 
@@ -1112,38 +1152,26 @@ func (kl *Kubelet) computePodContainerChanges(pod *api.Pod, runningPod kubeconta
 			hash := c.Hash
 			glog.V(3).Infof("pod %q container %q exists as %v", podFullName, container.Name, containerID)
 
-			if !createPodInfraContainer {
-				// look for changes in the container.
-
-				containerChanged := hash != 0 && hash != expectedHash
-				if !containerChanged {
-					result, err := kl.probeContainer(pod, podStatus, container, string(c.ID), c.Created)
-					if err != nil {
-						// TODO(vmarmol): examine this logic.
-						glog.V(2).Infof("probe no-error: %q", container.Name)
-						containersToKeep[containerID] = index
-						continue
-					}
-					if result == probe.Success {
-						glog.V(4).Infof("probe success: %q", container.Name)
-						containersToKeep[containerID] = index
-						continue
-					}
-					glog.Infof("pod %q container %q is unhealthy (probe result: %v), it will be killed and re-created.", podFullName, container.Name, result)
-				} else {
-					glog.Infof("pod %q container %q hash changed (%d vs %d), it will be killed and re-created.", podFullName, container.Name, hash, expectedHash)
+			// look for changes in the container.
+			containerChanged := hash != 0 && hash != expectedHash
+			if !containerChanged {
+				result, err := kl.probeContainer(pod, podStatus, container, string(c.ID), c.Created)
+				if err != nil {
+					// TODO(vmarmol): examine this logic.
+					glog.V(2).Infof("probe no-error: %q", container.Name)
+					containersToKeep[containerID] = index
+					continue
 				}
-				containersToStart[index] = empty{}
-			} else { // createPodInfraContainer == true and Container exists
-				// If we're creating infra containere everything will be killed anyway
-				// If RestartPolicy is Always or OnFailure we restart containers that were running before we
-				// killed them when restarting Infra Container.
-				if pod.Spec.RestartPolicy != api.RestartPolicyNever {
-					glog.V(1).Infof("Infra Container is being recreated. %q will be restarted.", container.Name)
-					containersToStart[index] = empty{}
+				if result == probe.Success {
+					glog.V(4).Infof("probe success: %q", container.Name)
+					containersToKeep[containerID] = index
+					continue
 				}
-				continue
+				glog.Infof("pod %q container %q is unhealthy (probe result: %v), it will be killed and re-created.", podFullName, container.Name, result)
+			} else {
+				glog.Infof("pod %q container %q hash changed (%d vs %d), it will be killed and re-created.", podFullName, container.Name, hash, expectedHash)
 			}
+			containersToStart[index] = empty{}
 		} else {
 			if kl.shouldContainerBeRestarted(&container, pod, &podStatus) {
 				// If we are here it means that the container is dead and sould be restarted, or never existed and should
@@ -1155,13 +1183,11 @@ func (kl *Kubelet) computePodContainerChanges(pod *api.Pod, runningPod kubeconta
 		}
 	}
 
-	// After the loop one of the following should be true:
-	// - createPodInfraContainer is true and containersToKeep is empty.
-	// (In fact, when createPodInfraContainer is false, containersToKeep will not be touched).
-	// - createPodInfraContainer is false and containersToKeep contains at least ID of Infra Container
+	// After the loop, the following should be true:
+	// createPodInfraContainer is false and containersToKeep contains at least the ID of infra Container
 
-	// If Infra container is the last running one, we don't want to keep it.
-	if !createPodInfraContainer && len(containersToStart) == 0 && len(containersToKeep) == 1 {
+	// If infra container is the last running one, we don't want to keep it.
+	if len(containersToStart) == 0 && len(containersToKeep) == 1 {
 		containersToKeep = make(map[dockertools.DockerID]int)
 	}
 
