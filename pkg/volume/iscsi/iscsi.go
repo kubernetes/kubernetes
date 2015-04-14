@@ -52,8 +52,8 @@ func (plugin *ISCSIPlugin) Name() string {
 	return ISCSIPluginName
 }
 
-func (plugin *ISCSIPlugin) CanSupport(spec *api.Volume) bool {
-	if spec.ISCSI == nil {
+func (plugin *ISCSIPlugin) CanSupport(spec *volume.Spec) bool {
+	if spec.VolumeSource.ISCSI == nil {
 		return false
 	}
 	// see if iscsiadm is there
@@ -72,22 +72,23 @@ func (plugin *ISCSIPlugin) GetAccessModes() []api.AccessModeType {
 	}
 }
 
-func (plugin *ISCSIPlugin) NewBuilder(spec *api.Volume, podRef *api.ObjectReference, _ volume.VolumeOptions) (volume.Builder, error) {
+func (plugin *ISCSIPlugin) NewBuilder(spec *volume.Spec, podRef *api.ObjectReference, _ volume.VolumeOptions) (volume.Builder, error) {
 	// Inject real implementations here, test through the internal function.
 	return plugin.newBuilderInternal(spec, podRef.UID, &ISCSIUtil{}, mount.New())
 }
 
-func (plugin *ISCSIPlugin) newBuilderInternal(spec *api.Volume, podUID types.UID, manager diskManager, mounter mount.Interface) (volume.Builder, error) {
-	lun := strconv.Itoa(spec.ISCSI.Lun)
+func (plugin *ISCSIPlugin) newBuilderInternal(spec *volume.Spec, podUID types.UID, manager diskManager, mounter mount.Interface) (volume.Builder, error) {
+	iscsi := spec.VolumeSource.ISCSI
+	lun := strconv.Itoa(iscsi.Lun)
 
 	return &iscsiDisk{
 		podUID:   podUID,
 		volName:  spec.Name,
-		portal:   spec.ISCSI.TargetPortal,
-		iqn:      spec.ISCSI.IQN,
+		portal:   iscsi.TargetPortal,
+		iqn:      iscsi.IQN,
 		lun:      lun,
-		fsType:   spec.ISCSI.FSType,
-		readOnly: spec.ISCSI.ReadOnly,
+		fsType:   iscsi.FSType,
+		readOnly: iscsi.ReadOnly,
 		manager:  manager,
 		mounter:  mounter,
 		plugin:   plugin,

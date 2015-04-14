@@ -50,7 +50,7 @@ func TestCanSupport(t *testing.T) {
 	if plug.Name() != "kubernetes.io/git-repo" {
 		t.Errorf("Wrong name: %s", plug.Name())
 	}
-	if !plug.CanSupport(&api.Volume{VolumeSource: api.VolumeSource{GitRepo: &api.GitRepoVolumeSource{}}}) {
+	if !plug.CanSupport(&volume.Spec{Name: "foo", VolumeSource: api.VolumeSource{GitRepo: &api.GitRepoVolumeSource{}}}) {
 		t.Errorf("Expected true")
 	}
 }
@@ -118,7 +118,7 @@ func TestPlugin(t *testing.T) {
 			},
 		},
 	}
-	builder, err := plug.NewBuilder(spec, &api.ObjectReference{UID: types.UID("poduid")}, volume.VolumeOptions{""})
+	builder, err := plug.NewBuilder(volume.NewSpecFromVolume(spec), &api.ObjectReference{UID: types.UID("poduid")}, volume.VolumeOptions{""})
 	if err != nil {
 		t.Errorf("Failed to make a new Builder: %v", err)
 	}
@@ -169,11 +169,12 @@ func TestPluginLegacy(t *testing.T) {
 	if plug.Name() != "git" {
 		t.Errorf("Wrong name: %s", plug.Name())
 	}
-	if plug.CanSupport(&api.Volume{VolumeSource: api.VolumeSource{GitRepo: &api.GitRepoVolumeSource{}}}) {
+	if plug.CanSupport(&volume.Spec{Name: "foo", VolumeSource: api.VolumeSource{GitRepo: &api.GitRepoVolumeSource{}}}) {
 		t.Errorf("Expected false")
 	}
 
-	if _, err := plug.NewBuilder(&api.Volume{VolumeSource: api.VolumeSource{GitRepo: &api.GitRepoVolumeSource{}}}, &api.ObjectReference{UID: types.UID("poduid")}, volume.VolumeOptions{""}); err == nil {
+	spec := &api.Volume{VolumeSource: api.VolumeSource{GitRepo: &api.GitRepoVolumeSource{}}}
+	if _, err := plug.NewBuilder(volume.NewSpecFromVolume(spec), &api.ObjectReference{UID: types.UID("poduid")}, volume.VolumeOptions{""}); err == nil {
 		t.Errorf("Expected failiure")
 	}
 

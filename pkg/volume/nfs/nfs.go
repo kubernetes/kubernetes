@@ -50,11 +50,8 @@ func (plugin *nfsPlugin) Name() string {
 	return nfsPluginName
 }
 
-func (plugin *nfsPlugin) CanSupport(spec *api.Volume) bool {
-	if spec.VolumeSource.NFS != nil {
-		return true
-	}
-	return false
+func (plugin *nfsPlugin) CanSupport(spec *volume.Spec) bool {
+	return spec.VolumeSource.NFS != nil
 }
 
 func (plugin *nfsPlugin) GetAccessModes() []api.AccessModeType {
@@ -65,11 +62,11 @@ func (plugin *nfsPlugin) GetAccessModes() []api.AccessModeType {
 	}
 }
 
-func (plugin *nfsPlugin) NewBuilder(spec *api.Volume, podRef *api.ObjectReference, _ volume.VolumeOptions) (volume.Builder, error) {
+func (plugin *nfsPlugin) NewBuilder(spec *volume.Spec, podRef *api.ObjectReference, _ volume.VolumeOptions) (volume.Builder, error) {
 	return plugin.newBuilderInternal(spec, podRef, plugin.mounter)
 }
 
-func (plugin *nfsPlugin) newBuilderInternal(spec *api.Volume, podRef *api.ObjectReference, mounter nfsMountInterface) (volume.Builder, error) {
+func (plugin *nfsPlugin) newBuilderInternal(spec *volume.Spec, podRef *api.ObjectReference, mounter nfsMountInterface) (volume.Builder, error) {
 	return &nfs{
 		volName:    spec.Name,
 		server:     spec.VolumeSource.NFS.Server,

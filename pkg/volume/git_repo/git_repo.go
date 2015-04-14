@@ -58,19 +58,16 @@ func (plugin *gitRepoPlugin) Name() string {
 	return gitRepoPluginName
 }
 
-func (plugin *gitRepoPlugin) CanSupport(spec *api.Volume) bool {
+func (plugin *gitRepoPlugin) CanSupport(spec *volume.Spec) bool {
 	if plugin.legacyMode {
 		// Legacy mode instances can be cleaned up but not created anew.
 		return false
 	}
 
-	if spec.GitRepo != nil {
-		return true
-	}
-	return false
+	return spec.VolumeSource.GitRepo != nil
 }
 
-func (plugin *gitRepoPlugin) NewBuilder(spec *api.Volume, podRef *api.ObjectReference, opts volume.VolumeOptions) (volume.Builder, error) {
+func (plugin *gitRepoPlugin) NewBuilder(spec *volume.Spec, podRef *api.ObjectReference, opts volume.VolumeOptions) (volume.Builder, error) {
 	if plugin.legacyMode {
 		// Legacy mode instances can be cleaned up but not created anew.
 		return nil, fmt.Errorf("legacy mode: can not create new instances")
@@ -78,8 +75,8 @@ func (plugin *gitRepoPlugin) NewBuilder(spec *api.Volume, podRef *api.ObjectRefe
 	return &gitRepo{
 		podRef:     *podRef,
 		volName:    spec.Name,
-		source:     spec.GitRepo.Repository,
-		revision:   spec.GitRepo.Revision,
+		source:     spec.VolumeSource.GitRepo.Repository,
+		revision:   spec.VolumeSource.GitRepo.Revision,
 		exec:       exec.New(),
 		plugin:     plugin,
 		legacyMode: false,
@@ -119,7 +116,7 @@ func (gr *gitRepo) SetUp() error {
 }
 
 // This is the spec for the volume that this plugin wraps.
-var wrappedVolumeSpec = &api.Volume{
+var wrappedVolumeSpec = &volume.Spec{
 	Name:         "not-used",
 	VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}},
 }

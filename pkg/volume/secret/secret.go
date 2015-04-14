@@ -50,20 +50,16 @@ func (plugin *secretPlugin) Name() string {
 	return secretPluginName
 }
 
-func (plugin *secretPlugin) CanSupport(spec *api.Volume) bool {
-	if spec.Secret != nil {
-		return true
-	}
-
-	return false
+func (plugin *secretPlugin) CanSupport(spec *volume.Spec) bool {
+	return spec.VolumeSource.Secret != nil
 }
 
-func (plugin *secretPlugin) NewBuilder(spec *api.Volume, podRef *api.ObjectReference, opts volume.VolumeOptions) (volume.Builder, error) {
+func (plugin *secretPlugin) NewBuilder(spec *volume.Spec, podRef *api.ObjectReference, opts volume.VolumeOptions) (volume.Builder, error) {
 	return plugin.newBuilderInternal(spec, podRef, opts)
 }
 
-func (plugin *secretPlugin) newBuilderInternal(spec *api.Volume, podRef *api.ObjectReference, opts volume.VolumeOptions) (volume.Builder, error) {
-	return &secretVolume{spec.Name, *podRef, plugin, spec.Secret.SecretName, &opts}, nil
+func (plugin *secretPlugin) newBuilderInternal(spec *volume.Spec, podRef *api.ObjectReference, opts volume.VolumeOptions) (volume.Builder, error) {
+	return &secretVolume{spec.Name, *podRef, plugin, spec.VolumeSource.Secret.SecretName, &opts}, nil
 }
 
 func (plugin *secretPlugin) NewCleaner(volName string, podUID types.UID) (volume.Cleaner, error) {
@@ -89,7 +85,7 @@ func (sv *secretVolume) SetUp() error {
 }
 
 // This is the spec for the volume that this plugin wraps.
-var wrappedVolumeSpec = &api.Volume{
+var wrappedVolumeSpec = &volume.Spec{
 	Name:         "not-used",
 	VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{Medium: api.StorageTypeMemory}},
 }

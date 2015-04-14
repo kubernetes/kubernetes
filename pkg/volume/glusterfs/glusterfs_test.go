@@ -37,10 +37,10 @@ func TestCanSupport(t *testing.T) {
 	if plug.Name() != "kubernetes.io/glusterfs" {
 		t.Errorf("Wrong name: %s", plug.Name())
 	}
-	if !plug.CanSupport(&api.Volume{VolumeSource: api.VolumeSource{Glusterfs: &api.GlusterfsVolumeSource{}}}) {
+	if !plug.CanSupport(&volume.Spec{Name: "foo", VolumeSource: api.VolumeSource{Glusterfs: &api.GlusterfsVolumeSource{}}}) {
 		t.Errorf("Expected true")
 	}
-	if plug.CanSupport(&api.Volume{VolumeSource: api.VolumeSource{}}) {
+	if plug.CanSupport(&volume.Spec{Name: "foo", VolumeSource: api.VolumeSource{}}) {
 		t.Errorf("Expected false")
 	}
 }
@@ -94,7 +94,7 @@ func TestPlugin(t *testing.T) {
 			func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
 		},
 	}
-	builder, err := plug.(*glusterfsPlugin).newBuilderInternal(spec, ep, &api.ObjectReference{UID: types.UID("poduid")}, &mount.FakeMounter{}, &fake)
+	builder, err := plug.(*glusterfsPlugin).newBuilderInternal(volume.NewSpecFromVolume(spec), ep, &api.ObjectReference{UID: types.UID("poduid")}, &mount.FakeMounter{}, &fake)
 	volumePath := builder.GetPath()
 	if err != nil {
 		t.Errorf("Failed to make a new Builder: %v", err)

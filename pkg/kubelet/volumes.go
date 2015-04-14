@@ -54,7 +54,7 @@ func (vh *volumeHost) GetKubeClient() client.Interface {
 	return vh.kubelet.kubeClient
 }
 
-func (vh *volumeHost) NewWrapperBuilder(spec *api.Volume, podRef *api.ObjectReference, opts volume.VolumeOptions) (volume.Builder, error) {
+func (vh *volumeHost) NewWrapperBuilder(spec *volume.Spec, podRef *api.ObjectReference, opts volume.VolumeOptions) (volume.Builder, error) {
 	b, err := vh.kubelet.newVolumeBuilderFromPlugins(spec, podRef, opts)
 	if err == nil && b == nil {
 		return nil, errUnsupportedVolumeType
@@ -62,7 +62,7 @@ func (vh *volumeHost) NewWrapperBuilder(spec *api.Volume, podRef *api.ObjectRefe
 	return b, nil
 }
 
-func (vh *volumeHost) NewWrapperCleaner(spec *api.Volume, podUID types.UID) (volume.Cleaner, error) {
+func (vh *volumeHost) NewWrapperCleaner(spec *volume.Spec, podUID types.UID) (volume.Cleaner, error) {
 	plugin, err := vh.kubelet.volumePluginMgr.FindPluginBySpec(spec)
 	if err != nil {
 		return nil, err
@@ -78,7 +78,7 @@ func (vh *volumeHost) NewWrapperCleaner(spec *api.Volume, podUID types.UID) (vol
 	return c, nil
 }
 
-func (kl *Kubelet) newVolumeBuilderFromPlugins(spec *api.Volume, podRef *api.ObjectReference, opts volume.VolumeOptions) (volume.Builder, error) {
+func (kl *Kubelet) newVolumeBuilderFromPlugins(spec *volume.Spec, podRef *api.ObjectReference, opts volume.VolumeOptions) (volume.Builder, error) {
 	plugin, err := kl.volumePluginMgr.FindPluginBySpec(spec)
 	if err != nil {
 		return nil, fmt.Errorf("can't use volume plugins for %s: %v", spew.Sprintf("%#v", *spec), err)
@@ -112,7 +112,8 @@ func (kl *Kubelet) mountExternalVolumes(pod *api.Pod) (volumeMap, error) {
 		}
 
 		// Try to use a plugin for this volume.
-		builder, err := kl.newVolumeBuilderFromPlugins(volSpec, podRef, volume.VolumeOptions{rootContext})
+		internal := volume.NewSpecFromVolume(volSpec)
+		builder, err := kl.newVolumeBuilderFromPlugins(internal, podRef, volume.VolumeOptions{rootContext})
 		if err != nil {
 			glog.Errorf("Could not create volume builder for pod %s: %v", pod.UID, err)
 			return nil, err
