@@ -40,7 +40,7 @@ fi
 # Additional parameters that are passed to ginkgo runner.
 GINKGO_TEST_ARGS=""
 
-if [[ "${SCALABILITY:-}" == "true" ]]; then
+if [[ "${PERFORMANCE:-}" == "true" ]]; then
     if [[ "${KUBERNETES_PROVIDER}" == "aws" ]]; then
       export MASTER_SIZE="m3.xlarge"
     else
@@ -49,7 +49,7 @@ if [[ "${SCALABILITY:-}" == "true" ]]; then
     # TODO(wojtek-t): Once we have enough quota for the project, increase
     # NUM_MINIONS to 100 (which is our v1.0 goal).
     export NUM_MINIONS="10"
-    GINKGO_TEST_ARGS="--ginkgo.focus=Density "
+    GINKGO_TEST_ARGS="--ginkgo.focus=\[Performance suite\] "
 else
     if [[ "${KUBERNETES_PROVIDER}" == "aws" ]]; then
       export MASTER_SIZE="t2.small"
