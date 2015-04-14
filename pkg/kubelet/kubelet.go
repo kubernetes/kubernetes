@@ -232,14 +232,14 @@ func NewMainKubelet(
 
 	klet.podManager = newBasicPodManager(klet.kubeClient)
 
-	dockerCache, err := dockertools.NewDockerCache(containerManager)
+	runtimeCache, err := kubecontainer.NewRuntimeCache(containerManager)
 	if err != nil {
 		return nil, err
 	}
-	klet.dockerCache = dockerCache
-	klet.podWorkers = newPodWorkers(dockerCache, klet.syncPod, recorder)
+	klet.runtimeCache = runtimeCache
+	klet.podWorkers = newPodWorkers(runtimeCache, klet.syncPod, recorder)
 
-	metrics.Register(dockerCache)
+	metrics.Register(runtimeCache)
 
 	if err = klet.setupDataDirs(); err != nil {
 		return nil, err
@@ -274,7 +274,7 @@ type nodeLister interface {
 type Kubelet struct {
 	hostname       string
 	dockerClient   dockertools.DockerInterface
-	dockerCache    dockertools.DockerCache
+	runtimeCache   kubecontainer.RuntimeCache
 	kubeClient     client.Interface
 	rootDirectory  string
 	podWorkers     *podWorkers
@@ -1396,7 +1396,7 @@ func (kl *Kubelet) SyncPods(allPods []api.Pod, podSyncTypes map[types.UID]metric
 	var err error
 	desiredPods := make(map[types.UID]empty)
 
-	runningPods, err := kl.dockerCache.GetPods()
+	runningPods, err := kl.runtimeCache.GetPods()
 	if err != nil {
 		glog.Errorf("Error listing containers: %#v", err)
 		return err

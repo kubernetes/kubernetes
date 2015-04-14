@@ -23,7 +23,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
+	kubecontainer "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/dockertools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 )
@@ -40,14 +40,14 @@ func newPod(uid, name string) *api.Pod {
 func createPodWorkers() (*podWorkers, map[types.UID][]string) {
 	fakeDocker := &dockertools.FakeDockerClient{}
 	fakeRecorder := &record.FakeRecorder{}
-	fakeDockerCache := dockertools.NewFakeDockerCache(dockertools.NewDockerManager(fakeDocker, fakeRecorder, dockertools.PodInfraContainerImage, 0, 0))
+	fakeRuntimeCache := kubecontainer.NewFakeRuntimeCache(dockertools.NewDockerManager(fakeDocker, fakeRecorder, dockertools.PodInfraContainerImage, 0, 0))
 
 	lock := sync.Mutex{}
 	processed := make(map[types.UID][]string)
 
 	podWorkers := newPodWorkers(
-		fakeDockerCache,
-		func(pod *api.Pod, mirrorPod *api.Pod, runningPod container.Pod) error {
+		fakeRuntimeCache,
+		func(pod *api.Pod, mirrorPod *api.Pod, runningPod kubecontainer.Pod) error {
 			func() {
 				lock.Lock()
 				defer lock.Unlock()

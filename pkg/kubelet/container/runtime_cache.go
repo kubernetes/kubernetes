@@ -32,24 +32,24 @@ type RuntimeCache interface {
 	ForceUpdateIfOlder(time.Time) error
 }
 
+// TODO(yifan): This interface can be removed once docker manager has implemented
+// all the runtime interfaces, (thus we can pass the runtime directly).
+type podsGetter interface {
+	GetPods(bool) ([]*Pod, error)
+}
+
 // NewRuntimeCache creates a container runtime cache.
-func NewRuntimeCache(runtime Runtime) (RuntimeCache, error) {
-	pods, err := runtime.GetPods(false)
-	if err != nil {
-		return nil, err
-	}
+func NewRuntimeCache(getter podsGetter) (RuntimeCache, error) {
 	return &runtimeCache{
-		runtime:   runtime,
-		cacheTime: time.Now(),
-		pods:      pods,
-		updating:  false,
+		getter:   getter,
+		updating: false,
 	}, nil
 }
 
 type runtimeCache struct {
 	sync.Mutex
 	// The underlying container runtime used to update the cache.
-	runtime Runtime
+	getter podsGetter
 	// Last time when cache was updated.
 	cacheTime time.Time
 	// The content of the cache.
@@ -90,7 +90,7 @@ func (r *runtimeCache) ForceUpdateIfOlder(minExpectedCacheTime time.Time) error 
 }
 
 func (r *runtimeCache) updateCache() error {
-	pods, err := r.runtime.GetPods(false)
+	pods, err := r.getter.GetPods(false)
 	if err != nil {
 		return err
 	}
@@ -105,7 +105,7 @@ func (r *runtimeCache) startUpdatingCache() {
 	run := true
 	for run {
 		time.Sleep(defaultUpdateInterval)
-		pods, err := r.runtime.GetPods(false)
+		pods, err := r.getter.GetPods(false)
 		cacheTime := time.Now()
 		if err != nil {
 			continue

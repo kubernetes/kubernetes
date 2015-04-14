@@ -103,9 +103,9 @@ func newTestKubelet(t *testing.T) *TestKubelet {
 	kubelet.podManager = podManager
 	kubelet.containerRefManager = kubecontainer.NewRefManager()
 	kubelet.containerManager = dockertools.NewDockerManager(fakeDocker, fakeRecorder, dockertools.PodInfraContainerImage, 0, 0)
-	kubelet.dockerCache = dockertools.NewFakeDockerCache(kubelet.containerManager)
+	kubelet.runtimeCache = kubecontainer.NewFakeRuntimeCache(kubelet.containerManager)
 	kubelet.podWorkers = newPodWorkers(
-		kubelet.dockerCache,
+		kubelet.runtimeCache,
 		func(pod *api.Pod, mirrorPod *api.Pod, runningPod container.Pod) error {
 			err := kubelet.syncPod(pod, mirrorPod, runningPod)
 			waitGroup.Done()
