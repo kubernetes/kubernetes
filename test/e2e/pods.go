@@ -123,7 +123,7 @@ var _ = Describe("Pods", func() {
 		expectNoError(err)
 	})
 
-	It("should get a host IP", func() {
+	PIt("should get a host IP", func() {
 		name := "pod-hostip-" + string(util.NewUUID())
 		testHostIP(c, &api.Pod{
 			ObjectMeta: api.ObjectMeta{
