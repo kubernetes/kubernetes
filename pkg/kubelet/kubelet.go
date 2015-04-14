@@ -1682,7 +1682,7 @@ func (kl *Kubelet) GetHostname() string {
 func (kl *Kubelet) GetHostIP() (net.IP, error) {
 	node, err := kl.GetNode()
 	if err != nil {
-		return nil, fmt.Errorf("Cannot get node: %v", err)
+		return nil, fmt.Errorf("cannot get node: %v", err)
 	}
 	addresses := node.Status.Addresses
 	addressMap := make(map[api.NodeAddressType][]api.NodeAddress)
@@ -1698,7 +1698,7 @@ func (kl *Kubelet) GetHostIP() (net.IP, error) {
 	if addresses, ok := addressMap[api.NodeExternalIP]; ok {
 		return net.ParseIP(addresses[0].Address), nil
 	}
-	return nil, fmt.Errorf("Host IP unknown; known addresses: %v", addresses)
+	return nil, fmt.Errorf("host IP unknown; known addresses: %v", addresses)
 }
 
 // GetPods returns all pods bound to the kubelet and their spec, and the mirror
