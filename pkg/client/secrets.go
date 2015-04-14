@@ -53,7 +53,7 @@ func newSecrets(c *Client, ns string) *secrets {
 func (s *secrets) Create(secret *api.Secret) (*api.Secret, error) {
 	result := &api.Secret{}
 	err := s.client.Post().
-		Namespace(secret.Namespace).
+		Namespace(s.namespace).
 		Resource("secrets").
 		Body(secret).
 		Do().
