@@ -15,7 +15,9 @@
   {% endif -%}
 
 {% elif grains.cloud == 'aws' -%}
-  {% set cloud_config = "--cloud_config=/etc/aws.conf" -%}
+  {% if grains.cloud_config is defined -%}
+    {% set cloud_config = "--cloud_config=" + grains.cloud_config -%}
+  {% endif -%}
 {% endif -%}
 
 {% endif -%}
