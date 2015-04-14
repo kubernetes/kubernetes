@@ -80,6 +80,8 @@ then
 	echo "${COMPROOT} up to date."
 else
 	echo "${COMPROOT} is out of date. Please run hack/run-gendocs.sh"
+	echo "If you did not make a change to kubectl or its dependencies,"
+	echo "run 'make clean' and retry this command."
 	exit 1
 fi
 
