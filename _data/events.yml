@@ -6,6 +6,13 @@
     speaker: "TBD"
     url: "http://www.dotscale.io/"
 - 
+    date: 2015-05-22 00:00:00 -0800
+    title: "Docker and Kubernetes in Depth (full day workshop)"
+    location: "Vancouver, BC, Canada"
+    venue: "UBC Robson Square"
+    speaker: "Brian Dorsey"
+    url: "http://www.polyglotconf.com/"
+- 
     date: 2015-05-21 00:00:00 -0800
     title: "OpenStack Summit"
     location: "Vancouver, BC, Canada"
@@ -19,6 +26,13 @@
     venue: "Omni Interlocken Resort"
     speaker: "Brendan Burns"
     url: "http://gluecon.com/"
+- 
+    date: 2015-04-21 00:00:00 -0800
+    title: "Bay Area Kubernetes Meetup"
+    location: "Mountain View, CA, USA"
+    venue: ""
+    speaker: "Daniel Smith"
+    url: "http://www.meetup.com/Bay-Area-Kubernetes-Meetup/events/221831573/"
 - 
     date: 2015-04-18 00:00:00 -0800
     title: "Hands-on Kubernetes workshop @ Berkeley GDG"
