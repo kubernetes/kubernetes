@@ -40,7 +40,7 @@ func (r RealClock) Since(ts time.Time) time.Duration {
 	return time.Since(ts)
 }
 
-// FakeClock implements Clock, but returns an arbitary time.
+// FakeClock implements Clock, but returns an arbitrary time.
 type FakeClock struct {
 	Time time.Time
 }
