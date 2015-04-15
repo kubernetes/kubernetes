@@ -26,6 +26,7 @@ import (
 	kubecontainer "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/dockertools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/securitycontext"
 )
 
 func newPod(uid, name string) *api.Pod {
@@ -40,7 +41,8 @@ func newPod(uid, name string) *api.Pod {
 func createPodWorkers() (*podWorkers, map[types.UID][]string) {
 	fakeDocker := &dockertools.FakeDockerClient{}
 	fakeRecorder := &record.FakeRecorder{}
-	fakeRuntimeCache := kubecontainer.NewFakeRuntimeCache(dockertools.NewDockerManager(fakeDocker, fakeRecorder, dockertools.PodInfraContainerImage, 0, 0))
+	fakeSecurityContextProvider := &securitycontext.FakeSecurityContextProvider{}
+	fakeRuntimeCache := kubecontainer.NewFakeRuntimeCache(dockertools.NewDockerManager(fakeDocker, fakeRecorder, dockertools.PodInfraContainerImage, 0, 0, fakeSecurityContextProvider))
 
 	lock := sync.Mutex{}
 	processed := make(map[types.UID][]string)

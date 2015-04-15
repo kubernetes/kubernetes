@@ -116,7 +116,7 @@ echo "Starting etcd"
 kube::etcd::start
 
 # Admission Controllers to invoke prior to persisting objects in cluster
-ADMISSION_CONTROL=NamespaceLifecycle,NamespaceAutoProvision,LimitRanger,ResourceQuota
+ADMISSION_CONTROL=NamespaceLifecycle,NamespaceAutoProvision,LimitRanger,ResourceQuota,SecurityContext
 
 APISERVER_LOG=/tmp/kube-apiserver.log
 sudo -E "${GO_OUT}/kube-apiserver" \
@@ -149,6 +149,7 @@ sudo -E "${GO_OUT}/kubelet" \
   --address="127.0.0.1" \
   --api_servers="${API_HOST}:${API_PORT}" \
   --auth_path="${KUBE_ROOT}/hack/.test-cmd-auth" \
+  --security_context="restrict" \
   --port="$KUBELET_PORT" >"${KUBELET_LOG}" 2>&1 &
 KUBELET_PID=$!
 

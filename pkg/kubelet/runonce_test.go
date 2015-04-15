@@ -28,6 +28,7 @@ import (
 	kubecontainer "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/dockertools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/network"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/securitycontext"
 	docker "github.com/fsouza/go-dockerclient"
 	cadvisorApi "github.com/google/cadvisor/info/v1"
 )
@@ -74,18 +75,20 @@ func (d *testDocker) InspectContainer(id string) (*docker.Container, error) {
 func TestRunOnce(t *testing.T) {
 	cadvisor := &cadvisor.Mock{}
 	cadvisor.On("MachineInfo").Return(&cadvisorApi.MachineInfo{}, nil)
+	fakeSecurityContextProvider := securitycontext.FakeSecurityContextProvider{}
 
 	podManager, _ := newFakePodManager()
 
 	kb := &Kubelet{
-		rootDirectory:       "/tmp/kubelet",
-		recorder:            &record.FakeRecorder{},
-		cadvisor:            cadvisor,
-		nodeLister:          testNodeLister{},
-		statusManager:       newStatusManager(nil),
-		containerRefManager: kubecontainer.NewRefManager(),
-		readinessManager:    kubecontainer.NewReadinessManager(),
-		podManager:          podManager,
+		rootDirectory:           "/tmp/kubelet",
+		recorder:                &record.FakeRecorder{},
+		cadvisor:                cadvisor,
+		nodeLister:              testNodeLister{},
+		statusManager:           newStatusManager(nil),
+		containerRefManager:     kubecontainer.NewRefManager(),
+		readinessManager:        kubecontainer.NewReadinessManager(),
+		podManager:              podManager,
+		securityContextProvider: fakeSecurityContextProvider,
 	}
 
 	kb.networkPlugin, _ = network.InitNetworkPlugin([]network.NetworkPlugin{}, "", network.NewFakeHost(nil))
@@ -145,7 +148,7 @@ func TestRunOnce(t *testing.T) {
 		t: t,
 	}
 
-	kb.containerManager = dockertools.NewDockerManager(kb.dockerClient, kb.recorder, dockertools.PodInfraContainerImage, 0, 0)
+	kb.containerManager = dockertools.NewDockerManager(kb.dockerClient, kb.recorder, dockertools.PodInfraContainerImage, 0, 0, fakeSecurityContextProvider)
 	kb.containerManager.Puller = &dockertools.FakeDockerPuller{}
 
 	pods := []*api.Pod{

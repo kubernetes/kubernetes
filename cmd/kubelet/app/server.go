@@ -47,6 +47,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/securitycontext"
 	"github.com/golang/glog"
 	"github.com/spf13/pflag"
 )
@@ -98,13 +99,14 @@ type KubeletServer struct {
 	CertDirectory                  string
 	NodeStatusUpdateFrequency      time.Duration
 	ResourceContainer              string
+    SecurityContextProvider string
 
 	// Flags intended for testing
 
 	// Crash immediately, rather than eating panics.
-	ReallyCrashForTesting bool
+    ReallyCrashForTesting bool
 	// Insert a probability of random errors during calls to the master.
-	ChaosChance float64
+    ChaosChance                    float64
 }
 
 // bootstrapping interface for kubelet, targets the initialization protocol
@@ -201,6 +203,7 @@ func (s *KubeletServer) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.CloudProvider, "cloud_provider", s.CloudProvider, "The provider for cloud services.  Empty string for no provider.")
 	fs.StringVar(&s.CloudConfigFile, "cloud_config", s.CloudConfigFile, "The path to the cloud provider configuration file.  Empty string for no configuration file.")
 	fs.StringVar(&s.ResourceContainer, "resource_container", s.ResourceContainer, "Absolute name of the resource-only container to create and run the Kubelet in (Default: /kubelet).")
+	fs.StringVar(&s.SecurityContextProvider, "security_context", s.SecurityContextProvider, "Name of the security context provider to use. Allowable values are <empty>|permit|restrict")
 
 	// Flags intended for testing, not recommended used in production environments.
 	fs.BoolVar(&s.ReallyCrashForTesting, "really_crash_for_testing", s.ReallyCrashForTesting, "If true, when panics occur crash. Intended for testing.")
@@ -300,6 +303,13 @@ func (s *KubeletServer) Run(_ []string) error {
 		Cloud:                          cloud,
 		NodeStatusUpdateFrequency: s.NodeStatusUpdateFrequency,
 		ResourceContainer:         s.ResourceContainer,
+	}
+
+	switch s.SecurityContextProvider{
+	case "restrict":
+		kcfg.SecurityContextProvider = securitycontext.NewRestrictSecurityContextProvider()
+	default:
+		kcfg.SecurityContextProvider = securitycontext.NewPermitSecurityContextProvider()
 	}
 
 	RunKubelet(&kcfg, nil)
@@ -406,6 +416,7 @@ func SimpleKubelet(client *client.Client,
 		Cloud:                   cloud,
 		NodeStatusUpdateFrequency: 10 * time.Second,
 		ResourceContainer:         "/kubelet",
+		SecurityContextProvider:   securitycontext.NewPermitSecurityContextProvider(),
 	}
 	return &kcfg
 }
@@ -529,6 +540,7 @@ type KubeletConfig struct {
 	Cloud                          cloudprovider.Interface
 	NodeStatusUpdateFrequency      time.Duration
 	ResourceContainer              string
+	SecurityContextProvider        securitycontext.SecurityContextProvider
 }
 
 func createAndInitKubelet(kc *KubeletConfig) (k KubeletBootstrap, pc *config.PodConfig, err error) {
@@ -572,7 +584,8 @@ func createAndInitKubelet(kc *KubeletConfig) (k KubeletBootstrap, pc *config.Pod
 		kc.ImageGCPolicy,
 		kc.Cloud,
 		kc.NodeStatusUpdateFrequency,
-		kc.ResourceContainer)
+		kc.ResourceContainer,
+		kc.SecurityContextProvider)
 
 	if err != nil {
 		return nil, nil, err

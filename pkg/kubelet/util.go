@@ -23,6 +23,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/capabilities"
 	cadvisorApi "github.com/google/cadvisor/info/v1"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/securitycontext"
 )
 
 func CapacityFromMachineInfo(info *cadvisorApi.MachineInfo) api.ResourceList {
@@ -38,7 +39,7 @@ func CapacityFromMachineInfo(info *cadvisorApi.MachineInfo) api.ResourceList {
 }
 
 // Check whether we have the capabilities to run the specified pod.
-func canRunPod(pod *api.Pod) error {
+func canRunPod(pod *api.Pod, scp securitycontext.SecurityContextProvider) error {
 	if pod.Spec.HostNetwork {
 		allowed, err := allowHostNetwork(pod)
 		if err != nil {
@@ -49,6 +50,12 @@ func canRunPod(pod *api.Pod) error {
 		}
 	}
 	// TODO(vmarmol): Check Privileged too.
+
+	// Can't run if we aren't validated by the security context
+	if errs := scp.ValidateSecurityContext(pod); len(errs) > 0 {
+		return fmt.Errorf("pod with UID %q does not comply with the security context", pod.UID)
+	}
+
 	return nil
 }
 
