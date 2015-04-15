@@ -215,10 +215,8 @@ func (self *basicPodManager) GetPodByName(namespace, name string) (*api.Pod, boo
 func (self *basicPodManager) GetPodByFullName(podFullName string) (*api.Pod, bool) {
 	self.lock.RLock()
 	defer self.lock.RUnlock()
-	if pod, ok := self.podByFullName[podFullName]; ok {
-		return pod, true
-	}
-	return nil, false
+	pod, ok := self.podByFullName[podFullName]
+	return pod, ok
 }
 
 // If the UID belongs to a mirror pod, maps it to the UID of its static pod.
