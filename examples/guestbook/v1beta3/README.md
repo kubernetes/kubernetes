@@ -13,3 +13,6 @@ The v1beta3 API is not enabled by default. The kube-apiserver process needs to r
 sudo sed -i 's|KUBE_API_ARGS="|KUBE_API_ARGS="--runtime_config=api/v1beta3 |' /etc/kubernetes/apiserver
 ````
 
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/guestbook/v1beta3/README.md?pixel)]()

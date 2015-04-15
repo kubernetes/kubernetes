@@ -125,3 +125,6 @@ any new pods on the node. Node unschedulable example:
 ```
 kubectl update nodes 10.1.2.3 --patch='{"apiVersion": "v1beta1", "unschedulable": true}'
 ```
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/node.md?pixel)]()

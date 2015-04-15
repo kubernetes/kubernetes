@@ -54,3 +54,6 @@ If you want more control over the upgrading process, you may use the following w
      Or, if you deleted the VM instance and created a new one, and are using `--sync_nodes=true` on the apiserver
      (the default), then a new schedulable node resource will be created automatically when you create a new
      VM instance.  See [Node](node.md).
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/cluster_management.md?pixel)]()

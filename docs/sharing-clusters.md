@@ -104,3 +104,6 @@ export $KUBECONFIG=path/to/other/.kubeconfig
 ```
 Detailed examples and explanation of `.kubeconfig` loading/merging rules can be found in [kubeconfig-file.md](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/kubeconfig-file.md).
 
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/sharing-clusters.md?pixel)]()

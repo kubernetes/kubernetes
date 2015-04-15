@@ -19,3 +19,6 @@ Docs in this directory relate to developing Kubernetes.
   and how the version information gets embedded into the built binaries.
 
 * **Profiling Kubernetes** ([profiling.md](profiling.md)): How to plug in go pprof profiler to Kubernetes.
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/devel/README.md?pixel)]()

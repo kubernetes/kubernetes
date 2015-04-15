@@ -171,3 +171,6 @@ SparkContext available as sc.
 Make sure the Master Pod is running (use: ```kubectl get pods```).
 
 ```kubectl create -f spark-worker-controller.json```
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/spark/README.md?pixel)]()

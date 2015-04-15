@@ -89,3 +89,6 @@ kind: Pod
 Kubernetes NFS volumes allow an existing NFS share to be made available to containers within a pod. 
 
 [The NFS Pod example](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/examples/nfs/test.yaml) demonstrates how to specify the usage of an NFS volume within a pod. In this example one can see that a volumeMount called "myshare" is being mounted onto /var/www/html/mount-test in the container "testpd". The volume "myshare" is defined as type nfs, with the NFS server serving from 172.17.0.2 and exporting directory /tmp as the share. The mount being created in this example is not read only. 
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/volumes.md?pixel)]()
