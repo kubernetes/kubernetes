@@ -250,7 +250,7 @@ func NewTimeoutError(message string, retryAfterSeconds int) error {
 }
 
 // NewGenericServerResponse returns a new error for server responses that are not in a recognizable form.
-func NewGenericServerResponse(code int, verb, kind, name, serverMessage string, retryAfterSeconds int) error {
+func NewGenericServerResponse(code int, verb, kind, name, serverMessage string, retryAfterSeconds int, isUnexpectedResponse bool) error {
 	reason := api.StatusReasonUnknown
 	message := fmt.Sprintf("the server responded with the status code %d but did not return more information", code)
 	switch code {
@@ -297,6 +297,17 @@ func NewGenericServerResponse(code int, verb, kind, name, serverMessage string, 
 	case len(kind) > 0:
 		message = fmt.Sprintf("%s (%s %s)", message, strings.ToLower(verb), kind)
 	}
+	var causes []api.StatusCause
+	if isUnexpectedResponse {
+		causes = []api.StatusCause{
+			{
+				Type:    api.CauseTypeUnexpectedServerResponse,
+				Message: serverMessage,
+			},
+		}
+	} else {
+		causes = nil
+	}
 	return &StatusError{api.Status{
 		Status: api.StatusFailure,
 		Code:   code,
@@ -305,13 +316,7 @@ func NewGenericServerResponse(code int, verb, kind, name, serverMessage string, 
 			Kind: kind,
 			ID:   name,
 
-			Causes: []api.StatusCause{
-				{
-					Type:    api.CauseTypeUnexpectedServerResponse,
-					Message: serverMessage,
-				},
-			},
-
+			Causes:            causes,
 			RetryAfterSeconds: retryAfterSeconds,
 		},
 		Message: message,
