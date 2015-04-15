@@ -27,14 +27,43 @@ $minion_ips = $num_minion.times.collect { |n| $minion_ip_base + "#{n+3}" }
 # Determine the OS platform to use
 $kube_os = ENV['KUBERNETES_OS'] || "fedora"
 
-# Check if we already have kube box
-$kube_box_url = ENV['KUBERNETES_BOX_URL'] || "http://opscode-vm-bento.s3.amazonaws.com/vagrant/virtualbox/opscode_fedora-20_chef-provisionerless.box"
+# To override the vagrant provider, use (e.g.):
+#   DEFAULT_VAGRANT_PROVIDER=... .../cluster/kube-up.sh
+# To override the box, use (e.g.):
+#   KUBERNETES_BOX_NAME=... .../cluster/kube-up.sh
+# You can overried both (e.g.):
+#   DEFAULT_VAGRANT_PROVIDER=... KUBERNETES_BOX_NAME=... .../cluster/kube-up.sh
+# If you want to specify the location for the box, add (e.g.):
+#   KUBERNETES_BOX_URL=... KUBERNETES_BOX_NAME=... .../cluster/kube-up.sh
+# KUBERNETES_BOX_URL will be ignored unless KUBERNETES_BOX_NAME is set
 
-# OS platform to box information
-$kube_box = {
-  "fedora" => {
-    "name" => "fedora20",
-    "box_url" => $kube_box_url 
+# Default OS platform to provider/box information
+$kube_provider_boxes = {
+  :parallels => {
+    'fedora' => {
+      # :box_url is optional; if omitted the box will be retrieved by
+      # :box_name from http://atlas.hashicorp.com/boxes/search (formerly
+      # http://vagrantcloud.com/); this allows you override :box_name with
+      # your own value so long as you provide :box_url; for example, the
+      # "official" name of this box is "rickard-von-essen/
+      # opscode_fedora-20", but by providing the URL and our own name, we
+      # make it appear as yet another provider under the "kube-fedora20"
+      # box
+      :box_name => 'kube-fedora20',
+      :box_url => 'https://atlas.hashicorp.com/rickard-von-essen/boxes/opscode_fedora-20/versions/0.4.0/providers/parallels.box'
+    }
+  },
+  :virtualbox => {
+    'fedora' => {
+      :box_name => 'kube-fedora20',
+      :box_url => 'http://opscode-vm-bento.s3.amazonaws.com/vagrant/virtualbox/opscode_fedora-20_chef-provisionerless.box'
+    }
+  },
+  :vmware_desktop => {
+    'fedora' => {
+      :box_name => 'kube-fedora20',
+      :box_url => 'http://opscode-vm-bento.s3.amazonaws.com/vagrant/vmware/opscode_fedora-20-i386_chef-provisionerless.box'
+    }
   }
 }
 
@@ -57,13 +86,54 @@ end
 $vm_mem = (ENV['KUBERNETES_MEMORY'] || 1024).to_i
 
 Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
-  def customize_vm(config)
-    config.vm.box = $kube_box[$kube_os]["name"]
-    config.vm.box_url = $kube_box[$kube_os]["box_url"]
+  def setvmboxandurl(config, provider)
+    config.vm.box = ENV['KUBERNETES_BOX_NAME'] || $kube_provider_boxes[provider][$kube_os][:box_name]
 
-    config.vm.provider :virtualbox do |v|
-      v.customize ["modifyvm", :id, "--memory", $vm_mem]
-      v.customize ["modifyvm", :id, "--cpus", $vm_cpus]
+    if ENV['KUBERNETES_BOX_NAME'] && ENV['KUBERNETES_BOX_URL']
+      config.vm.box_url = ENV['KUBERNETES_BOX_URL']
+    elsif $kube_provider_boxes[provider][$kube_os][:box_url]
+      config.vm.box_url = $kube_provider_boxes[provider][$kube_os][:box_url]
+    end
+  end
+
+  def customize_vm(config)
+    # Try VMWare Fusion first (see
+    # https://docs.vagrantup.com/v2/providers/basic_usage.html)
+    config.vm.provider :vmware_fusion do |v, override|
+      setvmboxandurl(override, :vmware_desktop)
+      v.vmx['memsize'] = $vm_mem
+      v.vmx['numvcpus'] = $vm_cpus
+    end
+
+    # Then try VMWare Workstation
+    config.vm.provider :vmware_workstation do |v, override|
+      setvmboxandurl(override, :vmware_desktop)
+      v.vmx['memsize'] = $vm_mem
+      v.vmx['numvcpus'] = $vm_cpus
+    end
+
+    # Then try Parallels
+    config.vm.provider :parallels do |v, override|
+      setvmboxandurl(override, :parallels)
+      v.memory = $vm_mem # v.customize ['set', :id, '--memsize', $vm_mem]
+      v.cpus = $vm_cpus # v.customize ['set', :id, '--cpus', $vm_cpus]
+
+      # Don't attempt to update the Parallels tools on the image (this can
+      # be done manually if necessary)
+      v.update_guest_tools = false # v.customize ['set', :id, '--tools-autoupdate', 'off']
+
+      # Set up Parallels folder sharing to behave like VirtualBox (i.e.,
+      # mount the current directory as /vagrant and that's it)
+      v.customize ['set', :id, '--shf-guest', 'off']
+      v.customize ['set', :id, '--shf-guest-automount', 'off']
+      v.customize ['set', :id, '--shf-host', 'on']
+    end
+
+    # Finally, fall back to VirtualBox
+    config.vm.provider :virtualbox do |v, override|
+      setvmboxandurl(override, :virtualbox)
+      v.memory = $vm_mem # v.customize ["modifyvm", :id, "--memory", $vm_mem]
+      v.cpus = $vm_cpus # v.customize ["modifyvm", :id, "--cpus", $vm_cpus]
 
       # Use faster paravirtualized networking
       v.customize ["modifyvm", :id, "--nictype1", "virtio"]
