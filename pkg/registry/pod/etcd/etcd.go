@@ -135,7 +135,7 @@ func (r *BindingREST) setPodHostAndAnnotations(ctx api.Context, podID, oldMachin
 	if err != nil {
 		return nil, err
 	}
-	err = r.store.Helper.AtomicUpdate(podKey, &api.Pod{}, false, func(obj runtime.Object) (runtime.Object, uint64, error) {
+	err = r.store.Helper.GuaranteedUpdate(podKey, &api.Pod{}, false, func(obj runtime.Object) (runtime.Object, uint64, error) {
 		pod, ok := obj.(*api.Pod)
 		if !ok {
 			return nil, 0, fmt.Errorf("unexpected object: %#v", obj)

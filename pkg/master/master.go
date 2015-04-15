@@ -40,7 +40,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/authorizer"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/handlers"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/master/ports"
@@ -72,7 +71,6 @@ import (
 
 // Config is a structure used to configure a Master.
 type Config struct {
-	Cloud             cloudprovider.Interface
 	EtcdHelper        tools.EtcdHelper
 	EventTTL          time.Duration
 	MinionRegexp      string
@@ -396,7 +394,7 @@ func (m *Master) init(c *Config) {
 		"bindings":     podStorage.Binding,
 
 		"replicationControllers": controllerStorage,
-		"services":               service.NewStorage(m.serviceRegistry, c.Cloud, m.nodeRegistry, m.endpointRegistry, m.portalNet, c.ClusterName),
+		"services":               service.NewStorage(m.serviceRegistry, m.nodeRegistry, m.endpointRegistry, m.portalNet, c.ClusterName),
 		"endpoints":              endpointsStorage,
 		"minions":                nodeStorage,
 		"minions/status":         nodeStatusStorage,

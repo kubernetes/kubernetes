@@ -23,6 +23,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl"
 	cmdutil "github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/cmd/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/resource"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -67,7 +68,8 @@ func NewCmdDelete(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 			cmdutil.CheckErr(err)
 		},
 	}
-	cmd.Flags().VarP(&filenames, "filename", "f", "Filename, directory, or URL to a file containing the resource to delete")
+	usage := "Filename, directory, or URL to a file containing the resource to delete"
+	kubectl.AddJsonFilenameFlag(cmd, &filenames, usage)
 	cmd.Flags().StringP("selector", "l", "", "Selector (label query) to filter on")
 	cmd.Flags().Bool("all", false, "[-all] to select all the specified resources")
 	return cmd

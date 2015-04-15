@@ -84,16 +84,20 @@ func NewConfigFactory(client *client.Client) *ConfigFactory {
 		framework.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
 				if pod, ok := obj.(*api.Pod); ok {
-					c.modeler.ForgetPod(pod)
+					c.modeler.LockedAction(func() {
+						c.modeler.ForgetPod(pod)
+					})
 				}
 			},
 			DeleteFunc: func(obj interface{}) {
-				switch t := obj.(type) {
-				case *api.Pod:
-					c.modeler.ForgetPod(t)
-				case cache.DeletedFinalStateUnknown:
-					c.modeler.ForgetPodByKey(t.Key)
-				}
+				c.modeler.LockedAction(func() {
+					switch t := obj.(type) {
+					case *api.Pod:
+						c.modeler.ForgetPod(t)
+					case cache.DeletedFinalStateUnknown:
+						c.modeler.ForgetPodByKey(t.Key)
+					}
+				})
 			},
 		},
 	)

@@ -19,7 +19,7 @@ let loadedImageFlags=0;
 
 while true; do
 
- if [ $loadedImageFlags == 3 ]; then break; fi;
+ if [ $loadedImageFlags == 7 ]; then break; fi;
 
  if which docker 1>/dev/null 2>&1; then
    if docker load -i /srv/salt/kube-bins/kube-apiserver.tar 1>/dev/null 2>&1; then
@@ -28,9 +28,10 @@ while true; do
    if docker load -i /srv/salt/kube-bins/kube-scheduler.tar 1>/dev/null 2>&1; then
      let loadedImageFlags="$loadedImageFlags|2";
    fi;
-
+   if docker load -i /srv/salt/kube-bins/kube-controller-manager.tar 1>/dev/null 2>&1; then
+     let loadedImageFlags="$loadedImageFlags|4";
+   fi;
  fi;
-
 
 done;
 

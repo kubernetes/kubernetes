@@ -244,7 +244,7 @@ func CreateResource(r rest.Creater, scope RequestScope, typer runtime.ObjectType
 }
 
 // PatchResource returns a function that will handle a resource patch
-// TODO: Eventually PatchResource should just use AtomicUpdate and this routine should be a bit cleaner
+// TODO: Eventually PatchResource should just use GuaranteedUpdate and this routine should be a bit cleaner
 func PatchResource(r rest.Patcher, scope RequestScope, typer runtime.ObjectTyper, admit admission.Interface, converter runtime.ObjectConvertor) restful.RouteFunction {
 	return func(req *restful.Request, res *restful.Response) {
 		w := res.ResponseWriter

@@ -122,7 +122,8 @@ func NewMainKubelet(
 	cadvisorInterface cadvisor.Interface,
 	imageGCPolicy ImageGCPolicy,
 	cloud cloudprovider.Interface,
-	nodeStatusUpdateFrequency time.Duration) (*Kubelet, error) {
+	nodeStatusUpdateFrequency time.Duration,
+	resourceContainer string) (*Kubelet, error) {
 	if rootDirectory == "" {
 		return nil, fmt.Errorf("invalid root directory %q", rootDirectory)
 	}
@@ -228,6 +229,7 @@ func NewMainKubelet(
 		nodeRef:                        nodeRef,
 		containerManager:               containerManager,
 		nodeStatusUpdateFrequency:      nodeStatusUpdateFrequency,
+		resourceContainer:              resourceContainer,
 	}
 
 	klet.podManager = newBasicPodManager(klet.kubeClient)
@@ -358,6 +360,10 @@ type Kubelet struct {
 	//    status. Kubelet may fail to update node status reliablly if the value is too small,
 	//    as it takes time to gather all necessary node information.
 	nodeStatusUpdateFrequency time.Duration
+
+	// The name of the resource-only container to run the Kubelet in (empty for no container).
+	// Name must be absolute.
+	resourceContainer string
 }
 
 // getRootDir returns the full path to the directory under which kubelet can
@@ -536,6 +542,16 @@ func (kl *Kubelet) Run(updates <-chan PodUpdate) {
 	if kl.kubeClient == nil {
 		glog.Warning("No api server defined - no node status update will be sent.")
 	}
+
+	// Move Kubelet to a container.
+	if kl.resourceContainer != "" {
+		err := util.RunInResourceContainer(kl.resourceContainer)
+		if err != nil {
+			glog.Warningf("Failed to move Kubelet to container %q: %v", kl.resourceContainer, err)
+		}
+		glog.Infof("Running in container %q", kl.resourceContainer)
+	}
+
 	go kl.syncNodeStatus()
 	kl.statusManager.Start()
 	kl.syncLoop(updates, kl)

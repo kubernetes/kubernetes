@@ -14,6 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package service provides Registry interface and it's RESTStorage
+// Package service provides the Registry interface and its RESTStorage
 // implementation for storing Service api objects.
 package service

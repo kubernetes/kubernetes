@@ -96,6 +96,7 @@ type KubeletServer struct {
 	TLSPrivateKeyFile              string
 	CertDirectory                  string
 	NodeStatusUpdateFrequency      time.Duration
+	ResourceContainer              string
 
 	// Flags intended for testing
 
@@ -147,6 +148,7 @@ func NewKubeletServer() *KubeletServer {
 		HostNetworkSources:          kubelet.FileSource,
 		CertDirectory:               "/var/run/kubernetes",
 		NodeStatusUpdateFrequency:   10 * time.Second,
+		ResourceContainer:           "/kubelet",
 	}
 }
 
@@ -196,6 +198,7 @@ func (s *KubeletServer) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.NetworkPluginName, "network_plugin", s.NetworkPluginName, "<Warning: Alpha feature> The name of the network plugin to be invoked for various events in kubelet/pod lifecycle")
 	fs.StringVar(&s.CloudProvider, "cloud_provider", s.CloudProvider, "The provider for cloud services.  Empty string for no provider.")
 	fs.StringVar(&s.CloudConfigFile, "cloud_config", s.CloudConfigFile, "The path to the cloud provider configuration file.  Empty string for no configuration file.")
+	fs.StringVar(&s.ResourceContainer, "resource_container", s.ResourceContainer, "Absolute name of the resource-only container to create and run the Kubelet in (Default: /kubelet).")
 
 	// Flags intended for testing, not recommended used in production environments.
 	fs.BoolVar(&s.ReallyCrashForTesting, "really_crash_for_testing", s.ReallyCrashForTesting, "If true, when panics occur crash. Intended for testing.")
@@ -207,6 +210,7 @@ func (s *KubeletServer) Run(_ []string) error {
 	util.ReallyCrash = s.ReallyCrashForTesting
 	rand.Seed(time.Now().UTC().UnixNano())
 
+	// TODO(vmarmol): Do this through container config.
 	if err := util.ApplyOomScoreAdj(0, s.OOMScoreAdj); err != nil {
 		glog.Info(err)
 	}
@@ -293,6 +297,7 @@ func (s *KubeletServer) Run(_ []string) error {
 		ImageGCPolicy:                  imageGCPolicy,
 		Cloud:                          cloud,
 		NodeStatusUpdateFrequency: s.NodeStatusUpdateFrequency,
+		ResourceContainer:         s.ResourceContainer,
 	}
 
 	RunKubelet(&kcfg, nil)
@@ -412,6 +417,7 @@ func SimpleKubelet(client *client.Client,
 		ImageGCPolicy:           imageGCPolicy,
 		Cloud:                   cloud,
 		NodeStatusUpdateFrequency: 10 * time.Second,
+		ResourceContainer:         "/kubelet",
 	}
 	return &kcfg
 }
@@ -534,6 +540,7 @@ type KubeletConfig struct {
 	ImageGCPolicy                  kubelet.ImageGCPolicy
 	Cloud                          cloudprovider.Interface
 	NodeStatusUpdateFrequency      time.Duration
+	ResourceContainer              string
 }
 
 func createAndInitKubelet(kc *KubeletConfig) (k KubeletBootstrap, pc *config.PodConfig, err error) {
@@ -576,7 +583,8 @@ func createAndInitKubelet(kc *KubeletConfig) (k KubeletBootstrap, pc *config.Pod
 		kc.CadvisorInterface,
 		kc.ImageGCPolicy,
 		kc.Cloud,
-		kc.NodeStatusUpdateFrequency)
+		kc.NodeStatusUpdateFrequency,
+		kc.ResourceContainer)
 
 	if err != nil {
 		return nil, nil, err
