@@ -80,6 +80,40 @@ func runLivenessTest(c *client.Client, podDescr *api.Pod) {
 	}
 }
 
+// testHostIP tests that a pod gets a host IP
+func testHostIP(c *client.Client, pod *api.Pod) {
+	ns := "e2e-test-" + string(util.NewUUID())
+	podClient := c.Pods(ns)
+	By("creating pod")
+	defer podClient.Delete(pod.Name)
+	_, err := podClient.Create(pod)
+	if err != nil {
+		Fail(fmt.Sprintf("Failed to create pod: %v", err))
+	}
+	By("ensuring that pod is running and has a hostIP")
+	// Wait for the pods to enter the running state. Waiting loops until the pods
+	// are running so non-running pods cause a timeout for this test.
+	err = waitForPodRunningInNamespace(c, pod.Name, ns)
+	Expect(err).NotTo(HaveOccurred())
+	// Try to make sure we get a hostIP for each pod.
+	hostIPTimeout := 2 * time.Minute
+	t := time.Now()
+	for {
+		p, err := podClient.Get(pod.Name)
+		Expect(err).NotTo(HaveOccurred())
+		if p.Status.HostIP != "" {
+			Logf("Pod %s has hostIP: %s", p.Name, p.Status.HostIP)
+			break
+		}
+		if time.Since(t) >= hostIPTimeout {
+			Failf("Gave up waiting for hostIP of pod %s after %v seconds",
+				p.Name, time.Since(t).Seconds())
+		}
+		Logf("Retrying to get the hostIP of pod %s", p.Name)
+		time.Sleep(5 * time.Second)
+	}
+}
+
 var _ = Describe("Pods", func() {
 	var c *client.Client
 
@@ -89,6 +123,22 @@ var _ = Describe("Pods", func() {
 		expectNoError(err)
 	})
 
+	PIt("should get a host IP", func() {
+		name := "pod-hostip-" + string(util.NewUUID())
+		testHostIP(c, &api.Pod{
+			ObjectMeta: api.ObjectMeta{
+				Name: name,
+			},
+			Spec: api.PodSpec{
+				Containers: []api.Container{
+					{
+						Name:  "test",
+						Image: "gcr.io/google_containers/pause",
+					},
+				},
+			},
+		})
+	})
 	It("should be submitted and removed", func() {
 		podClient := c.Pods(api.NamespaceDefault)
 

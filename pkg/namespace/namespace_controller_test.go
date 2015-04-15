@@ -20,7 +20,6 @@ import (
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/cache"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/testclient"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
@@ -69,7 +68,6 @@ func TestFinalize(t *testing.T) {
 
 func TestSyncNamespaceThatIsTerminating(t *testing.T) {
 	mockClient := &testclient.Fake{}
-	nm := NamespaceManager{kubeClient: mockClient, store: cache.NewStore(cache.MetaNamespaceKeyFunc)}
 	now := util.Now()
 	testNamespace := api.Namespace{
 		ObjectMeta: api.ObjectMeta{
@@ -84,7 +82,7 @@ func TestSyncNamespaceThatIsTerminating(t *testing.T) {
 			Phase: api.NamespaceTerminating,
 		},
 	}
-	err := nm.syncNamespace(testNamespace)
+	err := syncNamespace(mockClient, testNamespace)
 	if err != nil {
 		t.Errorf("Unexpected error when synching namespace %v", err)
 	}
@@ -109,7 +107,6 @@ func TestSyncNamespaceThatIsTerminating(t *testing.T) {
 
 func TestSyncNamespaceThatIsActive(t *testing.T) {
 	mockClient := &testclient.Fake{}
-	nm := NamespaceManager{kubeClient: mockClient, store: cache.NewStore(cache.MetaNamespaceKeyFunc)}
 	testNamespace := api.Namespace{
 		ObjectMeta: api.ObjectMeta{
 			Name:            "test",
@@ -122,7 +119,7 @@ func TestSyncNamespaceThatIsActive(t *testing.T) {
 			Phase: api.NamespaceActive,
 		},
 	}
-	err := nm.syncNamespace(testNamespace)
+	err := syncNamespace(mockClient, testNamespace)
 	if err != nil {
 		t.Errorf("Unexpected error when synching namespace %v", err)
 	}

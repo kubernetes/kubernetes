@@ -1,4 +1,4 @@
-// Copyright 2014 go-dockerclient authors. All rights reserved.
+// Copyright 2015 go-dockerclient authors. All rights reserved.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
@@ -93,7 +93,7 @@ func TestNewTLSVersionedClient(t *testing.T) {
 	keyPath := "testing/data/key.pem"
 	caPath := "testing/data/ca.pem"
 	endpoint := "https://localhost:4243"
-	client, err := NewVersionnedTLSClient(endpoint, certPath, keyPath, caPath, "1.14")
+	client, err := NewVersionedTLSClient(endpoint, certPath, keyPath, caPath, "1.14")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -113,7 +113,7 @@ func TestNewTLSVersionedClientInvalidCA(t *testing.T) {
 	keyPath := "testing/data/key.pem"
 	caPath := "testing/data/key.pem"
 	endpoint := "https://localhost:4243"
-	_, err := NewVersionnedTLSClient(endpoint, certPath, keyPath, caPath, "1.14")
+	_, err := NewVersionedTLSClient(endpoint, certPath, keyPath, caPath, "1.14")
 	if err == nil {
 		t.Errorf("Expected invalid ca at %s", caPath)
 	}
@@ -136,14 +136,15 @@ func TestNewClientInvalidEndpoint(t *testing.T) {
 	}
 }
 
-func TestNewTLSClient2376(t *testing.T) {
+func TestNewTLSClient(t *testing.T) {
 	var tests = []struct {
 		endpoint string
 		expected string
 	}{
 		{"tcp://localhost:2376", "https"},
-		{"tcp://localhost:2375", "http"},
-		{"tcp://localhost:4000", "http"},
+		{"tcp://localhost:2375", "https"},
+		{"tcp://localhost:4000", "https"},
+		{"http://localhost:4000", "https"},
 	}
 
 	for _, tt := range tests {

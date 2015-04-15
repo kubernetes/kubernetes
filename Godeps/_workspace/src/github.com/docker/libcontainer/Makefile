@@ -22,3 +22,12 @@ direct-build:
 
 direct-install:
 	go install -v $(GO_PACKAGES)
+
+local:
+	go test -v
+
+validate:
+	hack/validate.sh
+
+binary: all
+	docker run --rm --privileged -v $(CURDIR)/bundles:/go/bin dockercore/libcontainer make direct-install

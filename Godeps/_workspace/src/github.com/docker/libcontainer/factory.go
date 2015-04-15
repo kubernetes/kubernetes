@@ -1,7 +1,10 @@
 package libcontainer
 
-type Factory interface {
+import (
+	"github.com/docker/libcontainer/configs"
+)
 
+type Factory interface {
 	// Creates a new container with the given id and starts the initial process inside it.
 	// id must be a string containing only letters, digits and underscores and must contain
 	// between 1 and 1024 characters, inclusive.
@@ -11,22 +14,32 @@ type Factory interface {
 	//
 	// Returns the new container with a running process.
 	//
-	// Errors:
+	// errors:
 	// IdInUse - id is already in use by a container
 	// InvalidIdFormat - id has incorrect format
 	// ConfigInvalid - config is invalid
-	// SystemError - System error
+	// Systemerror - System error
 	//
 	// On error, any partially created container parts are cleaned up (the operation is atomic).
-	Create(id string, config *Config) (Container, Error)
+	Create(id string, config *configs.Config) (Container, error)
 
-	// Load takes an ID for an existing container and reconstructs the container
-	// from the state.
+	// Load takes an ID for an existing container and returns the container information
+	// from the state.  This presents a read only view of the container.
 	//
-	// Errors:
+	// errors:
 	// Path does not exist
 	// Container is stopped
 	// System error
-	// TODO: fix description
-	Load(id string) (Container, Error)
+	Load(id string) (Container, error)
+
+	// StartInitialization is an internal API to libcontainer used during the rexec of the
+	// container.
+	//
+	// Errors:
+	// Pipe connection error
+	// System error
+	StartInitialization() error
+
+	// Type returns info string about factory type (e.g. lxc, libcontainer...)
+	Type() string
 }

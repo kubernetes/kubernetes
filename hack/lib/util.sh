@@ -96,6 +96,18 @@ kube::util::host_platform() {
   echo "${host_os}/${host_arch}"
 }
 
+kube::util::find-binary() {
+  local lookfor="${1}"
+  local host_platform="$(kube::util::host_platform)"
+  local locations=(
+    "${KUBE_ROOT}/_output/dockerized/bin/${host_platform}/${lookfor}"
+    "${KUBE_ROOT}/_output/local/bin/${host_platform}/${lookfor}"
+    "${KUBE_ROOT}/platforms/${host_platform}/${lookfor}"
+  )
+  local bin=$( (ls -t "${locations[@]}" 2>/dev/null || true) | head -1 )
+  echo -n "${bin}"
+}
+
 # Wait for background jobs to finish. Return with
 # an error status if any of the jobs failed.
 kube::util::wait-for-jobs() {
@@ -106,3 +118,31 @@ kube::util::wait-for-jobs() {
   done
   return ${fail}
 }
+
+# takes a binary to run $1 and then copies the results to $2
+kube::util::gen-doc() {
+  local cmd="$1"
+  local dest="$2"
+
+  # remove all old generated file from the destination
+  for file in $(cat "${dest}/.files_generated" 2>/dev/null); do
+    set +e
+    rm "${dest}/${file}"
+    set -e
+  done
+
+  # We do this in a tmpdir in case the dest has other non-autogenned files
+  # We don't want to include them in the list of gen'd files
+  local tmpdir="${KUBE_ROOT}/doc_tmp"
+  mkdir "${tmpdir}"
+  # generate the new files
+  ${cmd} "${tmpdir}"
+  # create the list of generated files
+  ls "${tmpdir}" | LC_ALL=C sort > "${tmpdir}/.files_generated"
+  # put the new generated file into the destination
+  find "${tmpdir}" -exec rsync -pt {} "${dest}" \; >/dev/null
+  #cleanup
+  rm -rf "${tmpdir}"
+}
+
+# ex: ts=2 sw=2 et filetype=sh

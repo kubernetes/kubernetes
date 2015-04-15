@@ -435,6 +435,7 @@ kubectl stop -f examples/guestbook/redis-slave-controller.json
 kubectl stop -f examples/guestbook/frontend-controller.json
 kubectl delete -f examples/guestbook/redis-master-service.json
 kubectl delete -f examples/guestbook/redis-slave-service.json
+kubectl delete -f examples/guestbook/frontend-service.json
 ```
 
 ### Troubleshooting

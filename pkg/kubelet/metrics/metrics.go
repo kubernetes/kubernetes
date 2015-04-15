@@ -20,7 +20,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/dockertools"
+	kubecontainer "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
 	"github.com/golang/glog"
 	"github.com/prometheus/client_golang/prometheus"
 )
@@ -70,7 +70,7 @@ var (
 var registerMetrics sync.Once
 
 // Register all metrics.
-func Register(containerCache dockertools.DockerCache) {
+func Register(containerCache kubecontainer.RuntimeCache) {
 	// Register the metrics.
 	registerMetrics.Do(func() {
 		prometheus.MustRegister(ImagePullLatency)
@@ -108,7 +108,7 @@ func SinceInMicroseconds(start time.Time) float64 {
 	return float64(time.Since(start).Nanoseconds() / time.Microsecond.Nanoseconds())
 }
 
-func newPodAndContainerCollector(containerCache dockertools.DockerCache) *podAndContainerCollector {
+func newPodAndContainerCollector(containerCache kubecontainer.RuntimeCache) *podAndContainerCollector {
 	return &podAndContainerCollector{
 		containerCache: containerCache,
 	}
@@ -117,7 +117,7 @@ func newPodAndContainerCollector(containerCache dockertools.DockerCache) *podAnd
 // Custom collector for current pod and container counts.
 type podAndContainerCollector struct {
 	// Cache for accessing information about running containers.
-	containerCache dockertools.DockerCache
+	containerCache kubecontainer.RuntimeCache
 }
 
 // TODO(vmarmol): Split by source?

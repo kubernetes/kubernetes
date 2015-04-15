@@ -1,4 +1,4 @@
-// Copyright 2014 go-dockerclient authors. All rights reserved.
+// Copyright 2015 go-dockerclient authors. All rights reserved.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
@@ -35,6 +35,7 @@ import (
 type DockerServer struct {
 	containers     []*docker.Container
 	execs          []*docker.ExecInspect
+	execMut        sync.RWMutex
 	cMut           sync.RWMutex
 	images         []docker.Image
 	iMut           sync.RWMutex
@@ -43,6 +44,8 @@ type DockerServer struct {
 	mux            *mux.Router
 	hook           func(*http.Request)
 	failures       map[string]string
+	multiFailures  []map[string]string
+	execCallbacks  map[string]func()
 	customHandlers map[string]http.Handler
 	handlerMutex   sync.RWMutex
 	cChan          chan<- *docker.Container
@@ -69,6 +72,7 @@ func NewServer(bind string, containerChan chan<- *docker.Container, hook func(*h
 		imgIDs:         make(map[string]string),
 		hook:           hook,
 		failures:       make(map[string]string),
+		execCallbacks:  make(map[string]func()),
 		customHandlers: make(map[string]http.Handler),
 		cChan:          containerChan,
 	}
@@ -89,6 +93,7 @@ func (s *DockerServer) buildMuxer() {
 	s.mux.Path("/containers/json").Methods("GET").HandlerFunc(s.handlerWrapper(s.listContainers))
 	s.mux.Path("/containers/create").Methods("POST").HandlerFunc(s.handlerWrapper(s.createContainer))
 	s.mux.Path("/containers/{id:.*}/json").Methods("GET").HandlerFunc(s.handlerWrapper(s.inspectContainer))
+	s.mux.Path("/containers/{id:.*}/rename").Methods("POST").HandlerFunc(s.handlerWrapper(s.renameContainer))
 	s.mux.Path("/containers/{id:.*}/top").Methods("GET").HandlerFunc(s.handlerWrapper(s.topContainer))
 	s.mux.Path("/containers/{id:.*}/start").Methods("POST").HandlerFunc(s.handlerWrapper(s.startContainer))
 	s.mux.Path("/containers/{id:.*}/kill").Methods("POST").HandlerFunc(s.handlerWrapper(s.stopContainer))
@@ -115,15 +120,57 @@ func (s *DockerServer) buildMuxer() {
 	s.mux.Path("/images/{id:.*}/get").Methods("GET").HandlerFunc(s.handlerWrapper(s.getImage))
 }
 
+// SetHook changes the hook function used by the server.
+//
+// The hook function is a function called on every request.
+func (s *DockerServer) SetHook(hook func(*http.Request)) {
+	s.hook = hook
+}
+
+// PrepareExec adds a callback to a container exec in the fake server.
+//
+// This function will be called whenever the given exec id is started, and the
+// given exec id will remain in the "Running" start while the function is
+// running, so it's useful for emulating an exec that runs for two seconds, for
+// example:
+//
+//    opts := docker.CreateExecOptions{
+//        AttachStdin:  true,
+//        AttachStdout: true,
+//        AttachStderr: true,
+//        Tty:          true,
+//        Cmd:          []string{"/bin/bash", "-l"},
+//    }
+//    // Client points to a fake server.
+//    exec, err := client.CreateExec(opts)
+//    // handle error
+//    server.PrepareExec(exec.ID, func() {time.Sleep(2 * time.Second)})
+//    err = client.StartExec(exec.ID, docker.StartExecOptions{Tty: true}) // will block for 2 seconds
+//    // handle error
+func (s *DockerServer) PrepareExec(id string, callback func()) {
+	s.execCallbacks[id] = callback
+}
+
 // PrepareFailure adds a new expected failure based on a URL regexp it receives
 // an id for the failure.
 func (s *DockerServer) PrepareFailure(id string, urlRegexp string) {
 	s.failures[id] = urlRegexp
 }
 
+// PrepareMultiFailures enqueues a new expected failure based on a URL regexp
+// it receives an id for the failure.
+func (s *DockerServer) PrepareMultiFailures(id string, urlRegexp string) {
+	s.multiFailures = append(s.multiFailures, map[string]string{"error": id, "url": urlRegexp})
+}
+
 // ResetFailure removes an expected failure identified by the given id.
 func (s *DockerServer) ResetFailure(id string) {
 	delete(s.failures, id)
+}
+
+// ResetMultiFailures removes all enqueued failures.
+func (s *DockerServer) ResetMultiFailures() {
+	s.multiFailures = []map[string]string{}
 }
 
 // CustomHandler registers a custom handler for a specific path.
@@ -170,9 +217,11 @@ func (s *DockerServer) URL() string {
 func (s *DockerServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	s.handlerMutex.RLock()
 	defer s.handlerMutex.RUnlock()
-	if handler, ok := s.customHandlers[r.URL.Path]; ok {
-		handler.ServeHTTP(w, r)
-		return
+	for re, handler := range s.customHandlers {
+		if m, _ := regexp.MatchString(re, r.URL.Path); m {
+			handler.ServeHTTP(w, r)
+			return
+		}
 	}
 	s.mux.ServeHTTP(w, r)
 	if s.hook != nil {
@@ -198,6 +247,19 @@ func (s *DockerServer) handlerWrapper(f func(http.ResponseWriter, *http.Request)
 				continue
 			}
 			http.Error(w, errorID, http.StatusBadRequest)
+			return
+		}
+		for i, failure := range s.multiFailures {
+			matched, err := regexp.MatchString(failure["url"], r.URL.Path)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusBadRequest)
+				return
+			}
+			if !matched {
+				continue
+			}
+			http.Error(w, failure["error"], http.StatusBadRequest)
+			s.multiFailures = append(s.multiFailures[:i], s.multiFailures[i+1:]...)
 			return
 		}
 		f(w, r)
@@ -334,6 +396,23 @@ func (s *DockerServer) generateID() string {
 	var buf [16]byte
 	rand.Read(buf[:])
 	return fmt.Sprintf("%x", buf)
+}
+
+func (s *DockerServer) renameContainer(w http.ResponseWriter, r *http.Request) {
+	id := mux.Vars(r)["id"]
+	container, index, err := s.findContainer(id)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusNotFound)
+		return
+	}
+	copy := *container
+	copy.Name = r.URL.Query().Get("name")
+	s.cMut.Lock()
+	defer s.cMut.Unlock()
+	if s.containers[index].ID == copy.ID {
+		s.containers[index] = &copy
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (s *DockerServer) inspectContainer(w http.ResponseWriter, r *http.Request) {
@@ -524,9 +603,13 @@ func (s *DockerServer) commitContainer(w http.ResponseWriter, r *http.Request) {
 		Config:    config,
 	}
 	repository := r.URL.Query().Get("repo")
+	tag := r.URL.Query().Get("tag")
 	s.iMut.Lock()
 	s.images = append(s.images, image)
 	if repository != "" {
+		if tag != "" {
+			repository += ":" + tag
+		}
 		s.imgIDs[repository] = image.ID
 	}
 	s.iMut.Unlock()
@@ -582,20 +665,28 @@ func (s *DockerServer) buildImage(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *DockerServer) pullImage(w http.ResponseWriter, r *http.Request) {
-	repository := r.URL.Query().Get("fromImage")
+	fromImageName := r.URL.Query().Get("fromImage")
+	tag := r.URL.Query().Get("tag")
 	image := docker.Image{
 		ID: s.generateID(),
 	}
 	s.iMut.Lock()
 	s.images = append(s.images, image)
-	if repository != "" {
-		s.imgIDs[repository] = image.ID
+	if fromImageName != "" {
+		if tag != "" {
+			fromImageName = fmt.Sprintf("%s:%s", fromImageName, tag)
+		}
+		s.imgIDs[fromImageName] = image.ID
 	}
 	s.iMut.Unlock()
 }
 
 func (s *DockerServer) pushImage(w http.ResponseWriter, r *http.Request) {
 	name := mux.Vars(r)["name"]
+	tag := r.URL.Query().Get("tag")
+	if tag != "" {
+		name += ":" + tag
+	}
 	s.iMut.RLock()
 	if _, ok := s.imgIDs[name]; !ok {
 		s.iMut.RUnlock()
@@ -619,6 +710,10 @@ func (s *DockerServer) tagImage(w http.ResponseWriter, r *http.Request) {
 	s.iMut.Lock()
 	defer s.iMut.Unlock()
 	newRepo := r.URL.Query().Get("repo")
+	newTag := r.URL.Query().Get("tag")
+	if newTag != "" {
+		newRepo += ":" + newTag
+	}
 	s.imgIDs[newRepo] = s.imgIDs[name]
 	w.WriteHeader(http.StatusCreated)
 }
@@ -722,7 +817,6 @@ func (s *DockerServer) loadImage(w http.ResponseWriter, r *http.Request) {
 func (s *DockerServer) getImage(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	w.Header().Set("Content-Type", "application/tar")
-
 }
 
 func (s *DockerServer) createExecContainer(w http.ResponseWriter, r *http.Request) {
@@ -733,7 +827,7 @@ func (s *DockerServer) createExecContainer(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	exec := docker.ExecInspect{
-		ID:        "id-exec-created-by-test",
+		ID:        s.generateID(),
 		Container: *container,
 	}
 	var params docker.CreateExecOptions
@@ -748,44 +842,63 @@ func (s *DockerServer) createExecContainer(w http.ResponseWriter, r *http.Reques
 			exec.ProcessConfig.Arguments = params.Cmd[1:]
 		}
 	}
+	s.execMut.Lock()
 	s.execs = append(s.execs, &exec)
+	s.execMut.Unlock()
 	w.WriteHeader(http.StatusOK)
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{"Id": exec.ID})
-
 }
 
 func (s *DockerServer) startExecContainer(w http.ResponseWriter, r *http.Request) {
 	id := mux.Vars(r)["id"]
-	for _, exec := range s.execs {
-		if exec.ID == id {
-			w.WriteHeader(http.StatusOK)
-			return
+	if exec, err := s.getExec(id); err == nil {
+		s.execMut.Lock()
+		exec.Running = true
+		s.execMut.Unlock()
+		if callback, ok := s.execCallbacks[id]; ok {
+			callback()
+			delete(s.execCallbacks, id)
+		} else if callback, ok := s.execCallbacks["*"]; ok {
+			callback()
+			delete(s.execCallbacks, "*")
 		}
+		s.execMut.Lock()
+		exec.Running = false
+		s.execMut.Unlock()
+		w.WriteHeader(http.StatusOK)
+		return
 	}
 	w.WriteHeader(http.StatusNotFound)
 }
 
 func (s *DockerServer) resizeExecContainer(w http.ResponseWriter, r *http.Request) {
 	id := mux.Vars(r)["id"]
-	for _, exec := range s.execs {
-		if exec.ID == id {
-			w.WriteHeader(http.StatusOK)
-			return
-		}
+	if _, err := s.getExec(id); err == nil {
+		w.WriteHeader(http.StatusOK)
+		return
 	}
 	w.WriteHeader(http.StatusNotFound)
 }
 
 func (s *DockerServer) inspectExecContainer(w http.ResponseWriter, r *http.Request) {
 	id := mux.Vars(r)["id"]
-	for _, exec := range s.execs {
-		if exec.ID == id {
-			w.WriteHeader(http.StatusOK)
-			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(exec)
-			return
-		}
+	if exec, err := s.getExec(id); err == nil {
+		w.WriteHeader(http.StatusOK)
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(exec)
+		return
 	}
 	w.WriteHeader(http.StatusNotFound)
+}
+
+func (s *DockerServer) getExec(id string) (*docker.ExecInspect, error) {
+	s.execMut.RLock()
+	defer s.execMut.RUnlock()
+	for _, exec := range s.execs {
+		if exec.ID == id {
+			return exec, nil
+		}
+	}
+	return nil, errors.New("exec not found")
 }

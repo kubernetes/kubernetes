@@ -28,7 +28,7 @@ nginx:
     - group: root
     - mode: 644
 
-{% if grains.cloud in ['gce'] %}
+{% if grains.cloud is defined and grains.cloud in ['gce'] %}
 /etc/kubernetes/manifests/nginx.json:
   file:
     - managed

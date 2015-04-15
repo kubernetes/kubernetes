@@ -503,7 +503,7 @@ func TestSetObjNilOutParam(t *testing.T) {
 	}
 }
 
-func TestAtomicUpdate(t *testing.T) {
+func TestGuaranteedUpdate(t *testing.T) {
 	fakeClient := NewFakeEtcdClient(t)
 	fakeClient.TestIndex = true
 	helper := NewEtcdHelper(fakeClient, codec)
@@ -511,7 +511,7 @@ func TestAtomicUpdate(t *testing.T) {
 	// Create a new node.
 	fakeClient.ExpectNotFoundGet("/some/key")
 	obj := &TestResource{ObjectMeta: api.ObjectMeta{Name: "foo"}, Value: 1}
-	err := helper.AtomicUpdate("/some/key", &TestResource{}, true, func(in runtime.Object) (runtime.Object, uint64, error) {
+	err := helper.GuaranteedUpdate("/some/key", &TestResource{}, true, func(in runtime.Object) (runtime.Object, uint64, error) {
 		return obj, 0, nil
 	})
 	if err != nil {
@@ -530,7 +530,7 @@ func TestAtomicUpdate(t *testing.T) {
 	// Update an existing node.
 	callbackCalled := false
 	objUpdate := &TestResource{ObjectMeta: api.ObjectMeta{Name: "foo"}, Value: 2}
-	err = helper.AtomicUpdate("/some/key", &TestResource{}, true, func(in runtime.Object) (runtime.Object, uint64, error) {
+	err = helper.GuaranteedUpdate("/some/key", &TestResource{}, true, func(in runtime.Object) (runtime.Object, uint64, error) {
 		callbackCalled = true
 
 		if in.(*TestResource).Value != 1 {
@@ -557,7 +557,7 @@ func TestAtomicUpdate(t *testing.T) {
 	}
 }
 
-func TestAtomicUpdateNoChange(t *testing.T) {
+func TestGuaranteedUpdateNoChange(t *testing.T) {
 	fakeClient := NewFakeEtcdClient(t)
 	fakeClient.TestIndex = true
 	helper := NewEtcdHelper(fakeClient, codec)
@@ -565,7 +565,7 @@ func TestAtomicUpdateNoChange(t *testing.T) {
 	// Create a new node.
 	fakeClient.ExpectNotFoundGet("/some/key")
 	obj := &TestResource{ObjectMeta: api.ObjectMeta{Name: "foo"}, Value: 1}
-	err := helper.AtomicUpdate("/some/key", &TestResource{}, true, func(in runtime.Object) (runtime.Object, uint64, error) {
+	err := helper.GuaranteedUpdate("/some/key", &TestResource{}, true, func(in runtime.Object) (runtime.Object, uint64, error) {
 		return obj, 0, nil
 	})
 	if err != nil {
@@ -575,7 +575,7 @@ func TestAtomicUpdateNoChange(t *testing.T) {
 	// Update an existing node with the same data
 	callbackCalled := false
 	objUpdate := &TestResource{ObjectMeta: api.ObjectMeta{Name: "foo"}, Value: 1}
-	err = helper.AtomicUpdate("/some/key", &TestResource{}, true, func(in runtime.Object) (runtime.Object, uint64, error) {
+	err = helper.GuaranteedUpdate("/some/key", &TestResource{}, true, func(in runtime.Object) (runtime.Object, uint64, error) {
 		fakeClient.Err = errors.New("should not be called")
 		callbackCalled = true
 		return objUpdate, 0, nil
@@ -588,7 +588,7 @@ func TestAtomicUpdateNoChange(t *testing.T) {
 	}
 }
 
-func TestAtomicUpdateKeyNotFound(t *testing.T) {
+func TestGuaranteedUpdateKeyNotFound(t *testing.T) {
 	fakeClient := NewFakeEtcdClient(t)
 	fakeClient.TestIndex = true
 	helper := NewEtcdHelper(fakeClient, codec)
@@ -602,19 +602,19 @@ func TestAtomicUpdateKeyNotFound(t *testing.T) {
 	}
 
 	ignoreNotFound := false
-	err := helper.AtomicUpdate("/some/key", &TestResource{}, ignoreNotFound, f)
+	err := helper.GuaranteedUpdate("/some/key", &TestResource{}, ignoreNotFound, f)
 	if err == nil {
 		t.Errorf("Expected error for key not found.")
 	}
 
 	ignoreNotFound = true
-	err = helper.AtomicUpdate("/some/key", &TestResource{}, ignoreNotFound, f)
+	err = helper.GuaranteedUpdate("/some/key", &TestResource{}, ignoreNotFound, f)
 	if err != nil {
 		t.Errorf("Unexpected error %v.", err)
 	}
 }
 
-func TestAtomicUpdate_CreateCollision(t *testing.T) {
+func TestGuaranteedUpdate_CreateCollision(t *testing.T) {
 	fakeClient := NewFakeEtcdClient(t)
 	fakeClient.TestIndex = true
 	helper := NewEtcdHelper(fakeClient, codec)
@@ -633,11 +633,11 @@ func TestAtomicUpdate_CreateCollision(t *testing.T) {
 			defer wgDone.Done()
 
 			firstCall := true
-			err := helper.AtomicUpdate("/some/key", &TestResource{}, true, func(in runtime.Object) (runtime.Object, uint64, error) {
+			err := helper.GuaranteedUpdate("/some/key", &TestResource{}, true, func(in runtime.Object) (runtime.Object, uint64, error) {
 				defer func() { firstCall = false }()
 
 				if firstCall {
-					// Force collision by joining all concurrent AtomicUpdate operations here.
+					// Force collision by joining all concurrent GuaranteedUpdate operations here.
 					wgForceCollision.Done()
 					wgForceCollision.Wait()
 				}

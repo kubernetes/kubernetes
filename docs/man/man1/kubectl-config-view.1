@@ -3,7 +3,7 @@
 
 .SH NAME
 .PP
-kubectl config view \- displays merged kubeconfig settings or a specified kubeconfig file.
+kubectl config view \- displays Merged kubeconfig settings or a specified kubeconfig file.
 
 
 .SH SYNOPSIS
@@ -13,7 +13,7 @@ kubectl config view \- displays merged kubeconfig settings or a specified kubeco
 
 .SH DESCRIPTION
 .PP
-displays merged kubeconfig settings or a specified kubeconfig file.
+displays Merged kubeconfig settings or a specified kubeconfig file.
 
 .PP
 You can use \-\-output=template \-\-template=TEMPLATE to extract specific values.
@@ -21,12 +21,20 @@ You can use \-\-output=template \-\-template=TEMPLATE to extract specific values
 
 .SH OPTIONS
 .PP
+\fB\-\-flatten\fP=false
+    flatten the resulting kubeconfig file into self contained output (useful for creating portable kubeconfig files)
+
+.PP
 \fB\-h\fP, \fB\-\-help\fP=false
     help for view
 
 .PP
 \fB\-\-merge\fP=true
     merge together the full hierarchy of kubeconfig files
+
+.PP
+\fB\-\-minify\fP=false
+    remove all information not used by current\-context from the output
 
 .PP
 \fB\-\-no\-headers\fP=false
@@ -165,7 +173,7 @@ You can use \-\-output=template \-\-template=TEMPLATE to extract specific values
 .RS
 
 .nf
-// Show merged kubeconfig settings.
+// Show Merged kubeconfig settings.
 $ kubectl config view
 
 // Show only local kubeconfig settings

@@ -1664,6 +1664,49 @@
     ]
    },
    {
+    "path": "/api/v1beta3/minions/{name}/status",
+    "description": "API at /api/v1beta3 version v1beta3",
+    "operations": [
+     {
+      "type": "v1beta3.Node",
+      "method": "PUT",
+      "summary": "replace the specified Node",
+      "nickname": "replaceNode",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Node",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1beta3.Node",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta3.Node"
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
     "path": "/api/v1beta3/namespaces",
     "description": "API at /api/v1beta3 version v1beta3",
     "operations": [
@@ -2714,6 +2757,49 @@
       ],
       "produces": [
        "*/*"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/api/v1beta3/nodes/{name}/status",
+    "description": "API at /api/v1beta3 version v1beta3",
+    "operations": [
+     {
+      "type": "v1beta3.Node",
+      "method": "PUT",
+      "summary": "replace the specified Node",
+      "nickname": "replaceNode",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Node",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1beta3.Node",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta3.Node"
+       }
+      ],
+      "produces": [
+       "application/json"
       ],
       "consumes": [
        "*/*"
@@ -9778,14 +9864,14 @@
     "id": "v1beta3.Volume",
     "required": [
      "name",
+     "gcePersistentDisk",
      "gitRepo",
      "secret",
      "nfs",
      "iscsi",
      "glusterfs",
      "hostPath",
-     "emptyDir",
-     "gcePersistentDisk"
+     "emptyDir"
     ],
     "properties": {
      "emptyDir": {

@@ -227,6 +227,22 @@ func (h *HumanReadablePrinter) validatePrintHandlerFunc(printFunc reflect.Value)
 	return nil
 }
 
+func (h *HumanReadablePrinter) HandledResources() []string {
+	keys := make([]string, 0)
+
+	for k := range h.handlerMap {
+		// k.String looks like "*api.PodList" and we want just "pod"
+		api := strings.Split(k.String(), ".")
+		resource := api[len(api)-1]
+		if strings.HasSuffix(resource, "List") {
+			continue
+		}
+		resource = strings.ToLower(resource)
+		keys = append(keys, resource)
+	}
+	return keys
+}
+
 var podColumns = []string{"POD", "IP", "CONTAINER(S)", "IMAGE(S)", "HOST", "LABELS", "STATUS", "CREATED"}
 var replicationControllerColumns = []string{"CONTROLLER", "CONTAINER(S)", "IMAGE(S)", "SELECTOR", "REPLICAS"}
 var serviceColumns = []string{"NAME", "LABELS", "SELECTOR", "IP", "PORT(S)"}

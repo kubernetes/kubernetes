@@ -147,6 +147,7 @@ type Flag struct {
 	Value     Value  // value as set
 	DefValue  string // default value (as text); for usage message
 	Changed   bool   // If the user set the value (or if left to default)
+	Annotations map[string][]string // used by cobra.Command  bash autocomple code
 }
 
 // Value is the interface to the dynamic value stored in a flag.
@@ -358,7 +359,7 @@ func (f *FlagSet) Var(value Value, name string, usage string) {
 // Like Var, but accepts a shorthand letter that can be used after a single dash.
 func (f *FlagSet) VarP(value Value, name, shorthand, usage string) {
 	// Remember the default value as a string; it won't change.
-	flag := &Flag{name, shorthand, usage, value, value.String(), false}
+	flag := &Flag{name, shorthand, usage, value, value.String(), false, make(map[string][]string)}
 	f.AddFlag(flag)
 }
 

@@ -22,9 +22,7 @@ import (
 	"reflect"
 	"sort"
 	"sync"
-	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/fsouza/go-dockerclient"
 )
@@ -222,9 +220,11 @@ func (f *FakeDockerClient) StopContainer(id string, timeout uint) error {
 		f.Stopped = append(f.Stopped, id)
 		var newList []docker.APIContainers
 		for _, container := range f.ContainerList {
-			if container.ID != id {
-				newList = append(newList, container)
+			if container.ID == id {
+				f.ExitedContainerList = append(f.ExitedContainerList, container)
+				continue
 			}
+			newList = append(newList, container)
 		}
 		f.ContainerList = newList
 	}
@@ -330,22 +330,4 @@ func (f *FakeDockerPuller) IsImagePresent(name string) (bool, error) {
 		}
 	}
 	return false, nil
-}
-
-type FakeDockerCache struct {
-	client DockerInterface
-}
-
-func NewFakeDockerCache(client DockerInterface) DockerCache {
-	return &FakeDockerCache{
-		client: client,
-	}
-}
-
-func (f *FakeDockerCache) GetPods() ([]*container.Pod, error) {
-	return GetPods(f.client, false)
-}
-
-func (f *FakeDockerCache) ForceUpdateIfOlder(time.Time) error {
-	return nil
 }

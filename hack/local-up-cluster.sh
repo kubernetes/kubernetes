@@ -45,6 +45,7 @@ API_HOST=${API_HOST:-127.0.0.1}
 API_CORS_ALLOWED_ORIGINS=${API_CORS_ALLOWED_ORIGINS:-"/127.0.0.1(:[0-9]+)?$,/localhost(:[0-9]+)?$"}
 KUBELET_PORT=${KUBELET_PORT:-10250}
 LOG_LEVEL=${LOG_LEVEL:-3}
+CHAOS_CHANCE=${CHAOS_CHANCE:-0.0}
 
 # For the common local scenario, fail fast if server is already running.
 # this can happen if you run local-up-cluster.sh twice and kill etcd in between.
@@ -143,6 +144,7 @@ CTLRMGR_PID=$!
 KUBELET_LOG=/tmp/kubelet.log
 sudo -E "${GO_OUT}/kubelet" \
   --v=${LOG_LEVEL} \
+  --chaos_chance="${CHAOS_CHANCE}" \
   --hostname_override="127.0.0.1" \
   --address="127.0.0.1" \
   --api_servers="${API_HOST}:${API_PORT}" \

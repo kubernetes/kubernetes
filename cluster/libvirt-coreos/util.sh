@@ -25,6 +25,8 @@ export LIBVIRT_DEFAULT_URI=qemu:///system
 readonly POOL=kubernetes
 readonly POOL_PATH="$(cd $ROOT && pwd)/libvirt_storage_pool"
 
+ETCD_VERSION=${ETCD_VERSION:-v2.0.9}
+
 # join <delim> <list...>
 # Concatenates the list elements with the delimiter passed as first parameter
 #
@@ -93,6 +95,9 @@ function destroy-pool {
         virsh vol-delete $vol --pool $POOL
       done
 
+  rm -rf "$POOL_PATH"/etcd/*
+  virsh vol-delete etcd --pool $POOL || true
+
   [[ "$1" == 'keep_base_image' ]] && return
 
   set +e
@@ -112,7 +117,7 @@ function initialize-pool {
   fi
 
   wget -N -P "$ROOT" http://${COREOS_CHANNEL:-alpha}.release.core-os.net/amd64-usr/current/coreos_production_qemu_image.img.bz2
-  if [ "$ROOT/coreos_production_qemu_image.img.bz2" -nt "$POOL_PATH/coreos_base.img" ]; then
+  if [[ "$ROOT/coreos_production_qemu_image.img.bz2" -nt "$POOL_PATH/coreos_base.img" ]]; then
       bunzip2 -f -k "$ROOT/coreos_production_qemu_image.img.bz2"
       virsh vol-delete coreos_base.img --pool $POOL 2> /dev/null || true
       mv "$ROOT/coreos_production_qemu_image.img" "$POOL_PATH/coreos_base.img"
@@ -140,6 +145,18 @@ function initialize-pool {
       render-template "$ROOT/skydns-rc.yaml"  > "$POOL_PATH/kubernetes/addons/skydns-rc.yaml"
   fi
 
+  mkdir -p "$POOL_PATH/etcd"
+  if [[ ! -f "$ROOT/etcd-${ETCD_VERSION}-linux-amd64.tar.gz" ]]; then
+      wget -P "$ROOT" https://github.com/coreos/etcd/releases/download/${ETCD_VERSION}/etcd-${ETCD_VERSION}-linux-amd64.tar.gz
+  fi
+  if [[ "$ROOT/etcd-${ETCD_VERSION}-linux-amd64.tar.gz" -nt "$POOL_PATH/etcd/etcd" ]]; then
+      tar -x -C "$POOL_PATH/etcd" -f "$ROOT/etcd-${ETCD_VERSION}-linux-amd64.tar.gz" etcd-${ETCD_VERSION}-linux-amd64
+      rm -rf "$POOL_PATH/etcd/bin/*"
+      mkdir -p "$POOL_PATH/etcd/bin"
+      mv "$POOL_PATH"/etcd/etcd-${ETCD_VERSION}-linux-amd64/{etcd,etcdctl} "$POOL_PATH/etcd/bin"
+      rm -rf "$POOL_PATH/etcd/etcd-${ETCD_VERSION}-linux-amd64"
+  fi
+
   virsh pool-refresh $POOL
 }
 
@@ -163,9 +180,9 @@ function wait-cluster-readiness {
   echo "Wait for cluster readiness"
   local kubectl="${KUBE_ROOT}/cluster/kubectl.sh"
 
-  local timeout=50
+  local timeout=120
   while [[ $timeout -ne 0 ]]; do
-    nb_ready_minions=$("${kubectl}" get nodes -o template -t "{{range.items}}{{range.status.conditions}}{{.kind}}{{end}}:{{end}}" --api-version=v1beta3 2>/dev/null | tr ':' '\n' | grep -c Ready || true)
+    nb_ready_minions=$("${kubectl}" get nodes -o template -t "{{range.items}}{{range.status.conditions}}{{.type}}{{end}}:{{end}}" --api-version=v1beta3 2>/dev/null | tr ':' '\n' | grep -c Ready || true)
     echo "Nb ready minions: $nb_ready_minions / $NUM_MINIONS"
     if [[ "$nb_ready_minions" -eq "$NUM_MINIONS" ]]; then
         return 0
@@ -187,6 +204,7 @@ function kube-up {
 
   readonly ssh_keys="$(cat ~/.ssh/id_*.pub | sed 's/^/  - /')"
   readonly kubernetes_dir="$POOL_PATH/kubernetes"
+  readonly etcd_dir="$POOL_PATH/etcd"
   readonly discovery=$(curl -s https://discovery.etcd.io/new)
 
   readonly machines=$(join , "${KUBE_MINION_IP_ADDRESSES[@]}")

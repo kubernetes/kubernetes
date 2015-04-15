@@ -7,33 +7,44 @@ import (
 	"strconv"
 
 	"github.com/docker/libcontainer/cgroups"
+	"github.com/docker/libcontainer/configs"
 )
 
 type CpuGroup struct {
 }
 
-func (s *CpuGroup) Set(d *data) error {
+func (s *CpuGroup) Apply(d *data) error {
 	// We always want to join the cpu group, to allow fair cpu scheduling
 	// on a container basis
 	dir, err := d.join("cpu")
 	if err != nil {
 		return err
 	}
-	if d.c.CpuShares != 0 {
-		if err := writeFile(dir, "cpu.shares", strconv.FormatInt(d.c.CpuShares, 10)); err != nil {
+
+	if err := s.Set(dir, d.c); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (s *CpuGroup) Set(path string, cgroup *configs.Cgroup) error {
+	if cgroup.CpuShares != 0 {
+		if err := writeFile(path, "cpu.shares", strconv.FormatInt(cgroup.CpuShares, 10)); err != nil {
 			return err
 		}
 	}
-	if d.c.CpuPeriod != 0 {
-		if err := writeFile(dir, "cpu.cfs_period_us", strconv.FormatInt(d.c.CpuPeriod, 10)); err != nil {
+	if cgroup.CpuPeriod != 0 {
+		if err := writeFile(path, "cpu.cfs_period_us", strconv.FormatInt(cgroup.CpuPeriod, 10)); err != nil {
 			return err
 		}
 	}
-	if d.c.CpuQuota != 0 {
-		if err := writeFile(dir, "cpu.cfs_quota_us", strconv.FormatInt(d.c.CpuQuota, 10)); err != nil {
+	if cgroup.CpuQuota != 0 {
+		if err := writeFile(path, "cpu.cfs_quota_us", strconv.FormatInt(cgroup.CpuQuota, 10)); err != nil {
 			return err
 		}
 	}
+
 	return nil
 }
 

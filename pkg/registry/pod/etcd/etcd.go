@@ -110,6 +110,8 @@ func (r *BindingREST) New() runtime.Object {
 	return &api.Binding{}
 }
 
+var _ = rest.Creater(&BindingREST{})
+
 // Create ensures a pod is bound to a specific host.
 func (r *BindingREST) Create(ctx api.Context, obj runtime.Object) (out runtime.Object, err error) {
 	binding := obj.(*api.Binding)
@@ -133,7 +135,7 @@ func (r *BindingREST) setPodHostAndAnnotations(ctx api.Context, podID, oldMachin
 	if err != nil {
 		return nil, err
 	}
-	err = r.store.Helper.AtomicUpdate(podKey, &api.Pod{}, false, func(obj runtime.Object) (runtime.Object, uint64, error) {
+	err = r.store.Helper.GuaranteedUpdate(podKey, &api.Pod{}, false, func(obj runtime.Object) (runtime.Object, uint64, error) {
 		pod, ok := obj.(*api.Pod)
 		if !ok {
 			return nil, 0, fmt.Errorf("unexpected object: %#v", obj)
@@ -197,6 +199,9 @@ type LogREST struct {
 	kubeletConn client.ConnectionInfoGetter
 }
 
+// LogREST implements GetterWithOptions
+var _ = rest.GetterWithOptions(&LogREST{})
+
 // New creates a new Pod log options object
 func (r *LogREST) New() runtime.Object {
 	return &api.PodLogOptions{}
@@ -221,6 +226,6 @@ func (r *LogREST) Get(ctx api.Context, name string, opts runtime.Object) (runtim
 }
 
 // NewGetOptions creates a new options object
-func (r *LogREST) NewGetOptions() runtime.Object {
-	return &api.PodLogOptions{}
+func (r *LogREST) NewGetOptions() (runtime.Object, bool, string) {
+	return &api.PodLogOptions{}, false, ""
 }

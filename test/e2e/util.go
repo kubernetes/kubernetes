@@ -117,7 +117,6 @@ func waitForPodSuccessInNamespace(c *client.Client, podName string, contName str
 				} else {
 					return true, fmt.Errorf("pod %s terminated with failure: %+v", podName, ci.State.Termination)
 				}
-				Logf("Waiting for pod %q in namespace %s status to be success or failure", podName, namespace)
 			} else {
 				Logf("Nil State.Termination for container %s in pod %s in namespace %s so far", contName, podName, namespace)
 			}

@@ -50,20 +50,16 @@ func (plugin *secretPlugin) Name() string {
 	return secretPluginName
 }
 
-func (plugin *secretPlugin) CanSupport(spec *api.Volume) bool {
-	if spec.Secret != nil {
-		return true
-	}
-
-	return false
+func (plugin *secretPlugin) CanSupport(spec *volume.Spec) bool {
+	return spec.VolumeSource.Secret != nil
 }
 
-func (plugin *secretPlugin) NewBuilder(spec *api.Volume, podRef *api.ObjectReference) (volume.Builder, error) {
-	return plugin.newBuilderInternal(spec, podRef)
+func (plugin *secretPlugin) NewBuilder(spec *volume.Spec, podRef *api.ObjectReference, opts volume.VolumeOptions) (volume.Builder, error) {
+	return plugin.newBuilderInternal(spec, podRef, opts)
 }
 
-func (plugin *secretPlugin) newBuilderInternal(spec *api.Volume, podRef *api.ObjectReference) (volume.Builder, error) {
-	return &secretVolume{spec.Name, *podRef, plugin, spec.Secret.SecretName}, nil
+func (plugin *secretPlugin) newBuilderInternal(spec *volume.Spec, podRef *api.ObjectReference, opts volume.VolumeOptions) (volume.Builder, error) {
+	return &secretVolume{spec.Name, *podRef, plugin, spec.VolumeSource.Secret.SecretName, &opts}, nil
 }
 
 func (plugin *secretPlugin) NewCleaner(volName string, podUID types.UID) (volume.Cleaner, error) {
@@ -71,7 +67,7 @@ func (plugin *secretPlugin) NewCleaner(volName string, podUID types.UID) (volume
 }
 
 func (plugin *secretPlugin) newCleanerInternal(volName string, podUID types.UID) (volume.Cleaner, error) {
-	return &secretVolume{volName, api.ObjectReference{UID: podUID}, plugin, ""}, nil
+	return &secretVolume{volName, api.ObjectReference{UID: podUID}, plugin, "", nil}, nil
 }
 
 // secretVolume handles retrieving secrets from the API server
@@ -81,6 +77,7 @@ type secretVolume struct {
 	podRef     api.ObjectReference
 	plugin     *secretPlugin
 	secretName string
+	opts       *volume.VolumeOptions
 }
 
 func (sv *secretVolume) SetUp() error {
@@ -88,7 +85,7 @@ func (sv *secretVolume) SetUp() error {
 }
 
 // This is the spec for the volume that this plugin wraps.
-var wrappedVolumeSpec = &api.Volume{
+var wrappedVolumeSpec = &volume.Spec{
 	Name:         "not-used",
 	VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{Medium: api.StorageTypeMemory}},
 }
@@ -97,7 +94,7 @@ func (sv *secretVolume) SetUpAt(dir string) error {
 	glog.V(3).Infof("Setting up volume %v for pod %v at %v", sv.volName, sv.podRef.UID, dir)
 
 	// Wrap EmptyDir, let it do the setup.
-	wrapped, err := sv.plugin.host.NewWrapperBuilder(wrappedVolumeSpec, &sv.podRef)
+	wrapped, err := sv.plugin.host.NewWrapperBuilder(wrappedVolumeSpec, &sv.podRef, *sv.opts)
 	if err != nil {
 		return err
 	}
@@ -125,8 +122,8 @@ func (sv *secretVolume) SetUpAt(dir string) error {
 
 	for name, data := range secret.Data {
 		hostFilePath := path.Join(dir, name)
-		glog.V(3).Infof("Writing secret data %v/%v/%v (%v bytes) to host file %v", sv.podRef.Namespace, sv.secretName, len(data), hostFilePath)
-		err := ioutil.WriteFile(hostFilePath, data, 0777)
+		glog.V(3).Infof("Writing secret data %v/%v/%v (%v bytes) to host file %v", sv.podRef.Namespace, sv.secretName, name, len(data), hostFilePath)
+		err := ioutil.WriteFile(hostFilePath, data, 0444)
 		if err != nil {
 			glog.Errorf("Error writing secret data to host path: %v, %v", hostFilePath, err)
 			return err

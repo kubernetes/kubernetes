@@ -96,8 +96,8 @@ type throttledDockerPuller struct {
 	limiter util.RateLimiter
 }
 
-// NewDockerPuller creates a new instance of the default implementation of DockerPuller.
-func NewDockerPuller(client DockerInterface, qps float32, burst int) DockerPuller {
+// newDockerPuller creates a new instance of the default implementation of DockerPuller.
+func newDockerPuller(client DockerInterface, qps float32, burst int) DockerPuller {
 	dp := dockerPuller{
 		client:  client,
 		keyring: credentialprovider.NewDockerKeyring(),
@@ -409,30 +409,6 @@ func (c DockerContainers) FindPodContainer(podFullName string, uid types.UID, co
 	return nil, false, 0
 }
 
-// RemoveContainerWithID removes the container with the given containerID.
-func (c DockerContainers) RemoveContainerWithID(containerID DockerID) {
-	delete(c, containerID)
-}
-
-// FindContainersByPod returns the containers that belong to the pod.
-func (c DockerContainers) FindContainersByPod(podUID types.UID, podFullName string) DockerContainers {
-	containers := make(DockerContainers)
-	for _, dockerContainer := range c {
-		if len(dockerContainer.Names) == 0 {
-			continue
-		}
-		dockerName, _, err := ParseDockerName(dockerContainer.Names[0])
-		if err != nil {
-			continue
-		}
-		if podUID == dockerName.PodUID ||
-			(podUID == "" && podFullName == dockerName.PodFullName) {
-			containers[DockerID(dockerContainer.ID)] = dockerContainer
-		}
-	}
-	return containers
-}
-
 const containerNamePrefix = "k8s"
 
 func HashContainer(container *api.Container) uint64 {
@@ -559,56 +535,6 @@ func GetKubeletDockerContainers(client DockerInterface, allContainers bool) (Doc
 			continue
 		}
 		result[DockerID(container.ID)] = container
-	}
-	return result, nil
-}
-
-// TODO: Move this function with dockerCache to DockerManager.
-func GetPods(client DockerInterface, all bool) ([]*kubecontainer.Pod, error) {
-	pods := make(map[types.UID]*kubecontainer.Pod)
-	var result []*kubecontainer.Pod
-
-	containers, err := GetKubeletDockerContainers(client, all)
-	if err != nil {
-		return nil, err
-	}
-
-	// Group containers by pod.
-	for _, c := range containers {
-		if len(c.Names) == 0 {
-			glog.Warningf("Cannot parse empty docker container name: %#v", c.Names)
-			continue
-		}
-		dockerName, hash, err := ParseDockerName(c.Names[0])
-		if err != nil {
-			glog.Warningf("Parse docker container name %q error: %v", c.Names[0], err)
-			continue
-		}
-		pod, found := pods[dockerName.PodUID]
-		if !found {
-			name, namespace, err := kubecontainer.ParsePodFullName(dockerName.PodFullName)
-			if err != nil {
-				glog.Warningf("Parse pod full name %q error: %v", dockerName.PodFullName, err)
-				continue
-			}
-			pod = &kubecontainer.Pod{
-				ID:        dockerName.PodUID,
-				Name:      name,
-				Namespace: namespace,
-			}
-			pods[dockerName.PodUID] = pod
-		}
-		pod.Containers = append(pod.Containers, &kubecontainer.Container{
-			ID:      types.UID(c.ID),
-			Name:    dockerName.ContainerName,
-			Hash:    hash,
-			Created: c.Created,
-		})
-	}
-
-	// Convert map to list.
-	for _, c := range pods {
-		result = append(result, c)
 	}
 	return result, nil
 }

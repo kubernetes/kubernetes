@@ -113,10 +113,19 @@ func GetResource(r rest.Getter, scope RequestScope) restful.RouteFunction {
 }
 
 // GetResourceWithOptions returns a function that handles retrieving a single resource from a rest.Storage object.
-func GetResourceWithOptions(r rest.GetterWithOptions, scope RequestScope, getOptionsKind string) restful.RouteFunction {
+func GetResourceWithOptions(r rest.GetterWithOptions, scope RequestScope, getOptionsKind string, subpath bool, subpathKey string) restful.RouteFunction {
 	return getResourceHandler(scope,
 		func(ctx api.Context, name string, req *restful.Request) (runtime.Object, error) {
-			opts, err := queryToObject(req.Request.URL.Query(), scope, getOptionsKind)
+			query := req.Request.URL.Query()
+			if subpath {
+				newQuery := make(url.Values)
+				for k, v := range query {
+					newQuery[k] = v
+				}
+				newQuery[subpathKey] = []string{req.PathParameter("path")}
+				query = newQuery
+			}
+			opts, err := queryToObject(query, scope, getOptionsKind)
 			if err != nil {
 				return nil, err
 			}
@@ -235,7 +244,7 @@ func CreateResource(r rest.Creater, scope RequestScope, typer runtime.ObjectType
 }
 
 // PatchResource returns a function that will handle a resource patch
-// TODO: Eventually PatchResource should just use AtomicUpdate and this routine should be a bit cleaner
+// TODO: Eventually PatchResource should just use GuaranteedUpdate and this routine should be a bit cleaner
 func PatchResource(r rest.Patcher, scope RequestScope, typer runtime.ObjectTyper, admit admission.Interface, converter runtime.ObjectConvertor) restful.RouteFunction {
 	return func(req *restful.Request, res *restful.Response) {
 		w := res.ResponseWriter

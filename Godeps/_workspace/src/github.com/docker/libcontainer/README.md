@@ -1,48 +1,172 @@
-## libcontainer - reference implementation for containers [![Build Status](https://ci.dockerproject.com/github.com/docker/libcontainer/status.svg?branch=master)](https://ci.dockerproject.com/github.com/docker/libcontainer) 
+## libcontainer - reference implementation for containers [![Build Status](https://jenkins.dockerproject.com/buildStatus/icon?job=Libcontainer Master)](https://jenkins.dockerproject.com/job/Libcontainer%20Master/) 
 
-### Note on API changes:
-
-Please bear with us while we work on making the libcontainer API stable and something that we can support long term.  We are currently discussing the API with the community, therefore, if you currently depend on libcontainer please pin your dependency at a specific tag or commit id.  Please join the discussion and help shape the API.
-
-#### Background
-
-libcontainer specifies configuration options for what a container is.  It provides a native Go implementation for using Linux namespaces with no external dependencies.  libcontainer provides many convenience functions for working with namespaces, networking, and management.  
+Libcontainer provides a native Go implementation for creating containers 
+with namespaces, cgroups, capabilities, and filesystem access controls.
+It allows you to manage the lifecycle of the container performing additional operations
+after the container is created.
 
 
 #### Container
-A container is a self contained execution environment that shares the kernel of the host system and which is (optionally) isolated from other containers in the system.
+A container is a self contained execution environment that shares the kernel of the 
+host system and which is (optionally) isolated from other containers in the system.
 
-libcontainer may be used to execute a process in a container. If a user tries to run a new process inside an existing container, the new process is added to the processes executing in the container.
+#### Using libcontainer
+
+To create a container you first have to initialize an instance of a factory
+that will handle the creation and initialization for a container.
+
+Because containers are spawned in a two step process you will need to provide
+arguments to a binary that will be executed as the init process for the container.
+To use the current binary that is spawning the containers and acting as the parent
+you can use `os.Args[0]` and we have a command called `init` setup.
+
+```go
+root, err := libcontainer.New("/var/lib/container", libcontainer.InitArgs(os.Args[0], "init"))
+if err != nil {
+    log.Fatal(err)
+}
+```
+
+Once you have an instance of the factory created we can create a configuration 
+struct describing how the container is to be created.  A sample would look similar to this:
+
+```go
+config := &configs.Config{
+    Rootfs: rootfs,
+    Capabilities: []string{
+        "CHOWN",
+        "DAC_OVERRIDE",
+        "FSETID",
+        "FOWNER",
+        "MKNOD",
+        "NET_RAW",
+        "SETGID",
+        "SETUID",
+        "SETFCAP",
+        "SETPCAP",
+        "NET_BIND_SERVICE",
+        "SYS_CHROOT",
+        "KILL",
+        "AUDIT_WRITE",
+    },
+    Namespaces: configs.Namespaces([]configs.Namespace{
+        {Type: configs.NEWNS},
+        {Type: configs.NEWUTS},
+        {Type: configs.NEWIPC},
+        {Type: configs.NEWPID},
+        {Type: configs.NEWNET},
+    }),
+    Cgroups: &configs.Cgroup{
+        Name:            "test-container",
+        Parent:          "system",
+        AllowAllDevices: false,
+        AllowedDevices:  configs.DefaultAllowedDevices,
+    },
+
+    Devices:  configs.DefaultAutoCreatedDevices,
+    Hostname: "testing",
+    Networks: []*configs.Network{
+        {
+            Type:    "loopback",
+            Address: "127.0.0.1/0",
+            Gateway: "localhost",
+        },
+    },
+    Rlimits: []configs.Rlimit{
+        {
+            Type: syscall.RLIMIT_NOFILE,
+            Hard: uint64(1024),
+            Soft: uint64(1024),
+        },
+    },
+}
+```
+
+Once you have the configuration populated you can create a container:
+
+```go
+container, err := root.Create("container-id", config)
+```
+
+To spawn bash as the initial process inside the container and have the
+processes pid returned in order to wait, signal, or kill the process:
+
+```go
+process := &libcontainer.Process{
+    Args:   []string{"/bin/bash"},
+    Env:    []string{"PATH=/bin"},
+    User:   "daemon",
+    Stdin:  os.Stdin,
+    Stdout: os.Stdout,
+    Stderr: os.Stderr,
+}
+
+err := container.Start(process)
+if err != nil {
+    log.Fatal(err)
+}
+
+// wait for the process to finish.
+status, err := process.Wait()
+if err != nil {
+    log.Fatal(err)
+}
+
+// destroy the container.
+container.Destroy()
+```
+
+Additional ways to interact with a running container are:
+
+```go
+// return all the pids for all processes running inside the container.
+processes, err := container.Processes() 
+
+// get detailed cpu, memory, io, and network statistics for the container and 
+// it's processes.
+stats, err := container.Stats()
 
 
-#### Root file system
+// pause all processes inside the container.
+container.Pause()
 
-A container runs with a directory known as its *root file system*, or *rootfs*, mounted as the file system root. The rootfs is usually a full system tree.
-
-
-#### Configuration
-
-A container is initially configured by supplying configuration data when the container is created.
+// resume all paused processes.
+container.Resume()
+```
 
 
 #### nsinit
 
-`nsinit` is a cli application which demonstrates the use of libcontainer.  It is able to spawn new containers or join existing containers, based on the current directory.
+`nsinit` is a cli application which demonstrates the use of libcontainer.  
+It is able to spawn new containers or join existing containers.  A root
+filesystem must be provided for use along with a container configuration file.
 
-To use `nsinit`, cd into a Linux rootfs and copy a `container.json` file into the directory with your specified configuration. Environment, networking, and different capabilities for the container are specified in this file. The configuration is used for each process executed inside the container.
+To build `nsinit`, run `make binary`. It will save the binary into
+`bundles/nsinit`.
+
+To use `nsinit`, cd into a Linux rootfs and copy a `container.json` file into 
+the directory with your specified configuration. Environment, networking, 
+and different capabilities for the container are specified in this file. 
+The configuration is used for each process executed inside the container.
                                                                                                                                
 See the `sample_configs` folder for examples of what the container configuration should look like.
 
 To execute `/bin/bash` in the current directory as a container just run the following **as root**:
 ```bash
-nsinit exec /bin/bash
+nsinit exec --tty /bin/bash
 ```
 
-If you wish to spawn another process inside the container while your current bash session is running, run the same command again to get another bash shell (or change the command).  If the original process (PID 1) dies, all other processes spawned inside the container will be killed and the namespace will be removed. 
+If you wish to spawn another process inside the container while your 
+current bash session is running, run the same command again to 
+get another bash shell (or change the command).  If the original 
+process (PID 1) dies, all other processes spawned inside the container 
+will be killed and the namespace will be removed. 
 
-You can identify if a process is running in a container by looking to see if `state.json` is in the root of the directory.
+You can identify if a process is running in a container by 
+looking to see if `state.json` is in the root of the directory.
    
-You may also specify an alternate root place where the `container.json` file is read and where the `state.json` file will be saved.
+You may also specify an alternate root place where 
+the `container.json` file is read and where the `state.json` file will be saved.
 
 #### Future
 See the [roadmap](ROADMAP.md).

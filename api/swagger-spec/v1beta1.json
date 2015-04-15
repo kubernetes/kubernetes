@@ -1920,6 +1920,49 @@
     ]
    },
    {
+    "path": "/api/v1beta1/minions/{name}/status",
+    "description": "API at /api/v1beta1 version v1beta1",
+    "operations": [
+     {
+      "type": "v1beta1.Minion",
+      "method": "PUT",
+      "summary": "replace the specified Node",
+      "nickname": "replaceNode",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Node",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1beta1.Minion",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta1.Minion"
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
     "path": "/api/v1beta1/namespaces",
     "description": "API at /api/v1beta1 version v1beta1",
     "operations": [
@@ -2970,6 +3013,49 @@
       ],
       "produces": [
        "*/*"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/api/v1beta1/nodes/{name}/status",
+    "description": "API at /api/v1beta1 version v1beta1",
+    "operations": [
+     {
+      "type": "v1beta1.Minion",
+      "method": "PUT",
+      "summary": "replace the specified Node",
+      "nickname": "replaceNode",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Node",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1beta1.Minion",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta1.Minion"
+       }
+      ],
+      "produces": [
+       "application/json"
       ],
       "consumes": [
        "*/*"
@@ -4615,6 +4701,14 @@
       "summary": "create a Binding",
       "nickname": "createBinding",
       "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Binding",
+        "required": true,
+        "allowMultiple": false
+       },
        {
         "type": "string",
         "paramType": "query",
@@ -6913,7 +7007,6 @@
     "required": [
      "name",
      "image",
-     "entrypoint:omitempty",
      "imagePullPolicy"
     ],
     "properties": {
@@ -6933,7 +7026,7 @@
       "format": "int32",
       "description": "CPU share in thousandths of a core; cannot be updated"
      },
-     "entrypoint:omitempty": {
+     "entrypoint": {
       "type": "array",
       "items": {
        "type": "string"
@@ -8634,9 +8727,9 @@
    "v1beta1.PersistentVolumeSpec": {
     "id": "v1beta1.PersistentVolumeSpec",
     "required": [
+     "persistentDisk",
      "hostPath",
-     "glusterfs",
-     "persistentDisk"
+     "glusterfs"
     ],
     "properties": {
      "accessModes": {

@@ -45,8 +45,7 @@ func Example() {
 	fifo := cache.NewDeltaFIFO(cache.MetaNamespaceKeyFunc, nil, downstream)
 
 	// Let's do threadsafe output to get predictable test results.
-	outputSetLock := sync.Mutex{}
-	outputSet := util.StringSet{}
+	deletionCounter := make(chan string, 1000)
 
 	cfg := &framework.Config{
 		Queue:            fifo,
@@ -68,6 +67,7 @@ func Example() {
 					return err
 				}
 
+				// Delete this object.
 				source.Delete(newest.Object.(runtime.Object))
 			} else {
 				// Update our downstream store.
@@ -83,10 +83,8 @@ func Example() {
 					return err
 				}
 
-				// Record some output.
-				outputSetLock.Lock()
-				defer outputSetLock.Unlock()
-				outputSet.Insert(key)
+				// Report this deletion.
+				deletionCounter <- key
 			}
 			return nil
 		},
@@ -94,20 +92,23 @@ func Example() {
 
 	// Create the controller and run it until we close stop.
 	stop := make(chan struct{})
+	defer close(stop)
 	go framework.New(cfg).Run(stop)
 
 	// Let's add a few objects to the source.
-	for _, name := range []string{"a-hello", "b-controller", "c-framework"} {
+	testIDs := []string{"a-hello", "b-controller", "c-framework"}
+	for _, name := range testIDs {
 		// Note that these pods are not valid-- the fake source doesn't
 		// call validation or anything.
 		source.Add(&api.Pod{ObjectMeta: api.ObjectMeta{Name: name}})
 	}
 
 	// Let's wait for the controller to process the things we just added.
-	time.Sleep(500 * time.Millisecond)
-	close(stop)
+	outputSet := util.StringSet{}
+	for i := 0; i < len(testIDs); i++ {
+		outputSet.Insert(<-deletionCounter)
+	}
 
-	outputSetLock.Lock()
 	for _, key := range outputSet.List() {
 		fmt.Println(key)
 	}
@@ -122,8 +123,7 @@ func ExampleInformer() {
 	source := framework.NewFakeControllerSource()
 
 	// Let's do threadsafe output to get predictable test results.
-	outputSetLock := sync.Mutex{}
-	outputSet := util.StringSet{}
+	deletionCounter := make(chan string, 1000)
 
 	// Make a controller that immediately deletes anything added to it, and
 	// logs anything deleted.
@@ -141,30 +141,31 @@ func ExampleInformer() {
 					key = "oops something went wrong with the key"
 				}
 
-				// Record some output when items are deleted.
-				outputSetLock.Lock()
-				defer outputSetLock.Unlock()
-				outputSet.Insert(key)
+				// Report this deletion.
+				deletionCounter <- key
 			},
 		},
 	)
 
 	// Run the controller and run it until we close stop.
 	stop := make(chan struct{})
+	defer close(stop)
 	go controller.Run(stop)
 
 	// Let's add a few objects to the source.
-	for _, name := range []string{"a-hello", "b-controller", "c-framework"} {
+	testIDs := []string{"a-hello", "b-controller", "c-framework"}
+	for _, name := range testIDs {
 		// Note that these pods are not valid-- the fake source doesn't
-		// call validation or perform any other checking.
+		// call validation or anything.
 		source.Add(&api.Pod{ObjectMeta: api.ObjectMeta{Name: name}})
 	}
 
 	// Let's wait for the controller to process the things we just added.
-	time.Sleep(500 * time.Millisecond)
-	close(stop)
+	outputSet := util.StringSet{}
+	for i := 0; i < len(testIDs); i++ {
+		outputSet.Insert(<-deletionCounter)
+	}
 
-	outputSetLock.Lock()
 	for _, key := range outputSet.List() {
 		fmt.Println(key)
 	}
@@ -302,8 +303,9 @@ func TestUpdate(t *testing.T) {
 
 	var testDoneWG sync.WaitGroup
 
-	// Make a controller that immediately deletes anything added to it, and
-	// logs anything deleted.
+	// Make a controller that deletes things once it observes an update.
+	// It calls Done() on the wait group on deletions so we can tell when
+	// everything we've added has been deleted.
 	_, controller := framework.NewInformer(
 		source,
 		&api.Pod{},

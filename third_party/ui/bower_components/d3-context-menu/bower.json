@@ -1,0 +1,17 @@
+{
+  "name": "d3-context-menu",
+  "version": "0.0.1",
+  "main": [
+    "js/d3-context-menu.js",
+    "css/d3-context-menu.css"
+  ],
+  "ignore": [
+    ".jshintrc",
+    "**/*.txt",
+    "examples",
+    "README.md"
+  ],
+  "dependencies": {
+    "d3": "3"
+  }
+}

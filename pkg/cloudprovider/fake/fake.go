@@ -33,6 +33,12 @@ type FakeBalancer struct {
 	Hosts      []string
 }
 
+type FakeUpdateBalancerCall struct {
+	Name   string
+	Region string
+	Hosts  []string
+}
+
 // FakeCloud is a test-double implementation of Interface, TCPLoadBalancer and Instances. It is useful for testing.
 type FakeCloud struct {
 	Exists        bool
@@ -46,7 +52,7 @@ type FakeCloud struct {
 	MasterName    string
 	ExternalIP    net.IP
 	Balancers     []FakeBalancer
-
+	UpdateCalls   []FakeUpdateBalancerCall
 	cloudprovider.Zone
 }
 
@@ -105,6 +111,7 @@ func (f *FakeCloud) CreateTCPLoadBalancer(name, region string, externalIP net.IP
 // It adds an entry "update" into the internal method call record.
 func (f *FakeCloud) UpdateTCPLoadBalancer(name, region string, hosts []string) error {
 	f.addCall("update")
+	f.UpdateCalls = append(f.UpdateCalls, FakeUpdateBalancerCall{name, region, hosts})
 	return f.Err
 }
 

@@ -31,6 +31,14 @@ var initializers []func()
 // Set this to true to enable it
 var EnablePrefixMatching bool = false
 
+// enables an information splash screen on Windows if the CLI is started from explorer.exe.
+var EnableWindowsMouseTrap bool = true
+
+var MousetrapHelpText string = `This is a command line tool
+
+You need to open cmd.exe and run it from there.
+`
+
 //OnInitialize takes a series of func() arguments and appends them to a slice of func().
 func OnInitialize(y ...func()) {
 	for _, x := range y {

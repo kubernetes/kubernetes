@@ -20,7 +20,6 @@ import (
 	"github.com/golang/glog"
 	info "github.com/google/cadvisor/info/v1"
 	"github.com/google/cadvisor/utils/cpuload/netlink"
-	"github.com/google/cadvisor/utils/cpuload/scheddebug"
 )
 
 type CpuLoadReader interface {
@@ -37,17 +36,9 @@ type CpuLoadReader interface {
 }
 
 func New() (CpuLoadReader, error) {
-	// First try to create a scheddebug based load reader.
-	schedReader, schedErr := scheddebug.New()
-	if schedErr == nil {
-		glog.Info("Using a sched debug based load reader")
-		return schedReader, nil
-	}
-	glog.V(1).Infof("failed to create a scheddebug-based cpu load reader: %v", schedErr)
-	// netlink gives us more data than scheddebug, but it doesn't work inside network namespaces. It also needs to be hierarchical.
 	reader, err := netlink.New()
 	if err != nil {
-		return nil, fmt.Errorf("failed to create any cpu load reader - netlink based (%v), scheddebug based (%v)", err, schedErr)
+		return nil, fmt.Errorf("failed to create a netlink based cpuload reader: %v", err)
 	}
 	glog.Info("Using a netlink-based load reader")
 	return reader, nil

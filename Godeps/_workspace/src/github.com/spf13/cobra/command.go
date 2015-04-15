@@ -18,11 +18,13 @@ package cobra
 import (
 	"bytes"
 	"fmt"
+	"github.com/inconshreveable/mousetrap"
+	flag "github.com/spf13/pflag"
 	"io"
 	"os"
+	"runtime"
 	"strings"
-
-	flag "github.com/spf13/pflag"
+	"time"
 )
 
 // Command is just that, a command for your application.
@@ -42,6 +44,10 @@ type Command struct {
 	Long string
 	// Examples of how to use the command
 	Example string
+	// List of all valid non-flag arguments, used for bash completions *TODO* actually validate these
+	ValidArgs []string
+	// Custom functions used by the bash autocompletion generator
+	BashCompletionFunction string
 	// Full set of flags
 	flags *flag.FlagSet
 	// Set of flags childrens of this command will inherit
@@ -223,7 +229,7 @@ Aliases:
 
 Examples:
 {{ .Example }}
-{{end}}{{ if .HasSubCommands}}
+{{end}}{{ if .HasRunnableSubCommands}}
 
 Available Commands: {{range .Commands}}{{if .Runnable}}
   {{rpad .Name .NamePadding }} {{.Short}}{{end}}{{end}}
@@ -231,8 +237,9 @@ Available Commands: {{range .Commands}}{{if .Runnable}}
 {{ if .HasLocalFlags}}Flags:
 {{.LocalFlags.FlagUsages}}{{end}}
 {{ if .HasInheritedFlags}}Global Flags:
-{{.InheritedFlags.FlagUsages}}{{end}}{{if .HasParent}}{{if and (gt .Commands 0) (gt .Parent.Commands 1) }}
-Additional help topics: {{if gt .Commands 0 }}{{range .Commands}}{{if not .Runnable}} {{rpad .CommandPath .CommandPathPadding}} {{.Short}}{{end}}{{end}}{{end}}{{if gt .Parent.Commands 1 }}{{range .Parent.Commands}}{{if .Runnable}}{{if not (eq .Name $cmd.Name) }}{{end}}
+{{.InheritedFlags.FlagUsages}}{{end}}{{if or (.HasHelpSubCommands) (.HasRunnableSiblings)}}
+Additional help topics:
+{{if .HasHelpSubCommands}}{{range .Commands}}{{if not .Runnable}} {{rpad .CommandPath .CommandPathPadding}} {{.Short}}{{end}}{{end}}{{end}}{{if .HasRunnableSiblings }}{{range .Parent.Commands}}{{if .Runnable}}{{if not (eq .Name $cmd.Name) }}
   {{rpad .CommandPath .CommandPathPadding}} {{.Short}}{{end}}{{end}}{{end}}{{end}}
 {{end}}{{ if .HasSubCommands }}
 Use "{{.Root.Name}} help [command]" for more information about a command.
@@ -305,6 +312,8 @@ func stripFlags(args []string, c *Command) []string {
 				inFlag = true
 			case inFlag:
 				inFlag = false
+			case y == "":
+				// strip empty commands, as the go tests expect this to be ok....
 			case !strings.HasPrefix(y, "-"):
 				commands = append(commands, y)
 				inFlag = false
@@ -375,10 +384,9 @@ func (c *Command) Find(arrs []string) (*Command, []string, error) {
 
 	commandFound, a := innerfind(c, arrs)
 
-	// if commander returned and the first argument (if it exists) doesn't
-	// match the command name, return nil & error
-	if commandFound.Name() == c.Name() && len(arrs[0]) > 0 && commandFound.Name() != arrs[0] {
-		return nil, a, fmt.Errorf("unknown command %q\nRun 'help' for usage.\n", a[0])
+	// If we matched on the root, but we asked for a subcommand, return an error
+	if commandFound.Name() == c.Name() && len(stripFlags(arrs, c)) > 0 && commandFound.Name() != arrs[0] {
+		return nil, a, fmt.Errorf("unknown command %q", a[0])
 	}
 
 	return commandFound, a, nil
@@ -396,16 +404,6 @@ func (c *Command) Root() *Command {
 	}
 
 	return findRoot(c)
-}
-
-// execute the command determined by args and the command tree
-func (c *Command) findAndExecute(args []string) (err error) {
-
-	cmd, a, e := c.Find(args)
-	if e != nil {
-		return e
-	}
-	return cmd.execute(a)
 }
 
 func (c *Command) execute(a []string) (err error) {
@@ -474,6 +472,14 @@ func (c *Command) Execute() (err error) {
 		return c.Root().Execute()
 	}
 
+	if EnableWindowsMouseTrap && runtime.GOOS == "windows" {
+		if mousetrap.StartedByExplorer() {
+			c.Print(MousetrapHelpText)
+			time.Sleep(5 * time.Second)
+			os.Exit(1)
+		}
+	}
+
 	// initialize help as the last point possible to allow for user
 	// overriding
 	c.initHelp()
@@ -494,55 +500,21 @@ func (c *Command) Execute() (err error) {
 			c.Help()
 		}
 	} else {
-		err = c.findAndExecute(args)
-	}
-
-	// Now handle the case where the root is runnable and only flags are provided
-	if err != nil && c.Runnable() {
-		// This is pretty much a custom version of the *Command.execute method
-		// with a few differences because it's the final command (no fall back)
-		e := c.ParseFlags(args)
+		cmd, flags, e := c.Find(args)
 		if e != nil {
-			// Flags parsing had an error.
-			// If an error happens here, we have to report it to the user
-			c.Println(e.Error())
-			// If an error happens search also for subcommand info about that
-			if c.cmdErrorBuf != nil && c.cmdErrorBuf.Len() > 0 {
-				c.Println(c.cmdErrorBuf.String())
-			} else {
-				c.Usage()
-			}
 			err = e
-			return
 		} else {
-			// If help is called, regardless of other flags, we print that
-			if c.helpFlagVal {
-				c.Help()
-				return nil
-			}
-
-			argWoFlags := c.Flags().Args()
-			if len(argWoFlags) > 0 {
-				// If there are arguments (not flags) one of the earlier
-				// cases should have caught it.. It means invalid usage
-				// print the usage
-				c.Usage()
-			} else {
-				// Only flags left... Call root.Run
-				c.preRun()
-				c.Run(c, argWoFlags)
-				err = nil
-			}
+			err = cmd.execute(flags)
 		}
 	}
 
 	if err != nil {
 		if err == flag.ErrHelp {
 			c.Help()
+
 		} else {
 			c.Println("Error:", err.Error())
-			c.Printf("%v: invalid command %#q\n", c.Root().Name(), os.Args[1:])
-			c.Printf("Run '%v help' for usage\n", c.Root().Name())
+			c.Printf("Run '%v help' for usage.\n", c.Root().Name())
 		}
 	}
 
@@ -785,6 +757,37 @@ func (c *Command) Runnable() bool {
 // Determine if the command has children commands
 func (c *Command) HasSubCommands() bool {
 	return len(c.commands) > 0
+}
+
+func (c *Command) HasRunnableSiblings() bool {
+	if !c.HasParent() {
+		return false
+	}
+	for _, sub := range c.parent.commands {
+		if sub.Runnable() {
+			return true
+		}
+	}
+	return false
+}
+
+func (c *Command) HasHelpSubCommands() bool {
+	for _, sub := range c.commands {
+		if !sub.Runnable() {
+			return true
+		}
+	}
+	return false
+}
+
+// Determine if the command has runnable children commands
+func (c *Command) HasRunnableSubCommands() bool {
+	for _, sub := range c.commands {
+		if sub.Runnable() {
+			return true
+		}
+	}
+	return false
 }
 
 // Determine if the command is a child command

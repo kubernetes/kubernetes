@@ -40,6 +40,14 @@ func Initialize(c Capabilities) {
 	})
 }
 
+// Setup the capability set.  It wraps Initialize for improving usibility.
+func Setup(allowPrivileged bool, hostNetworkSources []string) {
+	Initialize(Capabilities{
+		AllowPrivileged:    allowPrivileged,
+		HostNetworkSources: hostNetworkSources,
+	})
+}
+
 // SetCapabilitiesForTests.  Convenience method for testing.  This should only be called from tests.
 func SetForTests(c Capabilities) {
 	capabilities = &c

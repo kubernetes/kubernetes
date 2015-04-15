@@ -26,7 +26,7 @@ This is an example of a simple secret, in json format:
 ```
 
 The data field is a map.
-Its keys must match [DNS_SUBDOMAIN](docs/design/identifiers.md).
+Its keys must match [DNS_SUBDOMAIN](design/identifiers.md).
 The values are arbitrary data, encoded using base64.
 
 This is an example of a pod that uses a secret, in json format:
@@ -302,7 +302,7 @@ A secret is only sent to a node if a pod on that node requires it.  It is not
 written to disk.  It is stored in a tmpfs.  It is deleted once the pod that
 depends on it is deleted.
 
-On most Kubernetes-project-maintained distributions, commuication between user
+On most Kubernetes-project-maintained distributions, communication between user
 to the apiserver, and from apiserver to the kubelets, is protected by SSL/TLS.
 Secrets are protected when transmitted over these channels.
 

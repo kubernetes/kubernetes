@@ -35,3 +35,4 @@ kube-master-addons:
     - restart: True
     - watch:
       - file: master-docker-image-tags
+      - file: /etc/kubernetes/kube-master-addons.sh

@@ -107,3 +107,6 @@ hack/local-up-cluster.sh
 #### kubectl claims to start a container but `get pods` and `docker ps` don't show it.
 
 One or more of the kubernetes daemons might've crashed. Tail the logs of each in /tmp.
+
+#### The pods fail to connect to the services by host names
+The local-up-cluster.sh script doesn't start a DNS service. Similar situation can be found [here](https://github.com/GoogleCloudPlatform/kubernetes/issues/6667). You can start a manually. Related documents can be found [here](https://github.com/GoogleCloudPlatform/kubernetes/tree/master/cluster/addons/dns#how-do-i-configure-it)

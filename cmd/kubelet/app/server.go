@@ -29,7 +29,9 @@ import (
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/capabilities"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/chaosclient"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/clientauth"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/credentialprovider"
@@ -84,7 +86,6 @@ type KubeletServer struct {
 	ClusterDomain                  string
 	MasterServiceNamespace         string
 	ClusterDNS                     util.IP
-	ReallyCrashForTesting          bool
 	StreamingConnectionIdleTimeout time.Duration
 	ImageGCHighThresholdPercent    int
 	ImageGCLowThresholdPercent     int
@@ -95,6 +96,14 @@ type KubeletServer struct {
 	TLSPrivateKeyFile              string
 	CertDirectory                  string
 	NodeStatusUpdateFrequency      time.Duration
+	ResourceContainer              string
+
+	// Flags intended for testing
+
+	// Crash immediately, rather than eating panics.
+	ReallyCrashForTesting bool
+	// Insert a probability of random errors during calls to the master.
+	ChaosChance float64
 }
 
 // bootstrapping interface for kubelet, targets the initialization protocol
@@ -139,6 +148,7 @@ func NewKubeletServer() *KubeletServer {
 		HostNetworkSources:          kubelet.FileSource,
 		CertDirectory:               "/var/run/kubernetes",
 		NodeStatusUpdateFrequency:   10 * time.Second,
+		ResourceContainer:           "/kubelet",
 	}
 }
 
@@ -181,7 +191,6 @@ func (s *KubeletServer) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.ClusterDomain, "cluster_domain", s.ClusterDomain, "Domain for this cluster.  If set, kubelet will configure all containers to search this domain in addition to the host's search domains")
 	fs.StringVar(&s.MasterServiceNamespace, "master_service_namespace", s.MasterServiceNamespace, "The namespace from which the kubernetes master services should be injected into pods")
 	fs.Var(&s.ClusterDNS, "cluster_dns", "IP address for a cluster DNS server.  If set, kubelet will configure all containers to use this for DNS resolution in addition to the host's DNS servers")
-	fs.BoolVar(&s.ReallyCrashForTesting, "really_crash_for_testing", s.ReallyCrashForTesting, "If true, crash with panics more often.")
 	fs.DurationVar(&s.StreamingConnectionIdleTimeout, "streaming_connection_idle_timeout", 0, "Maximum time a streaming connection can be idle before the connection is automatically closed.  Example: '5m'")
 	fs.DurationVar(&s.NodeStatusUpdateFrequency, "node_status_update_frequency", s.NodeStatusUpdateFrequency, "Specifies how often kubelet posts node status to master. Note: be cautious when changing the constant, it must work with nodeMonitorGracePeriod in nodecontroller. Default: 10s")
 	fs.IntVar(&s.ImageGCHighThresholdPercent, "image_gc_high_threshold", s.ImageGCHighThresholdPercent, "The percent of disk usage after which image garbage collection is always run. Default: 90%%")
@@ -189,6 +198,11 @@ func (s *KubeletServer) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.NetworkPluginName, "network_plugin", s.NetworkPluginName, "<Warning: Alpha feature> The name of the network plugin to be invoked for various events in kubelet/pod lifecycle")
 	fs.StringVar(&s.CloudProvider, "cloud_provider", s.CloudProvider, "The provider for cloud services.  Empty string for no provider.")
 	fs.StringVar(&s.CloudConfigFile, "cloud_config", s.CloudConfigFile, "The path to the cloud provider configuration file.  Empty string for no configuration file.")
+	fs.StringVar(&s.ResourceContainer, "resource_container", s.ResourceContainer, "Absolute name of the resource-only container to create and run the Kubelet in (Default: /kubelet).")
+
+	// Flags intended for testing, not recommended used in production environments.
+	fs.BoolVar(&s.ReallyCrashForTesting, "really_crash_for_testing", s.ReallyCrashForTesting, "If true, when panics occur crash. Intended for testing.")
+	fs.Float64Var(&s.ChaosChance, "chaos_chance", s.ChaosChance, "If > 0.0, introduce random client errors and latency. Intended for testing. [default=0.0]")
 }
 
 // Run runs the specified KubeletServer.  This should never exit.
@@ -196,6 +210,7 @@ func (s *KubeletServer) Run(_ []string) error {
 	util.ReallyCrash = s.ReallyCrashForTesting
 	rand.Seed(time.Now().UTC().UnixNano())
 
+	// TODO(vmarmol): Do this through container config.
 	if err := util.ApplyOomScoreAdj(0, s.OOMScoreAdj); err != nil {
 		glog.Info(err)
 	}
@@ -282,6 +297,7 @@ func (s *KubeletServer) Run(_ []string) error {
 		ImageGCPolicy:                  imageGCPolicy,
 		Cloud:                          cloud,
 		NodeStatusUpdateFrequency: s.NodeStatusUpdateFrequency,
+		ResourceContainer:         s.ResourceContainer,
 	}
 
 	RunKubelet(&kcfg, nil)
@@ -337,11 +353,26 @@ func (s *KubeletServer) createAPIServerClient() (*client.Client, error) {
 		glog.Infof("Multiple api servers specified.  Picking first one")
 	}
 	clientConfig.Host = s.APIServerList[0]
+
+	s.addChaosToClientConfig(&clientConfig)
+
 	c, err := client.New(&clientConfig)
 	if err != nil {
 		return nil, err
 	}
 	return c, nil
+}
+
+// addChaosToClientConfig injects random errors into client connections if configured.
+func (s *KubeletServer) addChaosToClientConfig(config *client.Config) {
+	if s.ChaosChance != 0.0 {
+		config.WrapTransport = func(rt http.RoundTripper) http.RoundTripper {
+			seed := chaosclient.NewSeed(1)
+			// TODO: introduce a standard chaos package with more tunables - this is just a proof of concept
+			// TODO: introduce random latency and stalls
+			return chaosclient.NewChaosRoundTripper(rt, chaosclient.LogChaos, seed.P(s.ChaosChance, chaosclient.ErrSimulatedConnectionResetByPeer))
+		}
+	}
 }
 
 // SimpleRunKubelet is a simple way to start a Kubelet talking to dockerEndpoint, using an API Client.
@@ -386,6 +417,7 @@ func SimpleKubelet(client *client.Client,
 		ImageGCPolicy:           imageGCPolicy,
 		Cloud:                   cloud,
 		NodeStatusUpdateFrequency: 10 * time.Second,
+		ResourceContainer:         "/kubelet",
 	}
 	return &kcfg
 }
@@ -406,7 +438,7 @@ func RunKubelet(kcfg *KubeletConfig, builder KubeletBuilder) {
 	} else {
 		glog.Infof("No api server defined - no events will be sent to API server.")
 	}
-	kubelet.SetupCapabilities(kcfg.AllowPrivileged, kcfg.HostNetworkSources)
+	capabilities.Setup(kcfg.AllowPrivileged, kcfg.HostNetworkSources)
 
 	credentialprovider.SetPreferredDockercfgPath(kcfg.RootDirectory)
 
@@ -508,6 +540,7 @@ type KubeletConfig struct {
 	ImageGCPolicy                  kubelet.ImageGCPolicy
 	Cloud                          cloudprovider.Interface
 	NodeStatusUpdateFrequency      time.Duration
+	ResourceContainer              string
 }
 
 func createAndInitKubelet(kc *KubeletConfig) (k KubeletBootstrap, pc *config.PodConfig, err error) {
@@ -550,7 +583,8 @@ func createAndInitKubelet(kc *KubeletConfig) (k KubeletBootstrap, pc *config.Pod
 		kc.CadvisorInterface,
 		kc.ImageGCPolicy,
 		kc.Cloud,
-		kc.NodeStatusUpdateFrequency)
+		kc.NodeStatusUpdateFrequency,
+		kc.ResourceContainer)
 
 	if err != nil {
 		return nil, nil, err

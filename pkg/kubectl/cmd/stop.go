@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl"
 	cmdutil "github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/cmd/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/resource"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -79,7 +80,8 @@ func NewCmdStop(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 			})
 		},
 	}
-	cmd.Flags().VarP(&flags.Filenames, "filename", "f", "Filename, directory, or URL to file of resource(s) to be stopped")
+	usage := "Filename, directory, or URL to file of resource(s) to be stopped"
+	kubectl.AddJsonFilenameFlag(cmd, &flags.Filenames, usage)
 	cmd.Flags().StringP("selector", "l", "", "Selector (label query) to filter on")
 	cmd.Flags().Bool("all", false, "[-all] to select all the specified resources")
 	return cmd

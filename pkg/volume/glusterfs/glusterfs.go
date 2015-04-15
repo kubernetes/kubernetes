@@ -53,11 +53,8 @@ func (plugin *glusterfsPlugin) Name() string {
 	return glusterfsPluginName
 }
 
-func (plugin *glusterfsPlugin) CanSupport(spec *api.Volume) bool {
-	if spec.VolumeSource.Glusterfs != nil {
-		return true
-	}
-	return false
+func (plugin *glusterfsPlugin) CanSupport(spec *volume.Spec) bool {
+	return spec.VolumeSource.Glusterfs != nil || spec.PersistentVolumeSource.Glusterfs != nil
 }
 
 func (plugin *glusterfsPlugin) GetAccessModes() []api.AccessModeType {
@@ -68,7 +65,7 @@ func (plugin *glusterfsPlugin) GetAccessModes() []api.AccessModeType {
 	}
 }
 
-func (plugin *glusterfsPlugin) NewBuilder(spec *api.Volume, podRef *api.ObjectReference) (volume.Builder, error) {
+func (plugin *glusterfsPlugin) NewBuilder(spec *volume.Spec, podRef *api.ObjectReference, _ volume.VolumeOptions) (volume.Builder, error) {
 	ep_name := spec.VolumeSource.Glusterfs.EndpointsName
 	ns := api.NamespaceDefault
 	ep, err := plugin.host.GetKubeClient().Endpoints(ns).Get(ep_name)
@@ -80,7 +77,7 @@ func (plugin *glusterfsPlugin) NewBuilder(spec *api.Volume, podRef *api.ObjectRe
 	return plugin.newBuilderInternal(spec, ep, podRef, mount.New(), exec.New())
 }
 
-func (plugin *glusterfsPlugin) newBuilderInternal(spec *api.Volume, ep *api.Endpoints, podRef *api.ObjectReference, mounter mount.Interface, exe exec.Interface) (volume.Builder, error) {
+func (plugin *glusterfsPlugin) newBuilderInternal(spec *volume.Spec, ep *api.Endpoints, podRef *api.ObjectReference, mounter mount.Interface, exe exec.Interface) (volume.Builder, error) {
 	return &glusterfs{
 		volName:  spec.Name,
 		hosts:    ep,

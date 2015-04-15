@@ -115,7 +115,9 @@ func (c *Controller) processLoop() {
 //      get called even if nothing changed. This is useful for periodically
 //      evaluating or syncing something.
 //  * OnDelete will get the final state of the item if it is known, otherwise
-//      it will get an object of type cache.DeletedFinalStateUnknown.
+//      it will get an object of type cache.DeletedFinalStateUnknown. This can
+//      happen if the watch is closed and misses the delete event and we don't
+//      notice the deletion until the subsequent re-list.
 type ResourceEventHandler interface {
 	OnAdd(obj interface{})
 	OnUpdate(oldObj, newObj interface{})
@@ -170,7 +172,7 @@ func DeletionHandlingMetaNamespaceKeyFunc(obj interface{}) (string, error) {
 // Parameters:
 //  * lw is list and watch functions for the source of the resource you want to
 //    be informed of.
-//  * objType is an object of the type that you expect to receieve.
+//  * objType is an object of the type that you expect to receive.
 //  * resyncPeriod: if non-zero, will re-list this often (you will get OnUpdate
 //    calls, even if nothing changed). Otherwise, re-list will be delayed as
 //    long as possible (until the upstream source closes the watch or times out,

@@ -16,13 +16,13 @@ package libcontainer
 
 import (
 	"fmt"
+	"path"
 	"time"
 
 	"github.com/docker/libcontainer"
 	"github.com/docker/libcontainer/cgroups"
-	cgroupfs "github.com/docker/libcontainer/cgroups/fs"
-	"github.com/docker/libcontainer/network"
 	info "github.com/google/cadvisor/info/v1"
+	"github.com/google/cadvisor/utils/sysinfo"
 )
 
 type CgroupSubsystems struct {
@@ -73,23 +73,31 @@ var supportedSubsystems map[string]struct{} = map[string]struct{}{
 	"blkio":   {},
 }
 
-// Get stats of the specified container
-func GetStats(cgroupPaths map[string]string, state *libcontainer.State) (*info.ContainerStats, error) {
-	// TODO(vmarmol): Use libcontainer's Stats() in the new API when that is ready.
-	stats := &libcontainer.ContainerStats{}
-
-	var err error
-	stats.CgroupStats, err = cgroupfs.GetStats(cgroupPaths)
+// Get cgroup and networking stats of the specified container
+func GetStats(cgroupManager cgroups.Manager, networkInterfaces []string) (*info.ContainerStats, error) {
+	cgroupStats, err := cgroupManager.GetStats()
 	if err != nil {
-		return &info.ContainerStats{}, err
+		return nil, err
 	}
-
-	stats.NetworkStats, err = network.GetStats(&state.NetworkState)
-	if err != nil {
-		return &info.ContainerStats{}, err
+	libcontainerStats := &libcontainer.Stats{
+		CgroupStats: cgroupStats,
 	}
+	stats := toContainerStats(libcontainerStats)
 
-	return toContainerStats(stats), nil
+	if len(networkInterfaces) != 0 {
+		// ContainerStats only reports stat for one network device.
+		// TODO(rjnagal): Handle multiple physical network devices.
+		// TODO(rjnagal): Use networking stats directly from libcontainer.
+		stats.Network, err = sysinfo.GetNetworkStats(networkInterfaces[0])
+		if err != nil {
+			return stats, err
+		}
+	}
+	return stats, nil
+}
+
+func DockerStateDir(dockerRoot string) string {
+	return path.Join(dockerRoot, "containers")
 }
 
 func DiskStatsCopy(blkio_stats []cgroups.BlkioStatEntry) (stat []info.PerDiskStats) {
@@ -134,7 +142,7 @@ func DiskStatsCopy(blkio_stats []cgroups.BlkioStatEntry) (stat []info.PerDiskSta
 }
 
 // Convert libcontainer stats to info.ContainerStats.
-func toContainerStats(libcontainerStats *libcontainer.ContainerStats) *info.ContainerStats {
+func toContainerStats(libcontainerStats *libcontainer.Stats) *info.ContainerStats {
 	s := libcontainerStats.CgroupStats
 	ret := new(info.ContainerStats)
 	ret.Timestamp = time.Now()
@@ -176,10 +184,16 @@ func toContainerStats(libcontainerStats *libcontainer.ContainerStats) *info.Cont
 			}
 		}
 	}
-	// TODO(vishh): Perform a deep copy or alias libcontainer network stats.
-	if libcontainerStats.NetworkStats != nil {
-		ret.Network = *(*info.NetworkStats)(libcontainerStats.NetworkStats)
+	if len(libcontainerStats.Interfaces) > 0 {
+		// TODO(vmarmol): Handle multiple interfaces.
+		ret.Network.RxBytes = libcontainerStats.Interfaces[0].RxBytes
+		ret.Network.RxPackets = libcontainerStats.Interfaces[0].RxPackets
+		ret.Network.RxErrors = libcontainerStats.Interfaces[0].RxErrors
+		ret.Network.RxDropped = libcontainerStats.Interfaces[0].RxDropped
+		ret.Network.TxBytes = libcontainerStats.Interfaces[0].TxBytes
+		ret.Network.TxPackets = libcontainerStats.Interfaces[0].TxPackets
+		ret.Network.TxErrors = libcontainerStats.Interfaces[0].TxErrors
+		ret.Network.TxDropped = libcontainerStats.Interfaces[0].TxDropped
 	}
-
 	return ret
 }

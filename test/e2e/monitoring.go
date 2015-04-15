@@ -32,7 +32,7 @@ import (
 )
 
 // TODO: quinton: debug issue #6541 and then remove Pending flag here.
-var _ = PDescribe("Monitoring", func() {
+var _ = Describe("Monitoring", func() {
 	var c *client.Client
 
 	BeforeEach(func() {
@@ -209,7 +209,7 @@ func testMonitoringUsingHeapsterInfluxdb(c *client.Client) {
 	if !ok {
 		Failf("failed to get master http client")
 	}
-	proxyUrl := fmt.Sprintf("%s/api/v1beta1/proxy/services/%s/", getMasterHost(), influxdbService)
+	proxyUrl := fmt.Sprintf("%s/api/v1beta3/proxy/namespaces/default/services/%s/", getMasterHost(), influxdbService)
 	config := &influxdb.ClientConfig{
 		Host: proxyUrl,
 		// TODO(vishh): Infer username and pw from the Pod spec.

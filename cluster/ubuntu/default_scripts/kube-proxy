@@ -7,4 +7,4 @@
 KUBE_PROXY_OPTS="--master=http://127.0.0.1:8080 \
 --logtostderr=true"
 
-# Add more envionrment settings used by kube-apiserver here
+# Add more environment settings used by kube-proxy here

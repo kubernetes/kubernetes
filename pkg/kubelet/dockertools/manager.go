@@ -60,18 +60,25 @@ type DockerManager struct {
 	//      means that some entries may be recycled before a pod has been
 	//      deleted.
 	reasonCache stringCache
+	// TODO(yifan): We export this for testability, so when we have a fake
+	// container manager, then we can unexport this. Also at that time, we
+	// use the concrete type so that we can record the pull failure and eliminate
+	// the image checking in GetPodStatus().
+	Puller DockerPuller
 }
 
 // Ensures DockerManager implements ConatinerRunner.
 var _ kubecontainer.ContainerRunner = new(DockerManager)
 
-func NewDockerManager(client DockerInterface, recorder record.EventRecorder, podInfraContainerImage string) *DockerManager {
+func NewDockerManager(client DockerInterface, recorder record.EventRecorder, podInfraContainerImage string, qps float32, burst int) *DockerManager {
 	reasonCache := stringCache{cache: lru.New(maxReasonCacheEntries)}
 	return &DockerManager{
 		client:                 client,
 		recorder:               recorder,
 		PodInfraContainerImage: podInfraContainerImage,
-		reasonCache:            reasonCache}
+		reasonCache:            reasonCache,
+		Puller:                 newDockerPuller(client, qps, burst),
+	}
 }
 
 // A cache which stores strings keyed by <pod_UID>_<container_name>.
@@ -224,8 +231,17 @@ func (self *DockerManager) GetPodStatus(pod *api.Pod) (*api.PodStatus, error) {
 	uid := pod.UID
 	manifest := pod.Spec
 
+	oldStatuses := make(map[string]api.ContainerStatus, len(pod.Spec.Containers))
+	lastObservedTime := make(map[string]util.Time, len(pod.Spec.Containers))
+	for _, status := range pod.Status.ContainerStatuses {
+		oldStatuses[status.Name] = status
+		if status.LastTerminationState.Termination != nil {
+			lastObservedTime[status.Name] = status.LastTerminationState.Termination.FinishedAt
+		}
+	}
+
 	var podStatus api.PodStatus
-	statuses := make(map[string]api.ContainerStatus)
+	statuses := make(map[string]*api.ContainerStatus, len(pod.Spec.Containers))
 
 	expectedContainers := make(map[string]api.Container)
 	for _, container := range manifest.Containers {
@@ -238,6 +254,10 @@ func (self *DockerManager) GetPodStatus(pod *api.Pod) (*api.PodStatus, error) {
 		return nil, err
 	}
 
+	containerDone := util.NewStringSet()
+	// Loop through list of running and exited docker containers to construct
+	// the statuses. We assume docker returns a list of containers sorted in
+	// reverse by time.
 	for _, value := range containers {
 		if len(value.Names) == 0 {
 			continue
@@ -254,30 +274,44 @@ func (self *DockerManager) GetPodStatus(pod *api.Pod) (*api.PodStatus, error) {
 		}
 		dockerContainerName := dockerName.ContainerName
 		c, found := expectedContainers[dockerContainerName]
-		terminationMessagePath := ""
 		if !found {
-			// TODO(dchen1107): should figure out why not continue here
-			// continue
-		} else {
-			terminationMessagePath = c.TerminationMessagePath
+			continue
 		}
-		// We assume docker return us a list of containers in time order
-		if containerStatus, found := statuses[dockerContainerName]; found {
-			// Populate last termination state
-			if containerStatus.LastTerminationState.Termination == nil {
-				result := self.inspectContainer(value.ID, dockerContainerName, terminationMessagePath)
-				if result.err == nil && result.status.State.Termination != nil {
-					containerStatus.LastTerminationState = result.status.State
-				}
-			}
-			containerStatus.RestartCount += 1
-			statuses[dockerContainerName] = containerStatus
+		terminationMessagePath := c.TerminationMessagePath
+		if containerDone.Has(dockerContainerName) {
 			continue
 		}
 
+		var terminationState *api.ContainerState = nil
+		// Inspect the container.
 		result := self.inspectContainer(value.ID, dockerContainerName, terminationMessagePath)
 		if result.err != nil {
 			return nil, result.err
+		} else if result.status.State.Termination != nil {
+			terminationState = &result.status.State
+		}
+
+		if containerStatus, found := statuses[dockerContainerName]; found {
+			if containerStatus.LastTerminationState.Termination == nil && terminationState != nil {
+				// Populate the last termination state.
+				containerStatus.LastTerminationState = *terminationState
+			}
+			count := true
+			// Only count dead containers terminated after last time we observed,
+			if lastObservedTime, ok := lastObservedTime[dockerContainerName]; ok {
+				if terminationState != nil && terminationState.Termination.FinishedAt.After(lastObservedTime.Time) {
+					count = false
+				} else {
+					// The container finished before the last observation. No
+					// need to examine/count the older containers. Mark the
+					// container name as done.
+					containerDone.Insert(dockerContainerName)
+				}
+			}
+			if count {
+				containerStatus.RestartCount += 1
+			}
+			continue
 		}
 
 		if dockerContainerName == PodInfraContainerName {
@@ -287,44 +321,54 @@ func (self *DockerManager) GetPodStatus(pod *api.Pod) (*api.PodStatus, error) {
 			}
 		} else {
 			// Add user container information.
-			statuses[dockerContainerName] = result.status
+			if oldStatus, found := oldStatuses[dockerContainerName]; found {
+				// Use the last observed restart count if it's available.
+				result.status.RestartCount = oldStatus.RestartCount
+			}
+			statuses[dockerContainerName] = &result.status
 		}
 	}
 
+	// Handle the containers for which we cannot find any associated active or
+	// dead docker containers.
 	for _, container := range manifest.Containers {
+		if _, found := statuses[container.Name]; found {
+			continue
+		}
 		var containerStatus api.ContainerStatus
-		if status, found := statuses[container.Name]; found {
-			containerStatus = status
-		} else {
-			// The container has not been created yet. Check image is ready on
-			// the node or not.
-			// TODO: If we integrate DockerPuller into DockerManager, we can
-			// record the pull failure and eliminate the image checking below.
-			image := container.Image
-			// TODO(dchen1107): docker/docker/issues/8365 to figure out if the image exists
-			_, err := self.client.InspectImage(image)
-			if err == nil {
-				containerStatus.State.Waiting = &api.ContainerStateWaiting{
-					Reason: fmt.Sprintf("Image: %s is ready, container is creating", image),
-				}
-			} else if err == docker.ErrNoSuchImage {
-				containerStatus.State.Waiting = &api.ContainerStateWaiting{
-					Reason: fmt.Sprintf("Image: %s is not ready on the node", image),
-				}
+		if oldStatus, found := oldStatuses[container.Name]; found {
+			// Some states may be lost due to GC; apply the last observed
+			// values if possible.
+			containerStatus.RestartCount = oldStatus.RestartCount
+			containerStatus.LastTerminationState = oldStatus.LastTerminationState
+		}
+		//Check image is ready on the node or not.
+		// TODO: If we integrate DockerPuller into DockerManager, we can
+		// record the pull failure and eliminate the image checking below.
+		image := container.Image
+		// TODO(dchen1107): docker/docker/issues/8365 to figure out if the image exists
+		_, err := self.client.InspectImage(image)
+		if err == nil {
+			containerStatus.State.Waiting = &api.ContainerStateWaiting{
+				Reason: fmt.Sprintf("Image: %s is ready, container is creating", image),
+			}
+		} else if err == docker.ErrNoSuchImage {
+			containerStatus.State.Waiting = &api.ContainerStateWaiting{
+				Reason: fmt.Sprintf("Image: %s is not ready on the node", image),
 			}
 		}
-		if containerStatus.State.Waiting != nil {
-			// For containers in the waiting state, fill in a specific reason if it is recorded.
-			if reason, ok := self.reasonCache.Get(uid, container.Name); ok {
-				containerStatus.State.Waiting.Reason = reason
-			}
-		}
-		statuses[container.Name] = containerStatus
+		statuses[container.Name] = &containerStatus
 	}
 
 	podStatus.ContainerStatuses = make([]api.ContainerStatus, 0)
-	for _, status := range statuses {
-		podStatus.ContainerStatuses = append(podStatus.ContainerStatuses, status)
+	for containerName, status := range statuses {
+		if status.State.Waiting != nil {
+			// For containers in the waiting state, fill in a specific reason if it is recorded.
+			if reason, ok := self.reasonCache.Get(uid, containerName); ok {
+				status.State.Waiting.Reason = reason
+			}
+		}
+		podStatus.ContainerStatuses = append(podStatus.ContainerStatuses, *status)
 	}
 
 	return &podStatus, nil
@@ -519,4 +563,95 @@ func makeCapabilites(capAdd []api.CapabilityType, capDrop []api.CapabilityType) 
 		dropCaps = append(dropCaps, string(cap))
 	}
 	return addCaps, dropCaps
+}
+
+func (self *DockerManager) GetPods(all bool) ([]*kubecontainer.Pod, error) {
+	pods := make(map[types.UID]*kubecontainer.Pod)
+	var result []*kubecontainer.Pod
+
+	containers, err := GetKubeletDockerContainers(self.client, all)
+	if err != nil {
+		return nil, err
+	}
+
+	// Group containers by pod.
+	for _, c := range containers {
+		if len(c.Names) == 0 {
+			glog.Warningf("Cannot parse empty docker container name: %#v", c.Names)
+			continue
+		}
+		dockerName, hash, err := ParseDockerName(c.Names[0])
+		if err != nil {
+			glog.Warningf("Parse docker container name %q error: %v", c.Names[0], err)
+			continue
+		}
+		pod, found := pods[dockerName.PodUID]
+		if !found {
+			name, namespace, err := kubecontainer.ParsePodFullName(dockerName.PodFullName)
+			if err != nil {
+				glog.Warningf("Parse pod full name %q error: %v", dockerName.PodFullName, err)
+				continue
+			}
+			pod = &kubecontainer.Pod{
+				ID:        dockerName.PodUID,
+				Name:      name,
+				Namespace: namespace,
+			}
+			pods[dockerName.PodUID] = pod
+		}
+		pod.Containers = append(pod.Containers, &kubecontainer.Container{
+			ID:      types.UID(c.ID),
+			Name:    dockerName.ContainerName,
+			Hash:    hash,
+			Created: c.Created,
+		})
+	}
+
+	// Convert map to list.
+	for _, c := range pods {
+		result = append(result, c)
+	}
+	return result, nil
+}
+
+func (self *DockerManager) Pull(image string) error {
+	return self.Puller.Pull(image)
+}
+
+func (self *DockerManager) IsImagePresent(image string) (bool, error) {
+	return self.Puller.IsImagePresent(image)
+}
+
+// PodInfraContainer returns true if the pod infra container has changed.
+func (self *DockerManager) PodInfraContainerChanged(pod *api.Pod, podInfraContainer *kubecontainer.Container) (bool, error) {
+	networkMode := ""
+	var ports []api.ContainerPort
+
+	dockerPodInfraContainer, err := self.client.InspectContainer(string(podInfraContainer.ID))
+	if err != nil {
+		return false, err
+	}
+
+	// Check network mode.
+	if dockerPodInfraContainer.HostConfig != nil {
+		networkMode = dockerPodInfraContainer.HostConfig.NetworkMode
+	}
+	if pod.Spec.HostNetwork {
+		if networkMode != "host" {
+			glog.V(4).Infof("host: %v, %v", pod.Spec.HostNetwork, networkMode)
+			return true, nil
+		}
+	} else {
+		// Docker only exports ports from the pod infra container. Let's
+		// collect all of the relevant ports and export them.
+		for _, container := range pod.Spec.Containers {
+			ports = append(ports, container.Ports...)
+		}
+	}
+	expectedPodInfraContainer := &api.Container{
+		Name:  PodInfraContainerName,
+		Image: self.PodInfraContainerImage,
+		Ports: ports,
+	}
+	return podInfraContainer.Hash != HashContainer(expectedPodInfraContainer), nil
 }

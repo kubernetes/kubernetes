@@ -37,7 +37,7 @@ func TestCanSupport(t *testing.T) {
 	if plug.Name() != "kubernetes.io/aws-ebs" {
 		t.Errorf("Wrong name: %s", plug.Name())
 	}
-	if !plug.CanSupport(&api.Volume{VolumeSource: api.VolumeSource{AWSElasticBlockStore: &api.AWSElasticBlockStoreVolumeSource{}}}) {
+	if !plug.CanSupport(&volume.Spec{Name: "foo", VolumeSource: api.VolumeSource{AWSElasticBlockStore: &api.AWSElasticBlockStoreVolumeSource{}}}) {
 		t.Errorf("Expected true")
 	}
 }
@@ -106,7 +106,7 @@ func TestPlugin(t *testing.T) {
 			},
 		},
 	}
-	builder, err := plug.(*awsElasticBlockStorePlugin).newBuilderInternal(spec, types.UID("poduid"), &fakePDManager{}, &mount.FakeMounter{})
+	builder, err := plug.(*awsElasticBlockStorePlugin).newBuilderInternal(volume.NewSpecFromVolume(spec), types.UID("poduid"), &fakePDManager{}, &mount.FakeMounter{})
 	if err != nil {
 		t.Errorf("Failed to make a new Builder: %v", err)
 	}

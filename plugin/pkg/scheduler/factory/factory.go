@@ -84,16 +84,20 @@ func NewConfigFactory(client *client.Client) *ConfigFactory {
 		framework.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
 				if pod, ok := obj.(*api.Pod); ok {
-					c.modeler.ForgetPod(pod)
+					c.modeler.LockedAction(func() {
+						c.modeler.ForgetPod(pod)
+					})
 				}
 			},
 			DeleteFunc: func(obj interface{}) {
-				switch t := obj.(type) {
-				case *api.Pod:
-					c.modeler.ForgetPod(t)
-				case cache.DeletedFinalStateUnknown:
-					c.modeler.ForgetPodByKey(t.Key)
-				}
+				c.modeler.LockedAction(func() {
+					switch t := obj.(type) {
+					case *api.Pod:
+						c.modeler.ForgetPod(t)
+					case cache.DeletedFinalStateUnknown:
+						c.modeler.ForgetPodByKey(t.Key)
+					}
+				})
 			},
 		},
 	)
@@ -168,13 +172,7 @@ func (f *ConfigFactory) CreateFromKeys(predicateKeys, priorityKeys util.StringSe
 
 	// Watch minions.
 	// Minions may be listed frequently, so provide a local up-to-date cache.
-	if false {
-		// Disable this code until minions support watches. Note when this code is enabled,
-		// we need to make sure minion ListWatcher has proper FieldSelector.
-		cache.NewReflector(f.createMinionLW(), &api.Node{}, f.NodeLister.Store, 10*time.Second).RunUntil(f.StopEverything)
-	} else {
-		cache.NewPoller(f.pollMinions, 10*time.Second, f.NodeLister.Store).RunUntil(f.StopEverything)
-	}
+	cache.NewReflector(f.createMinionLW(), &api.Node{}, f.NodeLister.Store, 0).RunUntil(f.StopEverything)
 
 	// Watch and cache all service objects. Scheduler needs to find all pods
 	// created by the same service, so that it can spread them correctly.
@@ -232,7 +230,7 @@ func (factory *ConfigFactory) createAssignedPodLW() *cache.ListWatch {
 
 // createMinionLW returns a cache.ListWatch that gets all changes to minions.
 func (factory *ConfigFactory) createMinionLW() *cache.ListWatch {
-	return cache.NewListWatchFromClient(factory.Client, "minions", api.NamespaceAll, parseSelectorOrDie(""))
+	return cache.NewListWatchFromClient(factory.Client, "nodes", api.NamespaceAll, parseSelectorOrDie(""))
 }
 
 // Lists all minions and filter out unhealthy ones, then returns

@@ -38,11 +38,6 @@ if [[ -n "${DOCKER_ROOT}" ]]; then
 EOF
 fi
 
-cat <<EOF > /etc/aws.conf
-[Global]
-Zone = ${ZONE}
-EOF
-
 # Auto accept all keys from minions that try to join
 mkdir -p /etc/salt/master.d
 cat <<EOF >/etc/salt/master.d/auto-accept.conf

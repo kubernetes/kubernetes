@@ -2,7 +2,7 @@
 
 ## Overview
 
-Kubernetes [`Pods`](Pods.md) are mortal. They are born and they die, and they
+Kubernetes [`Pods`](pods.md) are mortal. They are born and they die, and they
 are not resurrected.  [`ReplicationControllers`](replication-controller.md) in
 particular create and destroy `Pods` dynamically (e.g. when scaling up or down
 or when doing rolling updates).  While each `Pod` gets its own IP address, even
