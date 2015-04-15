@@ -150,6 +150,13 @@ func NewAPIFactory() (*cmdutil.Factory, *testFactory, runtime.Codec) {
 		Object: func() (meta.RESTMapper, runtime.ObjectTyper) {
 			return latest.RESTMapper, api.Scheme
 		},
+		Client: func() (*client.Client, error) {
+			// Swap out the HTTP client out of the client with the fake's version.
+			fakeClient := t.Client.(*client.FakeRESTClient)
+			c := client.NewOrDie(t.ClientConfig)
+			c.Client = fakeClient.Client
+			return c, t.Err
+		},
 		RESTClient: func(*meta.RESTMapping) (resource.RESTClient, error) {
 			return t.Client, t.Err
 		},

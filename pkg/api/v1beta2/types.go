@@ -1655,3 +1655,32 @@ type SecretList struct {
 
 	Items []Secret `json:"items" description:"items is a list of secret objects"`
 }
+
+// Type and constants for component health validation.
+type ComponentConditionType string
+
+// These are the valid conditions for the component.
+const (
+	ComponentHealthy ComponentConditionType = "Healthy"
+)
+
+type ComponentCondition struct {
+	Type    ComponentConditionType `json:"type"`
+	Status  ConditionStatus        `json:"status"`
+	Message string                 `json:"message,omitempty" description:"health check message received from the component"`
+	Error   string                 `json:"error,omitempty" description:"error code from health check attempt (if any)"`
+}
+
+// ComponentStatus (and ComponentStatusList) holds the cluster validation info.
+type ComponentStatus struct {
+	TypeMeta `json:",inline"`
+
+	Name       string               `json:"name,omitempty" description:"name of the component"`
+	Conditions []ComponentCondition `json:"conditions,omitempty"`
+}
+
+type ComponentStatusList struct {
+	TypeMeta `json:",inline"`
+
+	Items []ComponentStatus `json:"items" description:"items is a list of component status objects"`
+}

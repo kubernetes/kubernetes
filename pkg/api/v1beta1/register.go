@@ -68,6 +68,8 @@ func init() {
 		&PodLogOptions{},
 		&PodExecOptions{},
 		&PodProxyOptions{},
+		&ComponentStatus{},
+		&ComponentStatusList{},
 	)
 	// Future names are supported
 	api.Scheme.AddKnownTypeWithName("v1beta1", "Node", &Minion{})
@@ -110,3 +112,5 @@ func (*ListOptions) IsAnAPIObject()               {}
 func (*PodLogOptions) IsAnAPIObject()             {}
 func (*PodExecOptions) IsAnAPIObject()            {}
 func (*PodProxyOptions) IsAnAPIObject()           {}
+func (*ComponentStatus) IsAnAPIObject()           {}
+func (*ComponentStatusList) IsAnAPIObject()       {}

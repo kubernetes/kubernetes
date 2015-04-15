@@ -87,6 +87,31 @@ func testData() (*api.PodList, *api.ServiceList, *api.ReplicationControllerList)
 	return pods, svc, rc
 }
 
+func testComponentStatusData() *api.ComponentStatusList {
+	good := &api.ComponentStatus{
+		Name: "servergood",
+		Conditions: []api.ComponentCondition{
+			{Type: api.ComponentHealthy, Status: api.ConditionTrue, Message: "ok", Error: "nil"},
+		},
+	}
+	bad := &api.ComponentStatus{
+		Name: "serverbad",
+		Conditions: []api.ComponentCondition{
+			{Type: api.ComponentHealthy, Status: api.ConditionFalse, Message: "", Error: "bad status: 500"},
+		},
+	}
+	unknown := &api.ComponentStatus{
+		Name: "serverunknown",
+		Conditions: []api.ComponentCondition{
+			{Type: api.ComponentHealthy, Status: api.ConditionUnknown, Message: "", Error: "fizzbuzz error"},
+		},
+	}
+
+	return &api.ComponentStatusList{
+		Items: []api.ComponentStatus{*good, *bad, *unknown},
+	}
+}
+
 // Verifies that schemas that are not in the master tree of Kubernetes can be retrieved via Get.
 func TestGetUnknownSchemaObject(t *testing.T) {
 	f, tf, codec := NewTestFactory()
@@ -179,6 +204,32 @@ func TestGetListObjects(t *testing.T) {
 	cmd.Run(cmd, []string{"pods"})
 
 	expected := []runtime.Object{pods}
+	actual := tf.Printer.(*testPrinter).Objects
+	if !reflect.DeepEqual(expected, actual) {
+		t.Errorf("unexpected object: %#v %#v", expected, actual)
+	}
+	if len(buf.String()) == 0 {
+		t.Errorf("unexpected empty output")
+	}
+}
+
+func TestGetListComponentStatus(t *testing.T) {
+	statuses := testComponentStatusData()
+
+	f, tf, codec := NewAPIFactory()
+	tf.Printer = &testPrinter{}
+	tf.Client = &client.FakeRESTClient{
+		Codec: codec,
+		Resp:  &http.Response{StatusCode: 200, Body: objBody(codec, statuses)},
+	}
+	tf.Namespace = "test"
+	buf := bytes.NewBuffer([]byte{})
+
+	cmd := NewCmdGet(f, buf)
+	cmd.SetOutput(buf)
+	cmd.Run(cmd, []string{"componentstatuses"})
+
+	expected := []runtime.Object{statuses}
 	actual := tf.Printer.(*testPrinter).Objects
 	if !reflect.DeepEqual(expected, actual) {
 		t.Errorf("unexpected object: %#v %#v", expected, actual)

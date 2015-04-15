@@ -138,13 +138,17 @@ func kindToResource(kind string, mixedCase bool) (plural, singular string) {
 	} else {
 		singular = strings.ToLower(kind)
 	}
-	switch string(singular[len(singular)-1]) {
-	case "s":
-		plural = singular
-	case "y":
-		plural = strings.TrimSuffix(singular, "y") + "ies"
-	default:
-		plural = singular + "s"
+	if strings.HasSuffix(singular, "status") {
+		plural = strings.TrimSuffix(singular, "status") + "statuses"
+	} else {
+		switch string(singular[len(singular)-1]) {
+		case "s":
+			plural = singular
+		case "y":
+			plural = strings.TrimSuffix(singular, "y") + "ies"
+		default:
+			plural = singular + "s"
+		}
 	}
 	return
 }
@@ -215,7 +219,7 @@ func (m *DefaultRESTMapper) RESTMapping(kind string, versions ...string) (*RESTM
 		return nil, fmt.Errorf("the provided version %q has no relevant versions", version)
 	}
 
-	return &RESTMapping{
+	retVal := &RESTMapping{
 		Resource:   resource,
 		APIVersion: version,
 		Kind:       kind,
@@ -224,7 +228,9 @@ func (m *DefaultRESTMapper) RESTMapping(kind string, versions ...string) (*RESTM
 		Codec:            interfaces.Codec,
 		ObjectConvertor:  interfaces.ObjectConvertor,
 		MetadataAccessor: interfaces.MetadataAccessor,
-	}, nil
+	}
+
+	return retVal, nil
 }
 
 // aliasToResource is used for mapping aliases to resources

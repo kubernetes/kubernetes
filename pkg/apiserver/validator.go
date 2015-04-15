@@ -48,13 +48,39 @@ type validator struct {
 	rt      http.RoundTripper
 }
 
+type ServerStatus struct {
+	Component  string       `json:"component,omitempty"`
+	Health     string       `json:"health,omitempty"`
+	HealthCode probe.Result `json:"healthCode,omitempty"`
+	Msg        string       `json:"msg,omitempty"`
+	Err        string       `json:"err,omitempty"`
+}
+
 // TODO: can this use pkg/probe/http
-func (s *Server) check(client httpGet) (probe.Result, string, error) {
+func (server *Server) DoServerCheck(rt http.RoundTripper) (probe.Result, string, error) {
+	var client *http.Client
 	scheme := "http://"
-	if s.EnableHTTPS {
+	if server.EnableHTTPS {
+		// TODO(roberthbailey): The servers that use HTTPS are currently the
+		// kubelets, and we should be using a standard kubelet client library
+		// to talk to them rather than a separate http client.
+		transport := &http.Transport{
+			Proxy: http.ProxyFromEnvironment,
+			Dial: (&net.Dialer{
+				Timeout:   30 * time.Second,
+				KeepAlive: 30 * time.Second,
+			}).Dial,
+			TLSHandshakeTimeout: 10 * time.Second,
+			TLSClientConfig:     &tls.Config{InsecureSkipVerify: true},
+		}
+
+		client = &http.Client{Transport: transport}
 		scheme = "https://"
+	} else {
+		client = &http.Client{Transport: rt}
 	}
-	resp, err := client.Get(scheme + net.JoinHostPort(s.Addr, strconv.Itoa(s.Port)) + s.Path)
+
+	resp, err := client.Get(scheme + net.JoinHostPort(server.Addr, strconv.Itoa(server.Port)) + server.Path)
 	if err != nil {
 		return probe.Unknown, "", err
 	}
@@ -70,14 +96,6 @@ func (s *Server) check(client httpGet) (probe.Result, string, error) {
 	return probe.Success, string(data), nil
 }
 
-type ServerStatus struct {
-	Component  string       `json:"component,omitempty"`
-	Health     string       `json:"health,omitempty"`
-	HealthCode probe.Result `json:"healthCode,omitempty"`
-	Msg        string       `json:"msg,omitempty"`
-	Err        string       `json:"err,omitempty"`
-}
-
 func (v *validator) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	verb := "get"
 	apiResource := ""
@@ -88,21 +106,7 @@ func (v *validator) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	reply := []ServerStatus{}
 	for name, server := range v.servers() {
 		transport := v.rt
-		if server.EnableHTTPS {
-			// TODO(roberthbailey): The servers that use HTTPS are currently the
-			// kubelets, and we should be using a standard kubelet client library
-			// to talk to them rather than a separate http client.
-			transport = &http.Transport{
-				Proxy: http.ProxyFromEnvironment,
-				Dial: (&net.Dialer{
-					Timeout:   30 * time.Second,
-					KeepAlive: 30 * time.Second,
-				}).Dial,
-				TLSHandshakeTimeout: 10 * time.Second,
-				TLSClientConfig:     &tls.Config{InsecureSkipVerify: true},
-			}
-		}
-		status, msg, err := server.check(&http.Client{Transport: transport})
+		status, msg, err := server.DoServerCheck(transport)
 		var errorMsg string
 		if err != nil {
 			errorMsg = err.Error()
