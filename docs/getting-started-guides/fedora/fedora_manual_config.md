@@ -16,7 +16,7 @@ fed-node = 192.168.121.65
 
 **Prepare the hosts:**
     
-* Install kubernetes on all hosts - fed-{master,node}.  This will also pull in etcd and docker.  This guide has been tested with kubernetes-0.12.0 but should work with later versions too.
+* Install kubernetes on all hosts - fed-{master,node}.  This will also pull in docker. Also install etcd on fed-master.  This guide has been tested with kubernetes-0.15.0 but should work with other versions too.
 * The [--enablerepo=update-testing](https://fedoraproject.org/wiki/QA:Updates_Testing) directive in the yum command below will ensure that the most recent Kubernetes version that is scheduled for pre-release will be installed. This should be a more recent version than the Fedora "stable" release for Kubernetes that you would get without adding the directive. 
 * If you want the very latest Kubernetes release [you can download and yum install the RPM directly from Fedora Koji](http://koji.fedoraproject.org/koji/packageinfo?packageID=19202) instead of using the yum install command below.
 
@@ -101,7 +101,8 @@ done
     "apiVersion": "v1beta3",
     "kind": "Node",
     "metadata": {
-        "name": "fed-node"
+        "name": "fed-node",
+        "labels":{ "name": "fed-node-label"}
     },
     "spec": {
         "externalID": "fed-node"
@@ -122,7 +123,7 @@ fed-node           name=fed-node-label     Unknown
 
 Please note that in the above, it only creates a representation for the node
 _fed-node_ internally. It does not provision the actual _fed-node_. Also, it
-is assumed that _fed-node_ (as specified in `id`) can be resolved and is
+is assumed that _fed-node_ (as specified in `name`) can be resolved and is
 reachable from kubernetes master node. This guide will discuss how to provision
 a kubernetes node (fed-node) below.
 
