@@ -35,6 +35,7 @@
 
 {% set etcd_servers = "--etcd_servers=http://127.0.0.1:4001" -%}
 
+{%  set portal_net = "" -%}
 {% if pillar['portal_net'] is defined -%}
   {% set portal_net = "--portal_net=" + pillar['portal_net'] -%}
 {% endif -%}
