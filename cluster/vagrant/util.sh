@@ -33,12 +33,61 @@ function detect-minions {
 # Verify prereqs on host machine  Also sets exports USING_KUBE_SCRIPTS=true so
 # that our Vagrantfile doesn't error out.
 function verify-prereqs {
-  for x in vagrant VBoxManage; do
+  for x in vagrant; do
     if ! which "$x" >/dev/null; then
       echo "Can't find $x in PATH, please fix and retry."
       exit 1
     fi
   done
+
+  local vagrant_plugins=$(vagrant plugin list | sed '-es% .*$%%' '-es%  *% %g' | tr ' ' $'\n')
+  local providers=(
+      # Format is:
+      #   provider_ctl_executable vagrant_provider_name vagrant_provider_plugin_re
+      # either provider_ctl_executable or vagrant_provider_plugin_re can
+      # be blank (i.e., '') if none is needed by Vagrant (see, e.g.,
+      # virtualbox entry)
+      vmrun vmware_fusion vagrant-vmware-fusion
+      vmrun vmware_workstation vagrant-vmware-workstation
+      prlctl parallels vagrant-parallels
+      VBoxManage virtualbox ''
+  )
+  local provider_found=''
+  local provider_bin
+  local provider_name
+  local provider_plugin_re
+
+  while [ "${#providers[@]}" -gt 0 ]; do
+    provider_bin=${providers[0]}
+    provider_name=${providers[1]}
+    provider_plugin_re=${providers[2]}
+    providers=("${providers[@]:3}")
+
+    # If the provider is explicitly set, look only for that provider
+    if [ -n "${VAGRANT_DEFAULT_PROVIDER:-}" ] \
+        && [ "${VAGRANT_DEFAULT_PROVIDER}" != "${provider_name}" ]; then
+      continue
+    fi
+
+    if ([ -z "${provider_bin}" ] \
+          || which "${provider_bin}" >/dev/null 2>&1) \
+        && ([ -z "${provider_plugin_re}" ] \
+          || [ -n "$(echo "${vagrant_plugins}" | grep -E "^${provider_plugin_re}$")" ]); then
+      provider_found="${provider_name}"
+      # Stop after finding the first viable provider
+      break
+    fi
+  done
+
+  if [ -z "${provider_found}" ]; then
+    if [ -n "${VAGRANT_DEFAULT_PROVIDER}" ]; then
+      echo "Can't find the necessary components for the ${VAGRANT_DEFAULT_PROVIDER} vagrant provider, please fix and retry."
+    else
+      echo "Can't find the necessary components for any viable vagrant providers (e.g., virtualbox), please fix and retry."
+    fi
+
+    exit 1
+  fi
 
   # Set VAGRANT_CWD to KUBE_ROOT so that we find the right Vagrantfile no
   # matter what directory the tools are called from.
@@ -89,6 +138,7 @@ function create-provision-scripts {
     echo "DNS_REPLICAS='${DNS_REPLICAS:-}'"
     echo "RUNTIME_CONFIG='${RUNTIME_CONFIG:-}'"
     echo "ADMISSION_CONTROL='${ADMISSION_CONTROL:-}'"
+    echo "VAGRANT_DEFAULT_PROVIDER='${VAGRANT_DEFAULT_PROVIDER:-}'"
     grep -v "^#" "${KUBE_ROOT}/cluster/vagrant/provision-master.sh"
     grep -v "^#" "${KUBE_ROOT}/cluster/vagrant/provision-network.sh"
   ) > "${KUBE_TEMP}/master-start.sh"
@@ -109,6 +159,7 @@ function create-provision-scripts {
       echo "MINION_CONTAINER_SUBNETS=(${MINION_CONTAINER_SUBNETS[@]})"
       echo "CONTAINER_SUBNET='${CONTAINER_SUBNET}'"
       echo "DOCKER_OPTS='${EXTRA_DOCKER_OPTS-}'"
+      echo "VAGRANT_DEFAULT_PROVIDER='${VAGRANT_DEFAULT_PROVIDER:-}'"
       grep -v "^#" "${KUBE_ROOT}/cluster/vagrant/provision-minion.sh"
       grep -v "^#" "${KUBE_ROOT}/cluster/vagrant/provision-network.sh"
     ) > "${KUBE_TEMP}/minion-start-${i}.sh"
@@ -116,6 +167,9 @@ function create-provision-scripts {
 }
 
 function verify-cluster {
+  # TODO: How does the user know the difference between "tak[ing] some
+  # time" and "loop[ing] forever"? Can we give more specific feedback on
+  # whether "an error" has occurred?
   echo "Each machine instance has been created/updated."
   echo "  Now waiting for the Salt provisioning process to complete on each machine."
   echo "  This can take some time based on your network, disk, and cpu speed."
