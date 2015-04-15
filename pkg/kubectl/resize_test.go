@@ -43,7 +43,7 @@ func (c *ErrorReplicationControllerClient) ReplicationControllers(namespace stri
 
 func TestReplicationControllerResizeRetry(t *testing.T) {
 	fake := &ErrorReplicationControllerClient{Fake: testclient.Fake{}}
-	resizer := ReplicationControllerResizer{&RealResizerClient{fake}}
+	resizer := ReplicationControllerResizer{NewResizerClient(fake)}
 	preconditions := ResizePrecondition{-1, ""}
 	count := uint(3)
 	name := "foo"
@@ -67,7 +67,7 @@ func TestReplicationControllerResizeRetry(t *testing.T) {
 
 func TestReplicationControllerResize(t *testing.T) {
 	fake := &testclient.Fake{}
-	resizer := ReplicationControllerResizer{&RealResizerClient{fake}}
+	resizer := ReplicationControllerResizer{NewResizerClient(fake)}
 	preconditions := ResizePrecondition{-1, ""}
 	count := uint(3)
 	name := "foo"
@@ -90,7 +90,7 @@ func TestReplicationControllerResizeFailsPreconditions(t *testing.T) {
 			Replicas: 10,
 		},
 	})
-	resizer := ReplicationControllerResizer{&RealResizerClient{fake}}
+	resizer := ReplicationControllerResizer{NewResizerClient(fake)}
 	preconditions := ResizePrecondition{2, ""}
 	count := uint(3)
 	name := "foo"

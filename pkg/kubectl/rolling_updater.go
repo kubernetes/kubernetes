@@ -207,27 +207,31 @@ type RollingUpdaterClient interface {
 	ControllerHasDesiredReplicas(rc *api.ReplicationController) wait.ConditionFunc
 }
 
-// RealRollingUpdaterClient is a RollingUpdaterClient which uses a Kube client.
-type RealRollingUpdaterClient struct {
-	Client client.Interface
+func NewRollingUpdaterClient(c client.Interface) RollingUpdaterClient {
+	return &realRollingUpdaterClient{c}
 }
 
-func (c *RealRollingUpdaterClient) GetReplicationController(namespace, name string) (*api.ReplicationController, error) {
-	return c.Client.ReplicationControllers(namespace).Get(name)
+// realRollingUpdaterClient is a RollingUpdaterClient which uses a Kube client.
+type realRollingUpdaterClient struct {
+	client client.Interface
 }
 
-func (c *RealRollingUpdaterClient) UpdateReplicationController(namespace string, rc *api.ReplicationController) (*api.ReplicationController, error) {
-	return c.Client.ReplicationControllers(namespace).Update(rc)
+func (c *realRollingUpdaterClient) GetReplicationController(namespace, name string) (*api.ReplicationController, error) {
+	return c.client.ReplicationControllers(namespace).Get(name)
 }
 
-func (c *RealRollingUpdaterClient) CreateReplicationController(namespace string, rc *api.ReplicationController) (*api.ReplicationController, error) {
-	return c.Client.ReplicationControllers(namespace).Create(rc)
+func (c *realRollingUpdaterClient) UpdateReplicationController(namespace string, rc *api.ReplicationController) (*api.ReplicationController, error) {
+	return c.client.ReplicationControllers(namespace).Update(rc)
 }
 
-func (c *RealRollingUpdaterClient) DeleteReplicationController(namespace, name string) error {
-	return c.Client.ReplicationControllers(namespace).Delete(name)
+func (c *realRollingUpdaterClient) CreateReplicationController(namespace string, rc *api.ReplicationController) (*api.ReplicationController, error) {
+	return c.client.ReplicationControllers(namespace).Create(rc)
 }
 
-func (c *RealRollingUpdaterClient) ControllerHasDesiredReplicas(rc *api.ReplicationController) wait.ConditionFunc {
-	return client.ControllerHasDesiredReplicas(c.Client, rc)
+func (c *realRollingUpdaterClient) DeleteReplicationController(namespace, name string) error {
+	return c.client.ReplicationControllers(namespace).Delete(name)
+}
+
+func (c *realRollingUpdaterClient) ControllerHasDesiredReplicas(rc *api.ReplicationController) wait.ConditionFunc {
+	return client.ControllerHasDesiredReplicas(c.client, rc)
 }

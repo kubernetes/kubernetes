@@ -172,19 +172,23 @@ type ResizerClient interface {
 	ControllerHasDesiredReplicas(rc *api.ReplicationController) wait.ConditionFunc
 }
 
-// RealResizerClient is a ResizerClient which uses a Kube client.
-type RealResizerClient struct {
-	Client client.Interface
+func NewResizerClient(c client.Interface) ResizerClient {
+	return &realResizerClient{c}
 }
 
-func (c *RealResizerClient) GetReplicationController(namespace, name string) (*api.ReplicationController, error) {
-	return c.Client.ReplicationControllers(namespace).Get(name)
+// realResizerClient is a ResizerClient which uses a Kube client.
+type realResizerClient struct {
+	client client.Interface
 }
 
-func (c *RealResizerClient) UpdateReplicationController(namespace string, rc *api.ReplicationController) (*api.ReplicationController, error) {
-	return c.Client.ReplicationControllers(namespace).Update(rc)
+func (c *realResizerClient) GetReplicationController(namespace, name string) (*api.ReplicationController, error) {
+	return c.client.ReplicationControllers(namespace).Get(name)
 }
 
-func (c *RealResizerClient) ControllerHasDesiredReplicas(rc *api.ReplicationController) wait.ConditionFunc {
-	return client.ControllerHasDesiredReplicas(c.Client, rc)
+func (c *realResizerClient) UpdateReplicationController(namespace string, rc *api.ReplicationController) (*api.ReplicationController, error) {
+	return c.client.ReplicationControllers(namespace).Update(rc)
+}
+
+func (c *realResizerClient) ControllerHasDesiredReplicas(rc *api.ReplicationController) wait.ConditionFunc {
+	return client.ControllerHasDesiredReplicas(c.client, rc)
 }
