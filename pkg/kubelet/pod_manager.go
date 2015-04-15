@@ -72,7 +72,7 @@ type basicPodManager struct {
 	mirrorPodByFullName map[string]*api.Pod
 
 	// A mirror pod client to create/delete mirror pods.
-	mirrorClient mirrorClient
+	mirrorClient
 }
 
 func newBasicPodManager(apiserverClient client.Interface) *basicPodManager {
@@ -269,16 +269,6 @@ func (self *basicPodManager) DeleteOrphanedMirrorPods() {
 	for _, podFullName := range podFullNames {
 		self.mirrorClient.DeleteMirrorPod(podFullName)
 	}
-}
-
-// Creates a mirror pod for the given pod.
-func (self *basicPodManager) CreateMirrorPod(pod api.Pod) error {
-	return self.mirrorClient.CreateMirrorPod(pod)
-}
-
-// Delete a mirror pod by name.
-func (self *basicPodManager) DeleteMirrorPod(podFullName string) error {
-	return self.mirrorClient.DeleteMirrorPod(podFullName)
 }
 
 // Returns true if mirrorPod is a correct representation of pod; false otherwise.
