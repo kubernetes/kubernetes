@@ -179,24 +179,16 @@ func applyUpdates(changed []api.Pod, current []api.Pod) []api.Pod {
 	return updated
 }
 
-func (self *basicPodManager) convertMapToPods(UIDMap map[types.UID]*api.Pod) []api.Pod {
-	pods := make([]api.Pod, 0, len(UIDMap))
-	for _, pod := range UIDMap {
-		pods = append(pods, *pod)
-	}
-	return pods
-}
-
 // GetPods returns the regular pods bound to the kubelet and their spec.
 func (self *basicPodManager) GetPods() []api.Pod {
 	self.lock.RLock()
 	defer self.lock.RUnlock()
-	return self.convertMapToPods(self.podByUID)
+	return podsMapToPods(self.podByUID)
 }
 
 // Returns all pods (including mirror pods).
 func (self *basicPodManager) getAllPods() []api.Pod {
-	return append(self.convertMapToPods(self.podByUID), self.convertMapToPods(self.mirrorPodByUID)...)
+	return append(podsMapToPods(self.podByUID), podsMapToPods(self.mirrorPodByUID)...)
 }
 
 // GetPodsAndMirrorMap returns the a copy of the regular pods and the mirror
@@ -208,7 +200,7 @@ func (self *basicPodManager) GetPodsAndMirrorMap() ([]api.Pod, map[string]api.Po
 	for key, pod := range self.mirrorPodByFullName {
 		mirrorPods[key] = *pod
 	}
-	return self.convertMapToPods(self.podByUID), mirrorPods
+	return podsMapToPods(self.podByUID), mirrorPods
 }
 
 // GetPodByName provides the (non-mirror) pod that matches namespace and name,
@@ -278,4 +270,12 @@ func (self *basicPodManager) IsMirrorPodOf(mirrorPod, pod *api.Pod) bool {
 		return false
 	}
 	return api.Semantic.DeepEqual(&pod.Spec, &mirrorPod.Spec)
+}
+
+func podsMapToPods(UIDMap map[types.UID]*api.Pod) []api.Pod {
+	pods := make([]api.Pod, 0, len(UIDMap))
+	for _, pod := range UIDMap {
+		pods = append(pods, *pod)
+	}
+	return pods
 }
