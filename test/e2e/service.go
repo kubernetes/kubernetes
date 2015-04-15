@@ -286,6 +286,10 @@ var _ = Describe("Services", func() {
 			Expect(err).NotTo(HaveOccurred())
 		}(ns, serviceName)
 
+		// Wait for the load balancer to be created asynchronously, which is
+		// currently indicated by a public IP address being added to the spec.
+		result, err = waitForPublicIPs(c, serviceName, ns)
+		Expect(err).NotTo(HaveOccurred())
 		if len(result.Spec.PublicIPs) != 1 {
 			Failf("got unexpected number (%d) of public IPs for externally load balanced service: %v", result.Spec.PublicIPs, result)
 		}
@@ -325,7 +329,7 @@ var _ = Describe("Services", func() {
 
 		By("hitting the pod through the service's external load balancer")
 		var resp *http.Response
-		for t := time.Now(); time.Since(t) < 4*time.Minute; time.Sleep(5 * time.Second) {
+		for t := time.Now(); time.Since(t) < time.Minute; time.Sleep(5 * time.Second) {
 			resp, err = http.Get(fmt.Sprintf("http://%s:%d", ip, port))
 			if err == nil {
 				break
@@ -369,19 +373,43 @@ var _ = Describe("Services", func() {
 				service.ObjectMeta.Name = serviceName
 				service.ObjectMeta.Namespace = namespace
 				By("creating service " + serviceName + " in namespace " + namespace)
-				result, err := c.Services(namespace).Create(service)
+				_, err := c.Services(namespace).Create(service)
 				Expect(err).NotTo(HaveOccurred())
 				defer func(namespace, serviceName string) { // clean up when we're done
 					By("deleting service " + serviceName + " in namespace " + namespace)
 					err := c.Services(namespace).Delete(serviceName)
 					Expect(err).NotTo(HaveOccurred())
 				}(namespace, serviceName)
+			}
+		}
+		for _, namespace := range namespaces {
+			for _, serviceName := range serviceNames {
+				result, err := waitForPublicIPs(c, serviceName, namespace)
+				Expect(err).NotTo(HaveOccurred())
 				publicIPs = append(publicIPs, result.Spec.PublicIPs...) // Save 'em to check uniqueness
 			}
 		}
 		validateUniqueOrFail(publicIPs)
 	})
 })
+
+func waitForPublicIPs(c *client.Client, serviceName, namespace string) (*api.Service, error) {
+	const timeout = 4 * time.Minute
+	var service *api.Service
+	By(fmt.Sprintf("waiting up to %v for service %s in namespace %s to have a public IP", timeout, serviceName, namespace))
+	for start := time.Now(); time.Since(start) < timeout; time.Sleep(5 * time.Second) {
+		service, err := c.Services(namespace).Get(serviceName)
+		if err != nil {
+			Logf("Get service failed, ignoring for 5s: %v", err)
+			continue
+		}
+		if len(service.Spec.PublicIPs) > 0 {
+			return service, nil
+		}
+		Logf("Waiting for service %s in namespace %s to have a public IP (%v)", serviceName, namespace, time.Since(start))
+	}
+	return service, fmt.Errorf("service %s in namespace %s to have a public IP after %.2f seconds", nil, serviceName, namespace, podStartTimeout.Seconds())
+}
 
 func validateUniqueOrFail(s []string) {
 	By(fmt.Sprintf("validating unique: %v", s))

@@ -14,6 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package controller contains code for syncing cloud instances with
+// Package nodecontroller contains code for syncing cloud instances with
 // minion registry
-package controller
+package nodecontroller
