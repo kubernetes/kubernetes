@@ -249,22 +249,25 @@ func (self *basicPodManager) TranslatePodUID(uid types.UID) types.UID {
 	return uid
 }
 
-func (self *basicPodManager) getFullNameMaps() (map[string]*api.Pod, map[string]*api.Pod) {
+func (self *basicPodManager) getOrphanedMirrorPodNames() []string {
 	self.lock.RLock()
 	defer self.lock.RUnlock()
-	return self.podByFullName, self.mirrorPodByFullName
+	var podFullNames []string
+	for podFullName := range self.mirrorPodByFullName {
+		if _, ok := self.podByFullName[podFullName]; !ok {
+			podFullNames = append(podFullNames, podFullName)
+		}
+	}
+	return podFullNames
 }
 
 // Delete all mirror pods which do not have associated static pods. This method
 // sends deletion requets to the API server, but does NOT modify the internal
 // pod storage in basicPodManager.
 func (self *basicPodManager) DeleteOrphanedMirrorPods() {
-	podByFullName, mirrorPodByFullName := self.getFullNameMaps()
-
-	for podFullName := range mirrorPodByFullName {
-		if _, ok := podByFullName[podFullName]; !ok {
-			self.mirrorClient.DeleteMirrorPod(podFullName)
-		}
+	podFullNames := self.getOrphanedMirrorPodNames()
+	for _, podFullName := range podFullNames {
+		self.mirrorClient.DeleteMirrorPod(podFullName)
 	}
 }
 
