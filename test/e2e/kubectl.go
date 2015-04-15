@@ -97,6 +97,10 @@ var _ = Describe("kubectl", func() {
 	Describe("guestbook", func() {
 		var guestbookPath = filepath.Join(testContext.RepoRoot, "examples/guestbook")
 
+		if testContext.Provider != "gce" && testContext.Provider != "gke" {
+			By(fmt.Sprintf("Skipping guestbook, uses createExternalLoadBalancer, a (gce|gke) feature"))
+		}
+
 		It("should create and stop a working application", func() {
 			defer cleanup(guestbookPath, frontendSelector, redisMasterSelector, redisSlaveSelector)
 
