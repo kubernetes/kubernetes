@@ -9,13 +9,6 @@
 {% endif %}
 {% endif %}
 
-/usr/local/bin/kube-apiserver:
-  file.managed:
-    - source: salt://kube-bins/kube-apiserver
-    - user: root
-    - group: root
-    - mode: 755
-
 # Copy kube-apiserver manifest to manifests folder for kubelet.
 /etc/kubernetes/manifests/kube-apiserver.manifest:
   file.managed:
