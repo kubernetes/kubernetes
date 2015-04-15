@@ -221,7 +221,7 @@ func (p *provider) ValidateSecurityContext(pod *api.Pod) fielderrors.ValidationE
 
 		if !p.SecurityConstraints.AllowCapabilities {
 			if container.SecurityContext.Capabilities != nil &&
-					(len(container.SecurityContext.Capabilities.Add) > 0 || len(container.SecurityContext.Capabilities.Drop) > 0){
+				(len(container.SecurityContext.Capabilities.Add) > 0 || len(container.SecurityContext.Capabilities.Drop) > 0) {
 				field := fmt.Sprintf("%s.SecurityContext.Capabilities", container.Name)
 				allErrs = append(allErrs, fielderrors.NewFieldInvalid(field, container.SecurityContext.Capabilities, "SecurityContext does not allow capability requests"))
 			}

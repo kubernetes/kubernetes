@@ -35,11 +35,12 @@ func NewPermitSecurityContextProvider() SecurityContextProvider {
 	}
 }
 
-func (p *permitProvider) ApplySecurityContext(pod *api.Pod)          {}
-func (p *permitProvider) ValidateSecurityContext(pod *api.Pod) fielderrors.ValidationErrorList { return nil }
+func (p *permitProvider) ApplySecurityContext(pod *api.Pod) {}
+func (p *permitProvider) ValidateSecurityContext(pod *api.Pod) fielderrors.ValidationErrorList {
+	return nil
+}
 func (p *permitProvider) ModifyHostConfig(pod *api.Pod, container *api.Container, hostConfig *docker.HostConfig) {
 }
 func (p *permitProvider) ModifyContainerConfig(pod *api.Pod, container *api.Container, config *docker.Config) error {
 	return nil
 }
-

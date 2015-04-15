@@ -125,7 +125,7 @@ func NewMainKubelet(
 	cloud cloudprovider.Interface,
 	nodeStatusUpdateFrequency time.Duration,
 	resourceContainer string,
-    securityContextProvider securitycontext.SecurityContextProvider) (*Kubelet, error) {
+	securityContextProvider securitycontext.SecurityContextProvider) (*Kubelet, error) {
 	if rootDirectory == "" {
 		return nil, fmt.Errorf("invalid root directory %q", rootDirectory)
 	}

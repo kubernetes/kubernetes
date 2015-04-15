@@ -22,8 +22,8 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/capabilities"
-	cadvisorApi "github.com/google/cadvisor/info/v1"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/securitycontext"
+	cadvisorApi "github.com/google/cadvisor/info/v1"
 )
 
 func CapacityFromMachineInfo(info *cadvisorApi.MachineInfo) api.ResourceList {

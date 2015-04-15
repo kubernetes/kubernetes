@@ -65,7 +65,7 @@ type DockerManager struct {
 	// container manager, then we can unexport this. Also at that time, we
 	// use the concrete type so that we can record the pull failure and eliminate
 	// the image checking in GetPodStatus().
-	Puller DockerPuller
+	Puller                  DockerPuller
 	securityContextProvider securitycontext.SecurityContextProvider
 }
 

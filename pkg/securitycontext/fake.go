@@ -25,8 +25,10 @@ import (
 
 type FakeSecurityContextProvider struct{}
 
-func (p *FakeSecurityContextProvider) ApplySecurityContext(pod *api.Pod)          {}
-func (p *FakeSecurityContextProvider) ValidateSecurityContext(pod *api.Pod) fielderrors.ValidationErrorList { return nil }
+func (p *FakeSecurityContextProvider) ApplySecurityContext(pod *api.Pod) {}
+func (p *FakeSecurityContextProvider) ValidateSecurityContext(pod *api.Pod) fielderrors.ValidationErrorList {
+	return nil
+}
 func (p *FakeSecurityContextProvider) ModifyHostConfig(pod *api.Pod, container *api.Container, hostConfig *docker.HostConfig) {
 }
 func (p *FakeSecurityContextProvider) ModifyContainerConfig(pod *api.Pod, container *api.Container, config *docker.Config) error {

@@ -99,14 +99,14 @@ type KubeletServer struct {
 	CertDirectory                  string
 	NodeStatusUpdateFrequency      time.Duration
 	ResourceContainer              string
-    SecurityContextProvider string
+	SecurityContextProvider        string
 
 	// Flags intended for testing
 
 	// Crash immediately, rather than eating panics.
-    ReallyCrashForTesting bool
+	ReallyCrashForTesting bool
 	// Insert a probability of random errors during calls to the master.
-    ChaosChance                    float64
+	ChaosChance float64
 }
 
 // bootstrapping interface for kubelet, targets the initialization protocol
@@ -305,7 +305,7 @@ func (s *KubeletServer) Run(_ []string) error {
 		ResourceContainer:         s.ResourceContainer,
 	}
 
-	switch s.SecurityContextProvider{
+	switch s.SecurityContextProvider {
 	case "restrict":
 		kcfg.SecurityContextProvider = securitycontext.NewRestrictSecurityContextProvider()
 	default:
