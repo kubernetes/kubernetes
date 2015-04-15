@@ -24,6 +24,7 @@
 
 {% set address = "--address=127.0.0.1" -%}
 
+{% set cluster_name = "" -%}
 {% if pillar['instance_prefix'] is defined -%}
   {% set cluster_name = "--cluster_name=" + pillar['instance_prefix'] -%}
 {% endif -%}
@@ -35,6 +36,7 @@
 
 {% set etcd_servers = "--etcd_servers=http://127.0.0.1:4001" -%}
 
+{% set portal_net = "" -%}
 {% if pillar['portal_net'] is defined -%}
   {% set portal_net = "--portal_net=" + pillar['portal_net'] -%}
 {% endif -%}
