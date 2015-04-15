@@ -73,40 +73,44 @@ function start_service() {
   echo "Starting service '$1' on port $2 with $3 replicas"
   svcs_to_clean+=("$1")
   ${KUBECTL} create -f - << __EOF__
-      {
-          "kind": "ReplicationController",
-          "apiVersion": "v1beta1",
-          "id": "$1",
-          "namespace": "default",
-          "desiredState": {
-              "replicas": $3,
-              "replicaSelector": {
-                  "name": "$1"
-              },
-              "podTemplate": {
-                  "desiredState": {
-                      "manifest": {
-                          "version": "v1beta2",
-                          "containers": [
-                              {
-                                  "name": "$1",
-                                  "image": "gcr.io/google_containers/serve_hostname:1.1",
-                                  "ports": [
-                                      {
-                                          "containerPort": 9376,
-                                          "protocol": "TCP"
-                                      }
-                                  ]
-                              }
-                          ]
-                      }
-                  },
-                  "labels": {
-                      "name": "$1"
-                  }
+{
+  "kind": "ReplicationController",
+  "apiVersion": "v1beta3",
+  "metadata": {
+    "name": "$1",
+    "namespace": "default",
+    "labels": {
+      "name": "$1"
+    }
+  },
+  "spec": {
+    "replicas": $3,
+    "selector": {
+      "name": "$1"
+    },
+    "template": {
+      "metadata": {
+        "labels": {
+          "name": "$1"
+        }
+      },
+      "spec": {
+        "containers": [
+          {
+            "name": "$1",
+            "image": "gcr.io/google_containers/serve_hostname:1.1",
+            "ports": [
+              {
+                "containerPort": 9376,
+                "protocol": "TCP"
               }
+            ]
           }
+        ]
       }
+    }
+  }
+}
 __EOF__
   # Convert '1.2.3.4 5.6.7.8' => '"1.2.3.4", "5.6.7.8"'
   local ip ips_array=() public_ips
@@ -115,22 +119,30 @@ __EOF__
   done
   public_ips=$(join ", " "${ips_array[@]:+${ips_array[@]}}")
   ${KUBECTL} create -f - << __EOF__
+{
+  "kind": "Service",
+  "apiVersion": "v1beta3",
+  "metadata": {
+    "name": "$1",
+    "namespace": "default",
+    "labels": {
+      "name": "$1"
+    }
+  },
+  "spec": {
+    "ports": [
       {
-          "kind": "Service",
-          "apiVersion": "v1beta1",
-          "id": "$1",
-          "namespace": "default",
-          "port": $2,
-          "protocol": "TCP",
-          "labels": {
-              "name": "$1"
-          },
-          "selector": {
-              "name": "$1"
-          },
-          "containerPort": 9376,
-          "publicIPs": [ ${public_ips} ]
+        "protocol": "TCP",
+        "port": $2,
+        "targetPort": 9376
       }
+    ],
+    "selector": {
+      "name": "$1"
+    },
+    "publicIPs": [ ${public_ips} ]
+  }
+}
 __EOF__
 }
 

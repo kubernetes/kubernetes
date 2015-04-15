@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 
@@ -74,7 +75,7 @@ var _ = Describe("Services", func() {
 		pod := &api.Pod{
 			TypeMeta: api.TypeMeta{
 				Kind:       "Pod",
-				APIVersion: "v1beta1",
+				APIVersion: latest.Version,
 			},
 			ObjectMeta: api.ObjectMeta{
 				Name: "dns-test-" + string(util.NewUUID()),
@@ -166,7 +167,7 @@ var _ = Describe("Services", func() {
 	It("should provide RW and RO services", func() {
 		svc := api.ServiceList{}
 		err := c.Get().
-			AbsPath("/api/v1beta1/proxy/services/kubernetes-ro/api/v1beta1/services").
+			AbsPath("/api/v1beta3/proxy/namespaces/default/services/kubernetes-ro/api/v1beta3/services").
 			Do().
 			Into(&svc)
 		if err != nil {
@@ -299,7 +300,7 @@ var _ = Describe("Services", func() {
 		pod := &api.Pod{
 			TypeMeta: api.TypeMeta{
 				Kind:       "Pod",
-				APIVersion: "v1beta1",
+				APIVersion: latest.Version,
 			},
 			ObjectMeta: api.ObjectMeta{
 				Name:   "elb-test-" + string(util.NewUUID()),
