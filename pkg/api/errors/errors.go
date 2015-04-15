@@ -273,6 +273,9 @@ func NewGenericServerResponse(code int, verb, kind, name, serverMessage string, 
 	case http.StatusForbidden:
 		reason = api.StatusReasonForbidden
 		message = "the server does not allow access to the requested resource"
+	case http.StatusMethodNotAllowed:
+		reason = api.StatusReasonMethodNotAllowed
+		message = "the server does not allow this method on the requested resource"
 	case StatusUnprocessableEntity:
 		reason = api.StatusReasonInvalid
 		message = "the server rejected our request due to an error in our request"
