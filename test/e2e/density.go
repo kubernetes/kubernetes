@@ -34,6 +34,19 @@ import (
 	. "github.com/onsi/gomega"
 )
 
+// Convenient wrapper around listing pods supporting retries.
+func listPods(c *client.Client, namespace string, label labels.Selector) (*api.PodList, error) {
+	maxRetries := 2
+	pods, err := c.Pods(namespace).List(label)
+	for i := 0; i < maxRetries; i++ {
+		if err == nil {
+			return pods, nil
+		}
+		pods, err = c.Pods(namespace).List(label)
+	}
+	return pods, err
+}
+
 // Delete a Replication Controller and all pods it spawned
 func DeleteRC(c *client.Client, ns, name string) error {
 	rc, err := c.ReplicationControllers(ns).Get(name)
@@ -103,7 +116,7 @@ func RunRC(c *client.Client, name string, ns, image string, replicas int) {
 
 	By(fmt.Sprintf("Making sure all %d replicas exist", replicas))
 	label := labels.SelectorFromSet(labels.Set(map[string]string{"name": name}))
-	pods, err := c.Pods(ns).List(label)
+	pods, err := listPods(c, ns, label)
 	Expect(err).NotTo(HaveOccurred())
 	current = len(pods.Items)
 	failCount := 5
@@ -123,7 +136,7 @@ func RunRC(c *client.Client, name string, ns, image string, replicas int) {
 
 		last = current
 		time.Sleep(5 * time.Second)
-		pods, err = c.Pods(ns).List(label)
+		pods, err = listPods(c, ns, label)
 		Expect(err).NotTo(HaveOccurred())
 		current = len(pods.Items)
 	}
@@ -142,7 +155,7 @@ func RunRC(c *client.Client, name string, ns, image string, replicas int) {
 		unknown := 0
 		time.Sleep(10 * time.Second)
 
-		currentPods, listErr := c.Pods(ns).List(label)
+		currentPods, listErr := listPods(c, ns, label)
 		Expect(listErr).NotTo(HaveOccurred())
 		if len(currentPods.Items) != len(pods.Items) {
 			Failf("Number of reported pods changed: %d vs %d", len(currentPods.Items), len(pods.Items))
