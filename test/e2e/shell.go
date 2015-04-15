@@ -35,6 +35,14 @@ var (
 var _ = Describe("Shell", func() {
 
 	defer GinkgoRecover()
+
+	// A number of scripts only work on gce
+	if testContext.Provider != "gce" && testContext.Provider != "gke" {
+		By(fmt.Sprintf("Skipping Shell test, which is only supported for provider gce and gke (not %s)",
+			testContext.Provider))
+		return
+	}
+
 	// Slurp up all the tests in hack/e2e-suite
 	bashE2ERoot := filepath.Join(root, "hack/e2e-suite")
 	files, err := ioutil.ReadDir(bashE2ERoot)
