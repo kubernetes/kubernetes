@@ -24,6 +24,7 @@
 
 {% set address = "--address=127.0.0.1" -%}
 
+{% set cluster_name = "" -%}
 {% if pillar['instance_prefix'] is defined -%}
   {% set cluster_name = "--cluster_name=" + pillar['instance_prefix'] -%}
 {% endif -%}
