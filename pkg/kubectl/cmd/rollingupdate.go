@@ -111,7 +111,7 @@ func RunRollingUpdate(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, arg
 		return err
 	}
 
-	updater := kubectl.NewRollingUpdater(newRc.Namespace, client)
+	updater := kubectl.NewRollingUpdater(newRc.Namespace, &kubectl.RealRollingUpdaterClient{client})
 
 	// fetch rc
 	oldRc, err := client.ReplicationControllers(newRc.Namespace).Get(oldName)

@@ -197,7 +197,7 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 			if err != nil {
 				return nil, err
 			}
-			return kubectl.ResizerFor(mapping.Kind, client)
+			return kubectl.ResizerFor(mapping.Kind, &kubectl.RealResizerClient{client})
 		},
 		Reaper: func(mapping *meta.RESTMapping) (kubectl.Reaper, error) {
 			client, err := clients.ClientForVersion(mapping.APIVersion)
