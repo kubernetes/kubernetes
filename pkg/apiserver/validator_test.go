@@ -65,7 +65,6 @@ func TestValidate(t *testing.T) {
 				StatusCode: test.code,
 			},
 		}
-		//		fake := &http.Client{Transport: fakeRT}
 		status, data, err := s.DoServerCheck(fakeRT)
 		expect := fmt.Sprintf("http://%s:%d/healthz", s.Addr, s.Port)
 		if fakeRT.url != expect {
