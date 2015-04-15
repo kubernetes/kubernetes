@@ -44,6 +44,7 @@ type ProxyServer struct {
 	HealthzPort        int
 	HealthzBindAddress util.IP
 	OOMScoreAdj        int
+	ResourceContainer  string
 }
 
 // NewProxyServer creates a new ProxyServer object with default parameters
@@ -53,6 +54,7 @@ func NewProxyServer() *ProxyServer {
 		HealthzPort:        10249,
 		HealthzBindAddress: util.IP(net.ParseIP("127.0.0.1")),
 		OOMScoreAdj:        -899,
+		ResourceContainer:  "/kube-proxy",
 	}
 }
 
@@ -63,12 +65,21 @@ func (s *ProxyServer) AddFlags(fs *pflag.FlagSet) {
 	fs.IntVar(&s.HealthzPort, "healthz_port", s.HealthzPort, "The port to bind the health check server. Use 0 to disable.")
 	fs.Var(&s.HealthzBindAddress, "healthz_bind_address", "The IP address for the health check server to serve on, defaulting to 127.0.0.1 (set to 0.0.0.0 for all interfaces)")
 	fs.IntVar(&s.OOMScoreAdj, "oom_score_adj", s.OOMScoreAdj, "The oom_score_adj value for kube-proxy process. Values must be within the range [-1000, 1000]")
+	fs.StringVar(&s.ResourceContainer, "resource_container", s.ResourceContainer, "Absolute name of the resource-only container to create and run the Kube-proxy in (Default: /kube-proxy).")
 }
 
 // Run runs the specified ProxyServer.  This should never exit.
 func (s *ProxyServer) Run(_ []string) error {
+	// TODO(vmarmol): Use container config for this.
 	if err := util.ApplyOomScoreAdj(0, s.OOMScoreAdj); err != nil {
 		glog.Info(err)
+	}
+
+	// Run in its own container.
+	if err := util.RunInResourceContainer(s.ResourceContainer); err != nil {
+		glog.Warningf("Failed to start in resource-only container %q: %v", s.ResourceContainer, err)
+	} else {
+		glog.Infof("Running in resource-only container %q", s.ResourceContainer)
 	}
 
 	serviceConfig := config.NewServiceConfig()
