@@ -80,6 +80,7 @@ More specifically, having a Kubernetes cluster span multiple
 well-connected availability zones within a single geographical region
 (e.g. US North East, UK, Japan etc) is worthy of further
 consideration, in particular because it potentially addresses
+some of these requirements.
 
 ## What use cases require Cluster Federation?
 
@@ -224,7 +225,7 @@ initial implementation targeting single cloud provider only.
 
 Doing nothing (i.e. forcing users to choose between 1 and 2 on their
 own) is probably an OK starting point.  Kubernetes autoscaling can get
-us to 3 at some later date.
+us to three at some later date.
 
 Up to this point, this use case ("Unavailability Zones") seems materially different from all the others above.  It does not require dynamic cross-cluster service migration (we assume that the service is already running in more than one cluster when the failure occurs).  Nor does it necessarily involve cross-cluster service discovery or location affinity.  As a result, I propose that we address this use case somewhat independently of the others (although I strongly suspect that it will become substantially easier once we've solved the others).  
    
@@ -258,7 +259,7 @@ application-dependent, primarily influenced by network bandwidth
 consumption, latency requirements and cost sensitivity.
 
 For simplicity, lets assume that all Kubernetes distributed
-applications fall into one of 3 categories with respect to relative
+applications fall into one of three categories with respect to relative
 location affinity:
 
 1. **"Strictly Coupled"**: Those applications that strictly cannot be
@@ -301,7 +302,7 @@ of our users are in Western Europe, U.S. West Coast" etc).
 
 ## Cross-cluster service discovery
 
-I propose having pods use standard discovery methods used by external clients of Kubernetes applications (i.e. use DNS).  DNS might resolve to a public endpoint in the local or a remote cluster. Other than Strictly Coupled applications, software should be largely oblivious of which of the two occurs.   
+I propose having pods use standard discovery methods used by external clients of Kubernetes applications (i.e. DNS).  DNS might resolve to a public endpoint in the local or a remote cluster. Other than Strictly Coupled applications, software should be largely oblivious of which of the two occurs.   
 _Aside:_ How do we avoid "tromboning" through an external VIP when DNS
 resolves to a public IP on the local cluster?  Strictly speaking this
 would be an optimization, and probably only matters to high bandwidth,
@@ -352,8 +353,9 @@ completely immovable) require the federation system to:
 1. start up an entire replica application in the destination cluster
 1. copy persistent data to the new application instance
 1. switch traffic across
-1. tear down the original application instance It is proposed that
-support for automated migration of Strictly Coupled applications be
+1. tear down the original application instance 
+
+It is proposed that support for automated migration of Strictly Coupled applications be
 deferred to a later date.
 
 ## Other Requirements
@@ -417,7 +419,7 @@ could potentially cache auth, to mitigate an SPOF auth system.
 Identify concrete applications of each use case and configure a proof
 of concept service that exercises the use case.  For example, cluster
 failure tolerance seems popular, so set up an apache frontend with
-replicas in each of 3 availability zones with either an Amazon Elastic
+replicas in each of three availability zones with either an Amazon Elastic
 Load Balancer or Google Cloud Load Balancer pointing at them? What
 does the zookeeper config look like for N=3 across 3 AZs -- and how
 does each replica find the other replicas and how do clients find
