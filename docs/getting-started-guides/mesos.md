@@ -141,7 +141,7 @@ $ cat <<EOPOD >nginx.json
     "version": "v1beta1",
     "containers": [{
       "name": "nginx-01",
-      "image": "dockerfile/nginx",
+      "image": "nginx",
       "ports": [{
         "containerPort": 80,
         "hostPort": 31000
@@ -177,7 +177,7 @@ We can use the `kubectl` interface to monitor the status of our pod:
 ```bash
 $ bin/kubectl get pods
 POD          IP           CONTAINER(S)  IMAGE(S)          HOST                       LABELS                STATUS
-nginx-id-01  172.17.5.27  nginx-01      dockerfile/nginx  10.72.72.178/10.72.72.178  cluster=gce,name=foo  Running
+nginx-id-01  172.17.5.27  nginx-01      nginx             10.72.72.178/10.72.72.178  cluster=gce,name=foo  Running
 ```
 
 Verify that the pod task is running in the Mesos web GUI. Click on the

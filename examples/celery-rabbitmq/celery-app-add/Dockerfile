@@ -1,4 +1,4 @@
-FROM dockerfile/celery
+FROM library/celery
 
 ADD celery_conf.py /data/celery_conf.py
 ADD run_tasks.py /data/run_tasks.py

@@ -59,19 +59,19 @@ synthetic-logger-0.25lps-pod           synth-lgr               ubuntu:14.04     
 synthetic-logger-10lps-pod             synth-lgr               ubuntu:14.04                       kubernetes-minion-1.c.kubernetes-elk.internal/146.148.42.44     name=synth-logging-source    Running
 influx-grafana                         influxdb                kubernetes/heapster_influxdb       kubernetes-minion-3.c.kubernetes-elk.internal/130.211.129.169   name=influxdb                Running
                                        grafana                 kubernetes/heapster_grafana                                                                                                     
-                                       elasticsearch           dockerfile/elasticsearch                                                                                                        
+                                       elasticsearch           elasticsearch                                                                                                                   
 heapster                               heapster                kubernetes/heapster                kubernetes-minion-2.c.kubernetes-elk.internal/146.148.41.87     name=heapster                Running
 67cfcb1f-9764-11e4-898c-42010af03582   etcd                    quay.io/coreos/etcd:latest         kubernetes-minion-3.c.kubernetes-elk.internal/130.211.129.169   k8s-app=skydns               Running
                                        kube2sky                kubernetes/kube2sky:1.0                                                                                                         
                                        skydns                  kubernetes/skydns:2014-12-23-001                                                                                                
-6ba20338-9764-11e4-898c-42010af03582   elasticsearch-logging   dockerfile/elasticsearch           kubernetes-minion-3.c.kubernetes-elk.internal/130.211.129.169   name=elasticsearch-logging   Running
+6ba20338-9764-11e4-898c-42010af03582   elasticsearch-logging   elasticsearch                      kubernetes-minion-3.c.kubernetes-elk.internal/130.211.129.169   name=elasticsearch-logging   Running
 ../../../cluster/kubectl.sh get replicationControllers
 Running: ../../../cluster/../cluster/gce/../../_output/dockerized/bin/linux/amd64/kubectl get replicationControllers
 CONTROLLER                         CONTAINER(S)            IMAGE(S)                           SELECTOR                     REPLICAS
 skydns                             etcd                    quay.io/coreos/etcd:latest         k8s-app=skydns               1
                                    kube2sky                kubernetes/kube2sky:1.0                                         
                                    skydns                  kubernetes/skydns:2014-12-23-001                                
-elasticsearch-logging-controller   elasticsearch-logging   dockerfile/elasticsearch           name=elasticsearch-logging   1
+elasticsearch-logging-controller   elasticsearch-logging   elasticsearch                      name=elasticsearch-logging   1
 kibana-logging-controller          kibana-logging          kubernetes/kibana                  name=kibana-logging          1
 ../../.../kubectl.sh get services
 Running: ../../../cluster/../cluster/gce/../../_output/dockerized/bin/linux/amd64/kubectl get services

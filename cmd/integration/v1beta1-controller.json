@@ -12,7 +12,7 @@
              "id": "nginx-controller",
              "containers": [{
                "name": "nginx",
-               "image": "dockerfile/nginx",
+               "image": "nginx",
                "ports": [{"containerPort": 80}]
              }]
            }

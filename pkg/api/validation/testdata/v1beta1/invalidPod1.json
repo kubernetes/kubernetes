@@ -8,7 +8,7 @@
       "id": "redis-master",
       "containers": [{
         "name": "master",
-        "image": "dockerfile/redis",
+        "image": "redis",
         "command": "this is a bad command"
       }]
     }

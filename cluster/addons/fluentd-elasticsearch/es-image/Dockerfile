@@ -2,7 +2,7 @@
 # to work with Kubernetes logging. Inspired by the Dockerfile
 # dockerfile/elasticsearch
 
-FROM dockerfile/java:openjdk-7-jre
+FROM java:openjdk-7-jre
 MAINTAINER Satnam Singh "satnam@google.com"
 
 ENV DEBIAN_FRONTEND noninteractive

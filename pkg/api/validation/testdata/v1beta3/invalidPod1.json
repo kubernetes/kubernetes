@@ -11,7 +11,7 @@
     "containers": [
       {
         "name": "master",
-        "image": "dockerfile/redis",
+        "image": "redis",
         "args": "this is a bad command"
       }
     ]

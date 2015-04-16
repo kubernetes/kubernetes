@@ -42,7 +42,7 @@
         "version": "v1beta1",
         "containers": [{
           "name": "master",
-          "image": "dockerfile/redis",
+          "image": "redis",
           "env": [
             {
               "name": "REDIS_PASSWORD",

@@ -39,7 +39,7 @@ Note that, although the redis server runs just with a single replica, we use rep
           "id": "redis-master",
           "containers": [{
             "name": "redis-master",
-            "image": "dockerfile/redis",
+            "image": "redis",
             "ports": [{
               "containerPort": 6379,   # containerPort: Where traffic to redis ultimately is routed to.
             }]
@@ -65,7 +65,7 @@ $ kubectl create -f examples/guestbook/redis-master-controller.json
 
 $ cluster/kubectl.sh get rc
 CONTROLLER                             CONTAINER(S)            IMAGE(S)                                 SELECTOR                     REPLICAS
-redis-master-controller                redis-master            dockerfile/redis                         name=redis-master            1
+redis-master-controller                redis-master            redis                                    name=redis-master            1
 ```
 
 Once that's up you can list the pods in the cluster, to verify that the master is running:
@@ -78,7 +78,7 @@ You'll see all kubernetes components, most importantly the redis master pod. It 
 
 ```shell
 POD                                          IP                  CONTAINER(S)            IMAGE(S)                                 HOST                                                              LABELS                                                     STATUS
-redis-master-controller-gb50a                10.244.3.7          redis-master            dockerfile/redis                         kubernetes-minion-7agi.c.hazel-mote-834.internal/104.154.54.203   app=redis,name=redis-master                                Running
+redis-master-controller-gb50a                10.244.3.7          redis-master            redis                                    kubernetes-minion-7agi.c.hazel-mote-834.internal/104.154.54.203   app=redis,name=redis-master                                Running
 ```
 
 If you ssh to that machine, you can run `docker ps` to see the actual pod:
@@ -88,7 +88,7 @@ me@workstation$ gcloud compute ssh kubernetes-minion-7agi
 
 me@kubernetes-minion-7agi:~$ sudo docker ps
 CONTAINER ID        IMAGE                                  COMMAND                CREATED              STATUS              PORTS                    NAMES
-0ffef9649265        dockerfile/redis:latest                "redis-server /etc/r   About a minute ago   Up About a minute                            k8s_redis-master.767aef46_redis-master-controller-gb50a.default.api_4530d7b3-ae5d-11e4-bf77-42010af0d719_579ee964
+0ffef9649265        redis:latest                           "redis-server /etc/r   About a minute ago   Up About a minute                            k8s_redis-master.767aef46_redis-master-controller-gb50a.default.api_4530d7b3-ae5d-11e4-bf77-42010af0d719_579ee964
 ```
 
 (Note that initial `docker pull` may take a few minutes, depending on network conditions.  You can monitor the status of this by running `journalctl -f -u docker` to check when the image is being downloaded.  Of course, you can also run `journalctl -f -u kubelet` to see what state the kubelet is in as well during this time.
@@ -182,7 +182,7 @@ redis-slave-controller
 
 $ kubectl get rc
 CONTROLLER                             CONTAINER(S)            IMAGE(S)                                 SELECTOR                     REPLICAS
-redis-master-controller                redis-master            dockerfile/redis                         name=redis-master            1
+redis-master-controller                redis-master            redis                                    name=redis-master            1
 redis-slave-controller                 redis-slave             kubernetes/redis-slave:v2                name=redis-slave             2
 ```
 
@@ -197,7 +197,7 @@ Once that's up you can list the pods in the cluster, to verify that the master a
 ```shell
 $ kubectl get pods
 POD                                          IP                  CONTAINER(S)            IMAGE(S)                                 HOST                                                              LABELS                                                     STATUS
-redis-master-controller-gb50a                10.244.3.7          redis-master            dockerfile/redis                         kubernetes-minion-7agi.c.hazel-mote-834.internal/104.154.54.203   app=redis,name=redis-master                                Running
+redis-master-controller-gb50a                10.244.3.7          redis-master            redis                                    kubernetes-minion-7agi.c.hazel-mote-834.internal/104.154.54.203   app=redis,name=redis-master                                Running
 redis-slave-controller-182tv                 10.244.3.6          redis-slave             kubernetes/redis-slave:v2                kubernetes-minion-7agi.c.hazel-mote-834.internal/104.154.54.203   app=redis,name=redis-slave,uses=redis-master               Running
 redis-slave-controller-zwk1b                 10.244.2.8          redis-slave             kubernetes/redis-slave:v2                kubernetes-minion-3vxa.c.hazel-mote-834.internal/104.154.54.6     app=redis,name=redis-slave,uses=redis-master               Running
 ```
@@ -287,7 +287,7 @@ frontend-controller
 $ kubectl get rc
 CONTROLLER                             CONTAINER(S)            IMAGE(S)                                   SELECTOR                     REPLICAS
 frontend-controller                    php-redis               kubernetes/example-guestbook-php-redis:v2  name=frontend                3
-redis-master-controller                redis-master            dockerfile/redis                           name=redis-master            1
+redis-master-controller                redis-master            redis                                      name=redis-master            1
 redis-slave-controller                 redis-slave             kubernetes/redis-slave:v2                  name=redis-slave             2
 ```
 
@@ -299,7 +299,7 @@ POD                                          IP                  CONTAINER(S)   
 frontend-controller-5m1zc                    10.244.1.131        php-redis               kubernetes/example-guestbook-php-redis:v2  kubernetes-minion-3vxa.c.hazel-mote-834.internal/146.148.71.71    app=frontend,name=frontend,uses=redis-slave,redis-master   Running
 frontend-controller-ckn42                    10.244.2.134        php-redis               kubernetes/example-guestbook-php-redis:v2  kubernetes-minion-by92.c.hazel-mote-834.internal/104.154.54.6     app=frontend,name=frontend,uses=redis-slave,redis-master   Running
 frontend-controller-v5drx                    10.244.0.128        php-redis               kubernetes/example-guestbook-php-redis:v2  kubernetes-minion-wilb.c.hazel-mote-834.internal/23.236.61.63     app=frontend,name=frontend,uses=redis-slave,redis-master   Running
-redis-master-controller-gb50a                10.244.3.7          redis-master            dockerfile/redis                           kubernetes-minion-7agi.c.hazel-mote-834.internal/104.154.54.203   app=redis,name=redis-master                                Running
+redis-master-controller-gb50a                10.244.3.7          redis-master            redis                                      kubernetes-minion-7agi.c.hazel-mote-834.internal/104.154.54.203   app=redis,name=redis-master                                Running
 redis-slave-controller-182tv                 10.244.3.6          redis-slave             kubernetes/redis-slave:v2                  kubernetes-minion-7agi.c.hazel-mote-834.internal/104.154.54.203   app=redis,name=redis-slave,uses=redis-master               Running
 redis-slave-controller-zwk1b                 10.244.2.8          redis-slave             kubernetes/redis-slave:v2                  kubernetes-minion-3vxa.c.hazel-mote-834.internal/104.154.54.6     app=redis,name=redis-slave,uses=redis-master               Running
 ```

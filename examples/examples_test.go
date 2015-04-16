@@ -212,7 +212,23 @@ func TestExampleObjectSchemas(t *testing.T) {
 	}
 }
 
-var sampleRegexp = regexp.MustCompile("(?ms)^```(?:(?P<type>yaml)\\w*\\n(?P<content>.+?)|\\w*\\n(?P<content>\\{.+?\\}))\\w*\\n^```")
+// This regex is tricky, but it works.  For future me, here is the decode:
+//
+// Flags: (?ms) = multiline match, allow . to match \n
+// 1) Look for a line that starts with ``` (a markdown code block)
+// 2) (?: ... ) = non-capturing group
+// 3) (P<name>) = capture group as "name"
+// 4) Look for #1 followed by either:
+// 4a)    "yaml" followed by any word-characters followed by a newline (e.g. ```yamlfoo\n)
+// 4b)    "any word-characters followed by a newline (e.g. ```json\n)
+// 5) Look for either:
+// 5a)    #4a followed by one or more characters (non-greedy)
+// 5b)    #4b followed by { followed by one or more characters (non-greedy) followed by }
+// 6) Look for #5 followed by a newline followed by ``` (end of the code block)
+//
+// This could probably be simplified, but is already too delicate.  Before any
+// real changes, we should have a testscase that just tests this regex.
+var sampleRegexp = regexp.MustCompile("(?ms)^```(?:(?P<type>yaml)\\w*\\n(?P<content>.+?)|\\w*\\n(?P<content>\\{.+?\\}))\\n^```")
 var subsetRegexp = regexp.MustCompile("(?ms)\\.{3}")
 
 func TestReadme(t *testing.T) {
