@@ -90,3 +90,34 @@ func TestStoreToPodLister(t *testing.T) {
 		t.Errorf("Unexpected pod exists")
 	}
 }
+
+func TestStoreToServiceLister(t *testing.T) {
+	store := NewStore(MetaNamespaceKeyFunc)
+	store.Add(&api.Service{
+		ObjectMeta: api.ObjectMeta{Name: "foo"},
+		Spec: api.ServiceSpec{
+			Selector: map[string]string{},
+		},
+	})
+	store.Add(&api.Service{ObjectMeta: api.ObjectMeta{Name: "bar"}})
+	ssl := StoreToServiceLister{store}
+
+	pod := &api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			Name:   "foopod",
+			Labels: map[string]string{"role": "foo"},
+		},
+	}
+
+	services, err := ssl.GetPodServices(pod)
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+
+	if len(services) != 1 {
+		t.Fatalf("Expected 1 service, got %v", len(services))
+	}
+	if e, a := "foo", services[0].Name; e != a {
+		t.Errorf("Expected service %q, got %q", e, a)
+	}
+}
