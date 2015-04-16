@@ -19,7 +19,7 @@ The cluster setup scripts can setup Kubernetes for multiple targets. First modif
 
     KUBERNETES_PROVIDER="azure"
 
-Next, specify an existing virtual network and subnet in `cluster/azure/config-defualt.sh`:
+Next, specify an existing virtual network and subnet in `cluster/azure/config-default.sh`:
 
     AZ_VNET=<vnet name>
     AZ_SUBNET=<subnet name>
