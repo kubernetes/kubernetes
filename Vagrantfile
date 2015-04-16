@@ -90,6 +90,8 @@ end
 # When doing Salt provisioning, we copy approximately 200MB of content in /tmp before anything else happens.
 # This causes problems if anything else was in /tmp or the other directories that are bound to tmpfs device (i.e /run, etc.)
 $vm_mem = (ENV['KUBERNETES_MEMORY'] || 1024).to_i
+$vm_master_mem = (ENV['KUBERNETES_MASTER_MEMORY'] || $vm_mem).to_i
+$vm_minion_mem = (ENV['KUBERNETES_MINION_MEMORY'] || $vm_mem).to_i
 
 Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
   def setvmboxandurl(config, provider)
@@ -116,26 +118,26 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
     end
   end
 
-  def customize_vm(config)
+  def customize_vm(config, vm_mem)
     # Try VMWare Fusion first (see
     # https://docs.vagrantup.com/v2/providers/basic_usage.html)
     config.vm.provider :vmware_fusion do |v, override|
       setvmboxandurl(override, :vmware_desktop)
-      v.vmx['memsize'] = $vm_mem
+      v.vmx['memsize'] = vm_mem
       v.vmx['numvcpus'] = $vm_cpus
     end
 
     # Then try VMWare Workstation
     config.vm.provider :vmware_workstation do |v, override|
       setvmboxandurl(override, :vmware_desktop)
-      v.vmx['memsize'] = $vm_mem
+      v.vmx['memsize'] = vm_mem
       v.vmx['numvcpus'] = $vm_cpus
     end
 
     # Then try Parallels
     config.vm.provider :parallels do |v, override|
       setvmboxandurl(override, :parallels)
-      v.memory = $vm_mem # v.customize ['set', :id, '--memsize', $vm_mem]
+      v.memory = vm_mem # v.customize ['set', :id, '--memsize', vm_mem]
       v.cpus = $vm_cpus # v.customize ['set', :id, '--cpus', $vm_cpus]
 
       # Don't attempt to update the Parallels tools on the image (this can
@@ -152,7 +154,7 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
     # Finally, fall back to VirtualBox
     config.vm.provider :virtualbox do |v, override|
       setvmboxandurl(override, :virtualbox)
-      v.memory = $vm_mem # v.customize ["modifyvm", :id, "--memory", $vm_mem]
+      v.memory = vm_mem # v.customize ["modifyvm", :id, "--memory", vm_mem]
       v.cpus = $vm_cpus # v.customize ["modifyvm", :id, "--cpus", $vm_cpus]
 
       # Use faster paravirtualized networking
@@ -163,7 +165,7 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
 
   # Kubernetes master
   config.vm.define "master" do |c|
-    customize_vm c
+    customize_vm c, $vm_master_mem
     if ENV['KUBE_TEMP'] then
       script = "#{ENV['KUBE_TEMP']}/master-start.sh"
       c.vm.provision "shell", run: "always", path: script
@@ -175,7 +177,7 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
   # Kubernetes minion
   $num_minion.times do |n|
     config.vm.define "minion-#{n+1}" do |minion|
-      customize_vm minion
+      customize_vm minion, $vm_minion_mem
 
       minion_index = n+1
       minion_ip = $minion_ips[n]
