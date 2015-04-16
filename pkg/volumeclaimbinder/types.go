@@ -49,14 +49,14 @@ func accessModesIndexFunc(obj interface{}) (string, error) {
 }
 
 // ListByAccessModes returns all volumes with the given set of AccessModeTypes *in order* of their storage capacity (low to high)
-func (pvstore *persistentVolumeOrderedIndex) ListByAccessModes(modes []api.AccessModeType) ([]*api.PersistentVolume, error) {
+func (pvIndex *persistentVolumeOrderedIndex) ListByAccessModes(modes []api.AccessModeType) ([]*api.PersistentVolume, error) {
 	pv := &api.PersistentVolume{
 		Spec: api.PersistentVolumeSpec{
 			AccessModes: modes,
 		},
 	}
 
-	objs, err := pvstore.Index("accessmodes", pv)
+	objs, err := pvIndex.Index("accessmodes", pv)
 	if err != nil {
 		return nil, err
 	}
@@ -74,8 +74,8 @@ func (pvstore *persistentVolumeOrderedIndex) ListByAccessModes(modes []api.Acces
 type matchPredicate func(compareThis, toThis *api.PersistentVolume) bool
 
 // Find returns the nearest PV from the ordered list or nil if a match is not found
-func (pvstore *persistentVolumeOrderedIndex) Find(pv *api.PersistentVolume, matchPredicate matchPredicate) (*api.PersistentVolume, error) {
-	volumes, err := pvstore.ListByAccessModes(pv.Spec.AccessModes)
+func (pvIndex *persistentVolumeOrderedIndex) Find(pv *api.PersistentVolume, matchPredicate matchPredicate) (*api.PersistentVolume, error) {
+	volumes, err := pvIndex.ListByAccessModes(pv.Spec.AccessModes)
 	if err != nil {
 		return nil, err
 	}
@@ -88,7 +88,7 @@ func (pvstore *persistentVolumeOrderedIndex) Find(pv *api.PersistentVolume, matc
 }
 
 // FindByAccessModesAndStorageCapacity is a convenience method that calls Find w/ requisite matchPredicate for storage
-func (pvstore *persistentVolumeOrderedIndex) FindByAccessModesAndStorageCapacity(modes []api.AccessModeType, qty resource.Quantity) (*api.PersistentVolume, error) {
+func (pvIndex *persistentVolumeOrderedIndex) FindByAccessModesAndStorageCapacity(modes []api.AccessModeType, qty resource.Quantity) (*api.PersistentVolume, error) {
 	pv := &api.PersistentVolume{
 		Spec: api.PersistentVolumeSpec{
 			AccessModes: modes,
@@ -98,12 +98,12 @@ func (pvstore *persistentVolumeOrderedIndex) FindByAccessModesAndStorageCapacity
 		},
 	}
 
-	return pvstore.Find(pv, filterBoundVolumes)
+	return pvIndex.Find(pv, filterBoundVolumes)
 }
 
 // FindBestMatchForClaim is a convenience method that finds a volume by the claim's AccessModes and requests for Storage
-func (pvstore *persistentVolumeOrderedIndex) FindBestMatchForClaim(claim *api.PersistentVolumeClaim) (*api.PersistentVolume, error) {
-	return pvstore.FindByAccessModesAndStorageCapacity(claim.Spec.AccessModes, claim.Spec.Resources.Requests[api.ResourceName(api.ResourceStorage)])
+func (pvIndex *persistentVolumeOrderedIndex) FindBestMatchForClaim(claim *api.PersistentVolumeClaim) (*api.PersistentVolume, error) {
+	return pvIndex.FindByAccessModesAndStorageCapacity(claim.Spec.AccessModes, claim.Spec.Resources.Requests[api.ResourceName(api.ResourceStorage)])
 }
 
 // byCapacity is used to order volumes by ascending storage size
@@ -125,7 +125,6 @@ func (c byCapacity) Len() int {
 
 // matchStorageCapacity is a matchPredicate used to sort and find volumes
 func matchStorageCapacity(pvA, pvB *api.PersistentVolume) bool {
-
 	// skip already claimed volumes
 	if pvA.Spec.ClaimRef != nil {
 		return false

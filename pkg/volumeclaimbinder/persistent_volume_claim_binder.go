@@ -117,6 +117,9 @@ func (controller *PersistentVolumeClaimBinder) syncPersistentVolume(obj interfac
 }
 
 func (controller *PersistentVolumeClaimBinder) syncPersistentVolumeClaim(obj interface{}) error {
+	controller.lock.Lock()
+	defer controller.lock.Unlock()
+
 	claim := obj.(*api.PersistentVolumeClaim)
 	glog.V(5).Infof("Synchronizing PersistentVolumeClaim[%s]\n", claim.Name)
 
@@ -218,7 +221,7 @@ func (controller *PersistentVolumeClaimBinder) reconcile(synchronizers ...Synchr
 		wg := sync.WaitGroup{}
 		wg.Add(len(items))
 		for ix := range items {
-			go func(ix int) {
+			func(ix int) {
 				defer wg.Done()
 				obj := items[ix]
 				glog.V(5).Infof("Reconciliation of %v", obj)
