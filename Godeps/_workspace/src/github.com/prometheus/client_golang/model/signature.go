@@ -17,6 +17,7 @@ import (
 	"bytes"
 	"hash"
 	"hash/fnv"
+	"sync"
 )
 
 // SeparatorByte is a byte that cannot occur in valid UTF-8 sequences and is
@@ -28,7 +29,7 @@ var (
 	// cache the signature of an empty label set.
 	emptyLabelSignature = fnv.New64a().Sum64()
 
-	hashAndBufPool = make(chan *hashAndBuf, 1024)
+	hashAndBufPool sync.Pool
 )
 
 type hashAndBuf struct {
@@ -37,19 +38,15 @@ type hashAndBuf struct {
 }
 
 func getHashAndBuf() *hashAndBuf {
-	select {
-	case hb := <-hashAndBufPool:
-		return hb
-	default:
+	hb := hashAndBufPool.Get()
+	if hb == nil {
 		return &hashAndBuf{h: fnv.New64a()}
 	}
+	return hb.(*hashAndBuf)
 }
 
 func putHashAndBuf(hb *hashAndBuf) {
-	select {
-	case hashAndBufPool <- hb:
-	default:
-	}
+	hashAndBufPool.Put(hb)
 }
 
 // LabelsToSignature returns a unique signature (i.e., fingerprint) for a given
@@ -63,10 +60,10 @@ func LabelsToSignature(labels map[string]string) uint64 {
 	hb := getHashAndBuf()
 	defer putHashAndBuf(hb)
 
-	for k, v := range labels {
-		hb.b.WriteString(k)
+	for labelName, labelValue := range labels {
+		hb.b.WriteString(labelName)
 		hb.b.WriteByte(SeparatorByte)
-		hb.b.WriteString(v)
+		hb.b.WriteString(labelValue)
 		hb.h.Write(hb.b.Bytes())
 		result ^= hb.h.Sum64()
 		hb.h.Reset()
@@ -75,10 +72,34 @@ func LabelsToSignature(labels map[string]string) uint64 {
 	return result
 }
 
-// LabelValuesToSignature returns a unique signature (i.e., fingerprint) for the
-// values of a given label set.
-func LabelValuesToSignature(labels map[string]string) uint64 {
-	if len(labels) == 0 {
+// metricToFingerprint works exactly as LabelsToSignature but takes a Metric as
+// parameter (rather than a label map) and returns a Fingerprint.
+func metricToFingerprint(m Metric) Fingerprint {
+	if len(m) == 0 {
+		return Fingerprint(emptyLabelSignature)
+	}
+
+	var result uint64
+	hb := getHashAndBuf()
+	defer putHashAndBuf(hb)
+
+	for labelName, labelValue := range m {
+		hb.b.WriteString(string(labelName))
+		hb.b.WriteByte(SeparatorByte)
+		hb.b.WriteString(string(labelValue))
+		hb.h.Write(hb.b.Bytes())
+		result ^= hb.h.Sum64()
+		hb.h.Reset()
+		hb.b.Reset()
+	}
+	return Fingerprint(result)
+}
+
+// SignatureForLabels works like LabelsToSignature but takes a Metric as
+// parameter (rather than a label map) and only includes the labels with the
+// specified LabelNames into the signature calculation.
+func SignatureForLabels(m Metric, labels LabelNames) uint64 {
+	if len(m) == 0 || len(labels) == 0 {
 		return emptyLabelSignature
 	}
 
@@ -86,12 +107,44 @@ func LabelValuesToSignature(labels map[string]string) uint64 {
 	hb := getHashAndBuf()
 	defer putHashAndBuf(hb)
 
-	for _, v := range labels {
-		hb.b.WriteString(v)
+	for _, label := range labels {
+		hb.b.WriteString(string(label))
+		hb.b.WriteByte(SeparatorByte)
+		hb.b.WriteString(string(m[label]))
 		hb.h.Write(hb.b.Bytes())
 		result ^= hb.h.Sum64()
 		hb.h.Reset()
 		hb.b.Reset()
+	}
+	return result
+}
+
+// SignatureWithoutLabels works like LabelsToSignature but takes a Metric as
+// parameter (rather than a label map) and excludes the labels with any of the
+// specified LabelNames from the signature calculation.
+func SignatureWithoutLabels(m Metric, labels map[LabelName]struct{}) uint64 {
+	if len(m) == 0 {
+		return emptyLabelSignature
+	}
+
+	var result uint64
+	hb := getHashAndBuf()
+	defer putHashAndBuf(hb)
+
+	for labelName, labelValue := range m {
+		if _, exclude := labels[labelName]; exclude {
+			continue
+		}
+		hb.b.WriteString(string(labelName))
+		hb.b.WriteByte(SeparatorByte)
+		hb.b.WriteString(string(labelValue))
+		hb.h.Write(hb.b.Bytes())
+		result ^= hb.h.Sum64()
+		hb.h.Reset()
+		hb.b.Reset()
+	}
+	if result == 0 {
+		return emptyLabelSignature
 	}
 	return result
 }

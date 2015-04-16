@@ -14,10 +14,8 @@
 package model
 
 import (
-	"encoding/binary"
 	"encoding/json"
 	"fmt"
-	"hash/fnv"
 	"sort"
 	"strings"
 )
@@ -66,37 +64,7 @@ func (m Metric) String() string {
 
 // Fingerprint returns a Metric's Fingerprint.
 func (m Metric) Fingerprint() Fingerprint {
-	labelNames := make([]string, 0, len(m))
-	maxLength := 0
-
-	for labelName, labelValue := range m {
-		labelNames = append(labelNames, string(labelName))
-		if len(labelName) > maxLength {
-			maxLength = len(labelName)
-		}
-		if len(labelValue) > maxLength {
-			maxLength = len(labelValue)
-		}
-	}
-
-	sort.Strings(labelNames)
-
-	summer := fnv.New64a()
-	buf := make([]byte, maxLength)
-
-	for _, labelName := range labelNames {
-		labelValue := m[LabelName(labelName)]
-
-		copy(buf, labelName)
-		summer.Write(buf[:len(labelName)])
-
-		summer.Write(separator)
-
-		copy(buf, labelValue)
-		summer.Write(buf[:len(labelValue)])
-	}
-
-	return Fingerprint(binary.LittleEndian.Uint64(summer.Sum(nil)))
+	return metricToFingerprint(m)
 }
 
 // Clone returns a copy of the Metric.
@@ -133,7 +101,7 @@ type COWMetric struct {
 
 // Set sets a label name in the wrapped Metric to a given value and copies the
 // Metric initially, if it is not already a copy.
-func (m COWMetric) Set(ln LabelName, lv LabelValue) {
+func (m *COWMetric) Set(ln LabelName, lv LabelValue) {
 	m.doCOW()
 	m.Metric[ln] = lv
 }

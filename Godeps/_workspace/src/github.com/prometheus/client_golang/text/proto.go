@@ -18,7 +18,7 @@ import (
 	"io"
 
 	"github.com/golang/protobuf/proto"
-	"github.com/matttproud/golang_protobuf_extensions/ext"
+	"github.com/matttproud/golang_protobuf_extensions/pbutil"
 
 	dto "github.com/prometheus/client_model/go"
 )
@@ -27,7 +27,7 @@ import (
 // protobuf format and returns the number of bytes written and any error
 // encountered.
 func WriteProtoDelimited(w io.Writer, p *dto.MetricFamily) (int, error) {
-	return ext.WriteDelimited(w, p)
+	return pbutil.WriteDelimited(w, p)
 }
 
 // WriteProtoText writes the MetricFamily to the writer in text format and

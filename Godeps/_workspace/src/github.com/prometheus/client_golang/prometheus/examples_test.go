@@ -18,8 +18,10 @@ import (
 	"fmt"
 	"math"
 	"net/http"
+	"os"
 	"runtime"
 	"sort"
+	"time"
 
 	dto "github.com/prometheus/client_model/go"
 
@@ -497,4 +499,20 @@ func ExampleHistogram() {
 	//     upper_bound: 40
 	//   >
 	// >
+}
+
+func ExamplePushCollectors() {
+	hostname, _ := os.Hostname()
+	completionTime := prometheus.NewGauge(prometheus.GaugeOpts{
+		Name: "db_backup_last_completion_time",
+		Help: "The timestamp of the last succesful completion of a DB backup.",
+	})
+	completionTime.Set(float64(time.Now().Unix()))
+	if err := prometheus.PushCollectors(
+		"db_backup", hostname,
+		"http://pushgateway:9091",
+		completionTime,
+	); err != nil {
+		fmt.Println("Could not push completion time to Pushgateway:", err)
+	}
 }
