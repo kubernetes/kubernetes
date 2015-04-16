@@ -23,6 +23,10 @@ Next, specify an existing virtual network in `cluster/azure/config-defualt.sh`:
 
     AZ_VNET=<vnet name>
 
+You can create a virtual network:
+
+    azure network vnet create <vnet name> --location "West US" -v
+
 Now you're ready.
 
 You can then use the `cluster/kube-*.sh` scripts to manage your azure cluster, start with:
