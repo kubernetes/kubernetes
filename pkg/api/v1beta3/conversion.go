@@ -44,6 +44,8 @@ func init() {
 			switch label {
 			case "metadata.name":
 				return label, value, nil
+			case "spec.unschedulable":
+				return label, value, nil
 			default:
 				return "", "", fmt.Errorf("field label not supported: %s", label)
 			}
