@@ -233,6 +233,12 @@ func WriteToFile(config clientcmdapi.Config, filename string) error {
 	if err != nil {
 		return err
 	}
+	dir := filepath.Dir(filename)
+	if _, err := os.Stat(dir); os.IsNotExist(err) {
+		if err = os.MkdirAll(dir, 0755); err != nil {
+			return err
+		}
+	}
 	if err := ioutil.WriteFile(filename, content, 0600); err != nil {
 		return err
 	}
