@@ -160,7 +160,10 @@ func (h *EtcdHelper) ExtractObjToList(key string, listObj runtime.Object) error 
 	}
 
 	response, err := h.Client.Get(key, false, false)
-	if err != nil && !IsEtcdNotFound(err) {
+	if err != nil {
+		if IsEtcdNotFound(err) {
+			return nil
+		}
 		return err
 	}
 
