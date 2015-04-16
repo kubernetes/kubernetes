@@ -18,6 +18,7 @@ package config
 
 import (
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"sort"
@@ -25,9 +26,11 @@ import (
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/validation"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 )
 
@@ -68,7 +71,11 @@ func writeTestFile(t *testing.T, dir, name string, contents string) *os.File {
 	return file
 }
 
-func TestReadFromFile(t *testing.T) {
+func TestReadContainerManifestFromFile(t *testing.T) {
+	// ContainerManifest is supported only for pre v1beta3 versions.
+	if !api.PreV1Beta3(testapi.Version()) {
+		return
+	}
 	hostname := "random-test-hostname"
 	var testCases = []struct {
 		desc         string
@@ -77,18 +84,18 @@ func TestReadFromFile(t *testing.T) {
 	}{
 		{
 			desc: "Manifest",
-			fileContents: `{
-					"version": "v1beta1",
+			fileContents: fmt.Sprintf(`{
+					"version": "%s",
 					"uuid": "12345",
 					"id": "test",
 					"containers": [{ "name": "image", "image": "test/image", "imagePullPolicy": "PullAlways"}]
-				}`,
+				}`, testapi.Version()),
 			expected: CreatePodUpdate(kubelet.SET, kubelet.FileSource, &api.Pod{
 				ObjectMeta: api.ObjectMeta{
 					Name:      "test-" + hostname,
 					UID:       "12345",
 					Namespace: kubelet.NamespaceDefault,
-					SelfLink:  "/api/v1beta2/pods/test-" + hostname + "?namespace=default",
+					SelfLink:  getSelfLink("test-"+hostname, kubelet.NamespaceDefault),
 				},
 				Spec: api.PodSpec{
 					Host:          hostname,
@@ -104,17 +111,17 @@ func TestReadFromFile(t *testing.T) {
 		},
 		{
 			desc: "Manifest without ID",
-			fileContents: `{
-					"version": "v1beta1",
-					"uuid": "12345",
-					"containers": [{ "name": "image", "image": "test/image", "imagePullPolicy": "PullAlways"}]
-				}`,
+			fileContents: fmt.Sprintf(`{
+						"version": "%s",
+						"uuid": "12345",
+						"containers": [{ "name": "image", "image": "test/image", "imagePullPolicy": "PullAlways"}]
+					}`, testapi.Version()),
 			expected: CreatePodUpdate(kubelet.SET, kubelet.FileSource, &api.Pod{
 				ObjectMeta: api.ObjectMeta{
 					Name:      "12345-" + hostname,
 					UID:       "12345",
 					Namespace: kubelet.NamespaceDefault,
-					SelfLink:  "/api/v1beta2/pods/12345-" + hostname + "?namespace=default",
+					SelfLink:  getSelfLink("12345-"+hostname, kubelet.NamespaceDefault),
 				},
 				Spec: api.PodSpec{
 					Host:          hostname,
@@ -125,129 +132,6 @@ func TestReadFromFile(t *testing.T) {
 						Image: "test/image",
 						TerminationMessagePath: "/dev/termination-log",
 						ImagePullPolicy:        "Always"}},
-				},
-			}),
-		},
-		{
-			desc: "Manifest v1beta2",
-			fileContents: `{
-					"version": "v1beta2",
-					"uuid": "12345",
-					"id": "test",
-					"containers": [{ "name": "image", "image": "test/image", "imagePullPolicy": "PullAlways"}]
-				}`,
-			expected: CreatePodUpdate(kubelet.SET, kubelet.FileSource, &api.Pod{
-				ObjectMeta: api.ObjectMeta{
-					Name:      "test-" + hostname,
-					UID:       "12345",
-					Namespace: kubelet.NamespaceDefault,
-					SelfLink:  "/api/v1beta2/pods/test-" + hostname + "?namespace=default",
-				},
-				Spec: api.PodSpec{
-					Host:          hostname,
-					RestartPolicy: api.RestartPolicyAlways,
-					DNSPolicy:     api.DNSClusterFirst,
-					Containers: []api.Container{{
-						Name:  "image",
-						Image: "test/image",
-						TerminationMessagePath: "/dev/termination-log",
-						ImagePullPolicy:        "Always"}},
-				},
-			}),
-		},
-		{
-			desc: "Simple pod",
-			fileContents: `{
-					"kind": "Pod",
-					"apiVersion": "v1beta1",
-					"uid": "12345",
-					"id": "test",
-					"namespace": "mynamespace",
-					"desiredState": {
-						"manifest": {
-							"containers": [{ "name": "image", "image": "test/image" }]
-						}
-					}
-				}`,
-			expected: CreatePodUpdate(kubelet.SET, kubelet.FileSource, &api.Pod{
-				ObjectMeta: api.ObjectMeta{
-					Name:      "test-" + hostname,
-					UID:       "12345",
-					Namespace: "mynamespace",
-					SelfLink:  "/api/v1beta2/pods/test-" + hostname + "?namespace=mynamespace",
-				},
-				Spec: api.PodSpec{
-					Host:          hostname,
-					RestartPolicy: api.RestartPolicyAlways,
-					DNSPolicy:     api.DNSClusterFirst,
-					Containers: []api.Container{{
-						Name:  "image",
-						Image: "test/image",
-						TerminationMessagePath: "/dev/termination-log",
-						ImagePullPolicy:        "IfNotPresent"}},
-				},
-			}),
-		},
-		{
-			desc: "Pod without ID",
-			fileContents: `{
-					"kind": "Pod",
-					"apiversion": "v1beta1",
-					"uid": "12345",
-					"desiredState": {
-						"manifest": {
-							"containers": [{ "name": "image", "image": "test/image" }]
-						}
-					}
-				}`,
-			expected: CreatePodUpdate(kubelet.SET, kubelet.FileSource, &api.Pod{
-				ObjectMeta: api.ObjectMeta{
-					Name:      "12345-" + hostname,
-					UID:       "12345",
-					Namespace: kubelet.NamespaceDefault,
-					SelfLink:  "/api/v1beta2/pods/12345-" + hostname + "?namespace=default",
-				},
-				Spec: api.PodSpec{
-					Host:          hostname,
-					RestartPolicy: api.RestartPolicyAlways,
-					DNSPolicy:     api.DNSClusterFirst,
-					Containers: []api.Container{{
-						Name:  "image",
-						Image: "test/image",
-						TerminationMessagePath: "/dev/termination-log",
-						ImagePullPolicy:        "IfNotPresent"}},
-				},
-			}),
-		},
-		{
-			desc: "Pod v1beta3",
-			fileContents: `{
-					"kind": "Pod",
-					"apiversion": "v1beta3",
-					"metadata": {
-						"uid": "12345",
-						"name": "test"
-					},
-					"spec": {
-						"containers": [{ "name": "image", "image": "test/image" }]
-					}
-				}`,
-			expected: CreatePodUpdate(kubelet.SET, kubelet.FileSource, &api.Pod{
-				ObjectMeta: api.ObjectMeta{
-					Name:      "test-" + hostname,
-					UID:       "12345",
-					Namespace: kubelet.NamespaceDefault,
-					SelfLink:  "/api/v1beta2/pods/test-" + hostname + "?namespace=default",
-				},
-				Spec: api.PodSpec{
-					Host:          hostname,
-					RestartPolicy: api.RestartPolicyAlways,
-					DNSPolicy:     api.DNSClusterFirst,
-					Containers: []api.Container{{
-						Name:  "image",
-						Image: "test/image",
-						TerminationMessagePath: "/dev/termination-log",
-						ImagePullPolicy:        "IfNotPresent"}},
 				},
 			}),
 		},
@@ -278,13 +162,129 @@ func TestReadFromFile(t *testing.T) {
 	}
 }
 
+func TestReadPodsFromFile(t *testing.T) {
+	hostname := "random-test-hostname"
+	var testCases = []struct {
+		desc     string
+		pod      runtime.Object
+		expected kubelet.PodUpdate
+	}{
+		{
+			desc: "Simple pod",
+			pod: &api.Pod{
+				TypeMeta: api.TypeMeta{
+					Kind:       "Pod",
+					APIVersion: "",
+				},
+				ObjectMeta: api.ObjectMeta{
+					Name:      "test",
+					UID:       "12345",
+					Namespace: "mynamespace",
+				},
+				Spec: api.PodSpec{
+					Containers: []api.Container{{Name: "image", Image: "test/image"}},
+				},
+			},
+			expected: CreatePodUpdate(kubelet.SET, kubelet.FileSource, &api.Pod{
+				ObjectMeta: api.ObjectMeta{
+					Name:      "test-" + hostname,
+					UID:       "12345",
+					Namespace: "mynamespace",
+					SelfLink:  getSelfLink("test-"+hostname, "mynamespace"),
+				},
+				Spec: api.PodSpec{
+					Host:          hostname,
+					RestartPolicy: api.RestartPolicyAlways,
+					DNSPolicy:     api.DNSClusterFirst,
+					Containers: []api.Container{{
+						Name:  "image",
+						Image: "test/image",
+						TerminationMessagePath: "/dev/termination-log",
+						ImagePullPolicy:        "IfNotPresent"}},
+				},
+			}),
+		},
+		{
+			desc: "Pod without ID",
+			pod: &api.Pod{
+				TypeMeta: api.TypeMeta{
+					Kind:       "Pod",
+					APIVersion: "",
+				},
+				ObjectMeta: api.ObjectMeta{
+					// No name
+					UID: "12345",
+				},
+				Spec: api.PodSpec{
+					Containers: []api.Container{{Name: "image", Image: "test/image"}},
+				},
+			},
+			expected: CreatePodUpdate(kubelet.SET, kubelet.FileSource, &api.Pod{
+				ObjectMeta: api.ObjectMeta{
+					Name:      "12345-" + hostname,
+					UID:       "12345",
+					Namespace: kubelet.NamespaceDefault,
+					SelfLink:  getSelfLink("12345-"+hostname, kubelet.NamespaceDefault),
+				},
+				Spec: api.PodSpec{
+					Host:          hostname,
+					RestartPolicy: api.RestartPolicyAlways,
+					DNSPolicy:     api.DNSClusterFirst,
+					Containers: []api.Container{{
+						Name:  "image",
+						Image: "test/image",
+						TerminationMessagePath: "/dev/termination-log",
+						ImagePullPolicy:        "IfNotPresent"}},
+				},
+			}),
+		},
+	}
+
+	for _, testCase := range testCases {
+		func() {
+			var versionedPod runtime.Object
+			err := testapi.Converter().Convert(&testCase.pod, &versionedPod)
+			if err != nil {
+				t.Fatalf("error in versioning the pod: %s", testCase.desc, err)
+			}
+			fileContents, err := testapi.Codec().Encode(versionedPod)
+			if err != nil {
+				t.Fatalf("%s: error in encoding the pod: %v", testCase.desc, err)
+			}
+
+			file := writeTestFile(t, os.TempDir(), "test_pod_config", string(fileContents))
+			defer os.Remove(file.Name())
+
+			ch := make(chan interface{})
+			NewSourceFile(file.Name(), hostname, time.Millisecond, ch)
+			select {
+			case got := <-ch:
+				update := got.(kubelet.PodUpdate)
+				for _, pod := range update.Pods {
+					if errs := validation.ValidatePod(pod); len(errs) > 0 {
+						t.Errorf("%s: Invalid pod %#v, %#v", testCase.desc, pod, errs)
+					}
+				}
+				if !api.Semantic.DeepEqual(testCase.expected, update) {
+					t.Errorf("%s: Expected %#v, Got %#v", testCase.desc, testCase.expected, update)
+				}
+			case <-time.After(time.Second):
+				t.Errorf("%s: Expected update, timeout instead", testCase.desc)
+			}
+		}()
+	}
+}
+
 func TestReadManifestFromFileWithDefaults(t *testing.T) {
+	if !api.PreV1Beta3(testapi.Version()) {
+		return
+	}
 	file := writeTestFile(t, os.TempDir(), "test_pod_config",
-		`{
-			"version": "v1beta1",
+		fmt.Sprintf(`{
+			"version": "%s",
 			"id": "test",
 			"containers": [{ "name": "image", "image": "test/image" }]
-		}`)
+		}`, testapi.Version()))
 	defer os.Remove(file.Name())
 
 	ch := make(chan interface{})
@@ -335,7 +335,7 @@ func TestExtractFromEmptyDir(t *testing.T) {
 	}
 }
 
-func ExampleManifestAndPod(id string) (v1beta1.ContainerManifest, *api.Pod) {
+func exampleManifestAndPod(id string) (v1beta1.ContainerManifest, *api.Pod) {
 	hostname := "an-example-host"
 
 	manifest := v1beta1.ContainerManifest{
@@ -363,7 +363,7 @@ func ExampleManifestAndPod(id string) (v1beta1.ContainerManifest, *api.Pod) {
 			Name:      id + "-" + hostname,
 			UID:       types.UID(id),
 			Namespace: kubelet.NamespaceDefault,
-			SelfLink:  "/api/v1beta2/pods/" + id + "-" + hostname + "?namespace=default",
+			SelfLink:  getSelfLink(id+"-"+hostname, kubelet.NamespaceDefault),
 		},
 		Spec: api.PodSpec{
 			Host: hostname,
@@ -387,8 +387,11 @@ func ExampleManifestAndPod(id string) (v1beta1.ContainerManifest, *api.Pod) {
 }
 
 func TestExtractFromDir(t *testing.T) {
-	manifest, expectedPod := ExampleManifestAndPod("1")
-	manifest2, expectedPod2 := ExampleManifestAndPod("2")
+	if !api.PreV1Beta3(testapi.Version()) {
+		return
+	}
+	manifest, expectedPod := exampleManifestAndPod("1")
+	manifest2, expectedPod2 := exampleManifestAndPod("2")
 
 	manifests := []v1beta1.ContainerManifest{manifest, manifest2}
 	pods := []*api.Pod{expectedPod, expectedPod2}

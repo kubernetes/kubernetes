@@ -29,6 +29,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
@@ -46,6 +47,22 @@ func expectHTTP(url string, code int, t *testing.T) {
 	if r.StatusCode != code {
 		t.Errorf("unexpected response: %v", r.StatusCode)
 	}
+}
+
+func getPath(resource, namespace, name string) string {
+	return testapi.ResourcePath(resource, namespace, name)
+}
+
+func pathWithNamespaceQuery(resource, namespace, name string) string {
+	return testapi.ResourcePathWithNamespaceQuery(resource, namespace, name)
+}
+
+func pathWithPrefix(prefix, resource, namespace, name string) string {
+	return testapi.ResourcePathWithPrefix(prefix, resource, namespace, name)
+}
+
+func pathWithPrefixAndNamespaceQuery(prefix, resource, namespace, name string) string {
+	return testapi.ResourcePathWithPrefixAndNamespaceQuery(prefix, resource, namespace, name)
 }
 
 func TestMaxInFlight(t *testing.T) {
@@ -168,17 +185,15 @@ func TestGetAPIRequestInfo(t *testing.T) {
 		{"GET", "/watch/namespaces/other/pods", "watch", "", "other", "pods", "", "Pod", "", []string{"pods"}},
 
 		// fully-qualified paths
-		{"GET", "/api/v1beta1/namespaces/other/pods", "list", "v1beta1", "other", "pods", "", "Pod", "", []string{"pods"}},
-		{"GET", "/api/v1beta1/namespaces/other/pods/foo", "get", "v1beta1", "other", "pods", "", "Pod", "foo", []string{"pods", "foo"}},
-		{"GET", "/api/v1beta1/pods", "list", "v1beta1", api.NamespaceAll, "pods", "", "Pod", "", []string{"pods"}},
-		{"POST", "/api/v1beta1/pods", "create", "v1beta1", api.NamespaceDefault, "pods", "", "Pod", "", []string{"pods"}},
-		{"GET", "/api/v1beta1/pods/foo", "get", "v1beta1", api.NamespaceDefault, "pods", "", "Pod", "foo", []string{"pods", "foo"}},
-		{"GET", "/api/v1beta1/pods/foo?namespace=other", "get", "v1beta1", "other", "pods", "", "Pod", "foo", []string{"pods", "foo"}},
-		{"GET", "/api/v1beta1/pods?namespace=other", "list", "v1beta1", "other", "pods", "", "Pod", "", []string{"pods"}},
-		{"GET", "/api/v1beta1/proxy/pods/foo", "proxy", "v1beta1", api.NamespaceDefault, "pods", "", "Pod", "foo", []string{"pods", "foo"}},
-		{"GET", "/api/v1beta1/redirect/pods/foo", "redirect", "v1beta1", api.NamespaceDefault, "pods", "", "Pod", "foo", []string{"pods", "foo"}},
-		{"GET", "/api/v1beta1/watch/pods", "watch", "v1beta1", api.NamespaceAll, "pods", "", "Pod", "", []string{"pods"}},
-		{"GET", "/api/v1beta1/watch/namespaces/other/pods", "watch", "v1beta1", "other", "pods", "", "Pod", "", []string{"pods"}},
+		{"GET", pathWithNamespaceQuery("pods", "other", ""), "list", testapi.Version(), "other", "pods", "", "Pod", "", []string{"pods"}},
+		{"GET", pathWithNamespaceQuery("pods", "other", "foo"), "get", testapi.Version(), "other", "pods", "", "Pod", "foo", []string{"pods", "foo"}},
+		{"GET", getPath("pods", "", ""), "list", testapi.Version(), api.NamespaceAll, "pods", "", "Pod", "", []string{"pods"}},
+		{"POST", getPath("pods", "", ""), "create", testapi.Version(), api.NamespaceDefault, "pods", "", "Pod", "", []string{"pods"}},
+		{"GET", getPath("pods", "", "foo"), "get", testapi.Version(), api.NamespaceDefault, "pods", "", "Pod", "foo", []string{"pods", "foo"}},
+		{"GET", pathWithPrefix("proxy", "pods", "", "foo"), "proxy", testapi.Version(), api.NamespaceDefault, "pods", "", "Pod", "foo", []string{"pods", "foo"}},
+		{"GET", pathWithPrefix("watch", "pods", "", ""), "watch", testapi.Version(), api.NamespaceAll, "pods", "", "Pod", "", []string{"pods"}},
+		{"GET", pathWithPrefixAndNamespaceQuery("redirect", "pods", "", ""), "redirect", testapi.Version(), api.NamespaceAll, "pods", "", "Pod", "", []string{"pods"}},
+		{"GET", pathWithPrefixAndNamespaceQuery("watch", "pods", "other", ""), "watch", testapi.Version(), "other", "pods", "", "Pod", "", []string{"pods"}},
 
 		// subresource identification
 		{"GET", "/namespaces/other/pods/foo/status", "get", "", "other", "pods", "status", "Pod", "foo", []string{"pods", "foo", "status"}},
@@ -222,8 +237,8 @@ func TestGetAPIRequestInfo(t *testing.T) {
 
 	errorCases := map[string]string{
 		"no resource path":            "/",
-		"just apiversion":             "/api/v1beta1/",
-		"apiversion with no resource": "/api/v1beta1/",
+		"just apiversion":             "/api/version/",
+		"apiversion with no resource": "/api/version/",
 	}
 	for k, v := range errorCases {
 		req, err := http.NewRequest("GET", v, nil)

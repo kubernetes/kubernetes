@@ -78,8 +78,8 @@ func path(resource, namespace, name string) string {
 	return testapi.ResourcePath(resource, namespace, name)
 }
 
-func pathWithQuery(resource, namespace, name string) string {
-	return testapi.ResourcePathWithQueryParams(resource, namespace, name)
+func pathWithNamespaceQuery(resource, namespace, name string) string {
+	return testapi.ResourcePathWithNamespaceQuery(resource, namespace, name)
 }
 
 func pathWithPrefix(prefix, resource, namespace, name string) string {
@@ -90,8 +90,8 @@ func timeoutPath(resource, namespace, name string) string {
 	return addTimeoutFlag(testapi.ResourcePath(resource, namespace, name))
 }
 
-func timeoutPathWithQuery(resource, namespace, name string) string {
-	return addTimeoutFlag(testapi.ResourcePathWithQueryParams(resource, namespace, name))
+func timeoutPathWithNamespaceQuery(resource, namespace, name string) string {
+	return addTimeoutFlag(testapi.ResourcePathWithNamespaceQuery(resource, namespace, name))
 }
 
 // Bodies for requests used in subsequent tests.
@@ -848,15 +848,15 @@ func TestNamespaceAuthorization(t *testing.T) {
 		statusCodes map[int]bool // allowed status codes.
 	}{
 
-		{"POST", timeoutPathWithQuery("pods", "foo", ""), "foo", aPod, code201},
-		{"GET", pathWithQuery("pods", "foo", ""), "foo", "", code200},
-		{"GET", pathWithQuery("pods", "foo", "a"), "foo", "", code200},
-		{"DELETE", timeoutPathWithQuery("pods", "foo", "a"), "foo", "", code200},
+		{"POST", timeoutPathWithNamespaceQuery("pods", "foo", ""), "foo", aPod, code201},
+		{"GET", pathWithNamespaceQuery("pods", "foo", ""), "foo", "", code200},
+		{"GET", pathWithNamespaceQuery("pods", "foo", "a"), "foo", "", code200},
+		{"DELETE", timeoutPathWithNamespaceQuery("pods", "foo", "a"), "foo", "", code200},
 
 		{"POST", timeoutPath("pods", "bar", ""), "bar", aPod, code403},
-		{"GET", pathWithQuery("pods", "bar", ""), "bar", "", code403},
-		{"GET", pathWithQuery("pods", "bar", "a"), "bar", "", code403},
-		{"DELETE", timeoutPathWithQuery("pods", "bar", "a"), "bar", "", code403},
+		{"GET", pathWithNamespaceQuery("pods", "bar", ""), "bar", "", code403},
+		{"GET", pathWithNamespaceQuery("pods", "bar", "a"), "bar", "", code403},
+		{"DELETE", timeoutPathWithNamespaceQuery("pods", "bar", "a"), "bar", "", code403},
 
 		{"POST", timeoutPath("pods", api.NamespaceDefault, ""), "", aPod, code403},
 		{"GET", path("pods", "", ""), "", "", code403},

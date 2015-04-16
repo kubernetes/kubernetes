@@ -27,6 +27,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 )
@@ -46,9 +47,10 @@ func getFakeClient(t *testing.T, validURLs []string) (ClientPosterFunc, *httptes
 	}
 	server := httptest.NewServer(http.HandlerFunc(handlerFunc))
 	return func(mapping *meta.RESTMapping) (RESTClientPoster, error) {
-		fakeCodec := runtime.CodecFor(api.Scheme, "v1beta1")
-		fakeUri, _ := url.Parse(server.URL + "/api/v1beta1")
-		return client.NewRESTClient(fakeUri, "v1beta1", fakeCodec, true, 5, 10), nil
+		fakeCodec := testapi.Codec()
+		fakeUri, _ := url.Parse(server.URL + "/api/" + testapi.Version())
+		legacyBehavior := api.PreV1Beta3(testapi.Version())
+		return client.NewRESTClient(fakeUri, testapi.Version(), fakeCodec, legacyBehavior, 5, 10), nil
 	}, server
 }
 
@@ -64,7 +66,10 @@ func TestCreateObjects(t *testing.T) {
 	})
 
 	typer, mapper := getTyperAndMapper()
-	client, s := getFakeClient(t, []string{"/api/v1beta1/pods?namespace=default", "/api/v1beta1/services?namespace=default"})
+	client, s := getFakeClient(t, []string{
+		testapi.ResourcePathWithNamespaceQuery("pods", api.NamespaceDefault, ""),
+		testapi.ResourcePathWithNamespaceQuery("services", api.NamespaceDefault, ""),
+	})
 
 	errs := CreateObjects(typer, mapper, client, items)
 	s.Close()
@@ -77,11 +82,13 @@ func TestCreateNoNameItem(t *testing.T) {
 	items := []runtime.Object{}
 
 	items = append(items, &api.Service{
-		TypeMeta: api.TypeMeta{APIVersion: "v1beta1", Kind: "Service"},
+		TypeMeta: api.TypeMeta{APIVersion: testapi.Version(), Kind: "Service"},
 	})
 
 	typer, mapper := getTyperAndMapper()
-	client, s := getFakeClient(t, []string{"/api/v1beta1/services"})
+	client, s := getFakeClient(t, []string{
+		testapi.ResourcePath("services", api.NamespaceDefault, ""),
+	})
 
 	errs := CreateObjects(typer, mapper, client, items)
 	s.Close()
@@ -125,12 +132,15 @@ func TestCreateNoClientItems(t *testing.T) {
 	items := []runtime.Object{}
 
 	items = append(items, &api.Pod{
-		TypeMeta:   api.TypeMeta{APIVersion: "v1beta1", Kind: "Pod"},
+		TypeMeta:   api.TypeMeta{APIVersion: testapi.Version(), Kind: "Pod"},
 		ObjectMeta: api.ObjectMeta{Name: "test-pod"},
 	})
 
 	typer, mapper := getTyperAndMapper()
-	_, s := getFakeClient(t, []string{"/api/v1beta1/pods", "/api/v1beta1/services"})
+	_, s := getFakeClient(t, []string{
+		testapi.ResourcePath("pods", api.NamespaceDefault, ""),
+		testapi.ResourcePath("services", api.NamespaceDefault, ""),
+	})
 
 	noClientFunc := func(mapping *meta.RESTMapping) (RESTClientPoster, error) {
 		return nil, fmt.Errorf("no client")
