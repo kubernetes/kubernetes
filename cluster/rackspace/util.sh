@@ -318,7 +318,6 @@ kube-up() {
 
   echo "Kubernetes cluster created."
 
-  export KUBECONFIG="${KUBECONFIG-${HOME}/.kube/.kubeconfig}"
   export KUBE_CERT=""
   export KUBE_KEY=""
   export CA_CERT=""

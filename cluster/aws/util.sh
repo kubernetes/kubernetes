@@ -605,7 +605,6 @@ function kube-up {
   echo "Kubernetes cluster created."
 
   # TODO use token instead of kube_auth
-  export KUBECONFIG="${KUBECONFIG:-${HOME}/.kube/.kubeconfig}"
   export KUBE_CERT="/tmp/$RANDOM-kubecfg.crt"
   export KUBE_KEY="/tmp/$RANDOM-kubecfg.key"
   export CA_CERT="/tmp/$RANDOM-kubernetes.ca.crt"

@@ -87,15 +87,7 @@ if [[ -z "${AUTH_CONFIG:-}" ]];  then
 
     detect-master >/dev/null
 
-
-    if [[ "$KUBERNETES_PROVIDER" == "vagrant" ]]; then
-      # When we are using vagrant it has hard coded auth.  We repeat that here so that
-      # we don't clobber auth that might be used for a publicly facing cluster.
-      auth_config=(
-        "--auth_config=${HOME}/.kubernetes_vagrant_auth"
-        "--kubeconfig=${HOME}/.kubernetes_vagrant_kubeconfig"
-      )
-    elif [[ "${KUBERNETES_PROVIDER}" == "gke" ]]; then
+    if [[ "${KUBERNETES_PROVIDER}" == "gke" ]]; then
       # GKE stores its own kubeconfig in gcloud's config directory.
       detect-project &> /dev/null
       auth_config=(
@@ -103,25 +95,15 @@ if [[ -z "${AUTH_CONFIG:-}" ]];  then
         # gcloud doesn't set the current-context, so we have to set it
         "--context=gke_${PROJECT}_${ZONE}_${CLUSTER_NAME}"
       )
-    elif [[ "${KUBERNETES_PROVIDER}" == "gce" ]]; then
-      auth_config=(
-        "--kubeconfig=${KUBECONFIG:-$DEFAULT_KUBECONFIG}"
-      )
-    elif [[ "${KUBERNETES_PROVIDER}" == "aws" ]]; then
-      auth_config=(
-        "--auth_config=${HOME}/.kube/${INSTANCE_PREFIX}/kubernetes_auth"
-      )
-    elif [[ "${KUBERNETES_PROVIDER}" == "libvirt-coreos" ]]; then
-      auth_config=(
-        "--kubeconfig=${HOME}/.kube/.kubeconfig"
-      )
     elif [[ "${KUBERNETES_PROVIDER}" == "conformance_test" ]]; then
       auth_config=(
         "--auth_config=${KUBERNETES_CONFORMANCE_TEST_AUTH_CONFIG:-}"
         "--cert_dir=${KUBERNETES_CONFORMANCE_TEST_CERT_DIR:-}"
       )
     else
-      auth_config=()
+      auth_config=(
+      "--kubeconfig=${KUBECONFIG:-$DEFAULT_KUBECONFIG}"
+    )
     fi
 else
   echo "Conformance Test.  No cloud-provider-specific preparation."

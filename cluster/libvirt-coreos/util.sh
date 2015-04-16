@@ -237,7 +237,6 @@ function kube-up {
     rm $domain_xml
   done
 
-  export KUBECONFIG="${KUBECONFIG:-${HOME}/.kube/.kubeconfig}"
   export KUBE_SERVER="http://192.168.10.1:8080"
   export CONTEXT="libvirt-coreos"
   create-kubeconfig
