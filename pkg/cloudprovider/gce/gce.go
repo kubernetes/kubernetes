@@ -22,7 +22,6 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
-	"os/exec"
 	"path"
 	"strconv"
 	"strings"
@@ -446,26 +445,8 @@ func (gce *GCECloud) ExternalID(instance string) (string, error) {
 	return strconv.FormatUint(inst.Id, 10), nil
 }
 
-// fqdnSuffix is hacky function to compute the delta between hostame and hostname -f.
-func fqdnSuffix() (string, error) {
-	fullHostname, err := exec.Command("hostname", "-f").Output()
-	if err != nil {
-		return "", err
-	}
-	hostname := strings.Split(string(fullHostname), ".")[0]
-	return strings.TrimSpace(string(fullHostname)[len(string(hostname)):]), nil
-}
-
 // List is an implementation of Instances.List.
 func (gce *GCECloud) List(filter string) ([]string, error) {
-	// GCE gives names without their fqdn suffix, so get that here for appending.
-	// This is needed because the kubelet looks for its jobs in /registry/hosts/<fqdn>/pods
-	// We should really just replace this convention, with a negotiated naming protocol for kubelet's
-	// to register with the master.
-	suffix, err := fqdnSuffix()
-	if err != nil {
-		return []string{}, err
-	}
 	listCall := gce.service.Instances.List(gce.projectID, gce.zone)
 	if len(filter) > 0 {
 		listCall = listCall.Filter("name eq " + filter)
@@ -476,7 +457,7 @@ func (gce *GCECloud) List(filter string) ([]string, error) {
 	}
 	var instances []string
 	for _, instance := range res.Items {
-		instances = append(instances, instance.Name+suffix)
+		instances = append(instances, instance.Name)
 	}
 	return instances, nil
 }
