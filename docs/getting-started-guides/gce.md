@@ -52,7 +52,7 @@ The `kubectl.sh` line below spins up two containers running
 [Nginx](http://nginx.org/en/) running on port 80:
 
 ```bash
-cluster/kubectl.sh run-container my-nginx --image=dockerfile/nginx --replicas=2 --port=80
+cluster/kubectl.sh run-container my-nginx --image=nginx --replicas=2 --port=80
 ```
 
 To stop the containers:
@@ -87,7 +87,7 @@ Where pod.json contains something like:
       "id": "php",
       "containers": [{
         "name": "nginx",
-        "image": "dockerfile/nginx",
+        "image": "nginx",
         "ports": [{
           "containerPort": 80,
           "hostPort": 8081

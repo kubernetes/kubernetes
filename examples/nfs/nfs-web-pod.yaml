@@ -9,7 +9,7 @@ metadata:
 spec:
   containers:
     - name: web
-      image: dockerfile/nginx
+      image: nginx
       ports:
         - name: web
           containerPort: 80

@@ -184,7 +184,7 @@ metadata:
   name: mypod
 spec:
   containers:
-    - image: dockerfile/nginx
+    - image: nginx
       name: myfrontend
       volumeMounts:
       - mountPath: "/var/www/html"

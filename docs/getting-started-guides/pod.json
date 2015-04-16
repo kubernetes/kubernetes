@@ -8,7 +8,7 @@
       "id": "php",
       "containers": [{
         "name": "nginx",
-        "image": "dockerfile/nginx",
+        "image": "nginx",
         "ports": [{
           "containerPort": 80,
           "hostPort": 8081

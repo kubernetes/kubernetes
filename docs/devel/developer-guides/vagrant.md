@@ -181,7 +181,7 @@ NAME   IMAGE(S   SELECTOR   REPLICAS
 Start a container running nginx with a replication controller and three replicas
 
 ```
-$ cluster/kubectl.sh run-container my-nginx --image=dockerfile/nginx --replicas=3 --port=80
+$ cluster/kubectl.sh run-container my-nginx --image=nginx --replicas=3 --port=80
 ```
 
 When listing the pods, you will see that three containers have been started and are in Waiting state:
@@ -189,9 +189,9 @@ When listing the pods, you will see that three containers have been started and 
 ```
 $ cluster/kubectl.sh get pods
 NAME                                   IMAGE(S)            HOST                    LABELS         STATUS
-781191ff-3ffe-11e4-9036-0800279696e1   dockerfile/nginx    10.245.2.4/10.245.2.4   name=myNginx   Waiting
-7813c8bd-3ffe-11e4-9036-0800279696e1   dockerfile/nginx    10.245.2.2/10.245.2.2   name=myNginx   Waiting
-78140853-3ffe-11e4-9036-0800279696e1   dockerfile/nginx    10.245.2.3/10.245.2.3   name=myNginx   Waiting
+781191ff-3ffe-11e4-9036-0800279696e1   nginx               10.245.2.4/10.245.2.4   name=myNginx   Waiting
+7813c8bd-3ffe-11e4-9036-0800279696e1   nginx               10.245.2.2/10.245.2.2   name=myNginx   Waiting
+78140853-3ffe-11e4-9036-0800279696e1   nginx               10.245.2.3/10.245.2.3   name=myNginx   Waiting
 ```
 
 You need to wait for the provisioning to complete, you can monitor the minions by doing:
@@ -210,7 +210,7 @@ Once the docker image for nginx has been downloaded, the container will start an
 $ sudo salt '*minion-1' cmd.run 'docker ps'
 kubernetes-minion-1:
     CONTAINER ID        IMAGE                     COMMAND                CREATED             STATUS              PORTS                    NAMES
-    dbe79bf6e25b        dockerfile/nginx:latest   "nginx"                21 seconds ago      Up 19 seconds                                k8s--mynginx.8c5b8a3a--7813c8bd_-_3ffe_-_11e4_-_9036_-_0800279696e1.etcd--7813c8bd_-_3ffe_-_11e4_-_9036_-_0800279696e1--fcfa837f
+    dbe79bf6e25b        nginx:latest              "nginx"                21 seconds ago      Up 19 seconds                                k8s--mynginx.8c5b8a3a--7813c8bd_-_3ffe_-_11e4_-_9036_-_0800279696e1.etcd--7813c8bd_-_3ffe_-_11e4_-_9036_-_0800279696e1--fcfa837f
     fa0e29c94501        kubernetes/pause:latest   "/pause"               8 minutes ago       Up 8 minutes        0.0.0.0:8080->80/tcp     k8s--net.a90e7ce4--7813c8bd_-_3ffe_-_11e4_-_9036_-_0800279696e1.etcd--7813c8bd_-_3ffe_-_11e4_-_9036_-_0800279696e1--baf5b21b
 ```
 
@@ -219,16 +219,16 @@ Going back to listing the pods, services and replicationControllers, you now hav
 ```
 $ cluster/kubectl.sh get pods
 NAME                                   IMAGE(S)            HOST                    LABELS         STATUS
-781191ff-3ffe-11e4-9036-0800279696e1   dockerfile/nginx    10.245.2.4/10.245.2.4   name=myNginx   Running
-7813c8bd-3ffe-11e4-9036-0800279696e1   dockerfile/nginx    10.245.2.2/10.245.2.2   name=myNginx   Running
-78140853-3ffe-11e4-9036-0800279696e1   dockerfile/nginx    10.245.2.3/10.245.2.3   name=myNginx   Running
+781191ff-3ffe-11e4-9036-0800279696e1   nginx               10.245.2.4/10.245.2.4   name=myNginx   Running
+7813c8bd-3ffe-11e4-9036-0800279696e1   nginx               10.245.2.2/10.245.2.2   name=myNginx   Running
+78140853-3ffe-11e4-9036-0800279696e1   nginx               10.245.2.3/10.245.2.3   name=myNginx   Running
 
 $ cluster/kubectl.sh get services
 NAME   LABELS   SELECTOR   IP   PORT
 
 $ cluster/kubectl.sh get replicationControllers
 NAME      IMAGE(S            SELECTOR       REPLICAS
-myNginx   dockerfile/nginx   name=my-nginx   3
+myNginx   nginx              name=my-nginx   3
 ```
 
 We did not start any services, hence there are none listed. But we see three replicas displayed properly.
@@ -239,8 +239,8 @@ You can already play with resizing the replicas with:
 $ cluster/kubectl.sh resize rc my-nginx --replicas=2
 $ cluster/kubectl.sh get pods
 NAME                                   IMAGE(S)            HOST                    LABELS         STATUS
-7813c8bd-3ffe-11e4-9036-0800279696e1   dockerfile/nginx    10.245.2.2/10.245.2.2   name=myNginx   Running
-78140853-3ffe-11e4-9036-0800279696e1   dockerfile/nginx    10.245.2.3/10.245.2.3   name=myNginx   Running
+7813c8bd-3ffe-11e4-9036-0800279696e1   nginx               10.245.2.2/10.245.2.2   name=myNginx   Running
+78140853-3ffe-11e4-9036-0800279696e1   nginx               10.245.2.3/10.245.2.3   name=myNginx   Running
 ```
 
 Congratulations!

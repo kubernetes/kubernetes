@@ -80,7 +80,7 @@ POD                            IP             CONTAINER(S)    IMAGE(S)          
 frontend-controller-0133o      10.2.1.14      php-redis       kubernetes/example-guestbook-php-redis   kube-01/172.18.0.13   name=frontend,uses=redisslave,redis-master   Running
 frontend-controller-ls6k1      10.2.3.10      php-redis       kubernetes/example-guestbook-php-redis   <unassigned>          name=frontend,uses=redisslave,redis-master   Running
 frontend-controller-oh43e      10.2.2.15      php-redis       kubernetes/example-guestbook-php-redis   kube-02/172.18.0.14   name=frontend,uses=redisslave,redis-master   Running
-redis-master                   10.2.1.3       master          dockerfile/redis                         kube-01/172.18.0.13   name=redis-master                            Running
+redis-master                   10.2.1.3       master          redis                                    kube-01/172.18.0.13   name=redis-master                            Running
 redis-slave-controller-fplln   10.2.2.3       slave           brendanburns/redis-slave                 kube-02/172.18.0.14   name=redisslave,uses=redis-master            Running
 redis-slave-controller-gziey   10.2.1.4       slave           brendanburns/redis-slave                 kube-01/172.18.0.13   name=redisslave,uses=redis-master            Running
 

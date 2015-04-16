@@ -1075,7 +1075,7 @@ const (
 			"containers": [
 				{
 					"name": "redis",
-					"image": "dockerfile/redis",
+					"image": "redis",
 					"volumeMounts": [{
 						"name": "redis-data",
 						"mountPath": "/data"
@@ -1103,7 +1103,7 @@ const (
 id: container-vm-guestbook-manifest
 containers:
   - name: redis
-    image: dockerfile/redis
+    image: redis
     volumeMounts:
       - name: redis-data
         mountPath: /data
