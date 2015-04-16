@@ -88,6 +88,7 @@ func (t Timestamp) String() string {
 	return strconv.FormatFloat(float64(t)/float64(second), 'f', -1, 64)
 }
 
+// MarshalJSON implements the json.Marshaler interface.
 func (t Timestamp) MarshalJSON() ([]byte, error) {
 	return []byte(t.String()), nil
 }
