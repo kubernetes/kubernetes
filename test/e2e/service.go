@@ -52,7 +52,7 @@ var _ = Describe("Services", func() {
 			return
 		}
 
-		podClient := c.Pods(namespace0)
+		podClient := c.Pods(api.NamespaceDefault)
 
 		//TODO: Wait for skyDNS
 
@@ -125,7 +125,7 @@ var _ = Describe("Services", func() {
 			Failf("Failed to create %s pod: %v", pod.Name, err)
 		}
 
-		expectNoError(waitForPodRunningInNamespace(c, pod.Name, namespace0))
+		expectNoError(waitForPodRunning(c, pod.Name))
 
 		By("retrieving the pod")
 		pod, err := podClient.Get(pod.Name)
@@ -142,7 +142,7 @@ var _ = Describe("Services", func() {
 				_, err := c.Get().
 					Prefix("proxy").
 					Resource("pods").
-					Namespace(namespace0).
+					Namespace(api.NamespaceDefault).
 					Name(pod.Name).
 					Suffix("results", name).
 					Do().Raw()
@@ -188,7 +188,7 @@ var _ = Describe("Services", func() {
 
 	It("should serve a basic endpoint from pods", func(done Done) {
 		serviceName := "endpoint-test2"
-		ns := namespace0
+		ns := api.NamespaceDefault
 		labels := map[string]string{
 			"foo": "bar",
 			"baz": "blah",
@@ -257,7 +257,7 @@ var _ = Describe("Services", func() {
 
 	It("should be able to create a functioning external load balancer", func() {
 		serviceName := "external-lb-test"
-		ns := namespace0
+		ns := api.NamespaceDefault
 		labels := map[string]string{
 			"key0": "value0",
 		}
@@ -317,7 +317,7 @@ var _ = Describe("Services", func() {
 		}
 
 		By("creating pod to be part of service " + serviceName)
-		podClient := c.Pods(ns)
+		podClient := c.Pods(api.NamespaceDefault)
 		defer func() {
 			By("deleting pod " + pod.Name)
 			defer GinkgoRecover()
@@ -326,7 +326,7 @@ var _ = Describe("Services", func() {
 		if _, err := podClient.Create(pod); err != nil {
 			Failf("Failed to create pod %s: %v", pod.Name, err)
 		}
-		expectNoError(waitForPodRunningInNamespace(c, pod.Name, ns))
+		expectNoError(waitForPodRunning(c, pod.Name))
 
 		By("hitting the pod through the service's external load balancer")
 		var resp *http.Response
