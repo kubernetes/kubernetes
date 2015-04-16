@@ -38,6 +38,6 @@ func (*NsenterMounter) List() ([]MountPoint, error) {
 	return []MountPoint{}, nil
 }
 
-func (*NsenterMounter) IsMountPoint(file string) (bool, error) {
-	return false, nil
+func (*NsenterMounter) IsLikelyNotMountPoint(file string) (bool, error) {
+	return true, nil
 }

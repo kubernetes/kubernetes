@@ -144,12 +144,12 @@ func (b *nfsBuilder) SetUp() error {
 }
 
 func (b *nfsBuilder) SetUpAt(dir string) error {
-	mountpoint, err := b.mounter.IsMountPoint(dir)
-	glog.V(4).Infof("NFS mount set up: %s %v %v", dir, mountpoint, err)
+	notMnt, err := b.mounter.IsLikelyNotMountPoint(dir)
+	glog.V(4).Infof("NFS mount set up: %s %v %v", dir, !notMnt, err)
 	if err != nil && !os.IsNotExist(err) {
 		return err
 	}
-	if mountpoint {
+	if !notMnt {
 		return nil
 	}
 	os.MkdirAll(dir, 0750)
@@ -160,22 +160,22 @@ func (b *nfsBuilder) SetUpAt(dir string) error {
 	}
 	err = b.mounter.Mount(source, dir, "nfs", options)
 	if err != nil {
-		mountpoint, mntErr := b.mounter.IsMountPoint(dir)
+		notMnt, mntErr := b.mounter.IsLikelyNotMountPoint(dir)
 		if mntErr != nil {
-			glog.Errorf("IsMountpoint check failed: %v", mntErr)
+			glog.Errorf("IsLikelyNotMountPoint check failed: %v", mntErr)
 			return err
 		}
-		if mountpoint {
+		if !notMnt {
 			if mntErr = b.mounter.Unmount(dir); mntErr != nil {
 				glog.Errorf("Failed to unmount: %v", mntErr)
 				return err
 			}
-			mountpoint, mntErr := b.mounter.IsMountPoint(dir)
+			notMnt, mntErr := b.mounter.IsLikelyNotMountPoint(dir)
 			if mntErr != nil {
-				glog.Errorf("IsMountpoint check failed: %v", mntErr)
+				glog.Errorf("IsLikelyNotMountPoint check failed: %v", mntErr)
 				return err
 			}
-			if mountpoint {
+			if !notMnt {
 				// This is very odd, we don't expect it.  We'll try again next sync loop.
 				glog.Errorf("%s is still mounted, despite call to unmount().  Will try again next sync loop.", dir)
 				return err
@@ -208,12 +208,12 @@ func (c *nfsCleaner) TearDown() error {
 }
 
 func (c *nfsCleaner) TearDownAt(dir string) error {
-	mountpoint, err := c.mounter.IsMountPoint(dir)
+	notMnt, err := c.mounter.IsLikelyNotMountPoint(dir)
 	if err != nil {
-		glog.Errorf("Error checking IsMountPoint: %v", err)
+		glog.Errorf("Error checking IsLikelyNotMountPoint: %v", err)
 		return err
 	}
-	if !mountpoint {
+	if notMnt {
 		return os.Remove(dir)
 	}
 
@@ -221,12 +221,12 @@ func (c *nfsCleaner) TearDownAt(dir string) error {
 		glog.Errorf("Unmounting failed: %v", err)
 		return err
 	}
-	mountpoint, mntErr := c.mounter.IsMountPoint(dir)
+	notMnt, mntErr := c.mounter.IsLikelyNotMountPoint(dir)
 	if mntErr != nil {
-		glog.Errorf("IsMountpoint check failed: %v", mntErr)
+		glog.Errorf("IsLikelyNotMountPoint check failed: %v", mntErr)
 		return mntErr
 	}
-	if !mountpoint {
+	if notMnt {
 		if err := os.Remove(dir); err != nil {
 			return err
 		}

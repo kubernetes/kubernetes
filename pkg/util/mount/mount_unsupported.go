@@ -32,6 +32,6 @@ func (mounter *Mounter) List() ([]MountPoint, error) {
 	return []MountPoint{}, nil
 }
 
-func (mounter *Mounter) IsMountPoint(file string) (bool, error) {
-	return false, nil
+func (mounter *Mounter) IsLikelyNotMountPoint(file string) (bool, error) {
+	return true, nil
 }
