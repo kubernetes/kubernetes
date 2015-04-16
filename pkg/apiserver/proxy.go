@@ -195,7 +195,11 @@ func (r *ProxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	// This is essentially a hack for https://github.com/GoogleCloudPlatform/kubernetes/issues/4958.
 	// Note: Keep this code after tryUpgrade to not break that flow.
 	if len(parts) == 2 && !strings.HasSuffix(req.URL.Path, "/") {
-		w.Header().Set("Location", req.URL.Path+"/")
+		var queryPart string
+		if len(req.URL.RawQuery) > 0 {
+			queryPart = "?" + req.URL.RawQuery
+		}
+		w.Header().Set("Location", req.URL.Path+"/"+queryPart)
 		w.WriteHeader(http.StatusMovedPermanently)
 		return
 	}

@@ -374,19 +374,24 @@ func TestRedirectOnMissingTrailingSlash(t *testing.T) {
 		path string
 		// The path requested on the proxy server.
 		proxyServerPath string
+		// query string
+		query string
 	}{
-		{"/trailing/slash/", "/trailing/slash/"},
-		{"/", "/"},
+		{"/trailing/slash/", "/trailing/slash/", ""},
+		{"/", "/", "test1=value1&test2=value2"},
 		// "/" should be added at the end.
-		{"", "/"},
+		{"", "/", "test1=value1&test2=value2"},
 		// "/" should not be added at a non-root path.
-		{"/some/path", "/some/path"},
+		{"/some/path", "/some/path", ""},
 	}
 
 	for _, item := range table {
 		proxyServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 			if req.URL.Path != item.proxyServerPath {
 				t.Errorf("Unexpected request on path: %s, expected path: %s, item: %v", req.URL.Path, item.proxyServerPath, item)
+			}
+			if req.URL.RawQuery != item.query {
+				t.Errorf("Unexpected query on url: %s, expected: %s", req.URL.RawQuery, item.query)
 			}
 		}))
 		defer proxyServer.Close()
@@ -405,7 +410,7 @@ func TestRedirectOnMissingTrailingSlash(t *testing.T) {
 		proxyTestPattern := "/api/version2/proxy/namespaces/ns/foo/id" + item.path
 		req, err := http.NewRequest(
 			"GET",
-			server.URL+proxyTestPattern,
+			server.URL+proxyTestPattern+"?"+item.query,
 			strings.NewReader(""),
 		)
 		if err != nil {
