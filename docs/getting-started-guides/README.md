@@ -18,7 +18,7 @@ Bare-metal     | Ansible      | Fedora | flannel     | [docs](../../docs/getting
 AWS            | CoreOS       | CoreOS | flannel     | [docs](../../docs/getting-started-guides/coreos.md)    | Community                    | Uses K8s version 0.11.0
 GCE            | CoreOS       | CoreOS | flannel     | [docs](../../docs/getting-started-guides/coreos.md)    | Community (@kelseyhightower) | Uses K8s version 0.11.0
 Vagrant        | CoreOS       | CoreOS | flannel     | [docs](../../docs/getting-started-guides/coreos.md)    | Community (@pires)           | Uses K8s version 0.11.0
-CloudStack     | Ansible      | CoreOS | flannel     | [docs](../../docs/getting-started-guides/cloudstack.md)| Community (@sebgoa)          | Uses K8s version 0.9.1
+CloudStack     | Ansible      | CoreOS | flannel     | [docs](../../docs/getting-started-guides/cloudstack.md)| Community (@runseb)          | Uses K8s version 0.9.1
 Vmware         |              | Debian | OVS         | [docs](../../docs/getting-started-guides/vsphere.md)   | Community (@pietern)         | Uses K8s version 0.9.1
 AWS            | Saltstack    | Ubuntu | OVS         | [docs](../../docs/getting-started-guides/aws.md)       | Community (@justinsb)        | Uses K8s version 0.5.0
 Vmware         | CoreOS       | CoreOS | flannel     | [docs](../../docs/getting-started-guides/coreos.md)    | Community (@kelseyhightower) |
@@ -28,8 +28,8 @@ Bare-metal     | custom       | Ubuntu Cluster | flannel | [docs](../../docs/get
 Docker Single Node        | custom       | N/A    | local       | [docs](docker.md) | Project (@brendandburns) | Tested @ 0.14.1 |
 Docker Multi Node        | Flannel| N/A    | local       | [docs](docker-multinode.md) | Project (@brendandburns) | Tested @ 0.14.1 |
 Local          |              |        | _none_      | [docs](../../docs/getting-started-guides/locally.md)   | Community (@preillyme)                     |
-Ovirt          |              |        |             | [docs](../../docs/getting-started-guides/ovirt.md)     | Inactive                     |
-Rackspace      | CoreOS       | CoreOS | Rackspace   | [docs](../../docs/getting-started-guides/rackspace.md) | Inactive                     |
+Ovirt          |              |        |             | [docs](../../docs/getting-started-guides/ovirt.md)     | Inactive (@simon3z)          |
+Rackspace      | CoreOS       | CoreOS | Rackspace   | [docs](../../docs/getting-started-guides/rackspace.md) | Inactive (@doubleerr)        |
 Bare-metal     | custom       | CentOS | _none_      | [docs](../../docs/getting-started-guides/centos/centos_manual_config.md) | Community(@coolsvap)    | Uses K8s v0.9.1
 libvirt/KVM    | CoreOS       | CoreOS | libvirt/KVM | [docs](../../docs/getting-started-guides/libvirt-coreos.md) | Community (@lhuard1A)   |
 AWS            | Juju         | Ubuntu | flannel     | [docs](../../docs/getting-started-guides/juju.md)      | [Community](https://github.com/whitmo/bundle-kubernetes) ( [@whit](https://github.com/whitmo), [@matt](https://github.com/mbruzek), [@chuck](https://github.com/chuckbutler) ) | [Tested](http://reports.vapour.ws/charm-tests-by-charm/kubernetes) K8s v0.8.1
