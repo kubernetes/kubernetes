@@ -431,6 +431,7 @@ func (m *Master) init(c *Config) {
 
 	apiserver.InstallSupport(m.muxHelper, m.rootWebService)
 	apiserver.AddApiWebService(m.handlerContainer, c.APIPrefix, apiVersions)
+	apiserver.InstallServiceErrorHandler(m.handlerContainer)
 
 	// Register root handler.
 	// We do not register this using restful Webservice since we do not want to surface this in api docs.

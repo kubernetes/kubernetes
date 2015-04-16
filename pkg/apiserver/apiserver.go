@@ -30,6 +30,8 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/admission"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	apierrors "github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/rest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/healthz"
@@ -168,6 +170,15 @@ func InstallLogsSupport(mux Mux) {
 	mux.Handle("/logs/", http.StripPrefix("/logs/", http.FileServer(http.Dir("/var/log/"))))
 }
 
+func InstallServiceErrorHandler(container *restful.Container) {
+	container.ServiceErrorHandler(serviceErrorHandler)
+}
+
+func serviceErrorHandler(serviceErr restful.ServiceError, response *restful.Response) {
+	// TODO: Update go-restful to return the request as well, so that we can use the appropriate codec rather than using the latest one.
+	errorJSON(apierrors.NewGenericServerResponse(serviceErr.Code, "", "", "", "", 0, false), latest.Codec, response.ResponseWriter)
+}
+
 // Adds a service to return the supported api versions.
 func AddApiWebService(container *restful.Container, apiPrefix string, versions []string) {
 	// TODO: InstallREST should register each version automatically
@@ -246,6 +257,7 @@ func writeJSON(statusCode int, codec runtime.Codec, object runtime.Object, w htt
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
+	glog.Infof("Writting status code: %d", statusCode)
 	w.WriteHeader(statusCode)
 	w.Write(formatted.Bytes())
 }
