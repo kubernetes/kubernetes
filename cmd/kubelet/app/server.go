@@ -317,20 +317,6 @@ func (s *KubeletServer) Run(_ []string) error {
 
 }
 
-func (s *KubeletServer) setupRunOnce() {
-	if s.RunOnce {
-		// Don't use apiserver source, on the presumption that this flag is used
-		// for bootstrapping some system pods.
-		if len(s.APIServerList) > 0 {
-			glog.Fatalf("invalid option: --runonce and --api_servers are mutually exclusive")
-		}
-		if s.EnableServer {
-			glog.Infof("--runonce is set, disabling server")
-			s.EnableServer = false
-		}
-	}
-}
-
 // TODO: replace this with clientcmd
 func (s *KubeletServer) createAPIServerClient() (*client.Client, error) {
 	authInfo, err := clientauth.LoadFromFile(s.AuthPath)
