@@ -88,8 +88,9 @@ $ ./bin/km scheduler \
   --v=2 >scheduler.log 2>&1 &
 ```
 
-Kubernetes-mesos will start up kubelets automatically, but currently the service
-proxy needs to be started manually. Start the service proxy on each Mesos slave:
+Also on the master node, we'll start up a proxy instance to act as a
+public-facing service router, for testing the web interface a little
+later on.
 
 ```bash
 $ sudo ./bin/km proxy \
