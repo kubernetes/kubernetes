@@ -231,6 +231,36 @@ var _ = Describe("Specs", func() {
 		})
 	})
 
+	Describe("With a focused spec within a pending context and a pending spec within a focused context", func() {
+		BeforeEach(func() {
+			pendingInFocused := New(
+				leafnodes.NewItNode("PendingInFocused", func() {}, pendingFlag, codelocation.New(0), 0, nil, 0),
+				[]*containernode.ContainerNode{
+					containernode.New("", focusedFlag, codelocation.New(0)),
+				}, false)
+
+			focusedInPending := New(
+				leafnodes.NewItNode("FocusedInPending", func() {}, focusedFlag, codelocation.New(0), 0, nil, 0),
+				[]*containernode.ContainerNode{
+					containernode.New("", pendingFlag, codelocation.New(0)),
+				}, false)
+
+			specs = NewSpecs([]*Spec{
+				newSpec("A", noneFlag),
+				newSpec("B", noneFlag),
+				pendingInFocused,
+				focusedInPending,
+			})
+			specs.ApplyFocus("", "", "")
+		})
+
+		It("should not have a programmatic focus and should run all tests", func() {
+			Ω(willRunTexts(specs)).Should(Equal([]string{"A", "B"}))
+			Ω(skippedTexts(specs)).Should(BeEmpty())
+			Ω(pendingTexts(specs)).Should(ConsistOf(ContainSubstring("PendingInFocused"), ContainSubstring("FocusedInPending")))
+		})
+	})
+
 	Describe("skipping measurements", func() {
 		BeforeEach(func() {
 			specs = NewSpecs([]*Spec{

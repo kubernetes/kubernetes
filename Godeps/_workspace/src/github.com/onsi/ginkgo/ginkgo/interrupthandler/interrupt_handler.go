@@ -4,6 +4,7 @@ import (
 	"os"
 	"os/signal"
 	"sync"
+	"syscall"
 )
 
 type InterruptHandler struct {
@@ -33,7 +34,7 @@ func (h *InterruptHandler) WasInterrupted() bool {
 
 func (h *InterruptHandler) handleInterrupt() {
 	c := make(chan os.Signal, 1)
-	signal.Notify(c, os.Interrupt)
+	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
 
 	<-c
 	signal.Stop(c)
