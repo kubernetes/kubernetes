@@ -256,6 +256,13 @@ git fetch upstream
 git rebase upstream/master
 ```
 
+If you have write access to the main repository, you should modify your git configuration so that
+you can't accidentally push to upstream:
+
+```
+git remote set-url --push upstream no_push
+```
+
 ## Regenerating the CLI documentation
 
 ```
