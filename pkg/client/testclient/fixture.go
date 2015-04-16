@@ -38,6 +38,8 @@ type ObjectRetriever interface {
 	Kind(kind, name string) (runtime.Object, error)
 	// Add adds a runtime object for test purposes into this object.
 	Add(runtime.Object) error
+	// Delete removes a runtime object from this object.
+	Delete(runtime.Object) error
 }
 
 // ObjectReaction returns a ReactionFunc that takes a generic action string of the form
@@ -214,5 +216,48 @@ func (o objects) Add(obj runtime.Object) error {
 		o.types[kind] = append(o.types[kind], obj)
 	}
 
+	return nil
+}
+
+func (o objects) Delete(obj runtime.Object) error {
+	_, kind, err := o.typer.ObjectVersionAndKind(obj)
+	if err != nil {
+		return err
+	}
+
+	switch {
+	case runtime.IsListType(obj):
+		if kind != "List" {
+			o.delete(kind, obj)
+		}
+
+		list, err := runtime.ExtractList(obj)
+		if err != nil {
+			return err
+		}
+		for _, obj := range list {
+			if err := o.delete(kind, obj); err != nil {
+				return err
+			}
+		}
+	default:
+		if status, ok := obj.(*api.Status); ok && status.Details != nil {
+			kind = status.Details.Kind
+		}
+		o.delete(kind, obj)
+	}
+
+	return nil
+}
+
+func (o objects) delete(kind string, obj runtime.Object) error {
+	newArray := []runtime.Object{}
+	for i, elem := range o.types[kind] {
+		if reflect.DeepEqual(elem, obj) {
+			newArray = append(o.types[kind][:0], o.types[kind][(i+1):]...)
+			o.types[kind] = newArray
+			return nil
+		}
+	}
 	return nil
 }

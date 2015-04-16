@@ -72,3 +72,30 @@ func TestErrors(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
+
+func TestDeleteFromClient(t *testing.T) {
+	podA := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "ns"}}
+	podB := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "bar", Namespace: "ns"}}
+
+	o := NewObjects(api.Scheme)
+	o.Add(podA)
+	o.Add(podB)
+
+	client := &Fake{ReactFn: ObjectReaction(o, latest.RESTMapper)}
+	pod, err := client.Pods(api.NamespaceAll).Get("any")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if pod.Name != podA.Name {
+		t.Errorf("Expected %+v\n\n but got %+v\n", podA, pod)
+	}
+
+	o.Delete(podA)
+	pod, err = client.Pods(api.NamespaceAll).Get("any")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if pod.Name != podB.Name {
+		t.Errorf("Expected %+v\n\n but got %+v\n", podB, pod)
+	}
+}
