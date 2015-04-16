@@ -21,8 +21,6 @@ package integration
 import (
 	"fmt"
 	"log"
-	"net/http"
-	"net/http/httptest"
 	"reflect"
 	"runtime"
 	"sync"
@@ -31,47 +29,19 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/master"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/version"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
-	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/admission/admit"
 )
 
 func init() {
 	requireEtcd()
 }
 
-func RunAMaster(t *testing.T) (*master.Master, *httptest.Server) {
-	helper, err := master.NewEtcdHelper(newEtcdClient(), testapi.Version())
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	var m *master.Master
-	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		m.Handler.ServeHTTP(w, req)
-	}))
-
-	m = master.New(&master.Config{
-		EtcdHelper:        helper,
-		KubeletClient:     client.FakeKubeletClient{},
-		EnableLogsSupport: false,
-		EnableProfiling:   true,
-		EnableUISupport:   false,
-		APIPrefix:         "/api",
-		Authorizer:        apiserver.NewAlwaysAllowAuthorizer(),
-		AdmissionControl:  admit.NewAlwaysAdmit(),
-	})
-
-	return m, s
-}
-
 func TestClient(t *testing.T) {
-	_, s := RunAMaster(t)
+	_, s := runAMaster(t)
 	defer s.Close()
 
 	ns := api.NamespaceDefault
@@ -149,7 +119,7 @@ func TestMultiWatch(t *testing.T) {
 
 	deleteAllEtcdKeys()
 	defer deleteAllEtcdKeys()
-	_, s := RunAMaster(t)
+	_, s := runAMaster(t)
 	defer s.Close()
 
 	ns := api.NamespaceDefault
