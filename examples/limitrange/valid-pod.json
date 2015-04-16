@@ -13,7 +13,7 @@
         "name": "kubernetes-serve-hostname",
         "image": "gcr.io/google_containers/serve_hostname",
         "cpu": 1000,
-        "memory": 1048576
+        "memory": 5242880
       }]
     }
   }
