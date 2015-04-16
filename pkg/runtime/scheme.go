@@ -18,9 +18,10 @@ package runtime
 
 import (
 	"fmt"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/conversion"
 	"net/url"
 	"reflect"
+
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/conversion"
 )
 
 // Scheme defines methods for serializing and deserializing API objects. It
@@ -147,8 +148,9 @@ func (self *Scheme) rawExtensionToEmbeddedObject(in *RawExtension, out *Embedded
 }
 
 // runtimeObjectToRawExtensionArray takes a list of objects and encodes them as RawExtension in the output version
-// defined by the conversion.Scope. If objects must be encoded to different schema versions you should set them as
-// runtime.Unknown in the internal version instead.
+// defined by the conversion.Scope. If objects must be encoded to different schema versions than the default, you
+// should encode them yourself with runtime.Unknown, or convert the object prior to invoking conversion. Objects
+// outside of the current scheme must be added as runtime.Unknown.
 func (self *Scheme) runtimeObjectToRawExtensionArray(in *[]Object, out *[]RawExtension, s conversion.Scope) error {
 	src := *in
 	dest := make([]RawExtension, len(src))
@@ -160,7 +162,12 @@ func (self *Scheme) runtimeObjectToRawExtensionArray(in *[]Object, out *[]RawExt
 		case *Unknown:
 			dest[i].RawJSON = t.RawJSON
 		default:
-			data, err := scheme.EncodeToVersion(src[i], outVersion)
+			version := outVersion
+			// if the object exists
+			if inVersion, _, err := scheme.ObjectVersionAndKind(src[i]); err == nil && len(inVersion) != 0 {
+				version = inVersion
+			}
+			data, err := scheme.EncodeToVersion(src[i], version)
 			if err != nil {
 				return err
 			}

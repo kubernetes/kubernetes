@@ -20,8 +20,6 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl"
 	cmdutil "github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/cmd/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/resource"
@@ -162,28 +160,20 @@ func RunGet(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string
 		}
 		defaultVersion := clientConfig.Version
 
-		// the outermost object will be converted to the output-version
-		version := cmdutil.OutputVersion(cmd, defaultVersion)
-
+		singular := false
 		r := b.Flatten().Do()
-		obj, err := r.Object()
+		infos, err := r.IntoSingular(&singular).Infos()
 		if err != nil {
 			return err
 		}
 
-		// try conversion to all the possible versions
-		// TODO: simplify by adding a ResourceBuilder mode
-		versions := []string{version, latest.Version}
-		infos, _ := r.Infos()
-		for _, info := range infos {
-			versions = append(versions, info.Mapping.APIVersion)
+		// the outermost object will be converted to the output-version, but inner
+		// objects can use their mappings
+		version := cmdutil.OutputVersion(cmd, defaultVersion)
+		obj, err := resource.AsVersionedObject(infos, !singular, version)
+		if err != nil {
+			return err
 		}
-
-		// TODO: add a new ResourceBuilder mode for Object() that attempts to ensure the objects
-		// are in the appropriate version if one exists (and if not, use the best effort).
-		// TODO: ensure api-version is set with the default preferred api version by the client
-		// builder on initialization
-		printer := kubectl.NewVersionedPrinter(printer, api.Scheme, versions...)
 
 		return printer.PrintObj(obj, out)
 	}

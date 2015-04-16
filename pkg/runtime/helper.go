@@ -149,3 +149,25 @@ func FieldPtr(v reflect.Value, fieldName string, dest interface{}) error {
 	}
 	return fmt.Errorf("couldn't assign/convert %v to %v", field.Type(), v.Type())
 }
+
+// MultiObjectTyper returns the types of objects across multiple schemes in order.
+type MultiObjectTyper []ObjectTyper
+
+func (m MultiObjectTyper) DataVersionAndKind(data []byte) (version, kind string, err error) {
+	for _, t := range m {
+		version, kind, err = t.DataVersionAndKind(data)
+		if err == nil {
+			return
+		}
+	}
+	return
+}
+func (m MultiObjectTyper) ObjectVersionAndKind(obj Object) (version, kind string, err error) {
+	for _, t := range m {
+		version, kind, err = t.ObjectVersionAndKind(obj)
+		if err == nil {
+			return
+		}
+	}
+	return
+}

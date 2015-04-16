@@ -162,6 +162,7 @@ for version in "${kube_api_versions[@]}"; do
   # Command
   kubectl create "${kube_flags[@]}" -f examples/limitrange/valid-pod.json
   # Post-condition: valid-pod POD is running
+  kubectl get "${kube_flags[@]}" pods -o json
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" 'valid-pod:'
   kube::test::get_object_assert 'pod valid-pod' "{{$id_field}}" 'valid-pod'
   kube::test::get_object_assert 'pod/valid-pod' "{{$id_field}}" 'valid-pod'
