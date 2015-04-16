@@ -139,7 +139,7 @@ func runControllerManager(machineList []string, cl *client.Client, nodeMilliCPU,
 	}
 
 	endpoints := service.NewEndpointController(cl)
-	go util.Forever(func() { endpoints.SyncServiceEndpoints() }, time.Second*10)
+	go endpoints.Run(5, util.NeverStop)
 
 	controllerManager := controller.NewReplicationManager(cl)
 	controllerManager.Run(controller.DefaultSyncPeriod)

@@ -50,6 +50,7 @@ type CMServer struct {
 	ClientConfig            client.Config
 	CloudProvider           string
 	CloudConfigFile         string
+	ConcurrentEndpointSyncs int
 	MinionRegexp            string
 	NodeSyncPeriod          time.Duration
 	ResourceQuotaSyncPeriod time.Duration
@@ -79,6 +80,7 @@ func NewCMServer() *CMServer {
 	s := CMServer{
 		Port:                    ports.ControllerManagerPort,
 		Address:                 util.IP(net.ParseIP("127.0.0.1")),
+		ConcurrentEndpointSyncs: 5,
 		NodeSyncPeriod:          10 * time.Second,
 		ResourceQuotaSyncPeriod: 10 * time.Second,
 		NamespaceSyncPeriod:     5 * time.Minute,
@@ -101,6 +103,7 @@ func (s *CMServer) AddFlags(fs *pflag.FlagSet) {
 	client.BindClientConfigFlags(fs, &s.ClientConfig)
 	fs.StringVar(&s.CloudProvider, "cloud_provider", s.CloudProvider, "The provider for cloud services.  Empty string for no provider.")
 	fs.StringVar(&s.CloudConfigFile, "cloud_config", s.CloudConfigFile, "The path to the cloud provider configuration file.  Empty string for no configuration file.")
+	fs.IntVar(&s.ConcurrentEndpointSyncs, "concurrent_endpoint_syncs", s.ConcurrentEndpointSyncs, "The number of endpoint syncing operations that will be done concurrently. Larger number = faster endpoint updating, but more CPU (and network) load")
 	fs.StringVar(&s.MinionRegexp, "minion_regexp", s.MinionRegexp, "If non empty, and --cloud_provider is specified, a regular expression for matching minion VMs.")
 	fs.DurationVar(&s.NodeSyncPeriod, "node_sync_period", s.NodeSyncPeriod, ""+
 		"The period for syncing nodes from cloudprovider. Longer periods will result in "+
@@ -171,7 +174,7 @@ func (s *CMServer) Run(_ []string) error {
 	}()
 
 	endpoints := service.NewEndpointController(kubeClient)
-	go util.Forever(func() { endpoints.SyncServiceEndpoints() }, time.Second*10)
+	go endpoints.Run(s.ConcurrentEndpointSyncs, util.NeverStop)
 
 	controllerManager := replicationControllerPkg.NewReplicationManager(kubeClient)
 	controllerManager.Run(replicationControllerPkg.DefaultSyncPeriod)
