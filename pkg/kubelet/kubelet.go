@@ -265,6 +265,7 @@ func NewMainKubelet(
 	}
 	statusManager := newStatusManager(kubeClient)
 	containerManager := dockertools.NewDockerManager(dockerClient, recorder, podInfraContainerImage, pullQPS, pullBurst)
+	volumeManager := newVolumeManager()
 
 	klet := &Kubelet{
 		hostname:                       hostname,
@@ -288,6 +289,7 @@ func NewMainKubelet(
 		containerGC:                    containerGC,
 		imageManager:                   imageManager,
 		statusManager:                  statusManager,
+		volumeManager:                  volumeManager,
 		cloud:                          cloud,
 		nodeRef:                        nodeRef,
 		containerManager:               containerManager,
@@ -415,6 +417,9 @@ type Kubelet struct {
 
 	// Syncs pods statuses with apiserver; also used as a cache of statuses.
 	statusManager *statusManager
+
+	// Manager for the volume maps for the pods.
+	volumeManager *volumeManager
 
 	//Cloud provider interface
 	cloud cloudprovider.Interface
@@ -661,11 +666,11 @@ func (kl *Kubelet) syncNodeStatus() {
 	}
 }
 
-func makeBinds(container *api.Container, podVolumes volumeMap) []string {
-	binds := []string{}
+func makeBinds(container *api.Container, podVolumes volumeMap) (binds []string) {
 	for _, mount := range container.VolumeMounts {
 		vol, ok := podVolumes[mount.Name]
 		if !ok {
+			glog.Warningf("Mount cannot be satisified for container %q, because the volume is missing: %q", container.Name, mount)
 			continue
 		}
 		b := fmt.Sprintf("%s:%s", vol.GetPath(), mount.MountPath)
@@ -674,19 +679,23 @@ func makeBinds(container *api.Container, podVolumes volumeMap) []string {
 		}
 		binds = append(binds, b)
 	}
-	return binds
+	return
 }
 
 // generateRunContainerOptions generates the RunContainerOptions, which can be used by
 // the container runtime to set parameters for launching a container.
-func (kl *Kubelet) generateRunContainerOptions(pod *api.Pod, container *api.Container, podVolumes volumeMap, netMode, ipcMode string) (*kubecontainer.RunContainerOptions, error) {
+func (kl *Kubelet) generateRunContainerOptions(pod *api.Pod, container *api.Container, netMode, ipcMode string) (*kubecontainer.RunContainerOptions, error) {
 	var err error
 	opts := &kubecontainer.RunContainerOptions{
 		NetMode: netMode,
 		IpcMode: ipcMode,
 	}
 
-	opts.Binds = makeBinds(container, podVolumes)
+	vol, ok := kl.volumeManager.GetVolumes(pod.UID)
+	if !ok {
+		return nil, fmt.Errorf("impossible: cannot find the mounted volumes for pod %q", kubecontainer.GetPodFullName(pod))
+	}
+	opts.Binds = makeBinds(container, vol)
 	opts.Envs, err = kl.makeEnvironmentVariables(pod.Namespace, container)
 	if err != nil {
 		return nil, err
@@ -710,13 +719,13 @@ func (kl *Kubelet) generateRunContainerOptions(pod *api.Pod, container *api.Cont
 }
 
 // Run a single container from a pod. Returns the docker container ID
-func (kl *Kubelet) runContainer(pod *api.Pod, container *api.Container, podVolumes volumeMap, netMode, ipcMode string) (dockertools.DockerID, error) {
+func (kl *Kubelet) runContainer(pod *api.Pod, container *api.Container, netMode, ipcMode string) (dockertools.DockerID, error) {
 	ref, err := kubecontainer.GenerateContainerRef(pod, container)
 	if err != nil {
 		glog.Errorf("Couldn't make a ref to pod %v, container %v: '%v'", pod.Name, container.Name, err)
 	}
 
-	opts, err := kl.generateRunContainerOptions(pod, container, podVolumes, netMode, ipcMode)
+	opts, err := kl.generateRunContainerOptions(pod, container, netMode, ipcMode)
 	if err != nil {
 		return "", err
 	}
@@ -953,7 +962,7 @@ func (kl *Kubelet) createPodInfraContainer(pod *api.Pod) (dockertools.DockerID, 
 		kl.recorder.Eventf(ref, "pulled", "Successfully pulled image %q", container.Image)
 	}
 
-	id, err := kl.runContainer(pod, container, nil, netNamespace, "")
+	id, err := kl.runContainer(pod, container, netNamespace, "")
 	if err != nil {
 		return "", err
 	}
@@ -1084,8 +1093,7 @@ func shouldContainerBeRestarted(container *api.Container, pod *api.Pod, podStatu
 
 // Attempts to start a container pulling the image before that if necessary. It returns DockerID of a started container
 // if it was successful, and a non-nil error otherwise.
-func (kl *Kubelet) pullImageAndRunContainer(pod *api.Pod, container *api.Container, podVolumes *volumeMap,
-	podInfraContainerID dockertools.DockerID) (dockertools.DockerID, error) {
+func (kl *Kubelet) pullImageAndRunContainer(pod *api.Pod, container *api.Container, podInfraContainerID dockertools.DockerID) (dockertools.DockerID, error) {
 	podFullName := kubecontainer.GetPodFullName(pod)
 	ref, err := kubecontainer.GenerateContainerRef(pod, container)
 	if err != nil {
@@ -1109,7 +1117,7 @@ func (kl *Kubelet) pullImageAndRunContainer(pod *api.Pod, container *api.Contain
 	}
 	// TODO(dawnchen): Check RestartPolicy.DelaySeconds before restart a container
 	namespaceMode := fmt.Sprintf("container:%v", podInfraContainerID)
-	containerID, err := kl.runContainer(pod, container, *podVolumes, namespaceMode, namespaceMode)
+	containerID, err := kl.runContainer(pod, container, namespaceMode, namespaceMode)
 	if err != nil {
 		// TODO(bburns) : Perhaps blacklist a container after N failures?
 		glog.Errorf("Error running pod %q container %q: %v", podFullName, container.Name, err)
@@ -1330,15 +1338,26 @@ func (kl *Kubelet) syncPod(pod *api.Pod, mirrorPod *api.Pod, runningPod kubecont
 		}
 	}
 
-	// Starting phase: if we should create infra container then we do it first
-	var ref *api.ObjectReference
-	var podVolumes volumeMap
+	// Starting phase:
+	ref, err := api.GetReference(pod)
+	if err != nil {
+		glog.Errorf("Couldn't make a ref to pod %q: '%v'", podFullName, err)
+	}
+
+	// Mount volumes.
+	podVolumes, err := kl.mountExternalVolumes(pod)
+	if err != nil {
+		if ref != nil {
+			kl.recorder.Eventf(ref, "failedMount", "Unable to mount volumes for pod %q: %v", podFullName, err)
+		}
+		glog.Errorf("Unable to mount volumes for pod %q: %v; skipping pod", podFullName, err)
+		return err
+	}
+	kl.volumeManager.SetVolumes(pod.UID, podVolumes)
+
+	// If we should create infra container then we do it first.
 	podInfraContainerID := containerChanges.infraContainerId
 	if containerChanges.startInfraContainer && (len(containerChanges.containersToStart) > 0) {
-		ref, err = api.GetReference(pod)
-		if err != nil {
-			glog.Errorf("Couldn't make a ref to pod %q: '%v'", podFullName, err)
-		}
 		glog.V(4).Infof("Creating pod infra container for %q", podFullName)
 		podInfraContainerID, err = kl.createPodInfraContainer(pod)
 
@@ -1352,21 +1371,10 @@ func (kl *Kubelet) syncPod(pod *api.Pod, mirrorPod *api.Pod, runningPod kubecont
 		}
 	}
 
-	// Mount volumes
-	podVolumes, err = kl.mountExternalVolumes(pod)
-	if err != nil {
-		if ref != nil {
-			kl.recorder.Eventf(ref, "failedMount",
-				"Unable to mount volumes for pod %q: %v", podFullName, err)
-		}
-		glog.Errorf("Unable to mount volumes for pod %q: %v; skipping pod", podFullName, err)
-		return err
-	}
-
 	// Start everything
 	for container := range containerChanges.containersToStart {
 		glog.V(4).Infof("Creating container %+v", pod.Spec.Containers[container])
-		kl.pullImageAndRunContainer(pod, &pod.Spec.Containers[container], &podVolumes, podInfraContainerID)
+		kl.pullImageAndRunContainer(pod, &pod.Spec.Containers[container], podInfraContainerID)
 	}
 
 	if isStaticPod(pod) {
@@ -1452,6 +1460,8 @@ func (kl *Kubelet) cleanupOrphanedVolumes(pods []*api.Pod, running []*docker.Con
 			//TODO (jonesdl) We should somehow differentiate between volumes that are supposed
 			//to be deleted and volumes that are leftover after a crash.
 			glog.Warningf("Orphaned volume %q found, tearing down volume", name)
+			// TODO(yifan): Refactor this hacky string manipulation.
+			kl.volumeManager.DeleteVolumes(types.UID(parts[0]))
 			//TODO (jonesdl) This should not block other kubelet synchronization procedures
 			err := vol.TearDown()
 			if err != nil {
