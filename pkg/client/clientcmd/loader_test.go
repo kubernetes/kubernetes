@@ -22,6 +22,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -209,8 +210,7 @@ func TestResolveRelativePaths(t *testing.T) {
 	WriteToFile(pathResolutionConfig2, configFile2)
 
 	loadingRules := ClientConfigLoadingRules{
-		ExplicitPath: configFile1,
-		Precedence:   []string{configFile2},
+		Precedence: []string{configFile1, configFile2},
 	}
 
 	mergedConfig, err := loadingRules.Load()
@@ -274,7 +274,86 @@ func TestResolveRelativePaths(t *testing.T) {
 
 }
 
-func ExampleMergingSomeWithConflict() {
+func TestMigratingFile(t *testing.T) {
+	sourceFile, _ := ioutil.TempFile("", "")
+	defer os.Remove(sourceFile.Name())
+	destinationFile, _ := ioutil.TempFile("", "")
+	// delete the file so that we'll write to it
+	os.Remove(destinationFile.Name())
+
+	WriteToFile(testConfigAlfa, sourceFile.Name())
+
+	loadingRules := ClientConfigLoadingRules{
+		MigrationRules: map[string]string{destinationFile.Name(): sourceFile.Name()},
+	}
+
+	if _, err := loadingRules.Load(); err != nil {
+		t.Errorf("unexpected error %v", err)
+	}
+
+	// the load should have recreated this file
+	defer os.Remove(destinationFile.Name())
+
+	sourceContent, err := ioutil.ReadFile(sourceFile.Name())
+	if err != nil {
+		t.Errorf("unexpected error %v", err)
+	}
+	destinationContent, err := ioutil.ReadFile(destinationFile.Name())
+	if err != nil {
+		t.Errorf("unexpected error %v", err)
+	}
+
+	if !reflect.DeepEqual(sourceContent, destinationContent) {
+		t.Errorf("source and destination do not match")
+	}
+}
+
+func TestMigratingFileLeaveExistingFileAlone(t *testing.T) {
+	sourceFile, _ := ioutil.TempFile("", "")
+	defer os.Remove(sourceFile.Name())
+	destinationFile, _ := ioutil.TempFile("", "")
+	defer os.Remove(destinationFile.Name())
+
+	WriteToFile(testConfigAlfa, sourceFile.Name())
+
+	loadingRules := ClientConfigLoadingRules{
+		MigrationRules: map[string]string{destinationFile.Name(): sourceFile.Name()},
+	}
+
+	if _, err := loadingRules.Load(); err != nil {
+		t.Errorf("unexpected error %v", err)
+	}
+
+	destinationContent, err := ioutil.ReadFile(destinationFile.Name())
+	if err != nil {
+		t.Errorf("unexpected error %v", err)
+	}
+
+	if len(destinationContent) > 0 {
+		t.Errorf("destination should not have been touched")
+	}
+}
+
+func TestMigratingFileSourceMissingSkip(t *testing.T) {
+	sourceFilename := "some-missing-file"
+	destinationFile, _ := ioutil.TempFile("", "")
+	// delete the file so that we'll write to it
+	os.Remove(destinationFile.Name())
+
+	loadingRules := ClientConfigLoadingRules{
+		MigrationRules: map[string]string{destinationFile.Name(): sourceFilename},
+	}
+
+	if _, err := loadingRules.Load(); err != nil {
+		t.Errorf("unexpected error %v", err)
+	}
+
+	if _, err := os.Stat(destinationFile.Name()); !os.IsNotExist(err) {
+		t.Errorf("destination should not exist")
+	}
+}
+
+func ExampleNoMergingOnExplicitPaths() {
 	commandLineFile, _ := ioutil.TempFile("", "")
 	defer os.Remove(commandLineFile.Name())
 	envVarFile, _ := ioutil.TempFile("", "")
@@ -286,6 +365,52 @@ func ExampleMergingSomeWithConflict() {
 	loadingRules := ClientConfigLoadingRules{
 		ExplicitPath: commandLineFile.Name(),
 		Precedence:   []string{envVarFile.Name()},
+	}
+
+	mergedConfig, err := loadingRules.Load()
+
+	json, err := clientcmdlatest.Codec.Encode(mergedConfig)
+	if err != nil {
+		fmt.Printf("Unexpected error: %v", err)
+	}
+	output, err := yaml.JSONToYAML(json)
+	if err != nil {
+		fmt.Printf("Unexpected error: %v", err)
+	}
+
+	fmt.Printf("%v", string(output))
+	// Output:
+	// apiVersion: v1
+	// clusters:
+	// - cluster:
+	//     server: http://cow.org:8080
+	//   name: cow-cluster
+	// contexts:
+	// - context:
+	//     cluster: cow-cluster
+	//     namespace: hammer-ns
+	//     user: red-user
+	//   name: federal-context
+	// current-context: ""
+	// kind: Config
+	// preferences: {}
+	// users:
+	// - name: red-user
+	//   user:
+	//     token: red-token
+}
+
+func ExampleMergingSomeWithConflict() {
+	commandLineFile, _ := ioutil.TempFile("", "")
+	defer os.Remove(commandLineFile.Name())
+	envVarFile, _ := ioutil.TempFile("", "")
+	defer os.Remove(envVarFile.Name())
+
+	WriteToFile(testConfigAlfa, commandLineFile.Name())
+	WriteToFile(testConfigConflictAlfa, envVarFile.Name())
+
+	loadingRules := ClientConfigLoadingRules{
+		Precedence: []string{commandLineFile.Name(), envVarFile.Name()},
 	}
 
 	mergedConfig, err := loadingRules.Load()
@@ -344,8 +469,7 @@ func ExampleMergingEverythingNoConflicts() {
 	WriteToFile(testConfigDelta, homeDirFile.Name())
 
 	loadingRules := ClientConfigLoadingRules{
-		ExplicitPath: commandLineFile.Name(),
-		Precedence:   []string{envVarFile.Name(), currentDirFile.Name(), homeDirFile.Name()},
+		Precedence: []string{commandLineFile.Name(), envVarFile.Name(), currentDirFile.Name(), homeDirFile.Name()},
 	}
 
 	mergedConfig, err := loadingRules.Load()

@@ -18,8 +18,10 @@ package clientcmd
 
 import (
 	"fmt"
+	"io"
 	"io/ioutil"
 	"os"
+	"path"
 	"path/filepath"
 
 	"github.com/ghodss/yaml"
@@ -33,21 +35,23 @@ import (
 const (
 	RecommendedConfigPathFlag   = "kubeconfig"
 	RecommendedConfigPathEnvVar = "KUBECONFIG"
-
-	DefaultEnvVarIndex     = 0
-	DefaultCurrentDirIndex = 1
-	DefaultHomeDirIndex    = 2
+	RecommendedHomeFileName     = "/.kube/config"
 )
+
+var OldRecommendedHomeFile = path.Join(os.Getenv("HOME"), "/.kube/.kubeconfig")
+var RecommendedHomeFile = path.Join(os.Getenv("HOME"), RecommendedHomeFileName)
 
 // ClientConfigLoadingRules is an ExplicitPath and string slice of specific locations that are used for merging together a Config
 // Callers can put the chain together however they want, but we'd recommend:
-// [0] = EnvVarPath
-// [1] = CurrentDirectoryPath
-// [2] = HomeDirectoryPath
+// EnvVarPathFiles if set (a list of files if set) OR the HomeDirectoryPath
 // ExplicitPath is special, because if a user specifically requests a certain file be used and error is reported if thie file is not present
 type ClientConfigLoadingRules struct {
 	ExplicitPath string
 	Precedence   []string
+
+	// MigrationRules is a map of destination files to source files.  If a destination file is not present, then the source file is checked.
+	// If the source file is present, then it is copied to the destination file BEFORE any further loading happens.
+	MigrationRules map[string]string
 
 	// DoNotResolvePaths indicates whether or not to resolve paths with respect to the originating files.  This is phrased as a negative so
 	// that a default object that doesn't set this will usually get the behavior it wants.
@@ -57,14 +61,29 @@ type ClientConfigLoadingRules struct {
 // NewDefaultClientConfigLoadingRules returns a ClientConfigLoadingRules object with default fields filled in.  You are not required to
 // use this constructor
 func NewDefaultClientConfigLoadingRules() *ClientConfigLoadingRules {
+	chain := []string{}
+	migrationRules := map[string]string{}
+
+	envVarFiles := os.Getenv(RecommendedConfigPathEnvVar)
+	if len(envVarFiles) != 0 {
+		chain = append(chain, filepath.SplitList(envVarFiles)...)
+
+	} else {
+		chain = append(chain, RecommendedHomeFile)
+		migrationRules[RecommendedHomeFile] = OldRecommendedHomeFile
+
+	}
+
 	return &ClientConfigLoadingRules{
-		Precedence: []string{os.Getenv(RecommendedConfigPathEnvVar), ".kubeconfig", os.Getenv("HOME") + "/.kube/.kubeconfig"},
+		Precedence:     chain,
+		MigrationRules: migrationRules,
 	}
 }
 
-// Load takes the loading rules and merges together a Config object based on following order.
-//   1.  ExplicitPath
-//   2.  Precedence slice
+// Load starts by running the MigrationRules and then
+// takes the loading rules and returns a Config object based on following rules.
+//   if the ExplicitPath, return the unmerged explicit file
+//   Otherwise, return a merged config based on the Precedence slice
 // A missing ExplicitPath file produces an error. Empty filenames or other missing files are ignored.
 // Read errors or files with non-deserializable content produce errors.
 // The first file to set a particular map key wins and map key's value is never changed.
@@ -75,17 +94,25 @@ func NewDefaultClientConfigLoadingRules() *ClientConfigLoadingRules {
 // Relative paths inside of the .kubeconfig files are resolved against the .kubeconfig file's parent folder
 // and only absolute file paths are returned.
 func (rules *ClientConfigLoadingRules) Load() (*clientcmdapi.Config, error) {
+	if err := rules.Migrate(); err != nil {
+		return nil, err
+	}
+
 	errlist := []error{}
+
+	kubeConfigFiles := []string{}
 
 	// Make sure a file we were explicitly told to use exists
 	if len(rules.ExplicitPath) > 0 {
 		if _, err := os.Stat(rules.ExplicitPath); os.IsNotExist(err) {
-			errlist = append(errlist, fmt.Errorf("The config file %v does not exist", rules.ExplicitPath))
+			return nil, err
 		}
-	}
+		kubeConfigFiles = append(kubeConfigFiles, rules.ExplicitPath)
 
-	kubeConfigFiles := []string{rules.ExplicitPath}
-	kubeConfigFiles = append(kubeConfigFiles, rules.Precedence...)
+	} else {
+		kubeConfigFiles = append(kubeConfigFiles, rules.Precedence...)
+
+	}
 
 	// first merge all of our maps
 	mapConfig := clientcmdapi.NewConfig()
@@ -118,6 +145,53 @@ func (rules *ClientConfigLoadingRules) Load() (*clientcmdapi.Config, error) {
 	mergo.Merge(config, nonMapConfig)
 
 	return config, errors.NewAggregate(errlist)
+}
+
+// Migrate uses the MigrationRules map.  If a destination file is not present, then the source file is checked.
+// If the source file is present, then it is copied to the destination file BEFORE any further loading happens.
+func (rules *ClientConfigLoadingRules) Migrate() error {
+	if rules.MigrationRules == nil {
+		return nil
+	}
+
+	for destination, source := range rules.MigrationRules {
+		if _, err := os.Stat(destination); err == nil {
+			// if the destination already exists, do nothing
+			continue
+		} else if !os.IsNotExist(err) {
+			// if we had an error other than non-existence, fail
+			return err
+		}
+
+		if sourceInfo, err := os.Stat(source); err != nil {
+			if os.IsNotExist(err) {
+				// if the source file doesn't exist, there's no work to do.
+				continue
+			}
+
+			// if we had an error other than non-existence, fail
+			return err
+		} else if sourceInfo.IsDir() {
+			return fmt.Errorf("cannot migrate %v to %v because it is a directory", source, destination)
+		}
+
+		in, err := os.Open(source)
+		if err != nil {
+			return err
+		}
+		defer in.Close()
+		out, err := os.Create(destination)
+		if err != nil {
+			return err
+		}
+		defer out.Close()
+
+		if _, err = io.Copy(out, in); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func mergeConfigWithFile(startingConfig *clientcmdapi.Config, filename string) error {

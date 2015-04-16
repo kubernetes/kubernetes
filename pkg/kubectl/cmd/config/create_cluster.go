@@ -30,7 +30,7 @@ import (
 )
 
 type createClusterOptions struct {
-	pathOptions           *PathOptions
+	configAccess          ConfigAccess
 	name                  string
 	server                util.StringFlag
 	apiVersion            util.StringFlag
@@ -52,8 +52,8 @@ $ kubectl config set-cluster e2e --certificate-authority=~/.kube/e2e/kubernetes.
 $ kubectl config set-cluster e2e --insecure-skip-tls-verify=true`
 )
 
-func NewCmdConfigSetCluster(out io.Writer, pathOptions *PathOptions) *cobra.Command {
-	options := &createClusterOptions{pathOptions: pathOptions}
+func NewCmdConfigSetCluster(out io.Writer, configAccess ConfigAccess) *cobra.Command {
+	options := &createClusterOptions{configAccess: configAccess}
 
 	cmd := &cobra.Command{
 		Use:     fmt.Sprintf("set-cluster NAME [--%v=server] [--%v=path/to/certficate/authority] [--%v=apiversion] [--%v=true]", clientcmd.FlagAPIServer, clientcmd.FlagCAFile, clientcmd.FlagAPIVersion, clientcmd.FlagInsecure),
@@ -89,7 +89,7 @@ func (o createClusterOptions) run() error {
 		return err
 	}
 
-	config, err := o.pathOptions.getStartingConfig()
+	config, err := o.configAccess.GetStartingConfig()
 	if err != nil {
 		return err
 	}
@@ -97,7 +97,7 @@ func (o createClusterOptions) run() error {
 	cluster := o.modifyCluster(config.Clusters[o.name])
 	config.Clusters[o.name] = cluster
 
-	if err := o.pathOptions.ModifyConfig(*config); err != nil {
+	if err := ModifyConfig(o.configAccess, *config); err != nil {
 		return err
 	}
 
@@ -169,5 +169,5 @@ func (o createClusterOptions) validate() error {
 		}
 	}
 
-	return o.pathOptions.Validate()
+	return nil
 }
