@@ -45,6 +45,11 @@ func (c *FakeEndpoints) Get(name string) (*api.Endpoints, error) {
 	return obj.(*api.Endpoints), err
 }
 
+func (c *FakeEndpoints) Delete(name string) error {
+	_, err := c.Fake.Invokes(FakeAction{Action: "delete-endpoints", Value: name}, &api.Endpoints{})
+	return err
+}
+
 func (c *FakeEndpoints) Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
 	c.Fake.Actions = append(c.Fake.Actions, FakeAction{Action: "watch-endpoints", Value: resourceVersion})
 	return c.Fake.Watch, c.Fake.Err
