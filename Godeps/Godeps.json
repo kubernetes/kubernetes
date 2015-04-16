@@ -74,8 +74,8 @@
 		},
 		{
 			"ImportPath": "github.com/coreos/go-etcd/etcd",
-			"Comment": "v0.4.6-8-g60e12ca",
-			"Rev": "60e12cac3db8ffce00b576b4af0e7b0a968f1003"
+			"Comment": "v2.0.0-3-g0424b5f",
+			"Rev": "0424b5f86ef0ca57a5309c599f74bbb3e97ecd9d"
 		},
 		{
 			"ImportPath": "github.com/coreos/go-systemd/dbus",
