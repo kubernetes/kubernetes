@@ -33,22 +33,28 @@ $kube_os = ENV['KUBERNETES_OS'] || "fedora"
 #   KUBERNETES_BOX_NAME=... .../cluster/kube-up.sh
 # You can overried both (e.g.):
 #   DEFAULT_VAGRANT_PROVIDER=... KUBERNETES_BOX_NAME=... .../cluster/kube-up.sh
-# If you want to specify the location for the box, add (e.g.):
-#   KUBERNETES_BOX_URL=... KUBERNETES_BOX_NAME=... .../cluster/kube-up.sh
-# KUBERNETES_BOX_URL will be ignored unless KUBERNETES_BOX_NAME is set
+# You can specify a box version:
+#   KUBERNETES_BOX_NAME=... KUBERNETES_BOX_VERSION=... .../cluster/kube-up.sh
+# If you want to specify the location for the box instead of the version,
+# add (e.g.):
+#   KUBERNETES_BOX_NAME=... KUBERNETES_BOX_URL=... .../cluster/kube-up.sh
+# KUBERNETES_BOX_URL and KUBERNETES_BOX_VERSION will be ignored unless
+# KUBERNETES_BOX_NAME is set
 
 # Default OS platform to provider/box information
 $kube_provider_boxes = {
   :parallels => {
     'fedora' => {
-      # :box_url is optional; if omitted the box will be retrieved by
-      # :box_name from http://atlas.hashicorp.com/boxes/search (formerly
+      # :box_url and :box_version are optional (and mutually exclusive);
+      # if :box_url is omitted the box will be retrieved by :box_name (and
+      # :box_version if provided) from
+      # http://atlas.hashicorp.com/boxes/search (formerly
       # http://vagrantcloud.com/); this allows you override :box_name with
       # your own value so long as you provide :box_url; for example, the
-      # "official" name of this box is "rickard-von-essen/
-      # opscode_fedora-20", but by providing the URL and our own name, we
-      # make it appear as yet another provider under the "kube-fedora20"
-      # box
+      # "official" name of this box is
+      # "rickard-von-essen/opscode_fedora-20", but by providing the URL
+      # and our own name, we make it appear as yet another provider under
+      # the "kube-fedora20" box
       :box_name => 'kube-fedora20',
       :box_url => 'https://atlas.hashicorp.com/rickard-von-essen/boxes/opscode_fedora-20/versions/0.4.0/providers/parallels.box'
     }
@@ -87,12 +93,26 @@ $vm_mem = (ENV['KUBERNETES_MEMORY'] || 1024).to_i
 
 Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
   def setvmboxandurl(config, provider)
-    config.vm.box = ENV['KUBERNETES_BOX_NAME'] || $kube_provider_boxes[provider][$kube_os][:box_name]
+    if ENV['KUBERNETES_BOX_NAME']
+      config.vm.box = ENV['KUBERNETES_BOX_NAME']
 
-    if ENV['KUBERNETES_BOX_NAME'] && ENV['KUBERNETES_BOX_URL']
-      config.vm.box_url = ENV['KUBERNETES_BOX_URL']
-    elsif $kube_provider_boxes[provider][$kube_os][:box_url]
-      config.vm.box_url = $kube_provider_boxes[provider][$kube_os][:box_url]
+      if ENV['KUBERNETES_BOX_URL']
+        config.vm.box_url = ENV['KUBERNETES_BOX_URL']
+      end
+
+      if ENV['KUBERNETES_BOX_VERSION']
+        config.vm.box_version = ENV['KUBERNETES_BOX_VERSION']
+      end
+    else
+      config.vm.box = $kube_provider_boxes[provider][$kube_os][:box_name]
+
+      if $kube_provider_boxes[provider][$kube_os][:box_url]
+        config.vm.box_url = $kube_provider_boxes[provider][$kube_os][:box_url]
+      end
+
+      if $kube_provider_boxes[provider][$kube_os][:box_version]
+        config.vm.box_version = $kube_provider_boxes[provider][$kube_os][:box_version]
+      end
     end
   end
 
