@@ -409,7 +409,7 @@ func waitForPublicIPs(c *client.Client, serviceName, namespace string) (*api.Ser
 		}
 		Logf("Waiting for service %s in namespace %s to have a public IP (%v)", serviceName, namespace, time.Since(start))
 	}
-	return service, fmt.Errorf("service %s in namespace %s to have a public IP after %.2f seconds", nil, serviceName, namespace, podStartTimeout.Seconds())
+	return service, fmt.Errorf("service %s in namespace %s doesn't have a public IP after %.2f seconds", serviceName, namespace, podStartTimeout.Seconds())
 }
 
 func validateUniqueOrFail(s []string) {
