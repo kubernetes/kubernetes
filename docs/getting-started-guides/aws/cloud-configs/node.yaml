@@ -19,7 +19,7 @@ coreos:
           content: |
             [Service]
             ExecStartPre=/bin/bash -c "until curl http://<master-private-ip>:4001/v2/machines; do sleep 2; done"
-            ExecStartPre=/usr/bin/etcdctl set /coreos.com/network/config '{"Network":"10.244.0.0/16", "Backend": {"Type": "vxlan"}}'
+            ExecStartPre=/usr/bin/etcdctl -C <master-private-ip>:4001 set /coreos.com/network/config '{"Network":"10.244.0.0/16", "Backend": {"Type": "vxlan"}}'
     - name: docker.service
       command: start
       drop-ins:
