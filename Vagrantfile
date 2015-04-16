@@ -28,15 +28,12 @@ $minion_ips = $num_minion.times.collect { |n| $minion_ip_base + "#{n+3}" }
 $kube_os = ENV['KUBERNETES_OS'] || "fedora"
 
 # To override the vagrant provider, use (e.g.):
-#   KUBERNETES_PROVIDER=vagrant KUBERNETES_DEFAULT_VAGRANT_PROVIDER=... .../cluster/kube-up.sh
+#   KUBERNETES_PROVIDER=vagrant DEFAULT_VAGRANT_PROVIDER=... .../cluster/kube-up.sh
 # To override the box, use (e.g.):
 #   KUBERNETES_PROVIDER=vagrant KUBERNETES_BOX_NAME=... .../cluster/kube-up.sh
-# You can overried both (e.g.):
-#   KUBERNETES_PROVIDER=vagrant DEFAULT_VAGRANT_PROVIDER=... KUBERNETES_BOX_NAME=... .../cluster/kube-up.sh
 # You can specify a box version:
 #   KUBERNETES_PROVIDER=vagrant KUBERNETES_BOX_NAME=... KUBERNETES_BOX_VERSION=... .../cluster/kube-up.sh
-# If you want to specify the location for the box instead of the version,
-# add (e.g.):
+# You can specify a box location:
 #   KUBERNETES_PROVIDER=vagrant KUBERNETES_BOX_NAME=... KUBERNETES_BOX_URL=... .../cluster/kube-up.sh
 # KUBERNETES_BOX_URL and KUBERNETES_BOX_VERSION will be ignored unless
 # KUBERNETES_BOX_NAME is set
@@ -89,30 +86,29 @@ end
 # In Fedora VM, tmpfs device is mapped to /tmp.  tmpfs is given 50% of RAM allocation.
 # When doing Salt provisioning, we copy approximately 200MB of content in /tmp before anything else happens.
 # This causes problems if anything else was in /tmp or the other directories that are bound to tmpfs device (i.e /run, etc.)
-$vm_mem = (ENV['KUBERNETES_MEMORY'] || 1024).to_i
-$vm_master_mem = (ENV['KUBERNETES_MASTER_MEMORY'] || $vm_mem).to_i
-$vm_minion_mem = (ENV['KUBERNETES_MINION_MEMORY'] || $vm_mem).to_i
+$vm_master_mem = (ENV['KUBERNETES_MASTER_MEMORY'] || ENV['KUBERNETES_MEMORY'] || 1024).to_i
+$vm_minion_mem = (ENV['KUBERNETES_MINION_MEMORY'] || ENV['KUBERNETES_MEMORY'] || 1024).to_i
 
 Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
   def setvmboxandurl(config, provider)
-    if ENV['KUBERNETES_BOX_NAME']
+    if ENV['KUBERNETES_BOX_NAME'] then
       config.vm.box = ENV['KUBERNETES_BOX_NAME']
 
-      if ENV['KUBERNETES_BOX_URL']
+      if ENV['KUBERNETES_BOX_URL'] then
         config.vm.box_url = ENV['KUBERNETES_BOX_URL']
       end
 
-      if ENV['KUBERNETES_BOX_VERSION']
+      if ENV['KUBERNETES_BOX_VERSION'] then
         config.vm.box_version = ENV['KUBERNETES_BOX_VERSION']
       end
     else
       config.vm.box = $kube_provider_boxes[provider][$kube_os][:box_name]
 
-      if $kube_provider_boxes[provider][$kube_os][:box_url]
+      if $kube_provider_boxes[provider][$kube_os][:box_url] then
         config.vm.box_url = $kube_provider_boxes[provider][$kube_os][:box_url]
       end
 
-      if $kube_provider_boxes[provider][$kube_os][:box_version]
+      if $kube_provider_boxes[provider][$kube_os][:box_version] then
         config.vm.box_version = $kube_provider_boxes[provider][$kube_os][:box_version]
       end
     end
@@ -176,17 +172,20 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
 
   # Kubernetes minion
   $num_minion.times do |n|
-    config.vm.define "minion-#{n+1}" do |minion|
+    minion_vm_name = "minion-#{n+1}"
+    minion_prefix = ENV['INSTANCE_PREFIX'] || 'kubernetes' # must mirror default in cluster/vagrant/config-default.sh
+    minion_hostname = "#{minion_prefix}#{minion_vm_name}"
+
+    config.vm.define minion_vm_name do |minion|
       customize_vm minion, $vm_minion_mem
 
-      minion_index = n+1
       minion_ip = $minion_ips[n]
       if ENV['KUBE_TEMP'] then
         script = "#{ENV['KUBE_TEMP']}/minion-start-#{n}.sh"
         minion.vm.provision "shell", run: "always", path: script
       end
       minion.vm.network "private_network", ip: "#{minion_ip}"
-      minion.vm.hostname = "#{ENV['INSTANCE_PREFIX']}-minion-#{minion_index}"
+      minion.vm.hostname = minion_hostname
     end
   end
 end
