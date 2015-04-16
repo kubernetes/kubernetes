@@ -183,7 +183,6 @@ func (controller *PersistentVolumeClaimBinder) syncPersistentVolumeClaimStatus(v
 	return err
 }
 
-
 func (controller *PersistentVolumeClaimBinder) Run(period time.Duration) {
 	glog.V(5).Infof("Starting PersistentVolumeClaimBinder\n")
 	go util.Forever(func() { controller.synchronize() }, period)
