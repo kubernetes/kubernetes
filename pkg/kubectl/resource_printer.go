@@ -503,12 +503,6 @@ func printNode(node *api.Node, w io.Writer) error {
 		cond := node.Status.Conditions[i]
 		conditionMap[cond.Type] = &cond
 	}
-	var schedulable string
-	if node.Spec.Unschedulable {
-		schedulable = "Unschedulable"
-	} else {
-		schedulable = "Schedulable"
-	}
 	var status []string
 	for _, validCondition := range NodeAllConditions {
 		if condition, ok := conditionMap[validCondition]; ok {
@@ -522,7 +516,10 @@ func printNode(node *api.Node, w io.Writer) error {
 	if len(status) == 0 {
 		status = append(status, "Unknown")
 	}
-	_, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", node.Name, schedulable, formatLabels(node.Labels), strings.Join(status, ","))
+	if node.Spec.Unschedulable {
+		status = append(status, "SchedulingDisabled")
+	}
+	_, err := fmt.Fprintf(w, "%s\t%s\t%s\n", node.Name, formatLabels(node.Labels), strings.Join(status, ","))
 	return err
 }
 
