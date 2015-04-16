@@ -35,6 +35,9 @@ for easy scaling of replicated systems, and handles restarting of a Pod when the
 **Resource**
 : CPU, memory, and other things that a pod can request.   See [resources](resources.md).
 
+**Secret**
+: An object containing sensitive information, such as authentication tokens, which can be made available to containers upon request. See [secrets](secrets.md).
+
 **Selector**
 : An expression that matches Labels.  Can identify related objects, such as pods which are replicas in a load-balanced
 service.  See [labels](labels.md).

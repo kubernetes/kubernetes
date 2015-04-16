@@ -8,7 +8,7 @@
 
 <hr>
 
-Kubernetes is an open source system for managing containerized applications across multiple hosts,
+Kubernetes is an open source system for managing [containerized applications](https://github.com/GoogleCloudPlatform/kubernetes/wiki/Why-Kubernetes%3F#why-containers) across multiple hosts,
 providing basic mechanisms for deployment, maintenance, and scaling of applications.
 
 Kubernetes is:
@@ -18,7 +18,7 @@ Kubernetes is:
 * **extensible**: modular, pluggable, hookable, composable
 * **self-healing**: auto-placement, auto-restart, auto-replication
 
-Kubernetes builds upon a decade and a half of experience at Google running production workloads at scale, combined with best-of-breed ideas and practices from the community.
+Kubernetes builds upon a [decade and a half of experience at Google running production workloads at scale](https://research.google.com/pubs/pub43438.html), combined with best-of-breed ideas and practices from the community.
 
 <hr>
 
@@ -63,22 +63,22 @@ Kubernetes documentation is organized into several categories.
     - covers development conventions
     - explains current architecture and project plans
   - **Service Documentation**
+    - in [docs/services.md](docs/services.md)
     - [Service FAQ](https://github.com/GoogleCloudPlatform/kubernetes/wiki/Services-FAQ)
     - for people who are interested in how Services work
     - details of ```kube-proxy``` iptables
     - how to wire services to external internet
+  - **API documentation**
+    - in [the API doc](docs/api.md)
+    - and automatically generated API documentation served by the master
   - **Design Documentation**
-    - [Design Overview](DESIGN.md)
-    - More in [docs/design](docs/design)
+    - in [docs/design](docs/design)
     - for people who want to understand the design choices made
     - describes tradeoffs, alternative designs
     - descriptions of planned features that are too long for a github issue.
   - **Walkthroughs and Examples**
     - in [examples](/examples)
     - Hands on introduction and example config files
-  - **API documentation**
-    - in [the API conventions doc](docs/api-conventions.md)
-    - and automatically generated API documentation served by the master
   - **Wiki/FAQ**
     - in [wiki](https://github.com/GoogleCloudPlatform/kubernetes/wiki)
     - includes a number of [Kubernetes community-contributed recipes](/contrib/recipes)
