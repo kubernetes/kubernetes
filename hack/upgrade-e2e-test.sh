@@ -17,10 +17,10 @@
 # Provide reasonable default for running the end-to-end tests against a recent
 # stable release and then again after upgrading it to a version built from head.
 
-go run "$(dirname $0)/e2e.go" -v -build -up -version="v0.6.0" -tests="*" -check_version_skew=false
+go run "$(dirname $0)/e2e.go" -v -build -up -version="v0.14.0" -test -check_version_skew=false
 if [ $? -eq 0 ]; then
 	echo "Tests on initial version succeeded. Proceeding with push and second set of tests."
-	go run "$(dirname $0)/e2e.go" -v -push -version="" -tests="*" -check_version_skew=false
+	go run "$(dirname $0)/e2e.go" -v -push -version="" -test -check_version_skew=false
 else
 	echo "Tests on initial version failed. Skipping tests on second version."
 fi
