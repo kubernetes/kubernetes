@@ -151,7 +151,7 @@ runTests() {
   if [[ ! ${KUBE_COVER} =~ ^[yY]$ ]]; then
     kube::log::status "Running unit tests without code coverage"
     go test "${goflags[@]:+${goflags[@]}}" \
-      ${KUBE_RACE} ${KUBE_TIMEOUT} "${@+${@/#/${KUBE_GO_PACKAGE}/}}"
+      ${KUBE_RACE} ${KUBE_TIMEOUT} "${@+${@/#/${KUBE_GO_PACKAGE}/}}" || true
     return 0
   fi
 
@@ -173,7 +173,7 @@ runTests() {
           -cover -covermode="${KUBE_COVERMODE}" \
           -coverprofile="${cover_report_dir}/{}/${cover_profile}" \
           "${cover_params[@]+${cover_params[@]}}" \
-          "${KUBE_GO_PACKAGE}/{}"
+          "${KUBE_GO_PACKAGE}/{}" || true
 
   COMBINED_COVER_PROFILE="${cover_report_dir}/combined-coverage.out"
   {
