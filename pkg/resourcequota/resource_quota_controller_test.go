@@ -179,3 +179,91 @@ func TestSyncResourceQuota(t *testing.T) {
 	}
 
 }
+
+func TestSyncResourceQuotaSpecChange(t *testing.T) {
+	quota := api.ResourceQuota{
+		Spec: api.ResourceQuotaSpec{
+			Hard: api.ResourceList{
+				api.ResourceCPU: resource.MustParse("4"),
+			},
+		},
+		Status: api.ResourceQuotaStatus{
+			Hard: api.ResourceList{
+				api.ResourceCPU: resource.MustParse("3"),
+			},
+			Used: api.ResourceList{
+				api.ResourceCPU: resource.MustParse("0"),
+			},
+		},
+	}
+
+	expectedUsage := api.ResourceQuota{
+		Status: api.ResourceQuotaStatus{
+			Hard: api.ResourceList{
+				api.ResourceCPU: resource.MustParse("4"),
+			},
+			Used: api.ResourceList{
+				api.ResourceCPU: resource.MustParse("0"),
+			},
+		},
+	}
+
+	kubeClient := testclient.NewSimpleFake(&quota)
+
+	resourceQuotaManager := NewResourceQuotaManager(kubeClient)
+	err := resourceQuotaManager.syncResourceQuota(quota)
+	if err != nil {
+		t.Fatalf("Unexpected error %v", err)
+	}
+
+	usage := kubeClient.Actions[1].Value.(*api.ResourceQuota)
+
+	// ensure hard and used limits are what we expected
+	for k, v := range expectedUsage.Status.Hard {
+		actual := usage.Status.Hard[k]
+		actualValue := actual.String()
+		expectedValue := v.String()
+		if expectedValue != actualValue {
+			t.Errorf("Usage Hard: Key: %v, Expected: %v, Actual: %v", k, expectedValue, actualValue)
+		}
+	}
+	for k, v := range expectedUsage.Status.Used {
+		actual := usage.Status.Used[k]
+		actualValue := actual.String()
+		expectedValue := v.String()
+		if expectedValue != actualValue {
+			t.Errorf("Usage Used: Key: %v, Expected: %v, Actual: %v", k, expectedValue, actualValue)
+		}
+	}
+
+}
+
+func TestSyncResourceQuotaNoChange(t *testing.T) {
+	quota := api.ResourceQuota{
+		Spec: api.ResourceQuotaSpec{
+			Hard: api.ResourceList{
+				api.ResourceCPU: resource.MustParse("4"),
+			},
+		},
+		Status: api.ResourceQuotaStatus{
+			Hard: api.ResourceList{
+				api.ResourceCPU: resource.MustParse("4"),
+			},
+			Used: api.ResourceList{
+				api.ResourceCPU: resource.MustParse("0"),
+			},
+		},
+	}
+
+	kubeClient := testclient.NewSimpleFake(&api.PodList{}, &quota)
+
+	resourceQuotaManager := NewResourceQuotaManager(kubeClient)
+	err := resourceQuotaManager.syncResourceQuota(quota)
+	if err != nil {
+		t.Fatalf("Unexpected error %v", err)
+	}
+
+	if len(kubeClient.Actions) != 1 && kubeClient.Actions[0].Action != "list-pods" {
+		t.Errorf("SyncResourceQuota made an unexpected client action when state was not dirty: %v", kubeClient.Actions)
+	}
+}
