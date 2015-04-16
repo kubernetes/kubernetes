@@ -28,16 +28,16 @@ $minion_ips = $num_minion.times.collect { |n| $minion_ip_base + "#{n+3}" }
 $kube_os = ENV['KUBERNETES_OS'] || "fedora"
 
 # To override the vagrant provider, use (e.g.):
-#   DEFAULT_VAGRANT_PROVIDER=... .../cluster/kube-up.sh
+#   KUBERNETES_PROVIDER=vagrant KUBERNETES_DEFAULT_VAGRANT_PROVIDER=... .../cluster/kube-up.sh
 # To override the box, use (e.g.):
-#   KUBERNETES_BOX_NAME=... .../cluster/kube-up.sh
+#   KUBERNETES_PROVIDER=vagrant KUBERNETES_BOX_NAME=... .../cluster/kube-up.sh
 # You can overried both (e.g.):
-#   DEFAULT_VAGRANT_PROVIDER=... KUBERNETES_BOX_NAME=... .../cluster/kube-up.sh
+#   KUBERNETES_PROVIDER=vagrant DEFAULT_VAGRANT_PROVIDER=... KUBERNETES_BOX_NAME=... .../cluster/kube-up.sh
 # You can specify a box version:
-#   KUBERNETES_BOX_NAME=... KUBERNETES_BOX_VERSION=... .../cluster/kube-up.sh
+#   KUBERNETES_PROVIDER=vagrant KUBERNETES_BOX_NAME=... KUBERNETES_BOX_VERSION=... .../cluster/kube-up.sh
 # If you want to specify the location for the box instead of the version,
 # add (e.g.):
-#   KUBERNETES_BOX_NAME=... KUBERNETES_BOX_URL=... .../cluster/kube-up.sh
+#   KUBERNETES_PROVIDER=vagrant KUBERNETES_BOX_NAME=... KUBERNETES_BOX_URL=... .../cluster/kube-up.sh
 # KUBERNETES_BOX_URL and KUBERNETES_BOX_VERSION will be ignored unless
 # KUBERNETES_BOX_NAME is set
 
@@ -51,10 +51,10 @@ $kube_provider_boxes = {
       # http://atlas.hashicorp.com/boxes/search (formerly
       # http://vagrantcloud.com/); this allows you override :box_name with
       # your own value so long as you provide :box_url; for example, the
-      # "official" name of this box is
-      # "rickard-von-essen/opscode_fedora-20", but by providing the URL
-      # and our own name, we make it appear as yet another provider under
-      # the "kube-fedora20" box
+      # "official" name of this box is "rickard-von-essen/
+      # opscode_fedora-20", but by providing the URL and our own name, we
+      # make it appear as yet another provider under the "kube-fedora20"
+      # box
       :box_name => 'kube-fedora20',
       :box_url => 'https://atlas.hashicorp.com/rickard-von-essen/boxes/opscode_fedora-20/versions/0.4.0/providers/parallels.box'
     }
