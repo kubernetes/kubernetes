@@ -60,7 +60,9 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
   def customize_vm(config)
     config.vm.box = $kube_box[$kube_os]["name"]
     config.vm.box_url = $kube_box[$kube_os]["box_url"]
-
+    if ENV['KUBERNETES_USE_NFS'] == "true" then
+      config.vm.synced_folder ".", "/vagrant", type: "nfs", nfs_udp: false, nfs_export: (ENV['KUBERNETES_NFS_EXPORT'] == "true")
+    end
     config.vm.provider :virtualbox do |v|
       v.customize ["modifyvm", :id, "--memory", $vm_mem]
       v.customize ["modifyvm", :id, "--cpus", $vm_cpus]
