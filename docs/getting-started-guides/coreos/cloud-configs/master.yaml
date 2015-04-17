@@ -1,15 +1,17 @@
 #cloud-config
 
 ---
-write_files:
-- path: /opt/bin/waiter.sh
-  owner: root
-  content: |
-    #! /usr/bin/bash
-    until curl http://127.0.0.1:4001/v2/machines; do sleep 2; done
+hostname: master
 coreos:
+  etcd2:
+    listen-client-urls: http://0.0.0.0:2379,http://0.0.0.0:4001
+    advertise-client-urls: http://<master-private-ip>:2379,http://<master-private-ip>:4001
+    initial-cluster-token: k8s_etcd
+    listen-peer-urls: http://<master-private-ip>:2380,http://<master-private-ip>:7001
+    initial-advertise-peer-urls: http://<master-private-ip>:2380
+    initial-cluster: master=http://<master-private-ip>:2380"
+    initial-cluster-state: new
   fleet:
-    etcd-servers: http://localhost:4001
     metadata: "role=master"
   flannel:
     interface: eth1
@@ -30,54 +32,15 @@ coreos:
         ExecStart=/opt/bin/setup-network-environment
         RemainAfterExit=yes
         Type=oneshot
-    - name: etcd.service
-      command: start
-      content: |
-        [Unit]
-        Description=etcd
-        Requires=setup-network-environment.service
-        After=setup-network-environment.service
-
-        [Service]
-        EnvironmentFile=/etc/network-environment
-        User=etcd
-        PermissionsStartOnly=true
-        ExecStart=/usr/bin/etcd \
-        --name ${DEFAULT_IPV4} \
-        --addr ${DEFAULT_IPV4}:4001 \
-        --bind-addr 0.0.0.0 \
-        --cluster-active-size 1 \
-        --data-dir /var/lib/etcd \
-        --http-read-timeout 86400 \
-        --peer-addr ${DEFAULT_IPV4}:7001 \
-        --snapshot true
-        Restart=always
-        RestartSec=10s
     - name: fleet.service
       command: start
-    - name: etcd-waiter.service
-      command: start
-      content: |
-        [Unit]
-        Description=etcd waiter
-        Wants=network-online.target
-        Wants=etcd.service
-        After=etcd.service
-        After=network-online.target
-        Before=flanneld.service
-
-        [Service]
-        ExecStartPre=/usr/bin/chmod +x /opt/bin/waiter.sh
-        ExecStart=/usr/bin/bash /opt/bin/waiter.sh
-        RemainAfterExit=true
-        Type=oneshot
     - name: flanneld.service
       command: start
       drop-ins:
         - name: 50-network-config.conf
           content: |
             [Unit]
-            Requires=etcd.service
+            Requires=etcd2.service
             [Service]
             ExecStartPre=/usr/bin/etcdctl set /coreos.com/network/config '{"Network":"10.244.0.0/16", "Backend": {"Type": "vxlan"}}'
     - name: docker-cache.service
@@ -124,8 +87,8 @@ coreos:
         [Unit]
         Description=Kubernetes API Server
         Documentation=https://github.com/GoogleCloudPlatform/kubernetes
-        Requires=etcd.service
-        After=etcd.service
+        Requires=etcd2.service
+        After=etcd2.service
 
         [Service]
         ExecStartPre=-/usr/bin/mkdir -p /opt/bin
