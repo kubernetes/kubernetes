@@ -45,5 +45,5 @@ function gather_installation_reqs(){
     fi
 
     package_status 'juju-quickstart'
+    package_status 'juju-deployer'
 }
-
