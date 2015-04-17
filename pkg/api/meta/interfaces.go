@@ -40,6 +40,8 @@ type Interface interface {
 	SetNamespace(namespace string)
 	Name() string
 	SetName(name string)
+	GenerateName() string
+	SetGenerateName(name string)
 	UID() types.UID
 	SetUID(uid types.UID)
 	ResourceVersion() string
@@ -78,6 +80,9 @@ type MetadataAccessor interface {
 
 	Name(obj runtime.Object) (string, error)
 	SetName(obj runtime.Object, name string) error
+
+	GenerateName(obj runtime.Object) (string, error)
+	SetGenerateName(obj runtime.Object, name string) error
 
 	UID(obj runtime.Object) (types.UID, error)
 	SetUID(obj runtime.Object, uid types.UID) error

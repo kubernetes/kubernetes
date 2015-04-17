@@ -21,19 +21,25 @@ import (
 )
 
 type attributesRecord struct {
+	kind      string
 	namespace string
 	resource  string
 	operation string
 	object    runtime.Object
 }
 
-func NewAttributesRecord(object runtime.Object, namespace, resource, operation string) Attributes {
+func NewAttributesRecord(object runtime.Object, kind, namespace, resource, operation string) Attributes {
 	return &attributesRecord{
+		kind:      kind,
 		namespace: namespace,
 		resource:  resource,
 		operation: operation,
 		object:    object,
 	}
+}
+
+func (record *attributesRecord) GetKind() string {
+	return record.kind
 }
 
 func (record *attributesRecord) GetNamespace() string {
