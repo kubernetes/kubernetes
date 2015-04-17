@@ -690,11 +690,16 @@ func TestEtcdWatch(t *testing.T) {
 
 	for name, m := range table {
 		podA := &api.Pod{
-			ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "1"},
-			Spec:       api.PodSpec{Host: "machine"},
+			ObjectMeta: api.ObjectMeta{
+				Name:            "foo",
+				Namespace:       api.NamespaceDefault,
+				ResourceVersion: "1",
+			},
+			Spec: api.PodSpec{Host: "machine"},
 		}
 		respWithPodA := &etcd.Response{
 			Node: &etcd.Node{
+				Key:           "/registry/pods/default/foo",
 				Value:         runtime.EncodeOrDie(testapi.Codec(), podA),
 				ModifiedIndex: 1,
 				CreatedIndex:  1,

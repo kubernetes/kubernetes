@@ -429,18 +429,7 @@ func (e *Etcd) WatchPredicate(ctx api.Context, m generic.Matcher, resourceVersio
 		return nil, err
 	}
 
-	var watchKey string
-	if name, ok := m.MatchesSingle(); ok {
-		key, err := e.KeyFunc(ctx, name)
-		if err != nil {
-			return nil, err
-		}
-		watchKey = key
-	} else {
-		watchKey = e.KeyRootFunc(ctx)
-	}
-
-	return e.Helper.WatchList(watchKey, version, func(obj runtime.Object) bool {
+	filterFunc := func(obj runtime.Object) bool {
 		matches, err := m.Matches(obj)
 		if err != nil {
 			glog.Errorf("unable to match watch: %v", err)
@@ -453,5 +442,15 @@ func (e *Etcd) WatchPredicate(ctx api.Context, m generic.Matcher, resourceVersio
 			}
 		}
 		return matches
-	})
+	}
+
+	if name, ok := m.MatchesSingle(); ok {
+		key, err := e.KeyFunc(ctx, name)
+		if err != nil {
+			return nil, err
+		}
+		return e.Helper.Watch(key, version, filterFunc)
+	}
+
+	return e.Helper.WatchList(e.KeyRootFunc(ctx), version, filterFunc)
 }

@@ -79,8 +79,10 @@ func (h *EtcdHelper) WatchList(key string, resourceVersion uint64, filter Filter
 // Watch begins watching the specified key. Events are decoded into
 // API objects and sent down the returned watch.Interface.
 // Errors will be sent down the channel.
-func (h *EtcdHelper) Watch(key string, resourceVersion uint64) watch.Interface {
-	return h.WatchAndTransform(key, resourceVersion, nil)
+func (h *EtcdHelper) Watch(key string, resourceVersion uint64, filter FilterFunc) (watch.Interface, error) {
+	w := newEtcdWatcher(false, nil, filter, h.Codec, h.Versioner, nil)
+	go w.etcdWatch(h.Client, key, resourceVersion)
+	return w, nil
 }
 
 // WatchAndTransform begins watching the specified key. Events are decoded into
