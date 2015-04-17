@@ -83,6 +83,7 @@ coreos:
         --port=10250 \
         --hostname_override=$private_ipv4 \
         --api_servers=<master-private-ip>:8080 \
+        --allow_privileged=true \
         --logtostderr=true
         Restart=always
         RestartSec=10

@@ -132,6 +132,7 @@ coreos:
         ExecStartPre=/usr/bin/wget -N -P /opt/bin https://storage.googleapis.com/kubernetes-release/release/v0.15.0/bin/linux/amd64/kube-apiserver
         ExecStartPre=/usr/bin/chmod +x /opt/bin/kube-apiserver
         ExecStart=/opt/bin/kube-apiserver \
+        --allow_privileged=true \
         --address=0.0.0.0 \
         --port=8080 \
         --portal_net=10.100.0.0/16 \
