@@ -609,6 +609,7 @@ func SplitResourceArgument(arg string) []string {
 		if set.Has(s) {
 			continue
 		}
+		set.Insert(s)
 		out = append(out, s)
 	}
 	return out
