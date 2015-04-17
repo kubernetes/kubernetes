@@ -129,7 +129,7 @@ func newServerTest() *serverTestFramework {
 			}, true
 		},
 	}
-	server := NewServer(fw.fakeKubelet, true)
+	server := NewServer(fw.fakeKubelet, true, false)
 	fw.serverUnderTest = &server
 	fw.testHTTPServer = httptest.NewServer(fw.serverUnderTest)
 	return fw

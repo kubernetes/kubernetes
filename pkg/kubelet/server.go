@@ -24,6 +24,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"net/http/pprof"
 	"net/url"
 	"path"
 	"strconv"
@@ -48,8 +49,9 @@ import (
 
 // Server is a http.Handler which exposes kubelet functionality over HTTP.
 type Server struct {
-	host HostInterface
-	mux  *http.ServeMux
+	host      HostInterface
+	mux       *http.ServeMux
+	profiling bool
 }
 
 type TLSOptions struct {
@@ -59,9 +61,9 @@ type TLSOptions struct {
 }
 
 // ListenAndServeKubeletServer initializes a server to respond to HTTP network requests on the Kubelet.
-func ListenAndServeKubeletServer(host HostInterface, address net.IP, port uint, tlsOptions *TLSOptions, enableDebuggingHandlers bool) {
+func ListenAndServeKubeletServer(host HostInterface, address net.IP, port uint, tlsOptions *TLSOptions, enableDebuggingHandlers bool, enableProfiling bool) {
 	glog.Infof("Starting to listen on %s:%d", address, port)
-	handler := NewServer(host, enableDebuggingHandlers)
+	handler := NewServer(host, enableDebuggingHandlers, enableProfiling)
 	s := &http.Server{
 		Addr:           net.JoinHostPort(address.String(), strconv.FormatUint(uint64(port), 10)),
 		Handler:        &handler,
@@ -80,7 +82,7 @@ func ListenAndServeKubeletServer(host HostInterface, address net.IP, port uint, 
 // ListenAndServeKubeletReadOnlyServer initializes a server to respond to HTTP network requests on the Kubelet.
 func ListenAndServeKubeletReadOnlyServer(host HostInterface, address net.IP, port uint) {
 	glog.V(1).Infof("Starting to listen read-only on %s:%d", address, port)
-	s := &Server{host, http.NewServeMux()}
+	s := &Server{host, http.NewServeMux(), true}
 	healthz.InstallHandler(s.mux)
 	s.mux.HandleFunc("/stats/", s.handleStats)
 	s.mux.Handle("/metrics", prometheus.Handler())
@@ -115,14 +117,18 @@ type HostInterface interface {
 }
 
 // NewServer initializes and configures a kubelet.Server object to handle HTTP requests.
-func NewServer(host HostInterface, enableDebuggingHandlers bool) Server {
+func NewServer(host HostInterface, enableDebuggingHandlers bool, enableProfiling bool) Server {
 	server := Server{
-		host: host,
-		mux:  http.NewServeMux(),
+		host:      host,
+		mux:       http.NewServeMux(),
+		profiling: enableProfiling,
 	}
 	server.InstallDefaultHandlers()
 	if enableDebuggingHandlers {
 		server.InstallDebuggingHandlers()
+	}
+	if enableProfiling {
+		server.InstallProfilingHandlers()
 	}
 	return server
 }
@@ -150,6 +156,13 @@ func (s *Server) InstallDebuggingHandlers() {
 	s.mux.HandleFunc("/logs/", s.handleLogs)
 	s.mux.HandleFunc("/containerLogs/", s.handleContainerLogs)
 	s.mux.Handle("/metrics", prometheus.Handler())
+}
+
+// InstallProfilingHandlers registers the HTTP handlers for the profiling endpoints
+func (s *Server) InstallProfilingHandlers() {
+	s.mux.HandleFunc("/debug/pprof/", pprof.Index)
+	s.mux.HandleFunc("/debug/pprof/profile", pprof.Profile)
+	s.mux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
 }
 
 // error serializes an error object into an HTTP response.

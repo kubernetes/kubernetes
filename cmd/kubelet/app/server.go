@@ -75,6 +75,7 @@ type KubeletServer struct {
 	RegistryBurst                  int
 	RunOnce                        bool
 	EnableDebuggingHandlers        bool
+	EnableProfiling                bool
 	MinimumGCAge                   time.Duration
 	MaxPerPodContainerCount        int
 	MaxContainerCount              int
@@ -111,7 +112,7 @@ type KubeletServer struct {
 type KubeletBootstrap interface {
 	BirthCry()
 	StartGarbageCollection()
-	ListenAndServe(net.IP, uint, *kubelet.TLSOptions, bool)
+	ListenAndServe(net.IP, uint, *kubelet.TLSOptions, bool, bool)
 	ListenAndServeReadOnly(net.IP, uint)
 	Run(<-chan kubelet.PodUpdate)
 	RunOnce(<-chan kubelet.PodUpdate) ([]kubelet.RunPodResult, error)
@@ -134,6 +135,7 @@ func NewKubeletServer() *KubeletServer {
 		RootDirectory:               defaultRootDir,
 		RegistryBurst:               10,
 		EnableDebuggingHandlers:     true,
+		EnableProfiling:             true,
 		MinimumGCAge:                1 * time.Minute,
 		MaxPerPodContainerCount:     5,
 		MaxContainerCount:           100,
@@ -200,6 +202,7 @@ func (s *KubeletServer) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.CloudProvider, "cloud_provider", s.CloudProvider, "The provider for cloud services.  Empty string for no provider.")
 	fs.StringVar(&s.CloudConfigFile, "cloud_config", s.CloudConfigFile, "The path to the cloud provider configuration file.  Empty string for no configuration file.")
 	fs.StringVar(&s.ResourceContainer, "resource_container", s.ResourceContainer, "Absolute name of the resource-only container to create and run the Kubelet in (Default: /kubelet).")
+	fs.BoolVar(&s.EnableProfiling, "profiling", true, "Enable profiling via web interface host:port/debug/pprof/")
 
 	// Flags intended for testing, not recommended used in production environments.
 	fs.BoolVar(&s.ReallyCrashForTesting, "really_crash_for_testing", s.ReallyCrashForTesting, "If true, when panics occur crash. Intended for testing.")
@@ -287,6 +290,7 @@ func (s *KubeletServer) Run(_ []string) error {
 		CadvisorInterface:              cadvisorInterface,
 		EnableServer:                   s.EnableServer,
 		EnableDebuggingHandlers:        s.EnableDebuggingHandlers,
+		EnableProfiling:                s.EnableProfiling,
 		DockerClient:                   dockertools.ConnectToDockerOrDie(s.DockerEndpoint),
 		KubeClient:                     client,
 		MasterServiceNamespace:         s.MasterServiceNamespace,
@@ -390,6 +394,7 @@ func SimpleKubelet(client *client.Client,
 		Address:                 util.IP(net.ParseIP(address)),
 		EnableServer:            true,
 		EnableDebuggingHandlers: true,
+		EnableProfiling:         true,
 		HTTPCheckFrequency:      1 * time.Second,
 		FileCheckFrequency:      1 * time.Second,
 		SyncFrequency:           3 * time.Second,
@@ -455,7 +460,7 @@ func startKubelet(k KubeletBootstrap, podCfg *config.PodConfig, kc *KubeletConfi
 	// start the kubelet server
 	if kc.EnableServer {
 		go util.Forever(func() {
-			k.ListenAndServe(net.IP(kc.Address), kc.Port, kc.TLSOptions, kc.EnableDebuggingHandlers)
+			k.ListenAndServe(net.IP(kc.Address), kc.Port, kc.TLSOptions, kc.EnableDebuggingHandlers, kc.EnableProfiling)
 		}, 0)
 	}
 	if kc.ReadOnlyPort > 0 {
@@ -514,6 +519,7 @@ type KubeletConfig struct {
 	ClusterDNS                     util.IP
 	EnableServer                   bool
 	EnableDebuggingHandlers        bool
+	EnableProfiling                bool
 	Port                           uint
 	ReadOnlyPort                   uint
 	Runonce                        bool
