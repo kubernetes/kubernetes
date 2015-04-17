@@ -584,7 +584,16 @@ function kube-up {
   # https://github.com/GoogleCloudPlatform/kubernetes/issues/3168
   KUBELET_TOKEN=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
 
-  create-master-instance &
+  # Reserve the master's IP so that it can later be transferred to another VM
+  # without disrupting the kubelets. IPs are associated with regions, not zones,
+  # so extract the region name, which is the same as the zone but with the final
+  # dash and characters trailing the dash removed.
+  local REGION=${ZONE%-*}
+  MASTER_RESERVED_IP=$(gcloud compute addresses create "${MASTER_NAME}-ip" \
+    --project "${PROJECT}" \
+    --region "${REGION}" -q --format yaml | awk '/^address:/ { print $2 }')
+
+  create-master-instance $MASTER_RESERVED_IP &
 
   # Create a single firewall rule for all minions.
   create-firewall-rule "${MINION_TAG}-all" "${CLUSTER_IP_RANGE}" "${MINION_TAG}" &
@@ -646,16 +655,6 @@ function kube-up {
   wait-for-jobs
 
   detect-master
-
-  # Reserve the master's IP so that it can later be transferred to another VM
-  # without disrupting the kubelets. IPs are associated with regions, not zones,
-  # so extract the region name, which is the same as the zone but with the final
-  # dash and characters trailing the dash removed.
-  local REGION=${ZONE%-*}
-  gcloud compute addresses create "${MASTER_NAME}-ip" \
-    --project "${PROJECT}" \
-    --addresses "${KUBE_MASTER_IP}" \
-    --region "${REGION}"
 
   echo "Waiting for cluster initialization."
   echo
