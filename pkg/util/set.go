@@ -91,6 +91,24 @@ func (s StringSet) Difference(s2 StringSet) StringSet {
 	return result
 }
 
+// Union returns a new set which includes items in either s1 or s2.
+// vof objects that are not in s2
+// For example:
+// s1 = {1, 2}
+// s2 = {3, 4}
+// s1.Union(s2) = {1, 2, 3, 4}
+// s2.Union(s1) = {1, 2, 3, 4}
+func (s1 StringSet) Union(s2 StringSet) StringSet {
+	result := NewStringSet()
+	for key := range s1 {
+		result.Insert(key)
+	}
+	for key := range s2 {
+		result.Insert(key)
+	}
+	return result
+}
+
 // IsSuperset returns true iff s1 is a superset of s2.
 func (s1 StringSet) IsSuperset(s2 StringSet) bool {
 	for item := range s2 {

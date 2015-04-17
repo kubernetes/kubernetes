@@ -18,6 +18,8 @@ package cache
 
 import (
 	"fmt"
+	"strings"
+
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
 )
 
@@ -67,6 +69,9 @@ type ExplicitKey string
 // keys for API objects which implement meta.Interface.
 // The key uses the format <namespace>/<name> unless <namespace> is empty, then
 // it's just <name>.
+//
+// TODO: replace key-as-string with a key-as-struct so that this
+// packing/unpacking won't be necessary.
 func MetaNamespaceKeyFunc(obj interface{}) (string, error) {
 	if key, ok := obj.(ExplicitKey); ok {
 		return string(key), nil
@@ -79,6 +84,25 @@ func MetaNamespaceKeyFunc(obj interface{}) (string, error) {
 		return meta.Namespace() + "/" + meta.Name(), nil
 	}
 	return meta.Name(), nil
+}
+
+// SplitMetaNamespaceKey returns the namespace and name that
+// MetaNamespaceKeyFunc encoded into key.
+//
+// TODO: replace key-as-string with a key-as-struct so that this
+// packing/unpacking won't be necessary.
+func SplitMetaNamespaceKey(key string) (namespace, name string, err error) {
+	parts := strings.Split(key, "/")
+	switch len(parts) {
+	case 1:
+		// name only, no namespace
+		return "", parts[0], nil
+	case 2:
+		// name and namespace
+		return parts[0], parts[1], nil
+	}
+
+	return "", "", fmt.Errorf("unexpected key format: %q", key)
 }
 
 // cache responsibilities are limited to:
