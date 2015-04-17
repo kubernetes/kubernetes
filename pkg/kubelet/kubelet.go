@@ -2085,8 +2085,8 @@ func (kl *Kubelet) GetCachedMachineInfo() (*cadvisorApi.MachineInfo, error) {
 	return kl.machineInfo, nil
 }
 
-func (kl *Kubelet) ListenAndServe(address net.IP, port uint, tlsOptions *TLSOptions, enableDebuggingHandlers bool) {
-	ListenAndServeKubeletServer(kl, address, port, tlsOptions, enableDebuggingHandlers)
+func (kl *Kubelet) ListenAndServe(address net.IP, port uint, tlsOptions *TLSOptions, enableDebuggingHandlers bool, enableProfiling bool) {
+	ListenAndServeKubeletServer(kl, address, port, tlsOptions, enableDebuggingHandlers, enableProfiling)
 }
 
 func (kl *Kubelet) ListenAndServeReadOnly(address net.IP, port uint) {
