@@ -145,6 +145,22 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
       v.customize ['set', :id, '--shf-guest', 'off']
       v.customize ['set', :id, '--shf-guest-automount', 'off']
       v.customize ['set', :id, '--shf-host', 'on']
+
+      # Remove all auto-mounted "shared folders"; the result seems to
+      # persist between runs (i.e., vagrant halt && vagrant up)
+      override.vm.provision :shell, :inline => (%q{
+        set -ex
+        if [ -d /media/psf ]; then
+          for i in /media/psf/*; do
+            if [ -d "${i}" ]; then
+              umount "${i}" || true
+              rmdir -v "${i}"
+            fi
+          done
+          rmdir -v /media/psf
+        fi
+        exit
+      }).strip
     end
 
     # Finally, fall back to VirtualBox
