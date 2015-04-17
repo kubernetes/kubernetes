@@ -315,14 +315,7 @@ func (e *EndpointController) syncService(key string) {
 				continue
 			}
 
-			inService := false
-			for _, c := range pod.Status.Conditions {
-				if c.Type == api.PodReady && c.Status == api.ConditionTrue {
-					inService = true
-					break
-				}
-			}
-			if !inService {
+			if !api.IsPodReady(pod) {
 				glog.V(5).Infof("Pod is out of service: %v/%v", pod.Namespace, pod.Name)
 				continue
 			}
