@@ -139,7 +139,6 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	patcher, isPatcher := storage.(rest.Patcher)
 	watcher, isWatcher := storage.(rest.Watcher)
 	_, isRedirector := storage.(rest.Redirector)
-	connecter, isConnecter := storage.(rest.Connecter)
 	storageMeta, isMetadata := storage.(rest.StorageMetadata)
 	if !isMetadata {
 		storageMeta = defaultStorageMetadata{}
@@ -194,22 +193,6 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		isGetter = true
 	}
 
-	var (
-		connectOptions     runtime.Object
-		connectOptionsKind string
-		connectSubpath     bool
-		connectSubpathKey  string
-	)
-	if isConnecter {
-		connectOptions, connectSubpath, connectSubpathKey = connecter.NewConnectOptions()
-		if connectOptions != nil {
-			_, connectOptionsKind, err = a.group.Typer.ObjectVersionAndKind(connectOptions)
-			if err != nil {
-				return err
-			}
-		}
-	}
-
 	var ctxFn ContextFunc
 	ctxFn = func(req *restful.Request) api.Context {
 		if ctx, ok := context.Get(req.Request); ok {
@@ -255,8 +238,6 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		actions = appendIf(actions, action{"REDIRECT", "redirect/" + itemPath, nameParams, namer}, isRedirector)
 		actions = appendIf(actions, action{"PROXY", "proxy/" + itemPath + "/{path:*}", proxyParams, namer}, isRedirector)
 		actions = appendIf(actions, action{"PROXY", "proxy/" + itemPath, nameParams, namer}, isRedirector)
-		actions = appendIf(actions, action{"CONNECT", itemPath, nameParams, namer}, isConnecter)
-		actions = appendIf(actions, action{"CONNECT", itemPath + "/{path:*}", nameParams, namer}, isConnecter && connectSubpath)
 
 	} else {
 		// v1beta3 format with namespace in path
@@ -294,8 +275,6 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			actions = appendIf(actions, action{"REDIRECT", "redirect/" + itemPath, nameParams, namer}, isRedirector)
 			actions = appendIf(actions, action{"PROXY", "proxy/" + itemPath + "/{path:*}", proxyParams, namer}, isRedirector)
 			actions = appendIf(actions, action{"PROXY", "proxy/" + itemPath, nameParams, namer}, isRedirector)
-			actions = appendIf(actions, action{"CONNECT", itemPath, nameParams, namer}, isConnecter)
-			actions = appendIf(actions, action{"CONNECT", itemPath + "/{path:*}", nameParams, namer}, isConnecter && connectSubpath)
 
 			// list across namespace.
 			namer = scopeNaming{scope, a.group.Linker, gpath.Join(a.prefix, itemPath), true}
@@ -336,8 +315,6 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			actions = appendIf(actions, action{"REDIRECT", "redirect/" + itemPath, nameParams, namer}, isRedirector)
 			actions = appendIf(actions, action{"PROXY", "proxy/" + itemPath + "/{path:*}", proxyParams, namer}, isRedirector)
 			actions = appendIf(actions, action{"PROXY", "proxy/" + itemPath, nameParams, namer}, isRedirector)
-			actions = appendIf(actions, action{"CONNECT", itemPath, nameParams, namer}, isConnecter)
-			actions = appendIf(actions, action{"CONNECT", itemPath + "/{path:*}", nameParams, namer}, isConnecter && connectSubpath)
 		}
 	}
 
@@ -503,23 +480,6 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			addProxyRoute(ws, "PUT", a.prefix, action.Path, proxyHandler, kind, resource, action.Params)
 			addProxyRoute(ws, "POST", a.prefix, action.Path, proxyHandler, kind, resource, action.Params)
 			addProxyRoute(ws, "DELETE", a.prefix, action.Path, proxyHandler, kind, resource, action.Params)
-		case "CONNECT":
-			for _, method := range connecter.ConnectMethods() {
-				route := ws.Method(method).Path(action.Path).
-					To(ConnectResource(connecter, reqScope, connectOptionsKind, connectSubpath, connectSubpathKey)).
-					Filter(m).
-					Doc("connect " + method + " requests to " + kind).
-					Operation("connect" + method + kind).
-					Produces("*/*").
-					Consumes("*/*").
-					Writes("string")
-				if connectOptions != nil {
-					if err := addObjectParams(ws, route, connectOptions); err != nil {
-						return err
-					}
-				}
-				ws.Route(route)
-			}
 		default:
 			return fmt.Errorf("unrecognized action verb: %s", action.Verb)
 		}
