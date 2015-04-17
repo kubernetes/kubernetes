@@ -268,15 +268,36 @@ function create-salt-auth() {
     (umask 077;
       echo "{\"BearerToken\": \"${KUBELET_TOKEN}\", \"Insecure\": true }" > "${kubelet_auth_file}")
 
+    mkdir -p /srv/salt-overlay/salt/kube-addons
     # Generate tokens for other "service accounts".  Append to known_tokens.
+    # Also, for each account, generate a kubeconfig containing the secret
+    # for that account, and other info needed to reach the master.
+    # The kubeconfigs go into the salt overlay so they can be used
+    # by the kube-addons component, which loads them as secrets.
     #
     # NB: If this list ever changes, this script actually has to
-    # change to detect the existence of this file, kill any deleted
+    # change to detect the known_tokens file, existence of this file, kill any deleted
     # old tokens and add any new tokens (to handle the upgrade case).
     local -r service_accounts=("system:scheduler" "system:controller_manager" "system:logging" "system:monitoring" "system:dns")
     for account in "${service_accounts[@]}"; do
+      local -r munged_username=$(tr -s ':_' '--' <<< "${account}")
+      # Generate random token
       token=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
+      # Put in master's list of known tokens.
       echo "${token},${account},${account}" >> "${KNOWN_TOKENS_FILE}"
+      # Generate a kubeconfig for the service account that will use this token.
+      local -r kubeconfig="/srv/salt-overlay/salt/kube-addons/${munged_username}.kubeconfig"
+      create-service-account-kubeconfig "${kubeconfig}" "${account}" "${token}"
+      # Generate a "secret" kind yaml file that embeds the kubeconfig file.
+      local -r kubeconfig_base64=$(cat "${kubeconfig}" | base64 -w0)
+      local -r kubeconfig="/srv/salt-overlay/salt/kube-addons/${munged_username}.secret.yaml"
+      cat > $secret_yaml <<EOF
+apiVersion: v1beta1
+kind: Secret 
+id: token-${munged_username}
+data:
+  kubeconfig: ${kubeconfig_base64}
+EOF
     done
   fi
 }
