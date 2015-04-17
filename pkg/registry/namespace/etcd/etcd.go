@@ -20,6 +20,7 @@ import (
 	"fmt"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/generic"
@@ -48,14 +49,15 @@ type FinalizeREST struct {
 
 // NewStorage returns a RESTStorage object that will work against namespaces
 func NewStorage(h tools.EtcdHelper) (*REST, *StatusREST, *FinalizeREST) {
+	prefix := "/registry/namespaces"
 	store := &etcdgeneric.Etcd{
 		NewFunc:     func() runtime.Object { return &api.Namespace{} },
 		NewListFunc: func() runtime.Object { return &api.NamespaceList{} },
-		KeyRootFunc: func(ctx api.Context) string {
-			return "/registry/namespaces"
+		KeyRootFunc: func(ctx api.Context) (string, error) {
+			return etcdgeneric.NoNamespaceKeyRootFunc(ctx, prefix)
 		},
 		KeyFunc: func(ctx api.Context, name string) (string, error) {
-			return "/registry/namespaces/" + name, nil
+			return etcdgeneric.NoNamespaceKeyFunc(ctx, prefix, name)
 		},
 		ObjectNameFunc: func(obj runtime.Object) (string, error) {
 			return obj.(*api.Namespace).Name, nil
@@ -79,6 +81,35 @@ func NewStorage(h tools.EtcdHelper) (*REST, *StatusREST, *FinalizeREST) {
 	return &REST{Etcd: store, status: &statusStore}, &StatusREST{store: &statusStore}, &FinalizeREST{store: &finalizeStore}
 }
 
+// validateContext checks for either of these conditions
+// - ctx has no namespace set (valid since Namespace is a root-scoped type)
+// - ctx has a namespace equal to the given name (valid since getting/updating/deleting a Namespace is considered scoped to that namespace)
+func validateContext(ctx api.Context, name string) error {
+	ns := api.NamespaceValue(ctx)
+	if ns != api.NamespaceNone && ns != name {
+		return errors.NewBadRequest("Namespace in context does not match namespace name")
+	}
+	return nil
+}
+
+// Get overrides the default implementation to validate the namespace in the context,
+// then call the generic etcd registry without a namespace in the context
+func (r *REST) Get(ctx api.Context, name string) (runtime.Object, error) {
+	if err := validateContext(ctx, name); err != nil {
+		return nil, err
+	}
+	return r.Etcd.Get(api.WithoutNamespace(ctx), name)
+}
+
+// Update overrides the default implementation to validate the namespace in the context,
+// then call the generic etcd registry without a namespace in the context
+func (r *REST) Update(ctx api.Context, obj runtime.Object) (runtime.Object, bool, error) {
+	if err := validateContext(ctx, obj.(*api.Namespace).Name); err != nil {
+		return nil, false, err
+	}
+	return r.Etcd.Update(api.WithoutNamespace(ctx), obj)
+}
+
 // Delete enforces life-cycle rules for namespace termination
 func (r *REST) Delete(ctx api.Context, name string, options *api.DeleteOptions) (runtime.Object, error) {
 	nsObj, err := r.Get(ctx, name)
@@ -87,6 +118,7 @@ func (r *REST) Delete(ctx api.Context, name string, options *api.DeleteOptions) 
 	}
 
 	namespace := nsObj.(*api.Namespace)
+	ctx = api.WithoutNamespace(ctx)
 
 	// upon first request to delete, we switch the phase to start namespace termination
 	if namespace.DeletionTimestamp.IsZero() {
@@ -110,8 +142,13 @@ func (r *StatusREST) New() runtime.Object {
 }
 
 // Update alters the status subset of an object.
+// This function validates the namespace in the context,
+// then calls the generic etcd registry without a namespace in the context
 func (r *StatusREST) Update(ctx api.Context, obj runtime.Object) (runtime.Object, bool, error) {
-	return r.store.Update(ctx, obj)
+	if err := validateContext(ctx, obj.(*api.Namespace).Name); err != nil {
+		return nil, false, err
+	}
+	return r.store.Update(api.WithoutNamespace(ctx), obj)
 }
 
 func (r *FinalizeREST) New() runtime.Object {
@@ -119,6 +156,11 @@ func (r *FinalizeREST) New() runtime.Object {
 }
 
 // Update alters the status finalizers subset of an object.
+// This function validates the namespace in the context,
+// then calls the generic etcd registry without a namespace in the context
 func (r *FinalizeREST) Update(ctx api.Context, obj runtime.Object) (runtime.Object, bool, error) {
-	return r.store.Update(ctx, obj)
+	if err := validateContext(ctx, obj.(*api.Namespace).Name); err != nil {
+		return nil, false, err
+	}
+	return r.store.Update(api.WithoutNamespace(ctx), obj)
 }

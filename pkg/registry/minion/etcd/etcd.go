@@ -54,11 +54,11 @@ func NewStorage(h tools.EtcdHelper, connection client.ConnectionInfoGetter) (*RE
 	store := &etcdgeneric.Etcd{
 		NewFunc:     func() runtime.Object { return &api.Node{} },
 		NewListFunc: func() runtime.Object { return &api.NodeList{} },
-		KeyRootFunc: func(ctx api.Context) string {
-			return prefix
+		KeyRootFunc: func(ctx api.Context) (string, error) {
+			return etcdgeneric.NoNamespaceKeyRootFunc(ctx, prefix)
 		},
 		KeyFunc: func(ctx api.Context, name string) (string, error) {
-			return prefix + "/" + name, nil
+			return etcdgeneric.NoNamespaceKeyFunc(ctx, prefix, name)
 		},
 		ObjectNameFunc: func(obj runtime.Object) (string, error) {
 			return obj.(*api.Node).Name, nil

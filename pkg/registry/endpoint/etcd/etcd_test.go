@@ -112,7 +112,10 @@ func TestDelete(t *testing.T) {
 func TestEtcdListEndpoints(t *testing.T) {
 	ctx := api.NewDefaultContext()
 	storage, fakeClient := newStorage(t)
-	key := storage.KeyRootFunc(ctx)
+	key, err := storage.KeyRootFunc(ctx)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 	fakeClient.Data[key] = tools.EtcdResponseWithError{
 		R: &etcd.Response{
 			Node: &etcd.Node{
@@ -182,7 +185,10 @@ func TestListEmptyEndpointsList(t *testing.T) {
 	ctx := api.NewDefaultContext()
 	storage, fakeClient := newStorage(t)
 	fakeClient.ChangeIndex = 1
-	key := storage.KeyRootFunc(ctx)
+	key, err := storage.KeyRootFunc(ctx)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 	fakeClient.Data[key] = tools.EtcdResponseWithError{
 		R: &etcd.Response{},
 		E: fakeClient.NewError(tools.EtcdErrorCodeNotFound),
@@ -205,7 +211,10 @@ func TestListEndpointsList(t *testing.T) {
 	ctx := api.NewDefaultContext()
 	storage, fakeClient := newStorage(t)
 	fakeClient.ChangeIndex = 1
-	key := storage.KeyRootFunc(ctx)
+	key, err := storage.KeyRootFunc(ctx)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 	fakeClient.Data[key] = tools.EtcdResponseWithError{
 		R: &etcd.Response{
 			Node: &etcd.Node{

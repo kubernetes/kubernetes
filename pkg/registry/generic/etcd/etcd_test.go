@@ -74,7 +74,7 @@ func NewTestGenericEtcdRegistry(t *testing.T) (*tools.FakeEtcdClient, *Etcd) {
 		EndpointName:   "pods",
 		CreateStrategy: strategy,
 		UpdateStrategy: strategy,
-		KeyRootFunc:    func(ctx api.Context) string { return "/registry/pods" },
+		KeyRootFunc:    func(ctx api.Context) (string, error) { return "/registry/pods", nil },
 		KeyFunc: func(ctx api.Context, id string) (string, error) {
 			return path.Join("/registry/pods", id), nil
 		},
@@ -207,7 +207,12 @@ func TestEtcdList(t *testing.T) {
 			}
 			fakeClient.Data[key] = item.in
 		} else {
-			fakeClient.Data[registry.KeyRootFunc(api.NewContext())] = item.in
+			key, err := registry.KeyRootFunc(api.NewContext())
+			if err != nil {
+				t.Errorf("%v: unexpected error: %v", name, err)
+				continue
+			}
+			fakeClient.Data[key] = item.in
 		}
 		list, err := registry.ListPredicate(api.NewContext(), item.m)
 		if e, a := item.succeed, err == nil; e != a {

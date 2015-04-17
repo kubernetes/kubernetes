@@ -45,7 +45,7 @@ func NewREST(h tools.EtcdHelper) *REST {
 		NewListFunc: func() runtime.Object { return &api.ReplicationControllerList{} },
 		// Produces a path that etcd understands, to the root of the resource
 		// by combining the namespace in the context with the given prefix
-		KeyRootFunc: func(ctx api.Context) string {
+		KeyRootFunc: func(ctx api.Context) (string, error) {
 			return etcdgeneric.NamespaceKeyRootFunc(ctx, controllerPrefix)
 		},
 		// Produces a path that etcd understands, to the resource by combining

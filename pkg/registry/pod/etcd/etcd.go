@@ -60,7 +60,7 @@ func NewStorage(h tools.EtcdHelper, k client.ConnectionInfoGetter) PodStorage {
 	store := &etcdgeneric.Etcd{
 		NewFunc:     func() runtime.Object { return &api.Pod{} },
 		NewListFunc: func() runtime.Object { return &api.PodList{} },
-		KeyRootFunc: func(ctx api.Context) string {
+		KeyRootFunc: func(ctx api.Context) (string, error) {
 			return etcdgeneric.NamespaceKeyRootFunc(ctx, prefix)
 		},
 		KeyFunc: func(ctx api.Context, name string) (string, error) {

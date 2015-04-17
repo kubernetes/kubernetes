@@ -61,6 +61,11 @@ func WithNamespace(parent Context, namespace string) Context {
 	return WithValue(parent, namespaceKey, namespace)
 }
 
+// WithoutNamespace returns a copy of parent in which the namespace value is set to NamespaceNone
+func WithoutNamespace(parent Context) Context {
+	return WithValue(parent, namespaceKey, NamespaceNone)
+}
+
 // NamespaceFrom returns the value of the namespace key on the ctx
 func NamespaceFrom(ctx Context) (string, bool) {
 	namespace, ok := ctx.Value(namespaceKey).(string)
