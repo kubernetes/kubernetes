@@ -272,29 +272,20 @@ function get-password {
   fi
 }
 
-# Set MASTER_HTPASSWD
-function set-master-htpasswd {
-  python "${KUBE_ROOT}/third_party/htpasswd/htpasswd.py" \
-    -b -c "${KUBE_TEMP}/htpasswd" "$KUBE_USER" "$KUBE_PASSWORD"
-  local htpasswd
-  MASTER_HTPASSWD=$(cat "${KUBE_TEMP}/htpasswd")
-}
-
-# Generate authentication token for admin user. Will
-# read from $HOME/.kubernetes_auth if available.
+# Ensure that we have a bearer token created for validating to the master.
+# Will read from kubeconfig for the current context if available.
+#
+# Assumed vars
+#   KUBE_ROOT
 #
 # Vars set:
-#   KUBE_ADMIN_TOKEN
-function get-admin-token {
-  local file="$HOME/.kubernetes_auth"
-  if [[ -r "$file" ]]; then
-    KUBE_ADMIN_TOKEN=$(cat "$file" | python -c 'import json,sys;print json.load(sys.stdin)["BearerToken"]')
-    return
+#   KUBE_BEARER_TOKEN
+function get-bearer-token() {
+  get-kubeconfig-bearertoken
+  if [[ -z "${KUBE_BEARER_TOKEN:-}" ]]; then
+    KUBE_BEARER_TOKEN=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
   fi
-  KUBE_ADMIN_TOKEN=$(python -c 'import string,random; print "".join(random.SystemRandom().choice(string.ascii_letters + string.digits) for _ in range(32))')
 }
-
-
 
 # Wait for background jobs to finish. Exit with
 # an error status if any of the jobs failed.
@@ -482,7 +473,7 @@ ENABLE_CLUSTER_DNS: $(yaml-quote ${ENABLE_CLUSTER_DNS:-false})
 DNS_REPLICAS: $(yaml-quote ${DNS_REPLICAS:-})
 DNS_SERVER_IP: $(yaml-quote ${DNS_SERVER_IP:-})
 DNS_DOMAIN: $(yaml-quote ${DNS_DOMAIN:-})
-MASTER_HTPASSWD: $(yaml-quote ${MASTER_HTPASSWD})
+KUBE_BEARER_TOKEN: $(yaml-quote ${KUBE_BEARER_TOKEN})
 ADMISSION_CONTROL: $(yaml-quote ${ADMISSION_CONTROL:-})
 MASTER_IP_RANGE: $(yaml-quote ${MASTER_IP_RANGE})
 EOF
@@ -516,8 +507,7 @@ function write-node-env {
 # variables are set:
 #   ensure-temp-dir
 #   detect-project
-#   get-password
-#   set-master-htpasswd
+#   get-bearer-token
 #
 function create-master-instance {
   local address_opt=""
@@ -550,8 +540,7 @@ function kube-up {
   ensure-temp-dir
   detect-project
 
-  get-password
-  set-master-htpasswd
+  get-bearer-token
 
   # Make sure we have the tar files staged on Google Storage
   find-release-tars
@@ -679,8 +668,9 @@ function kube-up {
   echo "  up."
   echo
 
-  until curl --insecure --user "${KUBE_USER}:${KUBE_PASSWORD}" --max-time 5 \
-          --fail --output /dev/null --silent "https://${KUBE_MASTER_IP}/api/v1beta1/pods"; do
+  until curl --insecure -H "Authorization: Bearer ${KUBE_BEARER_TOKEN}" \
+          --max-time 5 --fail --output /dev/null --silent \
+          "https://${KUBE_MASTER_IP}/api/v1beta1/pods"; do
       printf "."
       sleep 2
   done
@@ -859,8 +849,7 @@ function kube-push {
   detect-project
   detect-master
   detect-minion-names
-  get-password
-  set-master-htpasswd
+  get-bearer-token
 
   # Make sure we have the tar files staged on Google Storage
   find-release-tars
