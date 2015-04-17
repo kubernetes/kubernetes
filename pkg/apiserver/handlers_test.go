@@ -147,9 +147,14 @@ func TestGetAPIRequestInfo(t *testing.T) {
 		expectedParts       []string
 	}{
 
-		// resource paths
+		// namespace paths
 		{"GET", "/namespaces", "list", "", "", "namespaces", "", "Namespace", "", []string{"namespaces"}},
 		{"GET", "/namespaces/other", "get", "", "other", "namespaces", "", "Namespace", "other", []string{"namespaces", "other"}},
+		{"PUT", "/namespaces/other", "update", "", "other", "namespaces", "", "Namespace", "other", []string{"namespaces", "other"}},
+		{"POST", "/namespaces", "create", "", "", "namespaces", "", "Namespace", "", []string{"namespaces"}},
+		{"DELETE", "/namespaces/other", "delete", "", "other", "namespaces", "", "Namespace", "other", []string{"namespaces", "other"}},
+		{"GET", "/proxy/namespaces/other", "proxy", "", "other", "namespaces", "", "Namespace", "other", []string{"namespaces", "other"}},
+		{"GET", "/redirect/namespaces/other", "redirect", "", "other", "namespaces", "", "Namespace", "other", []string{"namespaces", "other"}},
 
 		// root scope type paths
 		{"GET", "/minions", "list", "", "", "minions", "", "Minion", "", []string{"minions"}},
@@ -160,6 +165,7 @@ func TestGetAPIRequestInfo(t *testing.T) {
 		{"GET", "/proxy/minions/foo", "proxy", "", "", "minions", "", "Minion", "foo", []string{"minions", "foo"}},
 		{"GET", "/redirect/minions/foo", "redirect", "", "", "minions", "", "Minion", "foo", []string{"minions", "foo"}},
 
+		// resource paths
 		{"GET", "/namespaces/other/pods", "list", "", "other", "pods", "", "Pod", "", []string{"pods"}},
 		{"GET", "/namespaces/other/pods/foo", "get", "", "other", "pods", "", "Pod", "foo", []string{"pods", "foo"}},
 		{"GET", "/pods", "list", "", api.NamespaceAll, "pods", "", "Pod", "", []string{"pods"}},
@@ -200,6 +206,7 @@ func TestGetAPIRequestInfo(t *testing.T) {
 
 		// subresource identification
 		{"GET", "/namespaces/other/pods/foo/status", "get", "", "other", "pods", "status", "Pod", "foo", []string{"pods", "foo", "status"}},
+		{"PUT", "/namespaces/other/status", "update", "", "other", "status", "", "", "", []string{"status"}},
 		{"PUT", "/namespaces/other/finalize", "update", "", "other", "finalize", "", "", "", []string{"finalize"}},
 	}
 
