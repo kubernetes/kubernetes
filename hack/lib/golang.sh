@@ -303,7 +303,7 @@ kube::golang::build_binaries_for_platform() {
       fi
 
       if kube::golang::is_statically_linked_library "${binary}"; then
-        CGO_ENABLED=0 go build -installsuffix cgo -o "${output_path}/${bin}" \
+        CGO_ENABLED=0 go build -o "${output_path}/${bin}" \
           "${goflags[@]:+${goflags[@]}}" \
           -ldflags "${version_ldflags}" \
           "${binary}"
