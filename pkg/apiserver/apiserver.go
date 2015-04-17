@@ -257,7 +257,6 @@ func writeJSON(statusCode int, codec runtime.Codec, object runtime.Object, w htt
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
-	glog.Infof("Writting status code: %d", statusCode)
 	w.WriteHeader(statusCode)
 	w.Write(formatted.Bytes())
 }
