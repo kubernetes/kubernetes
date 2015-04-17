@@ -36,6 +36,38 @@ type RollingUpdater struct {
 	ns string
 }
 
+// RollingUpdaterConfig is the configuration for a rolling deployment process.
+type RollingUpdaterConfig struct {
+	// Out is a writer for progress output.
+	Out io.Writer
+	// OldRC is an existing controller to be replaced.
+	OldRc *api.ReplicationController
+	// NewRc is a controller that will take ownership of updated pods (will be
+	// created if needed).
+	NewRc *api.ReplicationController
+	// UpdatePeriod is the time to wait between individual pod updates.
+	UpdatePeriod time.Duration
+	// Interval is the time to wait between polling controller status after
+	// update.
+	Interval time.Duration
+	// Timeout is the time to wait for controller updates before giving up.
+	Timeout time.Duration
+	// CleanupPolicy defines the cleanup action to take after the deployment is
+	// complete.
+	CleanupPolicy RollingUpdaterCleanupPolicy
+}
+
+// RollingUpdaterCleanupPolicy is a cleanup action to take after the
+// deployment is complete.
+type RollingUpdaterCleanupPolicy string
+
+const (
+	// DeleteRollingUpdateCleanupPolicy means delete the old controller.
+	DeleteRollingUpdateCleanupPolicy RollingUpdaterCleanupPolicy = "Delete"
+	// PreserveRollingUpdateCleanupPolicy means keep the old controller.
+	PreserveRollingUpdateCleanupPolicy RollingUpdaterCleanupPolicy = "Preserve"
+)
+
 // NewRollingUpdater creates a RollingUpdater from a client
 func NewRollingUpdater(namespace string, c RollingUpdaterClient) *RollingUpdater {
 	return &RollingUpdater{
@@ -49,20 +81,25 @@ const (
 	desiredReplicasAnnotation = kubectlAnnotationPrefix + "desired-replicas"
 )
 
-// Update all pods for a ReplicationController (oldRc) by creating a new controller (newRc)
-// with 0 replicas, and synchronously resizing oldRc,newRc by 1 until oldRc has 0 replicas
-// and newRc has the original # of desired replicas. oldRc is then deleted.
-// If an update from newRc to oldRc is already in progress, we attempt to drive it to completion.
-// If an error occurs at any step of the update, the error will be returned.
-//  'out' writer for progress output
-//  'oldRc' existing controller to be replaced
-//  'newRc' controller that will take ownership of updated pods (will be created if needed)
-//  'updatePeriod' time to wait between individual pod updates
-//  'interval' time to wait between polling controller status after update
-//  'timeout' time to wait for controller updates before giving up
+// Update all pods for a ReplicationController (oldRc) by creating a new
+// controller (newRc) with 0 replicas, and synchronously resizing oldRc,newRc
+// by 1 until oldRc has 0 replicas and newRc has the original # of desired
+// replicas. Cleanup occurs based on a RollingUpdaterCleanupPolicy.
 //
-// TODO: make this handle performing a rollback of a partially completed rollout.
-func (r *RollingUpdater) Update(out io.Writer, oldRc, newRc *api.ReplicationController, updatePeriod, interval, timeout time.Duration) error {
+// If an update from newRc to oldRc is already in progress, we attempt to
+// drive it to completion. If an error occurs at any step of the update, the
+// error will be returned.
+//
+// TODO: make this handle performing a rollback of a partially completed
+// rollout.
+func (r *RollingUpdater) Update(config *RollingUpdaterConfig) error {
+	out := config.Out
+	oldRc := config.OldRc
+	newRc := config.NewRc
+	updatePeriod := config.UpdatePeriod
+	interval := config.Interval
+	timeout := config.Timeout
+
 	oldName := oldRc.ObjectMeta.Name
 	newName := newRc.ObjectMeta.Name
 	retry := &RetryParams{interval, timeout}
@@ -156,9 +193,17 @@ func (r *RollingUpdater) Update(out io.Writer, oldRc, newRc *api.ReplicationCont
 	if err != nil {
 		return err
 	}
-	// delete old rc
-	fmt.Fprintf(out, "Update succeeded. Deleting %s\n", oldName)
-	return r.c.DeleteReplicationController(r.ns, oldName)
+
+	switch config.CleanupPolicy {
+	case DeleteRollingUpdateCleanupPolicy:
+		// delete old rc
+		fmt.Fprintf(out, "Update succeeded. Deleting %s\n", oldName)
+		return r.c.DeleteReplicationController(r.ns, oldName)
+	case PreserveRollingUpdateCleanupPolicy:
+		return nil
+	default:
+		return nil
+	}
 }
 
 func (r *RollingUpdater) getExistingNewRc(sourceId, name string) (rc *api.ReplicationController, existing bool, err error) {

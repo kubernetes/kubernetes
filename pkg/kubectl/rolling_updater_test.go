@@ -19,12 +19,14 @@ package kubectl
 import (
 	"bytes"
 	"fmt"
+	"io/ioutil"
 	"testing"
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/testclient"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/wait"
 )
 
 type updaterFake struct {
@@ -257,7 +259,16 @@ Update succeeded. Deleting foo-v1
 			"default",
 		}
 		var buffer bytes.Buffer
-		if err := updater.Update(&buffer, test.oldRc, test.newRc, 0, time.Millisecond, time.Millisecond); err != nil {
+		config := &RollingUpdaterConfig{
+			Out:           &buffer,
+			OldRc:         test.oldRc,
+			NewRc:         test.newRc,
+			UpdatePeriod:  0,
+			Interval:      time.Millisecond,
+			Timeout:       time.Millisecond,
+			CleanupPolicy: DeleteRollingUpdateCleanupPolicy,
+		}
+		if err := updater.Update(config); err != nil {
 			t.Errorf("Update failed: %v", err)
 		}
 		if buffer.String() != test.output {
@@ -299,10 +310,101 @@ Update succeeded. Deleting foo-v1
 	updater := RollingUpdater{NewRollingUpdaterClient(fakeClientFor("default", responses)), "default"}
 
 	var buffer bytes.Buffer
-	if err := updater.Update(&buffer, rc, rcExisting, 0, time.Millisecond, time.Millisecond); err != nil {
+	config := &RollingUpdaterConfig{
+		Out:           &buffer,
+		OldRc:         rc,
+		NewRc:         rcExisting,
+		UpdatePeriod:  0,
+		Interval:      time.Millisecond,
+		Timeout:       time.Millisecond,
+		CleanupPolicy: DeleteRollingUpdateCleanupPolicy,
+	}
+	if err := updater.Update(config); err != nil {
 		t.Errorf("Update failed: %v", err)
 	}
 	if buffer.String() != output {
 		t.Errorf("Output was not as expected. Expected:\n%s\nGot:\n%s", output, buffer.String())
 	}
+}
+
+// TestRollingUpdater_preserveCleanup ensures that the old controller isn't
+// deleted following a successful deployment.
+func TestRollingUpdater_preserveCleanup(t *testing.T) {
+	rc := oldRc(2)
+	rcExisting := newRc(1, 3)
+
+	updater := &RollingUpdater{
+		ns: "default",
+		c: &rollingUpdaterClientImpl{
+			GetReplicationControllerFn: func(namespace, name string) (*api.ReplicationController, error) {
+				switch name {
+				case rc.Name:
+					return rc, nil
+				case rcExisting.Name:
+					return rcExisting, nil
+				default:
+					return nil, fmt.Errorf("unexpected get call for %s/%s", namespace, name)
+				}
+			},
+			UpdateReplicationControllerFn: func(namespace string, rc *api.ReplicationController) (*api.ReplicationController, error) {
+				return rc, nil
+			},
+			CreateReplicationControllerFn: func(namespace string, rc *api.ReplicationController) (*api.ReplicationController, error) {
+				t.Fatalf("unexpected call to create %s/rc:%#v", namespace, rc)
+				return nil, nil
+			},
+			DeleteReplicationControllerFn: func(namespace, name string) error {
+				t.Fatalf("unexpected call to delete %s/%s", namespace, name)
+				return nil
+			},
+			ControllerHasDesiredReplicasFn: func(rc *api.ReplicationController) wait.ConditionFunc {
+				return func() (done bool, err error) {
+					return true, nil
+				}
+			},
+		},
+	}
+
+	config := &RollingUpdaterConfig{
+		Out:           ioutil.Discard,
+		OldRc:         rc,
+		NewRc:         rcExisting,
+		UpdatePeriod:  0,
+		Interval:      time.Millisecond,
+		Timeout:       time.Millisecond,
+		CleanupPolicy: PreserveRollingUpdateCleanupPolicy,
+	}
+	err := updater.Update(config)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+}
+
+// rollingUpdaterClientImpl is a dynamic RollingUpdaterClient.
+type rollingUpdaterClientImpl struct {
+	GetReplicationControllerFn     func(namespace, name string) (*api.ReplicationController, error)
+	UpdateReplicationControllerFn  func(namespace string, rc *api.ReplicationController) (*api.ReplicationController, error)
+	CreateReplicationControllerFn  func(namespace string, rc *api.ReplicationController) (*api.ReplicationController, error)
+	DeleteReplicationControllerFn  func(namespace, name string) error
+	ControllerHasDesiredReplicasFn func(rc *api.ReplicationController) wait.ConditionFunc
+}
+
+func (c *rollingUpdaterClientImpl) GetReplicationController(namespace, name string) (*api.ReplicationController, error) {
+	return c.GetReplicationControllerFn(namespace, name)
+}
+
+func (c *rollingUpdaterClientImpl) UpdateReplicationController(namespace string, rc *api.ReplicationController) (*api.ReplicationController, error) {
+	return c.UpdateReplicationControllerFn(namespace, rc)
+}
+
+func (c *rollingUpdaterClientImpl) CreateReplicationController(namespace string, rc *api.ReplicationController) (*api.ReplicationController, error) {
+	return c.CreateReplicationControllerFn(namespace, rc)
+}
+
+func (c *rollingUpdaterClientImpl) DeleteReplicationController(namespace, name string) error {
+	return c.DeleteReplicationControllerFn(namespace, name)
+}
+
+func (c *rollingUpdaterClientImpl) ControllerHasDesiredReplicas(rc *api.ReplicationController) wait.ConditionFunc {
+	return c.ControllerHasDesiredReplicasFn(rc)
 }
