@@ -19,26 +19,6 @@
 # managed result is of that. Start everything below that directory.
 KUBECTL=/usr/local/bin/kubectl
 
-function create-kubernetesauth-secret() {
-  local -r token=$1
-  local -r username=$2
-  local -r safe_username=$(tr -s ':_' '--' <<< "${username}")
-
-  # Make secret with a kubernetes_auth file with a token.
-  # TODO(etune): put apiserver certs into secret too, and reference from authfile,
-  # so that "Insecure" is not needed.
-  kafile=$(echo "{\"BearerToken\": \"${token}\", \"Insecure\": true }" | base64 -w0)
-  read -r -d '' secretjson <<EOF
-apiVersion: v1beta1
-kind: Secret 
-id: token-${safe_username}
-data:
-  kubernetes-auth: ${kafile}
-EOF
-  create-resource-from-string "${secretjson}" 100 10 "Secret-for-token-for-user-${username}" &
-# TODO: label the secrets with special label so kubectl does not show these?
-}
-
 # $1 filename of addon to start.
 # $2 count of tries to start the addon.
 # $3 delay in seconds between two consecutive tries
@@ -74,20 +54,6 @@ function create-resource-from-string() {
 # was already enforced by salt, and /etc/kubernetes/addons is the
 # managed result is of that. Start everything below that directory.
 echo "== Kubernetes addon manager started at $(date -Is) =="
-
-# Generate secrets for "internal service accounts".
-# TODO(etune): move to a completely yaml/object based
-# workflow so that service accounts can be created
-# at the same time as the services that use them.
-# NOTE: needs to run as root to read this file.
-# Read each line in the csv file of tokens.
-while read line; do
-  # Split each line into the token and username.
-  IFS=',' read -a parts <<< "${line}"
-  token=${parts[0]}
-  username=${parts[1]}
-  create-kubernetesauth-secret "${token}" "${username}"
-done < /srv/kubernetes/known_tokens.csv
 
 for obj in $(find /etc/kubernetes/addons -name \*.yaml); do
   start_addon ${obj} 100 10 &

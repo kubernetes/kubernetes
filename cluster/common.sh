@@ -24,7 +24,7 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 
 DEFAULT_KUBECONFIG="${HOME}/.kube/config"
 
-# Generate kubeconfig data for the created cluster.
+# Generate kubeconfig data for admin user for the created cluster.
 # Assumed vars:
 #   KUBE_USER
 #   KUBE_PASSWORD
@@ -56,6 +56,52 @@ function create-kubeconfig() {
   "${kubectl}" config use-context "${CONTEXT}"  --cluster="${CONTEXT}"
 
    echo "Wrote config for ${CONTEXT} to ${KUBECONFIG}"
+}
+
+# Generate kubeconfig data for a specific service account
+# (non-admin builtin user) for the created cluster.
+# Arguments:
+# $1    path of generated kubeconfig file.
+# $2    username of service account
+# $3    token
+# 
+# Assumed vars:
+#   KUBE_MASTER_IP
+#
+#   KUBE_CERT
+#   KUBE_KEY
+#   CA_CERT
+function create-service-account-kubeconfig() {
+  local kubectl="${KUBE_ROOT}/cluster/kubectl.sh"
+  local kubeconfig=$1
+  local kube_user=$2
+  local token=$3
+  local context="pod"  # Any string would do here because a service account kubeconfig
+                       # is generated per-cluster and stored as a secret in that cluster.
+
+  # kubeconfig determines the file we write to, but it may not exist yet
+  if [[ ! -e "${kubeconfig}" ]]; then
+    mkdir -p $(dirname "${kubeconfig}")
+    touch "${kubeconfig}"
+  fi
+  local context="local"
+  "${kubectl}" config set-cluster "${context}" --kubeconfig="${kubeconfig}" \
+                                               --server="https://${KUBE_MASTER_IP}" \
+                                               --certificate-authority="${CA_CERT}" \
+                                               --embed-certs=true
+  "${kubectl}" config set-credentials "${context}" --kubeconfig="${kubeconfig}" \
+                                                   --username="${kube_user}" \
+                                                   --token="${token}" \
+                                                    --client-certificate="${KUBE_CERT}" \
+                                                    --client-key="${KUBE_KEY}" \
+                                                    --embed-certs=true
+  "${kubectl}" config set-context "${context}" --kubeconfig="${kubeconfig}" \
+                                               --cluster="${context}" \
+                                               --user="${context}"
+  "${kubectl}" config use-context "${context}"  --kubeconfig="${kubeconfig}" \
+                                                --cluster="${context}"
+
+   echo "Wrote config for ${context} to ${kubeconfig}"
 }
 
 # Clear kubeconfig data for a context
