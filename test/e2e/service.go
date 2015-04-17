@@ -330,7 +330,7 @@ var _ = Describe("Services", func() {
 
 		By("hitting the pod through the service's external load balancer")
 		var resp *http.Response
-		for t := time.Now(); time.Since(t) < time.Minute; time.Sleep(5 * time.Second) {
+		for t := time.Now(); time.Since(t) < podStartTimeout; time.Sleep(5 * time.Second) {
 			resp, err = http.Get(fmt.Sprintf("http://%s:%d", ip, port))
 			if err == nil {
 				break
@@ -409,7 +409,7 @@ func waitForPublicIPs(c *client.Client, serviceName, namespace string) (*api.Ser
 		}
 		Logf("Waiting for service %s in namespace %s to have a public IP (%v)", serviceName, namespace, time.Since(start))
 	}
-	return service, fmt.Errorf("service %s in namespace %s doesn't have a public IP after %.2f seconds", serviceName, namespace, podStartTimeout.Seconds())
+	return service, fmt.Errorf("service %s in namespace %s doesn't have a public IP after %.2f seconds", serviceName, namespace, timeout.Seconds())
 }
 
 func validateUniqueOrFail(s []string) {
