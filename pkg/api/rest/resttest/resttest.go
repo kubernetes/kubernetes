@@ -36,6 +36,8 @@ type Tester struct {
 	clusterScope bool
 }
 
+const testNamespace = "test"
+
 type injectErrorFunc func(err error)
 
 func New(t *testing.T, storage rest.Storage, storageError injectErrorFunc) *Tester {
@@ -61,7 +63,7 @@ func (t *Tester) newContext() api.Context {
 	if t.clusterScope {
 		return api.NewContext()
 	}
-	return api.NewDefaultContext()
+	return api.WithNamespace(api.NewContext(), testNamespace)
 }
 
 func copyOrDie(obj runtime.Object) runtime.Object {
@@ -113,7 +115,7 @@ func (t *Tester) TestCreateHasMetadata(valid runtime.Object) {
 	}
 
 	objectMeta.Name = "test"
-	objectMeta.Namespace = api.NamespaceDefault
+	objectMeta.Namespace = testNamespace
 	if t.clusterScope {
 		objectMeta.Namespace = api.NamespaceNone
 	}
