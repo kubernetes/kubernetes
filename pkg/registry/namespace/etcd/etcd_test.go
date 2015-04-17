@@ -285,15 +285,45 @@ func TestGet(t *testing.T) {
 		},
 	}
 	storage, _, _ := NewStorage(helper)
-	obj, err := storage.Get(api.NewContext(), "foo")
-	namespace := obj.(*api.Namespace)
+	obj, err := storage.Get(api.WithNamespace(api.NewContext(), "foo"), "foo")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+	namespace := obj.(*api.Namespace)
 
 	expect.Status.Phase = api.NamespaceActive
 	if e, a := expect, namespace; !api.Semantic.DeepEqual(e, a) {
 		t.Errorf("Unexpected namespace: %s", util.ObjectDiff(e, a))
+	}
+}
+
+func TestUpdateNamespace(t *testing.T) {
+	existingNamespace := api.Namespace{
+		ObjectMeta: api.ObjectMeta{
+			Name: "foo",
+		},
+		Status: api.NamespaceStatus{Phase: api.NamespaceActive},
+	}
+
+	updatedNamespace := existingNamespace
+	updatedNamespace.ResourceVersion = "1"
+
+	fakeEtcdClient, helper := newHelper(t)
+	fakeEtcdClient.ChangeIndex = 1
+	fakeEtcdClient.Data["/registry/namespaces/foo"] = tools.EtcdResponseWithError{
+		R: &etcd.Response{
+			Node: &etcd.Node{
+				Value:         runtime.EncodeOrDie(latest.Codec, &existingNamespace),
+				ModifiedIndex: 1,
+				CreatedIndex:  1,
+			},
+		},
+	}
+	storage, _, _ := NewStorage(helper)
+	_, _, err := storage.Update(api.WithNamespace(api.NewContext(), "foo"), &updatedNamespace)
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }
 
@@ -315,7 +345,7 @@ func TestDeleteNamespace(t *testing.T) {
 		},
 	}
 	storage, _, _ := NewStorage(helper)
-	_, err := storage.Delete(api.NewContext(), "foo", nil)
+	_, err := storage.Delete(api.WithNamespace(api.NewContext(), "foo"), "foo", nil)
 
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -345,7 +375,7 @@ func TestDeleteNamespaceWithIncompleteFinalizers(t *testing.T) {
 		},
 	}
 	storage, _, _ := NewStorage(helper)
-	_, err := storage.Delete(api.NewContext(), "foo", nil)
+	_, err := storage.Delete(api.WithNamespace(api.NewContext(), "foo"), "foo", nil)
 	if err == nil {
 		t.Fatalf("expected error: %v", err)
 	}
@@ -374,7 +404,7 @@ func TestDeleteNamespaceWithCompleteFinalizers(t *testing.T) {
 		},
 	}
 	storage, _, _ := NewStorage(helper)
-	_, err := storage.Delete(api.NewContext(), "foo", nil)
+	_, err := storage.Delete(api.WithNamespace(api.NewContext(), "foo"), "foo", nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
