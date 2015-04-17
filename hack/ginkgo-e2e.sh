@@ -19,6 +19,7 @@ set -o nounset
 set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+source "${KUBE_ROOT}/cluster/common.sh"
 
 # --- Find local test binaries.
 
@@ -104,7 +105,7 @@ if [[ -z "${AUTH_CONFIG:-}" ]];  then
       )
     elif [[ "${KUBERNETES_PROVIDER}" == "gce" ]]; then
       auth_config=(
-        "--kubeconfig=${HOME}/.kube/.kubeconfig"
+        "--kubeconfig=${KUBECONFIG:-$DEFAULT_KUBECONFIG}"
       )
     elif [[ "${KUBERNETES_PROVIDER}" == "aws" ]]; then
       auth_config=(
