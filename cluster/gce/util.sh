@@ -375,7 +375,7 @@ function create-node-template {
       $2 \
       --can-ip-forward \
       --metadata-from-file "$3" "$4" \
-      --metadata "$5"; then
+      --metadata $5; then
         if (( attempt > 5 )); then
           echo -e "${color_red}Failed to create instance template $1 ${color_norm}"
           exit 2
@@ -615,7 +615,7 @@ function kube-up {
   create-node-template "${NODE_INSTANCE_PREFIX}-template" "${scope_flags[*]}" \
     "startup-script=${KUBE_ROOT}/cluster/gce/configure-vm.sh" \
     "kube-env=${KUBE_TEMP}/node-kube-env.yaml" \
-    "kube-token=${KUBELET_TOKEN}"
+    "kube-token=${KUBELET_TOKEN} node-ip-range=${MINION_IP_RANGES[0]}"
 
   gcloud preview managed-instance-groups --zone "${ZONE}" \
       create "${NODE_INSTANCE_PREFIX}-group" \
