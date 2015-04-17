@@ -1607,7 +1607,11 @@ func (kl *Kubelet) syncLoop(updates <-chan PodUpdate, handler SyncHandler) {
 		unsyncedPod := false
 		podSyncTypes := make(map[types.UID]metrics.SyncPodType)
 		select {
-		case u := <-updates:
+		case u, ok := <-updates:
+			if !ok {
+				glog.Errorf("Update channel is closed. Exiting the sync loop.")
+				return
+			}
 			kl.podManager.UpdatePods(u, podSyncTypes)
 			unsyncedPod = true
 		case <-time.After(kl.resyncInterval):
