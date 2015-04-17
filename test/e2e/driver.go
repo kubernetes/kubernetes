@@ -18,12 +18,9 @@ package e2e
 
 import (
 	"fmt"
-	"os"
-	"os/signal"
 	"path"
 	"regexp"
 	"strings"
-	"syscall"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -57,23 +54,6 @@ func init() {
 
 func (t *testResult) Fail() { *t = false }
 
-// Convert any received TERM signals into INT signals.
-// The Ginkgo runner only handles SIGINT, so if Jenkins aborts a run,
-// we lose all reporting unless we also handle SIGTERM.
-// This function never returns.
-func convertSigTermIntoInterrupt() {
-	p, err := os.FindProcess(os.Getpid())
-	if err != nil {
-		glog.Fatalf("Failed looking up own process: %s", err.Error())
-	}
-	c := make(chan os.Signal, 1)
-	signal.Notify(c, syscall.SIGTERM)
-	for {
-		<-c
-		p.Signal(os.Interrupt)
-	}
-}
-
 // Run each Go end-to-end-test. This function assumes the
 // creation of a test cluster.
 func RunE2ETests(context *TestContextType, orderseed int64, times int, reportDir string, testList []string) {
@@ -81,7 +61,6 @@ func RunE2ETests(context *TestContextType, orderseed int64, times int, reportDir
 	util.ReallyCrash = true
 	util.InitLogs()
 	defer util.FlushLogs()
-	go convertSigTermIntoInterrupt()
 
 	if len(testList) != 0 {
 		if config.GinkgoConfig.FocusString != "" || config.GinkgoConfig.SkipString != "" {
