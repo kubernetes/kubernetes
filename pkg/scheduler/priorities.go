@@ -31,7 +31,7 @@ func calculateScore(requested, capacity int64, node string) int {
 		return 0
 	}
 	if requested > capacity {
-		glog.Errorf("Combined requested resources from existing pods exceeds capacity on minion: %s", node)
+		glog.Infof("Combined requested resources from existing pods exceeds capacity on minion: %s", node)
 		return 0
 	}
 	return int(((capacity - requested) * 10) / capacity)
@@ -61,7 +61,7 @@ func calculateOccupancy(pod api.Pod, node api.Node, pods []api.Pod) HostPriority
 	cpuScore := calculateScore(totalMilliCPU, capacityMilliCPU, node.Name)
 	memoryScore := calculateScore(totalMemory, capacityMemory, node.Name)
 	glog.V(4).Infof(
-		"%v -> %v: Least Requested Priority, AbsoluteRequested: (%d, %d) / (%d, %d) Score: (%d, %d)",
+		"%v -> %v: Least Requested Priority, Absolute/Requested: (%d, %d) / (%d, %d) Score: (%d, %d)",
 		pod.Name, node.Name,
 		totalMilliCPU, totalMemory,
 		capacityMilliCPU, capacityMemory,
