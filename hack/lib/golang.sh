@@ -295,6 +295,7 @@ kube::golang::build_binaries_for_platform() {
       output_path="${output_path}/${platform//\//_}"
     fi
 
+    kube::log::progress "    "
     for binary in "${binaries[@]}"; do
       local bin=$(basename "${binary}")
       if [[ ${GOOS} == "windows" ]]; then
@@ -312,7 +313,9 @@ kube::golang::build_binaries_for_platform() {
           -ldflags "${version_ldflags}" \
           "${binary}"
       fi
+      kube::log::progress "*"
     done
+    kube::log::progress "\n"
   else
     # Use go install.
     if [[ "${#nonstatics[@]}" != 0 ]]; then
