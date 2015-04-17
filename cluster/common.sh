@@ -22,6 +22,8 @@ set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 
+DEFAULT_KUBECONFIG="${HOME}/.kube/config"
+
 # Generate kubeconfig data for the created cluster.
 # Assumed vars:
 #   KUBE_USER
@@ -36,6 +38,7 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 function create-kubeconfig() {
   local kubectl="${KUBE_ROOT}/cluster/kubectl.sh"
 
+  KUBECONFIG=${KUBECONFIG:-$DEFAULT_KUBECONFIG}
   # KUBECONFIG determines the file we write to, but it may not exist yet
   if [[ ! -e "${KUBECONFIG}" ]]; then
     mkdir -p $(dirname "${KUBECONFIG}")
@@ -60,6 +63,7 @@ function create-kubeconfig() {
 #   KUBECONFIG
 #   CONTEXT
 function clear-kubeconfig() {
+  KUBECONFIG=${KUBECONFIG:-$DEFAULT_KUBECONFIG}
   local kubectl="${KUBE_ROOT}/cluster/kubectl.sh"
   "${kubectl}" config unset "clusters.${CONTEXT}"
   "${kubectl}" config unset "users.${CONTEXT}"
@@ -85,6 +89,7 @@ function clear-kubeconfig() {
 # KUBE_USER,KUBE_PASSWORD will be empty if no current-context is set, or
 # the current-context user does not exist or contain basicauth entries.
 function get-kubeconfig-basicauth() {
+  KUBECONFIG=${KUBECONFIG:-$DEFAULT_KUBECONFIG}
   # Templates to safely extract the username,password for the current-context
   # user.  The long chain of 'with' commands avoids indexing nil if any of the
   # entries ("current-context", "contexts"."current-context", "users", etc)
