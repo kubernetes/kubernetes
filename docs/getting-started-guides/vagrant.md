@@ -32,7 +32,7 @@ export KUBERNETES_PROVIDER=vagrant
 
 Vagrant will provision each machine in the cluster with all the necessary components to run Kubernetes.  The initial setup can take a few minutes to complete on each machine.
 
-If you have more than one available Vagrant provider, Kubernetes will usually pick the best one. However, one can override which one Kubernetes will use by setting the [`VAGRANT_DEFAULT_PROVIDER`](https://docs.vagrantup.com/v2/providers/default.html) environment variable:
+If you installed more than one Vagrant provider, Kubernetes will usually pick the appropriate one. However, you can override which one Kubernetes will use by setting the [`VAGRANT_DEFAULT_PROVIDER`](https://docs.vagrantup.com/v2/providers/default.html) environment variable:
 
 ```sh
 export VAGRANT_DEFAULT_PROVIDER=parallels
