@@ -3,8 +3,8 @@
 
 **Authorization**
 :Kubernetes does not currently have an authorization system.  Anyone with the cluster password can do anything.  We plan
-to add sophisticated authorization, and to make it pluggable.  See the [access control design doc](./devel/access.md) and
-[this issue](https://github.com/GoogleCloudPlatform/kubernetes/issue/1430).
+to add sophisticated authorization, and to make it pluggable.  See the [access control design doc](./design/access.md) and
+[this issue](https://github.com/GoogleCloudPlatform/kubernetes/issues/1430).
 
 **Annotation**
 : A key/value pair that can hold large (compared to a Label), and possibly not human-readable data.  Intended to store

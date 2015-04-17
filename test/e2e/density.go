@@ -34,6 +34,19 @@ import (
 	. "github.com/onsi/gomega"
 )
 
+// Convenient wrapper around listing pods supporting retries.
+func listPods(c *client.Client, namespace string, label labels.Selector) (*api.PodList, error) {
+	maxRetries := 4
+	pods, err := c.Pods(namespace).List(label)
+	for i := 0; i < maxRetries; i++ {
+		if err == nil {
+			return pods, nil
+		}
+		pods, err = c.Pods(namespace).List(label)
+	}
+	return pods, err
+}
+
 // Delete a Replication Controller and all pods it spawned
 func DeleteRC(c *client.Client, ns, name string) error {
 	rc, err := c.ReplicationControllers(ns).Get(name)

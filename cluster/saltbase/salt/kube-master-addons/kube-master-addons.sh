@@ -18,9 +18,6 @@
 let loadedImageFlags=0;
 
 while true; do
-
- if [ $loadedImageFlags == 7 ]; then break; fi;
-
  if which docker 1>/dev/null 2>&1; then
    if docker load -i /srv/salt/kube-bins/kube-apiserver.tar 1>/dev/null 2>&1; then
      let loadedImageFlags="$loadedImageFlags|1";
@@ -32,6 +29,12 @@ while true; do
      let loadedImageFlags="$loadedImageFlags|4";
    fi;
  fi;
+
+ # required docker images got installed. exit while loop.
+ if [ $loadedImageFlags == 7 ]; then break; fi;
+
+ # sleep for 5 seconds before attempting to load docker images again.
+ sleep 5;
 
 done;
 
