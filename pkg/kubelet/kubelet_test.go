@@ -113,6 +113,8 @@ func newTestKubelet(t *testing.T) *TestKubelet {
 		},
 		fakeRecorder)
 	kubelet.containerManager.Puller = &dockertools.FakeDockerPuller{}
+	kubelet.prober = NewProber(nil, kubelet.readinessManager, kubelet.containerRefManager, kubelet.recorder)
+
 	return &TestKubelet{kubelet, fakeDocker, mockCadvisor, fakeKubeClient, waitGroup, fakeMirrorClient}
 }
 
