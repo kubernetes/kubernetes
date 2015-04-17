@@ -982,7 +982,7 @@ func (kl *Kubelet) makePodDataDirs(pod *api.Pod) error {
 	return nil
 }
 
-func (kl *Kubelet) shouldContainerBeRestarted(container *api.Container, pod *api.Pod, podStatus *api.PodStatus) bool {
+func shouldContainerBeRestarted(container *api.Container, pod *api.Pod, podStatus *api.PodStatus, readinessManager *kubecontainer.ReadinessManager) bool {
 	podFullName := kubecontainer.GetPodFullName(pod)
 
 	// Get all dead container status.
@@ -996,7 +996,7 @@ func (kl *Kubelet) shouldContainerBeRestarted(container *api.Container, pod *api
 	// Set dead containers to unready state.
 	for _, c := range resultStatus {
 		// TODO(yifan): Unify the format of container ID. (i.e. including docker:// as prefix).
-		kl.readinessManager.RemoveReadiness(strings.TrimPrefix(c.ContainerID, dockertools.DockerPrefix))
+		readinessManager.RemoveReadiness(strings.TrimPrefix(c.ContainerID, dockertools.DockerPrefix))
 	}
 
 	// Check RestartPolicy for dead container.
@@ -1124,7 +1124,7 @@ func (kl *Kubelet) computePodContainerChanges(pod *api.Pod, runningPod kubeconta
 
 		c := runningPod.FindContainerByName(container.Name)
 		if c == nil {
-			if kl.shouldContainerBeRestarted(&container, pod, &podStatus) {
+			if shouldContainerBeRestarted(&container, pod, &podStatus, kl.readinessManager) {
 				// If we are here it means that the container is dead and should be restarted, or never existed and should
 				// be created. We may be inserting this ID again if the container has changed and it has
 				// RestartPolicy::Always, but it's not a big deal.
