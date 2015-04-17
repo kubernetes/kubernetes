@@ -390,20 +390,23 @@ function create-node-template {
 
 # Robustly try to add metadata on an instance.
 # $1: The name of the instace.
-# $2: The metadata key=value pair to add.
+# $2...$n: The metadata key=value pairs to add.
 function add-instance-metadata {
+  local -r instance=$1
+  shift 1
+  local -r kvs=( "$@" )
   detect-project
   local attempt=0
   while true; do
-    if ! gcloud compute instances add-metadata "$1" \
+    if ! gcloud compute instances add-metadata "${instance}" \
       --project "${PROJECT}" \
       --zone "${ZONE}" \
-      --metadata "$2"; then
+      --metadata "${kvs[@]}"; then
         if (( attempt > 5 )); then
-          echo -e "${color_red}Failed to add instance metadata in $1 ${color_norm}"
+          echo -e "${color_red}Failed to add instance metadata in ${instance} ${color_norm}"
           exit 2
         fi
-        echo -e "${color_yellow}Attempt $(($attempt+1)) failed to add metadata in $1. Retrying.${color_norm}"
+        echo -e "${color_yellow}Attempt $(($attempt+1)) failed to add metadata in ${instance}. Retrying.${color_norm}"
         attempt=$(($attempt+1))
     else
         break
@@ -412,21 +415,25 @@ function add-instance-metadata {
 }
 
 # Robustly try to add metadata on an instance, from a file.
-# $1: The name of the instace.
-# $2: The metadata key=file pair to add.
+# $1: The name of the instance.
+# $2...$n: The metadata key=file pairs to add.
 function add-instance-metadata-from-file {
+  local -r instance=$1
+  shift 1
+  local -r kvs=( "$@" )
   detect-project
   local attempt=0
   while true; do
-    if ! gcloud compute instances add-metadata "$1" \
+    echo "${kvs[@]}"
+    if ! gcloud compute instances add-metadata "${instance}" \
       --project "${PROJECT}" \
       --zone "${ZONE}" \
-      --metadata-from-file "$2"; then
+      --metadata-from-file "${kvs[@]}"; then
         if (( attempt > 5 )); then
-          echo -e "${color_red}Failed to add instance metadata in $1 ${color_norm}"
+          echo -e "${color_red}Failed to add instance metadata in ${instance} ${color_norm}"
           exit 2
         fi
-        echo -e "${color_yellow}Attempt $(($attempt+1)) failed to add metadata in $1. Retrying.${color_norm}"
+        echo -e "${color_yellow}Attempt $(($attempt+1)) failed to add metadata in ${instance}. Retrying.${color_norm}"
         attempt=$(($attempt+1))
     else
         break
@@ -851,8 +858,10 @@ function kube-push {
   find-release-tars
   upload-server-tars
 
+  echo "Updating master metadata ..."
   write-master-env
-  add-instance-metadata-from-file "${KUBE_MASTER}" "kube-env=${KUBE_TEMP}/master-kube-env.yaml"
+  add-instance-metadata-from-file "${KUBE_MASTER}" "kube-env=${KUBE_TEMP}/master-kube-env.yaml" "startup-script=${KUBE_ROOT}/cluster/gce/configure-vm.sh"
+
   echo "Pushing to master (log at ${OUTPUT}/kube-push-${KUBE_MASTER}.log) ..."
   cat ${KUBE_ROOT}/cluster/gce/configure-vm.sh | gcloud compute ssh --ssh-flag="-o LogLevel=quiet" --project "${PROJECT}" --zone "${ZONE}" "${KUBE_MASTER}" --command "sudo bash -s -- --push" &> ${OUTPUT}/kube-push-"${KUBE_MASTER}".log
 
@@ -897,7 +906,7 @@ function kube-update-nodes() {
   echo "Updating node metadata... "
   write-node-env
   for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
-    add-instance-metadata-from-file "${MINION_NAMES[$i]}" "kube-env=${KUBE_TEMP}/node-kube-env.yaml" &
+    add-instance-metadata-from-file "${MINION_NAMES[$i]}" "kube-env=${KUBE_TEMP}/node-kube-env.yaml" "startup-script=${KUBE_ROOT}/cluster/gce/configure-vm.sh" &
   done
   wait-for-jobs
   echo "Done"
