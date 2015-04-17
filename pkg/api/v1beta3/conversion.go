@@ -23,8 +23,10 @@ import (
 )
 
 func init() {
+	err := newer.Scheme.AddConversionFuncs()
+
 	// Add field conversion funcs.
-	err := newer.Scheme.AddFieldLabelConversionFunc("v1beta3", "Pod",
+	err = newer.Scheme.AddFieldLabelConversionFunc("v1beta3", "Pod",
 		func(label, value string) (string, string, error) {
 			switch label {
 			case "metadata.name",
