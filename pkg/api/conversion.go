@@ -35,6 +35,10 @@ func init() {
 			obj.LabelSelector = labels.Everything()
 			obj.FieldSelector = fields.Everything()
 		},
+		func(obj *PodExecOptions) {
+			obj.Stderr = true
+			obj.Stdout = true
+		},
 	)
 	Scheme.AddConversionFuncs(
 		func(in *util.Time, out *util.Time, s conversion.Scope) error {
