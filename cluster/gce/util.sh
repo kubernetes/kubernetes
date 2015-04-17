@@ -837,7 +837,6 @@ function kube-down {
     --quiet \
     "${MASTER_NAME}-ip" || true
 
-  export KUBECONFIG="${HOME}/.kube/.kubeconfig"
   export CONTEXT="${PROJECT}_${INSTANCE_PREFIX}"
   clear-kubeconfig
 }
