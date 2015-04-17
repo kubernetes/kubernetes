@@ -95,9 +95,11 @@ coreos:
         ExecStartPre=/usr/bin/chmod +x /opt/bin/kube-apiserver
         ExecStart=/opt/bin/kube-apiserver \
         --allow_privileged=true \
-        --address=0.0.0.0 \
+        --insecure_bind_address=0.0.0.0 \
+        --insecure_port=8080 \
+        --kubelet_https=true \
+        --secure_port=6443 \
         --portal_net=10.100.0.0/16 \
-        --port=8080 \
         --etcd_servers=http://127.0.0.1:4001 \
         --public_address_override=127.0.0.1 \
         --logtostderr=true
@@ -171,7 +173,9 @@ coreos:
         --hostname_override=127.0.0.1 \
         --api_servers=127.0.0.1:8080 \
         --allow_privileged=true \
-        --logtostderr=true
+        --logtostderr=true \
+        --healthz_bind_address=0.0.0.0 \
+        --healthz_port=10248
         Restart=always
         RestartSec=10
   update:

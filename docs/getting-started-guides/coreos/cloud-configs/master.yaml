@@ -133,8 +133,10 @@ coreos:
         ExecStartPre=/usr/bin/chmod +x /opt/bin/kube-apiserver
         ExecStart=/opt/bin/kube-apiserver \
         --allow_privileged=true \
-        --address=0.0.0.0 \
-        --port=8080 \
+        --insecure_bind_address=0.0.0.0 \
+        --insecure_port=8080 \
+        --kubelet_https=true \
+        --secure_port=6443 \
         --portal_net=10.100.0.0/16 \
         --etcd_servers=http://127.0.0.1:4001 \
         --public_address_override=$private_ipv4 \
@@ -185,12 +187,14 @@ coreos:
         After=fleet.service
 
         [Service]
-        ExecStartPre=/usr/bin/wget -N -P /opt/bin https://storage.googleapis.com/k8s/kube-register
+        # ExecStartPre=/usr/bin/wget -N -P /opt/bin https://storage.googleapis.com/k8s/kube-register
+        ExecStartPre=/usr/bin/wget -N -O /opt/bin/kube-register https://github.com/kelseyhightower/kube-register/releases/download/v0.0.2/kube-register-0.0.2-linux-amd64
         ExecStartPre=/usr/bin/chmod +x /opt/bin/kube-register
         ExecStart=/opt/bin/kube-register \
         --metadata=role=node \
         --fleet-endpoint=unix:///var/run/fleet.sock \
-        --api-endpoint=http://127.0.0.1:8080
+        --api-endpoint=http://127.0.0.1:8080 \
+        --healthz-port=10248
         Restart=always
         RestartSec=10
   update:

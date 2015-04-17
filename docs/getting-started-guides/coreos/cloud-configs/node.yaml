@@ -84,7 +84,9 @@ coreos:
         --hostname_override=$private_ipv4 \
         --api_servers=<master-private-ip>:8080 \
         --allow_privileged=true \
-        --logtostderr=true
+        --logtostderr=true \
+        --healthz_bind_address=0.0.0.0 \
+        --healthz_port=10248
         Restart=always
         RestartSec=10
   update:
