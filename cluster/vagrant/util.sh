@@ -64,8 +64,8 @@ function verify-prereqs {
     providers=("${providers[@]:3}")
 
     # If the provider is explicitly set, look only for that provider
-    if [ -n "${DEFAULT_VAGRANT_PROVIDER:-}" ] \
-        && [ "${DEFAULT_VAGRANT_PROVIDER}" != "${provider_name}" ]; then
+    if [ -n "${VAGRANT_DEFAULT_PROVIDER:-}" ] \
+        && [ "${VAGRANT_DEFAULT_PROVIDER}" != "${provider_name}" ]; then
       continue
     fi
 
@@ -80,8 +80,8 @@ function verify-prereqs {
   done
 
   if [ -z "${provider_found}" ]; then
-    if [ -n "${DEFAULT_VAGRANT_PROVIDER}" ]; then
-      echo "Can't find the necessary components for the ${DEFAULT_VAGRANT_PROVIDER} vagrant provider, please fix and retry."
+    if [ -n "${VAGRANT_DEFAULT_PROVIDER}" ]; then
+      echo "Can't find the necessary components for the ${VAGRANT_DEFAULT_PROVIDER} vagrant provider, please fix and retry."
     else
       echo "Can't find the necessary components for any viable vagrant providers (e.g., virtualbox), please fix and retry."
     fi
@@ -138,7 +138,7 @@ function create-provision-scripts {
     echo "DNS_REPLICAS='${DNS_REPLICAS:-}'"
     echo "RUNTIME_CONFIG='${RUNTIME_CONFIG:-}'"
     echo "ADMISSION_CONTROL='${ADMISSION_CONTROL:-}'"
-    echo "DEFAULT_VAGRANT_PROVIDER='${DEFAULT_VAGRANT_PROVIDER:-}'"
+    echo "VAGRANT_DEFAULT_PROVIDER='${VAGRANT_DEFAULT_PROVIDER:-}'"
     grep -v "^#" "${KUBE_ROOT}/cluster/vagrant/provision-master.sh"
     grep -v "^#" "${KUBE_ROOT}/cluster/vagrant/provision-network.sh"
   ) > "${KUBE_TEMP}/master-start.sh"
@@ -159,7 +159,7 @@ function create-provision-scripts {
       echo "MINION_CONTAINER_SUBNETS=(${MINION_CONTAINER_SUBNETS[@]})"
       echo "CONTAINER_SUBNET='${CONTAINER_SUBNET}'"
       echo "DOCKER_OPTS='${EXTRA_DOCKER_OPTS-}'"
-      echo "DEFAULT_VAGRANT_PROVIDER='${DEFAULT_VAGRANT_PROVIDER:-}'"
+      echo "VAGRANT_DEFAULT_PROVIDER='${VAGRANT_DEFAULT_PROVIDER:-}'"
       grep -v "^#" "${KUBE_ROOT}/cluster/vagrant/provision-minion.sh"
       grep -v "^#" "${KUBE_ROOT}/cluster/vagrant/provision-network.sh"
     ) > "${KUBE_TEMP}/minion-start-${i}.sh"

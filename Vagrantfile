@@ -28,7 +28,7 @@ $minion_ips = $num_minion.times.collect { |n| $minion_ip_base + "#{n+3}" }
 $kube_os = ENV['KUBERNETES_OS'] || "fedora"
 
 # To override the vagrant provider, use (e.g.):
-#   KUBERNETES_PROVIDER=vagrant DEFAULT_VAGRANT_PROVIDER=... .../cluster/kube-up.sh
+#   KUBERNETES_PROVIDER=vagrant VAGRANT_DEFAULT_PROVIDER=... .../cluster/kube-up.sh
 # To override the box, use (e.g.):
 #   KUBERNETES_PROVIDER=vagrant KUBERNETES_BOX_NAME=... .../cluster/kube-up.sh
 # You can specify a box version:
