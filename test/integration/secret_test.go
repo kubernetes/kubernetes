@@ -26,7 +26,6 @@ import (
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/master"
@@ -50,7 +49,7 @@ func deleteSecretOrErrorf(t *testing.T, c *client.Client, ns, name string) {
 
 // TestSecrets tests apiserver-side behavior of creation of secret objects and their use by pods.
 func TestSecrets(t *testing.T) {
-	helper, err := master.NewEtcdHelper(newEtcdClient(), testapi.Version())
+	helper, err := master.NewEtcdHelper(newEtcdClient(), "v1beta1")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -72,9 +71,16 @@ func TestSecrets(t *testing.T) {
 		AdmissionControl:  admit.NewAlwaysAdmit(),
 	})
 
-	deleteAllEtcdKeys()
-	client := client.NewOrDie(&client.Config{Host: s.URL, Version: testapi.Version()})
-	DoTestSecrets(t, client, testapi.Version())
+	testCases := []string{
+		"v1beta1",
+		"v1beta2",
+	}
+
+	for _, apiVersion := range testCases {
+		deleteAllEtcdKeys()
+		client := client.NewOrDie(&client.Config{Host: s.URL, Version: apiVersion})
+		DoTestSecrets(t, client, apiVersion)
+	}
 }
 
 // DoTestSecrets test secrets for one api version.

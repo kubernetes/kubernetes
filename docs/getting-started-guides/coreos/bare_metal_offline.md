@@ -606,7 +606,7 @@ On the Kubernetes Master node lets create a '''nginx.yml'''
         id: www
         containers:
           - name: nginx
-            image: nginx
+            image: dockerfile/nginx
     
 
 Now for the service: ```nginx-service.yml```

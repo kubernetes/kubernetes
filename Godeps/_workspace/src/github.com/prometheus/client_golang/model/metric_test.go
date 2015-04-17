@@ -22,7 +22,7 @@ func testMetric(t testing.TB) {
 	}{
 		{
 			input:       Metric{},
-			fingerprint: 14695981039346656037,
+			fingerprint: 2676020557754725067,
 		},
 		{
 			input: Metric{
@@ -30,27 +30,31 @@ func testMetric(t testing.TB) {
 				"occupation":   "robot",
 				"manufacturer": "westinghouse",
 			},
-			fingerprint: 11310079640881077873,
+			fingerprint: 13260944541294022935,
 		},
 		{
 			input: Metric{
 				"x": "y",
 			},
-			fingerprint: 13948396922932177635,
+			fingerprint: 1470933794305433534,
 		},
+		// The following two demonstrate a bug in fingerprinting. They
+		// should not have the same fingerprint with a sane
+		// fingerprinting function. See
+		// https://github.com/prometheus/client_golang/issues/74 .
 		{
 			input: Metric{
 				"a": "bb",
 				"b": "c",
 			},
-			fingerprint: 3198632812309449502,
+			fingerprint: 3734646176939799877,
 		},
 		{
 			input: Metric{
 				"a":  "b",
 				"bb": "c",
 			},
-			fingerprint: 5774953389407657638,
+			fingerprint: 3734646176939799877,
 		},
 	}
 
@@ -68,54 +72,5 @@ func TestMetric(t *testing.T) {
 func BenchmarkMetric(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		testMetric(b)
-	}
-}
-
-func TestCOWMetric(t *testing.T) {
-	testMetric := Metric{
-		"to_delete": "test1",
-		"to_change": "test2",
-	}
-
-	scenarios := []struct {
-		fn  func(*COWMetric)
-		out Metric
-	}{
-		{
-			fn: func(cm *COWMetric) {
-				cm.Delete("to_delete")
-			},
-			out: Metric{
-				"to_change": "test2",
-			},
-		},
-		{
-			fn: func(cm *COWMetric) {
-				cm.Set("to_change", "changed")
-			},
-			out: Metric{
-				"to_delete": "test1",
-				"to_change": "changed",
-			},
-		},
-	}
-
-	for i, s := range scenarios {
-		orig := testMetric.Clone()
-		cm := &COWMetric{
-			Metric: orig,
-		}
-
-		s.fn(cm)
-
-		// Test that the original metric was not modified.
-		if !orig.Equal(testMetric) {
-			t.Fatalf("%d. original metric changed; expected %v, got %v", i, testMetric, orig)
-		}
-
-		// Test that the new metric has the right changes.
-		if !cm.Metric.Equal(s.out) {
-			t.Fatalf("%d. copied metric doesn't contain expected changes; expected %v, got %v", i, s.out, cm.Metric)
-		}
 	}
 }

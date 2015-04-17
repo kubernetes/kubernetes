@@ -28,6 +28,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/cache"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/controller/framework"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	algorithm "github.com/GoogleCloudPlatform/kubernetes/pkg/scheduler"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/scheduler"
@@ -83,20 +84,16 @@ func NewConfigFactory(client *client.Client) *ConfigFactory {
 		framework.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
 				if pod, ok := obj.(*api.Pod); ok {
-					c.modeler.LockedAction(func() {
-						c.modeler.ForgetPod(pod)
-					})
+					c.modeler.ForgetPod(pod)
 				}
 			},
 			DeleteFunc: func(obj interface{}) {
-				c.modeler.LockedAction(func() {
-					switch t := obj.(type) {
-					case *api.Pod:
-						c.modeler.ForgetPod(t)
-					case cache.DeletedFinalStateUnknown:
-						c.modeler.ForgetPodByKey(t.Key)
-					}
-				})
+				switch t := obj.(type) {
+				case *api.Pod:
+					c.modeler.ForgetPod(t)
+				case cache.DeletedFinalStateUnknown:
+					c.modeler.ForgetPodByKey(t.Key)
+				}
 			},
 		},
 	)
@@ -229,9 +226,40 @@ func (factory *ConfigFactory) createAssignedPodLW() *cache.ListWatch {
 
 // createMinionLW returns a cache.ListWatch that gets all changes to minions.
 func (factory *ConfigFactory) createMinionLW() *cache.ListWatch {
-	// TODO: Filter out nodes that doesn't have NodeReady condition.
-	fields := fields.Set{client.NodeUnschedulable: "false"}.AsSelector()
-	return cache.NewListWatchFromClient(factory.Client, "nodes", api.NamespaceAll, fields)
+	return cache.NewListWatchFromClient(factory.Client, "nodes", api.NamespaceAll, parseSelectorOrDie(""))
+}
+
+// Lists all minions and filter out unhealthy ones, then returns
+// an enumerator for cache.Poller.
+func (factory *ConfigFactory) pollMinions() (cache.Enumerator, error) {
+	allNodes, err := factory.Client.Nodes().List(labels.Everything(), fields.Everything())
+	if err != nil {
+		return nil, err
+	}
+	nodes := &api.NodeList{
+		TypeMeta: allNodes.TypeMeta,
+		ListMeta: allNodes.ListMeta,
+	}
+	for _, node := range allNodes.Items {
+		conditionMap := make(map[api.NodeConditionType]*api.NodeCondition)
+		for i := range node.Status.Conditions {
+			cond := node.Status.Conditions[i]
+			conditionMap[cond.Type] = &cond
+		}
+		if node.Spec.Unschedulable {
+			continue
+		}
+		if condition, ok := conditionMap[api.NodeReady]; ok {
+			if condition.Status == api.ConditionTrue {
+				nodes.Items = append(nodes.Items, node)
+			}
+		} else {
+			// If no condition is set, we get unknown node condition. In such cases,
+			// do not add the node.
+			glog.V(2).Infof("Minion %s is not available. Skipping", node.Name)
+		}
+	}
+	return &nodeEnumerator{nodes}, nil
 }
 
 // Returns a cache.ListWatch that gets all changes to services.

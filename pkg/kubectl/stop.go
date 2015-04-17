@@ -65,7 +65,7 @@ type objInterface interface {
 
 func (reaper *ReplicationControllerReaper) Stop(namespace, name string) (string, error) {
 	rc := reaper.ReplicationControllers(namespace)
-	resizer, err := ResizerFor("ReplicationController", NewResizerClient(*reaper))
+	resizer, err := ResizerFor("ReplicationController", *reaper)
 	if err != nil {
 		return "", err
 	}

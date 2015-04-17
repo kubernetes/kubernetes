@@ -22,6 +22,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/admission"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	apierrors "github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
@@ -49,11 +50,11 @@ type exists struct {
 func (e *exists) Admit(a admission.Attributes) (err error) {
 	defaultVersion, kind, err := latest.RESTMapper.VersionAndKindForResource(a.GetResource())
 	if err != nil {
-		return admission.NewForbidden(a, err)
+		return err
 	}
 	mapping, err := latest.RESTMapper.RESTMapping(kind, defaultVersion)
 	if err != nil {
-		return admission.NewForbidden(a, err)
+		return err
 	}
 	if mapping.Scope.Name() != meta.RESTScopeNameNamespace {
 		return nil
@@ -67,12 +68,17 @@ func (e *exists) Admit(a admission.Attributes) (err error) {
 	}
 	_, exists, err := e.store.Get(namespace)
 	if err != nil {
-		return admission.NewForbidden(a, err)
+		return err
 	}
 	if exists {
 		return nil
 	}
-	return admission.NewForbidden(a, fmt.Errorf("Namespace %s does not exist", a.GetNamespace()))
+	obj := a.GetObject()
+	name := "Unknown"
+	if obj != nil {
+		name, _ = meta.NewAccessor().Name(obj)
+	}
+	return apierrors.NewForbidden(kind, name, fmt.Errorf("Namespace %s does not exist", a.GetNamespace()))
 }
 
 func NewExists(c client.Interface) admission.Interface {

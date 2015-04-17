@@ -27,7 +27,6 @@ type Attributes interface {
 	GetResource() string
 	GetOperation() string
 	GetObject() runtime.Object
-	GetKind() string
 }
 
 // Interface is an abstract, pluggable interface for Admission Control decisions.

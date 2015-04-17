@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package pbutil
+package ext
 
 import (
 	"bytes"
@@ -20,8 +20,6 @@ import (
 	"reflect"
 	"testing"
 	"testing/quick"
-
-	"github.com/matttproud/golang_protobuf_extensions/pbtest"
 
 	. "github.com/golang/protobuf/proto"
 	. "github.com/golang/protobuf/proto/testdata"
@@ -140,10 +138,10 @@ I expect it may.  Let's hope you enjoy testing as much as we do.`),
 
 func TestEndToEndValid(t *testing.T) {
 	for _, test := range [][]Message{
-		{&Empty{}},
-		{&GoEnum{Foo: FOO_FOO1.Enum()}, &Empty{}, &GoEnum{Foo: FOO_FOO1.Enum()}},
-		{&GoEnum{Foo: FOO_FOO1.Enum()}},
-		{&Strings{
+		[]Message{&Empty{}},
+		[]Message{&GoEnum{Foo: FOO_FOO1.Enum()}, &Empty{}, &GoEnum{Foo: FOO_FOO1.Enum()}},
+		[]Message{&GoEnum{Foo: FOO_FOO1.Enum()}},
+		[]Message{&Strings{
 			StringField: String(`This is my gigantic, unhappy string.  It exceeds
 the encoding size of a single byte varint.  We are using it to fuzz test the
 correctness of the header decoding mechanisms, which may prove problematic.
@@ -175,6 +173,45 @@ I expect it may.  Let's hope you enjoy testing as much as we do.`),
 		if read != written {
 			t.Fatalf("%v read = %d; want %d", test, read, written)
 		}
+	}
+}
+
+// visitMessage empties the private state fields of the quick.Value()-generated
+// Protocol Buffer messages, for they cause an inordinate amount of problems.
+// This is because we are using an automated fuzz generator on a type with
+// private fields.
+func visitMessage(m Message) {
+	t := reflect.TypeOf(m)
+	if t.Kind() != reflect.Ptr {
+		return
+	}
+	derefed := t.Elem()
+	if derefed.Kind() != reflect.Struct {
+		return
+	}
+	v := reflect.ValueOf(m)
+	elem := v.Elem()
+	for i := 0; i < elem.NumField(); i++ {
+		field := elem.FieldByIndex([]int{i})
+		fieldType := field.Type()
+		if fieldType.Implements(reflect.TypeOf((*Message)(nil)).Elem()) {
+			visitMessage(field.Interface().(Message))
+		}
+		if field.Kind() == reflect.Slice {
+			for i := 0; i < field.Len(); i++ {
+				elem := field.Index(i)
+				elemType := elem.Type()
+				if elemType.Implements(reflect.TypeOf((*Message)(nil)).Elem()) {
+					visitMessage(elem.Interface().(Message))
+				}
+			}
+		}
+	}
+	if field := elem.FieldByName("XXX_unrecognized"); field.IsValid() {
+		field.Set(reflect.ValueOf([]byte{}))
+	}
+	if field := elem.FieldByName("XXX_extensions"); field.IsValid() {
+		field.Set(reflect.ValueOf(nil))
 	}
 }
 
@@ -270,9 +307,7 @@ func rndMessage(r *rand.Rand) Message {
 	if !ok {
 		panic("attempt to generate illegal item; consult item 11")
 	}
-	if err := pbtest.SanitizeGenerated(v.Interface().(Message)); err != nil {
-		panic(err)
-	}
+	visitMessage(v.Interface().(Message))
 	return v.Interface().(Message)
 }
 

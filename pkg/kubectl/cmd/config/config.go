@@ -18,10 +18,10 @@ package config
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"path"
-	"path/filepath"
 	"reflect"
 	"strconv"
 
@@ -33,54 +33,41 @@ import (
 )
 
 type PathOptions struct {
-	// GlobalFile is the full path to the file to load as the global (final) option
+	Local     bool
+	Global    bool
+	UseEnvVar bool
+
+	LocalFile  string
 	GlobalFile string
-	// EnvVar is the env var name that points to the list of kubeconfig files to load
-	EnvVar string
-	// ExplicitFileFlag is the name of the flag to use for prompting for the kubeconfig file
+	EnvVarFile string
+
+	EnvVar           string
 	ExplicitFileFlag string
 
-	// GlobalFileSubpath is an optional value used for displaying help
-	GlobalFileSubpath string
-
 	LoadingRules *clientcmd.ClientConfigLoadingRules
-}
-
-// ConfigAccess is used by subcommands and methods in this package to load and modify the appropriate config files
-type ConfigAccess interface {
-	// GetLoadingPrecedence returns the slice of files that should be used for loading and inspecting the config
-	GetLoadingPrecedence() []string
-	// GetStartingConfig returns the config that subcommands should being operating against.  It may or may not be merged depending on loading rules
-	GetStartingConfig() (*clientcmdapi.Config, error)
-	// GetDefaultFilename returns the name of the file you should write into (create if necessary), if you're trying to create a new stanza as opposed to updating an existing one.
-	GetDefaultFilename() string
-	// IsExplicitFile indicates whether or not this command is interested in exactly one file.  This implementation only ever does that  via a flag, but implementations that handle local, global, and flags may have more
-	IsExplicitFile() bool
-	// GetExplicitFile returns the particular file this command is operating against.  This implementation only ever has one, but implementations that handle local, global, and flags may have more
-	GetExplicitFile() string
 }
 
 func NewCmdConfig(pathOptions *PathOptions, out io.Writer) *cobra.Command {
 	if len(pathOptions.ExplicitFileFlag) == 0 {
 		pathOptions.ExplicitFileFlag = clientcmd.RecommendedConfigPathFlag
 	}
+	if len(pathOptions.EnvVar) > 0 {
+		pathOptions.EnvVarFile = os.Getenv(pathOptions.EnvVar)
+	}
 
 	cmd := &cobra.Command{
 		Use:   "config SUBCOMMAND",
 		Short: "config modifies kubeconfig files",
-		Long: `config modifies kubeconfig files using subcommands like "kubectl config set current-context my-context"
-
-The loading order follows these rules:
-    1. If the --` + pathOptions.ExplicitFileFlag + ` flag is set, then only that file is loaded.  The flag may only be set once and no merging takes place.
-    2. If $` + pathOptions.EnvVar + ` environment variable is set, then it is used a list of paths (normal path delimitting rules for your system).  These paths are merged together.  When a value is modified, it is modified in the file that defines the stanza.  When a value is created, it is created in the first file that exists.  If no files in the chain exist, then it creates the last file in the list.
-    3. Otherwise, ` + path.Join("${HOME}", pathOptions.GlobalFileSubpath) + ` is used and no merging takes place.
-`,
+		Long:  `config modifies kubeconfig files using subcommands like "kubectl config set current-context my-context"`,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmd.Help()
 		},
 	}
 
 	// file paths are common to all sub commands
+	cmd.PersistentFlags().BoolVar(&pathOptions.Local, "local", pathOptions.Local, "use the kubeconfig in the current directory")
+	cmd.PersistentFlags().BoolVar(&pathOptions.Global, "global", pathOptions.Global, "use the kubeconfig from "+pathOptions.GlobalFile)
+	cmd.PersistentFlags().BoolVar(&pathOptions.UseEnvVar, "envvar", pathOptions.UseEnvVar, "use the kubeconfig from $"+pathOptions.EnvVar)
 	cmd.PersistentFlags().StringVar(&pathOptions.LoadingRules.ExplicitPath, pathOptions.ExplicitFileFlag, pathOptions.LoadingRules.ExplicitPath, "use a particular kubeconfig file")
 
 	cmd.AddCommand(NewCmdConfigView(out, pathOptions))
@@ -96,11 +83,12 @@ The loading order follows these rules:
 
 func NewDefaultPathOptions() *PathOptions {
 	ret := &PathOptions{
-		GlobalFile:       clientcmd.RecommendedHomeFile,
-		EnvVar:           clientcmd.RecommendedConfigPathEnvVar,
-		ExplicitFileFlag: clientcmd.RecommendedConfigPathFlag,
+		LocalFile:  ".kubeconfig",
+		GlobalFile: path.Join(os.Getenv("HOME"), "/.kube/.kubeconfig"),
+		EnvVar:     clientcmd.RecommendedConfigPathEnvVar,
+		EnvVarFile: os.Getenv(clientcmd.RecommendedConfigPathEnvVar),
 
-		GlobalFileSubpath: clientcmd.RecommendedHomeFileName,
+		ExplicitFileFlag: clientcmd.RecommendedConfigPathFlag,
 
 		LoadingRules: clientcmd.NewDefaultClientConfigLoadingRules(),
 	}
@@ -109,78 +97,125 @@ func NewDefaultPathOptions() *PathOptions {
 	return ret
 }
 
-func (o *PathOptions) GetEnvVarFiles() []string {
-	if len(o.EnvVar) == 0 {
-		return []string{}
+func (o PathOptions) Validate() error {
+	if len(o.LoadingRules.ExplicitPath) > 0 {
+		if o.Global {
+			return errors.New("cannot specify both --" + o.ExplicitFileFlag + " and --global")
+		}
+		if o.Local {
+			return errors.New("cannot specify both --" + o.ExplicitFileFlag + " and --local")
+		}
+		if o.UseEnvVar {
+			return errors.New("cannot specify both --" + o.ExplicitFileFlag + " and --envvar")
+		}
 	}
 
-	envVarValue := os.Getenv(o.EnvVar)
-	if len(envVarValue) == 0 {
-		return []string{}
+	if o.Global {
+		if o.Local {
+			return errors.New("cannot specify both --global and --local")
+		}
+		if o.UseEnvVar {
+			return errors.New("cannot specify both --global and --envvar")
+		}
 	}
 
-	return filepath.SplitList(envVarValue)
+	if o.Local {
+		if o.UseEnvVar {
+			return errors.New("cannot specify both --local and --envvar")
+		}
+	}
+
+	if o.UseEnvVar {
+		if len(o.EnvVarFile) == 0 {
+			return fmt.Errorf("environment variable %v does not have a value", o.EnvVar)
+		}
+
+	}
+
+	return nil
 }
 
-func (o *PathOptions) GetLoadingPrecedence() []string {
-	if envVarFiles := o.GetEnvVarFiles(); len(envVarFiles) > 0 {
-		return envVarFiles
-	}
-
-	return []string{o.GlobalFile}
-}
-
-func (o *PathOptions) GetStartingConfig() (*clientcmdapi.Config, error) {
-	// don't mutate the original
-	loadingRules := *o.LoadingRules
-	loadingRules.Precedence = o.GetLoadingPrecedence()
-
-	clientConfig := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(&loadingRules, &clientcmd.ConfigOverrides{})
-	rawConfig, err := clientConfig.RawConfig()
-	if os.IsNotExist(err) {
-		return clientcmdapi.NewConfig(), nil
-	}
-	if err != nil {
+func (o *PathOptions) getStartingConfig() (*clientcmdapi.Config, error) {
+	if err := o.Validate(); err != nil {
 		return nil, err
 	}
 
-	return &rawConfig, nil
+	config := clientcmdapi.NewConfig()
+
+	switch {
+	case o.Global:
+		config = getConfigFromFileOrDie(o.GlobalFile)
+
+	case o.UseEnvVar:
+		config = getConfigFromFileOrDie(o.EnvVarFile)
+
+	case o.Local:
+		config = getConfigFromFileOrDie(o.LocalFile)
+
+		// no specific flag was set, load according to the loading rules
+	default:
+		clientConfig := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(o.LoadingRules, &clientcmd.ConfigOverrides{})
+		rawConfig, err := clientConfig.RawConfig()
+		if err != nil {
+			return nil, err
+		}
+		config = &rawConfig
+
+	}
+
+	return config, nil
 }
 
+// GetDefaultFilename returns the name of the file you should write into (create if necessary), if you're trying to create
+// a new stanza as opposed to updating an existing one.
 func (o *PathOptions) GetDefaultFilename() string {
 	if o.IsExplicitFile() {
 		return o.GetExplicitFile()
 	}
 
-	if envVarFiles := o.GetEnvVarFiles(); len(envVarFiles) > 0 {
-		if len(envVarFiles) == 1 {
-			return envVarFiles[0]
-		}
+	if len(o.EnvVarFile) > 0 {
+		return o.EnvVarFile
+	}
 
-		// if any of the envvar files already exists, return it
-		for _, envVarFile := range envVarFiles {
-			if _, err := os.Stat(envVarFile); err == nil {
-				return envVarFile
-			}
-		}
-
-		// otherwise, return the last one in the list
-		return envVarFiles[len(envVarFiles)-1]
+	if _, err := os.Stat(o.LocalFile); err == nil {
+		return o.LocalFile
 	}
 
 	return o.GlobalFile
+
 }
 
 func (o *PathOptions) IsExplicitFile() bool {
-	if len(o.LoadingRules.ExplicitPath) > 0 {
+	switch {
+	case len(o.LoadingRules.ExplicitPath) > 0 ||
+		o.Global ||
+		o.UseEnvVar ||
+		o.Local:
 		return true
 	}
-
 	return false
 }
 
 func (o *PathOptions) GetExplicitFile() string {
-	return o.LoadingRules.ExplicitPath
+	if !o.IsExplicitFile() {
+		return ""
+	}
+
+	switch {
+	case len(o.LoadingRules.ExplicitPath) > 0:
+		return o.LoadingRules.ExplicitPath
+
+	case o.Global:
+		return o.GlobalFile
+
+	case o.UseEnvVar:
+		return o.EnvVarFile
+
+	case o.Local:
+		return o.LocalFile
+	}
+
+	return ""
 }
 
 // ModifyConfig takes a Config object, iterates through Clusters, AuthInfos, and Contexts, uses the LocationOfOrigin if specified or
@@ -188,8 +223,8 @@ func (o *PathOptions) GetExplicitFile() string {
 // Preferences and CurrentContext should always be set in the default destination file.  Since we can't distinguish between empty and missing values
 // (no nil strings), we're forced have separate handling for them.  In all the currently known cases, newConfig should have, at most, one difference,
 // that means that this code will only write into a single file.
-func ModifyConfig(configAccess ConfigAccess, newConfig clientcmdapi.Config) error {
-	startingConfig, err := configAccess.GetStartingConfig()
+func (o *PathOptions) ModifyConfig(newConfig clientcmdapi.Config) error {
+	startingConfig, err := o.getStartingConfig()
 	if err != nil {
 		return err
 	}
@@ -202,12 +237,12 @@ func ModifyConfig(configAccess ConfigAccess, newConfig clientcmdapi.Config) erro
 		// nothing to do
 
 	case startingConfig.CurrentContext != newConfig.CurrentContext:
-		if err := writeCurrentContext(configAccess, newConfig.CurrentContext); err != nil {
+		if err := o.writeCurrentContext(newConfig.CurrentContext); err != nil {
 			return err
 		}
 
 	case !reflect.DeepEqual(startingConfig.Preferences, newConfig.Preferences):
-		if err := writePreferences(configAccess, newConfig.Preferences); err != nil {
+		if err := o.writePreferences(newConfig.Preferences); err != nil {
 			return err
 		}
 
@@ -218,7 +253,7 @@ func ModifyConfig(configAccess ConfigAccess, newConfig clientcmdapi.Config) erro
 			if !reflect.DeepEqual(cluster, startingCluster) || !exists {
 				destinationFile := cluster.LocationOfOrigin
 				if len(destinationFile) == 0 {
-					destinationFile = configAccess.GetDefaultFilename()
+					destinationFile = o.GetDefaultFilename()
 				}
 
 				configToWrite := getConfigFromFileOrDie(destinationFile)
@@ -235,7 +270,7 @@ func ModifyConfig(configAccess ConfigAccess, newConfig clientcmdapi.Config) erro
 			if !reflect.DeepEqual(context, startingContext) || !exists {
 				destinationFile := context.LocationOfOrigin
 				if len(destinationFile) == 0 {
-					destinationFile = configAccess.GetDefaultFilename()
+					destinationFile = o.GetDefaultFilename()
 				}
 
 				configToWrite := getConfigFromFileOrDie(destinationFile)
@@ -252,7 +287,7 @@ func ModifyConfig(configAccess ConfigAccess, newConfig clientcmdapi.Config) erro
 			if !reflect.DeepEqual(authInfo, startingAuthInfo) || !exists {
 				destinationFile := authInfo.LocationOfOrigin
 				if len(destinationFile) == 0 {
-					destinationFile = configAccess.GetDefaultFilename()
+					destinationFile = o.GetDefaultFilename()
 				}
 
 				configToWrite := getConfigFromFileOrDie(destinationFile)
@@ -268,7 +303,7 @@ func ModifyConfig(configAccess ConfigAccess, newConfig clientcmdapi.Config) erro
 			if _, exists := newConfig.Clusters[key]; !exists {
 				destinationFile := cluster.LocationOfOrigin
 				if len(destinationFile) == 0 {
-					destinationFile = configAccess.GetDefaultFilename()
+					destinationFile = o.GetDefaultFilename()
 				}
 
 				configToWrite := getConfigFromFileOrDie(destinationFile)
@@ -284,7 +319,7 @@ func ModifyConfig(configAccess ConfigAccess, newConfig clientcmdapi.Config) erro
 			if _, exists := newConfig.Contexts[key]; !exists {
 				destinationFile := context.LocationOfOrigin
 				if len(destinationFile) == 0 {
-					destinationFile = configAccess.GetDefaultFilename()
+					destinationFile = o.GetDefaultFilename()
 				}
 
 				configToWrite := getConfigFromFileOrDie(destinationFile)
@@ -300,7 +335,7 @@ func ModifyConfig(configAccess ConfigAccess, newConfig clientcmdapi.Config) erro
 			if _, exists := newConfig.AuthInfos[key]; !exists {
 				destinationFile := authInfo.LocationOfOrigin
 				if len(destinationFile) == 0 {
-					destinationFile = configAccess.GetDefaultFilename()
+					destinationFile = o.GetDefaultFilename()
 				}
 
 				configToWrite := getConfigFromFileOrDie(destinationFile)
@@ -321,26 +356,15 @@ func ModifyConfig(configAccess ConfigAccess, newConfig clientcmdapi.Config) erro
 // If newCurrentContext is the same as the startingConfig's current context, then we exit.
 // If newCurrentContext has a value, then that value is written into the default destination file.
 // If newCurrentContext is empty, then we find the config file that is setting the CurrentContext and clear the value from that file
-func writeCurrentContext(configAccess ConfigAccess, newCurrentContext string) error {
-	if startingConfig, err := configAccess.GetStartingConfig(); err != nil {
+func (o *PathOptions) writeCurrentContext(newCurrentContext string) error {
+	if startingConfig, err := o.getStartingConfig(); err != nil {
 		return err
 	} else if startingConfig.CurrentContext == newCurrentContext {
 		return nil
 	}
 
-	if configAccess.IsExplicitFile() {
-		file := configAccess.GetExplicitFile()
-		currConfig := getConfigFromFileOrDie(file)
-		currConfig.CurrentContext = newCurrentContext
-		if err := clientcmd.WriteToFile(*currConfig, file); err != nil {
-			return err
-		}
-
-		return nil
-	}
-
 	if len(newCurrentContext) > 0 {
-		destinationFile := configAccess.GetDefaultFilename()
+		destinationFile := o.GetDefaultFilename()
 		config := getConfigFromFileOrDie(destinationFile)
 		config.CurrentContext = newCurrentContext
 
@@ -351,34 +375,46 @@ func writeCurrentContext(configAccess ConfigAccess, newCurrentContext string) er
 		return nil
 	}
 
-	// we're supposed to be clearing the current context.  We need to find the first spot in the chain that is setting it and clear it
-	for _, file := range configAccess.GetLoadingPrecedence() {
-		if _, err := os.Stat(file); err == nil {
-			currConfig := getConfigFromFileOrDie(file)
+	if o.IsExplicitFile() {
+		file := o.GetExplicitFile()
+		currConfig := getConfigFromFileOrDie(file)
+		currConfig.CurrentContext = newCurrentContext
+		if err := clientcmd.WriteToFile(*currConfig, file); err != nil {
+			return err
+		}
 
-			if len(currConfig.CurrentContext) > 0 {
-				currConfig.CurrentContext = newCurrentContext
-				if err := clientcmd.WriteToFile(*currConfig, file); err != nil {
-					return err
-				}
+		return nil
+	}
 
-				return nil
+	filesToCheck := make([]string, 0, len(o.LoadingRules.Precedence)+1)
+	filesToCheck = append(filesToCheck, o.LoadingRules.ExplicitPath)
+	filesToCheck = append(filesToCheck, o.LoadingRules.Precedence...)
+
+	for _, file := range filesToCheck {
+		currConfig := getConfigFromFileOrDie(file)
+
+		if len(currConfig.CurrentContext) > 0 {
+			currConfig.CurrentContext = newCurrentContext
+			if err := clientcmd.WriteToFile(*currConfig, file); err != nil {
+				return err
 			}
+
+			return nil
 		}
 	}
 
-	return errors.New("no config found to write context")
+	return nil
 }
 
-func writePreferences(configAccess ConfigAccess, newPrefs clientcmdapi.Preferences) error {
-	if startingConfig, err := configAccess.GetStartingConfig(); err != nil {
+func (o *PathOptions) writePreferences(newPrefs clientcmdapi.Preferences) error {
+	if startingConfig, err := o.getStartingConfig(); err != nil {
 		return err
 	} else if reflect.DeepEqual(startingConfig.Preferences, newPrefs) {
 		return nil
 	}
 
-	if configAccess.IsExplicitFile() {
-		file := configAccess.GetExplicitFile()
+	if o.IsExplicitFile() {
+		file := o.GetExplicitFile()
 		currConfig := getConfigFromFileOrDie(file)
 		currConfig.Preferences = newPrefs
 		if err := clientcmd.WriteToFile(*currConfig, file); err != nil {
@@ -388,7 +424,11 @@ func writePreferences(configAccess ConfigAccess, newPrefs clientcmdapi.Preferenc
 		return nil
 	}
 
-	for _, file := range configAccess.GetLoadingPrecedence() {
+	filesToCheck := make([]string, 0, len(o.LoadingRules.Precedence)+1)
+	filesToCheck = append(filesToCheck, o.LoadingRules.ExplicitPath)
+	filesToCheck = append(filesToCheck, o.LoadingRules.Precedence...)
+
+	for _, file := range filesToCheck {
 		currConfig := getConfigFromFileOrDie(file)
 
 		if !reflect.DeepEqual(currConfig.Preferences, newPrefs) {
@@ -401,7 +441,7 @@ func writePreferences(configAccess ConfigAccess, newPrefs clientcmdapi.Preferenc
 		}
 	}
 
-	return errors.New("no config found to write preferences")
+	return nil
 }
 
 // getConfigFromFileOrDie tries to read a kubeconfig file and if it can't, it calls exit.  One exception, missing files result in empty configs, not an exit

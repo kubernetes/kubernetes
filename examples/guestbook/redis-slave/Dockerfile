@@ -1,4 +1,4 @@
-FROM redis
+FROM dockerfile/redis
 
 ADD run.sh /run.sh
 

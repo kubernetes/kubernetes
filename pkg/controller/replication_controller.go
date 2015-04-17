@@ -25,7 +25,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/validation"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -56,7 +55,6 @@ type PodControlInterface interface {
 // RealPodControl is the default implementation of PodControllerInterface.
 type RealPodControl struct {
 	kubeClient client.Interface
-	recorder   record.EventRecorder
 }
 
 // Time period of main replication controller sync loop
@@ -94,7 +92,6 @@ func (r RealPodControl) createReplica(namespace string, controller api.Replicati
 		return
 	}
 	if _, err := r.kubeClient.Pods(namespace).Create(pod); err != nil {
-		r.recorder.Eventf(&controller, "failedCreate", "Error creating: %v", err)
 		util.HandleError(fmt.Errorf("unable to create pod replica: %v", err))
 	}
 }
@@ -105,17 +102,12 @@ func (r RealPodControl) deletePod(namespace, podID string) error {
 
 // NewReplicationManager creates a new ReplicationManager.
 func NewReplicationManager(kubeClient client.Interface) *ReplicationManager {
-	eventBroadcaster := record.NewBroadcaster()
-	eventBroadcaster.StartRecordingToSink(kubeClient.Events(""))
-
 	rm := &ReplicationManager{
 		kubeClient: kubeClient,
 		podControl: RealPodControl{
 			kubeClient: kubeClient,
-			recorder:   eventBroadcaster.NewRecorder(api.EventSource{Component: "replication-controller"}),
 		},
 	}
-
 	rm.syncHandler = rm.syncReplicationController
 	return rm
 }

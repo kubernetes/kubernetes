@@ -89,7 +89,7 @@ type Resizer interface {
 	ResizeSimple(namespace, name string, preconditions *ResizePrecondition, newSize uint) (string, error)
 }
 
-func ResizerFor(kind string, c ResizerClient) (Resizer, error) {
+func ResizerFor(kind string, c client.Interface) (Resizer, error) {
 	switch kind {
 	case "ReplicationController":
 		return &ReplicationControllerResizer{c}, nil
@@ -98,7 +98,7 @@ func ResizerFor(kind string, c ResizerClient) (Resizer, error) {
 }
 
 type ReplicationControllerResizer struct {
-	c ResizerClient
+	client.Interface
 }
 
 type RetryParams struct {
@@ -122,7 +122,8 @@ func ResizeCondition(r Resizer, precondition *ResizePrecondition, namespace, nam
 }
 
 func (resizer *ReplicationControllerResizer) ResizeSimple(namespace, name string, preconditions *ResizePrecondition, newSize uint) (string, error) {
-	controller, err := resizer.c.GetReplicationController(namespace, name)
+	rc := resizer.ReplicationControllers(namespace)
+	controller, err := rc.Get(name)
 	if err != nil {
 		return "", ControllerResizeError{ControllerResizeGetFailure, "Unknown", err}
 	}
@@ -133,7 +134,7 @@ func (resizer *ReplicationControllerResizer) ResizeSimple(namespace, name string
 	}
 	controller.Spec.Replicas = int(newSize)
 	// TODO: do retry on 409 errors here?
-	if _, err := resizer.c.UpdateReplicationController(namespace, controller); err != nil {
+	if _, err := rc.Update(controller); err != nil {
 		return "", ControllerResizeError{ControllerResizeUpdateFailure, controller.ResourceVersion, err}
 	}
 	// TODO: do a better job of printing objects here.
@@ -158,37 +159,9 @@ func (resizer *ReplicationControllerResizer) Resize(namespace, name string, newS
 	if waitForReplicas != nil {
 		rc := &api.ReplicationController{ObjectMeta: api.ObjectMeta{Namespace: namespace, Name: name}}
 		if err := wait.Poll(waitForReplicas.interval, waitForReplicas.timeout,
-			resizer.c.ControllerHasDesiredReplicas(rc)); err != nil {
+			client.ControllerHasDesiredReplicas(resizer, rc)); err != nil {
 			return err
 		}
 	}
 	return nil
-}
-
-// ResizerClient abstracts access to ReplicationControllers.
-type ResizerClient interface {
-	GetReplicationController(namespace, name string) (*api.ReplicationController, error)
-	UpdateReplicationController(namespace string, rc *api.ReplicationController) (*api.ReplicationController, error)
-	ControllerHasDesiredReplicas(rc *api.ReplicationController) wait.ConditionFunc
-}
-
-func NewResizerClient(c client.Interface) ResizerClient {
-	return &realResizerClient{c}
-}
-
-// realResizerClient is a ResizerClient which uses a Kube client.
-type realResizerClient struct {
-	client client.Interface
-}
-
-func (c *realResizerClient) GetReplicationController(namespace, name string) (*api.ReplicationController, error) {
-	return c.client.ReplicationControllers(namespace).Get(name)
-}
-
-func (c *realResizerClient) UpdateReplicationController(namespace string, rc *api.ReplicationController) (*api.ReplicationController, error) {
-	return c.client.ReplicationControllers(namespace).Update(rc)
-}
-
-func (c *realResizerClient) ControllerHasDesiredReplicas(rc *api.ReplicationController) wait.ConditionFunc {
-	return client.ControllerHasDesiredReplicas(c.client, rc)
 }

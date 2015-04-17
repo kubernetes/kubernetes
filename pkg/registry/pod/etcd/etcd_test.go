@@ -280,15 +280,6 @@ func TestListPodListSelection(t *testing.T) {
 			},
 		},
 	}
-	fakeEtcdClient.Data["/registry/pods/default/zot"] = tools.EtcdResponseWithError{
-		R: &etcd.Response{
-			Node: &etcd.Node{
-				Value: runtime.EncodeOrDie(latest.Codec, &api.Pod{
-					ObjectMeta: api.ObjectMeta{Name: "zot"},
-				}),
-			},
-		},
-	}
 	storage := NewStorage(helper, nil).Pod
 
 	ctx := api.NewDefaultContext()

@@ -24,9 +24,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/wait"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -128,7 +126,7 @@ func ServeImageOrFail(c *client.Client, test string, image string) {
 		Expect(err).NotTo(HaveOccurred())
 	}
 
-	By("Ensuring each pod is running")
+	By("Ensuring each pod is running and has a hostIP")
 
 	// Wait for the pods to enter the running state. Waiting loops until the pods
 	// are running so non-running pods cause a timeout for this test.
@@ -137,43 +135,35 @@ func ServeImageOrFail(c *client.Client, test string, image string) {
 		Expect(err).NotTo(HaveOccurred())
 	}
 
+	// Try to make sure we get a hostIP for each pod.
+	hostIPTimeout := 2 * time.Minute
+	t = time.Now()
+	for i, pod := range pods.Items {
+		for {
+			p, err := c.Pods(ns).Get(pod.Name)
+			Expect(err).NotTo(HaveOccurred())
+			if p.Status.HostIP != "" {
+				Logf("Controller %s: Replica %d has hostIP: %s", name, i+1, p.Status.HostIP)
+				break
+			}
+			if time.Since(t) >= hostIPTimeout {
+				Failf("Controller %s: Gave up waiting for hostIP of replica %d after %v seconds",
+					name, i, time.Since(t).Seconds())
+			}
+			Logf("Controller %s: Retrying to get the hostIP of replica %d", name, i+1)
+			time.Sleep(5 * time.Second)
+		}
+	}
+
+	// Re-fetch the pod information to update the host port information.
+	pods, err = c.Pods(ns).List(label)
+	Expect(err).NotTo(HaveOccurred())
+
 	// Verify that something is listening.
 	By("Trying to dial each unique pod")
-	retryTimeout := 2 * time.Minute
-	retryInterval := 5 * time.Second
-	err = wait.Poll(retryInterval, retryTimeout, responseChecker{c, ns, label, name, pods}.checkAllResponses)
-	if err != nil {
-		Failf("Did not get expected responses within the timeout period of %.2f seconds.", retryTimeout.Seconds())
-	}
-}
 
-func isElementOf(podUID types.UID, pods *api.PodList) bool {
-	for _, pod := range pods.Items {
-		if pod.UID == podUID {
-			return true
-		}
-	}
-	return false
-}
-
-type responseChecker struct {
-	c              *client.Client
-	ns             string
-	label          labels.Selector
-	controllerName string
-	pods           *api.PodList
-}
-
-func (r responseChecker) checkAllResponses() (done bool, err error) {
-	successes := 0
-	currentPods, err := r.c.Pods(r.ns).List(r.label)
-	Expect(err).NotTo(HaveOccurred())
-	for i, pod := range r.pods.Items {
-		// Check that the replica list remains unchanged, otherwise we have problems.
-		if !isElementOf(pod.UID, currentPods) {
-			return false, fmt.Errorf("Pod with UID %s is no longer a member of the replica set.  Must have been restarted for some reason.  Current replica set: %v", pod.UID, currentPods)
-		}
-		body, err := r.c.Get().
+	for i, pod := range pods.Items {
+		body, err := c.Get().
 			Prefix("proxy").
 			Namespace(api.NamespaceDefault).
 			Resource("pods").
@@ -181,19 +171,12 @@ func (r responseChecker) checkAllResponses() (done bool, err error) {
 			Do().
 			Raw()
 		if err != nil {
-			Logf("Controller %s: Failed to GET from replica %d (%s): %v:", r.controllerName, i+1, pod.Name, err)
-			continue
+			Failf("Controller %s: Failed to GET from replica %d: %v", name, i+1, err)
 		}
 		// The body should be the pod name.
 		if string(body) != pod.Name {
-			Logf("Controller %s: Replica %d expected response %s but got %s", r.controllerName, i+1, pod.Name, string(body))
-			continue
+			Failf("Controller %s: Replica %d expected response %s but got %s", name, i+1, pod.Name, string(body))
 		}
-		successes++
-		Logf("Controller %s: Got expected result from replica %d: %s, %d of %d required successes so far", r.controllerName, i+1, string(body), successes, len(r.pods.Items))
+		Logf("Controller %s: Got expected result from replica %d: %s", name, i+1, string(body))
 	}
-	if successes < len(r.pods.Items) {
-		return false, nil
-	}
-	return true, nil
 }

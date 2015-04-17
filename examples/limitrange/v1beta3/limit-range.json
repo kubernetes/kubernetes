@@ -13,7 +13,7 @@
         "cpu": "2"
       },
       "min": {
-        "memory": "5Mi",
+        "memory": "1Mi",
         "cpu": "250m"
       }
     },
@@ -24,11 +24,11 @@
         "cpu": "2"
       },
       "min": {
-        "memory": "5Mi",
+        "memory": "1Mi",
         "cpu": "250m"
       },
       "default": {
-        "memory": "5Mi",
+        "memory": "1Mi",
         "cpu": "250m"
       }       
     }

@@ -3,7 +3,7 @@
 TAG = 1.0
 
 build:	
-	docker build -t gcr.io/google_containers/elasticsearch:$(TAG) .
+	docker build -t kubernetes/elasticsearch:$(TAG) .
 
 push:	
-	docker push gcr.io/google_containers/elasticsearch:$(TAG)
+	docker push kubernetes/elasticsearch:$(TAG)

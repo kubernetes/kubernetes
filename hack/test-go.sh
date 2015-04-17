@@ -35,7 +35,6 @@ kube::test::find_dirs() {
           -o -wholename '*/third_party/*' \
           -o -wholename '*/Godeps/*' \
           -o -wholename '*/contrib/podex/*' \
-          -o -wholename '*/test/integration/*' \
         \) -prune \
       \) -name '*_test.go' -print0 | xargs -0n1 dirname | sed 's|^\./||' | sort -u
   )
@@ -151,7 +150,7 @@ runTests() {
   if [[ ! ${KUBE_COVER} =~ ^[yY]$ ]]; then
     kube::log::status "Running unit tests without code coverage"
     go test "${goflags[@]:+${goflags[@]}}" \
-      ${KUBE_RACE} ${KUBE_TIMEOUT} "${@+${@/#/${KUBE_GO_PACKAGE}/}}" || true
+      ${KUBE_RACE} ${KUBE_TIMEOUT} "${@+${@/#/${KUBE_GO_PACKAGE}/}}"
     return 0
   fi
 
@@ -173,7 +172,7 @@ runTests() {
           -cover -covermode="${KUBE_COVERMODE}" \
           -coverprofile="${cover_report_dir}/{}/${cover_profile}" \
           "${cover_params[@]+${cover_params[@]}}" \
-          "${KUBE_GO_PACKAGE}/{}" || true
+          "${KUBE_GO_PACKAGE}/{}"
 
   COMBINED_COVER_PROFILE="${cover_report_dir}/combined-coverage.out"
   {

@@ -25,12 +25,12 @@ import (
 )
 
 type useContextOptions struct {
-	configAccess ConfigAccess
-	contextName  string
+	pathOptions *PathOptions
+	contextName string
 }
 
-func NewCmdConfigUseContext(out io.Writer, configAccess ConfigAccess) *cobra.Command {
-	options := &useContextOptions{configAccess: configAccess}
+func NewCmdConfigUseContext(out io.Writer, pathOptions *PathOptions) *cobra.Command {
+	options := &useContextOptions{pathOptions: pathOptions}
 
 	cmd := &cobra.Command{
 		Use:   "use-context CONTEXT_NAME",
@@ -57,14 +57,14 @@ func (o useContextOptions) run() error {
 		return err
 	}
 
-	config, err := o.configAccess.GetStartingConfig()
+	config, err := o.pathOptions.getStartingConfig()
 	if err != nil {
 		return err
 	}
 
 	config.CurrentContext = o.contextName
 
-	if err := ModifyConfig(o.configAccess, *config); err != nil {
+	if err := o.pathOptions.ModifyConfig(*config); err != nil {
 		return err
 	}
 
@@ -87,5 +87,5 @@ func (o useContextOptions) validate() error {
 		return errors.New("You must specify a current-context")
 	}
 
-	return nil
+	return o.pathOptions.Validate()
 }

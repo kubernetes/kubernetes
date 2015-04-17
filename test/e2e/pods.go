@@ -483,7 +483,7 @@ var _ = Describe("Pods", func() {
 					Containers: []api.Container{
 						{
 							Name:  "nginx",
-							Image: "nginx",
+							Image: "dockerfile/nginx",
 						},
 					},
 				},
@@ -555,7 +555,7 @@ var _ = Describe("Pods", func() {
 					Containers: []api.Container{
 						{
 							Name:  "nginx",
-							Image: "nginx",
+							Image: "dockerfile/nginx",
 							Ports: []api.Port{{ContainerPort: 80}},
 						},
 					},

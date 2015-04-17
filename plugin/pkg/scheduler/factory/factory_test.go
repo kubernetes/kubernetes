@@ -131,6 +131,168 @@ func PriorityTwo(pod api.Pod, podLister algorithm.PodLister, minionLister algori
 	return []algorithm.HostPriority{}, nil
 }
 
+func TestPollMinions(t *testing.T) {
+	table := []struct {
+		minions       []api.Node
+		expectedCount int
+	}{
+		{
+			minions: []api.Node{
+				{
+					ObjectMeta: api.ObjectMeta{Name: "foo"},
+					Status: api.NodeStatus{
+						Conditions: []api.NodeCondition{
+							{Type: api.NodeReady, Status: api.ConditionTrue},
+						},
+					},
+				},
+				{
+					ObjectMeta: api.ObjectMeta{Name: "fiz"},
+					Spec: api.NodeSpec{
+						Unschedulable: false,
+					},
+				},
+				{
+					ObjectMeta: api.ObjectMeta{Name: "baz"},
+					Status: api.NodeStatus{
+						Conditions: []api.NodeCondition{
+							{Type: api.NodeReady, Status: api.ConditionTrue},
+							{Type: api.NodeReady, Status: api.ConditionTrue},
+						},
+					},
+				},
+				{
+					ObjectMeta: api.ObjectMeta{Name: "fuz"},
+					Status: api.NodeStatus{
+						Conditions: []api.NodeCondition{
+							{Type: api.NodeReady, Status: api.ConditionTrue},
+						},
+					},
+					Spec: api.NodeSpec{
+						Unschedulable: false,
+					},
+				},
+				{
+					ObjectMeta: api.ObjectMeta{Name: "buz"},
+					Status: api.NodeStatus{
+						Conditions: []api.NodeCondition{
+							{Type: api.NodeReady, Status: api.ConditionTrue},
+						},
+					},
+					Spec: api.NodeSpec{
+						Unschedulable: true,
+					},
+				},
+				{
+					ObjectMeta: api.ObjectMeta{Name: "foobar"},
+					Status: api.NodeStatus{
+						Conditions: []api.NodeCondition{
+							{Type: api.NodeReady, Status: api.ConditionFalse},
+						},
+					},
+					Spec: api.NodeSpec{
+						Unschedulable: false,
+					},
+				},
+			},
+			expectedCount: 3,
+		},
+		{
+			minions: []api.Node{
+				{
+					ObjectMeta: api.ObjectMeta{Name: "foo"},
+					Status: api.NodeStatus{
+						Conditions: []api.NodeCondition{
+							{Type: api.NodeReady, Status: api.ConditionTrue},
+						},
+					},
+				},
+				{
+					ObjectMeta: api.ObjectMeta{Name: "bar"},
+					Status: api.NodeStatus{
+						Conditions: []api.NodeCondition{
+							{Type: api.NodeReady, Status: api.ConditionFalse},
+						},
+					},
+				},
+			},
+			expectedCount: 1,
+		},
+		{
+			minions: []api.Node{
+				{
+					ObjectMeta: api.ObjectMeta{Name: "foo"},
+					Spec: api.NodeSpec{
+						Unschedulable: false,
+					},
+				},
+				{
+					ObjectMeta: api.ObjectMeta{Name: "bar"},
+					Spec: api.NodeSpec{
+						Unschedulable: true,
+					},
+				},
+			},
+			expectedCount: 0,
+		},
+		{
+			minions: []api.Node{
+				{
+					ObjectMeta: api.ObjectMeta{Name: "foo"},
+					Status: api.NodeStatus{
+						Conditions: []api.NodeCondition{
+							{Type: api.NodeReady, Status: api.ConditionTrue},
+							{Type: "invalidValue", Status: api.ConditionFalse}},
+					},
+				},
+			},
+			expectedCount: 1,
+		},
+		{
+			minions: []api.Node{
+				{
+					ObjectMeta: api.ObjectMeta{Name: "foo"},
+					Status: api.NodeStatus{
+						Conditions: []api.NodeCondition{},
+					},
+				},
+			},
+			expectedCount: 0,
+		},
+	}
+
+	for _, item := range table {
+		ml := &api.NodeList{Items: item.minions}
+		handler := util.FakeHandler{
+			StatusCode:   200,
+			ResponseBody: runtime.EncodeOrDie(latest.Codec, ml),
+			T:            t,
+		}
+		mux := http.NewServeMux()
+		// FakeHandler musn't be sent requests other than the one you want to test.
+		resource := "nodes"
+		if api.PreV1Beta3(testapi.Version()) {
+			resource = "minions"
+		}
+		mux.Handle(testapi.ResourcePath(resource, api.NamespaceAll, ""), &handler)
+		server := httptest.NewServer(mux)
+		defer server.Close()
+		client := client.NewOrDie(&client.Config{Host: server.URL, Version: testapi.Version()})
+		cf := NewConfigFactory(client)
+
+		ce, err := cf.pollMinions()
+		if err != nil {
+			t.Errorf("Unexpected error: %v", err)
+			continue
+		}
+		handler.ValidateRequest(t, testapi.ResourcePath(resource, api.NamespaceAll, ""), "GET", nil)
+
+		if a := ce.Len(); item.expectedCount != a {
+			t.Errorf("Expected %v, got %v", item.expectedCount, a)
+		}
+	}
+}
+
 func TestDefaultErrorFunc(t *testing.T) {
 	testPod := &api.Pod{
 		ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "bar"},

@@ -7,4 +7,4 @@ desiredState:
     id: www
     containers:
       - name: nginx
-        image: nginx
+        image: dockerfile/nginx

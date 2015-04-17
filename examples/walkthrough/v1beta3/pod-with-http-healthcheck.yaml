@@ -5,7 +5,7 @@ metadata:
 spec:
   containers:
     - name: nginx
-      image: nginx
+      image: dockerfile/nginx
       # defines the health checking
       livenessProbe:
         # an http probe

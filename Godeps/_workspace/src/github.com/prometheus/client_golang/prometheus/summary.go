@@ -16,7 +16,6 @@ package prometheus
 import (
 	"fmt"
 	"hash/fnv"
-	"math"
 	"sort"
 	"sync"
 	"time"
@@ -278,8 +277,10 @@ func (s *summary) Write(out *dto.Metric) error {
 
 	s.bufMtx.Lock()
 	s.mtx.Lock()
-	// Swap bufs even if hotBuf is empty to set new hotBufExpTime.
-	s.swapBufs(time.Now())
+
+	if len(s.hotBuf) != 0 {
+		s.swapBufs(time.Now())
+	}
 	s.bufMtx.Unlock()
 
 	s.flushColdBuf()
@@ -287,15 +288,9 @@ func (s *summary) Write(out *dto.Metric) error {
 	sum.SampleSum = proto.Float64(s.sum)
 
 	for _, rank := range s.sortedObjectives {
-		var q float64
-		if s.headStream.Count() == 0 {
-			q = math.NaN()
-		} else {
-			q = s.headStream.Query(rank)
-		}
 		qs = append(qs, &dto.Quantile{
 			Quantile: proto.Float64(rank),
-			Value:    proto.Float64(q),
+			Value:    proto.Float64(s.headStream.Query(rank)),
 		})
 	}
 

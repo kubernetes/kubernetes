@@ -1,0 +1,12 @@
+[Unit]
+Description=Kubernetes Scheduler Plugin
+Documentation=https://github.com/GoogleCloudPlatform/kubernetes
+
+[Service]
+Type=simple
+EnvironmentFile=-/etc/sysconfig/kube-scheduler
+ExecStart=/usr/local/bin/kube-scheduler "$DAEMON_ARGS"
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

@@ -122,8 +122,7 @@ func NewMainKubelet(
 	cadvisorInterface cadvisor.Interface,
 	imageGCPolicy ImageGCPolicy,
 	cloud cloudprovider.Interface,
-	nodeStatusUpdateFrequency time.Duration,
-	resourceContainer string) (*Kubelet, error) {
+	nodeStatusUpdateFrequency time.Duration) (*Kubelet, error) {
 	if rootDirectory == "" {
 		return nil, fmt.Errorf("invalid root directory %q", rootDirectory)
 	}
@@ -229,7 +228,6 @@ func NewMainKubelet(
 		nodeRef:                        nodeRef,
 		containerManager:               containerManager,
 		nodeStatusUpdateFrequency:      nodeStatusUpdateFrequency,
-		resourceContainer:              resourceContainer,
 	}
 
 	klet.podManager = newBasicPodManager(klet.kubeClient)
@@ -360,10 +358,6 @@ type Kubelet struct {
 	//    status. Kubelet may fail to update node status reliablly if the value is too small,
 	//    as it takes time to gather all necessary node information.
 	nodeStatusUpdateFrequency time.Duration
-
-	// The name of the resource-only container to run the Kubelet in (empty for no container).
-	// Name must be absolute.
-	resourceContainer string
 }
 
 // getRootDir returns the full path to the directory under which kubelet can
@@ -542,16 +536,6 @@ func (kl *Kubelet) Run(updates <-chan PodUpdate) {
 	if kl.kubeClient == nil {
 		glog.Warning("No api server defined - no node status update will be sent.")
 	}
-
-	// Move Kubelet to a container.
-	if kl.resourceContainer != "" {
-		err := util.RunInResourceContainer(kl.resourceContainer)
-		if err != nil {
-			glog.Warningf("Failed to move Kubelet to container %q: %v", kl.resourceContainer, err)
-		}
-		glog.Infof("Running in container %q", kl.resourceContainer)
-	}
-
 	go kl.syncNodeStatus()
 	kl.statusManager.Start()
 	kl.syncLoop(updates, kl)
@@ -1123,56 +1107,52 @@ func (kl *Kubelet) computePodContainerChanges(pod *api.Pod, runningPod kubeconta
 		expectedHash := dockertools.HashContainer(&container)
 
 		c := runningPod.FindContainerByName(container.Name)
-		if c == nil {
+		if c != nil {
+			containerID := dockertools.DockerID(c.ID)
+			hash := c.Hash
+			glog.V(3).Infof("pod %q container %q exists as %v", podFullName, container.Name, containerID)
+
+			if !createPodInfraContainer {
+				// look for changes in the container.
+
+				containerChanged := hash != 0 && hash != expectedHash
+				if !containerChanged {
+					result, err := kl.probeContainer(pod, podStatus, container, string(c.ID), c.Created)
+					if err != nil {
+						// TODO(vmarmol): examine this logic.
+						glog.V(2).Infof("probe no-error: %q", container.Name)
+						containersToKeep[containerID] = index
+						continue
+					}
+					if result == probe.Success {
+						glog.V(4).Infof("probe success: %q", container.Name)
+						containersToKeep[containerID] = index
+						continue
+					}
+					glog.Infof("pod %q container %q is unhealthy (probe result: %v), it will be killed and re-created.", podFullName, container.Name, result)
+				} else {
+					glog.Infof("pod %q container %q hash changed (%d vs %d), it will be killed and re-created.", podFullName, container.Name, hash, expectedHash)
+				}
+				containersToStart[index] = empty{}
+			} else { // createPodInfraContainer == true and Container exists
+				// If we're creating infra containere everything will be killed anyway
+				// If RestartPolicy is Always or OnFailure we restart containers that were running before we
+				// killed them when restarting Infra Container.
+				if pod.Spec.RestartPolicy != api.RestartPolicyNever {
+					glog.V(1).Infof("Infra Container is being recreated. %q will be restarted.", container.Name)
+					containersToStart[index] = empty{}
+				}
+				continue
+			}
+		} else {
 			if kl.shouldContainerBeRestarted(&container, pod, &podStatus) {
-				// If we are here it means that the container is dead and should be restarted, or never existed and should
+				// If we are here it means that the container is dead and sould be restarted, or never existed and should
 				// be created. We may be inserting this ID again if the container has changed and it has
 				// RestartPolicy::Always, but it's not a big deal.
 				glog.V(3).Infof("Container %+v is dead, but RestartPolicy says that we should restart it.", container)
 				containersToStart[index] = empty{}
 			}
-			continue
 		}
-
-		containerID := dockertools.DockerID(c.ID)
-		hash := c.Hash
-		glog.V(3).Infof("pod %q container %q exists as %v", podFullName, container.Name, containerID)
-
-		if createPodInfraContainer {
-			// createPodInfraContainer == true and Container exists
-			// If we're creating infra containere everything will be killed anyway
-			// If RestartPolicy is Always or OnFailure we restart containers that were running before we
-			// killed them when restarting Infra Container.
-			if pod.Spec.RestartPolicy != api.RestartPolicyNever {
-				glog.V(1).Infof("Infra Container is being recreated. %q will be restarted.", container.Name)
-				containersToStart[index] = empty{}
-			}
-			continue
-		}
-
-		// At this point, the container is running and pod infra container is good.
-		// We will look for changes and check healthiness for the container.
-		containerChanged := hash != 0 && hash != expectedHash
-		if containerChanged {
-			glog.Infof("pod %q container %q hash changed (%d vs %d), it will be killed and re-created.", podFullName, container.Name, hash, expectedHash)
-			containersToStart[index] = empty{}
-			continue
-		}
-
-		result, err := kl.probeContainer(pod, podStatus, container, string(c.ID), c.Created)
-		if err != nil {
-			// TODO(vmarmol): examine this logic.
-			glog.V(2).Infof("probe no-error: %q", container.Name)
-			containersToKeep[containerID] = index
-			continue
-		}
-		if result == probe.Success {
-			glog.V(4).Infof("probe success: %q", container.Name)
-			containersToKeep[containerID] = index
-			continue
-		}
-		glog.Infof("pod %q container %q is unhealthy (probe result: %v), it will be killed and re-created.", podFullName, container.Name, result)
-		containersToStart[index] = empty{}
 	}
 
 	// After the loop one of the following should be true:

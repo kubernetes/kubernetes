@@ -253,7 +253,7 @@ func CreateResource(r rest.Creater, scope RequestScope, typer runtime.ObjectType
 			return
 		}
 
-		err = admit.Admit(admission.NewAttributesRecord(obj, scope.Kind, namespace, scope.Resource, "CREATE"))
+		err = admit.Admit(admission.NewAttributesRecord(obj, namespace, scope.Resource, "CREATE"))
 		if err != nil {
 			errorJSON(err, scope.Codec, w)
 			return
@@ -281,7 +281,7 @@ func CreateResource(r rest.Creater, scope RequestScope, typer runtime.ObjectType
 }
 
 // PatchResource returns a function that will handle a resource patch
-// TODO: Eventually PatchResource should just use GuaranteedUpdate and this routine should be a bit cleaner
+// TODO: Eventually PatchResource should just use AtomicUpdate and this routine should be a bit cleaner
 func PatchResource(r rest.Patcher, scope RequestScope, typer runtime.ObjectTyper, admit admission.Interface, converter runtime.ObjectConvertor) restful.RouteFunction {
 	return func(req *restful.Request, res *restful.Response) {
 		w := res.ResponseWriter
@@ -299,7 +299,7 @@ func PatchResource(r rest.Patcher, scope RequestScope, typer runtime.ObjectTyper
 
 		obj := r.New()
 		// PATCH requires same permission as UPDATE
-		err = admit.Admit(admission.NewAttributesRecord(obj, scope.Kind, namespace, scope.Resource, "UPDATE"))
+		err = admit.Admit(admission.NewAttributesRecord(obj, namespace, scope.Resource, "UPDATE"))
 		if err != nil {
 			errorJSON(err, scope.Codec, w)
 			return
@@ -399,7 +399,7 @@ func UpdateResource(r rest.Updater, scope RequestScope, typer runtime.ObjectType
 			return
 		}
 
-		err = admit.Admit(admission.NewAttributesRecord(obj, scope.Kind, namespace, scope.Resource, "UPDATE"))
+		err = admit.Admit(admission.NewAttributesRecord(obj, namespace, scope.Resource, "UPDATE"))
 		if err != nil {
 			errorJSON(err, scope.Codec, w)
 			return
@@ -460,7 +460,7 @@ func DeleteResource(r rest.GracefulDeleter, checkBody bool, scope RequestScope, 
 			}
 		}
 
-		err = admit.Admit(admission.NewAttributesRecord(nil, scope.Kind, namespace, scope.Resource, "DELETE"))
+		err = admit.Admit(admission.NewAttributesRecord(nil, namespace, scope.Resource, "DELETE"))
 		if err != nil {
 			errorJSON(err, scope.Codec, w)
 			return

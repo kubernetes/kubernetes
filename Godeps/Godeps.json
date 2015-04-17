@@ -317,8 +317,8 @@
 			"Rev": "05017fcccf23c823bfdea560dcc958a136e54fb7"
 		},
 		{
-			"ImportPath": "github.com/matttproud/golang_protobuf_extensions/pbutil",
-			"Rev": "fc2b8d3a73c4867e51861bbdd5ae3c1f0869dd6a"
+			"ImportPath": "github.com/matttproud/golang_protobuf_extensions/ext",
+			"Rev": "ba7d65ac66e9da93a714ca18f6d1bc7a0c09100c"
 		},
 		{
 			"ImportPath": "github.com/miekg/dns",
@@ -348,18 +348,18 @@
 		},
 		{
 			"ImportPath": "github.com/prometheus/client_golang/model",
-			"Comment": "0.4.0-1-g692492e",
-			"Rev": "692492e54b553a81013254cc1fba4b6dd76fad30"
+			"Comment": "0.2.0-5-gde5f7a2",
+			"Rev": "de5f7a2db9d883392ce3ad667087280fe1ff9cea"
 		},
 		{
 			"ImportPath": "github.com/prometheus/client_golang/prometheus",
-			"Comment": "0.4.0-1-g692492e",
-			"Rev": "692492e54b553a81013254cc1fba4b6dd76fad30"
+			"Comment": "0.2.0-5-gde5f7a2",
+			"Rev": "de5f7a2db9d883392ce3ad667087280fe1ff9cea"
 		},
 		{
 			"ImportPath": "github.com/prometheus/client_golang/text",
-			"Comment": "0.4.0-1-g692492e",
-			"Rev": "692492e54b553a81013254cc1fba4b6dd76fad30"
+			"Comment": "0.2.0-5-gde5f7a2",
+			"Rev": "de5f7a2db9d883392ce3ad667087280fe1ff9cea"
 		},
 		{
 			"ImportPath": "github.com/prometheus/client_model/go",
@@ -368,7 +368,7 @@
 		},
 		{
 			"ImportPath": "github.com/prometheus/procfs",
-			"Rev": "490cc6eb5fa45bf8a8b7b73c8bc82a8160e8531d"
+			"Rev": "6c34ef819e19b4e16f410100ace4aa006f0e3bf8"
 		},
 		{
 			"ImportPath": "github.com/rackspace/gophercloud",

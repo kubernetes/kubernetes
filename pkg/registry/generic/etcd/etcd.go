@@ -145,20 +145,9 @@ func (e *Etcd) List(ctx api.Context, label labels.Selector, field fields.Selecto
 // ListPredicate returns a list of all the items matching m.
 func (e *Etcd) ListPredicate(ctx api.Context, m generic.Matcher) (runtime.Object, error) {
 	list := e.NewListFunc()
-	if name, ok := m.MatchesSingle(); ok {
-		key, err := e.KeyFunc(ctx, name)
-		if err != nil {
-			return nil, err
-		}
-		err = e.Helper.ExtractObjToList(key, list)
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		err := e.Helper.ExtractToList(e.KeyRootFunc(ctx), list)
-		if err != nil {
-			return nil, err
-		}
+	err := e.Helper.ExtractToList(e.KeyRootFunc(ctx), list)
+	if err != nil {
+		return nil, err
 	}
 	return generic.FilterList(list, m, generic.DecoratorFunc(e.Decorator))
 }
@@ -266,7 +255,7 @@ func (e *Etcd) Update(ctx api.Context, obj runtime.Object) (runtime.Object, bool
 	// TODO: expose TTL
 	creating := false
 	out := e.NewFunc()
-	err = e.Helper.GuaranteedUpdate(key, out, true, func(existing runtime.Object) (runtime.Object, uint64, error) {
+	err = e.Helper.AtomicUpdate(key, out, true, func(existing runtime.Object) (runtime.Object, uint64, error) {
 		version, err := e.Helper.Versioner.ObjectResourceVersion(existing)
 		if err != nil {
 			return nil, 0, err

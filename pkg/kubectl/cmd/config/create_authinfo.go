@@ -31,7 +31,7 @@ import (
 )
 
 type createAuthInfoOptions struct {
-	configAccess      ConfigAccess
+	pathOptions       *PathOptions
 	name              string
 	authPath          util.StringFlag
 	clientCertificate util.StringFlag
@@ -67,8 +67,8 @@ $ kubectl set-credentials cluster-admin --username=admin --password=uXFGweU9l35q
 // Embed client certificate data in the "cluster-admin" entry
 $ kubectl set-credentials cluster-admin --client-certificate=~/.kube/admin.crt --embed-certs=true`
 
-func NewCmdConfigSetAuthInfo(out io.Writer, configAccess ConfigAccess) *cobra.Command {
-	options := &createAuthInfoOptions{configAccess: configAccess}
+func NewCmdConfigSetAuthInfo(out io.Writer, pathOptions *PathOptions) *cobra.Command {
+	options := &createAuthInfoOptions{pathOptions: pathOptions}
 
 	cmd := &cobra.Command{
 		Use:     fmt.Sprintf("set-credentials NAME [--%v=/path/to/authfile] [--%v=path/to/certfile] [--%v=path/to/keyfile] [--%v=bearer_token] [--%v=basic_user] [--%v=basic_password]", clientcmd.FlagAuthPath, clientcmd.FlagCertFile, clientcmd.FlagKeyFile, clientcmd.FlagBearerToken, clientcmd.FlagUsername, clientcmd.FlagPassword),
@@ -104,7 +104,7 @@ func (o createAuthInfoOptions) run() error {
 		return err
 	}
 
-	config, err := o.configAccess.GetStartingConfig()
+	config, err := o.pathOptions.getStartingConfig()
 	if err != nil {
 		return err
 	}
@@ -112,7 +112,7 @@ func (o createAuthInfoOptions) run() error {
 	authInfo := o.modifyAuthInfo(config.AuthInfos[o.name])
 	config.AuthInfos[o.name] = authInfo
 
-	if err := ModifyConfig(o.configAccess, *config); err != nil {
+	if err := o.pathOptions.ModifyConfig(*config); err != nil {
 		return err
 	}
 
@@ -225,5 +225,5 @@ func (o createAuthInfoOptions) validate() error {
 		}
 	}
 
-	return nil
+	return o.pathOptions.Validate()
 }

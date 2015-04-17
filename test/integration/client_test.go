@@ -30,7 +30,6 @@ import (
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
@@ -46,7 +45,7 @@ func init() {
 }
 
 func RunAMaster(t *testing.T) (*master.Master, *httptest.Server) {
-	helper, err := master.NewEtcdHelper(newEtcdClient(), testapi.Version())
+	helper, err := master.NewEtcdHelper(newEtcdClient(), "v1beta1")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -74,69 +73,76 @@ func TestClient(t *testing.T) {
 	_, s := RunAMaster(t)
 	defer s.Close()
 
-	ns := api.NamespaceDefault
-	deleteAllEtcdKeys()
-	client := client.NewOrDie(&client.Config{Host: s.URL, Version: testapi.Version()})
+	testCases := []string{
+		"v1beta1",
+		"v1beta2",
+		"v1beta3",
+	}
+	for _, apiVersion := range testCases {
+		ns := api.NamespaceDefault
+		deleteAllEtcdKeys()
+		client := client.NewOrDie(&client.Config{Host: s.URL, Version: apiVersion})
 
-	info, err := client.ServerVersion()
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if e, a := version.Get(), *info; !reflect.DeepEqual(e, a) {
-		t.Errorf("expected %#v, got %#v", e, a)
-	}
+		info, err := client.ServerVersion()
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if e, a := version.Get(), *info; !reflect.DeepEqual(e, a) {
+			t.Errorf("expected %#v, got %#v", e, a)
+		}
 
-	pods, err := client.Pods(ns).List(labels.Everything())
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if len(pods.Items) != 0 {
-		t.Errorf("expected no pods, got %#v", pods)
-	}
+		pods, err := client.Pods(ns).List(labels.Everything())
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if len(pods.Items) != 0 {
+			t.Errorf("expected no pods, got %#v", pods)
+		}
 
-	// get a validation error
-	pod := &api.Pod{
-		ObjectMeta: api.ObjectMeta{
-			GenerateName: "test",
-		},
-		Spec: api.PodSpec{
-			Containers: []api.Container{
-				{
-					Name: "test",
+		// get a validation error
+		pod := &api.Pod{
+			ObjectMeta: api.ObjectMeta{
+				GenerateName: "test",
+			},
+			Spec: api.PodSpec{
+				Containers: []api.Container{
+					{
+						Name: "test",
+					},
 				},
 			},
-		},
-	}
+		}
 
-	got, err := client.Pods(ns).Create(pod)
-	if err == nil {
-		t.Fatalf("unexpected non-error: %v", got)
-	}
+		got, err := client.Pods(ns).Create(pod)
+		if err == nil {
+			t.Fatalf("unexpected non-error: %v", got)
+		}
 
-	// get a created pod
-	pod.Spec.Containers[0].Image = "an-image"
-	got, err = client.Pods(ns).Create(pod)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if got.Name == "" {
-		t.Errorf("unexpected empty pod Name %v", got)
-	}
+		// get a created pod
+		pod.Spec.Containers[0].Image = "an-image"
+		got, err = client.Pods(ns).Create(pod)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if got.Name == "" {
+			t.Errorf("unexpected empty pod Name %v", got)
+		}
 
-	// pod is shown, but not scheduled
-	pods, err = client.Pods(ns).List(labels.Everything())
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if len(pods.Items) != 1 {
-		t.Errorf("expected one pod, got %#v", pods)
-	}
-	actual := pods.Items[0]
-	if actual.Name != got.Name {
-		t.Errorf("expected pod %#v, got %#v", got, actual)
-	}
-	if actual.Spec.Host != "" {
-		t.Errorf("expected pod to be unscheduled, got %#v", actual)
+		// pod is shown, but not scheduled
+		pods, err = client.Pods(ns).List(labels.Everything())
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if len(pods.Items) != 1 {
+			t.Errorf("expected one pod, got %#v", pods)
+		}
+		actual := pods.Items[0]
+		if actual.Name != got.Name {
+			t.Errorf("expected pod %#v, got %#v", got, actual)
+		}
+		if actual.Spec.Host != "" {
+			t.Errorf("expected pod to be unscheduled, got %#v", actual)
+		}
 	}
 }
 
@@ -153,7 +159,7 @@ func TestMultiWatch(t *testing.T) {
 	defer s.Close()
 
 	ns := api.NamespaceDefault
-	client := client.NewOrDie(&client.Config{Host: s.URL, Version: testapi.Version()})
+	client := client.NewOrDie(&client.Config{Host: s.URL, Version: "v1beta1"})
 
 	dummyEvent := func(i int) *api.Event {
 		name := fmt.Sprintf("unrelated-%v", i)

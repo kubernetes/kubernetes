@@ -21,6 +21,7 @@ import (
 	"io"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/admission"
+	apierrors "github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 )
 
@@ -35,7 +36,7 @@ func init() {
 type alwaysDeny struct{}
 
 func (alwaysDeny) Admit(a admission.Attributes) (err error) {
-	return admission.NewForbidden(a, errors.New("Admission control is denying all modifications"))
+	return apierrors.NewForbidden(a.GetResource(), "", errors.New("Admission control is denying all modifications"))
 }
 
 func NewAlwaysDeny() admission.Interface {

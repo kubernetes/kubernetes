@@ -16,10 +16,6 @@
 
 # Marks the current stable version
 
-set -o errexit
-set -o nounset
-set -o pipefail
-
 if [[ -z "$1" ]]; then
   echo "Usage: $0 <version>"
   exit 1
@@ -32,7 +28,7 @@ fi
 
 STABLE_FILE_LOCATION="kubernetes-release/release/stable.txt"
 
-version_file=$(mktemp -t stable.XXXXXX)
+version_file=$(mktemp -t stable)
 
 echo $1 >> ${version_file}
 echo "Uploading stable version $1 to google storage"

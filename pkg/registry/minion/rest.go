@@ -107,8 +107,7 @@ type ResourceGetter interface {
 // NodeToSelectableFields returns a label set that represents the object.
 func NodeToSelectableFields(node *api.Node) fields.Set {
 	return fields.Set{
-		"metadata.name":      node.Name,
-		"spec.unschedulable": fmt.Sprint(node.Spec.Unschedulable),
+		"metadata.name": node.Name,
 	}
 }
 

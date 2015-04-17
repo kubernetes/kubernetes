@@ -30,14 +30,10 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
-	"net/url"
 	"os"
-	"strconv"
 	"strings"
 	"testing"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/apiserver"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/authenticator"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/auth/authenticator/bearertoken"
@@ -50,15 +46,8 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/auth/authenticator/token/tokentest"
 )
 
-var nodeResourceName string
-
 func init() {
 	requireEtcd()
-	if api.PreV1Beta3(testapi.Version()) {
-		nodeResourceName = "minions"
-	} else {
-		nodeResourceName = "nodes"
-	}
 }
 
 const (
@@ -74,175 +63,113 @@ func getTestTokenAuth() authenticator.Request {
 	return bearertoken.New(tokenAuthenticator)
 }
 
-func path(resource, namespace, name string) string {
-	return testapi.ResourcePath(resource, namespace, name)
-}
-
-func pathWithQuery(resource, namespace, name string) string {
-	return testapi.ResourcePathWithQueryParams(resource, namespace, name)
-}
-
-func pathWithPrefix(prefix, resource, namespace, name string) string {
-	return testapi.ResourcePathWithPrefix(prefix, resource, namespace, name)
-}
-
-func timeoutPath(resource, namespace, name string) string {
-	return addTimeoutFlag(testapi.ResourcePath(resource, namespace, name))
-}
-
-func timeoutPathWithQuery(resource, namespace, name string) string {
-	return addTimeoutFlag(testapi.ResourcePathWithQueryParams(resource, namespace, name))
-}
-
 // Bodies for requests used in subsequent tests.
 var aPod string = `
 {
   "kind": "Pod",
-  "apiVersion": "v1beta3",
-  "metadata": {
-    "name": "a",
-    "creationTimestamp": null%s
-  },
-  "spec": {
-    "containers": [
-      {
-        "name": "foo",
-        "image": "bar/foo"
-      }
-    ]
-  }
+  "apiVersion": "v1beta1",
+  "id": "a",
+  "desiredState": {
+    "manifest": {
+      "version": "v1beta1",
+      "id": "a",
+      "containers": [{ "name": "foo", "image": "bar/foo" }]
+    }
+  }%s
 }
 `
 var aRC string = `
 {
   "kind": "ReplicationController",
-  "apiVersion": "v1beta3",
-  "metadata": {
-    "name": "a",
-    "labels": {
-      "name": "a"
-    }%s
-  },
-  "spec": {
+  "apiVersion": "v1beta1",
+  "id": "a",
+  "desiredState": {
     "replicas": 2,
-    "selector": {
-      "name": "a"
-    },
-    "template": {
-      "metadata": {
-        "labels": {
-          "name": "a"
-        }
-      },
-      "spec": {
-        "containers": [
-          {
+    "replicaSelector": {"name": "a"},
+    "podTemplate": {
+      "desiredState": {
+        "manifest": {
+          "version": "v1beta1",
+          "id": "a",
+          "containers": [{
             "name": "foo",
             "image": "bar/foo"
-          }
-        ]
-      }
+          }]
+        }
+      },
+      "labels": {"name": "a"}
     }
-  }
+  },
+  "labels": {"name": "a"}%s
 }
 `
 var aService string = `
 {
   "kind": "Service",
-  "apiVersion": "v1beta3",
-  "metadata": {
-    "name": "a",
-    "labels": {
-      "name": "a"
-    }%s
-  },
-  "spec": {
-    "ports": [
-      {
-        "protocol": "TCP",
-        "port": 8000
-      }
-    ],
-    "selector": {
-      "name": "a"
-    },
-    "portalIP": "10.0.0.100"
-  }
+  "apiVersion": "v1beta1",
+  "id": "a",
+  "port": 8000,
+  "portalIP": "10.0.0.100",
+  "labels": { "name": "a" },
+  "selector": { "name": "a" }%s
 }
 `
-var aNode string = `
+var aMinion string = `
 {
-  "kind": "Node",
-  "apiVersion": "v1beta3",
-  "metadata": {
-    "name": "a"%s
+  "kind": "Minion",
+  "apiVersion": "v1beta1",
+  "id": "a",
+  "resources": {
+	"capacity": { "memory": "10", "cpu": "10"}
   },
-  "spec": {
-    "externalID": "external"
-  }
+  "externalID": "external",
+  "hostIP": "10.10.10.10"%s
 }
 `
+
 var aEvent string = `
 {
   "kind": "Event",
-  "apiVersion": "v1beta3",
-  "metadata": {
-    "name": "a"%s
-  },
+  "apiVersion": "v1beta1",
+  "id": "a",
   "involvedObject": {
-    "kind": "Node",
-    "namespace": "default",
+    "kind": "Minion",
     "name": "a",
-    "apiVersion": "v1beta3"
-  }
+    "namespace": "default",
+    "apiVersion": "v1beta1"
+  }%s
 }
 `
 
 var aBinding string = `
 {
   "kind": "Binding",
-  "apiVersion": "v1beta3",
-  "metadata": {
-    "name": "a"%s
-  },
-  "target": {
-    "name": "10.10.10.10"
-  }
+  "apiVersion": "v1beta1",
+  "id": "a",
+  "host": "10.10.10.10",
+  "podID": "a"%s
 }
 `
 
 var aEndpoints string = `
 {
   "kind": "Endpoints",
-  "apiVersion": "v1beta3",
-  "metadata": {
-    "name": "a"%s
-  },
-  "subsets": [
-    {
-      "addresses": [
-        {
-          "IP": "10.10.1.1"
-        }
-      ],
-      "ports": [
-        {
-          "port": 1909,
-          "protocol": "TCP"
-        }
-      ]
-    }
-  ]
+  "apiVersion": "v1beta1",
+  "id": "a",
+  "endpoints": ["10.10.1.1:1909"]%s
 }
 `
 
 var deleteNow string = `
 {
-  "kind": "DeleteOptions",
-  "apiVersion": "v1beta3",
-  "gracePeriodSeconds": null%s
+	"kind": "DeleteOptions",
+	"apiVersion": "v1beta1",
+	"gracePeriod": 0%s
 }
 `
+
+// To ensure that a POST completes before a dependent GET, set a timeout.
+var timeoutFlag = "?timeout=60s"
 
 // Requests to try.  Each one should be forbidden or not forbidden
 // depending on the authentication and authorization setup of the master.
@@ -255,15 +182,6 @@ var code405 = map[int]bool{405: true}
 var code409 = map[int]bool{409: true}
 var code422 = map[int]bool{422: true}
 var code500 = map[int]bool{500: true}
-
-// To ensure that a POST completes before a dependent GET, set a timeout.
-func addTimeoutFlag(URLString string) string {
-	u, _ := url.Parse(URLString)
-	values := u.Query()
-	values.Set("timeout", "60s")
-	u.RawQuery = values.Encode()
-	return u.String()
-}
 
 func getTestRequests() []struct {
 	verb        string
@@ -278,82 +196,86 @@ func getTestRequests() []struct {
 		statusCodes map[int]bool // Set of expected resp.StatusCode if all goes well.
 	}{
 		// Normal methods on pods
-		{"GET", path("pods", "", ""), "", code200},
-		{"GET", path("pods", api.NamespaceDefault, ""), "", code200},
-		{"POST", timeoutPath("pods", api.NamespaceDefault, ""), aPod, code201},
-		{"PUT", timeoutPath("pods", api.NamespaceDefault, "a"), aPod, code200},
-		{"GET", path("pods", api.NamespaceDefault, "a"), "", code200},
-		{"PATCH", path("pods", api.NamespaceDefault, "a"), "{%v}", code200},
-		{"DELETE", timeoutPath("pods", api.NamespaceDefault, "a"), deleteNow, code200},
+		{"GET", "/api/v1beta1/pods", "", code200},
+		{"POST", "/api/v1beta1/pods" + timeoutFlag, aPod, code201},
+		{"PUT", "/api/v1beta1/pods/a" + timeoutFlag, aPod, code200},
+		{"GET", "/api/v1beta1/pods", "", code200},
+		{"GET", "/api/v1beta1/pods/a", "", code200},
+		{"PATCH", "/api/v1beta1/pods/a", "{%v}", code200},
+		{"DELETE", "/api/v1beta1/pods/a" + timeoutFlag, deleteNow, code200},
 
 		// Non-standard methods (not expected to work,
 		// but expected to pass/fail authorization prior to
 		// failing validation.
-		{"OPTIONS", path("pods", api.NamespaceDefault, ""), "", code405},
-		{"OPTIONS", path("pods", api.NamespaceDefault, "a"), "", code405},
-		{"HEAD", path("pods", api.NamespaceDefault, ""), "", code405},
-		{"HEAD", path("pods", api.NamespaceDefault, "a"), "", code405},
-		{"TRACE", path("pods", api.NamespaceDefault, ""), "", code405},
-		{"TRACE", path("pods", api.NamespaceDefault, "a"), "", code405},
-		{"NOSUCHVERB", path("pods", api.NamespaceDefault, ""), "", code405},
+		{"OPTIONS", "/api/v1beta1/pods", "", code405},
+		{"OPTIONS", "/api/v1beta1/pods/a", "", code405},
+		{"HEAD", "/api/v1beta1/pods", "", code405},
+		{"HEAD", "/api/v1beta1/pods/a", "", code405},
+		{"TRACE", "/api/v1beta1/pods", "", code405},
+		{"TRACE", "/api/v1beta1/pods/a", "", code405},
+		{"NOSUCHVERB", "/api/v1beta1/pods", "", code405},
 
 		// Normal methods on services
-		{"GET", path("services", "", ""), "", code200},
-		{"GET", path("services", api.NamespaceDefault, ""), "", code200},
-		{"POST", timeoutPath("services", api.NamespaceDefault, ""), aService, code201},
-		{"PUT", timeoutPath("services", api.NamespaceDefault, "a"), aService, code200},
-		{"GET", path("services", api.NamespaceDefault, "a"), "", code200},
-		{"DELETE", timeoutPath("services", api.NamespaceDefault, "a"), "", code200},
+		{"GET", "/api/v1beta1/services", "", code200},
+		{"POST", "/api/v1beta1/services" + timeoutFlag, aService, code201},
+		{"PUT", "/api/v1beta1/services/a" + timeoutFlag, aService, code200},
+		{"GET", "/api/v1beta1/services", "", code200},
+		{"GET", "/api/v1beta1/services/a", "", code200},
+		{"DELETE", "/api/v1beta1/services/a" + timeoutFlag, "", code200},
 
 		// Normal methods on replicationControllers
-		{"GET", path("replicationControllers", "", ""), "", code200},
-		{"GET", path("replicationControllers", api.NamespaceDefault, ""), "", code200},
-		{"POST", timeoutPath("replicationControllers", api.NamespaceDefault, ""), aRC, code201},
-		{"PUT", timeoutPath("replicationControllers", api.NamespaceDefault, "a"), aRC, code200},
-		{"GET", path("replicationControllers", api.NamespaceDefault, "a"), "", code200},
-		{"DELETE", timeoutPath("replicationControllers", api.NamespaceDefault, "a"), "", code200},
+		{"GET", "/api/v1beta1/replicationControllers", "", code200},
+		{"POST", "/api/v1beta1/replicationControllers" + timeoutFlag, aRC, code201},
+		{"PUT", "/api/v1beta1/replicationControllers/a" + timeoutFlag, aRC, code200},
+		{"GET", "/api/v1beta1/replicationControllers", "", code200},
+		{"GET", "/api/v1beta1/replicationControllers/a", "", code200},
+		{"DELETE", "/api/v1beta1/replicationControllers/a" + timeoutFlag, "", code200},
 
 		// Normal methods on endpoints
-		{"GET", path("endpoints", "", ""), "", code200},
-		{"GET", path("endpoints", api.NamespaceDefault, ""), "", code200},
-		{"POST", timeoutPath("endpoints", api.NamespaceDefault, ""), aEndpoints, code201},
-		{"PUT", timeoutPath("endpoints", api.NamespaceDefault, "a"), aEndpoints, code200},
-		{"GET", path("endpoints", api.NamespaceDefault, "a"), "", code200},
-		{"DELETE", timeoutPath("endpoints", api.NamespaceDefault, "a"), "", code200},
+		{"GET", "/api/v1beta1/endpoints", "", code200},
+		{"POST", "/api/v1beta1/endpoints" + timeoutFlag, aEndpoints, code201},
+		{"PUT", "/api/v1beta1/endpoints/a" + timeoutFlag, aEndpoints, code200},
+		{"GET", "/api/v1beta1/endpoints", "", code200},
+		{"GET", "/api/v1beta1/endpoints/a", "", code200},
+		{"DELETE", "/api/v1beta1/endpoints/a" + timeoutFlag, "", code200},
 
 		// Normal methods on minions
-		{"GET", path(nodeResourceName, "", ""), "", code200},
-		{"POST", timeoutPath(nodeResourceName, "", ""), aNode, code201},
-		{"PUT", timeoutPath(nodeResourceName, "", "a"), aNode, code200},
-		{"GET", path(nodeResourceName, "", "a"), "", code200},
-		{"DELETE", timeoutPath(nodeResourceName, "", "a"), "", code200},
+		{"GET", "/api/v1beta1/minions", "", code200},
+		{"POST", "/api/v1beta1/minions" + timeoutFlag, aMinion, code201},
+		{"PUT", "/api/v1beta1/minions/a" + timeoutFlag, aMinion, code200},
+		{"GET", "/api/v1beta1/minions", "", code200},
+		{"GET", "/api/v1beta1/minions/a", "", code200},
+		{"DELETE", "/api/v1beta1/minions/a" + timeoutFlag, "", code200},
 
 		// Normal methods on events
-		{"GET", path("events", "", ""), "", code200},
-		{"GET", path("events", api.NamespaceDefault, ""), "", code200},
-		{"POST", timeoutPath("events", api.NamespaceDefault, ""), aEvent, code201},
-		{"PUT", timeoutPath("events", api.NamespaceDefault, "a"), aEvent, code200},
-		{"GET", path("events", api.NamespaceDefault, "a"), "", code200},
-		{"DELETE", timeoutPath("events", api.NamespaceDefault, "a"), "", code200},
+		{"GET", "/api/v1beta1/events", "", code200},
+		{"POST", "/api/v1beta1/events" + timeoutFlag, aEvent, code201},
+		{"PUT", "/api/v1beta1/events/a" + timeoutFlag, aEvent, code200},
+		{"GET", "/api/v1beta1/events", "", code200},
+		{"GET", "/api/v1beta1/events", "", code200},
+		{"GET", "/api/v1beta1/events/a", "", code200},
+		{"DELETE", "/api/v1beta1/events/a" + timeoutFlag, "", code200},
 
 		// Normal methods on bindings
-		{"GET", path("bindings", api.NamespaceDefault, ""), "", code405},
-		{"POST", timeoutPath("pods", api.NamespaceDefault, ""), aPod, code201}, // Need a pod to bind or you get a 404
-		{"POST", timeoutPath("bindings", api.NamespaceDefault, ""), aBinding, code201},
-		{"PUT", timeoutPath("bindings", api.NamespaceDefault, "a"), aBinding, code404},
-		{"GET", path("bindings", api.NamespaceDefault, "a"), "", code404}, // No bindings instances
-		{"DELETE", timeoutPath("bindings", api.NamespaceDefault, "a"), "", code404},
+		{"GET", "/api/v1beta1/bindings", "", code405},              // Bindings are write-only
+		{"POST", "/api/v1beta1/pods" + timeoutFlag, aPod, code201}, // Need a pod to bind or you get a 404
+		{"POST", "/api/v1beta1/bindings" + timeoutFlag, aBinding, code201},
+		{"PUT", "/api/v1beta1/bindings/a" + timeoutFlag, aBinding, code404},
+		{"GET", "/api/v1beta1/bindings", "", code405},
+		{"GET", "/api/v1beta1/bindings/a", "", code404}, // No bindings instances
+		{"DELETE", "/api/v1beta1/bindings/a" + timeoutFlag, "", code404},
 
 		// Non-existent object type.
-		{"GET", path("foo", "", ""), "", code404},
-		{"POST", path("foo", api.NamespaceDefault, ""), `{"foo": "foo"}`, code404},
-		{"PUT", path("foo", api.NamespaceDefault, "a"), `{"foo": "foo"}`, code404},
-		{"GET", path("foo", api.NamespaceDefault, "a"), "", code404},
-		{"DELETE", timeoutPath("foo", api.NamespaceDefault, ""), "", code404},
+		{"GET", "/api/v1beta1/foo", "", code404},
+		{"POST", "/api/v1beta1/foo", `{"foo": "foo"}`, code404},
+		{"PUT", "/api/v1beta1/foo/a", `{"foo": "foo"}`, code404},
+		{"GET", "/api/v1beta1/foo", "", code404},
+		{"GET", "/api/v1beta1/foo/a", "", code404},
+		{"DELETE", "/api/v1beta1/foo" + timeoutFlag, "", code404},
 
 		// Special verbs on nodes
-		{"GET", pathWithPrefix("proxy", nodeResourceName, api.NamespaceDefault, "a"), "", code404},
-		{"GET", pathWithPrefix("redirect", nodeResourceName, api.NamespaceDefault, "a"), "", code404},
+		{"GET", "/api/v1beta1/proxy/minions/a", "", code404},
+		{"GET", "/api/v1beta1/redirect/minions/a", "", code404},
 		// TODO: test .../watch/..., which doesn't end before the test timeout.
 		// TODO: figure out how to create a minion so that it can successfully proxy/redirect.
 
@@ -377,7 +299,7 @@ func TestAuthModeAlwaysAllow(t *testing.T) {
 
 	// Set up a master
 
-	helper, err := master.NewEtcdHelper(newEtcdClient(), testapi.Version())
+	helper, err := master.NewEtcdHelper(newEtcdClient(), "v1beta1")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -409,7 +331,7 @@ func TestAuthModeAlwaysAllow(t *testing.T) {
 			if r.verb == "PUT" {
 				// For update operations, insert previous resource version
 				if resVersion := previousResourceVersion[getPreviousResourceVersionKey(r.URL, "")]; resVersion != 0 {
-					sub += fmt.Sprintf(",\r\n\"resourceVersion\": \"%v\"", resVersion)
+					sub += fmt.Sprintf(",\r\n\"resourceVersion\": %v", resVersion)
 				}
 				namespace := "default"
 				sub += fmt.Sprintf(",\r\n\"namespace\": %q", namespace)
@@ -445,8 +367,6 @@ func TestAuthModeAlwaysAllow(t *testing.T) {
 					if err == nil {
 						key := getPreviousResourceVersionKey(r.URL, id)
 						previousResourceVersion[key] = currentResourceVersion
-					} else {
-						t.Logf("error in trying to extract resource version: %s", err)
 					}
 				}
 			}
@@ -460,42 +380,10 @@ func parseResourceVersion(response []byte) (string, float64, error) {
 	if err != nil {
 		return "", 0, fmt.Errorf("unexpected error unmarshaling resultBody: %v", err)
 	}
-	apiVersion, ok := resultBodyMap["apiVersion"].(string)
-	if !ok {
-		return "", 0, fmt.Errorf("unexpected error, apiVersion not found in JSON response: %v", string(response))
-	}
-	if api.PreV1Beta3(apiVersion) {
-		return parsePreV1Beta3ResourceVersion(resultBodyMap, response)
-	}
-	return parseV1Beta3ResourceVersion(resultBodyMap, response)
-}
-
-func parseV1Beta3ResourceVersion(resultBodyMap map[string]interface{}, response []byte) (string, float64, error) {
-	metadata, ok := resultBodyMap["metadata"].(map[string]interface{})
-	if !ok {
-		return "", 0, fmt.Errorf("unexpected error, metadata not found in JSON response: %v", string(response))
-	}
-	id, ok := metadata["name"].(string)
-	if !ok {
-		return "", 0, fmt.Errorf("unexpected error, id not found in JSON response: %v", string(response))
-	}
-	resourceVersionString, ok := metadata["resourceVersion"].(string)
-	if !ok {
-		return "", 0, fmt.Errorf("unexpected error, resourceVersion not found in JSON response: %v", string(response))
-	}
-	resourceVersion, err := strconv.ParseFloat(resourceVersionString, 64)
-	if err != nil {
-		return "", 0, fmt.Errorf("unexpected error, could not parse resourceVersion as float64, err: %s. JSON response: %v", err, string(response))
-	}
-	return id, resourceVersion, nil
-}
-
-func parsePreV1Beta3ResourceVersion(resultBodyMap map[string]interface{}, response []byte) (string, float64, error) {
 	id, ok := resultBodyMap["id"].(string)
 	if !ok {
 		return "", 0, fmt.Errorf("unexpected error, id not found in JSON response: %v", string(response))
 	}
-
 	resourceVersion, ok := resultBodyMap["resourceVersion"].(float64)
 	if !ok {
 		return "", 0, fmt.Errorf("unexpected error, resourceVersion not found in JSON response: %v", string(response))
@@ -517,7 +405,7 @@ func TestAuthModeAlwaysDeny(t *testing.T) {
 
 	// Set up a master
 
-	helper, err := master.NewEtcdHelper(newEtcdClient(), testapi.Version())
+	helper, err := master.NewEtcdHelper(newEtcdClient(), "v1beta1")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -584,7 +472,7 @@ func TestAliceNotForbiddenOrUnauthorized(t *testing.T) {
 
 	// Set up a master
 
-	helper, err := master.NewEtcdHelper(newEtcdClient(), testapi.Version())
+	helper, err := master.NewEtcdHelper(newEtcdClient(), "v1beta1")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -618,7 +506,7 @@ func TestAliceNotForbiddenOrUnauthorized(t *testing.T) {
 			if r.verb == "PUT" {
 				// For update operations, insert previous resource version
 				if resVersion := previousResourceVersion[getPreviousResourceVersionKey(r.URL, "")]; resVersion != 0 {
-					sub += fmt.Sprintf(",\r\n\"resourceVersion\": \"%v\"", resVersion)
+					sub += fmt.Sprintf(",\r\n\"resourceVersion\": %v", resVersion)
 				}
 				namespace := "default"
 				sub += fmt.Sprintf(",\r\n\"namespace\": %q", namespace)
@@ -673,7 +561,7 @@ func TestBobIsForbidden(t *testing.T) {
 
 	// Set up a master
 
-	helper, err := master.NewEtcdHelper(newEtcdClient(), testapi.Version())
+	helper, err := master.NewEtcdHelper(newEtcdClient(), "v1beta1")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -734,7 +622,7 @@ func TestUnknownUserIsUnauthorized(t *testing.T) {
 
 	// Set up a master
 
-	helper, err := master.NewEtcdHelper(newEtcdClient(), testapi.Version())
+	helper, err := master.NewEtcdHelper(newEtcdClient(), "v1beta1")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -811,7 +699,7 @@ func TestNamespaceAuthorization(t *testing.T) {
 
 	// This file has alice and bob in it.
 
-	helper, err := master.NewEtcdHelper(newEtcdClient(), testapi.Version())
+	helper, err := master.NewEtcdHelper(newEtcdClient(), "v1beta1")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -848,20 +736,20 @@ func TestNamespaceAuthorization(t *testing.T) {
 		statusCodes map[int]bool // allowed status codes.
 	}{
 
-		{"POST", timeoutPathWithQuery("pods", "foo", ""), "foo", aPod, code201},
-		{"GET", pathWithQuery("pods", "foo", ""), "foo", "", code200},
-		{"GET", pathWithQuery("pods", "foo", "a"), "foo", "", code200},
-		{"DELETE", timeoutPathWithQuery("pods", "foo", "a"), "foo", "", code200},
+		{"POST", "/api/v1beta1/pods" + timeoutFlag + "&namespace=foo", "foo", aPod, code201},
+		{"GET", "/api/v1beta1/pods?namespace=foo", "foo", "", code200},
+		{"GET", "/api/v1beta1/pods/a?namespace=foo", "foo", "", code200},
+		{"DELETE", "/api/v1beta1/pods/a" + timeoutFlag + "&namespace=foo", "foo", "", code200},
 
-		{"POST", timeoutPath("pods", "bar", ""), "bar", aPod, code403},
-		{"GET", pathWithQuery("pods", "bar", ""), "bar", "", code403},
-		{"GET", pathWithQuery("pods", "bar", "a"), "bar", "", code403},
-		{"DELETE", timeoutPathWithQuery("pods", "bar", "a"), "bar", "", code403},
+		{"POST", "/api/v1beta1/pods" + timeoutFlag + "&namespace=bar", "bar", aPod, code403},
+		{"GET", "/api/v1beta1/pods?namespace=bar", "bar", "", code403},
+		{"GET", "/api/v1beta1/pods/a?namespace=bar", "bar", "", code403},
+		{"DELETE", "/api/v1beta1/pods/a" + timeoutFlag + "&namespace=bar", "bar", "", code403},
 
-		{"POST", timeoutPath("pods", api.NamespaceDefault, ""), "", aPod, code403},
-		{"GET", path("pods", "", ""), "", "", code403},
-		{"GET", path("pods", api.NamespaceDefault, "a"), "", "", code403},
-		{"DELETE", timeoutPath("pods", api.NamespaceDefault, "a"), "", "", code403},
+		{"POST", "/api/v1beta1/pods" + timeoutFlag, "", aPod, code403},
+		{"GET", "/api/v1beta1/pods", "", "", code403},
+		{"GET", "/api/v1beta1/pods/a", "", "", code403},
+		{"DELETE", "/api/v1beta1/pods/a" + timeoutFlag, "", "", code403},
 	}
 
 	for _, r := range requests {
@@ -872,7 +760,7 @@ func TestNamespaceAuthorization(t *testing.T) {
 			if r.verb == "PUT" && r.body != "" {
 				// For update operations, insert previous resource version
 				if resVersion := previousResourceVersion[getPreviousResourceVersionKey(r.URL, "")]; resVersion != 0 {
-					sub += fmt.Sprintf(",\r\n\"resourceVersion\": \"%v\"", resVersion)
+					sub += fmt.Sprintf(",\r\n\"resourceVersion\": %v", resVersion)
 				}
 				namespace := r.namespace
 				if len(namespace) == 0 {
@@ -926,7 +814,7 @@ func TestKindAuthorization(t *testing.T) {
 
 	// Set up a master
 
-	helper, err := master.NewEtcdHelper(newEtcdClient(), testapi.Version())
+	helper, err := master.NewEtcdHelper(newEtcdClient(), "v1beta1")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -961,15 +849,15 @@ func TestKindAuthorization(t *testing.T) {
 		body        string
 		statusCodes map[int]bool // allowed status codes.
 	}{
-		{"POST", timeoutPath("services", api.NamespaceDefault, ""), aService, code201},
-		{"GET", path("services", api.NamespaceDefault, ""), "", code200},
-		{"GET", path("services", api.NamespaceDefault, "a"), "", code200},
-		{"DELETE", timeoutPath("services", api.NamespaceDefault, "a"), "", code200},
+		{"POST", "/api/v1beta1/services" + timeoutFlag, aService, code201},
+		{"GET", "/api/v1beta1/services", "", code200},
+		{"GET", "/api/v1beta1/services/a", "", code200},
+		{"DELETE", "/api/v1beta1/services/a" + timeoutFlag, "", code200},
 
-		{"POST", timeoutPath("pods", api.NamespaceDefault, ""), aPod, code403},
-		{"GET", path("pods", "", ""), "", code403},
-		{"GET", path("pods", api.NamespaceDefault, "a"), "", code403},
-		{"DELETE", timeoutPath("pods", api.NamespaceDefault, "a"), "", code403},
+		{"POST", "/api/v1beta1/pods" + timeoutFlag, aPod, code403},
+		{"GET", "/api/v1beta1/pods", "", code403},
+		{"GET", "/api/v1beta1/pods/a", "", code403},
+		{"DELETE", "/api/v1beta1/pods/a" + timeoutFlag, "", code403},
 	}
 
 	for _, r := range requests {
@@ -980,7 +868,7 @@ func TestKindAuthorization(t *testing.T) {
 			if r.verb == "PUT" && r.body != "" {
 				// For update operations, insert previous resource version
 				if resVersion := previousResourceVersion[getPreviousResourceVersionKey(r.URL, "")]; resVersion != 0 {
-					resourceVersionJson := fmt.Sprintf(",\r\n\"resourceVersion\": \"%v\"", resVersion)
+					resourceVersionJson := fmt.Sprintf(",\r\n\"resourceVersion\": %v", resVersion)
 					bodyStr = fmt.Sprintf(r.body, resourceVersionJson)
 				}
 			}
@@ -1029,12 +917,13 @@ func TestReadOnlyAuthorization(t *testing.T) {
 
 	// Set up a master
 
-	helper, err := master.NewEtcdHelper(newEtcdClient(), testapi.Version())
+	helper, err := master.NewEtcdHelper(newEtcdClient(), "v1beta1")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	a := newAuthorizerWithContents(t, `{"readonly": true}`)
+	a := newAuthorizerWithContents(t, `{"readonly": true}
+`)
 
 	var m *master.Master
 	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
@@ -1062,9 +951,9 @@ func TestReadOnlyAuthorization(t *testing.T) {
 		body        string
 		statusCodes map[int]bool // allowed status codes.
 	}{
-		{"POST", path("pods", "", ""), aPod, code403},
-		{"GET", path("pods", "", ""), "", code200},
-		{"GET", path("pods", api.NamespaceDefault, "a"), "", code404},
+		{"POST", "/api/v1beta1/pods", aPod, code403},
+		{"GET", "/api/v1beta1/pods", "", code200},
+		{"GET", "/api/v1beta1/pods/a", "", code404},
 	}
 
 	for _, r := range requests {

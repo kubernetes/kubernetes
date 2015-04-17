@@ -23,7 +23,6 @@ import (
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/aws"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
@@ -235,7 +234,7 @@ func testPDPod(diskName, targetHost string, readOnly bool) *api.Pod {
 	pod := &api.Pod{
 		TypeMeta: api.TypeMeta{
 			Kind:       "Pod",
-			APIVersion: latest.Version,
+			APIVersion: "v1beta1",
 		},
 		ObjectMeta: api.ObjectMeta{
 			Name: "pd-test-" + string(util.NewUUID()),

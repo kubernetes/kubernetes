@@ -39,7 +39,8 @@ var providers = make(map[string]Factory)
 func RegisterCloudProvider(name string, cloud Factory) {
 	providersMutex.Lock()
 	defer providersMutex.Unlock()
-	if _, found := providers[name]; found {
+	_, found := providers[name]
+	if found {
 		glog.Fatalf("Cloud provider %q was registered twice", name)
 	}
 	glog.V(1).Infof("Registered cloud provider %q", name)

@@ -31,5 +31,17 @@ func (kl *Kubelet) getRootDirContext() (string, error) {
 	}
 
 	// Get the SELinux context of the rootDir.
-	return selinux.Getfilecon(kl.getRootDir())
+	rootContext, err := selinux.Getfilecon(kl.getRootDir())
+	if err != nil {
+		return "", err
+	}
+
+	// There is a libcontainer bug where the null byte is not stripped from
+	// the result of reading some selinux xattrs; strip it.
+	//
+	// TODO: remove when https://github.com/docker/libcontainer/issues/499
+	// is fixed
+	rootContext = rootContext[:len(rootContext)-1]
+
+	return rootContext, nil
 }

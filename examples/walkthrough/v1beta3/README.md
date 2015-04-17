@@ -40,7 +40,7 @@ metadata:
 spec:
   containers:
   - name: nginx
-    image: nginx
+    image: dockerfile/nginx
     volumeMounts:
     - mountPath: /srv/www
       name: www-data

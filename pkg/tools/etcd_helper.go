@@ -151,33 +151,6 @@ func (h *EtcdHelper) ExtractToList(key string, listObj runtime.Object) error {
 	return nil
 }
 
-// ExtractObjToList unmarshals json found at key and opaques it into a *List api object
-// (an object that satisfies the runtime.IsList definition).
-func (h *EtcdHelper) ExtractObjToList(key string, listObj runtime.Object) error {
-	listPtr, err := runtime.GetItemsPtr(listObj)
-	if err != nil {
-		return err
-	}
-
-	response, err := h.Client.Get(key, false, false)
-	if err != nil && !IsEtcdNotFound(err) {
-		return err
-	}
-
-	nodes := make([]*etcd.Node, 0)
-	nodes = append(nodes, response.Node)
-
-	if err := h.decodeNodeList(nodes, listPtr); err != nil {
-		return err
-	}
-	if h.Versioner != nil {
-		if err := h.Versioner.UpdateList(listObj, response.EtcdIndex); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
 // ExtractObj unmarshals json found at key into objPtr. On a not found error, will either return
 // a zero object of the requested type, or an error, depending on ignoreNotFound. Treats
 // empty responses and nil response nodes exactly like a not found error.
@@ -311,33 +284,31 @@ func (h *EtcdHelper) SetObj(key string, obj, out runtime.Object, ttl uint64) err
 	return err
 }
 
-// Pass an EtcdUpdateFunc to EtcdHelper.GuaranteedUpdate to make an etcd update that is guaranteed to succeed.
-// See the comment for GuaranteedUpdate for more detail.
+// Pass an EtcdUpdateFunc to EtcdHelper.AtomicUpdate to make an atomic etcd update.
+// See the comment for AtomicUpdate for more detail.
 type EtcdUpdateFunc func(input runtime.Object) (output runtime.Object, ttl uint64, err error)
 
-// GuaranteedUpdate calls "tryUpdate()" to update key "key" that is of type "ptrToType". It keeps
-// calling tryUpdate() and retrying the update until success if there is etcd index conflict. Note that object
-// passed to tryUpdate() may change across invocations of tryUpdate() if other writers are simultaneously
-// updating it, so tryUpdate() needs to take into account the current contents of the object when
-// deciding how the updated object (that it returns) should look.
+// AtomicUpdate generalizes the pattern that allows for making atomic updates to etcd objects.
+// Note, tryUpdate may be called more than once.
 //
 // Example:
 //
 // h := &util.EtcdHelper{client, encoding, versioning}
-// err := h.GuaranteedUpdate("myKey", &MyType{}, true, func(input runtime.Object) (runtime.Object, uint64, error) {
-//	// Before each invocation of the user-defined function, "input" is reset to etcd's current contents for "myKey".
+// err := h.AtomicUpdate("myKey", &MyType{}, true, func(input runtime.Object) (runtime.Object, uint64, error) {
+//	// Before this function is called, currentObj has been reset to etcd's current
+//	// contents for "myKey".
 //
-//	cur := input.(*MyType) // Guaranteed to succeed.
+//	cur := input.(*MyType) // Guaranteed to work.
 //
 //	// Make a *modification*.
 //	cur.Counter++
 //
 //	// Return the modified object. Return an error to stop iterating. Return a non-zero uint64 to set
-//      // the TTL on the object.
+//  // the TTL on the object.
 //	return cur, 0, nil
 // })
 //
-func (h *EtcdHelper) GuaranteedUpdate(key string, ptrToType runtime.Object, ignoreNotFound bool, tryUpdate EtcdUpdateFunc) error {
+func (h *EtcdHelper) AtomicUpdate(key string, ptrToType runtime.Object, ignoreNotFound bool, tryUpdate EtcdUpdateFunc) error {
 	v, err := conversion.EnforcePtr(ptrToType)
 	if err != nil {
 		// Panic is appropriate, because this is a programming error.

@@ -31,13 +31,13 @@ import (
 // fault-tolerant way.
 type RollingUpdater struct {
 	// Client interface for creating and updating controllers
-	c RollingUpdaterClient
+	c client.Interface
 	// Namespace for resources
 	ns string
 }
 
 // NewRollingUpdater creates a RollingUpdater from a client
-func NewRollingUpdater(namespace string, c RollingUpdaterClient) *RollingUpdater {
+func NewRollingUpdater(namespace string, c client.Interface) *RollingUpdater {
 	return &RollingUpdater{
 		c,
 		namespace,
@@ -95,7 +95,7 @@ func (r *RollingUpdater) Update(out io.Writer, oldRc, newRc *api.ReplicationCont
 		newRc.ObjectMeta.Annotations[desiredReplicasAnnotation] = fmt.Sprintf("%d", desired)
 		newRc.ObjectMeta.Annotations[sourceIdAnnotation] = sourceId
 		newRc.Spec.Replicas = 0
-		newRc, err = r.c.CreateReplicationController(r.ns, newRc)
+		newRc, err = r.c.ReplicationControllers(r.ns).Create(newRc)
 		if err != nil {
 			return err
 		}
@@ -147,7 +147,7 @@ func (r *RollingUpdater) Update(out io.Writer, oldRc, newRc *api.ReplicationCont
 		}
 	}
 	// Clean up annotations
-	if newRc, err = r.c.GetReplicationController(r.ns, newName); err != nil {
+	if newRc, err = r.c.ReplicationControllers(r.ns).Get(newName); err != nil {
 		return err
 	}
 	delete(newRc.ObjectMeta.Annotations, sourceIdAnnotation)
@@ -158,11 +158,11 @@ func (r *RollingUpdater) Update(out io.Writer, oldRc, newRc *api.ReplicationCont
 	}
 	// delete old rc
 	fmt.Fprintf(out, "Update succeeded. Deleting %s\n", oldName)
-	return r.c.DeleteReplicationController(r.ns, oldName)
+	return r.c.ReplicationControllers(r.ns).Delete(oldName)
 }
 
 func (r *RollingUpdater) getExistingNewRc(sourceId, name string) (rc *api.ReplicationController, existing bool, err error) {
-	if rc, err = r.c.GetReplicationController(r.ns, name); err == nil {
+	if rc, err = r.c.ReplicationControllers(r.ns).Get(name); err == nil {
 		existing = true
 		annotations := rc.ObjectMeta.Annotations
 		source := annotations[sourceIdAnnotation]
@@ -184,54 +184,17 @@ func (r *RollingUpdater) resizeAndWait(rc *api.ReplicationController, retry *Ret
 	if err := resizer.Resize(rc.Namespace, rc.Name, uint(rc.Spec.Replicas), &ResizePrecondition{-1, ""}, retry, wait); err != nil {
 		return nil, err
 	}
-	return r.c.GetReplicationController(r.ns, rc.ObjectMeta.Name)
+	return r.c.ReplicationControllers(r.ns).Get(rc.ObjectMeta.Name)
 }
 
 func (r *RollingUpdater) updateAndWait(rc *api.ReplicationController, interval, timeout time.Duration) (*api.ReplicationController, error) {
-	rc, err := r.c.UpdateReplicationController(r.ns, rc)
+	rc, err := r.c.ReplicationControllers(r.ns).Update(rc)
 	if err != nil {
 		return nil, err
 	}
-	if err = wait.Poll(interval, timeout, r.c.ControllerHasDesiredReplicas(rc)); err != nil {
+	if err = wait.Poll(interval, timeout,
+		client.ControllerHasDesiredReplicas(r.c, rc)); err != nil {
 		return nil, err
 	}
-	return r.c.GetReplicationController(r.ns, rc.ObjectMeta.Name)
-}
-
-// RollingUpdaterClient abstracts access to ReplicationControllers.
-type RollingUpdaterClient interface {
-	GetReplicationController(namespace, name string) (*api.ReplicationController, error)
-	UpdateReplicationController(namespace string, rc *api.ReplicationController) (*api.ReplicationController, error)
-	CreateReplicationController(namespace string, rc *api.ReplicationController) (*api.ReplicationController, error)
-	DeleteReplicationController(namespace, name string) error
-	ControllerHasDesiredReplicas(rc *api.ReplicationController) wait.ConditionFunc
-}
-
-func NewRollingUpdaterClient(c client.Interface) RollingUpdaterClient {
-	return &realRollingUpdaterClient{c}
-}
-
-// realRollingUpdaterClient is a RollingUpdaterClient which uses a Kube client.
-type realRollingUpdaterClient struct {
-	client client.Interface
-}
-
-func (c *realRollingUpdaterClient) GetReplicationController(namespace, name string) (*api.ReplicationController, error) {
-	return c.client.ReplicationControllers(namespace).Get(name)
-}
-
-func (c *realRollingUpdaterClient) UpdateReplicationController(namespace string, rc *api.ReplicationController) (*api.ReplicationController, error) {
-	return c.client.ReplicationControllers(namespace).Update(rc)
-}
-
-func (c *realRollingUpdaterClient) CreateReplicationController(namespace string, rc *api.ReplicationController) (*api.ReplicationController, error) {
-	return c.client.ReplicationControllers(namespace).Create(rc)
-}
-
-func (c *realRollingUpdaterClient) DeleteReplicationController(namespace, name string) error {
-	return c.client.ReplicationControllers(namespace).Delete(name)
-}
-
-func (c *realRollingUpdaterClient) ControllerHasDesiredReplicas(rc *api.ReplicationController) wait.ConditionFunc {
-	return client.ControllerHasDesiredReplicas(c.client, rc)
+	return r.c.ReplicationControllers(r.ns).Get(rc.ObjectMeta.Name)
 }

@@ -73,10 +73,7 @@ func (s *SwaggerSchema) ValidateBytes(data []byte) error {
 	if err := json.Unmarshal(data, &obj); err != nil {
 		return err
 	}
-	fields, ok := obj.(map[string]interface{})
-	if !ok {
-		return fmt.Errorf("error in unmarshaling data %s", string(data))
-	}
+	fields := obj.(map[string]interface{})
 	apiVersion := fields["apiVersion"].(string)
 	kind := fields["kind"].(string)
 	return s.ValidateObject(obj, apiVersion, "", apiVersion+"."+kind)
@@ -87,37 +84,25 @@ func (s *SwaggerSchema) ValidateObject(obj interface{}, apiVersion, fieldName, t
 	// TODO: handle required fields here too.
 	model, ok := models[typeName]
 	if !ok {
-		return fmt.Errorf("couldn't find type: %s", typeName)
-	}
-	properties := model.Properties
-	if len(properties) == 0 {
-		// The object does not have any sub-fields.
+		glog.V(2).Infof("couldn't find type: %s, skipping validation", typeName)
 		return nil
 	}
-	fields, ok := obj.(map[string]interface{})
-	if !ok {
-		return fmt.Errorf("expected object of type map[string]interface{} as value of %s field", fieldName)
-	}
+	properties := model.Properties
+	fields := obj.(map[string]interface{})
 	if len(fieldName) > 0 {
 		fieldName = fieldName + "."
 	}
 	for key, value := range fields {
 		details, ok := properties[key]
 		if !ok {
-			// Some properties can be missing because of
-			// https://github.com/GoogleCloudPlatform/kubernetes/issues/6842.
-			glog.V(2).Infof("couldn't find properties for %s", key)
+			glog.V(2).Infof("couldn't find properties for %s, skipping", key)
 			continue
 		}
-		if details.Type == nil && details.Ref == nil {
-			return fmt.Errorf("could not find the type of %s from object: %v", key, details)
+		if details.Type == nil {
+			glog.V(2).Infof("nil details for %s, skipping", key)
+			continue
 		}
-		var fieldType string
-		if details.Type != nil {
-			fieldType = *details.Type
-		} else {
-			fieldType = *details.Ref
-		}
+		fieldType := *details.Type
 		if value == nil {
 			glog.V(2).Infof("Skipping nil field: %s", key)
 			continue
@@ -149,15 +134,7 @@ func (s *SwaggerSchema) validateField(value interface{}, apiVersion, fieldName, 
 		if !ok {
 			return NewInvalidTypeError(reflect.Array, reflect.TypeOf(value).Kind(), fieldName)
 		}
-		var arrType string
-		if fieldDetails.Items.Ref == nil && fieldDetails.Items.Type == nil {
-			return NewInvalidTypeError(reflect.Array, reflect.TypeOf(value).Kind(), fieldName)
-		}
-		if fieldDetails.Items.Ref != nil {
-			arrType = *fieldDetails.Items.Ref
-		} else {
-			arrType = *fieldDetails.Items.Type
-		}
+		arrType := *fieldDetails.Items.Ref
 		for ix := range arr {
 			err := s.validateField(arr[ix], apiVersion, fmt.Sprintf("%s[%d]", fieldName, ix), arrType, nil)
 			if err != nil {
@@ -179,7 +156,6 @@ func (s *SwaggerSchema) validateField(value interface{}, apiVersion, fieldName, 
 		if _, ok := value.(bool); !ok {
 			return NewInvalidTypeError(reflect.Bool, reflect.TypeOf(value).Kind(), fieldName)
 		}
-	case "any":
 	default:
 		return fmt.Errorf("unexpected type: %v", fieldType)
 	}

@@ -22,7 +22,7 @@
             "containers":[
                {
                   "name":"master",
-                  "image":"redis",
+                  "image":"dockerfile/redis",
                   "ports":[
                      {
                         "containerPort":6379,

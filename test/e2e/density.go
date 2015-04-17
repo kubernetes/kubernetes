@@ -60,19 +60,8 @@ func DeleteRC(c *client.Client, ns, name string) error {
 		return fmt.Errorf("Failed to resize replication controller %s to zero: %v", name, err)
 	}
 
-	// Wait up to 20 minutes until all replicas are killed.
-	endTime := time.Now().Add(time.Minute * 20)
-	for {
-		if time.Now().After(endTime) {
-			return fmt.Errorf("Timeout while waiting for replication controller %s replicas to 0", name)
-		}
-		remainingTime := endTime.Sub(time.Now())
-		err := wait.Poll(time.Second, remainingTime, client.ControllerHasDesiredReplicas(c, rc))
-		if err != nil {
-			glog.Errorf("Error while waiting for replication controller %s replicas to read 0: %v", name, err)
-		} else {
-			break
-		}
+	if err := wait.Poll(time.Second, time.Minute*20, client.ControllerHasDesiredReplicas(c, rc)); err != nil {
+		return fmt.Errorf("Error waiting for replication controller %s replicas to reach 0: %v", name, err)
 	}
 
 	// Delete the replication controller.
@@ -127,7 +116,7 @@ func RunRC(c *client.Client, name string, ns, image string, replicas int) {
 
 	By(fmt.Sprintf("Making sure all %d replicas exist", replicas))
 	label := labels.SelectorFromSet(labels.Set(map[string]string{"name": name}))
-	pods, err := listPods(c, ns, label)
+	pods, err := c.Pods(ns).List(label)
 	Expect(err).NotTo(HaveOccurred())
 	current = len(pods.Items)
 	failCount := 5
@@ -147,7 +136,7 @@ func RunRC(c *client.Client, name string, ns, image string, replicas int) {
 
 		last = current
 		time.Sleep(5 * time.Second)
-		pods, err = listPods(c, ns, label)
+		pods, err = c.Pods(ns).List(label)
 		Expect(err).NotTo(HaveOccurred())
 		current = len(pods.Items)
 	}
@@ -166,7 +155,7 @@ func RunRC(c *client.Client, name string, ns, image string, replicas int) {
 		unknown := 0
 		time.Sleep(10 * time.Second)
 
-		currentPods, listErr := listPods(c, ns, label)
+		currentPods, listErr := c.Pods(ns).List(label)
 		Expect(listErr).NotTo(HaveOccurred())
 		if len(currentPods.Items) != len(pods.Items) {
 			Failf("Number of reported pods changed: %d vs %d", len(currentPods.Items), len(pods.Items))

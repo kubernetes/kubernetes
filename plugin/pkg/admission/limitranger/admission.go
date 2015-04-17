@@ -22,6 +22,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/admission"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	apierrors "github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
@@ -57,9 +58,6 @@ func (l *limitRanger) Admit(a admission.Attributes) (err error) {
 	name := "Unknown"
 	if obj != nil {
 		name, _ = meta.NewAccessor().Name(obj)
-		if len(name) == 0 {
-			name, _ = meta.NewAccessor().GenerateName(obj)
-		}
 	}
 
 	key := &api.LimitRange{
@@ -70,7 +68,7 @@ func (l *limitRanger) Admit(a admission.Attributes) (err error) {
 	}
 	items, err := l.indexer.Index("namespace", key)
 	if err != nil {
-		return admission.NewForbidden(a, fmt.Errorf("Unable to %s %s at this time because there was an error enforcing limit ranges", a.GetOperation(), resource))
+		return apierrors.NewForbidden(a.GetResource(), name, fmt.Errorf("Unable to %s %s at this time because there was an error enforcing limit ranges", a.GetOperation(), resource))
 	}
 	if len(items) == 0 {
 		return nil
@@ -81,7 +79,7 @@ func (l *limitRanger) Admit(a admission.Attributes) (err error) {
 		limitRange := items[i].(*api.LimitRange)
 		err = l.limitFunc(limitRange, a.GetResource(), a.GetObject())
 		if err != nil {
-			return admission.NewForbidden(a, err)
+			return err
 		}
 	}
 	return nil
@@ -252,11 +250,11 @@ func PodLimitFunc(limitRange *api.LimitRange, pod *api.Pod) error {
 				switch minOrMax {
 				case "Min":
 					if observed < enforced {
-						return err
+						return apierrors.NewForbidden("pods", pod.Name, err)
 					}
 				case "Max":
 					if observed > enforced {
-						return err
+						return apierrors.NewForbidden("pods", pod.Name, err)
 					}
 				}
 			}

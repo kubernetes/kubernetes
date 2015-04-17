@@ -54,7 +54,7 @@ var _ = Describe("kubectl", func() {
 
 	Describe("update-demo", func() {
 		var (
-			updateDemoRoot = filepath.Join(testContext.RepoRoot, "examples/update-demo/v1beta3")
+			updateDemoRoot = filepath.Join(testContext.RepoRoot, "examples/update-demo/v1beta1")
 			nautilusPath   = filepath.Join(updateDemoRoot, "nautilus-rc.yaml")
 			kittenPath     = filepath.Join(updateDemoRoot, "kitten-rc.yaml")
 		)
@@ -96,10 +96,6 @@ var _ = Describe("kubectl", func() {
 
 	Describe("guestbook", func() {
 		var guestbookPath = filepath.Join(testContext.RepoRoot, "examples/guestbook")
-
-		if testContext.Provider != "gce" && testContext.Provider != "gke" {
-			By(fmt.Sprintf("Skipping guestbook, uses createExternalLoadBalancer, a (gce|gke) feature"))
-		}
 
 		It("should create and stop a working application", func() {
 			defer cleanup(guestbookPath, frontendSelector, redisMasterSelector, redisSlaveSelector)

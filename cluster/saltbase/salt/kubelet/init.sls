@@ -51,6 +51,19 @@
     - makedirs: true
 
 kubelet:
+  group.present:
+    - system: True
+  user.present:
+    - system: True
+    - gid_from_name: True
+    - shell: /sbin/nologin
+    - home: /var/lib/kubelet
+{% if grains['os_family'] != 'RedHat' %}    
+    - groups:
+      - docker
+{% endif %}      
+    - require:
+      - group: kubelet
   service.running:
     - enable: True
     - watch:

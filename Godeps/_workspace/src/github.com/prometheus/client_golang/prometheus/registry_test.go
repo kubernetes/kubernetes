@@ -61,29 +61,31 @@ func testHandler(t testing.TB) {
 
 	varintBuf := make([]byte, binary.MaxVarintLen32)
 
-	externalMetricFamily := &dto.MetricFamily{
-		Name: proto.String("externalname"),
-		Help: proto.String("externaldocstring"),
-		Type: dto.MetricType_COUNTER.Enum(),
-		Metric: []*dto.Metric{
-			{
-				Label: []*dto.LabelPair{
-					{
-						Name:  proto.String("externallabelname"),
-						Value: proto.String("externalval1"),
+	externalMetricFamily := []*dto.MetricFamily{
+		{
+			Name: proto.String("externalname"),
+			Help: proto.String("externaldocstring"),
+			Type: dto.MetricType_COUNTER.Enum(),
+			Metric: []*dto.Metric{
+				{
+					Label: []*dto.LabelPair{
+						{
+							Name:  proto.String("externallabelname"),
+							Value: proto.String("externalval1"),
+						},
+						{
+							Name:  proto.String("externalconstname"),
+							Value: proto.String("externalconstvalue"),
+						},
 					},
-					{
-						Name:  proto.String("externalconstname"),
-						Value: proto.String("externalconstvalue"),
+					Counter: &dto.Counter{
+						Value: proto.Float64(1),
 					},
-				},
-				Counter: &dto.Counter{
-					Value: proto.Float64(1),
 				},
 			},
 		},
 	}
-	marshaledExternalMetricFamily, err := proto.Marshal(externalMetricFamily)
+	marshaledExternalMetricFamily, err := proto.Marshal(externalMetricFamily[0])
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -214,42 +216,16 @@ metric: <
 	expectedMetricFamilyAsProtoCompactText := []byte(`name:"name" help:"docstring" type:COUNTER metric:<label:<name:"constname" value:"constvalue" > label:<name:"labelname" value:"val1" > counter:<value:1 > > metric:<label:<name:"constname" value:"constvalue" > label:<name:"labelname" value:"val2" > counter:<value:1 > > 
 `)
 
-	externalMetricFamilyWithSameName := &dto.MetricFamily{
-		Name: proto.String("name"),
-		Help: proto.String("inconsistent help string does not matter here"),
-		Type: dto.MetricType_COUNTER.Enum(),
-		Metric: []*dto.Metric{
-			{
-				Label: []*dto.LabelPair{
-					{
-						Name:  proto.String("constname"),
-						Value: proto.String("constvalue"),
-					},
-					{
-						Name:  proto.String("labelname"),
-						Value: proto.String("different_val"),
-					},
-				},
-				Counter: &dto.Counter{
-					Value: proto.Float64(42),
-				},
-			},
-		},
-	}
-
-	expectedMetricFamilyMergedWithExternalAsProtoCompactText := []byte(`name:"name" help:"docstring" type:COUNTER metric:<label:<name:"constname" value:"constvalue" > label:<name:"labelname" value:"different_val" > counter:<value:42 > > metric:<label:<name:"constname" value:"constvalue" > label:<name:"labelname" value:"val1" > counter:<value:1 > > metric:<label:<name:"constname" value:"constvalue" > label:<name:"labelname" value:"val2" > counter:<value:1 > > 
-`)
-
 	type output struct {
 		headers map[string]string
 		body    []byte
 	}
 
 	var scenarios = []struct {
-		headers    map[string]string
-		out        output
-		collector  Collector
-		externalMF []*dto.MetricFamily
+		headers        map[string]string
+		out            output
+		withCounter    bool
+		withExternalMF bool
 	}{
 		{ // 0
 			headers: map[string]string{
@@ -305,7 +281,7 @@ metric: <
 				},
 				body: expectedMetricFamilyAsText,
 			},
-			collector: metricVec,
+			withCounter: true,
 		},
 		{ // 5
 			headers: map[string]string{
@@ -317,7 +293,7 @@ metric: <
 				},
 				body: expectedMetricFamilyAsBytes,
 			},
-			collector: metricVec,
+			withCounter: true,
 		},
 		{ // 6
 			headers: map[string]string{
@@ -329,7 +305,7 @@ metric: <
 				},
 				body: externalMetricFamilyAsText,
 			},
-			externalMF: []*dto.MetricFamily{externalMetricFamily},
+			withExternalMF: true,
 		},
 		{ // 7
 			headers: map[string]string{
@@ -341,7 +317,7 @@ metric: <
 				},
 				body: externalMetricFamilyAsBytes,
 			},
-			externalMF: []*dto.MetricFamily{externalMetricFamily},
+			withExternalMF: true,
 		},
 		{ // 8
 			headers: map[string]string{
@@ -359,8 +335,8 @@ metric: <
 					[]byte{},
 				),
 			},
-			collector:  metricVec,
-			externalMF: []*dto.MetricFamily{externalMetricFamily},
+			withCounter:    true,
+			withExternalMF: true,
 		},
 		{ // 9
 			headers: map[string]string{
@@ -383,7 +359,7 @@ metric: <
 				},
 				body: expectedMetricFamilyAsText,
 			},
-			collector: metricVec,
+			withCounter: true,
 		},
 		{ // 11
 			headers: map[string]string{
@@ -401,8 +377,8 @@ metric: <
 					[]byte{},
 				),
 			},
-			collector:  metricVec,
-			externalMF: []*dto.MetricFamily{externalMetricFamily},
+			withCounter:    true,
+			withExternalMF: true,
 		},
 		{ // 12
 			headers: map[string]string{
@@ -420,8 +396,8 @@ metric: <
 					[]byte{},
 				),
 			},
-			collector:  metricVec,
-			externalMF: []*dto.MetricFamily{externalMetricFamily},
+			withCounter:    true,
+			withExternalMF: true,
 		},
 		{ // 13
 			headers: map[string]string{
@@ -439,8 +415,8 @@ metric: <
 					[]byte{},
 				),
 			},
-			collector:  metricVec,
-			externalMF: []*dto.MetricFamily{externalMetricFamily},
+			withCounter:    true,
+			withExternalMF: true,
 		},
 		{ // 14
 			headers: map[string]string{
@@ -458,42 +434,20 @@ metric: <
 					[]byte{},
 				),
 			},
-			collector:  metricVec,
-			externalMF: []*dto.MetricFamily{externalMetricFamily},
-		},
-		{ // 15
-			headers: map[string]string{
-				"Accept": "application/vnd.google.protobuf;proto=io.prometheus.client.MetricFamily;encoding=compact-text",
-			},
-			out: output{
-				headers: map[string]string{
-					"Content-Type": `application/vnd.google.protobuf; proto=io.prometheus.client.MetricFamily; encoding=compact-text`,
-				},
-				body: bytes.Join(
-					[][]byte{
-						externalMetricFamilyAsProtoCompactText,
-						expectedMetricFamilyMergedWithExternalAsProtoCompactText,
-					},
-					[]byte{},
-				),
-			},
-			collector: metricVec,
-			externalMF: []*dto.MetricFamily{
-				externalMetricFamily,
-				externalMetricFamilyWithSameName,
-			},
+			withCounter:    true,
+			withExternalMF: true,
 		},
 	}
 	for i, scenario := range scenarios {
 		registry := newRegistry()
 		registry.collectChecksEnabled = true
 
-		if scenario.collector != nil {
-			registry.Register(scenario.collector)
+		if scenario.withCounter {
+			registry.Register(metricVec)
 		}
-		if scenario.externalMF != nil {
+		if scenario.withExternalMF {
 			registry.metricFamilyInjectionHook = func() []*dto.MetricFamily {
-				return scenario.externalMF
+				return externalMetricFamily
 			}
 		}
 		writer := &fakeResponseWriter{

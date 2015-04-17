@@ -139,7 +139,7 @@ func (f *FakeDockerClient) ListContainers(options docker.ListContainersOptions) 
 	if options.All {
 		return append(f.ContainerList, f.ExitedContainerList...), err
 	}
-	return append([]docker.APIContainers{}, f.ContainerList...), err
+	return f.ContainerList, err
 }
 
 // InspectContainer is a test-spy implementation of DockerInterface.InspectContainer.
