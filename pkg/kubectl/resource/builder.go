@@ -600,8 +600,16 @@ func (b *Builder) Do() *Result {
 	return r
 }
 
+// SplitResourceArgument splits the argument with commas and returns unique
+// strings in the original order.
 func SplitResourceArgument(arg string) []string {
+	out := []string{}
 	set := util.NewStringSet()
-	set.Insert(strings.Split(arg, ",")...)
-	return set.List()
+	for _, s := range strings.Split(arg, ",") {
+		if set.Has(s) {
+			continue
+		}
+		out = append(out, s)
+	}
+	return out
 }
