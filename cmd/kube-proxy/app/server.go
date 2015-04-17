@@ -40,6 +40,7 @@ import (
 // ProxyServer contains configures and runs a Kubernetes proxy server
 type ProxyServer struct {
 	BindAddress        util.IP
+	PublicAddress      util.IP
 	ClientConfig       client.Config
 	HealthzPort        int
 	HealthzBindAddress util.IP
@@ -51,6 +52,7 @@ type ProxyServer struct {
 func NewProxyServer() *ProxyServer {
 	return &ProxyServer{
 		BindAddress:        util.IP(net.ParseIP("0.0.0.0")),
+		PublicAddress:      nil,
 		HealthzPort:        10249,
 		HealthzBindAddress: util.IP(net.ParseIP("127.0.0.1")),
 		OOMScoreAdj:        -899,
@@ -61,6 +63,7 @@ func NewProxyServer() *ProxyServer {
 // AddFlags adds flags for a specific ProxyServer to the specified FlagSet
 func (s *ProxyServer) AddFlags(fs *pflag.FlagSet) {
 	fs.Var(&s.BindAddress, "bind_address", "The IP address for the proxy server to serve on (set to 0.0.0.0 for all interfaces)")
+	fs.Var(&s.PublicAddress, "public_address", "The IP address for the proxy server to serve on, for externally load balanced services using NAT")
 	client.BindClientConfigFlags(fs, &s.ClientConfig)
 	fs.IntVar(&s.HealthzPort, "healthz_port", s.HealthzPort, "The port to bind the health check server. Use 0 to disable.")
 	fs.Var(&s.HealthzBindAddress, "healthz_bind_address", "The IP address for the health check server to serve on, defaulting to 127.0.0.1 (set to 0.0.0.0 for all interfaces)")
@@ -90,7 +93,7 @@ func (s *ProxyServer) Run(_ []string) error {
 		protocol = iptables.ProtocolIpv6
 	}
 	loadBalancer := proxy.NewLoadBalancerRR()
-	proxier := proxy.NewProxier(loadBalancer, net.IP(s.BindAddress), iptables.New(exec.New(), protocol))
+	proxier := proxy.NewProxier(loadBalancer, net.IP(s.BindAddress), iptables.New(exec.New(), protocol), net.IP(s.PublicAddress))
 	if proxier == nil {
 		glog.Fatalf("failed to create proxier, aborting")
 	}
