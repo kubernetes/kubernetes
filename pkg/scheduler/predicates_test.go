@@ -52,7 +52,7 @@ func makeResources(milliCPU int64, memory int64) api.NodeResources {
 	}
 }
 
-func newResourcePod(usage ...resourceRequest) api.Pod {
+func newResourcePod(usage ...resourceRequest) *api.Pod {
 	containers := []api.Container{}
 	for _, req := range usage {
 		containers = append(containers, api.Container{
@@ -64,7 +64,7 @@ func newResourcePod(usage ...resourceRequest) api.Pod {
 			},
 		})
 	}
-	return api.Pod{
+	return &api.Pod{
 		Spec: api.PodSpec{
 			Containers: containers,
 		},
@@ -73,14 +73,14 @@ func newResourcePod(usage ...resourceRequest) api.Pod {
 
 func TestPodFitsResources(t *testing.T) {
 	tests := []struct {
-		pod          api.Pod
-		existingPods []api.Pod
+		pod          *api.Pod
+		existingPods []*api.Pod
 		fits         bool
 		test         string
 	}{
 		{
-			pod: api.Pod{},
-			existingPods: []api.Pod{
+			pod: &api.Pod{},
+			existingPods: []*api.Pod{
 				newResourcePod(resourceRequest{milliCPU: 10, memory: 20}),
 			},
 			fits: true,
@@ -88,7 +88,7 @@ func TestPodFitsResources(t *testing.T) {
 		},
 		{
 			pod: newResourcePod(resourceRequest{milliCPU: 1, memory: 1}),
-			existingPods: []api.Pod{
+			existingPods: []*api.Pod{
 				newResourcePod(resourceRequest{milliCPU: 10, memory: 20}),
 			},
 			fits: false,
@@ -96,7 +96,7 @@ func TestPodFitsResources(t *testing.T) {
 		},
 		{
 			pod: newResourcePod(resourceRequest{milliCPU: 1, memory: 1}),
-			existingPods: []api.Pod{
+			existingPods: []*api.Pod{
 				newResourcePod(resourceRequest{milliCPU: 5, memory: 5}),
 			},
 			fits: true,
@@ -104,7 +104,7 @@ func TestPodFitsResources(t *testing.T) {
 		},
 		{
 			pod: newResourcePod(resourceRequest{milliCPU: 1, memory: 2}),
-			existingPods: []api.Pod{
+			existingPods: []*api.Pod{
 				newResourcePod(resourceRequest{milliCPU: 5, memory: 19}),
 			},
 			fits: false,
@@ -112,7 +112,7 @@ func TestPodFitsResources(t *testing.T) {
 		},
 		{
 			pod: newResourcePod(resourceRequest{milliCPU: 5, memory: 1}),
-			existingPods: []api.Pod{
+			existingPods: []*api.Pod{
 				newResourcePod(resourceRequest{milliCPU: 5, memory: 19}),
 			},
 			fits: true,
@@ -135,19 +135,19 @@ func TestPodFitsResources(t *testing.T) {
 
 func TestPodFitsHost(t *testing.T) {
 	tests := []struct {
-		pod  api.Pod
+		pod  *api.Pod
 		node string
 		fits bool
 		test string
 	}{
 		{
-			pod:  api.Pod{},
+			pod:  &api.Pod{},
 			node: "foo",
 			fits: true,
 			test: "no host specified",
 		},
 		{
-			pod: api.Pod{
+			pod: &api.Pod{
 				Spec: api.PodSpec{
 					Host: "foo",
 				},
@@ -157,7 +157,7 @@ func TestPodFitsHost(t *testing.T) {
 			test: "host matches",
 		},
 		{
-			pod: api.Pod{
+			pod: &api.Pod{
 				Spec: api.PodSpec{
 					Host: "bar",
 				},
@@ -169,7 +169,7 @@ func TestPodFitsHost(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		result, err := PodFitsHost(test.pod, []api.Pod{}, test.node)
+		result, err := PodFitsHost(test.pod, []*api.Pod{}, test.node)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -181,20 +181,20 @@ func TestPodFitsHost(t *testing.T) {
 
 func TestPodFitsPorts(t *testing.T) {
 	tests := []struct {
-		pod          api.Pod
-		existingPods []api.Pod
+		pod          *api.Pod
+		existingPods []*api.Pod
 		fits         bool
 		test         string
 	}{
 		{
-			pod:          api.Pod{},
-			existingPods: []api.Pod{},
+			pod:          &api.Pod{},
+			existingPods: []*api.Pod{},
 			fits:         true,
 			test:         "nothing running",
 		},
 		{
 			pod: newPod("m1", 8080),
-			existingPods: []api.Pod{
+			existingPods: []*api.Pod{
 				newPod("m1", 9090),
 			},
 			fits: true,
@@ -202,7 +202,7 @@ func TestPodFitsPorts(t *testing.T) {
 		},
 		{
 			pod: newPod("m1", 8080),
-			existingPods: []api.Pod{
+			existingPods: []*api.Pod{
 				newPod("m1", 8080),
 			},
 			fits: false,
@@ -210,7 +210,7 @@ func TestPodFitsPorts(t *testing.T) {
 		},
 		{
 			pod: newPod("m1", 8000, 8080),
-			existingPods: []api.Pod{
+			existingPods: []*api.Pod{
 				newPod("m1", 8080),
 			},
 			fits: false,
@@ -218,7 +218,7 @@ func TestPodFitsPorts(t *testing.T) {
 		},
 		{
 			pod: newPod("m1", 8000, 8080),
-			existingPods: []api.Pod{
+			existingPods: []*api.Pod{
 				newPod("m1", 8001, 8080),
 			},
 			fits: false,
@@ -238,25 +238,25 @@ func TestPodFitsPorts(t *testing.T) {
 
 func TestGetUsedPorts(t *testing.T) {
 	tests := []struct {
-		pods []api.Pod
+		pods []*api.Pod
 
 		ports map[int]bool
 	}{
 		{
-			[]api.Pod{
+			[]*api.Pod{
 				newPod("m1", 9090),
 			},
 			map[int]bool{9090: true},
 		},
 		{
-			[]api.Pod{
+			[]*api.Pod{
 				newPod("m1", 9090),
 				newPod("m1", 9091),
 			},
 			map[int]bool{9090: true, 9091: true},
 		},
 		{
-			[]api.Pod{
+			[]*api.Pod{
 				newPod("m1", 9090),
 				newPod("m2", 9091),
 			},
@@ -296,15 +296,15 @@ func TestDiskConflicts(t *testing.T) {
 		},
 	}
 	tests := []struct {
-		pod          api.Pod
-		existingPods []api.Pod
+		pod          *api.Pod
+		existingPods []*api.Pod
 		isOk         bool
 		test         string
 	}{
-		{api.Pod{}, []api.Pod{}, true, "nothing"},
-		{api.Pod{}, []api.Pod{{Spec: volState}}, true, "one state"},
-		{api.Pod{Spec: volState}, []api.Pod{{Spec: volState}}, false, "same state"},
-		{api.Pod{Spec: volState2}, []api.Pod{{Spec: volState}}, true, "different state"},
+		{&api.Pod{}, []*api.Pod{}, true, "nothing"},
+		{&api.Pod{}, []*api.Pod{{Spec: volState}}, true, "one state"},
+		{&api.Pod{Spec: volState}, []*api.Pod{{Spec: volState}}, false, "same state"},
+		{&api.Pod{Spec: volState2}, []*api.Pod{{Spec: volState}}, true, "different state"},
 	}
 
 	for _, test := range tests {
@@ -345,15 +345,15 @@ func TestAWSDiskConflicts(t *testing.T) {
 		},
 	}
 	tests := []struct {
-		pod          api.Pod
-		existingPods []api.Pod
+		pod          *api.Pod
+		existingPods []*api.Pod
 		isOk         bool
 		test         string
 	}{
-		{api.Pod{}, []api.Pod{}, true, "nothing"},
-		{api.Pod{}, []api.Pod{{Spec: volState}}, true, "one state"},
-		{api.Pod{Spec: volState}, []api.Pod{{Spec: volState}}, false, "same state"},
-		{api.Pod{Spec: volState2}, []api.Pod{{Spec: volState}}, true, "different state"},
+		{&api.Pod{}, []*api.Pod{}, true, "nothing"},
+		{&api.Pod{}, []*api.Pod{{Spec: volState}}, true, "one state"},
+		{&api.Pod{Spec: volState}, []*api.Pod{{Spec: volState}}, false, "same state"},
+		{&api.Pod{Spec: volState2}, []*api.Pod{{Spec: volState}}, true, "different state"},
 	}
 
 	for _, test := range tests {
@@ -372,18 +372,18 @@ func TestAWSDiskConflicts(t *testing.T) {
 
 func TestPodFitsSelector(t *testing.T) {
 	tests := []struct {
-		pod    api.Pod
+		pod    *api.Pod
 		labels map[string]string
 		fits   bool
 		test   string
 	}{
 		{
-			pod:  api.Pod{},
+			pod:  &api.Pod{},
 			fits: true,
 			test: "no selector",
 		},
 		{
-			pod: api.Pod{
+			pod: &api.Pod{
 				Spec: api.PodSpec{
 					NodeSelector: map[string]string{
 						"foo": "bar",
@@ -394,7 +394,7 @@ func TestPodFitsSelector(t *testing.T) {
 			test: "missing labels",
 		},
 		{
-			pod: api.Pod{
+			pod: &api.Pod{
 				Spec: api.PodSpec{
 					NodeSelector: map[string]string{
 						"foo": "bar",
@@ -408,7 +408,7 @@ func TestPodFitsSelector(t *testing.T) {
 			test: "same labels",
 		},
 		{
-			pod: api.Pod{
+			pod: &api.Pod{
 				Spec: api.PodSpec{
 					NodeSelector: map[string]string{
 						"foo": "bar",
@@ -423,7 +423,7 @@ func TestPodFitsSelector(t *testing.T) {
 			test: "node labels are superset",
 		},
 		{
-			pod: api.Pod{
+			pod: &api.Pod{
 				Spec: api.PodSpec{
 					NodeSelector: map[string]string{
 						"foo": "bar",
@@ -442,7 +442,7 @@ func TestPodFitsSelector(t *testing.T) {
 		node := api.Node{ObjectMeta: api.ObjectMeta{Labels: test.labels}}
 
 		fit := NodeSelector{FakeNodeInfo(node)}
-		fits, err := fit.PodSelectorMatches(test.pod, []api.Pod{}, "machine")
+		fits, err := fit.PodSelectorMatches(test.pod, []*api.Pod{}, "machine")
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -455,8 +455,8 @@ func TestPodFitsSelector(t *testing.T) {
 func TestNodeLabelPresence(t *testing.T) {
 	label := map[string]string{"foo": "bar", "bar": "foo"}
 	tests := []struct {
-		pod          api.Pod
-		existingPods []api.Pod
+		pod          *api.Pod
+		existingPods []*api.Pod
 		labels       []string
 		presence     bool
 		fits         bool
@@ -536,8 +536,8 @@ func TestServiceAffinity(t *testing.T) {
 	node4 := api.Node{ObjectMeta: api.ObjectMeta{Name: "machine4", Labels: labels4}}
 	node5 := api.Node{ObjectMeta: api.ObjectMeta{Name: "machine5", Labels: labels4}}
 	tests := []struct {
-		pod      api.Pod
-		pods     []api.Pod
+		pod      *api.Pod
+		pods     []*api.Pod
 		services []api.Service
 		node     string
 		labels   []string
@@ -545,28 +545,29 @@ func TestServiceAffinity(t *testing.T) {
 		test     string
 	}{
 		{
+			pod:    new(api.Pod),
 			node:   "machine1",
 			fits:   true,
 			labels: []string{"region"},
 			test:   "nothing scheduled",
 		},
 		{
-			pod:    api.Pod{Spec: api.PodSpec{NodeSelector: map[string]string{"region": "r1"}}},
+			pod:    &api.Pod{Spec: api.PodSpec{NodeSelector: map[string]string{"region": "r1"}}},
 			node:   "machine1",
 			fits:   true,
 			labels: []string{"region"},
 			test:   "pod with region label match",
 		},
 		{
-			pod:    api.Pod{Spec: api.PodSpec{NodeSelector: map[string]string{"region": "r2"}}},
+			pod:    &api.Pod{Spec: api.PodSpec{NodeSelector: map[string]string{"region": "r2"}}},
 			node:   "machine1",
 			fits:   false,
 			labels: []string{"region"},
 			test:   "pod with region label mismatch",
 		},
 		{
-			pod:      api.Pod{ObjectMeta: api.ObjectMeta{Labels: selector}},
-			pods:     []api.Pod{{Spec: api.PodSpec{Host: "machine1"}, ObjectMeta: api.ObjectMeta{Labels: selector}}},
+			pod:      &api.Pod{ObjectMeta: api.ObjectMeta{Labels: selector}},
+			pods:     []*api.Pod{{Spec: api.PodSpec{Host: "machine1"}, ObjectMeta: api.ObjectMeta{Labels: selector}}},
 			node:     "machine1",
 			services: []api.Service{{Spec: api.ServiceSpec{Selector: selector}}},
 			fits:     true,
@@ -574,8 +575,8 @@ func TestServiceAffinity(t *testing.T) {
 			test:     "service pod on same minion",
 		},
 		{
-			pod:      api.Pod{ObjectMeta: api.ObjectMeta{Labels: selector}},
-			pods:     []api.Pod{{Spec: api.PodSpec{Host: "machine2"}, ObjectMeta: api.ObjectMeta{Labels: selector}}},
+			pod:      &api.Pod{ObjectMeta: api.ObjectMeta{Labels: selector}},
+			pods:     []*api.Pod{{Spec: api.PodSpec{Host: "machine2"}, ObjectMeta: api.ObjectMeta{Labels: selector}}},
 			node:     "machine1",
 			services: []api.Service{{Spec: api.ServiceSpec{Selector: selector}}},
 			fits:     true,
@@ -583,8 +584,8 @@ func TestServiceAffinity(t *testing.T) {
 			test:     "service pod on different minion, region match",
 		},
 		{
-			pod:      api.Pod{ObjectMeta: api.ObjectMeta{Labels: selector}},
-			pods:     []api.Pod{{Spec: api.PodSpec{Host: "machine3"}, ObjectMeta: api.ObjectMeta{Labels: selector}}},
+			pod:      &api.Pod{ObjectMeta: api.ObjectMeta{Labels: selector}},
+			pods:     []*api.Pod{{Spec: api.PodSpec{Host: "machine3"}, ObjectMeta: api.ObjectMeta{Labels: selector}}},
 			node:     "machine1",
 			services: []api.Service{{Spec: api.ServiceSpec{Selector: selector}}},
 			fits:     false,
@@ -592,8 +593,8 @@ func TestServiceAffinity(t *testing.T) {
 			test:     "service pod on different minion, region mismatch",
 		},
 		{
-			pod:      api.Pod{ObjectMeta: api.ObjectMeta{Labels: selector, Namespace: "ns1"}},
-			pods:     []api.Pod{{Spec: api.PodSpec{Host: "machine3"}, ObjectMeta: api.ObjectMeta{Labels: selector, Namespace: "ns1"}}},
+			pod:      &api.Pod{ObjectMeta: api.ObjectMeta{Labels: selector, Namespace: "ns1"}},
+			pods:     []*api.Pod{{Spec: api.PodSpec{Host: "machine3"}, ObjectMeta: api.ObjectMeta{Labels: selector, Namespace: "ns1"}}},
 			node:     "machine1",
 			services: []api.Service{{Spec: api.ServiceSpec{Selector: selector}, ObjectMeta: api.ObjectMeta{Namespace: "ns2"}}},
 			fits:     true,
@@ -601,8 +602,8 @@ func TestServiceAffinity(t *testing.T) {
 			test:     "service in different namespace, region mismatch",
 		},
 		{
-			pod:      api.Pod{ObjectMeta: api.ObjectMeta{Labels: selector, Namespace: "ns1"}},
-			pods:     []api.Pod{{Spec: api.PodSpec{Host: "machine3"}, ObjectMeta: api.ObjectMeta{Labels: selector, Namespace: "ns2"}}},
+			pod:      &api.Pod{ObjectMeta: api.ObjectMeta{Labels: selector, Namespace: "ns1"}},
+			pods:     []*api.Pod{{Spec: api.PodSpec{Host: "machine3"}, ObjectMeta: api.ObjectMeta{Labels: selector, Namespace: "ns2"}}},
 			node:     "machine1",
 			services: []api.Service{{Spec: api.ServiceSpec{Selector: selector}, ObjectMeta: api.ObjectMeta{Namespace: "ns1"}}},
 			fits:     true,
@@ -610,8 +611,8 @@ func TestServiceAffinity(t *testing.T) {
 			test:     "pod in different namespace, region mismatch",
 		},
 		{
-			pod:      api.Pod{ObjectMeta: api.ObjectMeta{Labels: selector, Namespace: "ns1"}},
-			pods:     []api.Pod{{Spec: api.PodSpec{Host: "machine3"}, ObjectMeta: api.ObjectMeta{Labels: selector, Namespace: "ns1"}}},
+			pod:      &api.Pod{ObjectMeta: api.ObjectMeta{Labels: selector, Namespace: "ns1"}},
+			pods:     []*api.Pod{{Spec: api.PodSpec{Host: "machine3"}, ObjectMeta: api.ObjectMeta{Labels: selector, Namespace: "ns1"}}},
 			node:     "machine1",
 			services: []api.Service{{Spec: api.ServiceSpec{Selector: selector}, ObjectMeta: api.ObjectMeta{Namespace: "ns1"}}},
 			fits:     false,
@@ -619,8 +620,8 @@ func TestServiceAffinity(t *testing.T) {
 			test:     "service and pod in same namespace, region mismatch",
 		},
 		{
-			pod:      api.Pod{ObjectMeta: api.ObjectMeta{Labels: selector}},
-			pods:     []api.Pod{{Spec: api.PodSpec{Host: "machine2"}, ObjectMeta: api.ObjectMeta{Labels: selector}}},
+			pod:      &api.Pod{ObjectMeta: api.ObjectMeta{Labels: selector}},
+			pods:     []*api.Pod{{Spec: api.PodSpec{Host: "machine2"}, ObjectMeta: api.ObjectMeta{Labels: selector}}},
 			node:     "machine1",
 			services: []api.Service{{Spec: api.ServiceSpec{Selector: selector}}},
 			fits:     false,
@@ -628,8 +629,8 @@ func TestServiceAffinity(t *testing.T) {
 			test:     "service pod on different minion, multiple labels, not all match",
 		},
 		{
-			pod:      api.Pod{ObjectMeta: api.ObjectMeta{Labels: selector}},
-			pods:     []api.Pod{{Spec: api.PodSpec{Host: "machine5"}, ObjectMeta: api.ObjectMeta{Labels: selector}}},
+			pod:      &api.Pod{ObjectMeta: api.ObjectMeta{Labels: selector}},
+			pods:     []*api.Pod{{Spec: api.PodSpec{Host: "machine5"}, ObjectMeta: api.ObjectMeta{Labels: selector}}},
 			node:     "machine4",
 			services: []api.Service{{Spec: api.ServiceSpec{Selector: selector}}},
 			fits:     true,
@@ -641,7 +642,7 @@ func TestServiceAffinity(t *testing.T) {
 	for _, test := range tests {
 		nodes := []api.Node{node1, node2, node3, node4, node5}
 		serviceAffinity := ServiceAffinity{FakePodLister(test.pods), FakeServiceLister(test.services), FakeNodeListInfo(nodes), test.labels}
-		fits, err := serviceAffinity.CheckServiceAffinity(test.pod, []api.Pod{}, test.node)
+		fits, err := serviceAffinity.CheckServiceAffinity(test.pod, []*api.Pod{}, test.node)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}

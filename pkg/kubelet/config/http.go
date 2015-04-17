@@ -74,7 +74,7 @@ func (s *sourceURL) extractFromURL() error {
 	}
 	if len(data) == 0 {
 		// Emit an update with an empty PodList to allow HTTPSource to be marked as seen
-		s.updates <- kubelet.PodUpdate{[]api.Pod{}, kubelet.SET, kubelet.HTTPSource}
+		s.updates <- kubelet.PodUpdate{[]*api.Pod{}, kubelet.SET, kubelet.HTTPSource}
 		return fmt.Errorf("zero-length data received from %v", s.url)
 	}
 	// Short circuit if the manifest has not changed since the last time it was read.
@@ -91,12 +91,12 @@ func (s *sourceURL) extractFromURL() error {
 			return singleErr
 		}
 		// It parsed!
-		s.updates <- kubelet.PodUpdate{[]api.Pod{pod}, kubelet.SET, kubelet.HTTPSource}
+		s.updates <- kubelet.PodUpdate{[]*api.Pod{pod}, kubelet.SET, kubelet.HTTPSource}
 		return nil
 	}
 
 	// That didn't work, so try an array of manifests.
-	parsed, manifests, pods, multiErr := tryDecodeManifestList(data, s.applyDefaults)
+	parsed, manifests, podList, multiErr := tryDecodeManifestList(data, s.applyDefaults)
 	if parsed {
 		if multiErr != nil {
 			// It parsed but could not be used.
@@ -110,7 +110,11 @@ func (s *sourceURL) extractFromURL() error {
 			return singleErr
 		}
 		// It parsed!
-		s.updates <- kubelet.PodUpdate{pods.Items, kubelet.SET, kubelet.HTTPSource}
+		pods := make([]*api.Pod, 0)
+		for i := range podList.Items {
+			pods = append(pods, &podList.Items[i])
+		}
+		s.updates <- kubelet.PodUpdate{pods, kubelet.SET, kubelet.HTTPSource}
 		return nil
 	}
 
@@ -124,18 +128,22 @@ func (s *sourceURL) extractFromURL() error {
 			// It parsed but could not be used.
 			return singlePodErr
 		}
-		s.updates <- kubelet.PodUpdate{[]api.Pod{pod}, kubelet.SET, kubelet.HTTPSource}
+		s.updates <- kubelet.PodUpdate{[]*api.Pod{pod}, kubelet.SET, kubelet.HTTPSource}
 		return nil
 	}
 
 	// That didn't work, so try a list of pods.
-	parsed, pods, multiPodErr := tryDecodePodList(data, s.applyDefaults)
+	parsed, podList, multiPodErr := tryDecodePodList(data, s.applyDefaults)
 	if parsed {
 		if multiPodErr != nil {
 			// It parsed but could not be used.
 			return multiPodErr
 		}
-		s.updates <- kubelet.PodUpdate{pods.Items, kubelet.SET, kubelet.HTTPSource}
+		pods := make([]*api.Pod, 0)
+		for i := range podList.Items {
+			pods = append(pods, &podList.Items[i])
+		}
+		s.updates <- kubelet.PodUpdate{pods, kubelet.SET, kubelet.HTTPSource}
 		return nil
 	}
 

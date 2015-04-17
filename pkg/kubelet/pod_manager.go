@@ -43,11 +43,11 @@ import (
 // also be removed.
 
 type podManager interface {
-	GetPods() []api.Pod
+	GetPods() []*api.Pod
 	GetPodByFullName(podFullName string) (*api.Pod, bool)
 	GetPodByName(namespace, name string) (*api.Pod, bool)
-	GetPodsAndMirrorMap() ([]api.Pod, map[string]api.Pod)
-	SetPods(pods []api.Pod)
+	GetPodsAndMirrorMap() ([]*api.Pod, map[string]api.Pod)
+	SetPods(pods []*api.Pod)
 	UpdatePods(u PodUpdate, podSyncTypes map[types.UID]metrics.SyncPodType)
 	DeleteOrphanedMirrorPods()
 	TranslatePodUID(uid types.UID) types.UID
@@ -78,7 +78,7 @@ type basicPodManager struct {
 func newBasicPodManager(apiserverClient client.Interface) *basicPodManager {
 	pm := &basicPodManager{}
 	pm.mirrorClient = newBasicMirrorClient(apiserverClient)
-	pm.SetPods([]api.Pod{})
+	pm.SetPods(nil)
 	return pm
 }
 
@@ -127,27 +127,26 @@ func (self *basicPodManager) UpdatePods(u PodUpdate, podSyncTypes map[types.UID]
 }
 
 // Set the internal pods based on the new pods.
-func (self *basicPodManager) SetPods(newPods []api.Pod) {
+func (self *basicPodManager) SetPods(newPods []*api.Pod) {
 	self.lock.Lock()
 	defer self.lock.Unlock()
 	self.setPods(newPods)
 }
 
-func (self *basicPodManager) setPods(newPods []api.Pod) {
+func (self *basicPodManager) setPods(newPods []*api.Pod) {
 	podByUID := make(map[types.UID]*api.Pod)
 	mirrorPodByUID := make(map[types.UID]*api.Pod)
 	podByFullName := make(map[string]*api.Pod)
 	mirrorPodByFullName := make(map[string]*api.Pod)
 
-	for i := range newPods {
-		pod := newPods[i]
-		podFullName := kubecontainer.GetPodFullName(&pod)
-		if isMirrorPod(&pod) {
-			mirrorPodByUID[pod.UID] = &pod
-			mirrorPodByFullName[podFullName] = &pod
+	for _, pod := range newPods {
+		podFullName := kubecontainer.GetPodFullName(pod)
+		if isMirrorPod(pod) {
+			mirrorPodByUID[pod.UID] = pod
+			mirrorPodByFullName[podFullName] = pod
 		} else {
-			podByUID[pod.UID] = &pod
-			podByFullName[podFullName] = &pod
+			podByUID[pod.UID] = pod
+			podByFullName[podFullName] = pod
 		}
 	}
 
@@ -157,21 +156,19 @@ func (self *basicPodManager) setPods(newPods []api.Pod) {
 	self.mirrorPodByFullName = mirrorPodByFullName
 }
 
-func applyUpdates(changed []api.Pod, current []api.Pod) []api.Pod {
-	updated := []api.Pod{}
+func applyUpdates(changed []*api.Pod, current []*api.Pod) []*api.Pod {
+	updated := []*api.Pod{}
 	m := map[types.UID]*api.Pod{}
-	for i := range changed {
-		pod := &changed[i]
+	for _, pod := range changed {
 		m[pod.UID] = pod
 	}
 
-	for i := range current {
-		pod := &current[i]
+	for _, pod := range current {
 		if m[pod.UID] != nil {
-			updated = append(updated, *m[pod.UID])
+			updated = append(updated, m[pod.UID])
 			glog.V(4).Infof("pod with UID: %q has a new spec %+v", pod.UID, *m[pod.UID])
 		} else {
-			updated = append(updated, *pod)
+			updated = append(updated, pod)
 			glog.V(4).Infof("pod with UID: %q stay with the same spec %+v", pod.UID, *pod)
 		}
 	}
@@ -180,20 +177,20 @@ func applyUpdates(changed []api.Pod, current []api.Pod) []api.Pod {
 }
 
 // GetPods returns the regular pods bound to the kubelet and their spec.
-func (self *basicPodManager) GetPods() []api.Pod {
+func (self *basicPodManager) GetPods() []*api.Pod {
 	self.lock.RLock()
 	defer self.lock.RUnlock()
 	return podsMapToPods(self.podByUID)
 }
 
 // Returns all pods (including mirror pods).
-func (self *basicPodManager) getAllPods() []api.Pod {
+func (self *basicPodManager) getAllPods() []*api.Pod {
 	return append(podsMapToPods(self.podByUID), podsMapToPods(self.mirrorPodByUID)...)
 }
 
 // GetPodsAndMirrorMap returns the a copy of the regular pods and the mirror
 // pods indexed by full name.
-func (self *basicPodManager) GetPodsAndMirrorMap() ([]api.Pod, map[string]api.Pod) {
+func (self *basicPodManager) GetPodsAndMirrorMap() ([]*api.Pod, map[string]api.Pod) {
 	self.lock.RLock()
 	defer self.lock.RUnlock()
 	mirrorPods := make(map[string]api.Pod)
@@ -270,10 +267,10 @@ func (self *basicPodManager) IsMirrorPodOf(mirrorPod, pod *api.Pod) bool {
 	return api.Semantic.DeepEqual(&pod.Spec, &mirrorPod.Spec)
 }
 
-func podsMapToPods(UIDMap map[types.UID]*api.Pod) []api.Pod {
-	pods := make([]api.Pod, 0, len(UIDMap))
+func podsMapToPods(UIDMap map[types.UID]*api.Pod) []*api.Pod {
+	pods := make([]*api.Pod, 0, len(UIDMap))
 	for _, pod := range UIDMap {
-		pods = append(pods, *pod)
+		pods = append(pods, pod)
 	}
 	return pods
 }

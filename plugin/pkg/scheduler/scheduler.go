@@ -112,7 +112,7 @@ func (s *Scheduler) scheduleOne() {
 	defer func() {
 		metrics.E2eSchedulingLatency.Observe(metrics.SinceInMicroseconds(start))
 	}()
-	dest, err := s.config.Algorithm.Schedule(*pod, s.config.MinionLister)
+	dest, err := s.config.Algorithm.Schedule(pod, s.config.MinionLister)
 	metrics.SchedulingAlgorithmLatency.Observe(metrics.SinceInMicroseconds(start))
 	if err != nil {
 		glog.V(1).Infof("Failed to schedule: %v", pod)

@@ -51,16 +51,15 @@ func (kl *Kubelet) RunOnce(updates <-chan PodUpdate) ([]RunPodResult, error) {
 }
 
 // runOnce runs a given set of pods and returns their status.
-func (kl *Kubelet) runOnce(pods []api.Pod, retryDelay time.Duration) (results []RunPodResult, err error) {
+func (kl *Kubelet) runOnce(pods []*api.Pod, retryDelay time.Duration) (results []RunPodResult, err error) {
 	kl.handleNotFittingPods(pods)
 
 	ch := make(chan RunPodResult)
-	for i := range pods {
-		pod := pods[i] // Make a copy
-		go func() {
+	for _, pod := range pods {
+		go func(pod *api.Pod) {
 			err := kl.runPod(pod, retryDelay)
-			ch <- RunPodResult{&pod, err}
-		}()
+			ch <- RunPodResult{pod, err}
+		}(pod)
 	}
 
 	glog.Infof("waiting for %d pods", len(pods))
@@ -84,7 +83,7 @@ func (kl *Kubelet) runOnce(pods []api.Pod, retryDelay time.Duration) (results []
 }
 
 // runPod runs a single pod and wait until all containers are running.
-func (kl *Kubelet) runPod(pod api.Pod, retryDelay time.Duration) error {
+func (kl *Kubelet) runPod(pod *api.Pod, retryDelay time.Duration) error {
 	delay := retryDelay
 	retry := 0
 	for {
@@ -104,7 +103,7 @@ func (kl *Kubelet) runPod(pod api.Pod, retryDelay time.Duration) error {
 		glog.Infof("pod %q containers not running: syncing", pod.Name)
 		// We don't create mirror pods in this mode; pass a dummy boolean value
 		// to sycnPod.
-		if err = kl.syncPod(&pod, nil, p); err != nil {
+		if err = kl.syncPod(pod, nil, p); err != nil {
 			return fmt.Errorf("error syncing pod: %v", err)
 		}
 		if retry >= RunOnceMaxRetries {
@@ -119,7 +118,7 @@ func (kl *Kubelet) runPod(pod api.Pod, retryDelay time.Duration) error {
 }
 
 // isPodRunning returns true if all containers of a manifest are running.
-func (kl *Kubelet) isPodRunning(pod api.Pod, runningPod container.Pod) (bool, error) {
+func (kl *Kubelet) isPodRunning(pod *api.Pod, runningPod container.Pod) (bool, error) {
 	for _, container := range pod.Spec.Containers {
 		c := runningPod.FindContainerByName(container.Name)
 		if c == nil {

@@ -34,9 +34,9 @@ func NewServiceSpreadPriority(serviceLister ServiceLister) PriorityFunction {
 
 // CalculateSpreadPriority spreads pods by minimizing the number of pods belonging to the same service
 // on the same machine.
-func (s *ServiceSpread) CalculateSpreadPriority(pod api.Pod, podLister PodLister, minionLister MinionLister) (HostPriorityList, error) {
+func (s *ServiceSpread) CalculateSpreadPriority(pod *api.Pod, podLister PodLister, minionLister MinionLister) (HostPriorityList, error) {
 	var maxCount int
-	var nsServicePods []api.Pod
+	var nsServicePods []*api.Pod
 
 	services, err := s.serviceLister.GetPodServices(pod)
 	if err == nil {
@@ -101,8 +101,8 @@ func NewServiceAntiAffinityPriority(serviceLister ServiceLister, label string) P
 // CalculateAntiAffinityPriority spreads pods by minimizing the number of pods belonging to the same service
 // on machines with the same value for a particular label.
 // The label to be considered is provided to the struct (ServiceAntiAffinity).
-func (s *ServiceAntiAffinity) CalculateAntiAffinityPriority(pod api.Pod, podLister PodLister, minionLister MinionLister) (HostPriorityList, error) {
-	var nsServicePods []api.Pod
+func (s *ServiceAntiAffinity) CalculateAntiAffinityPriority(pod *api.Pod, podLister PodLister, minionLister MinionLister) (HostPriorityList, error) {
+	var nsServicePods []*api.Pod
 
 	services, err := s.serviceLister.GetPodServices(pod)
 	if err == nil {

@@ -85,7 +85,7 @@ func applyDefaults(pod *api.Pod, source string, isFile bool, hostname string) er
 
 type defaultFunc func(pod *api.Pod) error
 
-func tryDecodeSinglePod(data []byte, defaultFn defaultFunc) (parsed bool, pod api.Pod, err error) {
+func tryDecodeSinglePod(data []byte, defaultFn defaultFunc) (parsed bool, pod *api.Pod, err error) {
 	obj, err := api.Scheme.Decode(data)
 	if err != nil {
 		return false, pod, err
@@ -104,7 +104,7 @@ func tryDecodeSinglePod(data []byte, defaultFn defaultFunc) (parsed bool, pod ap
 		err = fmt.Errorf("invalid pod: %v", errs)
 		return true, pod, err
 	}
-	return true, *newPod, nil
+	return true, newPod, nil
 }
 
 func tryDecodePodList(data []byte, defaultFn defaultFunc) (parsed bool, pods api.PodList, err error) {
@@ -132,7 +132,7 @@ func tryDecodePodList(data []byte, defaultFn defaultFunc) (parsed bool, pods api
 	return true, *newPods, err
 }
 
-func tryDecodeSingleManifest(data []byte, defaultFn defaultFunc) (parsed bool, manifest v1beta1.ContainerManifest, pod api.Pod, err error) {
+func tryDecodeSingleManifest(data []byte, defaultFn defaultFunc) (parsed bool, manifest v1beta1.ContainerManifest, pod *api.Pod, err error) {
 	// TODO: should be api.Scheme.Decode
 	// This is awful.  DecodeInto() expects to find an APIObject, which
 	// Manifest is not.  We keep reading manifest for now for compat, but
@@ -144,6 +144,7 @@ func tryDecodeSingleManifest(data []byte, defaultFn defaultFunc) (parsed bool, m
 	// avoids writing a v1beta1.ContainerManifest -> api.Pod
 	// conversion which would be identical to the api.ContainerManifest ->
 	// api.Pod conversion.
+	pod = new(api.Pod)
 	if err = yaml.Unmarshal(data, &manifest); err != nil {
 		return false, manifest, pod, err
 	}
@@ -155,10 +156,10 @@ func tryDecodeSingleManifest(data []byte, defaultFn defaultFunc) (parsed bool, m
 		err = fmt.Errorf("invalid manifest: %v", errs)
 		return false, manifest, pod, err
 	}
-	if err = api.Scheme.Convert(&newManifest, &pod); err != nil {
+	if err = api.Scheme.Convert(&newManifest, pod); err != nil {
 		return true, manifest, pod, err
 	}
-	if err := defaultFn(&pod); err != nil {
+	if err := defaultFn(pod); err != nil {
 		return true, manifest, pod, err
 	}
 	// Success.

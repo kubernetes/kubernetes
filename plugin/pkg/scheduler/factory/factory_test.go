@@ -115,19 +115,19 @@ func TestCreateFromEmptyConfig(t *testing.T) {
 	factory.CreateFromConfig(policy)
 }
 
-func PredicateOne(pod api.Pod, existingPods []api.Pod, node string) (bool, error) {
+func PredicateOne(pod *api.Pod, existingPods []*api.Pod, node string) (bool, error) {
 	return true, nil
 }
 
-func PredicateTwo(pod api.Pod, existingPods []api.Pod, node string) (bool, error) {
+func PredicateTwo(pod *api.Pod, existingPods []*api.Pod, node string) (bool, error) {
 	return true, nil
 }
 
-func PriorityOne(pod api.Pod, podLister algorithm.PodLister, minionLister algorithm.MinionLister) (algorithm.HostPriorityList, error) {
+func PriorityOne(pod *api.Pod, podLister algorithm.PodLister, minionLister algorithm.MinionLister) (algorithm.HostPriorityList, error) {
 	return []algorithm.HostPriority{}, nil
 }
 
-func PriorityTwo(pod api.Pod, podLister algorithm.PodLister, minionLister algorithm.MinionLister) (algorithm.HostPriorityList, error) {
+func PriorityTwo(pod *api.Pod, podLister algorithm.PodLister, minionLister algorithm.MinionLister) (algorithm.HostPriorityList, error) {
 	return []algorithm.HostPriority{}, nil
 }
 
