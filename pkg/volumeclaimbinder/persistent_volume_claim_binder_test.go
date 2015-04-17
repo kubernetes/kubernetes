@@ -20,6 +20,7 @@ import (
 	"reflect"
 	"testing"
 
+	"fmt"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
@@ -166,19 +167,27 @@ func TestBindingWithExamples(t *testing.T) {
 		t.Error("Unexpected error getting PVC from client: %v", err)
 	}
 
-	controller := NewPersistentVolumeClaimBinder(client)
-	err = controller.volumeStore.Add(pv)
-	if err != nil {
-		t.Error("Unexpected error: %v", err)
+	mockClient := &mockBinderClient{
+		volume: pv,
+		claim:  claim,
 	}
 
-	if _, exists, _ := controller.volumeStore.Get(pv); !exists {
-		t.Error("Expected to find volume in the index")
+	controller := PersistentVolumeClaimBinder{
+		volumeStore: NewPersistentVolumeOrderedIndex(),
+		client:      mockClient,
 	}
 
-	err = controller.syncPersistentVolumeClaim(claim)
-	if err != nil {
-		t.Error("Unexpected error: %v", err)
+	controller.volumeStore.Add(pv)
+	controller.syncPersistentVolume(pv)
+
+	if pv.Status.Phase != api.VolumeAvailable {
+		t.Errorf("Expected phase %s but got %s", api.VolumeBound, pv.Status.Phase)
+	}
+
+	controller.syncPersistentVolumeClaim(claim)
+
+	if pv.Status.Phase != api.VolumeBound {
+		t.Errorf("Expected phase %s but got %s", api.VolumeBound, pv.Status.Phase)
 	}
 
 	if claim.Status.VolumeRef == nil {
@@ -192,9 +201,47 @@ func TestBindingWithExamples(t *testing.T) {
 		t.Errorf("Expected phase %s but got %s", api.ClaimBound, claim.Status.Phase)
 	}
 	if claim.Status.AccessModes[0] != pv.Spec.AccessModes[0] {
-		t.Errorf("Expected phase %s but got %s", api.ClaimBound, claim.Status.Phase)
+		t.Errorf("Expected access mode %s but got %s", claim.Status.AccessModes[0], pv.Spec.AccessModes[0])
 	}
-	if claim.Status.Phase != api.ClaimBound {
-		t.Errorf("Expected phase %s but got %s", api.ClaimBound, claim.Status.Phase)
+
+	// pretend the user deleted their claim
+	mockClient.claim = nil
+
+	controller.syncPersistentVolume(pv)
+	if pv.Status.Phase != api.VolumeReleased {
+		t.Errorf("Expected phase %s but got %s", api.VolumeReleased, pv.Status.Phase)
 	}
+}
+
+type mockBinderClient struct {
+	volume *api.PersistentVolume
+	claim  *api.PersistentVolumeClaim
+}
+
+func (c *mockBinderClient) GetPersistentVolume(name string) (*api.PersistentVolume, error) {
+	return c.volume, nil
+}
+
+func (c *mockBinderClient) UpdatePersistentVolume(volume *api.PersistentVolume) (*api.PersistentVolume, error) {
+	return volume, nil
+}
+
+func (c *mockBinderClient) UpdatePersistentVolumeStatus(volume *api.PersistentVolume) (*api.PersistentVolume, error) {
+	return volume, nil
+}
+
+func (c *mockBinderClient) GetPersistentVolumeClaim(namespace, name string) (*api.PersistentVolumeClaim, error) {
+	if c.claim != nil {
+		return c.claim, nil
+	} else {
+		return nil, fmt.Errorf("Claim does not exist")
+	}
+}
+
+func (c *mockBinderClient) UpdatePersistentVolumeClaim(claim *api.PersistentVolumeClaim) (*api.PersistentVolumeClaim, error) {
+	return claim, nil
+}
+
+func (c *mockBinderClient) UpdatePersistentVolumeClaimStatus(claim *api.PersistentVolumeClaim) (*api.PersistentVolumeClaim, error) {
+	return claim, nil
 }
