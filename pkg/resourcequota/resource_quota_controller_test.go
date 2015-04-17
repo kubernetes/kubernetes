@@ -267,3 +267,63 @@ func TestSyncResourceQuotaNoChange(t *testing.T) {
 		t.Errorf("SyncResourceQuota made an unexpected client action when state was not dirty: %v", kubeClient.Actions)
 	}
 }
+
+func TestIsPodCPUUnbounded(t *testing.T) {
+	pod := api.Pod{
+		ObjectMeta: api.ObjectMeta{Name: "pod-running"},
+		Status:     api.PodStatus{Phase: api.PodRunning},
+		Spec: api.PodSpec{
+			Volumes:    []api.Volume{{Name: "vol"}},
+			Containers: []api.Container{{Name: "ctr", Image: "image", Resources: getResourceRequirements("100m", "0")}},
+		},
+	}
+	if IsPodCPUUnbounded(&pod) {
+		t.Errorf("Expected false")
+	}
+	pod = api.Pod{
+		ObjectMeta: api.ObjectMeta{Name: "pod-running"},
+		Status:     api.PodStatus{Phase: api.PodRunning},
+		Spec: api.PodSpec{
+			Volumes:    []api.Volume{{Name: "vol"}},
+			Containers: []api.Container{{Name: "ctr", Image: "image", Resources: getResourceRequirements("0", "0")}},
+		},
+	}
+	if !IsPodCPUUnbounded(&pod) {
+		t.Errorf("Expected true")
+	}
+
+	pod.Spec.Containers[0].Resources = api.ResourceRequirements{}
+	if !IsPodCPUUnbounded(&pod) {
+		t.Errorf("Expected true")
+	}
+}
+
+func TestIsPodMemoryUnbounded(t *testing.T) {
+	pod := api.Pod{
+		ObjectMeta: api.ObjectMeta{Name: "pod-running"},
+		Status:     api.PodStatus{Phase: api.PodRunning},
+		Spec: api.PodSpec{
+			Volumes:    []api.Volume{{Name: "vol"}},
+			Containers: []api.Container{{Name: "ctr", Image: "image", Resources: getResourceRequirements("0", "1Gi")}},
+		},
+	}
+	if IsPodMemoryUnbounded(&pod) {
+		t.Errorf("Expected false")
+	}
+	pod = api.Pod{
+		ObjectMeta: api.ObjectMeta{Name: "pod-running"},
+		Status:     api.PodStatus{Phase: api.PodRunning},
+		Spec: api.PodSpec{
+			Volumes:    []api.Volume{{Name: "vol"}},
+			Containers: []api.Container{{Name: "ctr", Image: "image", Resources: getResourceRequirements("0", "0")}},
+		},
+	}
+	if !IsPodMemoryUnbounded(&pod) {
+		t.Errorf("Expected true")
+	}
+
+	pod.Spec.Containers[0].Resources = api.ResourceRequirements{}
+	if !IsPodMemoryUnbounded(&pod) {
+		t.Errorf("Expected true")
+	}
+}
