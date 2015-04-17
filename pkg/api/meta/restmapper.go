@@ -226,3 +226,22 @@ func (m *DefaultRESTMapper) RESTMapping(kind string, versions ...string) (*RESTM
 		MetadataAccessor: interfaces.MetadataAccessor,
 	}, nil
 }
+
+// aliasToResource is used for mapping aliases to resources
+var aliasToResource = map[string][]string{}
+
+// AddResourceAlias maps aliases to resources
+func (m *DefaultRESTMapper) AddResourceAlias(alias string, resources ...string) {
+	if len(resources) == 0 {
+		return
+	}
+	aliasToResource[alias] = resources
+}
+
+// AliasesForResource returns whether a resource has an alias or not
+func (m *DefaultRESTMapper) AliasesForResource(alias string) ([]string, bool) {
+	if res, ok := aliasToResource[alias]; ok {
+		return res, true
+	}
+	return nil, false
+}
