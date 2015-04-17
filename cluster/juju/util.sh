@@ -20,7 +20,9 @@ set -o nounset
 set -o pipefail
 
 source $KUBE_ROOT/cluster/juju/prereqs/ubuntu-juju.sh
-KUBE_BUNDLE_URL='https://raw.githubusercontent.com/whitmo/bundle-kubernetes/master/bundles.yaml'
+export JUJU_REPOSITORY=${KUBE_ROOT}/cluster/juju/charms
+#KUBE_BUNDLE_URL='https://raw.githubusercontent.com/whitmo/bundle-kubernetes/master/bundles.yaml'
+KUBE_BUNDLE_PATH=${KUBE_ROOT}/cluster/juju/bundles/local.yaml
 function verify-prereqs() {
     gather_installation_reqs
 }
@@ -30,6 +32,11 @@ function get-password() {
 }
 
 function kube-up() {
+    if [[ -d "~/.juju/current-env" ]]; then
+        juju quickstart -i --no-browser
+    else
+        juju quickstart --no-browser
+    fi
     # If something were to happen that I'm not accounting for, do not
     # punish the user by making them tear things down. In a perfect world
     # quickstart should handle this situation, so be nice in the meantime
@@ -37,17 +44,17 @@ function kube-up() {
     envstatus=$(juju status kubernetes-master --format=oneline)
 
     if [[ "" == "${envstatus}" ]]; then
-        if [[ -d "~/.juju/current-env" ]]; then
-            juju quickstart -i --no-browser -i $KUBE_BUNDLE_URL
-        else
-            juju quickstart --no-browser ${KUBE_BUNDLE_URL}
-        fi
-        sleep 60
+        juju deployer -c ${KUBE_BUNDLE_PATH}
     fi
     # Sleep due to juju bug http://pad.lv/1432759
     sleep-status
 }
 
+function kube-down() {
+    local jujuenv
+    jujuenv=$(cat ~/.juju/current-environment)
+    juju destroy-environment $jujuenv
+}
 
 function detect-master() {
     local kubestatus
@@ -56,8 +63,7 @@ function detect-master() {
     export KUBE_MASTER_IP=${kubestatus}
     export KUBE_MASTER=$KUBE_MASTER_IP:8080
     export KUBERNETES_MASTER=$KUBE_MASTER
-
-   }
+}
 
 function detect-minions(){
     # Strip out the components except for STDOUT return
@@ -72,10 +78,10 @@ function detect-minions(){
     # Stdout: '10.202.146.124
     # '
     #  UnitId: kubernetes/1
- 
-    KUBE_MINION_IP_ADDRESSES=($(juju run --service kubernetes \
-        "unit-get private-address" --format=yaml \
-        | awk '/Stdout/ {gsub(/'\''/,""); print $2}'))
+    KUBERNETES_JSON=$(juju run --service kubernetes \
+            "unit-get private-address" --format=json)
+    KUBE_MINION_IP_ADDRESSES=($(${KUBE_ROOT}/cluster/juju/return-node-ips.py $KUBERNETES_JSON))
+    echo $KUBE_MINION_IP_ADDRESSES
     NUM_MINIONS=${#KUBE_MINION_IP_ADDRESSES[@]}
     MINION_NAMES=$KUBE_MINION_IP_ADDRESSES
 }
@@ -87,7 +93,6 @@ function setup-logging-firewall(){
 function teardown-logging-firewall(){
     echo "TODO: teardown logging and firewall rules"
 }
-
 
 function sleep-status(){
     local i
@@ -109,4 +114,3 @@ function sleep-status(){
     echo "Sleeping an additional minute to allow the cluster to settle"
     sleep 60
 }
-
