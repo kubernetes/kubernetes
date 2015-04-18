@@ -247,7 +247,7 @@ var podColumns = []string{"POD", "IP", "CONTAINER(S)", "IMAGE(S)", "HOST", "LABE
 var replicationControllerColumns = []string{"CONTROLLER", "CONTAINER(S)", "IMAGE(S)", "SELECTOR", "REPLICAS"}
 var serviceColumns = []string{"NAME", "LABELS", "SELECTOR", "IP", "PORT(S)"}
 var endpointColumns = []string{"NAME", "ENDPOINTS"}
-var nodeColumns = []string{"NAME", "LABELS", "STATUS"}
+var nodeColumns = []string{"NAME", "SCHEDULABLE", "LABELS", "STATUS"}
 var statusColumns = []string{"STATUS"}
 var eventColumns = []string{"FIRSTSEEN", "LASTSEEN", "COUNT", "NAME", "KIND", "SUBOBJECT", "REASON", "SOURCE", "MESSAGE"}
 var limitRangeColumns = []string{"NAME"}
@@ -505,9 +505,9 @@ func printNode(node *api.Node, w io.Writer) error {
 	}
 	var schedulable string
 	if node.Spec.Unschedulable {
-		schedulable = "Unschedulable"
+		schedulable = "False"
 	} else {
-		schedulable = "Schedulable"
+		schedulable = "True"
 	}
 	var status []string
 	for _, validCondition := range NodeAllConditions {
