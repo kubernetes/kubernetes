@@ -109,7 +109,7 @@ if [[ -z "${AUTH_CONFIG:-}" ]];  then
       )
     elif [[ "${KUBERNETES_PROVIDER}" == "aws" ]]; then
       auth_config=(
-        "--auth_config=${HOME}/.kube/${INSTANCE_PREFIX}/kubernetes_auth"
+        "--kubeconfig=${KUBECONFIG:-$DEFAULT_KUBECONFIG}"
       )
     elif [[ "${KUBERNETES_PROVIDER}" == "libvirt-coreos" ]]; then
       auth_config=(
