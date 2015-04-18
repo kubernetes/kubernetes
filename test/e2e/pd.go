@@ -57,7 +57,7 @@ var _ = Describe("PD", func() {
 	})
 
 	It("should schedule a pod w/ a RW PD, remove it, then schedule it on another host", func() {
-		if testContext.Provider != "gce" && testContext.Provider != "aws" {
+		if !providerIs("gce", "aws") {
 			By(fmt.Sprintf("Skipping PD test, which is only supported for providers gce & aws (not %s)",
 				testContext.Provider))
 			return
