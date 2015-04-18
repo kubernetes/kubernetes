@@ -21,7 +21,7 @@ func TestGetHomeDocument(t *testing.T) {
 			"href-template": "services{?marker,limit}",
 			"href-vars": map[string]interface{}{
 				"marker": "param/marker",
-				"limit": "param/limit",
+				"limit":  "param/limit",
 			},
 			"hints": map[string]interface{}{
 				"allow": []string{"GET"},

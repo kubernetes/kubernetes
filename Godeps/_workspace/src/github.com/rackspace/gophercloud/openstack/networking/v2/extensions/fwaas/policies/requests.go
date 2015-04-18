@@ -128,21 +128,14 @@ func Create(c *gophercloud.ServiceClient, opts CreateOptsBuilder) CreateResult {
 		return res
 	}
 
-	_, res.Err = c.Request("POST", rootURL(c), gophercloud.RequestOpts{
-		JSONBody:     &reqBody,
-		JSONResponse: &res.Body,
-		OkCodes:      []int{201},
-	})
+	_, res.Err = c.Post(rootURL(c), reqBody, &res.Body, nil)
 	return res
 }
 
 // Get retrieves a particular firewall policy based on its unique ID.
 func Get(c *gophercloud.ServiceClient, id string) GetResult {
 	var res GetResult
-	_, res.Err = c.Request("GET", resourceURL(c, id), gophercloud.RequestOpts{
-		JSONResponse: &res.Body,
-		OkCodes:      []int{200},
-	})
+	_, res.Err = c.Get(resourceURL(c, id), &res.Body, nil)
 	return res
 }
 
@@ -198,10 +191,8 @@ func Update(c *gophercloud.ServiceClient, id string, opts UpdateOptsBuilder) Upd
 	}
 
 	// Send request to API
-	_, res.Err = c.Request("PUT", resourceURL(c, id), gophercloud.RequestOpts{
-		JSONBody:     &reqBody,
-		JSONResponse: &res.Body,
-		OkCodes:      []int{200},
+	_, res.Err = c.Put(resourceURL(c, id), reqBody, &res.Body, &gophercloud.RequestOpts{
+		OkCodes: []int{200},
 	})
 	return res
 }
@@ -209,9 +200,7 @@ func Update(c *gophercloud.ServiceClient, id string, opts UpdateOptsBuilder) Upd
 // Delete will permanently delete a particular firewall policy based on its unique ID.
 func Delete(c *gophercloud.ServiceClient, id string) DeleteResult {
 	var res DeleteResult
-	_, res.Err = c.Request("DELETE", resourceURL(c, id), gophercloud.RequestOpts{
-		OkCodes: []int{204},
-	})
+	_, res.Err = c.Delete(resourceURL(c, id), nil)
 	return res
 }
 
@@ -230,10 +219,8 @@ func InsertRule(c *gophercloud.ServiceClient, policyID, ruleID, beforeID, afterI
 
 	// Send request to API
 	var res commonResult
-	_, res.Err = c.Request("PUT", insertURL(c, policyID), gophercloud.RequestOpts{
-		JSONBody:     &reqBody,
-		JSONResponse: &res.Body,
-		OkCodes:      []int{200},
+	_, res.Err = c.Put(insertURL(c, policyID), reqBody, &res.Body, &gophercloud.RequestOpts{
+		OkCodes: []int{200},
 	})
 	return res.Err
 }
@@ -249,10 +236,8 @@ func RemoveRule(c *gophercloud.ServiceClient, policyID, ruleID string) error {
 
 	// Send request to API
 	var res commonResult
-	_, res.Err = c.Request("PUT", removeURL(c, policyID), gophercloud.RequestOpts{
-		JSONBody:     &reqBody,
-		JSONResponse: &res.Body,
-		OkCodes:      []int{200},
+	_, res.Err = c.Put(removeURL(c, policyID), reqBody, &res.Body, &gophercloud.RequestOpts{
+		OkCodes: []int{200},
 	})
 	return res.Err
 }

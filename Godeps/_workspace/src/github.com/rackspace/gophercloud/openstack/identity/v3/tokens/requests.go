@@ -235,11 +235,7 @@ func Create(c *gophercloud.ServiceClient, options gophercloud.AuthOptions, scope
 
 	var result CreateResult
 	var response *http.Response
-	response, result.Err = c.Request("POST", tokenURL(c), gophercloud.RequestOpts{
-		JSONBody:     &req,
-		JSONResponse: &result.Body,
-		OkCodes:      []int{201},
-	})
+	response, result.Err = c.Post(tokenURL(c), req, &result.Body, nil)
 	if result.Err != nil {
 		return result
 	}
@@ -251,10 +247,9 @@ func Create(c *gophercloud.ServiceClient, options gophercloud.AuthOptions, scope
 func Get(c *gophercloud.ServiceClient, token string) GetResult {
 	var result GetResult
 	var response *http.Response
-	response, result.Err = c.Request("GET", tokenURL(c), gophercloud.RequestOpts{
-		MoreHeaders:  subjectTokenHeaders(c, token),
-		JSONResponse: &result.Body,
-		OkCodes:      []int{200, 203},
+	response, result.Err = c.Get(tokenURL(c), &result.Body, &gophercloud.RequestOpts{
+		MoreHeaders: subjectTokenHeaders(c, token),
+		OkCodes:     []int{200, 203},
 	})
 	if result.Err != nil {
 		return result
@@ -279,9 +274,8 @@ func Validate(c *gophercloud.ServiceClient, token string) (bool, error) {
 // Revoke immediately makes specified token invalid.
 func Revoke(c *gophercloud.ServiceClient, token string) RevokeResult {
 	var res RevokeResult
-	_, res.Err = c.Request("DELETE", tokenURL(c), gophercloud.RequestOpts{
+	_, res.Err = c.Delete(tokenURL(c), &gophercloud.RequestOpts{
 		MoreHeaders: subjectTokenHeaders(c, token),
-		OkCodes:     []int{204},
 	})
 	return res
 }

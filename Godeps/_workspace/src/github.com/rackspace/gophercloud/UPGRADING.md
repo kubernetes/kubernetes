@@ -8,7 +8,7 @@ extensible, maintainable and easy-to-use.
 Below we've compiled upgrade instructions for the various services that
 existed before. If you have a specific issue that is not addressed below,
 please [submit an issue](/issues/new) or
-[e-mail our support team](mailto:sdk-support@rackspace.com).
+[e-mail our support team](https://developer.rackspace.com/support/).
 
 * [Authentication](#authentication)
 * [Servers](#servers)

@@ -95,7 +95,7 @@ func Update(c *gophercloud.ServiceClient, opts UpdateOptsBuilder) UpdateResult {
 
 	resp, err := c.Request("POST", updateURL(c), gophercloud.RequestOpts{
 		MoreHeaders: h,
-		OkCodes:     []int{204},
+		OkCodes:     []int{201, 202, 204},
 	})
 	res.Header = resp.Header
 	res.Err = err
