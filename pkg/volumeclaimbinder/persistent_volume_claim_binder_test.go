@@ -144,6 +144,54 @@ func TestExampleObjects(t *testing.T) {
 	}
 }
 
+func TestRequiresUpdate(t *testing.T) {
+	old := &api.PersistentVolume{
+		Spec: api.PersistentVolumeSpec{
+			AccessModes: []api.AccessModeType{api.ReadWriteOnce},
+			Capacity: api.ResourceList{
+				api.ResourceName(api.ResourceStorage): resource.MustParse("5Gi"),
+			},
+			PersistentVolumeSource: api.PersistentVolumeSource{
+				HostPath: &api.HostPathVolumeSource{
+					Path: "/tmp/data02",
+				},
+			},
+		},
+	}
+
+	new := &api.PersistentVolume{
+		Spec: api.PersistentVolumeSpec{
+			AccessModes: []api.AccessModeType{api.ReadWriteOnce},
+			Capacity: api.ResourceList{
+				api.ResourceName(api.ResourceStorage): resource.MustParse("5Gi"),
+			},
+			PersistentVolumeSource: api.PersistentVolumeSource{
+				HostPath: &api.HostPathVolumeSource{
+					Path: "/tmp/data02",
+				},
+			},
+			ClaimRef: &api.ObjectReference{Name: "foo"},
+		},
+	}
+
+	if !updateRequired(old, new) {
+		t.Errorf("Update expected for the new volume with added ClaimRef")
+	}
+
+	old.Spec.ClaimRef = new.Spec.ClaimRef
+	old.Status.Phase = api.VolumeBound
+
+	if !updateRequired(old, new) {
+		t.Errorf("Update expected for the new volume with added Status")
+	}
+
+	new.Status.Phase = old.Status.Phase
+
+	if updateRequired(old, new) {
+		t.Errorf("No updated expected for identical objects")
+	}
+}
+
 func TestBindingWithExamples(t *testing.T) {
 
 	api.ForTesting_ReferencesAllowBlankSelfLinks = true
@@ -167,31 +215,37 @@ func TestBindingWithExamples(t *testing.T) {
 		t.Error("Unexpected error getting PVC from client: %v", err)
 	}
 
+	volumeIndex := NewPersistentVolumeOrderedIndex()
 	mockClient := &mockBinderClient{
 		volume: pv,
 		claim:  claim,
 	}
 
-	controller := PersistentVolumeClaimBinder{
-		volumeStore: NewPersistentVolumeOrderedIndex(),
-		client:      mockClient,
-	}
-
-	controller.volumeStore.Add(pv)
-	controller.syncPersistentVolume(pv)
+	volumeIndex.Add(pv)
+	syncVolume(mockClient, pv)
 
 	if pv.Status.Phase != api.VolumeAvailable {
 		t.Errorf("Expected phase %s but got %s", api.VolumeBound, pv.Status.Phase)
 	}
 
-	controller.syncPersistentVolumeClaim(claim)
-
-	if pv.Status.Phase != api.VolumeBound {
-		t.Errorf("Expected phase %s but got %s", api.VolumeBound, pv.Status.Phase)
+	if pv.Spec.ClaimRef != nil {
+		t.Errorf("Expected nil ClaimRef but got %+v\n", pv.Spec.ClaimRef)
 	}
+
+	syncClaim(volumeIndex, mockClient, claim)
+
+	if pv.Spec.ClaimRef == nil {
+		t.Errorf("Expected ClaimRef but got nil for volume: %+v\n", pv)
+	}
+
+	syncVolume(mockClient, pv)
 
 	if claim.Status.VolumeRef == nil {
 		t.Error("Expected claim to be bound to volume")
+	}
+
+	if pv.Status.Phase != api.VolumeBound {
+		t.Errorf("Expected phase %s but got %s", api.VolumeBound, pv.Status.Phase)
 	}
 
 	if claim.Status.Phase != api.ClaimBound {
@@ -206,8 +260,8 @@ func TestBindingWithExamples(t *testing.T) {
 
 	// pretend the user deleted their claim
 	mockClient.claim = nil
+	syncVolume(mockClient, pv)
 
-	controller.syncPersistentVolume(pv)
 	if pv.Status.Phase != api.VolumeReleased {
 		t.Errorf("Expected phase %s but got %s", api.VolumeReleased, pv.Status.Phase)
 	}

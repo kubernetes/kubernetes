@@ -235,8 +235,8 @@ func (s *CMServer) Run(_ []string) error {
 	namespaceManager := namespace.NewNamespaceManager(kubeClient, s.NamespaceSyncPeriod)
 	namespaceManager.Run()
 
-	pvclaimBinder := volumeclaimbinder.NewPersistentVolumeClaimBinder(kubeClient)
-	pvclaimBinder.Run(s.PVClaimBinderSyncPeriod)
+	pvclaimBinder := volumeclaimbinder.NewPersistentVolumeClaimBinder(kubeClient, s.PVClaimBinderSyncPeriod)
+	pvclaimBinder.Run()
 
 	select {}
 	return nil
