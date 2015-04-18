@@ -17,9 +17,10 @@ limitations under the License.
 package volumeclaimbinder
 
 import (
+	"testing"
+
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
-	"testing"
 )
 
 func TestMatchVolume(t *testing.T) {

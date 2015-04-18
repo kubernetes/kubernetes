@@ -18,6 +18,7 @@ package volumeclaimbinder
 
 import (
 	"fmt"
+	"reflect"
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -30,7 +31,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 
 	"github.com/golang/glog"
-	"reflect"
 )
 
 // PersistentVolumeClaimBinder is a controller that synchronizes PersistentVolumeClaims.
@@ -94,7 +94,6 @@ func NewPersistentVolumeClaimBinder(kubeClient client.Interface, syncPeriod time
 				syncClaim(volumeIndex, binderClient, claim)
 			},
 			UpdateFunc: func(oldObj, newObj interface{}) {
-				//				oldClaim := newObj.(*api.PersistentVolumeClaim)
 				newClaim := newObj.(*api.PersistentVolumeClaim)
 				if newClaim.Status.VolumeRef == nil {
 					syncClaim(volumeIndex, binderClient, newClaim)

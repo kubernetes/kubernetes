@@ -17,10 +17,10 @@ limitations under the License.
 package volumeclaimbinder
 
 import (
+	"fmt"
 	"reflect"
 	"testing"
 
-	"fmt"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"

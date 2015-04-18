@@ -319,6 +319,11 @@ func validateSource(source *api.VolumeSource) errs.ValidationErrorList {
 		numVolumes++
 		allErrs = append(allErrs, validateGlusterfs(source.Glusterfs).Prefix("glusterfs")...)
 	}
+	if source.PersistentVolumeClaimVolumeSource != nil {
+		numVolumes++
+		allErrs = append(allErrs, validatePersistentClaimVolumeSource(source.PersistentVolumeClaimVolumeSource).Prefix("glusterfs")...)
+	}
+
 	if numVolumes != 1 {
 		allErrs = append(allErrs, errs.NewFieldInvalid("", source, "exactly 1 volume type is required"))
 	}
@@ -390,6 +395,14 @@ func validateSecretVolumeSource(secretSource *api.SecretVolumeSource) errs.Valid
 	allErrs := errs.ValidationErrorList{}
 	if secretSource.SecretName == "" {
 		allErrs = append(allErrs, errs.NewFieldRequired("secretName"))
+	}
+	return allErrs
+}
+
+func validatePersistentClaimVolumeSource(claim *api.PersistentVolumeClaimVolumeSource) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+	if claim.ClaimName == "" {
+		allErrs = append(allErrs, errs.NewFieldRequired("claimName"))
 	}
 	return allErrs
 }
