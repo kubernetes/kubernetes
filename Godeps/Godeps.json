@@ -63,16 +63,6 @@
 			"Rev": "8d75e11374a1928608c906fe745b538483e7aeb2"
 		},
 		{
-			"ImportPath": "github.com/coreos/etcd/etcdserver/etcdhttp/httptypes",
-			"Comment": "v2.0.4-288-g866a9d4",
-			"Rev": "866a9d4e41401657ea44bf539b2c5561d6fdcd67"
-		},
-		{
-			"ImportPath": "github.com/coreos/etcd/pkg/types",
-			"Comment": "v2.0.4-288-g866a9d4",
-			"Rev": "866a9d4e41401657ea44bf539b2c5561d6fdcd67"
-		},
-		{
 			"ImportPath": "github.com/coreos/go-etcd/etcd",
 			"Comment": "v2.0.0-3-g0424b5f",
 			"Rev": "0424b5f86ef0ca57a5309c599f74bbb3e97ecd9d"
