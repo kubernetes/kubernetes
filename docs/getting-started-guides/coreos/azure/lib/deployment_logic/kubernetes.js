@@ -1,22 +1,29 @@
 var _ = require('underscore');
+_.mixin(require('underscore.string').exports());
 
 var util = require('../util.js');
 var cloud_config = require('../cloud_config.js');
 
 
 exports.create_etcd_cloud_config = function (node_count, conf) {
-  var elected_node = 0;
-
   var input_file = './cloud_config_templates/kubernetes-cluster-etcd-node-template.yml';
+
+  var peers = [ ];
+  for (var i = 0; i < node_count; i++) {
+    peers.push(util.hostname(i, 'etcd') + '=http://' + util.hostname(i, 'etcd') + ':2380');
+  }
+  var cluster = peers.join(',');
 
   return _(node_count).times(function (n) {
     var output_file = util.join_output_file_path('kubernetes-cluster-etcd-node-' + n, 'generated.yml');
 
     return cloud_config.process_template(input_file, output_file, function(data) {
-      if (n !== elected_node) {
-        data.coreos.etcd.peers = [
-          util.hostname(elected_node, 'etcd'), 7001
-        ].join(':');
+      for (var i = 0; i < data.coreos.units.length; i++) {
+        var unit = data.coreos.units[i];
+        if (unit.name === 'etcd2.service') {
+          unit.content = _.replaceAll(_.replaceAll(unit.content, '%host%', util.hostname(n, 'etcd')), '%cluster%', cluster);
+          break;
+        }
       }
       return data;
     });
