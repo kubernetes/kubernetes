@@ -116,21 +116,58 @@ func GetResource(r rest.Getter, scope RequestScope) restful.RouteFunction {
 func GetResourceWithOptions(r rest.GetterWithOptions, scope RequestScope, getOptionsKind string, subpath bool, subpathKey string) restful.RouteFunction {
 	return getResourceHandler(scope,
 		func(ctx api.Context, name string, req *restful.Request) (runtime.Object, error) {
-			query := req.Request.URL.Query()
-			if subpath {
-				newQuery := make(url.Values)
-				for k, v := range query {
-					newQuery[k] = v
-				}
-				newQuery[subpathKey] = []string{req.PathParameter("path")}
-				query = newQuery
-			}
-			opts, err := queryToObject(query, scope, getOptionsKind)
+			opts, err := getRequestOptions(req, scope, getOptionsKind, subpath, subpathKey)
 			if err != nil {
 				return nil, err
 			}
 			return r.Get(ctx, name, opts)
 		})
+}
+
+func getRequestOptions(req *restful.Request, scope RequestScope, kind string, subpath bool, subpathKey string) (runtime.Object, error) {
+	if len(kind) == 0 {
+		return nil, nil
+	}
+	query := req.Request.URL.Query()
+	if subpath {
+		newQuery := make(url.Values)
+		for k, v := range query {
+			newQuery[k] = v
+		}
+		newQuery[subpathKey] = []string{req.PathParameter("path")}
+		query = newQuery
+	}
+	return queryToObject(query, scope, kind)
+}
+
+// ConnectResource returns a function that handles a connect request on a rest.Storage object.
+func ConnectResource(connecter rest.Connecter, scope RequestScope, connectOptionsKind string, subpath bool, subpathKey string) restful.RouteFunction {
+	return func(req *restful.Request, res *restful.Response) {
+		w := res.ResponseWriter
+		namespace, name, err := scope.Namer.Name(req)
+		if err != nil {
+			errorJSON(err, scope.Codec, w)
+			return
+		}
+		ctx := scope.ContextFunc(req)
+		ctx = api.WithNamespace(ctx, namespace)
+		opts, err := getRequestOptions(req, scope, connectOptionsKind, subpath, subpathKey)
+		if err != nil {
+			errorJSON(err, scope.Codec, w)
+			return
+		}
+		handler, err := connecter.Connect(ctx, name, opts)
+		if err != nil {
+			errorJSON(err, scope.Codec, w)
+			return
+		}
+		handler.ServeHTTP(w, req.Request)
+		err = handler.RequestError()
+		if err != nil {
+			errorJSON(err, scope.Codec, w)
+			return
+		}
+	}
 }
 
 // ListResource returns a function that handles retrieving a list of resources from a rest.Storage object.
@@ -216,7 +253,7 @@ func CreateResource(r rest.Creater, scope RequestScope, typer runtime.ObjectType
 			return
 		}
 
-		err = admit.Admit(admission.NewAttributesRecord(obj, namespace, scope.Resource, "CREATE"))
+		err = admit.Admit(admission.NewAttributesRecord(obj, scope.Kind, namespace, scope.Resource, "CREATE"))
 		if err != nil {
 			errorJSON(err, scope.Codec, w)
 			return
@@ -262,7 +299,7 @@ func PatchResource(r rest.Patcher, scope RequestScope, typer runtime.ObjectTyper
 
 		obj := r.New()
 		// PATCH requires same permission as UPDATE
-		err = admit.Admit(admission.NewAttributesRecord(obj, namespace, scope.Resource, "UPDATE"))
+		err = admit.Admit(admission.NewAttributesRecord(obj, scope.Kind, namespace, scope.Resource, "UPDATE"))
 		if err != nil {
 			errorJSON(err, scope.Codec, w)
 			return
@@ -362,7 +399,7 @@ func UpdateResource(r rest.Updater, scope RequestScope, typer runtime.ObjectType
 			return
 		}
 
-		err = admit.Admit(admission.NewAttributesRecord(obj, namespace, scope.Resource, "UPDATE"))
+		err = admit.Admit(admission.NewAttributesRecord(obj, scope.Kind, namespace, scope.Resource, "UPDATE"))
 		if err != nil {
 			errorJSON(err, scope.Codec, w)
 			return
@@ -423,7 +460,7 @@ func DeleteResource(r rest.GracefulDeleter, checkBody bool, scope RequestScope, 
 			}
 		}
 
-		err = admit.Admit(admission.NewAttributesRecord(nil, namespace, scope.Resource, "DELETE"))
+		err = admit.Admit(admission.NewAttributesRecord(nil, scope.Kind, namespace, scope.Resource, "DELETE"))
 		if err != nil {
 			errorJSON(err, scope.Codec, w)
 			return

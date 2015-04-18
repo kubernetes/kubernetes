@@ -12,5 +12,5 @@ spec:
     - an
     - ok
     - command
-    image: dockerfile/redis
+    image: redis
     name: master

@@ -80,7 +80,7 @@ var _ = Describe("Subcommand", func() {
 
 			Ω(content).Should(ContainSubstring("\t" + `. "github.com/onsi/ginkgo"`))
 			Ω(content).Should(ContainSubstring("\t" + `. "github.com/onsi/gomega"`))
-			Ω(content).Should(ContainSubstring("\t" + `. "github.com/sclevine/agouti/core"`))
+			Ω(content).Should(ContainSubstring("\t" + `"github.com/sclevine/agouti"`))
 		})
 	})
 
@@ -256,9 +256,9 @@ var _ = Describe("Subcommand", func() {
 				Ω(content).Should(ContainSubstring("package foo_bar_test"))
 				Ω(content).Should(ContainSubstring("\t" + `. "github.com/onsi/ginkgo"`))
 				Ω(content).Should(ContainSubstring("\t" + `. "github.com/onsi/gomega"`))
-				Ω(content).Should(ContainSubstring("\t" + `. "github.com/sclevine/agouti/core"`))
 				Ω(content).Should(ContainSubstring("\t" + `. "github.com/sclevine/agouti/matchers"`))
-				Ω(content).Should(ContainSubstring("page, err = agoutiDriver.Page()"))
+				Ω(content).Should(ContainSubstring("\t" + `"github.com/sclevine/agouti"`))
+				Ω(content).Should(ContainSubstring("page, err = agoutiDriver.NewPage()"))
 			})
 		})
 	})

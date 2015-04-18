@@ -30,16 +30,16 @@ const (
 	run_long = `Create and run a particular image, possibly replicated.
 Creates a replication controller to manage the created container(s).`
 	run_example = `// Starts a single instance of nginx.
-$ kubectl run-container nginx --image=dockerfile/nginx
+$ kubectl run-container nginx --image=nginx
 
 // Starts a replicated instance of nginx.
-$ kubectl run-container nginx --image=dockerfile/nginx --replicas=5
+$ kubectl run-container nginx --image=nginx --replicas=5
 
 // Dry run. Print the corresponding API objects without creating them.
-$ kubectl run-container nginx --image=dockerfile/nginx --dry-run
+$ kubectl run-container nginx --image=nginx --dry-run
 
 // Start a single instance of nginx, but overload the desired state with a partial set of values parsed from JSON.
-$ kubectl run-container nginx --image=dockerfile/nginx --overrides='{ "apiVersion": "v1beta1", "desiredState": { ... } }'`
+$ kubectl run-container nginx --image=nginx --overrides='{ "apiVersion": "v1beta1", "desiredState": { ... } }'`
 )
 
 func NewCmdRunContainer(f *cmdutil.Factory, out io.Writer) *cobra.Command {

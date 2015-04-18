@@ -64,7 +64,7 @@ const (
 // functionally similar, this helps our unit tests properly check that the correct PodUpdates
 // are generated.
 type PodUpdate struct {
-	Pods   []api.Pod
+	Pods   []*api.Pod
 	Op     PodOperation
 	Source string
 }

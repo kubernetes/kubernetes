@@ -66,7 +66,7 @@ func (s *sourceFile) extractFromPath() error {
 			return err
 		}
 		// Emit an update with an empty PodList to allow FileSource to be marked as seen
-		s.updates <- kubelet.PodUpdate{[]api.Pod{}, kubelet.SET, kubelet.FileSource}
+		s.updates <- kubelet.PodUpdate{[]*api.Pod{}, kubelet.SET, kubelet.FileSource}
 		return fmt.Errorf("path does not exist, ignoring")
 	}
 
@@ -83,7 +83,7 @@ func (s *sourceFile) extractFromPath() error {
 		if err != nil {
 			return err
 		}
-		s.updates <- kubelet.PodUpdate{[]api.Pod{pod}, kubelet.SET, kubelet.FileSource}
+		s.updates <- kubelet.PodUpdate{[]*api.Pod{pod}, kubelet.SET, kubelet.FileSource}
 
 	default:
 		return fmt.Errorf("path is not a directory or file")
@@ -95,13 +95,13 @@ func (s *sourceFile) extractFromPath() error {
 // Get as many pod configs as we can from a directory.  Return an error iff something
 // prevented us from reading anything at all.  Do not return an error if only some files
 // were problematic.
-func (s *sourceFile) extractFromDir(name string) ([]api.Pod, error) {
+func (s *sourceFile) extractFromDir(name string) ([]*api.Pod, error) {
 	dirents, err := filepath.Glob(filepath.Join(name, "[^.]*"))
 	if err != nil {
 		return nil, fmt.Errorf("glob failed: %v", err)
 	}
 
-	pods := make([]api.Pod, 0)
+	pods := make([]*api.Pod, 0)
 	if len(dirents) == 0 {
 		return pods, nil
 	}
@@ -131,7 +131,7 @@ func (s *sourceFile) extractFromDir(name string) ([]api.Pod, error) {
 	return pods, nil
 }
 
-func (s *sourceFile) extractFromFile(filename string) (pod api.Pod, err error) {
+func (s *sourceFile) extractFromFile(filename string) (pod *api.Pod, err error) {
 	glog.V(3).Infof("Reading config file %q", filename)
 	file, err := os.Open(filename)
 	if err != nil {

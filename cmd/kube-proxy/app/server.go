@@ -27,6 +27,8 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd"
+	clientcmdapi "github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/proxy"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/proxy/config"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -40,11 +42,12 @@ import (
 // ProxyServer contains configures and runs a Kubernetes proxy server
 type ProxyServer struct {
 	BindAddress        util.IP
-	ClientConfig       client.Config
 	HealthzPort        int
 	HealthzBindAddress util.IP
 	OOMScoreAdj        int
 	ResourceContainer  string
+	Master             string
+	Kubeconfig         string
 }
 
 // NewProxyServer creates a new ProxyServer object with default parameters
@@ -61,11 +64,12 @@ func NewProxyServer() *ProxyServer {
 // AddFlags adds flags for a specific ProxyServer to the specified FlagSet
 func (s *ProxyServer) AddFlags(fs *pflag.FlagSet) {
 	fs.Var(&s.BindAddress, "bind_address", "The IP address for the proxy server to serve on (set to 0.0.0.0 for all interfaces)")
-	client.BindClientConfigFlags(fs, &s.ClientConfig)
+	fs.StringVar(&s.Master, "master", s.Master, "The address of the Kubernetes API server (overrides any value in kubeconfig)")
 	fs.IntVar(&s.HealthzPort, "healthz_port", s.HealthzPort, "The port to bind the health check server. Use 0 to disable.")
 	fs.Var(&s.HealthzBindAddress, "healthz_bind_address", "The IP address for the health check server to serve on, defaulting to 127.0.0.1 (set to 0.0.0.0 for all interfaces)")
 	fs.IntVar(&s.OOMScoreAdj, "oom_score_adj", s.OOMScoreAdj, "The oom_score_adj value for kube-proxy process. Values must be within the range [-1000, 1000]")
 	fs.StringVar(&s.ResourceContainer, "resource_container", s.ResourceContainer, "Absolute name of the resource-only container to create and run the Kube-proxy in (Default: /kube-proxy).")
+	fs.StringVar(&s.Kubeconfig, "kubeconfig", s.Kubeconfig, "Path to kubeconfig file with authorization and master location information.")
 }
 
 // Run runs the specified ProxyServer.  This should never exit.
@@ -105,20 +109,31 @@ func (s *ProxyServer) Run(_ []string) error {
 	// are registered yet.
 
 	// define api config source
-	if s.ClientConfig.Host != "" {
-		glog.Infof("Using API calls to get config %v", s.ClientConfig.Host)
-		client, err := client.New(&s.ClientConfig)
-		if err != nil {
-			glog.Fatalf("Invalid API configuration: %v", err)
-		}
-		config.NewSourceAPI(
-			client.Services(api.NamespaceAll),
-			client.Endpoints(api.NamespaceAll),
-			30*time.Second,
-			serviceConfig.Channel("api"),
-			endpointsConfig.Channel("api"),
-		)
+	if s.Kubeconfig == "" && s.Master == "" {
+		glog.Warningf("Neither --kubeconfig nor --master was specified.  Using default API client.  This might not work.")
 	}
+
+	// This creates a client, first loading any specified kubeconfig
+	// file, and then overriding the Master flag, if non-empty.
+	kubeconfig, err := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
+		&clientcmd.ClientConfigLoadingRules{ExplicitPath: s.Kubeconfig},
+		&clientcmd.ConfigOverrides{ClusterInfo: clientcmdapi.Cluster{Server: s.Master}}).ClientConfig()
+	if err != nil {
+		return err
+	}
+
+	client, err := client.New(kubeconfig)
+	if err != nil {
+		glog.Fatalf("Invalid API configuration: %v", err)
+	}
+
+	config.NewSourceAPI(
+		client.Services(api.NamespaceAll),
+		client.Endpoints(api.NamespaceAll),
+		30*time.Second,
+		serviceConfig.Channel("api"),
+		endpointsConfig.Channel("api"),
+	)
 
 	if s.HealthzPort > 0 {
 		go util.Forever(func() {

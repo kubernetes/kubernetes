@@ -151,6 +151,36 @@ func (h *EtcdHelper) ExtractToList(key string, listObj runtime.Object) error {
 	return nil
 }
 
+// ExtractObjToList unmarshals json found at key and opaques it into a *List api object
+// (an object that satisfies the runtime.IsList definition).
+func (h *EtcdHelper) ExtractObjToList(key string, listObj runtime.Object) error {
+	listPtr, err := runtime.GetItemsPtr(listObj)
+	if err != nil {
+		return err
+	}
+
+	response, err := h.Client.Get(key, false, false)
+	if err != nil {
+		if IsEtcdNotFound(err) {
+			return nil
+		}
+		return err
+	}
+
+	nodes := make([]*etcd.Node, 0)
+	nodes = append(nodes, response.Node)
+
+	if err := h.decodeNodeList(nodes, listPtr); err != nil {
+		return err
+	}
+	if h.Versioner != nil {
+		if err := h.Versioner.UpdateList(listObj, response.EtcdIndex); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // ExtractObj unmarshals json found at key into objPtr. On a not found error, will either return
 // a zero object of the requested type, or an error, depending on ignoreNotFound. Treats
 // empty responses and nil response nodes exactly like a not found error.

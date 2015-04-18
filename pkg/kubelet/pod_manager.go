@@ -43,11 +43,11 @@ import (
 // also be removed.
 
 type podManager interface {
-	GetPods() []api.Pod
+	GetPods() []*api.Pod
 	GetPodByFullName(podFullName string) (*api.Pod, bool)
 	GetPodByName(namespace, name string) (*api.Pod, bool)
-	GetPodsAndMirrorMap() ([]api.Pod, map[string]api.Pod)
-	SetPods(pods []api.Pod)
+	GetPodsAndMirrorMap() ([]*api.Pod, map[string]api.Pod)
+	SetPods(pods []*api.Pod)
 	UpdatePods(u PodUpdate, podSyncTypes map[types.UID]metrics.SyncPodType)
 	DeleteOrphanedMirrorPods()
 	TranslatePodUID(uid types.UID) types.UID
@@ -72,13 +72,13 @@ type basicPodManager struct {
 	mirrorPodByFullName map[string]*api.Pod
 
 	// A mirror pod client to create/delete mirror pods.
-	mirrorClient mirrorClient
+	mirrorClient
 }
 
 func newBasicPodManager(apiserverClient client.Interface) *basicPodManager {
 	pm := &basicPodManager{}
 	pm.mirrorClient = newBasicMirrorClient(apiserverClient)
-	pm.SetPods([]api.Pod{})
+	pm.SetPods(nil)
 	return pm
 }
 
@@ -127,27 +127,26 @@ func (self *basicPodManager) UpdatePods(u PodUpdate, podSyncTypes map[types.UID]
 }
 
 // Set the internal pods based on the new pods.
-func (self *basicPodManager) SetPods(newPods []api.Pod) {
+func (self *basicPodManager) SetPods(newPods []*api.Pod) {
 	self.lock.Lock()
 	defer self.lock.Unlock()
 	self.setPods(newPods)
 }
 
-func (self *basicPodManager) setPods(newPods []api.Pod) {
+func (self *basicPodManager) setPods(newPods []*api.Pod) {
 	podByUID := make(map[types.UID]*api.Pod)
 	mirrorPodByUID := make(map[types.UID]*api.Pod)
 	podByFullName := make(map[string]*api.Pod)
 	mirrorPodByFullName := make(map[string]*api.Pod)
 
-	for i := range newPods {
-		pod := newPods[i]
-		podFullName := kubecontainer.GetPodFullName(&pod)
-		if isMirrorPod(&pod) {
-			mirrorPodByUID[pod.UID] = &pod
-			mirrorPodByFullName[podFullName] = &pod
+	for _, pod := range newPods {
+		podFullName := kubecontainer.GetPodFullName(pod)
+		if isMirrorPod(pod) {
+			mirrorPodByUID[pod.UID] = pod
+			mirrorPodByFullName[podFullName] = pod
 		} else {
-			podByUID[pod.UID] = &pod
-			podByFullName[podFullName] = &pod
+			podByUID[pod.UID] = pod
+			podByFullName[podFullName] = pod
 		}
 	}
 
@@ -157,21 +156,19 @@ func (self *basicPodManager) setPods(newPods []api.Pod) {
 	self.mirrorPodByFullName = mirrorPodByFullName
 }
 
-func applyUpdates(changed []api.Pod, current []api.Pod) []api.Pod {
-	updated := []api.Pod{}
+func applyUpdates(changed []*api.Pod, current []*api.Pod) []*api.Pod {
+	updated := []*api.Pod{}
 	m := map[types.UID]*api.Pod{}
-	for i := range changed {
-		pod := &changed[i]
+	for _, pod := range changed {
 		m[pod.UID] = pod
 	}
 
-	for i := range current {
-		pod := &current[i]
+	for _, pod := range current {
 		if m[pod.UID] != nil {
-			updated = append(updated, *m[pod.UID])
+			updated = append(updated, m[pod.UID])
 			glog.V(4).Infof("pod with UID: %q has a new spec %+v", pod.UID, *m[pod.UID])
 		} else {
-			updated = append(updated, *pod)
+			updated = append(updated, pod)
 			glog.V(4).Infof("pod with UID: %q stay with the same spec %+v", pod.UID, *pod)
 		}
 	}
@@ -179,36 +176,28 @@ func applyUpdates(changed []api.Pod, current []api.Pod) []api.Pod {
 	return updated
 }
 
-func (self *basicPodManager) convertMapToPods(UIDMap map[types.UID]*api.Pod) []api.Pod {
-	pods := make([]api.Pod, 0, len(UIDMap))
-	for _, pod := range UIDMap {
-		pods = append(pods, *pod)
-	}
-	return pods
-}
-
 // GetPods returns the regular pods bound to the kubelet and their spec.
-func (self *basicPodManager) GetPods() []api.Pod {
+func (self *basicPodManager) GetPods() []*api.Pod {
 	self.lock.RLock()
 	defer self.lock.RUnlock()
-	return self.convertMapToPods(self.podByUID)
+	return podsMapToPods(self.podByUID)
 }
 
 // Returns all pods (including mirror pods).
-func (self *basicPodManager) getAllPods() []api.Pod {
-	return append(self.convertMapToPods(self.podByUID), self.convertMapToPods(self.mirrorPodByUID)...)
+func (self *basicPodManager) getAllPods() []*api.Pod {
+	return append(podsMapToPods(self.podByUID), podsMapToPods(self.mirrorPodByUID)...)
 }
 
 // GetPodsAndMirrorMap returns the a copy of the regular pods and the mirror
 // pods indexed by full name.
-func (self *basicPodManager) GetPodsAndMirrorMap() ([]api.Pod, map[string]api.Pod) {
+func (self *basicPodManager) GetPodsAndMirrorMap() ([]*api.Pod, map[string]api.Pod) {
 	self.lock.RLock()
 	defer self.lock.RUnlock()
 	mirrorPods := make(map[string]api.Pod)
 	for key, pod := range self.mirrorPodByFullName {
 		mirrorPods[key] = *pod
 	}
-	return self.convertMapToPods(self.podByUID), mirrorPods
+	return podsMapToPods(self.podByUID), mirrorPods
 }
 
 // GetPodByName provides the (non-mirror) pod that matches namespace and name,
@@ -223,10 +212,8 @@ func (self *basicPodManager) GetPodByName(namespace, name string) (*api.Pod, boo
 func (self *basicPodManager) GetPodByFullName(podFullName string) (*api.Pod, bool) {
 	self.lock.RLock()
 	defer self.lock.RUnlock()
-	if pod, ok := self.podByFullName[podFullName]; ok {
-		return pod, true
-	}
-	return nil, false
+	pod, ok := self.podByFullName[podFullName]
+	return pod, ok
 }
 
 // If the UID belongs to a mirror pod, maps it to the UID of its static pod.
@@ -249,33 +236,26 @@ func (self *basicPodManager) TranslatePodUID(uid types.UID) types.UID {
 	return uid
 }
 
-func (self *basicPodManager) getFullNameMaps() (map[string]*api.Pod, map[string]*api.Pod) {
+func (self *basicPodManager) getOrphanedMirrorPodNames() []string {
 	self.lock.RLock()
 	defer self.lock.RUnlock()
-	return self.podByFullName, self.mirrorPodByFullName
+	var podFullNames []string
+	for podFullName := range self.mirrorPodByFullName {
+		if _, ok := self.podByFullName[podFullName]; !ok {
+			podFullNames = append(podFullNames, podFullName)
+		}
+	}
+	return podFullNames
 }
 
 // Delete all mirror pods which do not have associated static pods. This method
 // sends deletion requets to the API server, but does NOT modify the internal
 // pod storage in basicPodManager.
 func (self *basicPodManager) DeleteOrphanedMirrorPods() {
-	podByFullName, mirrorPodByFullName := self.getFullNameMaps()
-
-	for podFullName := range mirrorPodByFullName {
-		if _, ok := podByFullName[podFullName]; !ok {
-			self.mirrorClient.DeleteMirrorPod(podFullName)
-		}
+	podFullNames := self.getOrphanedMirrorPodNames()
+	for _, podFullName := range podFullNames {
+		self.mirrorClient.DeleteMirrorPod(podFullName)
 	}
-}
-
-// Creates a mirror pod for the given pod.
-func (self *basicPodManager) CreateMirrorPod(pod api.Pod) error {
-	return self.mirrorClient.CreateMirrorPod(pod)
-}
-
-// Delete a mirror pod by name.
-func (self *basicPodManager) DeleteMirrorPod(podFullName string) error {
-	return self.mirrorClient.DeleteMirrorPod(podFullName)
 }
 
 // Returns true if mirrorPod is a correct representation of pod; false otherwise.
@@ -285,4 +265,12 @@ func (self *basicPodManager) IsMirrorPodOf(mirrorPod, pod *api.Pod) bool {
 		return false
 	}
 	return api.Semantic.DeepEqual(&pod.Spec, &mirrorPod.Spec)
+}
+
+func podsMapToPods(UIDMap map[types.UID]*api.Pod) []*api.Pod {
+	pods := make([]*api.Pod, 0, len(UIDMap))
+	for _, pod := range UIDMap {
+		pods = append(pods, pod)
+	}
+	return pods
 }

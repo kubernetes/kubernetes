@@ -21,7 +21,7 @@ import (
 	"testing"
 	dto "github.com/prometheus/client_model/go"
 
-	"github.com/matttproud/golang_protobuf_extensions/ext"
+	"github.com/matttproud/golang_protobuf_extensions/pbutil"
 )
 
 // Benchmarks to show how much penalty text format parsing actually inflicts.
@@ -101,7 +101,7 @@ func BenchmarkParseProto(b *testing.B) {
 		in := bytes.NewReader(data)
 		for {
 			family.Reset()
-			if _, err := ext.ReadDelimited(in, family); err != nil {
+			if _, err := pbutil.ReadDelimited(in, family); err != nil {
 				if err == io.EOF {
 					break
 				}
@@ -129,7 +129,7 @@ func BenchmarkParseProtoGzip(b *testing.B) {
 		}
 		for {
 			family.Reset()
-			if _, err := ext.ReadDelimited(in, family); err != nil {
+			if _, err := pbutil.ReadDelimited(in, family); err != nil {
 				if err == io.EOF {
 					break
 				}
@@ -156,7 +156,7 @@ func BenchmarkParseProtoMap(b *testing.B) {
 		in := bytes.NewReader(data)
 		for {
 			family := &dto.MetricFamily{}
-			if _, err := ext.ReadDelimited(in, family); err != nil {
+			if _, err := pbutil.ReadDelimited(in, family); err != nil {
 				if err == io.EOF {
 					break
 				}

@@ -108,10 +108,13 @@ func FilterQuotaPods(pods []api.Pod) []api.Pod {
 // syncResourceQuota runs a complete sync of current status
 func (rm *ResourceQuotaManager) syncResourceQuota(quota api.ResourceQuota) (err error) {
 
+	// quota is dirty if any part of spec hard limits differs from the status hard limits
+	dirty := !api.Semantic.DeepEqual(quota.Spec.Hard, quota.Status.Hard)
+
 	// dirty tracks if the usage status differs from the previous sync,
 	// if so, we send a new usage with latest status
 	// if this is our first sync, it will be dirty by default, since we need track usage
-	dirty := quota.Status.Hard == nil || quota.Status.Used == nil
+	dirty = dirty || (quota.Status.Hard == nil || quota.Status.Used == nil)
 
 	// Create a usage object that is based on the quota resource version
 	usage := api.ResourceQuota{

@@ -615,6 +615,18 @@ __EOF__
   kube::test::get_object_assert 'nodes/127.0.0.1 service/kubernetes' "{{range.items}}{{$id_field}}:{{end}}" '127.0.0.1:kubernetes:'
 
 
+  #####################
+  # Resource aliasing #
+  ##################### 
+
+  kube::log::status "Testing resource aliasing"
+  kubectl create -f examples/cassandra/cassandra.yaml
+  kubectl create -f examples/cassandra/cassandra-controller.yaml
+  kubectl create -f examples/cassandra/cassandra-service.yaml
+  kube::test::get_object_assert "all -l'name=cassandra'" "{{range.items}}{{$id_field}}:{{end}}" 'cassandra:cassandra:cassandra:'
+  kubectl delete all -l name=cassandra
+
+
   ###########
   # Swagger #
   ###########

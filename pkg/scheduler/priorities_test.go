@@ -98,8 +98,8 @@ func TestLeastRequested(t *testing.T) {
 		},
 	}
 	tests := []struct {
-		pod          api.Pod
-		pods         []api.Pod
+		pod          *api.Pod
+		pods         []*api.Pod
 		nodes        []api.Node
 		expectedList HostPriorityList
 		test         string
@@ -116,7 +116,7 @@ func TestLeastRequested(t *testing.T) {
 				Memory Score: ((10000 - 0) *10) / 10000 = 10
 				Minion2 Score: (10 + 10) / 2 = 10
 			*/
-			pod:          api.Pod{Spec: noResources},
+			pod:          &api.Pod{Spec: noResources},
 			nodes:        []api.Node{makeMinion("machine1", 4000, 10000), makeMinion("machine2", 4000, 10000)},
 			expectedList: []HostPriority{{"machine1", 10}, {"machine2", 10}},
 			test:         "nothing scheduled, nothing requested",
@@ -133,7 +133,7 @@ func TestLeastRequested(t *testing.T) {
 				Memory Score: ((10000 - 5000) *10) / 10000 = 5
 				Minion2 Score: (5 + 5) / 2 = 5
 			*/
-			pod:          api.Pod{Spec: cpuAndMemory},
+			pod:          &api.Pod{Spec: cpuAndMemory},
 			nodes:        []api.Node{makeMinion("machine1", 4000, 10000), makeMinion("machine2", 6000, 10000)},
 			expectedList: []HostPriority{{"machine1", 3}, {"machine2", 5}},
 			test:         "nothing scheduled, resources requested, differently sized machines",
@@ -150,11 +150,11 @@ func TestLeastRequested(t *testing.T) {
 				Memory Score: ((10000 - 0) *10) / 10000 = 10
 				Minion2 Score: (10 + 10) / 2 = 10
 			*/
-			pod:          api.Pod{Spec: noResources},
+			pod:          &api.Pod{Spec: noResources},
 			nodes:        []api.Node{makeMinion("machine1", 4000, 10000), makeMinion("machine2", 4000, 10000)},
 			expectedList: []HostPriority{{"machine1", 10}, {"machine2", 10}},
 			test:         "no resources requested, pods scheduled",
-			pods: []api.Pod{
+			pods: []*api.Pod{
 				{Spec: machine1Spec, ObjectMeta: api.ObjectMeta{Labels: labels2}},
 				{Spec: machine1Spec, ObjectMeta: api.ObjectMeta{Labels: labels1}},
 				{Spec: machine2Spec, ObjectMeta: api.ObjectMeta{Labels: labels1}},
@@ -173,11 +173,11 @@ func TestLeastRequested(t *testing.T) {
 				Memory Score: ((20000 - 5000) *10) / 20000 = 7.5
 				Minion2 Score: (4 + 7.5) / 2 = 5
 			*/
-			pod:          api.Pod{Spec: noResources},
+			pod:          &api.Pod{Spec: noResources},
 			nodes:        []api.Node{makeMinion("machine1", 10000, 20000), makeMinion("machine2", 10000, 20000)},
 			expectedList: []HostPriority{{"machine1", 7}, {"machine2", 5}},
 			test:         "no resources requested, pods scheduled with resources",
-			pods: []api.Pod{
+			pods: []*api.Pod{
 				{Spec: cpuOnly, ObjectMeta: api.ObjectMeta{Labels: labels2}},
 				{Spec: cpuOnly, ObjectMeta: api.ObjectMeta{Labels: labels1}},
 				{Spec: cpuOnly2, ObjectMeta: api.ObjectMeta{Labels: labels1}},
@@ -196,11 +196,11 @@ func TestLeastRequested(t *testing.T) {
 				Memory Score: ((20000 - 10000) *10) / 20000 = 5
 				Minion2 Score: (4 + 5) / 2 = 4
 			*/
-			pod:          api.Pod{Spec: cpuAndMemory},
+			pod:          &api.Pod{Spec: cpuAndMemory},
 			nodes:        []api.Node{makeMinion("machine1", 10000, 20000), makeMinion("machine2", 10000, 20000)},
 			expectedList: []HostPriority{{"machine1", 5}, {"machine2", 4}},
 			test:         "resources requested, pods scheduled with resources",
-			pods: []api.Pod{
+			pods: []*api.Pod{
 				{Spec: cpuOnly},
 				{Spec: cpuAndMemory},
 			},
@@ -217,11 +217,11 @@ func TestLeastRequested(t *testing.T) {
 				Memory Score: ((50000 - 10000) *10) / 50000 = 8
 				Minion2 Score: (4 + 8) / 2 = 6
 			*/
-			pod:          api.Pod{Spec: cpuAndMemory},
+			pod:          &api.Pod{Spec: cpuAndMemory},
 			nodes:        []api.Node{makeMinion("machine1", 10000, 20000), makeMinion("machine2", 10000, 50000)},
 			expectedList: []HostPriority{{"machine1", 5}, {"machine2", 6}},
 			test:         "resources requested, pods scheduled with resources, differently sized machines",
-			pods: []api.Pod{
+			pods: []*api.Pod{
 				{Spec: cpuOnly},
 				{Spec: cpuAndMemory},
 			},
@@ -238,21 +238,21 @@ func TestLeastRequested(t *testing.T) {
 				Memory Score: ((10000 - 5000) *10) / 10000 = 5
 				Minion2 Score: (0 + 5) / 2 = 2
 			*/
-			pod:          api.Pod{Spec: cpuOnly},
+			pod:          &api.Pod{Spec: cpuOnly},
 			nodes:        []api.Node{makeMinion("machine1", 4000, 10000), makeMinion("machine2", 4000, 10000)},
 			expectedList: []HostPriority{{"machine1", 5}, {"machine2", 2}},
 			test:         "requested resources exceed minion capacity",
-			pods: []api.Pod{
+			pods: []*api.Pod{
 				{Spec: cpuOnly},
 				{Spec: cpuAndMemory},
 			},
 		},
 		{
-			pod:          api.Pod{Spec: noResources},
+			pod:          &api.Pod{Spec: noResources},
 			nodes:        []api.Node{makeMinion("machine1", 0, 0), makeMinion("machine2", 0, 0)},
 			expectedList: []HostPriority{{"machine1", 0}, {"machine2", 0}},
 			test:         "zero minion resources, pods scheduled with resources",
-			pods: []api.Pod{
+			pods: []*api.Pod{
 				{Spec: cpuOnly},
 				{Spec: cpuAndMemory},
 			},
@@ -275,8 +275,6 @@ func TestNewNodeLabelPriority(t *testing.T) {
 	label2 := map[string]string{"bar": "foo"}
 	label3 := map[string]string{"bar": "baz"}
 	tests := []struct {
-		pod          api.Pod
-		pods         []api.Pod
 		nodes        []api.Node
 		label        string
 		presence     bool
@@ -356,7 +354,7 @@ func TestNewNodeLabelPriority(t *testing.T) {
 			label:    test.label,
 			presence: test.presence,
 		}
-		list, err := prioritizer.CalculateNodeLabelPriority(test.pod, FakePodLister(test.pods), FakeMinionLister(api.NodeList{Items: test.nodes}))
+		list, err := prioritizer.CalculateNodeLabelPriority(nil, nil, FakeMinionLister(api.NodeList{Items: test.nodes}))
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -430,8 +428,8 @@ func TestBalancedResourceAllocation(t *testing.T) {
 		},
 	}
 	tests := []struct {
-		pod          api.Pod
-		pods         []api.Pod
+		pod          *api.Pod
+		pods         []*api.Pod
 		nodes        []api.Node
 		expectedList HostPriorityList
 		test         string
@@ -448,7 +446,7 @@ func TestBalancedResourceAllocation(t *testing.T) {
 				Memory Fraction: 0 / 10000 = 0%
 				Minion2 Score: 10 - (0-0)*10 = 10
 			*/
-			pod:          api.Pod{Spec: noResources},
+			pod:          &api.Pod{Spec: noResources},
 			nodes:        []api.Node{makeMinion("machine1", 4000, 10000), makeMinion("machine2", 4000, 10000)},
 			expectedList: []HostPriority{{"machine1", 10}, {"machine2", 10}},
 			test:         "nothing scheduled, nothing requested",
@@ -465,7 +463,7 @@ func TestBalancedResourceAllocation(t *testing.T) {
 				Memory Fraction: 5000/10000 = 50%
 				Minion2 Score: 10 - (0.5-0.5)*10 = 10
 			*/
-			pod:          api.Pod{Spec: cpuAndMemory},
+			pod:          &api.Pod{Spec: cpuAndMemory},
 			nodes:        []api.Node{makeMinion("machine1", 4000, 10000), makeMinion("machine2", 6000, 10000)},
 			expectedList: []HostPriority{{"machine1", 7}, {"machine2", 10}},
 			test:         "nothing scheduled, resources requested, differently sized machines",
@@ -482,11 +480,11 @@ func TestBalancedResourceAllocation(t *testing.T) {
 				Memory Fraction: 0 / 10000 = 0%
 				Minion2 Score: 10 - (0-0)*10 = 10
 			*/
-			pod:          api.Pod{Spec: noResources},
+			pod:          &api.Pod{Spec: noResources},
 			nodes:        []api.Node{makeMinion("machine1", 4000, 10000), makeMinion("machine2", 4000, 10000)},
 			expectedList: []HostPriority{{"machine1", 10}, {"machine2", 10}},
 			test:         "no resources requested, pods scheduled",
-			pods: []api.Pod{
+			pods: []*api.Pod{
 				{Spec: machine1Spec, ObjectMeta: api.ObjectMeta{Labels: labels2}},
 				{Spec: machine1Spec, ObjectMeta: api.ObjectMeta{Labels: labels1}},
 				{Spec: machine2Spec, ObjectMeta: api.ObjectMeta{Labels: labels1}},
@@ -505,11 +503,11 @@ func TestBalancedResourceAllocation(t *testing.T) {
 				Memory Fraction: 5000 / 20000 = 25%
 				Minion2 Score: 10 - (0.6-0.25)*10 = 6
 			*/
-			pod:          api.Pod{Spec: noResources},
+			pod:          &api.Pod{Spec: noResources},
 			nodes:        []api.Node{makeMinion("machine1", 10000, 20000), makeMinion("machine2", 10000, 20000)},
 			expectedList: []HostPriority{{"machine1", 4}, {"machine2", 6}},
 			test:         "no resources requested, pods scheduled with resources",
-			pods: []api.Pod{
+			pods: []*api.Pod{
 				{Spec: cpuOnly, ObjectMeta: api.ObjectMeta{Labels: labels2}},
 				{Spec: cpuOnly, ObjectMeta: api.ObjectMeta{Labels: labels1}},
 				{Spec: cpuOnly2, ObjectMeta: api.ObjectMeta{Labels: labels1}},
@@ -528,11 +526,11 @@ func TestBalancedResourceAllocation(t *testing.T) {
 				Memory Fraction: 10000 / 20000 = 50%
 				Minion2 Score: 10 - (0.6-0.5)*10 = 9
 			*/
-			pod:          api.Pod{Spec: cpuAndMemory},
+			pod:          &api.Pod{Spec: cpuAndMemory},
 			nodes:        []api.Node{makeMinion("machine1", 10000, 20000), makeMinion("machine2", 10000, 20000)},
 			expectedList: []HostPriority{{"machine1", 6}, {"machine2", 9}},
 			test:         "resources requested, pods scheduled with resources",
-			pods: []api.Pod{
+			pods: []*api.Pod{
 				{Spec: cpuOnly},
 				{Spec: cpuAndMemory},
 			},
@@ -549,11 +547,11 @@ func TestBalancedResourceAllocation(t *testing.T) {
 				Memory Fraction: 10000 / 50000 = 20%
 				Minion2 Score: 10 - (0.6-0.2)*10 = 6
 			*/
-			pod:          api.Pod{Spec: cpuAndMemory},
+			pod:          &api.Pod{Spec: cpuAndMemory},
 			nodes:        []api.Node{makeMinion("machine1", 10000, 20000), makeMinion("machine2", 10000, 50000)},
 			expectedList: []HostPriority{{"machine1", 6}, {"machine2", 6}},
 			test:         "resources requested, pods scheduled with resources, differently sized machines",
-			pods: []api.Pod{
+			pods: []*api.Pod{
 				{Spec: cpuOnly},
 				{Spec: cpuAndMemory},
 			},
@@ -570,21 +568,21 @@ func TestBalancedResourceAllocation(t *testing.T) {
 				Memory Fraction 5000 / 10000 = 50%
 				Minion2 Score: 0
 			*/
-			pod:          api.Pod{Spec: cpuOnly},
+			pod:          &api.Pod{Spec: cpuOnly},
 			nodes:        []api.Node{makeMinion("machine1", 4000, 10000), makeMinion("machine2", 4000, 10000)},
 			expectedList: []HostPriority{{"machine1", 0}, {"machine2", 0}},
 			test:         "requested resources exceed minion capacity",
-			pods: []api.Pod{
+			pods: []*api.Pod{
 				{Spec: cpuOnly},
 				{Spec: cpuAndMemory},
 			},
 		},
 		{
-			pod:          api.Pod{Spec: noResources},
+			pod:          &api.Pod{Spec: noResources},
 			nodes:        []api.Node{makeMinion("machine1", 0, 0), makeMinion("machine2", 0, 0)},
 			expectedList: []HostPriority{{"machine1", 0}, {"machine2", 0}},
 			test:         "zero minion resources, pods scheduled with resources",
-			pods: []api.Pod{
+			pods: []*api.Pod{
 				{Spec: cpuOnly},
 				{Spec: cpuAndMemory},
 			},

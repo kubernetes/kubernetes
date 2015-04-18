@@ -26,15 +26,15 @@ import (
 )
 
 type unsetOptions struct {
-	pathOptions  *PathOptions
+	configAccess ConfigAccess
 	propertyName string
 }
 
 const unset_long = `Unsets an individual value in a kubeconfig file
 PROPERTY_NAME is a dot delimited name where each token represents either a attribute name or a map key.  Map keys may not contain dots.`
 
-func NewCmdConfigUnset(out io.Writer, pathOptions *PathOptions) *cobra.Command {
-	options := &unsetOptions{pathOptions: pathOptions}
+func NewCmdConfigUnset(out io.Writer, configAccess ConfigAccess) *cobra.Command {
+	options := &unsetOptions{configAccess: configAccess}
 
 	cmd := &cobra.Command{
 		Use:   "unset PROPERTY_NAME",
@@ -61,7 +61,7 @@ func (o unsetOptions) run() error {
 		return err
 	}
 
-	config, err := o.pathOptions.getStartingConfig()
+	config, err := o.configAccess.GetStartingConfig()
 	if err != nil {
 		return err
 	}
@@ -75,7 +75,7 @@ func (o unsetOptions) run() error {
 		return err
 	}
 
-	if err := o.pathOptions.ModifyConfig(*config); err != nil {
+	if err := ModifyConfig(o.configAccess, *config); err != nil {
 		return err
 	}
 
@@ -98,5 +98,5 @@ func (o unsetOptions) validate() error {
 		return errors.New("You must specify a property")
 	}
 
-	return o.pathOptions.Validate()
+	return nil
 }

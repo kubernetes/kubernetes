@@ -42,20 +42,20 @@ func (lw fakePodLW) Watch(resourceVersion string) (watch.Interface, error) {
 var _ cache.ListerWatcher = fakePodLW{}
 
 func TestNewSourceApiserver_UpdatesAndMultiplePods(t *testing.T) {
-	pod1v1 := api.Pod{
+	pod1v1 := &api.Pod{
 		ObjectMeta: api.ObjectMeta{Name: "p"},
 		Spec:       api.PodSpec{Containers: []api.Container{{Image: "image/one"}}}}
-	pod1v2 := api.Pod{
+	pod1v2 := &api.Pod{
 		ObjectMeta: api.ObjectMeta{Name: "p"},
 		Spec:       api.PodSpec{Containers: []api.Container{{Image: "image/two"}}}}
-	pod2 := api.Pod{
+	pod2 := &api.Pod{
 		ObjectMeta: api.ObjectMeta{Name: "q"},
 		Spec:       api.PodSpec{Containers: []api.Container{{Image: "image/blah"}}}}
 
 	// Setup fake api client.
 	fakeWatch := watch.NewFake()
 	lw := fakePodLW{
-		listResp:  &api.PodList{Items: []api.Pod{pod1v1}},
+		listResp:  &api.PodList{Items: []api.Pod{*pod1v1}},
 		watchResp: fakeWatch,
 	}
 
@@ -74,7 +74,7 @@ func TestNewSourceApiserver_UpdatesAndMultiplePods(t *testing.T) {
 	}
 
 	// Add another pod
-	fakeWatch.Add(&pod2)
+	fakeWatch.Add(pod2)
 	got, ok = <-ch
 	if !ok {
 		t.Errorf("Unable to read from channel when expected")
@@ -89,7 +89,7 @@ func TestNewSourceApiserver_UpdatesAndMultiplePods(t *testing.T) {
 	}
 
 	// Modify pod1
-	fakeWatch.Modify(&pod1v2)
+	fakeWatch.Modify(pod1v2)
 	got, ok = <-ch
 	if !ok {
 		t.Errorf("Unable to read from channel when expected")
@@ -103,7 +103,7 @@ func TestNewSourceApiserver_UpdatesAndMultiplePods(t *testing.T) {
 	}
 
 	// Delete pod1
-	fakeWatch.Delete(&pod1v2)
+	fakeWatch.Delete(pod1v2)
 	got, ok = <-ch
 	if !ok {
 		t.Errorf("Unable to read from channel when expected")
@@ -115,7 +115,7 @@ func TestNewSourceApiserver_UpdatesAndMultiplePods(t *testing.T) {
 	}
 
 	// Delete pod2
-	fakeWatch.Delete(&pod2)
+	fakeWatch.Delete(pod2)
 	got, ok = <-ch
 	if !ok {
 		t.Errorf("Unable to read from channel when expected")

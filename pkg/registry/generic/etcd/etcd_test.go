@@ -126,6 +126,11 @@ func TestEtcdList(t *testing.T) {
 		Spec:       api.PodSpec{Host: "machine"},
 	}
 
+	singleElemListResp := &etcd.Response{
+		Node: &etcd.Node{
+			Value: runtime.EncodeOrDie(testapi.Codec(), podA),
+		},
+	}
 	normalListResp := &etcd.Response{
 		Node: &etcd.Node{
 			Nodes: []*etcd.Node{
@@ -174,7 +179,7 @@ func TestEtcdList(t *testing.T) {
 		},
 		"normalFiltered": {
 			in: tools.EtcdResponseWithError{
-				R: normalListResp,
+				R: singleElemListResp,
 				E: nil,
 			},
 			m:       setMatcher{util.NewStringSet("foo")},
@@ -194,7 +199,16 @@ func TestEtcdList(t *testing.T) {
 
 	for name, item := range table {
 		fakeClient, registry := NewTestGenericEtcdRegistry(t)
-		fakeClient.Data[registry.KeyRootFunc(api.NewContext())] = item.in
+		if name, ok := item.m.MatchesSingle(); ok {
+			key, err := registry.KeyFunc(api.NewContext(), name)
+			if err != nil {
+				t.Errorf("Couldn't create key for %v", name)
+				continue
+			}
+			fakeClient.Data[key] = item.in
+		} else {
+			fakeClient.Data[registry.KeyRootFunc(api.NewContext())] = item.in
+		}
 		list, err := registry.ListPredicate(api.NewContext(), item.m)
 		if e, a := item.succeed, err == nil; e != a {
 			t.Errorf("%v: expected %v, got %v", name, e, a)

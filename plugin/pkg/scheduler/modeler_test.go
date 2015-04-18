@@ -30,15 +30,15 @@ type nn struct {
 
 type names []nn
 
-func (ids names) list() []api.Pod {
-	out := make([]api.Pod, len(ids))
-	for i, id := range ids {
-		out[i] = api.Pod{
+func (ids names) list() []*api.Pod {
+	out := make([]*api.Pod, 0, len(ids))
+	for _, id := range ids {
+		out = append(out, &api.Pod{
 			ObjectMeta: api.ObjectMeta{
 				Namespace: id.namespace,
 				Name:      id.name,
 			},
-		}
+		})
 	}
 	return out
 }
@@ -54,9 +54,9 @@ func (ids names) has(pod *api.Pod) bool {
 
 func TestModeler(t *testing.T) {
 	table := []struct {
-		queuedPods    []api.Pod
-		scheduledPods []api.Pod
-		assumedPods   []api.Pod
+		queuedPods    []*api.Pod
+		scheduledPods []*api.Pod
+		assumedPods   []*api.Pod
 		expectPods    names
 	}{
 		{
@@ -79,16 +79,16 @@ func TestModeler(t *testing.T) {
 
 	for _, item := range table {
 		q := &cache.StoreToPodLister{cache.NewStore(cache.MetaNamespaceKeyFunc)}
-		for i := range item.queuedPods {
-			q.Store.Add(&item.queuedPods[i])
+		for _, pod := range item.queuedPods {
+			q.Store.Add(pod)
 		}
 		s := &cache.StoreToPodLister{cache.NewStore(cache.MetaNamespaceKeyFunc)}
-		for i := range item.scheduledPods {
-			s.Store.Add(&item.scheduledPods[i])
+		for _, pod := range item.scheduledPods {
+			s.Store.Add(pod)
 		}
 		m := NewSimpleModeler(q, s)
-		for i := range item.assumedPods {
-			m.AssumePod(&item.assumedPods[i])
+		for _, pod := range item.assumedPods {
+			m.AssumePod(pod)
 		}
 
 		list, err := m.PodLister().List(labels.Everything())
@@ -98,14 +98,14 @@ func TestModeler(t *testing.T) {
 
 		found := 0
 		for _, pod := range list {
-			if item.expectPods.has(&pod) {
+			if item.expectPods.has(pod) {
 				found++
 			} else {
 				t.Errorf("found unexpected pod %#v", pod)
 			}
 		}
 		if e, a := item.expectPods, found; len(e) != a {
-			t.Errorf("Expected pods:\n%+v\nFound pods:\n%v\n", e, list)
+			t.Errorf("Expected pods:\n%+v\nFound pods:\n%s\n", podNames(e.list()), podNames(list))
 		}
 	}
 }

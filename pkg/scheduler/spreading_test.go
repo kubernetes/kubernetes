@@ -40,36 +40,37 @@ func TestServiceSpreadPriority(t *testing.T) {
 		Host: "machine2",
 	}
 	tests := []struct {
-		pod          api.Pod
-		pods         []api.Pod
+		pod          *api.Pod
+		pods         []*api.Pod
 		nodes        []string
 		services     []api.Service
 		expectedList HostPriorityList
 		test         string
 	}{
 		{
+			pod:          new(api.Pod),
 			nodes:        []string{"machine1", "machine2"},
 			expectedList: []HostPriority{{"machine1", 10}, {"machine2", 10}},
 			test:         "nothing scheduled",
 		},
 		{
-			pod:          api.Pod{ObjectMeta: api.ObjectMeta{Labels: labels1}},
-			pods:         []api.Pod{{Spec: zone1Spec}},
+			pod:          &api.Pod{ObjectMeta: api.ObjectMeta{Labels: labels1}},
+			pods:         []*api.Pod{{Spec: zone1Spec}},
 			nodes:        []string{"machine1", "machine2"},
 			expectedList: []HostPriority{{"machine1", 10}, {"machine2", 10}},
 			test:         "no services",
 		},
 		{
-			pod:          api.Pod{ObjectMeta: api.ObjectMeta{Labels: labels1}},
-			pods:         []api.Pod{{Spec: zone1Spec, ObjectMeta: api.ObjectMeta{Labels: labels2}}},
+			pod:          &api.Pod{ObjectMeta: api.ObjectMeta{Labels: labels1}},
+			pods:         []*api.Pod{{Spec: zone1Spec, ObjectMeta: api.ObjectMeta{Labels: labels2}}},
 			nodes:        []string{"machine1", "machine2"},
 			services:     []api.Service{{Spec: api.ServiceSpec{Selector: map[string]string{"key": "value"}}}},
 			expectedList: []HostPriority{{"machine1", 10}, {"machine2", 10}},
 			test:         "different services",
 		},
 		{
-			pod: api.Pod{ObjectMeta: api.ObjectMeta{Labels: labels1}},
-			pods: []api.Pod{
+			pod: &api.Pod{ObjectMeta: api.ObjectMeta{Labels: labels1}},
+			pods: []*api.Pod{
 				{Spec: zone1Spec, ObjectMeta: api.ObjectMeta{Labels: labels2}},
 				{Spec: zone2Spec, ObjectMeta: api.ObjectMeta{Labels: labels1}},
 			},
@@ -79,8 +80,8 @@ func TestServiceSpreadPriority(t *testing.T) {
 			test:         "two pods, one service pod",
 		},
 		{
-			pod: api.Pod{ObjectMeta: api.ObjectMeta{Labels: labels1}},
-			pods: []api.Pod{
+			pod: &api.Pod{ObjectMeta: api.ObjectMeta{Labels: labels1}},
+			pods: []*api.Pod{
 				{Spec: zone1Spec, ObjectMeta: api.ObjectMeta{Labels: labels2}},
 				{Spec: zone1Spec, ObjectMeta: api.ObjectMeta{Labels: labels1, Namespace: api.NamespaceDefault}},
 				{Spec: zone1Spec, ObjectMeta: api.ObjectMeta{Labels: labels1, Namespace: "ns1"}},
@@ -93,8 +94,8 @@ func TestServiceSpreadPriority(t *testing.T) {
 			test:         "five pods, one service pod in no namespace",
 		},
 		{
-			pod: api.Pod{ObjectMeta: api.ObjectMeta{Labels: labels1, Namespace: api.NamespaceDefault}},
-			pods: []api.Pod{
+			pod: &api.Pod{ObjectMeta: api.ObjectMeta{Labels: labels1, Namespace: api.NamespaceDefault}},
+			pods: []*api.Pod{
 				{Spec: zone1Spec, ObjectMeta: api.ObjectMeta{Labels: labels1}},
 				{Spec: zone1Spec, ObjectMeta: api.ObjectMeta{Labels: labels1, Namespace: "ns1"}},
 				{Spec: zone2Spec, ObjectMeta: api.ObjectMeta{Labels: labels1, Namespace: api.NamespaceDefault}},
@@ -106,8 +107,8 @@ func TestServiceSpreadPriority(t *testing.T) {
 			test:         "four pods, one service pod in default namespace",
 		},
 		{
-			pod: api.Pod{ObjectMeta: api.ObjectMeta{Labels: labels1, Namespace: "ns1"}},
-			pods: []api.Pod{
+			pod: &api.Pod{ObjectMeta: api.ObjectMeta{Labels: labels1, Namespace: "ns1"}},
+			pods: []*api.Pod{
 				{Spec: zone1Spec, ObjectMeta: api.ObjectMeta{Labels: labels1}},
 				{Spec: zone1Spec, ObjectMeta: api.ObjectMeta{Labels: labels1, Namespace: api.NamespaceDefault}},
 				{Spec: zone1Spec, ObjectMeta: api.ObjectMeta{Labels: labels1, Namespace: "ns2"}},
@@ -120,8 +121,8 @@ func TestServiceSpreadPriority(t *testing.T) {
 			test:         "five pods, one service pod in specific namespace",
 		},
 		{
-			pod: api.Pod{ObjectMeta: api.ObjectMeta{Labels: labels1}},
-			pods: []api.Pod{
+			pod: &api.Pod{ObjectMeta: api.ObjectMeta{Labels: labels1}},
+			pods: []*api.Pod{
 				{Spec: zone1Spec, ObjectMeta: api.ObjectMeta{Labels: labels2}},
 				{Spec: zone1Spec, ObjectMeta: api.ObjectMeta{Labels: labels1}},
 				{Spec: zone2Spec, ObjectMeta: api.ObjectMeta{Labels: labels1}},
@@ -132,8 +133,8 @@ func TestServiceSpreadPriority(t *testing.T) {
 			test:         "three pods, two service pods on different machines",
 		},
 		{
-			pod: api.Pod{ObjectMeta: api.ObjectMeta{Labels: labels1}},
-			pods: []api.Pod{
+			pod: &api.Pod{ObjectMeta: api.ObjectMeta{Labels: labels1}},
+			pods: []*api.Pod{
 				{Spec: zone1Spec, ObjectMeta: api.ObjectMeta{Labels: labels2}},
 				{Spec: zone1Spec, ObjectMeta: api.ObjectMeta{Labels: labels1}},
 				{Spec: zone2Spec, ObjectMeta: api.ObjectMeta{Labels: labels1}},
@@ -145,8 +146,8 @@ func TestServiceSpreadPriority(t *testing.T) {
 			test:         "four pods, three service pods",
 		},
 		{
-			pod: api.Pod{ObjectMeta: api.ObjectMeta{Labels: labels1}},
-			pods: []api.Pod{
+			pod: &api.Pod{ObjectMeta: api.ObjectMeta{Labels: labels1}},
+			pods: []*api.Pod{
 				{Spec: zone1Spec, ObjectMeta: api.ObjectMeta{Labels: labels2}},
 				{Spec: zone1Spec, ObjectMeta: api.ObjectMeta{Labels: labels1}},
 				{Spec: zone2Spec, ObjectMeta: api.ObjectMeta{Labels: labels1}},
@@ -203,14 +204,15 @@ func TestZoneSpreadPriority(t *testing.T) {
 		"machine21": zone2, "machine22": zone2,
 	}
 	tests := []struct {
-		pod          api.Pod
-		pods         []api.Pod
+		pod          *api.Pod
+		pods         []*api.Pod
 		nodes        map[string]map[string]string
 		services     []api.Service
 		expectedList HostPriorityList
 		test         string
 	}{
 		{
+			pod:   new(api.Pod),
 			nodes: labeledNodes,
 			expectedList: []HostPriority{{"machine11", 10}, {"machine12", 10},
 				{"machine21", 10}, {"machine22", 10},
@@ -218,8 +220,8 @@ func TestZoneSpreadPriority(t *testing.T) {
 			test: "nothing scheduled",
 		},
 		{
-			pod:   api.Pod{ObjectMeta: api.ObjectMeta{Labels: labels1}},
-			pods:  []api.Pod{{Spec: zone1Spec}},
+			pod:   &api.Pod{ObjectMeta: api.ObjectMeta{Labels: labels1}},
+			pods:  []*api.Pod{{Spec: zone1Spec}},
 			nodes: labeledNodes,
 			expectedList: []HostPriority{{"machine11", 10}, {"machine12", 10},
 				{"machine21", 10}, {"machine22", 10},
@@ -227,8 +229,8 @@ func TestZoneSpreadPriority(t *testing.T) {
 			test: "no services",
 		},
 		{
-			pod:      api.Pod{ObjectMeta: api.ObjectMeta{Labels: labels1}},
-			pods:     []api.Pod{{Spec: zone1Spec, ObjectMeta: api.ObjectMeta{Labels: labels2}}},
+			pod:      &api.Pod{ObjectMeta: api.ObjectMeta{Labels: labels1}},
+			pods:     []*api.Pod{{Spec: zone1Spec, ObjectMeta: api.ObjectMeta{Labels: labels2}}},
 			nodes:    labeledNodes,
 			services: []api.Service{{Spec: api.ServiceSpec{Selector: map[string]string{"key": "value"}}}},
 			expectedList: []HostPriority{{"machine11", 10}, {"machine12", 10},
@@ -237,8 +239,8 @@ func TestZoneSpreadPriority(t *testing.T) {
 			test: "different services",
 		},
 		{
-			pod: api.Pod{ObjectMeta: api.ObjectMeta{Labels: labels1}},
-			pods: []api.Pod{
+			pod: &api.Pod{ObjectMeta: api.ObjectMeta{Labels: labels1}},
+			pods: []*api.Pod{
 				{Spec: zone0Spec, ObjectMeta: api.ObjectMeta{Labels: labels2}},
 				{Spec: zone1Spec, ObjectMeta: api.ObjectMeta{Labels: labels2}},
 				{Spec: zone2Spec, ObjectMeta: api.ObjectMeta{Labels: labels1}},
@@ -251,8 +253,8 @@ func TestZoneSpreadPriority(t *testing.T) {
 			test: "three pods, one service pod",
 		},
 		{
-			pod: api.Pod{ObjectMeta: api.ObjectMeta{Labels: labels1}},
-			pods: []api.Pod{
+			pod: &api.Pod{ObjectMeta: api.ObjectMeta{Labels: labels1}},
+			pods: []*api.Pod{
 				{Spec: zone1Spec, ObjectMeta: api.ObjectMeta{Labels: labels2}},
 				{Spec: zone1Spec, ObjectMeta: api.ObjectMeta{Labels: labels1}},
 				{Spec: zone2Spec, ObjectMeta: api.ObjectMeta{Labels: labels1}},
@@ -265,8 +267,8 @@ func TestZoneSpreadPriority(t *testing.T) {
 			test: "three pods, two service pods on different machines",
 		},
 		{
-			pod: api.Pod{ObjectMeta: api.ObjectMeta{Labels: labels1, Namespace: api.NamespaceDefault}},
-			pods: []api.Pod{
+			pod: &api.Pod{ObjectMeta: api.ObjectMeta{Labels: labels1, Namespace: api.NamespaceDefault}},
+			pods: []*api.Pod{
 				{Spec: zone1Spec, ObjectMeta: api.ObjectMeta{Labels: labels1}},
 				{Spec: zone1Spec, ObjectMeta: api.ObjectMeta{Labels: labels1, Namespace: api.NamespaceDefault}},
 				{Spec: zone2Spec, ObjectMeta: api.ObjectMeta{Labels: labels1}},
@@ -280,8 +282,8 @@ func TestZoneSpreadPriority(t *testing.T) {
 			test: "three service label match pods in different namespaces",
 		},
 		{
-			pod: api.Pod{ObjectMeta: api.ObjectMeta{Labels: labels1}},
-			pods: []api.Pod{
+			pod: &api.Pod{ObjectMeta: api.ObjectMeta{Labels: labels1}},
+			pods: []*api.Pod{
 				{Spec: zone1Spec, ObjectMeta: api.ObjectMeta{Labels: labels2}},
 				{Spec: zone1Spec, ObjectMeta: api.ObjectMeta{Labels: labels1}},
 				{Spec: zone2Spec, ObjectMeta: api.ObjectMeta{Labels: labels1}},
@@ -295,8 +297,8 @@ func TestZoneSpreadPriority(t *testing.T) {
 			test: "four pods, three service pods",
 		},
 		{
-			pod: api.Pod{ObjectMeta: api.ObjectMeta{Labels: labels1}},
-			pods: []api.Pod{
+			pod: &api.Pod{ObjectMeta: api.ObjectMeta{Labels: labels1}},
+			pods: []*api.Pod{
 				{Spec: zone1Spec, ObjectMeta: api.ObjectMeta{Labels: labels2}},
 				{Spec: zone1Spec, ObjectMeta: api.ObjectMeta{Labels: labels1}},
 				{Spec: zone2Spec, ObjectMeta: api.ObjectMeta{Labels: labels1}},
@@ -309,8 +311,8 @@ func TestZoneSpreadPriority(t *testing.T) {
 			test: "service with partial pod label matches",
 		},
 		{
-			pod: api.Pod{ObjectMeta: api.ObjectMeta{Labels: labels1}},
-			pods: []api.Pod{
+			pod: &api.Pod{ObjectMeta: api.ObjectMeta{Labels: labels1}},
+			pods: []*api.Pod{
 				{Spec: zone0Spec, ObjectMeta: api.ObjectMeta{Labels: labels1}},
 				{Spec: zone1Spec, ObjectMeta: api.ObjectMeta{Labels: labels1}},
 				{Spec: zone2Spec, ObjectMeta: api.ObjectMeta{Labels: labels1}},

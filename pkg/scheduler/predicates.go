@@ -80,11 +80,11 @@ func isVolumeConflict(volume api.Volume, pod *api.Pod) bool {
 // are exclusive so if there is already a volume mounted on that node, another pod can't schedule
 // there. This is GCE specific for now.
 // TODO: migrate this into some per-volume specific code?
-func NoDiskConflict(pod api.Pod, existingPods []api.Pod, node string) (bool, error) {
+func NoDiskConflict(pod *api.Pod, existingPods []*api.Pod, node string) (bool, error) {
 	manifest := &(pod.Spec)
 	for ix := range manifest.Volumes {
 		for podIx := range existingPods {
-			if isVolumeConflict(manifest.Volumes[ix], &existingPods[podIx]) {
+			if isVolumeConflict(manifest.Volumes[ix], existingPods[podIx]) {
 				return false, nil
 			}
 		}
@@ -111,31 +111,31 @@ func getResourceRequest(pod *api.Pod) resourceRequest {
 	return result
 }
 
-func CheckPodsExceedingCapacity(pods []api.Pod, capacity api.ResourceList) (fitting []api.Pod, notFitting []api.Pod) {
+func CheckPodsExceedingCapacity(pods []*api.Pod, capacity api.ResourceList) (fitting []*api.Pod, notFitting []*api.Pod) {
 	totalMilliCPU := capacity.Cpu().MilliValue()
 	totalMemory := capacity.Memory().Value()
 	milliCPURequested := int64(0)
 	memoryRequested := int64(0)
-	for ix := range pods {
-		podRequest := getResourceRequest(&pods[ix])
+	for _, pod := range pods {
+		podRequest := getResourceRequest(pod)
 		fitsCPU := totalMilliCPU == 0 || (totalMilliCPU-milliCPURequested) >= podRequest.milliCPU
 		fitsMemory := totalMemory == 0 || (totalMemory-memoryRequested) >= podRequest.memory
 		if !fitsCPU || !fitsMemory {
 			// the pod doesn't fit
-			notFitting = append(notFitting, pods[ix])
+			notFitting = append(notFitting, pod)
 			continue
 		}
 		// the pod fits
 		milliCPURequested += podRequest.milliCPU
 		memoryRequested += podRequest.memory
-		fitting = append(fitting, pods[ix])
+		fitting = append(fitting, pod)
 	}
 	return
 }
 
 // PodFitsResources calculates fit based on requested, rather than used resources
-func (r *ResourceFit) PodFitsResources(pod api.Pod, existingPods []api.Pod, node string) (bool, error) {
-	podRequest := getResourceRequest(&pod)
+func (r *ResourceFit) PodFitsResources(pod *api.Pod, existingPods []*api.Pod, node string) (bool, error) {
+	podRequest := getResourceRequest(pod)
 	if podRequest.milliCPU == 0 && podRequest.memory == 0 {
 		// no resources requested always fits.
 		return true, nil
@@ -144,7 +144,7 @@ func (r *ResourceFit) PodFitsResources(pod api.Pod, existingPods []api.Pod, node
 	if err != nil {
 		return false, err
 	}
-	pods := []api.Pod{}
+	pods := []*api.Pod{}
 	copy(pods, existingPods)
 	pods = append(existingPods, pod)
 	_, exceeding := CheckPodsExceedingCapacity(pods, info.Status.Capacity)
@@ -180,15 +180,15 @@ type NodeSelector struct {
 	info NodeInfo
 }
 
-func (n *NodeSelector) PodSelectorMatches(pod api.Pod, existingPods []api.Pod, node string) (bool, error) {
+func (n *NodeSelector) PodSelectorMatches(pod *api.Pod, existingPods []*api.Pod, node string) (bool, error) {
 	minion, err := n.info.GetNodeInfo(node)
 	if err != nil {
 		return false, err
 	}
-	return PodMatchesNodeLabels(&pod, minion), nil
+	return PodMatchesNodeLabels(pod, minion), nil
 }
 
-func PodFitsHost(pod api.Pod, existingPods []api.Pod, node string) (bool, error) {
+func PodFitsHost(pod *api.Pod, existingPods []*api.Pod, node string) (bool, error) {
 	if len(pod.Spec.Host) == 0 {
 		return true, nil
 	}
@@ -222,7 +222,7 @@ func NewNodeLabelPredicate(info NodeInfo, labels []string, presence bool) FitPre
 // Alternately, eliminating minions that have a certain label, regardless of value, is also useful
 // A minion may have a label with "retiring" as key and the date as the value
 // and it may be desirable to avoid scheduling new pods on this minion
-func (n *NodeLabelChecker) CheckNodeLabelPresence(pod api.Pod, existingPods []api.Pod, node string) (bool, error) {
+func (n *NodeLabelChecker) CheckNodeLabelPresence(pod *api.Pod, existingPods []*api.Pod, node string) (bool, error) {
 	var exists bool
 	minion, err := n.info.GetNodeInfo(node)
 	if err != nil {
@@ -264,7 +264,7 @@ func NewServiceAffinityPredicate(podLister PodLister, serviceLister ServiceListe
 // - L is listed in the ServiceAffinity object that is passed into the function
 // - the pod does not have any NodeSelector for L
 // - some other pod from the same service is already scheduled onto a minion that has value V for label L
-func (s *ServiceAffinity) CheckServiceAffinity(pod api.Pod, existingPods []api.Pod, node string) (bool, error) {
+func (s *ServiceAffinity) CheckServiceAffinity(pod *api.Pod, existingPods []*api.Pod, node string) (bool, error) {
 	var affinitySelector labels.Selector
 
 	// check if the pod being scheduled has the affinity labels specified in its NodeSelector
@@ -292,7 +292,7 @@ func (s *ServiceAffinity) CheckServiceAffinity(pod api.Pod, existingPods []api.P
 				return false, err
 			}
 			// consider only the pods that belong to the same namespace
-			nsServicePods := []api.Pod{}
+			nsServicePods := []*api.Pod{}
 			for _, nsPod := range servicePods {
 				if nsPod.Namespace == pod.Namespace {
 					nsServicePods = append(nsServicePods, nsPod)
@@ -333,7 +333,7 @@ func (s *ServiceAffinity) CheckServiceAffinity(pod api.Pod, existingPods []api.P
 	return affinitySelector.Matches(labels.Set(minion.Labels)), nil
 }
 
-func PodFitsPorts(pod api.Pod, existingPods []api.Pod, node string) (bool, error) {
+func PodFitsPorts(pod *api.Pod, existingPods []*api.Pod, node string) (bool, error) {
 	existingPorts := getUsedPorts(existingPods...)
 	wantPorts := getUsedPorts(pod)
 	for wport := range wantPorts {
@@ -347,7 +347,7 @@ func PodFitsPorts(pod api.Pod, existingPods []api.Pod, node string) (bool, error
 	return true, nil
 }
 
-func getUsedPorts(pods ...api.Pod) map[int]bool {
+func getUsedPorts(pods ...*api.Pod) map[int]bool {
 	ports := make(map[int]bool)
 	for _, pod := range pods {
 		for _, container := range pod.Spec.Containers {
@@ -361,12 +361,12 @@ func getUsedPorts(pods ...api.Pod) map[int]bool {
 
 // MapPodsToMachines obtains a list of pods and pivots that list into a map where the keys are host names
 // and the values are the list of pods running on that host.
-func MapPodsToMachines(lister PodLister) (map[string][]api.Pod, error) {
-	machineToPods := map[string][]api.Pod{}
+func MapPodsToMachines(lister PodLister) (map[string][]*api.Pod, error) {
+	machineToPods := map[string][]*api.Pod{}
 	// TODO: perform more targeted query...
 	pods, err := lister.List(labels.Everything())
 	if err != nil {
-		return map[string][]api.Pod{}, err
+		return map[string][]*api.Pod{}, err
 	}
 	for _, scheduledPod := range pods {
 		host := scheduledPod.Spec.Host

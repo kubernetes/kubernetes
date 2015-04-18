@@ -130,7 +130,7 @@ func TestExtractManifestFromHTTP(t *testing.T) {
 				Containers: []v1beta1.Container{{Name: "1", Image: "foo", ImagePullPolicy: v1beta1.PullAlways}}},
 			expected: CreatePodUpdate(kubelet.SET,
 				kubelet.HTTPSource,
-				api.Pod{
+				&api.Pod{
 					ObjectMeta: api.ObjectMeta{
 						UID:       "111",
 						Name:      "foo" + "-" + hostname,
@@ -155,7 +155,7 @@ func TestExtractManifestFromHTTP(t *testing.T) {
 				Containers: []v1beta1.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}}},
 			expected: CreatePodUpdate(kubelet.SET,
 				kubelet.HTTPSource,
-				api.Pod{
+				&api.Pod{
 					ObjectMeta: api.ObjectMeta{
 						UID:       "111",
 						Name:      "111" + "-" + hostname,
@@ -180,7 +180,7 @@ func TestExtractManifestFromHTTP(t *testing.T) {
 				Containers: []v1beta1.Container{{Name: "1", Image: "foo", ImagePullPolicy: v1beta1.PullAlways}}},
 			expected: CreatePodUpdate(kubelet.SET,
 				kubelet.HTTPSource,
-				api.Pod{
+				&api.Pod{
 					ObjectMeta: api.ObjectMeta{
 						UID:       "111",
 						Name:      "foo" + "-" + hostname,
@@ -209,7 +209,7 @@ func TestExtractManifestFromHTTP(t *testing.T) {
 			},
 			expected: CreatePodUpdate(kubelet.SET,
 				kubelet.HTTPSource,
-				api.Pod{
+				&api.Pod{
 					ObjectMeta: api.ObjectMeta{
 						UID:       "111",
 						Name:      "foo" + "-" + hostname,
@@ -227,7 +227,7 @@ func TestExtractManifestFromHTTP(t *testing.T) {
 							ImagePullPolicy:        "Always"}},
 					},
 				},
-				api.Pod{
+				&api.Pod{
 					ObjectMeta: api.ObjectMeta{
 						UID:       "222",
 						Name:      "bar" + "-" + hostname,
@@ -283,9 +283,9 @@ func TestExtractManifestFromHTTP(t *testing.T) {
 		if !api.Semantic.DeepEqual(testCase.expected, update) {
 			t.Errorf("%s: Expected: %#v, Got: %#v", testCase.desc, testCase.expected, update)
 		}
-		for i := range update.Pods {
-			if errs := validation.ValidatePod(&update.Pods[i]); len(errs) != 0 {
-				t.Errorf("%s: Expected no validation errors on %#v, Got %v", testCase.desc, update.Pods[i], errors.NewAggregate(errs))
+		for _, pod := range update.Pods {
+			if errs := validation.ValidatePod(pod); len(errs) != 0 {
+				t.Errorf("%s: Expected no validation errors on %#v, Got %v", testCase.desc, pod, errors.NewAggregate(errs))
 			}
 		}
 	}
@@ -317,7 +317,7 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 			},
 			expected: CreatePodUpdate(kubelet.SET,
 				kubelet.HTTPSource,
-				api.Pod{
+				&api.Pod{
 					ObjectMeta: api.ObjectMeta{
 						UID:       "111",
 						Name:      "foo" + "-" + hostname,
@@ -355,7 +355,7 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 			},
 			expected: CreatePodUpdate(kubelet.SET,
 				kubelet.HTTPSource,
-				api.Pod{
+				&api.Pod{
 					ObjectMeta: api.ObjectMeta{
 						UID:       "111",
 						Name:      "foo" + "-" + hostname,
@@ -406,7 +406,7 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 			},
 			expected: CreatePodUpdate(kubelet.SET,
 				kubelet.HTTPSource,
-				api.Pod{
+				&api.Pod{
 					ObjectMeta: api.ObjectMeta{
 						UID:       "111",
 						Name:      "foo" + "-" + hostname,
@@ -424,7 +424,7 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 							ImagePullPolicy:        "Always"}},
 					},
 				},
-				api.Pod{
+				&api.Pod{
 					ObjectMeta: api.ObjectMeta{
 						UID:       "222",
 						Name:      "bar" + "-" + hostname,
@@ -472,9 +472,9 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 		if !api.Semantic.DeepEqual(testCase.expected, update) {
 			t.Errorf("%s: Expected: %#v, Got: %#v", testCase.desc, testCase.expected, update)
 		}
-		for i := range update.Pods {
-			if errs := validation.ValidatePod(&update.Pods[i]); len(errs) != 0 {
-				t.Errorf("%s: Expected no validation errors on %#v, Got %v", testCase.desc, update.Pods[i], errors.NewAggregate(errs))
+		for _, pod := range update.Pods {
+			if errs := validation.ValidatePod(pod); len(errs) != 0 {
+				t.Errorf("%s: Expected no validation errors on %#v, Got %v", testCase.desc, pod, errors.NewAggregate(errs))
 			}
 		}
 	}

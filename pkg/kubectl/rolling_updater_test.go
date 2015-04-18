@@ -253,7 +253,7 @@ Update succeeded. Deleting foo-v1
 
 	for _, test := range tests {
 		updater := RollingUpdater{
-			fakeClientFor("default", test.responses),
+			NewRollingUpdaterClient(fakeClientFor("default", test.responses)),
 			"default",
 		}
 		var buffer bytes.Buffer
@@ -296,7 +296,7 @@ Update succeeded. Deleting foo-v1
 		{newRc(3, 3), nil},
 		{newRc(3, 3), nil},
 	}
-	updater := RollingUpdater{fakeClientFor("default", responses), "default"}
+	updater := RollingUpdater{NewRollingUpdaterClient(fakeClientFor("default", responses)), "default"}
 
 	var buffer bytes.Buffer
 	if err := updater.Update(&buffer, rc, rcExisting, 0, time.Millisecond, time.Millisecond); err != nil {

@@ -23,6 +23,7 @@ import (
 	"math/rand"
 	"net"
 	"net/http"
+	_ "net/http/pprof"
 	"path"
 	"strconv"
 	"strings"
@@ -315,20 +316,6 @@ func (s *KubeletServer) Run(_ []string) error {
 	// runs forever
 	select {}
 
-}
-
-func (s *KubeletServer) setupRunOnce() {
-	if s.RunOnce {
-		// Don't use apiserver source, on the presumption that this flag is used
-		// for bootstrapping some system pods.
-		if len(s.APIServerList) > 0 {
-			glog.Fatalf("invalid option: --runonce and --api_servers are mutually exclusive")
-		}
-		if s.EnableServer {
-			glog.Infof("--runonce is set, disabling server")
-			s.EnableServer = false
-		}
-	}
 }
 
 // TODO: replace this with clientcmd

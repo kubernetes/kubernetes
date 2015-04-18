@@ -250,8 +250,9 @@ func (r *Request) RequestURI(uri string) *Request {
 const (
 	// A constant that clients can use to refer in a field selector to the object name field.
 	// Will be automatically emitted as the correct name for the API version.
-	ObjectNameField = "metadata.name"
-	PodHost         = "spec.host"
+	NodeUnschedulable = "spec.unschedulable"
+	ObjectNameField   = "metadata.name"
+	PodHost           = "spec.host"
 )
 
 type clientFieldNameToAPIVersionFieldName map[string]string
@@ -294,10 +295,12 @@ func (v versionToResourceToFieldMapping) filterField(apiVersion, resourceType, f
 var fieldMappings = versionToResourceToFieldMapping{
 	"v1beta1": resourceTypeToFieldMapping{
 		"nodes": clientFieldNameToAPIVersionFieldName{
-			ObjectNameField: "name",
+			ObjectNameField:   "name",
+			NodeUnschedulable: "unschedulable",
 		},
 		"minions": clientFieldNameToAPIVersionFieldName{
-			ObjectNameField: "name",
+			ObjectNameField:   "name",
+			NodeUnschedulable: "unschedulable",
 		},
 		"pods": clientFieldNameToAPIVersionFieldName{
 			PodHost: "DesiredState.Host",
@@ -305,10 +308,12 @@ var fieldMappings = versionToResourceToFieldMapping{
 	},
 	"v1beta2": resourceTypeToFieldMapping{
 		"nodes": clientFieldNameToAPIVersionFieldName{
-			ObjectNameField: "name",
+			ObjectNameField:   "name",
+			NodeUnschedulable: "unschedulable",
 		},
 		"minions": clientFieldNameToAPIVersionFieldName{
-			ObjectNameField: "name",
+			ObjectNameField:   "name",
+			NodeUnschedulable: "unschedulable",
 		},
 		"pods": clientFieldNameToAPIVersionFieldName{
 			PodHost: "DesiredState.Host",
@@ -316,10 +321,12 @@ var fieldMappings = versionToResourceToFieldMapping{
 	},
 	"v1beta3": resourceTypeToFieldMapping{
 		"nodes": clientFieldNameToAPIVersionFieldName{
-			ObjectNameField: "metadata.name",
+			ObjectNameField:   "metadata.name",
+			NodeUnschedulable: "spec.unschedulable",
 		},
 		"minions": clientFieldNameToAPIVersionFieldName{
-			ObjectNameField: "metadata.name",
+			ObjectNameField:   "metadata.name",
+			NodeUnschedulable: "spec.unschedulable",
 		},
 		"pods": clientFieldNameToAPIVersionFieldName{
 			PodHost: "spec.host",
@@ -785,7 +792,7 @@ func (r *Request) transformUnstructuredResponseError(resp *http.Response, req *h
 		message = strings.TrimSpace(string(body))
 	}
 	retryAfter, _ := retryAfterSeconds(resp)
-	return errors.NewGenericServerResponse(resp.StatusCode, req.Method, r.resource, r.resourceName, message, retryAfter)
+	return errors.NewGenericServerResponse(resp.StatusCode, req.Method, r.resource, r.resourceName, message, retryAfter, true)
 }
 
 // isTextResponse returns true if the response appears to be a textual media type.

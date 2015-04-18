@@ -30,6 +30,8 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/admission"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	apierrors "github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/rest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/healthz"
@@ -166,6 +168,15 @@ func InstallLogsSupport(mux Mux) {
 	// TODO: use restful: ws.Route(ws.GET("/logs/{logpath:*}").To(fileHandler))
 	// See github.com/emicklei/go-restful/blob/master/examples/restful-serve-static.go
 	mux.Handle("/logs/", http.StripPrefix("/logs/", http.FileServer(http.Dir("/var/log/"))))
+}
+
+func InstallServiceErrorHandler(container *restful.Container) {
+	container.ServiceErrorHandler(serviceErrorHandler)
+}
+
+func serviceErrorHandler(serviceErr restful.ServiceError, response *restful.Response) {
+	// TODO: Update go-restful to return the request as well, so that we can use the appropriate codec rather than using the latest one.
+	errorJSON(apierrors.NewGenericServerResponse(serviceErr.Code, "", "", "", "", 0, false), latest.Codec, response.ResponseWriter)
 }
 
 // Adds a service to return the supported api versions.

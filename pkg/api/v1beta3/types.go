@@ -1291,6 +1291,37 @@ type PodLogOptions struct {
 	Follow bool `json:"follow,omitempty" description:"follow the log stream of the pod; defaults to false"`
 }
 
+// PodExecOptions is the query options to a Pod's remote exec call
+type PodExecOptions struct {
+	TypeMeta `json:",inline"`
+
+	// Stdin if true indicates that stdin is to be redirected for the exec call
+	Stdin bool `json:"stdin,omitempty" description:"redirect the standard input stream of the pod for this call; defaults to false"`
+
+	// Stdout if true indicates that stdout is to be redirected for the exec call
+	Stdout bool `json:"stdout,omitempty" description:"redirect the standard output stream of the pod for this call; defaults to true"`
+
+	// Stderr if true indicates that stderr is to be redirected for the exec call
+	Stderr bool `json:"stderr,omitempty" description:"redirect the standard error stream of the pod for this call; defaults to true"`
+
+	// TTY if true indicates that a tty will be allocated for the exec call
+	TTY bool `json:"tty,omitempty" description:"allocate a terminal for this exec call; defaults to false"`
+
+	// Container in which to execute the command.
+	Container string `json:"container,omitempty" description:"the container in which to execute the command. Defaults to only container if there is only one container in the pod."`
+
+	// Command is the remote command to execute
+	Command string `json:"command" description:"the command to execute"`
+}
+
+// PodProxyOptions is the query options to a Pod's proxy call
+type PodProxyOptions struct {
+	TypeMeta `json:",inline"`
+
+	// Path is the URL path to use for the current proxy request
+	Path string `json:"path,omitempty" description:"URL path to use in proxy request to pod"`
+}
+
 // Status is a return value for calls that don't return other objects.
 type Status struct {
 	TypeMeta `json:",inline"`

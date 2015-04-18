@@ -202,7 +202,7 @@ func LogLocation(getter ResourceGetter, connInfo client.ConnectionInfoGetter, ct
 		if len(pod.Spec.Containers) == 1 {
 			container = pod.Spec.Containers[0].Name
 		} else {
-			return nil, nil, fmt.Errorf("a container name must be specified for pod %s", name)
+			return nil, nil, errors.NewBadRequest(fmt.Sprintf("a container name must be specified for pod %s", name))
 		}
 	}
 	nodeHost := pod.Status.HostIP
@@ -223,6 +223,81 @@ func LogLocation(getter ResourceGetter, connInfo client.ConnectionInfoGetter, ct
 		Host:     fmt.Sprintf("%s:%d", nodeHost, nodePort),
 		Path:     fmt.Sprintf("/containerLogs/%s/%s/%s", pod.Namespace, name, container),
 		RawQuery: params.Encode(),
+	}
+	return loc, nodeTransport, nil
+}
+
+// ExecLocation returns the exec URL for a pod container. If opts.Container is blank
+// and only one container is present in the pod, that container is used.
+func ExecLocation(getter ResourceGetter, connInfo client.ConnectionInfoGetter, ctx api.Context, name string, opts *api.PodExecOptions) (*url.URL, http.RoundTripper, error) {
+
+	pod, err := getPod(getter, ctx, name)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// Try to figure out a container
+	container := opts.Container
+	if container == "" {
+		if len(pod.Spec.Containers) == 1 {
+			container = pod.Spec.Containers[0].Name
+		} else {
+			return nil, nil, errors.NewBadRequest(fmt.Sprintf("a container name must be specified for pod %s", name))
+		}
+	}
+	nodeHost := pod.Status.HostIP
+	if len(nodeHost) == 0 {
+		// If pod has not been assigned a host, return an empty location
+		return nil, nil, fmt.Errorf("pod %s does not have a host assigned", name)
+	}
+	nodeScheme, nodePort, nodeTransport, err := connInfo.GetConnectionInfo(nodeHost)
+	if err != nil {
+		return nil, nil, err
+	}
+	params := url.Values{}
+	if opts.Stdin {
+		params.Add(api.ExecStdinParam, "1")
+	}
+	if opts.Stdout {
+		params.Add(api.ExecStdoutParam, "1")
+	}
+	if opts.Stderr {
+		params.Add(api.ExecStderrParam, "1")
+	}
+	if opts.TTY {
+		params.Add(api.ExecTTYParam, "1")
+	}
+	params.Add("command", opts.Command)
+	loc := &url.URL{
+		Scheme:   nodeScheme,
+		Host:     fmt.Sprintf("%s:%d", nodeHost, nodePort),
+		Path:     fmt.Sprintf("/exec/%s/%s/%s", pod.Namespace, name, container),
+		RawQuery: params.Encode(),
+	}
+	return loc, nodeTransport, nil
+}
+
+// PortForwardLocation returns a the port-forward URL for a pod.
+func PortForwardLocation(getter ResourceGetter, connInfo client.ConnectionInfoGetter, ctx api.Context, name string) (*url.URL, http.RoundTripper, error) {
+
+	pod, err := getPod(getter, ctx, name)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	nodeHost := pod.Status.HostIP
+	if len(nodeHost) == 0 {
+		// If pod has not been assigned a host, return an empty location
+		return nil, nil, errors.NewBadRequest(fmt.Sprintf("pod %s does not have a host assigned", name))
+	}
+	nodeScheme, nodePort, nodeTransport, err := connInfo.GetConnectionInfo(nodeHost)
+	if err != nil {
+		return nil, nil, err
+	}
+	loc := &url.URL{
+		Scheme: nodeScheme,
+		Host:   fmt.Sprintf("%s:%d", nodeHost, nodePort),
+		Path:   fmt.Sprintf("/portForward/%s/%s", pod.Namespace, name),
 	}
 	return loc, nodeTransport, nil
 }

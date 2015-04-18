@@ -79,7 +79,7 @@ A RabbitMQ broker can be turned up using the file `examples/celery-rabbitmq/rabb
           "id": "rabbitmq",
           "containers": [{
             "name": "rabbitmq",
-            "image": "dockerfile/rabbitmq",
+            "image": "library/rabbitmq",
             "cpu": 100,
             "ports": [{"containerPort": 5672, "hostPort": 5672}]
           }]
@@ -144,7 +144,7 @@ There are several things to point out here...
 Like the RabbitMQ controller, this controller ensures that there is always a pod is running a Celery worker instance. The celery-app-add Docker image is an extension of the standard Celery image. This is the Dockerfile:
 
 ```
-FROM dockerfile/celery
+FROM library/celery
 
 ADD celery_conf.py /data/celery_conf.py
 ADD run_tasks.py /data/run_tasks.py
@@ -239,7 +239,7 @@ flower-controller-cegta     10.246.2.17         flower              endocode/flo
 kube-dns-fplln              10.246.1.3          etcd                quay.io/coreos/etcd:latest         10.245.1.3/10.245.1.3   k8s-app=kube-dns,kubernetes.io/cluster-service=true   Running
                                                 kube2sky            kubernetes/kube2sky:1.0                                                                                          
                                                 skydns              kubernetes/skydns:2014-12-23-001                                                                                 
-rabbitmq-controller-pjzb3   10.246.2.16         rabbitmq            dockerfile/rabbitmq                10.245.1.4/10.245.1.4   app=taskQueue,name=rabbitmq                           Running
+rabbitmq-controller-pjzb3   10.246.2.16         rabbitmq            library/rabbitmq                   10.245.1.4/10.245.1.4   app=taskQueue,name=rabbitmq                           Running
 
 ```
 

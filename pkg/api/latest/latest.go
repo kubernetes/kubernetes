@@ -61,6 +61,9 @@ var SelfLinker = runtime.SelfLinker(accessor)
 // Kubernetes versions.
 var RESTMapper meta.RESTMapper
 
+// userResources is a group of resources mostly used by a kubectl user
+var userResources = []string{"rc", "svc", "pods", "pvc"}
+
 // InterfacesFor returns the default Codec and ResourceVersioner for a given version
 // string, or an error if the version is not known.
 func InterfacesFor(version string) (*meta.VersionInterfaces, error) {
@@ -124,8 +127,18 @@ func init() {
 		"PersistentVolume": true,
 	}
 
+	// setup aliases for groups of resources
+	mapper.AddResourceAlias("all", userResources...)
+
 	// these kinds should be excluded from the list of resources
-	ignoredKinds := util.NewStringSet("ListOptions", "DeleteOptions", "Status", "ContainerManifest")
+	ignoredKinds := util.NewStringSet(
+		"ListOptions",
+		"DeleteOptions",
+		"Status",
+		"ContainerManifest",
+		"PodLogOptions",
+		"PodExecOptions",
+		"PodProxyOptions")
 
 	// enumerate all supported versions, get the kinds, and register with the mapper how to address our resources
 	for _, version := range versions {

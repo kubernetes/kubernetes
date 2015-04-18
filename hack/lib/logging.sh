@@ -119,6 +119,13 @@ kube::log::info() {
   done
 }
 
+# Just like kube::log::info, but no \n, so you can make a progress bar
+kube::log::progress() {
+  for message; do
+    echo -e -n "$message"
+  done
+}
+
 kube::log::info_from_stdin() {
   local messages=()
   while read -r line; do

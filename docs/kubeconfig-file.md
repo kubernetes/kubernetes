@@ -84,15 +84,20 @@ If the contents of the kubernetes_auth file conflict with entries in .kubeconfig
 
 ## Loading and merging rules
 The rules for loading and merging the .kubeconfig files are straightforward, but there are a lot of them.  The final config is built in this order:
-  1.  Merge together the kubeconfig itself.  This is done with the following hierarchy and merge rules:
+  1.  Get the kubeconfig  from disk.  This is done with the following hierarchy and merge rules:
+      
 
+      If the CommandLineLocation (the value of the `kubeconfig` command line option) is set, use this file only.  No merging.  Only one instance of this flag is allowed.
+
+
+      Else, if EnvVarLocation (the value of $KUBECONFIG) is available, use it as a list of files that should be merged.  
+      Merge files together based on the following rules.
       Empty filenames are ignored.  Files with non-deserializable content produced errors.
       The first file to set a particular value or map key wins and the value or map key is never changed.
       This means that the first file to set CurrentContext will have its context preserved.  It also means that if two files specify a "red-user", only values from the first file's red-user are used.  Even non-conflicting entries from the second file's "red-user" are discarded.
-      1.  CommandLineLocation - the value of the `kubeconfig` command line option
-      1.  EnvVarLocation - the value of $KUBECONFIG
-      1.  CurrentDirectoryLocation - ``pwd``/.kubeconfig
-      1.  HomeDirectoryLocation = ~/.kube/.kubeconfig
+
+
+      Otherwise, use HomeDirectoryLocation (~/.kube/config) with no merging.
   1.  Determine the context to use based on the first hit in this chain
       1.  command line argument - the value of the `context` command line option
       1.  current-context from the merged kubeconfig file

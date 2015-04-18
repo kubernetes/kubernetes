@@ -36,7 +36,7 @@ import (
 
 // Convenient wrapper around listing pods supporting retries.
 func listPods(c *client.Client, namespace string, label labels.Selector) (*api.PodList, error) {
-	maxRetries := 2
+	maxRetries := 4
 	pods, err := c.Pods(namespace).List(label)
 	for i := 0; i < maxRetries; i++ {
 		if err == nil {
@@ -60,8 +60,19 @@ func DeleteRC(c *client.Client, ns, name string) error {
 		return fmt.Errorf("Failed to resize replication controller %s to zero: %v", name, err)
 	}
 
-	if err := wait.Poll(time.Second, time.Minute*20, client.ControllerHasDesiredReplicas(c, rc)); err != nil {
-		return fmt.Errorf("Error waiting for replication controller %s replicas to reach 0: %v", name, err)
+	// Wait up to 20 minutes until all replicas are killed.
+	endTime := time.Now().Add(time.Minute * 20)
+	for {
+		if time.Now().After(endTime) {
+			return fmt.Errorf("Timeout while waiting for replication controller %s replicas to 0", name)
+		}
+		remainingTime := endTime.Sub(time.Now())
+		err := wait.Poll(time.Second, remainingTime, client.ControllerHasDesiredReplicas(c, rc))
+		if err != nil {
+			glog.Errorf("Error while waiting for replication controller %s replicas to read 0: %v", name, err)
+		} else {
+			break
+		}
 	}
 
 	// Delete the replication controller.

@@ -30,7 +30,7 @@ In addition to defining the application containers that run in the pod, the pod 
 
 ### Management
 
-Pods also simplify application deployment and management by providing a higher-level abstraction than the raw, low-level container interface. Pods serve as units of deployment and horizontal scaling/replication. Co-location, fate sharing, coordinated replication, resource sharing, and dependency management are handled automatically.
+Pods also simplify application deployment and management by providing a higher-level abstraction than the raw, low-level container interface. Pods serve as units of deployment and horizontal scaling/replication. Co-location (co-scheduling), fate sharing, coordinated replication, resource sharing, and dependency management are handled automatically.
 
 ## Uses of pods
 
@@ -60,7 +60,9 @@ That approach would provide co-location, but would not provide most of the benef
 
 Pods aren't intended to be treated as durable pets. They won't survive scheduling failures, node failures, or other evictions, such as due to lack of resources, or in the case of node maintenance. 
 
-In general, users shouldn't need to create pods directly. They should almost always use controllers (e.g., [replication controller](replication-controller.md)), even for singletons.  Controllers provide self-healing with a cluster scope, as well as replication and rollout management.
+In general, users shouldn't need to create pods directly. They should almost always use controllers (e.g., [replication controller](replication-controller.md)), even for singletons.  Controllers provide self-healing with a cluster scope, as well as replication and rollout management. 
+
+The use of collective APIs as the primary user-facing primitive is relatively common among cluster scheduling systems, including [Borg](https://research.google.com/pubs/pub43438.html), [Marathon](https://mesosphere.github.io/marathon/docs/rest-api.html, https://github.com/gambol99/go-marathon/blob/master/application.go), [Aurora](http://aurora.apache.org/documentation/latest/configuration-reference/#job-schema), and [Tupperware](http://www.slideshare.net/Docker/aravindnarayanan-facebook140613153626phpapp02-37588997).
 
 Pod is exposed as a primitive in order to facilitate:
 * scheduler and controller pluggability

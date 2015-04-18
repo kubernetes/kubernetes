@@ -8,7 +8,7 @@ The `image` property of a container supports the same syntax as the `docker` com
 ## Using a Private Registry
 
 ### Google Container Registry
-Kubernetes has native support for the [Google Container Regisry](https://cloud.google.com/tools/container-registry/), when running on Google Compute Engine.  If you are running your cluster on Google Compute Engine or Google Container Engine, simply use the full image name (e.g. gcr.io/my_project/image:tag) and the kubelet will automatically authenticate and pull down your private image.
+Kubernetes has native support for the [Google Container Registry](https://cloud.google.com/tools/container-registry/), when running on Google Compute Engine.  If you are running your cluster on Google Compute Engine or Google Container Engine, simply use the full image name (e.g. gcr.io/my_project/image:tag) and the kubelet will automatically authenticate and pull down your private image.
 
 ### Other Private Registries
 Docker stores keys for private registries in a `.dockercfg` file.  Create a config file by running `docker login <registry>.<domain>` and then copying the resulting `.dockercfg` file to the kubelet working dir.

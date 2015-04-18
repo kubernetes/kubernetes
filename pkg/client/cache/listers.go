@@ -39,17 +39,49 @@ type StoreToPodLister struct {
 	Store
 }
 
-// TODO Get rid of the selector because that is confusing because the user might not realize that there has already been
-// some selection at the caching stage.  Also, consistency will facilitate code generation.  However, the pkg/client
-// is inconsistent too.
-func (s *StoreToPodLister) List(selector labels.Selector) (pods []api.Pod, err error) {
+// Please note that selector is filtering among the pods that have gotten into
+// the store; there may have been some filtering that already happened before
+// that.
+//
+// TODO: converge on the interface in pkg/client.
+func (s *StoreToPodLister) List(selector labels.Selector) (pods []*api.Pod, err error) {
+	// TODO: it'd be great to just call
+	// s.Pods(api.NamespaceAll).List(selector), however then we'd have to
+	// remake the list.Items as a []*api.Pod. So leave this separate for
+	// now.
 	for _, m := range s.Store.List() {
 		pod := m.(*api.Pod)
 		if selector.Matches(labels.Set(pod.Labels)) {
-			pods = append(pods, *pod)
+			pods = append(pods, pod)
 		}
 	}
 	return pods, nil
+}
+
+// Pods is taking baby steps to be more like the api in pkg/client
+func (s *StoreToPodLister) Pods(namespace string) storePodsNamespacer {
+	return storePodsNamespacer{s.Store, namespace}
+}
+
+type storePodsNamespacer struct {
+	store     Store
+	namespace string
+}
+
+// Please note that selector is filtering among the pods that have gotten into
+// the store; there may have been some filtering that already happened before
+// that.
+func (s storePodsNamespacer) List(selector labels.Selector) (pods api.PodList, err error) {
+	list := api.PodList{}
+	for _, m := range s.store.List() {
+		pod := m.(*api.Pod)
+		if s.namespace == api.NamespaceAll || s.namespace == pod.Namespace {
+			if selector.Matches(labels.Set(pod.Labels)) {
+				list.Items = append(list.Items, *pod)
+			}
+		}
+	}
+	return list, nil
 }
 
 // Exists returns true if a pod matching the namespace/name of the given pod exists in the store.
@@ -106,7 +138,7 @@ func (s *StoreToServiceLister) List() (services api.ServiceList, err error) {
 
 // TODO: Move this back to scheduler as a helper function that takes a Store,
 // rather than a method of StoreToServiceLister.
-func (s *StoreToServiceLister) GetPodServices(pod api.Pod) (services []api.Service, err error) {
+func (s *StoreToServiceLister) GetPodServices(pod *api.Pod) (services []api.Service, err error) {
 	var selector labels.Selector
 	var service api.Service
 
@@ -114,6 +146,10 @@ func (s *StoreToServiceLister) GetPodServices(pod api.Pod) (services []api.Servi
 		service = *m.(*api.Service)
 		// consider only services that are in the same namespace as the pod
 		if service.Namespace != pod.Namespace {
+			continue
+		}
+		if service.Spec.Selector == nil {
+			// services with nil selectors match nothing, not everything.
 			continue
 		}
 		selector = labels.Set(service.Spec.Selector).AsSelector()

@@ -148,7 +148,7 @@ func TestRunOnce(t *testing.T) {
 	kb.containerManager = dockertools.NewDockerManager(kb.dockerClient, kb.recorder, dockertools.PodInfraContainerImage, 0, 0)
 	kb.containerManager.Puller = &dockertools.FakeDockerPuller{}
 
-	pods := []api.Pod{
+	pods := []*api.Pod{
 		{
 			ObjectMeta: api.ObjectMeta{
 				UID:       "12345678",

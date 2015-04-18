@@ -50,7 +50,7 @@ func TestAdmission(t *testing.T) {
 			Containers: []api.Container{{Name: "ctr", Image: "image"}},
 		},
 	}
-	err := handler.Admit(admission.NewAttributesRecord(&pod, namespaceObj.Namespace, "pods", "CREATE"))
+	err := handler.Admit(admission.NewAttributesRecord(&pod, "Pod", namespaceObj.Namespace, "pods", "CREATE"))
 	if err != nil {
 		t.Errorf("Unexpected error returned from admission handler: %v", err)
 	}
@@ -60,19 +60,19 @@ func TestAdmission(t *testing.T) {
 	store.Add(namespaceObj)
 
 	// verify create operations in the namespace cause an error
-	err = handler.Admit(admission.NewAttributesRecord(&pod, namespaceObj.Namespace, "pods", "CREATE"))
+	err = handler.Admit(admission.NewAttributesRecord(&pod, "Pod", namespaceObj.Namespace, "pods", "CREATE"))
 	if err == nil {
 		t.Errorf("Expected error rejecting creates in a namespace when it is terminating")
 	}
 
 	// verify update operations in the namespace can proceed
-	err = handler.Admit(admission.NewAttributesRecord(&pod, namespaceObj.Namespace, "pods", "UPDATE"))
+	err = handler.Admit(admission.NewAttributesRecord(&pod, "Pod", namespaceObj.Namespace, "pods", "UPDATE"))
 	if err != nil {
 		t.Errorf("Unexpected error returned from admission handler: %v", err)
 	}
 
 	// verify delete operations in the namespace can proceed
-	err = handler.Admit(admission.NewAttributesRecord(nil, namespaceObj.Namespace, "pods", "DELETE"))
+	err = handler.Admit(admission.NewAttributesRecord(nil, "Pod", namespaceObj.Namespace, "pods", "DELETE"))
 	if err != nil {
 		t.Errorf("Unexpected error returned from admission handler: %v", err)
 	}

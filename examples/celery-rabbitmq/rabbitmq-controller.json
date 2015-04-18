@@ -12,7 +12,7 @@
           "id": "rabbitmq",
           "containers": [{
             "name": "rabbitmq",
-            "image": "dockerfile/rabbitmq",
+            "image": "library/rabbitmq",
             "cpu": 100,
             "ports": [{"containerPort": 5672, "hostPort": 5672}]
           }]

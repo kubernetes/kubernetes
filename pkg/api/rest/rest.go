@@ -171,6 +171,32 @@ type Redirector interface {
 	ResourceLocation(ctx api.Context, id string) (remoteLocation *url.URL, transport http.RoundTripper, err error)
 }
 
+// ConnectHandler is a handler for HTTP connection requests. It extends the standard
+// http.Handler interface by adding a method that returns an error object if an error
+// occurred during the handling of the request.
+type ConnectHandler interface {
+	http.Handler
+
+	// RequestError returns an error if one occurred during handling of an HTTP request
+	RequestError() error
+}
+
+// Connecter is a storage object that responds to a connection request
+type Connecter interface {
+	// Connect returns a ConnectHandler that will handle the request/response for a request
+	Connect(ctx api.Context, id string, options runtime.Object) (ConnectHandler, error)
+
+	// NewConnectOptions returns an empty options object that will be used to pass
+	// options to the Connect method. If nil, then a nil options object is passed to
+	// Connect. It may return a bool and a string. If true, the value of the request
+	// path below the object will be included as the named string in the serialization
+	// of the runtime object.
+	NewConnectOptions() (runtime.Object, bool, string)
+
+	// ConnectMethods returns the list of HTTP methods handled by Connect
+	ConnectMethods() []string
+}
+
 // ResourceStreamer is an interface implemented by objects that prefer to be streamed from the server
 // instead of decoded directly.
 type ResourceStreamer interface {

@@ -776,12 +776,9 @@ _kubectl_config()
     flags_with_completion=()
     flags_completion=()
 
-    flags+=("--envvar")
-    flags+=("--global")
     flags+=("--help")
     flags+=("-h")
     flags+=("--kubeconfig=")
-    flags+=("--local")
 
     must_have_one_flag=()
     must_have_one_noun=()
