@@ -1,28 +1,25 @@
 #!/bin/bash
 #
 ### BEGIN INIT INFO
-# Provides:   kube-addons
-# Required-Start:    $local_fs $network $syslog kube-apiserver
+# Provides:   node-upgrade-gcp
+# Required-Start:    $local_fs $network $syslog
 # Required-Stop:
 # Default-Start:     2 3 4 5
 # Default-Stop:      0 1 6
-# Short-Description: Kubernetes Addon Object Manager
+# Short-Description: Node Upgrade Manager for GCP
 # Description:
-#   Enforces installation of Kubernetes Addon Objects
+#   Responsible for automatically upgrading Kuberentes software
 ### END INIT INFO
 
 
 # PATH should only include /usr/* if it runs after the mountnfs.sh script
 PATH=/sbin:/usr/sbin:/bin:/usr/bin
-DESC="Kubernetes Addon Object Manager"
-NAME=kube-addons
+DESC="Node Upgrade Manager for GCP"
+NAME=node-upgrade-gcp
 DAEMON_LOG_FILE=/var/log/$NAME.log
 PIDFILE=/var/run/$NAME.pid
 SCRIPTNAME=/etc/init.d/$NAME
-KUBE_ADDONS_SH=/etc/kubernetes/kube-addons.sh
-
-# Read configuration variable file if it is present
-[ -r /etc/default/$NAME ] && . /etc/default/$NAME
+NODE_UPGRADE_GCP_SH=/etc/kubernetes/node-upgrade-gcp.sh
 
 # Define LSB log_* functions.
 # Depend on lsb-base (>= 3.2-14) to ensure that this file is present
@@ -37,7 +34,7 @@ KUBE_ADDONS_SH=/etc/kubernetes/kube-addons.sh
 #
 do_start()
 {
-    ${KUBE_ADDONS_SH} </dev/null >>${DAEMON_LOG_FILE} 2>&1 &
+    ${NODE_UPGRADE_GCP_SH} </dev/null >>${DAEMON_LOG_FILE} 2>&1 &
     echo $! > ${PIDFILE}
     disown
 }

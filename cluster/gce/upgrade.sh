@@ -65,10 +65,7 @@ function usage() {
 
 function upgrade-master() {
   echo "== Upgrading master to '${SERVER_BINARY_TAR_URL}'. Do not interrupt, deleting master instance. =="
-
   detect-master
-  get-password
-  set-master-htpasswd
 
   # Delete the master instance. Note that the master-pd is created
   # with auto-delete=no, so it should not be deleted.
@@ -102,6 +99,7 @@ function wait-for-master() {
 function prepare-upgrade() {
   ensure-temp-dir
   detect-project
+  get-bearer-token
 
   if [[ "${local_binaries}" == "true" ]]; then
     find-release-tars
@@ -113,11 +111,8 @@ function prepare-upgrade() {
 
 function upgrade-nodes() {
   echo "== Upgrading nodes to ${SERVER_BINARY_TAR_URL}. =="
-
   detect-minion-names
-  get-password
-  set-master-htpasswd
-  kube-update-nodes upgrade
+  kube-update-nodes
   echo "== Done =="
 }
 

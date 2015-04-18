@@ -1,0 +1,9 @@
+[Unit]
+Description=Node Upgrade Manager for GCP
+Documentation=https://github.com/GoogleCloudPlatform/kubernetes
+
+[Service]
+ExecStart=/etc/kubernetes/node-upgrade-gcp.sh
+
+[Install]
+WantedBy=multi-user.target
