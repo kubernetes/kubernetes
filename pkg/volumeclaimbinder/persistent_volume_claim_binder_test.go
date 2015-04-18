@@ -20,12 +20,35 @@ import (
 	"fmt"
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/testclient"
 )
+
+func TestRunStop(t *testing.T) {
+	o := testclient.NewObjects(api.Scheme)
+	client := &testclient.Fake{ReactFn: testclient.ObjectReaction(o, latest.RESTMapper)}
+	binder := NewPersistentVolumeClaimBinder(client, 1*time.Second)
+
+	if len(binder.stopChannels) != 0 {
+		t.Errorf("Non-running binder should not have any stopChannels.  Got %v", len(binder.stopChannels))
+	}
+
+	binder.Run()
+
+	if len(binder.stopChannels) != 2 {
+		t.Errorf("Running binder should have exactly 2 stopChannels.  Got %v", len(binder.stopChannels))
+	}
+
+	binder.Stop()
+
+	if len(binder.stopChannels) != 0 {
+		t.Errorf("Non-running binder should not have any stopChannels.  Got %v", len(binder.stopChannels))
+	}
+}
 
 func TestExampleObjects(t *testing.T) {
 

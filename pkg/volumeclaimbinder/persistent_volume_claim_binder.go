@@ -39,6 +39,7 @@ type PersistentVolumeClaimBinder struct {
 	volumeController *framework.Controller
 	claimController  *framework.Controller
 	client           binderClient
+	stopChannels     map[string]chan struct{}
 }
 
 // NewPersistentVolumeClaimBinder creates a new PersistentVolumeClaimBinder
@@ -234,8 +235,27 @@ func syncClaim(volumeIndex *persistentVolumeOrderedIndex, binderClient binderCli
 
 func (controller *PersistentVolumeClaimBinder) Run() {
 	glog.V(5).Infof("Starting PersistentVolumeClaimBinder\n")
-	go controller.claimController.Run(make(chan struct{}))
-	go controller.volumeController.Run(make(chan struct{}))
+	if controller.stopChannels == nil {
+		controller.stopChannels = make(map[string]chan struct{})
+	}
+
+	if _, exists := controller.stopChannels["volumes"]; !exists {
+		controller.stopChannels["volumes"] = make(chan struct{})
+		go controller.volumeController.Run(controller.stopChannels["volumes"])
+	}
+
+	if _, exists := controller.stopChannels["claims"]; !exists {
+		controller.stopChannels["claims"] = make(chan struct{})
+		go controller.claimController.Run(controller.stopChannels["claims"])
+	}
+}
+
+func (controller *PersistentVolumeClaimBinder) Stop() {
+	glog.V(5).Infof("Stopping PersistentVolumeClaimBinder\n")
+	for name, stopChan := range controller.stopChannels {
+		close(stopChan)
+		delete(controller.stopChannels, name)
+	}
 }
 
 // binderClient abstracts access to PVs and PVCs
