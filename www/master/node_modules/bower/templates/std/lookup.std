@@ -1,8 +1,0 @@
-{{#condense}}
-{{#if url}}
-{{#cyan}}{{name}}{{/cyan}} {{url}}
-{{else}}
-Package not found.
-{{/if}}
-{{/condense}}
-

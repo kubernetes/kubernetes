@@ -1,4 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" version="1.1" baseProfile="full" width="100px" height="100px" viewBox="0 0 100 100">
-  <rect id="rect" width="50" height="50" fill="blue" onclick="document.getElementById('rect').setAttribute('fill', 'green')" />
-</svg>

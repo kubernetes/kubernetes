@@ -1,9 +1,0 @@
-<div>Details for:
-  <select ng-model="planet" ng-options="planet.name for planet in planets">
-</select>
-<div class="planet-info">
-  <div>{{planet.name}}</div>
-  <div>Radius: {{getRadiusKm()}}km</div>
-  <div>Moons: <span ng-repeat="moon in planet.moons">{{moon}}</span></div>
-</div>
-</div>

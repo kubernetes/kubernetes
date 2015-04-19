@@ -1,4 +1,0 @@
-ArgumentError: error evaluating function `svg-gradient`: svg-gradient direction must be 'to bottom', 'to right', 'to bottom right', 'to top right' or 'ellipse at center' in {path}svg-gradient1.less on line 2, column 6:
-1 .a {
-2   a: svg-gradient(horizontal, black, white);
-3 }

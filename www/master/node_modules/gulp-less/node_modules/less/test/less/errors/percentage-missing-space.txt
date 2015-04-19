@@ -1,4 +1,0 @@
-SyntaxError: Invalid % without number in {path}percentage-missing-space.less on line 2, column 3:
-1 .a {
-2   error: calc(1 %);
-3 }

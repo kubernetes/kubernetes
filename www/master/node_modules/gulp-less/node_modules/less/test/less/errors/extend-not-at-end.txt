@@ -1,3 +1,0 @@
-SyntaxError: Extend can only be used at the end of selector in {path}extend-not-at-end.less on line 1, column 21:
-1 .a:extend(.b all).c {
-2   property: red;

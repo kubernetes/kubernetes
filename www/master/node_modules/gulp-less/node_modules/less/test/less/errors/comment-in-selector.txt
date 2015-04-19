@@ -1,2 +1,0 @@
-ParseError: Unrecognised input in {path}comment-in-selector.less on line 1, column 21:
-1 #gaga /* Comment */ span { color: red }

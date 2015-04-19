@@ -1,4 +1,0 @@
-ParseError: Unrecognised input in {path}property-ie5-hack.less on line 2, column 3:
-1 .test {
-2   display/*/: block; /*sorry for IE5*/
-3 }

@@ -1,3 +1,0 @@
-ParseError: missing closing `)` in {path}parse-error-missing-parens.less on line 1, column 8:
-1 @media (missing: bracket {
-2   body {

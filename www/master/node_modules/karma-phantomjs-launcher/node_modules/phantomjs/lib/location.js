@@ -1,1 +1,0 @@
-module.exports.location = "phantom/bin/phantomjs"

@@ -1,6 +1,0 @@
-*.swp
-.idea
-node_modules
-src
-test
-Cakefile

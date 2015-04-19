@@ -1,3 +1,0 @@
-ParseError: missing opening `(` in {path}parse-error-extra-parens.less on line 1, column 24:
-1 @media (extra: bracket)) {
-2   body {

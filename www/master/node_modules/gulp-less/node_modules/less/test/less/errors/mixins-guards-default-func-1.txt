@@ -1,4 +1,0 @@
-RuntimeError: Ambiguous use of `default()` found when matching for `.m(1, 2)` in {path}mixins-guards-default-func-1.less on line 8, column 5:
-7     .m(1, 1);
-8     .m(1, 2);
-9 }

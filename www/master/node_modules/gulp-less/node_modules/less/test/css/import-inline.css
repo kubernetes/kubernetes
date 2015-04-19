@@ -1,8 +1,0 @@
-#import {
-  color: #ff0000;
-}
-@media (min-width: 600px) {
-  #css { color: yellow; }
-
-}
-this isn't very valid CSS.

@@ -1,4 +1,0 @@
-ArgumentError: error evaluating function `color`: argument must be a color keyword or 3/6 digit hex e.g. #FFF in {path}color-func-invalid-color.less on line 2, column 10:
-1 .test {
-2   color: color("NOT A COLOR");
-3 }

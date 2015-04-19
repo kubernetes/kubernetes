@@ -1,6 +1,0 @@
-{
-    "environments": ["node"],
-    "disallowVars": true,
-    "disallowDuplicated": true,
-    "disallowUnknownReferences": true
-}

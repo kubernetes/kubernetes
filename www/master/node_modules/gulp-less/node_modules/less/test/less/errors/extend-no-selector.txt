@@ -1,3 +1,0 @@
-SyntaxError: Extend must be used to extend a selector, it cannot be used on its own in {path}extend-no-selector.less on line 1, column 17:
-1 :extend(.a all) {
-2   property: red;

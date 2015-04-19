@@ -1,4 +1,0 @@
-NameError: variable @b is undefined in {path}javascript-undefined-var.less on line 2, column 15:
-1 .scope {
-2     @a: `@{b}`;
-3 }

@@ -1,3 +1,0 @@
-SyntaxError: properties must be inside selector blocks, they cannot be in the root. in {path}property-in-root3.less on line 1, column 1:
-1 prop:1;
-2 .a {

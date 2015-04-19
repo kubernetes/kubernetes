@@ -1,2 +1,0 @@
-NameError: variable @color is undefined in {path}property-interp-not-defined.less on line 1, column 12:
-1 a {outline-@{color}: green}

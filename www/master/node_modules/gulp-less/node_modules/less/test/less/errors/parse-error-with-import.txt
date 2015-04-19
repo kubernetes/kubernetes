@@ -1,4 +1,0 @@
-ParseError: Unrecognised input in {path}parse-error-with-import.less on line 8, column 9:
-7 
-8 nonsense;
-9 

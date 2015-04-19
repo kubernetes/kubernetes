@@ -1,7 +1,0 @@
-{
-  "appenders": [
-    {
-      "type": "console" 
-    }
-  ]
-}

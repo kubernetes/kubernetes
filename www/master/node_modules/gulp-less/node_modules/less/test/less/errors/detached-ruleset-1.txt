@@ -1,4 +1,0 @@
-SyntaxError: Rulesets cannot be evaluated on a property. in {path}detached-ruleset-1.less on line 5, column 3:
-4 .a {
-5   a: @a;
-6 }

@@ -1,2 +1,0 @@
-This directory contains modules internal to selenium-webdriver that are not
-intended for general consumption. They may change at any time.

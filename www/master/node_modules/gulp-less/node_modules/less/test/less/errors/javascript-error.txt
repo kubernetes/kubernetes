@@ -1,4 +1,0 @@
-SyntaxError: JavaScript evaluation error: 'TypeError: Cannot read property 'toJS' of undefined' in {path}javascript-error.less on line 2, column 25:
-1 .scope {
-2     var: `this.foo.toJS`;
-3 }

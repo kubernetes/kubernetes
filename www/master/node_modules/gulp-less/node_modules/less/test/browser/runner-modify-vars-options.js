@@ -1,2 +1,0 @@
-/* exported less */
-var less = {};

@@ -1,3 +1,0 @@
---require ./test/bootstrap/
---ui bdd
---reporter spec

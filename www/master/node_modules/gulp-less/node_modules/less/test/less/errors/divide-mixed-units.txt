@@ -1,4 +1,0 @@
-SyntaxError: Multiple units in dimension. Correct the units or use the unit function. Bad unit: px/em in {path}divide-mixed-units.less on line 2, column 3:
-1 .a {
-2   error: (1px / 3em);
-3 }

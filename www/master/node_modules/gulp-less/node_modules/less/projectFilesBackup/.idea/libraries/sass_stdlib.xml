@@ -1,8 +1,0 @@
-<component name="libraryTable">
-  <library name="sass-stdlib">
-    <CLASSES />
-    <SOURCES>
-      <root url="file://$APPLICATION_HOME_DIR$/plugins/sass/lib/stubs/sass_functions.scss" />
-    </SOURCES>
-  </library>
-</component>

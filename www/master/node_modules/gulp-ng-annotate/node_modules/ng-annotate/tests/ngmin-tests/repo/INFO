@@ -1,6 +1,0 @@
-Tests imported 2014-05-09 from https://github.com/btford/ngmin.git
-(revision be63c57076dc8fca81347260ca1e5923ccdbf8ec)
-ngmin is MIT licensed, author Brian Ford
-
-../ngmin_original.js and ../ngmin_with_annotations.js are reduced versions
-of the original test files.

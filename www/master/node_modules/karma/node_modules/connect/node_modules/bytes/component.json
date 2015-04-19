@@ -1,7 +1,0 @@
-{
-  "name": "bytes",
-  "description": "byte size string parser / serializer",
-  "keywords": ["bytes", "utility"],
-  "version": "0.1.0",
-  "scripts": ["index.js"]
-}

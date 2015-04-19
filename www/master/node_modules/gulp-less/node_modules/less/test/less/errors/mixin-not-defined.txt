@@ -1,3 +1,0 @@
-NameError: .mixin-not-defined is undefined in {path}mixin-not-defined.less on line 11, column 1:
-10 
-11 .mixin-not-defined();
