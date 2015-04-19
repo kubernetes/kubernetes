@@ -1,0 +1,21 @@
+﻿<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <title></title>
+    <script type="text/javascript">
+    function setcolor(what){
+        document.body.style.backgroundColor=what
+        document.cookie="bgcolor="+what
+    }
+    
+    function popuponclick() {
+        my_window = window.open("sessionCookieDest.html", "cookiedestwindow", "status=1,width=350,height=150");
+    }  
+    </script>
+</head>
+<body>
+    <input id="setcolorbutton" type="button" value="Set Background Color" onclick="setcolor('#80FFFF')"/>
+    <input id="openwindowbutton" type="button" value="Open New Window" onclick="popuponclick()"/>
+</body>
+</html>

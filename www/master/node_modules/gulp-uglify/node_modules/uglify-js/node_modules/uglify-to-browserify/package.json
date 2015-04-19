@@ -1,0 +1,30 @@
+{
+  "name": "uglify-to-browserify",
+  "version": "1.0.2",
+  "description": "A transform to make UglifyJS work in browserify.",
+  "keywords": [],
+  "dependencies": {},
+  "devDependencies": {
+    "uglify-js": "~2.4.0",
+    "source-map": "~0.1.27"
+  },
+  "scripts": {
+    "test": "node test/index.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ForbesLindesay/uglify-to-browserify.git"
+  },
+  "author": {
+    "name": "ForbesLindesay"
+  },
+  "license": "MIT",
+  "readme": "# uglify-to-browserify\r\n\r\nA transform to make UglifyJS work in browserify.\r\n\r\n[![Build Status](https://travis-ci.org/ForbesLindesay/uglify-to-browserify.png?branch=master)](https://travis-ci.org/ForbesLindesay/uglify-to-browserify)\r\n[![Dependency Status](https://gemnasium.com/ForbesLindesay/uglify-to-browserify.png)](https://gemnasium.com/ForbesLindesay/uglify-to-browserify)\r\n[![NPM version](https://badge.fury.io/js/uglify-to-browserify.png)](http://badge.fury.io/js/uglify-to-browserify)\r\n\r\n## Installation\r\n\r\n    npm install uglify-to-browserify\r\n\r\n## License\r\n\r\n  MIT",
+  "readmeFilename": "README.md",
+  "bugs": {
+    "url": "https://github.com/ForbesLindesay/uglify-to-browserify/issues"
+  },
+  "homepage": "https://github.com/ForbesLindesay/uglify-to-browserify",
+  "_id": "uglify-to-browserify@1.0.2",
+  "_from": "uglify-to-browserify@~1.0.0"
+}

@@ -1,0 +1,33 @@
+<!DOCTYPE html><meta charset="UTF-8"><meta http-equiv="Content-Language" content="en" /><title>webdriver.http.CorsClient</title><link href="dossier.css" rel="stylesheet" type="text/css"><div id="main-wrapper"><input type="checkbox" id="sidenav-toggle" /><main><header><h1>Class webdriver.http.CorsClient</h1><a class="source" href="source/lib/webdriver/http/corsclient.js.src.html#l64">code &raquo;</a><dl><dt>All implemented interfaces:<dd><code><a href="interface_webdriver_http_Client.html">webdriver.http.Client</a></code></dl></header><section><p>Communicates with a WebDriver server, which may be on a different domain,
+ using the <a href="http://www.w3.org/TR/cors/">cross-origin resource sharing
+ </a> (CORS) extension to WebDriver's JSON wire protocol.
+
+ <p>Each command from the standard JSON protocol will be encoded in a
+ JSON object with the following form:
+ {method:string, path:string, data:!Object}
+
+ <p>The encoded command is then sent as a POST request to the server's /xdrpc
+ endpoint.  The server will decode the command, re-route it to the appropriate
+ handler, and then return the command's response as a standard JSON response
+ object.  The JSON responses will <em>always</em> be returned with a 200
+ response from the server; clients must rely on the response's "status" field
+ to determine whether the command succeeded.
+
+ <p>This client cannot be used with the standard wire protocol due to
+ limitations in the various browser implementations of the CORS specification:
+ <ul>
+   <li>IE's <a href="http://goo.gl/6l3kA">XDomainRequest</a> object is only
+     capable of generating the types of requests that may be generated through
+     a standard <a href="http://goo.gl/vgzAU">HTML form</a> - it can not send
+     DELETE requests, as is required in the wire protocol.
+   <li>WebKit's implementation of CORS does not follow the spec and forbids
+     redirects: https://bugs.webkit.org/show_bug.cgi?id=57600
+     This limitation appears to be intentional and is documented in WebKit's
+     Layout tests:
+     //LayoutTests/http/tests/xmlhttprequest/access-control-and-redirects.html
+   <li>If the server does not return a 2xx response, IE and Opera's
+     implementations will fire the XDomainRequest/XMLHttpRequest object's
+     onerror handler, but without the corresponding response text returned by
+     the server. This renders IE and Opera incapable of handling command
+     failures in the standard JSON protocol.
+ </ul><h2>Constructor</h2><div class="ctor wrap-details public"><div><div class="ctor"><span class="member">webdriver.http.CorsClient <span class="args">( url )</span></span></div><div class="info"><table><tbody><tr><th>Parameters<tr><td><dl><dt>url: <code class="type"><a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/String">string</a></code><dd>URL for the WebDriver server to send commands to.</dl></table></div></div></div></section><div id="visibility-controls"><b>Show:</b><label for="show-public"><span><input type="checkbox" id="show-public" checked/></span>Public</label><label for="show-protected"><span><input type="checkbox" id="show-protected"/></span>Protected</label><label for="show-private"><span><input type="checkbox" id="show-private"/></span>Private</label></div><section id="instance-methods"><h2>Instance Methods</h2><div class="wrap-details public"><div><details class="function"><summary><div><a class="source" href="source/lib/webdriver/http/corsclient.js.src.html#l96">code &raquo;</a><span class="member"><a name="send">send</a> <span class="args">( request, callback )</span></span></div></summary><div class="info"><table><tbody><tr><th>Parameters<tr><td><dl><dt>request<dt>callback</dl></table></div></details></div></div></section><section id="instance-properties"><h2>Instance Properties</h2><div class="wrap-details private"><div><details><summary><div><a class="source" href="source/lib/webdriver/http/corsclient.js.src.html#l71">code &raquo;</a><span class="member"><a name="url_">url_</a> : <code class="type"><a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/String">string</a></code></span></div></summary></details></div></div></section><section id="static-functions"><h2>Static Functions</h2><div class="wrap-details public"><div><details class="function"><summary><div><a class="source" href="source/lib/webdriver/http/corsclient.js.src.html#l88">code &raquo;</a><span class="member"><a name="webdriver.http.CorsClient.isAvailable">webdriver.http.CorsClient.isAvailable</a> <span class="args">( )</span> &rArr; <code class="type"><a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Boolean">boolean</a></code></span></div><p>Tests whether the current environment supports cross-origin resource sharing.</summary><div class="info"><table><tbody><tr><th>Returns<tr><td><dl>Whether cross-origin resource sharing is supported.</dl></table></div></details></div></div></section><section id="static-properties"><h2>Static Properties</h2><div class="wrap-details public"><div><details><summary><div><a class="source" href="source/lib/webdriver/http/corsclient.js.src.html#l80">code &raquo;</a><span class="member"><a name="webdriver.http.CorsClient.XDRPC_ENDPOINT">webdriver.http.CorsClient.XDRPC_ENDPOINT</a> : <code class="type"><a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/String">string</a></code></span></div><p>Resource URL to send commands to on the server.</summary></details></div></div></section></main><nav id="topnav"><div><div id="menubutton"><label for="sidenav-toggle">Menu</label></div><form id="searchbox"><div><input type="search" placeholder="Search" tabindex="1"></div></form></div></nav><nav id="sidenav"><input type="checkbox" id="sidenav-types-ctrl" /><input type="checkbox" id="sidenav-files-ctrl" /><input type="checkbox" id="sidenav-modules-ctrl" /><a id="sidenav-overview"><div><h4>Overview</h4></div></a><div id="sidenav-types"><label for="sidenav-types-ctrl"><h4>Types</h4></label><i>Loading</i></div><div id="sidenav-modules"><label for="sidenav-modules-ctrl"><h4>Modules</h4></label><i>Loading</i></div><div id="sidenav-files"><label for="sidenav-files-ctrl"><h4>Files</h4></label><i>Loading</i></div><a href="license.html"><div><h4>License</h4></div></a></nav><div id="push-footer"></div></div><footer><a href="https://github.com/jleyba/js-dossier">Generated by dossier</a></footer><script src="types.js"></script><script src="dossier.js"></script>

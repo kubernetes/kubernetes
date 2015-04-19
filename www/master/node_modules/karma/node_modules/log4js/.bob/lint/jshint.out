@@ -1,0 +1,71 @@
+lib/appenders/clustered.js: line 14, col 106, Line is too long.
+lib/appenders/clustered.js: line 26, col 108, Line is too long.
+lib/appenders/clustered.js: line 29, col 117, Line is too long.
+lib/appenders/clustered.js: line 60, col 102, Line is too long.
+lib/appenders/clustered.js: line 74, col 3, Mixed spaces and tabs.
+lib/appenders/clustered.js: line 74, col 120, Line is too long.
+lib/appenders/clustered.js: line 74, col 23, Expected 'if' to have an indentation at 11 instead at 23.
+lib/appenders/clustered.js: line 75, col 107, Line is too long.
+lib/appenders/clustered.js: line 77, col 20, Mixed spaces and tabs.
+lib/appenders/clustered.js: line 77, col 27, Expected '}' to have an indentation at 11 instead at 27.
+lib/appenders/clustered.js: line 80, col 6, Missing semicolon.
+lib/appenders/clustered.js: line 87, col 113, Line is too long.
+lib/appenders/clustered.js: line 106, col 6, Missing semicolon.
+lib/appenders/clustered.js: line 120, col 112, Line is too long.
+
+lib/appenders/fileSync.js: line 153, col 13, Expected 'fs' to have an indentation at 11 instead at 13.
+lib/appenders/fileSync.js: line 158, col 13, Expected '}' to have an indentation at 15 instead at 13.
+lib/appenders/fileSync.js: line 159, col 9, Expected '}' to have an indentation at 11 instead at 9.
+
+lib/appenders/gelf.js: line 56, col 24, ['_facility'] is better written in dot notation.
+lib/appenders/gelf.js: line 37, col 23, This function has too many statements. (21)
+lib/appenders/gelf.js: line 37, col 23, This function's cyclomatic complexity is too high. (8)
+
+lib/appenders/loggly.js: line 43, col 146, Line is too long.
+lib/appenders/loggly.js: line 29, col 32, This function's cyclomatic complexity is too high. (7)
+lib/appenders/loggly.js: line 56, col 9, Expected 'for' to have an indentation at 5 instead at 9.
+lib/appenders/loggly.js: line 57, col 8, Mixed spaces and tabs.
+lib/appenders/loggly.js: line 57, col 11, Expected 'msg' to have an indentation at 7 instead at 11.
+lib/appenders/loggly.js: line 58, col 9, Expected '}' to have an indentation at 5 instead at 9.
+
+lib/appenders/multiprocess.js: line 99, col 128, Line is too long.
+lib/appenders/multiprocess.js: line 99, col 3, Expected 'if' to have an indentation at 5 instead at 3.
+lib/appenders/multiprocess.js: line 100, col 5, Expected 'loggingEvent' to have an indentation at 7 instead at 5.
+lib/appenders/multiprocess.js: line 101, col 3, Expected '}' to have an indentation at 5 instead at 3.
+
+lib/connect-logger.js: line 34, col 19, This function's cyclomatic complexity is too high. (6)
+lib/connect-logger.js: line 113, col 16, This function's cyclomatic complexity is too high. (10)
+
+lib/layouts.js: line 163, col 24, This function's cyclomatic complexity is too high. (6)
+
+lib/log4js.js: line 177, col 41, Blocks are nested too deeply. (4)
+lib/log4js.js: line 258, col 19, This function's cyclomatic complexity is too high. (9)
+
+lib/streams/DateRollingFileStream.js: line 11, col 31, This function has too many statements. (22)
+lib/streams/DateRollingFileStream.js: line 11, col 31, This function's cyclomatic complexity is too high. (8)
+
+test/clusteredAppender-test.js: line 30, col 8, Missing semicolon.
+test/clusteredAppender-test.js: line 41, col 33, Expected 'appenders' to have an indentation at 9 instead at 33.
+test/clusteredAppender-test.js: line 60, col 68, Missing semicolon.
+test/clusteredAppender-test.js: line 61, col 7, Expected 'assert' to have an indentation at 25 instead at 7.
+test/clusteredAppender-test.js: line 63, col 5, Expected '}' to have an indentation at 23 instead at 5.
+test/clusteredAppender-test.js: line 115, col 102, Line is too long.
+test/clusteredAppender-test.js: line 123, col 105, Line is too long.
+
+test/fileSyncAppender-test.js: line 28, col 102, Line is too long.
+test/fileSyncAppender-test.js: line 54, col 101, Line is too long.
+test/fileSyncAppender-test.js: line 165, col 13, Expected '}' to have an indentation at 15 instead at 13.
+test/fileSyncAppender-test.js: line 167, col 13, Expected 'levels' to have an indentation at 15 instead at 13.
+test/fileSyncAppender-test.js: line 168, col 9, Expected '}' to have an indentation at 13 instead at 9.
+
+test/logging-test.js: line 88, col 8, Expected 'appenderShutdownCalled' to have an indentation at 9 instead at 8.
+test/logging-test.js: line 89, col 8, Expected 'shutdownCallbackCalled' to have an indentation at 9 instead at 8.
+test/logging-test.js: line 111, col 9, Expected 'events' to have an indentation at 11 instead at 9.
+test/logging-test.js: line 112, col 7, Expected '}' to have an indentation at 9 instead at 7.
+
+test/multiprocess-test.js: line 78, col 1, Mixed spaces and tabs.
+test/multiprocess-test.js: line 78, col 5, Expected 'appender' to have an indentation at 7 instead at 5.
+test/multiprocess-test.js: line 104, col 111, Line is too long.
+test/multiprocess-test.js: line 107, col 105, Line is too long.
+
+57 errors

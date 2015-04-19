@@ -1,0 +1,37 @@
+{
+  "name": "chainsaw",
+  "version": "0.1.0",
+  "description": "Build chainable fluent interfaces the easy way... with a freakin' chainsaw!",
+  "main": "./index.js",
+  "repository": {
+    "type": "git",
+    "url": "http://github.com/substack/node-chainsaw.git"
+  },
+  "dependencies": {
+    "traverse": ">=0.3.0 <0.4"
+  },
+  "keywords": [
+    "chain",
+    "fluent",
+    "interface",
+    "monad",
+    "monadic"
+  ],
+  "author": {
+    "name": "James Halliday",
+    "email": "mail@substack.net",
+    "url": "http://substack.net"
+  },
+  "license": "MIT/X11",
+  "engine": {
+    "node": ">=0.4.0"
+  },
+  "readme": "Chainsaw\n========\n\nBuild chainable fluent interfaces the easy way in node.js.\n\nWith this meta-module you can write modules with chainable interfaces.\nChainsaw takes care of all of the boring details and makes nested flow control\nsuper simple too.\n\nJust call `Chainsaw` with a constructor function like in the examples below.\nIn your methods, just do `saw.next()` to move along to the next event and\n`saw.nest()` to create a nested chain.\n\nExamples\n========\n\nadd_do.js\n---------\n\nThis silly example adds values with a chainsaw.\n\n    var Chainsaw = require('chainsaw');\n    \n    function AddDo (sum) {\n        return Chainsaw(function (saw) {\n            this.add = function (n) {\n                sum += n;\n                saw.next();\n            };\n             \n            this.do = function (cb) {\n                saw.nest(cb, sum);\n            };\n        });\n    }\n    \n    AddDo(0)\n        .add(5)\n        .add(10)\n        .do(function (sum) {\n            if (sum > 12) this.add(-10);\n        })\n        .do(function (sum) {\n            console.log('Sum: ' + sum);\n        })\n    ;\n\nOutput:\n    Sum: 5\n\nprompt.js\n---------\n\nThis example provides a wrapper on top of stdin with the help of\n[node-lazy](https://github.com/pkrumins/node-lazy) for line-processing.\n\n    var Chainsaw = require('chainsaw');\n    var Lazy = require('lazy');\n    \n    module.exports = Prompt;\n    function Prompt (stream) {\n        var waiting = [];\n        var lines = [];\n        var lazy = Lazy(stream).lines.map(String)\n            .forEach(function (line) {\n                if (waiting.length) {\n                    var w = waiting.shift();\n                    w(line);\n                }\n                else lines.push(line);\n            })\n        ;\n        \n        var vars = {};\n        return Chainsaw(function (saw) {\n            this.getline = function (f) {\n                var g = function (line) {\n                    saw.nest(f, line, vars);\n                };\n                \n                if (lines.length) g(lines.shift());\n                else waiting.push(g);\n            };\n            \n            this.do = function (cb) {\n                saw.nest(cb, vars);\n            };\n        });\n    }\n\nAnd now for the new Prompt() module in action:\n\n    var util = require('util');\n    var stdin = process.openStdin();\n     \n    Prompt(stdin)\n        .do(function () {\n            util.print('x = ');\n        })\n        .getline(function (line, vars) {\n            vars.x = parseInt(line, 10);\n        })\n        .do(function () {\n            util.print('y = ');\n        })\n        .getline(function (line, vars) {\n            vars.y = parseInt(line, 10);\n        })\n        .do(function (vars) {\n            if (vars.x + vars.y < 10) {\n                util.print('z = ');\n                this.getline(function (line) {\n                    vars.z = parseInt(line, 10);\n                })\n            }\n            else {\n                vars.z = 0;\n            }\n        })\n        .do(function (vars) {\n            console.log('x + y + z = ' + (vars.x + vars.y + vars.z));\n            process.exit();\n        })\n    ;\n\nInstallation\n============\n\nWith [npm](http://github.com/isaacs/npm), just do:\n    npm install chainsaw\n\nor clone this project on github:\n\n    git clone http://github.com/substack/node-chainsaw.git\n\nTo run the tests with [expresso](http://github.com/visionmedia/expresso),\njust do:\n\n    expresso\n\n\nLight Mode vs Full Mode\n=======================\n\n`node-chainsaw` supports two different modes. In full mode, every\naction is recorded, which allows you to replay actions using the\n`jump()`, `trap()` and `down()` methods.\n\nHowever, if your chainsaws are long-lived, recording every action can\nconsume a tremendous amount of memory, so we also offer a \"light\" mode\nwhere actions are not recorded and the aforementioned methods are\ndisabled.\n\nTo enable light mode simply use `Chainsaw.light()` to construct your\nsaw, instead of `Chainsaw()`.\n\n\n",
+  "readmeFilename": "README.markdown",
+  "bugs": {
+    "url": "https://github.com/substack/node-chainsaw/issues"
+  },
+  "homepage": "https://github.com/substack/node-chainsaw",
+  "_id": "chainsaw@0.1.0",
+  "_from": "chainsaw@~0.1.0"
+}

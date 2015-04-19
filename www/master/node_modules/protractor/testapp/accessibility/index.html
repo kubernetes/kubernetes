@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+
+<html ng-app="xApp" lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>Angular.js Example</title>
+    <script src="../../lib/angular/angular.min.js"></script>
+    <script src="../../lib/angular/angular-aria.min.js"></script>
+    <script>
+      angular.module('xApp', []);
+    </script>
+  </head>
+  <body>
+    <label for="firstName">First name:</label>
+    <input ng-model="firstName" type="text" id="firstName" />
+    <br>
+    <label for="lastName">Last name:</label>
+    <input ng-model="lastName" type="text" id="lastName" />
+    <br>
+    Hello {{firstName}} {{lastName}}
+    <img src="http://example.com/img.jpg" alt="Firstname Lastname">
+  </body>
+</html>

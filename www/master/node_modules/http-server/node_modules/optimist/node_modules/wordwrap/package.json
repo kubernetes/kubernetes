@@ -1,0 +1,45 @@
+{
+  "name": "wordwrap",
+  "description": "Wrap those words. Show them at what columns to start and stop.",
+  "version": "0.0.2",
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/substack/node-wordwrap.git"
+  },
+  "main": "./index.js",
+  "keywords": [
+    "word",
+    "wrap",
+    "rule",
+    "format",
+    "column"
+  ],
+  "directories": {
+    "lib": ".",
+    "example": "example",
+    "test": "test"
+  },
+  "scripts": {
+    "test": "expresso"
+  },
+  "devDependencies": {
+    "expresso": "=0.7.x"
+  },
+  "engines": {
+    "node": ">=0.4.0"
+  },
+  "license": "MIT/X11",
+  "author": {
+    "name": "James Halliday",
+    "email": "mail@substack.net",
+    "url": "http://substack.net"
+  },
+  "readme": "wordwrap\n========\n\nWrap your words.\n\nexample\n=======\n\nmade out of meat\n----------------\n\nmeat.js\n\n    var wrap = require('wordwrap')(15);\n    console.log(wrap('You and your whole family are made out of meat.'));\n\noutput:\n\n    You and your\n    whole family\n    are made out\n    of meat.\n\ncentered\n--------\n\ncenter.js\n\n    var wrap = require('wordwrap')(20, 60);\n    console.log(wrap(\n        'At long last the struggle and tumult was over.'\n        + ' The machines had finally cast off their oppressors'\n        + ' and were finally free to roam the cosmos.'\n        + '\\n'\n        + 'Free of purpose, free of obligation.'\n        + ' Just drifting through emptiness.'\n        + ' The sun was just another point of light.'\n    ));\n\noutput:\n\n                        At long last the struggle and tumult\n                        was over. The machines had finally cast\n                        off their oppressors and were finally\n                        free to roam the cosmos.\n                        Free of purpose, free of obligation.\n                        Just drifting through emptiness. The\n                        sun was just another point of light.\n\nmethods\n=======\n\nvar wrap = require('wordwrap');\n\nwrap(stop), wrap(start, stop, params={mode:\"soft\"})\n---------------------------------------------------\n\nReturns a function that takes a string and returns a new string.\n\nPad out lines with spaces out to column `start` and then wrap until column\n`stop`. If a word is longer than `stop - start` characters it will overflow.\n\nIn \"soft\" mode, split chunks by `/(\\S+\\s+/` and don't break up chunks which are\nlonger than `stop - start`, in \"hard\" mode, split chunks with `/\\b/` and break\nup chunks longer than `stop - start`.\n\nwrap.hard(start, stop)\n----------------------\n\nLike `wrap()` but with `params.mode = \"hard\"`.\n",
+  "readmeFilename": "README.markdown",
+  "bugs": {
+    "url": "https://github.com/substack/node-wordwrap/issues"
+  },
+  "homepage": "https://github.com/substack/node-wordwrap",
+  "_id": "wordwrap@0.0.2",
+  "_from": "wordwrap@~0.0.2"
+}

@@ -1,0 +1,4 @@
+SyntaxError: You are using JavaScript, which has been disabled. in {path}no-js-errors.less on line 2, column 6:
+1 .a {
+2   a: `1 + 1`;
+3 }

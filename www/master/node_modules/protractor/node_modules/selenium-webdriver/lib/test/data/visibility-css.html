@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta content="text/html; charset=UTF-8" http-equiv="content-type" />
+<title>Visibility test via CSS</title>
+<style>
+
+.box-popup {
+  border : 1px;
+  min-width : 150px;
+}
+body {
+  overflow : hidden;
+}
+</style></head><body>
+<div style="left: 30px; top: 10px; visibility: visible; position: absolute; overflow: visible;"
+     class="box-popup" id="suggest">
+    <p>Hello world. I like cheese.</p>
+</div>
+</body>
+</html>

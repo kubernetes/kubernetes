@@ -1,0 +1,56 @@
+{
+  "name": "object-keys",
+  "version": "0.4.0",
+  "author": {
+    "name": "Jordan Harband"
+  },
+  "description": "An Object.keys replacement, in case Object.keys is not available. From https://github.com/kriskowal/es5-shim",
+  "license": "MIT",
+  "main": "index.js",
+  "scripts": {
+    "test": "node test/index.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/ljharb/object-keys.git"
+  },
+  "keywords": [
+    "Object.keys",
+    "keys",
+    "ES5",
+    "shim"
+  ],
+  "dependencies": {},
+  "devDependencies": {
+    "foreach": "~2.0.3",
+    "is": "~0.2.6",
+    "tape": "~1.0.4",
+    "indexof": "~0.0.1"
+  },
+  "testling": {
+    "files": "test/index.js",
+    "browsers": [
+      "iexplore/6.0..latest",
+      "firefox/3.0..6.0",
+      "firefox/15.0..latest",
+      "firefox/nightly",
+      "chrome/4.0..10.0",
+      "chrome/20.0..latest",
+      "chrome/canary",
+      "opera/10.0..latest",
+      "opera/next",
+      "safari/4.0..latest",
+      "ipad/6.0..latest",
+      "iphone/6.0..latest",
+      "android-browser/4.2"
+    ]
+  },
+  "readme": "#object-keys <sup>[![Version Badge][2]][1]</sup>\n\n[![Build Status][3]][4] [![dependency status][5]][6]\n\n[![browser support][7]][8]\n\nAn Object.keys shim. Uses Object.keys if available.\n\n## Example\n\n```js\nvar keys = require('object-keys');\nvar assert = require('assert');\nvar obj = {\n\ta: true,\n\tb: true,\n\tc: true\n};\n\nassert.equal(keys(obj), ['a', 'b', 'c']);\n```\n\n## Source\nImplementation taken directly from [es5-shim]([9]), with modifications, including from [lodash]([10]).\n\n## Tests\nSimply clone the repo, `npm install`, and run `npm test`\n\n[1]: https://npmjs.org/package/object-keys\n[2]: http://vb.teelaun.ch/ljharb/object-keys.svg\n[3]: https://travis-ci.org/ljharb/object-keys.png\n[4]: https://travis-ci.org/ljharb/object-keys\n[5]: https://david-dm.org/ljharb/object-keys.png\n[6]: https://david-dm.org/ljharb/object-keys\n[7]: https://ci.testling.com/ljharb/object-keys.png\n[8]: https://ci.testling.com/ljharb/object-keys\n[9]: https://github.com/kriskowal/es5-shim/blob/master/es5-shim.js#L542-589\n[10]: https://github.com/bestiejs/lodash\n\n",
+  "readmeFilename": "README.md",
+  "bugs": {
+    "url": "https://github.com/ljharb/object-keys/issues"
+  },
+  "homepage": "https://github.com/ljharb/object-keys",
+  "_id": "object-keys@0.4.0",
+  "_from": "object-keys@~0.4.0"
+}

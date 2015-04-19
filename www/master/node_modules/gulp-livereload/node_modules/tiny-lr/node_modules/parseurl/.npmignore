@@ -1,0 +1,4 @@
+benchmark/
+coverage/
+test/
+.travis.yml

@@ -1,0 +1,9 @@
+
+guard-default-func-conflict {
+    .m(@x, 1)                  {}
+    .m(@x, 2) when (default()) {}
+    .m(@x, 2) when (default()) {}
+
+    .m(1, 1);
+    .m(1, 2);
+}

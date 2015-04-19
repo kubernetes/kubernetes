@@ -1,0 +1,7 @@
+{
+  "loopfunc": true,
+  "sub": true,
+  "undef": true,
+  "unused": true,
+  "node": true
+}

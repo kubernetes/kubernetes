@@ -1,0 +1,14 @@
+.*
+*.bat
+*.md
+*.min.*
+*.txt
+*.log
+package.json
+node_modules
+doc
+examples
+src
+tests
+.nuget
+nuget

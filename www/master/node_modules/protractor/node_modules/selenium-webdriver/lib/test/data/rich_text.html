@@ -1,0 +1,161 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+        "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+<script type="text/javascript">
+function setKeypressHandler (el, keyHandler) {
+  if (el.addEventListener) {
+    el.addEventListener('keypress', keyHandler, false);
+    el.addEventListener('keydown', keyHandler, false);
+    el.addEventListener('keyup', keyHandler, false);
+  } else {
+    el.attachEvent('onkeypress', keyHandler);
+    el.attachEvent('onkeydown', keyHandler);
+    el.attachEvent('onkeyup', keyHandler);
+  }
+}
+
+function output (text) {
+  var div = document.getElementById('debugOutput');
+  div.appendChild(document.createTextNode(text));
+  div.appendChild(document.createElement('br'));
+}
+
+window.onload = function () {
+  // Super dumb browser detection
+  var isIE = window.navigator.userAgent.search('MSIE') != -1
+    || window.navigator.userAgent.search('Trident') != -1;
+
+  var editFrame = document.getElementById('editFrame').contentWindow;
+  setKeypressHandler(editFrame.document, printEventData);
+  if (isIE) {
+    editFrame.document.body.contentEditable = true;
+  } else {
+    editFrame.document.designMode = 'On';
+    // Attach a name to the containing HTML element
+    editFrame.document.getElementsByTagName("html")[0].id = "frameHtml";
+  }
+
+  var editDiv = document.getElementById('editDiv');
+  setKeypressHandler(editDiv, printEventData);
+  editDiv.contentEditable = true;
+
+  editFrame.document.body.style.margin = 1;
+  editFrame.document.body.style.padding = 0;
+  editFrame.document.body.id = 'theBody';
+
+  editDiv.style.margin = 1;
+  editDiv.style.padding = 0;
+
+  window.setTimeout(function() {
+    var pre = document.createElement('pre');
+    function write(text) {
+      pre.appendChild(document.createTextNode(text));
+      pre.appendChild(document.createElement('br'));
+    }
+
+    write('frame.contentWindow.document.designMode: ' +
+      editFrame.document.designMode);
+    write('frame.contentWindow.document.body.contentEditable: ' +
+      editFrame.document.body.contentEditable);
+    document.getElementById('editFrameInfo').appendChild(pre);
+
+    pre = document.createElement('pre');
+    write('div.ownerDocument.designMode: ' +
+      editDiv.ownerDocument.designMode);
+    write('div.ownerDocument.body.contentEditable: ' +
+      editDiv.ownerDocument.body.contentEditable);
+    write('div.contentEditable: ' +
+      editDiv.contentEditable);
+    document.getElementById('editDivInfo').appendChild(pre);
+  }, 0);
+};
+
+function isDef(obj, prop) {
+  return typeof obj[prop] != 'undefined';
+}
+
+function printEventData(e) {
+  e = e || window.event;
+
+  function write(id, text, opt_color) {
+    var el = document.getElementById(id);
+    el.innerHTML = '[' + text + ']';
+    el.style.backgroundColor = opt_color || 'white';
+  }
+  write('type', e.type);
+  write('tagName', isDef(e, 'target') ? e.target.tagName : e.srcElement.tagName);
+  write('tagId', isDef(e, 'target') ? e.target.id : e.srcElement.id);
+  write('keyidentifier', isDef(e, 'keyIdentifier') ? e.keyIdentifier : 'n/a');
+  write('keylocation', isDef(e, 'keyLocation') ? e.keyLocation : 'n/a');
+  write('keycode', e.keyCode);
+  write('charcode', e.charCode);
+  write('which', e.which);
+  if (isDef(e, 'isTrusted')) {
+    write('istrusted', e.isTrusted, e.isTrusted ? '#afa' : '#faa');
+  } else {
+    write('istrusted', 'n/a');
+  }
+  write('alt', e.altKey);
+  write('ctrl', e.ctrlKey);
+  write('shift', e.shiftKey);
+  write('meta', e.metaKey);
+
+  var s = "";
+  for (var i in e) {
+    s += i + ": " + e[i] + "   ";
+  }
+  //alert(s);
+}
+</script>
+</head>
+<body>
+<div>
+  <div id="butter" style="background-color: #ffa;">
+  </div>
+  <table width="100%">
+      <tr valign="top">
+        <td width="50%">
+          <div>IFRAME</div>
+          <iframe id="editFrame" name="editFrame" src="" height="200px" width="300px" frameborder="0" style="border: 1px solid black;">
+          </iframe>
+          <div id="editFrameInfo">
+          <pre>frame.contentWindow.document.designMode: on<br>frame.contentWindow.document.body.contentEditable: false<br></pre></div>
+        </td>
+        <td>
+          <div>DIV</div>
+          <div id="editDiv" style="border-top-width: 1px; border-right-width: 1px; border-bottom-width: 1px; border-left-width: 1px; border-top-style: solid; border-right-style: solid; border-bottom-style: solid; border-left-style: solid; border-top-color: black; border-right-color: black; border-bottom-color: black; border-left-color: black; height: 200px; width: 300px; overflow-x: auto; overflow-y: auto; margin-top: 1px; margin-right: 1px; margin-bottom: 1px; margin-left: 1px; padding-top: 0px; padding-right: 0px; padding-bottom: 0px; padding-left: 0px; " contenteditable="true">
+          </div>
+          <div id="editDivInfo">
+          <pre>div.ownerDocument.designMode: off<br>div.ownerDocument.body.contentEditable: false<br>div.contentEditable: true<br></pre></div>
+        </td>
+      </tr>
+  </table>
+</div>
+
+<HR>
+<DIV style="margin: 0px;padding:0px;padding-left:10px;font-family:Courier;">
+  <TABLE cellpadding="0" cellspacing="0" width="200px" style="font-size:9pt;">
+    <TBODY>
+      <TR><TD width="110px">type:</TD><TD id="type" width="90px">[]</TD></TR>
+      <TR><TD>tagName:</TD><TD id="tagName">[]</TD></TR>
+      <TR><TD>id:</TD><TD id="tagId">[]</TD></TR>
+      <TR><TD>keyIdentifier:</TD><TD id="keyidentifier">[]</TD></TR>
+      <TR><TD>keyLocation:</TD><TD id="keylocation">[]</TD></TR>
+      <TR><TD>keyCode:</TD><TD id="keycode">[]</TD></TR>
+      <TR><TD>charCode:</TD><TD id="charcode">[]</TD></TR>
+      <TR><TD>which:</TD><TD id="which">[]</TD></TR>
+      <TR><TD>isTrusted:</TD><TD id="istrusted">[]</TD></TR>
+      <TR><TD colspan="2">---------------------</TD></TR>
+      <TR><TD colspan="2">Modifiers</TD></TR>
+      <TR><TD>alt:</TD><TD id="alt">[]</TD></TR>
+      <TR><TD>ctrl:</TD><TD id="ctrl">[]</TD></TR>
+      <TR><TD>shift:</TD><TD id="shift">[]</TD></TR>
+      <TR><TD>meta:</TD><TD id="meta">[]</TD></TR>
+    </TBODY>
+  </TABLE>
+</DIV>
+
+
+
+</BODY></HTML>

@@ -1,0 +1,57 @@
+.sidebar,
+.sidebar2,
+.type1 .sidebar3,
+.type2.sidebar4 {
+  width: 300px;
+  background: red;
+}
+.sidebar .box,
+.sidebar2 .box,
+.type1 .sidebar3 .box,
+.type2.sidebar4 .box {
+  background: #FFF;
+  border: 1px solid #000;
+  margin: 10px 0;
+}
+.sidebar2 {
+  background: blue;
+}
+.type1 .sidebar3 {
+  background: green;
+}
+.type2.sidebar4 {
+  background: red;
+}
+.button,
+.submit {
+  color: black;
+}
+.button:hover,
+.submit:hover {
+  color: white;
+}
+.button2 :hover {
+  nested: white;
+}
+.button2 :hover {
+  notnested: black;
+}
+.amp-test-h,
+.amp-test-f.amp-test-c .amp-test-a.amp-test-d.amp-test-a.amp-test-e + .amp-test-c .amp-test-a.amp-test-d.amp-test-a.amp-test-e.amp-test-g,
+.amp-test-f.amp-test-c .amp-test-a.amp-test-d.amp-test-a.amp-test-e + .amp-test-c .amp-test-a.amp-test-d.amp-test-b.amp-test-e.amp-test-g,
+.amp-test-f.amp-test-c .amp-test-a.amp-test-d.amp-test-a.amp-test-e + .amp-test-c .amp-test-b.amp-test-d.amp-test-a.amp-test-e.amp-test-g,
+.amp-test-f.amp-test-c .amp-test-a.amp-test-d.amp-test-a.amp-test-e + .amp-test-c .amp-test-b.amp-test-d.amp-test-b.amp-test-e.amp-test-g,
+.amp-test-f.amp-test-c .amp-test-a.amp-test-d.amp-test-b.amp-test-e + .amp-test-c .amp-test-a.amp-test-d.amp-test-a.amp-test-e.amp-test-g,
+.amp-test-f.amp-test-c .amp-test-a.amp-test-d.amp-test-b.amp-test-e + .amp-test-c .amp-test-a.amp-test-d.amp-test-b.amp-test-e.amp-test-g,
+.amp-test-f.amp-test-c .amp-test-a.amp-test-d.amp-test-b.amp-test-e + .amp-test-c .amp-test-b.amp-test-d.amp-test-a.amp-test-e.amp-test-g,
+.amp-test-f.amp-test-c .amp-test-a.amp-test-d.amp-test-b.amp-test-e + .amp-test-c .amp-test-b.amp-test-d.amp-test-b.amp-test-e.amp-test-g,
+.amp-test-f.amp-test-c .amp-test-b.amp-test-d.amp-test-a.amp-test-e + .amp-test-c .amp-test-a.amp-test-d.amp-test-a.amp-test-e.amp-test-g,
+.amp-test-f.amp-test-c .amp-test-b.amp-test-d.amp-test-a.amp-test-e + .amp-test-c .amp-test-a.amp-test-d.amp-test-b.amp-test-e.amp-test-g,
+.amp-test-f.amp-test-c .amp-test-b.amp-test-d.amp-test-a.amp-test-e + .amp-test-c .amp-test-b.amp-test-d.amp-test-a.amp-test-e.amp-test-g,
+.amp-test-f.amp-test-c .amp-test-b.amp-test-d.amp-test-a.amp-test-e + .amp-test-c .amp-test-b.amp-test-d.amp-test-b.amp-test-e.amp-test-g,
+.amp-test-f.amp-test-c .amp-test-b.amp-test-d.amp-test-b.amp-test-e + .amp-test-c .amp-test-a.amp-test-d.amp-test-a.amp-test-e.amp-test-g,
+.amp-test-f.amp-test-c .amp-test-b.amp-test-d.amp-test-b.amp-test-e + .amp-test-c .amp-test-a.amp-test-d.amp-test-b.amp-test-e.amp-test-g,
+.amp-test-f.amp-test-c .amp-test-b.amp-test-d.amp-test-b.amp-test-e + .amp-test-c .amp-test-b.amp-test-d.amp-test-a.amp-test-e.amp-test-g,
+.amp-test-f.amp-test-c .amp-test-b.amp-test-d.amp-test-b.amp-test-e + .amp-test-c .amp-test-b.amp-test-d.amp-test-b.amp-test-e.amp-test-g {
+  test: extended by masses of selectors;
+}

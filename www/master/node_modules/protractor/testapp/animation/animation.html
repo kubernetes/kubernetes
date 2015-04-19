@@ -1,0 +1,10 @@
+<!-- https://docs.angularjs.org/guide/animations -->
+<div id="animationTop">
+  <label>
+    <input id="checkbox" type="checkbox" ng-model="checked" style="float:left; margin-right:10px;">
+    Click Me to toggle with animation
+  </label>
+  <div id="toggledNode" class="animate-if" ng-if="checked" style="clear:both;">
+    I exist!
+  </div>
+</div>

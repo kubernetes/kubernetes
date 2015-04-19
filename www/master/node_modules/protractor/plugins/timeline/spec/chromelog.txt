@@ -1,0 +1,284 @@
+[2.465][INFO]: COMMAND InitSession {
+   "desiredCapabilities": {
+      "browserName": "chrome",
+      "chromeOptions": {
+         "args": [ "start-maximized", "disable-webgl", "blacklist-webgl", "blacklist-accelerated-compositing", "disable-accelerated-2d-canvas", "disable-accelerated-compositing", "disable-accelerated-layers", "disable-accelerated-plugins", "disable-accelerated-video", "disable-accelerated-video-decode", "disable-gpu", "test-type", "disable-threaded-compositing" ],
+         "binary": "/Volumes/Sauce/Chrome/Chrome 35.app/Contents/MacOS/Google Chrome"
+      },
+      "count": 1,
+      "debuggerAddress": "127.0.0.1:9222",
+      "proxy": {
+         "proxyAutoconfigUrl": "http://127.0.0.1:19876/proxy.pac",
+         "proxyType": "PAC"
+      },
+      "webdriver.remote.quietExceptions": true
+   }
+}
+[2.466][INFO]: Populating Preferences file: {
+   "alternate_error_pages": {
+      "enabled": false
+   },
+   "autofill": {
+      "enabled": false
+   },
+   "browser": {
+      "check_default_browser": false
+   },
+   "distribution": {
+      "import_bookmarks": false,
+      "import_history": false,
+      "import_search_engine": false,
+      "make_chrome_default_for_user": false,
+      "show_welcome_page": false,
+      "skip_first_run_ui": true
+   },
+   "dns_prefetching": {
+      "enabled": false
+   },
+   "profile": {
+      "content_settings": {
+         "pattern_pairs": {
+            "https://*,*": {
+               "media-stream": {
+                  "audio": "Default",
+                  "video": "Default"
+               }
+            }
+         }
+      },
+      "default_content_settings": {
+         "geolocation": 1,
+         "mouselock": 1,
+         "notifications": 1,
+         "popups": 1,
+         "ppapi-broker": 1
+      },
+      "password_manager_enabled": false
+   },
+   "safebrowsing": {
+      "enabled": false
+   },
+   "search": {
+      "suggest_enabled": false
+   },
+   "translate": {
+      "enabled": false
+   }
+}
+[2.467][INFO]: Populating Local State file: {
+   "background_mode": {
+      "enabled": false
+   },
+   "ssl": {
+      "rev_checking": {
+         "enabled": false
+      }
+   }
+}
+[2.469][INFO]: Launching chrome: /Volumes/Sauce/Chrome/Chrome 35.app/Contents/MacOS/Google Chrome --blacklist-accelerated-compositing --blacklist-webgl --disable-accelerated-2d-canvas --disable-accelerated-compositing --disable-accelerated-layers --disable-accelerated-plugins --disable-accelerated-video --disable-accelerated-video-decode --disable-background-networking --disable-client-side-phishing-detection --disable-component-update --disable-default-apps --disable-gpu --disable-hang-monitor --disable-prompt-on-repost --disable-sync --disable-threaded-compositing --disable-web-resources --disable-webgl --enable-logging --ignore-certificate-errors --load-extension=/var/folders/bl/1800rz_j7blcqx8pthyrq59h0000gn/T/.org.chromium.Chromium.BZB35o/internal --logging-level=1 --metrics-recording-only --no-first-run --password-store=basic --proxy-pac-url=http://127.0.0.1:19876/proxy.pac --remote-debugging-port=12382 --safebrowsing-disable-auto-update --safebrowsing-disable-download-protection --start-maximized --test-type --use-mock-keychain --user-data-dir=/var/folders/bl/1800rz_j7blcqx8pthyrq59h0000gn/T/.org.chromium.Chromium.E1jTrM data:,
+[4.246][INFO]: RESPONSE InitSession {
+   "acceptSslCerts": true,
+   "applicationCacheEnabled": false,
+   "browserConnectionEnabled": false,
+   "browserName": "chrome",
+   "chrome": {
+      "userDataDir": "/var/folders/bl/1800rz_j7blcqx8pthyrq59h0000gn/T/.org.chromium.Chromium.E1jTrM"
+   },
+   "cssSelectorsEnabled": true,
+   "databaseEnabled": false,
+   "handlesAlerts": true,
+   "javascriptEnabled": true,
+   "locationContextEnabled": true,
+   "nativeEvents": true,
+   "platform": "Mac OS X",
+   "rotatable": false,
+   "takesHeapSnapshot": true,
+   "takesScreenshot": true,
+   "version": "35.0.1916.114",
+   "webStorageEnabled": true
+}
+[4.512][INFO]: COMMAND ExecuteScript {
+   "args": [  ],
+   "script": "return screen.width"
+}
+[4.746][INFO]: Waiting for pending navigations...
+[4.763][INFO]: Done waiting for pending navigations
+[4.812][INFO]: Waiting for pending navigations...
+[4.812][INFO]: Done waiting for pending navigations
+[4.812][INFO]: RESPONSE ExecuteScript 1280
+[4.815][INFO]: COMMAND ExecuteScript {
+   "args": [  ],
+   "script": "return screen.height"
+}
+[4.815][INFO]: Waiting for pending navigations...
+[4.815][INFO]: Done waiting for pending navigations
+[4.824][INFO]: Waiting for pending navigations...
+[4.824][INFO]: Done waiting for pending navigations
+[4.824][INFO]: RESPONSE ExecuteScript 800
+[4.827][INFO]: COMMAND SetWindowPosition {
+   "windowHandle": "current",
+   "x": 0,
+   "y": 0
+}
+[4.832][INFO]: Waiting for pending navigations...
+[4.843][INFO]: Done waiting for pending navigations
+[5.001][INFO]: RESPONSE SetWindowPosition
+[5.003][INFO]: COMMAND SetWindowSize {
+   "height": 800,
+   "width": 1280,
+   "windowHandle": "current"
+}
+[5.198][INFO]: RESPONSE SetWindowSize
+[5.201][INFO]: COMMAND MaximizeWindow {
+   "windowHandle": "current"
+}
+[5.307][INFO]: RESPONSE MaximizeWindow
+[5.310][INFO]: COMMAND GetWindows {
+
+}
+[5.311][INFO]: RESPONSE GetWindows [ "CDwindow-64D838A1-3314-CD60-A5AB-D64369F3D241" ]
+[5.397][INFO]: COMMAND SetScriptTimeout {
+   "ms": 11000
+}
+[5.397][INFO]: RESPONSE SetScriptTimeout
+[5.456][INFO]: COMMAND GetLogTypes {
+
+}
+[5.456][INFO]: RESPONSE GetLogTypes [ "browser", "driver" ]
+[5.598][INFO]: COMMAND Navigate {
+   "url": "data:text/html,\u003Chtml>\u003C/html>"
+}
+[5.598][INFO]: Waiting for pending navigations...
+[5.598][INFO]: Done waiting for pending navigations
+[5.667][INFO]: Waiting for pending navigations...
+[5.667][INFO]: Done waiting for pending navigations
+[5.667][INFO]: RESPONSE Navigate
+[5.850][INFO]: COMMAND ExecuteScript {
+   "args": [  ],
+   "script": "window.name = \"NG_DEFER_BOOTSTRAP!\" + window.name;window.location.replace(\"http://localhost:8081/index.html#/async\");"
+}
+[5.850][INFO]: Waiting for pending navigations...
+[5.850][INFO]: Done waiting for pending navigations
+[5.859][INFO]: Waiting for pending navigations...
+[6.112][INFO]: Done waiting for pending navigations
+[6.112][INFO]: RESPONSE ExecuteScript null
+[6.293][INFO]: COMMAND ExecuteScript {
+   "args": [  ],
+   "script": "return window.location.href;"
+}
+[6.293][INFO]: Waiting for pending navigations...
+[6.293][INFO]: Done waiting for pending navigations
+[6.296][INFO]: Waiting for pending navigations...
+[6.296][INFO]: Done waiting for pending navigations
+[6.296][INFO]: RESPONSE ExecuteScript "http://localhost:8081/index.html#/async"
+[6.474][INFO]: COMMAND ExecuteAsyncScript {
+   "args": [ 10 ],
+   "script": "try { return (function (attempts, asyncCallback) {\n  var callback = function(args) {\n    setTimeout(function() {\n      asyncCallback(args);\n    }, 0);\n  };\n  var check = function(n) {\n    try {\n   ..."
+}
+[6.474][INFO]: Waiting for pending navigations...
+[6.474][INFO]: Done waiting for pending navigations
+[6.585][INFO]: Waiting for pending navigations...
+[6.585][INFO]: Done waiting for pending navigations
+[6.585][INFO]: RESPONSE ExecuteAsyncScript [ true, null ]
+[6.658][INFO]: COMMAND ExecuteScript {
+   "args": [  ],
+   "script": "return (function () {\n    angular.module('protractorBaseModule_', []).\n        config(['$compileProvider', function($compileProvider) {\n          if ($compileProvider.debugInfoEnabled) {\n          ..."
+}
+[6.658][INFO]: Waiting for pending navigations...
+[6.658][INFO]: Done waiting for pending navigations
+[6.660][INFO]: Waiting for pending navigations...
+[6.660][INFO]: Done waiting for pending navigations
+[6.661][INFO]: RESPONSE ExecuteScript null
+[6.824][INFO]: COMMAND ExecuteScript {
+   "args": [ [ "protractorBaseModule_" ] ],
+   "script": "angular.resumeBootstrap(arguments[0]);"
+}
+[6.824][INFO]: Waiting for pending navigations...
+[6.824][INFO]: Done waiting for pending navigations
+[6.868][INFO]: Waiting for pending navigations...
+[6.868][INFO]: Done waiting for pending navigations
+[6.868][INFO]: RESPONSE ExecuteScript null
+[7.103][INFO]: COMMAND ExecuteAsyncScript {
+   "args": [ "body" ],
+   "script": "try { return (function (rootSelector, callback) {\n  var el = document.querySelector(rootSelector);\n\n  try {\n    if (!window.angular) {\n      throw new Error('angular could not be found on the windo..."
+}
+[7.103][INFO]: Waiting for pending navigations...
+[7.103][INFO]: Done waiting for pending navigations
+[7.312][INFO]: Waiting for pending navigations...
+[7.312][INFO]: Done waiting for pending navigations
+[7.312][INFO]: RESPONSE ExecuteAsyncScript null
+[7.402][INFO]: COMMAND ExecuteScript {
+   "args": [ "slowHttpStatus", false, null, "body" ],
+   "script": "try { return (function (binding, exactMatch, using, rootSelector) {\n  var root = document.querySelector(rootSelector || 'body');\n  using = using || document;\n  if (angular.getTestability) {\n    ret..."
+}
+[7.402][INFO]: Waiting for pending navigations...
+[7.402][INFO]: Done waiting for pending navigations
+[7.405][INFO]: Waiting for pending navigations...
+[7.405][INFO]: Done waiting for pending navigations
+[7.405][INFO]: RESPONSE ExecuteScript [ {
+   "ELEMENT": "0.5319263362325728-1"
+} ]
+[7.610][INFO]: COMMAND GetElementText {
+   "id": "0.5319263362325728-1"
+}
+[7.610][INFO]: Waiting for pending navigations...
+[7.610][INFO]: Done waiting for pending navigations
+[7.626][INFO]: Waiting for pending navigations...
+[7.626][INFO]: Done waiting for pending navigations
+[7.626][INFO]: RESPONSE GetElementText "not started"
+[7.731][INFO]: COMMAND ExecuteAsyncScript {
+   "args": [ "body" ],
+   "script": "try { return (function (rootSelector, callback) {\n  var el = document.querySelector(rootSelector);\n\n  try {\n    if (!window.angular) {\n      throw new Error('angular could not be found on the windo..."
+}
+[7.731][INFO]: Waiting for pending navigations...
+[7.731][INFO]: Done waiting for pending navigations
+[7.734][INFO]: Waiting for pending navigations...
+[7.734][INFO]: Done waiting for pending navigations
+[7.734][INFO]: RESPONSE ExecuteAsyncScript null
+[7.793][INFO]: COMMAND FindElements {
+   "using": "css selector",
+   "value": "[ng-click=\"slowHttp()\"]"
+}
+[7.793][INFO]: Waiting for pending navigations...
+[7.793][INFO]: Done waiting for pending navigations
+[7.805][INFO]: Waiting for pending navigations...
+[7.805][INFO]: Done waiting for pending navigations
+[7.805][INFO]: RESPONSE FindElements [ {
+   "ELEMENT": "0.5319263362325728-2"
+} ]
+[7.888][INFO]: COMMAND ClickElement {
+   "id": "0.5319263362325728-2"
+}
+[7.888][INFO]: Waiting for pending navigations...
+[7.888][INFO]: Done waiting for pending navigations
+[7.932][INFO]: Waiting for pending navigations...
+[7.932][INFO]: Done waiting for pending navigations
+[7.932][INFO]: RESPONSE ClickElement
+[8.138][INFO]: COMMAND ExecuteAsyncScript {
+   "args": [ "body" ],
+   "script": "try { return (function (rootSelector, callback) {\n  var el = document.querySelector(rootSelector);\n\n  try {\n    if (!window.angular) {\n      throw new Error('angular could not be found on the windo..."
+}
+[8.138][INFO]: Waiting for pending navigations...
+[8.138][INFO]: Done waiting for pending navigations
+[13.026][INFO]: Waiting for pending navigations...
+[13.026][INFO]: Done waiting for pending navigations
+[13.026][INFO]: RESPONSE ExecuteAsyncScript null
+[13.100][INFO]: COMMAND ExecuteScript {
+   "args": [ "slowHttpStatus", false, null, "body" ],
+   "script": "try { return (function (binding, exactMatch, using, rootSelector) {\n  var root = document.querySelector(rootSelector || 'body');\n  using = using || document;\n  if (angular.getTestability) {\n    ret..."
+}
+[13.100][INFO]: Waiting for pending navigations...
+[13.100][INFO]: Done waiting for pending navigations
+[13.102][INFO]: Waiting for pending navigations...
+[13.102][INFO]: Done waiting for pending navigations
+[13.102][INFO]: RESPONSE ExecuteScript [ {
+   "ELEMENT": "0.5319263362325728-1"
+} ]
+[13.296][INFO]: COMMAND GetElementText {
+   "id": "0.5319263362325728-1"
+}
+[13.296][INFO]: Waiting for pending navigations...
+[13.296][INFO]: Done waiting for pending navigations
+[13.301][INFO]: Waiting for pending navigations...
+[13.301][INFO]: Done waiting for pending navigations
+[13.301][INFO]: RESPONSE GetElementText "done"

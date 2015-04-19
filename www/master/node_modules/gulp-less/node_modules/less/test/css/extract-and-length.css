@@ -1,0 +1,133 @@
+.multiunit {
+  length: 6;
+  extract: abc "abc" 1 1px 1% #112233;
+}
+.incorrect-index {
+  v1: extract(a b c, 5);
+  v2: extract(a, b, c, -2);
+}
+.scalar {
+  var-value: variable;
+  var-length: 1;
+  ill-index: extract(variable, 2);
+  name-value: name;
+  string-value: "string";
+  number-value: 12345678;
+  color-value: #0000ff;
+  rgba-value: rgba(80, 160, 240, 0.67);
+  empty-value: ;
+  name-length: 1;
+  string-length: 1;
+  number-length: 1;
+  color-length: 1;
+  rgba-length: 1;
+  empty-length: 1;
+}
+.mixin-arguments-1 {
+  length: 4;
+  extract: c | b | a;
+}
+.mixin-arguments-2 {
+  length: 4;
+  extract: c | b | a;
+}
+.mixin-arguments-3 {
+  length: 4;
+  extract: c | b | a;
+}
+.mixin-arguments-4 {
+  length: 0;
+  extract: extract(, 2) | extract(, 1);
+}
+.mixin-arguments-2 {
+  length: 4;
+  extract: c | b | a;
+}
+.mixin-arguments-3 {
+  length: 4;
+  extract: c | b | a;
+}
+.mixin-arguments-4 {
+  length: 3;
+  extract: c | b;
+}
+.mixin-arguments-2 {
+  length: 4;
+  extract: 3 | 2 | 1;
+}
+.mixin-arguments-3 {
+  length: 4;
+  extract: 3 | 2 | 1;
+}
+.mixin-arguments-4 {
+  length: 3;
+  extract: 3 | 2;
+}
+.md-space-comma {
+  length-1: 3;
+  extract-1: 1 2 3;
+  length-2: 3;
+  extract-2: 2;
+}
+.md-space-comma-as-args-2 {
+  length: 3;
+  extract: "x" "y" "z" | 1 2 3 | a b c;
+}
+.md-space-comma-as-args-3 {
+  length: 3;
+  extract: "x" "y" "z" | 1 2 3 | a b c;
+}
+.md-space-comma-as-args-4 {
+  length: 2;
+  extract: "x" "y" "z" | 1 2 3;
+}
+.md-cat-space-comma {
+  length-1: 3;
+  extract-1: 1 2 3;
+  length-2: 3;
+  extract-2: 2;
+}
+.md-cat-space-comma-as-args-2 {
+  length: 3;
+  extract: "x" "y" "z" | 1 2 3 | a b c;
+}
+.md-cat-space-comma-as-args-3 {
+  length: 3;
+  extract: "x" "y" "z" | 1 2 3 | a b c;
+}
+.md-cat-space-comma-as-args-4 {
+  length: 2;
+  extract: "x" "y" "z" | 1 2 3;
+}
+.md-cat-comma-space {
+  length-1: 3;
+  extract-1: 1, 2, 3;
+  length-2: 3;
+  extract-2: 2;
+}
+.md-cat-comma-space-as-args-1 {
+  length: 3;
+  extract: "x", "y", "z" | 1, 2, 3 | a, b, c;
+}
+.md-cat-comma-space-as-args-2 {
+  length: 3;
+  extract: "x", "y", "z" | 1, 2, 3 | a, b, c;
+}
+.md-cat-comma-space-as-args-3 {
+  length: 3;
+  extract: "x", "y", "z" | 1, 2, 3 | a, b, c;
+}
+.md-cat-comma-space-as-args-4 {
+  length: 0;
+  extract: extract(, 2) | extract(, 1);
+}
+.md-3D {
+  length-1: 2;
+  extract-1: a b c d, 1 2 3 4;
+  length-2: 2;
+  extract-2: 5 6 7 8;
+  length-3: 4;
+  extract-3: 7;
+  length-4: 1;
+  extract-4: 8;
+}

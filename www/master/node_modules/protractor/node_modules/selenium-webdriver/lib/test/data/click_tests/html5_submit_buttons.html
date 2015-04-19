@@ -1,0 +1,15 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>HTML5 Submit Buttons</title>
+</head>
+<body>
+<form id="form1" action="submitted_page.html">
+<label for="name">Enter your name: </label><input type="text" name="name" id="name"/>
+<button id="internal_explicit_submit" type="submit">Explicit Submit</button>
+<button id="internal_implicit_submit">Implicit Submit</button>
+</form>
+<button id="external_explicit_submit" type="submit" form="form1">Explicit Submit</button>
+<button id="external_implicit_submit" form="form1">Implicit Submit</button>
+</body>
+</html>

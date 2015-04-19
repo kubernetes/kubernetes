@@ -1,0 +1,11 @@
+{{#yellow}}Unable to find a suitable version for {{name}}, please choose one:{{/yellow}}
+{{#condense}}
+{{#each picks}}
+    {{#magenta}}{{sum @index 1}}){{/magenta}} {{#cyan}}{{endpoint.name}}#{{endpoint.target}}{{/cyan}}{{#if pkgMeta._release}} which resolved to {{#green}}{{pkgMeta._release}}{{/green}}{{/if}}{{#if dependants}} and is required by {{#green}}{{dependants}}{{/green}}{{/if}}
+{{/each}}
+{{/condense}}
+
+{{#unless saveResolutions}}
+
+Prefix the choice with ! to persist it to bower.json
+{{/unless}}

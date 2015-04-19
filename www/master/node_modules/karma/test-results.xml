@@ -1,0 +1,39 @@
+<?xml version="1.0"?>
+<testsuites>
+  <testsuite name="Chrome 31.0.1650 (Mac OS X 10.9.0)" package="" timestamp="2013-12-07T15:36:47" id="0" hostname="vojta-macbookpro.roam.corp.google.com">
+    <properties>
+      <property name="browser.fullName" value="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_9_0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/31.0.1650.63 Safari/537.36"/>
+    </properties>
+  </testsuite>
+  <testsuite name="Chrome 31.0.1650 (Mac OS X 10.9.0)" package="" timestamp="2013-12-07T15:36:48" id="0" hostname="vojta-macbookpro.roam.corp.google.com" tests="23" errors="0" failures="0" time="0.02">
+    <properties>
+      <property name="browser.fullName" value="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_9_0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/31.0.1650.63 Safari/537.36"/>
+    </properties>
+    <testcase name="should start execution when all files loaded and pass config" time="0.013" classname="Chrome 31.0.1650 (Mac OS X 10.9.0).Karma"/>
+    <testcase name="should open a new window when useIFrame is false" time="0.001" classname="Chrome 31.0.1650 (Mac OS X 10.9.0).Karma"/>
+    <testcase name="should not start execution if any error during loading files" time="0.001" classname="Chrome 31.0.1650 (Mac OS X 10.9.0).Karma"/>
+    <testcase name="should remove reference to start even after syntax error" time="0" classname="Chrome 31.0.1650 (Mac OS X 10.9.0).Karma"/>
+    <testcase name="should not set up context if there was an error" time="0" classname="Chrome 31.0.1650 (Mac OS X 10.9.0).Karma"/>
+    <testcase name="should report navigator name" time="0.001" classname="Chrome 31.0.1650 (Mac OS X 10.9.0).Karma"/>
+    <testcase name="should report browser id" time="0" classname="Chrome 31.0.1650 (Mac OS X 10.9.0).Karma"/>
+    <testcase name="should buffer results when polling" time="0" classname="Chrome 31.0.1650 (Mac OS X 10.9.0).Karma result"/>
+    <testcase name="should buffer results when polling" time="0.001" classname="Chrome 31.0.1650 (Mac OS X 10.9.0).Karma result"/>
+    <testcase name="should emit &quot;start&quot; with total specs count first" time="0" classname="Chrome 31.0.1650 (Mac OS X 10.9.0).Karma result"/>
+    <testcase name="should not emit &quot;start&quot; if already done by the adapter" time="0" classname="Chrome 31.0.1650 (Mac OS X 10.9.0).Karma result"/>
+    <testcase name="should capture alert" time="0" classname="Chrome 31.0.1650 (Mac OS X 10.9.0).Karma setupContext"/>
+    <testcase name="should be getter/setter" time="0" classname="Chrome 31.0.1650 (Mac OS X 10.9.0).Karma store"/>
+    <testcase name="should clone arrays to avoid memory leaks" time="0" classname="Chrome 31.0.1650 (Mac OS X 10.9.0).Karma store"/>
+    <testcase name="should clean the result buffer before completing" time="0.001" classname="Chrome 31.0.1650 (Mac OS X 10.9.0).Karma complete"/>
+    <testcase name="should navigate the client to return_url if specified" time="0" classname="Chrome 31.0.1650 (Mac OS X 10.9.0).Karma complete"/>
+    <testcase name="should serialize string" time="0" classname="Chrome 31.0.1650 (Mac OS X 10.9.0).stringify"/>
+    <testcase name="should serialize booleans" time="0" classname="Chrome 31.0.1650 (Mac OS X 10.9.0).stringify"/>
+    <testcase name="should serialize null and undefined" time="0.001" classname="Chrome 31.0.1650 (Mac OS X 10.9.0).stringify"/>
+    <testcase name="should serialize functions" time="0" classname="Chrome 31.0.1650 (Mac OS X 10.9.0).stringify"/>
+    <testcase name="should serialize arrays" time="0" classname="Chrome 31.0.1650 (Mac OS X 10.9.0).stringify"/>
+    <testcase name="should serialize html" time="0.001" classname="Chrome 31.0.1650 (Mac OS X 10.9.0).stringify"/>
+    <testcase name="should serialize across iframes" time="0" classname="Chrome 31.0.1650 (Mac OS X 10.9.0).stringify"/>
+    <system-out><![CDATA[
+]]></system-out>
+    <system-err/>
+  </testsuite>
+</testsuites>

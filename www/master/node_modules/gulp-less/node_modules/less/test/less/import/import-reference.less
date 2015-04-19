@@ -1,0 +1,51 @@
+.z {
+  color: red;
+  .c {
+    color: green;
+  }
+}
+.only-with-visible,
+.z {
+  color: green;
+  &:hover {
+    color: green;
+  }
+  & {
+    color: green;
+  }
+  & + & {
+    color: green;
+    .sub {
+      color: green;
+    }
+  }
+}
+
+& {
+  .hidden {
+    hidden: true;
+  }
+}
+
+@media tv {
+  .hidden {
+    hidden: true;
+  }
+}
+
+/* comment is not output */
+
+.zz {
+  .y {
+    pulled-in: yes;
+  }
+  /* comment pulled in */
+}
+@max-size: 450px;
+.mixin-with-mediaq(@num) {
+  color: green;
+  test: @num;
+  @media (max-size: @max-size) {
+    color: red;
+  }
+}

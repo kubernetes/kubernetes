@@ -1,0 +1,18 @@
+@charset "UTF-8";
+@namespace less "http://lesscss.org";
+@keyframes enlarger {
+  from {
+    font-size: 12px;
+  }
+  to {
+    font-size: 15px;
+  }
+}
+@-webkit-keyframes reducer {
+  from {
+    font-size: 13px;
+  }
+  to {
+    font-size: 10px;
+  }
+}

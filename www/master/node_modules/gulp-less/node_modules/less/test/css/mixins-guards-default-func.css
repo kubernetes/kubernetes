@@ -1,0 +1,129 @@
+guard-default-basic-1-1 {
+  case: 1;
+}
+guard-default-basic-1-2 {
+  default: 2;
+}
+guard-default-basic-2-0 {
+  default: 0;
+}
+guard-default-basic-2-2 {
+  case: 2;
+}
+guard-default-basic-3-0 {
+  default: 0;
+}
+guard-default-basic-3-2 {
+  case: 2;
+}
+guard-default-basic-3-3 {
+  case: 3;
+}
+guard-default-definition-order-0 {
+  default: 0;
+}
+guard-default-definition-order-2 {
+  case: 2;
+}
+guard-default-definition-order-2 {
+  case: 3;
+}
+guard-default-out-of-guard-0 {
+  case-0: default();
+  case-1: 1;
+  default: 2;
+  case-2: default();
+}
+guard-default-out-of-guard-1 {
+  default: default();
+}
+guard-default-out-of-guard-2 {
+  default: default();
+}
+guard-default-expr-not-1 {
+  case: 1;
+  default: 1;
+}
+guard-default-expr-eq-true {
+  case: true;
+}
+guard-default-expr-eq-false {
+  case: false;
+  default: false;
+}
+guard-default-expr-or-1 {
+  case: 1;
+}
+guard-default-expr-or-2 {
+  case: 2;
+  default: 2;
+}
+guard-default-expr-or-3 {
+  default: 3;
+}
+guard-default-expr-and-1 {
+  case: 1;
+}
+guard-default-expr-and-2 {
+  case: 2;
+}
+guard-default-expr-and-3 {
+  default: 3;
+}
+guard-default-expr-always-1 {
+  case: 1;
+  default: 1;
+}
+guard-default-expr-always-2 {
+  default: 2;
+}
+guard-default-expr-never-1 {
+  case: 1;
+}
+guard-default-multi-1-0 {
+  case: 0;
+}
+guard-default-multi-1-1 {
+  default-1: 1;
+}
+guard-default-multi-2-1 {
+  default-1: no;
+}
+guard-default-multi-2-2 {
+  default-2: no;
+}
+guard-default-multi-2-3 {
+  default-3: 3;
+}
+guard-default-multi-3-blue {
+  case-2: #00008b;
+}
+guard-default-multi-3-green {
+  default-color: #008000;
+}
+guard-default-multi-3-foo {
+  case-1: I am 'foo';
+}
+guard-default-multi-3-baz {
+  default-string: I am 'baz';
+}
+guard-default-multi-4 {
+  always: 1;
+  always: 2;
+  case: 2;
+}
+guard-default-not-ambiguos-2 {
+  case: 1;
+  not-default: 2;
+}
+guard-default-not-ambiguos-3 {
+  case: 1;
+  not-default-1: 2;
+  not-default-2: 2;
+}
+guard-default-scopes-3 {
+  3: when default;
+}
+guard-default-scopes-1 {
+  1: no condition;
+}

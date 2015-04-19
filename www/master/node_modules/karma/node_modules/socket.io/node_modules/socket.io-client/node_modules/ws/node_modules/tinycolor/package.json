@@ -1,0 +1,28 @@
+{
+  "author": {
+    "name": "Einar Otto Stangvik",
+    "email": "einaros@gmail.com",
+    "url": "http://2x.io"
+  },
+  "name": "tinycolor",
+  "description": "a to-the-point color module for node",
+  "version": "0.0.1",
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/einaros/tinycolor.git"
+  },
+  "engines": {
+    "node": ">=0.4.0"
+  },
+  "dependencies": {},
+  "devDependencies": {},
+  "main": "tinycolor",
+  "readme": "# tinycolor #\n\nThis is a no-fuzz, barebone, zero muppetry color module for node.js.",
+  "readmeFilename": "README.md",
+  "bugs": {
+    "url": "https://github.com/einaros/tinycolor/issues"
+  },
+  "homepage": "https://github.com/einaros/tinycolor",
+  "_id": "tinycolor@0.0.1",
+  "_from": "tinycolor@0.x"
+}

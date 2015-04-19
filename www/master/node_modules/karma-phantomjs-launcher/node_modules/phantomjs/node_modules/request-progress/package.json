@@ -1,0 +1,61 @@
+{
+  "name": "request-progress",
+  "version": "0.3.1",
+  "description": "Tracks the download progress of a request made with mikeal/request",
+  "main": "index.js",
+  "dependencies": {
+    "throttleit": "~0.0.2"
+  },
+  "devDependencies": {
+    "mocha": "~1.12.0",
+    "expect.js": "~0.2.0"
+  },
+  "scripts": {
+    "test": "mocha -R spec"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/IndigoUnited/node-request-progress"
+  },
+  "bugs": {
+    "url": "http://github.com/IndigoUnited/node-request-progress/issues"
+  },
+  "keywords": [
+    "progress",
+    "request",
+    "mikeal",
+    "size",
+    "bytes",
+    "percent",
+    "percentage"
+  ],
+  "author": {
+    "name": "IndigoUnited",
+    "email": "hello@indigounited.com",
+    "url": "http://indigounited.com"
+  },
+  "license": "MIT",
+  "readme": "# request-progress [![Build Status](https://secure.travis-ci.org/IndigoUnited/node-request-progress.png)](http://travis-ci.org/IndigoUnited/node-request-progress.png)\n\nTracks the download progress of a request made with [request](https://github.com/mikeal/request).\n\n\n## Installation\n\n`$ npm install request-progress`\n\n\n## Usage\n\n```js\nvar fs = require('fs');\nvar request = require('request');\nvar progress = require('request-progress');\n\n// Note that the options argument is optional\nprogress(request('http://google.com/doodle.png'), {\n    throttle: 2000,  // Throttle the progress event to 2000ms, defaults to 1000ms\n    delay: 1000      // Only start to emit after 1000ms delay, defaults to 0ms\n})\n.on('progress', function (state) {\n    console.log('received size in bytes', state.received);\n    // The properties bellow can be null if response does not contain\n    // the content-length header\n    console.log('total size in bytes', state.total);\n    console.log('percent', state.percent);\n})\n.on('error', function (err) {\n    // Do something with err\n})\n.pipe(fs.createWriteStream('doodle.png'))\n.on('error', function (err) {\n    // Do something with err\n})\n.on('close', function (err) {\n    // Saved to doogle.png!\n})\n```\n\nNote that the `state` object emitted in the `progress` event is reused to avoid creating a new object for each event.\n\n\n## License\n\nReleased under the [MIT License](http://www.opensource.org/licenses/mit-license.php).\n",
+  "readmeFilename": "README.md",
+  "_id": "request-progress@0.3.1",
+  "dist": {
+    "shasum": "0721c105d8a96ac6b2ce8b2c89ae2d5ecfcf6b3a",
+    "tarball": "http://registry.npmjs.org/request-progress/-/request-progress-0.3.1.tgz"
+  },
+  "_from": "request-progress@0.3.1",
+  "_npmVersion": "1.3.8",
+  "_npmUser": {
+    "name": "satazor",
+    "email": "andremiguelcruz@msn.com"
+  },
+  "maintainers": [
+    {
+      "name": "satazor",
+      "email": "andremiguelcruz@msn.com"
+    }
+  ],
+  "directories": {},
+  "_shasum": "0721c105d8a96ac6b2ce8b2c89ae2d5ecfcf6b3a",
+  "_resolved": "https://registry.npmjs.org/request-progress/-/request-progress-0.3.1.tgz",
+  "homepage": "https://github.com/IndigoUnited/node-request-progress"
+}

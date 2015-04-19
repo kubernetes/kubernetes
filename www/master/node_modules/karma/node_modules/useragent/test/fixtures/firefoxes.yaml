@@ -1,0 +1,1386 @@
+# http://people.mozilla.com/~dwitte/ua.txt
+#
+# The following are some example User Agent strings for various versions of
+# Firefox and other Gecko-based browsers. Many of these have been modified by
+# extensions, external applications, distributions, and users. The version number
+# for Firefox 5.0 (and the corresponding Gecko version) is tentative. See
+# https://developer.mozilla.org/En/Gecko_User_Agent_String_Reference for more
+# details. Credit to http://useragentstring.com/ for providing some of these
+# strings.
+
+test_cases:
+    # Firefox 4.0 (prerelease)
+    - user_agent_string: Mozilla/5.0 (Windows NT 6.0; rv:2.0b6pre) Gecko/20100907 Firefox/4.0b6pre
+      family: 'Firefox Beta'
+      major: '4'
+      minor: '0'
+      patch: b6pre
+    - user_agent_string: Mozilla/5.0 (Windows NT 6.1; WOW64; rv:2.0b6pre) Gecko/20100903 Firefox/4.0b6pre
+      family: 'Firefox Beta'
+      major: '4'
+      minor: '0'
+      patch: b6pre
+    - user_agent_string: Mozilla/5.0 (Windows NT 6.1; rv:2.0b6pre) Gecko/20100903 Firefox/4.0b6pre Firefox/4.0b6pre
+      family: 'Firefox Beta'
+      major: '4'
+      minor: '0'
+      patch: b6pre
+    - user_agent_string: Mozilla/5.0 (Macintosh; Intel Mac OS X 10.6; rv:2.0b6pre) Gecko/20100907 Firefox/4.0b6pre
+      family: 'Firefox Beta'
+      major: '4'
+      minor: '0'
+      patch: b6pre
+    - user_agent_string: Mozilla/5.0 (X11; Linux i686; rv:2.0b6pre) Gecko/20100907 Firefox/4.0b6pre
+      family: 'Firefox Beta'
+      major: '4'
+      minor: '0'
+      patch: b6pre
+
+    # Firefox 4.0.1
+    - user_agent_string: Mozilla/5.0 (Windows NT 5.2; rv:2.0.1) Gecko/20100101 Firefox/4.0.1
+      family: 'Firefox'
+      major: '4'
+      minor: '0'
+      patch: '1'
+    - user_agent_string: Mozilla/5.0 (Windows NT 6.1; rv:2.0.1) Gecko/20100101 Firefox/4.0.1
+      family: 'Firefox'
+      major: '4'
+      minor: '0'
+      patch: '1'
+    - user_agent_string: Mozilla/5.0 (Windows NT 6.1; Win64; x64; rv:2.0.1) Gecko/20100101 Firefox/4.0.1
+      family: 'Firefox'
+      major: '4'
+      minor: '0'
+      patch: '1'
+    - user_agent_string: Mozilla/5.0 (Windows NT 6.1; WOW64; rv:2.0.1) Gecko/20100101 Firefox/4.0.1
+      family: 'Firefox'
+      major: '4'
+      minor: '0'
+      patch: '1'
+    - user_agent_string: Mozilla/5.0 (WindowsCE 6.0; rv:2.0.1) Gecko/20100101 Firefox/4.0.1
+      family: 'Firefox'
+      major: '4'
+      minor: '0'
+      patch: '1'
+    - user_agent_string: Mozilla/5.0 (Macintosh; Intel Mac OS X 10.5; rv:2.0.1) Gecko/20100101 Firefox/4.0.1
+      family: 'Firefox'
+      major: '4'
+      minor: '0'
+      patch: '1'
+    - user_agent_string: Mozilla/5.0 (Macintosh; Intel Mac OS X 10.6; rv:2.0.1) Gecko/20100101 Firefox/4.0.1
+      family: 'Firefox'
+      major: '4'
+      minor: '0'
+      patch: '1'
+    - user_agent_string: Mozilla/5.0 (X11; Linux i686; rv:2.0.1) Gecko/20100101 Firefox/4.0.1
+      family: 'Firefox'
+      major: '4'
+      minor: '0'
+      patch: '1'
+    - user_agent_string: Mozilla/5.0 (X11; Linux x86_64; rv:2.0.1) Gecko/20100101 Firefox/4.0.1
+      family: 'Firefox'
+      major: '4'
+      minor: '0'
+      patch: '1'
+    - user_agent_string: Mozilla/5.0 (X11; Linux i686 on x86_64; rv:2.0.1) Gecko/20100101 Firefox/4.0.1
+      family: 'Firefox'
+      major: '4'
+      minor: '0'
+      patch: '1'
+    - user_agent_string: Mozilla/5.0 (X11; Linux armv7l; rv:2.0.1) Gecko/20100101 Firefox/4.0.1
+      family: 'Firefox'
+      major: '4'
+      minor: '0'
+      patch: '1'
+
+    # Firefox 4.0 (prerelease)
+    - user_agent_string: Mozilla/5.0 (Windows NT 6.0; rv:2.0b6pre) Gecko/20100907 Firefox/4.0b6pre
+      family: 'Firefox Beta'
+      major: '4'
+      minor: '0'
+      patch: b6pre
+    - user_agent_string: Mozilla/5.0 (Windows NT 6.1; WOW64; rv:2.0b6pre) Gecko/20100903 Firefox/4.0b6pre
+      family: 'Firefox Beta'
+      major: '4'
+      minor: '0'
+      patch: b6pre
+    - user_agent_string: Mozilla/5.0 (Windows NT 6.1; rv:2.0b6pre) Gecko/20100903 Firefox/4.0b6pre Firefox/4.0b6pre
+      family: 'Firefox Beta'
+      major: '4'
+      minor: '0'
+      patch: b6pre
+    - user_agent_string: Mozilla/5.0 (Macintosh; Intel Mac OS X 10.6; rv:2.0b6pre) Gecko/20100907 Firefox/4.0b6pre
+      family: 'Firefox Beta'
+      major: '4'
+      minor: '0'
+      patch: b6pre
+    - user_agent_string: Mozilla/5.0 (X11; Linux i686; rv:2.0b6pre) Gecko/20100907 Firefox/4.0b6pre
+      family: 'Firefox Beta'
+      major: '4'
+      minor: '0'
+      patch: b6pre
+
+    # Firefox 5.0 (version number tentative -- not yet released)
+    - user_agent_string: Mozilla/5.0 (Windows NT 5.2; rv:2.1.1) Gecko/ Firefox/5.0.1
+      family: 'Firefox'
+      major: '5'
+      minor: '0'
+      patch: '1'
+    - user_agent_string: Mozilla/5.0 (Windows NT 6.1; rv:2.1.1) Gecko/ Firefox/5.0.1
+      family: 'Firefox'
+      major: '5'
+      minor: '0'
+      patch: '1'
+    - user_agent_string: Mozilla/5.0 (Windows NT 6.1; Win64; x64; rv:2.1.1) Gecko/ Firefox/5.0.1
+      family: 'Firefox'
+      major: '5'
+      minor: '0'
+      patch: '1'
+    - user_agent_string: Mozilla/5.0 (Windows NT 6.1; WOW64; rv:2.1.1) Gecko/ Firefox/5.0.1
+      family: 'Firefox'
+      major: '5'
+      minor: '0'
+      patch: '1'
+    - user_agent_string: Mozilla/5.0 (WindowsCE 6.0; rv:2.1.1) Gecko/ Firefox/5.0.1
+      family: 'Firefox'
+      major: '5'
+      minor: '0'
+      patch: '1'
+    - user_agent_string: Mozilla/5.0 (Macintosh; Intel Mac OS X 10.5; rv:2.1.1) Gecko/ Firefox/5.0.1
+      family: 'Firefox'
+      major: '5'
+      minor: '0'
+      patch: '1'
+    - user_agent_string: Mozilla/5.0 (Macintosh; Intel Mac OS X 10.6; rv:2.1.1) Gecko/ Firefox/5.0.1
+      family: 'Firefox'
+      major: '5'
+      minor: '0'
+      patch: '1'
+    - user_agent_string: Mozilla/5.0 (X11; Linux i686; rv:2.1.1) Gecko/ Firefox/5.0.1
+      family: 'Firefox'
+      major: '5'
+      minor: '0'
+      patch: '1'
+    - user_agent_string: Mozilla/5.0 (X11; Linux x86_64; rv:2.1.1) Gecko/ Firefox/5.0.1
+      family: 'Firefox'
+      major: '5'
+      minor: '0'
+      patch: '1'
+    - user_agent_string: Mozilla/5.0 (X11; Linux i686 on x86_64; rv:2.1.1) Gecko/ Firefox/5.0.1
+      family: 'Firefox'
+      major: '5'
+      minor: '0'
+      patch: '1'
+    - user_agent_string: Mozilla/5.0 (X11; Linux armv7l; rv:2.1.1) Gecko/ Firefox/5.0.1
+      family: 'Firefox'
+      major: '5'
+      minor: '0'
+      patch: '1'
+
+    # Firefox 3.6
+    - user_agent_string: Mozilla/5.0 (X11; U; Linux x86_64; en-US; rv:1.9.2.8) Gecko/20100804 Gentoo Firefox/3.6.8
+      family: 'Firefox'
+      major: '3'
+      minor: '6'
+      patch: '8'
+    - user_agent_string: Mozilla/5.0 (X11; U; Linux x86_64; en-US; rv:1.9.2.8) Gecko/20100723 SUSE/3.6.8-0.1.1 Firefox/3.6.8
+      family: 'Firefox'
+      major: '3'
+      minor: '6'
+      patch: '8'
+    - user_agent_string: Mozilla/5.0 (X11; U; Linux i686; zh-CN; rv:1.9.2.8) Gecko/20100722 Ubuntu/10.04 (lucid) Firefox/3.6.8
+      family: 'Firefox'
+      major: '3'
+      minor: '6'
+      patch: '8'
+    - user_agent_string: Mozilla/5.0 (X11; U; Linux i686; ru; rv:1.9.2.8) Gecko/20100723 Ubuntu/10.04 (lucid) Firefox/3.6.8
+      family: 'Firefox'
+      major: '3'
+      minor: '6'
+      patch: '8'
+    - user_agent_string: Mozilla/5.0 (X11; U; Linux i686; fi-FI; rv:1.9.2.8) Gecko/20100723 Ubuntu/10.04 (lucid) Firefox/3.6.8
+      family: 'Firefox'
+      major: '3'
+      minor: '6'
+      patch: '8'
+    - user_agent_string: Mozilla/5.0 (X11; U; Linux i686; en-US; rv:1.9.2.8) Gecko/20100727 Firefox/3.6.8
+      family: 'Firefox'
+      major: '3'
+      minor: '6'
+      patch: '8'
+    - user_agent_string: Mozilla/5.0 (X11; U; Linux i686; de-DE; rv:1.9.2.8) Gecko/20100725 Gentoo Firefox/3.6.8
+      family: 'Firefox'
+      major: '3'
+      minor: '6'
+      patch: '8'
+    - user_agent_string: Mozilla/5.0 (X11; U; FreeBSD i386; de-CH; rv:1.9.2.8) Gecko/20100729 Firefox/3.6.8
+      family: 'Firefox'
+      major: '3'
+      minor: '6'
+      patch: '8'
+    - user_agent_string: Mozilla/5.0 (Windows; U; Windows NT 6.1; zh-CN; rv:1.9.2.8) Gecko/20100722 Firefox/3.6.8
+      family: 'Firefox'
+      major: '3'
+      minor: '6'
+      patch: '8'
+    - user_agent_string: Mozilla/5.0 (Windows; U; Windows NT 6.1; pt-BR; rv:1.9.2.8) Gecko/20100722 Firefox/3.6.8 GTB7.1
+      family: 'Firefox'
+      major: '3'
+      minor: '6'
+      patch: '8'
+    - user_agent_string: Mozilla/5.0 (Windows; U; Windows NT 6.1; he; rv:1.9.2.8) Gecko/20100722 Firefox/3.6.8
+      family: 'Firefox'
+      major: '3'
+      minor: '6'
+      patch: '8'
+    - user_agent_string: Mozilla/5.0 (Windows; U; Windows NT 6.1; fr; rv:1.9.2.8) Gecko/20100722 Firefox/3.6.8 GTB7.1
+      family: 'Firefox'
+      major: '3'
+      minor: '6'
+      patch: '8'
+    - user_agent_string: Mozilla/5.0 (Windows; U; Windows NT 6.1; en-GB; rv:1.9.2.8) Gecko/20100722 Firefox/3.6.8 ( .NET CLR 3.5.30729; .NET4.0C)
+      family: 'Firefox'
+      major: '3'
+      minor: '6'
+      patch: '8'
+    - user_agent_string: Mozilla/5.0 (Windows; U; Windows NT 6.1; de; rv:1.9.2.8) Gecko/20100722 Firefox/3.6.8
+      family: 'Firefox'
+      major: '3'
+      minor: '6'
+      patch: '8'
+    - user_agent_string: Mozilla/5.0 (Windows; U; Windows NT 6.1; de; rv:1.9.2.3) Gecko/20121221 Firefox/3.6.8
+      family: 'Firefox'
+      major: '3'
+      minor: '6'
+      patch: '8'
+    - user_agent_string: Mozilla/5.0 (Windows; U; Windows NT 6.0; en-US; rv:1.9.2.8) Gecko/20100722 BTRS86393 Firefox/3.6.8 ( .NET CLR 3.5.30729; .NET4.0C)
+      family: 'Firefox'
+      major: '3'
+      minor: '6'
+      patch: '8'
+    - user_agent_string: Mozilla/5.0 (Windows; U; Windows NT 5.2; zh-TW; rv:1.9.2.8) Gecko/20100722 Firefox/3.6.8
+      family: 'Firefox'
+      major: '3'
+      minor: '6'
+      patch: '8'
+    - user_agent_string: Mozilla/5.0 (Windows; U; Windows NT 5.1; zh-CN; rv:1.9.2.8) Gecko/20100722 Firefox/3.6.8
+      family: 'Firefox'
+      major: '3'
+      minor: '6'
+      patch: '8'
+    - user_agent_string: Mozilla/5.0 (Windows; U; Windows NT 5.1; tr; rv:1.9.2.8) Gecko/20100722 Firefox/3.6.8 ( .NET CLR 3.5.30729; .NET4.0E)
+      family: 'Firefox'
+      major: '3'
+      minor: '6'
+      patch: '8'
+    - user_agent_string: Mozilla/5.0 (Windows; U; Windows NT 5.1; ro; rv:1.9.2.8) Gecko/20100722 Firefox/3.6.8
+      family: 'Firefox'
+      major: '3'
+      minor: '6'
+      patch: '8'
+    - user_agent_string: Mozilla/5.0 (Macintosh; U; Intel Mac OS X 10.6; en; rv:1.9.2.8) Gecko/20100805 Firefox/3.6.8
+      family: 'Firefox'
+      major: '3'
+      minor: '6'
+      patch: '8'
+    - user_agent_string: Mozilla/5.0 (X11; U; Linux x86_64; en-US; rv:1.9.2.7) Gecko/20100723 Fedora/3.6.7-1.fc13 Firefox/3.6.7
+      family: 'Firefox'
+      major: '3'
+      minor: '6'
+      patch: '7'
+    - user_agent_string: Mozilla/5.0 (X11; U; Linux i686; en-US; rv:1.9.2.7) Gecko/20100726 CentOS/3.6-3.el5.centos Firefox/3.6.7
+      family: 'Firefox'
+      major: '3'
+      minor: '6'
+      patch: '7'
+    - user_agent_string: Mozilla/5.0 (Windows; U; Windows NT 6.1; hu; rv:1.9.2.7) Gecko/20100713 Firefox/3.6.7 GTB7.1
+      family: 'Firefox'
+      major: '3'
+      minor: '6'
+      patch: '7'
+    - user_agent_string: Mozilla/5.0 (Windows; U; Windows NT 5.1; pt-PT; rv:1.9.2.7) Gecko/20100713 Firefox/3.6.7 (.NET CLR 3.5.30729)
+      family: 'Firefox'
+      major: '3'
+      minor: '6'
+      patch: '7'
+    - user_agent_string: Mozilla/5.0 (X11; U; Linux x86_64; en-US; rv:1.9.2.6) Gecko/20100628 Ubuntu/10.04 (lucid) Firefox/3.6.6 GTB7.1
+      family: 'Firefox'
+      major: '3'
+      minor: '6'
+      patch: '6'
+    - user_agent_string: Mozilla/5.0 (X11; U; Linux x86_64; en-US; rv:1.9.2.6) Gecko/20100628 Ubuntu/10.04 (lucid) Firefox/3.6.6 GTB7.0
+      family: 'Firefox'
+      major: '3'
+      minor: '6'
+      patch: '6'
+    - user_agent_string: Mozilla/5.0 (X11; U; Linux x86_64; en-US; rv:1.9.2.6) Gecko/20100628 Ubuntu/10.04 (lucid) Firefox/3.6.6 (.NET CLR 3.5.30729)
+      family: 'Firefox'
+      major: '3'
+      minor: '6'
+      patch: '6'
+    - user_agent_string: Mozilla/5.0 (X11; U; Linux x86_64; en-US; rv:1.9.2.6) Gecko/20100628 Ubuntu/10.04 (lucid) Firefox/3.6.6
+      family: 'Firefox'
+      major: '3'
+      minor: '6'
+      patch: '6'
+    - user_agent_string: Mozilla/5.0 (Windows; U; Windows NT 6.1; pt-PT; rv:1.9.2.6) Gecko/20100625 Firefox/3.6.6
+      family: 'Firefox'
+      major: '3'
+      minor: '6'
+      patch: '6'
+    - user_agent_string: Mozilla/5.0 (Windows; U; Windows NT 6.1; it; rv:1.9.2.6) Gecko/20100625 Firefox/3.6.6 ( .NET CLR 3.5.30729)
+      family: 'Firefox'
+      major: '3'
+      minor: '6'
+      patch: '6'
+    - user_agent_string: Mozilla/5.0 (Windows; U; Windows NT 6.1; en-US; rv:1.9.2.6) Gecko/20100625 Firefox/3.6.6 (.NET CLR 3.5.30729)
+      family: 'Firefox'
+      major: '3'
+      minor: '6'
+      patch: '6'
+    - user_agent_string: Mozilla/5.0 (Windows; U; Windows NT 6.0; zh-CN; rv:1.9.2.6) Gecko/20100625 Firefox/3.6.6 GTB7.1
+      family: 'Firefox'
+      major: '3'
+      minor: '6'
+      patch: '6'
+    - user_agent_string: Mozilla/5.0 (Windows; U; Windows NT 6.0; nl; rv:1.9.2.6) Gecko/20100625 Firefox/3.6.6
+      family: 'Firefox'
+      major: '3'
+      minor: '6'
+      patch: '6'
+    - user_agent_string: Mozilla/5.0 (Windows; U; Windows NT 5.1; it; rv:1.9.2.6) Gecko/20100625 Firefox/3.6.6 ( .NET CLR 3.5.30729; .NET4.0E)
+      family: 'Firefox'
+      major: '3'
+      minor: '6'
+      patch: '6'
+    - user_agent_string: Mozilla/5.0 (X11; U; Linux x86_64; en-US; rv:1.9.2.4) Gecko/20100614 Ubuntu/10.04 (lucid) Firefox/3.6.4
+      family: 'Firefox'
+      major: '3'
+      minor: '6'
+      patch: '4'
+    - user_agent_string: Mozilla/5.0 (X11; U; Linux i686; en-US; rv:1.9.2.4) Gecko/20100625 Gentoo Firefox/3.6.4
+      family: 'Firefox'
+      major: '3'
+      minor: '6'
+      patch: '4'
+    - user_agent_string: Mozilla/5.0 (Windows; U; Windows NT 6.1; ru; rv:1.9.2.4) Gecko/20100513 Firefox/3.6.4
+      family: 'Firefox'
+      major: '3'
+      minor: '6'
+      patch: '4'
+    - user_agent_string: Mozilla/5.0 (Windows; U; Windows NT 6.1; ja; rv:1.9.2.4) Gecko/20100611 Firefox/3.6.4 GTB7.1
+      family: 'Firefox'
+      major: '3'
+      minor: '6'
+      patch: '4'
+    - user_agent_string: Mozilla/5.0 (Windows; U; Windows NT 6.1; cs; rv:1.9.2.4) Gecko/20100513 Firefox/3.6.4 (.NET CLR 3.5.30729)
+      family: 'Firefox'
+      major: '3'
+      minor: '6'
+      patch: '4'
+    - user_agent_string: Mozilla/5.0 (Windows; U; Windows NT 6.0; zh-CN; rv:1.9.2.4) Gecko/20100513 Firefox/3.6.4
+      family: 'Firefox'
+      major: '3'
+      minor: '6'
+      patch: '4'
+    - user_agent_string: Mozilla/5.0 (Windows; U; Windows NT 6.0; ja; rv:1.9.2.4) Gecko/20100513 Firefox/3.6.4 ( .NET CLR 3.5.30729)
+      family: 'Firefox'
+      major: '3'
+      minor: '6'
+      patch: '4'
+    - user_agent_string: Mozilla/5.0 (Windows; U; Windows NT 6.0; fr; rv:1.9.2.4) Gecko/20100523 Firefox/3.6.4 ( .NET CLR 3.5.30729)
+      family: 'Firefox'
+      major: '3'
+      minor: '6'
+      patch: '4'
+    - user_agent_string: Mozilla/5.0 (Windows; U; Windows NT 6.0; en-US; rv:1.9.2.4) Gecko/20100527 Firefox/3.6.4 (.NET CLR 3.5.30729)
+      family: 'Firefox'
+      major: '3'
+      minor: '6'
+      patch: '4'
+    - user_agent_string: Mozilla/5.0 (Windows; U; Windows NT 6.0; en-US; rv:1.9.2.4) Gecko/20100527 Firefox/3.6.4
+      family: 'Firefox'
+      major: '3'
+      minor: '6'
+      patch: '4'
+    - user_agent_string: Mozilla/5.0 (Windows; U; Windows NT 6.0; en-US; rv:1.9.2.4) Gecko/20100523 Firefox/3.6.4 ( .NET CLR 3.5.30729)
+      family: 'Firefox'
+      major: '3'
+      minor: '6'
+      patch: '4'
+    - user_agent_string: Mozilla/5.0 (Windows; U; Windows NT 6.0; en-US; rv:1.9.2.4) Gecko/20100513 Firefox/3.6.4 (.NET CLR 3.5.30729)
+      family: 'Firefox'
+      major: '3'
+      minor: '6'
+      patch: '4'
+    - user_agent_string: Mozilla/5.0 (Windows; U; Windows NT 5.2; en-CA; rv:1.9.2.4) Gecko/20100523 Firefox/3.6.4
+      family: 'Firefox'
+      major: '3'
+      minor: '6'
+      patch: '4'
+    - user_agent_string: Mozilla/5.0 (Windows; U; Windows NT 5.1; zh-TW; rv:1.9.2.4) Gecko/20100611 Firefox/3.6.4 GTB7.0 ( .NET CLR 3.5.30729)
+      family: 'Firefox'
+      major: '3'
+      minor: '6'
+      patch: '4'
+    - user_agent_string: Mozilla/5.0 (Windows; U; Windows NT 5.1; zh-CN; rv:1.9.2.4) Gecko/20100513 Firefox/3.6.4 (.NET CLR 3.5.30729)
+      family: 'Firefox'
+      major: '3'
+      minor: '6'
+      patch: '4'
+    - user_agent_string: Mozilla/5.0 (Windows; U; Windows NT 5.1; zh-CN; rv:1.9.2.4) Gecko/20100503 Firefox/3.6.4 ( .NET CLR 3.5.30729)
+      family: 'Firefox'
+      major: '3'
+      minor: '6'
+      patch: '4'
+    - user_agent_string: Mozilla/5.0 (Windows; U; Windows NT 5.1; nb-NO; rv:1.9.2.4) Gecko/20100611 Firefox/3.6.4 (.NET CLR 3.5.30729)
+      family: 'Firefox'
+      major: '3'
+      minor: '6'
+      patch: '4'
+    - user_agent_string: Mozilla/5.0 (Windows; U; Windows NT 5.1; ko; rv:1.9.2.4) Gecko/20100523 Firefox/3.6.4
+      family: 'Firefox'
+      major: '3'
+      minor: '6'
+      patch: '4'
+    - user_agent_string: Mozilla/5.0 (Windows; U; Windows NT 5.1; cs; rv:1.9.2.4) Gecko/20100611 Firefox/3.6.4
+      family: 'Firefox'
+      major: '3'
+      minor: '6'
+      patch: '4'
+    - user_agent_string: Mozilla/5.0 (Macintosh; U; PPC Mac OS X 10.5; en-US; rv:1.9.2.4) Gecko/20100611 Firefox/3.6.4 GTB7.0
+      family: 'Firefox'
+      major: '3'
+      minor: '6'
+      patch: '4'
+    - user_agent_string: Mozilla/5.0 (X11; U; Linux x86_64; fr; rv:1.9.2.3) Gecko/20100403 Fedora/3.6.3-4.fc13 Firefox/3.6.3
+      family: 'Firefox'
+      major: '3'
+      minor: '6'
+      patch: '3'
+    - user_agent_string: Mozilla/5.0 (X11; U; Linux x86_64; en-US; rv:1.9.2.3) Gecko/20100403 Firefox/3.6.3
+      family: 'Firefox'
+      major: '3'
+      minor: '6'
+      patch: '3'
+    - user_agent_string: Mozilla/5.0 (X11; U; Linux x86_64; de; rv:1.9.2.3) Gecko/20100401 SUSE/3.6.3-1.1 Firefox/3.6.3
+      family: 'Firefox'
+      major: '3'
+      minor: '6'
+      patch: '3'
+    - user_agent_string: Mozilla/5.0 (X11; U; Linux i686; ko-KR; rv:1.9.2.3) Gecko/20100423 Ubuntu/10.04 (lucid) Firefox/3.6.3
+      family: 'Firefox'
+      major: '3'
+      minor: '6'
+      patch: '3'
+    - user_agent_string: Mozilla/5.0 (X11; U; Linux i686; en-US; rv:1.9.2.3) Gecko/20100404 Ubuntu/10.04 (lucid) Firefox/3.6.3
+      family: 'Firefox'
+      major: '3'
+      minor: '6'
+      patch: '3'
+    - user_agent_string: Mozilla/5.0 (X11; U; Linux i686; de; rv:1.9.2.3) Gecko/20100423 Ubuntu/10.04 (lucid) Firefox/3.6.3
+      family: 'Firefox'
+      major: '3'
+      minor: '6'
+      patch: '3'
+    - user_agent_string: Mozilla/5.0 (Macintosh; U; PPC Mac OS X 10.5; en-US; rv:1.9.2.3) Gecko/20100401 Firefox/3.6.3
+      family: 'Firefox'
+      major: '3'
+      minor: '6'
+      patch: '3'
+    - user_agent_string: Mozilla/5.0 (Macintosh; U; Intel Mac OS X 10.6; es-ES; rv:1.9.2.3) Gecko/20100401 Firefox/3.6.3
+      family: 'Firefox'
+      major: '3'
+      minor: '6'
+      patch: '3'
+    - user_agent_string: Mozilla/5.0 (Macintosh; U; Intel Mac OS X 10.6; en-US; rv:1.9.2.3) Gecko/20100401 Firefox/3.6.3 GTB7.0
+      family: 'Firefox'
+      major: '3'
+      minor: '6'
+      patch: '3'
+    - user_agent_string: Mozilla/5.0 (Macintosh; U; Intel Mac OS X 10.6; en-US; rv:1.9.2.3) Gecko/20100401 Firefox/3.6.3
+      family: 'Firefox'
+      major: '3'
+      minor: '6'
+      patch: '3'
+    - user_agent_string: Mozilla/5.0 (Macintosh; U; Intel Mac OS X 10.6; en-GB; rv:1.9.2.3) Gecko/20100401 Firefox/3.6.3
+      family: 'Firefox'
+      major: '3'
+      minor: '6'
+      patch: '3'
+    - user_agent_string: Mozilla/5.0 (Macintosh; U; Intel Mac OS X 10.5; nl; rv:1.9.2.3) Gecko/20100401 Firefox/3.6.3
+      family: 'Firefox'
+      major: '3'
+      minor: '6'
+      patch: '3'
+    - user_agent_string: Mozilla/5.0 (Macintosh; U; Intel Mac OS X 10.5; fr; rv:1.9.2.3) Gecko/20100401 Firefox/3.6.3
+      family: 'Firefox'
+      major: '3'
+      minor: '6'
+      patch: '3'
+    - user_agent_string: Mozilla/5.0 (Windows; U; Windows NT 6.1; zh-CN; rv:1.9.2.3) Gecko/20100401 Firefox/3.6.3 (.NET CLR 3.5.30729)
+      family: 'Firefox'
+      major: '3'
+      minor: '6'
+      patch: '3'
+    - user_agent_string: Mozilla/5.0 (Windows; U; Windows NT 6.1; ru; rv:1.9.2.3) Gecko/20100401 Firefox/3.6.3
+      family: 'Firefox'
+      major: '3'
+      minor: '6'
+      patch: '3'
+    - user_agent_string: Mozilla/5.0 (Windows; U; Windows NT 6.1; pl; rv:1.9.2.3) Gecko/20100401 Firefox/3.6.3
+      family: 'Firefox'
+      major: '3'
+      minor: '6'
+      patch: '3'
+    - user_agent_string: Mozilla/5.0 (Windows; U; Windows NT 6.1; it; rv:1.9.2.3) Gecko/20100401 Firefox/3.6.3
+      family: 'Firefox'
+      major: '3'
+      minor: '6'
+      patch: '3'
+    - user_agent_string: Mozilla/5.0 (Windows; U; Windows NT 6.1; hu; rv:1.9.2.3) Gecko/20100401 Firefox/3.6.3 GTB7.1
+      family: 'Firefox'
+      major: '3'
+      minor: '6'
+      patch: '3'
+    - user_agent_string: Mozilla/5.0 (Windows; U; Windows NT 6.1; es-ES; rv:1.9.2.3) Gecko/20100401 Firefox/3.6.3 GTB7.1
+      family: 'Firefox'
+      major: '3'
+      minor: '6'
+      patch: '3'
+    - user_agent_string: Mozilla/5.0 (Windows; U; Windows NT 6.1; es-ES; rv:1.9.2.3) Gecko/20100401 Firefox/3.6.3 GTB7.0 ( .NET CLR 3.5.30729)
+      family: 'Firefox'
+      major: '3'
+      minor: '6'
+      patch: '3'
+    - user_agent_string: Mozilla/5.0 (Windows; U; Windows NT 6.1; es-ES; rv:1.9.2.3) Gecko/20100401 Firefox/3.6.3
+      family: 'Firefox'
+      major: '3'
+      minor: '6'
+      patch: '3'
+    - user_agent_string: Mozilla/5.0 (Windows; U; Windows NT 6.1; en-US; rv:1.9.2.3) Gecko/20100401 Firefox/3.6.3 (.NET CLR 3.5.30729)
+      family: 'Firefox'
+      major: '3'
+      minor: '6'
+      patch: '3'
+    - user_agent_string: Mozilla/5.0 (Windows; U; Windows NT 6.1; cs; rv:1.9.2.3) Gecko/20100401 Firefox/3.6.3 ( .NET CLR 3.5.30729)
+      family: 'Firefox'
+      major: '3'
+      minor: '6'
+      patch: '3'
+    - user_agent_string: Mozilla/5.0 (Windows; U; Windows NT 6.1; ca; rv:1.9.2.3) Gecko/20100401 Firefox/3.6.3 (.NET CLR 3.5.30729)
+      family: 'Firefox'
+      major: '3'
+      minor: '6'
+      patch: '3'
+    - user_agent_string: Mozilla/5.0 (Windows; U; Windows NT 6.0; sv-SE; rv:1.9.2.3) Gecko/20100401 Firefox/3.6.3 (.NET CLR 3.5.30729)
+      family: 'Firefox'
+      major: '3'
+      minor: '6'
+      patch: '3'
+    - user_agent_string: Mozilla/5.0 (Windows; U; Windows NT 6.0; pl; rv:1.9.2.3) Gecko/20100401 Firefox/3.6.3 (.NET CLR 3.5.30729)
+      family: 'Firefox'
+      major: '3'
+      minor: '6'
+      patch: '3'
+    - user_agent_string: Mozilla/5.0 (Windows; U; Windows NT 6.0; nl; rv:1.9.2.3) Gecko/20100401 Firefox/3.6.3 (.NET CLR 3.5.30729)
+      family: 'Firefox'
+      major: '3'
+      minor: '6'
+      patch: '3'
+    - user_agent_string: Mozilla/5.0 (X11; U; SunOS sun4u; en-US; rv:1.9.2.3) Gecko/20100403 Firefox/3.6.3
+      family: 'Firefox'
+      major: '3'
+      minor: '6'
+      patch: '3'
+    - user_agent_string: Mozilla/5.0 (Macintosh; U; Intel Mac OS X 10.7; en-US; rv:1.9.2.2) Gecko/20100316 Firefox/3.6.2
+      family: 'Firefox'
+      major: '3'
+      minor: '6'
+      patch: '2'
+
+    # Firefox 3.5
+    - user_agent_string: Mozilla/5.0 (X11; U; Linux x86_64; it; rv:1.9.1.9) Gecko/20100402 Ubuntu/9.10 (karmic) Firefox/3.5.9 (.NET CLR 3.5.30729)
+      family: 'Firefox'
+      major: '3'
+      minor: '5'
+      patch: '9'
+    - user_agent_string: Mozilla/5.0 (X11; U; Linux x86_64; it; rv:1.9.1.9) Gecko/20100330 Fedora/3.5.9-2.fc12 Firefox/3.5.9
+      family: 'Firefox'
+      major: '3'
+      minor: '5'
+      patch: '9'
+    - user_agent_string: Mozilla/5.0 (X11; U; Linux x86_64; fr; rv:1.9.1.9) Gecko/20100317 SUSE/3.5.9-0.1.1 Firefox/3.5.9 GTB7.0
+      family: 'Firefox'
+      major: '3'
+      minor: '5'
+      patch: '9'
+    - user_agent_string: Mozilla/5.0 (X11; U; Linux x86_64; es-CL; rv:1.9.1.9) Gecko/20100402 Ubuntu/9.10 (karmic) Firefox/3.5.9
+      family: 'Firefox'
+      major: '3'
+      minor: '5'
+      patch: '9'
+    - user_agent_string: Mozilla/5.0 (X11; U; Linux x86_64; cs-CZ; rv:1.9.1.9) Gecko/20100317 SUSE/3.5.9-0.1.1 Firefox/3.5.9
+      family: 'Firefox'
+      major: '3'
+      minor: '5'
+      patch: '9'
+    - user_agent_string: Mozilla/5.0 (X11; U; Linux i686; nl; rv:1.9.1.9) Gecko/20100401 Ubuntu/9.10 (karmic) Firefox/3.5.9
+      family: 'Firefox'
+      major: '3'
+      minor: '5'
+      patch: '9'
+    - user_agent_string: Mozilla/5.0 (X11; U; Linux i686; hu-HU; rv:1.9.1.9) Gecko/20100330 Fedora/3.5.9-1.fc12 Firefox/3.5.9
+      family: 'Firefox'
+      major: '3'
+      minor: '5'
+      patch: '9'
+    - user_agent_string: Mozilla/5.0 (X11; U; Linux i686; es-ES; rv:1.9.1.9) Gecko/20100317 SUSE/3.5.9-0.1 Firefox/3.5.9
+      family: 'Firefox'
+      major: '3'
+      minor: '5'
+      patch: '9'
+    - user_agent_string: Mozilla/5.0 (X11; U; Linux i686; en-US; rv:1.9.1.9) Gecko/20100401 Ubuntu/9.10 (karmic) Firefox/3.5.9 GTB7.1
+      family: 'Firefox'
+      major: '3'
+      minor: '5'
+      patch: '9'
+    - user_agent_string: Mozilla/5.0 (X11; U; Linux i686; en-US; rv:1.9.1.9) Gecko/20100315 Ubuntu/9.10 (karmic) Firefox/3.5.9
+      family: 'Firefox'
+      major: '3'
+      minor: '5'
+      patch: '9'
+    - user_agent_string: Mozilla/5.0 (X11; U; Linux i686; en-US; rv:1.9.1.4) Gecko/20091028 Ubuntu/9.10 (karmic) Firefox/3.5.9
+      family: 'Firefox'
+      major: '3'
+      minor: '5'
+      patch: '9'
+    - user_agent_string: Mozilla/5.0 (Windows; U; Windows NT 6.1; tr; rv:1.9.1.9) Gecko/20100315 Firefox/3.5.9 GTB7.1
+      family: 'Firefox'
+      major: '3'
+      minor: '5'
+      patch: '9'
+    - user_agent_string: Mozilla/5.0 (Windows; U; Windows NT 6.1; hu; rv:1.9.1.9) Gecko/20100315 Firefox/3.5.9 (.NET CLR 3.5.30729)
+      family: 'Firefox'
+      major: '3'
+      minor: '5'
+      patch: '9'
+    - user_agent_string: Mozilla/5.0 (Windows; U; Windows NT 6.1; fr; rv:1.9.1.9) Gecko/20100315 Firefox/3.5.9
+      family: 'Firefox'
+      major: '3'
+      minor: '5'
+      patch: '9'
+    - user_agent_string: Mozilla/5.0 (Windows; U; Windows NT 6.1; et; rv:1.9.1.9) Gecko/20100315 Firefox/3.5.9
+      family: 'Firefox'
+      major: '3'
+      minor: '5'
+      patch: '9'
+    - user_agent_string: Mozilla/5.0 (Windows; U; Windows NT 6.1; en-US; rv:1.9.1.9) Gecko/20100315 Firefox/3.5.9
+      family: 'Firefox'
+      major: '3'
+      minor: '5'
+      patch: '9'
+    - user_agent_string: Mozilla/5.0 (Windows; U; Windows NT 6.0; nl; rv:1.9.1.9) Gecko/20100315 Firefox/3.5.9 ( .NET CLR 3.5.30729)
+      family: 'Firefox'
+      major: '3'
+      minor: '5'
+      patch: '9'
+    - user_agent_string: Mozilla/5.0 (Windows; U; Windows NT 6.0; es-ES; rv:1.9.1.9) Gecko/20100315 Firefox/3.5.9 GTB5 (.NET CLR 3.5.30729)
+      family: 'Firefox'
+      major: '3'
+      minor: '5'
+      patch: '9'
+    - user_agent_string: Mozilla/5.0 (Windows; U; Windows NT 6.0; de; rv:1.9.1.9) Gecko/20100315 Firefox/3.5.9 GTB7.0 (.NET CLR 3.0.30618)
+      family: 'Firefox'
+      major: '3'
+      minor: '5'
+      patch: '9'
+    - user_agent_string: Mozilla/5.0 (Windows; U; Windows NT 6.0; ca; rv:1.9.1.9) Gecko/20100315 Firefox/3.5.9 GTB7.0 ( .NET CLR 3.5.30729)
+      family: 'Firefox'
+      major: '3'
+      minor: '5'
+      patch: '9'
+    - user_agent_string: Mozilla/5.0 (X11; U; Linux x86_64; ru; rv:1.9.1.8) Gecko/20100216 Fedora/3.5.8-1.fc12 Firefox/3.5.8
+      family: 'Firefox'
+      major: '3'
+      minor: '5'
+      patch: '8'
+    - user_agent_string: Mozilla/5.0 (X11; U; Linux x86_64; es-ES; rv:1.9.1.8) Gecko/20100216 Fedora/3.5.8-1.fc11 Firefox/3.5.8
+      family: 'Firefox'
+      major: '3'
+      minor: '5'
+      patch: '8'
+    - user_agent_string: Mozilla/5.0 (X11; U; Linux x86_64; en-US; rv:1.9.1.8) Gecko/20100318 Gentoo Firefox/3.5.8
+      family: 'Firefox'
+      major: '3'
+      minor: '5'
+      patch: '8'
+    - user_agent_string: Mozilla/5.0 (X11; U; Linux i686; zh-CN; rv:1.9.1.8) Gecko/20100216 Fedora/3.5.8-1.fc12 Firefox/3.5.8
+      family: 'Firefox'
+      major: '3'
+      minor: '5'
+      patch: '8'
+    - user_agent_string: Mozilla/5.0 (X11; U; Linux i686; ja-JP; rv:1.9.1.8) Gecko/20100216 Fedora/3.5.8-1.fc12 Firefox/3.5.8
+      family: 'Firefox'
+      major: '3'
+      minor: '5'
+      patch: '8'
+    - user_agent_string: Mozilla/5.0 (X11; U; Linux i686; es-AR; rv:1.9.1.8) Gecko/20100214 Ubuntu/9.10 (karmic) Firefox/3.5.8
+      family: 'Firefox'
+      major: '3'
+      minor: '5'
+      patch: '8'
+    - user_agent_string: Mozilla/5.0 (X11; U; Linux i686; de; rv:1.9.1.8) Gecko/20100214 Ubuntu/9.10 (karmic) Firefox/3.5.8
+      family: 'Firefox'
+      major: '3'
+      minor: '5'
+      patch: '8'
+    - user_agent_string: Mozilla/5.0 (X11; U; Linux i686; de; rv:1.9.1.8) Gecko/20100202 Firefox/3.5.8
+      family: 'Firefox'
+      major: '3'
+      minor: '5'
+      patch: '8'
+    - user_agent_string: Mozilla/5.0 (X11; U; FreeBSD i386; ja-JP; rv:1.9.1.8) Gecko/20100305 Firefox/3.5.8
+      family: 'Firefox'
+      major: '3'
+      minor: '5'
+      patch: '8'
+    - user_agent_string: Mozilla/5.0 (Windows; U; Windows NT 6.1; sl; rv:1.9.1.8) Gecko/20100202 Firefox/3.5.8
+      family: 'Firefox'
+      major: '3'
+      minor: '5'
+      patch: '8'
+    - user_agent_string: Mozilla/5.0 (Windows; U; Windows NT 6.0; en-US; rv:1.9.1.8) Gecko/20100202 Firefox/3.5.8 (.NET CLR 3.5.30729) FirePHP/0.4
+      family: 'Firefox'
+      major: '3'
+      minor: '5'
+      patch: '8'
+    - user_agent_string: Mozilla/5.0 (Windows; U; Windows NT 5.1; zh-TW; rv:1.9.1.8) Gecko/20100202 Firefox/3.5.8 GTB6
+      family: 'Firefox'
+      major: '3'
+      minor: '5'
+      patch: '8'
+    - user_agent_string: Mozilla/5.0 (Windows; U; Windows NT 5.1; ja; rv:1.9.1.8) Gecko/20100202 Firefox/3.5.8 GTB7.0 (.NET CLR 3.5.30729)
+      family: 'Firefox'
+      major: '3'
+      minor: '5'
+      patch: '8'
+    - user_agent_string: Mozilla/5.0 (X11; U; Linux x86_64; en-US; rv:1.9.2) Gecko/20100305 Gentoo Firefox/3.5.7
+      family: 'Firefox'
+      major: '3'
+      minor: '5'
+      patch: '7'
+    - user_agent_string: Mozilla/5.0 (X11; U; Linux x86_64; cs-CZ; rv:1.9.1.7) Gecko/20100106 Ubuntu/9.10 (karmic) Firefox/3.5.7
+      family: 'Firefox'
+      major: '3'
+      minor: '5'
+      patch: '7'
+    - user_agent_string: Mozilla/5.0 (X11; U; Linux i686; es-ES; rv:1.9.1.7) Gecko/20091222 SUSE/3.5.7-1.1.1 Firefox/3.5.7
+      family: 'Firefox'
+      major: '3'
+      minor: '5'
+      patch: '7'
+    - user_agent_string: Mozilla/5.0 (Windows; U; Windows NT 6.0; ja; rv:1.9.1.7) Gecko/20091221 Firefox/3.5.7 GTB6
+      family: 'Firefox'
+      major: '3'
+      minor: '5'
+      patch: '7'
+    - user_agent_string: Mozilla/5.0 (Windows; U; Windows NT 6.0; de; rv:1.9.1.7) Gecko/20091221 Firefox/3.5.7 (.NET CLR 1.1.4322; .NET CLR 2.0.50727; .NET CLR 3.0.30729; .NET CLR 3.5.30729)
+      family: 'Firefox'
+      major: '3'
+      minor: '5'
+      patch: '7'
+    - user_agent_string: Mozilla/5.0 (Windows; U; Windows NT 5.2; fr; rv:1.9.1.7) Gecko/20091221 Firefox/3.5.7 (.NET CLR 3.0.04506.648)
+      family: 'Firefox'
+      major: '3'
+      minor: '5'
+      patch: '7'
+    - user_agent_string: Mozilla/5.0 (Windows; U; Windows NT 5.1; fa; rv:1.9.1.7) Gecko/20091221 Firefox/3.5.7
+      family: 'Firefox'
+      major: '3'
+      minor: '5'
+      patch: '7'
+    - user_agent_string: Mozilla/5.0 (Windows; U; Windows NT 5.1; en-US; rv:1.9.1.7) Gecko/20091221 MRA 5.5 (build 02842) Firefox/3.5.7 (.NET CLR 3.5.30729)
+      family: 'Firefox'
+      major: '3'
+      minor: '5'
+      patch: '7'
+    - user_agent_string: Mozilla/5.0 (X11; U; Linux x86_64; fr; rv:1.9.1.6) Gecko/20091215 Ubuntu/9.10 (karmic) Firefox/3.5.6
+      family: 'Firefox'
+      major: '3'
+      minor: '5'
+      patch: '6'
+    - user_agent_string: Mozilla/5.0 (X11; U; Linux x86_64; en-US; rv:1.9.1.6) Gecko/20100117 Gentoo Firefox/3.5.6
+      family: 'Firefox'
+      major: '3'
+      minor: '5'
+      patch: '6'
+    - user_agent_string: Mozilla/5.0 (X11; U; Linux i686; zh-CN; rv:1.9.1.6) Gecko/20091216 Fedora/3.5.6-1.fc11 Firefox/3.5.6 GTB6
+      family: 'Firefox'
+      major: '3'
+      minor: '5'
+      patch: '6'
+    - user_agent_string: Mozilla/5.0 (X11; U; Linux i686; es-ES; rv:1.9.1.6) Gecko/20091201 SUSE/3.5.6-1.1.1 Firefox/3.5.6 GTB6
+      family: 'Firefox'
+      major: '3'
+      minor: '5'
+      patch: '6'
+    - user_agent_string: Mozilla/5.0 (X11; U; Linux i686; en-US; rv:1.9.1.6) Gecko/20100118 Gentoo Firefox/3.5.6
+      family: 'Firefox'
+      major: '3'
+      minor: '5'
+      patch: '6'
+    - user_agent_string: Mozilla/5.0 (X11; U; Linux i686; en-GB; rv:1.9.1.6) Gecko/20091215 Ubuntu/9.10 (karmic) Firefox/3.5.6 GTB6
+      family: 'Firefox'
+      major: '3'
+      minor: '5'
+      patch: '6'
+    - user_agent_string: Mozilla/5.0 (X11; U; Linux i686; de; rv:1.9.1.6) Gecko/20091215 Ubuntu/9.10 (karmic) Firefox/3.5.6 GTB7.0
+      family: 'Firefox'
+      major: '3'
+      minor: '5'
+      patch: '6'
+    - user_agent_string: Mozilla/5.0 (X11; U; Linux i686; de; rv:1.9.1.6) Gecko/20091215 Ubuntu/9.10 (karmic) Firefox/3.5.6
+      family: 'Firefox'
+      major: '3'
+      minor: '5'
+      patch: '6'
+    - user_agent_string: Mozilla/5.0 (X11; U; Linux i686; de; rv:1.9.1.6) Gecko/20091201 SUSE/3.5.6-1.1.1 Firefox/3.5.6
+      family: 'Firefox'
+      major: '3'
+      minor: '5'
+      patch: '6'
+    - user_agent_string: Mozilla/5.0 (X11; U; Linux i686; cs-CZ; rv:1.9.1.6) Gecko/20100107 Fedora/3.5.6-1.fc12 Firefox/3.5.6
+      family: 'Firefox'
+      major: '3'
+      minor: '5'
+      patch: '6'
+    - user_agent_string: Mozilla/5.0 (X11; U; Linux i686; ca; rv:1.9.1.6) Gecko/20091215 Ubuntu/9.10 (karmic) Firefox/3.5.6
+      family: 'Firefox'
+      major: '3'
+      minor: '5'
+      patch: '6'
+    - user_agent_string: Mozilla/5.0 (Windows; U; Windows NT 6.1; it; rv:1.9.1.6) Gecko/20091201 Firefox/3.5.6
+      family: 'Firefox'
+      major: '3'
+      minor: '5'
+      patch: '6'
+    - user_agent_string: Mozilla/5.0 (Windows; U; Windows NT 6.1; en-US; rv:1.9.1.6) Gecko/20091201 Firefox/3.5.6 ( .NET CLR 3.5.30729)
+      family: 'Firefox'
+      major: '3'
+      minor: '5'
+      patch: '6'
+    - user_agent_string: Mozilla/5.0 (Windows; U; Windows NT 6.0; id; rv:1.9.1.6) Gecko/20091201 Firefox/3.5.6 (.NET CLR 3.5.30729)
+      family: 'Firefox'
+      major: '3'
+      minor: '5'
+      patch: '6'
+    - user_agent_string: Mozilla/5.0 (Windows; U; Windows NT 6.0; en-US; rv:1.9.1.6) Gecko/20091201 MRA 5.4 (build 02647) Firefox/3.5.6 (.NET CLR 3.5.30729)
+      family: 'Firefox'
+      major: '3'
+      minor: '5'
+      patch: '6'
+    - user_agent_string: Mozilla/5.0 (Windows; U; Windows NT 5.1; nl; rv:1.9.1.6) Gecko/20091201 Firefox/3.5.6 (.NET CLR 1.1.4322; .NET CLR 2.0.50727; .NET CLR 3.0.4506.2152; .NET CLR 3.5.30729)
+      family: 'Firefox'
+      major: '3'
+      minor: '5'
+      patch: '6'
+    - user_agent_string: Mozilla/5.0 (Windows; U; Windows NT 5.1; en-US; rv:1.9.1.6) Gecko/20091201 MRA 5.5 (build 02842) Firefox/3.5.6 (.NET CLR 3.5.30729)
+      family: 'Firefox'
+      major: '3'
+      minor: '5'
+      patch: '6'
+    - user_agent_string: Mozilla/5.0 (Windows; U; Windows NT 5.1; en-US; rv:1.9.1.6) Gecko/20091201 MRA 5.5 (build 02842) Firefox/3.5.6
+      family: 'Firefox'
+      major: '3'
+      minor: '5'
+      patch: '6'
+    - user_agent_string: Mozilla/5.0 (Windows; U; Windows NT 5.1; en-US; rv:1.9.1.6) Gecko/20091201 Firefox/3.5.6 GTB6 (.NET CLR 3.5.30729) FBSMTWB
+      family: 'Firefox'
+      major: '3'
+      minor: '5'
+      patch: '6'
+    - user_agent_string: Mozilla/5.0 (Windows; U; Windows NT 5.1; en-US; rv:1.9.1.6) Gecko/20091201 Firefox/3.5.6 (.NET CLR 3.5.30729) FBSMTWB
+      family: 'Firefox'
+      major: '3'
+      minor: '5'
+      patch: '6'
+    - user_agent_string: Mozilla/5.0 (Macintosh; U; Intel Mac OS X 10.6; en-US; rv:1.9.1.6) Gecko/20091201 Firefox/3.5.6 (.NET CLR 3.5.30729)
+      family: 'Firefox'
+      major: '3'
+      minor: '5'
+      patch: '6'
+    - user_agent_string: Mozilla/5.0 (Macintosh; U; Intel Mac OS X 10.6; sv-SE; rv:1.9.1.3) Gecko/20090824 Firefox/3.5.3
+      family: 'Firefox'
+      major: '3'
+      minor: '5'
+      patch: '3'
+
+    # Firefox on the next Gecko major release (preliminary)
+    - user_agent_string: Mozilla/5.0 (Windows NT 5.2; rv:2.0.1) Gecko Firefox/5.0.1
+      family: 'Firefox'
+      major: '5'
+      minor: '0'
+      patch: '1'
+    - user_agent_string: Mozilla/5.0 (Windows NT 6.1; rv:2.0.1) Gecko Firefox/5.0.1
+      family: 'Firefox'
+      major: '5'
+      minor: '0'
+      patch: '1'
+    - user_agent_string: Mozilla/5.0 (Windows NT 6.1; Win64; x64; rv:2.0.1) Gecko Firefox/5.0.1
+      family: 'Firefox'
+      major: '5'
+      minor: '0'
+      patch: '1'
+    - user_agent_string: Mozilla/5.0 (Windows NT 6.1; WOW64; rv:2.0.1) Gecko Firefox/5.0.1
+      family: 'Firefox'
+      major: '5'
+      minor: '0'
+      patch: '1'
+    - user_agent_string: Mozilla/5.0 (WindowsCE 6.0; rv:2.0.1) Gecko Firefox/5.0.1
+      family: 'Firefox'
+      major: '5'
+      minor: '0'
+      patch: '1'
+    - user_agent_string: Mozilla/5.0 (Macintosh; Intel Mac OS X 10.5; rv:2.0.1) Gecko Firefox/5.0.1
+      family: 'Firefox'
+      major: '5'
+      minor: '0'
+      patch: '1'
+    - user_agent_string: Mozilla/5.0 (Macintosh; Intel Mac OS X 10.6; rv:2.0.1) Gecko Firefox/5.0.1
+      family: 'Firefox'
+      major: '5'
+      minor: '0'
+      patch: '1'
+    - user_agent_string: Mozilla/5.0 (X11; Linux i686; rv:2.0.1) Gecko Firefox/5.0.1
+      family: 'Firefox'
+      major: '5'
+      minor: '0'
+      patch: '1'
+    - user_agent_string: Mozilla/5.0 (X11; Linux x86_64; rv:2.0.1) Gecko Firefox/5.0.1
+      family: 'Firefox'
+      major: '5'
+      minor: '0'
+      patch: '1'
+    - user_agent_string: Mozilla/5.0 (X11; Linux i686 on x86_64; rv:2.0.1) Gecko Firefox/5.0.1
+      family: 'Firefox'
+      major: '5'
+      minor: '0'
+      patch: '1'
+    - user_agent_string: Mozilla/5.0 (X11; Linux armv7l; rv:2.0.1) Gecko Firefox/5.0.1
+      family: 'Firefox'
+      major: '5'
+      minor: '0'
+      patch: '1'
+
+#    # Fennec 2.0.1 (not yet released)
+#    - user_agent_string: Mozilla/5.0 (Android; Linux armv7l; rv:2.0.1) Gecko/20100101 Firefox/4.0.1 Fennec/2.0.1
+#      family: 'Fennec'
+#      major: '2'
+#      minor: '0'
+#      patch: '1'
+#    - user_agent_string: Mozilla/5.0 (Maemo; Linux armv7l; rv:2.0.1) Gecko/20100101 Firefox/4.0.1 Fennec/2.0.1
+#      family: 'Fennec'
+#      major: '2'
+#      minor: '0'
+#      patch: '1'
+#    - user_agent_string: Mozilla/5.0 (X11; Linux armv7l; rv:2.0.1) Gecko/20100101 Firefox/4.0.1 Fennec/2.0.1
+#      family: 'Fennec'
+#      major: '2'
+#      minor: '0'
+#      patch: '1'
+#    - user_agent_string: Mozilla/5.0 (X11; Linux i686; rv:2.0.1) Gecko/20100101 Firefox/4.0.1 Fennec/2.0.1
+#      family: 'Fennec'
+#      major: '2'
+#      minor: '0'
+#      patch: '1'
+#    - user_agent_string: Mozilla/5.0 (X11; Linux i686 on x86_64; rv:2.0.1) Gecko/20100101 Firefox/4.0.1 Fennec/2.0.1
+#      family: 'Fennec'
+#      major: '2'
+#      minor: '0'
+#      patch: '1'
+#
+#    # Fennec 2.0 (prerelease)
+#    - user_agent_string: Mozilla/5.0 (Android; Linux armv7l; rv:2.0b6pre) Gecko/20100907 Firefox/4.0b6pre Fennec/2.0b1pre
+#      family: 'Fennec'
+#      major: '2'
+#      minor: '0'
+#      patch: 'a1pre'
+#    - user_agent_string: Mozilla/5.0 (X11; Linux i686; rv:2.0b6pre) Gecko/20100907 Firefox/4.0b6pre Fennec/2.0b1pre
+#      family: 'Fennec'
+#      major: '2'
+#      minor: '0'
+#      patch: 'a1pre'
+#    - user_agent_string: Mozilla/5.0 (Windows NT 5.1; rv:2.0b6pre) Gecko/20100902 Firefox/4.0b6pre Fennec/2.0b1pre
+#      family: 'Fennec'
+#      major: '2'
+#      minor: '0'
+#      patch: 'a1pre'
+#    - user_agent_string: Mozilla/5.0 (X11; Linux armv7l; rv:2.0b4pre) Gecko/20100818 Firefox/4.0b4pre Fennec/2.0a1pre
+#      family: 'Fennec'
+#      major: '2'
+#      minor: '0'
+#      patch: 'a1pre'
+#    - user_agent_string: Mozilla/5.0 (X11; Linux armv7l; rv:2.0b4pre) Gecko/20100812 Firefox/4.0b4pre Fennec/2.0a1pre
+#      family: 'Fennec'
+#      major: '2'
+#      minor: '0'
+#      patch: 'a1pre'
+#    - user_agent_string: Mozilla/5.0 (X11; Linux armv7l; rv:2.0b3pre) Gecko/20100730 Firefox/4.0b3pre Fennec/2.0a1pre
+#      family: 'Fennec'
+#      major: '2'
+#      minor: '0'
+#      patch: 'a1pre'
+
+    # Camino 2.2 (not yet released)
+    - user_agent_string: Mozilla/5.0 (Macintosh; Intel Mac OS X 10.4; rv:2.0.1) Gecko/20100101 Firefox/4.0.1 Camino/2.2.1
+      family: 'Camino'
+      major: '2'
+      minor: '2'
+      patch: '1'
+    - user_agent_string: Mozilla/5.0 (Macintosh; Intel Mac OS X 10.5; rv:2.0.1) Gecko/20100101 Firefox/4.0.1 Camino/2.2.1
+      family: 'Camino'
+      major: '2'
+      minor: '2'
+      patch: '1'
+    - user_agent_string: Mozilla/5.0 (Macintosh; Intel Mac OS X 10.6; rv:2.0.1) Gecko/20100101 Firefox/4.0.1 Camino/2.2.1
+      family: 'Camino'
+      major: '2'
+      minor: '2'
+      patch: '1'
+    - user_agent_string: Mozilla/5.0 (Macintosh; PPC Mac OS X 10.4; rv:2.0.1) Gecko/20100101 Firefox/4.0.1 Camino/2.2.1
+      family: 'Camino'
+      major: '2'
+      minor: '2'
+      patch: '1'
+    - user_agent_string: Mozilla/5.0 (Macintosh; PPC Mac OS X 10.5; rv:2.0.1) Gecko/20100101 Firefox/4.0.1 Camino/2.2.1
+      family: 'Camino'
+      major: '2'
+      minor: '2'
+      patch: '1'
+
+    # Camino 2.0
+    - user_agent_string: Mozilla/5.0 (Macintosh; U; PPC Mac OS X 10.4; en; rv:1.9.0.19) Gecko/2010051911 Camino/2.0.3 (like Firefox/3.0.19)
+      family: 'Camino'
+      major: '2'
+      minor: '0'
+      patch: '3'
+    - user_agent_string: Mozilla/5.0 (Macintosh; U; Intel Mac OS X 10.6; nl; rv:1.9.0.19) Gecko/2010051911 Camino/2.0.3 (MultiLang) (like Firefox/3.0.19)
+      family: 'Camino'
+      major: '2'
+      minor: '0'
+      patch: '3'
+    - user_agent_string: Mozilla/5.0 (Macintosh; U; Intel Mac OS X 10.6; en; rv:1.9.0.18) Gecko/2010021619 Camino/2.0.2 (like Firefox/3.0.18)
+      family: 'Camino'
+      major: '2'
+      minor: '0'
+      patch: '2'
+
+    # Camino 1.6
+    - user_agent_string: Mozilla/5.0 (Macintosh; U; PPC Mac OS X Mach-O; it; rv:1.8.1.21) Gecko/20090327 Camino/1.6.7 (MultiLang) (like Firefox/2.0.0.21pre)
+      family: 'Camino'
+      major: '1'
+      minor: '6'
+      patch: '7'
+    - user_agent_string: Mozilla/5.0 (Macintosh; U; PPC Mac OS X Mach-O; en; rv:1.8.1.21) Gecko/20090327 Camino/1.6.7 (like Firefox/2.0.0.21pre)
+      family: 'Camino'
+      major: '1'
+      minor: '6'
+      patch: '7'
+
+    # Camino 1.5
+    - user_agent_string: Mozilla/5.0 (Macintosh; U; PPC Mac OS X Mach-O; en; rv:1.8.1.12) Gecko/20080206 Camino/1.5.5
+      family: 'Camino'
+      major: '1'
+      minor: '5'
+      patch: '5'
+    - user_agent_string: Mozilla/5.0 (Macintosh; U; Intel Mac OS X Mach-O; en; rv:1.8.1.12) Gecko/20080206 Camino/1.5.5
+      family: 'Camino'
+      major: '1'
+      minor: '5'
+      patch: '5'
+    - user_agent_string: Mozilla/5.0 (Macintosh; U; Intel Mac OS X; en; rv:1.8.1.11) Gecko/20071128 Camino/1.5.4
+      family: 'Camino'
+      major: '1'
+      minor: '5'
+      patch: '4'
+    - user_agent_string: Mozilla/5.0 (Macintosh; U; PPC Mac OS X Mach-O; en; rv:1.8.1.6) Gecko/20070809 Camino/1.5.1
+      family: 'Camino'
+      major: '1'
+      minor: '5'
+      patch: '1'
+    - user_agent_string: Mozilla/5.0 (Macintosh; U; Intel Mac OS X; en; rv:1.8.1.6) Gecko/20070809 Camino/1.5.1
+      family: 'Camino'
+      major: '1'
+      minor: '5'
+      patch: '1'
+#
+#    # Thunderbird 3.1
+#    - user_agent_string: Mozilla/5.0 (Windows; U; Windows NT 6.1; sv-SE; rv:1.9.2.8) Gecko/20100802 Thunderbird/3.1.2 ThunderBrowse/3.3.2
+#      family: 'Thunderbird'
+#      major: '3'
+#      minor: '1'
+#      patch: '2'
+#    - user_agent_string: Mozilla/5.0 (Windows; U; Windows NT 6.0; de; rv:1.9.2.8) Gecko/20100802 Thunderbird/3.1.2
+#      family: 'Thunderbird'
+#      major: '3'
+#      minor: '1'
+#      patch: '2'
+#    - user_agent_string: Mozilla/5.0 (Windows; U; Windows NT 5.1; zh-CN; rv:1.9.2.7) Gecko/20100713 Lightning/1.0b2 Thunderbird/3.1.1 ThunderBrowse/3.3.1
+#      family: 'Thunderbird'
+#      major: '3'
+#      minor: '1'
+#      patch: '1'
+#
+#    # Thunderbird 3.0
+#    - user_agent_string: Mozilla/5.0 (X11; U; Linux x86_64; en-US; rv:1.9.1.10) Gecko/20100621 Fedora/3.0.5-1.fc13 Lightning/1.0b2pre Thunderbird/3.0.5
+#      family: 'Thunderbird'
+#      major: '3'
+#      minor: '0'
+#      patch: '5'
+#    - user_agent_string: Mozilla/5.0 (Windows; U; Windows NT 6.1; en-GB; rv:1.9.1.10) Gecko/20100512 Lightning/1.0b1 Thunderbird/3.0.5
+#      family: 'Thunderbird'
+#      major: '3'
+#      minor: '0'
+#      patch: '5'
+#    - user_agent_string: Mozilla/5.0 (X11; U; Linux i686; en-US; rv:1.9.1.9) Gecko/20100423 Thunderbird/3.0.4
+#      family: 'Thunderbird'
+#      major: '3'
+#      minor: '0'
+#      patch: '4'
+#    - user_agent_string: Mozilla/5.0 (Windows; U; Windows NT 5.1; en-GB; rv:1.9.1.9) Gecko/20100317 Lightning/1.0b1 Thunderbird/3.0.4
+#      family: 'Thunderbird'
+#      major: '3'
+#      minor: '0'
+#      patch: '4'
+#    - user_agent_string: Mozilla/5.0 (Macintosh; U; Intel Mac OS X 10.6; en-US; rv:1.9.1.9) Gecko/20100317 Thunderbird/3.0.4
+#      family: 'Thunderbird'
+#      major: '3'
+#      minor: '0'
+#      patch: '4'
+#    - user_agent_string: Mozilla/5.0 (Macintosh; U; Intel Mac OS X 10.5; pl; rv:1.9.1.9) Gecko/20100317 Thunderbird/3.0.4
+#      family: 'Thunderbird'
+#      major: '3'
+#      minor: '0'
+#      patch: '4'
+#    - user_agent_string: Mozilla/5.0 (Macintosh; U; Intel Mac OS X 10.5; en-US; rv:1.9.1.9) Gecko/20100317 Thunderbird/3.0.4
+#      family: 'Thunderbird'
+#      major: '3'
+#      minor: '0'
+#      patch: '4'
+#    - user_agent_string: Mozilla/5.0 (X11; U; Linux x86_64; en-US; rv:1.9.1.8) Gecko/20100408 Thunderbird/3.0.3
+#      family: 'Thunderbird'
+#      major: '3'
+#      minor: '0'
+#      patch: '3'
+#    - user_agent_string: Mozilla/5.0 (Windows; U; Windows NT 5.1; es-ES; rv:1.9.1.7) Gecko/20100111 Thunderbird/3.0.1 ThunderBrowse/3.2.8.1
+#      family: 'Thunderbird'
+#      major: '3'
+#      minor: '0'
+#      patch: '1'
+#    - user_agent_string: Mozilla/5.0 (Windows; U; Windows NT 5.0; fr-CA; rv:1.9.1.7) Gecko/20100111 Thunderbird/3.0.1 ThunderBrowse/3.2.8.1
+#      family: 'Thunderbird'
+#      major: '3'
+#      minor: '0'
+#      patch: '1'
+#    - user_agent_string: Mozilla/5.0 (Windows; U; Windows NT 5.0; es-ES; rv:1.9.1.7) Gecko/20100111 Thunderbird/3.0.1 ThunderBrowse/3.2.8.1
+#      family: 'Thunderbird'
+#      major: '3'
+#      minor: '0'
+#      patch: '1'
+
+    # SeaMonkey 2.1.1 (not yet released)
+    - user_agent_string: Mozilla/5.0 (Windows NT 5.2; rv:2.0.1) Gecko/20100101 Firefox/4.0.1 SeaMonkey/2.1.1
+      family: 'SeaMonkey'
+      major: '2'
+      minor: '1'
+      patch: '1'
+    - user_agent_string: Mozilla/5.0 (Windows NT 6.1; rv:2.0.1) Gecko/20100101 Firefox/4.0.1 SeaMonkey/2.1.1
+      family: 'SeaMonkey'
+      major: '2'
+      minor: '1'
+      patch: '1'
+    - user_agent_string: Mozilla/5.0 (Windows NT 6.1; Win64; x64; rv:2.0.1) Gecko/20100101 Firefox/4.0.1 SeaMonkey/2.1.1
+      family: 'SeaMonkey'
+      major: '2'
+      minor: '1'
+      patch: '1'
+    - user_agent_string: Mozilla/5.0 (Windows NT 6.1; WOW64; rv:2.0.1) Gecko/20100101 Firefox/4.0.1 SeaMonkey/2.1.1
+      family: 'SeaMonkey'
+      major: '2'
+      minor: '1'
+      patch: '1'
+    - user_agent_string: Mozilla/5.0 (WindowsCE 6.0; rv:2.0.1) Gecko/20100101 Firefox/4.0.1 SeaMonkey/2.1.1
+      family: 'SeaMonkey'
+      major: '2'
+      minor: '1'
+      patch: '1'
+    - user_agent_string: Mozilla/5.0 (Macintosh; Intel Mac OS X 10.5; rv:2.0.1) Gecko/20100101 Firefox/4.0.1 SeaMonkey/2.1.1
+      family: 'SeaMonkey'
+      major: '2'
+      minor: '1'
+      patch: '1'
+    - user_agent_string: Mozilla/5.0 (Macintosh; Intel Mac OS X 10.6; rv:2.0.1) Gecko/20100101 Firefox/4.0.1 SeaMonkey/2.1.1
+      family: 'SeaMonkey'
+      major: '2'
+      minor: '1'
+      patch: '1'
+    - user_agent_string: Mozilla/5.0 (X11; Linux i686; rv:2.0.1) Gecko/20100101 Firefox/4.0.1 SeaMonkey/2.1.1
+      family: 'SeaMonkey'
+      major: '2'
+      minor: '1'
+      patch: '1'
+    - user_agent_string: Mozilla/5.0 (X11; Linux x86_64; rv:2.0.1) Gecko/20100101 Firefox/4.0.1 SeaMonkey/2.1.1
+      family: 'SeaMonkey'
+      major: '2'
+      minor: '1'
+      patch: '1'
+    - user_agent_string: Mozilla/5.0 (X11; Linux i686 on x86_64; rv:2.0.1) Gecko/20100101 Firefox/4.0.1 SeaMonkey/2.1.1
+      family: 'SeaMonkey'
+      major: '2'
+      minor: '1'
+      patch: '1'
+    - user_agent_string: Mozilla/5.0 (X11; Linux armv7l; rv:2.0.1) Gecko/20100101 Firefox/4.0.1 SeaMonkey/2.1.1
+      family: 'SeaMonkey'
+      major: '2'
+      minor: '1'
+      patch: '1'
+
+    # SeaMonkey 2.1 (prerelease)
+    - user_agent_string: Mozilla/5.0 (Windows; Windows NT 5.2; rv:2.0b3pre) Gecko/20100803 SeaMonkey/2.1a3pre
+      family: 'SeaMonkey'
+      major: '2'
+      minor: '1'
+      patch: 'a3pre'
+    - user_agent_string: Mozilla/5.0 (X11; U; Linux i686; en-US; rv:1.9.3a4pre) Gecko/20100404 SeaMonkey/2.1a1pre
+      family: 'SeaMonkey'
+      major: '2'
+      minor: '1'
+      patch: 'a1pre'
+    - user_agent_string: Mozilla/5.0 (Windows; U; Windows NT 5.2; en-CA; rv:1.9.3a3pre) Gecko/20100312 SeaMonkey/2.1a1pre
+      family: 'SeaMonkey'
+      major: '2'
+      minor: '1'
+      patch: 'a1pre'
+
+    # SeaMonkey 2.0
+    - user_agent_string: Mozilla/5.0 (X11; U; Linux x86_64; en-US; rv:1.9.1.11) Gecko/20100721 SeaMonkey/2.0.6
+      family: 'SeaMonkey'
+      major: '2'
+      minor: '0'
+      patch: '6'
+    - user_agent_string: Mozilla/5.0 (X11; U; Linux x86_64; en-US; rv:1.9.1.11) Gecko/20100714 SUSE/2.0.6-2.1 SeaMonkey/2.0.6
+      family: 'SeaMonkey'
+      major: '2'
+      minor: '0'
+      patch: '6'
+    - user_agent_string: Mozilla/5.0 (X11; U; Linux ia64; de; rv:1.9.1.11) Gecko/20100820 Lightning/1.0b2pre SeaMonkey/2.0.6
+      family: 'SeaMonkey'
+      major: '2'
+      minor: '0'
+      patch: '6'
+    - user_agent_string: Mozilla/5.0 (X11; U; Linux i686; en-US; rv:1.9.1.11) Gecko/20100722 SeaMonkey/2.0.6
+      family: 'SeaMonkey'
+      major: '2'
+      minor: '0'
+      patch: '6'
+    - user_agent_string: Mozilla/5.0 (X11; U; Linux i686; en-US; rv:1.9.1.11) Gecko/20100701 SeaMonkey/2.0.6
+      family: 'SeaMonkey'
+      major: '2'
+      minor: '0'
+      patch: '6'
+    - user_agent_string: Mozilla/5.0 (Windows; U; Windows NT 9.0; en-US; rv:1.9.1.11) Gecko/20100701 SeaMonkey/2.0.6
+      family: 'SeaMonkey'
+      major: '2'
+      minor: '0'
+      patch: '6'
+    - user_agent_string: Mozilla/5.0 (Windows; U; Windows NT 6.0; en-US; rv:1.9.1.11) Gecko/20100701 SeaMonkey/2.0.6
+      family: 'SeaMonkey'
+      major: '2'
+      minor: '0'
+      patch: '6'
+    - user_agent_string: Mozilla/5.0 (Windows; U; Windows NT 5.1; en-US; rv:1.9.1.11) Gecko/20100722 SeaMonkey/2.0.6
+      family: 'SeaMonkey'
+      major: '2'
+      minor: '0'
+      patch: '6'
+    - user_agent_string: Mozilla/5.0 (Windows; U; Windows NT 5.1; en-US; rv:1.9.1.11) Gecko/20100701 SeaMonkey/2.0.6
+      family: 'SeaMonkey'
+      major: '2'
+      minor: '0'
+      patch: '6'
+    - user_agent_string: Mozilla/5.0 (Windows; U; Windows NT 5.1; de; rv:1.9.1.11) Gecko/20100701 SeaMonkey/2.0.6
+      family: 'SeaMonkey'
+      major: '2'
+      minor: '0'
+      patch: '6'
+    - user_agent_string: Mozilla/5.0 (Windows; U; Windows NT 5.0; en-US; rv:1.9.1.11) Gecko/20100701 SeaMonkey/2.0.6
+      family: 'SeaMonkey'
+      major: '2'
+      minor: '0'
+      patch: '6'
+    - user_agent_string: Mozilla/5.0 (Windows; U; Windows NT 5.2; en-CA; rv:1.9.1.11pre) Gecko/20100630 SeaMonkey/2.0.6pre
+      family: 'SeaMonkey'
+      major: '2'
+      minor: '0'
+      patch: '6pre'
+    - user_agent_string: Mozilla/5.0 (Windows; U; Windows NT 5.2; en-CA; rv:1.9.1.11pre) Gecko/20100629 SeaMonkey/2.0.6pre
+      family: 'SeaMonkey'
+      major: '2'
+      minor: '0'
+      patch: '6pre'
+    - user_agent_string: Mozilla/5.0 (Windows; U; Windows NT 5.1; en-US; rv:1.9.1.11pre) Gecko/20100515 SeaMonkey/2.0.6pre
+      family: 'SeaMonkey'
+      major: '2'
+      minor: '0'
+      patch: '6pre'
+    - user_agent_string: Mozilla/5.0 (Windows; U; Windows NT 5.1; en-US; rv:1.9.1.11pre) Gecko/20100508 SeaMonkey/2.0.6pre
+      family: 'SeaMonkey'
+      major: '2'
+      minor: '0'
+      patch: '6pre'
+    - user_agent_string: Mozilla/5.0 (X11; U; Linux i686; de; rv:1.9.1.10) Gecko/20100504 Lightning/1.0b1 Mnenhy/0.8.2 SeaMonkey/2.0.5
+      family: 'SeaMonkey'
+      major: '2'
+      minor: '0'
+      patch: '5'
+    - user_agent_string: Mozilla/5.0 (Windows; U; Windows NT 6.1; ru; rv:1.9.1.10) Gecko/20100504 Lightning/1.0b1 SeaMonkey/2.0.5
+      family: 'SeaMonkey'
+      major: '2'
+      minor: '0'
+      patch: '5'
+    - user_agent_string: Mozilla/5.0 (Windows; U; Windows NT 5.2; en-US; rv:1.9.1.10) Gecko/20100504 Lightning/1.0b1 SeaMonkey/2.0.5
+      family: 'SeaMonkey'
+      major: '2'
+      minor: '0'
+      patch: '5'
+    - user_agent_string: Mozilla/5.0 (X11; U; Linux x86_64; fr; rv:1.9.1.9) Gecko/20100428 Lightning/1.0b1 SeaMonkey/2.0.4
+      family: 'SeaMonkey'
+      major: '2'
+      minor: '0'
+      patch: '4'
+    - user_agent_string: Mozilla/5.0 (X11; U; Linux x86_64; en-US; rv:1.9.1.9) Gecko/20100317 SUSE/2.0.4-3.2 Lightning/1.0b1 SeaMonkey/2.0.4
+      family: 'SeaMonkey'
+      major: '2'
+      minor: '0'
+      patch: '4'
+    - user_agent_string: Mozilla/5.0 (Windows; U; Windows NT 6.1; en-US; rv:1.9.1.9) Gecko/20100317 Lightning/1.0b1 SeaMonkey/2.0.4
+      family: 'SeaMonkey'
+      major: '2'
+      minor: '0'
+      patch: '4'
+    - user_agent_string: Mozilla/5.0 (Windows; U; Windows NT 6.0; de; rv:1.9.1.8) Gecko/20100205 SeaMonkey/2.0.3
+      family: 'SeaMonkey'
+      major: '2'
+      minor: '0'
+      patch: '3'
+    - user_agent_string: Mozilla/5.0 (Windows; U; Windows NT 5.2; en-US; rv:1.9.1.7) Gecko/20100104 SeaMonkey/2.0.2
+      family: 'SeaMonkey'
+      major: '2'
+      minor: '0'
+      patch: '2'
+    - user_agent_string: Mozilla/5.0 (Windows; U; Windows NT 5.1; de; rv:1.9.1.7) Gecko/20100104 SeaMonkey/2.0.2
+      family: 'SeaMonkey'
+      major: '2'
+      minor: '0'
+      patch: '2'

@@ -1,0 +1,4 @@
+--reporter spec
+--ui bdd
+--require should
+--growl

@@ -1,0 +1,456 @@
+.nav-back {
+  width: 80px;
+  font-size: 14px;
+  padding-left: 14px;
+  line-height: 15px;
+}
+
+.nav-back {
+  /* :before */
+  /* content: ""; */
+  background: url('/assets/img/icons/arrow-back.png');
+  background-size: 14px 14px;
+  background-repeat: no-repeat;
+  display: block;
+}
+
+a {
+  text-decoration: none;
+}
+
+.main-fab {
+  position:absolute;
+  z-index:20;
+  font-size:30px;
+  top:100px;
+  left:24px;
+  transform:scale(.88,.88);
+}
+
+.md-breadcrumb {
+  padding-left:16px;
+}
+
+.md-table {
+  min-width: 100%;
+  border-collapse: collapse;
+}
+
+.md-table tbody tr:hover, .md-table tbody tr:focus {
+  cursor:pointer;
+  background-color:rgba(63,81,181,0.2);
+}
+
+.md-table-header {
+  border-bottom: 1px solid rgb(230,230,230);
+  color: rgb(130,130,130);
+  text-align: left;
+  font-size: 0.75em;
+  font-weight: 700;
+  padding: 16px 16px 16px 0;
+}
+
+.md-table-header a {
+  text-decoration: none;
+  color: inherit;
+}
+
+.md-table-caret {
+  display: inline-block;
+  vertical-align: middle;
+}
+
+.md-table-content {
+  font-size: 0.8em;
+  padding: 16px 16px 16px 0;
+  height: 72px;
+}
+
+.md-table-td-more {
+  max-width:72px;
+  width:72px;
+  padding:16px;
+}
+
+.md-table-thumbs {
+  max-width: 104px;
+  width: 104px;
+  padding: 16px 32px;
+}
+
+.md-table-thumbs div {
+  overflow:hidden;
+  width: 40px;
+  height:40px;
+  border-radius:20px;
+  border: 1px solid rgba(0,0,0,0.2);
+  background-size:cover;
+  box-shadow: 0 8px 10px rgba(0,0,0,.3);
+  -webkit-box-shadow: 0 8px 10px rgba(0,0,0,.1);
+}
+
+.md-table-footer {
+  height:40px;
+}
+
+.md-table-count-info {
+  line-height:40px;
+  font-size:.75em;
+}
+
+.md-table-footer-item {
+  width: 40px;
+  height: 40px;
+  vertical-align:middle;
+}
+
+.md-table-active-page {
+  font-weight: 700;
+}
+
+.bold {
+  font-weight: 700;
+}
+
+.grey, .gray {
+  color: #888888;
+}
+
+md-input-container.md-default-theme .md-input {
+  color: white;
+  border-color: white;
+  margin-top: 24px;
+}
+
+.dashboard-subnav {
+  font-size: 0.9em;
+  min-height: 38px;
+  max-height: 38px;
+  background-color: #09c1d1 !important;
+
+
+  // Right Views select list
+  md-select.md-default-theme:focus .md-select-label {
+    border-bottom: none;
+    color: white;
+  }
+}
+
+.selectSubPages p {
+  text-align: center;
+  color: #fff;
+}
+
+.selectSubPages .md-default-theme .md-select-label.md-placeholder {
+  color: #fff;
+}
+
+.selectSubPages .md-select-label {
+  padding-top: 0px;
+  font-size: 1em;
+  line-height: 1em;
+  border-bottom: none;
+  padding-bottom: 0px;
+}
+
+.selectSubPages md-select {
+  margin-top: 10px;
+  margin-right: 80px;
+  padding: 0px;
+}
+
+md-select-menu {
+  // min-height: 400px;
+  max-height: none;
+}
+
+.md-toolbar-tools {
+  padding-left: 8px;
+  padding-right: 8px;
+}
+
+.md-toolbar-small {
+  height: 38px;
+  min-height: 38px;
+}
+
+.md-toolbar-tools-small {
+  background-color: #09c1d1;
+}
+
+/* Begin kubernetes-ui Menu */
+.kubernetes-ui-menu,
+.kubernetes-ui-menu ul {
+  list-style: none;
+  padding: 0;
+}
+.kubernetes-ui-menu li {
+  margin: 0;
+}
+.kubernetes-ui-menu > li {
+  border-top: 1px solid rgba(0, 0, 0, 0.12);
+}
+.kubernetes-ui-menu .md-button {
+  border-radius: 0;
+  color: inherit;
+  cursor: pointer;
+  font-weight: 400;
+  line-height: 40px;
+  margin: 0;
+  max-height: 40px;
+  overflow: hidden;
+  padding: 0px 16px;
+  text-align: left;
+  text-decoration: none;
+  white-space: normal;
+  width: 100%;
+}
+.kubernetes-ui-menu a.md-button {
+  display: block;
+}
+.kubernetes-ui-menu button.md-button::-moz-focus-inner {
+  padding: 0;
+}
+.kubernetes-ui-menu .md-button.active {
+  color: #03a9f4;
+}
+.menu-heading {
+  color: #888;
+  display: block;
+  font-size: inherit;
+  font-weight: 500;
+  line-height: 40px;
+  margin: 0;
+  padding: 0px 16px;
+  text-align: left;
+  width: 100%;
+}
+.kubernetes-ui-menu li.parentActive,
+.kubernetes-ui-menu li.parentActive .menu-toggle-list {
+  background-color: #f6f6f6;
+}
+.menu-toggle-list {
+  background: #fff;
+  max-height: 999px;
+  overflow: hidden;
+  position: relative;
+  z-index: 1;
+  -webkit-transition: 0.75s cubic-bezier(0.35, 0, 0.25, 1);
+  -webkit-transition-property: max-height;
+  -moz-transition: 0.75s cubic-bezier(0.35, 0, 0.25, 1);
+  -moz-transition-property: max-height;
+  transition: 0.75s cubic-bezier(0.35, 0, 0.25, 1);
+  transition-property: max-height;
+}
+.menu-toggle-list.ng-hide {
+  max-height: 0;
+}
+.kubernetes-ui-menu .menu-toggle-list a.md-button {
+  display: block;
+  padding: 0 16px 0 32px;
+  text-transform: none;
+}
+.md-button-toggle .md-toggle-icon {
+  background: transparent url(/assets/img/icons/list_control_down.png) no-repeat center center;
+  background-size: 100% auto;
+  display: inline-block;
+  height: 24px;
+  margin: auto 0 auto auto;
+  speak: none;
+  width: 24px;
+  transition: transform 0.3s ease-in-out;
+  -webkit-transition: -webkit-transform 0.3s ease-in-out;
+}
+.md-button-toggle .md-toggle-icon.toggled {
+  transform: rotate(180deg);
+  -webkit-transform: rotate(180deg);
+}
+/* End kubernetes-ui Menu */
+
+
+
+.menu-icon {
+  background: none;
+  border: none;
+  margin-right: 16px;
+  padding: 0;
+}
+
+.whiteframedemoBasicUsage md-whiteframe {
+  background: #fff;
+  margin: 2px;
+  padding: 2px;
+}
+
+.tabsDefaultTabs {
+  height: 100%;
+  width: 100%;
+  /*
+   * Animation styles
+   */
+}
+
+.tabsDefaultTabs .remove-tab {
+  margin-bottom: 40px;
+}
+.tabsDefaultTabs .home-buttons {
+  .md-button {
+    display: block;
+    max-height: 30px;
+  }
+  .md-button.add-tab {
+    margin-top: 20px;
+    max-height: 30px !important;
+  }
+}
+.tabsDefaultTabs .demo-tab {
+  display: block;
+  position: relative;
+  background: white;
+  border: 0px solid black;
+  min-height: 0px;
+  width: 100%;
+}
+
+.tabsDefaultTabs .tab0, .tabsDefaultTabs .tab1, .tabsDefaultTabs .tab2, .tabsDefaultTabs .tab3 {
+  background-color: #bbdefb;
+}
+.tabsDefaultTabs .md-header {
+  background-color: #1976D2 !important;
+}
+.tabsDefaultTabs md-tab {
+  color: #90caf9 !important;
+}
+.tabsDefaultTabs md-tab.active, .tabsDefaultTabs md-tab:focus {
+  color: white !important;
+}
+.tabsDefaultTabs md-tab[disabled] {
+  opacity: 0.5;
+}
+.tabsDefaultTabs .md-header .md-ripple {
+  border-color: #FFFF8D !important;
+}
+.tabsDefaultTabs md-tabs-ink-bar {
+  background-color: #FFFF8D !important;
+}
+.tabsDefaultTabs .title {
+  padding-top: 8px;
+  padding-right: 8px;
+  text-align: left;
+  text-transform: uppercase;
+  color: #888;
+  margin-top: 24px;
+}
+.tabsDefaultTabs [layout-align] > * {
+  margin-left: 8px;
+}
+.tabsDefaultTabs form > [layout] > * {
+  margin-left: 8px;
+}
+.tabsDefaultTabs .long > input {
+  width: 264px;
+}
+
+.menuBtn {
+  background-color: transparent;
+  border: none;
+  height: 38px;
+  margin: 16px;
+  position: absolute;
+  width: 36px;
+}
+md-toolbar h1 {
+  font-size: 1.250em;
+  font-weight: 400;
+  margin: auto;
+}
+md-list .md-button {
+  color: inherit;
+  font-weight: 500;
+  text-align: left;
+  width: 100%;
+}
+.visuallyhidden {
+  border: 0;
+  clip: rect(0 0 0 0);
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  padding: 0;
+  position: absolute;
+  width: 1px;
+}
+
+md-list .md-button {
+  color: inherit;
+  font-weight: 500;
+  text-align: left;
+  width: 100%;
+}
+md-list .md-button.selected {
+  color: #03a9f4;
+}
+
+#content {
+  overflow: hidden;
+}
+#content md-content {
+  padding-left: 0px;
+  padding-right: 0px;
+  padding-top: 0px;
+}
+#content .md-button.action {
+  background-color: transparent;
+  border: none;
+  height: 38px;
+  margin: 8px auto 16px 0;
+  position: absolute;
+  top: 10px;
+  right: 25px;
+  width: 36px;
+}
+
+#content img {
+  display: block;
+  height: auto;
+  max-width: 500px;
+}
+
+.content-wrapper {
+  position: relative;
+}
+
+.visuallyhidden {
+  border: 0;
+  clip: rect(0 0 0 0);
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  padding: 0;
+  position: absolute;
+  width: 1px;
+}
+
+md-toolbar h1 {
+  font-size: 1.250em;
+  font-weight: 400;
+}
+
+.menuBtn {
+  background: url(data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHhtbG5zOnhsaW5rPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5L3hsaW5rIiB2ZXJzaW9uPSIxLjEiIHg9IjBweCIgeT0iMHB4IiB3aWR0aD0iMjRweCIgaGVpZ2h0PSIyNHB4IiB2aWV3Qm94PSIwIDAgMjQgMjQiIGVuYWJsZS1iYWNrZ3JvdW5kPSJuZXcgMCAwIDI0IDI0IiB4bWw6c3BhY2U9InByZXNlcnZlIj4KPGcgaWQ9IkhlYWRlciI+CiAgICA8Zz4KICAgICAgICA8cmVjdCB4PSItNjE4IiB5PSItMjIzMiIgZmlsbD0ibm9uZSIgd2lkdGg9IjE0MDAiIGhlaWdodD0iMzYwMCIvPgogICAgPC9nPgo8L2c+CjxnIGlkPSJMYWJlbCI+CjwvZz4KPGcgaWQ9Ikljb24iPgogICAgPGc+CiAgICAgICAgPHJlY3QgZmlsbD0ibm9uZSIgd2lkdGg9IjI0IiBoZWlnaHQ9IjI0Ii8+CiAgICAgICAgPHBhdGggZD0iTTMsMThoMTh2LTJIM1YxOHogTTMsMTNoMTh2LTJIM1YxM3ogTTMsNnYyaDE4VjZIM3oiIHN0eWxlPSJmaWxsOiNmM2YzZjM7Ii8+CiAgICA8L2c+CjwvZz4KPGcgaWQ9IkdyaWQiIGRpc3BsYXk9Im5vbmUiPgogICAgPGcgZGlzcGxheT0iaW5saW5lIj4KICAgIDwvZz4KPC9nPgo8L3N2Zz4=) no-repeat  center center;
+}
+
+.actionBtn {
+  background: url(data:image/svg+xml;charset=utf-8;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIzNiIgaGVpZ2h0PSIzNiIgdmlld0JveD0iMCAwIDM2IDM2Ij4NCiAgICA8cGF0aCBkPSJNMCAwaDM2djM2aC0zNnoiIGZpbGw9Im5vbmUiLz4NCiAgICA8cGF0aCBkPSJNNCAyN2gyOHYtM2gtMjh2M3ptMC04aDI4di0zaC0yOHYzem0wLTExdjNoMjh2LTNoLTI4eiIvPg0KPC9zdmc+) no-repeat  center center;
+}
+
+.kubernetes-ui-logo {
+  background-image: url("/assets/img/kubernetes.svg");
+  background-size: 40px 40px;
+  width: 40px;
+  height: 40px;
+}
+.kubernetes-ui-text {
+  line-height: 40px; vertical-align: middle;
+  padding: 2px;
+}

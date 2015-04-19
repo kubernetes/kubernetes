@@ -1,0 +1,48 @@
+{
+  "name": "cryptiles",
+  "description": "General purpose crypto utilities",
+  "version": "0.2.2",
+  "author": {
+    "name": "Eran Hammer",
+    "email": "eran@hueniverse.com",
+    "url": "http://hueniverse.com"
+  },
+  "contributors": [],
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/hueniverse/cryptiles"
+  },
+  "main": "index",
+  "keywords": [
+    "cryptography",
+    "security",
+    "utilites"
+  ],
+  "engines": {
+    "node": ">=0.8.0"
+  },
+  "dependencies": {
+    "boom": "0.4.x"
+  },
+  "devDependencies": {
+    "lab": "0.1.x",
+    "complexity-report": "0.x.x"
+  },
+  "scripts": {
+    "test": "make test-cov"
+  },
+  "licenses": [
+    {
+      "type": "BSD",
+      "url": "http://github.com/hueniverse/cryptiles/raw/master/LICENSE"
+    }
+  ],
+  "readme": "cryptiles\n=========\n\nGeneral purpose crypto utilities\n\n[![Build Status](https://secure.travis-ci.org/hueniverse/cryptiles.png)](http://travis-ci.org/hueniverse/cryptiles)\n",
+  "readmeFilename": "README.md",
+  "bugs": {
+    "url": "https://github.com/hueniverse/cryptiles/issues"
+  },
+  "homepage": "https://github.com/hueniverse/cryptiles",
+  "_id": "cryptiles@0.2.2",
+  "_from": "cryptiles@0.2.x"
+}

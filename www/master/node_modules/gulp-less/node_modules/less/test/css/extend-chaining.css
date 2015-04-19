@@ -1,0 +1,81 @@
+.a,
+.b,
+.c {
+  color: black;
+}
+.f,
+.e,
+.d {
+  color: black;
+}
+.g.h,
+.i.j.h,
+.k.j.h {
+  color: black;
+}
+.i.j,
+.k.j {
+  color: white;
+}
+.l,
+.m,
+.n,
+.o,
+.p,
+.q,
+.r,
+.s,
+.t {
+  color: black;
+}
+.u,
+.v.u.v {
+  color: black;
+}
+.w,
+.v.w.v {
+  color: black;
+}
+.x,
+.y,
+.z {
+  color: x;
+}
+.y,
+.z,
+.x {
+  color: y;
+}
+.z,
+.x,
+.y {
+  color: z;
+}
+.va,
+.vb,
+.vc {
+  color: black;
+}
+.vb,
+.vc {
+  color: white;
+}
+@media tv {
+  .ma,
+  .mb,
+  .mc {
+    color: black;
+  }
+  .md,
+  .ma,
+  .mb,
+  .mc {
+    color: white;
+  }
+}
+@media tv and plasma {
+  .me,
+  .mf {
+    background: red;
+  }
+}

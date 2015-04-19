@@ -1,0 +1,94 @@
+<p>Forms using different types of input</p>
+
+<div>
+  <h4>Bindings</h4>
+  <span>{{greeting}}</span>
+  <span data-ng-bind="username"></span>
+  <span data-ng-bind-template="({{nickname|uppercase}})"></span>
+</div>
+
+<div>
+  <h4>Text</h4>
+  <label>Username</label>
+  <input ng-model="username" type="text"/>
+  <label>Nickname</label>
+  <input ng-model="nickname" type="text"/>
+</div>
+
+<div>
+  <h4>Textarea</h4>
+  <textarea ng-model="aboutbox"></textarea>
+</div>
+
+<div>
+  <h4>Multiple input radio</h4>
+  <div ng-style="{'color': color}">Color <br/>
+    <input ng-model="color" value="blue" type="radio"/> blue <br/>
+    <input ng-model="color" value="green" type="radio"/> green <br/>
+    <input ng-model="color" value="red" type="radio"/> red <br/>
+  </div>
+</div>
+
+<div>
+  <h4>Selects</h4>
+  <div ng-repeat="dayColor in dayColors">
+    <select ng-model="dayColor.color" ng-options="c for c in colors"></select>
+  </div>
+
+  <select ng-model="fruit" ng-options="fruit for fruit in fruits">
+    <option value="">{{defaultFruit}}</option>
+  </select>
+  <span>Fruit: {{fruit}}</span>
+</div>
+
+<div id="checkboxes">
+  <h4>Checkboxes</h4>
+  <input ng-model="show" type="checkbox"/> Show?
+  <span id="shower" ng-show="show">Shown!!</span>
+
+  <input ng-model="disabled" type="checkbox"/> Disable?
+  <button id="disabledButton" ng-disabled="disabled">Dummy</button>
+
+  <input ng:model="check.w" ng-true-value="'w'" type="checkbox"/> W
+  <input data-ng-model="check.x" ng-true-value="'x'" type="checkbox"/> X
+
+  <span id="letterlist">{{check.w}}{{check.x}}</span>
+</div>
+
+<div>
+  <h4>Drag and Drop</h4>
+  <input type="range" name="points" min="1" max="10" value="1">
+</div>
+
+<div>
+  <h4>Alert trigger</h4>
+  <button id="alertbutton" ng-click="doAlert()">Open Alert</button>
+</div>
+
+<div>
+  <h4>Buttons</h4>
+  <button id="exacttext">Exact text</button>
+  <button id="otherbutton">Partial button text</button>
+  <button id="trapbutton">No match</button>
+  <button id="hiddenbutton" style="display:none">Can't see me!</button>
+  <input type="submit" value="Exact text" id="submitbutton"/>
+  <input type="button" value="Hello text" id="inputbutton"/>
+</div>
+
+<div id="animals">
+  <h4>Inner text</h4>
+  <ul>
+    <li class="pet" id="bigdog">big dog</li>
+    <li class="pet" id="smalldog">small dog</li>
+    <li class="notpet" id="otherdog">other dog</li>
+    <li class="pet" id="bigcat">big cat</li>
+    <li class="pet" id="smallcat">small cat</li>
+  </ul>
+</div>
+
+<div id="transformedtext">
+  <h4>Transformed text</h4>
+  <div id="textuppercase" style="text-transform: uppercase;">Uppercase</div>
+  <div id="textlowercase" style="text-transform: lowercase;">Lowercase</div>
+  <div id="textcapitalize" style="text-transform: capitalize;">capitalize</div>
+</div>

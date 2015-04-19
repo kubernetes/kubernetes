@@ -1,0 +1,54 @@
+{
+  "name": "gaze",
+  "description": "A globbing fs.watch wrapper built from the best parts of other fine watch libs.",
+  "version": "0.5.1",
+  "homepage": "https://github.com/shama/gaze",
+  "author": {
+    "name": "Kyle Robinson Young",
+    "email": "kyle@dontkry.com"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/shama/gaze.git"
+  },
+  "bugs": {
+    "url": "https://github.com/shama/gaze/issues"
+  },
+  "licenses": [
+    {
+      "type": "MIT",
+      "url": "https://github.com/shama/gaze/blob/master/LICENSE-MIT"
+    }
+  ],
+  "main": "lib/gaze",
+  "engines": {
+    "node": ">= 0.8.0"
+  },
+  "scripts": {
+    "test": "grunt nodeunit -v"
+  },
+  "dependencies": {
+    "globule": "~0.1.0"
+  },
+  "devDependencies": {
+    "grunt": "~0.4.1",
+    "grunt-contrib-nodeunit": "~0.2.0",
+    "grunt-contrib-jshint": "~0.6.0",
+    "grunt-benchmark": "~0.2.0",
+    "grunt-cli": "~0.1.13",
+    "async": "~0.2.10",
+    "rimraf": "~2.2.6"
+  },
+  "keywords": [
+    "watch",
+    "glob"
+  ],
+  "files": [
+    "lib",
+    "LICENSE-MIT"
+  ],
+  "readme": "# gaze [![Build Status](https://travis-ci.org/shama/gaze.png?branch=master)](https://travis-ci.org/shama/gaze)\n\nA globbing fs.watch wrapper built from the best parts of other fine watch libs.  \nCompatible with Node.js 0.10/0.8, Windows, OSX and Linux.\n\n![gaze](http://dontkry.com/images/repos/gaze.png)\n\n## Usage\nInstall the module with: `npm install gaze` or place into your `package.json`\nand run `npm install`.\n\n```javascript\nvar gaze = require('gaze');\n\n// Watch all .js files/dirs in process.cwd()\ngaze('**/*.js', function(err, watcher) {\n  // Files have all started watching\n  // watcher === this\n\n  // Get all watched files\n  console.log(this.watched());\n\n  // On file changed\n  this.on('changed', function(filepath) {\n    console.log(filepath + ' was changed');\n  });\n\n  // On file added\n  this.on('added', function(filepath) {\n    console.log(filepath + ' was added');\n  });\n\n  // On file deleted\n  this.on('deleted', function(filepath) {\n    console.log(filepath + ' was deleted');\n  });\n\n  // On changed/added/deleted\n  this.on('all', function(event, filepath) {\n    console.log(filepath + ' was ' + event);\n  });\n\n  // Get watched files with relative paths\n  console.log(this.relative());\n});\n\n// Also accepts an array of patterns\ngaze(['stylesheets/*.css', 'images/**/*.png'], function() {\n  // Add more patterns later to be watched\n  this.add(['js/*.js']);\n});\n```\n\n### Alternate Interface\n\n```javascript\nvar Gaze = require('gaze').Gaze;\n\nvar gaze = new Gaze('**/*');\n\n// Files have all started watching\ngaze.on('ready', function(watcher) { });\n\n// A file has been added/changed/deleted has occurred\ngaze.on('all', function(event, filepath) { });\n```\n\n### Errors\n\n```javascript\ngaze('**/*', function() {\n  this.on('error', function(err) {\n    // Handle error here\n  });\n});\n```\n\n### Minimatch / Glob\n\nSee [isaacs's minimatch](https://github.com/isaacs/minimatch) for more\ninformation on glob patterns.\n\n## Documentation\n\n### gaze(patterns, [options], callback)\n\n* `patterns` {String|Array} File patterns to be matched\n* `options` {Object}\n* `callback` {Function}\n  * `err` {Error | null}\n  * `watcher` {Object} Instance of the Gaze watcher\n\n### Class: gaze.Gaze\n\nCreate a Gaze object by instanting the `gaze.Gaze` class.\n\n```javascript\nvar Gaze = require('gaze').Gaze;\nvar gaze = new Gaze(pattern, options, callback);\n```\n\n#### Properties\n\n* `options` The options object passed in.\n  * `interval` {integer} Interval to pass to fs.watchFile\n  * `debounceDelay` {integer} Delay for events called in succession for the same\n    file/event\n\n#### Events\n\n* `ready(watcher)` When files have been globbed and watching has begun.\n* `all(event, filepath)` When an `added`, `changed` or `deleted` event occurs.\n* `added(filepath)` When a file has been added to a watch directory.\n* `changed(filepath)` When a file has been changed.\n* `deleted(filepath)` When a file has been deleted.\n* `renamed(newPath, oldPath)` When a file has been renamed.\n* `end()` When the watcher is closed and watches have been removed.\n* `error(err)` When an error occurs.\n* `nomatch` When no files have been matched.\n\n#### Methods\n\n* `emit(event, [...])` Wrapper for the EventEmitter.emit.\n  `added`|`changed`|`deleted` events will also trigger the `all` event.\n* `close()` Unwatch all files and reset the watch instance.\n* `add(patterns, callback)` Adds file(s) patterns to be watched.\n* `remove(filepath)` removes a file or directory from being watched. Does not\n  recurse directories.\n* `watched()` Returns the currently watched files.\n* `relative([dir, unixify])` Returns the currently watched files with relative paths.\n  * `dir` {string} Only return relative files for this directory.\n  * `unixify` {boolean} Return paths with `/` instead of `\\\\` if on Windows.\n\n## FAQs\n\n### Why Another `fs.watch` Wrapper?\nI liked parts of other `fs.watch` wrappers but none had all the features I\nneeded. This lib combines the features I needed from other fine watch libs:\nSpeedy data behavior from\n[paulmillr's chokidar](https://github.com/paulmillr/chokidar), API interface\nfrom [mikeal's watch](https://github.com/mikeal/watch) and file globbing using\n[isaacs's glob](https://github.com/isaacs/node-glob) which is also used by\n[cowboy's Grunt](https://github.com/gruntjs/grunt).\n\n### How do I fix the error `EMFILE: Too many opened files.`?\nThis is because of your system's max opened file limit. For OSX the default is\nvery low (256). Increase your limit temporarily with `ulimit -n 10480`, the\nnumber being the new max limit.\n\n## Contributing\nIn lieu of a formal styleguide, take care to maintain the existing coding style.\nAdd unit tests for any new or changed functionality. Lint and test your code\nusing [grunt](http://gruntjs.com/).\n\n## Release History\n* 0.5.1 - Use setImmediate (process.nextTick for node v0.8) to defer ready/nomatch events (@amasad).\n* 0.5.0 - Process is now kept alive while watching files. Emits a nomatch event when no files are matching.\n* 0.4.3 - Track file additions in newly created folders (@brett-shwom).\n* 0.4.2 - Fix .remove() method to remove a single file in a directory (@kaelzhang). Fixing Cannot call method 'call' of undefined (@krasimir). Track new file additions within folders (@brett-shwom).\n* 0.4.1 - Fix watchDir not respecting close in race condition (@chrisirhc).\n* 0.4.0 - Drop support for node v0.6. Use globule for file matching. Avoid node v0.10 path.resolve/join errors. Register new files when added to non-existent folder. Multiple instances can now poll the same files (@jpommerening).\n* 0.3.4 - Code clean up. Fix path must be strings errors (@groner). Fix incorrect added events (@groner).\n* 0.3.3 - Fix for multiple patterns with negate.\n* 0.3.2 - Emit `end` before removeAllListeners.\n* 0.3.1 - Fix added events within subfolder patterns.\n* 0.3.0 - Handle safewrite events, `forceWatchMethod` option removed, bug fixes and watch optimizations (@rgaskill).\n* 0.2.2 - Fix issue where subsequent add calls dont get watched (@samcday). removeAllListeners on close.\n* 0.2.1 - Fix issue with invalid `added` events in current working dir.\n* 0.2.0 - Support and mark folders with `path.sep`. Add `forceWatchMethod` option. Support `renamed` events.\n* 0.1.6 - Recognize the `cwd` option properly\n* 0.1.5 - Catch too many open file errors\n* 0.1.4 - Really fix the race condition with 2 watches\n* 0.1.3 - Fix race condition with 2 watches\n* 0.1.2 - Read triggering changed event fix\n* 0.1.1 - Minor fixes\n* 0.1.0 - Initial release\n\n## License\nCopyright (c) 2013 Kyle Robinson Young  \nLicensed under the MIT license.\n",
+  "readmeFilename": "README.md",
+  "_id": "gaze@0.5.1",
+  "_from": "gaze@^0.5.1"
+}

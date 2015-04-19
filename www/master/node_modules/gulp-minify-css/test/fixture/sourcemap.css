@@ -1,0 +1,9 @@
+/*! Special Comment */
+
+@import "srcmap-sub/srcmap-sub.css";
+@import url(http://fonts.googleapis.com/css?family=Open+Sans);
+
+.sourcemap {
+  color: green;
+  font-size: 20px;
+}

@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Upload Form</title>
+  <script>
+    var intervalId;
+    function onTick() {
+      var label = document.getElementById('upload_label');
+      label.innerHTML += '.';
+    }
+
+    function onUploadSubmit() {
+      document.getElementById('upload_target').contentWindow.document.body.
+          innerHTML = '';
+      var label = document.getElementById('upload_label');
+      label.innerHTML = 'Uploading "' + document.forms[0].upload.value + '"';
+      label.style.display = '';
+      intervalId = window.setInterval(onTick, 500);
+      return true;
+    }
+
+    function onUploadDone() {
+      var label = document.getElementById('upload_label');
+      label.style.display = 'none';
+      window.clearInterval(intervalId);
+      return true;
+    }
+  </script>
+</head>
+<body>
+<form action="/common/upload" method="post" name="upload_form"
+      target="upload_target" enctype="multipart/form-data"
+      onsubmit="onUploadSubmit();">
+  <div>
+    Enter a file to upload:
+    <div><input id="upload" name="upload" type="file"/></div>
+    <div><input id="go" type="submit" value="Go!"/></div>
+  </div>
+  <div id="upload_label" style="display:none"></div>
+  <iframe src="" id="upload_target" name="upload_target"
+          style="width:300px;height:200px">
+  </iframe>
+</form>
+</body>
+</html>

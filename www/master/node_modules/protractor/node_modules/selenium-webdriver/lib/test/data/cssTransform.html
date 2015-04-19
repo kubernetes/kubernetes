@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<style>
+#parentY {
+  transform: translateY(-10000px);
+  -webkit-transform: translateY(-10000px);
+  -o-transform: translateY(-10000px);
+  -ms-transform: translateY(-10000px);
+  -moz-transform: translateY(-10000px);
+}
+#parentX {
+  transform: translateX(-10000px);
+  -webkit-transform: translateX(-10000px);
+  -o-transform: translateX(-10000px);
+  -ms-transform: translateX(-10000px);
+  -moz-transform: translateX(-10000px);
+}
+#transformX {
+  transform: translateX(-10000px);
+  -webkit-transform: translateX(-10000px);
+  -o-transform: translateX(-10000px);
+  -ms-transform: translateX(-10000px);
+  -moz-transform: translateX(-10000px);
+}
+#transformY {
+  transform: translateY(-10000px);
+  -webkit-transform: translateY(-10000px);
+  -o-transform: translateY(-10000px);
+  -ms-transform: translateY(-10000px);
+  -moz-transform: translateY(-10000px);
+}
+
+#zero-transform {
+  transform: translateY(0px);
+  -webkit-transform: translateY(0px);
+  -o-transform: translateY(0px);
+  -ms-transform: translateY(0px);
+  -moz-transform: translateY(0px);
+  transform: translateX(0px);
+  -webkit-transform: translateX(0px);
+  -o-transform: translateX(0px);
+  -ms-transform: translateX(0px);
+  -moz-transform: translateX(0px);
+}
+</style>
+<div id='zero-tranform'>
+You shouldn't see anything other than this sentence on the page
+</div>
+<div id='parentY'>
+  I have a hidden child
+  <div id='childY'>
+    I am a hidden child
+  </div>
+</div>
+<div id='parentX'>
+  I have a hidden child
+  <div id='childX'>
+    I am a hidden child
+  </div>
+</div>
+<div id='transformX'>I am a hidden element </div>
+<div id='transformY'>I am a hidden element </div>

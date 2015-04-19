@@ -1,0 +1,36 @@
+{
+  "name": "read",
+  "version": "1.0.5",
+  "main": "lib/read.js",
+  "dependencies": {
+    "mute-stream": "~0.0.4"
+  },
+  "devDependencies": {
+    "tap": "*"
+  },
+  "engines": {
+    "node": ">=0.8"
+  },
+  "author": {
+    "name": "Isaac Z. Schlueter",
+    "email": "i@izs.me",
+    "url": "http://blog.izs.me/"
+  },
+  "description": "read(1) for node programs",
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/isaacs/read.git"
+  },
+  "license": "BSD",
+  "scripts": {
+    "test": "tap test/*.js"
+  },
+  "readme": "## read\n\nFor reading user input from stdin.\n\nSimilar to the `readline` builtin's `question()` method, but with a\nfew more features.\n\n## USAGE\n\n```javascript\nvar read = require(\"read\")\nread(options, callback)\n```\n\nThe callback gets called with either the user input, or the default\nspecified, or an error, as `callback(error, result, isDefault)`\nnode style.\n\n## OPTIONS\n\nEvery option is optional.\n\n* `prompt` What to write to stdout before reading input.\n* `silent` Don't echo the output as the user types it.\n* `replace` Replace silenced characters with the supplied character value.\n* `timeout` Number of ms to wait for user input before giving up.\n* `default` The default value if the user enters nothing.\n* `edit` Allow the user to edit the default value.\n* `terminal` Treat the output as a TTY, whether it is or not.\n* `input` Readable stream to get input data from. (default `process.stdin`)\n* `output` Writeable stream to write prompts to. (default: `process.stdout`)\n\nIf silent is true, and the input is a TTY, then read will set raw\nmode, and read character by character.\n\n## COMPATIBILITY\n\nThis module works sort of with node 0.6.  It does not work with node\nversions less than 0.6.  It is best on node 0.8.\n\nOn node version 0.6, it will remove all listeners on the input\nstream's `data` and `keypress` events, because the readline module did\nnot fully clean up after itself in that version of node, and did not\nmake it possible to clean up after it in a way that has no potential\nfor side effects.\n\nAdditionally, some of the readline options (like `terminal`) will not\nfunction in versions of node before 0.8, because they were not\nimplemented in the builtin readline module.\n\n## CONTRIBUTING\n\nPatches welcome.\n",
+  "readmeFilename": "README.md",
+  "bugs": {
+    "url": "https://github.com/isaacs/read/issues"
+  },
+  "homepage": "https://github.com/isaacs/read",
+  "_id": "read@1.0.5",
+  "_from": "read@~1.0.4"
+}

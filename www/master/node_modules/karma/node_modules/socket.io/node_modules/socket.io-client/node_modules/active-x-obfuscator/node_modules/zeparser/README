@@ -1,0 +1,37 @@
+This is a JavaScript parser.
+http://github.com/qfox/ZeParser
+(c) Peter van der Zee
+http://qfox.nl
+
+
+Benchmark
+http://qfox.github.com/ZeParser/benchmark.html
+
+The Tokenizer is used by the parser. The parser tells the tokenizer whether the next token may be a regular expression or not. Without the parser, the tokenizer will fail if regular expression literals are used in the input.
+
+Usage:
+ZeParser.parse(input);
+
+Returns a "parse tree" which is a tree of an array of arrays with tokens (regular objects) as leafs. Meta information embedded as properties (of the arrays and the tokens).
+
+ZeParser.createParser(input);
+
+Returns a new ZeParser instance which has already parsed the input. Amongst others, the ZeParser instance will have the properties .tree, .wtree and .btree.
+
+.tree is the parse tree mentioned above.
+.wtree ("white" tree) is a regular array with all the tokens encountered (including whitespace, line terminators and comments)
+.btree ("black" tree) is just like .wtree but without the whitespace, line terminators and comments. This is what the specification would call the "token stream".
+
+I'm aware that the naming convention is a bit awkward. It's a tradeoff between short and descriptive. The streams are used quite often in the analysis.
+
+Tokens are regular objects with several properties. Amongst them are .tokposw and .tokposw, they correspond with their own position in the .wtree and .btree.
+
+The parser has two modes for parsing: simple and extended. Simple mode is mainly for just parsing and returning the streams and a simple parse tree. There's not so much meta information here and this mode is mainly built for speed. The other mode has everything required for Zeon to do its job. This mode is toggled by the instance property .ast, which is true by default :)
+
+Non-factory example:
+
+var input = "foo";
+var tree = []; // this should probably be refactored away some day
+var tokenizer = new Tokenizer(input); // dito
+var parser = new ZeParser(input, tokenizer, tree);
+parser.parse(); // returns tree..., should never throw errors

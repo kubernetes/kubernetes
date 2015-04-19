@@ -1,0 +1,80 @@
+.error,
+.badError {
+  border: 1px #f00;
+  background: #fdd;
+}
+.error.intrusion,
+.badError.intrusion {
+  font-size: 1.3em;
+  font-weight: bold;
+}
+.intrusion .error,
+.intrusion .badError {
+  display: none;
+}
+.badError {
+  border-width: 3px;
+}
+.foo .bar,
+.foo .baz,
+.ext1 .ext2 .bar,
+.ext1 .ext2 .baz,
+.ext3 .bar,
+.ext3 .baz,
+.ext4 .bar,
+.ext4 .baz {
+  display: none;
+}
+div.ext5,
+.ext6 > .ext5,
+div.ext7,
+.ext6 > .ext7 {
+  width: 100px;
+}
+.ext,
+.a .c,
+.b .c {
+  test: 1;
+}
+.a,
+.b {
+  test: 2;
+}
+.a .c,
+.b .c {
+  test: 3;
+}
+.a .c .d,
+.b .c .d {
+  test: 4;
+}
+.replace.replace .replace,
+.c.replace + .replace .replace,
+.replace.replace .c,
+.c.replace + .replace .c,
+.rep_ace.rep_ace .rep_ace,
+.c.rep_ace + .rep_ace .rep_ace,
+.rep_ace.rep_ace .c,
+.c.rep_ace + .rep_ace .c {
+  prop: copy-paste-replace;
+}
+.attributes [data="test"],
+.attributes .attributes .attribute-test {
+  extend: attributes;
+}
+.attributes [data],
+.attributes .attributes .attribute-test2 {
+  extend: attributes2;
+}
+.attributes [data="test3"],
+.attributes .attributes .attribute-test {
+  extend: attributes2;
+}
+.header .header-nav,
+.footer .footer-nav {
+  background: red;
+}
+.header .header-nav:before,
+.footer .footer-nav:before {
+  background: blue;
+}

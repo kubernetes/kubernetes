@@ -1,0 +1,147 @@
+<!DOCTYPE html><meta charset="UTF-8"><meta http-equiv="Content-Language" content="en" /><title>webdriver.WebElementPromise</title><link href="dossier.css" rel="stylesheet" type="text/css"><div id="main-wrapper"><input type="checkbox" id="sidenav-toggle" /><main><header><h1>Class webdriver.WebElementPromise</h1><a class="source" href="source/lib/webdriver/webdriver.js.src.html#l2125">code &raquo;</a><pre><code><a href="class_webdriver_WebElement.html">webdriver.WebElement</a>
+  &#x2514; webdriver.WebElementPromise</code></pre><dl><dt>All implemented interfaces:<dd><code><a href="">webdriver.promise.Thenable.&lt;webdriver.WebElement&gt;</a></code></dl></header><section><p>WebElementPromise is a promise that will be fulfilled with a WebElement.
+ This serves as a forward proxy on WebElement, allowing calls to be
+ scheduled without directly on this instance before the underlying
+ WebElement has been fulfilled. In other words, the following two statements
+ are equivalent:
+ <pre><code>
+     driver.findElement({id: 'my-button'}).click();
+     driver.findElement({id: 'my-button'}).then(function(el) {
+       return el.click();
+     });
+ </code></pre><h2>Constructor</h2><div class="ctor wrap-details public"><div><div class="ctor"><span class="member">webdriver.WebElementPromise <span class="args">( driver, el )</span></span></div><div class="info"><table><tbody><tr><th>Parameters<tr><td><dl><dt>driver: <code class="type">!<a href="class_webdriver_WebDriver.html">webdriver.WebDriver</a></code><dd>The parent WebDriver instance for this
+     element.<dt>el: <code class="type">!<a href="class_webdriver_promise_Promise.html">webdriver.promise.Promise</a></code><dd>A promise
+     that will resolve to the promised element.</dl></table></div></div></div></section><div id="visibility-controls"><b>Show:</b><label for="show-public"><span><input type="checkbox" id="show-public" checked/></span>Public</label><label for="show-protected"><span><input type="checkbox" id="show-protected"/></span>Protected</label><label for="show-private"><span><input type="checkbox" id="show-private"/></span>Private</label></div><section id="instance-methods"><h2>Instance Methods</h2><h3>Defined in <code class="type">webdriver.WebElementPromise</code></h3><div class="wrap-details public"><div><details class="function"><summary><div><a class="source" href="source/lib/webdriver/webdriver.js.src.html#l2129">code &raquo;</a><span class="member"><a name="cancel">cancel</a> <span class="args">( )</span></span></div></summary></details></div></div><div class="wrap-details public"><div><details class="function"><summary><div><a class="source" href="source/lib/webdriver/webdriver.js.src.html#l2132">code &raquo;</a><span class="member"><a name="isPending">isPending</a> <span class="args">( )</span> &rArr; <code class="type">boolean</code></span></div></summary></details></div></div><div class="wrap-details public"><div><details class="function"><summary><div><a class="source" href="source/lib/webdriver/webdriver.js.src.html#l2135">code &raquo;</a><span class="member"><a name="then">then</a> <span class="args">( )</span></span></div></summary></details></div></div><div class="wrap-details public"><div><details class="function"><summary><div><a class="source" href="source/lib/webdriver/webdriver.js.src.html#l2138">code &raquo;</a><span class="member"><a name="thenCatch">thenCatch</a> <span class="args">( )</span></span></div></summary></details></div></div><div class="wrap-details public"><div><details class="function"><summary><div><a class="source" href="source/lib/webdriver/webdriver.js.src.html#l2141">code &raquo;</a><span class="member"><a name="thenFinally">thenFinally</a> <span class="args">( )</span></span></div></summary></details></div></div><h3>Defined in <code class="type"><a href="class_webdriver_WebElement.html">webdriver.WebElement</a></code></h3><div class="wrap-details public"><div><details class="function"><summary><div><a class="source" href="source/lib/webdriver/webdriver.js.src.html#l2054">code &raquo;</a><span class="member"><a name="clear">clear</a> <span class="args">( )</span> &rArr; <code class="type">!<a href="class_webdriver_promise_Promise.html">webdriver.promise.Promise</a>.&lt;void&gt;</code></span></div><p>Schedules a command to clear the <code >value</code> of this element. This command
+ has no effect if the underlying DOM element is neither a text INPUT element
+ nor a TEXTAREA element.</summary><div class="info"><table><tbody><tr><th>Returns<tr><td><dl>A promise that will be resolved
+     when the element has been cleared.</dl></table></div></details></div></div><div class="wrap-details public"><div><details class="function"><summary><div><a class="source" href="source/lib/webdriver/webdriver.js.src.html#l1831">code &raquo;</a><span class="member"><a name="click">click</a> <span class="args">( )</span> &rArr; <code class="type">!<a href="class_webdriver_promise_Promise.html">webdriver.promise.Promise</a>.&lt;void&gt;</code></span></div><p>Schedules a command to click on this element.</summary><div class="info"><table><tbody><tr><th>Returns<tr><td><dl>A promise that will be resolved
+     when the click command has completed.</dl></table></div></details></div></div><div class="wrap-details public"><div><details class="function"><summary><div><a class="source" href="source/lib/webdriver/webdriver.js.src.html#l1771">code &raquo;</a><span class="member"><a name="findElement">findElement</a> <span class="args">( locator )</span> &rArr; <code class="type">!<a href="class_webdriver_WebElement.html">webdriver.WebElement</a></code></span></div><p>Schedule a command to find a descendant of this element. If the element
+ cannot be found, a <code >bot.ErrorCode.NO_SUCH_ELEMENT</code> result will
+ be returned by the driver. Unlike other commands, this error cannot be
+ suppressed. In other words, scheduling a command to find an element doubles
+ as an assert that the element is present on the page. To test whether an
+ element is present on the page, use <code >#isElementPresent</code> instead.
+
+ <p>The search criteria for an element may be defined using one of the
+ factories in the <code  class="type"><a href="namespace_webdriver_By.html">webdriver.By</a></code> namespace, or as a short-hand
+ <code  class="type"><a href="namespace_webdriver_By.html#webdriver.By.Hash">webdriver.By.Hash</a></code> object. For example, the following two statements
+ are equivalent:
+ <code><pre>
+ var e1 = element.findElement(By.id('foo'));
+ var e2 = element.findElement({id:'foo'});
+ </pre></code>
+
+ <p>You may also provide a custom locator function, which takes as input
+ this WebDriver instance and returns a <code  class="type"><a href="class_webdriver_WebElement.html">webdriver.WebElement</a></code>, or a
+ promise that will resolve to a WebElement. For example, to find the first
+ visible link on a page, you could write:
+ <code><pre>
+ var link = element.findElement(firstVisibleLink);
+
+ function firstVisibleLink(element) {
+   var links = element.findElements(By.tagName('a'));
+   return webdriver.promise.filter(links, function(link) {
+     return links.isDisplayed();
+   }).then(function(visibleLinks) {
+     return visibleLinks[0];
+   });
+ }
+ </pre></code></summary><div class="info"><table><tbody><tr><th>Parameters<tr><td><dl><dt>locator: <code class="type">!(<a href="class_webdriver_Locator.html">webdriver.Locator</a>|<a href="namespace_webdriver_By.html#webdriver.By.Hash">webdriver.By.Hash</a>|<a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Function">Function</a>)</code><dd>The
+     locator strategy to use when searching for the element.</dl><tr><th>Returns<tr><td><dl>A WebElement that can be used to issue
+     commands against the located element. If the element is not found, the
+     element will be invalidated and all scheduled commands aborted.</dl></table></div></details></div></div><div class="wrap-details public"><div><details class="function"><summary><div><a class="source" href="source/lib/webdriver/webdriver.js.src.html#l1812">code &raquo;</a><span class="member"><a name="findElements">findElements</a> <span class="args">( locator )</span> &rArr; <code class="type">!<a href="class_webdriver_promise_Promise.html">webdriver.promise.Promise</a></code></span></div><p>Schedules a command to find all of the descendants of this element that
+ match the given search criteria.</summary><div class="info"><table><tbody><tr><th>Parameters<tr><td><dl><dt>locator: <code class="type">!(<a href="class_webdriver_Locator.html">webdriver.Locator</a>|<a href="namespace_webdriver_By.html#webdriver.By.Hash">webdriver.By.Hash</a>|<a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Function">Function</a>)</code><dd>The
+     locator strategy to use when searching for the elements.</dl><tr><th>Returns<tr><td><dl>A
+     promise that will resolve to an array of WebElements.</dl></table></div></details></div></div><div class="wrap-details public"><div><details class="function"><summary><div><a class="source" href="source/lib/webdriver/webdriver.js.src.html#l1960">code &raquo;</a><span class="member"><a name="getAttribute">getAttribute</a> <span class="args">( attributeName )</span> &rArr; <code class="type">!<a href="class_webdriver_promise_Promise.html">webdriver.promise.Promise</a></code></span></div><p>Schedules a command to query for the value of the given attribute of the
+ element. Will return the current value, even if it has been modified after
+ the page has been loaded. More exactly, this method will return the value of
+ the given attribute, unless that attribute is not present, in which case the
+ value of the property with the same name is returned. If neither value is
+ set, null is returned (for example, the "value" property of a textarea
+ element). The "style" attribute is converted as best can be to a
+ text representation with a trailing semi-colon. The following are deemed to
+ be "boolean" attributes and will return either "true" or null:
+
+ <p>async, autofocus, autoplay, checked, compact, complete, controls, declare,
+ defaultchecked, defaultselected, defer, disabled, draggable, ended,
+ formnovalidate, hidden, indeterminate, iscontenteditable, ismap, itemscope,
+ loop, multiple, muted, nohref, noresize, noshade, novalidate, nowrap, open,
+ paused, pubdate, readonly, required, reversed, scoped, seamless, seeking,
+ selected, spellcheck, truespeed, willvalidate
+
+ <p>Finally, the following commonly mis-capitalized attribute/property names
+ are evaluated as expected:
+ <ul>
+   <li>"class"
+   <li>"readonly"
+ </ul></summary><div class="info"><table><tbody><tr><th>Parameters<tr><td><dl><dt>attributeName: <code class="type"><a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/String">string</a></code><dd>The name of the attribute to query.</dl><tr><th>Returns<tr><td><dl>A promise that will be
+     resolved with the attribute's value. The returned value will always be
+     either a string or null.</dl></table></div></details></div></div><div class="wrap-details public"><div><details class="function"><summary><div><a class="source" href="source/lib/webdriver/webdriver.js.src.html#l1922">code &raquo;</a><span class="member"><a name="getCssValue">getCssValue</a> <span class="args">( cssStyleProperty )</span> &rArr; <code class="type">!<a href="class_webdriver_promise_Promise.html">webdriver.promise.Promise</a>.&lt;<a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/String">string</a>&gt;</code></span></div><p>Schedules a command to query for the computed style of the element
+ represented by this instance. If the element inherits the named style from
+ its parent, the parent will be queried for its value.  Where possible, color
+ values will be converted to their hex representation (e.g. #00ff00 instead of
+ rgb(0, 255, 0)).
+ <p/>
+ <em>Warning:</em> the value returned will be as the browser interprets it, so
+ it may be tricky to form a proper assertion.</summary><div class="info"><table><tbody><tr><th>Parameters<tr><td><dl><dt>cssStyleProperty: <code class="type"><a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/String">string</a></code><dd>The name of the CSS style property to look
+     up.</dl><tr><th>Returns<tr><td><dl>A promise that will be
+     resolved with the requested CSS value.</dl></table></div></details></div></div><div class="wrap-details public"><div><details class="function"><summary><div><a class="source" href="source/lib/webdriver/webdriver.js.src.html#l1697">code &raquo;</a><span class="member"><a name="getDriver">getDriver</a> <span class="args">( )</span> &rArr; <code class="type">!<a href="class_webdriver_WebDriver.html">webdriver.WebDriver</a></code></span></div></summary><div class="info"><table><tbody><tr><th>Returns<tr><td><dl>The parent driver for this instance.</dl></table></div></details></div></div><div class="wrap-details public"><div><details class="function"><summary><div><a class="source" href="source/lib/webdriver/webdriver.js.src.html#l1708">code &raquo;</a><span class="member"><a name="getId">getId</a> <span class="args">( )</span> &rArr; <code class="type">!<a href="class_webdriver_promise_Promise.html">webdriver.promise.Promise</a>.&lt;<a href="class_webdriver_WebElement.html#webdriver.WebElement.Id">webdriver.WebElement.Id</a>&gt;</code></span></div></summary><div class="info"><table><tbody><tr><th>Returns<tr><td><dl>A promise
+     that resolves to this element's JSON representation as defined by the
+     WebDriver wire protocol.</dl></table></div></details></div></div><div class="wrap-details public"><div><details class="function"><summary><div><a class="source" href="source/lib/webdriver/webdriver.js.src.html#l2097">code &raquo;</a><span class="member"><a name="getInnerHtml">getInnerHtml</a> <span class="args">( )</span> &rArr; <code class="type">!<a href="class_webdriver_promise_Promise.html">webdriver.promise.Promise</a>.&lt;<a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/String">string</a>&gt;</code></span></div><p>Schedules a command to retrieve the inner HTML of this element.</summary><div class="info"><table><tbody><tr><th>Returns<tr><td><dl>A promise that will be
+     resolved with the element's inner HTML.</dl></table></div></details></div></div><div class="wrap-details public"><div><details class="function"><summary><div><a class="source" href="source/lib/webdriver/webdriver.js.src.html#l2001">code &raquo;</a><span class="member"><a name="getLocation">getLocation</a> <span class="args">( )</span> &rArr; <code class="type">!<a href="class_webdriver_promise_Promise.html">webdriver.promise.Promise</a></code></span></div><p>Schedules a command to compute the location of this element in page space.</summary><div class="info"><table><tbody><tr><th>Returns<tr><td><dl>A promise that
+     will be resolved to the element's location as a
+     <code >{x:number, y:number}</code> object.</dl></table></div></details></div></div><div class="wrap-details public"><div><details class="function"><summary><div><a class="source" href="source/lib/webdriver/webdriver.js.src.html#l2078">code &raquo;</a><span class="member"><a name="getOuterHtml">getOuterHtml</a> <span class="args">( )</span> &rArr; <code class="type">!<a href="class_webdriver_promise_Promise.html">webdriver.promise.Promise</a>.&lt;<a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/String">string</a>&gt;</code></span></div><p>Schedules a command to retrieve the outer HTML of this element.</summary><div class="info"><table><tbody><tr><th>Returns<tr><td><dl>A promise that will be
+     resolved with the element's outer HTML.</dl></table></div></details></div></div><div class="wrap-details public"><div><details class="function"><summary><div><a class="source" href="source/lib/webdriver/webdriver.js.src.html#l1988">code &raquo;</a><span class="member"><a name="getSize">getSize</a> <span class="args">( )</span> &rArr; <code class="type">!<a href="class_webdriver_promise_Promise.html">webdriver.promise.Promise</a></code></span></div><p>Schedules a command to compute the size of this element's bounding box, in
+ pixels.</summary><div class="info"><table><tbody><tr><th>Returns<tr><td><dl>A
+     promise that will be resolved with the element's size as a
+     <code >{width:number, height:number}</code> object.</dl></table></div></details></div></div><div class="wrap-details public"><div><details class="function"><summary><div><a class="source" href="source/lib/webdriver/webdriver.js.src.html#l1900">code &raquo;</a><span class="member"><a name="getTagName">getTagName</a> <span class="args">( )</span> &rArr; <code class="type">!<a href="class_webdriver_promise_Promise.html">webdriver.promise.Promise</a>.&lt;<a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/String">string</a>&gt;</code></span></div><p>Schedules a command to query for the tag/node name of this element.</summary><div class="info"><table><tbody><tr><th>Returns<tr><td><dl>A promise that will be
+     resolved with the element's tag name.</dl></table></div></details></div></div><div class="wrap-details public"><div><details class="function"><summary><div><a class="source" href="source/lib/webdriver/webdriver.js.src.html#l1974">code &raquo;</a><span class="member"><a name="getText">getText</a> <span class="args">( )</span> &rArr; <code class="type">!<a href="class_webdriver_promise_Promise.html">webdriver.promise.Promise</a>.&lt;<a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/String">string</a>&gt;</code></span></div><p>Get the visible (i.e. not hidden by CSS) innerText of this element, including
+ sub-elements, without any leading or trailing whitespace.</summary><div class="info"><table><tbody><tr><th>Returns<tr><td><dl>A promise that will be
+     resolved with the element's visible text.</dl></table></div></details></div></div><div class="wrap-details public"><div><details class="function"><summary><div><a class="source" href="source/lib/webdriver/webdriver.js.src.html#l2066">code &raquo;</a><span class="member"><a name="isDisplayed">isDisplayed</a> <span class="args">( )</span> &rArr; <code class="type">!<a href="class_webdriver_promise_Promise.html">webdriver.promise.Promise</a>.&lt;<a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Boolean">boolean</a>&gt;</code></span></div><p>Schedules a command to test whether this element is currently displayed.</summary><div class="info"><table><tbody><tr><th>Returns<tr><td><dl>A promise that will be
+     resolved with whether this element is currently visible on the page.</dl></table></div></details></div></div><div class="wrap-details public"><div><details class="function"><summary><div><a class="source" href="source/lib/webdriver/webdriver.js.src.html#l1796">code &raquo;</a><span class="member"><a name="isElementPresent">isElementPresent</a> <span class="args">( locator )</span> &rArr; <code class="type">!<a href="class_webdriver_promise_Promise.html">webdriver.promise.Promise</a>.&lt;<a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Boolean">boolean</a>&gt;</code></span></div><p>Schedules a command to test if there is at least one descendant of this
+ element that matches the given search criteria.</summary><div class="info"><table><tbody><tr><th>Parameters<tr><td><dl><dt>locator: <code class="type">!(<a href="class_webdriver_Locator.html">webdriver.Locator</a>|<a href="namespace_webdriver_By.html#webdriver.By.Hash">webdriver.By.Hash</a>|<a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Function">Function</a>)</code><dd>The
+     locator strategy to use when searching for the element.</dl><tr><th>Returns<tr><td><dl>A promise that will be
+     resolved with whether an element could be located on the page.</dl></table></div></details></div></div><div class="wrap-details public"><div><details class="function"><summary><div><a class="source" href="source/lib/webdriver/webdriver.js.src.html#l2014">code &raquo;</a><span class="member"><a name="isEnabled">isEnabled</a> <span class="args">( )</span> &rArr; <code class="type">!<a href="class_webdriver_promise_Promise.html">webdriver.promise.Promise</a>.&lt;<a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Boolean">boolean</a>&gt;</code></span></div><p>Schedules a command to query whether the DOM element represented by this
+ instance is enabled, as dicted by the <code >disabled</code> attribute.</summary><div class="info"><table><tbody><tr><th>Returns<tr><td><dl>A promise that will be
+     resolved with whether this element is currently enabled.</dl></table></div></details></div></div><div class="wrap-details public"><div><details class="function"><summary><div><a class="source" href="source/lib/webdriver/webdriver.js.src.html#l2026">code &raquo;</a><span class="member"><a name="isSelected">isSelected</a> <span class="args">( )</span> &rArr; <code class="type">!<a href="class_webdriver_promise_Promise.html">webdriver.promise.Promise</a>.&lt;<a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Boolean">boolean</a>&gt;</code></span></div><p>Schedules a command to query whether this element is selected.</summary><div class="info"><table><tbody><tr><th>Returns<tr><td><dl>A promise that will be
+     resolved with whether this element is currently selected.</dl></table></div></details></div></div><div class="wrap-details private"><div><details class="function"><summary><div><a class="source" href="source/lib/webdriver/webdriver.js.src.html#l1725">code &raquo;</a><code class="type">&lt;T&gt;</code> <span class="member"><a name="schedule_">schedule_</a> <span class="args">( command, description )</span> &rArr; <code class="type">!<a href="class_webdriver_promise_Promise.html">webdriver.promise.Promise</a>.&lt;T&gt;</code></span></div><p>Schedules a command that targets this element with the parent WebDriver
+ instance. Will ensure this element's ID is included in the command parameters
+ under the "id" key.</summary><div class="info"><table><tbody><tr><th>Parameters<tr><td><dl><dt>command: <code class="type">!<a href="class_webdriver_Command.html">webdriver.Command</a></code><dd>The command to schedule.<dt>description: <code class="type"><a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/String">string</a></code><dd>A description of the command for debugging.</dl><tr><th>Returns<tr><td><dl>A promise that will be resolved
+     with the command result.</dl></table></div></details></div></div><div class="wrap-details public"><div><details class="function"><summary><div><a class="source" href="source/lib/webdriver/webdriver.js.src.html#l1878">code &raquo;</a><span class="member"><a name="sendKeys">sendKeys</a> <span class="args">( var_args )</span> &rArr; <code class="type">!<a href="class_webdriver_promise_Promise.html">webdriver.promise.Promise</a>.&lt;void&gt;</code></span></div><p>Schedules a command to type a sequence on the DOM element represented by this
+ instance.
+ <p/>
+ Modifier keys (SHIFT, CONTROL, ALT, META) are stateful; once a modifier is
+ processed in the keysequence, that key state is toggled until one of the
+ following occurs:
+ <ul>
+ <li>The modifier key is encountered again in the sequence. At this point the
+ state of the key is toggled (along with the appropriate keyup/down events).
+ </li>
+ <li>The <code >webdriver.Key.NULL</code> key is encountered in the sequence. When
+ this key is encountered, all modifier keys current in the down state are
+ released (with accompanying keyup events). The NULL key can be used to
+ simulate common keyboard shortcuts:
+ <code><pre>
+     element.sendKeys("text was",
+                      webdriver.Key.CONTROL, "a", webdriver.Key.NULL,
+                      "now text is");
+     // Alternatively:
+     element.sendKeys("text was",
+                      webdriver.Key.chord(webdriver.Key.CONTROL, "a"),
+                      "now text is");
+ </pre></code></li>
+ <li>The end of the keysequence is encountered. When there are no more keys
+ to type, all depressed modifier keys are released (with accompanying keyup
+ events).
+ </li>
+ </ul>
+ <strong>Note:</strong> On browsers where native keyboard events are not yet
+ supported (e.g. Firefox on OS X), key events will be synthesized. Special
+ punctionation keys will be synthesized according to a standard QWERTY en-us
+ keyboard layout.</summary><div class="info"><table><tbody><tr><th>Parameters<tr><td><dl><dt>var_args: <code class="type">...<a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/String">string</a></code><dd>The sequence of keys to
+     type. All arguments will be joined into a single sequence (var_args is
+     permitted for convenience).</dl><tr><th>Returns<tr><td><dl>A promise that will be resolved
+     when all keys have been typed.</dl></table></div></details></div></div><div class="wrap-details public"><div><details class="function"><summary><div><a class="source" href="source/lib/webdriver/webdriver.js.src.html#l2040">code &raquo;</a><span class="member"><a name="submit">submit</a> <span class="args">( )</span> &rArr; <code class="type">!<a href="class_webdriver_promise_Promise.html">webdriver.promise.Promise</a>.&lt;void&gt;</code></span></div><p>Schedules a command to submit the form containing this element (or this
+ element if it is a FORM element). This command is a no-op if the element is
+ not contained in a form.</summary><div class="info"><table><tbody><tr><th>Returns<tr><td><dl>A promise that will be resolved
+     when the form has been submitted.</dl></table></div></details></div></div></section><section id="instance-properties"><h2>Instance Properties</h2><h3>Defined in <code class="type"><a href="class_webdriver_WebElement.html">webdriver.WebElement</a></code></h3><div class="wrap-details private"><div><details><summary><div><a class="source" href="source/lib/webdriver/webdriver.js.src.html#l1640">code &raquo;</a><span class="member"><a name="driver_">driver_</a> : <code class="type">!<a href="class_webdriver_WebDriver.html">webdriver.WebDriver</a></code></span></div></summary></details></div></div><div class="wrap-details private"><div><details><summary><div><a class="source" href="source/lib/webdriver/webdriver.js.src.html#l1643">code &raquo;</a><span class="member"><a name="id_">id_</a> : <code class="type">!<a href="class_webdriver_promise_Promise.html">webdriver.promise.Promise</a>.&lt;<a href="class_webdriver_WebElement.html#webdriver.WebElement.Id">webdriver.WebElement.Id</a>&gt;</code></span></div></summary></details></div></div></section><section id="static-properties"><h2>Static Properties</h2><div class="wrap-details public"><div><details><summary><div><a class="source" href="source/lib/webdriver/webdriver.js.src.html#l2125">code &raquo;</a><span class="member"><a name="webdriver.WebElementPromise.superClass_">webdriver.WebElementPromise.superClass_</a> : <code class="type"><a href="class_webdriver_WebElement.html">webdriver.WebElement.prototype</a></code></span></div></summary></details></div></div></section></main><nav id="topnav"><div><div id="menubutton"><label for="sidenav-toggle">Menu</label></div><form id="searchbox"><div><input type="search" placeholder="Search" tabindex="1"></div></form></div></nav><nav id="sidenav"><input type="checkbox" id="sidenav-types-ctrl" /><input type="checkbox" id="sidenav-files-ctrl" /><input type="checkbox" id="sidenav-modules-ctrl" /><a id="sidenav-overview"><div><h4>Overview</h4></div></a><div id="sidenav-types"><label for="sidenav-types-ctrl"><h4>Types</h4></label><i>Loading</i></div><div id="sidenav-modules"><label for="sidenav-modules-ctrl"><h4>Modules</h4></label><i>Loading</i></div><div id="sidenav-files"><label for="sidenav-files-ctrl"><h4>Files</h4></label><i>Loading</i></div><a href="license.html"><div><h4>License</h4></div></a></nav><div id="push-footer"></div></div><footer><a href="https://github.com/jleyba/js-dossier">Generated by dossier</a></footer><script src="types.js"></script><script src="dossier.js"></script>

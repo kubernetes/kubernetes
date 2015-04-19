@@ -1,0 +1,5 @@
+.git*
+.travis.yml
+*.md
+test/
+.DS_Store

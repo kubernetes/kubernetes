@@ -1,0 +1,4 @@
+ParseError: Unrecognised input in {path}property-asterisk-only-name.less on line 2, column 5:
+1 a {
+2     * : 1;
+3 }

@@ -1,0 +1,44 @@
+v0.3.10:
+  date: 2014-12-17
+  changes:
+    - Add support for json5.
+v0.3.9:
+  date: 2014-12-08
+  changes:
+    - Add support for literate iced coffee.
+v0.3.8:
+  date: 2014-11-20
+  changes:
+    - Add support for [cjsx](https://github.com/jsdf/coffee-react).
+v0.3.7:
+  date: 2014-09-08
+  changes:
+    - Add support for [TypeScript](http://www.typescriptlang.org/).
+v0.3.6:
+  date: 2014-08-25
+  changes:
+    - Add support for coffee.md.
+v0.3.5:
+  date: 2014-07-03
+  changes:
+    - Add support for jsx.
+v0.3.4:
+  date: 2014-06-27
+  changes:
+    - Make .js first jsVariant entry.
+v0.3.3:
+  date: 2014-06-02
+  changes:
+    - Fix casing on livescript dependency.
+v0.3.0:
+  date: 2014-04-20
+  changes:
+    - Simplify loading of coffee-script and iced-coffee-script.
+v0.2.0:
+  date: 2014-04-20
+  changes:
+    - Move module loading into rechoir.
+v0.1.0:
+  date: 2014-04-20
+  changes:
+    - Initial public release.

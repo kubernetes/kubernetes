@@ -1,0 +1,16 @@
+{
+  "appenders": [
+    { 
+      "category": "tests", 
+      "type": "file", 
+      "filename": "tmp-tests.log", 
+      "layout": { 
+        "type": "messagePassThrough" 
+      } 
+    }
+  ],
+  
+  "levels": {
+    "tests":  "WARN"
+  }
+}

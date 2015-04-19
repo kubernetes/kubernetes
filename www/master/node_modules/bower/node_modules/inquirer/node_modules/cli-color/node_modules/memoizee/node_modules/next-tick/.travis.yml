@@ -1,0 +1,12 @@
+language: node_js
+node_js:
+  - 0.8
+  - 0.10
+  - 0.11
+
+before_install:
+  - mkdir node_modules; ln -s ../ node_modules/next-tick
+
+notifications:
+  email:
+    - medikoo+next-tick@medikoo.com

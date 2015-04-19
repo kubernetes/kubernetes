@@ -1,0 +1,3 @@
+ParseError: missing closing `}` in {path}parse-error-missing-bracket.less on line 1, column 6:
+1 body {
+2   background-color: #fff;

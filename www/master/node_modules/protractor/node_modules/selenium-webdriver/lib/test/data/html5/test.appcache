@@ -1,0 +1,11 @@
+CACHE MANIFEST
+
+CACHE:
+# Additional items to cache.
+yellow.jpg
+red.jpg
+blue.jpg
+green.jpg
+
+FALLBACK:
+status.html offline.html

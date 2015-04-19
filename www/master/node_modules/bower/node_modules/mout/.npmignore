@@ -1,0 +1,30 @@
+# dumb files
+# ==========
+
+.tmp*
+.project
+.settings/
+.livereload
+.DS_Store?
+ehthumbs.db
+Icon?
+Thumbs.db
+
+
+# stuff not needed by node
+# ========================
+
+node_modules/
+tests/
+_build/
+doc_html/
+coverage/
+
+# we keep the doc/ folder in case npm decides to display it in the future
+# also good in case user is using an old version or working offline
+
+# we also keep the src/ folder in case the user still needs the AMD modules
+# after build (see issue #102)
+
+bower.json
+build.js

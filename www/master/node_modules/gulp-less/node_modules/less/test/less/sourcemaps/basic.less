@@ -1,0 +1,27 @@
+@var: black;
+
+.a() {
+  color: red;
+}
+
+.b {
+  color: green;
+  .a();
+  color: blue;
+  background: @var;
+}
+
+.a, .b {
+  background: green;
+  .c, .d {
+    background: gray;
+    & + & {
+      color: red;
+    }
+  }
+}
+
+.extend:extend(.a all) {
+  color: pink;
+}
+@import (inline) "imported.css";

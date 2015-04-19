@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8" />
+	<title>jQuery UI Selectable - Default functionality</title>
+        <link type="text/css" href="css/ui-lightness/jquery-ui-1.8.1.custom.css" rel="stylesheet" />
+        <script type="text/javascript" src="js/jquery-1.4.4.min.js"></script>
+        <script type="text/javascript" src="js/jquery-ui-1.8.10.custom.min.js"></script>
+	
+	<style type="text/css">
+	#feedback { font-size: 1.4em; }
+	#selectable .ui-selecting { background: #FECA40; }
+	#selectable .ui-selected { background: #F39814; color: white; }
+	#selectable { list-style-type: none; margin: 0; padding: 0; width: 60%; }
+	#selectable li { margin: 3px; padding: 0.4em; font-size: 1.4em; height: 18px; }
+	</style>
+	<script type="text/javascript">
+	$(function() {
+            $("#selectable").selectable({
+              stop: function() {
+                var infodiv = $("#infodiv").empty();
+                $(".ui-selected", this).each(function() {
+                  var that_id = this.id;
+                  infodiv.append(' #' + that_id);
+                  });
+              }
+              });
+            $("button").button();
+            $("button").click(function() {
+              var list_disabled = $("#selectable").selectable("option", "disabled");
+              $("#infodiv").find('p').html('Disabled: ' + !list_disabled);
+              $("#selectable").selectable("option", "disabled", !list_disabled);
+              });
+	});
+	</script>
+</head>
+<body>
+<div class="demo">
+
+<ol id="selectable">
+	<li id="item1" class="ui-widget-content">Item 1</li>
+	<li id="item2" class="ui-widget-content">Item 2</li>
+	<li id="item3" class="ui-widget-content">Item 3</li>
+	<li id="item4" class="ui-widget-content">Item 4</li>
+	<li id="item5" class="ui-widget-content">Item 5</li>
+	<li id="item6" class="ui-widget-content">Item 6</li>
+	<li id="item7" class="ui-widget-content">Item 7</li>
+</ol>
+
+</div><!-- End demo -->
+
+<div class="demo-description">
+
+  <p>Enable a DOM element (or group of elements) to be selectable. Draw a box with your cursor to select items. Hold down the Ctrl key to make multiple non-adjacent selections. </p>
+
+  <button type="button" id="somebutton">Click to lock</button>
+
+  <div id="infodiv">
+    <p>no info</p>
+  </div>
+
+
+</div><!-- End demo-description -->
+</body>
+</html>

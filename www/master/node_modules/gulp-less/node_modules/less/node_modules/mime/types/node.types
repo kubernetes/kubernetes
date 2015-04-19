@@ -1,0 +1,77 @@
+# What: WebVTT
+# Why: To allow formats intended for marking up external text track resources.
+# http://dev.w3.org/html5/webvtt/
+# Added by: niftylettuce
+text/vtt  vtt
+
+# What: Google Chrome Extension
+# Why: To allow apps to (work) be served with the right content type header.
+# http://codereview.chromium.org/2830017
+# Added by: niftylettuce
+application/x-chrome-extension  crx
+
+# What: HTC support
+# Why: To properly render .htc files such as CSS3PIE
+# Added by: niftylettuce
+text/x-component  htc
+
+# What: HTML5 application cache manifes ('.manifest' extension)
+# Why: De-facto standard. Required by Mozilla browser when serving HTML5 apps
+# per https://developer.mozilla.org/en/offline_resources_in_firefox
+# Added by: louisremi
+text/cache-manifest  manifest
+
+# What: node binary buffer format
+# Why: semi-standard extension w/in the node community
+# Added by: tootallnate
+application/octet-stream  buffer
+
+# What: The "protected" MP-4 formats used by iTunes.
+# Why: Required for streaming music to browsers (?)
+# Added by: broofa
+application/mp4  m4p
+audio/mp4  m4a
+
+# What: Video format, Part of RFC1890
+# Why: See https://github.com/bentomas/node-mime/pull/6
+# Added by: mjrusso
+video/MP2T  ts
+
+# What: EventSource mime type
+# Why: mime type of Server-Sent Events stream
+# http://www.w3.org/TR/eventsource/#text-event-stream
+# Added by: francois2metz
+text/event-stream  event-stream
+
+# What: Mozilla App manifest mime type
+# Why: https://developer.mozilla.org/en/Apps/Manifest#Serving_manifests
+# Added by: ednapiranha
+application/x-web-app-manifest+json   webapp
+
+# What: Lua file types
+# Why: Googling around shows de-facto consensus on these
+# Added by: creationix (Issue #45)
+text/x-lua  lua
+application/x-lua-bytecode  luac
+
+# What: Markdown files, as per http://daringfireball.net/projects/markdown/syntax
+# Why: http://stackoverflow.com/questions/10701983/what-is-the-mime-type-for-markdown
+# Added by: avoidwork
+text/x-markdown  markdown md mkd
+
+# What: ini files
+# Why: because they're just text files
+# Added by: Matthew Kastor
+text/plain  ini
+
+# What: DASH Adaptive Streaming manifest
+# Why: https://developer.mozilla.org/en-US/docs/DASH_Adaptive_Streaming_for_HTML_5_Video
+# Added by: eelcocramer
+application/dash+xml mdp
+
+# What: OpenType font files - http://www.microsoft.com/typography/otspec/
+# Why:  Browsers usually ignore the font MIME types and sniff the content,
+#       but Chrome, shows a warning if OpenType fonts aren't served with
+#       the `font/opentype` MIME type: http://i.imgur.com/8c5RN8M.png.
+# Added by: alrra
+font/opentype  otf

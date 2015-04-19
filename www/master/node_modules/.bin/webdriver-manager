@@ -1,0 +1,312 @@
+#!/usr/bin/env node
+
+var fs = require('fs');
+var os = require('os');
+var url = require('url');
+var request = require('request');
+var http = require('http');
+var path = require('path');
+var AdmZip = require('adm-zip');
+var optimist = require('optimist');
+var childProcess = require('child_process');
+
+/**
+ * Download the requested binaries to node_modules/protractor/selenium/
+ */
+var SELENIUM_DIR = path.resolve(__dirname, '../selenium');
+
+var versions = require('../config.json').webdriverVersions;
+
+/**
+ * Get the major and minor version but ignore the patch (required for selenium
+ * download URLs).
+ */
+var shortVersion = function(version) {
+  return version.slice(0, version.lastIndexOf('.'));
+}
+
+var binaries = {
+  standalone: {
+    name: 'selenium standalone',
+    isDefault: true,
+    prefix: 'selenium-server-standalone',
+    filename: 'selenium-server-standalone-' + versions.selenium + '.jar',
+    url: function() {
+      return 'https://selenium-release.storage.googleapis.com/' +
+          shortVersion(versions.selenium) + '/' +
+          'selenium-server-standalone-' + versions.selenium + '.jar';
+    }
+  },
+  chrome: {
+    name: 'chromedriver',
+    isDefault: true,
+    prefix: 'chromedriver_',
+    filename: 'chromedriver_' + versions.chromedriver + '.zip',
+    url: function() {
+      var urlPrefix = 'https://chromedriver.storage.googleapis.com/' +
+          versions.chromedriver + '/chromedriver_';
+      if (os.type() == 'Darwin') {
+        return urlPrefix + 'mac32.zip';
+      } else if (os.type() == 'Linux') {
+        if (os.arch() == 'x64') {
+          return urlPrefix + 'linux64.zip';
+        } else {
+          return urlPrefix + 'linux32.zip';
+        }
+      } else if (os.type() == 'Windows_NT') {
+        return urlPrefix + 'win32.zip';
+      }
+    }
+  },
+  ie: {
+    name: 'IEDriver',
+    isDefault: false,
+    prefix: 'IEDriverServer',
+    filename: 'IEDriverServer_' + versions.iedriver + '.zip',
+    url: function() {
+      var urlPrefix = 'https://selenium-release.storage.googleapis.com/' +
+          shortVersion(versions.iedriver) + '/IEDriverServer';
+      if (os.type() == 'Windows_NT') {
+        if (os.arch() == 'x64') {
+          return urlPrefix + '_x64_' + versions.iedriver + '.zip';
+        } else {
+          return urlPrefix + '_Win32_' + versions.iedriver + '.zip';
+        }
+      }
+    }
+  }
+};
+
+var cli = optimist.
+    usage('Usage: webdriver-manager <command>\n' +
+        'Commands:\n' +
+        '  update: install or update selected binaries\n' +
+        '  start: start up the selenium server\n' +
+        '  status: list the current available drivers').
+    describe('out_dir', 'Location to output/expect ').
+    default('out_dir', SELENIUM_DIR).
+    describe('seleniumPort', 'Optional port for the selenium standalone server').
+    describe('ignore_ssl', 'Ignore SSL certificates').boolean('ignore_ssl').
+    default('ignore_ssl', false).
+    describe('proxy', 'Proxy to use for the install or update command');
+
+for (bin in binaries) {
+  cli.describe(bin, 'Install or update ' + binaries[bin].name).
+  boolean(bin).
+  default(bin, binaries[bin].isDefault);
+}
+
+var argv = cli.
+    check(function(arg) {
+      if (arg._.length != 1) {
+        throw 'Please specify one command';
+      }
+    }).
+    argv;
+
+if (!fs.existsSync(argv.out_dir) || !fs.statSync(argv.out_dir).isDirectory()) {
+  fs.mkdirSync(argv.out_dir);
+}
+
+var resolveProxy = function(fileUrl) {
+  var protocol = url.parse(fileUrl).protocol;
+  if (argv.proxy) {
+    return argv.proxy;
+  } else if (protocol === 'https:') {
+    return process.env.HTTPS_PROXY || process.env.https_proxy || process.env.HTTP_PROXY || process.env.http_proxy;
+  } else if (protocol === 'http:') {
+    return process.env.HTTP_PROXY || process.env.http_proxy;
+  }
+};
+
+/**
+ * Function to download file using HTTP.get.
+ * TODO: look into using something instead of request here, to avoid the
+ * big dependency cost. It's required for now to follow redirects.
+ */
+var httpGetFile = function(fileUrl, fileName, outputDir, callback) {
+  console.log('downloading ' + fileUrl + '...');
+  var filePath = path.join(outputDir, fileName);
+  var file = fs.createWriteStream(filePath);
+  var ignoreSSL = argv.ignore_ssl;
+
+  if (ignoreSSL) {
+    console.log('Ignoring SSL certificate');
+  }
+
+  var options = {
+    url: fileUrl,
+    strictSSL: !ignoreSSL,
+    proxy: resolveProxy(fileUrl)
+  };
+
+  request(options)
+      .on('response', function(response) {
+        if (response.statusCode !== 200) {
+          fs.unlink(filePath);
+          console.error('Error: Got code ' + response.statusCode + ' from ' + fileUrl);
+        }
+      })
+      .on('error', function(error) {
+        fs.unlink(filePath);
+        console.error('Error: Got error ' + error + ' from ' + fileUrl);
+      })
+      .on('data', function(data) {
+        file.write(data);
+      })
+      .on('end', function() {
+        file.end(function() {
+          console.log(fileName + ' downloaded to ' + filePath);
+          if (callback) {
+            callback(filePath);
+          }
+        });
+      });
+};
+
+/**
+ * Normalize a command across OS
+ */
+var spawnCommand = function(command, args) {
+  var win32 = process.platform === 'win32';
+  var winCommand = win32 ? 'cmd' : command;
+  var finalArgs = win32 ? ['/c'].concat(command, args) : args;
+
+  return childProcess.spawn(winCommand, finalArgs,
+      { stdio: 'inherit' });
+};
+
+/**
+ * If a new version of the file with the given url exists, download and
+ * delete the old version.
+ */
+var downloadIfNew = function(bin, outputDir, existingFiles, opt_callback) {
+  if (!bin.exists) {
+    // Remove anything else that matches the exclusive prefix.
+    existingFiles.forEach(function(file) {
+      if (file.indexOf(bin.prefix) != -1) {
+        fs.unlinkSync(path.join(outputDir, file));
+      }
+    });
+    console.log('Updating ' + bin.name);
+    var url = bin.url();
+    if (!url) {
+      console.error(bin.name + ' is not available for your system.');
+      return;
+    }
+    httpGetFile(url, bin.filename, outputDir, function(downloaded) {
+      if (opt_callback) {
+        opt_callback(downloaded);
+      }
+    });
+  } else {
+    console.log(bin.name + ' is up to date.');
+  }
+};
+
+/**
+ * Append '.exe' to a filename if the system is windows.
+ */
+var executableName = function(file) {
+  if (os.type() == 'Windows_NT') {
+    return file + '.exe';
+  } else {
+    return file;
+  }
+};
+
+
+// Setup before any command.
+var existingFiles = fs.readdirSync(argv.out_dir);
+
+for (name in binaries) {
+  bin = binaries[name];
+  var exists = fs.existsSync(path.join(argv.out_dir, bin.filename));
+  var outOfDateExists = false;
+  existingFiles.forEach(function(file) {
+    if (file.indexOf(bin.prefix) != -1 && file != bin.filename) {
+      outOfDateExists = true;
+    }
+  });
+  bin.exists = exists;
+  bin.outOfDateExists = outOfDateExists;
+}
+
+switch (argv._[0]) {
+  case 'start':
+    if (!binaries.standalone.exists) {
+      console.error('Selenium Standalone is not present. Install with ' +
+          'webdriver-manager update --standalone');
+      process.exit(1);
+    }
+    var args = ['-jar', path.join(argv.out_dir, binaries.standalone.filename)];
+    if (argv.seleniumPort) {
+      args.push('-port', argv.seleniumPort);
+    }
+    if (binaries.chrome.exists) {
+      args.push('-Dwebdriver.chrome.driver=' +
+          path.join(argv.out_dir, executableName('chromedriver')));
+    }
+    if (binaries.ie.exists) {
+       args.push('-Dwebdriver.ie.driver=' +
+          path.join(argv.out_dir, executableName('IEDriverServer')));
+    }
+    var seleniumProcess = spawnCommand('java', args);
+    console.log('seleniumProcess.pid: ' + seleniumProcess.pid);
+    seleniumProcess.on('exit', function(code) {
+      console.log('Selenium Standalone has exited with code ' + code);
+      process.exit(code);
+    });
+    process.stdin.resume();
+    process.stdin.on('data', function(chunk) {
+      console.log('Attempting to shut down selenium nicely');
+      http.get('http://localhost:4444/selenium-server/driver/?cmd=shutDownSeleniumServer');
+
+    });
+    process.on('SIGINT', function() {
+      console.log('Staying alive until the Selenium Standalone process exits');
+    });
+    break;
+  case 'status':
+    for (name in binaries) {
+      bin = binaries[name];
+      if (bin.exists) {
+        console.log(bin.name + ' is up to date');
+      } else if (bin.outOfDateExists) {
+        console.log('**' + bin.name + ' needs to be updated');
+      } else {
+        console.log(bin.name + ' is not present')
+      }
+    }
+    break;
+  case 'update':
+    if (argv.standalone) {
+      downloadIfNew(binaries.standalone, argv.out_dir, existingFiles);
+    }
+    if (argv.chrome) {
+      downloadIfNew(binaries.chrome, argv.out_dir, existingFiles,
+        function(filename) {
+          var zip = new AdmZip(filename);
+          // Expected contents of the zip:
+          //   mac/linux: chromedriver
+          //   windows: chromedriver.exe
+          zip.extractAllTo(argv.out_dir, true);
+          if (os.type() != 'Windows_NT') {
+            fs.chmodSync(path.join(argv.out_dir, 'chromedriver'), 0755);
+          }
+        });
+    }
+    if (argv.ie) {
+       downloadIfNew(binaries.ie, argv.out_dir, existingFiles,
+        function(filename) {
+          var zip = new AdmZip(filename);
+          // Expected contents of the zip:
+          //   IEDriverServer.exe
+          zip.extractAllTo(argv.out_dir, true);
+        });
+    }
+    break;
+  default:
+    console.error('Invalid command');
+    optimist.showHelp();
+}

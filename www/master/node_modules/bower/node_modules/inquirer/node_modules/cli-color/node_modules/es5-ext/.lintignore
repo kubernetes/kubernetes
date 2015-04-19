@@ -1,0 +1,8 @@
+/string/#/normalize/_data.js
+/test/boolean/is-boolean.js
+/test/date/is-date.js
+/test/number/is-number.js
+/test/object/is-copy.js
+/test/object/is-object.js
+/test/reg-exp/is-reg-exp.js
+/test/string/is-string.js

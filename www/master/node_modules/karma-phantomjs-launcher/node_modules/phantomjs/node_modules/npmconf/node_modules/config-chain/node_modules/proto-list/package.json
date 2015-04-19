@@ -1,0 +1,33 @@
+{
+  "name": "proto-list",
+  "version": "1.2.3",
+  "description": "A utility for managing a prototype chain",
+  "main": "./proto-list.js",
+  "author": {
+    "name": "Isaac Z. Schlueter",
+    "email": "i@izs.me",
+    "url": "http://blog.izs.me/"
+  },
+  "scripts": {
+    "test": "tap test/*.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/isaacs/proto-list"
+  },
+  "license": {
+    "type": "MIT",
+    "url": "https://github.com/isaacs/proto-list/blob/master/LICENSE"
+  },
+  "devDependencies": {
+    "tap": "0"
+  },
+  "readme": "A list of objects, bound by their prototype chain.\n\nUsed in npm's config stuff.\n",
+  "readmeFilename": "README.md",
+  "bugs": {
+    "url": "https://github.com/isaacs/proto-list/issues"
+  },
+  "homepage": "https://github.com/isaacs/proto-list",
+  "_id": "proto-list@1.2.3",
+  "_from": "proto-list@~1.2.1"
+}

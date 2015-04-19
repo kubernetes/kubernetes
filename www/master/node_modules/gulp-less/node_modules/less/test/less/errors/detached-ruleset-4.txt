@@ -1,0 +1,3 @@
+ParseError: Unrecognised input in {path}detached-ruleset-4.less on line 1, column 18:
+1 .mixin-definition(@a: {
+2   b: 1;

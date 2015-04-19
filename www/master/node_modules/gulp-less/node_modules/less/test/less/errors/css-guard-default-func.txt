@@ -1,0 +1,4 @@
+SyntaxError: error evaluating function `default`: it is currently only allowed in parametric mixin guards, in {path}css-guard-default-func.less on line 2, column 16:
+1 
+2 selector when (default()) {
+3     color: red;

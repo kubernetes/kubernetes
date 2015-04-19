@@ -1,0 +1,6 @@
+/lib-cov/
+/src/
+/test/
+/bower.json
+/Rakefile
+/Gruntfile.js

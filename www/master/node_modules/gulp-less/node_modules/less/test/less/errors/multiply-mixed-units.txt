@@ -1,0 +1,4 @@
+SyntaxError: Multiple units in dimension. Correct the units or use the unit function. Bad unit: em*px in {path}multiply-mixed-units.less on line 6, column 3:
+5 .a {
+6   error: (1px * 1em);
+7 }

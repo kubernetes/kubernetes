@@ -1,0 +1,43 @@
+{
+  "name": "osenv",
+  "version": "0.0.3",
+  "main": "osenv.js",
+  "directories": {
+    "test": "test"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "tap": "~0.2.5"
+  },
+  "scripts": {
+    "test": "tap test/*.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/isaacs/osenv"
+  },
+  "keywords": [
+    "environment",
+    "variable",
+    "home",
+    "tmpdir",
+    "path",
+    "prompt",
+    "ps1"
+  ],
+  "author": {
+    "name": "Isaac Z. Schlueter",
+    "email": "i@izs.me",
+    "url": "http://blog.izs.me/"
+  },
+  "license": "BSD",
+  "description": "Look up environment settings specific to different operating systems",
+  "readme": "# osenv\n\nLook up environment settings specific to different operating systems.\n\n## Usage\n\n```javascript\nvar osenv = require('osenv')\nvar path = osenv.path()\nvar user = osenv.user()\n// etc.\n\n// Some things are not reliably in the env, and have a fallback command:\nvar h = osenv.hostname(function (er, hostname) {\n  h = hostname\n})\n// This will still cause it to be memoized, so calling osenv.hostname()\n// is now an immediate operation.\n\n// You can always send a cb, which will get called in the nextTick\n// if it's been memoized, or wait for the fallback data if it wasn't\n// found in the environment.\nosenv.hostname(function (er, hostname) {\n  if (er) console.error('error looking up hostname')\n  else console.log('this machine calls itself %s', hostname)\n})\n```\n\n## osenv.hostname()\n\nThe machine name.  Calls `hostname` if not found.\n\n## osenv.user()\n\nThe currently logged-in user.  Calls `whoami` if not found.\n\n## osenv.prompt()\n\nEither PS1 on unix, or PROMPT on Windows.\n\n## osenv.tmpdir()\n\nThe place where temporary files should be created.\n\n## osenv.home()\n\nNo place like it.\n\n## osenv.path()\n\nAn array of the places that the operating system will search for\nexecutables.\n\n## osenv.editor() \n\nReturn the executable name of the editor program.  This uses the EDITOR\nand VISUAL environment variables, and falls back to `vi` on Unix, or\n`notepad.exe` on Windows.\n\n## osenv.shell()\n\nThe SHELL on Unix, which Windows calls the ComSpec.  Defaults to 'bash'\nor 'cmd'.\n",
+  "readmeFilename": "README.md",
+  "bugs": {
+    "url": "https://github.com/isaacs/osenv/issues"
+  },
+  "homepage": "https://github.com/isaacs/osenv",
+  "_id": "osenv@0.0.3",
+  "_from": "osenv@0.0.3"
+}

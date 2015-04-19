@@ -1,0 +1,3 @@
+[submodule "pages"]
+	path = pages
+	url = https://github.com/pivotal/jasmine.git

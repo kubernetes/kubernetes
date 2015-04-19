@@ -1,0 +1,17 @@
+#!/bin/bash
+
+WD_PORT=${WD_PORT:-9134}
+
+pidfile=tmp/phantomjs.pid
+
+[ -e $pidfile ] && echo "PhantomJS started. tmp/phantomjs.pid exists. Run npm run phantom-stop or remove the file." && exit 0;
+
+echo "Starting PhantomJS WebDriver on port $WD_PORT"
+echo "phantomjs --webdriver=$WD_PORT >> tmp/phantomjs.log &"
+phantomjs --webdriver=$WD_PORT >tmp/phantomjs.log 2>&1 &
+pid=$!
+
+echo $pid > $pidfile
+
+echo "... Waiting a bit for PhantomJS to start ..."
+sleep 1

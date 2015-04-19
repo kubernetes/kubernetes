@@ -1,0 +1,17 @@
+
+Usage:
+
+{{#condense}}
+{{#each usage}}
+    {{#cyan}}bower{{/cyan}} {{.}}
+{{/each}}
+{{/condense}}
+
+Commands:
+
+{{#condense}}
+{{#each commands}}
+    {{#rpad length="23"}}{{@key}}{{/rpad}} {{.}}
+{{/each}}
+{{/condense}}
+

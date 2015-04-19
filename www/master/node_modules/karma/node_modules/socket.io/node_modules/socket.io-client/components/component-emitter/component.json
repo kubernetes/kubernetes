@@ -1,0 +1,13 @@
+{
+  "name": "emitter",
+  "description": "Event emitter",
+  "keywords": [
+    "emitter",
+    "events"
+  ],
+  "version": "0.0.6",
+  "scripts": [
+    "index.js"
+  ],
+  "repo": "https://raw.github.com/component/emitter"
+}

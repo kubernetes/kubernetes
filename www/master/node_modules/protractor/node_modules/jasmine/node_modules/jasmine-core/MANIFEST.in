@@ -1,0 +1,5 @@
+recursive-include . *.py
+include lib/jasmine-core/*.js
+include lib/jasmine-core/*.css
+include images/*.png
+include package.json

@@ -1,0 +1,38 @@
+{
+  "name": "unique-stream",
+  "version": "1.0.0",
+  "description": "node.js through stream that emits a unique stream of objects based on criteria",
+  "main": "index.js",
+  "scripts": {
+    "test": "mocha"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/eugeneware/unique-stream"
+  },
+  "keywords": [
+    "unique",
+    "stream",
+    "unique-stream",
+    "streaming",
+    "streams"
+  ],
+  "author": {
+    "name": "Eugene Ware",
+    "email": "eugene@noblesamurai.com"
+  },
+  "license": "BSD",
+  "devDependencies": {
+    "chai": "~1.7.2",
+    "mocha": "^1.18.2",
+    "after": "~0.8.1"
+  },
+  "readme": "# unique-stream\n\nnode.js through stream that emits a unique stream of objects based on criteria\n\n[![build status](https://secure.travis-ci.org/eugeneware/unique-stream.png)](http://travis-ci.org/eugeneware/unique-stream)\n\n## Installation\n\nInstall via npm:\n\n```\n$ npm install unique-stream\n```\n\n## Examples\n\n### Dedupe a ReadStream based on JSON.stringify:\n\n``` js\nvar unique = require('unique-stream')\n  , Stream = require('stream');\n\n// return a stream of 3 identical objects\nfunction makeStreamOfObjects() {\n  var s = new Stream;\n  s.readable = true;\n  var count = 3;\n  for (var i = 0; i < 3; i++) {\n    setImmediate(function () {\n      s.emit('data', { name: 'Bob', number: 123 });\n      --count && end();\n    });\n  }\n\n  function end() {\n    s.emit('end');\n  }\n\n  return s;\n}\n\n// Will only print out one object as the rest are dupes. (Uses JSON.stringify)\nmakeStreamOfObjects()\n  .pipe(unique())\n  .on('data', console.log);\n\n```\n\n### Dedupe a ReadStream based on an object property:\n\n``` js\n// Use name as the key field to dedupe on. Will only print one object\nmakeStreamOfObjects()\n  .pipe(unique('name'))\n  .on('data', console.log);\n```\n\n### Dedupe a ReadStream based on a custom function:\n\n``` js\n// Use a custom function to dedupe on. Use the 'number' field. Will only print one object.\nmakeStreamOfObjects()\n  .pipe(function (data) {\n    return data.number;\n  })\n  .on('data', console.log);\n```\n\n## Dedupe multiple streams\n\nThe reason I wrote this was to dedupe multiple object streams:\n\n``` js\nvar aggregator = unique();\n\n// Stream 1\nmakeStreamOfObjects()\n  .pipe(aggregator);\n\n// Stream 2\nmakeStreamOfObjects()\n  .pipe(aggregator);\n\n// Stream 3\nmakeStreamOfObjects()\n  .pipe(aggregator);\n\naggregator.on('data', console.log);\n```\n",
+  "readmeFilename": "README.md",
+  "bugs": {
+    "url": "https://github.com/eugeneware/unique-stream/issues"
+  },
+  "homepage": "https://github.com/eugeneware/unique-stream",
+  "_id": "unique-stream@1.0.0",
+  "_from": "unique-stream@^1.0.0"
+}

@@ -1,0 +1,63 @@
+<!DOCTYPE html><meta charset="UTF-8"><meta http-equiv="Content-Language" content="en" /><title>webdriver.promise.Thenable</title><link href="dossier.css" rel="stylesheet" type="text/css"><div id="main-wrapper"><input type="checkbox" id="sidenav-toggle" /><main><header><h1>Interface webdriver.promise.Thenable.<code class="type">&lt;T&gt;</code></h1><a class="source" href="source/lib/webdriver/promise.js.src.html#l89">code &raquo;</a></header><section><p>Thenable is a promise-like object with a <code >then</code> method which may be
+ used to schedule callbacks on a promised value.</section><div id="visibility-controls"><b>Show:</b><label for="show-public"><span><input type="checkbox" id="show-public" checked/></span>Public</label><label for="show-protected"><span><input type="checkbox" id="show-protected"/></span>Protected</label><label for="show-private"><span><input type="checkbox" id="show-private"/></span>Private</label></div><section id="instance-methods"><h2>Instance Methods</h2><div class="wrap-details public"><div><details class="function"><summary><div><a class="source" href="source/lib/webdriver/promise.js.src.html#l98">code &raquo;</a><span class="member"><a name="cancel">cancel</a> <span class="args">( opt_reason )</span></span></div><p>Cancels the computation of this promise's value, rejecting the promise in the
+ process. This method is a no-op if the promise has alreayd been resolved.</summary><div class="info"><table><tbody><tr><th>Parameters<tr><td><dl><dt>opt_reason: <code class="type"><a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/String">string</a>=</code><dd>The reason this promise is being cancelled.</dl></table></div></details></div></div><div class="wrap-details public"><div><details class="function"><summary><div><a class="source" href="source/lib/webdriver/promise.js.src.html#l102">code &raquo;</a><span class="member"><a name="isPending">isPending</a> <span class="args">( )</span> &rArr; <code class="type"><a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Boolean">boolean</a></code></span></div></summary><div class="info"><table><tbody><tr><th>Returns<tr><td><dl>Whether this promise's value is still being computed.</dl></table></div></details></div></div><div class="wrap-details public"><div><details class="function"><summary><div><a class="source" href="source/lib/webdriver/promise.js.src.html#l118">code &raquo;</a><code class="type">&lt;R&gt;</code> <span class="member"><a name="then">then</a> <span class="args">( opt_callback, opt_errback )</span> &rArr; <code class="type">!<a href="class_webdriver_promise_Promise.html">webdriver.promise.Promise</a>.&lt;R&gt;</code></span></div><p>Registers listeners for when this instance is resolved.</summary><div class="info"><table><tbody><tr><th>Parameters<tr><td><dl><dt>opt_callback: <code class="type">?(function(T): (R|<a href="class_webdriver_promise_Promise.html">webdriver.promise.Promise</a>.&lt;R&gt;))=</code><dd>The
+     function to call if this promise is successfully resolved. The function
+     should expect a single argument: the promise's resolved value.<dt>opt_errback: <code class="type">?(function(*): (R|<a href="class_webdriver_promise_Promise.html">webdriver.promise.Promise</a>.&lt;R&gt;))=</code><dd>The
+     function to call if this promise is rejected. The function should expect
+     a single argument: the rejection reason.</dl><tr><th>Returns<tr><td><dl>A new promise which will be
+     resolved with the result of the invoked callback.</dl></table></div></details></div></div><div class="wrap-details public"><div><details class="function"><summary><div><a class="source" href="source/lib/webdriver/promise.js.src.html#l146">code &raquo;</a><code class="type">&lt;R&gt;</code> <span class="member"><a name="thenCatch">thenCatch</a> <span class="args">( errback )</span> &rArr; <code class="type">!<a href="class_webdriver_promise_Promise.html">webdriver.promise.Promise</a>.&lt;R&gt;</code></span></div><p>Registers a listener for when this promise is rejected. This is synonymous
+ with the <code >catch</code> clause in a synchronous API:
+ <pre><code>
+   // Synchronous API:
+   try {
+     doSynchronousWork();
+   } catch (ex) {
+     console.error(ex);
+   }
+
+   // Asynchronous promise API:
+   doAsynchronousWork().thenCatch(function(ex) {
+     console.error(ex);
+   });
+ </code></pre></summary><div class="info"><table><tbody><tr><th>Parameters<tr><td><dl><dt>errback: <code class="type">function(*): (R|<a href="class_webdriver_promise_Promise.html">webdriver.promise.Promise</a>.&lt;R&gt;)</code><dd>The function
+     to call if this promise is rejected. The function should expect a single
+     argument: the rejection reason.</dl><tr><th>Returns<tr><td><dl>A new promise which will be
+     resolved with the result of the invoked callback.</dl></table></div></details></div></div><div class="wrap-details public"><div><details class="function"><summary><div><a class="source" href="source/lib/webdriver/promise.js.src.html#l188">code &raquo;</a><code class="type">&lt;R&gt;</code> <span class="member"><a name="thenFinally">thenFinally</a> <span class="args">( callback )</span> &rArr; <code class="type">!<a href="class_webdriver_promise_Promise.html">webdriver.promise.Promise</a>.&lt;R&gt;</code></span></div><p>Registers a listener to invoke when this promise is resolved, regardless
+ of whether the promise's value was successfully computed. This function
+ is synonymous with the <code >finally</code> clause in a synchronous API:
+ <pre><code>
+   // Synchronous API:
+   try {
+     doSynchronousWork();
+   } finally {
+     cleanUp();
+   }
+
+   // Asynchronous promise API:
+   doAsynchronousWork().thenFinally(cleanUp);
+ </code></pre>
+
+ <b>Note:</b> similar to the <code >finally</code> clause, if the registered
+ callback returns a rejected promise or throws an error, it will silently
+ replace the rejection error (if any) from this promise:
+ <pre><code>
+   try {
+     throw Error('one');
+   } finally {
+     throw Error('two');  // Hides Error: one
+   }
+
+   webdriver.promise.rejected(Error('one'))
+       .thenFinally(function() {
+         throw Error('two');  // Hides Error: one
+       });
+ </code></pre></summary><div class="info"><table><tbody><tr><th>Parameters<tr><td><dl><dt>callback: <code class="type">function(): (R|<a href="class_webdriver_promise_Promise.html">webdriver.promise.Promise</a>.&lt;R&gt;)</code><dd>The function
+     to call when this promise is resolved.</dl><tr><th>Returns<tr><td><dl>A promise that will be fulfilled
+     with the callback result.</dl></table></div></details></div></div></section><section id="static-functions"><h2>Global Functions</h2><div class="wrap-details public"><div><details class="function"><summary><div><a class="source" href="source/lib/webdriver/promise.js.src.html#l208">code &raquo;</a><span class="member"><a name="webdriver.promise.Thenable.addImplementation">webdriver.promise.Thenable.addImplementation</a> <span class="args">( ctor )</span></span></div><p>Adds a property to a class prototype to allow runtime checks of whether
+ instances of that class implement the Thenable interface. This function will
+ also ensure the prototype's <code >then</code> function is exported from compiled
+ code.</summary><div class="info"><table><tbody><tr><th>Parameters<tr><td><dl><dt>ctor: <code class="type">function(new: <a href="interface_webdriver_promise_Thenable.html">webdriver.promise.Thenable</a>, ?)</code><dd>The
+     constructor whose prototype to modify.</dl></table></div></details></div></div><div class="wrap-details public"><div><details class="function"><summary><div><a class="source" href="source/lib/webdriver/promise.js.src.html#l231">code &raquo;</a><span class="member"><a name="webdriver.promise.Thenable.isImplementation">webdriver.promise.Thenable.isImplementation</a> <span class="args">( object )</span> &rArr; <code class="type"><a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Boolean">boolean</a></code></span></div><p>Checks if an object has been tagged for implementing the Thenable interface
+ as defined by <code  class="type"><a href="interface_webdriver_promise_Thenable.html#webdriver.promise.Thenable.addImplementation">webdriver.promise.Thenable.addImplementation</a></code>.</summary><div class="info"><table><tbody><tr><th>Parameters<tr><td><dl><dt>object: <code class="type">*</code><dd>The object to test.</dl><tr><th>Returns<tr><td><dl>Whether the object is an implementation of the Thenable
+     interface.</dl></table></div></details></div></div></section><section id="static-properties"><h2>Global Properties</h2><div class="wrap-details private"><div><details><summary><div><a class="source" href="source/lib/webdriver/promise.js.src.html#l197">code &raquo;</a><span class="member"><a name="webdriver.promise.Thenable.IMPLEMENTED_BY_PROP_">webdriver.promise.Thenable.IMPLEMENTED_BY_PROP_</a> : <code class="type"><a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/String">string</a></code></span></div><p>Property used to flag constructor's as implementing the Thenable interface
+ for runtime type checking.</summary></details></div></div></section></main><nav id="topnav"><div><div id="menubutton"><label for="sidenav-toggle">Menu</label></div><form id="searchbox"><div><input type="search" placeholder="Search" tabindex="1"></div></form></div></nav><nav id="sidenav"><input type="checkbox" id="sidenav-types-ctrl" /><input type="checkbox" id="sidenav-files-ctrl" /><input type="checkbox" id="sidenav-modules-ctrl" /><a id="sidenav-overview"><div><h4>Overview</h4></div></a><div id="sidenav-types"><label for="sidenav-types-ctrl"><h4>Types</h4></label><i>Loading</i></div><div id="sidenav-modules"><label for="sidenav-modules-ctrl"><h4>Modules</h4></label><i>Loading</i></div><div id="sidenav-files"><label for="sidenav-files-ctrl"><h4>Files</h4></label><i>Loading</i></div><a href="license.html"><div><h4>License</h4></div></a></nav><div id="push-footer"></div></div><footer><a href="https://github.com/jleyba/js-dossier">Generated by dossier</a></footer><script src="types.js"></script><script src="dossier.js"></script>

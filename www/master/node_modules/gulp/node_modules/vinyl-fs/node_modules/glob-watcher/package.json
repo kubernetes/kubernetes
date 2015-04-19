@@ -1,0 +1,49 @@
+{
+  "name": "glob-watcher",
+  "description": "Watch globs",
+  "version": "0.0.6",
+  "homepage": "http://github.com/wearefractal/glob-watcher",
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/wearefractal/glob-watcher.git"
+  },
+  "author": {
+    "name": "Fractal",
+    "email": "contact@wearefractal.com",
+    "url": "http://wearefractal.com/"
+  },
+  "main": "./index.js",
+  "dependencies": {
+    "gaze": "^0.5.1"
+  },
+  "devDependencies": {
+    "mocha": "^1.17.0",
+    "should": "^2.1.1",
+    "mocha-lcov-reporter": "0.0.1",
+    "coveralls": "^2.6.1",
+    "istanbul": "^0.2.3",
+    "rimraf": "^2.2.5",
+    "jshint": "^2.4.1",
+    "mkdirp": "^0.3.5"
+  },
+  "scripts": {
+    "test": "mocha --reporter spec && jshint",
+    "coveralls": "istanbul cover _mocha --report lcovonly -- -R spec && cat ./coverage/lcov.info | coveralls && rm -rf ./coverage"
+  },
+  "engines": {
+    "node": ">= 0.9"
+  },
+  "licenses": [
+    {
+      "type": "MIT",
+      "url": "http://github.com/wearefractal/glob-watcher/raw/master/LICENSE"
+    }
+  ],
+  "readme": "# glob-watcher [![NPM version][npm-image]][npm-url] [![Build Status][travis-image]][travis-url] [![Coveralls Status][coveralls-image]][coveralls-url] [![Dependency Status][david-image]][david-url]\n\n## Information\n\n<table>\n<tr> \n<td>Package</td><td>glob-watcher</td>\n</tr>\n<tr>\n<td>Description</td>\n<td>Watch globs</td>\n</tr>\n<tr>\n<td>Node Version</td>\n<td>>= 0.9</td>\n</tr>\n</table>\n\n## Usage\n\n```javascript\nvar watch = require('glob-watcher');\n\n// callback interface\nwatch([\"./*.js\", \"!./something.js\"], function(evt){\n  // evt has what file changed and all that jazz\n});\n\n// EE interface\nvar watcher = watch([\"./*.js\", \"!./something.js\"]);\nwatcher.on('change', function(evt) {\n  // evt has what file changed and all that jazz\n});\n\n// add files after it has been created\nwatcher.add(\"./somefolder/somefile.js\");\n```\n\n\n[npm-url]: https://npmjs.org/package/glob-watcher\n[npm-image]: https://badge.fury.io/js/glob-watcher.png\n\n[travis-url]: https://travis-ci.org/wearefractal/glob-watcher\n[travis-image]: https://travis-ci.org/wearefractal/glob-watcher.png?branch=master\n\n[coveralls-url]: https://coveralls.io/r/wearefractal/glob-watcher\n[coveralls-image]: https://coveralls.io/repos/wearefractal/glob-watcher/badge.png\n\n[depstat-url]: https://david-dm.org/wearefractal/glob-watcher\n[depstat-image]: https://david-dm.org/wearefractal/glob-watcher.png\n\n[david-url]: https://david-dm.org/wearefractal/glob-watcher\n[david-image]: https://david-dm.org/wearefractal/glob-watcher.png?theme=shields.io\n",
+  "readmeFilename": "README.md",
+  "bugs": {
+    "url": "https://github.com/wearefractal/glob-watcher/issues"
+  },
+  "_id": "glob-watcher@0.0.6",
+  "_from": "glob-watcher@^0.0.6"
+}

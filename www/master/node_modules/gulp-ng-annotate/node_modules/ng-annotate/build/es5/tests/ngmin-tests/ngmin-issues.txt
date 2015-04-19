@@ -1,0 +1,56 @@
+list updated 2014-06-12
+
+the lists below are correct to my knowledge, if not please let me know!
+
+ngmin issues that just works in ng-annotate:
+--------------------------------------------
+#99 Fails on certain regex string.
+#98 Issue with routeProvider when resolve option
+#96 Make it works with Browserify module structure
+#91 ngmin 30x is slower than ngAnnotate
+#89 Support for javascript enclosures?
+#87 Not working with resolve in ngRoute.
+#85 ngmin is changing things it shouldn't
+#83 Support minification of modal controller
+#78 module.run not being annotated
+#77 Still does not annotate directive.controller
+  - second example needs an explicit /* @ngInject */
+#73 Support minification of ngAnimate enhancement
+#70 The future of ngmin
+  - ng-annotate is actively maintained
+#64 minifications fails
+#63 Files with components that containt angular components both minification ready and not ready
+#61 Add plug-able annotation system enhancement
+#59 Support for http interceptors
+#57 Injector returned by angular.bootstrap is not treated
+#56 add test to be sure that .decorator function is properly parsed
+#54 Support for ui-router resolve, onEnter and onExit enhancement
+#50 ngmin fails to annotate a declaration if it follows an annotated one bug
+#46 Support for Run
+#43 Decorators not properly annotated
+#42 Support for components wrapped in IIFE
+#37 Support minification of $httpProvider.responseInterceptors.push functions enhancement
+#35 Support minification of $routeProvider resolve functions enhancement
+#22 Support anonymous factory
+
+ngmin issues that works in ng-annotate by adding an explicit /* @ngInject */:
+-----------------------------------------------------------------------------
+#84 Support services as function references
+#81 Support injector().invoke
+#79 Support minification of module providers
+#69 Certain style of directives do not get their controllers min safed
+#65 Is there a way to detect and minify controller inside a controller?
+  - (example in issue comment works as-is)
+
+ngmin bug issues not included in the lists above:
+-------------------------------------------------
+#95 Unexpected token ILLEGAL Use --force to continue
+
+ngmin feature request issues where ng-annotate also lacks the feature:
+----------------------------------------------------------------------
+#88 Use "strict DI mode" enhancement
+#86 Inclusion in grunt-contrib-uglify
+#51 Fixes #19 - Add support for source-map generation
+#44 Dynamic Analysis bonus points enhancement
+#19 source map support enhancement
+#12 Group chainable methods enhancement

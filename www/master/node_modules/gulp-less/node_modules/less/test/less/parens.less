@@ -1,0 +1,45 @@
+.parens {
+  @var: 1px;
+  border: (@var * 2) solid black;
+  margin: (@var * 1) (@var + 2) (4 * 4) 3;
+  width: (6 * 6);
+  padding: 2px (6 * 6px);
+}
+
+.more-parens {
+  @var: (2 * 2);
+  padding: (2 * @var) 4 4 (@var * 1px);
+  width-all: ((@var * @var) * 6);
+  width-first: ((@var * @var)) * 6;
+  width-keep: (@var * @var) * 6;
+  height-keep: (7 * 7) + (8 * 8);
+  height-all: ((7 * 7) + (8 * 8));
+  height-parts: ((7 * 7)) + ((8 * 8));
+  margin-keep: (4 * (5 + 5) / 2) - (@var * 2);
+  margin-parts: ((4 * (5 + 5) / 2)) - ((@var * 2));
+  margin-all: ((4 * (5 + 5) / 2) + (-(@var * 2)));
+  border-radius-keep: 4px * (1 + 1) / @var + 3px;
+  border-radius-parts: ((4px * (1 + 1))) / ((@var + 3px));
+  border-radius-all: (4px * (1 + 1) / @var + 3px);
+  //margin: (6 * 6)px;
+}
+
+.negative {
+  @var: 1;
+  neg-var: -@var; // -1 ?
+  neg-var-paren: -(@var); // -(1) ?
+}
+
+.nested-parens {
+  width: 2 * (4 * (2 + (1 + 6))) - 1;
+  height: ((2 + 3) * (2 + 3) / (9 - 4)) + 1;
+}
+
+.mixed-units {
+  margin: 2px 4em 1 5pc;
+  padding: (2px + 4px) 1em 2px 2;
+}
+
+.test-false-negatives {
+  a: ~"(";
+}

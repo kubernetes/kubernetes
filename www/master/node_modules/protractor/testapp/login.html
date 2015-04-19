@@ -1,0 +1,25 @@
+<html>
+  <head>
+    <title>Test Application Login</title>
+    <script>
+      function login() {
+        // Make sure everything works when the login is slow.
+        window.setTimeout(function() {
+          // Set a simple cookie.
+          var username = document.getElementById('username').value;
+          var password = document.getElementById('password').value;
+
+          document.cookie = 'testcookie=' + username + '-' + password;
+
+          window.location.assign('index.html');
+        }, 2000);
+      };
+    </script>
+  </head>
+  <body>
+    <div>Login</div>
+    <div><label>Username</label><input id="username" type="text"/></div>
+    <div><label>Password</label><input id="password" type="text"/></div>
+    <div><button id="clickme" onClick="login()">Go</button></div>
+  </body>
+</html>

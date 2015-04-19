@@ -1,0 +1,47 @@
+{
+  "name": "boom",
+  "description": "HTTP-friendly error objects",
+  "version": "0.4.2",
+  "author": {
+    "name": "Eran Hammer",
+    "email": "eran@hueniverse.com",
+    "url": "http://hueniverse.com"
+  },
+  "contributors": [],
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/spumko/boom"
+  },
+  "main": "index",
+  "keywords": [
+    "error",
+    "http"
+  ],
+  "engines": {
+    "node": ">=0.8.0"
+  },
+  "dependencies": {
+    "hoek": "0.9.x"
+  },
+  "devDependencies": {
+    "lab": "0.1.x",
+    "complexity-report": "0.x.x"
+  },
+  "scripts": {
+    "test": "make test-cov"
+  },
+  "licenses": [
+    {
+      "type": "BSD",
+      "url": "http://github.com/spumko/boom/raw/master/LICENSE"
+    }
+  ],
+  "readme": "<a href=\"https://github.com/spumko\"><img src=\"https://raw.github.com/spumko/spumko/master/images/from.png\" align=\"right\" /></a>\n![boom Logo](https://raw.github.com/spumko/boom/master/images/boom.png)\n\nHTTP-friendly error objects\n\n[![Build Status](https://secure.travis-ci.org/spumko/boom.png)](http://travis-ci.org/spumko/boom)\n",
+  "readmeFilename": "README.md",
+  "bugs": {
+    "url": "https://github.com/spumko/boom/issues"
+  },
+  "homepage": "https://github.com/spumko/boom",
+  "_id": "boom@0.4.2",
+  "_from": "boom@0.4.x"
+}

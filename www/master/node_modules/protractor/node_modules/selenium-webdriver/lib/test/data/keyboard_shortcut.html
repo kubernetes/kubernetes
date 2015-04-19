@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<body style="background: white">
+<div style="background: red">CTRL + 1: red</div>
+<div style="background: green">SHIFT + 1: green</div>
+<div style="background: yellow">CTRL + SHIFT + 1: yellow</div>
+<div style="background: lightblue">ALT + 1: lightblue</div>
+<div style="background: lightgreen">CTRL + ALT + 1: lightgreen</div>
+<div style="background: silver">SHIFT + ALT + 1: silver</div>
+<div style="background: magenta">CTRL + SHIFT + ALT + 1: magenta</div>
+<script>
+  var colors = {};
+  colors[0x001] = 'red';
+  colors[0x010] = 'green';
+  colors[0x011] = 'yellow';
+  colors[0x100] = 'lightblue';
+  colors[0x101] = 'lightgreen';
+  colors[0x110] = 'silver';
+  colors[0x111] = 'magenta';
+
+  document.onkeydown = function(e) {
+    if (e.keyCode != 49) return;
+    var mask = 0;
+    if (e.ctrlKey) mask |= 0x001;
+    if (e.shiftKey) mask |= 0x010;
+    if (e.altKey) mask |= 0x100;
+
+    console.log(mask);
+    if (mask) {
+      document.body.style.backgroundColor = colors[mask];
+    }
+
+    e.preventDefault();
+    e.stopPropagation();
+    return false;
+  };
+</script>

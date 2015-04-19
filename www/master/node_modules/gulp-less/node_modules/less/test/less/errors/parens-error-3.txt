@@ -1,0 +1,4 @@
+SyntaxError: expected ')' got '-' in {path}parens-error-3.less on line 2, column 29:
+1 .a {
+2   something: (12 + (13 + 10 -23));
+3 }

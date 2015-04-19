@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Page with overflow</title>
+  <style>
+    #over {
+      width:400px;
+      height: 300px;
+      overflow-x: scroll;
+      overflow-y: hidden;
+    }
+  </style>
+</head>
+<body>
+  <div id="over">
+    <div style="width: 5000px;">
+      <div style="width: 100%; text-align: right;" ><a href="#" id="right" onclick="document.getElementById('right-clicked').innerText='ok'">Click right</a></div>
+    </div>
+    <div style="height: 5000px; width: 5000px;">
+      Right clicked: <span id="right-clicked"></span></br>
+      Bottom clicked: <span id="bottom-clicked"></span></br>
+      Bottom-right clicked: <span id="bottom-right-clicked"></span></br>
+    </div>
+    <div style="width: 5000px;">
+      <div style="width: 100%; text-align: right;" ><a href="#" id="bottom-right" onclick="document.getElementById('bottom-right-clicked').innerText='ok'">Click bottom-right</a></div>
+    </div>
+    <a href="#" id="bottom" onclick="document.getElementById('bottom-clicked').innerText='ok'">Click bottom</a>
+  </div>
+</body>
+</html>

@@ -1,0 +1,30 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+
+<html>
+    <head>
+        <title>Javascript Enhanced Page</title>
+    </head>
+    <body>
+        <form id="form1" action="javascriptEnhancedForm.html" method="post">
+            <p>
+                <label id="labelforusername" for="username">
+                    Username: <input id="username" type="text" name="username" />
+                    <script type="text/javascript">
+                        document.getElementById('username').value = 'Michael';
+                    </script>
+                </label>
+            </p>
+            <p>
+                <label for="password">
+                    Password: <input id="password" type="password" name="password" />
+                    <script type="text/javascript">
+                        var z = document.getElementById('password'); setTimeout('try{z.focus();z.select();} catch(e) {}', 1);
+                    </script>
+                </label>
+            </p>
+            <p>
+                <input type="submit" value="Submit" />
+            </p>
+        </form>
+    </body>
+</html>

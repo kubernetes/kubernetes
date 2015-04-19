@@ -1,0 +1,54 @@
+# Compiled source #
+###################
+*.com
+*.class
+*.dll
+*.exe
+*.o
+*.so
+
+# OS generated files #
+######################
+.DS_Store*
+ehthumbs.db
+Icon?
+Thumbs.db
+Desktop.ini
+.Spotlight-V100
+.Trashes
+._*
+
+# NetBeans #
+############
+nbsettings/
+nbproject/
+nbbuild/
+nbdist/
+nbactions.xml
+nb-configuration.xml
+
+# Textmate #
+############
+*.tmproj
+*.tmproject
+tmtags
+
+# VIM #
+#######
+.*.sw[a-z]
+*.un~
+Session.vim
+
+# Sublime TextEditor #
+######################
+*.sublime-project
+
+# Eclipse #
+######################
+/.project
+/.settings
+
+# Node #
+######################
+node_modules
+npm-debug.*

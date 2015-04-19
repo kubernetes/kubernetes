@@ -1,0 +1,4 @@
+NameError: .a is undefined in {path}mixin-not-visible-in-scope-1.less on line 7, column 13:
+6     & {
+7         .b {.a} // was Err. before 1.6.2
+8     }

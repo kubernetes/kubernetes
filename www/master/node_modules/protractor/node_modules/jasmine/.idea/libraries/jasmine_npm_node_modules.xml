@@ -1,0 +1,14 @@
+<component name="libraryTable">
+  <library name="jasmine-npm node_modules" type="javaScript">
+    <properties>
+      <option name="frameworkName" value="node_modules" />
+      <sourceFilesUrls>
+        <item url="file://$PROJECT_DIR$/node_modules" />
+      </sourceFilesUrls>
+    </properties>
+    <CLASSES>
+      <root url="file://$PROJECT_DIR$/node_modules" />
+    </CLASSES>
+    <SOURCES />
+  </library>
+</component>

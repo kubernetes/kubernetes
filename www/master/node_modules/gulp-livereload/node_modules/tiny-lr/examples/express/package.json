@@ -1,0 +1,10 @@
+{
+  "name": "express-lr-sample",
+  "version": "0.0.0",
+  "description": "ERROR: No README.md file found!",
+  "main": "server.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "DEBUG='tinylr tinylr:*' node server.js"
+  }
+}

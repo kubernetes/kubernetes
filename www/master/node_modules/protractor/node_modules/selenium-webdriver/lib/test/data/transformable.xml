@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?xml-stylesheet type="text/xsl" href="transformable.xsl"?>
+<!DOCTYPE html [ <!ENTITY nbsp "&#160;"> ]>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:html="http://www.w3.org/1999/xhtml" xmlns:ui="http://dummy.com/mynamespace">
+  <body id='body'>
+    <p>Click the button.</p>
+    <ui:app url="xhtmlTest.html">
+      <ui:someButton id="x" name="y">Go to another page</ui:someButton>
+    </ui:app>
+  </body>
+</html>

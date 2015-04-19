@@ -1,0 +1,56 @@
+<html>
+  <head>
+    <script type="text/javascript" src="https://www.google.com/jsapi"></script>
+    <script type="text/javascript">
+      google.load("visualization", "1", {packages:["timeline"]});
+      google.setOnLoadCallback(drawChart);
+
+      function drawChart() {
+        var xmlhttp = new XMLHttpRequest();
+        var url = "timeline.json";
+
+        xmlhttp.onreadystatechange = function() {
+        if (xmlhttp.readyState == 4 && xmlhttp.status == 200) {
+            var data = JSON.parse(xmlhttp.responseText);
+            actualDraw(data);
+          }
+        }
+
+        xmlhttp.open("GET", url, true);
+        xmlhttp.send();
+
+        function actualDraw(data) {
+          var container = document.getElementById('timeline');
+          var chart = new google.visualization.Timeline(container);
+          var dataTable = new google.visualization.DataTable();
+
+          dataTable.addColumn({ type: 'string', id: 'Source' });
+          dataTable.addColumn({ type: 'string', id: 'Command' });
+          dataTable.addColumn({ type: 'number', id: 'Start' });
+          dataTable.addColumn({ type: 'number', id: 'End' });
+          for (var i = 0; i < data.length; ++i) {
+            var event = data[i];
+            if (!event.start && event.end) {
+              continue;
+            }
+            var row = [];
+            row.push(event.source);
+            row.push(event.command.name_ || event.command);
+            row.push(event.start);
+            row.push(event.end);
+            dataTable.addRow(row);
+          }
+
+          var options = {
+            timeline: { colorByRowLabel: true }
+          };
+
+          chart.draw(dataTable, options);
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <div id="timeline" style="width: 900px; height: 400px;"></div>
+  </body>
+</html>

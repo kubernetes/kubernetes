@@ -1,0 +1,31 @@
+.code {
+  width: 500px;
+  height: 500px;
+  display: block;
+}
+
+.config {
+  width: 500px;
+  height: 400px;
+  display: block;
+}
+
+.go {
+  display: block;
+  float: right;
+  font-size: 18px;
+}
+
+.result {
+  width: 500px;
+  height: 1000px;
+  display: block;
+}
+
+.edit {
+  float: left;
+}
+
+.results {
+  float: left;
+}

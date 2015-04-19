@@ -1,0 +1,14 @@
+{
+  "name": "bind",
+  "version": "0.0.1",
+  "description": "function binding utility",
+  "keywords": [
+    "bind",
+    "utility"
+  ],
+  "dependencies": {},
+  "scripts": [
+    "index.js"
+  ],
+  "repo": "https://raw.github.com/component/bind"
+}

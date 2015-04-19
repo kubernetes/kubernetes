@@ -1,0 +1,21 @@
+pi-test {
+  border: 0;
+  @not-variable: @not-variable;
+  ufo-width: 50%;
+  *-z-border: 1px dashed blue;
+  -www-border-top: 2px;
+  radius-is-not-a-border: true;
+  border-top-left-radius: 2em;
+  border-top-red-radius-: 3pt;
+  global-local-mixer-property: strong;
+}
+pi-test-merge {
+  pre-property-ish: high, middle, low, base;
+  pre-property-ish+: nice try dude;
+}
+pi-indirect-vars {
+  auto: auto;
+}
+pi-complex-values {
+  3px rgba(255, 255, 0, 0.5), 3.141592653589793 /* foo */3px rgba(255, 255, 0, 0.5), 3.141592653589793 /* foo */: none;
+}

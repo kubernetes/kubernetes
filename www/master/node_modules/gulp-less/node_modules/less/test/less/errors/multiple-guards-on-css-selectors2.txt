@@ -1,0 +1,4 @@
+SyntaxError: Guards are only currently allowed on a single selector. in {path}multiple-guards-on-css-selectors2.less on line 3, column 23:
+2 .a,
+3 .b when (@ie8 = true) {
+4 }

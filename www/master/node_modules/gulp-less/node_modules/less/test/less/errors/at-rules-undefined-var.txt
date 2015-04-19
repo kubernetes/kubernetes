@@ -1,0 +1,4 @@
+NameError: variable @name is undefined in {path}at-rules-undefined-var.less on line 2, column 12:
+1 
+2 @keyframes @name {
+3     50% {width: 20px;}

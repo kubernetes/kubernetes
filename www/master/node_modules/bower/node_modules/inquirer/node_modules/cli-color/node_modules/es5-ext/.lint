@@ -1,0 +1,38 @@
+@root
+
+module
+
+indent 2
+maxlen 100
+tabs
+
+ass
+continue
+forin
+nomen
+plusplus
+vars
+
+./global.js
+./function/_define-length.js
+./function/#/copy.js
+./object/unserialize.js
+./test/function/valid-function.js
+evil
+
+./math/_pack-ieee754.js
+./math/_unpack-ieee754.js
+./math/clz32/shim.js
+./math/imul/shim.js
+./number/to-uint32.js
+./string/#/at.js
+bitwise
+
+./math/fround/shim.js
+predef+ Float32Array
+
+./object/first-key.js
+forin
+
+./test/reg-exp/#/index.js
+predef+ __dirname

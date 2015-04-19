@@ -1,0 +1,4 @@
+SyntaxError: properties must be inside selector blocks, they cannot be in the root. in {path}detached-ruleset-3.less on line 2, column 3:
+1 @a: {
+2   b: 1;
+3 };

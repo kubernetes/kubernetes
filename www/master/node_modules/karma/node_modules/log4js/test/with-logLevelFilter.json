@@ -1,0 +1,41 @@
+{
+  "appenders": [
+    { 
+      "category": "tests", 
+      "type": "logLevelFilter",
+      "level": "WARN",
+      "appender": {
+        "type": "file",
+        "filename": "test/logLevelFilter-warnings.log", 
+        "layout": { 
+          "type": "messagePassThrough" 
+        } 
+      }
+    },
+    {
+      "category": "tests",
+      "type": "logLevelFilter",
+      "level": "TRACE",
+      "maxLevel": "DEBUG",
+      "appender": {
+        "type": "file",
+        "filename": "test/logLevelFilter-debugs.log",
+        "layout": {
+          "type": "messagePassThrough"
+          }
+        }
+    },
+    { 
+      "category": "tests", 
+      "type": "file",
+      "filename": "test/logLevelFilter.log", 
+      "layout": { 
+        "type": "messagePassThrough" 
+      } 
+    }
+  ],
+  
+  "levels": {
+    "tests":  "TRACE"
+  }
+}

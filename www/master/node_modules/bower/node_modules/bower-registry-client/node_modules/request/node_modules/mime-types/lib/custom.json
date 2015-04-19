@@ -1,0 +1,27 @@
+{
+  "text/jade": [
+    "jade"
+  ],
+  "text/stylus": [
+    "stylus",
+    "styl"
+  ],
+  "text/less": [
+    "less"
+  ],
+  "text/x-sass": [
+    "sass"
+  ],
+  "text/x-scss": [
+    "scss"
+  ],
+  "text/coffeescript": [
+    "coffee"
+  ],
+  "text/x-handlebars-template": [
+    "hbs"
+  ],
+  "text/jsx": [
+    "jsx"
+  ]
+}

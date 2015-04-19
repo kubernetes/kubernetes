@@ -1,0 +1,261 @@
+Dec 23, 2014 7:59:17 PM org.openqa.grid.selenium.GridLauncher main
+INFO: Launching a standalone server
+Setting system property webdriver.ie.driver to D:\selenium\IEDriverServer.exe
+Setting system property webdriver.ie.driver.logfile to c:\log\iedriver.log
+Setting system property webdriver.ie.driver.loglevel to DEBUG
+Setting system property http.proxyHost to maki77193.miso
+Setting system property http.proxyPort to 33128
+Setting system property http.nonProxyHosts to "localhost|127.0.0.1"
+Setting system property https.proxyHost to maki77193.miso
+Setting system property https.proxyPort to 33128
+Setting system property https.nonProxyHosts to "localhost|127.0.0.1"
+19:59:17.466 INFO - Java: Oracle Corporation 24.60-b09
+19:59:17.472 INFO - OS: Windows Server 2008 R2 6.1 x86
+19:59:17.504 INFO - v2.40.0, with Core v2.40.0. Built from revision fbe29a9
+19:59:18.069 INFO - RemoteWebDriver instances should connect to: http://127.0.0.1:4443/wd/hub
+19:59:18.075 INFO - Version Jetty/5.1.x
+19:59:18.079 INFO - Started HttpContext[/selenium-server/driver,/selenium-server/driver]
+19:59:18.080 INFO - Started HttpContext[/selenium-server,/selenium-server]
+19:59:18.080 INFO - Started HttpContext[/,/]
+19:59:18.210 INFO - Started org.openqa.jetty.jetty.servlet.ServletHandler@149959a
+19:59:18.210 INFO - Started HttpContext[/wd,/wd]
+19:59:18.220 INFO - Started SocketListener on 0.0.0.0:4443
+19:59:18.220 INFO - Started org.openqa.jetty.jetty.Server@150f0a7
+19:59:20.171 INFO - Executing: [new session: Capabilities [{count=1, browserName=internet explorer, webdriver.remote.quietExceptions=true}]] at URL: /session)
+19:59:20.216 INFO - Creating a new session for Capabilities [{count=1, browserName=internet explorer, webdriver.remote.quietExceptions=true}]
+Started InternetExplorerDriver server (32-bit)
+2.42.0.0
+Listening on port 28134
+Log level is set to DEBUG
+Log file is set to c:\log\iedriver.log
+19:59:23.420 INFO - I/O exception (java.net.SocketException) caught when processing request: Software caused connection abort: recv failed
+19:59:23.420 INFO - Retrying request
+19:59:23.595 INFO - Done: /session
+19:59:23.768 INFO - Executing: [execute script: return screen.width, []] at URL: /session/c163949d-96b2-44e0-9d06-653a863a4a90/execute)
+19:59:23.855 INFO - Done: /session/c163949d-96b2-44e0-9d06-653a863a4a90/execute
+19:59:23.863 INFO - Executing: [execute script: return screen.height, []] at URL: /session/c163949d-96b2-44e0-9d06-653a863a4a90/execute)
+19:59:23.907 INFO - Done: /session/c163949d-96b2-44e0-9d06-653a863a4a90/execute
+19:59:23.913 INFO - Executing: [set window position] at URL: /session/c163949d-96b2-44e0-9d06-653a863a4a90/window/current/position)
+19:59:23.940 INFO - Done: /session/c163949d-96b2-44e0-9d06-653a863a4a90/window/current/position
+19:59:23.949 INFO - Executing: [set window size] at URL: /session/c163949d-96b2-44e0-9d06-653a863a4a90/window/current/size)
+19:59:23.999 INFO - Done: /session/c163949d-96b2-44e0-9d06-653a863a4a90/window/current/size
+19:59:24.006 INFO - Executing: [maximise window] at URL: /session/c163949d-96b2-44e0-9d06-653a863a4a90/window/current/maximize)
+19:59:24.049 INFO - Done: /session/c163949d-96b2-44e0-9d06-653a863a4a90/window/current/maximize
+19:59:24.056 INFO - Executing: [get window handles] at URL: /session/c163949d-96b2-44e0-9d06-653a863a4a90/window_handles)
+19:59:24.060 INFO - Done: /session/c163949d-96b2-44e0-9d06-653a863a4a90/window_handles
+19:59:24.163 INFO - Executing: [set script timeoutt: 11000] at URL: /session/c163949d-96b2-44e0-9d06-653a863a4a90/timeouts/async_script)
+19:59:24.209 INFO - Done: /session/c163949d-96b2-44e0-9d06-653a863a4a90/timeouts/async_script
+19:59:24.326 INFO - Executing: [fetching available log types] at URL: /session/c163949d-96b2-44e0-9d06-653a863a4a90/log/types)
+19:59:24.345 WARN - Exception thrown
+org.openqa.selenium.WebDriverException: Command not found: GET /session/6944190b-14c8-4d68-9822-85718b9425ea/log/types
+Command duration or timeout: 6 milliseconds
+Build info: version: '2.40.0', revision: 'fbe29a9', time: '2014-02-19 20:54:28'
+System info: host: 'WIN-8LIIH1BGM1D', ip: '172.20.33.134', os.name: 'Windows Server 2008 R2', os.arch: 'x86', os.version: '6.1', java.version: '1.7.0_60'
+Session ID: 6944190b-14c8-4d68-9822-85718b9425ea
+Driver info: org.openqa.selenium.ie.InternetExplorerDriver
+Capabilities [{platform=WINDOWS, javascriptEnabled=true, elementScrollBehavior=0, ignoreZoomSetting=false, enablePersistentHover=true, ie.ensureCleanSession=false, browserName=internet explorer, enableElementCacheCleanup=true, unexpectedAlertBehaviour=dismiss, version=11, ie.usePerProcessProxy=false, cssSelectorsEnabled=true, ignoreProtectedModeSettings=false, requireWindowFocus=false, handlesAlerts=true, initialBrowserUrl=http://localhost:28134/, ie.forceCreateProcessApi=false, nativeEvents=true, browserAttachTimeout=0, ie.browserCommandLineSwitches=, takesScreenshot=true}]
+  at sun.reflect.NativeConstructorAccessorImpl.newInstance0(Native Method)
+  at sun.reflect.NativeConstructorAccessorImpl.newInstance(Unknown Source)
+  at sun.reflect.DelegatingConstructorAccessorImpl.newInstance(Unknown Source)
+  at java.lang.reflect.Constructor.newInstance(Unknown Source)
+  at org.openqa.selenium.remote.ErrorHandler.createThrowable(ErrorHandler.java:193)
+  at org.openqa.selenium.remote.ErrorHandler.throwIfResponseFailed(ErrorHandler.java:145)
+  at org.openqa.selenium.remote.RemoteWebDriver.execute(RemoteWebDriver.java:573)
+  at org.openqa.selenium.remote.RemoteWebDriver.execute(RemoteWebDriver.java:588)
+  at org.openqa.selenium.remote.RemoteExecuteMethod.execute(RemoteExecuteMethod.java:32)
+  at org.openqa.selenium.remote.RemoteLogs.getAvailableLogTypes(RemoteLogs.java:87)
+  at org.openqa.selenium.remote.server.handler.GetAvailableLogTypesHandler.call(GetAvailableLogTypesHandler.java:35)
+  at org.openqa.selenium.remote.server.handler.GetAvailableLogTypesHandler.call(GetAvailableLogTypesHandler.java:1)
+  at java.util.concurrent.FutureTask.run(Unknown Source)
+  at org.openqa.selenium.remote.server.DefaultSession$1.run(DefaultSession.java:170)
+  at java.util.concurrent.ThreadPoolExecutor.runWorker(Unknown Source)
+  at java.util.concurrent.ThreadPoolExecutor$Worker.run(Unknown Source)
+  at java.lang.Thread.run(Unknown Source)
+19:59:24.354 WARN - Exception: Command not found: GET /session/6944190b-14c8-4d68-9822-85718b9425ea/log/types
+Command duration or timeout: 6 milliseconds
+Build info: version: '2.40.0', revision: 'fbe29a9', time: '2014-02-19 20:54:28'
+System info: host: 'WIN-8LIIH1BGM1D', ip: '172.20.33.134', os.name: 'Windows Server 2008 R2', os.arch: 'x86', os.version: '6.1', java.version: '1.7.0_60'
+Session ID: 6944190b-14c8-4d68-9822-85718b9425ea
+Driver info: org.openqa.selenium.ie.InternetExplorerDriver
+Capabilities [{platform=WINDOWS, javascriptEnabled=true, elementScrollBehavior=0, ignoreZoomSetting=false, enablePersistentHover=true, ie.ensureCleanSession=false, browserName=internet explorer, enableElementCacheCleanup=true, unexpectedAlertBehaviour=dismiss, version=11, ie.usePerProcessProxy=false, cssSelectorsEnabled=true, ignoreProtectedModeSettings=false, requireWindowFocus=false, handlesAlerts=true, initialBrowserUrl=http://localhost:28134/, ie.forceCreateProcessApi=false, nativeEvents=true, browserAttachTimeout=0, ie.browserCommandLineSwitches=, takesScreenshot=true}]
+19:59:24.599 INFO - Executing: [get: about:blank] at URL: /session/c163949d-96b2-44e0-9d06-653a863a4a90/url)
+19:59:24.832 INFO - Done: /session/c163949d-96b2-44e0-9d06-653a863a4a90/url
+19:59:25.027 INFO - Executing: [execute script: window.name = "NG_DEFER_BOOTSTRAP!" + window.name;window.location.replace("http://localhost:8081/index.html#/async");, []] at URL: /session/c163949d-96b2-44e0-9d06-653a863a4a90/execute)
+19:59:25.073 INFO - Done: /session/c163949d-96b2-44e0-9d06-653a863a4a90/execute
+19:59:25.288 INFO - Executing: [execute script: return window.location.href;, []] at URL: /session/c163949d-96b2-44e0-9d06-653a863a4a90/execute)
+19:59:25.327 INFO - Done: /session/c163949d-96b2-44e0-9d06-653a863a4a90/execute
+19:59:25.541 INFO - Executing: [execute async script: try { return (function (attempts, asyncCallback) {
+  var callback = function(args) {
+    setTimeout(function() {
+      asyncCallback(args);
+    }, 0);
+  };
+  var check = function(n) {
+    try {
+      if (window.angular && window.angular.resumeBootstrap) {
+        callback([true, null]);
+      } else if (n < 1) {
+        if (window.angular) {
+          callback([false, 'angular never provided resumeBootstrap']);
+        } else {
+          callback([false, 'retries looking for angular exceeded']);
+        }
+      } else {
+        window.setTimeout(function() {check(n - 1);}, 1000);
+      }
+    } catch (e) {
+      callback([false, e]);
+    }
+  };
+  check(attempts);
+}).apply(this, arguments); }
+catch(e) { throw (e instanceof Error) ? e : new Error(e); }, [10]] at URL: /session/c163949d-96b2-44e0-9d06-653a863a4a90/execute_async)
+19:59:25.613 INFO - Done: /session/c163949d-96b2-44e0-9d06-653a863a4a90/execute_async
+19:59:25.717 INFO - Executing: [execute script: return (function () {
+    angular.module('protractorBaseModule_', []).
+        config(['$compileProvider', function($compileProvider) {
+          if ($compileProvider.debugInfoEnabled) {
+            $compileProvider.debugInfoEnabled(true);
+          }
+        }]);
+  }).apply(null, arguments);, []] at URL: /session/c163949d-96b2-44e0-9d06-653a863a4a90/execute)
+19:59:25.751 INFO - Done: /session/c163949d-96b2-44e0-9d06-653a863a4a90/execute
+19:59:25.954 INFO - Executing: [execute script: angular.resumeBootstrap(arguments[0]);, [[protractorBaseModule_]]] at URL: /session/c163949d-96b2-44e0-9d06-653a863a4a90/execute)
+19:59:26.064 INFO - Done: /session/c163949d-96b2-44e0-9d06-653a863a4a90/execute
+19:59:26.560 INFO - Executing: [execute async script: try { return (function (rootSelector, callback) {
+  var el = document.querySelector(rootSelector);
+
+  try {
+    if (!window.angular) {
+      throw new Error('angular could not be found on the window');
+    }
+    if (angular.getTestability) {
+      angular.getTestability(el).whenStable(callback);
+    } else {
+      if (!angular.element(el).injector()) {
+        throw new Error('root element (' + rootSelector + ') has no injector.' +
+           ' this may mean it is not inside ng-app.');
+      }
+      angular.element(el).injector().get('$browser').
+          notifyWhenNoOutstandingRequests(callback);
+    }
+  } catch (err) {
+    callback(err.message);
+  }
+}).apply(this, arguments); }
+catch(e) { throw (e instanceof Error) ? e : new Error(e); }, [body]] at URL: /session/c163949d-96b2-44e0-9d06-653a863a4a90/execute_async)
+19:59:26.614 INFO - Done: /session/c163949d-96b2-44e0-9d06-653a863a4a90/execute_async
+19:59:26.734 INFO - Executing: [execute script: try { return (function (binding, exactMatch, using, rootSelector) {
+  var root = document.querySelector(rootSelector || 'body');
+  using = using || document;
+  if (angular.getTestability) {
+    return angular.getTestability(root).
+        findBindings(using, binding, exactMatch);
+  }
+  var bindings = using.getElementsByClassName('ng-binding');
+  var matches = [];
+  for (var i = 0; i < bindings.length; ++i) {
+    var dataBinding = angular.element(bindings[i]).data('$binding');
+    if(dataBinding) {
+      var bindingName = dataBinding.exp || dataBinding[0].exp || dataBinding;
+      if (exactMatch) {
+        var matcher = new RegExp('({|\\s|^|\\|)' + binding + '(}|\\s|$|\\|)');
+        if (matcher.test(bindingName)) {
+          matches.push(bindings[i]);
+        }
+      } else {
+        if (bindingName.indexOf(binding) != -1) {
+          matches.push(bindings[i]);
+        }
+      }
+      
+    }
+  }
+  return matches; /* Return the whole array for webdriver.findElements. */
+}).apply(this, arguments); }
+catch(e) { throw (e instanceof Error) ? e : new Error(e); }, [slowHttpStatus, false, null, body]] at URL: /session/c163949d-96b2-44e0-9d06-653a863a4a90/execute)
+19:59:26.780 INFO - Done: /session/c163949d-96b2-44e0-9d06-653a863a4a90/execute
+19:59:26.987 INFO - Executing: [get text: 0 [org.openqa.selenium.remote.RemoteWebElement@55c8cc3e -> unknown locator]] at URL: /session/c163949d-96b2-44e0-9d06-653a863a4a90/element/0/text)
+19:59:27.047 INFO - Done: /session/c163949d-96b2-44e0-9d06-653a863a4a90/element/0/text
+19:59:27.207 INFO - Executing: [execute async script: try { return (function (rootSelector, callback) {
+  var el = document.querySelector(rootSelector);
+
+  try {
+    if (!window.angular) {
+      throw new Error('angular could not be found on the window');
+    }
+    if (angular.getTestability) {
+      angular.getTestability(el).whenStable(callback);
+    } else {
+      if (!angular.element(el).injector()) {
+        throw new Error('root element (' + rootSelector + ') has no injector.' +
+           ' this may mean it is not inside ng-app.');
+      }
+      angular.element(el).injector().get('$browser').
+          notifyWhenNoOutstandingRequests(callback);
+    }
+  } catch (err) {
+    callback(err.message);
+  }
+}).apply(this, arguments); }
+catch(e) { throw (e instanceof Error) ? e : new Error(e); }, [body]] at URL: /session/c163949d-96b2-44e0-9d06-653a863a4a90/execute_async)
+19:59:27.263 INFO - Done: /session/c163949d-96b2-44e0-9d06-653a863a4a90/execute_async
+19:59:27.382 INFO - Executing: [find elements: By.selector: [ng-click="slowHttp()"]] at URL: /session/c163949d-96b2-44e0-9d06-653a863a4a90/elements)
+19:59:27.475 INFO - Done: /session/c163949d-96b2-44e0-9d06-653a863a4a90/elements
+19:59:27.588 INFO - Executing: [click: 1 [[InternetExplorerDriver: internet explorer on WINDOWS (6944190b-14c8-4d68-9822-85718b9425ea)] -> css selector: [ng-click="slowHttp()"]]] at URL: /session/c163949d-96b2-44e0-9d06-653a863a4a90/element/1/click)
+19:59:27.842 INFO - Done: /session/c163949d-96b2-44e0-9d06-653a863a4a90/element/1/click
+19:59:28.110 INFO - Executing: [execute async script: try { return (function (rootSelector, callback) {
+  var el = document.querySelector(rootSelector);
+
+  try {
+    if (!window.angular) {
+      throw new Error('angular could not be found on the window');
+    }
+    if (angular.getTestability) {
+      angular.getTestability(el).whenStable(callback);
+    } else {
+      if (!angular.element(el).injector()) {
+        throw new Error('root element (' + rootSelector + ') has no injector.' +
+           ' this may mean it is not inside ng-app.');
+      }
+      angular.element(el).injector().get('$browser').
+          notifyWhenNoOutstandingRequests(callback);
+    }
+  } catch (err) {
+    callback(err.message);
+  }
+}).apply(this, arguments); }
+catch(e) { throw (e instanceof Error) ? e : new Error(e); }, [body]] at URL: /session/c163949d-96b2-44e0-9d06-653a863a4a90/execute_async)
+19:59:32.842 INFO - Done: /session/c163949d-96b2-44e0-9d06-653a863a4a90/execute_async
+19:59:32.997 INFO - Executing: [execute script: try { return (function (binding, exactMatch, using, rootSelector) {
+  var root = document.querySelector(rootSelector || 'body');
+  using = using || document;
+  if (angular.getTestability) {
+    return angular.getTestability(root).
+        findBindings(using, binding, exactMatch);
+  }
+  var bindings = using.getElementsByClassName('ng-binding');
+  var matches = [];
+  for (var i = 0; i < bindings.length; ++i) {
+    var dataBinding = angular.element(bindings[i]).data('$binding');
+    if(dataBinding) {
+      var bindingName = dataBinding.exp || dataBinding[0].exp || dataBinding;
+      if (exactMatch) {
+        var matcher = new RegExp('({|\\s|^|\\|)' + binding + '(}|\\s|$|\\|)');
+        if (matcher.test(bindingName)) {
+          matches.push(bindings[i]);
+        }
+      } else {
+        if (bindingName.indexOf(binding) != -1) {
+          matches.push(bindings[i]);
+        }
+      }
+      
+    }
+  }
+  return matches; /* Return the whole array for webdriver.findElements. */
+}).apply(this, arguments); }
+catch(e) { throw (e instanceof Error) ? e : new Error(e); }, [slowHttpStatus, false, null, body]] at URL: /session/c163949d-96b2-44e0-9d06-653a863a4a90/execute)
+19:59:33.035 INFO - Done: /session/c163949d-96b2-44e0-9d06-653a863a4a90/execute
+19:59:33.265 INFO - Executing: [get text: 0 [org.openqa.selenium.remote.RemoteWebElement@55c8cc3e -> unknown locator]] at URL: /session/c163949d-96b2-44e0-9d06-653a863a4a90/element/0/text)
+19:59:33.354 INFO - Done: /session/c163949d-96b2-44e0-9d06-653a863a4a90/element/0/text

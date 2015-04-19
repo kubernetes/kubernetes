@@ -1,0 +1,29 @@
+{
+  "name": "is-utf8",
+  "version": "0.2.0",
+  "description": "detect if a buffer is utf8 encoded.",
+  "main": "is-utf8.js",
+  "scripts": {
+    "test": "node test.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/wayfind/is-utf8.git"
+  },
+  "keywords": [
+    "utf8",
+    "charset"
+  ],
+  "author": {
+    "name": "wayfind"
+  },
+  "license": "BSD",
+  "readme": "#utf8 detector\n\nDetect if a Buffer is utf8 encoded\n\n    var fs = require('fs');\n    var isUtf8 = require('is-utf8');\n    var ansi = fs.readFileSync('ansi.txt');\n    var utf8 = fs.readFileSync('utf8.txt');\n    \n    console.log('ansi.txt is utf8: '+isUtf8(ansi));\n    console.log('utf8.txt is utf8: '+isUtf8(utf8));\n    \n",
+  "readmeFilename": "README.md",
+  "bugs": {
+    "url": "https://github.com/wayfind/is-utf8/issues"
+  },
+  "homepage": "https://github.com/wayfind/is-utf8",
+  "_id": "is-utf8@0.2.0",
+  "_from": "is-utf8@^0.2.0"
+}

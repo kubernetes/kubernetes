@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html><head>
+<title>screen test</title>
+<script type="text/javascript" src="screen.js"></script>
+<link rel="stylesheet" type="text/css" href="screen.css" />
+</head>
+<body style="width: 100px; height: 100px;">
+<style>
+#content {
+  width: 100%;
+  height: 100%;
+}
+.row {
+  height: 20px;
+  width: 100%;
+}
+.column {
+  height: 20px;
+  width: 20px;
+}
+</style>
+<table id="content">
+<tr class="row row1">
+<td class="column column1 cell" id="cell11">&nbsp;</td>
+<td class="column column2 cell" id="cell12">&nbsp;</td>
+<td class="column column3 cell" id="cell13">&nbsp;</td>
+<td class="column column4 cell" id="cell14">&nbsp;</td>
+<td class="column column5 cell" id="cell15">&nbsp;</td>
+</tr>
+<tr class="row row2">
+<td class="column column1 cell" id="cell21">&nbsp;</td>
+<td class="column column2 cell" id="cell22">&nbsp;</td>
+<td class="column column3 cell" id="cell23">&nbsp;</td>
+<td class="column column4 cell" id="cell24">&nbsp;</td>
+<td class="column column5 cell" id="cell25">&nbsp;</td>
+</tr>
+<tr class="row row3">
+<td class="column column1 cell" id="cell31">&nbsp;</td>
+<td class="column column2 cell" id="cell32">&nbsp;</td>
+<td class="column column3 cell" id="cell33">&nbsp;</td>
+<td class="column column4 cell" id="cell34">&nbsp;</td>
+<td class="column column5 cell" id="cell35">&nbsp;</td>
+</tr>
+<tr class="row row4">
+<td class="column column1 cell" id="cell41">&nbsp;</td>
+<td class="column column2 cell" id="cell42">&nbsp;</td>
+<td class="column column3 cell" id="cell43">&nbsp;</td>
+<td class="column column4 cell" id="cell44">&nbsp;</td>
+<td class="column column5 cell" id="cell45">&nbsp;</td>
+</tr>
+<tr class="row row5">
+<td class="column column1 cell" id="cell51">&nbsp;</td>
+<td class="column column2 cell" id="cell52">&nbsp;</td>
+<td class="column column3 cell" id="cell53">&nbsp;</td>
+<td class="column column4 cell" id="cell54">&nbsp;</td>
+<td class="column column5 cell" id="cell55">&nbsp;</td>
+</tr>
+</table>
+<script>
+var initialColor = 0x0F0F0F;
+var stepColor = 1000;
+var cnt = 1;
+for (var i = 1; i < 6; i++) {
+  for (var j = 1; j < 6; j++) {
+    el = document.getElementById('cell' + i + '' + j);
+    el.style.backgroundColor = toColor(initialColor + (cnt * stepColor));
+    cnt++;
+  }
+}
+</script>
+</body>
+</html>

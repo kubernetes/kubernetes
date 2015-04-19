@@ -1,0 +1,47 @@
+{
+  "name": "reduce-component",
+  "description": "Array reduce component",
+  "version": "1.0.1",
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/redventures/reduce.git"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "mocha": "*",
+    "should": "*"
+  },
+  "component": {
+    "scripts": {
+      "reduce": "index.js"
+    }
+  },
+  "main": "./index.js",
+  "license": "Apache, Version 2.0",
+  "readme": "\n# reduce\n\n  array reduce\n\n## Installation\n\n```sh\n  $ component install redventures/reduce\n```\n\n## API\n\n```js\nvar reduce = require('reduce');\n\nvar numbers = [0, 1, 2, 3, 4, 5];\n\nvar result = reduce(numbers, function(prev, curr){\n  return prev + curr;\n});\n```\n   \n## License\n\nCopyright 2012 Red Ventures\n\nLicensed under the Apache License, Version 2.0 (the \"License\"); you may not use this work except in compliance with the License. You may obtain a copy of the License in the LICENSE file, or at:\n\nhttp://www.apache.org/licenses/LICENSE-2.0\n\nUnless required by applicable law or agreed to in writing, software distributed under the License is distributed on an \"AS IS\" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.\n",
+  "readmeFilename": "Readme.md",
+  "bugs": {
+    "url": "https://github.com/redventures/reduce/issues"
+  },
+  "_id": "reduce-component@1.0.1",
+  "dist": {
+    "shasum": "e0c93542c574521bea13df0f9488ed82ab77c5da",
+    "tarball": "http://registry.npmjs.org/reduce-component/-/reduce-component-1.0.1.tgz"
+  },
+  "_from": "reduce-component@1.0.1",
+  "_npmVersion": "1.3.11",
+  "_npmUser": {
+    "name": "gjohnson",
+    "email": "gjj391@gmail.com"
+  },
+  "maintainers": [
+    {
+      "name": "gjohnson",
+      "email": "gjj391@gmail.com"
+    }
+  ],
+  "directories": {},
+  "_shasum": "e0c93542c574521bea13df0f9488ed82ab77c5da",
+  "_resolved": "https://registry.npmjs.org/reduce-component/-/reduce-component-1.0.1.tgz",
+  "homepage": "https://github.com/redventures/reduce"
+}

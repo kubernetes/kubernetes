@@ -1,0 +1,142 @@
+#!/usr/bin/env node
+
+var util = require('util');
+var fs = require('fs');
+var path = require('path');
+var CleanCSS = require('../index');
+
+var commands = require('commander');
+
+var packageConfig = fs.readFileSync(path.join(path.dirname(fs.realpathSync(process.argv[1])), '../package.json'));
+var buildVersion = JSON.parse(packageConfig).version;
+
+var isWindows = process.platform == 'win32';
+
+// Specify commander options to parse command line params correctly
+commands
+  .version(buildVersion, '-v, --version')
+  .usage('[options] source-file, [source-file, ...]')
+  .option('-b, --keep-line-breaks', 'Keep line breaks')
+  .option('--s0', 'Remove all special comments, i.e. /*! comment */')
+  .option('--s1', 'Remove all special comments but the first one')
+  .option('-r, --root [root-path]', 'Set a root path to which resolve absolute @import rules')
+  .option('-o, --output [output-file]', 'Use [output-file] as output instead of STDOUT')
+  .option('-s, --skip-import', 'Disable @import processing')
+  .option('--skip-rebase', 'Disable URLs rebasing')
+  .option('--skip-advanced', 'Disable advanced optimizations - selector & property merging, reduction, etc.')
+  .option('--skip-aggressive-merging', 'Disable properties merging based on their order')
+  .option('--skip-shorthand-compacting', 'Disable shorthand compacting')
+  .option('--rounding-precision [n]', 'Rounds to `N` decimal places. Defaults to 2. -1 disables rounding.', parseInt)
+  .option('-c, --compatibility [ie7|ie8]', 'Force compatibility mode (see Readme for advanced examples)')
+  .option('--source-map', 'Enables building input\'s source map')
+  .option('-t, --timeout [seconds]', 'Per connection timeout when fetching remote @imports (defaults to 5 seconds)')
+  .option('-d, --debug', 'Shows debug information (minification time & compression efficiency)');
+
+commands.on('--help', function() {
+  util.puts('  Examples:\n');
+  util.puts('    %> cleancss one.css');
+  util.puts('    %> cleancss -o one-min.css one.css');
+  if (isWindows) {
+    util.puts('    %> type one.css two.css three.css | cleancss -o merged-and-minified.css');
+  } else {
+    util.puts('    %> cat one.css two.css three.css | cleancss -o merged-and-minified.css');
+    util.puts('    %> cat one.css two.css three.css | cleancss | gzip -9 -c > merged-minified-and-gzipped.css.gz');
+  }
+  util.puts('');
+  process.exit();
+});
+
+commands.parse(process.argv);
+
+// If no sensible data passed in just print help and exit
+var fromStdin = !process.env.__DIRECT__ && !process.stdin.isTTY;
+if (!fromStdin && commands.args.length === 0) {
+  commands.outputHelp();
+  return 0;
+}
+
+// Now coerce commands into CleanCSS configuration...
+var options = {
+  advanced: commands.skipAdvanced ? false : true,
+  aggressiveMerging: commands.skipAggressiveMerging ? false : true,
+  compatibility: commands.compatibility,
+  debug: commands.debug,
+  inliner: commands.timeout ? { timeout: parseFloat(commands.timeout) * 1000 } : undefined,
+  keepBreaks: !!commands.keepLineBreaks,
+  keepSpecialComments: commands.s0 ? 0 : (commands.s1 ? 1 : '*'),
+  processImport: commands.skipImport ? false : true,
+  rebase: commands.skipRebase ? false : true,
+  root: commands.root,
+  roundingPrecision: commands.roundingPrecision,
+  shorthandCompacting: commands.skipShorthandCompacting ? false : true,
+  sourceMap: commands.sourceMap,
+  target: commands.output
+};
+
+if (options.root || commands.args.length > 0)
+  options.relativeTo = path.dirname(path.resolve(options.root || commands.args[0]));
+
+if (options.sourceMap && !options.target) {
+  outputFeedback(['Source maps will not be built because you have not specified an output file.'], true);
+  options.sourceMap = false;
+}
+
+// ... and do the magic!
+if (commands.args.length > 0) {
+  minify(commands.args);
+} else {
+  var stdin = process.openStdin();
+  stdin.setEncoding('utf-8');
+  var data = '';
+  stdin.on('data', function(chunk) {
+    data += chunk;
+  });
+  stdin.on('end', function() {
+    minify(data);
+  });
+}
+
+function minify(data) {
+  new CleanCSS(options).minify(data, function (errors, minified) {
+    if (options.debug) {
+      console.error('Original: %d bytes', minified.stats.originalSize);
+      console.error('Minified: %d bytes', minified.stats.minifiedSize);
+      console.error('Efficiency: %d%', ~~(minified.stats.efficiency * 10000) / 100.0);
+      console.error('Time spent: %dms', minified.stats.timeSpent);
+    }
+
+    outputFeedback(minified.errors, true);
+    outputFeedback(minified.warnings);
+
+    if (minified.errors.length > 0)
+      process.exit(1);
+
+    if (minified.sourceMap) {
+      var mapFilename = path.basename(options.target) + '.map';
+      output(minified.styles + '/*# sourceMappingURL=' + mapFilename + ' */');
+      outputMap(minified.sourceMap, mapFilename);
+    } else {
+      output(minified.styles);
+    }
+  });
+}
+
+function output(minified) {
+  if (options.target)
+    fs.writeFileSync(options.target, minified, 'utf8');
+  else
+    process.stdout.write(minified);
+}
+
+function outputMap(sourceMap, mapFilename) {
+  var mapPath = path.join(path.dirname(options.target), mapFilename);
+  fs.writeFileSync(mapPath, sourceMap.toString(), 'utf-8');
+}
+
+function outputFeedback(messages, isError) {
+  var prefix = isError ? '\x1B[31mERROR\x1B[39m:' : 'WARNING:';
+
+  messages.forEach(function(message) {
+    console.error('%s %s', prefix, message);
+  });
+}

@@ -1,0 +1,174 @@
+<html>
+<head>
+    <title>We Leave From Here</title>
+
+    <script type="text/javascript">
+        function changePage() {
+            var newLocation = '/common/page/3';
+            window.location = newLocation;
+        }
+    </script>
+</head>
+<body>
+There should be a form here:
+
+<form method="get" action="resultPage.html" name="login">
+    <input type="email" id="email"/>
+    <input type="number" id="age"/>
+    <input type="submit" id="submitButton" value="Hello there"/>
+</form>
+
+<form method="get" action="resultPage.html" name="image">
+    <input type="image" id="imageButton" alt="click me!" src="images/button.gif"/>
+</form>
+
+<form method="get" action="resultPage.html" name="optional" style="display: block">
+    Here's a checkbox:
+    <input type="checkbox" id="checky" name="checky" value="furrfu"/>
+    <input type="checkbox" id="checkedchecky" name="checkedchecky" checked="checked" />
+    <input type="checkbox" id="disabledchecky" disabled="disabled" name="disabledchecky" />
+    <input type="checkbox" id="randomly_disabled_checky" disabled="somerandomstring" checked="checked" name="randomlydisabledchecky" />
+    <br/>
+    <select name="selectomatic">
+        <option selected="selected" id="non_multi_option" value="one">One</option>
+        <option value="two">Two</option>
+        <option value="four">Four</option>
+        <option value="still learning how to count, apparently">Still learning how to count, apparently</option>
+    </select>
+
+    <select name="multi" id="multi" multiple="multiple">
+        <option selected="selected" value="eggs">Eggs</option>
+        <option value="ham">Ham</option>
+        <option selected="selected" value="sausages">Sausages</option>
+        <option value="onion gravy">Onion gravy</option>
+    </select>
+
+    <select name="no-select" disabled="disabled">
+      <option value="foo">Foo</option>
+    </select>
+
+		<select name="select_empty_multiple" multiple>
+			<option id="multi_1" value="select_1">select_1</option>
+			<option id="multi_2" value="select_2">select_2</option>
+			<option id="multi_3" value="select_3">select_3</option>
+			<option id="multi_4" value="select_4">select_4</option>
+		</select>
+
+		<select name="multi_true" multiple="true">
+			<option id="multi_true_1" value="select_1">select_1</option>
+			<option id="multi_true_2" value="select_2">select_2</option>
+		</select>
+
+		<select name="multi_false" multiple="false">
+			<option id="multi_false_1" value="select_1">select_1</option>
+			<option id="multi_false_2" value="select_2">select_2</option>
+		</select>
+
+    <select id="invisi_select" style="opacity:0;">
+      <option selected value="apples">Apples</option>
+      <option value="oranges">Oranges</option>
+    </select>
+
+    <select name="select-default">
+        <option>One</option>
+        <option>Two</option>
+        <option>Four</option>
+        <option>Still learning how to count, apparently</option>
+    </select>
+
+    <select name="select_with_spaces">
+        <option>One</option>
+        <option>  Two  </option>
+        <option>
+          Four
+        </option>
+        <option>
+          Still learning   how to count,
+          apparently
+        </option>
+    </select>
+
+    <select>
+    	<option id="blankOption"></option>
+    	<option id="optionEmptyValueSet" value="">nothing</option>
+    </select>
+
+    <br/>
+
+    <input type="radio" id="cheese" name="snack" value="cheese"/>Cheese<br/>
+    <input type="radio" id="peas" name="snack" value="peas"/>Peas<br/>
+    <input type="radio" id="cheese_and_peas" name="snack" value="cheese and peas" checked/>Cheese and peas<br/>
+    <input type="radio" id="nothing" name="snack" value="nowt" disabled="disabled"/>Not a sausage<br/>
+    <input type="radio" id="randomly_disabled_nothing" name="snack" value="funny nowt" disabled="somedisablingstring"/>Not another sausage
+
+    <input type="hidden" name="hidden" value="fromage" />
+
+    <p id="cheeseLiker">I like cheese</p>
+    <input type="submit" value="Click!"/>
+    
+    <input type="radio" id="lone_disabled_selected_radio" name="not_a_snack" value="cumberland" checked="checked" disabled="disabled" />Cumberland sausage
+</form>
+
+<form method="get" action="resultPage.html" name="disable">
+    <input type="text" id="working"/>
+    <input type="text" id="notWorking" disabled="true"/>
+
+    <textarea id="notWorkingArea" disabled="disabled" cols="5" rows="5"></textarea>
+
+    <input type="text" id="inputWithText" value="Example text"/>
+    <textarea id="withText" rows="5" cols="5">Example text</textarea>
+    <textarea id="emptyTextArea" rows="5" cols="5"></textarea>
+</form>
+
+<form method="post" action="resultPage.html">
+    <select id="redirect" name="redirect" onchange="javascript:changePage();">
+        <option selected="selected" value="one">One</option>
+        <option id="changeme" value="two">Two</option>
+    </select>
+
+    <input id="no-type" />
+    <input type="file" id="upload" onchange="document.getElementById('fileResults').innerHTML = 'changed';" />
+    <span id="fileResults"></span>
+
+    <input type="submit" />
+</form>
+
+<form method="get" action="resultPage.html">
+  <input type="text" value="name" name="id-name1"/>
+  <input type="text" value="id"   id="id-name1"/>
+
+  <!-- Reverse the ordering -->
+  <input type="text" value="id"   id="id-name2"/>
+  <input type="text" value="name" name="id-name2"/>
+  <input name="readonly" readonly="readonly" />
+</form>
+
+<!-- form with nested children -->
+<form method="get" action="resultPage.html" id="nested_form">
+  <div>
+    <input type="text" value="name" name="x"/>
+  </div>
+  <input type="submit" />
+</form>  
+
+<!-- Form with disabled form elements -->
+<form method="get" action="xhtmlTest.html">
+  <p>
+    <input type="text" id="disabledTextElement1" disabled="foo" />
+    <input type="text" id="disabledTextElement2" disabled="" />
+    <input type="submit" id="disabledSubmitElement" disabled="qwerty" value="Submit" />
+  </p>
+</form>
+<!-- Empty div to test GetAttribute -->
+<div id="wallace" class="gromit"></div>
+
+<input type='button' id='killIframe' onclick='top.remove();' value="Kill containing iframe" />
+
+<form method="get" action="formPage.html">
+  <p>
+    <label for="checkbox-with-label" id="label-for-checkbox-with-label">Label</label><input type="checkbox" id="checkbox-with-label" />
+  </p>
+</form>
+<input id="vsearchGadget" name="SearchableText" type="text" size="18" value="" title="Hvad søger du?" accesskey="4" class="inputLabel" />
+</body>
+</html>

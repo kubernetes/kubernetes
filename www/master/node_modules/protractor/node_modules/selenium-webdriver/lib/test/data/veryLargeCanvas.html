@@ -1,0 +1,81 @@
+<?xml version="1.0"?>
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head>
+  <title>Rectangles</title>
+  <script type="text/javascript">
+    function appendMessage(message) {
+      document.getElementById('result').innerHTML += message
+        + " ";
+    }
+  </script>
+  <style type="text/css">
+    #r1 {
+      position: absolute;
+      background-color: lightblue;
+      left: 100px;
+      top: 100px;
+      width: 100px;
+      height: 50px;
+    }
+    #r2 {
+      position: absolute;
+      background-color: red;
+      left: 2500px;
+      top: 50px;
+      width: 80px;
+      height: 50px;
+    }
+    #r3 {
+      position: absolute;
+      background-color: yellow;
+      left: 60px;
+      top: 1500px;
+      width: 80px;
+      height: 50px;
+    }
+    #r4 {
+      position: absolute;
+      background-color: cyan;
+      left: 220px;
+      top: 180px;
+      width: 100px;
+      height: 50px;
+    }
+    #r5 {
+      position: absolute;
+      background-color: blue;
+      left: 60px;
+      top: 1600px;
+      width: 80px;
+      height: 50px;
+    }
+    #r6 {
+      position: absolute;
+      background-color: green;
+      left: 2581px;
+      top: 50px;
+      width: 80px;
+      height: 50px;
+    }
+    #result {
+      border: 10;
+      padding: 5;
+      background-color: grey;
+      position: absolute;
+      left: 20px;
+      top: 30px;
+      width: 400px;
+      height: 20px;
+    }
+    </style>
+</head>
+<body>
+  <div id="result"></div>
+  <div id="r1" onclick="appendMessage('First')">First Target</div>
+  <div id="r2" onclick="appendMessage('Second')">Second Target</div>
+  <div id="r3" onclick="appendMessage('Third')">Third Target</div>
+  <div id="r4" onclick="appendMessage('Fourth')">Fourth Target</div>
+  <div id="r5" onclick="appendMessage('OOPS2')">Not a Target</div>
+  <div id="r6" onclick="appendMessage('OOPS')">Not a Target</div>
+</body>
+</html>

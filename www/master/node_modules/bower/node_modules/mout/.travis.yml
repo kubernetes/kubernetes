@@ -1,0 +1,16 @@
+ language: node_js
+ node_js:
+   - "0.10"
+ script:
+   - "npm test --coverage"
+   - "jshint src"
+ notifications:
+  irc:
+    channels:
+      - "irc.freenode.org#moutjs"
+    on_success: change
+    on_failure: always
+    use_notice: true
+    skip_join: true
+ git:
+   depth: 10

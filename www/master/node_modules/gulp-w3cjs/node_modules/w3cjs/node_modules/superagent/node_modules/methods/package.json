@@ -1,0 +1,33 @@
+{
+  "name": "methods",
+  "version": "0.0.1",
+  "description": "HTTP methods that node supports",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "http",
+    "methods"
+  ],
+  "author": {
+    "name": "TJ Holowaychuk"
+  },
+  "license": "MIT",
+  "_id": "methods@0.0.1",
+  "dist": {
+    "shasum": "277c90f8bef39709645a8371c51c3b6c648e068c",
+    "tarball": "http://registry.npmjs.org/methods/-/methods-0.0.1.tgz"
+  },
+  "maintainers": [
+    {
+      "name": "tjholowaychuk",
+      "email": "tj@vision-media.ca"
+    }
+  ],
+  "directories": {},
+  "_shasum": "277c90f8bef39709645a8371c51c3b6c648e068c",
+  "_from": "methods@0.0.1",
+  "_resolved": "https://registry.npmjs.org/methods/-/methods-0.0.1.tgz",
+  "readme": "ERROR: No README data found!"
+}

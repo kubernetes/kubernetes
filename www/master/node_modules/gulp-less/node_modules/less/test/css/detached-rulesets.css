@@ -1,0 +1,71 @@
+.wrap-selector {
+  color: black;
+  one: 1px;
+  four: magic-frame;
+  visible-one: visible;
+  visible-two: visible;
+}
+.wrap-selector {
+  color: red;
+  visible-one: visible;
+  visible-two: visible;
+}
+.wrap-selector {
+  color: black;
+  background: white;
+  visible-one: visible;
+  visible-two: visible;
+}
+header {
+  background: blue;
+}
+@media screen and (min-width: 1200) {
+  header {
+    background: red;
+  }
+}
+html.lt-ie9 header {
+  background: red;
+}
+.wrap-selector {
+  test: extra-wrap;
+  visible-one: visible;
+  visible-two: visible;
+}
+.wrap-selector .wrap-selector {
+  test: wrapped-twice;
+  visible-one: visible;
+  visible-two: visible;
+}
+.wrap-selector {
+  test-func: 90;
+  test-arithmetic: 18px;
+  visible-one: visible;
+  visible-two: visible;
+}
+.without-mixins {
+  b: 1;
+}
+@media (orientation: portrait) and tv {
+  .my-selector {
+    background-color: black;
+  }
+}
+@media (orientation: portrait) and widescreen and print and tv {
+  .triple-wrapped-mq {
+    triple: true;
+  }
+}
+@media (orientation: portrait) and widescreen and tv {
+  .triple-wrapped-mq {
+    triple: true;
+  }
+}
+@media (orientation: portrait) and tv {
+  .triple-wrapped-mq {
+    triple: true;
+  }
+}
+.a {
+  test: test;
+}

@@ -1,0 +1,10 @@
+{
+  "silent": false,
+  "router": {
+    "localhost": "localhost:9000"
+  },
+  "forward": {
+    "port": 9001,
+    "host": "localhost"
+  }
+}

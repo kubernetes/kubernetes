@@ -1,0 +1,86 @@
+#!/usr/bin/env node
+
+var path = require('path');
+var fs = require('fs');
+var resolve = require('resolve');
+
+var NODE_PATH = process.env.NODE_PATH;
+
+// This wrapper only resolves which instance of Karma should be run.
+// All the logic is in the main Karma module.
+// The resolving algorithm checks (in this order):
+//   - a local module (using `require`, so it will traverse up, looking for `node_modules/karma`),
+//   - a siblink module to karma-cli (that loads the global karma, when using NVM),
+//   - a global module (NODE_PATH)
+
+
+var requireCliAndRun = function(karmaPath) {
+  if (process.argv.indexOf('--which') !== -1) {
+    console.log(karmaPath);
+  } else {
+    var karmaCli = require(path.join(karmaPath, 'lib', 'cli'));
+
+    if (karmaCli.run) {
+      karmaCli.run();
+    } else {
+      karmaCliRun(karmaCli, karmaPath);
+    }
+  }
+};
+
+
+// TODO(vojta): remove once we don't care about Karma 0.10
+var karmaCliRun = function(karmaCli, karmaPath) {
+  var config = karmaCli.process();
+
+  switch (config.cmd) {
+  case 'start':
+    require(path.join(karmaPath, 'lib', 'server')).start(config);
+    break;
+  case 'run':
+    require(path.join(karmaPath, 'lib', 'runner')).run(config);
+    break;
+  case 'init':
+    require(path.join(karmaPath, 'lib', 'init')).init(config);
+    break;
+  case 'completion':
+    require(path.join(karmaPath, 'lib', 'completion')).completion(config);
+    break;
+  }
+};
+
+
+resolve('karma', {basedir: process.cwd()}, function(err, pathToKarma) {
+  // There is a local version, let's use it.
+  if (!err) {
+    return requireCliAndRun(pathToKarma.replace(/(\/|\\)lib(\/|\\)index\.js/, ''));
+  }
+
+  // We can't load a global one, since NODE_PATH is not defined.
+  if (!NODE_PATH) {
+    // Let's try a siblink to karma-cli, that is a global module with NVM.
+    var siblinkKarma = path.normalize(path.join(__dirname, '..', '..', 'karma'));
+    if (fs.existsSync(siblinkKarma)) {
+      return requireCliAndRun(siblinkKarma);
+    }
+
+    console.error('Cannot find local Karma!\n' +
+                  '  Please install Karma by `npm install karma --save-dev`.\n' +
+                  '  If you wanna use a global instance, please set NODE_PATH env variable.\n');
+    return;
+  }
+
+  // Let's try global paths.
+  var globalPaths = NODE_PATH.split(path.delimiter);
+  var globalKarma;
+
+  while (globalPaths.length) {
+    globalKarma = path.normalize(path.join(globalPaths.shift(), 'karma'));
+    if (fs.existsSync(globalKarma)) {
+      return requireCliAndRun(globalKarma);
+    }
+  }
+
+  console.error('Cannot find local Karma!\n' +
+                '  Please install karma by `npm install karma --save-dev`.\n');
+});

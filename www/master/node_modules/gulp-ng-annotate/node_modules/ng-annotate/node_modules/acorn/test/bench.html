@@ -1,0 +1,96 @@
+<!doctype html>
+<head>
+  <meta charset="utf-8">
+  <title>Acorn benchmark</title>
+  <script src="../acorn.js"></script>
+  <script src="compare/esprima.js"></script>
+  <script src="compare/traceur.js"></script>
+  <script src="jquery-string.js"></script>
+  <script src="codemirror-string.js"></script>
+  <style>
+    td { text-align: right; padding-right: 20px; }
+    th { text-align: left; padding-right: 40px; }
+    body { max-width: 50em; padding: 1em 2em; }
+    h1 { font-size: 150%; }
+  </style>
+</head>
+
+<h1>Acorn/Esprima/Traceur speed comparison</h1>
+
+<p>This will run each of the three ES6 parsers on the source code of
+jQuery 1.11.1 and CodeMirror 3.0b1 for five seconds, and show a table
+indicating the number of lines parsed per second. Note that Traceur
+always stores location data, and is thus not fairly compared by the
+benchmark <em>without</em> location data.<p>
+
+<p>Also note that having the developer tools open in Chrome, or
+Firebug in Firefox <em>heavily</em> influences the numbers you get. In
+Chrome, the effect even lingers (in the tab) after you close the
+developer tools. Load in a fresh tab to get (halfway) stable
+numbers.</p>
+
+<button onclick="run(false)">Compare <strong>without</strong> location data</button>
+<button onclick="run(true)">Compare <strong>with</strong> location data</button>
+<button onclick="run(false, true)">Run only Acorn</button>
+<span id="running"></span>
+
+<script>
+  var sourceFileName = 'source.js';
+
+  function runAcorn(code, locations) {
+    acorn.parse(code, {ecmaVersion: 6, locations: locations, sourceFile: sourceFileName});
+  }
+  function runEsprima(code, locations) {
+    esprima.parse(code, {loc: locations, source: sourceFileName});
+  }
+  function runTraceur(code) {
+    var file = new traceur.syntax.SourceFile(sourceFileName, code);
+    var parser = new traceur.syntax.Parser(file);
+    parser.parseScript();
+  }
+
+  var totalLines = codemirror30.split("\n").length + jquery111.split("\n").length;
+
+  var nowHost = (typeof performance === 'object' && 'now' in performance) ? performance : Date;
+
+  function benchmark(runner, locations) {
+    // Give it a chance to warm up (first runs are usually outliers)
+    runner(jquery111, locations);
+    runner(codemirror30, locations);
+    var t0 = nowHost.now(), t1, lines = 0;
+    for (;;) {
+      runner(jquery111, locations);
+      runner(codemirror30, locations);
+      lines += totalLines;
+      t1 = nowHost.now();
+      if (t1 - t0 > 5000) break;
+    }
+    return lines / ((t1 - t0) / 1000);
+  }
+
+  function showOutput(values) {
+    var html = "<hr><table>";
+    for (var i = 0; i < values.length; ++i)
+      html += "<tr><th>" + values[i].name + "</td><td>" + Math.round(values[i].score) + " lines per second</td><td>" +
+                        Math.round(values[i].score * 100 / values[0].score) + "%</td></tr>";
+    document.body.appendChild(document.createElement("div")).innerHTML = html;
+  }
+
+  function run(locations, acornOnly) {
+    var running = document.getElementById("running");
+    running.innerHTML = "Running benchmark...";
+    var data = [{name: "Acorn", runner: runAcorn},
+                {name: "Esprima", runner: runEsprima},
+                {name: "Traceur", runner: runTraceur}];
+    if (acornOnly) data.length = 1;
+    var pos = 0;
+    function next() {
+      data[pos].score = benchmark(data[pos].runner, locations);
+      if (++pos == data.length) {
+        running.innerHTML = "";
+        showOutput(data);
+      } else setTimeout(next, 100);
+    }
+    setTimeout(next, 50);
+  }
+</script>

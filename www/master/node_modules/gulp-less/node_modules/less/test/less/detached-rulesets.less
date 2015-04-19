@@ -1,0 +1,103 @@
+@ruleset: {
+     color: black;
+     background: white;
+  };
+
+@a: 1px;
+.wrap-mixin(@ruleset) {
+  @a: hidden and if you see this in the output its a bug;
+  @b: visible;
+  @d: magic-frame; // same behaviour as mixin calls - falls back to this frame
+  .wrap-selector {
+      @c: visible;
+      @ruleset();
+      visible-one: @b;
+      visible-two: @c;
+    }
+};
+
+.wrap-mixin({
+  color: black;
+  one: @a;
+  @b: hidden and if you see this in the output its a bug;
+  @c: hidden and if you see this in the output its a bug;
+  four: @d;
+});
+
+.wrap-mixin(@ruleset: {
+  color: red;
+});
+
+.wrap-mixin(@ruleset);
+
+.desktop-and-old-ie(@rules) {
+  @media screen and (min-width: 1200) { @rules(); }
+  html.lt-ie9 &                       { @rules(); }
+}
+
+header {
+  background: blue;
+
+  .desktop-and-old-ie({
+    background: red;
+  });
+}
+
+.wrap-mixin-calls-wrap(@ruleset) {
+  .wrap-mixin(@ruleset);
+};
+
+.wrap-mixin({
+  test: extra-wrap;
+  .wrap-mixin-calls-wrap({
+    test: wrapped-twice;
+  });
+});
+
+.wrap-mixin({
+  test-func: unit(90px);
+  test-arithmetic: unit((9+9), px);
+});
+// without mixins
+@ruleset-2: {
+  b: 1;
+};
+.without-mixins {
+  @ruleset-2();
+}
+@my-ruleset: {
+    .my-selector {
+      @media tv {
+        background-color: black;
+      }
+    }
+  };
+@media (orientation:portrait) {
+    @my-ruleset();
+    .wrap-media-mixin({
+      @media tv {
+        .triple-wrapped-mq {
+          triple: true;
+        }
+      }
+    });
+}
+.wrap-media-mixin(@ruleset) {
+  @media widescreen {
+    @media print {
+      @ruleset();
+    }
+    @ruleset();
+  }
+  @ruleset();
+}
+// unlocking mixins
+@my-mixins: {
+  .mixin() {
+    test: test;
+  }
+};
+@my-mixins();
+.a {
+  .mixin();
+}

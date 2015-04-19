@@ -1,0 +1,12 @@
+{
+  "name": "socket.io-parser",
+  "version": "1.0.1",
+  "description": "socket.io protocol parser",
+  "dependencies": {
+    "component/json": "*"
+  },
+  "scripts": [
+    "index.js"
+  ],
+  "repo": "https://raw.github.com/learnboost/socket.io-protocol"
+}

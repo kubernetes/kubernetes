@@ -1,0 +1,9 @@
+{
+  "name": "querystring",
+  "repo": "visionmedia/node-querystring",
+  "description": "query-string parser / stringifier with nesting support",
+  "version": "0.5.6",
+  "keywords": ["querystring", "query", "parser"],
+  "scripts": ["index.js"],
+  "license": "MIT"
+}

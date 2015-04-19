@@ -1,0 +1,17 @@
+{
+  "appenders": [
+    { 
+      "category": "tests", 
+      "type": "dateFile", 
+      "filename": "test/date-file-test.log",
+      "pattern": "-from-MM-dd", 
+      "layout": { 
+        "type": "messagePassThrough" 
+      } 
+    }
+  ],
+  
+  "levels": {
+    "tests":  "WARN"
+  }
+}

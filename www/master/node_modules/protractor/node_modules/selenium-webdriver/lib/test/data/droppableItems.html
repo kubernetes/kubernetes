@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>jQuery UI Droppable - Default Demo</title>
+    <link type="text/css" href="css/ui-lightness/jquery-ui-1.8.10.custom.css" rel="stylesheet" />
+    <script type="text/javascript" src="js/jquery-1.4.4.min.js"></script>
+    <script type="text/javascript" src="js/jquery-ui-1.8.10.custom.min.js"></script>
+  <style type="text/css">
+  #draggable { width: 100px; height: 100px; padding: 0.5em; float: left; margin: 10px 10px 10px 0; }
+  #droppable { width: 150px; height: 150px; padding: 0.5em; float: left; margin: 10px; }
+  </style>
+  <script type="text/javascript">
+  $(function() {
+    $("#draggable").draggable();
+    $("#droppable").droppable({
+      drop: function(event, ui) {
+        $(this).addClass('ui-state-highlight').find('p').html('Dropped!');
+      }
+  });
+
+        var report_event = function(report_text) {
+          var reportElement = $("#drop_reports");
+          var origText = reportElement.text();
+          reportElement.text(origText + " " + report_text);
+        }
+
+        $('body').mousedown(function() {
+            report_event('down');
+        });
+
+        $('body').mousemove(function() {
+            report_event('move');
+        });
+
+        $('body').mouseup(function() {
+            report_event('up');
+        });
+  });
+  </script>
+</head>
+<body>
+<div class="demo">
+
+<div id="draggable" class="ui-widget-content">
+  <p>Drag me to my target</p>
+</div>
+
+<div id="droppable" class="ui-widget-header">
+  <p>Drop here</p>
+</div>
+
+<div class="test-data">
+  <p id="drop_reports">start</p>
+</div>
+
+</div><!-- End demo -->
+
+<div class="demo-description">
+
+<p>Taken from the JQuery demo.</p>
+
+</div><!-- End demo-description -->
+</body>
+</html>

@@ -1,0 +1,57 @@
+{
+  "author": {
+    "name": "Brian J. Brennan",
+    "email": "brianloveswords@gmail.com",
+    "url": "http://bjb.io"
+  },
+  "name": "buffer-crc32",
+  "description": "A pure javascript CRC32 algorithm that plays nice with binary data",
+  "version": "0.2.1",
+  "contributors": [
+    {
+      "name": "Vladimir Kuznetsov"
+    }
+  ],
+  "homepage": "https://github.com/brianloveswords/buffer-crc32",
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/brianloveswords/buffer-crc32.git"
+  },
+  "main": "index.js",
+  "scripts": {
+    "test": "tap tests/*.test.js"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "tap": "~0.2.5"
+  },
+  "optionalDependencies": {},
+  "engines": {
+    "node": "*"
+  },
+  "_id": "buffer-crc32@0.2.1",
+  "dist": {
+    "shasum": "be3e5382fc02b6d6324956ac1af98aa98b08534c",
+    "tarball": "http://registry.npmjs.org/buffer-crc32/-/buffer-crc32-0.2.1.tgz"
+  },
+  "_npmVersion": "1.1.65",
+  "_npmUser": {
+    "name": "brianloveswords",
+    "email": "brian@nyhacker.org"
+  },
+  "maintainers": [
+    {
+      "name": "brianloveswords",
+      "email": "brian@nyhacker.org"
+    }
+  ],
+  "directories": {},
+  "_shasum": "be3e5382fc02b6d6324956ac1af98aa98b08534c",
+  "_from": "buffer-crc32@0.2.1",
+  "_resolved": "https://registry.npmjs.org/buffer-crc32/-/buffer-crc32-0.2.1.tgz",
+  "readme": "# buffer-crc32\n\n[![Build Status](https://secure.travis-ci.org/brianloveswords/buffer-crc32.png?branch=master)](http://travis-ci.org/brianloveswords/buffer-crc32)\n\ncrc32 that works with binary data and fancy character sets, outputs\nbuffer, signed or unsigned data and has tests.\n\nDerived from the sample CRC implementation in the PNG specification: http://www.w3.org/TR/PNG/#D-CRCAppendix\n\n# install\n```\nnpm install buffer-crc32\n```\n\n# example\n```js\nvar crc32 = require('buffer-crc32');\n// works with buffers\nvar buf = Buffer([0x00, 0x73, 0x75, 0x70, 0x20, 0x62, 0x72, 0x6f, 0x00])\ncrc32(buf) // -> <Buffer 94 5a ab 4a>\n\n// has convenience methods for getting signed or unsigned ints\ncrc32.signed(buf) // -> -1805997238\ncrc32.unsigned(buf) // -> 2488970058\n\n// will cast to buffer if given a string, so you can\n// directly use foreign characters safely\ncrc32('自動販売機') // -> <Buffer cb 03 1a c5>\n\n// and works in append mode too\nvar partialCrc = crc32('hey');\nvar partialCrc = crc32(' ', partialCrc);\nvar partialCrc = crc32('sup', partialCrc);\nvar partialCrc = crc32(' ', partialCrc);\nvar finalCrc = crc32('bros', partialCrc); // -> <Buffer 47 fa 55 70>\n```\n\n# tests\nThis was tested against the output of zlib's crc32 method. You can run\nthe tests with`npm test` (requires tap)\n\n# see also\nhttps://github.com/alexgorbatchev/node-crc, `crc.buffer.crc32` also\nsupports buffer inputs and return unsigned ints (thanks @tjholowaychuk).\n\n# license\nMIT/X11\n",
+  "readmeFilename": "README.md",
+  "bugs": {
+    "url": "https://github.com/brianloveswords/buffer-crc32/issues"
+  }
+}

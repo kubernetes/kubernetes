@@ -1,0 +1,8 @@
+.gitignore
+.travis.yml
+Makefile
+.git/
+src/
+test/
+node_modules/
+

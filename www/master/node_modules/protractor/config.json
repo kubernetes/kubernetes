@@ -1,0 +1,7 @@
+{
+  "webdriverVersions": {
+    "selenium": "2.45.0",
+    "chromedriver": "2.14",
+    "iedriver": "2.45.0"
+  }
+}

@@ -1,0 +1,40 @@
+#!/usr/bin/env node
+
+var path = require("path");
+var fs = require("fs");
+var acorn = require("../acorn.js");
+
+var infile, parsed, options = {}, silent = false, compact = false;
+
+function help(status) {
+  var print = (status == 0) ? console.log : console.error;
+  print("usage: " + path.basename(process.argv[1]) + " [--ecma3|--ecma5|--ecma6] [--strictSemicolons]");
+  print("        [--locations] [--compact] [--silent] [--help] [--] infile");
+  process.exit(status);
+}
+
+for (var i = 2; i < process.argv.length; ++i) {
+  var arg = process.argv[i];
+  if (arg[0] != "-" && !infile) infile = arg;
+  else if (arg == "--" && !infile && i + 2 == process.argv.length) infile = process.argv[++i];
+  else if (arg == "--ecma3") options.ecmaVersion = 3;
+  else if (arg == "--ecma5") options.ecmaVersion = 5;
+  else if (arg == "--ecma6") options.ecmaVersion = 6;
+  else if (arg == "--strictSemicolons") options.strictSemicolons = true;
+  else if (arg == "--locations") options.locations = true;
+  else if (arg == "--silent") silent = true;
+  else if (arg == "--compact") compact = true;
+  else if (arg == "--help") help(0);
+  else help(1);
+}
+
+try {
+  var code = fs.readFileSync(infile, "utf8");
+  parsed = acorn.parse(code, options);
+} catch(e) {
+  console.log(e.message);
+  process.exit(1);
+}
+
+if (!silent)
+  console.log(JSON.stringify(parsed, null, compact ? null : 2));

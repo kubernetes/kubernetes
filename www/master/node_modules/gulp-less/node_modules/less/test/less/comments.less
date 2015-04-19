@@ -1,0 +1,96 @@
+/******************\
+*                  *
+*  Comment Header  *
+*                  *
+\******************/
+
+/*
+
+    Comment
+
+*/
+
+/*
+ * Comment Test
+ *
+ * - cloudhead (http://cloudhead.net)
+ *
+ */
+
+////////////////
+@var: "content";
+////////////////
+
+/* Colors
+ * ------
+ *   #EDF8FC (background blue)
+ *   #166C89 (darkest blue)
+ *
+ * Text:
+ *   #333 (standard text) // A comment within a comment!
+ *   #1F9EC9 (standard link)
+ *
+ */
+
+/* @group Variables
+------------------- */
+#comments /* boo *//* boo again*/,
+//.commented_out1
+//.commented_out2
+//.commented_out3
+.comments //end of comments1
+//end of comments2
+{
+  /**/ // An empty comment
+  color: red; /* A C-style comment */  /* A C-style comment */
+  background-color: orange; // A little comment
+  font-size: 12px;
+
+  /* lost comment */ content: @var;
+
+  border: 1px solid black;
+
+  // padding & margin //
+  padding: 0; // }{ '"
+  margin: 2em;
+} //
+
+/* commented out
+  #more-comments {
+    color: grey;
+  }
+*/
+
+.selector /* .with */, .lots, /* of */ .comments {
+  color/* survive */ /* me too */: grey, /* blue */ orange;
+  -webkit-border-radius: 2px /* webkit only */;
+  -moz-border-radius: (2px * 4) /* moz only with operation */;
+}
+
+.mixin_def_with_colors(@a: white, // in
+       @b: 1px //put in @b - causes problems! --->
+	   ) // the
+	   when (@a = white) {
+	.test {
+	    color: @b;
+	}
+}
+.mixin_def_with_colors();
+
+// .s when
+//R/2
+
+.sr-only-focusable {
+  clip: auto;
+}
+
+@-webkit-keyframes /* Safari */ hover /* and Chrome */ {
+  0% {
+    color: red;
+  }
+}
+
+#last { color: blue }
+//
+
+/*  *//* { *//*  *//*  *//*  */#div { color:#A33; }/* } */

@@ -1,0 +1,7 @@
+node_modules
+npm-debug.log
+test/fixtures/*-test.txt
+examples/*.txt
+examples/simple/*.txt
+.DS_Store
+

@@ -1,0 +1,6 @@
+body {
+  width: 100%;
+}
+.a {
+  var: test;
+}

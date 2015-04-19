@@ -1,0 +1,102 @@
+<html>
+<body>
+
+<style>
+<!--
+.dragme{position:relative;}
+-->
+</style>
+<script language="JavaScript1.2">
+<!--
+
+var ie=document.all;
+var nn6=document.getElementById&&!document.all;
+
+var isdrag=false;
+var x,y;
+var dobj;
+
+function movemouse(e)
+{
+  if (isdrag)
+  {
+    if (e && e.clientX)
+    {
+      dobj.style.left = tx + e.clientX - x;
+      dobj.style.top = ty + e.clientY - y
+    }
+    else
+    {
+      dobj.style.left = tx + event.clientX - x;
+      dobj.style.top = ty + event.clientY - y;
+    }
+    return false;
+  }
+}
+
+function selectmouse(e)
+{
+  var fobj;
+  var topelement;
+  if (e && e.target)
+  {
+    fobj = e.target;
+    topelement = "HTML";
+  }
+  else
+  {
+    fobj = event.srcElement;
+    topelement = "BODY";
+  }
+
+  while (fobj.tagName != topelement && fobj.className != "dragme")
+  {
+    if (fobj.parentNode)
+    {
+      fobj = fobj.parentNode;
+    }
+    else
+    {
+      fobj = fobj.parentElement;
+    }
+  }
+
+  if (fobj.className=="dragme")
+  {
+    isdrag = true;
+    dobj = fobj;
+    tx = parseInt(dobj.style.left+0);
+    ty = parseInt(dobj.style.top+0);
+    if (e && e.clientX)
+    {
+      x = e.clientX;
+      y = e.clientY;
+    }
+    else
+    {
+      x = event.clientX;
+      y = event.clientY;
+    }
+
+    document.onmousemove=movemouse;
+    return false;
+  }
+}
+
+document.onmousedown=selectmouse;
+document.onmouseup=new Function("isdrag=false");
+
+//-->
+</script>
+
+
+
+<img src="icon.gif" class="dragme" id="test1"><br>
+<img src="icon.gif" class="dragme" id="test2"><br>
+<b>"Hi there</b>
+<div style="position: absolute; left: 210px; top: 80px; height: 400px; width: 100px; padding: 10em;">
+<img src="icon.gif" class="dragme" id="test3"><br>
+<img src="icon.gif" class="dragme" id="test4"><br>
+</div>
+</body>
+</html>

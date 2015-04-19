@@ -1,0 +1,2 @@
+ParseError: Unrecognised input in {path}bad-variable-declaration1.less on line 1, column 1:
+1 @@demo: "hi";

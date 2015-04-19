@@ -1,0 +1,12 @@
+language: node_js
+node_js:
+  - "0.8"
+  - "0.10"
+  - "0.11"
+matrix:
+  allow_failures:
+    - node_js: "0.11"
+  fast_finish: true
+before_install:
+  # remove build script deps before install
+  - node -pe 'f="./package.json";p=require(f);d=p.devDependencies;for(k in d){if("co"===k.substr(0,2))delete d[k]}require("fs").writeFileSync(f,JSON.stringify(p,null,2))'

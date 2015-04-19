@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>click-jacking</title>
+  <script>
+    var clickJacker;
+
+    function setOpacity(opacity) {
+      var matches = window.navigator.userAgent.match(/MSIE\s*(\d*)/);
+      if (matches && matches.length > 1 && parseInt(matches[1]) <= 8) {
+        clickJacker.style.filter = 'alpha(opacity=' + (opacity * 100) + ')';
+      } else {
+        clickJacker.style.opacity = opacity;
+      }
+    }
+
+    function init() {
+      clickJacker = document.getElementById('clickJacker');
+      setOpacity(0);
+    }
+  </script>
+</head>
+<body onload="init()">
+<div>
+  <div id="clickJacker"
+       onclick="setOpacity(1);"
+       style="position:absolute;float:left;
+              width:200px;height:100px; padding:10px;
+              background-color:darkred;
+              border:1px solid darkred;">Click jacked!</div>
+  <div style="width:200px; height:100px;
+              border:1px solid black; padding:10px">Click Me</div>
+  <script>
+    clickJacker = document.getElementById('clickJacker');
+  </script>
+</div>
+</body>
+</html>

@@ -1,0 +1,2 @@
+less: OperationError: Can't substract or divide a color from a number in {pathhref}console-errors/test-error.less on line null, column 0:
+1   prop: (3 / #fff);

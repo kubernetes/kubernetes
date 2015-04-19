@@ -1,0 +1,5 @@
+npm-debug.log
+node_modules
+.*.swp
+.lock-*
+build/

@@ -1,0 +1,50 @@
+{
+  "name": "minimist",
+  "version": "0.0.10",
+  "description": "parse argument options",
+  "main": "index.js",
+  "devDependencies": {
+    "tape": "~1.0.4",
+    "tap": "~0.4.0"
+  },
+  "scripts": {
+    "test": "tap test/*.js"
+  },
+  "testling": {
+    "files": "test/*.js",
+    "browsers": [
+      "ie/6..latest",
+      "ff/5",
+      "firefox/latest",
+      "chrome/10",
+      "chrome/latest",
+      "safari/5.1",
+      "safari/latest",
+      "opera/12"
+    ]
+  },
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/substack/minimist.git"
+  },
+  "homepage": "https://github.com/substack/minimist",
+  "keywords": [
+    "argv",
+    "getopt",
+    "parser",
+    "optimist"
+  ],
+  "author": {
+    "name": "James Halliday",
+    "email": "mail@substack.net",
+    "url": "http://substack.net"
+  },
+  "license": "MIT",
+  "readme": "# minimist\n\nparse argument options\n\nThis module is the guts of optimist's argument parser without all the\nfanciful decoration.\n\n[![browser support](https://ci.testling.com/substack/minimist.png)](http://ci.testling.com/substack/minimist)\n\n[![build status](https://secure.travis-ci.org/substack/minimist.png)](http://travis-ci.org/substack/minimist)\n\n# example\n\n``` js\nvar argv = require('minimist')(process.argv.slice(2));\nconsole.dir(argv);\n```\n\n```\n$ node example/parse.js -a beep -b boop\n{ _: [], a: 'beep', b: 'boop' }\n```\n\n```\n$ node example/parse.js -x 3 -y 4 -n5 -abc --beep=boop foo bar baz\n{ _: [ 'foo', 'bar', 'baz' ],\n  x: 3,\n  y: 4,\n  n: 5,\n  a: true,\n  b: true,\n  c: true,\n  beep: 'boop' }\n```\n\n# methods\n\n``` js\nvar parseArgs = require('minimist')\n```\n\n## var argv = parseArgs(args, opts={})\n\nReturn an argument object `argv` populated with the array arguments from `args`.\n\n`argv._` contains all the arguments that didn't have an option associated with\nthem.\n\nNumeric-looking arguments will be returned as numbers unless `opts.string` or\n`opts.boolean` is set for that argument name.\n\nAny arguments after `'--'` will not be parsed and will end up in `argv._`.\n\noptions can be:\n\n* `opts.string` - a string or array of strings argument names to always treat as\nstrings\n* `opts.boolean` - a string or array of strings to always treat as booleans\n* `opts.alias` - an object mapping string names to strings or arrays of string\nargument names to use as aliases\n* `opts.default` - an object mapping string argument names to default values\n\n# install\n\nWith [npm](https://npmjs.org) do:\n\n```\nnpm install minimist\n```\n\n# license\n\nMIT\n",
+  "readmeFilename": "readme.markdown",
+  "bugs": {
+    "url": "https://github.com/substack/minimist/issues"
+  },
+  "_id": "minimist@0.0.10",
+  "_from": "minimist@~0.0.1"
+}

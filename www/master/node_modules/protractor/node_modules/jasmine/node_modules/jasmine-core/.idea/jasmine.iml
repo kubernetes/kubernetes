@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<module type="RUBY_MODULE" version="4">
+  <component name="GemRequirementsHolder" version="3">
+    <requirement>
+      <requirement>
+        <dependency name="frank" version="0" bound="GREATER_OR_EQUAL" git="false" path="false" doRequire="true" />
+      </requirement>
+      <source from="Gemfile" />
+    </requirement>
+    <requirement>
+      <requirement>
+        <dependency name="json_pure" version="1.4.3" bound="LATEST_IN_BRANCH" git="false" path="false" doRequire="true" />
+      </requirement>
+      <source from="Gemfile" />
+    </requirement>
+    <requirement>
+      <requirement>
+        <dependency name="ragaskar-jsdoc_helper" version="0" bound="GREATER_OR_EQUAL" git="false" path="false" doRequire="true" />
+      </requirement>
+      <source from="Gemfile" />
+    </requirement>
+    <requirement>
+      <requirement>
+        <dependency name="rake" version="0.8.7" bound="EQUAL" git="false" path="false" doRequire="true" />
+      </requirement>
+      <source from="Gemfile" />
+    </requirement>
+  </component>
+  <component name="NewModuleRootManager">
+    <content url="file://$MODULE_DIR$">
+      <excludeFolder url="file://$MODULE_DIR$/.bundle" />
+    </content>
+    <orderEntry type="inheritedJdk" />
+    <orderEntry type="sourceFolder" forTests="false" />
+    <orderEntry type="library" scope="PROVIDED" name="bundler (v1.0.9, Ruby SDK 1.8.7-p174 [jasmine]) [gem]" level="application" />
+    <orderEntry type="library" scope="PROVIDED" name="daemons (v1.0.10, Ruby SDK 1.8.7-p174 [jasmine]) [gem]" level="application" />
+    <orderEntry type="library" scope="PROVIDED" name="frank (v1.0.8, Ruby SDK 1.8.7-p174 [jasmine]) [gem]" level="application" />
+    <orderEntry type="library" scope="PROVIDED" name="gem_plugin (v0.2.3, Ruby SDK 1.8.7-p174 [jasmine]) [gem]" level="application" />
+    <orderEntry type="library" scope="PROVIDED" name="json_pure (v1.5.1, Ruby SDK 1.8.7-p174 [jasmine]) [gem]" level="application" />
+    <orderEntry type="library" scope="PROVIDED" name="mongrel (v1.2.0.pre2, Ruby SDK 1.8.7-p174 [jasmine]) [gem]" level="application" />
+    <orderEntry type="library" scope="PROVIDED" name="net-scp (v1.0.4, Ruby SDK 1.8.7-p174 [jasmine]) [gem]" level="application" />
+    <orderEntry type="library" scope="PROVIDED" name="ragaskar-jsdoc_helper (v0.0.2.1, Ruby SDK 1.8.7-p174 [jasmine]) [gem]" level="application" />
+    <orderEntry type="library" scope="PROVIDED" name="term-ansicolor (v1.0.5, Ruby SDK 1.8.7-p174 [jasmine]) [gem]" level="application" />
+  </component>
+</module>
+

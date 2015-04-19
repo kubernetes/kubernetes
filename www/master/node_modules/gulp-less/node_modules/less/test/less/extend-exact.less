@@ -1,0 +1,46 @@
+.replace.replace,
+.c.replace + .replace {
+  .replace,
+  .c {
+    prop: copy-paste-replace;
+  }
+}
+.rep_ace:extend(.replace.replace .replace) {}
+
+.a .b .c {
+  prop: not_effected;
+}
+
+.a {
+  prop: is_effected;
+  .b {
+    prop: not_effected;
+  }
+  .b.c {
+    prop: not_effected;
+  }
+}
+
+.c, .a {
+  .b, .a {
+    .a, .c {
+      prop: not_effected;
+    }
+  }
+}
+
+.effected {
+  &:extend(.a);
+  &:extend(.b);
+  &:extend(.c);
+}
+
+.e {
+  && {
+    prop: extend-double;
+    &:hover {
+      hover: not-extended;
+    }
+  }
+}
+.dbl:extend(.e.e) {}

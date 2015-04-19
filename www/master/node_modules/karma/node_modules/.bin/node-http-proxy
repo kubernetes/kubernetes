@@ -1,0 +1,113 @@
+#!/usr/bin/env node
+
+var path = require('path'),
+    fs = require('fs'),
+    util  = require('util'),
+    argv = require('optimist').argv,
+    httpProxy = require('../lib/node-http-proxy');
+
+var help = [
+    "usage: node-http-proxy [options] ",
+    "",
+    "Starts a node-http-proxy server using the specified command-line options",
+    "",
+    "options:",
+    "  --port   PORT       Port that the proxy server should run on",
+    "  --host   HOST       Host that the proxy server should run on",
+    "  --target HOST:PORT  Location of the server the proxy will target",
+    "  --config OUTFILE    Location of the configuration file for the proxy server",
+    "  --silent            Silence the log output from the proxy server",
+    "  --user   USER       User to drop privileges to once server socket is bound",
+    "  -h, --help          You're staring at it"
+].join('\n');
+
+if (argv.h || argv.help || Object.keys(argv).length === 2) {
+  return util.puts(help);
+}
+
+var location, config = {},
+    port = argv.port || 80, 
+    host = argv.host || undefined, 
+    target = argv.target;
+    user = argv.user;
+
+//
+// If we were passed a config, parse it
+//
+if (argv.config) {
+  try {
+    var data = fs.readFileSync(argv.config);
+    config = JSON.parse(data.toString());
+  } catch (ex) {
+    util.puts('Error starting node-http-proxy: ' + ex);
+    process.exit(1);
+  }
+}
+
+//
+// If `config.https` is set, then load the required file contents into the config options.
+//
+if (config.https) {
+  Object.keys(config.https).forEach(function (key) {
+    // If CA certs are specified, load those too.
+    if (key === "ca") {
+      for (var i=0; i < config.https.ca.length; i++) {
+        if (config.https.ca === undefined) {
+          config.https.ca = [];
+        }
+        config.https.ca[i] = fs.readFileSync(config.https[key][i], 'utf8');
+      }
+    } else {
+      config.https[key] = fs.readFileSync(config.https[key], 'utf8');
+    }
+  });
+}
+
+//
+// Check to see if we should silence the logs
+//
+config.silent = typeof argv.silent !== 'undefined' ? argv.silent : config.silent;
+
+//
+// If we were passed a target, parse the url string
+//
+if (typeof target === 'string') location = target.split(':');
+
+//
+// Create the server with the specified options
+//
+var server;
+if (location) {
+  var targetPort = location.length === 1 ? 80 : parseInt(location[1]);
+  server = httpProxy.createServer(targetPort, location[0], config);
+}
+else if (config.router) {
+  server = httpProxy.createServer(config);
+}
+else {
+  return util.puts(help);
+}
+
+//
+// Start the server
+//
+if (host) {
+  server.listen(port, host);
+} else {
+  server.listen(port);
+}
+
+
+//
+// Drop privileges if requested
+//
+if (typeof user === 'string') {
+    process.setuid(user);
+}
+
+//
+// Notify that the server is started
+//
+if (!config.silent) {
+  util.puts('node-http-proxy server now listening on port: ' + port);
+}

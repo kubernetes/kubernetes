@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<!--
+The entry point for client. This file is loaded just once when the client is captured.
+It contains socket.io and all the communication logic.
+-->
+<html>
+<head>
+  <title>Karma</title>
+  <!-- TOOD(vojta): create simple favicon and cache it -->
+  <link href="data:image/x-icon;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQEAYAAABPYyMiAAAABmJLR0T///////8JWPfcAAAACXBIWXMAAABIAAAASABGyWs+AAAAF0lEQVRIx2NgGAWjYBSMglEwCkbBSAcACBAAAeaR9cIAAAAASUVORK5CYII=" rel="icon" type="image/x-icon">
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <style type="text/css">
+    iframe {
+      height: 100%;
+      width: 100%;
+      border: 0;
+    }
+
+    html, body {
+      height: 100%;
+      padding: 0;
+      margin: 0;
+
+      font-family: sans-serif;
+    }
+
+    .offline {
+      background: #DDD;
+    }
+
+    .online {
+      background: #6C4;
+
+    }
+
+    .iddle {
+    }
+
+    .executing {
+      background: #F99;
+    }
+
+    #banner {
+      padding: 5px 10px;
+    }
+
+    h1 {
+      font-size: 1.8em;
+      margin: 0;
+      padding: 0;
+    }
+
+    ul {
+      margin: 0;
+      padding: 0;
+
+      list-style: none;
+    }
+
+    li {
+      padding: 5px 12px;
+    }
+
+    .btn-debug {
+      float: right;
+    }
+
+    .offline .btn-debug {
+      display: none;
+    }
+
+    .btn-debug {
+      -moz-box-shadow:inset 0px 1px 0px 0px #ffffff;
+      -webkit-box-shadow:inset 0px 1px 0px 0px #ffffff;
+      box-shadow:inset 0px 1px 0px 0px #ffffff;
+      background:-webkit-gradient( linear, left top, left bottom, color-stop(0.05, #ffffff), color-stop(1, #f6f6f6) );
+      background:-moz-linear-gradient( center top, #ffffff 5%, #f6f6f6 100% );
+      filter:progid:DXImageTransform.Microsoft.gradient(startColorstr='#ffffff', endColorstr='#f6f6f6');
+      background-color:#ffffff;
+      -moz-border-radius:6px;
+      -webkit-border-radius:6px;
+      border-radius:6px;
+      border:1px solid #dcdcdc;
+      display:inline-block;
+      color:#666666;
+      font-family:arial;
+      font-size:15px;
+      font-weight:bold;
+      padding:6px 24px;
+      text-decoration:none;
+      text-shadow:1px 1px 0px #ffffff;
+    }
+
+    .btn-debug:hover {
+      background:-webkit-gradient( linear, left top, left bottom, color-stop(0.05, #f6f6f6), color-stop(1, #ffffff) );
+      background:-moz-linear-gradient( center top, #f6f6f6 5%, #ffffff 100% );
+      filter:progid:DXImageTransform.Microsoft.gradient(startColorstr='#f6f6f6', endColorstr='#ffffff');
+      background-color:#f6f6f6;
+    }
+  </style>
+</head>
+<body>
+  <div id="banner" class="offline">
+    <a href="debug.html" target="_blank" class="btn-debug">DEBUG</a>
+    <h1 id="title">Karma - starting</h1>
+  </div>
+
+  <ul id="browsers"></ul>
+
+  <iframe id="context" src="about:blank" width="100%" height="100%"></iframe>
+
+  <script src="socket.io/socket.io.js"></script>
+  <script src="karma.js"></script>
+</body>
+</html>

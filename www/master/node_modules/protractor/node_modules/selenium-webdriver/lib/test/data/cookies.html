@@ -1,0 +1,30 @@
+<html>
+<head>
+    <title>Testing cookies</title>
+
+    <script type="text/javascript">
+        function setCookie(domain, name) {
+            document.cookie = name + "=ok;path=/;domain=" + domain;            
+        }
+
+        function showCookie() {
+            document.getElementById("result").innerHTML = "<p>" + document.cookie + "</p>";
+        }
+    </script>
+</head>
+<body onload="showCookie();">
+<h2>Cookie Mashing</h2>
+    .com <a href="#" onclick="setCookie('.com', 'the.com_one'); showCookie(); return false;">Click</a></br />
+    . <a href="#" onclick="setCookie('.', 'the.one'); showCookie(); return false;">Click</a></br />
+    google.com <a href="#" onclick="setCookie('google.com', 'google'); showCookie(); return false;">Click</a></br />
+    .google.com <a href="#" onclick="setCookie('.google.com', '.google'); showCookie(); return false;">Click</a></br />
+    127.0.0.1 <a href="#" onclick="setCookie('127.0.0.1', 'localhost'); showCookie(); return false;">Click</a></br />
+    localhost:3001 <a href="#" onclick="setCookie('mency.ad.corp.google.com:62210', 'with_port'); showCookie(); return false;">Click</a></br />
+    .google:3001 <a href="#" onclick="setCookie('.google.com:62210', 'with_domain_and_port'); showCookie(); return false;">Click</a></br />
+    172.16.12.225 <a href="#" onclick="setCookie('172.16.12.225', 'raw_IP'); showCookie(); return false;">Click</a></br />  
+    172.16.12.225:port <a href="#" onclick="setCookie('172.16.12.225:62210', 'raw_IP_and_port'); showCookie(); return false;">Click</a></br />
+    <a href="#" onclick="document.cookie = 'foo=bar;path=/common/galaxy';">Set on a different path</a>
+
+<div id="result"></div>
+</body>
+</html>

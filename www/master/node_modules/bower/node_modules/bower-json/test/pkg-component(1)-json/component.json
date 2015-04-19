@@ -1,0 +1,14 @@
+{
+  "name": "route",
+  "repo": "apily/route",
+  "version": "0.0.1",
+  "description": "Route component",
+  "keywords": ["router", "route"],
+  "scripts": ["index.js"],
+  "dependencies": {},
+  "development": {
+    "component/assert": "*",
+    "visionmedia/mocha": "*"
+  },
+  "license": "MIT"
+}

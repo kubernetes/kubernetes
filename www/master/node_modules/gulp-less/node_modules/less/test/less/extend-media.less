@@ -1,0 +1,24 @@
+.ext1 .ext2 {
+  background: black;
+}
+
+@media tv {
+  .ext1 .ext3 {
+    color: white;
+  }
+  .tv-lowres :extend(.ext1 all) {
+    background: blue;
+  }
+  @media hires {
+    .ext1 .ext4 {
+      color: green;
+    }
+    .tv-hires :extend(.ext1 all) {
+      background: red;
+    }
+  }
+}
+
+.all:extend(.ext1 all) {
+
+}

@@ -1,0 +1,64 @@
+{
+  // == Enforcing Options =====================================================
+
+  "bitwise"       : true
+, "camelcase"     : true
+, "curly"         : true
+, "eqeqeq"        : true
+, "forin"         : false
+, "immed"         : true
+, "latedef"       : false
+, "newcap"        : true
+, "noarg"         : true
+, "noempty"       : true
+, "nonew"         : true
+, "plusplus"      : true
+, "quotmark"      : true
+, "regexp"        : true
+, "undef"         : true
+, "unused"        : true
+, "strict"        : false
+, "trailing"      : true
+
+, "indent"        : 2
+, "maxparams"     : 4
+, "maxdepth"      : 4
+, "maxstatements" : 15
+, "maxcomplexity" : 15
+, "maxlen"        : 100
+
+  // == Relaxing Options ======================================================
+
+, "asi"           : false
+, "boss"          : false
+, "debug"         : false
+, "eqnull"        : true
+, "es5"           : false
+, "esnext"        : false
+, "evil"          : false
+, "expr"          : false
+, "funcscope"     : false
+, "globalstrict"  : false
+, "iterator"      : false
+, "lastsemic"     : false
+, "laxbreak"      : false
+, "laxcomma"      : false
+, "loopfunc"      : false
+, "multistr"      : false
+, "onecase"       : false
+, "proto"         : false
+, "regexdash"     : false
+, "scripturl"     : false
+, "smarttabs"     : false
+, "shadow"        : false
+, "sub"           : false
+, "supernew"      : false
+, "validthis"     : false
+
+  // == Environments ==========================================================
+
+, "browser"       : false
+, "devel"         : false
+, "node"          : true
+
+}

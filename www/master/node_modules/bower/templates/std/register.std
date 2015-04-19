@@ -1,0 +1,5 @@
+Package {{#cyan}}{{name}}{{/cyan}} registered successfully!
+All valid semver tags on {{#cyan}}{{url}}{{/cyan}} will be available as versions.
+To publish a new version, just release a valid semver tag.
+
+Run {{#cyan}}bower info {{name}}{{/cyan}} to list the available versions.

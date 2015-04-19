@@ -1,0 +1,16 @@
+{
+    "command": "cache clean",
+    "description": "Cleans cached packages.",
+    "usage": [
+        "cache clean [<options>]",
+        "cache clean <name> [<name> ...] [<options>]",
+        "cache clean <name>#<version> [<name>#<version> ..] [<options>]"
+    ],
+    "options": [
+        {
+            "shorthand":   "-h",
+            "flag":        "--help",
+            "description": "Show this help message"
+        }
+    ]
+}

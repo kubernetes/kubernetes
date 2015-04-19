@@ -1,0 +1,34 @@
+﻿<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <title>Session cookie destination</title>
+    <script type="text/javascript">
+    //Get cookie routine by Shelley Powers 
+    function get_cookie(Name) {
+        var search = Name + "=";
+        var returnvalue = "";
+        if (document.cookie.length > 0) {
+            offset = document.cookie.indexOf(search);
+            // if cookie exists
+            if (offset != -1) {
+                offset += search.length;
+                // set index of beginning of value
+                end = document.cookie.indexOf(";", offset);
+                // set index of end of cookie value
+                if (end == -1) end = document.cookie.length;
+                returnvalue=unescape(document.cookie.substring(offset, end))
+            }
+        }
+        return returnvalue;
+    }
+
+    function setcolor(){
+        document.body.style.backgroundColor=get_cookie("bgcolor")
+    }
+    </script>
+</head>
+<body onload="setcolor()">
+This is the cookie destination page.
+</body>
+</html>

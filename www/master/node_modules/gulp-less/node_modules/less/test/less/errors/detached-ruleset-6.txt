@@ -1,0 +1,4 @@
+ParseError: Unrecognised input in {path}detached-ruleset-6.less on line 2, column 3:
+1 .a {
+2   b: {
+3     color: red;

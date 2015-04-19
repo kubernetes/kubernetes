@@ -1,0 +1,9 @@
+echo curl -X POST http://localhost:35729/changed \
+  -H "Content-Type: application/json" \
+  -d "{ \"files\": true }"
+
+echo
+
+curl -X POST http://localhost:35729/changed \
+  -H "Content-Type: application/json" \
+  -d "{ \"files\": true }"

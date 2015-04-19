@@ -1,0 +1,9 @@
+{
+  "k8sApiServer": "ENV_K8S_API_SERVER",
+  "k8sDataServer": "ENV_K8S_DATA_SERVER",
+  "k8sDataPollMinIntervalSec": "ENV_K8S_DATA_POLL_MIN_INTERVAL_SEC",
+  "k8sDataPollMaxIntervalSec": "ENV_K8S_DATA_POLL_MAX_INTERVAL_SEC",
+  "k8sDataPollErrorThreshold": "ENV_K8S_DATA_POLL_ERROR_THRESHOLD",
+  "cAdvisorProxy": "ENV_C_ADVISOR_PROXY",
+  "cAdvisorPort": "ENV_C_ADVISOR_PORT"
+}

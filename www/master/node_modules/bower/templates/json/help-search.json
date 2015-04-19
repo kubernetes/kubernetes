@@ -1,0 +1,15 @@
+{
+    "command": "search",
+    "description": "Finds all packages or a specific package.",
+    "usage": [
+        "search [<options>]",
+        "search <name> [<options>]"
+    ],
+    "options": [
+        {
+            "shorthand":   "-h",
+            "flag":        "--help",
+            "description": "Show this help message"
+        }
+    ]
+}

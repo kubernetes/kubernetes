@@ -1,0 +1,5 @@
+language: node_js
+npm_args: --ws:native
+node_js:
+  - "0.8"
+  - "0.10"

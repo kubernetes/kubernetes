@@ -1,0 +1,45 @@
+{
+  "name": "range-parser",
+  "author": {
+    "name": "TJ Holowaychuk",
+    "email": "tj@vision-media.ca",
+    "url": "http://tjholowaychuk.com"
+  },
+  "description": "Range header field string parser",
+  "version": "0.0.4",
+  "main": "index.js",
+  "dependencies": {},
+  "devDependencies": {
+    "mocha": "*",
+    "should": "*"
+  },
+  "_npmUser": {
+    "name": "tjholowaychuk",
+    "email": "tj@vision-media.ca"
+  },
+  "_id": "range-parser@0.0.4",
+  "optionalDependencies": {},
+  "engines": {
+    "node": "*"
+  },
+  "_engineSupported": true,
+  "_npmVersion": "1.1.19",
+  "_nodeVersion": "v0.6.16",
+  "_defaultsLoaded": true,
+  "dist": {
+    "shasum": "c0427ffef51c10acba0782a46c9602e744ff620b",
+    "tarball": "http://registry.npmjs.org/range-parser/-/range-parser-0.0.4.tgz"
+  },
+  "maintainers": [
+    {
+      "name": "tjholowaychuk",
+      "email": "tj@vision-media.ca"
+    }
+  ],
+  "directories": {},
+  "_shasum": "c0427ffef51c10acba0782a46c9602e744ff620b",
+  "_from": "range-parser@0.0.4",
+  "_resolved": "https://registry.npmjs.org/range-parser/-/range-parser-0.0.4.tgz",
+  "readme": "\n# node-range-parser\n\n  Range header field parser.\n\n## Example:\n\n```js\nassert(-1 == parse(200, 'bytes=500-20'));\nassert(-2 == parse(200, 'bytes=malformed'));\nparse(200, 'bytes=0-499').should.eql(arr('bytes', [{ start: 0, end: 199 }]));\nparse(1000, 'bytes=0-499').should.eql(arr('bytes', [{ start: 0, end: 499 }]));\nparse(1000, 'bytes=40-80').should.eql(arr('bytes', [{ start: 40, end: 80 }]));\nparse(1000, 'bytes=-500').should.eql(arr('bytes', [{ start: 500, end: 999 }]));\nparse(1000, 'bytes=-400').should.eql(arr('bytes', [{ start: 600, end: 999 }]));\nparse(1000, 'bytes=500-').should.eql(arr('bytes', [{ start: 500, end: 999 }]));\nparse(1000, 'bytes=400-').should.eql(arr('bytes', [{ start: 400, end: 999 }]));\nparse(1000, 'bytes=0-0').should.eql(arr('bytes', [{ start: 0, end: 0 }]));\nparse(1000, 'bytes=-1').should.eql(arr('bytes', [{ start: 999, end: 999 }]));\nparse(1000, 'items=0-5').should.eql(arr('items', [{ start: 0, end: 5 }]));\nparse(1000, 'bytes=40-80,-1').should.eql(arr('bytes', [{ start: 40, end: 80 }, { start: 999, end: 999 }]));\n```\n\n## Installation\n\n```\n$ npm install range-parser\n```",
+  "readmeFilename": "Readme.md"
+}

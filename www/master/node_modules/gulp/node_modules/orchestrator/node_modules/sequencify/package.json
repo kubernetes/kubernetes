@@ -1,0 +1,44 @@
+{
+  "name": "sequencify",
+  "description": "A module for sequencing tasks and dependencies",
+  "version": "0.0.7",
+  "homepage": "https://github.com/robrich/sequencify",
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/robrich/sequencify.git"
+  },
+  "author": {
+    "name": "Rob Richardson",
+    "url": "http://robrich.org/"
+  },
+  "main": "./index.js",
+  "keywords": [
+    "task",
+    "sequence",
+    "sequencer",
+    "compose"
+  ],
+  "devDependencies": {
+    "mocha": "~1.16.1",
+    "should": "~2.1.1"
+  },
+  "scripts": {
+    "test": "mocha"
+  },
+  "engines": {
+    "node": ">= 0.4"
+  },
+  "licenses": [
+    {
+      "type": "MIT",
+      "url": "http://github.com/robrich/sequencify/raw/master/LICENSE"
+    }
+  ],
+  "readme": "![status](https://secure.travis-ci.org/robrich/sequencify.png?branch=master)\r\n\r\nSequencify\r\n==========\r\n\r\nA module for sequencing tasks and dependencies\r\n\r\nUsage\r\n-----\r\n\r\n```javascript\r\nvar sequencify = require('sequencify');\r\n\r\nvar items = {\r\n  a: {\r\n    name: 'a',\r\n    dep: []\r\n    // other properties as needed\r\n  },\r\n  b: {\r\n    name: 'b',\r\n    dep: ['a']\r\n  },\r\n  c: {\r\n    name: 'c',\r\n    dep: ['a']\r\n  },\r\n  d: {\r\n    name: 'd',\r\n    dep: ['c']\r\n  },\r\n};\r\n\r\nvar names = ['d', 'b', 'c', 'a']; // The names of the items you want arranged, need not be all\r\n\r\nvar results = [];\r\n\r\nsequencify(items, names, results);\r\n\r\nconsole.log(results);\r\n// ['a','b','c','d'];\r\n```\r\n\r\nLICENSE\r\n-------\r\n\r\n(MIT License)\r\n\r\nCopyright (c) 2013 [Richardson & Sons, LLC](http://richardsonandsons.com/)\r\n\r\nPermission is hereby granted, free of charge, to any person obtaining\r\na copy of this software and associated documentation files (the\r\n\"Software\"), to deal in the Software without restriction, including\r\nwithout limitation the rights to use, copy, modify, merge, publish,\r\ndistribute, sublicense, and/or sell copies of the Software, and to\r\npermit persons to whom the Software is furnished to do so, subject to\r\nthe following conditions:\r\n\r\nThe above copyright notice and this permission notice shall be\r\nincluded in all copies or substantial portions of the Software.\r\n\r\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND,\r\nEXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF\r\nMERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND\r\nNONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE\r\nLIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION\r\nOF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION\r\nWITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.\r\n",
+  "readmeFilename": "README.md",
+  "bugs": {
+    "url": "https://github.com/robrich/sequencify/issues"
+  },
+  "_id": "sequencify@0.0.7",
+  "_from": "sequencify@~0.0.7"
+}

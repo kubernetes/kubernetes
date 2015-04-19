@@ -1,0 +1,19 @@
+{
+  "name": "debug",
+  "repo": "visionmedia/debug",
+  "description": "small debugging utility",
+  "version": "2.0.0",
+  "keywords": [
+    "debug",
+    "log",
+    "debugger"
+  ],
+  "main": "browser.js",
+  "scripts": [
+    "browser.js",
+    "debug.js"
+  ],
+  "dependencies": {
+    "guille/ms.js": "0.6.1"
+  }
+}

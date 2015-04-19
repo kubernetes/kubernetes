@@ -1,0 +1,57 @@
+{
+  "name": "duplexer",
+  "version": "0.1.1",
+  "description": "Creates a duplex stream",
+  "keywords": [],
+  "author": {
+    "name": "Raynos",
+    "email": "raynos2@gmail.com"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/Raynos/duplexer.git"
+  },
+  "main": "index",
+  "homepage": "https://github.com/Raynos/duplexer",
+  "contributors": [
+    {
+      "name": "Jake Verbaten"
+    }
+  ],
+  "bugs": {
+    "url": "https://github.com/Raynos/duplexer/issues",
+    "email": "raynos2@gmail.com"
+  },
+  "devDependencies": {
+    "tape": "0.3.3",
+    "through": "~0.1.4"
+  },
+  "licenses": [
+    {
+      "type": "MIT",
+      "url": "http://github.com/Raynos/duplexer/raw/master/LICENSE"
+    }
+  ],
+  "scripts": {
+    "test": "node test"
+  },
+  "testling": {
+    "files": "test/index.js",
+    "browsers": [
+      "ie/8..latest",
+      "firefox/16..latest",
+      "firefox/nightly",
+      "chrome/22..latest",
+      "chrome/canary",
+      "opera/12..latest",
+      "opera/next",
+      "safari/5.1..latest",
+      "ipad/6.0..latest",
+      "iphone/6.0..latest"
+    ]
+  },
+  "readme": "# duplexer\n\n[![build status][1]][2] [![dependency status][3]][4]\n\n[![browser support][5]][6]\n\nCreates a duplex stream\n\nTaken from [event-stream][7]\n\n## duplex (writeStream, readStream)\n\nTakes a writable stream and a readable stream and makes them appear as a readable writable stream.\n\nIt is assumed that the two streams are connected to each other in some way.\n\n## Example\n\n```js\nvar grep = cp.exec('grep Stream')\n\nduplex(grep.stdin, grep.stdout)\n```\n\n## Installation\n\n`npm install duplexer`\n\n## Tests\n\n`npm test`\n\n## Contributors\n\n - Dominictarr\n - Raynos\n - samccone\n\n## MIT Licenced\n\n  [1]: https://secure.travis-ci.org/Raynos/duplexer.png\n  [2]: https://travis-ci.org/Raynos/duplexer\n  [3]: https://david-dm.org/Raynos/duplexer.png\n  [4]: https://david-dm.org/Raynos/duplexer\n  [5]: https://ci.testling.com/Raynos/duplexer.png\n  [6]: https://ci.testling.com/Raynos/duplexer\n  [7]: https://github.com/dominictarr/event-stream#duplex-writestream-readstream\n",
+  "readmeFilename": "README.md",
+  "_id": "duplexer@0.1.1",
+  "_from": "duplexer@~0.1.1"
+}

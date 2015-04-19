@@ -1,0 +1,32 @@
+{
+  "name": "config-chain",
+  "version": "1.1.8",
+  "description": "HANDLE CONFIGURATION ONCE AND FOR ALL",
+  "homepage": "http://github.com/dominictarr/config-chain",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/dominictarr/config-chain.git"
+  },
+  "dependencies": {
+    "proto-list": "~1.2.1",
+    "ini": "1"
+  },
+  "devDependencies": {
+    "tap": "0.3.0"
+  },
+  "author": {
+    "name": "Dominic Tarr",
+    "email": "dominic.tarr@gmail.com",
+    "url": "http://dominictarr.com"
+  },
+  "scripts": {
+    "test": "tap test/"
+  },
+  "readme": "#config-chain\n\nUSE THIS MODULE TO LOAD ALL YOUR CONFIGURATIONS\n\n``` js\n\n  //npm install config-chain\n\n  var cc = require('config-chain')\n    , opts = require('optimist').argv //ALWAYS USE OPTIMIST FOR COMMAND LINE OPTIONS.\n    , env = opts.env || process.env.YOUR_APP_ENV || 'dev' //SET YOUR ENV LIKE THIS.\n\n  // EACH ARG TO CONFIGURATOR IS LOADED INTO CONFIGURATION CHAIN\n  // EARLIER ITEMS OVERIDE LATER ITEMS\n  // PUTS COMMAND LINE OPTS FIRST, AND DEFAULTS LAST!\n\n  //strings are interpereted as filenames.\n  //will be loaded synchronously\n\n  var conf =\n  cc(\n    //OVERRIDE SETTINGS WITH COMMAND LINE OPTS\n    opts,\n\n    //ENV VARS IF PREFIXED WITH 'myApp_'\n\n    cc.env('myApp_'), //myApp_foo = 'like this'\n\n    //FILE NAMED BY ENV\n    path.join(__dirname,  'config.' + env + '.json'),\n\n    //IF `env` is PRODUCTION\n    env === 'prod'\n      ? path.join(__dirname, 'special.json') //load a special file\n      : null //NULL IS IGNORED!\n\n    //SUBDIR FOR ENV CONFIG\n    path.join(__dirname,  'config', env, 'config.json'),\n\n    //SEARCH PARENT DIRECTORIES FROM CURRENT DIR FOR FILE\n    cc.find('config.json'),\n\n    //PUT DEFAULTS LAST\n    {\n      host: 'localhost'\n      port: 8000\n    })\n\n  var host = conf.get('host')\n\n  // or\n\n  var host = conf.store.host\n\n```\n\nFINALLY, EASY FLEXIBLE CONFIGURATIONS!\n\n##see also: [proto-list](https://github.com/isaacs/proto-list/)\n\nWHATS THAT YOU SAY?\n\nYOU WANT A \"CLASS\" SO THAT YOU CAN DO CRAYCRAY JQUERY CRAPS?\n\nEXTEND WITH YOUR OWN FUNCTIONALTY!?\n\n## CONFIGCHAIN LIVES TO SERVE ONLY YOU!\n\n```javascript\nvar cc = require('config-chain')\n\n// all the stuff you did before\nvar config = cc({\n      some: 'object'\n    },\n    cc.find('config.json'),\n    cc.env('myApp_')\n  )\n  // CONFIGS AS A SERVICE, aka \"CaaS\", aka EVERY DEVOPS DREAM OMG!\n  .addUrl('http://configurator:1234/my-configs')\n  // ASYNC FTW!\n  .addFile('/path/to/file.json')\n\n  // OBJECTS ARE OK TOO, they're SYNC but they still ORDER RIGHT\n  // BECAUSE PROMISES ARE USED BUT NO, NOT *THOSE* PROMISES, JUST\n  // ACTUAL PROMISES LIKE YOU MAKE TO YOUR MOM, KEPT OUT OF LOVE\n  .add({ another: 'object' })\n\n  // DIE A THOUSAND DEATHS IF THIS EVER HAPPENS!!\n  .on('error', function (er) {\n    // IF ONLY THERE WAS SOMETHIGN HARDER THAN THROW\n    // MY SORROW COULD BE ADEQUATELY EXPRESSED.  /o\\\n    throw er\n  })\n\n  // THROW A PARTY IN YOUR FACE WHEN ITS ALL LOADED!!\n  .on('load', function (config) {\n    console.awesome('HOLY SHIT!')\n  })\n```\n\n# BORING API DOCS\n\n## cc(...args)\n\nMAKE A CHAIN AND ADD ALL THE ARGS.\n\nIf the arg is a STRING, then it shall be a JSON FILENAME.\n\nSYNC I/O!\n\nRETURN THE CHAIN!\n\n## cc.json(...args)\n\nJoin the args INTO A JSON FILENAME!\n\nSYNC I/O!\n\n## cc.find(relativePath)\n\nSEEK the RELATIVE PATH by climbing the TREE OF DIRECTORIES.\n\nRETURN THE FOUND PATH!\n\nSYNC I/O!\n\n## cc.parse(content, file, type)\n\nParse the content string, and guess the type from either the\nspecified type or the filename.\n\nRETURN THE RESULTING OBJECT!\n\nNO I/O!\n\n## cc.env(prefix, env=process.env)\n\nGet all the keys on the provided env object (or process.env) which are\nprefixed by the specified prefix, and put the values on a new object.\n\nRETURN THE RESULTING OBJECT!\n\nNO I/O!\n\n## cc.ConfigChain()\n\nThe ConfigChain class for CRAY CRAY JQUERY STYLE METHOD CHAINING!\n\nOne of these is returned by the main exported function, as well.\n\nIt inherits (prototypically) from\n[ProtoList](https://github.com/isaacs/proto-list/), and also inherits\n(parasitically) from\n[EventEmitter](http://nodejs.org/api/events.html#events_class_events_eventemitter)\n\nIt has all the methods from both, and except where noted, they are\nunchanged.\n\n### LET IT BE KNOWN THAT chain IS AN INSTANCE OF ConfigChain.\n\n## chain.sources\n\nA list of all the places where it got stuff.  The keys are the names\npassed to addFile or addUrl etc, and the value is an object with some\ninfo about the data source.\n\n## chain.addFile(filename, type, [name=filename])\n\nFilename is the name of the file.  Name is an arbitrary string to be\nused later if you desire.  Type is either 'ini' or 'json', and will\ntry to guess intelligently if omitted.\n\nLoaded files can be saved later.\n\n## chain.addUrl(url, type, [name=url])\n\nSame as the filename thing, but with a url.\n\nCan't be saved later.\n\n## chain.addEnv(prefix, env, [name='env'])\n\nAdd all the keys from the env object that start with the prefix.\n\n## chain.addString(data, file, type, [name])\n\nParse the string and add it to the set.  (Mainly used internally.)\n\n## chain.add(object, [name])\n\nAdd the object to the set.\n\n## chain.root {Object}\n\nThe root from which all the other config objects in the set descend\nprototypically.\n\nPut your defaults here.\n\n## chain.set(key, value, name)\n\nSet the key to the value on the named config object.  If name is\nunset, then set it on the first config object in the set.  (That is,\nthe one with the highest priority, which was added first.)\n\n## chain.get(key, [name])\n\nGet the key from the named config object explicitly, or from the\nresolved configs if not specified.\n\n## chain.save(name, type)\n\nWrite the named config object back to its origin.\n\nCurrently only supported for env and file config types.\n\nFor files, encode the data according to the type.\n\n## chain.on('save', function () {})\n\nWhen one or more files are saved, emits `save` event when they're all\nsaved.\n\n## chain.on('load', function (chain) {})\n\nWhen the config chain has loaded all the specified files and urls and\nsuch, the 'load' event fires.\n",
+  "readmeFilename": "readme.markdown",
+  "bugs": {
+    "url": "https://github.com/dominictarr/config-chain/issues"
+  },
+  "_id": "config-chain@1.1.8",
+  "_from": "config-chain@~1.1.8"
+}

@@ -1,0 +1,97 @@
+<html>
+<head>
+    <title>Hello WebDriver</title>
+</head>
+<body style="" name="body">
+<h1>Heading</h1>
+
+<p id="oneline">A single line of text</p>
+
+<div id="multiline">
+    <p>A div containing</p>
+    More than one line of text<br/>
+
+    <div>and block level elements</div>
+</div>
+
+<span id="span">An inline element</span>
+
+<p id="lotsofspaces">This line has lots
+
+    of spaces.
+</p>
+
+<p id="nbsp">This line has a&nbsp;non-breaking space</p>
+
+<p id="nbspandspaces">This line has a &nbsp; non-breaking space and spaces</p>
+
+<p id="multilinenbsp">These lines &nbsp<br />&nbsp have leading and trailing NBSPs&nbsp;&nbsp;</p>
+
+<p id="inline">This <span id="inlinespan">    line has <em>text</em>	</span> within elements that are meant to be displayed
+    <!-- not as a block but --> inline</p>
+
+<div id="div-with-pre">
+<p>before pre</p>
+<pre id="preformatted">   This section has a preformatted
+    text block    
+  split in four lines
+         </pre>
+<p>after pre</p>
+</div>
+
+<div id="twoblocks"><p>Some text</p><p>Some more text</p></div>
+
+<div id="nestedblocks">Cheese <div><p>Some text</p><div><p>Some more text</p><p>and also</p></div></div>Brie</div>
+
+<div id="collapsingtext"><span></span><div>Hello, world</div><span></span></div>
+
+<div id="withDocumentWrite">
+<script>
+document.write("with document.write");
+document.write(" and with document.write again");
+</script>
+</div>
+
+<form action="resultPage.html">
+    <p>
+        <input type="checkbox" id="checkbox1">
+        <label id="label1" for="checkbox1">foo<br />bar</label>
+    </p>
+</form>
+
+<div id="links">
+<a href="">   link with leading space</a>
+<a href="" id="linkWithTrailingSpace">link with trailing space   		
+</a>
+<a href=""><b>link with formatting tags</b></a>
+<a href="" id="quote">link with " (double quote)</a>
+<a href="" id="squote">link with ' (single quote)</a>
+<a href="" id="backslash">link with \ (backslash)</a>
+</div>
+
+<div style="text-indent:80%"><a href="resultPage.html" id="multilinelink">this link should break<br />on multiple lines</a></div>
+
+<div name="someDiv">Top level</div>
+<div id="containsSomeDiv">
+  <div name="someDiv">Nested</div>
+</div>
+
+<table id="wrappingtext">
+    <tbody>
+        <tr><td style="width: 10px;"><span>beforeSpace</span><span> </span><span>afterSpace</span></td></tr>
+    </tbody>
+</table>
+
+<!-- Here comes an invalid <img> tag which has no src attribute ... -->
+<img id="invalidImgTag" />
+
+<img id="validImgTag" src="icon.gif" />
+<a id="validAnchorTag" href="icon.gif">a link to an icon</a>
+
+<span id="simpleJsonText">{a="b", c=1, d=true}</span>
+<span id="complexJsonText">{a="\\b\\\"'\'"}</span>
+
+<span id="trimmedSpace">             ​‌‍  ⁠　test             ​‌‍  ⁠　</span>
+
+</body>
+</html>

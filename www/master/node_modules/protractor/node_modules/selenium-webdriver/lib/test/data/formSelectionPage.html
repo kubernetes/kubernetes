@@ -1,0 +1,46 @@
+<?xml version="1.0"?>
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head>
+    <title>Testing Typing into body</title>
+    <script type="text/javascript">
+        function setMessage(message) {
+            document.getElementById('result').innerHTML = message;
+        }
+
+        function showSelected() {
+          var selectElement = document.getElementById('multi');
+          if (selectElement == null) {
+            appendMessage("null!");
+          }
+
+          var options_array = selectElement.getElementsByTagName('option');
+          var selected_cheese = "";
+          for (var i = 0; i < options_array.length; i++) {
+            if (options_array[i].selected) {
+              selected_cheese = selected_cheese + options_array[i].label + " ";
+            }
+          }
+          setMessage(selected_cheese);
+        }
+    </script>
+</head>
+
+<body>
+  <h1>Type Stuff</h1>
+
+  <div id="result">
+    &nbsp;
+  </div>
+
+  <form action="" id="on-form" name="multichoice">
+    <select name="multi" id="multi" multiple="multiple">
+        <option selected="selected" label="emmental">Emmental</option>
+        <option label="roquefort" >Roquefort</option>
+        <option label="parmigiano">Parmigiano</option>
+        <option label="cheddar">Cheddar</option>
+    </select>
+  </form>
+
+  <input type="button" name="showselected" onclick="showSelected()" value="Show selected"/>
+</body>
+

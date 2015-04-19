@@ -1,0 +1,3 @@
+#! /bin/sh
+
+node -e "console.log(require('./lib').precompile('$1', {compat: false, trackIds: true, knownHelpersOnly: true}))"
