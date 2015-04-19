@@ -1,0 +1,59 @@
+<div class="dashboard">
+  <div ng-controller="ListPodsCtrl" style="padding:25px;" class="list-pods">
+
+    <md-whiteframe layout-margin class="md-whiteframe-z2">
+    <md-toolbar class="">
+      <div class="md-toolbar-tools">
+        Pods
+      </div>
+    </md-toolbar>
+    <md-content>
+
+
+        <div class="pod-group">
+          <md-grid-list md-cols="6" md-row-height="1:1.5" md-gutter="8px" ng-repeat="(podName, groupPods) in groupedPods">
+            <md-grid-tile md-rowspan="1" md-colspan="2" class="gray">
+              <md-grid-tile-footer>
+                <div class="pod-title"><h2>{{podName}}</h2></div>
+              </md-grid-tile-footer>
+            </md-grid-tile>
+
+            <md-grid-tile class="purple" md-rowspan="1" md-colspan="1" ng-repeat="pod in groupPods" >
+              <div>
+
+                <div>
+                  Containers:
+                  <span ng-repeat="container in pod.desiredState.manifest.containers">
+                    {{container.name}}
+                  </span>
+                </div>
+                <div>
+                  Images:
+                  <span ng-repeat="container in pod.desiredState.manifest.containers">
+                    {{container.image}}
+                  </span>
+                </div>
+                <div>Internal IP: {{pod.currentState.podIP}}</div>
+                <div>
+                Labels:
+                  <span ng-repeat="(label, value) in pod.labels">{{label}}={{value}}<span ng-show="!$last">, </span></span>
+                </div>
+                <div>Status: {{pod.currentState.status}}</div>
+              </div>
+              <md-grid-tile-footer>
+
+                <div class="pod-host">{{pod.currentState.host}}</div>
+                <div><a ng-href="/#/dashboard/pods/{{ pod.id }}"><h3>{{ pod.id }}</h3></a></div>
+
+              </md-grid-tile-footer>
+            </md-grid-tile>
+
+          </md-grid-list>
+        </div>
+
+
+    </md-content>
+    </md-whiteframe>
+
+  </div>
+</div>

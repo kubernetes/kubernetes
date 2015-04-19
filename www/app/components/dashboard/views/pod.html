@@ -1,0 +1,97 @@
+<div dashboard-header></div>
+<div class="dashboard">
+  <div ng-controller="PodCtrl" layout="column" class="body-wrapper pod">
+    <div class="detail">
+
+      <div class="back">
+        <div class="nav-back">
+          <a ng-click="doTheBack()">BACK</a>
+        </div>
+        <!-- <md-button class="md-default-theme" ng-click="doTheBack">BACK</md-button> -->
+      </div>
+
+      <div class="heading">
+        <span class="label">Pod:</span>
+        <span>{{pod.id}}</span>
+      </div>
+
+
+      <table>
+        <tbody>
+          <tr>
+            <td class="name">Status</td>
+            <td class="value">
+              {{pod.currentState.status}} on <a ng-href="/#/dashboard/groups/host/selector/host={{pod.currentState.host}}">{{pod.currentState.host}}</a>
+            </td>
+          </tr>
+
+          <tr>
+            <td class="name">Created</td>
+            <td class="value">
+              {{pod.creationTimestamp | date:'medium'}}
+            </td>
+          </tr>
+
+          <tr>
+            <td class="name">Pod Networking</td>
+            <td class="value">
+              {{pod.currentState.podIP}}
+              <span ng-repeat="container in pod.desiredState.manifest.containers">
+                    <span ng-repeat="port in container.ports">
+                     : {{port.containerPort}}
+                   </span>
+              </span>
+            </td>
+          </tr>
+
+          <tr>
+            <td class="name">Host Networking</td>
+            <td class="value">
+              {{pod.currentState.hostIP}}
+              <span ng-repeat="container in pod.desiredState.manifest.containers">
+                  <span ng-repeat="port in container.ports">
+                    :{{port.hostPort}}
+                  </span>
+              </span>
+            </td>
+          </tr>
+
+          <tr>
+            <td class="name">Labels</td>
+            <td class="value">
+              <div ng-repeat="(label, value) in pod.labels">
+                {{label}}: {{value}}
+              </div>
+            </td>
+          </tr>
+
+          <tr>
+            <td class="name">Containers</td>
+            <td class="value">
+
+              <table class="containerTable">
+                <tr>
+                  <td>Name</td>
+                  <td>Image</td>
+                  <td>Restarts</td>
+                </tr>
+                <tr ng-repeat="container in pod.desiredState.manifest.containers">
+                  <td>{{container.name}}</td>
+                  <td>{{container.image}}</td>
+                  <td>{{pod.currentState.info[container.name].restartCount}}</td>
+                </tr>
+              </table>
+
+            </td>
+          </tr>
+
+
+        </tbody>
+      </table>
+
+
+
+    </div>
+  </div>
+</div>
+<div dashboard-footer></div>
