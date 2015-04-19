@@ -39,9 +39,12 @@ import (
 	"github.com/spf13/pflag"
 )
 
+const DEFAULT_CONTAINERS_CIDR = "10.244.0.0/16"
+
 // ProxyServer contains configures and runs a Kubernetes proxy server
 type ProxyServer struct {
 	BindAddress        util.IP
+	ContainersCIDR     util.IPNet
 	HealthzPort        int
 	HealthzBindAddress util.IP
 	OOMScoreAdj        int
@@ -70,6 +73,7 @@ func (s *ProxyServer) AddFlags(fs *pflag.FlagSet) {
 	fs.IntVar(&s.OOMScoreAdj, "oom_score_adj", s.OOMScoreAdj, "The oom_score_adj value for kube-proxy process. Values must be within the range [-1000, 1000]")
 	fs.StringVar(&s.ResourceContainer, "resource_container", s.ResourceContainer, "Absolute name of the resource-only container to create and run the Kube-proxy in (Default: /kube-proxy).")
 	fs.StringVar(&s.Kubeconfig, "kubeconfig", s.Kubeconfig, "Path to kubeconfig file with authorization and master location information.")
+	fs.Var(&s.ContainersCIDR, "container_net", "Network CIDR that is used for the containers (defaults to "+DEFAULT_CONTAINERS_CIDR+")")
 }
 
 // Run runs the specified ProxyServer.  This should never exit.
@@ -77,6 +81,18 @@ func (s *ProxyServer) Run(_ []string) error {
 	// TODO(vmarmol): Use container config for this.
 	if err := util.ApplyOomScoreAdj(0, s.OOMScoreAdj); err != nil {
 		glog.Info(err)
+	}
+
+	if s.ContainersCIDR.IP == nil {
+		_, net, err := net.ParseCIDR(DEFAULT_CONTAINERS_CIDR)
+		if err != nil {
+			glog.Fatal("error parsing default container CIDR", err)
+		}
+		if net == nil {
+			glog.Fatal("error parsing default container CIDR (was nil)")
+		}
+		s.ContainersCIDR = util.IPNet(*net)
+		glog.Info("Set container_cidr to default (", DEFAULT_CONTAINERS_CIDR, ")")
 	}
 
 	// Run in its own container.
@@ -93,8 +109,9 @@ func (s *ProxyServer) Run(_ []string) error {
 	if net.IP(s.BindAddress).To4() == nil {
 		protocol = iptables.ProtocolIpv6
 	}
+
 	loadBalancer := proxy.NewLoadBalancerRR()
-	proxier := proxy.NewProxier(loadBalancer, net.IP(s.BindAddress), iptables.New(exec.New(), protocol))
+	proxier := proxy.NewProxier(loadBalancer, net.IP(s.BindAddress), net.IPNet(s.ContainersCIDR), iptables.New(exec.New(), protocol))
 	if proxier == nil {
 		glog.Fatalf("failed to create proxier, aborting")
 	}

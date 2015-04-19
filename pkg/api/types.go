@@ -988,6 +988,13 @@ type ServicePort struct {
 	// of v1beta3 the default value is the sames as the Port field (an
 	// identity map).
 	TargetPort util.IntOrString `json:"targetPort"`
+
+	// Optional: The port that we will listen on, on every minion.
+	// This allows services to be exposed without necessarily using a load balancer.
+	// Some load balancers require a publicPort also.
+	// TODO: How to trigger auto-assignment?
+	// TODO: For ELB, we probably _don't_ want this port opened on each minion publicly.
+	PublicPort int `json:"publicPort"`
 }
 
 // Service is a named abstraction of software service (for example, mysql) consisting of local port

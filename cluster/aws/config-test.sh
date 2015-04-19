@@ -39,6 +39,7 @@ MINION_SCOPES=""
 POLL_SLEEP_INTERVAL=3
 PORTAL_NET="10.0.0.0/16"
 MASTER_IP_RANGE="${MASTER_IP_RANGE:-10.246.0.0/24}"
+CONTAINERS_CIDR=10.244.0.0/24
 
 
 # When set to true, Docker Cache is enabled by default as part of the cluster bring up.

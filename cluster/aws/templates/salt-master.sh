@@ -24,6 +24,7 @@ grains:
     - kubernetes-master
   cloud: aws
   cbr-cidr: "${MASTER_IP_RANGE}"
+  containers-cidr: "${CONTAINERS_CIDR}"
 EOF
 
 if [[ -n "${DOCKER_OPTS}" ]]; then
