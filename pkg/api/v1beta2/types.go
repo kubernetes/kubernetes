@@ -863,6 +863,11 @@ type ServicePort struct {
 	// of Port is used (an identity map) - note this is a different default
 	// than Service.ContainerPort.
 	ContainerPort util.IntOrString `json:"containerPort" description:"the port to access on the containers belonging to pods targeted by the service; defaults to the service port"`
+
+	// Optional: The port that we will listen on, on every minion.
+	// This allows services to be exposed without necessarily using a load balancer.
+	// Some load balancers require a publicPort also.
+	PublicPort int `json:"publicPort"`
 }
 
 // EndpointObjectReference is a reference to an object exposing the endpoint
