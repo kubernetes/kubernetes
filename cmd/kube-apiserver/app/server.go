@@ -146,7 +146,8 @@ func (s *APIServer) AddFlags(fs *pflag.FlagSet) {
 		"If HTTPS serving is enabled, and --tls_cert_file and --tls_private_key_file are not provided, "+
 		"a self-signed certificate and key are generated for the public address and saved to /var/run/kubernetes.")
 	fs.StringVar(&s.TLSPrivateKeyFile, "tls_private_key_file", s.TLSPrivateKeyFile, "File containing x509 private key matching --tls_cert_file.")
-	fs.StringVar(&s.CertDirectory, "cert_dir", s.CertDirectory, "The directory where the TLS certs are located (by default /var/run/kubernetes)")
+	fs.StringVar(&s.CertDirectory, "cert_dir", s.CertDirectory, "The directory where the TLS certs are located (by default /var/run/kubernetes). "+
+		"If --tls_cert_file and --tls_private_key_file are provided, this flag will be ignored.")
 	fs.StringVar(&s.APIPrefix, "api_prefix", s.APIPrefix, "The prefix for API requests on the server. Default '/api'.")
 	fs.StringVar(&s.StorageVersion, "storage_version", s.StorageVersion, "The version to store resources with. Defaults to server preferred")
 	fs.StringVar(&s.CloudProvider, "cloud_provider", s.CloudProvider, "The provider for cloud services.  Empty string for no provider.")

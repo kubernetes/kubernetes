@@ -169,7 +169,8 @@ func (s *KubeletServer) AddFlags(fs *pflag.FlagSet) {
 		"If --tls_cert_file and --tls_private_key_file are not provided, a self-signed certificate and key "+
 		"are generated for the public address and saved to the directory passed to --cert_dir.")
 	fs.StringVar(&s.TLSPrivateKeyFile, "tls_private_key_file", s.TLSPrivateKeyFile, "File containing x509 private key matching --tls_cert_file.")
-	fs.StringVar(&s.CertDirectory, "cert_dir", s.CertDirectory, "The directory where the TLS certs are located (by default /var/run/kubernetes)")
+	fs.StringVar(&s.CertDirectory, "cert_dir", s.CertDirectory, "The directory where the TLS certs are located (by default /var/run/kubernetes). "+
+		"If --tls_cert_file and --tls_private_key_file are provided, this flag will be ignored.")
 	fs.StringVar(&s.HostnameOverride, "hostname_override", s.HostnameOverride, "If non-empty, will use this string as identification instead of the actual hostname.")
 	fs.StringVar(&s.PodInfraContainerImage, "pod_infra_container_image", s.PodInfraContainerImage, "The image whose network/ipc namespaces containers in each pod will use.")
 	fs.StringVar(&s.DockerEndpoint, "docker_endpoint", s.DockerEndpoint, "If non-empty, use this for the docker endpoint to communicate with")
