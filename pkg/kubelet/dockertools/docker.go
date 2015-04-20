@@ -538,3 +538,21 @@ func GetKubeletDockerContainers(client DockerInterface, allContainers bool) (Doc
 	}
 	return result, nil
 }
+
+// KillContainer kills a docker container with the given containerID.
+// TODO(yifan): To use strong type for the containerID.
+func KillContainer(client DockerInterface, containerID string,
+	refManager *kubecontainer.RefManager, readinessManager *kubecontainer.ReadinessManager, recorder record.EventRecorder) error {
+	glog.V(2).Infof("Killing container with id %q", containerID)
+	readinessManager.RemoveReadiness(containerID)
+	// Wait 10s for graceful stop before force killing.
+	err := client.StopContainer(containerID, 10)
+	ref, ok := refManager.GetRef(containerID)
+	if !ok {
+		glog.Warningf("No ref for pod '%v'", containerID)
+	} else {
+		// TODO: pass reason down here, and state, or move this call up the stack.
+		recorder.Eventf(ref, "killing", "Killing %v", containerID)
+	}
+	return err
+}
