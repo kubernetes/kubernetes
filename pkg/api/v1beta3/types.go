@@ -1683,7 +1683,7 @@ const (
 
 type ComponentCondition struct {
 	Type    ComponentConditionType `json:"type" description:"type of component condition, currently only Healthy"`
-	Status  ConditionStatus        `json:"status" description:"current status of this component condition"`
+	Status  ConditionStatus        `json:"status" description:"current status of this component condition, one of True, False, Unknown"`
 	Message string                 `json:"message,omitempty" description:"health check message received from the component"`
 	Error   string                 `json:"error,omitempty" description:"error code from health check attempt (if any)"`
 }
@@ -1691,15 +1691,14 @@ type ComponentCondition struct {
 // ComponentStatus (and ComponentStatusList) holds the cluster validation info.
 type ComponentStatus struct {
 	TypeMeta   `json:",inline"`
-	ObjectMeta `json:"metadata,omitempty"`
+	ObjectMeta `json:"metadata,omitempty" description:"standard object metadata; see https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#metadata"`
 
-	Name       string               `json:"name,omitempty" description:"name of the component"`
-	Conditions []ComponentCondition `json:"conditions,omitempty" description:"Conditions is a list of ComponentCondition objects"`
+	Conditions []ComponentCondition `json:"conditions,omitempty" description:"list of component conditions observed" patchStrategy:"merge" patchMergeKey:"type"`
 }
 
 type ComponentStatusList struct {
 	TypeMeta `json:",inline"`
-	ListMeta `json:"metadata,omitempty"`
+	ListMeta `json:"metadata,omitempty" description:"standard list metadata; see https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#metadata"`
 
-	Items []ComponentStatus `json:"items" description:"items is a list of ComponentStatus objects"`
+	Items []ComponentStatus `json:"items" description:"list of component status objects"`
 }

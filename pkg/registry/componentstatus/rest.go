@@ -102,9 +102,9 @@ func (rs *REST) getComponentStatus(name string, server apiserver.Server) *api.Co
 	}
 
 	retVal := &api.ComponentStatus{
-		Name:       name,
 		Conditions: []api.ComponentCondition{*c},
 	}
+	retVal.Name = name
 
 	return retVal
 }

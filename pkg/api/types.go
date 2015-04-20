@@ -1837,10 +1837,10 @@ const (
 )
 
 type ComponentCondition struct {
-	Type    ComponentConditionType `json:"type" description:"the type of condition"`
-	Status  ConditionStatus        `json:"status" description:"the status of this condition"`
-	Message string                 `json:"message,omitempty" description:"health check message received from the component"`
-	Error   string                 `json:"error,omitempty" description:"error code from health check attempt (if any)"`
+	Type    ComponentConditionType `json:"type"`
+	Status  ConditionStatus        `json:"status"`
+	Message string                 `json:"message,omitempty"`
+	Error   string                 `json:"error,omitempty"`
 }
 
 // ComponentStatus (and ComponentStatusList) holds the cluster validation info.
@@ -1848,13 +1848,12 @@ type ComponentStatus struct {
 	TypeMeta   `json:",inline"`
 	ObjectMeta `json:"metadata,omitempty"`
 
-	Name       string               `json:"name,omitempty" description:"name of the component"`
-	Conditions []ComponentCondition `json:"conditions,omitempty" description:"list of component condition objects"`
+	Conditions []ComponentCondition `json:"conditions,omitempty"`
 }
 
 type ComponentStatusList struct {
 	TypeMeta `json:",inline"`
 	ListMeta `json:"metadata,omitempty"`
 
-	Items []ComponentStatus `json:"items" description:"items is a list of component status objects"`
+	Items []ComponentStatus `json:"items"`
 }
