@@ -267,12 +267,22 @@ func TestList(t *testing.T) {
 	}
 }
 
+func testHasNodeAddress(t *testing.T, addrs []api.NodeAddress, addressType api.NodeAddressType, address string) {
+	for _, addr := range addrs {
+		if addr.Type == addressType && addr.Address == address {
+			return
+		}
+	}
+	t.Errorf("Did not find expected address: %s:%s in %v", addressType, address, addrs)
+}
+
 func TestNodeAddresses(t *testing.T) {
 	// Note these instances have the same name
 	// (we test that this produces an error)
 	instances := make([]ec2.Instance, 2)
 	instances[0].PrivateDNSName = "instance1"
 	instances[0].PrivateIpAddress = "192.168.0.1"
+	instances[0].PublicIpAddress = "1.2.3.4"
 	instances[0].State.Name = "running"
 	instances[1].PrivateDNSName = "instance1"
 	instances[1].PrivateIpAddress = "192.168.0.2"
@@ -295,12 +305,12 @@ func TestNodeAddresses(t *testing.T) {
 	if err3 != nil {
 		t.Errorf("Should not error when instance found")
 	}
-	if len(addrs3) != 1 {
-		t.Errorf("Should return exactly one NodeAddress")
+	if len(addrs3) != 3 {
+		t.Errorf("Should return exactly 3 NodeAddresses")
 	}
-	if e, a := instances[0].PrivateIpAddress, addrs3[0].Address; e != a {
-		t.Errorf("Expected %v, got %v", e, a)
-	}
+	testHasNodeAddress(t, addrs3, api.NodeInternalIP, "192.168.0.1")
+	testHasNodeAddress(t, addrs3, api.NodeLegacyHostIP, "192.168.0.1")
+	testHasNodeAddress(t, addrs3, api.NodeExternalIP, "1.2.3.4")
 }
 
 func TestGetRegion(t *testing.T) {
