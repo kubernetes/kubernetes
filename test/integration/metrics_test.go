@@ -28,6 +28,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/golang/glog"
 	"github.com/golang/protobuf/proto"
@@ -111,7 +112,7 @@ func TestApiserverMetrics(t *testing.T) {
 	// Make a request to the apiserver to ensure there's at least one data point
 	// for the metrics we're expecting -- otherwise, they won't be exported.
 	client := client.NewOrDie(&client.Config{Host: s.URL, Version: testapi.Version()})
-	if _, err := client.Pods(api.NamespaceDefault).List(labels.Everything()); err != nil {
+	if _, err := client.Pods(api.NamespaceDefault).List(labels.Everything(), fields.Everything()); err != nil {
 		t.Fatalf("unexpected error getting pods: %v", err)
 	}
 

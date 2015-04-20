@@ -174,7 +174,7 @@ var _ = Describe("Pods", func() {
 		}
 
 		By("setting up watch")
-		pods, err := podClient.List(labels.SelectorFromSet(labels.Set(map[string]string{"time": value})))
+		pods, err := podClient.List(labels.SelectorFromSet(labels.Set(map[string]string{"time": value})), fields.Everything())
 		if err != nil {
 			Fail(fmt.Sprintf("Failed to query for pods: %v", err))
 		}
@@ -196,7 +196,7 @@ var _ = Describe("Pods", func() {
 		}
 
 		By("verifying the pod is in kubernetes")
-		pods, err = podClient.List(labels.SelectorFromSet(labels.Set(map[string]string{"time": value})))
+		pods, err = podClient.List(labels.SelectorFromSet(labels.Set(map[string]string{"time": value})), fields.Everything())
 		if err != nil {
 			Fail(fmt.Sprintf("Failed to query for pods: %v", err))
 		}
@@ -214,7 +214,7 @@ var _ = Describe("Pods", func() {
 
 		By("deleting the pod")
 		podClient.Delete(pod.Name)
-		pods, err = podClient.List(labels.SelectorFromSet(labels.Set(map[string]string{"time": value})))
+		pods, err = podClient.List(labels.SelectorFromSet(labels.Set(map[string]string{"time": value})), fields.Everything())
 		if err != nil {
 			Fail(fmt.Sprintf("Failed to delete pod: %v", err))
 		}
@@ -286,7 +286,7 @@ var _ = Describe("Pods", func() {
 		expectNoError(waitForPodRunning(c, pod.Name))
 
 		By("verifying the pod is in kubernetes")
-		pods, err := podClient.List(labels.SelectorFromSet(labels.Set(map[string]string{"time": value})))
+		pods, err := podClient.List(labels.SelectorFromSet(labels.Set(map[string]string{"time": value})), fields.Everything())
 		Expect(len(pods.Items)).To(Equal(1))
 
 		By("retrieving the pod")
@@ -309,7 +309,7 @@ var _ = Describe("Pods", func() {
 		expectNoError(waitForPodRunning(c, pod.Name))
 
 		By("verifying the updated pod is in kubernetes")
-		pods, err = podClient.List(labels.SelectorFromSet(labels.Set(map[string]string{"time": value})))
+		pods, err = podClient.List(labels.SelectorFromSet(labels.Set(map[string]string{"time": value})), fields.Everything())
 		Expect(len(pods.Items)).To(Equal(1))
 		fmt.Println("pod update OK")
 	})
