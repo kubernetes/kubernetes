@@ -39,7 +39,7 @@ func newTestHost(t *testing.T, client client.Interface) volume.VolumeHost {
 		t.Fatalf("can't make a temp rootdir: %v", err)
 	}
 
-	return volume.NewFakeVolumeHost(tempDir, client, empty_dir.ProbeVolumePluginsWithMounter(&mount.FakeMounter{}))
+	return volume.NewFakeVolumeHost(tempDir, client, empty_dir.ProbeVolumePlugins())
 }
 
 func TestCanSupport(t *testing.T) {
@@ -97,7 +97,7 @@ func TestPlugin(t *testing.T) {
 		t.Errorf("Can't find the plugin by name")
 	}
 
-	builder, err := plugin.NewBuilder(volume.NewSpecFromVolume(volumeSpec), &api.ObjectReference{UID: types.UID(testPodUID)}, volume.VolumeOptions{})
+	builder, err := plugin.NewBuilder(volume.NewSpecFromVolume(volumeSpec), &api.ObjectReference{UID: types.UID(testPodUID)}, volume.VolumeOptions{}, &mount.FakeMounter{})
 	if err != nil {
 		t.Errorf("Failed to make a new Builder: %v", err)
 	}
@@ -139,7 +139,7 @@ func TestPlugin(t *testing.T) {
 		}
 	}
 
-	cleaner, err := plugin.NewCleaner(testVolumeName, types.UID(testPodUID))
+	cleaner, err := plugin.NewCleaner(testVolumeName, types.UID(testPodUID), mount.New())
 	if err != nil {
 		t.Errorf("Failed to make a new Cleaner: %v", err)
 	}

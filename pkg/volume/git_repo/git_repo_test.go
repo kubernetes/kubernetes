@@ -27,6 +27,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/exec"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/mount"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume/empty_dir"
 )
@@ -118,7 +119,7 @@ func TestPlugin(t *testing.T) {
 			},
 		},
 	}
-	builder, err := plug.NewBuilder(volume.NewSpecFromVolume(spec), &api.ObjectReference{UID: types.UID("poduid")}, volume.VolumeOptions{""})
+	builder, err := plug.NewBuilder(volume.NewSpecFromVolume(spec), &api.ObjectReference{UID: types.UID("poduid")}, volume.VolumeOptions{""}, mount.New())
 	if err != nil {
 		t.Errorf("Failed to make a new Builder: %v", err)
 	}
@@ -140,7 +141,7 @@ func TestPlugin(t *testing.T) {
 		}
 	}
 
-	cleaner, err := plug.NewCleaner("vol1", types.UID("poduid"))
+	cleaner, err := plug.NewCleaner("vol1", types.UID("poduid"), mount.New())
 	if err != nil {
 		t.Errorf("Failed to make a new Cleaner: %v", err)
 	}
@@ -174,11 +175,11 @@ func TestPluginLegacy(t *testing.T) {
 	}
 
 	spec := &api.Volume{VolumeSource: api.VolumeSource{GitRepo: &api.GitRepoVolumeSource{}}}
-	if _, err := plug.NewBuilder(volume.NewSpecFromVolume(spec), &api.ObjectReference{UID: types.UID("poduid")}, volume.VolumeOptions{""}); err == nil {
+	if _, err := plug.NewBuilder(volume.NewSpecFromVolume(spec), &api.ObjectReference{UID: types.UID("poduid")}, volume.VolumeOptions{""}, nil); err == nil {
 		t.Errorf("Expected failiure")
 	}
 
-	cleaner, err := plug.NewCleaner("vol1", types.UID("poduid"))
+	cleaner, err := plug.NewCleaner("vol1", types.UID("poduid"), nil)
 	if err != nil {
 		t.Errorf("Failed to make a new Cleaner: %v", err)
 	}

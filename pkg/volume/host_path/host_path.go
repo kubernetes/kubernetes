@@ -21,6 +21,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/mount"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume"
 )
 
@@ -57,7 +58,7 @@ func (plugin *hostPathPlugin) GetAccessModes() []api.AccessModeType {
 	}
 }
 
-func (plugin *hostPathPlugin) NewBuilder(spec *volume.Spec, podRef *api.ObjectReference, _ volume.VolumeOptions) (volume.Builder, error) {
+func (plugin *hostPathPlugin) NewBuilder(spec *volume.Spec, podRef *api.ObjectReference, _ volume.VolumeOptions, _ mount.Interface) (volume.Builder, error) {
 	if spec.VolumeSource.HostPath != nil {
 		return &hostPath{spec.VolumeSource.HostPath.Path}, nil
 	} else {
@@ -65,7 +66,7 @@ func (plugin *hostPathPlugin) NewBuilder(spec *volume.Spec, podRef *api.ObjectRe
 	}
 }
 
-func (plugin *hostPathPlugin) NewCleaner(volName string, podUID types.UID) (volume.Cleaner, error) {
+func (plugin *hostPathPlugin) NewCleaner(volName string, podUID types.UID, _ mount.Interface) (volume.Cleaner, error) {
 	return &hostPath{""}, nil
 }
 

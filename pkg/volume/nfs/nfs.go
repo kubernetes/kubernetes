@@ -64,7 +64,7 @@ func (plugin *nfsPlugin) GetAccessModes() []api.AccessModeType {
 	}
 }
 
-func (plugin *nfsPlugin) NewBuilder(spec *volume.Spec, podRef *api.ObjectReference, _ volume.VolumeOptions) (volume.Builder, error) {
+func (plugin *nfsPlugin) NewBuilder(spec *volume.Spec, podRef *api.ObjectReference, _ volume.VolumeOptions, _ mount.Interface) (volume.Builder, error) {
 	return plugin.newBuilderInternal(spec, podRef, plugin.mounter)
 }
 
@@ -80,7 +80,7 @@ func (plugin *nfsPlugin) newBuilderInternal(spec *volume.Spec, podRef *api.Objec
 	}, nil
 }
 
-func (plugin *nfsPlugin) NewCleaner(volName string, podUID types.UID) (volume.Cleaner, error) {
+func (plugin *nfsPlugin) NewCleaner(volName string, podUID types.UID, _ mount.Interface) (volume.Cleaner, error) {
 	return plugin.newCleanerInternal(volName, podUID, plugin.mounter)
 }
 
