@@ -1595,7 +1595,7 @@ func (f *fakeContainerCommandRunner) RunInContainer(id string, cmd []string) ([]
 	return []byte{}, f.E
 }
 
-func (f *fakeContainerCommandRunner) GetDockerServerVersion() ([]uint, error) {
+func (f *fakeContainerCommandRunner) GetDockerServerVersion() (docker.APIVersion, error) {
 	return nil, nil
 }
 
