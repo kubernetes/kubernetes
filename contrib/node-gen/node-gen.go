@@ -26,7 +26,8 @@ import (
 	"os"
 	"strings"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta3"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 )
 
 const usage = "podex [--labels=LABELS] NODES..."
@@ -72,29 +73,38 @@ func main() {
 }
 
 func getManifest(labelmap map[string]string, nodenames ...string) (io.Reader, error) {
-	typeMeta := v1beta3.TypeMeta{
-		APIVersion: "v1beta3",
-		Kind:       "List",
+	versions, err := latest.InterfacesFor("v1beta3")
+	if err != nil {
+		return nil, err
 	}
-	list := &v1beta3.NodeList{
-		TypeMeta: typeMeta,
-		Items:    []v1beta3.Node{},
+	codec := versions.Codec
+
+	list := &api.NodeList{
+		Items: []api.Node{},
 	}
 
-	typeMeta.Kind = "Node"
 	for _, nodename := range nodenames {
-		metadata := v1beta3.ObjectMeta{
-			Name:   nodename,
-			Labels: labelmap,
+		node := &api.Node{
+			ObjectMeta: api.ObjectMeta{
+				Name:   nodename,
+				Labels: labelmap,
+			},
 		}
-		node := v1beta3.Node{
-			TypeMeta:   typeMeta,
-			ObjectMeta: metadata,
+		// The Encode/Decode obviously isn't required, but it will cause the
+		// Spec.ExternalID to get set == Name. But why not, right?
+		b, err := codec.Encode(node)
+		if err != nil {
+			return nil, err
 		}
-		list.Items = append(list.Items, node)
+		err = codec.DecodeInto(b, node)
+		if err != nil {
+			return nil, err
+		}
+
+		list.Items = append(list.Items, *node)
 	}
 
-	jsonBytes, err := json.Marshal(list)
+	jsonBytes, err := codec.Encode(list)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal container manifest into JSON: %v", err)
 	}
