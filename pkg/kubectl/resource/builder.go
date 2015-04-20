@@ -58,6 +58,8 @@ type Builder struct {
 	flatten bool
 	latest  bool
 
+	requireObject bool
+
 	singleResourceType bool
 	continueOnError    bool
 }
@@ -70,7 +72,8 @@ type resourceTuple struct {
 // NewBuilder creates a builder that operates on generic objects.
 func NewBuilder(mapper meta.RESTMapper, typer runtime.ObjectTyper, clientMapper ClientMapper) *Builder {
 	return &Builder{
-		mapper: &Mapper{typer, mapper, clientMapper},
+		mapper:        &Mapper{typer, mapper, clientMapper},
+		requireObject: true,
 	}
 }
 
@@ -327,6 +330,12 @@ func (b *Builder) Latest() *Builder {
 	return b
 }
 
+// RequireObject ensures that resulting infos have an object set. If false, resulting info may not have an object set.
+func (b *Builder) RequireObject(require bool) *Builder {
+	b.requireObject = require
+	return b
+}
+
 // ContinueOnError will attempt to load and visit as many objects as possible, even if some visits
 // return errors or some objects cannot be loaded. The default behavior is to terminate after
 // the first error is returned from a VisitorFunc.
@@ -537,9 +546,6 @@ func (b *Builder) visitorResult() *Result {
 		visitors := []Visitor{}
 		for _, name := range b.names {
 			info := NewInfo(client, mapping, selectorNamespace, name)
-			if err := info.Get(); err != nil {
-				return &Result{singular: isSingular, err: err}
-			}
 			visitors = append(visitors, info)
 		}
 		return &Result{singular: isSingular, visitor: VisitorList(visitors), sources: visitors}
@@ -593,7 +599,7 @@ func (b *Builder) Do() *Result {
 		helpers = append(helpers, RequireNamespace(b.namespace))
 	}
 	helpers = append(helpers, FilterNamespace)
-	if b.latest {
+	if b.requireObject {
 		helpers = append(helpers, RetrieveLazy)
 	}
 	r.visitor = NewDecoratedVisitor(r.visitor, helpers...)
