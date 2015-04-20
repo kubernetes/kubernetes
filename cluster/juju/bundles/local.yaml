@@ -12,7 +12,7 @@ kubernetes-local:
       charm: cs:trusty/docker
       num_units: 2
       options:
-        latest: true
+        latest: false
       annotations:
         "gui-x": "0"
         "gui-y": "0"
