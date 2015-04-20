@@ -22,6 +22,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl"
 	cmdutil "github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/cmd/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/resource"
 )
@@ -38,6 +39,7 @@ given resource.`,
 			err := RunDescribe(f, out, cmd, args)
 			cmdutil.CheckErr(err)
 		},
+		ValidArgs: kubectl.DescribableResources(),
 	}
 	return cmd
 }

@@ -273,6 +273,15 @@ _kubectl_describe()
 
     must_have_one_flag=()
     must_have_one_noun=()
+    must_have_one_noun+=("limitrange")
+    must_have_one_noun+=("minion")
+    must_have_one_noun+=("node")
+    must_have_one_noun+=("persistentvolume")
+    must_have_one_noun+=("persistentvolumeclaim")
+    must_have_one_noun+=("pod")
+    must_have_one_noun+=("replicationcontroller")
+    must_have_one_noun+=("resourcequota")
+    must_have_one_noun+=("service")
 }
 
 _kubectl_create()
