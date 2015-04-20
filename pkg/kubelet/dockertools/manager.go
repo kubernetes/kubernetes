@@ -375,7 +375,7 @@ func (dm *DockerManager) GetPodStatus(pod *api.Pod) (*api.PodStatus, error) {
 }
 
 func (dm *DockerManager) GetRunningContainers(ids []string) ([]*docker.Container, error) {
-	result := []*docker.Container{}
+	var result []*docker.Container
 	if dm.client == nil {
 		return nil, fmt.Errorf("unexpected nil docker client.")
 	}
