@@ -58,7 +58,7 @@ func fakeClient() ClientMapper {
 	})
 }
 
-func fakeClientWith(t *testing.T, data map[string]string) ClientMapper {
+func fakeClientWith(testName string, t *testing.T, data map[string]string) ClientMapper {
 	return ClientMapperFunc(func(*meta.RESTMapping) (RESTClient, error) {
 		return &client.FakeRESTClient{
 			Codec: latest.Codec,
@@ -70,7 +70,7 @@ func fakeClientWith(t *testing.T, data map[string]string) ClientMapper {
 				}
 				body, ok := data[p]
 				if !ok {
-					t.Fatalf("unexpected request: %s (%s)\n%#v", p, req.URL, req)
+					t.Fatalf("%s: unexpected request: %s (%s)\n%#v", testName, p, req.URL, req)
 				}
 				return &http.Response{
 					StatusCode: http.StatusOK,
@@ -305,7 +305,7 @@ func TestURLBuilderRequireNamespace(t *testing.T) {
 
 func TestResourceByName(t *testing.T) {
 	pods, _ := testData()
-	b := NewBuilder(latest.RESTMapper, api.Scheme, fakeClientWith(t, map[string]string{
+	b := NewBuilder(latest.RESTMapper, api.Scheme, fakeClientWith("", t, map[string]string{
 		"/namespaces/test/pods/foo": runtime.EncodeOrDie(latest.Codec, &pods.Items[0]),
 	})).
 		NamespaceParam("test")
@@ -336,9 +336,42 @@ func TestResourceByName(t *testing.T) {
 	}
 }
 
+func TestResourceByNameWithoutRequireObject(t *testing.T) {
+	b := NewBuilder(latest.RESTMapper, api.Scheme, fakeClientWith("", t, map[string]string{})).
+		NamespaceParam("test")
+
+	test := &testVisitor{}
+	singular := false
+
+	if b.Do().Err() == nil {
+		t.Errorf("unexpected non-error")
+	}
+
+	b.ResourceTypeOrNameArgs(true, "pods", "foo").RequireObject(false)
+
+	err := b.Do().IntoSingular(&singular).Visit(test.Handle)
+	if err != nil || !singular || len(test.Infos) != 1 {
+		t.Fatalf("unexpected response: %v %t %#v", err, singular, test.Infos)
+	}
+	if test.Infos[0].Name != "foo" {
+		t.Errorf("unexpected name: %#v", test.Infos[0].Name)
+	}
+	if test.Infos[0].Object != nil {
+		t.Errorf("unexpected object: %#v", test.Infos[0].Object)
+	}
+
+	mapping, err := b.Do().ResourceMapping()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if mapping.Kind != "Pod" || mapping.Resource != "pods" {
+		t.Errorf("unexpected resource mapping: %#v", mapping)
+	}
+}
+
 func TestResourceByNameAndEmptySelector(t *testing.T) {
 	pods, _ := testData()
-	b := NewBuilder(latest.RESTMapper, api.Scheme, fakeClientWith(t, map[string]string{
+	b := NewBuilder(latest.RESTMapper, api.Scheme, fakeClientWith("", t, map[string]string{
 		"/namespaces/test/pods/foo": runtime.EncodeOrDie(latest.Codec, &pods.Items[0]),
 	})).
 		NamespaceParam("test").
@@ -366,7 +399,7 @@ func TestResourceByNameAndEmptySelector(t *testing.T) {
 func TestSelector(t *testing.T) {
 	pods, svc := testData()
 	labelKey := api.LabelSelectorQueryParam(testapi.Version())
-	b := NewBuilder(latest.RESTMapper, api.Scheme, fakeClientWith(t, map[string]string{
+	b := NewBuilder(latest.RESTMapper, api.Scheme, fakeClientWith("", t, map[string]string{
 		"/namespaces/test/pods?" + labelKey + "=a%3Db":     runtime.EncodeOrDie(latest.Codec, pods),
 		"/namespaces/test/services?" + labelKey + "=a%3Db": runtime.EncodeOrDie(latest.Codec, svc),
 	})).
@@ -467,35 +500,43 @@ func TestResourceTuple(t *testing.T) {
 		},
 	}
 	for k, testCase := range testCases {
-		pods, _ := testData()
-		b := NewBuilder(latest.RESTMapper, api.Scheme, fakeClientWith(t, map[string]string{
-			"/namespaces/test/pods/foo": runtime.EncodeOrDie(latest.Codec, &pods.Items[0]),
-			"/namespaces/test/pods/bar": runtime.EncodeOrDie(latest.Codec, &pods.Items[0]),
-			"/nodes/foo":                runtime.EncodeOrDie(latest.Codec, &api.Node{ObjectMeta: api.ObjectMeta{Name: "foo"}}),
-		})).
-			NamespaceParam("test").DefaultNamespace().
-			ResourceTypeOrNameArgs(true, testCase.args...)
+		for _, requireObject := range []bool{true, false} {
+			expectedRequests := map[string]string{}
+			if requireObject {
+				pods, _ := testData()
+				expectedRequests = map[string]string{
+					"/namespaces/test/pods/foo": runtime.EncodeOrDie(latest.Codec, &pods.Items[0]),
+					"/namespaces/test/pods/bar": runtime.EncodeOrDie(latest.Codec, &pods.Items[0]),
+					"/nodes/foo":                runtime.EncodeOrDie(latest.Codec, &api.Node{ObjectMeta: api.ObjectMeta{Name: "foo"}}),
+					"/minions/foo":              runtime.EncodeOrDie(latest.Codec, &api.Node{ObjectMeta: api.ObjectMeta{Name: "foo"}}),
+				}
+			}
 
-		r := b.Do()
+			b := NewBuilder(latest.RESTMapper, api.Scheme, fakeClientWith(k, t, expectedRequests)).
+				NamespaceParam("test").DefaultNamespace().
+				ResourceTypeOrNameArgs(true, testCase.args...).RequireObject(requireObject)
 
-		if !testCase.errFn(r.Err()) {
-			t.Errorf("%s: unexpected error: %v", k, r.Err())
-		}
-		if r.Err() != nil {
-			continue
-		}
-		switch {
-		case (r.singular && len(testCase.args) != 1),
-			(!r.singular && len(testCase.args) == 1):
-			t.Errorf("%s: result had unexpected singular value", k)
-		}
-		info, err := r.Infos()
-		if err != nil {
-			// test error
-			continue
-		}
-		if len(info) != len(testCase.args) {
-			t.Errorf("%s: unexpected number of infos returned: %#v", k, info)
+			r := b.Do()
+
+			if !testCase.errFn(r.Err()) {
+				t.Errorf("%s: unexpected error: %v", k, r.Err())
+			}
+			if r.Err() != nil {
+				continue
+			}
+			switch {
+			case (r.singular && len(testCase.args) != 1),
+				(!r.singular && len(testCase.args) == 1):
+				t.Errorf("%s: result had unexpected singular value", k)
+			}
+			info, err := r.Infos()
+			if err != nil {
+				// test error
+				continue
+			}
+			if len(info) != len(testCase.args) {
+				t.Errorf("%s: unexpected number of infos returned: %#v", k, info)
+			}
 		}
 	}
 }
@@ -579,7 +620,7 @@ func TestSingularObject(t *testing.T) {
 func TestListObject(t *testing.T) {
 	pods, _ := testData()
 	labelKey := api.LabelSelectorQueryParam(testapi.Version())
-	b := NewBuilder(latest.RESTMapper, api.Scheme, fakeClientWith(t, map[string]string{
+	b := NewBuilder(latest.RESTMapper, api.Scheme, fakeClientWith("", t, map[string]string{
 		"/namespaces/test/pods?" + labelKey + "=a%3Db": runtime.EncodeOrDie(latest.Codec, pods),
 	})).
 		SelectorParam("a=b").
@@ -612,7 +653,7 @@ func TestListObject(t *testing.T) {
 func TestListObjectWithDifferentVersions(t *testing.T) {
 	pods, svc := testData()
 	labelKey := api.LabelSelectorQueryParam(testapi.Version())
-	obj, err := NewBuilder(latest.RESTMapper, api.Scheme, fakeClientWith(t, map[string]string{
+	obj, err := NewBuilder(latest.RESTMapper, api.Scheme, fakeClientWith("", t, map[string]string{
 		"/namespaces/test/pods?" + labelKey + "=a%3Db":     runtime.EncodeOrDie(latest.Codec, pods),
 		"/namespaces/test/services?" + labelKey + "=a%3Db": runtime.EncodeOrDie(latest.Codec, svc),
 	})).
@@ -638,7 +679,7 @@ func TestListObjectWithDifferentVersions(t *testing.T) {
 
 func TestWatch(t *testing.T) {
 	_, svc := testData()
-	w, err := NewBuilder(latest.RESTMapper, api.Scheme, fakeClientWith(t, map[string]string{
+	w, err := NewBuilder(latest.RESTMapper, api.Scheme, fakeClientWith("", t, map[string]string{
 		"/watch/namespaces/test/services/redis-master?resourceVersion=12": watchBody(watch.Event{
 			Type:   watch.Added,
 			Object: &svc.Items[0],
@@ -693,7 +734,7 @@ func TestLatest(t *testing.T) {
 		ObjectMeta: api.ObjectMeta{Name: "baz", Namespace: "test", ResourceVersion: "15"},
 	}
 
-	b := NewBuilder(latest.RESTMapper, api.Scheme, fakeClientWith(t, map[string]string{
+	b := NewBuilder(latest.RESTMapper, api.Scheme, fakeClientWith("", t, map[string]string{
 		"/namespaces/test/pods/foo":     runtime.EncodeOrDie(latest.Codec, newPod),
 		"/namespaces/test/pods/bar":     runtime.EncodeOrDie(latest.Codec, newPod2),
 		"/namespaces/test/services/baz": runtime.EncodeOrDie(latest.Codec, newSvc),

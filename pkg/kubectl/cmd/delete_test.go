@@ -27,6 +27,66 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 )
 
+func TestDeleteObjectByTuple(t *testing.T) {
+	_, _, rc := testData()
+
+	f, tf, codec := NewAPIFactory()
+	tf.Printer = &testPrinter{}
+	tf.Client = &client.FakeRESTClient{
+		Codec: codec,
+		Client: client.HTTPClientFunc(func(req *http.Request) (*http.Response, error) {
+			switch p, m := req.URL.Path, req.Method; {
+			case p == "/namespaces/test/replicationcontrollers/redis-master-controller" && m == "DELETE":
+				return &http.Response{StatusCode: 200, Body: objBody(codec, &rc.Items[0])}, nil
+			default:
+				// Ensures no GET is performed when deleting by name
+				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+				return nil, nil
+			}
+		}),
+	}
+	tf.Namespace = "test"
+	buf := bytes.NewBuffer([]byte{})
+
+	cmd := NewCmdDelete(f, buf)
+	cmd.Flags().Set("namespace", "test")
+	cmd.Run(cmd, []string{"replicationcontrollers/redis-master-controller"})
+
+	if buf.String() != "replicationControllers/redis-master-controller\n" {
+		t.Errorf("unexpected output: %s", buf.String())
+	}
+}
+
+func TestDeleteNamedObject(t *testing.T) {
+	_, _, rc := testData()
+
+	f, tf, codec := NewAPIFactory()
+	tf.Printer = &testPrinter{}
+	tf.Client = &client.FakeRESTClient{
+		Codec: codec,
+		Client: client.HTTPClientFunc(func(req *http.Request) (*http.Response, error) {
+			switch p, m := req.URL.Path, req.Method; {
+			case p == "/namespaces/test/replicationcontrollers/redis-master-controller" && m == "DELETE":
+				return &http.Response{StatusCode: 200, Body: objBody(codec, &rc.Items[0])}, nil
+			default:
+				// Ensures no GET is performed when deleting by name
+				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+				return nil, nil
+			}
+		}),
+	}
+	tf.Namespace = "test"
+	buf := bytes.NewBuffer([]byte{})
+
+	cmd := NewCmdDelete(f, buf)
+	cmd.Flags().Set("namespace", "test")
+	cmd.Run(cmd, []string{"replicationcontrollers", "redis-master-controller"})
+
+	if buf.String() != "replicationControllers/redis-master-controller\n" {
+		t.Errorf("unexpected output: %s", buf.String())
+	}
+}
+
 func TestDeleteObject(t *testing.T) {
 	_, _, rc := testData()
 
