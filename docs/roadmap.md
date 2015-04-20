@@ -1,6 +1,6 @@
 # Kubernetes Roadmap
 
-Updated Feb 9, 2015
+Updated April 20, 2015
 
 This document is intended to capture the set of supported use cases, features,
 docs, and patterns that we feel are required to call Kubernetes “feature
@@ -18,30 +18,30 @@ clustered database or key-value store. We will target such workloads for our
 
 ## APIs and core features
 1. Consistent v1 API
-  - Status: v1beta3 (#1519) is being developed as the release candidate for the v1 API.
-2. Multi-port services for apps which need more than one port on the same portal IP (#1802)
-  - Status: #2585 covers the design.
-3. Nominal services for applications which need one stable IP per pod instance (#260)
+  - Status: DONE. [v1beta3](http://kubernetesio.blogspot.com/2015/04/introducing-kubernetes-v1beta3.html) was developed as the release candidate for the v1 API.
+2. Multi-port services for apps which need more than one port on the same portal IP ([#1802](https://github.com/GoogleCloudPlatform/kubernetes/issues/1802))
+  - Status: DONE. Released in 0.15.0
+3. Nominal services for applications which need one stable IP per pod instance ([#260](https://github.com/GoogleCloudPlatform/kubernetes/issues/260))
   - Status: #2585 covers some design options.
-4. API input is scrubbed of status fields in favor of a new API to set status (#4248)
-  - Status: in progress
-5. Input validation reporting versioned field names (#2518)
-  - Status: in progress
+4. API input is scrubbed of status fields in favor of a new API to set status ([#4248](https://github.com/GoogleCloudPlatform/kubernetes/issues/4248))
+  - Status: DONE
+5. Input validation reporting versioned field names ([#2518](https://github.com/GoogleCloudPlatform/kubernetes/issues/2518))
+  - Status: DONE ([#4575](https://github.com/GoogleCloudPlatform/kubernetes/pull/4575))
 6. Error reporting: Report common problems in ways that users can discover
   - Status:
 7. Event management: Make events usable and useful
   - Status:
-8. Persistent storage support (#4055)
+8. Persistent storage support ([#5105](https://github.com/GoogleCloudPlatform/kubernetes/issues/5105))
   - Status: in progress
-9. Allow nodes to join/leave a cluster (#2303,#2435)
-  - Status: high level [design doc](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/design/clustering.md).
+9. Allow nodes to join/leave a cluster ([#6087](https://github.com/GoogleCloudPlatform/kubernetes/issues/6087),[#3168](https://github.com/GoogleCloudPlatform/kubernetes/issues/3168))
+  - Status: in progress ([#6949](https://github.com/GoogleCloudPlatform/kubernetes/pull/6949))
 10. Handle node death
   - Status: mostly covered by nodes joining/leaving a cluster
-11. Allow live cluster upgrades (#2524)
+11. Allow live cluster upgrades ([#6075](https://github.com/GoogleCloudPlatform/kubernetes/issues/6075),[#6079](https://github.com/GoogleCloudPlatform/kubernetes/issues/6079))
   - Status: design in progress
 12. Allow kernel upgrades
   - Status: mostly covered by nodes joining/leaving a cluster, need demonstration
-13. Allow rolling-updates to fail gracefully (#1353)
+13. Allow rolling-updates to fail gracefully ([#1353](https://github.com/GoogleCloudPlatform/kubernetes/issues/1353))
   - Status:
 14. Easy .dockercfg
   - Status:
