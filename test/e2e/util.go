@@ -62,6 +62,18 @@ func Failf(format string, a ...interface{}) {
 	Fail(fmt.Sprintf(format, a...), 1)
 }
 
+func providerIs(providers ...string) bool {
+	if testContext.Provider == "" {
+		Fail("testContext.Provider is not defined")
+	}
+	for _, provider := range providers {
+		if strings.ToLower(provider) == strings.ToLower(testContext.Provider) {
+			return true
+		}
+	}
+	return false
+}
+
 type podCondition func(pod *api.Pod) (bool, error)
 
 func waitForPodCondition(c *client.Client, ns, podName, desc string, condition podCondition) error {
