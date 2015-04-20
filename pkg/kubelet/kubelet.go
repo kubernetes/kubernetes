@@ -203,22 +203,21 @@ func NewMainKubelet(
 	containerManager := dockertools.NewDockerManager(dockerClient, recorder, podInfraContainerImage, pullQPS, pullBurst)
 
 	klet := &Kubelet{
-		hostname:               hostname,
-		dockerClient:           dockerClient,
-		kubeClient:             kubeClient,
-		rootDirectory:          rootDirectory,
-		resyncInterval:         resyncInterval,
-		containerRefManager:    kubecontainer.NewRefManager(),
-		readinessManager:       kubecontainer.NewReadinessManager(),
-		runner:                 dockertools.NewDockerContainerCommandRunner(dockerClient),
-		httpClient:             &http.Client{},
-		sourcesReady:           sourcesReady,
-		clusterDomain:          clusterDomain,
-		clusterDNS:             clusterDNS,
-		serviceLister:          serviceLister,
-		nodeLister:             nodeLister,
-		masterServiceNamespace: masterServiceNamespace,
-		prober:                 newProbeHolder(),
+		hostname:                       hostname,
+		dockerClient:                   dockerClient,
+		kubeClient:                     kubeClient,
+		rootDirectory:                  rootDirectory,
+		resyncInterval:                 resyncInterval,
+		containerRefManager:            kubecontainer.NewRefManager(),
+		readinessManager:               kubecontainer.NewReadinessManager(),
+		runner:                         dockertools.NewDockerContainerCommandRunner(dockerClient),
+		httpClient:                     &http.Client{},
+		sourcesReady:                   sourcesReady,
+		clusterDomain:                  clusterDomain,
+		clusterDNS:                     clusterDNS,
+		serviceLister:                  serviceLister,
+		nodeLister:                     nodeLister,
+		masterServiceNamespace:         masterServiceNamespace,
 		streamingConnectionIdleTimeout: streamingConnectionIdleTimeout,
 		recorder:                       recorder,
 		cadvisor:                       cadvisorInterface,
@@ -233,6 +232,7 @@ func NewMainKubelet(
 	}
 
 	klet.podManager = newBasicPodManager(klet.kubeClient)
+	klet.prober = NewProber(klet.runner, klet.readinessManager, klet.containerRefManager, klet.recorder)
 
 	runtimeCache, err := kubecontainer.NewRuntimeCache(containerManager)
 	if err != nil {
@@ -312,11 +312,11 @@ type Kubelet struct {
 	// Volume plugins.
 	volumePluginMgr volume.VolumePluginMgr
 
-	// Network plugin
+	// Network plugin.
 	networkPlugin network.NetworkPlugin
 
-	// Probe runner holder
-	prober probeHolder
+	// Healthy check prober.
+	prober *Prober
 	// Container readiness state manager.
 	readinessManager *kubecontainer.ReadinessManager
 
@@ -1159,7 +1159,7 @@ func (kl *Kubelet) computePodContainerChanges(pod *api.Pod, runningPod kubeconta
 			continue
 		}
 
-		result, err := kl.probeContainer(pod, podStatus, container, string(c.ID), c.Created)
+		result, err := kl.prober.Probe(pod, podStatus, container, string(c.ID), c.Created)
 		if err != nil {
 			// TODO(vmarmol): examine this logic.
 			glog.V(2).Infof("probe no-error: %q", container.Name)
