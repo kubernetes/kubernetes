@@ -16,7 +16,8 @@ limitations under the License.
 
 package proxy
 
-//PortalManager is an interface that abstracts over iptables
+//PortalManager is an interface that abstracts over Managing Portals.
+//See IptablesPortalManager for an implementation.
 type PortalManager interface {
 	Init() error
 	OpenPortal(proxier *Proxier, service ServicePortName, info *serviceInfo) error

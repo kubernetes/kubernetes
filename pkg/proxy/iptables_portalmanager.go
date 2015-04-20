@@ -28,10 +28,14 @@ import (
 	"github.com/golang/glog"
 )
 
+//IptablesPortalManager implements PortalManager using iptables.
+//It is assumed that there is only one instance on a single machine
+//because of iptables.
 type IptablesPortalManager struct {
 	iptables iptables.Interface
 }
 
+//Returns a new IptablesPortalManager given an iptables.Interface
 func NewIptablesPortalManager(iptables iptables.Interface) *IptablesPortalManager {
 	return &IptablesPortalManager{iptables}
 }
@@ -63,6 +67,7 @@ func (i *IptablesPortalManager) Init() error {
 	return nil
 }
 
+//Deletes the old iptables rules
 func (i *IptablesPortalManager) DeleteOld() {
 	// DEPRECATED: The iptablesOldPortalChain is from when we had a single chain
 	// for all rules.  We'll unilaterally delete it here.  We will remove this
@@ -90,6 +95,7 @@ func (i *IptablesPortalManager) Flush() error {
 	return errors.NewAggregate(el)
 }
 
+//Opens a portal
 func (i *IptablesPortalManager) OpenPortal(proxier *Proxier, service ServicePortName, info *serviceInfo) error {
 	err := i.openOnePortal(proxier, info.portalIP, info.portalPort, info.protocol, proxier.listenIP, info.proxyPort, service)
 	if err != nil {
@@ -129,6 +135,7 @@ func (i *IptablesPortalManager) openOnePortal(proxier *Proxier, portalIP net.IP,
 	return nil
 }
 
+//Closes a portal.
 func (i *IptablesPortalManager) ClosePortal(proxier *Proxier, service ServicePortName, info *serviceInfo) error {
 	// Collect errors and report them all at the end.
 	el := i.closeOnePortal(proxier, info.portalIP, info.portalPort, info.protocol, proxier.listenIP, info.proxyPort, service)
