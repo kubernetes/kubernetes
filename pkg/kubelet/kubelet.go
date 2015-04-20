@@ -233,6 +233,7 @@ func NewMainKubelet(
 
 	klet.podManager = newBasicPodManager(klet.kubeClient)
 	klet.prober = NewProber(klet.runner, klet.readinessManager, klet.containerRefManager, klet.recorder)
+	klet.handlerRunner = NewHandlerRunner(klet.httpClient, klet.runner, klet.containerManager)
 
 	runtimeCache, err := kubecontainer.NewRuntimeCache(containerManager)
 	if err != nil {
@@ -317,6 +318,10 @@ type Kubelet struct {
 
 	// Healthy check prober.
 	prober *Prober
+
+	// Container lifecycle handler runner.
+	handlerRunner HandlerRunner
+
 	// Container readiness state manager.
 	readinessManager *kubecontainer.ReadinessManager
 
@@ -597,31 +602,6 @@ func makeBinds(container *api.Container, podVolumes volumeMap) []string {
 	return binds
 }
 
-// A basic interface that knows how to execute handlers
-type actionHandler interface {
-	Run(podFullName string, uid types.UID, container *api.Container, handler *api.Handler) error
-}
-
-func (kl *Kubelet) newActionHandler(handler *api.Handler) actionHandler {
-	switch {
-	case handler.Exec != nil:
-		return &execActionHandler{kubelet: kl}
-	case handler.HTTPGet != nil:
-		return &httpActionHandler{client: kl.httpClient, kubelet: kl}
-	default:
-		glog.Errorf("Invalid handler: %v", handler)
-		return nil
-	}
-}
-
-func (kl *Kubelet) runHandler(podFullName string, uid types.UID, container *api.Container, handler *api.Handler) error {
-	actionHandler := kl.newActionHandler(handler)
-	if actionHandler == nil {
-		return fmt.Errorf("invalid handler")
-	}
-	return actionHandler.Run(podFullName, uid, container, handler)
-}
-
 // generateRunContainerOptions generates the RunContainerOptions, which can be used by
 // the container runtime to set parameters for launching a container.
 func (kl *Kubelet) generateRunContainerOptions(pod *api.Pod, container *api.Container, podVolumes volumeMap, netMode, ipcMode string) (*kubecontainer.RunContainerOptions, error) {
@@ -677,7 +657,7 @@ func (kl *Kubelet) runContainer(pod *api.Pod, container *api.Container, podVolum
 	}
 
 	if container.Lifecycle != nil && container.Lifecycle.PostStart != nil {
-		handlerErr := kl.runHandler(kubecontainer.GetPodFullName(pod), pod.UID, container, container.Lifecycle.PostStart)
+		handlerErr := kl.handlerRunner.Run(id, pod, container, container.Lifecycle.PostStart)
 		if handlerErr != nil {
 			kl.killContainerByID(id)
 			return dockertools.DockerID(""), fmt.Errorf("failed to call event handler: %v", handlerErr)
