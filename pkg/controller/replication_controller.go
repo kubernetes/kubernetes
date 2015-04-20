@@ -187,9 +187,10 @@ func (rm *ReplicationManager) watchControllers(resourceVersion *string) {
 }
 
 // Helper function. Also used in pkg/registry/controller, for now.
-func FilterActivePods(pods []api.Pod) []api.Pod {
-	var result []api.Pod
-	for _, value := range pods {
+func FilterActivePods(pods []api.Pod) []*api.Pod {
+	var result []*api.Pod
+	for i := range pods {
+		value := &pods[i]
 		if api.PodSucceeded != value.Status.Phase &&
 			api.PodFailed != value.Status.Phase {
 			result = append(result, value)

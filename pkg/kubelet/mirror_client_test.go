@@ -34,10 +34,10 @@ type fakeMirrorClient struct {
 	deleteCounts map[string]int
 }
 
-func (fmc *fakeMirrorClient) CreateMirrorPod(pod api.Pod) error {
+func (fmc *fakeMirrorClient) CreateMirrorPod(pod *api.Pod) error {
 	fmc.mirrorPodLock.Lock()
 	defer fmc.mirrorPodLock.Unlock()
-	podFullName := kubecontainer.GetPodFullName(&pod)
+	podFullName := kubecontainer.GetPodFullName(pod)
 	fmc.mirrorPods.Insert(podFullName)
 	fmc.createCounts[podFullName]++
 	return nil

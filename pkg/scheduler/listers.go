@@ -45,7 +45,7 @@ type PodLister interface {
 // FakePodLister implements PodLister on an []api.Pods for test purposes.
 type FakePodLister []*api.Pod
 
-// List returns []api.Pod matching a query.
+// List returns []*api.Pod matching a query.
 func (f FakePodLister) List(s labels.Selector) (selected []*api.Pod, err error) {
 	for _, pod := range f {
 		if s.Matches(labels.Set(pod.Labels)) {
