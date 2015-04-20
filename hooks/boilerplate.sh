@@ -25,12 +25,14 @@ if [ ! -e $REF_FILE ]; then
   exit 0
 fi
 
+YEAR=$(git log --diff-filter=A -- ${FILE} | grep Date | awk '{print $6}' | sort | head -n 1)
+
 LINES=$(cat "${REF_FILE}" | wc -l | tr -d ' ')
 if [[ "${EXT}" == "go" ]]; then
   # remove build tags from the top of Go file
-  DIFFER=$(cat "${FILE}" | sed '/\/\*/,$!d' | sed 's/2015/2014/g' | head "-${LINES}" | diff -q - "${REF_FILE}")
+  DIFFER=$(cat "${FILE}" | sed '/\/\*/,$!d' | sed "s/${YEAR}/2013/g" | head "-${LINES}" | diff -q - "${REF_FILE}")
 else
-  DIFFER=$(head "-${LINES}" "${FILE}" | sed 's/2015/2014/g' | diff -q - "${REF_FILE}")
+  DIFFER=$(head "-${LINES}" "${FILE}" | sed "s/${YEAR}/2013/g" | diff -q - "${REF_FILE}")
 fi
 
 if [[ -z "${DIFFER}" ]]; then
