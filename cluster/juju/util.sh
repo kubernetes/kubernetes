@@ -80,7 +80,8 @@ function detect-minions(){
     #  UnitId: kubernetes/1
     KUBERNETES_JSON=$(juju run --service kubernetes \
             "unit-get private-address" --format=json)
-    KUBE_MINION_IP_ADDRESSES=($(${KUBE_ROOT}/cluster/juju/return-node-ips.py $KUBERNETES_JSON))
+    echo $KUBERNETES_JSON
+    KUBE_MINION_IP_ADDRESSES=($(${KUBE_ROOT}/cluster/juju/return-node-ips.py "$KUBERNETES_JSON"))
     echo $KUBE_MINION_IP_ADDRESSES
     NUM_MINIONS=${#KUBE_MINION_IP_ADDRESSES[@]}
     MINION_NAMES=$KUBE_MINION_IP_ADDRESSES
