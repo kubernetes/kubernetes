@@ -78,7 +78,7 @@ def relation_changed():
     # Setup kubernetes supplemental group
     setup_kubernetes_group()
 
-    # Register services
+    # Register upstart managed services
     for n in ("cadvisor", "kubelet", "proxy"):
         if render_upstart(n, template_data) or not host.service_running(n):
             print("Starting %s" % n)

@@ -11,6 +11,6 @@ exec docker run \
   --volume=/var/run:/var/run:rw \
   --volume=/sys/fs/cgroup:/sys/fs/cgroup:ro \
   --volume=/var/lib/docker/:/var/lib/docker:ro \
-  --publish=127.0.0.1:4194:8080 \
+  --publish=127.0.0.1:4193:8080 \
   --name=cadvisor \
   google/cadvisor:latest
