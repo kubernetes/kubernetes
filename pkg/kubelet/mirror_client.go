@@ -43,19 +43,19 @@ func newBasicMirrorClient(apiserverClient client.Interface) *basicMirrorClient {
 }
 
 // Creates a mirror pod.
-func (self *basicMirrorClient) CreateMirrorPod(pod api.Pod) error {
-	if self.apiserverClient == nil {
+func (mc *basicMirrorClient) CreateMirrorPod(pod api.Pod) error {
+	if mc.apiserverClient == nil {
 		return nil
 	}
 	pod.Annotations[ConfigMirrorAnnotationKey] = MirrorType
 
-	_, err := self.apiserverClient.Pods(NamespaceDefault).Create(&pod)
+	_, err := mc.apiserverClient.Pods(NamespaceDefault).Create(&pod)
 	return err
 }
 
 // Deletes a mirror pod.
-func (self *basicMirrorClient) DeleteMirrorPod(podFullName string) error {
-	if self.apiserverClient == nil {
+func (mc *basicMirrorClient) DeleteMirrorPod(podFullName string) error {
+	if mc.apiserverClient == nil {
 		return nil
 	}
 	name, namespace, err := kubecontainer.ParsePodFullName(podFullName)
@@ -64,7 +64,7 @@ func (self *basicMirrorClient) DeleteMirrorPod(podFullName string) error {
 		return err
 	}
 	glog.V(4).Infof("Deleting a mirror pod %q", podFullName)
-	if err := self.apiserverClient.Pods(namespace).Delete(name); err != nil {
+	if err := mc.apiserverClient.Pods(namespace).Delete(name); err != nil {
 		glog.Errorf("Failed deleting a mirror pod %q: %v", podFullName, err)
 	}
 	return nil

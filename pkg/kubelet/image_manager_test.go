@@ -48,15 +48,15 @@ func newRealImageManager(policy ImageGCPolicy) (*realImageManager, *dockertools.
 }
 
 // Accessors used for thread-safe testing.
-func (self *realImageManager) imageRecordsLen() int {
-	self.imageRecordsLock.Lock()
-	defer self.imageRecordsLock.Unlock()
-	return len(self.imageRecords)
+func (im *realImageManager) imageRecordsLen() int {
+	im.imageRecordsLock.Lock()
+	defer im.imageRecordsLock.Unlock()
+	return len(im.imageRecords)
 }
-func (self *realImageManager) getImageRecord(name string) (*imageRecord, bool) {
-	self.imageRecordsLock.Lock()
-	defer self.imageRecordsLock.Unlock()
-	v, ok := self.imageRecords[name]
+func (im *realImageManager) getImageRecord(name string) (*imageRecord, bool) {
+	im.imageRecordsLock.Lock()
+	defer im.imageRecordsLock.Unlock()
+	v, ok := im.imageRecords[name]
 	vCopy := *v
 	return &vCopy, ok
 }

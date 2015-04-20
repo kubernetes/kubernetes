@@ -87,26 +87,26 @@ type stringCache struct {
 	cache *lru.Cache
 }
 
-func (self *stringCache) composeKey(uid types.UID, name string) string {
+func (sc *stringCache) composeKey(uid types.UID, name string) string {
 	return fmt.Sprintf("%s_%s", uid, name)
 }
 
-func (self *stringCache) Add(uid types.UID, name string, value string) {
-	self.lock.Lock()
-	defer self.lock.Unlock()
-	self.cache.Add(self.composeKey(uid, name), value)
+func (sc *stringCache) Add(uid types.UID, name string, value string) {
+	sc.lock.Lock()
+	defer sc.lock.Unlock()
+	sc.cache.Add(sc.composeKey(uid, name), value)
 }
 
-func (self *stringCache) Remove(uid types.UID, name string) {
-	self.lock.Lock()
-	defer self.lock.Unlock()
-	self.cache.Remove(self.composeKey(uid, name))
+func (sc *stringCache) Remove(uid types.UID, name string) {
+	sc.lock.Lock()
+	defer sc.lock.Unlock()
+	sc.cache.Remove(sc.composeKey(uid, name))
 }
 
-func (self *stringCache) Get(uid types.UID, name string) (string, bool) {
-	self.lock.RLock()
-	defer self.lock.RUnlock()
-	value, ok := self.cache.Get(self.composeKey(uid, name))
+func (sc *stringCache) Get(uid types.UID, name string) (string, bool) {
+	sc.lock.RLock()
+	defer sc.lock.RUnlock()
+	value, ok := sc.cache.Get(sc.composeKey(uid, name))
 	if ok {
 		return value.(string), ok
 	} else {
@@ -119,7 +119,7 @@ func (self *stringCache) Get(uid types.UID, name string) (string, bool) {
 // stream the log. Set |follow| to false and specify the number of lines (e.g.
 // "100" or "all") to tail the log.
 // TODO: Make 'RawTerminal' option  flagable.
-func (self *DockerManager) GetKubeletDockerContainerLogs(containerID, tail string, follow bool, stdout, stderr io.Writer) (err error) {
+func (dm *DockerManager) GetKubeletDockerContainerLogs(containerID, tail string, follow bool, stdout, stderr io.Writer) (err error) {
 	opts := docker.LogsOptions{
 		Container:    containerID,
 		Stdout:       true,
@@ -135,7 +135,7 @@ func (self *DockerManager) GetKubeletDockerContainerLogs(containerID, tail strin
 		opts.Tail = tail
 	}
 
-	err = self.client.Logs(opts)
+	err = dm.client.Logs(opts)
 	return
 }
 
@@ -157,10 +157,10 @@ type containerStatusResult struct {
 	err    error
 }
 
-func (self *DockerManager) inspectContainer(dockerID, containerName, tPath string) *containerStatusResult {
+func (dm *DockerManager) inspectContainer(dockerID, containerName, tPath string) *containerStatusResult {
 	result := containerStatusResult{api.ContainerStatus{}, "", nil}
 
-	inspectResult, err := self.client.InspectContainer(dockerID)
+	inspectResult, err := dm.client.InspectContainer(dockerID)
 
 	if err != nil {
 		result.err = err
@@ -226,7 +226,7 @@ func (self *DockerManager) inspectContainer(dockerID, containerName, tPath strin
 
 // GetPodStatus returns docker related status for all containers in the pod as
 // well as the infrastructure container.
-func (self *DockerManager) GetPodStatus(pod *api.Pod) (*api.PodStatus, error) {
+func (dm *DockerManager) GetPodStatus(pod *api.Pod) (*api.PodStatus, error) {
 	podFullName := kubecontainer.GetPodFullName(pod)
 	uid := pod.UID
 	manifest := pod.Spec
@@ -249,7 +249,7 @@ func (self *DockerManager) GetPodStatus(pod *api.Pod) (*api.PodStatus, error) {
 	}
 	expectedContainers[PodInfraContainerName] = api.Container{}
 
-	containers, err := self.client.ListContainers(docker.ListContainersOptions{All: true})
+	containers, err := dm.client.ListContainers(docker.ListContainersOptions{All: true})
 	if err != nil {
 		return nil, err
 	}
@@ -284,7 +284,7 @@ func (self *DockerManager) GetPodStatus(pod *api.Pod) (*api.PodStatus, error) {
 
 		var terminationState *api.ContainerState = nil
 		// Inspect the container.
-		result := self.inspectContainer(value.ID, dockerContainerName, terminationMessagePath)
+		result := dm.inspectContainer(value.ID, dockerContainerName, terminationMessagePath)
 		if result.err != nil {
 			return nil, result.err
 		} else if result.status.State.Termination != nil {
@@ -347,7 +347,7 @@ func (self *DockerManager) GetPodStatus(pod *api.Pod) (*api.PodStatus, error) {
 		// record the pull failure and eliminate the image checking below.
 		image := container.Image
 		// TODO(dchen1107): docker/docker/issues/8365 to figure out if the image exists
-		_, err := self.client.InspectImage(image)
+		_, err := dm.client.InspectImage(image)
 		if err == nil {
 			containerStatus.State.Waiting = &api.ContainerStateWaiting{
 				Reason: fmt.Sprintf("Image: %s is ready, container is creating", image),
@@ -364,7 +364,7 @@ func (self *DockerManager) GetPodStatus(pod *api.Pod) (*api.PodStatus, error) {
 	for containerName, status := range statuses {
 		if status.State.Waiting != nil {
 			// For containers in the waiting state, fill in a specific reason if it is recorded.
-			if reason, ok := self.reasonCache.Get(uid, containerName); ok {
+			if reason, ok := dm.reasonCache.Get(uid, containerName); ok {
 				status.State.Waiting.Reason = reason
 			}
 		}
@@ -374,13 +374,13 @@ func (self *DockerManager) GetPodStatus(pod *api.Pod) (*api.PodStatus, error) {
 	return &podStatus, nil
 }
 
-func (self *DockerManager) GetRunningContainers(ids []string) ([]*docker.Container, error) {
+func (dm *DockerManager) GetRunningContainers(ids []string) ([]*docker.Container, error) {
 	result := []*docker.Container{}
-	if self.client == nil {
+	if dm.client == nil {
 		return nil, fmt.Errorf("unexpected nil docker client.")
 	}
 	for ix := range ids {
-		status, err := self.client.InspectContainer(ids[ix])
+		status, err := dm.client.InspectContainer(ids[ix])
 		if err != nil {
 			return nil, err
 		}
@@ -391,20 +391,20 @@ func (self *DockerManager) GetRunningContainers(ids []string) ([]*docker.Contain
 	return result, nil
 }
 
-func (self *DockerManager) RunContainer(pod *api.Pod, container *api.Container, opts *kubecontainer.RunContainerOptions) (string, error) {
-	dockerID, err := self.runContainer(pod, container, opts)
+func (dm *DockerManager) RunContainer(pod *api.Pod, container *api.Container, opts *kubecontainer.RunContainerOptions) (string, error) {
+	dockerID, err := dm.runContainer(pod, container, opts)
 	if err != nil {
 		errString := err.Error()
 		if errString != "" {
-			self.reasonCache.Add(pod.UID, container.Name, errString)
+			dm.reasonCache.Add(pod.UID, container.Name, errString)
 		} else {
-			self.reasonCache.Remove(pod.UID, container.Name)
+			dm.reasonCache.Remove(pod.UID, container.Name)
 		}
 	}
 	return dockerID, err
 }
 
-func (self *DockerManager) runContainer(pod *api.Pod, container *api.Container, opts *kubecontainer.RunContainerOptions) (string, error) {
+func (dm *DockerManager) runContainer(pod *api.Pod, container *api.Container, opts *kubecontainer.RunContainerOptions) (string, error) {
 	ref, err := kubecontainer.GenerateContainerRef(pod, container)
 	if err != nil {
 		glog.Errorf("Couldn't make a ref to pod %v, container %v: '%v'", pod.Name, container.Name, err)
@@ -441,16 +441,16 @@ func (self *DockerManager) runContainer(pod *api.Pod, container *api.Container, 
 
 	glog.V(3).Infof("Container %v/%v/%v: setting entrypoint \"%v\" and command \"%v\"", pod.Namespace, pod.Name, container.Name, dockerOpts.Config.Entrypoint, dockerOpts.Config.Cmd)
 
-	dockerContainer, err := self.client.CreateContainer(dockerOpts)
+	dockerContainer, err := dm.client.CreateContainer(dockerOpts)
 	if err != nil {
 		if ref != nil {
-			self.recorder.Eventf(ref, "failed", "Failed to create docker container with error: %v", err)
+			dm.recorder.Eventf(ref, "failed", "Failed to create docker container with error: %v", err)
 		}
 		return "", err
 	}
 
 	if ref != nil {
-		self.recorder.Eventf(ref, "created", "Created with docker id %v", dockerContainer.ID)
+		dm.recorder.Eventf(ref, "created", "Created with docker id %v", dockerContainer.ID)
 	}
 
 	// The reason we create and mount the log file in here (not in kubelet) is because
@@ -495,15 +495,15 @@ func (self *DockerManager) runContainer(pod *api.Pod, container *api.Container, 
 		hc.DNSSearch = opts.DNSSearch
 	}
 
-	if err = self.client.StartContainer(dockerContainer.ID, hc); err != nil {
+	if err = dm.client.StartContainer(dockerContainer.ID, hc); err != nil {
 		if ref != nil {
-			self.recorder.Eventf(ref, "failed",
+			dm.recorder.Eventf(ref, "failed",
 				"Failed to start with docker id %v with error: %v", dockerContainer.ID, err)
 		}
 		return "", err
 	}
 	if ref != nil {
-		self.recorder.Eventf(ref, "started", "Started with docker id %v", dockerContainer.ID)
+		dm.recorder.Eventf(ref, "started", "Started with docker id %v", dockerContainer.ID)
 	}
 	return dockerContainer.ID, nil
 }
@@ -565,11 +565,11 @@ func makeCapabilites(capAdd []api.CapabilityType, capDrop []api.CapabilityType) 
 	return addCaps, dropCaps
 }
 
-func (self *DockerManager) GetPods(all bool) ([]*kubecontainer.Pod, error) {
+func (dm *DockerManager) GetPods(all bool) ([]*kubecontainer.Pod, error) {
 	pods := make(map[types.UID]*kubecontainer.Pod)
 	var result []*kubecontainer.Pod
 
-	containers, err := GetKubeletDockerContainers(self.client, all)
+	containers, err := GetKubeletDockerContainers(dm.client, all)
 	if err != nil {
 		return nil, err
 	}
@@ -614,20 +614,20 @@ func (self *DockerManager) GetPods(all bool) ([]*kubecontainer.Pod, error) {
 	return result, nil
 }
 
-func (self *DockerManager) Pull(image string) error {
-	return self.Puller.Pull(image)
+func (dm *DockerManager) Pull(image string) error {
+	return dm.Puller.Pull(image)
 }
 
-func (self *DockerManager) IsImagePresent(image string) (bool, error) {
-	return self.Puller.IsImagePresent(image)
+func (dm *DockerManager) IsImagePresent(image string) (bool, error) {
+	return dm.Puller.IsImagePresent(image)
 }
 
 // PodInfraContainer returns true if the pod infra container has changed.
-func (self *DockerManager) PodInfraContainerChanged(pod *api.Pod, podInfraContainer *kubecontainer.Container) (bool, error) {
+func (dm *DockerManager) PodInfraContainerChanged(pod *api.Pod, podInfraContainer *kubecontainer.Container) (bool, error) {
 	networkMode := ""
 	var ports []api.ContainerPort
 
-	dockerPodInfraContainer, err := self.client.InspectContainer(string(podInfraContainer.ID))
+	dockerPodInfraContainer, err := dm.client.InspectContainer(string(podInfraContainer.ID))
 	if err != nil {
 		return false, err
 	}
@@ -650,7 +650,7 @@ func (self *DockerManager) PodInfraContainerChanged(pod *api.Pod, podInfraContai
 	}
 	expectedPodInfraContainer := &api.Container{
 		Name:  PodInfraContainerName,
-		Image: self.PodInfraContainerImage,
+		Image: dm.PodInfraContainerImage,
 		Ports: ports,
 	}
 	return podInfraContainer.Hash != HashContainer(expectedPodInfraContainer), nil
