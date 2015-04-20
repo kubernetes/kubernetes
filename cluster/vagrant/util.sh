@@ -18,6 +18,7 @@
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
 source "${KUBE_ROOT}/cluster/vagrant/${KUBE_CONFIG_FILE-"config-default.sh"}"
+source "${KUBE_ROOT}/cluster/common.sh"
 
 function detect-master () {
   KUBE_MASTER_IP=$MASTER_IP
@@ -252,49 +253,18 @@ function kube-up {
 
   vagrant up
 
-  local kube_cert=".kubecfg.vagrant.crt"
-  local kube_key=".kubecfg.vagrant.key"
-  local ca_cert=".kubernetes.vagrant.ca.crt"
+  export KUBE_CERT="/tmp/$RANDOM-kubecfg.crt"
+  export KUBE_KEY="/tmp/$RANDOM-kubecfg.key"
+  export CA_CERT="/tmp/$RANDOM-kubernetes.ca.crt"
+  export CONTEXT="vagrant"
 
-  (umask 077
-   vagrant ssh master -- sudo cat /srv/kubernetes/kubecfg.crt >"${HOME}/${kube_cert}" 2>/dev/null
-   vagrant ssh master -- sudo cat /srv/kubernetes/kubecfg.key >"${HOME}/${kube_key}" 2>/dev/null
-   vagrant ssh master -- sudo cat /srv/kubernetes/ca.crt >"${HOME}/${ca_cert}" 2>/dev/null
+  (
+   umask 077
+   vagrant ssh master -- sudo cat /srv/kubernetes/kubecfg.crt >"${KUBE_CERT}" 2>/dev/null
+   vagrant ssh master -- sudo cat /srv/kubernetes/kubecfg.key >"${KUBE_KEY}" 2>/dev/null
+   vagrant ssh master -- sudo cat /srv/kubernetes/ca.crt >"${CA_CERT}" 2>/dev/null
 
-   cat <<EOF >"${HOME}/.kubernetes_vagrant_auth"
-{
-  "User": "$KUBE_USER",
-  "Password": "$KUBE_PASSWORD",
-  "CAFile": "$HOME/$ca_cert",
-  "CertFile": "$HOME/$kube_cert",
-  "KeyFile": "$HOME/$kube_key"
-}
-EOF
-
-   cat <<EOF >"${HOME}/.kubernetes_vagrant_kubeconfig"
-apiVersion: v1
-clusters:
-- cluster:
-    certificate-authority: ${HOME}/$ca_cert
-    server: https://${MASTER_IP}:443
-  name: vagrant
-contexts:
-- context:
-    cluster: vagrant
-    namespace: default
-    user: vagrant
-  name: vagrant
-current-context: "vagrant"
-kind: Config
-preferences: {}
-users:
-- name: vagrant
-  user:
-    auth-path: ${HOME}/.kubernetes_vagrant_auth
-EOF
-
-   chmod 0600 ~/.kubernetes_vagrant_auth "${HOME}/${kube_cert}" \
-     "${HOME}/${kube_key}" "${HOME}/${ca_cert}"
+   create-kubeconfig
   )
 
   verify-cluster

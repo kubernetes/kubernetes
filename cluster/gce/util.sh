@@ -679,9 +679,9 @@ function kube-up {
   echo "Kubernetes cluster created."
 
   # TODO use token instead of basic auth
-  export KUBE_CERT="/tmp/kubecfg.crt"
-  export KUBE_KEY="/tmp/kubecfg.key"
-  export CA_CERT="/tmp/kubernetes.ca.crt"
+  export KUBE_CERT="/tmp/$RANDOM-kubecfg.crt"
+  export KUBE_KEY="/tmp/$RANDOM-kubecfg.key"
+  export CA_CERT="/tmp/$RANDOM-kubernetes.ca.crt"
   export CONTEXT="${PROJECT}_${INSTANCE_PREFIX}"
 
   # TODO: generate ADMIN (and KUBELET) tokens and put those in the master's

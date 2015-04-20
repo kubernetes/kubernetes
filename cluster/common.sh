@@ -30,11 +30,12 @@ DEFAULT_KUBECONFIG="${HOME}/.kube/config"
 #   KUBE_PASSWORD
 #   KUBE_MASTER_IP
 #   KUBECONFIG
+#   CONTEXT
 #
+# The following can be omitted for --insecure-skip-tls-verify
 #   KUBE_CERT
 #   KUBE_KEY
 #   CA_CERT
-#   CONTEXT
 function create-kubeconfig() {
   local kubectl="${KUBE_ROOT}/cluster/kubectl.sh"
 
@@ -44,14 +45,31 @@ function create-kubeconfig() {
     mkdir -p $(dirname "${KUBECONFIG}")
     touch "${KUBECONFIG}"
   fi
-  "${kubectl}" config set-cluster "${CONTEXT}" --server="https://${KUBE_MASTER_IP}" \
-                                               --certificate-authority="${CA_CERT}" \
-                                               --embed-certs=true
-  "${kubectl}" config set-credentials "${CONTEXT}" --username="${KUBE_USER}" \
-                                                --password="${KUBE_PASSWORD}" \
-                                                --client-certificate="${KUBE_CERT}" \
-                                                --client-key="${KUBE_KEY}" \
-                                                --embed-certs=true
+  local cluster_args=(
+      "--server=${KUBE_SERVER:-https://${KUBE_MASTER_IP}}"
+  )
+  if [[ -z "${CA_CERT:-}" ]]; then
+    cluster_args+=("--insecure-skip-tls-verify=true")
+  else
+    cluster_args+=(
+      "--certificate-authority=${CA_CERT}"
+      "--embed-certs=true"
+    )
+  fi
+  local user_args=(
+     "--username=${KUBE_USER}"
+     "--password=${KUBE_PASSWORD}"
+  )
+  if [[ ! -z "${KUBE_CERT:-}" && ! -z "${KUBE_KEY:-}" ]]; then
+    user_args+=(
+     "--client-certificate=${KUBE_CERT}"
+     "--client-key=${KUBE_KEY}"
+     "--embed-certs=true"
+    )
+  fi
+
+  "${kubectl}" config set-cluster "${CONTEXT}" "${cluster_args[@]}"
+  "${kubectl}" config set-credentials "${CONTEXT}" "${user_args[@]}"
   "${kubectl}" config set-context "${CONTEXT}" --cluster="${CONTEXT}" --user="${CONTEXT}"
   "${kubectl}" config use-context "${CONTEXT}"  --cluster="${CONTEXT}"
 

@@ -20,6 +20,7 @@
 # config-default.sh.
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
 source "${KUBE_ROOT}/cluster/aws/${KUBE_CONFIG_FILE-"config-default.sh"}"
+source "${KUBE_ROOT}/cluster/common.sh"
 
 # This removes the final character in bash (somehow)
 AWS_REGION=${ZONE%?}
@@ -265,7 +266,7 @@ function upload-server-tars() {
 
 
 # Ensure that we have a password created for validating to the master.  Will
-# read from the kubernetes auth-file for the current context if available.
+# read from kubeconfig for the current context if available.
 #
 # Assumed vars
 #   KUBE_ROOT
@@ -274,17 +275,11 @@ function upload-server-tars() {
 #   KUBE_USER
 #   KUBE_PASSWORD
 function get-password {
-  # go template to extract the auth-path of the current-context user
-  # Note: we save dot ('.') to $dot because the 'with' action overrides dot
-  local template='{{$dot := .}}{{with $ctx := index $dot "current-context"}}{{range $element := (index $dot "contexts")}}{{ if eq .name $ctx }}{{ with $user := .context.user }}{{range $element := (index $dot "users")}}{{ if eq .name $user }}{{ index . "user" "auth-path" }}{{end}}{{end}}{{end}}{{end}}{{end}}{{end}}'
-  local file=$("${KUBE_ROOT}/cluster/kubectl.sh" config view -o template --template="${template}")
-  if [[ ! -z "$file" && -r "$file" ]]; then
-    KUBE_USER=$(cat "$file" | python -c 'import json,sys;print json.load(sys.stdin)["User"]')
-    KUBE_PASSWORD=$(cat "$file" | python -c 'import json,sys;print json.load(sys.stdin)["Password"]')
-    return
+  get-kubeconfig-basicauth
+  if [[ -z "${KUBE_USER}" || -z "${KUBE_PASSWORD}" ]]; then
+    KUBE_USER=admin
+    KUBE_PASSWORD=$(python -c 'import string,random; print "".join(random.SystemRandom().choice(string.ascii_letters + string.digits) for _ in range(16))')
   fi
-  KUBE_USER=admin
-  KUBE_PASSWORD=$(python -c 'import string,random; print "".join(random.SystemRandom().choice(string.ascii_letters + string.digits) for _ in range(16))')
 }
 
 # Adds a tag to an AWS resource
@@ -609,44 +604,24 @@ function kube-up {
 
   echo "Kubernetes cluster created."
 
-  local kube_cert="kubecfg.crt"
-  local kube_key="kubecfg.key"
-  local ca_cert="kubernetes.ca.crt"
   # TODO use token instead of kube_auth
-  local kube_auth="kubernetes_auth"
+  export KUBE_CERT="/tmp/$RANDOM-kubecfg.crt"
+  export KUBE_KEY="/tmp/$RANDOM-kubecfg.key"
+  export CA_CERT="/tmp/$RANDOM-kubernetes.ca.crt"
+  export CONTEXT="aws_${INSTANCE_PREFIX}"
 
   local kubectl="${KUBE_ROOT}/cluster/kubectl.sh"
-  local context="${INSTANCE_PREFIX}"
-  local user="${INSTANCE_PREFIX}-admin"
-  local config_dir="${HOME}/.kube/${context}"
 
   # TODO: generate ADMIN (and KUBELET) tokens and put those in the master's
   # config file.  Distribute the same way the htpasswd is done.
   (
     mkdir -p "${config_dir}"
     umask 077
-    ssh -oStrictHostKeyChecking=no -i "${AWS_SSH_KEY}" ubuntu@${KUBE_MASTER_IP} sudo cat /srv/kubernetes/kubecfg.crt >"${config_dir}/${kube_cert}" 2>$LOG
-    ssh -oStrictHostKeyChecking=no -i "${AWS_SSH_KEY}" ubuntu@${KUBE_MASTER_IP} sudo cat /srv/kubernetes/kubecfg.key >"${config_dir}/${kube_key}" 2>$LOG
-    ssh -oStrictHostKeyChecking=no -i "${AWS_SSH_KEY}" ubuntu@${KUBE_MASTER_IP} sudo cat /srv/kubernetes/ca.crt >"${config_dir}/${ca_cert}" 2>$LOG
+    ssh -oStrictHostKeyChecking=no -i "${AWS_SSH_KEY}" "ubuntu@${KUBE_MASTER_IP}" sudo cat /srv/kubernetes/kubecfg.crt >"${KUBE_CERT}" 2>"$LOG"
+    ssh -oStrictHostKeyChecking=no -i "${AWS_SSH_KEY}" "ubuntu@${KUBE_MASTER_IP}" sudo cat /srv/kubernetes/kubecfg.key >"${KUBE_KEY}" 2>"$LOG"
+    ssh -oStrictHostKeyChecking=no -i "${AWS_SSH_KEY}" "ubuntu@${KUBE_MASTER_IP}" sudo cat /srv/kubernetes/ca.crt >"${CA_CERT}" 2>"$LOG"
 
-    "${kubectl}" config set-cluster "${context}" --server="https://${KUBE_MASTER_IP}" --certificate-authority="${config_dir}/${ca_cert}" --global
-    "${kubectl}" config set-credentials "${user}" --auth-path="${config_dir}/${kube_auth}" --global
-    "${kubectl}" config set-context "${context}" --cluster="${context}" --user="${user}" --global
-    "${kubectl}" config use-context "${context}" --global
-
-    cat << EOF > "${config_dir}/${kube_auth}"
-{
-  "User": "$KUBE_USER",
-  "Password": "$KUBE_PASSWORD",
-  "CAFile": "${config_dir}/${ca_cert}",
-  "CertFile": "${config_dir}/${kube_cert}",
-  "KeyFile": "${config_dir}/${kube_key}"
-}
-EOF
-
-    chmod 0600 "${config_dir}/${kube_auth}" "${config_dir}/$kube_cert" \
-      "${config_dir}/${kube_key}" "${config_dir}/${ca_cert}"
-    echo "Wrote ${config_dir}/${kube_auth}"
+    create-kubeconfig
   )
 
   echo "Sanity checking cluster..."
@@ -700,7 +675,7 @@ EOF
   echo
   echo -e "${color_yellow}  https://${KUBE_MASTER_IP}"
   echo
-  echo -e "${color_green}The user name and password to use is located in ${config_dir}/${kube_auth}${color_norm}"
+  echo -e "${color_green}The user name and password to use is located in ${KUBECONFIG}.${color_norm}"
   echo
 }
 

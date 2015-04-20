@@ -20,6 +20,7 @@
 # config-default.sh.
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
 source $(dirname ${BASH_SOURCE})/${KUBE_CONFIG_FILE-"config-default.sh"}
+source "${KUBE_ROOT}/cluster/common.sh"
 
 verify-prereqs() {
   # Make sure that prerequisites are installed.
@@ -50,29 +51,17 @@ verify-prereqs() {
 }
 
 # Ensure that we have a password created for validating to the master.  Will
-# read from $HOME/.kubernetres_auth if available.
+# read from kubeconfig current-context if available.
 #
 # Vars set:
 #   KUBE_USER
 #   KUBE_PASSWORD
 get-password() {
-  local file="$HOME/.kubernetes_auth"
-  if [[ -r "$file" ]]; then
-    KUBE_USER=$(cat "$file" | python -c 'import json,sys;print json.load(sys.stdin)["User"]')
-    KUBE_PASSWORD=$(cat "$file" | python -c 'import json,sys;print json.load(sys.stdin)["Password"]')
-    return
+  get-kubeconfig-basicauth
+  if [[ -z "${KUBE_USER}" || -z "${KUBE_PASSWORD}" ]]; then
+    KUBE_USER=admin
+    KUBE_PASSWORD=$(python -c 'import string,random; print "".join(random.SystemRandom().choice(string.ascii_letters + string.digits) for _ in range(16))')
   fi
-  KUBE_USER=admin
-  KUBE_PASSWORD=$(python -c 'import string,random; print "".join(random.SystemRandom().choice(string.ascii_letters + string.digits) for _ in range(16))')
-
-  # Store password for reuse.
-  cat << EOF > "$file"
-{
-  "User": "$KUBE_USER",
-  "Password": "$KUBE_PASSWORD"
-}
-EOF
-  chmod 0600 "$file"
 }
 
 rax-ssh-key() {
@@ -328,6 +317,13 @@ kube-up() {
   done
 
   echo "Kubernetes cluster created."
+
+  export KUBE_CERT=""
+  export KUBE_KEY=""
+  export CA_CERT=""
+  export CONTEXT="rackspace_${INSTANCE_PREFIX}"
+
+  create-kubeconfig
 
   # Don't bail on errors, we want to be able to print some info.
   set +e
