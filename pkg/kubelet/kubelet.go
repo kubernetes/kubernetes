@@ -1636,7 +1636,7 @@ func (kl *Kubelet) syncLoop(updates <-chan PodUpdate, handler SyncHandler) {
 }
 
 // Returns Docker version for this Kubelet.
-func (kl *Kubelet) GetDockerVersion() ([]uint, error) {
+func (kl *Kubelet) GetDockerVersion() (docker.APIVersion, error) {
 	if kl.dockerClient == nil {
 		return nil, fmt.Errorf("no Docker client")
 	}
