@@ -56,7 +56,7 @@ function start_addon() {
 # $3 name of this object to use when logging about it.
 function create-resource-from-string() {
   local -r config_string=$1;
-  local -r tries=$2;
+  local tries=$2;
   local -r delay=$3;
   local -r config_name=$1;
   while [ ${tries} -gt 0 ]; do
