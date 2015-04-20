@@ -1002,14 +1002,14 @@ func shouldContainerBeRestarted(container *api.Container, pod *api.Pod, podStatu
 	// Check RestartPolicy for dead container.
 	if len(resultStatus) > 0 {
 		if pod.Spec.RestartPolicy == api.RestartPolicyNever {
-			glog.Infof("Already ran container %q of pod %q, do nothing", container.Name, podFullName)
+			glog.V(4).Infof("Already ran container %q of pod %q, do nothing", container.Name, podFullName)
 			return false
 		}
 		if pod.Spec.RestartPolicy == api.RestartPolicyOnFailure {
 			// Check the exit code of last run. Note: This assumes the result is sorted
 			// by the created time in reverse order.
 			if resultStatus[0].State.Termination.ExitCode == 0 {
-				glog.Infof("Already successfully ran container %q of pod %q, do nothing", container.Name, podFullName)
+				glog.V(4).Infof("Already successfully ran container %q of pod %q, do nothing", container.Name, podFullName)
 				return false
 			}
 		}
@@ -1264,7 +1264,7 @@ func (kl *Kubelet) syncPod(pod *api.Pod, mirrorPod *api.Pod, runningPod kubecont
 		if err != nil {
 			glog.Errorf("Couldn't make a ref to pod %q: '%v'", podFullName, err)
 		}
-		glog.Infof("Creating pod infra container for %q", podFullName)
+		glog.V(4).Infof("Creating pod infra container for %q", podFullName)
 		podInfraContainerID, err = kl.createPodInfraContainer(pod)
 
 		// Call the networking plugin
