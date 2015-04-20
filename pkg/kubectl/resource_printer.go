@@ -256,6 +256,7 @@ var namespaceColumns = []string{"NAME", "LABELS", "STATUS"}
 var secretColumns = []string{"NAME", "DATA"}
 var persistentVolumeColumns = []string{"NAME", "LABELS", "CAPACITY", "ACCESSMODES", "STATUS", "CLAIM"}
 var persistentVolumeClaimColumns = []string{"NAME", "LABELS", "STATUS", "VOLUME"}
+var componentStatusColumns = []string{"NAME", "STATUS", "MESSAGE", "ERROR"}
 
 // addDefaultHandlers adds print handlers for default Kubernetes types.
 func (h *HumanReadablePrinter) addDefaultHandlers() {
@@ -284,6 +285,8 @@ func (h *HumanReadablePrinter) addDefaultHandlers() {
 	h.Handler(persistentVolumeClaimColumns, printPersistentVolumeClaimList)
 	h.Handler(persistentVolumeColumns, printPersistentVolume)
 	h.Handler(persistentVolumeColumns, printPersistentVolumeList)
+	h.Handler(componentStatusColumns, printComponentStatus)
+	h.Handler(componentStatusColumns, printComponentStatusList)
 }
 
 func (h *HumanReadablePrinter) unknown(data []byte, w io.Writer) error {
@@ -641,6 +644,36 @@ func printResourceQuotaList(list *api.ResourceQuotaList, w io.Writer) error {
 			return err
 		}
 	}
+	return nil
+}
+
+func printComponentStatus(item *api.ComponentStatus, w io.Writer) error {
+	status := "Unknown"
+	message := ""
+	error := ""
+	for _, condition := range item.Conditions {
+		if condition.Type == api.ComponentHealthy {
+			if condition.Status == api.ConditionTrue {
+				status = "Healthy"
+			} else {
+				status = "Unhealthy"
+			}
+			message = condition.Message
+			error = condition.Error
+			break
+		}
+	}
+	_, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", item.Name, status, message, error)
+	return err
+}
+
+func printComponentStatusList(list *api.ComponentStatusList, w io.Writer) error {
+	for _, item := range list.Items {
+		if err := printComponentStatus(&item, w); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 

@@ -242,6 +242,7 @@ _kubectl_get()
 
     must_have_one_flag=()
     must_have_one_noun=()
+    must_have_one_noun+=("componentstatus")
     must_have_one_noun+=("endpoints")
     must_have_one_noun+=("event")
     must_have_one_noun+=("limitrange")

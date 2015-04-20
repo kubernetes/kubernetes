@@ -43,6 +43,7 @@ type Interface interface {
 	NamespacesInterface
 	PersistentVolumesInterface
 	PersistentVolumeClaimsNamespacer
+	ComponentStatusesInterface
 }
 
 func (c *Client) ReplicationControllers(namespace string) ReplicationControllerInterface {
@@ -92,6 +93,10 @@ func (c *Client) PersistentVolumeClaims(namespace string) PersistentVolumeClaimI
 	return newPersistentVolumeClaims(c, namespace)
 }
 
+func (c *Client) ComponentStatuses() ComponentStatusInterface {
+	return newComponentStatuses(c)
+}
+
 // VersionInterface has a method to retrieve the server version.
 type VersionInterface interface {
 	ServerVersion() (*version.Info, error)
@@ -135,6 +140,25 @@ func (c *Client) ServerAPIVersions() (*api.APIVersions, error) {
 		return nil, fmt.Errorf("got '%s': %v", string(body), err)
 	}
 	return &v, nil
+}
+
+type ComponentValidatorInterface interface {
+	ValidateComponents() (*api.ComponentStatusList, error)
+}
+
+// ValidateComponents retrieves and parses the master's self-monitored cluster state.
+// TODO: This should hit the versioned endpoint when that is implemented.
+func (c *Client) ValidateComponents() (*api.ComponentStatusList, error) {
+	body, err := c.Get().AbsPath("/validate").DoRaw()
+	if err != nil {
+		return nil, err
+	}
+
+	statuses := []api.ComponentStatus{}
+	if err := json.Unmarshal(body, &statuses); err != nil {
+		return nil, fmt.Errorf("got '%s': %v", string(body), err)
+	}
+	return &api.ComponentStatusList{Items: statuses}, nil
 }
 
 // IsTimeout tests if this is a timeout error in the underlying transport.
