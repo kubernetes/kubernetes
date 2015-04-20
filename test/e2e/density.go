@@ -269,11 +269,13 @@ var _ = Describe("Density", func() {
 			ns = "e2e-density" + nameStr
 			RCName = "my-hostname-density" + nameStr
 			RunRC(c, RCName, ns, "gcr.io/google_containers/pause:go", totalPods)
-			By("waiting for all events to be recorded")
+
+			By("Waiting for all events to be recorded")
 			last := -1
 			current := 0
 			var events *api.EventList
-			for last < current {
+			timeout := 10 * time.Minute
+			for start := time.Now(); last < current && time.Since(start) < timeout; time.Sleep(10 * time.Second) {
 				e, err := c.Events(ns).List(
 					labels.Everything(),
 					fields.Set{
@@ -284,12 +286,14 @@ var _ = Describe("Density", func() {
 				last = current
 				current = len(e.Items)
 				events = e
-				time.Sleep(10 * time.Second)
+			}
+			if current != last {
+				Logf("Warning: Not all events were recorded after waiting %.2f minutes", timeout.Minutes())
 			}
 			Logf("Found %d events", current)
 
-			// Verify no pods were killed or failed to start
-			By("verifying no pods were killed or failed to start")
+			// Verify there were no pod killings or failures
+			By("Verifying there were no pod killings or failures")
 			for _, e := range events.Items {
 				for _, s := range []string{"kill", "fail"} {
 					Expect(e.Reason).NotTo(ContainSubstring(s), "event:' %s', reason: '%s', message: '%s', field path: '%s'", e, e.ObjectMeta.Name, e.Message, e.InvolvedObject.FieldPath)
