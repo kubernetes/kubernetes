@@ -112,11 +112,8 @@ func Create(client *gophercloud.ServiceClient, loadBalancerID int, opts CreateOp
 		return res
 	}
 
-	resp, err := client.Request("POST", rootURL(client, loadBalancerID), gophercloud.RequestOpts{
-		JSONBody:     &reqBody,
-		JSONResponse: &res.Body,
-		OkCodes:      []int{202},
-	})
+	resp, err := client.Post(rootURL(client, loadBalancerID), reqBody, &res.Body, nil)
+
 	if err != nil {
 		res.Err = err
 		return res
@@ -145,22 +142,14 @@ func BulkDelete(c *gophercloud.ServiceClient, loadBalancerID int, nodeIDs []int)
 	url := rootURL(c, loadBalancerID)
 	url += gophercloud.IDSliceToQueryString("id", nodeIDs)
 
-	_, res.Err = c.Request("DELETE", url, gophercloud.RequestOpts{
-		OkCodes: []int{202},
-	})
-
+	_, res.Err = c.Delete(url, nil)
 	return res
 }
 
 // Get is the operation responsible for showing details for a single node.
 func Get(c *gophercloud.ServiceClient, lbID, nodeID int) GetResult {
 	var res GetResult
-
-	_, res.Err = c.Request("GET", resourceURL(c, lbID, nodeID), gophercloud.RequestOpts{
-		JSONResponse: &res.Body,
-		OkCodes:      []int{200},
-	})
-
+	_, res.Err = c.Get(resourceURL(c, lbID, nodeID), &res.Body, nil)
 	return res
 }
 
@@ -213,20 +202,14 @@ func Update(c *gophercloud.ServiceClient, lbID, nodeID int, opts UpdateOptsBuild
 		return res
 	}
 
-	_, res.Err = c.Request("PUT", resourceURL(c, lbID, nodeID), gophercloud.RequestOpts{
-		JSONBody: &reqBody,
-		OkCodes:  []int{202},
-	})
-
+	_, res.Err = c.Put(resourceURL(c, lbID, nodeID), reqBody, nil, nil)
 	return res
 }
 
 // Delete is the operation responsible for permanently deleting a node.
 func Delete(c *gophercloud.ServiceClient, lbID, nodeID int) DeleteResult {
 	var res DeleteResult
-	_, res.Err = c.Request("DELETE", resourceURL(c, lbID, nodeID), gophercloud.RequestOpts{
-		OkCodes: []int{202},
-	})
+	_, res.Err = c.Delete(resourceURL(c, lbID, nodeID), nil)
 	return res
 }
 

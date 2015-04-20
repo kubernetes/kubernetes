@@ -42,12 +42,7 @@ func Enable(c *gophercloud.ServiceClient, lbID int, opts CreateOptsBuilder) Enab
 		return res
 	}
 
-	_, res.Err = c.Request("PUT", rootURL(c, lbID), gophercloud.RequestOpts{
-		JSONBody:     &reqBody,
-		JSONResponse: &res.Body,
-		OkCodes:      []int{202},
-	})
-
+	_, res.Err = c.Put(rootURL(c, lbID), reqBody, &res.Body, nil)
 	return res
 }
 
@@ -55,12 +50,7 @@ func Enable(c *gophercloud.ServiceClient, lbID int, opts CreateOptsBuilder) Enab
 // persistence configuration for a particular load balancer.
 func Get(c *gophercloud.ServiceClient, lbID int) GetResult {
 	var res GetResult
-
-	_, res.Err = c.Request("GET", rootURL(c, lbID), gophercloud.RequestOpts{
-		JSONResponse: &res.Body,
-		OkCodes:      []int{200},
-	})
-
+	_, res.Err = c.Get(rootURL(c, lbID), &res.Body, nil)
 	return res
 }
 
@@ -68,10 +58,6 @@ func Get(c *gophercloud.ServiceClient, lbID int) GetResult {
 // particular load balancer.
 func Disable(c *gophercloud.ServiceClient, lbID int) DisableResult {
 	var res DisableResult
-
-	_, res.Err = c.Request("DELETE", rootURL(c, lbID), gophercloud.RequestOpts{
-		OkCodes: []int{202},
-	})
-
+	_, res.Err = c.Delete(rootURL(c, lbID), nil)
 	return res
 }

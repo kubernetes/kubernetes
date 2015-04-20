@@ -49,7 +49,7 @@ func TestList(t *testing.T) {
             "tenant_id": "26a7980765d0414dbc1fc1f88cdb7e6e",
             "shared": true,
             "id": "db193ab3-96e3-4cb3-8fc5-05f4296d0324",
-            "provider:segmentation_id": null,
+            "provider:segmentation_id": 1234567890,
             "provider:physical_network": null,
             "provider:network_type": "local"
         }
@@ -91,7 +91,7 @@ func TestList(t *testing.T) {
 				ID:              "db193ab3-96e3-4cb3-8fc5-05f4296d0324",
 				NetworkType:     "local",
 				PhysicalNetwork: "",
-				SegmentationID:  "",
+				SegmentationID:  "1234567890",
 			},
 		}
 

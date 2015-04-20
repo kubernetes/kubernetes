@@ -177,10 +177,7 @@ func Create(c *gophercloud.ServiceClient, opts CreateOptsBuilder) CreateResult {
 	}
 
 	// Send request to API
-	resp, err := c.Request("POST", createURL(c), gophercloud.RequestOpts{
-		JSONBody: &reqBody,
-		OkCodes:  []int{202},
-	})
+	resp, err := c.Post(createURL(c), &reqBody, nil, nil)
 	res.Header = resp.Header
 	res.Err = err
 	return res
@@ -199,10 +196,7 @@ func Get(c *gophercloud.ServiceClient, idOrURL string) GetResult {
 	}
 
 	var res GetResult
-	_, res.Err = c.Request("GET", url, gophercloud.RequestOpts{
-		JSONResponse: &res.Body,
-		OkCodes:      []int{200},
-	})
+	_, res.Err = c.Get(url, &res.Body, nil)
 	return res
 }
 
@@ -379,8 +373,6 @@ func Delete(c *gophercloud.ServiceClient, idOrURL string) DeleteResult {
 	}
 
 	var res DeleteResult
-	_, res.Err = c.Request("DELETE", url, gophercloud.RequestOpts{
-		OkCodes: []int{202},
-	})
+	_, res.Err = c.Delete(url, nil)
 	return res
 }

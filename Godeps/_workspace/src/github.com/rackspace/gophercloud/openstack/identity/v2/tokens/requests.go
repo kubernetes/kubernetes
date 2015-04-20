@@ -75,10 +75,8 @@ func Create(client *gophercloud.ServiceClient, auth AuthOptionsBuilder) CreateRe
 	}
 
 	var result CreateResult
-	_, result.Err = client.Request("POST", CreateURL(client), gophercloud.RequestOpts{
-		JSONBody:     &request,
-		JSONResponse: &result.Body,
-		OkCodes:      []int{200, 203},
+	_, result.Err = client.Post(CreateURL(client), request, &result.Body, &gophercloud.RequestOpts{
+		OkCodes: []int{200, 203},
 	})
 	return result
 }

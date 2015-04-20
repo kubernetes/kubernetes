@@ -24,6 +24,9 @@ func Get(c *gophercloud.ServiceClient, networkID string) os.GetResult {
 
 // Create accepts a CreateOpts struct and creates a new network using the values
 // provided. You must remember to provide a NetworkID value.
+//
+// NOTE: Currently the SecurityGroup option is not implemented to work with
+// Rackspace.
 func Create(c *gophercloud.ServiceClient, opts os.CreateOptsBuilder) os.CreateResult {
 	return os.Create(c, opts)
 }

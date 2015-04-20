@@ -11,7 +11,6 @@ func Find(c *gophercloud.ServiceClient, stackName string) FindResult {
 
 	_, res.Err = c.Request("GET", findURL(c, stackName), gophercloud.RequestOpts{
 		JSONResponse: &res.Body,
-		OkCodes:      []int{200},
 	})
 	return res
 }
@@ -197,9 +196,8 @@ func ListResourceEvents(client *gophercloud.ServiceClient, stackName, stackID, r
 // Get retreives data for the given stack resource.
 func Get(c *gophercloud.ServiceClient, stackName, stackID, resourceName, eventID string) GetResult {
 	var res GetResult
-	_, res.Err = c.Request("GET", getURL(c, stackName, stackID, resourceName, eventID), gophercloud.RequestOpts{
-		JSONResponse: &res.Body,
-		OkCodes:      []int{200},
+	_, res.Err = c.Get(getURL(c, stackName, stackID, resourceName, eventID), &res.Body, &gophercloud.RequestOpts{
+		OkCodes: []int{200},
 	})
 	return res
 }
