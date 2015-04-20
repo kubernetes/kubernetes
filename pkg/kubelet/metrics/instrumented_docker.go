@@ -36,114 +36,114 @@ func NewInstrumentedDockerInterface(dockerClient dockertools.DockerInterface) do
 	}
 }
 
-func (self instrumentedDockerInterface) ListContainers(options docker.ListContainersOptions) ([]docker.APIContainers, error) {
+func (in instrumentedDockerInterface) ListContainers(options docker.ListContainersOptions) ([]docker.APIContainers, error) {
 	start := time.Now()
 	defer func() {
 		DockerOperationsLatency.WithLabelValues("list_containers").Observe(SinceInMicroseconds(start))
 	}()
-	return self.client.ListContainers(options)
+	return in.client.ListContainers(options)
 }
 
-func (self instrumentedDockerInterface) InspectContainer(id string) (*docker.Container, error) {
+func (in instrumentedDockerInterface) InspectContainer(id string) (*docker.Container, error) {
 	start := time.Now()
 	defer func() {
 		DockerOperationsLatency.WithLabelValues("inspect_container").Observe(SinceInMicroseconds(start))
 	}()
-	return self.client.InspectContainer(id)
+	return in.client.InspectContainer(id)
 }
 
-func (self instrumentedDockerInterface) CreateContainer(opts docker.CreateContainerOptions) (*docker.Container, error) {
+func (in instrumentedDockerInterface) CreateContainer(opts docker.CreateContainerOptions) (*docker.Container, error) {
 	start := time.Now()
 	defer func() {
 		DockerOperationsLatency.WithLabelValues("create_container").Observe(SinceInMicroseconds(start))
 	}()
-	return self.client.CreateContainer(opts)
+	return in.client.CreateContainer(opts)
 }
 
-func (self instrumentedDockerInterface) StartContainer(id string, hostConfig *docker.HostConfig) error {
+func (in instrumentedDockerInterface) StartContainer(id string, hostConfig *docker.HostConfig) error {
 	start := time.Now()
 	defer func() {
 		DockerOperationsLatency.WithLabelValues("start_container").Observe(SinceInMicroseconds(start))
 	}()
-	return self.client.StartContainer(id, hostConfig)
+	return in.client.StartContainer(id, hostConfig)
 }
 
-func (self instrumentedDockerInterface) StopContainer(id string, timeout uint) error {
+func (in instrumentedDockerInterface) StopContainer(id string, timeout uint) error {
 	start := time.Now()
 	defer func() {
 		DockerOperationsLatency.WithLabelValues("stop_container").Observe(SinceInMicroseconds(start))
 	}()
-	return self.client.StopContainer(id, timeout)
+	return in.client.StopContainer(id, timeout)
 }
 
-func (self instrumentedDockerInterface) RemoveContainer(opts docker.RemoveContainerOptions) error {
+func (in instrumentedDockerInterface) RemoveContainer(opts docker.RemoveContainerOptions) error {
 	start := time.Now()
 	defer func() {
 		DockerOperationsLatency.WithLabelValues("remove_container").Observe(SinceInMicroseconds(start))
 	}()
-	return self.client.RemoveContainer(opts)
+	return in.client.RemoveContainer(opts)
 }
 
-func (self instrumentedDockerInterface) InspectImage(image string) (*docker.Image, error) {
+func (in instrumentedDockerInterface) InspectImage(image string) (*docker.Image, error) {
 	start := time.Now()
 	defer func() {
 		DockerOperationsLatency.WithLabelValues("inspect_image").Observe(SinceInMicroseconds(start))
 	}()
-	return self.client.InspectImage(image)
+	return in.client.InspectImage(image)
 }
 
-func (self instrumentedDockerInterface) ListImages(opts docker.ListImagesOptions) ([]docker.APIImages, error) {
+func (in instrumentedDockerInterface) ListImages(opts docker.ListImagesOptions) ([]docker.APIImages, error) {
 	start := time.Now()
 	defer func() {
 		DockerOperationsLatency.WithLabelValues("list_images").Observe(SinceInMicroseconds(start))
 	}()
-	return self.client.ListImages(opts)
+	return in.client.ListImages(opts)
 }
 
-func (self instrumentedDockerInterface) PullImage(opts docker.PullImageOptions, auth docker.AuthConfiguration) error {
+func (in instrumentedDockerInterface) PullImage(opts docker.PullImageOptions, auth docker.AuthConfiguration) error {
 	start := time.Now()
 	defer func() {
 		DockerOperationsLatency.WithLabelValues("pull_image").Observe(SinceInMicroseconds(start))
 	}()
-	return self.client.PullImage(opts, auth)
+	return in.client.PullImage(opts, auth)
 }
 
-func (self instrumentedDockerInterface) RemoveImage(image string) error {
+func (in instrumentedDockerInterface) RemoveImage(image string) error {
 	start := time.Now()
 	defer func() {
 		DockerOperationsLatency.WithLabelValues("remove_image").Observe(SinceInMicroseconds(start))
 	}()
-	return self.client.RemoveImage(image)
+	return in.client.RemoveImage(image)
 }
 
-func (self instrumentedDockerInterface) Logs(opts docker.LogsOptions) error {
+func (in instrumentedDockerInterface) Logs(opts docker.LogsOptions) error {
 	start := time.Now()
 	defer func() {
 		DockerOperationsLatency.WithLabelValues("logs").Observe(SinceInMicroseconds(start))
 	}()
-	return self.client.Logs(opts)
+	return in.client.Logs(opts)
 }
 
-func (self instrumentedDockerInterface) Version() (*docker.Env, error) {
+func (in instrumentedDockerInterface) Version() (*docker.Env, error) {
 	start := time.Now()
 	defer func() {
 		DockerOperationsLatency.WithLabelValues("version").Observe(SinceInMicroseconds(start))
 	}()
-	return self.client.Version()
+	return in.client.Version()
 }
 
-func (self instrumentedDockerInterface) CreateExec(opts docker.CreateExecOptions) (*docker.Exec, error) {
+func (in instrumentedDockerInterface) CreateExec(opts docker.CreateExecOptions) (*docker.Exec, error) {
 	start := time.Now()
 	defer func() {
 		DockerOperationsLatency.WithLabelValues("create_exec").Observe(SinceInMicroseconds(start))
 	}()
-	return self.client.CreateExec(opts)
+	return in.client.CreateExec(opts)
 }
 
-func (self instrumentedDockerInterface) StartExec(startExec string, opts docker.StartExecOptions) error {
+func (in instrumentedDockerInterface) StartExec(startExec string, opts docker.StartExecOptions) error {
 	start := time.Now()
 	defer func() {
 		DockerOperationsLatency.WithLabelValues("start_exec").Observe(SinceInMicroseconds(start))
 	}()
-	return self.client.StartExec(startExec, opts)
+	return in.client.StartExec(startExec, opts)
 }

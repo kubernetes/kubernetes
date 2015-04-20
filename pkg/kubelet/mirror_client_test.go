@@ -34,20 +34,20 @@ type fakeMirrorClient struct {
 	deleteCounts map[string]int
 }
 
-func (self *fakeMirrorClient) CreateMirrorPod(pod api.Pod) error {
-	self.mirrorPodLock.Lock()
-	defer self.mirrorPodLock.Unlock()
+func (fmc *fakeMirrorClient) CreateMirrorPod(pod api.Pod) error {
+	fmc.mirrorPodLock.Lock()
+	defer fmc.mirrorPodLock.Unlock()
 	podFullName := kubecontainer.GetPodFullName(&pod)
-	self.mirrorPods.Insert(podFullName)
-	self.createCounts[podFullName]++
+	fmc.mirrorPods.Insert(podFullName)
+	fmc.createCounts[podFullName]++
 	return nil
 }
 
-func (self *fakeMirrorClient) DeleteMirrorPod(podFullName string) error {
-	self.mirrorPodLock.Lock()
-	defer self.mirrorPodLock.Unlock()
-	self.mirrorPods.Delete(podFullName)
-	self.deleteCounts[podFullName]++
+func (fmc *fakeMirrorClient) DeleteMirrorPod(podFullName string) error {
+	fmc.mirrorPodLock.Lock()
+	defer fmc.mirrorPodLock.Unlock()
+	fmc.mirrorPods.Delete(podFullName)
+	fmc.deleteCounts[podFullName]++
 	return nil
 }
 
@@ -59,28 +59,28 @@ func newFakeMirrorClient() *fakeMirrorClient {
 	return &m
 }
 
-func (self *fakeMirrorClient) HasPod(podFullName string) bool {
-	self.mirrorPodLock.RLock()
-	defer self.mirrorPodLock.RUnlock()
-	return self.mirrorPods.Has(podFullName)
+func (fmc *fakeMirrorClient) HasPod(podFullName string) bool {
+	fmc.mirrorPodLock.RLock()
+	defer fmc.mirrorPodLock.RUnlock()
+	return fmc.mirrorPods.Has(podFullName)
 }
 
-func (self *fakeMirrorClient) NumOfPods() int {
-	self.mirrorPodLock.RLock()
-	defer self.mirrorPodLock.RUnlock()
-	return self.mirrorPods.Len()
+func (fmc *fakeMirrorClient) NumOfPods() int {
+	fmc.mirrorPodLock.RLock()
+	defer fmc.mirrorPodLock.RUnlock()
+	return fmc.mirrorPods.Len()
 }
 
-func (self *fakeMirrorClient) GetPods() []string {
-	self.mirrorPodLock.RLock()
-	defer self.mirrorPodLock.RUnlock()
-	return self.mirrorPods.List()
+func (fmc *fakeMirrorClient) GetPods() []string {
+	fmc.mirrorPodLock.RLock()
+	defer fmc.mirrorPodLock.RUnlock()
+	return fmc.mirrorPods.List()
 }
 
-func (self *fakeMirrorClient) GetCounts(podFullName string) (int, int) {
-	self.mirrorPodLock.RLock()
-	defer self.mirrorPodLock.RUnlock()
-	return self.createCounts[podFullName], self.deleteCounts[podFullName]
+func (fmc *fakeMirrorClient) GetCounts(podFullName string) (int, int) {
+	fmc.mirrorPodLock.RLock()
+	defer fmc.mirrorPodLock.RUnlock()
+	return fmc.createCounts[podFullName], fmc.deleteCounts[podFullName]
 }
 
 func TestParsePodFullName(t *testing.T) {

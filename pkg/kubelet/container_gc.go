@@ -89,21 +89,22 @@ type evictUnit struct {
 	// Name of the container in the pod.
 	name string
 }
+
 type containersByEvictUnit map[evictUnit][]containerGCInfo
 
 // Returns the number of containers in this map.
-func (self containersByEvictUnit) NumContainers() int {
+func (cu containersByEvictUnit) NumContainers() int {
 	num := 0
-	for key := range self {
-		num += len(self[key])
+	for key := range cu {
+		num += len(cu[key])
 	}
 
 	return num
 }
 
 // Returns the number of pod in this map.
-func (self containersByEvictUnit) NumEvictUnits() int {
-	return len(self)
+func (cu containersByEvictUnit) NumEvictUnits() int {
+	return len(cu)
 }
 
 // Newest first.
@@ -113,9 +114,9 @@ func (a byCreated) Len() int           { return len(a) }
 func (a byCreated) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a byCreated) Less(i, j int) bool { return a[i].createTime.After(a[j].createTime) }
 
-func (self *realContainerGC) GarbageCollect() error {
+func (cgc *realContainerGC) GarbageCollect() error {
 	// Separate containers by evict units.
-	evictUnits, unidentifiedContainers, err := self.evictableContainers()
+	evictUnits, unidentifiedContainers, err := cgc.evictableContainers()
 	if err != nil {
 		return err
 	}
@@ -123,58 +124,58 @@ func (self *realContainerGC) GarbageCollect() error {
 	// Remove unidentified containers.
 	for _, container := range unidentifiedContainers {
 		glog.Infof("Removing unidentified dead container %q with ID %q", container.name, container.id)
-		err = self.dockerClient.RemoveContainer(docker.RemoveContainerOptions{ID: container.id})
+		err = cgc.dockerClient.RemoveContainer(docker.RemoveContainerOptions{ID: container.id})
 		if err != nil {
 			glog.Warningf("Failed to remove unidentified dead container %q: %v", container.name, err)
 		}
 	}
 
 	// Enforce max containers per evict unit.
-	if self.policy.MaxPerPodContainer >= 0 {
-		self.enforceMaxContainersPerEvictUnit(evictUnits, self.policy.MaxPerPodContainer)
+	if cgc.policy.MaxPerPodContainer >= 0 {
+		cgc.enforceMaxContainersPerEvictUnit(evictUnits, cgc.policy.MaxPerPodContainer)
 	}
 
 	// Enforce max total number of containers.
-	if self.policy.MaxContainers >= 0 && evictUnits.NumContainers() > self.policy.MaxContainers {
+	if cgc.policy.MaxContainers >= 0 && evictUnits.NumContainers() > cgc.policy.MaxContainers {
 		// Leave an equal number of containers per evict unit (min: 1).
-		numContainersPerEvictUnit := self.policy.MaxContainers / evictUnits.NumEvictUnits()
+		numContainersPerEvictUnit := cgc.policy.MaxContainers / evictUnits.NumEvictUnits()
 		if numContainersPerEvictUnit < 1 {
 			numContainersPerEvictUnit = 1
 		}
-		self.enforceMaxContainersPerEvictUnit(evictUnits, numContainersPerEvictUnit)
+		cgc.enforceMaxContainersPerEvictUnit(evictUnits, numContainersPerEvictUnit)
 
 		// If we still need to evict, evict oldest first.
 		numContainers := evictUnits.NumContainers()
-		if numContainers > self.policy.MaxContainers {
+		if numContainers > cgc.policy.MaxContainers {
 			flattened := make([]containerGCInfo, 0, numContainers)
 			for uid := range evictUnits {
 				flattened = append(flattened, evictUnits[uid]...)
 			}
 			sort.Sort(byCreated(flattened))
 
-			self.removeOldestN(flattened, numContainers-self.policy.MaxContainers)
+			cgc.removeOldestN(flattened, numContainers-cgc.policy.MaxContainers)
 		}
 	}
 
 	return nil
 }
 
-func (self *realContainerGC) enforceMaxContainersPerEvictUnit(evictUnits containersByEvictUnit, MaxContainers int) {
+func (cgc *realContainerGC) enforceMaxContainersPerEvictUnit(evictUnits containersByEvictUnit, MaxContainers int) {
 	for uid := range evictUnits {
 		toRemove := len(evictUnits[uid]) - MaxContainers
 
 		if toRemove > 0 {
-			evictUnits[uid] = self.removeOldestN(evictUnits[uid], toRemove)
+			evictUnits[uid] = cgc.removeOldestN(evictUnits[uid], toRemove)
 		}
 	}
 }
 
 // Removes the oldest toRemove containers and returns the resulting slice.
-func (self *realContainerGC) removeOldestN(containers []containerGCInfo, toRemove int) []containerGCInfo {
+func (cgc *realContainerGC) removeOldestN(containers []containerGCInfo, toRemove int) []containerGCInfo {
 	// Remove from oldest to newest (last to first).
 	numToKeep := len(containers) - toRemove
 	for i := numToKeep; i < len(containers); i++ {
-		err := self.dockerClient.RemoveContainer(docker.RemoveContainerOptions{ID: containers[i].id})
+		err := cgc.dockerClient.RemoveContainer(docker.RemoveContainerOptions{ID: containers[i].id})
 		if err != nil {
 			glog.Warningf("Failed to remove dead container %q: %v", containers[i].name, err)
 		}
@@ -186,18 +187,18 @@ func (self *realContainerGC) removeOldestN(containers []containerGCInfo, toRemov
 
 // Get all containers that are evictable. Evictable containers are: not running
 // and created more than MinAge ago.
-func (self *realContainerGC) evictableContainers() (containersByEvictUnit, []containerGCInfo, error) {
-	containers, err := dockertools.GetKubeletDockerContainers(self.dockerClient, true)
+func (cgc *realContainerGC) evictableContainers() (containersByEvictUnit, []containerGCInfo, error) {
+	containers, err := dockertools.GetKubeletDockerContainers(cgc.dockerClient, true)
 	if err != nil {
 		return containersByEvictUnit{}, []containerGCInfo{}, err
 	}
 
 	unidentifiedContainers := make([]containerGCInfo, 0)
 	evictUnits := make(containersByEvictUnit)
-	newestGCTime := time.Now().Add(-self.policy.MinAge)
+	newestGCTime := time.Now().Add(-cgc.policy.MinAge)
 	for _, container := range containers {
 		// Prune out running containers.
-		data, err := self.dockerClient.InspectContainer(container.ID)
+		data, err := cgc.dockerClient.InspectContainer(container.ID)
 		if err != nil {
 			// Container may have been removed already, skip.
 			continue

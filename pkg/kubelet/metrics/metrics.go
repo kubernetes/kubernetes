@@ -90,8 +90,8 @@ const (
 	SyncPodSync
 )
 
-func (self SyncPodType) String() string {
-	switch self {
+func (sp SyncPodType) String() string {
+	switch sp {
 	case SyncPodCreate:
 		return "create"
 	case SyncPodUpdate:
@@ -132,13 +132,13 @@ var (
 		nil, nil)
 )
 
-func (self *podAndContainerCollector) Describe(ch chan<- *prometheus.Desc) {
+func (pc *podAndContainerCollector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- runningPodCountDesc
 	ch <- runningContainerCountDesc
 }
 
-func (self *podAndContainerCollector) Collect(ch chan<- prometheus.Metric) {
-	runningPods, err := self.containerCache.GetPods()
+func (pc *podAndContainerCollector) Collect(ch chan<- prometheus.Metric) {
+	runningPods, err := pc.containerCache.GetPods()
 	if err != nil {
 		glog.Warning("Failed to get running container information while collecting metrics: %v", err)
 		return
