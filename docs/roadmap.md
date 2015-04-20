@@ -25,8 +25,8 @@ clustered database or key-value store. We will target such workloads for our
   - Status: #2585 covers some design options.
 4. API input is scrubbed of status fields in favor of a new API to set status ([#4248](https://github.com/GoogleCloudPlatform/kubernetes/issues/4248))
   - Status: DONE
-5. Input validation reporting versioned field names ([#2518](https://github.com/GoogleCloudPlatform/kubernetes/issues/2518))
-  - Status: DONE ([#4575](https://github.com/GoogleCloudPlatform/kubernetes/pull/4575))
+5. Input validation reporting versioned field names ([#3084](https://github.com/GoogleCloudPlatform/kubernetes/issues/3084))
+  - Status: in progress
 6. Error reporting: Report common problems in ways that users can discover
   - Status:
 7. Event management: Make events usable and useful
