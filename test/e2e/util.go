@@ -274,8 +274,15 @@ func kubectlCmd(args ...string) *exec.Cmd {
 	defaultArgs := []string{}
 	if testContext.KubeConfig != "" {
 		defaultArgs = append(defaultArgs, "--"+clientcmd.RecommendedConfigPathFlag+"="+testContext.KubeConfig)
+
+		// Reference the KubeContext
 		if testContext.KubeContext != "" {
 			defaultArgs = append(defaultArgs, "--"+clientcmd.FlagContext+"="+testContext.KubeContext)
+		}
+
+		// Reference a --server option so tests can run anywhere.
+		if testContext.Host != "" {
+			defaultArgs = append(defaultArgs, "--"+clientcmd.FlagAPIServer+"="+testContext.Host)
 		}
 	} else {
 		defaultArgs = append(defaultArgs, "--"+clientcmd.FlagAuthPath+"="+testContext.AuthConfig)
