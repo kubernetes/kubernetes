@@ -134,7 +134,15 @@ func RunRollingUpdate(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, arg
 	if newRc.Spec.Replicas == 0 {
 		newRc.Spec.Replicas = oldRc.Spec.Replicas
 	}
-	err = updater.Update(out, oldRc, newRc, period, interval, timeout)
+	err = updater.Update(&kubectl.RollingUpdaterConfig{
+		Out:           out,
+		OldRc:         oldRc,
+		NewRc:         newRc,
+		UpdatePeriod:  period,
+		Interval:      interval,
+		Timeout:       timeout,
+		CleanupPolicy: kubectl.DeleteRollingUpdateCleanupPolicy,
+	})
 	if err != nil {
 		return err
 	}
