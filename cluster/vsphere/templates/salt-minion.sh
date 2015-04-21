@@ -37,7 +37,7 @@ echo "master: $KUBE_MASTER" > /etc/salt/minion.d/master.conf
 #
 cat <<EOF >/etc/salt/minion.d/grains.conf
 grains:
-  minion_ip: $(ip route get 1.1.1.1 | awk '{print $7}')
+  hostname_override: $(ip route get 1.1.1.1 | awk '{print $7}')
   roles:
     - kubernetes-pool
     - kubernetes-pool-vsphere
