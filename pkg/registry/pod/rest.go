@@ -200,7 +200,7 @@ func LogLocation(getter ResourceGetter, connInfo client.ConnectionInfoGetter, ct
 			return nil, nil, errors.NewBadRequest(fmt.Sprintf("a container name must be specified for pod %s", name))
 		}
 	}
-	nodeHost := pod.Status.HostIP
+	nodeHost := pod.Spec.Host
 	if len(nodeHost) == 0 {
 		// If pod has not been assigned a host, return an empty location
 		return nil, nil, nil
@@ -240,7 +240,7 @@ func ExecLocation(getter ResourceGetter, connInfo client.ConnectionInfoGetter, c
 			return nil, nil, errors.NewBadRequest(fmt.Sprintf("a container name must be specified for pod %s", name))
 		}
 	}
-	nodeHost := pod.Status.HostIP
+	nodeHost := pod.Spec.Host
 	if len(nodeHost) == 0 {
 		// If pod has not been assigned a host, return an empty location
 		return nil, nil, fmt.Errorf("pod %s does not have a host assigned", name)
@@ -280,7 +280,7 @@ func PortForwardLocation(getter ResourceGetter, connInfo client.ConnectionInfoGe
 		return nil, nil, err
 	}
 
-	nodeHost := pod.Status.HostIP
+	nodeHost := pod.Spec.Host
 	if len(nodeHost) == 0 {
 		// If pod has not been assigned a host, return an empty location
 		return nil, nil, errors.NewBadRequest(fmt.Sprintf("pod %s does not have a host assigned", name))
