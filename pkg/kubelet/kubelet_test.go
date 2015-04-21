@@ -1597,10 +1597,6 @@ func (f *fakeContainerCommandRunner) RunInContainer(id string, cmd []string) ([]
 	return []byte{}, f.E
 }
 
-func (f *fakeContainerCommandRunner) GetDockerServerVersion() (docker.APIVersion, error) {
-	return nil, nil
-}
-
 func (f *fakeContainerCommandRunner) ExecInContainer(id string, cmd []string, in io.Reader, out, err io.WriteCloser, tty bool) error {
 	f.Cmd = cmd
 	f.ID = id

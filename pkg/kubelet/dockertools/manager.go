@@ -655,3 +655,43 @@ func (dm *DockerManager) PodInfraContainerChanged(pod *api.Pod, podInfraContaine
 	}
 	return podInfraContainer.Hash != HashContainer(expectedPodInfraContainer), nil
 }
+
+type dockerVersion docker.APIVersion
+
+func NewVersion(input string) (dockerVersion, error) {
+	version, err := docker.NewAPIVersion(input)
+	return dockerVersion(version), err
+}
+
+func (dv dockerVersion) String() string {
+	return docker.APIVersion(dv).String()
+}
+
+func (dv dockerVersion) Compare(other string) (int, error) {
+	a := docker.APIVersion(dv)
+	b, err := docker.NewAPIVersion(other)
+	if err != nil {
+		return 0, err
+	}
+	if a.LessThan(b) {
+		return -1, nil
+	}
+	if a.GreaterThan(b) {
+		return 1, nil
+	}
+	return 0, nil
+}
+
+func (dm *DockerManager) Version() (kubecontainer.Version, error) {
+	env, err := dm.client.Version()
+	if err != nil {
+		return nil, fmt.Errorf("docker: failed to get docker version: %v", err)
+	}
+
+	apiVersion := env.Get("ApiVersion")
+	version, err := docker.NewAPIVersion(apiVersion)
+	if err != nil {
+		return nil, fmt.Errorf("docker: failed to parse docker server version %q: %v", apiVersion, err)
+	}
+	return dockerVersion(version), nil
+}

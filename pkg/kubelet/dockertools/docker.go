@@ -120,7 +120,8 @@ type dockerContainerCommandRunner struct {
 var dockerAPIVersionWithExec, _ = docker.NewAPIVersion("1.15")
 
 // Returns the major and minor version numbers of docker server.
-func (d *dockerContainerCommandRunner) GetDockerServerVersion() (docker.APIVersion, error) {
+// TODO(yifan): Remove this once the ContainerCommandRunner is implemented by dockerManager.
+func (d *dockerContainerCommandRunner) getDockerServerVersion() (docker.APIVersion, error) {
 	env, err := d.client.Version()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get docker server version - %v", err)
@@ -136,7 +137,7 @@ func (d *dockerContainerCommandRunner) GetDockerServerVersion() (docker.APIVersi
 }
 
 func (d *dockerContainerCommandRunner) nativeExecSupportExists() (bool, error) {
-	version, err := d.GetDockerServerVersion()
+	version, err := d.getDockerServerVersion()
 	if err != nil {
 		return false, err
 	}
@@ -483,7 +484,6 @@ func ConnectToDockerOrDie(dockerEndpoint string) DockerInterface {
 // TODO(yifan): Move this to container.Runtime.
 type ContainerCommandRunner interface {
 	RunInContainer(containerID string, cmd []string) ([]byte, error)
-	GetDockerServerVersion() (docker.APIVersion, error)
 	ExecInContainer(containerID string, cmd []string, in io.Reader, out, err io.WriteCloser, tty bool) error
 	PortForward(pod *kubecontainer.Pod, port uint16, stream io.ReadWriteCloser) error
 }
