@@ -25,7 +25,7 @@ import (
 
 func TestResolvePortInt(t *testing.T) {
 	expected := 80
-	port, err := ResolvePort(util.IntOrString{Kind: util.IntstrInt, IntVal: expected}, &api.Container{})
+	port, err := resolvePort(util.IntOrString{Kind: util.IntstrInt, IntVal: expected}, &api.Container{})
 	if port != expected {
 		t.Errorf("expected: %d, saw: %d", expected, port)
 	}
@@ -42,7 +42,7 @@ func TestResolvePortString(t *testing.T) {
 			{Name: name, ContainerPort: expected},
 		},
 	}
-	port, err := ResolvePort(util.IntOrString{Kind: util.IntstrString, StrVal: name}, container)
+	port, err := resolvePort(util.IntOrString{Kind: util.IntstrString, StrVal: name}, container)
 	if port != expected {
 		t.Errorf("expected: %d, saw: %d", expected, port)
 	}
@@ -59,7 +59,7 @@ func TestResolvePortStringUnknown(t *testing.T) {
 			{Name: "bar", ContainerPort: expected},
 		},
 	}
-	port, err := ResolvePort(util.IntOrString{Kind: util.IntstrString, StrVal: name}, container)
+	port, err := resolvePort(util.IntOrString{Kind: util.IntstrString, StrVal: name}, container)
 	if port != -1 {
 		t.Errorf("expected: -1, saw: %d", port)
 	}

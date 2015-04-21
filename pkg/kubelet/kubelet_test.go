@@ -114,6 +114,7 @@ func newTestKubelet(t *testing.T) *TestKubelet {
 		fakeRecorder)
 	kubelet.containerManager.Puller = &dockertools.FakeDockerPuller{}
 	kubelet.prober = NewProber(nil, kubelet.readinessManager, kubelet.containerRefManager, kubelet.recorder)
+	kubelet.handlerRunner = NewHandlerRunner(&fakeHTTP{}, &fakeContainerCommandRunner{}, kubelet.containerManager)
 
 	return &TestKubelet{kubelet, fakeDocker, mockCadvisor, fakeKubeClient, waitGroup, fakeMirrorClient}
 }
@@ -767,6 +768,7 @@ func TestSyncPodsWithPodInfraCreatesContainerCallsHandler(t *testing.T) {
 	waitGroup := testKubelet.waitGroup
 	fakeHttp := fakeHTTP{}
 	kubelet.httpClient = &fakeHttp
+	kubelet.handlerRunner = NewHandlerRunner(kubelet.httpClient, &fakeContainerCommandRunner{}, kubelet.containerManager)
 	pods := []*api.Pod{
 		{
 			ObjectMeta: api.ObjectMeta{
@@ -1692,6 +1694,7 @@ func TestRunHandlerExec(t *testing.T) {
 	kubelet := testKubelet.kubelet
 	fakeDocker := testKubelet.fakeDocker
 	kubelet.runner = &fakeCommandRunner
+	kubelet.handlerRunner = NewHandlerRunner(&fakeHTTP{}, kubelet.runner, kubelet.containerManager)
 
 	containerID := "abc1234"
 	podName := "podFoo"
@@ -1715,7 +1718,12 @@ func TestRunHandlerExec(t *testing.T) {
 			},
 		},
 	}
-	err := kubelet.runHandler(podName+"_"+podNamespace, "", &container, container.Lifecycle.PostStart)
+
+	pod := api.Pod{}
+	pod.ObjectMeta.Name = podName
+	pod.ObjectMeta.Namespace = podNamespace
+	pod.Spec.Containers = []api.Container{container}
+	err := kubelet.handlerRunner.Run(containerID, &pod, &container, container.Lifecycle.PostStart)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -1741,7 +1749,9 @@ func TestRunHandlerHttp(t *testing.T) {
 	testKubelet := newTestKubelet(t)
 	kubelet := testKubelet.kubelet
 	kubelet.httpClient = &fakeHttp
+	kubelet.handlerRunner = NewHandlerRunner(kubelet.httpClient, &fakeContainerCommandRunner{}, kubelet.containerManager)
 
+	containerID := "abc1234"
 	podName := "podFoo"
 	podNamespace := "nsFoo"
 	containerName := "containerFoo"
@@ -1758,7 +1768,12 @@ func TestRunHandlerHttp(t *testing.T) {
 			},
 		},
 	}
-	err := kubelet.runHandler(podName+"_"+podNamespace, "", &container, container.Lifecycle.PostStart)
+	pod := api.Pod{}
+	pod.ObjectMeta.Name = podName
+	pod.ObjectMeta.Namespace = podNamespace
+	pod.Spec.Containers = []api.Container{container}
+	err := kubelet.handlerRunner.Run(containerID, &pod, &container, container.Lifecycle.PostStart)
+
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -1767,35 +1782,28 @@ func TestRunHandlerHttp(t *testing.T) {
 	}
 }
 
-func TestNewHandler(t *testing.T) {
+func TestRunHandlerNil(t *testing.T) {
 	testKubelet := newTestKubelet(t)
 	kubelet := testKubelet.kubelet
-	handler := &api.Handler{
-		HTTPGet: &api.HTTPGetAction{
-			Host: "foo",
-			Port: util.IntOrString{IntVal: 8080, Kind: util.IntstrInt},
-			Path: "bar",
+
+	containerID := "abc1234"
+	podName := "podFoo"
+	podNamespace := "nsFoo"
+	containerName := "containerFoo"
+
+	container := api.Container{
+		Name: containerName,
+		Lifecycle: &api.Lifecycle{
+			PostStart: &api.Handler{},
 		},
 	}
-	actionHandler := kubelet.newActionHandler(handler)
-	if actionHandler == nil {
-		t.Error("unexpected nil action handler.")
-	}
-
-	handler = &api.Handler{
-		Exec: &api.ExecAction{
-			Command: []string{"ls", "-l"},
-		},
-	}
-	actionHandler = kubelet.newActionHandler(handler)
-	if actionHandler == nil {
-		t.Error("unexpected nil action handler.")
-	}
-
-	handler = &api.Handler{}
-	actionHandler = kubelet.newActionHandler(handler)
-	if actionHandler != nil {
-		t.Errorf("unexpected non-nil action handler: %v", actionHandler)
+	pod := api.Pod{}
+	pod.ObjectMeta.Name = podName
+	pod.ObjectMeta.Namespace = podNamespace
+	pod.Spec.Containers = []api.Container{container}
+	err := kubelet.handlerRunner.Run(containerID, &pod, &container, container.Lifecycle.PostStart)
+	if err == nil {
+		t.Errorf("expect error, but got nil")
 	}
 }
 
@@ -1809,6 +1817,7 @@ func TestSyncPodEventHandlerFails(t *testing.T) {
 	kubelet.httpClient = &fakeHTTP{
 		err: fmt.Errorf("test error"),
 	}
+	kubelet.handlerRunner = NewHandlerRunner(kubelet.httpClient, &fakeContainerCommandRunner{}, kubelet.containerManager)
 
 	pods := []*api.Pod{
 		{
