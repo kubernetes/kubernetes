@@ -23,6 +23,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/golang/glog"
@@ -195,6 +196,18 @@ func (rm *ResourceQuotaManager) syncResourceQuota(quota api.ResourceQuota) (err 
 			value = resource.NewQuantity(int64(len(items.Items)), resource.DecimalSI)
 		case api.ResourceQuotas:
 			items, err := rm.kubeClient.ResourceQuotas(usage.Namespace).List(labels.Everything())
+			if err != nil {
+				return err
+			}
+			value = resource.NewQuantity(int64(len(items.Items)), resource.DecimalSI)
+		case api.ResourceSecrets:
+			items, err := rm.kubeClient.Secrets(usage.Namespace).List(labels.Everything(), fields.Everything())
+			if err != nil {
+				return err
+			}
+			value = resource.NewQuantity(int64(len(items.Items)), resource.DecimalSI)
+		case api.ResourcePersistentVolumeClaims:
+			items, err := rm.kubeClient.PersistentVolumeClaims(usage.Namespace).List(labels.Everything(), fields.Everything())
 			if err != nil {
 				return err
 			}
