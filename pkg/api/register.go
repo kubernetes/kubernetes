@@ -28,6 +28,8 @@ func init() {
 		&Pod{},
 		&PodList{},
 		&PodStatusResult{},
+		&PodTemplate{},
+		&PodTemplateList{},
 		&ReplicationControllerList{},
 		&ReplicationController{},
 		&ServiceList{},
@@ -71,6 +73,8 @@ func init() {
 func (*Pod) IsAnAPIObject()                       {}
 func (*PodList) IsAnAPIObject()                   {}
 func (*PodStatusResult) IsAnAPIObject()           {}
+func (*PodTemplate) IsAnAPIObject()               {}
+func (*PodTemplateList) IsAnAPIObject()           {}
 func (*ReplicationController) IsAnAPIObject()     {}
 func (*ReplicationControllerList) IsAnAPIObject() {}
 func (*Service) IsAnAPIObject()                   {}
