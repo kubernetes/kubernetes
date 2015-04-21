@@ -469,7 +469,7 @@ func ValidatePersistentVolumeStatusUpdate(newPv, oldPv *api.PersistentVolume) er
 	allErrs := errs.ValidationErrorList{}
 	allErrs = append(allErrs, ValidateObjectMetaUpdate(&oldPv.ObjectMeta, &newPv.ObjectMeta).Prefix("metadata")...)
 	if newPv.ResourceVersion == "" {
-		allErrs = append(allErrs, fmt.Errorf("ResourceVersion must be specified"))
+		allErrs = append(allErrs, errs.NewFieldRequired("resourceVersion"))
 	}
 	newPv.Spec = oldPv.Spec
 	return allErrs
@@ -507,7 +507,7 @@ func ValidatePersistentVolumeClaimStatusUpdate(newPvc, oldPvc *api.PersistentVol
 	allErrs := errs.ValidationErrorList{}
 	allErrs = append(allErrs, ValidateObjectMetaUpdate(&oldPvc.ObjectMeta, &newPvc.ObjectMeta).Prefix("metadata")...)
 	if newPvc.ResourceVersion == "" {
-		allErrs = append(allErrs, fmt.Errorf("ResourceVersion must be specified"))
+		allErrs = append(allErrs, errs.NewFieldRequired("resourceVersion"))
 	}
 	newPvc.Spec = oldPvc.Spec
 	return allErrs
@@ -1161,7 +1161,7 @@ func ValidateSecret(secret *api.Secret) errs.ValidationErrorList {
 
 func validateBasicResource(quantity resource.Quantity) errs.ValidationErrorList {
 	if quantity.Value() < 0 {
-		return errs.ValidationErrorList{fmt.Errorf("%v is not a valid resource quantity", quantity.Value())}
+		return errs.ValidationErrorList{errs.NewFieldInvalid("", quantity.Value(), "must be a valid resource quantity")}
 	}
 	return errs.ValidationErrorList{}
 }
@@ -1216,7 +1216,7 @@ func ValidateResourceQuotaStatusUpdate(newResourceQuota, oldResourceQuota *api.R
 	allErrs := errs.ValidationErrorList{}
 	allErrs = append(allErrs, ValidateObjectMetaUpdate(&oldResourceQuota.ObjectMeta, &newResourceQuota.ObjectMeta).Prefix("metadata")...)
 	if newResourceQuota.ResourceVersion == "" {
-		allErrs = append(allErrs, fmt.Errorf("ResourceVersion must be specified"))
+		allErrs = append(allErrs, errs.NewFieldRequired("resourceVersion"))
 	}
 	for k := range newResourceQuota.Status.Hard {
 		allErrs = append(allErrs, validateResourceName(string(k), string(newResourceQuota.TypeMeta.Kind))...)
@@ -1242,12 +1242,12 @@ func ValidateNamespace(namespace *api.Namespace) errs.ValidationErrorList {
 func validateFinalizerName(stringValue string) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 	if !util.IsQualifiedName(stringValue) {
-		return append(allErrs, fmt.Errorf("finalizer name: %v, %v", stringValue, qualifiedNameErrorMsg))
+		return append(allErrs, errs.NewFieldInvalid("spec.finalizers", stringValue, qualifiedNameErrorMsg))
 	}
 
 	if len(strings.Split(stringValue, "/")) == 1 {
 		if !api.IsStandardFinalizerName(stringValue) {
-			return append(allErrs, fmt.Errorf("finalizer name: %v is neither a standard finalizer name nor is it fully qualified", stringValue))
+			return append(allErrs, errs.NewFieldInvalid("spec.finalizers", stringValue, fmt.Sprintf("finalizer name is neither a standard finalizer name nor is it fully qualified")))
 		}
 	}
 
