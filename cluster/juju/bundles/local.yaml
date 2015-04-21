@@ -7,9 +7,10 @@ kubernetes-local:
         "gui-y": "0"
       expose: true
       options:
-        version: "source"
+        version: "v0.15.0"
     docker:
-      charm: cs:trusty/docker
+      charm: docker-0
+      branch: https://github.com/chuckbutler/docker-charm.git
       num_units: 2
       options:
         latest: false
