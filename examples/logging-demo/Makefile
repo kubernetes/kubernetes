@@ -5,7 +5,7 @@
 
 .PHONY: up down logger-up logger-down logger10-up logger10-downget net
 
-KUBECTL=../../../kubectl.sh
+KUBECTL=../../cluster/kubectl.sh
 
 up:	logger-up logger10-up
 
