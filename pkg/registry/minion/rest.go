@@ -24,12 +24,14 @@ import (
 	"strconv"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/validation"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/generic"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/fielderrors"
 )
 
@@ -129,12 +131,21 @@ func MatchNode(label labels.Selector, field fields.Selector) generic.Matcher {
 
 // ResourceLocation returns a URL to which one can send traffic for the specified node.
 func ResourceLocation(getter ResourceGetter, connection client.ConnectionInfoGetter, ctx api.Context, id string) (*url.URL, http.RoundTripper, error) {
-	nodeObj, err := getter.Get(ctx, id)
+	name, portReq, valid := util.SplitPort(id)
+	if !valid {
+		return nil, nil, errors.NewBadRequest(fmt.Sprintf("invalid node request %q", id))
+	}
+
+	nodeObj, err := getter.Get(ctx, name)
 	if err != nil {
 		return nil, nil, err
 	}
 	node := nodeObj.(*api.Node)
-	host := node.Name
+	host := node.Name // TODO: use node's IP, don't expect the name to resolve.
+
+	if portReq != "" {
+		return &url.URL{Host: net.JoinHostPort(host, portReq)}, nil, nil
+	}
 
 	scheme, port, transport, err := connection.GetConnectionInfo(host)
 	if err != nil {
