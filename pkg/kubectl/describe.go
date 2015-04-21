@@ -237,7 +237,7 @@ func (d *PodDescriber) Describe(namespace, name string) (string, error) {
 		if err2 == nil && len(events.Items) > 0 {
 			return tabbedString(func(out io.Writer) error {
 				fmt.Fprintf(out, "Pod '%v': error '%v', but found events.\n", name, err)
-				describeEvents(events, out)
+				DescribeEvents(events, out)
 				return nil
 			})
 		}
@@ -279,7 +279,7 @@ func describePod(pod *api.Pod, rcs []api.ReplicationController, events *api.Even
 			}
 		}
 		if events != nil {
-			describeEvents(events, out)
+			DescribeEvents(events, out)
 		}
 		return nil
 	})
@@ -410,7 +410,7 @@ func describeReplicationController(controller *api.ReplicationController, events
 		fmt.Fprintf(out, "Replicas:\t%d current / %d desired\n", controller.Status.Replicas, controller.Spec.Replicas)
 		fmt.Fprintf(out, "Pods Status:\t%d Running / %d Waiting / %d Succeeded / %d Failed\n", running, waiting, succeeded, failed)
 		if events != nil {
-			describeEvents(events, out)
+			DescribeEvents(events, out)
 		}
 		return nil
 	})
@@ -460,7 +460,7 @@ func describeService(service *api.Service, endpoints *api.Endpoints, events *api
 		fmt.Fprintf(out, "Endpoints:\t%s\n", formatEndpoints(endpoints))
 		fmt.Fprintf(out, "Session Affinity:\t%s\n", service.Spec.SessionAffinity)
 		if events != nil {
-			describeEvents(events, out)
+			DescribeEvents(events, out)
 		}
 		return nil
 	})
@@ -550,13 +550,13 @@ func describeNode(node *api.Node, pods []*api.Pod, events *api.EventList) (strin
 			fmt.Fprintf(out, "  %s\n", pod.Name)
 		}
 		if events != nil {
-			describeEvents(events, out)
+			DescribeEvents(events, out)
 		}
 		return nil
 	})
 }
 
-func describeEvents(el *api.EventList, w io.Writer) {
+func DescribeEvents(el *api.EventList, w io.Writer) {
 	if len(el.Items) == 0 {
 		fmt.Fprint(w, "No events.")
 		return
