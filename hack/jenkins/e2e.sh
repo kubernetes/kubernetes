@@ -104,8 +104,21 @@ else
 
     sudo flock -x -n /var/run/lock/gcloud-components.lock -c "gcloud components update -q" || true
 
-    GITHASH=$(gsutil cat gs://kubernetes-release/ci/latest.txt)
-    gsutil -m cp gs://kubernetes-release/ci/${GITHASH}/kubernetes.tar.gz gs://kubernetes-release/ci/${GITHASH}/kubernetes-test.tar.gz .
+    # The "ci" bucket is for builds like "v0.15.0-468-gfa648c1"
+    bucket="ci"
+    # The "latest" version picks the most recent "ci" or "release" build.
+    version_file="latest"
+    if [[ ${JENKINS_USE_RELEASE_TARS:-} =~ ^[yY]$ ]]; then
+        # The "release" bucket is for builds like "v0.15.0"
+        bucket="release"
+        if [[ ${JENKINS_USE_STABLE:-} =~ ^[yY]$ ]]; then
+            # The "stable" version picks the most recent "release" build.
+            version_file="stable"
+        fi
+    fi
+
+    githash=$(gsutil cat gs://kubernetes-release/${bucket}/${version_file}.txt)
+    gsutil -m cp gs://kubernetes-release/${bucket}/${githash}/kubernetes.tar.gz gs://kubernetes-release/${bucket}/${githash}/kubernetes-test.tar.gz .
 fi
 
 md5sum kubernetes*.tar.gz
@@ -115,9 +128,9 @@ cd kubernetes
 
 # Set by GKE-CI to change the CLUSTER_API_VERSION to the git version
 if [[ ! -z ${E2E_SET_CLUSTER_API_VERSION:-} ]]; then
-    export CLUSTER_API_VERSION=$(echo ${GITHASH} | cut -c 2-)
-elif [[ ! -z ${E2E_USE_LATEST_RELEASE_VERSION:-} ]]; then
-    release=$(gsutil cat gs://kubernetes-release/release/latest.txt | cut -c 2-)
+    export CLUSTER_API_VERSION=$(echo ${githash} | cut -c 2-)
+elif [[ ${JENKINS_USE_RELEASE_TARS:-} =~ ^[yY]$ ]]; then
+    release=$(gsutil cat gs://kubernetes-release/release/${version_file}.txt | cut -c 2-)
     export CLUSTER_API_VERSION=${release}
 fi
 
