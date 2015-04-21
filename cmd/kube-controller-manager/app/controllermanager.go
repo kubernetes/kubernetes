@@ -20,6 +20,7 @@ limitations under the License.
 package app
 
 import (
+	"fmt"
 	"net"
 	"net/http"
 	"net/http/pprof"
@@ -40,6 +41,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/namespace"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/resourcequota"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/service"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/serviceaccount"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/volumeclaimbinder"
 
@@ -248,6 +250,12 @@ func (s *CMServer) Run(_ []string) error {
 		pvclaimBinder := volumeclaimbinder.NewPersistentVolumeClaimBinder(kubeClient, s.PVClaimBinderSyncPeriod)
 		pvclaimBinder.Run()
 	}
+
+	// TODO: generate signed token
+	tokenGenerator := serviceaccount.TokenGeneratorFunc(func(serviceAccount api.ServiceAccount, secret api.Secret) (string, error) {
+		return fmt.Sprintf("serviceaccount:%s:%s:%s:%s", serviceAccount.Namespace, serviceAccount.Name, serviceAccount.UID, secret.Name), nil
+	})
+	serviceaccount.NewTokensController(kubeClient, serviceaccount.DefaultTokenControllerOptions(tokenGenerator)).Run()
 
 	select {}
 	return nil
