@@ -23,7 +23,6 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/controller"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl"
 	cmdutil "github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/cmd/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/resource"
@@ -43,7 +42,7 @@ $ kubectl resize --replicas=3 replicationcontrollers foo
 // If the replication controller named foo's current size is 2, resize foo to 3.
 $ kubectl resize --current-replicas=2 --replicas=3 replicationcontrollers foo`
 
-	retryFrequency = controller.DefaultSyncPeriod / 100
+	retryFrequency = 100 * time.Millisecond
 	retryTimeout   = 10 * time.Second
 )
 

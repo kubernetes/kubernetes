@@ -55,6 +55,7 @@ type CMServer struct {
 	CloudProvider           string
 	CloudConfigFile         string
 	ConcurrentEndpointSyncs int
+	ConcurrentRCSyncs       int
 	MinionRegexp            string
 	NodeSyncPeriod          time.Duration
 	ResourceQuotaSyncPeriod time.Duration
@@ -90,6 +91,7 @@ func NewCMServer() *CMServer {
 		Port:                    ports.ControllerManagerPort,
 		Address:                 util.IP(net.ParseIP("127.0.0.1")),
 		ConcurrentEndpointSyncs: 5,
+		ConcurrentRCSyncs:       5,
 		NodeSyncPeriod:          10 * time.Second,
 		ResourceQuotaSyncPeriod: 10 * time.Second,
 		NamespaceSyncPeriod:     5 * time.Minute,
@@ -111,6 +113,7 @@ func (s *CMServer) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.CloudProvider, "cloud-provider", s.CloudProvider, "The provider for cloud services.  Empty string for no provider.")
 	fs.StringVar(&s.CloudConfigFile, "cloud-config", s.CloudConfigFile, "The path to the cloud provider configuration file.  Empty string for no configuration file.")
 	fs.IntVar(&s.ConcurrentEndpointSyncs, "concurrent-endpoint-syncs", s.ConcurrentEndpointSyncs, "The number of endpoint syncing operations that will be done concurrently. Larger number = faster endpoint updating, but more CPU (and network) load")
+	fs.IntVar(&s.ConcurrentRCSyncs, "concurrent_rc_syncs", s.ConcurrentRCSyncs, "The number of replication controllers that are allowed to sync concurrently. Larger number = more reponsive replica management, but more CPU (and network) load")
 	fs.StringVar(&s.MinionRegexp, "minion-regexp", s.MinionRegexp, "If non empty, and --cloud-provider is specified, a regular expression for matching minion VMs.")
 	fs.DurationVar(&s.NodeSyncPeriod, "node-sync-period", s.NodeSyncPeriod, ""+
 		"The period for syncing nodes from cloudprovider. Longer periods will result in "+
@@ -207,7 +210,7 @@ func (s *CMServer) Run(_ []string) error {
 	go endpoints.Run(s.ConcurrentEndpointSyncs, util.NeverStop)
 
 	controllerManager := replicationControllerPkg.NewReplicationManager(kubeClient)
-	controllerManager.Run(replicationControllerPkg.DefaultSyncPeriod)
+	go controllerManager.Run(s.ConcurrentRCSyncs, util.NeverStop)
 
 	cloud := cloudprovider.InitCloudProvider(s.CloudProvider, s.CloudConfigFile)
 	nodeResources := &api.NodeResources{

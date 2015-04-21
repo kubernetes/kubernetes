@@ -216,7 +216,7 @@ func startComponents(firstManifestURL, secondManifestURL, apiVersion string) (st
 	controllerManager := replicationControllerPkg.NewReplicationManager(cl)
 
 	// TODO: Write an integration test for the replication controllers watch.
-	controllerManager.Run(1 * time.Second)
+	go controllerManager.Run(3, util.NeverStop)
 
 	nodeResources := &api.NodeResources{
 		Capacity: api.ResourceList{
