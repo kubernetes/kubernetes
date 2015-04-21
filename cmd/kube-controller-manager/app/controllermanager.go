@@ -256,6 +256,7 @@ func (s *CMServer) Run(_ []string) error {
 		return fmt.Sprintf("serviceaccount:%s:%s:%s:%s", serviceAccount.Namespace, serviceAccount.Name, serviceAccount.UID, secret.Name), nil
 	})
 	serviceaccount.NewTokensController(kubeClient, serviceaccount.DefaultTokenControllerOptions(tokenGenerator)).Run()
+	serviceaccount.NewServiceAccountsController(kubeClient, serviceaccount.DefaultServiceAccountControllerOptions()).Run()
 
 	select {}
 	return nil
