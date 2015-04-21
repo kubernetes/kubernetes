@@ -68,7 +68,7 @@ kubectl create -f frontend-controller.json
 kubectl create -f frontend-service.json
 ```
 
-You need to wait for the pods to get deployed, run the following and wait for `STATUS` to change from `Unknown`, through `Pending` to `Runnig`. 
+You need to wait for the pods to get deployed, run the following and wait for `STATUS` to change from `Unknown`, through `Pending` to `Running`. 
 ```
 kubectl get pods --watch
 ```
