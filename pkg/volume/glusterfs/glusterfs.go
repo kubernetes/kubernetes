@@ -67,7 +67,7 @@ func (plugin *glusterfsPlugin) GetAccessModes() []api.AccessModeType {
 
 func (plugin *glusterfsPlugin) NewBuilder(spec *volume.Spec, podRef *api.ObjectReference, _ volume.VolumeOptions) (volume.Builder, error) {
 	ep_name := spec.VolumeSource.Glusterfs.EndpointsName
-	ns := api.NamespaceDefault
+	ns := podRef.Namespace
 	ep, err := plugin.host.GetKubeClient().Endpoints(ns).Get(ep_name)
 	if err != nil {
 		glog.Errorf("Glusterfs: failed to get endpoints %s[%v]", ep_name, err)
