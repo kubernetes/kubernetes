@@ -549,6 +549,46 @@ func (m *Master) InstallSwaggerAPI() {
 	swagger.RegisterSwaggerService(swaggerConfig, m.handlerContainer)
 }
 
+// Picks the best available address for an internal health check
+// TODO: Create utility function, combining this an GetHostIP in kubelet.go?
+func pickAddress(node *api.Node) string {
+	// Scores an address type; higher is preferrred
+	scoreAddressType := func(t api.NodeAddressType) int {
+		// We really want to favor InternalIP; the others are mostly arbitrary
+		switch t {
+		case api.NodeInternalIP:
+			return 4
+		case api.NodeHostName:
+			return 3
+		case api.NodeExternalIP:
+			return 2
+		case api.NodeLegacyHostIP:
+			return 1
+		default:
+			glog.Info("Unknown NodeAddressType ", t)
+			return -1
+		}
+	}
+
+	var bestAddress *api.NodeAddress
+	var bestScore int
+	for i := range node.Status.Addresses {
+		a := &node.Status.Addresses[i]
+		score := scoreAddressType(a.Type)
+		if bestAddress == nil || bestScore < score {
+			bestAddress = a
+			bestScore = score
+		}
+	}
+
+	if bestAddress != nil {
+		return bestAddress.Address
+	}
+
+	glog.Info("Unable to find address for node ", node.Name, " falling back to Name")
+	return node.Name
+}
+
 func (m *Master) getServersToValidate(c *Config) map[string]apiserver.Server {
 	serversToValidate := map[string]apiserver.Server{
 		"controller-manager": {Addr: "127.0.0.1", Port: ports.ControllerManagerPort, Path: "/healthz"},
@@ -581,7 +621,7 @@ func (m *Master) getServersToValidate(c *Config) map[string]apiserver.Server {
 		glog.Errorf("Failed to list minions: %v", err)
 	}
 	for ix, node := range nodes.Items {
-		serversToValidate[fmt.Sprintf("node-%d", ix)] = apiserver.Server{Addr: node.Name, Port: ports.KubeletPort, Path: "/healthz", EnableHTTPS: true}
+		serversToValidate[fmt.Sprintf("node-%d", ix)] = apiserver.Server{Addr: pickAddress(&node), Port: ports.KubeletPort, Path: "/healthz", EnableHTTPS: true}
 	}
 	return serversToValidate
 }
