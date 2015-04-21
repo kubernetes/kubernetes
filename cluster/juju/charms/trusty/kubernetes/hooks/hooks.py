@@ -71,21 +71,21 @@ def relation_changed():
     # Check required keys
     for k in ('etcd_servers', 'kubeapi_server'):
         if not template_data.get(k):
-            print("Missing data for %s %s" % (k, template_data))
+            print('Missing data for %s %s' % (k, template_data))
             return
-    print("Running with\n%s" % template_data)
+    print('Running with\n%s' % template_data)
 
     # Setup kubernetes supplemental group
     setup_kubernetes_group()
 
     # Register upstart managed services
-    for n in ("cadvisor", "kubelet", "proxy"):
+    for n in ('kubelet', 'proxy'):
         if render_upstart(n, template_data) or not host.service_running(n):
-            print("Starting %s" % n)
+            print('Starting %s' % n)
             host.service_restart(n)
 
     # Register machine via api
-    print("Registering machine")
+    print('Registering machine')
     register_machine(template_data['kubeapi_server'])
 
     # Save the marker (for restarts to detect prev install)
@@ -95,7 +95,7 @@ def relation_changed():
 def get_template_data():
     rels = hookenv.relations()
     template_data = hookenv.Config()
-    template_data.CONFIG_FILE_NAME = ".unit-state"
+    template_data.CONFIG_FILE_NAME = '.unit-state'
 
     overlay_type = get_scoped_rel_attr('network', rels, 'overlay_type')
     etcd_servers = get_rel_hosts('etcd', rels, ('hostname', 'port'))
@@ -104,7 +104,7 @@ def get_template_data():
     # kubernetes master isn't ha yet.
     if api_servers:
         api_info = api_servers.pop()
-        api_servers = "http://%s:%s" % (api_info[0], api_info[1])
+        api_servers = 'http://%s:%s' % (api_info[0], api_info[1])
 
     template_data['overlay_type'] = overlay_type
     template_data['kubelet_bind_addr'] = _bind_addr(
@@ -112,7 +112,7 @@ def get_template_data():
     template_data['proxy_bind_addr'] = _bind_addr(
         hookenv.unit_get('public-address'))
     template_data['kubeapi_server'] = api_servers
-    template_data['etcd_servers'] = ",".join([
+    template_data['etcd_servers'] = ','.join([
         'http://%s:%s' % (s[0], s[1]) for s in sorted(etcd_servers)])
     template_data['identifier'] = os.environ['JUJU_UNIT_NAME'].replace(
         '/', '-')
@@ -125,7 +125,7 @@ def _bind_addr(addr):
     try:
         return socket.gethostbyname(addr)
     except socket.error:
-            raise ValueError("Could not resolve private address")
+            raise ValueError('Could not resolve private address')
 
 
 def _encode(d):
@@ -186,8 +186,8 @@ def register_machine(apiserver, retry=False):
 
     with open('/proc/meminfo') as fh:
         info = fh.readline()
-        mem = info.strip().split(":")[1].strip().split()[0]
-    cpus = os.sysconf("SC_NPROCESSORS_ONLN")
+        mem = info.strip().split(':')[1].strip().split()[0]
+    cpus = os.sysconf('SC_NPROCESSORS_ONLN')
 
     registration_request = Registrator()
     registration_request.data['Kind'] = 'Minion'
@@ -201,7 +201,7 @@ def register_machine(apiserver, retry=False):
 
     response, result = registration_request.register(parsed.hostname,
                                                      parsed.port,
-                                                     "/api/v1beta3/nodes")
+                                                     '/api/v1beta3/nodes')
 
     print(response)
 
