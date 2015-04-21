@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"fmt"
 	"io/ioutil"
+	"strconv"
 	"testing"
 	"time"
 
@@ -117,7 +118,7 @@ func newRc(replicas int, desired int) *api.ReplicationController {
 	rc.ObjectMeta = api.ObjectMeta{
 		Name: "foo-v2",
 		Annotations: map[string]string{
-			desiredReplicasAnnotation: fmt.Sprintf("%d", desired),
+			DesiredReplicasAnnotation: fmt.Sprintf("%d", desired),
 			sourceIdAnnotation:        "foo-v1:7764ae47-9092-11e4-8393-42010af018ff",
 		},
 	}
@@ -250,13 +251,29 @@ Updating foo-v1 replicas: 5, foo-v2 replicas: 2
 Stopping foo-v1 replicas: 5 -> 0
 Update succeeded. Deleting foo-v1
 `,
+		}, {
+			nil, newRc(1, 2),
+			[]fakeResponse{
+				// existing newRc
+				{newRc(1, 2), nil},
+				// for gets/updates
+				{newRc(2, 2), nil},
+				{newRc(2, 2), nil},
+				{newRc(2, 2), nil},
+				{newRc(2, 2), nil},
+				{newRc(2, 2), nil},
+			},
+			`Continuing update with existing controller foo-v2.
+Resizing foo-v2 replicas: 1 -> 2
+`,
 		},
 	}
 
 	for _, test := range tests {
 		updater := RollingUpdater{
-			NewRollingUpdaterClient(fakeClientFor("default", test.responses)),
-			"default",
+			c:        NewRollingUpdaterClient(fakeClientFor("default", test.responses)),
+			ns:       "default",
+			debugOut: ioutil.Discard,
 		}
 		var buffer bytes.Buffer
 		config := &RollingUpdaterConfig{
@@ -307,7 +324,11 @@ Update succeeded. Deleting foo-v1
 		{newRc(3, 3), nil},
 		{newRc(3, 3), nil},
 	}
-	updater := RollingUpdater{NewRollingUpdaterClient(fakeClientFor("default", responses)), "default"}
+	updater := RollingUpdater{
+		c:        NewRollingUpdaterClient(fakeClientFor("default", responses)),
+		ns:       "default",
+		debugOut: ioutil.Discard,
+	}
 
 	var buffer bytes.Buffer
 	config := &RollingUpdaterConfig{
@@ -334,7 +355,8 @@ func TestRollingUpdater_preserveCleanup(t *testing.T) {
 	rcExisting := newRc(1, 3)
 
 	updater := &RollingUpdater{
-		ns: "default",
+		ns:       "default",
+		debugOut: ioutil.Discard,
 		c: &rollingUpdaterClientImpl{
 			GetReplicationControllerFn: func(namespace, name string) (*api.ReplicationController, error) {
 				switch name {
@@ -377,6 +399,64 @@ func TestRollingUpdater_preserveCleanup(t *testing.T) {
 	err := updater.Update(config)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
+	}
+}
+
+// TestRollingUpdater_onlyNewRc ensures that the rolling updater can deal with
+// the absence of an old RC.
+func TestRollingUpdater_onlyNewRc(t *testing.T) {
+	newRc := oldRc(3)
+	newRc.ObjectMeta.Annotations = map[string]string{
+		DesiredReplicasAnnotation: strconv.Itoa(5),
+	}
+
+	updater := &RollingUpdater{
+		ns:       "default",
+		debugOut: ioutil.Discard,
+		c: &rollingUpdaterClientImpl{
+			GetReplicationControllerFn: func(namespace, name string) (*api.ReplicationController, error) {
+				if name != newRc.ObjectMeta.Name {
+					t.Fatalf("unexpected call to get rc %s", name)
+				}
+				return newRc, nil
+			},
+			UpdateReplicationControllerFn: func(namespace string, rc *api.ReplicationController) (*api.ReplicationController, error) {
+				if rc.ObjectMeta.Name != newRc.ObjectMeta.Name {
+					t.Fatalf("unexpected call to update rc %s", rc.ObjectMeta.Name)
+				}
+				return rc, nil
+			},
+			CreateReplicationControllerFn: func(namespace string, rc *api.ReplicationController) (*api.ReplicationController, error) {
+				t.Fatalf("unexpected call to create %s/rc:%#v", namespace, rc)
+				return nil, nil
+			},
+			DeleteReplicationControllerFn: func(namespace, name string) error {
+				t.Fatalf("unexpected call to delete %s/%s", namespace, name)
+				return nil
+			},
+			ControllerHasDesiredReplicasFn: func(rc *api.ReplicationController) wait.ConditionFunc {
+				return func() (done bool, err error) {
+					return true, nil
+				}
+			},
+		},
+	}
+
+	config := &RollingUpdaterConfig{
+		Out:           ioutil.Discard,
+		NewRc:         newRc,
+		UpdatePeriod:  0,
+		Interval:      time.Millisecond,
+		Timeout:       time.Millisecond,
+		CleanupPolicy: DeleteRollingUpdateCleanupPolicy,
+	}
+	err := updater.Update(config)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	if e, a := 5, newRc.Spec.Replicas; e != a {
+		t.Errorf("expected replicas to be %d, got %d", e, a)
 	}
 }
 
