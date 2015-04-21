@@ -63,7 +63,7 @@ Key | Value
 `cbr-cidr` | (Optional) The minion IP address range used for the docker container bridge.
 `cloud` | (Optional) Which IaaS platform is used to host kubernetes, *gce*, *azure*, *aws*, *vagrant*
 `etcd_servers` | (Optional) Comma-delimited list of IP addresses the kube-apiserver and kubelet use to reach etcd.  Uses the IP of the first machine in the kubernetes_master role, or 127.0.0.1 on GCE.
-`hostnamef` | (Optional) The full host name of the machine, i.e. hostname -f (only used on Azure)
+`hostnamef` | (Optional) The full host name of the machine, i.e. uname -n
 `node_ip` | (Optional) The IP address to use to address this node
 `minion_ip` | (Optional) Mapped to the kubelet hostname_override, K8S TODO - change this name
 `network_mode` | (Optional) Networking model to use among nodes: *openvswitch*
