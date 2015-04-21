@@ -22,6 +22,7 @@ export NUM_MINIONS
 
 # The IP of the master
 export MASTER_IP="10.245.1.2"
+export KUBE_MASTER_IP="10.245.1.2"
 
 export INSTANCE_PREFIX="kubernetes"
 export MASTER_NAME="${INSTANCE_PREFIX}-master"
