@@ -129,10 +129,10 @@ func TestContainerManifestNaming(t *testing.T) {
 	}
 }
 
-func TestGetDockerServerVersion(t *testing.T) {
+func TestVersion(t *testing.T) {
 	fakeDocker := &FakeDockerClient{VersionInfo: docker.Env{"Version=1.1.3", "ApiVersion=1.15"}}
-	runner := dockerContainerCommandRunner{fakeDocker}
-	version, err := runner.GetDockerServerVersion()
+	manager := &DockerManager{client: fakeDocker}
+	version, err := manager.Version()
 	if err != nil {
 		t.Errorf("got error while getting docker server version - %s", err)
 	}

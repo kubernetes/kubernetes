@@ -32,10 +32,11 @@ import (
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	kubecontainer "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/dockertools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/httpstream"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/httpstream/spdy"
-	"github.com/fsouza/go-dockerclient"
 	cadvisorApi "github.com/google/cadvisor/info/v1"
 )
 
@@ -48,7 +49,7 @@ type fakeKubelet struct {
 	podsFunc                           func() []*api.Pod
 	logFunc                            func(w http.ResponseWriter, req *http.Request)
 	runFunc                            func(podFullName string, uid types.UID, containerName string, cmd []string) ([]byte, error)
-	dockerVersionFunc                  func() (docker.APIVersion, error)
+	containerVersionFunc               func() (kubecontainer.Version, error)
 	execFunc                           func(pod string, uid types.UID, container string, cmd []string, in io.Reader, out, err io.WriteCloser, tty bool) error
 	portForwardFunc                    func(name string, uid types.UID, port uint16, stream io.ReadWriteCloser) error
 	containerLogsFunc                  func(podFullName, containerName, tail string, follow bool, stdout, stderr io.Writer) error
@@ -72,8 +73,8 @@ func (fk *fakeKubelet) GetRootInfo(req *cadvisorApi.ContainerInfoRequest) (*cadv
 	return fk.rootInfoFunc(req)
 }
 
-func (fk *fakeKubelet) GetDockerVersion() (docker.APIVersion, error) {
-	return fk.dockerVersionFunc()
+func (fk *fakeKubelet) GetContainerRuntimeVersion() (kubecontainer.Version, error) {
+	return fk.containerVersionFunc()
 }
 
 func (fk *fakeKubelet) GetCachedMachineInfo() (*cadvisorApi.MachineInfo, error) {
@@ -450,8 +451,8 @@ func TestPodsInfo(t *testing.T) {
 
 func TestHealthCheck(t *testing.T) {
 	fw := newServerTest()
-	fw.fakeKubelet.dockerVersionFunc = func() (docker.APIVersion, error) {
-		return docker.NewAPIVersion("1.15")
+	fw.fakeKubelet.containerVersionFunc = func() (kubecontainer.Version, error) {
+		return dockertools.NewVersion("1.15")
 	}
 	fw.fakeKubelet.hostnameFunc = func() string {
 		return "127.0.0.1"
@@ -489,9 +490,9 @@ func TestHealthCheck(t *testing.T) {
 		t.Errorf("expected status code %d, got %d", http.StatusOK, resp.StatusCode)
 	}
 
-	//Test with old docker version
-	fw.fakeKubelet.dockerVersionFunc = func() (docker.APIVersion, error) {
-		return docker.NewAPIVersion("1.1")
+	//Test with old container runtime version
+	fw.fakeKubelet.containerVersionFunc = func() (kubecontainer.Version, error) {
+		return dockertools.NewVersion("1.1")
 	}
 
 	resp, err = http.Get(fw.testHTTPServer.URL + "/healthz")

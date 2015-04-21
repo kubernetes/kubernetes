@@ -1658,13 +1658,12 @@ func (kl *Kubelet) syncLoop(updates <-chan PodUpdate, handler SyncHandler) {
 	}
 }
 
-// Returns Docker version for this Kubelet.
-func (kl *Kubelet) GetDockerVersion() (docker.APIVersion, error) {
-	if kl.dockerClient == nil {
-		return nil, fmt.Errorf("no Docker client")
+// Returns the container runtime version for this Kubelet.
+func (kl *Kubelet) GetContainerRuntimeVersion() (kubecontainer.Version, error) {
+	if kl.containerManager == nil {
+		return nil, fmt.Errorf("no container runtime")
 	}
-	dockerRunner := dockertools.NewDockerContainerCommandRunner(kl.dockerClient)
-	return dockerRunner.GetDockerServerVersion()
+	return kl.containerManager.Version()
 }
 
 func (kl *Kubelet) validatePodPhase(podStatus *api.PodStatus) error {
