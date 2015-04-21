@@ -207,7 +207,13 @@ func TestWatchEtcdError(t *testing.T) {
 	fakeClient.WatchImmediateError = fmt.Errorf("immediate error")
 	h := EtcdHelper{fakeClient, codec, versioner}
 
-	got := <-h.Watch("/some/key", 4).ResultChan()
+	watching, err := h.Watch("/some/key", 4, Everything)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	defer watching.Stop()
+
+	got := <-watching.ResultChan()
 	if got.Type != watch.Error {
 		t.Fatalf("Unexpected non-error")
 	}
@@ -229,7 +235,10 @@ func TestWatch(t *testing.T) {
 	fakeClient.expectNotFoundGetSet["/some/key"] = struct{}{}
 	h := EtcdHelper{fakeClient, codec, versioner}
 
-	watching := h.Watch("/some/key", 0)
+	watching, err := h.Watch("/some/key", 0, Everything)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
 
 	fakeClient.WaitForWatchCompletion()
 	// when server returns not found, the watch index starts at the next value (1)
@@ -398,7 +407,11 @@ func TestWatchEtcdState(t *testing.T) {
 			fakeClient.Data[key] = value
 		}
 		h := EtcdHelper{fakeClient, codec, versioner}
-		watching := h.Watch("/somekey/foo", testCase.From)
+		watching, err := h.Watch("/somekey/foo", testCase.From, Everything)
+		if err != nil {
+			t.Fatalf("Unexpected error: %v", err)
+		}
+
 		fakeClient.WaitForWatchCompletion()
 
 		t.Logf("Testing %v", k)
@@ -466,7 +479,10 @@ func TestWatchFromZeroIndex(t *testing.T) {
 		fakeClient.Data["/some/key"] = testCase.Response
 		h := EtcdHelper{fakeClient, codec, versioner}
 
-		watching := h.Watch("/some/key", 0)
+		watching, err := h.Watch("/some/key", 0, Everything)
+		if err != nil {
+			t.Fatalf("Unexpected error: %v", err)
+		}
 
 		fakeClient.WaitForWatchCompletion()
 		if e, a := testCase.Response.R.EtcdIndex+1, fakeClient.WatchIndex; e != a {
@@ -612,7 +628,10 @@ func TestWatchFromNotFound(t *testing.T) {
 	}
 	h := EtcdHelper{fakeClient, codec, versioner}
 
-	watching := h.Watch("/some/key", 0)
+	watching, err := h.Watch("/some/key", 0, Everything)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
 
 	fakeClient.WaitForWatchCompletion()
 	if fakeClient.WatchIndex != 3 {
@@ -635,7 +654,10 @@ func TestWatchFromOtherError(t *testing.T) {
 	}
 	h := EtcdHelper{fakeClient, codec, versioner}
 
-	watching := h.Watch("/some/key", 0)
+	watching, err := h.Watch("/some/key", 0, Everything)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
 
 	errEvent := <-watching.ResultChan()
 	if e, a := watch.Error, errEvent.Type; e != a {
@@ -665,7 +687,11 @@ func TestWatchPurposefulShutdown(t *testing.T) {
 	fakeClient.expectNotFoundGetSet["/some/key"] = struct{}{}
 
 	// Test purposeful shutdown
-	watching := h.Watch("/some/key", 0)
+	watching, err := h.Watch("/some/key", 0, Everything)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
 	fakeClient.WaitForWatchCompletion()
 	watching.Stop()
 

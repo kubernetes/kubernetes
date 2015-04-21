@@ -271,7 +271,8 @@ func (r *Registry) WatchServices(ctx api.Context, label labels.Selector, field f
 		if err != nil {
 			return nil, err
 		}
-		return r.Watch(key, version), nil
+		// TODO: use generic.SelectionPredicate
+		return r.Watch(key, version, tools.Everything)
 	}
 	if field.Empty() {
 		return r.WatchList(makeServiceListKey(ctx), version, tools.Everything)
