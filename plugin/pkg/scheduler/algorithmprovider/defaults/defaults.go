@@ -60,6 +60,8 @@ func defaultPriorities() util.StringSet {
 	return util.NewStringSet(
 		// Prioritize nodes by least requested utilization.
 		factory.RegisterPriorityFunction("LeastRequestedPriority", algorithm.LeastRequestedPriority, 1),
+		// Prioritizes nodes to help achieve balanced resource usage
+		factory.RegisterPriorityFunction("BalancedResourceAllocation", algorithm.BalancedResourceAllocation, 1),
 		// spreads pods by minimizing the number of pods (belonging to the same service) on the same minion.
 		factory.RegisterPriorityConfigFactory(
 			"ServiceSpreadingPriority",
