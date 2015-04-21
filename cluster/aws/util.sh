@@ -615,7 +615,6 @@ function kube-up {
   # TODO: generate ADMIN (and KUBELET) tokens and put those in the master's
   # config file.  Distribute the same way the htpasswd is done.
   (
-    mkdir -p "${config_dir}"
     umask 077
     ssh -oStrictHostKeyChecking=no -i "${AWS_SSH_KEY}" "ubuntu@${KUBE_MASTER_IP}" sudo cat /srv/kubernetes/kubecfg.crt >"${KUBE_CERT}" 2>"$LOG"
     ssh -oStrictHostKeyChecking=no -i "${AWS_SSH_KEY}" "ubuntu@${KUBE_MASTER_IP}" sudo cat /srv/kubernetes/kubecfg.key >"${KUBE_KEY}" 2>"$LOG"
