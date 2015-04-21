@@ -135,40 +135,9 @@ func (d *dockerContainerCommandRunner) GetDockerServerVersion() (docker.APIVersi
 	return version, nil
 }
 
-func (d *dockerContainerCommandRunner) nativeExecSupportExists() (bool, error) {
-	version, err := d.GetDockerServerVersion()
-	if err != nil {
-		return false, err
-	}
-	return version.GreaterThanOrEqualTo(dockerAPIVersionWithExec), nil
-}
-
-func (d *dockerContainerCommandRunner) getRunInContainerCommand(containerID string, cmd []string) (*exec.Cmd, error) {
-	args := append([]string{"exec"}, cmd...)
-	command := exec.Command("/usr/sbin/nsinit", args...)
-	command.Dir = fmt.Sprintf("/var/lib/docker/execdriver/native/%s", containerID)
-	return command, nil
-}
-
-func (d *dockerContainerCommandRunner) runInContainerUsingNsinit(containerID string, cmd []string) ([]byte, error) {
-	c, err := d.getRunInContainerCommand(containerID, cmd)
-	if err != nil {
-		return nil, err
-	}
-	return c.CombinedOutput()
-}
-
-// RunInContainer uses nsinit to run the command inside the container identified by containerID
+// RunInContainer runs the command inside the container identified by containerID.
 // TODO(yifan): Use strong type for containerID.
 func (d *dockerContainerCommandRunner) RunInContainer(containerID string, cmd []string) ([]byte, error) {
-	// If native exec support does not exist in the local docker daemon use nsinit.
-	useNativeExec, err := d.nativeExecSupportExists()
-	if err != nil {
-		return nil, err
-	}
-	if !useNativeExec {
-		return d.runInContainerUsingNsinit(containerID, cmd)
-	}
 	createOpts := docker.CreateExecOptions{
 		Container:    containerID,
 		Cmd:          cmd,
