@@ -9,9 +9,9 @@ write-files:
         --silent --head --fail \
         http://${1}:${2}; do sleep 1 && echo -n .; done;
       exit $?
-hostname: node
 coreos:
   etcd2:
+    name: ${DEFAULT_IPV4}
     listen-client-urls: http://0.0.0.0:2379,http://0.0.0.0:4001
     initial-cluster: master=http://<master-private-ip>:2380
     proxy: on

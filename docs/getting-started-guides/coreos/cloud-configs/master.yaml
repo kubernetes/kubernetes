@@ -4,6 +4,7 @@
 hostname: master
 coreos:
   etcd2:
+    name: ${DEFAULT_IPV4}
     listen-client-urls: http://0.0.0.0:2379,http://0.0.0.0:4001
     advertise-client-urls: http://<master-private-ip>:2379,http://<master-private-ip>:4001
     initial-cluster-token: k8s_etcd
