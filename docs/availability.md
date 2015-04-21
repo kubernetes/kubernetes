@@ -73,7 +73,7 @@ Mitigations:
 - Action: Multiple independent clusters (and avoid making risky changes to all clusters at once)
   - Mitigates: Everything listed above.
 
-## Chosing Multiple Kubernetes Clusters
+## Choosing Multiple Kubernetes Clusters
 
 You may want to set up multiple kubernetes clusters, both to
 have clusters in different regions to be nearer to your users; and to tolerate failures and/or invasive maintenance.
@@ -120,8 +120,7 @@ then you need `R + U` clusters.  If it is not (e.g you want to ensure low latenc
 cluster failure), then you need to have `R * U` clusters (`U` in each of `R` regions).  In any case, try to put each cluster in a different zone.
 
 Finally, if any of your clusters would need more than the maximum recommended number of nodes for a Kubernetes cluster, then
-you may need even more clusters.  Our roadmap (
-https://github.com/GoogleCloudPlatform/kubernetes/blob/24e59de06e4da61f5dafd4cd84c9340a2c0d112f/docs/roadmap.md)
+you may need even more clusters.  Our [roadmap](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/roadmap.md)
 calls for maximum 100 node clusters at v1.0 and maximum 1000 node clusters in the middle of 2015.
 
 ## Working with multiple clusters
@@ -129,4 +128,3 @@ calls for maximum 100 node clusters at v1.0 and maximum 1000 node clusters in th
 When you have multiple clusters, you would typically create services with the same config in each cluster and put each of those
 service instances behind a load balancer (AWS Elastic Load Balancer, GCE Forwarding Rule or HTTP Load Balancer), so that
 failures of a single cluster are not visible to end users.
-
