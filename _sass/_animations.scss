@@ -1,0 +1,30 @@
+// keyframes
+
+@include keyframes(nav-underline-bounce) {
+    from {
+        width: 0%;
+    }
+    50% {
+        width: 100%;
+    }
+    to {
+        width: 30px;
+    }
+}
+
+// common transitions
+@mixin slide-in($x) {
+    @include cross-browser(transition-duration,.4s);
+    @include cross-browser(transition-property,transform);
+    &.slide-in {
+        @include cross-browser(transform,translate3d($x,0,0));
+    }
+}
+
+@mixin slide-in-ios-safe($x) {
+    @include cross-browser(transition-duration,.4s);
+    @include cross-browser(transition-property,left);
+    &.slide-in {
+        @include cross-browser(left,$x);
+    }
+}

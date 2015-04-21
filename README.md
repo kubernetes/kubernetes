@@ -1,86 +1,81 @@
-# Kubernetes
+Kubernetes.io Documentation
+=
 
-[![GoDoc](https://godoc.org/github.com/GoogleCloudPlatform/kubernetes?status.png)](https://godoc.org/github.com/GoogleCloudPlatform/kubernetes) [![Travis](https://travis-ci.org/GoogleCloudPlatform/kubernetes.svg?branch=master)](https://travis-ci.org/GoogleCloudPlatform/kubernetes) [![Coverage Status](https://coveralls.io/repos/GoogleCloudPlatform/kubernetes/badge.svg)](https://coveralls.io/r/GoogleCloudPlatform/kubernetes)
+####Author: [Tim Garrison](https://github.com/mitnosirrag) \<timg@plexipixel.com\>
+####Updated: `November 17, 2014`
 
-Kubernetes is an open source system for managing containerized applications across multiple hosts,
-providing basic mechanisms for deployment, maintenance, and scaling of applications.
+Overview
+-
+Kubernetes.io is a public facing website for Kubernetes by Google.  It is intended to provide documentation, support and information for developers looking to learn more about Kubernetes.  The website is a GitHub.io page and part of the Google Cloud Platform account at <https://github.com/googlecloudplatform/>.  Kubernetes.io is a static website that utilizes the `Jekyll` framework in order to make edits and updates easier to manage.
 
-Kubernetes is:
+GitHub.io Pages
+-
+See: [GitHub.io Pages](https://pages.github.com/)
 
-* **lean**: lightweight, simple, accessible
-* **portable**: public, private, hybrid, multi cloud
-* **extensible**: modular, pluggable, hookable, composable
-* **self-healing**: auto-placement, auto-restart, auto-replication
+Technologies Used
+-
+- [Jekyll](http://jekyllrb.com/docs/home/) - Framework used to process dynamic files into static website. Automatically run when `push`ing to GitHub. 
+- [Liquid Templates](https://github.com/Shopify/liquid/wiki) - Templating system, similar to Handlebars or Django, used for processing views with minimal logic. Embeds into HTML, similar to PHP.
+- [SASS](http://sass-lang.com/documentation/file.SASS_REFERENCE.html) - Pre-processor for CSS. Allows for re-usable items when styling.
+- JavaScript / [jQuery](http://api.jquery.com/) - jQuery is a JavaScript framework that makes common JS tasks a lot easier.
+- [Markdown](http://daringfireball.net/projects/markdown/syntax) - Markdown can be used to create HTML without knowing HTML, but you have to know Markdown. This document is created in Markdown. Kubernetes.io doesn't really use Markdown, since it wasn't practical.
+- [YAML](http://www.yaml.org/) - Data serialization format that is human-readable. Used for storing all variables and their values. Essentially our model.
 
-Kubernetes builds upon a decade and a half of experience at Google running production workloads at scale, combined with best-of-breed ideas and practices from the community.
+Folder Structure
+-
+- **`/`**
+    - **`_config.yml`** - Site configuration. Meta values, navigation, Jekyll settings and global variables are stored here. Changes to this file can be catastrophic.
+    - **`_local_config.yml`** - Used for local testing. Anything set here will override values set in *`_config.yml`*.
+    - **`community.md`** - Variables and content that are displayed in the *`community.html`* layout. Variables are stored in YAML format.
+    - **`events.md`** - Variables and content that are displayed in the *events.html* layout. Variables are stored in YAML format.
+    - **`feed.xml`** - Not currently used
+    - **`gettingstarted.md`** - Variables and content that are displayed in the *`gettingstarted.html`* layout. Variables are stored in YAML format.
+    - **`index.html`** - Variables and content that are displayed in the *`homepage.html`* layout. Variables are stored in YAML format.
+    - **`news.md`** - Variables and content that are stored in the *news.html* layout. Variables are stored in YAML format.
+- **`/_data`** - YAML files that populate dynamic sections with content.
+    - **`/events`** - Contains YAML files for individual events. Events follow a simple YAML template structure that uses key/value pairs to set variables that are displayed.  Events, like news, are sorted reverse chronologically, and must be named with their date in `YYYY-MM-DD.yml` format.  Events with duplicate dates that conflict with another file should have a single digit appended to the end of the filename to allow proper sorting.
+    - **/`news`** - Contains YAML files for individual news stories.  News files follow a simple YAML template structure that uses key/value pairs to set variables that are displayed.  News, like events, are sorted reverse chronologically, and must be named with their date in `YYYY-MM-DD.yml` format.  News files with duplicate dates that conflict with another file should have a single digit appended to the end of the filename to allow proper sorting.
+- **`/_includes`** - Generic HTML/Liquid includes for all pages.
+    - **`head.html`** - HTML declaration, meta tags, style tags and script tags. This file is included in all layouts.
+    - **`header.html`** - Included in the *`head.html`* include, this file displays the navigation for both desktop and mobile.
+    - **`hero.html`** - Included in the *`header.html`* include, this file displays the hero section of each interior page and the home page.
+    - **`footer.html`** - This file in included in all layouts.  It displays all footer information.
+- **`/_layouts`** - HTML/Liquid markup templates.
+    - **`community.html`** - HTML markup for community page.
+    - **`default.html`** - All layouts inherit this layout to simplify includes. 
+    - **`events.html`** - HTML markup for events page.
+    - **`gettingstarted.html`** - HTML markup for getting started page.
+    - **`homepage.html`** - HTML markup for home page.
+    - **`news.html`** - HTML markup for news page.
+- **`/_posts`** - Not currently used, would be for blogging.
+- **`/_sass`** - SASS partials are stored here. Jekyll will automatically parse SASS files into CSS files.  If you add a new partial file, make sure to include it in *`/css/main.scss`*.
+- **`/_site`** - Jekyll will generate the static website into this directory. Anything manually placed here will be overridden.
+- **`/css`** - Generic CSS can be placed here.  The file *`main.scss`* is what generates SASS partials, alter it with extreme caution.
+- **`/img`** - Site images and SVGs are stored here, in appropriate sub folders.
+- **`/js`** - Javascript and jQuery files are stored here.
+- **`/legacy`** - Contains the old version of the kubernetes.io website. Files in here can be linked to until they are replaced with newer versions.
 
-<hr>
+Events file example
+-
+#### Filename: `2014-11-22.yml`
+```yaml
+date: 2014-11-22 00:00:00 -0800
+title: "Top100 Summit"
+location: "Beijing, China"
+venue: "Beijing International Convention Center"
+speaker: "Tim Hockin & Dawn Chen"
+url: "http://www.top100summit.com/"
+```
+##### Note that dates follow the format: `YYYY-MM-DD HH:II:SS +0000`
 
-### Kubernetes can run anywhere!
-However, initial development was done on GCE and so our instructions and scripts are built around that.  If you make it work on other infrastructure please let us know and contribute instructions/code.
-
-### Kubernetes is in pre-production beta!
-While the concepts and architecture in Kubernetes represent years of experience designing and building large scale cluster manager at Google, the Kubernetes project is still under heavy development.  Expect bugs, design and API changes as we bring it to a stable, production product over the coming year.
-
-
-## Concepts
-
-Kubernetes works with the following concepts:
-
-**Clusters** are the compute resources on top of which your containers are built. Kubernetes can run anywhere! See the [Getting Started Guides](docs/getting-started-guides) for instructions for a variety of services.
-
-**Pods** are a colocated group of Docker containers with shared volumes. They're the smallest deployable units that can be created, scheduled, and managed with Kubernetes. Pods can be created individually, but it's recommended that you use a replication controller even if creating a single pod. [More about pods](docs/pods.md).
-
-**Replication controllers** manage the lifecycle of pods. They ensure that a specified number of pods are running
-at any given time, by creating or killing pods as required. [More about replication controllers](docs/replication-controller.md).
-
-**Services** provide a single, stable name and address for a set of pods.
-They act as basic load balancers. [More about services](docs/services.md).
-
-**Labels** are used to organize and select groups of objects based on key:value pairs. [More about labels](docs/labels.md).
-
-## Documentation
-
-Kubernetes documentation is organized into several categories.
-
-  - **Getting Started Guides**
-    - for people who want to create a kubernetes cluster
-    - in [docs/getting-started-guides](docs/getting-started-guides)
-  - **User Documentation**
-    - [User FAQ](https://github.com/GoogleCloudPlatform/kubernetes/wiki/User-FAQ)
-    - in [docs](docs/overview.md)
-    - for people who want to run programs on kubernetes
-    - describes current features of the system (with brief mentions of planned features)
-  - **Developer Documentation**
-    - in [docs/devel](docs/devel)
-    - for people who want to contribute code to kubernetes
-    - covers development conventions
-    - explains current architecture and project plans
-  - **Service Documentation**
-    - [Service FAQ](https://github.com/GoogleCloudPlatform/kubernetes/wiki/Services-FAQ)
-    - for people who are interested in how Services work
-    - details of ```kube-proxy``` iptables
-    - how to wire services to external internet
-  - **Design Documentation**
-    - in [docs/design](docs/design)
-    - for people who want to understand the design choices made
-    - describes tradeoffs, alternative designs
-    - descriptions of planned features that are too long for a github issue.
-  - **Walkthroughs and Examples**
-    - in [examples](/examples)
-    - Hands on introduction and example config files
-  - **API documentation**
-    - in [the API conventions doc](docs/api-conventions.md)
-    - and automatically generated API documentation served by the master
-  - **Wiki/FAQ**
-    - in [wiki](https://github.com/GoogleCloudPlatform/kubernetes/wiki)
-    - includes a number of [Kubernetes community-contributed recipes](/contrib/recipes)
-
-## Community, discussion and support
-
-If you have questions or want to start contributing please reach out.  We don't bite!
-
-The Kubernetes team is hanging out on IRC on the [#google-containers channel on freenode.net](http://webchat.freenode.net/?channels=google-containers).  We also have the [google-containers Google Groups mailing list](https://groups.google.com/forum/#!forum/google-containers) for questions and discussion as well as the [kubernetes-announce mailing list](https://groups.google.com/forum/#!forum/kubernetes-announce) for important announcements (low-traffic, no chatter).
-
-If you are a company and are looking for a more formal engagement with Google around Kubernetes and containers at Google as a whole, please fill out [this form](https://docs.google.com/a/google.com/forms/d/1_RfwC8LZU4CKe4vKq32x5xpEJI5QZ-j0ShGmZVv9cm4/viewform) and we'll be in touch.
-
+News file example
+-
+#### Filename: `2014-11-04.yml`
+```yaml
+date: 2014-11-04 00:00:00 -0800
+headline: "Google unveils its Container Engine to run apps in the best possible way on its cloud"
+author: "Jordan Novet"
+publication: "VentureBeat"
+url: "http://venturebeat.com/2014/11/04/google-container-engine/"
+```
+##### Note that dates follow the format: `YYYY-MM-DD HH:II:SS +0000`

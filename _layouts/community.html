@@ -1,0 +1,69 @@
+---
+layout: default
+---
+
+<div class="community">
+ <div class="container">
+  <ul class="steps">
+{% for comm in page.communities %}
+   <li class="step">
+    <div class="row">
+     <div class="col-lg-1 col-md-1 col-sm-1">
+      <div class="bullet hidden-xs">
+      </div>
+     </div>
+     <div class="col-lg-10 col-md-10 col-sm-10">
+      <div class="row">
+       <div class="col-xs-12">
+        <div class="bullet visible-xs-block float-left">
+        </div>
+        <h3 class="vertical-center height-52 text-gray">{{comm.title}}</h3>
+       </div>
+      </div>
+      <div class="row">
+       <div class="col-xs-12">
+        <p class="interior">{{comm.text}}</p>
+       </div>
+      </div>
+    {% if 'companies' == comm.slug %}
+      <div class="row">
+       <div class="col-xs-12">
+        <div class="row">
+         <div class="button-group tiles">
+        {% for comp in page.companies %}
+          <div class="col-lg-3 col-md-3 col-sm-3 col-xs-6">
+           <img src="{{comp.img}}" alt="{{comp.label}}" 
+            class="img-responsive button tile" />
+          </div>
+        {% endfor %}
+         </div>
+        </div>
+       </div>
+      </div>
+    {% elsif 'developers' == comm.slug %}
+      <div class="row">
+       <div class="col-lg-4 col-md-4 col-sm-5">
+        <div class="button-group float-none">
+         <a href="{{page.developers.url}}" class="button small">{{page.developers.label}}</a>
+        </div>
+       </div>
+      </div>
+    {% elsif 'technical' == comm.slug %}
+      <div class="row">
+       <div class="button-group float-none">
+        <div class="col-lg-4 col-md-5 col-sm-6">
+         <a href="{{page.techdetails.api.url}}" class="button small">{{page.techdetails.api.label}}</a>
+        </div>
+        <div class="col-lg-4 col-md-5 col-sm-6">
+         <a href="{{page.techdetails.kubecfg.url}}" class="button small">{{page.techdetails.kubecfg.label}}</a>
+        </div>
+       </div>
+      </div>
+    {% endif %}
+     </div>
+    </div>
+   </li>
+{% endfor %}
+  </ul>
+ </div>
+</div>

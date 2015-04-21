@@ -1,0 +1,58 @@
+{% if 'home' == page.slug %}
+<div class="hero homepage">
+ <div class="container">
+  <div class="row">
+   <div class="col-lg-6 col-md-6 col-sm-6 col-lg-offset-3 col-md-offset-3 col-sm-offset-3">
+    <div class="text-center">
+     <img src="{{site.url}}{{page.hero.img}}" alt="{{page.hero.alt}}"
+      class="img-responsive hidden-sm hidden-xs" />
+     <img src="{{site.url}}{{page.hero.img_mobile}}" alt="{{page.hero.alt}}"
+      class="img-responsive visible-sm-block visible-xs-block" />
+    </div>
+   </div>
+  </div>
+  <div class="row">
+   <div class="col-lg-6 col-md-6 col-sm-10 col-lg-offset-3 col-md-offset-3 col-sm-offset-1">
+    <h4 class="text-white">
+     {{page.hero.text}}
+    </h4>
+   </div>
+  </div>
+  <div class="row">
+   <div class="col-lg-6 col-md-6 col-sm-8 col-lg-offset-3 col-md-offset-3 col-sm-offset-2">
+    <div class="row">
+     <div class="col-lg-6 col-md-6 col-sm-6">
+      <a href="{{page.hero.buttons.button_1.url}}" class="button alt">{{page.hero.buttons.button_1.label}}</a>
+     </div>
+     <div class="col-lg-6 col-md-6 col-sm-6">
+      <a href="{{page.hero.buttons.button_2.url}}" class="button alt">{{page.hero.buttons.button_2.label}}</a>
+     </div>
+    </div>
+   </div>
+  </div>
+ </div>
+</div>
+{% else %}
+<div class="hero interior">
+ <div class="container">
+  <div class="row">
+   <div class="col-lg-2 col-md-2 col-sm-3 hidden-xs">
+    <img src="{{site.url}}{{page.hero.img}}" alt="{{page.hero.title}}"
+     class="img-responsive" />
+   </div>
+   <div class="col-lg-10 col-md-10 col-sm-9">
+    <div class="row">
+     <div class="col-xs-12">
+      <h1 class="text-white">{{page.hero.title}}</h1>
+     </div>
+    </div>
+    <div class="row">
+     <div class="col-xs-12">
+      <h4 class="text-white text-left">{{page.hero.text}}</h4>
+     </div>
+    </div>
+   </div>
+  </div>
+ </div>
+</div>
+{% endif %}
