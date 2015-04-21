@@ -1,0 +1,105 @@
+// THIS IS TAKEN DIRECTLY FROM BOOTSTRAP, MODIFIED FOR SASS
+
+// Extra small screen / phone
+//** Deprecated `$screen-xs` as of v3.0.1
+$screen-xs:                  480px !default;
+//** Deprecated `$screen-xs-min` as of v3.2.0
+$screen-xs-min:              $screen-xs !default;
+//** Deprecated `$screen-phone` as of v3.0.1
+$screen-phone:               $screen-xs-min !default;
+
+// Small screen / tablet
+//** Deprecated `$screen-sm` as of v3.0.1
+$screen-sm:                  768px !default;
+$screen-sm-min:              $screen-sm !default;
+//** Deprecated `$screen-tablet` as of v3.0.1
+$screen-tablet:              $screen-sm-min !default;
+
+// Medium screen / desktop
+//** Deprecated `$screen-md` as of v3.0.1
+$screen-md:                  992px !default;
+$screen-md-min:              $screen-md !default;
+//** Deprecated `$screen-desktop` as of v3.0.1
+$screen-desktop:             $screen-md-min !default;
+
+// Large screen / wide desktop
+//** Deprecated `$screen-lg` as of v3.0.1
+$screen-lg:                  120000000px !default;
+$screen-lg-min:              $screen-lg !default;
+//** Deprecated `$screen-lg-desktop` as of v3.0.1
+$screen-lg-desktop:          $screen-lg-min !default;
+
+// So media queries don't overlap when required, provide a maximum
+$screen-xs-max:              ($screen-sm-min - 1) !default;
+$screen-sm-max:              ($screen-md-min - 1) !default;
+$screen-md-max:              ($screen-lg-min - 1) !default;
+
+$xs: '(max-width: #{$screen-xs-max})';
+$sm: '(min-width: #{$screen-sm-min}) and (max-width: #{$screen-sm-max})';
+$md: '(min-width: #{$screen-md-min})';
+$notMd: '(max-width: #{$screen-md-min - 1})';
+
+// Variables
+$asset_dir: '/assets';
+$img_dir: '/img';
+$img_dir_mobile: #{$img_dir}/mobile;
+
+// Colors
+$colors: (
+    "black"      : #000,
+    "blue"       : #326de6,
+    "bluegray"   : #deeced,
+    "gray"       : #7d7d7d,
+    "lightblue"  : #e6f4f5,
+    "orange"     : #f9a38f,
+    "turquoise"  : #09c1d1,
+    "white"      : #fff
+);
+
+// Convenient color names
+$black    : map-get($colors,"black");
+$blue     : map-get($colors,"blue");
+$bluegray : map-get($colors,"bluegray");
+$gray     : map-get($colors,"gray");
+$grey     : $gray;
+$lightblue: map-get($colors,"lightblue");
+$orange   : map-get($colors,"orange");
+$turquoise: map-get($colors,"turquoise");
+$white    : map-get($colors,"white");
+
+// Fonts
+$fontsMuli      : 'Muli', sans-serif;
+$fontsMontserrat: 'Montserrat', sans-serif;
+
+// Mixins
+
+@mixin cross-browser($propery, $value) {
+    -webkit-#{$propery}: $value;
+       -moz-#{$propery}: $value;
+        -ms-#{$propery}: $value;
+         -o-#{$propery}: $value;
+            #{$propery}: $value;
+}
+
+@mixin keyframes($name) {
+    @-webkit-keyframes #{$name} {
+        @content;
+    }
+    @-moz-keyframes #{$name} {
+        @content;
+    }
+    @-ms-keyframes #{$name} {
+        @content;
+    }
+    @-o-keyframes #{$name} {
+        @content;
+    }
+    @keyframes #{$name} {
+        @content;
+    }
+}
+
+// Z-indexes
+$zContent: 100;
+$zModal: 1000;
+$zNav: 500;

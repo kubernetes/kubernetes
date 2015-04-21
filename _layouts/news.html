@@ -1,0 +1,54 @@
+---
+layout: default
+---
+
+<div class="news">
+ <div class="container">
+  <ul class="list">
+{% for story_hash in site.data.news reversed %}
+    {% assign story = story_hash[1] %}
+    {% if story.is_template %} {% continue %} {% endif %}
+   <li class="lazy_load_item">
+    <div class="row">
+     <div class="col-lg-3 col-md-3 col-sm-3 col-lg-offset-1 col-md-offset-1 col-sm-offset-1">
+    {% if story.img %}
+      <img src="{{story.img}}" alt="" class="img-responsive thumb" />
+    {% else %}
+      <img src="{{page.default_img}}" alt="" class="img-responsive thumb" />
+    {% endif %}
+     </div>
+     <div class="col-lg-7 col-md-7 col-sm-7">
+      <div class="date text-gray">
+       {{story.date | date: "%B %d, %Y"}}
+      </div>
+      <div class="headline">
+       <a href="{{story.url}}" class="text-gray"><h3>{{story.headline}}</h3></a>
+      </div>
+      <div class="byline text-gray">
+       {% if story.author %}{{story.author}},{% endif %} <address>{{story.publication}}</address>
+      </div>
+     </div>
+    </div>
+    <div class="row">
+     <div class="col-lg-10 col-md-10 col-sm-10 col-lg-offset-1 col-md-offset-1 col-sm-offset-1">
+      <div class="underline"></div>
+     </div>
+    </div>
+   </li>
+{% endfor %}
+  </ul>
+ </div>
+ <div class="container">
+  <div class="row">
+   <div class="col-lg-2 col-md-4 col-sm-4 col-lg-offset-5 col-md-offset-4 col-sm-offset-4">
+    <a href="javascript:;" id="load_more"
+     class="button small">{{page.load_more_label}}</a>
+   </div>
+  </div>
+ </div>
+</div>
+<script type="text/javascript">
+$(document).ready(function() {
+    init_list_load_more(jQuery,jQuery('#load_more'),4);
+});
+</script>

@@ -1,0 +1,69 @@
+# Site settings
+title: Kubernetes by Google
+
+description: Manage a cluster of Linux containers as a single system to accelerate Dev and simplify Ops with Kubernetes by Google.
+
+baseurl: "" # the subpath of your site, e.g. /blog/
+
+og: # if title, site_name or description are left blank, we will use the global
+    # title and description. 
+    title: 
+    site_name:
+    description:
+    type: website
+    image: /img/global/og_img.jpg
+
+url: "http://kubernetes.io" # the base hostname & protocol for your site
+
+google_analytics: "UA-36037335-10"
+
+# Build settings
+markdown: kramdown
+sass:
+    style: :compressed
+
+logo:
+    desktop: /img/desktop/nav_logo.svg
+    mobile: /img/mobile/nav_logo.svg
+
+nav:
+ - label: Home
+   url: /
+   slug: home
+   external: false
+ - label: Getting Started
+   url: /gettingstarted
+   slug: gettingstarted
+   external: false
+ - label: Community
+   url: /community
+   slug: community
+   external: false
+ - label: News
+   url: /news
+   slug: news
+   external: false
+ - label: Events
+   url: /events
+   slug: events
+   external: false
+ - label: Blog
+   url: http://googlecloudplatform.blogspot.com/search/label/Kubernetes
+   slug: blog
+   external: true
+
+footer:
+    connect: Connect With Us!
+    social: 
+      - label: stackoverflow
+        url: http://stackoverflow.com/questions/tagged/kubernetes
+      - label: twitter
+        url: https://twitter.com/googlecloud
+      - label: googleplus
+        url: https://plus.google.com/+googlecloudplatform
+            
+    links:
+      - label: Freenode
+        url: http://webchat.freenode.net/?channels=google-containers
+      - label: Mailing List
+        url: "https://groups.google.com/forum/#!forum/google-containers" 
