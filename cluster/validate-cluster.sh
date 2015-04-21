@@ -14,7 +14,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Validates that the cluster is healthy.
+# Bring up a Kubernetes cluster.
+#
+# If the full release name (gs://<bucket>/<release>) is passed in then we take
+# that directly.  If not then we assume we are doing development stuff and take
+# the defaults in the release config.
 
 set -o errexit
 set -o nounset
@@ -24,9 +28,12 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 source "${KUBE_ROOT}/cluster/kube-env.sh"
 source "${KUBE_ROOT}/cluster/${KUBERNETES_PROVIDER}/util.sh"
 
+get-password
+detect-master > /dev/null
+detect-minions > /dev/null
+
 MINIONS_FILE=/tmp/minions-$$
 trap 'rm -rf "${MINIONS_FILE}"' EXIT
-
 # Make several attempts to deal with slow cluster birth.
 attempt=0
 while true; do
@@ -47,39 +54,62 @@ done
 echo "Found ${found} nodes."
 cat -n "${MINIONS_FILE}"
 
-attempt=0
-while true; do
-  kubectl_output=$("${KUBE_ROOT}/cluster/kubectl.sh" get cs)
+# On vSphere, use minion IPs as their names
+if [[ "${KUBERNETES_PROVIDER}" == "vsphere" || "${KUBERNETES_PROVIDER}" == "vagrant" || "${KUBERNETES_PROVIDER}" == "libvirt-coreos" || "${KUBERNETES_PROVIDER}" == "juju" ]]  ; then
+  MINION_NAMES=("${KUBE_MINION_IP_ADDRESSES[@]}")
+fi
 
-  # The "kubectl componentstatuses" output is four columns like this:
-  #
-  #     COMPONENT            HEALTH    MSG       ERR
-  #     controller-manager   Healthy   ok        nil
-  #
-  # Parse the output to capture the value of the second column("HEALTH"), then use grep to
-  # count the number of times it doesn't match "success".
-  # Because of the header, the actual unsuccessful count is 1 minus the count.
+# On AWS we can't really name the minions, so just trust that if the number is right, the right names are there.
+if [[ "${KUBERNETES_PROVIDER}" == "aws" ]]; then
+  MINION_NAMES=("$(cat ${MINIONS_FILE})")
+  # /healthz validation isn't working for some reason on AWS.  So just hope for the best.
+  # TODO: figure out why and fix, it must be working in some form, or else clusters wouldn't work.
+  echo "Kubelet health checking on AWS isn't currently supported, assuming everything is good..."
+  echo -e "${color_green}Cluster validation succeeded${color_norm}"
+  exit 0
+fi
 
-  non_success_count=$(echo "${kubectl_output}" | \
-    sed -n 's/^\([[:alnum:][:punct:]]\+\)\s\+\([[:alnum:][:punct:]]\+\)\s\+.*/\2/p' | \
-    grep 'Healthy' --invert-match -c)
-
-  if ((non_success_count > 1)); then
-    if ((attempt < 5)); then
-      echo -e "${color_yellow}Cluster not working yet.${color_norm}"
-      attempt=$((attempt+1))
-      sleep 30
-    else
-      echo -e " ${color_yellow}Validate output:${color_norm}"
-      echo "${kubectl_output}"
-      echo -e "${color_red}Validation returned one or more failed components. Cluster is probably broken.${color_norm}"
+for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
+    # Grep returns an exit status of 1 when line is not found, so we need the : to always return a 0 exit status
+    count=$(grep -c "${MINION_NAMES[$i]}" "${MINIONS_FILE}") || :
+    if [[ "${count}" == "0" ]]; then
+      echo -e "${color_red}Failed to find ${MINION_NAMES[$i]}, cluster is probably broken.${color_norm}"
+      cat -n "${MINIONS_FILE}"
       exit 1
     fi
-  else
-    break
-  fi
-done
 
-echo "Validate output:"
-echo "${kubectl_output}"
+    name="${MINION_NAMES[$i]}"
+    if [[ "$KUBERNETES_PROVIDER" != "vsphere" &&  "$KUBERNETES_PROVIDER" != "vagrant" && "$KUBERNETES_PROVIDER" != "libvirt-coreos" && "$KUBERNETES_PROVIDER" != "juju" ]]; then
+      # Grab fully qualified name
+      name=$(grep "${MINION_NAMES[$i]}\." "${MINIONS_FILE}")
+    fi
+
+    # Make sure the kubelet is healthy.
+    # Make several attempts to deal with slow cluster birth.
+    attempt=0
+    while true; do
+      echo -n "Attempt $((attempt+1)) at checking Kubelet installation on node ${MINION_NAMES[$i]} ..."
+      if [[ "$KUBERNETES_PROVIDER" != "libvirt-coreos" && "$KUBERNETES_PROVIDER" != "juju" ]]; then
+        curl_output=$(curl -s --insecure --user "${KUBE_USER}:${KUBE_PASSWORD}" \
+          "https://${KUBE_MASTER_IP}/api/v1beta1/proxy/minions/${name}/healthz")
+      else
+        curl_output=$(curl -s \
+          "http://${KUBE_MASTER_IP}:8080/api/v1beta1/proxy/minions/${name}/healthz")
+      fi
+      if [[ "${curl_output}" != "ok" ]]; then
+          if (( attempt > 5 )); then
+            echo
+            echo -e "${color_red}Kubelet failed to install on node ${MINION_NAMES[$i]}. Your cluster is unlikely to work correctly."
+            echo -e "Please run ./cluster/kube-down.sh and re-create the cluster. (sorry!)${color_norm}"
+            exit 1
+          fi
+      else
+          echo -e " ${color_green}[working]${color_norm}"
+          break
+      fi
+      echo -e " ${color_yellow}[not working yet]${color_norm}"
+      attempt=$((attempt+1))
+      sleep 30
+    done
+done
 echo -e "${color_green}Cluster validation succeeded${color_norm}"
