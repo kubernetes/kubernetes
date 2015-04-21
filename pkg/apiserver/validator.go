@@ -39,6 +39,9 @@ type Server struct {
 	Port        int
 	Path        string
 	EnableHTTPS bool
+
+	// Set if we should pass an HTTP Host header that is not Addr
+	HostHeader string
 }
 
 // validator is responsible for validating the cluster and serving
@@ -80,7 +83,17 @@ func (server *Server) DoServerCheck(rt http.RoundTripper) (probe.Result, string,
 		client = &http.Client{Transport: rt}
 	}
 
-	resp, err := client.Get(scheme + net.JoinHostPort(server.Addr, strconv.Itoa(server.Port)) + server.Path)
+	url := scheme + net.JoinHostPort(server.Addr, strconv.Itoa(server.Port)) + server.Path
+	request, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return probe.Unknown, "", err
+	}
+	// The golang http library connects based on the url host.
+	// we set the host header to the node name for the kubelet, so the kubelet can verify it.
+	if server.HostHeader != "" {
+		request.Host = server.HostHeader
+	}
+	resp, err := client.Do(request)
 	if err != nil {
 		return probe.Unknown, "", err
 	}
