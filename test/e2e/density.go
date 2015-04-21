@@ -24,10 +24,14 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/cache"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/controller/framework"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/wait"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 
 	"github.com/golang/glog"
 	. "github.com/onsi/ginkgo"
@@ -268,25 +272,42 @@ var _ = Describe("Density", func() {
 			nameStr := strconv.Itoa(totalPods) + "-" + uuid
 			ns = "e2e-density" + nameStr
 			RCName = "my-hostname-density" + nameStr
+
+			// Create a listener for events
+			events := make([](*api.Event), 0)
+			_, controller := framework.NewInformer(
+				&cache.ListWatch{
+					ListFunc: func() (runtime.Object, error) {
+						return c.Events(ns).List(labels.Everything(), fields.Everything())
+					},
+					WatchFunc: func(rv string) (watch.Interface, error) {
+						return c.Events(ns).Watch(labels.Everything(), fields.Everything(), rv)
+					},
+				},
+				&api.Event{},
+				time.Second*10,
+				framework.ResourceEventHandlerFuncs{
+					AddFunc: func(obj interface{}) {
+						events = append(events, obj.(*api.Event))
+					},
+				},
+			)
+			stop := make(chan struct{})
+			go controller.Run(stop)
+
+			// Start the replication controller
 			RunRC(c, RCName, ns, "gcr.io/google_containers/pause:go", totalPods)
 
 			By("Waiting for all events to be recorded")
 			last := -1
-			current := 0
-			var events *api.EventList
+			current := len(events)
 			timeout := 10 * time.Minute
 			for start := time.Now(); last < current && time.Since(start) < timeout; time.Sleep(10 * time.Second) {
-				e, err := c.Events(ns).List(
-					labels.Everything(),
-					fields.Set{
-						"involvedObject.namespace": ns,
-					}.AsSelector(),
-				)
-				expectNoError(err)
 				last = current
-				current = len(e.Items)
-				events = e
+				current = len(events)
 			}
+			close(stop)
+
 			if current != last {
 				Logf("Warning: Not all events were recorded after waiting %.2f minutes", timeout.Minutes())
 			}
@@ -294,7 +315,7 @@ var _ = Describe("Density", func() {
 
 			// Verify there were no pod killings or failures
 			By("Verifying there were no pod killings or failures")
-			for _, e := range events.Items {
+			for _, e := range events {
 				for _, s := range []string{"kill", "fail"} {
 					Expect(e.Reason).NotTo(ContainSubstring(s), "event:' %s', reason: '%s', message: '%s', field path: '%s'", e, e.ObjectMeta.Name, e.Message, e.InvolvedObject.FieldPath)
 				}
