@@ -61,8 +61,10 @@ base:
 {% if pillar.get('enable_node_logging', '').lower() == 'true' and pillar['logging_destination'] is defined %}
   {% if pillar['logging_destination'] == 'elasticsearch' %}
     - fluentd-es
+    - kube-proxy
   {% elif pillar['logging_destination'] == 'gcp' %}
     - fluentd-gcp
+    - kube-proxy
   {% endif %}
 {% endif %}
 
