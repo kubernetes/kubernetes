@@ -1,0 +1,97 @@
+<div dashboard-header></div>
+<div class="dashboard">
+  <div ng-controller="ServiceCtrl" layout="column" class="body-wrapper service">
+
+    <div class="detail">
+
+      <div class="back">
+        <md-button class="md-default-theme" ng-href="/#/dashboard/services">‹ BACK</md-button>
+      </div>
+
+      <div class="heading">
+        <span class="label">Service: </span>
+        <span>{{service.id}}</span>
+      </div>
+
+
+      <table>
+        <tbody>
+          <tr>
+            <td class="name">Created</td>
+            <td class="value">
+              {{service.creationTimestamp | date:'medium'}}
+            </td>
+          </tr>
+
+          <tr>
+            <td class="name">Port</td>
+            <td class="value">
+              {{service.port}}
+            </td>
+          </tr>
+
+          <tr>
+            <td class="name">Container Port</td>
+            <td class="value">
+              {{service.containerPort}}
+            </td>
+          </tr>
+
+          <tr>
+            <td class="name">Portal IP</td>
+            <td class="value">
+              {{service.portalIP}}
+            </td>
+          </tr>
+
+          <tr>
+            <td class="name">Protocol</td>
+            <td class="value">
+              {{service.protocol}}
+            </td>
+          </tr>
+
+          <tr>
+            <td class="name">Session Affinity</td>
+            <td class="value">
+              {{service.sessionAffinity}}
+            </td>
+          </tr>
+
+          <tr>
+            <td class="name">Labels</td>
+            <td class="value">
+              <div ng-repeat="(label, value) in service.labels">
+                {{label}}: {{value}}
+              </div>
+            </td>
+          </tr>
+
+          <tr>
+            <td class="name">Related Pods</td>
+            <td class="value">
+              <div ng-repeat="(label, value) in service.selector">
+                <a ng-href="/#/dashboard/groups/type/selector/{{label}}={{value}},type=pod">{{label}}: {{value}}</a>
+              </div>
+            </td>
+          </tr>
+
+          <tr>
+            <td class="name">Related Replication Controllers</td>
+            <td class="value">
+              <div ng-repeat="(label, value) in service.selector">
+                <a ng-href="/#/dashboard/groups/type/selector/{{label}}={{value}},type=replicationController">{{label}}: {{value}}</a>
+              </div>
+            </td>
+          </tr>
+
+        </tbody>
+      </table>
+
+
+
+    </div>
+
+  </div>
+</div>
+<div dashboard-footer></div>

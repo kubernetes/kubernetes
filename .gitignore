@@ -50,3 +50,6 @@ network_closure.sh
 .kubeconfig
 
 .tags*
+
+# Web UI
+www/master/node_modules/

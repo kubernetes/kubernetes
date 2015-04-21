@@ -1,0 +1,3 @@
+{
+  "appSkeleton": "var componentNamespaces = [%s];"
+}

@@ -1,0 +1,30 @@
+{
+  "name": "kubernetes-ui",
+  "description": "UI for Kubernetes",
+  "version": "0.0.0",
+  "homepage": "https://github.com/kubernetes-ui/kubernetes-ui",
+  "license": "Apache",
+  "private": true,
+  "dependencies": {
+    "jquery": "~2.1.3",
+    "angular": "1.3.x",
+    "angular-route": "1.3.x",
+    "angular-css": "1.0.x",
+    "angular-mocks": "1.3.x",
+    "angular-animate": "1.3.x",
+    "angular-aria": "1.3.x",
+    "angular-material": "0.8.1",
+    "angularjs-jasmine-matchers": "0.2",
+    "hammerjs": "~2.0.2",
+    "angular-cookies": "1.3.x",
+    "modernizr": "2.8.3",
+    "ng-lodash": "~0.2.0",
+    "string-format-js": "~0.1.2",
+    "sprintf": "~1.0.2",
+    "jsonpath": "#3f6e79e",
+    "d3": "~3.5.5",
+    "d3-context-menu": "",
+    "angular-json-human": "~1.2.1",
+    "angular-filter": "~0.5.1"
+  }
+}
