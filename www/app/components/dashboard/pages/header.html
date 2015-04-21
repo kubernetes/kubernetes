@@ -1,0 +1,20 @@
+<div layout-fill>
+<md-toolbar md-scroll-shrink class="dashboard-subnav">
+   <div class="md-toolbar-tools">
+      <div layout="row" flex class="fill-height">
+         <div class="md-toolbar-item md-breadcrumb"></div>
+         <span style="display: inline-block;">Kubernetes</span>
+         <span flex></span>
+         <div class="md-toolbar-item md-tools" layout="row">
+            <div layout="column" class="selectSubPages">
+               <md-select ng-model="page" placeholder="Views" class="selectTitle">
+                  <md-optgroup label="Dashboard">
+                  <md-option id="{{subpage.id}}" ng-value="subpage.value" ng-repeat="subpage in subpages | filter: {category: 'dashboard' }">{{subpage.name}}</md-option>
+                  </md-option-group>
+               </md-select>
+            </div>
+         </div>
+      </div>
+   </div>
+</md-toolbar>
+</div>

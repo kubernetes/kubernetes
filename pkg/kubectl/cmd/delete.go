@@ -87,7 +87,7 @@ func RunDelete(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []str
 		FilenameParam(filenames...).
 		SelectorParam(cmdutil.GetFlagString(cmd, "selector")).
 		SelectAllParam(cmdutil.GetFlagBool(cmd, "all")).
-		ResourceTypeOrNameArgs(false, args...).
+		ResourceTypeOrNameArgs(false, args...).RequireObject(false).
 		Flatten().
 		Do()
 	err = r.Err()

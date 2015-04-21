@@ -32,7 +32,7 @@ var _ = Describe("MasterCerts", func() {
 	})
 
 	It("should have all expected certs on the master", func() {
-		if testContext.Provider != "gce" && testContext.Provider != "gke" {
+		if !providerIs("gce", "gke") {
 			By(fmt.Sprintf("Skipping MasterCerts test for cloud provider %s (only supported for gce and gke)", testContext.Provider))
 			return
 		}

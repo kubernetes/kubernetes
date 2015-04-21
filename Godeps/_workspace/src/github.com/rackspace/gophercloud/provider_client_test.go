@@ -18,18 +18,18 @@ func TestAuthenticatedHeaders(t *testing.T) {
 func TestUserAgent(t *testing.T) {
 	p := &ProviderClient{}
 
-	p.UserAgent.Prepend("custom-user-agent/v2.4")
-	expected := "custom-user-agent/v2.4 gophercloud/v1.0"
+	p.UserAgent.Prepend("custom-user-agent/2.4.0")
+	expected := "custom-user-agent/2.4.0 gophercloud/1.0.0"
 	actual := p.UserAgent.Join()
 	th.CheckEquals(t, expected, actual)
 
-	p.UserAgent.Prepend("another-custom-user-agent/v0.3", "a-third-ua/v5.9")
-	expected = "another-custom-user-agent/v0.3 a-third-ua/v5.9 custom-user-agent/v2.4 gophercloud/v1.0"
+	p.UserAgent.Prepend("another-custom-user-agent/0.3.0", "a-third-ua/5.9.0")
+	expected = "another-custom-user-agent/0.3.0 a-third-ua/5.9.0 custom-user-agent/2.4.0 gophercloud/1.0.0"
 	actual = p.UserAgent.Join()
 	th.CheckEquals(t, expected, actual)
 
 	p.UserAgent = UserAgent{}
-	expected = "gophercloud/v1.0"
+	expected = "gophercloud/1.0.0"
 	actual = p.UserAgent.Join()
 	th.CheckEquals(t, expected, actual)
 }

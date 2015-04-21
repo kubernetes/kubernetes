@@ -35,6 +35,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/httpstream"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/httpstream/spdy"
+	"github.com/fsouza/go-dockerclient"
 	cadvisorApi "github.com/google/cadvisor/info/v1"
 )
 
@@ -44,10 +45,10 @@ type fakeKubelet struct {
 	containerInfoFunc                  func(podFullName string, uid types.UID, containerName string, req *cadvisorApi.ContainerInfoRequest) (*cadvisorApi.ContainerInfo, error)
 	rootInfoFunc                       func(query *cadvisorApi.ContainerInfoRequest) (*cadvisorApi.ContainerInfo, error)
 	machineInfoFunc                    func() (*cadvisorApi.MachineInfo, error)
-	podsFunc                           func() []api.Pod
+	podsFunc                           func() []*api.Pod
 	logFunc                            func(w http.ResponseWriter, req *http.Request)
 	runFunc                            func(podFullName string, uid types.UID, containerName string, cmd []string) ([]byte, error)
-	dockerVersionFunc                  func() ([]uint, error)
+	dockerVersionFunc                  func() (docker.APIVersion, error)
 	execFunc                           func(pod string, uid types.UID, container string, cmd []string, in io.Reader, out, err io.WriteCloser, tty bool) error
 	portForwardFunc                    func(name string, uid types.UID, port uint16, stream io.ReadWriteCloser) error
 	containerLogsFunc                  func(podFullName, containerName, tail string, follow bool, stdout, stderr io.Writer) error
@@ -71,7 +72,7 @@ func (fk *fakeKubelet) GetRootInfo(req *cadvisorApi.ContainerInfoRequest) (*cadv
 	return fk.rootInfoFunc(req)
 }
 
-func (fk *fakeKubelet) GetDockerVersion() ([]uint, error) {
+func (fk *fakeKubelet) GetDockerVersion() (docker.APIVersion, error) {
 	return fk.dockerVersionFunc()
 }
 
@@ -79,7 +80,7 @@ func (fk *fakeKubelet) GetCachedMachineInfo() (*cadvisorApi.MachineInfo, error) 
 	return fk.machineInfoFunc()
 }
 
-func (fk *fakeKubelet) GetPods() []api.Pod {
+func (fk *fakeKubelet) GetPods() []*api.Pod {
 	return fk.podsFunc()
 }
 
@@ -449,8 +450,8 @@ func TestPodsInfo(t *testing.T) {
 
 func TestHealthCheck(t *testing.T) {
 	fw := newServerTest()
-	fw.fakeKubelet.dockerVersionFunc = func() ([]uint, error) {
-		return []uint{1, 15}, nil
+	fw.fakeKubelet.dockerVersionFunc = func() (docker.APIVersion, error) {
+		return docker.NewAPIVersion("1.15")
 	}
 	fw.fakeKubelet.hostnameFunc = func() string {
 		return "127.0.0.1"
@@ -489,8 +490,8 @@ func TestHealthCheck(t *testing.T) {
 	}
 
 	//Test with old docker version
-	fw.fakeKubelet.dockerVersionFunc = func() ([]uint, error) {
-		return []uint{1, 1}, nil
+	fw.fakeKubelet.dockerVersionFunc = func() (docker.APIVersion, error) {
+		return docker.NewAPIVersion("1.1")
 	}
 
 	resp, err = http.Get(fw.testHTTPServer.URL + "/healthz")

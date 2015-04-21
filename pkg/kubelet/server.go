@@ -41,6 +41,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/flushwriter"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/httpstream"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/httpstream/spdy"
+	"github.com/fsouza/go-dockerclient"
 	"github.com/golang/glog"
 	cadvisorApi "github.com/google/cadvisor/info/v1"
 	"github.com/prometheus/client_golang/prometheus"
@@ -100,9 +101,9 @@ func ListenAndServeKubeletReadOnlyServer(host HostInterface, address net.IP, por
 type HostInterface interface {
 	GetContainerInfo(podFullName string, uid types.UID, containerName string, req *cadvisorApi.ContainerInfoRequest) (*cadvisorApi.ContainerInfo, error)
 	GetRootInfo(req *cadvisorApi.ContainerInfoRequest) (*cadvisorApi.ContainerInfo, error)
-	GetDockerVersion() ([]uint, error)
+	GetDockerVersion() (docker.APIVersion, error)
 	GetCachedMachineInfo() (*cadvisorApi.MachineInfo, error)
-	GetPods() []api.Pod
+	GetPods() []*api.Pod
 	GetPodByName(namespace, name string) (*api.Pod, bool)
 	GetPodStatus(name string) (api.PodStatus, error)
 	RunInContainer(name string, uid types.UID, container string, cmd []string) ([]byte, error)
@@ -159,31 +160,18 @@ func (s *Server) error(w http.ResponseWriter, err error) {
 	http.Error(w, msg, http.StatusInternalServerError)
 }
 
-func isValidDockerVersion(ver []uint) (bool, string) {
-	minAllowedVersion := []uint{1, 15}
-	for i := 0; i < len(ver) && i < len(minAllowedVersion); i++ {
-		if ver[i] != minAllowedVersion[i] {
-			if ver[i] < minAllowedVersion[i] {
-				versions := make([]string, len(ver))
-				for i, v := range ver {
-					versions[i] = fmt.Sprint(v)
-				}
-				return false, strings.Join(versions, ".")
-			}
-			return true, ""
-		}
-	}
-	return true, ""
+func isValidDockerVersion(ver docker.APIVersion) bool {
+	minAllowedVersion, _ := docker.NewAPIVersion("1.15")
+	return ver.GreaterThanOrEqualTo(minAllowedVersion)
 }
 
 func (s *Server) dockerHealthCheck(req *http.Request) error {
-	versions, err := s.host.GetDockerVersion()
+	version, err := s.host.GetDockerVersion()
 	if err != nil {
 		return errors.New("unknown Docker version")
 	}
-	valid, version := isValidDockerVersion(versions)
-	if !valid {
-		return fmt.Errorf("Docker version is too old (%v)", version)
+	if !isValidDockerVersion(version) {
+		return fmt.Errorf("Docker version is too old (%v)", version.String())
 	}
 	return nil
 }
@@ -279,8 +267,9 @@ func (s *Server) handleContainerLogs(w http.ResponseWriter, req *http.Request) {
 // handlePods returns a list of pod bound to the Kubelet and their spec
 func (s *Server) handlePods(w http.ResponseWriter, req *http.Request) {
 	pods := s.host.GetPods()
-	podList := &api.PodList{
-		Items: pods,
+	podList := new(api.PodList)
+	for _, pod := range pods {
+		podList.Items = append(podList.Items, *pod)
 	}
 	data, err := latest.Codec.Encode(podList)
 	if err != nil {

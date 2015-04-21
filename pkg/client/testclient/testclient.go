@@ -125,3 +125,7 @@ func (c *Fake) ServerAPIVersions() (*api.APIVersions, error) {
 	c.Actions = append(c.Actions, FakeAction{Action: "get-apiversions", Value: nil})
 	return &api.APIVersions{Versions: []string{"v1beta1", "v1beta2"}}, nil
 }
+
+func (c *Fake) ComponentStatuses() client.ComponentStatusInterface {
+	return &FakeComponentStatuses{Fake: c}
+}

@@ -208,7 +208,7 @@ func startComponents(firstManifestURL, secondManifestURL, apiVersion string) (st
 
 	endpoints := service.NewEndpointController(cl)
 	// ensure the service endpoints are sync'd several times within the window that the integration tests wait
-	go util.Forever(func() { endpoints.SyncServiceEndpoints() }, time.Second*4)
+	go endpoints.Run(3, util.NeverStop)
 
 	controllerManager := replicationControllerPkg.NewReplicationManager(cl)
 
@@ -285,7 +285,7 @@ func endpointsSet(c *client.Client, serviceNamespace, serviceID string, endpoint
 	return func() (bool, error) {
 		endpoints, err := c.Endpoints(serviceNamespace).Get(serviceID)
 		if err != nil {
-			glog.Infof("Error on creating endpoints: %v", err)
+			glog.Infof("Error getting endpoints: %v", err)
 			return false, nil
 		}
 		count := 0

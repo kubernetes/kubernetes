@@ -557,6 +557,14 @@ func TestPrintMinionStatus(t *testing.T) {
 		},
 		{
 			minion: api.Node{
+				ObjectMeta: api.ObjectMeta{Name: "foo2"},
+				Spec:       api.NodeSpec{Unschedulable: true},
+				Status:     api.NodeStatus{Conditions: []api.NodeCondition{{Type: api.NodeReady, Status: api.ConditionTrue}}},
+			},
+			status: "Ready,SchedulingDisabled",
+		},
+		{
+			minion: api.Node{
 				ObjectMeta: api.ObjectMeta{Name: "foo3"},
 				Status: api.NodeStatus{Conditions: []api.NodeCondition{
 					{Type: api.NodeReady, Status: api.ConditionTrue},
@@ -574,16 +582,40 @@ func TestPrintMinionStatus(t *testing.T) {
 		{
 			minion: api.Node{
 				ObjectMeta: api.ObjectMeta{Name: "foo5"},
+				Spec:       api.NodeSpec{Unschedulable: true},
+				Status:     api.NodeStatus{Conditions: []api.NodeCondition{{Type: api.NodeReady, Status: api.ConditionFalse}}},
+			},
+			status: "NotReady,SchedulingDisabled",
+		},
+		{
+			minion: api.Node{
+				ObjectMeta: api.ObjectMeta{Name: "foo6"},
 				Status:     api.NodeStatus{Conditions: []api.NodeCondition{{Type: "InvalidValue", Status: api.ConditionTrue}}},
 			},
 			status: "Unknown",
 		},
 		{
 			minion: api.Node{
-				ObjectMeta: api.ObjectMeta{Name: "foo6"},
+				ObjectMeta: api.ObjectMeta{Name: "foo7"},
 				Status:     api.NodeStatus{Conditions: []api.NodeCondition{{}}},
 			},
 			status: "Unknown",
+		},
+		{
+			minion: api.Node{
+				ObjectMeta: api.ObjectMeta{Name: "foo8"},
+				Spec:       api.NodeSpec{Unschedulable: true},
+				Status:     api.NodeStatus{Conditions: []api.NodeCondition{{Type: "InvalidValue", Status: api.ConditionTrue}}},
+			},
+			status: "Unknown,SchedulingDisabled",
+		},
+		{
+			minion: api.Node{
+				ObjectMeta: api.ObjectMeta{Name: "foo9"},
+				Spec:       api.NodeSpec{Unschedulable: true},
+				Status:     api.NodeStatus{Conditions: []api.NodeCondition{{}}},
+			},
+			status: "Unknown,SchedulingDisabled",
 		},
 	}
 

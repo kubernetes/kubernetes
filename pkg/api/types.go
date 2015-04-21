@@ -1705,6 +1705,10 @@ const (
 	ResourceReplicationControllers ResourceName = "replicationcontrollers"
 	// ResourceQuotas, number
 	ResourceQuotas ResourceName = "resourcequotas"
+	// ResourceSecrets, number
+	ResourceSecrets ResourceName = "secrets"
+	// ResourcePersistentVolumeClaims, number
+	ResourcePersistentVolumeClaims ResourceName = "persistentvolumeclaims"
 )
 
 // ResourceQuotaSpec defines the desired hard limits to enforce for Quota
@@ -1826,4 +1830,34 @@ func AddToNodeAddresses(addresses *[]NodeAddress, addAddresses ...NodeAddress) {
 			*addresses = append(*addresses, add)
 		}
 	}
+}
+
+// Type and constants for component health validation.
+type ComponentConditionType string
+
+// These are the valid conditions for the component.
+const (
+	ComponentHealthy ComponentConditionType = "Healthy"
+)
+
+type ComponentCondition struct {
+	Type    ComponentConditionType `json:"type"`
+	Status  ConditionStatus        `json:"status"`
+	Message string                 `json:"message,omitempty"`
+	Error   string                 `json:"error,omitempty"`
+}
+
+// ComponentStatus (and ComponentStatusList) holds the cluster validation info.
+type ComponentStatus struct {
+	TypeMeta   `json:",inline"`
+	ObjectMeta `json:"metadata,omitempty"`
+
+	Conditions []ComponentCondition `json:"conditions,omitempty"`
+}
+
+type ComponentStatusList struct {
+	TypeMeta `json:",inline"`
+	ListMeta `json:"metadata,omitempty"`
+
+	Items []ComponentStatus `json:"items"`
 }

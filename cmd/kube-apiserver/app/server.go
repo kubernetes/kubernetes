@@ -24,6 +24,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"path"
 	"regexp"
 	"strconv"
 	"strings"
@@ -56,6 +57,7 @@ type APIServer struct {
 	APIBurst                   int
 	TLSCertFile                string
 	TLSPrivateKeyFile          string
+	CertDirectory              string
 	APIPrefix                  string
 	StorageVersion             string
 	CloudProvider              string
@@ -99,6 +101,7 @@ func NewAPIServer() *APIServer {
 		EnableLogsSupport:      true,
 		MasterServiceNamespace: api.NamespaceDefault,
 		ClusterName:            "kubernetes",
+		CertDirectory:          "/var/run/kubernetes",
 
 		RuntimeConfig: make(util.ConfigurationMap),
 		KubeletConfig: client.KubeletConfig{
@@ -143,6 +146,8 @@ func (s *APIServer) AddFlags(fs *pflag.FlagSet) {
 		"If HTTPS serving is enabled, and --tls_cert_file and --tls_private_key_file are not provided, "+
 		"a self-signed certificate and key are generated for the public address and saved to /var/run/kubernetes.")
 	fs.StringVar(&s.TLSPrivateKeyFile, "tls_private_key_file", s.TLSPrivateKeyFile, "File containing x509 private key matching --tls_cert_file.")
+	fs.StringVar(&s.CertDirectory, "cert_dir", s.CertDirectory, "The directory where the TLS certs are located (by default /var/run/kubernetes). "+
+		"If --tls_cert_file and --tls_private_key_file are provided, this flag will be ignored.")
 	fs.StringVar(&s.APIPrefix, "api_prefix", s.APIPrefix, "The prefix for API requests on the server. Default '/api'.")
 	fs.StringVar(&s.StorageVersion, "storage_version", s.StorageVersion, "The version to store resources with. Defaults to server preferred")
 	fs.StringVar(&s.CloudProvider, "cloud_provider", s.CloudProvider, "The provider for cloud services.  Empty string for no provider.")
@@ -368,8 +373,8 @@ func (s *APIServer) Run(_ []string) error {
 			defer util.HandleCrash()
 			for {
 				if s.TLSCertFile == "" && s.TLSPrivateKeyFile == "" {
-					s.TLSCertFile = "/var/run/kubernetes/apiserver.crt"
-					s.TLSPrivateKeyFile = "/var/run/kubernetes/apiserver.key"
+					s.TLSCertFile = path.Join(s.CertDirectory, "apiserver.crt")
+					s.TLSPrivateKeyFile = path.Join(s.CertDirectory, "apiserver.key")
 					if err := util.GenerateSelfSignedCert(config.PublicAddress.String(), s.TLSCertFile, s.TLSPrivateKeyFile); err != nil {
 						glog.Errorf("Unable to generate self signed cert: %v", err)
 					} else {

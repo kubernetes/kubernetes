@@ -21,6 +21,9 @@ PIDFILE=/var/run/$NAME.pid
 SCRIPTNAME=/etc/init.d/$NAME
 KUBE_ADDONS_SH=/etc/kubernetes/kube-addons.sh
 
+# Read configuration variable file if it is present
+[ -r /etc/default/$NAME ] && . /etc/default/$NAME
+
 # Define LSB log_* functions.
 # Depend on lsb-base (>= 3.2-14) to ensure that this file is present
 # and status_of_proc is working.

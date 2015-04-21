@@ -34,9 +34,9 @@ func NewSourceApiserver(c *client.Client, hostname string, updates chan<- interf
 // newSourceApiserverFromLW holds creates a config source that watches and pulls from the apiserver.
 func newSourceApiserverFromLW(lw cache.ListerWatcher, updates chan<- interface{}) {
 	send := func(objs []interface{}) {
-		var pods []api.Pod
+		var pods []*api.Pod
 		for _, o := range objs {
-			pods = append(pods, *o.(*api.Pod))
+			pods = append(pods, o.(*api.Pod))
 		}
 		updates <- kubelet.PodUpdate{pods, kubelet.SET, kubelet.ApiserverSource}
 	}

@@ -12,7 +12,7 @@ import (
 	"github.com/rackspace/gophercloud/openstack/compute/v2/servers"
 	th "github.com/rackspace/gophercloud/testhelper"
 
-	"code.google.com/p/go.crypto/ssh"
+	"golang.org/x/crypto/ssh"
 )
 
 const keyName = "gophercloud_test_key_pair"

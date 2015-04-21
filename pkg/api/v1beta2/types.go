@@ -1578,6 +1578,10 @@ const (
 	ResourceReplicationControllers ResourceName = "replicationcontrollers"
 	// ResourceQuotas, number
 	ResourceQuotas ResourceName = "resourcequotas"
+	// ResourceSecrets, number
+	ResourceSecrets ResourceName = "secrets"
+	// ResourcePersistentVolumeClaims, number
+	ResourcePersistentVolumeClaims ResourceName = "persistentvolumeclaims"
 )
 
 // ResourceQuotaSpec defines the desired hard limits to enforce for Quota
@@ -1654,4 +1658,33 @@ type SecretList struct {
 	TypeMeta `json:",inline"`
 
 	Items []Secret `json:"items" description:"items is a list of secret objects"`
+}
+
+// Type and constants for component health validation.
+type ComponentConditionType string
+
+// These are the valid conditions for the component.
+const (
+	ComponentHealthy ComponentConditionType = "Healthy"
+)
+
+type ComponentCondition struct {
+	Type    ComponentConditionType `json:"type" description:"type of component condition, currently only Healthy"`
+	Status  ConditionStatus        `json:"status" description:"current status of this component condition, one of True, False, Unknown"`
+	Message string                 `json:"message,omitempty" description:"health check message received from the component"`
+	Error   string                 `json:"error,omitempty" description:"error code from health check attempt (if any)"`
+}
+
+// ComponentStatus (and ComponentStatusList) holds the cluster validation info.
+type ComponentStatus struct {
+	TypeMeta `json:",inline"`
+
+	Name       string               `json:"name,omitempty" description:"name of the component"`
+	Conditions []ComponentCondition `json:"conditions,omitempty" description:"list of component conditions observed"`
+}
+
+type ComponentStatusList struct {
+	TypeMeta `json:",inline"`
+
+	Items []ComponentStatus `json:"items" description:"list of component status objects"`
 }

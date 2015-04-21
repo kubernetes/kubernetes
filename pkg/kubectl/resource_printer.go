@@ -256,6 +256,7 @@ var namespaceColumns = []string{"NAME", "LABELS", "STATUS"}
 var secretColumns = []string{"NAME", "DATA"}
 var persistentVolumeColumns = []string{"NAME", "LABELS", "CAPACITY", "ACCESSMODES", "STATUS", "CLAIM"}
 var persistentVolumeClaimColumns = []string{"NAME", "LABELS", "STATUS", "VOLUME"}
+var componentStatusColumns = []string{"NAME", "STATUS", "MESSAGE", "ERROR"}
 
 // addDefaultHandlers adds print handlers for default Kubernetes types.
 func (h *HumanReadablePrinter) addDefaultHandlers() {
@@ -284,6 +285,8 @@ func (h *HumanReadablePrinter) addDefaultHandlers() {
 	h.Handler(persistentVolumeClaimColumns, printPersistentVolumeClaimList)
 	h.Handler(persistentVolumeColumns, printPersistentVolume)
 	h.Handler(persistentVolumeColumns, printPersistentVolumeList)
+	h.Handler(componentStatusColumns, printComponentStatus)
+	h.Handler(componentStatusColumns, printComponentStatusList)
 }
 
 func (h *HumanReadablePrinter) unknown(data []byte, w io.Writer) error {
@@ -503,12 +506,6 @@ func printNode(node *api.Node, w io.Writer) error {
 		cond := node.Status.Conditions[i]
 		conditionMap[cond.Type] = &cond
 	}
-	var schedulable string
-	if node.Spec.Unschedulable {
-		schedulable = "Unschedulable"
-	} else {
-		schedulable = "Schedulable"
-	}
 	var status []string
 	for _, validCondition := range NodeAllConditions {
 		if condition, ok := conditionMap[validCondition]; ok {
@@ -522,7 +519,10 @@ func printNode(node *api.Node, w io.Writer) error {
 	if len(status) == 0 {
 		status = append(status, "Unknown")
 	}
-	_, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", node.Name, schedulable, formatLabels(node.Labels), strings.Join(status, ","))
+	if node.Spec.Unschedulable {
+		status = append(status, "SchedulingDisabled")
+	}
+	_, err := fmt.Fprintf(w, "%s\t%s\t%s\n", node.Name, formatLabels(node.Labels), strings.Join(status, ","))
 	return err
 }
 
@@ -644,6 +644,36 @@ func printResourceQuotaList(list *api.ResourceQuotaList, w io.Writer) error {
 			return err
 		}
 	}
+	return nil
+}
+
+func printComponentStatus(item *api.ComponentStatus, w io.Writer) error {
+	status := "Unknown"
+	message := ""
+	error := ""
+	for _, condition := range item.Conditions {
+		if condition.Type == api.ComponentHealthy {
+			if condition.Status == api.ConditionTrue {
+				status = "Healthy"
+			} else {
+				status = "Unhealthy"
+			}
+			message = condition.Message
+			error = condition.Error
+			break
+		}
+	}
+	_, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", item.Name, status, message, error)
+	return err
+}
+
+func printComponentStatusList(list *api.ComponentStatusList, w io.Writer) error {
+	for _, item := range list.Items {
+		if err := printComponentStatus(&item, w); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 

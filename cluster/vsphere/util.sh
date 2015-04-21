@@ -21,6 +21,7 @@
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
 source "${KUBE_ROOT}/cluster/vsphere/config-common.sh"
 source "${KUBE_ROOT}/cluster/vsphere/${KUBE_CONFIG_FILE-"config-default.sh"}"
+source "${KUBE_ROOT}/cluster/common.sh"
 
 # Detect the IP for the master
 #
@@ -169,29 +170,17 @@ function upload-server-tars {
 }
 
 # Ensure that we have a password created for validating to the master. Will
-# read from $HOME/.kubernetes_auth if available.
+# read from kubeconfig if available.
 #
 # Vars set:
 #   KUBE_USER
 #   KUBE_PASSWORD
 function get-password {
-  local file="$HOME/.kubernetes_auth"
-  if [[ -r "$file" ]]; then
-    KUBE_USER=$(cat "$file" | python -c 'import json,sys;print json.load(sys.stdin)["User"]')
-    KUBE_PASSWORD=$(cat "$file" | python -c 'import json,sys;print json.load(sys.stdin)["Password"]')
-    return
+  get-kubeconfig-basicauth
+  if [[ -z "${KUBE_USER}" || -z "${KUBE_PASSWORD}" ]]; then
+    KUBE_USER=admin
+    KUBE_PASSWORD=$(python -c 'import string,random; print "".join(random.SystemRandom().choice(string.ascii_letters + string.digits) for _ in range(16))')
   fi
-  KUBE_USER=admin
-  KUBE_PASSWORD=$(python -c 'import string,random; print "".join(random.SystemRandom().choice(string.ascii_letters + string.digits) for _ in range(16))')
-
-  # Store password for reuse.
-  cat << EOF > "$file"
-{
-  "User": "$KUBE_USER",
-  "Password": "$KUBE_PASSWORD"
-}
-EOF
-  chmod 0600 "$file"
 }
 
 # Run command over ssh
@@ -372,6 +361,24 @@ function kube-up {
     printf " OK\n"
   done
 
+  echo "Kubernetes cluster created."
+
+  # TODO use token instead of basic auth
+  export KUBE_CERT="/tmp/$RANDOM-kubecfg.crt"
+  export KUBE_KEY="/tmp/$RANDOM-kubecfg.key"
+  export CA_CERT="/tmp/$RANDOM-kubernetes.ca.crt"
+  export CONTEXT="vsphere_${INSTANCE_PREFIX}"
+
+  (
+    umask 077
+
+    kube-ssh "${KUBE_MASTER_IP}" sudo cat /srv/kubernetes/kubecfg.crt >"${KUBE_CERT}" 2>/dev/null
+    kube-ssh "${KUBE_MASTER_IP}" sudo cat /srv/kubernetes/kubecfg.key >"${KUBE_KEY}" 2>/dev/null
+    kube-ssh "${KUBE_MASTER_IP}" sudo cat /srv/kubernetes/ca.crt >"${CA_CERT}" 2>/dev/null
+
+    create-kubeconfig
+  )
+
   echo
   echo "Sanity checking cluster..."
 
@@ -394,33 +401,8 @@ function kube-up {
   echo
   echo "  https://${KUBE_MASTER_IP}"
   echo
-  echo "The user name and password to use is located in ~/.kubernetes_auth."
+  echo "The user name and password to use is located in ${KUBECONFIG}"
   echo
-
-  local kube_cert=".kubecfg.crt"
-  local kube_key=".kubecfg.key"
-  local ca_cert=".kubernetes.ca.crt"
-
-  (
-    umask 077
-
-    kube-ssh "${KUBE_MASTER_IP}" sudo cat /srv/kubernetes/kubecfg.crt >"${HOME}/${kube_cert}" 2>/dev/null
-    kube-ssh "${KUBE_MASTER_IP}" sudo cat /srv/kubernetes/kubecfg.key >"${HOME}/${kube_key}" 2>/dev/null
-    kube-ssh "${KUBE_MASTER_IP}" sudo cat /srv/kubernetes/ca.crt >"${HOME}/${ca_cert}" 2>/dev/null
-
-    cat << EOF > ~/.kubernetes_auth
-    {
-      "User": "$KUBE_USER",
-      "Password": "$KUBE_PASSWORD",
-      "CAFile": "$HOME/$ca_cert",
-      "CertFile": "$HOME/$kube_cert",
-      "KeyFile": "$HOME/$kube_key"
-    }
-EOF
-
-    chmod 0600 ~/.kubernetes_auth "${HOME}/${kube_cert}" \
-      "${HOME}/${kube_key}" "${HOME}/${ca_cert}"
-  )
 }
 
 # Delete a kubernetes cluster

@@ -23,7 +23,6 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
-	"strings"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
@@ -34,6 +33,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/endpoint"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/minion"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/fielderrors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 	"github.com/golang/glog"
@@ -206,14 +206,9 @@ var _ = rest.Redirector(&REST{})
 // ResourceLocation returns a URL to which one can send traffic for the specified service.
 func (rs *REST) ResourceLocation(ctx api.Context, id string) (*url.URL, http.RoundTripper, error) {
 	// Allow ID as "svcname" or "svcname:port".
-	parts := strings.Split(id, ":")
-	if len(parts) > 2 {
+	svcName, portStr, valid := util.SplitPort(id)
+	if !valid {
 		return nil, nil, errors.NewBadRequest(fmt.Sprintf("invalid service request %q", id))
-	}
-	svcName := parts[0]
-	portStr := ""
-	if len(parts) == 2 {
-		portStr = parts[1]
 	}
 
 	eps, err := rs.endpoints.GetEndpoints(ctx, svcName)

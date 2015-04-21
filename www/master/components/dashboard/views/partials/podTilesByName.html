@@ -1,0 +1,34 @@
+
+<md-grid-list class="list-color-{{$index + 1}}" md-cols="6" md-row-height="1:1" md-gutter="8px" ng-repeat="(podName, groupPods) in podsByName">
+  <md-grid-tile md-rowspan="2" md-colspan="2" class="colored">
+    <md-grid-tile-footer>
+      <div class="pod-title"><h2>{{podName}} overview</h2></div>
+    </md-grid-tile-footer>
+  </md-grid-tile>
+
+  <md-grid-tile class="colored {{podStatusClass(pod)}}" md-rowspan="1" md-colspan="1" ng-repeat="pod in groupPods" >
+    <md-grid-tile-header class="clear-bg">
+
+      <div layout="row">
+        <div class="labels"><span ng-repeat="(label, value) in otherLabels(pod.labels)">{{label}}: {{value}}<span ng-show="!$last">, </span></span></div>
+
+        <div flex="20" class="restarts" ng-show="getPodRestarts(pod) > 0">
+          <md-button class="md-fab restart-button">
+              {{getPodRestarts(pod)}}
+          </md-button>
+        </div>
+      </div>
+
+    </md-grid-tile-header>
+    <div class="inner-box">
+
+      <div ng-show="podStatusClass(pod)">Status: {{pod.currentState.status}}</div>
+    </div>
+    <md-grid-tile-footer>
+
+      <div class="pod-host">{{pod.currentState.host}}</div>
+      <div><a ng-href="/#/dashboard/pods/{{ pod.id }}"><h3>{{ pod.id }}</h3></a></div>
+
+    </md-grid-tile-footer>
+  </md-grid-tile>
+</md-grid-list>

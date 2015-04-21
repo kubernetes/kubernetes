@@ -21,6 +21,7 @@
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
 source "${KUBE_ROOT}/cluster/azure/${KUBE_CONFIG_FILE-"config-default.sh"}"
+source "${KUBE_ROOT}/cluster/common.sh"
 
 function azure_call {
     local -a params=()
@@ -242,30 +243,17 @@ function detect-master () {
 }
 
 # Ensure that we have a password created for validating to the master.  Will
-# read from $HOME/.kubernetres_auth if available.
+# read from kubeconfig current-context if available.
 #
 # Vars set:
 #   KUBE_USER
 #   KUBE_PASSWORD
 function get-password {
-    local file="$HOME/.kubernetes_auth"
-    if [[ -r "$file" ]]; then
-        KUBE_USER=$(cat "$file" | python -c 'import json,sys;print json.load(sys.stdin)["User"]')
-        KUBE_PASSWORD=$(cat "$file" | python -c 'import json,sys;print json.load(sys.stdin)["Password"]')
-        return
-    fi
+  get-kubeconfig-basicauth
+  if [[ -z "${KUBE_USER}" || -z "${KUBE_PASSWORD}" ]]; then
     KUBE_USER=admin
     KUBE_PASSWORD=$(python -c 'import string,random; print "".join(random.SystemRandom().choice(string.ascii_letters + string.digits) for _ in range(16))')
-
-    # Remove this code, since in all use cases I can see, we are overwriting this
-    # at cluster creation time.
-    cat << EOF > "$file"
-{
-  "User": "$KUBE_USER",
-  "Password": "$KUBE_PASSWORD"
-}
-EOF
-    chmod 0600 "$file"
+  fi
 }
 
 # Generate authentication token for admin user. Will
@@ -432,32 +420,22 @@ function kube-up {
     printf "\n"
     echo "Kubernetes cluster created."
 
-    local kube_cert=".kubecfg.crt"
-    local kube_key=".kubecfg.key"
-    local ca_cert=".kubernetes.ca.crt"
+    export KUBE_CERT="/tmp/$RANDOM-kubecfg.crt"
+    export KUBE_KEY="/tmp/$RANDOM-kubecfg.key"
+    export CA_CERT="/tmp/$RANDOM-kubernetes.ca.crt"
+    export CONTEXT="azure_${INSTANCE_PREFIX}"
 
     # TODO: generate ADMIN (and KUBELET) tokens and put those in the master's
     # config file.  Distribute the same way the htpasswd is done.
 (umask 077
     ssh -oStrictHostKeyChecking=no -i $AZ_SSH_KEY -p 22000 $AZ_CS.cloudapp.net \
-        sudo cat /srv/kubernetes/kubecfg.crt >"${HOME}/${kube_cert}" 2>/dev/null
+        sudo cat /srv/kubernetes/kubecfg.crt >"${KUBE_CERT}" 2>/dev/null
     ssh -oStrictHostKeyChecking=no -i $AZ_SSH_KEY -p 22000 $AZ_CS.cloudapp.net \
-        sudo cat /srv/kubernetes/kubecfg.key >"${HOME}/${kube_key}" 2>/dev/null
+        sudo cat /srv/kubernetes/kubecfg.key >"${KUBE_KEY}" 2>/dev/null
     ssh -oStrictHostKeyChecking=no -i $AZ_SSH_KEY -p 22000 $AZ_CS.cloudapp.net \
-        sudo cat /srv/kubernetes/ca.crt >"${HOME}/${ca_cert}" 2>/dev/null
+        sudo cat /srv/kubernetes/ca.crt >"${CA_CERT}" 2>/dev/null
 
-    cat << EOF > ~/.kubernetes_auth
-{
-  "User": "$KUBE_USER",
-  "Password": "$KUBE_PASSWORD",
-  "CAFile": "$HOME/$ca_cert",
-  "CertFile": "$HOME/$kube_cert",
-  "KeyFile": "$HOME/$kube_key"
-}
-EOF
-
-    chmod 0600 ~/.kubernetes_auth "${HOME}/${kube_cert}" \
-        "${HOME}/${kube_key}" "${HOME}/${ca_cert}"
+    create-kubeconfig
 )
 
     # Wait for salt on the minions
@@ -482,7 +460,7 @@ EOF
     echo
     echo "  https://${KUBE_MASTER_IP}"
     echo
-    echo "The user name and password to use is located in ~/.kubernetes_auth."
+    echo "The user name and password to use is located in ${KUBECONFIG}."
     echo
 }
 

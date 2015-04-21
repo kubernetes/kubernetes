@@ -1,0 +1,125 @@
+.server-overview {
+  @import (multiple) "colors";
+
+  .color-1 {
+    background-color: #512DA8;
+    border-color: #512DA8;
+    fill: #512DA8;
+    stroke: #512DA8;
+  }
+
+  .color-2 {
+    background-color: #9C27B0;
+    border-color: #9C27B0;
+    fill: #9C27B0;
+    stroke: #9C27B0;
+  }
+
+  .color-3 {
+    background-color: #00BCD4;
+    border-color: #00BCD4;
+    fill: #00BCD4;
+    stroke: #00BCD4;
+  }
+
+  .color-max-1 {
+    background-color: lighten(#512DA8, 40%);
+    border-color: lighten(#512DA8, 40%);
+    fill: lighten(#512DA8, 40%);
+    // stroke: lighten(#512DA8, 40%);
+  }
+
+  .color-max-2 {
+    background-color: lighten(#9C27B0, 40%);
+    border-color: lighten(#9C27B0, 40%);
+    fill: lighten(#9C27B0, 40%);
+    // stroke: lighten(#9C27B0, 40%);
+  }
+
+  .color-max-3 {
+    background-color: lighten(#00BCD4, 40%);
+    border-color: lighten(#00BCD4, 40%);
+    fill: lighten(#00BCD4, 40%);
+    // stroke: lighten(#00BCD4, 40%);
+  }
+
+  .color-max-warning {
+    background-color: lighten(@warningColor, 30%) !important;
+    border-color: lighten(@warningColor, 30%) !important;
+    fill: lighten(@warningColor, 30%) !important;
+    // stroke: lighten(@warningColor, 30%) !important;
+  }
+
+  .color-max-critical {
+    background-color: lighten(@criticalColor, 30%) !important;
+    border-color: lighten(@criticalColor, 30%) !important;
+    fill: lighten(@criticalColor, 30%) !important;
+    // stroke: lighten(@criticalColor, 30%) !important;
+  }
+
+  .max_tick_arc {
+    stroke: #FFF !important;
+  }
+
+  .concentric {
+    // float:left;
+    // border: 0px; /* solid black; */
+  }
+  // Chart
+  .concentricchart {
+
+    .bg-circle {
+      background: #F9F9F9;
+      fill: #F9F9F9;
+      stroke: #FFFFFF;
+      stroke-width: 1px;
+    }
+    path {
+      // stroke: #FFFFFF;
+      // stroke-width: 1px;
+      // opacity:0.8;
+    }
+    text {
+      font-size:12px;
+      font-family: 'Roboto', sans-serif;
+    }
+
+    .value_group {
+      fill: white;
+    }
+
+    .legend_group rect {
+      // stroke: #cccccc;
+      // stroke-width: 1px;
+      opacity:0.8;
+    }
+  }
+
+  svg.legend {
+    height: 115px;
+
+    text {
+      font-size:12px;
+      font-family: 'Roboto', sans-serif;
+    }
+
+    .hostName {
+      font-size:16px;
+    }
+
+    .rect {
+
+    }
+
+  }
+
+  .minion-name {
+    text-align: center;
+    vertical-align: bottom;
+    width: 100%;
+  }
+  .chart_area {
+    width: 325px;
+    height: 425px;
+  }
+}

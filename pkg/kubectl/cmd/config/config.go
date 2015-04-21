@@ -186,7 +186,7 @@ func (o *PathOptions) GetExplicitFile() string {
 // ModifyConfig takes a Config object, iterates through Clusters, AuthInfos, and Contexts, uses the LocationOfOrigin if specified or
 // uses the default destination file to write the results into.  This results in multiple file reads, but it's very easy to follow.
 // Preferences and CurrentContext should always be set in the default destination file.  Since we can't distinguish between empty and missing values
-// (no nil strings), we're forced have separate handling for them.  In all the currently known cases, newConfig should have, at most, one difference,
+// (no nil strings), we're forced have separate handling for them.  In the kubeconfig cases, newConfig should have at most one difference,
 // that means that this code will only write into a single file.
 func ModifyConfig(configAccess ConfigAccess, newConfig clientcmdapi.Config) error {
 	startingConfig, err := configAccess.GetStartingConfig()
@@ -194,124 +194,123 @@ func ModifyConfig(configAccess ConfigAccess, newConfig clientcmdapi.Config) erro
 		return err
 	}
 
-	// at this point, config and startingConfig should have, at most, one difference.  We need to chase the difference until we find it
-	// then we'll build a partial config object to call write upon.  Special case the test for current context and preferences since those
-	// always write to the default file.
-	switch {
-	case reflect.DeepEqual(*startingConfig, newConfig):
+	// We need to find all differences, locate their original files, read a partial config to modify only that stanza and write out the file.
+	// Special case the test for current context and preferences since those always write to the default file.
+	if reflect.DeepEqual(*startingConfig, newConfig) {
 		// nothing to do
+		return nil
+	}
 
-	case startingConfig.CurrentContext != newConfig.CurrentContext:
+	if startingConfig.CurrentContext != newConfig.CurrentContext {
 		if err := writeCurrentContext(configAccess, newConfig.CurrentContext); err != nil {
 			return err
 		}
+	}
 
-	case !reflect.DeepEqual(startingConfig.Preferences, newConfig.Preferences):
+	if !reflect.DeepEqual(startingConfig.Preferences, newConfig.Preferences) {
 		if err := writePreferences(configAccess, newConfig.Preferences); err != nil {
 			return err
 		}
+	}
 
-	default:
-		// something is different. Search every cluster, authInfo, and context.  First from new to old for differences, then from old to new for deletions
-		for key, cluster := range newConfig.Clusters {
-			startingCluster, exists := startingConfig.Clusters[key]
-			if !reflect.DeepEqual(cluster, startingCluster) || !exists {
-				destinationFile := cluster.LocationOfOrigin
-				if len(destinationFile) == 0 {
-					destinationFile = configAccess.GetDefaultFilename()
-				}
+	// Search every cluster, authInfo, and context.  First from new to old for differences, then from old to new for deletions
+	for key, cluster := range newConfig.Clusters {
+		startingCluster, exists := startingConfig.Clusters[key]
+		if !reflect.DeepEqual(cluster, startingCluster) || !exists {
+			destinationFile := cluster.LocationOfOrigin
+			if len(destinationFile) == 0 {
+				destinationFile = configAccess.GetDefaultFilename()
+			}
 
-				configToWrite := getConfigFromFileOrDie(destinationFile)
-				configToWrite.Clusters[key] = cluster
+			configToWrite := getConfigFromFileOrDie(destinationFile)
+			configToWrite.Clusters[key] = cluster
 
-				if err := clientcmd.WriteToFile(*configToWrite, destinationFile); err != nil {
-					return err
-				}
+			if err := clientcmd.WriteToFile(*configToWrite, destinationFile); err != nil {
+				return err
 			}
 		}
+	}
 
-		for key, context := range newConfig.Contexts {
-			startingContext, exists := startingConfig.Contexts[key]
-			if !reflect.DeepEqual(context, startingContext) || !exists {
-				destinationFile := context.LocationOfOrigin
-				if len(destinationFile) == 0 {
-					destinationFile = configAccess.GetDefaultFilename()
-				}
+	for key, context := range newConfig.Contexts {
+		startingContext, exists := startingConfig.Contexts[key]
+		if !reflect.DeepEqual(context, startingContext) || !exists {
+			destinationFile := context.LocationOfOrigin
+			if len(destinationFile) == 0 {
+				destinationFile = configAccess.GetDefaultFilename()
+			}
 
-				configToWrite := getConfigFromFileOrDie(destinationFile)
-				configToWrite.Contexts[key] = context
+			configToWrite := getConfigFromFileOrDie(destinationFile)
+			configToWrite.Contexts[key] = context
 
-				if err := clientcmd.WriteToFile(*configToWrite, destinationFile); err != nil {
-					return err
-				}
+			if err := clientcmd.WriteToFile(*configToWrite, destinationFile); err != nil {
+				return err
 			}
 		}
+	}
 
-		for key, authInfo := range newConfig.AuthInfos {
-			startingAuthInfo, exists := startingConfig.AuthInfos[key]
-			if !reflect.DeepEqual(authInfo, startingAuthInfo) || !exists {
-				destinationFile := authInfo.LocationOfOrigin
-				if len(destinationFile) == 0 {
-					destinationFile = configAccess.GetDefaultFilename()
-				}
+	for key, authInfo := range newConfig.AuthInfos {
+		startingAuthInfo, exists := startingConfig.AuthInfos[key]
+		if !reflect.DeepEqual(authInfo, startingAuthInfo) || !exists {
+			destinationFile := authInfo.LocationOfOrigin
+			if len(destinationFile) == 0 {
+				destinationFile = configAccess.GetDefaultFilename()
+			}
 
-				configToWrite := getConfigFromFileOrDie(destinationFile)
-				configToWrite.AuthInfos[key] = authInfo
+			configToWrite := getConfigFromFileOrDie(destinationFile)
+			configToWrite.AuthInfos[key] = authInfo
 
-				if err := clientcmd.WriteToFile(*configToWrite, destinationFile); err != nil {
-					return err
-				}
+			if err := clientcmd.WriteToFile(*configToWrite, destinationFile); err != nil {
+				return err
 			}
 		}
+	}
 
-		for key, cluster := range startingConfig.Clusters {
-			if _, exists := newConfig.Clusters[key]; !exists {
-				destinationFile := cluster.LocationOfOrigin
-				if len(destinationFile) == 0 {
-					destinationFile = configAccess.GetDefaultFilename()
-				}
+	for key, cluster := range startingConfig.Clusters {
+		if _, exists := newConfig.Clusters[key]; !exists {
+			destinationFile := cluster.LocationOfOrigin
+			if len(destinationFile) == 0 {
+				destinationFile = configAccess.GetDefaultFilename()
+			}
 
-				configToWrite := getConfigFromFileOrDie(destinationFile)
-				delete(configToWrite.Clusters, key)
+			configToWrite := getConfigFromFileOrDie(destinationFile)
+			delete(configToWrite.Clusters, key)
 
-				if err := clientcmd.WriteToFile(*configToWrite, destinationFile); err != nil {
-					return err
-				}
+			if err := clientcmd.WriteToFile(*configToWrite, destinationFile); err != nil {
+				return err
 			}
 		}
+	}
 
-		for key, context := range startingConfig.Contexts {
-			if _, exists := newConfig.Contexts[key]; !exists {
-				destinationFile := context.LocationOfOrigin
-				if len(destinationFile) == 0 {
-					destinationFile = configAccess.GetDefaultFilename()
-				}
+	for key, context := range startingConfig.Contexts {
+		if _, exists := newConfig.Contexts[key]; !exists {
+			destinationFile := context.LocationOfOrigin
+			if len(destinationFile) == 0 {
+				destinationFile = configAccess.GetDefaultFilename()
+			}
 
-				configToWrite := getConfigFromFileOrDie(destinationFile)
-				delete(configToWrite.Contexts, key)
+			configToWrite := getConfigFromFileOrDie(destinationFile)
+			delete(configToWrite.Contexts, key)
 
-				if err := clientcmd.WriteToFile(*configToWrite, destinationFile); err != nil {
-					return err
-				}
+			if err := clientcmd.WriteToFile(*configToWrite, destinationFile); err != nil {
+				return err
 			}
 		}
+	}
 
-		for key, authInfo := range startingConfig.AuthInfos {
-			if _, exists := newConfig.AuthInfos[key]; !exists {
-				destinationFile := authInfo.LocationOfOrigin
-				if len(destinationFile) == 0 {
-					destinationFile = configAccess.GetDefaultFilename()
-				}
+	for key, authInfo := range startingConfig.AuthInfos {
+		if _, exists := newConfig.AuthInfos[key]; !exists {
+			destinationFile := authInfo.LocationOfOrigin
+			if len(destinationFile) == 0 {
+				destinationFile = configAccess.GetDefaultFilename()
+			}
 
-				configToWrite := getConfigFromFileOrDie(destinationFile)
-				delete(configToWrite.AuthInfos, key)
+			configToWrite := getConfigFromFileOrDie(destinationFile)
+			delete(configToWrite.AuthInfos, key)
 
-				if err := clientcmd.WriteToFile(*configToWrite, destinationFile); err != nil {
-					return err
-				}
+			if err := clientcmd.WriteToFile(*configToWrite, destinationFile); err != nil {
+				return err
 			}
 		}
-
 	}
 
 	return nil

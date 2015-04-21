@@ -63,7 +63,7 @@ function increment_ipv4 {
 }
 
 node_count="${NUM_MINIONS}"
-next_node="10.244.0.0"
+next_node="${KUBE_GCE_CLUSTER_CLASS_B:-10.244}.0.0"
 node_subnet_size=24
 node_subnet_count=$((2 ** (32-$node_subnet_size)))
 subnets=()
@@ -73,7 +73,7 @@ for ((node_num=0; node_num<node_count; node_num++)); do
   next_node=$(increment_ipv4 $next_node $node_subnet_count)
 done
 
-CLUSTER_IP_RANGE="10.244.0.0/16"
+CLUSTER_IP_RANGE="${KUBE_GCE_CLUSTER_CLASS_B:-10.244}.0.0/16"
 MINION_IP_RANGES=($(eval echo "${subnets[@]}"))
 
 MINION_SCOPES=("storage-ro" "compute-rw" "https://www.googleapis.com/auth/monitoring")

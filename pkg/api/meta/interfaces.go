@@ -147,4 +147,5 @@ type RESTMapping struct {
 type RESTMapper interface {
 	VersionAndKindForResource(resource string) (defaultVersion, kind string, err error)
 	RESTMapping(kind string, versions ...string) (*RESTMapping, error)
+	AliasesForResource(resource string) ([]string, bool)
 }

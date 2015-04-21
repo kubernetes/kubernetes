@@ -157,11 +157,7 @@ func TestExampleObjectSchemas(t *testing.T) {
 			"service":                   &api.Service{},
 			"replication-controller":    &api.ReplicationController{},
 		},
-		"../examples/update-demo/v1beta1": {
-			"kitten-rc":   &api.ReplicationController{},
-			"nautilus-rc": &api.ReplicationController{},
-		},
-		"../examples/update-demo/v1beta3": {
+		"../examples/update-demo": {
 			"kitten-rc":   &api.ReplicationController{},
 			"nautilus-rc": &api.ReplicationController{},
 		},

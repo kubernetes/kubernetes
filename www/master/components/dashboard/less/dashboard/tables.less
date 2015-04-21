@@ -1,0 +1,95 @@
+.dash-table {
+  min-width: 100%;
+  border-collapse: collapse;
+}
+
+.dash-table tbody tr:hover, .dash-table tbody tr:focus {
+  &:not(.no-link){
+    cursor:pointer;
+    background-color:rgba(63,81,181,0.2);
+  }
+}
+
+.dash-table {
+
+  .dash-table-header {
+    border-bottom: 1px solid rgb(230,230,230);
+    color: rgb(130,130,130);
+    text-align: left;
+    font-size: 0.75em;
+    font-weight: 700;
+    padding: 16px 16px 16px 0;
+  }
+
+  .dash-table-header a {
+    text-decoration: none;
+    color: inherit;
+  }
+
+  .dash-table-caret {
+    display: inline-block;
+    vertical-align: middle;
+  }
+
+  .dash-table-content {
+    font-size: 0.8em;
+    padding: 16px 16px 16px 0;
+    height: 72px;
+  }
+
+  .dash-table-td-more {
+    max-width:72px;
+    width:72px;
+    padding:16px;
+  }
+
+  .dash-table-thumbs {
+    max-width: 104px;
+    width: 104px;
+    padding: 16px 32px;
+  }
+
+  .dash-table-thumbs div {
+    overflow:hidden;
+    width: 40px;
+    height:40px;
+    border-radius:20px;
+    border: 1px solid rgba(0,0,0,0.2);
+    background-size:cover;
+    box-shadow: 0 8px 10px rgba(0,0,0,.3);
+    -webkit-box-shadow: 0 8px 10px rgba(0,0,0,.1);
+  }
+
+  .dash-table-footer {
+    height:40px;
+  }
+
+  .dash-table-count-info {
+    line-height:40px;
+    font-size:.75em;
+  }
+
+  .dash-table-footer-item {
+    width: 40px;
+    height: 40px;
+    vertical-align:middle;
+  }
+
+  .dash-table-active-page {
+    font-weight: 700;
+  }
+
+  .bold {
+    font-weight: 700;
+  }
+
+  .grey {
+    color: grey;
+  }
+
+  md-input-container.md-default-theme .md-input {
+    color: white;
+    border-color: white;
+    margin-top: 24px;
+  }
+}

@@ -62,6 +62,8 @@ var resourceToResourceName = map[string]api.ResourceName{
 	"services":               api.ResourceServices,
 	"replicationControllers": api.ResourceReplicationControllers,
 	"resourceQuotas":         api.ResourceQuotas,
+	"secrets":                api.ResourceSecrets,
+	"persistentVolumeClaims": api.ResourcePersistentVolumeClaims,
 }
 
 func (q *quota) Admit(a admission.Attributes) (err error) {

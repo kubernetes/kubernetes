@@ -1,0 +1,82 @@
+<div dashboard-header></div>
+<div class="dashboard">
+<div ng-controller="ReplicationControllerCtrl" layout="column" class="body-wrapper">
+
+  <div class="detail">
+
+      <div class="back">
+        <md-button class="md-default-theme" ng-href="/#/dashboard/replicationcontrollers">‹ BACK</md-button>
+      </div>
+
+      <div class="heading">
+        <span class="label">Replication Controller: </span>
+        <span>{{replicationController.id}}</span>
+      </div>
+
+
+      <table>
+        <tbody>
+          <tr>
+            <td class="name">Created</td>
+            <td class="value">
+              {{replicationController.creationTimestamp | date:'medium'}}
+            </td>
+          </tr>
+
+          <tr>
+            <td class="name">Desired Replicas</td>
+            <td class="value">
+              {{replicationController.desiredState.replicas}}
+            </td>
+          </tr>
+
+          <tr>
+            <td class="name">Current Replicas</td>
+            <td class="value">
+              {{replicationController.currentState.replicas}}
+            </td>
+          </tr>
+
+          <tr>
+            <td class="name">Labels</td>
+            <td class="value">
+              <div ng-repeat="(label, value) in replicationController.labels">
+                  {{label}}: {{value}}
+              </div>
+            </td>
+          </tr>
+
+          <tr>
+            <td class="name">Related Pods</td>
+            <td class="value">
+              <div ng-repeat="(label, value) in replicationController.desiredState.replicaSelector">
+                  <a ng-href="/#/dashboard/groups/type/selector/{{label}}={{value}},type=pod">{{label}}: {{value}}</a>
+                </div>
+            </td>
+          </tr>
+
+
+          <tr>
+            <td class="name">Related Services</td>
+            <td class="value">
+              <div ng-repeat="(label, value) in replicationController.desiredState.replicaSelector">
+                  <a ng-href="/#/dashboard/groups/type/selector/{{label}}={{value}},type=service">{{label}}: {{value}}</a>
+                </div>
+            </td>
+          </tr>
+
+
+
+
+        </tbody>
+      </table>
+
+
+
+    </div>
+
+
+
+  </div>
+</div>
+<div dashboard-footer></div>

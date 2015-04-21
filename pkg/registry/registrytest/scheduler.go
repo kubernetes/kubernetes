@@ -23,11 +23,11 @@ import (
 
 type Scheduler struct {
 	Err     error
-	Pod     api.Pod
+	Pod     *api.Pod
 	Machine string
 }
 
-func (s *Scheduler) Schedule(pod api.Pod, lister scheduler.MinionLister) (string, error) {
+func (s *Scheduler) Schedule(pod *api.Pod, lister scheduler.MinionLister) (string, error) {
 	s.Pod = pod
 	return s.Machine, s.Err
 }

@@ -63,19 +63,9 @@
 			"Rev": "8d75e11374a1928608c906fe745b538483e7aeb2"
 		},
 		{
-			"ImportPath": "github.com/coreos/etcd/etcdserver/etcdhttp/httptypes",
-			"Comment": "v2.0.4-288-g866a9d4",
-			"Rev": "866a9d4e41401657ea44bf539b2c5561d6fdcd67"
-		},
-		{
-			"ImportPath": "github.com/coreos/etcd/pkg/types",
-			"Comment": "v2.0.4-288-g866a9d4",
-			"Rev": "866a9d4e41401657ea44bf539b2c5561d6fdcd67"
-		},
-		{
 			"ImportPath": "github.com/coreos/go-etcd/etcd",
-			"Comment": "v0.4.6-8-g60e12ca",
-			"Rev": "60e12cac3db8ffce00b576b4af0e7b0a968f1003"
+			"Comment": "v2.0.0-3-g0424b5f",
+			"Rev": "0424b5f86ef0ca57a5309c599f74bbb3e97ecd9d"
 		},
 		{
 			"ImportPath": "github.com/coreos/go-systemd/dbus",
@@ -372,8 +362,8 @@
 		},
 		{
 			"ImportPath": "github.com/rackspace/gophercloud",
-			"Comment": "v1.0.0-490-g32d0a89",
-			"Rev": "32d0a893a8ef70abe76dc5153e2925b39cbea7f7"
+			"Comment": "v1.0.0-569-gf3ced00",
+			"Rev": "f3ced00552c1c7d4a6184500af9062cfb4ff4463"
 		},
 		{
 			"ImportPath": "github.com/russross/blackfriday",

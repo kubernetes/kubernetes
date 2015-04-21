@@ -11,7 +11,9 @@
       "pods": "10",
       "services": "5",
       "replicationcontrollers":"20",
-      "resourcequotas":"1"
+      "resourcequotas":"1",
+      "secrets":"10",
+      "persistentvolumeclaims":"10"
     }
   }
 }

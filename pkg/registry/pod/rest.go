@@ -21,7 +21,6 @@ import (
 	"net"
 	"net/http"
 	"net/url"
-	"strings"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
@@ -31,6 +30,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/generic"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/fielderrors"
 )
 
@@ -150,16 +150,11 @@ func getPod(getter ResourceGetter, ctx api.Context, name string) (*api.Pod, erro
 func ResourceLocation(getter ResourceGetter, ctx api.Context, id string) (*url.URL, http.RoundTripper, error) {
 	// Allow ID as "podname" or "podname:port".  If port is not specified,
 	// try to use the first defined port on the pod.
-	parts := strings.Split(id, ":")
-	if len(parts) > 2 {
+	name, port, valid := util.SplitPort(id)
+	if !valid {
 		return nil, nil, errors.NewBadRequest(fmt.Sprintf("invalid pod request %q", id))
 	}
-	name := parts[0]
-	port := ""
-	if len(parts) == 2 {
-		// TODO: if port is not a number but a "(container)/(portname)", do a name lookup.
-		port = parts[1]
-	}
+	// TODO: if port is not a number but a "(container)/(portname)", do a name lookup.
 
 	pod, err := getPod(getter, ctx, name)
 	if err != nil {
@@ -205,7 +200,7 @@ func LogLocation(getter ResourceGetter, connInfo client.ConnectionInfoGetter, ct
 			return nil, nil, errors.NewBadRequest(fmt.Sprintf("a container name must be specified for pod %s", name))
 		}
 	}
-	nodeHost := pod.Status.HostIP
+	nodeHost := pod.Spec.Host
 	if len(nodeHost) == 0 {
 		// If pod has not been assigned a host, return an empty location
 		return nil, nil, nil
@@ -245,7 +240,7 @@ func ExecLocation(getter ResourceGetter, connInfo client.ConnectionInfoGetter, c
 			return nil, nil, errors.NewBadRequest(fmt.Sprintf("a container name must be specified for pod %s", name))
 		}
 	}
-	nodeHost := pod.Status.HostIP
+	nodeHost := pod.Spec.Host
 	if len(nodeHost) == 0 {
 		// If pod has not been assigned a host, return an empty location
 		return nil, nil, fmt.Errorf("pod %s does not have a host assigned", name)
@@ -285,7 +280,7 @@ func PortForwardLocation(getter ResourceGetter, connInfo client.ConnectionInfoGe
 		return nil, nil, err
 	}
 
-	nodeHost := pod.Status.HostIP
+	nodeHost := pod.Spec.Host
 	if len(nodeHost) == 0 {
 		// If pod has not been assigned a host, return an empty location
 		return nil, nil, errors.NewBadRequest(fmt.Sprintf("pod %s does not have a host assigned", name))

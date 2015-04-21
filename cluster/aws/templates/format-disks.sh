@@ -67,5 +67,13 @@ else
   ln -s /mnt/docker /var/lib/docker
   DOCKER_ROOT="/mnt/docker"
   DOCKER_OPTS="${DOCKER_OPTS} -g /mnt/docker"
+
+  # Move /var/lib/kubelet to /mnt if we have it
+  # (the backing for empty-dir volumes can use a lot of space!)
+  if [[ -d /var/lib/kubelet ]]; then
+    mv /var/lib/kubelet /mnt/
+  fi
+  mkdir -p /mnt/kubelet
+  ln -s /mnt/kubelet /var/lib/kubelet
 fi
 

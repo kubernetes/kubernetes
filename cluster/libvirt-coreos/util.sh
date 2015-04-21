@@ -18,7 +18,8 @@
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
 readonly ROOT=$(dirname "${BASH_SOURCE}")
-source $ROOT/${KUBE_CONFIG_FILE:-"config-default.sh"}
+source "$ROOT/${KUBE_CONFIG_FILE:-"config-default.sh"}"
+source "$KUBE_ROOT/cluster/common.sh"
 
 export LIBVIRT_DEFAULT_URI=qemu:///system
 
@@ -199,6 +200,7 @@ function wait-cluster-readiness {
 function kube-up {
   detect-master
   detect-minions
+  get-password
   initialize-pool keep_base_image
   initialize-network
 
@@ -235,12 +237,9 @@ function kube-up {
     rm $domain_xml
   done
 
-  export KUBECONFIG="${HOME}/.kube/.kubeconfig"
-  local kubectl="${KUBE_ROOT}/cluster/kubectl.sh"
-
-  "${kubectl}" config set-cluster libvirt-coreos --server=http://${KUBE_MASTER_IP-}:8080
-  "${kubectl}" config set-context libvirt-coreos --cluster=libvirt-coreos
-  "${kubectl}" config use-context libvirt-coreos --cluster=libvirt-coreos
+  export KUBE_SERVER="http://192.168.10.1:8080"
+  export CONTEXT="libvirt-coreos"
+  create-kubeconfig
 
   wait-cluster-readiness
 
@@ -331,8 +330,8 @@ function test-teardown {
 
 # Set the {KUBE_USER} and {KUBE_PASSWORD} environment values required to interact with provider
 function get-password {
-  export KUBE_USER=core
-  echo "TODO get-password"
+  export KUBE_USER=''
+  export KUBE_PASSWORD=''
 }
 
 # SSH to a node by name or IP ($1) and run a command ($2).

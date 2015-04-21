@@ -31,7 +31,7 @@ log_level: debug
 log_level_logfile: debug
 EOF
 
-hostnamef=$(hostname -f)
+hostnamef=$(uname -n)
 apt-get install -y ipcalc
 netmask=$(ipcalc $MINION_IP_RANGE | grep Netmask | awk '{ print $2 }')
 network=$(ipcalc $MINION_IP_RANGE | grep Address | awk '{ print $2 }')

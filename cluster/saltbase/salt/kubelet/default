@@ -17,8 +17,8 @@
 
 {% set config = "--config=/etc/kubernetes/manifests" -%}
 {% set hostname_override = "" -%}
-{% if grains.minion_ip is defined -%}
-  {% set hostname_override = " --hostname_override=" + grains.minion_ip -%}
+{% if grains.hostname_override is defined -%}
+  {% set hostname_override = " --hostname_override=" + grains.hostname_override -%}
 {% endif -%}
 
 {% set cluster_dns = "" %}

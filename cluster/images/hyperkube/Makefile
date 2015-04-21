@@ -1,6 +1,6 @@
 # build the hyperkube image.
 
-VERSION=v0.14.2
+VERSION=v0.15.0
 
 all:
 	curl -O http://storage.googleapis.com/kubernetes-release/release/${VERSION}/bin/linux/amd64/hyperkube

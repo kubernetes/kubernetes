@@ -14,10 +14,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-var base = "http://localhost:8001/api/v1beta1/";
+var base = "http://localhost:8001/api/v1beta3/";
 
 var updateImage = function($http, server) {
-  $http.get(base + "proxy/pods/" + server.podId + "/data.json")
+  $http.get(base + "proxy/namespaces/default/pods/" + server.podName + "/data.json")
     .success(function(data) {
       console.log(data);
       server.image = data.image;
@@ -29,13 +29,13 @@ var updateImage = function($http, server) {
 };
 
 var updateServer = function($http, server) {
-  $http.get(base + "pods/" + server.podId)
+  $http.get(base + "namespaces/default/pods/" + server.podName)
     .success(function(data) {
       console.log(data);
-      server.labels = data.labels;
-      server.host = data.currentState.host.split('.')[0];
-      server.status = data.currentState.status;
-      server.dockerImage = data.currentState.info["update-demo"].image;
+      server.labels = data.metadata.labels;
+      server.host = data.spec.host.split('.')[0];
+      server.status = data.status.phase;
+      server.dockerImage = data.status.containerStatuses[0].image;
       updateImage($http, server);
     })
     .error(function(data) {
@@ -57,10 +57,10 @@ var ButtonsCtrl = function ($scope, $http, $interval) {
   $interval(angular.bind({}, update, $scope, $http), 2000);
 };
 
-var getServer = function($scope, id) {
+var getServer = function($scope, name) {
   var servers = $scope.servers;
   for (var i = 0; i < servers.length; ++i) {
-    if (servers[i].podId == id) {
+    if (servers[i].podName == name) {
       return servers[i];
     }
   }
@@ -68,7 +68,7 @@ var getServer = function($scope, id) {
 };
 
 var isUpdateDemoPod = function(pod) {
-    return pod.labels && pod.labels.name == "update-demo";
+    return pod.metadata && pod.metadata.labels && pod.metadata.labels.name == "update-demo";
 };
 
 var update = function($scope, $http) {
@@ -76,7 +76,7 @@ var update = function($scope, $http) {
     console.log("No HTTP!");
     return;
   }
-  $http.get(base + "pods")
+  $http.get(base + "namespaces/default/pods")
     .success(function(data) {
       console.log(data);
       var newServers = [];
@@ -85,9 +85,9 @@ var update = function($scope, $http) {
         if (!isUpdateDemoPod(pod)) {
           continue;
         }
-        var server = getServer($scope, pod.id);
+        var server = getServer($scope, pod.metadata.name);
         if (server == null) {
-          server = { "podId": pod.id };
+          server = { "podName": pod.metadata.name };
         }
         newServers.push(server);
       }

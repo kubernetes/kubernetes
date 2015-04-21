@@ -17,6 +17,7 @@ limitations under the License.
 package ui
 
 import (
+	"mime"
 	"net/http"
 
 	assetfs "github.com/elazarl/go-bindata-assetfs"
@@ -27,6 +28,12 @@ type MuxInterface interface {
 }
 
 func InstallSupport(mux MuxInterface, enableSwaggerSupport bool) {
+
+	// Send correct mime type for .svg files.  TODO: remove when
+	// https://github.com/golang/go/commit/21e47d831bafb59f22b1ea8098f709677ec8ce33
+	// makes it into all of our supported go versions.
+	mime.AddExtensionType(".svg", "image/svg+xml")
+
 	// Expose files in www/ on <host>/static/
 	fileServer := http.FileServer(&assetfs.AssetFS{Asset: Asset, AssetDir: AssetDir, Prefix: "www"})
 	prefix := "/static/"

@@ -134,7 +134,9 @@ install-salt() {
   URL_BASE="https://storage.googleapis.com/kubernetes-release/salt"
 
   for deb in "${DEBS[@]}"; do
-    download-or-bust "${URL_BASE}/${deb}"
+    if [ ! -e "${deb}" ]; then
+      download-or-bust "${URL_BASE}/${deb}"
+    fi
   done
 
   # Based on
@@ -152,7 +154,7 @@ EOF
 
   for deb in "${DEBS[@]}"; do
     echo "== Installing ${deb}, ignore dependency complaints (will fix later) =="
-    dpkg --force-depends -i "${deb}"
+    dpkg --skip-same-version --force-depends -i "${deb}"
   done
 
   # This will install any of the unmet dependencies from above.
@@ -172,6 +174,7 @@ EOF
 stop-salt-minion() {
   # This ensures it on next reboot
   echo manual > /etc/init/salt-minion.override
+  update-rc.d salt-minion disable
 
   if service salt-minion status >/dev/null; then
     echo "salt-minion started in defiance of runlevel policy, aborting startup." >&2
@@ -205,18 +208,21 @@ mount-master-pd() {
   mkdir -p /mnt/master-pd/srv/kubernetes
   # Contains the cluster's initial config parameters and auth tokens
   mkdir -p /mnt/master-pd/srv/salt-overlay
-  ln -s /mnt/master-pd/var/etcd /var/etcd
-  ln -s /mnt/master-pd/srv/kubernetes /srv/kubernetes
-  ln -s /mnt/master-pd/srv/salt-overlay /srv/salt-overlay
+
+  ln -s -f /mnt/master-pd/var/etcd /var/etcd
+  ln -s -f /mnt/master-pd/srv/kubernetes /srv/kubernetes
+  ln -s -f /mnt/master-pd/srv/salt-overlay /srv/salt-overlay
 
   # This is a bit of a hack to get around the fact that salt has to run after the
   # PD and mounted directory are already set up. We can't give ownership of the
   # directory to etcd until the etcd user and group exist, but they don't exist
   # until salt runs if we don't create them here. We could alternatively make the
   # permissions on the directory more permissive, but this seems less bad.
-  useradd -s /sbin/nologin -d /var/etcd etcd
-  chown etcd /mnt/master-pd/var/etcd
-  chgrp etcd /mnt/master-pd/var/etcd
+  if ! id etcd &>/dev/null; then
+    useradd -s /sbin/nologin -d /var/etcd etcd
+  fi
+  chown -R etcd /mnt/master-pd/var/etcd
+  chgrp -R etcd /mnt/master-pd/var/etcd
 }
 
 # Create the overlay files for the salt tree.  We create these in a separate
@@ -282,6 +288,14 @@ function create-salt-auth() {
 }
 
 function download-release() {
+  # TODO(zmerlynn): We should optimize for the reboot case here, but
+  # unlike the .debs, we don't have version information in the
+  # filenames here, nor do the URLs even provide useful information in
+  # the dev environment case (because they're just a project
+  # bucket). We should probably push a hash into the kube-env, and
+  # store it when we download, and then when it's different infer that
+  # a push occurred (otherwise it's a simple reboot).
+
   echo "Downloading binary release tar ($SERVER_BINARY_TAR_URL)"
   download-or-bust "$SERVER_BINARY_TAR_URL"
 

@@ -18,8 +18,11 @@ package controller
 
 import (
 	"fmt"
+	"math/rand"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
+	"sort"
 	"sync"
 	"testing"
 	"time"
@@ -373,5 +376,54 @@ func TestWatchControllers(t *testing.T) {
 	case <-received:
 	case <-time.After(100 * time.Millisecond):
 		t.Errorf("Expected 1 call but got 0")
+	}
+}
+
+func TestSortingActivePods(t *testing.T) {
+	numPods := 5
+	podList := newPodList(numPods)
+	pods := make([]*api.Pod, len(podList.Items))
+	for i := range podList.Items {
+		pods[i] = &podList.Items[i]
+	}
+	// pods[0] is not scheduled yet.
+	pods[0].Spec.Host = ""
+	pods[0].Status.Phase = api.PodPending
+	// pods[1] is scheduled but pending.
+	pods[1].Spec.Host = "bar"
+	pods[1].Status.Phase = api.PodPending
+	// pods[2] is unknown.
+	pods[2].Spec.Host = "foo"
+	pods[2].Status.Phase = api.PodUnknown
+	// pods[3] is running but not ready.
+	pods[3].Spec.Host = "foo"
+	pods[3].Status.Phase = api.PodRunning
+	// pods[4] is running and ready.
+	pods[4].Spec.Host = "foo"
+	pods[4].Status.Phase = api.PodRunning
+	pods[4].Status.Conditions = []api.PodCondition{{Type: api.PodReady, Status: api.ConditionTrue}}
+
+	getOrder := func(pods []*api.Pod) []string {
+		names := make([]string, len(pods))
+		for i := range pods {
+			names[i] = pods[i].Name
+		}
+		return names
+	}
+
+	expected := getOrder(pods)
+
+	for i := 0; i < 20; i++ {
+		idx := rand.Perm(numPods)
+		randomizedPods := make([]*api.Pod, numPods)
+		for j := 0; j < numPods; j++ {
+			randomizedPods[j] = pods[idx[j]]
+		}
+		sort.Sort(activePods(randomizedPods))
+		actual := getOrder(randomizedPods)
+
+		if !reflect.DeepEqual(actual, expected) {
+			t.Errorf("expected %v, got %v", expected, actual)
+		}
 	}
 }

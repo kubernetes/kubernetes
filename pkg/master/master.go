@@ -43,6 +43,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/master/ports"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/componentstatus"
 	controlleretcd "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/controller/etcd"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/endpoint"
 	endpointsetcd "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/endpoint/etcd"
@@ -416,6 +417,8 @@ func (m *Master) init(c *Config) {
 		"persistentVolumes/status":      persistentVolumeStatusStorage,
 		"persistentVolumeClaims":        persistentVolumeClaimStorage,
 		"persistentVolumeClaims/status": persistentVolumeClaimStatusStorage,
+
+		"componentStatuses": componentstatus.NewStorage(func() map[string]apiserver.Server { return m.getServersToValidate(c) }),
 	}
 
 	apiVersions := []string{"v1beta1", "v1beta2"}

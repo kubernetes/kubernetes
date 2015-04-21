@@ -95,6 +95,7 @@ kube::log::status "Starting kube-apiserver"
   --public_address_override="127.0.0.1" \
   --kubelet_port=${KUBELET_PORT} \
   --runtime_config=api/v1beta3 \
+  --cert_dir="${TMPDIR:-/tmp/}" \
   --portal_net="10.0.0.0/24" 1>&2 &
 APISERVER_PID=$!
 
@@ -162,6 +163,7 @@ for version in "${kube_api_versions[@]}"; do
   # Command
   kubectl create "${kube_flags[@]}" -f examples/limitrange/valid-pod.json
   # Post-condition: valid-pod POD is running
+  kubectl get "${kube_flags[@]}" pods -o json
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" 'valid-pod:'
   kube::test::get_object_assert 'pod valid-pod' "{{$id_field}}" 'valid-pod'
   kube::test::get_object_assert 'pod/valid-pod' "{{$id_field}}" 'valid-pod'
@@ -613,6 +615,18 @@ __EOF__
 
   kube::log::status "Testing kubectl(${version}:multiget)"
   kube::test::get_object_assert 'nodes/127.0.0.1 service/kubernetes' "{{range.items}}{{$id_field}}:{{end}}" '127.0.0.1:kubernetes:'
+
+
+  #####################
+  # Resource aliasing #
+  ##################### 
+
+  kube::log::status "Testing resource aliasing"
+  kubectl create -f examples/cassandra/cassandra.yaml "${kube_flags[@]}"
+  kubectl create -f examples/cassandra/cassandra-controller.yaml "${kube_flags[@]}"
+  kubectl create -f examples/cassandra/cassandra-service.yaml "${kube_flags[@]}"
+  kube::test::get_object_assert "all -l'name=cassandra'" "{{range.items}}{{$id_field}}:{{end}}" 'cassandra:cassandra:cassandra:'
+  kubectl delete all -l name=cassandra "${kube_flags[@]}"
 
 
   ###########

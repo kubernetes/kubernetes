@@ -72,7 +72,7 @@ grains:
   roles:
     - kubernetes-pool
   cbr-cidr: '$(echo "$CONTAINER_SUBNET" | sed -e "s/'/''/g")'
-  minion_ip: '$(echo "$MINION_IP" | sed -e "s/'/''/g")'
+  hostname_override: '$(echo "$MINION_IP" | sed -e "s/'/''/g")'
 EOF
 
 # we will run provision to update code each time we test, so we do not want to do salt install each time

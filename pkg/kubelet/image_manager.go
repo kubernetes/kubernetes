@@ -112,16 +112,16 @@ func newImageManager(dockerClient dockertools.DockerInterface, cadvisorInterface
 	return im, nil
 }
 
-func (self *realImageManager) start() error {
+func (im *realImageManager) start() error {
 	// Initial detection make detected time "unknown" in the past.
 	var zero time.Time
-	err := self.detectImages(zero)
+	err := im.detectImages(zero)
 	if err != nil {
 		return err
 	}
 
 	go util.Forever(func() {
-		err := self.detectImages(time.Now())
+		err := im.detectImages(time.Now())
 		if err != nil {
 			glog.Warningf("[ImageManager] Failed to monitor images: %v", err)
 		}
@@ -130,12 +130,12 @@ func (self *realImageManager) start() error {
 	return nil
 }
 
-func (self *realImageManager) detectImages(detected time.Time) error {
-	images, err := self.dockerClient.ListImages(docker.ListImagesOptions{})
+func (im *realImageManager) detectImages(detected time.Time) error {
+	images, err := im.dockerClient.ListImages(docker.ListImagesOptions{})
 	if err != nil {
 		return err
 	}
-	containers, err := self.dockerClient.ListContainers(docker.ListContainersOptions{
+	containers, err := im.dockerClient.ListContainers(docker.ListContainersOptions{
 		All: true,
 	})
 	if err != nil {
@@ -151,39 +151,39 @@ func (self *realImageManager) detectImages(detected time.Time) error {
 	// Add new images and record those being used.
 	now := time.Now()
 	currentImages := util.NewStringSet()
-	self.imageRecordsLock.Lock()
-	defer self.imageRecordsLock.Unlock()
+	im.imageRecordsLock.Lock()
+	defer im.imageRecordsLock.Unlock()
 	for _, image := range images {
 		currentImages.Insert(image.ID)
 
 		// New image, set it as detected now.
-		if _, ok := self.imageRecords[image.ID]; !ok {
-			self.imageRecords[image.ID] = &imageRecord{
+		if _, ok := im.imageRecords[image.ID]; !ok {
+			im.imageRecords[image.ID] = &imageRecord{
 				detected: detected,
 			}
 		}
 
 		// Set last used time to now if the image is being used.
 		if isImageUsed(&image, imagesInUse) {
-			self.imageRecords[image.ID].lastUsed = now
+			im.imageRecords[image.ID].lastUsed = now
 		}
 
-		self.imageRecords[image.ID].size = image.VirtualSize
+		im.imageRecords[image.ID].size = image.VirtualSize
 	}
 
 	// Remove old images from our records.
-	for image := range self.imageRecords {
+	for image := range im.imageRecords {
 		if !currentImages.Has(image) {
-			delete(self.imageRecords, image)
+			delete(im.imageRecords, image)
 		}
 	}
 
 	return nil
 }
 
-func (self *realImageManager) GarbageCollect() error {
+func (im *realImageManager) GarbageCollect() error {
 	// Get disk usage on disk holding images.
-	fsInfo, err := self.cadvisor.DockerImagesFsInfo()
+	fsInfo, err := im.cadvisor.DockerImagesFsInfo()
 	if err != nil {
 		return err
 	}
@@ -193,23 +193,23 @@ func (self *realImageManager) GarbageCollect() error {
 	// Check valid capacity.
 	if capacity == 0 {
 		err := fmt.Errorf("invalid capacity %d on device %q at mount point %q", capacity, fsInfo.Device, fsInfo.Mountpoint)
-		self.recorder.Eventf(self.nodeRef, "invalidDiskCapacity", err.Error())
+		im.recorder.Eventf(im.nodeRef, "invalidDiskCapacity", err.Error())
 		return err
 	}
 
 	// If over the max threshold, free enough to place us at the lower threshold.
 	usagePercent := int(usage * 100 / capacity)
-	if usagePercent >= self.policy.HighThresholdPercent {
-		amountToFree := usage - (int64(self.policy.LowThresholdPercent) * capacity / 100)
-		glog.Infof("[ImageManager]: Disk usage on %q (%s) is at %d%% which is over the high threshold (%d%%). Trying to free %d bytes", fsInfo.Device, fsInfo.Mountpoint, usagePercent, self.policy.HighThresholdPercent, amountToFree)
-		freed, err := self.freeSpace(amountToFree)
+	if usagePercent >= im.policy.HighThresholdPercent {
+		amountToFree := usage - (int64(im.policy.LowThresholdPercent) * capacity / 100)
+		glog.Infof("[ImageManager]: Disk usage on %q (%s) is at %d%% which is over the high threshold (%d%%). Trying to free %d bytes", fsInfo.Device, fsInfo.Mountpoint, usagePercent, im.policy.HighThresholdPercent, amountToFree)
+		freed, err := im.freeSpace(amountToFree)
 		if err != nil {
 			return err
 		}
 
 		if freed < amountToFree {
 			err := fmt.Errorf("failed to garbage collect required amount of images. Wanted to free %d, but freed %d", amountToFree, freed)
-			self.recorder.Eventf(self.nodeRef, "freeDiskSpaceFailed", err.Error())
+			im.recorder.Eventf(im.nodeRef, "freeDiskSpaceFailed", err.Error())
 			return err
 		}
 	}
@@ -223,19 +223,19 @@ func (self *realImageManager) GarbageCollect() error {
 // bytes freed is always returned.
 // Note that error may be nil and the number of bytes free may be less
 // than bytesToFree.
-func (self *realImageManager) freeSpace(bytesToFree int64) (int64, error) {
+func (im *realImageManager) freeSpace(bytesToFree int64) (int64, error) {
 	startTime := time.Now()
-	err := self.detectImages(startTime)
+	err := im.detectImages(startTime)
 	if err != nil {
 		return 0, err
 	}
 
-	self.imageRecordsLock.Lock()
-	defer self.imageRecordsLock.Unlock()
+	im.imageRecordsLock.Lock()
+	defer im.imageRecordsLock.Unlock()
 
 	// Get all images in eviction order.
-	images := make([]evictionInfo, 0, len(self.imageRecords))
-	for image, record := range self.imageRecords {
+	images := make([]evictionInfo, 0, len(im.imageRecords))
+	for image, record := range im.imageRecords {
 		images = append(images, evictionInfo{
 			id:          image,
 			imageRecord: *record,
@@ -254,12 +254,12 @@ func (self *realImageManager) freeSpace(bytesToFree int64) (int64, error) {
 
 		// Remove image. Continue despite errors.
 		glog.Infof("[ImageManager]: Removing image %q to free %d bytes", image.id, image.size)
-		err := self.dockerClient.RemoveImage(image.id)
+		err := im.dockerClient.RemoveImage(image.id)
 		if err != nil {
 			lastErr = err
 			continue
 		}
-		delete(self.imageRecords, image.id)
+		delete(im.imageRecords, image.id)
 		spaceFreed += image.size
 
 		if spaceFreed >= bytesToFree {
@@ -277,14 +277,14 @@ type evictionInfo struct {
 
 type byLastUsedAndDetected []evictionInfo
 
-func (self byLastUsedAndDetected) Len() int      { return len(self) }
-func (self byLastUsedAndDetected) Swap(i, j int) { self[i], self[j] = self[j], self[i] }
-func (self byLastUsedAndDetected) Less(i, j int) bool {
+func (ev byLastUsedAndDetected) Len() int      { return len(ev) }
+func (ev byLastUsedAndDetected) Swap(i, j int) { ev[i], ev[j] = ev[j], ev[i] }
+func (ev byLastUsedAndDetected) Less(i, j int) bool {
 	// Sort by last used, break ties by detected.
-	if self[i].lastUsed.Equal(self[j].lastUsed) {
-		return self[i].detected.Before(self[j].detected)
+	if ev[i].lastUsed.Equal(ev[j].lastUsed) {
+		return ev[i].detected.Before(ev[j].detected)
 	} else {
-		return self[i].lastUsed.Before(self[j].lastUsed)
+		return ev[i].lastUsed.Before(ev[j].lastUsed)
 	}
 }
 

@@ -27,19 +27,19 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
-func falsePredicate(pod api.Pod, existingPods []api.Pod, node string) (bool, error) {
+func falsePredicate(pod *api.Pod, existingPods []*api.Pod, node string) (bool, error) {
 	return false, nil
 }
 
-func truePredicate(pod api.Pod, existingPods []api.Pod, node string) (bool, error) {
+func truePredicate(pod *api.Pod, existingPods []*api.Pod, node string) (bool, error) {
 	return true, nil
 }
 
-func matchesPredicate(pod api.Pod, existingPods []api.Pod, node string) (bool, error) {
+func matchesPredicate(pod *api.Pod, existingPods []*api.Pod, node string) (bool, error) {
 	return pod.Name == node, nil
 }
 
-func numericPriority(pod api.Pod, podLister PodLister, minionLister MinionLister) (HostPriorityList, error) {
+func numericPriority(pod *api.Pod, podLister PodLister, minionLister MinionLister) (HostPriorityList, error) {
 	nodes, err := minionLister.List()
 	result := []HostPriority{}
 
@@ -60,7 +60,7 @@ func numericPriority(pod api.Pod, podLister PodLister, minionLister MinionLister
 	return result, nil
 }
 
-func reverseNumericPriority(pod api.Pod, podLister PodLister, minionLister MinionLister) (HostPriorityList, error) {
+func reverseNumericPriority(pod *api.Pod, podLister PodLister, minionLister MinionLister) (HostPriorityList, error) {
 	var maxScore float64
 	minScore := math.MaxFloat64
 	reverseResult := []HostPriority{}
@@ -165,7 +165,7 @@ func TestGenericScheduler(t *testing.T) {
 		predicates   map[string]FitPredicate
 		prioritizers []PriorityConfig
 		nodes        []string
-		pod          api.Pod
+		pod          *api.Pod
 		expectedHost string
 		expectsErr   bool
 	}{
@@ -189,7 +189,7 @@ func TestGenericScheduler(t *testing.T) {
 			predicates:   map[string]FitPredicate{"matches": matchesPredicate},
 			prioritizers: []PriorityConfig{{Function: EqualPriority, Weight: 1}},
 			nodes:        []string{"machine1", "machine2"},
-			pod:          api.Pod{ObjectMeta: api.ObjectMeta{Name: "machine2"}},
+			pod:          &api.Pod{ObjectMeta: api.ObjectMeta{Name: "machine2"}},
 			expectedHost: "machine2",
 			name:         "test 3",
 		},
@@ -204,7 +204,7 @@ func TestGenericScheduler(t *testing.T) {
 			predicates:   map[string]FitPredicate{"matches": matchesPredicate},
 			prioritizers: []PriorityConfig{{Function: numericPriority, Weight: 1}},
 			nodes:        []string{"3", "2", "1"},
-			pod:          api.Pod{ObjectMeta: api.ObjectMeta{Name: "2"}},
+			pod:          &api.Pod{ObjectMeta: api.ObjectMeta{Name: "2"}},
 			expectedHost: "2",
 			name:         "test 5",
 		},
@@ -212,7 +212,7 @@ func TestGenericScheduler(t *testing.T) {
 			predicates:   map[string]FitPredicate{"true": truePredicate},
 			prioritizers: []PriorityConfig{{Function: numericPriority, Weight: 1}, {Function: reverseNumericPriority, Weight: 2}},
 			nodes:        []string{"3", "2", "1"},
-			pod:          api.Pod{ObjectMeta: api.ObjectMeta{Name: "2"}},
+			pod:          &api.Pod{ObjectMeta: api.ObjectMeta{Name: "2"}},
 			expectedHost: "1",
 			name:         "test 6",
 		},
@@ -227,7 +227,7 @@ func TestGenericScheduler(t *testing.T) {
 
 	for _, test := range tests {
 		random := rand.New(rand.NewSource(0))
-		scheduler := NewGenericScheduler(test.predicates, test.prioritizers, FakePodLister([]api.Pod{}), random)
+		scheduler := NewGenericScheduler(test.predicates, test.prioritizers, FakePodLister([]*api.Pod{}), random)
 		machine, err := scheduler.Schedule(test.pod, FakeMinionLister(makeNodeList(test.nodes)))
 		if test.expectsErr {
 			if err == nil {
@@ -247,7 +247,7 @@ func TestGenericScheduler(t *testing.T) {
 func TestFindFitAllError(t *testing.T) {
 	nodes := []string{"3", "2", "1"}
 	predicates := map[string]FitPredicate{"true": truePredicate, "false": falsePredicate}
-	_, predicateMap, err := findNodesThatFit(api.Pod{}, FakePodLister([]api.Pod{}), predicates, makeNodeList(nodes))
+	_, predicateMap, err := findNodesThatFit(&api.Pod{}, FakePodLister([]*api.Pod{}), predicates, makeNodeList(nodes))
 
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -271,8 +271,8 @@ func TestFindFitAllError(t *testing.T) {
 func TestFindFitSomeError(t *testing.T) {
 	nodes := []string{"3", "2", "1"}
 	predicates := map[string]FitPredicate{"true": truePredicate, "match": matchesPredicate}
-	pod := api.Pod{ObjectMeta: api.ObjectMeta{Name: "1"}}
-	_, predicateMap, err := findNodesThatFit(pod, FakePodLister([]api.Pod{}), predicates, makeNodeList(nodes))
+	pod := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "1"}}
+	_, predicateMap, err := findNodesThatFit(pod, FakePodLister([]*api.Pod{}), predicates, makeNodeList(nodes))
 
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)

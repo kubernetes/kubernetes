@@ -62,6 +62,18 @@ func Failf(format string, a ...interface{}) {
 	Fail(fmt.Sprintf(format, a...), 1)
 }
 
+func providerIs(providers ...string) bool {
+	if testContext.Provider == "" {
+		Fail("testContext.Provider is not defined")
+	}
+	for _, provider := range providers {
+		if strings.ToLower(provider) == strings.ToLower(testContext.Provider) {
+			return true
+		}
+	}
+	return false
+}
+
 type podCondition func(pod *api.Pod) (bool, error)
 
 func waitForPodCondition(c *client.Client, ns, podName, desc string, condition podCondition) error {
@@ -272,11 +284,19 @@ func validateController(c *client.Client, containerImage string, replicas int, c
 // kubectlCmd runs the kubectl executable.
 func kubectlCmd(args ...string) *exec.Cmd {
 	defaultArgs := []string{}
+
+	// Reference a --server option so tests can run anywhere.
+	if testContext.Host != "" {
+		defaultArgs = append(defaultArgs, "--"+clientcmd.FlagAPIServer+"="+testContext.Host)
+	}
 	if testContext.KubeConfig != "" {
 		defaultArgs = append(defaultArgs, "--"+clientcmd.RecommendedConfigPathFlag+"="+testContext.KubeConfig)
+
+		// Reference the KubeContext
 		if testContext.KubeContext != "" {
 			defaultArgs = append(defaultArgs, "--"+clientcmd.FlagContext+"="+testContext.KubeContext)
 		}
+
 	} else {
 		defaultArgs = append(defaultArgs, "--"+clientcmd.FlagAuthPath+"="+testContext.AuthConfig)
 		if testContext.CertDir != "" {

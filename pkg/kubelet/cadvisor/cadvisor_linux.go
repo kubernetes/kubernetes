@@ -77,9 +77,9 @@ func New(port uint) (Interface, error) {
 	return cadvisorClient, nil
 }
 
-func (self *cadvisorClient) exportHTTP(port uint) error {
+func (cc *cadvisorClient) exportHTTP(port uint) error {
 	mux := http.NewServeMux()
-	err := cadvisorHttp.RegisterHandlers(mux, self, "", "", "", "", "/metrics")
+	err := cadvisorHttp.RegisterHandlers(mux, cc, "", "", "", "", "/metrics")
 	if err != nil {
 		return err
 	}
@@ -106,20 +106,20 @@ func (self *cadvisorClient) exportHTTP(port uint) error {
 	return nil
 }
 
-func (self *cadvisorClient) ContainerInfo(name string, req *cadvisorApi.ContainerInfoRequest) (*cadvisorApi.ContainerInfo, error) {
-	return self.GetContainerInfo(name, req)
+func (cc *cadvisorClient) ContainerInfo(name string, req *cadvisorApi.ContainerInfoRequest) (*cadvisorApi.ContainerInfo, error) {
+	return cc.GetContainerInfo(name, req)
 }
 
-func (self *cadvisorClient) VersionInfo() (*cadvisorApi.VersionInfo, error) {
-	return self.GetVersionInfo()
+func (cc *cadvisorClient) VersionInfo() (*cadvisorApi.VersionInfo, error) {
+	return cc.GetVersionInfo()
 }
 
-func (self *cadvisorClient) MachineInfo() (*cadvisorApi.MachineInfo, error) {
-	return self.GetMachineInfo()
+func (cc *cadvisorClient) MachineInfo() (*cadvisorApi.MachineInfo, error) {
+	return cc.GetMachineInfo()
 }
 
-func (self *cadvisorClient) DockerImagesFsInfo() (cadvisorApiV2.FsInfo, error) {
-	res, err := self.GetFsInfo(cadvisorFs.LabelDockerImages)
+func (cc *cadvisorClient) DockerImagesFsInfo() (cadvisorApiV2.FsInfo, error) {
+	res, err := cc.GetFsInfo(cadvisorFs.LabelDockerImages)
 	if err != nil {
 		return cadvisorApiV2.FsInfo{}, err
 	}
@@ -134,6 +134,6 @@ func (self *cadvisorClient) DockerImagesFsInfo() (cadvisorApiV2.FsInfo, error) {
 	return res[0], nil
 }
 
-func (self *cadvisorClient) GetPastEvents(request *events.Request) ([]*cadvisorApi.Event, error) {
-	return self.GetPastEvents(request)
+func (cc *cadvisorClient) GetPastEvents(request *events.Request) ([]*cadvisorApi.Event, error) {
+	return cc.GetPastEvents(request)
 }

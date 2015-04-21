@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
 	kubecontainer "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/probe"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -146,16 +147,21 @@ func (p fakeExecProber) Probe(_ exec.Cmd) (probe.Result, error) {
 }
 
 func makeTestKubelet(result probe.Result, err error) *Kubelet {
-	return &Kubelet{
-		readinessManager: kubecontainer.NewReadinessManager(),
-		prober: probeHolder{
-			exec: fakeExecProber{
-				result: result,
-				err:    err,
-			},
-		},
+	kl := &Kubelet{
+		readinessManager:    kubecontainer.NewReadinessManager(),
 		containerRefManager: kubecontainer.NewRefManager(),
 	}
+
+	kl.prober = &Prober{
+		exec: fakeExecProber{
+			result: result,
+			err:    err,
+		},
+		readinessManager: kl.readinessManager,
+		refManager:       kl.containerRefManager,
+		recorder:         &record.FakeRecorder{},
+	}
+	return kl
 }
 
 // TestProbeContainer tests the functionality of probeContainer.
@@ -402,7 +408,7 @@ func TestProbeContainer(t *testing.T) {
 		} else {
 			kl = makeTestKubelet(test.expectedResult, nil)
 		}
-		result, err := kl.probeContainer(&api.Pod{}, api.PodStatus{}, test.testContainer, dc.ID, dc.Created)
+		result, err := kl.prober.Probe(&api.Pod{}, api.PodStatus{}, test.testContainer, dc.ID, dc.Created)
 		if test.expectError && err == nil {
 			t.Error("Expected error but did no error was returned.")
 		}

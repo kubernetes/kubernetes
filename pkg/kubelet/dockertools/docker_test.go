@@ -130,26 +130,20 @@ func TestContainerManifestNaming(t *testing.T) {
 }
 
 func TestGetDockerServerVersion(t *testing.T) {
-	fakeDocker := &FakeDockerClient{VersionInfo: docker.Env{"Client version=1.2", "Server version=1.1.3", "Server API version=1.15"}}
+	fakeDocker := &FakeDockerClient{VersionInfo: docker.Env{"Version=1.1.3", "ApiVersion=1.15"}}
 	runner := dockerContainerCommandRunner{fakeDocker}
 	version, err := runner.GetDockerServerVersion()
 	if err != nil {
 		t.Errorf("got error while getting docker server version - %s", err)
 	}
-	expectedVersion := []uint{1, 15}
-	if len(expectedVersion) != len(version) {
-		t.Errorf("invalid docker server version. expected: %v, got: %v", expectedVersion, version)
-	} else {
-		for idx, val := range expectedVersion {
-			if version[idx] != val {
-				t.Errorf("invalid docker server version. expected: %v, got: %v", expectedVersion, version)
-			}
-		}
+	expectedVersion, _ := docker.NewAPIVersion("1.15")
+	if e, a := expectedVersion.String(), version.String(); e != a {
+		t.Errorf("invalid docker server version. expected: %v, got: %v", e, a)
 	}
 }
 
 func TestExecSupportExists(t *testing.T) {
-	fakeDocker := &FakeDockerClient{VersionInfo: docker.Env{"Client version=1.2", "Server version=1.3.0", "Server API version=1.15"}}
+	fakeDocker := &FakeDockerClient{VersionInfo: docker.Env{"Version=1.3.0", "ApiVersion=1.15"}}
 	runner := dockerContainerCommandRunner{fakeDocker}
 	useNativeExec, err := runner.nativeExecSupportExists()
 	if err != nil {
@@ -161,7 +155,7 @@ func TestExecSupportExists(t *testing.T) {
 }
 
 func TestExecSupportNotExists(t *testing.T) {
-	fakeDocker := &FakeDockerClient{VersionInfo: docker.Env{"Client version=1.2", "Server version=1.1.2", "Server API version=1.14"}}
+	fakeDocker := &FakeDockerClient{VersionInfo: docker.Env{"Version=1.1.2", "ApiVersion=1.14"}}
 	runner := dockerContainerCommandRunner{fakeDocker}
 	useNativeExec, _ := runner.nativeExecSupportExists()
 	if useNativeExec {

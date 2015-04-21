@@ -168,12 +168,12 @@ func (s *podStorage) Merge(source string, change interface{}) error {
 			s.updates <- *updates
 		}
 		if len(deletes.Pods) > 0 || len(adds.Pods) > 0 {
-			s.updates <- kubelet.PodUpdate{s.MergedState().([]api.Pod), kubelet.SET, source}
+			s.updates <- kubelet.PodUpdate{s.MergedState().([]*api.Pod), kubelet.SET, source}
 		}
 
 	case PodConfigNotificationSnapshot:
 		if len(updates.Pods) > 0 || len(deletes.Pods) > 0 || len(adds.Pods) > 0 {
-			s.updates <- kubelet.PodUpdate{s.MergedState().([]api.Pod), kubelet.SET, source}
+			s.updates <- kubelet.PodUpdate{s.MergedState().([]*api.Pod), kubelet.SET, source}
 		}
 
 	default:
@@ -212,7 +212,7 @@ func (s *podStorage) merge(source string, change interface{}) (adds, updates, de
 				if !reflect.DeepEqual(existing.Spec, ref.Spec) {
 					// this is an update
 					existing.Spec = ref.Spec
-					updates.Pods = append(updates.Pods, *existing)
+					updates.Pods = append(updates.Pods, existing)
 					continue
 				}
 				// this is a no-op
@@ -224,17 +224,17 @@ func (s *podStorage) merge(source string, change interface{}) (adds, updates, de
 			}
 			ref.Annotations[kubelet.ConfigSourceAnnotationKey] = source
 			pods[name] = ref
-			adds.Pods = append(adds.Pods, *ref)
+			adds.Pods = append(adds.Pods, ref)
 		}
 
 	case kubelet.REMOVE:
 		glog.V(4).Infof("Removing a pod %v", update)
 		for _, value := range update.Pods {
-			name := kubecontainer.GetPodFullName(&value)
+			name := kubecontainer.GetPodFullName(value)
 			if existing, found := pods[name]; found {
 				// this is a delete
 				delete(pods, name)
-				deletes.Pods = append(deletes.Pods, *existing)
+				deletes.Pods = append(deletes.Pods, existing)
 				continue
 			}
 			// this is a no-op
@@ -255,7 +255,7 @@ func (s *podStorage) merge(source string, change interface{}) (adds, updates, de
 				if !reflect.DeepEqual(existing.Spec, ref.Spec) {
 					// this is an update
 					existing.Spec = ref.Spec
-					updates.Pods = append(updates.Pods, *existing)
+					updates.Pods = append(updates.Pods, existing)
 					continue
 				}
 				// this is a no-op
@@ -266,13 +266,13 @@ func (s *podStorage) merge(source string, change interface{}) (adds, updates, de
 			}
 			ref.Annotations[kubelet.ConfigSourceAnnotationKey] = source
 			pods[name] = ref
-			adds.Pods = append(adds.Pods, *ref)
+			adds.Pods = append(adds.Pods, ref)
 		}
 
 		for name, existing := range oldPods {
 			if _, found := pods[name]; !found {
 				// this is a delete
-				deletes.Pods = append(deletes.Pods, *existing)
+				deletes.Pods = append(deletes.Pods, existing)
 			}
 		}
 
@@ -297,10 +297,9 @@ func (s *podStorage) seenSources(sources ...string) bool {
 	return s.sourcesSeen.HasAll(sources...)
 }
 
-func filterInvalidPods(pods []api.Pod, source string, recorder record.EventRecorder) (filtered []*api.Pod) {
+func filterInvalidPods(pods []*api.Pod, source string, recorder record.EventRecorder) (filtered []*api.Pod) {
 	names := util.StringSet{}
-	for i := range pods {
-		pod := &pods[i]
+	for i, pod := range pods {
 		var errlist []error
 		if errs := validation.ValidatePod(pod); len(errs) != 0 {
 			errlist = append(errlist, errs...)
@@ -330,21 +329,21 @@ func filterInvalidPods(pods []api.Pod, source string, recorder record.EventRecor
 func (s *podStorage) Sync() {
 	s.updateLock.Lock()
 	defer s.updateLock.Unlock()
-	s.updates <- kubelet.PodUpdate{s.MergedState().([]api.Pod), kubelet.SET, kubelet.AllSource}
+	s.updates <- kubelet.PodUpdate{s.MergedState().([]*api.Pod), kubelet.SET, kubelet.AllSource}
 }
 
 // Object implements config.Accessor
 func (s *podStorage) MergedState() interface{} {
 	s.podLock.RLock()
 	defer s.podLock.RUnlock()
-	pods := make([]api.Pod, 0)
+	pods := make([]*api.Pod, 0)
 	for _, sourcePods := range s.pods {
 		for _, podRef := range sourcePods {
 			pod, err := api.Scheme.Copy(podRef)
 			if err != nil {
 				glog.Errorf("unable to copy pod: %v", err)
 			}
-			pods = append(pods, *pod.(*api.Pod))
+			pods = append(pods, pod.(*api.Pod))
 		}
 	}
 	return pods

@@ -29,6 +29,8 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd"
+	clientcmdapi "github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/nodecontroller"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/servicecontroller"
@@ -47,9 +49,9 @@ import (
 type CMServer struct {
 	Port                    int
 	Address                 util.IP
-	ClientConfig            client.Config
 	CloudProvider           string
 	CloudConfigFile         string
+	ConcurrentEndpointSyncs int
 	MinionRegexp            string
 	NodeSyncPeriod          time.Duration
 	ResourceQuotaSyncPeriod time.Duration
@@ -72,6 +74,9 @@ type CMServer struct {
 
 	ClusterName     string
 	EnableProfiling bool
+
+	Master     string
+	Kubeconfig string
 }
 
 // NewCMServer creates a new CMServer with a default config.
@@ -79,6 +84,7 @@ func NewCMServer() *CMServer {
 	s := CMServer{
 		Port:                    ports.ControllerManagerPort,
 		Address:                 util.IP(net.ParseIP("127.0.0.1")),
+		ConcurrentEndpointSyncs: 5,
 		NodeSyncPeriod:          10 * time.Second,
 		ResourceQuotaSyncPeriod: 10 * time.Second,
 		NamespaceSyncPeriod:     5 * time.Minute,
@@ -96,11 +102,9 @@ func NewCMServer() *CMServer {
 func (s *CMServer) AddFlags(fs *pflag.FlagSet) {
 	fs.IntVar(&s.Port, "port", s.Port, "The port that the controller-manager's http service runs on")
 	fs.Var(&s.Address, "address", "The IP address to serve on (set to 0.0.0.0 for all interfaces)")
-	s.ClientConfig.QPS = 20.0
-	s.ClientConfig.Burst = 30
-	client.BindClientConfigFlags(fs, &s.ClientConfig)
 	fs.StringVar(&s.CloudProvider, "cloud_provider", s.CloudProvider, "The provider for cloud services.  Empty string for no provider.")
 	fs.StringVar(&s.CloudConfigFile, "cloud_config", s.CloudConfigFile, "The path to the cloud provider configuration file.  Empty string for no configuration file.")
+	fs.IntVar(&s.ConcurrentEndpointSyncs, "concurrent_endpoint_syncs", s.ConcurrentEndpointSyncs, "The number of endpoint syncing operations that will be done concurrently. Larger number = faster endpoint updating, but more CPU (and network) load")
 	fs.StringVar(&s.MinionRegexp, "minion_regexp", s.MinionRegexp, "If non empty, and --cloud_provider is specified, a regular expression for matching minion VMs.")
 	fs.DurationVar(&s.NodeSyncPeriod, "node_sync_period", s.NodeSyncPeriod, ""+
 		"The period for syncing nodes from cloudprovider. Longer periods will result in "+
@@ -130,6 +134,8 @@ func (s *CMServer) AddFlags(fs *pflag.FlagSet) {
 	fs.Var(resource.NewQuantityFlagValue(&s.NodeMemory), "node_memory", "The amount of memory (in bytes) provisioned on each node")
 	fs.StringVar(&s.ClusterName, "cluster_name", s.ClusterName, "The instance prefix for the cluster")
 	fs.BoolVar(&s.EnableProfiling, "profiling", false, "Enable profiling via web interface host:port/debug/pprof/")
+	fs.StringVar(&s.Master, "master", s.Master, "The address of the Kubernetes API server (overrides any value in kubeconfig)")
+	fs.StringVar(&s.Kubeconfig, "kubeconfig", s.Kubeconfig, "Path to kubeconfig file with authorization and master location information.")
 }
 
 func (s *CMServer) verifyMinionFlags() {
@@ -151,11 +157,23 @@ func (s *CMServer) verifyMinionFlags() {
 func (s *CMServer) Run(_ []string) error {
 	s.verifyMinionFlags()
 
-	if len(s.ClientConfig.Host) == 0 {
-		glog.Fatal("usage: controller-manager --master <master>")
+	if s.Kubeconfig == "" && s.Master == "" {
+		glog.Warningf("Neither --kubeconfig nor --master was specified.  Using default API client.  This might not work.")
 	}
 
-	kubeClient, err := client.New(&s.ClientConfig)
+	// This creates a client, first loading any specified kubeconfig
+	// file, and then overriding the Master flag, if non-empty.
+	kubeconfig, err := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
+		&clientcmd.ClientConfigLoadingRules{ExplicitPath: s.Kubeconfig},
+		&clientcmd.ConfigOverrides{ClusterInfo: clientcmdapi.Cluster{Server: s.Master}}).ClientConfig()
+	if err != nil {
+		return err
+	}
+
+	kubeconfig.QPS = 20.0
+	kubeconfig.Burst = 30
+
+	kubeClient, err := client.New(kubeconfig)
 	if err != nil {
 		glog.Fatalf("Invalid API configuration: %v", err)
 	}
@@ -171,7 +189,7 @@ func (s *CMServer) Run(_ []string) error {
 	}()
 
 	endpoints := service.NewEndpointController(kubeClient)
-	go util.Forever(func() { endpoints.SyncServiceEndpoints() }, time.Second*10)
+	go endpoints.Run(s.ConcurrentEndpointSyncs, util.NeverStop)
 
 	controllerManager := replicationControllerPkg.NewReplicationManager(kubeClient)
 	controllerManager.Run(replicationControllerPkg.DefaultSyncPeriod)

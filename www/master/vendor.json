@@ -1,0 +1,5 @@
+[
+  "../../third_party/ui/bower_components/angular-json-human/dist/angular-json-human.css",
+  "../../third_party/ui/bower_components/angular-material/angular-material.css",
+  "../../third_party/ui/bower_components/d3/d3.min.js"
+]

@@ -9,8 +9,8 @@ If you are considering contributing a new guide, please read the
 
 IaaS Provider  | Config. Mgmt | OS     | Networking  | Docs                                                   | Support Level                | Notes
 -------------- | ------------ | ------ | ----------  | ----------------------------------------------------   | ---------------------------- | -----
-GKE            |              |        | GCE         | [docs](https://cloud.google.com/container-engine)      | Commercial                   | Uses K8s version 0.14.1
-GCE            | Saltstack    | Debian | GCE         | [docs](../../docs/getting-started-guides/gce.md)       | Project                      | Tested with 0.14.1 by @brendandburns
+GKE            |              |        | GCE         | [docs](https://cloud.google.com/container-engine)      | Commercial                   | Uses K8s version 0.15.0
+GCE            | Saltstack    | Debian | GCE         | [docs](../../docs/getting-started-guides/gce.md)       | Project                      | Tested with 0.15.0 by @robertbailey
 Mesos/GCE      |              |        |             | [docs](../../docs/getting-started-guides/mesos.md)     | [Community](https://github.com/mesosphere/kubernetes-mesos) ([@jdef](https://github.com/jdef)) | Uses K8s v0.11.0
 Vagrant        | Saltstack    | Fedora | OVS         | [docs](../../docs/getting-started-guides/vagrant.md)   | Project                      |
 Bare-metal     | custom       | Fedora | _none_      | [docs](../../docs/getting-started-guides/fedora/fedora_manual_config.md) | Project    | Uses K8s v0.13.2
@@ -29,13 +29,12 @@ Docker Single Node        | custom       | N/A    | local       | [docs](docker.
 Docker Multi Node        | Flannel| N/A    | local       | [docs](docker-multinode.md) | Project (@brendandburns) | Tested @ 0.14.1 |
 Local          |              |        | _none_      | [docs](../../docs/getting-started-guides/locally.md)   | Community (@preillyme)                     |
 Ovirt          |              |        |             | [docs](../../docs/getting-started-guides/ovirt.md)     | Inactive (@simon3z)          |
-Rackspace      | CoreOS       | CoreOS | Rackspace   | [docs](../../docs/getting-started-guides/rackspace.md) | Inactive (@doubleerr)        |
 Bare-metal     | custom       | CentOS | _none_      | [docs](../../docs/getting-started-guides/centos/centos_manual_config.md) | Community(@coolsvap)    | Uses K8s v0.9.1
 libvirt/KVM    | CoreOS       | CoreOS | libvirt/KVM | [docs](../../docs/getting-started-guides/libvirt-coreos.md) | Community (@lhuard1A)   |
 AWS            | Juju         | Ubuntu | flannel     | [docs](../../docs/getting-started-guides/juju.md)      | [Community](https://github.com/whitmo/bundle-kubernetes) ( [@whit](https://github.com/whitmo), [@matt](https://github.com/mbruzek), [@chuck](https://github.com/chuckbutler) ) | [Tested](http://reports.vapour.ws/charm-tests-by-charm/kubernetes) K8s v0.8.1
 OpenStack/HPCloud | Juju      | Ubuntu | flannel     | [docs](../../docs/getting-started-guides/juju.md)      | [Community](https://github.com/whitmo/bundle-kubernetes) ( [@whit](https://github.com/whitmo), [@matt](https://github.com/mbruzek), [@chuck](https://github.com/chuckbutler) ) | [Tested](http://reports.vapour.ws/charm-tests-by-charm/kubernetes) K8s v0.8.1
 Joyent         | Juju         | Ubuntu | flannel     | [docs](../../docs/getting-started-guides/juju.md)      | [Community](https://github.com/whitmo/bundle-kubernetes) ( [@whit](https://github.com/whitmo), [@matt](https://github.com/mbruzek), [@chuck](https://github.com/chuckbutler) ) | [Tested](http://reports.vapour.ws/charm-tests-by-charm/kubernetes) K8s v0.8.1
-Azure          | CoreOS       | CoreOS | Weave       | [docs](../../docs/getting-started-guides/coreos/azure/README.md)         | Community ([@errordeveloper](https://github.com/errordeveloper), [@squillace](https://github.com/squillace), [@chanezon](https://github.com/chanezon)) | Uses K8s version 0.11.0
+Azure          | CoreOS       | CoreOS | Weave       | [docs](../../docs/getting-started-guides/coreos/azure/README.md)         | Community ([@errordeveloper](https://github.com/errordeveloper), [@squillace](https://github.com/squillace), [@chanezon](https://github.com/chanezon), [@crossorigin](https://github.com/crossorigin)) | Uses K8s version 0.15.0
 Bare-metal (Offline) | CoreOS       | CoreOS | flannel      | [docs](../../docs/getting-started-guides/coreos/bare_metal_offline.md) | Community([@jeffbean](https://github.com/jeffbean))    | K8s v0.10.1
 
 Definition of columns:

@@ -1,6 +1,8 @@
 package stackresources
 
 import (
+	"fmt"
+	"reflect"
 	"time"
 
 	"github.com/mitchellh/mapstructure"
@@ -94,7 +96,15 @@ func ExtractResources(page pagination.Page) ([]Resource, error) {
 	}
 	err := mapstructure.Decode(casted, &response)
 
-	resources := casted.(map[string]interface{})["resources"].([]interface{})
+	var resources []interface{}
+	switch casted.(type) {
+	case map[string]interface{}:
+		resources = casted.(map[string]interface{})["resources"].([]interface{})
+	case map[string][]interface{}:
+		resources = casted.(map[string][]interface{})["resources"]
+	default:
+		return response.Resources, fmt.Errorf("Unknown type: %v", reflect.TypeOf(casted))
+	}
 
 	for i, resourceRaw := range resources {
 		resource := resourceRaw.(map[string]interface{})

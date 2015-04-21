@@ -2,6 +2,8 @@ package stacks
 
 import (
 	"encoding/json"
+	"fmt"
+	"reflect"
 	"time"
 
 	"github.com/mitchellh/mapstructure"
@@ -73,6 +75,8 @@ type ListedStack struct {
 // ExtractStacks extracts and returns a slice of ListedStack. It is used while iterating
 // over a stacks.List call.
 func ExtractStacks(page pagination.Page) ([]ListedStack, error) {
+	casted := page.(StackPage).Body
+
 	var res struct {
 		Stacks []ListedStack `mapstructure:"stacks"`
 	}
@@ -82,7 +86,16 @@ func ExtractStacks(page pagination.Page) ([]ListedStack, error) {
 		return nil, err
 	}
 
-	rawStacks := (((page.(StackPage).Body).(map[string]interface{}))["stacks"]).([]interface{})
+	var rawStacks []interface{}
+	switch casted.(type) {
+	case map[string]interface{}:
+		rawStacks = casted.(map[string]interface{})["stacks"].([]interface{})
+	case map[string][]interface{}:
+		rawStacks = casted.(map[string][]interface{})["stacks"]
+	default:
+		return res.Stacks, fmt.Errorf("Unknown type: %v", reflect.TypeOf(casted))
+	}
+
 	for i := range rawStacks {
 		thisStack := (rawStacks[i]).(map[string]interface{})
 

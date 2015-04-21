@@ -12,7 +12,7 @@ docker run --net=host -d kubernetes/etcd:2.0.5.1 /usr/local/bin/etcd --addr=127.
 
 ### Step Two: Run the master
 ```sh
-docker run --net=host -d -v /var/run/docker.sock:/var/run/docker.sock  gcr.io/google_containers/hyperkube:v0.14.2 /hyperkube kubelet --api_servers=http://localhost:8080 --v=2 --address=0.0.0.0 --enable_server --hostname_override=127.0.0.1 --config=/etc/kubernetes/manifests
+docker run --net=host -d -v /var/run/docker.sock:/var/run/docker.sock  gcr.io/google_containers/hyperkube:v0.15.0 /hyperkube kubelet --api_servers=http://localhost:8080 --v=2 --address=0.0.0.0 --enable_server --hostname_override=127.0.0.1 --config=/etc/kubernetes/manifests
 ```
 
 This actually runs the kubelet, which in turn runs a [pod](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/pods.md) that contains the other master components.
@@ -20,14 +20,14 @@ This actually runs the kubelet, which in turn runs a [pod](https://github.com/Go
 ### Step Three: Run the service proxy
 *Note, this could be combined with master above, but it requires --privileged for iptables manipulation*
 ```sh
-docker run -d --net=host --privileged gcr.io/google_containers/hyperkube:v0.14.2 /hyperkube proxy --master=http://127.0.0.1:8080 --v=2
+docker run -d --net=host --privileged gcr.io/google_containers/hyperkube:v0.15.0 /hyperkube proxy --master=http://127.0.0.1:8080 --v=2
 ```
 
 ### Test it out
 At this point you should have a running kubernetes cluster.  You can test this by downloading the kubectl 
 binary
-([OS X](http://storage.googleapis.com/kubernetes-release/release/v0.14.2/bin/darwin/amd64/kubectl))
-([linux](http://storage.googleapis.com/kubernetes-release/release/v0.14.2/bin/linux/amd64/kubectl))
+([OS X](http://storage.googleapis.com/kubernetes-release/release/v0.15.0/bin/darwin/amd64/kubectl))
+([linux](http://storage.googleapis.com/kubernetes-release/release/v0.15.0/bin/linux/amd64/kubectl))
 
 *Note:*
 On OS/X you will need to set up port forwarding via ssh:

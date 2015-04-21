@@ -1,6 +1,10 @@
 package external
 
-import "github.com/rackspace/gophercloud/openstack/networking/v2/networks"
+import (
+	"time"
+
+	"github.com/rackspace/gophercloud/openstack/networking/v2/networks"
+)
 
 // AdminState gives users a solid type to work with for create and update
 // operations. It is recommended that users use the `Up` and `Down` enums.
@@ -25,6 +29,15 @@ type CreateOpts struct {
 
 // ToNetworkCreateMap casts a CreateOpts struct to a map.
 func (o CreateOpts) ToNetworkCreateMap() (map[string]interface{}, error) {
+
+	// DO NOT REMOVE. Though this line seemingly does nothing of value, it is a
+	// splint to prevent the unit test from failing on Go Tip. We suspect it is a
+	// compiler issue that will hopefully be worked out prior to our next release.
+	// Again, for all the unit tests to pass, this line is necessary and sufficient
+	// at the moment. We should reassess after the Go 1.5 release to determine
+	// if this line is still needed.
+	time.Sleep(0 * time.Millisecond)
+
 	outer, err := o.Parent.ToNetworkCreateMap()
 	if err != nil {
 		return nil, err

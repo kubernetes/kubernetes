@@ -140,7 +140,8 @@ func (g *APIGroupVersion) InstallREST(container *restful.Container) error {
 	return errors.NewAggregate(registrationErrors)
 }
 
-// TODO: Convert to go-restful
+// TODO: This endpoint is deprecated and should be removed at some point.
+// Use "componentstatus" API instead.
 func InstallValidator(mux Mux, servers func() map[string]Server) {
 	mux.Handle("/validate", NewValidator(servers))
 }

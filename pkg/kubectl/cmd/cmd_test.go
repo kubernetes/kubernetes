@@ -49,23 +49,32 @@ type externalType struct {
 	Name string `json:"name"`
 }
 
-func (*internalType) IsAnAPIObject() {}
-func (*externalType) IsAnAPIObject() {}
+type ExternalType2 struct {
+	Kind       string `json:"kind"`
+	APIVersion string `json:"apiVersion"`
+
+	Name string `json:"name"`
+}
+
+func (*internalType) IsAnAPIObject()  {}
+func (*externalType) IsAnAPIObject()  {}
+func (*ExternalType2) IsAnAPIObject() {}
 
 func newExternalScheme() (*runtime.Scheme, meta.RESTMapper, runtime.Codec) {
 	scheme := runtime.NewScheme()
 	scheme.AddKnownTypeWithName("", "Type", &internalType{})
 	scheme.AddKnownTypeWithName("unlikelyversion", "Type", &externalType{})
+	scheme.AddKnownTypeWithName("v1beta1", "Type", &ExternalType2{})
 
 	codec := runtime.CodecFor(scheme, "unlikelyversion")
-	mapper := meta.NewDefaultRESTMapper([]string{"unlikelyversion"}, func(version string) (*meta.VersionInterfaces, bool) {
+	mapper := meta.NewDefaultRESTMapper([]string{"unlikelyversion", "v1beta1"}, func(version string) (*meta.VersionInterfaces, bool) {
 		return &meta.VersionInterfaces{
-			Codec:            codec,
+			Codec:            runtime.CodecFor(scheme, version),
 			ObjectConvertor:  scheme,
 			MetadataAccessor: meta.NewAccessor(),
-		}, (version == "unlikelyversion")
+		}, (version == "v1beta1" || version == "unlikelyversion")
 	})
-	for _, version := range []string{"unlikelyversion"} {
+	for _, version := range []string{"unlikelyversion", "v1beta1"} {
 		for kind := range scheme.KnownTypes(version) {
 			mixedCase := false
 			scope := meta.RESTScopeNamespace
@@ -142,6 +151,20 @@ func NewTestFactory() (*cmdutil.Factory, *testFactory, runtime.Codec) {
 	}, t, codec
 }
 
+func NewMixedFactory(apiClient resource.RESTClient) (*cmdutil.Factory, *testFactory, runtime.Codec) {
+	f, t, c := NewTestFactory()
+	f.Object = func() (meta.RESTMapper, runtime.ObjectTyper) {
+		return meta.MultiRESTMapper{t.Mapper, latest.RESTMapper}, runtime.MultiObjectTyper{t.Typer, api.Scheme}
+	}
+	f.RESTClient = func(m *meta.RESTMapping) (resource.RESTClient, error) {
+		if m.ObjectConvertor == api.Scheme {
+			return apiClient, t.Err
+		}
+		return t.Client, t.Err
+	}
+	return f, t, c
+}
+
 func NewAPIFactory() (*cmdutil.Factory, *testFactory, runtime.Codec) {
 	t := &testFactory{
 		Validator: validation.NullSchema{},
@@ -149,6 +172,13 @@ func NewAPIFactory() (*cmdutil.Factory, *testFactory, runtime.Codec) {
 	return &cmdutil.Factory{
 		Object: func() (meta.RESTMapper, runtime.ObjectTyper) {
 			return latest.RESTMapper, api.Scheme
+		},
+		Client: func() (*client.Client, error) {
+			// Swap out the HTTP client out of the client with the fake's version.
+			fakeClient := t.Client.(*client.FakeRESTClient)
+			c := client.NewOrDie(t.ClientConfig)
+			c.Client = fakeClient.Client
+			return c, t.Err
 		},
 		RESTClient: func(*meta.RESTMapping) (resource.RESTClient, error) {
 			return t.Client, t.Err

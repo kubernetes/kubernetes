@@ -57,11 +57,10 @@ func bodyToJSON(body []byte) (map[string]interface{}, error) {
 
 // ClusterLevelLoggingWithElasticsearch is an end to end test for cluster level logging.
 func ClusterLevelLoggingWithElasticsearch(c *client.Client) {
-
 	// TODO: For now assume we are only testing cluster logging with Elasticsearch
 	// on GCE. Once we are sure that Elasticsearch cluster level logging
 	// works for other providers we should widen this scope of this test.
-	if testContext.Provider != "gce" {
+	if !providerIs("gce") {
 		Logf("Skipping cluster level logging test for provider %s", testContext.Provider)
 		return
 	}

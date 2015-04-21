@@ -58,26 +58,38 @@ func (e ErrNoDescriber) Error() string {
 	return fmt.Sprintf("no describer has been defined for %v", e.Types)
 }
 
+func describerMap(c *client.Client) map[string]Describer {
+	m := map[string]Describer{
+		"Pod": &PodDescriber{c},
+		"ReplicationController": &ReplicationControllerDescriber{c},
+		"Service":               &ServiceDescriber{c},
+		"Minion":                &NodeDescriber{c},
+		"Node":                  &NodeDescriber{c},
+		"LimitRange":            &LimitRangeDescriber{c},
+		"ResourceQuota":         &ResourceQuotaDescriber{c},
+		"PersistentVolume":      &PersistentVolumeDescriber{c},
+		"PersistentVolumeClaim": &PersistentVolumeClaimDescriber{c},
+	}
+	return m
+}
+
+// List of all resource types we can describe
+func DescribableResources() []string {
+	keys := make([]string, 0)
+
+	for k := range describerMap(nil) {
+		resource := strings.ToLower(k)
+		keys = append(keys, resource)
+	}
+	return keys
+}
+
 // Describer returns the default describe functions for each of the standard
 // Kubernetes types.
 func DescriberFor(kind string, c *client.Client) (Describer, bool) {
-	switch kind {
-	case "Pod":
-		return &PodDescriber{c}, true
-	case "ReplicationController":
-		return &ReplicationControllerDescriber{c}, true
-	case "Service":
-		return &ServiceDescriber{c}, true
-	case "PersistentVolume":
-		return &PersistentVolumeDescriber{c}, true
-	case "PersistentVolumeClaim":
-		return &PersistentVolumeClaimDescriber{c}, true
-	case "Minion", "Node":
-		return &NodeDescriber{c}, true
-	case "LimitRange":
-		return &LimitRangeDescriber{c}, true
-	case "ResourceQuota":
-		return &ResourceQuotaDescriber{c}, true
+	f, ok := describerMap(c)[kind]
+	if ok {
+		return f, true
 	}
 	return nil, false
 }
@@ -225,7 +237,7 @@ func (d *PodDescriber) Describe(namespace, name string) (string, error) {
 		if err2 == nil && len(events.Items) > 0 {
 			return tabbedString(func(out io.Writer) error {
 				fmt.Fprintf(out, "Pod '%v': error '%v', but found events.\n", name, err)
-				describeEvents(events, out)
+				DescribeEvents(events, out)
 				return nil
 			})
 		}
@@ -267,7 +279,7 @@ func describePod(pod *api.Pod, rcs []api.ReplicationController, events *api.Even
 			}
 		}
 		if events != nil {
-			describeEvents(events, out)
+			DescribeEvents(events, out)
 		}
 		return nil
 	})
@@ -398,7 +410,7 @@ func describeReplicationController(controller *api.ReplicationController, events
 		fmt.Fprintf(out, "Replicas:\t%d current / %d desired\n", controller.Status.Replicas, controller.Spec.Replicas)
 		fmt.Fprintf(out, "Pods Status:\t%d Running / %d Waiting / %d Succeeded / %d Failed\n", running, waiting, succeeded, failed)
 		if events != nil {
-			describeEvents(events, out)
+			DescribeEvents(events, out)
 		}
 		return nil
 	})
@@ -448,7 +460,7 @@ func describeService(service *api.Service, endpoints *api.Endpoints, events *api
 		fmt.Fprintf(out, "Endpoints:\t%s\n", formatEndpoints(endpoints))
 		fmt.Fprintf(out, "Session Affinity:\t%s\n", service.Spec.SessionAffinity)
 		if events != nil {
-			describeEvents(events, out)
+			DescribeEvents(events, out)
 		}
 		return nil
 	})
@@ -466,12 +478,13 @@ func (d *NodeDescriber) Describe(namespace, name string) (string, error) {
 		return "", err
 	}
 
-	var pods []api.Pod
+	var pods []*api.Pod
 	allPods, err := d.Pods(namespace).List(labels.Everything())
 	if err != nil {
 		return "", err
 	}
-	for _, pod := range allPods.Items {
+	for i := range allPods.Items {
+		pod := &allPods.Items[i]
 		if pod.Spec.Host != name {
 			continue
 		}
@@ -490,7 +503,7 @@ func (d *NodeDescriber) Describe(namespace, name string) (string, error) {
 	return describeNode(node, pods, events)
 }
 
-func describeNode(node *api.Node, pods []api.Pod, events *api.EventList) (string, error) {
+func describeNode(node *api.Node, pods []*api.Pod, events *api.EventList) (string, error) {
 	return tabbedString(func(out io.Writer) error {
 		fmt.Fprintf(out, "Name:\t%s\n", node.Name)
 		fmt.Fprintf(out, "Labels:\t%s\n", formatLabels(node.Labels))
@@ -537,13 +550,13 @@ func describeNode(node *api.Node, pods []api.Pod, events *api.EventList) (string
 			fmt.Fprintf(out, "  %s\n", pod.Name)
 		}
 		if events != nil {
-			describeEvents(events, out)
+			DescribeEvents(events, out)
 		}
 		return nil
 	})
 }
 
-func describeEvents(el *api.EventList, w io.Writer) {
+func DescribeEvents(el *api.EventList, w io.Writer) {
 	if len(el.Items) == 0 {
 		fmt.Fprint(w, "No events.")
 		return
