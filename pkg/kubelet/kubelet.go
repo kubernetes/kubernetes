@@ -91,7 +91,7 @@ type SyncHandler interface {
 	// Syncs current state to match the specified pods. SyncPodType specified what
 	// type of sync is occuring per pod. StartTime specifies the time at which
 	// syncing began (for use in monitoring).
-	SyncPods(pods []*api.Pod, podSyncTypes map[types.UID]metrics.SyncPodType, mirrorPods map[string]api.Pod,
+	SyncPods(pods []*api.Pod, podSyncTypes map[types.UID]metrics.SyncPodType, mirrorPods map[string]*api.Pod,
 		startTime time.Time) error
 }
 
@@ -1315,7 +1315,7 @@ func (kl *Kubelet) syncPod(pod *api.Pod, mirrorPod *api.Pod, runningPod kubecont
 		}
 		if mirrorPod == nil {
 			glog.V(3).Infof("Creating a mirror pod %q", podFullName)
-			if err := kl.podManager.CreateMirrorPod(*pod); err != nil {
+			if err := kl.podManager.CreateMirrorPod(pod); err != nil {
 				glog.Errorf("Failed creating a mirror pod %q: %v", podFullName, err)
 			}
 			// Pod status update is edge-triggered. If there is any update of the
@@ -1399,7 +1399,7 @@ func (kl *Kubelet) cleanupOrphanedVolumes(pods []*api.Pod, running []*docker.Con
 
 // SyncPods synchronizes the configured list of pods (desired state) with the host current state.
 func (kl *Kubelet) SyncPods(allPods []*api.Pod, podSyncTypes map[types.UID]metrics.SyncPodType,
-	mirrorPods map[string]api.Pod, start time.Time) error {
+	mirrorPods map[string]*api.Pod, start time.Time) error {
 	defer func() {
 		metrics.SyncPodsLatency.Observe(metrics.SinceInMicroseconds(start))
 	}()
@@ -1439,11 +1439,7 @@ func (kl *Kubelet) SyncPods(allPods []*api.Pod, podSyncTypes map[types.UID]metri
 		desiredPods[uid] = empty{}
 
 		// Run the sync in an async manifest worker.
-		var mirrorPod *api.Pod = nil
-		if m, ok := mirrorPods[podFullName]; ok {
-			mirrorPod = &m
-		}
-		kl.podWorkers.UpdatePod(pod, mirrorPod, func() {
+		kl.podWorkers.UpdatePod(pod, mirrorPods[podFullName], func() {
 			metrics.SyncPodLatency.WithLabelValues(podSyncTypes[pod.UID].String()).Observe(metrics.SinceInMicroseconds(start))
 		})
 

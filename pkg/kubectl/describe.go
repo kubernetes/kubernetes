@@ -478,12 +478,13 @@ func (d *NodeDescriber) Describe(namespace, name string) (string, error) {
 		return "", err
 	}
 
-	var pods []api.Pod
+	var pods []*api.Pod
 	allPods, err := d.Pods(namespace).List(labels.Everything())
 	if err != nil {
 		return "", err
 	}
-	for _, pod := range allPods.Items {
+	for i := range allPods.Items {
+		pod := &allPods.Items[i]
 		if pod.Spec.Host != name {
 			continue
 		}
@@ -502,7 +503,7 @@ func (d *NodeDescriber) Describe(namespace, name string) (string, error) {
 	return describeNode(node, pods, events)
 }
 
-func describeNode(node *api.Node, pods []api.Pod, events *api.EventList) (string, error) {
+func describeNode(node *api.Node, pods []*api.Pod, events *api.EventList) (string, error) {
 	return tabbedString(func(out io.Writer) error {
 		fmt.Fprintf(out, "Name:\t%s\n", node.Name)
 		fmt.Fprintf(out, "Labels:\t%s\n", formatLabels(node.Labels))
