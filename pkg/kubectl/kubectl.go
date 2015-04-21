@@ -97,7 +97,7 @@ func (e ShortcutExpander) VersionAndKindForResource(resource string) (defaultVer
 func expandResourceShortcut(resource string) string {
 	shortForms := map[string]string{
 		// Please keep this alphabetized
-		"cs":     "componentstatus",
+		"cs":     "componentstatuses",
 		"ev":     "events",
 		"limits": "limitRanges",
 		"mi":     "minions",

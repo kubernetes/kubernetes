@@ -67,12 +67,13 @@ func NewTestREST(resp testResponse) *REST {
 }
 
 func createTestStatus(name string, status api.ConditionStatus, msg string, err string) *api.ComponentStatus {
-	return &api.ComponentStatus{
-		Name: name,
+	retVal := &api.ComponentStatus{
 		Conditions: []api.ComponentCondition{
 			{Type: api.ComponentHealthy, Status: status, Message: msg, Error: err},
 		},
 	}
+	retVal.Name = name
+	return retVal
 }
 
 func TestList_NoError(t *testing.T) {

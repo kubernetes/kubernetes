@@ -90,23 +90,25 @@ func testData() (*api.PodList, *api.ServiceList, *api.ReplicationControllerList)
 
 func testComponentStatusData() *api.ComponentStatusList {
 	good := &api.ComponentStatus{
-		Name: "servergood",
 		Conditions: []api.ComponentCondition{
 			{Type: api.ComponentHealthy, Status: api.ConditionTrue, Message: "ok", Error: "nil"},
 		},
 	}
+	good.Name = "servergood"
+
 	bad := &api.ComponentStatus{
-		Name: "serverbad",
 		Conditions: []api.ComponentCondition{
 			{Type: api.ComponentHealthy, Status: api.ConditionFalse, Message: "", Error: "bad status: 500"},
 		},
 	}
+	bad.Name = "serverbad"
+
 	unknown := &api.ComponentStatus{
-		Name: "serverunknown",
 		Conditions: []api.ComponentCondition{
 			{Type: api.ComponentHealthy, Status: api.ConditionUnknown, Message: "", Error: "fizzbuzz error"},
 		},
 	}
+	unknown.Name = "serverunknown"
 
 	return &api.ComponentStatusList{
 		Items: []api.ComponentStatus{*good, *bad, *unknown},

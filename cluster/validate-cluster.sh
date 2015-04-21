@@ -49,9 +49,9 @@ cat -n "${MINIONS_FILE}"
 
 attempt=0
 while true; do
-  kubectl_output=$("${KUBE_ROOT}/cluster/kubectl.sh" get componentstatus)
+  kubectl_output=$("${KUBE_ROOT}/cluster/kubectl.sh" get cs)
 
-  # The "kubectl validate" output is four columns like this:
+  # The "kubectl componentstatuses" output is four columns like this:
   #
   #     COMPONENT            HEALTH    MSG       ERR
   #     controller-manager   Healthy   ok        nil
