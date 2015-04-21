@@ -100,25 +100,12 @@ elif [[ ! -x "${KUBECTL_PATH}" ]]; then
 fi
 kubectl="${KUBECTL_PATH:-${kubectl}}"
 
-# While GKE requires the kubectl binary, it's actually called through
-# gcloud. But we need to adjust the PATH so gcloud gets the right one.
+# GKE stores it's kubeconfig in a separate location.
 if [[ "$KUBERNETES_PROVIDER" == "gke" ]]; then
   detect-project &> /dev/null
-  export PATH=$(get_absolute_dirname $kubectl):$PATH
-  kubectl="${GCLOUD}"
-  # GKE runs kubectl through gcloud.
   config=(
-    "alpha"
-    "container"
-    "kubectl"
-    "--project=${PROJECT}"
-    "--zone=${ZONE}"
-    "--cluster=${CLUSTER_NAME}"
-  )
-elif [[ "$KUBERNETES_PROVIDER" == "vagrant" ]]; then
-  # When we are using vagrant it has hard coded kubeconfig, and do not clobber public endpoints
-  config=(
-    "--kubeconfig=$HOME/.kubernetes_vagrant_kubeconfig"
+    "--kubeconfig=${HOME}/.config/gcloud/kubernetes/kubeconfig"
+    "--context=gke_${PROJECT}_${ZONE}_${CLUSTER_NAME}"
   )
 fi
 

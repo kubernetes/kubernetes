@@ -176,8 +176,8 @@ Logs:
 
 To start using your cluster, open up another terminal/tab and run:
 
-  cluster/kubectl.sh config set-cluster local --server=http://${API_HOST}:${API_PORT} --insecure-skip-tls-verify=true --global
-  cluster/kubectl.sh config set-context local --cluster=local --global
+  cluster/kubectl.sh config set-cluster local --server=http://${API_HOST}:${API_PORT} --insecure-skip-tls-verify=true
+  cluster/kubectl.sh config set-context local --cluster=local
   cluster/kubectl.sh config use-context local
   cluster/kubectl.sh
 EOF
