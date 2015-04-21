@@ -33,6 +33,8 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+
+	"code.google.com/p/go-uuid/uuid"
 )
 
 const (
@@ -85,7 +87,7 @@ func waitForPodCondition(c *client.Client, ns, podName, desc string, condition p
 func createTestingNS(baseName string, c *client.Client) (*api.Namespace, error) {
 	namespaceObj := &api.Namespace{
 		ObjectMeta: api.ObjectMeta{
-			Name:      fmt.Sprintf("e2e-tests-%v-%v", baseName, randomSuffix()),
+			Name:      fmt.Sprintf("e2e-tests-%v-%v", baseName, uuid.New()),
 			Namespace: "",
 		},
 		Status: api.NamespaceStatus{},
@@ -193,7 +195,6 @@ func loadClient() (*client.Client, error) {
 }
 
 // randomSuffix provides a random string to append to pods,services,rcs.
-// NOTE: For test's namespaces, instead use createGinkgoNS(..).
 // TODO: Allow service names to have the same form as names
 //       for pods and replication controllers so we don't
 //       need to use such a function and can instead
