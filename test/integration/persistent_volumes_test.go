@@ -76,8 +76,25 @@ func TestPersistentVolumeClaimBinder(t *testing.T) {
 		t.Errorf("expected 3 PVCs, got %#v", len(claims.Items))
 	}
 
-	// make sure the binder has caught up
-	time.Sleep(2 * time.Second)
+	// the binder will eventually catch up and set status on Claims
+	watch, err := client.PersistentVolumeClaims(api.NamespaceDefault).Watch(labels.Everything(), fields.Everything(), "0")
+	if err != nil {
+		t.Fatalf("Couldn't subscribe to PersistentVolumeClaims: %v", err)
+	}
+	defer watch.Stop()
+
+	boundCount := 0
+	expectedBoundCount := 2
+	for {
+		event := <-watch.ResultChan()
+		claim := event.Object.(*api.PersistentVolumeClaim)
+		if claim.Status.VolumeRef != nil {
+			boundCount++
+		}
+		if boundCount == expectedBoundCount {
+			break
+		}
+	}
 
 	for _, claim := range createTestClaims() {
 		claim, err := client.PersistentVolumeClaims(api.NamespaceDefault).Get(claim.Name)
@@ -86,7 +103,7 @@ func TestPersistentVolumeClaimBinder(t *testing.T) {
 		}
 
 		if (claim.Name == "claim01" || claim.Name == "claim02") && claim.Status.VolumeRef == nil {
-			t.Errorf("Expected claim to be bound: %v", claim)
+			t.Errorf("Expected claim to be bound: %+v", claim)
 		}
 		if claim.Name == "claim03" && claim.Status.VolumeRef != nil {
 			t.Errorf("Expected claim03 to be unbound: %v", claim)

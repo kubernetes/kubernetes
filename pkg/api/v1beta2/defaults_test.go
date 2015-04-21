@@ -154,6 +154,26 @@ func TestSetDefaultService(t *testing.T) {
 	}
 }
 
+func TestSetDefaultPersistentVolume(t *testing.T) {
+	pv := &current.PersistentVolume{}
+	obj2 := roundTrip(t, runtime.Object(pv))
+	pv2 := obj2.(*current.PersistentVolume)
+
+	if pv2.Status.Phase != current.VolumePending {
+		t.Errorf("Expected volume phase %v, got %v", current.VolumePending, pv2.Status.Phase)
+	}
+}
+
+func TestSetDefaultPersistentVolumeClaim(t *testing.T) {
+	pvc := &current.PersistentVolumeClaim{}
+	obj2 := roundTrip(t, runtime.Object(pvc))
+	pvc2 := obj2.(*current.PersistentVolumeClaim)
+
+	if pvc2.Status.Phase != current.ClaimPending {
+		t.Errorf("Expected claim phase %v, got %v", current.ClaimPending, pvc2.Status.Phase)
+	}
+}
+
 func TestSetDefaultSecret(t *testing.T) {
 	s := &current.Secret{}
 	obj2 := roundTrip(t, runtime.Object(s))

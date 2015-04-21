@@ -59,6 +59,9 @@ func validNewPersistentVolumeClaim(name, ns string) *api.PersistentVolumeClaim {
 				},
 			},
 		},
+		Status: api.PersistentVolumeClaimStatus{
+			Phase: api.ClaimPending,
+		},
 	}
 	return pv
 }

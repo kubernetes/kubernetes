@@ -17,12 +17,12 @@ limitations under the License.
 package volumeclaimbinder
 
 import (
-	"fmt"
 	"reflect"
 	"testing"
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/testclient"
@@ -51,7 +51,6 @@ func TestRunStop(t *testing.T) {
 }
 
 func TestExampleObjects(t *testing.T) {
-
 	scenarios := map[string]struct {
 		expected interface{}
 	}{
@@ -167,56 +166,7 @@ func TestExampleObjects(t *testing.T) {
 	}
 }
 
-func TestRequiresUpdate(t *testing.T) {
-	old := &api.PersistentVolume{
-		Spec: api.PersistentVolumeSpec{
-			AccessModes: []api.AccessModeType{api.ReadWriteOnce},
-			Capacity: api.ResourceList{
-				api.ResourceName(api.ResourceStorage): resource.MustParse("5Gi"),
-			},
-			PersistentVolumeSource: api.PersistentVolumeSource{
-				HostPath: &api.HostPathVolumeSource{
-					Path: "/tmp/data02",
-				},
-			},
-		},
-	}
-
-	new := &api.PersistentVolume{
-		Spec: api.PersistentVolumeSpec{
-			AccessModes: []api.AccessModeType{api.ReadWriteOnce},
-			Capacity: api.ResourceList{
-				api.ResourceName(api.ResourceStorage): resource.MustParse("5Gi"),
-			},
-			PersistentVolumeSource: api.PersistentVolumeSource{
-				HostPath: &api.HostPathVolumeSource{
-					Path: "/tmp/data02",
-				},
-			},
-			ClaimRef: &api.ObjectReference{Name: "foo"},
-		},
-	}
-
-	if !updateRequired(old, new) {
-		t.Errorf("Update expected for the new volume with added ClaimRef")
-	}
-
-	old.Spec.ClaimRef = new.Spec.ClaimRef
-	old.Status.Phase = api.VolumeBound
-
-	if !updateRequired(old, new) {
-		t.Errorf("Update expected for the new volume with added Status")
-	}
-
-	new.Status.Phase = old.Status.Phase
-
-	if updateRequired(old, new) {
-		t.Errorf("No updated expected for identical objects")
-	}
-}
-
 func TestBindingWithExamples(t *testing.T) {
-
 	api.ForTesting_ReferencesAllowBlankSelfLinks = true
 	o := testclient.NewObjects(api.Scheme)
 	if err := testclient.AddObjectsFromPath("../../examples/persistent-volumes/claims/claim-01.yaml", o); err != nil {
@@ -245,7 +195,7 @@ func TestBindingWithExamples(t *testing.T) {
 	}
 
 	volumeIndex.Add(pv)
-	syncVolume(mockClient, pv)
+	syncVolume(volumeIndex, mockClient, pv)
 
 	if pv.Status.Phase != api.VolumeAvailable {
 		t.Errorf("Expected phase %s but got %s", api.VolumeBound, pv.Status.Phase)
@@ -261,10 +211,13 @@ func TestBindingWithExamples(t *testing.T) {
 		t.Errorf("Expected ClaimRef but got nil for volume: %+v\n", pv)
 	}
 
-	syncVolume(mockClient, pv)
+	// first sync verifies the new bound claim, advances state, triggering update
+	syncVolume(volumeIndex, mockClient, pv)
+	// second sync verifies claim, sees missing claim status and builds it
+	syncVolume(volumeIndex, mockClient, pv)
 
 	if claim.Status.VolumeRef == nil {
-		t.Error("Expected claim to be bound to volume")
+		t.Fatalf("Expected claim to be bound to volume")
 	}
 
 	if pv.Status.Phase != api.VolumeBound {
@@ -283,7 +236,7 @@ func TestBindingWithExamples(t *testing.T) {
 
 	// pretend the user deleted their claim
 	mockClient.claim = nil
-	syncVolume(mockClient, pv)
+	syncVolume(volumeIndex, mockClient, pv)
 
 	if pv.Status.Phase != api.VolumeReleased {
 		t.Errorf("Expected phase %s but got %s", api.VolumeReleased, pv.Status.Phase)
@@ -311,7 +264,7 @@ func (c *mockBinderClient) GetPersistentVolumeClaim(namespace, name string) (*ap
 	if c.claim != nil {
 		return c.claim, nil
 	} else {
-		return nil, fmt.Errorf("Claim does not exist")
+		return nil, errors.NewNotFound("persistentVolume", name)
 	}
 }
 
