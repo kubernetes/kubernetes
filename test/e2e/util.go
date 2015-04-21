@@ -284,6 +284,11 @@ func validateController(c *client.Client, containerImage string, replicas int, c
 // kubectlCmd runs the kubectl executable.
 func kubectlCmd(args ...string) *exec.Cmd {
 	defaultArgs := []string{}
+
+	// Reference a --server option so tests can run anywhere.
+	if testContext.Host != "" {
+		defaultArgs = append(defaultArgs, "--"+clientcmd.FlagAPIServer+"="+testContext.Host)
+	}
 	if testContext.KubeConfig != "" {
 		defaultArgs = append(defaultArgs, "--"+clientcmd.RecommendedConfigPathFlag+"="+testContext.KubeConfig)
 
@@ -292,10 +297,6 @@ func kubectlCmd(args ...string) *exec.Cmd {
 			defaultArgs = append(defaultArgs, "--"+clientcmd.FlagContext+"="+testContext.KubeContext)
 		}
 
-		// Reference a --server option so tests can run anywhere.
-		if testContext.Host != "" {
-			defaultArgs = append(defaultArgs, "--"+clientcmd.FlagAPIServer+"="+testContext.Host)
-		}
 	} else {
 		defaultArgs = append(defaultArgs, "--"+clientcmd.FlagAuthPath+"="+testContext.AuthConfig)
 		if testContext.CertDir != "" {
