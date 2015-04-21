@@ -5,7 +5,6 @@ import sys
 # `juju run` command's JSON object, see cluster/juju/util.sh
 
 if len(sys.argv) > 1:
-    print(sys.argv[1])
     # It takes the JSON output as the first argument.
     nodes = json.loads(sys.argv[1])
     # There can be multiple nodes to print the Stdout.
