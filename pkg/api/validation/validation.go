@@ -81,6 +81,26 @@ func ValidateAnnotations(annotations map[string]string, field string) errs.Valid
 	return allErrs
 }
 
+// ValidateMinimalName prevents names from containing values that break URLs: '/' and '%'.
+// Go doesn't properly handle url encoding.  Try:
+// 	u, _ := url.Parse("https://www.example.com/test%2Fpath/")
+// 	fmt.Println(u.Path)
+func ValidateMinimalName(name string, field string) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+
+	if len(name) == 0 {
+		allErrs = append(allErrs, errs.NewFieldRequired(field))
+	}
+	if strings.Contains(name, "%") {
+		allErrs = append(allErrs, errs.NewFieldInvalid(field, name, `may not contain "%"`))
+	}
+	if strings.Contains(name, "/") {
+		allErrs = append(allErrs, errs.NewFieldInvalid(field, name, `may not contain "/"`))
+	}
+
+	return allErrs
+}
+
 // ValidateNameFunc validates that the provided name is valid for a given resource type.
 // Not all resources have the same validation rules for names. Prefix is true if the
 // name will have a value appended to it.
@@ -194,9 +214,8 @@ func ValidateObjectMeta(meta *api.ObjectMeta, requiresNamespace bool, nameFn Val
 	}
 	// if the generated name validates, but the calculated value does not, it's a problem with generation, and we
 	// report it here. This may confuse users, but indicates a programming bug and still must be validated.
-	if len(meta.Name) == 0 {
-		allErrs = append(allErrs, errs.NewFieldRequired("name"))
-	} else {
+	allErrs = append(allErrs, ValidateMinimalName(meta.Name, "name")...)
+	if nameFn != nil && (len(meta.Name) > 0) {
 		if ok, qualifier := nameFn(meta.Name, false); !ok {
 			allErrs = append(allErrs, errs.NewFieldInvalid("name", meta.Name, qualifier))
 		}
@@ -1161,7 +1180,7 @@ func ValidateSecret(secret *api.Secret) errs.ValidationErrorList {
 
 func validateBasicResource(quantity resource.Quantity) errs.ValidationErrorList {
 	if quantity.Value() < 0 {
-		return errs.ValidationErrorList{fmt.Errorf("%v is not a valid resource quantity", quantity.Value())}
+		return errs.ValidationErrorList{errs.NewFieldInvalid("value", quantity.Value(), fmt.Sprintf("%v is not a valid resource quantity", quantity.Value()))}
 	}
 	return errs.ValidationErrorList{}
 }
