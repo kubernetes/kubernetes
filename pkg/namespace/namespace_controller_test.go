@@ -18,8 +18,10 @@ package namespace
 
 import (
 	"testing"
+	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/testclient"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
@@ -129,5 +131,27 @@ func TestSyncNamespaceThatIsActive(t *testing.T) {
 	}
 	if len(actionSet) != 0 {
 		t.Errorf("Expected no action from controller, but got: %v", actionSet)
+	}
+}
+
+func TestRunStop(t *testing.T) {
+	o := testclient.NewObjects(api.Scheme)
+	client := &testclient.Fake{ReactFn: testclient.ObjectReaction(o, latest.RESTMapper)}
+	nsMgr := NewNamespaceManager(client, 1*time.Second)
+
+	if nsMgr.StopEverything != nil {
+		t.Errorf("Non-running manager should not have a stop channel.  Got %v", nsMgr.StopEverything)
+	}
+
+	nsMgr.Run()
+
+	if nsMgr.StopEverything == nil {
+		t.Errorf("Running manager should have a stop channel.  Got nil")
+	}
+
+	nsMgr.Stop()
+
+	if nsMgr.StopEverything != nil {
+		t.Errorf("Non-running manager should not have a stop channel.  Got %v", nsMgr.StopEverything)
 	}
 }
