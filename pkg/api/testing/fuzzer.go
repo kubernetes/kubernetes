@@ -18,6 +18,7 @@ package testing
 
 import (
 	"math/rand"
+	"reflect"
 	"strconv"
 	"testing"
 
@@ -33,13 +34,6 @@ import (
 
 	"speter.net/go/exp/math/dec/inf"
 )
-
-func fuzzOneOf(c fuzz.Continue, objs ...interface{}) {
-	// Use a new fuzzer which cannot populate nil to ensure one obj will be set.
-	f := fuzz.New().NilChance(0).NumElements(1, 1)
-	i := c.RandUint64() % uint64(len(objs))
-	f.Fuzz(objs[i])
-}
 
 // FuzzerFor can randomly populate api objects that are destined for version.
 func FuzzerFor(t *testing.T, version string, src rand.Source) *fuzz.Fuzzer {
@@ -171,9 +165,12 @@ func FuzzerFor(t *testing.T, version string, src rand.Source) *fuzz.Fuzzer {
 			*rp = policies[c.Rand.Intn(len(policies))]
 		},
 		func(vs *api.VolumeSource, c fuzz.Continue) {
-			// Exactly one of the fields should be set.
-			//FIXME: the fuzz can still end up nil.  What if fuzz allowed me to say that?
-			fuzzOneOf(c, &vs.HostPath, &vs.EmptyDir, &vs.GCEPersistentDisk, &vs.AWSElasticBlockStore, &vs.GitRepo, &vs.Secret, &vs.NFS, &vs.ISCSI, &vs.Glusterfs)
+			// Exactly one of the fields must be set.
+			v := reflect.ValueOf(vs).Elem()
+			i := int(c.RandUint64() % uint64(v.NumField()))
+			v = v.Field(i).Addr()
+			// Use a new fuzzer which cannot populate nil to ensure one field will be set.
+			fuzz.New().NilChance(0).NumElements(1, 1).Fuzz(v.Interface())
 		},
 		func(d *api.DNSPolicy, c fuzz.Continue) {
 			policies := []api.DNSPolicy{api.DNSClusterFirst, api.DNSDefault}
