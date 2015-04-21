@@ -86,6 +86,8 @@ func TestGenerateContainerRef(t *testing.T) {
 		noSelfLinkPod        = okPod
 		defaultedSelfLinkPod = okPod
 	)
+	noSelfLinkPod.Kind = ""
+	noSelfLinkPod.APIVersion = ""
 	noSelfLinkPod.ObjectMeta.SelfLink = ""
 	defaultedSelfLinkPod.ObjectMeta.SelfLink = "/api/v1beta1/pods/ok"
 
