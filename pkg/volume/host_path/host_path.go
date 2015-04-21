@@ -89,6 +89,9 @@ func (hp *hostPath) GetPath() string {
 	return hp.path
 }
 
+func (pd *hostPath) SetSecret(secret *api.Secret) {
+}
+
 // TearDown does nothing.
 func (hp *hostPath) TearDown() error {
 	return nil

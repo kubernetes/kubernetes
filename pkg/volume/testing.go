@@ -125,6 +125,9 @@ func (fv *FakeVolume) GetPath() string {
 	return path.Join(fv.Plugin.Host.GetPodVolumeDir(fv.PodUID, util.EscapeQualifiedNameForDisk(fv.Plugin.PluginName), fv.VolName))
 }
 
+func (pd *FakeVolume) SetSecret(secret *api.Secret) {
+}
+
 func (fv *FakeVolume) TearDown() error {
 	return fv.TearDownAt(fv.GetPath())
 }

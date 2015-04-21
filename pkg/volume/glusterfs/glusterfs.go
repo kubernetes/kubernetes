@@ -108,6 +108,7 @@ type glusterfs struct {
 	volName  string
 	podRef   *api.ObjectReference
 	hosts    *api.Endpoints
+	secret   *api.Secret
 	path     string
 	readonly bool
 	mounter  mount.Interface
@@ -145,6 +146,10 @@ func (glusterfsVolume *glusterfs) SetUpAt(dir string) error {
 func (glusterfsVolume *glusterfs) GetPath() string {
 	name := glusterfsPluginName
 	return glusterfsVolume.plugin.host.GetPodVolumeDir(glusterfsVolume.podRef.UID, util.EscapeQualifiedNameForDisk(name), glusterfsVolume.volName)
+}
+
+func (glusterfsVolume *glusterfs) SetSecret(secret *api.Secret) {
+	glusterfsVolume.secret = secret
 }
 
 func (glusterfsVolume *glusterfs) TearDown() error {

@@ -257,6 +257,9 @@ func (pd *gcePersistentDisk) GetPath() string {
 	return pd.plugin.host.GetPodVolumeDir(pd.podUID, util.EscapeQualifiedNameForDisk(name), pd.volName)
 }
 
+func (pd *gcePersistentDisk) SetSecret(secret *api.Secret) {
+}
+
 // Unmounts the bind mount, and detaches the disk only if the PD
 // resource was the last reference to that disk on the kubelet.
 func (pd *gcePersistentDisk) TearDown() error {

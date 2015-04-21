@@ -266,6 +266,9 @@ func (pd *awsElasticBlockStore) GetPath() string {
 	return pd.plugin.host.GetPodVolumeDir(pd.podUID, util.EscapeQualifiedNameForDisk(name), pd.volName)
 }
 
+func (pd *awsElasticBlockStore) SetSecret(secret *api.Secret) {
+}
+
 // Unmounts the bind mount, and detaches the disk only if the PD
 // resource was the last reference to that disk on the kubelet.
 func (pd *awsElasticBlockStore) TearDown() error {

@@ -30,6 +30,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume/gce_pd"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume/glusterfs"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume/host_path"
 )
 
