@@ -86,6 +86,7 @@ func TestRunOnce(t *testing.T) {
 		containerRefManager: kubecontainer.NewRefManager(),
 		readinessManager:    kubecontainer.NewReadinessManager(),
 		podManager:          podManager,
+		os:                  FakeOS{},
 	}
 
 	kb.networkPlugin, _ = network.InitNetworkPlugin([]network.NetworkPlugin{}, "", network.NewFakeHost(nil))

@@ -374,7 +374,8 @@ func SimpleKubelet(client *client.Client,
 	tlsOptions *kubelet.TLSOptions,
 	cadvisorInterface cadvisor.Interface,
 	configFilePath string,
-	cloud cloudprovider.Interface) *KubeletConfig {
+	cloud cloudprovider.Interface,
+	osInterface kubelet.OSInterface) *KubeletConfig {
 
 	imageGCPolicy := kubelet.ImageGCPolicy{
 		HighThresholdPercent: 90,
@@ -406,6 +407,7 @@ func SimpleKubelet(client *client.Client,
 		Cloud:                   cloud,
 		NodeStatusUpdateFrequency: 10 * time.Second,
 		ResourceContainer:         "/kubelet",
+		OSInterface:               osInterface,
 	}
 	return &kcfg
 }
@@ -432,6 +434,9 @@ func RunKubelet(kcfg *KubeletConfig, builder KubeletBuilder) {
 
 	if builder == nil {
 		builder = createAndInitKubelet
+	}
+	if kcfg.OSInterface == nil {
+		kcfg.OSInterface = kubelet.RealOS{}
 	}
 	k, podCfg, err := builder(kcfg)
 	if err != nil {
@@ -529,6 +534,7 @@ type KubeletConfig struct {
 	Cloud                          cloudprovider.Interface
 	NodeStatusUpdateFrequency      time.Duration
 	ResourceContainer              string
+	OSInterface                    kubelet.OSInterface
 }
 
 func createAndInitKubelet(kc *KubeletConfig) (k KubeletBootstrap, pc *config.PodConfig, err error) {
@@ -572,7 +578,8 @@ func createAndInitKubelet(kc *KubeletConfig) (k KubeletBootstrap, pc *config.Pod
 		kc.ImageGCPolicy,
 		kc.Cloud,
 		kc.NodeStatusUpdateFrequency,
-		kc.ResourceContainer)
+		kc.ResourceContainer,
+		kc.OSInterface)
 
 	if err != nil {
 		return nil, nil, err

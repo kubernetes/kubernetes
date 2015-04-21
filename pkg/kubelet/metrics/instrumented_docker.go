@@ -132,6 +132,14 @@ func (in instrumentedDockerInterface) Version() (*docker.Env, error) {
 	return in.client.Version()
 }
 
+func (in instrumentedDockerInterface) Info() (*docker.Env, error) {
+	start := time.Now()
+	defer func() {
+		DockerOperationsLatency.WithLabelValues("version").Observe(SinceInMicroseconds(start))
+	}()
+	return in.client.Info()
+}
+
 func (in instrumentedDockerInterface) CreateExec(opts docker.CreateExecOptions) (*docker.Exec, error) {
 	start := time.Now()
 	defer func() {
