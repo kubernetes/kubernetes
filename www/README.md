@@ -91,7 +91,7 @@ This is the file that is built-in to the kube-apiserver.
 See [master/components/README.md](master/components/README.md).
 
 ### Testing
-Currently kuberntes/www includes both unit-testing (run via [Karma](http://karma-runner.github.io/0.12/index.html)) and
+Currently kubernetes/www includes both unit-testing (run via [Karma](http://karma-runner.github.io/0.12/index.html)) and
 end-to-end testing (run via
 [Protractor](http://angular.github.io/protractor/#/)).
 
