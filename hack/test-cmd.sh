@@ -95,6 +95,7 @@ kube::log::status "Starting kube-apiserver"
   --public_address_override="127.0.0.1" \
   --kubelet_port=${KUBELET_PORT} \
   --runtime_config=api/v1beta3 \
+  --cert_dir="${TMPDIR:-/tmp/}" \
   --portal_net="10.0.0.0/24" 1>&2 &
 APISERVER_PID=$!
 
@@ -621,11 +622,11 @@ __EOF__
   ##################### 
 
   kube::log::status "Testing resource aliasing"
-  kubectl create -f examples/cassandra/cassandra.yaml
-  kubectl create -f examples/cassandra/cassandra-controller.yaml
-  kubectl create -f examples/cassandra/cassandra-service.yaml
+  kubectl create -f examples/cassandra/cassandra.yaml "${kube_flags[@]}"
+  kubectl create -f examples/cassandra/cassandra-controller.yaml "${kube_flags[@]}"
+  kubectl create -f examples/cassandra/cassandra-service.yaml "${kube_flags[@]}"
   kube::test::get_object_assert "all -l'name=cassandra'" "{{range.items}}{{$id_field}}:{{end}}" 'cassandra:cassandra:cassandra:'
-  kubectl delete all -l name=cassandra
+  kubectl delete all -l name=cassandra "${kube_flags[@]}"
 
 
   ###########
