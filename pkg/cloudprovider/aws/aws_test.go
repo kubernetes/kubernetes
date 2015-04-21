@@ -164,12 +164,25 @@ type FakeEC2 struct {
 	instances []ec2.Instance
 }
 
+func contains(haystack []string, needle string) bool {
+	for _, s := range haystack {
+		if needle == s {
+			return true
+		}
+	}
+	return false
+}
+
 func (self *FakeEC2) Instances(instanceIds []string, filter *ec2InstanceFilter) (resp *ec2.InstancesResp, err error) {
 	matches := []ec2.Instance{}
 	for _, instance := range self.instances {
-		if filter == nil || filter.Matches(instance) {
-			matches = append(matches, instance)
+		if filter != nil && !filter.Matches(instance) {
+			continue
 		}
+		if instanceIds != nil && !contains(instanceIds, instance.InstanceId) {
+			continue
+		}
+		matches = append(matches, instance)
 	}
 	return &ec2.InstancesResp{"",
 		[]ec2.Reservation{
