@@ -2,16 +2,48 @@
 ## More specifically, we need to add peer hosts for each but the elected peer.
 
 coreos:
-  etcd:
-    name: etcd
-    addr: $private_ipv4:4001
-    bind-addr: 0.0.0.0
-    peer-addr: $private_ipv4:7001
-    snapshot: true
-    max-retry-attempts: 50
   units:
-    - name: etcd.service
+    - name: download-etcd2.service
+      enable: true
       command: start
+      content: |
+        [Unit]
+        After=network-online.target
+        Before=etcd2.service
+        Description=Download etcd2 Binaries
+        Documentation=https://github.com/coreos/etcd/
+        Requires=network-online.target
+        [Service]
+        Environment=ETCD2_RELEASE_TARBALL=https://github.com/coreos/etcd/releases/download/v2.0.9/etcd-v2.0.9-linux-amd64.tar.gz
+        ExecStartPre=/bin/mkdir -p /opt/bin
+        ExecStart=/bin/bash -c "curl --silent --location $ETCD2_RELEASE_TARBALL | tar xzv -C /opt"
+        ExecStartPost=/bin/ln -s /opt/etcd-v2.0.9-linux-amd64/etcd /opt/bin/etcd2
+        ExecStartPost=/bin/ln -s /opt/etcd-v2.0.9-linux-amd64/etcdctl /opt/bin/etcdctl2
+        RemainAfterExit=yes
+        Type=oneshot
+        [Install]
+        WantedBy=multi-user.target
+    - name: etcd2.service
+      enable: true
+      command: start
+      content: |
+        [Unit]
+        After=download-etcd2.service
+        Description=etcd 2
+        Documentation=https://github.com/coreos/etcd/
+        [Service]
+        Environment=ETCD_NAME=%host%
+        Environment=ETCD_INITIAL_CLUSTER_TOKEN=etcd-cluster
+        Environment=ETCD_INITIAL_ADVERTISE_PEER_URLS=http://%host%:2380
+        Environment=ETCD_LISTEN_PEER_URLS=http://%host%:2380
+        Environment=ETCD_LISTEN_CLIENT_URLS=http://0.0.0.0:2379,http://0.0.0.0:4001
+        Environment=ETCD_INITIAL_CLUSTER=%cluster%
+        Environment=ETCD_INITIAL_CLUSTER_STATE=new
+        ExecStart=/opt/bin/etcd2
+        Restart=always
+        RestartSec=10
+        [Install]
+        WantedBy=multi-user.target
   update:
     group: stable
     reboot-strategy: off

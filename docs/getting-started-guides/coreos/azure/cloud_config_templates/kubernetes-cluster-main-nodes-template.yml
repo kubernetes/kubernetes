@@ -18,9 +18,37 @@ write_files:
       printf '{ "id": "%s", "kind": "Minion", "apiVersion": "v1beta1", "labels": { "environment": "production" }  }' "${minion_id}" \
         | /opt/bin/kubectl create -s "${master_url}" -f -
 
+  - path: /etc/kubernetes/manifests/fluentd.manifest
+    permissions: '0755'
+    owner: root
+    content: |
+      version: v1beta2
+      id: fluentd-to-elasticsearch
+      containers:
+        - name: fluentd-es
+          image: gcr.io/google_containers/fluentd-elasticsearch:1.3
+          env:
+            - name: FLUENTD_ARGS
+              value: -qq
+          volumeMounts:
+            - name: containers
+              mountPath: /var/lib/docker/containers
+            - name: varlog
+              mountPath: /varlog
+      volumes:
+        - name: containers
+          source:
+            hostDir:
+              path: /var/lib/docker/containers
+        - name: varlog
+          source:
+            hostDir:
+              path: /var/log
+
 coreos:
   update:
     group: stable
+    reboot-strategy: off
   units:
     - name: docker.service
       drop-ins:
@@ -187,7 +215,7 @@ coreos:
         Documentation=https://github.com/GoogleCloudPlatform/kubernetes
         Requires=network-online.target
         [Service]
-        Environment=KUBE_RELEASE_TARBALL=https://github.com/GoogleCloudPlatform/kubernetes/releases/download/v0.11.0/kubernetes.tar.gz
+        Environment=KUBE_RELEASE_TARBALL=https://github.com/GoogleCloudPlatform/kubernetes/releases/download/v0.15.0/kubernetes.tar.gz
         ExecStartPre=/bin/mkdir -p /opt/
         ExecStart=/bin/bash -c "curl --silent --location $KUBE_RELEASE_TARBALL | tar xzv -C /tmp/"
         ExecStart=/bin/tar xzvf /tmp/kubernetes/server/kubernetes-server-linux-amd64.tar.gz -C /opt
@@ -278,12 +306,16 @@ coreos:
         Wants=download-kubernetes.service
         ConditionHost=!kube-00
         [Service]
+        ExecStartPre=/bin/mkdir -p /etc/kubernetes/manifests/
         ExecStart=/opt/kubernetes/server/bin/kubelet \
             --address=0.0.0.0 \
             --port=10250 \
             --hostname_override=%H \
             --api_servers=http://kube-00:8080 \
-            --logtostderr=true
+            --logtostderr=true \
+            --cluster_dns=10.1.0.3 \
+            --cluster_domain=kube.local \
+            --config=/etc/kubernetes/manifests/
         Restart=always
         RestartSec=10
         [Install]
