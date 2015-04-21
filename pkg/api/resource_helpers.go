@@ -58,3 +58,13 @@ func GetExistingContainerStatus(statuses []ContainerStatus, name string) Contain
 	}
 	return ContainerStatus{}
 }
+
+// IsPodReady retruns true if a pod is ready; false otherwise.
+func IsPodReady(pod *Pod) bool {
+	for _, c := range pod.Status.Conditions {
+		if c.Type == PodReady && c.Status == ConditionTrue {
+			return true
+		}
+	}
+	return false
+}
