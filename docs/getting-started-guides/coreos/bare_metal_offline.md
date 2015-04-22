@@ -646,7 +646,7 @@ List fleet machines
 List Kubernetes
 
     kubectl get pods
-    kubectl grt minions
+    kubectl get minions
 
 
 Kill all pods:
