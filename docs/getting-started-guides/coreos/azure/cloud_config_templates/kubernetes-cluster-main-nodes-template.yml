@@ -120,7 +120,7 @@ coreos:
         Before=weave-helper.service
         Before=docker.service
         Description=Install Weave
-        Documentation=http://zettio.github.io/weave/
+        Documentation=http://weaveworks.github.io/weave/
         Requires=network-online.target
         [Service]
         Type=oneshot
@@ -129,7 +129,7 @@ coreos:
         ExecStartPre=/usr/bin/curl \
           --silent \
           --location \
-          https://github.com/weaveworks/weave/releases/download/v0.9.0/weave \
+          https://github.com/weaveworks/weave/releases/download/latest_release/weave \
           --output /opt/bin/weave
         ExecStartPre=/usr/bin/curl \
           --silent \
@@ -150,7 +150,7 @@ coreos:
         After=install-weave.service
         After=docker.service
         Description=Weave Network Router
-        Documentation=http://zettio.github.io/weave/
+        Documentation=http://weaveworks.github.io/weave/
         Requires=docker.service
         Requires=install-weave.service
         [Service]
@@ -165,13 +165,12 @@ coreos:
         After=install-weave.service
         After=docker.service
         Description=Weave Network Router
-        Documentation=http://zettio.github.io/weave/
+        Documentation=http://weaveworks.github.io/weave/
         Requires=docker.service
         Requires=install-weave.service
         [Service]
         EnvironmentFile=/etc/weave.%H.env
-        ExecStartPre=/usr/bin/docker pull zettio/weave:latest
-        ExecStartPre=/usr/bin/docker pull zettio/weavetools:latest
+        ExecStartPre=/opt/bin/weave setup
         ExecStartPre=/opt/bin/weave launch $WEAVE_PEERS
         ExecStart=/usr/bin/docker attach weave
         Restart=on-failure
