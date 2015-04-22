@@ -56,6 +56,7 @@ function verify-prereqs {
   if [[ "${KUBE_PROMPT_FOR_UPDATE}" != "y" ]]; then
     gcloud_prompt="-q"
   fi
+  local sudo_prefix=""
   if [ ! -w $(dirname `which gcloud`) ]; then
     sudo_prefix="sudo"
   fi
