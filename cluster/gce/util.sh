@@ -983,7 +983,7 @@ function restart-kube-proxy {
 
 # Restart the kube-apiserver on a node ($1)
 function restart-apiserver {
-  ssh-to-node "$1" "sudo docker kill \`sudo docker ps | grep /kube-apiserver | awk '{print $1}'\`"
+  ssh-to-node "$1" "sudo docker ps | grep /kube-apiserver | cut -d ' ' -f 1 | xargs sudo docker kill"
 }
 
 # Perform preparations required to run e2e tests

@@ -266,7 +266,7 @@ function restart-kube-proxy() {
 # Restart the kube-proxy on master ($1)
 function restart-apiserver() {
   echo "... in restart-kube-apiserver()"  >&2
-  ssh-to-node "$1" "sudo docker kill \`sudo docker ps | grep /kube-apiserver | awk '{print $1}'\`"
+  ssh-to-node "$1" "sudo docker ps | grep /kube-apiserver | cut -d ' ' -f 1 | xargs sudo docker kill"
 }
 
 # Execute after running tests to perform any required clean-up.  This is called
