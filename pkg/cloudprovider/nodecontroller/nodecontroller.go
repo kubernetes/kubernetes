@@ -612,9 +612,6 @@ func (nc *NodeController) monitorNodeStatus() error {
 			}
 
 			// Report node events.
-			if readyCondition.Status == api.ConditionTrue && lastReadyCondition.Status != api.ConditionTrue {
-				nc.recordNodeEvent(node, "ready")
-			}
 			if readyCondition.Status == api.ConditionFalse && lastReadyCondition.Status != api.ConditionFalse {
 				nc.recordNodeEvent(node, "not_ready")
 			}
