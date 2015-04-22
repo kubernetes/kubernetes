@@ -85,6 +85,9 @@ func NewTestGenericEtcdRegistry(t *testing.T) (*tools.FakeEtcdClient, *Etcd) {
 		KeyFunc: func(ctx api.Context, id string) (string, error) {
 			return path.Join(podPrefix, id), nil
 		},
+		DeleteCollectionFunc: func(ctx api.Context) (runtime.Object, error) {
+			return DeleteCollectionPerNamespaceFunc(func() runtime.Object { return &api.PodList{} })(ctx, s, podPrefix)
+		},
 		ObjectNameFunc: func(obj runtime.Object) (string, error) { return obj.(*api.Pod).Name, nil },
 		Storage:        s,
 	}
@@ -708,6 +711,35 @@ func TestEtcdDelete(t *testing.T) {
 		if e, a := item.expect, fakeClient.Data[path]; !api.Semantic.DeepDerivative(e, a) {
 			t.Errorf("%v:\n%s", name, util.ObjectDiff(e, a))
 		}
+	}
+}
+
+func TestEtcdDeleteCollection(t *testing.T) {
+	fakeClient, registry := NewTestGenericEtcdRegistry(t)
+	path := etcdtest.AddPrefix("/pods/testns")
+
+	podA := &api.Pod{
+		ObjectMeta: api.ObjectMeta{Name: "foo", ResourceVersion: "1"},
+		Spec:       api.PodSpec{NodeName: "machine"},
+	}
+
+	fakeClient.Data[path] = tools.EtcdResponseWithError{
+		R: &etcd.Response{
+			Node: &etcd.Node{
+				Key:           "/foo",
+				Value:         runtime.EncodeOrDie(testapi.Codec(), podA),
+				Dir:           false,
+				ModifiedIndex: 1,
+			},
+		},
+	}
+	obj, err := registry.DeleteCollection(api.WithNamespace(api.NewContext(), "testns"))
+	if err != nil {
+		t.Errorf("unexpected error: %v (%#v)", err, obj)
+	}
+	_, err = fakeClient.Get(path, false, false)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
 	}
 }
 

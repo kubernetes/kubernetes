@@ -71,6 +71,11 @@ func (c *FakeServiceAccounts) Delete(name string) error {
 	return err
 }
 
+func (c *FakeServiceAccounts) DeleteAll() error {
+	_, err := c.Fake.Invokes(NewDeleteAllAction(), &api.ServiceAccount{})
+	return err
+}
+
 func (c *FakeServiceAccounts) Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
 	c.Fake.Invokes(NewWatchAction("serviceaccounts", c.Namespace, label, field, resourceVersion), nil)
 	return c.Fake.Watch, c.Fake.Err()

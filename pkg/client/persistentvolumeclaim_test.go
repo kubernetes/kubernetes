@@ -189,6 +189,16 @@ func TestPersistentVolumeClaimDelete(t *testing.T) {
 	c.Validate(t, nil, err)
 }
 
+func TestPersistentVolumeClaimDeleteAll(t *testing.T) {
+	ns := api.NamespaceDefault
+	c := &testClient{
+		Request:  testRequest{Method: "DELETE", Path: testapi.ResourcePath(getPersistentVolumeClaimsResoureName(), ns, ""), Query: buildQueryValues(nil)},
+		Response: Response{StatusCode: 200},
+	}
+	err := c.Setup().PersistentVolumeClaims(ns).DeleteAll()
+	c.Validate(t, nil, err)
+}
+
 func TestPersistentVolumeClaimWatch(t *testing.T) {
 	c := &testClient{
 		Request: testRequest{

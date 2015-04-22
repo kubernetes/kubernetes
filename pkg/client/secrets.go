@@ -31,6 +31,7 @@ type SecretsInterface interface {
 	Create(secret *api.Secret) (*api.Secret, error)
 	Update(secret *api.Secret) (*api.Secret, error)
 	Delete(name string) error
+	DeleteAll() error
 	List(label labels.Selector, field fields.Selector) (*api.SecretList, error)
 	Get(name string) (*api.Secret, error)
 	Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error)
@@ -107,6 +108,14 @@ func (s *secrets) Delete(name string) error {
 		Namespace(s.namespace).
 		Resource("secrets").
 		Name(name).
+		Do().
+		Error()
+}
+
+func (s *secrets) DeleteAll() error {
+	return s.client.Delete().
+		Namespace(s.namespace).
+		Resource("secrets").
 		Do().
 		Error()
 }

@@ -61,6 +61,9 @@ func NewREST(s storage.Interface) *REST {
 		PredicateFunc: func(label labels.Selector, field fields.Selector) generic.Matcher {
 			return controller.MatchController(label, field)
 		},
+		DeleteCollectionFunc: func(ctx api.Context) (runtime.Object, error) {
+			return etcdgeneric.DeleteCollectionPerNamespaceFunc(func() runtime.Object { return &api.ReplicationControllerList{} })(ctx, s, controllerPrefix)
+		},
 		EndpointName: "replicationControllers",
 
 		// Used to validate controller creation

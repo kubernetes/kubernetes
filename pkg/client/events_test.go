@@ -193,3 +193,16 @@ func TestEventDelete(t *testing.T) {
 	err := c.Setup().Events(ns).Delete("foo")
 	c.Validate(t, nil, err)
 }
+
+func TestEventDeleteAll(t *testing.T) {
+	ns := api.NamespaceDefault
+	c := &testClient{
+		Request: testRequest{
+			Method: "DELETE",
+			Path:   testapi.ResourcePath("events", ns, ""),
+		},
+		Response: Response{StatusCode: 200},
+	}
+	err := c.Setup().Events(ns).DeleteAll()
+	c.Validate(t, nil, err)
+}

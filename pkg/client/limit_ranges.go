@@ -35,6 +35,7 @@ type LimitRangeInterface interface {
 	List(selector labels.Selector) (*api.LimitRangeList, error)
 	Get(name string) (*api.LimitRange, error)
 	Delete(name string) error
+	DeleteAll() error
 	Create(limitRange *api.LimitRange) (*api.LimitRange, error)
 	Update(limitRange *api.LimitRange) (*api.LimitRange, error)
 	Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error)
@@ -71,6 +72,11 @@ func (c *limitRanges) Get(name string) (result *api.LimitRange, err error) {
 // Delete takes the name of the limitRange, and returns an error if one occurs
 func (c *limitRanges) Delete(name string) error {
 	return c.r.Delete().Namespace(c.ns).Resource("limitRanges").Name(name).Do().Error()
+}
+
+// DeleteAll deletes all limitRanges.
+func (c *limitRanges) DeleteAll() error {
+	return c.r.Delete().Namespace(c.ns).Resource("limitRanges").Do().Error()
 }
 
 // Create takes the representation of a limitRange.  Returns the server's representation of the limitRange, and an error, if it occurs.

@@ -152,3 +152,13 @@ func TestDeleteService(t *testing.T) {
 	err := c.Setup().Services(ns).Delete("1")
 	c.Validate(t, nil, err)
 }
+
+func TestDeleteAllServices(t *testing.T) {
+	ns := api.NamespaceDefault
+	c := &testClient{
+		Request:  testRequest{Method: "DELETE", Path: testapi.ResourcePath("services", ns, ""), Query: buildQueryValues(nil)},
+		Response: Response{StatusCode: 200},
+	}
+	err := c.Setup().Services(ns).DeleteAll()
+	c.Validate(t, nil, err)
+}

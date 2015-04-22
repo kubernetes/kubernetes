@@ -140,6 +140,16 @@ func TestDeletePod(t *testing.T) {
 	c.Validate(t, nil, err)
 }
 
+func TestDeleteAllPods(t *testing.T) {
+	ns := api.NamespaceDefault
+	c := &testClient{
+		Request:  testRequest{Method: "DELETE", Path: testapi.ResourcePath("pods", ns, ""), Query: buildQueryValues(nil)},
+		Response: Response{StatusCode: 200},
+	}
+	err := c.Setup().Pods(ns).DeleteAll()
+	c.Validate(t, nil, err)
+}
+
 func TestCreatePod(t *testing.T) {
 	ns := api.NamespaceDefault
 	requestPod := &api.Pod{

@@ -66,6 +66,9 @@ func NewStorage(s storage.Interface) (*REST, *StatusREST, *FinalizeREST) {
 		PredicateFunc: func(label labels.Selector, field fields.Selector) generic.Matcher {
 			return namespace.MatchNamespace(label, field)
 		},
+		DeleteCollectionFunc: func(ctx api.Context) (runtime.Object, error) {
+			return &api.Status{Status: api.StatusFailure}, etcdgeneric.DeleteCollectionNotSupportedFunc("namespace")
+		},
 		EndpointName: "namespaces",
 		Storage:      s,
 	}

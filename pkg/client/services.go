@@ -35,6 +35,7 @@ type ServiceInterface interface {
 	Create(srv *api.Service) (*api.Service, error)
 	Update(srv *api.Service) (*api.Service, error)
 	Delete(name string) error
+	DeleteAll() error
 	Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error)
 }
 
@@ -85,6 +86,11 @@ func (c *services) Update(svc *api.Service) (result *api.Service, err error) {
 // Delete deletes an existing service.
 func (c *services) Delete(name string) error {
 	return c.r.Delete().Namespace(c.ns).Resource("services").Name(name).Do().Error()
+}
+
+// Deletes all existing services.
+func (c *services) DeleteAll() error {
+	return c.r.Delete().Namespace(c.ns).Resource("services").Do().Error()
 }
 
 // Watch returns a watch.Interface that watches the requested services.
