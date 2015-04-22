@@ -19,10 +19,13 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-source $KUBE_ROOT/cluster/juju/prereqs/ubuntu-juju.sh
-export JUJU_REPOSITORY=${KUBE_ROOT}/cluster/juju/charms
+UTIL_SCRIPT=$(realpath "${BASH_SOURCE}")
+JUJU_PATH=$(dirname ${UTIL_SCRIPT})
+source ${JUJU_PATH}/prereqs/ubuntu-juju.sh
+export JUJU_REPOSITORY=${JUJU_PATH}/charms
 #KUBE_BUNDLE_URL='https://raw.githubusercontent.com/whitmo/bundle-kubernetes/master/bundles.yaml'
-KUBE_BUNDLE_PATH=${KUBE_ROOT}/cluster/juju/bundles/local.yaml
+KUBE_BUNDLE_PATH=${JUJU_PATH}/bundles/local.yaml
+
 function verify-prereqs() {
     gather_installation_reqs
 }
@@ -65,37 +68,37 @@ function detect-master() {
     export KUBERNETES_MASTER=$KUBE_MASTER
 }
 
-function detect-minions(){
-    # Strip out the components except for STDOUT return
-    # and trim out the single quotes to build an array of minions
+function detect-minions() {
+    # Run the Juju command that gets the minion private IP addresses.
+    local ipoutput
+    ipoutput=$(juju run --service kubernetes "unit-get private-address" --format=yaml)
+    echo $ipoutput
+    # Strip out the IP addresses
     #
     # Example Output:
     #- MachineId: "10"
-    #  Stdout: '10.197.55.232
-    #'
+    #  Stdout: |
+    #    10.197.55.232
     # UnitId: kubernetes/0
     # - MachineId: "11"
-    # Stdout: '10.202.146.124
-    # '
+    # Stdout: |
+    #    10.202.146.124
     #  UnitId: kubernetes/1
-    KUBERNETES_JSON=$(juju run --service kubernetes \
-            "unit-get private-address" --format=json)
-    echo $KUBERNETES_JSON
-    KUBE_MINION_IP_ADDRESSES=($(${KUBE_ROOT}/cluster/juju/return-node-ips.py "$KUBERNETES_JSON"))
-    echo $KUBE_MINION_IP_ADDRESSES
+    KUBE_MINION_IP_ADDRESSES=($(echo $ipoutput | grep -Eo '[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}'))
+    echo ${KUBE_MINION_IP_ADDRESSES[@]}
     NUM_MINIONS=${#KUBE_MINION_IP_ADDRESSES[@]}
     MINION_NAMES=$KUBE_MINION_IP_ADDRESSES
 }
 
-function setup-logging-firewall(){
+function setup-logging-firewall() {
     echo "TODO: setup logging and firewall rules"
 }
 
-function teardown-logging-firewall(){
+function teardown-logging-firewall() {
     echo "TODO: teardown logging and firewall rules"
 }
 
-function sleep-status(){
+function sleep-status() {
     local i
     local maxtime
     local jujustatus
