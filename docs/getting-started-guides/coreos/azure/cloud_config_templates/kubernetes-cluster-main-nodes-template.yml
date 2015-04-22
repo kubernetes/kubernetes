@@ -129,7 +129,7 @@ coreos:
         ExecStartPre=/usr/bin/curl \
           --silent \
           --location \
-          https://github.com/zettio/weave/releases/download/latest_release/weave \
+          https://github.com/weaveworks/weave/releases/download/v0.9.0/weave \
           --output /opt/bin/weave
         ExecStartPre=/usr/bin/curl \
           --silent \
