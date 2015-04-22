@@ -39,6 +39,7 @@ var _ = Describe("PD", func() {
 		podClient client.PodInterface
 		host0Name string
 		host1Name string
+		numHosts  int
 	)
 
 	BeforeEach(func() {
@@ -50,10 +51,15 @@ var _ = Describe("PD", func() {
 
 		nodes, err := c.Nodes().List(labels.Everything(), fields.Everything())
 		expectNoError(err, "Failed to list nodes for e2e cluster.")
-		Expect(len(nodes.Items) >= 2).To(BeTrue())
 
-		host0Name = nodes.Items[0].ObjectMeta.Name
-		host1Name = nodes.Items[1].ObjectMeta.Name
+		numHosts = len(nodes.Items)
+
+		if len(nodes.Items) >= 2 {
+			host1Name = nodes.Items[1].ObjectMeta.Name
+		}
+		if len(nodes.Items) >= 1 {
+			host0Name = nodes.Items[0].ObjectMeta.Name
+		}
 	})
 
 	It("should schedule a pod w/ a RW PD, remove it, then schedule it on another host", func() {
@@ -62,6 +68,8 @@ var _ = Describe("PD", func() {
 				testContext.Provider))
 			return
 		}
+
+		Expect(numHosts >= 2).To(BeTrue(), "At least 2 nodes required")
 
 		By("creating PD")
 		diskName, err := createPD()
@@ -119,6 +127,8 @@ var _ = Describe("PD", func() {
 				testContext.Provider))
 			return
 		}
+
+		Expect(numHosts >= 2).To(BeTrue(), "At least 2 nodes required")
 
 		By("creating PD")
 		diskName, err := createPD()
