@@ -107,10 +107,10 @@ func newTestKubelet(t *testing.T) *TestKubelet {
 	kubelet.runtimeCache = kubecontainer.NewFakeRuntimeCache(kubelet.containerManager)
 	kubelet.podWorkers = newPodWorkers(
 		kubelet.runtimeCache,
-		func(pod *api.Pod, mirrorPod *api.Pod, runningPod container.Pod) error {
-			err := kubelet.syncPod(pod, mirrorPod, runningPod)
+		func(pod *api.Pod, mirrorPod *api.Pod, runningPod container.Pod) (*syncPodSummary, error) {
+			summary, err := kubelet.syncPod(pod, mirrorPod, runningPod)
 			waitGroup.Done()
-			return err
+			return summary, err
 		},
 		fakeRecorder)
 	kubelet.containerManager.Puller = &dockertools.FakeDockerPuller{}
@@ -3536,7 +3536,7 @@ func TestCreateMirrorPod(t *testing.T) {
 	}
 	pods := []*api.Pod{pod}
 	kl.podManager.SetPods(pods)
-	err := kl.syncPod(pod, nil, container.Pod{})
+	_, err := kl.syncPod(pod, nil, container.Pod{})
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -3589,7 +3589,7 @@ func TestDeleteOutdatedMirrorPod(t *testing.T) {
 
 	pods := []*api.Pod{pod, mirrorPod}
 	kl.podManager.SetPods(pods)
-	err := kl.syncPod(pod, mirrorPod, container.Pod{})
+	_, err := kl.syncPod(pod, mirrorPod, container.Pod{})
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -3781,7 +3781,7 @@ func TestHostNetworkAllowed(t *testing.T) {
 		},
 	}
 	kubelet.podManager.SetPods([]*api.Pod{pod})
-	err := kubelet.syncPod(pod, nil, container.Pod{})
+	_, err := kubelet.syncPod(pod, nil, container.Pod{})
 	if err != nil {
 		t.Errorf("expected pod infra creation to succeed: %v", err)
 	}
@@ -3810,7 +3810,7 @@ func TestHostNetworkDisallowed(t *testing.T) {
 			HostNetwork: true,
 		},
 	}
-	err := kubelet.syncPod(pod, nil, container.Pod{})
+	_, err := kubelet.syncPod(pod, nil, container.Pod{})
 	if err == nil {
 		t.Errorf("expected pod infra creation to fail")
 	}

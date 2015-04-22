@@ -1099,6 +1099,12 @@ func (kl *Kubelet) pullImageAndRunContainer(pod *api.Pod, container *api.Contain
 	return containerID, nil
 }
 
+const (
+	becauseContainerNotFound   = "NotFound"
+	becauseContainerChanged    = "Changed"
+	becauseContainerNotHealthy = "Unhealthy"
+)
+
 // Structure keeping information on changes that need to happen for a pod. The semantics is as follows:
 // - startInfraContainer is true if new Infra Containers have to be started and old one (if running) killed.
 //   Additionally if it is true then containersToKeep have to be empty
@@ -1112,7 +1118,7 @@ func (kl *Kubelet) pullImageAndRunContainer(pod *api.Pod, container *api.Contain
 type podContainerChangesSpec struct {
 	startInfraContainer bool
 	infraContainerId    dockertools.DockerID
-	containersToStart   map[int]empty
+	containersToStart   map[int]string
 	containersToKeep    map[dockertools.DockerID]int
 }
 
@@ -1121,7 +1127,7 @@ func (kl *Kubelet) computePodContainerChanges(pod *api.Pod, runningPod kubeconta
 	uid := pod.UID
 	glog.V(4).Infof("Syncing Pod %+v, podFullName: %q, uid: %q", pod, podFullName, uid)
 
-	containersToStart := make(map[int]empty)
+	containersToStart := make(map[int]string)
 	containersToKeep := make(map[dockertools.DockerID]int)
 	createPodInfraContainer := false
 
@@ -1159,7 +1165,7 @@ func (kl *Kubelet) computePodContainerChanges(pod *api.Pod, runningPod kubeconta
 				// be created. We may be inserting this ID again if the container has changed and it has
 				// RestartPolicy::Always, but it's not a big deal.
 				glog.V(3).Infof("Container %+v is dead, but RestartPolicy says that we should restart it.", container)
-				containersToStart[index] = empty{}
+				containersToStart[index] = becauseContainerNotFound
 			}
 			continue
 		}
@@ -1175,7 +1181,7 @@ func (kl *Kubelet) computePodContainerChanges(pod *api.Pod, runningPod kubeconta
 			// killed them when restarting Infra Container.
 			if pod.Spec.RestartPolicy != api.RestartPolicyNever {
 				glog.V(1).Infof("Infra Container is being recreated. %q will be restarted.", container.Name)
-				containersToStart[index] = empty{}
+				containersToStart[index] = becauseContainerNotHealthy
 			}
 			continue
 		}
@@ -1185,7 +1191,7 @@ func (kl *Kubelet) computePodContainerChanges(pod *api.Pod, runningPod kubeconta
 		containerChanged := hash != 0 && hash != expectedHash
 		if containerChanged {
 			glog.Infof("pod %q container %q hash changed (%d vs %d), it will be killed and re-created.", podFullName, container.Name, hash, expectedHash)
-			containersToStart[index] = empty{}
+			containersToStart[index] = becauseContainerChanged
 			continue
 		}
 
@@ -1202,7 +1208,7 @@ func (kl *Kubelet) computePodContainerChanges(pod *api.Pod, runningPod kubeconta
 			continue
 		}
 		glog.Infof("pod %q container %q is unhealthy (probe result: %v), it will be killed and re-created.", podFullName, container.Name, result)
-		containersToStart[index] = empty{}
+		containersToStart[index] = becauseContainerNotHealthy
 	}
 
 	// After the loop one of the following should be true:
@@ -1223,10 +1229,17 @@ func (kl *Kubelet) computePodContainerChanges(pod *api.Pod, runningPod kubeconta
 	}, nil
 }
 
-func (kl *Kubelet) syncPod(pod *api.Pod, mirrorPod *api.Pod, runningPod kubecontainer.Pod) error {
+type syncPodSummary struct {
+	NotFound  int
+	Unhealthy int
+	Changed   int
+}
+
+func (kl *Kubelet) syncPod(pod *api.Pod, mirrorPod *api.Pod, runningPod kubecontainer.Pod) (*syncPodSummary, error) {
 	podFullName := kubecontainer.GetPodFullName(pod)
 	uid := pod.UID
 
+	summary := &syncPodSummary{}
 	// Before returning, regenerate status and store it in the cache.
 	defer func() {
 		if isStaticPod(pod) && mirrorPod == nil {
@@ -1250,24 +1263,36 @@ func (kl *Kubelet) syncPod(pod *api.Pod, mirrorPod *api.Pod, runningPod kubecont
 	err := canRunPod(pod)
 	if err != nil {
 		kl.killPod(runningPod)
-		return err
+		return summary, err
 	}
 
 	if err := kl.makePodDataDirs(pod); err != nil {
 		glog.Errorf("Unable to make pod data directories for pod %q (uid %q): %v", podFullName, uid, err)
-		return err
+		return summary, err
 	}
 
 	podStatus, err := kl.generatePodStatus(pod)
 	if err != nil {
 		glog.Errorf("Unable to get status for pod %q (uid %q): %v", podFullName, uid, err)
-		return err
+		return summary, err
 	}
 
 	containerChanges, err := kl.computePodContainerChanges(pod, runningPod, podStatus)
 	glog.V(3).Infof("Got container changes for pod %q: %+v", podFullName, containerChanges)
 	if err != nil {
-		return err
+		return summary, err
+	}
+
+	// Compose the summary.
+	for _, value := range containerChanges.containersToStart {
+		switch value {
+		case becauseContainerNotFound:
+			summary.NotFound++
+		case becauseContainerNotHealthy:
+			summary.Unhealthy++
+		case becauseContainerChanged:
+			summary.Changed++
+		}
 	}
 
 	if containerChanges.startInfraContainer || (len(containerChanges.containersToKeep) == 0 && len(containerChanges.containersToStart) == 0) {
@@ -1280,7 +1305,7 @@ func (kl *Kubelet) syncPod(pod *api.Pod, mirrorPod *api.Pod, runningPod kubecont
 		// Killing phase: if we want to start new infra container, or nothing is running kill everything (including infra container)
 		err = kl.killPod(runningPod)
 		if err != nil {
-			return err
+			return summary, err
 		}
 	} else {
 		// Otherwise kill any containers in this pod which are not specified as ones to keep.
@@ -1309,7 +1334,7 @@ func (kl *Kubelet) syncPod(pod *api.Pod, mirrorPod *api.Pod, runningPod kubecont
 			kl.recorder.Eventf(ref, "failedMount", "Unable to mount volumes for pod %q: %v", podFullName, err)
 		}
 		glog.Errorf("Unable to mount volumes for pod %q: %v; skipping pod", podFullName, err)
-		return err
+		return summary, err
 	}
 	kl.volumeManager.SetVolumes(pod.UID, podVolumes)
 
@@ -1325,7 +1350,7 @@ func (kl *Kubelet) syncPod(pod *api.Pod, mirrorPod *api.Pod, runningPod kubecont
 		}
 		if err != nil {
 			glog.Errorf("Failed to create pod infra container: %v; Skipping pod %q", err, podFullName)
-			return err
+			return summary, err
 		}
 	}
 
@@ -1355,7 +1380,7 @@ func (kl *Kubelet) syncPod(pod *api.Pod, mirrorPod *api.Pod, runningPod kubecont
 			kl.statusManager.DeletePodStatus(podFullName)
 		}
 	}
-	return nil
+	return summary, nil
 }
 
 // Stores all volumes defined by the set of pods into a map.
