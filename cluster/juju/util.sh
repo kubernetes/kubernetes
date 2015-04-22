@@ -51,6 +51,8 @@ function kube-up() {
     fi
     # Sleep due to juju bug http://pad.lv/1432759
     sleep-status
+    detect-master
+    detect-minions
 }
 
 function kube-down() {
@@ -64,14 +66,15 @@ function detect-master() {
     # Capturing a newline, and my awk-fu was weak - pipe through tr -d
     kubestatus=$(juju status --format=oneline kubernetes-master | awk '{print $3}' | tr -d "\n")
     export KUBE_MASTER_IP=${kubestatus}
-    export KUBE_MASTER=$KUBE_MASTER_IP:8080
-    export KUBERNETES_MASTER=$KUBE_MASTER
+    export KUBE_MASTER=${KUBE_MASTER_IP}
+    export KUBERNETES_MASTER=http://${KUBE_MASTER}:8080
+    echo "Kubernetes master: " ${KUBERNETES_MASTER}
 }
 
 function detect-minions() {
     # Run the Juju command that gets the minion private IP addresses.
     local ipoutput
-    ipoutput=$(juju run --service kubernetes "unit-get private-address" --format=yaml)
+    ipoutput=$(juju run --service kubernetes "unit-get private-address" --format=json)
     echo $ipoutput
     # Strip out the IP addresses
     #
@@ -84,10 +87,10 @@ function detect-minions() {
     # Stdout: |
     #    10.202.146.124
     #  UnitId: kubernetes/1
-    KUBE_MINION_IP_ADDRESSES=($(echo $ipoutput | grep -Eo '[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}'))
-    echo ${KUBE_MINION_IP_ADDRESSES[@]}
-    NUM_MINIONS=${#KUBE_MINION_IP_ADDRESSES[@]}
-    MINION_NAMES=$KUBE_MINION_IP_ADDRESSES
+    export KUBE_MINION_IP_ADDRESSES=($(${JUJU_PATH}/return-node-ips.py "${ipoutput}"))
+    echo "Kubernetes minions:  " ${KUBE_MINION_IP_ADDRESSES[@]}
+    export NUM_MINIONS=${#KUBE_MINION_IP_ADDRESSES[@]}
+    export MINION_NAMES=$KUBE_MINION_IP_ADDRESSES
 }
 
 function setup-logging-firewall() {
