@@ -993,7 +993,7 @@ const (
 )
 
 type NodeCondition struct {
-	Kind               NodeConditionKind `json:"kind" description:"kind of the condition, one of Reachable, Ready, Schedulable"`
+	Kind               NodeConditionKind `json:"kind" description:"kind of the condition, current kinds: Reachable, Ready, Schedulable"`
 	Status             ConditionStatus   `json:"status" description:"status of the condition, one of Full, None, Unknown"`
 	LastProbeTime      util.Time         `json:"lastProbeTime,omitempty" description:"last time the condition was probed"`
 	LastTransitionTime util.Time         `json:"lastTransitionTime,omitempty" description:"last time the condition transit from one status to another"`
@@ -1607,7 +1607,7 @@ const (
 
 type ComponentCondition struct {
 	Type    ComponentConditionType `json:"type" description:"type of component condition, currently only Healthy"`
-	Status  ConditionStatus        `json:"status" description:"current status of this component condition, one of True, False, Unknown"`
+	Status  ConditionStatus        `json:"status" description:"current status of this component condition, one of Full, None, Unknown"`
 	Message string                 `json:"message,omitempty" description:"health check message received from the component"`
 	Error   string                 `json:"error,omitempty" description:"error code from health check attempt (if any)"`
 }
