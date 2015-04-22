@@ -1166,7 +1166,6 @@ type NodeAddress struct {
 
 // NodeResources is an object for conveying resource information about a node.
 // see http://docs.k8s.io/resources.md for more details.
-// TODO: Use ResourceList instead?
 type NodeResources struct {
 	// Capacity represents the available resources of a node
 	Capacity ResourceList `json:"capacity,omitempty"`
@@ -1815,22 +1814,6 @@ const (
 	MergePatchType          PatchType = "application/merge-patch+json"
 	StrategicMergePatchType PatchType = "application/strategic-merge-patch+json"
 )
-
-// Appends the NodeAddresses to the passed-by-pointer slice, only if they do not already exist
-func AddToNodeAddresses(addresses *[]NodeAddress, addAddresses ...NodeAddress) {
-	for _, add := range addAddresses {
-		exists := false
-		for _, existing := range *addresses {
-			if existing.Address == add.Address && existing.Type == add.Type {
-				exists = true
-				break
-			}
-		}
-		if !exists {
-			*addresses = append(*addresses, add)
-		}
-	}
-}
 
 // Type and constants for component health validation.
 type ComponentConditionType string

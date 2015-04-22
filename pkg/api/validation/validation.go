@@ -1074,8 +1074,8 @@ func ValidateReadOnlyPersistentDisks(volumes []api.Volume) errs.ValidationErrorL
 	return allErrs
 }
 
-// ValidateMinion tests if required fields in the node are set.
-func ValidateMinion(node *api.Node) errs.ValidationErrorList {
+// ValidateNode tests if required fields in the node are set.
+func ValidateNode(node *api.Node) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 	allErrs = append(allErrs, ValidateObjectMeta(&node.ObjectMeta, false, ValidateNodeName).Prefix("metadata")...)
 
@@ -1090,34 +1090,42 @@ func ValidateMinion(node *api.Node) errs.ValidationErrorList {
 	return allErrs
 }
 
-// ValidateMinionUpdate tests to make sure a minion update can be applied.  Modifies oldMinion.
-func ValidateMinionUpdate(oldMinion *api.Node, minion *api.Node) errs.ValidationErrorList {
+// ValidateNodeUpdate tests to make sure a node update can be applied.  Modifies oldNode.
+func ValidateNodeUpdate(oldNode *api.Node, node *api.Node) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
-	allErrs = append(allErrs, ValidateObjectMetaUpdate(&oldMinion.ObjectMeta, &minion.ObjectMeta).Prefix("metadata")...)
+	allErrs = append(allErrs, ValidateObjectMetaUpdate(&oldNode.ObjectMeta, &node.ObjectMeta).Prefix("metadata")...)
 
 	// TODO: Enable the code once we have better api object.status update model. Currently,
 	// anyone can update node status.
-	// if !api.Semantic.DeepEqual(minion.Status, api.NodeStatus{}) {
-	// 	allErrs = append(allErrs, errs.NewFieldInvalid("status", minion.Status, "status must be empty"))
+	// if !api.Semantic.DeepEqual(node.Status, api.NodeStatus{}) {
+	// 	allErrs = append(allErrs, errs.NewFieldInvalid("status", node.Status, "status must be empty"))
 	// }
+
+	// Validte no duplicate addresses in node status.
+	addresses := make(map[api.NodeAddress]bool)
+	for _, address := range node.Status.Addresses {
+		if _, ok := addresses[address]; ok {
+			allErrs = append(allErrs, fmt.Errorf("duplicate node addresses found"))
+		}
+		addresses[address] = true
+	}
 
 	// TODO: move reset function to its own location
 	// Ignore metadata changes now that they have been tested
-	oldMinion.ObjectMeta = minion.ObjectMeta
+	oldNode.ObjectMeta = node.ObjectMeta
 	// Allow users to update capacity
-	oldMinion.Status.Capacity = minion.Status.Capacity
+	oldNode.Status.Capacity = node.Status.Capacity
 	// Allow users to unschedule node
-	oldMinion.Spec.Unschedulable = minion.Spec.Unschedulable
+	oldNode.Spec.Unschedulable = node.Spec.Unschedulable
 	// Clear status
-	oldMinion.Status = minion.Status
+	oldNode.Status = node.Status
 
 	// TODO: Add a 'real' ValidationError type for this error and provide print actual diffs.
-	if !api.Semantic.DeepEqual(oldMinion, minion) {
-		glog.V(4).Infof("Update failed validation %#v vs %#v", oldMinion, minion)
+	if !api.Semantic.DeepEqual(oldNode, node) {
+		glog.V(4).Infof("Update failed validation %#v vs %#v", oldNode, node)
 		allErrs = append(allErrs, fmt.Errorf("update contains more than labels or capacity changes"))
 	}
 
-	// TODO: validate Spec.Capacity
 	return allErrs
 }
 

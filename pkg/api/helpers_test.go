@@ -85,3 +85,60 @@ func TestIsStandardResource(t *testing.T) {
 		}
 	}
 }
+
+func TestAddToNodeAddresses(t *testing.T) {
+	testCases := []struct {
+		existing []NodeAddress
+		toAdd    []NodeAddress
+		expected []NodeAddress
+	}{
+		{
+			existing: []NodeAddress{},
+			toAdd:    []NodeAddress{},
+			expected: []NodeAddress{},
+		},
+		{
+			existing: []NodeAddress{},
+			toAdd: []NodeAddress{
+				{Type: NodeExternalIP, Address: "1.1.1.1"},
+				{Type: NodeHostName, Address: "localhost"},
+			},
+			expected: []NodeAddress{
+				{Type: NodeExternalIP, Address: "1.1.1.1"},
+				{Type: NodeHostName, Address: "localhost"},
+			},
+		},
+		{
+			existing: []NodeAddress{},
+			toAdd: []NodeAddress{
+				{Type: NodeExternalIP, Address: "1.1.1.1"},
+				{Type: NodeExternalIP, Address: "1.1.1.1"},
+			},
+			expected: []NodeAddress{
+				{Type: NodeExternalIP, Address: "1.1.1.1"},
+			},
+		},
+		{
+			existing: []NodeAddress{
+				{Type: NodeExternalIP, Address: "1.1.1.1"},
+				{Type: NodeInternalIP, Address: "10.1.1.1"},
+			},
+			toAdd: []NodeAddress{
+				{Type: NodeExternalIP, Address: "1.1.1.1"},
+				{Type: NodeHostName, Address: "localhost"},
+			},
+			expected: []NodeAddress{
+				{Type: NodeExternalIP, Address: "1.1.1.1"},
+				{Type: NodeInternalIP, Address: "10.1.1.1"},
+				{Type: NodeHostName, Address: "localhost"},
+			},
+		},
+	}
+
+	for i, tc := range testCases {
+		AddToNodeAddresses(&tc.existing, tc.toAdd...)
+		if !Semantic.DeepEqual(tc.expected, tc.existing) {
+			t.Error("case[%d], expected: %v, got: %v", i, tc.expected, tc.existing)
+		}
+	}
+}
