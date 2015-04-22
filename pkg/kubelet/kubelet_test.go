@@ -73,7 +73,7 @@ func newTestKubelet(t *testing.T) *TestKubelet {
 	fakeDocker := &dockertools.FakeDockerClient{Errors: make(map[string]error), RemovedImages: util.StringSet{}}
 	fakeRecorder := &record.FakeRecorder{}
 	fakeKubeClient := &testclient.Fake{}
-	fakeSecurityContextProvider := securitycontext.FakeSecurityContextProvider{}
+	fakeSecurityContextProvider := &securitycontext.FakeSecurityContextProvider{}
 
 	kubelet := &Kubelet{}
 	kubelet.securityContextProvider = fakeSecurityContextProvider

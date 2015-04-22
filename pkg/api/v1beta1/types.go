@@ -1645,6 +1645,9 @@ type SecurityContext struct {
 	// SELinuxOptions are the labels to be applied to the container
 	// and volumes
 	SELinuxOptions *SELinuxOptions `json:"seLinuxOptions,omitempty"`
+
+	// RunAsUser is the UID to run the entrypoint of the container process.  Corresponding option is --user or -u
+	RunAsUser int64 `json:"runAsUser,omitempty"`
 }
 
 // SELinuxOptions are the labels to be applied to the container
@@ -1681,6 +1684,9 @@ type SecurityConstraints struct {
 
 	// AllowCapabilities dictates if a container can request to add or drop capabilites
 	AllowCapabilities bool `json:"allowCapabilities,omitempty"`
+
+	// AllowCapabilities dictates if a container can request to run the entry point process as a specific user
+	AllowRunAsUser bool `json:"allowRunAsUser,omitempty"`
 
 	// Capabilities represents, if AllowCapabilities is true, the caps that requests
 	// are allowed to add or drop.

@@ -446,9 +446,9 @@ func (dm *DockerManager) runContainer(pod *api.Pod, container *api.Container, op
 
 	glog.V(3).Infof("Container %v/%v/%v: setting entrypoint \"%v\" and command \"%v\"", pod.Namespace, pod.Name, container.Name, dockerOpts.Config.Entrypoint, dockerOpts.Config.Cmd)
 
-    if err := self.securityContextProvider.ModifyContainerConfig(pod, container, dockerOpts.Config); err != nil {
-        return "", err
-    }
+	if err := dm.securityContextProvider.ModifyContainerConfig(pod, container, dockerOpts.Config); err != nil {
+		return "", err
+	}
 
 	dockerContainer, err := dm.client.CreateContainer(dockerOpts)
 	if err != nil {
@@ -504,7 +504,7 @@ func (dm *DockerManager) runContainer(pod *api.Pod, container *api.Container, op
 		hc.DNSSearch = opts.DNSSearch
 	}
 
-	self.securityContextProvider.ModifyHostConfig(pod, container, hc)
+	dm.securityContextProvider.ModifyHostConfig(pod, container, hc)
 
 	if err = dm.client.StartContainer(dockerContainer.ID, hc); err != nil {
 		if ref != nil {

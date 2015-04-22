@@ -18,6 +18,7 @@ package securitycontext
 
 import (
 	"fmt"
+	"strconv"
 
 	docker "github.com/fsouza/go-dockerclient"
 	"github.com/golang/glog"
@@ -72,6 +73,19 @@ func (p *provider) applySecurityContextToContainer(c *api.Container) {
 	p.applyPrivileged(c)
 	p.applyCapRequests(c)
 	p.applySELinux(c)
+	p.applyRunAsUser(c)
+}
+
+// applyRunAsUser will set the RunAsUser to 0 or p.DefaultSecurityContext.RunAsUser (if DefaultSecurityContext is not nil)
+// if the constraints do not allow run as user requests
+func (p *provider) applyRunAsUser(c *api.Container) {
+	if !p.SecurityConstraints.AllowRunAsUser {
+		if p.DefaultSecurityContext != nil {
+			c.SecurityContext.RunAsUser = p.DefaultSecurityContext.RunAsUser
+		} else {
+			c.SecurityContext.RunAsUser = 0
+		}
+	}
 }
 
 // applySELinux will:
@@ -227,6 +241,11 @@ func (p *provider) ValidateSecurityContext(pod *api.Pod) fielderrors.ValidationE
 			}
 		}
 
+		if !p.SecurityConstraints.AllowRunAsUser && container.SecurityContext.RunAsUser > 0 {
+			field := fmt.Sprintf("%s.SecurityContext.RunAsUser", container.Name)
+			allErrs = append(allErrs, fielderrors.NewFieldInvalid(field, container.SecurityContext.RunAsUser, "SecurityContext does not allow run as user requests"))
+		}
+
 		if p.SecurityConstraints.SELinux == nil {
 			if container.SecurityContext.SELinuxOptions != nil {
 				field := fmt.Sprintf("%s.SecurityContext.SELinuxOptions", container.Name)
@@ -271,7 +290,7 @@ func (p *provider) ModifyContainerConfig(pod *api.Pod, container *api.Container,
 	if container.SecurityContext == nil {
 		return nil
 	}
-
+	config.User = strconv.FormatInt(container.SecurityContext.RunAsUser, 10)
 	return nil
 }
 

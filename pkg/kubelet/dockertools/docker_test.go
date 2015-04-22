@@ -393,7 +393,7 @@ func TestIsImagePresent(t *testing.T) {
 func TestGetRunningContainers(t *testing.T) {
 	fakeDocker := &FakeDockerClient{Errors: make(map[string]error)}
 	fakeRecorder := &record.FakeRecorder{}
-	fakeSecurityContextProvider := securitycontext.FakeSecurityContextProvider{}
+	fakeSecurityContextProvider := &securitycontext.FakeSecurityContextProvider{}
 	containerManager := NewDockerManager(fakeDocker, fakeRecorder, PodInfraContainerImage, 0, 0, fakeSecurityContextProvider)
 	tests := []struct {
 		containers  map[string]*docker.Container

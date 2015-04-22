@@ -50,7 +50,7 @@ func TestFilterCapabilities(t *testing.T) {
 		},
 	}
 
-	scp := DefaultSecurityContextProvider{}
+	scp := provider{}
 
 	for _, tc := range testCases {
 		actual := scp.filterCapabilities(tc.requested, tc.allowed)
@@ -112,7 +112,7 @@ func TestApplyPrivileged(t *testing.T) {
 		{"Constraint disallowed, pod not requested", false, false, false},
 	}
 
-	scp := DefaultSecurityContextProvider{&api.SecurityConstraints{}}
+	scp := provider{&api.SecurityConstraints{}}
 
 	for _, tc := range testCases {
 		scp.SecurityConstraints.AllowPrivileged = tc.constraintSetting
@@ -305,7 +305,7 @@ func TestApplyCapRequests(t *testing.T) {
 		},
 	}
 
-	scp := DefaultSecurityContextProvider{}
+	scp := provider{}
 	container := api.Container{}
 	for _, tc := range testCases {
 		scp.SecurityConstraints = tc.securityContraints
@@ -466,7 +466,7 @@ func TestApplySELinux(t *testing.T) {
 		},
 	}
 
-	scp := DefaultSecurityContextProvider{}
+	scp := provider{}
 	container := api.Container{}
 	for _, tc := range testCases {
 		scp.SecurityConstraints = tc.securityContraints
@@ -475,6 +475,96 @@ func TestApplySELinux(t *testing.T) {
 
 		if !reflect.DeepEqual(tc.expectedSecurityContext.SELinuxOptions, container.SecurityContext.SELinuxOptions) {
 			t.Errorf("Unexpected SELinux result for tc: %s.  Expected %+v, got %+v", tc.name, tc.expectedSecurityContext.SELinuxOptions, container.SecurityContext.SELinuxOptions)
+		}
+	}
+}
+
+func TestApplyRunAsUser(t *testing.T) {
+	testCases := []struct {
+		name                     string
+		securityContraints       *api.SecurityConstraints
+		containerSecurityContext *api.SecurityContext
+		expectedSecurityContext  *api.SecurityContext
+	}{
+		{
+			name: "context that doesn't allow, no default, no container requests",
+			securityContraints: &api.SecurityConstraints{
+				AllowRunAsUser: false,
+			},
+			containerSecurityContext: &api.SecurityContext{},
+			expectedSecurityContext:  &api.SecurityContext{RunAsUser: 0},
+		},
+		{
+			name: "context that doesn't allow, no default, container requests",
+			securityContraints: &api.SecurityConstraints{
+				AllowRunAsUser: false,
+			},
+			containerSecurityContext: &api.SecurityContext{RunAsUser: 888},
+			expectedSecurityContext:  &api.SecurityContext{RunAsUser: 0},
+		},
+		{
+			name: "context that doesn't allow, default, container requests",
+			securityContraints: &api.SecurityConstraints{
+				AllowRunAsUser:         false,
+				DefaultSecurityContext: &api.SecurityContext{RunAsUser: 999},
+			},
+			containerSecurityContext: &api.SecurityContext{RunAsUser: 0},
+			expectedSecurityContext:  &api.SecurityContext{RunAsUser: 999},
+		},
+		{
+			name: "context that doesn't allow, default, container doesn't request",
+			securityContraints: &api.SecurityConstraints{
+				AllowRunAsUser:         false,
+				DefaultSecurityContext: &api.SecurityContext{RunAsUser: 999},
+			},
+			containerSecurityContext: &api.SecurityContext{},
+			expectedSecurityContext:  &api.SecurityContext{RunAsUser: 999},
+		},
+		{
+			name: "context allows, no default, no container requests",
+			securityContraints: &api.SecurityConstraints{
+				AllowRunAsUser: true,
+			},
+			containerSecurityContext: &api.SecurityContext{},
+			expectedSecurityContext:  &api.SecurityContext{RunAsUser: 0},
+		},
+		{
+			name: "context allows, no default, container requests",
+			securityContraints: &api.SecurityConstraints{
+				AllowRunAsUser: true,
+			},
+			containerSecurityContext: &api.SecurityContext{RunAsUser: 888},
+			expectedSecurityContext:  &api.SecurityContext{RunAsUser: 888},
+		},
+		{
+			name: "context allows, default, container requests",
+			securityContraints: &api.SecurityConstraints{
+				AllowRunAsUser:         true,
+				DefaultSecurityContext: &api.SecurityContext{RunAsUser: 999},
+			},
+			containerSecurityContext: &api.SecurityContext{RunAsUser: 888},
+			expectedSecurityContext:  &api.SecurityContext{RunAsUser: 888},
+		},
+		{
+			name: "context allows, default, container doesn't request",
+			securityContraints: &api.SecurityConstraints{
+				AllowRunAsUser:         true,
+				DefaultSecurityContext: &api.SecurityContext{RunAsUser: 999},
+			},
+			containerSecurityContext: &api.SecurityContext{},
+			expectedSecurityContext:  &api.SecurityContext{RunAsUser: 999},
+		},
+	}
+
+	scp := provider{}
+	container := api.Container{}
+	for _, tc := range testCases {
+		scp.SecurityConstraints = tc.securityContraints
+		container.SecurityContext = tc.containerSecurityContext
+		scp.applySELinux(&container)
+
+		if !reflect.DeepEqual(tc.expectedSecurityContext.SELinuxOptions, container.SecurityContext.SELinuxOptions) {
+			t.Errorf("Unexpected RunAsUser result for tc: %s.  Expected %+v, got %+v", tc.name, tc.expectedSecurityContext.RunAsUser, container.SecurityContext.RunAsUser)
 		}
 	}
 }

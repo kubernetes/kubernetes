@@ -75,7 +75,7 @@ func (d *testDocker) InspectContainer(id string) (*docker.Container, error) {
 func TestRunOnce(t *testing.T) {
 	cadvisor := &cadvisor.Mock{}
 	cadvisor.On("MachineInfo").Return(&cadvisorApi.MachineInfo{}, nil)
-	fakeSecurityContextProvider := securitycontext.FakeSecurityContextProvider{}
+	fakeSecurityContextProvider := &securitycontext.FakeSecurityContextProvider{}
 
 	podManager, _ := newFakePodManager()
 
