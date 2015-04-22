@@ -152,7 +152,7 @@ coreos:
 
         [Service]
         # ExecStartPre=/usr/bin/wget -N -P /opt/bin https://storage.googleapis.com/k8s/kube-register
-        ExecStartPre=/usr/bin/wget -N -O /opt/bin/kube-register https://github.com/kelseyhightower/kube-register/releases/download/v0.0.2/kube-register-0.0.2-linux-amd64
+        ExecStartPre=/usr/bin/wget -N -O /opt/bin/kube-register https://github.com/kelseyhightower/kube-register/releases/download/v0.0.3/kube-register-0.0.3-linux-amd64
         ExecStartPre=/usr/bin/chmod +x /opt/bin/kube-register
         ExecStart=/opt/bin/kube-register \
         --metadata=role=node \
