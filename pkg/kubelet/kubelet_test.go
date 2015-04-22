@@ -113,8 +113,8 @@ func newTestKubelet(t *testing.T) *TestKubelet {
 		},
 		fakeRecorder)
 	kubelet.containerManager.Puller = &dockertools.FakeDockerPuller{}
-	kubelet.prober = NewProber(nil, kubelet.readinessManager, kubelet.containerRefManager, kubelet.recorder)
-	kubelet.handlerRunner = NewHandlerRunner(&fakeHTTP{}, &fakeContainerCommandRunner{}, kubelet.containerManager)
+	kubelet.prober = newProber(nil, kubelet.readinessManager, kubelet.containerRefManager, kubelet.recorder)
+	kubelet.handlerRunner = newHandlerRunner(&fakeHTTP{}, &fakeContainerCommandRunner{}, kubelet.containerManager)
 
 	return &TestKubelet{kubelet, fakeDocker, mockCadvisor, fakeKubeClient, waitGroup, fakeMirrorClient}
 }
@@ -768,7 +768,7 @@ func TestSyncPodsWithPodInfraCreatesContainerCallsHandler(t *testing.T) {
 	waitGroup := testKubelet.waitGroup
 	fakeHttp := fakeHTTP{}
 	kubelet.httpClient = &fakeHttp
-	kubelet.handlerRunner = NewHandlerRunner(kubelet.httpClient, &fakeContainerCommandRunner{}, kubelet.containerManager)
+	kubelet.handlerRunner = newHandlerRunner(kubelet.httpClient, &fakeContainerCommandRunner{}, kubelet.containerManager)
 	pods := []*api.Pod{
 		{
 			ObjectMeta: api.ObjectMeta{
@@ -1690,7 +1690,7 @@ func TestRunHandlerExec(t *testing.T) {
 	kubelet := testKubelet.kubelet
 	fakeDocker := testKubelet.fakeDocker
 	kubelet.runner = &fakeCommandRunner
-	kubelet.handlerRunner = NewHandlerRunner(&fakeHTTP{}, kubelet.runner, kubelet.containerManager)
+	kubelet.handlerRunner = newHandlerRunner(&fakeHTTP{}, kubelet.runner, kubelet.containerManager)
 
 	containerID := "abc1234"
 	podName := "podFoo"
@@ -1745,7 +1745,7 @@ func TestRunHandlerHttp(t *testing.T) {
 	testKubelet := newTestKubelet(t)
 	kubelet := testKubelet.kubelet
 	kubelet.httpClient = &fakeHttp
-	kubelet.handlerRunner = NewHandlerRunner(kubelet.httpClient, &fakeContainerCommandRunner{}, kubelet.containerManager)
+	kubelet.handlerRunner = newHandlerRunner(kubelet.httpClient, &fakeContainerCommandRunner{}, kubelet.containerManager)
 
 	containerID := "abc1234"
 	podName := "podFoo"
@@ -1813,7 +1813,7 @@ func TestSyncPodEventHandlerFails(t *testing.T) {
 	kubelet.httpClient = &fakeHTTP{
 		err: fmt.Errorf("test error"),
 	}
-	kubelet.handlerRunner = NewHandlerRunner(kubelet.httpClient, &fakeContainerCommandRunner{}, kubelet.containerManager)
+	kubelet.handlerRunner = newHandlerRunner(kubelet.httpClient, &fakeContainerCommandRunner{}, kubelet.containerManager)
 
 	pods := []*api.Pod{
 		{

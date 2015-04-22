@@ -22,14 +22,11 @@ import (
 	"strconv"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	kubecontainer "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/dockertools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/golang/glog"
 )
-
-type HandlerRunner interface {
-	Run(containerID string, pod *api.Pod, container *api.Container, handler *api.Handler) error
-}
 
 type handlerRunner struct {
 	httpGetter       httpGetter
@@ -38,7 +35,7 @@ type handlerRunner struct {
 }
 
 // TODO(yifan): Merge commandRunner and containerManager once containerManager implements the ContainerCommandRunner interface.
-func NewHandlerRunner(httpGetter httpGetter, commandRunner dockertools.ContainerCommandRunner, containerManager *dockertools.DockerManager) *handlerRunner {
+func newHandlerRunner(httpGetter httpGetter, commandRunner dockertools.ContainerCommandRunner, containerManager *dockertools.DockerManager) kubecontainer.HandlerRunner {
 	return &handlerRunner{
 		httpGetter:       httpGetter,
 		commandRunner:    commandRunner,

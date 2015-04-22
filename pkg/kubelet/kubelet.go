@@ -232,8 +232,8 @@ func NewMainKubelet(
 	}
 
 	klet.podManager = newBasicPodManager(klet.kubeClient)
-	klet.prober = NewProber(klet.runner, klet.readinessManager, klet.containerRefManager, klet.recorder)
-	klet.handlerRunner = NewHandlerRunner(klet.httpClient, klet.runner, klet.containerManager)
+	klet.prober = newProber(klet.runner, klet.readinessManager, klet.containerRefManager, klet.recorder)
+	klet.handlerRunner = newHandlerRunner(klet.httpClient, klet.runner, klet.containerManager)
 
 	runtimeCache, err := kubecontainer.NewRuntimeCache(containerManager)
 	if err != nil {
@@ -317,10 +317,10 @@ type Kubelet struct {
 	networkPlugin network.NetworkPlugin
 
 	// Healthy check prober.
-	prober *Prober
+	prober kubecontainer.Prober
 
 	// Container lifecycle handler runner.
-	handlerRunner HandlerRunner
+	handlerRunner kubecontainer.HandlerRunner
 
 	// Container readiness state manager.
 	readinessManager *kubecontainer.ReadinessManager
