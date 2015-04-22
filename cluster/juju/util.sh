@@ -19,7 +19,7 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-UTIL_SCRIPT=$(realpath "${BASH_SOURCE}")
+UTIL_SCRIPT=$(readlink -m "${BASH_SOURCE}")
 JUJU_PATH=$(dirname ${UTIL_SCRIPT})
 source ${JUJU_PATH}/prereqs/ubuntu-juju.sh
 export JUJU_REPOSITORY=${JUJU_PATH}/charms
