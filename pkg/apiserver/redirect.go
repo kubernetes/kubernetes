@@ -25,6 +25,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/rest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/httplog"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
 type RedirectHandler struct {
@@ -39,7 +40,7 @@ func (r *RedirectHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	var apiResource string
 	var httpCode int
 	reqStart := time.Now()
-	defer monitor("redirect", &verb, &apiResource, &httpCode, reqStart)
+	defer monitor(&verb, &apiResource, util.GetClient(req), &httpCode, reqStart)
 
 	requestInfo, err := r.apiRequestInfoResolver.GetAPIRequestInfo(req)
 	if err != nil {
