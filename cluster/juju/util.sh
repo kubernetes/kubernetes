@@ -106,10 +106,17 @@ function sleep-status() {
     maxtime=900
     jujustatus=''
     echo "Waiting up to 15 minutes to allow the cluster to come online... wait for it..."
+
+    jujustatus=$(juju status kubernetes-master --format=oneline)
+    if [[ $jujustatus == *"started"* ]];
+    then
+        return
+    fi
+
     while [[ $i < $maxtime && $jujustatus != *"started"* ]]; do
+        sleep 15
+        i+=15
         jujustatus=$(juju status kubernetes-master --format=oneline)
-        sleep 30
-        i+=30
     done
 
     # sleep because we cannot get the status back of where the minions are in the deploy phase
