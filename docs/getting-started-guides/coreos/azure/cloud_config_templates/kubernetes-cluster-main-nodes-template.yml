@@ -193,7 +193,7 @@ coreos:
         [Service]
         Type=oneshot
         EnvironmentFile=/etc/weave.%H.env
-        ExecStart=/opt/bin/weave create-bridge
+        ExecStart=/opt/bin/weave --local create-bridge
         ExecStart=/usr/bin/ip addr add dev weave $BRIDGE_ADDRESS_CIDR
         ExecStart=/usr/bin/ip route add $BREAKOUT_ROUTE dev weave scope link
         ExecStart=/usr/bin/ip route add 224.0.0.0/4 dev weave
