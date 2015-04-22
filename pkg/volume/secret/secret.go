@@ -25,6 +25,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume"
+	volumeutil "github.com/GoogleCloudPlatform/kubernetes/pkg/volume/util"
 	"github.com/golang/glog"
 )
 
@@ -91,6 +92,10 @@ var wrappedVolumeSpec = &volume.Spec{
 }
 
 func (sv *secretVolume) SetUpAt(dir string) error {
+	if volumeutil.IsReady(sv.getMetaDir()) {
+		return nil
+	}
+
 	glog.V(3).Infof("Setting up volume %v for pod %v at %v", sv.volName, sv.podRef.UID, dir)
 
 	// Wrap EmptyDir, let it do the setup.
@@ -130,6 +135,8 @@ func (sv *secretVolume) SetUpAt(dir string) error {
 		}
 	}
 
+	volumeutil.SetReady(sv.getMetaDir())
+
 	return nil
 }
 
@@ -159,4 +166,8 @@ func (sv *secretVolume) TearDownAt(dir string) error {
 		return err
 	}
 	return wrapped.TearDownAt(dir)
+}
+
+func (sv *secretVolume) getMetaDir() string {
+	return path.Join(sv.plugin.host.GetPodPluginDir(sv.podRef.UID, util.EscapeQualifiedNameForDisk(secretPluginName)), sv.volName)
 }

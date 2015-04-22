@@ -19,7 +19,6 @@ package git_repo
 import (
 	"fmt"
 	"io/ioutil"
-	"os"
 	"path"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -27,7 +26,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/exec"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume"
-	"github.com/golang/glog"
+	volumeutil "github.com/GoogleCloudPlatform/kubernetes/pkg/volume/util"
 )
 
 // This is the primary entrypoint for volume plugins.
@@ -123,7 +122,7 @@ var wrappedVolumeSpec = &volume.Spec{
 
 // SetUpAt creates new directory and clones a git repo.
 func (gr *gitRepo) SetUpAt(dir string) error {
-	if gr.isReady() {
+	if volumeutil.IsReady(gr.getMetaDir()) {
 		return nil
 	}
 	if gr.legacyMode {
@@ -152,7 +151,7 @@ func (gr *gitRepo) SetUpAt(dir string) error {
 	}
 	if len(gr.revision) == 0 {
 		// Done!
-		gr.setReady()
+		volumeutil.SetReady(gr.getMetaDir())
 		return nil
 	}
 
@@ -164,41 +163,12 @@ func (gr *gitRepo) SetUpAt(dir string) error {
 		return fmt.Errorf("failed to exec 'git reset --hard': %s: %v", output, err)
 	}
 
-	gr.setReady()
+	volumeutil.SetReady(gr.getMetaDir())
 	return nil
 }
 
 func (gr *gitRepo) getMetaDir() string {
 	return path.Join(gr.plugin.host.GetPodPluginDir(gr.podRef.UID, util.EscapeQualifiedNameForDisk(gitRepoPluginName)), gr.volName)
-}
-
-func (gr *gitRepo) isReady() bool {
-	metaDir := gr.getMetaDir()
-	readyFile := path.Join(metaDir, "ready")
-	s, err := os.Stat(readyFile)
-	if err != nil {
-		return false
-	}
-	if !s.Mode().IsRegular() {
-		glog.Errorf("GitRepo ready-file is not a file: %s", readyFile)
-		return false
-	}
-	return true
-}
-
-func (gr *gitRepo) setReady() {
-	metaDir := gr.getMetaDir()
-	if err := os.MkdirAll(metaDir, 0750); err != nil && !os.IsExist(err) {
-		glog.Errorf("Can't mkdir %s: %v", metaDir, err)
-		return
-	}
-	readyFile := path.Join(metaDir, "ready")
-	file, err := os.Create(readyFile)
-	if err != nil {
-		glog.Errorf("Can't touch %s: %v", readyFile, err)
-		return
-	}
-	file.Close()
 }
 
 func (gr *gitRepo) execCommand(command string, args []string, dir string) ([]byte, error) {
