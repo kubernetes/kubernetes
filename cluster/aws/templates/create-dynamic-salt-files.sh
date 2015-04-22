@@ -40,19 +40,14 @@ mkdir -p /srv/salt-overlay/salt/nginx
 echo $MASTER_HTPASSWD > /srv/salt-overlay/salt/nginx/htpasswd
 
 # Generate and distribute a shared secret (bearer token) to
-# apiserver and nodes so that kubelet/kube-proxy can authenticate to
+# apiserver and kubelet so that kubelet can authenticate to
 # apiserver to send events.
 # This works on CoreOS, so it should work on a lot of distros.
 kubelet_token=$(cat /dev/urandom | base64 | tr -d "=+/" | dd bs=32 count=1 2> /dev/null)
-# Same thing for kube-proxy.
-kube_proxy_token=$(cat /dev/urandom | base64 | tr -d "=+/" | dd bs=32 count=1 2> /dev/null)
 
-# Make a list of tokens and usernames to be pushed to the apiserver
 mkdir -p /srv/salt-overlay/salt/kube-apiserver
 known_tokens_file="/srv/salt-overlay/salt/kube-apiserver/known_tokens.csv"
-(umask u=rw,go= ; echo "" > $known_tokens_file)
-echo "$kubelet_token,kubelet,kubelet" >> $known_tokens_file ;
-echo "$kube_proxy_token,kube_proxy,kube_proxy" >> $known_tokens_file
+(umask u=rw,go= ; echo "$kubelet_token,kubelet,kubelet" > $known_tokens_file)
 
 mkdir -p /srv/salt-overlay/salt/kubelet
 kubelet_auth_file="/srv/salt-overlay/salt/kubelet/kubernetes_auth"
