@@ -20,6 +20,7 @@
 # config-default.sh.
 
 KUBE_PROMPT_FOR_UPDATE=y
+KUBE_SKIP_UPDATE=${KUBE_SKIP_UPDATE-"n"}
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
 source "${KUBE_ROOT}/cluster/gke/${KUBE_CONFIG_FILE:-config-default.sh}"
 
@@ -86,13 +87,19 @@ function verify-prereqs() {
       exit 1
     fi
   fi
+  if [[ "${KUBE_SKIP_UPDATE} == "y" ]]; then
+    return
+  fi
   # update and install components as needed
   if [[ "${KUBE_PROMPT_FOR_UPDATE}" != "y" ]]; then
     gcloud_prompt="-q"
   fi
-  gcloud ${gcloud_prompt:-} components update preview || true
-  gcloud ${gcloud_prompt:-} components update alpha || true
-  gcloud ${gcloud_prompt:-} components update || true
+  if [ ! -w $(dirname `which gcloud`) ]; then
+    sudo_prefix="sudo"
+  fi
+  ${sudo_prefix} gcloud ${gcloud_prompt:-} components update preview || true
+  ${sudo_prefix} gcloud ${gcloud_prompt:-} components update alpha|| true
+  ${sudo_prefix} gcloud ${gcloud_prompt:-} components update || true
 }
 
 # Instantiate a kubernetes cluster
