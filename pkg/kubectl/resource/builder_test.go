@@ -178,7 +178,7 @@ func TestPathBuilder(t *testing.T) {
 	}
 
 	info := test.Infos[0]
-	if info.Name != "redis-master-controller" || info.Namespace != "" || info.Object == nil {
+	if info.Name != "redis-master" || info.Namespace != "" || info.Object == nil {
 		t.Errorf("unexpected info: %#v", info)
 	}
 }
@@ -230,7 +230,7 @@ func TestPathBuilderWithMultiple(t *testing.T) {
 	}
 
 	info := test.Infos[1]
-	if info.Name != "redis-master-controller" || info.Namespace != "test" || info.Object == nil {
+	if info.Name != "redis-master" || info.Namespace != "test" || info.Object == nil {
 		t.Errorf("unexpected info: %#v", info)
 	}
 }
@@ -250,7 +250,7 @@ func TestDirectoryBuilder(t *testing.T) {
 
 	found := false
 	for _, info := range test.Infos {
-		if info.Name == "redis-master-controller" && info.Namespace == "test" && info.Object != nil {
+		if info.Name == "redis-master" && info.Namespace == "test" && info.Object != nil {
 			found = true
 		}
 	}
@@ -612,7 +612,7 @@ func TestSingularObject(t *testing.T) {
 	if !ok {
 		t.Fatalf("unexpected object: %#v", obj)
 	}
-	if rc.Name != "redis-master-controller" || rc.Namespace != "test" {
+	if rc.Name != "redis-master" || rc.Namespace != "test" {
 		t.Errorf("unexpected controller: %#v", rc)
 	}
 }
