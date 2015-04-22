@@ -137,10 +137,13 @@ EOF
 known_tokens_file="/srv/salt-overlay/salt/kube-apiserver/known_tokens.csv"
 if [[ ! -f "${known_tokens_file}" ]]; then
   kubelet_token=$(cat /dev/urandom | base64 | tr -d "=+/" | dd bs=32 count=1 2> /dev/null)
+  kube_proxy_token=$(cat /dev/urandom | base64 | tr -d "=+/" | dd bs=32 count=1 2> /dev/null)
 
   mkdir -p /srv/salt-overlay/salt/kube-apiserver
   known_tokens_file="/srv/salt-overlay/salt/kube-apiserver/known_tokens.csv"
-  (umask u=rw,go= ; echo "$kubelet_token,kubelet,kubelet" > $known_tokens_file)
+  (umask u=rw,go= ; echo "" > $known_tokens_file)
+  echo "$kubelet_token,kubelet,kubelet" >> $known_tokens_file
+  echo "$kube_proxy_token,kube-proxy,kube-proxy" >> $known_tokens_file
 
   mkdir -p /srv/salt-overlay/salt/kubelet
   kubelet_auth_file="/srv/salt-overlay/salt/kubelet/kubernetes_auth"

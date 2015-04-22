@@ -73,14 +73,20 @@ for k,v in yaml.load(sys.stdin).iteritems():
   fi
 }
 
-function ensure-kube-token() {
+function ensure-kube-tokens() {
   # We bake the KUBELET_TOKEN in separately to avoid auth information
   # having to be re-communicated on kube-push. (Otherwise the client
   # has to keep the bearer token around to handle generating a valid
   # kube-env.)
   if [[ -z "${KUBELET_TOKEN:-}" ]] && [[ ! -e "${KNOWN_TOKENS_FILE}" ]]; then
-    until KUBELET_TOKEN=$(curl-metadata kube-token); do
+    until KUBELET_TOKEN=$(curl-metadata kubelet-token); do
       echo 'Waiting for metadata KUBELET_TOKEN...'
+      sleep 3
+    done
+  fi
+  if [[ -z "${KUBE_PROXY_TOKEN:-}" ]] && [[ ! -e "${KNOWN_TOKENS_FILE}" ]]; then
+    until KUBE_PROXY_TOKEN=$(curl-metadata kube-proxy-token); do
+      echo 'Waiting for metadata KUBE_PROXY_TOKEN...'
       sleep 3
     done
   fi
@@ -252,7 +258,7 @@ EOF
 
 # This should only happen on cluster initialization. Uses
 # MASTER_HTPASSWORD to generate the nginx/htpasswd file, and the
-# KUBELET_TOKEN, plus /dev/urandom, to generate known_tokens.csv
+# KUBELET_TOKEN and KUBE_PROXY_TOKEN, to generate known_tokens.csv
 # (KNOWN_TOKENS_FILE). After the first boot and on upgrade, these
 # files exist on the master-pd and should never be touched again
 # (except perhaps an additional service account, see NB below.)
@@ -266,8 +272,9 @@ function create-salt-auth() {
 
   if [ ! -e "${KNOWN_TOKENS_FILE}" ]; then
     mkdir -p /srv/salt-overlay/salt/kube-apiserver
-    (umask 077;
-      echo "${KUBELET_TOKEN},kubelet,kubelet" > "${KNOWN_TOKENS_FILE}")
+    (umask 077; echo "" > "${KNOWN_TOKENS_FILE}")
+    echo "${KUBELET_TOKEN},kubelet,kubelet" >> "${KNOWN_TOKENS_FILE}"
+    echo "${KUBE_PROXY_TOKEN},kube_proxy,kube_proxy" >> "${KNOWN_TOKENS_FILE}"
 
     mkdir -p /srv/salt-overlay/salt/kubelet
     kubelet_auth_file="/srv/salt-overlay/salt/kubelet/kubernetes_auth"
@@ -422,7 +429,7 @@ if [[ -z "${is_push}" ]]; then
   ensure-install-dir
   set-kube-env
   [[ "${KUBERNETES_MASTER}" == "true" ]] && mount-master-pd
-  ensure-kube-token
+  ensure-kube-tokens
   create-salt-pillar
   create-salt-auth
   download-release
