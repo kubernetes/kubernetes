@@ -195,6 +195,72 @@ func TestIncrementUsageCPU(t *testing.T) {
 	}
 }
 
+func TestUnboundedCPU(t *testing.T) {
+	namespace := "default"
+	client := testclient.NewSimpleFake(&api.PodList{
+		Items: []api.Pod{
+			{
+				ObjectMeta: api.ObjectMeta{Name: "123", Namespace: namespace},
+				Spec: api.PodSpec{
+					Volumes:    []api.Volume{{Name: "vol"}},
+					Containers: []api.Container{{Name: "ctr", Image: "image", Resources: getResourceRequirements("100m", "1Gi")}},
+				},
+			},
+		},
+	})
+	status := &api.ResourceQuotaStatus{
+		Hard: api.ResourceList{},
+		Used: api.ResourceList{},
+	}
+	r := api.ResourceCPU
+	status.Hard[r] = resource.MustParse("200m")
+	status.Used[r] = resource.MustParse("100m")
+
+	newPod := &api.Pod{
+		ObjectMeta: api.ObjectMeta{Name: "123", Namespace: namespace},
+		Spec: api.PodSpec{
+			Volumes:    []api.Volume{{Name: "vol"}},
+			Containers: []api.Container{{Name: "ctr", Image: "image", Resources: getResourceRequirements("0m", "1Gi")}},
+		}}
+	_, err := IncrementUsage(admission.NewAttributesRecord(newPod, "Pod", namespace, "pods", "CREATE"), status, client)
+	if err == nil {
+		t.Errorf("Expected CPU unbounded usage error")
+	}
+}
+
+func TestUnboundedMemory(t *testing.T) {
+	namespace := "default"
+	client := testclient.NewSimpleFake(&api.PodList{
+		Items: []api.Pod{
+			{
+				ObjectMeta: api.ObjectMeta{Name: "123", Namespace: namespace},
+				Spec: api.PodSpec{
+					Volumes:    []api.Volume{{Name: "vol"}},
+					Containers: []api.Container{{Name: "ctr", Image: "image", Resources: getResourceRequirements("100m", "1Gi")}},
+				},
+			},
+		},
+	})
+	status := &api.ResourceQuotaStatus{
+		Hard: api.ResourceList{},
+		Used: api.ResourceList{},
+	}
+	r := api.ResourceMemory
+	status.Hard[r] = resource.MustParse("10Gi")
+	status.Used[r] = resource.MustParse("1Gi")
+
+	newPod := &api.Pod{
+		ObjectMeta: api.ObjectMeta{Name: "123", Namespace: namespace},
+		Spec: api.PodSpec{
+			Volumes:    []api.Volume{{Name: "vol"}},
+			Containers: []api.Container{{Name: "ctr", Image: "image", Resources: getResourceRequirements("250m", "0")}},
+		}}
+	_, err := IncrementUsage(admission.NewAttributesRecord(newPod, "Pod", namespace, "pods", "CREATE"), status, client)
+	if err == nil {
+		t.Errorf("Expected memory unbounded usage error")
+	}
+}
+
 func TestExceedUsageCPU(t *testing.T) {
 	namespace := "default"
 	client := testclient.NewSimpleFake(&api.PodList{

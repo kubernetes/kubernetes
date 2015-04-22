@@ -240,6 +240,28 @@ func PodCPU(pod *api.Pod) *resource.Quantity {
 	return resource.NewMilliQuantity(int64(val), resource.DecimalSI)
 }
 
+// IsPodCPUUnbounded returns true if the cpu use is unbounded for any container in pod
+func IsPodCPUUnbounded(pod *api.Pod) bool {
+	for j := range pod.Spec.Containers {
+		container := pod.Spec.Containers[j]
+		if container.Resources.Limits.Cpu().MilliValue() == int64(0) {
+			return true
+		}
+	}
+	return false
+}
+
+// IsPodMemoryUnbounded returns true if the memory use is unbounded for any container in pod
+func IsPodMemoryUnbounded(pod *api.Pod) bool {
+	for j := range pod.Spec.Containers {
+		container := pod.Spec.Containers[j]
+		if container.Resources.Limits.Memory().Value() == int64(0) {
+			return true
+		}
+	}
+	return false
+}
+
 // PodMemory computes the memory usage of a pod
 func PodMemory(pod *api.Pod) *resource.Quantity {
 	val := int64(0)
