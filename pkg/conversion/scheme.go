@@ -201,6 +201,12 @@ func (s *Scheme) AddConversionFuncs(conversionFuncs ...interface{}) error {
 	return nil
 }
 
+// Similar to AddConversionFuncs, but registers conversion functions that were
+// automatically generated.
+func (s *Scheme) AddGeneratedConversionFuncs(conversionFuncs ...interface{}) error {
+	return s.AddConversionFuncs(conversionFuncs...)
+}
+
 // AddStructFieldConversion allows you to specify a mechanical copy for a moved
 // or renamed struct field without writing an entire conversion function. See
 // the comment in Converter.SetStructFieldCopy for parameter details.

@@ -307,6 +307,12 @@ func (s *Scheme) AddConversionFuncs(conversionFuncs ...interface{}) error {
 	return s.raw.AddConversionFuncs(conversionFuncs...)
 }
 
+// Similar to AddConversionFuncs, but registers conversion functions that were
+// automatically generated.
+func (s *Scheme) AddGeneratedConversionFuncs(conversionFuncs ...interface{}) error {
+	return s.raw.AddGeneratedConversionFuncs(conversionFuncs...)
+}
+
 // AddFieldLabelConversionFunc adds a conversion function to convert field selectors
 // of the given kind from the given version to internal version representation.
 func (s *Scheme) AddFieldLabelConversionFunc(version, kind string, conversionFunc FieldLabelConversionFunc) error {
