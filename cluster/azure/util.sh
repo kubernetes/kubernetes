@@ -438,21 +438,22 @@ function kube-up {
     create-kubeconfig
 )
 
-    # Wait for salt on the minions
-    sleep 30
-
     echo "Sanity checking cluster..."
+    echo
+    echo "  This will continually check the minions to ensure docker is"
+    echo "  installed. This is usually a good indicator that salt has"
+    echo "  successfully  provisioned. This might loop forever if there was"
+    echo "  some uncaught error during start up."
+    echo
     # Basic sanity checking
     for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
         # Make sure docker is installed
         echo "--> Making sure docker is installed on ${MINION_NAMES[$i]}."
-        ssh -oStrictHostKeyChecking=no -i $AZ_SSH_KEY -p ${ssh_ports[$i]} \
-            $AZ_CS.cloudapp.net which docker > /dev/null || {
-            echo "Docker failed to install on ${MINION_NAMES[$i]}. Your cluster is unlikely" >&2
-            echo "to work correctly. Please run ./cluster/kube-down.sh and re-create the" >&2
-            echo "cluster. (sorry!)" >&2
-            exit 1
-        }
+        until ssh -oStrictHostKeyChecking=no -i $AZ_SSH_KEY -p ${ssh_ports[$i]} \
+            $AZ_CS.cloudapp.net which docker > /dev/null 2>&1; do
+            printf "."
+            sleep 2
+        done
     done
 
     echo
