@@ -4743,20 +4743,39 @@
     ]
    },
    {
+    "path": "/api/v1beta2/pods/{name}/exec",
+    "description": "API at /api/v1beta2 version v1beta2",
+    "operations": [
+     {
+      "type": "string",
+      "method": "GET",
+      "summary": "connect GET requests to Pod",
+      "nickname": "connectGETPod",
+      "parameters": [],
+      "produces": [
+       "*/*"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
     "path": "/api/v1beta2/pods/{name}/log",
     "description": "API at /api/v1beta2 version v1beta2",
     "operations": [
      {
-      "type": "v1beta2.PodLogOptions",
+      "type": "v1beta2.Pod",
       "method": "GET",
-      "summary": "read the specified PodLogOptions",
-      "nickname": "readPodLogOptions",
+      "summary": "read the specified Pod",
+      "nickname": "readPod",
       "parameters": [
        {
         "type": "string",
         "paramType": "path",
         "name": "name",
-        "description": "name of the PodLogOptions",
+        "description": "name of the Pod",
         "required": true,
         "allowMultiple": false
        },
@@ -4773,11 +4792,198 @@
        {
         "code": 200,
         "message": "OK",
-        "responseModel": "v1beta2.PodLogOptions"
+        "responseModel": "v1beta2.Pod"
        }
       ],
       "produces": [
        "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/api/v1beta2/pods/{name}/portforward",
+    "description": "API at /api/v1beta2 version v1beta2",
+    "operations": [
+     {
+      "type": "string",
+      "method": "GET",
+      "summary": "connect GET requests to Pod",
+      "nickname": "connectGETPod",
+      "parameters": [],
+      "produces": [
+       "*/*"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/api/v1beta2/pods/{name}/proxy",
+    "description": "API at /api/v1beta2 version v1beta2",
+    "operations": [
+     {
+      "type": "string",
+      "method": "GET",
+      "summary": "connect GET requests to Pod",
+      "nickname": "connectGETPod",
+      "parameters": [],
+      "produces": [
+       "*/*"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "string",
+      "method": "POST",
+      "summary": "connect POST requests to Pod",
+      "nickname": "connectPOSTPod",
+      "parameters": [],
+      "produces": [
+       "*/*"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "string",
+      "method": "PUT",
+      "summary": "connect PUT requests to Pod",
+      "nickname": "connectPUTPod",
+      "parameters": [],
+      "produces": [
+       "*/*"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "string",
+      "method": "DELETE",
+      "summary": "connect DELETE requests to Pod",
+      "nickname": "connectDELETEPod",
+      "parameters": [],
+      "produces": [
+       "*/*"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "string",
+      "method": "HEAD",
+      "summary": "connect HEAD requests to Pod",
+      "nickname": "connectHEADPod",
+      "parameters": [],
+      "produces": [
+       "*/*"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "string",
+      "method": "OPTIONS",
+      "summary": "connect OPTIONS requests to Pod",
+      "nickname": "connectOPTIONSPod",
+      "parameters": [],
+      "produces": [
+       "*/*"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/api/v1beta2/pods/{name}/proxy/{path:*}",
+    "description": "API at /api/v1beta2 version v1beta2",
+    "operations": [
+     {
+      "type": "string",
+      "method": "GET",
+      "summary": "connect GET requests to Pod",
+      "nickname": "connectGETPod",
+      "parameters": [],
+      "produces": [
+       "*/*"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "string",
+      "method": "POST",
+      "summary": "connect POST requests to Pod",
+      "nickname": "connectPOSTPod",
+      "parameters": [],
+      "produces": [
+       "*/*"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "string",
+      "method": "PUT",
+      "summary": "connect PUT requests to Pod",
+      "nickname": "connectPUTPod",
+      "parameters": [],
+      "produces": [
+       "*/*"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "string",
+      "method": "DELETE",
+      "summary": "connect DELETE requests to Pod",
+      "nickname": "connectDELETEPod",
+      "parameters": [],
+      "produces": [
+       "*/*"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "string",
+      "method": "HEAD",
+      "summary": "connect HEAD requests to Pod",
+      "nickname": "connectHEADPod",
+      "parameters": [],
+      "produces": [
+       "*/*"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "string",
+      "method": "OPTIONS",
+      "summary": "connect OPTIONS requests to Pod",
+      "nickname": "connectOPTIONSPod",
+      "parameters": [],
+      "produces": [
+       "*/*"
       ],
       "consumes": [
        "*/*"
@@ -6914,6 +7120,31 @@
     "id": "",
     "properties": null
    },
+   "v1beta2.AWSElasticBlockStoreVolumeSource": {
+    "id": "v1beta2.AWSElasticBlockStoreVolumeSource",
+    "required": [
+     "volumeID"
+    ],
+    "properties": {
+     "fsType": {
+      "type": "string",
+      "description": "file system type to mount, such as ext4, xfs, ntfs"
+     },
+     "partition": {
+      "type": "integer",
+      "format": "int32",
+      "description": "partition on the disk to mount (e.g., '1' for /dev/sda1); if omitted the plain device name (e.g., /dev/sda) will be mounted"
+     },
+     "readOnly": {
+      "type": "boolean",
+      "description": "read-only if true, read-write otherwise (false or unspecified)"
+     },
+     "volumeID": {
+      "type": "string",
+      "description": "unique id of the PD resource in AWS"
+     }
+    }
+   },
    "v1beta2.AccessModeType": {
     "id": "v1beta2.AccessModeType",
     "properties": {}
@@ -8657,6 +8888,19 @@
      }
     }
    },
+   "v1beta2.PersistentVolumeClaimVolumeSource": {
+    "id": "v1beta2.PersistentVolumeClaimVolumeSource",
+    "properties": {
+     "claimName": {
+      "type": "string",
+      "description": "the name of the claim in the same namespace to be mounted as a volume"
+     },
+     "readOnly": {
+      "type": "boolean",
+      "description": "mount volume as read-only when true; default false"
+     }
+    }
+   },
    "v1beta2.PersistentVolumeList": {
     "id": "v1beta2.PersistentVolumeList",
     "properties": {
@@ -8717,6 +8961,7 @@
     "id": "v1beta2.PersistentVolumeSpec",
     "required": [
      "persistentDisk",
+     "awsElasticBlockStore",
      "hostPath",
      "glusterfs"
     ],
@@ -8727,6 +8972,10 @@
        "$ref": "v1beta2.AccessModeType"
       },
       "description": "all ways the volume can be mounted"
+     },
+     "awsElasticBlockStore": {
+      "$ref": "v1beta2.AWSElasticBlockStoreVolumeSource",
+      "description": "AWS disk resource provisioned by an admin"
      },
      "capacity": {
       "type": "any",
@@ -8877,63 +9126,6 @@
        "$ref": "v1beta2.Pod"
       },
       "description": "list of pods"
-     },
-     "kind": {
-      "type": "string",
-      "description": "kind of object, in CamelCase; cannot be updated"
-     },
-     "namespace": {
-      "type": "string",
-      "description": "namespace to which the object belongs; must be a DNS_SUBDOMAIN; 'default' by default; cannot be updated"
-     },
-     "resourceVersion": {
-      "$ref": "uint64",
-      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
-     },
-     "selfLink": {
-      "type": "string",
-      "description": "URL for the object; populated by the system, read-only"
-     },
-     "uid": {
-      "type": "string",
-      "description": "unique UUID across space and time; populated by the system, read-only"
-     }
-    }
-   },
-   "v1beta2.PodLogOptions": {
-    "id": "v1beta2.PodLogOptions",
-    "properties": {
-     "annotations": {
-      "type": "any",
-      "description": "map of string keys and values that can be used by external tooling to store and retrieve arbitrary metadata about the object"
-     },
-     "apiVersion": {
-      "type": "string",
-      "description": "version of the schema the object should have"
-     },
-     "container": {
-      "type": "string",
-      "description": "the container for which to stream logs; defaults to only container if there is one container in the pod"
-     },
-     "creationTimestamp": {
-      "type": "string",
-      "description": "RFC 3339 date and time at which the object was created; populated by the system, read-only; null for lists"
-     },
-     "deletionTimestamp": {
-      "type": "string",
-      "description": "RFC 3339 date and time at which the object will be deleted; populated by the system when a graceful deletion is requested, read-only; if not set, graceful deletion of the object has not been requested"
-     },
-     "follow": {
-      "type": "boolean",
-      "description": "follow the log stream of the pod; defaults to false"
-     },
-     "generateName": {
-      "type": "string",
-      "description": "an optional prefix to use to generate a unique name; has the same validation rules as name; optional, and is applied only name if is not specified"
-     },
-     "id": {
-      "type": "string",
-      "description": "name of the object; must be a DNS_SUBDOMAIN and unique among all objects of the same kind within the same namespace; used in resource URLs; cannot be updated"
      },
      "kind": {
       "type": "string",
@@ -9801,7 +9993,7 @@
      },
      "source": {
       "$ref": "v1beta2.VolumeSource",
-      "description": "location and type of volume to mount; at most one of HostDir, EmptyDir, GCEPersistentDisk, or GitRepo; default is EmptyDir"
+      "description": "location and type of volume to mount; at most one of HostDir, EmptyDir, GCEPersistentDisk, AWSElasticBlockStore, or GitRepo; default is EmptyDir"
      }
     }
    },
@@ -9832,6 +10024,7 @@
      "hostDir",
      "emptyDir",
      "persistentDisk",
+     "awsElasticBlockStore",
      "gitRepo",
      "secret",
      "nfs",
@@ -9839,6 +10032,10 @@
      "glusterfs"
     ],
     "properties": {
+     "awsElasticBlockStore": {
+      "$ref": "v1beta2.AWSElasticBlockStoreVolumeSource",
+      "description": "AWS disk resource attached to the host machine on demand"
+     },
      "emptyDir": {
       "$ref": "v1beta2.EmptyDirVolumeSource",
       "description": "temporary directory that shares a pod's lifetime"
@@ -9866,6 +10063,10 @@
      "persistentDisk": {
       "$ref": "v1beta2.GCEPersistentDiskVolumeSource",
       "description": "GCE disk resource attached to the host machine on demand"
+     },
+     "persistentVolumeClaim": {
+      "$ref": "v1beta2.PersistentVolumeClaimVolumeSource",
+      "description": "a reference to a PersistentVolumeClaim in the same namespace"
      },
      "secret": {
       "$ref": "v1beta2.SecretVolumeSource",

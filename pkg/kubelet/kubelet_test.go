@@ -113,8 +113,8 @@ func newTestKubelet(t *testing.T) *TestKubelet {
 		},
 		fakeRecorder)
 	kubelet.containerManager.Puller = &dockertools.FakeDockerPuller{}
-	kubelet.prober = NewProber(nil, kubelet.readinessManager, kubelet.containerRefManager, kubelet.recorder)
-	kubelet.handlerRunner = NewHandlerRunner(&fakeHTTP{}, &fakeContainerCommandRunner{}, kubelet.containerManager)
+	kubelet.prober = newProber(nil, kubelet.readinessManager, kubelet.containerRefManager, kubelet.recorder)
+	kubelet.handlerRunner = newHandlerRunner(&fakeHTTP{}, &fakeContainerCommandRunner{}, kubelet.containerManager)
 
 	return &TestKubelet{kubelet, fakeDocker, mockCadvisor, fakeKubeClient, waitGroup, fakeMirrorClient}
 }
@@ -511,10 +511,10 @@ func TestSyncPodsDoesNothing(t *testing.T) {
 	waitGroup.Wait()
 	verifyCalls(t, fakeDocker, []string{
 		"list", "list",
-		// Check the pod infra contianer.
-		"inspect_container",
 		// Get pod status.
 		"list", "inspect_container", "inspect_container",
+		// Check the pod infra contianer.
+		"inspect_container",
 		// Get pod status.
 		"list", "inspect_container", "inspect_container"})
 }
@@ -743,10 +743,10 @@ func TestSyncPodsWithPodInfraCreatesContainer(t *testing.T) {
 
 	verifyCalls(t, fakeDocker, []string{
 		"list", "list",
-		// Check the pod infra container.
-		"inspect_container",
 		// Get pod status.
 		"list", "inspect_container", "inspect_image",
+		// Check the pod infra container.
+		"inspect_container",
 		// Create container.
 		"create", "start",
 		// Get pod status.
@@ -768,7 +768,7 @@ func TestSyncPodsWithPodInfraCreatesContainerCallsHandler(t *testing.T) {
 	waitGroup := testKubelet.waitGroup
 	fakeHttp := fakeHTTP{}
 	kubelet.httpClient = &fakeHttp
-	kubelet.handlerRunner = NewHandlerRunner(kubelet.httpClient, &fakeContainerCommandRunner{}, kubelet.containerManager)
+	kubelet.handlerRunner = newHandlerRunner(kubelet.httpClient, &fakeContainerCommandRunner{}, kubelet.containerManager)
 	pods := []*api.Pod{
 		{
 			ObjectMeta: api.ObjectMeta{
@@ -818,10 +818,10 @@ func TestSyncPodsWithPodInfraCreatesContainerCallsHandler(t *testing.T) {
 
 	verifyCalls(t, fakeDocker, []string{
 		"list", "list",
-		// Check the pod infra container.
-		"inspect_container",
 		// Get pod status.
 		"list", "inspect_container", "inspect_image",
+		// Check the pod infra container.
+		"inspect_container",
 		// Create container.
 		"create", "start",
 		// Get pod status.
@@ -1104,10 +1104,10 @@ func TestSyncPodsDeletesDuplicate(t *testing.T) {
 
 	verifyCalls(t, fakeDocker, []string{
 		"list", "list",
-		// Check the pod infra container.
-		"inspect_container",
 		// Get pod status.
 		"list", "inspect_container", "inspect_container", "inspect_container",
+		// Check the pod infra container.
+		"inspect_container",
 		// Kill the duplicated container.
 		"stop",
 		// Get pod status.
@@ -1175,10 +1175,10 @@ func TestSyncPodsBadHash(t *testing.T) {
 
 	verifyCalls(t, fakeDocker, []string{
 		"list", "list",
-		// Check the pod infra container.
-		"inspect_container",
 		// Get pod status.
 		"list", "inspect_container", "inspect_container",
+		// Check the pod infra container.
+		"inspect_container",
 		// Kill and restart the bad hash container.
 		"stop", "create", "start",
 		// Get pod status.
@@ -1249,10 +1249,10 @@ func TestSyncPodsUnhealthy(t *testing.T) {
 
 	verifyCalls(t, fakeDocker, []string{
 		"list", "list",
-		// Check the pod infra container.
-		"inspect_container",
 		// Get pod status.
 		"list", "inspect_container", "inspect_container",
+		// Check the pod infra container.
+		"inspect_container",
 		// Kill the unhealthy container.
 		"stop",
 		// Restart the unhealthy container.
@@ -1597,10 +1597,6 @@ func (f *fakeContainerCommandRunner) RunInContainer(id string, cmd []string) ([]
 	return []byte{}, f.E
 }
 
-func (f *fakeContainerCommandRunner) GetDockerServerVersion() (docker.APIVersion, error) {
-	return nil, nil
-}
-
 func (f *fakeContainerCommandRunner) ExecInContainer(id string, cmd []string, in io.Reader, out, err io.WriteCloser, tty bool) error {
 	f.Cmd = cmd
 	f.ID = id
@@ -1694,7 +1690,7 @@ func TestRunHandlerExec(t *testing.T) {
 	kubelet := testKubelet.kubelet
 	fakeDocker := testKubelet.fakeDocker
 	kubelet.runner = &fakeCommandRunner
-	kubelet.handlerRunner = NewHandlerRunner(&fakeHTTP{}, kubelet.runner, kubelet.containerManager)
+	kubelet.handlerRunner = newHandlerRunner(&fakeHTTP{}, kubelet.runner, kubelet.containerManager)
 
 	containerID := "abc1234"
 	podName := "podFoo"
@@ -1749,7 +1745,7 @@ func TestRunHandlerHttp(t *testing.T) {
 	testKubelet := newTestKubelet(t)
 	kubelet := testKubelet.kubelet
 	kubelet.httpClient = &fakeHttp
-	kubelet.handlerRunner = NewHandlerRunner(kubelet.httpClient, &fakeContainerCommandRunner{}, kubelet.containerManager)
+	kubelet.handlerRunner = newHandlerRunner(kubelet.httpClient, &fakeContainerCommandRunner{}, kubelet.containerManager)
 
 	containerID := "abc1234"
 	podName := "podFoo"
@@ -1817,7 +1813,7 @@ func TestSyncPodEventHandlerFails(t *testing.T) {
 	kubelet.httpClient = &fakeHTTP{
 		err: fmt.Errorf("test error"),
 	}
-	kubelet.handlerRunner = NewHandlerRunner(kubelet.httpClient, &fakeContainerCommandRunner{}, kubelet.containerManager)
+	kubelet.handlerRunner = newHandlerRunner(kubelet.httpClient, &fakeContainerCommandRunner{}, kubelet.containerManager)
 
 	pods := []*api.Pod{
 		{
@@ -1868,10 +1864,10 @@ func TestSyncPodEventHandlerFails(t *testing.T) {
 
 	verifyCalls(t, fakeDocker, []string{
 		"list", "list",
-		// Check the pod infra container.
-		"inspect_container",
 		// Get pod status.
 		"list", "inspect_container", "inspect_image",
+		// Check the pod infra container.
+		"inspect_container",
 		// Create the container.
 		"create", "start",
 		// Kill the container since event handler fails.
@@ -3871,10 +3867,10 @@ func TestSyncPodsWithRestartPolicy(t *testing.T) {
 		{
 			api.RestartPolicyAlways,
 			[]string{"list", "list",
-				// Check the pod infra container.
-				"inspect_container",
 				// Get pod status.
 				"list", "inspect_container", "inspect_container", "inspect_container",
+				// Check the pod infra container.
+				"inspect_container",
 				// Restart both containers.
 				"create", "start", "create", "start",
 				// Get pod status.
@@ -3885,10 +3881,10 @@ func TestSyncPodsWithRestartPolicy(t *testing.T) {
 		{
 			api.RestartPolicyOnFailure,
 			[]string{"list", "list",
-				// Check the pod infra container.
-				"inspect_container",
 				// Get pod status.
 				"list", "inspect_container", "inspect_container", "inspect_container",
+				// Check the pod infra container.
+				"inspect_container",
 				// Restart the failed container.
 				"create", "start",
 				// Get pod status.
@@ -3899,10 +3895,10 @@ func TestSyncPodsWithRestartPolicy(t *testing.T) {
 		{
 			api.RestartPolicyNever,
 			[]string{"list", "list",
-				// Check the pod infra container.
-				"inspect_container",
 				// Get pod status.
 				"list", "inspect_container", "inspect_container", "inspect_container",
+				// Check the pod infra container.
+				"inspect_container",
 				// Stop the last pod infra container.
 				"stop",
 				// Get pod status.

@@ -266,7 +266,7 @@ func (nc *NodeController) reconcileExternalServices(nodes *api.NodeList) (should
 				glog.Errorf("External load balancers for non TCP services are not currently supported: %v.", service)
 				continue
 			}
-			name := cloudprovider.GetLoadBalancerName(nc.clusterName, service.Namespace, service.Name)
+			name := cloudprovider.GetLoadBalancerName(&service)
 			err := balancer.UpdateTCPLoadBalancer(name, zone.Region, hosts)
 			if err != nil {
 				glog.Errorf("External error while updating TCP load balancer: %v.", err)
@@ -652,7 +652,7 @@ func (nc *NodeController) getCloudNodesWithSpec() (*api.NodeList, error) {
 func (nc *NodeController) deletePods(nodeID string) error {
 	glog.V(2).Infof("Delete all pods from %v", nodeID)
 	// TODO: We don't yet have field selectors from client, see issue #1362.
-	pods, err := nc.kubeClient.Pods(api.NamespaceAll).List(labels.Everything())
+	pods, err := nc.kubeClient.Pods(api.NamespaceAll).List(labels.Everything(), fields.Everything())
 	if err != nil {
 		return err
 	}

@@ -83,7 +83,7 @@ func ClusterLevelLoggingWithElasticsearch(c *client.Client) {
 	// Wait for the Elasticsearch pods to enter the running state.
 	By("Checking to make sure the Elasticsearch pods are running")
 	label := labels.SelectorFromSet(labels.Set(map[string]string{"name": "elasticsearch-logging"}))
-	pods, err := c.Pods(api.NamespaceDefault).List(label)
+	pods, err := c.Pods(api.NamespaceDefault).List(label, fields.Everything())
 	Expect(err).NotTo(HaveOccurred())
 	for _, pod := range pods.Items {
 		err = waitForPodRunning(c, pod.Name)

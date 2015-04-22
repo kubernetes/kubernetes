@@ -25,11 +25,20 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume"
 )
 
+type Version interface {
+	// Compare compares two versions of the runtime. On success it returns -1
+	// if the version is less than the other, 1 if it is greater than the other,
+	// or 0 if they are equal.
+	Compare(other string) (int, error)
+	// String returns a string that represents the version.
+	String() string
+}
+
 // Runtime interface defines the interfaces that should be implemented
 // by a container runtime.
 type Runtime interface {
-	// Version returns a map of version information of the container runtime.
-	Version() (map[string]string, error)
+	// Version returns the version information of the container runtime.
+	Version() (Version, error)
 	// GetPods returns a list containers group by pods. The boolean parameter
 	// specifies whether the runtime returns all containers including those already
 	// exited and dead containers (used for garbage collection).

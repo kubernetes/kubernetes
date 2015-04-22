@@ -148,7 +148,7 @@ func (rm *ResourceQuotaManager) syncResourceQuota(quota api.ResourceQuota) (err 
 
 	pods := &api.PodList{}
 	if set[api.ResourcePods] || set[api.ResourceMemory] || set[api.ResourceCPU] {
-		pods, err = rm.kubeClient.Pods(usage.Namespace).List(labels.Everything())
+		pods, err = rm.kubeClient.Pods(usage.Namespace).List(labels.Everything(), fields.Everything())
 		if err != nil {
 			return err
 		}
@@ -238,6 +238,28 @@ func PodCPU(pod *api.Pod) *resource.Quantity {
 		val = val + pod.Spec.Containers[j].Resources.Limits.Cpu().MilliValue()
 	}
 	return resource.NewMilliQuantity(int64(val), resource.DecimalSI)
+}
+
+// IsPodCPUUnbounded returns true if the cpu use is unbounded for any container in pod
+func IsPodCPUUnbounded(pod *api.Pod) bool {
+	for j := range pod.Spec.Containers {
+		container := pod.Spec.Containers[j]
+		if container.Resources.Limits.Cpu().MilliValue() == int64(0) {
+			return true
+		}
+	}
+	return false
+}
+
+// IsPodMemoryUnbounded returns true if the memory use is unbounded for any container in pod
+func IsPodMemoryUnbounded(pod *api.Pod) bool {
+	for j := range pod.Spec.Containers {
+		container := pod.Spec.Containers[j]
+		if container.Resources.Limits.Memory().Value() == int64(0) {
+			return true
+		}
+	}
+	return false
 }
 
 // PodMemory computes the memory usage of a pod

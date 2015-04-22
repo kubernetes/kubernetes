@@ -37,9 +37,8 @@ import (
 
 const maxProbeRetries = 3
 
-// Prober helps to check the liveness/readiness of a container.
-// TODO(yifan): Replace the concrete type with interface later.
-type Prober struct {
+// prober helps to check the liveness/readiness of a container.
+type prober struct {
 	exec   execprobe.ExecProber
 	http   httprobe.HTTPProber
 	tcp    tcprobe.TCPProber
@@ -52,13 +51,13 @@ type Prober struct {
 
 // NewProber creates a Prober, it takes a command runner and
 // several container info managers.
-func NewProber(
+func newProber(
 	runner dockertools.ContainerCommandRunner,
 	readinessManager *kubecontainer.ReadinessManager,
 	refManager *kubecontainer.RefManager,
-	recorder record.EventRecorder) *Prober {
+	recorder record.EventRecorder) kubecontainer.Prober {
 
-	return &Prober{
+	return &prober{
 		exec:   execprobe.New(),
 		http:   httprobe.New(),
 		tcp:    tcprobe.New(),
@@ -73,7 +72,7 @@ func NewProber(
 // Probe checks the liveness/readiness of the given container.
 // If the container's liveness probe is unsuccessful, set readiness to false.
 // If liveness is successful, do a readiness check and set readiness accordingly.
-func (pb *Prober) Probe(pod *api.Pod, status api.PodStatus, container api.Container, containerID string, createdAt int64) (probe.Result, error) {
+func (pb *prober) Probe(pod *api.Pod, status api.PodStatus, container api.Container, containerID string, createdAt int64) (probe.Result, error) {
 	// Probe liveness.
 	live, err := pb.probeLiveness(pod, status, container, containerID, createdAt)
 	if err != nil {
@@ -113,7 +112,7 @@ func (pb *Prober) Probe(pod *api.Pod, status api.PodStatus, container api.Contai
 
 // probeLiveness probes the liveness of a container.
 // If the initalDelay since container creation on liveness probe has not passed the probe will return probe.Success.
-func (pb *Prober) probeLiveness(pod *api.Pod, status api.PodStatus, container api.Container, containerID string, createdAt int64) (probe.Result, error) {
+func (pb *prober) probeLiveness(pod *api.Pod, status api.PodStatus, container api.Container, containerID string, createdAt int64) (probe.Result, error) {
 	p := container.LivenessProbe
 	if p == nil {
 		return probe.Success, nil
@@ -126,7 +125,7 @@ func (pb *Prober) probeLiveness(pod *api.Pod, status api.PodStatus, container ap
 
 // probeReadiness probes the readiness of a container.
 // If the initial delay on the readiness probe has not passed the probe will return probe.Failure.
-func (pb *Prober) probeReadiness(pod *api.Pod, status api.PodStatus, container api.Container, containerID string, createdAt int64) (probe.Result, error) {
+func (pb *prober) probeReadiness(pod *api.Pod, status api.PodStatus, container api.Container, containerID string, createdAt int64) (probe.Result, error) {
 	p := container.ReadinessProbe
 	if p == nil {
 		return probe.Success, nil
@@ -139,7 +138,7 @@ func (pb *Prober) probeReadiness(pod *api.Pod, status api.PodStatus, container a
 
 // runProbeWithRetries tries to probe the container in a finite loop, it returns the last result
 // if it never succeeds.
-func (pb *Prober) runProbeWithRetries(p *api.Probe, pod *api.Pod, status api.PodStatus, container api.Container, containerID string, retires int) (probe.Result, error) {
+func (pb *prober) runProbeWithRetries(p *api.Probe, pod *api.Pod, status api.PodStatus, container api.Container, containerID string, retires int) (probe.Result, error) {
 	var err error
 	var result probe.Result
 	for i := 0; i < retires; i++ {
@@ -151,7 +150,7 @@ func (pb *Prober) runProbeWithRetries(p *api.Probe, pod *api.Pod, status api.Pod
 	return result, err
 }
 
-func (pb *Prober) runProbe(p *api.Probe, pod *api.Pod, status api.PodStatus, container api.Container, containerID string) (probe.Result, error) {
+func (pb *prober) runProbe(p *api.Probe, pod *api.Pod, status api.PodStatus, container api.Container, containerID string) (probe.Result, error) {
 	timeout := time.Duration(p.TimeoutSeconds) * time.Second
 	if p.Exec != nil {
 		glog.V(4).Infof("Exec-Probe Pod: %v, Container: %v", pod, container)
@@ -228,7 +227,7 @@ type execInContainer struct {
 	run func() ([]byte, error)
 }
 
-func (p *Prober) newExecInContainer(pod *api.Pod, container api.Container, containerID string) exec.Cmd {
+func (p *prober) newExecInContainer(pod *api.Pod, container api.Container, containerID string) exec.Cmd {
 	return execInContainer{func() ([]byte, error) {
 		return p.runner.RunInContainer(containerID, container.LivenessProbe.Exec.Command)
 	}}

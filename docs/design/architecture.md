@@ -17,7 +17,7 @@ The **Kubelet** manages [pods](../pods.md) and their containers, their images, t
 
 ### Kube-Proxy
 
-Each node also runs a simple network proxy and load balancer (see the [services FAQ](https://github.com/GoogleCloudPlatform/kubernetes/wiki/Services-FAQ) for more details).  This reflects `services` (see [the services doc](../docs/services.md) for more details) as defined in the Kubernetes API on each node and can do simple TCP and UDP stream forwarding (round robin) across a set of backends.
+Each node also runs a simple network proxy and load balancer (see the [services FAQ](https://github.com/GoogleCloudPlatform/kubernetes/wiki/Services-FAQ) for more details).  This reflects `services` (see [the services doc](../services.md) for more details) as defined in the Kubernetes API on each node and can do simple TCP and UDP stream forwarding (round robin) across a set of backends.
 
 Service endpoints are currently found via [DNS](../dns.md) or through environment variables (both [Docker-links-compatible](https://docs.docker.com/userguide/dockerlinks/) and Kubernetes {FOO}_SERVICE_HOST and {FOO}_SERVICE_PORT variables are supported).  These variables resolve to ports managed by the service proxy.
 

@@ -41,7 +41,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/flushwriter"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/httpstream"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/httpstream/spdy"
-	"github.com/fsouza/go-dockerclient"
 	"github.com/golang/glog"
 	cadvisorApi "github.com/google/cadvisor/info/v1"
 	"github.com/prometheus/client_golang/prometheus"
@@ -101,7 +100,7 @@ func ListenAndServeKubeletReadOnlyServer(host HostInterface, address net.IP, por
 type HostInterface interface {
 	GetContainerInfo(podFullName string, uid types.UID, containerName string, req *cadvisorApi.ContainerInfoRequest) (*cadvisorApi.ContainerInfo, error)
 	GetRootInfo(req *cadvisorApi.ContainerInfoRequest) (*cadvisorApi.ContainerInfo, error)
-	GetDockerVersion() (docker.APIVersion, error)
+	GetContainerRuntimeVersion() (kubecontainer.Version, error)
 	GetCachedMachineInfo() (*cadvisorApi.MachineInfo, error)
 	GetPods() []*api.Pod
 	GetPodByName(namespace, name string) (*api.Pod, bool)
@@ -160,18 +159,18 @@ func (s *Server) error(w http.ResponseWriter, err error) {
 	http.Error(w, msg, http.StatusInternalServerError)
 }
 
-func isValidDockerVersion(ver docker.APIVersion) bool {
-	minAllowedVersion, _ := docker.NewAPIVersion("1.15")
-	return ver.GreaterThanOrEqualTo(minAllowedVersion)
-}
-
 func (s *Server) dockerHealthCheck(req *http.Request) error {
-	version, err := s.host.GetDockerVersion()
+	version, err := s.host.GetContainerRuntimeVersion()
 	if err != nil {
 		return errors.New("unknown Docker version")
 	}
-	if !isValidDockerVersion(version) {
-		return fmt.Errorf("Docker version is too old (%v)", version.String())
+	// Verify the docker version.
+	result, err := version.Compare("1.15")
+	if err != nil {
+		return err
+	}
+	if result < 0 {
+		return fmt.Errorf("Docker version is too old: %q", version.String())
 	}
 	return nil
 }

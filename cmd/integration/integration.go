@@ -43,6 +43,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/nodecontroller"
 	replicationControllerPkg "github.com/GoogleCloudPlatform/kubernetes/pkg/controller"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/cadvisor"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/dockertools"
@@ -260,7 +261,7 @@ func podsOnMinions(c *client.Client, podNamespace string, labelSelector labels.S
 	podInfo := fakeKubeletClient{}
 	// wait for minions to indicate they have info about the desired pods
 	return func() (bool, error) {
-		pods, err := c.Pods(podNamespace).List(labelSelector)
+		pods, err := c.Pods(podNamespace).List(labelSelector, fields.Everything())
 		if err != nil {
 			glog.Infof("Unable to get pods to list: %v", err)
 			return false, nil
@@ -384,7 +385,7 @@ containers:
 			namespace := kubelet.NamespaceDefault
 			if err := wait.Poll(time.Second, time.Minute*2,
 				podRunning(c, namespace, podName)); err != nil {
-				if pods, err := c.Pods(namespace).List(labels.Everything()); err == nil {
+				if pods, err := c.Pods(namespace).List(labels.Everything(), fields.Everything()); err == nil {
 					for _, pod := range pods.Items {
 						glog.Infof("pod found: %s/%s", namespace, pod.Name)
 					}

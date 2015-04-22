@@ -26,6 +26,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	"github.com/golang/glog"
@@ -479,7 +480,7 @@ func (d *NodeDescriber) Describe(namespace, name string) (string, error) {
 	}
 
 	var pods []*api.Pod
-	allPods, err := d.Pods(namespace).List(labels.Everything())
+	allPods, err := d.Pods(namespace).List(labels.Everything(), fields.Everything())
 	if err != nil {
 		return "", err
 	}
@@ -613,7 +614,7 @@ func printReplicationControllersByLabels(matchingRCs []api.ReplicationController
 }
 
 func getPodStatusForReplicationController(c client.PodInterface, controller *api.ReplicationController) (running, waiting, succeeded, failed int, err error) {
-	rcPods, err := c.List(labels.SelectorFromSet(controller.Spec.Selector))
+	rcPods, err := c.List(labels.SelectorFromSet(controller.Spec.Selector), fields.Everything())
 	if err != nil {
 		return
 	}

@@ -152,7 +152,7 @@ func makeTestKubelet(result probe.Result, err error) *Kubelet {
 		containerRefManager: kubecontainer.NewRefManager(),
 	}
 
-	kl.prober = &Prober{
+	kl.prober = &prober{
 		exec: fakeExecProber{
 			result: result,
 			err:    err,

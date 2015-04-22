@@ -30,7 +30,7 @@ type FakePods struct {
 	Namespace string
 }
 
-func (c *FakePods) List(selector labels.Selector) (*api.PodList, error) {
+func (c *FakePods) List(label labels.Selector, field fields.Selector) (*api.PodList, error) {
 	obj, err := c.Fake.Invokes(FakeAction{Action: "list-pods"}, &api.PodList{})
 	return obj.(*api.PodList), err
 }

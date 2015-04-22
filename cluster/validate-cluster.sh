@@ -59,10 +59,9 @@ while true; do
   # Parse the output to capture the value of the second column("HEALTH"), then use grep to
   # count the number of times it doesn't match "success".
   # Because of the header, the actual unsuccessful count is 1 minus the count.
-
   non_success_count=$(echo "${kubectl_output}" | \
-    sed -n 's/^\([[:alnum:][:punct:]]\+\)\s\+\([[:alnum:][:punct:]]\+\)\s\+.*/\2/p' | \
-    grep 'Healthy' --invert-match -c)
+    sed -n 's/^[[:alnum:][:punct:]]/&/p' | \
+    grep --invert-match -c '^[[:alnum:][:punct:]]\{1,\}[[:space:]]\{1,\}Healthy')
 
   if ((non_success_count > 1)); then
     if ((attempt < 5)); then

@@ -740,7 +740,7 @@ func validateContainers(containers []api.Container, volumes util.StringSet) errs
 		cErrs = append(cErrs, validateEnv(ctr.Env).Prefix("env")...)
 		cErrs = append(cErrs, validateVolumeMounts(ctr.VolumeMounts, volumes).Prefix("volumeMounts")...)
 		cErrs = append(cErrs, validatePullPolicy(&ctr).Prefix("pullPolicy")...)
-		cErrs = append(cErrs, validateResourceRequirements(&ctr).Prefix("resources")...)
+		cErrs = append(cErrs, ValidateResourceRequirements(&ctr.Resources).Prefix("resources")...)
 		allErrs = append(allErrs, cErrs.PrefixIndex(i)...)
 	}
 	// Check for colliding ports across all containers.
@@ -885,6 +885,24 @@ func ValidatePodStatusUpdate(newPod, oldPod *api.Pod) errs.ValidationErrorList {
 	// For status update we ignore changes to pod spec.
 	newPod.Spec = oldPod.Spec
 
+	return allErrs
+}
+
+// ValidatePodTemplate tests if required fields in the pod template are set.
+func ValidatePodTemplate(pod *api.PodTemplate) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+	allErrs = append(allErrs, ValidateObjectMeta(&pod.ObjectMeta, true, ValidatePodName).Prefix("metadata")...)
+	allErrs = append(allErrs, ValidatePodTemplateSpec(&pod.Template, 0).Prefix("template")...)
+	return allErrs
+}
+
+// ValidatePodTemplateUpdate tests to see if the update is legal for an end user to make. newPod is updated with fields
+// that cannot be changed.
+func ValidatePodTemplateUpdate(newPod, oldPod *api.PodTemplate) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+
+	allErrs = append(allErrs, ValidateObjectMetaUpdate(&oldPod.ObjectMeta, &newPod.ObjectMeta).Prefix("metadata")...)
+	allErrs = append(allErrs, ValidatePodTemplateSpec(&newPod.Template, 0).Prefix("template")...)
 	return allErrs
 }
 
@@ -1167,9 +1185,9 @@ func validateBasicResource(quantity resource.Quantity) errs.ValidationErrorList 
 }
 
 // Validates resource requirement spec.
-func validateResourceRequirements(container *api.Container) errs.ValidationErrorList {
+func ValidateResourceRequirements(requirements *api.ResourceRequirements) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
-	for resourceName, quantity := range container.Resources.Limits {
+	for resourceName, quantity := range requirements.Limits {
 		// Validate resource name.
 		errs := validateResourceName(resourceName.String(), fmt.Sprintf("resources.limits[%s]", resourceName))
 		if api.IsStandardResourceName(resourceName.String()) {
@@ -1177,7 +1195,14 @@ func validateResourceRequirements(container *api.Container) errs.ValidationError
 		}
 		allErrs = append(allErrs, errs...)
 	}
-
+	for resourceName, quantity := range requirements.Requests {
+		// Validate resource name.
+		errs := validateResourceName(resourceName.String(), fmt.Sprintf("resources.requests[%s]", resourceName))
+		if api.IsStandardResourceName(resourceName.String()) {
+			errs = append(errs, validateBasicResource(quantity).Prefix(fmt.Sprintf("Resource %s: ", resourceName))...)
+		}
+		allErrs = append(allErrs, errs...)
+	}
 	return allErrs
 }
 

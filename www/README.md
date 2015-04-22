@@ -30,7 +30,7 @@ Bower components should be refernced in one of the `vendor.json` files below:
 
 ### Serving the app during development
 
-The app can be served through `kubectl`, but for some types of review a local web server is convenient. One can be installed as follows:
+For development you can serve the files locally by installing a webserver as follows:
 
 ```
 sudo npm install -g http-server
@@ -42,6 +42,9 @@ The server can then be launched:
 cd app
 http-server -a localhost -p 8000
 ```
+
+### Serving the app in production
+https://<kubernetes-master>/static/app/
 
 ### Configuration
 #### Configuration settings
@@ -57,7 +60,6 @@ www/master
 ├── shared/config/development.json
 └── components
     ├── dashboard/config/development.json
-    ├── graph/config/development.json
     └── my_component/config/development.json
 ```
 produces ```www/master/shared/config/generated-config.js```:
@@ -66,14 +68,16 @@ angular.module('kubernetesApp.config', [])
 .constant('ENV', {
   '/': <www/master/shared/config/development.json>,
   'dashboard': <www/master/components/dashboard/config/development.json>,
-  'graph': <www/master/components/graph/config/development.json>,
   'my_component': <www/master/components/my_component/config/development.json>
 });
 ```
 
 #### Kubernetes server configuration
 
-**RECOMMENDED**: By default the Kubernetes api server does not support CORS,
+You'll need to run ```hack/build-ui.sh``` to create a new ```pkg/ui/datafile.go``` file.
+This is the file that is built-in to the kube-apiserver.
+
+**RECOMMENDED**: When working in development mode the Kubernetes api server does not support CORS,
   so the `kube-apiserver.service` must be started with
   `--cors_allowed_origins=.*` or `--cors_allowed_origins=http://<your
   host here>`
@@ -87,7 +91,7 @@ angular.module('kubernetesApp.config', [])
 See [master/components/README.md](master/components/README.md).
 
 ### Testing
-Currently kuberntes-ui includes both unit-testing (run via [Karma](http://karma-runner.github.io/0.12/index.html)) and
+Currently kubernetes/www includes both unit-testing (run via [Karma](http://karma-runner.github.io/0.12/index.html)) and
 end-to-end testing (run via
 [Protractor](http://angular.github.io/protractor/#/)).
 

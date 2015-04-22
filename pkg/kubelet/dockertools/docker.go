@@ -120,7 +120,8 @@ type dockerContainerCommandRunner struct {
 var dockerAPIVersionWithExec, _ = docker.NewAPIVersion("1.15")
 
 // Returns the major and minor version numbers of docker server.
-func (d *dockerContainerCommandRunner) GetDockerServerVersion() (docker.APIVersion, error) {
+// TODO(yifan): Remove this once the ContainerCommandRunner is implemented by dockerManager.
+func (d *dockerContainerCommandRunner) getDockerServerVersion() (docker.APIVersion, error) {
 	env, err := d.client.Version()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get docker server version - %v", err)
@@ -136,7 +137,7 @@ func (d *dockerContainerCommandRunner) GetDockerServerVersion() (docker.APIVersi
 }
 
 func (d *dockerContainerCommandRunner) nativeExecSupportExists() (bool, error) {
-	version, err := d.GetDockerServerVersion()
+	version, err := d.getDockerServerVersion()
 	if err != nil {
 		return false, err
 	}
@@ -295,7 +296,11 @@ func (d *dockerContainerCommandRunner) PortForward(pod *kubecontainer.Pod, port 
 	}
 
 	containerPid := container.State.Pid
-	// TODO use exec.LookPath for socat / what if the host doesn't have it???
+	// TODO what if the host doesn't have it???
+	_, lookupErr := exec.LookPath("socat")
+	if lookupErr != nil {
+		return fmt.Errorf("Unable to do port forwarding: socat not found.")
+	}
 	args := []string{"-t", fmt.Sprintf("%d", containerPid), "-n", "socat", "-", fmt.Sprintf("TCP4:localhost:%d", port)}
 	// TODO use exec.LookPath
 	command := exec.Command("nsenter", args...)
@@ -479,7 +484,6 @@ func ConnectToDockerOrDie(dockerEndpoint string) DockerInterface {
 // TODO(yifan): Move this to container.Runtime.
 type ContainerCommandRunner interface {
 	RunInContainer(containerID string, cmd []string) ([]byte, error)
-	GetDockerServerVersion() (docker.APIVersion, error)
 	ExecInContainer(containerID string, cmd []string, in io.Reader, out, err io.WriteCloser, tty bool) error
 	PortForward(pod *kubecontainer.Pod, port uint16, stream io.ReadWriteCloser) error
 }

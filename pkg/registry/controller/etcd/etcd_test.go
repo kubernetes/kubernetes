@@ -60,7 +60,7 @@ func createController(storage *REST, rc api.ReplicationController, t *testing.T)
 }
 
 var validPodTemplate = api.PodTemplate{
-	Spec: api.PodTemplateSpec{
+	Template: api.PodTemplateSpec{
 		ObjectMeta: api.ObjectMeta{
 			Labels: map[string]string{"a": "b"},
 		},
@@ -79,8 +79,8 @@ var validPodTemplate = api.PodTemplate{
 }
 
 var validControllerSpec = api.ReplicationControllerSpec{
-	Selector: validPodTemplate.Spec.Labels,
-	Template: &validPodTemplate.Spec,
+	Selector: validPodTemplate.Template.Labels,
+	Template: &validPodTemplate.Template,
 }
 
 var validController = api.ReplicationController{
@@ -161,7 +161,7 @@ func TestCreateControllerWithGeneratedName(t *testing.T) {
 		Spec: api.ReplicationControllerSpec{
 			Replicas: 2,
 			Selector: map[string]string{"a": "b"},
-			Template: &validPodTemplate.Spec,
+			Template: &validPodTemplate.Template,
 		},
 	}
 
@@ -663,7 +663,7 @@ func TestCreate(t *testing.T) {
 			Spec: api.ReplicationControllerSpec{
 				Replicas: 2,
 				Selector: map[string]string{"a": "b"},
-				Template: &validPodTemplate.Spec,
+				Template: &validPodTemplate.Template,
 			},
 		},
 		// invalid
@@ -671,7 +671,7 @@ func TestCreate(t *testing.T) {
 			Spec: api.ReplicationControllerSpec{
 				Replicas: 2,
 				Selector: map[string]string{},
-				Template: &validPodTemplate.Spec,
+				Template: &validPodTemplate.Template,
 			},
 		},
 	)

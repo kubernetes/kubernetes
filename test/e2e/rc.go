@@ -22,6 +22,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
@@ -110,7 +111,7 @@ func ServeImageOrFail(c *client.Client, test string, image string) {
 	// List the pods, making sure we observe all the replicas.
 	listTimeout := time.Minute
 	label := labels.SelectorFromSet(labels.Set(map[string]string{"name": name}))
-	pods, err := c.Pods(ns).List(label)
+	pods, err := c.Pods(ns).List(label, fields.Everything())
 	Expect(err).NotTo(HaveOccurred())
 	t := time.Now()
 	for {
@@ -123,7 +124,7 @@ func ServeImageOrFail(c *client.Client, test string, image string) {
 				name, replicas, len(pods.Items), time.Since(t).Seconds())
 		}
 		time.Sleep(5 * time.Second)
-		pods, err = c.Pods(ns).List(label)
+		pods, err = c.Pods(ns).List(label, fields.Everything())
 		Expect(err).NotTo(HaveOccurred())
 	}
 
@@ -165,7 +166,7 @@ type responseChecker struct {
 
 func (r responseChecker) checkAllResponses() (done bool, err error) {
 	successes := 0
-	currentPods, err := r.c.Pods(r.ns).List(r.label)
+	currentPods, err := r.c.Pods(r.ns).List(r.label, fields.Everything())
 	Expect(err).NotTo(HaveOccurred())
 	for i, pod := range r.pods.Items {
 		// Check that the replica list remains unchanged, otherwise we have problems.

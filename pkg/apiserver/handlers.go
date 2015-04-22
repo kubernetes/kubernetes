@@ -104,8 +104,7 @@ func RateLimit(rl util.RateLimiter, handler http.Handler) http.Handler {
 func tooManyRequests(w http.ResponseWriter) {
 	// Return a 429 status indicating "Too Many Requests"
 	w.Header().Set("Retry-After", RetryAfter)
-	w.WriteHeader(errors.StatusTooManyRequests)
-	fmt.Fprintf(w, "Too many requests, please try again later.")
+	http.Error(w, "Too many requests, please try again later.", errors.StatusTooManyRequests)
 }
 
 // RecoverPanics wraps an http Handler to recover and log panics.
@@ -113,8 +112,7 @@ func RecoverPanics(handler http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		defer func() {
 			if x := recover(); x != nil {
-				w.WriteHeader(http.StatusInternalServerError)
-				fmt.Fprint(w, "apis panic. Look in log for details.")
+				http.Error(w, "apis panic. Look in log for details.", http.StatusInternalServerError)
 				glog.Infof("APIServer panic'd on %v %v: %v\n%s\n", req.Method, req.RequestURI, x, debug.Stack())
 			}
 		}()

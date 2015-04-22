@@ -1,0 +1,10 @@
+{
+  "apiVersion": "v1beta1",
+  "kind": "Service",
+  "id": "meteor",
+  "port": 80,
+  "containerPort": "http-server",
+  "selector": { "name": "meteor" },
+  "createExternalLoadBalancer": true,
+  "sessionAffinity": "ClientIP"
+}

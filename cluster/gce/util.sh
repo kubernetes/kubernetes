@@ -25,6 +25,7 @@ source "${KUBE_ROOT}/cluster/common.sh"
 NODE_INSTANCE_PREFIX="${INSTANCE_PREFIX}-minion"
 
 KUBE_PROMPT_FOR_UPDATE=y
+KUBE_SKIP_UPDATE=${KUBE_SKIP_UPDATE-"n"}
 
 # Verify prereqs
 function verify-prereqs {
@@ -48,12 +49,20 @@ function verify-prereqs {
       fi
     fi
   done
+  if [[ "${KUBE_SKIP_UPDATE}" == "y" ]]; then
+    return
+  fi
   # update and install components as needed
   if [[ "${KUBE_PROMPT_FOR_UPDATE}" != "y" ]]; then
     gcloud_prompt="-q"
   fi
-  gcloud ${gcloud_prompt:-} components update preview || true
-  gcloud ${gcloud_prompt:-} components update || true
+  local sudo_prefix=""
+  if [ ! -w $(dirname `which gcloud`) ]; then
+    sudo_prefix="sudo"
+  fi
+  ${sudo_prefix} gcloud ${gcloud_prompt:-} components update preview || true
+  ${sudo_prefix} gcloud ${gcloud_prompt:-} components update alpha || true
+  ${sudo_prefix} gcloud ${gcloud_prompt:-} components update || true
 }
 
 # Create a temp dir that'll be deleted at the end of this bash session.
@@ -967,11 +976,15 @@ function test-teardown {
 function ssh-to-node {
   local node="$1"
   local cmd="$2"
+  # Loop until we can successfully ssh into the box
   for try in $(seq 1 5); do
-    if gcloud compute ssh --ssh-flag="-o LogLevel=quiet" --project "${PROJECT}" --zone="${ZONE}" "${node}" --command "${cmd}"; then
+    if gcloud compute ssh --ssh-flag="-o LogLevel=quiet" --project "${PROJECT}" --zone="${ZONE}" "${node}" --command "echo test"; then
       break
     fi
+    sleep 5
   done
+  # Then actually try the command.
+  gcloud compute ssh --ssh-flag="-o LogLevel=quiet" --project "${PROJECT}" --zone="${ZONE}" "${node}" --command "${cmd}"
 }
 
 # Restart the kube-proxy on a node ($1)
@@ -981,7 +994,7 @@ function restart-kube-proxy {
 
 # Restart the kube-apiserver on a node ($1)
 function restart-apiserver {
-  ssh-to-node "$1" "sudo docker kill `sudo docker ps | grep /kube-apiserver | awk '{print $1}'`"
+  ssh-to-node "$1" "sudo docker kill \`sudo docker ps | grep /kube-apiserver | awk '{print $1}'\`"
 }
 
 # Perform preparations required to run e2e tests

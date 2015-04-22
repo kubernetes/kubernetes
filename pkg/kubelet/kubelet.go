@@ -232,8 +232,8 @@ func NewMainKubelet(
 	}
 
 	klet.podManager = newBasicPodManager(klet.kubeClient)
-	klet.prober = NewProber(klet.runner, klet.readinessManager, klet.containerRefManager, klet.recorder)
-	klet.handlerRunner = NewHandlerRunner(klet.httpClient, klet.runner, klet.containerManager)
+	klet.prober = newProber(klet.runner, klet.readinessManager, klet.containerRefManager, klet.recorder)
+	klet.handlerRunner = newHandlerRunner(klet.httpClient, klet.runner, klet.containerManager)
 
 	runtimeCache, err := kubecontainer.NewRuntimeCache(containerManager)
 	if err != nil {
@@ -317,10 +317,10 @@ type Kubelet struct {
 	networkPlugin network.NetworkPlugin
 
 	// Healthy check prober.
-	prober *Prober
+	prober kubecontainer.Prober
 
 	// Container lifecycle handler runner.
-	handlerRunner HandlerRunner
+	handlerRunner kubecontainer.HandlerRunner
 
 	// Container readiness state manager.
 	readinessManager *kubecontainer.ReadinessManager
@@ -1060,20 +1060,16 @@ type podContainerChangesSpec struct {
 	containersToKeep    map[dockertools.DockerID]int
 }
 
-func (kl *Kubelet) computePodContainerChanges(pod *api.Pod, runningPod kubecontainer.Pod) (podContainerChangesSpec, error) {
+func (kl *Kubelet) computePodContainerChanges(pod *api.Pod, runningPod kubecontainer.Pod, podStatus api.PodStatus) (podContainerChangesSpec, error) {
 	podFullName := kubecontainer.GetPodFullName(pod)
 	uid := pod.UID
 	glog.V(4).Infof("Syncing Pod %+v, podFullName: %q, uid: %q", pod, podFullName, uid)
-
-	err := kl.makePodDataDirs(pod)
-	if err != nil {
-		return podContainerChangesSpec{}, err
-	}
 
 	containersToStart := make(map[int]empty)
 	containersToKeep := make(map[dockertools.DockerID]int)
 	createPodInfraContainer := false
 
+	var err error
 	var podInfraContainerID dockertools.DockerID
 	var changed bool
 	podInfraContainer := runningPod.FindContainerByName(dockertools.PodInfraContainerName)
@@ -1095,18 +1091,6 @@ func (kl *Kubelet) computePodContainerChanges(pod *api.Pod, runningPod kubeconta
 		createPodInfraContainer = false
 		podInfraContainerID = dockertools.DockerID(podInfraContainer.ID)
 		containersToKeep[podInfraContainerID] = -1
-	}
-
-	// Do not use the cache here since we need the newest status to check
-	// if we need to restart the container below.
-	pod, found := kl.GetPodByFullName(podFullName)
-	if !found {
-		return podContainerChangesSpec{}, fmt.Errorf("couldn't find pod %q", podFullName)
-	}
-	podStatus, err := kl.generatePodStatus(pod)
-	if err != nil {
-		glog.Errorf("Unable to get pod with name %q and uid %q info with error(%v)", podFullName, uid, err)
-		return podContainerChangesSpec{}, err
 	}
 
 	for index, container := range pod.Spec.Containers {
@@ -1213,7 +1197,18 @@ func (kl *Kubelet) syncPod(pod *api.Pod, mirrorPod *api.Pod, runningPod kubecont
 		return err
 	}
 
-	containerChanges, err := kl.computePodContainerChanges(pod, runningPod)
+	if err := kl.makePodDataDirs(pod); err != nil {
+		glog.Errorf("Unable to make pod data directories for pod %q (uid %q): %v", podFullName, uid, err)
+		return err
+	}
+
+	podStatus, err := kl.generatePodStatus(pod)
+	if err != nil {
+		glog.Errorf("Unable to get status for pod %q (uid %q): %v", podFullName, uid, err)
+		return err
+	}
+
+	containerChanges, err := kl.computePodContainerChanges(pod, runningPod, podStatus)
 	glog.V(3).Infof("Got container changes for pod %q: %+v", podFullName, containerChanges)
 	if err != nil {
 		return err
@@ -1658,13 +1653,12 @@ func (kl *Kubelet) syncLoop(updates <-chan PodUpdate, handler SyncHandler) {
 	}
 }
 
-// Returns Docker version for this Kubelet.
-func (kl *Kubelet) GetDockerVersion() (docker.APIVersion, error) {
-	if kl.dockerClient == nil {
-		return nil, fmt.Errorf("no Docker client")
+// Returns the container runtime version for this Kubelet.
+func (kl *Kubelet) GetContainerRuntimeVersion() (kubecontainer.Version, error) {
+	if kl.containerManager == nil {
+		return nil, fmt.Errorf("no container runtime")
 	}
-	dockerRunner := dockertools.NewDockerContainerCommandRunner(kl.dockerClient)
-	return dockerRunner.GetDockerServerVersion()
+	return kl.containerManager.Version()
 }
 
 func (kl *Kubelet) validatePodPhase(podStatus *api.PodStatus) error {
@@ -1770,6 +1764,21 @@ func (kl *Kubelet) recordNodeOnlineEvent() {
 	kl.recorder.Eventf(kl.nodeRef, "online", "Node %s is now online", kl.hostname)
 }
 
+func (kl *Kubelet) recordNodeSchedulableEvent() {
+	// TODO: This requires a transaction, either both node status is updated
+	// and event is recorded or neither should happen, see issue #6055.
+	kl.recorder.Eventf(kl.nodeRef, "schedulable", "Node %s is now schedulable", kl.hostname)
+}
+
+func (kl *Kubelet) recordNodeUnschedulableEvent() {
+	// TODO: This requires a transaction, either both node status is updated
+	// and event is recorded or neither should happen, see issue #6055.
+	kl.recorder.Eventf(kl.nodeRef, "unschedulable", "Node %s is now unschedulable", kl.hostname)
+}
+
+// Maintains Node.Spec.Unschedulable value from previous run of tryUpdateNodeStatus()
+var oldNodeUnschedulable bool
+
 // tryUpdateNodeStatus tries to update node status to master.
 func (kl *Kubelet) tryUpdateNodeStatus() error {
 	node, err := kl.kubeClient.Nodes().Get(kl.hostname)
@@ -1836,6 +1845,14 @@ func (kl *Kubelet) tryUpdateNodeStatus() error {
 		kl.recordNodeOnlineEvent()
 	}
 
+	if oldNodeUnschedulable != node.Spec.Unschedulable {
+		if node.Spec.Unschedulable {
+			kl.recordNodeUnschedulableEvent()
+		} else {
+			kl.recordNodeSchedulableEvent()
+		}
+		oldNodeUnschedulable = node.Spec.Unschedulable
+	}
 	_, err = kl.kubeClient.Nodes().UpdateStatus(node)
 	return err
 }

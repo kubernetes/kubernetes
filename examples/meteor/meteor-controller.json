@@ -1,0 +1,26 @@
+{
+  "id": "meteor-controller",
+  "kind": "ReplicationController",
+  "apiVersion": "v1beta1",
+  "desiredState": {
+    "replicas": 2,
+    "replicaSelector": {"name": "meteor"},
+    "podTemplate": {
+      "desiredState": {
+        "manifest": {
+          "version": "v1beta1",
+          "id": "meteor-controller",
+          "containers": [{
+            "name": "meteor",
+            "image": "chees/meteor-gke-example:latest",
+            "cpu": 1000,
+            "memory": 500000000,
+            "ports": [{"name": "http-server", "containerPort": 8080, "hostPort": 80}]
+          }]
+        }
+      },
+      "labels": { "name": "meteor" }
+    }
+  },
+  "labels": {"name": "meteor"}
+}

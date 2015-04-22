@@ -36,6 +36,10 @@ type Scheme struct {
 // Function to convert a field selector to internal representation.
 type FieldLabelConversionFunc func(label, value string) (internalLabel, internalValue string, err error)
 
+func (self *Scheme) Raw() *conversion.Scheme {
+	return self.raw
+}
+
 // fromScope gets the input version, desired output version, and desired Scheme
 // from a conversion.Scope.
 func (self *Scheme) fromScope(s conversion.Scope) (inVersion, outVersion string, scheme *Scheme) {
