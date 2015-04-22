@@ -49,7 +49,7 @@ function verify-prereqs {
       fi
     fi
   done
-  if [[ "${KUBE_SKIP_UPDATE} == "y" ]]; then
+  if [[ "${KUBE_SKIP_UPDATE}" == "y" ]]; then
     return
   fi
   # update and install components as needed
