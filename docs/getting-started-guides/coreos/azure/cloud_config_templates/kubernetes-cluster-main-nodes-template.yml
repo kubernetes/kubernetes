@@ -345,6 +345,8 @@ coreos:
       content: |
         [Unit]
         After=download-kubernetes.service
+        Before=proxy.service
+        Before=kubelet.service
         ConditionFileIsExecutable=/opt/kubernetes/server/bin/kubectl
         ConditionFileIsExecutable=/opt/bin/register_minion.sh
         Description=Kubernetes Create Minion
