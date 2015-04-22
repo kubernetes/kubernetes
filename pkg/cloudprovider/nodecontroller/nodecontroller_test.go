@@ -32,7 +32,6 @@ import (
 	fake_cloud "github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider/fake"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
@@ -558,7 +557,7 @@ func TestSyncCloudNodesEvictPods(t *testing.T) {
 			matchRE:              ".*",
 			expectedRequestCount: 2, // List + Delete
 			expectedDeleted:      []string{"node1"},
-			expectedActions:      []testclient.FakeAction{{Action: "list-pods"}, {Action: "delete-pod", Value: "pod0"}, {Action: "list-services"}},
+			expectedActions:      []testclient.FakeAction{{Action: "list-pods"}, {Action: "delete-pod", Value: "pod0"}},
 		},
 		{
 			// Delete node1, but pod0 is running on node0.
@@ -572,7 +571,7 @@ func TestSyncCloudNodesEvictPods(t *testing.T) {
 			matchRE:              ".*",
 			expectedRequestCount: 2, // List + Delete
 			expectedDeleted:      []string{"node1"},
-			expectedActions:      []testclient.FakeAction{{Action: "list-pods"}, {Action: "list-services"}},
+			expectedActions:      []testclient.FakeAction{{Action: "list-pods"}},
 		},
 	}
 
@@ -594,71 +593,6 @@ func TestSyncCloudNodesEvictPods(t *testing.T) {
 		}
 		if !reflect.DeepEqual(item.expectedActions, item.fakeNodeHandler.Actions) {
 			t.Errorf("time out waiting for deleting pods, expected %+v, got %+v", item.expectedActions, item.fakeNodeHandler.Actions)
-		}
-	}
-}
-
-func TestSyncCloudNodesReconcilesExternalService(t *testing.T) {
-	table := []struct {
-		fakeNodeHandler       *FakeNodeHandler
-		fakeCloud             *fake_cloud.FakeCloud
-		matchRE               string
-		expectedClientActions []testclient.FakeAction
-		expectedUpdateCalls   []fake_cloud.FakeUpdateBalancerCall
-	}{
-		{
-			// Set of nodes does not change: do nothing.
-			fakeNodeHandler: &FakeNodeHandler{
-				Existing: []*api.Node{newNode("node0"), newNode("node1")},
-				Fake:     testclient.NewSimpleFake(&api.ServiceList{Items: []api.Service{*newService("service0", types.UID(""), true), *newService("service1", types.UID(""), false)}})},
-			fakeCloud: &fake_cloud.FakeCloud{
-				Machines: []string{"node0", "node1"},
-			},
-			matchRE:               ".*",
-			expectedClientActions: nil,
-			expectedUpdateCalls:   nil,
-		},
-		{
-			// Delete "node1", target pool for "service0" should shrink.
-			fakeNodeHandler: &FakeNodeHandler{
-				Existing: []*api.Node{newNode("node0"), newNode("node1")},
-				Fake:     testclient.NewSimpleFake(&api.ServiceList{Items: []api.Service{*newService("service0", types.UID("2c104a7c-e79e-11e4-8187-42010af0068a"), true), *newService("service1", types.UID(""), false)}})},
-			fakeCloud: &fake_cloud.FakeCloud{
-				Machines: []string{"node0"},
-			},
-			matchRE:               ".*",
-			expectedClientActions: []testclient.FakeAction{{Action: "list-pods"}, {Action: "list-services"}},
-			expectedUpdateCalls: []fake_cloud.FakeUpdateBalancerCall{
-				{Name: "a2c104a7ce79e11e4818742010af0068", Hosts: []string{"node0"}},
-			},
-		},
-		{
-			// Add "node1", target pool for "service0" should grow.
-			fakeNodeHandler: &FakeNodeHandler{
-				Existing: []*api.Node{newNode("node0")},
-				Fake:     testclient.NewSimpleFake(&api.ServiceList{Items: []api.Service{*newService("service0", types.UID("2c104a7c-e79e-11e4-8187-42010af0068a"), true), *newService("service1", types.UID(""), false)}})},
-			fakeCloud: &fake_cloud.FakeCloud{
-				Machines: []string{"node0", "node1"},
-			},
-			matchRE:               ".*",
-			expectedClientActions: []testclient.FakeAction{{Action: "list-services"}},
-			expectedUpdateCalls: []fake_cloud.FakeUpdateBalancerCall{
-				{Name: "a2c104a7ce79e11e4818742010af0068", Hosts: []string{"node0", "node1"}},
-			},
-		},
-	}
-
-	for _, item := range table {
-		nodeController := NewNodeController(item.fakeCloud, item.matchRE, nil, &api.NodeResources{}, item.fakeNodeHandler,
-			10, time.Minute, util.NewFakeRateLimiter(), testNodeMonitorGracePeriod, testNodeStartupGracePeriod, testNodeMonitorPeriod, "kubernetes")
-		if err := nodeController.syncCloudNodes(); err != nil {
-			t.Errorf("unexpected error: %v", err)
-		}
-		if !reflect.DeepEqual(item.expectedClientActions, item.fakeNodeHandler.Actions) {
-			t.Errorf("expected client actions mismatch, expected %+v, got %+v", item.expectedClientActions, item.fakeNodeHandler.Actions)
-		}
-		if !reflect.DeepEqual(item.expectedUpdateCalls, item.fakeCloud.UpdateCalls) {
-			t.Errorf("expected update calls mismatch, expected %+v, got %+v", item.expectedUpdateCalls, item.fakeCloud.UpdateCalls)
 		}
 	}
 }
@@ -1127,10 +1061,6 @@ func newNode(name string) *api.Node {
 
 func newPod(name, host string) *api.Pod {
 	return &api.Pod{ObjectMeta: api.ObjectMeta{Name: name}, Spec: api.PodSpec{Host: host}}
-}
-
-func newService(name string, uid types.UID, external bool) *api.Service {
-	return &api.Service{ObjectMeta: api.ObjectMeta{Name: name, Namespace: "namespace", UID: uid}, Spec: api.ServiceSpec{CreateExternalLoadBalancer: external}}
 }
 
 func sortedNodeNames(nodes []*api.Node) []string {

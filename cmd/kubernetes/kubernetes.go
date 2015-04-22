@@ -130,12 +130,13 @@ func runControllerManager(machineList []string, cl *client.Client, nodeMilliCPU,
 		},
 	}
 
+	const nodeSyncPeriod = 10 * time.Second
 	nodeController := nodecontroller.NewNodeController(
 		nil, "", machineList, nodeResources, cl, 10, 5*time.Minute, util.NewTokenBucketRateLimiter(*deletingPodsQps, *deletingPodsBurst), 40*time.Second, 60*time.Second, 5*time.Second, "")
-	nodeController.Run(10*time.Second, true)
+	nodeController.Run(nodeSyncPeriod, true)
 
 	serviceController := servicecontroller.New(nil, cl, "kubernetes")
-	if err := serviceController.Run(); err != nil {
+	if err := serviceController.Run(nodeSyncPeriod); err != nil {
 		glog.Warningf("Running without a service controller: %v", err)
 	}
 

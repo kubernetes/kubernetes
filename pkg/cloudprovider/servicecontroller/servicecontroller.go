@@ -79,7 +79,9 @@ func New(cloud cloudprovider.Interface, kubeClient client.Interface, clusterName
 // Run starts a background goroutine that watches for changes to services that
 // have (or had) externalLoadBalancers=true and ensures that they have external
 // load balancers created and deleted appropriately.
-func (s *ServiceController) Run() error {
+// nodeSyncPeriod controls how often we check the cluster's nodes to determine
+// if external load balancers need to be updated to point to a new set.
+func (s *ServiceController) Run(nodeSyncPeriod time.Duration) error {
 	if err := s.init(); err != nil {
 		return err
 	}
@@ -101,6 +103,11 @@ func (s *ServiceController) Run() error {
 	for i := 0; i < workerGoroutines; i++ {
 		go s.watchServices(serviceQueue)
 	}
+
+	nodeLister := &cache.StoreToNodeLister{cache.NewStore(cache.MetaNamespaceKeyFunc)}
+	nodeLW := cache.NewListWatchFromClient(s.kubeClient.(*client.Client), "nodes", api.NamespaceAll, fields.Everything())
+	cache.NewReflector(nodeLW, &api.Node{}, nodeLister.Store, 0).Run()
+	go s.nodeSyncLoop(nodeLister, nodeSyncPeriod)
 	return nil
 }
 
@@ -367,6 +374,18 @@ func (s *serviceCache) ListKeys() []string {
 	return keys
 }
 
+// ListKeys implements the interface required by DeltaFIFO to list the keys we
+// already know about.
+func (s *serviceCache) allServices() []*cachedService {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	services := make([]*cachedService, 0, len(s.serviceMap))
+	for _, v := range s.serviceMap {
+		services = append(services, v)
+	}
+	return services
+}
+
 func (s *serviceCache) get(serviceName string) (*cachedService, bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -445,13 +464,39 @@ func portsEqual(x, y *api.Service) bool {
 	if err != nil {
 		return false
 	}
-	if len(xPorts) != len(yPorts) {
+	return intSlicesEqual(xPorts, yPorts)
+}
+
+func intSlicesEqual(x, y []int) bool {
+	if len(x) != len(y) {
 		return false
 	}
-	sort.Ints(xPorts)
-	sort.Ints(yPorts)
-	for i := range xPorts {
-		if xPorts[i] != yPorts[i] {
+	if !sort.IntsAreSorted(x) {
+		sort.Ints(x)
+	}
+	if !sort.IntsAreSorted(y) {
+		sort.Ints(y)
+	}
+	for i := range x {
+		if x[i] != y[i] {
+			return false
+		}
+	}
+	return true
+}
+
+func stringSlicesEqual(x, y []string) bool {
+	if len(x) != len(y) {
+		return false
+	}
+	if !sort.StringsAreSorted(x) {
+		sort.Strings(x)
+	}
+	if !sort.StringsAreSorted(y) {
+		sort.Strings(y)
+	}
+	for i := range x {
+		if x[i] != y[i] {
 			return false
 		}
 	}
@@ -464,4 +509,79 @@ func hostsFromNodeList(list *api.NodeList) []string {
 		result[ix] = list.Items[ix].Name
 	}
 	return result
+}
+
+// nodeSyncLoop handles updating the hosts pointed to by all external load
+// balancers whenever the set of nodes in the cluster changes.
+func (s *ServiceController) nodeSyncLoop(nodeLister *cache.StoreToNodeLister, period time.Duration) {
+	var prevHosts []string
+	var servicesToUpdate []*cachedService
+	// TODO: Eliminate the unneeded now variable once we stop compiling in go1.3.
+	// It's needed at the moment because go1.3 requires ranges to be assigned to
+	// something to compile, and gofmt1.4 complains about using `_ = range`.
+	for now := range time.Tick(period) {
+		_ = now
+		nodes, err := nodeLister.List()
+		if err != nil {
+			glog.Errorf("Failed to retrieve current set of nodes from node lister: %v", err)
+			continue
+		}
+		newHosts := hostsFromNodeList(&nodes)
+		if stringSlicesEqual(newHosts, prevHosts) {
+			// The set of nodes in the cluster hasn't changed, but we can retry
+			// updating any services that we failed to update last time around.
+			servicesToUpdate = s.updateLoadBalancerHosts(servicesToUpdate, newHosts)
+			continue
+		}
+		glog.Infof("Detected change in list of current cluster nodes. New node set: %v", newHosts)
+
+		// Try updating all services, and save the ones that fail to try again next
+		// round.
+		servicesToUpdate = s.cache.allServices()
+		numServices := len(servicesToUpdate)
+		servicesToUpdate = s.updateLoadBalancerHosts(servicesToUpdate, newHosts)
+		glog.Infof("Successfully updated %d out of %d external load balancers to direct traffic to the updated set of nodes",
+			numServices-len(servicesToUpdate), numServices)
+
+		prevHosts = newHosts
+	}
+}
+
+// updateLoadBalancerHosts updates all existing external load balancers so that
+// they will match the list of hosts provided.
+// Returns the list of services that couldn't be updated.
+func (s *ServiceController) updateLoadBalancerHosts(services []*cachedService, hosts []string) (servicesToRetry []*cachedService) {
+	for _, service := range services {
+		func() {
+			service.mu.Lock()
+			defer service.mu.Unlock()
+			if err := s.lockedUpdateLoadBalancerHosts(service.service, hosts); err != nil {
+				glog.Errorf("External error while updating TCP load balancer: %v.", err)
+				servicesToRetry = append(servicesToRetry, service)
+			}
+		}()
+	}
+	return servicesToRetry
+}
+
+// Updates the external load balancer of a service, assuming we hold the mutex
+// associated with the service.
+func (s *ServiceController) lockedUpdateLoadBalancerHosts(service *api.Service, hosts []string) error {
+	if !service.Spec.CreateExternalLoadBalancer {
+		return nil
+	}
+
+	name := cloudprovider.GetLoadBalancerName(service)
+	err := s.balancer.UpdateTCPLoadBalancer(name, s.zone.Region, hosts)
+	if err == nil {
+		return nil
+	}
+
+	// It's only an actual error if the load balancer still exists.
+	if exists, err := s.balancer.TCPLoadBalancerExists(name, s.zone.Region); err != nil {
+		glog.Errorf("External error while checking if TCP load balancer %q exists: name, %v")
+	} else if !exists {
+		return nil
+	}
+	return err
 }
