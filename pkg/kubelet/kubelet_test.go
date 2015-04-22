@@ -511,10 +511,10 @@ func TestSyncPodsDoesNothing(t *testing.T) {
 	waitGroup.Wait()
 	verifyCalls(t, fakeDocker, []string{
 		"list", "list",
-		// Check the pod infra contianer.
-		"inspect_container",
 		// Get pod status.
 		"list", "inspect_container", "inspect_container",
+		// Check the pod infra contianer.
+		"inspect_container",
 		// Get pod status.
 		"list", "inspect_container", "inspect_container"})
 }
@@ -743,10 +743,10 @@ func TestSyncPodsWithPodInfraCreatesContainer(t *testing.T) {
 
 	verifyCalls(t, fakeDocker, []string{
 		"list", "list",
-		// Check the pod infra container.
-		"inspect_container",
 		// Get pod status.
 		"list", "inspect_container", "inspect_image",
+		// Check the pod infra container.
+		"inspect_container",
 		// Create container.
 		"create", "start",
 		// Get pod status.
@@ -818,10 +818,10 @@ func TestSyncPodsWithPodInfraCreatesContainerCallsHandler(t *testing.T) {
 
 	verifyCalls(t, fakeDocker, []string{
 		"list", "list",
-		// Check the pod infra container.
-		"inspect_container",
 		// Get pod status.
 		"list", "inspect_container", "inspect_image",
+		// Check the pod infra container.
+		"inspect_container",
 		// Create container.
 		"create", "start",
 		// Get pod status.
@@ -1104,10 +1104,10 @@ func TestSyncPodsDeletesDuplicate(t *testing.T) {
 
 	verifyCalls(t, fakeDocker, []string{
 		"list", "list",
-		// Check the pod infra container.
-		"inspect_container",
 		// Get pod status.
 		"list", "inspect_container", "inspect_container", "inspect_container",
+		// Check the pod infra container.
+		"inspect_container",
 		// Kill the duplicated container.
 		"stop",
 		// Get pod status.
@@ -1175,10 +1175,10 @@ func TestSyncPodsBadHash(t *testing.T) {
 
 	verifyCalls(t, fakeDocker, []string{
 		"list", "list",
-		// Check the pod infra container.
-		"inspect_container",
 		// Get pod status.
 		"list", "inspect_container", "inspect_container",
+		// Check the pod infra container.
+		"inspect_container",
 		// Kill and restart the bad hash container.
 		"stop", "create", "start",
 		// Get pod status.
@@ -1249,10 +1249,10 @@ func TestSyncPodsUnhealthy(t *testing.T) {
 
 	verifyCalls(t, fakeDocker, []string{
 		"list", "list",
-		// Check the pod infra container.
-		"inspect_container",
 		// Get pod status.
 		"list", "inspect_container", "inspect_container",
+		// Check the pod infra container.
+		"inspect_container",
 		// Kill the unhealthy container.
 		"stop",
 		// Restart the unhealthy container.
@@ -1864,10 +1864,10 @@ func TestSyncPodEventHandlerFails(t *testing.T) {
 
 	verifyCalls(t, fakeDocker, []string{
 		"list", "list",
-		// Check the pod infra container.
-		"inspect_container",
 		// Get pod status.
 		"list", "inspect_container", "inspect_image",
+		// Check the pod infra container.
+		"inspect_container",
 		// Create the container.
 		"create", "start",
 		// Kill the container since event handler fails.
@@ -3867,10 +3867,10 @@ func TestSyncPodsWithRestartPolicy(t *testing.T) {
 		{
 			api.RestartPolicyAlways,
 			[]string{"list", "list",
-				// Check the pod infra container.
-				"inspect_container",
 				// Get pod status.
 				"list", "inspect_container", "inspect_container", "inspect_container",
+				// Check the pod infra container.
+				"inspect_container",
 				// Restart both containers.
 				"create", "start", "create", "start",
 				// Get pod status.
@@ -3881,10 +3881,10 @@ func TestSyncPodsWithRestartPolicy(t *testing.T) {
 		{
 			api.RestartPolicyOnFailure,
 			[]string{"list", "list",
-				// Check the pod infra container.
-				"inspect_container",
 				// Get pod status.
 				"list", "inspect_container", "inspect_container", "inspect_container",
+				// Check the pod infra container.
+				"inspect_container",
 				// Restart the failed container.
 				"create", "start",
 				// Get pod status.
@@ -3895,10 +3895,10 @@ func TestSyncPodsWithRestartPolicy(t *testing.T) {
 		{
 			api.RestartPolicyNever,
 			[]string{"list", "list",
-				// Check the pod infra container.
-				"inspect_container",
 				// Get pod status.
 				"list", "inspect_container", "inspect_container", "inspect_container",
+				// Check the pod infra container.
+				"inspect_container",
 				// Stop the last pod infra container.
 				"stop",
 				// Get pod status.

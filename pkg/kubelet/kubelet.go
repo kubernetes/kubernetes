@@ -1060,20 +1060,16 @@ type podContainerChangesSpec struct {
 	containersToKeep    map[dockertools.DockerID]int
 }
 
-func (kl *Kubelet) computePodContainerChanges(pod *api.Pod, runningPod kubecontainer.Pod) (podContainerChangesSpec, error) {
+func (kl *Kubelet) computePodContainerChanges(pod *api.Pod, runningPod kubecontainer.Pod, podStatus api.PodStatus) (podContainerChangesSpec, error) {
 	podFullName := kubecontainer.GetPodFullName(pod)
 	uid := pod.UID
 	glog.V(4).Infof("Syncing Pod %+v, podFullName: %q, uid: %q", pod, podFullName, uid)
-
-	err := kl.makePodDataDirs(pod)
-	if err != nil {
-		return podContainerChangesSpec{}, err
-	}
 
 	containersToStart := make(map[int]empty)
 	containersToKeep := make(map[dockertools.DockerID]int)
 	createPodInfraContainer := false
 
+	var err error
 	var podInfraContainerID dockertools.DockerID
 	var changed bool
 	podInfraContainer := runningPod.FindContainerByName(dockertools.PodInfraContainerName)
@@ -1095,18 +1091,6 @@ func (kl *Kubelet) computePodContainerChanges(pod *api.Pod, runningPod kubeconta
 		createPodInfraContainer = false
 		podInfraContainerID = dockertools.DockerID(podInfraContainer.ID)
 		containersToKeep[podInfraContainerID] = -1
-	}
-
-	// Do not use the cache here since we need the newest status to check
-	// if we need to restart the container below.
-	pod, found := kl.GetPodByFullName(podFullName)
-	if !found {
-		return podContainerChangesSpec{}, fmt.Errorf("couldn't find pod %q", podFullName)
-	}
-	podStatus, err := kl.generatePodStatus(pod)
-	if err != nil {
-		glog.Errorf("Unable to get pod with name %q and uid %q info with error(%v)", podFullName, uid, err)
-		return podContainerChangesSpec{}, err
 	}
 
 	for index, container := range pod.Spec.Containers {
@@ -1213,7 +1197,18 @@ func (kl *Kubelet) syncPod(pod *api.Pod, mirrorPod *api.Pod, runningPod kubecont
 		return err
 	}
 
-	containerChanges, err := kl.computePodContainerChanges(pod, runningPod)
+	if err := kl.makePodDataDirs(pod); err != nil {
+		glog.Errorf("Unable to make pod data directories for pod %q (uid %q): %v", podFullName, uid, err)
+		return err
+	}
+
+	podStatus, err := kl.generatePodStatus(pod)
+	if err != nil {
+		glog.Errorf("Unable to get status for pod %q (uid %q): %v", podFullName, uid, err)
+		return err
+	}
+
+	containerChanges, err := kl.computePodContainerChanges(pod, runningPod, podStatus)
 	glog.V(3).Infof("Got container changes for pod %q: %+v", podFullName, containerChanges)
 	if err != nil {
 		return err
