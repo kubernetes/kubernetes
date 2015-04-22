@@ -48,6 +48,175 @@
     ]
    },
    {
+    "path": "/api/v1beta3/namespaces/{namespaces}/componentstatuses",
+    "description": "API at /api/v1beta3 version v1beta3",
+    "operations": [
+     {
+      "type": "v1beta3.ComponentStatusList",
+      "method": "GET",
+      "summary": "list objects of kind ComponentStatus",
+      "nickname": "listComponentStatus",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespaces",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "fieldSelector",
+        "description": "a selector to restrict the list of returned objects by their fields; defaults to everything",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "labelSelector",
+        "description": "a selector to restrict the list of returned objects by their labels; defaults to everything",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "resourceVersion",
+        "description": "when specified with a watch call, shows changes that occur after that particular version of a resource; defaults to changes from the beginning of history",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "watch",
+        "description": "watch for changes to the described resources and return them as a stream of add, update, and remove notifications; specify resourceVersion",
+        "required": false,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta3.ComponentStatusList"
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/api/v1beta3/namespaces/{namespaces}/componentstatuses/{name}",
+    "description": "API at /api/v1beta3 version v1beta3",
+    "operations": [
+     {
+      "type": "v1beta3.ComponentStatus",
+      "method": "GET",
+      "summary": "read the specified ComponentStatus",
+      "nickname": "readComponentStatus",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the ComponentStatus",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespaces",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta3.ComponentStatus"
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
+    "path": "/api/v1beta3/componentstatuses",
+    "description": "API at /api/v1beta3 version v1beta3",
+    "operations": [
+     {
+      "type": "v1beta3.ComponentStatusList",
+      "method": "GET",
+      "summary": "list objects of kind ComponentStatus",
+      "nickname": "listComponentStatus",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "fieldSelector",
+        "description": "a selector to restrict the list of returned objects by their fields; defaults to everything",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "labelSelector",
+        "description": "a selector to restrict the list of returned objects by their labels; defaults to everything",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "resourceVersion",
+        "description": "when specified with a watch call, shows changes that occur after that particular version of a resource; defaults to changes from the beginning of history",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "boolean",
+        "paramType": "query",
+        "name": "watch",
+        "description": "watch for changes to the described resources and return them as a stream of add, update, and remove notifications; specify resourceVersion",
+        "required": false,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta3.ComponentStatusList"
+       }
+      ],
+      "produces": [
+       "application/json"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
     "path": "/api/v1beta3/namespaces/{namespaces}/endpoints",
     "description": "API at /api/v1beta3 version v1beta3",
     "operations": [
@@ -8224,6 +8393,122 @@
     "id": "v1beta3.CapabilityType",
     "properties": {}
    },
+   "v1beta3.ComponentCondition": {
+    "id": "v1beta3.ComponentCondition",
+    "required": [
+     "type",
+     "status"
+    ],
+    "properties": {
+     "error": {
+      "type": "string",
+      "description": "error code from health check attempt (if any)"
+     },
+     "message": {
+      "type": "string",
+      "description": "health check message received from the component"
+     },
+     "status": {
+      "type": "string",
+      "description": "current status of this component condition, one of True, False, Unknown"
+     },
+     "type": {
+      "type": "string",
+      "description": "type of component condition, currently only Healthy"
+     }
+    }
+   },
+   "v1beta3.ComponentStatus": {
+    "id": "v1beta3.ComponentStatus",
+    "properties": {
+     "annotations": {
+      "type": "any",
+      "description": "map of string keys and values that can be used by external tooling to store and retrieve arbitrary metadata about objects"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "version of the schema the object should have"
+     },
+     "conditions": {
+      "type": "array",
+      "items": {
+       "$ref": "v1beta3.ComponentCondition"
+      },
+      "description": "list of component conditions observed"
+     },
+     "creationTimestamp": {
+      "type": "string",
+      "description": "RFC 3339 date and time at which the object was created; populated by the system, read-only; null for lists"
+     },
+     "deletionTimestamp": {
+      "type": "string",
+      "description": "RFC 3339 date and time at which the object will be deleted; populated by the system when a graceful deletion is requested, read-only; if not set, graceful deletion of the object has not been requested"
+     },
+     "generateName": {
+      "type": "string",
+      "description": "an optional prefix to use to generate a unique name; has the same validation rules as name; optional, and is applied only name if is not specified"
+     },
+     "kind": {
+      "type": "string",
+      "description": "kind of object, in CamelCase; cannot be updated"
+     },
+     "labels": {
+      "type": "any",
+      "description": "map of string keys and values that can be used to organize and categorize objects; may match selectors of replication controllers and services"
+     },
+     "name": {
+      "type": "string",
+      "description": "string that identifies an object. Must be unique within a namespace; cannot be updated"
+     },
+     "namespace": {
+      "type": "string",
+      "description": "namespace of the object; cannot be updated"
+     },
+     "resourceVersion": {
+      "type": "string",
+      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
+     },
+     "selfLink": {
+      "type": "string",
+      "description": "URL for the object; populated by the system, read-only"
+     },
+     "uid": {
+      "type": "string",
+      "description": "unique UUID across space and time; populated by the system; read-only"
+     }
+    }
+   },
+   "v1beta3.ComponentStatusList": {
+    "id": "v1beta3.ComponentStatusList",
+    "required": [
+     "items"
+    ],
+    "properties": {
+     "apiVersion": {
+      "type": "string",
+      "description": "version of the schema the object should have"
+     },
+     "items": {
+      "type": "array",
+      "items": {
+       "$ref": "v1beta3.ComponentStatus"
+      },
+      "description": "list of component status objects"
+     },
+     "kind": {
+      "type": "string",
+      "description": "kind of object, in CamelCase; cannot be updated"
+     },
+     "resourceVersion": {
+      "type": "string",
+      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
+     },
+     "selfLink": {
+      "type": "string",
+      "description": "URL for the object; populated by the system, read-only"
+     }
+    }
+   },
    "v1beta3.Container": {
     "id": "v1beta3.Container",
     "required": [
@@ -9308,11 +9593,11 @@
      },
      "status": {
       "type": "string",
-      "description": "status of the condition, one of Full, None, Unknown"
+      "description": "status of the condition, one of True, False, Unknown"
      },
      "type": {
       "type": "string",
-      "description": "type of node condition, one of Ready, Schedulable"
+      "description": "type of node condition, currently only Ready"
      }
     }
    },
@@ -9822,11 +10107,11 @@
     "properties": {
      "status": {
       "type": "string",
-      "description": "status of the condition, one of Full, None, Unknown"
+      "description": "status of the condition, one of True, False, Unknown"
      },
      "type": {
       "type": "string",
-      "description": "kind of the condition"
+      "description": "kind of the condition, currently only Ready"
      }
     }
    },
@@ -10724,15 +11009,15 @@
     "id": "v1beta3.Volume",
     "required": [
      "name",
-     "emptyDir",
-     "secret",
+     "gcePersistentDisk",
+     "iscsi",
      "glusterfs",
      "hostPath",
+     "emptyDir",
      "awsElasticBlockStore",
      "gitRepo",
-     "nfs",
-     "iscsi",
-     "gcePersistentDisk"
+     "secret",
+     "nfs"
     ],
     "properties": {
      "awsElasticBlockStore": {
