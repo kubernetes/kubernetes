@@ -39,7 +39,10 @@ func TestCanSupport(t *testing.T) {
 	}
 }
 
-type fakeDiskManager struct{}
+type fakeDiskManager struct {
+	attachCalled bool
+	detachCalled bool
+}
 
 func (fake *fakeDiskManager) MakeGlobalPDName(disk iscsiDisk) string {
 	return "/tmp/fake_iscsi_path"
@@ -50,6 +53,11 @@ func (fake *fakeDiskManager) AttachDisk(disk iscsiDisk) error {
 	if err != nil {
 		return err
 	}
+	// Simulate the global mount so that the fakeMounter returns the
+	// expected number of mounts for the attached disk.
+	disk.mounter.Mount(globalPath, globalPath, disk.fsType, 0, "")
+
+	fake.attachCalled = true
 	return nil
 }
 
@@ -59,6 +67,7 @@ func (fake *fakeDiskManager) DetachDisk(disk iscsiDisk, mntPath string) error {
 	if err != nil {
 		return err
 	}
+	fake.detachCalled = true
 	return nil
 }
 
@@ -81,7 +90,9 @@ func TestPlugin(t *testing.T) {
 			},
 		},
 	}
-	builder, err := plug.(*ISCSIPlugin).newBuilderInternal(volume.NewSpecFromVolume(spec), types.UID("poduid"), &fakeDiskManager{}, &mount.FakeMounter{})
+	fakeManager := &fakeDiskManager{}
+	fakeMounter := &mount.FakeMounter{}
+	builder, err := plug.(*ISCSIPlugin).newBuilderInternal(volume.NewSpecFromVolume(spec), types.UID("poduid"), fakeManager, fakeMounter)
 	if err != nil {
 		t.Errorf("Failed to make a new Builder: %v", err)
 	}
@@ -111,8 +122,12 @@ func TestPlugin(t *testing.T) {
 			t.Errorf("SetUp() failed: %v", err)
 		}
 	}
+	if !fakeManager.attachCalled {
+		t.Errorf("Attach was not called")
+	}
 
-	cleaner, err := plug.(*ISCSIPlugin).newCleanerInternal("vol1", types.UID("poduid"), &fakeDiskManager{}, &mount.FakeMounter{})
+	fakeManager = &fakeDiskManager{}
+	cleaner, err := plug.(*ISCSIPlugin).newCleanerInternal("vol1", types.UID("poduid"), fakeManager, fakeMounter)
 	if err != nil {
 		t.Errorf("Failed to make a new Cleaner: %v", err)
 	}
@@ -127,5 +142,8 @@ func TestPlugin(t *testing.T) {
 		t.Errorf("TearDown() failed, volume path still exists: %s", path)
 	} else if !os.IsNotExist(err) {
 		t.Errorf("SetUp() failed: %v", err)
+	}
+	if !fakeManager.detachCalled {
+		t.Errorf("Detach was not called")
 	}
 }
