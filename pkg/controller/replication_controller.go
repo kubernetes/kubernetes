@@ -223,7 +223,7 @@ func (s activePods) Less(i, j int) bool {
 
 func (rm *ReplicationManager) syncReplicationController(controller api.ReplicationController) error {
 	s := labels.Set(controller.Spec.Selector).AsSelector()
-	podList, err := rm.kubeClient.Pods(controller.Namespace).List(s)
+	podList, err := rm.kubeClient.Pods(controller.Namespace).List(s, fields.Everything())
 	if err != nil {
 		return err
 	}

@@ -35,14 +35,14 @@ import (
 )
 
 // Convenient wrapper around listing pods supporting retries.
-func listPods(c *client.Client, namespace string, label labels.Selector) (*api.PodList, error) {
+func listPods(c *client.Client, namespace string, label labels.Selector, field fields.Selector) (*api.PodList, error) {
 	maxRetries := 4
-	pods, err := c.Pods(namespace).List(label)
+	pods, err := c.Pods(namespace).List(label, field)
 	for i := 0; i < maxRetries; i++ {
 		if err == nil {
 			return pods, nil
 		}
-		pods, err = c.Pods(namespace).List(label)
+		pods, err = c.Pods(namespace).List(label, field)
 	}
 	return pods, err
 }
@@ -127,7 +127,7 @@ func RunRC(c *client.Client, name string, ns, image string, replicas int) {
 
 	By(fmt.Sprintf("Making sure all %d replicas exist", replicas))
 	label := labels.SelectorFromSet(labels.Set(map[string]string{"name": name}))
-	pods, err := listPods(c, ns, label)
+	pods, err := listPods(c, ns, label, fields.Everything())
 	Expect(err).NotTo(HaveOccurred())
 	current = len(pods.Items)
 	failCount := 5
@@ -147,7 +147,7 @@ func RunRC(c *client.Client, name string, ns, image string, replicas int) {
 
 		last = current
 		time.Sleep(5 * time.Second)
-		pods, err = listPods(c, ns, label)
+		pods, err = listPods(c, ns, label, fields.Everything())
 		Expect(err).NotTo(HaveOccurred())
 		current = len(pods.Items)
 	}
@@ -166,7 +166,7 @@ func RunRC(c *client.Client, name string, ns, image string, replicas int) {
 		unknown := 0
 		time.Sleep(10 * time.Second)
 
-		currentPods, listErr := listPods(c, ns, label)
+		currentPods, listErr := listPods(c, ns, label, fields.Everything())
 		Expect(listErr).NotTo(HaveOccurred())
 		if len(currentPods.Items) != len(pods.Items) {
 			Failf("Number of reported pods changed: %d vs %d", len(currentPods.Items), len(pods.Items))

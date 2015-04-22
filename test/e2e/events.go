@@ -78,7 +78,7 @@ var _ = Describe("Events", func() {
 		expectNoError(waitForPodRunning(c, pod.Name))
 
 		By("verifying the pod is in kubernetes")
-		pods, err := podClient.List(labels.SelectorFromSet(labels.Set(map[string]string{"time": value})))
+		pods, err := podClient.List(labels.SelectorFromSet(labels.Set(map[string]string{"time": value})), fields.Everything())
 		Expect(len(pods.Items)).To(Equal(1))
 
 		By("retrieving the pod")

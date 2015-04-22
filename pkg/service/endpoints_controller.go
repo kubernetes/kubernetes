@@ -85,7 +85,7 @@ func NewEndpointController(client *client.Client) *EndpointController {
 	e.podStore.Store, e.podController = framework.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func() (runtime.Object, error) {
-				return e.client.Pods(api.NamespaceAll).List(labels.Everything())
+				return e.client.Pods(api.NamespaceAll).List(labels.Everything(), fields.Everything())
 			},
 			WatchFunc: func(rv string) (watch.Interface, error) {
 				return e.client.Pods(api.NamespaceAll).Watch(labels.Everything(), fields.Everything(), rv)

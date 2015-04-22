@@ -30,7 +30,7 @@ type PodsNamespacer interface {
 
 // PodInterface has methods to work with Pod resources.
 type PodInterface interface {
-	List(selector labels.Selector) (*api.PodList, error)
+	List(label labels.Selector, field fields.Selector) (*api.PodList, error)
 	Get(name string) (*api.Pod, error)
 	Delete(name string) error
 	Create(pod *api.Pod) (*api.Pod, error)
@@ -54,10 +54,10 @@ func newPods(c *Client, namespace string) *pods {
 	}
 }
 
-// List takes a selector, and returns the list of pods that match that selector.
-func (c *pods) List(selector labels.Selector) (result *api.PodList, err error) {
+// List takes label and field selectors, and returns the list of pods that match those selectors.
+func (c *pods) List(label labels.Selector, field fields.Selector) (result *api.PodList, err error) {
 	result = &api.PodList{}
-	err = c.r.Get().Namespace(c.ns).Resource("pods").LabelsSelectorParam(selector).Do().Into(result)
+	err = c.r.Get().Namespace(c.ns).Resource("pods").LabelsSelectorParam(label).FieldsSelectorParam(field).Do().Into(result)
 	return
 }
 

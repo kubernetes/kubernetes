@@ -148,7 +148,7 @@ func (rm *ResourceQuotaManager) syncResourceQuota(quota api.ResourceQuota) (err 
 
 	pods := &api.PodList{}
 	if set[api.ResourcePods] || set[api.ResourceMemory] || set[api.ResourceCPU] {
-		pods, err = rm.kubeClient.Pods(usage.Namespace).List(labels.Everything())
+		pods, err = rm.kubeClient.Pods(usage.Namespace).List(labels.Everything(), fields.Everything())
 		if err != nil {
 			return err
 		}

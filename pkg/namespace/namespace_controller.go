@@ -246,7 +246,7 @@ func deleteReplicationControllers(kubeClient client.Interface, ns string) error 
 }
 
 func deletePods(kubeClient client.Interface, ns string) error {
-	items, err := kubeClient.Pods(ns).List(labels.Everything())
+	items, err := kubeClient.Pods(ns).List(labels.Everything(), fields.Everything())
 	if err != nil {
 		return err
 	}
