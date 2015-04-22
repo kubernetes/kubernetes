@@ -144,7 +144,7 @@ func TestVersion(t *testing.T) {
 
 func TestExecSupportExists(t *testing.T) {
 	fakeDocker := &FakeDockerClient{VersionInfo: docker.Env{"Version=1.3.0", "ApiVersion=1.15"}}
-	runner := dockerContainerCommandRunner{fakeDocker}
+	runner := &DockerManager{client: fakeDocker}
 	useNativeExec, err := runner.nativeExecSupportExists()
 	if err != nil {
 		t.Errorf("got error while checking for exec support - %s", err)
@@ -156,7 +156,7 @@ func TestExecSupportExists(t *testing.T) {
 
 func TestExecSupportNotExists(t *testing.T) {
 	fakeDocker := &FakeDockerClient{VersionInfo: docker.Env{"Version=1.1.2", "ApiVersion=1.14"}}
-	runner := dockerContainerCommandRunner{fakeDocker}
+	runner := &DockerManager{client: fakeDocker}
 	useNativeExec, _ := runner.nativeExecSupportExists()
 	if useNativeExec {
 		t.Errorf("invalid exec support check output.")
@@ -164,7 +164,7 @@ func TestExecSupportNotExists(t *testing.T) {
 }
 
 func TestDockerContainerCommand(t *testing.T) {
-	runner := dockerContainerCommandRunner{}
+	runner := &DockerManager{}
 	containerID := "1234"
 	command := []string{"ls"}
 	cmd, _ := runner.getRunInContainerCommand(containerID, command)

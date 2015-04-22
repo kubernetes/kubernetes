@@ -210,7 +210,7 @@ func NewMainKubelet(
 		resyncInterval:                 resyncInterval,
 		containerRefManager:            kubecontainer.NewRefManager(),
 		readinessManager:               kubecontainer.NewReadinessManager(),
-		runner:                         dockertools.NewDockerContainerCommandRunner(dockerClient),
+		runner:                         containerManager,
 		httpClient:                     &http.Client{},
 		sourcesReady:                   sourcesReady,
 		clusterDomain:                  clusterDomain,
