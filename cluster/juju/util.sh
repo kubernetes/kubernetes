@@ -40,15 +40,9 @@ function kube-up() {
     else
         juju quickstart --no-browser
     fi
-    # If something were to happen that I'm not accounting for, do not
-    # punish the user by making them tear things down. In a perfect world
-    # quickstart should handle this situation, so be nice in the meantime
-    local envstatus
-    envstatus=$(juju status kubernetes-master --format=oneline)
-
-    if [[ "" == "${envstatus}" ]]; then
-        juju deployer -c ${KUBE_BUNDLE_PATH}
-    fi
+    # The juju-deployer command will deploy the bundle and can be run
+    # multiple times to continue deploying the parts that fail.
+    juju deployer -c ${KUBE_BUNDLE_PATH}
     # Sleep due to juju bug http://pad.lv/1432759
     sleep-status
     detect-master
