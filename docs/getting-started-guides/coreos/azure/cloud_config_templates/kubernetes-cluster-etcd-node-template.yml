@@ -37,6 +37,7 @@ coreos:
         Environment=ETCD_INITIAL_ADVERTISE_PEER_URLS=http://%host%:2380
         Environment=ETCD_LISTEN_PEER_URLS=http://%host%:2380
         Environment=ETCD_LISTEN_CLIENT_URLS=http://0.0.0.0:2379,http://0.0.0.0:4001
+        Environment=ETCD_ADVERTISE_CLIENT_URLS=http://%host%:2379,http://%host%:4001
         Environment=ETCD_INITIAL_CLUSTER=%cluster%
         Environment=ETCD_INITIAL_CLUSTER_STATE=new
         ExecStart=/opt/bin/etcd2
