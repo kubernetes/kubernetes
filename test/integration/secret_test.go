@@ -39,7 +39,7 @@ func init() {
 
 func deletePodOrErrorf(t *testing.T, c *client.Client, ns, name string) {
 	if err := c.Pods(ns).Delete(name); err != nil {
-		t.Errorf("unable to delete pods %v: %v", name, err)
+		t.Errorf("unable to delete pod %v: %v", name, err)
 	}
 }
 func deleteSecretOrErrorf(t *testing.T, c *client.Client, ns, name string) {
@@ -136,7 +136,7 @@ func DoTestSecrets(t *testing.T, client *client.Client, apiVersion string) {
 	defer deletePodOrErrorf(t, client, ns, pod.Name)
 
 	// Create a pod that consumes non-existent secret.
-	pod.ObjectMeta.Name = "uses-non-existant-secret"
+	pod.ObjectMeta.Name = "uses-non-existent-secret"
 	if _, err := client.Pods(ns).Create(pod); err != nil {
 		t.Errorf("Failed to create pod: %v", err)
 	}
