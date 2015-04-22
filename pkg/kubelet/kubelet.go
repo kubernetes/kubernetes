@@ -1769,6 +1769,21 @@ func (kl *Kubelet) recordNodeOnlineEvent() {
 	kl.recorder.Eventf(kl.nodeRef, "online", "Node %s is now online", kl.hostname)
 }
 
+func (kl *Kubelet) recordNodeSchedulableEvent() {
+	// TODO: This requires a transaction, either both node status is updated
+	// and event is recorded or neither should happen, see issue #6055.
+	kl.recorder.Eventf(kl.nodeRef, "schedulable", "Node %s is now schedulable", kl.hostname)
+}
+
+func (kl *Kubelet) recordNodeUnschedulableEvent() {
+	// TODO: This requires a transaction, either both node status is updated
+	// and event is recorded or neither should happen, see issue #6055.
+	kl.recorder.Eventf(kl.nodeRef, "unschedulable", "Node %s is now unschedulable", kl.hostname)
+}
+
+// Maintains Node.Spec.Unschedulable value from previous run of tryUpdateNodeStatus()
+var oldNodeUnschedulable bool
+
 // tryUpdateNodeStatus tries to update node status to master.
 func (kl *Kubelet) tryUpdateNodeStatus() error {
 	node, err := kl.kubeClient.Nodes().Get(kl.hostname)
@@ -1835,6 +1850,14 @@ func (kl *Kubelet) tryUpdateNodeStatus() error {
 		kl.recordNodeOnlineEvent()
 	}
 
+	if oldNodeUnschedulable != node.Spec.Unschedulable {
+		if node.Spec.Unschedulable {
+			kl.recordNodeUnschedulableEvent()
+		} else {
+			kl.recordNodeSchedulableEvent()
+		}
+		oldNodeUnschedulable = node.Spec.Unschedulable
+	}
 	_, err = kl.kubeClient.Nodes().UpdateStatus(node)
 	return err
 }
