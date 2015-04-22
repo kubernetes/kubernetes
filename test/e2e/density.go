@@ -24,10 +24,14 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/cache"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/controller/framework"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/wait"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 
 	"github.com/golang/glog"
 	. "github.com/onsi/ginkgo"
@@ -83,19 +87,14 @@ func DeleteRC(c *client.Client, ns, name string) error {
 }
 
 // Launch a Replication Controller and wait for all pods it spawns
-// to become running
+// to become running.  The controller will need to be cleaned up external
+// to this method
 func RunRC(c *client.Client, name string, ns, image string, replicas int) {
 	defer GinkgoRecover()
 
 	var last int
 	current := 0
 	same := 0
-
-	defer func() {
-		By("Cleaning up the replication controller")
-		err := DeleteRC(c, ns, name)
-		Expect(err).NotTo(HaveOccurred())
-	}()
 
 	By(fmt.Sprintf("Creating replication controller %s", name))
 	_, err := c.ReplicationControllers(ns).Create(&api.ReplicationController{
@@ -138,7 +137,7 @@ func RunRC(c *client.Client, name string, ns, image string, replicas int) {
 		} else if last == current {
 			same++
 		} else if current < last {
-			Failf("Controller %s: Number of submitted pods dropped from %d to %d", last, current)
+			Failf("Controller %s: Number of submitted pods dropped from %d to %d", name, last, current)
 		}
 
 		if same >= failCount {
@@ -228,13 +227,21 @@ var _ = Describe("Density", func() {
 		// during the test so clean it up here
 		rc, err := c.ReplicationControllers(ns).Get(RCName)
 		if err == nil && rc.Spec.Replicas != 0 {
-			DeleteRC(c, ns, RCName)
+			By("Cleaning up the replication controller")
+			err := DeleteRC(c, ns, RCName)
+			expectNoError(err)
+		}
+
+		// Clean up the namespace if a non-default one was used
+		if ns != api.NamespaceDefault {
+			By("Cleaning up the namespace")
+			err := c.Namespaces().Delete(ns)
+			expectNoError(err)
 		}
 	})
 
 	// Tests with "Skipped" substring in their name will be skipped when running
 	// e2e test suite without --ginkgo.focus & --ginkgo.skip flags.
-
 	type Density struct {
 		skip          bool
 		podsPerMinion int
@@ -260,9 +267,59 @@ var _ = Describe("Density", func() {
 		}
 		itArg := testArg
 		It(name, func() {
+			uuid := string(util.NewUUID())
 			totalPods := itArg.podsPerMinion * minionCount
-			RCName = "my-hostname-density" + strconv.Itoa(totalPods) + "-" + string(util.NewUUID())
+			nameStr := strconv.Itoa(totalPods) + "-" + uuid
+			ns = "e2e-density" + nameStr
+			RCName = "my-hostname-density" + nameStr
+
+			// Create a listener for events
+			events := make([](*api.Event), 0)
+			_, controller := framework.NewInformer(
+				&cache.ListWatch{
+					ListFunc: func() (runtime.Object, error) {
+						return c.Events(ns).List(labels.Everything(), fields.Everything())
+					},
+					WatchFunc: func(rv string) (watch.Interface, error) {
+						return c.Events(ns).Watch(labels.Everything(), fields.Everything(), rv)
+					},
+				},
+				&api.Event{},
+				time.Second*10,
+				framework.ResourceEventHandlerFuncs{
+					AddFunc: func(obj interface{}) {
+						events = append(events, obj.(*api.Event))
+					},
+				},
+			)
+			stop := make(chan struct{})
+			go controller.Run(stop)
+
+			// Start the replication controller
 			RunRC(c, RCName, ns, "gcr.io/google_containers/pause:go", totalPods)
+
+			By("Waiting for all events to be recorded")
+			last := -1
+			current := len(events)
+			timeout := 10 * time.Minute
+			for start := time.Now(); last < current && time.Since(start) < timeout; time.Sleep(10 * time.Second) {
+				last = current
+				current = len(events)
+			}
+			close(stop)
+
+			if current != last {
+				Logf("Warning: Not all events were recorded after waiting %.2f minutes", timeout.Minutes())
+			}
+			Logf("Found %d events", current)
+
+			// Verify there were no pod killings or failures
+			By("Verifying there were no pod killings or failures")
+			for _, e := range events {
+				for _, s := range []string{"kill", "fail"} {
+					Expect(e.Reason).NotTo(ContainSubstring(s), "event:' %s', reason: '%s', message: '%s', field path: '%s'", e, e.ObjectMeta.Name, e.Message, e.InvolvedObject.FieldPath)
+				}
+			}
 		})
 	}
 
@@ -305,6 +362,8 @@ var _ = Describe("Density", func() {
 						RunRC(c, name, ns, "gcr.io/google_containers/pause:go", n)
 						podsLaunched += n
 						glog.Info("Launched %v pods so far...", podsLaunched)
+						err := DeleteRC(c, ns, name)
+						expectNoError(err)
 					}
 				}()
 			}
