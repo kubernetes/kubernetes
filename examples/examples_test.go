@@ -340,6 +340,12 @@ func TestExampleObjectSchemas(t *testing.T) {
 			"cephfs":             &api.Pod{},
 			"cephfs-with-secret": &api.Pod{},
 		},
+		"../examples/spark/spark-gluster": {
+	        "glusterfs-endpoints":  &api.Endpoints{},
+            "spark-master-service": &api.Service{},
+            "spark-master":         &api.Pod{},
+            "spark-worker-rc":      &api.ReplicationController{},
+         },
 	}
 
 	capabilities.SetForTests(capabilities.Capabilities{
