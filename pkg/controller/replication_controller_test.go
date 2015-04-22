@@ -379,6 +379,25 @@ func TestWatchControllers(t *testing.T) {
 	}
 }
 
+func TestActivePodFiltering(t *testing.T) {
+	podList := newPodList(5)
+	podList.Items[0].Status.Phase = api.PodSucceeded
+	podList.Items[1].Status.Phase = api.PodFailed
+	expectedNames := util.NewStringSet()
+	for _, pod := range podList.Items[2:] {
+		expectedNames.Insert(pod.Name)
+	}
+
+	got := filterActivePods(podList.Items)
+	gotNames := util.NewStringSet()
+	for _, pod := range got {
+		gotNames.Insert(pod.Name)
+	}
+	if expectedNames.Difference(gotNames).Len() != 0 || gotNames.Difference(expectedNames).Len() != 0 {
+		t.Errorf("expected %v, got %v", expectedNames.List(), gotNames.List())
+	}
+}
+
 func TestSortingActivePods(t *testing.T) {
 	numPods := 5
 	podList := newPodList(numPods)
