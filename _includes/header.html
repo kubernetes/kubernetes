@@ -5,7 +5,7 @@
     <a href="{{site.url}}/"><img src="{{site.url}}{{site.logo.desktop}}" alt="{{site.title}}" id="logo-desktop" /></a>
     <nav>
 {% for link in site.nav %}
-     <a href="{% if false == link.external %}{{site.url}}{% endif %}{{link.url}}" {% if link.slug == page.slug %}class="active"{% endif %}>
+     <a href="{% if false == link.external %}{{site.url}}{% endif %}{{link.url}}" {% if link.slug == page.slug %}class="active"{% endif %} {% if true == link.external %}onclick="trackOutboundLink('{{link.url}}'); return false;"{% endif %}>
       <div>
        {{link.label}}
       </div>
@@ -26,7 +26,7 @@
 </header>
 <div id="mobile-nav-container" class="visible-sm-block visible-xs-block mobile-menu-slide">
 {% for link in site.nav %}
-  <a href="{% if false == link.external %}{{site.url}}{% endif %}{{link.url}}" {% if link.slug == page.slug %}class="active"{% endif %}>
+  <a href="{% if false == link.external %}{{site.url}}{% endif %}{{link.url}}" {% if link.slug == page.slug %}class="active"{% endif %} {% if true == link.external %}onclick="trackOutboundLink('{{link.url}}'); return false;"{% endif %}>
   <div></div>
   <span>{{link.label}}</span>
  </a>

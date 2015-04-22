@@ -5,7 +5,7 @@ permalink: /gettingstarted/
 show_in_nav: true
 slug: gettingstarted
 
-hero: 
+hero:
     title: Getting Started
     text: Get started running, deploying, and using Kubernetes.
     img: /img/desktop/getting_started/hero_icon.svg
@@ -24,14 +24,14 @@ steps:
     text: Releases of Kubernetes
     slug: releases
   - title: Technical Details
-    text: "Interested in taking a peek inside Kubernetes? You should start by reading the <a href=\"https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/design/README.md\">design overview</a> which introduces core Kubernetes concepts and components. After that, you probably want to take a look at the API documentation and learn about the kubecfg command line tool."
-    slug: technical
+    text: "Interested in taking a peek inside Kubernetes? You should start by reading the <a href=\"https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/design/README.md\" onclick=\"trackOutboundLink('https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/design/README.md'); return false;\">design overview</a> which introduces core Kubernetes concepts and components. After that, you probably want to take a look at the API documentation and learn about the kubecfg command line tool."
+    slug: techdetails
 
-hostedservices: 
+hostedservices:
   - label: Google Container Engine
     url: https://cloud.google.com/container-engine/
 
-installguides: 
+installguides:
   - label: Google Compute Engine
     url: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/getting-started-guides/gce.md
   - label: Vagrant
@@ -64,7 +64,7 @@ releases:
     url: https://github.com/GoogleCloudPlatform/kubernetes/releases
 
 techdetails:
-    api: 
+    api:
         label: API Documentation
         url: http://kubernetes.io/third_party/swagger-ui/
     kubecfg:

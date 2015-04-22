@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta http-equiv="X-UA-Compatible" content="IE=edge">
   <meta name="description" content="{{site.description}}">
-  <meta name="viewport" 
+  <meta name="viewport"
    content="width=device-width, initial-scale=1, user-scalable=no" />
   <meta property="og:title" content="{% if site.og.title %}{{site.og.title}}{% else %}{{site.title}}{% endif %}">
   <meta property="og:site_name" content="{% if site.og.site_name %}{{site.og.site_name}}{% else %}{{site.title}}{% endif %}">
@@ -13,10 +13,10 @@
   <meta property="og:url" content="{{site.url}}">
   <meta property="og:image" content="{{site.url}}{{site.og.image}}">
 
-  <link rel="shortcut icon" 
+  <link rel="shortcut icon"
    href="{{site.url}}/img/global/favicon.png" type="image/vnd.microsoft.icon" />
   <!-- apple device icons -->
-  <link rel="apple-touch-icon" 
+  <link rel="apple-touch-icon"
    href="{{site.url}}/img/global/apple_touch_icon_2X.jpg" />
   <!-- end apple device icons -->
   <link type="text/plain" rel="author" href="{{site.url}}/humans.txt" />
@@ -30,6 +30,9 @@
     }
   </script>
   <script type="text/javascript" src="{{site.url}}/js/script.js"></script>
+  <script>
+    var trackOutboundLink=function(n){ga("send","event","outbound","click",n,{hitCallback:function(){document.location=n}})};
+  </script>
  </head>
  <body>
   {% include header.html %}

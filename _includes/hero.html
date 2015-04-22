@@ -22,10 +22,10 @@
    <div class="col-lg-6 col-md-6 col-sm-8 col-lg-offset-3 col-md-offset-3 col-sm-offset-2">
     <div class="row">
      <div class="col-lg-6 col-md-6 col-sm-6">
-      <a href="{{page.hero.buttons.button_1.url}}" class="button alt">{{page.hero.buttons.button_1.label}}</a>
+      <a href="{{page.hero.buttons.button_1.url}}" class="button alt" {% if true == page.hero.buttons.button_1.external %}onclick="trackOutboundLink('{{page.hero.buttons.button_1.url}}'); return false;"{% endif %}>{{page.hero.buttons.button_1.label}}</a>
      </div>
      <div class="col-lg-6 col-md-6 col-sm-6">
-      <a href="{{page.hero.buttons.button_2.url}}" class="button alt">{{page.hero.buttons.button_2.label}}</a>
+      <a href="{{page.hero.buttons.button_2.url}}" class="button alt" {% if true == page.hero.buttons.button_2.external %}onclick="trackOutboundLink('{{page.hero.buttons.button_2.url}}'); return false;"{% endif %}>{{page.hero.buttons.button_2.label}}</a>
      </div>
     </div>
    </div>

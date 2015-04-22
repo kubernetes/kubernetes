@@ -30,7 +30,7 @@ layout: default
        <div class="col-xs-11">
         <div class="button-group">
         {% for guide in page.installguides %}
-         <a href="{{guide.url}}" class="button small dynamic">{{guide.label}}</a>
+         <a href="{{guide.url}}" onclick="trackOutboundLink('{{guide.url}}'); return false;" class="button small dynamic">{{guide.label}}</a>
         {% endfor %}
         </div>
        </div>
@@ -40,7 +40,7 @@ layout: default
        <div class="col-xs-11">
         <div class="button-group">
         {% for service in page.hostedservices %}
-         <a href="{{service.url}}" class="button small dynamic">{{service.label}}</a>
+         <a href="{{service.url}}" onclick="trackOutboundLink('{{service.url}}'); return false;" class="button small dynamic">{{service.label}}</a>
         {% endfor %}
         </div>
        </div>
@@ -49,7 +49,7 @@ layout: default
       <div class="row">
        <div class="col-lg-3 col-md-3 col-sm-3">
         <div class="button-group float-none">
-         <a href="{{page.firstapp.url}}" class="button small">{{page.firstapp.label}}</a>
+         <a href="{{page.firstapp.url}}" onclick="trackOutboundLink('{{page.firstapp.url}}'); return false;" class="button small">{{page.firstapp.label}}</a>
         </div>
        </div>
       </div>
@@ -57,18 +57,18 @@ layout: default
       <div class="row">
        <div class="col-lg-3 col-md-3 col-sm-3">
         <div class="button-group float-none">
-         <a href="{{page.releases.url}}" class="button small">{{page.releases.label}}</a>
+         <a href="{{page.releases.url}}" onclick="trackOutboundLink('{{page.releases.url}}'); return false;" class="button small">{{page.releases.label}}</a>
         </div>
        </div>
       </div>
-    {% elsif 'technical' == step.slug %}
+    {% elsif 'techdetails' == step.slug %}
       <div class="row">
        <div class="button-group float-none">
         <div class="col-lg-4 col-md-5 col-sm-6">
-         <a href="{{page.techdetails.api.url}}" class="button small">{{page.techdetails.api.label}}</a>
+         <a href="{{page.techdetails.api.url}}" onclick="trackOutboundLink('{{page.techdetails.api.url}}'); return false;" class="button small">{{page.techdetails.api.label}}</a>
         </div>
         <div class="col-lg-4 col-md-5 col-sm-6">
-         <a href="{{page.techdetails.kubecfg.url}}" class="button small">{{page.techdetails.kubecfg.label}}</a>
+         <a href="{{page.techdetails.kubecfg.url}}" onclick="trackOutboundLink('{{page.techdetails.kubecfg.url}}'); return false;" class="button small">{{page.techdetails.kubecfg.label}}</a>
         </div>
        </div>
       </div>

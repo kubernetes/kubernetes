@@ -32,7 +32,7 @@ layout: default
          <div class="button-group tiles">
         {% for comp in page.companies %}
           <div class="col-lg-3 col-md-3 col-sm-3 col-xs-6">
-           <img src="{{comp.img}}" alt="{{comp.label}}" 
+           <img src="{{comp.img}}" alt="{{comp.label}}"
             class="img-responsive button tile" />
           </div>
         {% endfor %}
@@ -44,7 +44,7 @@ layout: default
       <div class="row">
        <div class="col-lg-4 col-md-4 col-sm-5">
         <div class="button-group float-none">
-         <a href="{{page.developers.url}}" class="button small">{{page.developers.label}}</a>
+         <a href="{{page.developers.url}}" onclick="trackOutboundLink('{{page.developers.url}}'); return false;" class="button small">{{page.developers.label}}</a>
         </div>
        </div>
       </div>
