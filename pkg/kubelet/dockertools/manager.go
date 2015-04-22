@@ -336,6 +336,8 @@ func (dm *DockerManager) GetPodStatus(pod *api.Pod) (*api.PodStatus, error) {
 			continue
 		}
 		var containerStatus api.ContainerStatus
+		containerStatus.Name = container.Name
+		containerStatus.Image = container.Image
 		if oldStatus, found := oldStatuses[container.Name]; found {
 			// Some states may be lost due to GC; apply the last observed
 			// values if possible.

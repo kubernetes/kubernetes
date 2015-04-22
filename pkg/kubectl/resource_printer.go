@@ -32,6 +32,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/conversion"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume"
 	"github.com/docker/docker/pkg/units"
 	"github.com/ghodss/yaml"
@@ -243,7 +244,7 @@ func (h *HumanReadablePrinter) HandledResources() []string {
 	return keys
 }
 
-var podColumns = []string{"POD", "IP", "CONTAINER(S)", "IMAGE(S)", "HOST", "LABELS", "STATUS", "CREATED"}
+var podColumns = []string{"POD", "IP", "CONTAINER(S)", "IMAGE(S)", "HOST", "LABELS", "STATUS", "CREATED", "MESSAGE"}
 var replicationControllerColumns = []string{"CONTROLLER", "CONTAINER(S)", "IMAGE(S)", "SELECTOR", "REPLICAS"}
 var serviceColumns = []string{"NAME", "LABELS", "SELECTOR", "IP", "PORT(S)"}
 var endpointColumns = []string{"NAME", "ENDPOINTS"}
@@ -339,32 +340,97 @@ func podHostString(host, ip string) string {
 	return host + "/" + ip
 }
 
+// translateTimestamp returns the elapsed time since timestamp in
+// human-readable approximation.
+func translateTimestamp(timestamp util.Time) string {
+	return units.HumanDuration(time.Now().Sub(timestamp.Time))
+}
+
+// interpretContainerStatus interprets the container status and returns strings
+// associated with columns "STATUS", "CREATED", and "MESSAGE".
+// The meaning of MESSAGE varies based on the context of STATUS:
+//     STATUS: Waiting; MESSAGE: reason for waiting
+//     STATUS: Running; MESSAGE: reason for the last termination
+//     STATUS: Terminated; MESSAGE: reason for this termination
+func interpretContainerStatus(status *api.ContainerStatus) (string, string, string, error) {
+	// Helper function to compose a meaning message from terminate state.
+	getTermMsg := func(state *api.ContainerStateTerminated) string {
+		var message string
+		if state != nil {
+			message = fmt.Sprintf("exit code %d", state.ExitCode)
+			if state.Reason != "" {
+				message = fmt.Sprintf("%s, reason: %s", state.Reason)
+			}
+		}
+		return message
+	}
+
+	state := &status.State
+	if state.Waiting != nil {
+		return "Waiting", "", state.Waiting.Reason, nil
+	} else if state.Running != nil {
+		// Get the information of the last termination state. This is useful if
+		// a container is stuck in a crash loop.
+		message := getTermMsg(status.LastTerminationState.Termination)
+		if message != "" {
+			message = "last termination: " + message
+		}
+		return "Running", translateTimestamp(state.Running.StartedAt), message, nil
+	} else if state.Termination != nil {
+		return "Terminated", translateTimestamp(state.Termination.StartedAt), getTermMsg(state.Termination), nil
+	}
+	return "", "", "", fmt.Errorf("unknown container state %#v", *state)
+}
+
 func printPod(pod *api.Pod, w io.Writer) error {
 	// TODO: remove me when pods are converted
 	spec := &api.PodSpec{}
 	if err := api.Scheme.Convert(&pod.Spec, spec); err != nil {
 		glog.Errorf("Unable to convert pod manifest: %v", err)
 	}
-	containers := spec.Containers
-	var firstContainer api.Container
-	if len(containers) > 0 {
-		firstContainer, containers = containers[0], containers[1:]
-	}
-	_, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
+	_, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
 		pod.Name,
 		pod.Status.PodIP,
-		firstContainer.Name,
-		firstContainer.Image,
+		"", "",
 		podHostString(pod.Spec.Host, pod.Status.HostIP),
 		formatLabels(pod.Labels),
 		pod.Status.Phase,
-		units.HumanDuration(time.Now().Sub(pod.CreationTimestamp.Time)))
+		translateTimestamp(pod.CreationTimestamp),
+		pod.Status.Message,
+	)
 	if err != nil {
 		return err
 	}
-	// Lay out all the other containers on separate lines.
-	for _, container := range containers {
-		_, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n", "", "", container.Name, container.Image, "", "", "", "")
+	// Lay out all containers on separate lines.
+	statuses := pod.Status.ContainerStatuses
+	if len(statuses) == 0 {
+		// Container status has not been reported yet. Print basic information
+		// of the containers and exit the function.
+		for _, container := range pod.Spec.Containers {
+			_, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
+				"", "", container.Name, container.Image, "", "", "", "")
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+
+	// Print the actual container statuses.
+	for _, status := range statuses {
+		state, created, message, err := interpretContainerStatus(&status)
+		if err != nil {
+			return err
+		}
+		_, err = fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
+			"", "",
+			status.Name,
+			status.Image,
+			"", "",
+			state,
+			created,
+			message,
+		)
 		if err != nil {
 			return err
 		}
