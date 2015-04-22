@@ -244,7 +244,7 @@ coreos:
         ExecStart=/opt/kubernetes/server/bin/kube-apiserver \
             --address=0.0.0.0 \
             --port=8080 \
-            --etcd_servers=http://etcd-00:4001,http://etcd-01:4001,http://etcd-02:4001 \
+            $ETCD_SERVERS \
             --portal_net=10.1.0.0/16 \
             --cloud_provider=vagrant \
             --logtostderr=true --v=3
