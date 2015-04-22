@@ -245,6 +245,7 @@ func (h *HumanReadablePrinter) HandledResources() []string {
 }
 
 var podColumns = []string{"POD", "IP", "CONTAINER(S)", "IMAGE(S)", "HOST", "LABELS", "STATUS", "CREATED", "MESSAGE"}
+var podTemplateColumns = []string{"TEMPLATE", "CONTAINER(S)", "IMAGE(S)", "PODLABELS"}
 var replicationControllerColumns = []string{"CONTROLLER", "CONTAINER(S)", "IMAGE(S)", "SELECTOR", "REPLICAS"}
 var serviceColumns = []string{"NAME", "LABELS", "SELECTOR", "IP", "PORT(S)"}
 var endpointColumns = []string{"NAME", "ENDPOINTS"}
@@ -263,6 +264,8 @@ var componentStatusColumns = []string{"NAME", "STATUS", "MESSAGE", "ERROR"}
 func (h *HumanReadablePrinter) addDefaultHandlers() {
 	h.Handler(podColumns, printPod)
 	h.Handler(podColumns, printPodList)
+	h.Handler(podTemplateColumns, printPodTemplate)
+	h.Handler(podTemplateColumns, printPodTemplateList)
 	h.Handler(replicationControllerColumns, printReplicationController)
 	h.Handler(replicationControllerColumns, printReplicationControllerList)
 	h.Handler(serviceColumns, printService)
@@ -383,11 +386,6 @@ func interpretContainerStatus(status *api.ContainerStatus) (string, string, stri
 }
 
 func printPod(pod *api.Pod, w io.Writer) error {
-	// TODO: remove me when pods are converted
-	spec := &api.PodSpec{}
-	if err := api.Scheme.Convert(&pod.Spec, spec); err != nil {
-		glog.Errorf("Unable to convert pod manifest: %v", err)
-	}
 	_, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
 		pod.Name,
 		pod.Status.PodIP,
@@ -441,6 +439,40 @@ func printPod(pod *api.Pod, w io.Writer) error {
 func printPodList(podList *api.PodList, w io.Writer) error {
 	for _, pod := range podList.Items {
 		if err := printPod(&pod, w); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func printPodTemplate(pod *api.PodTemplate, w io.Writer) error {
+	containers := pod.Template.Spec.Containers
+	var firstContainer api.Container
+	if len(containers) > 0 {
+		firstContainer, containers = containers[0], containers[1:]
+	}
+	_, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\n",
+		pod.Name,
+		firstContainer.Name,
+		firstContainer.Image,
+		formatLabels(pod.Template.Labels),
+	)
+	if err != nil {
+		return err
+	}
+	// Lay out all the other containers on separate lines.
+	for _, container := range containers {
+		_, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", "", container.Name, container.Image, "")
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func printPodTemplateList(podList *api.PodTemplateList, w io.Writer) error {
+	for _, pod := range podList.Items {
+		if err := printPodTemplate(&pod, w); err != nil {
 			return err
 		}
 	}

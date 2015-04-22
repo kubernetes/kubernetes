@@ -85,13 +85,20 @@ func roundTrip(t *testing.T, codec runtime.Codec, item runtime.Object) {
 }
 
 // roundTripSame verifies the same source object is tested in all API versions.
-func roundTripSame(t *testing.T, item runtime.Object) {
+func roundTripSame(t *testing.T, item runtime.Object, except ...string) {
+	set := util.NewStringSet(except...)
 	seed := rand.Int63()
 	fuzzInternalObject(t, "", item, seed)
-	roundTrip(t, v1beta1.Codec, item)
-	roundTrip(t, v1beta2.Codec, item)
-	fuzzInternalObject(t, "v1beta3", item, seed)
-	roundTrip(t, v1beta3.Codec, item)
+	if !set.Has("v1beta1") {
+		roundTrip(t, v1beta1.Codec, item)
+	}
+	if !set.Has("v1beta2") {
+		roundTrip(t, v1beta2.Codec, item)
+	}
+	if !set.Has("v1beta3") {
+		fuzzInternalObject(t, "v1beta3", item, seed)
+		roundTrip(t, v1beta3.Codec, item)
+	}
 }
 
 func roundTripAll(t *testing.T, item runtime.Object) {
@@ -130,6 +137,10 @@ func TestList(t *testing.T) {
 
 var nonRoundTrippableTypes = util.NewStringSet("ContainerManifest", "ContainerManifestList")
 var nonInternalRoundTrippableTypes = util.NewStringSet("List", "ListOptions", "PodExecOptions")
+var nonRoundTrippableTypesByVersion = map[string][]string{
+	"PodTemplate":     {"v1beta1", "v1beta2"},
+	"PodTemplateList": {"v1beta1", "v1beta2"},
+}
 
 func TestRoundTripTypes(t *testing.T) {
 	// api.Scheme.Log(t)
@@ -148,7 +159,7 @@ func TestRoundTripTypes(t *testing.T) {
 			if _, err := meta.TypeAccessor(item); err != nil {
 				t.Fatalf("%q is not a TypeMeta and cannot be tested - add it to nonRoundTrippableTypes: %v", kind, err)
 			}
-			roundTripSame(t, item)
+			roundTripSame(t, item, nonRoundTrippableTypesByVersion[kind]...)
 			if !nonInternalRoundTrippableTypes.Has(kind) {
 				roundTrip(t, api.Codec, fuzzInternalObject(t, "", item, rand.Int63()))
 			}

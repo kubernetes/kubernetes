@@ -358,6 +358,34 @@ for version in "${kube_api_versions[@]}"; do
   kube::test::get_object_assert 'pods --namespace=other' "{{range.items}}{{$id_field}}:{{end}}" ''
 
 
+  #################
+  # Pod templates #
+  #################
+
+  # Note: pod templates exist only in v1beta3 and above, so output will always be in that form
+
+  ### Create PODTEMPLATE
+  # Pre-condition: no PODTEMPLATE
+  kube::test::get_object_assert podtemplates "{{range.items}}{{.metadata.name}}:{{end}}" ''
+  # Command
+  kubectl create -f examples/walkthrough/podtemplate.json "${kube_flags[@]}"
+  # Post-condition: nginx PODTEMPLATE is available
+  kube::test::get_object_assert podtemplates "{{range.items}}{{.metadata.name}}:{{end}}" 'nginx:'
+
+  ### Printing pod templates works
+  kubectl get podtemplates "${kube_flags[@]}"
+  ### Display of an object which doesn't existing in v1beta1 and v1beta2 works
+  [[ "$(kubectl get podtemplates -o yaml "${kube_flags[@]}" | grep nginx)" ]]
+
+  ### Delete nginx pod template by name
+  # Pre-condition: nginx pod template is available
+  kube::test::get_object_assert podtemplates "{{range.items}}{{.metadata.name}}:{{end}}" 'nginx:'
+  # Command
+  kubectl delete podtemplate nginx "${kube_flags[@]}"
+  # Post-condition: No templates exist
+  kube::test::get_object_assert podtemplate "{{range.items}}{{.metadata.name}}:{{end}}" ''
+
+
   ############
   # Services #
   ############

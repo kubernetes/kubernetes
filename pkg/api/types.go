@@ -848,8 +848,8 @@ type PodTemplate struct {
 	TypeMeta   `json:",inline"`
 	ObjectMeta `json:"metadata,omitempty"`
 
-	// Spec defines the pods that will be created from this template
-	Spec PodTemplateSpec `json:"spec,omitempty"`
+	// Template defines the pods that will be created from this pod template
+	Template PodTemplateSpec `json:"template,omitempty"`
 }
 
 // PodTemplateList is a list of PodTemplates.

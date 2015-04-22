@@ -80,6 +80,10 @@ func TestRESTMapper(t *testing.T) {
 		t.Errorf("unexpected version mapping: %s %s %v", v, k, err)
 	}
 
+	if m, err := RESTMapper.RESTMapping("PodTemplate", ""); err != nil || m.APIVersion != "v1beta3" || m.Resource != "podtemplates" {
+		t.Errorf("unexpected version mapping: %#v %v", m, err)
+	}
+
 	for _, version := range Versions {
 		mapping, err := RESTMapper.RESTMapping("ReplicationController", version)
 		if err != nil {

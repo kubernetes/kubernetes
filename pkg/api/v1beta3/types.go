@@ -854,8 +854,8 @@ type PodTemplate struct {
 	TypeMeta   `json:",inline"`
 	ObjectMeta `json:"metadata,omitempty" description:"standard object metadata; see https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#metadata"`
 
-	// Spec defines the behavior of a pod.
-	Spec PodTemplateSpec `json:"spec,omitempty" description:"specification of the desired behavior of the pod; https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#spec-and-status"`
+	// Template defines the pods that will be created from this pod template
+	Template PodTemplateSpec `json:"template,omitempty" description:"the template of the desired behavior of the pod; https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#spec-and-status"`
 }
 
 // PodTemplateList is a list of PodTemplates.
