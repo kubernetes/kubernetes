@@ -8,7 +8,7 @@ Print the logs for a container in a pod.
 Print the logs for a container in a pod. If the pod has only one container, the container name is optional.
 
 ```
-kubectl log [-f] POD [CONTAINER]
+kubectl log [-f] [-p] POD [CONTAINER]
 ```
 
 ### Examples
@@ -16,6 +16,9 @@ kubectl log [-f] POD [CONTAINER]
 ```
 // Returns snapshot of ruby-container logs from pod 123456-7890.
 $ kubectl log 123456-7890 ruby-container
+
+// Returns snapshot of previous terminated ruby-container logs from pod 123456-7890.
+$ kubectl log -p 123456-7890 ruby-container
 
 // Starts streaming of ruby-container logs from pod 123456-7890.
 $ kubectl log -f 123456-7890 ruby-container
@@ -27,6 +30,7 @@ $ kubectl log -f 123456-7890 ruby-container
   -f, --follow=false: Specify if the logs should be streamed.
   -h, --help=false: help for log
       --interactive=true: If true, prompt the user for input when required. Default true.
+  -p, --previous=false: If true, print the logs for the previous instance of the container in a pod if it exists.
 ```
 
 ### Options inherited from parent commands

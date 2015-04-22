@@ -31,6 +31,9 @@ const (
 	log_example = `// Returns snapshot of ruby-container logs from pod 123456-7890.
 $ kubectl log 123456-7890 ruby-container
 
+// Returns snapshot of previous terminated ruby-container logs from pod 123456-7890.
+$ kubectl log -p 123456-7890 ruby-container
+
 // Starts streaming of ruby-container logs from pod 123456-7890.
 $ kubectl log -f 123456-7890 ruby-container`
 )
@@ -60,7 +63,7 @@ func selectContainer(pod *api.Pod, in io.Reader, out io.Writer) string {
 // NewCmdLog creates a new pod log command
 func NewCmdLog(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "log [-f] POD [CONTAINER]",
+		Use:     "log [-f] [-p] POD [CONTAINER]",
 		Short:   "Print the logs for a container in a pod.",
 		Long:    "Print the logs for a container in a pod. If the pod has only one container, the container name is optional.",
 		Example: log_example,
@@ -71,6 +74,7 @@ func NewCmdLog(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	}
 	cmd.Flags().BoolP("follow", "f", false, "Specify if the logs should be streamed.")
 	cmd.Flags().Bool("interactive", true, "If true, prompt the user for input when required. Default true.")
+	cmd.Flags().BoolP("previous", "p", false, "If true, print the logs for the previous instance of the container in a pod if it exists.")
 	return cmd
 }
 
@@ -115,6 +119,11 @@ func RunLog(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string
 		follow = true
 	}
 
+	previous := false
+	if cmdutil.GetFlagBool(cmd, "previous") {
+		previous = true
+	}
+
 	readCloser, err := client.RESTClient.Get().
 		Namespace(namespace).
 		Name(podID).
@@ -122,6 +131,7 @@ func RunLog(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string
 		SubResource("log").
 		Param("follow", strconv.FormatBool(follow)).
 		Param("container", container).
+		Param("previous", strconv.FormatBool(previous)).
 		Stream()
 	if err != nil {
 		return err
