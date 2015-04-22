@@ -2,6 +2,7 @@ import httplib
 import json
 import time
 
+
 class Registrator:
 
     def __init__(self):
@@ -41,10 +42,9 @@ class Registrator:
         body = response.read()
         print(body)
         result = json.loads(body)
-        print("Response status:%s reason:%s body:%s" % (
-        response.status, response.reason, result))
+        print("Response status:%s reason:%s body:%s" % \
+             (response.status, response.reason, result))
         return response, result
-
 
     def update(self):
         ''' Contact the API Server to update a registration '''
@@ -80,5 +80,3 @@ class Registrator:
             print("Registration error")
             # TODO - get request data
             raise RuntimeError("Unable to register machine with")
-
-
