@@ -221,6 +221,7 @@ coreos:
         ExecStartPost=/bin/ln -s /opt/kubernetes/server/bin/kubectl /opt/bin/
         ExecStartPost=/bin/mv /tmp/kubernetes/examples/guestbook /home/core/guestbook-example
         ExecStartPost=/bin/rm -rf /tmp/kubernetes
+        ExecStartPost=/bin/sed 's/\("createExternalLoadBalancer":\) true/\1 false/' -i /home/core/guestbook-example/frontend-service.json
         RemainAfterExit=yes
         Type=oneshot
         [Install]
