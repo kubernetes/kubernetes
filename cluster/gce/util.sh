@@ -594,12 +594,11 @@ function kube-up {
     --zone "${ZONE}" \
     --size "10GB"
 
-  # Generate a bearer token for kubelets in this cluster. We push this
-  # separately from the other cluster variables so that the client (this
+  # Generate a bearer token for this cluster. We push this separately
+  # from the other cluster variables so that the client (this
   # computer) can forget it later. This should disappear with
   # https://github.com/GoogleCloudPlatform/kubernetes/issues/3168
   KUBELET_TOKEN=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
-  KUBE_PROXY_TOKEN=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
 
   # Reserve the master's IP so that it can later be transferred to another VM
   # without disrupting the kubelets. IPs are associated with regions, not zones,
@@ -626,8 +625,7 @@ function kube-up {
 
   # Wait for last batch of jobs
   wait-for-jobs
-  add-instance-metadata "${MASTER_NAME}" "kubelet-token=${KUBELET_TOKEN}"
-  add-instance-metadata "${MASTER_NAME}" "kube-proxy-token=${KUBE_PROXY_TOKEN}"
+  add-instance-metadata "${MASTER_NAME}" "kube-token=${KUBELET_TOKEN}"
 
   echo "Creating minions."
 
@@ -642,8 +640,7 @@ function kube-up {
   create-node-template "${NODE_INSTANCE_PREFIX}-template" "${scope_flags[*]}" \
     "startup-script=${KUBE_ROOT}/cluster/gce/configure-vm.sh" \
     "kube-env=${KUBE_TEMP}/node-kube-env.yaml" \
-    "kubelet-token=${KUBELET_TOKEN}" \
-    "kube-proxy-token=${KUBE_PROXY_TOKEN}"
+    "kube-token=${KUBELET_TOKEN}"
 
   gcloud preview managed-instance-groups --zone "${ZONE}" \
       create "${NODE_INSTANCE_PREFIX}-group" \
@@ -881,7 +878,7 @@ function kube-push {
   # TODO(zmerlynn): Re-create instance-template with the new
   # node-kube-env. This isn't important until the node-ip-range issue
   # is solved (because that's blocking automatic dynamic nodes from
-  # working). The node-kube-env has to be composed with the kube*-token
+  # working). The node-kube-env has to be composed with the kube-token
   # metadata. Ideally we would have
   # https://github.com/GoogleCloudPlatform/kubernetes/issues/3168
   # implemented before then, though, so avoiding this mess until then.
