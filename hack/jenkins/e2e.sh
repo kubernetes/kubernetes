@@ -102,6 +102,10 @@ else
         exit 1
     fi
 
+    # Tell kube-up.sh to skip the update, it doesn't lock. An internal
+    # gcloud bug can cause racing component updates to stomp on each
+    # other.
+    export KUBE_SKIP_UPDATE=y
     sudo flock -x -n /var/run/lock/gcloud-components.lock -c "gcloud components update -q" || true
 
     # The "ci" bucket is for builds like "v0.15.0-468-gfa648c1"
