@@ -26,16 +26,18 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 )
 
-func Test_errToAPIStatus(t *testing.T) {
-	err := errors.NewNotFound("foo", "bar")
-	status := errToAPIStatus(err)
-	if status.Reason != api.StatusReasonNotFound || status.Status != api.StatusFailure {
-		t.Errorf("unexpected status object: %#v", status)
-	}
-}
-
 func TestErrorsToAPIStatus(t *testing.T) {
 	cases := map[error]api.Status{
+		errors.NewNotFound("foo", "bar"): {
+			Status:  api.StatusFailure,
+			Code:    http.StatusNotFound,
+			Reason:  api.StatusReasonNotFound,
+			Message: "foo \"bar\" not found",
+			Details: &api.StatusDetails{
+				Kind: "foo",
+				ID:   "bar",
+			},
+		},
 		errors.NewAlreadyExists("foo", "bar"): {
 			Status:  api.StatusFailure,
 			Code:    http.StatusConflict,
