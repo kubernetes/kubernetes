@@ -251,23 +251,17 @@ EOF
 }
 
 # This should only happen on cluster initialization. Uses
-# MASTER_HTPASSWORD to generate the nginx/htpasswd file, and the
-# KUBELET_TOKEN, plus /dev/urandom, to generate known_tokens.csv
-# (KNOWN_TOKENS_FILE). After the first boot and on upgrade, these
-# files exist on the master-pd and should never be touched again
-# (except perhaps an additional service account, see NB below.)
+# KUBE_BEARER_TOKEN, KUBELET_TOKEN, and /dev/urandom to generate
+# known_tokens.csv (KNOWN_TOKENS_FILE). After the first boot and
+# on upgrade, this file exists on the master-pd and should never
+# be touched again (except perhaps an additional service account,
+# see NB below.)
 function create-salt-auth() {
-  local -r htpasswd_file="/srv/salt-overlay/salt/nginx/htpasswd"
-
-  if [ ! -e "${htpasswd_file}" ]; then
-    mkdir -p /srv/salt-overlay/salt/nginx
-    echo "${MASTER_HTPASSWD}" > "${htpasswd_file}"
-  fi
-
   if [ ! -e "${KNOWN_TOKENS_FILE}" ]; then
     mkdir -p /srv/salt-overlay/salt/kube-apiserver
     (umask 077;
-      echo "${KUBELET_TOKEN},kubelet,kubelet" > "${KNOWN_TOKENS_FILE}")
+      echo "${KUBE_BEARER_TOKEN},admin,admin" > "${KNOWN_TOKENS_FILE}";
+      echo "${KUBELET_TOKEN},kubelet,kubelet" >> "${KNOWN_TOKENS_FILE}")
 
     mkdir -p /srv/salt-overlay/salt/kubelet
     kubelet_auth_file="/srv/salt-overlay/salt/kubelet/kubernetes_auth"

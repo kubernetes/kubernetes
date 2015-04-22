@@ -28,6 +28,7 @@ DEFAULT_KUBECONFIG="${HOME}/.kube/config"
 # Assumed vars:
 #   KUBE_USER
 #   KUBE_PASSWORD
+#   KUBE_BEARER_TOKEN
 #   KUBE_MASTER_IP
 #   KUBECONFIG
 #   CONTEXT
@@ -56,10 +57,17 @@ function create-kubeconfig() {
       "--embed-certs=true"
     )
   fi
-  local user_args=(
+  local user_args=()
+  if [[ -z "${KUBE_USER:-}" || -z "${KUBE_PASSWORD:-}" ]]; then
+    user_args+=(
+     "--token=${KUBE_BEARER_TOKEN}"
+    )
+  else
+    user_args+=(
      "--username=${KUBE_USER}"
      "--password=${KUBE_PASSWORD}"
-  )
+    )
+  fi
   if [[ ! -z "${KUBE_CERT:-}" && ! -z "${KUBE_KEY:-}" ]]; then
     user_args+=(
      "--client-certificate=${KUBE_CERT}"
@@ -122,5 +130,30 @@ function get-kubeconfig-basicauth() {
   if [[ "${KUBE_USER}" == '<no value>' || "$KUBE_PASSWORD" == '<no value>' ]]; then
     KUBE_USER=''
     KUBE_PASSWORD=''
+  fi
+}
+
+# Get the bearer token for the current-context in kubeconfig if one exists.
+# Assumed vars:
+#   KUBECONFIG  # if unset, defaults to global
+#
+# Vars set:
+#   KUBE_BEARER_TOKEN
+#
+# KUBE_BEARER_TOKEN will be empty if no current-context is set, or the
+# current-context user does not exist or contain a bearer token entry.
+function get-kubeconfig-bearertoken() {
+  export KUBECONFIG=${KUBECONFIG:-$DEFAULT_KUBECONFIG}
+  # Template to safely extract the token for the current-context user.
+  # The long chain of 'with' commands avoids indexing nil if any of the
+  # entries ("current-context", "contexts"."current-context", "users", etc)
+  # is missing.
+  # Note: we save dot ('.') to $root because the 'with' action overrides it.
+  # See http://golang.org/pkg/text/template/.
+  local token='{{$dot := .}}{{with $ctx := index $dot "current-context"}}{{range $element := (index $dot "contexts")}}{{ if eq .name $ctx }}{{ with $user := .context.user }}{{range $element := (index $dot "users")}}{{ if eq .name $user }}{{ index . "user" "token" }}{{end}}{{end}}{{end}}{{end}}{{end}}{{end}}'
+  KUBE_BEARER_TOKEN=$("${KUBE_ROOT}/cluster/kubectl.sh" config view -o template --template="${token}")
+  # Handle empty/missing token
+  if [[ "${KUBE_BEARER_TOKEN}" == '<no value>' ]]; then
+    KUBE_BEARER_TOKEN=''
   fi
 }

@@ -33,7 +33,9 @@ base:
     - kube-controller-manager
     - kube-scheduler
     - monit
+{% if grains['cloud'] is defined and grains['cloud'] != 'gce' %}
     - nginx
+{% endif %}
     - cadvisor
     - kube-client-tools
     - kube-master-addons

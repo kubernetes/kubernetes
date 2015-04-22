@@ -4,15 +4,22 @@
 {% endif -%}
 
 {% if grains.api_servers is defined -%}
-  {% set api_servers = "--api_servers=https://" + grains.api_servers + ":6443" -%}
+  {% set api_servers = "--api_servers=https://" + grains.api_servers -%}
 {% elif grains.apiservers is defined -%} # TODO(remove after 0.16.0): Deprecated form
-  {% set api_servers = "--api_servers=https://" + grains.apiservers + ":6443" -%}
+  {% set api_servers = "--api_servers=https://" + grains.apiservers -%}
 {% elif grains['roles'][0] == 'kubernetes-master' -%}
   {% set master_ipv4 = salt['grains.get']('fqdn_ip4')[0] -%}
-  {% set api_servers = "--api_servers=https://" + master_ipv4 + ":6443" -%}
+  {% set api_servers = "--api_servers=https://" + master_ipv4 -%}
 {% else -%}
   {% set ips = salt['mine.get']('roles:kubernetes-master', 'network.ip_addrs', 'grain').values() -%}
-  {% set api_servers = "--api_servers=https://" + ips[0][0] + ":6443" -%}
+  {% set api_servers = "--api_servers=https://" + ips[0][0] -%}
+{% endif -%}
+
+# TODO: remove nginx for other cloud providers.
+{% if grains['cloud'] is defined and grains['cloud'] == 'gce' -%}
+  {% set api_servers_with_port = api_servers -%}
+{% else -%}
+  {% set api_servers_with_port = api_servers + ":6443" -%}
 {% endif -%}
 
 {% set config = "--config=/etc/kubernetes/manifests" -%}
@@ -33,4 +40,4 @@
   {% set docker_root = " --docker_root=" + grains.docker_root -%}
 {% endif -%}
 
-DAEMON_ARGS="{{daemon_args}} {{api_servers}} {{hostname_override}} {{config}} --allow_privileged={{pillar['allow_privileged']}} {{pillar['log_level']}} {{cluster_dns}} {{cluster_domain}} {{docker_root}}"
+DAEMON_ARGS="{{daemon_args}} {{api_servers_with_port}} {{hostname_override}} {{config}} --allow_privileged={{pillar['allow_privileged']}} {{pillar['log_level']}} {{cluster_dns}} {{cluster_domain}} {{docker_root}}"
