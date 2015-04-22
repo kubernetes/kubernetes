@@ -13,7 +13,7 @@ kubernetes-local:
       branch: https://github.com/chuckbutler/docker-charm.git
       num_units: 2
       options:
-        latest: false
+        latest: true
       annotations:
         "gui-x": "0"
         "gui-y": "0"
