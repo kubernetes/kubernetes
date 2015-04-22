@@ -1300,6 +1300,82 @@ func TestMountExternalVolumes(t *testing.T) {
 	}
 }
 
+type mockSecretClient struct{}
+
+func (mock *mockSecretClient) Get(namespace, name string) (*api.Secret, error) {
+	return &api.Secret{ObjectMeta: api.ObjectMeta{Name: name, Namespace: namespace}}, nil
+}
+
+func TestBuilderSecrets(t *testing.T) {
+	testKubelet := newTestKubelet(t)
+	kubelet := testKubelet.kubelet
+	kubelet.volumePluginMgr.InitPlugins([]volume.VolumePlugin{&volume.FakeVolumePlugin{"fake", nil}}, &volumeHost{kubelet})
+
+	scenarios := map[string]struct {
+		spec           *volume.Spec
+		podRef         *api.ObjectReference
+		expectedSecret *api.Secret
+	}{
+		"volume": {
+			spec: &volume.Spec{
+				SecretName: "usersecret",
+			},
+			podRef: &api.ObjectReference{
+				Name:      "pod",
+				Namespace: "user-ns",
+			},
+			expectedSecret: &api.Secret{
+				ObjectMeta: api.ObjectMeta{
+					Name:      "usersecret",
+					Namespace: "user-ns",
+				},
+			},
+		},
+		"persistent-volume": {
+			spec: &volume.Spec{
+				SecretRef: &api.ObjectReference{
+					Name:      "supersecret",
+					Namespace: "admin-ns",
+				},
+			},
+			podRef: &api.ObjectReference{
+				Name:      "pod",
+				Namespace: "user-ns",
+			},
+			expectedSecret: &api.Secret{
+				ObjectMeta: api.ObjectMeta{
+					Name:      "supersecret",
+					Namespace: "admin-ns",
+				},
+			},
+		},
+		"no-secret": {
+			spec: &volume.Spec{},
+			podRef: &api.ObjectReference{
+				Name:      "pod",
+				Namespace: "user-ns",
+			},
+		},
+	}
+
+	for name, test := range scenarios {
+		builder, _ := kubelet.newVolumeBuilderFromPlugins(test.spec, test.podRef, volume.VolumeOptions{}, &mockSecretClient{})
+		fakeVolume := builder.(*volume.FakeVolume)
+		if name == "no-secret" {
+			if fakeVolume.Secret != nil {
+				t.Errorf("Secret is expected to be nil for scenario: %s", name)
+			}
+		} else {
+			if fakeVolume.Secret == nil {
+				t.Errorf("Non-nil Secret expected for scenario: %s", name)
+			}
+			if e, a := test.expectedSecret, fakeVolume.Secret; !reflect.DeepEqual(e, a) {
+				t.Errorf("expected %+v got %+v\n", e, a)
+			}
+		}
+	}
+}
+
 func TestGetPodVolumesFromDisk(t *testing.T) {
 	testKubelet := newTestKubelet(t)
 	kubelet := testKubelet.kubelet
@@ -1317,7 +1393,7 @@ func TestGetPodVolumesFromDisk(t *testing.T) {
 
 	expectedPaths := []string{}
 	for i := range volsOnDisk {
-		fv := volume.FakeVolume{volsOnDisk[i].podUID, volsOnDisk[i].volName, plug}
+		fv := volume.FakeVolume{volsOnDisk[i].podUID, volsOnDisk[i].volName, plug, nil}
 		fv.SetUp()
 		expectedPaths = append(expectedPaths, fv.GetPath())
 	}

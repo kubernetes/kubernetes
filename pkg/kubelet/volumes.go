@@ -55,7 +55,7 @@ func (vh *volumeHost) GetKubeClient() client.Interface {
 }
 
 func (vh *volumeHost) NewWrapperBuilder(spec *volume.Spec, podRef *api.ObjectReference, opts volume.VolumeOptions) (volume.Builder, error) {
-	b, err := vh.kubelet.newVolumeBuilderFromPlugins(spec, podRef, opts, vh.GetKubeClient())
+	b, err := vh.kubelet.newVolumeBuilderFromPlugins(spec, podRef, opts, volume.NewSecretClient(vh.GetKubeClient()))
 	if err == nil && b == nil {
 		return nil, errUnsupportedVolumeType
 	}
@@ -78,7 +78,7 @@ func (vh *volumeHost) NewWrapperCleaner(spec *volume.Spec, podUID types.UID) (vo
 	return c, nil
 }
 
-func (kl *Kubelet) newVolumeBuilderFromPlugins(spec *volume.Spec, podRef *api.ObjectReference, opts volume.VolumeOptions, kubeClient client.Interface) (volume.Builder, error) {
+func (kl *Kubelet) newVolumeBuilderFromPlugins(spec *volume.Spec, podRef *api.ObjectReference, opts volume.VolumeOptions, secretClient volume.SecretClient) (volume.Builder, error) {
 	plugin, err := kl.volumePluginMgr.FindPluginBySpec(spec)
 	if err != nil {
 		return nil, fmt.Errorf("can't use volume plugins for %s: %v", spew.Sprintf("%#v", *spec), err)
@@ -92,16 +92,16 @@ func (kl *Kubelet) newVolumeBuilderFromPlugins(spec *volume.Spec, podRef *api.Ob
 		return nil, fmt.Errorf("failed to instantiate volume plugin for %s: %v", spew.Sprintf("%#v", *spec), err)
 	}
 
-	// Secrets for PersistentVolumes are found by reference in a namespace controlled by the administrator
 	// Secrets for Volumes are found by name in the same namespace as the pod
+	// Secrets for PersistentVolumes are found by reference in a namespace controlled by the administrator
 	var secret *api.Secret
 	if spec.SecretRef != nil {
-		secret, err = kubeClient.Secrets(spec.SecretRef.Namespace).Get(spec.SecretRef.Name)
+		secret, err = secretClient.Get(spec.SecretRef.Namespace, spec.SecretRef.Name)
 		if err != nil {
 			return nil, fmt.Errorf("Failed to find secret %s in namespace %s", spec.SecretRef.Name, spec.SecretRef.Namespace)
 		}
 	} else if spec.SecretName != "" {
-		secret, err = kubeClient.Secrets(podRef.Namespace).Get(spec.SecretName)
+		secret, err = secretClient.Get(podRef.Namespace, spec.SecretName)
 		if err != nil {
 			return nil, fmt.Errorf("Failed to find secret %s in namespace %s", spec.SecretName, podRef.Namespace)
 		}
@@ -130,7 +130,7 @@ func (kl *Kubelet) mountExternalVolumes(pod *api.Pod) (volumeMap, error) {
 
 		// Try to use a plugin for this volume.
 		spec := volume.NewSpecFromVolume(volSpec)
-		builder, err := kl.newVolumeBuilderFromPlugins(spec, podRef, volume.VolumeOptions{rootContext}, kl.kubeClient)
+		builder, err := kl.newVolumeBuilderFromPlugins(spec, podRef, volume.VolumeOptions{rootContext}, volume.NewSecretClient(kl.kubeClient))
 		if err != nil {
 			glog.Errorf("Could not create volume builder for pod %s: %v", pod.UID, err)
 			return nil, err

@@ -146,17 +146,22 @@ func NewSpecFromPersistentVolume(pv *api.PersistentVolume) *Spec {
 	}
 }
 
+// SecretClient decouples resolution of the secret from the Kube client.
+// The interface is narrowed and testing is simpler.
 type SecretClient interface {
 	Get(namespace, name string) (*api.Secret, error)
 }
 
-type realSecretClient struct {
-	client    client.Interface
-	namespace string
+func NewSecretClient(client client.Interface) SecretClient {
+	return &realSecretClient{client}
 }
 
-func (resolver *realSecretClient) Get(name string) (*api.Secret, error) {
-	return resolver.client.Secrets(resolver.namespace).Get(name)
+type realSecretClient struct {
+	client client.Interface
+}
+
+func (rsc *realSecretClient) Get(namespace, name string) (*api.Secret, error) {
+	return rsc.client.Secrets(namespace).Get(name)
 }
 
 // InitPlugins initializes each plugin.  All plugins must have unique names.
