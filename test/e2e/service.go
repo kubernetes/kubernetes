@@ -257,7 +257,7 @@ var _ = Describe("Services", func() {
 
 	It("should be able to create a functioning external load balancer", func() {
 		serviceName := "external-lb-test"
-		ns := api.NamespaceDefault
+		ns := namespace0
 		labels := map[string]string{
 			"key0": "value0",
 		}
@@ -274,9 +274,6 @@ var _ = Describe("Services", func() {
 				CreateExternalLoadBalancer: true,
 			},
 		}
-
-		By("cleaning up previous service " + serviceName + " from namespace " + ns)
-		c.Services(ns).Delete(serviceName)
 
 		By("creating service " + serviceName + " with external load balancer in namespace " + ns)
 		result, err := c.Services(ns).Create(service)
@@ -317,7 +314,7 @@ var _ = Describe("Services", func() {
 		}
 
 		By("creating pod to be part of service " + serviceName)
-		podClient := c.Pods(api.NamespaceDefault)
+		podClient := c.Pods(ns)
 		defer func() {
 			By("deleting pod " + pod.Name)
 			defer GinkgoRecover()
@@ -326,7 +323,7 @@ var _ = Describe("Services", func() {
 		if _, err := podClient.Create(pod); err != nil {
 			Failf("Failed to create pod %s: %v", pod.Name, err)
 		}
-		expectNoError(waitForPodRunning(c, pod.Name))
+		expectNoError(waitForPodRunningInNamespace(c, pod.Name, ns))
 
 		By("hitting the pod through the service's external load balancer")
 		var resp *http.Response
