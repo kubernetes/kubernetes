@@ -19,9 +19,11 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+KUBE_ROOT=$(readlink -f $KUBE_ROOT)
 source $KUBE_ROOT/cluster/juju/prereqs/ubuntu-juju.sh
 export JUJU_REPOSITORY=${KUBE_ROOT}/cluster/juju/charms
 #KUBE_BUNDLE_URL='https://raw.githubusercontent.com/whitmo/bundle-kubernetes/master/bundles.yaml'
+
 KUBE_BUNDLE_PATH=${KUBE_ROOT}/cluster/juju/bundles/local.yaml
 function verify-prereqs() {
     gather_installation_reqs
@@ -103,10 +105,17 @@ function sleep-status(){
     maxtime=900
     jujustatus=''
     echo "Waiting up to 15 minutes to allow the cluster to come online... wait for it..."
+
+    jujustatus=$(juju status kubernetes-master --format=oneline)
+    if [[ $jujustatus == *"started"* ]];
+    then
+        return
+    fi
+
     while [[ $i < $maxtime && $jujustatus != *"started"* ]]; do
+        sleep 15
+        i+=15
         jujustatus=$(juju status kubernetes-master --format=oneline)
-        sleep 30
-        i+=30
     done
 
     # sleep because we cannot get the status back of where the minions are in the deploy phase
