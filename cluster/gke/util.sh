@@ -238,8 +238,15 @@ function ssh-to-node() {
 
   local node="$1"
   local cmd="$2"
-  "${GCLOUD}" compute ssh --ssh-flag="-o LogLevel=quiet" --project "${PROJECT}" \
-    --zone="${ZONE}" "${node}" --command "${cmd}"
+  # Loop until we can successfully ssh into the box
+  for try in $(seq 1 5); do
+    if gcloud compute ssh --ssh-flag="-o LogLevel=quiet" --project "${PROJECT}" --zone="${ZONE}" "${node}" --command "echo test"; then
+      break
+    fi
+    sleep 5
+  done
+  # Then actually try the command.
+  gcloud compute ssh --ssh-flag="-o LogLevel=quiet" --project "${PROJECT}" --zone="${ZONE}" "${node}" --command "${cmd}"
 }
 
 # Restart the kube-proxy on a node ($1)
