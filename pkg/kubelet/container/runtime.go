@@ -95,6 +95,42 @@ type Pod struct {
 	Status api.PodStatus
 }
 
+// ContainerID is a type that identifies a container.
+type ContainerID struct {
+	// The type of the container runtime. e.g. 'docker', 'rkt'.
+	Type string
+	// The identification of the container, this is comsumable by
+	// the underlying container runtime. (Note that the container
+	// runtime interface still takes the whole struct as input).
+	ID string
+}
+
+func BuildContainerID(typ, ID string) ContainerID {
+	return ContainerID{Type: typ, ID: ID}
+}
+
+func (c *ContainerID) ParseString(data string) error {
+	// Trim the quotes and split the type and ID.
+	parts := strings.Split(strings.Trim(data, "\""), "://")
+	if len(parts) != 2 {
+		return fmt.Errorf("invalid container ID: %q", data)
+	}
+	c.Type, c.ID = parts[0], parts[1]
+	return nil
+}
+
+func (c *ContainerID) String() string {
+	return fmt.Sprintf("%s://%s", c.Type, c.ID)
+}
+
+func (c *ContainerID) MarshalJSON() ([]byte, error) {
+	return []byte(fmt.Sprintf("%q", c.String())), nil
+}
+
+func (c *ContainerID) UnmarshalJSON(data []byte) error {
+	return c.ParseString(string(data))
+}
+
 // Container provides the runtime information for a container, such as ID, hash,
 // status of the container.
 type Container struct {
