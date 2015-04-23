@@ -35,6 +35,11 @@ func (c *Mock) ContainerInfo(name string, req *cadvisorApi.ContainerInfoRequest)
 	return args.Get(0).(*cadvisorApi.ContainerInfo), args.Error(1)
 }
 
+func (c *Mock) SubcontainerInfo(name string, req *cadvisorApi.ContainerInfoRequest) (map[string]*cadvisorApi.ContainerInfo, error) {
+	args := c.Called(name, req)
+	return args.Get(0).(map[string]*cadvisorApi.ContainerInfo), args.Error(1)
+}
+
 // DockerContainer is a mock implementation of Interface.DockerContainer.
 func (c *Mock) DockerContainer(name string, req *cadvisorApi.ContainerInfoRequest) (cadvisorApi.ContainerInfo, error) {
 	args := c.Called(name, req)

@@ -114,6 +114,19 @@ func (cc *cadvisorClient) VersionInfo() (*cadvisorApi.VersionInfo, error) {
 	return cc.GetVersionInfo()
 }
 
+func (cc *cadvisorClient) SubcontainerInfo(name string, req *cadvisorApi.ContainerInfoRequest) (map[string]*cadvisorApi.ContainerInfo, error) {
+	infos, err := cc.SubcontainersInfo(name, req)
+	if err != nil {
+		return nil, err
+	}
+
+	result := make(map[string]*cadvisorApi.ContainerInfo, len(infos))
+	for _, info := range infos {
+		result[info.Name] = info
+	}
+	return result, nil
+}
+
 func (cc *cadvisorClient) MachineInfo() (*cadvisorApi.MachineInfo, error) {
 	return cc.GetMachineInfo()
 }
