@@ -29,7 +29,7 @@ You can use the kube-version-change utility to convert config files between diff
 
 ```
 $ hack/build-go.sh cmd/kube-version-change
-$ _output/go/bin/kube-version-change -i myPod.v1beta1.yaml -o myPod.v1beta3.yaml
+$ _output/local/go/bin/kube-version-change -i myPod.v1beta1.yaml -o myPod.v1beta3.yaml
 ```
 
 ### Maintenance on a Node
