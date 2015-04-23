@@ -147,7 +147,7 @@ func (b *Builder) Path(paths ...string) *Builder {
 			visitor = &DirectoryVisitor{
 				Mapper:       b.mapper,
 				Path:         p,
-				Extensions:   []string{".json", ".yaml"},
+				Extensions:   []string{".json", ".yaml", ".yml"},
 				Recursive:    false,
 				IgnoreErrors: b.continueOnError,
 			}
