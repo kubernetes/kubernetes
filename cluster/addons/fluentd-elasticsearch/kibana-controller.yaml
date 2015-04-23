@@ -17,7 +17,7 @@ desiredState:
               - name: "ES_SCHEME"
                 value: "https"
               - name: "ES_HOST"
-                value: "\"+window.location.hostname+\"/api/v1beta1/proxy/services/elasticsearch-logging"
+                value: "\"+window.location.hostname+\"/api/v1beta3/proxy/namespaces/default/services/elasticsearch-logging"
             ports:
               - name: kibana-port
                 containerPort: 80
