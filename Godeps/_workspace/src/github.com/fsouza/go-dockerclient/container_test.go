@@ -229,7 +229,8 @@ func TestInspectContainer(t *testing.T) {
                  ]
                },
                "Links": null,
-               "PublishAllPorts": false
+               "PublishAllPorts": false,
+               "CgroupParent": "/mesos"
              }
 }`
 	var expected Container
