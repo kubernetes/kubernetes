@@ -493,59 +493,59 @@ __EOF__
   # Command
   kubectl create -f examples/guestbook/frontend-controller.json "${kube_flags[@]}"
   # Post-condition: frontend replication controller is running
-  kube::test::get_object_assert rc "{{range.items}}{{$id_field}}:{{end}}" 'frontend-controller:'
+  kube::test::get_object_assert rc "{{range.items}}{{$id_field}}:{{end}}" 'frontend:'
   # Describe command should print detailed information
-  kube::test::describe_object_assert rc 'frontend-controller' "Name:" "Image(s):" "Labels:" "Selector:" "Replicas:" "Pods Status:"
+  kube::test::describe_object_assert rc 'frontend' "Name:" "Image(s):" "Labels:" "Selector:" "Replicas:" "Pods Status:"
 
   ### Resize replication controller frontend with current-replicas and replicas
   # Pre-condition: 3 replicas
-  kube::test::get_object_assert 'rc frontend-controller' "{{$rc_replicas_field}}" '3'
+  kube::test::get_object_assert 'rc frontend' "{{$rc_replicas_field}}" '3'
   # Command
-  kubectl resize --current-replicas=3 --replicas=2 replicationcontrollers frontend-controller "${kube_flags[@]}"
+  kubectl resize --current-replicas=3 --replicas=2 replicationcontrollers frontend "${kube_flags[@]}"
   # Post-condition: 2 replicas
-  kube::test::get_object_assert 'rc frontend-controller' "{{$rc_replicas_field}}" '2'
+  kube::test::get_object_assert 'rc frontend' "{{$rc_replicas_field}}" '2'
 
   ### Resize replication controller frontend with (wrong) current-replicas and replicas
   # Pre-condition: 2 replicas
-  kube::test::get_object_assert 'rc frontend-controller' "{{$rc_replicas_field}}" '2'
+  kube::test::get_object_assert 'rc frontend' "{{$rc_replicas_field}}" '2'
   # Command
-  ! kubectl resize --current-replicas=3 --replicas=2 replicationcontrollers frontend-controller "${kube_flags[@]}"
+  ! kubectl resize --current-replicas=3 --replicas=2 replicationcontrollers frontend "${kube_flags[@]}"
   # Post-condition: nothing changed
-  kube::test::get_object_assert 'rc frontend-controller' "{{$rc_replicas_field}}" '2'
+  kube::test::get_object_assert 'rc frontend' "{{$rc_replicas_field}}" '2'
 
   ### Resize replication controller frontend with replicas only
   # Pre-condition: 2 replicas
-  kube::test::get_object_assert 'rc frontend-controller' "{{$rc_replicas_field}}" '2'
+  kube::test::get_object_assert 'rc frontend' "{{$rc_replicas_field}}" '2'
   # Command
-  kubectl resize  --replicas=3 replicationcontrollers frontend-controller "${kube_flags[@]}"
+  kubectl resize  --replicas=3 replicationcontrollers frontend "${kube_flags[@]}"
   # Post-condition: 3 replicas
-  kube::test::get_object_assert 'rc frontend-controller' "{{$rc_replicas_field}}" '3'
+  kube::test::get_object_assert 'rc frontend' "{{$rc_replicas_field}}" '3'
 
   ### Expose replication controller as service
   # Pre-condition: 3 replicas
-  kube::test::get_object_assert 'rc frontend-controller' "{{$rc_replicas_field}}" '3'
+  kube::test::get_object_assert 'rc frontend' "{{$rc_replicas_field}}" '3'
   # Command
-  kubectl expose rc frontend-controller --port=80 "${kube_flags[@]}"
+  kubectl expose rc frontend --port=80 "${kube_flags[@]}"
   # Post-condition: service exists
-  kube::test::get_object_assert 'service frontend-controller' "{{$port_field}}" '80'
+  kube::test::get_object_assert 'service frontend' "{{$port_field}}" '80'
   # Command
-  kubectl expose service frontend-controller --port=443 --service-name=frontend-controller-2 "${kube_flags[@]}"
+  kubectl expose service frontend --port=443 --service-name=frontend-2 "${kube_flags[@]}"
   # Post-condition: service exists
-  kube::test::get_object_assert 'service frontend-controller-2' "{{$port_field}}" '443'
+  kube::test::get_object_assert 'service frontend-2' "{{$port_field}}" '443'
   # Command
   kubectl create -f examples/limitrange/valid-pod.json "${kube_flags[@]}"
-  kubectl expose pod valid-pod --port=444 --service-name=frontend-controller-3 "${kube_flags[@]}"
+  kubectl expose pod valid-pod --port=444 --service-name=frontend-3 "${kube_flags[@]}"
   # Post-condition: service exists
-  kube::test::get_object_assert 'service frontend-controller-3' "{{$port_field}}" '444'
+  kube::test::get_object_assert 'service frontend-3' "{{$port_field}}" '444'
   # Cleanup services
   kubectl delete pod valid-pod "${kube_flags[@]}"
-  kubectl delete service frontend-controller{,-2,-3} "${kube_flags[@]}"
+  kubectl delete service frontend{,-2,-3} "${kube_flags[@]}"
 
   ### Delete replication controller with id
   # Pre-condition: frontend replication controller is running
-  kube::test::get_object_assert rc "{{range.items}}{{$id_field}}:{{end}}" 'frontend-controller:'
+  kube::test::get_object_assert rc "{{range.items}}{{$id_field}}:{{end}}" 'frontend:'
   # Command
-  kubectl stop rc frontend-controller "${kube_flags[@]}"
+  kubectl stop rc frontend "${kube_flags[@]}"
   # Post-condition: no replication controller is running
   kube::test::get_object_assert rc "{{range.items}}{{$id_field}}:{{end}}" ''
 
@@ -556,13 +556,13 @@ __EOF__
   kubectl create -f examples/guestbook/frontend-controller.json "${kube_flags[@]}"
   kubectl create -f examples/guestbook/redis-slave-controller.json "${kube_flags[@]}"
   # Post-condition: frontend and redis-slave
-  kube::test::get_object_assert rc "{{range.items}}{{$id_field}}:{{end}}" 'frontend-controller:redis-slave-controller:'
+  kube::test::get_object_assert rc "{{range.items}}{{$id_field}}:{{end}}" 'frontend:redis-slave:'
 
   ### Delete multiple controllers at once
   # Pre-condition: frontend and redis-slave
-  kube::test::get_object_assert rc "{{range.items}}{{$id_field}}:{{end}}" 'frontend-controller:redis-slave-controller:'
+  kube::test::get_object_assert rc "{{range.items}}{{$id_field}}:{{end}}" 'frontend:redis-slave:'
   # Command
-  kubectl stop rc frontend-controller redis-slave-controller "${kube_flags[@]}" # delete multiple controllers at once
+  kubectl stop rc frontend redis-slave "${kube_flags[@]}" # delete multiple controllers at once
   # Post-condition: no replication controller is running
   kube::test::get_object_assert rc "{{range.items}}{{$id_field}}:{{end}}" ''
 

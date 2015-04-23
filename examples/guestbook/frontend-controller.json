@@ -1,27 +1,37 @@
 {
-  "id": "frontend-controller",
-  "kind": "ReplicationController",
-  "apiVersion": "v1beta1",
-  "desiredState": {
-    "replicas": 3,
-    "replicaSelector": {"name": "frontend"},
-    "podTemplate": {
-      "desiredState": {
-         "manifest": {
-           "version": "v1beta1",
-           "id": "frontend",
-           "containers": [{
-             "name": "php-redis",
-             "image": "gcr.io/google_containers/example-guestbook-php-redis:v2",
-             "ports": [{"name": "http-server", "containerPort": 80}]
-           }]
+   "kind":"ReplicationController",
+   "apiVersion":"v1beta3",
+   "metadata":{
+      "name":"frontend",
+      "labels":{
+         "name":"frontend"
+      }
+   },
+   "spec":{
+      "replicas":3,
+      "selector":{
+         "name":"frontend"
+      },
+      "template":{
+         "metadata":{
+            "labels":{
+               "name":"frontend"
+            }
+         },
+         "spec":{
+            "containers":[
+               {
+                  "name":"php-redis",
+                  "image":"kubernetes/example-guestbook-php-redis:v2",
+                  "ports":[
+                     {
+                        "containerPort":80,
+                        "protocol":"TCP"
+                     }
+                  ]
+               }
+            ]
          }
-       },
-       "labels": {
-         "name": "frontend",
-         "uses": "redis-slave-or-redis-master",
-         "app": "frontend"
-       }
-      }},
-  "labels": {"name": "frontend"}
+      }
+   }
 }
