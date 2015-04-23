@@ -2,7 +2,7 @@
 
 ## 0.15.0
 * Enables v1beta3 API and sets it to the default API version (#6098)
-  * See the [v1beta3 conversion guide](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api.md#v1beta3-conversion-tips)
+  * See the [v1beta3 conversion guide](http://docs.k8s.io/api.md#v1beta3-conversion-tips)
 * Added multi-port Services (#6182)
 * New Getting Started Guides
   * Multi-node local startup guide (#6505)

@@ -67,8 +67,8 @@ cluster/kubectl.sh get replicationControllers
 
 ### Running a user defined pod
 
-Note the difference between a [container](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/containers.md)
-and a [pod](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/pods.md). Since you only asked for the former, kubernetes will create a wrapper pod for you.
+Note the difference between a [container](http://docs.k8s.io/containers.md)
+and a [pod](http://docs.k8s.io/pods.md). Since you only asked for the former, kubernetes will create a wrapper pod for you.
 However you can't view the nginx start page on localhost. To verify that nginx is running you need to run `curl` within the docker container (try `docker exec`).
 
 You can control the specifications of a pod via a user defined manifest, and reach nginx through your browser on the port specified therein:

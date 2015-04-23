@@ -10,7 +10,7 @@ There are currently two deployment techniques.
    This uses [libcloud](http://libcloud.apache.org) to launch CoreOS instances and pass the appropriate cloud-config setup using userdata. Several manual steps are required. This is obsoleted by the Ansible playbook detailed below.
 
 * [Ansible playbook](https://github.com/runseb/ansible-kubernetes).
-  This is completely automated, a single playbook deploys Kubernetes based on the coreOS [instructions](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/getting-started-guides/coreos/coreos_multinode_cluster.md).
+  This is completely automated, a single playbook deploys Kubernetes based on the coreOS [instructions](http://docs.k8s.io/getting-started-guides/coreos/coreos_multinode_cluster.md).
 
 #Ansible playbook
 

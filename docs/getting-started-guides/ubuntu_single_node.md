@@ -7,7 +7,7 @@ This document describes how to get started to run kubernetes services on a singl
 3. Customizing ubuntu launch
 
 ### 1. Make kubernetes and etcd binaries
-Either build or download the latest [kubernetes binaries] (https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/getting-started-guides/binary_release.md)
+Either build or download the latest [kubernetes binaries] (http://docs.k8s.io/getting-started-guides/binary_release.md)
 
 Copy the kube binaries into `/opt/bin` or a path of your choice
 

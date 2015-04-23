@@ -195,7 +195,7 @@ Now for the good stuff!
 ## Cloud Configs
 The following config files are tailored for the OFFLINE version of a Kubernetes deployment.
 
-These are based on the work found here: [master.yml](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/getting-started-guides/coreos/cloud-configs/master.yaml), [node.yml](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/getting-started-guides/coreos/cloud-configs/node.yaml)
+These are based on the work found here: [master.yml](http://docs.k8s.io/getting-started-guides/coreos/cloud-configs/master.yaml), [node.yml](http://docs.k8s.io/getting-started-guides/coreos/cloud-configs/node.yaml)
 
 
 ### master.yml

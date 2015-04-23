@@ -21,7 +21,7 @@ done automatically based on statistical analysis and thresholds.
 
 * This proposal is for horizontal scaling only.  Vertical scaling will be handled in [issue 2072](https://github.com/GoogleCloudPlatform/kubernetes/issues/2072)
 * `ReplicationControllers` will not know about the auto-scaler, they are the target of the auto-scaler.  The `ReplicationController` responsibilities are 
-constrained to only ensuring that the desired number of pods are operational per the [Replication Controller Design](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/replication-controller.md#responsibilities-of-the-replication-controller)
+constrained to only ensuring that the desired number of pods are operational per the [Replication Controller Design](http://docs.k8s.io/replication-controller.md#responsibilities-of-the-replication-controller)
 * Auto-scalers will be loosely coupled with data gathering components in order to allow a wide variety of input sources
 * Auto-scalable resources will support a resize verb ([1629](https://github.com/GoogleCloudPlatform/kubernetes/issues/1629)) 
 such that the auto-scaler does not directly manipulate the underlying resource.
@@ -42,7 +42,7 @@ applications will expose one or more network endpoints for clients to connect to
 balanced or situated behind a proxy - the data from those proxies and load balancers can be used to estimate client to 
 server traffic for applications. This is the primary, but not sole, source of data for making decisions.
 
-Within Kubernetes a [kube proxy](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/services.md#ips-and-portals) 
+Within Kubernetes a [kube proxy](http://docs.k8s.io/services.md#ips-and-portals) 
 running on each node directs service requests to the underlying implementation.  
 
 While the proxy provides internal inter-pod connections, there will be L3 and L7 proxies and load balancers that manage 
@@ -225,7 +225,7 @@ or down as appropriate.  In the future this may be more configurable.
 
 ### Interactions with a deployment
 
-In a deployment it is likely that multiple replication controllers must be monitored.  For instance, in a [rolling deployment](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/replication-controller.md#rolling-updates)
+In a deployment it is likely that multiple replication controllers must be monitored.  For instance, in a [rolling deployment](http://docs.k8s.io/replication-controller.md#rolling-updates)
 there will be multiple replication controllers, with one scaling up and another scaling down.  This means that an 
 auto-scaler must be aware of the entire set of capacity that backs a service so it does not fight with the deployer.  `AutoScalerSpec.MonitorSelector` 
 is what provides this ability.  By using a selector that spans the entire service the auto-scaler can monitor capacity 
