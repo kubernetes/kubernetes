@@ -13,7 +13,7 @@ import (
 //
 // See http://goo.gl/BOZrF5 for more details.
 func (c *Client) Version() (*Env, error) {
-	body, _, err := c.do("GET", "/version", nil, false)
+	body, _, err := c.do("GET", "/version", doOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -28,7 +28,7 @@ func (c *Client) Version() (*Env, error) {
 //
 // See http://goo.gl/wmqZsW for more details.
 func (c *Client) Info() (*Env, error) {
-	body, _, err := c.do("GET", "/info", nil, false)
+	body, _, err := c.do("GET", "/info", doOptions{})
 	if err != nil {
 		return nil, err
 	}

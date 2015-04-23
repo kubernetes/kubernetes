@@ -7,7 +7,6 @@ env:
   - GOARCH=amd64
   - GOARCH=386
 install:
-  - go get -d ./...
+  - make testdeps
 script:
-  - go test ./...
-  - ./testing/bin/fmtpolice
+  - make test

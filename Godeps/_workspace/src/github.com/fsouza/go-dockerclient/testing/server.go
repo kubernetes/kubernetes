@@ -25,6 +25,8 @@ import (
 	"github.com/gorilla/mux"
 )
 
+var nameRegexp = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_.-]+$`)
+
 // DockerServer represents a programmable, concurrent (not much), HTTP server
 // implementing a fake version of the Docker remote API.
 //
@@ -339,6 +341,11 @@ func (s *DockerServer) createContainer(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+	name := r.URL.Query().Get("name")
+	if name != "" && !nameRegexp.MatchString(name) {
+		http.Error(w, "Invalid container name", http.StatusInternalServerError)
+		return
+	}
 	if _, err := s.findImage(config.Image); err != nil {
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
@@ -363,7 +370,7 @@ func (s *DockerServer) createContainer(w http.ResponseWriter, r *http.Request) {
 	}
 
 	container := docker.Container{
-		Name:    r.URL.Query().Get("name"),
+		Name:    name,
 		ID:      s.generateID(),
 		Created: time.Now(),
 		Path:    path,
