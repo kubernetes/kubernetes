@@ -60,7 +60,7 @@ kube-02             environment=production   Ready
 Let's follow the Guestbook example now:
 ```
 cd guestbook-example
-kubectl create -f redis-master.json
+kubectl create -f redis-master-controller.json
 kubectl create -f redis-master-service.json
 kubectl create -f redis-slave-controller.json
 kubectl create -f redis-slave-service.json
