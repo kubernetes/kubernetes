@@ -147,7 +147,14 @@ func TestRunOnce(t *testing.T) {
 		t: t,
 	}
 
-	kb.containerManager = dockertools.NewDockerManager(kb.dockerClient, kb.recorder, dockertools.PodInfraContainerImage, 0, 0)
+	kb.containerManager = dockertools.NewDockerManager(
+		kb.dockerClient,
+		kb.recorder,
+		kb.readinessManager,
+		kb.containerRefManager,
+		dockertools.PodInfraContainerImage,
+		0,
+		0)
 	kb.containerManager.Puller = &dockertools.FakeDockerPuller{}
 
 	pods := []*api.Pod{

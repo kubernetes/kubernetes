@@ -264,7 +264,17 @@ func NewMainKubelet(
 		return nil, fmt.Errorf("failed to initialize image manager: %v", err)
 	}
 	statusManager := newStatusManager(kubeClient)
-	containerManager := dockertools.NewDockerManager(dockerClient, recorder, podInfraContainerImage, pullQPS, pullBurst)
+	readinessManager := kubecontainer.NewReadinessManager()
+	containerRefManager := kubecontainer.NewRefManager()
+	containerManager := dockertools.NewDockerManager(
+		dockerClient,
+		recorder,
+		readinessManager,
+		containerRefManager,
+		podInfraContainerImage,
+		pullQPS,
+		pullBurst)
+
 	volumeManager := newVolumeManager()
 
 	klet := &Kubelet{
@@ -273,8 +283,8 @@ func NewMainKubelet(
 		kubeClient:                     kubeClient,
 		rootDirectory:                  rootDirectory,
 		resyncInterval:                 resyncInterval,
-		containerRefManager:            kubecontainer.NewRefManager(),
-		readinessManager:               kubecontainer.NewReadinessManager(),
+		containerRefManager:            containerRefManager,
+		readinessManager:               readinessManager,
 		runner:                         containerManager,
 		httpClient:                     &http.Client{},
 		sourcesReady:                   sourcesReady,
