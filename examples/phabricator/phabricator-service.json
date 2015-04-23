@@ -1,10 +1,22 @@
 {
-  "apiVersion": "v1beta1",
   "kind": "Service",
-  "id": "phabricator",
-  "port": 80,
-  "containerPort": "http-server",
-  "selector": { "name": "phabricator" },
-  "createExternalLoadBalancer": true,
-  "publicIPs": ["107.178.210.6"]
+  "apiVersion": "v1beta3",
+  "metadata": {
+    "name": "phabricator"
+  },
+  "spec": {
+    "ports": [
+      {
+        "port": 80,
+        "targetPort": "http-server"
+      }
+    ],
+    "selector": {
+      "name": "phabricator"
+    },
+    "createExternalLoadBalancer": true,
+    "publicIPs": [
+      "107.178.210.6"
+    ]
+  }
 }
