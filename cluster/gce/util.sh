@@ -198,9 +198,9 @@ function wait-for-minions-to-run {
     echo -e -n "${color_yellow}Waiting for minions to run. "
     echo -e "${running_minions} out of ${NUM_MINIONS} running. Retrying.${color_norm}"
     sleep 5
-    running_minions=$(gcloud preview --project "${PROJECT}" instance-groups \
+    running_minions=$((gcloud preview --project "${PROJECT}" instance-groups \
       --zone "${ZONE}" instances --group "${NODE_INSTANCE_PREFIX}-group" list \
-      --running | wc -l | xargs)
+      --running || true) | wc -l | xargs)
   done
 }
 
