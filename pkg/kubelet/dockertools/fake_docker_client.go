@@ -44,6 +44,7 @@ type FakeDockerClient struct {
 	Removed             []string
 	RemovedImages       util.StringSet
 	VersionInfo         docker.Env
+	Information         docker.Env
 }
 
 func (f *FakeDockerClient) ClearCalls() {
@@ -270,6 +271,10 @@ func (f *FakeDockerClient) PullImage(opts docker.PullImageOptions, auth docker.A
 
 func (f *FakeDockerClient) Version() (*docker.Env, error) {
 	return &f.VersionInfo, nil
+}
+
+func (f *FakeDockerClient) Info() (*docker.Env, error) {
+	return &f.Information, nil
 }
 
 func (f *FakeDockerClient) CreateExec(_ docker.CreateExecOptions) (*docker.Exec, error) {

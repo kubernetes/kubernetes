@@ -63,6 +63,7 @@ type DockerInterface interface {
 	RemoveImage(image string) error
 	Logs(opts docker.LogsOptions) error
 	Version() (*docker.Env, error)
+	Info() (*docker.Env, error)
 	CreateExec(docker.CreateExecOptions) (*docker.Exec, error)
 	StartExec(string, docker.StartExecOptions) error
 }
@@ -70,6 +71,7 @@ type DockerInterface interface {
 // DockerID is an ID of docker container. It is a type to make it clear when we're working with docker container Ids
 type DockerID string
 
+// KubeletContainerName encapsulates a pod name and a Kubernetes container name.
 type KubeletContainerName struct {
 	PodFullName   string
 	PodUID        types.UID

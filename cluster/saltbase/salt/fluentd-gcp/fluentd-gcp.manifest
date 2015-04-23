@@ -2,7 +2,7 @@ version: v1beta2
 id: fluentd-to-gcp
 containers:
   - name: fluentd-gcp
-    image: gcr.io/google_containers/fluentd-gcp:1.2
+    image: gcr.io/google_containers/fluentd-gcp:1.3
     volumeMounts:
       - name: containers
         mountPath: /var/lib/docker/containers

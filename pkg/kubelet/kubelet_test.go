@@ -75,6 +75,7 @@ func newTestKubelet(t *testing.T) *TestKubelet {
 	kubelet := &Kubelet{}
 	kubelet.dockerClient = fakeDocker
 	kubelet.kubeClient = fakeKubeClient
+	kubelet.os = FakeOS{}
 
 	kubelet.hostname = "testnode"
 	kubelet.networkPlugin, _ = network.InitNetworkPlugin([]network.NetworkPlugin{}, "", network.NewFakeHost(nil))
