@@ -29,7 +29,6 @@ import (
 
 	kapi "github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	kclient "github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	kclientcmd "github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd"
 	kfields "github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	klabels "github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	tools "github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
@@ -43,7 +42,6 @@ var (
 	etcd_mutation_timeout = flag.Duration("etcd_mutation_timeout", 10*time.Second, "crash after retrying etcd mutation for a specified duration")
 	etcd_server           = flag.String("etcd-server", "http://127.0.0.1:4001", "URL to etcd server")
 	verbose               = flag.Bool("verbose", false, "log extra information")
-	kubecfg_file          = flag.String("kubecfg_file", "", "Location of kubecfg file for access to kubernetes service")
 )
 
 func removeDNS(record string, etcdClient *etcd.Client) error {
@@ -130,31 +128,22 @@ func newEtcdClient() (client *etcd.Client) {
 
 // TODO: evaluate using pkg/client/clientcmd
 func newKubeClient() (*kclient.Client, error) {
-	var config *kclient.Config
-	if *kubecfg_file == "" {
-		// No kubecfg file provided. Use kubernetes_ro service.
-		masterHost := os.Getenv("KUBERNETES_RO_SERVICE_HOST")
-		if masterHost == "" {
-			log.Fatalf("KUBERNETES_RO_SERVICE_HOST is not defined")
-		}
-		masterPort := os.Getenv("KUBERNETES_RO_SERVICE_PORT")
-		if masterPort == "" {
-			log.Fatalf("KUBERNETES_RO_SERVICE_PORT is not defined")
-		}
-		config = &kclient.Config{
-			Host:    fmt.Sprintf("http://%s:%s", masterHost, masterPort),
-			Version: "v1beta1",
-		}
-	} else {
-		var err error
-		if config, err = kclientcmd.NewNonInteractiveDeferredLoadingClientConfig(
-			&kclientcmd.ClientConfigLoadingRules{ExplicitPath: *kubecfg_file},
-			&kclientcmd.ConfigOverrides{}).ClientConfig(); err != nil {
-			return nil, err
-		}
+	config := &kclient.Config{}
+
+	masterHost := os.Getenv("KUBERNETES_RO_SERVICE_HOST")
+	if masterHost == "" {
+		log.Fatalf("KUBERNETES_RO_SERVICE_HOST is not defined")
 	}
+	masterPort := os.Getenv("KUBERNETES_RO_SERVICE_PORT")
+	if masterPort == "" {
+		log.Fatalf("KUBERNETES_RO_SERVICE_PORT is not defined")
+	}
+	config.Host = fmt.Sprintf("http://%s:%s", masterHost, masterPort)
 	log.Printf("Using %s for kubernetes master", config.Host)
+
+	config.Version = "v1beta1"
 	log.Printf("Using kubernetes API %s", config.Version)
+
 	return kclient.New(config)
 }
 
