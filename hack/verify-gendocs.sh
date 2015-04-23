@@ -24,12 +24,6 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 kube::golang::setup_env
 "${KUBE_ROOT}/hack/build-go.sh" cmd/gendocs cmd/genman cmd/genbashcomp
 
-# Get the absolute path of the directory component of a file, i.e. the
-# absolute path of the dirname of $1.
-get_absolute_dirname() {
-  echo "$(cd "$(dirname "$1")" && pwd)"
-}
-
 gendocs=$(kube::util::find-binary "gendocs")
 genman=$(kube::util::find-binary "genman")
 genbashcomp=$(kube::util::find-binary "genbashcomp")
