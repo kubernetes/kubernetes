@@ -39,8 +39,12 @@ func (BasicReplicationController) Generate(params map[string]string) (runtime.Ob
 	// TODO: extract this flag to a central location.
 	labelString, found := params["labels"]
 	var labels map[string]string
+	var err error
 	if found && len(labelString) > 0 {
-		labels = ParseLabels(labelString)
+		labels, err = ParseLabels(labelString)
+		if err != nil {
+			return nil, err
+		}
 	} else {
 		labels = map[string]string{
 			"run-container": params["name"],

@@ -45,12 +45,18 @@ func (ServiceGenerator) Generate(params map[string]string) (runtime.Object, erro
 	if !found || len(selectorString) == 0 {
 		return nil, fmt.Errorf("'selector' is a required parameter.")
 	}
-	selector := ParseLabels(selectorString)
+	selector, err := ParseLabels(selectorString)
+	if err != nil {
+		return nil, err
+	}
 
 	labelsString, found := params["labels"]
 	var labels map[string]string
 	if found && len(labelsString) > 0 {
-		labels = ParseLabels(labelsString)
+		labels, err = ParseLabels(labelsString)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	name, found := params["name"]
