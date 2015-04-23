@@ -4140,7 +4140,7 @@ func TestGetPodCreationFailureReason(t *testing.T) {
 	pods := []*api.Pod{pod}
 	kubelet.podManager.SetPods(pods)
 	kubelet.volumeManager.SetVolumes(pod.UID, volumeMap{})
-	_, err := kubelet.runContainer(pod, &pod.Spec.Containers[0], "", "")
+	_, err := kubelet.containerManager.RunContainer(pod, &pod.Spec.Containers[0], kubelet, kubelet.handlerRunner, "", "")
 	if err == nil {
 		t.Errorf("expected error, found nil")
 	}

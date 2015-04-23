@@ -72,14 +72,6 @@ type Runtime interface {
 	IsImagePresent(image string) (bool, error)
 }
 
-// Container runner is a narrow interface to consume in the Kubelet
-// before there is a full implementation of Runtime.
-//
-// TODO: eventually include this interface in Runtime
-type ContainerRunner interface {
-	RunContainer(pod *api.Pod, container *api.Container, opts *RunContainerOptions) (string, error)
-}
-
 // Pod is a group of containers, with the status of the pod.
 type Pod struct {
 	// The ID of the pod, which can be used to retrieve a particular pod

@@ -728,38 +728,6 @@ func (kl *Kubelet) GenerateRunContainerOptions(pod *api.Pod, container *api.Cont
 	return opts, nil
 }
 
-// Run a single container from a pod. Returns the docker container ID
-func (kl *Kubelet) runContainer(pod *api.Pod, container *api.Container, netMode, ipcMode string) (dockertools.DockerID, error) {
-	ref, err := kubecontainer.GenerateContainerRef(pod, container)
-	if err != nil {
-		glog.Errorf("Couldn't make a ref to pod %v, container %v: '%v'", pod.Name, container.Name, err)
-	}
-
-	opts, err := kl.GenerateRunContainerOptions(pod, container, netMode, ipcMode)
-	if err != nil {
-		return "", err
-	}
-
-	id, err := kl.containerManager.RunContainer(pod, container, opts)
-	if err != nil {
-		return "", err
-	}
-
-	// Remember this reference so we can report events about this container
-	if ref != nil {
-		kl.containerRefManager.SetRef(id, ref)
-	}
-
-	if container.Lifecycle != nil && container.Lifecycle.PostStart != nil {
-		handlerErr := kl.handlerRunner.Run(id, pod, container, container.Lifecycle.PostStart)
-		if handlerErr != nil {
-			kl.containerManager.KillContainer(types.UID(id))
-			return dockertools.DockerID(""), fmt.Errorf("failed to call event handler: %v", handlerErr)
-		}
-	}
-	return dockertools.DockerID(id), err
-}
-
 var masterServices = util.NewStringSet("kubernetes", "kubernetes-ro")
 
 // getServiceEnvVarMap makes a map[string]string of env vars for services a pod in namespace ns should see
@@ -952,7 +920,7 @@ func (kl *Kubelet) createPodInfraContainer(pod *api.Pod) (dockertools.DockerID, 
 		kl.recorder.Eventf(ref, "pulled", "Successfully pulled image %q", container.Image)
 	}
 
-	id, err := kl.runContainer(pod, container, netNamespace, "")
+	id, err := kl.containerManager.RunContainer(pod, container, kl, kl.handlerRunner, netNamespace, "")
 	if err != nil {
 		return "", err
 	}
@@ -1107,7 +1075,7 @@ func (kl *Kubelet) pullImageAndRunContainer(pod *api.Pod, container *api.Contain
 	}
 	// TODO(dawnchen): Check RestartPolicy.DelaySeconds before restart a container
 	namespaceMode := fmt.Sprintf("container:%v", podInfraContainerID)
-	containerID, err := kl.runContainer(pod, container, namespaceMode, namespaceMode)
+	containerID, err := kl.containerManager.RunContainer(pod, container, kl, kl.handlerRunner, namespaceMode, namespaceMode)
 	if err != nil {
 		// TODO(bburns) : Perhaps blacklist a container after N failures?
 		glog.Errorf("Error running pod %q container %q: %v", podFullName, container.Name, err)
