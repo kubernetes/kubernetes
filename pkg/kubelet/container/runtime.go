@@ -66,7 +66,10 @@ type Runtime interface {
 	// Attaches the processes stdin, stdout, and stderr. Optionally uses a
 	// tty.
 	ExecInContainer(container api.Container, pod *api.Pod, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool)
-	// TODO(yifan): Pull/Remove images
+	// Pull pulls an image from the network to local storage.
+	Pull(image string)
+	// IsImagePresent checks whether the container image is already in the local storage.
+	IsImagePresent(image string) (bool, error)
 }
 
 // Container runner is a narrow interface to consume in the Kubelet
