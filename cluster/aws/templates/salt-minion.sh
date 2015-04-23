@@ -27,7 +27,7 @@ grains:
   roles:
     - kubernetes-pool
   cbr-cidr: $MINION_IP_RANGE
-  containers-cidr: "${CONTAINERS_CIDR}"
+  containers_cidr: "${CONTAINERS_CIDR}"
   cloud: aws
 EOF
 
