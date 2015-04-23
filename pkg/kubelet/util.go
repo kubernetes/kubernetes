@@ -21,7 +21,6 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/capabilities"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/securitycontext"
 	cadvisorApi "github.com/google/cadvisor/info/v1"
 )
@@ -65,7 +64,7 @@ func allowHostNetwork(pod *api.Pod) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	for _, source := range capabilities.Get().HostNetworkSources {
+	for _, source := range securitycontext.Get().HostNetworkSources {
 		if source == podSource {
 			return true, nil
 		}

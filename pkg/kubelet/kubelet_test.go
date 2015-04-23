@@ -36,7 +36,6 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/capabilities"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/testclient"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/cadvisor"
@@ -3731,7 +3730,7 @@ func TestHostNetworkAllowed(t *testing.T) {
 	testKubelet := newTestKubelet(t)
 	kubelet := testKubelet.kubelet
 
-	capabilities.SetForTests(capabilities.Capabilities{
+	securitycontext.SetForTests(api.SecurityConstraints{
 		HostNetworkSources: []string{ApiserverSource, FileSource},
 	})
 	pod := &api.Pod{
@@ -3761,7 +3760,7 @@ func TestHostNetworkDisallowed(t *testing.T) {
 	testKubelet := newTestKubelet(t)
 	kubelet := testKubelet.kubelet
 
-	capabilities.SetForTests(capabilities.Capabilities{
+	securitycontext.SetForTests(api.SecurityConstraints{
 		HostNetworkSources: []string{},
 	})
 	pod := &api.Pod{

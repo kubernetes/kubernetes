@@ -82,5 +82,5 @@ func (p *plugin) Admit(a admission.Attributes) (err error) {
 func (q *plugin) getSecurityContextProvider(pod *api.Pod) scapi.SecurityContextProvider {
 	//TODO this should be retrieved from the service account
 	//	return scapi.NewPermitSecurityContextProvider()
-	return scapi.NewRestrictSecurityContextProvider()
+	return scapi.NewRestrictSecurityContextProvider(scapi.Get())
 }

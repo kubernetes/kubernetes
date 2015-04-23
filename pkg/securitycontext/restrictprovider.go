@@ -32,23 +32,9 @@ type provider struct {
 }
 
 // NewRestrictSecurityContextProvider creates a new security context provider with the default constraints
-func NewRestrictSecurityContextProvider() SecurityContextProvider {
+func NewRestrictSecurityContextProvider(securityConstraints api.SecurityConstraints) SecurityContextProvider {
 	return &provider{
-		SecurityConstraints: &api.SecurityConstraints{
-			EnforcementPolicy: api.SecurityConstraintPolicyReject,
-			AllowPrivileged:   false,
-			AllowCapabilities: true,
-			SELinux: &api.SELinuxSecurityConstraints{
-				AllowUserLabel:  true,
-				AllowRoleLabel:  true,
-				AllowTypeLabel:  true,
-				AllowLevelLabel: true,
-				AllowDisable:    true,
-			},
-			DefaultSecurityContext: &api.SecurityContext{
-				Privileged: false,
-			},
-		},
+		SecurityConstraints: &securityConstraints,
 	}
 }
 
@@ -57,11 +43,6 @@ func NewRestrictSecurityContextProvider() SecurityContextProvider {
 func (p *provider) ApplySecurityContext(pod *api.Pod) {
 	for idx := range pod.Spec.Containers {
 		c := &pod.Spec.Containers[idx]
-		if c.SecurityContext == nil {
-			glog.V(4).Infof("Setting default security context for pod: %s, container: %s", pod.Name, c.Name)
-			c.SecurityContext = p.DefaultSecurityContext
-			continue
-		}
 		glog.V(4).Infof("Applying security constraints to %s", c.Name)
 		p.applySecurityContextToContainer(c)
 	}
@@ -223,11 +204,6 @@ func (p *provider) ValidateSecurityContext(pod *api.Pod) fielderrors.ValidationE
 	allErrs := fielderrors.ValidationErrorList{}
 
 	for _, container := range pod.Spec.Containers {
-		if container.SecurityContext == nil {
-			//not asking for anything, can't be breaking policy
-			continue
-		}
-
 		if !p.SecurityConstraints.AllowPrivileged && container.SecurityContext.Privileged {
 			field := fmt.Sprintf("%s.SecurityContext.Privileged", container.Name)
 			allErrs = append(allErrs, fielderrors.NewFieldInvalid(field, container.SecurityContext.Privileged, "SecurityContext does not allow privileged containers"))
@@ -285,22 +261,11 @@ func (p *provider) ValidateSecurityContext(pod *api.Pod) fielderrors.ValidationE
 }
 
 func (p *provider) ModifyContainerConfig(pod *api.Pod, container *api.Container, config *docker.Config) error {
-	//the only time the SC should be nil by the time we get here is if this is being applied to an infra container
-	//or no security contexts are defined
-	if container.SecurityContext == nil {
-		return nil
-	}
 	config.User = strconv.FormatInt(container.SecurityContext.RunAsUser, 10)
 	return nil
 }
 
 func (p *provider) ModifyHostConfig(pod *api.Pod, container *api.Container, hostConfig *docker.HostConfig) {
-	//the only time the SC should be nil by the time we get here is if this is being applied to an infra container
-	//or no security contexts are defined
-	if container.SecurityContext == nil {
-		return
-	}
-
 	hostConfig.Privileged = container.SecurityContext.Privileged
 
 	if container.SecurityContext.Capabilities != nil {

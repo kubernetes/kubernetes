@@ -599,15 +599,10 @@ type Container struct {
 	Lifecycle      *Lifecycle           `json:"lifecycle,omitempty"`
 	// Required.
 	TerminationMessagePath string `json:"terminationMessagePath,omitempty"`
-	// Optional: Default to false.
-	Privileged bool `json:"privileged,omitempty"`
 	// Required: Policy for pulling images for this container
 	ImagePullPolicy PullPolicy `json:"imagePullPolicy"`
-	// Optional: Capabilities for container.
-	//TODO: refactor to SecurityContext
-	Capabilities Capabilities `json:"capabilities,omitempty"`
 	// SecurityContext defines the security context the pod should run with
-	SecurityContext *SecurityContext `json:"securityContext,omitempty"`
+	SecurityContext `json:",inline"`
 }
 
 // Handler defines a specific action that should be taken
@@ -1785,11 +1780,9 @@ type SecretList struct {
 // then a default SecurityContext may be applied.
 type SecurityContext struct {
 	// Capabilities are the capabilities to add/drop when running the container
-	// TODO: will need to refactor this from the container spec to here
 	Capabilities *Capabilities `json:"capabilities,omitempty"`
 
 	// Run the container in privileged mode
-	// TODO: will need to refactor this from the container spec to here
 	Privileged bool `json:"privileged,omitempty"`
 
 	// SELinuxOptions are the labels to be applied to the container
@@ -1845,6 +1838,9 @@ type SecurityConstraints struct {
 	// DefaultSecurityContext is applied to any container that does not have a security context set.  It must
 	// also conform to the constraints defined in SecurityConstraints object
 	DefaultSecurityContext *SecurityContext `json:"defaultSecurityContext,omitempty"`
+
+	// List of pod sources for which using host network is allowed.
+	HostNetworkSources []string
 }
 
 // SELinuxSecurityConstraints defines what is allowed in SecurityContext requests with regards to SELinux label options

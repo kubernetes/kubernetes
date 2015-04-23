@@ -117,7 +117,7 @@ func TestApplyPrivileged(t *testing.T) {
 	for _, tc := range testCases {
 		scp.SecurityConstraints.AllowPrivileged = tc.constraintSetting
 		container := &api.Container{
-			SecurityContext: &api.SecurityContext{
+			SecurityContext: api.SecurityContext{
 				Privileged: tc.containerSetting,
 			},
 		}
@@ -133,8 +133,8 @@ func TestApplyCapRequests(t *testing.T) {
 	testCases := []struct {
 		name                     string
 		securityContraints       *api.SecurityConstraints
-		containerSecurityContext *api.SecurityContext
-		expectedSecurityContext  *api.SecurityContext
+		containerSecurityContext api.SecurityContext
+		expectedSecurityContext  api.SecurityContext
 	}{
 		{
 			//not testing nil, the entry method (ApplySecurityContext) ensures that if the container has
@@ -143,21 +143,21 @@ func TestApplyCapRequests(t *testing.T) {
 			securityContraints: &api.SecurityConstraints{
 				AllowCapabilities: false,
 			},
-			containerSecurityContext: &api.SecurityContext{},
-			expectedSecurityContext:  &api.SecurityContext{},
+			containerSecurityContext: api.SecurityContext{},
+			expectedSecurityContext:  api.SecurityContext{},
 		},
 		{
 			name: "context that doesn't allow, no default caps, container requests",
 			securityContraints: &api.SecurityConstraints{
 				AllowCapabilities: false,
 			},
-			containerSecurityContext: &api.SecurityContext{
+			containerSecurityContext: api.SecurityContext{
 				Capabilities: &api.Capabilities{
 					Add:  []api.CapabilityType{"foo"},
 					Drop: []api.CapabilityType{"bar"},
 				},
 			},
-			expectedSecurityContext: &api.SecurityContext{Capabilities: &api.Capabilities{}},
+			expectedSecurityContext: api.SecurityContext{Capabilities: &api.Capabilities{}},
 		},
 		{
 			name: "context that doesn't allow, default caps, no container requests",
@@ -170,8 +170,8 @@ func TestApplyCapRequests(t *testing.T) {
 					},
 				},
 			},
-			containerSecurityContext: &api.SecurityContext{},
-			expectedSecurityContext: &api.SecurityContext{
+			containerSecurityContext: api.SecurityContext{},
+			expectedSecurityContext: api.SecurityContext{
 				Capabilities: &api.Capabilities{
 					Add:  []api.CapabilityType{"a"},
 					Drop: []api.CapabilityType{"b"},
@@ -189,13 +189,13 @@ func TestApplyCapRequests(t *testing.T) {
 					},
 				},
 			},
-			containerSecurityContext: &api.SecurityContext{
+			containerSecurityContext: api.SecurityContext{
 				Capabilities: &api.Capabilities{
 					Add:  []api.CapabilityType{"foo"},
 					Drop: []api.CapabilityType{"bar"},
 				},
 			},
-			expectedSecurityContext: &api.SecurityContext{
+			expectedSecurityContext: api.SecurityContext{
 				Capabilities: &api.Capabilities{
 					Add:  []api.CapabilityType{"a"},
 					Drop: []api.CapabilityType{"b"},
@@ -207,13 +207,13 @@ func TestApplyCapRequests(t *testing.T) {
 			securityContraints: &api.SecurityConstraints{
 				AllowCapabilities: true,
 			},
-			containerSecurityContext: &api.SecurityContext{
+			containerSecurityContext: api.SecurityContext{
 				Capabilities: &api.Capabilities{
 					Add:  []api.CapabilityType{"foo"},
 					Drop: []api.CapabilityType{"bar"},
 				},
 			},
-			expectedSecurityContext: &api.SecurityContext{
+			expectedSecurityContext: api.SecurityContext{
 				Capabilities: &api.Capabilities{
 					Add:  []api.CapabilityType{"foo"},
 					Drop: []api.CapabilityType{"bar"},
@@ -226,13 +226,13 @@ func TestApplyCapRequests(t *testing.T) {
 				AllowCapabilities: true,
 				Capabilities:      &api.Capabilities{},
 			},
-			containerSecurityContext: &api.SecurityContext{
+			containerSecurityContext: api.SecurityContext{
 				Capabilities: &api.Capabilities{
 					Add:  []api.CapabilityType{"foo"},
 					Drop: []api.CapabilityType{"bar"},
 				},
 			},
-			expectedSecurityContext: &api.SecurityContext{
+			expectedSecurityContext: api.SecurityContext{
 				Capabilities: &api.Capabilities{
 					Add:  []api.CapabilityType{},
 					Drop: []api.CapabilityType{},
@@ -247,13 +247,13 @@ func TestApplyCapRequests(t *testing.T) {
 					Add: []api.CapabilityType{"foo"},
 				},
 			},
-			containerSecurityContext: &api.SecurityContext{
+			containerSecurityContext: api.SecurityContext{
 				Capabilities: &api.Capabilities{
 					Add:  []api.CapabilityType{"foo", "anotherFoo"},
 					Drop: []api.CapabilityType{"bar"},
 				},
 			},
-			expectedSecurityContext: &api.SecurityContext{
+			expectedSecurityContext: api.SecurityContext{
 				Capabilities: &api.Capabilities{
 					Add:  []api.CapabilityType{"foo"},
 					Drop: []api.CapabilityType{},
@@ -268,13 +268,13 @@ func TestApplyCapRequests(t *testing.T) {
 					Drop: []api.CapabilityType{"bar"},
 				},
 			},
-			containerSecurityContext: &api.SecurityContext{
+			containerSecurityContext: api.SecurityContext{
 				Capabilities: &api.Capabilities{
 					Add:  []api.CapabilityType{"foo"},
 					Drop: []api.CapabilityType{"bar", "anotherBar"},
 				},
 			},
-			expectedSecurityContext: &api.SecurityContext{
+			expectedSecurityContext: api.SecurityContext{
 				Capabilities: &api.Capabilities{
 					Add:  []api.CapabilityType{},
 					Drop: []api.CapabilityType{"bar"},
@@ -290,13 +290,13 @@ func TestApplyCapRequests(t *testing.T) {
 					Drop: []api.CapabilityType{"bar"},
 				},
 			},
-			containerSecurityContext: &api.SecurityContext{
+			containerSecurityContext: api.SecurityContext{
 				Capabilities: &api.Capabilities{
 					Add:  []api.CapabilityType{"foo", "anotherFoo"},
 					Drop: []api.CapabilityType{"bar", "anotherBar"},
 				},
 			},
-			expectedSecurityContext: &api.SecurityContext{
+			expectedSecurityContext: api.SecurityContext{
 				Capabilities: &api.Capabilities{
 					Add:  []api.CapabilityType{"foo"},
 					Drop: []api.CapabilityType{"bar"},
@@ -322,16 +322,16 @@ func TestApplySELinux(t *testing.T) {
 	testCases := []struct {
 		name                     string
 		securityContraints       *api.SecurityConstraints
-		containerSecurityContext *api.SecurityContext
-		expectedSecurityContext  *api.SecurityContext
+		containerSecurityContext api.SecurityContext
+		expectedSecurityContext  api.SecurityContext
 	}{
 		{
 			name: "context that doesn't allow, no default, no container requests",
 			securityContraints: &api.SecurityConstraints{
 				SELinux: &api.SELinuxSecurityConstraints{false, false, false, false, false},
 			},
-			containerSecurityContext: &api.SecurityContext{},
-			expectedSecurityContext:  &api.SecurityContext{},
+			containerSecurityContext: api.SecurityContext{},
+			expectedSecurityContext:  api.SecurityContext{},
 		},
 		{
 			//everything should be removed
@@ -339,10 +339,10 @@ func TestApplySELinux(t *testing.T) {
 			securityContraints: &api.SecurityConstraints{
 				SELinux: &api.SELinuxSecurityConstraints{false, false, false, false, false},
 			},
-			containerSecurityContext: &api.SecurityContext{
+			containerSecurityContext: api.SecurityContext{
 				SELinuxOptions: &api.SELinuxOptions{"user", "role", "type", "level", false},
 			},
-			expectedSecurityContext: &api.SecurityContext{
+			expectedSecurityContext: api.SecurityContext{
 				SELinuxOptions: &api.SELinuxOptions{"", "", "", "", false},
 			},
 		},
@@ -354,8 +354,8 @@ func TestApplySELinux(t *testing.T) {
 					SELinuxOptions: &api.SELinuxOptions{"user", "role", "type", "level", false},
 				},
 			},
-			containerSecurityContext: &api.SecurityContext{},
-			expectedSecurityContext: &api.SecurityContext{
+			containerSecurityContext: api.SecurityContext{},
+			expectedSecurityContext: api.SecurityContext{
 				SELinuxOptions: &api.SELinuxOptions{"user", "role", "type", "level", false},
 			},
 		},
@@ -367,10 +367,10 @@ func TestApplySELinux(t *testing.T) {
 					SELinuxOptions: &api.SELinuxOptions{"user", "role", "type", "level", false},
 				},
 			},
-			containerSecurityContext: &api.SecurityContext{
+			containerSecurityContext: api.SecurityContext{
 				SELinuxOptions: &api.SELinuxOptions{"a", "b", "c", "d", true},
 			},
-			expectedSecurityContext: &api.SecurityContext{
+			expectedSecurityContext: api.SecurityContext{
 				SELinuxOptions: &api.SELinuxOptions{"user", "role", "type", "level", false},
 			},
 		},
@@ -382,10 +382,10 @@ func TestApplySELinux(t *testing.T) {
 					SELinuxOptions: &api.SELinuxOptions{"user", "role", "type", "level", false},
 				},
 			},
-			containerSecurityContext: &api.SecurityContext{
+			containerSecurityContext: api.SecurityContext{
 				SELinuxOptions: &api.SELinuxOptions{"", "", "", "", true},
 			},
-			expectedSecurityContext: &api.SecurityContext{
+			expectedSecurityContext: api.SecurityContext{
 				SELinuxOptions: &api.SELinuxOptions{"user", "role", "type", "level", true},
 			},
 		},
@@ -397,10 +397,10 @@ func TestApplySELinux(t *testing.T) {
 					SELinuxOptions: &api.SELinuxOptions{"user", "role", "type", "level", false},
 				},
 			},
-			containerSecurityContext: &api.SecurityContext{
+			containerSecurityContext: api.SecurityContext{
 				SELinuxOptions: &api.SELinuxOptions{"", "", "", "test", false},
 			},
-			expectedSecurityContext: &api.SecurityContext{
+			expectedSecurityContext: api.SecurityContext{
 				SELinuxOptions: &api.SELinuxOptions{"user", "role", "type", "test", false},
 			},
 		},
@@ -412,10 +412,10 @@ func TestApplySELinux(t *testing.T) {
 					SELinuxOptions: &api.SELinuxOptions{"user", "role", "type", "level", false},
 				},
 			},
-			containerSecurityContext: &api.SecurityContext{
+			containerSecurityContext: api.SecurityContext{
 				SELinuxOptions: &api.SELinuxOptions{"", "test", "", "", false},
 			},
-			expectedSecurityContext: &api.SecurityContext{
+			expectedSecurityContext: api.SecurityContext{
 				SELinuxOptions: &api.SELinuxOptions{"user", "test", "type", "level", false},
 			},
 		},
@@ -427,10 +427,10 @@ func TestApplySELinux(t *testing.T) {
 					SELinuxOptions: &api.SELinuxOptions{"user", "role", "type", "level", false},
 				},
 			},
-			containerSecurityContext: &api.SecurityContext{
+			containerSecurityContext: api.SecurityContext{
 				SELinuxOptions: &api.SELinuxOptions{"", "", "test", "", false},
 			},
-			expectedSecurityContext: &api.SecurityContext{
+			expectedSecurityContext: api.SecurityContext{
 				SELinuxOptions: &api.SELinuxOptions{"user", "role", "test", "level", false},
 			},
 		},
@@ -442,10 +442,10 @@ func TestApplySELinux(t *testing.T) {
 					SELinuxOptions: &api.SELinuxOptions{"user", "role", "type", "level", false},
 				},
 			},
-			containerSecurityContext: &api.SecurityContext{
+			containerSecurityContext: api.SecurityContext{
 				SELinuxOptions: &api.SELinuxOptions{"test", "", "", "", false},
 			},
-			expectedSecurityContext: &api.SecurityContext{
+			expectedSecurityContext: api.SecurityContext{
 				SELinuxOptions: &api.SELinuxOptions{"test", "role", "type", "level", false},
 			},
 		},
@@ -457,10 +457,10 @@ func TestApplySELinux(t *testing.T) {
 					SELinuxOptions: &api.SELinuxOptions{"user", "role", "type", "level", false},
 				},
 			},
-			containerSecurityContext: &api.SecurityContext{
+			containerSecurityContext: api.SecurityContext{
 				SELinuxOptions: &api.SELinuxOptions{"test", "test", "test", "test", true},
 			},
-			expectedSecurityContext: &api.SecurityContext{
+			expectedSecurityContext: api.SecurityContext{
 				SELinuxOptions: &api.SELinuxOptions{"test", "test", "test", "test", true},
 			},
 		},
@@ -483,24 +483,24 @@ func TestApplyRunAsUser(t *testing.T) {
 	testCases := []struct {
 		name                     string
 		securityContraints       *api.SecurityConstraints
-		containerSecurityContext *api.SecurityContext
-		expectedSecurityContext  *api.SecurityContext
+		containerSecurityContext api.SecurityContext
+		expectedSecurityContext  api.SecurityContext
 	}{
 		{
 			name: "context that doesn't allow, no default, no container requests",
 			securityContraints: &api.SecurityConstraints{
 				AllowRunAsUser: false,
 			},
-			containerSecurityContext: &api.SecurityContext{},
-			expectedSecurityContext:  &api.SecurityContext{RunAsUser: 0},
+			containerSecurityContext: api.SecurityContext{},
+			expectedSecurityContext:  api.SecurityContext{RunAsUser: 0},
 		},
 		{
 			name: "context that doesn't allow, no default, container requests",
 			securityContraints: &api.SecurityConstraints{
 				AllowRunAsUser: false,
 			},
-			containerSecurityContext: &api.SecurityContext{RunAsUser: 888},
-			expectedSecurityContext:  &api.SecurityContext{RunAsUser: 0},
+			containerSecurityContext: api.SecurityContext{RunAsUser: 888},
+			expectedSecurityContext:  api.SecurityContext{RunAsUser: 0},
 		},
 		{
 			name: "context that doesn't allow, default, container requests",
@@ -508,8 +508,8 @@ func TestApplyRunAsUser(t *testing.T) {
 				AllowRunAsUser:         false,
 				DefaultSecurityContext: &api.SecurityContext{RunAsUser: 999},
 			},
-			containerSecurityContext: &api.SecurityContext{RunAsUser: 0},
-			expectedSecurityContext:  &api.SecurityContext{RunAsUser: 999},
+			containerSecurityContext: api.SecurityContext{RunAsUser: 0},
+			expectedSecurityContext:  api.SecurityContext{RunAsUser: 999},
 		},
 		{
 			name: "context that doesn't allow, default, container doesn't request",
@@ -517,24 +517,24 @@ func TestApplyRunAsUser(t *testing.T) {
 				AllowRunAsUser:         false,
 				DefaultSecurityContext: &api.SecurityContext{RunAsUser: 999},
 			},
-			containerSecurityContext: &api.SecurityContext{},
-			expectedSecurityContext:  &api.SecurityContext{RunAsUser: 999},
+			containerSecurityContext: api.SecurityContext{},
+			expectedSecurityContext:  api.SecurityContext{RunAsUser: 999},
 		},
 		{
 			name: "context allows, no default, no container requests",
 			securityContraints: &api.SecurityConstraints{
 				AllowRunAsUser: true,
 			},
-			containerSecurityContext: &api.SecurityContext{},
-			expectedSecurityContext:  &api.SecurityContext{RunAsUser: 0},
+			containerSecurityContext: api.SecurityContext{},
+			expectedSecurityContext:  api.SecurityContext{RunAsUser: 0},
 		},
 		{
 			name: "context allows, no default, container requests",
 			securityContraints: &api.SecurityConstraints{
 				AllowRunAsUser: true,
 			},
-			containerSecurityContext: &api.SecurityContext{RunAsUser: 888},
-			expectedSecurityContext:  &api.SecurityContext{RunAsUser: 888},
+			containerSecurityContext: api.SecurityContext{RunAsUser: 888},
+			expectedSecurityContext:  api.SecurityContext{RunAsUser: 888},
 		},
 		{
 			name: "context allows, default, container requests",
@@ -542,8 +542,8 @@ func TestApplyRunAsUser(t *testing.T) {
 				AllowRunAsUser:         true,
 				DefaultSecurityContext: &api.SecurityContext{RunAsUser: 999},
 			},
-			containerSecurityContext: &api.SecurityContext{RunAsUser: 888},
-			expectedSecurityContext:  &api.SecurityContext{RunAsUser: 888},
+			containerSecurityContext: api.SecurityContext{RunAsUser: 888},
+			expectedSecurityContext:  api.SecurityContext{RunAsUser: 888},
 		},
 		{
 			name: "context allows, default, container doesn't request",
@@ -551,8 +551,8 @@ func TestApplyRunAsUser(t *testing.T) {
 				AllowRunAsUser:         true,
 				DefaultSecurityContext: &api.SecurityContext{RunAsUser: 999},
 			},
-			containerSecurityContext: &api.SecurityContext{},
-			expectedSecurityContext:  &api.SecurityContext{RunAsUser: 999},
+			containerSecurityContext: api.SecurityContext{},
+			expectedSecurityContext:  api.SecurityContext{RunAsUser: 999},
 		},
 	}
 

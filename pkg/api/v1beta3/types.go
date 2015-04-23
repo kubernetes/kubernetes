@@ -614,15 +614,10 @@ type Container struct {
 	Lifecycle      *Lifecycle           `json:"lifecycle,omitempty" description:"actions that the management system should take in response to container lifecycle events; cannot be updated"`
 	// Optional: Defaults to /dev/termination-log
 	TerminationMessagePath string `json:"terminationMessagePath,omitempty" description:"path at which the file to which the container's termination message will be written is mounted into the container's filesystem; message written is intended to be brief final status, such as an assertion failure message; defaults to /dev/termination-log; cannot be updated"`
-	// Optional: Default to false.
-	Privileged bool `json:"privileged,omitempty" description:"whether or not the container is granted privileged status; defaults to false; cannot be updated"`
 	// Optional: Policy for pulling images for this container
 	ImagePullPolicy PullPolicy `json:"imagePullPolicy" description:"image pull policy; one of PullAlways, PullNever, PullIfNotPresent; defaults to PullAlways if :latest tag is specified, or PullIfNotPresent otherwise; cannot be updated"`
-	// Optional: Capabilities for container.
-	//TODO: refactor to SecurityContext
-	Capabilities Capabilities `json:"capabilities,omitempty" description:"capabilities for container; cannot be updated"`
 	// SecurityContext defines the security context the pod should run with
-	SecurityContext *SecurityContext `json:"securityContext,omitempty"`
+	SecurityContext `json:"securityContext,omitempty"`
 }
 
 // Handler defines a specific action that should be taken
@@ -1776,6 +1771,9 @@ type SecurityConstraints struct {
 	// DefaultSecurityContext is applied to any container that does not have a security context set.  It must
 	// also conform to the constraints defined in SecurityConstraints object
 	DefaultSecurityContext *SecurityContext `json:"defaultSecurityContext,omitempty"`
+
+	// List of pod sources for which using host network is allowed.
+	HostNetworkSources []string
 }
 
 // SELinuxSecurityConstraints defines what is allowed in SecurityContext requests with regards to SELinux label options

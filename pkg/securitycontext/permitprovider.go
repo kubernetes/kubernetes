@@ -27,11 +27,10 @@ type permitProvider struct {
 	*api.SecurityConstraints
 }
 
-func NewPermitSecurityContextProvider() SecurityContextProvider {
+func NewPermitSecurityContextProvider(securityConstraints api.SecurityConstraints) SecurityContextProvider {
+	securityConstraints.EnforcementPolicy = api.SecurityConstraintPolicyDisable
 	return &permitProvider{
-		SecurityConstraints: &api.SecurityConstraints{
-			EnforcementPolicy: api.SecurityConstraintPolicyDisable,
-		},
+		SecurityConstraints: &securityConstraints,
 	}
 }
 

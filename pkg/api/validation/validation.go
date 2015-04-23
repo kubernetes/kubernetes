@@ -25,12 +25,12 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/capabilities"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	errs "github.com/GoogleCloudPlatform/kubernetes/pkg/util/fielderrors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/securitycontext"
 	"github.com/golang/glog"
 )
 
@@ -716,14 +716,14 @@ func validateContainers(containers []api.Container, volumes util.StringSet) errs
 	allNames := util.StringSet{}
 	for i, ctr := range containers {
 		cErrs := errs.ValidationErrorList{}
-		capabilities := capabilities.Get()
+		securityConstraints := securitycontext.Get()
 		if len(ctr.Name) == 0 {
 			cErrs = append(cErrs, errs.NewFieldRequired("name"))
 		} else if !util.IsDNS1123Label(ctr.Name) {
 			cErrs = append(cErrs, errs.NewFieldInvalid("name", ctr.Name, dns1123LabelErrorMsg))
 		} else if allNames.Has(ctr.Name) {
 			cErrs = append(cErrs, errs.NewFieldDuplicate("name", ctr.Name))
-		} else if ctr.Privileged && !capabilities.AllowPrivileged {
+		} else if ctr.Privileged && !securityConstraints.AllowPrivileged {
 			cErrs = append(cErrs, errs.NewFieldForbidden("privileged", ctr.Privileged))
 		} else {
 			allNames.Insert(ctr.Name)
