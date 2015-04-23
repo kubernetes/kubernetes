@@ -1,5 +1,8 @@
 Change history of swagger
 =
+2015-04-09
+- add ModelBuildable interface for customization of Model
+
 2015-03-17
 - preserve order of Routes per WebService in Swagger listing
 - fix use of $ref and type in Swagger models

@@ -6,22 +6,40 @@ import (
 	"strings"
 )
 
+// ModelBuildable is used for extending Structs that need more control over
+// how the Model appears in the Swagger api declaration.
+type ModelBuildable interface {
+	PostBuildModel(m *Model) *Model
+}
+
 type modelBuilder struct {
 	Models map[string]Model
 }
 
-func (b modelBuilder) addModel(st reflect.Type, nameOverride string) {
+// addModelFrom creates and adds a Model to the builder and detects and calls
+// the post build hook for customizations
+func (b modelBuilder) addModelFrom(sample interface{}) {
+	if modelOrNil := b.addModel(reflect.TypeOf(sample), ""); modelOrNil != nil {
+		// allow customizations
+		if buildable, ok := sample.(ModelBuildable); ok {
+			modelOrNil = buildable.PostBuildModel(modelOrNil)
+			b.Models[modelOrNil.Id] = *modelOrNil
+		}
+	}
+}
+
+func (b modelBuilder) addModel(st reflect.Type, nameOverride string) *Model {
 	modelName := b.keyFrom(st)
 	if nameOverride != "" {
 		modelName = nameOverride
 	}
 	// no models needed for primitive types
 	if b.isPrimitiveType(modelName) {
-		return
+		return nil
 	}
 	// see if we already have visited this model
 	if _, ok := b.Models[modelName]; ok {
-		return
+		return nil
 	}
 	sm := Model{
 		Id:         modelName,
@@ -34,11 +52,11 @@ func (b modelBuilder) addModel(st reflect.Type, nameOverride string) {
 	// check for slice or array
 	if st.Kind() == reflect.Slice || st.Kind() == reflect.Array {
 		b.addModel(st.Elem(), "")
-		return
+		return &sm
 	}
 	// check for structure or primitive type
 	if st.Kind() != reflect.Struct {
-		return
+		return &sm
 	}
 	for i := 0; i < st.NumField(); i++ {
 		field := st.Field(i)
@@ -55,9 +73,10 @@ func (b modelBuilder) addModel(st reflect.Type, nameOverride string) {
 			sm.Properties[jsonName] = prop
 		}
 	}
-
 	// update model builder with completed model
 	b.Models[modelName] = sm
+
+	return &sm
 }
 
 func (b modelBuilder) isPropertyRequired(field reflect.StructField) bool {
@@ -107,12 +126,12 @@ func (b modelBuilder) buildProperty(field reflect.StructField, model *Model, mod
 	case fieldKind == reflect.Ptr:
 		return b.buildPointerTypeProperty(field, jsonName, modelName)
 	case fieldKind == reflect.String:
-	     	stringt := "string"
+		stringt := "string"
 		prop.Type = &stringt
 		return jsonName, prop
 	case fieldKind == reflect.Map:
-                // if it's a map, it's unstructured, and swagger 1.2 can't handle it
-	        anyt := "any"
+		// if it's a map, it's unstructured, and swagger 1.2 can't handle it
+		anyt := "any"
 		prop.Type = &anyt
 		return jsonName, prop
 	}
@@ -134,6 +153,19 @@ func (b modelBuilder) buildProperty(field reflect.StructField, model *Model, mod
 	return jsonName, prop
 }
 
+func hasNamedJSONTag(field reflect.StructField) bool {
+	parts := strings.Split(field.Tag.Get("json"), ",")
+	if len(parts) == 0 {
+		return false
+	}
+	for _, s := range parts[1:] {
+		if s == "inline" {
+			return false
+		}
+	}
+	return len(parts[0]) > 0
+}
+
 func (b modelBuilder) buildStructTypeProperty(field reflect.StructField, jsonName string, model *Model) (nameJson string, prop ModelProperty) {
 	fieldType := field.Type
 	// check for anonymous
@@ -144,7 +176,8 @@ func (b modelBuilder) buildStructTypeProperty(field reflect.StructField, jsonNam
 		prop.Ref = &anonType
 		return jsonName, prop
 	}
-	if field.Name == fieldType.Name() && field.Anonymous {
+
+	if field.Name == fieldType.Name() && field.Anonymous && !hasNamedJSONTag(field) {
 		// embedded struct
 		sub := modelBuilder{map[string]Model{}}
 		sub.addModel(fieldType, "")
@@ -246,8 +279,9 @@ func (b modelBuilder) keyFrom(st reflect.Type) string {
 	return key
 }
 
+// see also https://golang.org/ref/spec#Numeric_types
 func (b modelBuilder) isPrimitiveType(modelName string) bool {
-	return strings.Contains("uint8 int int32 int64 float32 float64 bool string byte time.Time", modelName)
+	return strings.Contains("uint8 uint16 uint32 uint64 int int8 int16 int32 int64 float32 float64 bool string byte rune time.Time", modelName)
 }
 
 // jsonNameOfField returns the name of the field as it should appear in JSON format
@@ -265,25 +299,31 @@ func (b modelBuilder) jsonNameOfField(field reflect.StructField) string {
 	return field.Name
 }
 
+// see also http://json-schema.org/latest/json-schema-core.html#anchor8
 func (b modelBuilder) jsonSchemaType(modelName string) string {
 	schemaMap := map[string]string{
-		"uint8":     "integer",
-		"int":       "integer",
-		"int32":     "integer",
-		"int64":     "integer",
-                "uint64":    "integer",
-		"byte":      "string",
+		"uint8":  "integer",
+		"uint16": "integer",
+		"uint32": "integer",
+		"uint64": "integer",
+
+		"int":   "integer",
+		"int8":  "integer",
+		"int16": "integer",
+		"int32": "integer",
+		"int64": "integer",
+
+		"byte":      "integer",
 		"float64":   "number",
 		"float32":   "number",
 		"bool":      "boolean",
 		"time.Time": "string",
 	}
 	mapped, ok := schemaMap[modelName]
-	if ok {
-		return mapped
-	} else {
+	if !ok {
 		return modelName // use as is (custom or struct)
 	}
+	return mapped
 }
 
 func (b modelBuilder) jsonSchemaFormat(modelName string) string {
@@ -298,9 +338,8 @@ func (b modelBuilder) jsonSchemaFormat(modelName string) string {
 		"time.Time": "date-time",
 	}
 	mapped, ok := schemaMap[modelName]
-	if ok {
-		return mapped
-	} else {
+	if !ok {
 		return "" // no format
 	}
+	return mapped
 }

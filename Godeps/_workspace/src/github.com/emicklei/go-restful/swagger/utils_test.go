@@ -18,7 +18,7 @@ func testJsonFromStruct(t *testing.T, sample interface{}, expectedJson string) b
 func modelsFromStruct(sample interface{}) map[string]Model {
 	models := map[string]Model{}
 	builder := modelBuilder{models}
-	builder.addModel(reflect.TypeOf(sample), "")
+	builder.addModelFrom(sample)
 	return models
 }
 

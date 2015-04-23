@@ -299,7 +299,7 @@ func (sws SwaggerService) addModelFromSampleTo(operation *Operation, isResponse 
 		}
 		operation.Type = modelName
 	}
-	modelBuilder{models}.addModel(reflect.TypeOf(sample), "")
+	modelBuilder{models}.addModelFrom(sample)
 }
 
 func asSwaggerParameter(param restful.ParameterData) Parameter {
