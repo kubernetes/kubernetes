@@ -892,3 +892,22 @@ func (dm *DockerManager) PortForward(pod *kubecontainer.Pod, port uint16, stream
 	command.Stdout = stream
 	return command.Run()
 }
+
+// KillContainer kills a container identified by containerID.
+// Internally, it invokes docker's StopContainer API with a timeout of 10s.
+// TODO(yifan): Use new ContainerID type.
+func (dm *DockerManager) KillContainer(containerID types.UID) error {
+	ID := string(containerID)
+	glog.V(2).Infof("Killing container with id %q", ID)
+	dm.readinessManager.RemoveReadiness(ID)
+	err := dm.client.StopContainer(ID, 10)
+
+	ref, ok := dm.containerRefManager.GetRef(ID)
+	if !ok {
+		glog.Warningf("No ref for pod '%v'", ID)
+	} else {
+		// TODO: pass reason down here, and state, or move this call up the stack.
+		dm.recorder.Eventf(ref, "killing", "Killing %v", ID)
+	}
+	return err
+}

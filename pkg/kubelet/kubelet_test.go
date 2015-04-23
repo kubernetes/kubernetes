@@ -368,19 +368,18 @@ func TestKillContainerWithError(t *testing.T) {
 			Names: []string{"/k8s_bar_qux_new_5678_42"},
 		},
 	}
-	fakeDocker := &dockertools.FakeDockerClient{
-		Errors:        make(map[string]error),
-		ContainerList: append([]docker.APIContainers{}, containers...),
-	}
 	testKubelet := newTestKubelet(t)
 	kubelet := testKubelet.kubelet
+	fakeDocker := testKubelet.fakeDocker
+	fakeDocker.ContainerList = containers
+
 	for _, c := range fakeDocker.ContainerList {
 		kubelet.readinessManager.SetReadiness(c.ID, true)
 	}
 	kubelet.dockerClient = fakeDocker
 	c := apiContainerToContainer(fakeDocker.ContainerList[0])
 	fakeDocker.Errors["stop"] = fmt.Errorf("sample error")
-	err := kubelet.killContainer(&c)
+	err := kubelet.containerManager.KillContainer(c.ID)
 	if err == nil {
 		t.Errorf("expected error, found nil")
 	}
@@ -420,7 +419,7 @@ func TestKillContainer(t *testing.T) {
 	}
 
 	c := apiContainerToContainer(fakeDocker.ContainerList[0])
-	err := kubelet.killContainer(&c)
+	err := kubelet.containerManager.KillContainer(c.ID)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
