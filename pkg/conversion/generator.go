@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 	"reflect"
+	"sort"
 	"strings"
 )
 
@@ -153,17 +154,40 @@ func (g *generator) generateConversionsForStruct(inType, outType reflect.Type) e
 	return nil
 }
 
+type byName []reflect.Type
+
+func (s byName) Len() int {
+	return len(s)
+}
+
+func (s byName) Less(i, j int) bool {
+	return s[i].Name() < s[j].Name()
+}
+
+func (s byName) Swap(i, j int) {
+	s[i], s[j] = s[j], s[i]
+}
+
 func (g *generator) WriteConversionFunctions(w io.Writer) error {
+	// It's desired to print conversion functions always in the same order
+	// (e.g. for better tracking of what has really been added).
+	var keys []reflect.Type
+	for key := range g.convertibles {
+		keys = append(keys, key)
+	}
+	sort.Sort(byName(keys))
+
 	indent := 2
-	for inType, outType := range g.convertibles {
+	for _, inType := range keys {
+		outType := g.convertibles[inType]
 		// All types in g.convertibles are structs.
 		if inType.Kind() != reflect.Struct {
 			return fmt.Errorf("non-struct conversions are not-supported")
 		}
-		if err := g.writeConversionForStruct(w, inType, outType, indent); err != nil {
+		if err := g.writeConversionForType(w, inType, outType, indent); err != nil {
 			return err
 		}
-		if err := g.writeConversionForStruct(w, outType, inType, indent); err != nil {
+		if err := g.writeConversionForType(w, outType, inType, indent); err != nil {
 			return err
 		}
 	}
@@ -340,10 +364,62 @@ func (g *generator) writeConversionForSlice(w io.Writer, inField, outField refle
 	return nil
 }
 
-func (g *generator) writeConversionForStruct(w io.Writer, inType, outType reflect.Type, indent int) error {
-	if err := writeHeader(w, g.typeName(inType), g.typeName(outType), indent); err != nil {
+func (g *generator) writeConversionForPtr(w io.Writer, inField, outField reflect.StructField, indent int) error {
+	switch inField.Type.Elem().Kind() {
+	case reflect.Map, reflect.Ptr, reflect.Slice, reflect.Interface, reflect.Struct:
+		// Don't copy these via assignment/conversion!
+	default:
+		// This should handle pointers to all simple types.
+		assignable := inField.Type.Elem().AssignableTo(outField.Type.Elem())
+		convertible := inField.Type.Elem().ConvertibleTo(outField.Type.Elem())
+		if assignable || convertible {
+			ifFormat := "if in.%s != nil {\n"
+			ifStmt := fmt.Sprintf(ifFormat, inField.Name)
+			if err := writeLine(w, indent, ifStmt); err != nil {
+				return err
+			}
+			newFormat := "out.%s = new(%s)\n"
+			newStmt := fmt.Sprintf(newFormat, outField.Name, g.typeName(outField.Type.Elem()))
+			if err := writeLine(w, indent+1, newStmt); err != nil {
+				return err
+			}
+		}
+		if assignable {
+			assignFormat := "*out.%s = *in.%s\n"
+			assignStmt := fmt.Sprintf(assignFormat, outField.Name, inField.Name)
+			if err := writeLine(w, indent+1, assignStmt); err != nil {
+				return err
+			}
+		} else if convertible {
+			assignFormat := "*out.%s = %s(*in.%s)\n"
+			assignStmt := fmt.Sprintf(assignFormat, outField.Name, g.typeName(outField.Type.Elem()), inField.Name)
+			if err := writeLine(w, indent+1, assignStmt); err != nil {
+				return err
+			}
+		}
+		if assignable || convertible {
+			if err := writeLine(w, indent, "}\n"); err != nil {
+				return err
+			}
+			return nil
+		}
+	}
+
+	assignFormat := "if err := s.Convert(&in.%s, &out.%s, 0); err != nil {\n"
+	assignStmt := fmt.Sprintf(assignFormat, inField.Name, outField.Name)
+	if err := writeLine(w, indent, assignStmt); err != nil {
 		return err
 	}
+	if err := writeLine(w, indent+1, "return err\n"); err != nil {
+		return err
+	}
+	if err := writeLine(w, indent, "}\n"); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (g *generator) writeConversionForStruct(w io.Writer, inType, outType reflect.Type, indent int) error {
 	for i := 0; i < inType.NumField(); i++ {
 		inField := inType.Field(i)
 		outField, _ := outType.FieldByName(inField.Name)
@@ -356,7 +432,7 @@ func (g *generator) writeConversionForStruct(w io.Writer, inType, outType reflec
 			if inField.Type.AssignableTo(outField.Type) {
 				assignFormat := "out.%s = in.%s\n"
 				assignStmt := fmt.Sprintf(assignFormat, outField.Name, inField.Name)
-				if err := writeLine(w, indent+1, assignStmt); err != nil {
+				if err := writeLine(w, indent, assignStmt); err != nil {
 					return err
 				}
 				continue
@@ -364,7 +440,7 @@ func (g *generator) writeConversionForStruct(w io.Writer, inType, outType reflec
 			if inField.Type.ConvertibleTo(outField.Type) {
 				assignFormat := "out.%s = %s(in.%s)\n"
 				assignStmt := fmt.Sprintf(assignFormat, outField.Name, g.typeName(outField.Type), inField.Name)
-				if err := writeLine(w, indent+1, assignStmt); err != nil {
+				if err := writeLine(w, indent, assignStmt); err != nil {
 					return err
 				}
 				continue
@@ -373,7 +449,7 @@ func (g *generator) writeConversionForStruct(w io.Writer, inType, outType reflec
 
 		// If the field is a slice, copy its elements one by one.
 		if inField.Type.Kind() == reflect.Slice {
-			if err := g.writeConversionForSlice(w, inField, outField, indent+1); err != nil {
+			if err := g.writeConversionForSlice(w, inField, outField, indent); err != nil {
 				return err
 			}
 			continue
@@ -381,7 +457,15 @@ func (g *generator) writeConversionForStruct(w io.Writer, inType, outType reflec
 
 		// If the field is a map, copy its elements one by one.
 		if inField.Type.Kind() == reflect.Map {
-			if err := g.writeConversionForMap(w, inField, outField, indent+1); err != nil {
+			if err := g.writeConversionForMap(w, inField, outField, indent); err != nil {
+				return err
+			}
+			continue
+		}
+
+		// If the field is a pointer, we can try to assign underlying values.
+		if inField.Type.Kind() == reflect.Ptr {
+			if err := g.writeConversionForPtr(w, inField, outField, indent); err != nil {
 				return err
 			}
 			continue
@@ -393,15 +477,30 @@ func (g *generator) writeConversionForStruct(w io.Writer, inType, outType reflec
 
 		assignFormat := "if err := s.Convert(&in.%s, &out.%s, 0); err != nil {\n"
 		assignStmt := fmt.Sprintf(assignFormat, inField.Name, outField.Name)
-		if err := writeLine(w, indent+1, assignStmt); err != nil {
+		if err := writeLine(w, indent, assignStmt); err != nil {
 			return err
 		}
-		if err := writeLine(w, indent+2, "return err\n"); err != nil {
+		if err := writeLine(w, indent+1, "return err\n"); err != nil {
 			return err
 		}
-		if err := writeLine(w, indent+1, "}\n"); err != nil {
+		if err := writeLine(w, indent, "}\n"); err != nil {
 			return err
 		}
+	}
+	return nil
+}
+
+func (g *generator) writeConversionForType(w io.Writer, inType, outType reflect.Type, indent int) error {
+	if err := writeHeader(w, g.typeName(inType), g.typeName(outType), indent); err != nil {
+		return err
+	}
+	switch inType.Kind() {
+	case reflect.Struct:
+		if err := g.writeConversionForStruct(w, inType, outType, indent+1); err != nil {
+			return err
+		}
+	default:
+		return fmt.Errorf("Type not supported: %v", inType)
 	}
 	if err := writeFooter(w, indent); err != nil {
 		return err
