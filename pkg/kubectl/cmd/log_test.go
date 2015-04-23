@@ -18,9 +18,12 @@ package cmd
 
 import (
 	"bytes"
+	"io/ioutil"
+	"net/http"
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 )
 
 func TestSelectContainer(t *testing.T) {
@@ -143,5 +146,88 @@ func TestSelectContainer(t *testing.T) {
 		if container != test.expectedContainer {
 			t.Errorf("unexpected output: %s for input: %s", container, test.input)
 		}
+	}
+}
+
+func TestLog(t *testing.T) {
+
+	tests := []struct {
+		name, version, podPath, logPath, container string
+		nsInQuery                                  bool
+		pod                                        *api.Pod
+	}{
+		{
+			name:      "v1beta1 - pod log",
+			version:   "v1beta1",
+			podPath:   "/api/v1beta1/pods/foo",
+			logPath:   "/api/v1beta1/pods/foo/log",
+			nsInQuery: true,
+			pod:       testPod(),
+		},
+		{
+			name:      "v1beta3 - pod log",
+			version:   "v1beta3",
+			podPath:   "/api/v1beta3/namespaces/test/pods/foo",
+			logPath:   "/api/v1beta3/namespaces/test/pods/foo/log",
+			nsInQuery: false,
+			pod:       testPod(),
+		},
+	}
+	for _, test := range tests {
+		logContent := "test log content"
+		f, tf, codec := NewAPIFactory()
+		tf.Client = &client.FakeRESTClient{
+			Codec: codec,
+			Client: client.HTTPClientFunc(func(req *http.Request) (*http.Response, error) {
+				switch p, m := req.URL.Path, req.Method; {
+				case p == test.podPath && m == "GET":
+					if test.nsInQuery {
+						if ns := req.URL.Query().Get("namespace"); ns != "test" {
+							t.Errorf("%s: did not get expected namespace: %s\n", test.name, ns)
+						}
+					}
+					body := objBody(codec, test.pod)
+					return &http.Response{StatusCode: 200, Body: body}, nil
+				case p == test.logPath && m == "GET":
+					if test.nsInQuery {
+						if ns := req.URL.Query().Get("namespace"); ns != "test" {
+							t.Errorf("%s: did not get expected namespace: %s\n", test.name, ns)
+						}
+					}
+					body := ioutil.NopCloser(bytes.NewBufferString(logContent))
+					return &http.Response{StatusCode: 200, Body: body}, nil
+				default:
+					// Ensures no GET is performed when deleting by name
+					t.Errorf("%s: unexpected request: %#v\n%#v", test.name, req.URL, req)
+					return nil, nil
+				}
+			}),
+		}
+		tf.Namespace = "test"
+		tf.ClientConfig = &client.Config{Version: test.version}
+		buf := bytes.NewBuffer([]byte{})
+
+		cmd := NewCmdLog(f, buf)
+		cmd.Flags().Set("namespace", "test")
+		cmd.Run(cmd, []string{"foo"})
+
+		if buf.String() != logContent {
+			t.Errorf("%s: did not get expected log content. Got: %s", test.name, buf.String())
+		}
+	}
+}
+
+func testPod() *api.Pod {
+	return &api.Pod{
+		ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "test", ResourceVersion: "10"},
+		Spec: api.PodSpec{
+			RestartPolicy: api.RestartPolicyAlways,
+			DNSPolicy:     api.DNSClusterFirst,
+			Containers: []api.Container{
+				{
+					Name: "bar",
+				},
+			},
+		},
 	}
 }
