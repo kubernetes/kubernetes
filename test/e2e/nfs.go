@@ -50,10 +50,9 @@ var _ = Describe("NFS", func() {
 	})
 
 	AfterEach(func() {
-		if !clean {
-			return
+		if clean {
+			c.Namespaces().Delete(namespace)
 		}
-		c.Namespaces().Delete(namespace)
 	})
 
 	It("should be able to mount NFS", func() {
@@ -90,12 +89,11 @@ var _ = Describe("NFS", func() {
 			},
 		}
 		defer func() {
-			if !clean {
-				return
+			if clean {
+				By("deleting the pod")
+				defer GinkgoRecover()
+				podClient.Delete(nfs_pod.Name)
 			}
-			By("deleting the pod")
-			defer GinkgoRecover()
-			podClient.Delete(nfs_pod.Name)
 		}()
 		if _, err := podClient.Create(nfs_pod); err != nil {
 			// Skip the test when 'privileged' containers are not allowed
@@ -132,12 +130,11 @@ var _ = Describe("NFS", func() {
 		}
 
 		defer func() {
-			if !clean {
-				return
+			if clean {
+				By("deleting the NFS service")
+				defer GinkgoRecover()
+				serviceClient.Delete(nfs_service.Name)
 			}
-			By("deleting the NFS service")
-			defer GinkgoRecover()
-			serviceClient.Delete(nfs_service.Name)
 		}()
 		if _, err := serviceClient.Create(nfs_service); err != nil {
 			Failf("Failed to create %s service: %v", nfs_service.Name, err)
@@ -197,12 +194,11 @@ var _ = Describe("NFS", func() {
 			},
 		}
 		defer func() {
-			if !clean {
-				return
+			if clean {
+				By("deleting the pod")
+				defer GinkgoRecover()
+				podClient.Delete(web_pod.Name)
 			}
-			By("deleting the pod")
-			defer GinkgoRecover()
-			podClient.Delete(web_pod.Name)
 		}()
 		if _, err := podClient.Create(web_pod); err != nil {
 			Failf("Failed to create %s pod: %v", web_pod.Name, err)
