@@ -29,12 +29,17 @@ import (
 
 func NewCmdDescribe(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "describe RESOURCE ID",
+		Use:   "describe (RESOURCE NAME | RESOURCE/NAME)",
 		Short: "Show details of a specific resource",
 		Long: `Show details of a specific resource.
 
 This command joins many API calls together to form a detailed description of a
 given resource.`,
+		Example: `// Describe a node
+$ kubectl describe nodes kubernetes-minion-emt8.c.myproject.internal
+
+// Describe a pod
+$ kubectl describe pods/nginx`,
 		Run: func(cmd *cobra.Command, args []string) {
 			err := RunDescribe(f, out, cmd, args)
 			cmdutil.CheckErr(err)
