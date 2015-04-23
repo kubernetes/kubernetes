@@ -117,7 +117,12 @@ func (rs *REST) getAttrs(obj runtime.Object) (objLabels labels.Set, objFields fi
 	if !ok {
 		return nil, nil, fmt.Errorf("invalid object type")
 	}
-	return labels.Set{}, fields.Set{
+	l := event.Labels
+	if l == nil {
+		l = labels.Set{}
+	}
+	return l, fields.Set{
+		"metadata.name":                  event.Name,
 		"involvedObject.kind":            event.InvolvedObject.Kind,
 		"involvedObject.namespace":       event.InvolvedObject.Namespace,
 		"involvedObject.name":            event.InvolvedObject.Name,
