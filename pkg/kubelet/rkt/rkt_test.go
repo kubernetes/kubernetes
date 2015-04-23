@@ -37,13 +37,14 @@ var enableTests bool
 func init() {
 	// Disabled by default since these tests require root privilege.
 	rand.Seed(time.Now().UnixNano())
-	flag.BoolVar(&enableTests, "enable-rkt-tests", false, "Whether the rkt tests should be enabled")
+	flag.BoolVar(&enableTests, "enable-rkt-tests", true, "Whether the rkt tests should be enabled")
 }
 
 const (
-	testACI1     = "http://users.developer.core-os.net/k8s_tests/test1.aci"
-	testACI2     = "http://users.developer.core-os.net/k8s_tests/test2.aci"
-	mountTestACI = "http://users.developer.core-os.net/k8s_tests/mount_test.aci"
+	testACI1              = "http://users.developer.core-os.net/k8s_tests/test1.aci"
+	testACI2              = "http://users.developer.core-os.net/k8s_tests/test2.aci"
+	mountTestACI          = "http://users.developer.core-os.net/k8s_tests/mount_test.aci"
+	runInContainerTestACI = "docker://nginx"
 )
 
 var (
@@ -175,10 +176,11 @@ func tryFindPod(expectedPod *api.Pod, pods []*kubecontainer.Pod) *kubecontainer.
 
 // verifyPod tests if the expected pod with expected state exists.
 func verifyPod(rkt *Runtime, expectedPod *api.Pod, expectedState string, t *testing.T) {
-	pods, err := rkt.GetPods()
+	pods, err := rkt.GetPods(true)
 	if err != nil {
 		t.Errorf("Cannot list pods: %v", err)
 	}
+
 	foundPod := tryFindPod(expectedPod, pods)
 	if foundPod == nil {
 		t.Errorf("Cannot find the pod: %v", expectedPod.Name)
@@ -192,7 +194,7 @@ func verifyPod(rkt *Runtime, expectedPod *api.Pod, expectedState string, t *test
 		}
 
 		time.Sleep(time.Second)
-		pods, err = rkt.GetPods()
+		pods, err = rkt.GetPods(true)
 		if err != nil {
 			t.Errorf("Cannot list pods: %v", err)
 		}
@@ -241,63 +243,6 @@ func TestRunListKillListPod(t *testing.T) {
 	}
 
 	verifyPod(rkt, pod, "termination", t)
-}
-
-// TestKillAndRunContainerInPod runs a pod, and kill/restart a container
-// in that pod.
-func TestKillAndRunContainerInPod(t *testing.T) {
-	if !enableTests {
-		return
-	}
-	rkt := newRktOrFail(t)
-
-	containers := []api.Container{
-		{
-			Name:  "testImage1",
-			Image: testACI1,
-		},
-		{
-			Name:  "testImage2",
-			Image: testACI2,
-		},
-	}
-
-	pod := &api.Pod{
-		ObjectMeta: api.ObjectMeta{
-			UID:         types.UID(fmt.Sprintf("testRkt_%d", rand.Int())),
-			Name:        "foo",
-			Namespace:   "default",
-			Annotations: make(map[string]string),
-		},
-		Spec: api.PodSpec{
-			Containers: containers,
-		},
-	}
-
-	if err := rkt.RunPod(pod, nil); err != nil {
-		t.Errorf("Cannot run pod: %v", err)
-	}
-
-	verifyPod(rkt, pod, "running", t)
-
-	if err := rkt.KillContainerInPod(containers[1], pod); err != nil {
-		t.Errorf("Cannot kill container: %v", err)
-	}
-
-	pod.Spec.Containers = []api.Container{containers[0]}
-	verifyPod(rkt, pod, "running", t)
-
-	if err := rkt.RunContainerInPod(containers[1], pod, nil); err != nil {
-		t.Errorf("Cannot run container: %v", err)
-	}
-
-	pod.Spec.Containers = containers
-	verifyPod(rkt, pod, "running", t)
-
-	// Tear down the pod
-	if err := rkt.KillPod(pod); err != nil {
-		t.Errorf("Cannot kill pod: %v", err)
-	}
 }
 
 type stubVolume struct {
@@ -408,5 +353,83 @@ func TestRunPodWithMountVolumes(t *testing.T) {
 	}
 	if err := rkt.KillPod(pod); err != nil {
 		t.Errorf("Cannot kill pod: %v", err)
+	}
+}
+
+func TestRunInContainer(t *testing.T) {
+	if !enableTests {
+		return
+	}
+	tests := []struct {
+		cmds           []string
+		expectedOutput []byte
+		expectedErr    error
+	}{
+		{
+			[]string{"/bin/echo", "hello"},
+			[]byte("hello"),
+			nil,
+		},
+		{
+			[]string{"/bin/echo", "rkt"},
+			[]byte("rkt"),
+			nil,
+		},
+	}
+
+	rkt := newRktOrFail(t)
+
+	containers := []api.Container{
+		{
+			Name:  "testRunInContainer",
+			Image: runInContainerTestACI,
+		},
+	}
+
+	pod := &api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			UID:         types.UID(fmt.Sprintf("testRkt_%d", rand.Int())),
+			Name:        "foo",
+			Namespace:   "default",
+			Annotations: make(map[string]string),
+		},
+		Spec: api.PodSpec{
+			Containers: containers,
+		},
+	}
+
+	if err := rkt.RunPod(pod, nil); err != nil {
+		t.Errorf("Cannot run pod: %v", err)
+	}
+
+	// TODO(yifan): Sleep here because there is race between "running" and pid file is ready.
+	time.Sleep(time.Second)
+	verifyPod(rkt, pod, "running", t)
+
+	pods, err := rkt.GetPods(true)
+	if err != nil {
+		t.Errorf("Cannot list pods: %v", err)
+	}
+	runningPod := tryFindPod(pod, pods)
+	if runningPod == nil {
+		t.Errorf("Cannot find pod: %v", pod)
+	}
+	runningContainer := runningPod.FindContainerByName(containers[0].Name)
+	if runningContainer == nil {
+		t.Errorf("Cannot find container: %v", containers[0])
+	}
+
+	for i, tt := range tests {
+		output, err := rkt.RunInContainer(string(runningContainer.ID), tt.cmds)
+		if err != tt.expectedErr {
+			t.Errorf("%d Expected: %#v, saw: %#v", i, tt.expectedErr, err)
+		}
+		if !reflect.DeepEqual(tt.expectedOutput, output) {
+			t.Errorf("%d Expected: %#v, saw: %#v", i, tt.expectedOutput, output)
+		}
+	}
+
+	if err := rkt.KillPod(pod); err != nil {
+		t.Errorf("Cannot kill pod %v", err)
 	}
 }
