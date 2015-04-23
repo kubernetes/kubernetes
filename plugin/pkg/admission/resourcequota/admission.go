@@ -19,6 +19,7 @@ package resourcequota
 import (
 	"fmt"
 	"io"
+	"strings"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/admission"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -60,10 +61,10 @@ func NewResourceQuota(client client.Interface) admission.Interface {
 var resourceToResourceName = map[string]api.ResourceName{
 	"pods":                   api.ResourcePods,
 	"services":               api.ResourceServices,
-	"replicationControllers": api.ResourceReplicationControllers,
-	"resourceQuotas":         api.ResourceQuotas,
+	"replicationcontrollers": api.ResourceReplicationControllers,
+	"resourcequotas":         api.ResourceQuotas,
 	"secrets":                api.ResourceSecrets,
-	"persistentVolumeClaims": api.ResourcePersistentVolumeClaims,
+	"persistentvolumeclaims": api.ResourcePersistentVolumeClaims,
 }
 
 func (q *quota) Admit(a admission.Attributes) (err error) {
@@ -137,7 +138,9 @@ func IncrementUsage(a admission.Attributes, status *api.ResourceQuotaStatus, cli
 	obj := a.GetObject()
 	// handle max counts for each kind of resource (pods, services, replicationControllers, etc.)
 	if a.GetOperation() == "CREATE" {
-		resourceName := resourceToResourceName[a.GetResource()]
+		// TODO v1beta1 had camel case, v1beta3 went to all lower, we can remove this line when we deprecate v1beta1
+		resourceNormalized := strings.ToLower(a.GetResource())
+		resourceName := resourceToResourceName[resourceNormalized]
 		hard, hardFound := status.Hard[resourceName]
 		if hardFound {
 			used, usedFound := status.Used[resourceName]
