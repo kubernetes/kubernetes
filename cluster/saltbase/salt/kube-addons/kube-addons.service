@@ -3,7 +3,6 @@ Description=Kubernetes Addon Object Manager
 Documentation=https://github.com/GoogleCloudPlatform/kubernetes
 
 [Service]
-EnvironmentFile=/etc/sysconfig/kube-addons
 ExecStart=/etc/kubernetes/kube-addons.sh
 
 [Install]

@@ -19,11 +19,6 @@
 # managed result is of that. Start everything below that directory.
 KUBECTL=/usr/local/bin/kubectl
 
-if [ -z "$APISERVER_URL" ] ; then
-  echo "Must set APISERVER_URL"
-  exit 1
-fi
-
 function create-kubeconfig-secret() {
   local -r token=$1
   local -r username=$2
@@ -32,6 +27,8 @@ function create-kubeconfig-secret() {
   # Make a kubeconfig file with the token.
   # TODO(etune): put apiserver certs into secret too, and reference from authfile,
   # so that "Insecure" is not needed.
+  # Point the kubeconfig file at https://kubernetes:443. Pods/components that
+  # do not have DNS available will have to override the server.
   read -r -d '' kubeconfig <<EOF
 apiVersion: v1
 kind: Config
@@ -42,7 +39,7 @@ users:
 clusters:
 - name: local
   cluster:
-     server: ${APISERVER_URL}
+     server: "https://kubernetes:443"
      insecure-skip-tls-verify: true
 contexts:
 - context:
