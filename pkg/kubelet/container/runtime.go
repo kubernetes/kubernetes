@@ -18,6 +18,7 @@ package container
 
 import (
 	"fmt"
+	"io"
 	"strings"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -58,6 +59,13 @@ type Runtime interface {
 	// not managed by kubelet. If 'all' is false, then only running containers
 	// are returned.
 	GetContainers(all bool) ([]*Container, error)
+	// TODO(vmarmol): Merge RunInContainer and ExecInContainer.
+	// Runs the command in the container of the specified pod using nsinit.
+	RunInContainer(container api.Container, pod *api.Pod, cmd []string)
+	// Runs the command in the container of the specified pod using nsenter.
+	// Attaches the processes stdin, stdout, and stderr. Optionally uses a
+	// tty.
+	ExecInContainer(container api.Container, pod *api.Pod, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool)
 	// TODO(yifan): Pull/Remove images
 }
 
