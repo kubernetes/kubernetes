@@ -103,7 +103,7 @@ func newTestKubelet(t *testing.T) *TestKubelet {
 	podManager, fakeMirrorClient := newFakePodManager()
 	kubelet.podManager = podManager
 	kubelet.containerRefManager = kubecontainer.NewRefManager()
-	kubelet.containerManager = dockertools.NewDockerManager(fakeDocker, fakeRecorder, dockertools.PodInfraContainerImage, 0, 0)
+	kubelet.containerManager = dockertools.NewDockerManager(fakeDocker, fakeRecorder, kubelet.readinessManager, kubelet.containerRefManager, dockertools.PodInfraContainerImage, 0, 0)
 	kubelet.runtimeCache = kubecontainer.NewFakeRuntimeCache(kubelet.containerManager)
 	kubelet.podWorkers = newPodWorkers(
 		kubelet.runtimeCache,

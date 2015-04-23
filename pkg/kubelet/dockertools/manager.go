@@ -49,8 +49,11 @@ const (
 // TODO: Eventually DockerManager should implement kubecontainer.Runtime
 // interface, and it should also add a cache to replace dockerCache.
 type DockerManager struct {
-	client   DockerInterface
-	recorder record.EventRecorder
+	client              DockerInterface
+	recorder            record.EventRecorder
+	readinessManager    *kubecontainer.ReadinessManager
+	containerRefManager *kubecontainer.RefManager
+
 	// TODO(yifan): PodInfraContainerImage can be unexported once
 	// we move createPodInfraContainer into dockertools.
 	PodInfraContainerImage string
@@ -73,11 +76,20 @@ type DockerManager struct {
 // Ensures DockerManager implements ConatinerRunner.
 var _ kubecontainer.ContainerRunner = new(DockerManager)
 
-func NewDockerManager(client DockerInterface, recorder record.EventRecorder, podInfraContainerImage string, qps float32, burst int) *DockerManager {
+func NewDockerManager(
+	client DockerInterface,
+	recorder record.EventRecorder,
+	readinessManager *kubecontainer.ReadinessManager,
+	containerRefManager *kubecontainer.RefManager,
+	podInfraContainerImage string,
+	qps float32,
+	burst int) *DockerManager {
 	reasonCache := stringCache{cache: lru.New(maxReasonCacheEntries)}
 	return &DockerManager{
 		client:                 client,
 		recorder:               recorder,
+		readinessManager:       readinessManager,
+		containerRefManager:    containerRefManager,
 		PodInfraContainerImage: podInfraContainerImage,
 		reasonCache:            reasonCache,
 		Puller:                 newDockerPuller(client, qps, burst),
