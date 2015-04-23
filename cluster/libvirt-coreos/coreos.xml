@@ -35,11 +35,6 @@
       <target dir='kubernetes'/>
       <readonly/>
     </filesystem>
-    <filesystem type='mount' accessmode='squash'>
-      <source dir='${etcd_dir}'/>
-      <target dir='etcd'/>
-      <readonly/>
-    </filesystem>
     <interface type='network'>
        <mac address='52:54:00:00:00:${i}'/>
        <source network='kubernetes_global'/>

@@ -17,22 +17,11 @@ coreos:
   etcd:
     name: ${name}
     addr: ${public_ip}:4001
-    # bind-addr: 0.0.0.0
+    bind-addr: 0.0.0.0
     peer-addr: ${public_ip}:7001
     # peers: {etcd_peers}
     discovery: ${discovery}
   units:
-    - name: etcd.service
-      drop-ins:
-        - name: opt-etcd2.conf
-          content: |
-            [Unit]
-            After=opt-etcd.mount
-            Requires=opt-etcd.mount
-
-            [Service]
-            ExecStart=
-            ExecStart=/opt/etcd/bin/etcd
     - name: static.network
       command: start
       content: |
@@ -112,17 +101,6 @@ coreos:
         [Mount]
         What=kubernetes
         Where=/opt/kubernetes
-        Options=ro,trans=virtio,version=9p2000.L
-        Type=9p
-    - name: opt-etcd.mount
-      command: start
-      content: |
-        [Unit]
-        ConditionVirtualization=|vm
-
-        [Mount]
-        What=etcd
-        Where=/opt/etcd
         Options=ro,trans=virtio,version=9p2000.L
         Type=9p
   update:
