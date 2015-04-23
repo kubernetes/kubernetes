@@ -56,6 +56,14 @@ coreos:
     group: stable
     reboot-strategy: off
   units:
+    - name: systemd-networkd-wait-online.service
+      drop-ins:
+        - name: 50-check-github-is-reachable.conf
+          content: |
+            [Service]
+            ExecStart=/bin/sh -x -c \
+              'until curl --silent --fail https://status.github.com/api/status.json | grep -q \"good\"; do sleep 2; done'
+
     - name: docker.service
       drop-ins:
         - name: 50-weave-kubernetes.conf
