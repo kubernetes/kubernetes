@@ -177,7 +177,7 @@ func testVolumeClient(client *client.Client, config VolumeTestConfig, volume api
 			Containers: []api.Container{
 				{
 					Name:       config.prefix + "-client",
-					Image:      "dockerfile/nginx",
+					Image:      "nginx",
 					Privileged: false,
 					Ports: []api.ContainerPort{
 						{
@@ -189,7 +189,7 @@ func testVolumeClient(client *client.Client, config VolumeTestConfig, volume api
 					VolumeMounts: []api.VolumeMount{
 						{
 							Name:      config.prefix + "-volume",
-							MountPath: "/var/www/html",
+							MountPath: "/usr/share/nginx/html",
 						},
 					},
 				},
