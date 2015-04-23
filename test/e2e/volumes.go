@@ -306,7 +306,7 @@ var _ = Describe("Volumes", func() {
 				ReadOnly:      true,
 			},
 		}
-		testVolumeClient(c, config, volume, "Hello from Glustr!")
+		testVolumeClient(c, config, volume, "Hello from Gluster!")
 	})
 
 })
