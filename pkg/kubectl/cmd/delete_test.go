@@ -50,6 +50,7 @@ func TestDeleteObjectByTuple(t *testing.T) {
 
 	cmd := NewCmdDelete(f, buf)
 	cmd.Flags().Set("namespace", "test")
+	cmd.Flags().Set("cascade", "false")
 	cmd.Run(cmd, []string{"replicationcontrollers/redis-master-controller"})
 
 	if buf.String() != "replicationControllers/redis-master-controller\n" {
@@ -80,6 +81,7 @@ func TestDeleteNamedObject(t *testing.T) {
 
 	cmd := NewCmdDelete(f, buf)
 	cmd.Flags().Set("namespace", "test")
+	cmd.Flags().Set("cascade", "false")
 	cmd.Run(cmd, []string{"replicationcontrollers", "redis-master-controller"})
 
 	if buf.String() != "replicationControllers/redis-master-controller\n" {
@@ -109,6 +111,7 @@ func TestDeleteObject(t *testing.T) {
 
 	cmd := NewCmdDelete(f, buf)
 	cmd.Flags().Set("filename", "../../../examples/guestbook/redis-master-controller.json")
+	cmd.Flags().Set("cascade", "false")
 	cmd.Run(cmd, []string{})
 
 	// uses the name from the file, not the response
@@ -137,6 +140,7 @@ func TestDeleteObjectIgnoreNotFound(t *testing.T) {
 
 	cmd := NewCmdDelete(f, buf)
 	cmd.Flags().Set("filename", "../../../examples/guestbook/redis-master-controller.json")
+	cmd.Flags().Set("cascade", "false")
 	cmd.Run(cmd, []string{})
 
 	if buf.String() != "" {
@@ -169,6 +173,7 @@ func TestDeleteMultipleObject(t *testing.T) {
 	cmd := NewCmdDelete(f, buf)
 	cmd.Flags().Set("filename", "../../../examples/guestbook/redis-master-controller.json")
 	cmd.Flags().Set("filename", "../../../examples/guestbook/frontend-service.json")
+	cmd.Flags().Set("cascade", "false")
 	cmd.Run(cmd, []string{})
 
 	if buf.String() != "replicationcontrollers/redis-master\nservices/frontend\n" {
@@ -201,6 +206,7 @@ func TestDeleteMultipleObjectIgnoreMissing(t *testing.T) {
 	cmd := NewCmdDelete(f, buf)
 	cmd.Flags().Set("filename", "../../../examples/guestbook/redis-master-controller.json")
 	cmd.Flags().Set("filename", "../../../examples/guestbook/frontend-service.json")
+	cmd.Flags().Set("cascade", "false")
 	cmd.Run(cmd, []string{})
 
 	if buf.String() != "services/frontend\n" {
@@ -232,6 +238,7 @@ func TestDeleteDirectory(t *testing.T) {
 
 	cmd := NewCmdDelete(f, buf)
 	cmd.Flags().Set("filename", "../../../examples/guestbook")
+	cmd.Flags().Set("cascade", "false")
 	cmd.Run(cmd, []string{})
 
 	if buf.String() != "replicationcontrollers/frontend\nservices/frontend\nreplicationcontrollers/redis-master\nservices/redis-master\nreplicationcontrollers/redis-slave\nservices/redis-slave\n" {
@@ -273,6 +280,7 @@ func TestDeleteMultipleSelector(t *testing.T) {
 
 	cmd := NewCmdDelete(f, buf)
 	cmd.Flags().Set("selector", "a=b")
+	cmd.Flags().Set("cascade", "false")
 	cmd.Run(cmd, []string{"pods,services"})
 
 	if buf.String() != "pods/foo\npods/bar\nservices/baz\n" {
