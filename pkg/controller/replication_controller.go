@@ -190,10 +190,10 @@ func (rm *ReplicationManager) watchControllers(resourceVersion *string) {
 // filterActivePods returns pods that have not terminated.
 func filterActivePods(pods []api.Pod) []*api.Pod {
 	var result []*api.Pod
-	for _, value := range pods {
-		if api.PodSucceeded != value.Status.Phase &&
-			api.PodFailed != value.Status.Phase {
-			result = append(result, &value)
+	for i := range pods {
+		if api.PodSucceeded != pods[i].Status.Phase &&
+			api.PodFailed != pods[i].Status.Phase {
+			result = append(result, &pods[i])
 		}
 	}
 	return result
