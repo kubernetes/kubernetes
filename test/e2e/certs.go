@@ -41,8 +41,8 @@ var _ = Describe("MasterCerts", func() {
 			cmd := exec.Command("gcloud", "compute", "ssh", "--project", testContext.CloudConfig.ProjectID,
 				"--zone", testContext.CloudConfig.Zone, testContext.CloudConfig.MasterName,
 				"--command", fmt.Sprintf("ls /srv/kubernetes/%s", certFile))
-			if _, err := cmd.CombinedOutput(); err != nil {
-				Fail(fmt.Sprintf("Error checking for cert file %s on master: %v", certFile, err))
+			if output, err := cmd.CombinedOutput(); err != nil {
+				Failf("Error checking for cert file %s on master: %v\n%s", certFile, err, string(output))
 			}
 		}
 	})
