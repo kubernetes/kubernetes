@@ -134,6 +134,9 @@ func startVolumeServer(client *client.Client, config VolumeTestConfig) *api.Serv
 	By("locating the NFS server service")
 	srv, err := serviceClient.Get(serverService.Name)
 	expectNoError(err, "Cannot read IP address of service %v: %v", serverService.Name, err)
+
+	By("sleeping a bit to give the server time to start")
+	time.Sleep(1 * time.Second)
 	return srv
 }
 
