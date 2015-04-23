@@ -67,6 +67,7 @@ func (d *MyDuration) UnmarshalText(text []byte) error {
 
 type LoadBalancerOpts struct {
 	SubnetId          string     `gcfg:"subnet-id"` // required
+	LBMethod          string     `gfcg:"lb-method"`
 	CreateMonitor     bool       `gcfg:"create-monitor"`
 	MonitorDelay      MyDuration `gcfg:"monitor-delay"`
 	MonitorTimeout    MyDuration `gcfg:"monitor-timeout"`
@@ -485,10 +486,15 @@ func (lb *LoadBalancer) CreateTCPLoadBalancer(name, region string, externalIP ne
 		return "", fmt.Errorf("unsupported load balancer affinity: %v", affinity)
 	}
 
+	lbmethod := lb.opts.LBMethod
+	if lbmethod == "" {
+		lbmethod = pools.LBMethodRoundRobin
+	}
 	pool, err := pools.Create(lb.network, pools.CreateOpts{
 		Name:     name,
 		Protocol: pools.ProtocolTCP,
 		SubnetID: lb.opts.SubnetId,
+		LBMethod: lbmethod,
 	}).Extract()
 	if err != nil {
 		return "", err
