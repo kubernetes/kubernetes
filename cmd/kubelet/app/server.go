@@ -30,7 +30,6 @@ import (
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/capabilities"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/chaosclient"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
@@ -47,6 +46,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/securitycontext"
 	"github.com/golang/glog"
 	"github.com/spf13/pflag"
 )
@@ -98,6 +98,7 @@ type KubeletServer struct {
 	CertDirectory                  string
 	NodeStatusUpdateFrequency      time.Duration
 	ResourceContainer              string
+	SecurityContextProvider        string
 
 	// Flags intended for testing
 
@@ -201,6 +202,7 @@ func (s *KubeletServer) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.CloudProvider, "cloud_provider", s.CloudProvider, "The provider for cloud services.  Empty string for no provider.")
 	fs.StringVar(&s.CloudConfigFile, "cloud_config", s.CloudConfigFile, "The path to the cloud provider configuration file.  Empty string for no configuration file.")
 	fs.StringVar(&s.ResourceContainer, "resource_container", s.ResourceContainer, "Absolute name of the resource-only container to create and run the Kubelet in (Default: /kubelet).")
+	fs.StringVar(&s.SecurityContextProvider, "security_context", s.SecurityContextProvider, "Name of the security context provider to use. Allowable values are <empty>|permit|restrict")
 
 	// Flags intended for testing, not recommended used in production environments.
 	fs.BoolVar(&s.ReallyCrashForTesting, "really_crash_for_testing", s.ReallyCrashForTesting, "If true, when panics occur crash. Intended for testing.")
@@ -301,6 +303,8 @@ func (s *KubeletServer) Run(_ []string) error {
 		NodeStatusUpdateFrequency: s.NodeStatusUpdateFrequency,
 		ResourceContainer:         s.ResourceContainer,
 	}
+
+	InitializeSecurityContextProvider(&kcfg, s.SecurityContextProvider)
 
 	RunKubelet(&kcfg, nil)
 
@@ -406,6 +410,7 @@ func SimpleKubelet(client *client.Client,
 		Cloud:                   cloud,
 		NodeStatusUpdateFrequency: 10 * time.Second,
 		ResourceContainer:         "/kubelet",
+		SecurityContextProvider:   securitycontext.NewPermitSecurityContextProvider(securitycontext.Get()),
 	}
 	return &kcfg
 }
@@ -415,6 +420,7 @@ func SimpleKubelet(client *client.Client,
 //   2 Kubelet binary
 //   3 Standalone 'kubernetes' binary
 // Eventually, #2 will be replaced with instances of #3
+// NOTE:  please see the comments on InitializeSecurityContextProvider for important information about the SecurityContextProvider!!
 func RunKubelet(kcfg *KubeletConfig, builder KubeletBuilder) {
 	kcfg.Hostname = util.GetHostname(kcfg.HostnameOverride)
 	eventBroadcaster := record.NewBroadcaster()
@@ -426,7 +432,10 @@ func RunKubelet(kcfg *KubeletConfig, builder KubeletBuilder) {
 	} else {
 		glog.Infof("No api server defined - no events will be sent to API server.")
 	}
-	capabilities.Setup(kcfg.AllowPrivileged, kcfg.HostNetworkSources)
+
+	//initialize the security context provider if it hasn't already happened
+	//NOTE:  please see the comments on InitializeSecurityContextProvider!
+	InitializeSecurityContextProvider(kcfg, "")
 
 	credentialprovider.SetPreferredDockercfgPath(kcfg.RootDirectory)
 
@@ -447,6 +456,43 @@ func RunKubelet(kcfg *KubeletConfig, builder KubeletBuilder) {
 		startKubelet(k, podCfg, kcfg)
 	}
 	glog.Infof("Started kubelet")
+}
+
+// InitializeSecurityContextProvider initializes a global security context and sets the security context provider.
+// This should eventually be pulled as a resource but this is replacing the existing capabilities functionality for now.
+// This method is called twice: once by Run and once by RunKubelet.
+//
+// Issue: the old global capabilities code has migrated into a security constraint.  This is initialized only once
+// for the system.  We also want to pass that global context into the global provider until the security constraints
+// are fetched at runtime based on the namespace.  In order to have both items you MUST initialize the context and
+// provider yourself before you use RunKubelet or SimpleKubelet since they set up a default security context provider
+// to catch anything that is not set. (this is where the old capabilities code was originally called) unless you are ok
+// with using the default permit provider which ignores the cap add/drop settings and priv container requests and
+// allows them to be run.
+//
+// SimpleKubelet example:
+//				myKcfg := KubeletConfig{}
+//				InitializeSecurityContextProvider(myKcfg, type)
+// 				simpleKubeletCfg := SimpleKubelet()
+//				simpleKubeletCfg.SecurityContextProvider = myKcfg.SecurityContextProvider
+// RunKubelet example:
+//				myKcfg := KubeletConfig{}
+//				InitializeSecurityContextProvider(myKcfg, type)
+//				RunKubelet(myKcfg, ...)
+//
+//
+// Using the Run method pre-initializes the provider base on the command line settings
+func InitializeSecurityContextProvider(kcfg *KubeletConfig, providerType string) {
+	securitycontext.Setup(kcfg.AllowPrivileged, kcfg.HostNetworkSources)
+
+	if kcfg.SecurityContextProvider == nil {
+		switch providerType {
+		case "restrict":
+			kcfg.SecurityContextProvider = securitycontext.NewRestrictSecurityContextProvider(securitycontext.Get())
+		default:
+			kcfg.SecurityContextProvider = securitycontext.NewPermitSecurityContextProvider(securitycontext.Get())
+		}
+	}
 }
 
 func startKubelet(k KubeletBootstrap, podCfg *config.PodConfig, kc *KubeletConfig) {
@@ -529,6 +575,7 @@ type KubeletConfig struct {
 	Cloud                          cloudprovider.Interface
 	NodeStatusUpdateFrequency      time.Duration
 	ResourceContainer              string
+	SecurityContextProvider        securitycontext.SecurityContextProvider
 }
 
 func createAndInitKubelet(kc *KubeletConfig) (k KubeletBootstrap, pc *config.PodConfig, err error) {
@@ -572,7 +619,8 @@ func createAndInitKubelet(kc *KubeletConfig) (k KubeletBootstrap, pc *config.Pod
 		kc.ImageGCPolicy,
 		kc.Cloud,
 		kc.NodeStatusUpdateFrequency,
-		kc.ResourceContainer)
+		kc.ResourceContainer,
+		kc.SecurityContextProvider)
 
 	if err != nil {
 		return nil, nil, err

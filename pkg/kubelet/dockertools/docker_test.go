@@ -27,6 +27,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/credentialprovider"
 	kubecontainer "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/securitycontext"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	docker "github.com/fsouza/go-dockerclient"
@@ -392,7 +393,8 @@ func TestIsImagePresent(t *testing.T) {
 func TestGetRunningContainers(t *testing.T) {
 	fakeDocker := &FakeDockerClient{Errors: make(map[string]error)}
 	fakeRecorder := &record.FakeRecorder{}
-	containerManager := NewDockerManager(fakeDocker, fakeRecorder, PodInfraContainerImage, 0, 0)
+	fakeSecurityContextProvider := &securitycontext.FakeSecurityContextProvider{}
+	containerManager := NewDockerManager(fakeDocker, fakeRecorder, PodInfraContainerImage, 0, 0, fakeSecurityContextProvider)
 	tests := []struct {
 		containers  map[string]*docker.Container
 		inputIDs    []string
@@ -657,7 +659,8 @@ func TestFindContainersByPod(t *testing.T) {
 		},
 	}
 	fakeClient := &FakeDockerClient{}
-	containerManager := NewDockerManager(fakeClient, &record.FakeRecorder{}, PodInfraContainerImage, 0, 0)
+	fakeSecurityContextProvider := &securitycontext.FakeSecurityContextProvider{}
+	containerManager := NewDockerManager(fakeClient, &record.FakeRecorder{}, PodInfraContainerImage, 0, 0, fakeSecurityContextProvider)
 	for i, test := range tests {
 		fakeClient.ContainerList = test.containerList
 		fakeClient.ExitedContainerList = test.exitedContainerList

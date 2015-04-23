@@ -63,6 +63,8 @@ func init() {
 		&PodProxyOptions{},
 		&ComponentStatus{},
 		&ComponentStatusList{},
+		&SecurityContext{},
+		&SecurityConstraints{},
 	)
 	// Legacy names are supported
 	api.Scheme.AddKnownTypeWithName("v1beta3", "Minion", &Node{})
@@ -106,3 +108,5 @@ func (*PodExecOptions) IsAnAPIObject()            {}
 func (*PodProxyOptions) IsAnAPIObject()           {}
 func (*ComponentStatus) IsAnAPIObject()           {}
 func (*ComponentStatusList) IsAnAPIObject()       {}
+func (*SecurityContext) IsAnAPIObject()           {}
+func (*SecurityConstraints) IsAnAPIObject()       {}

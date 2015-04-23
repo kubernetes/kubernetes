@@ -23,7 +23,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/capabilities"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/securitycontext"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	utilerrors "github.com/GoogleCloudPlatform/kubernetes/pkg/util/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/fielderrors"
@@ -786,7 +786,7 @@ func getResourceLimits(cpu, memory string) api.ResourceList {
 
 func TestValidateContainers(t *testing.T) {
 	volumes := util.StringSet{}
-	capabilities.SetForTests(capabilities.Capabilities{
+	securitycontext.SetForTests(api.SecurityConstraints{
 		AllowPrivileged: true,
 	})
 
@@ -816,13 +816,13 @@ func TestValidateContainers(t *testing.T) {
 			},
 			ImagePullPolicy: "IfNotPresent",
 		},
-		{Name: "abc-1234", Image: "image", Privileged: true, ImagePullPolicy: "IfNotPresent"},
+		{Name: "abc-1234", Image: "image", SecurityContext: api.SecurityContext{Privileged: true}, ImagePullPolicy: "IfNotPresent"},
 	}
 	if errs := validateContainers(successCase, volumes); len(errs) != 0 {
 		t.Errorf("expected success: %v", errs)
 	}
 
-	capabilities.SetForTests(capabilities.Capabilities{
+	securitycontext.SetForTests(api.SecurityConstraints{
 		AllowPrivileged: false,
 	})
 	errorCases := map[string][]api.Container{
@@ -930,7 +930,7 @@ func TestValidateContainers(t *testing.T) {
 			},
 		},
 		"privilege disabled": {
-			{Name: "abc", Image: "image", Privileged: true},
+			{Name: "abc", Image: "image", SecurityContext: api.SecurityContext{Privileged: true}},
 		},
 		"invalid compute resource": {
 			{

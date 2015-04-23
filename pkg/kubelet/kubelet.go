@@ -47,6 +47,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/probe"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/scheduler"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/securitycontext"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	utilErrors "github.com/GoogleCloudPlatform/kubernetes/pkg/util/errors"
@@ -123,7 +124,8 @@ func NewMainKubelet(
 	imageGCPolicy ImageGCPolicy,
 	cloud cloudprovider.Interface,
 	nodeStatusUpdateFrequency time.Duration,
-	resourceContainer string) (*Kubelet, error) {
+	resourceContainer string,
+	securityContextProvider securitycontext.SecurityContextProvider) (*Kubelet, error) {
 	if rootDirectory == "" {
 		return nil, fmt.Errorf("invalid root directory %q", rootDirectory)
 	}
@@ -200,7 +202,7 @@ func NewMainKubelet(
 		return nil, fmt.Errorf("failed to initialize image manager: %v", err)
 	}
 	statusManager := newStatusManager(kubeClient)
-	containerManager := dockertools.NewDockerManager(dockerClient, recorder, podInfraContainerImage, pullQPS, pullBurst)
+	containerManager := dockertools.NewDockerManager(dockerClient, recorder, podInfraContainerImage, pullQPS, pullBurst, securityContextProvider)
 
 	klet := &Kubelet{
 		hostname:                       hostname,
@@ -229,6 +231,7 @@ func NewMainKubelet(
 		containerManager:               containerManager,
 		nodeStatusUpdateFrequency:      nodeStatusUpdateFrequency,
 		resourceContainer:              resourceContainer,
+		securityContextProvider:        securityContextProvider,
 	}
 
 	klet.podManager = newBasicPodManager(klet.kubeClient)
@@ -369,6 +372,9 @@ type Kubelet struct {
 	// The name of the resource-only container to run the Kubelet in (empty for no container).
 	// Name must be absolute.
 	resourceContainer string
+
+	// securityContextProvider provides the ability to manipulate the container security options before running
+	securityContextProvider securitycontext.SecurityContextProvider
 }
 
 // getRootDir returns the full path to the directory under which kubelet can
@@ -1191,7 +1197,7 @@ func (kl *Kubelet) syncPod(pod *api.Pod, mirrorPod *api.Pod, runningPod kubecont
 	}()
 
 	// Kill pods we can't run.
-	err := canRunPod(pod)
+	err := canRunPod(pod, kl.securityContextProvider)
 	if err != nil {
 		kl.killPod(runningPod)
 		return err

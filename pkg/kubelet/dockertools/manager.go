@@ -31,12 +31,12 @@ import (
 	"sync"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/capabilities"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
 	kubecontainer "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/securitycontext"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	"github.com/fsouza/go-dockerclient"
+	docker "github.com/fsouza/go-dockerclient"
 	"github.com/golang/glog"
 	"github.com/golang/groupcache/lru"
 )
@@ -67,20 +67,22 @@ type DockerManager struct {
 	// container manager, then we can unexport this. Also at that time, we
 	// use the concrete type so that we can record the pull failure and eliminate
 	// the image checking in GetPodStatus().
-	Puller DockerPuller
+	Puller                  DockerPuller
+	securityContextProvider securitycontext.SecurityContextProvider
 }
 
 // Ensures DockerManager implements ConatinerRunner.
 var _ kubecontainer.ContainerRunner = new(DockerManager)
 
-func NewDockerManager(client DockerInterface, recorder record.EventRecorder, podInfraContainerImage string, qps float32, burst int) *DockerManager {
+func NewDockerManager(client DockerInterface, recorder record.EventRecorder, podInfraContainerImage string, qps float32, burst int, securityContextProvider securitycontext.SecurityContextProvider) *DockerManager {
 	reasonCache := stringCache{cache: lru.New(maxReasonCacheEntries)}
 	return &DockerManager{
-		client:                 client,
-		recorder:               recorder,
-		PodInfraContainerImage: podInfraContainerImage,
-		reasonCache:            reasonCache,
-		Puller:                 newDockerPuller(client, qps, burst),
+		client:                  client,
+		recorder:                recorder,
+		PodInfraContainerImage:  podInfraContainerImage,
+		reasonCache:             reasonCache,
+		Puller:                  newDockerPuller(client, qps, burst),
+		securityContextProvider: securityContextProvider,
 	}
 }
 
@@ -446,6 +448,10 @@ func (dm *DockerManager) runContainer(pod *api.Pod, container *api.Container, op
 
 	glog.V(3).Infof("Container %v/%v/%v: setting entrypoint \"%v\" and command \"%v\"", pod.Namespace, pod.Name, container.Name, dockerOpts.Config.Entrypoint, dockerOpts.Config.Cmd)
 
+	if err := dm.securityContextProvider.ModifyContainerConfig(pod, container, dockerOpts.Config); err != nil {
+		return "", err
+	}
+
 	dockerContainer, err := dm.client.CreateContainer(dockerOpts)
 	if err != nil {
 		if ref != nil {
@@ -476,22 +482,13 @@ func (dm *DockerManager) runContainer(pod *api.Pod, container *api.Container, op
 		}
 	}
 
-	privileged := false
-	if capabilities.Get().AllowPrivileged {
-		privileged = container.Privileged
-	} else if container.Privileged {
-		return "", fmt.Errorf("container requested privileged mode, but it is disallowed globally.")
-	}
-
-	capAdd, capDrop := makeCapabilites(container.Capabilities.Add, container.Capabilities.Drop)
 	hc := &docker.HostConfig{
 		PortBindings: portBindings,
 		Binds:        opts.Binds,
 		NetworkMode:  opts.NetMode,
 		IpcMode:      opts.IpcMode,
-		Privileged:   privileged,
-		CapAdd:       capAdd,
-		CapDrop:      capDrop,
+		//privileged is set by the security context provider below
+		//capabilities are modified by the security context provider below
 	}
 	if len(opts.DNS) > 0 {
 		hc.DNS = opts.DNS
@@ -499,6 +496,8 @@ func (dm *DockerManager) runContainer(pod *api.Pod, container *api.Container, op
 	if len(opts.DNSSearch) > 0 {
 		hc.DNSSearch = opts.DNSSearch
 	}
+
+	dm.securityContextProvider.ModifyHostConfig(pod, container, hc)
 
 	if err = dm.client.StartContainer(dockerContainer.ID, hc); err != nil {
 		if ref != nil {
@@ -554,20 +553,6 @@ func makePortsAndBindings(container *api.Container) (map[docker.Port]struct{}, m
 		}
 	}
 	return exposedPorts, portBindings
-}
-
-func makeCapabilites(capAdd []api.CapabilityType, capDrop []api.CapabilityType) ([]string, []string) {
-	var (
-		addCaps  []string
-		dropCaps []string
-	)
-	for _, cap := range capAdd {
-		addCaps = append(addCaps, string(cap))
-	}
-	for _, cap := range capDrop {
-		dropCaps = append(dropCaps, string(cap))
-	}
-	return addCaps, dropCaps
 }
 
 func (dm *DockerManager) GetPods(all bool) ([]*kubecontainer.Pod, error) {
