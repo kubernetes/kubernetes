@@ -24,11 +24,12 @@ limitations under the License.
  */
 
 package e2e
+
 import (
+	"fmt"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"strings"
-	"fmt"
 	"time"
 
 	. "github.com/onsi/ginkgo"
@@ -95,7 +96,7 @@ func startVolumeServer(client *client.Client, config VolumeTestConfig) *api.Serv
 					Name:       config.prefix + "-server",
 					Image:      config.serverImage,
 					Privileged: true,
-					Ports: serverPodPorts,
+					Ports:      serverPodPorts,
 				},
 			},
 		},
@@ -131,12 +132,12 @@ func startVolumeServer(client *client.Client, config VolumeTestConfig) *api.Serv
 		Failf("Failed to create %s service: %v", serverService.Name, err)
 	}
 
-	By("locating the NFS server service")
+	By("locating the server service")
 	srv, err := serviceClient.Get(serverService.Name)
 	expectNoError(err, "Cannot read IP address of service %v: %v", serverService.Name, err)
 
 	By("sleeping a bit to give the server time to start")
-	time.Sleep(1 * time.Second)
+	time.Sleep(20 * time.Second)
 	return srv
 }
 
@@ -149,7 +150,7 @@ func volumeTestCleanup(client *client.Client, config VolumeTestConfig) {
 	podClient := client.Pods(config.namespace)
 	serviceClient := client.Services(config.namespace)
 
- 	// ignore all errors, the pods/services may not be even created
+	// ignore all errors, the pods/services may not be even created
 	podClient.Delete(config.prefix + "-client")
 	serviceClient.Delete(config.prefix + "-server")
 	podClient.Delete(config.prefix + "-server")
@@ -199,7 +200,7 @@ func testVolumeClient(client *client.Client, config VolumeTestConfig, volume api
 			},
 			Volumes: []api.Volume{
 				{
-					Name: config.prefix + "-volume",
+					Name:         config.prefix + "-volume",
 					VolumeSource: volume,
 				},
 			},
@@ -240,10 +241,10 @@ var _ = Describe("Volumes", func() {
 
 	It("should be able to mount NFS", func() {
 		config := VolumeTestConfig{
-			namespace: namespace,
-			prefix: "nfs",
+			namespace:   namespace,
+			prefix:      "nfs",
 			serverImage: "jsafrane/nfs-data",
-			serverPorts: []int { 2049 },
+			serverPorts: []int{2049},
 		}
 
 		defer func() {
@@ -270,4 +271,39 @@ var _ = Describe("Volumes", func() {
 		}
 		testVolumeClient(c, config, volume, "Hello world!")
 	})
+
+	It("should be able to mount GlusterFS", func() {
+		config := VolumeTestConfig{
+			namespace:   namespace,
+			prefix:      "gluster",
+			serverImage: "jsafrane/kubernetes-gluster",
+			serverPorts: []int{24007, 24008, 49152},
+		}
+
+		defer func() {
+			if clean {
+				volumeTestCleanup(c, config)
+			}
+		}()
+
+		srv := startVolumeServer(c, config)
+		if srv == nil {
+			// Skip the test, message has been already logged.
+			return
+		}
+
+		serverIP := srv.Spec.PortalIP
+		Logf("Gluster server IP address: %v", serverIP)
+
+		volume := api.VolumeSource{
+			Glusterfs: &api.GlusterfsVolumeSource{
+				// Use service name as an endpoint
+				EndpointsName: config.prefix + "-server",
+				Path:          "test_vol",
+				ReadOnly:      true,
+			},
+		}
+		testVolumeClient(c, config, volume, "Hello from Glustr!")
+	})
+
 })
