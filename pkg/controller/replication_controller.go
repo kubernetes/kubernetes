@@ -17,6 +17,7 @@ limitations under the License.
 package controller
 
 import (
+	"encoding/json"
 	"fmt"
 	"sort"
 	"sync"
@@ -62,6 +63,7 @@ type RealPodControl struct {
 
 // Time period of main replication controller sync loop
 const DefaultSyncPeriod = 5 * time.Second
+const CreatedByAnnotation = "kubernetes.io/created-by"
 
 func (r RealPodControl) createReplica(namespace string, controller api.ReplicationController) {
 	desiredLabels := make(labels.Set)
@@ -72,6 +74,20 @@ func (r RealPodControl) createReplica(namespace string, controller api.Replicati
 	for k, v := range controller.Spec.Template.Annotations {
 		desiredAnnotations[k] = v
 	}
+
+	createdByRef, err := api.GetReference(&controller)
+	if err != nil {
+		util.HandleError(fmt.Errorf("unable to get controller reference: %v", err))
+		return
+	}
+
+	createdByRefJson, err := json.Marshal(createdByRef)
+	if err != nil {
+		util.HandleError(fmt.Errorf("unable to serialize controller reference: %v", err))
+		return
+	}
+
+	desiredAnnotations[CreatedByAnnotation] = string(createdByRefJson)
 
 	// use the dash (if the name isn't too long) to make the pod name a bit prettier
 	prefix := fmt.Sprintf("%s-", controller.Name)

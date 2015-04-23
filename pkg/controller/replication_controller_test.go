@@ -43,6 +43,10 @@ type FakePodControl struct {
 	lock           sync.Mutex
 }
 
+func init() {
+	api.ForTesting_ReferencesAllowBlankSelfLinks = true
+}
+
 func (f *FakePodControl) createReplica(namespace string, spec api.ReplicationController) {
 	f.lock.Lock()
 	defer f.lock.Unlock()
