@@ -116,7 +116,7 @@ func newTestKubelet(t *testing.T) *TestKubelet {
 	kubelet.containerManager.Puller = &dockertools.FakeDockerPuller{}
 	kubelet.prober = newProber(nil, kubelet.readinessManager, kubelet.containerRefManager, kubelet.recorder)
 	kubelet.handlerRunner = newHandlerRunner(&fakeHTTP{}, &fakeContainerCommandRunner{}, kubelet.containerManager)
-
+	kubelet.volumeManager = newVolumeManager()
 	return &TestKubelet{kubelet, fakeDocker, mockCadvisor, fakeKubeClient, waitGroup, fakeMirrorClient}
 }
 
@@ -4106,7 +4106,8 @@ func TestGetPodCreationFailureReason(t *testing.T) {
 	}
 	pods := []*api.Pod{pod}
 	kubelet.podManager.SetPods(pods)
-	_, err := kubelet.runContainer(pod, &pod.Spec.Containers[0], make(map[string]volume.Volume), "", "")
+	kubelet.volumeManager.SetVolumes(pod.UID, volumeMap{})
+	_, err := kubelet.runContainer(pod, &pod.Spec.Containers[0], "", "")
 	if err == nil {
 		t.Errorf("expected error, found nil")
 	}
@@ -4121,7 +4122,7 @@ func TestGetPodCreationFailureReason(t *testing.T) {
 		if state.Waiting == nil {
 			t.Errorf("expected waiting state, got %#v", state)
 		} else if state.Waiting.Reason != failureReason {
-			t.Errorf("expected reason %q, got %q", state.Waiting.Reason)
+			t.Errorf("expected reason %q, got %q", failureReason, state.Waiting.Reason)
 		}
 	}
 }
