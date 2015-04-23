@@ -33,6 +33,8 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+
+	"code.google.com/p/go-uuid/uuid"
 )
 
 const (
@@ -91,6 +93,19 @@ func waitForPodCondition(c *client.Client, ns, podName, desc string, condition p
 		Logf("Waiting for pod %s in namespace %s status to be %q (found %q) (%v)", podName, ns, desc, pod.Status.Phase, time.Since(start))
 	}
 	return fmt.Errorf("gave up waiting for pod %s to be %s after %.2f seconds", podName, desc, podStartTimeout.Seconds())
+}
+
+// createNS should be used by every test, note that we append a common prefix to the provided test name.
+func createTestingNS(baseName string, c *client.Client) (*api.Namespace, error) {
+	namespaceObj := &api.Namespace{
+		ObjectMeta: api.ObjectMeta{
+			Name:      fmt.Sprintf("e2e-tests-%v-%v", baseName, uuid.New()),
+			Namespace: "",
+		},
+		Status: api.NamespaceStatus{},
+	}
+	_, err := c.Namespaces().Create(namespaceObj)
+	return namespaceObj, err
 }
 
 func waitForPodRunningInNamespace(c *client.Client, podName string, namespace string) error {
@@ -191,6 +206,7 @@ func loadClient() (*client.Client, error) {
 	return c, nil
 }
 
+// randomSuffix provides a random string to append to pods,services,rcs.
 // TODO: Allow service names to have the same form as names
 //       for pods and replication controllers so we don't
 //       need to use such a function and can instead
@@ -281,6 +297,7 @@ func validateController(c *client.Client, containerImage string, replicas int, c
 	Failf("Timed out after %v seconds waiting for %s pods to reach valid state", podStartTimeout.Seconds(), testname)
 }
 
+// kubectlCmd runs the kubectl executable.
 // kubectlCmd runs the kubectl executable.
 func kubectlCmd(args ...string) *exec.Cmd {
 	defaultArgs := []string{}
