@@ -2210,9 +2210,19 @@ func (kl *Kubelet) GetContainerInfo(podFullName string, uid types.UID, container
 	return &ci, nil
 }
 
-// GetRootInfo returns stats (from Cadvisor) of current machine (root container).
-func (kl *Kubelet) GetRootInfo(req *cadvisorApi.ContainerInfoRequest) (*cadvisorApi.ContainerInfo, error) {
-	return kl.cadvisor.ContainerInfo("/", req)
+// Returns stats (from Cadvisor) for a non-Kubernetes container.
+func (kl *Kubelet) GetRawContainerInfo(containerName string, req *cadvisorApi.ContainerInfoRequest, subcontainers bool) (map[string]*cadvisorApi.ContainerInfo, error) {
+	if subcontainers {
+		return kl.cadvisor.SubcontainerInfo(containerName, req)
+	} else {
+		containerInfo, err := kl.cadvisor.ContainerInfo(containerName, req)
+		if err != nil {
+			return nil, err
+		}
+		return map[string]*cadvisorApi.ContainerInfo{
+			containerInfo.Name: containerInfo,
+		}, nil
+	}
 }
 
 // GetCachedMachineInfo assumes that the machine info can't change without a reboot

@@ -1441,7 +1441,7 @@ func TestGetContainerInfo(t *testing.T) {
 	mockCadvisor.AssertExpectations(t)
 }
 
-func TestGetRootInfo(t *testing.T) {
+func TestGetRawContainerInfoRoot(t *testing.T) {
 	containerPath := "/"
 	containerInfo := &cadvisorApi.ContainerInfo{
 		ContainerReference: cadvisorApi.ContainerReference{
@@ -1459,10 +1459,44 @@ func TestGetRootInfo(t *testing.T) {
 		cadvisor:     mockCadvisor,
 	}
 
-	// If the container name is an empty string, then it means the root container.
-	_, err := kubelet.GetRootInfo(cadvisorReq)
+	_, err := kubelet.GetRawContainerInfo(containerPath, cadvisorReq, false)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
+	}
+	mockCadvisor.AssertExpectations(t)
+}
+
+func TestGetRawContainerInfoSubcontainers(t *testing.T) {
+	containerPath := "/kubelet"
+	containerInfo := map[string]*cadvisorApi.ContainerInfo{
+		containerPath: {
+			ContainerReference: cadvisorApi.ContainerReference{
+				Name: containerPath,
+			},
+		},
+		"/kubelet/sub": {
+			ContainerReference: cadvisorApi.ContainerReference{
+				Name: "/kubelet/sub",
+			},
+		},
+	}
+	fakeDocker := dockertools.FakeDockerClient{}
+
+	mockCadvisor := &cadvisor.Mock{}
+	cadvisorReq := &cadvisorApi.ContainerInfoRequest{}
+	mockCadvisor.On("SubcontainerInfo", containerPath, cadvisorReq).Return(containerInfo, nil)
+
+	kubelet := Kubelet{
+		dockerClient: &fakeDocker,
+		cadvisor:     mockCadvisor,
+	}
+
+	result, err := kubelet.GetRawContainerInfo(containerPath, cadvisorReq, true)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if len(result) != 2 {
+		t.Errorf("Expected 2 elements, received: %+v", result)
 	}
 	mockCadvisor.AssertExpectations(t)
 }

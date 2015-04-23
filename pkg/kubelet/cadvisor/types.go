@@ -26,6 +26,7 @@ import (
 type Interface interface {
 	DockerContainer(name string, req *cadvisorApi.ContainerInfoRequest) (cadvisorApi.ContainerInfo, error)
 	ContainerInfo(name string, req *cadvisorApi.ContainerInfoRequest) (*cadvisorApi.ContainerInfo, error)
+	SubcontainerInfo(name string, req *cadvisorApi.ContainerInfoRequest) (map[string]*cadvisorApi.ContainerInfo, error)
 	MachineInfo() (*cadvisorApi.MachineInfo, error)
 
 	VersionInfo() (*cadvisorApi.VersionInfo, error)
