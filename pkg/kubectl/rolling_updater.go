@@ -66,6 +66,9 @@ const (
 	DeleteRollingUpdateCleanupPolicy RollingUpdaterCleanupPolicy = "Delete"
 	// PreserveRollingUpdateCleanupPolicy means keep the old controller.
 	PreserveRollingUpdateCleanupPolicy RollingUpdaterCleanupPolicy = "Preserve"
+	// RenameRollingUpdateCleanupPolicy means delete the old controller, and rename
+	// the new controller to the name of the old controller.
+	RenameRollingUpdateCleanupPolicy RollingUpdaterCleanupPolicy = "Rename"
 )
 
 // NewRollingUpdater creates a RollingUpdater from a client
@@ -199,6 +202,14 @@ func (r *RollingUpdater) Update(config *RollingUpdaterConfig) error {
 		// delete old rc
 		fmt.Fprintf(out, "Update succeeded. Deleting %s\n", oldName)
 		return r.c.DeleteReplicationController(r.ns, oldName)
+	case RenameRollingUpdateCleanupPolicy:
+		// delete old rc
+		fmt.Fprintf(out, "Update succeeded. Deleting old controller: %s\n", oldName)
+		if err := r.c.DeleteReplicationController(r.ns, oldName); err != nil {
+			return err
+		}
+		fmt.Fprintf(out, "Renaming %s to %s\n", newRc.Name, oldName)
+		return r.rename(newRc, oldName)
 	case PreserveRollingUpdateCleanupPolicy:
 		return nil
 	default:
@@ -241,6 +252,18 @@ func (r *RollingUpdater) updateAndWait(rc *api.ReplicationController, interval, 
 		return nil, err
 	}
 	return r.c.GetReplicationController(r.ns, rc.ObjectMeta.Name)
+}
+
+func (r *RollingUpdater) rename(rc *api.ReplicationController, newName string) error {
+	oldName := rc.Name
+	rc.Name = newName
+	rc.ResourceVersion = ""
+
+	_, err := r.c.CreateReplicationController(rc.Namespace, rc)
+	if err != nil {
+		return err
+	}
+	return r.c.DeleteReplicationController(rc.Namespace, oldName)
 }
 
 // RollingUpdaterClient abstracts access to ReplicationControllers.

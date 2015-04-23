@@ -59,9 +59,8 @@ func TestValidateArgs(t *testing.T) {
 			flags: map[string]string{
 				"image": "foo:v2",
 			},
-			args:      []string{"foo"},
-			expectErr: true,
-			testName:  "missing second image name",
+			args:     []string{"foo"},
+			testName: "missing second image name",
 		},
 		{
 			flags: map[string]string{
