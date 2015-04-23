@@ -10,12 +10,18 @@ write_files:
       #!/bin/sh -xe
       minion_id="${1}"
       master_url="${2}"
+      env_label="${3}"
       until healthcheck=$(curl --fail --silent "${master_url}/healthz")
       do sleep 2
       done
       test -n "${healthcheck}"
       test "${healthcheck}" = "ok"
-      printf '{ "id": "%s", "kind": "Minion", "apiVersion": "v1beta1", "labels": { "environment": "production" }  }' "${minion_id}" \
+      printf '{
+        "id": "%s",
+        "kind": "Minion",
+        "apiVersion": "v1beta1",
+        "labels": { "environment": "%s" }
+        }' "${minion_id}" "${env_label}" \
         | /opt/bin/kubectl create -s "${master_url}" -f -
 
   - path: /etc/kubernetes/manifests/fluentd.manifest
@@ -169,6 +175,7 @@ coreos:
         Requires=docker.service
         Requires=install-weave.service
         [Service]
+        TimeoutStartSec=0
         EnvironmentFile=/etc/weave.%H.env
         ExecStartPre=/opt/bin/weave setup
         ExecStartPre=/opt/bin/weave launch $WEAVE_PEERS
@@ -354,7 +361,7 @@ coreos:
         Wants=download-kubernetes.service
         ConditionHost=!kube-00
         [Service]
-        ExecStart=/opt/bin/register_minion.sh %H http://kube-00:8080
+        ExecStart=/opt/bin/register_minion.sh %H http://kube-00:8080 production
         Type=oneshot
         [Install]
         WantedBy=kubernetes-minion.target
