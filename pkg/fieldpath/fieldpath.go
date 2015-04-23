@@ -1,0 +1,47 @@
+/*
+Copyright 2015 Google Inc. All rights reserved.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package fieldpath
+
+import (
+	"fmt"
+
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
+)
+
+// ExtractFieldPathAsString extracts the field from the given object
+// and returns it as a string.  The object must be a pointer to an
+// API type.
+//
+// Currently, this API is limited to supporting the fieldpaths:
+//
+// 1.  metadata.name - The name of an API object
+// 2.  metadata.namespace - The namespace of an API object
+func ExtractFieldPathAsString(obj interface{}, fieldPath string) (string, error) {
+	accessor, err := meta.Accessor(obj)
+	if err != nil {
+		return "", nil
+	}
+
+	switch fieldPath {
+	case "metadata.name":
+		return accessor.Name(), nil
+	case "metadata.namespace":
+		return accessor.Namespace(), nil
+	}
+
+	return "", fmt.Errorf("Unsupported fieldPath: %v", fieldPath)
+}

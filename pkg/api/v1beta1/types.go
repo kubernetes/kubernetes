@@ -397,6 +397,23 @@ type EnvVar struct {
 	Key  string `json:"key,omitempty" description:"name of the environment variable; must be a C_IDENTIFIER; deprecated - use name instead"`
 	// Optional: defaults to "".
 	Value string `json:"value,omitempty" description:"value of the environment variable; defaults to empty string"`
+	// Optional: specify a source the value of this var should come from.
+	ValueFrom *EnvVarSource `json:"valueFrom,omitempty" description:"source for the environment variable's value; cannot be used if value is not empty"`
+}
+
+// EnvVarSource represents a source for the value of an EnvVar.
+// Only one of its members may be specified.
+type EnvVarSource struct {
+	// Selects a field of the pod; only name and namespace are supported.
+	FieldPath *ObjectFieldSelector `json:"fieldPath,omitempty" description:"selects a field of the pod; only name and namespace are supported"`
+}
+
+// ObjectFieldSelector selects an APIVersioned field of an object.
+type ObjectFieldSelector struct {
+	// The API version the FieldPath is written in terms of.
+	APIVersion string `json:"apiVersion,omitempty" description="The API version that FieldPath is written in terms of"`
+	// The path of the field to select in the specified API version
+	FieldPath string `json:"fieldPath,omitempty" description="The path of the field to select in the specified API version"`
 }
 
 // HTTPGetAction describes an action based on HTTP Get requests.

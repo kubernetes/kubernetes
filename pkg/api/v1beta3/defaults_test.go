@@ -302,3 +302,30 @@ func TestSetDefaultNodeExternalID(t *testing.T) {
 		t.Errorf("Expected default External ID: %s, got: %s", name, n2.Spec.ExternalID)
 	}
 }
+
+func TestSetDefaultObjectFieldSelectorAPIVersion(t *testing.T) {
+	s := current.PodSpec{
+		Containers: []current.Container{
+			{
+				Env: []current.EnvVar{
+					{
+						ValueFrom: &current.EnvVarSource{
+							FieldPath: &current.ObjectFieldSelector{},
+						},
+					},
+				},
+			},
+		},
+	}
+	pod := &current.Pod{
+		Spec: s,
+	}
+	obj2 := roundTrip(t, runtime.Object(pod))
+	pod2 := obj2.(*current.Pod)
+	s2 := pod2.Spec
+
+	apiVersion := s2.Containers[0].Env[0].ValueFrom.FieldPath.APIVersion
+	if apiVersion != "v1beta3" {
+		t.Errorf("Expected default APIVersion v1beta3, got: %v", apiVersion)
+	}
+}

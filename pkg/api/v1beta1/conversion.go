@@ -116,6 +116,11 @@ func init() {
 			out.Value = in.Value
 			out.Key = in.Name
 			out.Name = in.Name
+
+			if err := s.Convert(&in.ValueFrom, &out.ValueFrom, 0); err != nil {
+				return err
+			}
+
 			return nil
 		},
 		func(in *EnvVar, out *newer.EnvVar, s conversion.Scope) error {
@@ -125,9 +130,13 @@ func init() {
 			} else {
 				out.Name = in.Key
 			}
+
+			if err := s.Convert(&in.ValueFrom, &out.ValueFrom, 0); err != nil {
+				return err
+			}
+
 			return nil
 		},
-
 		// Path & MountType are deprecated.
 		func(in *newer.VolumeMount, out *VolumeMount, s conversion.Scope) error {
 			out.Name = in.Name

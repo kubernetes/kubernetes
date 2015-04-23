@@ -1794,6 +1794,23 @@ func init() {
 			out.Path = in.Path
 			return nil
 		},
+		func(in *EnvVar, out *newer.EnvVar, s conversion.Scope) error {
+			out.Name = in.Name
+			out.Value = in.Value
+			if err := s.Convert(&in.ValueFrom, &out.ValueFrom, 0); err != nil {
+				return err
+			}
+
+			return nil
+		},
+		func(in *newer.EnvVar, out *EnvVar, s conversion.Scope) error {
+			out.Name = in.Name
+			out.Value = in.Value
+			if err := s.Convert(&in.ValueFrom, &out.ValueFrom, 0); err != nil {
+				return err
+			}
+			return nil
+		},
 		func(in *PodSpec, out *newer.PodSpec, s conversion.Scope) error {
 			if in.Volumes != nil {
 				out.Volumes = make([]newer.Volume, len(in.Volumes))
@@ -2715,6 +2732,7 @@ func init() {
 		func(label, value string) (string, string, error) {
 			switch label {
 			case "metadata.name",
+				"metadata.namespace",
 				"status.phase",
 				"spec.host":
 				return label, value, nil

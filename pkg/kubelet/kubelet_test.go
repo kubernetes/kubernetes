@@ -68,6 +68,8 @@ type TestKubelet struct {
 	fakeMirrorClient *fakeMirrorClient
 }
 
+const testKubeletHostname = "testnode"
+
 func newTestKubelet(t *testing.T) *TestKubelet {
 	fakeDocker := &dockertools.FakeDockerClient{Errors: make(map[string]error), RemovedImages: util.StringSet{}}
 	fakeRecorder := &record.FakeRecorder{}
@@ -2378,6 +2380,39 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 				"KUBERNETES_RO_PORT_8087_TCP_ADDR=1.2.3.7"),
 			21,
 		},
+		{
+			"downward api pod",
+			"downward-api",
+			&api.Container{
+				Env: []api.EnvVar{
+					{
+						Name: "POD_NAME",
+						ValueFrom: &api.EnvVarSource{
+							FieldPath: &api.ObjectFieldSelector{
+								APIVersion: "v1beta3",
+								FieldPath:  "metadata.name",
+							},
+						},
+					},
+					{
+						Name: "POD_NAMESPACE",
+						ValueFrom: &api.EnvVarSource{
+							FieldPath: &api.ObjectFieldSelector{
+								APIVersion: "v1beta3",
+								FieldPath:  "metadata.namespace",
+							},
+						},
+					},
+				},
+			},
+			"nothing",
+			true,
+			util.NewStringSet(
+				"POD_NAME=dapi-test-pod-name",
+				"POD_NAMESPACE=downward-api",
+			),
+			2,
+		},
 	}
 
 	for _, tc := range testCases {
@@ -2390,7 +2425,14 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 			kl.serviceLister = testServiceLister{services}
 		}
 
-		result, err := kl.makeEnvironmentVariables(tc.ns, tc.container)
+		testPod := &api.Pod{
+			ObjectMeta: api.ObjectMeta{
+				Namespace: tc.ns,
+				Name:      "dapi-test-pod-name",
+			},
+		}
+
+		result, err := kl.makeEnvironmentVariables(testPod, tc.container)
 		if err != nil {
 			t.Errorf("[%v] Unexpected error: %v", tc.name, err)
 		}
