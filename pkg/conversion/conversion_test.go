@@ -38,15 +38,20 @@ func BenchmarkPodConversion(b *testing.B) {
 	}
 
 	scheme := api.Scheme.Raw()
+	var result *api.Pod
 	for i := 0; i < b.N; i++ {
 		versionedObj, err := scheme.ConvertToVersion(&pod, testapi.Version())
 		if err != nil {
 			b.Fatalf("Conversion error: %v", err)
 		}
-		_, err = scheme.ConvertToVersion(versionedObj, scheme.InternalVersion)
+		obj, err := scheme.ConvertToVersion(versionedObj, scheme.InternalVersion)
 		if err != nil {
 			b.Fatalf("Conversion error: %v", err)
 		}
+		result = obj.(*api.Pod)
+	}
+	if !api.Semantic.DeepDerivative(pod, *result) {
+		b.Fatalf("Incorrect conversion: expected %v, got %v", pod, result)
 	}
 }
 
@@ -61,15 +66,20 @@ func BenchmarkNodeConversion(b *testing.B) {
 	}
 
 	scheme := api.Scheme.Raw()
+	var result *api.Node
 	for i := 0; i < b.N; i++ {
 		versionedObj, err := scheme.ConvertToVersion(&node, testapi.Version())
 		if err != nil {
 			b.Fatalf("Conversion error: %v", err)
 		}
-		_, err = scheme.ConvertToVersion(versionedObj, scheme.InternalVersion)
+		obj, err := scheme.ConvertToVersion(versionedObj, scheme.InternalVersion)
 		if err != nil {
 			b.Fatalf("Conversion error: %v", err)
 		}
+		result = obj.(*api.Node)
+	}
+	if !api.Semantic.DeepDerivative(node, *result) {
+		b.Fatalf("Incorrect conversion: expected %v, got %v", node, result)
 	}
 }
 
@@ -84,14 +94,19 @@ func BenchmarkReplicationControllerConversion(b *testing.B) {
 	}
 
 	scheme := api.Scheme.Raw()
+	var result *api.ReplicationController
 	for i := 0; i < b.N; i++ {
 		versionedObj, err := scheme.ConvertToVersion(&replicationController, testapi.Version())
 		if err != nil {
 			b.Fatalf("Conversion error: %v", err)
 		}
-		_, err = scheme.ConvertToVersion(versionedObj, scheme.InternalVersion)
+		obj, err := scheme.ConvertToVersion(versionedObj, scheme.InternalVersion)
 		if err != nil {
 			b.Fatalf("Conversion error: %v", err)
 		}
+		result = obj.(*api.ReplicationController)
+	}
+	if !api.Semantic.DeepDerivative(replicationController, *result) {
+		b.Fatalf("Incorrect conversion: expected %v, got %v", replicationController, result)
 	}
 }
