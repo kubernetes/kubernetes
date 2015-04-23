@@ -30,3 +30,10 @@ type HandlerRunner interface {
 type Prober interface {
 	Probe(pod *api.Pod, status api.PodStatus, container api.Container, containerID string, createdAt int64) (probe.Result, error)
 }
+
+// RunContainerOptionsGenerator generates the options that necessary for
+// container runtime to run a container.
+// TODO(yifan): Remove netMode, ipcMode.
+type RunContainerOptionsGenerator interface {
+	GenerateRunContainerOptions(pod *api.Pod, container *api.Container, netMode, ipcMode string) (*RunContainerOptions, error)
+}

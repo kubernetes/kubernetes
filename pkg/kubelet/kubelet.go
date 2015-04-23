@@ -692,9 +692,9 @@ func makeBinds(container *api.Container, podVolumes volumeMap) (binds []string) 
 	return
 }
 
-// generateRunContainerOptions generates the RunContainerOptions, which can be used by
+// GenerateRunContainerOptions generates the RunContainerOptions, which can be used by
 // the container runtime to set parameters for launching a container.
-func (kl *Kubelet) generateRunContainerOptions(pod *api.Pod, container *api.Container, netMode, ipcMode string) (*kubecontainer.RunContainerOptions, error) {
+func (kl *Kubelet) GenerateRunContainerOptions(pod *api.Pod, container *api.Container, netMode, ipcMode string) (*kubecontainer.RunContainerOptions, error) {
 	var err error
 	opts := &kubecontainer.RunContainerOptions{
 		NetMode: netMode,
@@ -735,7 +735,7 @@ func (kl *Kubelet) runContainer(pod *api.Pod, container *api.Container, netMode,
 		glog.Errorf("Couldn't make a ref to pod %v, container %v: '%v'", pod.Name, container.Name, err)
 	}
 
-	opts, err := kl.generateRunContainerOptions(pod, container, netMode, ipcMode)
+	opts, err := kl.GenerateRunContainerOptions(pod, container, netMode, ipcMode)
 	if err != nil {
 		return "", err
 	}
