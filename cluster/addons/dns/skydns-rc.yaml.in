@@ -29,15 +29,10 @@ desiredState:
                     "-advertise-client-urls=http://127.0.0.1:4001",
             ]
           - name: kube2sky
-            image: gcr.io/google_containers/kube2sky:1.2
-            volumeMounts:
-              - name: dns-token
-                mountPath: /etc/dns_token
-                readOnly: true
+            image: gcr.io/google_containers/kube2sky:1.1
             command: [
                     # entrypoint = "/kube2sky",
                     "-domain={{ pillar['dns_domain'] }}",
-                    "-kubecfg_file=/etc/dns_token/kubeconfig",
             ]
           - name: skydns
             image: gcr.io/google_containers/skydns:2015-03-11-001
@@ -51,11 +46,3 @@ desiredState:
               - name: dns
                 containerPort: 53
                 protocol: UDP
-        volumes:
-          - name: dns-token
-            source:
-              secret:
-                target:
-                  kind: Secret
-                  namespace: default
-                  name: token-system-dns
