@@ -679,10 +679,10 @@ function kube-up {
 }
 
 function kube-down {
-  vpc_id=$(get_vpc_id)
+  local vpc_id=$(get_vpc_id)
   if [[ -n "${vpc_id}" ]]; then
     local elb_ids=$(get_elbs_in_vpc ${vpc_id})
-    if [[ -n ${elb_ids} ]]; then
+    if [[ -n "${elb_ids}" ]]; then
       echo "Deleting ELBs in: ${vpc_id}"
       for elb_id in ${elb_ids}; do
         $AWS_ELB_CMD delete-load-balancer --load-balancer-name=${elb_id}
@@ -707,16 +707,16 @@ function kube-down {
                             --filters Name=vpc-id,Values=${vpc_id} \
                                       Name=tag:KubernetesCluster,Values=${CLUSTER_ID} \
                             --query Reservations[].Instances[].InstanceId)
-    if [[ -n ${instance_ids} ]]; then
-      $AWS_CMD terminate-instances --instance-ids $instance_ids > $LOG
+    if [[ -n "${instance_ids}" ]]; then
+      $AWS_CMD terminate-instances --instance-ids ${instance_ids} > $LOG
       echo "Waiting for instances to be deleted"
       while true; do
-        instance_states=$($AWS_CMD describe-instances --instance-ids $instance_ids | expect_instance_states terminated)
-        if [[ "$instance_states" == "" ]]; then
+        local instance_states=$($AWS_CMD describe-instances --instance-ids ${instance_ids} | expect_instance_states terminated)
+        if [[ -z "${instance_states}" ]]; then
           echo "All instances deleted"
           break
         else
-          echo "Instances not yet deleted: $instance_states"
+          echo "Instances not yet deleted: ${instance_states}"
           echo "Sleeping for 3 seconds..."
           sleep 3
         fi
@@ -725,11 +725,11 @@ function kube-down {
 
     echo "Deleting VPC: ${vpc_id}"
     default_sg_id=$($AWS_CMD --output text describe-security-groups \
-                             --filters Name=vpc-id,Values=$vpc_id Name=group-name,Values=default \
+                             --filters Name=vpc-id,Values=${vpc_id} Name=group-name,Values=default \
                              --query SecurityGroups[].GroupId \
                     | tr "\t" "\n")
     sg_ids=$($AWS_CMD --output text describe-security-groups \
-                      --filters Name=vpc-id,Values=$vpc_id \
+                      --filters Name=vpc-id,Values=${vpc_id} \
                       --query SecurityGroups[].GroupId \
              | tr "\t" "\n")
     for sg_id in ${sg_ids}; do
@@ -740,7 +740,7 @@ function kube-down {
     done
 
     subnet_ids=$($AWS_CMD --output text describe-subnets \
-                          --filters Name=vpc-id,Values=$vpc_id \
+                          --filters Name=vpc-id,Values=${vpc_id} \
                           --query Subnets[].SubnetId \
              | tr "\t" "\n")
     for subnet_id in ${subnet_ids}; do
@@ -748,7 +748,7 @@ function kube-down {
     done
 
     igw_ids=$($AWS_CMD --output text describe-internet-gateways \
-                       --filters Name=attachment.vpc-id,Values=$vpc_id \
+                       --filters Name=attachment.vpc-id,Values=${vpc_id} \
                        --query InternetGateways[].InternetGatewayId \
              | tr "\t" "\n")
     for igw_id in ${igw_ids}; do
