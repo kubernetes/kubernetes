@@ -17,6 +17,7 @@ limitations under the License.
 package kubelet
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -44,7 +45,7 @@ type fakeKubelet struct {
 	podByNameFunc                      func(namespace, name string) (*api.Pod, bool)
 	statusFunc                         func(name string) (api.PodStatus, error)
 	containerInfoFunc                  func(podFullName string, uid types.UID, containerName string, req *cadvisorApi.ContainerInfoRequest) (*cadvisorApi.ContainerInfo, error)
-	rootInfoFunc                       func(query *cadvisorApi.ContainerInfoRequest) (*cadvisorApi.ContainerInfo, error)
+	rawInfoFunc                        func(query *cadvisorApi.ContainerInfoRequest) (map[string]*cadvisorApi.ContainerInfo, error)
 	machineInfoFunc                    func() (*cadvisorApi.MachineInfo, error)
 	podsFunc                           func() []*api.Pod
 	logFunc                            func(w http.ResponseWriter, req *http.Request)
@@ -69,8 +70,8 @@ func (fk *fakeKubelet) GetContainerInfo(podFullName string, uid types.UID, conta
 	return fk.containerInfoFunc(podFullName, uid, containerName, req)
 }
 
-func (fk *fakeKubelet) GetRootInfo(req *cadvisorApi.ContainerInfoRequest) (*cadvisorApi.ContainerInfo, error) {
-	return fk.rootInfoFunc(req)
+func (fk *fakeKubelet) GetRawContainerInfo(containerName string, req *cadvisorApi.ContainerInfoRequest, subcontainers bool) (map[string]*cadvisorApi.ContainerInfo, error) {
+	return fk.rawInfoFunc(req)
 }
 
 func (fk *fakeKubelet) GetContainerRuntimeVersion() (kubecontainer.Version, error) {
@@ -269,9 +270,15 @@ func TestContainerNotFound(t *testing.T) {
 
 func TestRootInfo(t *testing.T) {
 	fw := newServerTest()
-	expectedInfo := &cadvisorApi.ContainerInfo{}
-	fw.fakeKubelet.rootInfoFunc = func(req *cadvisorApi.ContainerInfoRequest) (*cadvisorApi.ContainerInfo, error) {
-		return expectedInfo, nil
+	expectedInfo := &cadvisorApi.ContainerInfo{
+		ContainerReference: cadvisorApi.ContainerReference{
+			Name: "/",
+		},
+	}
+	fw.fakeKubelet.rawInfoFunc = func(req *cadvisorApi.ContainerInfoRequest) (map[string]*cadvisorApi.ContainerInfo, error) {
+		return map[string]*cadvisorApi.ContainerInfo{
+			expectedInfo.Name: expectedInfo,
+		}, nil
 	}
 
 	resp, err := http.Get(fw.testHTTPServer.URL + "/stats")
@@ -285,7 +292,52 @@ func TestRootInfo(t *testing.T) {
 		t.Fatalf("received invalid json data: %v", err)
 	}
 	if !receivedInfo.Eq(expectedInfo) {
-		t.Errorf("received wrong data: %#v", receivedInfo)
+		t.Errorf("received wrong data: %#v, expected %#v", receivedInfo, expectedInfo)
+	}
+}
+
+func TestSubcontainerContainerInfo(t *testing.T) {
+	fw := newServerTest()
+	const kubeletContainer = "/kubelet"
+	const kubeletSubContainer = "/kubelet/sub"
+	expectedInfo := map[string]*cadvisorApi.ContainerInfo{
+		kubeletContainer: {
+			ContainerReference: cadvisorApi.ContainerReference{
+				Name: kubeletContainer,
+			},
+		},
+		kubeletSubContainer: {
+			ContainerReference: cadvisorApi.ContainerReference{
+				Name: kubeletSubContainer,
+			},
+		},
+	}
+	fw.fakeKubelet.rawInfoFunc = func(req *cadvisorApi.ContainerInfoRequest) (map[string]*cadvisorApi.ContainerInfo, error) {
+		return expectedInfo, nil
+	}
+
+	request := fmt.Sprintf("{\"containerName\":%q, \"subcontainers\": true}", kubeletContainer)
+	resp, err := http.Post(fw.testHTTPServer.URL+"/stats/container", "application/json", bytes.NewBuffer([]byte(request)))
+	if err != nil {
+		t.Fatalf("Got error GETing: %v", err)
+	}
+	defer resp.Body.Close()
+	var receivedInfo map[string]*cadvisorApi.ContainerInfo
+	err = json.NewDecoder(resp.Body).Decode(&receivedInfo)
+	if err != nil {
+		t.Fatalf("Received invalid json data: %v", err)
+	}
+	if len(receivedInfo) != len(expectedInfo) {
+		t.Errorf("Received wrong data: %#v, expected %#v", receivedInfo, expectedInfo)
+	}
+
+	for _, containerName := range []string{kubeletContainer, kubeletSubContainer} {
+		if _, ok := receivedInfo[containerName]; !ok {
+			t.Errorf("Expected container %q to be present in result: %#v", containerName, receivedInfo)
+		}
+		if !receivedInfo[containerName].Eq(expectedInfo[containerName]) {
+			t.Errorf("Invalid result for %q: Expected %#v, received %#v", containerName, expectedInfo[containerName], receivedInfo[containerName])
+		}
 	}
 }
 
@@ -423,29 +475,6 @@ func TestServeRunInContainerWithUID(t *testing.T) {
 	result := string(body)
 	if result != output {
 		t.Errorf("expected %s, got %s", output, result)
-	}
-}
-
-// TODO: fix me when pod level stats get implemented
-func TestPodsInfo(t *testing.T) {
-	fw := newServerTest()
-
-	resp, err := http.Get(fw.testHTTPServer.URL + "/stats/goodpod")
-	if err != nil {
-		t.Fatalf("Got error GETing: %v", err)
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusInternalServerError {
-		t.Errorf("expected status code %d, got %d", http.StatusInternalServerError, resp.StatusCode)
-	}
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		// copying the response body did not work
-		t.Fatalf("Cannot copy resp: %#v", err)
-	}
-	result := string(body)
-	if !strings.Contains(result, "pod level status currently unimplemented") {
-		t.Errorf("expected body contains pod level status currently unimplemented, got %s", result)
 	}
 }
 

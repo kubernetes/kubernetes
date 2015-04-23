@@ -99,8 +99,8 @@ func ListenAndServeKubeletReadOnlyServer(host HostInterface, address net.IP, por
 // For testablitiy.
 type HostInterface interface {
 	GetContainerInfo(podFullName string, uid types.UID, containerName string, req *cadvisorApi.ContainerInfoRequest) (*cadvisorApi.ContainerInfo, error)
-	GetRootInfo(req *cadvisorApi.ContainerInfoRequest) (*cadvisorApi.ContainerInfo, error)
 	GetContainerRuntimeVersion() (kubecontainer.Version, error)
+	GetRawContainerInfo(containerName string, req *cadvisorApi.ContainerInfoRequest, subcontainers bool) (map[string]*cadvisorApi.ContainerInfo, error)
 	GetCachedMachineInfo() (*cadvisorApi.MachineInfo, error)
 	GetPods() []*api.Pod
 	GetPodByName(namespace, name string) (*api.Pod, bool)
@@ -634,26 +634,68 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	s.mux.ServeHTTP(w, req)
 }
 
+type StatsRequest struct {
+	// The name of the container for which to request stats.
+	// Default: /
+	ContainerName string `json:"containerName,omitempty"`
+
+	// Max number of stats to return.
+	// If start and end time are specified this limit is ignored.
+	// Default: 60
+	NumStats int `json:"num_stats,omitempty"`
+
+	// Start time for which to query information.
+	// If ommitted, the beginning of time is assumed.
+	Start time.Time `json:"start,omitempty"`
+
+	// End time for which to query information.
+	// If ommitted, current time is assumed.
+	End time.Time `json:"end,omitempty"`
+
+	// Whether to also include information from subcontainers.
+	// Default: false.
+	Subcontainers bool `json:"subcontainers,omitempty"`
+}
+
 // serveStats implements stats logic.
 func (s *Server) serveStats(w http.ResponseWriter, req *http.Request) {
-	// /stats/<pod name>/<container name> or /stats/<namespace>/<pod name>/<uid>/<container name>
+	// Stats requests are in the following forms:
+	//
+	// /stats/                                              : Root container stats
+	// /stats/container/                                    : Non-Kubernetes container stats (returns a map)
+	// /stats/<pod name>/<container name>                   : Stats for Kubernetes pod/container
+	// /stats/<namespace>/<pod name>/<uid>/<container name> : Stats for Kubernetes namespace/pod/uid/container
 	components := strings.Split(strings.TrimPrefix(path.Clean(req.URL.Path), "/"), "/")
-	var stats *cadvisorApi.ContainerInfo
+	var stats interface{}
 	var err error
-	query := cadvisorApi.DefaultContainerInfoRequest()
+	var query StatsRequest
+	query.NumStats = 60
+
 	err = json.NewDecoder(req.Body).Decode(&query)
 	if err != nil && err != io.EOF {
 		s.error(w, err)
 		return
 	}
+	cadvisorRequest := cadvisorApi.ContainerInfoRequest{
+		NumStats: query.NumStats,
+		Start:    query.Start,
+		End:      query.End,
+	}
+
 	switch len(components) {
 	case 1:
-		// Machine stats
-		stats, err = s.host.GetRootInfo(&query)
+		// Root container stats.
+		var statsMap map[string]*cadvisorApi.ContainerInfo
+		statsMap, err = s.host.GetRawContainerInfo("/", &cadvisorRequest, false)
+		stats = statsMap["/"]
 	case 2:
-		// pod stats
-		// TODO(monnand) Implement this
-		err = errors.New("pod level status currently unimplemented")
+		// Non-Kubernetes container stats.
+		if components[1] != "container" {
+			http.Error(w, fmt.Sprintf("unknown stats request type %q", components[1]), http.StatusNotFound)
+			return
+		}
+		containerName := path.Join("/", query.ContainerName)
+		stats, err = s.host.GetRawContainerInfo(containerName, &cadvisorRequest, query.Subcontainers)
 	case 3:
 		// Backward compatibility without uid information, does not support namespace
 		pod, ok := s.host.GetPodByName(api.NamespaceDefault, components[1])
@@ -661,16 +703,16 @@ func (s *Server) serveStats(w http.ResponseWriter, req *http.Request) {
 			http.Error(w, "Pod does not exist", http.StatusNotFound)
 			return
 		}
-		stats, err = s.host.GetContainerInfo(kubecontainer.GetPodFullName(pod), "", components[2], &query)
+		stats, err = s.host.GetContainerInfo(kubecontainer.GetPodFullName(pod), "", components[2], &cadvisorRequest)
 	case 5:
 		pod, ok := s.host.GetPodByName(components[1], components[2])
 		if !ok {
 			http.Error(w, "Pod does not exist", http.StatusNotFound)
 			return
 		}
-		stats, err = s.host.GetContainerInfo(kubecontainer.GetPodFullName(pod), types.UID(components[3]), components[4], &query)
+		stats, err = s.host.GetContainerInfo(kubecontainer.GetPodFullName(pod), types.UID(components[3]), components[4], &cadvisorRequest)
 	default:
-		http.Error(w, "unknown resource.", http.StatusNotFound)
+		http.Error(w, fmt.Sprintf("Unknown resource: %v", components), http.StatusNotFound)
 		return
 	}
 	switch err {
