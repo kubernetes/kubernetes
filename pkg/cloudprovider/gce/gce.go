@@ -337,27 +337,28 @@ func (gce *GCECloud) UpdateTCPLoadBalancer(name, region string, hosts []string) 
 		toRemove = append(toRemove, &compute.InstanceReference{link})
 	}
 
-	add := &compute.TargetPoolsAddInstanceRequest{
-		Instances: toAdd,
-	}
-	op, err := gce.service.TargetPools.AddInstance(gce.projectID, region, name, add).Do()
-	if err != nil {
-		return err
-	}
-	err = gce.waitForRegionOp(op, region)
-	if err != nil {
-		return err
+	if len(toAdd) > 0 {
+		add := &compute.TargetPoolsAddInstanceRequest{Instances: toAdd}
+		op, err := gce.service.TargetPools.AddInstance(gce.projectID, region, name, add).Do()
+		if err != nil {
+			return err
+		}
+		if err := gce.waitForRegionOp(op, region); err != nil {
+			return err
+		}
 	}
 
-	rm := &compute.TargetPoolsRemoveInstanceRequest{
-		Instances: toRemove,
+	if len(toRemove) > 0 {
+		rm := &compute.TargetPoolsRemoveInstanceRequest{Instances: toRemove}
+		op, err := gce.service.TargetPools.RemoveInstance(gce.projectID, region, name, rm).Do()
+		if err != nil {
+			return err
+		}
+		if err := gce.waitForRegionOp(op, region); err != nil {
+			return err
+		}
 	}
-	op, err = gce.service.TargetPools.RemoveInstance(gce.projectID, region, name, rm).Do()
-	if err != nil {
-		return err
-	}
-	err = gce.waitForRegionOp(op, region)
-	return err
+	return nil
 }
 
 // DeleteTCPLoadBalancer is an implementation of TCPLoadBalancer.DeleteTCPLoadBalancer.
