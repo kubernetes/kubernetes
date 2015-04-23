@@ -60,9 +60,11 @@ const (
 )
 
 type CloudConfig struct {
-	ProjectID  string
-	Zone       string
-	MasterName string
+	ProjectID         string
+	Zone              string
+	MasterName        string
+	NodeInstanceGroup string
+	NumNodes          int
 
 	Provider cloudprovider.Interface
 }
@@ -262,6 +264,50 @@ func waitForPodSuccessInNamespace(c *client.Client, podName string, contName str
 // The default namespace is used to identify pods.
 func waitForPodSuccess(c *client.Client, podName string, contName string) error {
 	return waitForPodSuccessInNamespace(c, podName, contName, api.NamespaceDefault)
+}
+
+// Context for checking pods responses by issuing GETs to them and verifying if the answer with pod name.
+type podResponseChecker struct {
+	c              *client.Client
+	ns             string
+	label          labels.Selector
+	controllerName string
+	pods           *api.PodList
+}
+
+// checkAllResponses issues GETs to all pods in the context and verify they reply with pod name.
+func (r podResponseChecker) checkAllResponses() (done bool, err error) {
+	successes := 0
+	currentPods, err := r.c.Pods(r.ns).List(r.label, fields.Everything())
+	Expect(err).NotTo(HaveOccurred())
+	for i, pod := range r.pods.Items {
+		// Check that the replica list remains unchanged, otherwise we have problems.
+		if !isElementOf(pod.UID, currentPods) {
+			return false, fmt.Errorf("pod with UID %s is no longer a member of the replica set.  Must have been restarted for some reason.  Current replica set: %v", pod.UID, currentPods)
+		}
+		body, err := r.c.Get().
+			Prefix("proxy").
+			Namespace(r.ns).
+			Resource("pods").
+			Name(string(pod.Name)).
+			Do().
+			Raw()
+		if err != nil {
+			Logf("Controller %s: Failed to GET from replica %d (%s): %v:", r.controllerName, i+1, pod.Name, err)
+			continue
+		}
+		// The body should be the pod name.
+		if string(body) != pod.Name {
+			Logf("Controller %s: Replica %d expected response %s but got %s", r.controllerName, i+1, pod.Name, string(body))
+			continue
+		}
+		successes++
+		Logf("Controller %s: Got expected result from replica %d: %s, %d of %d required successes so far", r.controllerName, i+1, string(body), successes, len(r.pods.Items))
+	}
+	if successes < len(r.pods.Items) {
+		return false, nil
+	}
+	return true, nil
 }
 
 func loadConfig() (*client.Config, error) {
