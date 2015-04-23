@@ -171,13 +171,27 @@ func InstallLogsSupport(mux Mux) {
 	mux.Handle("/logs/", http.StripPrefix("/logs/", http.FileServer(http.Dir("/var/log/"))))
 }
 
-func InstallServiceErrorHandler(container *restful.Container) {
-	container.ServiceErrorHandler(serviceErrorHandler)
+func InstallServiceErrorHandler(container *restful.Container, requestResolver *APIRequestInfoResolver, apiVersions []string) {
+	container.ServiceErrorHandler(func(serviceErr restful.ServiceError, request *restful.Request, response *restful.Response) {
+		serviceErrorHandler(requestResolver, apiVersions, serviceErr, request, response)
+	})
 }
 
-func serviceErrorHandler(serviceErr restful.ServiceError, response *restful.Response) {
-	// TODO: Update go-restful to return the request as well, so that we can use the appropriate codec rather than using the latest one.
-	errorJSON(apierrors.NewGenericServerResponse(serviceErr.Code, "", "", "", "", 0, false), latest.Codec, response.ResponseWriter)
+func serviceErrorHandler(requestResolver *APIRequestInfoResolver, apiVersions []string, serviceErr restful.ServiceError, request *restful.Request, response *restful.Response) {
+	requestInfo, err := requestResolver.GetAPIRequestInfo(request.Request)
+	codec := latest.Codec
+	if err == nil && requestInfo.APIVersion != "" {
+		// check if the api version is valid.
+		for _, version := range apiVersions {
+			if requestInfo.APIVersion == version {
+				// valid api version.
+				codec = runtime.CodecFor(api.Scheme, requestInfo.APIVersion)
+				break
+			}
+		}
+	}
+
+	errorJSON(apierrors.NewGenericServerResponse(serviceErr.Code, "", "", "", "", 0, false), codec, response.ResponseWriter)
 }
 
 // Adds a service to return the supported api versions.
