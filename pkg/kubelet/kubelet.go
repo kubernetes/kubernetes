@@ -753,7 +753,7 @@ func (kl *Kubelet) runContainer(pod *api.Pod, container *api.Container, netMode,
 	if container.Lifecycle != nil && container.Lifecycle.PostStart != nil {
 		handlerErr := kl.handlerRunner.Run(id, pod, container, container.Lifecycle.PostStart)
 		if handlerErr != nil {
-			kl.killContainerByID(id)
+			kl.containerManager.KillContainer(types.UID(id))
 			return dockertools.DockerID(""), fmt.Errorf("failed to call event handler: %v", handlerErr)
 		}
 	}
@@ -909,26 +909,6 @@ func parseResolvConf(reader io.Reader) (nameservers []string, searches []string,
 	return nameservers, searches, nil
 }
 
-// Kill a docker container
-func (kl *Kubelet) killContainer(c *kubecontainer.Container) error {
-	return kl.killContainerByID(string(c.ID))
-}
-
-func (kl *Kubelet) killContainerByID(ID string) error {
-	glog.V(2).Infof("Killing container with id %q", ID)
-	kl.readinessManager.RemoveReadiness(ID)
-	err := kl.dockerClient.StopContainer(ID, 10)
-
-	ref, ok := kl.containerRefManager.GetRef(ID)
-	if !ok {
-		glog.Warningf("No ref for pod '%v'", ID)
-	} else {
-		// TODO: pass reason down here, and state, or move this call up the stack.
-		kl.recorder.Eventf(ref, "killing", "Killing %v", ID)
-	}
-	return err
-}
-
 // createPodInfraContainer starts the pod infra container for a pod. Returns the docker container ID of the newly created container.
 func (kl *Kubelet) createPodInfraContainer(pod *api.Pod) (dockertools.DockerID, error) {
 
@@ -1029,7 +1009,7 @@ func (kl *Kubelet) killPod(pod kubecontainer.Pod) error {
 					errs <- err
 				}
 			}
-			err := kl.killContainer(container)
+			err := kl.containerManager.KillContainer(container.ID)
 			if err != nil {
 				glog.Errorf("Failed to delete container: %v; Skipping pod %q", err, pod.ID)
 				errs <- err
@@ -1340,7 +1320,7 @@ func (kl *Kubelet) syncPod(pod *api.Pod, mirrorPod *api.Pod, runningPod kubecont
 			_, keep := containerChanges.containersToKeep[dockertools.DockerID(container.ID)]
 			if !keep {
 				glog.V(3).Infof("Killing unwanted container %+v", container)
-				err = kl.killContainer(container)
+				err = kl.containerManager.KillContainer(container.ID)
 				if err != nil {
 					glog.Errorf("Error killing container: %v", err)
 				}
