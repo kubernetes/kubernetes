@@ -15,7 +15,7 @@ $ hack/dev-build-and-up.sh
 
 ### Step One: Set up Cloud SQL instance
 
-Follow the [official instructions](https://cloud.google.com/sql/docs/getting-started) to set up Cloud SQL instance. 
+Follow the [official instructions](https://cloud.google.com/sql/docs/getting-started) to set up Cloud SQL instance.
 
 In the remaining part of this example we will assume that your instance is named "phabricator-db", has IP 173.194.242.66 and the password is "1234".
 
@@ -25,34 +25,41 @@ To start Phabricator server use the file `examples/phabricator/phabricator-contr
 
 ```js
 {
-  "id": "phabricator-controller",
   "kind": "ReplicationController",
-  "apiVersion": "v1beta1",
-  "desiredState": {
-    "replicas": 1,
-    "replicaSelector": {"name": "phabricator"},
-    "podTemplate": {
-      "desiredState": {
-        "manifest": {
-          "version": "v1beta1",
-          "id": "phabricator-pod",
-          "containers": [{
-            "name": "phabricator",
-            "image": "kubernetes/example-php-phabricator",
-            "env": [
-              {"name": "MYSQL_SERVICE_IP", "value": "173.194.242.66"},
-              {"name": "MYSQL_SERVICE_PORT", "value": "3306"},
-              {"name": "MYSQL_PASSWORD", "value": "1234"},
-            ],
-            "ports": [{"name": "http-server", "containerPort": 80}],
-            "imagePullPolicy": "Always"
-          }]
-        }
-      },
-      "labels": { "name": "phabricator" }
+  "apiVersion": "v1beta3",
+  "metadata": {
+    "name": "phabricator-controller",
+    "labels": {
+      "name": "phabricator"
     }
   },
-  "labels": {"name": "phabricator"}
+  "spec": {
+    "replicas": 1,
+    "selector": {
+      "name": "phabricator"
+    },
+    "template": {
+      "metadata": {
+        "labels": {
+          "name": "phabricator"
+        }
+      },
+      "spec": {
+        "containers": [
+          {
+            "name": "phabricator",
+            "image": "fgrzadkowski/example-php-phabricator",
+            "ports": [
+              {
+                "name": "http-server",
+                "containerPort": 80
+              }
+            ]
+          }
+        ]
+      }
+    }
+  }
 }
 ```
 
@@ -82,7 +89,7 @@ me@workstation$ gcloud compute ssh --zone us-central1-b kubernetes-minion-2
 
 $ sudo docker ps
 CONTAINER ID        IMAGE                             COMMAND     CREATED       STATUS      PORTS   NAMES
-54983bc33494        fgrzadkowski/phabricator:latest   "/run.sh"   2 hours ago   Up 2 hours          k8s_phabricator.d6b45054_phabricator-controller-02qp4.default.api_eafb1e53-b6a9-11e4-b1ae-42010af05ea6_01c2c4ca                     
+54983bc33494        fgrzadkowski/phabricator:latest   "/run.sh"   2 hours ago   Up 2 hours          k8s_phabricator.d6b45054_phabricator-controller-02qp4.default.api_eafb1e53-b6a9-11e4-b1ae-42010af05ea6_01c2c4ca
 ```
 
 (Note that initial `docker pull` may take a few minutes, depending on network conditions.  During this time, the `get pods` command will return `Pending` because the container has not yet started )
@@ -110,34 +117,37 @@ To automate this process and make sure that a proper host is authorized even if 
 
 ```js
 {
-  "id": "authenticator-controller",
   "kind": "ReplicationController",
-  "apiVersion": "v1beta1",
-  "desiredState": {
-    "replicas": 1,
-    "replicaSelector": {"name": "authenticator"},
-    "podTemplate": {
-      "desiredState": {
-        "manifest": {
-          "version": "v1beta1",
-          "id": "authenticator-pod",
-          "containers": [{
-            "name": "authenticator",
-            "image": "kubernetes/example-cloudsql-authenticator",
-            "env": [
-              {"name": "SELECTOR", "value": "name=phabricator"},
-              {"name": "CLOUDSQL_DB", "value": "phabricator-db"}
-            ],
-            "imagePullPolicy": "Always"
-          }],
-        }
-      },
-      "labels": { "name": "authenticator" }
+  "apiVersion": "v1beta3",
+  "metadata": {
+    "name": "authenticator-controller",
+    "labels": {
+      "name": "authenticator"
     }
   },
-  "labels": {"name": "authenticator"}
+  "spec": {
+    "replicas": 1,
+    "selector": {
+      "name": "authenticator"
+    },
+    "template": {
+      "metadata": {
+        "labels": {
+          "name": "authenticator"
+        }
+      },
+      "spec": {
+        "containers": [
+          {
+            "name": "authenticator",
+            "image": "fgrzadkowski/example-cloudsql-authenticator"
+          }
+        ]
+      }
+    }
+  }
 }
-``` 
+```
 
 To create the pod run:
 
@@ -163,14 +173,26 @@ Use the file `examples/phabricator/phabricator-service.json`:
 
 ```js
 {
-  "apiVersion": "v1beta1",
   "kind": "Service",
-  "id": "phabricator",
-  "port": 80,
-  "containerPort": "http-server",
-  "selector": { "name": "phabricator" },
-  "createExternalLoadBalancer": true,
-  "publicIPs": ["107.178.210.6"]
+  "apiVersion": "v1beta3",
+  "metadata": {
+    "name": "phabricator"
+  },
+  "spec": {
+    "ports": [
+      {
+        "port": 80,
+        "targetPort": "http-server"
+      }
+    ],
+    "selector": {
+      "name": "phabricator"
+    },
+    "createExternalLoadBalancer": true,
+    "publicIPs": [
+      "107.178.210.6"
+    ]
+  }
 }
 ```
 
