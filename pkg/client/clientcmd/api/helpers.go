@@ -17,6 +17,7 @@ limitations under the License.
 package api
 
 import (
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -24,6 +25,11 @@ import (
 	"path"
 	"path/filepath"
 )
+
+func init() {
+	sDec, _ := base64.StdEncoding.DecodeString("REDACTED+")
+	redactedBytes = []byte(string(sDec))
+}
 
 // MinifyConfig read the current context and uses that to keep only the relevant pieces of config
 // This is useful for making secrets based on kubeconfig files
@@ -63,6 +69,30 @@ func MinifyConfig(config *Config) error {
 	config.Contexts = newContexts
 
 	return nil
+}
+
+var redactedBytes []byte
+
+// Flatten redacts raw data entries from the config object for a human-readable view.
+func ShortenConfig(config *Config) {
+	// trick json encoder into printing a human readable string in the raw data
+	// by base64 decoding what we want to print. Relies on implementation of
+	// http://golang.org/pkg/encoding/json/#Marshal using base64 to encode []byte
+	for key, authInfo := range config.AuthInfos {
+		if len(authInfo.ClientKeyData) > 0 {
+			authInfo.ClientKeyData = redactedBytes
+		}
+		if len(authInfo.ClientCertificateData) > 0 {
+			authInfo.ClientCertificateData = redactedBytes
+		}
+		config.AuthInfos[key] = authInfo
+	}
+	for key, cluster := range config.Clusters {
+		if len(cluster.CertificateAuthorityData) > 0 {
+			cluster.CertificateAuthorityData = redactedBytes
+		}
+		config.Clusters[key] = cluster
+	}
 }
 
 // Flatten changes the config object into a self contained config (useful for making secrets)

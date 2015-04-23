@@ -17,10 +17,13 @@ limitations under the License.
 package api
 
 import (
+	"fmt"
 	"io/ioutil"
 	"os"
 	"reflect"
 	"testing"
+
+	"github.com/ghodss/yaml"
 )
 
 func newMergedConfig(certFile, certContent, keyFile, keyContent, caFile, caContent string, t *testing.T) Config {
@@ -36,10 +39,10 @@ func newMergedConfig(certFile, certContent, keyFile, keyContent, caFile, caConte
 
 	return Config{
 		AuthInfos: map[string]AuthInfo{
-			"red-user":  {Token: "red-token"},
+			"red-user":  {Token: "red-token", ClientCertificateData: []byte(certContent), ClientKeyData: []byte(keyContent)},
 			"blue-user": {Token: "blue-token", ClientCertificate: certFile, ClientKey: keyFile}},
 		Clusters: map[string]Cluster{
-			"cow-cluster":     {Server: "http://cow.org:8080"},
+			"cow-cluster":     {Server: "http://cow.org:8080", CertificateAuthorityData: []byte(caContent)},
 			"chicken-cluster": {Server: "http://chicken.org:8080", CertificateAuthority: caFile}},
 		Contexts: map[string]Context{
 			"federal-context": {AuthInfo: "red-user", Cluster: "cow-cluster"},
@@ -201,4 +204,98 @@ func TestFlattenSuccess(t *testing.T) {
 		t.Errorf("expected %v, got %v", keyData, string(mutatingConfig.AuthInfos[changingAuthInfo].ClientKeyData))
 	}
 
+}
+
+func ExampleMinifyAndShorten() {
+	certFile, _ := ioutil.TempFile("", "")
+	defer os.Remove(certFile.Name())
+	keyFile, _ := ioutil.TempFile("", "")
+	defer os.Remove(keyFile.Name())
+	caFile, _ := ioutil.TempFile("", "")
+	defer os.Remove(caFile.Name())
+
+	certData := "cert"
+	keyData := "key"
+	caData := "ca"
+
+	config := newMergedConfig(certFile.Name(), certData, keyFile.Name(), keyData, caFile.Name(), caData, nil)
+
+	MinifyConfig(&config)
+	ShortenConfig(&config)
+
+	output, _ := yaml.Marshal(config)
+	fmt.Printf("%s", string(output))
+	// Output:
+	// clusters:
+	//   cow-cluster:
+	//     LocationOfOrigin: ""
+	//     certificate-authority-data: REDACTED
+	//     server: http://cow.org:8080
+	// contexts:
+	//   federal-context:
+	//     LocationOfOrigin: ""
+	//     cluster: cow-cluster
+	//     user: red-user
+	// current-context: federal-context
+	// preferences: {}
+	// users:
+	//   red-user:
+	//     LocationOfOrigin: ""
+	//     client-certificate-data: REDACTED
+	//     client-key-data: REDACTED
+	//     token: red-token
+}
+
+func TestShortenSuccess(t *testing.T) {
+	certFile, _ := ioutil.TempFile("", "")
+	defer os.Remove(certFile.Name())
+	keyFile, _ := ioutil.TempFile("", "")
+	defer os.Remove(keyFile.Name())
+	caFile, _ := ioutil.TempFile("", "")
+	defer os.Remove(caFile.Name())
+
+	certData := "cert"
+	keyData := "key"
+	caData := "ca"
+
+	unchangingCluster := "chicken-cluster"
+	unchangingAuthInfo := "blue-user"
+	changingCluster := "cow-cluster"
+	changingAuthInfo := "red-user"
+
+	startingConfig := newMergedConfig(certFile.Name(), certData, keyFile.Name(), keyData, caFile.Name(), caData, t)
+	mutatingConfig := startingConfig
+
+	ShortenConfig(&mutatingConfig)
+
+	if len(mutatingConfig.Contexts) != 2 {
+		t.Errorf("unexpected contexts: %v", mutatingConfig.Contexts)
+	}
+	if !reflect.DeepEqual(startingConfig.Contexts, mutatingConfig.Contexts) {
+		t.Errorf("expected %v, got %v", startingConfig.Contexts, mutatingConfig.Contexts)
+	}
+
+	redacted := string(redactedBytes)
+	if len(mutatingConfig.Clusters) != 2 {
+		t.Errorf("unexpected clusters: %v", mutatingConfig.Clusters)
+	}
+	if !reflect.DeepEqual(startingConfig.Clusters[unchangingCluster], mutatingConfig.Clusters[unchangingCluster]) {
+		t.Errorf("expected %v, got %v", startingConfig.Clusters[unchangingCluster], mutatingConfig.Clusters[unchangingCluster])
+	}
+	if string(mutatingConfig.Clusters[changingCluster].CertificateAuthorityData) != redacted {
+		t.Errorf("expected %v, got %v", redacted, string(mutatingConfig.Clusters[changingCluster].CertificateAuthorityData))
+	}
+
+	if len(mutatingConfig.AuthInfos) != 2 {
+		t.Errorf("unexpected users: %v", mutatingConfig.AuthInfos)
+	}
+	if !reflect.DeepEqual(startingConfig.AuthInfos[unchangingAuthInfo], mutatingConfig.AuthInfos[unchangingAuthInfo]) {
+		t.Errorf("expected %v, got %v", startingConfig.AuthInfos[unchangingAuthInfo], mutatingConfig.AuthInfos[unchangingAuthInfo])
+	}
+	if string(mutatingConfig.AuthInfos[changingAuthInfo].ClientCertificateData) != redacted {
+		t.Errorf("expected %v, got %v", redacted, string(mutatingConfig.AuthInfos[changingAuthInfo].ClientCertificateData))
+	}
+	if string(mutatingConfig.AuthInfos[changingAuthInfo].ClientKeyData) != redacted {
+		t.Errorf("expected %v, got %v", redacted, string(mutatingConfig.AuthInfos[changingAuthInfo].ClientKeyData))
+	}
 }
