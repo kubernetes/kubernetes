@@ -1,20 +1,28 @@
 {
-  "id": "nimbus",
   "kind": "Pod",
-  "apiVersion": "v1beta1",
-  "desiredState": {
-    "manifest": {
-      "version": "v1beta1",
-      "id": "nimbus",
-      "containers": [{
-        "name": "nimbus",
-        "image": "mattf/storm-nimbus",
-        "cpu": 100,
-        "ports": [{ "containerPort": 6627 }]
-      }]
+  "apiVersion": "v1beta3",
+  "metadata": {
+    "name": "nimbus",
+    "labels": {
+      "name": "nimbus"
     }
   },
-  "labels": {
-    "name": "nimbus"
+  "spec": {
+    "containers": [
+      {
+        "name": "nimbus",
+        "image": "mattf/storm-nimbus",
+        "ports": [
+          {
+            "containerPort": 6627
+          }
+        ],
+        "resources": {
+          "limits": {
+            "cpu": "100m"
+          }
+        }
+      }
+    ]
   }
 }
