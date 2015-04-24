@@ -22,10 +22,12 @@ import (
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/wait"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 
 	. "github.com/onsi/ginkgo"
@@ -278,9 +280,9 @@ var _ = Describe("Pods", func() {
 			By("deleting the pod")
 			podClient.Delete(pod.Name)
 		}()
-		_, err := podClient.Create(pod)
+		pod, err := podClient.Create(pod)
 		if err != nil {
-			Fail(fmt.Sprintf("Failed to create pod: %v", err))
+			Failf("Failed to create pod: %v", err)
 		}
 
 		expectNoError(waitForPodRunning(c, pod.Name))
@@ -289,29 +291,36 @@ var _ = Describe("Pods", func() {
 		pods, err := podClient.List(labels.SelectorFromSet(labels.Set(map[string]string{"time": value})), fields.Everything())
 		Expect(len(pods.Items)).To(Equal(1))
 
-		By("retrieving the pod")
-		podOut, err := podClient.Get(pod.Name)
-		if err != nil {
-			Fail(fmt.Sprintf("Failed to get pod: %v", err))
-		}
-
-		By("updating the pod")
-		value = "time" + value
-		pod.Labels["time"] = value
-		pod.ResourceVersion = podOut.ResourceVersion
-		pod.UID = podOut.UID
-		pod.Spec.Host = podOut.Spec.Host
-		pod, err = podClient.Update(pod)
-		if err != nil {
-			Fail(fmt.Sprintf("Failed to update pod: %v", err))
-		}
+		// Standard get, update retry loop
+		expectNoError(wait.Poll(time.Millisecond*500, time.Second*30, func() (bool, error) {
+			By("updating the pod")
+			value = strconv.Itoa(time.Now().Nanosecond())
+			if pod == nil { // on retries we need to re-get
+				pod, err = podClient.Get(name)
+				if err != nil {
+					return false, fmt.Errorf("failed to get pod: %v", err)
+				}
+			}
+			pod.Labels["time"] = value
+			pod, err = podClient.Update(pod)
+			if err == nil {
+				Logf("Successfully updated pod")
+				return true, nil
+			}
+			if errors.IsConflict(err) {
+				Logf("Conflicting update to pod, re-get and re-update: %v", err)
+				pod = nil // re-get it when we retry
+				return false, nil
+			}
+			return false, fmt.Errorf("failed to update pod: %v", err)
+		}))
 
 		expectNoError(waitForPodRunning(c, pod.Name))
 
 		By("verifying the updated pod is in kubernetes")
 		pods, err = podClient.List(labels.SelectorFromSet(labels.Set(map[string]string{"time": value})), fields.Everything())
 		Expect(len(pods.Items)).To(Equal(1))
-		fmt.Println("pod update OK")
+		Logf("Pod update OK")
 	})
 
 	It("should contain environment variables for services", func() {
