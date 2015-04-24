@@ -19,12 +19,16 @@ package e2e
 import (
 	"bytes"
 	"fmt"
+	"io/ioutil"
 	"math/rand"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
+
+	"code.google.com/p/go-uuid/uuid"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
@@ -34,10 +38,10 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/wait"
 
+	"golang.org/x/crypto/ssh"
+
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-
-	"code.google.com/p/go-uuid/uuid"
 )
 
 const (
@@ -625,4 +629,86 @@ func BadEvents(events []*api.Event) int {
 		}
 	}
 	return badEvents
+}
+
+// SSH synchronously SSHs to a node running on provider and runs cmd. If there
+// is no error performing the SSH, the stdout, stderr, and exit code are
+// returned.
+func SSH(cmd, host, provider string) (string, string, int, error) {
+	// Get a signer for the provider.
+	signer, err := getSigner(provider)
+	if err != nil {
+		return "", "", 0, fmt.Errorf("error getting signer for provider %s: '%v'", provider, err)
+	}
+
+	// Setup the config, dial the server, and open a session.
+	config := &ssh.ClientConfig{
+		User: os.Getenv("USER"),
+		Auth: []ssh.AuthMethod{ssh.PublicKeys(signer)},
+	}
+	client, err := ssh.Dial("tcp", host, config)
+	if err != nil {
+		return "", "", 0, fmt.Errorf("error getting SSH client to host %s: '%v'", host, err)
+	}
+	session, err := client.NewSession()
+	if err != nil {
+		return "", "", 0, fmt.Errorf("error creating session to host %s: '%v'", host, err)
+	}
+	defer session.Close()
+
+	// Run the command.
+	code := 0
+	var bout, berr bytes.Buffer
+	session.Stdout, session.Stderr = &bout, &berr
+	if err = session.Run(cmd); err != nil {
+		// Check whether the command failed to run or didn't complete.
+		if exiterr, ok := err.(*ssh.ExitError); ok {
+			// If we got an ExitError and the exit code is nonzero, we'll
+			// consider the SSH itself successful (just that the command run
+			// errored on the host).
+			if code = exiterr.ExitStatus(); code != 0 {
+				err = nil
+			}
+		} else {
+			// Some other kind of error happened (e.g. an IOError); consider the
+			// SSH unsuccessful.
+			err = fmt.Errorf("failed running `%s` on %s: '%v'", cmd, host, err)
+		}
+	}
+	return bout.String(), berr.String(), code, err
+}
+
+// getSigner returns an ssh.Signer for the provider ("gce", etc.) that can be
+// used to SSH to their nodes.
+func getSigner(provider string) (ssh.Signer, error) {
+	// Get the directory in which SSH keys are located.
+	keydir := filepath.Join(os.Getenv("HOME"), ".ssh")
+
+	// Select the key itself to use. When implementing more providers here,
+	// please also add them to any SSH tests that are disabled because of signer
+	// support.
+	keyfile := ""
+	switch provider {
+	case "gce", "gke":
+		keyfile = "google_compute_engine"
+	default:
+		return nil, fmt.Errorf("getSigner(...) not implemented for %s", provider)
+	}
+	key := filepath.Join(keydir, keyfile)
+
+	// Create an actual signer.
+	file, err := os.Open(key)
+	if err != nil {
+		return nil, fmt.Errorf("error opening SSH key %s: '%v'", key, err)
+	}
+	defer file.Close()
+	buffer, err := ioutil.ReadAll(file)
+	if err != nil {
+		return nil, fmt.Errorf("error reading SSH key %s: '%v'", key, err)
+	}
+	signer, err := ssh.ParsePrivateKey(buffer)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing SSH key %s: '%v'", key, err)
+	}
+	return signer, nil
 }
