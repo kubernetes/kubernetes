@@ -16,6 +16,9 @@ Docker Single Node | custom       | N/A    | local       | [docs](docker.md) | P
 Docker Multi Node  | Flannel | N/A    | local       | [docs](docker-multinode.md) | Project (@brendandburns) | Tested @ 0.14.1 |
 Bare-metal     | Ansible      | Fedora | flannel     | [docs](../../docs/getting-started-guides/fedora/fedora_ansible_config.md)       | Project    | Uses K8s v0.13.2
 Bare-metal     | custom       | Fedora | _none_      | [docs](../../docs/getting-started-guides/fedora/fedora_manual_config.md) | Project    | Uses K8s v0.13.2
+Bare-metal     | custom       | Fedora | flannel   | [docs](../../docs/getting-started-guides/fedora/flannel_multi_node_cluster.md) | Community ([@aveshagarwal](https://github.com/aveshagarwal))| Tested with 0.15.0
+libvirt        | custom       | Fedora | flannel   | [docs](../../docs/getting-started-guides/fedora/flannel_multi_node_cluster.md) | Community ([@aveshagarwal](https://github.com/aveshagarwal))| Tested with 0.15.0
+KVM            | custom       | Fedora | flannel   | [docs](../../docs/getting-started-guides/fedora/flannel_multi_node_cluster.md) | Community ([@aveshagarwal](https://github.com/aveshagarwal))| Tested with 0.15.0
 Bare-metal     | custom       | Ubuntu Cluster | flannel | [docs](../../docs/getting-started-guides/ubuntu_multinodes_cluster.md) | Community (@resouer @WIZARD-CXY) | use k8s version 0.12.0
 Mesos/GCE      |              |        |             | [docs](../../docs/getting-started-guides/mesos.md)     | [Community](https://github.com/mesosphere/kubernetes-mesos) ([@jdef](https://github.com/jdef)) | Uses K8s v0.11.2
 AWS            | CoreOS       | CoreOS | flannel     | [docs](../../docs/getting-started-guides/coreos.md)    | Community                    | Uses K8s version 0.15.0
