@@ -16,7 +16,7 @@ package oomparser
 
 import (
 	"bufio"
-	"errors"
+	"fmt"
 	"io"
 	"os"
 	"os/exec"
@@ -30,7 +30,7 @@ import (
 )
 
 var containerRegexp *regexp.Regexp = regexp.MustCompile(
-	`Task in (.*) killed as a result of limit of `)
+	`Task in (.*) killed as a result of limit of (.*)`)
 var lastLineRegexp *regexp.Regexp = regexp.MustCompile(
 	`(^[A-Z]{1}[a-z]{2} .*[0-9]{1,2} [0-9]{1,2}:[0-9]{2}:[0-9]{2}) .* Killed process ([0-9]+) \(([0-9A-Za-z_]+)\)`)
 var firstLineRegexp *regexp.Regexp = regexp.MustCompile(
@@ -52,6 +52,9 @@ type OomInstance struct {
 	TimeOfDeath time.Time
 	// the absolute name of the container that OOMed
 	ContainerName string
+	// the absolute name of the container that was killed
+	// due to the OOM.
+	VictimContainerName string
 }
 
 // gets the container name from a line and adds it to the oomInstance.
@@ -61,6 +64,7 @@ func getContainerName(line string, currentOomInstance *OomInstance) error {
 		return nil
 	}
 	currentOomInstance.ContainerName = path.Join("/", parsedLine[1])
+	currentOomInstance.VictimContainerName = path.Join("/", parsedLine[2])
 	return nil
 }
 
@@ -183,17 +187,20 @@ func trySystemd() (*OomParser, error) {
 
 }
 
+// List of possible kernel log files. These are prioritized in order so that
+// we will use the first one that is available.
+var kernelLogFiles = []string{"/var/log/kern.log", "/var/log/messages", "/var/log/syslog"}
+
 // looks for system files that contain kernel messages and if one is found, sets
 // the systemFile attribute of the OomParser object
 func getSystemFile() (string, error) {
-	const varLogMessages = "/var/log/messages"
-	const varLogSyslog = "/var/log/syslog"
-	if utils.FileExists(varLogMessages) {
-		return varLogMessages, nil
-	} else if utils.FileExists(varLogSyslog) {
-		return varLogSyslog, nil
+	for _, logFile := range kernelLogFiles {
+		if utils.FileExists(logFile) {
+			glog.Infof("OOM parser using kernel log file: %q", logFile)
+			return logFile, nil
+		}
 	}
-	return "", errors.New("neither " + varLogSyslog + " nor " + varLogMessages + " exists from which to read kernel errors")
+	return "", fmt.Errorf("unable to find any kernel log file available from our set: %v", kernelLogFiles)
 }
 
 // initializes an OomParser object and calls getSystemFile to set the systemFile
@@ -201,12 +208,10 @@ func getSystemFile() (string, error) {
 func New() (*OomParser, error) {
 	systemFile, err := getSystemFile()
 	if err != nil {
-		glog.V(1).Infof("received error %v when calling getSystemFile", err)
 		return trySystemd()
 	}
 	file, err := os.Open(systemFile)
 	if err != nil {
-		glog.V(1).Infof("received error %v when opening file", err)
 		return trySystemd()
 	}
 	return &OomParser{

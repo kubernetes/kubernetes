@@ -494,12 +494,13 @@ type Event struct {
 
 // EventType is an enumerated type which lists the categories under which
 // events may fall. The Event field EventType is populated by this enum.
-type EventType int
+type EventType string
 
 const (
-	EventOom EventType = iota
-	EventContainerCreation
-	EventContainerDeletion
+	EventOom               EventType = "oom"
+	EventOomKill                     = "oomKill"
+	EventContainerCreation           = "containerCreation"
+	EventContainerDeletion           = "containerDeletion"
 )
 
 // Extra information about an event. Only one type will be set.
@@ -507,8 +508,8 @@ type EventData struct {
 	// Information about a container creation event.
 	Created *CreatedEventData `json:"created,omitempty"`
 
-	// Information about an OOM event.
-	Oom *OomEventData `json:"oom,omitempty"`
+	// Information about an OOM kill event.
+	OomKill *OomKillEventData `json:"oom,omitempty"`
 }
 
 // Information related to a container creation event.
@@ -518,7 +519,7 @@ type CreatedEventData struct {
 }
 
 // Information related to an OOM kill instance
-type OomEventData struct {
+type OomKillEventData struct {
 	// process id of the killed process
 	Pid int `json:"pid"`
 

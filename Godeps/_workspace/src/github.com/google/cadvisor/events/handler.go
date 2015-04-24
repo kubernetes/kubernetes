@@ -174,7 +174,7 @@ func getMaxEventsReturned(request *Request, eSlice EventSlice) EventSlice {
 // equivalent
 func checkIfIsSubcontainer(request *Request, event *info.Event) bool {
 	if request.IncludeSubcontainers == true {
-		return strings.HasPrefix(event.ContainerName+"/", request.ContainerName+"/")
+		return request.ContainerName == "/" || strings.HasPrefix(event.ContainerName+"/", request.ContainerName+"/")
 	}
 	return event.ContainerName == request.ContainerName
 }
@@ -270,7 +270,7 @@ func (self *events) AddEvent(e *info.Event) error {
 	for _, watchObject := range watchesToSend {
 		watchObject.eventChannel.GetChannel() <- e
 	}
-	glog.V(1).Infof("Added event %v", e)
+	glog.V(4).Infof("Added event %v", e)
 	return nil
 }
 

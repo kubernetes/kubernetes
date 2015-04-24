@@ -12,48 +12,57 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package memory
+package utils
 
 import (
 	"sort"
 	"time"
-
-	info "github.com/google/cadvisor/info/v1"
 )
 
-// A circular buffer for ContainerStats.
-type StatsBuffer struct {
-	buffer []*info.ContainerStats
-	size   int
-	index  int
+// A time-based buffer for ContainerStats. Holds information for a specific time period.
+type TimedStore struct {
+	buffer []timedStoreData
+	age    time.Duration
 }
 
-// Returns a new thread-compatible StatsBuffer.
-func NewStatsBuffer(size int) *StatsBuffer {
-	return &StatsBuffer{
-		buffer: make([]*info.ContainerStats, size),
-		size:   0,
-		index:  size - 1,
+type timedStoreData struct {
+	timestamp time.Time
+	data      interface{}
+}
+
+// Returns a new thread-compatible TimedStore.
+func NewTimedStore(age time.Duration) *TimedStore {
+	return &TimedStore{
+		buffer: make([]timedStoreData, 0),
+		age:    age,
 	}
 }
 
 // Adds an element to the start of the buffer (removing one from the end if necessary).
-func (self *StatsBuffer) Add(item *info.ContainerStats) {
-	if self.size < len(self.buffer) {
-		self.size++
+func (self *TimedStore) Add(timestamp time.Time, item interface{}) {
+	// Remove any elements before the eviction time.
+	evictTime := timestamp.Add(-self.age)
+	index := sort.Search(len(self.buffer), func(index int) bool {
+		return self.buffer[index].timestamp.After(evictTime)
+	})
+	if index < len(self.buffer) {
+		self.buffer = self.buffer[index:]
 	}
-	self.index = (self.index + 1) % len(self.buffer)
-	copied := *item
-	self.buffer[self.index] = &copied
+
+	copied := item
+	self.buffer = append(self.buffer, timedStoreData{
+		timestamp: timestamp,
+		data:      copied,
+	})
 }
 
 // Returns up to maxResult elements in the specified time period (inclusive).
 // Results are from first to last. maxResults of -1 means no limit. When first
 // and last are specified, maxResults is ignored.
-func (self *StatsBuffer) InTimeRange(start, end time.Time, maxResults int) []*info.ContainerStats {
+func (self *TimedStore) InTimeRange(start, end time.Time, maxResults int) []interface{} {
 	// No stats, return empty.
-	if self.size == 0 {
-		return []*info.ContainerStats{}
+	if len(self.buffer) == 0 {
+		return []interface{}{}
 	}
 
 	// Return all results in a time range if specified.
@@ -67,18 +76,18 @@ func (self *StatsBuffer) InTimeRange(start, end time.Time, maxResults int) []*in
 	var startIndex int
 	if start.IsZero() {
 		// None specified, start at the beginning.
-		startIndex = self.size - 1
+		startIndex = len(self.buffer) - 1
 	} else {
 		// Start is the index before the elements smaller than it. We do this by
 		// finding the first element smaller than start and taking the index
 		// before that element
-		startIndex = sort.Search(self.size, func(index int) bool {
+		startIndex = sort.Search(len(self.buffer), func(index int) bool {
 			// buffer[index] < start
-			return self.Get(index).Timestamp.Before(start)
+			return self.getData(index).timestamp.Before(start)
 		}) - 1
 		// Check if start is after all the data we have.
 		if startIndex < 0 {
-			return []*info.ContainerStats{}
+			return []interface{}{}
 		}
 	}
 
@@ -88,13 +97,13 @@ func (self *StatsBuffer) InTimeRange(start, end time.Time, maxResults int) []*in
 		endIndex = 0
 	} else {
 		// End is the first index smaller than or equal to it (so, not larger).
-		endIndex = sort.Search(self.size, func(index int) bool {
+		endIndex = sort.Search(len(self.buffer), func(index int) bool {
 			// buffer[index] <= t -> !(buffer[index] > t)
-			return !self.Get(index).Timestamp.After(end)
+			return !self.getData(index).timestamp.After(end)
 		})
 		// Check if end is before all the data we have.
-		if endIndex == self.size {
-			return []*info.ContainerStats{}
+		if endIndex == len(self.buffer) {
+			return []interface{}{}
 		}
 	}
 
@@ -106,46 +115,23 @@ func (self *StatsBuffer) InTimeRange(start, end time.Time, maxResults int) []*in
 	}
 
 	// Return in sorted timestamp order so from the "back" to "front".
-	result := make([]*info.ContainerStats, numResults)
+	result := make([]interface{}, numResults)
 	for i := 0; i < numResults; i++ {
 		result[i] = self.Get(startIndex - i)
 	}
 	return result
 }
 
-// TODO(vmarmol): Remove this function as it will no longer be neededt.
-// Returns the first N elements in the buffer. If N > size of buffer, size of buffer elements are returned.
-// Returns the elements in ascending timestamp order.
-func (self *StatsBuffer) FirstN(n int) []*info.ContainerStats {
-	// Cap n at the number of elements we have.
-	if n > self.size {
-		n = self.size
-	}
-
-	// index points to the latest element, get n before that one (keeping in mind we may have gone through 0).
-	start := self.index - (n - 1)
-	if start < 0 {
-		start += len(self.buffer)
-	}
-
-	// Copy the elements.
-	res := make([]*info.ContainerStats, n)
-	for i := 0; i < n; i++ {
-		index := (start + i) % len(self.buffer)
-		res[i] = self.buffer[index]
-	}
-	return res
+// Gets the element at the specified index. Note that elements are output in LIFO order.
+func (self *TimedStore) Get(index int) interface{} {
+	return self.getData(index).data
 }
 
-// Gets the element at the specified index. Note that elements are stored in LIFO order.
-func (self *StatsBuffer) Get(index int) *info.ContainerStats {
-	calculatedIndex := self.index - index
-	if calculatedIndex < 0 {
-		calculatedIndex += len(self.buffer)
-	}
-	return self.buffer[calculatedIndex]
+// Gets the data at the specified index. Note that elements are output in LIFO order.
+func (self *TimedStore) getData(index int) timedStoreData {
+	return self.buffer[len(self.buffer)-index-1]
 }
 
-func (self *StatsBuffer) Size() int {
-	return self.size
+func (self *TimedStore) Size() int {
+	return len(self.buffer)
 }
