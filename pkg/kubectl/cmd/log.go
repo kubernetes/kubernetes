@@ -57,6 +57,7 @@ func selectContainer(pod *api.Pod, in io.Reader, out io.Writer) string {
 	}
 }
 
+// NewCmdLog creates a new pod log command
 func NewCmdLog(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "log [-f] POD [CONTAINER]",
@@ -73,6 +74,7 @@ func NewCmdLog(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	return cmd
 }
 
+// RunLog retrieves a pod log
 func RunLog(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string) error {
 	if len(args) == 0 {
 		return cmdutil.UsageError(cmd, "POD is required for log")
@@ -114,11 +116,12 @@ func RunLog(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string
 	}
 
 	readCloser, err := client.RESTClient.Get().
-		Prefix("proxy").
-		Resource("nodes").
-		Name(pod.Spec.Host).
-		Suffix("containerLogs", namespace, podID, container).
+		Namespace(namespace).
+		Name(podID).
+		Resource("pods").
+		SubResource("log").
 		Param("follow", strconv.FormatBool(follow)).
+		Param("container", container).
 		Stream()
 	if err != nil {
 		return err
