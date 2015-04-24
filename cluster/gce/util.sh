@@ -691,47 +691,6 @@ function kube-up {
    create-kubeconfig
   )
 
-  echo "Sanity checking cluster..."
-
-  # Basic sanity checking
-  local i
-  local rc # Capture return code without exiting because of errexit bash option
-  local pause_pod="google_containers/pause"
-  for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
-      # Make sure docker is installed and working.
-      local attempt=0
-      while true; do
-        echo -n Attempt "$(($attempt+1))" to check Docker and pause pod on node "${MINION_NAMES[$i]}" ...
-        local output=$(gcloud compute --project "${PROJECT}" ssh --zone "$ZONE" "${MINION_NAMES[$i]}" --command "sudo docker ps -a" 2>/dev/null)
-        if [[ -z "${output}" ]]; then
-          if (( attempt > 9 )); then
-            echo
-            echo -e "${color_red}Docker failed to install on node ${MINION_NAMES[$i]}. Your cluster is unlikely" >&2
-            echo "to work correctly. Please run ./cluster/kube-down.sh and re-create the" >&2
-            echo -e "cluster. (sorry!)${color_norm}" >&2
-            exit 1
-          fi
-        elif [[ ! `echo "${output}" | grep "${pause_pod}"` ]]; then
-          if (( attempt > 9 )); then
-            echo
-            echo -e "${color_red}Failed to observe ${pause_pod} on node ${MINION_NAMES[$i]}. Your cluster is unlikely" >&2
-            echo "to work correctly. Please run ./cluster/kube-down.sh and re-create the" >&2
-            echo -e "cluster. (sorry!)${color_norm}" >&2
-            exit 1
-          fi
-        else
-          echo -e " ${color_green}[working]${color_norm}"
-          break
-        fi
-        echo -e " ${color_yellow}[not working yet]${color_norm}"
-        # Start Docker, in case it failed to start.
-        gcloud compute --project "${PROJECT}" ssh --zone "$ZONE" "${MINION_NAMES[$i]}" \
-                       --command "sudo service docker start" 2>/dev/null || true
-        attempt=$(($attempt+1))
-        sleep 30
-      done
-  done
-
   echo
   echo -e "${color_green}Kubernetes cluster is running.  The master is running at:"
   echo
