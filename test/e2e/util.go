@@ -30,6 +30,9 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/clientauth"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/wait"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -400,4 +403,176 @@ func testContainerOutputInNamespace(ns, scenarioName string, c *client.Client, p
 	for _, m := range expectedOutput {
 		Expect(string(logs)).To(ContainSubstring(m), "%q in container output", m)
 	}
+}
+
+// Delete a Replication Controller and all pods it spawned
+func DeleteRC(c *client.Client, ns, name string) error {
+	rc, err := c.ReplicationControllers(ns).Get(name)
+	if err != nil {
+		return fmt.Errorf("Failed to find replication controller %s in namespace %s: %v", name, ns, err)
+	}
+
+	rc.Spec.Replicas = 0
+
+	if _, err := c.ReplicationControllers(ns).Update(rc); err != nil {
+		return fmt.Errorf("Failed to resize replication controller %s to zero: %v", name, err)
+	}
+
+	// Wait up to 20 minutes until all replicas are killed.
+	endTime := time.Now().Add(time.Minute * 20)
+	for {
+		if time.Now().After(endTime) {
+			return fmt.Errorf("Timeout while waiting for replication controller %s replicas to 0", name)
+		}
+		remainingTime := endTime.Sub(time.Now())
+		err := wait.Poll(time.Second, remainingTime, client.ControllerHasDesiredReplicas(c, rc))
+		if err != nil {
+			Logf("Error while waiting for replication controller %s replicas to read 0: %v", name, err)
+		} else {
+			break
+		}
+	}
+
+	// Delete the replication controller.
+	if err := c.ReplicationControllers(ns).Delete(name); err != nil {
+		return fmt.Errorf("Failed to delete replication controller %s: %v", name, err)
+	}
+	return nil
+}
+
+// Launch a Replication Controller and wait for all pods it spawns
+// to become running. The controller will need to be cleaned up external
+// to this method
+func RunRC(c *client.Client, name string, ns, image string, replicas int) error {
+	var last int
+	current := 0
+	same := 0
+
+	By(fmt.Sprintf("Creating replication controller %s", name))
+	_, err := c.ReplicationControllers(ns).Create(&api.ReplicationController{
+		ObjectMeta: api.ObjectMeta{
+			Name: name,
+		},
+		Spec: api.ReplicationControllerSpec{
+			Replicas: replicas,
+			Selector: map[string]string{
+				"name": name,
+			},
+			Template: &api.PodTemplateSpec{
+				ObjectMeta: api.ObjectMeta{
+					Labels: map[string]string{"name": name},
+				},
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{
+							Name:  name,
+							Image: image,
+							Ports: []api.ContainerPort{{ContainerPort: 80}},
+						},
+					},
+				},
+			},
+		},
+	})
+	if err != nil {
+		return fmt.Errorf("Error creating replication controller: %v", err)
+	}
+
+	By(fmt.Sprintf("Making sure all %d replicas exist", replicas))
+	label := labels.SelectorFromSet(labels.Set(map[string]string{"name": name}))
+	pods, err := listPods(c, ns, label, fields.Everything())
+	if err != nil {
+		return fmt.Errorf("Error listing pods: %v", err)
+	}
+	current = len(pods.Items)
+	failCount := 5
+	for same < failCount && current < replicas {
+		Logf("Controller %s: Found %d pods out of %d", name, current, replicas)
+		if last < current {
+			same = 0
+		} else if last == current {
+			same++
+		} else if current < last {
+			return fmt.Errorf("Controller %s: Number of submitted pods dropped from %d to %d", name, last, current)
+		}
+
+		if same >= failCount {
+			return fmt.Errorf("Controller %s: No pods submitted for the last %d checks", name, failCount)
+		}
+
+		last = current
+		time.Sleep(5 * time.Second)
+		pods, err = listPods(c, ns, label, fields.Everything())
+		if err != nil {
+			return fmt.Errorf("Error listing pods: %v", err)
+		}
+		current = len(pods.Items)
+	}
+	if current != replicas {
+		return fmt.Errorf("Controller %s: Only found %d replicas out of %d", name, current, replicas)
+	}
+	Logf("Controller %s: Found %d pods out of %d", name, current, replicas)
+
+	By("Waiting for each pod to be running")
+	same = 0
+	last = 0
+	failCount = 10
+	current = 0
+	for same < failCount && current < replicas {
+		current = 0
+		waiting := 0
+		pending := 0
+		unknown := 0
+		time.Sleep(10 * time.Second)
+
+		currentPods, err := listPods(c, ns, label, fields.Everything())
+		if err != nil {
+			return fmt.Errorf("Error listing pods: %v", err)
+		}
+		if len(currentPods.Items) != len(pods.Items) {
+			return fmt.Errorf("Number of reported pods changed: %d vs %d", len(currentPods.Items), len(pods.Items))
+		}
+		for _, p := range currentPods.Items {
+			if p.Status.Phase == api.PodRunning {
+				current++
+			} else if p.Status.Phase == api.PodPending {
+				if p.Spec.Host == "" {
+					waiting++
+				} else {
+					pending++
+				}
+			} else if p.Status.Phase == api.PodUnknown {
+				unknown++
+			}
+		}
+		Logf("Pod States: %d running, %d pending, %d waiting, %d unknown ", current, pending, waiting, unknown)
+		if last < current {
+			same = 0
+		} else if last == current {
+			same++
+		} else if current < last {
+			return fmt.Errorf("Number of running pods dropped from %d to %d", last, current)
+		}
+		if same >= failCount {
+			return fmt.Errorf("No pods started for the last %d checks", failCount)
+		}
+		last = current
+	}
+	if current != replicas {
+		return fmt.Errorf("Only %d pods started out of %d", current, replicas)
+	}
+	return nil
+}
+
+// Convenient wrapper around listing pods supporting retries.
+func listPods(c *client.Client, namespace string, label labels.Selector, field fields.Selector) (*api.PodList, error) {
+	maxRetries := 4
+	pods, err := c.Pods(namespace).List(label, field)
+	for i := 0; i < maxRetries; i++ {
+		if err == nil {
+			return pods, nil
+		}
+		pods, err = c.Pods(namespace).List(label, field)
+	}
+	return pods, err
 }
