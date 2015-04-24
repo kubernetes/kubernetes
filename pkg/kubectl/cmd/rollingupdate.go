@@ -17,14 +17,22 @@ limitations under the License.
 package cmd
 
 import (
+	"bytes"
+	"crypto/md5"
+	"errors"
 	"fmt"
 	"io"
 	"os"
+	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl"
 	cmdutil "github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/cmd/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/resource"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/spf13/cobra"
 )
 
@@ -41,7 +49,11 @@ existing controller and overwrite at least one (common) label in its replicaSele
 $ kubectl rolling-update frontend-v1 -f frontend-v2.json
 
 // Update pods of frontend-v1 using JSON data passed into stdin.
-$ cat frontend-v2.json | kubectl rolling-update frontend-v1 -f -`
+$ cat frontend-v2.json | kubectl rolling-update frontend-v1 -f -
+
+// Update the pods of frontend-v1 to frontend-v2 by just changing the image
+$ kubectl rolling-update frontend-v1 frontend-v2 --image=image:v2
+`
 )
 
 func NewCmdRollingUpdate(f *cmdutil.Factory, out io.Writer) *cobra.Command {
@@ -61,49 +73,53 @@ func NewCmdRollingUpdate(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd.Flags().String("poll-interval", pollInterval, `Time delay between polling controller status after update. Valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".`)
 	cmd.Flags().String("timeout", timeout, `Max time to wait for a controller to update before giving up. Valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".`)
 	cmd.Flags().StringP("filename", "f", "", "Filename or URL to file to use to create the new controller.")
+	cmd.Flags().String("image", "", "Image to upgrade the controller to.  Can not be used with --filename/-f")
+	cmd.Flags().String("deployment-label-key", "deployment", "The key to use to differentiate between two different controllers, default 'deployment'.  Only relevant when --image is specified, ignored otherwise")
+	cmd.Flags().Bool("dry-run", false, "If true, print out the changes that would be made, but don't actually make them.")
+	cmdutil.AddPrinterFlags(cmd)
 	return cmd
+}
+
+func validateArguments(cmd *cobra.Command, args []string) (deploymentKey, filename, image, oldName string, err error) {
+	deploymentKey = cmdutil.GetFlagString(cmd, "deployment-label-key")
+	filename = cmdutil.GetFlagString(cmd, "filename")
+	image = cmdutil.GetFlagString(cmd, "image")
+
+	if len(deploymentKey) == 0 {
+		return "", "", "", "", cmdutil.UsageError(cmd, "--deployment-label-key can not be empty")
+	}
+	if len(filename) == 0 && len(image) == 0 {
+		return "", "", "", "", cmdutil.UsageError(cmd, "Must specify --filename or --image for new controller")
+	}
+	if len(filename) != 0 && len(image) != 0 {
+		return "", "", "", "", cmdutil.UsageError(cmd, "--filename and --image can not both be specified")
+	}
+	if len(image) > 0 && len(args) < 2 {
+		return "", "", "", "", cmdutil.UsageError(cmd, "You must specify a name for your new controller")
+	}
+	if len(args) < 1 {
+		return "", "", "", "", cmdutil.UsageError(cmd, "Must specify the controller to update")
+	}
+
+	return deploymentKey, filename, image, args[0], nil
 }
 
 func RunRollingUpdate(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string) error {
 	if os.Args[1] == "rollingupdate" {
 		printDeprecationWarning("rolling-update", "rollingupdate")
 	}
-
-	filename := cmdutil.GetFlagString(cmd, "filename")
-	if len(filename) == 0 {
-		return cmdutil.UsageError(cmd, "Must specify filename for new controller")
+	deploymentKey, filename, image, oldName, err := validateArguments(cmd, args)
+	if err != nil {
+		return err
 	}
 	period := cmdutil.GetFlagDuration(cmd, "update-period")
 	interval := cmdutil.GetFlagDuration(cmd, "poll-interval")
 	timeout := cmdutil.GetFlagDuration(cmd, "timeout")
-	if len(args) != 1 {
-		return cmdutil.UsageError(cmd, "Must specify the controller to update")
-	}
-	oldName := args[0]
+	dryrun := cmdutil.GetFlagBool(cmd, "dry-run")
 
 	cmdNamespace, err := f.DefaultNamespace()
 	if err != nil {
 		return err
-	}
-
-	mapper, typer := f.Object()
-	// TODO: use resource.Builder instead
-	obj, err := resource.NewBuilder(mapper, typer, f.ClientMapperForCommand()).
-		NamespaceParam(cmdNamespace).RequireNamespace().
-		FilenameParam(filename).
-		Do().
-		Object()
-	if err != nil {
-		return err
-	}
-	newRc, ok := obj.(*api.ReplicationController)
-	if !ok {
-		return cmdutil.UsageError(cmd, "%s does not specify a valid ReplicationController", filename)
-	}
-	newName := newRc.Name
-	if oldName == newName {
-		return cmdutil.UsageError(cmd, "%s cannot have the same name as the existing ReplicationController %s",
-			filename, oldName)
 	}
 
 	client, err := f.Client()
@@ -111,13 +127,70 @@ func RunRollingUpdate(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, arg
 		return err
 	}
 
-	updater := kubectl.NewRollingUpdater(newRc.Namespace, kubectl.NewRollingUpdaterClient(client))
-
 	// fetch rc
-	oldRc, err := client.ReplicationControllers(newRc.Namespace).Get(oldName)
+	oldRc, err := client.ReplicationControllers(cmdNamespace).Get(oldName)
 	if err != nil {
 		return err
 	}
+
+	mapper, typer := f.Object()
+	var newRc *api.ReplicationController
+
+	if len(filename) != 0 {
+		obj, err := resource.NewBuilder(mapper, typer, f.ClientMapperForCommand()).
+			NamespaceParam(cmdNamespace).RequireNamespace().
+			FilenameParam(filename).
+			Do().
+			Object()
+		if err != nil {
+			return err
+		}
+		var ok bool
+		newRc, ok = obj.(*api.ReplicationController)
+		if !ok {
+			return cmdutil.UsageError(cmd, "%s does not specify a valid ReplicationController", filename)
+		}
+	}
+	if len(image) != 0 {
+		newName := args[1]
+		var err error
+		// load the old RC into the "new" RC
+		if newRc, err = client.ReplicationControllers(cmdNamespace).Get(oldName); err != nil {
+			return err
+		}
+
+		if len(newRc.Spec.Template.Spec.Containers) > 1 {
+			// TODO: support multi-container image update.
+			return errors.New("Image update is not supported for multi-container pods")
+		}
+		if len(newRc.Spec.Template.Spec.Containers) == 0 {
+			return cmdutil.UsageError(cmd, "Pod has no containers! (%v)", newRc)
+		}
+		newRc.Spec.Template.Spec.Containers[0].Image = image
+
+		newHash, err := hashObject(newRc, client.Codec)
+		if err != nil {
+			return err
+		}
+		newRc.Name = newName
+
+		newRc.Spec.Selector[deploymentKey] = newHash
+		newRc.Spec.Template.Labels[deploymentKey] = newHash
+		newRc.ResourceVersion = ""
+
+		if _, found := oldRc.Spec.Selector[deploymentKey]; !found {
+			if err := addDeploymentKeyToReplicationController(oldRc, client, deploymentKey, cmdNamespace, out); err != nil {
+				return err
+			}
+		}
+	}
+	newName := newRc.Name
+	if oldName == newName {
+		return cmdutil.UsageError(cmd, "%s cannot have the same name as the existing ReplicationController %s",
+			filename, oldName)
+	}
+
+	updater := kubectl.NewRollingUpdater(newRc.Namespace, kubectl.NewRollingUpdaterClient(client))
 
 	var hasLabel bool
 	for key, oldValue := range oldRc.Spec.Selector {
@@ -134,6 +207,18 @@ func RunRollingUpdate(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, arg
 	if newRc.Spec.Replicas == 0 {
 		newRc.Spec.Replicas = oldRc.Spec.Replicas
 	}
+	if dryrun {
+		oldRcData := &bytes.Buffer{}
+		if err := f.PrintObject(cmd, oldRc, oldRcData); err != nil {
+			return err
+		}
+		newRcData := &bytes.Buffer{}
+		if err := f.PrintObject(cmd, newRc, newRcData); err != nil {
+			return err
+		}
+		fmt.Fprintf(out, "Rolling from:\n%s\nTo:\n%s\n", string(oldRcData.Bytes()), string(newRcData.Bytes()))
+		return nil
+	}
 	err = updater.Update(&kubectl.RollingUpdaterConfig{
 		Out:           out,
 		OldRc:         oldRc,
@@ -148,5 +233,70 @@ func RunRollingUpdate(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, arg
 	}
 
 	fmt.Fprintf(out, "%s\n", newName)
+	return nil
+}
+
+func hashObject(obj runtime.Object, codec runtime.Codec) (string, error) {
+	data, err := codec.Encode(obj)
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("%x", md5.Sum(data)), nil
+}
+
+const MaxRetries = 3
+
+func addDeploymentKeyToReplicationController(oldRc *api.ReplicationController, client *client.Client, deploymentKey, namespace string, out io.Writer) error {
+	oldHash, err := hashObject(oldRc, client.Codec)
+	if err != nil {
+		return err
+	}
+	// Update all labels to include the new hash, so they are correctly adopted
+	// TODO: extract the code from the label command and re-use it here.
+	podList, err := client.Pods(namespace).List(labels.SelectorFromSet(oldRc.Spec.Selector), fields.Everything())
+	if err != nil {
+		return err
+	}
+	for ix := range podList.Items {
+		pod := &podList.Items[ix]
+		if pod.Labels == nil {
+			pod.Labels = map[string]string{
+				deploymentKey: oldHash,
+			}
+		} else {
+			pod.Labels[deploymentKey] = oldHash
+		}
+		err = nil
+		delay := 3
+		for i := 0; i < MaxRetries; i++ {
+			_, err = client.Pods(namespace).Update(pod)
+			if err != nil {
+				fmt.Fprint(out, "Error updating pod (%v), retrying after %d seconds", err, delay)
+				time.Sleep(time.Second * time.Duration(delay))
+				delay *= delay
+			} else {
+				break
+			}
+		}
+		if err != nil {
+			return err
+		}
+	}
+	if oldRc.Spec.Selector == nil {
+		oldRc.Spec.Selector = map[string]string{}
+	}
+	if oldRc.Spec.Template.Labels == nil {
+		oldRc.Spec.Template.Labels = map[string]string{}
+	}
+	oldRc.Spec.Selector[deploymentKey] = oldHash
+	oldRc.Spec.Template.Labels[deploymentKey] = oldHash
+
+	if _, err := client.ReplicationControllers(namespace).Update(oldRc); err != nil {
+		return err
+	}
+	// Note there is still a race here, if a pod was created during the update phase.
+	// It's unlikely, but it could happen, and if it does, we'll create extra pods.
+	// TODO: Clean up orphaned pods here.
+
 	return nil
 }

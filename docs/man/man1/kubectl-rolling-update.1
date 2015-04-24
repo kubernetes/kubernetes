@@ -23,6 +23,14 @@ existing controller and overwrite at least one (common) label in its replicaSele
 
 .SH OPTIONS
 .PP
+\fB\-\-deployment\-label\-key\fP="deployment"
+    The key to use to differentiate between two different controllers, default 'deployment'.  Only relevant when \-\-image is specified, ignored otherwise
+
+.PP
+\fB\-\-dry\-run\fP=false
+    If true, print out the changes that would be made, but don't actually make them.
+
+.PP
 \fB\-f\fP, \fB\-\-filename\fP=""
     Filename or URL to file to use to create the new controller.
 
@@ -31,8 +39,29 @@ existing controller and overwrite at least one (common) label in its replicaSele
     help for rolling\-update
 
 .PP
+\fB\-\-image\fP=""
+    Image to upgrade the controller to.  Can not be used with \-\-filename/\-f
+
+.PP
+\fB\-\-no\-headers\fP=false
+    When using the default output, don't print headers.
+
+.PP
+\fB\-o\fP, \fB\-\-output\fP=""
+    Output format. One of: json|yaml|template|templatefile.
+
+.PP
+\fB\-\-output\-version\fP=""
+    Output the formatted object with the given version (default api\-version).
+
+.PP
 \fB\-\-poll\-interval\fP="3s"
     Time delay between polling controller status after update. Valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".
+
+.PP
+\fB\-t\fP, \fB\-\-template\fP=""
+    Template string or path to template file to use when \-o=template or \-o=templatefile.  The template format is golang templates [
+\[la]http://golang.org/pkg/text/template/#pkg-overview\[ra]]
 
 .PP
 \fB\-\-timeout\fP="5m0s"
@@ -155,6 +184,10 @@ $ kubectl rolling\-update frontend\-v1 \-f frontend\-v2.json
 
 // Update pods of frontend\-v1 using JSON data passed into stdin.
 $ cat frontend\-v2.json | kubectl rolling\-update frontend\-v1 \-f \-
+
+// Update the pods of frontend\-v1 to frontend\-v2 by just changing the image
+$ kubectl rolling\-update frontend\-v1 frontend\-v2 \-\-image=image:v2
+
 
 .fi
 .RE
