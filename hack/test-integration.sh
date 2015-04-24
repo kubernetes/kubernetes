@@ -27,6 +27,7 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 # Comma separated list of API Versions that should be tested.
 KUBE_TEST_API_VERSIONS=${KUBE_TEST_API_VERSIONS:-"v1beta1,v1beta3"}
 KUBE_INTEGRATION_TEST_MAX_CONCURRENCY=${KUBE_INTEGRATION_TEST_MAX_CONCURRENCY:-"-1"}
+LOG_LEVEL=${LOG_LEVEL:-2}
 
 cleanup() {
   kube::etcd::cleanup
@@ -44,7 +45,7 @@ runTests() {
 
   kube::log::status "Running integration test scenario"
 
-  "${KUBE_OUTPUT_HOSTBIN}/integration" --v=2 --apiVersion="$1" \
+  "${KUBE_OUTPUT_HOSTBIN}/integration" --v=${LOG_LEVEL} --apiVersion="$1" \
   --maxConcurrency="${KUBE_INTEGRATION_TEST_MAX_CONCURRENCY}"
 
   cleanup
