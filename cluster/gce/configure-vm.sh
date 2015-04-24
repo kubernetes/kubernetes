@@ -73,19 +73,6 @@ for k,v in yaml.load(sys.stdin).iteritems():
   fi
 }
 
-function ensure-kube-token() {
-  # We bake the KUBELET_TOKEN in separately to avoid auth information
-  # having to be re-communicated on kube-push. (Otherwise the client
-  # has to keep the bearer token around to handle generating a valid
-  # kube-env.)
-  if [[ -z "${KUBELET_TOKEN:-}" ]] && [[ ! -e "${KNOWN_TOKENS_FILE}" ]]; then
-    until KUBELET_TOKEN=$(curl-metadata kube-token); do
-      echo 'Waiting for metadata KUBELET_TOKEN...'
-      sleep 3
-    done
-  fi
-}
-
 function remove-docker-artifacts() {
   echo "== Deleting docker0 =="
   # Forcibly install bridge-utils (options borrowed from Salt logs).
@@ -416,7 +403,6 @@ if [[ -z "${is_push}" ]]; then
   ensure-install-dir
   set-kube-env
   [[ "${KUBERNETES_MASTER}" == "true" ]] && mount-master-pd
-  ensure-kube-token
   create-salt-pillar
   create-salt-auth
   download-release

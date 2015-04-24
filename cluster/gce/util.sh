@@ -358,7 +358,6 @@ function create-route {
 # $2: The scopes flag.
 # $3: The minion start script metadata from file.
 # $4: The kube-env metadata.
-# $5: Raw metadata
 function create-node-template {
   detect-project
   local attempt=0
@@ -374,8 +373,7 @@ function create-node-template {
       --network "${NETWORK}" \
       $2 \
       --can-ip-forward \
-      --metadata-from-file "$3" "$4" \
-      --metadata "$5"; then
+      --metadata-from-file "$3" "$4"; then
         if (( attempt > 5 )); then
           echo -e "${color_red}Failed to create instance template $1 ${color_norm}"
           exit 2
@@ -474,6 +472,7 @@ DNS_REPLICAS: $(yaml-quote ${DNS_REPLICAS:-})
 DNS_SERVER_IP: $(yaml-quote ${DNS_SERVER_IP:-})
 DNS_DOMAIN: $(yaml-quote ${DNS_DOMAIN:-})
 KUBE_BEARER_TOKEN: $(yaml-quote ${KUBE_BEARER_TOKEN})
+KUBELET_TOKEN: $(yaml-quote ${KUBELET_TOKEN:-})
 ADMISSION_CONTROL: $(yaml-quote ${ADMISSION_CONTROL:-})
 MASTER_IP_RANGE: $(yaml-quote ${MASTER_IP_RANGE})
 EOF
@@ -614,7 +613,6 @@ function kube-up {
 
   # Wait for last batch of jobs
   wait-for-jobs
-  add-instance-metadata "${MASTER_NAME}" "kube-token=${KUBELET_TOKEN}"
 
   echo "Creating minions."
 
@@ -628,8 +626,7 @@ function kube-up {
   write-node-env
   create-node-template "${NODE_INSTANCE_PREFIX}-template" "${scope_flags[*]}" \
     "startup-script=${KUBE_ROOT}/cluster/gce/configure-vm.sh" \
-    "kube-env=${KUBE_TEMP}/node-kube-env.yaml" \
-    "kube-token=${KUBELET_TOKEN}"
+    "kube-env=${KUBE_TEMP}/node-kube-env.yaml"
 
   gcloud preview managed-instance-groups --zone "${ZONE}" \
       create "${NODE_INSTANCE_PREFIX}-group" \
@@ -867,8 +864,8 @@ function kube-push {
   # TODO(zmerlynn): Re-create instance-template with the new
   # node-kube-env. This isn't important until the node-ip-range issue
   # is solved (because that's blocking automatic dynamic nodes from
-  # working). The node-kube-env has to be composed with the kube-token
-  # metadata. Ideally we would have
+  # working). The node-kube-env has to be composed with the KUBELET_TOKEN
+  # Ideally we would have
   # https://github.com/GoogleCloudPlatform/kubernetes/issues/3168
   # implemented before then, though, so avoiding this mess until then.
 
