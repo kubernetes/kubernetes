@@ -251,6 +251,15 @@ func addDeploymentKeyToReplicationController(oldRc *api.ReplicationController, c
 	if err != nil {
 		return err
 	}
+	// First, update the template label.  This ensures that any newly created pods will have the new label
+	if oldRc.Spec.Template.Labels == nil {
+		oldRc.Spec.Template.Labels = map[string]string{}
+	}
+	oldRc.Spec.Template.Labels[deploymentKey] = oldHash
+	if _, err := client.ReplicationControllers(namespace).Update(oldRc); err != nil {
+		return err
+	}
+
 	// Update all labels to include the new hash, so they are correctly adopted
 	// TODO: extract the code from the label command and re-use it here.
 	podList, err := client.Pods(namespace).List(labels.SelectorFromSet(oldRc.Spec.Selector), fields.Everything())
@@ -282,21 +291,30 @@ func addDeploymentKeyToReplicationController(oldRc *api.ReplicationController, c
 			return err
 		}
 	}
+
 	if oldRc.Spec.Selector == nil {
 		oldRc.Spec.Selector = map[string]string{}
 	}
-	if oldRc.Spec.Template.Labels == nil {
-		oldRc.Spec.Template.Labels = map[string]string{}
+	// Copy the old selector, so that we can scrub out any orphaned pods
+	selectorCopy := map[string]string{}
+	for k, v := range oldRc.Spec.Selector {
+		selectorCopy[k] = v
 	}
 	oldRc.Spec.Selector[deploymentKey] = oldHash
-	oldRc.Spec.Template.Labels[deploymentKey] = oldHash
 
 	if _, err := client.ReplicationControllers(namespace).Update(oldRc); err != nil {
 		return err
 	}
-	// Note there is still a race here, if a pod was created during the update phase.
-	// It's unlikely, but it could happen, and if it does, we'll create extra pods.
-	// TODO: Clean up orphaned pods here.
+
+	podList, err = client.Pods(namespace).List(labels.SelectorFromSet(selectorCopy), fields.Everything())
+	for ix := range podList.Items {
+		pod := &podList.Items[ix]
+		if value, found := pod.Labels[deploymentKey]; !found || value != oldHash {
+			if err := client.Pods(namespace).Delete(pod.Name); err != nil {
+				return err
+			}
+		}
+	}
 
 	return nil
 }
