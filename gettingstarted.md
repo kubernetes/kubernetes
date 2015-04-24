@@ -26,6 +26,9 @@ steps:
   - title: Technical Details
     text: "Interested in taking a peek inside Kubernetes? You should start by reading the <a href=\"https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/design/README.md\">design overview</a> which introduces core Kubernetes concepts and components. After that, you probably want to take a look at the API documentation and learn about the kubecfg command line tool."
     slug: technical
+  - title: Solutions
+    text: "Learn about Kubernetes solutions."
+    slug: solutions
 
 hostedservices: 
   - label: Google Container Engine
@@ -70,4 +73,8 @@ techdetails:
     kubecfg:
         label: Kubectl Command Tool
         url: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/kubectl.md
+
+solutions:
+    label: Kubernetes on DCOS
+    url: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/solutions/k8s-on-dcos.md
 ---

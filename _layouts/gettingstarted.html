@@ -72,6 +72,14 @@ layout: default
         </div>
        </div>
       </div>
+    {% elsif 'solutions' == step.slug %}
+      <div class="row">
+       <div class="button-group float-none">
+        <div class="col-lg-4 col-md-5 col-sm-6">
+         <a href="{{page.solutions.url}}" class="button small">{{page.solutions.label}}</a>
+        </div>
+       </div>
+      </div>
     {% endif %}
      </div>
     </div>
