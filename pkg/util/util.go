@@ -66,7 +66,7 @@ func logPanic(r interface{}) {
 		}
 		callers = callers + fmt.Sprintf("%v:%v\n", file, line)
 	}
-	glog.Infof("Recovered from panic: %#v (%v)\n%v", r, r, callers)
+	glog.Errorf("Recovered from panic: %#v (%v)\n%v", r, r, callers)
 }
 
 // ErrorHandlers is a list of functions which will be invoked when an unreturnable
