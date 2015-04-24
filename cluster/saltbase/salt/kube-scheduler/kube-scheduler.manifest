@@ -9,10 +9,23 @@
     "name": "kube-scheduler",
     "image": "gcr.io/google_containers/kube-scheduler:{{pillar['kube-scheduler_docker_tag']}}",
     "command": [
-                 "/kube-scheduler",
-                 "--master=127.0.0.1:8080",
-                 "{{pillar['log_level']}}"
-               ]
+                 "/bin/sh",
+                 "-c",
+                 "/usr/local/bin/kube-scheduler --master=127.0.0.1:8080 {{pillar['log_level']}} 1>>/var/log/kube-scheduler.log 2>&1"
+               ],
+    "volumeMounts": [
+        {
+          "name": "logfile",
+          "mountPath": "/var/log/kube-scheduler.log",
+          "readOnly": false
+        }
+      ]
     }
+],
+"volumes":[
+  { "name": "logfile",
+    "hostPath": {
+        "path": "/var/log/kube-scheduler.log"}
+  }
 ]
 }}

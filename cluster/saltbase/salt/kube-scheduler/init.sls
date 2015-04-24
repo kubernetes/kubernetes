@@ -9,6 +9,12 @@
     - makedirs: true
     - dir_mode: 755
 
+/var/log/kube-scheduler.log:
+  file.managed:
+    - user: root
+    - group: root
+    - mode: 644
+
 #stop legacy kube-scheduler service 
 stop_kube-scheduler:
   service.dead:

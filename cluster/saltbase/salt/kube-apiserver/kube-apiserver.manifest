@@ -74,6 +74,10 @@
  {% set runtime_config = "--runtime_config=" + grains.runtime_config -%}
 {% endif -%}
 
+{% set params = address + " " + etcd_servers + " " + cloud_provider + " " + cloud_config + " " + runtime_config + " " + admission_control + " " + portal_net + " " + client_ca_file + " " + basic_auth_file -%}
+{% set params = params + " " + cluster_name + " " + cert_file + " " + key_file + " --secure_port=" + secure_port + " " + token_auth_file + " " + publicAddressOverride + " " + pillar['log_level'] -%}
+
+
 {
 "apiVersion": "v1beta3",
 "kind": "Pod",
@@ -85,24 +89,9 @@
     "name": "kube-apiserver",
     "image": "gcr.io/google_containers/kube-apiserver:{{pillar['kube-apiserver_docker_tag']}}",
     "command": [
-                 "/kube-apiserver",
-                 "{{address}}",
-                 "{{etcd_servers}}",
-                 "{{cloud_provider}}",
-                 "{{cloud_config}}",
-                 "{{runtime_config}}",
-                 "{{admission_control}}",
-                 "--allow_privileged={{pillar['allow_privileged']}}",
-                 "{{portal_net}}",
-                 "{{cluster_name}}",
-                 "{{cert_file}}",
-                 "{{key_file}}",
-                 "--secure_port={{secure_port}}",
-                 "{{token_auth_file}}",
-                 "{{client_ca_file}}",
-                 "{{basic_auth_file}}",
-                 "{{publicAddressOverride}}",
-                 "{{pillar['log_level']}}"
+                 "/bin/sh",
+                 "-c",
+                 "/usr/local/bin/kube-apiserver {{params}} --allow_privileged={{pillar['allow_privileged']}} 1>>/var/log/kube-apiserver.log 2>&1"
                ],
     "ports":[
       { "name": "https",
@@ -119,6 +108,9 @@
         { "name": "srvkube",
         "mountPath": "/srv/kubernetes",
         "readOnly": true},
+        { "name": "logfile",
+        "mountPath": "/var/log/kube-apiserver.log",
+        "readOnly": false},
         { "name": "etcssl",
         "mountPath": "/etc/ssl",
         "readOnly": true},
@@ -150,6 +142,10 @@
   { "name": "srvkube",
     "hostPath": {
         "path": "/srv/kubernetes"}
+  },
+  { "name": "logfile",
+    "hostPath": {
+        "path": "/var/log/kube-apiserver.log"}
   },
   { "name": "etcssl",
     "hostPath": {
