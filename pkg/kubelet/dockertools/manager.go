@@ -45,9 +45,8 @@ const (
 	maxReasonCacheEntries = 200
 )
 
-// Implements kubecontainer.ContainerRunner.
 // TODO: Eventually DockerManager should implement kubecontainer.Runtime
-// interface, and it should also add a cache to replace dockerCache.
+// interface.
 type DockerManager struct {
 	client              DockerInterface
 	recorder            record.EventRecorder
@@ -72,9 +71,6 @@ type DockerManager struct {
 	// the image checking in GetPodStatus().
 	Puller DockerPuller
 }
-
-// Ensures DockerManager implements ConatinerRunner.
-var _ kubecontainer.ContainerRunner = new(DockerManager)
 
 func NewDockerManager(
 	client DockerInterface,
@@ -408,8 +404,8 @@ func (dm *DockerManager) GetRunningContainers(ids []string) ([]*docker.Container
 	return result, nil
 }
 
-func (dm *DockerManager) RunContainer(pod *api.Pod, container *api.Container, opts *kubecontainer.RunContainerOptions) (string, error) {
-	dockerID, err := dm.runContainer(pod, container, opts)
+func (dm *DockerManager) runContainerRecordErrorReason(pod *api.Pod, container *api.Container, opts *kubecontainer.RunContainerOptions, ref *api.ObjectReference) (string, error) {
+	dockerID, err := dm.runContainer(pod, container, opts, ref)
 	if err != nil {
 		errString := err.Error()
 		if errString != "" {
@@ -421,12 +417,7 @@ func (dm *DockerManager) RunContainer(pod *api.Pod, container *api.Container, op
 	return dockerID, err
 }
 
-func (dm *DockerManager) runContainer(pod *api.Pod, container *api.Container, opts *kubecontainer.RunContainerOptions) (string, error) {
-	ref, err := kubecontainer.GenerateContainerRef(pod, container)
-	if err != nil {
-		glog.Errorf("Couldn't make a ref to pod %v, container %v: '%v'", pod.Name, container.Name, err)
-	}
-
+func (dm *DockerManager) runContainer(pod *api.Pod, container *api.Container, opts *kubecontainer.RunContainerOptions, ref *api.ObjectReference) (string, error) {
 	dockerName := KubeletContainerName{
 		PodFullName:   kubecontainer.GetPodFullName(pod),
 		PodUID:        pod.UID,
@@ -910,4 +901,36 @@ func (dm *DockerManager) KillContainer(containerID types.UID) error {
 		dm.recorder.Eventf(ref, "killing", "Killing %v", ID)
 	}
 	return err
+}
+
+// Run a single container from a pod. Returns the docker container ID
+func (dm *DockerManager) RunContainer(pod *api.Pod, container *api.Container, generator kubecontainer.RunContainerOptionsGenerator, runner kubecontainer.HandlerRunner, netMode, ipcMode string) (DockerID, error) {
+	ref, err := kubecontainer.GenerateContainerRef(pod, container)
+	if err != nil {
+		glog.Errorf("Couldn't make a ref to pod %v, container %v: '%v'", pod.Name, container.Name, err)
+	}
+
+	opts, err := generator.GenerateRunContainerOptions(pod, container, netMode, ipcMode)
+	if err != nil {
+		return "", err
+	}
+
+	id, err := dm.runContainerRecordErrorReason(pod, container, opts, ref)
+	if err != nil {
+		return "", err
+	}
+
+	// Remember this reference so we can report events about this container
+	if ref != nil {
+		dm.containerRefManager.SetRef(id, ref)
+	}
+
+	if container.Lifecycle != nil && container.Lifecycle.PostStart != nil {
+		handlerErr := runner.Run(id, pod, container, container.Lifecycle.PostStart)
+		if handlerErr != nil {
+			dm.KillContainer(types.UID(id))
+			return DockerID(""), fmt.Errorf("failed to call event handler: %v", handlerErr)
+		}
+	}
+	return DockerID(id), err
 }
