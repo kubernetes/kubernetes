@@ -1,20 +1,28 @@
 {
-  "id": "zookeeper",
   "kind": "Pod",
-  "apiVersion": "v1beta1",
-  "desiredState": {
-    "manifest": {
-      "version": "v1beta1",
-      "id": "zookeeper",
-      "containers": [{
-        "name": "zookeeper",
-        "image": "mattf/zookeeper",
-        "cpu": 100,
-        "ports": [{ "containerPort": 2181 }]
-      }]
+  "apiVersion": "v1beta3",
+  "metadata": {
+    "name": "zookeeper",
+    "labels": {
+      "name": "zookeeper"
     }
   },
-  "labels": {
-    "name": "zookeeper"
+  "spec": {
+    "containers": [
+      {
+        "name": "zookeeper",
+        "image": "mattf/zookeeper",
+        "ports": [
+          {
+            "containerPort": 2181
+          }
+        ],
+        "resources": {
+          "limits": {
+            "cpu": "100m"
+          }
+        }
+      }
+    ]
   }
 }
