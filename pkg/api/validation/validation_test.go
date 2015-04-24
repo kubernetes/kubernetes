@@ -2055,7 +2055,7 @@ func TestValidateReplicationController(t *testing.T) {
 	}
 }
 
-func TestValidateMinion(t *testing.T) {
+func TestValidateNode(t *testing.T) {
 	validSelector := map[string]string{"a": "b"}
 	invalidSelector := map[string]string{"NoUppercaseOrSpecialCharsLike=Equals": "b"}
 	successCases := []api.Node{
@@ -2097,7 +2097,7 @@ func TestValidateMinion(t *testing.T) {
 		},
 	}
 	for _, successCase := range successCases {
-		if errs := ValidateMinion(&successCase); len(errs) != 0 {
+		if errs := ValidateNode(&successCase); len(errs) != 0 {
 			t.Errorf("expected success: %v", errs)
 		}
 	}
@@ -2148,7 +2148,7 @@ func TestValidateMinion(t *testing.T) {
 		},
 	}
 	for k, v := range errorCases {
-		errs := ValidateMinion(&v)
+		errs := ValidateNode(&v)
 		if len(errs) == 0 {
 			t.Errorf("expected failure for %s", k)
 		}
@@ -2168,11 +2168,11 @@ func TestValidateMinion(t *testing.T) {
 	}
 }
 
-func TestValidateMinionUpdate(t *testing.T) {
+func TestValidateNodeUpdate(t *testing.T) {
 	tests := []struct {
-		oldMinion api.Node
-		minion    api.Node
-		valid     bool
+		oldNode api.Node
+		node    api.Node
+		valid   bool
 	}{
 		{api.Node{}, api.Node{}, true},
 		{api.Node{
@@ -2300,14 +2300,50 @@ func TestValidateMinionUpdate(t *testing.T) {
 				Unschedulable: true,
 			},
 		}, true},
+		{api.Node{
+			ObjectMeta: api.ObjectMeta{
+				Name: "foo",
+			},
+			Spec: api.NodeSpec{
+				Unschedulable: false,
+			},
+		}, api.Node{
+			ObjectMeta: api.ObjectMeta{
+				Name: "foo",
+			},
+			Status: api.NodeStatus{
+				Addresses: []api.NodeAddress{
+					{Type: api.NodeExternalIP, Address: "1.1.1.1"},
+					{Type: api.NodeExternalIP, Address: "1.1.1.1"},
+				},
+			},
+		}, false},
+		{api.Node{
+			ObjectMeta: api.ObjectMeta{
+				Name: "foo",
+			},
+			Spec: api.NodeSpec{
+				Unschedulable: false,
+			},
+		}, api.Node{
+			ObjectMeta: api.ObjectMeta{
+				Name: "foo",
+			},
+			Status: api.NodeStatus{
+				Addresses: []api.NodeAddress{
+					{Type: api.NodeExternalIP, Address: "1.1.1.1"},
+					{Type: api.NodeInternalIP, Address: "10.1.1.1"},
+				},
+			},
+		}, true},
 	}
 	for i, test := range tests {
-		test.oldMinion.ObjectMeta.ResourceVersion = "1"
-		test.minion.ObjectMeta.ResourceVersion = "1"
-		errs := ValidateMinionUpdate(&test.oldMinion, &test.minion)
+		test.oldNode.ObjectMeta.ResourceVersion = "1"
+		test.node.ObjectMeta.ResourceVersion = "1"
+		errs := ValidateNodeUpdate(&test.oldNode, &test.node)
 		if test.valid && len(errs) > 0 {
 			t.Errorf("%d: Unexpected error: %v", i, errs)
-			t.Logf("%#v vs %#v", test.oldMinion.ObjectMeta, test.minion.ObjectMeta)
+			t.Logf("%#v vs %#v", test.oldNode.ObjectMeta, test.node.ObjectMeta)
 		}
 		if !test.valid && len(errs) == 0 {
 			t.Errorf("%d: Unexpected non-error", i)

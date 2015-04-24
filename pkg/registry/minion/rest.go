@@ -71,13 +71,13 @@ func (nodeStrategy) PrepareForUpdate(obj, old runtime.Object) {
 // Validate validates a new node.
 func (nodeStrategy) Validate(ctx api.Context, obj runtime.Object) fielderrors.ValidationErrorList {
 	node := obj.(*api.Node)
-	return validation.ValidateMinion(node)
+	return validation.ValidateNode(node)
 }
 
 // ValidateUpdate is the default update validation for an end user.
 func (nodeStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) fielderrors.ValidationErrorList {
-	errorList := validation.ValidateMinion(obj.(*api.Node))
-	return append(errorList, validation.ValidateMinionUpdate(old.(*api.Node), obj.(*api.Node))...)
+	errorList := validation.ValidateNode(obj.(*api.Node))
+	return append(errorList, validation.ValidateNodeUpdate(old.(*api.Node), obj.(*api.Node))...)
 }
 
 type nodeStatusStrategy struct {
@@ -98,7 +98,7 @@ func (nodeStatusStrategy) PrepareForUpdate(obj, old runtime.Object) {
 }
 
 func (nodeStatusStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) fielderrors.ValidationErrorList {
-	return validation.ValidateMinionUpdate(old.(*api.Node), obj.(*api.Node))
+	return validation.ValidateNodeUpdate(old.(*api.Node), obj.(*api.Node))
 }
 
 // ResourceGetter is an interface for retrieving resources by ResourceLocation.
