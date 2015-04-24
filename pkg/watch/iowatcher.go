@@ -101,7 +101,12 @@ func (sw *StreamWatcher) receive() {
 			case io.ErrUnexpectedEOF:
 				glog.V(1).Infof("Unexpected EOF during watch stream event decoding: %v", err)
 			default:
-				glog.Errorf("Unable to decode an event from the watch stream: %v", err)
+				msg := "Unable to decode an event from the watch stream: %v"
+				if util.IsProbableEOF(err) {
+					glog.V(5).Infof(msg, err)
+				} else {
+					glog.Errorf(msg, err)
+				}
 			}
 			return
 		}

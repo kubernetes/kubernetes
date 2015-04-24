@@ -511,7 +511,9 @@ func (r *Request) Watch() (watch.Interface, error) {
 	}
 	resp, err := client.Do(req)
 	if err != nil {
-		if isProbableEOF(err) {
+		// The watch stream mechanism handles many common partial data errors, so closed
+		// connections can be retried in many cases.
+		if util.IsProbableEOF(err) {
 			return watch.NewEmptyWatch(), nil
 		}
 		return nil, err
@@ -523,25 +525,6 @@ func (r *Request) Watch() (watch.Interface, error) {
 		return nil, fmt.Errorf("for request '%+v', got status: %v", req.URL, resp.StatusCode)
 	}
 	return watch.NewStreamWatcher(watchjson.NewDecoder(resp.Body, r.codec)), nil
-}
-
-// isProbableEOF returns true if the given error resembles a connection termination
-// scenario that would justify assuming that the watch is empty. The watch stream
-// mechanism handles many common partial data errors, so closed connections can be
-// retried in many cases.
-func isProbableEOF(err error) bool {
-	if uerr, ok := err.(*url.Error); ok {
-		err = uerr.Err
-	}
-	switch {
-	case err == io.EOF:
-		return true
-	case err.Error() == "http: can't write HTTP request on broken connection":
-		return true
-	case strings.Contains(err.Error(), "connection reset by peer"):
-		return true
-	}
-	return false
 }
 
 // Stream formats and executes the request, and offers streaming of the response.
