@@ -27,6 +27,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/rest"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/strategicpatch"
 
@@ -180,6 +181,15 @@ func ListResource(r rest.Lister, rw rest.Watcher, scope RequestScope, forceWatch
 			errorJSON(err, scope.Codec, w)
 			return
 		}
+
+		// Watches for single objects are routed to this function.
+		// Treat a /name parameter the same as a field selector entry.
+		hasName := true
+		_, name, err := scope.Namer.Name(req)
+		if err != nil {
+			hasName = false
+		}
+
 		ctx := scope.ContextFunc(req)
 		ctx = api.WithNamespace(ctx, namespace)
 
@@ -191,6 +201,7 @@ func ListResource(r rest.Lister, rw rest.Watcher, scope RequestScope, forceWatch
 		opts := *out.(*api.ListOptions)
 
 		// transform fields
+		// TODO: queryToObject should do this.
 		fn := func(label, value string) (newLabel, newValue string, err error) {
 			return scope.Convertor.ConvertFieldLabel(scope.APIVersion, scope.Kind, label, value)
 		}
@@ -199,6 +210,27 @@ func ListResource(r rest.Lister, rw rest.Watcher, scope RequestScope, forceWatch
 			err = errors.NewBadRequest(err.Error())
 			errorJSON(err, scope.Codec, w)
 			return
+		}
+
+		if hasName {
+			// metadata.name is the canonical internal name.
+			// generic.SelectionPredicate will notice that this is
+			// a request for a single object and optimize the
+			// storage query accordingly.
+			nameSelector := fields.OneTermEqualSelector("metadata.name", name)
+			if opts.FieldSelector != nil && !opts.FieldSelector.Empty() {
+				// It doesn't make sense to ask for both a name
+				// and a field selector, since just the name is
+				// sufficient to narrow down the request to a
+				// single object.
+				errorJSON(
+					errors.NewBadRequest("both a name and a field selector provided; please provide one or the other."),
+					scope.Codec,
+					w,
+				)
+				return
+			}
+			opts.FieldSelector = nameSelector
 		}
 
 		if (opts.Watch || forceWatch) && rw != nil {

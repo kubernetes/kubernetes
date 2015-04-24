@@ -110,6 +110,83 @@ func TestClient(t *testing.T) {
 	}
 }
 
+func TestSingleWatch(t *testing.T) {
+	_, s := runAMaster(t)
+	defer s.Close()
+
+	ns := "blargh"
+	deleteAllEtcdKeys()
+	client := client.NewOrDie(&client.Config{Host: s.URL, Version: testapi.Version()})
+
+	mkEvent := func(i int) *api.Event {
+		name := fmt.Sprintf("event-%v", i)
+		return &api.Event{
+			ObjectMeta: api.ObjectMeta{
+				Namespace: ns,
+				Name:      name,
+			},
+			InvolvedObject: api.ObjectReference{
+				Namespace: ns,
+				Name:      name,
+			},
+			Reason: fmt.Sprintf("event %v", i),
+		}
+	}
+
+	rv1 := ""
+	for i := 0; i < 10; i++ {
+		event := mkEvent(i)
+		got, err := client.Events(ns).Create(event)
+		if err != nil {
+			t.Fatalf("Failed creating event %#q: %v", event, err)
+		}
+		if rv1 == "" {
+			rv1 = got.ResourceVersion
+			if rv1 == "" {
+				t.Fatal("did not get a resource version.")
+			}
+		}
+		t.Logf("Created event %#v", got.ObjectMeta)
+	}
+
+	w, err := client.Get().
+		Prefix("watch").
+		NamespaceIfScoped(ns, len(ns) > 0).
+		Resource("events").
+		Name("event-9").
+		Param("resourceVersion", rv1).
+		Watch()
+
+	if err != nil {
+		t.Fatalf("Failed watch: %v", err)
+	}
+	defer w.Stop()
+
+	select {
+	case <-time.After(5 * time.Second):
+		t.Fatal("watch took longer than 15 seconds")
+	case got, ok := <-w.ResultChan():
+		if !ok {
+			t.Fatal("Watch channel closed unexpectedly.")
+		}
+
+		// We expect to see an ADD of event-9 and only event-9. (This
+		// catches a bug where all the events would have been sent down
+		// the channel.)
+		if e, a := watch.Added, got.Type; e != a {
+			t.Errorf("Wanted %v, got %v", e, a)
+		}
+		switch o := got.Object.(type) {
+		case *api.Event:
+			if e, a := "event-9", o.Name; e != a {
+				t.Errorf("Wanted %v, got %v", e, a)
+			}
+		default:
+			t.Fatalf("Unexpected watch event containing object %#q", got)
+		}
+	}
+}
+
 func TestMultiWatch(t *testing.T) {
 	// Disable this test as long as it demonstrates a problem.
 	// TODO: Reenable this test when we get #6059 resolved.

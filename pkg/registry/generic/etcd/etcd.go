@@ -417,7 +417,8 @@ func (e *Etcd) finalizeDelete(obj runtime.Object, runHooks bool) (runtime.Object
 
 // Watch makes a matcher for the given label and field, and calls
 // WatchPredicate. If possible, you should customize PredicateFunc to produre a
-// matcher that matches by key.
+// matcher that matches by key. generic.SelectionPredicate does this for you
+// automatically.
 func (e *Etcd) Watch(ctx api.Context, label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
 	return e.WatchPredicate(ctx, e.PredicateFunc(label, field), resourceVersion)
 }

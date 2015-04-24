@@ -162,6 +162,7 @@ func TestRESTGet(t *testing.T) {
 func TestRESTgetAttrs(t *testing.T) {
 	_, rest := NewTestREST()
 	eventA := &api.Event{
+		ObjectMeta: api.ObjectMeta{Name: "f0118"},
 		InvolvedObject: api.ObjectReference{
 			Kind:            "Pod",
 			Name:            "foo",
@@ -182,6 +183,7 @@ func TestRESTgetAttrs(t *testing.T) {
 		t.Errorf("diff: %s", util.ObjectDiff(e, a))
 	}
 	expect := fields.Set{
+		"metadata.name":                  "f0118",
 		"involvedObject.kind":            "Pod",
 		"involvedObject.name":            "foo",
 		"involvedObject.namespace":       "baz",
