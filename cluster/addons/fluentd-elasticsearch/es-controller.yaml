@@ -1,0 +1,33 @@
+apiVersion: v1beta3
+kind: ReplicationController
+metadata:
+  labels:
+    name: elasticsearch-logging
+    kubernetes.io/cluster-service: "true"
+  name: elasticsearch-logging
+spec:
+  replicas: 1
+  selector:
+    name: elasticsearch-logging
+  template:
+    metadata:
+      labels:
+        name: elasticsearch-logging
+        kubernetes.io/cluster-service: "true"
+    spec:
+      containers:
+      - image: gcr.io/google_containers/elasticsearch:1.0
+        name: elasticsearch-logging
+        ports:
+        - containerPort: 9200
+          name: es-port
+          protocol: TCP
+        - containerPort: 9300
+          name: es-transport-port
+          protocol: TCP
+        volumeMounts:
+        - mountPath: /data
+          name: es-persistent-storage
+      volumes:
+      - name: es-persistent-storage
+        emptyDir: {}
