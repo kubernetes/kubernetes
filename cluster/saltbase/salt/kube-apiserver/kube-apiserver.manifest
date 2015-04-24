@@ -43,10 +43,12 @@
 
 {% set cert_file = "--tls_cert_file=/srv/kubernetes/server.cert" -%}
 {% set key_file = "--tls_private_key_file=/srv/kubernetes/server.key" -%}
+{% set client_ca_file = "--client_ca_file=/dev/null" -%}
 
 {% set secure_port = "6443" -%}
 {% if grains['cloud'] is defined and grains['cloud'] == 'gce' %}
   {% set secure_port = "443" -%}
+  {% set client_ca_file = "--client_ca_file=/srv/kubernetes/ca.crt" -%}
 {% endif -%}
 
 {% set token_auth_file = "--token_auth_file=/dev/null" -%}
@@ -92,6 +94,7 @@
                  "{{key_file}}",
                  "--secure_port={{secure_port}}",
                  "{{token_auth_file}}",
+                 "{{client_ca_file}}",
                  "{{publicAddressOverride}}",
                  "{{pillar['log_level']}}"
                ],
