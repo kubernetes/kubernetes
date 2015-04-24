@@ -17,6 +17,7 @@ limitations under the License.
 package servicecontroller
 
 import (
+	"reflect"
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -26,6 +27,10 @@ import (
 )
 
 const region = "us-central"
+
+func newService(name string, uid types.UID, external bool) *api.Service {
+	return &api.Service{ObjectMeta: api.ObjectMeta{Name: name, Namespace: "namespace", UID: uid}, Spec: api.ServiceSpec{CreateExternalLoadBalancer: external}}
+}
 
 func TestCreateExternalLoadBalancer(t *testing.T) {
 	table := []struct {
@@ -120,6 +125,84 @@ func TestCreateExternalLoadBalancer(t *testing.T) {
 			if !actionFound {
 				t.Errorf("expected updated service to be sent to client, got these actions instead: %v", client.Actions)
 			}
+		}
+	}
+}
+
+// TODO: Finish converting and update comments
+func TestUpdateNodesInExternalLoadBalancer(t *testing.T) {
+	hosts := []string{"node0", "node1", "node73"}
+	table := []struct {
+		services            []*api.Service
+		expectedUpdateCalls []fake_cloud.FakeUpdateBalancerCall
+	}{
+		{
+			// No services present: no calls should be made.
+			services:            []*api.Service{},
+			expectedUpdateCalls: nil,
+		},
+		{
+			// Services do not have external load balancers: no calls should be made.
+			services: []*api.Service{
+				newService("s0", "111", false),
+				newService("s1", "222", false),
+			},
+			expectedUpdateCalls: nil,
+		},
+		{
+			// Services does have an external load balancer: one call should be made.
+			services: []*api.Service{
+				newService("s0", "333", true),
+			},
+			expectedUpdateCalls: []fake_cloud.FakeUpdateBalancerCall{
+				{Name: "a333", Region: region, Hosts: []string{"node0", "node1", "node73"}},
+			},
+		},
+		{
+			// Three services have an external load balancer: three calls.
+			services: []*api.Service{
+				newService("s0", "444", true),
+				newService("s1", "555", true),
+				newService("s2", "666", true),
+			},
+			expectedUpdateCalls: []fake_cloud.FakeUpdateBalancerCall{
+				{Name: "a444", Region: region, Hosts: []string{"node0", "node1", "node73"}},
+				{Name: "a555", Region: region, Hosts: []string{"node0", "node1", "node73"}},
+				{Name: "a666", Region: region, Hosts: []string{"node0", "node1", "node73"}},
+			},
+		},
+		{
+			// Two services have an external load balancer and two don't: two calls.
+			services: []*api.Service{
+				newService("s0", "777", false),
+				newService("s1", "888", true),
+				newService("s3", "999", true),
+				newService("s4", "123", false),
+			},
+			expectedUpdateCalls: []fake_cloud.FakeUpdateBalancerCall{
+				{Name: "a888", Region: region, Hosts: []string{"node0", "node1", "node73"}},
+				{Name: "a999", Region: region, Hosts: []string{"node0", "node1", "node73"}},
+			},
+		},
+	}
+	for _, item := range table {
+		cloud := &fake_cloud.FakeCloud{}
+
+		cloud.Region = region
+		client := &testclient.Fake{}
+		controller := New(cloud, client, "test-cluster2")
+		controller.init()
+		cloud.Calls = nil // ignore any cloud calls made in init()
+
+		var services []*cachedService
+		for _, service := range item.services {
+			services = append(services, &cachedService{service: service})
+		}
+		if err := controller.updateLoadBalancerHosts(services, hosts); err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		if !reflect.DeepEqual(item.expectedUpdateCalls, cloud.UpdateCalls) {
+			t.Errorf("expected update calls mismatch, expected %+v, got %+v", item.expectedUpdateCalls, cloud.UpdateCalls)
 		}
 	}
 }
