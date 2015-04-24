@@ -85,6 +85,15 @@ func (q *Type) Add(item interface{}) {
 	q.cond.Signal()
 }
 
+// Len returns the current queue length, for informational purposes only. You
+// shouldn't e.g. gate a call to Add() or Get() on Len() being a particular
+// value, that can't be synchronized properly.
+func (q *Type) Len() int {
+	q.cond.L.Lock()
+	defer q.cond.L.Unlock()
+	return len(q.queue)
+}
+
 // Get blocks until it can return an item to be processed. If shutdown = true,
 // the caller should end their goroutine. You must call Done with item when you
 // have finished processing it.

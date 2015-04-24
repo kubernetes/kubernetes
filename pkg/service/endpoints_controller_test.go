@@ -262,6 +262,41 @@ func TestSyncEndpointsItemsPreserveNoSelector(t *testing.T) {
 	endpointsHandler.ValidateRequestCount(t, 0)
 }
 
+func TestCheckLeftoverEndpoints(t *testing.T) {
+	ns := api.NamespaceDefault
+	// Note that this requests *all* endpoints, therefore the NamespaceAll
+	// below.
+	testServer, _ := makeTestServer(t, api.NamespaceAll,
+		serverResponse{http.StatusOK, &api.EndpointsList{
+			ListMeta: api.ListMeta{
+				ResourceVersion: "1",
+			},
+			Items: []api.Endpoints{{
+				ObjectMeta: api.ObjectMeta{
+					Name:            "foo",
+					Namespace:       ns,
+					ResourceVersion: "1",
+				},
+				Subsets: []api.EndpointSubset{{
+					Addresses: []api.EndpointAddress{{IP: "6.7.8.9"}},
+					Ports:     []api.EndpointPort{{Port: 1000}},
+				}},
+			}},
+		}})
+	defer testServer.Close()
+	client := client.NewOrDie(&client.Config{Host: testServer.URL, Version: testapi.Version()})
+	endpoints := NewEndpointController(client)
+	endpoints.checkLeftoverEndpoints()
+
+	if e, a := 1, endpoints.queue.Len(); e != a {
+		t.Fatalf("Expected %v, got %v", e, a)
+	}
+	got, _ := endpoints.queue.Get()
+	if e, a := ns+"/foo", got; e != a {
+		t.Errorf("Expected %v, got %v", e, a)
+	}
+}
+
 func TestSyncEndpointsProtocolTCP(t *testing.T) {
 	ns := "other"
 	testServer, endpointsHandler := makeTestServer(t, ns,
