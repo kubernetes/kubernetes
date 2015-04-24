@@ -168,6 +168,18 @@ func verifyBoolean(t *testing.T, expected, value bool) {
 	}
 }
 
+func newTestPods(count int) []*api.Pod {
+	pods := make([]*api.Pod, count)
+	for i := 0; i < count; i++ {
+		pods[i] = &api.Pod{
+			ObjectMeta: api.ObjectMeta{
+				Name: fmt.Sprintf("pod%d", i),
+			},
+		}
+	}
+	return pods
+}
+
 func TestKubeletDirs(t *testing.T) {
 	testKubelet := newTestKubelet(t)
 	kubelet := testKubelet.kubelet
@@ -4245,4 +4257,21 @@ func TestGetRestartCount(t *testing.T) {
 	// (i.e., remain the same).
 	fakeDocker.ExitedContainerList = []docker.APIContainers{}
 	verifyRestartCount(&pod, 2)
+}
+
+func TestFilterOutTerminatedPods(t *testing.T) {
+	testKubelet := newTestKubelet(t)
+	kubelet := testKubelet.kubelet
+	pods := newTestPods(5)
+	pods[0].Status.Phase = api.PodFailed
+	pods[1].Status.Phase = api.PodSucceeded
+	pods[2].Status.Phase = api.PodRunning
+	pods[3].Status.Phase = api.PodPending
+
+	expected := []*api.Pod{pods[2], pods[3], pods[4]}
+	kubelet.podManager.SetPods(pods)
+	actual := kubelet.filterOutTerminatedPods(pods)
+	if !reflect.DeepEqual(expected, actual) {
+		t.Errorf("expected %#v, got %#v", expected, actual)
+	}
 }
