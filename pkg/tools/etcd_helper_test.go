@@ -174,7 +174,7 @@ func TestExtractToListAcrossDirectories(t *testing.T) {
 								Key:           "/baz",
 								Value:         getEncodedPod("baz"),
 								Dir:           false,
-								ModifiedIndex: 1,
+								ModifiedIndex: 3,
 							},
 						},
 					},
@@ -199,7 +199,7 @@ func TestExtractToListAcrossDirectories(t *testing.T) {
 		Items: []api.Pod{
 			// We expect list to be sorted by directory (e.g. namespace) first, then by name.
 			{
-				ObjectMeta: api.ObjectMeta{Name: "baz", ResourceVersion: "1"},
+				ObjectMeta: api.ObjectMeta{Name: "baz", ResourceVersion: "3"},
 				Spec: api.PodSpec{
 					RestartPolicy: api.RestartPolicyAlways,
 					DNSPolicy:     api.DNSClusterFirst,
@@ -482,7 +482,8 @@ func TestSetObjWithVersion(t *testing.T) {
 func TestSetObjWithoutResourceVersioner(t *testing.T) {
 	obj := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
 	fakeClient := NewFakeEtcdClient(t)
-	helper := EtcdHelper{fakeClient, testapi.Codec(), nil, etcdtest.PathPrefix()}
+	helper := NewEtcdHelper(fakeClient, testapi.Codec(), etcdtest.PathPrefix())
+	helper.Versioner = nil
 	returnedObj := &api.Pod{}
 	err := helper.SetObj("/some/key", obj, returnedObj, 3)
 	key := etcdtest.AddPrefix("/some/key")
@@ -509,7 +510,8 @@ func TestSetObjWithoutResourceVersioner(t *testing.T) {
 func TestSetObjNilOutParam(t *testing.T) {
 	obj := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
 	fakeClient := NewFakeEtcdClient(t)
-	helper := EtcdHelper{fakeClient, testapi.Codec(), nil, etcdtest.PathPrefix()}
+	helper := NewEtcdHelper(fakeClient, testapi.Codec(), etcdtest.PathPrefix())
+	helper.Versioner = nil
 	err := helper.SetObj("/some/key", obj, nil, 3)
 	if err != nil {
 		t.Errorf("Unexpected error %#v", err)
