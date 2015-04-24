@@ -422,10 +422,115 @@ func TestRunInContainer(t *testing.T) {
 	for i, tt := range tests {
 		output, err := rkt.RunInContainer(string(runningContainer.ID), tt.cmds)
 		if err != tt.expectedErr {
-			t.Errorf("%d Expected: %#v, saw: %#v", i, tt.expectedErr, err)
+			t.Errorf("%d: Expected: %#v, saw: %#v", i, tt.expectedErr, err)
 		}
 		if !reflect.DeepEqual(tt.expectedOutput, output) {
-			t.Errorf("%d Expected: %#v, saw: %#v", i, tt.expectedOutput, output)
+			t.Errorf("%d: Expected: %#v, saw: %#v", i, tt.expectedOutput, output)
+		}
+	}
+
+	if err := rkt.KillPod(pod); err != nil {
+		t.Errorf("Cannot kill pod %v", err)
+	}
+}
+
+func TestExecInContainer(t *testing.T) {
+	if !enableTests {
+		return
+	}
+	tests := []struct {
+		cmds           []byte
+		expectedOutput []byte
+		expectedErr    error
+	}{
+		{
+			[]byte("echo hello\n"),
+			[]byte("hello\n"),
+			nil,
+		},
+		{
+			[]byte("echo rkt\n"),
+			[]byte("rkt\n"),
+			nil,
+		},
+		{
+			[]byte("exit"),
+			[]byte{},
+			nil,
+		},
+	}
+
+	rkt := newRktOrFail(t)
+
+	containers := []api.Container{
+		{
+			Name:  "testRunInContainer",
+			Image: runInContainerTestACI,
+		},
+	}
+
+	pod := &api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			UID:         types.UID(fmt.Sprintf("testRkt_%d", rand.Int())),
+			Name:        "foo",
+			Namespace:   "default",
+			Annotations: make(map[string]string),
+		},
+		Spec: api.PodSpec{
+			Containers: containers,
+		},
+	}
+
+	if err := rkt.RunPod(pod, nil); err != nil {
+		t.Errorf("Cannot run pod: %v", err)
+	}
+
+	// TODO(yifan): Sleep here because there is race between "running" and pid file is ready.
+	time.Sleep(time.Second)
+	verifyPod(rkt, pod, "running", t)
+
+	pods, err := rkt.GetPods(true)
+	if err != nil {
+		t.Errorf("Cannot list pods: %v", err)
+	}
+	runningPod := tryFindPod(pod, pods)
+	if runningPod == nil {
+		t.Errorf("Cannot find pod: %v", pod)
+	}
+	runningContainer := runningPod.FindContainerByName(containers[0].Name)
+	if runningContainer == nil {
+		t.Errorf("Cannot find container: %v", containers[0])
+	}
+
+	// Create pipes for stdin and stdout.
+	inR, inW, err := os.Pipe()
+	if err != nil {
+		t.Errorf("Cannot create pipe: %v", err)
+	}
+	outR, outW, err := os.Pipe()
+	if err != nil {
+		t.Errorf("Cannot create pipe: %v", err)
+	}
+
+	for i, tt := range tests {
+		go rkt.ExecInContainer(string(runningContainer.ID), []string{"/bin/bash"}, inR, outW, outW, false)
+		// Wait for exec, however, this is racy.
+		time.Sleep(time.Second)
+
+		// Make some input
+		n, err := inW.Write(tt.cmds)
+		if err != nil || n != len(tt.cmds) {
+			t.Errorf("%d: Cannot write to pipe: %v", i, err)
+		}
+
+		output := make([]byte, len(tt.expectedOutput))
+		_, err = outR.Read(output)
+		if err != nil {
+			t.Errorf("%d: Cannot read from pipe: %v", i, err)
+		}
+
+		if !reflect.DeepEqual(tt.expectedOutput, output) {
+			t.Errorf("%d: Expected: %q, saw: %q", i, tt.expectedOutput, output)
 		}
 	}
 

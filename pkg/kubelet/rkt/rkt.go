@@ -39,6 +39,7 @@ import (
 	"github.com/coreos/go-systemd/unit"
 	"github.com/coreos/rkt/store"
 	"github.com/golang/glog"
+	"github.com/kr/pty"
 )
 
 const (
@@ -251,17 +252,20 @@ func (r *Runtime) GetPodStatus(pod *api.Pod) (*api.PodStatus, error) {
 	return &p.Status, nil
 }
 
+func (r *Runtime) buildCommand(args ...string) *exec.Cmd {
+	cmd := exec.Command(rktBinName)
+	cmd.Args = append(cmd.Args, r.config.buildGlobalOptions()...)
+	cmd.Args = append(cmd.Args, args...)
+	return cmd
+}
+
 // RunCommand invokes rkt binary with arguments and returns the result
 // from stdout in a list of strings.
 // TODO(yifan): Do not export this.
 func (r *Runtime) RunCommand(args ...string) ([]string, error) {
 	glog.V(4).Info("Run rkt command:", args)
 
-	cmd := exec.Command(rktBinName)
-	cmd.Args = append(cmd.Args, r.config.buildGlobalOptions()...)
-	cmd.Args = append(cmd.Args, args...)
-
-	output, err := cmd.Output()
+	output, err := r.buildCommand(args...).Output()
 	if err != nil {
 		return nil, err
 	}
@@ -739,7 +743,8 @@ func HashContainer(container *api.Container) uint64 {
 	return uint64(hash.Sum32())
 }
 
-// Note: In rkt, the container ID is in the form of "UUID:ImageID".
+// Note: In rkt, the container ID is in the form of "UUID:appName:ImageID", where
+// appName is the container name.
 func (r *Runtime) RunInContainer(containerID string, cmd []string) ([]byte, error) {
 	id, err := parseContainerID(containerID)
 	if err != nil {
@@ -752,4 +757,62 @@ func (r *Runtime) RunInContainer(containerID string, cmd []string) ([]byte, erro
 
 	result, err := r.RunCommand(args...)
 	return []byte(strings.Join(result, "\n")), err
+}
+
+// Pty unsupported yet.
+func startPty(c *exec.Cmd) (*os.File, error) {
+	return pty.Start(c)
+}
+
+// Note: In rkt, the container ID is in the form of "UUID:appName:ImageID", where
+// appName is the container name.
+func (r *Runtime) ExecInContainer(containerID string, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool) error {
+	id, err := parseContainerID(containerID)
+	if err != nil {
+		return err
+	}
+	// TODO(yifan): Use appName instead of imageID.
+	// see https://github.com/coreos/rkt/pull/640
+	args := append([]string{}, "enter", "--imageid", id.imageID, id.uuid)
+	args = append(args, cmd...)
+	command := r.buildCommand(args...)
+
+	if tty {
+		p, err := startPty(command)
+		if err != nil {
+			return err
+		}
+		defer p.Close()
+
+		// make sure to close the stdout stream
+		defer stdout.Close()
+
+		if stdin != nil {
+			go io.Copy(p, stdin)
+		}
+		if stdout != nil {
+			go io.Copy(stdout, p)
+		}
+		return command.Wait()
+	}
+	if stdin != nil {
+		// Use an os.Pipe here as it returns true *os.File objects.
+		// This way, if you run 'kubectl exec -p <pod> -i bash' (no tty) and type 'exit',
+		// the call below to command.Run() can unblock because its Stdin is the read half
+		// of the pipe.
+		r, w, err := os.Pipe()
+		if err != nil {
+			return err
+		}
+		go io.Copy(w, stdin)
+
+		command.Stdin = r
+	}
+	if stdout != nil {
+		command.Stdout = stdout
+	}
+	if stderr != nil {
+		command.Stderr = stderr
+	}
+	return command.Run()
 }
