@@ -11,7 +11,7 @@ This example assumes that you have a Kubernetes cluster installed and running, a
 This is a somewhat long tutorial.  If you want to jump straight to the "do it now" commands, please see the [tl; dr](#tl-dr) at the end.
 
 ### Simple Single Pod Cassandra Node
-In Kubernetes, the atomic unit of an application is a [_Pod_](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/pods.md).  A Pod is one or more containers that _must_ be scheduled onto the same host.  All containers in a pod share a network namespace, and may optionally share mounted volumes.  In this simple case, we define a single container running Cassandra for our pod:
+In Kubernetes, the atomic unit of an application is a [_Pod_](http://docs.k8s.io/pods.md).  A Pod is one or more containers that _must_ be scheduled onto the same host.  All containers in a pod share a network namespace, and may optionally share mounted volumes.  In this simple case, we define a single container running Cassandra for our pod:
 
 ```yaml
 id: cassandra

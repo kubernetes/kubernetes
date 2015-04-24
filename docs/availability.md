@@ -120,7 +120,7 @@ then you need `R + U` clusters.  If it is not (e.g you want to ensure low latenc
 cluster failure), then you need to have `R * U` clusters (`U` in each of `R` regions).  In any case, try to put each cluster in a different zone.
 
 Finally, if any of your clusters would need more than the maximum recommended number of nodes for a Kubernetes cluster, then
-you may need even more clusters.  Our [roadmap](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/roadmap.md)
+you may need even more clusters.  Our [roadmap](http://docs.k8s.io/roadmap.md)
 calls for maximum 100 node clusters at v1.0 and maximum 1000 node clusters in the middle of 2015.
 
 ## Working with multiple clusters

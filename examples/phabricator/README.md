@@ -158,7 +158,7 @@ $ cluster/kubectl.sh create -f examples/phabricator/authenticator-controller.jso
 
 ### Step Four: Turn up the phabricator service
 
-A Kubernetes 'service' is a named load balancer that proxies traffic to one or more containers. The services in a Kubernetes cluster are discoverable inside other containers via *environment variables*. Services find the containers to load balance based on pod labels.  These environment variables are typically referenced in application code, shell scripts, or other places where one node needs to talk to another in a distributed system.  You should catch up on [kubernetes services](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/services.md) before proceeding.
+A Kubernetes 'service' is a named load balancer that proxies traffic to one or more containers. The services in a Kubernetes cluster are discoverable inside other containers via *environment variables*. Services find the containers to load balance based on pod labels.  These environment variables are typically referenced in application code, shell scripts, or other places where one node needs to talk to another in a distributed system.  You should catch up on [kubernetes services](http://docs.k8s.io/services.md) before proceeding.
 
 The pod that you created in Step One has the label `name=phabricator`. The selector field of the service determines which pods will receive the traffic sent to the service. Since we are setting up a service for an external application we also need to request external static IP address (otherwise it will be assigned dynamically):
 

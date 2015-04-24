@@ -1165,7 +1165,7 @@ type NodeAddress struct {
 }
 
 // NodeResources is an object for conveying resource information about a node.
-// see https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/resources.md for more details.
+// see http://docs.k8s.io/resources.md for more details.
 // TODO: Use ResourceList instead?
 type NodeResources struct {
 	// Capacity represents the available resources of a node

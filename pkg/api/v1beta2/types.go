@@ -47,7 +47,7 @@ import (
 
 // Volume represents a named volume in a pod that may be accessed by any containers in the pod.
 //
-// https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/volumes.md
+// http://docs.k8s.io/volumes.md
 type Volume struct {
 	// Required: This must be a DNS_LABEL.  Each volume in a pod must have
 	// a unique name.
@@ -61,7 +61,7 @@ type Volume struct {
 // VolumeSource represents the source location of a volume to mount.
 // Only one of its members may be specified.
 //
-// https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/volumes.md#types-of-volumes
+// http://docs.k8s.io/volumes.md#types-of-volumes
 type VolumeSource struct {
 	// HostDir represents a pre-existing directory on the host machine that is directly
 	// exposed to the container. This is generally used for system agents or other privileged
@@ -218,14 +218,14 @@ const (
 
 // HostPathVolumeSource represents bare host directory volume.
 //
-// https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/volumes.md#hostdir
+// http://docs.k8s.io/volumes.md#hostdir
 type HostPathVolumeSource struct {
 	Path string `json:"path" description:"path of the directory on the host"`
 }
 
 // Represents an empty directory volume.
 //
-// https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/volumes.md#emptydir
+// http://docs.k8s.io/volumes.md#emptydir
 type EmptyDirVolumeSource struct {
 	// Optional: what type of storage medium should back this directory.
 	// The default is "" which means to use the node's default medium.
@@ -242,7 +242,7 @@ const (
 
 // SecretVolumeSource adapts a Secret into a VolumeSource
 //
-// https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/design/secrets.md
+// http://docs.k8s.io/design/secrets.md
 type SecretVolumeSource struct {
 	// Reference to a Secret to use.  Only the ID field of this reference is used; a
 	// secret can only be used by pods in its namespace.
@@ -281,7 +281,7 @@ type ContainerPort struct {
 // The disk must also be in the same GCE project and zone as the kubelet.
 // A GCE PD can only be mounted as read/write once.
 //
-// https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/volumes.md#gcepersistentdisk
+// http://docs.k8s.io/volumes.md#gcepersistentdisk
 type GCEPersistentDiskVolumeSource struct {
 	// Unique name of the PD resource. Used to identify the disk in GCE
 	PDName string `json:"pdName" description:"unique name of the PD resource in GCE"`
@@ -365,7 +365,7 @@ type GlusterfsVolumeSource struct {
 
 // VolumeMount describes a mounting of a Volume within a container.
 //
-// https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/volumes.md
+// http://docs.k8s.io/volumes.md
 type VolumeMount struct {
 	// Required: This must match the Name of a Volume [above].
 	Name string `json:"name" description:"name of the volume to mount"`
@@ -385,7 +385,7 @@ type EnvVar struct {
 
 // HTTPGetAction describes an action based on HTTP Get requests.
 //
-// https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/container-environment.md#hook-handler-implementations
+// http://docs.k8s.io/container-environment.md#hook-handler-implementations
 type HTTPGetAction struct {
 	// Optional: Path to access on the HTTP server.
 	Path string `json:"path,omitempty" description:"path to access on the HTTP server"`
@@ -397,7 +397,7 @@ type HTTPGetAction struct {
 
 // TCPSocketAction describes an action based on opening a socket
 //
-// https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/container-environment.md#hook-handler-implementations
+// http://docs.k8s.io/container-environment.md#hook-handler-implementations
 type TCPSocketAction struct {
 	// Required: Port to connect to.
 	Port util.IntOrString `json:"port,omitempty" description:"number of name of the port to access on the container"`
@@ -405,7 +405,7 @@ type TCPSocketAction struct {
 
 // ExecAction describes a "run in container" action.
 //
-// https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/container-environment.md#hook-handler-implementations
+// http://docs.k8s.io/container-environment.md#hook-handler-implementations
 type ExecAction struct {
 	// Command is the command line to execute inside the container, the working directory for the
 	// command  is root ('/') in the container's filesystem.  The command is simply exec'd, it is
@@ -431,7 +431,7 @@ type LivenessProbe struct {
 
 // PullPolicy describes a policy for if/when to pull a container image
 //
-// https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/images.md#preloading-images
+// http://docs.k8s.io/images.md#preloading-images
 type PullPolicy string
 
 const (
@@ -448,7 +448,7 @@ type CapabilityType string
 
 // Capabilities represent POSIX capabilities that can be added or removed to a running container.
 //
-// https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/containers.md#capabilities
+// http://docs.k8s.io/containers.md#capabilities
 type Capabilities struct {
 	// Added capabilities
 	Add []CapabilityType `json:"add,omitempty" description:"added capabilities"`
@@ -507,7 +507,7 @@ const (
 // Handler defines a specific action that should be taken
 // TODO: pass structured data to these actions, and document that data here.
 //
-// https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/container-environment.md#hook-handler-implementations
+// http://docs.k8s.io/container-environment.md#hook-handler-implementations
 type Handler struct {
 	// One and only one of the following should be specified.
 	// Exec specifies the action to take.
@@ -523,7 +523,7 @@ type Handler struct {
 // events.  For the PostStart and PreStop lifecycle handlers, management of the container blocks
 // until the action is complete, unless the container process fails, in which case the handler is aborted.
 //
-// https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/container-environment.md#hook-details
+// http://docs.k8s.io/container-environment.md#hook-details
 type Lifecycle struct {
 	// PostStart is called immediately after a container is created.  If the handler fails, the container
 	// is terminated and restarted.
@@ -542,7 +542,7 @@ type TypeMeta struct {
 	UID               types.UID `json:"uid,omitempty" description:"unique UUID across space and time; populated by the system, read-only"`
 	CreationTimestamp util.Time `json:"creationTimestamp,omitempty" description:"RFC 3339 date and time at which the object was created; populated by the system, read-only; null for lists"`
 	SelfLink          string    `json:"selfLink,omitempty" description:"URL for the object; populated by the system, read-only"`
-	ResourceVersion   uint64    `json:"resourceVersion,omitempty" description:"string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"`
+	ResourceVersion   uint64    `json:"resourceVersion,omitempty" description:"string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: http://docs.k8s.io/api-conventions.md#concurrency-control-and-consistency"`
 	APIVersion        string    `json:"apiVersion,omitempty" description:"version of the schema the object should have"`
 	Namespace         string    `json:"namespace,omitempty" description:"namespace to which the object belongs; must be a DNS_SUBDOMAIN; 'default' by default; cannot be updated"`
 
@@ -590,7 +590,7 @@ const (
 
 // PodStatus represents a status of a pod.
 //
-// https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/pod-states.md
+// http://docs.k8s.io/pod-states.md
 type PodStatus string
 
 // These are the valid statuses of pods.
@@ -724,7 +724,7 @@ type PodList struct {
 
 // Pod is a collection of containers, used as either input (create, update) or as output (list, get).
 //
-// https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/pods.md
+// http://docs.k8s.io/pods.md
 type Pod struct {
 	TypeMeta     `json:",inline"`
 	Labels       map[string]string `json:"labels,omitempty" description:"map of string keys and values that can be used to organize and categorize pods; may match selectors of replication controllers and services"`
@@ -749,7 +749,7 @@ type ReplicationControllerList struct {
 
 // ReplicationController represents the configuration of a replication controller.
 //
-// https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/replication-controller.md
+// http://docs.k8s.io/replication-controller.md
 type ReplicationController struct {
 	TypeMeta     `json:",inline"`
 	DesiredState ReplicationControllerState `json:"desiredState,omitempty" description:"specification of the desired state of the replication controller"`
@@ -759,7 +759,7 @@ type ReplicationController struct {
 
 // PodTemplate holds the information used for creating pods.
 //
-// https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/replication-controller.md#pod-template
+// http://docs.k8s.io/replication-controller.md#pod-template
 type PodTemplate struct {
 	DesiredState PodState          `json:"desiredState,omitempty" description:"specification of the desired state of pods created from this template"`
 	NodeSelector map[string]string `json:"nodeSelector,omitempty" description:"a selector which must be true for the pod to fit on a node"`
@@ -794,7 +794,7 @@ type ServiceList struct {
 // (for example 3306) that the proxy listens on, and the selector that determines which pods
 // will answer requests sent through the proxy.
 //
-// https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/services.md
+// http://docs.k8s.io/services.md
 type Service struct {
 	TypeMeta `json:",inline"`
 
@@ -960,7 +960,7 @@ type NodeSystemInfo struct {
 
 // NodeStatus is information about the current status of a node.
 //
-// https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/node.md#node-status
+// http://docs.k8s.io/node.md#node-status
 type NodeStatus struct {
 	// NodePhase is the current lifecycle phase of the node.
 	Phase NodePhase `json:"phase,omitempty" description:"node phase is the current lifecycle phase of the node"`
@@ -983,7 +983,7 @@ type NodeInfo struct {
 
 // Described the current lifecycle phase of a node.
 //
-// https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/node.md#node-phase
+// http://docs.k8s.io/node.md#node-phase
 type NodePhase string
 
 // These are the valid phases of node.
@@ -998,7 +998,7 @@ const (
 
 // Describes the condition of a running node.
 //
-// https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/node.md#node-condition
+// http://docs.k8s.io/node.md#node-condition
 type NodeConditionKind string
 
 // These are valid conditions of node. Currently, we don't have enough information to decide
@@ -1016,7 +1016,7 @@ const (
 
 // Described the conditions of a running node.
 //
-// https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/node.md#node-condition
+// http://docs.k8s.io/node.md#node-condition
 type NodeCondition struct {
 	Kind               NodeConditionKind `json:"kind" description:"kind of the condition, current kinds: Reachable, Ready, Schedulable"`
 	Status             ConditionStatus   `json:"status" description:"status of the condition, one of Full, None, Unknown"`
@@ -1042,7 +1042,7 @@ type NodeAddress struct {
 
 // NodeResources represents resources on a Kubernetes system node
 //
-// https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/resources.md
+// http://docs.k8s.io/resources.md
 type NodeResources struct {
 	// Capacity represents the available resources.
 	Capacity ResourceList `json:"capacity,omitempty" description:"resource capacity of a node represented as a map of resource name to quantity of resource"`
@@ -1064,7 +1064,7 @@ type ResourceList map[ResourceName]util.IntOrString
 // Minion is a worker node in Kubernetenes.
 // The name of the minion according to etcd is in ID.
 //
-// https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/node.md#node-condition
+// http://docs.k8s.io/node.md#node-condition
 type Minion struct {
 	TypeMeta `json:",inline"`
 	// DEPRECATED: Use Status.Addresses instead.
@@ -1122,7 +1122,7 @@ const (
 // A namespace provides a scope for Names.
 // Use of multiple namespaces is optional.
 //
-// https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/namespaces.md
+// http://docs.k8s.io/namespaces.md
 type Namespace struct {
 	TypeMeta `json:",inline"`
 
@@ -1378,7 +1378,7 @@ type ObjectReference struct {
 	ID              string    `json:"name,omitempty" description:"id of the referent"`
 	UID             types.UID `json:"uid,omitempty" description:"uid of the referent"`
 	APIVersion      string    `json:"apiVersion,omitempty" description:"API version of the referent"`
-	ResourceVersion string    `json:"resourceVersion,omitempty" description:"specific resourceVersion to which this reference is made, if any: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"`
+	ResourceVersion string    `json:"resourceVersion,omitempty" description:"specific resourceVersion to which this reference is made, if any: http://docs.k8s.io/api-conventions.md#concurrency-control-and-consistency"`
 
 	// Optional. If referring to a piece of an object instead of an entire object, this string
 	// should contain information to identify the sub-object. For example, if the object
@@ -1394,7 +1394,7 @@ type ObjectReference struct {
 // Event is a report of an event somewhere in the cluster.
 // TODO: Decide whether to store these separately or with the object they apply to.
 //
-// https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/pod-states.md#events
+// http://docs.k8s.io/pod-states.md#events
 type Event struct {
 	TypeMeta `json:",inline"`
 
@@ -1633,7 +1633,7 @@ type NFSVolumeSource struct {
 // Secret holds secret data of a certain type.  The total bytes of the values in
 // the Data field must be less than MaxSecretSize bytes.
 //
-// https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/design/secrets.md
+// http://docs.k8s.io/design/secrets.md
 type Secret struct {
 	TypeMeta `json:",inline"`
 

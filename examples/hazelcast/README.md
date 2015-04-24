@@ -20,7 +20,7 @@ Source is freely available at:
 * Docker Trusted Build - https://registry.hub.docker.com/u/pires/hazelcast-k8s
 
 ### Simple Single Pod Hazelcast Node
-In Kubernetes, the atomic unit of an application is a [_Pod_](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/pods.md).  A Pod is one or more containers that _must_ be scheduled onto the same host.  All containers in a pod share a network namespace, and may optionally share mounted volumes.  In this simple case, we define a single container running Hazelcast for our pod:
+In Kubernetes, the atomic unit of an application is a [_Pod_](http://docs.k8s.io/pods.md).  A Pod is one or more containers that _must_ be scheduled onto the same host.  All containers in a pod share a network namespace, and may optionally share mounted volumes.  In this simple case, we define a single container running Hazelcast for our pod:
 
 ```yaml
 id: hazelcast

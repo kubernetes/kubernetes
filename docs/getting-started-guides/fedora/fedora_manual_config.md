@@ -2,7 +2,7 @@
 
 This is a getting started guide for Fedora.  It is a manual configuration so you understand all the underlying packages / services / ports, etc...
 
-This guide will only get ONE node (previously minion) working.  Multiple nodes require a functional [networking configuration](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/networking.md) done outside of kubernetes.  Although the additional kubernetes configuration requirements should be obvious.
+This guide will only get ONE node (previously minion) working.  Multiple nodes require a functional [networking configuration](http://docs.k8s.io/networking.md) done outside of kubernetes.  Although the additional kubernetes configuration requirements should be obvious.
 
 The kubernetes package provides a few services: kube-apiserver, kube-scheduler, kube-controller-manager, kubelet, kube-proxy.  These services are managed by systemd and the configuration resides in a central location: /etc/kubernetes.  We will break the services up between the hosts.  The first host, fed-master, will be the kubernetes master.  This host will run the kube-apiserver, kube-controller-manager, and kube-scheduler.  In addition, the master will also run _etcd_ (not needed if _etcd_ runs on a different host but this guide assumes that _etcd_ and kubernetes master run on the same host).  The remaining host, fed-node will be the node and run kubelet, proxy and docker.
 
