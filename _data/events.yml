@@ -27,6 +27,13 @@
     speaker: "Brendan Burns"
     url: "http://gluecon.com/"
 - 
+    date: 2015-05-04 00:00:00 -0800
+    title: "CoreOS Fest"
+    location: "San Francisco, CA, USA"
+    venue: "The Village"
+    speaker: "Brendan Burns"
+    url: "https://coreos.com/fest/"
+- 
     date: 2015-04-21 00:00:00 -0800
     title: "Bay Area Kubernetes Meetup"
     location: "Mountain View, CA, USA"
