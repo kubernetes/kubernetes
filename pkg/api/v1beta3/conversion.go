@@ -1104,6 +1104,7 @@ func init() {
 		},
 		func(in *Volume, out *newer.Volume, s conversion.Scope) error {
 			out.Name = in.Name
+			out.SecretName = in.SecretName
 			if err := s.Convert(&in.VolumeSource, &out.VolumeSource, 0); err != nil {
 				return err
 			}
@@ -1111,6 +1112,7 @@ func init() {
 		},
 		func(in *newer.Volume, out *Volume, s conversion.Scope) error {
 			out.Name = in.Name
+			out.SecretName = in.SecretName
 			if err := s.Convert(&in.VolumeSource, &out.VolumeSource, 0); err != nil {
 				return err
 			}
@@ -2161,6 +2163,11 @@ func init() {
 			return nil
 		},
 		func(in *PersistentVolumeSpec, out *newer.PersistentVolumeSpec, s conversion.Scope) error {
+			if in.SecretRef != nil {
+				if err := s.Convert(&in.SecretRef, &out.SecretRef, 0); err != nil {
+					return err
+				}
+			}
 			if in.Capacity != nil {
 				out.Capacity = make(map[newer.ResourceName]resource.Quantity)
 				for key, val := range in.Capacity {
@@ -2188,6 +2195,11 @@ func init() {
 			return nil
 		},
 		func(in *newer.PersistentVolumeSpec, out *PersistentVolumeSpec, s conversion.Scope) error {
+			if in.SecretRef != nil {
+				if err := s.Convert(&in.SecretRef, &out.SecretRef, 0); err != nil {
+					return err
+				}
+			}
 			if in.Capacity != nil {
 				out.Capacity = make(map[ResourceName]resource.Quantity)
 				for key, val := range in.Capacity {
