@@ -52,18 +52,18 @@ var (
 	requestCounter = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "apiserver_request_count",
-			Help: "Counter of apiserver requests broken out for each request handler, verb, API resource, and HTTP response code.",
+			Help: "Counter of apiserver requests broken out for each verb, API resource, client, and HTTP response code.",
 		},
-		[]string{"handler", "verb", "resource", "code"},
+		[]string{"verb", "resource", "client", "code"},
 	)
 	requestLatencies = prometheus.NewHistogramVec(
 		prometheus.HistogramOpts{
 			Name: "apiserver_request_latencies",
-			Help: "Response latency distribution in microseconds for each request handler and verb.",
+			Help: "Response latency distribution in microseconds for each verb, resource and client.",
 			// Use buckets ranging from 125 ms to 8 seconds.
 			Buckets: prometheus.ExponentialBuckets(125000, 2.0, 7),
 		},
-		[]string{"handler", "verb"},
+		[]string{"verb", "resource", "client"},
 	)
 )
 
@@ -74,9 +74,9 @@ func init() {
 
 // monitor is a helper function for each HTTP request handler to use for
 // instrumenting basic request counter and latency metrics.
-func monitor(handler string, verb, resource *string, httpCode *int, reqStart time.Time) {
-	requestCounter.WithLabelValues(handler, *verb, *resource, strconv.Itoa(*httpCode)).Inc()
-	requestLatencies.WithLabelValues(handler, *verb).Observe(float64((time.Since(reqStart)) / time.Microsecond))
+func monitor(verb, resource *string, client string, httpCode *int, reqStart time.Time) {
+	requestCounter.WithLabelValues(*verb, *resource, client, strconv.Itoa(*httpCode)).Inc()
+	requestLatencies.WithLabelValues(*verb, *resource, client).Observe(float64((time.Since(reqStart)) / time.Microsecond))
 }
 
 // monitorFilter creates a filter that reports the metrics for a given resource and action.
@@ -85,7 +85,7 @@ func monitorFilter(action, resource string) restful.FilterFunction {
 		reqStart := time.Now()
 		chain.ProcessFilter(req, res)
 		httpCode := res.StatusCode()
-		monitor("rest", &action, &resource, &httpCode, reqStart)
+		monitor(&action, &resource, util.GetClient(req.Request), &httpCode, reqStart)
 	}
 }
 

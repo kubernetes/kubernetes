@@ -24,6 +24,7 @@ import (
 	"io"
 	"io/ioutil"
 	"net"
+	"net/http"
 	"os"
 	"path"
 	"reflect"
@@ -490,4 +491,13 @@ func chooseHostInterfaceFromRoute(inFile io.Reader, nw networkInterfacer) (net.I
 		return nil, fmt.Errorf("Unable to select an IP.")
 	}
 	return nil, nil
+}
+
+func GetClient(req *http.Request) string {
+	if userAgent, ok := req.Header["User-Agent"]; ok {
+		if len(userAgent) > 0 {
+			return userAgent[0]
+		}
+	}
+	return "unknown"
 }

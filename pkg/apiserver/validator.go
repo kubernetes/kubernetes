@@ -27,6 +27,7 @@ import (
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/probe"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
 // TODO: this basic interface is duplicated in N places.  consolidate?
@@ -101,7 +102,7 @@ func (v *validator) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	apiResource := ""
 	var httpCode int
 	reqStart := time.Now()
-	defer monitor("validate", &verb, &apiResource, &httpCode, reqStart)
+	defer monitor(&verb, &apiResource, util.GetClient(r), &httpCode, reqStart)
 
 	reply := []ServerStatus{}
 	for name, server := range v.servers() {
