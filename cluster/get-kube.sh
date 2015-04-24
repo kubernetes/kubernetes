@@ -48,7 +48,7 @@ function create_cluster {
   (
     cd kubernetes
     ./cluster/kube-up.sh
-    echo "Kubernetes binaries at ${PWD}/kubernetes/cluster/"
+    echo "Kubernetes binaries at ${PWD}/cluster/"
     echo "You may want to add this directory to your PATH in \$HOME/.profile"
 
     echo "Installation successful!"
