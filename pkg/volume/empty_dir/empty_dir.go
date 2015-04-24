@@ -225,7 +225,9 @@ func (ed *emptyDir) GetPath() string {
 	return ed.plugin.host.GetPodVolumeDir(ed.podUID, util.EscapeQualifiedNameForDisk(name), ed.volName)
 }
 
-func (pd *emptyDir) SetSecret(secret *api.Secret) {
+func (pd *emptyDir) SetSecret(secret *api.Secret) error {
+	// validate secret and return an error if invalid
+	return nil
 }
 
 // TearDown simply discards everything in the directory.

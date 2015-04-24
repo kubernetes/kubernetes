@@ -130,7 +130,9 @@ func (iscsi *iscsiDisk) GetPath() string {
 	return iscsi.plugin.host.GetPodVolumeDir(iscsi.podUID, util.EscapeQualifiedNameForDisk(name), iscsi.volName)
 }
 
-func (pd *iscsiDisk) SetSecret(secret *api.Secret) {
+func (pd *iscsiDisk) SetSecret(secret *api.Secret) error {
+	// validate secret and return an error if invalid
+	return nil
 }
 
 func (iscsi *iscsiDisk) SetUp() error {

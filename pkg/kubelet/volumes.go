@@ -106,7 +106,10 @@ func (kl *Kubelet) newVolumeBuilderFromPlugins(spec *volume.Spec, podRef *api.Ob
 			return nil, fmt.Errorf("Failed to find secret %s in namespace %s", spec.SecretName, podRef.Namespace)
 		}
 	}
-	builder.SetSecret(secret)
+	err = builder.SetSecret(secret)
+	if err != nil {
+		return nil, fmt.Errorf("Failed to set secret on builder: %v", err)
+	}
 
 	glog.V(3).Infof("Used volume plugin %q for %s", plugin.Name(), spew.Sprintf("%#v", *spec))
 	return builder, nil

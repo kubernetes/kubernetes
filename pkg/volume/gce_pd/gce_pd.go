@@ -257,7 +257,9 @@ func (pd *gcePersistentDisk) GetPath() string {
 	return pd.plugin.host.GetPodVolumeDir(pd.podUID, util.EscapeQualifiedNameForDisk(name), pd.volName)
 }
 
-func (pd *gcePersistentDisk) SetSecret(secret *api.Secret) {
+func (pd *gcePersistentDisk) SetSecret(secret *api.Secret) error {
+	// validate secret and return an error if invalid
+	return nil
 }
 
 // Unmounts the bind mount, and detaches the disk only if the PD

@@ -148,8 +148,10 @@ func (glusterfsVolume *glusterfs) GetPath() string {
 	return glusterfsVolume.plugin.host.GetPodVolumeDir(glusterfsVolume.podRef.UID, util.EscapeQualifiedNameForDisk(name), glusterfsVolume.volName)
 }
 
-func (glusterfsVolume *glusterfs) SetSecret(secret *api.Secret) {
+func (glusterfsVolume *glusterfs) SetSecret(secret *api.Secret) error {
+	// validate secret and return an error if invalid
 	glusterfsVolume.secret = secret
+	return nil
 }
 
 func (glusterfsVolume *glusterfs) TearDown() error {
