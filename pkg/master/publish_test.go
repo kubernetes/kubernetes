@@ -26,21 +26,32 @@ import (
 )
 
 func TestSetEndpoints(t *testing.T) {
+	ns := api.NamespaceDefault
+	om := func(name string) api.ObjectMeta {
+		return api.ObjectMeta{Namespace: ns, Name: name}
+	}
 	tests := []struct {
-		testName     string
-		serviceName  string
-		ip           string
-		port         int
-		endpoints    *api.EndpointsList
-		expectUpdate bool
+		testName          string
+		serviceName       string
+		ip                string
+		port              int
+		additionalMasters int
+		endpoints         *api.EndpointsList
+		expectUpdate      *api.Endpoints // nil means none expected
 	}{
 		{
-			testName:     "no existing endpoints",
-			serviceName:  "foo",
-			ip:           "1.2.3.4",
-			port:         8080,
-			endpoints:    nil,
-			expectUpdate: true,
+			testName:    "no existing endpoints",
+			serviceName: "foo",
+			ip:          "1.2.3.4",
+			port:        8080,
+			endpoints:   nil,
+			expectUpdate: &api.Endpoints{
+				ObjectMeta: om("foo"),
+				Subsets: []api.EndpointSubset{{
+					Addresses: []api.EndpointAddress{{IP: "1.2.3.4"}},
+					Ports:     []api.EndpointPort{{Port: 8080, Protocol: "TCP"}},
+				}},
+			},
 		},
 		{
 			testName:    "existing endpoints satisfy",
@@ -49,14 +60,13 @@ func TestSetEndpoints(t *testing.T) {
 			port:        8080,
 			endpoints: &api.EndpointsList{
 				Items: []api.Endpoints{{
-					ObjectMeta: api.ObjectMeta{Name: "foo"},
+					ObjectMeta: om("foo"),
 					Subsets: []api.EndpointSubset{{
 						Addresses: []api.EndpointAddress{{IP: "1.2.3.4"}},
 						Ports:     []api.EndpointPort{{Port: 8080, Protocol: "TCP"}},
 					}},
 				}},
 			},
-			expectUpdate: false,
 		},
 		{
 			testName:    "existing endpoints satisfy but too many",
@@ -65,14 +75,88 @@ func TestSetEndpoints(t *testing.T) {
 			port:        8080,
 			endpoints: &api.EndpointsList{
 				Items: []api.Endpoints{{
-					ObjectMeta: api.ObjectMeta{Name: "foo"},
+					ObjectMeta: om("foo"),
 					Subsets: []api.EndpointSubset{{
 						Addresses: []api.EndpointAddress{{IP: "1.2.3.4"}, {IP: "4.3.2.1"}},
 						Ports:     []api.EndpointPort{{Port: 8080, Protocol: "TCP"}},
 					}},
 				}},
 			},
-			expectUpdate: true,
+			expectUpdate: &api.Endpoints{
+				ObjectMeta: om("foo"),
+				Subsets: []api.EndpointSubset{{
+					Addresses: []api.EndpointAddress{{IP: "1.2.3.4"}},
+					Ports:     []api.EndpointPort{{Port: 8080, Protocol: "TCP"}},
+				}},
+			},
+		},
+		{
+			testName:          "existing endpoints satisfy but too many + extra masters",
+			serviceName:       "foo",
+			ip:                "1.2.3.4",
+			port:              8080,
+			additionalMasters: 3,
+			endpoints: &api.EndpointsList{
+				Items: []api.Endpoints{{
+					ObjectMeta: om("foo"),
+					Subsets: []api.EndpointSubset{{
+						Addresses: []api.EndpointAddress{
+							{IP: "1.2.3.4"},
+							{IP: "4.3.2.1"},
+							{IP: "4.3.2.2"},
+							{IP: "4.3.2.3"},
+							{IP: "4.3.2.4"},
+						},
+						Ports: []api.EndpointPort{{Port: 8080, Protocol: "TCP"}},
+					}},
+				}},
+			},
+			expectUpdate: &api.Endpoints{
+				ObjectMeta: om("foo"),
+				Subsets: []api.EndpointSubset{{
+					Addresses: []api.EndpointAddress{
+						{IP: "1.2.3.4"},
+						{IP: "4.3.2.2"},
+						{IP: "4.3.2.3"},
+						{IP: "4.3.2.4"},
+					},
+					Ports: []api.EndpointPort{{Port: 8080, Protocol: "TCP"}},
+				}},
+			},
+		},
+		{
+			testName:          "existing endpoints satisfy but too many + extra masters + delete first",
+			serviceName:       "foo",
+			ip:                "4.3.2.4",
+			port:              8080,
+			additionalMasters: 3,
+			endpoints: &api.EndpointsList{
+				Items: []api.Endpoints{{
+					ObjectMeta: om("foo"),
+					Subsets: []api.EndpointSubset{{
+						Addresses: []api.EndpointAddress{
+							{IP: "1.2.3.4"},
+							{IP: "4.3.2.1"},
+							{IP: "4.3.2.2"},
+							{IP: "4.3.2.3"},
+							{IP: "4.3.2.4"},
+						},
+						Ports: []api.EndpointPort{{Port: 8080, Protocol: "TCP"}},
+					}},
+				}},
+			},
+			expectUpdate: &api.Endpoints{
+				ObjectMeta: om("foo"),
+				Subsets: []api.EndpointSubset{{
+					Addresses: []api.EndpointAddress{
+						{IP: "4.3.2.1"},
+						{IP: "4.3.2.2"},
+						{IP: "4.3.2.3"},
+						{IP: "4.3.2.4"},
+					},
+					Ports: []api.EndpointPort{{Port: 8080, Protocol: "TCP"}},
+				}},
+			},
 		},
 		{
 			testName:    "existing endpoints wrong name",
@@ -81,14 +165,20 @@ func TestSetEndpoints(t *testing.T) {
 			port:        8080,
 			endpoints: &api.EndpointsList{
 				Items: []api.Endpoints{{
-					ObjectMeta: api.ObjectMeta{Name: "bar"},
+					ObjectMeta: om("bar"),
 					Subsets: []api.EndpointSubset{{
 						Addresses: []api.EndpointAddress{{IP: "1.2.3.4"}},
 						Ports:     []api.EndpointPort{{Port: 8080, Protocol: "TCP"}},
 					}},
 				}},
 			},
-			expectUpdate: true,
+			expectUpdate: &api.Endpoints{
+				ObjectMeta: om("foo"),
+				Subsets: []api.EndpointSubset{{
+					Addresses: []api.EndpointAddress{{IP: "1.2.3.4"}},
+					Ports:     []api.EndpointPort{{Port: 8080, Protocol: "TCP"}},
+				}},
+			},
 		},
 		{
 			testName:    "existing endpoints wrong IP",
@@ -97,14 +187,20 @@ func TestSetEndpoints(t *testing.T) {
 			port:        8080,
 			endpoints: &api.EndpointsList{
 				Items: []api.Endpoints{{
-					ObjectMeta: api.ObjectMeta{Name: "foo"},
+					ObjectMeta: om("foo"),
 					Subsets: []api.EndpointSubset{{
 						Addresses: []api.EndpointAddress{{IP: "4.3.2.1"}},
 						Ports:     []api.EndpointPort{{Port: 8080, Protocol: "TCP"}},
 					}},
 				}},
 			},
-			expectUpdate: true,
+			expectUpdate: &api.Endpoints{
+				ObjectMeta: om("foo"),
+				Subsets: []api.EndpointSubset{{
+					Addresses: []api.EndpointAddress{{IP: "1.2.3.4"}},
+					Ports:     []api.EndpointPort{{Port: 8080, Protocol: "TCP"}},
+				}},
+			},
 		},
 		{
 			testName:    "existing endpoints wrong port",
@@ -113,14 +209,20 @@ func TestSetEndpoints(t *testing.T) {
 			port:        8080,
 			endpoints: &api.EndpointsList{
 				Items: []api.Endpoints{{
-					ObjectMeta: api.ObjectMeta{Name: "foo"},
+					ObjectMeta: om("foo"),
 					Subsets: []api.EndpointSubset{{
 						Addresses: []api.EndpointAddress{{IP: "1.2.3.4"}},
 						Ports:     []api.EndpointPort{{Port: 9090, Protocol: "TCP"}},
 					}},
 				}},
 			},
-			expectUpdate: true,
+			expectUpdate: &api.Endpoints{
+				ObjectMeta: om("foo"),
+				Subsets: []api.EndpointSubset{{
+					Addresses: []api.EndpointAddress{{IP: "1.2.3.4"}},
+					Ports:     []api.EndpointPort{{Port: 8080, Protocol: "TCP"}},
+				}},
+			},
 		},
 		{
 			testName:    "existing endpoints wrong protocol",
@@ -129,18 +231,24 @@ func TestSetEndpoints(t *testing.T) {
 			port:        8080,
 			endpoints: &api.EndpointsList{
 				Items: []api.Endpoints{{
-					ObjectMeta: api.ObjectMeta{Name: "foo"},
+					ObjectMeta: om("foo"),
 					Subsets: []api.EndpointSubset{{
 						Addresses: []api.EndpointAddress{{IP: "1.2.3.4"}},
 						Ports:     []api.EndpointPort{{Port: 8080, Protocol: "UDP"}},
 					}},
 				}},
 			},
-			expectUpdate: true,
+			expectUpdate: &api.Endpoints{
+				ObjectMeta: om("foo"),
+				Subsets: []api.EndpointSubset{{
+					Addresses: []api.EndpointAddress{{IP: "1.2.3.4"}},
+					Ports:     []api.EndpointPort{{Port: 8080, Protocol: "TCP"}},
+				}},
+			},
 		},
 	}
 	for _, test := range tests {
-		master := Master{}
+		master := Master{masterCount: test.additionalMasters + 1}
 		registry := &registrytest.EndpointRegistry{
 			Endpoints: test.endpoints,
 		}
@@ -149,18 +257,14 @@ func TestSetEndpoints(t *testing.T) {
 		if err != nil {
 			t.Errorf("case %q: unexpected error: %v", test.testName, err)
 		}
-		if test.expectUpdate {
-			expectedSubsets := []api.EndpointSubset{{
-				Addresses: []api.EndpointAddress{{IP: "1.2.3.4"}},
-				Ports:     []api.EndpointPort{{Port: 8080, Protocol: "TCP"}},
-			}}
+		if test.expectUpdate != nil {
 			if len(registry.Updates) != 1 {
 				t.Errorf("case %q: unexpected updates: %v", test.testName, registry.Updates)
-			} else if !reflect.DeepEqual(expectedSubsets, registry.Updates[0].Subsets) {
-				t.Errorf("case %q: expected update:\n%#v\ngot:\n%#v\n", test.testName, expectedSubsets, registry.Updates[0].Subsets)
+			} else if e, a := test.expectUpdate, &registry.Updates[0]; !reflect.DeepEqual(e, a) {
+				t.Errorf("case %q: expected update:\n%#v\ngot:\n%#v\n", test.testName, e, a)
 			}
 		}
-		if !test.expectUpdate && len(registry.Updates) > 0 {
+		if test.expectUpdate == nil && len(registry.Updates) > 0 {
 			t.Errorf("case %q: no update expected, yet saw: %v", test.testName, registry.Updates)
 		}
 	}
