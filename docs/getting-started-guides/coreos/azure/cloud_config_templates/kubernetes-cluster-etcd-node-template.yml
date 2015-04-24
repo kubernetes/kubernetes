@@ -32,13 +32,12 @@ coreos:
         Description=etcd 2
         Documentation=https://github.com/coreos/etcd/
         [Service]
-        Environment=ETCD_NAME=%host%
+        Environment=ETCD_NAME=%H
         Environment=ETCD_INITIAL_CLUSTER_TOKEN=etcd-cluster
-        Environment=ETCD_INITIAL_ADVERTISE_PEER_URLS=http://%host%:2380
-        Environment=ETCD_LISTEN_PEER_URLS=http://%host%:2380
+        Environment=ETCD_INITIAL_ADVERTISE_PEER_URLS=http://%H:2380
+        Environment=ETCD_LISTEN_PEER_URLS=http://%H:2380
         Environment=ETCD_LISTEN_CLIENT_URLS=http://0.0.0.0:2379,http://0.0.0.0:4001
-        Environment=ETCD_ADVERTISE_CLIENT_URLS=http://%host%:2379,http://%host%:4001
-        Environment=ETCD_INITIAL_CLUSTER=%cluster%
+        Environment=ETCD_ADVERTISE_CLIENT_URLS=http://%H:2379,http://%H:4001
         Environment=ETCD_INITIAL_CLUSTER_STATE=new
         ExecStart=/opt/bin/etcd2
         Restart=always

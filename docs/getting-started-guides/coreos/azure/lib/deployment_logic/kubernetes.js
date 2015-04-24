@@ -5,28 +5,51 @@ var util = require('../util.js');
 var cloud_config = require('../cloud_config.js');
 
 
+etcd_initial_cluster_conf_self = function (conf) {
+  var port = '2380';
+
+  var data = {
+    nodes: _(conf.nodes.etcd).times(function (n) {
+      var host = util.hostname(n, 'etcd');
+      return [host, [host, port].join(':')].join('=http://');
+    }),
+  };
+
+  return {
+    'name': 'etcd2.service',
+    'drop-ins': [{
+      'name': '50-etcd-initial-cluster.conf',
+      'content': _.template("[Service]\nEnvironment=ETCD_INITIAL_CLUSTER=<%= nodes.join(',') %>\n")(data),
+    }],
+  };
+};
+
+etcd_initial_cluster_conf_kube = function (conf) {
+  var port = '4001';
+
+  var data = {
+    nodes: _(conf.nodes.etcd).times(function (n) {
+      var host = util.hostname(n, 'etcd');
+      return 'http://' + [host, port].join(':');
+    }),
+  };
+
+  return {
+    'name': 'apiserver.service',
+    'drop-ins': [{
+      'name': '50-etcd-initial-cluster.conf',
+      'content': _.template("[Service]\nEnvironment=ETCD_SERVERS=--etcd_servers=<%= nodes.join(',') %>\n")(data),
+    }],
+  };
+};
+
 exports.create_etcd_cloud_config = function (node_count, conf) {
   var input_file = './cloud_config_templates/kubernetes-cluster-etcd-node-template.yml';
+  var output_file = util.join_output_file_path('kubernetes-cluster-etcd-nodes', 'generated.yml');
 
-  var peers = [ ];
-  for (var i = 0; i < node_count; i++) {
-    peers.push(util.hostname(i, 'etcd') + '=http://' + util.hostname(i, 'etcd') + ':2380');
-  }
-  var cluster = peers.join(',');
-
-  return _(node_count).times(function (n) {
-    var output_file = util.join_output_file_path('kubernetes-cluster-etcd-node-' + n, 'generated.yml');
-
-    return cloud_config.process_template(input_file, output_file, function(data) {
-      for (var i = 0; i < data.coreos.units.length; i++) {
-        var unit = data.coreos.units[i];
-        if (unit.name === 'etcd2.service') {
-          unit.content = _.replaceAll(_.replaceAll(unit.content, '%host%', util.hostname(n, 'etcd')), '%cluster%', cluster);
-          break;
-        }
-      }
-      return data;
-    });
+  return cloud_config.process_template(input_file, output_file, function(data) {
+    data.coreos.units.push(etcd_initial_cluster_conf_self(conf));
+    return data;
   });
 };
 
@@ -44,8 +67,10 @@ exports.create_node_cloud_config = function (node_count, conf) {
       bridge_address_cidr: util.ipv4([10, 2, n, 1], 24),
     });
   };
+
   return cloud_config.process_template(input_file, output_file, function(data) {
     data.write_files = data.write_files.concat(_(node_count).times(make_node_config));
+    data.coreos.units.push(etcd_initial_cluster_conf_kube(conf));
     return data;
   });
 };

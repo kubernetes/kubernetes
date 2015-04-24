@@ -10,12 +10,18 @@ write_files:
       #!/bin/sh -xe
       minion_id="${1}"
       master_url="${2}"
+      env_label="${3}"
       until healthcheck=$(curl --fail --silent "${master_url}/healthz")
       do sleep 2
       done
       test -n "${healthcheck}"
       test "${healthcheck}" = "ok"
-      printf '{ "id": "%s", "kind": "Minion", "apiVersion": "v1beta1", "labels": { "environment": "production" }  }' "${minion_id}" \
+      printf '{
+        "id": "%s",
+        "kind": "Minion",
+        "apiVersion": "v1beta1",
+        "labels": { "environment": "%s" }
+        }' "${minion_id}" "${env_label}" \
         | /opt/bin/kubectl create -s "${master_url}" -f -
 
   - path: /etc/kubernetes/manifests/fluentd.manifest
@@ -50,6 +56,14 @@ coreos:
     group: stable
     reboot-strategy: off
   units:
+    - name: systemd-networkd-wait-online.service
+      drop-ins:
+        - name: 50-check-github-is-reachable.conf
+          content: |
+            [Service]
+            ExecStart=/bin/sh -x -c \
+              'until curl --silent --fail https://status.github.com/api/status.json | grep -q \"good\"; do sleep 2; done'
+
     - name: docker.service
       drop-ins:
         - name: 50-weave-kubernetes.conf
@@ -120,7 +134,7 @@ coreos:
         Before=weave-helper.service
         Before=docker.service
         Description=Install Weave
-        Documentation=http://zettio.github.io/weave/
+        Documentation=http://weaveworks.github.io/weave/
         Requires=network-online.target
         [Service]
         Type=oneshot
@@ -129,7 +143,7 @@ coreos:
         ExecStartPre=/usr/bin/curl \
           --silent \
           --location \
-          https://github.com/weaveworks/weave/releases/download/v0.9.0/weave \
+          https://github.com/weaveworks/weave/releases/download/latest_release/weave \
           --output /opt/bin/weave
         ExecStartPre=/usr/bin/curl \
           --silent \
@@ -150,7 +164,7 @@ coreos:
         After=install-weave.service
         After=docker.service
         Description=Weave Network Router
-        Documentation=http://zettio.github.io/weave/
+        Documentation=http://weaveworks.github.io/weave/
         Requires=docker.service
         Requires=install-weave.service
         [Service]
@@ -165,13 +179,13 @@ coreos:
         After=install-weave.service
         After=docker.service
         Description=Weave Network Router
-        Documentation=http://zettio.github.io/weave/
+        Documentation=http://weaveworks.github.io/weave/
         Requires=docker.service
         Requires=install-weave.service
         [Service]
+        TimeoutStartSec=0
         EnvironmentFile=/etc/weave.%H.env
-        ExecStartPre=/usr/bin/docker pull zettio/weave:latest
-        ExecStartPre=/usr/bin/docker pull zettio/weavetools:latest
+        ExecStartPre=/opt/bin/weave setup
         ExecStartPre=/opt/bin/weave launch $WEAVE_PEERS
         ExecStart=/usr/bin/docker attach weave
         Restart=on-failure
@@ -194,7 +208,7 @@ coreos:
         [Service]
         Type=oneshot
         EnvironmentFile=/etc/weave.%H.env
-        ExecStart=/opt/bin/weave create-bridge
+        ExecStart=/opt/bin/weave --local create-bridge
         ExecStart=/usr/bin/ip addr add dev weave $BRIDGE_ADDRESS_CIDR
         ExecStart=/usr/bin/ip route add $BREAKOUT_ROUTE dev weave scope link
         ExecStart=/usr/bin/ip route add 224.0.0.0/4 dev weave
@@ -222,6 +236,7 @@ coreos:
         ExecStartPost=/bin/ln -s /opt/kubernetes/server/bin/kubectl /opt/bin/
         ExecStartPost=/bin/mv /tmp/kubernetes/examples/guestbook /home/core/guestbook-example
         ExecStartPost=/bin/rm -rf /tmp/kubernetes
+        ExecStartPost=/bin/sed 's/\("createExternalLoadBalancer":\) true/\1 false/' -i /home/core/guestbook-example/frontend-service.json
         RemainAfterExit=yes
         Type=oneshot
         [Install]
@@ -244,7 +259,7 @@ coreos:
         ExecStart=/opt/kubernetes/server/bin/kube-apiserver \
             --address=0.0.0.0 \
             --port=8080 \
-            --etcd_servers=http://etcd-00:4001,http://etcd-01:4001,http://etcd-02:4001 \
+            $ETCD_SERVERS \
             --portal_net=10.1.0.0/16 \
             --cloud_provider=vagrant \
             --logtostderr=true --v=3
@@ -345,6 +360,8 @@ coreos:
       content: |
         [Unit]
         After=download-kubernetes.service
+        Before=proxy.service
+        Before=kubelet.service
         ConditionFileIsExecutable=/opt/kubernetes/server/bin/kubectl
         ConditionFileIsExecutable=/opt/bin/register_minion.sh
         Description=Kubernetes Create Minion
@@ -352,7 +369,7 @@ coreos:
         Wants=download-kubernetes.service
         ConditionHost=!kube-00
         [Service]
-        ExecStart=/opt/bin/register_minion.sh %H http://kube-00:8080
+        ExecStart=/opt/bin/register_minion.sh %H http://kube-00:8080 production
         Type=oneshot
         [Install]
         WantedBy=kubernetes-minion.target
