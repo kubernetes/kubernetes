@@ -1,9 +1,21 @@
 {
-  "id": "spark-master",
   "kind": "Service",
-  "apiVersion": "v1beta1",
-  "port": 7077,
-  "containerPort": 7077,
-  "selector": { "name": "spark-master" },
-  "labels": { "name": "spark-master" }
+  "apiVersion": "v1beta3",
+  "metadata": {
+    "name": "spark-master",
+    "labels": {
+      "name": "spark-master"
+    }
+  },
+  "spec": {
+    "ports": [
+      {
+        "port": 7077,
+        "targetPort": 7077
+      }
+    ],
+    "selector": {
+      "name": "spark-master"
+    }
+  }
 }
