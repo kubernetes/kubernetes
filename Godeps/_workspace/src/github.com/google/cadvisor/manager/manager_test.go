@@ -81,7 +81,7 @@ func expectManagerWithContainers(containers []string, query *info.ContainerInfoR
 		infosMap[container] = itest.GenerateRandomContainerInfo(container, 4, query, 1*time.Second)
 	}
 
-	memoryStorage := memory.New(query.NumStats, nil)
+	memoryStorage := memory.New(time.Duration(query.NumStats)*time.Second, nil)
 	sysfs := &fakesysfs.FakeSysFs{}
 	m := createManagerAndAddContainers(
 		memoryStorage,

@@ -41,6 +41,7 @@ import (
 
 var globalHousekeepingInterval = flag.Duration("global_housekeeping_interval", 1*time.Minute, "Interval between global housekeepings")
 var logCadvisorUsage = flag.Bool("log_cadvisor_usage", false, "Whether to log the usage of the cAdvisor container")
+var enableLoadReader = flag.Bool("enable_load_reader", false, "Whether to enable cpu load reader")
 
 // The Manager interface defines operations for starting a manager and getting
 // container and machine information.
@@ -175,8 +176,8 @@ type manager struct {
 
 // Start the container manager.
 func (self *manager) Start() error {
-	// TODO(rjnagal): Skip creating cpu load reader while we improve resource usage and accuracy.
-	if false {
+
+	if *enableLoadReader {
 		// Create cpu load reader.
 		cpuLoadReader, err := cpuload.New()
 		if err != nil {
@@ -273,7 +274,7 @@ func (self *manager) globalHousekeeping(quit chan error) {
 			// Log if housekeeping took too long.
 			duration := time.Since(start)
 			if duration >= longHousekeeping {
-				glog.V(1).Infof("Global Housekeeping(%d) took %s", t.Unix(), duration)
+				glog.V(3).Infof("Global Housekeeping(%d) took %s", t.Unix(), duration)
 			}
 		case <-quit:
 			// Quit if asked to do so.
@@ -878,21 +879,32 @@ func (self *manager) watchForNewOoms() error {
 
 	go func() {
 		for oomInstance := range outStream {
+			// Surface OOM and OOM kill events.
 			newEvent := &info.Event{
 				ContainerName: oomInstance.ContainerName,
 				Timestamp:     oomInstance.TimeOfDeath,
 				EventType:     info.EventOom,
+			}
+			err := self.eventHandler.AddEvent(newEvent)
+			if err != nil {
+				glog.Errorf("failed to add OOM event for %q: %v", oomInstance.ContainerName, err)
+			}
+			glog.V(3).Infof("Created an OOM event in container %q at %v", oomInstance.ContainerName, oomInstance.TimeOfDeath)
+
+			newEvent = &info.Event{
+				ContainerName: oomInstance.VictimContainerName,
+				Timestamp:     oomInstance.TimeOfDeath,
+				EventType:     info.EventOomKill,
 				EventData: info.EventData{
-					Oom: &info.OomEventData{
+					OomKill: &info.OomKillEventData{
 						Pid:         oomInstance.Pid,
 						ProcessName: oomInstance.ProcessName,
 					},
 				},
 			}
-			glog.V(2).Infof("Created an oom event: %v", newEvent)
-			err := self.eventHandler.AddEvent(newEvent)
+			err = self.eventHandler.AddEvent(newEvent)
 			if err != nil {
-				glog.Errorf("failed to add event %v, got error: %v", newEvent, err)
+				glog.Errorf("failed to add OOM kill event for %q: %v", oomInstance.ContainerName, err)
 			}
 		}
 	}()

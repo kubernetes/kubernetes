@@ -21,7 +21,6 @@ import (
 	"math"
 	"sort"
 
-	"github.com/golang/glog"
 	info "github.com/google/cadvisor/info/v2"
 )
 
@@ -172,10 +171,8 @@ func GetMinutePercentiles(stats []*secondSample) info.Usage {
 		if !lastSample.Timestamp.IsZero() {
 			cpuRate, err := getCpuRate(*stat, lastSample)
 			if err != nil {
-				glog.V(3).Infof("Skipping sample, %v", err)
 				continue
 			}
-			glog.V(3).Infof("Adding cpu rate sample : %d", cpuRate)
 			cpu.AddSample(cpuRate)
 			memory.AddSample(stat.Memory)
 		} else {
