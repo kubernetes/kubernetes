@@ -6,7 +6,7 @@ For complete reference see [this](https://www.ibm.com/developerworks/community/b
 
 1. Hot Standby: In this scenario, data and state are shared between the two components such that an immediate failure in one component causes the the standby deamon to take over exactly where the failed component had left off.  This would be an ideal solution for kubernetes, however it poses a series of challenges in the case of controllers where component-state is cached locally and not persisted in a transactional way to a storage facility.  This would also introduce additional load on the apiserver, which is not desireable.  As a result, we are **NOT** planning on this approach at this time. 
 
-2. **Warm Standby**: In this scenario there is only one active component acting as the master and additional components running by not providing service or responding to requests.  Data and state are not shared between the active and standby components.  When a failure occurs, the standby component that becomes the master must determine the current state of the system before resuming functionality.
+2. **Warm Standby**: In this scenario there is only one active component acting as the master and additional components running but not providing service or responding to requests.  Data and state are not shared between the active and standby components.  When a failure occurs, the standby component that becomes the master must determine the current state of the system before resuming functionality.  This is the apprach that this proposal will leverage.
 
 3. Active-Active (Load Balanced): Clients can simply load-balance across any number of servers that are currently running.  Their general availability can be continuously updated, or published, such that load balancing only occurs across active participants.  This aspect of HA is outside of the scope of *this* proposal because there is already a partial implementation in the apiserver.
 
@@ -29,6 +29,12 @@ Some command line options would be added to components that can do HA:
 
 ## Design Discussion Notes
 Some components may run numerous threads in order to perform tasks in parallel. Upon losing master status, such components should exit instantly instead of attempting to gracefully shut down such threads. This is to ensure that, in the case there's some propagation delay in informing the threads they should stop, the lame-duck threads won't interfere with the new master.  The component should exit with an exit code indicating that the component is not the master.  Since all components will be run by systemd or some other monitoring system, this will just result in a restart.
+
+There is a short window for a split brain condition because we cannot gate operations at the apiserver.  Having the daemons exit shortens this window but does not eliminate it.  A proper solution for this problem will be addressed at a later date.  The proposed solution is:
+1. This requires transaction support in etcd (which is already planned - see [coreos/etcd#2675](https://github.com/coreos/etcd/pull/2675))
+2. Apart from the entry in etcd that is tracking the lease for a given component and is periodically refreshed, we introduce another entry (per component) that is changed only when the master is changing - let's call it "current master" entry (we don't refresh it).
+3. Master replica is aware of a version of its "current master" etcd entry.
+4. Whenever a master replica is trying to write something, it also attaches a "precondition" for the version of its "current master" entry [the whole transaction cannot succeed if the version of the corresponding "current master" entry in etcd has changed]. This basically guarantees that if we elect the new master, all transactions coming from the old master will fail.
 
 ## Open Questions:
 * Is there a desire to keep track of all nodes for a specific component type?
