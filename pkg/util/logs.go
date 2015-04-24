@@ -25,6 +25,7 @@ import (
 	"github.com/spf13/pflag"
 )
 
+// Uses _ instead of - to better align with glog flags.
 var logFlushFreq = pflag.Duration("log_flush_frequency", 5*time.Second, "Maximum number of seconds between log flushes")
 
 // TODO(thockin): This is temporary until we agree on log dirs and put those into each cmd.

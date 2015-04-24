@@ -35,7 +35,7 @@ var (
 	cloudConfig = &context.CloudConfig
 
 	orderseed = flag.Int64("orderseed", 0, "If non-zero, seed of random test shuffle order. (Otherwise random.)")
-	reportDir = flag.String("report_dir", "", "Path to the directory where the JUnit XML reports should be saved. Default is empty, which doesn't generate these reports.")
+	reportDir = flag.String("report-dir", "", "Path to the directory where the JUnit XML reports should be saved. Default is empty, which doesn't generate these reports.")
 	times     = flag.Int("times", 1, "Number of times each test is eligible to be run. Individual order is determined by shuffling --times instances of each test using --orderseed (like a multi-deck shoe of cards).")
 	testList  util.StringList
 )
@@ -45,16 +45,16 @@ func init() {
 
 	flag.StringVar(&context.KubeConfig, clientcmd.RecommendedConfigPathFlag, "", "Path to kubeconfig containing embeded authinfo.")
 	flag.StringVar(&context.KubeContext, clientcmd.FlagContext, "", "kubeconfig context to use/override. If unset, will use value from 'current-context'")
-	flag.StringVar(&context.AuthConfig, "auth_config", "", "Path to the auth info file.")
-	flag.StringVar(&context.CertDir, "cert_dir", "", "Path to the directory containing the certs. Default is empty, which doesn't use certs.")
+	flag.StringVar(&context.AuthConfig, "auth-config", "", "Path to the auth info file.")
+	flag.StringVar(&context.CertDir, "cert-dir", "", "Path to the directory containing the certs. Default is empty, which doesn't use certs.")
 	flag.StringVar(&context.Host, "host", "", "The host, or apiserver, to connect to")
-	flag.StringVar(&context.RepoRoot, "repo_root", "./", "Root directory of kubernetes repository, for finding test files. Default assumes working directory is repository root")
+	flag.StringVar(&context.RepoRoot, "repo-root", "./", "Root directory of kubernetes repository, for finding test files. Default assumes working directory is repository root")
 	flag.StringVar(&context.Provider, "provider", "", "The name of the Kubernetes provider (gce, gke, local, vagrant, etc.)")
 
 	// TODO: Flags per provider?  Rename gce_project/gce_zone?
-	flag.StringVar(&cloudConfig.MasterName, "kube_master", "", "Name of the kubernetes master. Only required if provider is gce or gke")
-	flag.StringVar(&cloudConfig.ProjectID, "gce_project", "", "The GCE project being used, if applicable")
-	flag.StringVar(&cloudConfig.Zone, "gce_zone", "", "GCE zone being used, if applicable")
+	flag.StringVar(&cloudConfig.MasterName, "kube-master", "", "Name of the kubernetes master. Only required if provider is gce or gke")
+	flag.StringVar(&cloudConfig.ProjectID, "gce-project", "", "The GCE project being used, if applicable")
+	flag.StringVar(&cloudConfig.Zone, "gce-zone", "", "GCE zone being used, if applicable")
 }
 
 func main() {
@@ -72,7 +72,7 @@ func main() {
 	if context.Provider == "aws" {
 		awsConfig := "[Global]\n"
 		if cloudConfig.Zone == "" {
-			glog.Error("gce_zone must be specified for AWS")
+			glog.Error("--gce-zone must be specified for AWS")
 			os.Exit(1)
 		}
 		awsConfig += fmt.Sprintf("Zone=%s\n", cloudConfig.Zone)
