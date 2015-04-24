@@ -16,12 +16,11 @@ limitations under the License.
 
 package util
 
-import (
-	flag "github.com/spf13/pflag"
-)
+import "github.com/spf13/pflag"
 
 // InitFlags normalizes and parses the command line flags
 func InitFlags() {
+	pflag.CommandLine.SetWordSeparators([]string{"-", "_"})
 	AddAllFlagsToPFlags()
-	flag.Parse()
+	pflag.Parse()
 }

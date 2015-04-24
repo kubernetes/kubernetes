@@ -17,6 +17,7 @@ limitations under the License.
 package util
 
 import (
+	"flag"
 	"fmt"
 	"io"
 	"os"
@@ -85,6 +86,7 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 	mapper := kubectl.ShortcutExpander{latest.RESTMapper}
 
 	flags := pflag.NewFlagSet("", pflag.ContinueOnError)
+	flags.SetWordSeparators([]string{"-", "_"})
 
 	clientConfig := optionalClientConfig
 	if optionalClientConfig == nil {
@@ -225,7 +227,7 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 // BindFlags adds any flags that are common to all kubectl sub commands.
 func (f *Factory) BindFlags(flags *pflag.FlagSet) {
 	// any flags defined by external projects (not part of pflags)
-	util.AddAllFlagsToPFlagSet(flags)
+	util.AddFlagSetToPFlagSet(flag.CommandLine, flags)
 
 	// This is necessary as github.com/spf13/cobra doesn't support "global"
 	// pflags currently.  See https://github.com/spf13/cobra/issues/44.
