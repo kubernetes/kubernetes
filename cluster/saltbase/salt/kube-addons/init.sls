@@ -48,20 +48,6 @@
     - makedirs: True
 {% endif %}
 
-{% if grains['os_family'] == 'RedHat' %}
-{% set environment_file = '/etc/sysconfig/kube-addons' %}
-{% else %}
-{% set environment_file = '/etc/default/kube-addons' %}
-{% endif %}
-
-{{ environment_file }}:
-  file.managed:
-    - source: salt://kube-addons/default
-    - template: jinja
-    - user: root
-    - group: root
-    - mode: 644
-
 /etc/kubernetes/kube-addons.sh:
   file.managed:
     - source: salt://kube-addons/kube-addons.sh
