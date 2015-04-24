@@ -667,7 +667,7 @@ function kube-up {
 
   until curl --insecure -H "Authorization: Bearer ${KUBE_BEARER_TOKEN}" \
           --max-time 5 --fail --output /dev/null --silent \
-          "https://${KUBE_MASTER_IP}/api/v1beta1/pods"; do
+          "https://${KUBE_MASTER_IP}/api/v1beta3/pods"; do
       printf "."
       sleep 2
   done

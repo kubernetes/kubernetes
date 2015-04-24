@@ -25,9 +25,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta2"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta3"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
@@ -38,11 +35,8 @@ func TestSetsCodec(t *testing.T) {
 		Prefix string
 		Codec  runtime.Codec
 	}{
-		"v1beta1": {false, "/api/v1beta1/", v1beta1.Codec},
-		"":        {false, "/api/" + latest.Version + "/", latest.Codec},
-		"v1beta2": {false, "/api/v1beta2/", v1beta2.Codec},
-		"v1beta3": {false, "/api/v1beta3/", v1beta3.Codec},
-		"v1beta4": {true, "", nil},
+		testapi.Version(): {false, "/api/" + testapi.Version() + "/", testapi.Codec()},
+		"invalidVersion":  {true, "", nil},
 	}
 	for version, expected := range testCases {
 		client, err := New(&Config{Host: "127.0.0.1", Version: version})
@@ -69,7 +63,7 @@ func TestRESTClientRequires(t *testing.T) {
 	if _, err := RESTClientFor(&Config{Host: "127.0.0.1", Version: "", Codec: testapi.Codec()}); err == nil {
 		t.Errorf("unexpected non-error")
 	}
-	if _, err := RESTClientFor(&Config{Host: "127.0.0.1", Version: "v1beta1"}); err == nil {
+	if _, err := RESTClientFor(&Config{Host: "127.0.0.1", Version: testapi.Version()}); err == nil {
 		t.Errorf("unexpected non-error")
 	}
 	if _, err := RESTClientFor(&Config{Host: "127.0.0.1", Version: testapi.Version(), Codec: testapi.Codec()}); err != nil {
@@ -85,17 +79,17 @@ func TestValidatesHostParameter(t *testing.T) {
 		URL string
 		Err bool
 	}{
-		{"127.0.0.1", "", "http://127.0.0.1/v1beta1/", false},
-		{"127.0.0.1:8080", "", "http://127.0.0.1:8080/v1beta1/", false},
-		{"foo.bar.com", "", "http://foo.bar.com/v1beta1/", false},
-		{"http://host/prefix", "", "http://host/prefix/v1beta1/", false},
-		{"http://host", "", "http://host/v1beta1/", false},
-		{"http://host", "/", "http://host/v1beta1/", false},
-		{"http://host", "/other", "http://host/other/v1beta1/", false},
+		{"127.0.0.1", "", "http://127.0.0.1/" + testapi.Version() + "/", false},
+		{"127.0.0.1:8080", "", "http://127.0.0.1:8080/" + testapi.Version() + "/", false},
+		{"foo.bar.com", "", "http://foo.bar.com/" + testapi.Version() + "/", false},
+		{"http://host/prefix", "", "http://host/prefix/" + testapi.Version() + "/", false},
+		{"http://host", "", "http://host/" + testapi.Version() + "/", false},
+		{"http://host", "/", "http://host/" + testapi.Version() + "/", false},
+		{"http://host", "/other", "http://host/other/" + testapi.Version() + "/", false},
 		{"host/server", "", "", true},
 	}
 	for i, testCase := range testCases {
-		c, err := RESTClientFor(&Config{Host: testCase.Host, Prefix: testCase.Prefix, Version: "v1beta1", Codec: testapi.Codec()})
+		c, err := RESTClientFor(&Config{Host: testCase.Host, Prefix: testCase.Prefix, Version: testapi.Version(), Codec: testapi.Codec()})
 		switch {
 		case err == nil && testCase.Err:
 			t.Errorf("expected error but was nil")

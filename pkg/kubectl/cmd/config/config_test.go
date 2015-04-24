@@ -26,6 +26,7 @@ import (
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd"
 	clientcmdapi "github.com/GoogleCloudPlatform/kubernetes/pkg/client/clientcmd/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -537,13 +538,13 @@ func TestNewEmptyCluster(t *testing.T) {
 func TestAdditionalCluster(t *testing.T) {
 	expectedConfig := newRedFederalCowHammerConfig()
 	cluster := *clientcmdapi.NewCluster()
-	cluster.APIVersion = "v1beta1"
+	cluster.APIVersion = testapi.Version()
 	cluster.CertificateAuthority = "ca-location"
 	cluster.InsecureSkipTLSVerify = false
 	cluster.Server = "serverlocation"
 	expectedConfig.Clusters["different-cluster"] = cluster
 	test := configCommandTest{
-		args:           []string{"set-cluster", "different-cluster", "--" + clientcmd.FlagAPIServer + "=serverlocation", "--" + clientcmd.FlagInsecure + "=false", "--" + clientcmd.FlagCAFile + "=ca-location", "--" + clientcmd.FlagAPIVersion + "=v1beta1"},
+		args:           []string{"set-cluster", "different-cluster", "--" + clientcmd.FlagAPIServer + "=serverlocation", "--" + clientcmd.FlagInsecure + "=false", "--" + clientcmd.FlagCAFile + "=ca-location", "--" + clientcmd.FlagAPIVersion + "=" + testapi.Version()},
 		startingConfig: newRedFederalCowHammerConfig(),
 		expectedConfig: expectedConfig,
 	}

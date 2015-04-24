@@ -120,7 +120,7 @@ func TestResourcePathForV1Beta1(t *testing.T) {
 	}
 }
 
-func TestResourcePathWithQueryParamsForV1Beta3(t *testing.T) {
+func TestResourcePathWithNamespaceQueryForV1Beta3(t *testing.T) {
 	if Version() != "v1beta3" {
 		// Skip the test if we are not testing v1beta3.
 		return
@@ -138,13 +138,13 @@ func TestResourcePathWithQueryParamsForV1Beta3(t *testing.T) {
 		{"resource", "", "", "/api/v1beta3/resource"},
 	}
 	for _, item := range testCases {
-		if actual := ResourcePathWithQueryParams(item.resource, item.namespace, item.name); actual != item.expected {
+		if actual := ResourcePathWithNamespaceQuery(item.resource, item.namespace, item.name); actual != item.expected {
 			t.Errorf("Expected: %s, got: %s for resource: %s, namespace: %s and name: %s", item.expected, actual, item.resource, item.namespace, item.name)
 		}
 	}
 }
 
-func TestResourcePathWithQueryParamsForV1Beta1(t *testing.T) {
+func TestResourcePathWithNamespaceQueryForV1Beta1(t *testing.T) {
 	if Version() != "v1beta1" {
 		// Skip the test if we are not testing v1beta1.
 		return
@@ -162,7 +162,7 @@ func TestResourcePathWithQueryParamsForV1Beta1(t *testing.T) {
 		{"resource", "", "", "/api/v1beta1/resource"},
 	}
 	for _, item := range testCases {
-		if actual := ResourcePathWithQueryParams(item.resource, item.namespace, item.name); actual != item.expected {
+		if actual := ResourcePathWithNamespaceQuery(item.resource, item.namespace, item.name); actual != item.expected {
 			t.Errorf("Expected: %s, got: %s for resource: %s, namespace: %s and name: %s", item.expected, actual, item.resource, item.namespace, item.name)
 		}
 	}

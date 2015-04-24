@@ -215,23 +215,17 @@ func stringBody(body string) io.ReadCloser {
 func TestClientVersions(t *testing.T) {
 	f := cmdutil.NewFactory(nil)
 
-	versions := []string{
-		"v1beta1",
-		"v1beta2",
-		"v1beta3",
+	version := testapi.Version()
+	mapping := &meta.RESTMapping{
+		APIVersion: version,
 	}
-	for _, version := range versions {
-		mapping := &meta.RESTMapping{
-			APIVersion: version,
-		}
-		c, err := f.RESTClient(mapping)
-		if err != nil {
-			t.Errorf("unexpected error: %v", err)
-		}
-		client := c.(*client.RESTClient)
-		if client.APIVersion() != version {
-			t.Errorf("unexpected Client APIVersion: %s %v", client.APIVersion, client)
-		}
+	c, err := f.RESTClient(mapping)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	client := c.(*client.RESTClient)
+	if client.APIVersion() != version {
+		t.Errorf("unexpected Client APIVersion: %s %v", client.APIVersion, client)
 	}
 }
 

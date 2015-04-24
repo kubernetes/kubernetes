@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
 )
 
 func TestFieldPath(t *testing.T) {
@@ -65,14 +66,14 @@ func TestGenerateContainerRef(t *testing.T) {
 		okPod = api.Pod{
 			TypeMeta: api.TypeMeta{
 				Kind:       "Pod",
-				APIVersion: "v1beta1",
+				APIVersion: testapi.Version(),
 			},
 			ObjectMeta: api.ObjectMeta{
 				Name:            "ok",
 				Namespace:       "test-ns",
 				UID:             "bar",
 				ResourceVersion: "42",
-				SelfLink:        "/api/v1beta1/pods/foo",
+				SelfLink:        "/api/" + testapi.Version() + "/pods/foo",
 			},
 			Spec: api.PodSpec{
 				Containers: []api.Container{
@@ -89,7 +90,7 @@ func TestGenerateContainerRef(t *testing.T) {
 	noSelfLinkPod.Kind = ""
 	noSelfLinkPod.APIVersion = ""
 	noSelfLinkPod.ObjectMeta.SelfLink = ""
-	defaultedSelfLinkPod.ObjectMeta.SelfLink = "/api/v1beta1/pods/ok"
+	defaultedSelfLinkPod.ObjectMeta.SelfLink = "/api/" + testapi.Version() + "/pods/ok"
 
 	cases := []struct {
 		name      string
@@ -106,7 +107,7 @@ func TestGenerateContainerRef(t *testing.T) {
 			},
 			expected: &api.ObjectReference{
 				Kind:            "Pod",
-				APIVersion:      "v1beta1",
+				APIVersion:      testapi.Version(),
 				Name:            "ok",
 				Namespace:       "test-ns",
 				UID:             "bar",
@@ -121,7 +122,7 @@ func TestGenerateContainerRef(t *testing.T) {
 			container: &api.Container{},
 			expected: &api.ObjectReference{
 				Kind:            "Pod",
-				APIVersion:      "v1beta1",
+				APIVersion:      testapi.Version(),
 				Name:            "ok",
 				Namespace:       "test-ns",
 				UID:             "bar",
@@ -145,7 +146,7 @@ func TestGenerateContainerRef(t *testing.T) {
 			},
 			expected: &api.ObjectReference{
 				Kind:            "Pod",
-				APIVersion:      "v1beta1",
+				APIVersion:      testapi.Version(),
 				Name:            "ok",
 				Namespace:       "test-ns",
 				UID:             "bar",
@@ -162,7 +163,7 @@ func TestGenerateContainerRef(t *testing.T) {
 			},
 			expected: &api.ObjectReference{
 				Kind:            "Pod",
-				APIVersion:      "v1beta1",
+				APIVersion:      testapi.Version(),
 				Name:            "ok",
 				Namespace:       "test-ns",
 				UID:             "bar",

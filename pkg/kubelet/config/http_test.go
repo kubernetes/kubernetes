@@ -23,10 +23,11 @@ import (
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta3"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/validation"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/errors"
 )
@@ -66,14 +67,14 @@ func TestExtractInvalidManifest(t *testing.T) {
 		{
 			desc: "Invalid volume name",
 			manifests: []api.ContainerManifest{
-				{Version: "v1beta1", Volumes: []api.Volume{{Name: "_INVALID_"}}},
+				{Version: testapi.Version(), Volumes: []api.Volume{{Name: "_INVALID_"}}},
 			},
 		},
 		{
 			desc: "Duplicate volume names",
 			manifests: []api.ContainerManifest{
 				{
-					Version: "v1beta1",
+					Version: testapi.Version(),
 					Volumes: []api.Volume{{Name: "repeated"}, {Name: "repeated"}},
 				},
 			},
@@ -82,7 +83,7 @@ func TestExtractInvalidManifest(t *testing.T) {
 			desc: "Unspecified container name",
 			manifests: []api.ContainerManifest{
 				{
-					Version:    "v1beta1",
+					Version:    testapi.Version(),
 					Containers: []api.Container{{Name: ""}},
 				},
 			},
@@ -91,7 +92,7 @@ func TestExtractInvalidManifest(t *testing.T) {
 			desc: "Invalid container name",
 			manifests: []api.ContainerManifest{
 				{
-					Version:    "v1beta1",
+					Version:    testapi.Version(),
 					Containers: []api.Container{{Name: "_INVALID_"}},
 				},
 			},
@@ -118,6 +119,10 @@ func TestExtractInvalidManifest(t *testing.T) {
 
 func TestExtractManifestFromHTTP(t *testing.T) {
 	hostname := "random-hostname"
+	// ContainerManifests are not supported v1beta3 onwards.
+	if api.PreV1Beta3(testapi.Version()) {
+		return
+	}
 
 	var testCases = []struct {
 		desc      string
@@ -135,7 +140,8 @@ func TestExtractManifestFromHTTP(t *testing.T) {
 						UID:       "111",
 						Name:      "foo" + "-" + hostname,
 						Namespace: "foobar",
-						SelfLink:  "/api/v1beta2/pods/foo-" + hostname + "?namespace=default",
+
+						SelfLink: getSelfLink("foo-"+hostname, kubelet.NamespaceDefault),
 					},
 					Spec: api.PodSpec{
 						Host:          hostname,
@@ -160,7 +166,8 @@ func TestExtractManifestFromHTTP(t *testing.T) {
 						UID:       "111",
 						Name:      "111" + "-" + hostname,
 						Namespace: "foobar",
-						SelfLink:  "/api/v1beta2/pods/111-" + hostname + "?namespace=default",
+
+						SelfLink: getSelfLink("111-"+hostname, kubelet.NamespaceDefault),
 					},
 					Spec: api.PodSpec{
 						Host:          hostname,
@@ -185,7 +192,8 @@ func TestExtractManifestFromHTTP(t *testing.T) {
 						UID:       "111",
 						Name:      "foo" + "-" + hostname,
 						Namespace: "foobar",
-						SelfLink:  "/api/v1beta2/pods/foo-" + hostname + "?namespace=default",
+
+						SelfLink: getSelfLink("foo-"+hostname, kubelet.NamespaceDefault),
 					},
 					Spec: api.PodSpec{
 						Host:          hostname,
@@ -214,7 +222,8 @@ func TestExtractManifestFromHTTP(t *testing.T) {
 						UID:       "111",
 						Name:      "foo" + "-" + hostname,
 						Namespace: "foobar",
-						SelfLink:  "/api/v1beta2/pods/foo-" + hostname + "?namespace=default",
+
+						SelfLink: getSelfLink("foo-"+hostname, kubelet.NamespaceDefault),
 					},
 					Spec: api.PodSpec{
 						Host:          hostname,
@@ -232,7 +241,8 @@ func TestExtractManifestFromHTTP(t *testing.T) {
 						UID:       "222",
 						Name:      "bar" + "-" + hostname,
 						Namespace: "foobar",
-						SelfLink:  "/api/v1beta2/pods/bar-" + hostname + "?namespace=default",
+
+						SelfLink: getSelfLink("bar-"+hostname, kubelet.NamespaceDefault),
 					},
 					Spec: api.PodSpec{
 						Host:          hostname,
@@ -296,61 +306,24 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 
 	var testCases = []struct {
 		desc     string
-		pods     interface{}
+		pods     runtime.Object
 		expected kubelet.PodUpdate
 	}{
 		{
-			desc: "Single pod v1beta1",
-			pods: v1beta1.Pod{
-				TypeMeta: v1beta1.TypeMeta{
+			desc: "Single pod",
+			pods: &api.Pod{
+				TypeMeta: api.TypeMeta{
 					Kind:       "Pod",
-					APIVersion: "v1beta1",
-					ID:         "foo",
-					UID:        "111",
-					Namespace:  "mynamespace",
+					APIVersion: "",
 				},
-				DesiredState: v1beta1.PodState{
-					Manifest: v1beta1.ContainerManifest{
-						Containers: []v1beta1.Container{{Name: "1", Image: "foo", ImagePullPolicy: v1beta1.PullAlways}},
-					},
-				},
-			},
-			expected: CreatePodUpdate(kubelet.SET,
-				kubelet.HTTPSource,
-				&api.Pod{
-					ObjectMeta: api.ObjectMeta{
-						UID:       "111",
-						Name:      "foo" + "-" + hostname,
-						Namespace: "mynamespace",
-						SelfLink:  "/api/v1beta2/pods/foo-" + hostname + "?namespace=mynamespace",
-					},
-					Spec: api.PodSpec{
-						Host:          hostname,
-						RestartPolicy: api.RestartPolicyAlways,
-						DNSPolicy:     api.DNSClusterFirst,
-						Containers: []api.Container{{
-							Name:  "1",
-							Image: "foo",
-							TerminationMessagePath: "/dev/termination-log",
-							ImagePullPolicy:        "Always"}},
-					},
-				}),
-		},
-		{
-			desc: "Single pod v1beta3",
-			pods: v1beta3.Pod{
-				TypeMeta: v1beta3.TypeMeta{
-					Kind:       "Pod",
-					APIVersion: "v1beta3",
-				},
-				ObjectMeta: v1beta3.ObjectMeta{
+				ObjectMeta: api.ObjectMeta{
 					Name:      "foo",
 					UID:       "111",
 					Namespace: "mynamespace",
 				},
-				Spec: v1beta3.PodSpec{
+				Spec: api.PodSpec{
 					Host:       hostname,
-					Containers: []v1beta3.Container{{Name: "1", Image: "foo", ImagePullPolicy: v1beta3.PullAlways}},
+					Containers: []api.Container{{Name: "1", Image: "foo", ImagePullPolicy: api.PullAlways}},
 				},
 			},
 			expected: CreatePodUpdate(kubelet.SET,
@@ -360,7 +333,8 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 						UID:       "111",
 						Name:      "foo" + "-" + hostname,
 						Namespace: "mynamespace",
-						SelfLink:  "/api/v1beta2/pods/foo-" + hostname + "?namespace=mynamespace",
+
+						SelfLink: getSelfLink("foo-"+hostname, "mynamespace"),
 					},
 					Spec: api.PodSpec{
 						Host:          hostname,
@@ -376,30 +350,30 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 		},
 		{
 			desc: "Multiple pods",
-			pods: v1beta3.PodList{
-				TypeMeta: v1beta3.TypeMeta{
+			pods: &api.PodList{
+				TypeMeta: api.TypeMeta{
 					Kind:       "PodList",
-					APIVersion: "v1beta3",
+					APIVersion: "",
 				},
-				Items: []v1beta3.Pod{
+				Items: []api.Pod{
 					{
-						ObjectMeta: v1beta3.ObjectMeta{
+						ObjectMeta: api.ObjectMeta{
 							Name: "foo",
 							UID:  "111",
 						},
-						Spec: v1beta3.PodSpec{
+						Spec: api.PodSpec{
 							Host:       hostname,
-							Containers: []v1beta3.Container{{Name: "1", Image: "foo", ImagePullPolicy: v1beta3.PullAlways}},
+							Containers: []api.Container{{Name: "1", Image: "foo", ImagePullPolicy: api.PullAlways}},
 						},
 					},
 					{
-						ObjectMeta: v1beta3.ObjectMeta{
+						ObjectMeta: api.ObjectMeta{
 							Name: "bar",
 							UID:  "222",
 						},
-						Spec: v1beta3.PodSpec{
+						Spec: api.PodSpec{
 							Host:       hostname,
-							Containers: []v1beta3.Container{{Name: "2", Image: "bar", ImagePullPolicy: ""}},
+							Containers: []api.Container{{Name: "2", Image: "bar", ImagePullPolicy: ""}},
 						},
 					},
 				},
@@ -411,7 +385,8 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 						UID:       "111",
 						Name:      "foo" + "-" + hostname,
 						Namespace: "default",
-						SelfLink:  "/api/v1beta2/pods/foo-" + hostname + "?namespace=default",
+
+						SelfLink: getSelfLink("foo-"+hostname, kubelet.NamespaceDefault),
 					},
 					Spec: api.PodSpec{
 						Host:          hostname,
@@ -429,7 +404,8 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 						UID:       "222",
 						Name:      "bar" + "-" + hostname,
 						Namespace: "default",
-						SelfLink:  "/api/v1beta2/pods/bar-" + hostname + "?namespace=default",
+
+						SelfLink: getSelfLink("bar-"+hostname, kubelet.NamespaceDefault),
 					},
 					Spec: api.PodSpec{
 						Host:          hostname,
@@ -443,17 +419,17 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 					},
 				}),
 		},
-		{
-			desc:     "Empty Array",
-			pods:     []v1beta3.Pod{},
-			expected: CreatePodUpdate(kubelet.SET, kubelet.HTTPSource),
-		},
 	}
 
 	for _, testCase := range testCases {
-		data, err := json.Marshal(testCase.pods)
+		var versionedPods runtime.Object
+		err := testapi.Converter().Convert(&testCase.pods, &versionedPods)
 		if err != nil {
-			t.Fatalf("%s: Some weird json problem: %v", testCase.desc, err)
+			t.Fatalf("error in versioning the pods: %s", testCase.desc, err)
+		}
+		data, err := testapi.Codec().Encode(versionedPods)
+		if err != nil {
+			t.Fatalf("%s: error in encoding the pod: %v", testCase.desc, err)
 		}
 		fakeHandler := util.FakeHandler{
 			StatusCode:   200,

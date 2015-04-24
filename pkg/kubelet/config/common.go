@@ -24,6 +24,7 @@ import (
 	"strings"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/validation"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet"
@@ -77,10 +78,21 @@ func applyDefaults(pod *api.Pod, source string, isFile bool, hostname string) er
 	// Set the Host field to indicate this pod is scheduled on the current node.
 	pod.Spec.Host = hostname
 
-	// Currently just simply follow the same format in resthandler.go
-	pod.ObjectMeta.SelfLink =
-		fmt.Sprintf("/api/v1beta2/pods/%s?namespace=%s", pod.Name, pod.Namespace)
+	pod.ObjectMeta.SelfLink = getSelfLink(pod.Name, pod.Namespace)
 	return nil
+}
+
+func getSelfLink(name, namespace string) string {
+	var selfLink string
+	if api.PreV1Beta3(latest.Version) {
+		selfLink = fmt.Sprintf("/api/"+latest.Version+"/pods/%s?namespace=%s", name, namespace)
+	} else {
+		if len(namespace) == 0 {
+			namespace = api.NamespaceDefault
+		}
+		selfLink = fmt.Sprintf("/api/"+latest.Version+"/pods/namespaces/%s/%s", name, namespace)
+	}
+	return selfLink
 }
 
 type defaultFunc func(pod *api.Pod) error
