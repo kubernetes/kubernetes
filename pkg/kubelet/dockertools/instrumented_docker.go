@@ -14,23 +14,21 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package metrics
+package dockertools
 
 import (
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/dockertools"
-	docker "github.com/fsouza/go-dockerclient"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/metrics"
+	"github.com/fsouza/go-dockerclient"
 )
 
-var _ dockertools.DockerInterface = instrumentedDockerInterface{}
-
 type instrumentedDockerInterface struct {
-	client dockertools.DockerInterface
+	client DockerInterface
 }
 
 // Creates an instrumented DockerInterface from an existing DockerInterface.
-func NewInstrumentedDockerInterface(dockerClient dockertools.DockerInterface) dockertools.DockerInterface {
+func NewInstrumentedDockerInterface(dockerClient DockerInterface) DockerInterface {
 	return instrumentedDockerInterface{
 		client: dockerClient,
 	}
@@ -39,7 +37,7 @@ func NewInstrumentedDockerInterface(dockerClient dockertools.DockerInterface) do
 func (in instrumentedDockerInterface) ListContainers(options docker.ListContainersOptions) ([]docker.APIContainers, error) {
 	start := time.Now()
 	defer func() {
-		DockerOperationsLatency.WithLabelValues("list_containers").Observe(SinceInMicroseconds(start))
+		metrics.DockerOperationsLatency.WithLabelValues("list_containers").Observe(metrics.SinceInMicroseconds(start))
 	}()
 	return in.client.ListContainers(options)
 }
@@ -47,7 +45,7 @@ func (in instrumentedDockerInterface) ListContainers(options docker.ListContaine
 func (in instrumentedDockerInterface) InspectContainer(id string) (*docker.Container, error) {
 	start := time.Now()
 	defer func() {
-		DockerOperationsLatency.WithLabelValues("inspect_container").Observe(SinceInMicroseconds(start))
+		metrics.DockerOperationsLatency.WithLabelValues("inspect_container").Observe(metrics.SinceInMicroseconds(start))
 	}()
 	return in.client.InspectContainer(id)
 }
@@ -55,7 +53,7 @@ func (in instrumentedDockerInterface) InspectContainer(id string) (*docker.Conta
 func (in instrumentedDockerInterface) CreateContainer(opts docker.CreateContainerOptions) (*docker.Container, error) {
 	start := time.Now()
 	defer func() {
-		DockerOperationsLatency.WithLabelValues("create_container").Observe(SinceInMicroseconds(start))
+		metrics.DockerOperationsLatency.WithLabelValues("create_container").Observe(metrics.SinceInMicroseconds(start))
 	}()
 	return in.client.CreateContainer(opts)
 }
@@ -63,7 +61,7 @@ func (in instrumentedDockerInterface) CreateContainer(opts docker.CreateContaine
 func (in instrumentedDockerInterface) StartContainer(id string, hostConfig *docker.HostConfig) error {
 	start := time.Now()
 	defer func() {
-		DockerOperationsLatency.WithLabelValues("start_container").Observe(SinceInMicroseconds(start))
+		metrics.DockerOperationsLatency.WithLabelValues("start_container").Observe(metrics.SinceInMicroseconds(start))
 	}()
 	return in.client.StartContainer(id, hostConfig)
 }
@@ -71,7 +69,7 @@ func (in instrumentedDockerInterface) StartContainer(id string, hostConfig *dock
 func (in instrumentedDockerInterface) StopContainer(id string, timeout uint) error {
 	start := time.Now()
 	defer func() {
-		DockerOperationsLatency.WithLabelValues("stop_container").Observe(SinceInMicroseconds(start))
+		metrics.DockerOperationsLatency.WithLabelValues("stop_container").Observe(metrics.SinceInMicroseconds(start))
 	}()
 	return in.client.StopContainer(id, timeout)
 }
@@ -79,7 +77,7 @@ func (in instrumentedDockerInterface) StopContainer(id string, timeout uint) err
 func (in instrumentedDockerInterface) RemoveContainer(opts docker.RemoveContainerOptions) error {
 	start := time.Now()
 	defer func() {
-		DockerOperationsLatency.WithLabelValues("remove_container").Observe(SinceInMicroseconds(start))
+		metrics.DockerOperationsLatency.WithLabelValues("remove_container").Observe(metrics.SinceInMicroseconds(start))
 	}()
 	return in.client.RemoveContainer(opts)
 }
@@ -87,7 +85,7 @@ func (in instrumentedDockerInterface) RemoveContainer(opts docker.RemoveContaine
 func (in instrumentedDockerInterface) InspectImage(image string) (*docker.Image, error) {
 	start := time.Now()
 	defer func() {
-		DockerOperationsLatency.WithLabelValues("inspect_image").Observe(SinceInMicroseconds(start))
+		metrics.DockerOperationsLatency.WithLabelValues("inspect_image").Observe(metrics.SinceInMicroseconds(start))
 	}()
 	return in.client.InspectImage(image)
 }
@@ -95,7 +93,7 @@ func (in instrumentedDockerInterface) InspectImage(image string) (*docker.Image,
 func (in instrumentedDockerInterface) ListImages(opts docker.ListImagesOptions) ([]docker.APIImages, error) {
 	start := time.Now()
 	defer func() {
-		DockerOperationsLatency.WithLabelValues("list_images").Observe(SinceInMicroseconds(start))
+		metrics.DockerOperationsLatency.WithLabelValues("list_images").Observe(metrics.SinceInMicroseconds(start))
 	}()
 	return in.client.ListImages(opts)
 }
@@ -103,7 +101,7 @@ func (in instrumentedDockerInterface) ListImages(opts docker.ListImagesOptions) 
 func (in instrumentedDockerInterface) PullImage(opts docker.PullImageOptions, auth docker.AuthConfiguration) error {
 	start := time.Now()
 	defer func() {
-		DockerOperationsLatency.WithLabelValues("pull_image").Observe(SinceInMicroseconds(start))
+		metrics.DockerOperationsLatency.WithLabelValues("pull_image").Observe(metrics.SinceInMicroseconds(start))
 	}()
 	return in.client.PullImage(opts, auth)
 }
@@ -111,7 +109,7 @@ func (in instrumentedDockerInterface) PullImage(opts docker.PullImageOptions, au
 func (in instrumentedDockerInterface) RemoveImage(image string) error {
 	start := time.Now()
 	defer func() {
-		DockerOperationsLatency.WithLabelValues("remove_image").Observe(SinceInMicroseconds(start))
+		metrics.DockerOperationsLatency.WithLabelValues("remove_image").Observe(metrics.SinceInMicroseconds(start))
 	}()
 	return in.client.RemoveImage(image)
 }
@@ -119,7 +117,7 @@ func (in instrumentedDockerInterface) RemoveImage(image string) error {
 func (in instrumentedDockerInterface) Logs(opts docker.LogsOptions) error {
 	start := time.Now()
 	defer func() {
-		DockerOperationsLatency.WithLabelValues("logs").Observe(SinceInMicroseconds(start))
+		metrics.DockerOperationsLatency.WithLabelValues("logs").Observe(metrics.SinceInMicroseconds(start))
 	}()
 	return in.client.Logs(opts)
 }
@@ -127,7 +125,7 @@ func (in instrumentedDockerInterface) Logs(opts docker.LogsOptions) error {
 func (in instrumentedDockerInterface) Version() (*docker.Env, error) {
 	start := time.Now()
 	defer func() {
-		DockerOperationsLatency.WithLabelValues("version").Observe(SinceInMicroseconds(start))
+		metrics.DockerOperationsLatency.WithLabelValues("version").Observe(metrics.SinceInMicroseconds(start))
 	}()
 	return in.client.Version()
 }
@@ -135,7 +133,7 @@ func (in instrumentedDockerInterface) Version() (*docker.Env, error) {
 func (in instrumentedDockerInterface) Info() (*docker.Env, error) {
 	start := time.Now()
 	defer func() {
-		DockerOperationsLatency.WithLabelValues("version").Observe(SinceInMicroseconds(start))
+		metrics.DockerOperationsLatency.WithLabelValues("version").Observe(metrics.SinceInMicroseconds(start))
 	}()
 	return in.client.Info()
 }
@@ -143,7 +141,7 @@ func (in instrumentedDockerInterface) Info() (*docker.Env, error) {
 func (in instrumentedDockerInterface) CreateExec(opts docker.CreateExecOptions) (*docker.Exec, error) {
 	start := time.Now()
 	defer func() {
-		DockerOperationsLatency.WithLabelValues("create_exec").Observe(SinceInMicroseconds(start))
+		metrics.DockerOperationsLatency.WithLabelValues("create_exec").Observe(metrics.SinceInMicroseconds(start))
 	}()
 	return in.client.CreateExec(opts)
 }
@@ -151,7 +149,7 @@ func (in instrumentedDockerInterface) CreateExec(opts docker.CreateExecOptions) 
 func (in instrumentedDockerInterface) StartExec(startExec string, opts docker.StartExecOptions) error {
 	start := time.Now()
 	defer func() {
-		DockerOperationsLatency.WithLabelValues("start_exec").Observe(SinceInMicroseconds(start))
+		metrics.DockerOperationsLatency.WithLabelValues("start_exec").Observe(metrics.SinceInMicroseconds(start))
 	}()
 	return in.client.StartExec(startExec, opts)
 }
