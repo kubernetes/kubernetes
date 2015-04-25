@@ -57,6 +57,10 @@ func (plugin *persistentClaimPlugin) NewBuilder(spec *volume.Spec, podRef *api.O
 		return nil, err
 	}
 
+	if claim.Status.VolumeRef == nil {
+		return nil, fmt.Errorf("The claim %+v is not yet bound to a volume", claim.Name)
+	}
+
 	pv, err := plugin.host.GetKubeClient().PersistentVolumes().Get(claim.Status.VolumeRef.Name)
 	if err != nil {
 		glog.Errorf("Error finding persistent volume for claim: %+v\n", claim.Name)
