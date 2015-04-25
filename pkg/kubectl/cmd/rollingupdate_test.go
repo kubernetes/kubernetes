@@ -18,12 +18,14 @@ package cmd
 
 import (
 	"bytes"
+	"io/ioutil"
 	"net/http"
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
@@ -137,12 +139,18 @@ func TestAddDeploymentHash(t *testing.T) {
 				return &http.Response{StatusCode: 200, Body: objBody(codec, podList)}, nil
 			case p == "/api/v1beta3/namespaces/default/pods/foo" && m == "PUT":
 				seen.Insert("foo")
+				obj := readOrDie(t, req, codec)
+				podList.Items[0] = *(obj.(*api.Pod))
 				return &http.Response{StatusCode: 200, Body: objBody(codec, &podList.Items[0])}, nil
 			case p == "/api/v1beta3/namespaces/default/pods/bar" && m == "PUT":
 				seen.Insert("bar")
+				obj := readOrDie(t, req, codec)
+				podList.Items[1] = *(obj.(*api.Pod))
 				return &http.Response{StatusCode: 200, Body: objBody(codec, &podList.Items[1])}, nil
 			case p == "/api/v1beta3/namespaces/default/pods/baz" && m == "PUT":
 				seen.Insert("baz")
+				obj := readOrDie(t, req, codec)
+				podList.Items[2] = *(obj.(*api.Pod))
 				return &http.Response{StatusCode: 200, Body: objBody(codec, &podList.Items[2])}, nil
 			case p == "/api/v1beta3/namespaces/default/replicationcontrollers/rc" && m == "PUT":
 				updatedRc = true
@@ -174,4 +182,18 @@ func TestAddDeploymentHash(t *testing.T) {
 	if !updatedRc {
 		t.Errorf("Failed to update replication controller with new labels")
 	}
+}
+
+func readOrDie(t *testing.T, req *http.Request, codec runtime.Codec) runtime.Object {
+	data, err := ioutil.ReadAll(req.Body)
+	if err != nil {
+		t.Errorf("Error reading: %v", err)
+		t.FailNow()
+	}
+	obj, err := codec.Decode(data)
+	if err != nil {
+		t.Errorf("error decoding: %v", err)
+		t.FailNow()
+	}
+	return obj
 }
