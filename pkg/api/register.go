@@ -64,6 +64,7 @@ func init() {
 		&PodProxyOptions{},
 		&ComponentStatus{},
 		&ComponentStatusList{},
+		&SerializedReference{},
 	)
 	// Legacy names are supported
 	Scheme.AddKnownTypeWithName("", "Minion", &Node{})
@@ -109,3 +110,4 @@ func (*PodExecOptions) IsAnAPIObject()            {}
 func (*PodProxyOptions) IsAnAPIObject()           {}
 func (*ComponentStatus) IsAnAPIObject()           {}
 func (*ComponentStatusList) IsAnAPIObject()       {}
+func (*SerializedReference) IsAnAPIObject()       {}

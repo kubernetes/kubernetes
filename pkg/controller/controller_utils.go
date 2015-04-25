@@ -17,10 +17,10 @@ limitations under the License.
 package controller
 
 import (
-	"encoding/json"
 	"fmt"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/validation"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/cache"
@@ -201,8 +201,9 @@ func (r RealPodControl) createReplica(namespace string, controller *api.Replicat
 	if err != nil {
 		return fmt.Errorf("unable to get controller reference: %v", err)
 	}
-	// TODO: Version this serialization per #7322
-	createdByRefJson, err := json.Marshal(createdByRef)
+	createdByRefJson, err := latest.Codec.Encode(&api.SerializedReference{
+		Reference: *createdByRef,
+	})
 	if err != nil {
 		return fmt.Errorf("unable to serialize controller reference: %v", err)
 	}
