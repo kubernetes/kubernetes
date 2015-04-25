@@ -37,12 +37,14 @@ mkdir -p binaries
 # flannel
 echo "Download & build flanneld ..."
 apt-get install linux-libc-dev
+FLANNEL_V="v0.4.0"
 if [ ! -d flannel ] ; then
     echo "flannel does not exsit, cloning ..."
     git clone https://github.com/coreos/flannel.git
 fi
 
 pushd flannel
+git checkout tags/${FLANNEL_V}
 docker run -v `pwd`:/opt/flannel -i -t google/golang /bin/bash -c "cd /opt/flannel && ./build"
 popd
 cp flannel/bin/flanneld binaries/
@@ -60,7 +62,7 @@ cp $ETCD/etcd $ETCD/etcdctl binaries
 # k8s
 echo "Download kubernetes release ..."
 
-K8S_V="v0.12.0"
+K8S_V="v0.15.0"
 if [ ! -f kubernetes.tar.gz ] ; then
     curl -L https://github.com/GoogleCloudPlatform/kubernetes/releases/download/$K8S_V/kubernetes.tar.gz -o kubernetes.tar.gz
     tar xzf kubernetes.tar.gz
