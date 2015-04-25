@@ -163,6 +163,10 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
       }).strip
     end
 
+    # Don't attempt to update Virtualbox Guest Additions (requires gcc)
+    if Vagrant.has_plugin?("vagrant-vbguest") then
+      config.vbguest.auto_update = false
+    end
     # Finally, fall back to VirtualBox
     config.vm.provider :virtualbox do |v, override|
       setvmboxandurl(override, :virtualbox)
