@@ -321,7 +321,7 @@ func validateSource(source *api.VolumeSource) errs.ValidationErrorList {
 	}
 	if source.PersistentVolumeClaimVolumeSource != nil {
 		numVolumes++
-		allErrs = append(allErrs, validatePersistentClaimVolumeSource(source.PersistentVolumeClaimVolumeSource).Prefix("glusterfs")...)
+		allErrs = append(allErrs, validatePersistentClaimVolumeSource(source.PersistentVolumeClaimVolumeSource).Prefix("persistentVolumeClaim")...)
 	}
 
 	if numVolumes != 1 {
