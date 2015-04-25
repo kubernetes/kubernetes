@@ -165,7 +165,7 @@ func NewMainKubelet(
 	if resyncInterval <= 0 {
 		return nil, fmt.Errorf("invalid sync frequency %d", resyncInterval)
 	}
-	dockerClient = metrics.NewInstrumentedDockerInterface(dockerClient)
+	dockerClient = dockertools.NewInstrumentedDockerInterface(dockerClient)
 
 	// Wait for the Docker daemon to be up (with a timeout).
 	waitStart := time.Now()
