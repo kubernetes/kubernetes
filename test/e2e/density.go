@@ -54,7 +54,9 @@ var _ = Describe("Density", func() {
 		expectNoError(err)
 		minionCount = len(minions.Items)
 		Expect(minionCount).NotTo(BeZero())
-		ns = api.NamespaceDefault
+		nsForTesting, err := createTestingNS("density", c)
+		ns = nsForTesting.Name
+		expectNoError(err)
 	})
 
 	AfterEach(func() {
@@ -69,11 +71,9 @@ var _ = Describe("Density", func() {
 			expectNoError(err)
 		}
 
-		// Clean up the namespace if a non-default one was used
-		if ns != api.NamespaceDefault {
-			By("Cleaning up the namespace")
-			err := c.Namespaces().Delete(ns)
-			expectNoError(err)
+		By(fmt.Sprintf("Destroying namespace for this suite %v", ns))
+		if err := c.Namespaces().Delete(ns); err != nil {
+			Failf("Couldn't delete ns %s", err)
 		}
 	})
 
@@ -104,10 +104,8 @@ var _ = Describe("Density", func() {
 		}
 		itArg := testArg
 		It(name, func() {
-			uuid := string(util.NewUUID())
 			totalPods := itArg.podsPerMinion * minionCount
-			nameStr := strconv.Itoa(totalPods) + "-" + uuid
-			ns = "e2e-density" + nameStr
+			nameStr := strconv.Itoa(totalPods) + "-" + string(util.NewUUID())
 			RCName = "my-hostname-density" + nameStr
 
 			// Create a listener for events
