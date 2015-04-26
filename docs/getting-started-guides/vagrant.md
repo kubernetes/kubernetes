@@ -111,40 +111,6 @@ NAME                LABELS
 10.245.1.3          <none>
 ```
 
-### Interacting with your Kubernetes cluster with the `kube-*` scripts.
-
-Alternatively to using the vagrant commands, you can also use the `cluster/kube-*.sh` scripts to interact with the vagrant based provider just like any other hosting platform for kubernetes.
-
-All of these commands assume you have set `KUBERNETES_PROVIDER` appropriately:
-
-```sh
-export KUBERNETES_PROVIDER=vagrant
-```
-
-Bring up a vagrant cluster
-
-```sh
-./cluster/kube-up.sh
-```
-
-Destroy the vagrant cluster
-
-```sh
-./cluster/kube-down.sh
-```
-
-Update the vagrant cluster after you make changes (only works when building your own releases locally):
-
-```sh
-./cluster/kube-push.sh
-```
-
-Interact with the cluster
-
-```sh
-./cluster/kubectl.sh
-```
-
 ### Authenticating with your master
 
 When using the vagrant provider in Kubernetes, the `cluster/kubectl.sh` script will cache your credentials in a `~/.kubernetes_vagrant_auth` file so you will not be prompted for them in the future.
