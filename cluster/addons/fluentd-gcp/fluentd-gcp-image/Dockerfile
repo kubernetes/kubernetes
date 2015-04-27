@@ -11,10 +11,9 @@ MAINTAINER Satnam Singh "satnam@google.com"
 
 # Disable prompts from apt.
 ENV DEBIAN_FRONTEND noninteractive
-ENV OPTS_APT -y --force-yes --no-install-recommends
 
 RUN apt-get -q update && \
-    apt-get -y install curl && \
+    apt-get install -y curl && \
     apt-get clean && \
     curl -s https://storage.googleapis.com/signals-agents/logging/google-fluentd-install.sh | sudo bash
 
@@ -22,4 +21,4 @@ RUN apt-get -q update && \
 COPY google-fluentd.conf /etc/google-fluentd/google-fluentd.conf
 
 # Start Fluentd to pick up our config that watches Docker container logs.
-CMD /usr/sbin/google-fluentd -qq > /var/log/google-fluentd.log
+CMD /usr/sbin/google-fluentd "$FLUENTD_ARGS" > /var/log/google-fluentd.log
