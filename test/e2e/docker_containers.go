@@ -32,6 +32,7 @@ var _ = Describe("Docker Containers", func() {
 	BeforeEach(func() {
 		var err error
 		c, err = loadClient()
+		Expect(err).NotTo(HaveOccurred())
 		ns_, err := createTestingNS("containers", c)
 		ns = ns_.Name
 		Expect(err).NotTo(HaveOccurred())
@@ -44,18 +45,18 @@ var _ = Describe("Docker Containers", func() {
 	})
 
 	It("should use the image defaults if command and args are blank", func() {
-		testContainerOutputInNamespace(ns, "use defaults", c, entrypointTestPod(), []string{
+		testContainerOutputInNamespace("use defaults", c, entrypointTestPod(), []string{
 			"[/ep default arguments]",
-		})
+		}, ns)
 	})
 
 	It("should be able to override the image's default arguments (docker cmd)", func() {
 		pod := entrypointTestPod()
 		pod.Spec.Containers[0].Args = []string{"override", "arguments"}
 
-		testContainerOutputInNamespace(ns, "override arguments", c, pod, []string{
+		testContainerOutputInNamespace("override arguments", c, pod, []string{
 			"[/ep override arguments]",
-		})
+		}, ns)
 	})
 
 	// Note: when you override the entrypoint, the image's arguments (docker cmd)
@@ -64,9 +65,9 @@ var _ = Describe("Docker Containers", func() {
 		pod := entrypointTestPod()
 		pod.Spec.Containers[0].Command = []string{"/ep-2"}
 
-		testContainerOutputInNamespace(ns, "override command", c, pod, []string{
+		testContainerOutputInNamespace("override command", c, pod, []string{
 			"[/ep-2]",
-		})
+		}, ns)
 	})
 
 	It("should be able to override the image's default command and arguments", func() {
@@ -74,9 +75,9 @@ var _ = Describe("Docker Containers", func() {
 		pod.Spec.Containers[0].Command = []string{"/ep-2"}
 		pod.Spec.Containers[0].Args = []string{"override", "arguments"}
 
-		testContainerOutputInNamespace(ns, "override all", c, pod, []string{
+		testContainerOutputInNamespace("override all", c, pod, []string{
 			"[/ep-2 override arguments]",
-		})
+		}, ns)
 	})
 })
 
