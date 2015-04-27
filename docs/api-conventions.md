@@ -294,6 +294,31 @@ Incorporating the default values into the `Spec` ensures that `Spec` depicts the
 full desired state so that it is easier for the system to determine how to
 achieve the state, and for the user to know what to anticipate.
 
+API version-specific default values are set by the API server.
+
+Late Initialization
+-------------------
+Late initialization is when resource fields are set by a system controller
+after an object is created/updated.
+
+For example, the scheduler sets the pod.spec.host field after the pod is created.
+
+Late-initializers should only make the following types of modifications:
+  - Setting previously unset fields
+  - Adding keys to maps
+  - Adding values to arrays which have mergeable semantics (`patchStrategy:"merge"` attribute in
+  go definition of type).
+These conventions:
+ 1. allow a user (with sufficient privilege) to override any system-default behaviors by setting
+    the fields that would otherwise have been defaulted.
+ 1. enables updates from users to be merged with changes made during late initialization, using
+    strategic merge patch, as opposed to clobbering the change.
+ 1. allow the component which does the late-initialization to use strategic merge patch, which
+    facilitates composition and concurrency of such components.
+
+Although the apiserver Admission Control stage acts prior to object creation,
+Admission Control plugins should follow the Late Initialization conventions
+too, to allow their implementation to be later moved to a controller, or to client libraries.
 
 Concurrency Control and Consistency
 -----------------------------------
