@@ -26,8 +26,8 @@ docker run -d --net=host --privileged gcr.io/google_containers/hyperkube:v0.14.2
 ### Test it out
 At this point you should have a running kubernetes cluster.  You can test this by downloading the kubectl 
 binary
-([OS X](http://storage.googleapis.com/kubernetes-release/release/v0.14.2/bin/darwin/amd64/kubectl))
-([linux](http://storage.googleapis.com/kubernetes-release/release/v0.14.2/bin/linux/amd64/kubectl))
+([OS X](https://storage.googleapis.com/kubernetes-release/release/v0.14.2/bin/darwin/amd64/kubectl))
+([linux](https://storage.googleapis.com/kubernetes-release/release/v0.14.2/bin/linux/amd64/kubectl))
 
 *Note:*
 On OS/X you will need to set up port forwarding via ssh:
