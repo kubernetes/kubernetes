@@ -508,26 +508,26 @@ type VolumeMount struct {
 type EnvVar struct {
 	// Required: This must be a C_IDENTIFIER.
 	Name string `json:"name"`
-	// Optional: defaults to "".
+	// Optional: no more than one of the following may be specified.
+	// Optional: Defaults to "".
 	Value string `json:"value,omitempty"`
-	// Optional: specify a source the value of this var should come from.
+	// Optional: Specifies a source the value of this var should come from.
 	ValueFrom *EnvVarSource `json:"valueFrom,omitempty"`
 }
 
 // EnvVarSource represents a source for the value of an EnvVar.
-// Only one of its members may be specified.
 type EnvVarSource struct {
-	// Selects a field of the pod; only name and namespace are supported.
+	// Required: Selects a field of the pod; only name and namespace are supported.
 	FieldPath *ObjectFieldSelector `json:"fieldPath,omitempty"`
 }
 
 // ObjectFieldSelector selects an APIVersioned field of an object.
 type ObjectFieldSelector struct {
-	// The API version the FieldPath is written in terms of.
-	// If no value is specified, it will be defaulted from the APIVersion
-	// the enclosing object is created with.
+	// Required: Version of the schema the FieldPath is written in terms of.
+	// If no value is specified, it will be defaulted to the APIVersion of the
+	// enclosing object.
 	APIVersion string `json:"apiVersion,omitempty"`
-	// The path of the field to select in the specified API version
+	// Required: Path of the field to select in the specified API version
 	FieldPath string `json:"fieldPath,omitempty"`
 }
 
