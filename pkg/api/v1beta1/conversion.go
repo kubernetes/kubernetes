@@ -377,6 +377,7 @@ func init() {
 			}
 			out.DesiredState.Host = in.Spec.Host
 			out.CurrentState.Host = in.Spec.Host
+			out.ServiceAccount = in.Spec.ServiceAccount
 			if err := s.Convert(&in.Status, &out.CurrentState, 0); err != nil {
 				return err
 			}
@@ -399,6 +400,7 @@ func init() {
 				return err
 			}
 			out.Spec.Host = in.DesiredState.Host
+			out.Spec.ServiceAccount = in.ServiceAccount
 			if err := s.Convert(&in.CurrentState, &out.Status, 0); err != nil {
 				return err
 			}
@@ -503,6 +505,7 @@ func init() {
 				return err
 			}
 			out.DesiredState.Host = in.Spec.Host
+			out.ServiceAccount = in.Spec.ServiceAccount
 			if err := s.Convert(&in.Spec.NodeSelector, &out.NodeSelector, 0); err != nil {
 				return err
 			}
@@ -519,6 +522,7 @@ func init() {
 				return err
 			}
 			out.Spec.Host = in.DesiredState.Host
+			out.Spec.ServiceAccount = in.ServiceAccount
 			if err := s.Convert(&in.NodeSelector, &out.Spec.NodeSelector, 0); err != nil {
 				return err
 			}
@@ -1677,6 +1681,19 @@ func init() {
 			switch label {
 			case "type":
 				return label, value, nil
+			default:
+				return "", "", fmt.Errorf("field label not supported: %s", label)
+			}
+		})
+	if err != nil {
+		// If one of the conversion functions is malformed, detect it immediately.
+		panic(err)
+	}
+	err = newer.Scheme.AddFieldLabelConversionFunc("v1beta1", "ServiceAccount",
+		func(label, value string) (string, string, error) {
+			switch label {
+			case "name":
+				return "metadata.name", value, nil
 			default:
 				return "", "", fmt.Errorf("field label not supported: %s", label)
 			}

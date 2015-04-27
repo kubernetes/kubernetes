@@ -814,6 +814,10 @@ type PodSpec struct {
 	// NodeSelector is a selector which must be true for the pod to fit on a node
 	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
 
+	// ServiceAccount is the name of the ServiceAccount to use to run this pod
+	// The pod will be allowed to use secrets referenced by the ServiceAccount
+	ServiceAccount string `json:"serviceAccount"`
+
 	// Host is a request to schedule this pod onto a specific host.  If it is non-empty,
 	// the the scheduler simply schedules this pod onto that host, assuming that it fits
 	// resource requirements.
@@ -1033,6 +1037,26 @@ type Service struct {
 
 	// Status represents the current status of a service.
 	Status ServiceStatus `json:"status,omitempty"`
+}
+
+// ServiceAccount binds together:
+// * a name, understood by users, and perhaps by peripheral systems, for an identity
+// * a principal that can be authenticated and authorized
+// * a set of secrets
+type ServiceAccount struct {
+	TypeMeta   `json:",inline"`
+	ObjectMeta `json:"metadata,omitempty"`
+
+	// Secrets is the list of secrets allowed to be used by pods running using this ServiceAccount
+	Secrets []ObjectReference `json:"secrets"`
+}
+
+// ServiceAccountList is a list of ServiceAccount objects
+type ServiceAccountList struct {
+	TypeMeta `json:",inline"`
+	ListMeta `json:"metadata,omitempty"`
+
+	Items []ServiceAccount `json:"items"`
 }
 
 // Endpoints is a collection of endpoints that implement the actual service.  Example:

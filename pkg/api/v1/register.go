@@ -52,6 +52,8 @@ func init() {
 		&NamespaceList{},
 		&Secret{},
 		&SecretList{},
+		&ServiceAccount{},
+		&ServiceAccountList{},
 		&PersistentVolume{},
 		&PersistentVolumeList{},
 		&PersistentVolumeClaim{},
@@ -97,6 +99,8 @@ func (*Namespace) IsAnAPIObject()                 {}
 func (*NamespaceList) IsAnAPIObject()             {}
 func (*Secret) IsAnAPIObject()                    {}
 func (*SecretList) IsAnAPIObject()                {}
+func (*ServiceAccount) IsAnAPIObject()            {}
+func (*ServiceAccountList) IsAnAPIObject()        {}
 func (*PersistentVolume) IsAnAPIObject()          {}
 func (*PersistentVolumeList) IsAnAPIObject()      {}
 func (*PersistentVolumeClaim) IsAnAPIObject()     {}

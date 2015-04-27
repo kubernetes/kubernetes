@@ -107,6 +107,10 @@ func (c *Fake) Services(namespace string) client.ServiceInterface {
 	return &FakeServices{Fake: c, Namespace: namespace}
 }
 
+func (c *Fake) ServiceAccounts(namespace string) client.ServiceAccountsInterface {
+	return &FakeServiceAccounts{Fake: c, Namespace: namespace}
+}
+
 func (c *Fake) Secrets(namespace string) client.SecretsInterface {
 	return &FakeSecrets{Fake: c, Namespace: namespace}
 }

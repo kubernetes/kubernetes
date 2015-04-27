@@ -51,6 +51,8 @@ func init() {
 		&ResourceQuotaList{},
 		&Namespace{},
 		&NamespaceList{},
+		&ServiceAccount{},
+		&ServiceAccountList{},
 		&Secret{},
 		&SecretList{},
 		&PersistentVolume{},
@@ -98,6 +100,8 @@ func (*ResourceQuota) IsAnAPIObject()             {}
 func (*ResourceQuotaList) IsAnAPIObject()         {}
 func (*Namespace) IsAnAPIObject()                 {}
 func (*NamespaceList) IsAnAPIObject()             {}
+func (*ServiceAccount) IsAnAPIObject()            {}
+func (*ServiceAccountList) IsAnAPIObject()        {}
 func (*Secret) IsAnAPIObject()                    {}
 func (*SecretList) IsAnAPIObject()                {}
 func (*PersistentVolume) IsAnAPIObject()          {}
