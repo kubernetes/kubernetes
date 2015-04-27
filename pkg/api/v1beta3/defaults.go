@@ -102,6 +102,16 @@ func init() {
 				obj.Type = SecretTypeOpaque
 			}
 		},
+		func(obj *PersistentVolume) {
+			if obj.Status.Phase == "" {
+				obj.Status.Phase = VolumePending
+			}
+		},
+		func(obj *PersistentVolumeClaim) {
+			if obj.Status.Phase == "" {
+				obj.Status.Phase = ClaimPending
+			}
+		},
 		func(obj *Endpoints) {
 			for i := range obj.Subsets {
 				ss := &obj.Subsets[i]

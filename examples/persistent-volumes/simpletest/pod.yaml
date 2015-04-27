@@ -2,17 +2,19 @@ kind: Pod
 apiVersion: v1beta3
 metadata:
   name: mypod
+  labels:
+    name: frontendhttp
 spec:
   containers:
-    - image: nginx
-      name: myfrontend
+    - name: myfrontend
+      image: dockerfile/nginx
+      ports:
+        - containerPort: 80
+          name: "http-server"
       volumeMounts:
       - mountPath: "/var/www/html"
         name: mypd
   volumes:
     - name: mypd
-      source:
-        persistentVolumeClaim:
-         accessMode: ReadWriteOnce
-         claimRef:
-           name: myclaim-1
+      persistentVolumeClaim:
+       claimName: myclaim-1

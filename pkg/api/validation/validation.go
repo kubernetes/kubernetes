@@ -319,6 +319,11 @@ func validateSource(source *api.VolumeSource) errs.ValidationErrorList {
 		numVolumes++
 		allErrs = append(allErrs, validateGlusterfs(source.Glusterfs).Prefix("glusterfs")...)
 	}
+	if source.PersistentVolumeClaimVolumeSource != nil {
+		numVolumes++
+		allErrs = append(allErrs, validatePersistentClaimVolumeSource(source.PersistentVolumeClaimVolumeSource).Prefix("persistentVolumeClaim")...)
+	}
+
 	if numVolumes != 1 {
 		allErrs = append(allErrs, errs.NewFieldInvalid("", source, "exactly 1 volume type is required"))
 	}
@@ -394,6 +399,14 @@ func validateSecretVolumeSource(secretSource *api.SecretVolumeSource) errs.Valid
 	return allErrs
 }
 
+func validatePersistentClaimVolumeSource(claim *api.PersistentVolumeClaimVolumeSource) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+	if claim.ClaimName == "" {
+		allErrs = append(allErrs, errs.NewFieldRequired("claimName"))
+	}
+	return allErrs
+}
+
 func validateNFS(nfs *api.NFSVolumeSource) errs.ValidationErrorList {
 	allErrs := errs.ValidationErrorList{}
 	if nfs.Server == "" {
@@ -447,6 +460,10 @@ func ValidatePersistentVolume(pv *api.PersistentVolume) errs.ValidationErrorList
 	if pv.Spec.AWSElasticBlockStore != nil {
 		numVolumes++
 		allErrs = append(allErrs, validateAWSElasticBlockStoreVolumeSource(pv.Spec.AWSElasticBlockStore).Prefix("awsElasticBlockStore")...)
+	}
+	if pv.Spec.Glusterfs != nil {
+		numVolumes++
+		allErrs = append(allErrs, validateGlusterfs(pv.Spec.Glusterfs).Prefix("glusterfs")...)
 	}
 	if numVolumes != 1 {
 		allErrs = append(allErrs, errs.NewFieldInvalid("", pv.Spec.PersistentVolumeSource, "exactly 1 volume type is required"))

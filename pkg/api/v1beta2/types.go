@@ -198,6 +198,8 @@ const (
 type PersistentVolumePhase string
 
 const (
+	// used for PersistentVolumes that are not available
+	VolumePending PersistentVolumePhase = "Pending"
 	// used for PersistentVolumes that are not yet bound
 	VolumeAvailable PersistentVolumePhase = "Available"
 	// used for PersistentVolumes that are bound

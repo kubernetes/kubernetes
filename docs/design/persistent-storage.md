@@ -12,7 +12,7 @@ A `PersistentVolumeClaim` (PVC) is a user's request for a persistent volume to u
 
 One new system component:
 
-`PersistentVolumeManager` is a singleton running in master that manages all PVs in the system, analogous to the node controller.  The volume manager watches the API for newly created volumes to manage.  The manager also watches for claims by users and binds them to available volumes. 
+`PersistentVolumeClaimBinder` is a singleton running in master that watches all PersistentVolumeClaims in the system and binds them to the closest matching available PersistentVolume. The volume manager watches the API for newly created volumes to manage. 
 
 One new volume:
 
@@ -32,7 +32,7 @@ Kubernetes makes no guarantees at runtime that the underlying storage exists or 
 
 #### Describe available storage
 
-Cluster administrators use the API to manage *PersistentVolumes*.  The singleton PersistentVolumeManager watches the Kubernetes API for new volumes and adds them to its internal cache of volumes in the system. All persistent volumes are managed and made available by the volume manager.  The manager also watches for new claims for storage and binds them to an available volume by matching the volume's characteristics (AccessModes and storage size) to the user's request.
+Cluster administrators use the API to manage *PersistentVolumes*.  A custom store ```NewPersistentVolumeOrderedIndex``` will index volumes by access modes and sort by storage capacity.  The ```PersistentVolumeClaimBinder``` watches for new claims for storage and binds them to an available volume by matching the volume's characteristics (AccessModes and storage size) to the user's request.
 
 PVs are system objects and, thus, have no namespace.
 
@@ -151,7 +151,7 @@ myclaim-1           map[]               pending
 
 #### Matching and binding
 
-  The ```PersistentVolumeManager``` attempts to find an available volume that most closely matches the user's request.  If one exists, they are bound by putting a reference on the PV to the PVC.  Requests can go unfulfilled if a suitable match is not found.
+  The ```PersistentVolumeClaimBinder``` attempts to find an available volume that most closely matches the user's request.  If one exists, they are bound by putting a reference on the PV to the PVC.  Requests can go unfulfilled if a suitable match is not found.
 
 ```
 
@@ -209,6 +209,6 @@ cluster/kubectl.sh delete pvc myclaim-1
 
 ```
 
-The ```PersistentVolumeManager``` will reconcile this by removing the claim reference from the PV and change the PVs status to 'Released'.   
+The ```PersistentVolumeClaimBinder``` will reconcile this by removing the claim reference from the PV and change the PVs status to 'Released'.   
 
 Admins can script the recycling of released volumes.  Future dynamic provisioners will understand how a volume should be recycled.  
