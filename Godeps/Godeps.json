@@ -25,11 +25,6 @@
 			"Rev": "bd8df7009305d6ada223ea3c95b94c0f38bfa119"
 		},
 		{
-			"ImportPath": "code.google.com/p/go.net/spdy",
-			"Comment": "null-240",
-			"Rev": "937a34c9de13c766c814510f76bca091dee06028"
-		},
-		{
 			"ImportPath": "code.google.com/p/google-api-go-client/compute/v1",
 			"Comment": "release-96",
 			"Rev": "98c78185197025f935947caac56a7b6d022f89d2"
@@ -147,7 +142,7 @@
 		},
 		{
 			"ImportPath": "github.com/docker/spdystream",
-			"Rev": "99515db39d3dad9607e0293f18152f3d59da76dc"
+			"Rev": "83ae67e694a4ab5cbaee4d3126f25118712b26e6"
 		},
 		{
 			"ImportPath": "github.com/elazarl/go-bindata-assetfs",
@@ -423,6 +418,11 @@
 		{
 			"ImportPath": "golang.org/x/net/html",
 			"Rev": "cbcac7bb8415db9b6cb4d1ebab1dc9afbd688b97"
+		},
+		{
+			"ImportPath": "golang.org/x/net/spdy",
+			"Comment": "deleted-upstream",
+			"Rev": "d175081df37eff8cda13f478bc11a0a65b39958b"
 		},
 		{
 			"ImportPath": "golang.org/x/net/websocket",

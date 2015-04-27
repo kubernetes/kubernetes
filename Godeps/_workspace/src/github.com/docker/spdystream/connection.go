@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"code.google.com/p/go.net/spdy"
+	"golang.org/x/net/spdy"
 )
 
 var (
