@@ -96,11 +96,11 @@ func (plugin *FakeVolumePlugin) CanSupport(spec *Spec) bool {
 }
 
 func (plugin *FakeVolumePlugin) NewBuilder(spec *Spec, podRef *api.ObjectReference, opts VolumeOptions) (Builder, error) {
-	return &FakeVolume{podRef.UID, spec.Name, plugin}, nil
+	return &FakeVolume{podRef.UID, spec.Name, plugin, nil}, nil
 }
 
 func (plugin *FakeVolumePlugin) NewCleaner(volName string, podUID types.UID) (Cleaner, error) {
-	return &FakeVolume{podUID, volName, plugin}, nil
+	return &FakeVolume{podUID, volName, plugin, nil}, nil
 }
 
 func (plugin *FakeVolumePlugin) GetAccessModes() []api.AccessModeType {
@@ -111,6 +111,7 @@ type FakeVolume struct {
 	PodUID  types.UID
 	VolName string
 	Plugin  *FakeVolumePlugin
+	Secret  *api.Secret
 }
 
 func (fv *FakeVolume) SetUp() error {
@@ -123,6 +124,11 @@ func (fv *FakeVolume) SetUpAt(dir string) error {
 
 func (fv *FakeVolume) GetPath() string {
 	return path.Join(fv.Plugin.Host.GetPodVolumeDir(fv.PodUID, util.EscapeQualifiedNameForDisk(fv.Plugin.PluginName), fv.VolName))
+}
+
+func (pd *FakeVolume) SetSecret(secret *api.Secret) error {
+	pd.Secret = secret
+	return nil
 }
 
 func (fv *FakeVolume) TearDown() error {

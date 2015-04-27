@@ -1074,6 +1074,7 @@ func init() {
 				return err
 			}
 			out.Name = in.Name
+			out.SecretName = in.SecretName
 			return nil
 		},
 		func(in *Volume, out *newer.Volume, s conversion.Scope) error {
@@ -1081,6 +1082,7 @@ func init() {
 				return err
 			}
 			out.Name = in.Name
+			out.SecretName = in.SecretName
 			return nil
 		},
 

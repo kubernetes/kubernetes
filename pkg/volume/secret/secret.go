@@ -153,6 +153,11 @@ func (sv *secretVolume) GetPath() string {
 	return sv.plugin.host.GetPodVolumeDir(sv.podRef.UID, util.EscapeQualifiedNameForDisk(secretPluginName), sv.volName)
 }
 
+func (pd *secretVolume) SetSecret(secret *api.Secret) error {
+	// validate secret and return an error if invalid
+	return nil
+}
+
 func (sv *secretVolume) TearDown() error {
 	return sv.TearDownAt(sv.GetPath())
 }

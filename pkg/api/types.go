@@ -172,6 +172,9 @@ type Volume struct {
 	// This is optional for now. If not specified, the Volume is implied to be an EmptyDir.
 	// This implied behavior is deprecated and will be removed in a future version.
 	VolumeSource `json:",inline,omitempty"`
+	// SecretName is the name of a Secret in the same namespace as the pod containing this volume
+	// used for volume authentication
+	SecretName string `json:"secretName,omitempty"`
 }
 
 // VolumeSource represents the source location of a volume to mount.
@@ -252,6 +255,9 @@ type PersistentVolumeSpec struct {
 	AccessModes []AccessModeType `json:"accessModes,omitempty"`
 	// holds the binding reference to a PersistentVolumeClaim
 	ClaimRef *ObjectReference `json:"claimRef,omitempty"`
+	// SecretRef is a reference to a Secret in the system.
+	// used for persistent volume authentication
+	SecretRef *ObjectReference `json:"secretRef,omitempty"`
 }
 
 type PersistentVolumeStatus struct {

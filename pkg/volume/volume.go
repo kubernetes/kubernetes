@@ -17,6 +17,7 @@ limitations under the License.
 package volume
 
 import (
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"io/ioutil"
 	"os"
 	"path"
@@ -41,6 +42,9 @@ type Builder interface {
 	// directory path, which may or may not exist yet.  This may be called
 	// more than once, so implementations must be idempotent.
 	SetUpAt(dir string) error
+	// SetSecret allows secure injection of a secret into the volume by the kubelet for volumes which require authentication.
+	// A secret should be validated before being accepted, returning an error for an invalid secret.
+	SetSecret(secret *api.Secret) error
 }
 
 // Cleaner interface provides method to cleanup/unmount the volumes.

@@ -56,6 +56,9 @@ type Volume struct {
 	// This is optional for now. If not specified, the Volume is implied to be an EmptyDir.
 	// This implied behavior is deprecated and will be removed in a future version.
 	Source VolumeSource `json:"source,omitempty" description:"location and type of volume to mount; at most one of HostDir, EmptyDir, GCEPersistentDisk, AWSElasticBlockStore, or GitRepo; default is EmptyDir"`
+	// SecretName is the name of a Secret in the same namespace as the pod containing this volume
+	// used for volume authentication
+	SecretName string `json:"secretName,omitempty" description:"name of a Secret in the same namespace as the pod containing this volume"`
 }
 
 // VolumeSource represents the source location of a volume to mount.
@@ -136,6 +139,9 @@ type PersistentVolumeSpec struct {
 	AccessModes []AccessModeType `json:"accessModes,omitempty" description:"all ways the volume can be mounted"`
 	// holds the binding reference to a PersistentVolumeClaim
 	ClaimRef *ObjectReference `json:"claimRef,omitempty" description:"the binding reference to a persistent volume claim"`
+	// SecretRef is a reference to a Secret in the system.
+	// used for persistent volume authentication
+	SecretRef *ObjectReference `json:"secretRef,omitempty" description:"a reference to a secret in the system"`
 }
 
 type PersistentVolumeStatus struct {

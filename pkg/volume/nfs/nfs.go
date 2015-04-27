@@ -155,6 +155,11 @@ func (nfsVolume *nfs) GetPath() string {
 	return nfsVolume.plugin.host.GetPodVolumeDir(nfsVolume.podRef.UID, util.EscapeQualifiedNameForDisk(name), nfsVolume.volName)
 }
 
+func (pd *nfs) SetSecret(secret *api.Secret) error {
+	// validate secret and return an error if invalid
+	return nil
+}
+
 func (nfsVolume *nfs) TearDown() error {
 	return nfsVolume.TearDownAt(nfsVolume.GetPath())
 }

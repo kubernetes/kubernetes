@@ -124,6 +124,8 @@ type Spec struct {
 	Name                   string
 	VolumeSource           api.VolumeSource
 	PersistentVolumeSource api.PersistentVolumeSource
+	SecretName             string
+	SecretRef              *api.ObjectReference
 }
 
 // NewSpecFromVolume creates an Spec from an api.Volume
@@ -131,6 +133,7 @@ func NewSpecFromVolume(vs *api.Volume) *Spec {
 	return &Spec{
 		Name:         vs.Name,
 		VolumeSource: vs.VolumeSource,
+		SecretName:   vs.SecretName,
 	}
 }
 
@@ -139,7 +142,26 @@ func NewSpecFromPersistentVolume(pv *api.PersistentVolume) *Spec {
 	return &Spec{
 		Name: pv.Name,
 		PersistentVolumeSource: pv.Spec.PersistentVolumeSource,
+		SecretRef:              pv.Spec.SecretRef,
 	}
+}
+
+// SecretClient decouples resolution of the secret from the Kube client.
+// The interface is narrowed and testing is simpler.
+type SecretClient interface {
+	Get(namespace, name string) (*api.Secret, error)
+}
+
+func NewSecretClient(client client.Interface) SecretClient {
+	return &realSecretClient{client}
+}
+
+type realSecretClient struct {
+	client client.Interface
+}
+
+func (rsc *realSecretClient) Get(namespace, name string) (*api.Secret, error) {
+	return rsc.client.Secrets(namespace).Get(name)
 }
 
 // InitPlugins initializes each plugin.  All plugins must have unique names.

@@ -185,6 +185,11 @@ func (gr *gitRepo) GetPath() string {
 	return gr.plugin.host.GetPodVolumeDir(gr.podRef.UID, util.EscapeQualifiedNameForDisk(name), gr.volName)
 }
 
+func (pd *gitRepo) SetSecret(secret *api.Secret) error {
+	// validate secret and return an error if invalid
+	return nil
+}
+
 // TearDown simply deletes everything in the directory.
 func (gr *gitRepo) TearDown() error {
 	return gr.TearDownAt(gr.GetPath())
