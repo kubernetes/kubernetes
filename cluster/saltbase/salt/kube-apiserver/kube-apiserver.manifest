@@ -43,7 +43,7 @@
 
 {% set cert_file = "--tls_cert_file=/srv/kubernetes/server.cert" -%}
 {% set key_file = "--tls_private_key_file=/srv/kubernetes/server.key" -%}
-{% set client_ca_file = "--client_ca_file=/dev/null" -%}
+{% set client_ca_file = "" -%}
 
 {% set secure_port = "6443" -%}
 {% if grains['cloud'] is defined and grains['cloud'] == 'gce' %}
