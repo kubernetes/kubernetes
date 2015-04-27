@@ -256,20 +256,6 @@ function get-password {
   fi
 }
 
-# Generate authentication token for admin user. Will
-# read from $HOME/.kubernetes_auth if available.
-#
-# Vars set:
-#   KUBE_ADMIN_TOKEN
-function get-admin-token {
-    local file="$HOME/.kubernetes_auth"
-    if [[ -r "$file" ]]; then
-        KUBE_ADMIN_TOKEN=$(cat "$file" | python -c 'import json,sys;print json.load(sys.stdin)["BearerToken"]')
-        return
-    fi
-    KUBE_ADMIN_TOKEN=$(python -c 'import string,random; print "".join(random.SystemRandom().choice(string.ascii_letters + string.digits) for _ in range(32))')
-}
-
 # Instantiate a kubernetes cluster
 #
 # Assumed vars
