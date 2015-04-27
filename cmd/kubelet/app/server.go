@@ -40,6 +40,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/cadvisor"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/config"
+	kubecontainer "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/dockertools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/network"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/master/ports"
@@ -375,7 +376,7 @@ func SimpleKubelet(client *client.Client,
 	cadvisorInterface cadvisor.Interface,
 	configFilePath string,
 	cloud cloudprovider.Interface,
-	osInterface kubelet.OSInterface) *KubeletConfig {
+	osInterface kubecontainer.OSInterface) *KubeletConfig {
 
 	imageGCPolicy := kubelet.ImageGCPolicy{
 		HighThresholdPercent: 90,
@@ -436,7 +437,7 @@ func RunKubelet(kcfg *KubeletConfig, builder KubeletBuilder) {
 		builder = createAndInitKubelet
 	}
 	if kcfg.OSInterface == nil {
-		kcfg.OSInterface = kubelet.RealOS{}
+		kcfg.OSInterface = kubecontainer.RealOS{}
 	}
 	k, podCfg, err := builder(kcfg)
 	if err != nil {
@@ -534,7 +535,7 @@ type KubeletConfig struct {
 	Cloud                          cloudprovider.Interface
 	NodeStatusUpdateFrequency      time.Duration
 	ResourceContainer              string
-	OSInterface                    kubelet.OSInterface
+	OSInterface                    kubecontainer.OSInterface
 }
 
 func createAndInitKubelet(kc *KubeletConfig) (k KubeletBootstrap, pc *config.PodConfig, err error) {

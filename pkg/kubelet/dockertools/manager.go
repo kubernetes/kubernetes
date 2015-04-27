@@ -56,6 +56,7 @@ type DockerManager struct {
 	recorder            record.EventRecorder
 	readinessManager    *kubecontainer.ReadinessManager
 	containerRefManager *kubecontainer.RefManager
+	os                  kubecontainer.OSInterface
 
 	// TODO(yifan): PodInfraContainerImage can be unexported once
 	// we move createPodInfraContainer into dockertools.
@@ -74,6 +75,12 @@ type DockerManager struct {
 	// use the concrete type so that we can record the pull failure and eliminate
 	// the image checking in GetPodStatus().
 	Puller DockerPuller
+
+	// Root of the Docker runtime.
+	dockerRoot string
+
+	// Directory of container logs.
+	containerLogsDir string
 }
 
 func NewDockerManager(
@@ -83,16 +90,51 @@ func NewDockerManager(
 	containerRefManager *kubecontainer.RefManager,
 	podInfraContainerImage string,
 	qps float32,
-	burst int) *DockerManager {
+	burst int,
+	containerLogsDir string,
+	osInterface kubecontainer.OSInterface) *DockerManager {
+	// Work out the location of the Docker runtime, defaulting to /var/lib/docker
+	// if there are any problems.
+	dockerRoot := "/var/lib/docker"
+	dockerInfo, err := client.Info()
+	if err != nil {
+		glog.Errorf("Failed to execute Info() call to the Docker client: %v", err)
+		glog.Warningf("Using fallback default of /var/lib/docker for location of Docker runtime")
+	} else {
+		driverStatus := dockerInfo.Get("DriverStatus")
+		// The DriverStatus is a*string* which represents a list of list of strings (pairs) e.g.
+		// DriverStatus=[["Root Dir","/var/lib/docker/aufs"],["Backing Filesystem","extfs"],["Dirs","279"]]
+		// Strip out the square brakcets and quotes.
+		s := strings.Replace(driverStatus, "[", "", -1)
+		s = strings.Replace(s, "]", "", -1)
+		s = strings.Replace(s, `"`, "", -1)
+		// Separate by commas.
+		ss := strings.Split(s, ",")
+		// Search for the Root Dir string
+		for i, k := range ss {
+			if k == "Root Dir" && i+1 < len(ss) {
+				// Discard the /aufs suffix.
+				dockerRoot, _ = path.Split(ss[i+1])
+				// Trim the last slash.
+				dockerRoot = strings.TrimSuffix(dockerRoot, "/")
+				glog.Infof("Setting dockerRoot to %s", dockerRoot)
+			}
+
+		}
+	}
+
 	reasonCache := stringCache{cache: lru.New(maxReasonCacheEntries)}
 	return &DockerManager{
-		client:                 client,
-		recorder:               recorder,
-		readinessManager:       readinessManager,
-		containerRefManager:    containerRefManager,
+		client:              client,
+		recorder:            recorder,
+		readinessManager:    readinessManager,
+		containerRefManager: containerRefManager,
+		os:                  osInterface,
 		PodInfraContainerImage: podInfraContainerImage,
 		reasonCache:            reasonCache,
 		Puller:                 newDockerPuller(client, qps, burst),
+		dockerRoot:             dockerRoot,
+		containerLogsDir:       containerLogsDir,
 	}
 }
 
@@ -935,6 +977,17 @@ func (dm *DockerManager) RunContainer(pod *api.Pod, container *api.Container, ge
 			dm.KillContainer(types.UID(id))
 			return DockerID(""), fmt.Errorf("failed to call event handler: %v", handlerErr)
 		}
+	}
+
+	// Create a symbolic link to the Docker container log file using a name which captures the
+	// full pod name, the container name and the Docker container ID. Cluster level logging will
+	// capture these symbolic filenames which can be used for search terms in Elasticsearch or for
+	// labels for Cloud Logging.
+	podFullName := kubecontainer.GetPodFullName(pod)
+	containerLogFile := path.Join(dm.dockerRoot, "containers", id, fmt.Sprintf("%s-json.log", id))
+	symlinkFile := path.Join(dm.containerLogsDir, fmt.Sprintf("%s-%s-%s.log", podFullName, container.Name, id))
+	if err = dm.os.Symlink(containerLogFile, symlinkFile); err != nil {
+		glog.Errorf("Failed to create symbolic link to the log file of pod %q container %q: %v", podFullName, container.Name, err)
 	}
 	return DockerID(id), err
 }

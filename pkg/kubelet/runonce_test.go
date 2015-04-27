@@ -86,7 +86,7 @@ func TestRunOnce(t *testing.T) {
 		containerRefManager: kubecontainer.NewRefManager(),
 		readinessManager:    kubecontainer.NewReadinessManager(),
 		podManager:          podManager,
-		os:                  FakeOS{},
+		os:                  kubecontainer.FakeOS{},
 		volumeManager:       newVolumeManager(),
 	}
 
@@ -154,7 +154,9 @@ func TestRunOnce(t *testing.T) {
 		kb.containerRefManager,
 		dockertools.PodInfraContainerImage,
 		0,
-		0)
+		0,
+		"",
+		kubecontainer.FakeOS{})
 	kb.containerManager.Puller = &dockertools.FakeDockerPuller{}
 
 	pods := []*api.Pod{

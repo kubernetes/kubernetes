@@ -77,7 +77,7 @@ func newTestKubelet(t *testing.T) *TestKubelet {
 	kubelet := &Kubelet{}
 	kubelet.dockerClient = fakeDocker
 	kubelet.kubeClient = fakeKubeClient
-	kubelet.os = FakeOS{}
+	kubelet.os = kubecontainer.FakeOS{}
 
 	kubelet.hostname = "testnode"
 	kubelet.networkPlugin, _ = network.InitNetworkPlugin([]network.NetworkPlugin{}, "", network.NewFakeHost(nil))
@@ -105,7 +105,7 @@ func newTestKubelet(t *testing.T) *TestKubelet {
 	podManager, fakeMirrorClient := newFakePodManager()
 	kubelet.podManager = podManager
 	kubelet.containerRefManager = kubecontainer.NewRefManager()
-	kubelet.containerManager = dockertools.NewDockerManager(fakeDocker, fakeRecorder, kubelet.readinessManager, kubelet.containerRefManager, dockertools.PodInfraContainerImage, 0, 0)
+	kubelet.containerManager = dockertools.NewDockerManager(fakeDocker, fakeRecorder, kubelet.readinessManager, kubelet.containerRefManager, dockertools.PodInfraContainerImage, 0, 0, "", kubelet.os)
 	kubelet.runtimeCache = kubecontainer.NewFakeRuntimeCache(kubelet.containerManager)
 	kubelet.podWorkers = newPodWorkers(
 		kubelet.runtimeCache,

@@ -70,6 +70,9 @@ const (
 
 	// nodeStatusUpdateRetry specifies how many times kubelet retries when posting node status failed.
 	nodeStatusUpdateRetry = 5
+
+	// Location of container logs.
+	containerLogsDir = "/var/log/containers"
 )
 
 var (
@@ -96,40 +99,6 @@ type SourcesReadyFn func() bool
 
 type volumeMap map[string]volume.Volume
 
-// OSInterface collects system level operations that need to be mocked out
-// during tests.
-type OSInterface interface {
-	Mkdir(path string, perm os.FileMode) error
-	Symlink(oldname string, newname string) error
-}
-
-// RealOS is used to dispatch the real system level operaitons.
-type RealOS struct{}
-
-// MkDir will will call os.Mkdir to create a directory.
-func (RealOS) Mkdir(path string, perm os.FileMode) error {
-	return os.Mkdir(path, perm)
-}
-
-// Symlink will call os.Symlink to create a symbolic link.
-func (RealOS) Symlink(oldname string, newname string) error {
-	return os.Symlink(oldname, newname)
-}
-
-// FakeOS mocks out certain OS calls to avoid perturbing the filesystem
-// on the test machine.
-type FakeOS struct{}
-
-// MkDir is a fake call that just returns nil.
-func (FakeOS) Mkdir(path string, perm os.FileMode) error {
-	return nil
-}
-
-// Symlink is a fake call that just returns nil.
-func (FakeOS) Symlink(oldname string, newname string) error {
-	return nil
-}
-
 // New creates a new Kubelet for use in main
 func NewMainKubelet(
 	hostname string,
@@ -155,7 +124,7 @@ func NewMainKubelet(
 	cloud cloudprovider.Interface,
 	nodeStatusUpdateFrequency time.Duration,
 	resourceContainer string,
-	osInterface OSInterface) (*Kubelet, error) {
+	osInterface kubecontainer.OSInterface) (*Kubelet, error) {
 	if rootDirectory == "" {
 		return nil, fmt.Errorf("invalid root directory %q", rootDirectory)
 	}
@@ -178,35 +147,6 @@ func NewMainKubelet(
 	}
 	if !dockerUp {
 		return nil, fmt.Errorf("timed out waiting for Docker to come up")
-	}
-	// Work out the location of the Docker runtime, defaulting to /var/lib/docker
-	// if there are any problems.
-	dockerRoot := "/var/lib/docker"
-	dockerInfo, err := dockerClient.Info()
-	if err != nil {
-		glog.Errorf("Failed to execute Info() call to the Docker client: %v", err)
-		glog.Warningf("Using fallback default of /var/lib/docker for location of Docker runtime")
-	} else {
-		driverStatus := dockerInfo.Get("DriverStatus")
-		// The DriverStatus is a*string* which represents a list of list of strings (pairs) e.g.
-		// DriverStatus=[["Root Dir","/var/lib/docker/aufs"],["Backing Filesystem","extfs"],["Dirs","279"]]
-		// Strip out the square brakcets and quotes.
-		s := strings.Replace(driverStatus, "[", "", -1)
-		s = strings.Replace(s, "]", "", -1)
-		s = strings.Replace(s, `"`, "", -1)
-		// Separate by commas.
-		ss := strings.Split(s, ",")
-		// Search for the Root Dir string
-		for i, k := range ss {
-			if k == "Root Dir" && i+1 < len(ss) {
-				// Discard the /aufs suffix.
-				dockerRoot, _ = path.Split(ss[i+1])
-				// Trim the last slash.
-				dockerRoot = strings.TrimSuffix(dockerRoot, "/")
-				glog.Infof("Setting dockerRoot to %s", dockerRoot)
-			}
-
-		}
 	}
 
 	serviceStore := cache.NewStore(cache.MetaNamespaceKeyFunc)
@@ -270,7 +210,9 @@ func NewMainKubelet(
 		containerRefManager,
 		podInfraContainerImage,
 		pullQPS,
-		pullBurst)
+		pullBurst,
+		containerLogsDir,
+		osInterface)
 
 	volumeManager := newVolumeManager()
 
@@ -303,7 +245,6 @@ func NewMainKubelet(
 		nodeStatusUpdateFrequency:      nodeStatusUpdateFrequency,
 		resourceContainer:              resourceContainer,
 		os:                             osInterface,
-		dockerRoot:                     dockerRoot,
 	}
 
 	klet.podManager = newBasicPodManager(klet.kubeClient)
@@ -331,10 +272,10 @@ func NewMainKubelet(
 	} else {
 		klet.networkPlugin = plug
 	}
-	// If the /var/log/containers directory does not exist, create it.
-	if _, err := os.Stat("/var/log/containers"); err != nil {
-		if err := osInterface.Mkdir("/var/log/containers", 0755); err != nil {
-			glog.Errorf("Failed to create directory /var/log/containers: %v", err)
+	// If the container logs directory does not exist, create it.
+	if _, err := os.Stat(containerLogsDir); err != nil {
+		if err := osInterface.Mkdir(containerLogsDir, 0755); err != nil {
+			glog.Errorf("Failed to create directory %q: %v", containerLogsDir, err)
 		}
 	}
 
@@ -454,8 +395,7 @@ type Kubelet struct {
 	// Name must be absolute.
 	resourceContainer string
 
-	os         OSInterface
-	dockerRoot string
+	os kubecontainer.OSInterface
 }
 
 // getRootDir returns the full path to the directory under which kubelet can
@@ -1047,21 +987,6 @@ func (kl *Kubelet) pullImageAndRunContainer(pod *api.Pod, container *api.Contain
 		// TODO(bburns) : Perhaps blacklist a container after N failures?
 		glog.Errorf("Error running pod %q container %q: %v", podFullName, container.Name, err)
 		return "", err
-	}
-	// Create a symbolic link to the Docker container log file using a name which captures the
-	// full pod name, the container name and the Docker container ID. Cluster level logging will
-	// capture these symbolic filenames which can be used for search terms in Elasticsearch or for
-	// labels for Cloud Logging.
-	// If for any reason kl.dockerRoot is not set, default to /var/lib/docker
-	dockerRoot := kl.dockerRoot
-	if kl.dockerRoot == "" {
-		dockerRoot = "/var/lib/docker"
-		glog.Errorf("dockerRoot field not set in the Kubelet configuration")
-	}
-	containerLogFile := fmt.Sprintf("%s/containers/%s/%s-json.log", dockerRoot, containerID, containerID)
-	symlinkFile := fmt.Sprintf("/var/log/containers/%s-%s-%s.log", podFullName, container.Name, containerID)
-	if err = kl.os.Symlink(containerLogFile, symlinkFile); err != nil {
-		glog.Errorf("Failed to create symbolic link to the log file of pod %q container %q: %v", podFullName, container.Name, err)
 	}
 	return containerID, nil
 }
