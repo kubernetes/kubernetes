@@ -1172,7 +1172,7 @@ func ValidateSecret(secret *api.Secret) errs.ValidationErrorList {
 	totalSize := 0
 	for key, value := range secret.Data {
 		if !util.IsDNS1123Subdomain(key) {
-			allErrs = append(allErrs, errs.NewFieldInvalid(fmt.Sprintf("data[%s]", key), key, cIdentifierErrorMsg))
+			allErrs = append(allErrs, errs.NewFieldInvalid(fmt.Sprintf("data[%s]", key), key, dnsSubdomainErrorMsg))
 		}
 
 		totalSize += len(value)
