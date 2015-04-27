@@ -27,6 +27,12 @@ import (
 
 func IndexHandler(container *restful.Container, muxHelper *MuxHelper) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
+		status := http.StatusOK
+		if r.URL.Path != "/" && r.URL.Path != "/index.html" {
+			// Since "/" matches all paths, handleIndex is called for all paths for which there is no handler registered.
+			// We want to to return a 404 status with a list of all valid paths, incase of an invalid URL request.
+			status = http.StatusNotFound
+		}
 		var handledPaths []string
 		// Extract the paths handled using restful.WebService
 		for _, ws := range container.RegisteredWebServices() {
@@ -35,6 +41,6 @@ func IndexHandler(container *restful.Container, muxHelper *MuxHelper) func(http.
 		// Extract the paths handled using mux handler.
 		handledPaths = append(handledPaths, muxHelper.RegisteredPaths...)
 		sort.Strings(handledPaths)
-		writeRawJSON(http.StatusOK, api.RootPaths{Paths: handledPaths}, w)
+		writeRawJSON(status, api.RootPaths{Paths: handledPaths}, w)
 	}
 }
