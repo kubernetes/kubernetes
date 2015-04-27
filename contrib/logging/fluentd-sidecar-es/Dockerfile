@@ -10,14 +10,16 @@
 FROM ubuntu:14.04
 MAINTAINER Alex Robinson "arob@google.com"
 
+# Ensure there are enough file descriptors for running Fluentd.
+RUN ulimit -n 65536
+
 # Disable prompts from apt.
 ENV DEBIAN_FRONTEND noninteractive
-ENV OPTS_APT -y --force-yes --no-install-recommends
 
 # Install the standard, official Fluentd agent (called td-agent, for the
 # project's parent company, Treasure Data).
 RUN apt-get -q update && \
-    apt-get -y install curl && \
+    apt-get install -y curl && \
     apt-get install -y -q libcurl4-openssl-dev make && \
     apt-get clean
 RUN /usr/bin/curl -L http://toolbelt.treasuredata.com/sh/install-ubuntu-trusty-td-agent2.sh | sh
