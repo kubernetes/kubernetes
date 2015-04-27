@@ -66,6 +66,8 @@ type Runtime interface {
 	// Attaches the processes stdin, stdout, and stderr. Optionally uses a
 	// tty.
 	ExecInContainer(container api.Container, pod *api.Pod, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool)
+	// Forward the specified port from the specified pod to the stream.
+	PortForward(pod Pod, port uint16, stream io.ReadWriteCloser)
 	// Pull pulls an image from the network to local storage.
 	Pull(image string)
 	// IsImagePresent checks whether the container image is already in the local storage.
