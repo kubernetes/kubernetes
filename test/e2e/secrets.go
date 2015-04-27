@@ -24,20 +24,31 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 
 	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
 )
 
 var _ = Describe("Secrets", func() {
 	var c *client.Client
+	var ns string
 
 	BeforeEach(func() {
 		var err error
 		c, err = loadClient()
-		Expect(err).NotTo(HaveOccurred())
+		expectNoError(err)
+		ns_, err := createTestingNS("secrets", c)
+		ns = ns_.Name
+		expectNoError(err)
+	})
+
+	AfterEach(func() {
+		// Clean up the namespace if a non-default one was used
+		if ns != api.NamespaceDefault {
+			By("Cleaning up the namespace")
+			err := c.Namespaces().Delete(ns)
+			expectNoError(err)
+		}
 	})
 
 	It("should be consumable from pods", func() {
-		ns := api.NamespaceDefault
 		name := "secret-test-" + string(util.NewUUID())
 		volumeName := "secret-volume"
 		volumeMountPath := "/etc/secret-volume"
@@ -83,7 +94,7 @@ var _ = Describe("Secrets", func() {
 				},
 				Containers: []api.Container{
 					{
-						Name:  "catcont",
+						Name:  "secret-test",
 						Image: "kubernetes/mounttest:0.1",
 						Args: []string{
 							"--file_content=/etc/secret-volume/data-1",
@@ -101,9 +112,9 @@ var _ = Describe("Secrets", func() {
 			},
 		}
 
-		testContainerOutput("consume secrets", c, pod, []string{
+		testContainerOutputInNamespace("consume secrets", c, pod, []string{
 			"content of file \"/etc/secret-volume/data-1\": value-1",
 			"mode of file \"/etc/secret-volume/data-1\": -r--r--r--",
-		})
+		}, ns)
 	})
 })
