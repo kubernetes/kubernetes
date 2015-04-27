@@ -293,3 +293,29 @@ func TestSetDefaultMinionExternalID(t *testing.T) {
 		t.Errorf("Expected default External ID: %s, got: %s", name, m2.ExternalID)
 	}
 }
+
+func TestSetDefaultObjectFieldSelectorAPIVersion(t *testing.T) {
+	s := current.ContainerManifest{
+		Containers: []current.Container{
+			{
+				Env: []current.EnvVar{
+					{
+						ValueFrom: &current.EnvVarSource{
+							FieldPath: &current.ObjectFieldSelector{},
+						},
+					},
+				},
+			},
+		},
+	}
+	obj2 := roundTrip(t, runtime.Object(&current.ContainerManifestList{
+		Items: []current.ContainerManifest{s},
+	}))
+	sList2 := obj2.(*current.ContainerManifestList)
+	s2 := sList2.Items[0]
+
+	apiVersion := s2.Containers[0].Env[0].ValueFrom.FieldPath.APIVersion
+	if apiVersion != "v1beta2" {
+		t.Errorf("Expected default APIVersion v1beta2, got: %v", apiVersion)
+	}
+}

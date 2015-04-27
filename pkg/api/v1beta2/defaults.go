@@ -167,6 +167,11 @@ func init() {
 				obj.ExternalID = obj.ID
 			}
 		},
+		func(obj *ObjectFieldSelector) {
+			if obj.APIVersion == "" {
+				obj.APIVersion = "v1beta2"
+			}
+		},
 	)
 }
 

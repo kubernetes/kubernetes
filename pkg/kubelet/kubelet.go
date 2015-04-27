@@ -36,6 +36,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/cache"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/fieldpath"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/cadvisor"
 	kubecontainer "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
@@ -702,7 +703,7 @@ func (kl *Kubelet) GenerateRunContainerOptions(pod *api.Pod, container *api.Cont
 		return nil, fmt.Errorf("impossible: cannot find the mounted volumes for pod %q", kubecontainer.GetPodFullName(pod))
 	}
 	opts.Binds = makeBinds(container, vol)
-	opts.Envs, err = kl.makeEnvironmentVariables(pod.Namespace, container)
+	opts.Envs, err = kl.makeEnvironmentVariables(pod, container)
 	if err != nil {
 		return nil, err
 	}
@@ -780,7 +781,7 @@ func (kl *Kubelet) getServiceEnvVarMap(ns string) (map[string]string, error) {
 }
 
 // Make the service environment variables for a pod in the given namespace.
-func (kl *Kubelet) makeEnvironmentVariables(ns string, container *api.Container) ([]string, error) {
+func (kl *Kubelet) makeEnvironmentVariables(pod *api.Pod, container *api.Container) ([]string, error) {
 	var result []string
 	// Note:  These are added to the docker.Config, but are not included in the checksum computed
 	// by dockertools.BuildDockerName(...).  That way, we can still determine whether an
@@ -791,7 +792,7 @@ func (kl *Kubelet) makeEnvironmentVariables(ns string, container *api.Container)
 	// To avoid this users can: (1) wait between starting a service and starting; or (2) detect
 	// missing service env var and exit and be restarted; or (3) use DNS instead of env vars
 	// and keep trying to resolve the DNS name of the service (recommended).
-	serviceEnv, err := kl.getServiceEnvVarMap(ns)
+	serviceEnv, err := kl.getServiceEnvVarMap(pod.Namespace)
 	if err != nil {
 		return result, err
 	}
@@ -803,7 +804,13 @@ func (kl *Kubelet) makeEnvironmentVariables(ns string, container *api.Container)
 		// env vars.
 		// TODO: remove this net line once all platforms use apiserver+Pods.
 		delete(serviceEnv, value.Name)
-		result = append(result, fmt.Sprintf("%s=%s", value.Name, value.Value))
+
+		runtimeValue, err := kl.runtimeEnvVarValue(value, pod)
+		if err != nil {
+			return result, err
+		}
+
+		result = append(result, fmt.Sprintf("%s=%s", value.Name, runtimeValue))
 	}
 
 	// Append remaining service env vars.
@@ -811,6 +818,33 @@ func (kl *Kubelet) makeEnvironmentVariables(ns string, container *api.Container)
 		result = append(result, fmt.Sprintf("%s=%s", k, v))
 	}
 	return result, nil
+}
+
+// runtimeEnvVarValue determines the value that an env var should take when a container
+// is started.  If the value of the env var is the empty string, the source of the env var
+// is resolved, if one is specified.
+//
+// TODO: preliminary factoring; make better
+func (kl *Kubelet) runtimeEnvVarValue(envVar api.EnvVar, pod *api.Pod) (string, error) {
+	runtimeVal := envVar.Value
+	if runtimeVal != "" {
+		return runtimeVal, nil
+	}
+
+	if envVar.ValueFrom != nil && envVar.ValueFrom.FieldPath != nil {
+		return kl.podFieldSelectorRuntimeValue(envVar.ValueFrom.FieldPath, pod)
+	}
+
+	return runtimeVal, nil
+}
+
+func (kl *Kubelet) podFieldSelectorRuntimeValue(fs *api.ObjectFieldSelector, pod *api.Pod) (string, error) {
+	internalFieldPath, _, err := api.Scheme.ConvertFieldLabel(fs.APIVersion, "Pod", fs.FieldPath, "")
+	if err != nil {
+		return "", err
+	}
+
+	return fieldpath.ExtractFieldPathAsString(pod, internalFieldPath)
 }
 
 // getClusterDNS returns a list of the DNS servers and a list of the DNS search

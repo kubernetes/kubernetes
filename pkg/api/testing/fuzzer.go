@@ -188,6 +188,20 @@ func FuzzerFor(t *testing.T, version string, src rand.Source) *fuzz.Fuzzer {
 			c.FuzzNoCustom(ct)                                          // fuzz self without calling this function again
 			ct.TerminationMessagePath = "/" + ct.TerminationMessagePath // Must be non-empty
 		},
+		func(ev *api.EnvVar, c fuzz.Continue) {
+			ev.Name = c.RandString()
+			if c.RandBool() {
+				ev.Value = c.RandString()
+			} else {
+				ev.ValueFrom = &api.EnvVarSource{}
+				ev.ValueFrom.FieldPath = &api.ObjectFieldSelector{}
+
+				versions := []string{"v1beta1", "v1beta2", "v1beta3"}
+
+				ev.ValueFrom.FieldPath.APIVersion = versions[c.Rand.Intn(len(versions))]
+				ev.ValueFrom.FieldPath.FieldPath = c.RandString()
+			}
+		},
 		func(e *api.Event, c fuzz.Continue) {
 			c.FuzzNoCustom(e) // fuzz self without calling this function again
 			// Fix event count to 1, otherwise, if a v1beta1 or v1beta2 event has a count set arbitrarily, it's count is ignored

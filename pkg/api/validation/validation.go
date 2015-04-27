@@ -555,12 +555,55 @@ func validateEnv(vars []api.EnvVar) errs.ValidationErrorList {
 		vErrs := errs.ValidationErrorList{}
 		if len(ev.Name) == 0 {
 			vErrs = append(vErrs, errs.NewFieldRequired("name"))
-		}
-		if !util.IsCIdentifier(ev.Name) {
+		} else if !util.IsCIdentifier(ev.Name) {
 			vErrs = append(vErrs, errs.NewFieldInvalid("name", ev.Name, cIdentifierErrorMsg))
 		}
+		vErrs = append(vErrs, validateEnvVarValueFrom(ev).Prefix("valueFrom")...)
 		allErrs = append(allErrs, vErrs.PrefixIndex(i)...)
 	}
+	return allErrs
+}
+
+func validateEnvVarValueFrom(ev api.EnvVar) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+
+	if ev.ValueFrom == nil {
+		return allErrs
+	}
+
+	numSources := 0
+
+	switch {
+	case ev.ValueFrom.FieldPath != nil:
+		numSources++
+		allErrs = append(allErrs, validateObjectFieldSelector(ev.ValueFrom.FieldPath).Prefix("fieldPath")...)
+	}
+
+	if ev.Value != "" && numSources != 0 {
+		allErrs = append(allErrs, errs.NewFieldInvalid("", "", "sources cannot be specified when value is not empty"))
+	}
+
+	return allErrs
+}
+
+var validFieldPathExpressions = util.NewStringSet("metadata.name", "metadata.namespace")
+
+func validateObjectFieldSelector(fs *api.ObjectFieldSelector) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+
+	if fs.APIVersion == "" {
+		allErrs = append(allErrs, errs.NewFieldRequired("apiVersion"))
+	} else if fs.FieldPath == "" {
+		allErrs = append(allErrs, errs.NewFieldRequired("fieldPath"))
+	} else {
+		internalFieldPath, _, err := api.Scheme.ConvertFieldLabel(fs.APIVersion, "Pod", fs.FieldPath, "")
+		if err != nil {
+			allErrs = append(allErrs, errs.NewFieldInvalid("fieldPath", fs.FieldPath, "error converting fieldPath"))
+		} else if !validFieldPathExpressions.Has(internalFieldPath) {
+			allErrs = append(allErrs, errs.NewFieldNotSupported("fieldPath", internalFieldPath))
+		}
+	}
+
 	return allErrs
 }
 

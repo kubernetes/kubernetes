@@ -633,23 +633,108 @@ func TestValidateEnv(t *testing.T) {
 		{Name: "ABC", Value: "value"},
 		{Name: "AbC_123", Value: "value"},
 		{Name: "abc", Value: ""},
+		{
+			Name: "abc",
+			ValueFrom: &api.EnvVarSource{
+				FieldPath: &api.ObjectFieldSelector{
+					APIVersion: "v1beta3",
+					FieldPath:  "metadata.name",
+				},
+			},
+		},
 	}
 	if errs := validateEnv(successCase); len(errs) != 0 {
 		t.Errorf("expected success: %v", errs)
 	}
 
-	errorCases := map[string][]api.EnvVar{
-		"zero-length name":        {{Name: ""}},
-		"name not a C identifier": {{Name: "a.b.c"}},
+	errorCases := []struct {
+		name          string
+		envs          []api.EnvVar
+		expectedError string
+	}{
+		{
+			name:          "zero-length name",
+			envs:          []api.EnvVar{{Name: ""}},
+			expectedError: "[0].name: required value",
+		},
+		{
+			name:          "name not a C identifier",
+			envs:          []api.EnvVar{{Name: "a.b.c"}},
+			expectedError: "[0].name: invalid value 'a.b.c': must match regex [A-Za-z_][A-Za-z0-9_]*",
+		},
+		{
+			name: "value and valueFrom specified",
+			envs: []api.EnvVar{{
+				Name:  "abc",
+				Value: "foo",
+				ValueFrom: &api.EnvVarSource{
+					FieldPath: &api.ObjectFieldSelector{
+						APIVersion: "v1beta3",
+						FieldPath:  "metadata.name",
+					},
+				},
+			}},
+			expectedError: "[0].valueFrom: invalid value '': sources cannot be specified when value is not empty",
+		},
+		{
+			name: "missing FieldPath on ObjectFieldSelector",
+			envs: []api.EnvVar{{
+				Name: "abc",
+				ValueFrom: &api.EnvVarSource{
+					FieldPath: &api.ObjectFieldSelector{
+						APIVersion: "v1beta3",
+					},
+				},
+			}},
+			expectedError: "[0].valueFrom.fieldPath.fieldPath: required value",
+		},
+		{
+			name: "missing APIVersion on ObjectFieldSelector",
+			envs: []api.EnvVar{{
+				Name: "abc",
+				ValueFrom: &api.EnvVarSource{
+					FieldPath: &api.ObjectFieldSelector{
+						FieldPath: "metadata.name",
+					},
+				},
+			}},
+			expectedError: "[0].valueFrom.fieldPath.apiVersion: required value",
+		},
+		{
+			name: "invalid fieldPath",
+			envs: []api.EnvVar{{
+				Name: "abc",
+				ValueFrom: &api.EnvVarSource{
+					FieldPath: &api.ObjectFieldSelector{
+						FieldPath:  "metadata.whoops",
+						APIVersion: "v1beta3",
+					},
+				},
+			}},
+			expectedError: "[0].valueFrom.fieldPath.fieldPath: invalid value 'metadata.whoops': error converting fieldPath",
+		},
+		{
+			name: "unsupported fieldPath",
+			envs: []api.EnvVar{{
+				Name: "abc",
+				ValueFrom: &api.EnvVarSource{
+					FieldPath: &api.ObjectFieldSelector{
+						FieldPath:  "status.phase",
+						APIVersion: "v1beta3",
+					},
+				},
+			}},
+			expectedError: "[0].valueFrom.fieldPath.fieldPath: unsupported value 'status.phase'",
+		},
 	}
-	for k, v := range errorCases {
-		if errs := validateEnv(v); len(errs) == 0 {
-			t.Errorf("expected failure for %s", k)
+	for _, tc := range errorCases {
+		if errs := validateEnv(tc.envs); len(errs) == 0 {
+			t.Errorf("expected failure for %s", tc.name)
 		} else {
 			for i := range errs {
-				detail := errs[i].(*errors.ValidationError).Detail
-				if detail != "" && detail != cIdentifierErrorMsg {
-					t.Errorf("%s: expected error detail either empty or %s, got %s", k, cIdentifierErrorMsg, detail)
+				str := errs[i].(*errors.ValidationError).Error()
+				if str != "" && str != tc.expectedError {
+					t.Errorf("%s: expected error detail either empty or %s, got %s", tc.name, tc.expectedError, str)
 				}
 			}
 		}
