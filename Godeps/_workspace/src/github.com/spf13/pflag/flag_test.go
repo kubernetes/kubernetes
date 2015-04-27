@@ -185,7 +185,8 @@ func TestShorthand(t *testing.T) {
 	boolaFlag := f.BoolP("boola", "a", false, "bool value")
 	boolbFlag := f.BoolP("boolb", "b", false, "bool2 value")
 	boolcFlag := f.BoolP("boolc", "c", false, "bool3 value")
-	stringFlag := f.StringP("string", "s", "0", "string value")
+	stringaFlag := f.StringP("stringa", "s", "0", "string value")
+	stringzFlag := f.StringP("stringz", "z", "0", "string value")
 	extra := "interspersed-argument"
 	notaflag := "--i-look-like-a-flag"
 	args := []string{
@@ -193,6 +194,7 @@ func TestShorthand(t *testing.T) {
 		extra,
 		"-cs",
 		"hello",
+		"-z=something",
 		"--",
 		notaflag,
 	}
@@ -212,8 +214,11 @@ func TestShorthand(t *testing.T) {
 	if *boolcFlag != true {
 		t.Error("boolc flag should be true, is ", *boolcFlag)
 	}
-	if *stringFlag != "hello" {
-		t.Error("string flag should be `hello`, is ", *stringFlag)
+	if *stringaFlag != "hello" {
+		t.Error("stringa flag should be `hello`, is ", *stringaFlag)
+	}
+	if *stringzFlag != "something" {
+		t.Error("stringz flag should be `something`, is ", *stringzFlag)
 	}
 	if len(f.Args()) != 2 {
 		t.Error("expected one argument, got", len(f.Args()))
@@ -231,6 +236,56 @@ func TestParse(t *testing.T) {
 
 func TestFlagSetParse(t *testing.T) {
 	testParse(NewFlagSet("test", ContinueOnError), t)
+}
+
+func testNormalizedNames(args []string, t *testing.T) {
+	f := NewFlagSet("normalized", ContinueOnError)
+	if f.Parsed() {
+		t.Error("f.Parse() = true before Parse")
+	}
+	withDashFlag := f.Bool("with-dash-flag", false, "bool value")
+	// Set this after some flags have been added and before others.
+	f.SetWordSeparators([]string{"-", "_"})
+	withUnderFlag := f.Bool("with_under_flag", false, "bool value")
+	withBothFlag := f.Bool("with-both_flag", false, "bool value")
+	if err := f.Parse(args); err != nil {
+		t.Fatal(err)
+	}
+	if !f.Parsed() {
+		t.Error("f.Parse() = false after Parse")
+	}
+	if *withDashFlag != true {
+		t.Error("withDashFlag flag should be true, is ", *withDashFlag)
+	}
+	if *withUnderFlag != true {
+		t.Error("withUnderFlag flag should be true, is ", *withUnderFlag)
+	}
+	if *withBothFlag != true {
+		t.Error("withBothFlag flag should be true, is ", *withBothFlag)
+	}
+}
+
+func TestNormalizedNames(t *testing.T) {
+	args := []string{
+		"--with-dash-flag",
+		"--with-under-flag",
+		"--with-both-flag",
+	}
+	testNormalizedNames(args, t)
+
+	args = []string{
+		"--with_dash_flag",
+		"--with_under_flag",
+		"--with_both_flag",
+	}
+	testNormalizedNames(args, t)
+
+	args = []string{
+		"--with-dash_flag",
+		"--with-under_flag",
+		"--with-both_flag",
+	}
+	testNormalizedNames(args, t)
 }
 
 // Declare a user-defined flag type.

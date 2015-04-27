@@ -120,6 +120,10 @@ const (
 	PanicOnError
 )
 
+// normalizedName is a flag name that has been normalized according to rules
+// for the FlagSet (e.g. making '-' and '_' equivalent).
+type normalizedName string
+
 // A FlagSet represents a set of defined flags.
 type FlagSet struct {
 	// Usage is the function called when an error occurs while parsing flags.
@@ -127,26 +131,27 @@ type FlagSet struct {
 	// a custom error handler.
 	Usage func()
 
-	name          string
-	parsed        bool
-	actual        map[string]*Flag
-	formal        map[string]*Flag
-	shorthands    map[byte]*Flag
-	args          []string // arguments after flags
-	exitOnError   bool     // does the program exit if there's an error?
-	errorHandling ErrorHandling
-	output        io.Writer // nil means stderr; use out() accessor
-	interspersed  bool      // allow interspersed option/non-option args
+	name           string
+	parsed         bool
+	actual         map[normalizedName]*Flag
+	formal         map[normalizedName]*Flag
+	shorthands     map[byte]*Flag
+	args           []string // arguments after flags
+	exitOnError    bool     // does the program exit if there's an error?
+	errorHandling  ErrorHandling
+	output         io.Writer // nil means stderr; use out() accessor
+	interspersed   bool      // allow interspersed option/non-option args
+	wordSeparators []string
 }
 
 // A Flag represents the state of a flag.
 type Flag struct {
-	Name      string // name as it appears on command line
-	Shorthand string // one-letter abbreviated flag
-	Usage     string // help message
-	Value     Value  // value as set
-	DefValue  string // default value (as text); for usage message
-	Changed   bool   // If the user set the value (or if left to default)
+	Name        string              // name as it appears on command line
+	Shorthand   string              // one-letter abbreviated flag
+	Usage       string              // help message
+	Value       Value               // value as set
+	DefValue    string              // default value (as text); for usage message
+	Changed     bool                // If the user set the value (or if left to default)
 	Annotations map[string][]string // used by cobra.Command  bash autocomple code
 }
 
@@ -159,19 +164,28 @@ type Value interface {
 }
 
 // sortFlags returns the flags as a slice in lexicographical sorted order.
-func sortFlags(flags map[string]*Flag) []*Flag {
+func sortFlags(flags map[normalizedName]*Flag) []*Flag {
 	list := make(sort.StringSlice, len(flags))
 	i := 0
-	for _, f := range flags {
-		list[i] = f.Name
+	for k := range flags {
+		list[i] = string(k)
 		i++
 	}
 	list.Sort()
 	result := make([]*Flag, len(list))
 	for i, name := range list {
-		result[i] = flags[name]
+		result[i] = flags[normalizedName(name)]
 	}
 	return result
+}
+
+func (f *FlagSet) normalizeFlagName(name string) normalizedName {
+	result := name
+	for _, sep := range f.wordSeparators {
+		result = strings.Replace(result, sep, "-", -1)
+	}
+	// Type convert to indicate normalization has been done.
+	return normalizedName(result)
 }
 
 func (f *FlagSet) out() io.Writer {
@@ -221,18 +235,24 @@ func Visit(fn func(*Flag)) {
 
 // Lookup returns the Flag structure of the named flag, returning nil if none exists.
 func (f *FlagSet) Lookup(name string) *Flag {
+	return f.lookup(f.normalizeFlagName(name))
+}
+
+// lookup returns the Flag structure of the named flag, returning nil if none exists.
+func (f *FlagSet) lookup(name normalizedName) *Flag {
 	return f.formal[name]
 }
 
 // Lookup returns the Flag structure of the named command-line flag,
 // returning nil if none exists.
 func Lookup(name string) *Flag {
-	return CommandLine.formal[name]
+	return CommandLine.Lookup(name)
 }
 
 // Set sets the value of the named flag.
 func (f *FlagSet) Set(name, value string) error {
-	flag, ok := f.formal[name]
+	normalName := f.normalizeFlagName(name)
+	flag, ok := f.formal[normalName]
 	if !ok {
 		return fmt.Errorf("no such flag -%v", name)
 	}
@@ -241,10 +261,10 @@ func (f *FlagSet) Set(name, value string) error {
 		return err
 	}
 	if f.actual == nil {
-		f.actual = make(map[string]*Flag)
+		f.actual = make(map[normalizedName]*Flag)
 	}
-	f.actual[name] = flag
-	f.Lookup(name).Changed = true
+	f.actual[normalName] = flag
+	f.lookup(normalName).Changed = true
 	return nil
 }
 
@@ -359,21 +379,27 @@ func (f *FlagSet) Var(value Value, name string, usage string) {
 // Like Var, but accepts a shorthand letter that can be used after a single dash.
 func (f *FlagSet) VarP(value Value, name, shorthand, usage string) {
 	// Remember the default value as a string; it won't change.
-	flag := &Flag{name, shorthand, usage, value, value.String(), false, make(map[string][]string)}
+	flag := &Flag{
+		Name:      name,
+		Shorthand: shorthand,
+		Usage:     usage,
+		Value:     value,
+		DefValue:  value.String(),
+	}
 	f.AddFlag(flag)
 }
 
 func (f *FlagSet) AddFlag(flag *Flag) {
-	_, alreadythere := f.formal[flag.Name]
+	_, alreadythere := f.formal[f.normalizeFlagName(flag.Name)]
 	if alreadythere {
 		msg := fmt.Sprintf("%s flag redefined: %s", f.name, flag.Name)
 		fmt.Fprintln(f.out(), msg)
 		panic(msg) // Happens only if flags are declared with identical names
 	}
 	if f.formal == nil {
-		f.formal = make(map[string]*Flag)
+		f.formal = make(map[normalizedName]*Flag)
 	}
-	f.formal[flag.Name] = flag
+	f.formal[f.normalizeFlagName(flag.Name)] = flag
 
 	if len(flag.Shorthand) == 0 {
 		return
@@ -436,9 +462,9 @@ func (f *FlagSet) setFlag(flag *Flag, value string, origArg string) error {
 	}
 	// mark as visited for Visit()
 	if f.actual == nil {
-		f.actual = make(map[string]*Flag)
+		f.actual = make(map[normalizedName]*Flag)
 	}
-	f.actual[flag.Name] = flag
+	f.actual[f.normalizeFlagName(flag.Name)] = flag
 	flag.Changed = true
 	return nil
 }
@@ -457,7 +483,7 @@ func (f *FlagSet) parseLongArg(s string, args []string) (a []string, err error) 
 	split := strings.SplitN(name, "=", 2)
 	name = split[0]
 	m := f.formal
-	flag, alreadythere := m[name] // BUG
+	flag, alreadythere := m[f.normalizeFlagName(name)] // BUG
 	if !alreadythere {
 		if name == "help" { // special case for nice help message.
 			f.usage()
@@ -507,7 +533,8 @@ func (f *FlagSet) parseShortArg(s string, args []string) (a []string, err error)
 				continue
 			}
 			if i < len(shorthands)-1 {
-				if e := f.setFlag(flag, shorthands[i+1:], s); e != nil {
+				v := strings.TrimPrefix(shorthands[i+1:], "=")
+				if e := f.setFlag(flag, v, s); e != nil {
 					err = e
 					return
 				}
@@ -554,7 +581,7 @@ func (f *FlagSet) parseArgs(args []string) (err error) {
 			args, err = f.parseShortArg(s, args)
 		}
 		if err != nil {
-		   return
+			return
 		}
 	}
 	return
@@ -596,6 +623,19 @@ func Parse() {
 // Whether to support interspersed option/non-option arguments.
 func SetInterspersed(interspersed bool) {
 	CommandLine.SetInterspersed(interspersed)
+}
+
+// SetWordSeparators sets a list of strings to be considerered as word
+// separators and normalized for the pruposes of lookups.  For example, if this
+// is set to {"-", "_", "."} then --foo_bar, --foo-bar, and --foo.bar are
+// considered equivalent flags.  This must be called before flags are parsed,
+// and may only be called once.
+func (f *FlagSet) SetWordSeparators(separators []string) {
+	f.wordSeparators = separators
+	for k, v := range f.formal {
+		delete(f.formal, k)
+		f.formal[f.normalizeFlagName(string(k))] = v
+	}
 }
 
 // Parsed returns true if the command-line flags have been parsed.
