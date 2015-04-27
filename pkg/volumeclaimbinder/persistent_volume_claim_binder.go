@@ -84,6 +84,8 @@ func NewPersistentVolumeClaimBinder(kubeClient client.Interface, syncPeriod time
 		framework.ResourceEventHandlerFuncs{
 			AddFunc:    binder.addClaim,
 			UpdateFunc: binder.updateClaim,
+			// no DeleteFunc needed.  a claim requires no clean-up.
+			// the missing claim itself is the release of the resource.
 		},
 	)
 
@@ -177,6 +179,8 @@ func syncVolume(volumeIndex *persistentVolumeOrderedIndex, binderClient binderCl
 			if err == nil {
 				// bound and active.  Build claim status as needed.
 				if claim.Status.VolumeRef == nil {
+					// syncClaimStatus sets VolumeRef, attempts to persist claim status,
+					// and does a rollback as needed on claim.Status
 					syncClaimStatus(binderClient, volume, claim)
 				}
 			} else {
@@ -198,6 +202,9 @@ func syncVolume(volumeIndex *persistentVolumeOrderedIndex, binderClient binderCl
 
 	if currentPhase != nextPhase {
 		volume.Status.Phase = nextPhase
+
+		// a change in state will trigger another update through this controller.
+		// each pass through this controller evaluates current phase and decides whether or not to change to the next phase
 		volume, err := binderClient.UpdatePersistentVolumeStatus(volume)
 		if err != nil {
 			// Rollback to previous phase
@@ -220,7 +227,6 @@ func syncClaim(volumeIndex *persistentVolumeOrderedIndex, binderClient binderCli
 	nextPhase := currentPhase
 
 	switch currentPhase {
-
 	// pending claims await a matching volume
 	case api.ClaimPending:
 		volume, err := volumeIndex.FindBestMatchForClaim(claim)

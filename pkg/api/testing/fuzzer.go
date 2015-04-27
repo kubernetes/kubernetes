@@ -203,11 +203,13 @@ func FuzzerFor(t *testing.T, version string, src rand.Source) *fuzz.Fuzzer {
 		},
 		func(pv *api.PersistentVolume, c fuzz.Continue) {
 			c.FuzzNoCustom(pv) // fuzz self without calling this function again
-			pv.Status.Phase = api.VolumePending
+			types := []api.PersistentVolumePhase{api.VolumePending, api.VolumeBound, api.VolumeReleased, api.VolumeAvailable}
+			pv.Status.Phase = types[c.Rand.Intn(len(types))]
 		},
 		func(pvc *api.PersistentVolumeClaim, c fuzz.Continue) {
 			c.FuzzNoCustom(pvc) // fuzz self without calling this function again
-			pvc.Status.Phase = api.ClaimPending
+			types := []api.PersistentVolumeClaimPhase{api.ClaimBound, api.ClaimPending}
+			pvc.Status.Phase = types[c.Rand.Intn(len(types))]
 		},
 		func(s *api.NamespaceSpec, c fuzz.Continue) {
 			s.Finalizers = []api.FinalizerName{api.FinalizerKubernetes}
