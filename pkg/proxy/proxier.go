@@ -42,6 +42,7 @@ type serviceInfo struct {
 	socket              proxySocket
 	timeout             time.Duration
 	publicIPs           []string // TODO: make this net.IP
+	publicPort          int
 	sessionAffinityType api.AffinityType
 	stickyMaxAgeMinutes int
 }
@@ -310,19 +311,20 @@ func newProxySocket(protocol api.Protocol, ip net.IP, port int) (proxySocket, er
 // Proxier is a simple proxy for TCP connections between a localhost:lport
 // and services that provide the actual implementations.
 type Proxier struct {
-	loadBalancer  LoadBalancer
-	mu            sync.Mutex // protects serviceMap
-	serviceMap    map[ServicePortName]*serviceInfo
-	numProxyLoops int32 // use atomic ops to access this; mostly for testing
-	listenIP      net.IP
-	iptables      iptables.Interface
-	hostIP        net.IP
+	loadBalancer   LoadBalancer
+	mu             sync.Mutex // protects serviceMap
+	serviceMap     map[ServicePortName]*serviceInfo
+	numProxyLoops  int32 // use atomic ops to access this; mostly for testing
+	listenIP       net.IP
+	iptables       iptables.Interface
+	hostIP         net.IP
+	containersCIDR net.IPNet
 }
 
 // NewProxier returns a new Proxier given a LoadBalancer and an address on
 // which to listen.  Because of the iptables logic, It is assumed that there
 // is only a single Proxier active on a machine.
-func NewProxier(loadBalancer LoadBalancer, listenIP net.IP, iptables iptables.Interface) *Proxier {
+func NewProxier(loadBalancer LoadBalancer, listenIP net.IP, containersCIDR net.IPNet, iptables iptables.Interface) *Proxier {
 	if listenIP.Equal(localhostIPv4) || listenIP.Equal(localhostIPv6) {
 		glog.Errorf("Can't proxy only on localhost - iptables can't do it")
 		return nil
@@ -334,10 +336,10 @@ func NewProxier(loadBalancer LoadBalancer, listenIP net.IP, iptables iptables.In
 		return nil
 	}
 	glog.Infof("Setting Proxy IP to %v", hostIP)
-	return CreateProxier(loadBalancer, listenIP, iptables, hostIP)
+	return CreateProxier(loadBalancer, listenIP, containersCIDR, iptables, hostIP)
 }
 
-func CreateProxier(loadBalancer LoadBalancer, listenIP net.IP, iptables iptables.Interface, hostIP net.IP) *Proxier {
+func CreateProxier(loadBalancer LoadBalancer, listenIP net.IP, containersCIDR net.IPNet, iptables iptables.Interface, hostIP net.IP) *Proxier {
 	glog.Infof("Initializing iptables")
 	// Clean up old messes.  Ignore erors.
 	iptablesDeleteOld(iptables)
@@ -353,11 +355,12 @@ func CreateProxier(loadBalancer LoadBalancer, listenIP net.IP, iptables iptables
 		return nil
 	}
 	return &Proxier{
-		loadBalancer: loadBalancer,
-		serviceMap:   make(map[ServicePortName]*serviceInfo),
-		listenIP:     listenIP,
-		iptables:     iptables,
-		hostIP:       hostIP,
+		loadBalancer:   loadBalancer,
+		serviceMap:     make(map[ServicePortName]*serviceInfo),
+		listenIP:       listenIP,
+		iptables:       iptables,
+		hostIP:         hostIP,
+		containersCIDR: containersCIDR,
 	}
 }
 
@@ -515,6 +518,7 @@ func (proxier *Proxier) OnUpdate(services []api.Service) {
 			info.portalPort = servicePort.Port
 			info.publicIPs = service.Spec.PublicIPs
 			info.sessionAffinityType = service.Spec.SessionAffinity
+			info.publicPort = servicePort.PublicPort
 			glog.V(4).Infof("info: %+v", info)
 
 			err = proxier.openPortal(serviceName, info)
@@ -542,7 +546,7 @@ func (proxier *Proxier) OnUpdate(services []api.Service) {
 }
 
 func sameConfig(info *serviceInfo, service *api.Service, port *api.ServicePort) bool {
-	if info.protocol != port.Protocol || info.portalPort != port.Port {
+	if info.protocol != port.Protocol || info.portalPort != port.Port || info.publicPort != port.PublicPort {
 		return false
 	}
 	if !info.portalIP.Equal(net.ParseIP(service.Spec.PortalIP)) {
@@ -580,6 +584,9 @@ func (proxier *Proxier) openPortal(service ServicePortName, info *serviceInfo) e
 			return err
 		}
 	}
+	if info.publicPort != 0 {
+		err = proxier.openPublicPort(info.publicPort, info.protocol, proxier.listenIP, info.proxyPort, service)
+	}
 	return nil
 }
 
@@ -608,11 +615,27 @@ func (proxier *Proxier) openOnePortal(portalIP net.IP, portalPort int, protocol 
 	return nil
 }
 
+func (proxier *Proxier) openPublicPort(publicPort int, protocol api.Protocol, proxyIP net.IP, proxyPort int, name ServicePortName) error {
+	args := proxier.iptablesPublicPortArgs(publicPort, protocol, proxyIP, proxyPort, name)
+	existed, err := proxier.iptables.EnsureRule(iptables.TableNAT, iptablesPublicChain, args...)
+	if err != nil {
+		glog.Errorf("Failed to install iptables %s rule for service %q", iptablesPublicChain, name)
+		return err
+	}
+	if !existed {
+		glog.Infof("Opened iptables public portal for service %q on %s %d", name, protocol, publicPort)
+	}
+	return nil
+}
+
 func (proxier *Proxier) closePortal(service ServicePortName, info *serviceInfo) error {
 	// Collect errors and report them all at the end.
 	el := proxier.closeOnePortal(info.portalIP, info.portalPort, info.protocol, proxier.listenIP, info.proxyPort, service)
 	for _, publicIP := range info.publicIPs {
 		el = append(el, proxier.closeOnePortal(net.ParseIP(publicIP), info.portalPort, info.protocol, proxier.listenIP, info.proxyPort, service)...)
+	}
+	if info.publicPort != 0 {
+		el = append(el, proxier.closePublicPort(info.publicPort, info.protocol, proxier.listenIP, info.proxyPort, service)...)
 	}
 	if len(el) == 0 {
 		glog.Infof("Closed iptables portals for service %q", service)
@@ -642,11 +665,26 @@ func (proxier *Proxier) closeOnePortal(portalIP net.IP, portalPort int, protocol
 	return el
 }
 
+func (proxier *Proxier) closePublicPort(publicPort int, protocol api.Protocol, proxyIP net.IP, proxyPort int, name ServicePortName) []error {
+	el := []error{}
+
+	args := proxier.iptablesPublicPortArgs(publicPort, protocol, proxyIP, proxyPort, name)
+	if err := proxier.iptables.DeleteRule(iptables.TableNAT, iptablesPublicChain, args...); err != nil {
+		glog.Errorf("Failed to delete iptables %s rule for service %q", iptablesPublicChain, name)
+		el = append(el, err)
+	}
+
+	return el
+}
+
 // See comments in the *PortalArgs() functions for some details about why we
-// use two chains.
+// use two chains for portals.
 var iptablesContainerPortalChain iptables.Chain = "KUBE-PORTALS-CONTAINER"
 var iptablesHostPortalChain iptables.Chain = "KUBE-PORTALS-HOST"
 var iptablesOldPortalChain iptables.Chain = "KUBE-PROXY"
+
+// Chain for public services
+var iptablesPublicChain iptables.Chain = "KUBE-PUBLIC"
 
 // Ensure that the iptables infrastructure we use is set up.  This can safely be called periodically.
 func iptablesInit(ipt iptables.Interface) error {
@@ -663,6 +701,12 @@ func iptablesInit(ipt iptables.Interface) error {
 		return err
 	}
 	if _, err := ipt.EnsureRule(iptables.TableNAT, iptables.ChainOutput, "-j", string(iptablesHostPortalChain)); err != nil {
+		return err
+	}
+	if _, err := ipt.EnsureChain(iptables.TableNAT, iptablesPublicChain); err != nil {
+		return err
+	}
+	if _, err := ipt.EnsureRule(iptables.TableNAT, iptables.ChainPrerouting, "-j", string(iptablesPublicChain)); err != nil {
 		return err
 	}
 	return nil
@@ -685,6 +729,9 @@ func iptablesFlush(ipt iptables.Interface) error {
 		el = append(el, err)
 	}
 	if err := ipt.FlushChain(iptables.TableNAT, iptablesHostPortalChain); err != nil {
+		el = append(el, err)
+	}
+	if err := ipt.FlushChain(iptables.TableNAT, iptablesPublicChain); err != nil {
 		el = append(el, err)
 	}
 	if len(el) != 0 {
@@ -715,15 +762,25 @@ func iptablesCommonPortalArgs(destIP net.IP, destPort int, protocol api.Protocol
 		"--comment", service.String(),
 		"-p", strings.ToLower(string(protocol)),
 		"-m", strings.ToLower(string(protocol)),
-		"-d", fmt.Sprintf("%s/32", destIP.String()),
-		"--dport", fmt.Sprintf("%d", destPort),
 	}
+
+	if destIP != nil {
+		args = append(args, "-d", fmt.Sprintf("%s/32", destIP.String()))
+	}
+
+	if destPort != 0 {
+		args = append(args, "--dport", fmt.Sprintf("%d", destPort))
+	}
+
 	return args
 }
 
 // Build a slice of iptables args for a from-container portal rule.
 func (proxier *Proxier) iptablesContainerPortalArgs(destIP net.IP, destPort int, protocol api.Protocol, proxyIP net.IP, proxyPort int, service ServicePortName) []string {
 	args := iptablesCommonPortalArgs(destIP, destPort, protocol, service)
+
+	// We want to apply this rule only to containers
+	args = append(args, "-s", proxier.containersCIDR.String())
 
 	// This is tricky.
 	//
@@ -798,6 +855,25 @@ func (proxier *Proxier) iptablesHostPortalArgs(destIP net.IP, destPort int, prot
 	}
 	// TODO: Can we DNAT with IPv6?
 	args = append(args, "-j", "DNAT", "--to-destination", net.JoinHostPort(proxyIP.String(), strconv.Itoa(proxyPort)))
+	return args
+}
+
+// Build a slice of iptables args for a public-port rule.
+func (proxier *Proxier) iptablesPublicPortArgs(publicPort int, protocol api.Protocol, proxyIP net.IP, proxyPort int, service ServicePortName) []string {
+	args := iptablesCommonPortalArgs(nil, publicPort, protocol, service)
+
+	// We want to apply this rule only to public IPs (not container IPs)
+	// TODO: Split the two chains based on the src IP
+	args = append(args, "!", "-s", proxier.containersCIDR.String())
+
+	if proxyIP.Equal(zeroIPv4) || proxyIP.Equal(zeroIPv6) {
+		// TODO: Can we REDIRECT with IPv6?
+		args = append(args, "-j", "REDIRECT", "--to-ports", fmt.Sprintf("%d", proxyPort))
+	} else {
+		// TODO: Can we DNAT with IPv6?
+		args = append(args, "-j", "DNAT", "--to-destination", net.JoinHostPort(proxyIP.String(), strconv.Itoa(proxyPort)))
+	}
+
 	return args
 }
 

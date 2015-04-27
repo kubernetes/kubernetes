@@ -8,5 +8,10 @@
   {% set ips = salt['mine.get']('roles:kubernetes-master', 'network.ip_addrs', 'grain').values() -%}
   {% set api_servers = "--master=http://" + ips[0][0] + ":7080" -%}
 {% endif -%}
+{% if grains.containers_cidr is defined -%}
+  {% set containers_cidr = "--containers_cidr=" + grains.containers_cidr -%}
+{% else -%}
+  {% set containers_cidr = "" -%}
+{% endif -%}
 
-DAEMON_ARGS="{{daemon_args}} {{api_servers}} {{pillar['log_level']}}"
+DAEMON_ARGS="{{daemon_args}} {{api_servers}} {{containers_cidr}} {{pillar['log_level']}}"

@@ -732,6 +732,7 @@ func init() {
 					Port:          in.Spec.Ports[i].Port,
 					Protocol:      Protocol(in.Spec.Ports[i].Protocol),
 					ContainerPort: in.Spec.Ports[i].TargetPort,
+					PublicPort:    in.Spec.Ports[i].PublicPort,
 				})
 			}
 
@@ -774,6 +775,7 @@ func init() {
 						Port:       in.Ports[i].Port,
 						Protocol:   newer.Protocol(in.Ports[i].Protocol),
 						TargetPort: in.Ports[i].ContainerPort,
+						PublicPort: in.Ports[i].PublicPort,
 					})
 				}
 			}
