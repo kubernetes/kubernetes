@@ -350,13 +350,13 @@ func runKubectl(args ...string) string {
 
 // testContainerOutput runs testContainerOutputInNamespace with the default namespace.
 func testContainerOutput(scenarioName string, c *client.Client, pod *api.Pod, expectedOutput []string) {
-	testContainerOutputInNamespace(api.NamespaceDefault, scenarioName, c, pod, expectedOutput)
+	testContainerOutputInNamespace(scenarioName, c, pod, expectedOutput, api.NamespaceDefault)
 }
 
 // testContainerOutputInNamespace runs the given pod in the given namespace and waits
 // for the first container in the podSpec to move into the 'Success' status.  It retrieves
 // the container log and searches for lines of expected output.
-func testContainerOutputInNamespace(ns, scenarioName string, c *client.Client, pod *api.Pod, expectedOutput []string) {
+func testContainerOutputInNamespace(scenarioName string, c *client.Client, pod *api.Pod, expectedOutput []string, ns string) {
 	By(fmt.Sprintf("Creating a pod to test %v", scenarioName))
 
 	defer c.Pods(ns).Delete(pod.Name)
