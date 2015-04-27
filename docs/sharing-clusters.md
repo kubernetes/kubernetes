@@ -72,7 +72,7 @@ omitted if you first run
 ```bash
 export KUBECONFIG=/path/to/standalone/.kube/config
 ```
-* The ca_file, key_file, and cert_file referrenced above are generated on the
+* The ca_file, key_file, and cert_file referenced above are generated on the
 kube master at cluster turnup. They can be found on the master under
 `/srv/kubernetes`. Bearer token/basic auth are also generated on the kube master.
 

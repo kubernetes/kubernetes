@@ -243,7 +243,7 @@ The fuzzer can be found in `pkg/api/testing/fuzzer.go`.
 ## Update the semantic comparisons
 
 VERY VERY rarely is this needed, but when it hits, it hurts.  In some rare
-cases we end up with objects (e.g. resource quantites) that have morally
+cases we end up with objects (e.g. resource quantities) that have morally
 equivalent values with different bitwise representations (e.g. value 10 with a
 base-2 formatter is the same as value 0 with a base-10 formatter).  The only way
 Go knows how to do deep-equality is through field-by-field bitwise comparisons.
@@ -278,7 +278,7 @@ At last, your change is done, all unit tests pass, e2e passes, you're done,
 right?  Actually, no.  You just changed the API.  If you are touching an
 existing facet of the API, you have to try *really* hard to make sure that
 *all* the examples and docs are updated.  There's no easy way to do this, due
-in part ot JSON and YAML silently dropping unknown fields.  You're clever -
+in part to JSON and YAML silently dropping unknown fields.  You're clever -
 you'll figure it out.  Put `grep` or `ack` to good use.
 
 If you added functionality, you should consider documenting it and/or writing

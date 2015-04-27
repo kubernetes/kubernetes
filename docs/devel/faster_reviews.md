@@ -135,7 +135,7 @@ might need later - but don't implement them now.
 
 We understand that it is hard to imagine, but sometimes we make mistakes.  It's
 OK to push back on changes requested during a review.  If you have a good reason
-for doing something a certain way, you are absolutley allowed to debate the
+for doing something a certain way, you are absolutely allowed to debate the
 merits of a requested change.  You might be overruled, but you might also
 prevail.  We're mostly pretty reasonable people.  Mostly.
 
@@ -151,7 +151,7 @@ things you can do that might help kick a stalled process along:
    * Ping the assignee (@username) on the PR comment stream asking for an
      estimate of when they can get to it.
 
-   * Ping the assigneed by email (many of us have email addresses that are well
+   * Ping the assignee by email (many of us have email addresses that are well
      published or are the same as our GitHub handle @google.com or @redhat.com).
 
 If you think you have fixed all the issues in a round of review, and you haven't
@@ -171,7 +171,7 @@ explanation.
 ## Final: Use common sense
 
 Obviously, none of these points are hard rules.  There is no document that can
-take the place of common sense and good taste.  Use your best judgement, but put
+take the place of common sense and good taste.  Use your best judgment, but put
 a bit of thought into how your work can be made easier to review.  If you do
 these things your PRs will flow much more easily.
 

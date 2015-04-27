@@ -79,7 +79,7 @@ files.  Currently, if a program expects a secret to be stored in an environment
 variable, then the user needs to modify the image to populate the environment
 variable from the file as an step before running the main program.  Future
 versions of Kubernetes are expected to provide more automation for populating
-enviroment variables from files.
+environment variables from files.
 
 
 ## Changes to Secrets
