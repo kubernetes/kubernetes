@@ -6,7 +6,7 @@ guide.
 A Getting Started Guide is instructions on how to create a Kubernetes cluster on top of a particular
 type(s) of infrastructure.  Infrastructure includes: the IaaS provider for VMs;
 the node OS; inter-node networking; and node Configuration Management system.
-A guide refers to scripts, Configuration Manangement files, and/or binary assets such as RPMs.  We call
+A guide refers to scripts, Configuration Management files, and/or binary assets such as RPMs.  We call
 the combination of all these things needed to run on a particular type of infrastructure a
 **distro**.
 
@@ -39,7 +39,7 @@ These guidelines say *what* to do.  See the Rationale section for *why*.
        that are updated to the new version.
  - Versioned distros should typically not modify or add code in `cluster/`.  That is just scripts for developer
    distros.  
- - If a versioned distro has not been updated for many binary releases, it may be dropped frome the Matrix.
+ - If a versioned distro has not been updated for many binary releases, it may be dropped from the Matrix.
 
 If you have a cluster partially working, but doing all the above steps seems like too much work,
 we still want to hear from you.  We suggest you write a blog post or a Gist, and we will link to it on our wiki page.
@@ -58,13 +58,13 @@ These guidelines say *what* to do.  See the Rationale section for *why*.
   - a development distro needs to have an organization which owns it.  This organization needs to: 
     - Setting up and maintaining Continuous Integration that runs e2e frequently (multiple times per day) against the
       Distro at head,  and which notifies all devs of breakage.
-    - being reasonably available for questions and assiting with
+    - being reasonably available for questions and assisting with
       refactoring and feature additions that affect code for their IaaS.
 
 ## Rationale 
  - We want want people to create Kubernetes clusters with whatever IaaS, Node OS,
    configuration management tools, and so on, which they are familiar with.  The
-   guidelines for **versioned distros** are designed for flexiblity.
+   guidelines for **versioned distros** are designed for flexibility.
  - We want developers to be able to work without understanding all the permutations of
    IaaS, NodeOS, and configuration management.  The guidelines for **developer distros** are designed
    for consistency.

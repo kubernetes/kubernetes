@@ -21,7 +21,7 @@ When Kubernetes is deployed, the server deploys the UI, you can visit ```/static
 The Kubernetes user interface is a query-based visualization of the Kubernetes API.  The user interface is defined by two functional primitives:
 
 #### GroupBy
-_GroupBy_ takes a label ```key``` as a parameter, places all objects with the same value for that key within a single group. For example ```/groups/host/selector``` groups pods by host.  ```/groups/name/selector``` groups pods by name.  Groups are hiearchical, for example ```/groups/name/host/selector``` first groups by pod name, and then by host.
+_GroupBy_ takes a label ```key``` as a parameter, places all objects with the same value for that key within a single group. For example ```/groups/host/selector``` groups pods by host.  ```/groups/name/selector``` groups pods by name.  Groups are hierarchical, for example ```/groups/name/host/selector``` first groups by pod name, and then by host.
 
 #### Select
 Select takes a [label selector](./labels.md) and uses it to filter, so only resources which match that label selector are displayed.  For example, ```/groups/host/selector/name=frontend```, shows pods, grouped by host, which have a label with the name `frontend`.

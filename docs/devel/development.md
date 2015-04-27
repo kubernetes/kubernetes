@@ -221,7 +221,7 @@ go run hack/e2e.go -build -pushup -test -down
 # seeing the output of failed commands.
 
 # -ctl can be used to quickly call kubectl against your e2e cluster. Useful for
-# cleaning up after a failed test or viewing logs. Use -v to avoid supressing
+# cleaning up after a failed test or viewing logs. Use -v to avoid suppressing
 # kubectl output.
 go run hack/e2e.go -v -ctl='get events'
 go run hack/e2e.go -v -ctl='delete pod foobar'

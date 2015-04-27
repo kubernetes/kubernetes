@@ -4,7 +4,7 @@ This document explain how to plug in profiler and how to profile Kubernetes serv
 
 ## Profiling library
 
-Go comes with inbuilt 'net/http/pprof' profiling library and profiling web service. The way service works is binding debug/pprof/ subtree on a running webserver to the profiler. Reading from subpages of debug/pprof returns pprof-formated profiles of the running binary. The output can be processed offline by the tool of choice, or used as an input to handy 'go tool pprof', which can graphically represent the result.
+Go comes with inbuilt 'net/http/pprof' profiling library and profiling web service. The way service works is binding debug/pprof/ subtree on a running webserver to the profiler. Reading from subpages of debug/pprof returns pprof-formatted profiles of the running binary. The output can be processed offline by the tool of choice, or used as an input to handy 'go tool pprof', which can graphically represent the result.
 
 ## Adding profiling to services to APIserver.
 
@@ -31,4 +31,4 @@ to get 30 sec. CPU profile.
 
 ## Contention profiling
 
-To enable contetion profiling you need to add line ```rt.SetBlockProfileRate(1)``` in addition to ```m.mux.HandleFunc(...)``` added before (```rt``` stands for ```runtime``` in ```master.go```). This enables 'debug/pprof/block' subpage, which can be used as an input to ```go tool pprof```.
+To enable contention profiling you need to add line ```rt.SetBlockProfileRate(1)``` in addition to ```m.mux.HandleFunc(...)``` added before (```rt``` stands for ```runtime``` in ```master.go```). This enables 'debug/pprof/block' subpage, which can be used as an input to ```go tool pprof```.
