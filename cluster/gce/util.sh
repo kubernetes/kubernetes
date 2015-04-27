@@ -473,6 +473,7 @@ DNS_SERVER_IP: $(yaml-quote ${DNS_SERVER_IP:-})
 DNS_DOMAIN: $(yaml-quote ${DNS_DOMAIN:-})
 KUBE_BEARER_TOKEN: $(yaml-quote ${KUBE_BEARER_TOKEN})
 KUBELET_TOKEN: $(yaml-quote ${KUBELET_TOKEN:-})
+KUBE_PROXY_TOKEN: $(yaml-quote ${KUBE_PROXY_TOKEN:-})
 ADMISSION_CONTROL: $(yaml-quote ${ADMISSION_CONTROL:-})
 MASTER_IP_RANGE: $(yaml-quote ${MASTER_IP_RANGE})
 EOF
@@ -587,6 +588,7 @@ function kube-up {
   # computer) can forget it later. This should disappear with
   # https://github.com/GoogleCloudPlatform/kubernetes/issues/3168
   KUBELET_TOKEN=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
+  KUBE_PROXY_TOKEN=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
 
   # Reserve the master's IP so that it can later be transferred to another VM
   # without disrupting the kubelets. IPs are associated with regions, not zones,
@@ -824,7 +826,7 @@ function kube-push {
   # node-kube-env. This isn't important until the node-ip-range issue
   # is solved (because that's blocking automatic dynamic nodes from
   # working). The node-kube-env has to be composed with the KUBELET_TOKEN
-  # Ideally we would have
+  # and KUBE_PROXY_TOKEN.  Ideally we would have
   # https://github.com/GoogleCloudPlatform/kubernetes/issues/3168
   # implemented before then, though, so avoiding this mess until then.
 

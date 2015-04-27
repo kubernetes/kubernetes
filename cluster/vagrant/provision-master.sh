@@ -137,14 +137,43 @@ EOF
 known_tokens_file="/srv/salt-overlay/salt/kube-apiserver/known_tokens.csv"
 if [[ ! -f "${known_tokens_file}" ]]; then
   kubelet_token=$(cat /dev/urandom | base64 | tr -d "=+/" | dd bs=32 count=1 2> /dev/null)
+  kube_proxy_token=$(cat /dev/urandom | base64 | tr -d "=+/" | dd bs=32 count=1 2> /dev/null)
 
   mkdir -p /srv/salt-overlay/salt/kube-apiserver
   known_tokens_file="/srv/salt-overlay/salt/kube-apiserver/known_tokens.csv"
-  (umask u=rw,go= ; echo "$kubelet_token,kubelet,kubelet" > $known_tokens_file)
+  (umask u=rw,go= ;
+   echo "$kubelet_token,kubelet,kubelet" > $known_tokens_file;
+   echo "$kube_proxy_token,kube_proxy,kube_proxy" >> $known_tokens_file)
 
   mkdir -p /srv/salt-overlay/salt/kubelet
   kubelet_auth_file="/srv/salt-overlay/salt/kubelet/kubernetes_auth"
   (umask u=rw,go= ; echo "{\"BearerToken\": \"$kubelet_token\", \"Insecure\": true }" > $kubelet_auth_file)
+
+  mkdir -p /srv/salt-overlay/salt/kube-proxy
+  kube_proxy_kubeconfig_file="/srv/salt-overlay/salt/kube_proxy/kubeconfig"
+  # Make a kubeconfig file with the token.
+  # TODO(etune): put apiserver certs into secret too, and reference from authfile,
+  # so that "Insecure" is not needed.
+  (umask 077;
+  cat > "${kube_proxy_kubeconfig_file}" <<EOF
+apiVersion: v1
+kind: Config
+users:
+- name: kube-proxy
+  user:
+    token: ${kube_proxy_token}
+clusters:
+- name: local
+  cluster:
+     insecure-skip-tls-verify: true
+contexts:
+- context:
+    cluster: local
+    user: kube-proxy
+  name: service-account-context
+current-context: service-account-context
+EOF
+)
 
   # Generate tokens for other "service accounts".  Append to known_tokens.
   #

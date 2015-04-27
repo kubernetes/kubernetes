@@ -238,7 +238,7 @@ EOF
 }
 
 # This should only happen on cluster initialization. Uses
-# KUBE_BEARER_TOKEN, KUBELET_TOKEN, and /dev/urandom to generate
+# KUBE_BEARER_TOKEN, KUBELET_TOKEN, and KUBE_PROXY_TOKEN to generate
 # known_tokens.csv (KNOWN_TOKENS_FILE). After the first boot and
 # on upgrade, this file exists on the master-pd and should never
 # be touched again (except perhaps an additional service account,
@@ -248,12 +248,39 @@ function create-salt-auth() {
     mkdir -p /srv/salt-overlay/salt/kube-apiserver
     (umask 077;
       echo "${KUBE_BEARER_TOKEN},admin,admin" > "${KNOWN_TOKENS_FILE}";
-      echo "${KUBELET_TOKEN},kubelet,kubelet" >> "${KNOWN_TOKENS_FILE}")
+      echo "${KUBELET_TOKEN},kubelet,kubelet" >> "${KNOWN_TOKENS_FILE}";
+      echo "${KUBE_PROXY_TOKEN},kube_proxy,kube_proxy" >> "${KNOWN_TOKENS_FILE}")
 
     mkdir -p /srv/salt-overlay/salt/kubelet
     kubelet_auth_file="/srv/salt-overlay/salt/kubelet/kubernetes_auth"
     (umask 077;
       echo "{\"BearerToken\": \"${KUBELET_TOKEN}\", \"Insecure\": true }" > "${kubelet_auth_file}")
+
+    mkdir -p /srv/salt-overlay/salt/kube-proxy
+    kube_proxy_kubeconfig_file="/srv/salt-overlay/salt/kube-proxy/kubeconfig"
+    # Make a kubeconfig file with the token.
+    # TODO(etune): put apiserver certs into secret too, and reference from authfile,
+    # so that "Insecure" is not needed.
+    (umask 077;
+    cat > "${kube_proxy_kubeconfig_file}" <<EOF
+apiVersion: v1
+kind: Config
+users:
+- name: kube-proxy
+  user:
+    token: ${KUBE_PROXY_TOKEN}
+clusters:
+- name: local
+  cluster:
+     insecure-skip-tls-verify: true
+contexts:
+- context:
+    cluster: local
+    user: kube-proxy
+  name: service-account-context
+current-context: service-account-context
+EOF
+)
 
     # Generate tokens for other "service accounts".  Append to known_tokens.
     #
