@@ -42,6 +42,10 @@ import (
 )
 
 const (
+	// The oom_score_adj of the POD infrastructure container. The default is 0, so
+	// any value below that makes it *less* likely to get OOM killed.
+	podOomScoreAdj = -100
+
 	maxReasonCacheEntries = 200
 )
 
@@ -933,4 +937,69 @@ func (dm *DockerManager) RunContainer(pod *api.Pod, container *api.Container, ge
 		}
 	}
 	return DockerID(id), err
+}
+
+// CreatePodInfraContainer starts the pod infra container for a pod. Returns the docker container ID of the newly created container.
+func (dm *DockerManager) CreatePodInfraContainer(pod *api.Pod, generator kubecontainer.RunContainerOptionsGenerator, runner kubecontainer.HandlerRunner) (DockerID, error) {
+	// Use host networking if specified.
+	netNamespace := ""
+	var ports []api.ContainerPort
+
+	if pod.Spec.HostNetwork {
+		netNamespace = "host"
+	} else {
+		// Docker only exports ports from the pod infra container.  Let's
+		// collect all of the relevant ports and export them.
+		for _, container := range pod.Spec.Containers {
+			ports = append(ports, container.Ports...)
+		}
+	}
+
+	container := &api.Container{
+		Name:  PodInfraContainerName,
+		Image: dm.PodInfraContainerImage,
+		Ports: ports,
+	}
+	ref, err := kubecontainer.GenerateContainerRef(pod, container)
+	if err != nil {
+		glog.Errorf("Couldn't make a ref to pod %v, container %v: '%v'", pod.Name, container.Name, err)
+	}
+	// TODO: make this a TTL based pull (if image older than X policy, pull)
+	ok, err := dm.IsImagePresent(container.Image)
+	if err != nil {
+		if ref != nil {
+			dm.recorder.Eventf(ref, "failed", "Failed to inspect image %q: %v", container.Image, err)
+		}
+		return "", err
+	}
+	if !ok {
+		if err := dm.Pull(container.Image); err != nil {
+			if ref != nil {
+				dm.recorder.Eventf(ref, "failed", "Failed to pull image %q: %v", container.Image, err)
+			}
+			return "", err
+		}
+	}
+	if ref != nil {
+		dm.recorder.Eventf(ref, "pulled", "Successfully pulled image %q", container.Image)
+	}
+
+	id, err := dm.RunContainer(pod, container, generator, runner, netNamespace, "")
+	if err != nil {
+		return "", err
+	}
+
+	// Set OOM score of POD container to lower than those of the other
+	// containers in the pod. This ensures that it is killed only as a last
+	// resort.
+	containerInfo, err := dm.client.InspectContainer(string(id))
+	if err != nil {
+		return "", err
+	}
+
+	// Ensure the PID actually exists, else we'll move ourselves.
+	if containerInfo.State.Pid == 0 {
+		return "", fmt.Errorf("failed to get init PID for Docker pod infra container %q", string(id))
+	}
+	return id, util.ApplyOomScoreAdj(containerInfo.State.Pid, podOomScoreAdj)
 }

@@ -59,10 +59,6 @@ import (
 )
 
 const (
-	// The oom_score_adj of the POD infrastructure container. The default is 0, so
-	// any value below that makes it *less* likely to get OOM killed.
-	podOomScoreAdj = -100
-
 	// Max amount of time to wait for the Docker daemon to come up.
 	maxWaitForDocker = 5 * time.Minute
 
@@ -877,69 +873,6 @@ func parseResolvConf(reader io.Reader) (nameservers []string, searches []string,
 	return nameservers, searches, nil
 }
 
-// createPodInfraContainer starts the pod infra container for a pod. Returns the docker container ID of the newly created container.
-func (kl *Kubelet) createPodInfraContainer(pod *api.Pod) (dockertools.DockerID, error) {
-
-	// Use host networking if specified and allowed.
-	netNamespace := ""
-	var ports []api.ContainerPort
-
-	if pod.Spec.HostNetwork {
-		netNamespace = "host"
-	} else {
-		// Docker only exports ports from the pod infra container.  Let's
-		// collect all of the relevant ports and export them.
-		for _, container := range pod.Spec.Containers {
-			ports = append(ports, container.Ports...)
-		}
-	}
-
-	container := &api.Container{
-		Name:  dockertools.PodInfraContainerName,
-		Image: kl.containerManager.PodInfraContainerImage,
-		Ports: ports,
-	}
-	ref, err := kubecontainer.GenerateContainerRef(pod, container)
-	if err != nil {
-		glog.Errorf("Couldn't make a ref to pod %v, container %v: '%v'", pod.Name, container.Name, err)
-	}
-	// TODO: make this a TTL based pull (if image older than X policy, pull)
-	ok, err := kl.containerManager.IsImagePresent(container.Image)
-	if err != nil {
-		if ref != nil {
-			kl.recorder.Eventf(ref, "failed", "Failed to inspect image %q: %v", container.Image, err)
-		}
-		return "", err
-	}
-	if !ok {
-		if err := kl.pullImage(container.Image, ref); err != nil {
-			return "", err
-		}
-	}
-	if ref != nil {
-		kl.recorder.Eventf(ref, "pulled", "Successfully pulled image %q", container.Image)
-	}
-
-	id, err := kl.containerManager.RunContainer(pod, container, kl, kl.handlerRunner, netNamespace, "")
-	if err != nil {
-		return "", err
-	}
-
-	// Set OOM score of POD container to lower than those of the other
-	// containers in the pod. This ensures that it is killed only as a last
-	// resort.
-	containerInfo, err := kl.dockerClient.InspectContainer(string(id))
-	if err != nil {
-		return "", err
-	}
-
-	// Ensure the PID actually exists, else we'll move ourselves.
-	if containerInfo.State.Pid == 0 {
-		return "", fmt.Errorf("failed to get init PID for Docker pod infra container %q", string(id))
-	}
-	return id, util.ApplyOomScoreAdj(containerInfo.State.Pid, podOomScoreAdj)
-}
-
 func (kl *Kubelet) pullImage(img string, ref *api.ObjectReference) error {
 	start := time.Now()
 	defer func() {
@@ -1317,7 +1250,7 @@ func (kl *Kubelet) syncPod(pod *api.Pod, mirrorPod *api.Pod, runningPod kubecont
 	podInfraContainerID := containerChanges.infraContainerId
 	if containerChanges.startInfraContainer && (len(containerChanges.containersToStart) > 0) {
 		glog.V(4).Infof("Creating pod infra container for %q", podFullName)
-		podInfraContainerID, err = kl.createPodInfraContainer(pod)
+		podInfraContainerID, err = kl.containerManager.CreatePodInfraContainer(pod, kl, kl.handlerRunner)
 
 		// Call the networking plugin
 		if err == nil {
