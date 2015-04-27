@@ -86,7 +86,7 @@ func waitForPodCondition(c *client.Client, ns, podName, desc string, condition p
 	for start := time.Now(); time.Since(start) < podStartTimeout; time.Sleep(5 * time.Second) {
 		pod, err := c.Pods(ns).Get(podName)
 		if err != nil {
-			Logf("Get pod failed, ignoring for 5s: %v", err)
+			Logf("Get pod %v in ns %v failed, ignoring for 5s: %v", podName, ns, err)
 			continue
 		}
 		done, err := condition(pod)
@@ -367,7 +367,7 @@ func testContainerOutputInNamespace(ns, scenarioName string, c *client.Client, p
 	containerName := pod.Spec.Containers[0].Name
 
 	// Wait for client pod to complete.
-	expectNoError(waitForPodSuccess(c, pod.Name, containerName))
+	expectNoError(waitForPodSuccessInNamespace(c, pod.Name, containerName, ns))
 
 	// Grab its logs.  Get host first.
 	podStatus, err := c.Pods(ns).Get(pod.Name)

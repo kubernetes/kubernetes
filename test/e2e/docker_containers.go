@@ -27,15 +27,24 @@ import (
 
 var _ = Describe("Docker Containers", func() {
 	var c *client.Client
+	var ns string
 
 	BeforeEach(func() {
 		var err error
 		c, err = loadClient()
+		ns_, err := createTestingNS("containers", c)
+		ns = ns_.Name
 		Expect(err).NotTo(HaveOccurred())
 	})
 
+	AfterEach(func() {
+		if err := c.Namespaces().Delete(ns); err != nil {
+			Failf("Couldn't delete ns %s", err)
+		}
+	})
+
 	It("should use the image defaults if command and args are blank", func() {
-		testContainerOutput("use defaults", c, entrypointTestPod(), []string{
+		testContainerOutputInNamespace(ns, "use defaults", c, entrypointTestPod(), []string{
 			"[/ep default arguments]",
 		})
 	})
@@ -44,7 +53,7 @@ var _ = Describe("Docker Containers", func() {
 		pod := entrypointTestPod()
 		pod.Spec.Containers[0].Args = []string{"override", "arguments"}
 
-		testContainerOutput("override arguments", c, pod, []string{
+		testContainerOutputInNamespace(ns, "override arguments", c, pod, []string{
 			"[/ep override arguments]",
 		})
 	})
@@ -55,7 +64,7 @@ var _ = Describe("Docker Containers", func() {
 		pod := entrypointTestPod()
 		pod.Spec.Containers[0].Command = []string{"/ep-2"}
 
-		testContainerOutput("override command", c, pod, []string{
+		testContainerOutputInNamespace(ns, "override command", c, pod, []string{
 			"[/ep-2]",
 		})
 	})
@@ -65,7 +74,7 @@ var _ = Describe("Docker Containers", func() {
 		pod.Spec.Containers[0].Command = []string{"/ep-2"}
 		pod.Spec.Containers[0].Args = []string{"override", "arguments"}
 
-		testContainerOutput("override all", c, pod, []string{
+		testContainerOutputInNamespace(ns, "override all", c, pod, []string{
 			"[/ep-2 override arguments]",
 		})
 	})
