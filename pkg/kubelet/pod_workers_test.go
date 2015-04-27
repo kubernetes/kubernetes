@@ -40,7 +40,7 @@ func newPod(uid, name string) *api.Pod {
 func createPodWorkers() (*podWorkers, map[types.UID][]string) {
 	fakeDocker := &dockertools.FakeDockerClient{}
 	fakeRecorder := &record.FakeRecorder{}
-	dockerManager := dockertools.NewDockerManager(fakeDocker, fakeRecorder, nil, nil, dockertools.PodInfraContainerImage, 0, 0)
+	dockerManager := dockertools.NewDockerManager(fakeDocker, fakeRecorder, nil, nil, dockertools.PodInfraContainerImage, 0, 0, "", kubecontainer.FakeOS{})
 	fakeRuntimeCache := kubecontainer.NewFakeRuntimeCache(dockerManager)
 
 	lock := sync.Mutex{}
