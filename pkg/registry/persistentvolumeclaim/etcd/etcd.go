@@ -34,7 +34,7 @@ type REST struct {
 
 // NewREST returns a RESTStorage object that will work against PersistentVolumeClaim objects.
 func NewStorage(h tools.EtcdHelper) (*REST, *StatusREST) {
-	prefix := "/registry/persistentvolumeclaims"
+	prefix := "/persistentvolumeclaims"
 	store := &etcdgeneric.Etcd{
 		NewFunc:     func() runtime.Object { return &api.PersistentVolumeClaim{} },
 		NewListFunc: func() runtime.Object { return &api.PersistentVolumeClaimList{} },

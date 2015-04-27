@@ -23,12 +23,13 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/rest/resttest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta3"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools/etcdtest"
 )
 
 func newHelper(t *testing.T) (*tools.FakeEtcdClient, tools.EtcdHelper) {
 	fakeEtcdClient := tools.NewFakeEtcdClient(t)
 	fakeEtcdClient.TestIndex = true
-	helper := tools.NewEtcdHelper(fakeEtcdClient, v1beta3.Codec)
+	helper := tools.NewEtcdHelper(fakeEtcdClient, v1beta3.Codec, etcdtest.PathPrefix())
 	return fakeEtcdClient, helper
 }
 
@@ -79,8 +80,9 @@ func TestUpdate(t *testing.T) {
 	fakeEtcdClient, helper := newHelper(t)
 	storage := NewREST(helper)
 	test := resttest.New(t, storage, fakeEtcdClient.SetError)
+	key := etcdtest.AddPrefix("podtemplates/default/foo")
 
-	fakeEtcdClient.ExpectNotFoundGet("/registry/podtemplates/default/foo")
+	fakeEtcdClient.ExpectNotFoundGet(key)
 	fakeEtcdClient.ChangeIndex = 2
 	pod := validNewPodTemplate("foo")
 	existing := validNewPodTemplate("exists")

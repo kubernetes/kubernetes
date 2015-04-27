@@ -82,7 +82,7 @@ func (h *delegateHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 func runApiServer(etcdClient tools.EtcdClient, addr net.IP, port int, masterServiceNamespace string) {
 	handler := delegateHandler{}
 
-	helper, err := master.NewEtcdHelper(etcdClient, "")
+	helper, err := master.NewEtcdHelper(etcdClient, "", master.DefaultEtcdPathPrefix)
 	if err != nil {
 		glog.Fatalf("Unable to get etcd helper: %v", err)
 	}

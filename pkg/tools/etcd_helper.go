@@ -23,7 +23,9 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os/exec"
+	"path"
 	"reflect"
+	"strings"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/conversion"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
@@ -38,15 +40,18 @@ type EtcdHelper struct {
 	Codec  runtime.Codec
 	// optional, no atomic operations can be performed without this interface
 	Versioner EtcdVersioner
+	// prefix for all etcd keys
+	PathPrefix string
 }
 
 // NewEtcdHelper creates a helper that works against objects that use the internal
 // Kubernetes API objects.
-func NewEtcdHelper(client EtcdGetSet, codec runtime.Codec) EtcdHelper {
+func NewEtcdHelper(client EtcdGetSet, codec runtime.Codec, prefix string) EtcdHelper {
 	return EtcdHelper{
-		Client:    client,
-		Codec:     codec,
-		Versioner: APIObjectVersioner{},
+		Client:     client,
+		Codec:      codec,
+		Versioner:  APIObjectVersioner{},
+		PathPrefix: prefix,
 	}
 }
 
@@ -136,6 +141,7 @@ func (h *EtcdHelper) ExtractToList(key string, listObj runtime.Object) error {
 	if err != nil {
 		return err
 	}
+	key = h.PrefixEtcdKey(key)
 	nodes, index, err := h.listEtcdNode(key)
 	if err != nil {
 		return err
@@ -158,7 +164,7 @@ func (h *EtcdHelper) ExtractObjToList(key string, listObj runtime.Object) error 
 	if err != nil {
 		return err
 	}
-
+	key = h.PrefixEtcdKey(key)
 	response, err := h.Client.Get(key, false, false)
 	if err != nil {
 		if IsEtcdNotFound(err) {
@@ -185,6 +191,7 @@ func (h *EtcdHelper) ExtractObjToList(key string, listObj runtime.Object) error 
 // a zero object of the requested type, or an error, depending on ignoreNotFound. Treats
 // empty responses and nil response nodes exactly like a not found error.
 func (h *EtcdHelper) ExtractObj(key string, objPtr runtime.Object, ignoreNotFound bool) error {
+	key = h.PrefixEtcdKey(key)
 	_, _, err := h.bodyAndExtractObj(key, objPtr, ignoreNotFound)
 	return err
 }
@@ -233,6 +240,7 @@ func (h *EtcdHelper) extractObj(response *etcd.Response, inErr error, objPtr run
 // and 0 means forever. If no error is returned and out is not nil, out will be set to the read value
 // from etcd.
 func (h *EtcdHelper) CreateObj(key string, obj, out runtime.Object, ttl uint64) error {
+	key = h.PrefixEtcdKey(key)
 	data, err := h.Codec.Encode(obj)
 	if err != nil {
 		return err
@@ -242,6 +250,7 @@ func (h *EtcdHelper) CreateObj(key string, obj, out runtime.Object, ttl uint64) 
 			return errors.New("resourceVersion may not be set on objects to be created")
 		}
 	}
+
 	response, err := h.Client.Create(key, string(data), ttl)
 	if err != nil {
 		return err
@@ -257,15 +266,18 @@ func (h *EtcdHelper) CreateObj(key string, obj, out runtime.Object, ttl uint64) 
 
 // Delete removes the specified key.
 func (h *EtcdHelper) Delete(key string, recursive bool) error {
+	key = h.PrefixEtcdKey(key)
 	_, err := h.Client.Delete(key, recursive)
 	return err
 }
 
 // DeleteObj removes the specified key and returns the value that existed at that spot.
 func (h *EtcdHelper) DeleteObj(key string, out runtime.Object) error {
+	key = h.PrefixEtcdKey(key)
 	if _, err := conversion.EnforcePtr(out); err != nil {
 		panic("unable to convert output object to pointer")
 	}
+
 	response, err := h.Client.Delete(key, false)
 	if !IsEtcdNotFound(err) {
 		// if the object that existed prior to the delete is returned by etcd, update out.
@@ -285,6 +297,7 @@ func (h *EtcdHelper) SetObj(key string, obj, out runtime.Object, ttl uint64) err
 	if err != nil {
 		return err
 	}
+	key = h.PrefixEtcdKey(key)
 
 	create := true
 	if h.Versioner != nil {
@@ -346,6 +359,7 @@ func (h *EtcdHelper) GuaranteedUpdate(key string, ptrToType runtime.Object, igno
 		// Panic is appropriate, because this is a programming error.
 		panic("need ptr to type")
 	}
+	key = h.PrefixEtcdKey(key)
 	for {
 		obj := reflect.New(v.Type()).Interface().(runtime.Object)
 		origBody, index, err := h.bodyAndExtractObj(key, obj, ignoreNotFound)
@@ -384,6 +398,13 @@ func (h *EtcdHelper) GuaranteedUpdate(key string, ptrToType runtime.Object, igno
 		_, _, err = h.extractObj(response, err, ptrToType, false, false)
 		return err
 	}
+}
+
+func (h *EtcdHelper) PrefixEtcdKey(key string) string {
+	if strings.HasPrefix(key, path.Join("/", h.PathPrefix)) {
+		return key
+	}
+	return path.Join("/", h.PathPrefix, key)
 }
 
 // GetEtcdVersion performs a version check against the provided Etcd server, returning a triplet

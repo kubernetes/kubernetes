@@ -17,6 +17,8 @@ limitations under the License.
 package etcd
 
 import (
+	"path"
+
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
@@ -34,7 +36,7 @@ type REST struct {
 
 // NewREST returns a RESTStorage object that will work against PersistentVolume objects.
 func NewStorage(h tools.EtcdHelper) (*REST, *StatusREST) {
-	prefix := "/registry/persistentvolumes"
+	prefix := "/persistentvolumes"
 	store := &etcdgeneric.Etcd{
 		NewFunc:     func() runtime.Object { return &api.PersistentVolume{} },
 		NewListFunc: func() runtime.Object { return &api.PersistentVolumeList{} },
@@ -42,7 +44,7 @@ func NewStorage(h tools.EtcdHelper) (*REST, *StatusREST) {
 			return prefix
 		},
 		KeyFunc: func(ctx api.Context, name string) (string, error) {
-			return prefix + "/" + name, nil
+			return path.Join(prefix, name), nil
 		},
 		ObjectNameFunc: func(obj runtime.Object) (string, error) {
 			return obj.(*api.PersistentVolume).Name, nil

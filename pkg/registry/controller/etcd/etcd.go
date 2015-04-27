@@ -34,7 +34,7 @@ type REST struct {
 
 // controllerPrefix is the location for controllers in etcd, only exposed
 // for testing
-var controllerPrefix = "/registry/controllers"
+var controllerPrefix = "/controllers"
 
 // NewREST returns a RESTStorage object that will work against replication controllers.
 func NewREST(h tools.EtcdHelper) *REST {

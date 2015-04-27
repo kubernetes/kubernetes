@@ -56,7 +56,7 @@ type REST struct {
 
 // NewStorage returns a RESTStorage object that will work against pods.
 func NewStorage(h tools.EtcdHelper, k client.ConnectionInfoGetter) PodStorage {
-	prefix := "/registry/pods"
+	prefix := "/pods"
 	store := &etcdgeneric.Etcd{
 		NewFunc:     func() runtime.Object { return &api.Pod{} },
 		NewListFunc: func() runtime.Object { return &api.PodList{} },

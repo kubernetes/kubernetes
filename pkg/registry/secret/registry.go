@@ -31,16 +31,17 @@ type registry struct {
 
 // NewEtcdRegistry returns a registry which will store Secret in the given helper
 func NewEtcdRegistry(h tools.EtcdHelper) generic.Registry {
+	prefix := "/secrets"
 	return registry{
 		Etcd: &etcdgeneric.Etcd{
 			NewFunc:      func() runtime.Object { return &api.Secret{} },
 			NewListFunc:  func() runtime.Object { return &api.SecretList{} },
 			EndpointName: "secrets",
 			KeyRootFunc: func(ctx api.Context) string {
-				return etcdgeneric.NamespaceKeyRootFunc(ctx, "/registry/secrets")
+				return etcdgeneric.NamespaceKeyRootFunc(ctx, prefix)
 			},
 			KeyFunc: func(ctx api.Context, id string) (string, error) {
-				return etcdgeneric.NamespaceKeyFunc(ctx, "/registry/secrets", id)
+				return etcdgeneric.NamespaceKeyFunc(ctx, prefix, id)
 			},
 			Helper: h,
 		},

@@ -50,7 +50,7 @@ func (r *StatusREST) Update(ctx api.Context, obj runtime.Object) (runtime.Object
 
 // NewStorage returns a RESTStorage object that will work against nodes.
 func NewStorage(h tools.EtcdHelper, connection client.ConnectionInfoGetter) (*REST, *StatusREST) {
-	prefix := "/registry/minions"
+	prefix := "/minions"
 	store := &etcdgeneric.Etcd{
 		NewFunc:     func() runtime.Object { return &api.Node{} },
 		NewListFunc: func() runtime.Object { return &api.NodeList{} },

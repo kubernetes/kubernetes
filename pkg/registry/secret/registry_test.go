@@ -27,6 +27,7 @@ import (
 	etcdgeneric "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/generic/etcd"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools/etcdtest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 
 	"github.com/coreos/go-etcd/etcd"
@@ -35,7 +36,7 @@ import (
 func NewTestSecretEtcdRegistry(t *testing.T) (*tools.FakeEtcdClient, generic.Registry) {
 	f := tools.NewFakeEtcdClient(t)
 	f.TestIndex = true
-	h := tools.NewEtcdHelper(f, testapi.Codec())
+	h := tools.NewEtcdHelper(f, testapi.Codec(), etcdtest.PathPrefix())
 	return f, NewEtcdRegistry(h)
 }
 
@@ -65,10 +66,11 @@ func TestSecretCreate(t *testing.T) {
 		R: &etcd.Response{},
 		E: tools.EtcdErrorNotFound,
 	}
-
 	ctx := api.NewDefaultContext()
 	key := "foo"
-	path, err := etcdgeneric.NamespaceKeyFunc(ctx, "/registry/secrets", key)
+	path, err := etcdgeneric.NamespaceKeyFunc(ctx, "/secrets", key)
+	path = etcdtest.AddPrefix(path)
+
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
