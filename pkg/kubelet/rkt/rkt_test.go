@@ -402,8 +402,6 @@ func TestRunInContainer(t *testing.T) {
 		t.Errorf("Cannot run pod: %v", err)
 	}
 
-	// TODO(yifan): Sleep here because there is race between "running" and pid file is ready.
-	time.Sleep(time.Second)
 	verifyPod(rkt, pod, "running", t)
 
 	pods, err := rkt.GetPods(true)
@@ -422,10 +420,10 @@ func TestRunInContainer(t *testing.T) {
 	for i, tt := range tests {
 		output, err := rkt.RunInContainer(string(runningContainer.ID), tt.cmds)
 		if err != tt.expectedErr {
-			t.Errorf("%d: Expected: %#v, saw: %#v", i, tt.expectedErr, err)
+			t.Errorf("%d: Expected: %v, saw: %v", i, tt.expectedErr, err)
 		}
 		if !reflect.DeepEqual(tt.expectedOutput, output) {
-			t.Errorf("%d: Expected: %#v, saw: %#v", i, tt.expectedOutput, output)
+			t.Errorf("%d: Expected: %v, saw: %v", i, tt.expectedOutput, output)
 		}
 	}
 
@@ -485,8 +483,6 @@ func TestExecInContainer(t *testing.T) {
 		t.Errorf("Cannot run pod: %v", err)
 	}
 
-	// TODO(yifan): Sleep here because there is race between "running" and pid file is ready.
-	time.Sleep(time.Second)
 	verifyPod(rkt, pod, "running", t)
 
 	pods, err := rkt.GetPods(true)

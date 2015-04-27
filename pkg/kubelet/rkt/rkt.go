@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"hash/adler32"
 	"io"
+	"io/ioutil"
 	"os"
 	"os/exec"
 	"path"
@@ -29,11 +30,12 @@ import (
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/capabilities"
 	kubecontainer "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume"
-	schema "github.com/appc/spec/schema"
+	appcschema "github.com/appc/spec/schema"
 	appctypes "github.com/appc/spec/schema/types"
 	"github.com/coreos/go-systemd/dbus"
 	"github.com/coreos/go-systemd/unit"
@@ -223,7 +225,7 @@ func (r *Runtime) RunPod(pod *api.Pod, volumeMap map[string]volume.Volume) error
 func (r *Runtime) KillPod(pod *api.Pod) error {
 	glog.V(4).Infof("Rkt is killing pod: name %q.", pod.Name)
 
-	serviceName := makePodServiceFileName(pod.Name, pod.Namespace)
+	serviceName := makePodServiceFileName(pod)
 
 	// TODO(yifan): More graceful stop. Replace with StopUnit and wait for a timeout.
 	r.systemd.KillUnit(serviceName, int32(syscall.SIGKILL))
@@ -436,15 +438,91 @@ func (r *Runtime) makePod(unitName string, podInfos map[string]*podInfo) (*kubec
 }
 
 // makePodServiceFileName constructs the unit file name for the given pod.
-// TODO(yifan), when BoundPod and Pod are combined, we can change the input to
-// take just a pod.
-func makePodServiceFileName(podName, podNamespace string) string {
+func makePodServiceFileName(pod *api.Pod) string {
 	// TODO(yifan): Revisit this later, decide whether we want to use UID.
-	return fmt.Sprintf("%s_%s_%s.service", kubernetesUnitPrefix, podName, podNamespace)
+	return fmt.Sprintf("%s_%s_%s_%s.service", kubernetesUnitPrefix, pod.Name, pod.Namespace, pod.UID)
 }
 
 func newUnitOption(section, name, value string) *unit.UnitOption {
 	return &unit.UnitOption{Section: section, Name: name, Value: value}
+}
+
+type resource struct {
+	limit   string
+	request string
+}
+
+// setIsolators overrides the isolators of the pod manifest if necessary.
+func setIsolators(app *appctypes.App, c *api.Container) error {
+	var isolator appctypes.Isolator
+	if len(c.Capabilities.Add) > 0 || len(c.Capabilities.Drop) > 0 || len(c.Resources.Limits) > 0 || len(c.Resources.Requests) > 0 {
+		app.Isolators = []appctypes.Isolator{}
+	}
+
+	// Retained capabilities/privileged.
+	privileged := false
+	if capabilities.Get().AllowPrivileged {
+		privileged = c.Privileged
+	} else if c.Privileged {
+		glog.Errorf("Privileged is disallowed globally")
+		// TODO(yifan): Return error?
+	}
+	var caps string
+	var value []byte
+	if privileged {
+		caps = getAllCapabilities()
+	} else {
+		caps = getCapabilities(c.Capabilities.Add)
+	}
+	if len(caps) > 0 {
+		value = []byte(fmt.Sprintf(`{"name":"os/linux/capabilities-retain-set","value":{"set":[%s]}`, caps))
+		if err := isolator.UnmarshalJSON(value); err != nil {
+			glog.Errorf("Cannot unmarshal the retained capabilites %q: %v", value, err)
+			return err
+		}
+		app.Isolators = append(app.Isolators, isolator)
+	}
+
+	// Removed capabilities.
+	caps = getCapabilities(c.Capabilities.Drop)
+	if len(caps) > 0 {
+		value = []byte(fmt.Sprintf(`{"name":"os/linux/capabilities-remove-set","value":{"set":[%s]}`, caps))
+		if err := isolator.UnmarshalJSON(value); err != nil {
+			glog.Errorf("Cannot unmarshal the retained capabilites %q: %v", value, err)
+			return err
+		}
+		app.Isolators = append(app.Isolators, isolator)
+	}
+
+	// Resources.
+	resources := make(map[api.ResourceName]resource)
+	for name, quantity := range c.Resources.Limits {
+		resources[name] = resource{limit: quantity.String()}
+	}
+	for name, quantity := range c.Resources.Requests {
+		r, ok := resources[name]
+		if !ok {
+			r = resource{}
+		}
+		r.request = quantity.String()
+	}
+	for name, res := range resources {
+		switch name {
+		case api.ResourceCPU:
+			name = "resource/cpu"
+		case api.ResourceMemory:
+			name = "resource/memory"
+		default:
+			glog.Warningf("Resource type not supported: %v", name)
+		}
+		value = []byte(fmt.Sprintf(`"name":%q,"value":{"request":%q,"limit":%q}`, name, res.request, res.limit))
+		if err := isolator.UnmarshalJSON(value); err != nil {
+			glog.Errorf("Cannot unmarshal the resource %q: %v", value, err)
+			return err
+		}
+		app.Isolators = append(app.Isolators, isolator)
+	}
+	return nil
 }
 
 // setApp overrides the app's fields if any of them are specified in the
@@ -511,13 +589,14 @@ func setApp(app *appctypes.App, c *api.Container) error {
 			Port:     uint(p.ContainerPort),
 		})
 	}
-	// TODO(yifan): Isolators.
-	return nil
+
+	// Override isolators.
+	return setIsolators(app, c)
 }
 
 // makePodManifest transforms a kubelet pod spec to the rkt pod manifest.
-func makePodManifest(pod *api.Pod, volumeMap map[string]volume.Volume) (*schema.PodManifest, error) {
-	manifest := schema.BlankPodManifest()
+func (r *Runtime) makePodManifest(pod *api.Pod, volumeMap map[string]volume.Volume) (*appcschema.PodManifest, error) {
+	manifest := appcschema.BlankPodManifest()
 
 	// Get the image manifests, assume they are already in the cas,
 	// and extract the app field from the image and to be the 'base app'.
@@ -533,16 +612,17 @@ func makePodManifest(pod *api.Pod, volumeMap map[string]volume.Volume) (*schema.
 		return nil, err
 	}
 	for _, c := range pod.Spec.Containers {
-		fullKey, err := ds.ResolveKey(c.Image)
+		imageID, err := r.getImageID(c.Image)
 		if err != nil {
-			return nil, fmt.Errorf("cannot resolve key: %v", err)
+			return nil, fmt.Errorf("cannot get image ID for %q: %v", c.Image, err)
 		}
-		hash, err := appctypes.NewHash(fullKey)
+		hash, err := appctypes.NewHash(imageID)
 		if err != nil {
-			glog.Errorf("impossible: cannot create hash from full key: %v", err)
+			glog.Errorf("Cannot create new hash from %q", imageID)
 			return nil, err
 		}
-		im, err := ds.GetImageManifest((*hash).String())
+
+		im, err := ds.GetImageManifest(hash.String())
 		if err != nil {
 			glog.Errorf("Cannot get image manifest: %v", err)
 			return nil, err
@@ -553,16 +633,9 @@ func makePodManifest(pod *api.Pod, volumeMap map[string]volume.Volume) (*schema.
 		if err := setApp(app, &c); err != nil {
 			return nil, err
 		}
-
-		appName, err := appctypes.NewACName(c.Name)
-		if err != nil {
-			glog.Errorf("Cannot use the container's name %q as ACName: %v", c.Name, err)
-			return nil, err
-		}
-
-		manifest.Apps = append(manifest.Apps, schema.RuntimeApp{
-			Name:  *appName,
-			Image: schema.RuntimeImage{ID: *hash},
+		manifest.Apps = append(manifest.Apps, appcschema.RuntimeApp{
+			Name:  im.Name,
+			Image: appcschema.RuntimeImage{ID: *hash},
 			App:   app,
 		})
 	}
@@ -666,19 +739,27 @@ func parseContainerID(id string) (*containerID, error) {
 // On success, it will return a string that represents name of the unit file
 // and a boolean that indicates if the unit file needs reload.
 func (r *Runtime) preparePod(pod *api.Pod, volumeMap map[string]volume.Volume) (string, bool, error) {
-	cmds := []string{"prepare", "--quiet"}
+	cmds := []string{"prepare", "--quiet", "--pod-manifest"}
 
-	// Construct the '--volume' cmd line.
-	for name, mount := range volumeMap {
-		cmds = append(cmds, "--volume")
-		cmds = append(cmds, fmt.Sprintf("%s,kind=host,source=%s", name, mount.GetPath()))
+	// Generate the pod manifest from the pod spec.
+	manifest, err := r.makePodManifest(pod, volumeMap)
+	if err != nil {
+		return "", false, err
+	}
+	manifestFile, err := ioutil.TempFile("", "manifest")
+	if err != nil {
+		return "", false, err
+	}
+	data, err := json.Marshal(manifest)
+	if err != nil {
+		return "", false, err
+	}
+	// File.Write returns error if the written length is less than len(data).
+	if _, err := manifestFile.Write(data); err != nil {
+		return "", false, err
 	}
 
-	// Append ACIs.
-	for _, c := range pod.Spec.Containers {
-		cmds = append(cmds, c.Image)
-	}
-
+	cmds = append(cmds, manifestFile.Name())
 	output, err := r.RunCommand(cmds...)
 	if err != nil {
 		return "", false, err
@@ -706,7 +787,7 @@ func (r *Runtime) preparePod(pod *api.Pod, volumeMap map[string]volume.Volume) (
 	// Save the unit file under systemd's service directory.
 	// TODO(yifan) Garbage collect 'dead' serivce files.
 	needReload := false
-	unitName := makePodServiceFileName(pod.Name, pod.Namespace)
+	unitName := makePodServiceFileName(pod)
 	if _, err := os.Stat(path.Join(systemdServiceDir, unitName)); err == nil {
 		needReload = true
 	}
