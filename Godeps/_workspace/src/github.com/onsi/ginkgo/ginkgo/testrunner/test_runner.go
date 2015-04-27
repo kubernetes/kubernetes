@@ -291,7 +291,7 @@ func (t *TestRunner) runParallelGinkgoSuite() RunResult {
 }
 
 func (t *TestRunner) cmd(ginkgoArgs []string, stream io.Writer, node int) *exec.Cmd {
-	args := []string{"-test.timeout=24h"}
+	args := []string{"--test.timeout=24h"}
 	if t.cover {
 		coverprofile := "--test.coverprofile=" + t.Suite.PackageName + ".coverprofile"
 		if t.numCPU > 1 {
