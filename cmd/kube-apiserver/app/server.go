@@ -63,6 +63,7 @@ type APIServer struct {
 	CloudProvider              string
 	CloudConfigFile            string
 	EventTTL                   time.Duration
+	BasicAuthFile              string
 	ClientCAFile               string
 	TokenAuthFile              string
 	AuthorizationMode          string
@@ -155,6 +156,7 @@ func (s *APIServer) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.CloudProvider, "cloud-provider", s.CloudProvider, "The provider for cloud services.  Empty string for no provider.")
 	fs.StringVar(&s.CloudConfigFile, "cloud-config", s.CloudConfigFile, "The path to the cloud provider configuration file.  Empty string for no configuration file.")
 	fs.DurationVar(&s.EventTTL, "event-ttl", s.EventTTL, "Amount of time to retain events. Default 1 hour.")
+	fs.StringVar(&s.BasicAuthFile, "basic-auth-file", s.BasicAuthFile, "If set, the file that will be used to admit requests to the secure port of the API server via http basic authentication.")
 	fs.StringVar(&s.ClientCAFile, "client-ca-file", s.ClientCAFile, "If set, any request presenting a client certificate signed by one of the authorities in the client-ca-file is authenticated with an identity corresponding to the CommonName of the client certificate.")
 	fs.StringVar(&s.TokenAuthFile, "token-auth-file", s.TokenAuthFile, "If set, the file that will be used to secure the secure port of the API server via token authentication.")
 	fs.StringVar(&s.AuthorizationMode, "authorization-mode", s.AuthorizationMode, "Selects how to do authorization on the secure port.  One of: "+strings.Join(apiserver.AuthorizationModeChoices, ","))
@@ -242,7 +244,7 @@ func (s *APIServer) Run(_ []string) error {
 
 	n := net.IPNet(s.PortalNet)
 
-	authenticator, err := apiserver.NewAuthenticator(s.ClientCAFile, s.TokenAuthFile)
+	authenticator, err := apiserver.NewAuthenticator(s.BasicAuthFile, s.ClientCAFile, s.TokenAuthFile)
 	if err != nil {
 		glog.Fatalf("Invalid Authentication Config: %v", err)
 	}
