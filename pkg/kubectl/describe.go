@@ -64,6 +64,7 @@ func describerMap(c *client.Client) map[string]Describer {
 	m := map[string]Describer{
 		"Pod": &PodDescriber{c},
 		"ReplicationController": &ReplicationControllerDescriber{c},
+		"Secret":                &SecretDescriber{c},
 		"Service":               &ServiceDescriber{c},
 		"Minion":                &NodeDescriber{c},
 		"Node":                  &NodeDescriber{c},
@@ -417,6 +418,44 @@ func describeReplicationController(controller *api.ReplicationController, events
 		if events != nil {
 			DescribeEvents(events, out)
 		}
+		return nil
+	})
+}
+
+// SecretDescriber generates information about a secret
+type SecretDescriber struct {
+	client.Interface
+}
+
+func (d *SecretDescriber) Describe(namespace, name string) (string, error) {
+	c := d.Secrets(namespace)
+
+	secret, err := c.Get(name)
+	if err != nil {
+		return "", err
+	}
+
+	return describeSecret(secret)
+}
+
+func describeSecret(secret *api.Secret) (string, error) {
+	return tabbedString(func(out io.Writer) error {
+		fmt.Fprintf(out, "Name:\t%s\n", secret.Name)
+		fmt.Fprintf(out, "Labels:\t%s\n", formatLabels(secret.Labels))
+		fmt.Fprintf(out, "Annotations:\t%s\n", formatLabels(secret.Annotations))
+
+		fmt.Fprintf(out, "\nType:\t%s\n", secret.Type)
+
+		fmt.Fprintf(out, "\nData\n====\n")
+		for k, v := range secret.Data {
+			switch {
+			case k == api.ServiceAccountTokenKey && secret.Type == api.SecretTypeServiceAccountToken:
+				fmt.Fprintf(out, "%s:\t%s\n", k, string(v))
+			default:
+				fmt.Fprintf(out, "%s:\t%d bytes\n", k, len(v))
+			}
+		}
+
 		return nil
 	})
 }

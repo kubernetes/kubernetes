@@ -2961,6 +2961,7 @@ func TestValidateNamespaceUpdate(t *testing.T) {
 }
 
 func TestValidateSecret(t *testing.T) {
+	// Opaque secret validation
 	validSecret := func() api.Secret {
 		return api.Secret{
 			ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "bar"},
@@ -2988,6 +2989,32 @@ func TestValidateSecret(t *testing.T) {
 	}
 	invalidKey.Data["a..b"] = []byte("whoops")
 
+	// kubernetes.io/service-account-token secret validation
+	validServiceAccountTokenSecret := func() api.Secret {
+		return api.Secret{
+			ObjectMeta: api.ObjectMeta{
+				Name:      "foo",
+				Namespace: "bar",
+				Annotations: map[string]string{
+					api.ServiceAccountNameKey: "foo",
+				},
+			},
+			Type: api.SecretTypeServiceAccountToken,
+			Data: map[string][]byte{
+				"data-1": []byte("bar"),
+			},
+		}
+	}
+
+	var (
+		emptyTokenAnnotation    = validServiceAccountTokenSecret()
+		missingTokenAnnotation  = validServiceAccountTokenSecret()
+		missingTokenAnnotations = validServiceAccountTokenSecret()
+	)
+	emptyTokenAnnotation.Annotations[api.ServiceAccountNameKey] = ""
+	delete(missingTokenAnnotation.Annotations, api.ServiceAccountNameKey)
+	missingTokenAnnotations.Annotations = nil
+
 	tests := map[string]struct {
 		secret api.Secret
 		valid  bool
@@ -2999,6 +3026,11 @@ func TestValidateSecret(t *testing.T) {
 		"invalid namespace": {invalidNs, false},
 		"over max size":     {overMaxSize, false},
 		"invalid key":       {invalidKey, false},
+
+		"valid service-account-token secret":        {validServiceAccountTokenSecret(), true},
+		"empty service-account-token annotation":    {emptyTokenAnnotation, false},
+		"missing service-account-token annotation":  {missingTokenAnnotation, false},
+		"missing service-account-token annotations": {missingTokenAnnotations, false},
 	}
 
 	for name, tc := range tests {

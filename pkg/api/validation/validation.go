@@ -1244,6 +1244,12 @@ func ValidateSecret(secret *api.Secret) errs.ValidationErrorList {
 	}
 
 	switch secret.Type {
+	case api.SecretTypeServiceAccountToken:
+		// Only require Annotations[kubernetes.io/service-account.name]
+		// Additional fields (like Annotations[kubernetes.io/service-account.uid] and Data[token]) might be contributed later by a controller loop
+		if value := secret.Annotations[api.ServiceAccountNameKey]; len(value) == 0 {
+			allErrs = append(allErrs, errs.NewFieldRequired(fmt.Sprintf("metadata.annotations[%s]", api.ServiceAccountNameKey)))
+		}
 	case api.SecretTypeOpaque, "":
 		// no-op
 	default:
