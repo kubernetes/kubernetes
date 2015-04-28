@@ -274,65 +274,6 @@ func (r *Runtime) RunCommand(args ...string) ([]string, error) {
 	return strings.Split(strings.TrimSpace(string(output)), "\n"), nil
 }
 
-type podInfo struct {
-	state       string
-	networkInfo string
-}
-
-// getIP returns the IP of a pod by parsing the network info.
-// The network info looks like this:
-//
-// default:ip4=172.16.28.3, database:ip4=172.16.28.42
-//
-func (p *podInfo) getIP() string {
-	parts := strings.Split(p.networkInfo, ",")
-
-	for _, part := range parts {
-		if strings.HasPrefix(part, "default:") {
-			return strings.Split(part, "=")[1]
-		}
-	}
-	return ""
-}
-
-// getContainerStatus converts the rkt pod state to the api.containerStatus.
-// TODO(yifan): Get more detailed info such as Image, ImageID, etc.
-func (p *podInfo) getContainerStatus(container *kubecontainer.Container) api.ContainerStatus {
-	var status api.ContainerStatus
-	status.Name = container.Name
-	status.Image = container.Image
-	switch p.state {
-	case Running:
-		// TODO(yifan): Get StartedAt.
-		status.State = api.ContainerState{
-			Running: &api.ContainerStateRunning{
-				StartedAt: util.Unix(container.Created, 0),
-			},
-		}
-	case Embryo, Preparing, Prepared:
-		status.State = api.ContainerState{Waiting: &api.ContainerStateWaiting{}}
-	case AbortedPrepare, Deleting, Exited, Garbage:
-		status.State = api.ContainerState{
-			Termination: &api.ContainerStateTerminated{
-				StartedAt: util.Unix(container.Created, 0),
-			},
-		}
-	default:
-		glog.Warningf("Unknown pod state: %q", p.state)
-	}
-	return status
-}
-
-func (p *podInfo) toPodStatus(pod *kubecontainer.Pod) api.PodStatus {
-	var status api.PodStatus
-	status.PodIP = p.getIP()
-	// For now just make every container's state as same as the pod.
-	for _, container := range pod.Containers {
-		status.ContainerStatuses = append(status.ContainerStatuses, p.getContainerStatus(container))
-	}
-	return status
-}
-
 // splitLine breaks a line by tabs, and trims the leading and tailing spaces.
 func splitLine(line string) []string {
 	var result []string
@@ -379,13 +320,19 @@ func (r *Runtime) getPodInfos() (map[string]*podInfo, error) {
 		if len(tuples) < 3 { // At least it should have 3 entries.
 			continue
 		}
-		info := &podInfo{
-			state: tuples[2],
+		id := tuples[0]
+
+		status, err := r.RunCommand("status", id)
+		if err != nil {
+			glog.Errorf("Cannot get status for pod (uuid=%q): %v", id, err)
+			continue
 		}
-		if len(tuples) == 4 {
-			info.networkInfo = tuples[3]
+		info := newPodInfo()
+		if err := info.parseStatus(status); err != nil {
+			glog.Errorf("Cannot parse status for pod (uuid=%q): %v", id, err)
+			continue
 		}
-		result[tuples[0]] = info
+		result[id] = info
 	}
 	return result, nil
 }
