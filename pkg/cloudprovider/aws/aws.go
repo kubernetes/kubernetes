@@ -275,16 +275,36 @@ func (aws *AWSCloud) Zones() (cloudprovider.Zones, bool) {
 
 // NodeAddresses is an implementation of Instances.NodeAddresses.
 func (aws *AWSCloud) NodeAddresses(name string) ([]api.NodeAddress, error) {
-	inst, err := aws.getInstancesByDnsName(name)
+	instance, err := aws.getInstancesByDnsName(name)
 	if err != nil {
 		return nil, err
 	}
-	ip := net.ParseIP(inst.PrivateIpAddress)
-	if ip == nil {
-		return nil, fmt.Errorf("invalid network IP: %s", inst.PrivateIpAddress)
+
+	addresses := []api.NodeAddress{}
+
+	if instance.PrivateIpAddress != "" {
+		ipAddress := instance.PrivateIpAddress
+		ip := net.ParseIP(ipAddress)
+		if ip == nil {
+			return nil, fmt.Errorf("EC2 instance had invalid private address: %s (%s)", instance.InstanceId, ipAddress)
+		}
+		addresses = append(addresses, api.NodeAddress{Type: api.NodeInternalIP, Address: ip.String()})
+
+		// Legacy compatibility: the private ip was the legacy host ip
+		addresses = append(addresses, api.NodeAddress{Type: api.NodeLegacyHostIP, Address: ip.String()})
 	}
 
-	return []api.NodeAddress{{Type: api.NodeLegacyHostIP, Address: ip.String()}}, nil
+	// TODO: Other IP addresses (multiple ips)?
+	if instance.PublicIpAddress != "" {
+		ipAddress := instance.PublicIpAddress
+		ip := net.ParseIP(ipAddress)
+		if ip == nil {
+			return nil, fmt.Errorf("EC2 instance had invalid public address: %s (%s)", instance.InstanceId, ipAddress)
+		}
+		addresses = append(addresses, api.NodeAddress{Type: api.NodeExternalIP, Address: ip.String()})
+	}
+
+	return addresses, nil
 }
 
 // ExternalID returns the cloud provider ID of the specified instance.
