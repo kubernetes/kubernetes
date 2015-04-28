@@ -225,7 +225,7 @@ func startComponents(firstManifestURL, secondManifestURL, apiVersion string) (st
 			api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
 		}}
 
-	nodeController := nodecontroller.NewNodeController(nil, "", machineList, nodeResources, cl, 10, 5*time.Minute, util.NewFakeRateLimiter(), 40*time.Second, 60*time.Second, 5*time.Second, "")
+	nodeController := nodecontroller.NewNodeController(nil, "", machineList, nodeResources, cl, 10, 5*time.Minute, util.NewFakeRateLimiter(), 40*time.Second, 60*time.Second, 5*time.Second, "", "", false)
 	nodeController.Run(5*time.Second, true)
 	cadvisorInterface := new(cadvisor.Fake)
 
