@@ -305,7 +305,8 @@ func (h *HumanReadablePrinter) printHeader(columnNames []string, w io.Writer) er
 	return nil
 }
 
-func formatEndpoints(endpoints *api.Endpoints) string {
+// Pass ports=nil for all ports.
+func formatEndpoints(endpoints *api.Endpoints, ports util.StringSet) string {
 	if len(endpoints.Subsets) == 0 {
 		return "<none>"
 	}
@@ -317,7 +318,7 @@ Loop:
 		ss := &endpoints.Subsets[i]
 		for i := range ss.Ports {
 			port := &ss.Ports[i]
-			if port.Name == "" { // TODO: add multi-port support.
+			if ports == nil || ports.Has(port.Name) {
 				for i := range ss.Addresses {
 					if len(list) == max {
 						more = true
@@ -555,7 +556,7 @@ func printServiceList(list *api.ServiceList, w io.Writer) error {
 }
 
 func printEndpoints(endpoints *api.Endpoints, w io.Writer) error {
-	_, err := fmt.Fprintf(w, "%s\t%s\n", endpoints.Name, formatEndpoints(endpoints))
+	_, err := fmt.Fprintf(w, "%s\t%s\n", endpoints.Name, formatEndpoints(endpoints, nil))
 	return err
 }
 
