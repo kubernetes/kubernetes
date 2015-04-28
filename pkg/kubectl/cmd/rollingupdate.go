@@ -51,14 +51,18 @@ $ kubectl rolling-update frontend-v1 -f frontend-v2.json
 // Update pods of frontend-v1 using JSON data passed into stdin.
 $ cat frontend-v2.json | kubectl rolling-update frontend-v1 -f -
 
-// Update the pods of frontend-v1 to frontend-v2 by just changing the image
+// Update the pods of frontend-v1 to frontend-v2 by just changing the image, and switching the
+// name of the replication controller.
 $ kubectl rolling-update frontend-v1 frontend-v2 --image=image:v2
+
+// Update the pods of frontend by just changing the image, and keeping the old name
+$ kubectl rolling-update frontend --image=image:v2
 `
 )
 
 func NewCmdRollingUpdate(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use: "rolling-update OLD_CONTROLLER_NAME -f NEW_CONTROLLER_SPEC",
+		Use: "rolling-update OLD_CONTROLLER_NAME ([NEW_CONTROLLER_NAME] --image=NEW_CONTAINER_IMAGE | -f NEW_CONTROLLER_SPEC)",
 		// rollingupdate is deprecated.
 		Aliases: []string{"rollingupdate"},
 		Short:   "Perform a rolling update of the given ReplicationController.",
@@ -93,9 +97,6 @@ func validateArguments(cmd *cobra.Command, args []string) (deploymentKey, filena
 	}
 	if len(filename) != 0 && len(image) != 0 {
 		return "", "", "", "", cmdutil.UsageError(cmd, "--filename and --image can not both be specified")
-	}
-	if len(image) > 0 && len(args) < 2 {
-		return "", "", "", "", cmdutil.UsageError(cmd, "You must specify a name for your new controller")
 	}
 	if len(args) < 1 {
 		return "", "", "", "", cmdutil.UsageError(cmd, "Must specify the controller to update")
@@ -133,6 +134,8 @@ func RunRollingUpdate(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, arg
 		return err
 	}
 
+	keepOldName := false
+
 	mapper, typer := f.Object()
 	var newRc *api.ReplicationController
 
@@ -152,7 +155,6 @@ func RunRollingUpdate(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, arg
 		}
 	}
 	if len(image) != 0 {
-		newName := args[1]
 		var err error
 		// load the old RC into the "new" RC
 		if newRc, err = client.ReplicationControllers(cmdNamespace).Get(oldName); err != nil {
@@ -172,10 +174,19 @@ func RunRollingUpdate(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, arg
 		if err != nil {
 			return err
 		}
+
+		var newName string
+		if len(args) >= 2 {
+			newName = args[1]
+		} else {
+			keepOldName = true
+			newName = fmt.Sprintf("%s-%s", newRc.Name, newHash)
+		}
 		newRc.Name = newName
 
 		newRc.Spec.Selector[deploymentKey] = newHash
 		newRc.Spec.Template.Labels[deploymentKey] = newHash
+		// Clear resource version after hashing so that identical updates get different hashes.
 		newRc.ResourceVersion = ""
 
 		if _, found := oldRc.Spec.Selector[deploymentKey]; !found {
@@ -219,6 +230,10 @@ func RunRollingUpdate(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, arg
 		fmt.Fprintf(out, "Rolling from:\n%s\nTo:\n%s\n", string(oldRcData.Bytes()), string(newRcData.Bytes()))
 		return nil
 	}
+	updateCleanupPolicy := kubectl.DeleteRollingUpdateCleanupPolicy
+	if keepOldName {
+		updateCleanupPolicy = kubectl.RenameRollingUpdateCleanupPolicy
+	}
 	err = updater.Update(&kubectl.RollingUpdaterConfig{
 		Out:           out,
 		OldRc:         oldRc,
@@ -226,13 +241,17 @@ func RunRollingUpdate(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, arg
 		UpdatePeriod:  period,
 		Interval:      interval,
 		Timeout:       timeout,
-		CleanupPolicy: kubectl.DeleteRollingUpdateCleanupPolicy,
+		CleanupPolicy: updateCleanupPolicy,
 	})
 	if err != nil {
 		return err
 	}
 
-	fmt.Fprintf(out, "%s\n", newName)
+	if keepOldName {
+		fmt.Fprintf(out, "%s\n", oldName)
+	} else {
+		fmt.Fprintf(out, "%s\n", newName)
+	}
 	return nil
 }
 
