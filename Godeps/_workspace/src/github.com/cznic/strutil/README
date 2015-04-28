@@ -1,0 +1,8 @@
+This is a goinstall-able mirror of modified code already published at:
+http://git.nic.cz/redmine/projects/gostrutil/repository
+
+Online godoc documentation for this package (should be) available at:
+http://gopkgdoc.appspot.com/pkg/github.com/cznic/strutil
+
+Installation:
+$ go get github.com/cznic/strutil

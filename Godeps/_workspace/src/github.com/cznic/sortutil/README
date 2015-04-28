@@ -1,0 +1,4 @@
+Packages in this repository:
+
+Install: $ go get github.com/cznic/sortutil
+Godocs:  http://godoc.org/github.com/cznic/sortutil
