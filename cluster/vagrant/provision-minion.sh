@@ -17,6 +17,8 @@
 # exit on any error
 set -e
 
+hostnamectl set-hostname ${MINION_NAMES[$MINION_ID]}
+
 # Setup hosts file to support ping by hostname to master
 if [ ! "$(cat /etc/hosts | grep $MASTER_NAME)" ]; then
   echo "Adding $MASTER_NAME to hosts file"
@@ -84,3 +86,14 @@ else
   # Restarting it here un-wedges it.
   systemctl restart salt-minion.service
 fi
+
+# re install docker because of this: https://github.com/docker/docker/issues/11135
+# required only for fedora21 bentobox image, but not checking for all that now
+yum -y remove docker-io || true
+yum -y install docker-io
+
+CONTRAIL_KUBERNETES=$HOME/contrail-kubernetes
+rm -rf $CONTRAIL_KUBERNETES
+sudo yum -y install ruby git
+git clone https://github.com/rombie/contrail-kubernetes.git $CONTRAIL_KUBERNETES
+sudo ruby $CONTRAIL_KUBERNETES/scripts/opencontrail-install/contrail_install.rb compute

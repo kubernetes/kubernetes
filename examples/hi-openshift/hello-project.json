@@ -1,0 +1,10 @@
+{
+  "id": "hello-openshift-project",
+  "kind": "Project",
+  "apiVersion": "v1beta1",
+  "displayName": "Hello OpenShift",
+  "description": "This is an example project to demonstrate OpenShift v3",
+  "labels": {
+    "name": "hello-openshift-project"
+  }
+}
