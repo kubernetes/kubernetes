@@ -89,11 +89,13 @@ type Config struct {
 	// allow v1beta3 to be conditionally disabled
 	DisableV1Beta3 bool
 	// allow downstream consumers to disable the index route
-	EnableIndex            bool
-	EnableProfiling        bool
-	APIPrefix              string
-	CorsAllowedOriginList  util.StringList
-	Authenticator          authenticator.Request
+	EnableIndex           bool
+	EnableProfiling       bool
+	APIPrefix             string
+	CorsAllowedOriginList util.StringList
+	Authenticator         authenticator.Request
+	// TODO(roberthbailey): Remove once the server no longer supports http basic auth.
+	SupportsBasicAuth      bool
 	Authorizer             authorizer.Authorizer
 	AdmissionControl       admission.Interface
 	MasterServiceNamespace string
@@ -500,7 +502,7 @@ func (m *Master) init(c *Config) {
 
 	// Install Authenticator
 	if c.Authenticator != nil {
-		authenticatedHandler, err := handlers.NewRequestAuthenticator(m.requestContextMapper, c.Authenticator, handlers.Unauthorized, handler)
+		authenticatedHandler, err := handlers.NewRequestAuthenticator(m.requestContextMapper, c.Authenticator, handlers.Unauthorized(c.SupportsBasicAuth), handler)
 		if err != nil {
 			glog.Fatalf("Could not initialize authenticator: %v", err)
 		}
