@@ -176,16 +176,16 @@ This is on the PXE server from the previous section:
 
     rm /etc/httpd/conf.d/welcome.conf
     cd /var/www/html/
-    wget -O kube-register https://github.com/jeffbean/kube-register/releases/download/v0.5/kube-register
+    wget -O kube-register  https://github.com/kelseyhightower/kube-register/releases/download/v0.0.2/kube-register-0.0.2-linux-amd64
     wget -O setup-network-environment https://github.com/kelseyhightower/setup-network-environment/releases/download/v1.0.0/setup-network-environment
-    wget https://storage.googleapis.com/kubernetes-release/release/v0.10.1/bin/linux/amd64/kubernetes --no-check-certificate
-    wget https://storage.googleapis.com/kubernetes-release/release/v0.10.1/bin/linux/amd64/kube-apiserver --no-check-certificate
-    wget https://storage.googleapis.com/kubernetes-release/release/v0.10.1/bin/linux/amd64/kube-controller-manager --no-check-certificate
-    wget https://storage.googleapis.com/kubernetes-release/release/v0.10.1/bin/linux/amd64/kube-scheduler --no-check-certificate
-    wget https://storage.googleapis.com/kubernetes-release/release/v0.10.1/bin/linux/amd64/kubectl --no-check-certificate
-    wget https://storage.googleapis.com/kubernetes-release/release/v0.10.1/bin/linux/amd64/kubecfg --no-check-certificate
-    wget https://storage.googleapis.com/kubernetes-release/release/v0.10.1/bin/linux/amd64/kubelet --no-check-certificate
-    wget https://storage.googleapis.com/kubernetes-release/release/v0.10.1/bin/linux/amd64/kube-proxy --no-check-certificate
+    wget https://storage.googleapis.com/kubernetes-release/release/v0.15.0/bin/linux/amd64/kubernetes --no-check-certificate
+    wget https://storage.googleapis.com/kubernetes-release/release/v0.15.0/bin/linux/amd64/kube-apiserver --no-check-certificate
+    wget https://storage.googleapis.com/kubernetes-release/release/v0.15.0/bin/linux/amd64/kube-controller-manager --no-check-certificate
+    wget https://storage.googleapis.com/kubernetes-release/release/v0.15.0/bin/linux/amd64/kube-scheduler --no-check-certificate
+    wget https://storage.googleapis.com/kubernetes-release/release/v0.15.0/bin/linux/amd64/kubectl --no-check-certificate
+    wget https://storage.googleapis.com/kubernetes-release/release/v0.15.0/bin/linux/amd64/kubecfg --no-check-certificate
+    wget https://storage.googleapis.com/kubernetes-release/release/v0.15.0/bin/linux/amd64/kubelet --no-check-certificate
+    wget https://storage.googleapis.com/kubernetes-release/release/v0.15.0/bin/linux/amd64/kube-proxy --no-check-certificate
     wget -O flanneld https://storage.googleapis.com/k8s/flanneld --no-check-certificate
 
 This sets up our binaries we need to run Kubernetes. This would need to be enhanced to download from the Internet for updates in the future.
@@ -197,6 +197,13 @@ The following config files are tailored for the OFFLINE version of a Kubernetes 
 
 These are based on the work found here: [master.yml](http://docs.k8s.io/getting-started-guides/coreos/cloud-configs/master.yaml), [node.yml](http://docs.k8s.io/getting-started-guides/coreos/cloud-configs/node.yaml)
 
+To make the setup work, you need to replace a few placeholders:
+
+ - Replace `<PXE_SERVER_IP>` with your PXE server ip address (e.g. 10.20.30.242)
+ - Replace `<MASTER_SERVER_IP>` with the kubernetes master ip address (e.g. 10.20.30.40)
+ - If you run a private docker registry, replace `rdocker.example.com` with your docker registry dns name.
+ - If you use a proxy, replace `rproxy.example.com` with your proxy server (and port)
+ - Add your own SSH public key(s) to the cloud config at the end
 
 ### master.yml
 On the PXE server make and fill in the variables ```vi /var/www/html/coreos/pxe-cloud-config-master.yml```.
@@ -215,9 +222,9 @@ On the PXE server make and fill in the variables ```vi /var/www/html/coreos/pxe-
         permissions: 0755
         content: |
           #! /usr/bin/bash
-          /usr/bin/wget -N -P "/opt/bin" "http://<pxe-server-ip>/kubectl"
-          /usr/bin/wget -N -P "/opt/bin" "http://<pxe-server-ip>/kubernetes"
-          /usr/bin/wget -N -P "/opt/bin" "http://<pxe-server-ip>/kubecfg"
+          /usr/bin/wget -N -P "/opt/bin" "http://<PXE_SERVER_IP>/kubectl"
+          /usr/bin/wget -N -P "/opt/bin" "http://<PXE_SERVER_IP>/kubernetes"
+          /usr/bin/wget -N -P "/opt/bin" "http://<PXE_SERVER_IP>/kubecfg"
           chmod +x /opt/bin/*
       - path: /etc/profile.d/opt-path.sh
         owner: root
@@ -260,7 +267,7 @@ On the PXE server make and fill in the variables ```vi /var/www/html/coreos/pxe-
             After=network-online.target
             [Service]
             ExecStartPre=-/usr/bin/mkdir -p /opt/bin
-            ExecStartPre=/usr/bin/wget -N -P /opt/bin http://<pxe-server-ip>/setup-network-environment 
+            ExecStartPre=/usr/bin/wget -N -P /opt/bin http://<PXE_SERVER_IP>/setup-network-environment
             ExecStartPre=/usr/bin/chmod +x /opt/bin/setup-network-environment
             ExecStart=/opt/bin/setup-network-environment
             RemainAfterExit=yes
@@ -337,7 +344,7 @@ On the PXE server make and fill in the variables ```vi /var/www/html/coreos/pxe-
             [Service]
             Type=notify
             ExecStartPre=-/usr/bin/mkdir -p /opt/bin
-            ExecStartPre=/usr/bin/wget -N -P /opt/bin http://<pxe-server-ip>/flanneld
+            ExecStartPre=/usr/bin/wget -N -P /opt/bin http://<PXE_SERVER_IP>/flanneld
             ExecStartPre=/usr/bin/chmod +x /opt/bin/flanneld
             ExecStartPre=-/usr/bin/etcdctl mk /coreos.com/network/config '{"Network":"10.100.0.0/16", "Backend": {"Type": "vxlan"}}'
             ExecStart=/opt/bin/flanneld
@@ -351,7 +358,7 @@ On the PXE server make and fill in the variables ```vi /var/www/html/coreos/pxe-
             After=etcd.service
             [Service]
             ExecStartPre=-/usr/bin/mkdir -p /opt/bin
-            ExecStartPre=/usr/bin/wget -N -P /opt/bin http://<pxe-server-ip>/kube-apiserver
+            ExecStartPre=/usr/bin/wget -N -P /opt/bin http://<PXE_SERVER_IP>/kube-apiserver
             ExecStartPre=/usr/bin/chmod +x /opt/bin/kube-apiserver
             ExecStart=/opt/bin/kube-apiserver \
             --address=0.0.0.0 \
@@ -370,7 +377,7 @@ On the PXE server make and fill in the variables ```vi /var/www/html/coreos/pxe-
             Requires=kube-apiserver.service
             After=kube-apiserver.service
             [Service]
-            ExecStartPre=/usr/bin/wget -N -P /opt/bin http://<pxe-server-ip>/kube-controller-manager
+            ExecStartPre=/usr/bin/wget -N -P /opt/bin http://<PXE_SERVER_IP>/kube-controller-manager
             ExecStartPre=/usr/bin/chmod +x /opt/bin/kube-controller-manager
             ExecStart=/opt/bin/kube-controller-manager \
             --master=127.0.0.1:8080 \
@@ -386,7 +393,7 @@ On the PXE server make and fill in the variables ```vi /var/www/html/coreos/pxe-
             Requires=kube-apiserver.service
             After=kube-apiserver.service
             [Service]
-            ExecStartPre=/usr/bin/wget -N -P /opt/bin http://<pxe-server-ip>/kube-scheduler
+            ExecStartPre=/usr/bin/wget -N -P /opt/bin http://<PXE_SERVER_IP>/kube-scheduler
             ExecStartPre=/usr/bin/chmod +x /opt/bin/kube-scheduler
             ExecStart=/opt/bin/kube-scheduler --master=127.0.0.1:8080
             Restart=always
@@ -402,11 +409,12 @@ On the PXE server make and fill in the variables ```vi /var/www/html/coreos/pxe-
             Requires=fleet.service
             After=fleet.service
             [Service]
-            ExecStartPre=/usr/bin/wget -N -P /opt/bin http://<pxe-server-ip>/kube-register
+            ExecStartPre=/usr/bin/wget -N -P /opt/bin http://<PXE_SERVER_IP>/kube-register
             ExecStartPre=/usr/bin/chmod +x /opt/bin/kube-register
             ExecStart=/opt/bin/kube-register \
             --metadata=role=node \
             --fleet-endpoint=unix:///var/run/fleet.sock \
+            --healthz-port=10248 \
             --api-endpoint=http://127.0.0.1:8080
             Restart=always
             RestartSec=10
@@ -458,7 +466,7 @@ On the PXE server make and fill in the variables ```vi /var/www/html/coreos/pxe-
             Wants=fleet.socket
             After=fleet.socket
             [Service]
-            Environment="FLEET_ETCD_SERVERS=http://10.20.30.40:4001"
+            Environment="FLEET_ETCD_SERVERS=http://<MASTER_SERVER_IP>:4001"
             Environment="FLEET_METADATA=role=node"
             ExecStart=/usr/bin/fleetd
             Restart=always
@@ -473,9 +481,9 @@ On the PXE server make and fill in the variables ```vi /var/www/html/coreos/pxe-
             [Service]
             Type=notify
             ExecStartPre=-/usr/bin/mkdir -p /opt/bin
-            ExecStartPre=/usr/bin/wget -N -P /opt/bin http://<pxe server ip>/flanneld
+            ExecStartPre=/usr/bin/wget -N -P /opt/bin http://<PXE_SERVER_IP>/flanneld
             ExecStartPre=/usr/bin/chmod +x /opt/bin/flanneld
-            ExecStart=/opt/bin/flanneld -etcd-endpoints http://10.20.30.40:4001
+            ExecStart=/opt/bin/flanneld -etcd-endpoints http://<MASTER_SERVER_IP>:4001
         - name: docker.service
           command: start
           content: |
@@ -501,7 +509,7 @@ On the PXE server make and fill in the variables ```vi /var/www/html/coreos/pxe-
             After=network-online.target
             [Service]
             ExecStartPre=-/usr/bin/mkdir -p /opt/bin
-            ExecStartPre=/usr/bin/wget -N -P /opt/bin http://<pxe server ip>/setup-network-environment 
+            ExecStartPre=/usr/bin/wget -N -P /opt/bin http://<PXE_SERVER_IP>/setup-network-environment
             ExecStartPre=/usr/bin/chmod +x /opt/bin/setup-network-environment
             ExecStart=/opt/bin/setup-network-environment
             RemainAfterExit=yes
@@ -515,10 +523,10 @@ On the PXE server make and fill in the variables ```vi /var/www/html/coreos/pxe-
             Requires=setup-network-environment.service
             After=setup-network-environment.service
             [Service]
-            ExecStartPre=/usr/bin/wget -N -P /opt/bin http://<pxe server ip>/kube-proxy
+            ExecStartPre=/usr/bin/wget -N -P /opt/bin http://<PXE_SERVER_IP>/kube-proxy
             ExecStartPre=/usr/bin/chmod +x /opt/bin/kube-proxy
             ExecStart=/opt/bin/kube-proxy \
-            --etcd_servers=http://10.20.30.40:4001 \
+            --etcd_servers=http://<MASTER_SERVER_IP>:4001 \
             --logtostderr=true
             Restart=always
             RestartSec=10
@@ -532,13 +540,15 @@ On the PXE server make and fill in the variables ```vi /var/www/html/coreos/pxe-
             After=setup-network-environment.service
             [Service]
             EnvironmentFile=/etc/network-environment
-            ExecStartPre=/usr/bin/wget -N -P /opt/bin http://<pxe server ip>/kubelet
+            ExecStartPre=/usr/bin/wget -N -P /opt/bin http://<PXE_SERVER_IP>/kubelet
             ExecStartPre=/usr/bin/chmod +x /opt/bin/kubelet
             ExecStart=/opt/bin/kubelet \
             --address=0.0.0.0 \
             --port=10250 \
             --hostname_override=${DEFAULT_IPV4} \
-            --etcd_servers=http://10.20.30.40:4001 \
+            --api_servers=<MASTER_SERVER_IP>:8080 \
+            --healthz_bind_address=0.0.0.0 \
+            --healthz_port=10248 \
             --logtostderr=true
             Restart=always
             RestartSec=10
@@ -642,6 +652,18 @@ List all keys in etcd:
 List fleet machines
 
     fleetctl list-machines
+
+Check system status of services on master node:
+
+    systemctl status kube-apiserver
+    systemctl status kube-controller-manager
+    systemctl status kube-scheduler
+    systemctl status kube-register
+
+Check system status of services on a minion node:
+
+    systemctl status kube-kubelet
+    systemctl status docker.service
 
 List Kubernetes
 
