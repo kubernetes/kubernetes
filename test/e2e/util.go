@@ -535,6 +535,9 @@ func RunRC(c *client.Client, name string, ns, image string, replicas int) error 
 		for _, p := range currentPods.Items {
 			if p.Status.Phase == api.PodRunning {
 				current++
+				if err := VerifyContainersAreNotFailed(p); err != nil {
+					return err
+				}
 			} else if p.Status.Phase == api.PodPending {
 				if p.Spec.Host == "" {
 					waiting++
@@ -575,4 +578,24 @@ func listPods(c *client.Client, namespace string, label labels.Selector, field f
 		pods, err = c.Pods(namespace).List(label, field)
 	}
 	return pods, err
+}
+
+func VerifyContainersAreNotFailed(pod api.Pod) error {
+	var errStrings []string
+
+	statuses := pod.Status.ContainerStatuses
+	if len(statuses) == 0 {
+		return nil
+	} else {
+		for _, status := range statuses {
+			if status.State.Termination != nil || status.LastTerminationState.Termination != nil || status.RestartCount != 0 {
+				errStrings = append(errStrings, fmt.Sprintf("Error: Pod %s: Container %s was found to have terminated %d times", pod.Name, status.Name, status.RestartCount))
+			}
+		}
+	}
+
+	if len(errStrings) > 0 {
+		return fmt.Errorf(strings.Join(errStrings, "\n"))
+	}
+	return nil
 }
