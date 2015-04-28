@@ -25,7 +25,6 @@ import (
 	"os"
 	"os/exec"
 	"path"
-	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -42,10 +41,7 @@ import (
 	"github.com/coreos/go-systemd/dbus"
 	"github.com/coreos/go-systemd/unit"
 	"github.com/coreos/rkt/store"
-	"github.com/docker/docker/pkg/parsers"
-	"github.com/fsouza/go-dockerclient"
 	"github.com/golang/glog"
-	"github.com/kr/pty"
 )
 
 const (
@@ -96,37 +92,6 @@ type Runtime struct {
 	config  *Config
 	// TODO(yifan): Refactor this to be generic keyring.
 	dockerKeyring credentialprovider.DockerKeyring
-}
-
-// Config stores the global configuration for the rkt runtime.
-// Run 'rkt' for more details.
-type Config struct {
-	// The debug flag for rkt.
-	Debug bool
-	// The rkt data directory.
-	Dir string
-	// This flag controls whether we skip image or key verification.
-	InsecureSkipVerify bool
-	// The local config directory.
-	LocalConfigDir string
-}
-
-// buildGlobalOptions returns an array of global command line options.
-func (c *Config) buildGlobalOptions() []string {
-	var result []string
-	if c == nil {
-		return result
-	}
-
-	result = append(result, fmt.Sprintf("--debug=%v", c.Debug))
-	result = append(result, fmt.Sprintf("--insecure-skip-verify=%v", c.InsecureSkipVerify))
-	if c.LocalConfigDir != "" {
-		result = append(result, fmt.Sprintf("--local-config=%s", c.LocalConfigDir))
-	}
-	if c.Dir != "" {
-		result = append(result, fmt.Sprintf("--dir=%s", c.Dir))
-	}
-	return result
 }
 
 func startMetadataService(systemd *dbus.Conn) error {
@@ -808,251 +773,10 @@ func (r *Runtime) preparePod(pod *api.Pod, volumeMap map[string]volume.Volume) (
 	return unitName, needReload, nil
 }
 
-func (r *Runtime) writeDockerAuthConfig(image string, creds docker.AuthConfiguration) error {
-	registry := "index.docker.io"
-	// Image spec: [<registry>/]<repository>/<image>[:<version]
-	explicitRegistry := (strings.Count(image, "/") == 2)
-	if explicitRegistry {
-		registry = strings.Split(image, "/")[0]
-	}
-
-	localConfigDir := rktLocalConfigDir
-	if r.config.LocalConfigDir != "" {
-		localConfigDir = r.config.LocalConfigDir
-	}
-	authDir := path.Join(localConfigDir, "auth.d")
-	if _, err := os.Stat(authDir); os.IsNotExist(err) {
-		if err := os.Mkdir(authDir, 0600); err != nil {
-			glog.Errorf("Cannot create auth dir: %v", err)
-			return err
-		}
-	}
-	f, err := os.Create(path.Join(localConfigDir, "auth.d", registry+".json"))
-	if err != nil {
-		glog.Errorf("Cannot create docker auth config file: %v", err)
-		return err
-	}
-	defer f.Close()
-	config := fmt.Sprintf(dockerAuthTemplate, registry, creds.Username, creds.Password)
-	if _, err := f.Write([]byte(config)); err != nil {
-		glog.Errorf("Cannot write docker auth config file: %v", err)
-		return err
-	}
-	return nil
-}
-
-// PullImage invokes 'rkt fetch' to download an aci.
-func (r *Runtime) PullImage(img string) error {
-	if strings.HasPrefix(img, dockerPrefix) {
-		repoToPull, tag := parsers.ParseRepositoryTag(img)
-		// If no tag was specified, use the default "latest".
-		if len(tag) == 0 {
-			tag = "latest"
-		}
-
-		creds, ok := r.dockerKeyring.Lookup(repoToPull)
-		if !ok {
-			glog.V(1).Infof("Pulling image %s without credentials", img)
-		}
-
-		// Let's update a json.
-		// TODO(yifan): Find a way to feed this to rkt.
-		if err := r.writeDockerAuthConfig(img, creds); err != nil {
-			return err
-		}
-	}
-
-	output, err := r.RunCommand("fetch", img)
-	if err != nil {
-		return fmt.Errorf("failed to fetch image: %v:", output)
-	}
-	return nil
-}
-
-// IsImagePresent returns true if the image is available on the machine.
-// TODO(yifan): This is hack, which uses 'rkt prepare --local' to test whether
-// the image is present.
-func (r *Runtime) IsImagePresent(img string) (bool, error) {
-	if _, err := r.RunCommand("prepare", "--local=true", img); err != nil {
-		return false, nil
-	}
-	return true, nil
-}
-
 // TODO(yifan): Move this duplicated function to container runtime.
 // HashContainer computes the hash of one api.Container.
 func HashContainer(container *api.Container) uint64 {
 	hash := adler32.New()
 	util.DeepHashObject(hash, *container)
 	return uint64(hash.Sum32())
-}
-
-// Note: In rkt, the container ID is in the form of "UUID:appName:ImageID", where
-// appName is the container name.
-func (r *Runtime) RunInContainer(containerID string, cmd []string) ([]byte, error) {
-	glog.V(4).Infof("Rkt running in container.")
-
-	id, err := parseContainerID(containerID)
-	if err != nil {
-		return nil, err
-	}
-	// TODO(yifan): Use appName instead of imageID.
-	// see https://github.com/coreos/rkt/pull/640
-	args := append([]string{}, "enter", "--imageid", id.imageID, id.uuid)
-	args = append(args, cmd...)
-
-	result, err := r.RunCommand(args...)
-	return []byte(strings.Join(result, "\n")), err
-}
-
-// Pty unsupported yet.
-func startPty(c *exec.Cmd) (*os.File, error) {
-	return pty.Start(c)
-}
-
-// Note: In rkt, the container ID is in the form of "UUID:appName:ImageID", where
-// appName is the container name.
-func (r *Runtime) ExecInContainer(containerID string, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool) error {
-	glog.V(4).Infof("Rkt execing in container.")
-
-	id, err := parseContainerID(containerID)
-	if err != nil {
-		return err
-	}
-	// TODO(yifan): Use appName instead of imageID.
-	// see https://github.com/coreos/rkt/pull/640
-	args := append([]string{}, "enter", "--imageid", id.imageID, id.uuid)
-	args = append(args, cmd...)
-	command := r.buildCommand(args...)
-
-	if tty {
-		p, err := startPty(command)
-		if err != nil {
-			return err
-		}
-		defer p.Close()
-
-		// make sure to close the stdout stream
-		defer stdout.Close()
-
-		if stdin != nil {
-			go io.Copy(p, stdin)
-		}
-		if stdout != nil {
-			go io.Copy(stdout, p)
-		}
-		return command.Wait()
-	}
-	if stdin != nil {
-		// Use an os.Pipe here as it returns true *os.File objects.
-		// This way, if you run 'kubectl exec -p <pod> -i bash' (no tty) and type 'exit',
-		// the call below to command.Run() can unblock because its Stdin is the read half
-		// of the pipe.
-		r, w, err := os.Pipe()
-		if err != nil {
-			return err
-		}
-		go io.Copy(w, stdin)
-
-		command.Stdin = r
-	}
-	if stdout != nil {
-		command.Stdout = stdout
-	}
-	if stderr != nil {
-		command.Stderr = stderr
-	}
-	return command.Run()
-}
-
-func (r *Runtime) findRktID(pod kubecontainer.Pod) (string, error) {
-	units, err := r.systemd.ListUnits()
-	if err != nil {
-		return "", err
-	}
-
-	for _, u := range units {
-		if strings.HasPrefix(u.Name, makePodServiceFileName(pod.Name, pod.Namespace, pod.ID)) {
-			f, err := os.Open(path.Join(systemdServiceDir, u.Name))
-			if err != nil {
-				return "", err
-			}
-			defer f.Close()
-			opts, err := unit.Deserialize(f)
-			if err != nil {
-				return "", err
-			}
-
-			for _, opt := range opts {
-				if opt.Section == unitKubernetesSection && opt.Name == unitRktID {
-					return opt.Value, nil
-				}
-			}
-		}
-	}
-	return "", fmt.Errorf("rkt uuid not found for pod %v", pod)
-}
-
-// PortForward executes socat in the pod's network namespace and copies
-// data between stream (representing the user's local connection on their
-// computer) and the specified port in the container.
-//
-// TODO:
-//  - match cgroups of container
-//  - should we support nsenter + socat on the host? (current impl)
-//  - should we support nsenter + socat in a container, running with elevated privs and --pid=host?
-func (r *Runtime) PortForward(pod kubecontainer.Pod, port uint16, stream io.ReadWriteCloser) error {
-	glog.V(4).Infof("Rkt port forwarding in container.")
-
-	podInfos, err := r.getPodInfos()
-	if err != nil {
-		return err
-	}
-
-	rktID, err := r.findRktID(pod)
-	if err != nil {
-		return err
-	}
-
-	info, ok := podInfos[rktID]
-	if !ok {
-		return fmt.Errorf("cannot find the pod info for pod %v", pod)
-	}
-	if info.pid < 0 {
-		return fmt.Errorf("cannot get the pid for pod %v", pod)
-	}
-
-	// TODO what if the host doesn't have it???
-	_, lookupErr := exec.LookPath("socat")
-	if lookupErr != nil {
-		return fmt.Errorf("unable to do port forwarding: socat not found.")
-	}
-	args := []string{"-t", fmt.Sprintf("%d", info.pid), "-n", "socat", "-", fmt.Sprintf("TCP4:localhost:%d", port)}
-	// TODO use exec.LookPath
-	command := exec.Command("nsenter", args...)
-	command.Stdin = stream
-	command.Stdout = stream
-	return command.Run()
-}
-
-// GetContainerLogs uses journalctl to get the logs of the container.
-// By default, it returns a snapshot of the container log. Set |follow| to true to
-// stream the log. Set |follow| to false and specify the number of lines (e.g.
-// "100" or "all") to tail the log.
-func (r *Runtime) GetContainerLogs(pod kubecontainer.Pod, tail string, follow bool, stdout, stderr io.Writer) error {
-	unitName := makePodServiceFileName(pod.Name, pod.Namespace, pod.ID)
-	cmd := exec.Command("journalctl", "-u", unitName)
-	if follow {
-		cmd.Args = append(cmd.Args, "-f")
-	}
-	if tail == "all" {
-		cmd.Args = append(cmd.Args, "-a")
-	} else {
-		_, err := strconv.Atoi(tail)
-		if err == nil {
-			cmd.Args = append(cmd.Args, "-n", tail)
-		}
-	}
-	cmd.Stdout, cmd.Stderr = stdout, stderr
-	return cmd.Start()
 }
