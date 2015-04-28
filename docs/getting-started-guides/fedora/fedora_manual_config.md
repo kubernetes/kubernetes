@@ -77,6 +77,15 @@ KUBE_SERVICE_ADDRESSES="--portal_net=10.254.0.0/16"
 KUBE_API_ARGS=""
 ```
 
+* *Optional* Edit /etc/kubernetes/controller-manager and remove --machines=127.0.0.1 from the KUBELET_ADDRESSES. Leaving this in won't hurt anything but it will cause the output to note that the 127.0.0.1 node is NotReady because we will not be configuring one in this guide.
+
+```
+KUBELET_ADDRESSES=""
+
+KUBE_CONTROLLER_MANAGER_ARGS=""
+```
+
+
 * Edit /etc/etcd/etcd.conf,let the etcd to listen all the ip instead of 127.0.0.1,if not ,you will get the error like "connection refused"
 ```
 ETCD_LISTEN_CLIENT_URLS="http://0.0.0.0:4001"
