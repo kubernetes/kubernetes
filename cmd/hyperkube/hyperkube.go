@@ -70,6 +70,7 @@ func (hk *HyperKube) Flags() *pflag.FlagSet {
 	if hk.baseFlags == nil {
 		hk.baseFlags = pflag.NewFlagSet(hk.Name, pflag.ContinueOnError)
 		hk.baseFlags.SetOutput(ioutil.Discard)
+		hk.baseFlags.SetWordSeparators([]string{"-", "_"})
 		hk.baseFlags.BoolVarP(&hk.helpFlagVal, "help", "h", false, "help for "+hk.Name)
 
 		// These will add all of the "global" flags (defined with both the

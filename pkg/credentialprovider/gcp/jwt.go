@@ -34,7 +34,7 @@ const (
 )
 
 var (
-	flagJwtFile = pflag.String("google_json_key", "",
+	flagJwtFile = pflag.String("google-json-key", "",
 		"The Google Cloud Platform Service Account JSON Key to use for authentication.")
 )
 

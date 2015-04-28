@@ -380,7 +380,7 @@
 		},
 		{
 			"ImportPath": "github.com/spf13/pflag",
-			"Rev": "18d831e92d67eafd1b0db8af9ffddbd04f7ae1f4"
+			"Rev": "60d4c375939ff7ba397a84117d5281256abb298f"
 		},
 		{
 			"ImportPath": "github.com/stretchr/objx",

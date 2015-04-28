@@ -948,9 +948,9 @@ func runSchedulerNoPhantomPodsTest(client *client.Client) {
 type testFunc func(*client.Client)
 
 func addFlags(fs *pflag.FlagSet) {
-	fs.StringVar(&apiVersion, "apiVersion", latest.Version, "API version that should be used by the client for communicating with the server")
+	fs.StringVar(&apiVersion, "api-version", latest.Version, "API version that should be used by the client for communicating with the server")
 	fs.IntVar(
-		&maxConcurrency, "maxConcurrency", -1, "Maximum number of tests to be run simultaneously. Unlimited if set to negative.")
+		&maxConcurrency, "max-concurrency", -1, "Maximum number of tests to be run simultaneously. Unlimited if set to negative.")
 }
 
 func main() {

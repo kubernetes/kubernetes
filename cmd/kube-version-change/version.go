@@ -55,6 +55,7 @@ func isYAML(data []byte) bool {
 
 func main() {
 	runtime.GOMAXPROCS(runtime.NumCPU())
+	flag.CommandLine.SetWordSeparators([]string{"-", "_"})
 	flag.Parse()
 
 	if *rewrite != "" {
