@@ -57,7 +57,7 @@ kubelet_auth_file="/srv/salt-overlay/salt/kubelet/kubernetes_auth"
 (umask u=rw,go= ; echo "{\"BearerToken\": \"$kubelet_token\", \"Insecure\": true }" > $kubelet_auth_file)
 
 mkdir -p /srv/salt-overlay/salt/kube-proxy
-kube_proxy_kubeconfig_file="/srv/salt-overlay/salt/kube_proxy/kubeconfig"
+kube_proxy_kubeconfig_file="/srv/salt-overlay/salt/kube-proxy/kubeconfig"
 cat > "${kube_proxy_kubeconfig_file}" <<EOF
 apiVersion: v1
 kind: Config

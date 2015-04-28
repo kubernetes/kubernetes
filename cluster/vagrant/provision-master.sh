@@ -150,7 +150,7 @@ if [[ ! -f "${known_tokens_file}" ]]; then
   (umask u=rw,go= ; echo "{\"BearerToken\": \"$kubelet_token\", \"Insecure\": true }" > $kubelet_auth_file)
 
   mkdir -p /srv/salt-overlay/salt/kube-proxy
-  kube_proxy_kubeconfig_file="/srv/salt-overlay/salt/kube_proxy/kubeconfig"
+  kube_proxy_kubeconfig_file="/srv/salt-overlay/salt/kube-proxy/kubeconfig"
   # Make a kubeconfig file with the token.
   # TODO(etune): put apiserver certs into secret too, and reference from authfile,
   # so that "Insecure" is not needed.
