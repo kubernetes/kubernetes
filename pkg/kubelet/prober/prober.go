@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package kubelet
+package prober
 
 import (
 	"fmt"
@@ -37,7 +37,12 @@ import (
 
 const maxProbeRetries = 3
 
-// prober helps to check the liveness/readiness of a container.
+// Prober checks the healthiness of a container.
+type Prober interface {
+	Probe(pod *api.Pod, status api.PodStatus, container api.Container, containerID string, createdAt int64) (probe.Result, error)
+}
+
+// Prober helps to check the liveness/readiness of a container.
 type prober struct {
 	exec   execprobe.ExecProber
 	http   httprobe.HTTPProber
@@ -51,11 +56,11 @@ type prober struct {
 
 // NewProber creates a Prober, it takes a command runner and
 // several container info managers.
-func newProber(
+func New(
 	runner dockertools.ContainerCommandRunner,
 	readinessManager *kubecontainer.ReadinessManager,
 	refManager *kubecontainer.RefManager,
-	recorder record.EventRecorder) kubecontainer.Prober {
+	recorder record.EventRecorder) Prober {
 
 	return &prober{
 		exec:   execprobe.New(),
@@ -63,6 +68,21 @@ func newProber(
 		tcp:    tcprobe.New(),
 		runner: runner,
 
+		readinessManager: readinessManager,
+		refManager:       refManager,
+		recorder:         recorder,
+	}
+}
+
+// New prober for use in tests.
+func NewTestProber(
+	exec execprobe.ExecProber,
+	readinessManager *kubecontainer.ReadinessManager,
+	refManager *kubecontainer.RefManager,
+	recorder record.EventRecorder) Prober {
+
+	return &prober{
+		exec:             exec,
 		readinessManager: readinessManager,
 		refManager:       refManager,
 		recorder:         recorder,
