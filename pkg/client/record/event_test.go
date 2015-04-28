@@ -473,3 +473,92 @@ func TestLotsOfEvents(t *testing.T) {
 	sinkWatcher.Stop()
 	logWatcher.Stop()
 }
+
+func TestEventfNoNamespace(t *testing.T) {
+	testPod := &api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			SelfLink: "/api/version/pods/foo",
+			Name:     "foo",
+			UID:      "bar",
+		},
+	}
+	testRef, err := api.GetPartialReference(testPod, "desiredState.manifest.containers[2]")
+	if err != nil {
+		t.Fatal(err)
+	}
+	table := []struct {
+		obj          runtime.Object
+		reason       string
+		messageFmt   string
+		elements     []interface{}
+		expect       *api.Event
+		expectLog    string
+		expectUpdate bool
+	}{
+		{
+			obj:        testRef,
+			reason:     "Started",
+			messageFmt: "some verbose message: %v",
+			elements:   []interface{}{1},
+			expect: &api.Event{
+				ObjectMeta: api.ObjectMeta{
+					Name:      "foo",
+					Namespace: "default",
+				},
+				InvolvedObject: api.ObjectReference{
+					Kind:       "Pod",
+					Name:       "foo",
+					Namespace:  "",
+					UID:        "bar",
+					APIVersion: "version",
+					FieldPath:  "desiredState.manifest.containers[2]",
+				},
+				Reason:  "Started",
+				Message: "some verbose message: 1",
+				Source:  api.EventSource{Component: "eventTest"},
+				Count:   1,
+			},
+			expectLog:    `Event(api.ObjectReference{Kind:"Pod", Namespace:"", Name:"foo", UID:"bar", APIVersion:"version", ResourceVersion:"", FieldPath:"desiredState.manifest.containers[2]"}): reason: 'Started' some verbose message: 1`,
+			expectUpdate: false,
+		},
+	}
+
+	for _, item := range table {
+		called := make(chan struct{})
+		testEvents := testEventSink{
+			OnCreate: func(event *api.Event) (*api.Event, error) {
+				returnEvent, _ := validateEvent(event, item.expect, t)
+				if item.expectUpdate {
+					t.Errorf("Expected event update(), got event create()")
+				}
+				called <- struct{}{}
+				return returnEvent, nil
+			},
+			OnUpdate: func(event *api.Event) (*api.Event, error) {
+				returnEvent, _ := validateEvent(event, item.expect, t)
+				if !item.expectUpdate {
+					t.Errorf("Expected event create(), got event update()")
+				}
+				called <- struct{}{}
+				return returnEvent, nil
+			},
+		}
+		eventBroadcaster := NewBroadcaster()
+		sinkWatcher := eventBroadcaster.StartRecordingToSink(&testEvents)
+		logWatcher1 := eventBroadcaster.StartLogging(t.Logf) // Prove that it is useful
+		logWatcher2 := eventBroadcaster.StartLogging(func(formatter string, args ...interface{}) {
+			if e, a := item.expectLog, fmt.Sprintf(formatter, args...); e != a {
+				t.Errorf("Expected '%v', got '%v'", e, a)
+			}
+			called <- struct{}{}
+		})
+		recorder := eventBroadcaster.NewRecorder(api.EventSource{Component: "eventTest"})
+		recorder.Eventf(item.obj, item.reason, item.messageFmt, item.elements...)
+
+		<-called
+		<-called
+		sinkWatcher.Stop()
+		logWatcher1.Stop()
+		logWatcher2.Stop()
+	}
+}
