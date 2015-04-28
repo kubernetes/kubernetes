@@ -136,7 +136,7 @@ func TestDeletePod(t *testing.T) {
 		Request:  testRequest{Method: "DELETE", Path: testapi.ResourcePath("pods", ns, "foo"), Query: buildQueryValues(ns, nil)},
 		Response: Response{StatusCode: 200},
 	}
-	err := c.Setup().Pods(ns).Delete("foo")
+	err := c.Setup().Pods(ns).Delete("foo", nil)
 	c.Validate(t, nil, err)
 }
 

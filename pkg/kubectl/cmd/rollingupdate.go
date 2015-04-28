@@ -345,7 +345,7 @@ func addDeploymentKeyToReplicationController(oldRc *api.ReplicationController, c
 	for ix := range podList.Items {
 		pod := &podList.Items[ix]
 		if value, found := pod.Labels[deploymentKey]; !found || value != oldHash {
-			if err := client.Pods(namespace).Delete(pod.Name); err != nil {
+			if err := client.Pods(namespace).Delete(pod.Name, nil); err != nil {
 				return err
 			}
 		}

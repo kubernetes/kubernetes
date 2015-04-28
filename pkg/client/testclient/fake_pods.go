@@ -40,7 +40,7 @@ func (c *FakePods) Get(name string) (*api.Pod, error) {
 	return obj.(*api.Pod), err
 }
 
-func (c *FakePods) Delete(name string) error {
+func (c *FakePods) Delete(name string, options *api.DeleteOptions) error {
 	_, err := c.Fake.Invokes(FakeAction{Action: "delete-pod", Value: name}, &api.Pod{})
 	return err
 }

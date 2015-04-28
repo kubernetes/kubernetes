@@ -32,7 +32,7 @@ type PodsNamespacer interface {
 type PodInterface interface {
 	List(label labels.Selector, field fields.Selector) (*api.PodList, error)
 	Get(name string) (*api.Pod, error)
-	Delete(name string) error
+	Delete(name string, options *api.DeleteOptions) error
 	Create(pod *api.Pod) (*api.Pod, error)
 	Update(pod *api.Pod) (*api.Pod, error)
 	Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error)
@@ -69,8 +69,16 @@ func (c *pods) Get(name string) (result *api.Pod, err error) {
 }
 
 // Delete takes the name of the pod, and returns an error if one occurs
-func (c *pods) Delete(name string) error {
-	return c.r.Delete().Namespace(c.ns).Resource("pods").Name(name).Do().Error()
+func (c *pods) Delete(name string, options *api.DeleteOptions) error {
+	// TODO: to make this reusable in other client libraries
+	if options == nil {
+		return c.r.Delete().Namespace(c.ns).Resource("pods").Name(name).Do().Error()
+	}
+	body, err := api.Scheme.EncodeToVersion(options, c.r.APIVersion())
+	if err != nil {
+		return err
+	}
+	return c.r.Delete().Namespace(c.ns).Resource("pods").Name(name).Body(body).Do().Error()
 }
 
 // Create takes the representation of a pod.  Returns the server's representation of the pod, and an error, if it occurs.

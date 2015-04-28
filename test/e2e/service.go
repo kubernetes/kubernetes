@@ -119,7 +119,7 @@ var _ = Describe("Services", func() {
 		defer func() {
 			By("deleting the pod")
 			defer GinkgoRecover()
-			podClient.Delete(pod.Name)
+			podClient.Delete(pod.Name, nil)
 		}()
 		if _, err := podClient.Create(pod); err != nil {
 			Failf("Failed to create %s pod: %v", pod.Name, err)
@@ -220,7 +220,7 @@ var _ = Describe("Services", func() {
 		var names []string
 		defer func() {
 			for _, name := range names {
-				err := c.Pods(ns).Delete(name)
+				err := c.Pods(ns).Delete(name, nil)
 				Expect(err).NotTo(HaveOccurred())
 			}
 		}()
@@ -237,13 +237,13 @@ var _ = Describe("Services", func() {
 
 		validateEndpointsOrFail(c, ns, serviceName, expectedPort, names)
 
-		err = c.Pods(ns).Delete(name1)
+		err = c.Pods(ns).Delete(name1, nil)
 		Expect(err).NotTo(HaveOccurred())
 		names = []string{name2}
 
 		validateEndpointsOrFail(c, ns, serviceName, expectedPort, names)
 
-		err = c.Pods(ns).Delete(name2)
+		err = c.Pods(ns).Delete(name2, nil)
 		Expect(err).NotTo(HaveOccurred())
 		names = []string{}
 
@@ -323,7 +323,7 @@ var _ = Describe("Services", func() {
 		defer func() {
 			By("deleting pod " + pod.Name)
 			defer GinkgoRecover()
-			podClient.Delete(pod.Name)
+			podClient.Delete(pod.Name, nil)
 		}()
 		if _, err := podClient.Create(pod); err != nil {
 			Failf("Failed to create pod %s: %v", pod.Name, err)

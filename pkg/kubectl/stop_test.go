@@ -34,7 +34,7 @@ func TestReplicationControllerStop(t *testing.T) {
 	})
 	reaper := ReplicationControllerReaper{fake, time.Millisecond, time.Millisecond}
 	name := "foo"
-	s, err := reaper.Stop("default", name)
+	s, err := reaper.Stop("default", name, nil)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -142,7 +142,7 @@ func TestSimpleStop(t *testing.T) {
 		if err != nil {
 			t.Errorf("unexpected error: %v (%s)", err, test.test)
 		}
-		s, err := reaper.Stop("default", "foo")
+		s, err := reaper.Stop("default", "foo", nil)
 		if err != nil && !test.expectError {
 			t.Errorf("unexpected error: %v (%s)", err, test.test)
 		}

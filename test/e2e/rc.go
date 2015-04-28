@@ -103,7 +103,7 @@ func ServeImageOrFail(c *client.Client, test string, image string) {
 		if err != nil {
 			Logf("Failed to cleanup replication controller %v: %v.", controller.Name, err)
 		}
-		if _, err = rcReaper.Stop(ns, controller.Name); err != nil {
+		if _, err = rcReaper.Stop(ns, controller.Name, nil); err != nil {
 			Logf("Failed to stop replication controller %v: %v.", controller.Name, err)
 		}
 	}()

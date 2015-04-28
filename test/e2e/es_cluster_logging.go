@@ -213,7 +213,7 @@ func ClusterLevelLoggingWithElasticsearch(c *client.Client) {
 	// Cleanup the pods when we are done.
 	defer func() {
 		for _, pod := range podNames {
-			if err = c.Pods(ns).Delete(pod); err != nil {
+			if err = c.Pods(ns).Delete(pod, nil); err != nil {
 				Logf("Failed to delete pod %s: %v", pod, err)
 			}
 		}

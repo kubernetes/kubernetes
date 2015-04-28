@@ -251,7 +251,7 @@ func deletePods(kubeClient client.Interface, ns string) error {
 		return err
 	}
 	for i := range items.Items {
-		err := kubeClient.Pods(ns).Delete(items.Items[i].Name)
+		err := kubeClient.Pods(ns).Delete(items.Items[i].Name, nil)
 		if err != nil {
 			return err
 		}

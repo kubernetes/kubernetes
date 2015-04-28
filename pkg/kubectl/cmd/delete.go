@@ -22,6 +22,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl"
 	cmdutil "github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/cmd/util"
@@ -73,6 +74,7 @@ func NewCmdDelete(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd.Flags().StringP("selector", "l", "", "Selector (label query) to filter on")
 	cmd.Flags().Bool("all", false, "[-all] to select all the specified resources")
 	cmd.Flags().Bool("cascade", true, "If true, cascade the delete resources managed by this resource (e.g. Pods created by a ReplicationController).  Default true.")
+	cmd.Flags().Int("grace-period", -1, "Period of time in seconds given to the resource to terminate gracefully. Ignored if negative.")
 	return cmd
 }
 
@@ -98,12 +100,12 @@ func RunDelete(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []str
 
 	// By default use a reaper to delete all related resources.
 	if cmdutil.GetFlagBool(cmd, "cascade") {
-		return ReapResult(r, f, out, cmdutil.GetFlagBool(cmd, "cascade"))
+		return ReapResult(r, f, out, cmdutil.GetFlagBool(cmd, "cascade"), cmdutil.GetFlagInt(cmd, "grace-period"))
 	}
 	return DeleteResult(r, out)
 }
 
-func ReapResult(r *resource.Result, f *cmdutil.Factory, out io.Writer, isDefaultDelete bool) error {
+func ReapResult(r *resource.Result, f *cmdutil.Factory, out io.Writer, isDefaultDelete bool, gracePeriod int) error {
 	found := 0
 	err := r.IgnoreErrors(errors.IsNotFound).Visit(func(info *resource.Info) error {
 		found++
@@ -115,7 +117,11 @@ func ReapResult(r *resource.Result, f *cmdutil.Factory, out io.Writer, isDefault
 			}
 			return err
 		}
-		if _, err := reaper.Stop(info.Namespace, info.Name); err != nil {
+		var options *api.DeleteOptions
+		if gracePeriod >= 0 {
+			options = api.NewDeleteOptions(int64(gracePeriod))
+		}
+		if _, err := reaper.Stop(info.Namespace, info.Name, options); err != nil {
 			return err
 		}
 		fmt.Fprintf(out, "%s/%s\n", info.Mapping.Resource, info.Name)

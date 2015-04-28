@@ -206,7 +206,7 @@ func main() {
 		// Make several attempts to delete the pods.
 		for _, podName := range podNames {
 			for start := time.Now(); time.Since(start) < deleteTimeout; time.Sleep(1 * time.Second) {
-				if err = c.Pods(ns).Delete(podName); err == nil {
+				if err = c.Pods(ns).Delete(podName, nil); err == nil {
 					break
 				}
 				glog.Warningf("After %v failed to delete pod %s/%s: %v", time.Since(start), ns, podName, err)

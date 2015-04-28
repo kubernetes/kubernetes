@@ -44,7 +44,7 @@ func runLivenessTest(c *client.Client, podDescr *api.Pod) {
 	// At the end of the test, clean up by removing the pod.
 	defer func() {
 		By("deleting the pod")
-		c.Pods(ns).Delete(podDescr.Name)
+		c.Pods(ns).Delete(podDescr.Name, nil)
 	}()
 
 	// Wait until the pod is not pending. (Here we need to check for something other than
@@ -87,7 +87,7 @@ func testHostIP(c *client.Client, pod *api.Pod) {
 	ns := "e2e-test-" + string(util.NewUUID())
 	podClient := c.Pods(ns)
 	By("creating pod")
-	defer podClient.Delete(pod.Name)
+	defer podClient.Delete(pod.Name, nil)
 	_, err := podClient.Create(pod)
 	if err != nil {
 		Fail(fmt.Sprintf("Failed to create pod: %v", err))
@@ -191,7 +191,7 @@ var _ = Describe("Pods", func() {
 		// We call defer here in case there is a problem with
 		// the test so we can ensure that we clean up after
 		// ourselves
-		defer podClient.Delete(pod.Name)
+		defer podClient.Delete(pod.Name, nil)
 		_, err = podClient.Create(pod)
 		if err != nil {
 			Fail(fmt.Sprintf("Failed to create pod: %v", err))
@@ -215,7 +215,7 @@ var _ = Describe("Pods", func() {
 		}
 
 		By("deleting the pod")
-		podClient.Delete(pod.Name)
+		podClient.Delete(pod.Name, nil)
 		pods, err = podClient.List(labels.SelectorFromSet(labels.Set(map[string]string{"time": value})), fields.Everything())
 		if err != nil {
 			Fail(fmt.Sprintf("Failed to delete pod: %v", err))
@@ -278,7 +278,7 @@ var _ = Describe("Pods", func() {
 		By("submitting the pod to kubernetes")
 		defer func() {
 			By("deleting the pod")
-			podClient.Delete(pod.Name)
+			podClient.Delete(pod.Name, nil)
 		}()
 		pod, err := podClient.Create(pod)
 		if err != nil {
@@ -342,7 +342,7 @@ var _ = Describe("Pods", func() {
 				},
 			},
 		}
-		defer c.Pods(api.NamespaceDefault).Delete(serverPod.Name)
+		defer c.Pods(api.NamespaceDefault).Delete(serverPod.Name, nil)
 		_, err := c.Pods(api.NamespaceDefault).Create(serverPod)
 		if err != nil {
 			Fail(fmt.Sprintf("Failed to create serverPod: %v", err))

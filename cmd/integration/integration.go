@@ -395,7 +395,7 @@ containers:
 				glog.Fatalf("%s FAILED: mirror pod has not been created or is not running: %v", desc, err)
 			}
 			// Delete the mirror pod, and wait for it to be recreated.
-			c.Pods(namespace).Delete(podName)
+			c.Pods(namespace).Delete(podName, nil)
 			if err = wait.Poll(time.Second, time.Minute*1,
 				podRunning(c, namespace, podName)); err != nil {
 				glog.Fatalf("%s FAILED: mirror pod has not been re-created or is not running: %v", desc, err)
@@ -928,7 +928,7 @@ func runSchedulerNoPhantomPodsTest(client *client.Client) {
 
 	// Delete a pod to free up room.
 	glog.Infof("Deleting pod %v", bar.Name)
-	err = client.Pods(api.NamespaceDefault).Delete(bar.Name)
+	err = client.Pods(api.NamespaceDefault).Delete(bar.Name, nil)
 	if err != nil {
 		glog.Fatalf("FAILED: couldn't delete pod %q: %v", bar.Name, err)
 	}

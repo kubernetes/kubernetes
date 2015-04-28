@@ -61,6 +61,7 @@ func NewCmdStop(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	kubectl.AddJsonFilenameFlag(cmd, &flags.Filenames, usage)
 	cmd.Flags().StringP("selector", "l", "", "Selector (label query) to filter on")
 	cmd.Flags().Bool("all", false, "[-all] to select all the specified resources")
+	cmd.Flags().Int("grace-period", -1, "Period of time in seconds given to the resource to terminate gracefully. Ignored if negative.")
 	return cmd
 }
 
@@ -82,5 +83,5 @@ func RunStop(f *cmdutil.Factory, cmd *cobra.Command, args []string, filenames ut
 	if r.Err() != nil {
 		return r.Err()
 	}
-	return ReapResult(r, f, out, false)
+	return ReapResult(r, f, out, false, cmdutil.GetFlagInt(cmd, "grace-period"))
 }
