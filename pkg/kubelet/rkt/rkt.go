@@ -210,46 +210,14 @@ func New(config *Config) (*Runtime, error) {
 	if err != nil {
 		return nil, err
 	}
-	if _, found := result[rktBinName]; !found {
-		return nil, fmt.Errorf("rkt: cannot get the version of rkt")
-	}
-	glog.V(4).Infof("Rkt version: %v.", result)
+	glog.V(4).Infof("Rkt version: %v", result)
 	return rkt, nil
-}
-
-// Version invokes 'rkt version' to get the version information of the rkt
-// runtime on the machine.
-// The return values are a map of component:version.
-//
-// Example:
-// rkt:0.3.2+git
-// appc:0.3.0+git
-//p
-func (r *Runtime) Version() (map[string]string, error) {
-	output, err := r.RunCommand("version")
-	if err != nil {
-		return nil, err
-	}
-
-	// Example output for 'rkt version':
-	// rkt version 0.3.2+git
-	// appc version 0.3.0+git
-	result := make(map[string]string)
-	for _, line := range output {
-		tuples := strings.Split(strings.TrimSpace(line), " ")
-		if len(tuples) != 3 {
-			glog.Warningf("Cannot parse the output: %q.", line)
-			continue
-		}
-		result[tuples[0]] = tuples[2]
-	}
-	return result, nil
 }
 
 // GetPods runs 'systemctl list-unit' and 'rkt list' to get the list of all the appcs.
 // Then it will use the result to contruct list of pods.
 func (r *Runtime) GetPods(all bool) ([]*kubecontainer.Pod, error) {
-	glog.V(4).Infof("Rkt getting pods.")
+	glog.V(4).Infof("Rkt getting pods")
 
 	units, err := r.systemd.ListUnits()
 	if err != nil {
