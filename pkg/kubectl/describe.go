@@ -29,6 +29,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/golang/glog"
 )
 
@@ -457,8 +458,8 @@ func describeService(service *api.Service, endpoints *api.Endpoints, events *api
 				name = "<unnamed>"
 			}
 			fmt.Fprintf(out, "Port:\t%s\t%d/%s\n", name, sp.Port, sp.Protocol)
+			fmt.Fprintf(out, "Endpoints:\t%s\t%s\n", name, formatEndpoints(endpoints, util.NewStringSet(sp.Name)))
 		}
-		fmt.Fprintf(out, "Endpoints:\t%s\n", formatEndpoints(endpoints))
 		fmt.Fprintf(out, "Session Affinity:\t%s\n", service.Spec.SessionAffinity)
 		if events != nil {
 			DescribeEvents(events, out)
