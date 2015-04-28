@@ -77,6 +77,11 @@ const (
 	dockerAuthTemplate = `{"rktKind":"dockerAuth","rktVersion":"v1","registries":[%q],"credentials":{"user":%q,"password":%q}}`
 )
 
+var (
+	systemd *dbus.Conn
+	absPath string
+)
+
 // Runtime implements the ContainerRuntime for rkt. The implementation
 // uses systemd, so in order to run this runtime, systemd must be installed
 // on the machine.
@@ -119,19 +124,29 @@ func (c *Config) buildGlobalOptions() []string {
 	return result
 }
 
+// init will start the metadata-service as a transient systemd service.
+func init() {
+	var err error
+	systemd, err = dbus.New()
+	if err != nil {
+		glog.Errorf("rkt: Cannot connect to dbus: %v", err)
+	}
+
+	// Test if rkt binary is in $PATH.
+	absPath, err = exec.LookPath(rktBinName)
+	if err != nil {
+		glog.Errorf("rkt: Cannot find rkt binary: %v", err)
+	}
+	systemd.StartTransientUnit(fmt.Sprintf("%s %s", rktBinName, "metatdata-service"), "replace")
+	if err != nil {
+		glog.Errorf("rkt: Cannot start transient unit: %v", err)
+	}
+}
+
 // New creates the rkt container runtime which implements the container runtime interface.
 // It will test if the rkt binary is in the $PATH, and whether we can get the
 // version of it. If so, creates the rkt container runtime, otherwise returns an error.
 func New(config *Config) (*Runtime, error) {
-	systemd, err := dbus.New()
-	if err != nil {
-		return nil, err
-	}
-	// Test if rkt binary is in $PATH.
-	absPath, err := exec.LookPath(rktBinName)
-	if err != nil {
-		return nil, err
-	}
 	rkt := &Runtime{
 		systemd:       systemd,
 		absPath:       absPath,
@@ -239,7 +254,7 @@ func (r *Runtime) RunPod(pod *api.Pod, volumeMap map[string]volume.Volume) error
 func (r *Runtime) KillPod(pod *api.Pod) error {
 	glog.V(4).Infof("Rkt is killing pod: name %q.", pod.Name)
 
-	serviceName := makePodServiceFileName(pod)
+	serviceName := makePodServiceFileName(pod.Name, pod.Namespace, pod.UID)
 
 	// TODO(yifan): More graceful stop. Replace with StopUnit and wait for a timeout.
 	r.systemd.KillUnit(serviceName, int32(syscall.SIGKILL))
@@ -399,9 +414,9 @@ func (r *Runtime) makePod(unitName string, podInfos map[string]*podInfo) (*kubec
 }
 
 // makePodServiceFileName constructs the unit file name for the given pod.
-func makePodServiceFileName(pod *api.Pod) string {
+func makePodServiceFileName(name, namespace string, uid types.UID) string {
 	// TODO(yifan): Revisit this later, decide whether we want to use UID.
-	return fmt.Sprintf("%s_%s_%s_%s.service", kubernetesUnitPrefix, pod.Name, pod.Namespace, pod.UID)
+	return fmt.Sprintf("%s_%s_%s_%s.service", kubernetesUnitPrefix, name, namespace, uid)
 }
 
 func newUnitOption(section, name, value string) *unit.UnitOption {
@@ -756,7 +771,7 @@ func (r *Runtime) preparePod(pod *api.Pod, volumeMap map[string]volume.Volume) (
 	// Save the unit file under systemd's service directory.
 	// TODO(yifan) Garbage collect 'dead' serivce files.
 	needReload := false
-	unitName := makePodServiceFileName(pod)
+	unitName := makePodServiceFileName(pod.Name, pod.Namespace, pod.UID)
 	if _, err := os.Stat(path.Join(systemdServiceDir, unitName)); err == nil {
 		needReload = true
 	}
@@ -852,6 +867,8 @@ func HashContainer(container *api.Container) uint64 {
 // Note: In rkt, the container ID is in the form of "UUID:appName:ImageID", where
 // appName is the container name.
 func (r *Runtime) RunInContainer(containerID string, cmd []string) ([]byte, error) {
+	glog.V(4).Infof("Rkt running in container.")
+
 	id, err := parseContainerID(containerID)
 	if err != nil {
 		return nil, err
@@ -873,6 +890,8 @@ func startPty(c *exec.Cmd) (*os.File, error) {
 // Note: In rkt, the container ID is in the form of "UUID:appName:ImageID", where
 // appName is the container name.
 func (r *Runtime) ExecInContainer(containerID string, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool) error {
+	glog.V(4).Infof("Rkt execing in container.")
+
 	id, err := parseContainerID(containerID)
 	if err != nil {
 		return err
@@ -920,5 +939,67 @@ func (r *Runtime) ExecInContainer(containerID string, cmd []string, stdin io.Rea
 	if stderr != nil {
 		command.Stderr = stderr
 	}
+	return command.Run()
+}
+
+func (r *Runtime) findRktID(pod kubecontainer.Pod) (string, error) {
+	units, err := r.systemd.ListUnits()
+	if err != nil {
+		return "", err
+	}
+
+	for _, u := range units {
+		if strings.HasPrefix(u.Name, makePodServiceFileName(pod.Name, pod.Namespace, pod.ID)) {
+			f, err := os.Open(path.Join(systemdServiceDir, u.Name))
+			if err != nil {
+				return "", err
+			}
+			defer f.Close()
+			opts, err := unit.Deserialize(f)
+			if err != nil {
+				return "", err
+			}
+
+			for _, opt := range opts {
+				if opt.Section == unitKubernetesSection && opt.Name == unitRktID {
+					return opt.Value, nil
+				}
+			}
+		}
+	}
+	return "", fmt.Errorf("rkt uuid not found for pod %v", pod)
+}
+
+func (r *Runtime) PortForward(pod kubecontainer.Pod, port uint16, stream io.ReadWriteCloser) error {
+	glog.V(4).Infof("Rkt port forwarding in container.")
+
+	podInfos, err := r.getPodInfos()
+	if err != nil {
+		return err
+	}
+
+	rktID, err := r.findRktID(pod)
+	if err != nil {
+		return err
+	}
+
+	info, ok := podInfos[rktID]
+	if !ok {
+		return fmt.Errorf("cannot find the pod info for pod %v", pod)
+	}
+	if info.pid < 0 {
+		return fmt.Errorf("cannot get the pid for pod %v", pod)
+	}
+
+	// TODO what if the host doesn't have it???
+	_, lookupErr := exec.LookPath("socat")
+	if lookupErr != nil {
+		return fmt.Errorf("unable to do port forwarding: socat not found.")
+	}
+	args := []string{"-t", fmt.Sprintf("%d", info.pid), "-n", "socat", "-", fmt.Sprintf("TCP4:localhost:%d", port)}
+	// TODO use exec.LookPath
+	command := exec.Command("nsenter", args...)
+	command.Stdin = stream
+	command.Stdout = stream
 	return command.Run()
 }

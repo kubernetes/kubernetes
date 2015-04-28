@@ -36,7 +36,7 @@ type podInfo struct {
 }
 
 func newPodInfo() *podInfo {
-	return &podInfo{exitCodes: make(map[string]int)}
+	return &podInfo{pid: -1, exitCodes: make(map[string]int)}
 }
 
 func (p *podInfo) parseStatus(status []string) error {
