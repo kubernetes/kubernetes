@@ -384,7 +384,7 @@ On the PXE server make and fill in the variables ```vi /var/www/html/coreos/pxe-
             --logtostderr=true
             Restart=always
             RestartSec=10
-        - name: ≈.service
+        - name: kube-scheduler.service
           command: start
           content: |
             [Unit]
