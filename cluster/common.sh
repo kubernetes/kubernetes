@@ -28,10 +28,12 @@ DEFAULT_KUBECONFIG="${HOME}/.kube/config"
 # Assumed vars:
 #   KUBE_USER
 #   KUBE_PASSWORD
-#   KUBE_BEARER_TOKEN
 #   KUBE_MASTER_IP
 #   KUBECONFIG
 #   CONTEXT
+#
+# If the apiserver supports bearer auth, also provide:
+#   KUBE_BEARER_TOKEN
 #
 # The following can be omitted for --insecure-skip-tls-verify
 #   KUBE_CERT
@@ -57,8 +59,9 @@ function create-kubeconfig() {
       "--embed-certs=true"
     )
   fi
+
   local user_args=()
-  if [[ -z "${KUBE_USER:-}" || -z "${KUBE_PASSWORD:-}" ]]; then
+  if [[ ! -z "${KUBE_BEARER_TOKEN:-}" ]]; then
     user_args+=(
      "--token=${KUBE_BEARER_TOKEN}"
     )
@@ -81,6 +84,13 @@ function create-kubeconfig() {
   "${kubectl}" config set-context "${CONTEXT}" --cluster="${CONTEXT}" --user="${CONTEXT}"
   "${kubectl}" config use-context "${CONTEXT}"  --cluster="${CONTEXT}"
 
+  # If we have a bearer token, also create a credential entry with basic auth
+  # so that it is easy to discover the basic auth password for your cluster
+  # to use in a web browser.
+  if [[ ! -z "${KUBE_BEARER_TOKEN:-}" ]]; then
+    "${kubectl}" config set-credentials "${CONTEXT}-basic-auth" "--username=${KUBE_USER}" "--password=${KUBE_PASSWORD}"
+  fi
+
    echo "Wrote config for ${CONTEXT} to ${KUBECONFIG}"
 }
 
@@ -93,6 +103,7 @@ function clear-kubeconfig() {
   local kubectl="${KUBE_ROOT}/cluster/kubectl.sh"
   "${kubectl}" config unset "clusters.${CONTEXT}"
   "${kubectl}" config unset "users.${CONTEXT}"
+  "${kubectl}" config unset "users.${CONTEXT}-basic-auth"
   "${kubectl}" config unset "contexts.${CONTEXT}"
 
   local current

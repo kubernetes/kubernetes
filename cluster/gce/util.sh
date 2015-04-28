@@ -471,6 +471,8 @@ ENABLE_CLUSTER_DNS: $(yaml-quote ${ENABLE_CLUSTER_DNS:-false})
 DNS_REPLICAS: $(yaml-quote ${DNS_REPLICAS:-})
 DNS_SERVER_IP: $(yaml-quote ${DNS_SERVER_IP:-})
 DNS_DOMAIN: $(yaml-quote ${DNS_DOMAIN:-})
+KUBE_USER: $(yaml-quote ${KUBE_USER})
+KUBE_PASSWORD: $(yaml-quote ${KUBE_PASSWORD})
 KUBE_BEARER_TOKEN: $(yaml-quote ${KUBE_BEARER_TOKEN})
 KUBELET_TOKEN: $(yaml-quote ${KUBELET_TOKEN:-})
 KUBE_PROXY_TOKEN: $(yaml-quote ${KUBE_PROXY_TOKEN:-})
@@ -507,6 +509,7 @@ function write-node-env {
 # variables are set:
 #   ensure-temp-dir
 #   detect-project
+#   get-password
 #   get-bearer-token
 #
 function create-master-instance {
@@ -540,6 +543,7 @@ function kube-up {
   ensure-temp-dir
   detect-project
 
+  get-password
   get-bearer-token
 
   # Make sure we have the tar files staged on Google Storage
@@ -803,6 +807,7 @@ function kube-push {
   detect-project
   detect-master
   detect-minion-names
+  get-password
   get-bearer-token
 
   # Make sure we have the tar files staged on Google Storage
@@ -831,7 +836,7 @@ function kube-push {
   echo
   echo "  https://${KUBE_MASTER_IP}"
   echo
-  echo "The user name and password to use is located in ~/.kubernetes_auth."
+  echo "The user name and password to use is located in ~/.kube/config"
   echo
 }
 

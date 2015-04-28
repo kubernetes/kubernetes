@@ -9,6 +9,12 @@
 {% endif %}
 {% endif %}
 
+{% if grains['cloud'] is defined and grains['cloud'] == 'gce' %}
+/srv/kubernetes/basic_auth.csv:
+  file.managed:
+    - source: salt://kube-apiserver/basic_auth.csv
+{% endif %}
+
 # Copy kube-apiserver manifest to manifests folder for kubelet.
 /etc/kubernetes/manifests/kube-apiserver.manifest:
   file.managed:
@@ -20,7 +26,7 @@
     - makedirs: true
     - dir_mode: 755
 
-#stop legacy kube-apiserver service 
+#stop legacy kube-apiserver service
 stop_kube-apiserver:
   service.dead:
     - name: kube-apiserver

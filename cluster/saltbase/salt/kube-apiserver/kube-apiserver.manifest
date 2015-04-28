@@ -52,11 +52,16 @@
 {% endif -%}
 
 {% set token_auth_file = "--token_auth_file=/dev/null" -%}
+{% set basic_auth_file = "" -%}
 
 {% if grains.cloud is defined -%}
 {% if grains.cloud in [ 'aws', 'gce', 'vagrant' ] -%}
     {% set token_auth_file = "--token_auth_file=/srv/kubernetes/known_tokens.csv" -%}
 {% endif -%}
+{% endif -%}
+
+{% if grains['cloud'] is defined and grains['cloud'] == 'gce' %}
+  {% set basic_auth_file = "--basic_auth_file=/srv/kubernetes/basic_auth.csv" -%}
 {% endif -%}
 
 {% set admission_control = "" -%}
@@ -95,6 +100,7 @@
                  "--secure_port={{secure_port}}",
                  "{{token_auth_file}}",
                  "{{client_ca_file}}",
+                 "{{basic_auth_file}}",
                  "{{publicAddressOverride}}",
                  "{{pillar['log_level']}}"
                ],
