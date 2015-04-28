@@ -367,8 +367,8 @@ function create-node-template {
       --machine-type "${MINION_SIZE}" \
       --boot-disk-type "${MINION_DISK_TYPE}" \
       --boot-disk-size "${MINION_DISK_SIZE}" \
-      --image-project="${IMAGE_PROJECT}" \
-      --image "${IMAGE}" \
+      --image-project="${MINION_IMAGE_PROJECT}" \
+      --image "${MINION_IMAGE}" \
       --tags "${MINION_TAG}" \
       --network "${NETWORK}" \
       $2 \
@@ -522,8 +522,8 @@ function create-master-instance {
     --project "${PROJECT}" \
     --zone "${ZONE}" \
     --machine-type "${MASTER_SIZE}" \
-    --image-project="${IMAGE_PROJECT}" \
-    --image "${IMAGE}" \
+    --image-project="${MASTER_IMAGE_PROJECT}" \
+    --image "${MASTER_IMAGE}" \
     --tags "${MASTER_TAG}" \
     --network "${NETWORK}" \
     --scopes "storage-ro" "compute-rw" \

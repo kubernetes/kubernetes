@@ -23,11 +23,14 @@ MINION_SIZE=${MINION_SIZE:-g1-small}
 NUM_MINIONS=${NUM_MINIONS:-2}
 MINION_DISK_TYPE=pd-standard
 MINION_DISK_SIZE=${MINION_DISK_SIZE:-100GB}
-# TODO(dchen1107): Filed an internal issue to create an alias
-# for containervm image, so that gcloud will expand this
-# to the latest supported image.
-IMAGE=container-vm-v20150317
-IMAGE_PROJECT=google-containers
+
+OS_DISTRIBUTION=${KUBE_OS_DISTRIBUTION:-debian}
+MASTER_IMAGE=${KUBE_GCE_MASTER_IMAGE:-container-vm-v20150317}
+MASTER_IMAGE_PROJECT=${KUBE_GCE_MASTER_PROJECT:-google-containers}
+MINION_IMAGE=${KUBE_GCE_MINION_IMAGE:-container-vm-v20150317}
+MINION_IMAGE_PROJECT=${KUBE_GCE_MINION_PROJECT:-google-containers}
+CONTAINER_RUNTIME=${KUBE_CONTAINER_RUNTIME:-docker}
+
 NETWORK=${KUBE_GCE_NETWORK:-e2e}
 INSTANCE_PREFIX="${KUBE_GCE_INSTANCE_PREFIX:-e2e-test-${USER}}"
 MASTER_NAME="${INSTANCE_PREFIX}-master"
