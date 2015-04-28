@@ -574,7 +574,6 @@ function kube-up {
   for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
     create-route "${MINION_NAMES[$i]}" "${MINION_IP_RANGES[$i]}" &
     add-instance-metadata "${MINION_NAMES[$i]}" "node-ip-range=${MINION_IP_RANGES[$i]}" &
-    add-instance-metadata "${MINION_NAMES[$i]}" "node-name=${MINION_NAMES[$i]}" &
 
     if [ $i -ne 0 ] && [ $((i%5)) -eq 0 ]; then
       echo Waiting for a batch of routes at $i...
