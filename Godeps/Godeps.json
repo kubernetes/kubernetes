@@ -90,6 +90,11 @@
 			"Rev": "b5c0891944c2f150ccc9d02aecf51b76c14c2948"
 		},
 		{
+			"ImportPath": "github.com/dgrijalva/jwt-go",
+			"Comment": "v2.2.0-23-g5ca8014",
+			"Rev": "5ca80149b9d3f8b863af0e2bb6742e608603bd99"
+		},
+		{
 			"ImportPath": "github.com/docker/docker/pkg/archive",
 			"Comment": "v1.4.1-1714-ged66853",
 			"Rev": "ed6685369740035b0af9675bf9add52d0af7657b"
