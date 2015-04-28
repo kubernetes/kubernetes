@@ -4,7 +4,7 @@
 
 // Package spdy implements the SPDY protocol (currently SPDY/3), described in
 // http://www.chromium.org/spdy/spdy-protocol/spdy-protocol-draft3.
-package spdy
+package spdy // import "golang.org/x/net/spdy"
 
 import (
 	"bytes"
