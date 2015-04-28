@@ -58,7 +58,9 @@ type GCECloud struct {
 	projectID        string
 	zone             string
 	instanceID       string
-	networkName      string
+
+	// We assume here that nodes and master are in the same network. TODO(cjcullen) Fix it.
+	networkName string
 
 	// Used for accessing the metadata server
 	metadataAccess func(string) (string, error)
@@ -248,6 +250,7 @@ func waitForOp(op *compute.Operation, getOperation func() (*compute.Operation, e
 	pollOp := op
 	for pollOp.Status != "DONE" {
 		var err error
+		// TODO: add some backoff here.
 		time.Sleep(time.Second)
 		pollOp, err = getOperation()
 		if err != nil {
@@ -589,6 +592,7 @@ func (gce *GCECloud) Configure(name string, spec *api.NodeSpec) error {
 		}
 		return ErrMetadataConflict
 	}
+	// We are setting the metadata, so they can be picked-up by the configure-vm.sh script to start docker with the given CIDR for Pods.
 	instance.Metadata.Items = append(instance.Metadata.Items,
 		&compute.MetadataItems{
 			Key:   podCIDRMetadataKey,
