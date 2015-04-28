@@ -49,7 +49,7 @@ cat -n "${MINIONS_FILE}"
 
 attempt=0
 while true; do
-  kubectl_output=$("${KUBE_ROOT}/cluster/kubectl.sh" get cs)
+  kubectl_output=$("${KUBE_ROOT}/cluster/kubectl.sh" get cs) || true
 
   # The "kubectl componentstatuses" output is four columns like this:
   #
@@ -61,7 +61,7 @@ while true; do
   # Because of the header, the actual unsuccessful count is 1 minus the count.
   non_success_count=$(echo "${kubectl_output}" | \
     sed -n 's/^[[:alnum:][:punct:]]/&/p' | \
-    grep --invert-match -c '^[[:alnum:][:punct:]]\{1,\}[[:space:]]\{1,\}Healthy')
+    grep --invert-match -c '^[[:alnum:][:punct:]]\{1,\}[[:space:]]\{1,\}Healthy') || true
 
   if ((non_success_count > 1)); then
     if ((attempt < 5)); then
