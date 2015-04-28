@@ -599,3 +599,30 @@ func VerifyContainersAreNotFailed(pod api.Pod) error {
 	}
 	return nil
 }
+
+// Prints the histogram of the events and returns the number of bad events.
+func BadEvents(events []*api.Event) int {
+	type histogramKey struct {
+		reason string
+		source string
+	}
+	histogram := make(map[histogramKey]int)
+	for _, e := range events {
+		histogram[histogramKey{reason: e.Reason, source: e.Source.Component}]++
+	}
+	for key, number := range histogram {
+		Logf("- reason: %s, source: %s -> %d", key.reason, key.source, number)
+	}
+	badPatterns := []string{"kill", "fail"}
+	badEvents := 0
+	for key, number := range histogram {
+		for _, s := range badPatterns {
+			if strings.Contains(key.reason, s) {
+				Logf("WARNING %d events from %s with reason: %s", number, key.source, key.reason)
+				badEvents += number
+				break
+			}
+		}
+	}
+	return badEvents
+}
