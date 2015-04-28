@@ -45,6 +45,7 @@ if [[ ! -f "$salt_tar" ]]; then
   release_not_found
 fi
 
+hostnamectl set-hostname $MASTER_NAME
 
 # Setup hosts file to support ping by hostname to each minion in the cluster from apiserver
 for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
@@ -55,6 +56,7 @@ for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
     echo "$ip $minion" >> /etc/hosts
   fi
 done
+echo "$MASTER_IP $MASTER_NAME" >> /etc/hosts
 echo "127.0.0.1 localhost" >> /etc/hosts # enables cmds like 'kubectl get pods' on master.
 
 # Update salt configuration
@@ -150,7 +152,7 @@ if [[ ! -f "${known_tokens_file}" ]]; then
   (umask u=rw,go= ; echo "{\"BearerToken\": \"$kubelet_token\", \"Insecure\": true }" > $kubelet_auth_file)
 
   mkdir -p /srv/salt-overlay/salt/kube-proxy
-  kube_proxy_kubeconfig_file="/srv/salt-overlay/salt/kube_proxy/kubeconfig"
+  kube_proxy_kubeconfig_file="/srv/salt-overlay/salt/kube-proxy/kubeconfig"
   # Make a kubeconfig file with the token.
   # TODO(etune): put apiserver certs into secret too, and reference from authfile,
   # so that "Insecure" is not needed.
@@ -251,3 +253,9 @@ else
   salt '*' mine.update
   salt --show-timeout --force-color '*' state.highstate
 fi
+
+CONTRAIL_KUBERNETES=$HOME/contrail-kubernetes
+rm -rf $CONTRAIL_KUBERNETES
+sudo yum -y install ruby git
+git clone https://github.com/rombie/contrail-kubernetes.git $CONTRAIL_KUBERNETES
+sudo ruby $CONTRAIL_KUBERNETES/scripts/opencontrail-install/contrail_install.rb controller

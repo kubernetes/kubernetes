@@ -29,6 +29,9 @@ mkdir -p $POST_NETWORK_SCRIPT_DIR
 cat <<EOF > ${POST_NETWORK_SCRIPT}
 #!/bin/bash
 
+// Quit openvswitch networking - TEMPORARY HACK to test other solutions
+exit 0
+
 set -e
 
 # Only do this operation if the bridge is not defined
