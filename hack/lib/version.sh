@@ -22,9 +22,6 @@
 #          source code.
 #    KUBE_GIT_TREE_STATE - "clean" indicates no changes since the git commit id
 #        "dirty" indicates source code changes after the git commit id
-#    KUBE_GIT_VERSION - "vX.Y" used to indicate the last release version.
-#    KUBE_GIT_MAJOR - The major part of the version
-#    KUBE_GIT_MINOR - The minor component of the version
 
 # Grovels through git to set a set of env variables.
 #
@@ -48,26 +45,6 @@ kube::version::get_version_vars() {
       fi
     fi
 
-    # Use git describe to find the version based on annotated tags.
-    if [[ -n ${KUBE_GIT_VERSION-} ]] || KUBE_GIT_VERSION=$("${git[@]}" describe --tags --abbrev=14 "${KUBE_GIT_COMMIT}^{commit}" 2>/dev/null); then
-      if [[ "${KUBE_GIT_TREE_STATE}" == "dirty" ]]; then
-        # git describe --dirty only considers changes to existing files, but
-        # that is problematic since new untracked .go files affect the build,
-        # so use our idea of "dirty" from git status instead.
-        KUBE_GIT_VERSION+="-dirty"
-      fi
-
-      # Try to match the "git describe" output to a regex to try to extract
-      # the "major" and "minor" versions and whether this is the exact tagged
-      # version or whether the tree is between two tagged versions.
-      if [[ "${KUBE_GIT_VERSION}" =~ ^v([0-9]+)\.([0-9]+)(\.[0-9]+)?([-].*)?$ ]]; then
-        KUBE_GIT_MAJOR=${BASH_REMATCH[1]}
-        KUBE_GIT_MINOR=${BASH_REMATCH[2]}
-        if [[ -n "${BASH_REMATCH[4]}" ]]; then
-          KUBE_GIT_MINOR+="+"
-        fi
-      fi
-    fi
   fi
 }
 
@@ -82,9 +59,6 @@ kube::version::save_version_vars() {
   cat <<EOF >"${version_file}"
 KUBE_GIT_COMMIT='${KUBE_GIT_COMMIT-}'
 KUBE_GIT_TREE_STATE='${KUBE_GIT_TREE_STATE-}'
-KUBE_GIT_VERSION='${KUBE_GIT_VERSION-}'
-KUBE_GIT_MAJOR='${KUBE_GIT_MAJOR-}'
-KUBE_GIT_MINOR='${KUBE_GIT_MINOR-}'
 EOF
 }
 
@@ -108,17 +82,6 @@ kube::version::ldflags() {
   if [[ -n ${KUBE_GIT_COMMIT-} ]]; then
     ldflags+=(-X "${KUBE_GO_PACKAGE}/pkg/version.gitCommit" "${KUBE_GIT_COMMIT}")
     ldflags+=(-X "${KUBE_GO_PACKAGE}/pkg/version.gitTreeState" "${KUBE_GIT_TREE_STATE}")
-  fi
-
-  if [[ -n ${KUBE_GIT_VERSION-} ]]; then
-    ldflags+=(-X "${KUBE_GO_PACKAGE}/pkg/version.gitVersion" "${KUBE_GIT_VERSION}")
-  fi
-
-  if [[ -n ${KUBE_GIT_MAJOR-} && -n ${KUBE_GIT_MINOR-} ]]; then
-    ldflags+=(
-      -X "${KUBE_GO_PACKAGE}/pkg/version.gitMajor" "${KUBE_GIT_MAJOR}"
-      -X "${KUBE_GO_PACKAGE}/pkg/version.gitMinor" "${KUBE_GIT_MINOR}"
-    )
   fi
 
   # The -ldflags parameter takes a single string, so join the output.
