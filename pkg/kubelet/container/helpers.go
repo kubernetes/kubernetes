@@ -17,6 +17,8 @@ limitations under the License.
 package container
 
 import (
+	"strings"
+
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/probe"
 )
@@ -36,4 +38,15 @@ type Prober interface {
 // TODO(yifan): Remove netMode, ipcMode.
 type RunContainerOptionsGenerator interface {
 	GenerateRunContainerOptions(pod *api.Pod, container *api.Container, netMode, ipcMode string) (*RunContainerOptions, error)
+}
+
+// Trims runtime prefix from image name (e.g.: docker://busybox -> busybox).
+func TrimRuntimePrefixFromImage(img string) string {
+	const prefixSeparator = "://"
+
+	idx := strings.Index(img, prefixSeparator)
+	if idx < 0 {
+		return img
+	}
+	return img[idx+len(prefixSeparator):]
 }

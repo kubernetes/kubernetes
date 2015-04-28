@@ -934,8 +934,7 @@ func shouldContainerBeRestarted(container *api.Container, pod *api.Pod, podStatu
 
 	// Set dead containers to unready state.
 	for _, c := range resultStatus {
-		// TODO(yifan): Unify the format of container ID. (i.e. including docker:// as prefix).
-		readinessManager.RemoveReadiness(strings.TrimPrefix(c.ContainerID, dockertools.DockerPrefix))
+		readinessManager.RemoveReadiness(kubecontainer.TrimRuntimePrefixFromImage(c.ContainerID))
 	}
 
 	// Check RestartPolicy for dead container.
@@ -1653,7 +1652,7 @@ func (kl *Kubelet) validateContainerStatus(podStatus *api.PodStatus, containerNa
 	if cStatus.State.Waiting != nil {
 		return "", fmt.Errorf("container %q is in waiting state.", containerName)
 	}
-	return strings.Replace(cStatus.ContainerID, dockertools.DockerPrefix, "", 1), nil
+	return kubecontainer.TrimRuntimePrefixFromImage(cStatus.ContainerID), nil
 }
 
 // GetKubeletContainerLogs returns logs from the container
