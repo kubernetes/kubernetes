@@ -307,6 +307,7 @@ func (s *APIServer) Run(_ []string) error {
 		ReadWritePort:          s.SecurePort,
 		PublicAddress:          net.IP(s.BindAddress),
 		Authenticator:          authenticator,
+		SupportsBasicAuth:      len(s.BasicAuthFile) > 0,
 		Authorizer:             authorizer,
 		AdmissionControl:       admissionController,
 		DisableV1Beta3:         disableV1beta3,
