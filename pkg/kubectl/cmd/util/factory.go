@@ -150,23 +150,23 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 				}
 				return kubectl.MakeLabels(rc.Spec.Selector), nil
 			case "Pod":
-				rc, err := client.Pods(namespace).Get(name)
+				pod, err := client.Pods(namespace).Get(name)
 				if err != nil {
 					return "", err
 				}
-				if len(rc.Labels) == 0 {
+				if len(pod.Labels) == 0 {
 					return "", fmt.Errorf("the pod has no labels and cannot be exposed")
 				}
-				return kubectl.MakeLabels(rc.Labels), nil
+				return kubectl.MakeLabels(pod.Labels), nil
 			case "Service":
-				rc, err := client.ReplicationControllers(namespace).Get(name)
+				svc, err := client.Services(namespace).Get(name)
 				if err != nil {
 					return "", err
 				}
-				if rc.Spec.Selector == nil {
+				if svc.Spec.Selector == nil {
 					return "", fmt.Errorf("the service has no pod selector set")
 				}
-				return kubectl.MakeLabels(rc.Spec.Selector), nil
+				return kubectl.MakeLabels(svc.Spec.Selector), nil
 			default:
 				return "", fmt.Errorf("it is not possible to get a pod selector from %s", mapping.Kind)
 			}
