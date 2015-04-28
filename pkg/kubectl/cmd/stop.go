@@ -17,7 +17,6 @@ limitations under the License.
 package cmd
 
 import (
-	"fmt"
 	"io"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl"
@@ -55,29 +54,7 @@ func NewCmdStop(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 		Long:    stop_long,
 		Example: stop_example,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdNamespace, err := f.DefaultNamespace()
-			cmdutil.CheckErr(err)
-			mapper, typer := f.Object()
-			r := resource.NewBuilder(mapper, typer, f.ClientMapperForCommand()).
-				ContinueOnError().
-				NamespaceParam(cmdNamespace).RequireNamespace().
-				ResourceTypeOrNameArgs(false, args...).
-				FilenameParam(flags.Filenames...).
-				SelectorParam(cmdutil.GetFlagString(cmd, "selector")).
-				SelectAllParam(cmdutil.GetFlagBool(cmd, "all")).
-				Flatten().
-				Do()
-			cmdutil.CheckErr(r.Err())
-
-			r.Visit(func(info *resource.Info) error {
-				reaper, err := f.Reaper(info.Mapping)
-				cmdutil.CheckErr(err)
-				if _, err := reaper.Stop(info.Namespace, info.Name); err != nil {
-					return err
-				}
-				fmt.Fprintf(out, "%s/%s\n", info.Mapping.Resource, info.Name)
-				return nil
-			})
+			cmdutil.CheckErr(RunStop(f, cmd, args, flags.Filenames, out))
 		},
 	}
 	usage := "Filename, directory, or URL to file of resource(s) to be stopped"
@@ -85,4 +62,25 @@ func NewCmdStop(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd.Flags().StringP("selector", "l", "", "Selector (label query) to filter on")
 	cmd.Flags().Bool("all", false, "[-all] to select all the specified resources")
 	return cmd
+}
+
+func RunStop(f *cmdutil.Factory, cmd *cobra.Command, args []string, filenames util.StringList, out io.Writer) error {
+	cmdNamespace, err := f.DefaultNamespace()
+	if err != nil {
+		return err
+	}
+	mapper, typer := f.Object()
+	r := resource.NewBuilder(mapper, typer, f.ClientMapperForCommand()).
+		ContinueOnError().
+		NamespaceParam(cmdNamespace).RequireNamespace().
+		ResourceTypeOrNameArgs(false, args...).
+		FilenameParam(filenames...).
+		SelectorParam(cmdutil.GetFlagString(cmd, "selector")).
+		SelectAllParam(cmdutil.GetFlagBool(cmd, "all")).
+		Flatten().
+		Do()
+	if r.Err() != nil {
+		return r.Err()
+	}
+	return ReapResult(r, f, out, false)
 }

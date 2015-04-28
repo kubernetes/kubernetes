@@ -35,6 +35,19 @@ type Reaper interface {
 	Stop(namespace, name string) (string, error)
 }
 
+type NoSuchReaperError struct {
+	kind string
+}
+
+func (n *NoSuchReaperError) Error() string {
+	return fmt.Sprintf("no reaper has been implemented for %q", n.kind)
+}
+
+func IsNoSuchReaperError(err error) bool {
+	_, ok := err.(*NoSuchReaperError)
+	return ok
+}
+
 func ReaperFor(kind string, c client.Interface) (Reaper, error) {
 	switch kind {
 	case "ReplicationController":
@@ -44,7 +57,7 @@ func ReaperFor(kind string, c client.Interface) (Reaper, error) {
 	case "Service":
 		return &ServiceReaper{c}, nil
 	}
-	return nil, fmt.Errorf("no reaper has been implemented for %q", kind)
+	return nil, &NoSuchReaperError{kind}
 }
 
 type ReplicationControllerReaper struct {

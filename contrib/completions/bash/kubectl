@@ -343,6 +343,7 @@ _kubectl_delete()
     flags_completion=()
 
     flags+=("--all")
+    flags+=("--cascade")
     flags+=("--filename=")
     flags_with_completion+=("--filename")
     flags_completion+=("_filedir '@(json|yaml|yml)'")
