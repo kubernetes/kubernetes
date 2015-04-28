@@ -52,8 +52,10 @@ const (
 	kubernetesUnitPrefix = "k8s"
 	systemdServiceDir    = "/run/systemd/system"
 
-	rktDataDir        = "/var/lib/rkt"
-	rktLocalConfigDir = "/etc/rkt"
+	rktDataDir             = "/var/lib/rkt"
+	rktLocalConfigDir      = "/etc/rkt"
+	rktMetadataServiceFile = "rkt-metadata.service"
+	rktMetadataSocketFile  = "rkt-metadata.socket"
 
 	unitKubernetesSection = "X-Kubernetes"
 	unitPodName           = "POD"
@@ -126,6 +128,52 @@ func (c *Config) buildGlobalOptions() []string {
 	return result
 }
 
+func startMetadataService(systemd *dbus.Conn) error {
+	units, err := systemd.ListUnits()
+	if err != nil {
+		return err
+	}
+	for _, u := range units {
+		if u.Name == rktMetadataServiceFile {
+			// Metadata is already running.
+			return nil
+		}
+	}
+
+	// Create the service and socket file under systemd directory.
+	var src, dst string
+	dst = path.Join(systemdServiceDir, rktMetadataServiceFile)
+	if _, err := os.Stat(dst); err == nil {
+		if err := os.Remove(dst); err != nil {
+			return err
+		}
+	}
+	dst = path.Join(systemdServiceDir, rktMetadataSocketFile)
+	if _, err := os.Stat(dst); err == nil {
+		if err := os.Remove(dst); err != nil {
+			return err
+		}
+	}
+
+	wd, err := os.Getwd()
+	if err != nil {
+		return err
+	}
+
+	dst = path.Join(systemdServiceDir, rktMetadataServiceFile)
+	src = path.Join(wd, rktMetadataServiceFile)
+	if err := os.Symlink(src, dst); err != nil {
+		return err
+	}
+	dst = path.Join(systemdServiceDir, rktMetadataSocketFile)
+	src = path.Join(wd, rktMetadataSocketFile)
+	if err := os.Symlink(src, dst); err != nil {
+		return err
+	}
+	_, err = systemd.StartUnit(rktMetadataServiceFile, "replace")
+	return err
+}
+
 // init will start the metadata-service as a transient systemd service.
 func init() {
 	var err error
@@ -139,9 +187,9 @@ func init() {
 	if err != nil {
 		glog.Errorf("rkt: Cannot find rkt binary: %v", err)
 	}
-	systemd.StartTransientUnit(fmt.Sprintf("%s %s", rktBinName, "metatdata-service"), "replace")
-	if err != nil {
-		glog.Errorf("rkt: Cannot start transient unit: %v", err)
+
+	if err := startMetadataService(systemd); err != nil {
+		glog.Errorf("rkt: Cannot start metadata service: %v", err)
 	}
 }
 
@@ -826,23 +874,26 @@ func (r *Runtime) writeDockerAuthConfig(image string, creds docker.AuthConfigura
 
 // PullImage invokes 'rkt fetch' to download an aci.
 func (r *Runtime) PullImage(img string) error {
-	repoToPull, tag := parsers.ParseRepositoryTag(img)
-	// If no tag was specified, use the default "latest".
-	if len(tag) == 0 {
-		tag = "latest"
+	if strings.HasPrefix(img, dockerPrefix) {
+		repoToPull, tag := parsers.ParseRepositoryTag(img)
+		// If no tag was specified, use the default "latest".
+		if len(tag) == 0 {
+			tag = "latest"
+		}
+
+		creds, ok := r.dockerKeyring.Lookup(repoToPull)
+		if !ok {
+			glog.V(1).Infof("Pulling image %s without credentials", img)
+		}
+
+		// Let's update a json.
+		// TODO(yifan): Find a way to feed this to rkt.
+		if err := r.writeDockerAuthConfig(img, creds); err != nil {
+			return err
+		}
 	}
 
-	creds, ok := r.dockerKeyring.Lookup(repoToPull)
-	if !ok {
-		glog.V(1).Infof("Pulling image %s without credentials", img)
-	}
-
-	// Let's update a json.
-	// TODO(yifan): Find a way to feed this to rkt.
-	if err := r.writeDockerAuthConfig(img, creds); err != nil {
-		return err
-	}
-	output, err := r.RunCommand("fetch", dockerPrefix+img)
+	output, err := r.RunCommand("fetch", img)
 	if err != nil {
 		return fmt.Errorf("failed to fetch image: %v:", output)
 	}
@@ -853,7 +904,7 @@ func (r *Runtime) PullImage(img string) error {
 // TODO(yifan): This is hack, which uses 'rkt prepare --local' to test whether
 // the image is present.
 func (r *Runtime) IsImagePresent(img string) (bool, error) {
-	if _, err := r.RunCommand("prepare", "--local=true", dockerPrefix+img); err != nil {
+	if _, err := r.RunCommand("prepare", "--local=true", img); err != nil {
 		return false, nil
 	}
 	return true, nil
