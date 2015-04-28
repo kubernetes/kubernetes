@@ -363,6 +363,7 @@ func getTestRequests() []struct {
 		{"GET", "/api", "", code200},
 		{"GET", "/healthz", "", code200},
 		{"GET", "/version", "", code200},
+		{"GET", "/invalidURL", "", code404},
 	}
 	return requests
 }
