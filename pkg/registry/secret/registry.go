@@ -18,32 +18,70 @@ package secret
 
 import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/generic"
-	etcdgeneric "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/generic/etcd"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/rest"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 )
 
-// registry implements custom changes to generic.Etcd.
-type registry struct {
-	*etcdgeneric.Etcd
+// Registry is an interface implemented by things that know how to store Secret objects.
+type Registry interface {
+	// ListSecrets obtains a list of Secrets having labels which match selector.
+	ListSecrets(ctx api.Context, selector labels.Selector) (*api.SecretList, error)
+	// Watch for new/changed/deleted secrets
+	WatchSecrets(ctx api.Context, label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error)
+	// Get a specific Secret
+	GetSecret(ctx api.Context, name string) (*api.Secret, error)
+	// Create a Secret based on a specification.
+	CreateSecret(ctx api.Context, Secret *api.Secret) (*api.Secret, error)
+	// Update an existing Secret
+	UpdateSecret(ctx api.Context, Secret *api.Secret) (*api.Secret, error)
+	// Delete an existing Secret
+	DeleteSecret(ctx api.Context, name string) error
 }
 
-// NewEtcdRegistry returns a registry which will store Secret in the given helper
-func NewEtcdRegistry(h tools.EtcdHelper) generic.Registry {
-	prefix := "/secrets"
-	return registry{
-		Etcd: &etcdgeneric.Etcd{
-			NewFunc:      func() runtime.Object { return &api.Secret{} },
-			NewListFunc:  func() runtime.Object { return &api.SecretList{} },
-			EndpointName: "secrets",
-			KeyRootFunc: func(ctx api.Context) string {
-				return etcdgeneric.NamespaceKeyRootFunc(ctx, prefix)
-			},
-			KeyFunc: func(ctx api.Context, id string) (string, error) {
-				return etcdgeneric.NamespaceKeyFunc(ctx, prefix, id)
-			},
-			Helper: h,
-		},
+// storage puts strong typing around storage calls
+type storage struct {
+	rest.StandardStorage
+}
+
+// NewRegistry returns a new Registry interface for the given Storage. Any mismatched
+// types will panic.
+func NewRegistry(s rest.StandardStorage) Registry {
+	return &storage{s}
+}
+
+func (s *storage) ListSecrets(ctx api.Context, label labels.Selector) (*api.SecretList, error) {
+	obj, err := s.List(ctx, label, fields.Everything())
+	if err != nil {
+		return nil, err
 	}
+	return obj.(*api.SecretList), nil
+}
+
+func (s *storage) WatchSecrets(ctx api.Context, label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
+	return s.Watch(ctx, label, field, resourceVersion)
+}
+
+func (s *storage) GetSecret(ctx api.Context, name string) (*api.Secret, error) {
+	obj, err := s.Get(ctx, name)
+	if err != nil {
+		return nil, err
+	}
+	return obj.(*api.Secret), nil
+}
+
+func (s *storage) CreateSecret(ctx api.Context, secret *api.Secret) (*api.Secret, error) {
+	obj, err := s.Create(ctx, secret)
+	return obj.(*api.Secret), err
+}
+
+func (s *storage) UpdateSecret(ctx api.Context, secret *api.Secret) (*api.Secret, error) {
+	obj, _, err := s.Update(ctx, secret)
+	return obj.(*api.Secret), err
+}
+
+func (s *storage) DeleteSecret(ctx api.Context, name string) error {
+	_, err := s.Delete(ctx, name, nil)
+	return err
 }

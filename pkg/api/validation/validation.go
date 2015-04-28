@@ -1242,6 +1242,29 @@ func ValidateSecret(secret *api.Secret) errs.ValidationErrorList {
 		allErrs = append(allErrs, errs.NewFieldForbidden("data", "Maximum secret size exceeded"))
 	}
 
+	switch secret.Type {
+	case api.SecretTypeOpaque, "":
+		// no-op
+	default:
+		// no-op
+	}
+
+	return allErrs
+}
+
+// ValidateSecretUpdate tests if required fields in the Secret are set.
+func ValidateSecretUpdate(oldSecret, newSecret *api.Secret) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+	allErrs = append(allErrs, ValidateObjectMetaUpdate(&oldSecret.ObjectMeta, &newSecret.ObjectMeta).Prefix("metadata")...)
+
+	if len(newSecret.Type) == 0 {
+		newSecret.Type = oldSecret.Type
+	}
+	if newSecret.Type != oldSecret.Type {
+		allErrs = append(allErrs, errs.NewFieldInvalid("type", newSecret.Type, "field is immutable"))
+	}
+
+	allErrs = append(allErrs, ValidateSecret(newSecret)...)
 	return allErrs
 }
 

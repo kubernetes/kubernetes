@@ -60,7 +60,7 @@ import (
 	podetcd "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/pod/etcd"
 	podtemplateetcd "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/podtemplate/etcd"
 	resourcequotaetcd "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/resourcequota/etcd"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/secret"
+	secretetcd "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/secret/etcd"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/service"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/ui"
@@ -381,7 +381,7 @@ func (m *Master) init(c *Config) {
 	limitRangeRegistry := limitrange.NewEtcdRegistry(c.EtcdHelper)
 
 	resourceQuotaStorage, resourceQuotaStatusStorage := resourcequotaetcd.NewStorage(c.EtcdHelper)
-	secretRegistry := secret.NewEtcdRegistry(c.EtcdHelper)
+	secretStorage := secretetcd.NewStorage(c.EtcdHelper)
 	persistentVolumeStorage, persistentVolumeStatusStorage := pvetcd.NewStorage(c.EtcdHelper)
 	persistentVolumeClaimStorage, persistentVolumeClaimStatusStorage := pvcetcd.NewStorage(c.EtcdHelper)
 
@@ -428,7 +428,7 @@ func (m *Master) init(c *Config) {
 		"namespaces":                    namespaceStorage,
 		"namespaces/status":             namespaceStatusStorage,
 		"namespaces/finalize":           namespaceFinalizeStorage,
-		"secrets":                       secret.NewStorage(secretRegistry),
+		"secrets":                       secretStorage,
 		"persistentVolumes":             persistentVolumeStorage,
 		"persistentVolumes/status":      persistentVolumeStatusStorage,
 		"persistentVolumeClaims":        persistentVolumeClaimStorage,
