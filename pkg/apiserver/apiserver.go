@@ -65,11 +65,19 @@ var (
 		},
 		[]string{"verb", "resource", "client"},
 	)
+	requestLatenciesSummary = prometheus.NewSummaryVec(
+		prometheus.SummaryOpts{
+			Name: "apiserver_request_latencies_summary",
+			Help: "Response latency summary in microseconds for each verb and resource.",
+		},
+		[]string{"verb", "resource"},
+	)
 )
 
 func init() {
 	prometheus.MustRegister(requestCounter)
 	prometheus.MustRegister(requestLatencies)
+	prometheus.MustRegister(requestLatenciesSummary)
 }
 
 // monitor is a helper function for each HTTP request handler to use for
@@ -77,6 +85,7 @@ func init() {
 func monitor(verb, resource *string, client string, httpCode *int, reqStart time.Time) {
 	requestCounter.WithLabelValues(*verb, *resource, client, strconv.Itoa(*httpCode)).Inc()
 	requestLatencies.WithLabelValues(*verb, *resource, client).Observe(float64((time.Since(reqStart)) / time.Microsecond))
+	requestLatenciesSummary.WithLabelValues(*verb, *resource).Observe(float64((time.Since(reqStart)) / time.Microsecond))
 }
 
 // monitorFilter creates a filter that reports the metrics for a given resource and action.
