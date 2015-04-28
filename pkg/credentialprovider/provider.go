@@ -32,7 +32,7 @@ type DockerConfigProvider interface {
 	Provide() DockerConfig
 }
 
-// A DockerConfigProvider that simply reads the .dockersfg file
+// A DockerConfigProvider that simply reads the .dockercfg file
 type defaultDockerConfigProvider struct{}
 
 // init registers our default provider, which simply reads the .dockercfg file.
