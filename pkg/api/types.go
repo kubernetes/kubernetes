@@ -518,7 +518,7 @@ type EnvVar struct {
 // EnvVarSource represents a source for the value of an EnvVar.
 type EnvVarSource struct {
 	// Required: Selects a field of the pod; only name and namespace are supported.
-	FieldPath *ObjectFieldSelector `json:"fieldPath,omitempty"`
+	FieldPath *ObjectFieldSelector `json:"fieldPath"`
 }
 
 // ObjectFieldSelector selects an APIVersioned field of an object.
@@ -526,9 +526,9 @@ type ObjectFieldSelector struct {
 	// Required: Version of the schema the FieldPath is written in terms of.
 	// If no value is specified, it will be defaulted to the APIVersion of the
 	// enclosing object.
-	APIVersion string `json:"apiVersion,omitempty"`
+	APIVersion string `json:"apiVersion"`
 	// Required: Path of the field to select in the specified API version
-	FieldPath string `json:"fieldPath,omitempty"`
+	FieldPath string `json:"fieldPath"`
 }
 
 // HTTPGetAction describes an action based on HTTP Get requests.
