@@ -31,6 +31,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/capabilities"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/credentialprovider"
 	kubecontainer "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -40,6 +41,8 @@ import (
 	"github.com/coreos/go-systemd/dbus"
 	"github.com/coreos/go-systemd/unit"
 	"github.com/coreos/rkt/store"
+	"github.com/docker/docker/pkg/parsers"
+	"github.com/fsouza/go-dockerclient"
 	"github.com/golang/glog"
 	"github.com/kr/pty"
 )
@@ -48,14 +51,13 @@ const (
 	acversion            = "0.5.1"
 	kubernetesUnitPrefix = "k8s"
 	systemdServiceDir    = "/run/systemd/system"
-	tmpPodManifestDir    = "/tmp"
+
+	rktDataDir        = "/var/lib/rkt"
+	rktLocalConfigDir = "/etc/rkt"
 
 	unitKubernetesSection = "X-Kubernetes"
 	unitPodName           = "POD"
 	unitRktID             = "RktID"
-
-	// TODO(yifan): Export in rkt?
-	defaultDataDir = "/var/lib/rkt"
 )
 
 const (
@@ -71,6 +73,10 @@ const (
 	Garbage        = "garbage"
 )
 
+const (
+	dockerAuthTemplate = `{"rktKind":"dockerAuth","rktVersion":"v1","registries":[%q],"credentials":{"user":%q,"password":%q}}`
+)
+
 // Runtime implements the ContainerRuntime for rkt. The implementation
 // uses systemd, so in order to run this runtime, systemd must be installed
 // on the machine.
@@ -78,6 +84,8 @@ type Runtime struct {
 	systemd *dbus.Conn
 	absPath string
 	config  *Config
+	// TODO(yifan): Refactor this to be generic keyring.
+	dockerKeyring credentialprovider.DockerKeyring
 }
 
 // Config stores the global configuration for the rkt runtime.
@@ -85,10 +93,12 @@ type Runtime struct {
 type Config struct {
 	// The debug flag for rkt.
 	Debug bool
-	// The rkt data directory
+	// The rkt data directory.
 	Dir string
 	// This flag controls whether we skip image or key verification.
 	InsecureSkipVerify bool
+	// The local config directory.
+	LocalConfigDir string
 }
 
 // buildGlobalOptions returns an array of global command line options.
@@ -100,6 +110,9 @@ func (c *Config) buildGlobalOptions() []string {
 
 	result = append(result, fmt.Sprintf("--debug=%v", c.Debug))
 	result = append(result, fmt.Sprintf("--insecure-skip-verify=%v", c.InsecureSkipVerify))
+	if c.LocalConfigDir != "" {
+		result = append(result, fmt.Sprintf("--local-config=%s", c.LocalConfigDir))
+	}
 	if c.Dir != "" {
 		result = append(result, fmt.Sprintf("--dir=%s", c.Dir))
 	}
@@ -120,9 +133,10 @@ func New(config *Config) (*Runtime, error) {
 		return nil, err
 	}
 	rkt := &Runtime{
-		systemd: systemd,
-		absPath: absPath,
-		config:  config,
+		systemd:       systemd,
+		absPath:       absPath,
+		config:        config,
+		dockerKeyring: credentialprovider.NewDockerKeyring(),
 	}
 
 	// Simply verify the binary by trying 'rkt version'.
@@ -553,7 +567,7 @@ func (r *Runtime) makePodManifest(pod *api.Pod, volumeMap map[string]volume.Volu
 	//
 	// https://github.com/coreos/rkt/issues/723.
 	//
-	ds, err := store.NewStore(defaultDataDir)
+	ds, err := store.NewStore(rktDataDir)
 	if err != nil {
 		glog.Errorf("Cannot open store: %v", err)
 		return nil, err
@@ -697,6 +711,14 @@ func (r *Runtime) preparePod(pod *api.Pod, volumeMap map[string]volume.Volume) (
 	if err != nil {
 		return "", false, err
 	}
+
+	defer func() {
+		manifestFile.Close()
+		if err := os.Remove(manifestFile.Name()); err != nil {
+			glog.Warningf("Cannot remove temp manifest file %q: %v", manifestFile.Name(), err)
+		}
+	}()
+
 	data, err := json.Marshal(manifest)
 	if err != nil {
 		return "", false, err
@@ -751,16 +773,72 @@ func (r *Runtime) preparePod(pod *api.Pod, volumeMap map[string]volume.Volume) (
 	return unitName, needReload, nil
 }
 
+func (r *Runtime) writeDockerAuthConfig(image string, creds docker.AuthConfiguration) error {
+	registry := "index.docker.io"
+	// Image spec: [<registry>/]<repository>/<image>[:<version]
+	explicitRegistry := (strings.Count(image, "/") == 2)
+	if explicitRegistry {
+		registry = strings.Split(image, "/")[0]
+	}
+
+	localConfigDir := rktLocalConfigDir
+	if r.config.LocalConfigDir != "" {
+		localConfigDir = r.config.LocalConfigDir
+	}
+	authDir := path.Join(localConfigDir, "auth.d")
+	if _, err := os.Stat(authDir); os.IsNotExist(err) {
+		if err := os.Mkdir(authDir, 0600); err != nil {
+			glog.Errorf("Cannot create auth dir: %v", err)
+			return err
+		}
+	}
+	f, err := os.Create(path.Join(localConfigDir, "auth.d", registry+".json"))
+	if err != nil {
+		glog.Errorf("Cannot create docker auth config file: %v", err)
+		return err
+	}
+	defer f.Close()
+	config := fmt.Sprintf(dockerAuthTemplate, registry, creds.Username, creds.Password)
+	if _, err := f.Write([]byte(config)); err != nil {
+		glog.Errorf("Cannot write docker auth config file: %v", err)
+		return err
+	}
+	return nil
+}
+
 // PullImage invokes 'rkt fetch' to download an aci.
 func (r *Runtime) PullImage(img string) error {
-	_, err := r.RunCommand("fetch", img)
-	return err
+	repoToPull, tag := parsers.ParseRepositoryTag(img)
+	// If no tag was specified, use the default "latest".
+	if len(tag) == 0 {
+		tag = "latest"
+	}
+
+	creds, ok := r.dockerKeyring.Lookup(repoToPull)
+	if !ok {
+		glog.V(1).Infof("Pulling image %s without credentials", img)
+	}
+
+	// Let's update a json.
+	// TODO(yifan): Find a way to feed this to rkt.
+	if err := r.writeDockerAuthConfig(img, creds); err != nil {
+		return err
+	}
+	output, err := r.RunCommand("fetch", "docker://"+img)
+	if err != nil {
+		return fmt.Errorf("failed to fetch image: %v:", output)
+	}
+	return nil
 }
 
 // IsImagePresent returns true if the image is available on the machine.
-// TODO(yifan): Not implemented yet.
+// TODO(yifan): This is hack, which uses 'rkt prepare --local' to test whether
+// the image is present.
 func (r *Runtime) IsImagePresent(img string) (bool, error) {
-	return false, nil
+	if _, err := r.RunCommand("prepare", "--local=true", "docker://"+img); err != nil {
+		return false, nil
+	}
+	return true, nil
 }
 
 // TODO(yifan): Move this duplicated function to container runtime.

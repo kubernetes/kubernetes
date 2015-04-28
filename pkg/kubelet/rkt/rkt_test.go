@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"math/rand"
 	"os"
+	"os/exec"
 	"path"
 	"reflect"
 	"testing"
@@ -532,5 +533,37 @@ func TestExecInContainer(t *testing.T) {
 
 	if err := rkt.KillPod(pod); err != nil {
 		t.Errorf("Cannot kill pod %v", err)
+	}
+}
+
+func TestIsImagePresentAndPullImage(t *testing.T) {
+	testImage := "nginx"
+	rkt := newRktOrFail(t)
+
+	if err := exec.Command("rkt", "gc", "--expire-prepared=0", "--grace-period=0").Run(); err != nil {
+		t.Errorf("Failed to rkt gc: %v", err)
+	}
+	if err := os.RemoveAll("/var/lib/rkt"); err != nil {
+		t.Errorf("Failed to remove rkt dir: %v", err)
+	}
+
+	ok, err := rkt.IsImagePresent(testImage)
+	if err != nil {
+		t.Errorf("IsImagePresent failed: %v", err)
+	}
+	if ok {
+		t.Errorf("Should not find the image present!")
+	}
+
+	if err := rkt.PullImage(testImage); err != nil {
+		t.Errorf("Failed to pull image: %v", err)
+	}
+
+	ok, err = rkt.IsImagePresent(testImage)
+	if err != nil {
+		t.Errorf("IsImagePresent failed: %v", err)
+	}
+	if !ok {
+		t.Errorf("Should find the image present!")
 	}
 }
