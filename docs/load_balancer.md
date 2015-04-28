@@ -13,7 +13,7 @@ _(new functionality)_
 
 To be exposed outside the k8s cluster, the service must be on known ports on externally reachable
 IPs.  For version 1 public services, k8s listens on _every_ external IP address on every minion, and assigns
-a _single_ port cluster-wide for each port on public service.
+a _single_ port cluster-wide for each port on public services.
 
 ## Important scenarios
 
@@ -57,10 +57,10 @@ ServiceStatus:
   - publicIPs[] // mirrors publicIPs in Service today, replaces them in future
 ```
 
-We have to differentiate between the load-balancer as seen externally (by the caller of k8s) vs as seen internally
+We have to differentiate between the load-balancer as seen externally (by the k8s end-user) vs. as seen internally
 (e.g. by kube-proxy).
 For example, if we were using AWS subnets to identify ELBs (which we're not), the external load-balancer name
-that the k8s-user cares about would be something like `myelbname.amazonaws.com`, the internal ip-ranges would be
+that the k8s-end-user cares about would be something like `myelbname.amazonaws.com`, the internal ip-ranges would be
 something like `10.244.250.192/30`.  In the case of GCE these are the same, and it looks like we don't need to track
 an internal name at the moment, but we do not want to bake this assumption into the API.  So publicIPs is _external_.
 
@@ -87,18 +87,19 @@ updating Status as kube-proxy/kubelet.
 
 ## Creation flow
 
-### Load-balanced
+### visibility: loadbalancer
+
 1. User `POST`s `/api/v1/namespaces/foo/services/bar` `Service{ Spec{ visibility: loadbalancer, ports: [{port: 80}] } }`
-1. API server verifies that port 80 can be assigned, accepts and persists
+1. API server assigns a hostPort (if the load balancer needs one), accepts and persists
 1. LB Controller wakes up, allocates a load-balancer, and `POST`s `/api/v1/namespaces/foo/services/bar` `Service{ Status{ publicIps: [ "1.2.3.4" ] }}`
 1. Service REST sets `Service.Status.publicIps = [ "1.2.3.4" ]`
 1. kube-proxy wakes up and sets iptables to receive on 1.2.3.4
 
-### Public
+### visibility: public
 
-1. User `POST`s `/api/v1/namespaces/foo/services/bar` `Service{ Spec{ visibility: public, ports: [{port: 80}] } }`
-1. API server verifies that port 80 can be assigned, accepts and persists
-1. kube-proxy wakes up and sets iptables to receive on hostPort (80)
+1. User `POST`s `/api/v1/namespaces/foo/services/bar` `Service{ Spec{ visibility: public, ports: [{port: 80, hostPort: 10080}] } }`
+1. API server verifies that port 10080 can be assigned, accepts and persists
+1. kube-proxy wakes up and sets iptables to receive on hostPort 10080
 
 
 In order to verify that the port can be assigned, the API server must check that the port is within a permitted range,
@@ -106,10 +107,9 @@ and that it is not already assigned to another service.  This is similar to the 
 The error codes & messages (in the case of port conflicts, out-of-range ports or port-exhaustion) will be analogous
 to the equivalent IP address errors.
 
-Advanced-clouds (e.g. GCE) may support load-balancing without requiring a public port assignment. 
-If the visibility is loadbalancer, a hostPort is not guaranteed to be assigned, and even if one is assigned it 
+Advanced clouds (e.g. GCE) may support load-balancing without requiring a public port assignment.
+If the visibility is _loadbalancer_, a hostPort is not guaranteed to be assigned, and even if one is assigned it
 is not guaranteed to be reachable (k8s should ideally configure firewall rules to prevent load-balancer bypass).
-
 
 ## New flags
 
