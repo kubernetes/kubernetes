@@ -55,6 +55,9 @@ type Converter struct {
 	// Map from a type to a function which applies defaults.
 	defaultingFuncs map[reflect.Type]reflect.Value
 
+	// Similar to above, but function is stored as interface{}.
+	defaultingInterfaces map[reflect.Type]interface{}
+
 	// Map from an input type to a function which can apply a key name mapping
 	inputFieldMappingFuncs map[reflect.Type]FieldMappingFunc
 
@@ -76,6 +79,7 @@ func NewConverter() *Converter {
 		conversionFuncs:          map[typePair]reflect.Value{},
 		generatedConversionFuncs: map[typePair]reflect.Value{},
 		defaultingFuncs:          map[reflect.Type]reflect.Value{},
+		defaultingInterfaces:     map[reflect.Type]interface{}{},
 		nameFunc:                 func(t reflect.Type) string { return t.Name() },
 		structFieldDests:         map[typeNamePair][]typeNamePair{},
 		structFieldSources:       map[typeNamePair][]typeNamePair{},
@@ -105,6 +109,10 @@ type Scope interface {
 	// DefaultConvert performs the default conversion, without calling a conversion func
 	// on the current stack frame. This makes it safe to call from a conversion func.
 	DefaultConvert(src, dest interface{}, flags FieldMatchingFlags) error
+
+	// If registered, returns a function applying defaults for objects of a given type.
+	// Used for automatically generating convertion functions.
+	DefaultingInterface(inType reflect.Type) (interface{}, bool)
 
 	// SrcTags and DestTags contain the struct tags that src and dest had, respectively.
 	// If the enclosing object was not a struct, then these will contain no tags, of course.
@@ -182,6 +190,11 @@ func (s scopeStack) describe() string {
 		}
 	}
 	return desc
+}
+
+func (s *scope) DefaultingInterface(inType reflect.Type) (interface{}, bool) {
+	value, found := s.converter.defaultingInterfaces[inType]
+	return value, found
 }
 
 // Formats src & dest as indices for printing.
@@ -277,7 +290,7 @@ func verifyConversionFunctionSignature(ft reflect.Type) error {
 // used if recursive conversion calls are desired).  It must return an error.
 //
 // Example:
-// c.RegisteConversionFunc(
+// c.RegisterConversionFunc(
 //         func(in *Pod, out *v1beta1.Pod, s Scope) error {
 //                 // conversion logic...
 //                 return nil
@@ -348,7 +361,9 @@ func (c *Converter) RegisterDefaultingFunc(defaultingFunc interface{}) error {
 	if ft.In(0).Kind() != reflect.Ptr {
 		return fmt.Errorf("expected pointer arg for 'in' param 0, got: %v", ft)
 	}
-	c.defaultingFuncs[ft.In(0).Elem()] = fv
+	inType := ft.In(0).Elem()
+	c.defaultingFuncs[inType] = fv
+	c.defaultingInterfaces[inType] = defaultingFunc
 	return nil
 }
 
