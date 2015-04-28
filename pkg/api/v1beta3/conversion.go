@@ -2794,7 +2794,7 @@ func init() {
 		// If one of the conversion functions is malformed, detect it immediately.
 		panic(err)
 	}
-	err = newer.Scheme.AddFieldLabelConversionFunc("v1beta1", "Namespace",
+	err = newer.Scheme.AddFieldLabelConversionFunc("v1beta3", "Namespace",
 		func(label, value string) (string, string, error) {
 			switch label {
 			case "status.phase":
