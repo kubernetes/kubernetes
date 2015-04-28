@@ -537,6 +537,9 @@ func TestExecInContainer(t *testing.T) {
 }
 
 func TestIsImagePresentAndPullImage(t *testing.T) {
+	if !enableTests {
+		return
+	}
 	testImage := "nginx"
 	rkt := newRktOrFail(t)
 
@@ -565,5 +568,49 @@ func TestIsImagePresentAndPullImage(t *testing.T) {
 	}
 	if !ok {
 		t.Errorf("Should find the image present!")
+	}
+}
+
+func TestGetContainerLogs(t *testing.T) {
+	if !enableTests {
+		return
+	}
+	rkt := newRktOrFail(t)
+
+	pod := &api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			UID:       types.UID(fmt.Sprintf("testRkt_%d", rand.Int())),
+			Name:      "foo",
+			Namespace: "default",
+		},
+		Spec: api.PodSpec{
+			Containers: []api.Container{
+				{
+					Name:  "testImage1",
+					Image: testACI1,
+				},
+			},
+		},
+	}
+	if err := rkt.RunPod(pod, nil); err != nil {
+		t.Errorf("Cannot run pod: %v", err)
+	}
+
+	verifyPod(rkt, pod, "running", t)
+	pods, err := rkt.GetPods(true)
+	if err != nil {
+		t.Errorf("Cannot list pods: %v", err)
+	}
+	runningPod := tryFindPod(pod, pods)
+	if runningPod == nil {
+		t.Errorf("Cannot find pod: %v", pod)
+	}
+
+	if err := rkt.GetContainerLogs(*runningPod, "", true, os.Stdout, os.Stderr); err != nil {
+		t.Errorf("Cannot get container logs: %v", err)
+	}
+
+	if err := rkt.KillPod(pod); err != nil {
+		t.Errorf("Cannot kill pod %v", err)
 	}
 }

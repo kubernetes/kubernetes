@@ -25,6 +25,7 @@ import (
 	"os"
 	"os/exec"
 	"path"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -1024,6 +1025,14 @@ func (r *Runtime) findRktID(pod kubecontainer.Pod) (string, error) {
 	return "", fmt.Errorf("rkt uuid not found for pod %v", pod)
 }
 
+// PortForward executes socat in the pod's network namespace and copies
+// data between stream (representing the user's local connection on their
+// computer) and the specified port in the container.
+//
+// TODO:
+//  - match cgroups of container
+//  - should we support nsenter + socat on the host? (current impl)
+//  - should we support nsenter + socat in a container, running with elevated privs and --pid=host?
 func (r *Runtime) PortForward(pod kubecontainer.Pod, port uint16, stream io.ReadWriteCloser) error {
 	glog.V(4).Infof("Rkt port forwarding in container.")
 
@@ -1056,4 +1065,26 @@ func (r *Runtime) PortForward(pod kubecontainer.Pod, port uint16, stream io.Read
 	command.Stdin = stream
 	command.Stdout = stream
 	return command.Run()
+}
+
+// GetContainerLogs uses journalctl to get the logs of the container.
+// By default, it returns a snapshot of the container log. Set |follow| to true to
+// stream the log. Set |follow| to false and specify the number of lines (e.g.
+// "100" or "all") to tail the log.
+func (r *Runtime) GetContainerLogs(pod kubecontainer.Pod, tail string, follow bool, stdout, stderr io.Writer) error {
+	unitName := makePodServiceFileName(pod.Name, pod.Namespace, pod.ID)
+	cmd := exec.Command("journalctl", "-u", unitName)
+	if follow {
+		cmd.Args = append(cmd.Args, "-f")
+	}
+	if tail == "all" {
+		cmd.Args = append(cmd.Args, "-a")
+	} else {
+		_, err := strconv.Atoi(tail)
+		if err == nil {
+			cmd.Args = append(cmd.Args, "-n", tail)
+		}
+	}
+	cmd.Stdout, cmd.Stderr = stdout, stderr
+	return cmd.Start()
 }
