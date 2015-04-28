@@ -43,6 +43,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/envvars"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/metrics"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/network"
+	kubeletTypes "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/probe"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
@@ -892,7 +893,7 @@ func (kl *Kubelet) killPod(pod kubecontainer.Pod) error {
 	errList := []error{}
 	if err == nil {
 		// Call the networking plugin for teardown.
-		err = kl.networkPlugin.TearDownPod(pod.Namespace, pod.Name, dockertools.DockerID(container.ID))
+		err = kl.networkPlugin.TearDownPod(pod.Namespace, pod.Name, kubeletTypes.DockerID(container.ID))
 		if err != nil {
 			glog.Errorf("Failed tearing down the network plugin for pod %q: %v", pod.ID, err)
 			errList = append(errList, err)
@@ -973,9 +974,9 @@ func shouldContainerBeRestarted(container *api.Container, pod *api.Pod, podStatu
 // - all running containers which are NOT contained in containersToKeep should be killed.
 type podContainerChangesSpec struct {
 	startInfraContainer bool
-	infraContainerId    dockertools.DockerID
+	infraContainerId    kubeletTypes.DockerID
 	containersToStart   map[int]empty
-	containersToKeep    map[dockertools.DockerID]int
+	containersToKeep    map[kubeletTypes.DockerID]int
 }
 
 func (kl *Kubelet) computePodContainerChanges(pod *api.Pod, runningPod kubecontainer.Pod, podStatus api.PodStatus) (podContainerChangesSpec, error) {
@@ -984,11 +985,11 @@ func (kl *Kubelet) computePodContainerChanges(pod *api.Pod, runningPod kubeconta
 	glog.V(4).Infof("Syncing Pod %+v, podFullName: %q, uid: %q", pod, podFullName, uid)
 
 	containersToStart := make(map[int]empty)
-	containersToKeep := make(map[dockertools.DockerID]int)
+	containersToKeep := make(map[kubeletTypes.DockerID]int)
 	createPodInfraContainer := false
 
 	var err error
-	var podInfraContainerID dockertools.DockerID
+	var podInfraContainerID kubeletTypes.DockerID
 	var changed bool
 	podInfraContainer := runningPod.FindContainerByName(dockertools.PodInfraContainerName)
 	if podInfraContainer != nil {
@@ -1007,7 +1008,7 @@ func (kl *Kubelet) computePodContainerChanges(pod *api.Pod, runningPod kubeconta
 	} else {
 		glog.V(4).Infof("Pod infra container looks good, keep it %q", podFullName)
 		createPodInfraContainer = false
-		podInfraContainerID = dockertools.DockerID(podInfraContainer.ID)
+		podInfraContainerID = kubeletTypes.DockerID(podInfraContainer.ID)
 		containersToKeep[podInfraContainerID] = -1
 	}
 
@@ -1026,7 +1027,7 @@ func (kl *Kubelet) computePodContainerChanges(pod *api.Pod, runningPod kubeconta
 			continue
 		}
 
-		containerID := dockertools.DockerID(c.ID)
+		containerID := kubeletTypes.DockerID(c.ID)
 		hash := c.Hash
 		glog.V(3).Infof("pod %q container %q exists as %v", podFullName, container.Name, containerID)
 
@@ -1074,7 +1075,7 @@ func (kl *Kubelet) computePodContainerChanges(pod *api.Pod, runningPod kubeconta
 
 	// If Infra container is the last running one, we don't want to keep it.
 	if !createPodInfraContainer && len(containersToStart) == 0 && len(containersToKeep) == 1 {
-		containersToKeep = make(map[dockertools.DockerID]int)
+		containersToKeep = make(map[kubeletTypes.DockerID]int)
 	}
 
 	return podContainerChangesSpec{
@@ -1147,7 +1148,7 @@ func (kl *Kubelet) syncPod(pod *api.Pod, mirrorPod *api.Pod, runningPod kubecont
 	} else {
 		// Otherwise kill any containers in this pod which are not specified as ones to keep.
 		for _, container := range runningPod.Containers {
-			_, keep := containerChanges.containersToKeep[dockertools.DockerID(container.ID)]
+			_, keep := containerChanges.containersToKeep[kubeletTypes.DockerID(container.ID)]
 			if !keep {
 				glog.V(3).Infof("Killing unwanted container %+v", container)
 				err = kl.containerManager.KillContainer(container.ID)

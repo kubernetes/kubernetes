@@ -34,6 +34,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/capabilities"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
 	kubecontainer "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
+	kubeletTypes "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/fsouza/go-dockerclient"
@@ -988,7 +989,7 @@ func (dm *DockerManager) KillContainer(containerID types.UID) error {
 }
 
 // Run a single container from a pod. Returns the docker container ID
-func (dm *DockerManager) RunContainer(pod *api.Pod, container *api.Container, generator kubecontainer.RunContainerOptionsGenerator, runner kubecontainer.HandlerRunner, netMode, ipcMode string) (DockerID, error) {
+func (dm *DockerManager) RunContainer(pod *api.Pod, container *api.Container, generator kubecontainer.RunContainerOptionsGenerator, runner kubecontainer.HandlerRunner, netMode, ipcMode string) (kubeletTypes.DockerID, error) {
 	ref, err := kubecontainer.GenerateContainerRef(pod, container)
 	if err != nil {
 		glog.Errorf("Couldn't make a ref to pod %v, container %v: '%v'", pod.Name, container.Name, err)
@@ -1013,7 +1014,7 @@ func (dm *DockerManager) RunContainer(pod *api.Pod, container *api.Container, ge
 		handlerErr := runner.Run(id, pod, container, container.Lifecycle.PostStart)
 		if handlerErr != nil {
 			dm.KillContainer(types.UID(id))
-			return DockerID(""), fmt.Errorf("failed to call event handler: %v", handlerErr)
+			return kubeletTypes.DockerID(""), fmt.Errorf("failed to call event handler: %v", handlerErr)
 		}
 	}
 
@@ -1027,11 +1028,11 @@ func (dm *DockerManager) RunContainer(pod *api.Pod, container *api.Container, ge
 	if err = dm.os.Symlink(containerLogFile, symlinkFile); err != nil {
 		glog.Errorf("Failed to create symbolic link to the log file of pod %q container %q: %v", podFullName, container.Name, err)
 	}
-	return DockerID(id), err
+	return kubeletTypes.DockerID(id), err
 }
 
 // CreatePodInfraContainer starts the pod infra container for a pod. Returns the docker container ID of the newly created container.
-func (dm *DockerManager) CreatePodInfraContainer(pod *api.Pod, generator kubecontainer.RunContainerOptionsGenerator, runner kubecontainer.HandlerRunner) (DockerID, error) {
+func (dm *DockerManager) CreatePodInfraContainer(pod *api.Pod, generator kubecontainer.RunContainerOptionsGenerator, runner kubecontainer.HandlerRunner) (kubeletTypes.DockerID, error) {
 	// Use host networking if specified.
 	netNamespace := ""
 	var ports []api.ContainerPort

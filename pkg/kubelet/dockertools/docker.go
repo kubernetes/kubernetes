@@ -29,6 +29,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/credentialprovider"
 	kubecontainer "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/leaky"
+	kubeletTypes "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/docker/docker/pkg/parsers"
@@ -67,9 +68,6 @@ type DockerInterface interface {
 	CreateExec(docker.CreateExecOptions) (*docker.Exec, error)
 	StartExec(string, docker.StartExecOptions) error
 }
-
-// DockerID is an ID of docker container. It is a type to make it clear when we're working with docker container Ids
-type DockerID string
 
 // KubeletContainerName encapsulates a pod name and a Kubernetes container name.
 type KubeletContainerName struct {
@@ -174,7 +172,7 @@ func (p throttledDockerPuller) IsImagePresent(name string) (bool, error) {
 }
 
 // DockerContainers is a map of containers
-type DockerContainers map[DockerID]*docker.APIContainers
+type DockerContainers map[kubeletTypes.DockerID]*docker.APIContainers
 
 func (c DockerContainers) FindPodContainer(podFullName string, uid types.UID, containerName string) (*docker.APIContainers, bool, uint64) {
 	for _, dockerContainer := range c {
@@ -319,7 +317,7 @@ func GetKubeletDockerContainers(client DockerInterface, allContainers bool) (Doc
 			glog.V(3).Infof("Docker Container: %s is not managed by kubelet.", container.Names[0])
 			continue
 		}
-		result[DockerID(container.ID)] = container
+		result[kubeletTypes.DockerID(container.ID)] = container
 	}
 	return result, nil
 }
