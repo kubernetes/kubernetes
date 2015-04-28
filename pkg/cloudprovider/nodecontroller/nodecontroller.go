@@ -582,12 +582,13 @@ func (nc *NodeController) getCloudNodesWithSpec() (*api.NodeList, error) {
 // deletePods will delete all pods from master running on given node.
 func (nc *NodeController) deletePods(nodeID string) error {
 	glog.V(2).Infof("Delete all pods from %v", nodeID)
-	// TODO: We don't yet have field selectors from client, see issue #1362.
-	pods, err := nc.kubeClient.Pods(api.NamespaceAll).List(labels.Everything(), fields.Everything())
+	pods, err := nc.kubeClient.Pods(api.NamespaceAll).List(labels.Everything(),
+		fields.OneTermEqualSelector(client.PodHost, nodeID))
 	if err != nil {
 		return err
 	}
 	for _, pod := range pods.Items {
+		// Defensive check, also needed for tests.
 		if pod.Spec.Host != nodeID {
 			continue
 		}
