@@ -27,6 +27,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/credentialprovider"
 	kubecontainer "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/network"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	docker "github.com/fsouza/go-dockerclient"
@@ -392,7 +393,8 @@ func TestIsImagePresent(t *testing.T) {
 func TestGetRunningContainers(t *testing.T) {
 	fakeDocker := &FakeDockerClient{Errors: make(map[string]error)}
 	fakeRecorder := &record.FakeRecorder{}
-	containerManager := NewDockerManager(fakeDocker, fakeRecorder, nil, nil, PodInfraContainerImage, 0, 0, "", kubecontainer.FakeOS{})
+	np, _ := network.InitNetworkPlugin([]network.NetworkPlugin{}, "", network.NewFakeHost(nil))
+	containerManager := NewDockerManager(fakeDocker, fakeRecorder, nil, nil, PodInfraContainerImage, 0, 0, "", kubecontainer.FakeOS{}, np)
 	tests := []struct {
 		containers  map[string]*docker.Container
 		inputIDs    []string
@@ -657,7 +659,8 @@ func TestFindContainersByPod(t *testing.T) {
 		},
 	}
 	fakeClient := &FakeDockerClient{}
-	containerManager := NewDockerManager(fakeClient, &record.FakeRecorder{}, nil, nil, PodInfraContainerImage, 0, 0, "", kubecontainer.FakeOS{})
+	np, _ := network.InitNetworkPlugin([]network.NetworkPlugin{}, "", network.NewFakeHost(nil))
+	containerManager := NewDockerManager(fakeClient, &record.FakeRecorder{}, nil, nil, PodInfraContainerImage, 0, 0, "", kubecontainer.FakeOS{}, np)
 	for i, test := range tests {
 		fakeClient.ContainerList = test.containerList
 		fakeClient.ExitedContainerList = test.exitedContainerList

@@ -34,6 +34,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/capabilities"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
 	kubecontainer "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/network"
 	kubeletTypes "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -82,6 +83,9 @@ type DockerManager struct {
 
 	// Directory of container logs.
 	containerLogsDir string
+
+	// Network plugin.
+	networkPlugin network.NetworkPlugin
 }
 
 func NewDockerManager(
@@ -93,7 +97,8 @@ func NewDockerManager(
 	qps float32,
 	burst int,
 	containerLogsDir string,
-	osInterface kubecontainer.OSInterface) *DockerManager {
+	osInterface kubecontainer.OSInterface,
+	networkPlugin network.NetworkPlugin) *DockerManager {
 	// Work out the location of the Docker runtime, defaulting to /var/lib/docker
 	// if there are any problems.
 	dockerRoot := "/var/lib/docker"
@@ -136,6 +141,7 @@ func NewDockerManager(
 		Puller:                 newDockerPuller(client, qps, burst),
 		dockerRoot:             dockerRoot,
 		containerLogsDir:       containerLogsDir,
+		networkPlugin:          networkPlugin,
 	}
 }
 
@@ -942,13 +948,24 @@ func (dm *DockerManager) PortForward(pod *kubecontainer.Pod, port uint16, stream
 
 // Kills all containers in the specified pod
 func (dm *DockerManager) KillPod(pod kubecontainer.Pod) error {
-	// Send the kills in parallel since they may take a long time.
-	errs := make(chan error, len(pod.Containers))
+	// Send the kills in parallel since they may take a long time. Len + 1 since there
+	// can be Len errors + the networkPlugin teardown error.
+	errs := make(chan error, len(pod.Containers)+1)
 	wg := sync.WaitGroup{}
 	for _, container := range pod.Containers {
 		wg.Add(1)
 		go func(container *kubecontainer.Container) {
 			defer util.HandleCrash()
+
+			// TODO: Handle this without signaling the pod infra container to
+			// adapt to the generic container runtime.
+			if container.Name == PodInfraContainerName {
+				err := dm.networkPlugin.TearDownPod(pod.Namespace, pod.Name, kubeletTypes.DockerID(container.ID))
+				if err != nil {
+					glog.Errorf("Failed tearing down the infra container: %v", err)
+					errs <- err
+				}
+			}
 			err := dm.KillContainer(container.ID)
 			if err != nil {
 				glog.Errorf("Failed to delete container: %v; Skipping pod %q", err, pod.ID)

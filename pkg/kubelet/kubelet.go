@@ -203,16 +203,6 @@ func NewMainKubelet(
 	statusManager := newStatusManager(kubeClient)
 	readinessManager := kubecontainer.NewReadinessManager()
 	containerRefManager := kubecontainer.NewRefManager()
-	containerManager := dockertools.NewDockerManager(
-		dockerClient,
-		recorder,
-		readinessManager,
-		containerRefManager,
-		podInfraContainerImage,
-		pullQPS,
-		pullBurst,
-		containerLogsDir,
-		osInterface)
 
 	volumeManager := newVolumeManager()
 
@@ -224,7 +214,6 @@ func NewMainKubelet(
 		resyncInterval:                 resyncInterval,
 		containerRefManager:            containerRefManager,
 		readinessManager:               readinessManager,
-		runner:                         containerManager,
 		httpClient:                     &http.Client{},
 		sourcesReady:                   sourcesReady,
 		clusterDomain:                  clusterDomain,
@@ -241,11 +230,29 @@ func NewMainKubelet(
 		volumeManager:                  volumeManager,
 		cloud:                          cloud,
 		nodeRef:                        nodeRef,
-		containerManager:               containerManager,
 		nodeStatusUpdateFrequency:      nodeStatusUpdateFrequency,
 		resourceContainer:              resourceContainer,
 		os:                             osInterface,
 	}
+
+	if plug, err := network.InitNetworkPlugin(networkPlugins, networkPluginName, &networkHost{klet}); err != nil {
+		return nil, err
+	} else {
+		klet.networkPlugin = plug
+	}
+	containerManager := dockertools.NewDockerManager(
+		dockerClient,
+		recorder,
+		readinessManager,
+		containerRefManager,
+		podInfraContainerImage,
+		pullQPS,
+		pullBurst,
+		containerLogsDir,
+		osInterface,
+		klet.networkPlugin)
+	klet.runner = containerManager
+	klet.containerManager = containerManager
 
 	klet.podManager = newBasicPodManager(klet.kubeClient)
 	klet.prober = newProber(klet.runner, klet.readinessManager, klet.containerRefManager, klet.recorder)
@@ -267,11 +274,6 @@ func NewMainKubelet(
 		return nil, err
 	}
 
-	if plug, err := network.InitNetworkPlugin(networkPlugins, networkPluginName, &networkHost{klet}); err != nil {
-		return nil, err
-	} else {
-		klet.networkPlugin = plug
-	}
 	// If the container logs directory does not exist, create it.
 	if _, err := os.Stat(containerLogsDir); err != nil {
 		if err := osInterface.Mkdir(containerLogsDir, 0755); err != nil {
@@ -888,27 +890,7 @@ func (kl *Kubelet) pullImage(pod *api.Pod, container *api.Container) error {
 
 // Kill all running containers in a pod (includes the pod infra container).
 func (kl *Kubelet) killPod(pod kubecontainer.Pod) error {
-	// TODO(vmarmol): Consider handling non-Docker runtimes, the plugins are not friendly to it today.
-	container, err := kl.containerManager.GetPodInfraContainer(pod)
-	errList := []error{}
-	if err == nil {
-		// Call the networking plugin for teardown.
-		err = kl.networkPlugin.TearDownPod(pod.Namespace, pod.Name, kubeletTypes.DockerID(container.ID))
-		if err != nil {
-			glog.Errorf("Failed tearing down the network plugin for pod %q: %v", pod.ID, err)
-			errList = append(errList, err)
-		}
-	}
-
-	err = kl.containerManager.KillPod(pod)
-	if err != nil {
-		errList = append(errList, err)
-	}
-
-	if len(errList) > 0 {
-		return utilErrors.NewAggregate(errList)
-	}
-	return nil
+	return kl.containerManager.KillPod(pod)
 }
 
 type empty struct{}
