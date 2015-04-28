@@ -272,7 +272,7 @@ func ConnectToDockerOrDie(dockerEndpoint string) DockerInterface {
 	}
 	client, err := docker.NewClient(getDockerEndpoint(dockerEndpoint))
 	if err != nil {
-		glog.Fatal("Couldn't connect to docker.")
+		glog.Fatalf("Couldn't connect to docker: %v", err)
 	}
 	return client
 }
