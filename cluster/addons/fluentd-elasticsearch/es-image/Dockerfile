@@ -12,16 +12,17 @@ RUN apt-get update && \
     apt-get clean
 
 RUN cd / && \
-    curl -O https://download.elasticsearch.org/elasticsearch/elasticsearch/elasticsearch-1.4.4.tar.gz && \
-    tar xf elasticsearch-1.4.4.tar.gz && \
-    mv elasticsearch-1.4.4 /elasticsearch && \
-    rm -rf elasticsearch-1.4.4.tar.gz
+    curl -O https://download.elastic.co/elasticsearch/elasticsearch/elasticsearch-1.5.2.tar.gz && \
+    tar xf elasticsearch-1.5.2.tar.gz && \
+    mv elasticsearch-1.5.2 /elasticsearch && \
+    rm elasticsearch-1.5.2.tar.gz
 
 ADD elasticsearch.yml /elasticsearch/config/elasticsearch.yml
 
 VOLUME ["/data"]
 WORKDIR /data
-CMD ["/elasticsearch/bin/elasticsearch"]
 
 EXPOSE 9200
 EXPOSE 9300
+
+CMD ["/elasticsearch/bin/elasticsearch"]
