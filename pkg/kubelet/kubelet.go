@@ -27,7 +27,6 @@ import (
 	"path"
 	"sort"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -867,39 +866,25 @@ func (kl *Kubelet) pullImage(img string, ref *api.ObjectReference) error {
 
 // Kill all running containers in a pod (includes the pod infra container).
 func (kl *Kubelet) killPod(pod kubecontainer.Pod) error {
-	// Send the kills in parallel since they may take a long time.
-	errs := make(chan error, len(pod.Containers))
-	wg := sync.WaitGroup{}
-	for _, container := range pod.Containers {
-		wg.Add(1)
-		go func(container *kubecontainer.Container) {
-			defer util.HandleCrash()
-			// Call the networking plugin for teardown.
-			// TODO: Handle this without signaling the pod infra container to
-			// adapt to the generic container runtime.
-			if container.Name == dockertools.PodInfraContainerName {
-				err := kl.networkPlugin.TearDownPod(pod.Namespace, pod.Name, dockertools.DockerID(container.ID))
-				if err != nil {
-					glog.Errorf("Failed tearing down the infra container: %v", err)
-					errs <- err
-				}
-			}
-			err := kl.containerManager.KillContainer(container.ID)
-			if err != nil {
-				glog.Errorf("Failed to delete container: %v; Skipping pod %q", err, pod.ID)
-				errs <- err
-			}
-			wg.Done()
-		}(container)
-	}
-	wg.Wait()
-	close(errs)
-	if len(errs) > 0 {
-		errList := []error{}
-		for err := range errs {
+	// TODO(vmarmol): Consider handling non-Docker runtimes, the plugins are not friendly to it today.
+	container, err := kl.containerManager.GetPodInfraContainer(pod)
+	errList := []error{}
+	if err == nil {
+		// Call the networking plugin for teardown.
+		err = kl.networkPlugin.TearDownPod(pod.Namespace, pod.Name, dockertools.DockerID(container.ID))
+		if err != nil {
+			glog.Errorf("Failed tearing down the network plugin for pod %q: %v", pod.ID, err)
 			errList = append(errList, err)
 		}
-		return fmt.Errorf("failed to delete containers (%v)", errList)
+	}
+
+	err = kl.containerManager.KillPod(pod)
+	if err != nil {
+		errList = append(errList, err)
+	}
+
+	if len(errList) > 0 {
+		return utilErrors.NewAggregate(errList)
 	}
 	return nil
 }

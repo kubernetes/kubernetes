@@ -433,6 +433,15 @@ func (dm *DockerManager) GetPodStatus(pod *api.Pod) (*api.PodStatus, error) {
 	return &podStatus, nil
 }
 
+func (dm *DockerManager) GetPodInfraContainer(pod kubecontainer.Pod) (kubecontainer.Container, error) {
+	for _, container := range pod.Containers {
+		if container.Name == PodInfraContainerName {
+			return *container, nil
+		}
+	}
+	return kubecontainer.Container{}, fmt.Errorf("unable to find pod infra container for pod %v", pod.ID)
+}
+
 func (dm *DockerManager) GetRunningContainers(ids []string) ([]*docker.Container, error) {
 	var result []*docker.Container
 	if dm.client == nil {
@@ -928,6 +937,35 @@ func (dm *DockerManager) PortForward(pod *kubecontainer.Pod, port uint16, stream
 	command.Stdin = stream
 	command.Stdout = stream
 	return command.Run()
+}
+
+// Kills all containers in the specified pod
+func (dm *DockerManager) KillPod(pod kubecontainer.Pod) error {
+	// Send the kills in parallel since they may take a long time.
+	errs := make(chan error, len(pod.Containers))
+	wg := sync.WaitGroup{}
+	for _, container := range pod.Containers {
+		wg.Add(1)
+		go func(container *kubecontainer.Container) {
+			defer util.HandleCrash()
+			err := dm.KillContainer(container.ID)
+			if err != nil {
+				glog.Errorf("Failed to delete container: %v; Skipping pod %q", err, pod.ID)
+				errs <- err
+			}
+			wg.Done()
+		}(container)
+	}
+	wg.Wait()
+	close(errs)
+	if len(errs) > 0 {
+		errList := []error{}
+		for err := range errs {
+			errList = append(errList, err)
+		}
+		return fmt.Errorf("failed to delete containers (%v)", errList)
+	}
+	return nil
 }
 
 // KillContainer kills a container identified by containerID.

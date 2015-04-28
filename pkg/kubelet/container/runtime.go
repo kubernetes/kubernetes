@@ -47,7 +47,7 @@ type Runtime interface {
 	// RunPod starts all the containers of a pod within a namespace.
 	RunPod(*api.Pod, map[string]volume.Volume) error
 	// KillPod kills all the containers of a pod.
-	KillPod(*api.Pod) error
+	KillPod(pod Pod) error
 	// RunContainerInPod starts a container within the same namespace of a pod.
 	RunContainerInPod(api.Container, *api.Pod, map[string]volume.Volume) error
 	// KillContainerInPod kills a container in the pod.
