@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	apierrors "github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl"
@@ -155,43 +156,58 @@ func RunRollingUpdate(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, arg
 		}
 	}
 	if len(image) != 0 {
-		var err error
-		// load the old RC into the "new" RC
-		if newRc, err = client.ReplicationControllers(cmdNamespace).Get(oldName); err != nil {
-			return err
-		}
-
-		if len(newRc.Spec.Template.Spec.Containers) > 1 {
-			// TODO: support multi-container image update.
-			return errors.New("Image update is not supported for multi-container pods")
-		}
-		if len(newRc.Spec.Template.Spec.Containers) == 0 {
-			return cmdutil.UsageError(cmd, "Pod has no containers! (%v)", newRc)
-		}
-		newRc.Spec.Template.Spec.Containers[0].Image = image
-
-		newHash, err := hashObject(newRc, client.Codec)
-		if err != nil {
-			return err
-		}
-
 		var newName string
+		var err error
+
 		if len(args) >= 2 {
 			newName = args[1]
 		} else {
-			keepOldName = true
-			newName = fmt.Sprintf("%s-%s", newRc.Name, newHash)
+			newName, _ = kubectl.GetNextControllerAnnotation(oldRc)
 		}
-		newRc.Name = newName
 
-		newRc.Spec.Selector[deploymentKey] = newHash
-		newRc.Spec.Template.Labels[deploymentKey] = newHash
-		// Clear resource version after hashing so that identical updates get different hashes.
-		newRc.ResourceVersion = ""
-
-		if _, found := oldRc.Spec.Selector[deploymentKey]; !found {
-			if err := addDeploymentKeyToReplicationController(oldRc, client, deploymentKey, cmdNamespace, out); err != nil {
+		if len(newName) > 0 {
+			newRc, err = client.ReplicationControllers(cmdNamespace).Get(newName)
+			if err != nil && !apierrors.IsNotFound(err) {
 				return err
+			}
+			fmt.Fprint(out, "Found existing update in progress (%s), resuming.\n", newName)
+		}
+		if newRc == nil {
+			// load the old RC into the "new" RC
+			if newRc, err = client.ReplicationControllers(cmdNamespace).Get(oldName); err != nil {
+				return err
+			}
+
+			if len(newRc.Spec.Template.Spec.Containers) > 1 {
+				// TODO: support multi-container image update.
+				return errors.New("Image update is not supported for multi-container pods")
+			}
+			if len(newRc.Spec.Template.Spec.Containers) == 0 {
+				return cmdutil.UsageError(cmd, "Pod has no containers! (%v)", newRc)
+			}
+			newRc.Spec.Template.Spec.Containers[0].Image = image
+
+			newHash, err := hashObject(newRc, client.Codec)
+			if err != nil {
+				return err
+			}
+
+			if len(newName) == 0 {
+				keepOldName = true
+				newName = fmt.Sprintf("%s-%s", newRc.Name, newHash)
+			}
+			newRc.Name = newName
+
+			newRc.Spec.Selector[deploymentKey] = newHash
+			newRc.Spec.Template.Labels[deploymentKey] = newHash
+			// Clear resource version after hashing so that identical updates get different hashes.
+			newRc.ResourceVersion = ""
+
+			kubectl.SetNextControllerAnnotation(oldRc, newName)
+			if _, found := oldRc.Spec.Selector[deploymentKey]; !found {
+				if err := addDeploymentKeyToReplicationController(oldRc, client, deploymentKey, cmdNamespace, out); err != nil {
+					return err
+				}
 			}
 		}
 	}
