@@ -58,6 +58,8 @@ const (
 	unitKubernetesSection = "X-Kubernetes"
 	unitPodName           = "POD"
 	unitRktID             = "RktID"
+
+	dockerPrefix = "docker://"
 )
 
 const (
@@ -588,6 +590,7 @@ func (r *Runtime) makePodManifest(pod *api.Pod, volumeMap map[string]volume.Volu
 		return nil, err
 	}
 	for _, c := range pod.Spec.Containers {
+		// Assume we are running docker images for now, see #7203.
 		imageID, err := r.getImageID(c.Image)
 		if err != nil {
 			return nil, fmt.Errorf("cannot get image ID for %q: %v", c.Image, err)
@@ -839,7 +842,7 @@ func (r *Runtime) PullImage(img string) error {
 	if err := r.writeDockerAuthConfig(img, creds); err != nil {
 		return err
 	}
-	output, err := r.RunCommand("fetch", "docker://"+img)
+	output, err := r.RunCommand("fetch", dockerPrefix+img)
 	if err != nil {
 		return fmt.Errorf("failed to fetch image: %v:", output)
 	}
@@ -850,7 +853,7 @@ func (r *Runtime) PullImage(img string) error {
 // TODO(yifan): This is hack, which uses 'rkt prepare --local' to test whether
 // the image is present.
 func (r *Runtime) IsImagePresent(img string) (bool, error) {
-	if _, err := r.RunCommand("prepare", "--local=true", "docker://"+img); err != nil {
+	if _, err := r.RunCommand("prepare", "--local=true", dockerPrefix+img); err != nil {
 		return false, nil
 	}
 	return true, nil
