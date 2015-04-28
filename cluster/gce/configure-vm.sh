@@ -22,6 +22,7 @@ set -o pipefail
 is_push=$@
 
 readonly KNOWN_TOKENS_FILE="/srv/salt-overlay/salt/kube-apiserver/known_tokens.csv"
+readonly BASIC_AUTH_FILE="/srv/salt-overlay/salt/kube-apiserver/basic_auth.csv"
 
 function ensure-install-dir() {
   INSTALL_DIR="/var/cache/kubernetes-install"
@@ -238,12 +239,18 @@ EOF
 }
 
 # This should only happen on cluster initialization. Uses
+# KUBE_PASSWORD and KUBE_USER to generate basic_auth.csv. Uses
 # KUBE_BEARER_TOKEN, KUBELET_TOKEN, and KUBE_PROXY_TOKEN to generate
 # known_tokens.csv (KNOWN_TOKENS_FILE). After the first boot and
 # on upgrade, this file exists on the master-pd and should never
 # be touched again (except perhaps an additional service account,
 # see NB below.)
 function create-salt-auth() {
+  if [ ! -e "${BASIC_AUTH_FILE}" ]; then
+    mkdir -p /srv/salt-overlay/salt/kube-apiserver
+    (umask 077;
+      echo "${KUBE_PASSWORD},${KUBE_USER},admin" > "${BASIC_AUTH_FILE}")
+  fi
   if [ ! -e "${KNOWN_TOKENS_FILE}" ]; then
     mkdir -p /srv/salt-overlay/salt/kube-apiserver
     (umask 077;
