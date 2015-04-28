@@ -846,21 +846,42 @@ func parseResolvConf(reader io.Reader) (nameservers []string, searches []string,
 	return nameservers, searches, nil
 }
 
-func (kl *Kubelet) pullImage(img string, ref *api.ObjectReference) error {
+// Pull the image for the specified pod and container.
+func (kl *Kubelet) pullImage(pod *api.Pod, container *api.Container) error {
+	if container.ImagePullPolicy == api.PullNever {
+		return nil
+	}
+
 	start := time.Now()
 	defer func() {
 		metrics.ImagePullLatency.Observe(metrics.SinceInMicroseconds(start))
 	}()
 
-	if err := kl.containerManager.Pull(img); err != nil {
+	ref, err := kubecontainer.GenerateContainerRef(pod, container)
+	if err != nil {
+		glog.Errorf("Couldn't make a ref to pod %v, container %v: '%v'", pod.Name, container.Name, err)
+	}
+	present, err := kl.containerManager.IsImagePresent(container.Image)
+	if err != nil {
 		if ref != nil {
-			kl.recorder.Eventf(ref, "failed", "Failed to pull image %q: %v", img, err)
+			kl.recorder.Eventf(ref, "failed", "Failed to inspect image %q: %v", container.Image, err)
 		}
-		return err
+		return fmt.Errorf("failed to inspect image %q: %v", container.Image, err)
 	}
-	if ref != nil {
-		kl.recorder.Eventf(ref, "pulled", "Successfully pulled image %q", img)
+
+	if container.ImagePullPolicy == api.PullAlways ||
+		(container.ImagePullPolicy == api.PullIfNotPresent && (!present)) {
+		if err := kl.containerManager.Pull(container.Image); err != nil {
+			if ref != nil {
+				kl.recorder.Eventf(ref, "failed", "Failed to pull image %q: %v", container.Image, err)
+			}
+			return err
+		}
+		if ref != nil {
+			kl.recorder.Eventf(ref, "pulled", "Successfully pulled image %q", container.Image)
+		}
 	}
+
 	return nil
 }
 
@@ -938,41 +959,6 @@ func shouldContainerBeRestarted(container *api.Container, pod *api.Pod, podStatu
 		}
 	}
 	return true
-}
-
-// Attempts to start a container pulling the image before that if necessary. It returns DockerID of a started container
-// if it was successful, and a non-nil error otherwise.
-func (kl *Kubelet) pullImageAndRunContainer(pod *api.Pod, container *api.Container, podInfraContainerID dockertools.DockerID) (dockertools.DockerID, error) {
-	podFullName := kubecontainer.GetPodFullName(pod)
-	ref, err := kubecontainer.GenerateContainerRef(pod, container)
-	if err != nil {
-		glog.Errorf("Couldn't make a ref to pod %v, container %v: '%v'", pod.Name, container.Name, err)
-	}
-	if container.ImagePullPolicy != api.PullNever {
-		present, err := kl.containerManager.IsImagePresent(container.Image)
-		if err != nil {
-			if ref != nil {
-				kl.recorder.Eventf(ref, "failed", "Failed to inspect image %q: %v", container.Image, err)
-			}
-			glog.Errorf("Failed to inspect image %q: %v; skipping pod %q container %q", container.Image, err, podFullName, container.Name)
-			return "", err
-		}
-		if container.ImagePullPolicy == api.PullAlways ||
-			(container.ImagePullPolicy == api.PullIfNotPresent && (!present)) {
-			if err := kl.pullImage(container.Image, ref); err != nil {
-				return "", err
-			}
-		}
-	}
-	// TODO(dawnchen): Check RestartPolicy.DelaySeconds before restart a container
-	namespaceMode := fmt.Sprintf("container:%v", podInfraContainerID)
-	containerID, err := kl.containerManager.RunContainer(pod, container, kl, kl.handlerRunner, namespaceMode, namespaceMode)
-	if err != nil {
-		// TODO(bburns) : Perhaps blacklist a container after N failures?
-		glog.Errorf("Error running pod %q container %q: %v", podFullName, container.Name, err)
-		return "", err
-	}
-	return containerID, nil
 }
 
 // Structure keeping information on changes that need to happen for a pod. The semantics is as follows:
@@ -1208,7 +1194,18 @@ func (kl *Kubelet) syncPod(pod *api.Pod, mirrorPod *api.Pod, runningPod kubecont
 	// Start everything
 	for container := range containerChanges.containersToStart {
 		glog.V(4).Infof("Creating container %+v", pod.Spec.Containers[container])
-		kl.pullImageAndRunContainer(pod, &pod.Spec.Containers[container], podInfraContainerID)
+		containerSpec := &pod.Spec.Containers[container]
+		if err := kl.pullImage(pod, containerSpec); err != nil {
+			glog.Warningf("Failed to pull image %q from pod %q and container %q: %v", containerSpec.Image, kubecontainer.GetPodFullName(pod), containerSpec.Name, err)
+			continue
+		}
+		// TODO(dawnchen): Check RestartPolicy.DelaySeconds before restart a container
+		namespaceMode := fmt.Sprintf("container:%v", podInfraContainerID)
+		_, err := kl.containerManager.RunContainer(pod, containerSpec, kl, kl.handlerRunner, namespaceMode, namespaceMode)
+		if err != nil {
+			// TODO(bburns) : Perhaps blacklist a container after N failures?
+			glog.Errorf("Error running pod %q container %q: %v", kubecontainer.GetPodFullName(pod), containerSpec.Name, err)
+		}
 	}
 
 	if isStaticPod(pod) {
