@@ -21,4 +21,4 @@ RUN apt-get -q update && \
 COPY google-fluentd.conf /etc/google-fluentd/google-fluentd.conf
 
 # Start Fluentd to pick up our config that watches Docker container logs.
-CMD /usr/sbin/google-fluentd -qq > /var/log/google-fluentd.log
+CMD /usr/sbin/google-fluentd "$FLUENTD_ARGS" > /var/log/google-fluentd.log
