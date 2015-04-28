@@ -27,7 +27,7 @@ Before chosing a particular guide, here are some things to consider:
 
 ## Setting up a cluster
 
-Pick one of the Getting Started Guides from the [matrix](docs/getting-started-guides/README.md) and follow it.
+Pick one of the Getting Started Guides from the [matrix](getting-started-guides/README.md) and follow it.
 If none of the Getting Started Guides fits, you may want to pull ideas from several of the guides.
 
 One option for custom networking is *OpenVSwitch GRE/VxLAN networking* ([ovs-networking.md](ovs-networking.md)), which
