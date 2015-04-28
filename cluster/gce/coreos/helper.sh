@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# A library of helper functions and constant for debian os distro
+# A library of helper functions and constant for coreos os distro
 
 # $1: if 'true', we're building a master yaml, else a node
 function build-kube-env {
@@ -22,6 +22,8 @@ function build-kube-env {
   local file=$2
 
   rm -f ${file}
+  # TODO(dawnchen): master node is still running with debian image
+  if [[ "${master}" == "true" ]]; then
   cat >$file <<EOF
 ENV_TIMESTAMP: $(yaml-quote $(date -u +%Y-%m-%dT%T%z))
 INSTANCE_PREFIX: $(yaml-quote ${INSTANCE_PREFIX})
@@ -47,13 +49,35 @@ KUBE_PROXY_TOKEN: $(yaml-quote ${KUBE_PROXY_TOKEN:-})
 ADMISSION_CONTROL: $(yaml-quote ${ADMISSION_CONTROL:-})
 MASTER_IP_RANGE: $(yaml-quote ${MASTER_IP_RANGE})
 EOF
-
-  if [[ "${master}" != "true" ]]; then
+  else
     cat >>$file <<EOF
-KUBERNETES_MASTER_NAME: $(yaml-quote ${MASTER_NAME})
-ZONE: $(yaml-quote ${ZONE})
-EXTRA_DOCKER_OPTS: $(yaml-quote ${EXTRA_DOCKER_OPTS})
-ENABLE_DOCKER_REGISTRY_CACHE: $(yaml-quote ${ENABLE_DOCKER_REGISTRY_CACHE:-false})
+ENV_TIMESTAMP=$(yaml-quote $(date -u +%Y-%m-%dT%T%z))
+INSTANCE_PREFIX=$(yaml-quote ${INSTANCE_PREFIX})
+NODE_INSTANCE_PREFIX=$(yaml-quote ${NODE_INSTANCE_PREFIX})
+SERVER_BINARY_TAR_URL=$(yaml-quote ${SERVER_BINARY_TAR_URL})
+PORTAL_NET=$(yaml-quote ${PORTAL_NET})
+ENABLE_CLUSTER_MONITORING=$(yaml-quote ${ENABLE_CLUSTER_MONITORING:-false})
+ENABLE_NODE_MONITORING=$(yaml-quote ${ENABLE_NODE_MONITORING:-false})
+ENABLE_CLUSTER_LOGGING=$(yaml-quote ${ENABLE_CLUSTER_LOGGING:-false})
+ENABLE_NODE_LOGGING=$(yaml-quote ${ENABLE_NODE_LOGGING:-false})
+LOGGING_DESTINATION=$(yaml-quote ${LOGGING_DESTINATION:-})
+ELASTICSEARCH_LOGGING_REPLICAS=$(yaml-quote ${ELASTICSEARCH_LOGGING_REPLICAS:-})
+ENABLE_CLUSTER_DNS=$(yaml-quote ${ENABLE_CLUSTER_DNS:-false})
+DNS_REPLICAS=$(yaml-quote ${DNS_REPLICAS:-})
+DNS_SERVER_IP=$(yaml-quote ${DNS_SERVER_IP:-})
+DNS_DOMAIN=$(yaml-quote ${DNS_DOMAIN:-})
+KUBE_USER=$(yaml-quote ${KUBE_USER})
+KUBE_PASSWORD=$(yaml-quote ${KUBE_PASSWORD})
+KUBE_BEARER_TOKEN=$(yaml-quote ${KUBE_BEARER_TOKEN})
+KUBELET_TOKEN=$(yaml-quote ${KUBELET_TOKEN:-})
+KUBE_PROXY_TOKEN=$(yaml-quote ${KUBE_PROXY_TOKEN:-})
+ADMISSION_CONTROL=$(yaml-quote ${ADMISSION_CONTROL:-})
+MASTER_IP_RANGE=$(yaml-quote ${MASTER_IP_RANGE})
+KUBERNETES_MASTER_NAME=$(yaml-quote ${MASTER_NAME})
+ZONE=$(yaml-quote ${ZONE})
+EXTRA_DOCKER_OPTS=$(yaml-quote ${EXTRA_DOCKER_OPTS})
+ENABLE_DOCKER_REGISTRY_CACHE=$(yaml-quote ${ENABLE_DOCKER_REGISTRY_CACHE:-false})
+PROJECT_ID=$(yaml-quote ${PROJECT})
 EOF
   fi
 }
@@ -71,6 +95,7 @@ EOF
 #   detect-project
 #   get-bearer-token
 #
+# TODO(dawnchen): Convert master node to use coreos image too
 function create-master-instance {
   local address_opt=""
   [[ -n ${1:-} ]] && address_opt="--address ${1}"
@@ -93,8 +118,10 @@ function create-master-instance {
     --disk name="${MASTER_NAME}-pd" device-name=master-pd mode=rw boot=no auto-delete=no
 }
 
+# TODO(dawnchen): Check $CONTAINER_RUNTIME to decide which
+# cloud_config yaml file should be passed
 function create-node-instance-template {
-  create-node-template "${NODE_INSTANCE_PREFIX}-template" "${scope_flags[*]}" \
-    "startup-script=${KUBE_ROOT}/cluster/gce/configure-vm.sh" \
-    "kube-env=${KUBE_TEMP}/node-kube-env.yaml"
+   create-node-template "${NODE_INSTANCE_PREFIX}-template" "${scope_flags[*]}" \
+    "kube-env=${KUBE_TEMP}/node-kube-env.yaml" \
+    "user-data=${KUBE_ROOT}/cluster/gce/coreos/node.yaml"
 }

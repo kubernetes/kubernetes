@@ -1,0 +1,156 @@
+#cloud-config
+
+write_files:
+  - path: /run/configure-hostname.sh
+    permissions: "0755"
+    content: |
+      #!/bin/bash -e
+      set -x
+      source /etc/kube-env
+
+      hostnamectl set-hostname $(hostname | cut -f1 -d.)
+  - path: /run/setup-auth.sh
+    permissions: "0755"
+    content: |
+      #!/bin/bash -e
+      set -x
+      source /etc/kube-env
+
+      /usr/bin/mkdir -p /var/lib/kubelet
+      /bin/echo  {\"BearerToken\": \"${KUBE_BEARER_TOKEN}\", \"Insecure\": true } > /var/lib/kubelet/kubernetes_auth
+  - path: /run/config-kube-proxy.sh
+    permissions: "0755"
+    content: |
+      #!/bin/bash -e
+      set -x
+      source /etc/kube-env
+
+      /usr/bin/mkdir -p /var/lib/kube-proxy
+      cat > /var/lib/kube-proxy/kubeconfig << EOF
+      apiVersion: v1
+      kind: Config
+      users:
+      - name: kube-proxy
+        user:
+          token: ${KUBE_PROXY_TOKEN}
+      clusters:
+      - name: local
+        cluster:
+          insecure-skip-tls-verify: true
+      contexts:
+      - context:
+          cluster: local
+          user: kube-proxy
+        name: service-account-context
+      current-context: service-account-context
+      EOF
+
+coreos:
+  units:
+    - name: kube-env.service
+      command: start
+      content: |
+        [Unit]
+        Description=Fetch kubernetes-node-environment
+        Requires=network-online.target
+        After=network-online.target
+        [Service]
+        Type=oneshot
+        RemainAfterExit=yes
+        ExecStart=/usr/bin/curl --fail --silent --show-error \
+        -H "X-Google-Metadata-Request: True" \
+        -o /etc/kube-env \
+        http://metadata.google.internal/computeMetadata/v1/instance/attributes/kube-env
+
+    - name: kubernetes-install-rkt.service
+      command: start
+      content: |
+        [Unit]
+        Description=Fetch Rocket
+        Documentation=http://github.com/coreos/rkt
+        Requires=network-online.target
+        After=network-online.target
+        [Service]
+        EnvironmentFile=/etc/kube-env
+        ExecStartPre=/usr/bin/mkdir -p /opt/rkt
+        ExecStartPre=/usr/bin/wget \
+        -O /opt/rkt/rkt-v0.5.4.tar.gz \
+        https://github.com/coreos/rkt/releases/download/v0.5.4/rkt-v0.5.4.tar.gz
+        ExecStartPre=/usr/bin/tar xzvf /opt/rkt/rkt-v0.5.4.tar.gz -C /opt --overwrite
+        ExecStart=/bin/systemd-run rkt metadata-service
+
+    - name: kubernetes-install-minion.service
+      command: start
+      content: |
+        [Unit]
+        Description=Install Kubernetes Server
+        Requires=network-online.target
+        After=network-online.target
+        Requires=kube-env.service
+        After=kube-env.service
+        [Service]
+        Type=oneshot
+        RemainAfterExit=yes
+        EnvironmentFile=/etc/kube-env
+        ExecStartPre=/usr/bin/mkdir -p /opt/kubernetes/pkg
+        ExecStartPre=/usr/bin/curl --location --create-dirs --output /opt/kubernetes/pkg/kubernetes-server-linux-amd64.tar.gz ${SERVER_BINARY_TAR_URL}
+        ExecStart=/usr/bin/tar xf /opt/kubernetes/pkg/kubernetes-server-linux-amd64.tar.gz -C /opt --overwrite
+
+    - name: kubernetes-preparation.service
+      command: start
+      content: |
+        [Unit]
+        Description=Configure Node For Kubernetes service
+        Requires=kubernetes-install-minion.service
+        After=kubernetes-install-minion.service
+        Requires=kubernetes-install-rkt.service
+        After=kubernetes-install-rkt.service
+        [Service]
+        Type=oneshot
+        RemainAfterExit=yes
+        EnvironmentFile=/etc/kube-env
+        # TODO(dawnchen): Push this to separate write-files
+        ExecStart=/run/configure-hostname.sh
+
+    - name: kubelet.service
+      command: start
+      content: |
+        [Unit]
+        Description=Run Kubelet service
+        Requires=kubernetes-preparation.service
+        After=kubernetes-preparation.service
+        [Service]
+        EnvironmentFile=/etc/kube-env
+        ExecStartPre=/usr/bin/mkdir -p /etc/kubernetes/manifests
+        ExecStartPre=/run/setup-auth.sh
+        ExecStart=/opt/kubernetes/server/bin/kubelet \
+        --api_servers=https://kubernetes-master.c.${PROJECT_ID}.internal \
+        --config=/etc/kubernetes/manifests \
+        --allow_privileged=False \
+        --v=2 \
+        --cluster_dns=10.0.0.10 \
+        --cluster_domain=kubernetes.local \
+        --logtostderr=true
+        Restart=always
+        RestartSec=10
+
+    - name: kube-proxy.service
+      command: start
+      content: |
+        [Unit]
+        Description=Start Kube-proxy service as Daemon
+        Requires=kubernetes-install-minion.service
+        After=kubernetes-install-minion.service
+        Requires=kubernetes-install-rkt.service
+        After=kubernetes-install-rkt.service
+        [Service]
+        EnvironmentFile=/etc/kube-env
+        ExecStartPre=/run/config-kube-proxy.sh
+        ExecStart=/opt/kubernetes/server/bin/kube-proxy \
+        --master=https://kubernetes-master.c.${PROJECT_ID}.internal \
+        --kubeconfig=/var/lib/kube-proxy/kubeconfig \
+        --v=2 \
+        --logtostderr=true
+        Restart=always
+        RestartSec=10
+

@@ -22,9 +22,12 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
 source "${KUBE_ROOT}/cluster/gce/${KUBE_CONFIG_FILE-"config-default.sh"}"
 source "${KUBE_ROOT}/cluster/common.sh"
 
-if [[ "${OS_DISTRIBUTION}" =~ ^"debian" ]]; then
-  echo "Starting cluster using os distro : ${OS_DISTRIBUTION}" >&2
+if [[ "${OS_DISTRIBUTION}" == "debian" || "${OS_DISTRIBUTION}" == "coreos" ]]; then
+  echo "Starting cluster using os distro: ${OS_DISTRIBUTION}" >&2
   source "${KUBE_ROOT}/cluster/gce/${OS_DISTRIBUTION}/helper.sh"
+else
+  echo "Cannot start cluster using os distro: ${OS_DISTRIBUTION}" >&2
+  return
 fi
 
 NODE_INSTANCE_PREFIX="${INSTANCE_PREFIX}-minion"
@@ -571,6 +574,7 @@ function kube-up {
   for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
     create-route "${MINION_NAMES[$i]}" "${MINION_IP_RANGES[$i]}" &
     add-instance-metadata "${MINION_NAMES[$i]}" "node-ip-range=${MINION_IP_RANGES[$i]}" &
+    add-instance-metadata "${MINION_NAMES[$i]}" "node-name=${MINION_NAMES[$i]}" &
 
     if [ $i -ne 0 ] && [ $((i%5)) -eq 0 ]; then
       echo Waiting for a batch of routes at $i...
@@ -725,6 +729,12 @@ function kube-down {
 
 # Update a kubernetes cluster with latest source
 function kube-push {
+  #TODO(dawnchen): figure out how to upgrade coreos node
+  if [[ "${OS_DISTRIBUTION}" != "debian" ]]; then
+    echo "Updating a kubernetes cluster with ${OS_DISTRIBUTION} is not supported yet." >&2
+    return
+  fi
+
   OUTPUT=${KUBE_ROOT}/_output/logs
   mkdir -p ${OUTPUT}
 
