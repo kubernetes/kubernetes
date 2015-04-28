@@ -39,6 +39,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/master"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	forked "github.com/GoogleCloudPlatform/kubernetes/third_party/forked/coreos/go-etcd/etcd"
 
 	"github.com/coreos/go-etcd/etcd"
 	"github.com/golang/glog"
@@ -194,7 +195,16 @@ func newEtcd(etcdConfigFile string, etcdServerList util.StringList, storageVersi
 			return helper, err
 		}
 	} else {
-		client = etcd.NewClient(etcdServerList)
+		etcdClient := etcd.NewClient(etcdServerList)
+		transport := &http.Transport{
+			Dial: forked.Dial,
+			TLSClientConfig: &tls.Config{
+				InsecureSkipVerify: true,
+			},
+			MaxIdleConnsPerHost: 500,
+		}
+		etcdClient.SetTransport(transport)
+		client = etcdClient
 	}
 
 	return master.NewEtcdHelper(client, storageVersion, pathPrefix)
