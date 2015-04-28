@@ -28,7 +28,15 @@ import (
 	"github.com/golang/glog"
 )
 
-type syncPodFnType func(*api.Pod, *api.Pod, kubecontainer.Pod) error
+const (
+	minBackoffInterval = time.Second * 4
+	maxBackoffInterval = time.Minute * 2
+	// If no incidents have triggered an increase of backoff interval in the
+	// past 5 minutes, we reset the interval and start over.
+	backoffWindow = time.Minute * 5
+)
+
+type syncPodFnType func(*api.Pod, *api.Pod, kubecontainer.Pod) (*syncPodSummary, error)
 
 type podWorkers struct {
 	// Protects all per worker fields.
@@ -79,11 +87,61 @@ func newPodWorkers(runtimeCache kubecontainer.RuntimeCache, syncPodFn syncPodFnT
 	}
 }
 
+// shouldBackOffMore returns true if the back off interval should be increased,
+// based on the the summary of the last sync.
+func shouldBackOffMore(summary *syncPodSummary) bool {
+	if summary.Unhealthy > 0 || summary.NotFound > 0 {
+		// Some containers were restarted in the last sync, we should increase
+		// the backoff interval. Note that we "NotFound" could also mean that
+		// the container was started the first time; the caller could rule out
+		// the possiblity by checking whether they are seeing the pod the first
+		// time. However, if we ever allow the addition/deletion of containers
+		// in in a pod, we need to revise this logic.
+		return true
+	}
+	return false
+}
+
+// computeNewBackoffTime computes and returns the new backoff interval,
+// along with the timestamp where the interval was last increased.
+func computeBackoffTime(summary *syncPodSummary, lastInterval time.Duration, firstSync bool,
+	lastIncreaseTime time.Time) (time.Duration, time.Time) {
+	if firstSync {
+		// If we are syncing this pod for the first time, don't back off.
+		return 0 * time.Second, lastIncreaseTime
+	}
+
+	if lastIncreaseTime.Add(backoffWindow).Before(time.Now()) {
+		// If we increased the backoff interval more than backoffWindow ago, we
+		// should reset the interval. This ensures that ancient restarts do not
+		// affect the current backoff interval.
+		lastInterval = 0 * time.Second
+	}
+	if shouldBackOffMore(summary) {
+		if lastInterval == 0 {
+			return minBackoffInterval, time.Now()
+		}
+		// Double the backoff interval unless it is capped by maxBackoffInterval.
+		if lastInterval*2 > maxBackoffInterval {
+			return maxBackoffInterval, time.Now()
+		} else {
+			return lastInterval * 2, time.Now()
+		}
+	}
+
+	return lastInterval, lastIncreaseTime
+}
+
 func (p *podWorkers) managePodLoop(podUpdates <-chan workUpdate) {
 	var minRuntimeCacheTime time.Time
+	var backoffInterval time.Duration
+	// This timestamp records the last time the backoff interval was increasd.
+	var lastIncreaseTime time.Time
+	firstSync := true
 	for newWork := range podUpdates {
 		func() {
 			defer p.checkForUpdates(newWork.pod.UID, newWork.updateCompleteFn)
+
 			// We would like to have the state of Docker from at least the moment
 			// when we finished the previous processing of that pod.
 			if err := p.runtimeCache.ForceUpdateIfOlder(minRuntimeCacheTime); err != nil {
@@ -96,7 +154,7 @@ func (p *podWorkers) managePodLoop(podUpdates <-chan workUpdate) {
 				return
 			}
 
-			err = p.syncPodFn(newWork.pod, newWork.mirrorPod,
+			summary, err := p.syncPodFn(newWork.pod, newWork.mirrorPod,
 				kubecontainer.Pods(pods).FindPodByID(newWork.pod.UID))
 			if err != nil {
 				glog.Errorf("Error syncing pod %s, skipping: %v", newWork.pod.UID, err)
@@ -104,6 +162,13 @@ func (p *podWorkers) managePodLoop(podUpdates <-chan workUpdate) {
 				return
 			}
 			minRuntimeCacheTime = time.Now()
+
+			backoffInterval, lastIncreaseTime = computeBackoffTime(summary, backoffInterval, firstSync, lastIncreaseTime)
+			if backoffInterval > 0 {
+				p.recorder.Eventf(newWork.pod, "backOff", "Containers restarted; backing off %v", backoffInterval)
+				time.Sleep(backoffInterval)
+			}
+			firstSync = false
 
 			newWork.updateCompleteFn()
 		}()

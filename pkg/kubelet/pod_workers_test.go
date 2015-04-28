@@ -48,13 +48,13 @@ func createPodWorkers() (*podWorkers, map[types.UID][]string) {
 
 	podWorkers := newPodWorkers(
 		fakeRuntimeCache,
-		func(pod *api.Pod, mirrorPod *api.Pod, runningPod kubecontainer.Pod) error {
+		func(pod *api.Pod, mirrorPod *api.Pod, runningPod kubecontainer.Pod) (*syncPodSummary, error) {
 			func() {
 				lock.Lock()
 				defer lock.Unlock()
 				processed[pod.UID] = append(processed[pod.UID], pod.Name)
 			}()
-			return nil
+			return &syncPodSummary{}, nil
 		},
 		fakeRecorder,
 	)
