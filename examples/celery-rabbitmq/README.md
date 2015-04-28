@@ -31,28 +31,29 @@ You should already have turned up a Kubernetes cluster. To get the most of this 
 
 The Celery task queue will need to communicate with the RabbitMQ broker. RabbitMQ will eventually appear on a separate pod, but since pods are ephemeral we need a service that can transparently route requests to RabbitMQ.
 
-Use the file `examples/celery-rabbitmq/rabbitmq-service.json`:
+Use the file `examples/celery-rabbitmq/rabbitmq-service.yaml`:
 
-```js
-{
-  "id": "rabbitmq-service",
-  "kind": "Service",
-  "apiVersion": "v1beta1",
-  "port": 5672,
-  "containerPort": 5672,
-  "selector": {
-    "app": "taskQueue"
-  },
-  "labels": {
-    "name": "rabbitmq-service"
-  }
-}
+```yaml
+apiVersion: v1beta3
+kind: Service
+metadata:
+  labels:
+    name: rabbitmq
+  name: rabbitmq-service
+spec:
+  ports:
+  - port: 5672
+    protocol: TCP
+    targetPort: 5672
+  selector:
+    app: taskQueue
+    component: rabbitmq
 ```
 
 To start the service, run:
 
 ```shell
-$ kubectl create -f examples/celery-rabbitmq/rabbitmq-service.json
+$ kubectl create -f examples/celery-rabbitmq/rabbitmq-service.yaml
 ```
 
 **NOTE**: If you're running Kubernetes from source, you can use `cluster/kubectl.sh` instead of `kubectl`.
@@ -62,81 +63,71 @@ This service allows other pods to connect to the rabbitmq. To them, it will be s
 
 ## Step 2: Fire up RabbitMQ
 
-A RabbitMQ broker can be turned up using the file `examples/celery-rabbitmq/rabbitmq-controller.json`:
+A RabbitMQ broker can be turned up using the file `examples/celery-rabbitmq/rabbitmq-controller.yaml`:
 
-```js
-{
-  "id": "rabbitmq-controller",
-  "kind": "ReplicationController",
-  "apiVersion": "v1beta1",
-  "desiredState": {
-    "replicas": 1,
-    "replicaSelector": {"name": "rabbitmq"},
-    "podTemplate": {
-      "desiredState": {
-        "manifest": {
-          "version": "v1beta1",
-          "id": "rabbitmq",
-          "containers": [{
-            "name": "rabbitmq",
-            "image": "library/rabbitmq",
-            "cpu": 100,
-            "ports": [{"containerPort": 5672, "hostPort": 5672}]
-          }]
-        }
-      },
-      "labels": {
-        "name": "rabbitmq",
-        "app": "taskQueue"
-      }
-    }
-  },
-  "labels": {
-    "name": "rabbitmq"
-  }
-}
+```yaml
+apiVersion: v1beta3
+kind: ReplicationController
+metadata:
+  labels:
+    name: rabbitmq
+  name: rabbitmq-controller
+spec:
+  replicas: 1
+  selector:
+    component: rabbitmq
+  template:
+    metadata:
+      labels:
+        app: taskQueue
+        component: rabbitmq
+    spec:
+      containers:
+      - image: rabbitmq
+        name: rabbitmq
+        ports:
+        - containerPort: 5672
+          protocol: TCP
+        resources:
+          limits:
+            cpu: 100m
 ```
 
-Running `$ kubectl create -f examples/celery-rabbitmq/rabbitmq-controller.json` brings up a replication controller that ensures one pod exists which is running a RabbitMQ instance.
+Running `$ kubectl create -f examples/celery-rabbitmq/rabbitmq-controller.yaml` brings up a replication controller that ensures one pod exists which is running a RabbitMQ instance.
 
 Note that bringing up the pod includes pulling down a docker image, which may take a few moments. This applies to all other pods in this example.
 
 
 ## Step 3: Fire up Celery
 
-Bringing up the celery worker is done by running `$ kubectl create -f examples/celery-rabbitmq/celery-controller.json`, which contains this:
+Bringing up the celery worker is done by running `$ kubectl create -f examples/celery-rabbitmq/celery-controller.yaml`, which contains this:
 
-```js
-{
-  "id": "celery-controller",
-  "kind": "ReplicationController",
-  "apiVersion": "v1beta1",
-  "desiredState": {
-    "replicas": 1,
-    "replicaSelector": {"name": "celery"},
-    "podTemplate": {
-      "desiredState": {
-        "manifest": {
-          "version": "v1beta1",
-          "id": "celery",
-          "containers": [{
-            "name": "celery",
-            "image": "endocode/celery-app-add",
-            "cpu": 100,
-            "ports": [{"containerPort": 5672, "hostPort": 5672}]
-          }]
-        }
-      },
-      "labels": {
-        "name": "celery",
-        "app": "taskQueue"
-      }
-    }
-  },
-  "labels": {
-    "name": "celery"
-  }
-}
+```yaml
+apiVersion: v1beta3
+kind: ReplicationController
+metadata:
+  labels:
+    name: celery
+  name: celery-controller
+spec:
+  replicas: 1
+  selector:
+    component: celery
+  template:
+    metadata:
+      labels:
+        app: taskQueue
+        component: celery
+    spec:
+      containers:
+      - image: endocode/celery-app-add
+        name: celery
+        ports:
+        - containerPort: 5672
+          protocol: TCP
+        resources:
+          limits:
+            cpu: 100m
 ```
 
 There are several things to point out here...
@@ -187,39 +178,35 @@ The question now is, how do you see what's going on?
 
 Flower is a web-based tool for monitoring and administrating Celery clusters. By connecting to the node that contains Celery, you can see the behaviour of all the workers and their tasks in real-time.
 
-To bring up the frontend, run this command `$ kubectl create -f examples/celery-rabbitmq/celery-controller.json`. This controller is defined as so:
+To bring up the frontend, run this command `$ kubectl create -f examples/celery-rabbitmq/flower-controller.yaml`. This controller is defined as so:
 
-```js
-{
-  "id": "flower-controller",
-  "kind": "ReplicationController",
-  "apiVersion": "v1beta1",
-  "desiredState": {
-    "replicas": 1,
-    "replicaSelector": {"name": "flower"},
-    "podTemplate": {
-      "desiredState": {
-        "manifest": {
-          "version": "v1beta1",
-          "id": "flower",
-          "containers": [{
-            "name": "flower",
-            "image": "endocode/flower",
-            "cpu": 100,
-            "ports": [{"containerPort": 5555, "hostPort": 5555}]
-          }]
-        }
-      },
-      "labels": {
-        "name": "flower",
-        "app": "taskQueue"
-      }
-    }
-  },
-  "labels": {
-    "name": "flower"
-  }
-}
+```yaml
+apiVersion: v1beta3
+kind: ReplicationController
+metadata:
+  labels:
+    name: flower
+  name: flower-controller
+spec:
+  replicas: 1
+  selector:
+    component: flower
+  template:
+    metadata:
+      labels:
+        app: taskQueue
+        component: flower
+    spec:
+      containers:
+      - image: endocode/flower
+        name: flower
+        ports:
+        - containerPort: 5555
+          hostPort: 5555
+          protocol: TCP
+        resources:
+          limits:
+            cpu: 100m
 ```
 
 This will bring up a new pod with Flower installed and port 5555 (Flower's default port) exposed. This image uses the following command to start Flower:
