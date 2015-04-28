@@ -300,8 +300,7 @@ func validateController(c *client.Client, containerImage string, replicas int, c
 	Failf("Timed out after %v seconds waiting for %s pods to reach valid state", podStartTimeout.Seconds(), testname)
 }
 
-// kubectlCmd runs the kubectl executable.
-// kubectlCmd runs the kubectl executable.
+// kubectlCmd runs the kubectl executable through the helper script.
 func kubectlCmd(args ...string) *exec.Cmd {
 	defaultArgs := []string{}
 
@@ -329,7 +328,7 @@ func kubectlCmd(args ...string) *exec.Cmd {
 	kubectlArgs := append(defaultArgs, args...)
 
 	//TODO: the "kubectl" path string might be worth externalizing into an (optional) ginko arg.
-	cmd := exec.Command("kubectl", kubectlArgs...)
+	cmd := exec.Command(filepath.Join(testContext.RepoRoot, "cluster/kubectl.sh"), kubectlArgs...)
 	Logf("Running '%s %s'", cmd.Path, strings.Join(cmd.Args, " "))
 	return cmd
 }
