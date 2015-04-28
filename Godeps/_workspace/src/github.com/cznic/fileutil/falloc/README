@@ -1,0 +1,5 @@
+This is a goinstall-able mirror of modified code already published at:
+https://git.nic.cz/redmine/projects/gofileutil/repository/show/falloc
+
+Install: $go get github.com/cznic/fileutil/falloc
+Godocs: http://gopkgdoc.appspot.com/pkg/github.com/cznic/fileutil/falloc
