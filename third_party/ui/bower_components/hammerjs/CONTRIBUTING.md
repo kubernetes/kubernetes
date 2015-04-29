@@ -39,3 +39,6 @@ and small
 pull request
 
 4. Write tests for your code, these can be found in `/tests`.
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/third_party/ui/bower_components/hammerjs/CONTRIBUTING.md?pixel)]()

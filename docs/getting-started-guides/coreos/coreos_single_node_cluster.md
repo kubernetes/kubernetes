@@ -56,3 +56,6 @@ hdiutil makehybrid -iso -joliet -joliet-volume-name "config-2" -joliet -o standa
 ```
 
 Boot the [vmware image](https://coreos.com/docs/running-coreos/platforms/vmware) using the `standalone.iso` as a config drive.
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/getting-started-guides/coreos/coreos_single_node_cluster.md?pixel)]()

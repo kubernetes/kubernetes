@@ -17,3 +17,6 @@ this directory, though, because they are written into
 ## Future work
 
 Document the current pillars across providers
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/cluster/saltbase/pillar/README.md?pixel)]()

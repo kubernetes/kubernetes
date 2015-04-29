@@ -15,3 +15,6 @@
 * Support a sandbox arg to eval
 * Use vm.runInNewContext in place of eval
 * Version 0.9.0
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/third_party/ui/bower_components/jsonpath/CHANGES.md?pixel)]()

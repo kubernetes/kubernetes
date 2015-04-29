@@ -139,3 +139,6 @@ There is a contributed [example](aws-coreos.md) from [CoreOS](http://www.coreos.
 
 ### Further reading
 Please see the [Kubernetes docs](https://github.com/GoogleCloudPlatform/kubernetes/tree/master/docs) for more details on administering and using a Kubernetes cluster.
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/getting-started-guides/aws.md?pixel)]()

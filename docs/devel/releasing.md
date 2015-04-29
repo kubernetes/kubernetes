@@ -163,3 +163,6 @@ After this summary, preamble, all the relevant PRs/issues that got in that
 version should be listed and linked together with a small summary understandable
 by plain mortals (in a perfect world PR/issue's title would be enough but often
 it is just too cryptic/geeky/domain-specific that it isn't).
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/devel/releasing.md?pixel)]()

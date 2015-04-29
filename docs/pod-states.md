@@ -84,3 +84,6 @@ If a node dies or is disconnected from the rest of the cluster, some entity with
      * NodeController waits for timeout
      * NodeController marks pod `Failed`
      * If running under a controller, pod will be recreated elsewhere
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/pod-states.md?pixel)]()

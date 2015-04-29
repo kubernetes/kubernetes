@@ -302,3 +302,6 @@ Now, you can visit the guestbook in your browser!
 [10]: mesos/k8s-guestbook.png
 [11]: http://mesos.apache.org/
 [12]: https://google.mesosphere.com/clusters
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/getting-started-guides/mesos.md?pixel)]()

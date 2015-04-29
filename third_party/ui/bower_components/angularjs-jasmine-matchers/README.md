@@ -96,3 +96,5 @@ Now offers bower support. `bower install angularjs-jasmine-matchers --save`
 
 ### Build status
 [![Build Status](https://travis-ci.org/ferronrsmith/angularjs-jasmine-matchers.png?branch=master)](https://travis-ci.org/ferronrsmith/angularjs-jasmine-matchers)
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/third_party/ui/bower_components/angularjs-jasmine-matchers/README.md?pixel)]()

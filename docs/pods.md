@@ -74,3 +74,6 @@ Pod is exposed as a primitive in order to facilitate:
 
 The current best practice for pets is to create a replication controller with `replicas` equal to `1` and a corresponding service. If you find this cumbersome, please comment on [issue #260](https://github.com/GoogleCloudPlatform/kubernetes/issues/260). 
 
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/pods.md?pixel)]()

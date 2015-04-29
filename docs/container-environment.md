@@ -85,3 +85,6 @@ Hook handlers are the way that hooks are surfaced to containers.  Containers ca
    * HTTP - Executes an HTTP request against a specific endpoint on the container.  HTTP error codes (5xx) and non-response/failure to connect are treated as container failures. Parameters are passed to the http endpoint as query args (e.g. http://some.server.com/some/path?reason=HEALTH)
 
 [1]: http://man7.org/linux/man-pages/man2/gethostname.2.html
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/container-environment.md?pixel)]()

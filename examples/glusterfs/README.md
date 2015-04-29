@@ -47,3 +47,6 @@ $ kubectl get pods
 ```
 
 If you ssh to that machine, you can run `docker ps` to see the actual pod and `mount` to see if the Glusterfs volume is mounted.
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/glusterfs/README.md?pixel)]()

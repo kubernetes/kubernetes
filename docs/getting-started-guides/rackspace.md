@@ -45,3 +45,6 @@ The current cluster design is inspired by:
 - eth0 - Public Interface used for servers/containers to reach the internet
 - eth1 - ServiceNet - Intra-cluster communication (k8s, etcd, etc) communicate via this interface. The `cloud-config` files use the special CoreOS identifier `$private_ipv4` to configure the services.
 - eth2 - Cloud Network - Used for k8s pods to communicate with one another. The proxy service will pass traffic via this interface.
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/getting-started-guides/rackspace.md?pixel)]()

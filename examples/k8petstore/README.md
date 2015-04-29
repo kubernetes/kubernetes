@@ -109,3 +109,6 @@ Thus we plan to add another tier of queueing, which empties the REDIS transactio
 For questions on running this app, you can ask on the google containers group (freenode ~ google-containers@googlegroups.com or #google-containers on IRC)
 
 For questions about bigpetstore, and how the data is generated, ask on the apache bigtop mailing list.
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/k8petstore/README.md?pixel)]()

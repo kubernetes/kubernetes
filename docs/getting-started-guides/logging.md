@@ -26,3 +26,6 @@ Elasticsearch service (more information to follow shortly in the contrib directo
 To enable logging of Docker contains in a cluster using Google Compute
 Platform set the config flags ``ENABLE_NODE_LOGGING`` to ``true`` and
 ``LOGGING_DESTINATION`` to ``gcp``.
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/getting-started-guides/logging.md?pixel)]()

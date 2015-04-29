@@ -77,3 +77,6 @@ will ensure the following:
 6. Object is persisted
 
 If at any step, there is an error, the request is canceled.
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/design/admission_control.md?pixel)]()

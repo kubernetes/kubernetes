@@ -246,3 +246,6 @@ Initial implementation:
 Improvements:
 - API server does logging instead.
 - Policies to drop logging for high rate trusted API calls, or by users performing audit or other sensitive functions.
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/design/access.md?pixel)]()
