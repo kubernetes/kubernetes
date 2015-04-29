@@ -43,6 +43,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/envvars"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/metrics"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/network"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/prober"
 	kubeletTypes "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/probe"
@@ -255,7 +256,7 @@ func NewMainKubelet(
 	klet.containerManager = containerManager
 
 	klet.podManager = newBasicPodManager(klet.kubeClient)
-	klet.prober = newProber(klet.runner, klet.readinessManager, klet.containerRefManager, klet.recorder)
+	klet.prober = prober.New(klet.runner, klet.readinessManager, klet.containerRefManager, klet.recorder)
 	klet.handlerRunner = newHandlerRunner(klet.httpClient, klet.runner, klet.containerManager)
 
 	runtimeCache, err := kubecontainer.NewRuntimeCache(containerManager)
@@ -341,7 +342,7 @@ type Kubelet struct {
 	networkPlugin network.NetworkPlugin
 
 	// Healthy check prober.
-	prober kubecontainer.Prober
+	prober prober.Prober
 
 	// Container lifecycle handler runner.
 	handlerRunner kubecontainer.HandlerRunner

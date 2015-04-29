@@ -20,17 +20,11 @@ import (
 	"strings"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/probe"
 )
 
 // HandlerRunner runs a lifecycle handler for a container.
 type HandlerRunner interface {
 	Run(containerID string, pod *api.Pod, container *api.Container, handler *api.Handler) error
-}
-
-// Prober checks the healthiness of a container.
-type Prober interface {
-	Probe(pod *api.Pod, status api.PodStatus, container api.Container, containerID string, createdAt int64) (probe.Result, error)
 }
 
 // RunContainerOptionsGenerator generates the options that necessary for
