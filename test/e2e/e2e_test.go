@@ -40,9 +40,7 @@ type testResult bool
 var (
 	cloudConfig = &testContext.CloudConfig
 
-	orderseed = flag.Int64("orderseed", 0, "If non-zero, seed of random test shuffle order. (Otherwise random.)")
 	reportDir = flag.String("report-dir", "", "Path to the directory where the JUnit XML reports should be saved. Default is empty, which doesn't generate these reports.")
-	times     = flag.Int("times", 1, "Number of times each test is eligible to be run. Individual order is determined by shuffling --times instances of each test using --orderseed (like a multi-deck shoe of cards).")
 )
 
 func init() {
@@ -79,16 +77,13 @@ func TestE2E(t *testing.T) {
 		config.GinkgoConfig.SkipString = "Skipped"
 	}
 
-	// TODO: Make orderseed work again.
 	gomega.RegisterFailHandler(ginkgo.Fail)
-	// Run the existing tests with output to console + JUnit for Jenkins
-	for i := 0; i < *times && !t.Failed(); i++ {
-		var r []ginkgo.Reporter
-		if *reportDir != "" {
-			r = append(r, reporters.NewJUnitReporter(path.Join(*reportDir, fmt.Sprintf("junit_%d_%02d.xml", i+1, config.GinkgoConfig.ParallelNode))))
-		}
-		ginkgo.RunSpecsWithDefaultAndCustomReporters(t, fmt.Sprintf("Kubernetes e2e Suite run %d of %d", i+1, *times), r)
+	// Run tests through the Ginkgo runner with output to console + JUnit for Jenkins
+	var r []ginkgo.Reporter
+	if *reportDir != "" {
+		r = append(r, reporters.NewJUnitReporter(path.Join(*reportDir, fmt.Sprintf("junit_%02d.xml", config.GinkgoConfig.ParallelNode))))
 	}
+	ginkgo.RunSpecsWithDefaultAndCustomReporters(t, "Kubernetes e2e suite", r)
 }
 
 func TestMain(m *testing.M) {
@@ -100,10 +95,6 @@ func TestMain(m *testing.M) {
 	// TODO: possibly clean up or refactor this functionality.
 	if testContext.Provider == "" {
 		glog.Info("The --provider flag is not set.  Treating as a conformance test.  Some tests may not be run.")
-		os.Exit(1)
-	}
-	if *times <= 0 {
-		glog.Error("Invalid --times (negative or no testing requested)!")
 		os.Exit(1)
 	}
 
