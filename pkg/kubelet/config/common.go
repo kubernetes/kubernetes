@@ -30,6 +30,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	utilyaml "github.com/GoogleCloudPlatform/kubernetes/pkg/util/yaml"
 
 	"github.com/ghodss/yaml"
 	"github.com/golang/glog"
@@ -98,7 +99,12 @@ func getSelfLink(name, namespace string) string {
 type defaultFunc func(pod *api.Pod) error
 
 func tryDecodeSinglePod(data []byte, defaultFn defaultFunc) (parsed bool, pod *api.Pod, err error) {
-	obj, err := api.Scheme.Decode(data)
+	// JSON is valid YAML, so this should work for everything.
+	json, err := utilyaml.ToJSON(data)
+	if err != nil {
+		return false, nil, err
+	}
+	obj, err := api.Scheme.Decode(json)
 	if err != nil {
 		return false, pod, err
 	}
@@ -120,7 +126,11 @@ func tryDecodeSinglePod(data []byte, defaultFn defaultFunc) (parsed bool, pod *a
 }
 
 func tryDecodePodList(data []byte, defaultFn defaultFunc) (parsed bool, pods api.PodList, err error) {
-	obj, err := api.Scheme.Decode(data)
+	json, err := utilyaml.ToJSON(data)
+	if err != nil {
+		return false, api.PodList{}, err
+	}
+	obj, err := api.Scheme.Decode(json)
 	if err != nil {
 		return false, pods, err
 	}
