@@ -256,8 +256,7 @@ func TestValidatePersistentVolumes(t *testing.T) {
 				PersistentVolumeSource: api.PersistentVolumeSource{
 					HostPath: &api.HostPathVolumeSource{Path: "/foo"},
 				},
-			},
-			),
+			}),
 		},
 		"missing-name": {
 			isExpectedFailure: true,
@@ -274,15 +273,14 @@ func TestValidatePersistentVolumes(t *testing.T) {
 		},
 		"missing-accessmodes": {
 			isExpectedFailure: true,
-			volume: testVolume("123*Bad(Name", "unexpected-namespace", api.PersistentVolumeSpec{
+			volume: testVolume("goodname", "missing-accessmodes", api.PersistentVolumeSpec{
 				Capacity: api.ResourceList{
 					api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
 				},
 				PersistentVolumeSource: api.PersistentVolumeSource{
 					HostPath: &api.HostPathVolumeSource{Path: "/foo"},
 				},
-			},
-			),
+			}),
 		},
 		"too-many-sources": {
 			isExpectedFailure: true,
