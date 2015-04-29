@@ -70,3 +70,6 @@ You might have to open up port 80 if it's not open yet in your project. For exam
 TODO replace the mongo image with the official mongo? https://registry.hub.docker.com/_/mongo/
 TODO use Kubernetes v1beta3 syntax?
 
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/meteor/README.md?pixel)]()

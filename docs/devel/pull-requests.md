@@ -14,3 +14,6 @@ We want to limit the total number of PRs in flight to:
 * Maintain a clean project
 * Remove old PRs that would be difficult to rebase as the underlying code has changed over time
 * Encourage code velocity
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/devel/pull-requests.md?pixel)]()

@@ -59,3 +59,6 @@ This command will build the module initially and then run the test suite.
 Testing with JSHint, JSCS and Karma:
 
 ```grunt dist```
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/third_party/ui/bower_components/ng-lodash/README.md?pixel)]()

@@ -27,3 +27,6 @@ Also take a look at the [development guide](docs/devel/development.md) for infor
 ## Adding dependencies
 
 If your patch depends on new packages, add that package with [`godep`](https://github.com/tools/godep).  Follow the [instructions to add a dependency](docs/devel/development.md#godep-and-dependency-management).
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/CONTRIBUTING.md?pixel)]()

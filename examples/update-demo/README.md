@@ -114,3 +114,6 @@ Note that the images included here are public domain.
 
 * [kitten](http://commons.wikimedia.org/wiki/File:Kitten-stare.jpg)
 * [nautilus](http://commons.wikimedia.org/wiki/File:Nautilus_pompilius.jpg)
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/update-demo/README.md?pixel)]()

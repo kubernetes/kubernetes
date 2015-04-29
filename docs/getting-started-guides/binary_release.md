@@ -21,3 +21,6 @@ make release
 ```
 
 For more details on the release process see the [`build/` directory](../../build)
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/getting-started-guides/binary_release.md?pixel)]()

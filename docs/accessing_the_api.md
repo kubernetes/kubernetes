@@ -73,3 +73,6 @@ variety of uses cases:
      Localhost will no longer be needed, and will not be the default.
      However, the localhost port may continue to be an option for
      installations that want to do their own auth proxy.
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/accessing_the_api.md?pixel)]()

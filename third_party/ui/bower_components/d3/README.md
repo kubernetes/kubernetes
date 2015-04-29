@@ -7,3 +7,6 @@
 Want to learn more? [See the wiki.](https://github.com/mbostock/d3/wiki)
 
 For examples, [see the gallery](https://github.com/mbostock/d3/wiki/Gallery) and [mbostock’s bl.ocks](http://bl.ocks.org/mbostock).
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/third_party/ui/bower_components/d3/README.md?pixel)]()

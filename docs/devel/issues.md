@@ -17,3 +17,6 @@ Definitions
 * design - priority/design is for issues that are used to track design discussions
 * support - priority/support is used for issues tracking user support requests
 * untriaged - anything without a priority/X label will be considered untriaged
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/devel/issues.md?pixel)]()

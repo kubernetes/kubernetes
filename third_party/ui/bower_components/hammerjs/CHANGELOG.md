@@ -28,3 +28,6 @@
 
 ### 2.0.0, 2014-07-11
 - Full rewrite of the library.
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/third_party/ui/bower_components/hammerjs/CHANGELOG.md?pixel)]()

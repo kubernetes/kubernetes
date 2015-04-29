@@ -58,3 +58,6 @@ This is an example of a pod that consumes its name and namespace via the downwar
   }
 }]
 ```
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/downward_api.md?pixel)]()

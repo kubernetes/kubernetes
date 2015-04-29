@@ -48,3 +48,6 @@ $ sudo service etcd restart
 etcd stop/waiting
 etcd start/running, process 29050
 ```
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/getting-started-guides/ubuntu_single_node.md?pixel)]()

@@ -25,3 +25,6 @@ To contribute new documentation or add examples to the gallery, just [edit the W
 6. Sign D3’s [Individual Contributor License Agreement](https://docs.google.com/forms/d/1CzjdBKtDuA8WeuFJinadx956xLQ4Xriv7-oDvXnZMaI/viewform). Unless you are submitting a trivial patch (such as fixing a typo), this form is needed to verify that you are able to contribute.
 
 7. Submit your pull request, and good luck!
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/third_party/ui/bower_components/d3/CONTRIBUTING.md?pixel)]()

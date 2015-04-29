@@ -51,3 +51,6 @@ Some important differences between v1beta1/2 and v1beta3:
 * Pull policies changed from `PullAlways`, `PullNever`, and `PullIfNotPresent` to `Always`, `Never`, and `IfNotPresent`.
 * The volume `source` is inlined into `volume` rather than nested.
 * Host volumes have been changed from `hostDir` to `hostPath` to better reflect that they can be files or directories.
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/api.md?pixel)]()

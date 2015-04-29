@@ -80,3 +80,6 @@ You can now use `sprintf` and `vsprintf` (also aliased as `fmt` and `vfmt` respe
 
     sprintf("%2$s %3$s a %1$s", "cracker", "Polly", "wants")
     vsprintf("The first 4 letters of the english alphabet are: %s, %s, %s and %s", ["a", "b", "c", "d"])
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/third_party/ui/bower_components/sprintf/README.md?pixel)]()

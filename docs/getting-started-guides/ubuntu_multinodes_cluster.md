@@ -168,3 +168,6 @@ Please try:
 3. Remove `data-dir` of etcd and run `reconfigureDocker.sh`again, the default path of `data-dir` is /infra*.etcd/
 
 4. You can also customize your own settings in `/etc/default/{component_name}` after configured success. 
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/getting-started-guides/ubuntu_multinodes_cluster.md?pixel)]()

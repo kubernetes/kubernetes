@@ -26,3 +26,6 @@ Modernizr is dual-licensed under the [BSD and MIT licenses](http://www.modernizr
 #### Try it out: 
 
 Run the test suite: [http://modernizr.github.com/Modernizr/test/](http://modernizr.github.com/Modernizr/test/)
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/third_party/ui/bower_components/modernizr/readme.md?pixel)]()

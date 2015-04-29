@@ -175,3 +175,6 @@ take the place of common sense and good taste.  Use your best judgment, but put
 a bit of thought into how your work can be made easier to review.  If you do
 these things your PRs will flow much more easily.
 
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/devel/faster_reviews.md?pixel)]()

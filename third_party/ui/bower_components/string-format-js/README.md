@@ -137,3 +137,6 @@ $ grunt browserTest
 ## License
 
 This software is released under the MIT License, see LICENSE.txt.
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/third_party/ui/bower_components/string-format-js/README.md?pixel)]()

@@ -109,3 +109,6 @@ License
 -------
 
 [MIT License](http://www.opensource.org/licenses/mit-license.php).
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/third_party/ui/bower_components/jsonpath/README.md?pixel)]()

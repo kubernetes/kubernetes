@@ -108,3 +108,5 @@ $ gcloud compute firewall-rules create openshift-origin-node-8443 --allow tcp:84
 ### Step 4: Try out OpenShift Origin
 
 TODO add more detail here:
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/openshift-origin/README.md?pixel)]()
