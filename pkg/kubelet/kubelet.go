@@ -62,6 +62,10 @@ const (
 	// Max amount of time to wait for the Docker daemon to come up.
 	maxWaitForDocker = 5 * time.Minute
 
+	// Amount of time to wait when checking health of the Docker daemon.
+	dockerHealthCheckTimeout   = 50 * time.Millisecond
+	dockerHealthCheckIncrement = 10 * time.Millisecond
+
 	// Initial node status update frequency and incremental frequency, for faster cluster startup.
 	// The update frequency will be increameted linearly, until it reaches status_update_frequency.
 	initialNodeStatusUpdateFrequency = 100 * time.Millisecond
@@ -98,6 +102,20 @@ type SourcesReadyFn func() bool
 
 type volumeMap map[string]volume.Volume
 
+// waits unitl Docker is responding, returns nil in case of success and error if it
+// didn't heared from docker for waitTime (so it should be big enough).
+func waitForDocker(waitTime, dockerWaitIncrement time.Duration, dockerClient dockertools.DockerInterface) error {
+	waitStart := time.Now()
+	for time.Since(waitStart) < waitTime {
+		_, err := dockerClient.Version()
+		if err == nil {
+			return nil
+		}
+		time.Sleep(dockerWaitIncrement)
+	}
+	return fmt.Errorf("timed out while waiting for Docker to respond")
+}
+
 // New creates a new Kubelet for use in main
 func NewMainKubelet(
 	hostname string,
@@ -133,19 +151,8 @@ func NewMainKubelet(
 	dockerClient = dockertools.NewInstrumentedDockerInterface(dockerClient)
 
 	// Wait for the Docker daemon to be up (with a timeout).
-	waitStart := time.Now()
-	dockerUp := false
-	for time.Since(waitStart) < maxWaitForDocker {
-		_, err := dockerClient.Version()
-		if err == nil {
-			dockerUp = true
-			break
-		}
-
-		time.Sleep(100 * time.Millisecond)
-	}
-	if !dockerUp {
-		return nil, fmt.Errorf("timed out waiting for Docker to come up")
+	if err := waitForDocker(maxWaitForDocker, 100*time.Millisecond, dockerClient); err != nil {
+		return nil, err
 	}
 
 	serviceStore := cache.NewStore(cache.MetaNamespaceKeyFunc)
@@ -1778,12 +1785,25 @@ func (kl *Kubelet) tryUpdateNodeStatus() error {
 		node.Status.NodeInfo.KubeProxyVersion = version.Get().String()
 	}
 
+	// Check if Docker is healthy
+	err = waitForDocker(dockerHealthCheckTimeout, dockerHealthCheckIncrement, kl.dockerClient)
+
 	currentTime := util.Now()
-	newCondition := api.NodeCondition{
-		Type:              api.NodeReady,
-		Status:            api.ConditionTrue,
-		Reason:            fmt.Sprintf("kubelet is posting ready status"),
-		LastHeartbeatTime: currentTime,
+	var newCondition api.NodeCondition
+	if err == nil {
+		newCondition = api.NodeCondition{
+			Type:              api.NodeReady,
+			Status:            api.ConditionTrue,
+			Reason:            fmt.Sprintf("kubelet is posting ready status"),
+			LastHeartbeatTime: currentTime,
+		}
+	} else {
+		newCondition = api.NodeCondition{
+			Type:              api.NodeReady,
+			Status:            api.ConditionFalse,
+			Reason:            fmt.Sprintf("docker daemon is not responding"),
+			LastHeartbeatTime: currentTime,
+		}
 	}
 	updated := false
 	for i := range node.Status.Conditions {
