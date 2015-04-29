@@ -528,7 +528,7 @@ func TestSyncPodsDoesNothing(t *testing.T) {
 	}
 	waitGroup.Wait()
 	verifyCalls(t, fakeDocker, []string{
-		"list", "list",
+		"list", "list", "list",
 		// Get pod status.
 		"list", "inspect_container", "inspect_container",
 		// Check the pod infra contianer.
@@ -570,7 +570,7 @@ func TestSyncPodsWithTerminationLog(t *testing.T) {
 	}
 	waitGroup.Wait()
 	verifyCalls(t, fakeDocker, []string{
-		"list", "list",
+		"list", "list", "list",
 		// Get pod status.
 		"list", "inspect_image",
 		// Create pod infra container.
@@ -630,7 +630,7 @@ func TestSyncPodsCreatesNetAndContainer(t *testing.T) {
 	waitGroup.Wait()
 
 	verifyCalls(t, fakeDocker, []string{
-		"list", "list",
+		"list", "list", "list",
 		// Get pod status.
 		"list", "inspect_image",
 		// Create pod infra container.
@@ -693,7 +693,7 @@ func TestSyncPodsCreatesNetAndContainerPullsImage(t *testing.T) {
 	waitGroup.Wait()
 
 	verifyCalls(t, fakeDocker, []string{
-		"list", "list",
+		"list", "list", "list",
 		// Get pod status.
 		"list", "inspect_image",
 		// Create pod infra container.
@@ -760,7 +760,7 @@ func TestSyncPodsWithPodInfraCreatesContainer(t *testing.T) {
 	waitGroup.Wait()
 
 	verifyCalls(t, fakeDocker, []string{
-		"list", "list",
+		"list", "list", "list",
 		// Get pod status.
 		"list", "inspect_container", "inspect_image",
 		// Check the pod infra container.
@@ -835,7 +835,7 @@ func TestSyncPodsWithPodInfraCreatesContainerCallsHandler(t *testing.T) {
 	waitGroup.Wait()
 
 	verifyCalls(t, fakeDocker, []string{
-		"list", "list",
+		"list", "list", "list",
 		// Get pod status.
 		"list", "inspect_container", "inspect_image",
 		// Check the pod infra container.
@@ -936,6 +936,7 @@ func TestSyncPodsDeletesWithNoPodInfraContainer(t *testing.T) {
 		"list",
 		// foo1
 		"list",
+		"list",
 		// Get pod status.
 		"list", "inspect_container",
 		// Kill the container since pod infra container is not running.
@@ -999,7 +1000,7 @@ func TestSyncPodsDeletesWhenSourcesAreReady(t *testing.T) {
 	if err := kubelet.SyncPods([]*api.Pod{}, emptyPodUIDs, map[string]*api.Pod{}, time.Now()); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	verifyCalls(t, fakeDocker, []string{"list", "stop", "stop", "inspect_container", "inspect_container"})
+	verifyCalls(t, fakeDocker, []string{"list", "stop", "stop", "list"})
 
 	// A map iteration is used to delete containers, so must not depend on
 	// order here.
@@ -1040,7 +1041,7 @@ func TestSyncPodsDeletes(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	verifyCalls(t, fakeDocker, []string{"list", "stop", "stop", "inspect_container", "inspect_container"})
+	verifyCalls(t, fakeDocker, []string{"list", "stop", "stop", "list"})
 
 	// A map iteration is used to delete containers, so must not depend on
 	// order here.
@@ -1121,7 +1122,7 @@ func TestSyncPodsDeletesDuplicate(t *testing.T) {
 	waitGroup.Wait()
 
 	verifyCalls(t, fakeDocker, []string{
-		"list", "list",
+		"list", "list", "list",
 		// Get pod status.
 		"list", "inspect_container", "inspect_container", "inspect_container",
 		// Check the pod infra container.
@@ -1192,7 +1193,7 @@ func TestSyncPodsBadHash(t *testing.T) {
 	waitGroup.Wait()
 
 	verifyCalls(t, fakeDocker, []string{
-		"list", "list",
+		"list", "list", "list",
 		// Get pod status.
 		"list", "inspect_container", "inspect_container",
 		// Check the pod infra container.
@@ -1266,7 +1267,7 @@ func TestSyncPodsUnhealthy(t *testing.T) {
 	waitGroup.Wait()
 
 	verifyCalls(t, fakeDocker, []string{
-		"list", "list",
+		"list", "list", "list",
 		// Get pod status.
 		"list", "inspect_container", "inspect_container",
 		// Check the pod infra container.
@@ -1915,7 +1916,7 @@ func TestSyncPodEventHandlerFails(t *testing.T) {
 	waitGroup.Wait()
 
 	verifyCalls(t, fakeDocker, []string{
-		"list", "list",
+		"list", "list", "list",
 		// Get pod status.
 		"list", "inspect_container", "inspect_image",
 		// Check the pod infra container.
@@ -3958,7 +3959,7 @@ func TestSyncPodsWithRestartPolicy(t *testing.T) {
 	}{
 		{
 			api.RestartPolicyAlways,
-			[]string{"list", "list",
+			[]string{"list", "list", "list",
 				// Get pod status.
 				"list", "inspect_container", "inspect_container", "inspect_container",
 				// Check the pod infra container.
@@ -3972,7 +3973,7 @@ func TestSyncPodsWithRestartPolicy(t *testing.T) {
 		},
 		{
 			api.RestartPolicyOnFailure,
-			[]string{"list", "list",
+			[]string{"list", "list", "list",
 				// Get pod status.
 				"list", "inspect_container", "inspect_container", "inspect_container",
 				// Check the pod infra container.
@@ -3986,7 +3987,7 @@ func TestSyncPodsWithRestartPolicy(t *testing.T) {
 		},
 		{
 			api.RestartPolicyNever,
-			[]string{"list", "list",
+			[]string{"list", "list", "list",
 				// Get pod status.
 				"list", "inspect_container", "inspect_container", "inspect_container",
 				// Check the pod infra container.

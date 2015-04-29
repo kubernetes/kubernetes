@@ -458,23 +458,6 @@ func (dm *DockerManager) GetPodInfraContainer(pod kubecontainer.Pod) (kubecontai
 	return kubecontainer.Container{}, fmt.Errorf("unable to find pod infra container for pod %v", pod.ID)
 }
 
-func (dm *DockerManager) GetRunningContainers(ids []string) ([]*docker.Container, error) {
-	var result []*docker.Container
-	if dm.client == nil {
-		return nil, fmt.Errorf("unexpected nil docker client.")
-	}
-	for ix := range ids {
-		status, err := dm.client.InspectContainer(ids[ix])
-		if err != nil {
-			return nil, err
-		}
-		if status != nil && status.State.Running {
-			result = append(result, status)
-		}
-	}
-	return result, nil
-}
-
 func (dm *DockerManager) runContainerRecordErrorReason(pod *api.Pod, container *api.Container, opts *kubecontainer.RunContainerOptions, ref *api.ObjectReference) (string, error) {
 	dockerID, err := dm.runContainer(pod, container, opts, ref)
 	if err != nil {

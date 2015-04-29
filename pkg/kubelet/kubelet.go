@@ -54,7 +54,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/version"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
-	docker "github.com/fsouza/go-dockerclient"
 	"github.com/golang/glog"
 	cadvisorApi "github.com/google/cadvisor/info/v1"
 )
@@ -1109,20 +1108,15 @@ func (kl *Kubelet) cleanupOrphanedPodDirs(pods []*api.Pod) error {
 
 // Compares the map of current volumes to the map of desired volumes.
 // If an active volume does not have a respective desired volume, clean it up.
-func (kl *Kubelet) cleanupOrphanedVolumes(pods []*api.Pod, running []*docker.Container) error {
+func (kl *Kubelet) cleanupOrphanedVolumes(pods []*api.Pod, runningPods []*kubecontainer.Pod) error {
 	desiredVolumes := getDesiredVolumes(pods)
 	currentVolumes := kl.getPodVolumesFromDisk()
+
 	runningSet := util.StringSet{}
-	for ix := range running {
-		if len(running[ix].Name) == 0 {
-			glog.V(2).Infof("Found running container ix=%d with info: %+v", ix, running[ix])
-		}
-		containerName, _, err := dockertools.ParseDockerName(running[ix].Name)
-		if err != nil {
-			continue
-		}
-		runningSet.Insert(string(containerName.PodUID))
+	for _, pod := range runningPods {
+		runningSet.Insert(string(pod.ID))
 	}
+
 	for name, vol := range currentVolumes {
 		if _, ok := desiredVolumes[name]; !ok {
 			parts := strings.Split(name, "/")
@@ -1232,16 +1226,24 @@ func (kl *Kubelet) SyncPods(allPods []*api.Pod, podSyncTypes map[types.UID]metri
 		return nil
 	}
 
-	// Kill containers associated with unwanted pods and get a list of
-	// unwanted containers that are still running.
-	running, err := kl.killUnwantedPods(desiredPods, runningPods)
+	// Kill containers associated with unwanted pods.
+	err = kl.killUnwantedPods(desiredPods, runningPods)
 	if err != nil {
 		glog.Errorf("Failed killing unwanted containers: %v", err)
+	}
+
+	// Note that we just killed the unwanted pods. This may not have reflected
+	// in the cache. We need to bypass the cach to get the latest set of
+	// running pods to clean up the volumes.
+	// TODO: Evaluate the performance impact of bypassing the runtime cache.
+	runningPods, err = kl.containerManager.GetPods(false)
+	if err != nil {
+		glog.Errorf("Error listing containers: %#v", err)
 		return err
 	}
 
 	// Remove any orphaned volumes.
-	err = kl.cleanupOrphanedVolumes(pods, running)
+	err = kl.cleanupOrphanedVolumes(pods, runningPods)
 	if err != nil {
 		glog.Errorf("Failed cleaning up orphaned volumes: %v", err)
 		return err
@@ -1260,15 +1262,10 @@ func (kl *Kubelet) SyncPods(allPods []*api.Pod, podSyncTypes map[types.UID]metri
 	return err
 }
 
-// killUnwantedPods kills the unwanted, running pods in parallel, and returns
-// containers in those pods that it failed to terminate.
+// killUnwantedPods kills the unwanted, running pods in parallel.
 func (kl *Kubelet) killUnwantedPods(desiredPods map[types.UID]empty,
-	runningPods []*kubecontainer.Pod) ([]*docker.Container, error) {
-	type result struct {
-		containers []*docker.Container
-		err        error
-	}
-	ch := make(chan result, len(runningPods))
+	runningPods []*kubecontainer.Pod) error {
+	ch := make(chan error, len(runningPods))
 	defer close(ch)
 	numWorkers := 0
 	for _, pod := range runningPods {
@@ -1277,15 +1274,14 @@ func (kl *Kubelet) killUnwantedPods(desiredPods map[types.UID]empty,
 			continue
 		}
 		numWorkers++
-		go func(pod *kubecontainer.Pod, ch chan result) {
+		go func(pod *kubecontainer.Pod, ch chan error) {
+			var err error = nil
 			defer func() {
-				// Send the IDs of the containers that we failed to killed.
-				containers, err := kl.getRunningContainersByPod(pod)
-				ch <- result{containers: containers, err: err}
+				ch <- err
 			}()
 			glog.V(1).Infof("Killing unwanted pod %q", pod.Name)
 			// Stop the containers.
-			err := kl.killPod(*pod)
+			err = kl.killPod(*pod)
 			if err != nil {
 				glog.Errorf("Failed killing the pod %q: %v", pod.Name, err)
 				return
@@ -1293,26 +1289,15 @@ func (kl *Kubelet) killUnwantedPods(desiredPods map[types.UID]empty,
 		}(pod, ch)
 	}
 
-	// Aggregate results from the pod killing workers.
+	// Aggregate errors from the pod killing workers.
 	var errs []error
-	var running []*docker.Container
 	for i := 0; i < numWorkers; i++ {
-		m := <-ch
-		if m.err != nil {
-			errs = append(errs, m.err)
-			continue
+		err := <-ch
+		if err != nil {
+			errs = append(errs, err)
 		}
-		running = append(running, m.containers...)
 	}
-	return running, utilErrors.NewAggregate(errs)
-}
-
-func (kl *Kubelet) getRunningContainersByPod(pod *kubecontainer.Pod) ([]*docker.Container, error) {
-	containerIDs := make([]string, len(pod.Containers))
-	for i, c := range pod.Containers {
-		containerIDs[i] = string(c.ID)
-	}
-	return kl.containerManager.GetRunningContainers(containerIDs)
+	return utilErrors.NewAggregate(errs)
 }
 
 type podsByCreationTime []*api.Pod
