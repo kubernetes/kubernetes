@@ -116,3 +116,17 @@ type Unknown struct {
 }
 
 func (*Unknown) IsAnAPIObject() {}
+
+// Unstructured allows objects that do not have Golang structs registered to be manipulated
+// generically. This can be used to deal with the API objects from a plug-in. Unstructured
+// objects still have functioning TypeMeta features-- kind, version, etc.
+// TODO: Make this object have easy access to field based accessors and settors for
+// metadata and field mutatation.
+type Unstructured struct {
+	TypeMeta `json:",inline"`
+	// Object is a JSON compatible map with string, float, int, []interface{}, or map[string]interface{}
+	// children.
+	Object map[string]interface{}
+}
+
+func (*Unstructured) IsAnAPIObject() {}

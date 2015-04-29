@@ -347,6 +347,12 @@ func (v FlattenListVisitor) Visit(fn VisitorFunc) error {
 		if err != nil {
 			return fn(info)
 		}
+		if errs := runtime.DecodeList(items, struct {
+			runtime.ObjectTyper
+			runtime.Decoder
+		}{v.Mapper, info.Mapping.Codec}); len(errs) > 0 {
+			return errors.NewAggregate(errs)
+		}
 		for i := range items {
 			item, err := v.InfoForObject(items[i])
 			if err != nil {

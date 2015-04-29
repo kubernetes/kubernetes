@@ -81,7 +81,7 @@ func ObjectReaction(o ObjectRetriever, mapper meta.RESTMapper) ReactionFunc {
 
 // AddObjectsFromPath loads the JSON or YAML file containing Kubernetes API resources
 // and adds them to the provided ObjectRetriever.
-func AddObjectsFromPath(path string, o ObjectRetriever) error {
+func AddObjectsFromPath(path string, o ObjectRetriever, decoder runtime.Decoder) error {
 	data, err := ioutil.ReadFile(path)
 	if err != nil {
 		return err
@@ -90,7 +90,7 @@ func AddObjectsFromPath(path string, o ObjectRetriever) error {
 	if err != nil {
 		return err
 	}
-	obj, err := api.Codec.Decode(data)
+	obj, err := decoder.Decode(data)
 	if err != nil {
 		return err
 	}
@@ -103,16 +103,11 @@ func AddObjectsFromPath(path string, o ObjectRetriever) error {
 type objects struct {
 	types   map[string][]runtime.Object
 	last    map[string]int
-	typer   runtime.ObjectTyper
-	creater runtime.ObjectCreater
-	copier  copier
+	scheme  runtime.ObjectScheme
+	decoder runtime.ObjectDecoder
 }
 
 var _ ObjectRetriever = &objects{}
-
-type copier interface {
-	Copy(obj runtime.Object) (runtime.Object, error)
-}
 
 // NewObjects implements the ObjectRetriever interface by introspecting the
 // objects provided to Add() and returning them when the Kind method is invoked.
@@ -124,18 +119,17 @@ type copier interface {
 // as a runtime.Object if Status == Success).  If multiple PodLists are provided, they
 // will be returned in order by the Kind call, and the last PodList will be reused for
 // subsequent calls.
-func NewObjects(scheme *runtime.Scheme) ObjectRetriever {
+func NewObjects(scheme runtime.ObjectScheme, decoder runtime.ObjectDecoder) ObjectRetriever {
 	return objects{
 		types:   make(map[string][]runtime.Object),
 		last:    make(map[string]int),
-		typer:   scheme,
-		creater: scheme,
-		copier:  scheme,
+		scheme:  scheme,
+		decoder: decoder,
 	}
 }
 
 func (o objects) Kind(kind, name string) (runtime.Object, error) {
-	empty, _ := o.creater.New("", kind)
+	empty, _ := o.scheme.New("", kind)
 	nilValue := reflect.Zero(reflect.TypeOf(empty)).Interface().(runtime.Object)
 
 	arr, ok := o.types[kind]
@@ -146,14 +140,14 @@ func (o objects) Kind(kind, name string) (runtime.Object, error) {
 			if !ok {
 				return empty, nil
 			}
-			out, err := o.creater.New("", kind)
+			out, err := o.scheme.New("", kind)
 			if err != nil {
 				return nilValue, err
 			}
 			if err := runtime.SetList(out, arr); err != nil {
 				return nilValue, err
 			}
-			if out, err = o.copier.Copy(out); err != nil {
+			if out, err = o.scheme.Copy(out); err != nil {
 				return nilValue, err
 			}
 			return out, nil
@@ -168,7 +162,7 @@ func (o objects) Kind(kind, name string) (runtime.Object, error) {
 	if index < 0 {
 		return nilValue, errors.NewNotFound(kind, name)
 	}
-	out, err := o.copier.Copy(arr[index])
+	out, err := o.scheme.Copy(arr[index])
 	if err != nil {
 		return nilValue, err
 	}
@@ -187,7 +181,7 @@ func (o objects) Kind(kind, name string) (runtime.Object, error) {
 }
 
 func (o objects) Add(obj runtime.Object) error {
-	_, kind, err := o.typer.ObjectVersionAndKind(obj)
+	_, kind, err := o.scheme.ObjectVersionAndKind(obj)
 	if err != nil {
 		return err
 	}
@@ -201,6 +195,9 @@ func (o objects) Add(obj runtime.Object) error {
 		list, err := runtime.ExtractList(obj)
 		if err != nil {
 			return err
+		}
+		if errs := runtime.DecodeList(list, o.decoder); len(errs) > 0 {
+			return errs[0]
 		}
 		for _, obj := range list {
 			if err := o.Add(obj); err != nil {

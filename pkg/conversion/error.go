@@ -54,6 +54,10 @@ type missingKindErr struct {
 	data string
 }
 
+func NewMissingKindErr(data string) error {
+	return &missingKindErr{data}
+}
+
 func (k *missingKindErr) Error() string {
 	return fmt.Sprintf("Object 'Kind' is missing in '%s'", k.data)
 }
@@ -68,6 +72,10 @@ func IsMissingKind(err error) bool {
 
 type missingVersionErr struct {
 	data string
+}
+
+func NewMissingVersionErr(data string) error {
+	return &missingVersionErr{data}
 }
 
 func (k *missingVersionErr) Error() string {
