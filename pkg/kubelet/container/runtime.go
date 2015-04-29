@@ -74,6 +74,11 @@ type Runtime interface {
 	PullImage(image string) error
 	// IsImagePresent checks whether the container image is already in the local storage.
 	IsImagePresent(image string) (bool, error)
+	// GetContainerLogs returns logs of a specific container. By
+	// default, it returns a snapshot of the container log. Set 'follow' to true to
+	// stream the log. Set 'follow' to false and specify the number of lines (e.g.
+	// "100" or "all") to tail the log.
+	GetContainerLogs(containerID, tail string, follow bool, stdout, stderr io.Writer) (err error)
 }
 
 // Pod is a group of containers, with the status of the pod.

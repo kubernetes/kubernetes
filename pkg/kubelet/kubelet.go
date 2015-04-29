@@ -1655,7 +1655,7 @@ func (kl *Kubelet) GetKubeletContainerLogs(podFullName, containerName, tail stri
 		// waiting state.
 		return err
 	}
-	return kl.containerManager.GetKubeletDockerContainerLogs(dockerContainerID, tail, follow, stdout, stderr)
+	return kl.containerManager.GetContainerLogs(dockerContainerID, tail, follow, stdout, stderr)
 }
 
 // GetHostname Returns the hostname as the kubelet sees it.
