@@ -17,11 +17,39 @@ limitations under the License.
 package dockertools
 
 import (
+	"reflect"
+	"sort"
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
+	kubecontainer "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/network"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/fsouza/go-dockerclient"
 )
+
+func NewFakeDockerManager() (*DockerManager, *FakeDockerClient) {
+	fakeDocker := &FakeDockerClient{Errors: make(map[string]error), RemovedImages: util.StringSet{}}
+	fakeRecorder := &record.FakeRecorder{}
+	readinessManager := kubecontainer.NewReadinessManager()
+	containerRefManager := kubecontainer.NewRefManager()
+	networkPlugin, _ := network.InitNetworkPlugin([]network.NetworkPlugin{}, "", network.NewFakeHost(nil))
+
+	dockerManager := NewDockerManager(
+		fakeDocker,
+		fakeRecorder,
+		readinessManager,
+		containerRefManager,
+		PodInfraContainerImage,
+		0, 0, "",
+		kubecontainer.FakeOS{},
+		networkPlugin,
+		nil)
+
+	return dockerManager, fakeDocker
+}
 
 func TestSetEntrypointAndCommand(t *testing.T) {
 	cases := []struct {
@@ -85,5 +113,104 @@ func TestSetEntrypointAndCommand(t *testing.T) {
 		if e, a := tc.expected.Config.Cmd, actualOpts.Config.Cmd; !api.Semantic.DeepEqual(e, a) {
 			t.Errorf("%v: unexpected command: expected %v, got %v", tc.name, e, a)
 		}
+	}
+}
+
+func TestConvertDockerToRuntimeContainer(t *testing.T) {
+	dockerContainer := &docker.APIContainers{
+		ID:      "ab2cdf",
+		Image:   "bar_image",
+		Created: 12345,
+		Names:   []string{"/k8s_bar.5678_foo_ns_1234_42"},
+	}
+	expected := &kubecontainer.Container{
+		ID:      types.UID("ab2cdf"),
+		Name:    "bar",
+		Image:   "bar_image",
+		Hash:    0x5678,
+		Created: 12345,
+	}
+
+	actual, err := convertDockerToRuntimeContainer(dockerContainer)
+	if err != nil {
+		t.Fatalf("unexpected error %v", err)
+	}
+	if !reflect.DeepEqual(expected, actual) {
+		t.Errorf("expected %#v, got %#v", expected, actual)
+	}
+}
+
+// verifyPods returns true if the two pod slices are equal.
+func verifyPods(a, b []*kubecontainer.Pod) bool {
+	if len(a) != len(b) {
+		return false
+	}
+
+	// Sort the containers within a pod.
+	for i := range a {
+		sort.Sort(containersByID(a[i].Containers))
+	}
+	for i := range b {
+		sort.Sort(containersByID(b[i].Containers))
+	}
+
+	// Sort the pods by UID.
+	sort.Sort(podsByID(a))
+	sort.Sort(podsByID(b))
+
+	return reflect.DeepEqual(a, b)
+}
+
+func TestGetPods(t *testing.T) {
+	manager, fakeDocker := NewFakeDockerManager()
+	dockerContainers := []docker.APIContainers{
+		{
+			ID:    "1111",
+			Names: []string{"/k8s_foo_qux_new_1234_42"},
+		},
+		{
+			ID:    "2222",
+			Names: []string{"/k8s_bar_qux_new_1234_42"},
+		},
+		{
+			ID:    "3333",
+			Names: []string{"/k8s_bar_jlk_wen_5678_42"},
+		},
+	}
+
+	// Convert the docker containers. This does not affect the test coverage
+	// because the conversion is tested separately in
+	// TestConvertDockerToRuntimeContainer.
+	containers := make([]*kubecontainer.Container, len(dockerContainers))
+	for i := range containers {
+		c, err := convertDockerToRuntimeContainer(&dockerContainers[i])
+		if err != nil {
+			t.Fatalf("unexpected error %v", err)
+		}
+		containers[i] = c
+	}
+
+	expected := []*kubecontainer.Pod{
+		{
+			ID:         types.UID("1234"),
+			Name:       "qux",
+			Namespace:  "new",
+			Containers: []*kubecontainer.Container{containers[0], containers[1]},
+		},
+		{
+			ID:         types.UID("5678"),
+			Name:       "jlk",
+			Namespace:  "wen",
+			Containers: []*kubecontainer.Container{containers[2]},
+		},
+	}
+
+	fakeDocker.ContainerList = dockerContainers
+	actual, err := manager.GetPods(false)
+	if err != nil {
+		t.Fatalf("unexpected error %v", err)
+	}
+	if !verifyPods(expected, actual) {
+		t.Errorf("expected %#v, got %#v", expected, actual)
 	}
 }
