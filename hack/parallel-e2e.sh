@@ -40,7 +40,7 @@ function up-clusters {
     local cluster_dir=${KUBE_ROOT}/_output/e2e/${KUBE_GCE_INSTANCE_PREFIX}
     mkdir -p ${cluster_dir}
     export KUBECONFIG=${cluster_dir}/.kubeconfig
-    go run hack/e2e.go -up -v |& tee ${cluster_dir}/up.log &
+    go run hack/e2e.go -up -v 2>&1 | tee ${cluster_dir}/up.log &
   done
 
   fail=0
@@ -61,7 +61,7 @@ function run-tests {
     local cluster_dir=${KUBE_ROOT}/_output/e2e/${KUBE_GCE_INSTANCE_PREFIX}
     export KUBECONFIG=${cluster_dir}/.kubeconfig
     export E2E_REPORT_DIR=${cluster_dir}
-    go run hack/e2e.go -test --test_args="--ginkgo.noColor" "${@:-}" -down |& tee ${cluster_dir}/e2e.log &
+    go run hack/e2e.go -test --test_args="--ginkgo.noColor" "${@:-}" -down 2>&1 | tee ${cluster_dir}/e2e.log &
   done
 
   wait
