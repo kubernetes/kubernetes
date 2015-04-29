@@ -59,6 +59,4 @@ func TestGenMdDoc(t *testing.T) {
 	if !strings.Contains(found, expected) {
 		t.Errorf("Unexpected response.\nExpecting to contain: \n %q\nGot:\n %q\n", expected, found)
 	}
-
-	fmt.Fprintf(os.Stdout, "%s\n", found)
 }

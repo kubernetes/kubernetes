@@ -120,9 +120,9 @@ const (
 	PanicOnError
 )
 
-// normalizedName is a flag name that has been normalized according to rules
+// NormalizedName is a flag name that has been normalized according to rules
 // for the FlagSet (e.g. making '-' and '_' equivalent).
-type normalizedName string
+type NormalizedName string
 
 // A FlagSet represents a set of defined flags.
 type FlagSet struct {
@@ -131,17 +131,17 @@ type FlagSet struct {
 	// a custom error handler.
 	Usage func()
 
-	name           string
-	parsed         bool
-	actual         map[normalizedName]*Flag
-	formal         map[normalizedName]*Flag
-	shorthands     map[byte]*Flag
-	args           []string // arguments after flags
-	exitOnError    bool     // does the program exit if there's an error?
-	errorHandling  ErrorHandling
-	output         io.Writer // nil means stderr; use out() accessor
-	interspersed   bool      // allow interspersed option/non-option args
-	wordSeparators []string
+	name              string
+	parsed            bool
+	actual            map[NormalizedName]*Flag
+	formal            map[NormalizedName]*Flag
+	shorthands        map[byte]*Flag
+	args              []string // arguments after flags
+	exitOnError       bool     // does the program exit if there's an error?
+	errorHandling     ErrorHandling
+	output            io.Writer // nil means stderr; use out() accessor
+	interspersed      bool      // allow interspersed option/non-option args
+	normalizeNameFunc func(f *FlagSet, name string) NormalizedName
 }
 
 // A Flag represents the state of a flag.
@@ -152,6 +152,7 @@ type Flag struct {
 	Value       Value               // value as set
 	DefValue    string              // default value (as text); for usage message
 	Changed     bool                // If the user set the value (or if left to default)
+	Deprecated  string              // If this flag is deprecated, this string is the new or now thing to use
 	Annotations map[string][]string // used by cobra.Command  bash autocomple code
 }
 
@@ -164,7 +165,7 @@ type Value interface {
 }
 
 // sortFlags returns the flags as a slice in lexicographical sorted order.
-func sortFlags(flags map[normalizedName]*Flag) []*Flag {
+func sortFlags(flags map[NormalizedName]*Flag) []*Flag {
 	list := make(sort.StringSlice, len(flags))
 	i := 0
 	for k := range flags {
@@ -174,18 +175,29 @@ func sortFlags(flags map[normalizedName]*Flag) []*Flag {
 	list.Sort()
 	result := make([]*Flag, len(list))
 	for i, name := range list {
-		result[i] = flags[normalizedName(name)]
+		result[i] = flags[NormalizedName(name)]
 	}
 	return result
 }
 
-func (f *FlagSet) normalizeFlagName(name string) normalizedName {
-	result := name
-	for _, sep := range f.wordSeparators {
-		result = strings.Replace(result, sep, "-", -1)
+func (f *FlagSet) SetNormalizeFunc(n func(f *FlagSet, name string) NormalizedName) {
+	f.normalizeNameFunc = n
+	for k, v := range f.formal {
+		delete(f.formal, k)
+		f.formal[f.normalizeFlagName(string(k))] = v
 	}
-	// Type convert to indicate normalization has been done.
-	return normalizedName(result)
+}
+
+func (f *FlagSet) GetNormalizeFunc() func(f *FlagSet, name string) NormalizedName {
+	if f.normalizeNameFunc != nil {
+		return f.normalizeNameFunc
+	}
+	return func(f *FlagSet, name string) NormalizedName { return NormalizedName(name) }
+}
+
+func (f *FlagSet) normalizeFlagName(name string) NormalizedName {
+	n := f.GetNormalizeFunc()
+	return n(f, name)
 }
 
 func (f *FlagSet) out() io.Writer {
@@ -239,8 +251,18 @@ func (f *FlagSet) Lookup(name string) *Flag {
 }
 
 // lookup returns the Flag structure of the named flag, returning nil if none exists.
-func (f *FlagSet) lookup(name normalizedName) *Flag {
+func (f *FlagSet) lookup(name NormalizedName) *Flag {
 	return f.formal[name]
+}
+
+// Mark a flag deprecated in your program
+func (f *FlagSet) MarkDeprecated(name string, usageMessage string) error {
+	flag := f.Lookup(name)
+	if flag == nil {
+		return fmt.Errorf("flag %q does not exist", name)
+	}
+	flag.Deprecated = usageMessage
+	return nil
 }
 
 // Lookup returns the Flag structure of the named command-line flag,
@@ -261,10 +283,13 @@ func (f *FlagSet) Set(name, value string) error {
 		return err
 	}
 	if f.actual == nil {
-		f.actual = make(map[normalizedName]*Flag)
+		f.actual = make(map[NormalizedName]*Flag)
 	}
 	f.actual[normalName] = flag
-	f.lookup(normalName).Changed = true
+	flag.Changed = true
+	if len(flag.Deprecated) > 0 {
+		fmt.Fprintf(os.Stderr, "Flag --%s has been deprecated, %s\n", flag.Name, flag.Deprecated)
+	}
 	return nil
 }
 
@@ -277,6 +302,9 @@ func Set(name, value string) error {
 // otherwise, the default values of all defined flags in the set.
 func (f *FlagSet) PrintDefaults() {
 	f.VisitAll(func(flag *Flag) {
+		if len(flag.Deprecated) > 0 {
+			return
+		}
 		format := "--%s=%s: %s\n"
 		if _, ok := flag.Value.(*stringValue); ok {
 			// put quotes on the value
@@ -295,6 +323,9 @@ func (f *FlagSet) FlagUsages() string {
 	x := new(bytes.Buffer)
 
 	f.VisitAll(func(flag *Flag) {
+		if len(flag.Deprecated) > 0 {
+			return
+		}
 		format := "--%s=%s: %s\n"
 		if _, ok := flag.Value.(*stringValue); ok {
 			// put quotes on the value
@@ -397,7 +428,7 @@ func (f *FlagSet) AddFlag(flag *Flag) {
 		panic(msg) // Happens only if flags are declared with identical names
 	}
 	if f.formal == nil {
-		f.formal = make(map[normalizedName]*Flag)
+		f.formal = make(map[NormalizedName]*Flag)
 	}
 	f.formal[f.normalizeFlagName(flag.Name)] = flag
 
@@ -462,10 +493,13 @@ func (f *FlagSet) setFlag(flag *Flag, value string, origArg string) error {
 	}
 	// mark as visited for Visit()
 	if f.actual == nil {
-		f.actual = make(map[normalizedName]*Flag)
+		f.actual = make(map[NormalizedName]*Flag)
 	}
 	f.actual[f.normalizeFlagName(flag.Name)] = flag
 	flag.Changed = true
+	if len(flag.Deprecated) > 0 {
+		fmt.Fprintf(os.Stderr, "Flag --%s has been deprecated, %s\n", flag.Name, flag.Deprecated)
+	}
 	return nil
 }
 
@@ -623,19 +657,6 @@ func Parse() {
 // Whether to support interspersed option/non-option arguments.
 func SetInterspersed(interspersed bool) {
 	CommandLine.SetInterspersed(interspersed)
-}
-
-// SetWordSeparators sets a list of strings to be considerered as word
-// separators and normalized for the pruposes of lookups.  For example, if this
-// is set to {"-", "_", "."} then --foo_bar, --foo-bar, and --foo.bar are
-// considered equivalent flags.  This must be called before flags are parsed,
-// and may only be called once.
-func (f *FlagSet) SetWordSeparators(separators []string) {
-	f.wordSeparators = separators
-	for k, v := range f.formal {
-		delete(f.formal, k)
-		f.formal[f.normalizeFlagName(string(k))] = v
-	}
 }
 
 // Parsed returns true if the command-line flags have been parsed.

@@ -483,6 +483,32 @@ func TestInvalidSubCommandFlags(t *testing.T) {
 
 }
 
+func TestSubCommandArgEvaluation(t *testing.T) {
+	cmd := initializeWithRootCmd()
+
+	first := &Command{
+		Use: "first",
+		Run: func(cmd *Command, args []string) {
+		},
+	}
+	cmd.AddCommand(first)
+
+	second := &Command{
+		Use: "second",
+		Run: func(cmd *Command, args []string) {
+			fmt.Fprintf(cmd.Out(), "%v", args)
+		},
+	}
+	first.AddCommand(second)
+
+	result := simpleTester(cmd, "first second first third")
+
+	expectedOutput := fmt.Sprintf("%v", []string{"first third"})
+	if result.Output != expectedOutput {
+		t.Errorf("exptected %v, got %v", expectedOutput, result.Output)
+	}
+}
+
 func TestPersistentFlags(t *testing.T) {
 	fullSetupTest("echo -s something -p more here")
 
