@@ -19,7 +19,6 @@ package dockertools
 import (
 	"fmt"
 	"hash/adler32"
-	"io"
 	"math/rand"
 	"os"
 	"strconv"
@@ -27,7 +26,6 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/credentialprovider"
-	kubecontainer "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/leaky"
 	kubeletTypes "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
@@ -273,13 +271,6 @@ func ConnectToDockerOrDie(dockerEndpoint string) DockerInterface {
 		glog.Fatalf("Couldn't connect to docker: %v", err)
 	}
 	return client
-}
-
-// TODO(yifan): Move this to container.Runtime.
-type ContainerCommandRunner interface {
-	RunInContainer(containerID string, cmd []string) ([]byte, error)
-	ExecInContainer(containerID string, cmd []string, in io.Reader, out, err io.WriteCloser, tty bool) error
-	PortForward(pod *kubecontainer.Pod, port uint16, stream io.ReadWriteCloser) error
 }
 
 func milliCPUToShares(milliCPU int64) int64 {

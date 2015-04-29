@@ -46,7 +46,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/prober"
 	kubeletTypes "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/probe"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/scheduler"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
@@ -254,13 +253,17 @@ func NewMainKubelet(
 		pullBurst,
 		containerLogsDir,
 		osInterface,
-		klet.networkPlugin)
+		klet.networkPlugin,
+		nil)
 	klet.runner = containerManager
 	klet.containerManager = containerManager
 
 	klet.podManager = newBasicPodManager(klet.kubeClient)
 	klet.prober = prober.New(klet.runner, klet.readinessManager, klet.containerRefManager, klet.recorder)
 	klet.handlerRunner = newHandlerRunner(klet.httpClient, klet.runner, klet.containerManager)
+
+	// TODO(vmarmol): Remove when the circular dependency is removed :(
+	containerManager.Prober = klet.prober
 
 	runtimeCache, err := kubecontainer.NewRuntimeCache(containerManager)
 	if err != nil {
@@ -321,7 +324,7 @@ type Kubelet struct {
 	// Optional, defaults to /logs/ from /var/log
 	logServer http.Handler
 	// Optional, defaults to simple Docker implementation
-	runner dockertools.ContainerCommandRunner
+	runner prober.ContainerCommandRunner
 	// Optional, client for http requests, defaults to empty client
 	httpClient httpGetter
 
@@ -924,164 +927,6 @@ func (kl *Kubelet) makePodDataDirs(pod *api.Pod) error {
 	return nil
 }
 
-func shouldContainerBeRestarted(container *api.Container, pod *api.Pod, podStatus *api.PodStatus, readinessManager *kubecontainer.ReadinessManager) bool {
-	podFullName := kubecontainer.GetPodFullName(pod)
-
-	// Get all dead container status.
-	var resultStatus []*api.ContainerStatus
-	for i, containerStatus := range podStatus.ContainerStatuses {
-		if containerStatus.Name == container.Name && containerStatus.State.Termination != nil {
-			resultStatus = append(resultStatus, &podStatus.ContainerStatuses[i])
-		}
-	}
-
-	// Set dead containers to unready state.
-	for _, c := range resultStatus {
-		readinessManager.RemoveReadiness(kubecontainer.TrimRuntimePrefixFromImage(c.ContainerID))
-	}
-
-	// Check RestartPolicy for dead container.
-	if len(resultStatus) > 0 {
-		if pod.Spec.RestartPolicy == api.RestartPolicyNever {
-			glog.V(4).Infof("Already ran container %q of pod %q, do nothing", container.Name, podFullName)
-			return false
-		}
-		if pod.Spec.RestartPolicy == api.RestartPolicyOnFailure {
-			// Check the exit code of last run. Note: This assumes the result is sorted
-			// by the created time in reverse order.
-			if resultStatus[0].State.Termination.ExitCode == 0 {
-				glog.V(4).Infof("Already successfully ran container %q of pod %q, do nothing", container.Name, podFullName)
-				return false
-			}
-		}
-	}
-	return true
-}
-
-// Structure keeping information on changes that need to happen for a pod. The semantics is as follows:
-// - startInfraContainer is true if new Infra Containers have to be started and old one (if running) killed.
-//   Additionally if it is true then containersToKeep have to be empty
-// - infraContainerId have to be set iff startInfraContainer is false. It stores dockerID of running Infra Container
-// - containersToStart keeps indices of Specs of containers that have to be started.
-// - containersToKeep stores mapping from dockerIDs of running containers to indices of their Specs for containers that
-//   should be kept running. If startInfraContainer is false then it contains an entry for infraContainerId (mapped to -1).
-//   It shouldn't be the case where containersToStart is empty and containersToKeep contains only infraContainerId. In such case
-//   Infra Container should be killed, hence it's removed from this map.
-// - all running containers which are NOT contained in containersToKeep should be killed.
-type podContainerChangesSpec struct {
-	startInfraContainer bool
-	infraContainerId    kubeletTypes.DockerID
-	containersToStart   map[int]empty
-	containersToKeep    map[kubeletTypes.DockerID]int
-}
-
-func (kl *Kubelet) computePodContainerChanges(pod *api.Pod, runningPod kubecontainer.Pod, podStatus api.PodStatus) (podContainerChangesSpec, error) {
-	podFullName := kubecontainer.GetPodFullName(pod)
-	uid := pod.UID
-	glog.V(4).Infof("Syncing Pod %+v, podFullName: %q, uid: %q", pod, podFullName, uid)
-
-	containersToStart := make(map[int]empty)
-	containersToKeep := make(map[kubeletTypes.DockerID]int)
-	createPodInfraContainer := false
-
-	var err error
-	var podInfraContainerID kubeletTypes.DockerID
-	var changed bool
-	podInfraContainer := runningPod.FindContainerByName(dockertools.PodInfraContainerName)
-	if podInfraContainer != nil {
-		glog.V(4).Infof("Found pod infra container for %q", podFullName)
-		changed, err = kl.containerManager.PodInfraContainerChanged(pod, podInfraContainer)
-		if err != nil {
-			return podContainerChangesSpec{}, err
-		}
-	}
-
-	createPodInfraContainer = true
-	if podInfraContainer == nil {
-		glog.V(2).Infof("Need to restart pod infra container for %q because it is not found", podFullName)
-	} else if changed {
-		glog.V(2).Infof("Need to restart pod infra container for %q because it is changed", podFullName)
-	} else {
-		glog.V(4).Infof("Pod infra container looks good, keep it %q", podFullName)
-		createPodInfraContainer = false
-		podInfraContainerID = kubeletTypes.DockerID(podInfraContainer.ID)
-		containersToKeep[podInfraContainerID] = -1
-	}
-
-	for index, container := range pod.Spec.Containers {
-		expectedHash := dockertools.HashContainer(&container)
-
-		c := runningPod.FindContainerByName(container.Name)
-		if c == nil {
-			if shouldContainerBeRestarted(&container, pod, &podStatus, kl.readinessManager) {
-				// If we are here it means that the container is dead and should be restarted, or never existed and should
-				// be created. We may be inserting this ID again if the container has changed and it has
-				// RestartPolicy::Always, but it's not a big deal.
-				glog.V(3).Infof("Container %+v is dead, but RestartPolicy says that we should restart it.", container)
-				containersToStart[index] = empty{}
-			}
-			continue
-		}
-
-		containerID := kubeletTypes.DockerID(c.ID)
-		hash := c.Hash
-		glog.V(3).Infof("pod %q container %q exists as %v", podFullName, container.Name, containerID)
-
-		if createPodInfraContainer {
-			// createPodInfraContainer == true and Container exists
-			// If we're creating infra containere everything will be killed anyway
-			// If RestartPolicy is Always or OnFailure we restart containers that were running before we
-			// killed them when restarting Infra Container.
-			if pod.Spec.RestartPolicy != api.RestartPolicyNever {
-				glog.V(1).Infof("Infra Container is being recreated. %q will be restarted.", container.Name)
-				containersToStart[index] = empty{}
-			}
-			continue
-		}
-
-		// At this point, the container is running and pod infra container is good.
-		// We will look for changes and check healthiness for the container.
-		containerChanged := hash != 0 && hash != expectedHash
-		if containerChanged {
-			glog.Infof("pod %q container %q hash changed (%d vs %d), it will be killed and re-created.", podFullName, container.Name, hash, expectedHash)
-			containersToStart[index] = empty{}
-			continue
-		}
-
-		result, err := kl.prober.Probe(pod, podStatus, container, string(c.ID), c.Created)
-		if err != nil {
-			// TODO(vmarmol): examine this logic.
-			glog.V(2).Infof("probe no-error: %q", container.Name)
-			containersToKeep[containerID] = index
-			continue
-		}
-		if result == probe.Success {
-			glog.V(4).Infof("probe success: %q", container.Name)
-			containersToKeep[containerID] = index
-			continue
-		}
-		glog.Infof("pod %q container %q is unhealthy (probe result: %v), it will be killed and re-created.", podFullName, container.Name, result)
-		containersToStart[index] = empty{}
-	}
-
-	// After the loop one of the following should be true:
-	// - createPodInfraContainer is true and containersToKeep is empty.
-	// (In fact, when createPodInfraContainer is false, containersToKeep will not be touched).
-	// - createPodInfraContainer is false and containersToKeep contains at least ID of Infra Container
-
-	// If Infra container is the last running one, we don't want to keep it.
-	if !createPodInfraContainer && len(containersToStart) == 0 && len(containersToKeep) == 1 {
-		containersToKeep = make(map[kubeletTypes.DockerID]int)
-	}
-
-	return podContainerChangesSpec{
-		startInfraContainer: createPodInfraContainer,
-		infraContainerId:    podInfraContainerID,
-		containersToStart:   containersToStart,
-		containersToKeep:    containersToKeep,
-	}, nil
-}
-
 func (kl *Kubelet) syncPod(pod *api.Pod, mirrorPod *api.Pod, runningPod kubecontainer.Pod) error {
 	podFullName := kubecontainer.GetPodFullName(pod)
 	uid := pod.UID
@@ -1123,14 +968,14 @@ func (kl *Kubelet) syncPod(pod *api.Pod, mirrorPod *api.Pod, runningPod kubecont
 		return err
 	}
 
-	containerChanges, err := kl.computePodContainerChanges(pod, runningPod, podStatus)
+	containerChanges, err := kl.containerManager.ComputePodContainerChanges(pod, runningPod, podStatus)
 	glog.V(3).Infof("Got container changes for pod %q: %+v", podFullName, containerChanges)
 	if err != nil {
 		return err
 	}
 
-	if containerChanges.startInfraContainer || (len(containerChanges.containersToKeep) == 0 && len(containerChanges.containersToStart) == 0) {
-		if len(containerChanges.containersToKeep) == 0 && len(containerChanges.containersToStart) == 0 {
+	if containerChanges.StartInfraContainer || (len(containerChanges.ContainersToKeep) == 0 && len(containerChanges.ContainersToStart) == 0) {
+		if len(containerChanges.ContainersToKeep) == 0 && len(containerChanges.ContainersToStart) == 0 {
 			glog.V(4).Infof("Killing Infra Container for %q because all other containers are dead.", podFullName)
 		} else {
 			glog.V(4).Infof("Killing Infra Container for %q, will start new one", podFullName)
@@ -1144,7 +989,7 @@ func (kl *Kubelet) syncPod(pod *api.Pod, mirrorPod *api.Pod, runningPod kubecont
 	} else {
 		// Otherwise kill any containers in this pod which are not specified as ones to keep.
 		for _, container := range runningPod.Containers {
-			_, keep := containerChanges.containersToKeep[kubeletTypes.DockerID(container.ID)]
+			_, keep := containerChanges.ContainersToKeep[kubeletTypes.DockerID(container.ID)]
 			if !keep {
 				glog.V(3).Infof("Killing unwanted container %+v", container)
 				err = kl.containerManager.KillContainer(container.ID)
@@ -1173,8 +1018,8 @@ func (kl *Kubelet) syncPod(pod *api.Pod, mirrorPod *api.Pod, runningPod kubecont
 	kl.volumeManager.SetVolumes(pod.UID, podVolumes)
 
 	// If we should create infra container then we do it first.
-	podInfraContainerID := containerChanges.infraContainerId
-	if containerChanges.startInfraContainer && (len(containerChanges.containersToStart) > 0) {
+	podInfraContainerID := containerChanges.InfraContainerId
+	if containerChanges.StartInfraContainer && (len(containerChanges.ContainersToStart) > 0) {
 		glog.V(4).Infof("Creating pod infra container for %q", podFullName)
 		podInfraContainerID, err = kl.containerManager.CreatePodInfraContainer(pod, kl, kl.handlerRunner)
 
@@ -1189,7 +1034,7 @@ func (kl *Kubelet) syncPod(pod *api.Pod, mirrorPod *api.Pod, runningPod kubecont
 	}
 
 	// Start everything
-	for container := range containerChanges.containersToStart {
+	for container := range containerChanges.ContainersToStart {
 		glog.V(4).Infof("Creating container %+v", pod.Spec.Containers[container])
 		containerSpec := &pod.Spec.Containers[container]
 		if err := kl.pullImage(pod, containerSpec); err != nil {

@@ -28,6 +28,7 @@ import (
 	kubecontainer "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/dockertools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/network"
+	kubeletProber "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/prober"
 	docker "github.com/fsouza/go-dockerclient"
 	cadvisorApi "github.com/google/cadvisor/info/v1"
 )
@@ -158,7 +159,8 @@ func TestRunOnce(t *testing.T) {
 		0,
 		"",
 		kubecontainer.FakeOS{},
-		kb.networkPlugin)
+		kb.networkPlugin,
+		&kubeletProber.FakeProber{})
 	kb.containerManager.Puller = &dockertools.FakeDockerPuller{}
 
 	pods := []*api.Pod{
