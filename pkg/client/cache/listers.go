@@ -123,6 +123,59 @@ func (s *StoreToNodeLister) GetNodeInfo(id string) (*api.Node, error) {
 	return minion.(*api.Node), nil
 }
 
+// StoreToControllerLister gives a store List and Exists methods. The store must contain only ReplicationControllers.
+type StoreToControllerLister struct {
+	Store
+}
+
+// Exists checks if the given rc exists in the store.
+func (s *StoreToControllerLister) Exists(controller *api.ReplicationController) (bool, error) {
+	_, exists, err := s.Store.Get(controller)
+	if err != nil {
+		return false, err
+	}
+	return exists, nil
+}
+
+// StoreToControllerLister lists all controllers in the store.
+// TODO: converge on the interface in pkg/client
+func (s *StoreToControllerLister) List() (controllers []api.ReplicationController, err error) {
+	for _, c := range s.Store.List() {
+		controllers = append(controllers, *(c.(*api.ReplicationController)))
+	}
+	return controllers, nil
+}
+
+// GetPodControllers returns a list of controllers managing a pod. Returns an error only if no matching controllers are found.
+func (s *StoreToControllerLister) GetPodControllers(pod *api.Pod) (controllers []api.ReplicationController, err error) {
+	var selector labels.Selector
+	var rc api.ReplicationController
+
+	if len(pod.Labels) == 0 {
+		err = fmt.Errorf("No controllers found for pod %v because it has no labels", pod.Name)
+		return
+	}
+
+	for _, m := range s.Store.List() {
+		rc = *m.(*api.ReplicationController)
+		if rc.Namespace != pod.Namespace {
+			continue
+		}
+		labelSet := labels.Set(rc.Spec.Selector)
+		selector = labels.Set(rc.Spec.Selector).AsSelector()
+
+		// If an rc with a nil or empty selector creeps in, it should match nothing, not everything.
+		if labelSet.AsSelector().Empty() || !selector.Matches(labels.Set(pod.Labels)) {
+			continue
+		}
+		controllers = append(controllers, rc)
+	}
+	if len(controllers) == 0 {
+		err = fmt.Errorf("Could not find controllers for pod %s in namespace %s with labels: %v", pod.Name, pod.Namespace, pod.Labels)
+	}
+	return
+}
+
 // StoreToServiceLister makes a Store that has the List method of the client.ServiceInterface
 // The Store must contain (only) Services.
 type StoreToServiceLister struct {
