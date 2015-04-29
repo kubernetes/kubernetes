@@ -251,7 +251,7 @@ type PersistentVolumeSource struct {
 
 type PersistentVolume struct {
 	TypeMeta   `json:",inline"`
-	ObjectMeta `json:"metadata,omitempty"`
+	ObjectMeta `json:"metadata,omitempty" description:"standard object metadata; see http://docs.k8s.io/api-conventions.md#metadata"`
 
 	//Spec defines a persistent volume owned by the cluster
 	Spec PersistentVolumeSpec `json:"spec,omitempty" description:"specification of a persistent volume as provisioned by an administrator"`
@@ -278,14 +278,14 @@ type PersistentVolumeStatus struct {
 
 type PersistentVolumeList struct {
 	TypeMeta `json:",inline"`
-	ListMeta `json:"metadata,omitempty"`
+	ListMeta `json:"metadata,omitempty" description:"standard list metadata; see http://docs.k8s.io/api-conventions.md#types-kinds`
 	Items    []PersistentVolume `json:"items,omitempty" description:"list of persistent volumes"`
 }
 
 // PersistentVolumeClaim is a user's request for and claim to a persistent volume
 type PersistentVolumeClaim struct {
 	TypeMeta   `json:",inline"`
-	ObjectMeta `json:"metadata,omitempty"`
+	ObjectMeta `json:"metadata,omitempty" description:"standard object metadata; see http://docs.k8s.io/api-conventions.md#metadata"`
 
 	// Spec defines the volume requested by a pod author
 	Spec PersistentVolumeClaimSpec `json:"spec,omitempty" description: "the desired characteristics of a volume"`
@@ -296,7 +296,7 @@ type PersistentVolumeClaim struct {
 
 type PersistentVolumeClaimList struct {
 	TypeMeta `json:",inline"`
-	ListMeta `json:"metadata,omitempty"`
+	ListMeta `json:"metadata,omitempty" description:"standard list metadata; see http://docs.k8s.io/api-conventions.md#types-kinds`
 	Items    []PersistentVolumeClaim `json:"items,omitempty" description: "a list of persistent volume claims"`
 }
 
@@ -1101,9 +1101,9 @@ type NodeSpec struct {
 // NodeSystemInfo is a set of ids/uuids to uniquely identify the node.
 type NodeSystemInfo struct {
 	// MachineID is the machine-id reported by the node
-	MachineID string `json:"machineID"`
+	MachineID string `json:"machineID" description:"machine-id reported by the node"`
 	// SystemUUID is the system-uuid reported by the node
-	SystemUUID string `json:"systemUUID"`
+	SystemUUID string `json:"systemUUID" description:"system-uuid reported by the node"`
 	// BootID is the boot-id reported by the node
 	BootID string `json:"bootID" description:"boot id is the boot-id reported by the node"`
 	// Kernel version reported by the node
@@ -1130,7 +1130,7 @@ type NodeStatus struct {
 	// Queried from cloud provider, if available.
 	Addresses []NodeAddress `json:"addresses,omitempty" description:"list of addresses reachable to the node" patchStrategy:"merge" patchMergeKey:"type"`
 	// NodeSystemInfo is a set of ids/uuids to uniquely identify the node
-	NodeInfo NodeSystemInfo `json:"nodeInfo,omitempty"`
+	NodeInfo NodeSystemInfo `json:"nodeInfo,omitempty" description:"set of ids/uuids to uniquely identify the node"`
 }
 
 type NodePhase string
@@ -1174,8 +1174,8 @@ const (
 )
 
 type NodeAddress struct {
-	Type    NodeAddressType `json:"type"`
-	Address string          `json:"address"`
+	Type    NodeAddressType `json:"type" description:"node address type, one of Hostname, ExternalIP or InternalIP"`
+	Address string          `json:"address" description:"the node address"`
 }
 
 // ResourceName is the name identifying various resources in a ResourceList.
