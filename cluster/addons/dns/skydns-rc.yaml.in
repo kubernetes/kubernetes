@@ -29,7 +29,7 @@ desiredState:
                     "-advertise-client-urls=http://127.0.0.1:4001",
             ]
           - name: kube2sky
-            image: gcr.io/google_containers/kube2sky:1.1
+            image: gcr.io/google_containers/kube2sky:1.2
             volumeMounts:
                - name: dns-token
                  mountPath: /etc/dns_token
@@ -37,6 +37,7 @@ desiredState:
             command: [
                     # entrypoint = "/kube2sky",
                     "-domain={{ pillar['dns_domain'] }}",
+                    "-kubecfg_file=/etc/dns_token/kubeconfig",
             ]
           - name: skydns
             image: gcr.io/google_containers/skydns:2015-03-11-001
