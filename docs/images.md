@@ -26,3 +26,7 @@ then a local image is used (preferentially or exclusively, respectively).
 This can be used to preload certain images for speed or as an alternative to authenticating to a private registry.
 
 Pull Policy is per-container, but any user of the cluster will have access to all local images.
+
+## Updating Images
+
+The default pull policy is `PullIfNotPresent` which causes the Kubelet to not pull an image if it already exists. If you would like to always force a pull you must set a pull image policy of `PullAlways` or specify a `:latest` tag on your image.
