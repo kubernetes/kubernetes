@@ -907,6 +907,20 @@ func (kl *Kubelet) killPod(pod kubecontainer.Pod) error {
 	if len(errList) > 0 {
 		return utilErrors.NewAggregate(errList)
 	}
+
+	// Tear down all volumes associated with the pod
+	volumes := kl.getPodVolumes(pod.ID)
+	for _, volume := range volumes {
+		volume.TearDown()
+	}
+
+	// Remove the pod directory.
+	err = os.RemoveAll(kl.getPodDir(pod.ID))
+	if err != nil {
+		glog.Errorf("Failed removing pod directory for %q", pod.Name)
+		return err
+	}
+
 	return nil
 }
 
