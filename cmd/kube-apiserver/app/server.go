@@ -74,6 +74,7 @@ type APIServer struct {
 	EtcdServerList             util.StringList
 	EtcdConfigFile             string
 	EtcdPathPrefix             string
+	OldEtcdPathPrefix          string
 	CorsAllowedOriginList      util.StringList
 	AllowPrivileged            bool
 	PortalNet                  util.IPNet // TODO: make this a list
@@ -102,6 +103,7 @@ func NewAPIServer() *APIServer {
 		AuthorizationMode:      "AlwaysAllow",
 		AdmissionControl:       "AlwaysAdmit",
 		EtcdPathPrefix:         master.DefaultEtcdPathPrefix,
+		OldEtcdPathPrefix:      master.DefaultEtcdPathPrefix,
 		EnableLogsSupport:      true,
 		MasterServiceNamespace: api.NamespaceDefault,
 		ClusterName:            "kubernetes",
@@ -167,6 +169,7 @@ func (s *APIServer) AddFlags(fs *pflag.FlagSet) {
 	fs.Var(&s.EtcdServerList, "etcd-servers", "List of etcd servers to watch (http://ip:port), comma separated. Mutually exclusive with -etcd-config")
 	fs.StringVar(&s.EtcdConfigFile, "etcd-config", s.EtcdConfigFile, "The config file for the etcd client. Mutually exclusive with -etcd-servers.")
 	fs.StringVar(&s.EtcdPathPrefix, "etcd-prefix", s.EtcdPathPrefix, "The prefix for all resource paths in etcd.")
+	fs.StringVar(&s.OldEtcdPathPrefix, "old-etcd-prefix", s.OldEtcdPathPrefix, "The previous prefix for all resource paths in etcd, if any.")
 	fs.Var(&s.CorsAllowedOriginList, "cors-allowed-origins", "List of allowed origins for CORS, comma separated.  An allowed origin can be a regular expression to support subdomain matching.  If this list is empty CORS will not be enabled.")
 	fs.BoolVar(&s.AllowPrivileged, "allow-privileged", s.AllowPrivileged, "If true, allow privileged containers.")
 	fs.Var(&s.PortalNet, "portal-net", "A CIDR notation IP range from which to assign portal IPs. This must not overlap with any IP ranges assigned to nodes for pods.")
@@ -252,6 +255,14 @@ func (s *APIServer) Run(_ []string) error {
 	helper, err := newEtcd(s.EtcdConfigFile, s.EtcdServerList, s.StorageVersion, s.EtcdPathPrefix)
 	if err != nil {
 		glog.Fatalf("Invalid storage version or misconfigured etcd: %v", err)
+	}
+
+	// TODO Is this the right place for migration to happen? Must *both* old and
+	// new etcd prefix params be supplied for this to be valid?
+	if s.OldEtcdPathPrefix != "" {
+		if err = helper.MigrateKeys(s.OldEtcdPathPrefix); err != nil {
+			glog.Fatalf("Migration of old etcd keys failed: %v", err)
+		}
 	}
 
 	n := net.IPNet(s.PortalNet)
