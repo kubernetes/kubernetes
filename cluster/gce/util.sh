@@ -22,6 +22,14 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
 source "${KUBE_ROOT}/cluster/gce/${KUBE_CONFIG_FILE-"config-default.sh"}"
 source "${KUBE_ROOT}/cluster/common.sh"
 
+if [[ "${OS_DISTRIBUTION}" == "debian" || "${OS_DISTRIBUTION}" == "coreos" ]]; then
+  echo "Starting cluster using os distro: ${OS_DISTRIBUTION}" >&2
+  source "${KUBE_ROOT}/cluster/gce/${OS_DISTRIBUTION}/helper.sh"
+else
+  echo "Cannot start cluster using os distro: ${OS_DISTRIBUTION}" >&2
+  return
+fi
+
 NODE_INSTANCE_PREFIX="${INSTANCE_PREFIX}-minion"
 
 KUBE_PROMPT_FOR_UPDATE=y
@@ -367,8 +375,8 @@ function create-node-template {
       --machine-type "${MINION_SIZE}" \
       --boot-disk-type "${MINION_DISK_TYPE}" \
       --boot-disk-size "${MINION_DISK_SIZE}" \
-      --image-project="${IMAGE_PROJECT}" \
-      --image "${IMAGE}" \
+      --image-project="${MINION_IMAGE_PROJECT}" \
+      --image "${MINION_IMAGE}" \
       --tags "${MINION_TAG}" \
       --network "${NETWORK}" \
       $2 \
@@ -448,90 +456,12 @@ function yaml-quote {
   echo "'$(echo "${@}" | sed -e "s/'/''/g")'"
 }
 
-# $1: if 'true', we're building a master yaml, else a node
-function build-kube-env {
-  local master=$1
-  local file=$2
-
-  rm -f ${file}
-  cat >$file <<EOF
-ENV_TIMESTAMP: $(yaml-quote $(date -u +%Y-%m-%dT%T%z))
-INSTANCE_PREFIX: $(yaml-quote ${INSTANCE_PREFIX})
-NODE_INSTANCE_PREFIX: $(yaml-quote ${NODE_INSTANCE_PREFIX})
-SERVER_BINARY_TAR_URL: $(yaml-quote ${SERVER_BINARY_TAR_URL})
-SALT_TAR_URL: $(yaml-quote ${SALT_TAR_URL})
-PORTAL_NET: $(yaml-quote ${PORTAL_NET})
-ENABLE_CLUSTER_MONITORING: $(yaml-quote ${ENABLE_CLUSTER_MONITORING:-false})
-ENABLE_NODE_MONITORING: $(yaml-quote ${ENABLE_NODE_MONITORING:-false})
-ENABLE_CLUSTER_LOGGING: $(yaml-quote ${ENABLE_CLUSTER_LOGGING:-false})
-ENABLE_NODE_LOGGING: $(yaml-quote ${ENABLE_NODE_LOGGING:-false})
-LOGGING_DESTINATION: $(yaml-quote ${LOGGING_DESTINATION:-})
-ELASTICSEARCH_LOGGING_REPLICAS: $(yaml-quote ${ELASTICSEARCH_LOGGING_REPLICAS:-})
-ENABLE_CLUSTER_DNS: $(yaml-quote ${ENABLE_CLUSTER_DNS:-false})
-DNS_REPLICAS: $(yaml-quote ${DNS_REPLICAS:-})
-DNS_SERVER_IP: $(yaml-quote ${DNS_SERVER_IP:-})
-DNS_DOMAIN: $(yaml-quote ${DNS_DOMAIN:-})
-KUBE_USER: $(yaml-quote ${KUBE_USER})
-KUBE_PASSWORD: $(yaml-quote ${KUBE_PASSWORD})
-KUBE_BEARER_TOKEN: $(yaml-quote ${KUBE_BEARER_TOKEN})
-KUBELET_TOKEN: $(yaml-quote ${KUBELET_TOKEN:-})
-KUBE_PROXY_TOKEN: $(yaml-quote ${KUBE_PROXY_TOKEN:-})
-ADMISSION_CONTROL: $(yaml-quote ${ADMISSION_CONTROL:-})
-MASTER_IP_RANGE: $(yaml-quote ${MASTER_IP_RANGE})
-EOF
-
-  if [[ "${master}" != "true" ]]; then
-    cat >>$file <<EOF
-KUBERNETES_MASTER_NAME: $(yaml-quote ${MASTER_NAME})
-ZONE: $(yaml-quote ${ZONE})
-EXTRA_DOCKER_OPTS: $(yaml-quote ${EXTRA_DOCKER_OPTS})
-ENABLE_DOCKER_REGISTRY_CACHE: $(yaml-quote ${ENABLE_DOCKER_REGISTRY_CACHE:-false})
-EOF
-  fi
-}
-
 function write-master-env {
   build-kube-env true "${KUBE_TEMP}/master-kube-env.yaml"
 }
 
 function write-node-env {
   build-kube-env false "${KUBE_TEMP}/node-kube-env.yaml"
-}
-
-# create-master-instance creates the master instance. If called with
-# an argument, the argument is used as the name to a reserved IP
-# address for the master. (In the case of upgrade/repair, we re-use
-# the same IP.)
-#
-# It requires a whole slew of assumed variables, partially due to to
-# the call to write-master-env. Listing them would be rather
-# futile. Instead, we list the required calls to ensure any additional
-# variables are set:
-#   ensure-temp-dir
-#   detect-project
-#   get-password
-#   get-bearer-token
-#
-function create-master-instance {
-  local address_opt=""
-  [[ -n ${1:-} ]] && address_opt="--address ${1}"
-
-  write-master-env
-  gcloud compute instances create "${MASTER_NAME}" \
-    ${address_opt} \
-    --project "${PROJECT}" \
-    --zone "${ZONE}" \
-    --machine-type "${MASTER_SIZE}" \
-    --image-project="${IMAGE_PROJECT}" \
-    --image "${IMAGE}" \
-    --tags "${MASTER_TAG}" \
-    --network "${NETWORK}" \
-    --scopes "storage-ro" "compute-rw" \
-    --can-ip-forward \
-    --metadata-from-file \
-      "startup-script=${KUBE_ROOT}/cluster/gce/configure-vm.sh" \
-      "kube-env=${KUBE_TEMP}/master-kube-env.yaml" \
-    --disk name="${MASTER_NAME}-pd" device-name=master-pd mode=rw boot=no auto-delete=no
 }
 
 # Instantiate a kubernetes cluster
@@ -626,9 +556,7 @@ function kube-up {
   fi
 
   write-node-env
-  create-node-template "${NODE_INSTANCE_PREFIX}-template" "${scope_flags[*]}" \
-    "startup-script=${KUBE_ROOT}/cluster/gce/configure-vm.sh" \
-    "kube-env=${KUBE_TEMP}/node-kube-env.yaml"
+  create-node-instance-template
 
   gcloud preview managed-instance-groups --zone "${ZONE}" \
       create "${NODE_INSTANCE_PREFIX}-group" \
@@ -800,6 +728,12 @@ function kube-down {
 
 # Update a kubernetes cluster with latest source
 function kube-push {
+  #TODO(dawnchen): figure out how to upgrade coreos node
+  if [[ "${OS_DISTRIBUTION}" != "debian" ]]; then
+    echo "Updating a kubernetes cluster with ${OS_DISTRIBUTION} is not supported yet." >&2
+    return
+  fi
+
   OUTPUT=${KUBE_ROOT}/_output/logs
   mkdir -p ${OUTPUT}
 
