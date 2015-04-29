@@ -87,7 +87,9 @@ In addition to enabling self-registration with 3rd-party discovery mechanisms, w
 
 We'd also like to accommodate other load-balancing solutions (e.g., HAProxy), non-load-balanced services ([Issue #260](https://github.com/GoogleCloudPlatform/kubernetes/issues/260)), and other types of groups (worker pools, etc.). Providing the ability to Watch a label selector applied to pod addresses would enable efficient monitoring of group membership, which could be directly consumed or synced with a discovery mechanism. Event hooks ([Issue #140](https://github.com/GoogleCloudPlatform/kubernetes/issues/140)) for join/leave events would probably make this even easier.
 
-### External routability
+### External Connectivity
+
+#### Routing to Pods
 
 We want traffic between containers to use the pod IP addresses across nodes. Say we have Node A with a container IP space of 10.244.1.0/24 and Node B with a container IP space of 10.244.2.0/24. And we have Container A1 at 10.244.1.1 and Container B1 at 10.244.2.1. We want Container A1 to talk to Container B1 directly with no NAT. B1 should see the "source" in the IP packets of 10.244.1.1 -- not the "primary" host IP for Node A. That means that we want to turn off NAT for traffic between containers (and also between VMs and containers).
 
@@ -97,11 +99,18 @@ So we end up with 3 cases:
 
 1. Container -> Container or Container <-> VM. These should use 10. addresses directly and there should be no NAT.
 
-2. Container -> Internet. These have to get mapped to the primary host IP so that GCE knows how to egress that traffic. There is actually 2 layers of NAT here: Container IP -> Internal Host IP -> External Host IP. The first level happens in the guest with IP tables and the second happens as part of GCE networking. The first one (Container IP -> internal host IP) does dynamic port allocation while the second maps ports 1:1.
+2. Container -> Internet. These have to get mapped to the primary host IP so that the host node knows how to egress that traffic. In most networking setups there are actually 2 layers of NAT here: Container IP -> Internal Host IP -> External Host IP. The first level happens in the guest with IP tables and the second happens as part of egress past a firewall to the broader internet.  On cloud providers, this is usually provided by the cloud virtual network.  On physical providers, this is provided by some sort of gateway router.
 
-3. Internet -> Container. This also has to go through the primary host IP and also has 2 levels of NAT, ideally. However, the path currently is a proxy with (External Host IP -> Internal Host IP -> Docker) -> (Docker -> Container IP). Once [issue #15](https://github.com/GoogleCloudPlatform/kubernetes/issues/15) is closed, it should be External Host IP -> Internal Host IP -> Container IP. But to get that second arrow we have to set up the port forwarding iptables rules per mapped port.
+3. Internet -> Container. This also has to go through the primary host IP and has 1 level of NAT, ideally. However, the path currently is a proxy with (External Host IP -> Internal Host IP -> Docker) -> (Docker -> Container IP). Once [issue #15](https://github.com/GoogleCloudPlatform/kubernetes/issues/15) is closed, it should be External Host IP -> Container IP. The way that this will work is that each
+container that wants to be present on the external internet will specify an external ip address.  The IP address will be trapped via IPTables on the host node and re-written to the container IP address.
+It is the responsibility of the cluster network adminstrator to make sure that these external IP addresses are routed to appropriate host machine.  In cloud provider environments this may involve
+setting up advanced routing rules, external load balancers, or both.  On physical networks this will envolve configuring a gateway router to receive packets for that IP address and forward them on to
+the host machine.  In networks where these rules are hard to adjust dynamically, a mediator may need to dynamically add an external IP address to a Pod after it has been scheduled, so that the IP address
+matches up to one that routes to the host machine.
 
-Another approach could be to create a new host interface alias for each pod, if we had a way to route an external IP to it. This would eliminate the scheduling constraints resulting from using the host's IP address.
+#### Routing to external traffic services
+Services in Kubernetes provide a load balancing abstraction across a number of pods.  Often you want to expose this load balanced service on the external internet.  The details of how to achieve
+this are given in the [services documentation](../services.md#external-services)
 
 ### IPv6
 
