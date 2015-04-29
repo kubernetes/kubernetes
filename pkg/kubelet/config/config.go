@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"reflect"
 	"sync"
+	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/validation"
@@ -148,6 +149,7 @@ func (s *podStorage) Merge(source string, change interface{}) error {
 	s.updateLock.Lock()
 	defer s.updateLock.Unlock()
 
+	start := time.Now()
 	adds, updates, deletes := s.merge(source, change)
 
 	// deliver update notifications
@@ -179,7 +181,9 @@ func (s *podStorage) Merge(source string, change interface{}) error {
 	default:
 		panic(fmt.Sprintf("unsupported PodConfigNotificationMode: %#v", s.mode))
 	}
-
+	elapsed := time.Since(start)
+	glog.V(1).Infof("%d/%d updates in the channel; merge finished in %.2f seconds.",
+		len(s.updates), cap(s.updates), elapsed.Seconds())
 	return nil
 }
 
