@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"strings"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	cmdutil "github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/cmd/util"
@@ -54,7 +53,7 @@ func RunClusterInfo(factory *cmdutil.Factory, out io.Writer, cmd *cobra.Command)
 	if err != nil {
 		return err
 	}
-	printService(out, "Kubernetes master", client.Host, false)
+	printService(out, "Kubernetes master", client.Host)
 
 	mapper, typer := factory.Object()
 	cmdNamespace, err := factory.DefaultNamespace()
@@ -71,13 +70,8 @@ func RunClusterInfo(factory *cmdutil.Factory, out io.Writer, cmd *cobra.Command)
 	b.Do().Visit(func(r *resource.Info) error {
 		services := r.Object.(*api.ServiceList).Items
 		for _, service := range services {
-			splittedLink := strings.Split(strings.Split(service.ObjectMeta.SelfLink, "?")[0], "/")
-			// insert "proxy" into the link
-			splittedLink = append(splittedLink, "")
-			copy(splittedLink[4:], splittedLink[3:])
-			splittedLink[3] = "proxy"
-			link := client.Host + strings.Join(splittedLink, "/") + "/"
-			printService(out, service.ObjectMeta.Labels["name"], link, true)
+			link := client.Host + "/api/v1beta3/proxy/namespaces/" + service.ObjectMeta.Namespace + "/services/" + service.ObjectMeta.Name
+			printService(out, service.ObjectMeta.Labels["name"], link)
 		}
 		return nil
 	})
@@ -86,7 +80,7 @@ func RunClusterInfo(factory *cmdutil.Factory, out io.Writer, cmd *cobra.Command)
 	// TODO consider printing more information about cluster
 }
 
-func printService(out io.Writer, name, link string, warn bool) {
+func printService(out io.Writer, name, link string) {
 	ct.ChangeColor(ct.Green, false, ct.None, false)
 	fmt.Fprint(out, name)
 	ct.ResetColor()
@@ -94,9 +88,5 @@ func printService(out io.Writer, name, link string, warn bool) {
 	ct.ChangeColor(ct.Yellow, false, ct.None, false)
 	fmt.Fprint(out, link)
 	ct.ResetColor()
-	// TODO remove this warn once trailing slash is no longer required
-	if warn {
-		fmt.Fprint(out, " (note the trailing slash)")
-	}
 	fmt.Fprintln(out, "")
 }
