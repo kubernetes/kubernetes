@@ -113,6 +113,7 @@ func TestRunOnce(t *testing.T) {
 			{label: "list pod container", containers: []docker.APIContainers{}},
 			{label: "syncPod", containers: podContainers},
 			{label: "list pod container", containers: podContainers},
+			{label: "list pod container", containers: podContainers},
 		},
 		inspectContainersResults: []inspectContainersResult{
 			{
