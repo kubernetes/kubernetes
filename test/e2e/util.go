@@ -713,3 +713,70 @@ func getSigner(provider string) (ssh.Signer, error) {
 	}
 	return signer, nil
 }
+
+// LatencyMetrics stores data about request latency at a given quantile
+// broken down by verb (e.g. GET, PUT, LIST) and resource (e.g. pods, services).
+type LatencyMetric struct {
+	verb     string
+	resource string
+	// 0 <= quantile <=1, e.g. 0.95 is 95%tile, 0.5 is median.
+	quantile float64
+	latency  time.Duration
+}
+
+func ReadLatencyMetrics(c *client.Client) ([]LatencyMetric, error) {
+	body, err := c.Get().AbsPath("/metrics").DoRaw()
+	if err != nil {
+		return nil, err
+	}
+	metrics := make([]LatencyMetric, 0)
+	for _, line := range strings.Split(string(body), "\n") {
+		if strings.HasPrefix(line, "apiserver_request_latencies_summary{") {
+			// Example line:
+			// apiserver_request_latencies_summary{resource="namespaces",verb="LIST",quantile="0.99"} 908
+			// TODO: This parsing code is long and not readable. We should improve it.
+			keyVal := strings.Split(line, " ")
+			if len(keyVal) != 2 {
+				return nil, fmt.Errorf("Error parsing metric %q", line)
+			}
+			keyElems := strings.Split(line, "\"")
+			if len(keyElems) != 7 {
+				return nil, fmt.Errorf("Error parsing metric %q", line)
+			}
+			resource := keyElems[1]
+			verb := keyElems[3]
+			quantile, err := strconv.ParseFloat(keyElems[5], 64)
+			if err != nil {
+				return nil, fmt.Errorf("Error parsing metric %q", line)
+			}
+			latency, err := strconv.ParseFloat(keyVal[1], 64)
+			if err != nil {
+				return nil, fmt.Errorf("Error parsing metric %q", line)
+			}
+			metrics = append(metrics, LatencyMetric{verb, resource, quantile, time.Duration(int64(latency)) * time.Microsecond})
+		}
+	}
+	return metrics, nil
+}
+
+// Prints summary metrics for request types with latency above threshold
+// and returns number of such request types.
+func HighLatencyRequests(c *client.Client, threshold time.Duration) (int, error) {
+	metrics, err := ReadLatencyMetrics(c)
+	if err != nil {
+		return 0, err
+	}
+	var badMetrics []LatencyMetric
+	for _, metric := range metrics {
+		if metric.verb != "WATCHLIST" &&
+			// We are only interested in 99%tile, but for logging purposes
+			// it's useful to have all the offending percentiles.
+			metric.quantile <= 0.99 &&
+			metric.latency > threshold {
+			Logf("WARNING - requests with too high latency: %+v", metric)
+			badMetrics = append(badMetrics, metric)
+		}
+	}
+
+	return len(badMetrics), nil
+}
