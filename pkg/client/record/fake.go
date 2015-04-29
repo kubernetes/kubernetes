@@ -18,6 +18,7 @@ package record
 
 import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
 // FakeRecorder is used as a fake during tests.
@@ -26,3 +27,6 @@ type FakeRecorder struct{}
 func (f *FakeRecorder) Event(object runtime.Object, reason, message string) {}
 
 func (f *FakeRecorder) Eventf(object runtime.Object, reason, messageFmt string, args ...interface{}) {}
+
+func (f *FakeRecorder) PastEventf(object runtime.Object, timestamp util.Time, reason, messageFmt string, args ...interface{}) {
+}
