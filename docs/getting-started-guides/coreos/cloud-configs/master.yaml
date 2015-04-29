@@ -12,7 +12,6 @@ coreos:
     etcd-servers: http://localhost:4001
     metadata: "role=master"
   flannel:
-    interface: eth1
   units:
     - name: setup-network-environment.service
       command: start

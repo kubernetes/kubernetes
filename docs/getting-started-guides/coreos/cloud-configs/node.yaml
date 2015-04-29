@@ -5,7 +5,6 @@ coreos:
     etcd-servers: http://<master-private-ip>:4001
     metadata: "role=node"
   flannel:
-    interface: eth1
     etcd_endpoints: http://<master-private-ip>:4001
   units:
     - name: etcd.service
@@ -18,6 +17,7 @@ coreos:
         - name: 50-network-config.conf
           content: |
             [Service]
+            Environment=ETCDCTL_PEERS=http://<master-private-ip>:4001
             ExecStartPre=/bin/bash -c "until curl http://<master-private-ip>:4001/v2/machines; do sleep 2; done"
             ExecStartPre=/usr/bin/etcdctl set /coreos.com/network/config '{"Network":"10.244.0.0/16", "Backend": {"Type": "vxlan"}}'
     - name: docker.service
