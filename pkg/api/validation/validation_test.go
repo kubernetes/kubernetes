@@ -1682,7 +1682,7 @@ func TestValidateService(t *testing.T) {
 			name: "dup port name",
 			tweakSvc: func(s *api.Service) {
 				s.Spec.Ports[0].Name = "p"
-				s.Spec.Ports = append(s.Spec.Ports, api.ServicePort{Name: "p", Port: 12345})
+				s.Spec.Ports = append(s.Spec.Ports, api.ServicePort{Name: "p", Port: 12345, Protocol: "TCP"})
 			},
 			numErrs: 1,
 		},
@@ -1698,7 +1698,7 @@ func TestValidateService(t *testing.T) {
 			name: "invalid load balancer protocol 2",
 			tweakSvc: func(s *api.Service) {
 				s.Spec.CreateExternalLoadBalancer = true
-				s.Spec.Ports = append(s.Spec.Ports, api.ServicePort{Name: "p", Port: 12345, Protocol: "UDP"})
+				s.Spec.Ports = append(s.Spec.Ports, api.ServicePort{Name: "q", Port: 12345, Protocol: "UDP"})
 			},
 			numErrs: 1,
 		},
@@ -1750,7 +1750,7 @@ func TestValidateService(t *testing.T) {
 			name: "valid external load balancer 2 ports",
 			tweakSvc: func(s *api.Service) {
 				s.Spec.CreateExternalLoadBalancer = true
-				s.Spec.Ports = append(s.Spec.Ports, api.ServicePort{Name: "p", Port: 12345, Protocol: "TCP"})
+				s.Spec.Ports = append(s.Spec.Ports, api.ServicePort{Name: "q", Port: 12345, Protocol: "TCP"})
 			},
 			numErrs: 0,
 		},
