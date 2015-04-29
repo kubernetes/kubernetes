@@ -17,7 +17,7 @@
 # Print 1 if the file in $1 is not in need of additional field descriptions, 0 otherwise.
 FILE="$1"
 
-if grep json: "${FILE}" | grep -v ,inline | grep -v -q description: | grep -v // ; then
+if grep json: "${FILE}" | grep -v // | grep -v ,inline | grep -v -q description: ; then
   echo "0"
 else
   echo "1"
