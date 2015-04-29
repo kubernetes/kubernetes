@@ -86,7 +86,7 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 	mapper := kubectl.ShortcutExpander{latest.RESTMapper}
 
 	flags := pflag.NewFlagSet("", pflag.ContinueOnError)
-	flags.SetWordSeparators([]string{"-", "_"})
+	flags.SetNormalizeFunc(util.WordSepNormalizeFunc)
 
 	clientConfig := optionalClientConfig
 	if optionalClientConfig == nil {
