@@ -86,7 +86,7 @@ type RuntimeHooks interface {
 	// Determines whether the runtime should pull the specified container's image.
 	ShouldPullImage(pod *api.Pod, container *api.Container, imagePresent bool) bool
 
-	// Runs after an image is pulled reporting it's status. Error may be nil
+	// Runs after an image is pulled reporting its status. Error may be nil
 	// for a successful pull.
 	ReportImagePull(pod *api.Pod, container *api.Container, err error)
 }

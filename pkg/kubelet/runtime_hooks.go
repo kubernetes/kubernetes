@@ -49,15 +49,15 @@ func (kr *kubeletRuntimeHooks) ShouldPullImage(pod *api.Pod, container *api.Cont
 	return false
 }
 
-func (kr *kubeletRuntimeHooks) ReportImagePull(pod *api.Pod, container *api.Container, err error) {
+func (kr *kubeletRuntimeHooks) ReportImagePull(pod *api.Pod, container *api.Container, pullError error) {
 	ref, err := kubecontainer.GenerateContainerRef(pod, container)
 	if err != nil {
-		glog.Errorf("Couldn't make a ref to pod %v, container %v: '%v'", pod.Name, container.Name, err)
+		glog.Errorf("Couldn't make a ref to pod %q, container %q: '%v'", pod.Name, container.Name, err)
 		return
 	}
 
-	if err != nil {
-		kr.recorder.Eventf(ref, "failed", "Failed to pull image %q: %v", container.Image, err)
+	if pullError != nil {
+		kr.recorder.Eventf(ref, "failed", "Failed to pull image %q: %v", container.Image, pullError)
 	} else {
 		kr.recorder.Eventf(ref, "pulled", "Successfully pulled image %q", container.Image)
 	}
