@@ -139,12 +139,16 @@ for version in "${kube_api_versions[@]}"; do
   labels_field=".metadata.labels"
   service_selector_field=".spec.selector"
   rc_replicas_field=".spec.replicas"
+  rc_status_replicas_field=".status.replicas"
+  rc_container_image_field=".spec.template.spec.containers"
   port_field="(index .spec.ports 0).port"
   if [ "${version}" = "v1beta1" ] || [ "${version}" = "v1beta2" ]; then
     id_field=".id"
     labels_field=".labels"
     service_selector_field=".selector"
     rc_replicas_field=".desiredState.replicas"
+    rc_status_replicas_field=".currentState.replicas"
+    rc_container_image_field=".desiredState.podTemplate.desiredState.manifest.containers"
     port_field=".port"
   fi
 
@@ -541,6 +545,14 @@ __EOF__
   kubectl delete pod valid-pod "${kube_flags[@]}"
   kubectl delete service frontend{,-2,-3} "${kube_flags[@]}"
 
+  ### Perform a rolling update with --image
+  # Pre-condition status.Replicas is 3, otherwise the rcmanager could update it and interfere with the rolling update
+  kube::test::get_object_assert 'rc frontend' "{{$rc_status_replicas_field}}" '3'
+  # Command
+  kubectl rolling-update frontend --image=kubernetes/pause --update-period=10ns --poll-interval=10ms "${kube_flags[@]}"
+  # Post-condition: current image IS kubernetes/pause
+  kube::test::get_object_assert 'rc frontend' '{{range \$c:=$rc_container_image_field}} {{\$c.image}} {{end}}' ' +kubernetes/pause +'
+
   ### Delete replication controller with id
   # Pre-condition: frontend replication controller is running
   kube::test::get_object_assert rc "{{range.items}}{{$id_field}}:{{end}}" 'frontend:'
@@ -647,7 +659,7 @@ __EOF__
 
   #####################
   # Resource aliasing #
-  ##################### 
+  #####################
 
   kube::log::status "Testing resource aliasing"
   kubectl create -f examples/cassandra/cassandra.yaml "${kube_flags[@]}"
