@@ -154,7 +154,7 @@ func (pb *prober) runProbe(p *api.Probe, pod *api.Pod, status api.PodStatus, con
 	timeout := time.Duration(p.TimeoutSeconds) * time.Second
 	if p.Exec != nil {
 		glog.V(4).Infof("Exec-Probe Pod: %v, Container: %v", pod, container)
-		return pb.exec.Probe(pb.newExecInContainer(pod, container, containerID))
+		return pb.exec.Probe(pb.newExecInContainer(pod, container, containerID, p.Exec.Command))
 	}
 	if p.HTTPGet != nil {
 		port, err := extractPort(p.HTTPGet.Port, container)
@@ -227,9 +227,9 @@ type execInContainer struct {
 	run func() ([]byte, error)
 }
 
-func (p *prober) newExecInContainer(pod *api.Pod, container api.Container, containerID string) exec.Cmd {
+func (p *prober) newExecInContainer(pod *api.Pod, container api.Container, containerID string, cmd []string) exec.Cmd {
 	return execInContainer{func() ([]byte, error) {
-		return p.runner.RunInContainer(containerID, container.LivenessProbe.Exec.Command)
+		return p.runner.RunInContainer(containerID, cmd)
 	}}
 }
 
