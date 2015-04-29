@@ -101,6 +101,54 @@ func TestGenerate(t *testing.T) {
 				"name":     "foo",
 				"image":    "someimage",
 				"replicas": "1",
+				"port":     "80",
+				"hostport": "80",
+			},
+			expected: &api.ReplicationController{
+				ObjectMeta: api.ObjectMeta{
+					Name:   "foo",
+					Labels: map[string]string{"run-container": "foo"},
+				},
+				Spec: api.ReplicationControllerSpec{
+					Replicas: 1,
+					Selector: map[string]string{"run-container": "foo"},
+					Template: &api.PodTemplateSpec{
+						ObjectMeta: api.ObjectMeta{
+							Labels: map[string]string{"run-container": "foo"},
+						},
+						Spec: api.PodSpec{
+							Containers: []api.Container{
+								{
+									Name:  "foo",
+									Image: "someimage",
+									Ports: []api.ContainerPort{
+										{
+											ContainerPort: 80,
+											HostPort:      80,
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			params: map[string]string{
+				"name":     "foo",
+				"image":    "someimage",
+				"replicas": "1",
+				"hostport": "80",
+			},
+			expected:  nil,
+			expectErr: true,
+		},
+		{
+			params: map[string]string{
+				"name":     "foo",
+				"image":    "someimage",
+				"replicas": "1",
 				"labels":   "foo=bar,baz=blah",
 			},
 			expected: &api.ReplicationController{
@@ -133,6 +181,9 @@ func TestGenerate(t *testing.T) {
 		obj, err := generator.Generate(test.params)
 		if !test.expectErr && err != nil {
 			t.Errorf("unexpected error: %v", err)
+		}
+		if test.expectErr && err != nil {
+			continue
 		}
 		if !reflect.DeepEqual(obj.(*api.ReplicationController).Spec.Template, test.expected.Spec.Template) {
 			t.Errorf("\nexpected:\n%#v\nsaw:\n%#v", test.expected.Spec.Template, obj.(*api.ReplicationController).Spec.Template)
