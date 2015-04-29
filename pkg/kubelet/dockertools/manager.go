@@ -171,12 +171,12 @@ func (sc *stringCache) Get(uid types.UID, name string) (string, bool) {
 	}
 }
 
-// GetKubeletDockerContainerLogs returns logs of a specific container. By
-// default, it returns a snapshot of the container log. Set |follow| to true to
-// stream the log. Set |follow| to false and specify the number of lines (e.g.
+// GetContainerLogs returns logs of a specific container. By
+// default, it returns a snapshot of the container log. Set 'follow' to true to
+// stream the log. Set 'follow' to false and specify the number of lines (e.g.
 // "100" or "all") to tail the log.
 // TODO: Make 'RawTerminal' option  flagable.
-func (dm *DockerManager) GetKubeletDockerContainerLogs(containerID, tail string, follow bool, stdout, stderr io.Writer) (err error) {
+func (dm *DockerManager) GetContainerLogs(containerID, tail string, follow bool, stdout, stderr io.Writer) (err error) {
 	opts := docker.LogsOptions{
 		Container:    containerID,
 		Stdout:       true,
