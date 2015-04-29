@@ -126,7 +126,7 @@ func (c byCapacity) Len() int {
 // matchStorageCapacity is a matchPredicate used to sort and find volumes
 func matchStorageCapacity(pvA, pvB *api.PersistentVolume) bool {
 	// skip already claimed volumes
-	if pvA.Spec.ClaimRef != nil {
+	if pvA.Status.ClaimRef != nil {
 		return false
 	}
 
@@ -139,7 +139,7 @@ func matchStorageCapacity(pvA, pvB *api.PersistentVolume) bool {
 
 // filterBoundVolumes is a matchPredicate that filters bound volumes before comparing storage capacity
 func filterBoundVolumes(compareThis, toThis *api.PersistentVolume) bool {
-	if compareThis.Spec.ClaimRef != nil || toThis.Spec.ClaimRef != nil {
+	if compareThis.Status.ClaimRef != nil || toThis.Status.ClaimRef != nil {
 		return false
 	}
 	return matchStorageCapacity(compareThis, toThis)

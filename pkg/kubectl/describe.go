@@ -303,8 +303,8 @@ func (d *PersistentVolumeDescriber) Describe(namespace, name string) (string, er
 		fmt.Fprintf(out, "Name:\t%s\n", pv.Name)
 		fmt.Fprintf(out, "Labels:\t%s\n", formatLabels(pv.Labels))
 		fmt.Fprintf(out, "Status:\t%d\n", pv.Status.Phase)
-		if pv.Spec.ClaimRef != nil {
-			fmt.Fprintf(out, "Claim:\t%d\n", pv.Spec.ClaimRef.Namespace+"/"+pv.Spec.ClaimRef.Name)
+		if pv.Status.ClaimRef != nil {
+			fmt.Fprintf(out, "Claim:\t%d\n", pv.Status.ClaimRef.Namespace+"/"+pv.Status.ClaimRef.Name)
 		} else {
 			fmt.Fprintf(out, "Claim:\t%d\n", "")
 		}

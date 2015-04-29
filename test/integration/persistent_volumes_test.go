@@ -88,7 +88,7 @@ func TestPersistentVolumeClaimBinder(t *testing.T) {
 	for {
 		event := <-watch.ResultChan()
 		claim := event.Object.(*api.PersistentVolumeClaim)
-		if claim.Status.VolumeRef != nil {
+		if claim.Spec.VolumeName != "" {
 			boundCount++
 		}
 		if boundCount == expectedBoundCount {
@@ -102,10 +102,10 @@ func TestPersistentVolumeClaimBinder(t *testing.T) {
 			t.Fatalf("Unexpected error: %v", err)
 		}
 
-		if (claim.Name == "claim01" || claim.Name == "claim02") && claim.Status.VolumeRef == nil {
+		if (claim.Name == "claim01" || claim.Name == "claim02") && claim.Spec.VolumeName == "" {
 			t.Errorf("Expected claim to be bound: %+v", claim)
 		}
-		if claim.Name == "claim03" && claim.Status.VolumeRef != nil {
+		if claim.Name == "claim03" && claim.Spec.VolumeName != "" {
 			t.Errorf("Expected claim03 to be unbound: %v", claim)
 		}
 	}

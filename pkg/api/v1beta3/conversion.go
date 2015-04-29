@@ -1591,6 +1591,9 @@ func convert_v1beta3_PersistentVolumeClaimSpec_To_api_PersistentVolumeClaimSpec(
 	if err := s.Convert(&in.Resources, &out.Resources, 0); err != nil {
 		return err
 	}
+	if err := s.Convert(&in.VolumeName, &out.VolumeName, 0); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -1602,6 +1605,9 @@ func convert_api_PersistentVolumeClaimSpec_To_v1beta3_PersistentVolumeClaimSpec(
 		}
 	}
 	if err := s.Convert(&in.Resources, &out.Resources, 0); err != nil {
+		return err
+	}
+	if err := s.Convert(&in.VolumeName, &out.VolumeName, 0); err != nil {
 		return err
 	}
 	return nil
@@ -1625,9 +1631,6 @@ func convert_v1beta3_PersistentVolumeClaimStatus_To_api_PersistentVolumeClaimSta
 			out.Capacity[newer.ResourceName(key)] = newVal
 		}
 	}
-	if err := s.Convert(&in.VolumeRef, &out.VolumeRef, 0); err != nil {
-		return err
-	}
 	return nil
 }
 
@@ -1648,9 +1651,6 @@ func convert_api_PersistentVolumeClaimStatus_To_v1beta3_PersistentVolumeClaimSta
 			}
 			out.Capacity[ResourceName(key)] = newVal
 		}
-	}
-	if err := s.Convert(&in.VolumeRef, &out.VolumeRef, 0); err != nil {
-		return err
 	}
 	return nil
 }
@@ -1755,9 +1755,6 @@ func convert_v1beta3_PersistentVolumeSpec_To_api_PersistentVolumeSpec(in *Persis
 			out.AccessModes[i] = newer.AccessModeType(in.AccessModes[i])
 		}
 	}
-	if err := s.Convert(&in.ClaimRef, &out.ClaimRef, 0); err != nil {
-		return err
-	}
 	return nil
 }
 
@@ -1781,19 +1778,22 @@ func convert_api_PersistentVolumeSpec_To_v1beta3_PersistentVolumeSpec(in *newer.
 			out.AccessModes[i] = AccessModeType(in.AccessModes[i])
 		}
 	}
+	return nil
+}
+
+func convert_v1beta3_PersistentVolumeStatus_To_api_PersistentVolumeStatus(in *PersistentVolumeStatus, out *newer.PersistentVolumeStatus, s conversion.Scope) error {
+	out.Phase = newer.PersistentVolumePhase(in.Phase)
 	if err := s.Convert(&in.ClaimRef, &out.ClaimRef, 0); err != nil {
 		return err
 	}
 	return nil
 }
 
-func convert_v1beta3_PersistentVolumeStatus_To_api_PersistentVolumeStatus(in *PersistentVolumeStatus, out *newer.PersistentVolumeStatus, s conversion.Scope) error {
-	out.Phase = newer.PersistentVolumePhase(in.Phase)
-	return nil
-}
-
 func convert_api_PersistentVolumeStatus_To_v1beta3_PersistentVolumeStatus(in *newer.PersistentVolumeStatus, out *PersistentVolumeStatus, s conversion.Scope) error {
 	out.Phase = PersistentVolumePhase(in.Phase)
+	if err := s.Convert(&in.ClaimRef, &out.ClaimRef, 0); err != nil {
+		return err
+	}
 	return nil
 }
 

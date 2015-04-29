@@ -205,6 +205,9 @@ func createTestVolumes() []*api.PersistentVolume {
 					api.ReadWriteOnce,
 					api.ReadOnlyMany,
 				},
+
+			},
+			Status: api.PersistentVolumeStatus {
 				// this one we're pretending is already bound
 				ClaimRef: &api.ObjectReference{UID: "abc123"},
 			},

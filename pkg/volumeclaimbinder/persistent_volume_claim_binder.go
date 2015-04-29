@@ -85,7 +85,7 @@ func NewPersistentVolumeClaimBinder(kubeClient client.Interface, syncPeriod time
 			AddFunc:    binder.addClaim,
 			UpdateFunc: binder.updateClaim,
 			// no DeleteFunc needed.  a claim requires no clean-up.
-			// the missing claim itself is the release of the resource.
+			// syncVolume handles the missing claim
 		},
 	)
 
@@ -158,8 +158,8 @@ func syncVolume(volumeIndex *persistentVolumeOrderedIndex, binderClient binderCl
 
 	// available volumes await a claim
 	case api.VolumeAvailable:
-		if volume.Spec.ClaimRef != nil {
-			_, err := binderClient.GetPersistentVolumeClaim(volume.Spec.ClaimRef.Namespace, volume.Spec.ClaimRef.Name)
+		if volume.Status.ClaimRef != nil {
+			_, err := binderClient.GetPersistentVolumeClaim(volume.Status.ClaimRef.Namespace, volume.Status.ClaimRef.Name)
 			if err == nil {
 				// change of phase will trigger an update event with the newly bound volume
 				glog.V(5).Infof("PersistentVolume[%s] is now bound\n", volume.Name)
@@ -172,18 +172,11 @@ func syncVolume(volumeIndex *persistentVolumeOrderedIndex, binderClient binderCl
 		}
 	//bound volumes require verification of their bound claims
 	case api.VolumeBound:
-		if volume.Spec.ClaimRef == nil {
+		if volume.Status.ClaimRef == nil {
 			return fmt.Errorf("PersistentVolume[%s] expected to be bound but found nil claimRef: %+v", volume)
 		} else {
-			claim, err := binderClient.GetPersistentVolumeClaim(volume.Spec.ClaimRef.Namespace, volume.Spec.ClaimRef.Name)
-			if err == nil {
-				// bound and active.  Build claim status as needed.
-				if claim.Status.VolumeRef == nil {
-					// syncClaimStatus sets VolumeRef, attempts to persist claim status,
-					// and does a rollback as needed on claim.Status
-					syncClaimStatus(binderClient, volume, claim)
-				}
-			} else {
+			_, err := binderClient.GetPersistentVolumeClaim(volume.Status.ClaimRef.Namespace, volume.Status.ClaimRef.Name)
+			if err != nil {
 				if errors.IsNotFound(err) {
 					nextPhase = api.VolumeReleased
 				} else {
@@ -193,7 +186,7 @@ func syncVolume(volumeIndex *persistentVolumeOrderedIndex, binderClient binderCl
 		}
 	// released volumes require recycling
 	case api.VolumeReleased:
-		if volume.Spec.ClaimRef == nil {
+		if volume.Status.ClaimRef == nil {
 			return fmt.Errorf("PersistentVolume[%s] expected to be bound but found nil claimRef: %+v", volume)
 		} else {
 			// TODO: implement Recycle method on plugins
@@ -237,32 +230,52 @@ func syncClaim(volumeIndex *persistentVolumeOrderedIndex, binderClient binderCli
 			return fmt.Errorf("A volume match does not exist for persistent claim: %s", claim.Name)
 		}
 
-		claimRef, err := api.GetReference(claim)
-		if err != nil {
-			return fmt.Errorf("Unexpected error getting claim reference: %v\n", err)
-		}
-
 		// make a binding reference to the claim.
-		// triggers update of the volume in this controller, which builds claim status
-		volume.Spec.ClaimRef = claimRef
-		volume, err = binderClient.UpdatePersistentVolume(volume)
+		// triggers update of the claim in this controller, which builds claim status
+		claim.Spec.VolumeName = volume.Name
+		// TODO: make this similar to Pod's binding both with BindingREST subresource and GuaranteedUpdate helper in etcd.go
+		claim, err = binderClient.UpdatePersistentVolumeClaim(claim)
 		if err == nil {
 			nextPhase = api.ClaimBound
-		}
-		if err != nil {
+			glog.V(5).Infof("PersistentVolumeClaime[%s] is bound\n", claim.Name)
+		} else {
 			// Rollback by unsetting the ClaimRef on the volume pointer.
 			// the volume in the index will be unbound again and ready to be matched.
-			volume.Spec.ClaimRef = nil
+			claim.Spec.VolumeName = ""
 			// Rollback by restoring original phase to claim pointer
 			nextPhase = api.ClaimPending
 			return fmt.Errorf("Error updating volume: %+v\n", err)
 		}
 
-	// bound claims requires no maintenance.  Deletion by the user is the last lifecycle phase.
 	case api.ClaimBound:
-		// This is the end of a claim's lifecycle.
-		// After claim deletion, a volume is recycled when it verifies its claim is unbound
-		glog.V(5).Infof("PersistentVolumeClaime[%s] is bound\n", claim.Name)
+		volume, err := binderClient.GetPersistentVolume(claim.Spec.VolumeName)
+		if err != nil {
+			return fmt.Errorf("Unexpected error getting persistent volume: %v\n", err)
+		}
+
+		if volume.Status.ClaimRef == nil {
+			claimRef, err := api.GetReference(claim)
+			if err != nil {
+				return fmt.Errorf("Unexpected error getting claim reference: %v\n", err)
+			}
+			volume.Status.ClaimRef = claimRef
+			_, err = binderClient.UpdatePersistentVolumeStatus(volume)
+			if err != nil {
+				return fmt.Errorf("Unexpected error saving PersistentVolume.Status: %+v", err)
+			}
+		}
+
+		if len(claim.Status.AccessModes) == 0 {
+			// all "actuals" are transferred from PV to PVC so the user knows what
+			// type of volume they actually got for their claim
+			claim.Status.Phase = api.ClaimBound
+			claim.Status.AccessModes = volume.Spec.AccessModes
+			claim.Status.Capacity = volume.Spec.Capacity
+			_,err := binderClient.UpdatePersistentVolumeClaimStatus(claim)
+			if err != nil {
+				return fmt.Errorf("Unexpected error saving claim status: %+v", err)
+			}
+		}
 	}
 
 	if currentPhase != nextPhase {
@@ -270,29 +283,6 @@ func syncClaim(volumeIndex *persistentVolumeOrderedIndex, binderClient binderCli
 		binderClient.UpdatePersistentVolumeClaimStatus(claim)
 	}
 	return nil
-}
-
-func syncClaimStatus(binderClient binderClient, volume *api.PersistentVolume, claim *api.PersistentVolumeClaim) (err error) {
-	volumeRef, err := api.GetReference(volume)
-	if err != nil {
-		return fmt.Errorf("Unexpected error getting volume reference: %v\n", err)
-	}
-
-	// all "actuals" are transferred from PV to PVC so the user knows what
-	// type of volume they actually got for their claim
-	claim.Status.Phase = api.ClaimBound
-	claim.Status.VolumeRef = volumeRef
-	claim.Status.AccessModes = volume.Spec.AccessModes
-	claim.Status.Capacity = volume.Spec.Capacity
-
-	_, err = binderClient.UpdatePersistentVolumeClaimStatus(claim)
-	if err != nil {
-		claim.Status.Phase = api.ClaimPending
-		claim.Status.VolumeRef = nil
-		claim.Status.AccessModes = nil
-		claim.Status.Capacity = nil
-	}
-	return err
 }
 
 // Run starts all of this binder's control loops
