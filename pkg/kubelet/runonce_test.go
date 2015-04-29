@@ -157,7 +157,8 @@ func TestRunOnce(t *testing.T) {
 		0,
 		0,
 		"",
-		kubecontainer.FakeOS{})
+		kubecontainer.FakeOS{},
+		kb.networkPlugin)
 	kb.containerManager.Puller = &dockertools.FakeDockerPuller{}
 
 	pods := []*api.Pod{

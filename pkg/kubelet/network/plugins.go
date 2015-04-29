@@ -22,7 +22,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/dockertools"
+	kubeletTypes "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/errors"
 	"github.com/golang/glog"
@@ -43,10 +43,10 @@ type NetworkPlugin interface {
 	// SetUpPod is the method called after the infra container of
 	// the pod has been created but before the other containers of the
 	// pod are launched.
-	SetUpPod(namespace string, name string, podInfraContainerID dockertools.DockerID) error
+	SetUpPod(namespace string, name string, podInfraContainerID kubeletTypes.DockerID) error
 
 	// TearDownPod is the method called before a pod's infra container will be deleted
-	TearDownPod(namespace string, name string, podInfraContainerID dockertools.DockerID) error
+	TearDownPod(namespace string, name string, podInfraContainerID kubeletTypes.DockerID) error
 }
 
 // Host is an interface that plugins can use to access the kubelet.
@@ -113,10 +113,10 @@ func (plugin *noopNetworkPlugin) Name() string {
 	return DefaultPluginName
 }
 
-func (plugin *noopNetworkPlugin) SetUpPod(namespace string, name string, id dockertools.DockerID) error {
+func (plugin *noopNetworkPlugin) SetUpPod(namespace string, name string, id kubeletTypes.DockerID) error {
 	return nil
 }
 
-func (plugin *noopNetworkPlugin) TearDownPod(namespace string, name string, id dockertools.DockerID) error {
+func (plugin *noopNetworkPlugin) TearDownPod(namespace string, name string, id kubeletTypes.DockerID) error {
 	return nil
 }

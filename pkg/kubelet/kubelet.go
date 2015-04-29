@@ -43,6 +43,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/envvars"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/metrics"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/network"
+	kubeletTypes "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/probe"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
@@ -202,16 +203,6 @@ func NewMainKubelet(
 	statusManager := newStatusManager(kubeClient)
 	readinessManager := kubecontainer.NewReadinessManager()
 	containerRefManager := kubecontainer.NewRefManager()
-	containerManager := dockertools.NewDockerManager(
-		dockerClient,
-		recorder,
-		readinessManager,
-		containerRefManager,
-		podInfraContainerImage,
-		pullQPS,
-		pullBurst,
-		containerLogsDir,
-		osInterface)
 
 	volumeManager := newVolumeManager()
 
@@ -223,7 +214,6 @@ func NewMainKubelet(
 		resyncInterval:                 resyncInterval,
 		containerRefManager:            containerRefManager,
 		readinessManager:               readinessManager,
-		runner:                         containerManager,
 		httpClient:                     &http.Client{},
 		sourcesReady:                   sourcesReady,
 		clusterDomain:                  clusterDomain,
@@ -240,11 +230,29 @@ func NewMainKubelet(
 		volumeManager:                  volumeManager,
 		cloud:                          cloud,
 		nodeRef:                        nodeRef,
-		containerManager:               containerManager,
 		nodeStatusUpdateFrequency:      nodeStatusUpdateFrequency,
 		resourceContainer:              resourceContainer,
 		os:                             osInterface,
 	}
+
+	if plug, err := network.InitNetworkPlugin(networkPlugins, networkPluginName, &networkHost{klet}); err != nil {
+		return nil, err
+	} else {
+		klet.networkPlugin = plug
+	}
+	containerManager := dockertools.NewDockerManager(
+		dockerClient,
+		recorder,
+		readinessManager,
+		containerRefManager,
+		podInfraContainerImage,
+		pullQPS,
+		pullBurst,
+		containerLogsDir,
+		osInterface,
+		klet.networkPlugin)
+	klet.runner = containerManager
+	klet.containerManager = containerManager
 
 	klet.podManager = newBasicPodManager(klet.kubeClient)
 	klet.prober = newProber(klet.runner, klet.readinessManager, klet.containerRefManager, klet.recorder)
@@ -266,11 +274,6 @@ func NewMainKubelet(
 		return nil, err
 	}
 
-	if plug, err := network.InitNetworkPlugin(networkPlugins, networkPluginName, &networkHost{klet}); err != nil {
-		return nil, err
-	} else {
-		klet.networkPlugin = plug
-	}
 	// If the container logs directory does not exist, create it.
 	if _, err := os.Stat(containerLogsDir); err != nil {
 		if err := osInterface.Mkdir(containerLogsDir, 0755); err != nil {
@@ -887,27 +890,7 @@ func (kl *Kubelet) pullImage(pod *api.Pod, container *api.Container) error {
 
 // Kill all running containers in a pod (includes the pod infra container).
 func (kl *Kubelet) killPod(pod kubecontainer.Pod) error {
-	// TODO(vmarmol): Consider handling non-Docker runtimes, the plugins are not friendly to it today.
-	container, err := kl.containerManager.GetPodInfraContainer(pod)
-	errList := []error{}
-	if err == nil {
-		// Call the networking plugin for teardown.
-		err = kl.networkPlugin.TearDownPod(pod.Namespace, pod.Name, dockertools.DockerID(container.ID))
-		if err != nil {
-			glog.Errorf("Failed tearing down the network plugin for pod %q: %v", pod.ID, err)
-			errList = append(errList, err)
-		}
-	}
-
-	err = kl.containerManager.KillPod(pod)
-	if err != nil {
-		errList = append(errList, err)
-	}
-
-	if len(errList) > 0 {
-		return utilErrors.NewAggregate(errList)
-	}
-	return nil
+	return kl.containerManager.KillPod(pod)
 }
 
 type empty struct{}
@@ -973,9 +956,9 @@ func shouldContainerBeRestarted(container *api.Container, pod *api.Pod, podStatu
 // - all running containers which are NOT contained in containersToKeep should be killed.
 type podContainerChangesSpec struct {
 	startInfraContainer bool
-	infraContainerId    dockertools.DockerID
+	infraContainerId    kubeletTypes.DockerID
 	containersToStart   map[int]empty
-	containersToKeep    map[dockertools.DockerID]int
+	containersToKeep    map[kubeletTypes.DockerID]int
 }
 
 func (kl *Kubelet) computePodContainerChanges(pod *api.Pod, runningPod kubecontainer.Pod, podStatus api.PodStatus) (podContainerChangesSpec, error) {
@@ -984,11 +967,11 @@ func (kl *Kubelet) computePodContainerChanges(pod *api.Pod, runningPod kubeconta
 	glog.V(4).Infof("Syncing Pod %+v, podFullName: %q, uid: %q", pod, podFullName, uid)
 
 	containersToStart := make(map[int]empty)
-	containersToKeep := make(map[dockertools.DockerID]int)
+	containersToKeep := make(map[kubeletTypes.DockerID]int)
 	createPodInfraContainer := false
 
 	var err error
-	var podInfraContainerID dockertools.DockerID
+	var podInfraContainerID kubeletTypes.DockerID
 	var changed bool
 	podInfraContainer := runningPod.FindContainerByName(dockertools.PodInfraContainerName)
 	if podInfraContainer != nil {
@@ -1007,7 +990,7 @@ func (kl *Kubelet) computePodContainerChanges(pod *api.Pod, runningPod kubeconta
 	} else {
 		glog.V(4).Infof("Pod infra container looks good, keep it %q", podFullName)
 		createPodInfraContainer = false
-		podInfraContainerID = dockertools.DockerID(podInfraContainer.ID)
+		podInfraContainerID = kubeletTypes.DockerID(podInfraContainer.ID)
 		containersToKeep[podInfraContainerID] = -1
 	}
 
@@ -1026,7 +1009,7 @@ func (kl *Kubelet) computePodContainerChanges(pod *api.Pod, runningPod kubeconta
 			continue
 		}
 
-		containerID := dockertools.DockerID(c.ID)
+		containerID := kubeletTypes.DockerID(c.ID)
 		hash := c.Hash
 		glog.V(3).Infof("pod %q container %q exists as %v", podFullName, container.Name, containerID)
 
@@ -1074,7 +1057,7 @@ func (kl *Kubelet) computePodContainerChanges(pod *api.Pod, runningPod kubeconta
 
 	// If Infra container is the last running one, we don't want to keep it.
 	if !createPodInfraContainer && len(containersToStart) == 0 && len(containersToKeep) == 1 {
-		containersToKeep = make(map[dockertools.DockerID]int)
+		containersToKeep = make(map[kubeletTypes.DockerID]int)
 	}
 
 	return podContainerChangesSpec{
@@ -1147,7 +1130,7 @@ func (kl *Kubelet) syncPod(pod *api.Pod, mirrorPod *api.Pod, runningPod kubecont
 	} else {
 		// Otherwise kill any containers in this pod which are not specified as ones to keep.
 		for _, container := range runningPod.Containers {
-			_, keep := containerChanges.containersToKeep[dockertools.DockerID(container.ID)]
+			_, keep := containerChanges.containersToKeep[kubeletTypes.DockerID(container.ID)]
 			if !keep {
 				glog.V(3).Infof("Killing unwanted container %+v", container)
 				err = kl.containerManager.KillContainer(container.ID)
