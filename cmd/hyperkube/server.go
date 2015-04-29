@@ -68,7 +68,7 @@ func (s *Server) Flags() *pflag.FlagSet {
 	if s.flags == nil {
 		s.flags = pflag.NewFlagSet(s.Name(), pflag.ContinueOnError)
 		s.flags.SetOutput(ioutil.Discard)
-		s.flags.SetWordSeparators([]string{"-", "_"})
+		s.flags.SetNormalizeFunc(util.WordSepNormalizeFunc)
 	}
 	return s.flags
 }

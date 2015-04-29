@@ -34,7 +34,7 @@ func printOptions(out *bytes.Buffer, cmd *Command, name string) {
 	parentFlags := cmd.InheritedFlags()
 	parentFlags.SetOutput(out)
 	if parentFlags.HasFlags() {
-		fmt.Fprintf(out, "### Options inherrited from parent commands\n\n```\n")
+		fmt.Fprintf(out, "### Options inherited from parent commands\n\n```\n")
 		parentFlags.PrintDefaults()
 		fmt.Fprintf(out, "```\n\n")
 	}

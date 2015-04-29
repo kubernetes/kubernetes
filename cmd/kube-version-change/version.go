@@ -31,6 +31,7 @@ import (
 	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
 	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta2"
 	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta3"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 
 	"github.com/ghodss/yaml"
 	flag "github.com/spf13/pflag"
@@ -55,7 +56,7 @@ func isYAML(data []byte) bool {
 
 func main() {
 	runtime.GOMAXPROCS(runtime.NumCPU())
-	flag.CommandLine.SetWordSeparators([]string{"-", "_"})
+	flag.CommandLine.SetNormalizeFunc(util.WordSepNormalizeFunc)
 	flag.Parse()
 
 	if *rewrite != "" {

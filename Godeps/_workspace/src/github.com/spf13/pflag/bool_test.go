@@ -156,7 +156,8 @@ func TestImplicitFalse(t *testing.T) {
 func TestInvalidValue(t *testing.T) {
 	var tristate triStateValue
 	f := setUpFlagSet(&tristate)
-	err := f.Parse([]string{"--tristate=invalid"})
+	args := []string{"--tristate=invalid"}
+	_, err := parseReturnStderr(t, f, args)
 	if err == nil {
 		t.Fatal("expected an error but did not get any, tristate has value", tristate)
 	}

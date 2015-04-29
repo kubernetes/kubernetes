@@ -145,9 +145,9 @@ A flag can also be assigned locally which will only apply to that specific comma
 
 ### Remove a command from its parent
 
-Removing a command is not a common action is simple program but it allows 3rd parties to customize an existing command tree.
+Removing a command is not a common action in simple programs but it allows 3rd parties to customize an existing command tree.
 
-In this exemple, we remove the existing `VersionCmd` command of an existing root command, and we replace it by our own version.
+In this example, we remove the existing `VersionCmd` command of an existing root command, and we replace it by our own version.
 
 	mainlib.RootCmd.RemoveCommand(mainlib.VersionCmd)
 	mainlib.RootCmd.AddCommand(versionCmd)

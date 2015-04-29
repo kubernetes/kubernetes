@@ -328,15 +328,18 @@ func stripFlags(args []string, c *Command) []string {
 	return commands
 }
 
-func argsMinusX(args []string, x string) []string {
-	newargs := []string{}
-
-	for _, y := range args {
-		if x != y {
-			newargs = append(newargs, y)
+// argsMinusFirstX removes only the first x from args.  Otherwise, commands that look like
+// openshift admin policy add-role-to-user admin my-user, lose the admin argument (arg[4]).
+func argsMinusFirstX(args []string, x string) []string {
+	for i, y := range args {
+		if x == y {
+			ret := []string{}
+			ret = append(ret, args[:i]...)
+			ret = append(ret, args[i+1:]...)
+			return ret
 		}
 	}
-	return newargs
+	return args
 }
 
 // find the target command given the args and command tree
@@ -359,7 +362,7 @@ func (c *Command) Find(arrs []string) (*Command, []string, error) {
 				matches := make([]*Command, 0)
 				for _, cmd := range c.commands {
 					if cmd.Name() == argsWOflags[0] || cmd.HasAlias(argsWOflags[0]) { // exact name or alias match
-						return innerfind(cmd, argsMinusX(args, argsWOflags[0]))
+						return innerfind(cmd, argsMinusFirstX(args, argsWOflags[0]))
 					} else if EnablePrefixMatching {
 						if strings.HasPrefix(cmd.Name(), argsWOflags[0]) { // prefix match
 							matches = append(matches, cmd)
@@ -374,7 +377,7 @@ func (c *Command) Find(arrs []string) (*Command, []string, error) {
 
 				// only accept a single prefix match - multiple matches would be ambiguous
 				if len(matches) == 1 {
-					return innerfind(matches[0], argsMinusX(args, argsWOflags[0]))
+					return innerfind(matches[0], argsMinusFirstX(args, argsWOflags[0]))
 				}
 			}
 		}
