@@ -123,6 +123,7 @@ func newTestKubelet(t *testing.T) *TestKubelet {
 	kubelet.containerManager.Prober = kubelet.prober
 	kubelet.handlerRunner = newHandlerRunner(&fakeHTTP{}, &fakeContainerCommandRunner{}, kubelet.containerManager)
 	kubelet.volumeManager = newVolumeManager()
+	kubelet.runtimeHooks = newKubeletRuntimeHooks(kubelet.recorder)
 	return &TestKubelet{kubelet, fakeDocker, mockCadvisor, fakeKubeClient, waitGroup, fakeMirrorClient}
 }
 
