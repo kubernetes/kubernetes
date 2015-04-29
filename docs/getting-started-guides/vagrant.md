@@ -118,7 +118,7 @@ When using the vagrant provider in Kubernetes, the `cluster/kubectl.sh` script w
 ```sh
 cat ~/.kubernetes_vagrant_auth
 { "User": "vagrant",
-  "Password": "vagrant"
+  "Password": "vagrant",
   "CAFile": "/home/k8s_user/.kubernetes.vagrant.ca.crt",
   "CertFile": "/home/k8s_user/.kubecfg.vagrant.crt",
   "KeyFile": "/home/k8s_user/.kubecfg.vagrant.key"
