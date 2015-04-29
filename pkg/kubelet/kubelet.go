@@ -1448,12 +1448,6 @@ func (kl *Kubelet) killUnwantedPods(desiredPods map[types.UID]empty,
 				glog.Errorf("Failed killing the pod %q: %v", pod.Name, err)
 				return
 			}
-			// Remove the pod directory.
-			err = os.RemoveAll(kl.getPodDir(pod.ID))
-			if err != nil {
-				glog.Errorf("Failed removing pod directory for %q", pod.Name)
-				return
-			}
 		}(pod, ch)
 	}
 
