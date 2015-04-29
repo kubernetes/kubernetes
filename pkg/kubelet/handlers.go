@@ -24,18 +24,19 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	kubecontainer "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/dockertools"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/prober"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/golang/glog"
 )
 
 type handlerRunner struct {
 	httpGetter       httpGetter
-	commandRunner    dockertools.ContainerCommandRunner
+	commandRunner    prober.ContainerCommandRunner
 	containerManager *dockertools.DockerManager
 }
 
 // TODO(yifan): Merge commandRunner and containerManager once containerManager implements the ContainerCommandRunner interface.
-func newHandlerRunner(httpGetter httpGetter, commandRunner dockertools.ContainerCommandRunner, containerManager *dockertools.DockerManager) kubecontainer.HandlerRunner {
+func newHandlerRunner(httpGetter httpGetter, commandRunner prober.ContainerCommandRunner, containerManager *dockertools.DockerManager) kubecontainer.HandlerRunner {
 	return &handlerRunner{
 		httpGetter:       httpGetter,
 		commandRunner:    commandRunner,

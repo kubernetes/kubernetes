@@ -108,7 +108,7 @@ func newTestKubelet(t *testing.T) *TestKubelet {
 	podManager, fakeMirrorClient := newFakePodManager()
 	kubelet.podManager = podManager
 	kubelet.containerRefManager = kubecontainer.NewRefManager()
-	kubelet.containerManager = dockertools.NewDockerManager(fakeDocker, fakeRecorder, kubelet.readinessManager, kubelet.containerRefManager, dockertools.PodInfraContainerImage, 0, 0, "", kubelet.os, kubelet.networkPlugin)
+	kubelet.containerManager = dockertools.NewDockerManager(fakeDocker, fakeRecorder, kubelet.readinessManager, kubelet.containerRefManager, dockertools.PodInfraContainerImage, 0, 0, "", kubelet.os, kubelet.networkPlugin, nil)
 	kubelet.runtimeCache = kubecontainer.NewFakeRuntimeCache(kubelet.containerManager)
 	kubelet.podWorkers = newPodWorkers(
 		kubelet.runtimeCache,
@@ -120,6 +120,7 @@ func newTestKubelet(t *testing.T) *TestKubelet {
 		fakeRecorder)
 	kubelet.containerManager.Puller = &dockertools.FakeDockerPuller{}
 	kubelet.prober = prober.New(nil, kubelet.readinessManager, kubelet.containerRefManager, kubelet.recorder)
+	kubelet.containerManager.Prober = kubelet.prober
 	kubelet.handlerRunner = newHandlerRunner(&fakeHTTP{}, &fakeContainerCommandRunner{}, kubelet.containerManager)
 	kubelet.volumeManager = newVolumeManager()
 	return &TestKubelet{kubelet, fakeDocker, mockCadvisor, fakeKubeClient, waitGroup, fakeMirrorClient}
