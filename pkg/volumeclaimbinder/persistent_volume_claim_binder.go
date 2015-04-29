@@ -271,7 +271,7 @@ func syncClaim(volumeIndex *persistentVolumeOrderedIndex, binderClient binderCli
 			claim.Status.Phase = api.ClaimBound
 			claim.Status.AccessModes = volume.Spec.AccessModes
 			claim.Status.Capacity = volume.Spec.Capacity
-			_,err := binderClient.UpdatePersistentVolumeClaimStatus(claim)
+			_, err := binderClient.UpdatePersistentVolumeClaimStatus(claim)
 			if err != nil {
 				return fmt.Errorf("Unexpected error saving claim status: %+v", err)
 			}

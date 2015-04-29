@@ -81,7 +81,7 @@ func TestNewBuilder(t *testing.T) {
 						GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{},
 					},
 				},
-				Status: api.PersistentVolumeStatus {
+				Status: api.PersistentVolumeStatus{
 					ClaimRef: &api.ObjectReference{
 						Name: "claimA",
 					},
@@ -92,7 +92,7 @@ func TestNewBuilder(t *testing.T) {
 					Name:      "claimA",
 					Namespace: "nsA",
 				},
-				Spec: api.PersistentVolumeClaimSpec {
+				Spec: api.PersistentVolumeClaimSpec{
 					VolumeName: "pvA",
 				},
 				Status: api.PersistentVolumeClaimStatus{
@@ -123,7 +123,7 @@ func TestNewBuilder(t *testing.T) {
 						HostPath: &api.HostPathVolumeSource{Path: "/tmp"},
 					},
 				},
-				Status: api.PersistentVolumeStatus {
+				Status: api.PersistentVolumeStatus{
 					ClaimRef: &api.ObjectReference{
 						Name: "claimB",
 					},
@@ -134,7 +134,7 @@ func TestNewBuilder(t *testing.T) {
 					Name:      "claimB",
 					Namespace: "nsB",
 				},
-				Spec: api.PersistentVolumeClaimSpec {
+				Spec: api.PersistentVolumeClaimSpec{
 					VolumeName: "pvA",
 				},
 			},
