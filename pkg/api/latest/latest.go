@@ -22,6 +22,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta2"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta3"
@@ -40,7 +41,7 @@ const OldestVersion = "v1beta1"
 // may be assumed to be least feature rich to most feature rich, and clients may
 // choose to prefer the latter items in the list over the former items when presented
 // with a set of versions to choose.
-var Versions = []string{"v1beta1", "v1beta2", "v1beta3"}
+var Versions = []string{"v1beta1", "v1beta2", "v1beta3", "v1"}
 
 // Codec is the default codec for serializing output that should use
 // the latest supported version.  Use this Codec when writing to
@@ -86,6 +87,12 @@ func InterfacesFor(version string) (*meta.VersionInterfaces, error) {
 			ObjectConvertor:  api.Scheme,
 			MetadataAccessor: accessor,
 		}, nil
+	case "v1":
+		return &meta.VersionInterfaces{
+			Codec:            v1.Codec,
+			ObjectConvertor:  api.Scheme,
+			MetadataAccessor: accessor,
+		}, nil
 	default:
 		return nil, fmt.Errorf("unsupported storage version: %s (valid: %s)", version, strings.Join(Versions, ", "))
 	}
@@ -103,7 +110,7 @@ func init() {
 		},
 	)
 	// list of versions we support on the server
-	versions := []string{"v1beta1", "v1beta2", "v1beta3"}
+	versions := []string{"v1beta1", "v1beta2", "v1beta3", "v1"}
 
 	// versions that used mixed case URL formats
 	versionMixedCase := map[string]bool{
@@ -116,6 +123,7 @@ func init() {
 		"v1beta1": meta.RESTScopeNamespaceLegacy,
 		"v1beta2": meta.RESTScopeNamespaceLegacy,
 		"v1beta3": meta.RESTScopeNamespace,
+		"v1":      meta.RESTScopeNamespace,
 	}
 
 	// the list of kinds that are scoped at the root of the api hierarchy

@@ -237,6 +237,8 @@ func (s *APIServer) Run(_ []string) error {
 		disableV1beta3 = true
 	}
 
+	_, enableV1 := s.RuntimeConfig["api/v1"]
+
 	// TODO: expose same flags as client.BindClientConfigFlags but for a server
 	clientConfig := &client.Config{
 		Host:    net.JoinHostPort(s.InsecureBindAddress.String(), strconv.Itoa(s.InsecurePort)),
@@ -311,6 +313,7 @@ func (s *APIServer) Run(_ []string) error {
 		Authorizer:             authorizer,
 		AdmissionControl:       admissionController,
 		DisableV1Beta3:         disableV1beta3,
+		EnableV1:               enableV1,
 		MasterServiceNamespace: s.MasterServiceNamespace,
 		ClusterName:            s.ClusterName,
 		ExternalHost:           s.ExternalHost,
