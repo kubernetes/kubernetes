@@ -22,6 +22,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
+	kubecontainer "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
 	"github.com/golang/glog"
 )
 
@@ -119,19 +120,14 @@ func (kl *Kubelet) runPod(pod *api.Pod, retryDelay time.Duration) error {
 
 // isPodRunning returns true if all containers of a manifest are running.
 func (kl *Kubelet) isPodRunning(pod *api.Pod, runningPod container.Pod) (bool, error) {
-	for _, container := range pod.Spec.Containers {
-		c := runningPod.FindContainerByName(container.Name)
-		if c == nil {
-			glog.Infof("container %q not found", container.Name)
-			return false, nil
-		}
-		inspectResult, err := kl.dockerClient.InspectContainer(string(c.ID))
-		if err != nil {
-			glog.Infof("failed to inspect container %q: %v", container.Name, err)
-			return false, err
-		}
-		if !inspectResult.State.Running {
-			glog.Infof("container %q not running: %#v", container.Name, inspectResult.State)
+	status, err := kl.containerManager.GetPodStatus(pod)
+	if err != nil {
+		glog.Infof("Failed to get the status of pod %q: %v", kubecontainer.GetPodFullName(pod), err)
+		return false, err
+	}
+	for _, st := range status.ContainerStatuses {
+		if st.State.Running == nil {
+			glog.Infof("Container %q not running: %#v", st.Name, st.State)
 			return false, nil
 		}
 	}
