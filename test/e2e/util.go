@@ -52,6 +52,9 @@ const (
 
 	// String used to mark pod deletion
 	nonExist = "NonExist"
+
+	// How often to poll pods.
+	podPoll = 5 * time.Second
 )
 
 type TestContextType struct {
@@ -88,12 +91,12 @@ func providerIs(providers ...string) bool {
 
 type podCondition func(pod *api.Pod) (bool, error)
 
-func waitForPodCondition(c *client.Client, ns, podName, desc string, condition podCondition) error {
-	By(fmt.Sprintf("waiting up to %v for pod %s status to be %s", podStartTimeout, podName, desc))
-	for start := time.Now(); time.Since(start) < podStartTimeout; time.Sleep(5 * time.Second) {
+func waitForPodCondition(c *client.Client, ns, podName, desc string, poll, timeout time.Duration, condition podCondition) error {
+	Logf("Waiting up to %v for pod %s status to be %s", timeout, podName, desc)
+	for start := time.Now(); time.Since(start) < timeout; time.Sleep(poll) {
 		pod, err := c.Pods(ns).Get(podName)
 		if err != nil {
-			Logf("Get pod %v in ns %v failed, ignoring for 5s: %v", podName, ns, err)
+			Logf("Get pod %s in ns %s failed, ignoring for %v: %v", podName, ns, poll, err)
 			continue
 		}
 		done, err := condition(pod)
@@ -102,7 +105,7 @@ func waitForPodCondition(c *client.Client, ns, podName, desc string, condition p
 		}
 		Logf("Waiting for pod %s in namespace %s status to be %q (found %q) (%v)", podName, ns, desc, pod.Status.Phase, time.Since(start))
 	}
-	return fmt.Errorf("gave up waiting for pod %s to be %s after %.2f seconds", podName, desc, podStartTimeout.Seconds())
+	return fmt.Errorf("gave up waiting for pod %s to be %s after %v", podName, desc, timeout)
 }
 
 // createNS should be used by every test, note that we append a common prefix to the provided test name.
@@ -119,7 +122,7 @@ func createTestingNS(baseName string, c *client.Client) (*api.Namespace, error) 
 }
 
 func waitForPodRunningInNamespace(c *client.Client, podName string, namespace string) error {
-	return waitForPodCondition(c, namespace, podName, "running", func(pod *api.Pod) (bool, error) {
+	return waitForPodCondition(c, namespace, podName, "running", podPoll, podStartTimeout, func(pod *api.Pod) (bool, error) {
 		return (pod.Status.Phase == api.PodRunning), nil
 	})
 }
@@ -130,7 +133,7 @@ func waitForPodRunning(c *client.Client, podName string) error {
 
 // waitForPodNotPending returns an error if it took too long for the pod to go out of pending state.
 func waitForPodNotPending(c *client.Client, ns, podName string) error {
-	return waitForPodCondition(c, ns, podName, "!pending", func(pod *api.Pod) (bool, error) {
+	return waitForPodCondition(c, ns, podName, "!pending", podPoll, podStartTimeout, func(pod *api.Pod) (bool, error) {
 		if pod.Status.Phase != api.PodPending {
 			Logf("Saw pod %s in namespace %s out of pending state (found %q)", podName, ns, pod.Status.Phase)
 			return true, nil
@@ -141,7 +144,7 @@ func waitForPodNotPending(c *client.Client, ns, podName string) error {
 
 // waitForPodSuccessInNamespace returns nil if the pod reached state success, or an error if it reached failure or ran too long.
 func waitForPodSuccessInNamespace(c *client.Client, podName string, contName string, namespace string) error {
-	return waitForPodCondition(c, namespace, podName, "success or failure", func(pod *api.Pod) (bool, error) {
+	return waitForPodCondition(c, namespace, podName, "success or failure", podPoll, podStartTimeout, func(pod *api.Pod) (bool, error) {
 		// Cannot use pod.Status.Phase == api.PodSucceeded/api.PodFailed due to #2632
 		ci, ok := api.GetContainerStatus(pod.Status.ContainerStatuses, contName)
 		if !ok {
@@ -739,6 +742,37 @@ func BadEvents(events []*api.Event) int {
 		}
 	}
 	return badEvents
+}
+
+// NodeSSHHosts returns SSH-able host names for all nodes. It returns an error
+// if it can't find an external IP for every node, though it still returns all
+// hosts that it found in that case.
+func NodeSSHHosts(c *client.Client) ([]string, error) {
+	var hosts []string
+	nodelist, err := c.Nodes().List(labels.Everything(), fields.Everything())
+	if err != nil {
+		return hosts, fmt.Errorf("error getting nodes: %v", err)
+	}
+	for _, n := range nodelist.Items {
+		for _, addr := range n.Status.Addresses {
+			// Use the first external IP address we find on the node, and
+			// use at most one per node.
+			// TODO(mbforbes): Use the "preferred" address for the node, once
+			// such a thing is defined (#2462).
+			if addr.Type == api.NodeExternalIP {
+				hosts = append(hosts, addr.Address+":22")
+				break
+			}
+		}
+	}
+
+	// Error if any node didn't have an external IP.
+	if len(hosts) != len(nodelist.Items) {
+		return hosts, fmt.Errorf(
+			"only found %d external IPs on nodes, but found %d nodes. Nodelist: %v",
+			len(hosts), len(nodelist.Items), nodelist)
+	}
+	return hosts, nil
 }
 
 // SSH synchronously SSHs to a node running on provider and runs cmd. If there
