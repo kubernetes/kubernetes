@@ -253,10 +253,14 @@ func (recorder *recorderImpl) Eventf(object runtime.Object, reason, messageFmt s
 
 func makeEvent(ref *api.ObjectReference, reason, message string) *api.Event {
 	t := util.Now()
+	namespace := ref.Namespace
+	if namespace == "" {
+		namespace = api.NamespaceDefault
+	}
 	return &api.Event{
 		ObjectMeta: api.ObjectMeta{
 			Name:      fmt.Sprintf("%v.%x", ref.Name, t.UnixNano()),
-			Namespace: ref.Namespace,
+			Namespace: namespace,
 		},
 		InvolvedObject: *ref,
 		Reason:         reason,
