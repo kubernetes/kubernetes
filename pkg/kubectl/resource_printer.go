@@ -255,7 +255,7 @@ var eventColumns = []string{"FIRSTSEEN", "LASTSEEN", "COUNT", "NAME", "KIND", "S
 var limitRangeColumns = []string{"NAME"}
 var resourceQuotaColumns = []string{"NAME"}
 var namespaceColumns = []string{"NAME", "LABELS", "STATUS"}
-var secretColumns = []string{"NAME", "DATA"}
+var secretColumns = []string{"NAME", "TYPE", "DATA"}
 var persistentVolumeColumns = []string{"NAME", "LABELS", "CAPACITY", "ACCESSMODES", "STATUS", "CLAIM"}
 var persistentVolumeClaimColumns = []string{"NAME", "LABELS", "STATUS", "VOLUME"}
 var componentStatusColumns = []string{"NAME", "STATUS", "MESSAGE", "ERROR"}
@@ -584,7 +584,7 @@ func printNamespaceList(list *api.NamespaceList, w io.Writer) error {
 }
 
 func printSecret(item *api.Secret, w io.Writer) error {
-	_, err := fmt.Fprintf(w, "%s\t%v\n", item.Name, len(item.Data))
+	_, err := fmt.Fprintf(w, "%s\t%s\t%v\n", item.Name, item.Type, len(item.Data))
 	return err
 }
 

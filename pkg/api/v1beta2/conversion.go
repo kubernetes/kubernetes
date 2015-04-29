@@ -1564,4 +1564,17 @@ func init() {
 		// If one of the conversion functions is malformed, detect it immediately.
 		panic(err)
 	}
+	err = newer.Scheme.AddFieldLabelConversionFunc("v1beta2", "Secret",
+		func(label, value string) (string, string, error) {
+			switch label {
+			case "type":
+				return label, value, nil
+			default:
+				return "", "", fmt.Errorf("field label not supported: %s", label)
+			}
+		})
+	if err != nil {
+		// If one of the conversion functions is malformed, detect it immediately.
+		panic(err)
+	}
 }
