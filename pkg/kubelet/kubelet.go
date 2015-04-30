@@ -291,10 +291,6 @@ func NewMainKubelet(
 	return klet, nil
 }
 
-type httpGetter interface {
-	Get(url string) (*http.Response, error)
-}
-
 type serviceLister interface {
 	List() (api.ServiceList, error)
 }
@@ -326,7 +322,7 @@ type Kubelet struct {
 	// Optional, defaults to simple Docker implementation
 	runner prober.ContainerCommandRunner
 	// Optional, client for http requests, defaults to empty client
-	httpClient httpGetter
+	httpClient kubeletTypes.HttpGetter
 
 	// cAdvisor used for container information.
 	cadvisor cadvisor.Interface

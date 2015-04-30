@@ -16,5 +16,11 @@ limitations under the License.
 
 package types
 
+import "net/http"
+
 // DockerID is an ID of docker container. It is a type to make it clear when we're working with docker container Ids
 type DockerID string
+
+type HttpGetter interface {
+	Get(url string) (*http.Response, error)
+}
