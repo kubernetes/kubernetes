@@ -75,3 +75,12 @@ func (pr *PortRange) Set(value string) error {
 func (*PortRange) Type() string {
 	return "portRange"
 }
+
+func ParsePortRange(value string) (*PortRange, error) {
+	pr := &PortRange{}
+	err := pr.Set(value)
+	if err != nil {
+		return nil, err
+	}
+	return pr, nil
+}
