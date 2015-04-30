@@ -291,7 +291,9 @@ func addDeploymentKeyToReplicationController(oldRc *api.ReplicationController, c
 		oldRc.Spec.Template.Labels = map[string]string{}
 	}
 	oldRc.Spec.Template.Labels[deploymentKey] = oldHash
-	if _, err := client.ReplicationControllers(namespace).Update(oldRc); err != nil {
+
+	oldRc, err = client.ReplicationControllers(namespace).Update(oldRc)
+	if err != nil {
 		return err
 	}
 
