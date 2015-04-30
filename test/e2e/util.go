@@ -474,7 +474,7 @@ func Diff(oldPods *api.PodList, curPods *api.PodList) PodDiff {
 // It will waits for all pods it spawns to become "Running".
 // It's the caller's responsibility to clean up externally (i.e. use the
 // namespace lifecycle for handling cleanup).
-func RunRC(c *client.Client, name string, ns, image string, replicas int) error {
+func RunRC(c *client.Client, name string, ns, image string, replicas int, podStatusFile *os.File) error {
 	var last int
 
 	maxContainerFailures := int(math.Max(1.0, float64(replicas)*.01))
@@ -522,7 +522,11 @@ func RunRC(c *client.Client, name string, ns, image string, replicas int) error 
 	current = len(pods.Items)
 	failCount := 5
 	for same < failCount && current < replicas {
-		Logf("Controller %s: Found %d pods out of %d", name, current, replicas)
+		msg := fmt.Sprintf("Controller %s: Found %d pods out of %d", name, current, replicas)
+		Logf(msg)
+		if podStatusFile != nil {
+			fmt.Fprintf(podStatusFile, "%s: %s\n", time.Now().String(), msg)
+		}
 		if last < current {
 			same = 0
 		} else if last == current {
@@ -546,7 +550,11 @@ func RunRC(c *client.Client, name string, ns, image string, replicas int) error 
 	if current != replicas {
 		return fmt.Errorf("Controller %s: Only found %d replicas out of %d", name, current, replicas)
 	}
-	Logf("Controller %s in ns %s: Found %d pods out of %d", name, ns, current, replicas)
+	msg := fmt.Sprintf("Controller %s in ns %s: Found %d pods out of %d", name, ns, current, replicas)
+	Logf(msg)
+	if podStatusFile != nil {
+		fmt.Fprintf(podStatusFile, "%s: %s\n", time.Now().String(), msg)
+	}
 
 	By(fmt.Sprintf("Waiting for all %d replicas to be running with a max container failures of %d", replicas, maxContainerFailures))
 	same = 0
@@ -587,7 +595,11 @@ func RunRC(c *client.Client, name string, ns, image string, replicas int) error 
 				unknown++
 			}
 		}
-		Logf("Pod States: %d running, %d pending, %d waiting, %d inactive, %d unknown ", current, pending, waiting, inactive, unknown)
+		msg := fmt.Sprintf("Pod States: %d running, %d pending, %d waiting, %d inactive, %d unknown ", current, pending, waiting, inactive, unknown)
+		Logf(msg)
+		if podStatusFile != nil {
+			fmt.Fprintf(podStatusFile, "%s: %s\n", time.Now().String(), msg)
+		}
 
 		if len(currentPods.Items) != len(pods.Items) {
 
@@ -935,4 +947,26 @@ func HighLatencyRequests(c *client.Client, threshold time.Duration, ignoredResou
 	}
 
 	return len(badMetrics), nil
+}
+
+// Retrieve metrics information
+func GetMetrics(c *client.Client) (string, error) {
+	body, err := c.Get().AbsPath("/metrics").DoRaw()
+	if err != nil {
+		return "", err
+	}
+	return string(body), nil
+}
+
+// Retrieve debug information
+func GetDebugInfo(c *client.Client) (map[string]string, error) {
+	data := make(map[string]string)
+	for _, key := range []string{"block", "goroutine", "heap", "threadcreate"} {
+		body, err := c.Get().AbsPath(fmt.Sprintf("/debug/pprof/%s", key)).DoRaw()
+		if err != nil {
+			Logf("Warning: Error trying to fetch %s debug data: %v", key, err)
+		}
+		data[key] = string(body)
+	}
+	return data, nil
 }

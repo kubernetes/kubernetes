@@ -19,6 +19,7 @@ package e2e
 import (
 	"fmt"
 	"math"
+	"os"
 	"strconv"
 	"time"
 
@@ -36,6 +37,26 @@ import (
 	. "github.com/onsi/gomega"
 )
 
+func writePerfData(c *client.Client, dirName string, postfix string) {
+	defer GinkgoRecover()
+
+	hdnl, err := os.Create(fmt.Sprintf("%s/metrics_%s.txt", dirName, postfix))
+	expectNoError(err)
+	metrics, err := GetMetrics(c)
+	expectNoError(err)
+	_, err = hdnl.WriteString(metrics)
+	expectNoError(err)
+	expectNoError(hdnl.Close())
+	debug, err := GetDebugInfo(c)
+	for key, value := range debug {
+		hdnl, err = os.Create(fmt.Sprintf("%s/%s_%s.txt", dirName, key, postfix))
+		expectNoError(err)
+		_, err = hdnl.WriteString(value)
+		expectNoError(err)
+		expectNoError(hdnl.Close())
+	}
+}
+
 // This test suite can take a long time to run, so by default it is added to
 // the ginkgo.skip list (see driver.go).
 // To run this suite you must explicitly ask for it by setting the
@@ -45,6 +66,7 @@ var _ = Describe("Density", func() {
 	var minionCount int
 	var RCName string
 	var ns string
+	var uuid string
 
 	BeforeEach(func() {
 		var err error
@@ -57,6 +79,9 @@ var _ = Describe("Density", func() {
 		nsForTesting, err := createTestingNS("density", c)
 		ns = nsForTesting.Name
 		expectNoError(err)
+		uuid = string(util.NewUUID())
+		expectNoError(os.Mkdir(uuid, 0777))
+		writePerfData(c, uuid, "before")
 	})
 
 	AfterEach(func() {
@@ -82,6 +107,7 @@ var _ = Describe("Density", func() {
 		highLatencyRequests, err := HighLatencyRequests(c, 10*time.Second, util.NewStringSet("events"))
 		expectNoError(err)
 		Expect(highLatencyRequests).NotTo(BeNumerically(">", 0))
+		writePerfData(c, uuid, "after")
 	})
 
 	// Tests with "Skipped" substring in their name will be skipped when running
@@ -112,8 +138,10 @@ var _ = Describe("Density", func() {
 		itArg := testArg
 		It(name, func() {
 			totalPods := itArg.podsPerMinion * minionCount
-			nameStr := strconv.Itoa(totalPods) + "-" + string(util.NewUUID())
-			RCName = "my-hostname-density" + nameStr
+			RCName = "density" + strconv.Itoa(totalPods) + "-" + uuid
+			fileHndl, err := os.Create(fmt.Sprintf("%s/pod_states.txt", uuid))
+			expectNoError(err)
+			defer fileHndl.Close()
 
 			// Create a listener for events.
 			events := make([](*api.Event), 0)
@@ -139,9 +167,10 @@ var _ = Describe("Density", func() {
 
 			// Start the replication controller.
 			startTime := time.Now()
-			expectNoError(RunRC(c, RCName, ns, "gcr.io/google_containers/pause:go", totalPods))
+			expectNoError(RunRC(c, RCName, ns, "gcr.io/google_containers/pause:go", totalPods, fileHndl))
 			e2eStartupTime := time.Now().Sub(startTime)
 			Logf("E2E startup time for %d pods: %v", totalPods, e2eStartupTime)
+			fmt.Fprintf(fileHndl, "E2E startup time for %d pods: %v\n", totalPods, e2eStartupTime)
 
 			By("Waiting for all events to be recorded")
 			last := -1
