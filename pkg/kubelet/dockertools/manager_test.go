@@ -17,6 +17,7 @@ limitations under the License.
 package dockertools
 
 import (
+	"fmt"
 	"reflect"
 	"sort"
 	"testing"
@@ -208,5 +209,129 @@ func TestListImages(t *testing.T) {
 	// returns a "sorted" list.
 	if !reflect.DeepEqual(expected.List(), actual.List()) {
 		t.Errorf("expected %#v, got %#v", expected.List(), actual.List())
+	}
+}
+
+func apiContainerToContainer(c docker.APIContainers) kubecontainer.Container {
+	dockerName, hash, err := ParseDockerName(c.Names[0])
+	if err != nil {
+		return kubecontainer.Container{}
+	}
+	return kubecontainer.Container{
+		ID:   types.UID(c.ID),
+		Name: dockerName.ContainerName,
+		Hash: hash,
+	}
+}
+
+func dockerContainersToPod(containers DockerContainers) kubecontainer.Pod {
+	var pod kubecontainer.Pod
+	for _, c := range containers {
+		dockerName, hash, err := ParseDockerName(c.Names[0])
+		if err != nil {
+			continue
+		}
+		pod.Containers = append(pod.Containers, &kubecontainer.Container{
+			ID:    types.UID(c.ID),
+			Name:  dockerName.ContainerName,
+			Hash:  hash,
+			Image: c.Image,
+		})
+		// TODO(yifan): Only one evaluation is enough.
+		pod.ID = dockerName.PodUID
+		name, namespace, _ := kubecontainer.ParsePodFullName(dockerName.PodFullName)
+		pod.Name = name
+		pod.Namespace = namespace
+	}
+	return pod
+}
+
+func TestKillContainerInPod(t *testing.T) {
+	manager, fakeDocker := NewFakeDockerManager()
+
+	pod := &api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			UID:       "12345678",
+			Name:      "qux",
+			Namespace: "new",
+		},
+		Spec: api.PodSpec{Containers: []api.Container{{Name: "foo"}, {Name: "bar"}}},
+	}
+	containers := []docker.APIContainers{
+		{
+			ID:    "1111",
+			Names: []string{"/k8s_foo_qux_new_1234_42"},
+		},
+		{
+			ID:    "2222",
+			Names: []string{"/k8s_bar_qux_new_1234_42"},
+		},
+	}
+	containerToKill := &containers[0]
+	containerToSpare := &containers[1]
+	fakeDocker.ContainerList = containers
+	// Set all containers to ready.
+	for _, c := range fakeDocker.ContainerList {
+		manager.readinessManager.SetReadiness(c.ID, true)
+	}
+
+	if err := manager.KillContainerInPod(pod.Spec.Containers[0], pod); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	// Assert the container has been stopped.
+	if err := fakeDocker.AssertStopped([]string{containerToKill.ID}); err != nil {
+		t.Errorf("container was not stopped correctly: %v", err)
+	}
+
+	// Verify that the readiness has been removed for the stopped container.
+	if ready := manager.readinessManager.GetReadiness(containerToKill.ID); ready {
+		t.Errorf("exepcted container entry ID '%v' to not be found. states: %+v", containerToKill.ID, ready)
+	}
+	if ready := manager.readinessManager.GetReadiness(containerToSpare.ID); !ready {
+		t.Errorf("exepcted container entry ID '%v' to be found. states: %+v", containerToSpare.ID, ready)
+	}
+}
+
+func TestKillContainerInPodWithError(t *testing.T) {
+	manager, fakeDocker := NewFakeDockerManager()
+
+	pod := &api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			UID:       "12345678",
+			Name:      "qux",
+			Namespace: "new",
+		},
+		Spec: api.PodSpec{Containers: []api.Container{{Name: "foo"}, {Name: "bar"}}},
+	}
+	containers := []docker.APIContainers{
+		{
+			ID:    "1111",
+			Names: []string{"/k8s_foo_qux_new_1234_42"},
+		},
+		{
+			ID:    "2222",
+			Names: []string{"/k8s_bar_qux_new_1234_42"},
+		},
+	}
+	containerToKill := &containers[0]
+	containerToSpare := &containers[1]
+	fakeDocker.ContainerList = containers
+	fakeDocker.Errors["stop"] = fmt.Errorf("sample error")
+
+	// Set all containers to ready.
+	for _, c := range fakeDocker.ContainerList {
+		manager.readinessManager.SetReadiness(c.ID, true)
+	}
+
+	if err := manager.KillContainerInPod(pod.Spec.Containers[0], pod); err == nil {
+		t.Errorf("expected error, found nil")
+	}
+
+	// Verify that the readiness has been removed even though the stop failed.
+	if ready := manager.readinessManager.GetReadiness(containerToKill.ID); ready {
+		t.Errorf("exepcted container entry ID '%v' to not be found. states: %+v", containerToKill.ID, ready)
+	}
+	if ready := manager.readinessManager.GetReadiness(containerToSpare.ID); !ready {
+		t.Errorf("exepcted container entry ID '%v' to be found. states: %+v", containerToSpare.ID, ready)
 	}
 }
