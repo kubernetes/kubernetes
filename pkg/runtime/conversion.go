@@ -67,13 +67,17 @@ func convertStringSliceToInt(input *[]string, out *int, s conversion.Scope) erro
 	return nil
 }
 
+// converStringSliceToBool will convert a string parameter to boolean.
+// Only the absence of a value, a value of "false", or a value of "0" resolve to false.
+// Any other value (including empty string) resolves to true.
 func convertStringSliceToBool(input *[]string, out *bool, s conversion.Scope) error {
 	if len(*input) == 0 {
 		*out = false
+		return nil
 	}
 	switch strings.ToLower((*input)[0]) {
-	case "true", "1":
-		*out = true
+	case "false", "0":
+		*out = false
 	default:
 		*out = true
 	}

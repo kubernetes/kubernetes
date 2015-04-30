@@ -29,6 +29,7 @@ type InternalComplex struct {
 	Integer   int
 	Integer64 int64
 	Int64     int64
+	Bool      bool
 }
 
 type ExternalComplex struct {
@@ -37,6 +38,7 @@ type ExternalComplex struct {
 	Integer   int    `json:"int"`
 	Integer64 int64  `json:",omitempty"`
 	Int64     int64
+	Bool      bool `json:"bool"`
 }
 
 func (*InternalComplex) IsAnAPIObject() {}
@@ -81,6 +83,36 @@ func TestStringMapConversion(t *testing.T) {
 			},
 			errFn:    func(err error) bool { return err != nil },
 			expected: &ExternalComplex{},
+		},
+		"parses boolean true": {
+			input: map[string][]string{
+				"bool": {"true"},
+			},
+			expected: &ExternalComplex{Bool: true},
+		},
+		"parses boolean any value": {
+			input: map[string][]string{
+				"bool": {"foo"},
+			},
+			expected: &ExternalComplex{Bool: true},
+		},
+		"parses boolean false": {
+			input: map[string][]string{
+				"bool": {"false"},
+			},
+			expected: &ExternalComplex{Bool: false},
+		},
+		"parses boolean empty value": {
+			input: map[string][]string{
+				"bool": {""},
+			},
+			expected: &ExternalComplex{Bool: true},
+		},
+		"parses boolean no value": {
+			input: map[string][]string{
+				"bool": {},
+			},
+			expected: &ExternalComplex{Bool: false},
 		},
 	}
 
