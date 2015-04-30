@@ -292,11 +292,10 @@ func addDeploymentKeyToReplicationController(oldRc *api.ReplicationController, c
 	}
 	oldRc.Spec.Template.Labels[deploymentKey] = oldHash
 
-	rc, err := client.ReplicationControllers(namespace).Update(oldRc)
+	oldRc, err = client.ReplicationControllers(namespace).Update(oldRc)
 	if err != nil {
 		return err
 	}
-	oldRc.ResourceVersion = rc.ResourceVersion
 
 	// Update all labels to include the new hash, so they are correctly adopted
 	// TODO: extract the code from the label command and re-use it here.
