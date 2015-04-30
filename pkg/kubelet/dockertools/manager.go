@@ -627,6 +627,67 @@ func makeCapabilites(capAdd []api.CapabilityType, capDrop []api.CapabilityType) 
 	return addCaps, dropCaps
 }
 
+// A helper function to get the KubeletContainerName and hash from a docker
+// container.
+func getDockerContainerNameInfo(c *docker.APIContainers) (*KubeletContainerName, uint64, error) {
+	if len(c.Names) == 0 {
+		return nil, 0, fmt.Errorf("cannot parse empty docker container name: %#v", c.Names)
+	}
+	dockerName, hash, err := ParseDockerName(c.Names[0])
+	if err != nil {
+		return nil, 0, fmt.Errorf("parse docker container name %q error: %v", c.Names[0], err)
+	}
+	return dockerName, hash, nil
+}
+
+// Converts docker.APIContainers to kubecontainer.Container.
+func convertDockerToRuntimeContainer(c *docker.APIContainers) (*kubecontainer.Container, error) {
+	dockerName, hash, err := getDockerContainerNameInfo(c)
+	if err != nil {
+		return nil, err
+	}
+	return &kubecontainer.Container{
+		ID:      types.UID(c.ID),
+		Name:    dockerName.ContainerName,
+		Image:   c.Image,
+		Hash:    hash,
+		Created: c.Created,
+	}, nil
+}
+
+// Get pod UID, name, and namespace by examining the container names.
+func getPodInfoFromContainer(c *docker.APIContainers) (types.UID, string, string, error) {
+	dockerName, _, err := getDockerContainerNameInfo(c)
+	if err != nil {
+		return types.UID(""), "", "", err
+	}
+	name, namespace, err := kubecontainer.ParsePodFullName(dockerName.PodFullName)
+	if err != nil {
+		return types.UID(""), "", "", fmt.Errorf("parse pod full name %q error: %v", dockerName.PodFullName, err)
+	}
+	return dockerName.PodUID, name, namespace, nil
+}
+
+// GetContainers returns a list of running containers if |all| is false;
+// otherwise, it returns all containers.
+func (dm *DockerManager) GetContainers(all bool) ([]*kubecontainer.Container, error) {
+	containers, err := GetKubeletDockerContainers(dm.client, all)
+	if err != nil {
+		return nil, err
+	}
+	// Convert DockerContainers to []*kubecontainer.Container
+	result := make([]*kubecontainer.Container, 0, len(containers))
+	for _, c := range containers {
+		converted, err := convertDockerToRuntimeContainer(c)
+		if err != nil {
+			glog.Errorf("Error examining the container: %v", err)
+			continue
+		}
+		result = append(result, converted)
+	}
+	return result, nil
+}
+
 func (dm *DockerManager) GetPods(all bool) ([]*kubecontainer.Pod, error) {
 	pods := make(map[types.UID]*kubecontainer.Pod)
 	var result []*kubecontainer.Pod
@@ -638,35 +699,28 @@ func (dm *DockerManager) GetPods(all bool) ([]*kubecontainer.Pod, error) {
 
 	// Group containers by pod.
 	for _, c := range containers {
-		if len(c.Names) == 0 {
-			glog.Warningf("Cannot parse empty docker container name: %#v", c.Names)
-			continue
-		}
-		dockerName, hash, err := ParseDockerName(c.Names[0])
+		converted, err := convertDockerToRuntimeContainer(c)
 		if err != nil {
-			glog.Warningf("Parse docker container name %q error: %v", c.Names[0], err)
+			glog.Errorf("Error examining the container: %v", err)
 			continue
 		}
-		pod, found := pods[dockerName.PodUID]
-		if !found {
-			name, namespace, err := kubecontainer.ParsePodFullName(dockerName.PodFullName)
-			if err != nil {
-				glog.Warningf("Parse pod full name %q error: %v", dockerName.PodFullName, err)
-				continue
-			}
-			pod = &kubecontainer.Pod{
-				ID:        dockerName.PodUID,
-				Name:      name,
-				Namespace: namespace,
-			}
-			pods[dockerName.PodUID] = pod
+
+		podUID, podName, podNamespace, err := getPodInfoFromContainer(c)
+		if err != nil {
+			glog.Errorf("Error examining the container: %v", err)
+			continue
 		}
-		pod.Containers = append(pod.Containers, &kubecontainer.Container{
-			ID:      types.UID(c.ID),
-			Name:    dockerName.ContainerName,
-			Hash:    hash,
-			Created: c.Created,
-		})
+
+		pod, found := pods[podUID]
+		if !found {
+			pod = &kubecontainer.Pod{
+				ID:        podUID,
+				Name:      podName,
+				Namespace: podNamespace,
+			}
+			pods[podUID] = pod
+		}
+		pod.Containers = append(pod.Containers, converted)
 	}
 
 	// Convert map to list.
