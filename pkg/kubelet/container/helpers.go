@@ -34,13 +34,13 @@ type RunContainerOptionsGenerator interface {
 	GenerateRunContainerOptions(pod *api.Pod, container *api.Container, netMode, ipcMode string) (*RunContainerOptions, error)
 }
 
-// Trims runtime prefix from image name (e.g.: docker://busybox -> busybox).
-func TrimRuntimePrefixFromImage(img string) string {
+// Trims runtime prefix from ID or image name (e.g.: docker://busybox -> busybox).
+func TrimRuntimePrefix(fullString string) string {
 	const prefixSeparator = "://"
 
-	idx := strings.Index(img, prefixSeparator)
+	idx := strings.Index(fullString, prefixSeparator)
 	if idx < 0 {
-		return img
+		return fullString
 	}
-	return img[idx+len(prefixSeparator):]
+	return fullString[idx+len(prefixSeparator):]
 }

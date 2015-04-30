@@ -1416,16 +1416,6 @@ func TestMakeVolumesAndBinds(t *testing.T) {
 	verifyStringArrayEquals(t, binds, expectedBinds)
 }
 
-type errorTestingDockerClient struct {
-	dockertools.FakeDockerClient
-	listContainersError error
-	containerList       []docker.APIContainers
-}
-
-func (f *errorTestingDockerClient) ListContainers(options docker.ListContainersOptions) ([]docker.APIContainers, error) {
-	return f.containerList, f.listContainersError
-}
-
 func TestGetContainerInfo(t *testing.T) {
 	containerID := "ab2cdf"
 	containerPath := fmt.Sprintf("/docker/%v", containerID)
@@ -1573,15 +1563,16 @@ func TestGetContainerInfoWhenDockerToolsFailed(t *testing.T) {
 	testKubelet := newTestKubelet(t)
 	kubelet := testKubelet.kubelet
 	mockCadvisor := testKubelet.fakeCadvisor
+	fakeDocker := testKubelet.fakeDocker
 	expectedErr := fmt.Errorf("List containers error")
-	kubelet.dockerClient = &errorTestingDockerClient{listContainersError: expectedErr}
+	fakeDocker.Errors["list"] = expectedErr
 
 	stats, err := kubelet.GetContainerInfo("qux", "", "foo", nil)
 	if err == nil {
-		t.Errorf("Expected error from dockertools, got none")
+		t.Errorf("expected error from dockertools, got none")
 	}
 	if err.Error() != expectedErr.Error() {
-		t.Errorf("Expected error %v got %v", expectedErr.Error(), err.Error())
+		t.Errorf("expected error %v got %v", expectedErr.Error(), err.Error())
 	}
 	if stats != nil {
 		t.Errorf("non-nil stats when dockertools failed")
@@ -1594,13 +1585,12 @@ func TestGetContainerInfoWithNoContainers(t *testing.T) {
 	kubelet := testKubelet.kubelet
 	mockCadvisor := testKubelet.fakeCadvisor
 
-	kubelet.dockerClient = &errorTestingDockerClient{listContainersError: nil}
 	stats, err := kubelet.GetContainerInfo("qux_ns", "", "foo", nil)
 	if err == nil {
-		t.Errorf("Expected error from cadvisor client, got none")
+		t.Errorf("expected error from cadvisor client, got none")
 	}
-	if err != ErrNoKubeletContainers {
-		t.Errorf("Expected error %v, got %v", ErrNoKubeletContainers.Error(), err.Error())
+	if err != ErrContainerNotFound {
+		t.Errorf("expected error %v, got %v", ErrContainerNotFound.Error(), err.Error())
 	}
 	if stats != nil {
 		t.Errorf("non-nil stats when dockertools returned no containers")
@@ -1612,15 +1602,14 @@ func TestGetContainerInfoWithNoMatchingContainers(t *testing.T) {
 	testKubelet := newTestKubelet(t)
 	kubelet := testKubelet.kubelet
 	mockCadvisor := testKubelet.fakeCadvisor
-
-	containerList := []docker.APIContainers{
+	fakeDocker := testKubelet.fakeDocker
+	fakeDocker.ContainerList = []docker.APIContainers{
 		{
 			ID:    "fakeId",
 			Names: []string{"/k8s_bar_qux_ns_1234_42"},
 		},
 	}
 
-	kubelet.dockerClient = &errorTestingDockerClient{listContainersError: nil, containerList: containerList}
 	stats, err := kubelet.GetContainerInfo("qux_ns", "", "foo", nil)
 	if err == nil {
 		t.Errorf("Expected error from cadvisor client, got none")
