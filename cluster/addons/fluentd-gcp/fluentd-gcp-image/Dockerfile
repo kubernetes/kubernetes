@@ -20,5 +20,8 @@ RUN apt-get -q update && \
 # Copy the Fluentd configuration file for logging Docker container logs.
 COPY google-fluentd.conf /etc/google-fluentd/google-fluentd.conf
 
+# Install the record reformer plugin.
+RUN /usr/sbin/google-fluentd-gem install fluent-plugin-record-reformer
+
 # Start Fluentd to pick up our config that watches Docker container logs.
 CMD /usr/sbin/google-fluentd "$FLUENTD_ARGS" > /var/log/google-fluentd.log

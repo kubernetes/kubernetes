@@ -6,7 +6,7 @@
 .PHONY:	build push
 
 
-TAG = 1.4
+TAG = 1.5
 
 build:
 	docker build -t gcr.io/google_containers/fluentd-gcp:$(TAG) .
