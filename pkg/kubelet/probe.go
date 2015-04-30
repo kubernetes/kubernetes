@@ -173,7 +173,7 @@ func (pb *prober) runProbe(p *api.Probe, pod *api.Pod, status api.PodStatus, con
 		glog.V(4).Infof("TCP-Probe PodIP: %v, Port: %v, Timeout: %v", status.PodIP, port, timeout)
 		return pb.tcp.Probe(status.PodIP, port, timeout)
 	}
-	glog.Warningf("Failed to find probe builder for %s %+v", container.Name, container.LivenessProbe)
+	glog.Warningf("Failed to find probe builder for container: %v", container)
 	return probe.Unknown, nil
 }
 
