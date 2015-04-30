@@ -18,19 +18,54 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-GINKGO_PARALLEL=${GINKGO_PARALLEL:-n} # set to 'y' to run tests in parallel
-KUBE_ROOT=$(readlink -f $(dirname "${BASH_SOURCE}")/..)
-
+KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 source "${KUBE_ROOT}/cluster/common.sh"
-source "${KUBE_ROOT}/hack/lib/init.sh"
 
-# Ginkgo will build the e2e tests, so we need to make sure that the environment
-# is set up correctly (including Godeps, etc).
-kube::golang::setup_env
+# --- Find local test binaries.
 
-# --- Build the Ginkgo test runner from Godeps
-godep go install github.com/onsi/ginkgo/ginkgo
-ginkgo=$(godep path)/bin/ginkgo
+# Detect the OS name/arch so that we can find our binary
+case "$(uname -s)" in
+  Darwin)
+    host_os=darwin
+    ;;
+  Linux)
+    host_os=linux
+    ;;
+  *)
+    echo "Unsupported host OS.  Must be Linux or Mac OS X." >&2
+    exit 1
+    ;;
+esac
+
+case "$(uname -m)" in
+  x86_64*)
+    host_arch=amd64
+    ;;
+  i?86_64*)
+    host_arch=amd64
+    ;;
+  amd64*)
+    host_arch=amd64
+    ;;
+  arm*)
+    host_arch=arm
+    ;;
+  i?86*)
+    host_arch=x86
+    ;;
+  *)
+    echo "Unsupported host arch. Must be x86_64, 386 or arm." >&2
+    exit 1
+    ;;
+esac
+
+# Gather up the list of likely places and use ls to find the latest one.
+locations=(
+  "${KUBE_ROOT}/_output/dockerized/bin/${host_os}/${host_arch}/e2e"
+  "${KUBE_ROOT}/_output/local/bin/${host_os}/${host_arch}/e2e"
+  "${KUBE_ROOT}/platforms/${host_os}/${host_arch}/e2e"
+)
+e2e=$( (ls -t "${locations[@]}" 2>/dev/null || true) | head -1 )
 
 # --- Setup some env vars.
 
@@ -62,8 +97,8 @@ if [[ -z "${AUTH_CONFIG:-}" ]];  then
       )
     elif [[ "${KUBERNETES_PROVIDER}" == "conformance_test" ]]; then
       auth_config=(
-        "--auth-config=${KUBERNETES_CONFORMANCE_TEST_AUTH_CONFIG:-}"
-        "--cert-dir=${KUBERNETES_CONFORMANCE_TEST_CERT_DIR:-}"
+        "--auth_config=${KUBERNETES_CONFORMANCE_TEST_AUTH_CONFIG:-}"
+        "--cert_dir=${KUBERNETES_CONFORMANCE_TEST_CERT_DIR:-}"
       )
     else
       auth_config=(
@@ -74,26 +109,21 @@ else
   echo "Conformance Test.  No cloud-provider-specific preparation."
   KUBERNETES_PROVIDER=""
   auth_config=(
-    "--auth-config=${AUTH_CONFIG:-}"
-    "--cert-dir=${CERT_DIR:-}"
+    "--auth_config=${AUTH_CONFIG:-}"
+    "--cert_dir=${CERT_DIR:-}"
   )
 fi
 
-ginkgo_args=()
-if [[ ${GINKGO_PARALLEL} =~ ^[yY]$ ]]; then
-  ginkgo_args+=("-p")
-fi
-
+# Use the kubectl binary from the same directory as the e2e binary.
 # The --host setting is used only when providing --auth_config
 # If --kubeconfig is used, the host to use is retrieved from the .kubeconfig
 # file and the one provided with --host is ignored.
-"${ginkgo}" "${ginkgo_args[@]:+${ginkgo_args[@]}}" test/e2e -- \
-  "${auth_config[@]:+${auth_config[@]}}" \
+export PATH=$(dirname "${e2e}"):"${PATH}"
+"${e2e}" "${auth_config[@]:+${auth_config[@]}}" \
   --host="https://${KUBE_MASTER_IP-}" \
   --provider="${KUBERNETES_PROVIDER}" \
-  --gce-project="${PROJECT:-}" \
-  --gce-zone="${ZONE:-}" \
-  --kube-master="${KUBE_MASTER:-}" \
-  --repo-root="${KUBE_VERSION_ROOT}" \
-  ${E2E_REPORT_DIR+"--report-dir=${E2E_REPORT_DIR}"} \
+  --gce_project="${PROJECT:-}" \
+  --gce_zone="${ZONE:-}" \
+  --kube_master="${KUBE_MASTER:-}" \
+  ${E2E_REPORT_DIR+"--report_dir=${E2E_REPORT_DIR}"} \
   "${@:-}"
