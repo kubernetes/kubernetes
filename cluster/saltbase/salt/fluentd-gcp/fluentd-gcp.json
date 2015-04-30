@@ -5,7 +5,7 @@
  "spec": {
    "containers": [
      { "name": "fluentd-cloud-logging",
-       "image": "gcr.io/google_containers/fluentd-gcp:1.4",
+       "image": "gcr.io/google_containers/fluentd-gcp:1.5",
        "env": [
          { "name": "FLUENTD_ARGS",
            "value": "-qq"}
