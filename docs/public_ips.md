@@ -20,13 +20,13 @@ node.
 The names in bold are the names we will use in the API.
 
 1. **cluster** The service is reachable from within the cluster on a virtual IP.  _(Existing functionality)_
-1. **loadbalancer** The service is exposed via a k8s-managed load-balancer.  _(Existing functionality)_
 1. **public** The service is exposed on a set of nodes, on a set of ports.  _(New functionality)_.
  For V1 services are exposed on all nodes.  The service endpoints would be discoverable via the k8s API,
  and helper processes could then expose that information via DNS or configure external systems
  (e.g. physical load balancers)  The intention is that this service should then be reachable from outside
  the k8s cluster; a cloud-provider would automatically configure firewall rules (or equivalents)
  so that a public service is reachable from the public Internet.
+1. **loadbalancer** The service is exposed via a k8s-managed load-balancer.  _(Existing functionality)_
 
 Expected future functionality:
 
@@ -36,9 +36,16 @@ to _cluster_, but with additional firewall rules.
 except that pods marked 'DMZ' are prevented from accessing _cluster_ services, and can only access services explicitly marked
 as dmz-reachable that are in their namespace.
 
-Currently these rules (and even the planned rules) nest very nicely (namespace < dmz < cluster < loadbalancer < public),
+Currently these rules (and even the planned rules) nest very nicely (namespace < dmz < cluster < public < loadbalancer),
 so for V1 we will have a single visibility setting.  In future, we may convert this to a variably-typed argument 
 (StringOrStringList, or StringOrVisibility) or just add a richer field.
+
+This does mean that loadbalancer => public; i.e. a service that is exposed through a load-balancer can also be
+reached at the nodes, bypassing the load-balancer.  It does not seem that any of the cloud load balancers
+currently offer any functionality that would make this problematic (e.g. if this were a way to bypass
+DDoS protection).  Further, because cloud load-balancers may have a financial and performance cost, there are
+legitimate reasons where a user might choose to send traffic _not_ through the load-balancer.  Future versions of
+the API will likely have a richer model.
 
 ## API sketch
 
@@ -104,15 +111,16 @@ updating Status as kube-proxy/kubelet.
 1. API server verifies that port 10080 can be assigned, accepts and persists
 1. kube-proxy wakes up and sets iptables to receive on hostPort 10080
 
+(These are just examples; it is valid to specify a hostPort with visiblity==loadbalancer, or to omit hostPort
+with visibility==public)
 
 In order to verify that the port can be assigned, the API server must check that the port is within a permitted range,
 and that it is not already assigned to another service.  This is similar to the allocation of internal cluster-IPs.
 The error codes & messages (in the case of port conflicts, out-of-range ports or port-exhaustion) will be analogous
 to the equivalent IP address errors.
 
-Advanced clouds (e.g. GCE) may support load-balancing without requiring a public port assignment.
-If the visibility is _loadbalancer_, a hostPort is not guaranteed to be assigned, and even if one is assigned it
-is not guaranteed to be reachable (k8s should ideally configure firewall rules to prevent load-balancer bypass).
+Advanced clouds (e.g. GCE) can support pure load-balancing without requiring a public port assignment, but
+for V1 visibility==loadbalancer incorporates visibility==public, so one will be assigned.
 
 ## New flags
 
