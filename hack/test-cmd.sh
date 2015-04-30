@@ -546,8 +546,6 @@ __EOF__
   kubectl delete service frontend{,-2,-3} "${kube_flags[@]}"
 
   ### Perform a rolling update with --image
-  # Pre-condition status.Replicas is 3, otherwise the rcmanager could update it and interfere with the rolling update
-  kube::test::get_object_assert 'rc frontend' "{{$rc_status_replicas_field}}" '3'
   # Command
   kubectl rolling-update frontend --image=kubernetes/pause --update-period=10ns --poll-interval=10ms "${kube_flags[@]}"
   # Post-condition: current image IS kubernetes/pause
