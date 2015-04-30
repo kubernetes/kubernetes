@@ -55,10 +55,6 @@ type Runtime interface {
 	// GetPodStatus retrieves the status of the pod, including the information of
 	// all containers in the pod.
 	GetPodStatus(*api.Pod) (api.PodStatus, error)
-	// GetContainers returns all containers on the node, including those are
-	// not managed by kubelet. If 'all' is false, then only running containers
-	// are returned.
-	GetContainers(all bool) ([]*Container, error)
 	// TODO(vmarmol): Merge RunInContainer and ExecInContainer.
 	// Runs the command in the container of the specified pod using nsinit.
 	// TODO(yifan): Use strong type for containerID.
