@@ -303,5 +303,5 @@ function kube-down() {
   echo "... in kube-down()" >&2
   detect-project >&2
   "${GCLOUD}" alpha container clusters delete --project="${PROJECT}" \
-    --zone="${ZONE}" "${CLUSTER_NAME}"
+    --zone="${ZONE}" "${CLUSTER_NAME} --quiet"
 }
