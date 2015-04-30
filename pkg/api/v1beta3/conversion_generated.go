@@ -3823,6 +3823,7 @@ func convert_v1beta3_ServicePort_To_api_ServicePort(in *ServicePort, out *newer.
 	if err := s.Convert(&in.TargetPort, &out.TargetPort, 0); err != nil {
 		return err
 	}
+	out.PublicPort = in.PublicPort
 	return nil
 }
 
@@ -3836,6 +3837,7 @@ func convert_api_ServicePort_To_v1beta3_ServicePort(in *newer.ServicePort, out *
 	if err := s.Convert(&in.TargetPort, &out.TargetPort, 0); err != nil {
 		return err
 	}
+	out.PublicPort = in.PublicPort
 	return nil
 }
 

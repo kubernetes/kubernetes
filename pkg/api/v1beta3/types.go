@@ -1014,6 +1014,10 @@ type ServicePort struct {
 	// target Pod's container ports.  If this is not specified, the value
 	// of Port is used (an identity map).
 	TargetPort util.IntOrString `json:"targetPort" description:"the port to access on the pods targeted by the service; defaults to the service port"`
+
+	// Optional: A port that we will listen on, on every minion.
+	// This allows services to be exposed without necessarily using a load balancer.
+	PublicPort int `json:"publicPort" description:"the port number on which this service is exposed outside the cluster"`
 }
 
 // Service is a named abstraction of software service (for example, mysql) consisting of local port
