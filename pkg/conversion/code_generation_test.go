@@ -146,7 +146,7 @@ func TestNoManualChangesToGenerateConversions(t *testing.T) {
 	versions := []string{"v1beta3"}
 
 	for _, version := range versions {
-		fileName := fmt.Sprintf("../../pkg/api/%s/conversion.go", version)
+		fileName := fmt.Sprintf("../../pkg/api/%s/conversion_generated.go", version)
 
 		existingFunctions, existingNames := bufferExistingConversions(t, fileName)
 		generatedFunctions, generatedNames := generateConversions(t, version)
