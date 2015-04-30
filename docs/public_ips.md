@@ -221,8 +221,8 @@ only happen if we run new services on the minions or specify public_service_port
 
 In future, we may allow sidecar-pods to be responsible for configuring load-balancers; these could be outside
 of the main k8s codebase.  We would likely configure the apiserver to permit load-balancer creation, assign a port
-(probably), but k8s would not create the load balancer.  kube-proxy would create the service as a public service,
-(possibly with additional firewall rules).  The loadbalancer sidecar-pod would create the load-balancer and
+(probably), but k8s would not create the load balancer.  kube-proxy would create the service as a public service.
+The loadbalancer sidecar-pod would create the load-balancer and
 call the API to report events.
 
 We might be able to move the cloud-provider load-balancer functionality into a sidecar-pod, but not for V1.
