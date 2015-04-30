@@ -21,15 +21,15 @@
 set -e
 
 function cleanup {
-    # cleanup work
-    rm -rf flannel kubernetes* etcd* binaries
+  # cleanup work
+  rm -rf flannel kubernetes* etcd* binaries
 }
 trap cleanup SIGHUP SIGINT SIGTERM
 
 # check root
 if [ "$(id -u)" != "0" ]; then
-    echo >&2 "Please run as root"
-    exit 1
+  echo >&2 "Please run as root"
+  exit 1
 fi
 
 mkdir -p binaries
@@ -37,12 +37,14 @@ mkdir -p binaries
 # flannel
 echo "Download & build flanneld ..."
 apt-get install linux-libc-dev
+FLANNEL_V="v0.4.0"
 if [ ! -d flannel ] ; then
-    echo "flannel does not exsit, cloning ..."
-    git clone https://github.com/coreos/flannel.git
+  echo "flannel does not exsit, cloning ..."
+  git clone https://github.com/coreos/flannel.git
 fi
 
 pushd flannel
+git checkout tags/${FLANNEL_V}
 docker run -v `pwd`:/opt/flannel -i -t google/golang /bin/bash -c "cd /opt/flannel && ./build"
 popd
 cp flannel/bin/flanneld binaries/
@@ -52,18 +54,18 @@ echo "Download etcd release ..."
 ETCD_V="v2.0.0"
 ETCD="etcd-${ETCD_V}-linux-amd64"
 if [ ! -f etcd.tar.gz ] ; then
-    curl -L  https://github.com/coreos/etcd/releases/download/$ETCD_V/$ETCD.tar.gz -o etcd.tar.gz
-    tar xzf etcd.tar.gz
+  curl -L  https://github.com/coreos/etcd/releases/download/$ETCD_V/$ETCD.tar.gz -o etcd.tar.gz
+  tar xzf etcd.tar.gz
 fi
 cp $ETCD/etcd $ETCD/etcdctl binaries
 
 # k8s
 echo "Download kubernetes release ..."
 
-K8S_V="v0.12.0"
+K8S_V="v0.15.0"
 if [ ! -f kubernetes.tar.gz ] ; then
-    curl -L https://github.com/GoogleCloudPlatform/kubernetes/releases/download/$K8S_V/kubernetes.tar.gz -o kubernetes.tar.gz
-    tar xzf kubernetes.tar.gz
+  curl -L https://github.com/GoogleCloudPlatform/kubernetes/releases/download/$K8S_V/kubernetes.tar.gz -o kubernetes.tar.gz
+  tar xzf kubernetes.tar.gz
 fi
 pushd kubernetes/server
 tar xzf kubernetes-server-linux-amd64.tar.gz

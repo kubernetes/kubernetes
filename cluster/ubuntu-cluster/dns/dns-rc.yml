@@ -1,0 +1,43 @@
+kind: ReplicationController
+apiVersion: v1beta3
+metadata:
+  name: kube-dns
+  labels:
+    k8s-app: kube-dns
+    kubernetes.io/cluster-service: "true"
+spec:
+  replicas: 1
+  selector:
+    k8s-app: kube-dns
+  template:
+    metadata:
+      labels:
+        name: kube-dns
+        k8s-app: kube-dns
+        kubernetes.io/cluster-service: "true"
+    spec:
+      dnsPolicy: "Default"
+      containers:
+        - name: etcd
+          image: quay.io/coreos/etcd:v2.0.3
+          command:
+            - "/etcd"
+            - "-listen-client-urls=http://0.0.0.0:2379,http://0.0.0.0:4001"
+            - "-initial-cluster-token=skydns-etcd"
+            - "-advertise-client-urls=http://127.0.0.1:4001"
+        - name: kube2sky
+          image: gcr.io/google_containers/kube2sky:1.2
+          command:
+            - "/kube2sky"
+            - "-domain=kubernetes.local"
+        - name: skydns
+          image: gcr.io/google_containers/skydns:2015-03-11-001
+          command:
+            - "/skydns"
+            - "-machines=http://localhost:4001"
+            - "-addr=0.0.0.0:53"
+            - "-domain=kubernetes.local"
+          ports:
+            - name: dns
+              containerPort: 53
+              protocol: UDP

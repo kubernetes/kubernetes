@@ -1,6 +1,6 @@
 # Kubelet Upstart and SysVinit configuration file
 
-# Customize kubelet binary location 
+# Customize kubelet binary location
 # KUBELET="/opt/bin/kubelet"
 
 # Use KUBELET_OPTS to modify the start/restart options
@@ -9,6 +9,8 @@ KUBELET_OPTS="--address=0.0.0.0 \
 --port=10250 \
 --hostname_override=MY_IP \
 --api_servers=http://MASTER_IP:8080 \
---logtostderr=true"
+--logtostderr=true \
+--cluster_dns=11.1.1.11 \
+--cluster_domain=kubernetes.local"
 
 # Add more envionrment settings used by kube-scheduler here

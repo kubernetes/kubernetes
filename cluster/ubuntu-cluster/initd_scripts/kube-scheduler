@@ -4,11 +4,11 @@ set -e
 ### BEGIN INIT INFO
 # Provides:           kube-scheduler
 # Required-Start:     $etcd
-# Required-Stop:      
-# Should-Start:       
-# Should-Stop:        
-# Default-Start:      
-# Default-Stop:       
+# Required-Stop:
+# Should-Start:
+# Should-Stop:
+# Default-Start:
+# Default-Stop:
 # Short-Description:  Start kube-proxy service
 # Description:
 #  http://www.github.com/GoogleCloudPlatform/Kubernetes
@@ -30,26 +30,26 @@ KUBE_SCHEDULER_DESC="Kube-Scheduler"
 . /lib/lsb/init-functions
 
 if [ -f /etc/default/$BASE ]; then
-	. /etc/default/$BASE
+  . /etc/default/$BASE
 fi
 
 # see also init_is_upstart in /lib/lsb/init-functions (which isn't available in Ubuntu 12.04, or we'd use it)
 if [ -x /sbin/initctl ] && /sbin/initctl version 2>/dev/null | grep -q upstart; then
-	log_failure_msg "$KUBE_SCHEDULER_DESC is managed via upstart, try using service $BASE $1"
-	exit 1
+  log_failure_msg "$KUBE_SCHEDULER_DESC is managed via upstart, try using service $BASE $1"
+  exit 1
 fi
 
 # Check kube-scheduler is present
 if [ ! -x $KUBE_SCHEDULER ]; then
-	log_failure_msg "$KUBE_SCHEDULER not present or not executable"
-	exit 1
+  log_failure_msg "$KUBE_SCHEDULER not present or not executable"
+  exit 1
 fi
 
 fail_unless_root() {
-	if [ "$(id -u)" != '0' ]; then
-		log_failure_msg "$KUBE_SCHEDULER_DESC must be run as root"
-		exit 1
-	fi
+  if [ "$(id -u)" != '0' ]; then
+    log_failure_msg "$KUBE_SCHEDULER_DESC must be run as root"
+    exit 1
+  fi
 }
 
 KUBE_SCHEDULER_START="start-stop-daemon \
@@ -66,34 +66,34 @@ KUBE_SCHEDULER_STOP="start-stop-daemon \
 --pidfile $KUBE_SCHEDULER_PIDFILE"
 
 case "$1" in
-	start)
-		fail_unless_root
-		log_begin_msg "Starting $KUBE_SCHEDULER_DESC: $BASE"
-        $KUBE_SCHEDULER_START
-		log_end_msg $?
-		;;
+  start)
+    fail_unless_root
+    log_begin_msg "Starting $KUBE_SCHEDULER_DESC: $BASE"
+    $KUBE_SCHEDULER_START
+    log_end_msg $?
+    ;;
 
-	stop)
-		fail_unless_root
-		log_begin_msg "Stopping $KUBE_SCHEDULER_DESC: $BASE"
-		$KUBE_SCHEDULER_STOP
-		log_end_msg $?
-		;;
+  stop)
+    fail_unless_root
+    log_begin_msg "Stopping $KUBE_SCHEDULER_DESC: $BASE"
+    $KUBE_SCHEDULER_STOP
+    log_end_msg $?
+    ;;
 
-	restart | force-reload)
-		fail_unless_root
-		log_begin_msg "Restarting $KUBE_SCHEDULER_DESC: $BASE"
-		$KUBE_SCHEDULER_STOP
-		$KUBE_SCHEDULER_START
-		log_end_msg $?
-		;;
+  restart | force-reload)
+    fail_unless_root
+    log_begin_msg "Restarting $KUBE_SCHEDULER_DESC: $BASE"
+    $KUBE_SCHEDULER_STOP
+    $KUBE_SCHEDULER_START
+    log_end_msg $?
+    ;;
 
-	status)
-		status_of_proc -p "$KUBE_SCHEDULER_PIDFILE" "$KUBE_SCHEDULER" "$KUBE_SCHEDULER_DESC"
-		;;
+  status)
+    status_of_proc -p "$KUBE_SCHEDULER_PIDFILE" "$KUBE_SCHEDULER" "$KUBE_SCHEDULER_DESC"
+    ;;
 
-	*)
-		echo "Usage: $0 {start|stop|restart|status}"
-		exit 1
-		;;
+  *)
+    echo "Usage: $0 {start|stop|restart|status}"
+    exit 1
+    ;;
 esac
