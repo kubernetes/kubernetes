@@ -17,7 +17,6 @@ limitations under the License.
 package nfs
 
 import (
-	"fmt"
 	"os"
 	"testing"
 
@@ -67,35 +66,6 @@ func contains(modes []api.AccessModeType, mode api.AccessModeType) bool {
 	return false
 }
 
-type fakeNFSMounter struct {
-	FakeMounter mount.FakeMounter
-}
-
-func (fake *fakeNFSMounter) Mount(server string, source string, target string, readOnly bool) error {
-	flags := 0
-	if readOnly {
-		flags |= mount.FlagReadOnly
-	}
-	fake.FakeMounter.MountPoints = append(fake.FakeMounter.MountPoints, mount.MountPoint{Device: server, Path: target, Type: "nfs", Opts: nil, Freq: 0, Pass: 0})
-	return fake.FakeMounter.Mount(fmt.Sprintf("%s:%s", server, source), target, "nfs", 0, "")
-}
-
-func (fake *fakeNFSMounter) Unmount(target string) error {
-	fake.FakeMounter.MountPoints = []mount.MountPoint{}
-	return fake.FakeMounter.Unmount(target, 0)
-}
-
-func (fake *fakeNFSMounter) List() ([]mount.MountPoint, error) {
-	list, _ := fake.FakeMounter.List()
-	return list, nil
-}
-
-func (fake *fakeNFSMounter) IsMountPoint(dir string) (bool, error) {
-	list, _ := fake.FakeMounter.List()
-	isMount := len(list) > 0
-	return isMount, nil
-}
-
 func TestPlugin(t *testing.T) {
 	plugMgr := volume.VolumePluginMgr{}
 	plugMgr.InitPlugins(ProbeVolumePlugins(), volume.NewFakeVolumeHost("/tmp/fake", nil, nil))
@@ -107,7 +77,7 @@ func TestPlugin(t *testing.T) {
 		Name:         "vol1",
 		VolumeSource: api.VolumeSource{NFS: &api.NFSVolumeSource{"localhost", "/tmp", false}},
 	}
-	fake := &fakeNFSMounter{}
+	fake := &mount.FakeMounter{}
 	builder, err := plug.(*nfsPlugin).newBuilderInternal(volume.NewSpecFromVolume(spec), &api.ObjectReference{UID: types.UID("poduid")}, fake)
 	volumePath := builder.GetPath()
 	if err != nil {
@@ -133,14 +103,14 @@ func TestPlugin(t *testing.T) {
 	if builder.(*nfs).readOnly {
 		t.Errorf("The volume source should not be read-only and it is.")
 	}
-	if len(fake.FakeMounter.Log) != 1 {
-		t.Errorf("Mount was not called exactly one time. It was called %d times.", len(fake.FakeMounter.Log))
+	if len(fake.Log) != 1 {
+		t.Errorf("Mount was not called exactly one time. It was called %d times.", len(fake.Log))
 	} else {
-		if fake.FakeMounter.Log[0].Action != mount.FakeActionMount {
-			t.Errorf("Unexpected mounter action: %#v", fake.FakeMounter.Log[0])
+		if fake.Log[0].Action != mount.FakeActionMount {
+			t.Errorf("Unexpected mounter action: %#v", fake.Log[0])
 		}
 	}
-	fake.FakeMounter.ResetLog()
+	fake.ResetLog()
 
 	cleaner, err := plug.(*nfsPlugin).newCleanerInternal("vol1", types.UID("poduid"), fake)
 	if err != nil {
@@ -157,13 +127,13 @@ func TestPlugin(t *testing.T) {
 	} else if !os.IsNotExist(err) {
 		t.Errorf("SetUp() failed: %v", err)
 	}
-	if len(fake.FakeMounter.Log) != 1 {
-		t.Errorf("Unmount was not called exactly one time. It was called %d times.", len(fake.FakeMounter.Log))
+	if len(fake.Log) != 1 {
+		t.Errorf("Unmount was not called exactly one time. It was called %d times.", len(fake.Log))
 	} else {
-		if fake.FakeMounter.Log[0].Action != mount.FakeActionUnmount {
-			t.Errorf("Unexpected mounter action: %#v", fake.FakeMounter.Log[0])
+		if fake.Log[0].Action != mount.FakeActionUnmount {
+			t.Errorf("Unexpected mounter action: %#v", fake.Log[0])
 		}
 	}
 
-	fake.FakeMounter.ResetLog()
+	fake.ResetLog()
 }

@@ -197,6 +197,7 @@ func (ed *emptyDir) setupTmpfs(dir string) error {
 	if isMnt && medium == mediumMemory {
 		return nil
 	}
+
 	// By default a tmpfs mount will receive a different SELinux context
 	// from that of the Kubelet root directory which is not readable from
 	// the SELinux context of a docker container.
@@ -206,15 +207,15 @@ func (ed *emptyDir) setupTmpfs(dir string) error {
 	// the container.
 	opts := ed.getTmpfsMountOptions()
 	glog.V(3).Infof("pod %v: mounting tmpfs for volume %v with opts %v", ed.podUID, ed.volName, opts)
-	return ed.mounter.Mount("tmpfs", dir, "tmpfs", 0, opts)
+	return ed.mounter.Mount("tmpfs", dir, "tmpfs", opts)
 }
 
-func (ed *emptyDir) getTmpfsMountOptions() string {
+func (ed *emptyDir) getTmpfsMountOptions() []string {
 	if ed.rootContext == "" {
-		return ""
+		return []string{""}
 	}
 
-	return fmt.Sprintf("rootcontext=\"%v\"", ed.rootContext)
+	return []string{fmt.Sprintf("rootcontext=\"%v\"", ed.rootContext)}
 }
 
 func (ed *emptyDir) GetPath() string {
@@ -261,7 +262,7 @@ func (ed *emptyDir) teardownTmpfs(dir string) error {
 	if ed.mounter == nil {
 		return fmt.Errorf("memory storage requested, but mounter is nil")
 	}
-	if err := ed.mounter.Unmount(dir, 0); err != nil {
+	if err := ed.mounter.Unmount(dir); err != nil {
 		return err
 	}
 	if err := os.RemoveAll(dir); err != nil {

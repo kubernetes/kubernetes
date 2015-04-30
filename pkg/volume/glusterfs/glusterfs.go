@@ -19,7 +19,6 @@ package glusterfs
 import (
 	"math/rand"
 	"os"
-	"strings"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
@@ -129,16 +128,15 @@ func (glusterfsVolume *glusterfs) SetUpAt(dir string) error {
 	if mountpoint {
 		return nil
 	}
-	path := glusterfsVolume.path
+
 	os.MkdirAll(dir, 0750)
-	err = glusterfsVolume.execMount(glusterfsVolume.hosts, path, dir, glusterfsVolume.readonly)
+	err = glusterfsVolume.setUpAtInternal(dir)
 	if err == nil {
 		return nil
 	}
 
-	// cleanup upon failure
+	// Cleanup upon failure.
 	glusterfsVolume.cleanup(dir)
-	// return error
 	return err
 }
 
@@ -165,7 +163,7 @@ func (glusterfsVolume *glusterfs) cleanup(dir string) error {
 		return os.RemoveAll(dir)
 	}
 
-	if err := glusterfsVolume.mounter.Unmount(dir, 0); err != nil {
+	if err := glusterfsVolume.mounter.Unmount(dir); err != nil {
 		glog.Errorf("Glusterfs: Unmounting failed: %v", err)
 		return err
 	}
@@ -183,30 +181,21 @@ func (glusterfsVolume *glusterfs) cleanup(dir string) error {
 	return nil
 }
 
-func (glusterfsVolume *glusterfs) execMount(hosts *api.Endpoints, path string, mountpoint string, readonly bool) error {
+func (glusterfsVolume *glusterfs) setUpAtInternal(dir string) error {
 	var errs error
-	var command exec.Cmd
-	var mountArgs []string
-	var opt []string
 
-	// build option array
-	if readonly == true {
-		opt = []string{"-o", "ro"}
-	} else {
-		opt = []string{"-o", "rw"}
+	options := []string{}
+	if glusterfsVolume.readonly {
+		options = append(options, "ro")
 	}
 
-	l := len(hosts.Subsets)
-	// avoid mount storm, pick a host randomly
+	l := len(glusterfsVolume.hosts.Subsets)
+	// Avoid mount storm, pick a host randomly.
 	start := rand.Int() % l
-	// iterate all hosts until mount succeeds.
+	// Iterate all hosts until mount succeeds.
 	for i := start; i < start+l; i++ {
-		arg := []string{"-t", "glusterfs", hosts.Subsets[i%l].Addresses[0].IP + ":" + path, mountpoint}
-		mountArgs = append(arg, opt...)
-		glog.V(1).Infof("Glusterfs: mount cmd: mount %v", strings.Join(mountArgs, " "))
-		command = glusterfsVolume.exe.Command("mount", mountArgs...)
-
-		_, errs = command.CombinedOutput()
+		hostIP := glusterfsVolume.hosts.Subsets[i%l].Addresses[0].IP
+		errs = glusterfsVolume.mounter.Mount(hostIP+":"+glusterfsVolume.path, dir, "glusterfs", options)
 		if errs == nil {
 			return nil
 		}

@@ -18,14 +18,11 @@ limitations under the License.
 // an alternate platform, we will need to abstract further.
 package mount
 
-// Each supported platform must define the following flags:
-//   - FlagBind: specifies a bind mount
-//   - FlagReadOnly: the mount will be read-only
 type Interface interface {
-	// Mount wraps syscall.Mount().
-	Mount(source string, target string, fstype string, flags uintptr, data string) error
-	// Umount wraps syscall.Mount().
-	Unmount(target string, flags int) error
+	// Mount mounts source to target as fstype with given options.
+	Mount(source string, target string, fstype string, options []string) error
+	// Unmount unmounts given target.
+	Unmount(target string) error
 	// List returns a list of all mounted filesystems.  This can be large.
 	// On some platforms, reading mounts is not guaranteed consistent (i.e.
 	// it could change between chunked reads). This is guaranteed to be

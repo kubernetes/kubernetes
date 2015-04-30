@@ -80,7 +80,7 @@ func (fake *fakePDManager) AttachAndMountDisk(pd *gcePersistentDisk, globalPDPat
 	fake.attachCalled = true
 	// Simulate the global mount so that the fakeMounter returns the
 	// expected number of mounts for the attached disk.
-	pd.mounter.Mount(globalPath, globalPath, pd.fsType, 0, "")
+	pd.mounter.Mount(globalPath, globalPath, pd.fsType, nil)
 	return nil
 }
 

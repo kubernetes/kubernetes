@@ -24,6 +24,7 @@ import (
 	"hash/adler32"
 	"io"
 	"os"
+	"os/exec"
 	"strconv"
 	"strings"
 	"syscall"
@@ -31,28 +32,91 @@ import (
 	"github.com/golang/glog"
 )
 
-const FlagBind = syscall.MS_BIND
-const FlagReadOnly = syscall.MS_RDONLY
+const (
+	// How many times to retry for a consistent read of /proc/mounts.
+	maxListTries = 3
+	// Number of fields per line in "/proc/mounts", as per the fstab man page.
+	expectedNumFieldsPerLine = 6
+)
 
 // Mounter implements mount.Interface for linux platform.
 type Mounter struct{}
 
-// Mount wraps syscall.Mount()
-func (mounter *Mounter) Mount(source string, target string, fstype string, flags uintptr, data string) error {
-	glog.V(5).Infof("Mounting %s %s %s %d %s", source, target, fstype, flags, data)
-	return syscall.Mount(source, target, fstype, flags, data)
+// Mount mounts source to target as fstype with given options. 'source' and 'fstype' must
+// be an emtpy string in case it's not required, e.g. for remount, or for auto filesystem
+// type, where kernel handles fs type for you. The mount 'options' is a list of options,
+// currently come from mount(8), e.g. "ro", "remount", "bind", etc. If no more option is
+// required, call Mount with an empty string list or nil.
+func (mounter *Mounter) Mount(source string, target string, fstype string, options []string) error {
+	// The remount options to use in case of bind mount, due to the fact that bind mount doesn't
+	// respect mount options.  The list equals:
+	//   options - 'bind' + 'remount' (no duplicate)
+	bindRemountOpts := []string{"remount"}
+	bind := false
+
+	if len(options) != 0 {
+		for _, option := range options {
+			switch option {
+			case "bind":
+				bind = true
+				break
+			case "remount":
+				break
+			default:
+				bindRemountOpts = append(bindRemountOpts, option)
+			}
+		}
+	}
+
+	if bind {
+		err := doMount(source, target, fstype, []string{"bind"})
+		if err != nil {
+			return err
+		}
+		return doMount(source, target, fstype, bindRemountOpts)
+	} else {
+		return doMount(source, target, fstype, options)
+	}
 }
 
-// Unmount wraps syscall.Unmount()
-func (mounter *Mounter) Unmount(target string, flags int) error {
-	return syscall.Unmount(target, flags)
+func doMount(source string, target string, fstype string, options []string) error {
+	glog.V(5).Infof("Mounting %s %s %s %v", source, target, fstype, options)
+	// Build mount command as follows:
+	//   mount [-t $fstype] [-o $options] [$source] $target
+	mountArgs := []string{}
+	if len(fstype) > 0 {
+		mountArgs = append(mountArgs, "-t", fstype)
+	}
+	if len(options) > 0 {
+		mountArgs = append(mountArgs, "-o", strings.Join(options, ","))
+	}
+	if len(source) > 0 {
+		mountArgs = append(mountArgs, source)
+	}
+	mountArgs = append(mountArgs, target)
+	command := exec.Command("mount", mountArgs...)
+	output, err := command.CombinedOutput()
+	if err != nil {
+		glog.Errorf("Mount failed: %v\nMounting arguments: %s %s %s %v\nOutput: %s\n",
+			err, source, target, fstype, options, string(output))
+	}
+	return err
 }
 
-// How many times to retry for a consistent read of /proc/mounts.
-const maxListTries = 3
+// Unmount unmounts target with given options.
+func (mounter *Mounter) Unmount(target string) error {
+	glog.V(5).Infof("Unmounting %s %v")
+	command := exec.Command("umount", target)
+	output, err := command.CombinedOutput()
+	if err != nil {
+		glog.Errorf("Unmount failed: %v\nUnmounting arguments: %s\nOutput: %s\n", err, target, string(output))
+		return err
+	}
+	return nil
+}
 
 // List returns a list of all mounted filesystems.
-func (*Mounter) List() ([]MountPoint, error) {
+func (mounter *Mounter) List() ([]MountPoint, error) {
 	hash1, err := readProcMounts(nil)
 	if err != nil {
 		return nil, err
@@ -88,9 +152,6 @@ func (mounter *Mounter) IsMountPoint(file string) (bool, error) {
 	// If the directory has the same device as parent, then it's not a mountpoint.
 	return stat.Sys().(*syscall.Stat_t).Dev != rootStat.Sys().(*syscall.Stat_t).Dev, nil
 }
-
-// As per the fstab man page.
-const expectedNumFieldsPerLine = 6
 
 // readProcMounts reads /proc/mounts and produces a hash of the contents.  If the out
 // argument is not nil, this fills it with MountPoint structs.
