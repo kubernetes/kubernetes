@@ -455,7 +455,8 @@ func (r *Request) Body(obj interface{}) *Request {
 	return r
 }
 
-func (r *Request) finalURL() string {
+// URL returns the current working URL.
+func (r *Request) URL() *url.URL {
 	p := r.path
 	if r.namespaceSet && !r.namespaceInQuery && len(r.namespace) > 0 {
 		p = path.Join(p, "namespaces", r.namespace)
@@ -472,9 +473,9 @@ func (r *Request) finalURL() string {
 		p = path.Join(p, r.resourceName, r.subresource, r.subpath)
 	}
 
-	finalURL := url.URL{}
+	finalURL := &url.URL{}
 	if r.baseURL != nil {
-		finalURL = *r.baseURL
+		*finalURL = *r.baseURL
 	}
 	finalURL.Path = p
 
@@ -494,16 +495,16 @@ func (r *Request) finalURL() string {
 		query.Set("timeout", r.timeout.String())
 	}
 	finalURL.RawQuery = query.Encode()
-	return finalURL.String()
+	return finalURL
 }
 
-// Similar to finalURL(), but if the request contains name of an object
+// finalURLTemplate is similar to URL(), but if the request contains name of an object
 // (e.g. GET for a specific Pod) it will be substited with "<name>".
-func (r Request) finalURLTemplate() string {
+func (r *Request) finalURLTemplate() string {
 	if len(r.resourceName) != 0 {
 		r.resourceName = "<name>"
 	}
-	return r.finalURL()
+	return r.URL().String()
 }
 
 // Watch attempts to begin watching the requested location.
@@ -512,7 +513,8 @@ func (r *Request) Watch() (watch.Interface, error) {
 	if r.err != nil {
 		return nil, r.err
 	}
-	req, err := http.NewRequest(r.verb, r.finalURL(), r.body)
+	url := r.URL().String()
+	req, err := http.NewRequest(r.verb, url, r.body)
 	if err != nil {
 		return nil, err
 	}
@@ -533,7 +535,7 @@ func (r *Request) Watch() (watch.Interface, error) {
 		if result := r.transformResponse(resp, req); result.err != nil {
 			return nil, result.err
 		}
-		return nil, fmt.Errorf("for request '%+v', got status: %v", req.URL, resp.StatusCode)
+		return nil, fmt.Errorf("for request '%+v', got status: %v", url, resp.StatusCode)
 	}
 	return watch.NewStreamWatcher(watchjson.NewDecoder(resp.Body, r.codec)), nil
 }
@@ -546,7 +548,8 @@ func (r *Request) Stream() (io.ReadCloser, error) {
 	if r.err != nil {
 		return nil, r.err
 	}
-	req, err := http.NewRequest(r.verb, r.finalURL(), nil)
+	url := r.URL().String()
+	req, err := http.NewRequest(r.verb, url, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -567,7 +570,7 @@ func (r *Request) Stream() (io.ReadCloser, error) {
 		// we have a decent shot at taking the object returned, parsing it as a status object and returning a more normal error
 		bodyBytes, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
-			return nil, fmt.Errorf("%v while accessing %v", resp.Status, r.finalURL())
+			return nil, fmt.Errorf("%v while accessing %v", resp.Status, url)
 		}
 
 		if runtimeObject, err := r.codec.Decode(bodyBytes); err == nil {
@@ -579,7 +582,7 @@ func (r *Request) Stream() (io.ReadCloser, error) {
 		}
 
 		bodyText := string(bodyBytes)
-		return nil, fmt.Errorf("%s while accessing %v: %s", resp.Status, r.finalURL(), bodyText)
+		return nil, fmt.Errorf("%s while accessing %v: %s", resp.Status, url, bodyText)
 	}
 
 	return resp.Body, nil
@@ -606,7 +609,7 @@ func (r *Request) Upgrade(config *Config, newRoundTripperFunc func(*tls.Config) 
 
 	r.client = &http.Client{Transport: wrapper}
 
-	req, err := http.NewRequest(r.verb, r.finalURL(), nil)
+	req, err := http.NewRequest(r.verb, r.URL().String(), nil)
 	if err != nil {
 		return nil, fmt.Errorf("Error creating request: %s", err)
 	}
@@ -647,8 +650,8 @@ func (r *Request) request(fn func(*http.Request, *http.Response)) error {
 	maxRetries := 10
 	retries := 0
 	for {
-		url := r.finalURL()
-		req, err := http.NewRequest(r.verb, r.finalURL(), r.body)
+		url := r.URL().String()
+		req, err := http.NewRequest(r.verb, url, r.body)
 		if err != nil {
 			return err
 		}
