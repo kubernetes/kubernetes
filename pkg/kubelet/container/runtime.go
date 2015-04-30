@@ -46,12 +46,10 @@ type Runtime interface {
 	GetPods(all bool) ([]*Pod, error)
 	// RunPod starts all the containers of a pod within a namespace.
 	RunPod(*api.Pod, map[string]volume.Volume) error
+	// Syncs the running pod into the desired pod.
+	SyncPod(pod *api.Pod, runningPod Pod, podStatus api.PodStatus) error
 	// KillPod kills all the containers of a pod.
 	KillPod(pod Pod) error
-	// RunContainerInPod starts a container within the same namespace of a pod.
-	RunContainerInPod(api.Container, *api.Pod, map[string]volume.Volume) error
-	// KillContainerInPod kills a container in the pod.
-	KillContainerInPod(api.Container, *api.Pod) error
 	// GetPodStatus retrieves the status of the pod, including the information of
 	// all containers in the pod.
 	GetPodStatus(*api.Pod) (*api.PodStatus, error)
