@@ -33,6 +33,9 @@ RUN sed -i -e "s/USER=td-agent/USER=root/" -e "s/GROUP=td-agent/GROUP=root/" /et
 # Install the Elasticsearch Fluentd plug-in.
 RUN /usr/sbin/td-agent-gem install fluent-plugin-elasticsearch
 
+# Install the record reformer plugin.
+RUN /usr/sbin/td-agent-gem install fluent-plugin-record-reformer
+
 # Copy the Fluentd configuration file.
 COPY td-agent.conf /etc/td-agent/td-agent.conf
 
