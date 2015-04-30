@@ -22,6 +22,7 @@ import (
 	"strings"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/credentialprovider"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	"github.com/coreos/go-systemd/dbus"
 	"github.com/golang/glog"
 )
@@ -137,4 +138,10 @@ func (r *Runtime) runCommand(args ...string) ([]string, error) {
 		return nil, err
 	}
 	return strings.Split(strings.TrimSpace(string(output)), "\n"), nil
+}
+
+// makePodServiceFileName constructs the unit file name for a pod using its UID.
+func makePodServiceFileName(uid types.UID) string {
+	// TODO(yifan): Revisit this later, decide whether we want to use UID.
+	return fmt.Sprintf("%s_%s.service", kubernetesUnitPrefix, uid)
 }
