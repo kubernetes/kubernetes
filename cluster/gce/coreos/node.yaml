@@ -123,7 +123,7 @@ coreos:
         ExecStartPre=/usr/bin/mkdir -p /etc/kubernetes/manifests
         ExecStartPre=/run/setup-auth.sh
         ExecStart=/opt/kubernetes/server/bin/kubelet \
-        --api_servers=https://kubernetes-master.c.${PROJECT_ID}.internal \
+        --api_servers=https://${KUBERNETES_MASTER_NAME}.c.${PROJECT_ID}.internal \
         --config=/etc/kubernetes/manifests \
         --allow_privileged=False \
         --v=2 \
@@ -146,7 +146,7 @@ coreos:
         EnvironmentFile=/etc/kube-env
         ExecStartPre=/run/config-kube-proxy.sh
         ExecStart=/opt/kubernetes/server/bin/kube-proxy \
-        --master=https://kubernetes-master.c.${PROJECT_ID}.internal \
+        --master=https://${KUBERNETES_MASTER_NAME}.c.${PROJECT_ID}.internal \
         --kubeconfig=/var/lib/kube-proxy/kubeconfig \
         --v=2 \
         --logtostderr=true
