@@ -71,26 +71,26 @@ func TestRequestWithErrorWontChange(t *testing.T) {
 
 func TestRequestPreservesBaseTrailingSlash(t *testing.T) {
 	r := &Request{baseURL: &url.URL{}, path: "/path/", namespaceInQuery: true}
-	if s := r.finalURL(); s != "/path/" {
+	if s := r.URL().String(); s != "/path/" {
 		t.Errorf("trailing slash should be preserved: %s", s)
 	}
 }
 
 func TestRequestAbsPathPreservesTrailingSlash(t *testing.T) {
 	r := (&Request{baseURL: &url.URL{}, namespaceInQuery: true}).AbsPath("/foo/")
-	if s := r.finalURL(); s != "/foo/" {
+	if s := r.URL().String(); s != "/foo/" {
 		t.Errorf("trailing slash should be preserved: %s", s)
 	}
 
 	r = (&Request{baseURL: &url.URL{}}).AbsPath("/foo/")
-	if s := r.finalURL(); s != "/foo/" {
+	if s := r.URL().String(); s != "/foo/" {
 		t.Errorf("trailing slash should be preserved: %s", s)
 	}
 }
 
 func TestRequestAbsPathJoins(t *testing.T) {
 	r := (&Request{baseURL: &url.URL{}, namespaceInQuery: true}).AbsPath("foo/bar", "baz")
-	if s := r.finalURL(); s != "foo/bar/baz" {
+	if s := r.URL().String(); s != "foo/bar/baz" {
 		t.Errorf("trailing slash should be preserved: %s", s)
 	}
 }
@@ -105,7 +105,7 @@ func TestRequestSetsNamespace(t *testing.T) {
 	if r.namespace == "" {
 		t.Errorf("namespace should be set: %#v", r)
 	}
-	if s := r.finalURL(); s != "?namespace=foo" {
+	if s := r.URL().String(); s != "?namespace=foo" {
 		t.Errorf("namespace should be in params: %s", s)
 	}
 
@@ -114,7 +114,7 @@ func TestRequestSetsNamespace(t *testing.T) {
 			Path: "/",
 		},
 	}).Namespace("foo")
-	if s := r.finalURL(); s != "namespaces/foo" {
+	if s := r.URL().String(); s != "namespaces/foo" {
 		t.Errorf("namespace should be in path: %s", s)
 	}
 }
@@ -124,7 +124,7 @@ func TestRequestOrdersNamespaceInPath(t *testing.T) {
 		baseURL: &url.URL{},
 		path:    "/test/",
 	}).Name("bar").Resource("baz").Namespace("foo")
-	if s := r.finalURL(); s != "/test/namespaces/foo/baz/bar" {
+	if s := r.URL().String(); s != "/test/namespaces/foo/baz/bar" {
 		t.Errorf("namespace should be in order in path: %s", s)
 	}
 }
@@ -134,7 +134,7 @@ func TestRequestOrdersSubResource(t *testing.T) {
 		baseURL: &url.URL{},
 		path:    "/test/",
 	}).Name("bar").Resource("baz").Namespace("foo").Suffix("test").SubResource("a", "b")
-	if s := r.finalURL(); s != "/test/namespaces/foo/baz/bar/a/b/test" {
+	if s := r.URL().String(); s != "/test/namespaces/foo/baz/bar/a/b/test" {
 		t.Errorf("namespace should be in order in path: %s", s)
 	}
 }
@@ -1028,7 +1028,7 @@ func TestUintParam(t *testing.T) {
 	for _, item := range table {
 		c := NewOrDie(&Config{})
 		r := c.Get().AbsPath("").UintParam(item.name, item.testVal)
-		if e, a := item.expectStr, r.finalURL(); e != a {
+		if e, a := item.expectStr, r.URL().String(); e != a {
 			t.Errorf("expected %v, got %v", e, a)
 		}
 	}
