@@ -235,6 +235,7 @@ func NewMainKubelet(
 		resourceContainer:              resourceContainer,
 		os:                             osInterface,
 		oomWatcher:                     oomWatcher,
+		runtimeHooks:                   newKubeletRuntimeHooks(recorder),
 	}
 
 	if plug, err := network.InitNetworkPlugin(networkPlugins, networkPluginName, &networkHost{klet}); err != nil {
@@ -402,8 +403,14 @@ type Kubelet struct {
 	// Name must be absolute.
 	resourceContainer string
 
-	os         kubecontainer.OSInterface
+	os kubecontainer.OSInterface
+
+	// Watcher of out of memory events.
 	oomWatcher OOMWatcher
+
+	// TODO(vmarmol): Remove this when we only have to inject the hooks into the runtimes.
+	// Hooks injected into the container runtime.
+	runtimeHooks kubecontainer.RuntimeHooks
 }
 
 // getRootDir returns the full path to the directory under which kubelet can
@@ -867,41 +874,25 @@ func parseResolvConf(reader io.Reader) (nameservers []string, searches []string,
 
 // Pull the image for the specified pod and container.
 func (kl *Kubelet) pullImage(pod *api.Pod, container *api.Container) error {
-	if container.ImagePullPolicy == api.PullNever {
-		return nil
-	}
-
-	start := time.Now()
-	defer func() {
-		metrics.ImagePullLatency.Observe(metrics.SinceInMicroseconds(start))
-	}()
-
-	ref, err := kubecontainer.GenerateContainerRef(pod, container)
-	if err != nil {
-		glog.Errorf("Couldn't make a ref to pod %v, container %v: '%v'", pod.Name, container.Name, err)
-	}
 	present, err := kl.containerManager.IsImagePresent(container.Image)
 	if err != nil {
+		ref, err := kubecontainer.GenerateContainerRef(pod, container)
+		if err != nil {
+			glog.Errorf("Couldn't make a ref to pod %v, container %v: '%v'", pod.Name, container.Name, err)
+		}
 		if ref != nil {
 			kl.recorder.Eventf(ref, "failed", "Failed to inspect image %q: %v", container.Image, err)
 		}
 		return fmt.Errorf("failed to inspect image %q: %v", container.Image, err)
 	}
 
-	if container.ImagePullPolicy == api.PullAlways ||
-		(container.ImagePullPolicy == api.PullIfNotPresent && (!present)) {
-		if err := kl.containerManager.Pull(container.Image); err != nil {
-			if ref != nil {
-				kl.recorder.Eventf(ref, "failed", "Failed to pull image %q: %v", container.Image, err)
-			}
-			return err
-		}
-		if ref != nil {
-			kl.recorder.Eventf(ref, "pulled", "Successfully pulled image %q", container.Image)
-		}
+	if !kl.runtimeHooks.ShouldPullImage(pod, container, present) {
+		return nil
 	}
 
-	return nil
+	err = kl.containerManager.Pull(container.Image)
+	kl.runtimeHooks.ReportImagePull(pod, container, err)
+	return err
 }
 
 // Kill all running containers in a pod (includes the pod infra container).

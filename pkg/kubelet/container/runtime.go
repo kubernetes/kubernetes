@@ -81,6 +81,16 @@ type Runtime interface {
 	GetContainerLogs(containerID, tail string, follow bool, stdout, stderr io.Writer) (err error)
 }
 
+// Customizable hooks injected into container runtimes.
+type RuntimeHooks interface {
+	// Determines whether the runtime should pull the specified container's image.
+	ShouldPullImage(pod *api.Pod, container *api.Container, imagePresent bool) bool
+
+	// Runs after an image is pulled reporting its status. Error may be nil
+	// for a successful pull.
+	ReportImagePull(pod *api.Pod, container *api.Container, err error)
+}
+
 // Pod is a group of containers, with the status of the pod.
 type Pod struct {
 	// The ID of the pod, which can be used to retrieve a particular pod

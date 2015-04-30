@@ -28,13 +28,6 @@ import (
 const kubeletSubsystem = "kubelet"
 
 var (
-	ImagePullLatency = prometheus.NewSummary(
-		prometheus.SummaryOpts{
-			Subsystem: kubeletSubsystem,
-			Name:      "image_pull_latency_microseconds",
-			Help:      "Image pull latency in microseconds.",
-		},
-	)
 	ContainersPerPodCount = prometheus.NewSummary(
 		prometheus.SummaryOpts{
 			Subsystem: kubeletSubsystem,
@@ -73,7 +66,6 @@ var registerMetrics sync.Once
 func Register(containerCache kubecontainer.RuntimeCache) {
 	// Register the metrics.
 	registerMetrics.Do(func() {
-		prometheus.MustRegister(ImagePullLatency)
 		prometheus.MustRegister(SyncPodLatency)
 		prometheus.MustRegister(DockerOperationsLatency)
 		prometheus.MustRegister(SyncPodsLatency)
