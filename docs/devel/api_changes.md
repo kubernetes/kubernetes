@@ -222,9 +222,24 @@ types, structural change in particular - you must add some logic to convert
 versioned APIs to and from the internal representation.  If you see errors from
 the `serialization_test`, it may indicate the need for explicit conversions.
 
+Performance of conversions very heavily influence performance of apiserver.
+Thus, we are auto-generating conversion functions that are much more efficient
+than the generic ones (which are based on reflections and thus are highly
+inefficient).
+
 The conversion code resides with each versioned API -
-`pkg/api/<version>/conversion.go`.  Unsurprisingly, this also requires you to
-add tests to `pkg/api/<version>/conversion_test.go`.
+`pkg/api/<version>/conversion.go`.  To regenerate conversion functions:
+   - run
+```
+   $ go run cmd/kube-conversion/conversion.go -v <version> -f <file1.txt> -n <file2.txt>
+```
+   - replace all conversion functions (convert\* functions) in the above file
+     with the contents of \<file1.txt\>
+   - replace arguments of `newer.Scheme.AddGeneratedConversionFuncs`
+     with the contents of \<file2.txt\>
+
+Unsurprisingly, this also requires you to add tests to
+`pkg/api/<version>/conversion_test.go`.
 
 ## Update the fuzzer
 

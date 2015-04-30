@@ -27,6 +27,7 @@ import (
 type Generator interface {
 	GenerateConversionsForType(version string, reflection reflect.Type) error
 	WriteConversionFunctions(w io.Writer) error
+	WriteConversionFunctionNames(w io.Writer) error
 	OverwritePackage(pkg, overwrite string)
 }
 
@@ -177,7 +178,7 @@ func (g *generator) WriteConversionFunctions(w io.Writer) error {
 	}
 	sort.Sort(byName(keys))
 
-	indent := 2
+	indent := 0
 	for _, inType := range keys {
 		outType := g.convertibles[inType]
 		// All types in g.convertibles are structs.
@@ -194,12 +195,32 @@ func (g *generator) WriteConversionFunctions(w io.Writer) error {
 	return nil
 }
 
+func (g *generator) WriteConversionFunctionNames(w io.Writer) error {
+	// Write conversion function names alphabetically ordered.
+	var names []string
+	for inType, outType := range g.convertibles {
+		names = append(names, conversionFunctionName(inType, outType))
+		names = append(names, conversionFunctionName(outType, inType))
+	}
+	sort.Strings(names)
+
+	indent := 2
+	for _, name := range names {
+		if err := writeLine(w, indent, fmt.Sprintf("%s,\n", name)); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (g *generator) typeName(inType reflect.Type) string {
 	switch inType.Kind() {
 	case reflect.Map:
 		return fmt.Sprintf("map[%s]%s", g.typeName(inType.Key()), g.typeName(inType.Elem()))
 	case reflect.Slice:
 		return fmt.Sprintf("[]%s", g.typeName(inType.Elem()))
+	case reflect.Ptr:
+		return fmt.Sprintf("*%s", g.typeName(inType.Elem()))
 	default:
 		typeWithPkg := fmt.Sprintf("%s", inType)
 		slices := strings.Split(typeWithPkg, ".")
@@ -221,6 +242,22 @@ func (g *generator) typeName(inType reflect.Type) string {
 	}
 }
 
+func packageForName(inType reflect.Type) string {
+	if inType.PkgPath() == "" {
+		return ""
+	}
+	slices := strings.Split(inType.PkgPath(), "/")
+	return slices[len(slices)-1]
+}
+
+func conversionFunctionName(inType, outType reflect.Type) string {
+	funcNameFormat := "convert_%s_%s_To_%s_%s"
+	inPkg := packageForName(inType)
+	outPkg := packageForName(outType)
+	funcName := fmt.Sprintf(funcNameFormat, inPkg, inType.Name(), outPkg, outType.Name())
+	return funcName
+}
+
 func indentLine(w io.Writer, indent int) error {
 	indentation := ""
 	for i := 0; i < indent; i++ {
@@ -240,9 +277,9 @@ func writeLine(w io.Writer, indent int, line string) error {
 	return nil
 }
 
-func writeHeader(w io.Writer, inType, outType string, indent int) error {
-	format := "func(in *%s, out *%s, s conversion.Scope) error {\n"
-	stmt := fmt.Sprintf(format, inType, outType)
+func writeHeader(w io.Writer, name, inType, outType string, indent int) error {
+	format := "func %s(in *%s, out *%s, s conversion.Scope) error {\n"
+	stmt := fmt.Sprintf(format, name, inType, outType)
 	return writeLine(w, indent, stmt)
 }
 
@@ -250,7 +287,7 @@ func writeFooter(w io.Writer, indent int) error {
 	if err := writeLine(w, indent+1, "return nil\n"); err != nil {
 		return err
 	}
-	if err := writeLine(w, indent, "},\n"); err != nil {
+	if err := writeLine(w, indent, "}\n"); err != nil {
 		return err
 	}
 	return nil
@@ -336,13 +373,29 @@ func (g *generator) writeConversionForSlice(w io.Writer, inField, outField refle
 	if err := writeLine(w, indent+1, forStmt); err != nil {
 		return err
 	}
-	if inField.Type.Elem().AssignableTo(outField.Type.Elem()) {
-		assignFormat := "out.%s[i] = in.%s[i]\n"
-		assignStmt := fmt.Sprintf(assignFormat, outField.Name, inField.Name)
-		if err := writeLine(w, indent+2, assignStmt); err != nil {
-			return err
+	assigned := false
+	switch inField.Type.Elem().Kind() {
+	case reflect.Map, reflect.Ptr, reflect.Slice, reflect.Interface, reflect.Struct:
+		// Don't copy these via assignment/conversion!
+	default:
+		// This should handle all simple types.
+		if inField.Type.Elem().AssignableTo(outField.Type.Elem()) {
+			assignFormat := "out.%s[i] = in.%s[i]\n"
+			assignStmt := fmt.Sprintf(assignFormat, outField.Name, inField.Name)
+			if err := writeLine(w, indent+2, assignStmt); err != nil {
+				return err
+			}
+			assigned = true
+		} else if inField.Type.Elem().ConvertibleTo(outField.Type.Elem()) {
+			assignFormat := "out.%s[i] = %s(in.%s[i])\n"
+			assignStmt := fmt.Sprintf(assignFormat, outField.Name, g.typeName(outField.Type.Elem()), inField.Name)
+			if err := writeLine(w, indent+2, assignStmt); err != nil {
+				return err
+			}
+			assigned = true
 		}
-	} else {
+	}
+	if !assigned {
 		assignFormat := "if err := s.Convert(&in.%s[i], &out.%s[i], 0); err != nil {\n"
 		assignStmt := fmt.Sprintf(assignFormat, inField.Name, outField.Name)
 		if err := writeLine(w, indent+2, assignStmt); err != nil {
@@ -471,10 +524,6 @@ func (g *generator) writeConversionForStruct(w io.Writer, inType, outType reflec
 			continue
 		}
 
-		// TODO(wojtek-t): At some point we may consider named functions and call
-		// appropriate function here instead of using generic Convert method that
-		// will call the same method underneath after some additional operations.
-
 		assignFormat := "if err := s.Convert(&in.%s, &out.%s, 0); err != nil {\n"
 		assignStmt := fmt.Sprintf(assignFormat, inField.Name, outField.Name)
 		if err := writeLine(w, indent, assignStmt); err != nil {
@@ -491,7 +540,8 @@ func (g *generator) writeConversionForStruct(w io.Writer, inType, outType reflec
 }
 
 func (g *generator) writeConversionForType(w io.Writer, inType, outType reflect.Type, indent int) error {
-	if err := writeHeader(w, g.typeName(inType), g.typeName(outType), indent); err != nil {
+	funcName := conversionFunctionName(inType, outType)
+	if err := writeHeader(w, funcName, g.typeName(inType), g.typeName(outType), indent); err != nil {
 		return err
 	}
 	switch inType.Kind() {
@@ -503,6 +553,9 @@ func (g *generator) writeConversionForType(w io.Writer, inType, outType reflect.
 		return fmt.Errorf("Type not supported: %v", inType)
 	}
 	if err := writeFooter(w, indent); err != nil {
+		return err
+	}
+	if err := writeLine(w, 0, "\n"); err != nil {
 		return err
 	}
 	return nil

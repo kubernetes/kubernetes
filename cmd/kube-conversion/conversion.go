@@ -20,7 +20,6 @@ import (
 	"io"
 	"os"
 	"runtime"
-	"strings"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/api/v1beta1"
@@ -33,39 +32,51 @@ import (
 )
 
 var (
-	outputDest = flag.StringP("output", "o", "-", "Output destination; '-' means stdout")
-	versions   = flag.StringP("versions", "v", "v1beta3", "Comma separated list of versions for conversion.")
+	functionDest = flag.StringP("funcDest", "f", "-", "Output for conversion functions; '-' means stdout")
+	namesDest    = flag.StringP("nameDest", "n", "-", "Output for function names; '-' means stdout")
+	version      = flag.StringP("version", "v", "v1beta3", "Version for conversion.")
 )
 
 func main() {
 	runtime.GOMAXPROCS(runtime.NumCPU())
 	flag.Parse()
 
-	var out io.Writer
-	if *outputDest == "-" {
-		out = os.Stdout
+	var funcOut io.Writer
+	if *functionDest == "-" {
+		funcOut = os.Stdout
 	} else {
-		file, err := os.Create(*outputDest)
+		file, err := os.Create(*functionDest)
 		if err != nil {
-			glog.Fatalf("Couldn't open %v: %v", *outputDest, err)
+			glog.Fatalf("Couldn't open %v: %v", *functionDest, err)
 		}
 		defer file.Close()
-		out = file
+		funcOut = file
+	}
+	var nameOut io.Writer
+	if *namesDest == "-" {
+		nameOut = os.Stdout
+	} else {
+		file, err := os.Create(*namesDest)
+		if err != nil {
+			glog.Fatalf("Couldn't open %v: %v", *functionDest, err)
+		}
+		defer file.Close()
+		nameOut = file
 	}
 
-	versionsForConversion := strings.Split(*versions, ",")
-	for _, version := range versionsForConversion {
-		generator := conversion.NewGenerator(api.Scheme.Raw())
-		// TODO(wojtek-t): Change the overwrites to a flag.
-		generator.OverwritePackage(version, "")
-		generator.OverwritePackage("api", "newer")
-		for _, knownType := range api.Scheme.KnownTypes(version) {
-			if err := generator.GenerateConversionsForType(version, knownType); err != nil {
-				glog.Errorf("error while generating conversion functions for %v: %v", knownType, err)
-			}
+	generator := conversion.NewGenerator(api.Scheme.Raw())
+	// TODO(wojtek-t): Change the overwrites to a flag.
+	generator.OverwritePackage(*version, "")
+	generator.OverwritePackage("api", "newer")
+	for _, knownType := range api.Scheme.KnownTypes(*version) {
+		if err := generator.GenerateConversionsForType(*version, knownType); err != nil {
+			glog.Errorf("error while generating conversion functions for %v: %v", knownType, err)
 		}
-		if err := generator.WriteConversionFunctions(out); err != nil {
-			glog.Fatalf("Error while writing conversion functions: %v", err)
-		}
+	}
+	if err := generator.WriteConversionFunctions(funcOut); err != nil {
+		glog.Fatalf("Error while writing conversion functions: %v", err)
+	}
+	if err := generator.WriteConversionFunctionNames(nameOut); err != nil {
+		glog.Fatalf("Error while writing conversion functions: %v", err)
 	}
 }

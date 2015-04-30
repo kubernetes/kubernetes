@@ -82,7 +82,20 @@ func NewRollingUpdater(namespace string, c RollingUpdaterClient) *RollingUpdater
 const (
 	sourceIdAnnotation        = kubectlAnnotationPrefix + "update-source-id"
 	desiredReplicasAnnotation = kubectlAnnotationPrefix + "desired-replicas"
+	nextControllerAnnotation  = kubectlAnnotationPrefix + "next-controller-id"
 )
+
+func GetNextControllerAnnotation(rc *api.ReplicationController) (string, bool) {
+	res, found := rc.Annotations[nextControllerAnnotation]
+	return res, found
+}
+
+func SetNextControllerAnnotation(rc *api.ReplicationController, name string) {
+	if rc.Annotations == nil {
+		rc.Annotations = map[string]string{}
+	}
+	rc.Annotations[nextControllerAnnotation] = name
+}
 
 // Update all pods for a ReplicationController (oldRc) by creating a new
 // controller (newRc) with 0 replicas, and synchronously resizing oldRc,newRc
