@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package kubelet
+package lifecycle
 
 import (
 	"fmt"
@@ -25,19 +25,20 @@ import (
 	kubecontainer "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/dockertools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/prober"
+	kubeletTypes "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/golang/glog"
 )
 
-type handlerRunner struct {
-	httpGetter       httpGetter
+type HandlerRunner struct {
+	httpGetter       kubeletTypes.HttpGetter
 	commandRunner    prober.ContainerCommandRunner
 	containerManager *dockertools.DockerManager
 }
 
 // TODO(yifan): Merge commandRunner and containerManager once containerManager implements the ContainerCommandRunner interface.
-func newHandlerRunner(httpGetter httpGetter, commandRunner prober.ContainerCommandRunner, containerManager *dockertools.DockerManager) kubecontainer.HandlerRunner {
-	return &handlerRunner{
+func NewHandlerRunner(httpGetter kubeletTypes.HttpGetter, commandRunner prober.ContainerCommandRunner, containerManager *dockertools.DockerManager) kubecontainer.HandlerRunner {
+	return &HandlerRunner{
 		httpGetter:       httpGetter,
 		commandRunner:    commandRunner,
 		containerManager: containerManager,
@@ -45,7 +46,7 @@ func newHandlerRunner(httpGetter httpGetter, commandRunner prober.ContainerComma
 }
 
 // TODO(yifan): Use a strong type for containerID.
-func (hr *handlerRunner) Run(containerID string, pod *api.Pod, container *api.Container, handler *api.Handler) error {
+func (hr *HandlerRunner) Run(containerID string, pod *api.Pod, container *api.Container, handler *api.Handler) error {
 	switch {
 	case handler.Exec != nil:
 		_, err := hr.commandRunner.RunInContainer(containerID, handler.Exec.Command)
@@ -84,7 +85,7 @@ func resolvePort(portReference util.IntOrString, container *api.Container) (int,
 	return -1, fmt.Errorf("couldn't find port: %v in %v", portReference, container)
 }
 
-func (hr *handlerRunner) runHTTPHandler(pod *api.Pod, container *api.Container, handler *api.Handler) error {
+func (hr *HandlerRunner) runHTTPHandler(pod *api.Pod, container *api.Container, handler *api.Handler) error {
 	host := handler.HTTPGet.Host
 	if len(host) == 0 {
 		status, err := hr.containerManager.GetPodStatus(pod)

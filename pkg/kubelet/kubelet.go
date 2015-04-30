@@ -41,6 +41,7 @@ import (
 	kubecontainer "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/dockertools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/envvars"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/lifecycle"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/metrics"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/network"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/prober"
@@ -260,7 +261,7 @@ func NewMainKubelet(
 
 	klet.podManager = newBasicPodManager(klet.kubeClient)
 	klet.prober = prober.New(klet.runner, klet.readinessManager, klet.containerRefManager, klet.recorder)
-	klet.handlerRunner = newHandlerRunner(klet.httpClient, klet.runner, klet.containerManager)
+	klet.handlerRunner = lifecycle.NewHandlerRunner(klet.httpClient, klet.runner, klet.containerManager)
 
 	// TODO(vmarmol): Remove when the circular dependency is removed :(
 	containerManager.Prober = klet.prober
@@ -289,10 +290,6 @@ func NewMainKubelet(
 	}
 
 	return klet, nil
-}
-
-type httpGetter interface {
-	Get(url string) (*http.Response, error)
 }
 
 type serviceLister interface {
@@ -326,7 +323,7 @@ type Kubelet struct {
 	// Optional, defaults to simple Docker implementation
 	runner prober.ContainerCommandRunner
 	// Optional, client for http requests, defaults to empty client
-	httpClient httpGetter
+	httpClient kubeletTypes.HttpGetter
 
 	// cAdvisor used for container information.
 	cadvisor cadvisor.Interface
