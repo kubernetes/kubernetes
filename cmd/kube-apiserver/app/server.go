@@ -80,6 +80,7 @@ type APIServer struct {
 	CorsAllowedOriginList      util.StringList
 	AllowPrivileged            bool
 	PortalNet                  util.IPNet // TODO: make this a list
+	PublicServicePorts         util.PortRange
 	EnableLogsSupport          bool
 	MasterServiceNamespace     string
 	RuntimeConfig              util.ConfigurationMap

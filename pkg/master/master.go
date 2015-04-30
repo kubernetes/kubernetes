@@ -141,6 +141,9 @@ type Config struct {
 
 	// The name of the cluster.
 	ClusterName string
+
+	// The range of ports to be assigned to public services
+	PublicServicePorts util.PortRange
 }
 
 // Master contains state for a Kubernetes cluster master/api server.
@@ -169,6 +172,7 @@ type Master struct {
 	v1beta3               bool
 	v1                    bool
 	requestContextMapper  api.RequestContextMapper
+	publicServicePorts    util.PortRange
 
 	// External host is the name that should be used in external (public internet) URLs for this master
 	externalHost string
@@ -221,10 +225,12 @@ func setDefaults(c *Config) {
 		if err != nil {
 			glog.Fatalf("Unable to parse CIDR: %v", err)
 		}
-		if size := ipallocator.RangeSize(portalNet); size < 8 {
-			glog.Fatalf("The portal net range must be at least %d IP addresses", 8)
-		}
 		c.PortalNet = portalNet
+	}
+	if c.PublicServicePorts.Size == 0 {
+		// TODO: Currently no way to specify no PublicServicePorts (do we need to allow this?)
+		c.PublicServicePorts = util.PortRange{Base: 30000, Size: 2767}
+		glog.Infof("Service port range unspecified. Defaulting to %v.", c.PublicServicePorts)
 	}
 	if c.MasterCount == 0 {
 		// Clearly, there will be at least one master.
@@ -260,6 +266,7 @@ func setDefaults(c *Config) {
 // Certain config fields will be set to a default value if unset,
 // including:
 //   PortalNet
+//   PublicServicePorts
 //   MasterCount
 //   ReadOnlyPort
 //   ReadWritePort
@@ -299,8 +306,8 @@ func New(c *Config) *Master {
 
 	m := &Master{
 		portalNet:             c.PortalNet,
+		publicServicePorts:    c.PublicServicePorts,
 		rootWebService:        new(restful.WebService),
-		enableCoreControllers: c.EnableCoreControllers,
 		enableLogsSupport:     c.EnableLogsSupport,
 		enableUISupport:       c.EnableUISupport,
 		enableSwaggerSupport:  c.EnableSwaggerSupport,
@@ -444,7 +451,7 @@ func (m *Master) init(c *Config) {
 		"podTemplates": podTemplateStorage,
 
 		"replicationControllers": controllerStorage,
-		"services":               service.NewStorage(m.serviceRegistry, m.nodeRegistry, m.endpointRegistry, portalAllocator, c.ClusterName),
+		"services":               service.NewStorage(m.serviceRegistry, m.nodeRegistry, m.endpointRegistry, portalAllocator, m.publicServicePorts, c.ClusterName),
 		"endpoints":              endpointsStorage,
 		"minions":                nodeStorage,
 		"minions/status":         nodeStatusStorage,
