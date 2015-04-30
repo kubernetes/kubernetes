@@ -18,6 +18,7 @@ package cache
 
 import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/golang/glog"
 	"time"
 )
 
@@ -81,6 +82,7 @@ func (c *ExpirationCache) getOrExpire(key string) (interface{}, bool) {
 		return nil, false
 	}
 	if c.expirationPolicy.IsExpired(timestampedItem) {
+		glog.V(4).Infof("Entry %v: %+v has expired", key, timestampedItem.obj)
 		// Since expiration happens lazily on read, don't hold up
 		// the reader trying to acquire a write lock for the delete.
 		// The next reader will retry the delete even if this one
