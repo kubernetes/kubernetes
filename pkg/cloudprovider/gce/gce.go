@@ -42,8 +42,6 @@ import (
 	"google.golang.org/cloud/compute/metadata"
 )
 
-const EXTERNAL_IP_METADATA_URL = "http://169.254.169.254/computeMetadata/v1/instance/network-interfaces/0/access-configs/0/external-ip"
-
 // GCECloud is an implementation of Interface, TCPLoadBalancer and Instances for Google Compute Engine.
 type GCECloud struct {
 	service          *compute.Service
@@ -414,27 +412,28 @@ func (gce *GCECloud) getInstanceByName(name string) (*compute.Instance, error) {
 
 // NodeAddresses is an implementation of Instances.NodeAddresses.
 func (gce *GCECloud) NodeAddresses(instance string) ([]api.NodeAddress, error) {
-	externalIP, err := gce.metadataAccess(EXTERNAL_IP_METADATA_URL)
+	externalIP, err := gce.getExternalIP(instance)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("couldn't get external IP for instance %s: %v", instance, err)
 	}
-	nodeAddresses := []api.NodeAddress{{Type: api.NodeExternalIP, Address: externalIP}}
-	if legacyHostAddress, err := gce.getLegacyHostAddress(instance); err == nil {
-		nodeAddresses = append(nodeAddresses, *legacyHostAddress)
-	}
-	return nodeAddresses, nil
+
+	return []api.NodeAddress{
+		{Type: api.NodeExternalIP, Address: externalIP},
+		// TODO(mbforbes): Remove NodeLegacyHostIP once v1beta1 is removed.
+		{Type: api.NodeLegacyHostIP, Address: externalIP},
+	}, nil
 }
 
-func (gce *GCECloud) getLegacyHostAddress(instance string) (*api.NodeAddress, error) {
+func (gce *GCECloud) getExternalIP(instance string) (string, error) {
 	inst, err := gce.getInstanceByName(instance)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 	ip := net.ParseIP(inst.NetworkInterfaces[0].AccessConfigs[0].NatIP)
 	if ip == nil {
-		return nil, fmt.Errorf("invalid network IP: %s", inst.NetworkInterfaces[0].AccessConfigs[0].NatIP)
+		return "", fmt.Errorf("invalid network IP: %s", inst.NetworkInterfaces[0].AccessConfigs[0].NatIP)
 	}
-	return &api.NodeAddress{Type: api.NodeLegacyHostIP, Address: ip.String()}, nil
+	return ip.String(), nil
 }
 
 // ExternalID returns the cloud provider ID of the specified instance.
