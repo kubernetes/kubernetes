@@ -43,7 +43,7 @@
             "osImage": "Debian GNU/Linux 7 (wheezy)",
             "containerRuntimeVersion": "docker://1.5.0",
             "kubeletVersion": "v0.15.0-484-g0c8ee980d705a3-dirty",
-            "KubeProxyVersion": "v0.15.0-484-g0c8ee980d705a3-dirty"
+            "kubeProxyVersion": "v0.15.0-484-g0c8ee980d705a3-dirty"
         }
     }
 }
