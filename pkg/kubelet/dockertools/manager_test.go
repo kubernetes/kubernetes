@@ -116,30 +116,6 @@ func TestSetEntrypointAndCommand(t *testing.T) {
 	}
 }
 
-func TestConvertDockerToRuntimeContainer(t *testing.T) {
-	dockerContainer := &docker.APIContainers{
-		ID:      "ab2cdf",
-		Image:   "bar_image",
-		Created: 12345,
-		Names:   []string{"/k8s_bar.5678_foo_ns_1234_42"},
-	}
-	expected := &kubecontainer.Container{
-		ID:      types.UID("ab2cdf"),
-		Name:    "bar",
-		Image:   "bar_image",
-		Hash:    0x5678,
-		Created: 12345,
-	}
-
-	actual, err := convertDockerToRuntimeContainer(dockerContainer)
-	if err != nil {
-		t.Fatalf("unexpected error %v", err)
-	}
-	if !reflect.DeepEqual(expected, actual) {
-		t.Errorf("expected %#v, got %#v", expected, actual)
-	}
-}
-
 // verifyPods returns true if the two pod slices are equal.
 func verifyPods(a, b []*kubecontainer.Pod) bool {
 	if len(a) != len(b) {
@@ -179,11 +155,10 @@ func TestGetPods(t *testing.T) {
 	}
 
 	// Convert the docker containers. This does not affect the test coverage
-	// because the conversion is tested separately in
-	// TestConvertDockerToRuntimeContainer.
+	// because the conversion is tested separately in convert_test.go
 	containers := make([]*kubecontainer.Container, len(dockerContainers))
 	for i := range containers {
-		c, err := convertDockerToRuntimeContainer(&dockerContainers[i])
+		c, err := toRuntimeContainer(&dockerContainers[i])
 		if err != nil {
 			t.Fatalf("unexpected error %v", err)
 		}
@@ -212,5 +187,26 @@ func TestGetPods(t *testing.T) {
 	}
 	if !verifyPods(expected, actual) {
 		t.Errorf("expected %#v, got %#v", expected, actual)
+	}
+}
+
+func TestListImages(t *testing.T) {
+	manager, fakeDocker := NewFakeDockerManager()
+	dockerImages := []docker.APIImages{{ID: "1111"}, {ID: "2222"}, {ID: "3333"}}
+	expected := util.NewStringSet([]string{"1111", "2222", "3333"}...)
+
+	fakeDocker.Images = dockerImages
+	actualImages, err := manager.ListImages()
+	if err != nil {
+		t.Fatalf("unexpected error %v", err)
+	}
+	actual := util.NewStringSet()
+	for _, i := range actualImages {
+		actual.Insert(i.ID)
+	}
+	// We can compare the two sets directly because util.StringSet.List()
+	// returns a "sorted" list.
+	if !reflect.DeepEqual(expected.List(), actual.List()) {
+		t.Errorf("expected %#v, got %#v", expected.List(), actual.List())
 	}
 }

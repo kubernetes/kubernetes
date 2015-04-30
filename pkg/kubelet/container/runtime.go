@@ -54,18 +54,18 @@ type Runtime interface {
 	KillContainerInPod(api.Container, *api.Pod) error
 	// GetPodStatus retrieves the status of the pod, including the information of
 	// all containers in the pod.
-	GetPodStatus(*api.Pod) (api.PodStatus, error)
+	GetPodStatus(*api.Pod) (*api.PodStatus, error)
 	// TODO(vmarmol): Merge RunInContainer and ExecInContainer.
 	// Runs the command in the container of the specified pod using nsinit.
 	// TODO(yifan): Use strong type for containerID.
-	RunInContainer(containerID string, cmd []string) error
+	RunInContainer(containerID string, cmd []string) ([]byte, error)
 	// Runs the command in the container of the specified pod using nsenter.
 	// Attaches the processes stdin, stdout, and stderr. Optionally uses a
 	// tty.
 	// TODO(yifan): Use strong type for containerID.
 	ExecInContainer(containerID string, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool) error
 	// Forward the specified port from the specified pod to the stream.
-	PortForward(pod Pod, port uint16, stream io.ReadWriteCloser) error
+	PortForward(pod *Pod, port uint16, stream io.ReadWriteCloser) error
 	// PullImage pulls an image from the network to local storage.
 	PullImage(image string) error
 	// IsImagePresent checks whether the container image is already in the local storage.
