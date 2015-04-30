@@ -109,6 +109,9 @@ appropriate backend without the clients knowing anything about Kubernetes or
 
 ![Services overview diagram](services_overview.png)
 
+By default, the choice of backend is random.  Client-IP-based session affinity
+can be selected by setting `service.spec.sessionAffinity` to  `"ClientIP"`.
+
 ### Why not use round-robin DNS?
 
 A question that pops up every now and then is why we do all this stuff with
