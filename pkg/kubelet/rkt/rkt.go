@@ -616,3 +616,26 @@ func (r *Runtime) GetPods(all bool) ([]*kubecontainer.Pod, error) {
 	}
 	return pods, nil
 }
+
+// KillPod invokes 'systemctl kill' to kill the unit that runs the pod.
+func (r *Runtime) KillPod(pod kubecontainer.Pod) error {
+	glog.V(4).Infof("Rkt is killing pod: name %q.", pod.Name)
+
+	// TODO(yifan): More graceful stop. Replace with StopUnit and wait for a timeout.
+	r.systemd.KillUnit(makePodServiceFileName(pod.ID), int32(syscall.SIGKILL))
+	return r.systemd.Reload()
+}
+
+// GetPodStatus currently invokes GetPods() to return the status.
+// TODO(yifan): Split the get status logic from GetPods().
+func (r *Runtime) GetPodStatus(pod *api.Pod) (*api.PodStatus, error) {
+	pods, err := r.GetPods(true)
+	if err != nil {
+		return nil, err
+	}
+	p := kubecontainer.Pods(pods).FindPodByID(pod.UID)
+	if len(p.Containers) == 0 {
+		return nil, fmt.Errorf("cannot find status for pod: %q", kubecontainer.BuildPodFullName(pod.Name, pod.Namespace))
+	}
+	return &p.Status, nil
+}
