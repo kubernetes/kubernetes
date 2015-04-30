@@ -19,8 +19,13 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-source $KUBE_ROOT/cluster/juju/prereqs/ubuntu-juju.sh
-KUBE_BUNDLE_URL='https://raw.githubusercontent.com/whitmo/bundle-kubernetes/master/bundles.yaml'
+UTIL_SCRIPT=$(readlink -m "${BASH_SOURCE}")
+JUJU_PATH=$(dirname ${UTIL_SCRIPT})
+source ${JUJU_PATH}/prereqs/ubuntu-juju.sh
+export JUJU_REPOSITORY=${JUJU_PATH}/charms
+#KUBE_BUNDLE_URL='https://raw.githubusercontent.com/whitmo/bundle-kubernetes/master/bundles.yaml'
+KUBE_BUNDLE_PATH=${JUJU_PATH}/bundles/local.yaml
+
 function verify-prereqs() {
     gather_installation_reqs
 }
@@ -30,66 +35,67 @@ function get-password() {
 }
 
 function kube-up() {
-    # If something were to happen that I'm not accounting for, do not
-    # punish the user by making them tear things down. In a perfect world
-    # quickstart should handle this situation, so be nice in the meantime
-    local envstatus
-    envstatus=$(juju status kubernetes-master --format=oneline)
-
-    if [[ "" == "${envstatus}" ]]; then
-        if [[ -d "~/.juju/current-env" ]]; then
-            juju quickstart -i --no-browser -i $KUBE_BUNDLE_URL
-        else
-            juju quickstart --no-browser ${KUBE_BUNDLE_URL}
-        fi
-        sleep 60
+    if [[ -d "~/.juju/current-env" ]]; then
+        juju quickstart -i --no-browser
+    else
+        juju quickstart --no-browser
     fi
+    # The juju-deployer command will deploy the bundle and can be run
+    # multiple times to continue deploying the parts that fail.
+    juju deployer -c ${KUBE_BUNDLE_PATH}
     # Sleep due to juju bug http://pad.lv/1432759
     sleep-status
+    detect-master
+    detect-minions
 }
 
+function kube-down() {
+    local jujuenv
+    jujuenv=$(cat ~/.juju/current-environment)
+    juju destroy-environment $jujuenv
+}
 
 function detect-master() {
     local kubestatus
     # Capturing a newline, and my awk-fu was weak - pipe through tr -d
     kubestatus=$(juju status --format=oneline kubernetes-master | awk '{print $3}' | tr -d "\n")
     export KUBE_MASTER_IP=${kubestatus}
-    export KUBE_MASTER=$KUBE_MASTER_IP:8080
-    export KUBERNETES_MASTER=$KUBE_MASTER
+    export KUBE_MASTER=${KUBE_MASTER_IP}
+    export KUBERNETES_MASTER=http://${KUBE_MASTER}:8080
+    echo "Kubernetes master: " ${KUBERNETES_MASTER}
+}
 
-   }
-
-function detect-minions(){
-    # Strip out the components except for STDOUT return
-    # and trim out the single quotes to build an array of minions
+function detect-minions() {
+    # Run the Juju command that gets the minion private IP addresses.
+    local ipoutput
+    ipoutput=$(juju run --service kubernetes "unit-get private-address" --format=json)
+    echo $ipoutput
+    # Strip out the IP addresses
     #
     # Example Output:
     #- MachineId: "10"
-    #  Stdout: '10.197.55.232
-    #'
+    #  Stdout: |
+    #    10.197.55.232
     # UnitId: kubernetes/0
     # - MachineId: "11"
-    # Stdout: '10.202.146.124
-    # '
+    # Stdout: |
+    #    10.202.146.124
     #  UnitId: kubernetes/1
- 
-    KUBE_MINION_IP_ADDRESSES=($(juju run --service kubernetes \
-        "unit-get private-address" --format=yaml \
-        | awk '/Stdout/ {gsub(/'\''/,""); print $2}'))
-    NUM_MINIONS=${#KUBE_MINION_IP_ADDRESSES[@]}
-    MINION_NAMES=$KUBE_MINION_IP_ADDRESSES
+    export KUBE_MINION_IP_ADDRESSES=($(${JUJU_PATH}/return-node-ips.py "${ipoutput}"))
+    echo "Kubernetes minions:  " ${KUBE_MINION_IP_ADDRESSES[@]}
+    export NUM_MINIONS=${#KUBE_MINION_IP_ADDRESSES[@]}
+    export MINION_NAMES=$KUBE_MINION_IP_ADDRESSES
 }
 
-function setup-logging-firewall(){
+function setup-logging-firewall() {
     echo "TODO: setup logging and firewall rules"
 }
 
-function teardown-logging-firewall(){
+function teardown-logging-firewall() {
     echo "TODO: teardown logging and firewall rules"
 }
 
-
-function sleep-status(){
+function sleep-status() {
     local i
     local maxtime
     local jujustatus
@@ -97,10 +103,17 @@ function sleep-status(){
     maxtime=900
     jujustatus=''
     echo "Waiting up to 15 minutes to allow the cluster to come online... wait for it..."
+
+    jujustatus=$(juju status kubernetes-master --format=oneline)
+    if [[ $jujustatus == *"started"* ]];
+    then
+        return
+    fi
+
     while [[ $i < $maxtime && $jujustatus != *"started"* ]]; do
+        sleep 15
+        i+=15
         jujustatus=$(juju status kubernetes-master --format=oneline)
-        sleep 30
-        i+=30
     done
 
     # sleep because we cannot get the status back of where the minions are in the deploy phase
@@ -109,4 +122,3 @@ function sleep-status(){
     echo "Sleeping an additional minute to allow the cluster to settle"
     sleep 60
 }
-

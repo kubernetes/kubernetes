@@ -20,12 +20,12 @@ set -o nounset
 set -o pipefail
 
 
-function check_for_ppa(){
+function check_for_ppa() {
     local repo="$1"
-    grep -qsw $repo /etcc/apt/sources.list /etc/apt/sources.list.d/*
+    grep -qsw $repo /etc/apt/sources.list /etc/apt/sources.list.d/*
 }
 
-function package_status(){
+function package_status() {
     local pkgname=$1
     local pkgstatus
     pkgstatus=$(dpkg-query -W --showformat='${Status}\n' "${pkgname}")
@@ -33,10 +33,9 @@ function package_status(){
         echo "Missing package ${pkgname}"
         sudo apt-get --force-yes --yes install ${pkgname}
     fi
-
 }
 
-function gather_installation_reqs(){
+function gather_installation_reqs() {
     if ! check_for_ppa "juju"; then
         echo "... Detected missing dependencies.. running"
         echo "... add-apt-repository ppa:juju/stable"
@@ -45,5 +44,5 @@ function gather_installation_reqs(){
     fi
 
     package_status 'juju-quickstart'
+    package_status 'juju-deployer'
 }
-
