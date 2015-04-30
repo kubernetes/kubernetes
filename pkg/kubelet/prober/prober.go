@@ -256,7 +256,7 @@ type execInContainer struct {
 
 func (p *prober) newExecInContainer(pod *api.Pod, container api.Container, containerID string, cmd []string) exec.Cmd {
 	return execInContainer{func() ([]byte, error) {
-		return p.runner.RunInContainer(containerID, cmd)
+		return p.Runner.RunInContainer(containerID, cmd)
 	}}
 }
 
