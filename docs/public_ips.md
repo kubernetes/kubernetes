@@ -216,7 +216,7 @@ of the main k8s codebase.  We would likely configure the apiserver to permit loa
 (possibly with additional firewall rules).  The loadbalancer sidecar-pod would create the load-balancer and
 call the API to report events.
 
-We could move the cloud-provider load-balancer functionality into a sidecar-pod, but not for V1.
+We might be able to move the cloud-provider load-balancer functionality into a sidecar-pod, but not for V1.
 
 Likely examples of load-balancer sidecar-pods:
 * hardware load-balancers (Cisco, Big5 etc)
