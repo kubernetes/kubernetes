@@ -33,13 +33,13 @@ Looks up a replication controller or service by name and uses the selector for t
 selector for a new Service on the specified port.`
 
 	expose_example = `// Creates a service for a replicated nginx, which serves on port 80 and connects to the containers on port 8000.
-$ kubectl expose nginx --port=80 --target-port=8000
+$ kubectl expose rc nginx --port=80 --target-port=8000
 
 // Creates a second service based on the above service, exposing the container port 8443 as port 443 with the name "nginx-https"
 $ kubectl expose service nginx --port=443 --target-port=8443 --service-name=nginx-https
 
 // Create a service for a replicated streaming application on port 4100 balancing UDP traffic and named 'video-stream'.
-$ kubectl expose streamer --port=4100 --protocol=udp --service-name=video-stream`
+$ kubectl expose rc streamer --port=4100 --protocol=udp --service-name=video-stream`
 )
 
 func NewCmdExposeService(f *cmdutil.Factory, out io.Writer) *cobra.Command {
