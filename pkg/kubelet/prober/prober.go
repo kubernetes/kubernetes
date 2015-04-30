@@ -165,10 +165,10 @@ func (pb *prober) probeReadiness(pod *api.Pod, status api.PodStatus, container a
 
 // runProbeWithRetries tries to probe the container in a finite loop, it returns the last result
 // if it never succeeds.
-func (pb *prober) runProbeWithRetries(p *api.Probe, pod *api.Pod, status api.PodStatus, container api.Container, containerID string, retires int) (probe.Result, error) {
+func (pb *prober) runProbeWithRetries(p *api.Probe, pod *api.Pod, status api.PodStatus, container api.Container, containerID string, retries int) (probe.Result, error) {
 	var err error
 	var result probe.Result
-	for i := 0; i < retires; i++ {
+	for i := 0; i < retries; i++ {
 		result, err = pb.runProbe(p, pod, status, container, containerID)
 		if result == probe.Success {
 			return probe.Success, nil
