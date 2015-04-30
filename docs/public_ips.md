@@ -98,19 +98,28 @@ updating Status as kube-proxy/kubelet.
 
 ## Creation flow
 
-### visibility: loadbalancer
-
-1. User `POST`s `/api/v1/namespaces/foo/services/bar` `Service{ Spec{ visibility: loadbalancer, ports: [{port: 80}] } }`
-1. API server assigns a hostPort, accepts and persists
-1. LB Controller wakes up, allocates a load-balancer, and `POST`s `/api/v1/namespaces/foo/services/bar` `Service{ Status{ publicIps: [ "1.2.3.4" ] }}`
-1. Service REST sets `Service.Status.publicIps = [ "1.2.3.4" ]`
-1. kube-proxy wakes up and sets iptables to receive on 1.2.3.4
-
 ### visibility: public
 
 1. User `POST`s `/api/v1/namespaces/foo/services/bar` `Service{ Spec{ visibility: public, ports: [{port: 80, hostPort: 10080}] } }`
 1. API server verifies that port 10080 can be assigned, accepts and persists
 1. kube-proxy wakes up and sets iptables to receive on hostPort 10080
+
+### visibility: loadbalancer (GCE)
+
+1. User `POST`s `/api/v1/namespaces/foo/services/bar` `Service{ Spec{ visibility: loadbalancer, ports: [{port: 80}] } }`
+1. API server assigns a hostPort, accepts and persists
+1. LB Controller wakes up, allocates a load-balancer, and `POST`s `/api/v1/namespaces/foo/services/bar` `Service{ Status{ publicIps: [ "1.2.3.4" ] }}`
+1. Service REST sets `Service.Status.publicIps = [ "1.2.3.4" ]`
+1. kube-proxy wakes up and sets iptables to receive on 1.2.3.4 (for visiblity==loadbalancer), and on hostPort (for visibility==public)
+
+### visibility: loadbalancer (AWS)
+
+1. User `POST`s `/api/v1/namespaces/foo/services/bar` `Service{ Spec{ visibility: loadbalancer, ports: [{port: 80}] } }`
+1. API server assigns a hostPort, accepts and persists
+1. LB Controller wakes up, allocates a load-balancer, and `POST`s `/api/v1/namespaces/foo/services/bar` `Service{ Status{ publicIps: [ "mylb.amazonaws.com" ] }}`
+1. Service REST sets `Service.Status.publicIps = [ "mylb.amazonaws.com" ]`
+1. kube-proxy wakes up and sets iptables to receive on hostPort (for visibility==public & visibility==loadbalancer)
+
 
 (These are just examples; it is valid to specify a hostPort with visiblity==loadbalancer, or to omit hostPort
 with visibility==public)
