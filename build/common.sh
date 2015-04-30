@@ -90,6 +90,7 @@ readonly DOCKER_DATA_MOUNT_ARGS=(
 # This is where the final release artifacts are created locally
 readonly RELEASE_STAGE="${LOCAL_OUTPUT_ROOT}/release-stage"
 readonly RELEASE_DIR="${LOCAL_OUTPUT_ROOT}/release-tars"
+readonly GCS_STAGE="${LOCAL_OUTPUT_ROOT}/gcs-stage"
 
 # The set of master binaries that run in Docker (on Linux)
 readonly KUBE_DOCKER_WRAPPED_BINARIES=(
@@ -265,7 +266,7 @@ function kube::build::short_hash() {
   else
     short_hash=$(echo -n "$1" | md5sum)
   fi
-  echo ${short_hash:0:5}
+  echo ${short_hash:0:10}
 }
 
 # Pedantically kill, wait-on and remove a container. The -f -v options
@@ -594,6 +595,14 @@ function kube::release::md5() {
   fi
 }
 
+function kube::release::sha1() {
+  if which shasum >/dev/null 2>&1; then
+    shasum -a1 "$1" | awk '{ print $1 }'
+  else
+    sha1sum "$1" | awk '{ print $1 }'
+  fi
+}
+
 # This will take binaries that run on master and creates Docker images
 # that wrap the binary in them. (One docker image per binary)
 function kube::release::create_docker_images_for_server() {
@@ -813,17 +822,59 @@ function kube::release::gcs::ensure_release_bucket() {
   fi
 }
 
+function kube::release::gcs::stage_and_hash() {
+  # Split the args into srcs... and dst
+  local -r args=( "$@" )
+  local -r split=$((${#args[@]}-1)) # Split point for src/dst args
+  local -r srcs=( "${args[@]::${split}}" )
+  local -r dst="${args[${split}]}"
+
+  for src in ${srcs[@]}; do
+    srcdir=$(dirname ${src})
+    srcthing=$(basename ${src})
+    mkdir -p ${GCS_STAGE}/${dst}
+    tar c -C ${srcdir} ${srcthing} | tar x -C ${GCS_STAGE}/${dst}
+  done
+}
+
 function kube::release::gcs::copy_release_artifacts() {
   # TODO: This isn't atomic.  There will be points in time where there will be
   # no active release.  Also, if something fails, the release could be half-
   # copied.  The real way to do this would perhaps to have some sort of release
   # version so that we are never overwriting a destination.
   local -r gcs_destination="gs://${KUBE_GCS_RELEASE_BUCKET}/${KUBE_GCS_RELEASE_PREFIX}"
-  local gcs_options=()
 
-  if [[ ${KUBE_GCS_NO_CACHING} =~ ^[yY]$ ]]; then
-    gcs_options=("-h" "Cache-Control:private, max-age=0")
-  fi
+  kube::log::status "Staging release artifacts to ${GCS_STAGE}"
+
+  rm -rf ${GCS_STAGE}
+  mkdir -p ${GCS_STAGE}
+
+  # Stage everything in release directory
+  kube::release::gcs::stage_and_hash "${RELEASE_DIR}"/* .
+
+  # Having the configure-vm.sh script from the GCE cluster deploy hosted with the
+  # release is useful for GKE.
+  kube::release::gcs::stage_and_hash "${RELEASE_STAGE}/full/kubernetes/cluster/gce/configure-vm.sh" extra/gce
+
+  # Upload the "naked" binaries to GCS.  This is useful for install scripts that
+  # download the binaries directly and don't need tars.
+  local platform platforms
+  platforms=($(cd "${RELEASE_STAGE}/client" ; echo *))
+  for platform in "${platforms[@]}"; do
+    local src="${RELEASE_STAGE}/client/${platform}/kubernetes/client/bin/*"
+    local dst="bin/${platform/-//}/"
+    # We assume here the "server package" is a superset of the "client package"
+    if [[ -d "${RELEASE_STAGE}/server/${platform}" ]]; then
+      src="${RELEASE_STAGE}/server/${platform}/kubernetes/server/bin/*"
+    fi
+    kube::release::gcs::stage_and_hash "$src" "$dst"
+  done
+
+  kube::log::status "Hashing files in ${GCS_STAGE}"
+  find ${GCS_STAGE} -type f | while read path; do
+    kube::release::md5 ${path} > "${path}.md5"
+    kube::release::sha1 ${path} > "${path}.sha1"
+  done
 
   kube::log::status "Copying release artifacts to ${gcs_destination}"
 
@@ -838,32 +889,15 @@ function kube::release::gcs::copy_release_artifacts() {
       echo "Skipping upload"
       return
     }
-    gsutil -m rm -f -R "${gcs_destination}"
+    gsutil -q -m rm -f -R "${gcs_destination}"
   fi
 
-  # Now upload everything in release directory
-  gsutil -q -m "${gcs_options[@]+${gcs_options[@]}}" cp -r "${RELEASE_DIR}"/* "${gcs_destination}"
+  local gcs_options=()
+  if [[ ${KUBE_GCS_NO_CACHING} =~ ^[yY]$ ]]; then
+    gcs_options=("-h" "Cache-Control:private, max-age=0")
+  fi
 
-  # Having the "template" scripts from the GCE cluster deploy hosted with the
-  # release is useful for GKE.  Copy everything from that directory up also.
-  gsutil "${gcs_options[@]+${gcs_options[@]}}" cp \
-    "${RELEASE_STAGE}/full/kubernetes/cluster/gce/configure-vm.sh" \
-    "${gcs_destination}extra/gce/"
-
-  # Upload the "naked" binaries to GCS.  This is useful for install scripts that
-  # download the binaries directly and don't need tars.
-  local platform platforms
-  platforms=($(cd "${RELEASE_STAGE}/client" ; echo *))
-  for platform in "${platforms[@]}"; do
-    local src="${RELEASE_STAGE}/client/${platform}/kubernetes/client/bin/*"
-    local dst="${gcs_destination}bin/${platform/-//}/"
-    # We assume here the "server package" is a superset of the "client package"
-    if [[ -d "${RELEASE_STAGE}/server/${platform}" ]]; then
-      src="${RELEASE_STAGE}/server/${platform}/kubernetes/server/bin/*"
-    fi
-    gsutil -q -m "${gcs_options[@]+${gcs_options[@]}}" cp \
-      "$src" "$dst"
-  done
+  gsutil -q -m "${gcs_options[@]+${gcs_options[@]}}" cp -r "${GCS_STAGE}"/* ${gcs_destination}
 
   # TODO(jbeda): Generate an HTML page with links for this release so it is easy
   # to see it.  For extra credit, generate a dynamic page that builds up the
@@ -872,7 +906,7 @@ function kube::release::gcs::copy_release_artifacts() {
 
   if [[ ${KUBE_GCS_MAKE_PUBLIC} =~ ^[yY]$ ]]; then
     kube::log::status "Marking all uploaded objects public"
-    gsutil -q acl ch -R -g all:R "${gcs_destination}" >/dev/null 2>&1
+    gsutil -q -m acl ch -R -g all:R "${gcs_destination}" >/dev/null 2>&1
   fi
 
   gsutil ls -lhr "${gcs_destination}"
@@ -884,8 +918,7 @@ function kube::release::gcs::publish_latest() {
   mkdir -p "${RELEASE_STAGE}/upload"
   echo ${KUBE_GCS_LATEST_CONTENTS} > "${RELEASE_STAGE}/upload/latest"
 
-  gsutil -m "${gcs_options[@]+${gcs_options[@]}}" cp \
-    "${RELEASE_STAGE}/upload/latest" "${latest_file_dst}"
+  gsutil -m cp "${RELEASE_STAGE}/upload/latest" "${latest_file_dst}"
 
   if [[ ${KUBE_GCS_MAKE_PUBLIC} =~ ^[yY]$ ]]; then
     gsutil acl ch -R -g all:R "${latest_file_dst}" >/dev/null 2>&1
