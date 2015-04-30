@@ -24,6 +24,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/conversion"
 )
 
+// AUTO-GENERATED FUNCTIONS START HERE
 func convert_v1beta3_AWSElasticBlockStoreVolumeSource_To_api_AWSElasticBlockStoreVolumeSource(in *AWSElasticBlockStoreVolumeSource, out *newer.AWSElasticBlockStoreVolumeSource, s conversion.Scope) error {
 	out.VolumeID = in.VolumeID
 	out.FSType = in.FSType
@@ -2913,6 +2914,8 @@ func convert_api_VolumeSource_To_v1beta3_VolumeSource(in *newer.VolumeSource, ou
 	}
 	return nil
 }
+
+// AUTO-GENERATED FUNCTIONS END HERE
 
 func init() {
 	err := newer.Scheme.AddGeneratedConversionFuncs(
