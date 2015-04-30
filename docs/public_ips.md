@@ -118,19 +118,25 @@ is not guaranteed to be reachable (k8s should ideally configure firewall rules t
 
 We will add a flag `public_service_ports` to the apiserver, which will determine the port-range allowed for public services.
 
-The syntax is `--public_service_ports=10000-20000` to specify the range 10000-20000 _inclusive_.
+The syntax is `--public_service_ports=30000-32767` to specify the range 30000-32767 _inclusive_.
 
 (Inside the code we will likely use a different representation)
 
-The default value is `--public_service_ports=10000-20000`.  This excludes most well-known ports, and certainly excludes
+The default value is `--public_service_ports=30000-32767`.  This excludes most well-known ports, and certainly excludes
 the <1024 ports.  We should try to keep the minion using ports <1024.
 
 TODO: figure out which >1024 ports are needed on the minion
 
 A null range can be specified (e.g. `--public_service_ports=0-0`).  This will have the effect of preventing any public port allocations.
 
-In future, we could allow disjoint port ranges (`--public_service_ports=10000-20000,22000-30000`), but not for V1
+In future, we could allow disjoint port ranges (`--public_service_ports=10000-20000,30000-32767`), but not for V1
 
+The range should not overlap the range of ports which kube-proxy uses internally for _cluster_ services;
+that range is set in /proc/sys/net/ipv4/ip_local_port_range.  We cannot know on the apiserver what the
+setting is on the kube-proxy machines (the minions), so we cannot prevent the user setting an overlapping range.
+The salt scripts could check this.  If an overlapping range is set, conflicts will randomly happen between
+cluster services and public services on some kube-proxy instances, and those kube-proxies will log errors and
+fail to serve that service.  This will likely result in degraded service availability.
 
 ## API evolution
 
@@ -191,31 +197,15 @@ for each service {
 
 ## kube-proxy iptables
 
-As part of the implementation of kube-proxy's internal magic, kube-proxy allocates ports that are used locally by
-iptables.  These ports are not visible other than to kube-proxy & iptables.  We need to be sure that these ports will
-not conflict with the cluster-wide ports.  To do that, we must make sure that kube-proxy differentiates between
-internal & external traffic, and uses these internal ports only with internal traffic.
+The current implementation of kube-proxy allocates ports for cluster services, randomly from the range
+in /proc/sys/net/ipv4/ip_local_port_range.  By allocating ports from a non-overlapping range specified by
+the public_service_ports argument, we should avoid conflicts.
 
-There are a few possible implementation strategies here:
-
-1. Use `sysctl -w net.ipv4.conf.all.route_localnet=1`, and then bind kube-proxy to 127.0.0.1 for internal traffic.  Requires kernel >= 3.6
-1. Use addrtype with iptables (external: `! --src-type local --dst-type local`, internal: `--src-type local --dst-type local`)
-1. Use the network interface to identify traffic (internal: lo, cbr0; external: eth0)
-1. Use the container CIDR range to identify internal (container) traffic (e.g. 10.244.0.0/16).  Requires fixing that CIDR.
-
-I would like to try those strategies, basically working from top to bottom until we find that one that works.  I tried
-the container CIDR strategy, so that should work.
-
-The sysctl strategy is nice, but does not work on old kernels, and so I propose for those creating a dummy internal address.
-I think the easiest way to do that is to create a bridge and assign it an IP.  This is a hack, but should allow us
-to support old kernels until they are replaced.  We should also be able to put this hack in the Salt scripts.
-
-The sysctl strategy (at least) gives simpler iptables rule than what we have now, so should make a pure-iptables implementation
-of kube-proxy easier.
+(There may be changes we can make to avoid this in future, but they are orthogonal to the public-ports work)
 
 It is possible that there would be an unexpected port-conflict meaning we could not open the port.  This will be treated
 as an unexpected failure (like out-of-fds); it will be logged and kube-proxy will continue and likely retry.  This should
-only happen if we run new services on the minions or choose a public_service_ports poorly.
+only happen if we run new services on the minions or specify public_service_ports overlapping with ip_local_port_range.
 
 
 ## Sidecar-pod implementations
