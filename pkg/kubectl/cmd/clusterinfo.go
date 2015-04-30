@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strconv"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	cmdutil "github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/cmd/util"
@@ -70,7 +71,14 @@ func RunClusterInfo(factory *cmdutil.Factory, out io.Writer, cmd *cobra.Command)
 	b.Do().Visit(func(r *resource.Info) error {
 		services := r.Object.(*api.ServiceList).Items
 		for _, service := range services {
-			link := client.Host + "/api/v1beta3/proxy/namespaces/" + service.ObjectMeta.Namespace + "/services/" + service.ObjectMeta.Name
+			var link string
+			if len(service.Spec.PublicIPs) > 0 {
+				for _, port := range service.Spec.Ports {
+					link += "http://" + service.Spec.PublicIPs[0] + ":" + strconv.Itoa(port.Port) + " "
+				}
+			} else {
+				link = client.Host + "/api/v1beta3/proxy/namespaces/" + service.ObjectMeta.Namespace + "/services/" + service.ObjectMeta.Name
+			}
 			printService(out, service.ObjectMeta.Labels["name"], link)
 		}
 		return nil
