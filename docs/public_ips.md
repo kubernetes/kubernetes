@@ -177,28 +177,28 @@ However, we would need to change the openstack code to auto-allocate a VIP.
 
 ## kube-proxy pseudocode
 
+
 ```
 for each service {
     for each service.port {
-        // listen on cluster
-        listen on <internalMagicIp>:0
-        proxyPort = figureOutTheRandomPortWeJustGotAssigned()
-        openPortal(service.portalIP, port.port, proxyPort)
-        
+      // listen on cluster
+      listen on <internalMagicIp>:0
+      proxyPort = figureOutTheRandomPortWeJustGotAssigned()
+      openPortal(service.portalIP, port.port, proxyPort)
 
-        if service.spec.visibility == "loadbalancer" || (service.spec.visibility == "" && service.createExternalLoadBalancer=true) {
-          if (port.hostPort != 0) {
-            openLoadBalancerPortals(service, port.port, port.hostPort) // uses cloud-provider to figure out correct iptables
-          }
-        } else if service.spec.visibility == "public" {
-          if (port.hostPort != 0) {
-            openPublicPortal(<publicMagicIp>, port.port, port.hostPort)
-          }
-        } else if service.spec.visibility == "" {
-          for each service.publicIP {  // deprecated
-            openPublicPortal(publicIP, port.port, proxyPort) // uses cloud-provider to decide srcip vs dstip (gclb vs rax)
-          }
+      for each service.publicIP {  // deprecated
+        openPublicPortal(publicIP, port.port, proxyPort) // uses cloud-provider to decide srcip vs dstip (gclb vs rax)
+      }
+
+      if service.spec.visibility == "loadbalancer" {
+        if (port.hostPort != 0) {
+          openLoadBalancerPortals(service, port.port, port.hostPort) // uses cloud-provider to figure out correct iptables
         }
+      } else if service.spec.visibility == "public" {
+        if (port.hostPort != 0) {
+          openPublicPortal(<publicMagicIp>, port.port, port.hostPort)
+        }
+      }
    }
 }
 ```
