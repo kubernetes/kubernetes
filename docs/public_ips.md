@@ -54,11 +54,12 @@ ServiceSpec:
   - portalIP
   - createExternalLoadBalancer  // deprecated
   - publicIPs[]  // deprecated
-  - visibility // "cluster" or "public" or "loadbalancer"
+  - visibility   // "cluster" or "public" or "loadbalancer"
   - ports[] {
       - protocol
       - port
-      - hostPort  // if non-zero, try.  if visibility == public && hostPort == 0, assign one
+      - hostPort  // if visibility==cluster, must be omitted or zero.
+                  // otherwise: if == 0, try to assign a port.  if != 0, try to assign the specified port.
    }
 ```
 
@@ -100,7 +101,7 @@ updating Status as kube-proxy/kubelet.
 ### visibility: loadbalancer
 
 1. User `POST`s `/api/v1/namespaces/foo/services/bar` `Service{ Spec{ visibility: loadbalancer, ports: [{port: 80}] } }`
-1. API server assigns a hostPort (if the load balancer needs one), accepts and persists
+1. API server assigns a hostPort, accepts and persists
 1. LB Controller wakes up, allocates a load-balancer, and `POST`s `/api/v1/namespaces/foo/services/bar` `Service{ Status{ publicIps: [ "1.2.3.4" ] }}`
 1. Service REST sets `Service.Status.publicIps = [ "1.2.3.4" ]`
 1. kube-proxy wakes up and sets iptables to receive on 1.2.3.4
