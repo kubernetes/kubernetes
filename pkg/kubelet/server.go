@@ -718,7 +718,7 @@ func (s *Server) serveStats(w http.ResponseWriter, req *http.Request) {
 	switch err {
 	case nil:
 		break
-	case ErrNoKubeletContainers, ErrContainerNotFound:
+	case ErrContainerNotFound:
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
 	default:

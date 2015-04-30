@@ -76,10 +76,6 @@ const (
 )
 
 var (
-	// ErrNoKubeletContainers returned when there are not containers managed by
-	// the kubelet (ie: either no containers on the node, or none that the kubelet cares about).
-	ErrNoKubeletContainers = errors.New("no containers managed by kubelet")
-
 	// ErrContainerNotFound returned when a container in the given pod with the
 	// given container name was not found, amongst those managed by the kubelet.
 	ErrContainerNotFound = errors.New("no matching container")
