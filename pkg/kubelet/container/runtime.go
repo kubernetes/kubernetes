@@ -74,6 +74,10 @@ type Runtime interface {
 	PullImage(image string) error
 	// IsImagePresent checks whether the container image is already in the local storage.
 	IsImagePresent(image string) (bool, error)
+	// Gets all images currently on the machine.
+	ListImages() ([]Image, error)
+	// Removes the specified image.
+	RemoveImage(image string) error
 	// GetContainerLogs returns logs of a specific container. By
 	// default, it returns a snapshot of the container log. Set 'follow' to true to
 	// stream the log. Set 'follow' to false and specify the number of lines (e.g.
@@ -162,6 +166,16 @@ type Container struct {
 	// The timestamp of the creation time of the container.
 	// TODO(yifan): Consider to move it to api.ContainerStatus.
 	Created int64
+}
+
+// Basic information about a container image.
+type Image struct {
+	// ID of the image.
+	ID string
+	// Other names by which this image is known.
+	Tags []string
+	// The size of the image in bytes.
+	Size int64
 }
 
 // RunContainerOptions specify the options which are necessary for running containers
