@@ -233,7 +233,7 @@ func (r RealPodControl) createReplica(namespace string, controller *api.Replicat
 }
 
 func (r RealPodControl) deletePod(namespace, podID string) error {
-	return r.kubeClient.Pods(namespace).Delete(podID)
+	return r.kubeClient.Pods(namespace).Delete(podID, nil)
 }
 
 // activePods type allows custom sorting of pods so an rc can pick the best ones to delete.

@@ -69,7 +69,7 @@ var _ = Describe("Events", func() {
 		By("submitting the pod to kubernetes")
 		defer func() {
 			By("deleting the pod")
-			podClient.Delete(pod.Name)
+			podClient.Delete(pod.Name, nil)
 		}()
 		if _, err := podClient.Create(pod); err != nil {
 			Failf("Failed to create pod: %v", err)

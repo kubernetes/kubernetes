@@ -1829,6 +1829,10 @@ func init() {
 				}
 			}
 			out.RestartPolicy = newer.RestartPolicy(in.RestartPolicy)
+			if in.TerminationGracePeriodSeconds != nil {
+				out.TerminationGracePeriodSeconds = new(int64)
+				*out.TerminationGracePeriodSeconds = *in.TerminationGracePeriodSeconds
+			}
 			out.DNSPolicy = newer.DNSPolicy(in.DNSPolicy)
 			if in.NodeSelector != nil {
 				out.NodeSelector = make(map[string]string)
@@ -1858,6 +1862,10 @@ func init() {
 				}
 			}
 			out.RestartPolicy = RestartPolicy(in.RestartPolicy)
+			if in.TerminationGracePeriodSeconds != nil {
+				out.TerminationGracePeriodSeconds = new(int64)
+				*out.TerminationGracePeriodSeconds = *in.TerminationGracePeriodSeconds
+			}
 			out.DNSPolicy = DNSPolicy(in.DNSPolicy)
 			if in.NodeSelector != nil {
 				out.NodeSelector = make(map[string]string)

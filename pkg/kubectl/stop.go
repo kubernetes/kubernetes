@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 )
@@ -32,7 +33,7 @@ const (
 
 // A Reaper handles terminating an object as gracefully as possible.
 type Reaper interface {
-	Stop(namespace, name string) (string, error)
+	Stop(namespace, name string, gracePeriod *api.DeleteOptions) (string, error)
 }
 
 type NoSuchReaperError struct {
@@ -76,7 +77,7 @@ type objInterface interface {
 	Get(name string) (meta.Interface, error)
 }
 
-func (reaper *ReplicationControllerReaper) Stop(namespace, name string) (string, error) {
+func (reaper *ReplicationControllerReaper) Stop(namespace, name string, gracePeriod *api.DeleteOptions) (string, error) {
 	rc := reaper.ReplicationControllers(namespace)
 	resizer, err := ResizerFor("ReplicationController", NewResizerClient(*reaper))
 	if err != nil {
@@ -91,19 +92,20 @@ func (reaper *ReplicationControllerReaper) Stop(namespace, name string) (string,
 	return fmt.Sprintf("%s stopped", name), nil
 }
 
-func (reaper *PodReaper) Stop(namespace, name string) (string, error) {
+func (reaper *PodReaper) Stop(namespace, name string, gracePeriod *api.DeleteOptions) (string, error) {
 	pods := reaper.Pods(namespace)
 	_, err := pods.Get(name)
 	if err != nil {
 		return "", err
 	}
-	if err := pods.Delete(name); err != nil {
+	if err := pods.Delete(name, gracePeriod); err != nil {
 		return "", err
 	}
+
 	return fmt.Sprintf("%s stopped", name), nil
 }
 
-func (reaper *ServiceReaper) Stop(namespace, name string) (string, error) {
+func (reaper *ServiceReaper) Stop(namespace, name string, gracePeriod *api.DeleteOptions) (string, error) {
 	services := reaper.Services(namespace)
 	_, err := services.Get(name)
 	if err != nil {

@@ -593,7 +593,7 @@ func (nc *NodeController) deletePods(nodeID string) error {
 			continue
 		}
 		glog.V(2).Infof("Delete pod %v", pod.Name)
-		if err := nc.kubeClient.Pods(pod.Namespace).Delete(pod.Name); err != nil {
+		if err := nc.kubeClient.Pods(pod.Namespace).Delete(pod.Name, nil); err != nil {
 			glog.Errorf("Error deleting pod %v: %v", pod.Name, err)
 		}
 	}

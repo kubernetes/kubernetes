@@ -363,7 +363,7 @@ func testContainerOutput(scenarioName string, c *client.Client, pod *api.Pod, ex
 func testContainerOutputInNamespace(scenarioName string, c *client.Client, pod *api.Pod, expectedOutput []string, ns string) {
 	By(fmt.Sprintf("Creating a pod to test %v", scenarioName))
 
-	defer c.Pods(ns).Delete(pod.Name)
+	defer c.Pods(ns).Delete(pod.Name, nil)
 	if _, err := c.Pods(ns).Create(pod); err != nil {
 		Failf("Failed to create pod: %v", err)
 	}

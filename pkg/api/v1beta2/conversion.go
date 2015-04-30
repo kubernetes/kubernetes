@@ -466,6 +466,10 @@ func init() {
 			if err := s.Convert(&in.RestartPolicy, &out.RestartPolicy, 0); err != nil {
 				return err
 			}
+			if in.TerminationGracePeriodSeconds != nil {
+				out.TerminationGracePeriodSeconds = new(int64)
+				*out.TerminationGracePeriodSeconds = *in.TerminationGracePeriodSeconds
+			}
 			out.DNSPolicy = DNSPolicy(in.DNSPolicy)
 			out.Version = "v1beta2"
 			out.HostNetwork = in.HostNetwork
@@ -480,6 +484,10 @@ func init() {
 			}
 			if err := s.Convert(&in.RestartPolicy, &out.RestartPolicy, 0); err != nil {
 				return err
+			}
+			if in.TerminationGracePeriodSeconds != nil {
+				out.TerminationGracePeriodSeconds = new(int64)
+				*out.TerminationGracePeriodSeconds = *in.TerminationGracePeriodSeconds
 			}
 			out.DNSPolicy = newer.DNSPolicy(in.DNSPolicy)
 			out.HostNetwork = in.HostNetwork
