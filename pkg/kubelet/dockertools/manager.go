@@ -1299,7 +1299,7 @@ func shouldContainerBeRestarted(container *api.Container, pod *api.Pod, podStatu
 
 	// Set dead containers to unready state.
 	for _, c := range resultStatus {
-		readinessManager.RemoveReadiness(kubecontainer.TrimRuntimePrefixFromImage(c.ContainerID))
+		readinessManager.RemoveReadiness(kubecontainer.TrimRuntimePrefix(c.ContainerID))
 	}
 
 	// Check RestartPolicy for dead container.

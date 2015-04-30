@@ -76,10 +76,6 @@ const (
 )
 
 var (
-	// ErrNoKubeletContainers returned when there are not containers managed by
-	// the kubelet (ie: either no containers on the node, or none that the kubelet cares about).
-	ErrNoKubeletContainers = errors.New("no containers managed by kubelet")
-
 	// ErrContainerNotFound returned when a container in the given pod with the
 	// given container name was not found, amongst those managed by the kubelet.
 	ErrContainerNotFound = errors.New("no matching container")
@@ -1435,7 +1431,7 @@ func (kl *Kubelet) validatePodPhase(podStatus *api.PodStatus) error {
 	return fmt.Errorf("pod is not in 'Running', 'Succeeded' or 'Failed' state - State: %q", podStatus.Phase)
 }
 
-func (kl *Kubelet) validateContainerStatus(podStatus *api.PodStatus, containerName string) (dockerID string, err error) {
+func (kl *Kubelet) validateContainerStatus(podStatus *api.PodStatus, containerName string) (containerID string, err error) {
 	cStatus, found := api.GetContainerStatus(podStatus.ContainerStatuses, containerName)
 	if !found {
 		return "", fmt.Errorf("container %q not found in pod", containerName)
@@ -1443,7 +1439,7 @@ func (kl *Kubelet) validateContainerStatus(podStatus *api.PodStatus, containerNa
 	if cStatus.State.Waiting != nil {
 		return "", fmt.Errorf("container %q is in waiting state.", containerName)
 	}
-	return kubecontainer.TrimRuntimePrefixFromImage(cStatus.ContainerID), nil
+	return kubecontainer.TrimRuntimePrefix(cStatus.ContainerID), nil
 }
 
 // GetKubeletContainerLogs returns logs from the container
@@ -1458,13 +1454,13 @@ func (kl *Kubelet) GetKubeletContainerLogs(podFullName, containerName, tail stri
 		// No log is available if pod is not in a "known" phase (e.g. Unknown).
 		return err
 	}
-	dockerContainerID, err := kl.validateContainerStatus(&podStatus, containerName)
+	containerID, err := kl.validateContainerStatus(&podStatus, containerName)
 	if err != nil {
 		// No log is available if the container status is missing or is in the
 		// waiting state.
 		return err
 	}
-	return kl.containerManager.GetContainerLogs(dockerContainerID, tail, follow, stdout, stderr)
+	return kl.containerManager.GetContainerLogs(containerID, tail, follow, stdout, stderr)
 }
 
 // GetHostname Returns the hostname as the kubelet sees it.
@@ -1756,7 +1752,7 @@ func (kl *Kubelet) generatePodStatus(pod *api.Pod) (api.PodStatus, error) {
 	for _, c := range spec.Containers {
 		for i, st := range podStatus.ContainerStatuses {
 			if st.Name == c.Name {
-				ready := st.State.Running != nil && kl.readinessManager.GetReadiness(strings.TrimPrefix(st.ContainerID, "docker://"))
+				ready := st.State.Running != nil && kl.readinessManager.GetReadiness(kubecontainer.TrimRuntimePrefix(st.ContainerID))
 				podStatus.ContainerStatuses[i].Ready = ready
 				break
 			}
@@ -1855,23 +1851,19 @@ func (kl *Kubelet) StreamingConnectionIdleTimeout() time.Duration {
 }
 
 // GetContainerInfo returns stats (from Cadvisor) for a container.
-func (kl *Kubelet) GetContainerInfo(podFullName string, uid types.UID, containerName string, req *cadvisorApi.ContainerInfoRequest) (*cadvisorApi.ContainerInfo, error) {
+func (kl *Kubelet) GetContainerInfo(podFullName string, podUID types.UID, containerName string, req *cadvisorApi.ContainerInfoRequest) (*cadvisorApi.ContainerInfo, error) {
 
-	uid = kl.podManager.TranslatePodUID(uid)
+	podUID = kl.podManager.TranslatePodUID(podUID)
 
-	dockerContainers, err := dockertools.GetKubeletDockerContainers(kl.dockerClient, false)
+	container, err := kl.findContainer(podFullName, podUID, containerName)
 	if err != nil {
 		return nil, err
 	}
-	if len(dockerContainers) == 0 {
-		return nil, ErrNoKubeletContainers
-	}
-	dockerContainer, found, _ := dockerContainers.FindPodContainer(podFullName, uid, containerName)
-	if !found {
+	if container == nil {
 		return nil, ErrContainerNotFound
 	}
 
-	ci, err := kl.cadvisor.DockerContainer(dockerContainer.ID, req)
+	ci, err := kl.cadvisor.DockerContainer(string(container.ID), req)
 	if err != nil {
 		return nil, err
 	}
