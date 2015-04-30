@@ -44,7 +44,6 @@ readonly KUBE_CLIENT_BINARIES_WIN=("${KUBE_CLIENT_BINARIES[@]/%/.exe}")
 
 # The set of test targets that we are building for all platforms
 readonly KUBE_TEST_TARGETS=(
-  cmd/e2e
   cmd/integration
   cmd/gendocs
   cmd/genman
@@ -59,6 +58,7 @@ readonly KUBE_TEST_PORTABLE=(
   hack/e2e-suite
   hack/e2e-internal
   hack/ginkgo-e2e.sh
+  hack/lib
 )
 
 # If we update this we need to also update the set of golang compilers we build
