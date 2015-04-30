@@ -72,5 +72,5 @@ Pod is exposed as a primitive in order to facilitate:
 * clean composition of Kubelet-level functionality with cluster-level functionality -- Kubelet is effectively the "pod controller"
 * high-availability applications, which will expect pods to be replaced in advance of their termination and certainly in advance of deletion, such as in the case of planned evictions, image prefetching, or live pod migration [#3949](https://github.com/GoogleCloudPlatform/kubernetes/issues/3949)
 
-The current best practice for pets is to create a replication controller with `replicas` equal to `1` and a corresponding service. If you find this cumbersome, please comment on [issue #260](https://github.com/GoogleCloudPlatform/kubernetes/issues/260). 
+The current best practice for pods is to create a replication controller with `replicas` equal to `1` and a corresponding service. If you find this cumbersome, please comment on [issue #260](https://github.com/GoogleCloudPlatform/kubernetes/issues/260). 
 
