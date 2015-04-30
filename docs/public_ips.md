@@ -12,18 +12,21 @@ _(new functionality)_
 ## Public ports
 
 To be exposed outside the k8s cluster, the service must be on known ports on externally reachable
-IPs.  For version 1 public services, k8s listens on _every_ external IP address on every minion, and assigns
-a _single_ port cluster-wide for each port on public services.
+IPs.  For version 1 public services, k8s exposes each public service port on a common port on each
+node.
 
 ## Important scenarios
 
 The names in bold are the names we will use in the API.
 
-1. **cluster** The service is reachable from within the cluster.  _(Existing functionality)_
+1. **cluster** The service is reachable from within the cluster on a virtual IP.  _(Existing functionality)_
 1. **loadbalancer** The service is exposed via a k8s-managed load-balancer.  _(Existing functionality)_
-1. **public** The service is exposed on a set of publicly-routable IP addresses, on a set of ports.  _(New functionality)_.
-The service endpoints would be discoverable via the k8s API, and helper processes could then expose that information
- via DNS or configure external systems (e.g. physical load balancers)
+1. **public** The service is exposed on a set of nodes, on a set of ports.  _(New functionality)_.
+ For V1 services are exposed on all nodes.  The service endpoints would be discoverable via the k8s API,
+ and helper processes could then expose that information via DNS or configure external systems
+ (e.g. physical load balancers)  The intention is that this service should then be reachable from outside
+ the k8s cluster; a cloud-provider would automatically configure firewall rules (or equivalents)
+ so that a public service is reachable from the public Internet.
 
 Expected future functionality:
 
