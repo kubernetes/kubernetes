@@ -535,3 +535,84 @@ func (r *Runtime) RunPod(pod *api.Pod, volumeMap map[string]volume.Volume) error
 	}
 	return nil
 }
+
+// makeRuntimePod constructs the container runtime pod. It will:
+// 1, Construct the pod by the information stored in the unit file.
+// 2, Construct the pod status from pod info.
+func (r *Runtime) makeRuntimePod(unitName string, podInfos map[string]*podInfo) (*kubecontainer.Pod, error) {
+	f, err := os.Open(path.Join(systemdServiceDir, unitName))
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+
+	var pod kubecontainer.Pod
+	opts, err := unit.Deserialize(f)
+	if err != nil {
+		return nil, err
+	}
+
+	var rktID string
+	for _, opt := range opts {
+		if opt.Section != unitKubernetesSection {
+			continue
+		}
+		switch opt.Name {
+		case unitPodName:
+			err = json.Unmarshal([]byte(opt.Value), &pod)
+			if err != nil {
+				return nil, err
+			}
+		case unitRktID:
+			rktID = opt.Value
+		default:
+			return nil, fmt.Errorf("rkt: Unexpected key: %q", opt.Name)
+		}
+	}
+
+	if len(rktID) == 0 {
+		return nil, fmt.Errorf("rkt: cannot find rkt ID of pod %v, unit file is broken", pod)
+	}
+	info, found := podInfos[rktID]
+	if !found {
+		return nil, fmt.Errorf("rkt: cannot find info for pod %q, rkt uuid: %q", pod.Name, rktID)
+	}
+	pod.Status = info.toPodStatus(&pod)
+	return &pod, nil
+}
+
+// GetPods runs 'systemctl list-unit' and 'rkt list' to get the list of rkt pods.
+// Then it will use the result to contruct a list of container runtime pods.
+// If all is false, then only running pods will be returned, otherwise all pods will be
+// returned.
+func (r *Runtime) GetPods(all bool) ([]*kubecontainer.Pod, error) {
+	glog.V(4).Infof("Rkt getting pods")
+
+	units, err := r.systemd.ListUnits()
+	if err != nil {
+		return nil, err
+	}
+
+	// TODO(yifan): Now we are getting the status of the pod as well.
+	// Probably we can leave much of the work to GetPodStatus().
+	podInfos, err := r.getPodInfos()
+	if err != nil {
+		return nil, err
+	}
+
+	var pods []*kubecontainer.Pod
+	for _, u := range units {
+		if strings.HasPrefix(u.Name, kubernetesUnitPrefix) {
+			if !all && u.SubState != "running" {
+				continue
+			}
+			pod, err := r.makeRuntimePod(u.Name, podInfos)
+			if err != nil {
+				glog.Warningf("rkt: Cannot construct pod from unit file: %v.", err)
+				continue
+			}
+			pods = append(pods, pod)
+		}
+	}
+	return pods, nil
+}
