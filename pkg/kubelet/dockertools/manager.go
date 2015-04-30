@@ -53,8 +53,8 @@ const (
 	maxReasonCacheEntries = 200
 )
 
-// TODO: Eventually DockerManager should implement kubecontainer.Runtime
-// interface.
+// TODO(yjhong): DockerManager should implement the Runtime interface.
+
 type DockerManager struct {
 	client              DockerInterface
 	recorder            record.EventRecorder
@@ -640,21 +640,6 @@ func getDockerContainerNameInfo(c *docker.APIContainers) (*KubeletContainerName,
 	return dockerName, hash, nil
 }
 
-// Converts docker.APIContainers to kubecontainer.Container.
-func convertDockerToRuntimeContainer(c *docker.APIContainers) (*kubecontainer.Container, error) {
-	dockerName, hash, err := getDockerContainerNameInfo(c)
-	if err != nil {
-		return nil, err
-	}
-	return &kubecontainer.Container{
-		ID:      types.UID(c.ID),
-		Name:    dockerName.ContainerName,
-		Image:   c.Image,
-		Hash:    hash,
-		Created: c.Created,
-	}, nil
-}
-
 // Get pod UID, name, and namespace by examining the container names.
 func getPodInfoFromContainer(c *docker.APIContainers) (types.UID, string, string, error) {
 	dockerName, _, err := getDockerContainerNameInfo(c)
@@ -678,7 +663,7 @@ func (dm *DockerManager) GetContainers(all bool) ([]*kubecontainer.Container, er
 	// Convert DockerContainers to []*kubecontainer.Container
 	result := make([]*kubecontainer.Container, 0, len(containers))
 	for _, c := range containers {
-		converted, err := convertDockerToRuntimeContainer(c)
+		converted, err := toRuntimeContainer(c)
 		if err != nil {
 			glog.Errorf("Error examining the container: %v", err)
 			continue
@@ -699,7 +684,7 @@ func (dm *DockerManager) GetPods(all bool) ([]*kubecontainer.Pod, error) {
 
 	// Group containers by pod.
 	for _, c := range containers {
-		converted, err := convertDockerToRuntimeContainer(c)
+		converted, err := toRuntimeContainer(c)
 		if err != nil {
 			glog.Errorf("Error examining the container: %v", err)
 			continue
@@ -730,12 +715,38 @@ func (dm *DockerManager) GetPods(all bool) ([]*kubecontainer.Pod, error) {
 	return result, nil
 }
 
-func (dm *DockerManager) Pull(image string) error {
+// List all images in the local storage.
+func (dm *DockerManager) ListImages() ([]kubecontainer.Image, error) {
+	var images []kubecontainer.Image
+
+	dockerImages, err := dm.client.ListImages(docker.ListImagesOptions{})
+	if err != nil {
+		return images, err
+	}
+
+	for _, di := range dockerImages {
+		image, err := toRuntimeImage(&di)
+		if err != nil {
+			continue
+		}
+		images = append(images, *image)
+	}
+	return images, nil
+}
+
+// PullImage pulls an image from network to local storage.
+func (dm *DockerManager) PullImage(image string) error {
 	return dm.Puller.Pull(image)
 }
 
+// IsImagePresent checks whether the container image is already in the local storage.
 func (dm *DockerManager) IsImagePresent(image string) (bool, error) {
 	return dm.Puller.IsImagePresent(image)
+}
+
+// Removes the specified image.
+func (dm *DockerManager) RemoveImage(image string) error {
+	return dm.client.RemoveImage(image)
 }
 
 // podInfraContainerChanged returns true if the pod infra container has changed.
@@ -1128,7 +1139,7 @@ func (dm *DockerManager) CreatePodInfraContainer(pod *api.Pod, generator kubecon
 		return "", err
 	}
 	if !ok {
-		if err := dm.Pull(container.Image); err != nil {
+		if err := dm.PullImage(container.Image); err != nil {
 			if ref != nil {
 				dm.recorder.Eventf(ref, "failed", "Failed to pull image %q: %v", container.Image, err)
 			}

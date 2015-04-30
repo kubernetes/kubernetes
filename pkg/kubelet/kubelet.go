@@ -883,7 +883,7 @@ func (kl *Kubelet) pullImage(pod *api.Pod, container *api.Container) error {
 		return nil
 	}
 
-	err = kl.containerManager.Pull(container.Image)
+	err = kl.containerManager.PullImage(container.Image)
 	kl.runtimeHooks.ReportImagePull(pod, container, err)
 	return err
 }
