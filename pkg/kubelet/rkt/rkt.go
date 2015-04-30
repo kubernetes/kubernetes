@@ -58,10 +58,6 @@ const (
 	Garbage        = "garbage"
 )
 
-const (
-	dockerAuthTemplate = `{"rktKind":"dockerAuth","rktVersion":"v1","registries":[%q],"credentials":{"user":%q,"password":%q}}`
-)
-
 // Runtime implements the ContainerRuntime for rkt. The implementation
 // uses systemd, so in order to run this runtime, systemd must be installed
 // on the machine.
