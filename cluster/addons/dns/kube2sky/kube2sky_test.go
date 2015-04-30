@@ -17,6 +17,7 @@ limitations under the License.
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"reflect"
 	"testing"
@@ -25,10 +26,22 @@ import (
 	kapi "github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	kwatch "github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 	"github.com/coreos/go-etcd/etcd"
+	skymsg "github.com/skynetservices/skydns/msg"
 )
 
 func TestDNSRecord(t *testing.T) {
-	if got, want := newDNSRecord("1.2.3.4", 1500), `{"host":"1.2.3.4","port":1500,"priority":10,"weight":10,"ttl":30}`; got != want {
+	svc := skymsg.Service{
+		Host:     "1.2.3.4",
+		Port:     1500,
+		Priority: dnsPriority,
+		Weight:   dnsWeight,
+		Ttl:      dnsTTL,
+	}
+	b, err := json.Marshal(svc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := newDNSRecord("1.2.3.4", 1500), string(b); got != want {
 		t.Errorf("newDNSRecord(1.2.3.4, 1500) = %q, want %q", got, want)
 	}
 }
