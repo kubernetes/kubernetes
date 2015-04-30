@@ -19,6 +19,7 @@ package kubectl
 import (
 	"fmt"
 	"io"
+	"io/ioutil"
 	"strconv"
 	"time"
 
@@ -34,6 +35,8 @@ type RollingUpdater struct {
 	c RollingUpdaterClient
 	// Namespace for resources
 	ns string
+	// debugOut is a writer for debugging messages.
+	debugOut io.Writer
 }
 
 // RollingUpdaterConfig is the configuration for a rolling deployment process.
@@ -72,16 +75,21 @@ const (
 )
 
 // NewRollingUpdater creates a RollingUpdater from a client
-func NewRollingUpdater(namespace string, c RollingUpdaterClient) *RollingUpdater {
+func NewRollingUpdater(namespace string, c RollingUpdaterClient, debugOut io.Writer) *RollingUpdater {
+	out := debugOut
+	if out == nil {
+		out = ioutil.Discard
+	}
 	return &RollingUpdater{
-		c,
-		namespace,
+		c:        c,
+		ns:       namespace,
+		debugOut: out,
 	}
 }
 
 const (
 	sourceIdAnnotation        = kubectlAnnotationPrefix + "update-source-id"
-	desiredReplicasAnnotation = kubectlAnnotationPrefix + "desired-replicas"
+	DesiredReplicasAnnotation = kubectlAnnotationPrefix + "desired-replicas"
 )
 
 // Update all pods for a ReplicationController (oldRc) by creating a new
@@ -103,7 +111,6 @@ func (r *RollingUpdater) Update(config *RollingUpdaterConfig) error {
 	interval := config.Interval
 	timeout := config.Timeout
 
-	oldName := oldRc.ObjectMeta.Name
 	newName := newRc.ObjectMeta.Name
 	retry := &RetryParams{interval, timeout}
 	waitForReplicas := &RetryParams{interval, timeout}
@@ -111,7 +118,11 @@ func (r *RollingUpdater) Update(config *RollingUpdaterConfig) error {
 		return fmt.Errorf("Invalid controller spec for %s; required: > 0 replicas, actual: %s\n", newName, newRc.Spec)
 	}
 	desired := newRc.Spec.Replicas
-	sourceId := fmt.Sprintf("%s:%s", oldName, oldRc.ObjectMeta.UID)
+
+	sourceId := ""
+	if oldRc != nil {
+		sourceId = fmt.Sprintf("%s:%s", oldRc.ObjectMeta.Name, oldRc.ObjectMeta.UID)
+	}
 
 	// look for existing newRc, incase this update was previously started but interrupted
 	rc, existing, err := r.getExistingNewRc(sourceId, newName)
@@ -120,11 +131,11 @@ func (r *RollingUpdater) Update(config *RollingUpdaterConfig) error {
 		if err != nil {
 			return err
 		}
-		replicas := rc.ObjectMeta.Annotations[desiredReplicasAnnotation]
+		replicas := rc.ObjectMeta.Annotations[DesiredReplicasAnnotation]
 		desired, err = strconv.Atoi(replicas)
 		if err != nil {
 			return fmt.Errorf("Unable to parse annotation for %s: %s=%s",
-				newName, desiredReplicasAnnotation, replicas)
+				newName, DesiredReplicasAnnotation, replicas)
 		}
 		newRc = rc
 	} else {
@@ -132,7 +143,7 @@ func (r *RollingUpdater) Update(config *RollingUpdaterConfig) error {
 		if newRc.ObjectMeta.Annotations == nil {
 			newRc.ObjectMeta.Annotations = map[string]string{}
 		}
-		newRc.ObjectMeta.Annotations[desiredReplicasAnnotation] = fmt.Sprintf("%d", desired)
+		newRc.ObjectMeta.Annotations[DesiredReplicasAnnotation] = fmt.Sprintf("%d", desired)
 		newRc.ObjectMeta.Annotations[sourceIdAnnotation] = sourceId
 		newRc.Spec.Replicas = 0
 		newRc, err = r.c.CreateReplicationController(r.ns, newRc)
@@ -141,11 +152,19 @@ func (r *RollingUpdater) Update(config *RollingUpdaterConfig) error {
 		}
 	}
 
+	// If there's no source RC, so just scale up the new immediately and return
+	// early.
+	if oldRc == nil {
+		return r.resizeAndCleanUp(newRc, newName, desired, retry, waitForReplicas, out)
+	}
+
+	oldName := oldRc.ObjectMeta.Name
 	// +1, -1 on oldRc, newRc until newRc has desired number of replicas or oldRc has 0 replicas
 	for newRc.Spec.Replicas < desired && oldRc.Spec.Replicas != 0 {
 		newRc.Spec.Replicas += 1
 		oldRc.Spec.Replicas -= 1
-		fmt.Printf("At beginning of loop: %s replicas: %d, %s replicas: %d\n",
+
+		fmt.Fprintf(r.debugOut, "At beginning of loop: %s replicas: %d, %s replicas: %d\n",
 			oldName, oldRc.Spec.Replicas,
 			newName, newRc.Spec.Replicas)
 		fmt.Fprintf(out, "Updating %s replicas: %d, %s replicas: %d\n",
@@ -161,7 +180,7 @@ func (r *RollingUpdater) Update(config *RollingUpdaterConfig) error {
 		if err != nil {
 			return err
 		}
-		fmt.Printf("At end of loop: %s replicas: %d, %s replicas: %d\n",
+		fmt.Fprintf(r.debugOut, "At end of loop: %s replicas: %d, %s replicas: %d\n",
 			oldName, oldRc.Spec.Replicas,
 			newName, newRc.Spec.Replicas)
 	}
@@ -171,32 +190,17 @@ func (r *RollingUpdater) Update(config *RollingUpdaterConfig) error {
 			oldName, oldRc.Spec.Replicas, 0)
 		oldRc.Spec.Replicas = 0
 		oldRc, err = r.resizeAndWait(oldRc, retry, waitForReplicas)
-		// oldRc, err = r.resizeAndWait(oldRc, interval, timeout)
 		if err != nil {
 			return err
 		}
 	}
-	// add remaining replicas on newRc
-	if newRc.Spec.Replicas != desired {
-		fmt.Fprintf(out, "Resizing %s replicas: %d -> %d\n",
-			newName, newRc.Spec.Replicas, desired)
-		newRc.Spec.Replicas = desired
-		newRc, err = r.resizeAndWait(newRc, retry, waitForReplicas)
-		if err != nil {
-			return err
-		}
-	}
-	// Clean up annotations
-	if newRc, err = r.c.GetReplicationController(r.ns, newName); err != nil {
-		return err
-	}
-	delete(newRc.ObjectMeta.Annotations, sourceIdAnnotation)
-	delete(newRc.ObjectMeta.Annotations, desiredReplicasAnnotation)
-	newRc, err = r.updateAndWait(newRc, interval, timeout)
+	// add remaining replicas on newRc and clean up annotations
+	err = r.resizeAndCleanUp(newRc, newName, desired, retry, waitForReplicas, out)
 	if err != nil {
 		return err
 	}
 
+	// Clean up the old RC based on policy.
 	switch config.CleanupPolicy {
 	case DeleteRollingUpdateCleanupPolicy:
 		// delete old rc
@@ -211,25 +215,31 @@ func (r *RollingUpdater) Update(config *RollingUpdaterConfig) error {
 		fmt.Fprintf(out, "Renaming %s to %s\n", newRc.Name, oldName)
 		return r.rename(newRc, oldName)
 	case PreserveRollingUpdateCleanupPolicy:
+		fmt.Fprintf(out, "Update succeeded. Preserving %s\n", oldName)
 		return nil
 	default:
 		return nil
 	}
 }
 
-func (r *RollingUpdater) getExistingNewRc(sourceId, name string) (rc *api.ReplicationController, existing bool, err error) {
-	if rc, err = r.c.GetReplicationController(r.ns, name); err == nil {
-		existing = true
-		annotations := rc.ObjectMeta.Annotations
-		source := annotations[sourceIdAnnotation]
-		_, ok := annotations[desiredReplicasAnnotation]
-		if source != sourceId || !ok {
-			err = fmt.Errorf("Missing/unexpected annotations for controller %s: %s", name, annotations)
-		}
-		return
+func (r *RollingUpdater) getExistingNewRc(sourceId, name string) (*api.ReplicationController, bool, error) {
+	rc, err := r.c.GetReplicationController(r.ns, name)
+	if err != nil {
+		return nil, false, err
 	}
-	err = nil
-	return
+
+	if _, ok := rc.ObjectMeta.Annotations[DesiredReplicasAnnotation]; !ok {
+		return rc, true, fmt.Errorf("Missing %s annotation for controller %s", DesiredReplicasAnnotation, name)
+	}
+
+	// If there's no source associated with the RC, don't validate association.
+	if len(sourceId) != 0 {
+		if source, ok := rc.ObjectMeta.Annotations[sourceIdAnnotation]; !ok || source != sourceId {
+			err = fmt.Errorf("Missing/unexpected %s annotation for controller %s: %s", sourceIdAnnotation, name, source)
+		}
+	}
+
+	return rc, true, err
 }
 
 func (r *RollingUpdater) resizeAndWait(rc *api.ReplicationController, retry *RetryParams, wait *RetryParams) (*api.ReplicationController, error) {
@@ -264,6 +274,30 @@ func (r *RollingUpdater) rename(rc *api.ReplicationController, newName string) e
 		return err
 	}
 	return r.c.DeleteReplicationController(rc.Namespace, oldName)
+}
+
+// resizeAndCleanUp resizes rc up to the desired replicas immediately, and
+// then cleans up annotations.
+func (r *RollingUpdater) resizeAndCleanUp(rc *api.ReplicationController, newName string,
+	desired int, retry *RetryParams, wait *RetryParams, out io.Writer) error {
+	var err error
+	if rc.Spec.Replicas != desired {
+		fmt.Fprintf(out, "Resizing %s replicas: %d -> %d\n",
+			newName, rc.Spec.Replicas, desired)
+		rc.Spec.Replicas = desired
+		rc, err = r.resizeAndWait(rc, retry, wait)
+		if err != nil {
+			return err
+		}
+	}
+	// Clean up annotations
+	if rc, err = r.c.GetReplicationController(r.ns, newName); err != nil {
+		return err
+	}
+	delete(rc.ObjectMeta.Annotations, sourceIdAnnotation)
+	delete(rc.ObjectMeta.Annotations, DesiredReplicasAnnotation)
+	_, err = r.updateAndWait(rc, interval, timeout)
+	return err
 }
 
 // RollingUpdaterClient abstracts access to ReplicationControllers.
