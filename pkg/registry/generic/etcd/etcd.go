@@ -296,7 +296,7 @@ func (e *Etcd) Update(ctx api.Context, obj runtime.Object) (runtime.Object, bool
 		}
 		if newVersion != version {
 			// TODO: return the most recent version to a client?
-			return nil, 0, kubeerr.NewConflict(e.EndpointName, name, fmt.Errorf("the resource was updated to %d", version))
+			return nil, 0, kubeerr.NewConflict(e.EndpointName, name, fmt.Errorf("version is %v, does not match %v specified in the update request", newVersion, version))
 		}
 		if err := rest.BeforeUpdate(e.UpdateStrategy, ctx, obj, existing); err != nil {
 			return nil, 0, err
