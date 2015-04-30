@@ -28,6 +28,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 
 	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
 )
 
 const (
@@ -45,11 +46,22 @@ const (
 
 var _ = Describe("kubectl", func() {
 	var c *client.Client
-
+	var ns string
+	var testingNs *api.Namespace
 	BeforeEach(func() {
 		var err error
 		c, err = loadClient()
 		expectNoError(err)
+		testingNs, err = createTestingNS("kubectl", c)
+		ns = testingNs.Name
+		Expect(err).NotTo(HaveOccurred())
+	})
+
+	AfterEach(func() {
+		By(fmt.Sprintf("Destroying namespace for this suite %v", ns))
+		if err := c.Namespaces().Delete(ns); err != nil {
+			Failf("Couldn't delete ns %s", err)
+		}
 	})
 
 	Describe("update-demo", func() {
@@ -63,22 +75,22 @@ var _ = Describe("kubectl", func() {
 			defer cleanup(nautilusPath, updateDemoSelector)
 
 			By("creating a replication controller")
-			runKubectl("create", "-f", nautilusPath)
-			validateController(c, nautilusImage, 2, "update-demo", updateDemoSelector, getUDData("nautilus.jpg"))
+			runKubectl("create", "-f", nautilusPath, fmt.Sprintf("--namespace=%v", ns))
+			validateController(c, nautilusImage, 2, "update-demo", updateDemoSelector, getUDData("nautilus.jpg", ns), ns)
 		})
 
 		It("should scale a replication controller", func() {
 			defer cleanup(nautilusPath, updateDemoSelector)
 
 			By("creating a replication controller")
-			runKubectl("create", "-f", nautilusPath)
-			validateController(c, nautilusImage, 2, "update-demo", updateDemoSelector, getUDData("nautilus.jpg"))
+			runKubectl("create", "-f", nautilusPath, fmt.Sprintf("--namespace=%v", ns))
+			validateController(c, nautilusImage, 2, "update-demo", updateDemoSelector, getUDData("nautilus.jpg", ns), ns)
 			By("scaling down the replication controller")
-			runKubectl("resize", "rc", "update-demo-nautilus", "--replicas=1")
-			validateController(c, nautilusImage, 1, "update-demo", updateDemoSelector, getUDData("nautilus.jpg"))
+			runKubectl("resize", "rc", "update-demo-nautilus", "--replicas=1", fmt.Sprintf("--namespace=%v", ns))
+			validateController(c, nautilusImage, 1, "update-demo", updateDemoSelector, getUDData("nautilus.jpg", ns), ns)
 			By("scaling up the replication controller")
-			runKubectl("resize", "rc", "update-demo-nautilus", "--replicas=2")
-			validateController(c, nautilusImage, 2, "update-demo", updateDemoSelector, getUDData("nautilus.jpg"))
+			runKubectl("resize", "rc", "update-demo-nautilus", "--replicas=2", fmt.Sprintf("--namespace=%v", ns))
+			validateController(c, nautilusImage, 2, "update-demo", updateDemoSelector, getUDData("nautilus.jpg", ns), ns)
 		})
 
 		It("should do a rolling update of a replication controller", func() {
@@ -86,11 +98,11 @@ var _ = Describe("kubectl", func() {
 			defer cleanup(updateDemoRoot, updateDemoSelector)
 
 			By("creating the initial replication controller")
-			runKubectl("create", "-f", nautilusPath)
-			validateController(c, nautilusImage, 2, "update-demo", updateDemoSelector, getUDData("nautilus.jpg"))
+			runKubectl("create", "-f", nautilusPath, fmt.Sprintf("--namespace=%v", ns))
+			validateController(c, nautilusImage, 2, "update-demo", updateDemoSelector, getUDData("nautilus.jpg", ns), ns)
 			By("rolling-update to new replication controller")
-			runKubectl("rolling-update", "update-demo-nautilus", "--update-period=1s", "-f", kittenPath)
-			validateController(c, kittenImage, 2, "update-demo", updateDemoSelector, getUDData("kitten.jpg"))
+			runKubectl("rolling-update", "update-demo-nautilus", "--update-period=1s", "-f", kittenPath, fmt.Sprintf("--namespace=%v", ns))
+			validateController(c, kittenImage, 2, "update-demo", updateDemoSelector, getUDData("kitten.jpg", ns), ns)
 		})
 	})
 
@@ -106,36 +118,36 @@ var _ = Describe("kubectl", func() {
 			defer cleanup(guestbookPath, frontendSelector, redisMasterSelector, redisSlaveSelector)
 
 			By("creating all guestbook components")
-			runKubectl("create", "-f", guestbookPath)
+			runKubectl("create", "-f", guestbookPath, fmt.Sprintf("--namespace=%v", ns))
 
 			By("validating guestbook app")
-			validateGuestbookApp(c)
+			validateGuestbookApp(c, ns)
 		})
 	})
 
 })
 
-func validateGuestbookApp(c *client.Client) {
+func validateGuestbookApp(c *client.Client, ns string) {
 	Logf("Waiting for frontend to serve content.")
-	if !waitForGuestbookResponse(c, "get", "", `{"data": ""}`, guestbookStartupTimeout) {
+	if !waitForGuestbookResponse(c, "get", "", `{"data": ""}`, guestbookStartupTimeout, ns) {
 		Failf("Frontend service did not start serving content in %v seconds.", guestbookStartupTimeout.Seconds())
 	}
 
 	Logf("Trying to add a new entry to the guestbook.")
-	if !waitForGuestbookResponse(c, "set", "TestEntry", `{"message": "Updated"}`, guestbookResponseTimeout) {
+	if !waitForGuestbookResponse(c, "set", "TestEntry", `{"message": "Updated"}`, guestbookResponseTimeout, ns) {
 		Failf("Cannot added new entry in %v seconds.", guestbookResponseTimeout.Seconds())
 	}
 
 	Logf("Verifying that added entry can be retrieved.")
-	if !waitForGuestbookResponse(c, "get", "", `{"data": "TestEntry"}`, guestbookResponseTimeout) {
+	if !waitForGuestbookResponse(c, "get", "", `{"data": "TestEntry"}`, guestbookResponseTimeout, ns) {
 		Failf("Entry to guestbook wasn't correctly added in %v seconds.", guestbookResponseTimeout.Seconds())
 	}
 }
 
 // Returns whether received expected response from guestbook on time.
-func waitForGuestbookResponse(c *client.Client, cmd, arg, expectedResponse string, timeout time.Duration) bool {
+func waitForGuestbookResponse(c *client.Client, cmd, arg, expectedResponse string, timeout time.Duration, ns string) bool {
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(5 * time.Second) {
-		res, err := makeRequestToGuestbook(c, cmd, arg)
+		res, err := makeRequestToGuestbook(c, cmd, arg, ns)
 		if err == nil && res == expectedResponse {
 			return true
 		}
@@ -143,10 +155,10 @@ func waitForGuestbookResponse(c *client.Client, cmd, arg, expectedResponse strin
 	return false
 }
 
-func makeRequestToGuestbook(c *client.Client, cmd, value string) (string, error) {
+func makeRequestToGuestbook(c *client.Client, cmd, value string, ns string) (string, error) {
 	result, err := c.Get().
 		Prefix("proxy").
-		Namespace(api.NamespaceDefault).
+		Namespace(ns).
 		Resource("services").
 		Name("frontend").
 		Suffix("/index.php").
@@ -165,14 +177,14 @@ type updateDemoData struct {
 // getUDData creates a validator function based on the input string (i.e. kitten.jpg).
 // For example, if you send "kitten.jpg", this function veridies that the image jpg = kitten.jpg
 // in the container's json field.
-func getUDData(jpgExpected string) func(*client.Client, string) error {
+func getUDData(jpgExpected string, ns string) func(*client.Client, string) error {
 
 	// getUDData validates data.json in the update-demo (returns nil if data is ok).
 	return func(c *client.Client, podID string) error {
 		Logf("validating pod %s", podID)
 		body, err := c.Get().
 			Prefix("proxy").
-			Namespace(api.NamespaceDefault).
+			Namespace(ns).
 			Resource("pods").
 			Name(podID).
 			Suffix("data.json").

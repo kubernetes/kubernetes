@@ -249,7 +249,7 @@ type validatorFn func(c *client.Client, podID string) error
 // "containerImage" : this is the name of the image we expect to be launched.  Not to confuse w/ images (kitten.jpg)  which are validated.
 // "testname":  which gets bubbled up to the logging/failure messages if errors happen.
 // "validator" function: This function is given a podID and a client, and it can do some specific validations that way.
-func validateController(c *client.Client, containerImage string, replicas int, containername string, testname string, validator validatorFn) {
+func validateController(c *client.Client, containerImage string, replicas int, containername string, testname string, validator validatorFn, ns string) {
 	getPodsTemplate := "--template={{range.items}}{{.metadata.name}} {{end}}"
 	// NB: kubectl adds the "exists" function to the standard template functions.
 	// This lets us check to see if the "running" entry exists for each of the containers
@@ -265,7 +265,7 @@ func validateController(c *client.Client, containerImage string, replicas int, c
 
 	By(fmt.Sprintf("waiting for all containers in %s pods to come up.", testname)) //testname should be selector
 	for start := time.Now(); time.Since(start) < podStartTimeout; time.Sleep(5 * time.Second) {
-		getPodsOutput := runKubectl("get", "pods", "-o", "template", getPodsTemplate, "--api-version=v1beta3", "-l", testname)
+		getPodsOutput := runKubectl("get", "pods", "-o", "template", getPodsTemplate, "--api-version=v1beta3", "-l", testname, fmt.Sprintf("--namespace=%v", ns))
 		pods := strings.Fields(getPodsOutput)
 		if numPods := len(pods); numPods != replicas {
 			By(fmt.Sprintf("Replicas for %s: expected=%d actual=%d", testname, replicas, numPods))
@@ -273,13 +273,13 @@ func validateController(c *client.Client, containerImage string, replicas int, c
 		}
 		var runningPods []string
 		for _, podID := range pods {
-			running := runKubectl("get", "pods", podID, "-o", "template", getContainerStateTemplate, "--api-version=v1beta3")
+			running := runKubectl("get", "pods", podID, "-o", "template", getContainerStateTemplate, "--api-version=v1beta3", fmt.Sprintf("--namespace=%v", ns))
 			if running != "true" {
 				Logf("%s is created but not running", podID)
 				continue
 			}
 
-			currentImage := runKubectl("get", "pods", podID, "-o", "template", getImageTemplate, "--api-version=v1beta3")
+			currentImage := runKubectl("get", "pods", podID, "-o", "template", getImageTemplate, "--api-version=v1beta3", fmt.Sprintf("--namespace=%v", ns))
 			if currentImage != containerImage {
 				Logf("%s is created but running wrong image; expected: %s, actual: %s", podID, containerImage, currentImage)
 				continue
