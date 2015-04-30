@@ -43,6 +43,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
 	kubecontainer "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/dockertools"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/lifecycle"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/metrics"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/network"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/prober"
@@ -121,7 +122,7 @@ func newTestKubelet(t *testing.T) *TestKubelet {
 	kubelet.containerManager.Puller = &dockertools.FakeDockerPuller{}
 	kubelet.prober = prober.New(nil, kubelet.readinessManager, kubelet.containerRefManager, kubelet.recorder)
 	kubelet.containerManager.Prober = kubelet.prober
-	kubelet.handlerRunner = newHandlerRunner(&fakeHTTP{}, &fakeContainerCommandRunner{}, kubelet.containerManager)
+	kubelet.handlerRunner = lifecycle.NewHandlerRunner(&fakeHTTP{}, &fakeContainerCommandRunner{}, kubelet.containerManager)
 	kubelet.volumeManager = newVolumeManager()
 	kubelet.runtimeHooks = newKubeletRuntimeHooks(kubelet.recorder)
 	return &TestKubelet{kubelet, fakeDocker, mockCadvisor, fakeKubeClient, waitGroup, fakeMirrorClient}
@@ -787,7 +788,7 @@ func TestSyncPodsWithPodInfraCreatesContainerCallsHandler(t *testing.T) {
 	waitGroup := testKubelet.waitGroup
 	fakeHttp := fakeHTTP{}
 	kubelet.httpClient = &fakeHttp
-	kubelet.handlerRunner = newHandlerRunner(kubelet.httpClient, &fakeContainerCommandRunner{}, kubelet.containerManager)
+	kubelet.handlerRunner = lifecycle.NewHandlerRunner(kubelet.httpClient, &fakeContainerCommandRunner{}, kubelet.containerManager)
 	pods := []*api.Pod{
 		{
 			ObjectMeta: api.ObjectMeta{
@@ -1744,7 +1745,7 @@ func TestRunHandlerExec(t *testing.T) {
 	kubelet := testKubelet.kubelet
 	fakeDocker := testKubelet.fakeDocker
 	kubelet.runner = &fakeCommandRunner
-	kubelet.handlerRunner = newHandlerRunner(&fakeHTTP{}, kubelet.runner, kubelet.containerManager)
+	kubelet.handlerRunner = lifecycle.NewHandlerRunner(&fakeHTTP{}, kubelet.runner, kubelet.containerManager)
 
 	containerID := "abc1234"
 	podName := "podFoo"
@@ -1799,7 +1800,7 @@ func TestRunHandlerHttp(t *testing.T) {
 	testKubelet := newTestKubelet(t)
 	kubelet := testKubelet.kubelet
 	kubelet.httpClient = &fakeHttp
-	kubelet.handlerRunner = newHandlerRunner(kubelet.httpClient, &fakeContainerCommandRunner{}, kubelet.containerManager)
+	kubelet.handlerRunner = lifecycle.NewHandlerRunner(kubelet.httpClient, &fakeContainerCommandRunner{}, kubelet.containerManager)
 
 	containerID := "abc1234"
 	podName := "podFoo"
@@ -1867,7 +1868,7 @@ func TestSyncPodEventHandlerFails(t *testing.T) {
 	kubelet.httpClient = &fakeHTTP{
 		err: fmt.Errorf("test error"),
 	}
-	kubelet.handlerRunner = newHandlerRunner(kubelet.httpClient, &fakeContainerCommandRunner{}, kubelet.containerManager)
+	kubelet.handlerRunner = lifecycle.NewHandlerRunner(kubelet.httpClient, &fakeContainerCommandRunner{}, kubelet.containerManager)
 
 	pods := []*api.Pod{
 		{
