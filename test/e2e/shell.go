@@ -22,19 +22,20 @@ import (
 	"io/ioutil"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
 
 	. "github.com/onsi/ginkgo"
 )
 
 var (
-	root = kubeRootOrDie()
+	root = absOrDie(filepath.Clean(filepath.Join(path.Base(os.Args[0]), "..")))
 )
 
 var _ = Describe("Shell", func() {
+
 	defer GinkgoRecover()
 	// Slurp up all the tests in hack/e2e-suite
-	// This should be using testContext.RepoRoot, but this is evaluated before flags are evaluated, so we are stuck.
 	bashE2ERoot := filepath.Join(root, "hack/e2e-suite")
 	files, err := ioutil.ReadDir(bashE2ERoot)
 	if err != nil {
@@ -55,13 +56,8 @@ var _ = Describe("Shell", func() {
 	}
 })
 
-// Returns the root directory of the Kubernetes source tree, assuming the test lives inside test/e2e.
-func kubeRootOrDie() string {
-	cwd, err := os.Getwd()
-	if err != nil {
-		panic(err)
-	}
-	out, err := filepath.Abs(filepath.Join(cwd, "..", ".."))
+func absOrDie(path string) string {
+	out, err := filepath.Abs(path)
 	if err != nil {
 		panic(err)
 	}

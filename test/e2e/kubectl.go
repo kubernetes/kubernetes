@@ -45,7 +45,6 @@ const (
 )
 
 var _ = Describe("kubectl", func() {
-	defer GinkgoRecover()
 	var c *client.Client
 	var ns string
 	var testingNs *api.Namespace
@@ -66,12 +65,11 @@ var _ = Describe("kubectl", func() {
 	})
 
 	Describe("update-demo", func() {
-		var updateDemoRoot, nautilusPath, kittenPath string
-		BeforeEach(func() {
+		var (
 			updateDemoRoot = filepath.Join(testContext.RepoRoot, "examples/update-demo")
-			nautilusPath = filepath.Join(updateDemoRoot, "nautilus-rc.yaml")
-			kittenPath = filepath.Join(updateDemoRoot, "kitten-rc.yaml")
-		})
+			nautilusPath   = filepath.Join(updateDemoRoot, "nautilus-rc.yaml")
+			kittenPath     = filepath.Join(updateDemoRoot, "kitten-rc.yaml")
+		)
 
 		It("should create and stop a replication controller", func() {
 			defer cleanup(nautilusPath, updateDemoSelector)
@@ -109,10 +107,7 @@ var _ = Describe("kubectl", func() {
 	})
 
 	Describe("guestbook", func() {
-		var guestbookPath string
-		BeforeEach(func() {
-			guestbookPath = filepath.Join(testContext.RepoRoot, "examples/guestbook")
-		})
+		var guestbookPath = filepath.Join(testContext.RepoRoot, "examples/guestbook")
 
 		It("should create and stop a working application", func() {
 			if !providerIs("gce", "gke") {
