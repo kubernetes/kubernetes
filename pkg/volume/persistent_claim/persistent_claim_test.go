@@ -153,7 +153,7 @@ func TestNewBuilder(t *testing.T) {
 	}
 
 	for _, item := range tests {
-		o := testclient.NewObjects(api.Scheme)
+		o := testclient.NewObjects(api.Scheme, api.Scheme)
 		o.Add(item.pv)
 		o.Add(item.claim)
 		client := &testclient.Fake{ReactFn: testclient.ObjectReaction(o, latest.RESTMapper)}
@@ -213,7 +213,7 @@ func TestNewBuilderClaimNotBound(t *testing.T) {
 			ClaimName: "claimC",
 		},
 	}
-	o := testclient.NewObjects(api.Scheme)
+	o := testclient.NewObjects(api.Scheme, api.Scheme)
 	o.Add(pv)
 	o.Add(claim)
 	client := &testclient.Fake{ReactFn: testclient.ObjectReaction(o, latest.RESTMapper)}

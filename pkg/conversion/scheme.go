@@ -238,6 +238,17 @@ func (s *Scheme) AddDefaultingFuncs(defaultingFuncs ...interface{}) error {
 	return nil
 }
 
+// Recognizes returns true if the scheme is able to handle the provided version and kind
+// of an object.
+func (s *Scheme) Recognizes(version, kind string) bool {
+	m, ok := s.versionMap[version]
+	if !ok {
+		return false
+	}
+	_, ok = m[kind]
+	return ok
+}
+
 // RegisterInputDefaults sets the provided field mapping function and field matching
 // as the defaults for the provided input type.  The fn may be nil, in which case no
 // mapping will happen by default. Use this method to register a mechanism for handling

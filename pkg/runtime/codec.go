@@ -21,8 +21,8 @@ import (
 )
 
 // CodecFor returns a Codec that invokes Encode with the provided version.
-func CodecFor(scheme *Scheme, version string) Codec {
-	return &codecWrapper{scheme, version}
+func CodecFor(codec ObjectCodec, version string) Codec {
+	return &codecWrapper{codec, version}
 }
 
 // yamlCodec converts YAML passed to the Decoder methods to JSON.
@@ -69,11 +69,11 @@ func EncodeOrDie(codec Codec, obj Object) string {
 // codecWrapper implements encoding to an alternative
 // default version for a scheme.
 type codecWrapper struct {
-	*Scheme
+	ObjectCodec
 	version string
 }
 
 // Encode implements Codec
 func (c *codecWrapper) Encode(obj Object) ([]byte, error) {
-	return c.Scheme.EncodeToVersion(obj, c.version)
+	return c.EncodeToVersion(obj, c.version)
 }

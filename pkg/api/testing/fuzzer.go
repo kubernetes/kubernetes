@@ -115,12 +115,14 @@ func FuzzerFor(t *testing.T, version string, src rand.Source) *fuzz.Fuzzer {
 		},
 		func(j *api.List, c fuzz.Continue) {
 			c.FuzzNoCustom(j) // fuzz self without calling this function again
-			if j.Items == nil {
+			// TODO: uncomment when round trip starts from a versioned object
+			if false { //j.Items == nil {
 				j.Items = []runtime.Object{}
 			}
 		},
 		func(j *runtime.Object, c fuzz.Continue) {
-			if c.RandBool() {
+			// TODO: uncomment when round trip starts from a versioned object
+			if true { //c.RandBool() {
 				*j = &runtime.Unknown{
 					TypeMeta: runtime.TypeMeta{Kind: "Something", APIVersion: "unknown"},
 					RawJSON:  []byte(`{"apiVersion":"unknown","kind":"Something","someKey":"someValue"}`),

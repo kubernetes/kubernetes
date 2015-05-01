@@ -393,6 +393,17 @@ func TestGetMultipleTypeObjectsAsList(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+	list, err := runtime.ExtractList(out)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if errs := runtime.DecodeList(list, api.Scheme); len(errs) > 0 {
+		t.Fatalf("unexpected error: %v", errs)
+	}
+	if err := runtime.SetList(out, list); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
 	expected := &api.List{
 		Items: []runtime.Object{
 			&pods.Items[0],

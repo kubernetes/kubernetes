@@ -63,9 +63,22 @@ func TestDecodeEmptyRawExtensionAsObject(t *testing.T) {
 	s.AddKnownTypes("", &ObjectTest{})
 	s.AddKnownTypeWithName("v1test", "ObjectTest", &ObjectTestExternal{})
 
-	_, err := s.Decode([]byte(`{"kind":"ObjectTest","apiVersion":"v1test","items":[{}]}`))
-	if err == nil {
-		t.Fatalf("unexpected non-error")
+	obj, err := s.Decode([]byte(`{"kind":"ObjectTest","apiVersion":"v1test","items":[{}]}`))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	test := obj.(*ObjectTest)
+	if unk, ok := test.Items[0].(*runtime.Unknown); !ok || unk.Kind != "" || unk.APIVersion != "" || string(unk.RawJSON) != "{}" {
+		t.Fatalf("unexpected object: %#v", test.Items[0])
+	}
+
+	obj, err = s.Decode([]byte(`{"kind":"ObjectTest","apiVersion":"v1test","items":[{"kind":"Other","apiVersion":"v1"}]}`))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	test = obj.(*ObjectTest)
+	if unk, ok := test.Items[0].(*runtime.Unknown); !ok || unk.Kind != "Other" || unk.APIVersion != "v1" || string(unk.RawJSON) != `{"kind":"Other","apiVersion":"v1"}` {
+		t.Fatalf("unexpected object: %#v", test.Items[0])
 	}
 }
 
@@ -99,17 +112,34 @@ func TestArrayOfRuntimeObject(t *testing.T) {
 	if err := json.Unmarshal(wire, obj); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	t.Logf("exact wire is: %#v", string(obj.Items[0].RawJSON))
+	t.Logf("exact wire is: %s", string(obj.Items[0].RawJSON))
 
 	decoded, err := s.Decode(wire)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+	list, err := runtime.ExtractList(decoded)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if errs := runtime.DecodeList(list, s); len(errs) > 0 {
+		t.Fatalf("unexpected error: %v", errs)
+	}
+
+	list2, err := runtime.ExtractList(list[3])
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if errs := runtime.DecodeList(list2, s); len(errs) > 0 {
+		t.Fatalf("unexpected error: %v", errs)
+	}
+	if err := runtime.SetList(list[3], list2); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 
 	internal.Items[2].(*runtime.Unknown).Kind = "OtherTest"
 	internal.Items[2].(*runtime.Unknown).APIVersion = "unknown"
-	if e, a := internal, decoded; !reflect.DeepEqual(e, a) {
-		t.Log(string(decoded.(*ObjectTest).Items[2].(*runtime.Unknown).RawJSON))
+	if e, a := internal.Items, list; !reflect.DeepEqual(e, a) {
 		t.Errorf("mismatched decoded: %s", util.ObjectDiff(e, a))
 	}
 }

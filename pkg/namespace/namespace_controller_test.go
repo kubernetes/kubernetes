@@ -135,7 +135,7 @@ func TestSyncNamespaceThatIsActive(t *testing.T) {
 }
 
 func TestRunStop(t *testing.T) {
-	o := testclient.NewObjects(api.Scheme)
+	o := testclient.NewObjects(api.Scheme, api.Scheme)
 	client := &testclient.Fake{ReactFn: testclient.ObjectReaction(o, latest.RESTMapper)}
 	nsMgr := NewNamespaceManager(client, 1*time.Second)
 

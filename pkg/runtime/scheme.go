@@ -17,6 +17,7 @@ limitations under the License.
 package runtime
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/url"
 	"reflect"
@@ -164,7 +165,15 @@ func (self *Scheme) runtimeObjectToRawExtensionArray(in *[]Object, out *[]RawExt
 	for i := range src {
 		switch t := src[i].(type) {
 		case *Unknown:
+			// TODO: this should be decoupled from the scheme (since it is JSON specific)
 			dest[i].RawJSON = t.RawJSON
+		case *Unstructured:
+			// TODO: this should be decoupled from the scheme (since it is JSON specific)
+			data, err := json.Marshal(t.Object)
+			if err != nil {
+				return err
+			}
+			dest[i].RawJSON = data
 		default:
 			version := outVersion
 			// if the object exists
@@ -192,24 +201,17 @@ func (self *Scheme) rawExtensionToRuntimeObjectArray(in *[]RawExtension, out *[]
 
 	for i := range src {
 		data := src[i].RawJSON
-		obj, err := scheme.Decode(data)
+		version, kind, err := scheme.raw.DataVersionAndKind(data)
 		if err != nil {
-			if !IsNotRegisteredError(err) {
-				return err
-			}
-			version, kind, err := scheme.raw.DataVersionAndKind(data)
-			if err != nil {
-				return err
-			}
-			obj = &Unknown{
-				TypeMeta: TypeMeta{
-					APIVersion: version,
-					Kind:       kind,
-				},
-				RawJSON: data,
-			}
+			return err
 		}
-		dest[i] = obj
+		dest[i] = &Unknown{
+			TypeMeta: TypeMeta{
+				APIVersion: version,
+				Kind:       kind,
+			},
+			RawJSON: data,
+		}
 	}
 	*out = dest
 	return nil
@@ -273,6 +275,12 @@ func (s *Scheme) DataVersionAndKind(data []byte) (version, kind string, err erro
 // ObjectVersionAndKind returns the version and kind of the given Object.
 func (s *Scheme) ObjectVersionAndKind(obj Object) (version, kind string, err error) {
 	return s.raw.ObjectVersionAndKind(obj)
+}
+
+// Recognizes returns true if the scheme is able to handle the provided version and kind
+// of an object.
+func (s *Scheme) Recognizes(version, kind string) bool {
+	return s.raw.Recognizes(version, kind)
 }
 
 // New returns a new API object of the given version ("" for internal
