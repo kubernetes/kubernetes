@@ -20,6 +20,8 @@ import (
 	"fmt"
 	"net"
 	"path"
+	"reflect"
+	"sort"
 	"strings"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -1051,6 +1053,20 @@ func ValidateService(service *api.Service) errs.ValidationErrorList {
 			if service.Spec.Ports[i].PublicPort != 0 {
 				allErrs = append(allErrs, errs.NewFieldInvalid("spec.ports", service.Spec.Ports[i], "cannot specify a public port with cluster-visibility services"))
 			}
+		}
+	}
+
+	// Check for duplicate PublicPorts
+	publicPorts := []int{}
+	for i := range service.Spec.Ports {
+		if service.Spec.Ports[i].PublicPort != 0 {
+			publicPorts = append(publicPorts, service.Spec.Ports[i].PublicPort)
+		}
+	}
+	sort.Ints(publicPorts)
+	for i := 1; i < len(publicPorts); i++ {
+		if publicPorts[i-1] == publicPorts[i] {
+			allErrs = append(allErrs, errs.NewFieldInvalid("spec.ports", service.Spec.Ports[i], "duplicate public port specified"))
 		}
 	}
 

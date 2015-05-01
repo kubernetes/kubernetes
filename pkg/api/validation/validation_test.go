@@ -1756,6 +1756,15 @@ func TestValidateService(t *testing.T) {
 			},
 			numErrs: 1,
 		},
+		{
+			name: "invalid public service with duplicate PublicPort",
+			tweakSvc: func(s *api.Service) {
+				s.Spec.Visibility = "public"
+				s.Spec.Ports = append(s.Spec.Ports, api.ServicePort{Name: "p1", Port: 1, Protocol: "TCP", PublicPort: 1})
+				s.Spec.Ports = append(s.Spec.Ports, api.ServicePort{Name: "p2", Port: 2, Protocol: "TCP", PublicPort: 1})
+			},
+			numErrs: 1,
+		},
 	}
 
 	for _, tc := range testCases {
