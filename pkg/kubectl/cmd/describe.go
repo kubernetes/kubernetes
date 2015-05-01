@@ -19,12 +19,16 @@ package cmd
 import (
 	"fmt"
 	"io"
+	"strings"
 
 	"github.com/spf13/cobra"
 
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl"
 	cmdutil "github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/cmd/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/resource"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 )
 
 func NewCmdDescribe(f *cmdutil.Factory, out io.Writer) *cobra.Command {
@@ -77,6 +81,9 @@ func RunDescribe(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []s
 	}
 	infos, err := r.Infos()
 	if err != nil {
+		if errors.IsNotFound(err) && len(args) == 2 {
+			return DescribeMatchingResources(mapper, typer, describer, f, cmdNamespace, args[0], args[1], out)
+		}
 		return err
 	}
 	info := infos[0]
@@ -86,5 +93,29 @@ func RunDescribe(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []s
 		return err
 	}
 	fmt.Fprintf(out, "%s\n", s)
+	return nil
+}
+
+func DescribeMatchingResources(mapper meta.RESTMapper, typer runtime.ObjectTyper, describer kubectl.Describer, f *cmdutil.Factory, namespace, rsrc, prefix string, out io.Writer) error {
+	r := resource.NewBuilder(mapper, typer, f.ClientMapperForCommand()).
+		NamespaceParam(namespace).DefaultNamespace().
+		ResourceTypeOrNameArgs(true, rsrc).
+		SingleResourceType().
+		Flatten().
+		Do()
+	infos, err := r.Infos()
+	if err != nil {
+		return err
+	}
+	for ix := range infos {
+		info := infos[ix]
+		if strings.HasPrefix(info.Name, prefix) {
+			s, err := describer.Describe(info.Namespace, info.Name)
+			if err != nil {
+				return err
+			}
+			fmt.Fprintf(out, "%s\n", s)
+		}
+	}
 	return nil
 }
