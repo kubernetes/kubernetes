@@ -107,7 +107,7 @@ func (r *Runtime) ExecInContainer(containerID string, cmd []string, stdin io.Rea
 // findRktID returns the rkt uuid for the pod.
 // TODO(yifan): This is unefficient which require us to list
 // all the unit files.
-func (r *Runtime) findRktID(pod kubecontainer.Pod) (string, error) {
+func (r *Runtime) findRktID(pod *kubecontainer.Pod) (string, error) {
 	units, err := r.systemd.ListUnits()
 	if err != nil {
 		return "", err
@@ -150,7 +150,7 @@ func (r *Runtime) findRktID(pod kubecontainer.Pod) (string, error) {
 //  - should we support nsenter + socat in a container, running with elevated privs and --pid=host?
 //
 // TODO(yifan): Merge with the same function in dockertools.
-func (r *Runtime) PortForward(pod kubecontainer.Pod, port uint16, stream io.ReadWriteCloser) error {
+func (r *Runtime) PortForward(pod *kubecontainer.Pod, port uint16, stream io.ReadWriteCloser) error {
 	glog.V(4).Infof("Rkt port forwarding in container.")
 
 	podInfos, err := r.getPodInfos()
