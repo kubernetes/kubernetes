@@ -43,7 +43,7 @@ func createPodWorkers() (*podWorkers, map[types.UID][]string) {
 	fakeDocker := &dockertools.FakeDockerClient{}
 	fakeRecorder := &record.FakeRecorder{}
 	np, _ := network.InitNetworkPlugin([]network.NetworkPlugin{}, "", network.NewFakeHost(nil))
-	dockerManager := dockertools.NewDockerManager(fakeDocker, fakeRecorder, nil, nil, dockertools.PodInfraContainerImage, 0, 0, "", kubecontainer.FakeOS{}, np, &kubeletProber.FakeProber{})
+	dockerManager := dockertools.NewDockerManager(fakeDocker, fakeRecorder, nil, nil, dockertools.PodInfraContainerImage, 0, 0, "", kubecontainer.FakeOS{}, np, &kubeletProber.FakeProber{}, nil, nil, newKubeletRuntimeHooks(fakeRecorder))
 	fakeRuntimeCache := kubecontainer.NewFakeRuntimeCache(dockerManager)
 
 	lock := sync.Mutex{}

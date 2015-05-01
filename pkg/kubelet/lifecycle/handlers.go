@@ -23,7 +23,6 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	kubecontainer "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/dockertools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/prober"
 	kubeletTypes "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -33,11 +32,15 @@ import (
 type HandlerRunner struct {
 	httpGetter       kubeletTypes.HttpGetter
 	commandRunner    prober.ContainerCommandRunner
-	containerManager *dockertools.DockerManager
+	containerManager podStatusProvider
+}
+
+type podStatusProvider interface {
+	GetPodStatus(pod *api.Pod) (*api.PodStatus, error)
 }
 
 // TODO(yifan): Merge commandRunner and containerManager once containerManager implements the ContainerCommandRunner interface.
-func NewHandlerRunner(httpGetter kubeletTypes.HttpGetter, commandRunner prober.ContainerCommandRunner, containerManager *dockertools.DockerManager) kubecontainer.HandlerRunner {
+func NewHandlerRunner(httpGetter kubeletTypes.HttpGetter, commandRunner prober.ContainerCommandRunner, containerManager podStatusProvider) kubecontainer.HandlerRunner {
 	return &HandlerRunner{
 		httpGetter:       httpGetter,
 		commandRunner:    commandRunner,

@@ -47,6 +47,9 @@ func NewFakeDockerManager() (*DockerManager, *FakeDockerClient) {
 		0, 0, "",
 		kubecontainer.FakeOS{},
 		networkPlugin,
+		nil,
+		nil,
+		nil,
 		nil)
 
 	return dockerManager, fakeDocker
