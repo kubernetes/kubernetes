@@ -35,6 +35,7 @@ func (ServiceGenerator) ParamNames() []GeneratorParam {
 		{"labels", false},
 		{"public-ip", false},
 		{"create-external-load-balancer", false},
+		{"visibility", false},
 		{"protocol", false},
 		{"container-port", false}, // alias of target-port
 		{"target-port", false},
@@ -103,6 +104,9 @@ func (ServiceGenerator) Generate(params map[string]string) (runtime.Object, erro
 	}
 	if params["create-external-load-balancer"] == "true" {
 		service.Spec.CreateExternalLoadBalancer = true
+	}
+	if len(params["visibility"]) != 0 {
+		service.Spec.Visibility = api.VisibilityType(params["visibility"])
 	}
 	if len(params["public-ip"]) != 0 {
 		service.Spec.PublicIPs = []string{params["public-ip"]}

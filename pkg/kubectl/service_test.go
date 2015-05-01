@@ -180,6 +180,38 @@ func TestGenerateService(t *testing.T) {
 				},
 			},
 		},
+		{
+			params: map[string]string{
+				"selector":       "foo=bar,baz=blah",
+				"name":           "test",
+				"port":           "80",
+				"protocol":       "UDP",
+				"container-port": "foobar",
+				"public-ip":      "1.2.3.4",
+				"visibility":     "public",
+			},
+			expected: api.Service{
+				ObjectMeta: api.ObjectMeta{
+					Name: "test",
+				},
+				Spec: api.ServiceSpec{
+					Selector: map[string]string{
+						"foo": "bar",
+						"baz": "blah",
+					},
+					Ports: []api.ServicePort{
+						{
+							Name:       "default",
+							Port:       80,
+							Protocol:   "UDP",
+							TargetPort: util.NewIntOrStringFromString("foobar"),
+						},
+					},
+					PublicIPs:  []string{"1.2.3.4"},
+					Visibility: "public",
+				},
+			},
+		},
 	}
 	generator := ServiceGenerator{}
 	for _, test := range tests {
