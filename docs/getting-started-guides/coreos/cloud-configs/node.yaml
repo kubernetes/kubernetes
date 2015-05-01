@@ -1,14 +1,22 @@
 #cloud-config
-
+write-files:
+  - path: /opt/bin/wupiao
+    permissions: '0755'
+    content: |
+      #!/bin/bash
+      # [w]ait [u]ntil [p]ort [i]s [a]ctually [o]pen
+      [ -n "$1" ] && [ -n "$2" ] && while ! curl --output /dev/null \
+        --silent --head --fail \
+        http://${1}:${2}; do sleep 1 && echo -n .; done;
+      exit $?
 coreos:
+  etcd2:
+    listen-client-urls: http://0.0.0.0:2379,http://0.0.0.0:4001
+    initial-cluster: master=http://<master-private-ip>:2380
+    proxy: on
   fleet:
-    etcd-servers: http://<master-private-ip>:4001
     metadata: "role=node"
-  flannel:
-    etcd_endpoints: http://<master-private-ip>:4001
   units:
-    - name: etcd.service
-      mask: true
     - name: fleet.service
       command: start
     - name: flanneld.service
@@ -16,9 +24,9 @@ coreos:
       drop-ins:
         - name: 50-network-config.conf
           content: |
+            [Unit]
+            Requires=etcd2.service
             [Service]
-            Environment=ETCDCTL_PEERS=http://<master-private-ip>:4001
-            ExecStartPre=/bin/bash -c "until curl http://<master-private-ip>:4001/v2/machines; do sleep 2; done"
             ExecStartPre=/usr/bin/etcdctl set /coreos.com/network/config '{"Network":"10.244.0.0/16", "Backend": {"Type": "vxlan"}}'
     - name: docker.service
       command: start
@@ -26,8 +34,6 @@ coreos:
         - name: 51-docker-mirror.conf
           content: |
             [Unit]
-            # making sure that flanneld finished startup, otherwise containers
-            # won't land in flannel's network...
             Requires=flanneld.service
             After=flanneld.service
             [Service]
@@ -58,8 +64,10 @@ coreos:
         After=setup-network-environment.service
 
         [Service]
-        ExecStartPre=/usr/bin/wget -N -P /opt/bin https://storage.googleapis.com/kubernetes-release/release/v0.11.0/bin/linux/amd64/kube-proxy
+        ExecStartPre=/usr/bin/wget -N -P /opt/bin https://storage.googleapis.com/kubernetes-release/release/v0.15.0/bin/linux/amd64/kube-proxy
         ExecStartPre=/usr/bin/chmod +x /opt/bin/kube-proxy
+        # wait for kubernetes master to be up and ready
+        ExecStartPre=/opt/bin/wupiao <master-private-ip> 8080
         ExecStart=/opt/bin/kube-proxy \
         --master=<master-private-ip>:8080 \
         --logtostderr=true
@@ -76,14 +84,19 @@ coreos:
 
         [Service]
         EnvironmentFile=/etc/network-environment
-        ExecStartPre=/usr/bin/wget -N -P /opt/bin https://storage.googleapis.com/kubernetes-release/release/v0.11.0/bin/linux/amd64/kubelet
+        ExecStartPre=/usr/bin/wget -N -P /opt/bin https://storage.googleapis.com/kubernetes-release/release/v0.15.0/bin/linux/amd64/kubelet
         ExecStartPre=/usr/bin/chmod +x /opt/bin/kubelet
+        # wait for kubernetes master to be up and ready
+        ExecStartPre=/opt/bin/wupiao <master-private-ip> 8080
         ExecStart=/opt/bin/kubelet \
         --address=0.0.0.0 \
         --port=10250 \
         --hostname_override=$private_ipv4 \
         --api_servers=<master-private-ip>:8080 \
-        --logtostderr=true
+        --allow_privileged=true \
+        --logtostderr=true \
+        --healthz_bind_address=0.0.0.0 \
+        --healthz_port=10248
         Restart=always
         RestartSec=10
   update:
