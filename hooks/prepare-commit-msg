@@ -29,8 +29,7 @@ for file in $(git diff --cached --name-only --diff-filter ACM | grep "\.sh" | gr
 done
 
 # Check API schema definitions for field descriptions
-# TODO: Check v1beta3, once it is documented
-for file in $(git diff --cached --name-only --diff-filter ACM | egrep "pkg/api/v.[^/]*/types\.go" | grep -v "third_party" | grep -v v1beta3); do
+for file in $(git diff --cached --name-only --diff-filter ACM | egrep "pkg/api/v.[^/]*/types\.go" | grep -v "third_party"); do
   # Check for files with fields without description tags
   descriptionless=$("${KUBE_HOOKS_DIR}/description.sh" "${file}")
   if [[ "$descriptionless" -eq "0" ]]; then
