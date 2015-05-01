@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"math"
 	"strconv"
-	"sync"
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -155,56 +154,6 @@ var _ = Describe("Density", func() {
 			// Tune the threshold for allowed failures.
 			badEvents := BadEvents(events)
 			Expect(badEvents).NotTo(BeNumerically(">", int(math.Floor(0.01*float64(totalPods)))))
-		})
-	}
-
-	type Scalability struct {
-		skip          bool
-		totalPods     int
-		podsPerMinion int
-		rcsPerThread  int
-	}
-
-	scalabilityTests := []Scalability{
-		{totalPods: 500, podsPerMinion: 10, rcsPerThread: 5, skip: true},
-		{totalPods: 500, podsPerMinion: 10, rcsPerThread: 25, skip: true},
-	}
-
-	for _, testArg := range scalabilityTests {
-		// # of threads calibrate to totalPods
-		threads := (testArg.totalPods / (testArg.podsPerMinion * testArg.rcsPerThread))
-
-		name := fmt.Sprintf(
-			"should be able to launch %v pods, %v per minion, in %v rcs/thread.",
-			testArg.totalPods, testArg.podsPerMinion, testArg.rcsPerThread)
-		if testArg.skip {
-			name = "[Skipped] " + name
-		}
-
-		itArg := testArg
-		It(name, func() {
-			podsLaunched := 0
-			var wg sync.WaitGroup
-			wg.Add(threads)
-
-			// Create queue of pending requests on the api server.
-			for i := 0; i < threads; i++ {
-				go func() {
-					defer wg.Done()
-					for i := 0; i < itArg.rcsPerThread; i++ {
-						name := "my-short-lived-pod" + string(util.NewUUID())
-						n := itArg.podsPerMinion * minionCount
-						expectNoError(RunRC(c, name, ns, "gcr.io/google_containers/pause:go", n))
-						podsLaunched += n
-						Logf("Launched %v pods so far...", podsLaunched)
-						err := DeleteRC(c, ns, name)
-						expectNoError(err)
-					}
-				}()
-			}
-			// Wait for all the pods from all the RC's to return.
-			wg.Wait()
-			Logf("%v pods out of %v launched", podsLaunched, itArg.totalPods)
 		})
 	}
 })
