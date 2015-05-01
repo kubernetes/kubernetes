@@ -129,7 +129,8 @@ coreos:
         --v=2 \
         --cluster_dns=10.0.0.10 \
         --cluster_domain=kubernetes.local \
-        --logtostderr=true
+        --logtostderr=true \
+        --container-runtime=${KUBERNETES_CONTAINER_RUNTIME}
         Restart=always
         RestartSec=10
 
