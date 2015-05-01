@@ -35,7 +35,7 @@ func (pr PortRange) String() string {
 	if pr.Size == 0 {
 		return ""
 	}
-	return fmt.Sprintf("%d-%d", pr.Base, pr.Base+pr.Size)
+	return fmt.Sprintf("%d-%d", pr.Base, pr.Base+pr.Size-1)
 }
 
 func (pr *PortRange) Set(value string) error {
@@ -67,8 +67,7 @@ func (pr *PortRange) Set(value string) error {
 		return fmt.Errorf("Port range end port cannot be less than start port: %s", value)
 	}
 	pr.Base = low
-	pr.Size = high - low
-
+	pr.Size = 1 + high - low
 	return nil
 }
 

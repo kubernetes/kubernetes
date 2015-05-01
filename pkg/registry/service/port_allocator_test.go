@@ -17,10 +17,40 @@ limitations under the License.
 package service
 
 import (
+	"strconv"
 	"testing"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
+
+func TestPortPoolIterator(t *testing.T) {
+	pr, err := util.ParsePortRange("100-200")
+	if err != nil {
+		t.Error(err)
+	}
+
+	ppd := &portPoolDriver{portRange: *pr}
+	it := ppd.Iterate()
+	ports := []string{}
+	for {
+		s, found := it.Next()
+		if !found {
+			break
+		}
+		ports = append(ports, s)
+	}
+
+	if len(ports) != 101 {
+		t.Errorf("unexpected size of port range %d != 101", len(ports))
+	}
+
+	for i := 0; i < 101; i++ {
+		expected := strconv.Itoa(100 + i)
+		if ports[i] != expected {
+			t.Errorf("Unexpected port @%d.  expected=%s, actual=%s", i, expected, ports[i])
+		}
+	}
+}
 
 func TestPortAllocatorNew(t *testing.T) {
 	if newPortAllocator(&util.PortRange{Base: 0, Size: 0}) != nil {
@@ -99,19 +129,19 @@ func TestPortAllocatorAllocateNext(t *testing.T) {
 	}
 
 	// Burn a bunch of ports.
-	for i := 3; i < 100; i++ {
+	for i := 3; i <= 100; i++ {
 		_, err = pa.AllocateNext()
 		if err != nil {
 			t.Error(err)
 		}
 	}
 
-	p100, err := pa.AllocateNext()
+	p101, err := pa.AllocateNext()
 	if err != nil {
 		t.Error(err)
 	}
-	if p100 != 199 {
-		t.Errorf("expected 199, got %s", p100)
+	if p101 != 200 {
+		t.Errorf("expected 200, got %s", p101)
 	}
 
 	_, err = pa.AllocateNext()
@@ -162,7 +192,7 @@ func TestPortAllocatorRelease(t *testing.T) {
 	}
 
 	// Burn a bunch of addresses.
-	for i := 4; i <= 100; i++ {
+	for i := 4; i <= 101; i++ {
 		pa.AllocateNext()
 	}
 	_, err = pa.AllocateNext()
