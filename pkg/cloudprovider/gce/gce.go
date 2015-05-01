@@ -239,16 +239,16 @@ func (gce *GCECloud) waitForRegionOp(op *compute.Operation, region string) error
 	return nil
 }
 
-// TCPLoadBalancerExists is an implementation of TCPLoadBalancer.TCPLoadBalancerExists.
-func (gce *GCECloud) TCPLoadBalancerExists(name, region string) (bool, error) {
-	_, err := gce.service.ForwardingRules.Get(gce.projectID, region, name).Do()
+// GetTCPLoadBalancer is an implementation of TCPLoadBalancer.GetTCPLoadBalancer
+func (gce *GCECloud) GetTCPLoadBalancer(name, region string) (endpoint string, exists bool, err error) {
+	fw, err := gce.service.ForwardingRules.Get(gce.projectID, region, name).Do()
 	if err == nil {
-		return true, nil
+		return fw.IPAddress, true, nil
 	}
 	if isHTTPErrorCode(err, http.StatusNotFound) {
-		return false, nil
+		return "", false, nil
 	}
-	return false, err
+	return "", false, err
 }
 
 func isHTTPErrorCode(err error, code int) bool {
