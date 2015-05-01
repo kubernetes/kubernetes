@@ -19,7 +19,9 @@ package resourcequota
 import (
 	"fmt"
 	"io"
+	"math/rand"
 	"strings"
+	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/admission"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -78,6 +80,13 @@ func (q *quota) Admit(a admission.Attributes) (err error) {
 			Name:      "",
 		},
 	}
+
+	// concurrent operations that modify quota tracked resources can cause a conflict when incrementing usage
+	// as a result, we will attempt to increment quota usage per request up to numRetries limit
+	// we fuzz each retry with an interval period to attempt to improve end-user experience during concurrent operations
+	numRetries := 10
+	interval := time.Duration(rand.Int63n(90)+int64(10)) * time.Millisecond
+
 	items, err := q.indexer.Index("namespace", key)
 	if err != nil {
 		return admission.NewForbidden(a, fmt.Errorf("Unable to %s %s at this time because there was an error enforcing quota", a.GetOperation(), a.GetResource()))
@@ -87,39 +96,54 @@ func (q *quota) Admit(a admission.Attributes) (err error) {
 	}
 
 	for i := range items {
+
 		quota := items[i].(*api.ResourceQuota)
 
-		// we cannot modify the value directly in the cache, so we copy
-		status := &api.ResourceQuotaStatus{
-			Hard: api.ResourceList{},
-			Used: api.ResourceList{},
-		}
-		for k, v := range quota.Status.Hard {
-			status.Hard[k] = *v.Copy()
-		}
-		for k, v := range quota.Status.Used {
-			status.Used[k] = *v.Copy()
-		}
+		for retry := 1; retry <= numRetries; retry++ {
 
-		dirty, err := IncrementUsage(a, status, q.client)
-		if err != nil {
-			return admission.NewForbidden(a, err)
-		}
-
-		if dirty {
-			// construct a usage record
-			usage := api.ResourceQuota{
-				ObjectMeta: api.ObjectMeta{
-					Name:            quota.Name,
-					Namespace:       quota.Namespace,
-					ResourceVersion: quota.ResourceVersion,
-					Labels:          quota.Labels,
-					Annotations:     quota.Annotations},
+			// we cannot modify the value directly in the cache, so we copy
+			status := &api.ResourceQuotaStatus{
+				Hard: api.ResourceList{},
+				Used: api.ResourceList{},
 			}
-			usage.Status = *status
-			_, err = q.client.ResourceQuotas(usage.Namespace).UpdateStatus(&usage)
+			for k, v := range quota.Status.Hard {
+				status.Hard[k] = *v.Copy()
+			}
+			for k, v := range quota.Status.Used {
+				status.Used[k] = *v.Copy()
+			}
+
+			dirty, err := IncrementUsage(a, status, q.client)
 			if err != nil {
-				return admission.NewForbidden(a, fmt.Errorf("Unable to %s %s at this time because there was an error enforcing quota", a.GetOperation(), a.GetResource()))
+				return admission.NewForbidden(a, err)
+			}
+
+			if dirty {
+				// construct a usage record
+				usage := api.ResourceQuota{
+					ObjectMeta: api.ObjectMeta{
+						Name:            quota.Name,
+						Namespace:       quota.Namespace,
+						ResourceVersion: quota.ResourceVersion,
+						Labels:          quota.Labels,
+						Annotations:     quota.Annotations},
+				}
+				usage.Status = *status
+				_, err = q.client.ResourceQuotas(usage.Namespace).UpdateStatus(&usage)
+				if err == nil {
+					break
+				}
+
+				// we have concurrent requests to update quota, so look to retry if needed
+				if retry == numRetries {
+					return admission.NewForbidden(a, fmt.Errorf("Unable to %s %s at this time because there are too many concurrent requests to increment quota", a.GetOperation(), a.GetResource()))
+				}
+				time.Sleep(interval)
+				// manually get the latest quota
+				quota, err = q.client.ResourceQuotas(usage.Namespace).Get(quota.Name)
+				if err != nil {
+					return admission.NewForbidden(a, err)
+				}
 			}
 		}
 	}
