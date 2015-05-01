@@ -66,7 +66,7 @@ Key | Value
 `hostnamef` | (Optional) The full host name of the machine, i.e. uname -n
 `node_ip` | (Optional) The IP address to use to address this node
 `hostname_override` | (Optional) Mapped to the kubelet hostname_override
-`network_mode` | (Optional) Networking model to use among nodes: *openvswitch*
+`network_mode` | (Optional) Networking model to use among nodes: *openvswitch*, *calico*
 `networkInterfaceName` | (Optional) Networking interface to use to bind addresses, default value *eth0*
 `publicAddressOverride` | (Optional) The IP address the kube-apiserver should use to bind against for external read-only access
 `roles` | (Required) 1. `kubernetes-master` means this machine is the master in the kubernetes cluster.  2. `kubernetes-pool` means this machine is a kubernetes-minion.  Depending on the role, the Salt scripts will provision different resources on the machine.
