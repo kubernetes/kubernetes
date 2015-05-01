@@ -488,6 +488,7 @@ func describeService(service *api.Service, endpoints *api.Endpoints, events *api
 		fmt.Fprintf(out, "Name:\t%s\n", service.Name)
 		fmt.Fprintf(out, "Labels:\t%s\n", formatLabels(service.Labels))
 		fmt.Fprintf(out, "Selector:\t%s\n", formatLabels(service.Spec.Selector))
+		fmt.Fprintf(out, "Visibility:\t%s\n", service.Spec.Visibility)
 		fmt.Fprintf(out, "IP:\t%s\n", service.Spec.PortalIP)
 		if len(service.Spec.PublicIPs) > 0 {
 			list := strings.Join(service.Spec.PublicIPs, ", ")

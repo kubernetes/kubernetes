@@ -601,6 +601,7 @@ func TestEtcdUpdateService(t *testing.T) {
 				"baz": "bar",
 			},
 			SessionAffinity: "None",
+			Visibility:      "cluster",
 		},
 	}
 	_, err := registry.UpdateService(ctx, &testService)

@@ -3864,7 +3864,20 @@ func convert_v1beta3_ServiceSpec_To_api_ServiceSpec(in *ServiceSpec, out *newer.
 		out.Selector = nil
 	}
 	out.PortalIP = in.PortalIP
-	out.CreateExternalLoadBalancer = in.CreateExternalLoadBalancer
+
+	visibilityIn := in.Visibility
+	if visibilityIn == "" {
+		if in.CreateExternalLoadBalancer {
+			visibilityIn = VisibilityTypeLoadBalancer
+		} else {
+			visibilityIn = VisibilityTypeCluster
+		}
+	}
+	if err := s.Convert(&visibilityIn, &out.Spec.Visibility, 0); err != nil {
+		return err
+	}
+	out.Spec.CreateExternalLoadBalancer = visibilityIn == VisibilityTypeLoadBalancer
+
 	if in.PublicIPs != nil {
 		out.PublicIPs = make([]string, len(in.PublicIPs))
 		for i := range in.PublicIPs {
@@ -3900,7 +3913,20 @@ func convert_api_ServiceSpec_To_v1beta3_ServiceSpec(in *newer.ServiceSpec, out *
 		out.Selector = nil
 	}
 	out.PortalIP = in.PortalIP
-	out.CreateExternalLoadBalancer = in.CreateExternalLoadBalancer
+
+	visibilityIn := in.Spec.Visibility
+	if visibilityIn == "" {
+		if in.Spec.CreateExternalLoadBalancer {
+			visibilityIn = newer.VisibilityTypeLoadBalancer
+		} else {
+			visibilityIn = newer.VisibilityTypeCluster
+		}
+	}
+	if err := s.Convert(&visibilityIn, &out.Visibility, 0); err != nil {
+		return err
+	}
+	out.CreateExternalLoadBalancer = visibilityIn == newer.VisibilityTypeLoadBalancer
+
 	if in.PublicIPs != nil {
 		out.PublicIPs = make([]string, len(in.PublicIPs))
 		for i := range in.PublicIPs {

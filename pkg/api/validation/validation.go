@@ -984,6 +984,9 @@ func ValidatePodTemplateUpdate(newPod, oldPod *api.PodTemplate) errs.ValidationE
 }
 
 var supportedSessionAffinityType = util.NewStringSet(string(api.AffinityTypeClientIP), string(api.AffinityTypeNone))
+var supportedVisibilityType = util.NewStringSet(string(api.VisibilityTypeCluster),
+	string(api.VisibilityTypePublic),
+	string(api.VisibilityTypeLoadBalancer))
 
 // ValidateService tests if required fields in the service are set.
 func ValidateService(service *api.Service) errs.ValidationErrorList {
@@ -1008,6 +1011,12 @@ func ValidateService(service *api.Service) errs.ValidationErrorList {
 		allErrs = append(allErrs, errs.NewFieldNotSupported("spec.sessionAffinity", service.Spec.SessionAffinity))
 	}
 
+	if service.Spec.Visibility == "" {
+		allErrs = append(allErrs, errs.NewFieldRequired("spec.visibility"))
+	} else if !supportedVisibilityType.Has(string(service.Spec.Visibility)) {
+		allErrs = append(allErrs, errs.NewFieldNotSupported("spec.visibility", service.Spec.Visibility))
+	}
+
 	if api.IsServiceIPSet(service) {
 		if ip := net.ParseIP(service.Spec.PortalIP); ip == nil {
 			allErrs = append(allErrs, errs.NewFieldInvalid("spec.portalIP", service.Spec.PortalIP, "portalIP should be empty, 'None', or a valid IP address"))
@@ -1027,6 +1036,13 @@ func ValidateService(service *api.Service) errs.ValidationErrorList {
 			if service.Spec.Ports[i].Protocol != api.ProtocolTCP {
 				allErrs = append(allErrs, errs.NewFieldInvalid("spec.ports", service.Spec.Ports[i], "cannot create an external load balancer with non-TCP ports"))
 			}
+		}
+		if service.Spec.Visibility != api.VisibilityTypeLoadBalancer {
+			allErrs = append(allErrs, errs.NewFieldInvalid("spec.visibility", service.Spec.Visibility, "visibility must be loadbalancer when createExternalLoadBalancer is true"))
+		}
+	} else {
+		if service.Spec.Visibility == api.VisibilityTypeLoadBalancer {
+			allErrs = append(allErrs, errs.NewFieldInvalid("spec.visibility", service.Spec.Visibility, "visibility cannot be loadbalancer when createExternalLoadBalancer is false"))
 		}
 	}
 

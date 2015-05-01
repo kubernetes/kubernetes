@@ -775,12 +775,24 @@ func addConversionFuncs() {
 			if err := s.Convert(&in.Spec.Selector, &out.Selector, 0); err != nil {
 				return err
 			}
-			out.CreateExternalLoadBalancer = in.Spec.CreateExternalLoadBalancer
 			out.PublicIPs = in.Spec.PublicIPs
 			out.PortalIP = in.Spec.PortalIP
 			if err := s.Convert(&in.Spec.SessionAffinity, &out.SessionAffinity, 0); err != nil {
 				return err
 			}
+
+			visibilityIn := in.Spec.Visibility
+			if visibilityIn == "" {
+				if in.Spec.CreateExternalLoadBalancer {
+					visibilityIn = newer.VisibilityTypeLoadBalancer
+				} else {
+					visibilityIn = newer.VisibilityTypeCluster
+				}
+			}
+			if err := s.Convert(&visibilityIn, &out.Visibility, 0); err != nil {
+				return err
+			}
+			out.CreateExternalLoadBalancer = visibilityIn == newer.VisibilityTypeLoadBalancer
 
 			return nil
 		},
@@ -819,12 +831,24 @@ func addConversionFuncs() {
 			if err := s.Convert(&in.Selector, &out.Spec.Selector, 0); err != nil {
 				return err
 			}
-			out.Spec.CreateExternalLoadBalancer = in.CreateExternalLoadBalancer
 			out.Spec.PublicIPs = in.PublicIPs
 			out.Spec.PortalIP = in.PortalIP
 			if err := s.Convert(&in.SessionAffinity, &out.Spec.SessionAffinity, 0); err != nil {
 				return err
 			}
+
+			visibilityIn := in.Visibility
+			if visibilityIn == "" {
+				if in.CreateExternalLoadBalancer {
+					visibilityIn = VisibilityTypeLoadBalancer
+				} else {
+					visibilityIn = VisibilityTypeCluster
+				}
+			}
+			if err := s.Convert(&visibilityIn, &out.Spec.Visibility, 0); err != nil {
+				return err
+			}
+			out.Spec.CreateExternalLoadBalancer = visibilityIn == VisibilityTypeLoadBalancer
 
 			return nil
 		},

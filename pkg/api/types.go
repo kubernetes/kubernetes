@@ -979,6 +979,20 @@ const (
 	AffinityTypeNone AffinityType = "None"
 )
 
+// Session Visibility Type string
+type VisibilityType string
+
+const (
+	// VisibilityTypeCluster means a service will only be accessible inside the k8s cluster.
+	VisibilityTypeCluster VisibilityType = "cluster"
+
+	// VisibilityTypePublic means a service will be exposed on the nodes, in addition to 'cluster' visibility.
+	VisibilityTypePublic VisibilityType = "public"
+
+	// VisibilityTypeLoadBalancer means a service will be exposed via a load balancer, in addition to 'public' visibility.
+	VisibilityTypeLoadBalancer VisibilityType = "loadbalancer"
+)
+
 // ServiceStatus represents the current status of a service
 type ServiceStatus struct{}
 
@@ -1001,6 +1015,10 @@ type ServiceSpec struct {
 
 	// CreateExternalLoadBalancer indicates whether a load balancer should be created for this service.
 	CreateExternalLoadBalancer bool `json:"createExternalLoadBalancer,omitempty"`
+
+	// Visibility determines how the service will be exposed.  Valid options: cluster, public, loadbalancer
+	Visibility VisibilityType `json:"visibility,omitempty" description:"control whether the service can be reached from outside the kubernetes cluster"`
+
 	// PublicIPs are used by external load balancers, or can be set by
 	// users to handle external traffic that arrives at a node.
 	// For load balancers, the publicIP will usually be the IP address of the load balancer,

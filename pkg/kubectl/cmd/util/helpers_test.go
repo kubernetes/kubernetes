@@ -141,6 +141,7 @@ func TestMerge(t *testing.T) {
 			expected: &api.Service{
 				Spec: api.ServiceSpec{
 					SessionAffinity: "None",
+					Visibility:      "cluster",
 				},
 			},
 		},
@@ -157,6 +158,7 @@ func TestMerge(t *testing.T) {
 			expected: &api.Service{
 				Spec: api.ServiceSpec{
 					SessionAffinity: "None",
+					Visibility:      "cluster",
 					Selector: map[string]string{
 						"version": "v2",
 					},

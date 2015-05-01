@@ -77,6 +77,15 @@ func addDefaultingFuncs() {
 			if obj.SessionAffinity == "" {
 				obj.SessionAffinity = AffinityTypeNone
 			}
+			if obj.Visibility == "" {
+				if obj.CreateExternalLoadBalancer {
+					obj.Visibility = VisibilityTypeLoadBalancer
+				} else {
+					obj.Visibility = VisibilityTypeCluster
+				}
+			} else if obj.Visibility == VisibilityTypeLoadBalancer {
+				obj.CreateExternalLoadBalancer = true
+			}
 			for i := range obj.Ports {
 				sp := &obj.Ports[i]
 				if sp.Protocol == "" {
