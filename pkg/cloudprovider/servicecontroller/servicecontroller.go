@@ -228,7 +228,7 @@ func (s *ServiceController) createLoadBalancerIfNeeded(namespacedName types.Name
 	if cachedService != nil {
 		// If the service already exists but needs to be updated, delete it so that
 		// we can recreate it cleanly.
-		if cachedService.Spec.CreateExternalLoadBalancer {
+		if wantsExternalLoadBalancer(cachedService) {
 			glog.Infof("Deleting existing load balancer for service %s that needs an updated load balancer.", namespacedName)
 			if err := s.ensureLBDeleted(cachedService); err != nil {
 				return err, retryable
@@ -257,7 +257,7 @@ func (s *ServiceController) createLoadBalancerIfNeeded(namespacedName types.Name
 		}
 	}
 
-	if !service.Spec.CreateExternalLoadBalancer {
+	if !wantsExternalLoadBalancer(service) {
 		glog.Infof("Not creating LB for service %s that doesn't want one.", namespacedName)
 		return nil, notRetryable
 	}
@@ -416,10 +416,10 @@ func (s *serviceCache) delete(serviceName string) {
 }
 
 func needsUpdate(oldService *api.Service, newService *api.Service) bool {
-	if !oldService.Spec.CreateExternalLoadBalancer && !newService.Spec.CreateExternalLoadBalancer {
+	if !wantsExternalLoadBalancer(oldService) && !wantsExternalLoadBalancer(newService) {
 		return false
 	}
-	if oldService.Spec.CreateExternalLoadBalancer != newService.Spec.CreateExternalLoadBalancer {
+	if wantsExternalLoadBalancer(oldService) != wantsExternalLoadBalancer(newService) {
 		return true
 	}
 	if !portsEqual(oldService, newService) || oldService.Spec.SessionAffinity != newService.Spec.SessionAffinity {
@@ -566,7 +566,7 @@ func (s *ServiceController) updateLoadBalancerHosts(services []*cachedService, h
 // Updates the external load balancer of a service, assuming we hold the mutex
 // associated with the service.
 func (s *ServiceController) lockedUpdateLoadBalancerHosts(service *api.Service, hosts []string) error {
-	if !service.Spec.CreateExternalLoadBalancer {
+	if !wantsExternalLoadBalancer(service) {
 		return nil
 	}
 
@@ -583,4 +583,12 @@ func (s *ServiceController) lockedUpdateLoadBalancerHosts(service *api.Service, 
 		return nil
 	}
 	return err
+}
+
+func wantsExternalLoadBalancer(service *api.Service) bool {
+	if service.Spec.Visibility == api.VisibilityType("") {
+		// TODO: does something do a version upgrade for us?  should we warn here?
+		return service.Spec.CreateExternalLoadBalancer
+	}
+	return service.Spec.Visibility == api.VisibilityTypeLoadBalancer
 }

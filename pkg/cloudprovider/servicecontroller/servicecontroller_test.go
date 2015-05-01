@@ -28,8 +28,8 @@ import (
 
 const region = "us-central"
 
-func newService(name string, uid types.UID, external bool) *api.Service {
-	return &api.Service{ObjectMeta: api.ObjectMeta{Name: name, Namespace: "namespace", UID: uid}, Spec: api.ServiceSpec{CreateExternalLoadBalancer: external}}
+func newService(name string, uid types.UID, visibility api.VisibilityType) *api.Service {
+	return &api.Service{ObjectMeta: api.ObjectMeta{Name: name, Namespace: "namespace", UID: uid}, Spec: api.ServiceSpec{Visibility: visibility}}
 }
 
 func TestCreateExternalLoadBalancer(t *testing.T) {
@@ -80,6 +80,66 @@ func TestCreateExternalLoadBalancer(t *testing.T) {
 						Protocol: api.ProtocolTCP,
 					}},
 					CreateExternalLoadBalancer: true,
+				},
+			},
+			expectErr:           false,
+			expectCreateAttempt: true,
+		},
+		{
+			service: &api.Service{
+				ObjectMeta: api.ObjectMeta{
+					Name:      "no-external-balancer",
+					Namespace: "default",
+				},
+				Spec: api.ServiceSpec{
+					Visibility: "cluster",
+				},
+			},
+			expectErr:           false,
+			expectCreateAttempt: false,
+		},
+		{
+			service: &api.Service{
+				ObjectMeta: api.ObjectMeta{
+					Name:      "no-external-balancer",
+					Namespace: "default",
+				},
+				Spec: api.ServiceSpec{
+					Visibility: "public",
+				},
+			},
+			expectErr:           false,
+			expectCreateAttempt: false,
+		},
+		{
+			service: &api.Service{
+				ObjectMeta: api.ObjectMeta{
+					Name:      "udp-service",
+					Namespace: "default",
+				},
+				Spec: api.ServiceSpec{
+					Ports: []api.ServicePort{{
+						Port:     80,
+						Protocol: api.ProtocolUDP,
+					}},
+					Visibility: "loadbalancer",
+				},
+			},
+			expectErr:           true,
+			expectCreateAttempt: false,
+		},
+		{
+			service: &api.Service{
+				ObjectMeta: api.ObjectMeta{
+					Name:      "basic-service1",
+					Namespace: "default",
+				},
+				Spec: api.ServiceSpec{
+					Ports: []api.ServicePort{{
+						Port:     80,
+						Protocol: api.ProtocolTCP,
+					}},
+					Visibility: "loadbalancer",
 				},
 			},
 			expectErr:           false,
@@ -144,15 +204,15 @@ func TestUpdateNodesInExternalLoadBalancer(t *testing.T) {
 		{
 			// Services do not have external load balancers: no calls should be made.
 			services: []*api.Service{
-				newService("s0", "111", false),
-				newService("s1", "222", false),
+				newService("s0", "111", api.VisibilityTypeCluster),
+				newService("s1", "222", api.VisibilityTypePublic),
 			},
 			expectedUpdateCalls: nil,
 		},
 		{
 			// Services does have an external load balancer: one call should be made.
 			services: []*api.Service{
-				newService("s0", "333", true),
+				newService("s0", "333", api.VisibilityTypeLoadBalancer),
 			},
 			expectedUpdateCalls: []fake_cloud.FakeUpdateBalancerCall{
 				{Name: "a333", Region: region, Hosts: []string{"node0", "node1", "node73"}},
@@ -161,9 +221,9 @@ func TestUpdateNodesInExternalLoadBalancer(t *testing.T) {
 		{
 			// Three services have an external load balancer: three calls.
 			services: []*api.Service{
-				newService("s0", "444", true),
-				newService("s1", "555", true),
-				newService("s2", "666", true),
+				newService("s0", "444", api.VisibilityTypeLoadBalancer),
+				newService("s1", "555", api.VisibilityTypeLoadBalancer),
+				newService("s2", "666", api.VisibilityTypeLoadBalancer),
 			},
 			expectedUpdateCalls: []fake_cloud.FakeUpdateBalancerCall{
 				{Name: "a444", Region: region, Hosts: []string{"node0", "node1", "node73"}},
@@ -174,10 +234,10 @@ func TestUpdateNodesInExternalLoadBalancer(t *testing.T) {
 		{
 			// Two services have an external load balancer and two don't: two calls.
 			services: []*api.Service{
-				newService("s0", "777", false),
-				newService("s1", "888", true),
-				newService("s3", "999", true),
-				newService("s4", "123", false),
+				newService("s0", "777", api.VisibilityTypePublic),
+				newService("s1", "888", api.VisibilityTypeLoadBalancer),
+				newService("s3", "999", api.VisibilityTypeLoadBalancer),
+				newService("s4", "123", api.VisibilityTypeCluster),
 			},
 			expectedUpdateCalls: []fake_cloud.FakeUpdateBalancerCall{
 				{Name: "a888", Region: region, Hosts: []string{"node0", "node1", "node73"}},
