@@ -438,7 +438,7 @@ func needsUpdate(oldService *api.Service, newService *api.Service) bool {
 }
 
 func (s *ServiceController) loadBalancerName(service *api.Service) string {
-	return cloudprovider.GetLoadBalancerName(service)
+	return cloudprovider.GetLoadBalancerName(s.clusterName, service.Namespace, service.Name)
 }
 
 func getTCPPorts(service *api.Service) ([]int, error) {
@@ -571,7 +571,7 @@ func (s *ServiceController) lockedUpdateLoadBalancerHosts(service *api.Service, 
 		return nil
 	}
 
-	name := cloudprovider.GetLoadBalancerName(service)
+	name := s.loadBalancerName(service)
 	err := s.balancer.UpdateTCPLoadBalancer(name, s.zone.Region, hosts)
 	if err == nil {
 		return nil
