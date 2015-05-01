@@ -120,7 +120,8 @@ func NewMainKubelet(
 	nodeStatusUpdateFrequency time.Duration,
 	resourceContainer string,
 	osInterface kubecontainer.OSInterface,
-	cgroupRoot string) (*Kubelet, error) {
+	cgroupRoot string,
+	containerRuntime string) (*Kubelet, error) {
 	if rootDirectory == "" {
 		return nil, fmt.Errorf("invalid root directory %q", rootDirectory)
 	}
@@ -239,6 +240,15 @@ func NewMainKubelet(
 		return nil, err
 	} else {
 		klet.networkPlugin = plug
+	}
+
+	// TODO(vmarmol,yjhong): Use container runtime.
+	// Initialize the runtime.
+	switch containerRuntime {
+	case "docker":
+		// Only supported one for now, continue.
+	default:
+		return nil, fmt.Errorf("unsupported container runtime %q specified", containerRuntime)
 	}
 	containerManager := dockertools.NewDockerManager(
 		dockerClient,
