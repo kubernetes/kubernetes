@@ -33,6 +33,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/capabilities"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/credentialprovider"
 	kubecontainer "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/prober"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume"
@@ -69,9 +70,13 @@ const (
 // uses systemd, so in order to run this runtime, systemd must be installed
 // on the machine.
 type Runtime struct {
-	systemd *dbus.Conn
-	absPath string
-	config  *Config
+	generator        kubecontainer.RunContainerOptionsGenerator
+	readinessManager *kubecontainer.ReadinessManager
+	prober           prober.Prober
+	systemd          *dbus.Conn
+	// The absolute path to rkt binary.
+	rktBinAbsPath string
+	config        *Config
 	// TODO(yifan): Refactor this to be generic keyring.
 	dockerKeyring credentialprovider.DockerKeyring
 }
@@ -98,14 +103,14 @@ func New(config *Config) (*Runtime, error) {
 	}
 
 	// Test if rkt binary is in $PATH.
-	absPath, err := exec.LookPath(rktBinName)
+	rktBinAbsPath, err := exec.LookPath(rktBinName)
 	if err != nil {
 		return nil, fmt.Errorf("cannot find rkt binary: %v", err)
 	}
 
 	rkt := &Runtime{
 		systemd:       systemd,
-		absPath:       absPath,
+		rktBinAbsPath: rktBinAbsPath,
 		config:        config,
 		dockerKeyring: credentialprovider.NewDockerKeyring(),
 	}
@@ -483,7 +488,7 @@ func (r *Runtime) preparePod(pod *api.Pod, volumeMap map[string]volume.Volume) (
 		return "", false, err
 	}
 
-	runPrepared := fmt.Sprintf("%s run-prepared --private-net=%v %s", r.absPath, pod.Spec.HostNetwork, uuid)
+	runPrepared := fmt.Sprintf("%s run-prepared --private-net=%v %s", r.rktBinAbsPath, !pod.Spec.HostNetwork, uuid)
 	units := []*unit.UnitOption{
 		newUnitOption(unitKubernetesSection, unitRktID, uuid),
 		newUnitOption(unitKubernetesSection, unitPodName, string(b)),
