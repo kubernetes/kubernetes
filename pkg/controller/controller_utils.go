@@ -19,6 +19,8 @@ package controller
 import (
 	"encoding/json"
 	"fmt"
+	"time"
+
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/validation"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
@@ -28,7 +30,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/wait"
 	"github.com/golang/glog"
 	"sync/atomic"
-	"time"
 )
 
 const CreatedByAnnotation = "kubernetes.io/created-by"
@@ -106,7 +107,9 @@ func (r *RCExpectations) setExpectations(rc *api.ReplicationController, add, del
 	if err != nil {
 		return err
 	}
-	return r.Add(&PodExpectations{add: int64(add), del: int64(del), key: rcKey})
+	podExp := &PodExpectations{add: int64(add), del: int64(del), key: rcKey}
+	glog.V(4).Infof("Setting expectations %+v", podExp)
+	return r.Add(podExp)
 }
 
 func (r *RCExpectations) ExpectCreations(rc *api.ReplicationController, adds int) error {
@@ -124,6 +127,8 @@ func (r *RCExpectations) lowerExpectations(rc *api.ReplicationController, add, d
 			glog.V(2).Infof("Controller has both add and del expectations %+v", podExp)
 		}
 		podExp.Seen(int64(add), int64(del))
+		// The expectations might've been modified since the update on the previous line.
+		glog.V(4).Infof("Lowering expectations %+v", podExp)
 	}
 }
 

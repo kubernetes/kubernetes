@@ -42,20 +42,28 @@ var (
 
 const (
 	// We'll attempt to recompute the required replicas of all replication controllers
-	// the have fulfilled their expectations at least this often.
+	// the have fulfilled their expectations at least this often. This recomputation
+	// happens based on contents in local pod storage.
 	FullControllerResyncPeriod = 30 * time.Second
 
-	// If a watch misdelivers info about a pod, it'll take this long
-	// to rectify the number of replicas.
+	// If a watch misdelivers info about a pod, it'll take at least this long
+	// to rectify the number of replicas. Note that dropped deletes are only
+	// rectified after the expectation times out because we don't know the
+	// final resting state of the pod.
 	PodRelistPeriod = 5 * time.Minute
 
-	// If a watch drops an (add, delete) event for a pod, it'll take this long
-	// before a dormant rc waiting for those packets is woken up anyway. This
-	// should typically be somewhere between the PodRelistPeriod and the
-	// FullControllerResyncPeriod. It is specifically targeted at the case
-	// where some problem prevents an update of expectations, without it the
-	// RC could stay asleep forever.
-	ExpectationsTimeout = 2 * time.Minute
+	// If a watch drops a delete event for a pod, it'll take this long
+	// before a dormant rc waiting for those packets is woken up anyway. It is
+	// specifically targeted at the case where some problem prevents an update
+	// of expectations, without it the RC could stay asleep forever. This should
+	// be set based on the expected latency of watch events.
+
+	// TODO: Set this per expectation, based on its size.
+	// Currently an rc can service (create *and* observe the watch events for said
+	// creation) about 10-20 pods a second, so it takes about 3.5 min to service
+	// 3000 pods. Just creation is limited to 30qps, and watching happens with
+	// ~10-30s latency/pod at scale.
+	ExpectationsTimeout = 6 * time.Minute
 )
 
 // ReplicationManager is responsible for synchronizing ReplicationController objects stored
@@ -220,6 +228,11 @@ func (rm *ReplicationManager) deletePod(obj interface{}) {
 		}
 		return
 	}
+	// When a delete is dropped, the relist will notice a pod in the store not
+	// in the list, leading to the insertion of a tombstone key. Since we don't
+	// know which rc to wake up/update expectations, we rely on the ttl on the
+	// expectation expiring. The rc syncs via the 30s periodic resync and notices
+	// fewer pods than its replica count.
 	podKey, err := framework.DeletionHandlingMetaNamespaceKeyFunc(obj)
 	if err != nil {
 		glog.Errorf("Couldn't get key for object %+v: %v", obj, err)
