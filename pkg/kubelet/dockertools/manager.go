@@ -54,7 +54,8 @@ const (
 	maxReasonCacheEntries = 200
 )
 
-// TODO(yjhong): DockerManager should implement the Runtime interface.
+// DockerManager implements the Runtime interface.
+var _ kubecontainer.Runtime = &DockerManager{}
 
 type DockerManager struct {
 	client              DockerInterface

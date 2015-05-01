@@ -23,7 +23,6 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume"
 )
 
 type Version interface {
@@ -44,8 +43,6 @@ type Runtime interface {
 	// specifies whether the runtime returns all containers including those already
 	// exited and dead containers (used for garbage collection).
 	GetPods(all bool) ([]*Pod, error)
-	// RunPod starts all the containers of a pod within a namespace.
-	RunPod(*api.Pod, map[string]volume.Volume) error
 	// Syncs the running pod into the desired pod.
 	SyncPod(pod *api.Pod, runningPod Pod, podStatus api.PodStatus) error
 	// KillPod kills all the containers of a pod.
