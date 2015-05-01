@@ -1657,11 +1657,11 @@ func TestValidateService(t *testing.T) {
 			numErrs: 1,
 		},
 		{
-			name: "invalid publicIPs",
+			name: "valid listen any address 0.0.0.0",
 			tweakSvc: func(s *api.Service) {
 				s.Spec.PublicIPs = []string{"0.0.0.0"}
 			},
-			numErrs: 1,
+			numErrs: 0,
 		},
 		{
 			name: "valid publicIPs host",
