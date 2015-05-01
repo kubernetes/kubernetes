@@ -10,7 +10,7 @@ coreos:
     initial-cluster-token: k8s_etcd
     listen-peer-urls: http://<master-private-ip>:2380,http://<master-private-ip>:7001
     initial-advertise-peer-urls: http://<master-private-ip>:2380
-    initial-cluster: master=http://<master-private-ip>:2380"
+    initial-cluster: master=http://<master-private-ip>:2380
     initial-cluster-state: new
   fleet:
     metadata: "role=master"
