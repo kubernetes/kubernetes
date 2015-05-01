@@ -24,22 +24,20 @@ echo "WRITING KUBE FILES , will overwrite the jsons, then testing pods. is kube 
 kubectl="kubectl"
 VERSION="r.2.8.19"
 PUBLIC_IP="10.1.4.89" # ip which we use to access the Web server.
-_SECONDS=1000          # number of seconds to measure throughput.
 FE="1"                # amount of Web server  
 LG="1"                # amount of load generators
 SLAVE="1"             # amount of redis slaves 
-TEST="1"              # 0 = Dont run tests, 1 = Do run tests.
+TEST_SECONDS="1000"   # 0 = Dont run tests, if > 0,  run tests for n seconds.
 NS="k8petstore"       # namespace
 
 kubectl="${1:-$kubectl}"
 VERSION="${2:-$VERSION}"
-PUBLIC_IP="${3:-$PUBLIC_IP}" # ip which we use to access the Web server.
-_SECONDS="${4:-$_SECONDS}"   # number of seconds to measure throughput.
-FE="${5:-$FE}"       # amount of Web server  
-LG="${6:-$LG}"        # amount of load generators
-SLAVE="${7:-$SLAVE}"     # amount of redis slaves 
-TEST="${8:-$TEST}"      # 0 = Dont run tests, 1 = Do run tests.
-NS="${9:-$NS}"          # namespace
+PUBLIC_IP="${3:-$PUBLIC_IP}"
+FE="${4:-$FE}"  
+LG="${5:-$LG}"
+SLAVE="${6:-$SLAVE}" 
+TEST_SECONDS="${7:-$TEST}"
+NS="${8:-$NS}" 
 
 echo "Running w/ args: kubectl $kubectl version $VERSION ip $PUBLIC_IP sec $_SECONDS fe $FE lg $LG slave $SLAVE test $TEST NAMESPACE $NS"
 function create { 
@@ -246,9 +244,9 @@ function tests {
 	pass_load=0 
 
 	### Print statistics of db size, every second, until $SECONDS are up.
-	for i in `seq 1 $_SECONDS`;
+	for i in `seq 1 $TEST_SECONDS`;
 	 do
-	    echo "curl : $PUBLIC_IP:3000 , $i of $_SECONDS"
+	    echo "curl : $PUBLIC_IP:3000 , $i of $TEST_SECONDS"
         curr_cnt="`curl "$PUBLIC_IP:3000/llen"`" 
         ### Write CSV File of # of trials / total transcations.
         echo "$i $curr_cnt" >> result
@@ -264,10 +262,14 @@ pollfor
 if [[ $pass_http -eq 1 ]]; then 
     echo "Passed..."
 else
-    exit 1
+    exit 2
 fi
 
-if [[ $TEST -eq 1 ]]; then
-    echo "running polling tests now"
+if [[ $TEST_SECONDS -eq 0 ]]; then
+    echo "skipping tests, TEST_SECONDS value was 0"
+else
+    echo "running polling tests now for $TEST_SECONDS"
     tests
 fi
+
+exit 0
