@@ -58,7 +58,7 @@ That approach would provide co-location, but would not provide most of the benef
 
 ## Durability of pods (or lack thereof)
 
-Pods aren't intended to be treated as durable pets. They won't survive scheduling failures, node failures, or other evictions, such as due to lack of resources, or in the case of node maintenance. 
+Pods aren't intended to be treated as durable [pets](https://blog.engineyard.com/2014/pets-vs-cattle). They won't survive scheduling failures, node failures, or other evictions, such as due to lack of resources, or in the case of node maintenance. 
 
 In general, users shouldn't need to create pods directly. They should almost always use controllers (e.g., [replication controller](replication-controller.md)), even for singletons.  Controllers provide self-healing with a cluster scope, as well as replication and rollout management. 
 
