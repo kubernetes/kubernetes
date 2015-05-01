@@ -27,7 +27,8 @@ func WordSepNormalizeFunc(f *pflag.FlagSet, name string) pflag.NormalizedName {
 		name = strings.Replace(name, sep, to, -1)
 	}
 	// Type convert to indicate normalization has been done.
-	return pflag.NormalizedName(name)
+	n := f.GetNormalizeFunc()
+	return n(f, name)
 }
 
 // InitFlags normalizes and parses the command line flags
