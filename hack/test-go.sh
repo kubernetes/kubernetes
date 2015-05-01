@@ -207,12 +207,14 @@ reportCoverageToCoveralls() {
 # Convert the CSV to an array of API versions to test
 IFS=',' read -a apiVersions <<< "${KUBE_TEST_API_VERSIONS}"
 ETCD_PREFIX=${ETCD_STANDARD_PREFIX}
+LAST_API_VERSION=""
 for apiVersion in "${apiVersions[@]}"; do
   echo "Running tests for APIVersion: $apiVersion"
+  LAST_API_VERSION=$apiVersion
   KUBE_API_VERSION="${apiVersion}" ETCD_PREFIX=${ETCD_STANDARD_PREFIX} runTests "$@"
 done
 echo "Using custom etcd path prefix: ${ETCD_CUSTOM_PREFIX}"
-KUBE_API_VERSION="${apiVersions[-1]}" ETCD_PREFIX=${ETCD_CUSTOM_PREFIX} runTests "$@"
+KUBE_API_VERSION="${LAST_API_VERSION}" ETCD_PREFIX=${ETCD_CUSTOM_PREFIX} runTests "$@"
 
 # We might run the tests for multiple versions, but we want to report only
 # one of them to coveralls. Here we report coverage from the last run.
