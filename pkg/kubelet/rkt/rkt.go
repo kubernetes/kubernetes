@@ -28,6 +28,8 @@ import (
 )
 
 const (
+	rktBinName = "rkt"
+
 	acversion             = "0.5.1"
 	rktMinimumVersion     = "0.5.4"
 	systemdMinimumVersion = "215"
@@ -44,19 +46,6 @@ const (
 	unitRktID             = "RktID"
 
 	dockerPrefix = "docker://"
-)
-
-const (
-	rktBinName = "rkt"
-
-	Embryo         = "embryo"
-	Preparing      = "preparing"
-	AbortedPrepare = "aborted prepare"
-	Prepared       = "prepared"
-	Running        = "running"
-	Deleting       = "deleting" // This covers pod.isExitedDeleting and pod.isDeleting.
-	Exited         = "exited"   // This covers pod.isExited and pod.isExitedGarbage.
-	Garbage        = "garbage"
 )
 
 // Runtime implements the ContainerRuntime for rkt. The implementation
