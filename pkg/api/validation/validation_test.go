@@ -1706,6 +1706,56 @@ func TestValidateService(t *testing.T) {
 			},
 			numErrs: 0,
 		},
+		{
+			name: "valid external load balancer with PublicPort",
+			tweakSvc: func(s *api.Service) {
+				s.Spec.CreateExternalLoadBalancer = true
+				s.Spec.Visibility = "loadbalancer"
+				s.Spec.Ports = append(s.Spec.Ports, api.ServicePort{Name: "p", Port: 12345, Protocol: "TCP", PublicPort: 12345})
+			},
+			numErrs: 0,
+		},
+		{
+			name: "valid external load balancer without PublicPort",
+			tweakSvc: func(s *api.Service) {
+				s.Spec.CreateExternalLoadBalancer = true
+				s.Spec.Visibility = "loadbalancer"
+				s.Spec.Ports = append(s.Spec.Ports, api.ServicePort{Name: "p", Port: 12345, Protocol: "TCP"})
+			},
+			numErrs: 0,
+		},
+		{
+			name: "valid public service with PublicPort",
+			tweakSvc: func(s *api.Service) {
+				s.Spec.Visibility = "public"
+				s.Spec.Ports = append(s.Spec.Ports, api.ServicePort{Name: "p", Port: 12345, Protocol: "TCP", PublicPort: 12345})
+			},
+			numErrs: 0,
+		},
+		{
+			name: "valid public service without PublicPort",
+			tweakSvc: func(s *api.Service) {
+				s.Spec.Visibility = "public"
+				s.Spec.Ports = append(s.Spec.Ports, api.ServicePort{Name: "p", Port: 12345, Protocol: "TCP"})
+			},
+			numErrs: 0,
+		},
+		{
+			name: "valid cluster service without PublicPort",
+			tweakSvc: func(s *api.Service) {
+				s.Spec.Visibility = "cluster"
+				s.Spec.Ports = append(s.Spec.Ports, api.ServicePort{Name: "p", Port: 12345, Protocol: "TCP"})
+			},
+			numErrs: 0,
+		},
+		{
+			name: "invalid cluster service with PublicPort",
+			tweakSvc: func(s *api.Service) {
+				s.Spec.Visibility = "cluster"
+				s.Spec.Ports = append(s.Spec.Ports, api.ServicePort{Name: "p", Port: 12345, Protocol: "TCP", PublicPort: 12345})
+			},
+			numErrs: 1,
+		},
 	}
 
 	for _, tc := range testCases {

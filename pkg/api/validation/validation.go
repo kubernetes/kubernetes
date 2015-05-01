@@ -1046,6 +1046,14 @@ func ValidateService(service *api.Service) errs.ValidationErrorList {
 		}
 	}
 
+	if service.Spec.Visibility == api.VisibilityTypeCluster {
+		for i := range service.Spec.Ports {
+			if service.Spec.Ports[i].PublicPort != 0 {
+				allErrs = append(allErrs, errs.NewFieldInvalid("spec.ports", service.Spec.Ports[i], "cannot specify a public port with cluster-visibility services"))
+			}
+		}
+	}
+
 	return allErrs
 }
 
