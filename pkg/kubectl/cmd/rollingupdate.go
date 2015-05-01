@@ -155,6 +155,9 @@ func RunRollingUpdate(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, arg
 			return cmdutil.UsageError(cmd, "%s does not specify a valid ReplicationController", filename)
 		}
 	}
+	// If the --image option is specified, we need to create a new rc with at least one different selector
+	// than the old rc. This selector is the hash of the rc, which will differ because the new rc has a
+	// different image.
 	if len(image) != 0 {
 		var newName string
 		var err error
@@ -205,7 +208,7 @@ func RunRollingUpdate(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, arg
 
 			kubectl.SetNextControllerAnnotation(oldRc, newName)
 			if _, found := oldRc.Spec.Selector[deploymentKey]; !found {
-				if err := addDeploymentKeyToReplicationController(oldRc, client, deploymentKey, cmdNamespace, out); err != nil {
+				if oldRc, err = addDeploymentKeyToReplicationController(oldRc, client, deploymentKey, cmdNamespace, out); err != nil {
 					return err
 				}
 			}
@@ -219,6 +222,9 @@ func RunRollingUpdate(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, arg
 
 	updater := kubectl.NewRollingUpdater(newRc.Namespace, kubectl.NewRollingUpdaterClient(client))
 
+	// To successfully pull off a rolling update the new and old rc have to differ
+	// by at least one selector. Every new pod should have the selector and every
+	// old pod should not have the selector.
 	var hasLabel bool
 	for key, oldValue := range oldRc.Spec.Selector {
 		if newValue, ok := newRc.Spec.Selector[key]; ok && newValue != oldValue {
@@ -281,25 +287,25 @@ func hashObject(obj runtime.Object, codec runtime.Codec) (string, error) {
 
 const MaxRetries = 3
 
-func addDeploymentKeyToReplicationController(oldRc *api.ReplicationController, client *client.Client, deploymentKey, namespace string, out io.Writer) error {
+func addDeploymentKeyToReplicationController(oldRc *api.ReplicationController, client *client.Client, deploymentKey, namespace string, out io.Writer) (*api.ReplicationController, error) {
 	oldHash, err := hashObject(oldRc, client.Codec)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	// First, update the template label.  This ensures that any newly created pods will have the new label
 	if oldRc.Spec.Template.Labels == nil {
 		oldRc.Spec.Template.Labels = map[string]string{}
 	}
 	oldRc.Spec.Template.Labels[deploymentKey] = oldHash
-	if _, err := client.ReplicationControllers(namespace).Update(oldRc); err != nil {
-		return err
+	if oldRc, err = client.ReplicationControllers(namespace).Update(oldRc); err != nil {
+		return nil, err
 	}
 
-	// Update all labels to include the new hash, so they are correctly adopted
+	// Update all pods managed by the rc to have the new hash label, so they are correctly adopted
 	// TODO: extract the code from the label command and re-use it here.
 	podList, err := client.Pods(namespace).List(labels.SelectorFromSet(oldRc.Spec.Selector), fields.Everything())
 	if err != nil {
-		return err
+		return nil, err
 	}
 	for ix := range podList.Items {
 		pod := &podList.Items[ix]
@@ -323,7 +329,7 @@ func addDeploymentKeyToReplicationController(oldRc *api.ReplicationController, c
 			}
 		}
 		if err != nil {
-			return err
+			return nil, err
 		}
 	}
 
@@ -337,19 +343,23 @@ func addDeploymentKeyToReplicationController(oldRc *api.ReplicationController, c
 	}
 	oldRc.Spec.Selector[deploymentKey] = oldHash
 
-	if _, err := client.ReplicationControllers(namespace).Update(oldRc); err != nil {
-		return err
+	// Update the selector of the rc so it manages all the pods we updated above
+	if oldRc, err = client.ReplicationControllers(namespace).Update(oldRc); err != nil {
+		return nil, err
 	}
 
+	// Clean up any orphaned pods that don't have the new label, this can happen if the rc manager
+	// doesn't see the update to its pod template and creates a new pod with the old labels after
+	// we've finished re-adopting existing pods to the rc.
 	podList, err = client.Pods(namespace).List(labels.SelectorFromSet(selectorCopy), fields.Everything())
 	for ix := range podList.Items {
 		pod := &podList.Items[ix]
 		if value, found := pod.Labels[deploymentKey]; !found || value != oldHash {
 			if err := client.Pods(namespace).Delete(pod.Name, nil); err != nil {
-				return err
+				return nil, err
 			}
 		}
 	}
 
-	return nil
+	return oldRc, nil
 }
