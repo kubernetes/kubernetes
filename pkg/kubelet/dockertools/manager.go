@@ -1023,7 +1023,7 @@ func (dm *DockerManager) KillPod(pod kubecontainer.Pod) error {
 					errs <- err
 				}
 			}
-			err := dm.KillContainer(container.ID)
+			err := dm.killContainer(container.ID)
 			if err != nil {
 				glog.Errorf("Failed to delete container: %v; Skipping pod %q", err, pod.ID)
 				errs <- err
@@ -1043,10 +1043,29 @@ func (dm *DockerManager) KillPod(pod kubecontainer.Pod) error {
 	return nil
 }
 
+// KillContainerInPod kills a container in the pod.
+func (dm *DockerManager) KillContainerInPod(container api.Container, pod *api.Pod) error {
+	// Locate the container.
+	pods, err := dm.GetPods(false)
+	if err != nil {
+		return err
+	}
+	targetPod := kubecontainer.Pods(pods).FindPod(kubecontainer.GetPodFullName(pod), pod.UID)
+	targetContainer := targetPod.FindContainerByName(container.Name)
+	if targetContainer == nil {
+		return fmt.Errorf("unable to find container %q in pod %q", container.Name, targetPod.Name)
+	}
+	return dm.killContainer(targetContainer.ID)
+}
+
 // KillContainer kills a container identified by containerID.
 // Internally, it invokes docker's StopContainer API with a timeout of 10s.
-// TODO(yifan): Use new ContainerID type.
+// TODO: Deprecate this function in favor of KillContainerInPod.
 func (dm *DockerManager) KillContainer(containerID types.UID) error {
+	return dm.killContainer(containerID)
+}
+
+func (dm *DockerManager) killContainer(containerID types.UID) error {
 	ID := string(containerID)
 	glog.V(2).Infof("Killing container with id %q", ID)
 	dm.readinessManager.RemoveReadiness(ID)
@@ -1087,7 +1106,7 @@ func (dm *DockerManager) RunContainer(pod *api.Pod, container *api.Container, ge
 	if container.Lifecycle != nil && container.Lifecycle.PostStart != nil {
 		handlerErr := runner.Run(id, pod, container, container.Lifecycle.PostStart)
 		if handlerErr != nil {
-			dm.KillContainer(types.UID(id))
+			dm.killContainer(types.UID(id))
 			return kubeletTypes.DockerID(""), fmt.Errorf("failed to call event handler: %v", handlerErr)
 		}
 	}
