@@ -21,7 +21,7 @@ import (
 	"os/exec"
 	"strconv"
 
-	kubecontainer "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 )
 
 // GetContainerLogs uses journalctl to get the logs of the container.
@@ -31,8 +31,8 @@ import (
 // TODO(yifan): Currently, it fetches all the containers' log within a pod. We will
 // be able to fetch individual container's log once https://github.com/coreos/rkt/pull/841
 // landed.
-func (r *Runtime) GetContainerLogs(pod kubecontainer.Pod, tail string, follow bool, stdout, stderr io.Writer) error {
-	unitName := makePodServiceFileName(pod.ID)
+func (r *Runtime) GetContainerLogs(pod *api.Pod, containerID string, tail string, follow bool, stdout, stderr io.Writer) error {
+	unitName := makePodServiceFileName(pod.UID)
 	cmd := exec.Command("journalctl", "-u", unitName)
 	if follow {
 		cmd.Args = append(cmd.Args, "-f")
