@@ -31,10 +31,15 @@ Some command line options would be added to components that can do HA:
 Some components may run numerous threads in order to perform tasks in parallel.  Upon losing master status, such components should exit instantly instead of attempting to gracefully shut down such threads.  This is to ensure that, in the case there's some propagation delay in informing the threads they should stop, the lame-duck threads won't interfere with the new master.  The component should exit with an exit code indicating that the component is not the master.  Since all components will be run by systemd or some other monitoring system, this will just result in a restart.
 
 There is a short window after a new master acquires the lease, during which data from the old master might be committed.  This is because there is currently no way to condition a write on its source being the master.  Having the daemons exit shortens this window but does not eliminate it.  A proper solution for this problem will be addressed at a later date.  The proposed solution is:
+
 1. This requires transaction support in etcd (which is already planned - see [coreos/etcd#2675](https://github.com/coreos/etcd/pull/2675))
+
 2. The entry in etcd that is tracking the lease for a given component (the "current master" entry) would have as its value the host:port of the lease-holder (as described earlier) and a sequence number. The sequence number is incremented whenever a new master gets the lease.
+
 3. Master replica is aware of the latest sequence number.
+
 4. Whenever master replica sends a mutating operation to the API server, it includes the sequence number.
+
 5. When the API server makes the corresponding write to etcd, it includes it in a transaction that does a compare-and-swap on the "current master" entry (old value == new value == host:port and sequence number from the replica that sent the mutating operation). This basically guarantees that if we elect the new master, all transactions coming from the old master will fail. You can think of this as the master attaching a "precondition" of its belief about who is the latest master.
 
 ## Open Questions:
