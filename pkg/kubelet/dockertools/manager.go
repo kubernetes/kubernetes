@@ -1247,7 +1247,7 @@ func (dm *DockerManager) ComputePodContainerChanges(pod *api.Pod, runningPod kub
 
 		c := runningPod.FindContainerByName(container.Name)
 		if c == nil {
-			if shouldContainerBeRestarted(&container, pod, &podStatus, dm.readinessManager) {
+			if kubecontainer.ShouldContainerBeRestarted(&container, pod, &podStatus, dm.readinessManager) {
 				// If we are here it means that the container is dead and should be restarted, or never existed and should
 				// be created. We may be inserting this ID again if the container has changed and it has
 				// RestartPolicy::Always, but it's not a big deal.
@@ -1314,38 +1314,4 @@ func (dm *DockerManager) ComputePodContainerChanges(pod *api.Pod, runningPod kub
 		ContainersToStart:   containersToStart,
 		ContainersToKeep:    containersToKeep,
 	}, nil
-}
-
-func shouldContainerBeRestarted(container *api.Container, pod *api.Pod, podStatus *api.PodStatus, readinessManager *kubecontainer.ReadinessManager) bool {
-	podFullName := kubecontainer.GetPodFullName(pod)
-
-	// Get all dead container status.
-	var resultStatus []*api.ContainerStatus
-	for i, containerStatus := range podStatus.ContainerStatuses {
-		if containerStatus.Name == container.Name && containerStatus.State.Termination != nil {
-			resultStatus = append(resultStatus, &podStatus.ContainerStatuses[i])
-		}
-	}
-
-	// Set dead containers to unready state.
-	for _, c := range resultStatus {
-		readinessManager.RemoveReadiness(kubecontainer.TrimRuntimePrefix(c.ContainerID))
-	}
-
-	// Check RestartPolicy for dead container.
-	if len(resultStatus) > 0 {
-		if pod.Spec.RestartPolicy == api.RestartPolicyNever {
-			glog.V(4).Infof("Already ran container %q of pod %q, do nothing", container.Name, podFullName)
-			return false
-		}
-		if pod.Spec.RestartPolicy == api.RestartPolicyOnFailure {
-			// Check the exit code of last run. Note: This assumes the result is sorted
-			// by the created time in reverse order.
-			if resultStatus[0].State.Termination.ExitCode == 0 {
-				glog.V(4).Infof("Already successfully ran container %q of pod %q, do nothing", container.Name, podFullName)
-				return false
-			}
-		}
-	}
-	return true
 }
