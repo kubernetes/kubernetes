@@ -153,6 +153,14 @@ func (op *portAllocationOperation) Allocate(port int) error {
 	return err
 }
 
+func (op *portAllocationOperation) AllocateNext() (int, error) {
+	port, err := op.pa.AllocateNext()
+	if err == nil {
+		op.allocated = append(op.allocated, port)
+	}
+	return port, err
+}
+
 func (op *portAllocationOperation) ReleaseDeferred(port int) {
 	op.releaseDeferred = append(op.releaseDeferred, port)
 }
@@ -164,34 +172,6 @@ func contains(haystack []int, needle int) bool {
 		}
 	}
 	return false
-}
-
-func (op *portAllocationOperation) ApplyChanges(oldPorts, newPorts []int) []error {
-	errs := []error{}
-
-	// These comparison loops are O(N^2), but it means we don't have to change the arguments in-place
-	// Also, we don't expect N to be huge (there's a hard-limit at 2^16, because they're ports!)
-	for _, newPort := range newPorts {
-		if contains(oldPorts, newPort) {
-			continue
-		}
-		err := op.Allocate(newPort)
-		if err != nil {
-			errs = append(errs, err)
-		}
-	}
-
-	for _, oldPort := range oldPorts {
-		if contains(newPorts, oldPort) {
-			continue
-		}
-		op.ReleaseDeferred(oldPort)
-	}
-
-	if len(errs) == 0 {
-		return nil
-	}
-	return errs
 }
 
 func (rs *REST) Create(ctx api.Context, obj runtime.Object) (runtime.Object, error) {
@@ -236,6 +216,7 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (runtime.Object, err
 		releaseServiceIP = true
 	}
 
+	assignPublicPorts := shouldAssignPublicPorts(service)
 	for i := range service.Spec.Ports {
 		servicePort := &service.Spec.Ports[i]
 		if servicePort.PublicPort != 0 {
@@ -243,6 +224,12 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (runtime.Object, err
 			if err != nil {
 				return nil, err
 			}
+		} else if assignPublicPorts {
+			publicPort, err := publicPortOp.AllocateNext()
+			if err != nil {
+				return nil, err
+			}
+			servicePort.PublicPort = publicPort
 		}
 	}
 
@@ -356,12 +343,42 @@ func (rs *REST) Update(ctx api.Context, obj runtime.Object) (runtime.Object, boo
 		}
 	}()
 
-	oldPublicPorts := collectServicePublicPorts(oldService)
-	newPublicPorts := collectServicePublicPorts(service)
+	assignPublicPorts := shouldAssignPublicPorts(service)
 
-	el := publicPortOp.ApplyChanges(oldPublicPorts, newPublicPorts)
-	if el != nil {
-		return nil, false, fmt.Errorf("error assigning public-ports: %v", el[0])
+	oldPublicPorts := collectServicePublicPorts(oldService)
+
+	newPublicPorts := []int{}
+	if assignPublicPorts {
+		for i := range service.Spec.Ports {
+			servicePort := &service.Spec.Ports[i]
+			publicPort := servicePort.PublicPort
+			if publicPort != 0 {
+				if !contains(oldPublicPorts, publicPort) {
+					err := publicPortOp.Allocate(publicPort)
+					if err != nil {
+						return nil, false, err
+					}
+				}
+			} else {
+				publicPort, err = publicPortOp.AllocateNext()
+				if err != nil {
+					return nil, false, err
+				}
+				servicePort.PublicPort = publicPort
+			}
+			newPublicPorts = append(newPublicPorts, publicPort)
+		}
+	} else {
+		// Validate should have validated that publicPort == 0
+	}
+
+	// The comparison loops are O(N^2), but we don't expect N to be huge
+	// (there's a hard-limit at 2^16, because they're ports; and even 4 ports would be a lot)
+	for _, oldPublicPort := range oldPublicPorts {
+		if !contains(newPublicPorts, oldPublicPort) {
+			continue
+		}
+		publicPortOp.ReleaseDeferred(oldPublicPort)
 	}
 
 	out, err := rs.registry.UpdateService(ctx, service)
@@ -426,4 +443,18 @@ func (rs *REST) ResourceLocation(ctx api.Context, id string) (*url.URL, http.Rou
 		}
 	}
 	return nil, nil, fmt.Errorf("no endpoints available for %q", id)
+}
+
+func shouldAssignPublicPorts(service *api.Service) bool {
+	switch service.Spec.Visibility {
+	case api.VisibilityTypeLoadBalancer:
+		return true
+	case api.VisibilityTypePublic:
+		return true
+	case api.VisibilityTypeCluster:
+		return false
+	default:
+		glog.Errorf("Unknown visibility value: %v", service.Spec.Visibility)
+		return false
+	}
 }
