@@ -96,8 +96,6 @@ func TestRunHandlerExec(t *testing.T) {
 	handlerRunner := NewHandlerRunner(&fakeHTTP{}, &fakeCommandRunner, nil)
 
 	containerID := "abc1234"
-	podName := "podFoo"
-	podNamespace := "nsFoo"
 	containerName := "containerFoo"
 
 	container := api.Container{
@@ -112,8 +110,8 @@ func TestRunHandlerExec(t *testing.T) {
 	}
 
 	pod := api.Pod{}
-	pod.ObjectMeta.Name = podName
-	pod.ObjectMeta.Namespace = podNamespace
+	pod.ObjectMeta.Name = "podFoo"
+	pod.ObjectMeta.Namespace = "nsFoo"
 	pod.Spec.Containers = []api.Container{container}
 	err := handlerRunner.Run(containerID, &pod, &container, container.Lifecycle.PostStart)
 	if err != nil {
@@ -140,8 +138,6 @@ func TestRunHandlerHttp(t *testing.T) {
 	handlerRunner := NewHandlerRunner(&fakeHttp, &fakeContainerCommandRunner{}, nil)
 
 	containerID := "abc1234"
-	podName := "podFoo"
-	podNamespace := "nsFoo"
 	containerName := "containerFoo"
 
 	container := api.Container{
@@ -157,8 +153,8 @@ func TestRunHandlerHttp(t *testing.T) {
 		},
 	}
 	pod := api.Pod{}
-	pod.ObjectMeta.Name = podName
-	pod.ObjectMeta.Namespace = podNamespace
+	pod.ObjectMeta.Name = "podFoo"
+	pod.ObjectMeta.Namespace = "nsFoo"
 	pod.Spec.Containers = []api.Container{container}
 	err := handlerRunner.Run(containerID, &pod, &container, container.Lifecycle.PostStart)
 

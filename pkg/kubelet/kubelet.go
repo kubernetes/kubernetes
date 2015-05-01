@@ -41,7 +41,6 @@ import (
 	kubecontainer "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/dockertools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/envvars"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/lifecycle"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/metrics"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/network"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/prober"
@@ -233,7 +232,6 @@ func NewMainKubelet(
 		resourceContainer:              resourceContainer,
 		os:                             osInterface,
 		oomWatcher:                     oomWatcher,
-		runtimeHooks:                   newKubeletRuntimeHooks(recorder),
 		cgroupRoot:                     cgroupRoot,
 	}
 
@@ -253,13 +251,15 @@ func NewMainKubelet(
 		containerLogsDir,
 		osInterface,
 		klet.networkPlugin,
-		nil)
+		nil,
+		klet,
+		klet.httpClient,
+		newKubeletRuntimeHooks(recorder))
 	klet.runner = containerManager
 	klet.containerManager = containerManager
 
 	klet.podManager = newBasicPodManager(klet.kubeClient)
 	klet.prober = prober.New(klet.runner, klet.readinessManager, klet.containerRefManager, klet.recorder)
-	klet.handlerRunner = lifecycle.NewHandlerRunner(klet.httpClient, klet.runner, klet.containerManager)
 
 	// TODO(vmarmol): Remove when the circular dependency is removed :(
 	containerManager.Prober = klet.prober
@@ -345,9 +345,6 @@ type Kubelet struct {
 	// Healthy check prober.
 	prober prober.Prober
 
-	// Container lifecycle handler runner.
-	handlerRunner kubecontainer.HandlerRunner
-
 	// Container readiness state manager.
 	readinessManager *kubecontainer.ReadinessManager
 
@@ -402,10 +399,6 @@ type Kubelet struct {
 
 	// Watcher of out of memory events.
 	oomWatcher OOMWatcher
-
-	// TODO(vmarmol): Remove this when we only have to inject the hooks into the runtimes.
-	// Hooks injected into the container runtime.
-	runtimeHooks kubecontainer.RuntimeHooks
 
 	// If non-empty, pass this to the container runtime as the root cgroup.
 	cgroupRoot string
@@ -871,29 +864,6 @@ func parseResolvConf(reader io.Reader) (nameservers []string, searches []string,
 	return nameservers, searches, nil
 }
 
-// Pull the image for the specified pod and container.
-func (kl *Kubelet) pullImage(pod *api.Pod, container *api.Container) error {
-	present, err := kl.containerManager.IsImagePresent(container.Image)
-	if err != nil {
-		ref, err := kubecontainer.GenerateContainerRef(pod, container)
-		if err != nil {
-			glog.Errorf("Couldn't make a ref to pod %v, container %v: '%v'", pod.Name, container.Name, err)
-		}
-		if ref != nil {
-			kl.recorder.Eventf(ref, "failed", "Failed to inspect image %q: %v", container.Image, err)
-		}
-		return fmt.Errorf("failed to inspect image %q: %v", container.Image, err)
-	}
-
-	if !kl.runtimeHooks.ShouldPullImage(pod, container, present) {
-		return nil
-	}
-
-	err = kl.containerManager.PullImage(container.Image)
-	kl.runtimeHooks.ReportImagePull(pod, container, err)
-	return err
-}
-
 // Kill all running containers in a pod (includes the pod infra container).
 func (kl *Kubelet) killPod(pod kubecontainer.Pod) error {
 	return kl.containerManager.KillPod(pod)
@@ -951,44 +921,6 @@ func (kl *Kubelet) syncPod(pod *api.Pod, mirrorPod *api.Pod, runningPod kubecont
 		return err
 	}
 
-	podStatus, err := kl.generatePodStatus(pod)
-	if err != nil {
-		glog.Errorf("Unable to get status for pod %q (uid %q): %v", podFullName, uid, err)
-		return err
-	}
-
-	containerChanges, err := kl.containerManager.ComputePodContainerChanges(pod, runningPod, podStatus)
-	glog.V(3).Infof("Got container changes for pod %q: %+v", podFullName, containerChanges)
-	if err != nil {
-		return err
-	}
-
-	if containerChanges.StartInfraContainer || (len(containerChanges.ContainersToKeep) == 0 && len(containerChanges.ContainersToStart) == 0) {
-		if len(containerChanges.ContainersToKeep) == 0 && len(containerChanges.ContainersToStart) == 0 {
-			glog.V(4).Infof("Killing Infra Container for %q because all other containers are dead.", podFullName)
-		} else {
-			glog.V(4).Infof("Killing Infra Container for %q, will start new one", podFullName)
-		}
-
-		// Killing phase: if we want to start new infra container, or nothing is running kill everything (including infra container)
-		err = kl.killPod(runningPod)
-		if err != nil {
-			return err
-		}
-	} else {
-		// Otherwise kill any containers in this pod which are not specified as ones to keep.
-		for _, container := range runningPod.Containers {
-			_, keep := containerChanges.ContainersToKeep[kubeletTypes.DockerID(container.ID)]
-			if !keep {
-				glog.V(3).Infof("Killing unwanted container %+v", container)
-				err = kl.containerManager.KillContainer(container.ID)
-				if err != nil {
-					glog.Errorf("Error killing container: %v", err)
-				}
-			}
-		}
-	}
-
 	// Starting phase:
 	ref, err := api.GetReference(pod)
 	if err != nil {
@@ -1006,37 +938,15 @@ func (kl *Kubelet) syncPod(pod *api.Pod, mirrorPod *api.Pod, runningPod kubecont
 	}
 	kl.volumeManager.SetVolumes(pod.UID, podVolumes)
 
-	// If we should create infra container then we do it first.
-	podInfraContainerID := containerChanges.InfraContainerId
-	if containerChanges.StartInfraContainer && (len(containerChanges.ContainersToStart) > 0) {
-		glog.V(4).Infof("Creating pod infra container for %q", podFullName)
-		podInfraContainerID, err = kl.containerManager.CreatePodInfraContainer(pod, kl, kl.handlerRunner)
-
-		// Call the networking plugin
-		if err == nil {
-			err = kl.networkPlugin.SetUpPod(pod.Namespace, pod.Name, podInfraContainerID)
-		}
-		if err != nil {
-			glog.Errorf("Failed to create pod infra container: %v; Skipping pod %q", err, podFullName)
-			return err
-		}
+	podStatus, err := kl.generatePodStatus(pod)
+	if err != nil {
+		glog.Errorf("Unable to get status for pod %q (uid %q): %v", podFullName, uid, err)
+		return err
 	}
 
-	// Start everything
-	for container := range containerChanges.ContainersToStart {
-		glog.V(4).Infof("Creating container %+v", pod.Spec.Containers[container])
-		containerSpec := &pod.Spec.Containers[container]
-		if err := kl.pullImage(pod, containerSpec); err != nil {
-			glog.Warningf("Failed to pull image %q from pod %q and container %q: %v", containerSpec.Image, kubecontainer.GetPodFullName(pod), containerSpec.Name, err)
-			continue
-		}
-		// TODO(dawnchen): Check RestartPolicy.DelaySeconds before restart a container
-		namespaceMode := fmt.Sprintf("container:%v", podInfraContainerID)
-		_, err := kl.containerManager.RunContainer(pod, containerSpec, kl, kl.handlerRunner, namespaceMode, namespaceMode)
-		if err != nil {
-			// TODO(bburns) : Perhaps blacklist a container after N failures?
-			glog.Errorf("Error running pod %q container %q: %v", kubecontainer.GetPodFullName(pod), containerSpec.Name, err)
-		}
+	err = kl.containerManager.SyncPod(pod, runningPod, podStatus)
+	if err != nil {
+		return err
 	}
 
 	if isStaticPod(pod) {

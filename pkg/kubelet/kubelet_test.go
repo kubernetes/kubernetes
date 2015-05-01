@@ -43,7 +43,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
 	kubecontainer "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/dockertools"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/lifecycle"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/metrics"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/network"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/prober"
@@ -109,7 +108,8 @@ func newTestKubelet(t *testing.T) *TestKubelet {
 	podManager, fakeMirrorClient := newFakePodManager()
 	kubelet.podManager = podManager
 	kubelet.containerRefManager = kubecontainer.NewRefManager()
-	kubelet.containerManager = dockertools.NewDockerManager(fakeDocker, fakeRecorder, kubelet.readinessManager, kubelet.containerRefManager, dockertools.PodInfraContainerImage, 0, 0, "", kubelet.os, kubelet.networkPlugin, nil)
+	runtimeHooks := newKubeletRuntimeHooks(kubelet.recorder)
+	kubelet.containerManager = dockertools.NewDockerManager(fakeDocker, fakeRecorder, kubelet.readinessManager, kubelet.containerRefManager, dockertools.PodInfraContainerImage, 0, 0, "", kubelet.os, kubelet.networkPlugin, nil, kubelet, &fakeHTTP{}, runtimeHooks)
 	kubelet.runtimeCache = kubecontainer.NewFakeRuntimeCache(kubelet.containerManager)
 	kubelet.podWorkers = newPodWorkers(
 		kubelet.runtimeCache,
@@ -122,9 +122,7 @@ func newTestKubelet(t *testing.T) *TestKubelet {
 	kubelet.containerManager.Puller = &dockertools.FakeDockerPuller{}
 	kubelet.prober = prober.New(nil, kubelet.readinessManager, kubelet.containerRefManager, kubelet.recorder)
 	kubelet.containerManager.Prober = kubelet.prober
-	kubelet.handlerRunner = lifecycle.NewHandlerRunner(&fakeHTTP{}, &fakeContainerCommandRunner{}, kubelet.containerManager)
 	kubelet.volumeManager = newVolumeManager()
-	kubelet.runtimeHooks = newKubeletRuntimeHooks(kubelet.recorder)
 	return &TestKubelet{kubelet, fakeDocker, mockCadvisor, fakeKubeClient, waitGroup, fakeMirrorClient}
 }
 
@@ -679,6 +677,16 @@ func TestSyncPodsWithPodInfraCreatesContainer(t *testing.T) {
 	fakeDocker.Unlock()
 }
 
+type fakeHTTP struct {
+	url string
+	err error
+}
+
+func (f *fakeHTTP) Get(url string) (*http.Response, error) {
+	f.url = url
+	return nil, f.err
+}
+
 func TestSyncPodsWithPodInfraCreatesContainerCallsHandler(t *testing.T) {
 	testKubelet := newTestKubelet(t)
 	testKubelet.fakeCadvisor.On("MachineInfo").Return(&cadvisorApi.MachineInfo{}, nil)
@@ -686,8 +694,12 @@ func TestSyncPodsWithPodInfraCreatesContainerCallsHandler(t *testing.T) {
 	fakeDocker := testKubelet.fakeDocker
 	waitGroup := testKubelet.waitGroup
 	fakeHttp := fakeHTTP{}
+
+	// Simulate HTTP failure. Re-create the containerManager to inject the failure.
 	kubelet.httpClient = &fakeHttp
-	kubelet.handlerRunner = lifecycle.NewHandlerRunner(kubelet.httpClient, &fakeContainerCommandRunner{}, kubelet.containerManager)
+	runtimeHooks := newKubeletRuntimeHooks(kubelet.recorder)
+	kubelet.containerManager = dockertools.NewDockerManager(kubelet.dockerClient, kubelet.recorder, kubelet.readinessManager, kubelet.containerRefManager, dockertools.PodInfraContainerImage, 0, 0, "", kubelet.os, kubelet.networkPlugin, nil, kubelet, kubelet.httpClient, runtimeHooks)
+
 	pods := []*api.Pod{
 		{
 			ObjectMeta: api.ObjectMeta{
@@ -740,7 +752,7 @@ func TestSyncPodsWithPodInfraCreatesContainerCallsHandler(t *testing.T) {
 		// Get pod status.
 		"list", "inspect_container", "inspect_image",
 		// Check the pod infra container.
-		"inspect_container",
+		"inspect_container", "inspect_image",
 		// Create container.
 		"create", "start",
 		// Get pod status.
@@ -753,7 +765,7 @@ func TestSyncPodsWithPodInfraCreatesContainerCallsHandler(t *testing.T) {
 	}
 	fakeDocker.Unlock()
 	if fakeHttp.url != "http://foo:8080/bar" {
-		t.Errorf("Unexpected handler: %s", fakeHttp.url)
+		t.Errorf("Unexpected handler: %q", fakeHttp.url)
 	}
 }
 
@@ -1560,7 +1572,6 @@ func (f *fakeContainerCommandRunner) PortForward(pod *kubecontainer.Pod, port ui
 	f.Stream = stream
 	return nil
 }
-
 func TestRunInContainerNoSuchPod(t *testing.T) {
 	fakeCommandRunner := fakeContainerCommandRunner{}
 	testKubelet := newTestKubelet(t)
@@ -1627,125 +1638,6 @@ func TestRunInContainer(t *testing.T) {
 	}
 }
 
-func TestRunHandlerExec(t *testing.T) {
-	fakeCommandRunner := fakeContainerCommandRunner{}
-	testKubelet := newTestKubelet(t)
-	kubelet := testKubelet.kubelet
-	fakeDocker := testKubelet.fakeDocker
-	kubelet.runner = &fakeCommandRunner
-	kubelet.handlerRunner = lifecycle.NewHandlerRunner(&fakeHTTP{}, kubelet.runner, kubelet.containerManager)
-
-	containerID := "abc1234"
-	podName := "podFoo"
-	podNamespace := "nsFoo"
-	containerName := "containerFoo"
-
-	fakeDocker.ContainerList = []docker.APIContainers{
-		{
-			ID:    containerID,
-			Names: []string{"/k8s_" + containerName + "_" + podName + "_" + podNamespace + "_12345678_42"},
-		},
-	}
-
-	container := api.Container{
-		Name: containerName,
-		Lifecycle: &api.Lifecycle{
-			PostStart: &api.Handler{
-				Exec: &api.ExecAction{
-					Command: []string{"ls", "-a"},
-				},
-			},
-		},
-	}
-
-	pod := api.Pod{}
-	pod.ObjectMeta.Name = podName
-	pod.ObjectMeta.Namespace = podNamespace
-	pod.Spec.Containers = []api.Container{container}
-	err := kubelet.handlerRunner.Run(containerID, &pod, &container, container.Lifecycle.PostStart)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	if fakeCommandRunner.ID != containerID ||
-		!reflect.DeepEqual(container.Lifecycle.PostStart.Exec.Command, fakeCommandRunner.Cmd) {
-		t.Errorf("unexpected commands: %v", fakeCommandRunner)
-	}
-}
-
-type fakeHTTP struct {
-	url string
-	err error
-}
-
-func (f *fakeHTTP) Get(url string) (*http.Response, error) {
-	f.url = url
-	return nil, f.err
-}
-
-func TestRunHandlerHttp(t *testing.T) {
-	fakeHttp := fakeHTTP{}
-
-	testKubelet := newTestKubelet(t)
-	kubelet := testKubelet.kubelet
-	kubelet.httpClient = &fakeHttp
-	kubelet.handlerRunner = lifecycle.NewHandlerRunner(kubelet.httpClient, &fakeContainerCommandRunner{}, kubelet.containerManager)
-
-	containerID := "abc1234"
-	podName := "podFoo"
-	podNamespace := "nsFoo"
-	containerName := "containerFoo"
-
-	container := api.Container{
-		Name: containerName,
-		Lifecycle: &api.Lifecycle{
-			PostStart: &api.Handler{
-				HTTPGet: &api.HTTPGetAction{
-					Host: "foo",
-					Port: util.IntOrString{IntVal: 8080, Kind: util.IntstrInt},
-					Path: "bar",
-				},
-			},
-		},
-	}
-	pod := api.Pod{}
-	pod.ObjectMeta.Name = podName
-	pod.ObjectMeta.Namespace = podNamespace
-	pod.Spec.Containers = []api.Container{container}
-	err := kubelet.handlerRunner.Run(containerID, &pod, &container, container.Lifecycle.PostStart)
-
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	if fakeHttp.url != "http://foo:8080/bar" {
-		t.Errorf("unexpected url: %s", fakeHttp.url)
-	}
-}
-
-func TestRunHandlerNil(t *testing.T) {
-	testKubelet := newTestKubelet(t)
-	kubelet := testKubelet.kubelet
-
-	containerID := "abc1234"
-	podName := "podFoo"
-	podNamespace := "nsFoo"
-	containerName := "containerFoo"
-
-	container := api.Container{
-		Name: containerName,
-		Lifecycle: &api.Lifecycle{
-			PostStart: &api.Handler{},
-		},
-	}
-	pod := api.Pod{}
-	pod.ObjectMeta.Name = podName
-	pod.ObjectMeta.Namespace = podNamespace
-	pod.Spec.Containers = []api.Container{container}
-	err := kubelet.handlerRunner.Run(containerID, &pod, &container, container.Lifecycle.PostStart)
-	if err == nil {
-		t.Errorf("expect error, but got nil")
-	}
-}
-
 func TestSyncPodEventHandlerFails(t *testing.T) {
 	testKubelet := newTestKubelet(t)
 	testKubelet.fakeCadvisor.On("MachineInfo").Return(&cadvisorApi.MachineInfo{}, nil)
@@ -1753,10 +1645,12 @@ func TestSyncPodEventHandlerFails(t *testing.T) {
 	fakeDocker := testKubelet.fakeDocker
 	waitGroup := testKubelet.waitGroup
 
+	// Simulate HTTP failure. Re-create the containerManager to inject the failure.
 	kubelet.httpClient = &fakeHTTP{
 		err: fmt.Errorf("test error"),
 	}
-	kubelet.handlerRunner = lifecycle.NewHandlerRunner(kubelet.httpClient, &fakeContainerCommandRunner{}, kubelet.containerManager)
+	runtimeHooks := newKubeletRuntimeHooks(kubelet.recorder)
+	kubelet.containerManager = dockertools.NewDockerManager(kubelet.dockerClient, kubelet.recorder, kubelet.readinessManager, kubelet.containerRefManager, dockertools.PodInfraContainerImage, 0, 0, "", kubelet.os, kubelet.networkPlugin, nil, kubelet, kubelet.httpClient, runtimeHooks)
 
 	pods := []*api.Pod{
 		{
@@ -1810,7 +1704,7 @@ func TestSyncPodEventHandlerFails(t *testing.T) {
 		// Get pod status.
 		"list", "inspect_container", "inspect_image",
 		// Check the pod infra container.
-		"inspect_container",
+		"inspect_container", "inspect_image",
 		// Create the container.
 		"create", "start",
 		// Kill the container since event handler fails.
@@ -1820,7 +1714,7 @@ func TestSyncPodEventHandlerFails(t *testing.T) {
 
 	// TODO(yifan): Check the stopped container's name.
 	if len(fakeDocker.Stopped) != 1 {
-		t.Errorf("Wrong containers were stopped: %v", fakeDocker.Stopped)
+		t.Fatalf("Wrong containers were stopped: %v", fakeDocker.Stopped)
 	}
 	dockerName, _, err := dockertools.ParseDockerName(fakeDocker.Stopped[0])
 	if err != nil {
@@ -4065,6 +3959,7 @@ func TestGetPodStatusWithLastTermination(t *testing.T) {
 	}
 }
 
+// TODO(vmarmol): Move this test away from using RunContainer().
 func TestGetPodCreationFailureReason(t *testing.T) {
 	testKubelet := newTestKubelet(t)
 	kubelet := testKubelet.kubelet
@@ -4089,7 +3984,7 @@ func TestGetPodCreationFailureReason(t *testing.T) {
 	pods := []*api.Pod{pod}
 	kubelet.podManager.SetPods(pods)
 	kubelet.volumeManager.SetVolumes(pod.UID, volumeMap{})
-	_, err := kubelet.containerManager.RunContainer(pod, &pod.Spec.Containers[0], kubelet, kubelet.handlerRunner, "", "")
+	_, err := kubelet.containerManager.RunContainer(pod, &pod.Spec.Containers[0], "", "")
 	if err == nil {
 		t.Errorf("expected error, found nil")
 	}

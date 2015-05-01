@@ -90,7 +90,6 @@ func TestRunOnce(t *testing.T) {
 		os:                  kubecontainer.FakeOS{},
 		volumeManager:       newVolumeManager(),
 	}
-	kb.runtimeHooks = newKubeletRuntimeHooks(kb.recorder)
 
 	kb.networkPlugin, _ = network.InitNetworkPlugin([]network.NetworkPlugin{}, "", network.NewFakeHost(nil))
 	if err := kb.setupDataDirs(); err != nil {
@@ -161,7 +160,10 @@ func TestRunOnce(t *testing.T) {
 		"",
 		kubecontainer.FakeOS{},
 		kb.networkPlugin,
-		&kubeletProber.FakeProber{})
+		&kubeletProber.FakeProber{},
+		kb,
+		nil,
+		newKubeletRuntimeHooks(kb.recorder))
 	kb.containerManager.Puller = &dockertools.FakeDockerPuller{}
 
 	pods := []*api.Pod{
