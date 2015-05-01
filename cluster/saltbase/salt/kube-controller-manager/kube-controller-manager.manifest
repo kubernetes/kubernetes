@@ -24,6 +24,8 @@
 {% if grains.cloud is defined -%}
 {% set cloud_provider = "--cloud_provider=" + grains.cloud -%}
 
+{% set service_account_key = " --service_account_private_key_file=/srv/kubernetes/server.key " -%}
+
 {% if grains.cloud == 'gce' -%}
   {% if grains.cloud_config is defined -%}
     {% set cloud_config = "--cloud_config=" + grains.cloud_config -%}
@@ -55,7 +57,7 @@
 {% endif -%}
 {% endif -%}
 
-{% set params = "--master=127.0.0.1:8080" + " " + machines + " " + cluster_name + " " + cluster_cidr + " " + allocate_node_cidrs + " " + minion_regexp + " " + cloud_provider  + " " + sync_nodes + " " + cloud_config + " " + pillar['log_level'] -%}
+{% set params = "--master=127.0.0.1:8080" + " " + machines + " " + cluster_name + " " + cluster_cidr + " " + allocate_node_cidrs + " " + minion_regexp + " " + cloud_provider  + " " + sync_nodes + " " + cloud_config + service_account_key + pillar['log_level'] -%}
 
 {
 "apiVersion": "v1beta3",

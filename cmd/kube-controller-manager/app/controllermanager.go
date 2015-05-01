@@ -20,7 +20,6 @@ limitations under the License.
 package app
 
 import (
-	"fmt"
 	"net"
 	"net/http"
 	"net/http/pprof"
@@ -75,6 +74,7 @@ type CMServer struct {
 	PodEvictionTimeout      time.Duration
 	DeletingPodsQps         float32
 	DeletingPodsBurst       int
+	ServiceAccountKeyFile   string
 
 	// TODO: Discover these by pinging the host machines, and rip out these params.
 	NodeMilliCPU int64
@@ -143,6 +143,7 @@ func (s *CMServer) AddFlags(fs *pflag.FlagSet) {
 		"Amount of time which we allow starting Node to be unresponsive before marking it unhealty.")
 	fs.DurationVar(&s.NodeMonitorPeriod, "node-monitor-period", 5*time.Second,
 		"The period for syncing NodeStatus in NodeController.")
+	fs.StringVar(&s.ServiceAccountKeyFile, "service-account-private-key-file", s.ServiceAccountKeyFile, "Filename containing a PEM-encoded private RSA key used to sign service account tokens.")
 	// TODO: Discover these by pinging the host machines, and rip out these flags.
 	// TODO: in the meantime, use resource.QuantityFlag() instead of these
 	fs.Int64Var(&s.NodeMilliCPU, "node-milli-cpu", s.NodeMilliCPU, "The amount of MilliCPU provisioned on each node")
@@ -251,12 +252,24 @@ func (s *CMServer) Run(_ []string) error {
 		pvclaimBinder.Run()
 	}
 
-	// TODO: generate signed token
-	tokenGenerator := serviceaccount.TokenGeneratorFunc(func(serviceAccount api.ServiceAccount, secret api.Secret) (string, error) {
-		return fmt.Sprintf("serviceaccount:%s:%s:%s:%s", serviceAccount.Namespace, serviceAccount.Name, serviceAccount.UID, secret.Name), nil
-	})
-	serviceaccount.NewTokensController(kubeClient, serviceaccount.DefaultTokenControllerOptions(tokenGenerator)).Run()
-	serviceaccount.NewServiceAccountsController(kubeClient, serviceaccount.DefaultServiceAccountControllerOptions()).Run()
+	if len(s.ServiceAccountKeyFile) > 0 {
+		privateKey, err := serviceaccount.ReadPrivateKey(s.ServiceAccountKeyFile)
+		if err != nil {
+			glog.Errorf("Error reading key for service account token controller: %v", err)
+		} else {
+			serviceaccount.NewTokensController(
+				kubeClient,
+				serviceaccount.DefaultTokenControllerOptions(
+					serviceaccount.JWTTokenGenerator(privateKey),
+				),
+			).Run()
+		}
+	}
+
+	serviceaccount.NewServiceAccountsController(
+		kubeClient,
+		serviceaccount.DefaultServiceAccountControllerOptions(),
+	).Run()
 
 	select {}
 	return nil
