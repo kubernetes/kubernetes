@@ -32,97 +32,21 @@ Once the cluster is up, it will print the ip address of your cluster, this proce
 export KUBERNETES_MASTER=https://<ip-address>
 ```
 
-Also setup your path to point to the released binaries:
-```
-export PATH=$PATH:$PWD:/kubernetes/cluster
-```
-
-If you run into trouble come ask questions on IRC at #google-containers on freenode.
-
-
-### Running a container (simple version)
-
-Once you have your cluster created you can use ```${SOME_DIR}/kubernetes/cluster/kubectl.sh``` to access
-the kubernetes api.
-
-The `kubectl.sh` line below spins up two containers running
-[Nginx](http://nginx.org/en/) running on port 80:
+Copy the appropriate ```kubectl``` binary to somewhere in your ```PATH```, for example:
 
 ```bash
-cluster/kubectl.sh run-container my-nginx --image=nginx --replicas=2 --port=80
+# OS X
+sudo cp kubernetes/platforms/darwin/amd64/kubectl /usr/local/bin/kubectl
+
+# Linux
+sudo cp kubernetes/platforms/linux/amd64/kubectl /usr/local/bin/kubectl
 ```
 
-To stop the containers:
 
-```bash
-cluster/kubectl.sh stop rc my-nginx
-```
+### Getting started with your cluster
+See [a simple nginx example](../../examples/simple-nginx.md) to try out your new cluster.
 
-To delete the containers:
-
-```bash
-cluster/kubectl.sh delete rc my-nginx
-```
-
-### Running a container (more complete version)
-
-```bash
-cd kubernetes
-cluster/kubectl.sh create -f docs/getting-started-guides/pod.json
-```
-
-Where pod.json contains something like:
-
-```json
-{
-  "id": "php",
-  "kind": "Pod",
-  "apiVersion": "v1beta1",
-  "desiredState": {
-    "manifest": {
-      "version": "v1beta1",
-      "id": "php",
-      "containers": [{
-        "name": "nginx",
-        "image": "nginx",
-        "ports": [{
-          "containerPort": 80,
-          "hostPort": 8081
-        }],
-        "livenessProbe": {
-          "enabled": true,
-          "type": "http",
-          "initialDelaySeconds": 30,
-          "httpGet": {
-            "path": "/index.html",
-            "port": 8081
-          }
-        }
-      }]
-    }
-  },
-  "labels": {
-    "name": "foo"
-  }
-}
-```
-
-You can see your cluster's pods:
-
-```bash
-cluster/kubectl.sh get pods
-```
-
-and delete the pod you just created:
-
-```bash
-cluster/kubectl.sh delete pods php
-```
-
-Since this pod is scheduled on a minion running in AWS, you will have to enable incoming tcp traffic via the port specified in the
-pod manifest before you see the nginx welcome page. After doing so, it should be visible at http://<external ip of minion running nginx>:<port from manifest>.
-
-Look in `examples/` for more examples
+For more complete applications, please look in the [examples directory](../../examples)
 
 ### Tearing down the cluster
 ```bash
