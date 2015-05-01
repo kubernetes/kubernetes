@@ -37,26 +37,6 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-func writePerfData(c *client.Client, dirName string, postfix string) {
-	defer GinkgoRecover()
-
-	hdnl, err := os.Create(fmt.Sprintf("%s/metrics_%s.txt", dirName, postfix))
-	expectNoError(err)
-	metrics, err := GetMetrics(c)
-	expectNoError(err)
-	_, err = hdnl.WriteString(metrics)
-	expectNoError(err)
-	expectNoError(hdnl.Close())
-	debug, err := GetDebugInfo(c)
-	for key, value := range debug {
-		hdnl, err = os.Create(fmt.Sprintf("%s/%s_%s.txt", dirName, key, postfix))
-		expectNoError(err)
-		_, err = hdnl.WriteString(value)
-		expectNoError(err)
-		expectNoError(hdnl.Close())
-	}
-}
-
 // This test suite can take a long time to run, so by default it is added to
 // the ginkgo.skip list (see driver.go).
 // To run this suite you must explicitly ask for it by setting the
@@ -81,7 +61,7 @@ var _ = Describe("Density", func() {
 		expectNoError(err)
 		uuid = string(util.NewUUID())
 		expectNoError(os.Mkdir(uuid, 0777))
-		writePerfData(c, uuid, "before")
+		expectNoError(writePerfData(c, uuid, "before"))
 	})
 
 	AfterEach(func() {
@@ -107,7 +87,7 @@ var _ = Describe("Density", func() {
 		highLatencyRequests, err := HighLatencyRequests(c, 10*time.Second, util.NewStringSet("events"))
 		expectNoError(err)
 		Expect(highLatencyRequests).NotTo(BeNumerically(">", 0))
-		writePerfData(c, uuid, "after")
+		expectNoError(writePerfData(c, uuid, "after"))
 	})
 
 	// Tests with "Skipped" substring in their name will be skipped when running

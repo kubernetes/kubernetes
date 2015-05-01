@@ -950,7 +950,7 @@ func HighLatencyRequests(c *client.Client, threshold time.Duration, ignoredResou
 }
 
 // Retrieve metrics information
-func GetMetrics(c *client.Client) (string, error) {
+func getMetrics(c *client.Client) (string, error) {
 	body, err := c.Get().AbsPath("/metrics").DoRaw()
 	if err != nil {
 		return "", err
@@ -959,7 +959,7 @@ func GetMetrics(c *client.Client) (string, error) {
 }
 
 // Retrieve debug information
-func GetDebugInfo(c *client.Client) (map[string]string, error) {
+func getDebugInfo(c *client.Client) (map[string]string, error) {
 	data := make(map[string]string)
 	for _, key := range []string{"block", "goroutine", "heap", "threadcreate"} {
 		body, err := c.Get().AbsPath(fmt.Sprintf("/debug/pprof/%s", key)).DoRaw()
@@ -969,4 +969,51 @@ func GetDebugInfo(c *client.Client) (map[string]string, error) {
 		data[key] = string(body)
 	}
 	return data, nil
+}
+
+func writePerfData(c *client.Client, dirName string, postfix string) error {
+	fname := fmt.Sprintf("%s/metrics_%s.txt", dirName, postfix)
+
+	hdnl, err := os.Create(fname)
+	if err != nil {
+		return fmt.Errorf("Error creating file '%s': %v", fname, err)
+	}
+
+	metrics, err := getMetrics(c)
+	if err != nil {
+		return fmt.Errorf("Error retrieving metrics: %v", err)
+	}
+
+	_, err = hdnl.WriteString(metrics)
+	if err != nil {
+		return fmt.Errorf("Error writing metrics: %v", err)
+	}
+
+	err = hdnl.Close()
+	if err != nil {
+		return fmt.Errorf("Error closing '%s': %v", fname, err)
+	}
+
+	debug, err := getDebugInfo(c)
+	if err != nil {
+		return fmt.Errorf("Error retrieving debug information: %v", err)
+	}
+
+	for key, value := range debug {
+		fname := fmt.Sprintf("%s/%s_%s.txt", dirName, key, postfix)
+		hdnl, err = os.Create(fname)
+		if err != nil {
+			return fmt.Errorf("Error creating file '%s': %v", fname, err)
+		}
+		_, err = hdnl.WriteString(value)
+		if err != nil {
+			return fmt.Errorf("Error writing %s: %v", key, err)
+		}
+
+		err = hdnl.Close()
+		if err != nil {
+			return fmt.Errorf("Error closing '%s': %v", fname, err)
+		}
+	}
+	return nil
 }
