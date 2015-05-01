@@ -30,32 +30,41 @@ type FakeReplicationControllers struct {
 	Namespace string
 }
 
+const (
+	GetControllerAction    = "get-replicationController"
+	UpdateControllerAction = "update-replicationController"
+	WatchControllerAction  = "watch-replicationController"
+	DeleteControllerAction = "delete-replicationController"
+	ListControllerAction   = "list-replicationControllers"
+	CreateControllerAction = "create-replicationController"
+)
+
 func (c *FakeReplicationControllers) List(selector labels.Selector) (*api.ReplicationControllerList, error) {
-	obj, err := c.Fake.Invokes(FakeAction{Action: "list-replicationControllers"}, &api.ReplicationControllerList{})
+	obj, err := c.Fake.Invokes(FakeAction{Action: ListControllerAction}, &api.ReplicationControllerList{})
 	return obj.(*api.ReplicationControllerList), err
 }
 
 func (c *FakeReplicationControllers) Get(name string) (*api.ReplicationController, error) {
-	obj, err := c.Fake.Invokes(FakeAction{Action: "get-replicationController", Value: name}, &api.ReplicationController{})
+	obj, err := c.Fake.Invokes(FakeAction{Action: GetControllerAction, Value: name}, &api.ReplicationController{})
 	return obj.(*api.ReplicationController), err
 }
 
 func (c *FakeReplicationControllers) Create(controller *api.ReplicationController) (*api.ReplicationController, error) {
-	obj, err := c.Fake.Invokes(FakeAction{Action: "create-replicationController", Value: controller}, &api.ReplicationController{})
+	obj, err := c.Fake.Invokes(FakeAction{Action: CreateControllerAction, Value: controller}, &api.ReplicationController{})
 	return obj.(*api.ReplicationController), err
 }
 
 func (c *FakeReplicationControllers) Update(controller *api.ReplicationController) (*api.ReplicationController, error) {
-	obj, err := c.Fake.Invokes(FakeAction{Action: "update-replicationController", Value: controller}, &api.ReplicationController{})
+	obj, err := c.Fake.Invokes(FakeAction{Action: UpdateControllerAction, Value: controller}, &api.ReplicationController{})
 	return obj.(*api.ReplicationController), err
 }
 
 func (c *FakeReplicationControllers) Delete(name string) error {
-	_, err := c.Fake.Invokes(FakeAction{Action: "delete-replicationController", Value: name}, &api.ReplicationController{})
+	_, err := c.Fake.Invokes(FakeAction{Action: DeleteControllerAction, Value: name}, &api.ReplicationController{})
 	return err
 }
 
 func (c *FakeReplicationControllers) Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
-	c.Fake.Actions = append(c.Fake.Actions, FakeAction{Action: "watch-replicationController", Value: resourceVersion})
+	c.Fake.Actions = append(c.Fake.Actions, FakeAction{Action: WatchControllerAction, Value: resourceVersion})
 	return c.Fake.Watch, nil
 }

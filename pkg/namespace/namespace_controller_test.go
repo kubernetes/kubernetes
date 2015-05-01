@@ -88,11 +88,12 @@ func TestSyncNamespaceThatIsTerminating(t *testing.T) {
 	if err != nil {
 		t.Errorf("Unexpected error when synching namespace %v", err)
 	}
+	// TODO: Reuse the constants for all these strings from testclient
 	expectedActionSet := util.NewStringSet(
+		testclient.ListControllerAction,
 		"list-services",
 		"list-pods",
 		"list-resourceQuotas",
-		"list-replicationControllers",
 		"list-secrets",
 		"list-limitRanges",
 		"list-events",
