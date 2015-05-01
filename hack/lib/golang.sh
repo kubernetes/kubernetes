@@ -49,6 +49,7 @@ readonly KUBE_TEST_TARGETS=(
   cmd/gendocs
   cmd/genman
   examples/k8petstore/web-server
+  github.com/onsi/ginkgo/ginkgo
 )
 readonly KUBE_TEST_BINARIES=("${KUBE_TEST_TARGETS[@]##*/}")
 readonly KUBE_TEST_BINARIES_WIN=("${KUBE_TEST_BINARIES[@]/%/.exe}")
@@ -59,6 +60,7 @@ readonly KUBE_TEST_PORTABLE=(
   hack/e2e-suite
   hack/e2e-internal
   hack/ginkgo-e2e.sh
+  hack/lib
 )
 
 # If we update this we need to also update the set of golang compilers we build
@@ -102,7 +104,14 @@ kube::golang::is_statically_linked_library() {
 kube::golang::binaries_from_targets() {
   local target
   for target; do
-    echo "${KUBE_GO_PACKAGE}/${target}"
+    # If the target starts with what looks like a domain name, assume it has a
+    # fully-qualified package name rather than one that needs the Kubernetes
+    # package prepended.
+    if [[ "${target}" =~ ^([[:alnum:]]+".")+[[:alnum:]]+"/" ]]; then
+      echo "${target}"
+    else
+      echo "${KUBE_GO_PACKAGE}/${target}"
+    fi
   done
 }
 
@@ -239,12 +248,20 @@ kube::golang::place_bins() {
       platform_src=""
     fi
 
-    local full_binpath_src="${KUBE_GOPATH}/bin${platform_src}"
-    if [[ -d "${full_binpath_src}" ]]; then
-      mkdir -p "${KUBE_OUTPUT_BINPATH}/${platform}"
-      find "${full_binpath_src}" -maxdepth 1 -type f -exec \
-        rsync -pt {} "${KUBE_OUTPUT_BINPATH}/${platform}" \;
+    local gopaths=("${KUBE_GOPATH}")
+    # If targets were built inside Godeps, then we need to sync from there too.
+    if [[ -z ${KUBE_NO_GODEPS:-} ]]; then
+      gopaths+=("${KUBE_ROOT}/Godeps/_workspace")
     fi
+    local gopath
+    for gopath in "${gopaths[@]}"; do
+      local full_binpath_src="${gopath}/bin${platform_src}"
+      if [[ -d "${full_binpath_src}" ]]; then
+        mkdir -p "${KUBE_OUTPUT_BINPATH}/${platform}"
+        find "${full_binpath_src}" -maxdepth 1 -type f -exec \
+          rsync -pt {} "${KUBE_OUTPUT_BINPATH}/${platform}" \;
+      fi
+    done
   done
 }
 
