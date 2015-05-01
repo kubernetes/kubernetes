@@ -556,6 +556,9 @@ func (dm *DockerManager) runContainer(pod *api.Pod, container *api.Container, op
 	if len(opts.DNSSearch) > 0 {
 		hc.DNSSearch = opts.DNSSearch
 	}
+	if len(opts.CgroupParent) > 0 {
+		hc.CgroupParent = opts.CgroupParent
+	}
 
 	if err = dm.client.StartContainer(dockerContainer.ID, hc); err != nil {
 		if ref != nil {

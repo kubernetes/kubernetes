@@ -99,6 +99,7 @@ type KubeletServer struct {
 	CertDirectory                  string
 	NodeStatusUpdateFrequency      time.Duration
 	ResourceContainer              string
+	CgroupRoot                     string
 
 	// Flags intended for testing
 
@@ -151,6 +152,7 @@ func NewKubeletServer() *KubeletServer {
 		CertDirectory:               "/var/run/kubernetes",
 		NodeStatusUpdateFrequency:   10 * time.Second,
 		ResourceContainer:           "/kubelet",
+		CgroupRoot:                  "",
 	}
 }
 
@@ -202,6 +204,7 @@ func (s *KubeletServer) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.CloudProvider, "cloud-provider", s.CloudProvider, "The provider for cloud services.  Empty string for no provider.")
 	fs.StringVar(&s.CloudConfigFile, "cloud-config", s.CloudConfigFile, "The path to the cloud provider configuration file.  Empty string for no configuration file.")
 	fs.StringVar(&s.ResourceContainer, "resource-container", s.ResourceContainer, "Absolute name of the resource-only container to create and run the Kubelet in (Default: /kubelet).")
+	fs.StringVar(&s.CgroupRoot, "cgroup_root", s.CgroupRoot, "Optional root cgroup to use for pods. This is handled by the container runtime on a best effort basis. Default: '', which means use the container runtime default.")
 
 	// Flags intended for testing, not recommended used in production environments.
 	fs.BoolVar(&s.ReallyCrashForTesting, "really-crash-for-testing", s.ReallyCrashForTesting, "If true, when panics occur crash. Intended for testing.")
@@ -301,6 +304,7 @@ func (s *KubeletServer) Run(_ []string) error {
 		Cloud:                          cloud,
 		NodeStatusUpdateFrequency: s.NodeStatusUpdateFrequency,
 		ResourceContainer:         s.ResourceContainer,
+		CgroupRoot:                s.CgroupRoot,
 	}
 
 	RunKubelet(&kcfg, nil)
@@ -409,6 +413,7 @@ func SimpleKubelet(client *client.Client,
 		NodeStatusUpdateFrequency: 10 * time.Second,
 		ResourceContainer:         "/kubelet",
 		OSInterface:               osInterface,
+		CgroupRoot:                "",
 	}
 	return &kcfg
 }
@@ -536,6 +541,7 @@ type KubeletConfig struct {
 	NodeStatusUpdateFrequency      time.Duration
 	ResourceContainer              string
 	OSInterface                    kubecontainer.OSInterface
+	CgroupRoot                     string
 }
 
 func createAndInitKubelet(kc *KubeletConfig) (k KubeletBootstrap, pc *config.PodConfig, err error) {
@@ -580,7 +586,8 @@ func createAndInitKubelet(kc *KubeletConfig) (k KubeletBootstrap, pc *config.Pod
 		kc.Cloud,
 		kc.NodeStatusUpdateFrequency,
 		kc.ResourceContainer,
-		kc.OSInterface)
+		kc.OSInterface,
+		kc.CgroupRoot)
 
 	if err != nil {
 		return nil, nil, err

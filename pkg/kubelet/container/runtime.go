@@ -195,6 +195,8 @@ type RunContainerOptions struct {
 	// into docker's container runtime.
 	NetMode string
 	IpcMode string
+	// The parent cgroup to pass to Docker
+	CgroupParent string
 }
 
 type Pods []*Pod

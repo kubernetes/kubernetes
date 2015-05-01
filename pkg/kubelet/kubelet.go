@@ -120,7 +120,8 @@ func NewMainKubelet(
 	cloud cloudprovider.Interface,
 	nodeStatusUpdateFrequency time.Duration,
 	resourceContainer string,
-	osInterface kubecontainer.OSInterface) (*Kubelet, error) {
+	osInterface kubecontainer.OSInterface,
+	cgroupRoot string) (*Kubelet, error) {
 	if rootDirectory == "" {
 		return nil, fmt.Errorf("invalid root directory %q", rootDirectory)
 	}
@@ -233,6 +234,7 @@ func NewMainKubelet(
 		os:                             osInterface,
 		oomWatcher:                     oomWatcher,
 		runtimeHooks:                   newKubeletRuntimeHooks(recorder),
+		cgroupRoot:                     cgroupRoot,
 	}
 
 	if plug, err := network.InitNetworkPlugin(networkPlugins, networkPluginName, &networkHost{klet}); err != nil {
@@ -404,6 +406,9 @@ type Kubelet struct {
 	// TODO(vmarmol): Remove this when we only have to inject the hooks into the runtimes.
 	// Hooks injected into the container runtime.
 	runtimeHooks kubecontainer.RuntimeHooks
+
+	// If non-empty, pass this to the container runtime as the root cgroup.
+	cgroupRoot string
 }
 
 // getRootDir returns the full path to the directory under which kubelet can
@@ -652,8 +657,9 @@ func makeBinds(container *api.Container, podVolumes volumeMap) (binds []string) 
 func (kl *Kubelet) GenerateRunContainerOptions(pod *api.Pod, container *api.Container, netMode, ipcMode string) (*kubecontainer.RunContainerOptions, error) {
 	var err error
 	opts := &kubecontainer.RunContainerOptions{
-		NetMode: netMode,
-		IpcMode: ipcMode,
+		NetMode:      netMode,
+		IpcMode:      ipcMode,
+		CgroupParent: kl.cgroupRoot,
 	}
 
 	vol, ok := kl.volumeManager.GetVolumes(pod.UID)
