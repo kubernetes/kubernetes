@@ -12,14 +12,12 @@ desiredState:
         id: monitoring-heapster
         containers:
           - name: heapster
-            image: gcr.io/google_containers/heapster:v0.10.0
+            image: gcr.io/google_containers/heapster:v0.11.0
             env:
               - name: "INFLUXDB_HOST"
                 value: "monitoring-influxdb"
               - name: "SINK"
                 value: "influxdb"
-              - name: "FLAGS"
-                value: "--kubelet_port=10255"
             volumeMounts:
               - name: ssl-certs
                 mountPath: /etc/ssl/certs

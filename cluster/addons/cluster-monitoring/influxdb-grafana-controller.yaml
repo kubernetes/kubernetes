@@ -22,7 +22,7 @@ desiredState:
               - containerPort: 8086
                 hostPort: 8086
           - name: grafana
-            image: gcr.io/google_containers/heapster_grafana:v0.6
+            image: gcr.io/google_containers/heapster_grafana:v0.7
             env: 
               - name: "INFLUXDB_EXTERNAL_URL"
                 value: '/api/v1beta1/proxy/services/monitoring-grafana/db/'
