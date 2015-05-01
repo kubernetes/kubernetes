@@ -45,11 +45,8 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/dockertools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/metrics"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/network"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/prober"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/probe"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
-	uexec "github.com/GoogleCloudPlatform/kubernetes/pkg/util/exec"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/version"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume"
 	_ "github.com/GoogleCloudPlatform/kubernetes/pkg/volume/host_path"
@@ -109,8 +106,9 @@ func newTestKubelet(t *testing.T) *TestKubelet {
 	kubelet.podManager = podManager
 	kubelet.containerRefManager = kubecontainer.NewRefManager()
 	runtimeHooks := newKubeletRuntimeHooks(kubelet.recorder)
-	kubelet.containerManager = dockertools.NewDockerManager(fakeDocker, fakeRecorder, kubelet.readinessManager, kubelet.containerRefManager, dockertools.PodInfraContainerImage, 0, 0, "", kubelet.os, kubelet.networkPlugin, nil, kubelet, &fakeHTTP{}, runtimeHooks)
-	kubelet.runtimeCache = kubecontainer.NewFakeRuntimeCache(kubelet.containerManager)
+
+	kubelet.containerRuntime = dockertools.NewFakeDockerManager(fakeDocker, fakeRecorder, kubelet.readinessManager, kubelet.containerRefManager, dockertools.PodInfraContainerImage, 0, 0, "", kubelet.os, kubelet.networkPlugin, kubelet, &fakeHTTP{}, runtimeHooks)
+	kubelet.runtimeCache = kubecontainer.NewFakeRuntimeCache(kubelet.containerRuntime)
 	kubelet.podWorkers = newPodWorkers(
 		kubelet.runtimeCache,
 		func(pod *api.Pod, mirrorPod *api.Pod, runningPod container.Pod) error {
@@ -119,9 +117,6 @@ func newTestKubelet(t *testing.T) *TestKubelet {
 			return err
 		},
 		fakeRecorder)
-	kubelet.containerManager.Puller = &dockertools.FakeDockerPuller{}
-	kubelet.prober = prober.New(nil, kubelet.readinessManager, kubelet.containerRefManager, kubelet.recorder)
-	kubelet.containerManager.Prober = kubelet.prober
 	kubelet.volumeManager = newVolumeManager()
 	return &TestKubelet{kubelet, fakeDocker, mockCadvisor, fakeKubeClient, waitGroup, fakeMirrorClient}
 }
@@ -504,7 +499,10 @@ func TestSyncPodsCreatesNetAndContainer(t *testing.T) {
 	kubelet := testKubelet.kubelet
 	fakeDocker := testKubelet.fakeDocker
 	waitGroup := testKubelet.waitGroup
-	kubelet.containerManager.PodInfraContainerImage = "custom_image_name"
+	// TODO: Move this test to dockertools so that we don't have to do the hacky
+	// type assertion here.
+	dm := kubelet.containerRuntime.(*dockertools.DockerManager)
+	dm.PodInfraContainerImage = "custom_image_name"
 	fakeDocker.ContainerList = []docker.APIContainers{}
 	pods := []*api.Pod{
 		{
@@ -565,9 +563,12 @@ func TestSyncPodsCreatesNetAndContainerPullsImage(t *testing.T) {
 	kubelet := testKubelet.kubelet
 	fakeDocker := testKubelet.fakeDocker
 	waitGroup := testKubelet.waitGroup
-	puller := kubelet.containerManager.Puller.(*dockertools.FakeDockerPuller)
+	// TODO: Move this test to dockertools so that we don't have to do the hacky
+	// type assertion here.
+	dm := kubelet.containerRuntime.(*dockertools.DockerManager)
+	puller := dm.Puller.(*dockertools.FakeDockerPuller)
 	puller.HasImages = []string{}
-	kubelet.containerManager.PodInfraContainerImage = "custom_image_name"
+	dm.PodInfraContainerImage = "custom_image_name"
 	fakeDocker.ContainerList = []docker.APIContainers{}
 	pods := []*api.Pod{
 		{
@@ -695,10 +696,10 @@ func TestSyncPodsWithPodInfraCreatesContainerCallsHandler(t *testing.T) {
 	waitGroup := testKubelet.waitGroup
 	fakeHttp := fakeHTTP{}
 
-	// Simulate HTTP failure. Re-create the containerManager to inject the failure.
+	// Simulate HTTP failure. Re-create the containerRuntime to inject the failure.
 	kubelet.httpClient = &fakeHttp
 	runtimeHooks := newKubeletRuntimeHooks(kubelet.recorder)
-	kubelet.containerManager = dockertools.NewDockerManager(kubelet.dockerClient, kubelet.recorder, kubelet.readinessManager, kubelet.containerRefManager, dockertools.PodInfraContainerImage, 0, 0, "", kubelet.os, kubelet.networkPlugin, nil, kubelet, kubelet.httpClient, runtimeHooks)
+	kubelet.containerRuntime = dockertools.NewFakeDockerManager(kubelet.dockerClient, kubelet.recorder, kubelet.readinessManager, kubelet.containerRefManager, dockertools.PodInfraContainerImage, 0, 0, "", kubelet.os, kubelet.networkPlugin, kubelet, kubelet.httpClient, runtimeHooks)
 
 	pods := []*api.Pod{
 		{
@@ -752,7 +753,7 @@ func TestSyncPodsWithPodInfraCreatesContainerCallsHandler(t *testing.T) {
 		// Get pod status.
 		"list", "inspect_container", "inspect_image",
 		// Check the pod infra container.
-		"inspect_container", "inspect_image",
+		"inspect_container",
 		// Create container.
 		"create", "start",
 		// Get pod status.
@@ -1645,12 +1646,12 @@ func TestSyncPodEventHandlerFails(t *testing.T) {
 	fakeDocker := testKubelet.fakeDocker
 	waitGroup := testKubelet.waitGroup
 
-	// Simulate HTTP failure. Re-create the containerManager to inject the failure.
+	// Simulate HTTP failure. Re-create the containerRuntime to inject the failure.
 	kubelet.httpClient = &fakeHTTP{
 		err: fmt.Errorf("test error"),
 	}
 	runtimeHooks := newKubeletRuntimeHooks(kubelet.recorder)
-	kubelet.containerManager = dockertools.NewDockerManager(kubelet.dockerClient, kubelet.recorder, kubelet.readinessManager, kubelet.containerRefManager, dockertools.PodInfraContainerImage, 0, 0, "", kubelet.os, kubelet.networkPlugin, nil, kubelet, kubelet.httpClient, runtimeHooks)
+	kubelet.containerRuntime = dockertools.NewFakeDockerManager(kubelet.dockerClient, kubelet.recorder, kubelet.readinessManager, kubelet.containerRefManager, dockertools.PodInfraContainerImage, 0, 0, "", kubelet.os, kubelet.networkPlugin, kubelet, kubelet.httpClient, runtimeHooks)
 
 	pods := []*api.Pod{
 		{
@@ -1704,7 +1705,7 @@ func TestSyncPodEventHandlerFails(t *testing.T) {
 		// Get pod status.
 		"list", "inspect_container", "inspect_image",
 		// Check the pod infra container.
-		"inspect_container", "inspect_image",
+		"inspect_container",
 		// Create the container.
 		"create", "start",
 		// Kill the container since event handler fails.
@@ -1731,9 +1732,12 @@ func TestSyncPodsWithPullPolicy(t *testing.T) {
 	kubelet := testKubelet.kubelet
 	fakeDocker := testKubelet.fakeDocker
 	waitGroup := testKubelet.waitGroup
-	puller := kubelet.containerManager.Puller.(*dockertools.FakeDockerPuller)
+	// TODO: Move this test to dockertools so that we don't have to do the hacky
+	// type assertion here.
+	dm := kubelet.containerRuntime.(*dockertools.DockerManager)
+	puller := dm.Puller.(*dockertools.FakeDockerPuller)
 	puller.HasImages = []string{"existing_one", "want:latest"}
-	kubelet.containerManager.PodInfraContainerImage = "custom_image_name"
+	dm.PodInfraContainerImage = "custom_image_name"
 	fakeDocker.ContainerList = []docker.APIContainers{}
 
 	pods := []*api.Pod{
@@ -2850,7 +2854,10 @@ func TestPortForward(t *testing.T) {
 
 	podInfraContainerImage := "POD"
 	infraContainerID := "infra"
-	kubelet.containerManager.PodInfraContainerImage = podInfraContainerImage
+	// TODO: Move this test to dockertools so that we don't have to do the hacky
+	// type assertion here.
+	dm := kubelet.containerRuntime.(*dockertools.DockerManager)
+	dm.PodInfraContainerImage = podInfraContainerImage
 
 	fakeDocker.ContainerList = []docker.APIContainers{
 		{
@@ -3984,7 +3991,10 @@ func TestGetPodCreationFailureReason(t *testing.T) {
 	pods := []*api.Pod{pod}
 	kubelet.podManager.SetPods(pods)
 	kubelet.volumeManager.SetVolumes(pod.UID, volumeMap{})
-	_, err := kubelet.containerManager.RunContainer(pod, &pod.Spec.Containers[0], "", "")
+	// TODO: Move this test to dockertools so that we don't have to do the hacky
+	// type assertion here.
+	dm := kubelet.containerRuntime.(*dockertools.DockerManager)
+	_, err := dm.RunContainer(pod, &pod.Spec.Containers[0], "", "")
 	if err == nil {
 		t.Errorf("expected error, found nil")
 	}
@@ -4105,289 +4115,5 @@ func TestFilterOutTerminatedPods(t *testing.T) {
 	actual := kubelet.filterOutTerminatedPods(pods)
 	if !reflect.DeepEqual(expected, actual) {
 		t.Errorf("expected %#v, got %#v", expected, actual)
-	}
-}
-
-type fakeExecProber struct {
-	result probe.Result
-	err    error
-}
-
-func (p fakeExecProber) Probe(_ uexec.Cmd) (probe.Result, error) {
-	return p.result, p.err
-}
-
-func makeTestKubelet(result probe.Result, err error) *Kubelet {
-	kl := &Kubelet{
-		readinessManager:    kubecontainer.NewReadinessManager(),
-		containerRefManager: kubecontainer.NewRefManager(),
-	}
-
-	// TODO(vmarmol): Fix
-	fakeExec := fakeExecProber{
-		result: result,
-		err:    err,
-	}
-	kl.prober = prober.NewTestProber(fakeExec, kl.readinessManager, kl.containerRefManager, &record.FakeRecorder{})
-	return kl
-}
-
-// TestProbeContainer tests the functionality of probeContainer.
-// Test cases are:
-//
-// No probe.
-// Only LivenessProbe.
-// Only ReadinessProbe.
-// Both probes.
-//
-// Also, for each probe, there will be several cases covering whether the initial
-// delay has passed, whether the probe handler will return Success, Failure,
-// Unknown or error.
-//
-func TestProbeContainer(t *testing.T) {
-	dc := &docker.APIContainers{
-		ID:      "foobar",
-		Created: time.Now().Unix(),
-	}
-	tests := []struct {
-		testContainer     api.Container
-		expectError       bool
-		expectedResult    probe.Result
-		expectedReadiness bool
-	}{
-		// No probes.
-		{
-			testContainer:     api.Container{},
-			expectedResult:    probe.Success,
-			expectedReadiness: true,
-		},
-		// Only LivenessProbe.
-		{
-			testContainer: api.Container{
-				LivenessProbe: &api.Probe{InitialDelaySeconds: 100},
-			},
-			expectedResult:    probe.Success,
-			expectedReadiness: true,
-		},
-		{
-			testContainer: api.Container{
-				LivenessProbe: &api.Probe{InitialDelaySeconds: -100},
-			},
-			expectedResult:    probe.Unknown,
-			expectedReadiness: false,
-		},
-		{
-			testContainer: api.Container{
-				LivenessProbe: &api.Probe{
-					InitialDelaySeconds: -100,
-					Handler: api.Handler{
-						Exec: &api.ExecAction{},
-					},
-				},
-			},
-			expectedResult:    probe.Failure,
-			expectedReadiness: false,
-		},
-		{
-			testContainer: api.Container{
-				LivenessProbe: &api.Probe{
-					InitialDelaySeconds: -100,
-					Handler: api.Handler{
-						Exec: &api.ExecAction{},
-					},
-				},
-			},
-			expectedResult:    probe.Success,
-			expectedReadiness: true,
-		},
-		{
-			testContainer: api.Container{
-				LivenessProbe: &api.Probe{
-					InitialDelaySeconds: -100,
-					Handler: api.Handler{
-						Exec: &api.ExecAction{},
-					},
-				},
-			},
-			expectedResult:    probe.Unknown,
-			expectedReadiness: false,
-		},
-		{
-			testContainer: api.Container{
-				LivenessProbe: &api.Probe{
-					InitialDelaySeconds: -100,
-					Handler: api.Handler{
-						Exec: &api.ExecAction{},
-					},
-				},
-			},
-			expectError:       true,
-			expectedResult:    probe.Unknown,
-			expectedReadiness: false,
-		},
-		// Only ReadinessProbe.
-		{
-			testContainer: api.Container{
-				ReadinessProbe: &api.Probe{InitialDelaySeconds: 100},
-			},
-			expectedResult:    probe.Success,
-			expectedReadiness: false,
-		},
-		{
-			testContainer: api.Container{
-				ReadinessProbe: &api.Probe{InitialDelaySeconds: -100},
-			},
-			expectedResult:    probe.Success,
-			expectedReadiness: false,
-		},
-		{
-			testContainer: api.Container{
-				ReadinessProbe: &api.Probe{
-					InitialDelaySeconds: -100,
-					Handler: api.Handler{
-						Exec: &api.ExecAction{},
-					},
-				},
-			},
-			expectedResult:    probe.Success,
-			expectedReadiness: true,
-		},
-		{
-			testContainer: api.Container{
-				ReadinessProbe: &api.Probe{
-					InitialDelaySeconds: -100,
-					Handler: api.Handler{
-						Exec: &api.ExecAction{},
-					},
-				},
-			},
-			expectedResult:    probe.Success,
-			expectedReadiness: true,
-		},
-		{
-			testContainer: api.Container{
-				ReadinessProbe: &api.Probe{
-					InitialDelaySeconds: -100,
-					Handler: api.Handler{
-						Exec: &api.ExecAction{},
-					},
-				},
-			},
-			expectedResult:    probe.Success,
-			expectedReadiness: true,
-		},
-		{
-			testContainer: api.Container{
-				ReadinessProbe: &api.Probe{
-					InitialDelaySeconds: -100,
-					Handler: api.Handler{
-						Exec: &api.ExecAction{},
-					},
-				},
-			},
-			expectError:       false,
-			expectedResult:    probe.Success,
-			expectedReadiness: true,
-		},
-		// Both LivenessProbe and ReadinessProbe.
-		{
-			testContainer: api.Container{
-				LivenessProbe:  &api.Probe{InitialDelaySeconds: 100},
-				ReadinessProbe: &api.Probe{InitialDelaySeconds: 100},
-			},
-			expectedResult:    probe.Success,
-			expectedReadiness: false,
-		},
-		{
-			testContainer: api.Container{
-				LivenessProbe:  &api.Probe{InitialDelaySeconds: 100},
-				ReadinessProbe: &api.Probe{InitialDelaySeconds: -100},
-			},
-			expectedResult:    probe.Success,
-			expectedReadiness: false,
-		},
-		{
-			testContainer: api.Container{
-				LivenessProbe:  &api.Probe{InitialDelaySeconds: -100},
-				ReadinessProbe: &api.Probe{InitialDelaySeconds: 100},
-			},
-			expectedResult:    probe.Unknown,
-			expectedReadiness: false,
-		},
-		{
-			testContainer: api.Container{
-				LivenessProbe:  &api.Probe{InitialDelaySeconds: -100},
-				ReadinessProbe: &api.Probe{InitialDelaySeconds: -100},
-			},
-			expectedResult:    probe.Unknown,
-			expectedReadiness: false,
-		},
-		{
-			testContainer: api.Container{
-				LivenessProbe: &api.Probe{
-					InitialDelaySeconds: -100,
-					Handler: api.Handler{
-						Exec: &api.ExecAction{},
-					},
-				},
-				ReadinessProbe: &api.Probe{InitialDelaySeconds: -100},
-			},
-			expectedResult:    probe.Unknown,
-			expectedReadiness: false,
-		},
-		{
-			testContainer: api.Container{
-				LivenessProbe: &api.Probe{
-					InitialDelaySeconds: -100,
-					Handler: api.Handler{
-						Exec: &api.ExecAction{},
-					},
-				},
-				ReadinessProbe: &api.Probe{InitialDelaySeconds: -100},
-			},
-			expectedResult:    probe.Failure,
-			expectedReadiness: false,
-		},
-		{
-			testContainer: api.Container{
-				LivenessProbe: &api.Probe{
-					InitialDelaySeconds: -100,
-					Handler: api.Handler{
-						Exec: &api.ExecAction{},
-					},
-				},
-				ReadinessProbe: &api.Probe{
-					InitialDelaySeconds: -100,
-					Handler: api.Handler{
-						Exec: &api.ExecAction{},
-					},
-				},
-			},
-			expectedResult:    probe.Success,
-			expectedReadiness: true,
-		},
-	}
-
-	for _, test := range tests {
-		var kl *Kubelet
-
-		if test.expectError {
-			kl = makeTestKubelet(test.expectedResult, errors.New("error"))
-		} else {
-			kl = makeTestKubelet(test.expectedResult, nil)
-		}
-		result, err := kl.prober.Probe(&api.Pod{}, api.PodStatus{}, test.testContainer, dc.ID, dc.Created)
-		if test.expectError && err == nil {
-			t.Error("Expected error but did no error was returned.")
-		}
-		if !test.expectError && err != nil {
-			t.Errorf("Expected error but got: %v", err)
-		}
-		if test.expectedResult != result {
-			t.Errorf("Expected result was %v but probeContainer() returned %v", test.expectedResult, result)
-		}
-		if test.expectedReadiness != kl.readinessManager.GetReadiness(dc.ID) {
-			t.Errorf("Expected readiness was %v but probeContainer() set %v", test.expectedReadiness, kl.readinessManager.GetReadiness(dc.ID))
-		}
 	}
 }
