@@ -1369,6 +1369,7 @@ func (kl *Kubelet) validateContainerStatus(podStatus *api.PodStatus, containerNa
 // TODO: this method is returning logs of random container attempts, when it should be returning the most recent attempt
 // or all of them.
 func (kl *Kubelet) GetKubeletContainerLogs(podFullName, containerName, tail string, follow bool, stdout, stderr io.Writer) error {
+	// TODO(vmarmol): Refactor to not need the pod status and verification.
 	podStatus, err := kl.GetPodStatus(podFullName)
 	if err != nil {
 		return fmt.Errorf("failed to get status for pod %q - %v", podFullName, err)

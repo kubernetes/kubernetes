@@ -74,7 +74,7 @@ type Runtime interface {
 	// default, it returns a snapshot of the container log. Set 'follow' to true to
 	// stream the log. Set 'follow' to false and specify the number of lines (e.g.
 	// "100" or "all") to tail the log.
-	GetContainerLogs(podUID *api.Pod, containerID, tail string, follow bool, stdout, stderr io.Writer) (err error)
+	GetContainerLogs(pod *api.Pod, containerID, tail string, follow bool, stdout, stderr io.Writer) (err error)
 }
 
 // Customizable hooks injected into container runtimes.

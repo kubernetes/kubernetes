@@ -81,6 +81,8 @@ type Runtime struct {
 	dockerKeyring credentialprovider.DockerKeyring
 }
 
+var _ kubecontainer.Runtime = &Runtime{}
+
 // New creates the rkt container runtime which implements the container runtime interface.
 // It will test if the rkt binary is in the $PATH, and whether we can get the
 // version of it. If so, creates the rkt container runtime, otherwise returns an error.
