@@ -21,6 +21,12 @@
 
 set -e
 
+
+# get the full path of configure dir and set $PWD to it.
+CONFIG_DIR=`dirname "$0"`
+CONFIG_DIR=`cd "$CONFIG_DIR"; pwd`
+cd $CONFIG_DIR
+
 #clean all init/init.d/configs
 function do_backup_clean() {
   #backup all config files
@@ -92,7 +98,7 @@ function cpMinion(){
     # copy default configs
     cp work/default_scripts/etcd /etc/default/
     cp work/default_scripts/flanneld /etc/default/
-    cp work/default_scripts/kube-proxy /etc/default
+    cp work/default_scripts/kube-proxy /etc/default/
     cp work/default_scripts/kubelet /etc/default/
 }
 
