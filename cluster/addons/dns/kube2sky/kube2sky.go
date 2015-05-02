@@ -106,7 +106,7 @@ func mutateEtcdOrDie(mutator func() error) {
 func newEtcdClient() (client *etcd.Client) {
 	maxConnectRetries := 12
 	for maxConnectRetries > 0 {
-		if _, _, err := tools.GetEtcdVersion(*etcd_server); err != nil {
+		if _, err := tools.GetEtcdVersion(*etcd_server); err != nil {
 			log.Fatalf("Failed to connect to etcd server: %v, error: %v", *etcd_server, err)
 			if maxConnectRetries > 0 {
 				log.Println("Retrying request after 5 second sleep.")
@@ -120,13 +120,25 @@ func newEtcdClient() (client *etcd.Client) {
 			break
 		}
 	}
-	client = etcd.NewClient([]string{*etcd_server})
-	if client == nil {
-		return nil
+	// loop until we have > 0 machines && machines[0] != ""
+	timeout := false
+	go func() {
+		<-time.After(10 * time.Second)
+		timeout = true
+	}()
+	for !timeout {
+		client = etcd.NewClient([]string{*etcd_server})
+		if client == nil {
+			return nil
+		}
+		client.SyncCluster()
+		machines := client.GetCluster()
+		if len(machines) > 0 && len(machines[0]) > 0 {
+			return client
+		}
 	}
-	client.SyncCluster()
-
-	return client
+	log.Fatal("Timed out waiting for correct response from etcd server")
+	return nil
 }
 
 // TODO: evaluate using pkg/client/clientcmd

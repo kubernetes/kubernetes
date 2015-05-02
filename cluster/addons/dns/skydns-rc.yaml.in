@@ -21,15 +21,17 @@ desiredState:
         dnsPolicy: "Default"  # Don't use cluster DNS.
         containers:
           - name: etcd
-            image: quay.io/coreos/etcd:v2.0.3
+            image: gcr.io/google_containers/etcd:2.0.9
             command: [
-                    # entrypoint = "/etcd",
-                    "-listen-client-urls=http://0.0.0.0:2379,http://0.0.0.0:4001",
+                    "/usr/local/bin/etcd",
+                    "--addr",
+                    "127.0.0.1:4001",
+                    "--bind-addr",
+                    "127.0.0.1:4001",
                     "-initial-cluster-token=skydns-etcd",
-                    "-advertise-client-urls=http://127.0.0.1:4001",
             ]
           - name: kube2sky
-            image: gcr.io/google_containers/kube2sky:1.2
+            image: gcr.io/google_containers/kube2sky:1.3
             volumeMounts:
                - name: dns-token
                  mountPath: /etc/dns_token
