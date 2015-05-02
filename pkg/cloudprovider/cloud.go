@@ -18,7 +18,6 @@ package cloudprovider
 
 import (
 	"net"
-	"strings"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 )
@@ -43,17 +42,8 @@ type Clusters interface {
 	Master(clusterName string) (string, error)
 }
 
-// TODO(#6812): Use a shorter name that's less likely to be longer than cloud
-// providers' name length limits.
-func GetLoadBalancerName(service *api.Service) string {
-	//GCE requires that the name of a load balancer starts with a lower case letter.
-	ret := "a" + string(service.UID)
-	ret = strings.Replace(ret, "-", "", -1)
-	//AWS requires that the name of a load balancer is shorter than 32 bytes.
-	if len(ret) > 32 {
-		ret = ret[:32]
-	}
-	return ret
+func GetLoadBalancerName(clusterName, serviceNamespace, serviceName string) string {
+	return clusterName + "-" + serviceNamespace + "-" + serviceName
 }
 
 // TCPLoadBalancer is an abstract, pluggable interface for TCP load balancers.
