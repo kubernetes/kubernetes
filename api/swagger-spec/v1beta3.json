@@ -10760,7 +10760,8 @@
      "name",
      "protocol",
      "port",
-     "targetPort"
+     "targetPort",
+     "publicPort"
     ],
     "properties": {
      "name": {
@@ -10775,6 +10776,11 @@
      "protocol": {
       "type": "string",
       "description": "the protocol used by this port; must be UDP or TCP; TCP if unspecified"
+     },
+     "publicPort": {
+      "type": "integer",
+      "format": "int32",
+      "description": "the port number on which this service is exposed outside the cluster"
      },
      "targetPort": {
       "type": "string",
@@ -10818,6 +10824,10 @@
      "sessionAffinity": {
       "type": "string",
       "description": "enable client IP based session affinity; must be ClientIP or None; defaults to None"
+     },
+     "visibility": {
+      "type": "string",
+      "description": "control whether the service can be reached from outside the kubernetes cluster"
      }
     }
    },

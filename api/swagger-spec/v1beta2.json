@@ -10093,6 +10093,10 @@
      "uid": {
       "type": "string",
       "description": "unique UUID across space and time; populated by the system, read-only"
+     },
+     "visibility": {
+      "type": "string",
+      "description": "control whether the service can be reached from outside the kubernetes cluster"
      }
     }
    },
@@ -10647,7 +10651,8 @@
      "name",
      "protocol",
      "port",
-     "containerPort"
+     "containerPort",
+     "publicPort"
     ],
     "properties": {
      "containerPort": {
@@ -10666,6 +10671,11 @@
      "protocol": {
       "type": "string",
       "description": "the protocol used by this port; must be UDP or TCP; TCP if unspecified"
+     },
+     "publicPort": {
+      "type": "integer",
+      "format": "int32",
+      "description": "the port number on which this service is exposed outside the cluster"
      }
     }
    },
