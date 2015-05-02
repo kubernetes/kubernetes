@@ -64,9 +64,10 @@ func NewConfigFactory(client *client.Client) *ConfigFactory {
 		Client:             client,
 		PodQueue:           cache.NewFIFO(cache.MetaNamespaceKeyFunc),
 		ScheduledPodLister: &cache.StoreToPodLister{},
-		NodeLister:         &cache.StoreToNodeLister{cache.NewStore(cache.MetaNamespaceKeyFunc)},
-		ServiceLister:      &cache.StoreToServiceLister{cache.NewStore(cache.MetaNamespaceKeyFunc)},
-		StopEverything:     make(chan struct{}),
+		// Only nodes in the "Ready" condition with status == "True" are schedulable
+		NodeLister:     &cache.StoreToNodeLister{cache.NewStore(cache.MetaNamespaceKeyFunc)},
+		ServiceLister:  &cache.StoreToServiceLister{cache.NewStore(cache.MetaNamespaceKeyFunc)},
+		StopEverything: make(chan struct{}),
 	}
 	modeler := scheduler.NewSimpleModeler(&cache.StoreToPodLister{c.PodQueue}, c.ScheduledPodLister)
 	c.modeler = modeler
@@ -150,8 +151,9 @@ func (f *ConfigFactory) CreateFromKeys(predicateKeys, priorityKeys util.StringSe
 	pluginArgs := PluginFactoryArgs{
 		PodLister:     f.PodLister,
 		ServiceLister: f.ServiceLister,
-		NodeLister:    f.NodeLister,
-		NodeInfo:      f.NodeLister,
+		// All fit predicates only need to consider schedulable nodes.
+		NodeLister: f.NodeLister.NodeCondition(api.NodeReady, api.ConditionTrue),
+		NodeInfo:   f.NodeLister,
 	}
 	predicateFuncs, err := getFitPredicateFunctions(predicateKeys, pluginArgs)
 	if err != nil {
@@ -191,8 +193,9 @@ func (f *ConfigFactory) CreateFromKeys(predicateKeys, priorityKeys util.StringSe
 	}
 
 	return &scheduler.Config{
-		Modeler:      f.modeler,
-		MinionLister: f.NodeLister,
+		Modeler: f.modeler,
+		// The scheduler only needs to consider schedulable nodes.
+		MinionLister: f.NodeLister.NodeCondition(api.NodeReady, api.ConditionTrue),
 		Algorithm:    algo,
 		Binder:       &binder{f.Client},
 		NextPod: func() *api.Pod {

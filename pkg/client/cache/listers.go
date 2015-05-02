@@ -21,6 +21,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
+	"github.com/golang/glog"
 )
 
 //  TODO: generate these classes and methods for all resources of interest using
@@ -104,6 +105,54 @@ func (s *StoreToNodeLister) List() (machines api.NodeList, err error) {
 		machines.Items = append(machines.Items, *(m.(*api.Node)))
 	}
 	return machines, nil
+}
+
+// NodeCondition returns a storeToNodeConditionLister
+func (s *StoreToNodeLister) NodeCondition(conditionType api.NodeConditionType, conditionStatus api.ConditionStatus) storeToNodeConditionLister {
+	// TODO: Move this filtering server side. Currently our selectors don't facilitate searching through a list so we
+	// have the reflector filter out the Unschedulable field and sift through node conditions in the lister.
+	return storeToNodeConditionLister{s.Store, conditionType, conditionStatus}
+}
+
+// storeToNodeConditionLister filters and returns nodes matching the given type and status from the store.
+type storeToNodeConditionLister struct {
+	store           Store
+	conditionType   api.NodeConditionType
+	conditionStatus api.ConditionStatus
+}
+
+// List returns a list of nodes that match the condition type/status in the storeToNodeConditionLister.
+func (s storeToNodeConditionLister) List() (nodes api.NodeList, err error) {
+	for _, m := range s.store.List() {
+		node := *m.(*api.Node)
+
+		// We currently only use a conditionType of "Ready". If the kubelet doesn't
+		// periodically report the status of a node, the nodecontroller sets its
+		// ConditionStatus to "Unknown". If the kubelet thinks a node is unhealthy
+		// it can (in theory) set its ConditionStatus to "False".
+		var nodeCondition *api.NodeCondition
+
+		// Get the last condition of the required type
+		for _, cond := range node.Status.Conditions {
+			if cond.Type == s.conditionType {
+				nodeCondition = &cond
+			} else {
+				glog.V(4).Infof("Ignoring condition type %v for node %v", cond.Type, node.Name)
+			}
+		}
+
+		// Check that the condition has the required status
+		if nodeCondition != nil {
+			if nodeCondition.Status == s.conditionStatus {
+				nodes.Items = append(nodes.Items, node)
+			} else {
+				glog.V(4).Infof("Ignoring node %v with condition status %v", node.Name, nodeCondition.Status)
+			}
+		} else {
+			glog.V(2).Infof("Node %s doesn't have conditions of type %v", node.Name, s.conditionType)
+		}
+	}
+	return
 }
 
 // TODO Move this back to scheduler as a helper function that takes a Store,
