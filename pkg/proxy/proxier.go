@@ -362,15 +362,29 @@ func (proxier *Proxier) openOnePortal(portalIP net.IP, portalPort int, protocol 
 }
 
 func (proxier *Proxier) openPublicPort(publicPort int, protocol api.Protocol, proxyIP net.IP, proxyPort int, name ServicePortName) error {
-	// Handle traffic from outside the cluster
-	args := proxier.iptablesPublicPortArgs(publicPort, protocol, proxyIP, proxyPort, name)
-	existed, err := proxier.iptables.EnsureRule(iptables.TableNAT, iptablesPublicChain, args...)
+	// TODO: Do we want to allow containers to access public services?  Probably yes.
+	// TODO: We could refactor this to be the same code as portal, but with IP == nil
+
+	// Handle traffic from containers.
+	args := proxier.iptablesContainerPublicArgs(publicPort, protocol, proxyIP, proxyPort, name)
+	existed, err := proxier.iptables.EnsureRule(iptables.TableNAT, iptablesContainerPublicChain, args...)
 	if err != nil {
-		glog.Errorf("Failed to install iptables %s rule for service %q", iptablesPublicChain, name)
+		glog.Errorf("Failed to install iptables %s rule for service %q", iptablesContainerPublicChain, name)
 		return err
 	}
 	if !existed {
-		glog.Infof("Opened iptables public portal for service %q on %s %d", name, protocol, publicPort)
+		glog.Infof("Opened iptables from-containers public port for service %q on %s port %d", name, protocol, publicPort)
+	}
+
+	// Handle traffic from the host.
+	args = proxier.iptablesHostPublicArgs(publicPort, protocol, proxyIP, proxyPort, name)
+	existed, err = proxier.iptables.EnsureRule(iptables.TableNAT, iptablesHostPublicChain, args...)
+	if err != nil {
+		glog.Errorf("Failed to install iptables %s rule for service %q", iptablesHostPublicChain, name)
+		return err
+	}
+	if !existed {
+		glog.Infof("Opened iptables from-host public port for service %q on %s port %d", name, protocol, publicPort)
 	}
 	return nil
 }
@@ -415,9 +429,17 @@ func (proxier *Proxier) closeOnePortal(portalIP net.IP, portalPort int, protocol
 func (proxier *Proxier) closePublicPort(publicPort int, protocol api.Protocol, proxyIP net.IP, proxyPort int, name ServicePortName) []error {
 	el := []error{}
 
-	args := proxier.iptablesPublicPortArgs(publicPort, protocol, proxyIP, proxyPort, name)
-	if err := proxier.iptables.DeleteRule(iptables.TableNAT, iptablesPublicChain, args...); err != nil {
-		glog.Errorf("Failed to delete iptables %s rule for service %q", iptablesPublicChain, name)
+	// Handle traffic from containers.
+	args := proxier.iptablesContainerPublicArgs(publicPort, protocol, proxyIP, proxyPort, name)
+	if err := proxier.iptables.DeleteRule(iptables.TableNAT, iptablesContainerPublicChain, args...); err != nil {
+		glog.Errorf("Failed to delete iptables %s rule for service %q", iptablesContainerPublicChain, name)
+		el = append(el, err)
+	}
+
+	// Handle traffic from the host.
+	args = proxier.iptablesHostPublicArgs(publicPort, protocol, proxyIP, proxyPort, name)
+	if err := proxier.iptables.DeleteRule(iptables.TableNAT, iptablesHostPublicChain, args...); err != nil {
+		glog.Errorf("Failed to delete iptables %s rule for service %q", iptablesHostPublicChain, name)
 		el = append(el, err)
 	}
 
@@ -430,8 +452,9 @@ var iptablesContainerPortalChain iptables.Chain = "KUBE-PORTALS-CONTAINER"
 var iptablesHostPortalChain iptables.Chain = "KUBE-PORTALS-HOST"
 var iptablesOldPortalChain iptables.Chain = "KUBE-PROXY"
 
-// Chain for public services
-var iptablesPublicChain iptables.Chain = "KUBE-PUBLIC"
+// Chains for public services
+var iptablesContainerPublicChain iptables.Chain = "KUBE-PUBLIC-CONTAINER"
+var iptablesHostPublicChain iptables.Chain = "KUBE-PUBLIC-HOST"
 
 // Ensure that the iptables infrastructure we use is set up.  This can safely be called periodically.
 func iptablesInit(ipt iptables.Interface) error {
@@ -450,10 +473,16 @@ func iptablesInit(ipt iptables.Interface) error {
 	if _, err := ipt.EnsureRule(iptables.TableNAT, iptables.ChainOutput, "-j", string(iptablesHostPortalChain)); err != nil {
 		return err
 	}
-	if _, err := ipt.EnsureChain(iptables.TableNAT, iptablesPublicChain); err != nil {
+	if _, err := ipt.EnsureChain(iptables.TableNAT, iptablesContainerPublicChain); err != nil {
 		return err
 	}
-	if _, err := ipt.EnsureRule(iptables.TableNAT, iptables.ChainPrerouting, "-j", string(iptablesPublicChain)); err != nil {
+	if _, err := ipt.EnsureRule(iptables.TableNAT, iptables.ChainPrerouting, "-j", string(iptablesContainerPublicChain)); err != nil {
+		return err
+	}
+	if _, err := ipt.EnsureChain(iptables.TableNAT, iptablesHostPublicChain); err != nil {
+		return err
+	}
+	if _, err := ipt.EnsureRule(iptables.TableNAT, iptables.ChainOutput, "-j", string(iptablesHostPublicChain)); err != nil {
 		return err
 	}
 	return nil
@@ -478,7 +507,10 @@ func iptablesFlush(ipt iptables.Interface) error {
 	if err := ipt.FlushChain(iptables.TableNAT, iptablesHostPortalChain); err != nil {
 		el = append(el, err)
 	}
-	if err := ipt.FlushChain(iptables.TableNAT, iptablesPublicChain); err != nil {
+	if err := ipt.FlushChain(iptables.TableNAT, iptablesContainerPublicChain); err != nil {
+		el = append(el, err)
+	}
+	if err := ipt.FlushChain(iptables.TableNAT, iptablesHostPublicChain); err != nil {
 		el = append(el, err)
 	}
 	if len(el) != 0 {
@@ -600,8 +632,10 @@ func (proxier *Proxier) iptablesHostPortalArgs(destIP net.IP, destPort int, prot
 	return args
 }
 
-// Build a slice of iptables args for a public-port rule.
-func (proxier *Proxier) iptablesPublicPortArgs(publicPort int, protocol api.Protocol, proxyIP net.IP, proxyPort int, service ServicePortName) []string {
+// Build a slice of iptables args for a from-container public-port rule.
+// See iptablesContainerPortalArgs
+// TODO: Should we just reuse iptablesContainerPortalArgs?
+func (proxier *Proxier) iptablesContainerPublicArgs(publicPort int, protocol api.Protocol, proxyIP net.IP, proxyPort int, service ServicePortName) []string {
 	args := iptablesCommonPortalArgs(nil, publicPort, protocol, service)
 
 	if proxyIP.Equal(zeroIPv4) || proxyIP.Equal(zeroIPv6) {
@@ -612,6 +646,20 @@ func (proxier *Proxier) iptablesPublicPortArgs(publicPort int, protocol api.Prot
 		args = append(args, "-j", "DNAT", "--to-destination", net.JoinHostPort(proxyIP.String(), strconv.Itoa(proxyPort)))
 	}
 
+	return args
+}
+
+// Build a slice of iptables args for a from-host public-port rule.
+// See iptablesHostPortalArgs
+// TODO: Should we just reuse iptablesHostPortalArgs?
+func (proxier *Proxier) iptablesHostPublicArgs(publicPort int, protocol api.Protocol, proxyIP net.IP, proxyPort int, service ServicePortName) []string {
+	args := iptablesCommonPortalArgs(nil, publicPort, protocol, service)
+
+	if proxyIP.Equal(zeroIPv4) || proxyIP.Equal(zeroIPv6) {
+		proxyIP = proxier.hostIP
+	}
+	// TODO: Can we DNAT with IPv6?
+	args = append(args, "-j", "DNAT", "--to-destination", net.JoinHostPort(proxyIP.String(), strconv.Itoa(proxyPort)))
 	return args
 }
 
