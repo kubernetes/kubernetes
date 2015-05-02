@@ -46,7 +46,7 @@
 {% set client_ca_file = "" -%}
 
 {% set secure_port = "6443" -%}
-{% if grains['cloud'] is defined and grains['cloud'] == 'gce' %}
+{% if grains['cloud'] is defined and grains.cloud in [ 'aws', 'gce' ]    %}
   {% set secure_port = "443" -%}
   {% set client_ca_file = "--client_ca_file=/srv/kubernetes/ca.crt" -%}
 {% endif -%}
@@ -60,7 +60,7 @@
 {% endif -%}
 {% endif -%}
 
-{% if grains['cloud'] is defined and grains['cloud'] == 'gce' %}
+{% if grains['cloud'] is defined and grains.cloud in [ 'aws', 'gce' ]  %}
   {% set basic_auth_file = "--basic_auth_file=/srv/kubernetes/basic_auth.csv" -%}
 {% endif -%}
 
