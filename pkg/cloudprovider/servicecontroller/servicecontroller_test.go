@@ -27,14 +27,9 @@ import (
 )
 
 const region = "us-central"
-const clusterName = "test-cluster"
-const namespace = "namespace"
 
 func newService(name string, uid types.UID, external bool) *api.Service {
-	return &api.Service{ObjectMeta: api.ObjectMeta{Name: name, Namespace: namespace, UID: uid}, Spec: api.ServiceSpec{CreateExternalLoadBalancer: external}}
-}
-func lbName(serviceName string) string {
-	return clusterName + "-" + namespace + "-" + serviceName
+	return &api.Service{ObjectMeta: api.ObjectMeta{Name: name, Namespace: "namespace", UID: uid}, Spec: api.ServiceSpec{CreateExternalLoadBalancer: external}}
 }
 
 func TestCreateExternalLoadBalancer(t *testing.T) {
@@ -96,7 +91,7 @@ func TestCreateExternalLoadBalancer(t *testing.T) {
 		cloud := &fake_cloud.FakeCloud{}
 		cloud.Region = region
 		client := &testclient.Fake{}
-		controller := New(cloud, client, clusterName)
+		controller := New(cloud, client, "test-cluster")
 		controller.init()
 		cloud.Calls = nil    // ignore any cloud calls made in init()
 		client.Actions = nil // ignore any client calls made in init()
@@ -160,7 +155,7 @@ func TestUpdateNodesInExternalLoadBalancer(t *testing.T) {
 				newService("s0", "333", true),
 			},
 			expectedUpdateCalls: []fake_cloud.FakeUpdateBalancerCall{
-				{Name: lbName("s0"), Region: region, Hosts: []string{"node0", "node1", "node73"}},
+				{Name: "a333", Region: region, Hosts: []string{"node0", "node1", "node73"}},
 			},
 		},
 		{
@@ -171,9 +166,9 @@ func TestUpdateNodesInExternalLoadBalancer(t *testing.T) {
 				newService("s2", "666", true),
 			},
 			expectedUpdateCalls: []fake_cloud.FakeUpdateBalancerCall{
-				{Name: lbName("s0"), Region: region, Hosts: []string{"node0", "node1", "node73"}},
-				{Name: lbName("s1"), Region: region, Hosts: []string{"node0", "node1", "node73"}},
-				{Name: lbName("s2"), Region: region, Hosts: []string{"node0", "node1", "node73"}},
+				{Name: "a444", Region: region, Hosts: []string{"node0", "node1", "node73"}},
+				{Name: "a555", Region: region, Hosts: []string{"node0", "node1", "node73"}},
+				{Name: "a666", Region: region, Hosts: []string{"node0", "node1", "node73"}},
 			},
 		},
 		{
@@ -185,8 +180,8 @@ func TestUpdateNodesInExternalLoadBalancer(t *testing.T) {
 				newService("s4", "123", false),
 			},
 			expectedUpdateCalls: []fake_cloud.FakeUpdateBalancerCall{
-				{Name: lbName("s1"), Region: region, Hosts: []string{"node0", "node1", "node73"}},
-				{Name: lbName("s3"), Region: region, Hosts: []string{"node0", "node1", "node73"}},
+				{Name: "a888", Region: region, Hosts: []string{"node0", "node1", "node73"}},
+				{Name: "a999", Region: region, Hosts: []string{"node0", "node1", "node73"}},
 			},
 		},
 	}
@@ -195,7 +190,7 @@ func TestUpdateNodesInExternalLoadBalancer(t *testing.T) {
 
 		cloud.Region = region
 		client := &testclient.Fake{}
-		controller := New(cloud, client, clusterName)
+		controller := New(cloud, client, "test-cluster2")
 		controller.init()
 		cloud.Calls = nil // ignore any cloud calls made in init()
 
