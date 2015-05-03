@@ -24,11 +24,28 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/endpoints"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/rest"
+	servicecontroller "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/service/allocator/controller"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 
 	"github.com/golang/glog"
 )
 
-func (m *Master) serviceWriterLoop(stop chan struct{}) {
+// StartCoreControllers begins the core controller loops that must exist for bootstrapping
+// a cluster.
+func (m *Master) StartCoreControllers() {
+	if m.masterServices != nil {
+		return
+	}
+	repair := servicecontroller.NewRepair(3*time.Minute, m.serviceRegistry, m.portalNet, m.portalAllocator)
+	if err := repair.RunOnce(); err != nil {
+		glog.Errorf("Unable to perform initial IP allocation check: %v", err)
+	}
+	m.masterServices = util.NewRunner(m.ServiceWriterLoop, m.ROServiceWriterLoop, repair.RunUntil)
+	m.masterServices.Start()
+}
+
+// ServiceWriterLoop is exposed for downstream consumers of master
+func (m *Master) ServiceWriterLoop(stop chan struct{}) {
 	t := time.NewTicker(10 * time.Second)
 	defer t.Stop()
 	for {
@@ -36,14 +53,14 @@ func (m *Master) serviceWriterLoop(stop chan struct{}) {
 		// TODO: when it becomes possible to change this stuff,
 		// stop polling and start watching.
 		// TODO: add endpoints of all replicas, not just the elected master.
-		if err := m.createMasterNamespaceIfNeeded(api.NamespaceDefault); err != nil {
+		if err := m.CreateMasterNamespaceIfNeeded(api.NamespaceDefault); err != nil {
 			glog.Errorf("Can't create master namespace: %v", err)
 		}
 		if m.serviceReadWriteIP != nil {
-			if err := m.createMasterServiceIfNeeded("kubernetes", m.serviceReadWriteIP, m.serviceReadWritePort); err != nil && !errors.IsAlreadyExists(err) {
+			if err := m.CreateMasterServiceIfNeeded("kubernetes", m.serviceReadWriteIP, m.serviceReadWritePort); err != nil && !errors.IsAlreadyExists(err) {
 				glog.Errorf("Can't create rw service: %v", err)
 			}
-			if err := m.setEndpoints("kubernetes", m.clusterIP, m.publicReadWritePort); err != nil {
+			if err := m.SetEndpoints("kubernetes", m.clusterIP, m.publicReadWritePort); err != nil {
 				glog.Errorf("Can't create rw endpoints: %v", err)
 			}
 		}
@@ -56,21 +73,22 @@ func (m *Master) serviceWriterLoop(stop chan struct{}) {
 	}
 }
 
-func (m *Master) roServiceWriterLoop(stop chan struct{}) {
+// ROServiceWriterLoop is exposed for downstream consumers of master
+func (m *Master) ROServiceWriterLoop(stop chan struct{}) {
 	t := time.NewTicker(10 * time.Second)
 	defer t.Stop()
 	for {
 		// Update service & endpoint records.
 		// TODO: when it becomes possible to change this stuff,
 		// stop polling and start watching.
-		if err := m.createMasterNamespaceIfNeeded(api.NamespaceDefault); err != nil {
+		if err := m.CreateMasterNamespaceIfNeeded(api.NamespaceDefault); err != nil {
 			glog.Errorf("Can't create master namespace: %v", err)
 		}
 		if m.serviceReadOnlyIP != nil {
-			if err := m.createMasterServiceIfNeeded("kubernetes-ro", m.serviceReadOnlyIP, m.serviceReadOnlyPort); err != nil && !errors.IsAlreadyExists(err) {
+			if err := m.CreateMasterServiceIfNeeded("kubernetes-ro", m.serviceReadOnlyIP, m.serviceReadOnlyPort); err != nil && !errors.IsAlreadyExists(err) {
 				glog.Errorf("Can't create ro service: %v", err)
 			}
-			if err := m.setEndpoints("kubernetes-ro", m.clusterIP, m.publicReadOnlyPort); err != nil {
+			if err := m.SetEndpoints("kubernetes-ro", m.clusterIP, m.publicReadOnlyPort); err != nil {
 				glog.Errorf("Can't create ro endpoints: %v", err)
 			}
 		}
@@ -83,8 +101,8 @@ func (m *Master) roServiceWriterLoop(stop chan struct{}) {
 	}
 }
 
-// createMasterNamespaceIfNeeded will create the namespace that contains the master services if it doesn't already exist
-func (m *Master) createMasterNamespaceIfNeeded(ns string) error {
+// CreateMasterNamespaceIfNeeded will create the namespace that contains the master services if it doesn't already exist
+func (m *Master) CreateMasterNamespaceIfNeeded(ns string) error {
 	ctx := api.NewContext()
 	if _, err := m.namespaceRegistry.GetNamespace(ctx, api.NamespaceDefault); err == nil {
 		// the namespace already exists
@@ -103,9 +121,9 @@ func (m *Master) createMasterNamespaceIfNeeded(ns string) error {
 	return err
 }
 
-// createMasterServiceIfNeeded will create the specified service if it
+// CreateMasterServiceIfNeeded will create the specified service if it
 // doesn't already exist.
-func (m *Master) createMasterServiceIfNeeded(serviceName string, serviceIP net.IP, servicePort int) error {
+func (m *Master) CreateMasterServiceIfNeeded(serviceName string, serviceIP net.IP, servicePort int) error {
 	ctx := api.NewDefaultContext()
 	if _, err := m.serviceRegistry.GetService(ctx, serviceName); err == nil {
 		// The service already exists.
@@ -132,20 +150,20 @@ func (m *Master) createMasterServiceIfNeeded(serviceName string, serviceIP net.I
 	return err
 }
 
-// setEndpoints sets the endpoints for the given apiserver service (ro or rw).
-// setEndpoints expects that the endpoints objects it manages will all be
-// managed only by setEndpoints; therefore, to understand this, you need only
+// SetEndpoints sets the endpoints for the given apiserver service (ro or rw).
+// SetEndpoints expects that the endpoints objects it manages will all be
+// managed only by SetEndpoints; therefore, to understand this, you need only
 // understand the requirements and the body of this function.
 //
 // Requirements:
 //  * All apiservers MUST use the same ports for their {rw, ro} services.
-//  * All apiservers MUST use setEndpoints and only setEndpoints to manage the
+//  * All apiservers MUST use SetEndpoints and only SetEndpoints to manage the
 //      endpoints for their {rw, ro} services.
 //  * All apiservers MUST know and agree on the number of apiservers expected
 //      to be running (m.masterCount).
-//  * setEndpoints is called periodically from all apiservers.
+//  * SetEndpoints is called periodically from all apiservers.
 //
-func (m *Master) setEndpoints(serviceName string, ip net.IP, port int) error {
+func (m *Master) SetEndpoints(serviceName string, ip net.IP, port int) error {
 	ctx := api.NewDefaultContext()
 	e, err := m.endpointRegistry.GetEndpoints(ctx, serviceName)
 	if err != nil {

@@ -71,6 +71,7 @@ func init() {
 		&ComponentStatus{},
 		&ComponentStatusList{},
 		&SerializedReference{},
+		&RangeAllocation{},
 	)
 	// Future names are supported
 	api.Scheme.AddKnownTypeWithName("v1beta2", "Node", &Minion{})
@@ -116,3 +117,4 @@ func (*PodProxyOptions) IsAnAPIObject()           {}
 func (*ComponentStatus) IsAnAPIObject()           {}
 func (*ComponentStatusList) IsAnAPIObject()       {}
 func (*SerializedReference) IsAnAPIObject()       {}
+func (*RangeAllocation) IsAnAPIObject()           {}

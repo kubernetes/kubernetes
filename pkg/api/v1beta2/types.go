@@ -1762,3 +1762,11 @@ type SELinuxOptions struct {
 	// SELinux level label.
 	Level string `json:"level,omitempty" description:"the level label to apply to the container"`
 }
+
+// RangeAllocation is not a public type
+type RangeAllocation struct {
+	TypeMeta `json:",inline"`
+
+	Range string `json:"range" description:"a range string that identifies the range represented by 'data'; required"`
+	Data  []byte `json:"data" description:"a bit array containing all allocated addresses in the previous segment"`
+}

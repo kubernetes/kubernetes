@@ -32,11 +32,11 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/endpoint"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/minion"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/service/ipallocator"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/fielderrors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
-	"github.com/golang/glog"
 )
 
 // REST adapts a service registry into apiserver's RESTStorage model.
@@ -44,46 +44,19 @@ type REST struct {
 	registry    Registry
 	machines    minion.Registry
 	endpoints   endpoint.Registry
-	portalMgr   *ipAllocator
+	portals     ipallocator.Interface
 	clusterName string
 }
 
 // NewStorage returns a new REST.
-func NewStorage(registry Registry, machines minion.Registry, endpoints endpoint.Registry, portalNet *net.IPNet,
+func NewStorage(registry Registry, machines minion.Registry, endpoints endpoint.Registry, portals ipallocator.Interface,
 	clusterName string) *REST {
-	// TODO: Before we can replicate masters, this has to be synced (e.g. lives in etcd)
-	ipa := newIPAllocator(portalNet)
-	if ipa == nil {
-		glog.Fatalf("Failed to create an IP allocator. Is subnet '%v' valid?", portalNet)
-	}
-	reloadIPsFromStorage(ipa, registry)
-
 	return &REST{
 		registry:    registry,
 		machines:    machines,
 		endpoints:   endpoints,
-		portalMgr:   ipa,
+		portals:     portals,
 		clusterName: clusterName,
-	}
-}
-
-// Helper: mark all previously allocated IPs in the allocator.
-func reloadIPsFromStorage(ipa *ipAllocator, registry Registry) {
-	services, err := registry.ListServices(api.NewContext())
-	if err != nil {
-		// This is really bad.
-		glog.Errorf("can't list services to init service REST: %v", err)
-		return
-	}
-	for i := range services.Items {
-		service := &services.Items[i]
-		if !api.IsServiceIPSet(service) {
-			continue
-		}
-		if err := ipa.Allocate(net.ParseIP(service.Spec.PortalIP)); err != nil {
-			// This is really bad.
-			glog.Errorf("service %q PortalIP %s could not be allocated: %v", service.Name, service.Spec.PortalIP, err)
-		}
 	}
 }
 
@@ -98,22 +71,23 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (runtime.Object, err
 	defer func() {
 		if releaseServiceIP {
 			if api.IsServiceIPSet(service) {
-				rs.portalMgr.Release(net.ParseIP(service.Spec.PortalIP))
+				rs.portals.Release(net.ParseIP(service.Spec.PortalIP))
 			}
 		}
 	}()
 
 	if api.IsServiceIPRequested(service) {
 		// Allocate next available.
-		ip, err := rs.portalMgr.AllocateNext()
+		ip, err := rs.portals.AllocateNext()
 		if err != nil {
-			return nil, err
+			el := fielderrors.ValidationErrorList{fielderrors.NewFieldInvalid("spec.portalIP", service.Spec.PortalIP, err.Error())}
+			return nil, errors.NewInvalid("Service", service.Name, el)
 		}
 		service.Spec.PortalIP = ip.String()
 		releaseServiceIP = true
 	} else if api.IsServiceIPSet(service) {
 		// Try to respect the requested IP.
-		if err := rs.portalMgr.Allocate(net.ParseIP(service.Spec.PortalIP)); err != nil {
+		if err := rs.portals.Allocate(net.ParseIP(service.Spec.PortalIP)); err != nil {
 			el := fielderrors.ValidationErrorList{fielderrors.NewFieldInvalid("spec.portalIP", service.Spec.PortalIP, err.Error())}
 			return nil, errors.NewInvalid("Service", service.Name, el)
 		}
@@ -138,7 +112,7 @@ func (rs *REST) Delete(ctx api.Context, id string) (runtime.Object, error) {
 		return nil, err
 	}
 	if api.IsServiceIPSet(service) {
-		rs.portalMgr.Release(net.ParseIP(service.Spec.PortalIP))
+		rs.portals.Release(net.ParseIP(service.Spec.PortalIP))
 	}
 	return &api.Status{Status: api.StatusSuccess}, rs.registry.DeleteService(ctx, id)
 }

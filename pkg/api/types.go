@@ -1915,3 +1915,24 @@ type SELinuxOptions struct {
 	// SELinux level label.
 	Level string `json:"level,omitempty" description:"the level label to apply to the container"`
 }
+
+// RangeAllocation is an opaque API object (not exposed to end users) that can be persisted to record
+// the global allocation state of the cluster. The schema of Range and Data generic, in that Range
+// should be a string representation of the inputs to a range (for instance, for IP allocation it
+// might be a CIDR) and Data is an opaque blob understood by an allocator which is typically a
+// binary range.  Consumers should use annotations to record additional information (schema version,
+// data encoding hints). A range allocation should *ALWAYS* be recreatable at any time by observation
+// of the cluster, thus the object is less strongly typed than most.
+type RangeAllocation struct {
+	TypeMeta   `json:",inline"`
+	ObjectMeta `json:"metadata,omitempty"`
+	// A string representing a unique label for a range of resources, such as a CIDR "10.0.0.0/8" or
+	// port range "10000-30000". Range is not strongly schema'd here. The Range is expected to define
+	// a start and end unless there is an implicit end.
+	Range string `json:"range"`
+	// A byte array representing the serialized state of a range allocation. Additional clarifiers on
+	// the type or format of data should be represented with annotations. For IP allocations, this is
+	// represented as a bit array starting at the base IP of the CIDR in Range, with each bit representing
+	// a single allocated address (the fifth bit on CIDR 10.0.0.0/8 is 10.0.0.4).
+	Data []byte `json:"data"`
+}

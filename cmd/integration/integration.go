@@ -185,17 +185,18 @@ func startComponents(firstManifestURL, secondManifestURL, apiVersion string) (st
 
 	// Create a master and install handlers into mux.
 	m := master.New(&master.Config{
-		EtcdHelper:        helper,
-		KubeletClient:     fakeKubeletClient{},
-		EnableLogsSupport: false,
-		EnableProfiling:   true,
-		APIPrefix:         "/api",
-		Authorizer:        apiserver.NewAlwaysAllowAuthorizer(),
-		AdmissionControl:  admit.NewAlwaysAdmit(),
-		ReadWritePort:     portNumber,
-		ReadOnlyPort:      portNumber,
-		PublicAddress:     publicAddress,
-		CacheTimeout:      2 * time.Second,
+		EtcdHelper:            helper,
+		KubeletClient:         fakeKubeletClient{},
+		EnableCoreControllers: true,
+		EnableLogsSupport:     false,
+		EnableProfiling:       true,
+		APIPrefix:             "/api",
+		Authorizer:            apiserver.NewAlwaysAllowAuthorizer(),
+		AdmissionControl:      admit.NewAlwaysAdmit(),
+		ReadWritePort:         portNumber,
+		ReadOnlyPort:          portNumber,
+		PublicAddress:         publicAddress,
+		CacheTimeout:          2 * time.Second,
 	})
 	handler.delegate = m.Handler
 

@@ -391,14 +391,15 @@ func TestAuthModeAlwaysAllow(t *testing.T) {
 	defer s.Close()
 
 	m = master.New(&master.Config{
-		EtcdHelper:        helper,
-		KubeletClient:     client.FakeKubeletClient{},
-		EnableLogsSupport: false,
-		EnableUISupport:   false,
-		EnableIndex:       true,
-		APIPrefix:         "/api",
-		Authorizer:        apiserver.NewAlwaysAllowAuthorizer(),
-		AdmissionControl:  admit.NewAlwaysAdmit(),
+		EtcdHelper:            helper,
+		KubeletClient:         client.FakeKubeletClient{},
+		EnableCoreControllers: true,
+		EnableLogsSupport:     false,
+		EnableUISupport:       false,
+		EnableIndex:           true,
+		APIPrefix:             "/api",
+		Authorizer:            apiserver.NewAlwaysAllowAuthorizer(),
+		AdmissionControl:      admit.NewAlwaysAdmit(),
 	})
 
 	transport := http.DefaultTransport
@@ -530,14 +531,15 @@ func TestAuthModeAlwaysDeny(t *testing.T) {
 	defer s.Close()
 
 	m = master.New(&master.Config{
-		EtcdHelper:        helper,
-		KubeletClient:     client.FakeKubeletClient{},
-		EnableLogsSupport: false,
-		EnableUISupport:   false,
-		EnableIndex:       true,
-		APIPrefix:         "/api",
-		Authorizer:        apiserver.NewAlwaysDenyAuthorizer(),
-		AdmissionControl:  admit.NewAlwaysAdmit(),
+		EtcdHelper:            helper,
+		KubeletClient:         client.FakeKubeletClient{},
+		EnableCoreControllers: true,
+		EnableLogsSupport:     false,
+		EnableUISupport:       false,
+		EnableIndex:           true,
+		APIPrefix:             "/api",
+		Authorizer:            apiserver.NewAlwaysDenyAuthorizer(),
+		AdmissionControl:      admit.NewAlwaysAdmit(),
 	})
 
 	transport := http.DefaultTransport
@@ -596,15 +598,16 @@ func TestAliceNotForbiddenOrUnauthorized(t *testing.T) {
 	defer s.Close()
 
 	m = master.New(&master.Config{
-		EtcdHelper:        helper,
-		KubeletClient:     client.FakeKubeletClient{},
-		EnableLogsSupport: false,
-		EnableUISupport:   false,
-		EnableIndex:       true,
-		APIPrefix:         "/api",
-		Authenticator:     getTestTokenAuth(),
-		Authorizer:        allowAliceAuthorizer{},
-		AdmissionControl:  admit.NewAlwaysAdmit(),
+		EtcdHelper:            helper,
+		KubeletClient:         client.FakeKubeletClient{},
+		EnableCoreControllers: true,
+		EnableLogsSupport:     false,
+		EnableUISupport:       false,
+		EnableIndex:           true,
+		APIPrefix:             "/api",
+		Authenticator:         getTestTokenAuth(),
+		Authorizer:            allowAliceAuthorizer{},
+		AdmissionControl:      admit.NewAlwaysAdmit(),
 	})
 
 	previousResourceVersion := make(map[string]float64)
@@ -684,15 +687,16 @@ func TestBobIsForbidden(t *testing.T) {
 	defer s.Close()
 
 	m = master.New(&master.Config{
-		EtcdHelper:        helper,
-		KubeletClient:     client.FakeKubeletClient{},
-		EnableLogsSupport: false,
-		EnableUISupport:   false,
-		EnableIndex:       true,
-		APIPrefix:         "/api",
-		Authenticator:     getTestTokenAuth(),
-		Authorizer:        allowAliceAuthorizer{},
-		AdmissionControl:  admit.NewAlwaysAdmit(),
+		EtcdHelper:            helper,
+		KubeletClient:         client.FakeKubeletClient{},
+		EnableCoreControllers: true,
+		EnableLogsSupport:     false,
+		EnableUISupport:       false,
+		EnableIndex:           true,
+		APIPrefix:             "/api",
+		Authenticator:         getTestTokenAuth(),
+		Authorizer:            allowAliceAuthorizer{},
+		AdmissionControl:      admit.NewAlwaysAdmit(),
 	})
 
 	transport := http.DefaultTransport
@@ -744,15 +748,16 @@ func TestUnknownUserIsUnauthorized(t *testing.T) {
 	defer s.Close()
 
 	m = master.New(&master.Config{
-		EtcdHelper:        helper,
-		KubeletClient:     client.FakeKubeletClient{},
-		EnableLogsSupport: false,
-		EnableUISupport:   false,
-		EnableIndex:       true,
-		APIPrefix:         "/api",
-		Authenticator:     getTestTokenAuth(),
-		Authorizer:        allowAliceAuthorizer{},
-		AdmissionControl:  admit.NewAlwaysAdmit(),
+		EtcdHelper:            helper,
+		KubeletClient:         client.FakeKubeletClient{},
+		EnableCoreControllers: true,
+		EnableLogsSupport:     false,
+		EnableUISupport:       false,
+		EnableIndex:           true,
+		APIPrefix:             "/api",
+		Authenticator:         getTestTokenAuth(),
+		Authorizer:            allowAliceAuthorizer{},
+		AdmissionControl:      admit.NewAlwaysAdmit(),
 	})
 
 	transport := http.DefaultTransport
@@ -823,15 +828,16 @@ func TestNamespaceAuthorization(t *testing.T) {
 	defer s.Close()
 
 	m = master.New(&master.Config{
-		EtcdHelper:        helper,
-		KubeletClient:     client.FakeKubeletClient{},
-		EnableLogsSupport: false,
-		EnableUISupport:   false,
-		EnableIndex:       true,
-		APIPrefix:         "/api",
-		Authenticator:     getTestTokenAuth(),
-		Authorizer:        a,
-		AdmissionControl:  admit.NewAlwaysAdmit(),
+		EtcdHelper:            helper,
+		KubeletClient:         client.FakeKubeletClient{},
+		EnableCoreControllers: true,
+		EnableLogsSupport:     false,
+		EnableUISupport:       false,
+		EnableIndex:           true,
+		APIPrefix:             "/api",
+		Authenticator:         getTestTokenAuth(),
+		Authorizer:            a,
+		AdmissionControl:      admit.NewAlwaysAdmit(),
 	})
 
 	previousResourceVersion := make(map[string]float64)
@@ -937,15 +943,16 @@ func TestKindAuthorization(t *testing.T) {
 	defer s.Close()
 
 	m = master.New(&master.Config{
-		EtcdHelper:        helper,
-		KubeletClient:     client.FakeKubeletClient{},
-		EnableLogsSupport: false,
-		EnableUISupport:   false,
-		EnableIndex:       true,
-		APIPrefix:         "/api",
-		Authenticator:     getTestTokenAuth(),
-		Authorizer:        a,
-		AdmissionControl:  admit.NewAlwaysAdmit(),
+		EtcdHelper:            helper,
+		KubeletClient:         client.FakeKubeletClient{},
+		EnableCoreControllers: true,
+		EnableLogsSupport:     false,
+		EnableUISupport:       false,
+		EnableIndex:           true,
+		APIPrefix:             "/api",
+		Authenticator:         getTestTokenAuth(),
+		Authorizer:            a,
+		AdmissionControl:      admit.NewAlwaysAdmit(),
 	})
 
 	previousResourceVersion := make(map[string]float64)
@@ -1038,15 +1045,16 @@ func TestReadOnlyAuthorization(t *testing.T) {
 	defer s.Close()
 
 	m = master.New(&master.Config{
-		EtcdHelper:        helper,
-		KubeletClient:     client.FakeKubeletClient{},
-		EnableLogsSupport: false,
-		EnableUISupport:   false,
-		EnableIndex:       true,
-		APIPrefix:         "/api",
-		Authenticator:     getTestTokenAuth(),
-		Authorizer:        a,
-		AdmissionControl:  admit.NewAlwaysAdmit(),
+		EtcdHelper:            helper,
+		KubeletClient:         client.FakeKubeletClient{},
+		EnableCoreControllers: true,
+		EnableLogsSupport:     false,
+		EnableUISupport:       false,
+		EnableIndex:           true,
+		APIPrefix:             "/api",
+		Authenticator:         getTestTokenAuth(),
+		Authorizer:            a,
+		AdmissionControl:      admit.NewAlwaysAdmit(),
 	})
 
 	transport := http.DefaultTransport
