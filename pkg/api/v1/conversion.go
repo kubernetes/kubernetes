@@ -1464,6 +1464,9 @@ func init() {
 			if err := s.Convert(&in.Resources, &out.Resources, 0); err != nil {
 				return err
 			}
+			if err := s.Convert(&in.VolumeName, &out.VolumeName, 0); err != nil {
+				return err
+			}
 			return nil
 		},
 		func(in *newer.PersistentVolumeClaimSpec, out *PersistentVolumeClaimSpec, s conversion.Scope) error {
@@ -1476,6 +1479,9 @@ func init() {
 				}
 			}
 			if err := s.Convert(&in.Resources, &out.Resources, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.VolumeName, &out.VolumeName, 0); err != nil {
 				return err
 			}
 			return nil
@@ -1500,9 +1506,6 @@ func init() {
 					out.Capacity[newer.ResourceName(key)] = newVal
 				}
 			}
-			if err := s.Convert(&in.VolumeRef, &out.VolumeRef, 0); err != nil {
-				return err
-			}
 			return nil
 		},
 		func(in *newer.PersistentVolumeClaimStatus, out *PersistentVolumeClaimStatus, s conversion.Scope) error {
@@ -1524,9 +1527,6 @@ func init() {
 					}
 					out.Capacity[ResourceName(key)] = newVal
 				}
-			}
-			if err := s.Convert(&in.VolumeRef, &out.VolumeRef, 0); err != nil {
-				return err
 			}
 			return nil
 		},
@@ -1584,6 +1584,9 @@ func init() {
 			if err := s.Convert(&in.HostPath, &out.HostPath, 0); err != nil {
 				return err
 			}
+			if err := s.Convert(&in.ISCSI, &out.ISCSI, 0); err != nil {
+				return err
+			}
 			if err := s.Convert(&in.Glusterfs, &out.Glusterfs, 0); err != nil {
 				return err
 			}
@@ -1597,6 +1600,9 @@ func init() {
 				return err
 			}
 			if err := s.Convert(&in.HostPath, &out.HostPath, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.ISCSI, &out.ISCSI, 0); err != nil {
 				return err
 			}
 			if err := s.Convert(&in.Glusterfs, &out.Glusterfs, 0); err != nil {
@@ -1626,9 +1632,6 @@ func init() {
 					}
 				}
 			}
-			if err := s.Convert(&in.ClaimRef, &out.ClaimRef, 0); err != nil {
-				return err
-			}
 			return nil
 		},
 		func(in *newer.PersistentVolumeSpec, out *PersistentVolumeSpec, s conversion.Scope) error {
@@ -1653,17 +1656,20 @@ func init() {
 					}
 				}
 			}
+			return nil
+		},
+		func(in *PersistentVolumeStatus, out *newer.PersistentVolumeStatus, s conversion.Scope) error {
+			out.Phase = newer.PersistentVolumePhase(in.Phase)
 			if err := s.Convert(&in.ClaimRef, &out.ClaimRef, 0); err != nil {
 				return err
 			}
 			return nil
 		},
-		func(in *PersistentVolumeStatus, out *newer.PersistentVolumeStatus, s conversion.Scope) error {
-			out.Phase = newer.PersistentVolumePhase(in.Phase)
-			return nil
-		},
 		func(in *newer.PersistentVolumeStatus, out *PersistentVolumeStatus, s conversion.Scope) error {
 			out.Phase = PersistentVolumePhase(in.Phase)
+			if err := s.Convert(&in.ClaimRef, &out.ClaimRef, 0); err != nil {
+				return err
+			}
 			return nil
 		},
 		func(in *Pod, out *newer.Pod, s conversion.Scope) error {

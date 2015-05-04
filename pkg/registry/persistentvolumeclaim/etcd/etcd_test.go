@@ -327,11 +327,19 @@ func TestEtcdUpdateStatus(t *testing.T) {
 	pvcStart := validNewPersistentVolumeClaim("foo", api.NamespaceDefault)
 	fakeClient.Set(key, runtime.EncodeOrDie(latest.Codec, pvcStart), 1)
 
-	pvIn := &api.PersistentVolumeClaim{
+	pvc := &api.PersistentVolumeClaim{
 		ObjectMeta: api.ObjectMeta{
 			Name:            "foo",
 			Namespace:       api.NamespaceDefault,
 			ResourceVersion: "1",
+		},
+		Spec: api.PersistentVolumeClaimSpec{
+			AccessModes: []api.AccessModeType{api.ReadWriteOnce},
+			Resources: api.ResourceRequirements{
+				Requests: api.ResourceList{
+					api.ResourceName(api.ResourceStorage): resource.MustParse("3Gi"),
+				},
+			},
 		},
 		Status: api.PersistentVolumeClaimStatus{
 			Phase: api.ClaimBound,
@@ -340,10 +348,10 @@ func TestEtcdUpdateStatus(t *testing.T) {
 
 	expected := *pvcStart
 	expected.ResourceVersion = "2"
-	expected.Labels = pvIn.Labels
-	expected.Status = pvIn.Status
+	expected.Labels = pvc.Labels
+	expected.Status = pvc.Status
 
-	_, _, err := statusStorage.Update(ctx, pvIn)
+	_, _, err := statusStorage.Update(ctx, pvc)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}

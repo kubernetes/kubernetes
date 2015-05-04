@@ -636,10 +636,10 @@ func printNodeList(list *api.NodeList, w io.Writer) error {
 
 func printPersistentVolume(pv *api.PersistentVolume, w io.Writer) error {
 	claimRefUID := ""
-	if pv.Spec.ClaimRef != nil {
-		claimRefUID += pv.Spec.ClaimRef.Name
+	if pv.Status.ClaimRef != nil {
+		claimRefUID += pv.Status.ClaimRef.Name
 		claimRefUID += " / "
-		claimRefUID += string(pv.Spec.ClaimRef.UID)
+		claimRefUID += string(pv.Status.ClaimRef.UID)
 	}
 
 	modesStr := volume.GetAccessModesAsString(pv.Spec.AccessModes)
@@ -661,11 +661,7 @@ func printPersistentVolumeList(list *api.PersistentVolumeList, w io.Writer) erro
 }
 
 func printPersistentVolumeClaim(pvc *api.PersistentVolumeClaim, w io.Writer) error {
-	volumeRefUID := ""
-	if pvc.Status.VolumeRef != nil {
-		volumeRefUID = string(pvc.Status.VolumeRef.UID)
-	}
-	_, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", pvc.Name, pvc.Labels, pvc.Status.Phase, volumeRefUID)
+	_, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", pvc.Name, pvc.Labels, pvc.Status.Phase, pvc.Spec.VolumeName)
 	return err
 }
 

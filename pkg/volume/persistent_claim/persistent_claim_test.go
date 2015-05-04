@@ -80,6 +80,8 @@ func TestNewBuilder(t *testing.T) {
 					PersistentVolumeSource: api.PersistentVolumeSource{
 						GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{},
 					},
+				},
+				Status: api.PersistentVolumeStatus{
 					ClaimRef: &api.ObjectReference{
 						Name: "claimA",
 					},
@@ -90,11 +92,11 @@ func TestNewBuilder(t *testing.T) {
 					Name:      "claimA",
 					Namespace: "nsA",
 				},
+				Spec: api.PersistentVolumeClaimSpec{
+					VolumeName: "pvA",
+				},
 				Status: api.PersistentVolumeClaimStatus{
 					Phase: api.ClaimBound,
-					VolumeRef: &api.ObjectReference{
-						Name: "pvA",
-					},
 				},
 			},
 			podVolume: api.VolumeSource{
@@ -120,6 +122,8 @@ func TestNewBuilder(t *testing.T) {
 					PersistentVolumeSource: api.PersistentVolumeSource{
 						HostPath: &api.HostPathVolumeSource{Path: "/tmp"},
 					},
+				},
+				Status: api.PersistentVolumeStatus{
 					ClaimRef: &api.ObjectReference{
 						Name: "claimB",
 					},
@@ -130,10 +134,8 @@ func TestNewBuilder(t *testing.T) {
 					Name:      "claimB",
 					Namespace: "nsB",
 				},
-				Status: api.PersistentVolumeClaimStatus{
-					VolumeRef: &api.ObjectReference{
-						Name: "pvB",
-					},
+				Spec: api.PersistentVolumeClaimSpec{
+					VolumeName: "pvA",
 				},
 			},
 			podVolume: api.VolumeSource{
@@ -194,17 +196,12 @@ func TestNewBuilderClaimNotBound(t *testing.T) {
 			PersistentVolumeSource: api.PersistentVolumeSource{
 				GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{},
 			},
-			ClaimRef: nil,
 		},
 	}
 	claim := &api.PersistentVolumeClaim{
 		ObjectMeta: api.ObjectMeta{
 			Name:      "claimC",
 			Namespace: "nsA",
-		},
-		Status: api.PersistentVolumeClaimStatus{
-			Phase:     api.ClaimBound,
-			VolumeRef: nil,
 		},
 	}
 	podVolume := api.VolumeSource{

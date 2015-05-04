@@ -220,6 +220,9 @@ type PersistentVolumeSource struct {
 	// This is useful for development and testing only.
 	// on-host storage is not supported in any way
 	HostPath *HostPathVolumeSource `json:"hostPath"`
+	// ISCSIVolumeSource represents an ISCSI resource that is attached to a
+	// kubelet's host machine and then exposed to the pod.
+	ISCSI *ISCSIVolumeSource `json:"iscsi"`
 	// Glusterfs represents a Glusterfs volume that is attached to a host and exposed to the pod
 	Glusterfs *GlusterfsVolumeSource `json:"glusterfs"`
 }
@@ -250,13 +253,13 @@ type PersistentVolumeSpec struct {
 	PersistentVolumeSource `json:",inline"`
 	// AccessModes contains all ways the volume can be mounted
 	AccessModes []AccessModeType `json:"accessModes,omitempty"`
-	// holds the binding reference to a PersistentVolumeClaim
-	ClaimRef *ObjectReference `json:"claimRef,omitempty"`
 }
 
 type PersistentVolumeStatus struct {
 	// Phase indicates if a volume is available, bound to a claim, or released by a claim
 	Phase PersistentVolumePhase `json:"phase,omitempty"`
+	// ClaimRef is a non-binding reference to the claim bound to this volume
+	ClaimRef *ObjectReference `json:"claimRef,omitempty"`
 }
 
 type PersistentVolumeList struct {
@@ -290,6 +293,8 @@ type PersistentVolumeClaimSpec struct {
 	AccessModes []AccessModeType `json:"accessModes,omitempty"`
 	// Resources represents the minimum resources required
 	Resources ResourceRequirements `json:"resources,omitempty"`
+	// VolumeName is the binding reference to the PersistentVolume backing this claim
+	VolumeName string `json:"volumeName,omitempty"`
 }
 
 type PersistentVolumeClaimStatus struct {
@@ -299,8 +304,6 @@ type PersistentVolumeClaimStatus struct {
 	AccessModes []AccessModeType `json:"accessModes,omitempty`
 	// Represents the actual resources of the underlying volume
 	Capacity ResourceList `json:"capacity,omitempty"`
-	// VolumeRef is a reference to the PersistentVolume bound to the PersistentVolumeClaim
-	VolumeRef *ObjectReference `json:"volumeRef,omitempty"`
 }
 
 type AccessModeType string
