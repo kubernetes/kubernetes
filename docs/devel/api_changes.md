@@ -301,6 +301,14 @@ you'll figure it out.  Put `grep` or `ack` to good use.
 If you added functionality, you should consider documenting it and/or writing
 an example to illustrate your change.
 
+Make sure you update the swagger API spec by running:
+
+```shell
+$ hack/update-swagger-spec.sh
+```
+
+The API spec changes should be in a commit separate from your other changes.
+
 ## Incompatible API changes
 If your change is going to be backward incompatible or might be a breaking change for API
 consumers, please send an announcement to `kubernetes-dev@googlegroups.com` before
