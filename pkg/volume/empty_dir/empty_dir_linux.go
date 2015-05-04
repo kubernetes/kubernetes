@@ -1,3 +1,5 @@
+// +build linux
+
 /*
 Copyright 2015 The Kubernetes Authors All rights reserved.
 
@@ -21,6 +23,7 @@ import (
 	"syscall"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/mount"
+	"github.com/golang/glog"
 )
 
 // Defined by Linux - the type number for tmpfs mounts.
@@ -32,6 +35,7 @@ type realMountDetector struct {
 }
 
 func (m *realMountDetector) GetMountMedium(path string) (storageMedium, bool, error) {
+	glog.V(5).Infof("Determining mount medium of %v", path)
 	isMnt, err := m.mounter.IsMountPoint(path)
 	if err != nil {
 		return 0, false, fmt.Errorf("IsMountPoint(%q): %v", path, err)
@@ -40,6 +44,8 @@ func (m *realMountDetector) GetMountMedium(path string) (storageMedium, bool, er
 	if err := syscall.Statfs(path, &buf); err != nil {
 		return 0, false, fmt.Errorf("statfs(%q): %v", path, err)
 	}
+
+	glog.V(5).Info("Statfs_t of %v: %+v", path, buf)
 	if buf.Type == linuxTmpfsMagic {
 		return mediumMemory, isMnt, nil
 	}

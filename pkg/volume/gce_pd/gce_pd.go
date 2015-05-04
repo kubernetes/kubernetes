@@ -75,9 +75,9 @@ func (plugin *gcePersistentDiskPlugin) GetAccessModes() []api.AccessModeType {
 	}
 }
 
-func (plugin *gcePersistentDiskPlugin) NewBuilder(spec *volume.Spec, podRef *api.ObjectReference, _ volume.VolumeOptions) (volume.Builder, error) {
+func (plugin *gcePersistentDiskPlugin) NewBuilder(spec *volume.Spec, podRef *api.ObjectReference, _ volume.VolumeOptions, mounter mount.Interface) (volume.Builder, error) {
 	// Inject real implementations here, test through the internal function.
-	return plugin.newBuilderInternal(spec, podRef.UID, &GCEDiskUtil{}, mount.New())
+	return plugin.newBuilderInternal(spec, podRef.UID, &GCEDiskUtil{}, mounter)
 }
 
 func (plugin *gcePersistentDiskPlugin) newBuilderInternal(spec *volume.Spec, podUID types.UID, manager pdManager, mounter mount.Interface) (volume.Builder, error) {
@@ -116,9 +116,9 @@ func (plugin *gcePersistentDiskPlugin) newBuilderInternal(spec *volume.Spec, pod
 	}, nil
 }
 
-func (plugin *gcePersistentDiskPlugin) NewCleaner(volName string, podUID types.UID) (volume.Cleaner, error) {
+func (plugin *gcePersistentDiskPlugin) NewCleaner(volName string, podUID types.UID, mounter mount.Interface) (volume.Cleaner, error) {
 	// Inject real implementations here, test through the internal function.
-	return plugin.newCleanerInternal(volName, podUID, &GCEDiskUtil{}, mount.New())
+	return plugin.newCleanerInternal(volName, podUID, &GCEDiskUtil{}, mounter)
 }
 
 func (plugin *gcePersistentDiskPlugin) newCleanerInternal(volName string, podUID types.UID, manager pdManager, mounter mount.Interface) (volume.Cleaner, error) {
