@@ -591,9 +591,9 @@ func validateEnvVarValueFrom(ev api.EnvVar) errs.ValidationErrorList {
 	numSources := 0
 
 	switch {
-	case ev.ValueFrom.FieldPath != nil:
+	case ev.ValueFrom.FieldRef != nil:
 		numSources++
-		allErrs = append(allErrs, validateObjectFieldSelector(ev.ValueFrom.FieldPath).Prefix("fieldPath")...)
+		allErrs = append(allErrs, validateObjectFieldSelector(ev.ValueFrom.FieldRef).Prefix("fieldRef")...)
 	}
 
 	if ev.Value != "" && numSources != 0 {

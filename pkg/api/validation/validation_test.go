@@ -636,7 +636,7 @@ func TestValidateEnv(t *testing.T) {
 		{
 			Name: "abc",
 			ValueFrom: &api.EnvVarSource{
-				FieldPath: &api.ObjectFieldSelector{
+				FieldRef: &api.ObjectFieldSelector{
 					APIVersion: "v1beta3",
 					FieldPath:  "metadata.name",
 				},
@@ -668,7 +668,7 @@ func TestValidateEnv(t *testing.T) {
 				Name:  "abc",
 				Value: "foo",
 				ValueFrom: &api.EnvVarSource{
-					FieldPath: &api.ObjectFieldSelector{
+					FieldRef: &api.ObjectFieldSelector{
 						APIVersion: "v1beta3",
 						FieldPath:  "metadata.name",
 					},
@@ -681,50 +681,50 @@ func TestValidateEnv(t *testing.T) {
 			envs: []api.EnvVar{{
 				Name: "abc",
 				ValueFrom: &api.EnvVarSource{
-					FieldPath: &api.ObjectFieldSelector{
+					FieldRef: &api.ObjectFieldSelector{
 						APIVersion: "v1beta3",
 					},
 				},
 			}},
-			expectedError: "[0].valueFrom.fieldPath.fieldPath: required value",
+			expectedError: "[0].valueFrom.fieldRef.fieldPath: required value",
 		},
 		{
 			name: "missing APIVersion on ObjectFieldSelector",
 			envs: []api.EnvVar{{
 				Name: "abc",
 				ValueFrom: &api.EnvVarSource{
-					FieldPath: &api.ObjectFieldSelector{
+					FieldRef: &api.ObjectFieldSelector{
 						FieldPath: "metadata.name",
 					},
 				},
 			}},
-			expectedError: "[0].valueFrom.fieldPath.apiVersion: required value",
+			expectedError: "[0].valueFrom.fieldRef.apiVersion: required value",
 		},
 		{
 			name: "invalid fieldPath",
 			envs: []api.EnvVar{{
 				Name: "abc",
 				ValueFrom: &api.EnvVarSource{
-					FieldPath: &api.ObjectFieldSelector{
+					FieldRef: &api.ObjectFieldSelector{
 						FieldPath:  "metadata.whoops",
 						APIVersion: "v1beta3",
 					},
 				},
 			}},
-			expectedError: "[0].valueFrom.fieldPath.fieldPath: invalid value 'metadata.whoops': error converting fieldPath",
+			expectedError: "[0].valueFrom.fieldRef.fieldPath: invalid value 'metadata.whoops': error converting fieldPath",
 		},
 		{
 			name: "unsupported fieldPath",
 			envs: []api.EnvVar{{
 				Name: "abc",
 				ValueFrom: &api.EnvVarSource{
-					FieldPath: &api.ObjectFieldSelector{
+					FieldRef: &api.ObjectFieldSelector{
 						FieldPath:  "status.phase",
 						APIVersion: "v1beta3",
 					},
 				},
 			}},
-			expectedError: "[0].valueFrom.fieldPath.fieldPath: unsupported value 'status.phase'",
+			expectedError: "[0].valueFrom.fieldRef.fieldPath: unsupported value 'status.phase'",
 		},
 	}
 	for _, tc := range errorCases {
