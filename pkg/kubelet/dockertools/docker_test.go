@@ -28,7 +28,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/credentialprovider"
 	kubecontainer "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/network"
-	kubeletProber "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/prober"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	docker "github.com/fsouza/go-dockerclient"
@@ -553,7 +552,7 @@ func TestFindContainersByPod(t *testing.T) {
 	}
 	fakeClient := &FakeDockerClient{}
 	np, _ := network.InitNetworkPlugin([]network.NetworkPlugin{}, "", network.NewFakeHost(nil))
-	containerManager := NewDockerManager(fakeClient, &record.FakeRecorder{}, nil, nil, PodInfraContainerImage, 0, 0, "", kubecontainer.FakeOS{}, np, &kubeletProber.FakeProber{}, nil, nil, nil)
+	containerManager := NewFakeDockerManager(fakeClient, &record.FakeRecorder{}, nil, nil, PodInfraContainerImage, 0, 0, "", kubecontainer.FakeOS{}, np, nil, nil, nil)
 	for i, test := range tests {
 		fakeClient.ContainerList = test.containerList
 		fakeClient.ExitedContainerList = test.exitedContainerList

@@ -88,7 +88,7 @@ func (kl *Kubelet) runPod(pod *api.Pod, retryDelay time.Duration) error {
 	delay := retryDelay
 	retry := 0
 	for {
-		pods, err := kl.containerManager.GetPods(false)
+		pods, err := kl.containerRuntime.GetPods(false)
 		if err != nil {
 			return fmt.Errorf("failed to get kubelet pods: %v", err)
 		}
@@ -120,7 +120,7 @@ func (kl *Kubelet) runPod(pod *api.Pod, retryDelay time.Duration) error {
 
 // isPodRunning returns true if all containers of a manifest are running.
 func (kl *Kubelet) isPodRunning(pod *api.Pod, runningPod container.Pod) (bool, error) {
-	status, err := kl.containerManager.GetPodStatus(pod)
+	status, err := kl.containerRuntime.GetPodStatus(pod)
 	if err != nil {
 		glog.Infof("Failed to get the status of pod %q: %v", kubecontainer.GetPodFullName(pod), err)
 		return false, err

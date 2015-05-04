@@ -245,39 +245,32 @@ func NewMainKubelet(
 		klet.networkPlugin = plug
 	}
 
-	// TODO(vmarmol,yjhong): Use container runtime.
 	// Initialize the runtime.
 	switch containerRuntime {
 	case "docker":
 		// Only supported one for now, continue.
+		klet.containerRuntime = dockertools.NewDockerManager(
+			dockerClient,
+			recorder,
+			readinessManager,
+			containerRefManager,
+			podInfraContainerImage,
+			pullQPS,
+			pullBurst,
+			containerLogsDir,
+			osInterface,
+			klet.networkPlugin,
+			klet,
+			klet.httpClient,
+			newKubeletRuntimeHooks(recorder))
 	default:
 		return nil, fmt.Errorf("unsupported container runtime %q specified", containerRuntime)
 	}
-	containerManager := dockertools.NewDockerManager(
-		dockerClient,
-		recorder,
-		readinessManager,
-		containerRefManager,
-		podInfraContainerImage,
-		pullQPS,
-		pullBurst,
-		containerLogsDir,
-		osInterface,
-		klet.networkPlugin,
-		nil,
-		klet,
-		klet.httpClient,
-		newKubeletRuntimeHooks(recorder))
-	klet.runner = containerManager
-	klet.containerManager = containerManager
 
+	klet.runner = klet.containerRuntime
 	klet.podManager = newBasicPodManager(klet.kubeClient)
-	klet.prober = prober.New(klet.runner, klet.readinessManager, klet.containerRefManager, klet.recorder)
 
-	// TODO(vmarmol): Remove when the circular dependency is removed :(
-	containerManager.Prober = klet.prober
-
-	runtimeCache, err := kubecontainer.NewRuntimeCache(containerManager)
+	runtimeCache, err := kubecontainer.NewRuntimeCache(klet.containerRuntime)
 	if err != nil {
 		return nil, err
 	}
@@ -355,9 +348,6 @@ type Kubelet struct {
 	// Network plugin.
 	networkPlugin network.NetworkPlugin
 
-	// Healthy check prober.
-	prober prober.Prober
-
 	// Container readiness state manager.
 	readinessManager *kubecontainer.ReadinessManager
 
@@ -389,8 +379,8 @@ type Kubelet struct {
 	// Reference to this node.
 	nodeRef *api.ObjectReference
 
-	// Manage containers.
-	containerManager *dockertools.DockerManager
+	// Container runtime.
+	containerRuntime kubecontainer.Runtime
 
 	// nodeStatusUpdateFrequency specifies how often kubelet posts node status to master.
 	// Note: be cautious when changing the constant, it must work with nodeMonitorGracePeriod
@@ -883,7 +873,7 @@ func parseResolvConf(reader io.Reader) (nameservers []string, searches []string,
 
 // Kill all running containers in a pod (includes the pod infra container).
 func (kl *Kubelet) killPod(pod kubecontainer.Pod) error {
-	return kl.containerManager.KillPod(pod)
+	return kl.containerRuntime.KillPod(pod)
 }
 
 type empty struct{}
@@ -961,7 +951,7 @@ func (kl *Kubelet) syncPod(pod *api.Pod, mirrorPod *api.Pod, runningPod kubecont
 		return err
 	}
 
-	err = kl.containerManager.SyncPod(pod, runningPod, podStatus)
+	err = kl.containerRuntime.SyncPod(pod, runningPod, podStatus)
 	if err != nil {
 		return err
 	}
@@ -1153,7 +1143,7 @@ func (kl *Kubelet) SyncPods(allPods []*api.Pod, podSyncTypes map[types.UID]metri
 	// in the cache. We need to bypass the cach to get the latest set of
 	// running pods to clean up the volumes.
 	// TODO: Evaluate the performance impact of bypassing the runtime cache.
-	runningPods, err = kl.containerManager.GetPods(false)
+	runningPods, err = kl.containerRuntime.GetPods(false)
 	if err != nil {
 		glog.Errorf("Error listing containers: %#v", err)
 		return err
@@ -1350,10 +1340,10 @@ func (kl *Kubelet) syncLoop(updates <-chan PodUpdate, handler SyncHandler) {
 
 // Returns the container runtime version for this Kubelet.
 func (kl *Kubelet) GetContainerRuntimeVersion() (kubecontainer.Version, error) {
-	if kl.containerManager == nil {
+	if kl.containerRuntime == nil {
 		return nil, fmt.Errorf("no container runtime")
 	}
-	return kl.containerManager.Version()
+	return kl.containerRuntime.Version()
 }
 
 func (kl *Kubelet) validatePodPhase(podStatus *api.PodStatus) error {
@@ -1393,7 +1383,7 @@ func (kl *Kubelet) GetKubeletContainerLogs(podFullName, containerName, tail stri
 		// waiting state.
 		return err
 	}
-	return kl.containerManager.GetContainerLogs(containerID, tail, follow, stdout, stderr)
+	return kl.containerRuntime.GetContainerLogs(containerID, tail, follow, stdout, stderr)
 }
 
 // GetHostname Returns the hostname as the kubelet sees it.
@@ -1663,7 +1653,7 @@ func (kl *Kubelet) generatePodStatus(pod *api.Pod) (api.PodStatus, error) {
 	glog.V(3).Infof("Generating status for %q", podFullName)
 
 	spec := &pod.Spec
-	podStatus, err := kl.containerManager.GetPodStatus(pod)
+	podStatus, err := kl.containerRuntime.GetPodStatus(pod)
 
 	if err != nil {
 		// Error handling
@@ -1713,7 +1703,7 @@ func (kl *Kubelet) ServeLogs(w http.ResponseWriter, req *http.Request) {
 // It returns nil if not found.
 // TODO(yifan): Move this to runtime once the runtime interface has been all implemented.
 func (kl *Kubelet) findContainer(podFullName string, podUID types.UID, containerName string) (*kubecontainer.Container, error) {
-	pods, err := kl.containerManager.GetPods(false)
+	pods, err := kl.containerRuntime.GetPods(false)
 	if err != nil {
 		return nil, err
 	}
@@ -1765,7 +1755,7 @@ func (kl *Kubelet) PortForward(podFullName string, podUID types.UID, port uint16
 		return fmt.Errorf("no runner specified.")
 	}
 
-	pods, err := kl.containerManager.GetPods(false)
+	pods, err := kl.containerRuntime.GetPods(false)
 	if err != nil {
 		return err
 	}

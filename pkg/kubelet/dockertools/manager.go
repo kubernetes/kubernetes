@@ -91,10 +91,8 @@ type DockerManager struct {
 	// Network plugin.
 	networkPlugin network.NetworkPlugin
 
-	// TODO(vmarmol): Make this non-public when we remove the circular dependency
-	// with prober.
 	// Health check prober.
-	Prober prober.Prober
+	prober prober.Prober
 
 	// Generator of runtime container options.
 	generator kubecontainer.RunContainerOptionsGenerator
@@ -117,7 +115,6 @@ func NewDockerManager(
 	containerLogsDir string,
 	osInterface kubecontainer.OSInterface,
 	networkPlugin network.NetworkPlugin,
-	prober prober.Prober,
 	generator kubecontainer.RunContainerOptionsGenerator,
 	httpClient kubeletTypes.HttpGetter,
 	runtimeHooks kubecontainer.RuntimeHooks) *DockerManager {
@@ -164,11 +161,13 @@ func NewDockerManager(
 		dockerRoot:             dockerRoot,
 		containerLogsDir:       containerLogsDir,
 		networkPlugin:          networkPlugin,
-		Prober:                 prober,
+		prober:                 nil,
 		generator:              generator,
 		runtimeHooks:           runtimeHooks,
 	}
 	dm.runner = lifecycle.NewHandlerRunner(httpClient, dm, dm)
+	dm.prober = prober.New(dm, readinessManager, containerRefManager, recorder)
+
 	return dm
 }
 
@@ -1305,7 +1304,7 @@ func (dm *DockerManager) computePodContainerChanges(pod *api.Pod, runningPod kub
 			continue
 		}
 
-		result, err := dm.Prober.Probe(pod, podStatus, container, string(c.ID), c.Created)
+		result, err := dm.prober.Probe(pod, podStatus, container, string(c.ID), c.Created)
 		if err != nil {
 			// TODO(vmarmol): examine this logic.
 			glog.V(2).Infof("probe no-error: %q", container.Name)
