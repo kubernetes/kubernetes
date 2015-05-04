@@ -75,6 +75,16 @@ func (s StringSet) HasAll(items ...string) bool {
 	return true
 }
 
+// HasAny returns true if any items are contained in the set.
+func (s StringSet) HasAny(items ...string) bool {
+	for _, item := range items {
+		if s.Has(item) {
+			return true
+		}
+	}
+	return false
+}
+
 // Difference returns a set of objects that are not in s2
 // For example:
 // s1 = {1, 2, 3}

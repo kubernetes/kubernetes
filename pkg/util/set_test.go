@@ -117,3 +117,15 @@ func TestStringSetDifference(t *testing.T) {
 		t.Errorf("Unexpected contents: %#v", d.List())
 	}
 }
+
+func TestStringSetHasAny(t *testing.T) {
+	a := NewStringSet("1", "2", "3")
+
+	if !a.HasAny("1", "4") {
+		t.Errorf("expected true, got false")
+	}
+
+	if a.HasAny("0", "4") {
+		t.Errorf("expected false, got true")
+	}
+}
