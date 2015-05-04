@@ -35,12 +35,18 @@ import (
 const (
 	// How many times to retry for a consistent read of /proc/mounts.
 	maxListTries = 3
-	// Number of fields per line in "/proc/mounts", as per the fstab man page.
+	// Number of fields per line in /proc/mounts as per the fstab man page.
 	expectedNumFieldsPerLine = 6
+	// Location of the mount file to use
+	procMountsPath = "/proc/mounts"
 )
 
-// Mounter implements mount.Interface for linux platform.
+// Mounter provides the default implementation of mount.Interface
+// for the linux platform.  This implementation assumes that the
+// kubelet is running in the host's root mount namespace.
 type Mounter struct{}
+
+var _ = Interface(&Mounter{})
 
 // Mount mounts source to target as fstype with given options. 'source' and 'fstype' must
 // be an emtpy string in case it's not required, e.g. for remount, or for auto filesystem
@@ -48,9 +54,24 @@ type Mounter struct{}
 // currently come from mount(8), e.g. "ro", "remount", "bind", etc. If no more option is
 // required, call Mount with an empty string list or nil.
 func (mounter *Mounter) Mount(source string, target string, fstype string, options []string) error {
-	// The remount options to use in case of bind mount, due to the fact that bind mount doesn't
-	// respect mount options.  The list equals:
-	//   options - 'bind' + 'remount' (no duplicate)
+	bind, bindRemountOpts := isBind(options)
+
+	if bind {
+		err := doMount(source, target, fstype, []string{"bind"})
+		if err != nil {
+			return err
+		}
+		return doMount(source, target, fstype, bindRemountOpts)
+	} else {
+		return doMount(source, target, fstype, options)
+	}
+}
+
+// isBind detects whether a bind mount is being requested and makes the remount options to
+// use in case of bind mount, due to the fact that bind mount doesn't respect mount options.
+// The list equals:
+//   options - 'bind' + 'remount' (no duplicate)
+func isBind(options []string) (bool, []string) {
 	bindRemountOpts := []string{"remount"}
 	bind := false
 
@@ -68,19 +89,24 @@ func (mounter *Mounter) Mount(source string, target string, fstype string, optio
 		}
 	}
 
-	if bind {
-		err := doMount(source, target, fstype, []string{"bind"})
-		if err != nil {
-			return err
-		}
-		return doMount(source, target, fstype, bindRemountOpts)
-	} else {
-		return doMount(source, target, fstype, options)
-	}
+	return bind, bindRemountOpts
 }
 
+// doMount runs the mount command.
 func doMount(source string, target string, fstype string, options []string) error {
 	glog.V(5).Infof("Mounting %s %s %s %v", source, target, fstype, options)
+	mountArgs := makeMountArgs(source, target, fstype, options)
+	command := exec.Command("mount", mountArgs...)
+	output, err := command.CombinedOutput()
+	if err != nil {
+		glog.Errorf("Mount failed: %v\nMounting arguments: %s %s %s %v\nOutput: %s\n",
+			err, source, target, fstype, options, string(output))
+	}
+	return err
+}
+
+// makeMountArgs makes the arguments to the mount(8) command.
+func makeMountArgs(source, target, fstype string, options []string) []string {
 	// Build mount command as follows:
 	//   mount [-t $fstype] [-o $options] [$source] $target
 	mountArgs := []string{}
@@ -94,16 +120,11 @@ func doMount(source string, target string, fstype string, options []string) erro
 		mountArgs = append(mountArgs, source)
 	}
 	mountArgs = append(mountArgs, target)
-	command := exec.Command("mount", mountArgs...)
-	output, err := command.CombinedOutput()
-	if err != nil {
-		glog.Errorf("Mount failed: %v\nMounting arguments: %s %s %s %v\nOutput: %s\n",
-			err, source, target, fstype, options, string(output))
-	}
-	return err
+
+	return mountArgs
 }
 
-// Unmount unmounts target with given options.
+// Unmount unmounts the target.
 func (mounter *Mounter) Unmount(target string) error {
 	glog.V(5).Infof("Unmounting %s %v")
 	command := exec.Command("umount", target)
@@ -116,25 +137,8 @@ func (mounter *Mounter) Unmount(target string) error {
 }
 
 // List returns a list of all mounted filesystems.
-func (mounter *Mounter) List() ([]MountPoint, error) {
-	hash1, err := readProcMounts(nil)
-	if err != nil {
-		return nil, err
-	}
-
-	for i := 0; i < maxListTries; i++ {
-		mps := []MountPoint{}
-		hash2, err := readProcMounts(&mps)
-		if err != nil {
-			return nil, err
-		}
-		if hash1 == hash2 {
-			// Success
-			return mps, nil
-		}
-		hash1 = hash2
-	}
-	return nil, fmt.Errorf("failed to get a consistent snapshot of /proc/mounts after %d tries", maxListTries)
+func (*Mounter) List() ([]MountPoint, error) {
+	return listProcMounts(procMountsPath)
 }
 
 // IsMountPoint determines if a directory is a mountpoint, by comparing the device for the
@@ -153,10 +157,31 @@ func (mounter *Mounter) IsMountPoint(file string) (bool, error) {
 	return stat.Sys().(*syscall.Stat_t).Dev != rootStat.Sys().(*syscall.Stat_t).Dev, nil
 }
 
-// readProcMounts reads /proc/mounts and produces a hash of the contents.  If the out
-// argument is not nil, this fills it with MountPoint structs.
-func readProcMounts(out *[]MountPoint) (uint32, error) {
-	file, err := os.Open("/proc/mounts")
+func listProcMounts(mountFilePath string) ([]MountPoint, error) {
+	hash1, err := readProcMounts(mountFilePath, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	for i := 0; i < maxListTries; i++ {
+		mps := []MountPoint{}
+		hash2, err := readProcMounts(mountFilePath, &mps)
+		if err != nil {
+			return nil, err
+		}
+		if hash1 == hash2 {
+			// Success
+			return mps, nil
+		}
+		hash1 = hash2
+	}
+	return nil, fmt.Errorf("failed to get a consistent snapshot of %v after %d tries", mountFilePath, maxListTries)
+}
+
+// readProcMounts reads the given mountFilePath (normally /proc/mounts) and produces a hash
+// of the contents.  If the out argument is not nil, this fills it with MountPoint structs.
+func readProcMounts(mountFilePath string, out *[]MountPoint) (uint32, error) {
+	file, err := os.Open(mountFilePath)
 	if err != nil {
 		return 0, err
 	}
