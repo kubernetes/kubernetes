@@ -26,6 +26,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/errors"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/mount"
 	"github.com/golang/glog"
 )
 
@@ -62,12 +63,12 @@ type VolumePlugin interface {
 	// Ownership of the spec pointer in *not* transferred.
 	// - spec: The api.Volume spec
 	// - podRef: a reference to the enclosing pod
-	NewBuilder(spec *Spec, podRef *api.ObjectReference, opts VolumeOptions) (Builder, error)
+	NewBuilder(spec *Spec, podRef *api.ObjectReference, opts VolumeOptions, mounter mount.Interface) (Builder, error)
 
 	// NewCleaner creates a new volume.Cleaner from recoverable state.
 	// - name: The volume name, as per the api.Volume spec.
 	// - podUID: The UID of the enclosing pod
-	NewCleaner(name string, podUID types.UID) (Cleaner, error)
+	NewCleaner(name string, podUID types.UID, mounter mount.Interface) (Cleaner, error)
 }
 
 // PersistentVolumePlugin is an extended interface of VolumePlugin and is used
@@ -105,12 +106,12 @@ type VolumeHost interface {
 	// the provided spec.  This is used to implement volume plugins which
 	// "wrap" other plugins.  For example, the "secret" volume is
 	// implemented in terms of the "emptyDir" volume.
-	NewWrapperBuilder(spec *Spec, podRef *api.ObjectReference, opts VolumeOptions) (Builder, error)
+	NewWrapperBuilder(spec *Spec, podRef *api.ObjectReference, opts VolumeOptions, mounter mount.Interface) (Builder, error)
 
 	// NewWrapperCleaner finds an appropriate plugin with which to handle
 	// the provided spec.  See comments on NewWrapperBuilder for more
 	// context.
-	NewWrapperCleaner(spec *Spec, podUID types.UID) (Cleaner, error)
+	NewWrapperCleaner(spec *Spec, podUID types.UID, mounter mount.Interface) (Cleaner, error)
 }
 
 // VolumePluginMgr tracks registered plugins.

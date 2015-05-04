@@ -30,21 +30,14 @@ import (
 
 // This is the primary entrypoint for volume plugins.
 func ProbeVolumePlugins() []volume.VolumePlugin {
-	return ProbeVolumePluginsWithMounter(mount.New())
-}
-
-// ProbePluginsWithMounter is a convenience for testing other plugins which wrap this one.
-//FIXME: alternative: pass mount.Interface to all ProbeVolumePlugins() functions?  Opinions?
-func ProbeVolumePluginsWithMounter(mounter mount.Interface) []volume.VolumePlugin {
 	return []volume.VolumePlugin{
-		&emptyDirPlugin{nil, mounter, false},
-		&emptyDirPlugin{nil, mounter, true},
+		&emptyDirPlugin{nil, false},
+		&emptyDirPlugin{nil, true},
 	}
 }
 
 type emptyDirPlugin struct {
 	host       volume.VolumeHost
-	mounter    mount.Interface
 	legacyMode bool // if set, plugin answers to the legacy name
 }
 
@@ -78,9 +71,8 @@ func (plugin *emptyDirPlugin) CanSupport(spec *volume.Spec) bool {
 	return false
 }
 
-func (plugin *emptyDirPlugin) NewBuilder(spec *volume.Spec, podRef *api.ObjectReference, opts volume.VolumeOptions) (volume.Builder, error) {
-	// Inject real implementations here, test through the internal function.
-	return plugin.newBuilderInternal(spec, podRef, plugin.mounter, &realMountDetector{plugin.mounter}, opts)
+func (plugin *emptyDirPlugin) NewBuilder(spec *volume.Spec, podRef *api.ObjectReference, opts volume.VolumeOptions, mounter mount.Interface) (volume.Builder, error) {
+	return plugin.newBuilderInternal(spec, podRef, mounter, &realMountDetector{mounter}, opts)
 }
 
 func (plugin *emptyDirPlugin) newBuilderInternal(spec *volume.Spec, podRef *api.ObjectReference, mounter mount.Interface, mountDetector mountDetector, opts volume.VolumeOptions) (volume.Builder, error) {
@@ -104,9 +96,9 @@ func (plugin *emptyDirPlugin) newBuilderInternal(spec *volume.Spec, podRef *api.
 	}, nil
 }
 
-func (plugin *emptyDirPlugin) NewCleaner(volName string, podUID types.UID) (volume.Cleaner, error) {
+func (plugin *emptyDirPlugin) NewCleaner(volName string, podUID types.UID, mounter mount.Interface) (volume.Cleaner, error) {
 	// Inject real implementations here, test through the internal function.
-	return plugin.newCleanerInternal(volName, podUID, plugin.mounter, &realMountDetector{plugin.mounter})
+	return plugin.newCleanerInternal(volName, podUID, mounter, &realMountDetector{mounter})
 }
 
 func (plugin *emptyDirPlugin) newCleanerInternal(volName string, podUID types.UID, mounter mount.Interface, mountDetector mountDetector) (volume.Cleaner, error) {

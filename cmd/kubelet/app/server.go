@@ -45,6 +45,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/network"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/master/ports"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/mount"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
@@ -309,6 +310,7 @@ func (s *KubeletServer) Run(_ []string) error {
 		ResourceContainer:         s.ResourceContainer,
 		CgroupRoot:                s.CgroupRoot,
 		ContainerRuntime:          s.ContainerRuntime,
+		Mounter:                   mount.New(),
 	}
 
 	RunKubelet(&kcfg, nil)
@@ -419,6 +421,7 @@ func SimpleKubelet(client *client.Client,
 		OSInterface:               osInterface,
 		CgroupRoot:                "",
 		ContainerRuntime:          "docker",
+		Mounter:                   mount.New(),
 	}
 	return &kcfg
 }
@@ -548,6 +551,7 @@ type KubeletConfig struct {
 	OSInterface                    kubecontainer.OSInterface
 	CgroupRoot                     string
 	ContainerRuntime               string
+	Mounter                        mount.Interface
 }
 
 func createAndInitKubelet(kc *KubeletConfig) (k KubeletBootstrap, pc *config.PodConfig, err error) {
@@ -594,7 +598,8 @@ func createAndInitKubelet(kc *KubeletConfig) (k KubeletBootstrap, pc *config.Pod
 		kc.ResourceContainer,
 		kc.OSInterface,
 		kc.CgroupRoot,
-		kc.ContainerRuntime)
+		kc.ContainerRuntime,
+		kc.Mounter)
 
 	if err != nil {
 		return nil, nil, err

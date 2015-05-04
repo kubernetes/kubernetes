@@ -51,6 +51,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	utilErrors "github.com/GoogleCloudPlatform/kubernetes/pkg/util/errors"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/mount"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/version"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
@@ -121,7 +122,8 @@ func NewMainKubelet(
 	resourceContainer string,
 	osInterface kubecontainer.OSInterface,
 	cgroupRoot string,
-	containerRuntime string) (*Kubelet, error) {
+	containerRuntime string,
+	mounter mount.Interface) (*Kubelet, error) {
 	if rootDirectory == "" {
 		return nil, fmt.Errorf("invalid root directory %q", rootDirectory)
 	}
@@ -234,6 +236,7 @@ func NewMainKubelet(
 		os:                             osInterface,
 		oomWatcher:                     oomWatcher,
 		cgroupRoot:                     cgroupRoot,
+		mounter:                        mounter,
 	}
 
 	if plug, err := network.InitNetworkPlugin(networkPlugins, networkPluginName, &networkHost{klet}); err != nil {
@@ -401,6 +404,7 @@ type Kubelet struct {
 	//    status. Kubelet may fail to update node status reliablly if the value is too small,
 	//    as it takes time to gather all necessary node information.
 	nodeStatusUpdateFrequency time.Duration
+
 	// The name of the resource-only container to run the Kubelet in (empty for no container).
 	// Name must be absolute.
 	resourceContainer string
@@ -412,6 +416,9 @@ type Kubelet struct {
 
 	// If non-empty, pass this to the container runtime as the root cgroup.
 	cgroupRoot string
+
+	// Mounter to use for volumes.
+	mounter mount.Interface
 }
 
 // getRootDir returns the full path to the directory under which kubelet can
