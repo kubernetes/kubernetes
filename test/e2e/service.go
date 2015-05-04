@@ -347,6 +347,103 @@ var _ = Describe("Services", func() {
 		}
 	})
 
+	It("should be able to create a functioning public service", func() {
+		serviceName := "publicservice-test"
+		ns := namespace0
+		labels := map[string]string{
+			"testid": "publicservice-test",
+		}
+		service := &api.Service{
+			ObjectMeta: api.ObjectMeta{
+				Name: serviceName,
+			},
+			Spec: api.ServiceSpec{
+				Selector: labels,
+				Ports: []api.ServicePort{{
+					Port:       80,
+					TargetPort: util.NewIntOrStringFromInt(80),
+				}},
+				Visibility: "public",
+			},
+		}
+
+		By("creating service " + serviceName + " with visibility=public in namespace " + ns)
+		result, err := c.Services(ns).Create(service)
+		Expect(err).NotTo(HaveOccurred())
+		defer func(ns, serviceName string) { // clean up when we're done
+			By("deleting service " + serviceName + " in namespace " + ns)
+			err := c.Services(ns).Delete(serviceName)
+			Expect(err).NotTo(HaveOccurred())
+		}(ns, serviceName)
+
+		if len(result.Spec.Ports) != 1 {
+			Failf("got unexpected number (%d) of Ports for public service: %v", len(result.Spec.Ports), result)
+		}
+
+		publicPort := result.Spec.Ports[0].PublicPort
+		if publicPort == 0 {
+			Failf("got unexpected publicPort (%d) on Ports[0] for public service: %v", publicPort, result)
+		}
+
+		publicIps, err := getMinionPublicIps(c)
+		Expect(err).NotTo(HaveOccurred())
+		if len(publicIps) == 0 {
+			Failf("got unexpected number (%d) of public IPs", len(publicIps))
+		}
+		ip := publicIps[0]
+
+		pod := &api.Pod{
+			TypeMeta: api.TypeMeta{
+				Kind:       "Pod",
+				APIVersion: latest.Version,
+			},
+			ObjectMeta: api.ObjectMeta{
+				Name:   "publicservice-test-" + string(util.NewUUID()),
+				Labels: labels,
+			},
+			Spec: api.PodSpec{
+				Containers: []api.Container{
+					{
+						Name:  "webserver",
+						Image: "gcr.io/google_containers/test-webserver",
+					},
+				},
+			},
+		}
+
+		By("creating pod to be part of service " + serviceName)
+		podClient := c.Pods(ns)
+		defer func() {
+			By("deleting pod " + pod.Name)
+			defer GinkgoRecover()
+			podClient.Delete(pod.Name, nil)
+		}()
+		if _, err := podClient.Create(pod); err != nil {
+			Failf("Failed to create pod %s: %v", pod.Name, err)
+		}
+		expectNoError(waitForPodRunningInNamespace(c, pod.Name, ns))
+
+		By("hitting the pod through the service's external IPs")
+		var resp *http.Response
+		for t := time.Now(); time.Since(t) < podStartTimeout; time.Sleep(5 * time.Second) {
+			resp, err = http.Get(fmt.Sprintf("http://%s:%d", ip, publicPort))
+			if err == nil {
+				break
+			}
+		}
+		Expect(err).NotTo(HaveOccurred())
+		defer resp.Body.Close()
+
+		body, err := ioutil.ReadAll(resp.Body)
+		Expect(err).NotTo(HaveOccurred())
+		if resp.StatusCode != 200 {
+			Failf("received non-success return status %q trying to access pod through public port; got body: %s", resp.Status, string(body))
+		}
+		if !strings.Contains(string(body), "test-webserver") {
+			Failf("received response body without expected substring 'test-webserver': %s", string(body))
+		}
+	})
+
 	It("should correctly serve identically named services in different namespaces on different external IP addresses", func() {
 		if !providerIs("gce", "gke") {
 			By(fmt.Sprintf("Skipping service namespace collision test; uses createExternalLoadBalancer, a (gce|gke) feature"))
@@ -412,6 +509,33 @@ func waitForPublicIPs(c *client.Client, serviceName, namespace string) (*api.Ser
 		Logf("Waiting for service %s in namespace %s to have a public IP (%v)", serviceName, namespace, time.Since(start))
 	}
 	return service, fmt.Errorf("service %s in namespace %s doesn't have a public IP after %.2f seconds", serviceName, namespace, timeout.Seconds())
+}
+
+func collectAddresses(nodes *api.NodeList, addressType api.NodeAddressType) []string {
+	ips := []string{}
+	for i := range nodes.Items {
+		item := &nodes.Items[i]
+		for j := range item.Status.Addresses {
+			nodeAddress := &item.Status.Addresses[j]
+			if nodeAddress.Type == addressType {
+				ips = append(ips, nodeAddress.Address)
+			}
+		}
+	}
+	return ips
+}
+
+func getMinionPublicIps(c *client.Client) ([]string, error) {
+	nodes, err := c.Nodes().List(nil, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	ips := collectAddresses(nodes, api.NodeExternalIP)
+	if len(ips) == 0 {
+		ips = collectAddresses(nodes, api.NodeLegacyHostIP)
+	}
+	return ips, nil
 }
 
 func validateUniqueOrFail(s []string) {
