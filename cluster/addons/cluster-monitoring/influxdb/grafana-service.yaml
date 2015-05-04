@@ -3,12 +3,12 @@ kind: Service
 metadata: 
   labels: 
     name: influxGrafana
-  name: monitoring-influxdb
+    kubernetes.io/cluster-service: "true"
+  name: monitoring-grafana
 spec: 
-  ports:
+  ports: 
     - port: 80
-      targetPort: 8086
+      targetPort: 8080
   selector: 
     name: influxGrafana
-
 

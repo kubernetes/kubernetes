@@ -110,7 +110,7 @@ while read line; do
   create-kubeconfig-secret "${token}" "${username}"
 done < /srv/kubernetes/known_tokens.csv
 
-for obj in $(find /etc/kubernetes/addons -name \*.yaml); do
+for obj in $(find /etc/kubernetes/addons \( -name \*.yaml -o -name \*.json \)); do
   start_addon ${obj} 100 10 &
   echo "++ addon ${obj} starting in pid $! ++"
 done
