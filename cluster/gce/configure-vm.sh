@@ -104,6 +104,11 @@ download-or-bust() {
 # Install salt from GCS.  See README.md for instructions on how to update these
 # debs.
 install-salt() {
+  if dpkg -s salt-minion &>/dev/null; then
+    echo "== SaltStack already installed, skipping install step =="
+    return
+  fi
+
   echo "== Refreshing package database =="
   until apt-get update; do
     echo "== apt-get update failed, retrying =="
@@ -158,16 +163,22 @@ EOF
   echo "== Finished installing Salt =="
 }
 
-# Ensure salt-minion never runs
+# Ensure salt-minion isn't running and never runs
 stop-salt-minion() {
+  if [[ -e /etc/init/salt-minion.override ]]; then
+    # Assume this has already run (upgrade, or baked into containervm)
+    return
+  fi
+
   # This ensures it on next reboot
   echo manual > /etc/init/salt-minion.override
   update-rc.d salt-minion disable
 
-  if service salt-minion status >/dev/null; then
-    echo "salt-minion started in defiance of runlevel policy, aborting startup." >&2
-    return 1
-  fi
+  while service salt-minion status >/dev/null; do
+    echo "salt-minion found running, stopping"
+    service salt-minion stop
+    sleep 1
+  done
 }
 
 # Mounts a persistent disk (formatting if needed) to store the persistent data
