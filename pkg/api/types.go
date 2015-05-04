@@ -1353,8 +1353,8 @@ type PodExecOptions struct {
 	// Container in which to execute the command.
 	Container string
 
-	// Command is the remote command to execute
-	Command string
+	// Command is the remote command to execute; argv array; not executed within a shell.
+	Command []string
 }
 
 // PodProxyOptions is the query options to a Pod's proxy call

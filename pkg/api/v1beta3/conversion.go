@@ -1850,7 +1850,12 @@ func convert_v1beta3_PodExecOptions_To_api_PodExecOptions(in *PodExecOptions, ou
 	out.Stderr = in.Stderr
 	out.TTY = in.TTY
 	out.Container = in.Container
-	out.Command = in.Command
+	if in.Command != nil {
+		out.Command = make([]string, len(in.Command))
+		for i := range in.Command {
+			out.Command[i] = in.Command[i]
+		}
+	}
 	return nil
 }
 
@@ -1863,7 +1868,12 @@ func convert_api_PodExecOptions_To_v1beta3_PodExecOptions(in *newer.PodExecOptio
 	out.Stderr = in.Stderr
 	out.TTY = in.TTY
 	out.Container = in.Container
-	out.Command = in.Command
+	if in.Command != nil {
+		out.Command = make([]string, len(in.Command))
+		for i := range in.Command {
+			out.Command[i] = in.Command[i]
+		}
+	}
 	return nil
 }
 

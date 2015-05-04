@@ -1715,7 +1715,12 @@ func init() {
 			out.Stderr = in.Stderr
 			out.TTY = in.TTY
 			out.Container = in.Container
-			out.Command = in.Command
+			if in.Command != nil {
+				out.Command = make([]string, len(in.Command))
+				for i := range in.Command {
+					out.Command[i] = in.Command[i]
+				}
+			}
 			return nil
 		},
 		func(in *newer.PodExecOptions, out *PodExecOptions, s conversion.Scope) error {
@@ -1727,7 +1732,12 @@ func init() {
 			out.Stderr = in.Stderr
 			out.TTY = in.TTY
 			out.Container = in.Container
-			out.Command = in.Command
+			if in.Command != nil {
+				out.Command = make([]string, len(in.Command))
+				for i := range in.Command {
+					out.Command[i] = in.Command[i]
+				}
+			}
 			return nil
 		},
 		func(in *PodList, out *newer.PodList, s conversion.Scope) error {
