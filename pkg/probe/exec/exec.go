@@ -43,7 +43,7 @@ func (pr execProber) Probe(e uexec.Cmd) (probe.Result, error) {
 	if err != nil {
 		return probe.Unknown, err
 	}
-	if strings.ToLower(string(data)) != defaultHealthyOutput {
+	if !strings.HasPrefix(strings.ToLower(string(data)), defaultHealthyOutput) {
 		return probe.Failure, nil
 	}
 	return probe.Success, nil
