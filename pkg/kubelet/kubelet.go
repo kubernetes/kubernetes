@@ -60,8 +60,8 @@ import (
 )
 
 const (
-	// Max amount of time to wait for the Docker daemon to come up.
-	maxWaitForDocker = 5 * time.Minute
+	// Max amount of time to wait for the container runtime to come up.
+	maxWaitForContainerRuntime = 5 * time.Minute
 
 	// Initial node status update frequency and incremental frequency, for faster cluster startup.
 	// The update frequency will be increameted linearly, until it reaches status_update_frequency.
@@ -94,6 +94,20 @@ type SyncHandler interface {
 type SourcesReadyFn func() bool
 
 type volumeMap map[string]volume.Volume
+
+// Wait for the container runtime to be up with a timeout.
+func waitUntilRuntimeIsUp(cr kubecontainer.Runtime, timeout time.Duration) error {
+	var err error = nil
+	waitStart := time.Now()
+	for time.Since(waitStart) < timeout {
+		_, err = cr.Version()
+		if err == nil {
+			return nil
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+	return err
+}
 
 // New creates a new Kubelet for use in main
 func NewMainKubelet(
@@ -131,22 +145,6 @@ func NewMainKubelet(
 		return nil, fmt.Errorf("invalid sync frequency %d", resyncInterval)
 	}
 	dockerClient = dockertools.NewInstrumentedDockerInterface(dockerClient)
-
-	// Wait for the Docker daemon to be up (with a timeout).
-	waitStart := time.Now()
-	dockerUp := false
-	for time.Since(waitStart) < maxWaitForDocker {
-		_, err := dockerClient.Version()
-		if err == nil {
-			dockerUp = true
-			break
-		}
-
-		time.Sleep(100 * time.Millisecond)
-	}
-	if !dockerUp {
-		return nil, fmt.Errorf("timed out waiting for Docker to come up")
-	}
 
 	serviceStore := cache.NewStore(cache.MetaNamespaceKeyFunc)
 	if kubeClient != nil {
@@ -265,6 +263,11 @@ func NewMainKubelet(
 			newKubeletRuntimeHooks(recorder))
 	default:
 		return nil, fmt.Errorf("unsupported container runtime %q specified", containerRuntime)
+	}
+
+	// Wait for the runtime to be up with a timeout.
+	if err := waitUntilRuntimeIsUp(klet.containerRuntime, maxWaitForContainerRuntime); err != nil {
+		return nil, fmt.Errorf("timed out waiting for %q to come up: %v", containerRuntime, err)
 	}
 
 	klet.runner = klet.containerRuntime

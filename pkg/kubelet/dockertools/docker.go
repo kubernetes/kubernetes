@@ -263,7 +263,7 @@ func getDockerEndpoint(dockerEndpoint string) string {
 func ConnectToDockerOrDie(dockerEndpoint string) DockerInterface {
 	if dockerEndpoint == "fake://" {
 		return &FakeDockerClient{
-			VersionInfo: []string{"apiVersion=1.16"},
+			VersionInfo: docker.Env{"ApiVersion=1.16"},
 		}
 	}
 	client, err := docker.NewClient(getDockerEndpoint(dockerEndpoint))
