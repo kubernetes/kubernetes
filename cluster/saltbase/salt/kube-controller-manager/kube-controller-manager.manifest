@@ -47,6 +47,8 @@
 {% endif -%}
 {% endif -%}
 
+{% set params = "--master=127.0.0.1:8080" + " " + machines + " " + cluster_name + " " + minion_regexp + " " + cloud_provider  + " " + sync_nodes + " " + cloud_config + " " + pillar['log_level'] -%}
+
 {
 "apiVersion": "v1beta3",
 "kind": "Pod",
@@ -58,20 +60,17 @@
     "name": "kube-controller-manager",
     "image": "gcr.io/google_containers/kube-controller-manager:{{pillar['kube-controller-manager_docker_tag']}}",
     "command": [
-                 "/kube-controller-manager",
-                 "--master=127.0.0.1:8080",
-                 "{{machines}}",
-                 "{{cluster_name}}",
-                 "{{minion_regexp}}",
-                 "{{cloud_provider}}",
-                 "{{sync_nodes}}",
-                 "{{cloud_config}}",
-                 "{{pillar['log_level']}}"
+                 "/bin/sh",
+                 "-c",
+                 "/usr/local/bin/kube-controller-manager {{params}} 1>>/var/log/kube-controller-manager.log 2>&1"
                ],
     "volumeMounts": [
         { "name": "srvkube",
         "mountPath": "/srv/kubernetes",
         "readOnly": true},
+        { "name": "logfile",
+        "mountPath": "/var/log/kube-controller-manager.log",
+        "readOnly": false},
         { "name": "etcssl",
         "mountPath": "/etc/ssl",
         "readOnly": true},
@@ -103,6 +102,10 @@
   { "name": "srvkube",
     "hostPath": {
         "path": "/srv/kubernetes"}
+  },
+  { "name": "logfile",
+    "hostPath": {
+        "path": "/var/log/kube-controller-manager.log"}
   },
   { "name": "etcssl",
     "hostPath": {

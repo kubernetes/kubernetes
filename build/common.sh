@@ -623,7 +623,7 @@ function kube::release::create_docker_images_for_server() {
         rm -rf ${docker_build_path}
         mkdir -p ${docker_build_path}
         ln $1/${binary_name} ${docker_build_path}/${binary_name}
-        printf " FROM busybox \n ADD ${binary_name} /${binary_name} \n ENTRYPOINT [ \"/${binary_name}\" ]\n" > ${docker_file_path}
+        printf " FROM busybox \n ADD ${binary_name} /usr/local/bin/${binary_name}\n" > ${docker_file_path}
 
         local docker_image_tag=gcr.io/google_containers/$binary_name:$md5_sum
         docker build -q -t "${docker_image_tag}" ${docker_build_path} >/dev/null
