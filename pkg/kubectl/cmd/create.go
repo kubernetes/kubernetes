@@ -54,6 +54,7 @@ func NewCmdCreate(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 
 	usage := "Filename, directory, or URL to file to use to create the resource"
 	kubectl.AddJsonFilenameFlag(cmd, &filenames, usage)
+	cmd.MarkFlagRequired("filename")
 
 	return cmd
 }

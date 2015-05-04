@@ -56,6 +56,7 @@ func NewCmdRunContainer(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmdutil.AddPrinterFlags(cmd)
 	cmd.Flags().String("generator", "run-container/v1", "The name of the API generator to use.  Default is 'run-container-controller/v1'.")
 	cmd.Flags().String("image", "", "The image for the container to run.")
+	cmd.MarkFlagRequired("image")
 	cmd.Flags().IntP("replicas", "r", 1, "Number of replicas to create for this container. Default is 1.")
 	cmd.Flags().Bool("dry-run", false, "If true, only print the object that would be sent, without sending it.")
 	cmd.Flags().String("overrides", "", "An inline JSON override for the generated object. If this is non-empty, it is used to override the generated object. Requires that the object supply a valid apiVersion field.")

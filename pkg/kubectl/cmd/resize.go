@@ -60,6 +60,7 @@ func NewCmdResize(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd.Flags().String("resource-version", "", "Precondition for resource version. Requires that the current resource version match this value in order to resize.")
 	cmd.Flags().Int("current-replicas", -1, "Precondition for current size. Requires that the current size of the replication controller match this value in order to resize.")
 	cmd.Flags().Int("replicas", -1, "The new desired number of replicas. Required.")
+	cmd.MarkFlagRequired("replicas")
 	return cmd
 }
 

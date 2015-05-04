@@ -305,6 +305,8 @@ _kubectl_create()
     flags+=("-h")
 
     must_have_one_flag=()
+    must_have_one_flag+=("--filename=")
+    must_have_one_flag+=("-f")
     must_have_one_noun=()
 }
 
@@ -329,6 +331,9 @@ _kubectl_update()
     flags+=("--patch=")
 
     must_have_one_flag=()
+    must_have_one_flag+=("--filename=")
+    must_have_one_flag+=("-f")
+    must_have_one_flag+=("--patch=")
     must_have_one_noun=()
 }
 
@@ -445,6 +450,7 @@ _kubectl_resize()
     flags+=("--resource-version=")
 
     must_have_one_flag=()
+    must_have_one_flag+=("--replicas=")
     must_have_one_noun=()
 }
 
@@ -470,6 +476,10 @@ _kubectl_exec()
     flags+=("-t")
 
     must_have_one_flag=()
+    must_have_one_flag+=("--container=")
+    must_have_one_flag+=("-c")
+    must_have_one_flag+=("--pod=")
+    must_have_one_flag+=("-p")
     must_have_one_noun=()
 }
 
@@ -489,6 +499,8 @@ _kubectl_port-forward()
     two_word_flags+=("-p")
 
     must_have_one_flag=()
+    must_have_one_flag+=("--pod=")
+    must_have_one_flag+=("-p")
     must_have_one_noun=()
 }
 
@@ -545,6 +557,7 @@ _kubectl_run-container()
     two_word_flags+=("-t")
 
     must_have_one_flag=()
+    must_have_one_flag+=("--image=")
     must_have_one_noun=()
 }
 
@@ -608,6 +621,7 @@ _kubectl_expose()
     two_word_flags+=("-t")
 
     must_have_one_flag=()
+    must_have_one_flag+=("--port=")
     must_have_one_noun=()
 }
 
