@@ -1,17 +1,6 @@
 #cloud-config
 
 write_files:
-  - path: /opt/bin/kube-net-update.sh
-    permissions: 0755
-    content: |
-      #!/bin/sh
-      set -x -e
-      nh=${ETCD_WATCH_KEY##*/}
-      net=$ETCD_WATCH_VALUE
-      case $ETCD_WATCH_ACTION in
-      set) ip route replace $net via $nh dev eth2 metric 900 ;;
-      expire) ip route del $net via $nh metric 900 ;;
-      esac
   - path: /opt/bin/regen-apiserver-list.sh
     permissions: 0755
     content: |
@@ -24,12 +13,19 @@ write_files:
     permissions: 0755
     content: |
       #!/bin/bash
+      # This temp URL is only good for the length of time specified at cluster creation time.
+      # Afterward, it will result in a 403.
       OBJECT_URL="CLOUD_FILES_URL"
-      echo "Downloading release ($OBJECT_URL)"
-      wget "${OBJECT_URL}" -O /opt/kubernetes.tar.gz
-      echo "Unpacking release"
-      rm -rf /opt/kubernetes || false
-      tar xzf /opt/kubernetes.tar.gz -C /opt/
+      if [ ! -s /opt/kubernetes.tar.gz ]
+      then
+        echo "Downloading release ($OBJECT_URL)"
+        wget "${OBJECT_URL}" -O /opt/kubernetes.tar.gz
+        echo "Unpacking release"
+        rm -rf /opt/kubernetes || false
+        tar xzf /opt/kubernetes.tar.gz -C /opt/
+      else
+        echo "kubernetes release found. Skipping download."
+      fi
 
 coreos:
   etcd:
@@ -51,6 +47,31 @@ coreos:
       command: start
     - name: fleet.service
       command: start
+    - name: flanneld.service
+      command: start
+      drop-ins:
+      - name: 50-network-config.conf
+        content: |
+          [Service]
+          ExecStartPre=/usr/bin/etcdctl set /coreos.com/network/config '{ "Network": "10.240.0.0/16", "Backend": {"Type": "host-gw"}}'
+          ExecStart=
+          ExecStart=/usr/libexec/sdnotify-proxy /run/flannel/sd.sock \
+            /usr/bin/docker run --net=host --privileged=true --rm \
+              --volume=/run/flannel:/run/flannel \
+              --env=NOTIFY_SOCKET=/run/flannel/sd.sock \
+              --env-file=/run/flannel/options.env \
+              --volume=${ETCD_SSL_DIR}:/etc/ssl/etcd:ro \
+              quay.io/coreos/flannel:${FLANNEL_VER} /opt/bin/flanneld -etcd-endpoints http://127.0.0.1:4001 --ip-masq=true --iface=eth2
+    - name: docker.service
+      command: start
+      drop-ins:
+        - name: 51-docker-mirror.conf
+          content: |
+            [Unit]
+            # making sure that flanneld finished startup, otherwise containers
+            # won't land in flannel's network...
+            Requires=flanneld.service
+            After=flanneld.service
     - name: download-release.service
       command: start
       content: |
@@ -144,30 +165,6 @@ coreos:
         ExecStart=/usr/bin/etcdctl exec-watch --recursive /corekube/apiservers -- /opt/bin/regen-apiserver-list.sh
         Restart=always
         RestartSec=30
-    - name: net-advertiser.service
-      command: start
-      content: |
-        [Unit]
-        Description=Kubernetes Network Advertiser
-        After=etcd.service
-        Requires=etcd.service
-        After=minion-kubelet.service
-        [Service]
-        ExecStart=/bin/sh -c 'eth2_ip=$$(ip -o -f inet a show dev eth2 | sed "s/.* inet \([0-9.]\+\).*/\1/"); while :; do etcdctl set /corekube/net/$$eth2_ip 10.240.INDEX.0/24 --ttl 300; sleep 120; done'
-        Restart=always
-        RestartSec=120
-    - name: net-router.service
-      command: start
-      content: |
-        [Unit]
-        Description=Kubernetes Network Router
-        After=etcd.service
-        Requires=etcd.service
-        After=minion-kubelet.service
-        [Service]
-        ExecStart=/usr/bin/etcdctl exec-watch --recursive /corekube/net -- /opt/bin/kube-net-update.sh
-        Restart=always
-        RestartSec=120
     - name: cbr0.netdev
       command: start
       content: |
@@ -193,41 +190,3 @@ coreos:
         ExecStart=/usr/sbin/iptables -t nat -A POSTROUTING -o eth1 -s 10.240.INDEX.0/24 -j MASQUERADE
         RemainAfterExit=yes
         Type=oneshot
-    - name: docker.service
-      command: start
-      content: |
-        [Unit]
-        After=network.target
-        Description=Docker Application Container Engine
-        Documentation=http://docs.docker.io
-
-        [Service]
-        ExecStartPre=/bin/mount --make-rprivate /
-        ExecStart=/usr/bin/docker -d -H fd:// -b cbr0 --iptables=false
-        Restart=always
-        RestartSec=30
-
-        [Install]
-        WantedBy=multi-user.target
-    - name: format-data.service
-      command: start
-      content: |
-        [Unit]
-        Description=Formats data drive
-        [Service]
-        Type=oneshot
-        RemainAfterExit=yes
-        ExecStart=/usr/sbin/wipefs -f /dev/xvde1
-        ExecStart=/usr/sbin/mkfs.btrfs -f /dev/xvde1
-    - name: var-lib-docker-volumes.mount
-      command: start
-      content: |
-        [Unit]
-        Description=Mount data drive to /var/lib/docker/volumes
-        Requires=format-data.service
-        After=format-data.service
-        Before=docker.service
-        [Mount]
-        What=/dev/xvde1
-        Where=/var/lib/docker/volumes
-        Type=btrfs
