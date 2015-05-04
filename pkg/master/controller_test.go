@@ -248,12 +248,12 @@ func TestSetEndpoints(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		master := Master{masterCount: test.additionalMasters + 1}
+		master := Controller{MasterCount: test.additionalMasters + 1}
 		registry := &registrytest.EndpointRegistry{
 			Endpoints: test.endpoints,
 		}
-		master.endpointRegistry = registry
-		err := master.setEndpoints(test.serviceName, net.ParseIP(test.ip), test.port)
+		master.EndpointRegistry = registry
+		err := master.SetEndpoints(test.serviceName, net.ParseIP(test.ip), test.port)
 		if err != nil {
 			t.Errorf("case %q: unexpected error: %v", test.testName, err)
 		}

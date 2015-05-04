@@ -63,8 +63,8 @@ import (
 	resourcequotaetcd "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/resourcequota/etcd"
 	secretetcd "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/secret/etcd"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/service"
-	ipallocator "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/service/allocator"
-	etcdipallocator "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/service/allocator/etcd"
+	ipallocator "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/service/ipallocator"
+	etcdipallocator "github.com/GoogleCloudPlatform/kubernetes/pkg/registry/service/ipallocator/etcd"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/ui"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -558,7 +558,32 @@ func (m *Master) init(c *Config) {
 
 	// TODO: Attempt clean shutdown?
 	if m.enableCoreControllers {
-		m.StartCoreControllers()
+		m.NewBootstrapController().Start()
+	}
+}
+
+// NewBootstrapController returns a controller for watching the core capabilities of the master.
+func (m *Master) NewBootstrapController() *Controller {
+	return &Controller{
+		NamespaceRegistry: m.namespaceRegistry,
+		ServiceRegistry:   m.serviceRegistry,
+		ServiceIPRegistry: m.portalAllocator,
+		EndpointRegistry:  m.endpointRegistry,
+		PortalNet:         m.portalNet,
+		MasterCount:       m.masterCount,
+
+		PortalIPInterval: 3 * time.Minute,
+		EndpointInterval: 10 * time.Second,
+
+		PublicIP: m.clusterIP,
+
+		ServiceIP:         m.serviceReadWriteIP,
+		ServicePort:       m.serviceReadWritePort,
+		PublicServicePort: m.publicReadWritePort,
+
+		ReadOnlyServiceIP:         m.serviceReadOnlyIP,
+		ReadOnlyServicePort:       m.serviceReadOnlyPort,
+		PublicReadOnlyServicePort: m.serviceReadOnlyPort,
 	}
 }
 
