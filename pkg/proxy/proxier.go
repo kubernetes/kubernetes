@@ -366,16 +366,16 @@ const syncInterval = 5 * time.Second
 
 // SyncLoop runs periodic work.  This is expected to run as a goroutine or as the main loop of the app.  It does not return.
 func (proxier *Proxier) SyncLoop() {
+	t := time.NewTicker(syncInterval)
+	defer t.Stop()
 	for {
-		select {
-		case <-time.After(syncInterval):
-			glog.V(3).Infof("Periodic sync")
-			if err := iptablesInit(proxier.iptables); err != nil {
-				glog.Errorf("Failed to ensure iptables: %v", err)
-			}
-			proxier.ensurePortals()
-			proxier.cleanupStaleStickySessions()
+		<-t.C
+		glog.V(3).Infof("Periodic sync")
+		if err := iptablesInit(proxier.iptables); err != nil {
+			glog.Errorf("Failed to ensure iptables: %v", err)
 		}
+		proxier.ensurePortals()
+		proxier.cleanupStaleStickySessions()
 	}
 }
 

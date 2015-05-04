@@ -89,7 +89,12 @@ func poller(interval, timeout time.Duration) WaitFunc {
 			defer tick.Stop()
 			var after <-chan time.Time
 			if timeout != 0 {
-				after = time.After(timeout)
+				// time.After is more convenient, but it
+				// potentially leaves timers around much longer
+				// than necessary if we exit early.
+				timer := time.NewTimer(timeout)
+				after = timer.C
+				defer timer.Stop()
 			}
 			for {
 				select {

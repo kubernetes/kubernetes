@@ -57,7 +57,7 @@ const (
 	// specifically targeted at the case where some problem prevents an update
 	// of expectations, without it the RC could stay asleep forever. This should
 	// be set based on the expected latency of watch events.
-
+	//
 	// TODO: Set this per expectation, based on its size.
 	// Currently an rc can service (create *and* observe the watch events for said
 	// creation) about 10-20 pods a second, so it takes about 3.5 min to service

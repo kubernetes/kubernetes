@@ -29,6 +29,8 @@ import (
 )
 
 func (m *Master) serviceWriterLoop(stop chan struct{}) {
+	t := time.NewTicker(10 * time.Second)
+	defer t.Stop()
 	for {
 		// Update service & endpoint records.
 		// TODO: when it becomes possible to change this stuff,
@@ -49,12 +51,14 @@ func (m *Master) serviceWriterLoop(stop chan struct{}) {
 		select {
 		case <-stop:
 			return
-		case <-time.After(10 * time.Second):
+		case <-t.C:
 		}
 	}
 }
 
 func (m *Master) roServiceWriterLoop(stop chan struct{}) {
+	t := time.NewTicker(10 * time.Second)
+	defer t.Stop()
 	for {
 		// Update service & endpoint records.
 		// TODO: when it becomes possible to change this stuff,
@@ -74,7 +78,7 @@ func (m *Master) roServiceWriterLoop(stop chan struct{}) {
 		select {
 		case <-stop:
 			return
-		case <-time.After(10 * time.Second):
+		case <-t.C:
 		}
 	}
 }
