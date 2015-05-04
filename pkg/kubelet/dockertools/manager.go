@@ -844,6 +844,7 @@ func (dm *DockerManager) Version() (kubecontainer.Version, error) {
 	apiVersion := env.Get("ApiVersion")
 	version, err := docker.NewAPIVersion(apiVersion)
 	if err != nil {
+		glog.Errorf("docker: failed to parse docker server version %q: %v", apiVersion, err)
 		return nil, fmt.Errorf("docker: failed to parse docker server version %q: %v", apiVersion, err)
 	}
 	return dockerVersion(version), nil
