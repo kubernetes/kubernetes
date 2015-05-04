@@ -52,9 +52,9 @@ kube_proxy_token=$(cat /dev/urandom | base64 | tr -d "=+/" | dd bs=32 count=1 2>
 
 # Make a list of tokens and usernames to be pushed to the apiserver
 mkdir -p /srv/salt-overlay/salt/kube-apiserver
-known_tokens_file="/srv/salt-overlay/salt/kube-apiserver/known_tokens.csv"
-(umask u=rw,go= ; echo "$kubelet_token,kubelet,kubelet" > $known_tokens_file ;
-echo "$kube_proxy_token,kube_proxy,kube_proxy" >> $known_tokens_file)
+readonly KNOWN_TOKENS_FILE="/srv/salt-overlay/salt/kube-apiserver/known_tokens.csv"
+(umask u=rw,go= ; echo "$kubelet_token,kubelet,kubelet" > $KNOWN_TOKENS_FILE ;
+echo "$kube_proxy_token,kube_proxy,kube_proxy" >> $KNOWN_TOKENS_FILE)
 
 mkdir -p /srv/salt-overlay/salt/kubelet
 kubelet_auth_file="/srv/salt-overlay/salt/kubelet/kubernetes_auth"
