@@ -115,9 +115,6 @@ func walkJSONFiles(inDir string, fn func(name, path string, data []byte)) error 
 
 func TestExampleObjectSchemas(t *testing.T) {
 	cases := map[string]map[string]runtime.Object{
-		"../docs/getting-started-guides": {
-			"pod": &api.Pod{},
-		},
 		"../cmd/integration": {
 			"v1beta1-controller": &api.ReplicationController{},
 			"v1beta3-controller": &api.ReplicationController{},
@@ -177,6 +174,10 @@ func TestExampleObjectSchemas(t *testing.T) {
 		"../examples/glusterfs/v1beta3": {
 			"glusterfs": &api.Pod{},
 		},
+		"../examples": {
+			"pod":         &api.Pod{},
+			"replication": &api.ReplicationController{},
+		},
 	}
 
 	for path, expected := range cases {
@@ -225,14 +226,18 @@ var sampleRegexp = regexp.MustCompile("(?ms)^```(?:(?P<type>yaml)\\w*\\n(?P<cont
 var subsetRegexp = regexp.MustCompile("(?ms)\\.{3}")
 
 func TestReadme(t *testing.T) {
-	paths := []string{
-		"../README.md",
-		"../examples/walkthrough/README.md",
-		"../examples/iscsi/README.md",
+	paths := []struct {
+		file         string
+		expectedType []runtime.Object
+	}{
+		{"../README.md", []runtime.Object{&api.Pod{}}},
+		{"../examples/walkthrough/README.md", []runtime.Object{&api.Pod{}}},
+		{"../examples/iscsi/README.md", []runtime.Object{&api.Pod{}}},
+		{"../examples/simple-yaml.md", []runtime.Object{&api.Pod{}, &api.ReplicationController{}}},
 	}
 
 	for _, path := range paths {
-		data, err := ioutil.ReadFile(path)
+		data, err := ioutil.ReadFile(path.file)
 		if err != nil {
 			t.Errorf("Unable to read file %s: %v", path, err)
 			continue
@@ -242,6 +247,7 @@ func TestReadme(t *testing.T) {
 		if matches == nil {
 			continue
 		}
+		ix := 0
 		for _, match := range matches {
 			var content, subtype string
 			for i, name := range sampleRegexp.SubexpNames() {
@@ -257,8 +263,13 @@ func TestReadme(t *testing.T) {
 				continue
 			}
 
-			//t.Logf("testing (%s): \n%s", subtype, content)
-			expectedType := &api.Pod{}
+			var expectedType runtime.Object
+			if len(path.expectedType) == 1 {
+				expectedType = path.expectedType[0]
+			} else {
+				expectedType = path.expectedType[ix]
+				ix++
+			}
 			json, err := yaml.ToJSON([]byte(content))
 			if err != nil {
 				t.Errorf("%s could not be converted to JSON: %v\n%s", path, err, string(content))
