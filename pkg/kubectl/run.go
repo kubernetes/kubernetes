@@ -17,6 +17,7 @@ limitations under the License.
 package kubectl
 
 import (
+	"fmt"
 	"strconv"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -32,6 +33,7 @@ func (BasicReplicationController) ParamNames() []GeneratorParam {
 		{"replicas", true},
 		{"image", true},
 		{"port", false},
+		{"hostport", false},
 	}
 }
 
@@ -78,19 +80,34 @@ func (BasicReplicationController) Generate(params map[string]string) (runtime.Ob
 		},
 	}
 
+	port := -1
+	hostPort := -1
 	if len(params["port"]) > 0 {
-		port, err := strconv.Atoi(params["port"])
+		port, err = strconv.Atoi(params["port"])
 		if err != nil {
 			return nil, err
 		}
+	}
 
-		// Don't include the port if it was not specified.
-		if port > 0 {
-			controller.Spec.Template.Spec.Containers[0].Ports = []api.ContainerPort{
-				{
-					ContainerPort: port,
-				},
-			}
+	if len(params["hostport"]) > 0 {
+		hostPort, err = strconv.Atoi(params["hostport"])
+		if err != nil {
+			return nil, err
+		}
+		if hostPort > 0 && port < 0 {
+			return nil, fmt.Errorf("--hostport requires --port to be specified")
+		}
+	}
+
+	// Don't include the port if it was not specified.
+	if port > 0 {
+		controller.Spec.Template.Spec.Containers[0].Ports = []api.ContainerPort{
+			{
+				ContainerPort: port,
+			},
+		}
+		if hostPort > 0 {
+			controller.Spec.Template.Spec.Containers[0].Ports[0].HostPort = hostPort
 		}
 	}
 	return &controller, nil
