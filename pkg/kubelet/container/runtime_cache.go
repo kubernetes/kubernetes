@@ -100,7 +100,7 @@ func (r *runtimeCache) updateCache() error {
 }
 
 // startUpdateingCache continues to invoke GetPods to get the newest result until
-// there is no requests within the default cache period.
+// there are no requests within the default cache period.
 func (r *runtimeCache) startUpdatingCache() {
 	run := true
 	for run {
