@@ -34,7 +34,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-func runLivenessTest(c *client.Client, podDescr *api.Pod) {
+func runLivenessTest(c *client.Client, podDescr *api.Pod, expectRestart bool) {
 	ns := "e2e-test-" + string(util.NewUUID())
 
 	By(fmt.Sprintf("Creating pod %s in namespace %s", podDescr.Name, ns))
@@ -62,7 +62,7 @@ func runLivenessTest(c *client.Client, podDescr *api.Pod) {
 	By(fmt.Sprintf("Initial restart count of pod %s is %d", podDescr.Name, initialRestartCount))
 
 	// Wait for at most 48 * 5 = 240s = 4 minutes until restartCount is incremented
-	pass := false
+	restarts := false
 	for i := 0; i < 48; i++ {
 		// Wait until restartCount is incremented.
 		time.Sleep(5 * time.Second)
@@ -72,13 +72,13 @@ func runLivenessTest(c *client.Client, podDescr *api.Pod) {
 		By(fmt.Sprintf("Restart count of pod %s in namespace %s is now %d", podDescr.Name, ns, restartCount))
 		if restartCount > initialRestartCount {
 			By(fmt.Sprintf("Restart count of pod %s in namespace %s increased from %d to %d during the test", podDescr.Name, ns, initialRestartCount, restartCount))
-			pass = true
+			restarts = true
 			break
 		}
 	}
 
-	if !pass {
-		Fail(fmt.Sprintf("Did not see the restart count of pod %s in namespace %s increase from %d during the test", podDescr.Name, ns, initialRestartCount))
+	if restarts != expectRestart {
+		Fail(fmt.Sprintf("pod %s in namespace %s - expected restarts: %v, found restarts: %v", podDescr.Name, ns, expectRestart, restarts))
 	}
 }
 
@@ -433,7 +433,33 @@ var _ = Describe("Pods", func() {
 					},
 				},
 			},
-		})
+		}, true)
+	})
+
+	It("should *not* be restarted with a docker exec \"cat /tmp/health\" liveness probe", func() {
+		runLivenessTest(c, &api.Pod{
+			ObjectMeta: api.ObjectMeta{
+				Name:   "liveness-exec",
+				Labels: map[string]string{"test": "liveness"},
+			},
+			Spec: api.PodSpec{
+				Containers: []api.Container{
+					{
+						Name:    "liveness",
+						Image:   "gcr.io/google_containers/busybox",
+						Command: []string{"/bin/sh", "-c", "echo ok >/tmp/health; sleep 600"},
+						LivenessProbe: &api.Probe{
+							Handler: api.Handler{
+								Exec: &api.ExecAction{
+									Command: []string{"cat", "/tmp/health"},
+								},
+							},
+							InitialDelaySeconds: 15,
+						},
+					},
+				},
+			},
+		}, false)
 	})
 
 	It("should be restarted with a /healthz http liveness probe", func() {
@@ -460,7 +486,7 @@ var _ = Describe("Pods", func() {
 					},
 				},
 			},
-		})
+		}, true)
 	})
 
 	// The following tests for remote command execution and port forwarding are

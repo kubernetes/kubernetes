@@ -17,7 +17,6 @@ limitations under the License.
 package dockertools
 
 import (
-	"bufio"
 	"bytes"
 	"errors"
 	"fmt"
@@ -904,20 +903,16 @@ func (dm *DockerManager) RunInContainer(containerID string, cmd []string) ([]byt
 		return nil, fmt.Errorf("failed to run in container - Exec setup failed - %v", err)
 	}
 	var buf bytes.Buffer
-	wrBuf := bufio.NewWriter(&buf)
 	startOpts := docker.StartExecOptions{
 		Detach:       false,
 		Tty:          false,
-		OutputStream: wrBuf,
-		ErrorStream:  wrBuf,
+		OutputStream: &buf,
+		ErrorStream:  &buf,
 		RawTerminal:  false,
 	}
-	errChan := make(chan error, 1)
-	go func() {
-		errChan <- dm.client.StartExec(execObj.ID, startOpts)
-	}()
-	wrBuf.Flush()
-	return buf.Bytes(), <-errChan
+	err = dm.client.StartExec(execObj.ID, startOpts)
+
+	return buf.Bytes(), err
 }
 
 // ExecInContainer uses nsenter to run the command inside the container identified by containerID.
