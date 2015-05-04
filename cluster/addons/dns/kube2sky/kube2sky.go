@@ -34,6 +34,7 @@ import (
 	kfields "github.com/GoogleCloudPlatform/kubernetes/pkg/fields"
 	klabels "github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	tools "github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/wait"
 	kwatch "github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 	etcd "github.com/coreos/go-etcd/etcd"
 	skymsg "github.com/skynetservices/skydns/msg"
@@ -121,24 +122,21 @@ func newEtcdClient() (client *etcd.Client) {
 		}
 	}
 	// loop until we have > 0 machines && machines[0] != ""
-	timeout := false
-	go func() {
-		<-time.After(10 * time.Second)
-		timeout = true
-	}()
-	for !timeout {
-		client = etcd.NewClient([]string{*etcd_server})
-		if client == nil {
-			return nil
+	poll, timeout := 1*time.Second, 10*time.Second
+	if err := wait.Poll(poll, timeout, func() (bool, error) {
+		if client = etcd.NewClient([]string{*etcd_server}); client == nil {
+			log.Fatal("etcd.NewClient returned nil")
 		}
 		client.SyncCluster()
 		machines := client.GetCluster()
-		if len(machines) > 0 && len(machines[0]) > 0 {
-			return client
+		if len(machines) == 0 || len(machines[0]) == 0 {
+			return false, nil
 		}
+		return true, nil
+	}); err != nil {
+		log.Fatalf("Timed out after %s waiting for at least 1 synchronized etcd server in the cluster", timeout)
 	}
-	log.Fatal("Timed out waiting for correct response from etcd server")
-	return nil
+	return client
 }
 
 // TODO: evaluate using pkg/client/clientcmd

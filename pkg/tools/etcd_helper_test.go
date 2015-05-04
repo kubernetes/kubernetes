@@ -35,6 +35,8 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+const validEtcdVersion = "etcd 2.0.9"
+
 type TestResource struct {
 	api.TypeMeta   `json:",inline"`
 	api.ObjectMeta `json:"metadata"`
@@ -685,7 +687,7 @@ func TestGuaranteedUpdate_CreateCollision(t *testing.T) {
 
 func TestGetEtcdVersion_ValidVersion(t *testing.T) {
 	testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprint(w, "etcd 2.0.9")
+		fmt.Fprint(w, validEtcdVersion)
 	}))
 	defer testServer.Close()
 
@@ -694,7 +696,7 @@ func TestGetEtcdVersion_ValidVersion(t *testing.T) {
 	if version, err = GetEtcdVersion(testServer.URL); err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
-	assert.Equal(t, "etcd 2.0.9", version, "Unexpected version")
+	assert.Equal(t, validEtcdVersion, version, "Unexpected version")
 	assert.Nil(t, err)
 }
 
