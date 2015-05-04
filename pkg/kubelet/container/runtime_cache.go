@@ -46,6 +46,17 @@ func NewRuntimeCache(getter podsGetter) (RuntimeCache, error) {
 	}, nil
 }
 
+// runtimeCache caches a list of pods. It records a timestamp (cacheTime) right
+// before updating the pods, so the timestamp is at most as new as the pods
+// (and can be slightly older). The timestamp always moves forward. Callers are
+// expected not to modify the pods returned from GetPods.
+// The pod updates can be triggered by a request (e.g., GetPods or
+// ForceUpdateIfOlder) if the cached pods are considered stale. These requests
+// will be blocked until the cache update is completed. To reduce the cache miss
+// penalty, upon a miss, runtimeCache would start a separate goroutine
+// (updatingThread) if one does not exist, to periodically updates the cache.
+// updatingThread would stop after a period of inactivity (no incoming requests)
+// to conserve resources.
 type runtimeCache struct {
 	sync.Mutex
 	// The underlying container runtime used to update the cache.
@@ -60,8 +71,8 @@ type runtimeCache struct {
 	updatingThreadStopTime time.Time
 }
 
-// GetPods returns the cached result for ListPods if the result is not
-// outdated, otherwise it will retrieve the newest result.
+// GetPods returns the cached pods if they are not outdated; otherwise, it
+// retrieves the latest pods and return them.
 // If the cache updating loop has stopped, this function will restart it.
 func (r *runtimeCache) GetPods() ([]*Pod, error) {
 	r.Lock()
@@ -90,13 +101,28 @@ func (r *runtimeCache) ForceUpdateIfOlder(minExpectedCacheTime time.Time) error 
 }
 
 func (r *runtimeCache) updateCache() error {
-	pods, err := r.getter.GetPods(false)
+	pods, timestamp, err := r.getPodsWithTimestamp()
 	if err != nil {
 		return err
 	}
-	r.pods = pods
-	r.cacheTime = time.Now()
+	r.writePodsIfNewer(pods, timestamp)
 	return nil
+}
+
+// getPodsWithTimestamp records a timestamp and retrieves pods from the getter.
+func (r *runtimeCache) getPodsWithTimestamp() ([]*Pod, time.Time, error) {
+	// Always record the timestamp before getting the pods to avoid stale pods.
+	timestamp := time.Now()
+	pods, err := r.getter.GetPods(false)
+	return pods, timestamp, err
+}
+
+// writePodsIfNewer writes the pods and timestamp if they are newer than the
+// cached ones.
+func (r *runtimeCache) writePodsIfNewer(pods []*Pod, timestamp time.Time) {
+	if timestamp.After(r.cacheTime) {
+		r.pods, r.cacheTime = pods, timestamp
+	}
 }
 
 // startUpdateingCache continues to invoke GetPods to get the newest result until
@@ -105,8 +131,7 @@ func (r *runtimeCache) startUpdatingCache() {
 	run := true
 	for run {
 		time.Sleep(defaultUpdateInterval)
-		pods, err := r.getter.GetPods(false)
-		cacheTime := time.Now()
+		pods, timestamp, err := r.getPodsWithTimestamp()
 		if err != nil {
 			continue
 		}
@@ -116,8 +141,7 @@ func (r *runtimeCache) startUpdatingCache() {
 			r.updating = false
 			run = false
 		}
-		r.pods = pods
-		r.cacheTime = cacheTime
+		r.writePodsIfNewer(pods, timestamp)
 		r.Unlock()
 	}
 }
