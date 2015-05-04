@@ -759,3 +759,86 @@ func TestUpdatePods(t *testing.T) {
 		}
 	}
 }
+
+func TestControllerUpdateRequeue(t *testing.T) {
+	// This server should force a requeue of the controller becuase it fails to update status.Replicas.
+	fakeHandler := util.FakeHandler{
+		StatusCode:   500,
+		ResponseBody: "",
+	}
+	testServer := httptest.NewServer(&fakeHandler)
+	defer testServer.Close()
+
+	client := client.NewOrDie(&client.Config{Host: testServer.URL, Version: testapi.Version()})
+	manager := NewReplicationManager(client)
+
+	rc := newReplicationController(1)
+	manager.controllerStore.Store.Add(rc)
+	rc.Status = api.ReplicationControllerStatus{Replicas: 2}
+	newPodList(manager.podStore.Store, 1, api.PodRunning, rc)
+
+	fakePodControl := FakePodControl{}
+	manager.podControl = &fakePodControl
+
+	manager.syncReplicationController(getKey(rc, t))
+
+	ch := make(chan interface{})
+	go func() {
+		item, _ := manager.queue.Get()
+		ch <- item
+	}()
+	select {
+	case key := <-ch:
+		expectedKey := getKey(rc, t)
+		if key != expectedKey {
+			t.Errorf("Expected requeue of controller with key %s got %s", expectedKey, key)
+		}
+	case <-time.After(100 * time.Millisecond):
+		manager.queue.ShutDown()
+		t.Errorf("Expected to find an rc in the queue, found none.")
+	}
+	// 1 Update and 1 GET, both of which fail
+	fakeHandler.ValidateRequestCount(t, 2)
+}
+
+func TestControllerUpdateStatusWithFailure(t *testing.T) {
+	rc := newReplicationController(1)
+	fakeClient := &testclient.Fake{
+		ReactFn: func(f testclient.FakeAction) (runtime.Object, error) {
+			if f.Action == testclient.GetControllerAction {
+				return rc, nil
+			}
+			return &api.ReplicationController{}, fmt.Errorf("Fake error")
+		},
+	}
+	fakeRCClient := &testclient.FakeReplicationControllers{fakeClient, "default"}
+	numReplicas := 10
+	updateReplicaCount(fakeRCClient, *rc, numReplicas)
+	updates, gets := 0, 0
+	for _, a := range fakeClient.Actions {
+		switch a.Action {
+		case testclient.GetControllerAction:
+			gets++
+			// Make sure the get is for the right rc even though the update failed.
+			if s, ok := a.Value.(string); !ok || s != rc.Name {
+				t.Errorf("Expected get for rc %v, got %+v instead", rc.Name, s)
+			}
+		case testclient.UpdateControllerAction:
+			updates++
+			// Confirm that the update has the right status.Replicas even though the Get
+			// returned an rc with replicas=1.
+			if c, ok := a.Value.(*api.ReplicationController); !ok {
+				t.Errorf("Expected an rc as the argument to update, got %T", c)
+			} else if c.Status.Replicas != numReplicas {
+				t.Errorf("Expected update for rc to contain replicas %v, got %v instead",
+					numReplicas, c.Status.Replicas)
+			}
+		default:
+			t.Errorf("Unexpected action %+v", a)
+			break
+		}
+	}
+	if gets != 1 || updates != 2 {
+		t.Errorf("Expected 1 get and 2 updates, got %d gets %d updates", gets, updates)
+	}
+}
