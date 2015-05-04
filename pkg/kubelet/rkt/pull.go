@@ -22,6 +22,7 @@ import (
 	"path"
 	"strings"
 
+	kubecontainer "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
 	"github.com/docker/docker/pkg/parsers"
 	docker "github.com/fsouza/go-dockerclient"
 	"github.com/golang/glog"
@@ -107,4 +108,12 @@ func (r *Runtime) IsImagePresent(img string) (bool, error) {
 		return false, nil
 	}
 	return true, nil
+}
+
+func (r *Runtime) ListImages() ([]kubecontainer.Image, error) {
+	return []kubecontainer.Image{}, fmt.Errorf("rkt: ListImages unimplemented")
+}
+
+func (r *Runtime) RemoveImage(image string) error {
+	return fmt.Errorf("rkt: RemoveImages unimplemented")
 }
