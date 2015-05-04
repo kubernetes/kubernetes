@@ -503,6 +503,10 @@ func (dm *DockerManager) runContainer(pod *api.Pod, container *api.Container, op
 	if len(containerHostname) > hostnameMaxLen {
 		containerHostname = containerHostname[:hostnameMaxLen]
 	}
+	namespacedName := types.NamespacedName{pod.Namespace, pod.Name}
+	labels := map[string]string{
+		"io.kubernetes.pod.name": namespacedName.String(),
+	}
 	dockerOpts := docker.CreateContainerOptions{
 		Name: BuildDockerName(dockerName, container),
 		Config: &docker.Config{
@@ -513,6 +517,7 @@ func (dm *DockerManager) runContainer(pod *api.Pod, container *api.Container, op
 			Memory:       container.Resources.Limits.Memory().Value(),
 			CPUShares:    milliCPUToShares(container.Resources.Limits.Cpu().MilliValue()),
 			WorkingDir:   container.WorkingDir,
+			Labels:       labels,
 		},
 	}
 
