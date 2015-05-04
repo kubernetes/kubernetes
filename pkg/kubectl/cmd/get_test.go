@@ -163,7 +163,7 @@ func TestGetUnknownSchemaObjectListGeneric(t *testing.T) {
 			output: "unlikelyversion",
 			list:   "v1beta3",
 			obj1:   "unlikelyversion", // doesn't have v1beta3
-			obj2:   "v1beta1",         // version of the API response
+			obj2:   "v1beta3",         // version of the API response
 		},
 		"handles common version": {
 			output: "v1beta1",

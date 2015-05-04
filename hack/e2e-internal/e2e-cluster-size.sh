@@ -31,4 +31,4 @@ source "${KUBE_VERSION_ROOT}/cluster/${KUBERNETES_PROVIDER}/util.sh"
 
 prepare-e2e
 
-${KUBECTL} get minions --no-headers | wc -l
+${KUBECTL} get nodes --no-headers | wc -l
