@@ -71,6 +71,7 @@ coreos:
         Requires=network-online.target
         After=network-online.target
         [Service]
+        Type=oneshot
         EnvironmentFile=/etc/kube-env
         ExecStartPre=/usr/bin/mkdir -p /opt/rkt
         ExecStartPre=/usr/bin/wget \
