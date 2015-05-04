@@ -23,27 +23,28 @@ Source is freely available at:
 In Kubernetes, the atomic unit of an application is a [_Pod_](http://docs.k8s.io/pods.md).  A Pod is one or more containers that _must_ be scheduled onto the same host.  All containers in a pod share a network namespace, and may optionally share mounted volumes.  In this simple case, we define a single container running Hazelcast for our pod:
 
 ```yaml
-id: hazelcast
+apiVersion: v1beta3
 kind: Pod
-apiVersion: v1beta1
-desiredState:
-  manifest:
-    version: v1beta1
-    id: hazelcast
-    containers:
-      - name: hazelcast
-        image: pires/hazelcast-k8s
-        cpu: 1000
-        ports:
-          - name: hazelcast
-            containerPort: 5701
-labels:
+metadata:
+  labels:
+    name: hazelcast
   name: hazelcast
+spec:
+  containers:
+  - image: pires/hazelcast-k8s
+    name: hazelcast
+    ports:
+    - containerPort: 5701
+      name: hazelcast
+      protocol: TCP
+    resources:
+      limits:
+        cpu: "1"
 ```
 
 There are a few things to note in this description.  First is that we are running the ```pires/hazelcast-k8s``` image.  This is a standard Ubuntu 14.04 installation with Java 8.  However it also adds a custom [```application ```](https://github.com/pires/hazelcast-kubernetes-bootstrapper) that finds any Hazelcast nodes in the cluster and bootstraps an Hazelcast instance.  The ```HazelcastDiscoveryController``` discovers the Kubernetes API Server using the built in Kubernetes discovery service, and then uses the Kubernetes API to find new nodes (more on this later).
 
-You may also note that we tell Kubernetes that the container exposes the ```Hazelcast``` port.  Finally, we tell the cluster manager that we need 1000 milli-cpus (1 core).
+You may also note that we tell Kubernetes that the container exposes the ```hazelcast``` port.  Finally, we tell the cluster manager that we need 1 cpu core.
 
 Given this configuration, we can create the pod as follows:
 
@@ -55,8 +56,10 @@ After a few moments, you should be able to see the pod running:
 
 ```sh
 $ kubectl get pods hazelcast
-POD                 CONTAINER(S)        IMAGE(S)               HOST                                                          LABELS              STATUS
-hazelcast           hazelcast           pires/hazelcast-k8s    kubernetes-minion-1/1.2.3.4                                    name=hazelcast      Running
+
+POD         IP            CONTAINER(S)   IMAGE(S)              HOST                                   LABELS           STATUS    CREATED      MESSAGE
+hazelcast   10.245.2.68                                        e2e-test-minion-vj7k/104.197.8.214     name=hazelcast   Running   11 seconds
+                          hazelcast      pires/hazelcast-k8s                                                           Running   1 seconds
 ```
 
 
@@ -65,16 +68,21 @@ In Kubernetes a _Service_ describes a set of Pods that perform the same task.  F
 
 Here is the service description:
 ```yaml
-id: hazelcast
+apiVersion: v1beta3
 kind: Service
-apiVersion: v1beta1
-port: 5701
-containerPort: 5701
-selector:
+metadata: 
+  labels: 
+    name: hazelcast
   name: hazelcast
+spec: 
+  ports:
+    - port: 5701
+      targetPort: 5701
+  selector: 
+    name: hazelcast
 ```
 
-The important thing to note here is the ```selector```. It is a query over labels, that identifies the set of _Pods_ contained by the _Service_.  In this case the selector is ```name=hazelcast```.  If you look back at the Pod specification above, you'll see that the pod has the corresponding label, so it will be selected for membership in this Service.
+The important thing to note here is the ```selector```. It is a query over labels, that identifies the set of _Pods_ contained by the _Service_.  In this case the selector is ```name: hazelcast```.  If you look back at the Pod specification above, you'll see that the pod has the corresponding label, so it will be selected for membership in this Service.
 
 Create this service as follows:
 ```sh
@@ -84,16 +92,29 @@ $ kubectl create -f hazelcast-service.yaml
 Once the service is created, you can query it's endpoints:
 ```sh
 $ kubectl get endpoints hazelcast -o yaml
-apiVersion: v1beta1
-creationTimestamp: 2015-01-05T05:51:50Z
-endpoints:
-- xxx.xxx.xxx.xxx:5701
-id: hazelcast
+apiVersion: v1beta3
 kind: Endpoints
-namespace: default
-resourceVersion: 69130
-selfLink: /api/v1beta1/endpoints/hazelcast?namespace=default
-uid: f1937b47-949e-11e4-8a8b-42010af0e23e
+metadata:
+  creationTimestamp: 2015-05-04T17:43:40Z
+  labels:
+    name: hazelcast
+  name: hazelcast
+  namespace: default
+  resourceVersion: "120480"
+  selfLink: /api/v1beta3/namespaces/default/endpoints/hazelcast
+  uid: 19a22aa9-f285-11e4-b38f-42010af0bbf9
+subsets:
+- addresses:
+  - IP: 10.245.2.68
+    targetRef:
+      kind: Pod
+      name: hazelcast
+      namespace: default
+      resourceVersion: "120479"
+      uid: d7238173-f283-11e4-b38f-42010af0bbf9
+  ports:
+  - port: 5701
+    protocol: TCP
 ```
 
 You can see that the _Service_ has found the pod we created in step one.
@@ -106,31 +127,33 @@ In Kubernetes a _Replication Controller_ is responsible for replicating sets of 
 Replication Controllers will "adopt" existing pods that match their selector query, so let's create a Replication Controller with a single replica to adopt our existing Hazelcast Pod.
 
 ```yaml
-id: hazelcast
+apiVersion: v1beta3
 kind: ReplicationController
-apiVersion: v1beta1
-desiredState:
-  replicas: 1
-  replicaSelector:
+metadata: 
+  labels: 
     name: hazelcast
-  # This is identical to the pod config above
-  podTemplate:
-    desiredState:
-      manifest:
-        version: v1beta1
-        id: hazelcast
-        containers:
-          - name: hazelcast
-            image: pires/hazelcast-k8s
-            cpu: 1000
-            ports:
-              - name: hazelcast
-                containerPort: 5701
-    labels:
-      name: hazelcast
+  name: hazelcast
+spec: 
+  replicas: 1
+  selector: 
+    name: hazelcast
+  template: 
+    metadata: 
+      labels: 
+        name: hazelcast
+    spec: 
+      containers: 
+        - resources:
+            limits:
+              cpu: 1
+          image: pires/hazelcast-k8s
+          name: hazelcast
+          ports: 
+            - containerPort: 5701
+              name: hazelcast
 ```
 
-The bulk of the replication controller config is actually identical to the Hazelcast pod declaration above, it simply gives the controller a recipe to use when creating new pods.  The other parts are the ```replicaSelector``` which contains the controller's selector query, and the ```replicas``` parameter which specifies the desired number of replicas, in this case 1.
+The bulk of the replication controller config is actually identical to the Hazelcast pod declaration above, it simply gives the controller a recipe to use when creating new pods.  The other parts are the ```selector``` which contains the controller's selector query, and the ```replicas``` parameter which specifies the desired number of replicas, in this case 1.
 
 Create this controller:
 
@@ -149,9 +172,11 @@ Now if you list the pods in your cluster, you should see two hazelcast pods:
 
 ```sh
 $ kubectl get pods
-POD                                    CONTAINER(S)        IMAGE(S)                       HOST                                                          LABELS              STATUS
-hazelcast                              hazelcast           pires/hazelcast-k8s            kubernetes-minion-1.c.my-cloud-code.internal/1.2.3.4          name=hazelcast      Running
-16b2beab-94a1-11e4-8a8b-42010af0e23e   hazelcast           pires/hazelcast-k8s            kubernetes-minion-3.c.my-cloud-code.internal/2.3.4.5          name=hazelcast      Running
+POD                 IP            CONTAINER(S)   IMAGE(S)              HOST                                 LABELS           STATUS    CREATED      MESSAGE
+hazelcast           10.245.2.68                                        e2e-test-minion-vj7k/104.197.8.214   name=hazelcast   Running   14 seconds
+                                  hazelcast      pires/hazelcast-k8s                                                         Running   2 seconds
+hazelcast-ulkws     10.245.1.80                                        e2e-test-minion-2x1f/146.148.62.37   name=hazelcast   Running   7 seconds    
+                                  hazelcast      pires/hazelcast-k8s                                                         Running   6 seconds
 ```
 
 Notice that one of the pods has the human readable name ```hazelcast``` that you specified in your config before, and one has a random string, since it was named by the replication controller.
