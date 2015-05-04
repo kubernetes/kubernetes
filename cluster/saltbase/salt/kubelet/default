@@ -16,7 +16,7 @@
 {% endif -%}
 
 # TODO: remove nginx for other cloud providers.
-{% if grains['cloud'] is defined and grains['cloud'] == 'gce' -%}
+{% if grains['cloud'] is defined and grains.cloud in [ 'aws', 'gce' ]  %}
   {% set api_servers_with_port = api_servers -%}
 {% else -%}
   {% set api_servers_with_port = api_servers + ":6443" -%}

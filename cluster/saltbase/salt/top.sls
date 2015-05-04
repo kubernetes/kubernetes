@@ -33,7 +33,7 @@ base:
     - kube-controller-manager
     - kube-scheduler
     - monit
-{% if grains['cloud'] is defined and grains['cloud'] != 'gce' %}
+{% if grains['cloud'] is defined and not grains.cloud in [ 'aws', 'gce' ] %}
     - nginx
 {% endif %}
     - cadvisor
