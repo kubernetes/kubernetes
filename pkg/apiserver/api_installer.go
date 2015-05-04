@@ -130,6 +130,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 
 	// what verbs are supported by the storage, used to know what verbs we support per path
 	creater, isCreater := storage.(rest.Creater)
+	namedCreater, isNamedCreater := storage.(rest.NamedCreater)
 	lister, isLister := storage.(rest.Lister)
 	getter, isGetter := storage.(rest.Getter)
 	getterWithOptions, isGetterWithOptions := storage.(rest.GetterWithOptions)
@@ -143,6 +144,10 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	storageMeta, isMetadata := storage.(rest.StorageMetadata)
 	if !isMetadata {
 		storageMeta = defaultStorageMetadata{}
+	}
+
+	if isNamedCreater {
+		isCreater = true
 	}
 
 	var versionedList interface{}
@@ -436,7 +441,13 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			addParams(route, action.Params)
 			ws.Route(route)
 		case "POST": // Create a resource.
-			route := ws.POST(action.Path).To(CreateResource(creater, reqScope, a.group.Typer, admit)).
+			var handler restful.RouteFunction
+			if isNamedCreater {
+				handler = CreateNamedResource(namedCreater, reqScope, a.group.Typer, admit)
+			} else {
+				handler = CreateResource(creater, reqScope, a.group.Typer, admit)
+			}
+			route := ws.POST(action.Path).To(handler).
 				Filter(m).
 				Doc("create a "+kind).
 				Operation("create"+kind).

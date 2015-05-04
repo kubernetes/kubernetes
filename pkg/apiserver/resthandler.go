@@ -256,19 +256,27 @@ func ListResource(r rest.Lister, rw rest.Watcher, scope RequestScope, forceWatch
 	}
 }
 
-// CreateResource returns a function that will handle a resource creation.
-func CreateResource(r rest.Creater, scope RequestScope, typer runtime.ObjectTyper, admit admission.Interface) restful.RouteFunction {
+func createHandler(r rest.NamedCreater, scope RequestScope, typer runtime.ObjectTyper, admit admission.Interface, includeName bool) restful.RouteFunction {
 	return func(req *restful.Request, res *restful.Response) {
 		w := res.ResponseWriter
 
 		// TODO: we either want to remove timeout or document it (if we document, move timeout out of this function and declare it in api_installer)
 		timeout := parseTimeout(req.Request.URL.Query().Get("timeout"))
 
-		namespace, err := scope.Namer.Namespace(req)
+		var (
+			namespace, name string
+			err             error
+		)
+		if includeName {
+			namespace, name, err = scope.Namer.Name(req)
+		} else {
+			namespace, err = scope.Namer.Namespace(req)
+		}
 		if err != nil {
 			errorJSON(err, scope.Codec, w)
 			return
 		}
+
 		ctx := scope.ContextFunc(req)
 		ctx = api.WithNamespace(ctx, namespace)
 
@@ -292,7 +300,7 @@ func CreateResource(r rest.Creater, scope RequestScope, typer runtime.ObjectType
 		}
 
 		result, err := finishRequest(timeout, func() (runtime.Object, error) {
-			out, err := r.Create(ctx, obj)
+			out, err := r.Create(ctx, name, obj)
 			if status, ok := out.(*api.Status); ok && err == nil && status.Code == 0 {
 				status.Code = http.StatusCreated
 			}
@@ -310,6 +318,24 @@ func CreateResource(r rest.Creater, scope RequestScope, typer runtime.ObjectType
 
 		write(http.StatusCreated, scope.APIVersion, scope.Codec, result, w, req.Request)
 	}
+}
+
+// CreateNamedResource returns a function that will handle a resource creation with name.
+func CreateNamedResource(r rest.NamedCreater, scope RequestScope, typer runtime.ObjectTyper, admit admission.Interface) restful.RouteFunction {
+	return createHandler(r, scope, typer, admit, true)
+}
+
+// CreateResource returns a function that will handle a resource creation.
+func CreateResource(r rest.Creater, scope RequestScope, typer runtime.ObjectTyper, admit admission.Interface) restful.RouteFunction {
+	return createHandler(&namedCreaterAdapter{r}, scope, typer, admit, false)
+}
+
+type namedCreaterAdapter struct {
+	rest.Creater
+}
+
+func (c *namedCreaterAdapter) Create(ctx api.Context, name string, obj runtime.Object) (runtime.Object, error) {
+	return c.Creater.Create(ctx, obj)
 }
 
 // PatchResource returns a function that will handle a resource patch
