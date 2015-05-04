@@ -44,7 +44,7 @@ __kubectl_get_resource()
     if [[ ${#nouns[@]} -eq 0 ]]; then
         return 1
     fi
-    __kubectl_parse_get ${nouns[${#nouns[@]} -1]}
+    __kubectl_parse_get "${nouns[${#nouns[@]} -1]}"
     if [[ $? -eq 0 ]]; then
         return 0
     fi
@@ -55,7 +55,7 @@ __kubectl_get_containers()
 {
     local template
     template="{{ range .desiredState.manifest.containers  }}{{ .name }} {{ end }}"
-    __debug ${FUNCNAME} "nouns are ${nouns[@]}"
+    __debug "${FUNCNAME} nouns are ${nouns[*]}"
 
     local len="${#nouns[@]}"
     if [[ ${len} -ne 1 ]]; then
