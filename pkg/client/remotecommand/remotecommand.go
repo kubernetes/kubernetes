@@ -24,6 +24,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/conversion/queryparams"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/httpstream"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/httpstream/spdy"
 	"github.com/golang/glog"
@@ -39,7 +40,8 @@ func (u *defaultUpgrader) upgrade(req *client.Request, config *client.Config) (h
 	return req.Upgrade(config, spdy.NewRoundTripper)
 }
 
-type RemoteCommandExecutor struct {
+// Executor executes a command on a pod container
+type Executor struct {
 	req     *client.Request
 	config  *client.Config
 	command []string
@@ -51,8 +53,9 @@ type RemoteCommandExecutor struct {
 	upgrader upgrader
 }
 
-func New(req *client.Request, config *client.Config, command []string, stdin io.Reader, stdout, stderr io.Writer, tty bool) *RemoteCommandExecutor {
-	return &RemoteCommandExecutor{
+// New creates a new RemoteCommandExecutor
+func New(req *client.Request, config *client.Config, command []string, stdin io.Reader, stdout, stderr io.Writer, tty bool) *Executor {
+	return &Executor{
 		req:     req,
 		config:  config,
 		command: command,
@@ -66,26 +69,27 @@ func New(req *client.Request, config *client.Config, command []string, stdin io.
 // Execute sends a remote command execution request, upgrading the
 // connection and creating streams to represent stdin/stdout/stderr. Data is
 // copied between these streams and the supplied stdin/stdout/stderr parameters.
-func (e *RemoteCommandExecutor) Execute() error {
-	doStdin := (e.stdin != nil)
-	doStdout := (e.stdout != nil)
-	doStderr := (!e.tty && e.stderr != nil)
-
-	if doStdin {
-		e.req.Param(api.ExecStdinParam, "1")
-	}
-	if doStdout {
-		e.req.Param(api.ExecStdoutParam, "1")
-	}
-	if doStderr {
-		e.req.Param(api.ExecStderrParam, "1")
-	}
-	if e.tty {
-		e.req.Param(api.ExecTTYParam, "1")
+func (e *Executor) Execute() error {
+	opts := api.PodExecOptions{
+		Stdin:   (e.stdin != nil),
+		Stdout:  (e.stdout != nil),
+		Stderr:  (!e.tty && e.stderr != nil),
+		TTY:     e.tty,
+		Command: e.command,
 	}
 
-	for _, s := range e.command {
-		e.req.Param(api.ExecCommandParamm, s)
+	versioned, err := api.Scheme.ConvertToVersion(&opts, e.config.Version)
+	if err != nil {
+		return err
+	}
+	params, err := queryparams.Convert(versioned)
+	if err != nil {
+		return err
+	}
+	for k, v := range params {
+		for _, vv := range v {
+			e.req.Param(k, vv)
+		}
 	}
 
 	if e.upgrader == nil {
@@ -130,7 +134,7 @@ func (e *RemoteCommandExecutor) Execute() error {
 	}()
 	defer errorStream.Reset()
 
-	if doStdin {
+	if opts.Stdin {
 		headers.Set(api.StreamType, api.StreamTypeStdin)
 		remoteStdin, err := conn.CreateStream(headers)
 		if err != nil {
@@ -147,7 +151,7 @@ func (e *RemoteCommandExecutor) Execute() error {
 	waitCount := 0
 	completedStreams := 0
 
-	if doStdout {
+	if opts.Stdout {
 		waitCount++
 		headers.Set(api.StreamType, api.StreamTypeStdout)
 		remoteStdout, err := conn.CreateStream(headers)
@@ -158,7 +162,7 @@ func (e *RemoteCommandExecutor) Execute() error {
 		go cp(api.StreamTypeStdout, e.stdout, remoteStdout)
 	}
 
-	if doStderr && !e.tty {
+	if opts.Stderr && !e.tty {
 		waitCount++
 		headers.Set(api.StreamType, api.StreamTypeStderr)
 		remoteStderr, err := conn.CreateStream(headers)
