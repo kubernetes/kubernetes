@@ -105,6 +105,9 @@ type PersistentVolumeSource struct {
 	// This is useful for development and testing only.
 	// on-host storage is not supported in any way.
 	HostPath *HostPathVolumeSource `json:"hostPath" description:"a HostPath provisioned by a developer or tester; for develment use only"`
+	// ISCSI represents an ISCSI Disk resource that is attached to a
+	// kubelet's host machine and then exposed to the pod.
+	ISCSI *ISCSIVolumeSource `json:"iscsi" description:"an iSCSI disk resource provisioned by an admin"`
 	// Glusterfs represents a Glusterfs volume that is attached to a host and exposed to the pod
 	Glusterfs *GlusterfsVolumeSource `json:"glusterfs" description:"Glusterfs volume resource provisioned by an admin"`
 	// NFS represents an NFS mount on the host

@@ -461,6 +461,10 @@ func ValidatePersistentVolume(pv *api.PersistentVolume) errs.ValidationErrorList
 		numVolumes++
 		allErrs = append(allErrs, validateAWSElasticBlockStoreVolumeSource(pv.Spec.AWSElasticBlockStore).Prefix("awsElasticBlockStore")...)
 	}
+	if pv.Spec.ISCSI != nil {
+		numVolumes++
+		allErrs = append(allErrs, validateISCSIVolumeSource(pv.Spec.ISCSI).Prefix("iscsi")...)
+	}
 	if pv.Spec.Glusterfs != nil {
 		numVolumes++
 		allErrs = append(allErrs, validateGlusterfs(pv.Spec.Glusterfs).Prefix("glusterfs")...)
