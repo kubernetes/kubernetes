@@ -1584,6 +1584,9 @@ func init() {
 			if err := s.Convert(&in.HostPath, &out.HostPath, 0); err != nil {
 				return err
 			}
+			if err := s.Convert(&in.ISCSI, &out.ISCSI, 0); err != nil {
+				return err
+			}
 			if err := s.Convert(&in.Glusterfs, &out.Glusterfs, 0); err != nil {
 				return err
 			}
@@ -1597,6 +1600,9 @@ func init() {
 				return err
 			}
 			if err := s.Convert(&in.HostPath, &out.HostPath, 0); err != nil {
+				return err
+			}
+			if err := s.Convert(&in.ISCSI, &out.ISCSI, 0); err != nil {
 				return err
 			}
 			if err := s.Convert(&in.Glusterfs, &out.Glusterfs, 0); err != nil {

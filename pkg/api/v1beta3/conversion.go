@@ -1709,6 +1709,9 @@ func convert_v1beta3_PersistentVolumeSource_To_api_PersistentVolumeSource(in *Pe
 	if err := s.Convert(&in.HostPath, &out.HostPath, 0); err != nil {
 		return err
 	}
+	if err := s.Convert(&in.ISCSI, &out.ISCSI, 0); err != nil {
+		return err
+	}
 	if err := s.Convert(&in.Glusterfs, &out.Glusterfs, 0); err != nil {
 		return err
 	}
@@ -1723,6 +1726,9 @@ func convert_api_PersistentVolumeSource_To_v1beta3_PersistentVolumeSource(in *ne
 		return err
 	}
 	if err := s.Convert(&in.HostPath, &out.HostPath, 0); err != nil {
+		return err
+	}
+	if err := s.Convert(&in.ISCSI, &out.ISCSI, 0); err != nil {
 		return err
 	}
 	if err := s.Convert(&in.Glusterfs, &out.Glusterfs, 0); err != nil {
