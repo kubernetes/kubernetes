@@ -24,6 +24,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/mount"
 )
 
 // fakeVolumeHost is useful for testing volume plugins.
@@ -55,20 +56,20 @@ func (f *fakeVolumeHost) GetKubeClient() client.Interface {
 	return f.kubeClient
 }
 
-func (f *fakeVolumeHost) NewWrapperBuilder(spec *Spec, podRef *api.ObjectReference, opts VolumeOptions) (Builder, error) {
+func (f *fakeVolumeHost) NewWrapperBuilder(spec *Spec, podRef *api.ObjectReference, opts VolumeOptions, mounter mount.Interface) (Builder, error) {
 	plug, err := f.pluginMgr.FindPluginBySpec(spec)
 	if err != nil {
 		return nil, err
 	}
-	return plug.NewBuilder(spec, podRef, opts)
+	return plug.NewBuilder(spec, podRef, opts, mounter)
 }
 
-func (f *fakeVolumeHost) NewWrapperCleaner(spec *Spec, podUID types.UID) (Cleaner, error) {
+func (f *fakeVolumeHost) NewWrapperCleaner(spec *Spec, podUID types.UID, mounter mount.Interface) (Cleaner, error) {
 	plug, err := f.pluginMgr.FindPluginBySpec(spec)
 	if err != nil {
 		return nil, err
 	}
-	return plug.NewCleaner(spec.Name, podUID)
+	return plug.NewCleaner(spec.Name, podUID, mounter)
 }
 
 // FakeVolumePlugin is useful for testing.  It tries to be a fully compliant
@@ -95,11 +96,11 @@ func (plugin *FakeVolumePlugin) CanSupport(spec *Spec) bool {
 	return true
 }
 
-func (plugin *FakeVolumePlugin) NewBuilder(spec *Spec, podRef *api.ObjectReference, opts VolumeOptions) (Builder, error) {
+func (plugin *FakeVolumePlugin) NewBuilder(spec *Spec, podRef *api.ObjectReference, opts VolumeOptions, mounter mount.Interface) (Builder, error) {
 	return &FakeVolume{podRef.UID, spec.Name, plugin}, nil
 }
 
-func (plugin *FakeVolumePlugin) NewCleaner(volName string, podUID types.UID) (Cleaner, error) {
+func (plugin *FakeVolumePlugin) NewCleaner(volName string, podUID types.UID, mounter mount.Interface) (Cleaner, error) {
 	return &FakeVolume{podUID, volName, plugin}, nil
 }
 

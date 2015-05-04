@@ -46,6 +46,7 @@ API_CORS_ALLOWED_ORIGINS=${API_CORS_ALLOWED_ORIGINS:-"/127.0.0.1(:[0-9]+)?$,/loc
 KUBELET_PORT=${KUBELET_PORT:-10250}
 LOG_LEVEL=${LOG_LEVEL:-3}
 CHAOS_CHANCE=${CHAOS_CHANCE:-0.0}
+SKIP_KUBELET=${SKIP_KUBELET:-""}
 
 # For the common local scenario, fail fast if server is already running.
 # this can happen if you run local-up-cluster.sh twice and kill etcd in between.
@@ -100,7 +101,7 @@ cleanup()
     echo "Cleaning up..."
     [[ -n "${APISERVER_PID-}" ]] && sudo kill "${APISERVER_PID}"
     [[ -n "${CTLRMGR_PID-}" ]] && sudo kill "${CTLRMGR_PID}"
-    [[ -n "${KUBELET_PID-}" ]] && sudo kill "${KUBELET_PID}"
+    [[ -n "${KUBELET_PID-}" && -z "${SKIP_KUBELET}" ]] && sudo kill "${KUBELET_PID}"
     [[ -n "${PROXY_PID-}" ]] && sudo kill "${PROXY_PID}"
     [[ -n "${SCHEDULER_PID-}" ]] && sudo kill "${SCHEDULER_PID}"
 
@@ -141,16 +142,21 @@ sudo -E "${GO_OUT}/kube-controller-manager" \
   --master="${API_HOST}:${API_PORT}" >"${CTLRMGR_LOG}" 2>&1 &
 CTLRMGR_PID=$!
 
-KUBELET_LOG=/tmp/kubelet.log
-sudo -E "${GO_OUT}/kubelet" \
-  --v=${LOG_LEVEL} \
-  --chaos_chance="${CHAOS_CHANCE}" \
-  --hostname_override="127.0.0.1" \
-  --address="127.0.0.1" \
-  --api_servers="${API_HOST}:${API_PORT}" \
-  --auth_path="${KUBE_ROOT}/hack/.test-cmd-auth" \
-  --port="$KUBELET_PORT" >"${KUBELET_LOG}" 2>&1 &
-KUBELET_PID=$!
+if [[ -z "${SKIP_KUBELET}" ]]; then
+  KUBELET_LOG=/tmp/kubelet.log
+  sudo -E "${GO_OUT}/kubelet" \
+    --v=${LOG_LEVEL} \
+    --chaos_chance="${CHAOS_CHANCE}" \
+    --hostname_override="127.0.0.1" \
+    --address="127.0.0.1" \
+    --api_servers="${API_HOST}:${API_PORT}" \
+    --auth_path="${KUBE_ROOT}/hack/.test-cmd-auth" \
+    --port="$KUBELET_PORT" >"${KUBELET_LOG}" 2>&1 &
+  KUBELET_PID=$!
+else
+  echo "Skipping kubelet start because SKIP_KUBELET is set"
+  KUBELET_LOG="(no kubelet log created)"
+fi
 
 PROXY_LOG=/tmp/kube-proxy.log
 sudo -E "${GO_OUT}/kube-proxy" \

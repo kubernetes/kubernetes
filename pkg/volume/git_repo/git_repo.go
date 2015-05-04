@@ -25,6 +25,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/exec"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/mount"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume"
 	volumeutil "github.com/GoogleCloudPlatform/kubernetes/pkg/volume/util"
 )
@@ -66,7 +67,7 @@ func (plugin *gitRepoPlugin) CanSupport(spec *volume.Spec) bool {
 	return spec.VolumeSource.GitRepo != nil
 }
 
-func (plugin *gitRepoPlugin) NewBuilder(spec *volume.Spec, podRef *api.ObjectReference, opts volume.VolumeOptions) (volume.Builder, error) {
+func (plugin *gitRepoPlugin) NewBuilder(spec *volume.Spec, podRef *api.ObjectReference, opts volume.VolumeOptions, mounter mount.Interface) (volume.Builder, error) {
 	if plugin.legacyMode {
 		// Legacy mode instances can be cleaned up but not created anew.
 		return nil, fmt.Errorf("legacy mode: can not create new instances")
@@ -80,10 +81,11 @@ func (plugin *gitRepoPlugin) NewBuilder(spec *volume.Spec, podRef *api.ObjectRef
 		plugin:     plugin,
 		legacyMode: false,
 		opts:       opts,
+		mounter:    mounter,
 	}, nil
 }
 
-func (plugin *gitRepoPlugin) NewCleaner(volName string, podUID types.UID) (volume.Cleaner, error) {
+func (plugin *gitRepoPlugin) NewCleaner(volName string, podUID types.UID, mounter mount.Interface) (volume.Cleaner, error) {
 	legacy := false
 	if plugin.legacyMode {
 		legacy = true
@@ -93,6 +95,7 @@ func (plugin *gitRepoPlugin) NewCleaner(volName string, podUID types.UID) (volum
 		volName:    volName,
 		plugin:     plugin,
 		legacyMode: legacy,
+		mounter:    mounter,
 	}, nil
 }
 
@@ -107,6 +110,7 @@ type gitRepo struct {
 	plugin     *gitRepoPlugin
 	legacyMode bool
 	opts       volume.VolumeOptions
+	mounter    mount.Interface
 }
 
 // SetUp creates new directory and clones a git repo.
@@ -130,7 +134,7 @@ func (gr *gitRepo) SetUpAt(dir string) error {
 	}
 
 	// Wrap EmptyDir, let it do the setup.
-	wrapped, err := gr.plugin.host.NewWrapperBuilder(wrappedVolumeSpec, &gr.podRef, gr.opts)
+	wrapped, err := gr.plugin.host.NewWrapperBuilder(wrappedVolumeSpec, &gr.podRef, gr.opts, gr.mounter)
 	if err != nil {
 		return err
 	}
@@ -193,7 +197,7 @@ func (gr *gitRepo) TearDown() error {
 // TearDownAt simply deletes everything in the directory.
 func (gr *gitRepo) TearDownAt(dir string) error {
 	// Wrap EmptyDir, let it do the teardown.
-	wrapped, err := gr.plugin.host.NewWrapperCleaner(wrappedVolumeSpec, gr.podRef.UID)
+	wrapped, err := gr.plugin.host.NewWrapperCleaner(wrappedVolumeSpec, gr.podRef.UID, gr.mounter)
 	if err != nil {
 		return err
 	}

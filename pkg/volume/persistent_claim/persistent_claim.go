@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/mount"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume"
 	"github.com/golang/glog"
 )
@@ -50,7 +51,7 @@ func (plugin *persistentClaimPlugin) CanSupport(spec *volume.Spec) bool {
 	return spec.VolumeSource.PersistentVolumeClaimVolumeSource != nil
 }
 
-func (plugin *persistentClaimPlugin) NewBuilder(spec *volume.Spec, podRef *api.ObjectReference, opts volume.VolumeOptions) (volume.Builder, error) {
+func (plugin *persistentClaimPlugin) NewBuilder(spec *volume.Spec, podRef *api.ObjectReference, opts volume.VolumeOptions, mounter mount.Interface) (volume.Builder, error) {
 	claim, err := plugin.host.GetKubeClient().PersistentVolumeClaims(podRef.Namespace).Get(spec.VolumeSource.PersistentVolumeClaimVolumeSource.ClaimName)
 	if err != nil {
 		glog.Errorf("Error finding claim: %+v\n", spec.VolumeSource.PersistentVolumeClaimVolumeSource.ClaimName)
@@ -67,7 +68,7 @@ func (plugin *persistentClaimPlugin) NewBuilder(spec *volume.Spec, podRef *api.O
 		return nil, err
 	}
 
-	builder, err := plugin.host.NewWrapperBuilder(volume.NewSpecFromPersistentVolume(pv), podRef, opts)
+	builder, err := plugin.host.NewWrapperBuilder(volume.NewSpecFromPersistentVolume(pv), podRef, opts, mounter)
 	if err != nil {
 		glog.Errorf("Error creating builder for claim: %+v\n", claim.Name)
 		return nil, err
@@ -76,6 +77,6 @@ func (plugin *persistentClaimPlugin) NewBuilder(spec *volume.Spec, podRef *api.O
 	return builder, nil
 }
 
-func (plugin *persistentClaimPlugin) NewCleaner(volName string, podUID types.UID) (volume.Cleaner, error) {
+func (plugin *persistentClaimPlugin) NewCleaner(_ string, _ types.UID, _ mount.Interface) (volume.Cleaner, error) {
 	return nil, fmt.Errorf("This will never be called directly. The PV backing this claim has a cleaner.  Kubelet uses that cleaner, not this one, when removing orphaned volumes.")
 }

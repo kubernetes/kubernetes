@@ -45,6 +45,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/network"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/master/ports"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/mount"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
@@ -108,6 +109,8 @@ type KubeletServer struct {
 	ReallyCrashForTesting bool
 	// Insert a probability of random errors during calls to the master.
 	ChaosChance float64
+	// Is the kubelet containerized
+	Containerized bool
 }
 
 // bootstrapping interface for kubelet, targets the initialization protocol
@@ -212,6 +215,7 @@ func (s *KubeletServer) AddFlags(fs *pflag.FlagSet) {
 	// Flags intended for testing, not recommended used in production environments.
 	fs.BoolVar(&s.ReallyCrashForTesting, "really-crash-for-testing", s.ReallyCrashForTesting, "If true, when panics occur crash. Intended for testing.")
 	fs.Float64Var(&s.ChaosChance, "chaos-chance", s.ChaosChance, "If > 0.0, introduce random client errors and latency. Intended for testing. [default=0.0]")
+	fs.BoolVar(&s.Containerized, "containerized", s.Containerized, "Experimental support for running kubelet in a container.  Intended for testing.")
 }
 
 // Run runs the specified KubeletServer.  This should never exit.
@@ -270,6 +274,12 @@ func (s *KubeletServer) Run(_ []string) error {
 		KeyFile:  s.TLSPrivateKeyFile,
 	}
 
+	mounter := mount.New()
+	if s.Containerized {
+		glog.Info("Running kubelet in containerized mode (experimental)")
+		mounter = &mount.NsenterMounter{}
+	}
+
 	kcfg := KubeletConfig{
 		Address:                        s.Address,
 		AllowPrivileged:                s.AllowPrivileged,
@@ -309,6 +319,7 @@ func (s *KubeletServer) Run(_ []string) error {
 		ResourceContainer:         s.ResourceContainer,
 		CgroupRoot:                s.CgroupRoot,
 		ContainerRuntime:          s.ContainerRuntime,
+		Mounter:                   mounter,
 	}
 
 	RunKubelet(&kcfg, nil)
@@ -419,6 +430,7 @@ func SimpleKubelet(client *client.Client,
 		OSInterface:               osInterface,
 		CgroupRoot:                "",
 		ContainerRuntime:          "docker",
+		Mounter:                   mount.New(),
 	}
 	return &kcfg
 }
@@ -548,6 +560,7 @@ type KubeletConfig struct {
 	OSInterface                    kubecontainer.OSInterface
 	CgroupRoot                     string
 	ContainerRuntime               string
+	Mounter                        mount.Interface
 }
 
 func createAndInitKubelet(kc *KubeletConfig) (k KubeletBootstrap, pc *config.PodConfig, err error) {
@@ -594,7 +607,8 @@ func createAndInitKubelet(kc *KubeletConfig) (k KubeletBootstrap, pc *config.Pod
 		kc.ResourceContainer,
 		kc.OSInterface,
 		kc.CgroupRoot,
-		kc.ContainerRuntime)
+		kc.ContainerRuntime,
+		kc.Mounter)
 
 	if err != nil {
 		return nil, nil, err

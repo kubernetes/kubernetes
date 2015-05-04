@@ -64,7 +64,7 @@ func (plugin *glusterfsPlugin) GetAccessModes() []api.AccessModeType {
 	}
 }
 
-func (plugin *glusterfsPlugin) NewBuilder(spec *volume.Spec, podRef *api.ObjectReference, _ volume.VolumeOptions) (volume.Builder, error) {
+func (plugin *glusterfsPlugin) NewBuilder(spec *volume.Spec, podRef *api.ObjectReference, _ volume.VolumeOptions, mounter mount.Interface) (volume.Builder, error) {
 	ep_name := spec.VolumeSource.Glusterfs.EndpointsName
 	ns := podRef.Namespace
 	ep, err := plugin.host.GetKubeClient().Endpoints(ns).Get(ep_name)
@@ -73,7 +73,7 @@ func (plugin *glusterfsPlugin) NewBuilder(spec *volume.Spec, podRef *api.ObjectR
 		return nil, err
 	}
 	glog.V(1).Infof("Glusterfs: endpoints %v", ep)
-	return plugin.newBuilderInternal(spec, ep, podRef, mount.New(), exec.New())
+	return plugin.newBuilderInternal(spec, ep, podRef, mounter, exec.New())
 }
 
 func (plugin *glusterfsPlugin) newBuilderInternal(spec *volume.Spec, ep *api.Endpoints, podRef *api.ObjectReference, mounter mount.Interface, exe exec.Interface) (volume.Builder, error) {
@@ -89,8 +89,8 @@ func (plugin *glusterfsPlugin) newBuilderInternal(spec *volume.Spec, ep *api.End
 	}, nil
 }
 
-func (plugin *glusterfsPlugin) NewCleaner(volName string, podUID types.UID) (volume.Cleaner, error) {
-	return plugin.newCleanerInternal(volName, podUID, mount.New())
+func (plugin *glusterfsPlugin) NewCleaner(volName string, podUID types.UID, mounter mount.Interface) (volume.Cleaner, error) {
+	return plugin.newCleanerInternal(volName, podUID, mounter)
 }
 
 func (plugin *glusterfsPlugin) newCleanerInternal(volName string, podUID types.UID, mounter mount.Interface) (volume.Cleaner, error) {
