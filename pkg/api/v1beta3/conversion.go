@@ -1591,9 +1591,7 @@ func convert_v1beta3_PersistentVolumeClaimSpec_To_api_PersistentVolumeClaimSpec(
 	if err := s.Convert(&in.Resources, &out.Resources, 0); err != nil {
 		return err
 	}
-	if err := s.Convert(&in.VolumeName, &out.VolumeName, 0); err != nil {
-		return err
-	}
+	out.VolumeName = in.VolumeName
 	return nil
 }
 
@@ -1607,9 +1605,7 @@ func convert_api_PersistentVolumeClaimSpec_To_v1beta3_PersistentVolumeClaimSpec(
 	if err := s.Convert(&in.Resources, &out.Resources, 0); err != nil {
 		return err
 	}
-	if err := s.Convert(&in.VolumeName, &out.VolumeName, 0); err != nil {
-		return err
-	}
+	out.VolumeName = in.VolumeName
 	return nil
 }
 
