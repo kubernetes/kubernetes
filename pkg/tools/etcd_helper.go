@@ -31,9 +31,38 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/conversion"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 	"github.com/coreos/go-etcd/etcd"
+	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/golang/glog"
 )
+
+var (
+	cacheHitCounter = prometheus.NewCounter(
+		prometheus.CounterOpts{
+			Name: "etcd_helper_cache_hit_count",
+			Help: "Counter of etcd helper cache hits.",
+		},
+	)
+	cacheMissCounter = prometheus.NewCounter(
+		prometheus.CounterOpts{
+			Name: "etcd_helper_cache_miss_count",
+			Help: "Counter of etcd helper cache miss.",
+		},
+	)
+	cacheEntryCounter = prometheus.NewCounter(
+		prometheus.CounterOpts{
+			Name: "etcd_helper_cache_entry_count",
+			Help: "Counter of etcd helper cache entries. This can be different from etcd_helper_cache_miss_count " +
+				"because two concurrent threads can miss the cache and generate the same entry twice.",
+		},
+	)
+)
+
+func init() {
+	prometheus.MustRegister(cacheHitCounter)
+	prometheus.MustRegister(cacheMissCounter)
+	prometheus.MustRegister(cacheEntryCounter)
+}
 
 // EtcdHelper offers common object marshalling/unmarshalling operations on an etcd client.
 type EtcdHelper struct {
@@ -179,8 +208,10 @@ func (h *EtcdHelper) getFromCache(index uint64) (runtime.Object, bool) {
 			glog.Errorf("Error during DeepCopy of cached object: %q", err)
 			return nil, false
 		}
+		cacheHitCounter.Inc()
 		return objCopy.(runtime.Object), true
 	}
+	cacheMissCounter.Inc()
 	return nil, false
 }
 
@@ -192,6 +223,9 @@ func (h *EtcdHelper) addToCache(index uint64, obj runtime.Object) {
 	}
 	h.mutex.Lock()
 	defer h.mutex.Unlock()
+	if _, found := h.cache[index]; !found {
+		cacheEntryCounter.Inc()
+	}
 	h.cache[index] = objCopy.(runtime.Object)
 	if len(h.cache) > maxEtcdCacheEntries {
 		var randomKey uint64
