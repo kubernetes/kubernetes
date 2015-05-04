@@ -593,7 +593,7 @@ func VerifyContainersAreNotFailed(pod api.Pod) error {
 	} else {
 		for _, status := range statuses {
 			if status.State.Termination != nil || status.LastTerminationState.Termination != nil || status.RestartCount != 0 {
-				errStrings = append(errStrings, fmt.Sprintf("Error: Pod %s: Container %s was found to have terminated %d times", pod.Name, status.Name, status.RestartCount))
+				errStrings = append(errStrings, fmt.Sprintf("Error: Pod %s (host: %s) : Container %s was found to have terminated %d times", pod.Name, pod.Spec.Host, status.Name, status.RestartCount))
 			}
 		}
 	}
