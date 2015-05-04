@@ -20,9 +20,11 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/meta"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl"
 	cmdutil "github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/cmd/util"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/resource"
+
 	"github.com/spf13/cobra"
 )
 
@@ -71,19 +73,15 @@ func NewCmdExposeService(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 }
 
 func RunExpose(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string) error {
-	var name, resource string
+	var name, res string
 	switch l := len(args); {
 	case l == 2:
-		resource, name = args[0], args[1]
+		res, name = args[0], args[1]
 	default:
 		return cmdutil.UsageError(cmd, "the type and name of a resource to expose are required arguments")
 	}
 
 	namespace, err := f.DefaultNamespace()
-	if err != nil {
-		return err
-	}
-	client, err := f.Client()
 	if err != nil {
 		return err
 	}
@@ -101,13 +99,14 @@ func RunExpose(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []str
 	} else {
 		params["name"] = cmdutil.GetFlagString(cmd, "service-name")
 	}
+	var mapping *meta.RESTMapping
 	if s, found := params["selector"]; !found || len(s) == 0 || cmdutil.GetFlagInt(cmd, "port") < 1 {
 		mapper, _ := f.Object()
-		v, k, err := mapper.VersionAndKindForResource(resource)
+		v, k, err := mapper.VersionAndKindForResource(res)
 		if err != nil {
 			return err
 		}
-		mapping, err := mapper.RESTMapping(k, v)
+		mapping, err = mapper.RESTMapping(k, v)
 		if err != nil {
 			return err
 		}
@@ -118,7 +117,14 @@ func RunExpose(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []str
 			}
 			params["selector"] = s
 		}
-		if cmdutil.GetFlagInt(cmd, "port") < 0 {
+		noPorts := true
+		for _, param := range names {
+			if param.Name == "port" {
+				noPorts = false
+				break
+			}
+		}
+		if cmdutil.GetFlagInt(cmd, "port") < 0 && !noPorts {
 			ports, err := f.PortsForResource(mapping, namespace, name)
 			if err != nil {
 				return err
@@ -141,14 +147,14 @@ func RunExpose(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []str
 		return err
 	}
 
-	service, err := generator.Generate(params)
+	object, err := generator.Generate(params)
 	if err != nil {
 		return err
 	}
 
 	inline := cmdutil.GetFlagString(cmd, "overrides")
 	if len(inline) > 0 {
-		service, err = cmdutil.Merge(service, inline, "Service")
+		object, err = cmdutil.Merge(object, inline, mapping.Kind)
 		if err != nil {
 			return err
 		}
@@ -156,11 +162,21 @@ func RunExpose(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []str
 
 	// TODO: extract this flag to a central location, when such a location exists.
 	if !cmdutil.GetFlagBool(cmd, "dry-run") {
-		service, err = client.Services(namespace).Create(service.(*api.Service))
+		mapper, typer := f.Object()
+		resourceMapper := &resource.Mapper{typer, mapper, f.ClientMapperForCommand()}
+		info, err := resourceMapper.InfoForObject(object)
+		if err != nil {
+			return err
+		}
+		data, err := info.Mapping.Codec.Encode(object)
+		if err != nil {
+			return err
+		}
+		_, err = resource.NewHelper(info.Client, info.Mapping).Create(namespace, false, data)
 		if err != nil {
 			return err
 		}
 	}
 
-	return f.PrintObject(cmd, service, out)
+	return f.PrintObject(cmd, object, out)
 }
