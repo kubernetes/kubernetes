@@ -695,6 +695,7 @@ func getSigner(provider string) (ssh.Signer, error) {
 		return nil, fmt.Errorf("getSigner(...) not implemented for %s", provider)
 	}
 	key := filepath.Join(keydir, keyfile)
+	Logf("Using SSH key: %s", key)
 
 	// Create an actual signer.
 	file, err := os.Open(key)
