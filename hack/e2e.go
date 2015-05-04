@@ -181,7 +181,7 @@ func Up() bool {
 
 // Ensure that the cluster is large engough to run the e2e tests.
 func ValidateClusterSize() {
-	// Check that there are at least 3 minions running
+	// Check that there are at least minMinionCount minions running
 	cmd := exec.Command(path.Join(*root, "hack/e2e-internal/e2e-cluster-size.sh"))
 	if *verbose {
 		cmd.Stderr = os.Stderr
