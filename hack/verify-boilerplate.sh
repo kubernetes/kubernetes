@@ -19,40 +19,37 @@ set -o nounset
 set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
+boiler="${KUBE_ROOT}/hooks/boilerplate.py"
 
 cd ${KUBE_ROOT}
 
-result=0
 find_files() {
+  local ext=$1
   find . -not \( \
       \( \
         -wholename './output' \
         -o -wholename './_output' \
         -o -wholename './release' \
         -o -wholename './target' \
+        -o -wholename './.git' \
         -o -wholename '*/third_party/*' \
         -o -wholename '*/Godeps/*' \
       \) -prune \
-    \) -name '*.go'
+    \) -name "*.${ext}"
 }
 
-for file in $(find_files); do
-  if [[ "$("${KUBE_ROOT}/hooks/boilerplate.sh" "${file}")" -eq "0" ]]; then
+files_need_boilerplate=()
+
+files=($(find_files "go"))
+files_need_boilerplate+=($(${boiler} "go" "${files[@]}"))
+
+files=($(find_files "sh"))
+files_need_boilerplate+=($(${boiler} "sh" "${files[@]}"))
+
+if [[ ${#files_need_boilerplate[@]} -gt 0 ]]; then
+  for file in "${files_need_boilerplate[@]}"; do
     echo "Boilerplate header is wrong for: ${file}"
-    result=1
-  fi
-done
-
-dirs=("cluster" "hack" "hooks" "build")
-
-for dir in ${dirs[@]}; do
-  for file in $(find "$dir" -name '*.sh'); do
-    if [[ "$("${KUBE_ROOT}/hooks/boilerplate.sh" "${file}")" -eq "0" ]]; then
-      echo "Boilerplate header is wrong for: ${file}"
-      result=1
-    fi
   done
-done
 
-
-exit ${result}
+  exit 1
+fi

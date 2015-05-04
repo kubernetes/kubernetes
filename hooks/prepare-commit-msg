@@ -5,28 +5,27 @@ KUBE_HOOKS_DIR="$(dirname "$(test -L "$0" && echo "$(dirname $0)/$(readlink "$0"
 files_need_gofmt=()
 files_need_boilerplate=()
 files_need_description=()
-for file in $(git diff --cached --name-only --diff-filter ACM | grep "\.go" | grep -v -e "third_party" -e "Godeps"); do
+
+files=($(git diff --cached --name-only --diff-filter ACM | grep "\.go" | grep -v -e "third_party" -e "Godeps"))
+for file in "${files[@]}"; do
   # Check for files that fail gofmt.
   diff="$(git show ":${file}" | gofmt -s -d)"
   if [[ -n "$diff" ]]; then
     files_need_gofmt+=("${file}")
   fi
-
-  # Check for files without the required boilerplate.
-  boilerplate=$("${KUBE_HOOKS_DIR}/boilerplate.sh" "${file}")
-  if [[ "$boilerplate" -eq "0" ]]; then
-    files_need_boilerplate+=("${file}")
-  fi
 done
 
-# Check sh files for boilerplate
-for file in $(git diff --cached --name-only --diff-filter ACM | grep "\.sh" | grep -v -e "third_party" -e "Godeps"); do
-  # Check for files without the required boilerplate.
-  boilerplate=$("${KUBE_HOOKS_DIR}/boilerplate.sh" "${file}")
-  if [[ "$boilerplate" -eq "0" ]]; then
-    files_need_boilerplate+=("${file}")
-  fi
-done
+boiler="${KUBE_HOOKS_DIR}/boilerplate.py"
+# Check for go files without the required boilerplate.
+if [[ ${#files[@]} -gt 0 ]]; then
+  files_need_boilerplate+=($("${boiler}" "go" "${files[@]}"))
+fi
+
+# Check for sh files without the required boilerplate.
+files=($(git diff --cached --name-only --diff-filter ACM | grep "\.sh" | grep -v -e "third_party" -e "Godeps"))
+if [[ ${#files[@]} -gt 0 ]]; then
+  files_need_boilerplate+=($("${boiler}" "sh" "${files[@]}"))
+fi
 
 # Check API schema definitions for field descriptions
 for file in $(git diff --cached --name-only --diff-filter ACM | egrep "pkg/api/v.[^/]*/types\.go" | grep -v "third_party"); do
