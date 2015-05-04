@@ -37,7 +37,7 @@ Azure          | Saltstack    | Ubuntu | OpenVPN     | [docs](../../docs/getting
 Bare-metal     | custom       | Ubuntu | _none_      | [docs](../../docs/getting-started-guides/ubuntu_single_node.md) | Community (@jainvipin)       |
 Local          |              |        | _none_      | [docs](../../docs/getting-started-guides/locally.md)   | Community (@preillyme)                     |
 libvirt/KVM    | CoreOS       | CoreOS | libvirt/KVM | [docs](../../docs/getting-started-guides/libvirt-coreos.md) | Community (@lhuard1A)   |
-Ovirt          |              |        |             | [docs](../../docs/getting-started-guides/ovirt.md)     | Inactive (@simon3z)          |
+oVirt          |              |        |             | [docs](../../docs/getting-started-guides/ovirt.md)     | Community (@simon3z)         |
 
 
 *Note*: The above table is ordered by version test/used in notes followed by support level.
