@@ -330,7 +330,7 @@ func TestSetDefaultObjectFieldSelectorAPIVersion(t *testing.T) {
 				Env: []current.EnvVar{
 					{
 						ValueFrom: &current.EnvVarSource{
-							FieldPath: &current.ObjectFieldSelector{},
+							FieldRef: &current.ObjectFieldSelector{},
 						},
 					},
 				},
@@ -344,7 +344,7 @@ func TestSetDefaultObjectFieldSelectorAPIVersion(t *testing.T) {
 	pod2 := obj2.(*current.Pod)
 	s2 := pod2.Spec
 
-	apiVersion := s2.Containers[0].Env[0].ValueFrom.FieldPath.APIVersion
+	apiVersion := s2.Containers[0].Env[0].ValueFrom.FieldRef.APIVersion
 	if apiVersion != "v1" {
 		t.Errorf("Expected default APIVersion v1, got: %v", apiVersion)
 	}

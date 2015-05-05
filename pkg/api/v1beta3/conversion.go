@@ -632,14 +632,14 @@ func convert_api_EnvVar_To_v1beta3_EnvVar(in *newer.EnvVar, out *EnvVar, s conve
 }
 
 func convert_v1beta3_EnvVarSource_To_api_EnvVarSource(in *EnvVarSource, out *newer.EnvVarSource, s conversion.Scope) error {
-	if err := s.Convert(&in.FieldPath, &out.FieldPath, 0); err != nil {
+	if err := s.Convert(&in.FieldRef, &out.FieldRef, 0); err != nil {
 		return err
 	}
 	return nil
 }
 
 func convert_api_EnvVarSource_To_v1beta3_EnvVarSource(in *newer.EnvVarSource, out *EnvVarSource, s conversion.Scope) error {
-	if err := s.Convert(&in.FieldPath, &out.FieldPath, 0); err != nil {
+	if err := s.Convert(&in.FieldRef, &out.FieldRef, 0); err != nil {
 		return err
 	}
 	return nil

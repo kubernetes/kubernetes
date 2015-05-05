@@ -196,12 +196,12 @@ func FuzzerFor(t *testing.T, version string, src rand.Source) *fuzz.Fuzzer {
 				ev.Value = c.RandString()
 			} else {
 				ev.ValueFrom = &api.EnvVarSource{}
-				ev.ValueFrom.FieldPath = &api.ObjectFieldSelector{}
+				ev.ValueFrom.FieldRef = &api.ObjectFieldSelector{}
 
 				versions := []string{"v1beta1", "v1beta2", "v1beta3"}
 
-				ev.ValueFrom.FieldPath.APIVersion = versions[c.Rand.Intn(len(versions))]
-				ev.ValueFrom.FieldPath.FieldPath = c.RandString()
+				ev.ValueFrom.FieldRef.APIVersion = versions[c.Rand.Intn(len(versions))]
+				ev.ValueFrom.FieldRef.FieldPath = c.RandString()
 			}
 		},
 		func(e *api.Event, c fuzz.Continue) {

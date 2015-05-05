@@ -2181,7 +2181,7 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 					{
 						Name: "POD_NAME",
 						ValueFrom: &api.EnvVarSource{
-							FieldPath: &api.ObjectFieldSelector{
+							FieldRef: &api.ObjectFieldSelector{
 								APIVersion: "v1beta3",
 								FieldPath:  "metadata.name",
 							},
@@ -2190,7 +2190,7 @@ func TestMakeEnvironmentVariables(t *testing.T) {
 					{
 						Name: "POD_NAMESPACE",
 						ValueFrom: &api.EnvVarSource{
-							FieldPath: &api.ObjectFieldSelector{
+							FieldRef: &api.ObjectFieldSelector{
 								APIVersion: "v1beta3",
 								FieldPath:  "metadata.namespace",
 							},

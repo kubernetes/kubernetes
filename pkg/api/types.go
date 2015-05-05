@@ -518,7 +518,7 @@ type EnvVar struct {
 // EnvVarSource represents a source for the value of an EnvVar.
 type EnvVarSource struct {
 	// Required: Selects a field of the pod; only name and namespace are supported.
-	FieldPath *ObjectFieldSelector `json:"fieldPath"`
+	FieldRef *ObjectFieldSelector `json:"fieldRef"`
 }
 
 // ObjectFieldSelector selects an APIVersioned field of an object.

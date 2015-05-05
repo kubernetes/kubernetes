@@ -798,8 +798,8 @@ func (kl *Kubelet) runtimeEnvVarValue(envVar api.EnvVar, pod *api.Pod) (string, 
 		return runtimeVal, nil
 	}
 
-	if envVar.ValueFrom != nil && envVar.ValueFrom.FieldPath != nil {
-		return kl.podFieldSelectorRuntimeValue(envVar.ValueFrom.FieldPath, pod)
+	if envVar.ValueFrom != nil && envVar.ValueFrom.FieldRef != nil {
+		return kl.podFieldSelectorRuntimeValue(envVar.ValueFrom.FieldRef, pod)
 	}
 
 	return runtimeVal, nil
