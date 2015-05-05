@@ -23,7 +23,6 @@ import (
 	"io"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
 	kubecontainer "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
 )
 
@@ -32,14 +31,6 @@ type unsupportedRuntime struct {
 }
 
 var _ kubecontainer.Runtime = &unsupportedRuntime{}
-
-func New(config *Config,
-	generator kubecontainer.RunContainerOptionsGenerator,
-	recorder record.EventRecorder,
-	containerRefManager *kubecontainer.RefManager,
-	readinessManager *kubecontainer.ReadinessManager) (kubecontainer.Runtime, error) {
-	return nil, unsupportedError
-}
 
 var unsupportedError = fmt.Errorf("rkt runtime is unsupported in this platform")
 
