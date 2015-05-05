@@ -222,10 +222,14 @@ initial implementation targeting single cloud provider only.
 1. Auto-scaling (not yet available) in the remaining clusters takes
    care of it for me automagically as the additional failed-over
    traffic arrives (with some latency).
+1. I manually specify "additional resources to be provisioned" per
+   remaining cluster, possibly proportional to both the remaining functioning resources
+   and the unavailable resources in the failed cluster(s).
+   (All the benefits of over-provisioning, without expensive idle resources.)
 
 Doing nothing (i.e. forcing users to choose between 1 and 2 on their
 own) is probably an OK starting point.  Kubernetes autoscaling can get
-us to three at some later date.
+us to 3 at some later date.
 
 Up to this point, this use case ("Unavailability Zones") seems materially different from all the others above.  It does not require dynamic cross-cluster service migration (we assume that the service is already running in more than one cluster when the failure occurs).  Nor does it necessarily involve cross-cluster service discovery or location affinity.  As a result, I propose that we address this use case somewhat independently of the others (although I strongly suspect that it will become substantially easier once we've solved the others).  
    
