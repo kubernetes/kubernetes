@@ -18,6 +18,7 @@ package cache
 
 import (
 	"fmt"
+	"math/rand"
 	"strconv"
 	"testing"
 	"time"
@@ -95,12 +96,25 @@ func TestRunUntil(t *testing.T) {
 func TestReflector_resyncChan(t *testing.T) {
 	s := NewStore(MetaNamespaceKeyFunc)
 	g := NewReflector(&testLW{}, &api.Pod{}, s, time.Millisecond)
-	a, b := g.resyncChan(), time.After(100*time.Millisecond)
+	a, _ := g.resyncChan()
+	b := time.After(100 * time.Millisecond)
 	select {
 	case <-a:
 		t.Logf("got timeout as expected")
 	case <-b:
 		t.Errorf("resyncChan() is at least 99 milliseconds late??")
+	}
+}
+
+func BenchmarkReflector_resyncChanMany(b *testing.B) {
+	s := NewStore(MetaNamespaceKeyFunc)
+	g := NewReflector(&testLW{}, &api.Pod{}, s, 25*time.Millisecond)
+	// The improvement to this (calling the timer's Stop() method) makes
+	// this benchmark about 40% faster.
+	for i := 0; i < b.N; i++ {
+		g.resyncPeriod = time.Duration(rand.Float64() * float64(time.Millisecond) * 25)
+		_, stop := g.resyncChan()
+		stop()
 	}
 }
 
