@@ -73,6 +73,8 @@ type Factory struct {
 	PodSelectorForObject func(object runtime.Object) (string, error)
 	// PortsForObject returns the ports associated with the provided object
 	PortsForObject func(object runtime.Object) ([]string, error)
+	// LabelsForObject returns the labels associated with the provided object
+	LabelsForObject func(object runtime.Object) (map[string]string, error)
 	// Returns a schema that can validate objects stored on disk.
 	Validator func() (validation.Schema, error)
 	// Returns the default namespace to use in cases where no other namespace is specified
@@ -181,6 +183,9 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 				}
 				return nil, fmt.Errorf("it is not possible to get ports from %s", kind)
 			}
+		},
+		LabelsForObject: func(object runtime.Object) (map[string]string, error) {
+			return meta.NewAccessor().Labels(object)
 		},
 		Resizer: func(mapping *meta.RESTMapping) (kubectl.Resizer, error) {
 			client, err := clients.ClientForVersion(mapping.APIVersion)

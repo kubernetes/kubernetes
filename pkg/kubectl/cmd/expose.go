@@ -32,7 +32,8 @@ const (
 	expose_long = `Take a replicated application and expose it as Kubernetes Service.
 
 Looks up a replication controller or service by name and uses the selector for that resource as the
-selector for a new Service on the specified port.`
+selector for a new Service on the specified port. If no labels are specified, the new service will
+re-use the labels from the resource it exposes.`
 
 	expose_example = `// Creates a service for a replicated nginx, which serves on port 80 and connects to the containers on port 8000.
 $ kubectl expose rc nginx --port=80 --target-port=8000
@@ -150,6 +151,13 @@ func RunExpose(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []str
 	}
 	if cmdutil.GetFlagBool(cmd, "create-external-load-balancer") {
 		params["create-external-load-balancer"] = "true"
+	}
+	if len(params["labels"]) == 0 {
+		labels, err := f.LabelsForObject(inputObject)
+		if err != nil {
+			return err
+		}
+		params["labels"] = kubectl.MakeLabels(labels)
 	}
 	err = kubectl.ValidateParams(names, params)
 	if err != nil {
