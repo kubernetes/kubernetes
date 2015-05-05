@@ -204,6 +204,17 @@ func FuzzerFor(t *testing.T, version string, src rand.Source) *fuzz.Fuzzer {
 				ev.ValueFrom.FieldRef.FieldPath = c.RandString()
 			}
 		},
+		func(sc *api.SecurityContext, c fuzz.Continue) {
+			c.FuzzNoCustom(sc) // fuzz self without calling this function again
+			priv := c.RandBool()
+			sc.Privileged = &priv
+			sc.Capabilities = &api.Capabilities{
+				Add:  make([]api.CapabilityType, 0),
+				Drop: make([]api.CapabilityType, 0),
+			}
+			c.Fuzz(&sc.Capabilities.Add)
+			c.Fuzz(&sc.Capabilities.Drop)
+		},
 		func(e *api.Event, c fuzz.Continue) {
 			c.FuzzNoCustom(e) // fuzz self without calling this function again
 			// Fix event count to 1, otherwise, if a v1beta1 or v1beta2 event has a count set arbitrarily, it's count is ignored
