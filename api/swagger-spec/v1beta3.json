@@ -7199,6 +7199,14 @@
         "description": "object name and auth scope, such as for teams and projects",
         "required": true,
         "allowMultiple": false
+       },
+       {
+        "type": "v1beta3.DeleteOptions",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
        }
       ],
       "responseMessages": [
@@ -8316,57 +8324,21 @@
      "target"
     ],
     "properties": {
-     "annotations": {
-      "type": "any",
-      "description": "map of string keys and values that can be used by external tooling to store and retrieve arbitrary metadata about objects"
-     },
      "apiVersion": {
       "type": "string",
       "description": "version of the schema the object should have"
-     },
-     "creationTimestamp": {
-      "type": "string",
-      "description": "RFC 3339 date and time at which the object was created; populated by the system, read-only; null for lists"
-     },
-     "deletionTimestamp": {
-      "type": "string",
-      "description": "RFC 3339 date and time at which the object will be deleted; populated by the system when a graceful deletion is requested, read-only; if not set, graceful deletion of the object has not been requested"
-     },
-     "generateName": {
-      "type": "string",
-      "description": "an optional prefix to use to generate a unique name; has the same validation rules as name; optional, and is applied only name if is not specified"
      },
      "kind": {
       "type": "string",
       "description": "kind of object, in CamelCase; cannot be updated"
      },
-     "labels": {
-      "type": "any",
-      "description": "map of string keys and values that can be used to organize and categorize objects; may match selectors of replication controllers and services"
-     },
-     "name": {
-      "type": "string",
-      "description": "string that identifies an object. Must be unique within a namespace; cannot be updated"
-     },
-     "namespace": {
-      "type": "string",
-      "description": "namespace of the object; cannot be updated"
-     },
-     "resourceVersion": {
-      "type": "string",
-      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
-     },
-     "selfLink": {
-      "type": "string",
-      "description": "URL for the object; populated by the system, read-only"
+     "metadata": {
+      "$ref": "v1beta3.ObjectMeta",
+      "description": "standard object metadata; see http://docs.k8s.io/api-conventions.md#metadata"
      },
      "target": {
       "$ref": "v1beta3.ObjectReference",
       "description": "an object to bind to"
-     },
-     "uid": {
-      "type": "string",
-      "description": "unique UUID across space and time; populated by the system; read-only"
      }
     }
    },
@@ -8421,10 +8393,6 @@
    "v1beta3.ComponentStatus": {
     "id": "v1beta3.ComponentStatus",
     "properties": {
-     "annotations": {
-      "type": "any",
-      "description": "map of string keys and values that can be used by external tooling to store and retrieve arbitrary metadata about objects"
-     },
      "apiVersion": {
       "type": "string",
       "description": "version of the schema the object should have"
@@ -8436,45 +8404,13 @@
       },
       "description": "list of component conditions observed"
      },
-     "creationTimestamp": {
-      "type": "string",
-      "description": "RFC 3339 date and time at which the object was created; populated by the system, read-only; null for lists"
-     },
-     "deletionTimestamp": {
-      "type": "string",
-      "description": "RFC 3339 date and time at which the object will be deleted; populated by the system when a graceful deletion is requested, read-only; if not set, graceful deletion of the object has not been requested"
-     },
-     "generateName": {
-      "type": "string",
-      "description": "an optional prefix to use to generate a unique name; has the same validation rules as name; optional, and is applied only name if is not specified"
-     },
      "kind": {
       "type": "string",
       "description": "kind of object, in CamelCase; cannot be updated"
      },
-     "labels": {
-      "type": "any",
-      "description": "map of string keys and values that can be used to organize and categorize objects; may match selectors of replication controllers and services"
-     },
-     "name": {
-      "type": "string",
-      "description": "string that identifies an object. Must be unique within a namespace; cannot be updated"
-     },
-     "namespace": {
-      "type": "string",
-      "description": "namespace of the object; cannot be updated"
-     },
-     "resourceVersion": {
-      "type": "string",
-      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
-     },
-     "selfLink": {
-      "type": "string",
-      "description": "URL for the object; populated by the system, read-only"
-     },
-     "uid": {
-      "type": "string",
-      "description": "unique UUID across space and time; populated by the system; read-only"
+     "metadata": {
+      "$ref": "v1beta3.ObjectMeta",
+      "description": "standard object metadata; see http://docs.k8s.io/api-conventions.md#metadata"
      }
     }
    },
@@ -8499,13 +8435,9 @@
       "type": "string",
       "description": "kind of object, in CamelCase; cannot be updated"
      },
-     "resourceVersion": {
-      "type": "string",
-      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
-     },
-     "selfLink": {
-      "type": "string",
-      "description": "URL for the object; populated by the system, read-only"
+     "metadata": {
+      "$ref": "v1beta3.ListMeta",
+      "description": "standard list metadata; see http://docs.k8s.io/api-conventions.md#metadata"
      }
     }
    },
@@ -8840,49 +8772,17 @@
      "subsets"
     ],
     "properties": {
-     "annotations": {
-      "type": "any",
-      "description": "map of string keys and values that can be used by external tooling to store and retrieve arbitrary metadata about objects"
-     },
      "apiVersion": {
       "type": "string",
       "description": "version of the schema the object should have"
-     },
-     "creationTimestamp": {
-      "type": "string",
-      "description": "RFC 3339 date and time at which the object was created; populated by the system, read-only; null for lists"
-     },
-     "deletionTimestamp": {
-      "type": "string",
-      "description": "RFC 3339 date and time at which the object will be deleted; populated by the system when a graceful deletion is requested, read-only; if not set, graceful deletion of the object has not been requested"
-     },
-     "generateName": {
-      "type": "string",
-      "description": "an optional prefix to use to generate a unique name; has the same validation rules as name; optional, and is applied only name if is not specified"
      },
      "kind": {
       "type": "string",
       "description": "kind of object, in CamelCase; cannot be updated"
      },
-     "labels": {
-      "type": "any",
-      "description": "map of string keys and values that can be used to organize and categorize objects; may match selectors of replication controllers and services"
-     },
-     "name": {
-      "type": "string",
-      "description": "string that identifies an object. Must be unique within a namespace; cannot be updated"
-     },
-     "namespace": {
-      "type": "string",
-      "description": "namespace of the object; cannot be updated"
-     },
-     "resourceVersion": {
-      "type": "string",
-      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
-     },
-     "selfLink": {
-      "type": "string",
-      "description": "URL for the object; populated by the system, read-only"
+     "metadata": {
+      "$ref": "v1beta3.ObjectMeta",
+      "description": "standard object metadata; see http://docs.k8s.io/api-conventions.md#metadata"
      },
      "subsets": {
       "type": "array",
@@ -8890,10 +8790,6 @@
        "$ref": "v1beta3.EndpointSubset"
       },
       "description": "sets of addresses and ports that comprise a service"
-     },
-     "uid": {
-      "type": "string",
-      "description": "unique UUID across space and time; populated by the system; read-only"
      }
     }
    },
@@ -8918,13 +8814,9 @@
       "type": "string",
       "description": "kind of object, in CamelCase; cannot be updated"
      },
-     "resourceVersion": {
-      "type": "string",
-      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
-     },
-     "selfLink": {
-      "type": "string",
-      "description": "URL for the object; populated by the system, read-only"
+     "metadata": {
+      "$ref": "v1beta3.ListMeta",
+      "description": "standard list metadata; see http://docs.k8s.io/api-conventions.md#metadata"
      }
     }
    },
@@ -8941,16 +8833,31 @@
      "value": {
       "type": "string",
       "description": "value of the environment variable; defaults to empty string"
+     },
+     "valueFrom": {
+      "$ref": "v1beta3.EnvVarSource",
+      "description": "source for the environment variable's value; cannot be used if value is not empty"
+     }
+    }
+   },
+   "v1beta3.EnvVarSource": {
+    "id": "v1beta3.EnvVarSource",
+    "required": [
+     "fieldRef"
+    ],
+    "properties": {
+     "fieldRef": {
+      "$ref": "v1beta3.ObjectFieldSelector",
+      "description": "selects a field of the pod; only name and namespace are supported"
      }
     }
    },
    "v1beta3.Event": {
     "id": "v1beta3.Event",
+    "required": [
+     "metadata"
+    ],
     "properties": {
-     "annotations": {
-      "type": "any",
-      "description": "map of string keys and values that can be used by external tooling to store and retrieve arbitrary metadata about objects"
-     },
      "apiVersion": {
       "type": "string",
       "description": "version of the schema the object should have"
@@ -8960,21 +8867,9 @@
       "format": "int32",
       "description": "the number of times this event has occurred"
      },
-     "creationTimestamp": {
-      "type": "string",
-      "description": "RFC 3339 date and time at which the object was created; populated by the system, read-only; null for lists"
-     },
-     "deletionTimestamp": {
-      "type": "string",
-      "description": "RFC 3339 date and time at which the object will be deleted; populated by the system when a graceful deletion is requested, read-only; if not set, graceful deletion of the object has not been requested"
-     },
      "firstTimestamp": {
       "type": "string",
       "description": "the time at which the event was first recorded"
-     },
-     "generateName": {
-      "type": "string",
-      "description": "an optional prefix to use to generate a unique name; has the same validation rules as name; optional, and is applied only name if is not specified"
      },
      "involvedObject": {
       "$ref": "v1beta3.ObjectReference",
@@ -8984,10 +8879,6 @@
       "type": "string",
       "description": "kind of object, in CamelCase; cannot be updated"
      },
-     "labels": {
-      "type": "any",
-      "description": "map of string keys and values that can be used to organize and categorize objects; may match selectors of replication controllers and services"
-     },
      "lastTimestamp": {
       "type": "string",
       "description": "the time at which the most recent occurance of this event was recorded"
@@ -8996,33 +8887,17 @@
       "type": "string",
       "description": "human-readable description of the status of this operation"
      },
-     "name": {
-      "type": "string",
-      "description": "string that identifies an object. Must be unique within a namespace; cannot be updated"
-     },
-     "namespace": {
-      "type": "string",
-      "description": "namespace of the object; cannot be updated"
+     "metadata": {
+      "$ref": "v1beta3.ObjectMeta",
+      "description": "standard object metadata; see http://docs.k8s.io/api-conventions.md#metadata"
      },
      "reason": {
       "type": "string",
       "description": "short, machine understandable string that gives the reason for the transition into the object's current status"
      },
-     "resourceVersion": {
-      "type": "string",
-      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
-     },
-     "selfLink": {
-      "type": "string",
-      "description": "URL for the object; populated by the system, read-only"
-     },
      "source": {
       "$ref": "v1beta3.EventSource",
       "description": "component reporting this event"
-     },
-     "uid": {
-      "type": "string",
-      "description": "unique UUID across space and time; populated by the system; read-only"
      }
     }
    },
@@ -9047,13 +8922,9 @@
       "type": "string",
       "description": "kind of object, in CamelCase; cannot be updated"
      },
-     "resourceVersion": {
-      "type": "string",
-      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
-     },
-     "selfLink": {
-      "type": "string",
-      "description": "URL for the object; populated by the system, read-only"
+     "metadata": {
+      "$ref": "v1beta3.ListMeta",
+      "description": "standard list metadata; see http://docs.k8s.io/api-conventions.md#metadata"
      }
     }
    },
@@ -9237,57 +9108,21 @@
    "v1beta3.LimitRange": {
     "id": "v1beta3.LimitRange",
     "properties": {
-     "annotations": {
-      "type": "any",
-      "description": "map of string keys and values that can be used by external tooling to store and retrieve arbitrary metadata about objects"
-     },
      "apiVersion": {
       "type": "string",
       "description": "version of the schema the object should have"
-     },
-     "creationTimestamp": {
-      "type": "string",
-      "description": "RFC 3339 date and time at which the object was created; populated by the system, read-only; null for lists"
-     },
-     "deletionTimestamp": {
-      "type": "string",
-      "description": "RFC 3339 date and time at which the object will be deleted; populated by the system when a graceful deletion is requested, read-only; if not set, graceful deletion of the object has not been requested"
-     },
-     "generateName": {
-      "type": "string",
-      "description": "an optional prefix to use to generate a unique name; has the same validation rules as name; optional, and is applied only name if is not specified"
      },
      "kind": {
       "type": "string",
       "description": "kind of object, in CamelCase; cannot be updated"
      },
-     "labels": {
-      "type": "any",
-      "description": "map of string keys and values that can be used to organize and categorize objects; may match selectors of replication controllers and services"
-     },
-     "name": {
-      "type": "string",
-      "description": "string that identifies an object. Must be unique within a namespace; cannot be updated"
-     },
-     "namespace": {
-      "type": "string",
-      "description": "namespace of the object; cannot be updated"
-     },
-     "resourceVersion": {
-      "type": "string",
-      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
-     },
-     "selfLink": {
-      "type": "string",
-      "description": "URL for the object; populated by the system, read-only"
+     "metadata": {
+      "$ref": "v1beta3.ObjectMeta",
+      "description": "standard object metadata; see http://docs.k8s.io/api-conventions.md#metadata"
      },
      "spec": {
       "$ref": "v1beta3.LimitRangeSpec",
-      "description": "spec defines the limits enforced; https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#spec-and-status"
-     },
-     "uid": {
-      "type": "string",
-      "description": "unique UUID across space and time; populated by the system; read-only"
+      "description": "spec defines the limits enforced; http://docs.k8s.io/api-conventions.md#spec-and-status"
      }
     }
    },
@@ -9333,13 +9168,9 @@
       "type": "string",
       "description": "kind of object, in CamelCase; cannot be updated"
      },
-     "resourceVersion": {
-      "type": "string",
-      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
-     },
-     "selfLink": {
-      "type": "string",
-      "description": "URL for the object; populated by the system, read-only"
+     "metadata": {
+      "$ref": "v1beta3.ListMeta",
+      "description": "standard list metadata; see http://docs.k8s.io/api-conventions.md#metadata"
      }
     }
    },
@@ -9355,6 +9186,19 @@
        "$ref": "v1beta3.LimitRangeItem"
       },
       "description": "limits is the list of LimitRangeItem objects that are enforced"
+     }
+    }
+   },
+   "v1beta3.ListMeta": {
+    "id": "v1beta3.ListMeta",
+    "properties": {
+     "resourceVersion": {
+      "type": "string",
+      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: http://docs.k8s.io/api-conventions.md#concurrency-control-and-consistency"
+     },
+     "selfLink": {
+      "type": "string",
+      "description": "URL for the object; populated by the system, read-only"
      }
     }
    },
@@ -9382,61 +9226,25 @@
    "v1beta3.Namespace": {
     "id": "v1beta3.Namespace",
     "properties": {
-     "annotations": {
-      "type": "any",
-      "description": "map of string keys and values that can be used by external tooling to store and retrieve arbitrary metadata about objects"
-     },
      "apiVersion": {
       "type": "string",
       "description": "version of the schema the object should have"
-     },
-     "creationTimestamp": {
-      "type": "string",
-      "description": "RFC 3339 date and time at which the object was created; populated by the system, read-only; null for lists"
-     },
-     "deletionTimestamp": {
-      "type": "string",
-      "description": "RFC 3339 date and time at which the object will be deleted; populated by the system when a graceful deletion is requested, read-only; if not set, graceful deletion of the object has not been requested"
-     },
-     "generateName": {
-      "type": "string",
-      "description": "an optional prefix to use to generate a unique name; has the same validation rules as name; optional, and is applied only name if is not specified"
      },
      "kind": {
       "type": "string",
       "description": "kind of object, in CamelCase; cannot be updated"
      },
-     "labels": {
-      "type": "any",
-      "description": "map of string keys and values that can be used to organize and categorize objects; may match selectors of replication controllers and services"
-     },
-     "name": {
-      "type": "string",
-      "description": "string that identifies an object. Must be unique within a namespace; cannot be updated"
-     },
-     "namespace": {
-      "type": "string",
-      "description": "namespace of the object; cannot be updated"
-     },
-     "resourceVersion": {
-      "type": "string",
-      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
-     },
-     "selfLink": {
-      "type": "string",
-      "description": "URL for the object; populated by the system, read-only"
+     "metadata": {
+      "$ref": "v1beta3.ObjectMeta",
+      "description": "standard object metadata; see http://docs.k8s.io/api-conventions.md#metadata"
      },
      "spec": {
       "$ref": "v1beta3.NamespaceSpec",
-      "description": "spec defines the behavior of the Namespace; https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#spec-and-status"
+      "description": "spec defines the behavior of the Namespace; http://docs.k8s.io/api-conventions.md#spec-and-status"
      },
      "status": {
       "$ref": "v1beta3.NamespaceStatus",
-      "description": "status describes the current status of a Namespace; https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#spec-and-status"
-     },
-     "uid": {
-      "type": "string",
-      "description": "unique UUID across space and time; populated by the system; read-only"
+      "description": "status describes the current status of a Namespace; http://docs.k8s.io/api-conventions.md#spec-and-status"
      }
     }
    },
@@ -9461,13 +9269,9 @@
       "type": "string",
       "description": "kind of object, in CamelCase; cannot be updated"
      },
-     "resourceVersion": {
-      "type": "string",
-      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
-     },
-     "selfLink": {
-      "type": "string",
-      "description": "URL for the object; populated by the system, read-only"
+     "metadata": {
+      "$ref": "v1beta3.ListMeta",
+      "description": "standard list metadata; see http://docs.k8s.io/api-conventions.md#metadata"
      }
     }
    },
@@ -9495,61 +9299,25 @@
    "v1beta3.Node": {
     "id": "v1beta3.Node",
     "properties": {
-     "annotations": {
-      "type": "any",
-      "description": "map of string keys and values that can be used by external tooling to store and retrieve arbitrary metadata about objects"
-     },
      "apiVersion": {
       "type": "string",
       "description": "version of the schema the object should have"
-     },
-     "creationTimestamp": {
-      "type": "string",
-      "description": "RFC 3339 date and time at which the object was created; populated by the system, read-only; null for lists"
-     },
-     "deletionTimestamp": {
-      "type": "string",
-      "description": "RFC 3339 date and time at which the object will be deleted; populated by the system when a graceful deletion is requested, read-only; if not set, graceful deletion of the object has not been requested"
-     },
-     "generateName": {
-      "type": "string",
-      "description": "an optional prefix to use to generate a unique name; has the same validation rules as name; optional, and is applied only name if is not specified"
      },
      "kind": {
       "type": "string",
       "description": "kind of object, in CamelCase; cannot be updated"
      },
-     "labels": {
-      "type": "any",
-      "description": "map of string keys and values that can be used to organize and categorize objects; may match selectors of replication controllers and services"
-     },
-     "name": {
-      "type": "string",
-      "description": "string that identifies an object. Must be unique within a namespace; cannot be updated"
-     },
-     "namespace": {
-      "type": "string",
-      "description": "namespace of the object; cannot be updated"
-     },
-     "resourceVersion": {
-      "type": "string",
-      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
-     },
-     "selfLink": {
-      "type": "string",
-      "description": "URL for the object; populated by the system, read-only"
+     "metadata": {
+      "$ref": "v1beta3.ObjectMeta",
+      "description": "standard object metadata; see http://docs.k8s.io/api-conventions.md#metadata"
      },
      "spec": {
       "$ref": "v1beta3.NodeSpec",
-      "description": "specification of a node; https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#spec-and-status"
+      "description": "specification of a node; http://docs.k8s.io/api-conventions.md#spec-and-status"
      },
      "status": {
       "$ref": "v1beta3.NodeStatus",
-      "description": "most recently observed status of the node; populated by the system, read-only; https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#spec-and-status"
-     },
-     "uid": {
-      "type": "string",
-      "description": "unique UUID across space and time; populated by the system; read-only"
+      "description": "most recently observed status of the node; populated by the system, read-only; http://docs.k8s.io/api-conventions.md#spec-and-status"
      }
     }
    },
@@ -9561,10 +9329,12 @@
     ],
     "properties": {
      "address": {
-      "type": "string"
+      "type": "string",
+      "description": "the node address"
      },
      "type": {
-      "type": "string"
+      "type": "string",
+      "description": "node address type, one of Hostname, ExternalIP or InternalIP"
      }
     }
    },
@@ -9622,13 +9392,9 @@
       "type": "string",
       "description": "kind of object, in CamelCase; cannot be updated"
      },
-     "resourceVersion": {
-      "type": "string",
-      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
-     },
-     "selfLink": {
-      "type": "string",
-      "description": "URL for the object; populated by the system, read-only"
+     "metadata": {
+      "$ref": "v1beta3.ListMeta",
+      "description": "standard list metadata; see http://docs.k8s.io/api-conventions.md#metadata"
      }
     }
    },
@@ -9661,7 +9427,7 @@
      },
      "capacity": {
       "type": "any",
-      "description": "compute resource capacity of the node; https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/resources.md"
+      "description": "compute resource capacity of the node; http://docs.k8s.io/resources.md"
      },
      "conditions": {
       "type": "array",
@@ -9671,7 +9437,8 @@
       "description": "list of node conditions observed"
      },
      "nodeInfo": {
-      "$ref": "v1beta3.NodeSystemInfo"
+      "$ref": "v1beta3.NodeSystemInfo",
+      "description": "set of ids/uuids to uniquely identify the node"
      },
      "phase": {
       "type": "string",
@@ -9689,13 +9456,9 @@
      "osImage",
      "containerRuntimeVersion",
      "kubeletVersion",
-     "KubeProxyVersion"
+     "kubeProxyVersion"
     ],
     "properties": {
-     "KubeProxyVersion": {
-      "type": "string",
-      "description": "Kube-proxy version reported by the node"
-     },
      "bootID": {
       "type": "string",
       "description": "boot id is the boot-id reported by the node"
@@ -9708,19 +9471,86 @@
       "type": "string",
       "description": "Kernel version reported by the node from 'uname -r' (e.g. 3.16.0-0.bpo.4-amd64)"
      },
+     "kubeProxyVersion": {
+      "type": "string",
+      "description": "Kube-proxy version reported by the node"
+     },
      "kubeletVersion": {
       "type": "string",
       "description": "Kubelet version reported by the node"
      },
      "machineID": {
-      "type": "string"
+      "type": "string",
+      "description": "machine-id reported by the node"
      },
      "osImage": {
       "type": "string",
       "description": "OS image used reported by the node from /etc/os-release (e.g. Debian GNU/Linux 7 (wheezy))"
      },
      "systemUUID": {
-      "type": "string"
+      "type": "string",
+      "description": "system-uuid reported by the node"
+     }
+    }
+   },
+   "v1beta3.ObjectFieldSelector": {
+    "id": "v1beta3.ObjectFieldSelector",
+    "required": [
+     "fieldPath"
+    ],
+    "properties": {
+     "apiVersion": {
+      "type": "string",
+      "description": "version of the schema that fieldPath is written in terms of; defaults to v1beta3"
+     },
+     "fieldPath": {
+      "type": "string",
+      "description": "path of the field to select in the specified API version"
+     }
+    }
+   },
+   "v1beta3.ObjectMeta": {
+    "id": "v1beta3.ObjectMeta",
+    "properties": {
+     "annotations": {
+      "type": "any",
+      "description": "map of string keys and values that can be used by external tooling to store and retrieve arbitrary metadata about objects"
+     },
+     "creationTimestamp": {
+      "type": "string",
+      "description": "RFC 3339 date and time at which the object was created; populated by the system, read-only; null for lists"
+     },
+     "deletionTimestamp": {
+      "type": "string",
+      "description": "RFC 3339 date and time at which the object will be deleted; populated by the system when a graceful deletion is requested, read-only; if not set, graceful deletion of the object has not been requested"
+     },
+     "generateName": {
+      "type": "string",
+      "description": "an optional prefix to use to generate a unique name; has the same validation rules as name; optional, and is applied only name if is not specified"
+     },
+     "labels": {
+      "type": "any",
+      "description": "map of string keys and values that can be used to organize and categorize objects; may match selectors of replication controllers and services"
+     },
+     "name": {
+      "type": "string",
+      "description": "string that identifies an object. Must be unique within a namespace; cannot be updated"
+     },
+     "namespace": {
+      "type": "string",
+      "description": "namespace of the object; cannot be updated"
+     },
+     "resourceVersion": {
+      "type": "string",
+      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: http://docs.k8s.io/api-conventions.md#concurrency-control-and-consistency"
+     },
+     "selfLink": {
+      "type": "string",
+      "description": "URL for the object; populated by the system, read-only"
+     },
+     "uid": {
+      "type": "string",
+      "description": "unique UUID across space and time; populated by the system; read-only"
      }
     }
    },
@@ -9749,7 +9579,7 @@
      },
      "resourceVersion": {
       "type": "string",
-      "description": "specific resourceVersion to which this reference is made, if any: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
+      "description": "specific resourceVersion to which this reference is made, if any: http://docs.k8s.io/api-conventions.md#concurrency-control-and-consistency"
      },
      "uid": {
       "type": "string",
@@ -9760,49 +9590,17 @@
    "v1beta3.PersistentVolume": {
     "id": "v1beta3.PersistentVolume",
     "properties": {
-     "annotations": {
-      "type": "any",
-      "description": "map of string keys and values that can be used by external tooling to store and retrieve arbitrary metadata about objects"
-     },
      "apiVersion": {
       "type": "string",
       "description": "version of the schema the object should have"
-     },
-     "creationTimestamp": {
-      "type": "string",
-      "description": "RFC 3339 date and time at which the object was created; populated by the system, read-only; null for lists"
-     },
-     "deletionTimestamp": {
-      "type": "string",
-      "description": "RFC 3339 date and time at which the object will be deleted; populated by the system when a graceful deletion is requested, read-only; if not set, graceful deletion of the object has not been requested"
-     },
-     "generateName": {
-      "type": "string",
-      "description": "an optional prefix to use to generate a unique name; has the same validation rules as name; optional, and is applied only name if is not specified"
      },
      "kind": {
       "type": "string",
       "description": "kind of object, in CamelCase; cannot be updated"
      },
-     "labels": {
-      "type": "any",
-      "description": "map of string keys and values that can be used to organize and categorize objects; may match selectors of replication controllers and services"
-     },
-     "name": {
-      "type": "string",
-      "description": "string that identifies an object. Must be unique within a namespace; cannot be updated"
-     },
-     "namespace": {
-      "type": "string",
-      "description": "namespace of the object; cannot be updated"
-     },
-     "resourceVersion": {
-      "type": "string",
-      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
-     },
-     "selfLink": {
-      "type": "string",
-      "description": "URL for the object; populated by the system, read-only"
+     "metadata": {
+      "$ref": "v1beta3.ObjectMeta",
+      "description": "standard object metadata; see http://docs.k8s.io/api-conventions.md#metadata"
      },
      "spec": {
       "$ref": "v1beta3.PersistentVolumeSpec",
@@ -9811,59 +9609,23 @@
      "status": {
       "$ref": "v1beta3.PersistentVolumeStatus",
       "description": "current status of a persistent volume; populated by the system, read-only"
-     },
-     "uid": {
-      "type": "string",
-      "description": "unique UUID across space and time; populated by the system; read-only"
      }
     }
    },
    "v1beta3.PersistentVolumeClaim": {
     "id": "v1beta3.PersistentVolumeClaim",
     "properties": {
-     "annotations": {
-      "type": "any",
-      "description": "map of string keys and values that can be used by external tooling to store and retrieve arbitrary metadata about objects"
-     },
      "apiVersion": {
       "type": "string",
       "description": "version of the schema the object should have"
-     },
-     "creationTimestamp": {
-      "type": "string",
-      "description": "RFC 3339 date and time at which the object was created; populated by the system, read-only; null for lists"
-     },
-     "deletionTimestamp": {
-      "type": "string",
-      "description": "RFC 3339 date and time at which the object will be deleted; populated by the system when a graceful deletion is requested, read-only; if not set, graceful deletion of the object has not been requested"
-     },
-     "generateName": {
-      "type": "string",
-      "description": "an optional prefix to use to generate a unique name; has the same validation rules as name; optional, and is applied only name if is not specified"
      },
      "kind": {
       "type": "string",
       "description": "kind of object, in CamelCase; cannot be updated"
      },
-     "labels": {
-      "type": "any",
-      "description": "map of string keys and values that can be used to organize and categorize objects; may match selectors of replication controllers and services"
-     },
-     "name": {
-      "type": "string",
-      "description": "string that identifies an object. Must be unique within a namespace; cannot be updated"
-     },
-     "namespace": {
-      "type": "string",
-      "description": "namespace of the object; cannot be updated"
-     },
-     "resourceVersion": {
-      "type": "string",
-      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
-     },
-     "selfLink": {
-      "type": "string",
-      "description": "URL for the object; populated by the system, read-only"
+     "metadata": {
+      "$ref": "v1beta3.ObjectMeta",
+      "description": "standard object metadata; see http://docs.k8s.io/api-conventions.md#metadata"
      },
      "spec": {
       "$ref": "v1beta3.PersistentVolumeClaimSpec"
@@ -9871,10 +9633,6 @@
      "status": {
       "$ref": "v1beta3.PersistentVolumeClaimStatus",
       "description": "the current status of a persistent volume claim; read-only"
-     },
-     "uid": {
-      "type": "string",
-      "description": "unique UUID across space and time; populated by the system; read-only"
      }
     }
    },
@@ -9895,13 +9653,8 @@
       "type": "string",
       "description": "kind of object, in CamelCase; cannot be updated"
      },
-     "resourceVersion": {
-      "type": "string",
-      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
-     },
-     "selfLink": {
-      "type": "string",
-      "description": "URL for the object; populated by the system, read-only"
+     "metadata": {
+      "$ref": "v1beta3.ListMeta"
      }
     }
    },
@@ -9976,13 +9729,8 @@
       "type": "string",
       "description": "kind of object, in CamelCase; cannot be updated"
      },
-     "resourceVersion": {
-      "type": "string",
-      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
-     },
-     "selfLink": {
-      "type": "string",
-      "description": "URL for the object; populated by the system, read-only"
+     "metadata": {
+      "$ref": "v1beta3.ListMeta"
      }
     }
    },
@@ -10040,61 +9788,25 @@
    "v1beta3.Pod": {
     "id": "v1beta3.Pod",
     "properties": {
-     "annotations": {
-      "type": "any",
-      "description": "map of string keys and values that can be used by external tooling to store and retrieve arbitrary metadata about objects"
-     },
      "apiVersion": {
       "type": "string",
       "description": "version of the schema the object should have"
-     },
-     "creationTimestamp": {
-      "type": "string",
-      "description": "RFC 3339 date and time at which the object was created; populated by the system, read-only; null for lists"
-     },
-     "deletionTimestamp": {
-      "type": "string",
-      "description": "RFC 3339 date and time at which the object will be deleted; populated by the system when a graceful deletion is requested, read-only; if not set, graceful deletion of the object has not been requested"
-     },
-     "generateName": {
-      "type": "string",
-      "description": "an optional prefix to use to generate a unique name; has the same validation rules as name; optional, and is applied only name if is not specified"
      },
      "kind": {
       "type": "string",
       "description": "kind of object, in CamelCase; cannot be updated"
      },
-     "labels": {
-      "type": "any",
-      "description": "map of string keys and values that can be used to organize and categorize objects; may match selectors of replication controllers and services"
-     },
-     "name": {
-      "type": "string",
-      "description": "string that identifies an object. Must be unique within a namespace; cannot be updated"
-     },
-     "namespace": {
-      "type": "string",
-      "description": "namespace of the object; cannot be updated"
-     },
-     "resourceVersion": {
-      "type": "string",
-      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
-     },
-     "selfLink": {
-      "type": "string",
-      "description": "URL for the object; populated by the system, read-only"
+     "metadata": {
+      "$ref": "v1beta3.ObjectMeta",
+      "description": "standard object metadata; see http://docs.k8s.io/api-conventions.md#metadata"
      },
      "spec": {
       "$ref": "v1beta3.PodSpec",
-      "description": "specification of the desired behavior of the pod; https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#spec-and-status"
+      "description": "specification of the desired behavior of the pod; http://docs.k8s.io/api-conventions.md#spec-and-status"
      },
      "status": {
       "$ref": "v1beta3.PodStatus",
-      "description": "most recently observed status of the pod; populated by the system, read-only; https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#spec-and-status"
-     },
-     "uid": {
-      "type": "string",
-      "description": "unique UUID across space and time; populated by the system; read-only"
+      "description": "most recently observed status of the pod; populated by the system, read-only; http://docs.k8s.io/api-conventions.md#spec-and-status"
      }
     }
    },
@@ -10136,13 +9848,8 @@
       "type": "string",
       "description": "kind of object, in CamelCase; cannot be updated"
      },
-     "resourceVersion": {
-      "type": "string",
-      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
-     },
-     "selfLink": {
-      "type": "string",
-      "description": "URL for the object; populated by the system, read-only"
+     "metadata": {
+      "$ref": "v1beta3.ListMeta"
      }
     }
    },
@@ -10179,6 +9886,10 @@
      "restartPolicy": {
       "type": "string",
       "description": "restart policy for all containers within the pod; one of RestartPolicyAlways, RestartPolicyOnFailure, RestartPolicyNever"
+     },
+     "terminationGracePeriodSeconds": {
+      "$ref": "int64",
+      "description": "optional duration in seconds the pod needs to terminate gracefully; may be decreased in delete request; value must be non-negative integer; the value zero indicates delete immediately; if this value is not set, the default grace period will be used instead; the grace period is the duration in seconds after the processes running in the pod are sent a termination signal and the time when the processes are forcibly halted with a kill signal; set this value longer than the expected cleanup time for your process"
      },
      "volumes": {
       "type": "array",
@@ -10227,57 +9938,21 @@
    "v1beta3.PodTemplate": {
     "id": "v1beta3.PodTemplate",
     "properties": {
-     "annotations": {
-      "type": "any",
-      "description": "map of string keys and values that can be used by external tooling to store and retrieve arbitrary metadata about objects"
-     },
      "apiVersion": {
       "type": "string",
       "description": "version of the schema the object should have"
-     },
-     "creationTimestamp": {
-      "type": "string",
-      "description": "RFC 3339 date and time at which the object was created; populated by the system, read-only; null for lists"
-     },
-     "deletionTimestamp": {
-      "type": "string",
-      "description": "RFC 3339 date and time at which the object will be deleted; populated by the system when a graceful deletion is requested, read-only; if not set, graceful deletion of the object has not been requested"
-     },
-     "generateName": {
-      "type": "string",
-      "description": "an optional prefix to use to generate a unique name; has the same validation rules as name; optional, and is applied only name if is not specified"
      },
      "kind": {
       "type": "string",
       "description": "kind of object, in CamelCase; cannot be updated"
      },
-     "labels": {
-      "type": "any",
-      "description": "map of string keys and values that can be used to organize and categorize objects; may match selectors of replication controllers and services"
-     },
-     "name": {
-      "type": "string",
-      "description": "string that identifies an object. Must be unique within a namespace; cannot be updated"
-     },
-     "namespace": {
-      "type": "string",
-      "description": "namespace of the object; cannot be updated"
-     },
-     "resourceVersion": {
-      "type": "string",
-      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
-     },
-     "selfLink": {
-      "type": "string",
-      "description": "URL for the object; populated by the system, read-only"
+     "metadata": {
+      "$ref": "v1beta3.ObjectMeta",
+      "description": "standard object metadata; see http://docs.k8s.io/api-conventions.md#metadata"
      },
      "template": {
       "$ref": "v1beta3.PodTemplateSpec",
-      "description": "the template of the desired behavior of the pod; https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#spec-and-status"
-     },
-     "uid": {
-      "type": "string",
-      "description": "unique UUID across space and time; populated by the system; read-only"
+      "description": "the template of the desired behavior of the pod; http://docs.k8s.io/api-conventions.md#spec-and-status"
      }
     }
    },
@@ -10302,62 +9977,22 @@
       "type": "string",
       "description": "kind of object, in CamelCase; cannot be updated"
      },
-     "resourceVersion": {
-      "type": "string",
-      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
-     },
-     "selfLink": {
-      "type": "string",
-      "description": "URL for the object; populated by the system, read-only"
+     "metadata": {
+      "$ref": "v1beta3.ListMeta",
+      "description": "standard list metadata; see http://docs.k8s.io/api-conventions.md#metadata"
      }
     }
    },
    "v1beta3.PodTemplateSpec": {
     "id": "v1beta3.PodTemplateSpec",
     "properties": {
-     "annotations": {
-      "type": "any",
-      "description": "map of string keys and values that can be used by external tooling to store and retrieve arbitrary metadata about objects"
-     },
-     "creationTimestamp": {
-      "type": "string",
-      "description": "RFC 3339 date and time at which the object was created; populated by the system, read-only; null for lists"
-     },
-     "deletionTimestamp": {
-      "type": "string",
-      "description": "RFC 3339 date and time at which the object will be deleted; populated by the system when a graceful deletion is requested, read-only; if not set, graceful deletion of the object has not been requested"
-     },
-     "generateName": {
-      "type": "string",
-      "description": "an optional prefix to use to generate a unique name; has the same validation rules as name; optional, and is applied only name if is not specified"
-     },
-     "labels": {
-      "type": "any",
-      "description": "map of string keys and values that can be used to organize and categorize objects; may match selectors of replication controllers and services"
-     },
-     "name": {
-      "type": "string",
-      "description": "string that identifies an object. Must be unique within a namespace; cannot be updated"
-     },
-     "namespace": {
-      "type": "string",
-      "description": "namespace of the object; cannot be updated"
-     },
-     "resourceVersion": {
-      "type": "string",
-      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
-     },
-     "selfLink": {
-      "type": "string",
-      "description": "URL for the object; populated by the system, read-only"
+     "metadata": {
+      "$ref": "v1beta3.ObjectMeta",
+      "description": "standard object metadata; see http://docs.k8s.io/api-conventions.md#metadata"
      },
      "spec": {
       "$ref": "v1beta3.PodSpec",
-      "description": "specification of the desired behavior of the pod; https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#spec-and-status"
-     },
-     "uid": {
-      "type": "string",
-      "description": "unique UUID across space and time; populated by the system; read-only"
+      "description": "specification of the desired behavior of the pod; http://docs.k8s.io/api-conventions.md#spec-and-status"
      }
     }
    },
@@ -10391,61 +10026,25 @@
    "v1beta3.ReplicationController": {
     "id": "v1beta3.ReplicationController",
     "properties": {
-     "annotations": {
-      "type": "any",
-      "description": "map of string keys and values that can be used by external tooling to store and retrieve arbitrary metadata about objects"
-     },
      "apiVersion": {
       "type": "string",
       "description": "version of the schema the object should have"
-     },
-     "creationTimestamp": {
-      "type": "string",
-      "description": "RFC 3339 date and time at which the object was created; populated by the system, read-only; null for lists"
-     },
-     "deletionTimestamp": {
-      "type": "string",
-      "description": "RFC 3339 date and time at which the object will be deleted; populated by the system when a graceful deletion is requested, read-only; if not set, graceful deletion of the object has not been requested"
-     },
-     "generateName": {
-      "type": "string",
-      "description": "an optional prefix to use to generate a unique name; has the same validation rules as name; optional, and is applied only name if is not specified"
      },
      "kind": {
       "type": "string",
       "description": "kind of object, in CamelCase; cannot be updated"
      },
-     "labels": {
-      "type": "any",
-      "description": "map of string keys and values that can be used to organize and categorize objects; may match selectors of replication controllers and services"
-     },
-     "name": {
-      "type": "string",
-      "description": "string that identifies an object. Must be unique within a namespace; cannot be updated"
-     },
-     "namespace": {
-      "type": "string",
-      "description": "namespace of the object; cannot be updated"
-     },
-     "resourceVersion": {
-      "type": "string",
-      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
-     },
-     "selfLink": {
-      "type": "string",
-      "description": "URL for the object; populated by the system, read-only"
+     "metadata": {
+      "$ref": "v1beta3.ObjectMeta",
+      "description": "standard object metadata; see http://docs.k8s.io/api-conventions.md#metadata"
      },
      "spec": {
       "$ref": "v1beta3.ReplicationControllerSpec",
-      "description": "specification of the desired behavior of the replication controller; https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#spec-and-status"
+      "description": "specification of the desired behavior of the replication controller; http://docs.k8s.io/api-conventions.md#spec-and-status"
      },
      "status": {
       "$ref": "v1beta3.ReplicationControllerStatus",
-      "description": "most recently observed status of the replication controller; populated by the system, read-only; https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#spec-and-status"
-     },
-     "uid": {
-      "type": "string",
-      "description": "unique UUID across space and time; populated by the system; read-only"
+      "description": "most recently observed status of the replication controller; populated by the system, read-only; http://docs.k8s.io/api-conventions.md#spec-and-status"
      }
     }
    },
@@ -10470,13 +10069,9 @@
       "type": "string",
       "description": "kind of object, in CamelCase; cannot be updated"
      },
-     "resourceVersion": {
-      "type": "string",
-      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
-     },
-     "selfLink": {
-      "type": "string",
-      "description": "URL for the object; populated by the system, read-only"
+     "metadata": {
+      "$ref": "v1beta3.ListMeta",
+      "description": "standard list metadata; see http://docs.k8s.io/api-conventions.md#metadata"
      }
     }
    },
@@ -10521,61 +10116,25 @@
    "v1beta3.ResourceQuota": {
     "id": "v1beta3.ResourceQuota",
     "properties": {
-     "annotations": {
-      "type": "any",
-      "description": "map of string keys and values that can be used by external tooling to store and retrieve arbitrary metadata about objects"
-     },
      "apiVersion": {
       "type": "string",
       "description": "version of the schema the object should have"
-     },
-     "creationTimestamp": {
-      "type": "string",
-      "description": "RFC 3339 date and time at which the object was created; populated by the system, read-only; null for lists"
-     },
-     "deletionTimestamp": {
-      "type": "string",
-      "description": "RFC 3339 date and time at which the object will be deleted; populated by the system when a graceful deletion is requested, read-only; if not set, graceful deletion of the object has not been requested"
-     },
-     "generateName": {
-      "type": "string",
-      "description": "an optional prefix to use to generate a unique name; has the same validation rules as name; optional, and is applied only name if is not specified"
      },
      "kind": {
       "type": "string",
       "description": "kind of object, in CamelCase; cannot be updated"
      },
-     "labels": {
-      "type": "any",
-      "description": "map of string keys and values that can be used to organize and categorize objects; may match selectors of replication controllers and services"
-     },
-     "name": {
-      "type": "string",
-      "description": "string that identifies an object. Must be unique within a namespace; cannot be updated"
-     },
-     "namespace": {
-      "type": "string",
-      "description": "namespace of the object; cannot be updated"
-     },
-     "resourceVersion": {
-      "type": "string",
-      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
-     },
-     "selfLink": {
-      "type": "string",
-      "description": "URL for the object; populated by the system, read-only"
+     "metadata": {
+      "$ref": "v1beta3.ObjectMeta",
+      "description": "standard object metadata; see http://docs.k8s.io/api-conventions.md#metadata"
      },
      "spec": {
       "$ref": "v1beta3.ResourceQuotaSpec",
-      "description": "spec defines the desired quota; https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#spec-and-status"
+      "description": "spec defines the desired quota; http://docs.k8s.io/api-conventions.md#spec-and-status"
      },
      "status": {
       "$ref": "v1beta3.ResourceQuotaStatus",
-      "description": "status defines the actual enforced quota and current usage; https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#spec-and-status"
-     },
-     "uid": {
-      "type": "string",
-      "description": "unique UUID across space and time; populated by the system; read-only"
+      "description": "status defines the actual enforced quota and current usage; http://docs.k8s.io/api-conventions.md#spec-and-status"
      }
     }
    },
@@ -10600,13 +10159,9 @@
       "type": "string",
       "description": "kind of object, in CamelCase; cannot be updated"
      },
-     "resourceVersion": {
-      "type": "string",
-      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
-     },
-     "selfLink": {
-      "type": "string",
-      "description": "URL for the object; populated by the system, read-only"
+     "metadata": {
+      "$ref": "v1beta3.ListMeta",
+      "description": "standard list metadata; see http://docs.k8s.io/api-conventions.md#metadata"
      }
     }
    },
@@ -10641,68 +10196,32 @@
      },
      "requests": {
       "type": "any",
-      "description": "Minimum amount of resources requested"
+      "description": "Minimum amount of resources requested; requests are honored only for persistent volumes as of now"
      }
     }
    },
    "v1beta3.Secret": {
     "id": "v1beta3.Secret",
     "properties": {
-     "annotations": {
-      "type": "any",
-      "description": "map of string keys and values that can be used by external tooling to store and retrieve arbitrary metadata about objects"
-     },
      "apiVersion": {
       "type": "string",
       "description": "version of the schema the object should have"
-     },
-     "creationTimestamp": {
-      "type": "string",
-      "description": "RFC 3339 date and time at which the object was created; populated by the system, read-only; null for lists"
      },
      "data": {
       "type": "any",
       "description": "data contains the secret data.  Each key must be a valid DNS_SUBDOMAIN.  Each value must be a base64 encoded string"
      },
-     "deletionTimestamp": {
-      "type": "string",
-      "description": "RFC 3339 date and time at which the object will be deleted; populated by the system when a graceful deletion is requested, read-only; if not set, graceful deletion of the object has not been requested"
-     },
-     "generateName": {
-      "type": "string",
-      "description": "an optional prefix to use to generate a unique name; has the same validation rules as name; optional, and is applied only name if is not specified"
-     },
      "kind": {
       "type": "string",
       "description": "kind of object, in CamelCase; cannot be updated"
      },
-     "labels": {
-      "type": "any",
-      "description": "map of string keys and values that can be used to organize and categorize objects; may match selectors of replication controllers and services"
-     },
-     "name": {
-      "type": "string",
-      "description": "string that identifies an object. Must be unique within a namespace; cannot be updated"
-     },
-     "namespace": {
-      "type": "string",
-      "description": "namespace of the object; cannot be updated"
-     },
-     "resourceVersion": {
-      "type": "string",
-      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
-     },
-     "selfLink": {
-      "type": "string",
-      "description": "URL for the object; populated by the system, read-only"
+     "metadata": {
+      "$ref": "v1beta3.ObjectMeta",
+      "description": "standard object metadata; see http://docs.k8s.io/api-conventions.md#metadata"
      },
      "type": {
       "type": "string",
       "description": "type facilitates programmatic handling of secret data"
-     },
-     "uid": {
-      "type": "string",
-      "description": "unique UUID across space and time; populated by the system; read-only"
      }
     }
    },
@@ -10727,13 +10246,9 @@
       "type": "string",
       "description": "kind of object, in CamelCase; cannot be updated"
      },
-     "resourceVersion": {
-      "type": "string",
-      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
-     },
-     "selfLink": {
-      "type": "string",
-      "description": "URL for the object; populated by the system, read-only"
+     "metadata": {
+      "$ref": "v1beta3.ListMeta",
+      "description": "standard list metadata; see http://docs.k8s.io/api-conventions.md#metadata"
      }
     }
    },
@@ -10752,61 +10267,25 @@
    "v1beta3.Service": {
     "id": "v1beta3.Service",
     "properties": {
-     "annotations": {
-      "type": "any",
-      "description": "map of string keys and values that can be used by external tooling to store and retrieve arbitrary metadata about objects"
-     },
      "apiVersion": {
       "type": "string",
       "description": "version of the schema the object should have"
-     },
-     "creationTimestamp": {
-      "type": "string",
-      "description": "RFC 3339 date and time at which the object was created; populated by the system, read-only; null for lists"
-     },
-     "deletionTimestamp": {
-      "type": "string",
-      "description": "RFC 3339 date and time at which the object will be deleted; populated by the system when a graceful deletion is requested, read-only; if not set, graceful deletion of the object has not been requested"
-     },
-     "generateName": {
-      "type": "string",
-      "description": "an optional prefix to use to generate a unique name; has the same validation rules as name; optional, and is applied only name if is not specified"
      },
      "kind": {
       "type": "string",
       "description": "kind of object, in CamelCase; cannot be updated"
      },
-     "labels": {
-      "type": "any",
-      "description": "map of string keys and values that can be used to organize and categorize objects; may match selectors of replication controllers and services"
-     },
-     "name": {
-      "type": "string",
-      "description": "string that identifies an object. Must be unique within a namespace; cannot be updated"
-     },
-     "namespace": {
-      "type": "string",
-      "description": "namespace of the object; cannot be updated"
-     },
-     "resourceVersion": {
-      "type": "string",
-      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
-     },
-     "selfLink": {
-      "type": "string",
-      "description": "URL for the object; populated by the system, read-only"
+     "metadata": {
+      "$ref": "v1beta3.ObjectMeta",
+      "description": "standard object metadata; see http://docs.k8s.io/api-conventions.md#metadata"
      },
      "spec": {
       "$ref": "v1beta3.ServiceSpec",
-      "description": "specification of the desired behavior of the service; https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#spec-and-status"
+      "description": "specification of the desired behavior of the service; http://docs.k8s.io/api-conventions.md#spec-and-status"
      },
      "status": {
       "$ref": "v1beta3.ServiceStatus",
-      "description": "most recently observed status of the service; populated by the system, read-only; https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#spec-and-status"
-     },
-     "uid": {
-      "type": "string",
-      "description": "unique UUID across space and time; populated by the system; read-only"
+      "description": "most recently observed status of the service; populated by the system, read-only; http://docs.k8s.io/api-conventions.md#spec-and-status"
      }
     }
    },
@@ -10831,13 +10310,9 @@
       "type": "string",
       "description": "kind of object, in CamelCase; cannot be updated"
      },
-     "resourceVersion": {
-      "type": "string",
-      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
-     },
-     "selfLink": {
-      "type": "string",
-      "description": "URL for the object; populated by the system, read-only"
+     "metadata": {
+      "$ref": "v1beta3.ListMeta",
+      "description": "standard list metadata; see http://docs.k8s.io/api-conventions.md#metadata"
      }
     }
    },
@@ -10936,17 +10411,13 @@
       "type": "string",
       "description": "human-readable description of the status of this operation"
      },
+     "metadata": {
+      "$ref": "v1beta3.ListMeta",
+      "description": "standard list metadata; see http://docs.k8s.io/api-conventions.md#metadata"
+     },
      "reason": {
       "type": "string",
       "description": "machine-readable description of why this operation is in the 'Failure' status; if this value is empty there is no information available; a reason clarifies an HTTP status code but does not override it"
-     },
-     "resourceVersion": {
-      "type": "string",
-      "description": "string that identifies the internal version of this object that can be used by clients to determine when objects have changed; populated by the system, read-only; value must be treated as opaque by clients and passed unmodified back to the server: https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/api-conventions.md#concurrency-control-and-consistency"
-     },
-     "selfLink": {
-      "type": "string",
-      "description": "URL for the object; populated by the system, read-only"
      },
      "status": {
       "type": "string",
@@ -11009,15 +10480,15 @@
     "id": "v1beta3.Volume",
     "required": [
      "name",
-     "gcePersistentDisk",
-     "iscsi",
-     "glusterfs",
-     "hostPath",
-     "emptyDir",
      "awsElasticBlockStore",
      "gitRepo",
      "secret",
-     "nfs"
+     "nfs",
+     "glusterfs",
+     "hostPath",
+     "emptyDir",
+     "gcePersistentDisk",
+     "iscsi"
     ],
     "properties": {
      "awsElasticBlockStore": {
