@@ -23,6 +23,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl"
 	cmdutil "github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/cmd/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/resource"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/watch"
 
 	"github.com/spf13/cobra"
@@ -58,6 +59,7 @@ $ kubectl get rc/web service/frontend pods/web-pod-13je7`
 // NewCmdGet creates a command object for the generic "get" action, which
 // retrieves one or more resources from a server.
 func NewCmdGet(f *cmdutil.Factory, out io.Writer) *cobra.Command {
+	var filenames util.StringList
 	p := kubectl.NewHumanReadablePrinter(false)
 	validArgs := p.HandledResources()
 
@@ -67,21 +69,24 @@ func NewCmdGet(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 		Long:    get_long,
 		Example: get_example,
 		Run: func(cmd *cobra.Command, args []string) {
-			err := RunGet(f, out, cmd, args)
+			err := RunGet(f, out, cmd, args, filenames)
 			cmdutil.CheckErr(err)
 		},
 		ValidArgs: validArgs,
 	}
 	cmdutil.AddPrinterFlags(cmd)
 	cmd.Flags().StringP("selector", "l", "", "Selector (label query) to filter on")
+	kubectl.AddJsonFilenameFlag(cmd, &filenames, "Filename, directory, or URL to a file containing the resource to get")
 	cmd.Flags().BoolP("watch", "w", false, "After listing/getting the requested object, watch for changes.")
 	cmd.Flags().Bool("watch-only", false, "Watch for changes to the requested object(s), without listing/getting first.")
+	cmd.Flags().Bool("latest", true, "Return the latest copy of the object; if false files read from disk will not talk to the server")
 	return cmd
 }
 
 // RunGet implements the generic Get command
 // TODO: convert all direct flag accessors to a struct and pass that instead of cmd
-func RunGet(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string) error {
+func RunGet(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string, filenames util.StringList) error {
+	latest := cmdutil.GetFlagBool(cmd, "latest")
 	selector := cmdutil.GetFlagString(cmd, "selector")
 	mapper, typer := f.Object()
 
@@ -95,6 +100,7 @@ func RunGet(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string
 	if isWatch || isWatchOnly {
 		r := resource.NewBuilder(mapper, typer, f.ClientMapperForCommand()).
 			NamespaceParam(cmdNamespace).DefaultNamespace().
+			FilenameParam(filenames...).
 			SelectorParam(selector).
 			ResourceTypeOrNameArgs(true, args...).
 			SingleResourceType().
@@ -144,10 +150,13 @@ func RunGet(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string
 
 	b := resource.NewBuilder(mapper, typer, f.ClientMapperForCommand()).
 		NamespaceParam(cmdNamespace).DefaultNamespace().
+		FilenameParam(filenames...).
 		SelectorParam(selector).
 		ResourceTypeOrNameArgs(true, args...).
-		ContinueOnError().
-		Latest()
+		ContinueOnError()
+	if latest {
+		b.Latest()
+	}
 	printer, generic, err := cmdutil.PrinterForCommand(cmd)
 	if err != nil {
 		return err
