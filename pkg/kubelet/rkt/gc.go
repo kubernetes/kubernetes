@@ -16,40 +16,12 @@ limitations under the License.
 
 package rkt
 
-import (
-	"os/exec"
-
-	"github.com/golang/glog"
-)
-
-const (
-	// TODO(yifan): Merge with ContainerGCPolicy, i.e., derive
-	// the grace period from MinAge in ContainerGCPolicy.
-	//
-	// Duration to wait before discarding inactive pods from garbage
-	defaultGracePeriod = "1m"
-	// Duration to wait before expiring prepared pods.
-	defaultExpirePrepared = "1m"
-)
-
-// GarbageCollect collects the pods/containers. TODO(yifan): Enforce the gc policy.
-func (r *Runtime) GarbageCollect() error {
-	if err := exec.Command("systemctl", "reset-failed").Run(); err != nil {
-		glog.Errorf("rkt: Failed to reset failed systemd services: %v", err)
-	}
-	if _, err := r.runCommand("gc", "--grace-period="+defaultGracePeriod, "--expire-prepared="+defaultExpirePrepared); err != nil {
-		glog.Errorf("rkt: Failed to gc: %v", err)
-		return err
-	}
-	return nil
-}
-
 // ImageManager manages and garbage collects the container images for rkt.
 type ImageManager struct {
-	runtime *Runtime
+	runtime *runtime
 }
 
-func NewImageManager(r *Runtime) *ImageManager {
+func NewImageManager(r *runtime) *ImageManager {
 	return &ImageManager{runtime: r}
 }
 
