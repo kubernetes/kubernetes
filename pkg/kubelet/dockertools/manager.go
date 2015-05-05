@@ -38,6 +38,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/prober"
 	kubeletTypes "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/probe"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/securitycontext"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	docker "github.com/fsouza/go-dockerclient"
@@ -524,6 +525,8 @@ func (dm *DockerManager) runContainer(pod *api.Pod, container *api.Container, op
 
 	glog.V(3).Infof("Container %v/%v/%v: setting entrypoint \"%v\" and command \"%v\"", pod.Namespace, pod.Name, container.Name, dockerOpts.Config.Entrypoint, dockerOpts.Config.Cmd)
 
+	securityContextProvider := securitycontext.NewSimpleSecurityContextProvider()
+	securityContextProvider.ModifyContainerConfig(pod, container, dockerOpts.Config)
 	dockerContainer, err := dm.client.CreateContainer(dockerOpts)
 	if err != nil {
 		if ref != nil {
@@ -554,22 +557,15 @@ func (dm *DockerManager) runContainer(pod *api.Pod, container *api.Container, op
 		}
 	}
 
-	privileged := false
-	if capabilities.Get().AllowPrivileged {
-		privileged = container.Privileged
-	} else if container.Privileged {
+	if !capabilities.Get().AllowPrivileged && securitycontext.HasPrivilegedRequest(container) {
 		return "", fmt.Errorf("container requested privileged mode, but it is disallowed globally.")
 	}
 
-	capAdd, capDrop := makeCapabilites(container.Capabilities.Add, container.Capabilities.Drop)
 	hc := &docker.HostConfig{
 		PortBindings: portBindings,
 		Binds:        opts.Binds,
 		NetworkMode:  opts.NetMode,
 		IpcMode:      opts.IpcMode,
-		Privileged:   privileged,
-		CapAdd:       capAdd,
-		CapDrop:      capDrop,
 	}
 	if len(opts.DNS) > 0 {
 		hc.DNS = opts.DNS
@@ -580,6 +576,7 @@ func (dm *DockerManager) runContainer(pod *api.Pod, container *api.Container, op
 	if len(opts.CgroupParent) > 0 {
 		hc.CgroupParent = opts.CgroupParent
 	}
+	securityContextProvider.ModifyHostConfig(pod, container, hc)
 
 	if err = dm.client.StartContainer(dockerContainer.ID, hc); err != nil {
 		if ref != nil {
@@ -635,20 +632,6 @@ func makePortsAndBindings(container *api.Container) (map[docker.Port]struct{}, m
 		}
 	}
 	return exposedPorts, portBindings
-}
-
-func makeCapabilites(capAdd []api.CapabilityType, capDrop []api.CapabilityType) ([]string, []string) {
-	var (
-		addCaps  []string
-		dropCaps []string
-	)
-	for _, cap := range capAdd {
-		addCaps = append(addCaps, string(cap))
-	}
-	for _, cap := range capDrop {
-		dropCaps = append(dropCaps, string(cap))
-	}
-	return addCaps, dropCaps
 }
 
 // A helper function to get the KubeletContainerName and hash from a docker

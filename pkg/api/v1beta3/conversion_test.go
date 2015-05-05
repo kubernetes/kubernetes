@@ -45,3 +45,63 @@ func TestNodeConversion(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
+
+func TestBadSecurityContextConversion(t *testing.T) {
+	priv := false
+	testCases := map[string]struct {
+		c   *current.Container
+		err string
+	}{
+		// this use case must use true for the container and false for the sc.  Otherwise the defaulter
+		// will assume privileged was left undefined (since it is the default value) and copy the
+		// sc setting upwards
+		"mismatched privileged": {
+			c: &current.Container{
+				Privileged: true,
+				SecurityContext: &current.SecurityContext{
+					Privileged: &priv,
+				},
+			},
+			err: "container privileged settings do not match security context settings, cannot convert",
+		},
+		"mismatched caps add": {
+			c: &current.Container{
+				Capabilities: current.Capabilities{
+					Add: []current.CapabilityType{"foo"},
+				},
+				SecurityContext: &current.SecurityContext{
+					Capabilities: &current.Capabilities{
+						Add: []current.CapabilityType{"bar"},
+					},
+				},
+			},
+			err: "container capability settings do not match security context settings, cannot convert",
+		},
+		"mismatched caps drop": {
+			c: &current.Container{
+				Capabilities: current.Capabilities{
+					Drop: []current.CapabilityType{"foo"},
+				},
+				SecurityContext: &current.SecurityContext{
+					Capabilities: &current.Capabilities{
+						Drop: []current.CapabilityType{"bar"},
+					},
+				},
+			},
+			err: "container capability settings do not match security context settings, cannot convert",
+		},
+	}
+
+	for k, v := range testCases {
+		got := newer.Container{}
+		err := newer.Scheme.Convert(v.c, &got)
+		if err == nil {
+			t.Errorf("expected error for case %s but got none", k)
+		} else {
+			if err.Error() != v.err {
+				t.Errorf("unexpected error for case %s.  Expected: %s but got: %s", k, v.err, err.Error())
+			}
+		}
+	}
+
+}

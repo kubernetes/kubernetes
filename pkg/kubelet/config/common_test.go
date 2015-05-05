@@ -22,6 +22,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/securitycontext"
 
 	"github.com/ghodss/yaml"
 )
@@ -46,6 +47,7 @@ func TestDecodeSinglePod(t *testing.T) {
 				Image:                  "test/image",
 				ImagePullPolicy:        "IfNotPresent",
 				TerminationMessagePath: "/dev/termination-log",
+				SecurityContext:        securitycontext.ValidSecurityContextWithContainerDefaults(),
 			}},
 		},
 	}
@@ -108,6 +110,7 @@ func TestDecodePodList(t *testing.T) {
 				Image:                  "test/image",
 				ImagePullPolicy:        "IfNotPresent",
 				TerminationMessagePath: "/dev/termination-log",
+				SecurityContext:        securitycontext.ValidSecurityContextWithContainerDefaults(),
 			}},
 		},
 	}

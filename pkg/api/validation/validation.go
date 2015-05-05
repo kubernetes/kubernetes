@@ -776,15 +776,12 @@ func validateContainers(containers []api.Container, volumes util.StringSet) errs
 	allNames := util.StringSet{}
 	for i, ctr := range containers {
 		cErrs := errs.ValidationErrorList{}
-		capabilities := capabilities.Get()
 		if len(ctr.Name) == 0 {
 			cErrs = append(cErrs, errs.NewFieldRequired("name"))
 		} else if !util.IsDNS1123Label(ctr.Name) {
 			cErrs = append(cErrs, errs.NewFieldInvalid("name", ctr.Name, dns1123LabelErrorMsg))
 		} else if allNames.Has(ctr.Name) {
 			cErrs = append(cErrs, errs.NewFieldDuplicate("name", ctr.Name))
-		} else if ctr.Privileged && !capabilities.AllowPrivileged {
-			cErrs = append(cErrs, errs.NewFieldForbidden("privileged", ctr.Privileged))
 		} else {
 			allNames.Insert(ctr.Name)
 		}
@@ -801,6 +798,7 @@ func validateContainers(containers []api.Container, volumes util.StringSet) errs
 		cErrs = append(cErrs, validateVolumeMounts(ctr.VolumeMounts, volumes).Prefix("volumeMounts")...)
 		cErrs = append(cErrs, validatePullPolicy(&ctr).Prefix("pullPolicy")...)
 		cErrs = append(cErrs, ValidateResourceRequirements(&ctr.Resources).Prefix("resources")...)
+		cErrs = append(cErrs, ValidateSecurityContext(ctr.SecurityContext).Prefix("securityContext")...)
 		allErrs = append(allErrs, cErrs.PrefixIndex(i)...)
 	}
 	// Check for colliding ports across all containers.
@@ -1479,5 +1477,27 @@ func ValidateEndpointsUpdate(oldEndpoints, newEndpoints *api.Endpoints) errs.Val
 	allErrs := errs.ValidationErrorList{}
 	allErrs = append(allErrs, ValidateObjectMetaUpdate(&oldEndpoints.ObjectMeta, &newEndpoints.ObjectMeta).Prefix("metadata")...)
 	allErrs = append(allErrs, validateEndpointSubsets(newEndpoints.Subsets).Prefix("subsets")...)
+	return allErrs
+}
+
+// ValidateSecurityContext ensure the security context contains valid settings
+func ValidateSecurityContext(sc *api.SecurityContext) errs.ValidationErrorList {
+	allErrs := errs.ValidationErrorList{}
+	//this should only be true for testing since SecurityContext is defaulted by the api
+	if sc == nil {
+		return allErrs
+	}
+
+	if sc.Privileged != nil {
+		if *sc.Privileged && !capabilities.Get().AllowPrivileged {
+			allErrs = append(allErrs, errs.NewFieldForbidden("privileged", sc.Privileged))
+		}
+	}
+
+	if sc.RunAsUser != nil {
+		if *sc.RunAsUser < 0 {
+			allErrs = append(allErrs, errs.NewFieldInvalid("runAsUser", *sc.RunAsUser, "runAsUser cannot be negative"))
+		}
+	}
 	return allErrs
 }

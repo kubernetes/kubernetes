@@ -36,4 +36,5 @@ import (
 	_ "github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/admission/namespace/exists"
 	_ "github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/admission/namespace/lifecycle"
 	_ "github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/admission/resourcequota"
+	_ "github.com/GoogleCloudPlatform/kubernetes/plugin/pkg/admission/securitycontext/scdeny"
 )

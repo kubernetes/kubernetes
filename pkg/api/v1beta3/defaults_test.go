@@ -349,3 +349,104 @@ func TestSetDefaultObjectFieldSelectorAPIVersion(t *testing.T) {
 		t.Errorf("Expected default APIVersion v1beta3, got: %v", apiVersion)
 	}
 }
+
+func TestSetDefaultSecurityContext(t *testing.T) {
+	priv := false
+	privTrue := true
+	testCases := map[string]struct {
+		c current.Container
+	}{
+		"downward defaulting caps": {
+			c: current.Container{
+				Privileged: false,
+				Capabilities: current.Capabilities{
+					Add:  []current.CapabilityType{"foo"},
+					Drop: []current.CapabilityType{"bar"},
+				},
+				SecurityContext: &current.SecurityContext{
+					Privileged: &priv,
+				},
+			},
+		},
+		"downward defaulting priv": {
+			c: current.Container{
+				Privileged: false,
+				Capabilities: current.Capabilities{
+					Add:  []current.CapabilityType{"foo"},
+					Drop: []current.CapabilityType{"bar"},
+				},
+				SecurityContext: &current.SecurityContext{
+					Capabilities: &current.Capabilities{
+						Add:  []current.CapabilityType{"foo"},
+						Drop: []current.CapabilityType{"bar"},
+					},
+				},
+			},
+		},
+		"upward defaulting caps": {
+			c: current.Container{
+				Privileged: false,
+				SecurityContext: &current.SecurityContext{
+					Privileged: &priv,
+					Capabilities: &current.Capabilities{
+						Add:  []current.CapabilityType{"biz"},
+						Drop: []current.CapabilityType{"baz"},
+					},
+				},
+			},
+		},
+		"upward defaulting priv": {
+			c: current.Container{
+				Capabilities: current.Capabilities{
+					Add:  []current.CapabilityType{"foo"},
+					Drop: []current.CapabilityType{"bar"},
+				},
+				SecurityContext: &current.SecurityContext{
+					Privileged: &privTrue,
+					Capabilities: &current.Capabilities{
+						Add:  []current.CapabilityType{"foo"},
+						Drop: []current.CapabilityType{"bar"},
+					},
+				},
+			},
+		},
+	}
+
+	pod := &current.Pod{
+		Spec: current.PodSpec{},
+	}
+
+	for k, v := range testCases {
+		pod.Spec.Containers = []current.Container{v.c}
+		obj := roundTrip(t, runtime.Object(pod))
+		defaultedPod := obj.(*current.Pod)
+		c := defaultedPod.Spec.Containers[0]
+		if isEqual, issues := areSecurityContextAndContainerEqual(&c); !isEqual {
+			t.Errorf("test case %s expected the security context to have the same values as the container but found %#v", k, issues)
+		}
+	}
+}
+
+func areSecurityContextAndContainerEqual(c *current.Container) (bool, []string) {
+	issues := make([]string, 0)
+	equal := true
+
+	if c.SecurityContext == nil || c.SecurityContext.Privileged == nil || c.SecurityContext.Capabilities == nil {
+		equal = false
+		issues = append(issues, "Expected non nil settings for SecurityContext")
+		return equal, issues
+	}
+	if *c.SecurityContext.Privileged != c.Privileged {
+		equal = false
+		issues = append(issues, "The defaulted SecurityContext.Privileged value did not match the container value")
+	}
+	if !reflect.DeepEqual(c.Capabilities.Add, c.Capabilities.Add) {
+		equal = false
+		issues = append(issues, "The defaulted SecurityContext.Capabilities.Add did not match the container settings")
+	}
+	if !reflect.DeepEqual(c.Capabilities.Drop, c.Capabilities.Drop) {
+		equal = false
+		issues = append(issues, "The defaulted SecurityContext.Capabilities.Drop did not match the container settings")
+	}
+	return equal, issues
+}
