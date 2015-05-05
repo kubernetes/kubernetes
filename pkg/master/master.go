@@ -92,8 +92,10 @@ type Config struct {
 	EnableUISupport       bool
 	// allow downstream consumers to disable swagger
 	EnableSwaggerSupport bool
-	// allow v1beta1 and v1beta2 to be conditionally disabled
-	DisableLegacyAPIs bool
+	// allow v1beta1 to be conditionally disabled
+	DisableV1Beta1 bool
+	// allow v1beta2 to be conditionally disabled
+	DisableV1Beta2 bool
 	// allow v1beta3 to be conditionally disabled
 	DisableV1Beta3 bool
 	// allow v1 to be conditionally enabled
@@ -162,7 +164,8 @@ type Master struct {
 	authorizer            authorizer.Authorizer
 	admissionControl      admission.Interface
 	masterCount           int
-	legacyAPIs            bool
+	v1beta1               bool
+	v1beta2               bool
 	v1beta3               bool
 	v1                    bool
 	requestContextMapper  api.RequestContextMapper
@@ -307,7 +310,8 @@ func New(c *Config) *Master {
 		authenticator:         c.Authenticator,
 		authorizer:            c.Authorizer,
 		admissionControl:      c.AdmissionControl,
-		legacyAPIs:            !c.DisableLegacyAPIs,
+		v1beta1:               !c.DisableV1Beta1,
+		v1beta2:               !c.DisableV1Beta2,
 		v1beta3:               !c.DisableV1Beta3,
 		v1:                    c.EnableV1,
 		requestContextMapper:  c.RequestContextMapper,
@@ -465,11 +469,13 @@ func (m *Master) init(c *Config) {
 	}
 
 	apiVersions := []string{}
-	if m.legacyAPIs {
+	if m.v1beta1 {
 		if err := m.api_v1beta1().InstallREST(m.handlerContainer); err != nil {
 			glog.Fatalf("Unable to setup API v1beta1: %v", err)
 		}
 		apiVersions = append(apiVersions, "v1beta1")
+	}
+	if m.v1beta2 {
 		if err := m.api_v1beta2().InstallREST(m.handlerContainer); err != nil {
 			glog.Fatalf("Unable to setup API v1beta2: %v", err)
 		}

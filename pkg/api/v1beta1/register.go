@@ -18,6 +18,7 @@ package v1beta1
 
 import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/registered"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
 )
 
@@ -31,6 +32,19 @@ var Codec = runtime.CodecFor(api.Scheme, "v1beta1")
 const Dependency = true
 
 func init() {
+	// Check if v1beta1 is in the list of supported API versions.
+	if !registered.IsRegisteredAPIVersion("v1beta1") {
+		return
+	}
+
+	// Register the API.
+	addKnownTypes()
+	addConversionFuncs()
+	addDefaultingFuncs()
+}
+
+// Adds the list of known types to api.Scheme.
+func addKnownTypes() {
 	api.Scheme.AddKnownTypes("v1beta1",
 		&Pod{},
 		&PodStatusResult{},

@@ -24,7 +24,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/conversion"
 )
 
-func init() {
+func addConversionFuncs() {
 	err := newer.Scheme.AddConversionFuncs(
 		convert_v1_Container_To_api_Container,
 		convert_api_Container_To_v1_Container,

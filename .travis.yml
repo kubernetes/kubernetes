@@ -33,6 +33,7 @@ script:
   - node_modules/karma/bin/karma start www/master/karma.conf.js --single-run --browsers PhantomJS
   - PATH=$HOME/gopath/bin:./third_party/etcd:$PATH ./hack/test-cmd.sh
   - PATH=$HOME/gopath/bin:./third_party/etcd:$PATH KUBE_TEST_API_VERSIONS="${KUBE_TEST_API_VERSIONS}" KUBE_INTEGRATION_TEST_MAX_CONCURRENCY=4 LOG_LEVEL=4 ./hack/test-integration.sh
+  - PATH=$HOME/gopath/bin:./third_party/etcd:$PATH ./hack/test-update-storage-objects.sh
 
 notifications:
   irc: "chat.freenode.net#google-containers"
