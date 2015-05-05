@@ -34,7 +34,6 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/capabilities"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/credentialprovider"
 	kubecontainer "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/prober"
@@ -106,11 +105,7 @@ var _ kubecontainer.Runtime = &runtime{}
 // New creates the rkt container runtime which implements the container runtime interface.
 // It will test if the rkt binary is in the $PATH, and whether we can get the
 // version of it. If so, creates the rkt container runtime, otherwise returns an error.
-func New(config *Config,
-	generator kubecontainer.RunContainerOptionsGenerator,
-	recorder record.EventRecorder,
-	containerRefManager *kubecontainer.RefManager,
-	readinessManager *kubecontainer.ReadinessManager) (kubecontainer.Runtime, error) {
+func New(config *Config) (kubecontainer.Runtime, error) {
 	systemdVersion, err := getSystemdVersion()
 	if err != nil {
 		return nil, err
@@ -135,14 +130,11 @@ func New(config *Config,
 	}
 
 	rkt := &runtime{
-		generator:        generator,
-		readinessManager: readinessManager,
-		systemd:          systemd,
-		rktBinAbsPath:    rktBinAbsPath,
-		config:           config,
-		dockerKeyring:    credentialprovider.NewDockerKeyring(),
+		systemd:       systemd,
+		rktBinAbsPath: rktBinAbsPath,
+		config:        config,
+		dockerKeyring: credentialprovider.NewDockerKeyring(),
 	}
-	rkt.prober = prober.New(rkt, readinessManager, containerRefManager, recorder)
 
 	// Test the rkt version.
 	version, err := rkt.Version()

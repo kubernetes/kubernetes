@@ -44,7 +44,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/metrics"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/network"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/prober"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/rkt"
 	kubeletTypes "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
@@ -262,15 +261,6 @@ func NewMainKubelet(
 			klet,
 			klet.httpClient,
 			newKubeletRuntimeHooks(recorder))
-	case "rkt":
-		conf := &rkt.Config{
-			InsecureSkipVerify: true,
-		}
-		rktRuntime, err := rkt.New(conf, klet, recorder, containerRefManager, readinessManager)
-		if err != nil {
-			return nil, err
-		}
-		klet.containerRuntime = rktRuntime
 	default:
 		return nil, fmt.Errorf("unsupported container runtime %q specified", containerRuntime)
 	}
