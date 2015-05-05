@@ -13,6 +13,7 @@ var _ = fmt.Println
 var _ = os.Stderr
 
 var tp, te, tt, t1 []string
+var rootPersPre, echoPre, echoPersPre, timesPersPre []string
 var flagb1, flagb2, flagb3, flagbr, flagbp bool
 var flags1, flags2a, flags2b, flags3 string
 var flagi1, flagi2, flagi3, flagir int
@@ -38,6 +39,12 @@ var cmdEcho = &Command{
 	Short:   "Echo anything to the screen",
 	Long:    `an utterly useless command for testing.`,
 	Example: "Just run cobra-test echo",
+	PersistentPreRun: func(cmd *Command, args []string) {
+		echoPersPre = args
+	},
+	PreRun: func(cmd *Command, args []string) {
+		echoPre = args
+	},
 	Run: func(cmd *Command, args []string) {
 		te = args
 	},
@@ -51,10 +58,22 @@ var cmdEchoSub = &Command{
 	},
 }
 
+var cmdDeprecated = &Command{
+	Use:        "deprecated [can't do anything here]",
+	Short:      "A command which is deprecated",
+	Long:       `an absolutely utterly useless command for testing deprecation!.`,
+	Deprecated: "Please use echo instead",
+	Run: func(cmd *Command, args []string) {
+	},
+}
+
 var cmdTimes = &Command{
 	Use:   "times [# times] [string to echo]",
 	Short: "Echo anything to the screen more times",
 	Long:  `a slightly useless command for testing.`,
+	PersistentPreRun: func(cmd *Command, args []string) {
+		timesPersPre = args
+	},
 	Run: func(cmd *Command, args []string) {
 		tt = args
 	},
@@ -64,6 +83,9 @@ var cmdRootNoRun = &Command{
 	Use:   "cobra-test",
 	Short: "The root can run it's own function",
 	Long:  "The root description for help",
+	PersistentPreRun: func(cmd *Command, args []string) {
+		rootPersPre = args
+	},
 }
 
 var cmdRootSameName = &Command{
@@ -140,6 +162,8 @@ func commandInit() {
 
 func initialize() *Command {
 	tt, tp, te = nil, nil, nil
+	rootPersPre, echoPre, echoPersPre, timesPersPre = nil, nil, nil, nil
+
 	var c = cmdRootNoRun
 	flagInit()
 	commandInit()
@@ -148,6 +172,7 @@ func initialize() *Command {
 
 func initializeWithSameName() *Command {
 	tt, tp, te = nil, nil, nil
+	rootPersPre, echoPre, echoPersPre, timesPersPre = nil, nil, nil, nil
 	var c = cmdRootSameName
 	flagInit()
 	commandInit()
@@ -205,7 +230,7 @@ func fullTester(c *Command, input string) resulter {
 	// Testing flag with invalid input
 	c.SetOutput(buf)
 	cmdEcho.AddCommand(cmdTimes)
-	c.AddCommand(cmdPrint, cmdEcho, cmdSubNoRun)
+	c.AddCommand(cmdPrint, cmdEcho, cmdSubNoRun, cmdDeprecated)
 	c.SetArgs(strings.Split(input, " "))
 
 	err := c.Execute()
@@ -810,5 +835,54 @@ func TestReplaceCommandWithRemove(t *testing.T) {
 	}
 	if versionUsed != 2 {
 		t.Errorf("Replacing command should have been called but didn't\n")
+	}
+}
+
+func TestDeprecatedSub(t *testing.T) {
+	c := fullSetupTest("deprecated")
+
+	checkResultContains(t, c, cmdDeprecated.Deprecated)
+}
+
+func TestPreRun(t *testing.T) {
+	noRRSetupTest("echo one two")
+	if echoPre == nil || echoPersPre == nil {
+		t.Error("PreRun or PersistentPreRun not called")
+	}
+	if rootPersPre != nil || timesPersPre != nil {
+		t.Error("Wrong *Pre functions called!")
+	}
+
+	noRRSetupTest("echo times one two")
+	if timesPersPre == nil {
+		t.Error("PreRun or PersistentPreRun not called")
+	}
+	if echoPre != nil || echoPersPre != nil || rootPersPre != nil {
+		t.Error("Wrong *Pre functions called!")
+	}
+
+	noRRSetupTest("print one two")
+	if rootPersPre == nil {
+		t.Error("Parent PersistentPreRun not called but should not have been")
+	}
+	if echoPre != nil || echoPersPre != nil || timesPersPre != nil {
+		t.Error("Wrong *Pre functions called!")
+	}
+}
+
+// Check if cmdEchoSub gets PersistentPreRun from rootCmd even if is added last
+func TestPeristentPreRunPropagation(t *testing.T) {
+	rootCmd := initialize()
+
+	// First add the cmdEchoSub to cmdPrint
+	cmdPrint.AddCommand(cmdEchoSub)
+	// Now add cmdPrint to rootCmd
+	rootCmd.AddCommand(cmdPrint)
+
+	rootCmd.SetArgs(strings.Split("print echosub lala", " "))
+	rootCmd.Execute()
+
+	if rootPersPre == nil || len(rootPersPre) == 0 || rootPersPre[0] != "lala" {
+		t.Error("RootCmd PersistentPreRun not called but should have been")
 	}
 }
