@@ -24,6 +24,9 @@ base:
 {% endif %}
     - logrotate
     - monit
+{% if grains['cloud'] is defined and grains['cloud'] == 'gce' %}
+    - node-upgrade-gcp
+{% endif %}
 
   'roles:kubernetes-master':
     - match: grain
