@@ -304,9 +304,12 @@ func (nc *NodeController) syncCloudNodes() error {
 		return err
 	}
 	nodeMap := make(map[string]*api.Node)
+	nodeMapLock := sync.Mutex{}
 	for i := range nodes.Items {
 		node := nodes.Items[i]
+		nodeMapLock.Lock()
 		nodeMap[node.Name] = &node
+		nodeMapLock.Unlock()
 	}
 	if nc.allocateNodeCIDRs {
 		nc.reconcilePodCIDRs(matches, nodes)
@@ -318,7 +321,10 @@ func (nc *NodeController) syncCloudNodes() error {
 	for i := range matches.Items {
 		go func(node *api.Node) {
 			defer wg.Done()
-			if _, ok := nodeMap[node.Name]; !ok {
+			nodeMapLock.Lock()
+			_, ok := nodeMap[node.Name]
+			nodeMapLock.Unlock()
+			if !ok {
 				glog.V(3).Infof("Querying addresses for new node: %s", node.Name)
 				nodeList := &api.NodeList{}
 				nodeList.Items = []api.Node{*node}
@@ -337,7 +343,9 @@ func (nc *NodeController) syncCloudNodes() error {
 					glog.Errorf("Create node %s error: %v", node.Name, err)
 				}
 			}
+			nodeMapLock.Lock()
 			delete(nodeMap, node.Name)
+			nodeMapLock.Unlock()
 		}(&matches.Items[i])
 	}
 	wg.Wait()

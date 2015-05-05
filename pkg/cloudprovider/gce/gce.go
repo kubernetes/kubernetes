@@ -44,6 +44,7 @@ import (
 )
 
 var ErrMetadataConflict = errors.New("Metadata already set at the same key")
+
 const podCIDRMetadataKey string = "node-ip-range"
 
 // GCECloud is an implementation of Interface, TCPLoadBalancer and Instances for Google Compute Engine.
