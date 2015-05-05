@@ -31,7 +31,7 @@ import (
 )
 
 var (
-	PluginName    = "mesos"
+	ProviderName  = "mesos"
 	CloudProvider *MesosCloud
 
 	noHostNameSpecified = errors.New("No hostname specified")
@@ -39,7 +39,7 @@ var (
 
 func init() {
 	cloudprovider.RegisterCloudProvider(
-		PluginName,
+		ProviderName,
 		func(configReader io.Reader) (cloudprovider.Interface, error) {
 			provider, err := newMesosCloud(configReader)
 			if err == nil {
@@ -108,6 +108,11 @@ func (c *MesosCloud) Clusters() (cloudprovider.Clusters, bool) {
 // Routes always returns nil, false in this implementation.
 func (c *MesosCloud) Routes() (cloudprovider.Routes, bool) {
 	return nil, false
+}
+
+// ProviderName returns the cloud provider ID.
+func (c *MesosCloud) ProviderName() string {
+	return ProviderName
 }
 
 // ListClusters lists the names of the available Mesos clusters.

@@ -36,6 +36,8 @@ type Interface interface {
 	Clusters() (Clusters, bool)
 	// Routes returns a routes interface along with whether the interface is supported.
 	Routes() (Routes, bool)
+	// ProviderName returns the cloud provider ID.
+	ProviderName() string
 }
 
 // Clusters is an abstract, pluggable interface for clusters of containers.

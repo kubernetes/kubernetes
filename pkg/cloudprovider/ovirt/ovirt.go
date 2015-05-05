@@ -33,6 +33,8 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
 )
 
+const ProviderName = "ovirt"
+
 type OVirtInstance struct {
 	UUID      string
 	Name      string
@@ -75,7 +77,7 @@ type XmlVmsList struct {
 }
 
 func init() {
-	cloudprovider.RegisterCloudProvider("ovirt",
+	cloudprovider.RegisterCloudProvider(ProviderName,
 		func(config io.Reader) (cloudprovider.Interface, error) {
 			return newOVirtCloud(config)
 		})
@@ -113,6 +115,11 @@ func newOVirtCloud(config io.Reader) (*OVirtCloud, error) {
 
 func (aws *OVirtCloud) Clusters() (cloudprovider.Clusters, bool) {
 	return nil, false
+}
+
+// ProviderName returns the cloud provider ID.
+func (v *OVirtCloud) ProviderName() string {
+	return ProviderName
 }
 
 // TCPLoadBalancer returns an implementation of TCPLoadBalancer for oVirt cloud

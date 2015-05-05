@@ -42,6 +42,8 @@ import (
 	"github.com/golang/glog"
 )
 
+const ProviderName = "openstack"
+
 var ErrNotFound = errors.New("Failed to find object")
 var ErrMultipleResults = errors.New("Multiple results where only one expected")
 var ErrNoAddressFound = errors.New("No address found for host")
@@ -99,7 +101,7 @@ type Config struct {
 }
 
 func init() {
-	cloudprovider.RegisterCloudProvider("openstack", func(config io.Reader) (cloudprovider.Interface, error) {
+	cloudprovider.RegisterCloudProvider(ProviderName, func(config io.Reader) (cloudprovider.Interface, error) {
 		cfg, err := readConfig(config)
 		if err != nil {
 			return nil, err
@@ -392,6 +394,11 @@ func (i *Instances) GetNodeResources(name string) (*api.NodeResources, error) {
 
 func (os *OpenStack) Clusters() (cloudprovider.Clusters, bool) {
 	return nil, false
+}
+
+// ProviderName returns the cloud provider ID.
+func (os *OpenStack) ProviderName() string {
+	return ProviderName
 }
 
 type LoadBalancer struct {

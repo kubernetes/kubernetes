@@ -31,6 +31,8 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/cloudprovider"
 )
 
+const ProviderName = "vagrant"
+
 // VagrantCloud is an implementation of Interface, TCPLoadBalancer and Instances for developer managed Vagrant cluster.
 type VagrantCloud struct {
 	saltURL  string
@@ -40,7 +42,7 @@ type VagrantCloud struct {
 }
 
 func init() {
-	cloudprovider.RegisterCloudProvider("vagrant", func(config io.Reader) (cloudprovider.Interface, error) { return newVagrantCloud() })
+	cloudprovider.RegisterCloudProvider(ProviderName, func(config io.Reader) (cloudprovider.Interface, error) { return newVagrantCloud() })
 }
 
 // SaltToken is an authorization token required by Salt REST API.
@@ -82,6 +84,11 @@ func newVagrantCloud() (*VagrantCloud, error) {
 
 func (v *VagrantCloud) Clusters() (cloudprovider.Clusters, bool) {
 	return nil, false
+}
+
+// ProviderName returns the cloud provider ID.
+func (v *VagrantCloud) ProviderName() string {
+	return ProviderName
 }
 
 // TCPLoadBalancer returns an implementation of TCPLoadBalancer for Vagrant cloud.

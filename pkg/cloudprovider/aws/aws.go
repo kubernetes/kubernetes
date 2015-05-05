@@ -41,6 +41,8 @@ import (
 	"github.com/golang/glog"
 )
 
+const ProviderName = "aws"
+
 // Abstraction over EC2, to allow mocking/other implementations
 type EC2 interface {
 	// Query EC2 for instances matching the filter
@@ -250,7 +252,7 @@ func (s *awsSdkEC2) DeleteVolume(volumeID string) (resp *ec2.DeleteVolumeOutput,
 }
 
 func init() {
-	cloudprovider.RegisterCloudProvider("aws", func(config io.Reader) (cloudprovider.Interface, error) {
+	cloudprovider.RegisterCloudProvider(ProviderName, func(config io.Reader) (cloudprovider.Interface, error) {
 		metadata := &awsSdkMetadata{}
 		return newAWSCloud(config, getAuth, metadata)
 	})
@@ -364,6 +366,11 @@ func newAWSCloud(config io.Reader, authFunc AuthFunc, metadata AWSMetadata) (*AW
 
 func (aws *AWSCloud) Clusters() (cloudprovider.Clusters, bool) {
 	return nil, false
+}
+
+// ProviderName returns the cloud provider ID.
+func (aws *AWSCloud) ProviderName() string {
+	return ProviderName
 }
 
 // TCPLoadBalancer returns an implementation of TCPLoadBalancer for Amazon Web Services.
