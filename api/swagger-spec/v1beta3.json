@@ -8458,7 +8458,7 @@
      },
      "capabilities": {
       "$ref": "v1beta3.Capabilities",
-      "description": "capabilities for container; cannot be updated"
+      "description": "capabilities for container; cannot be updated; deprecated; See SecurityContext."
      },
      "command": {
       "type": "array",
@@ -8503,7 +8503,7 @@
      },
      "privileged": {
       "type": "boolean",
-      "description": "whether or not the container is granted privileged status; defaults to false; cannot be updated"
+      "description": "whether or not the container is granted privileged status; defaults to false; cannot be updated; deprecated;  See SecurityContext."
      },
      "readinessProbe": {
       "$ref": "v1beta3.Probe",
@@ -8512,6 +8512,10 @@
      "resources": {
       "$ref": "v1beta3.ResourceRequirements",
       "description": "Compute Resources required by this container; cannot be updated"
+     },
+     "securityContext": {
+      "$ref": "v1beta3.SecurityContext",
+      "description": "security options the pod should run with"
      },
      "terminationMessagePath": {
       "type": "string",
@@ -8689,7 +8693,8 @@
       "description": "version of the schema the object should have"
      },
      "gracePeriodSeconds": {
-      "$ref": "int64",
+      "type": "integer",
+      "format": "int64",
       "description": "the duration in seconds to wait before deleting this object; defaults to a per object value if not specified; zero means delete immediately"
      },
      "kind": {
@@ -9888,7 +9893,8 @@
       "description": "restart policy for all containers within the pod; one of RestartPolicyAlways, RestartPolicyOnFailure, RestartPolicyNever"
      },
      "terminationGracePeriodSeconds": {
-      "$ref": "int64",
+      "type": "integer",
+      "format": "int64",
       "description": "optional duration in seconds the pod needs to terminate gracefully; may be decreased in delete request; value must be non-negative integer; the value zero indicates delete immediately; if this value is not set, the default grace period will be used instead; the grace period is the duration in seconds after the processes running in the pod are sent a termination signal and the time when the processes are forcibly halted with a kill signal; set this value longer than the expected cleanup time for your process"
      },
      "volumes": {
@@ -10200,6 +10206,27 @@
      }
     }
    },
+   "v1beta3.SELinuxOptions": {
+    "id": "v1beta3.SELinuxOptions",
+    "properties": {
+     "level": {
+      "type": "string",
+      "description": "the level label to apply to the container"
+     },
+     "role": {
+      "type": "string",
+      "description": "the role label to apply to the container"
+     },
+     "type": {
+      "type": "string",
+      "description": "the type label to apply to the container"
+     },
+     "user": {
+      "type": "string",
+      "description": "the user label to apply to the container"
+     }
+    }
+   },
    "v1beta3.Secret": {
     "id": "v1beta3.Secret",
     "properties": {
@@ -10261,6 +10288,28 @@
      "secretName": {
       "type": "string",
       "description": "secretName is the name of a secret in the pod's namespace"
+     }
+    }
+   },
+   "v1beta3.SecurityContext": {
+    "id": "v1beta3.SecurityContext",
+    "properties": {
+     "capabilities": {
+      "$ref": "v1beta3.Capabilities",
+      "description": "the linux capabilites that should be added or removed"
+     },
+     "privileged": {
+      "type": "boolean",
+      "description": "run the container in privileged mode"
+     },
+     "runAsUser": {
+      "type": "integer",
+      "format": "int64",
+      "description": "the user id that runs the first process in the container"
+     },
+     "seLinuxOptions": {
+      "$ref": "v1beta3.SELinuxOptions",
+      "description": "options that control the SELinux labels applied"
      }
     }
    },
@@ -10480,15 +10529,15 @@
     "id": "v1beta3.Volume",
     "required": [
      "name",
+     "gcePersistentDisk",
      "awsElasticBlockStore",
      "gitRepo",
-     "secret",
      "nfs",
-     "glusterfs",
+     "iscsi",
      "hostPath",
-     "emptyDir",
-     "gcePersistentDisk",
-     "iscsi"
+     "secret",
+     "glusterfs",
+     "emptyDir"
     ],
     "properties": {
      "awsElasticBlockStore": {
