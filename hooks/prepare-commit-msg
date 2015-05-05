@@ -27,6 +27,12 @@ if [[ ${#files[@]} -gt 0 ]]; then
   files_need_boilerplate+=($("${boiler}" "sh" "${files[@]}"))
 fi
 
+# Check for py files without the required boilerplate.
+files=($(git diff --cached --name-only --diff-filter ACM | grep "\.py" | grep -v -e "third_party" -e "Godeps"))
+if [[ ${#files} -gt 0 ]]; then
+  files_need_boilerplate+=($("${boiler}" "py" "${files[@]}"))
+fi
+
 # Check API schema definitions for field descriptions
 for file in $(git diff --cached --name-only --diff-filter ACM | egrep "pkg/api/v.[^/]*/types\.go" | grep -v "third_party"); do
   # Check for files with fields without description tags
