@@ -1,0 +1,67 @@
+apiVersion: v1beta3
+kind: ReplicationController
+metadata:
+  labels:
+    k8s-app: kube-dns
+    kubernetes.io/cluster-service: "true"
+  name: kube-dns
+  namespace: default
+spec:
+  replicas: {{ pillar['dns_replicas'] }}
+  selector:
+    k8s-app: kube-dns
+  template:
+    metadata:
+      labels:
+        k8s-app: kube-dns
+        kubernetes.io/cluster-service: "true"
+        name: kube-dns
+    spec:
+      containers:
+      - name: etcd
+        image: gcr.io/google_containers/etcd:2.0.9
+        command:
+        - /usr/local/bin/etcd
+        - -listen-client-urls
+        - http://127.0.0.1:2379,http://127.0.0.1:4001
+        - -advertise-client-urls
+        - http://127.0.0.1:2379,http://127.0.0.1:4001
+        - -initial-cluster-token
+        - skydns-etcd
+      - name: kube2sky
+        image: gcr.io/google_containers/kube2sky:1.4
+        args:
+        # entrypoint = "/kube2sky"
+        - -domain={{ pillar['dns_domain'] }}
+        - -kubecfg_file=/etc/dns_token/kubeconfig
+        volumeMounts:
+        - mountPath: /etc/dns_token
+          name: dns-token
+          readOnly: true
+      - name: skydns
+        image: gcr.io/google_containers/skydns:2015-03-11-001
+        args:
+        # entrypoint = "/skydns"
+        - -machines=http://localhost:4001
+        - -addr=0.0.0.0:53
+        - -domain={{ pillar['dns_domain'] }}.
+        ports:
+        - containerPort: 53
+          name: dns
+          protocol: UDP
+        livenessProbe:
+          exec:
+            command:
+            - "/bin/sh"
+            - "-c"
+            # The health check succeeds by virtue of not hanging. It'd be nice
+            # to also check local services are known, but if that's broken then
+            # etcd or kube2sky has to be restarted, not skydns.
+            - "nslookup foobar 127.0.0.1 &> /dev/null; echo ok"
+          initialDelaySeconds: 30
+          timeoutSeconds: 5
+      dnsPolicy: Default  # Don't use cluster DNS.
+      volumes:
+      - name: dns-token
+        secret:
+          secretName: token-system-dns
