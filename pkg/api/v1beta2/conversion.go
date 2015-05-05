@@ -19,7 +19,6 @@ package v1beta2
 import (
 	"fmt"
 	"net"
-	"reflect"
 	"strconv"
 
 	newer "github.com/GoogleCloudPlatform/kubernetes/pkg/api"
@@ -358,19 +357,14 @@ func init() {
 			if err := s.Convert(&in.TerminationMessagePath, &out.TerminationMessagePath, 0); err != nil {
 				return err
 			}
+			if err := s.Convert(&in.Privileged, &out.Privileged, 0); err != nil {
+				return err
+			}
 			if err := s.Convert(&in.ImagePullPolicy, &out.ImagePullPolicy, 0); err != nil {
 				return err
 			}
-			if err := s.Convert(&in.SecurityContext, &out.SecurityContext, 0); err != nil {
+			if err := s.Convert(&in.Capabilities, &out.Capabilities, 0); err != nil {
 				return err
-			}
-			// now that we've converted set the container field from security context
-			if out.SecurityContext != nil && out.SecurityContext.Privileged != nil {
-				out.Privileged = *out.SecurityContext.Privileged
-			}
-			// now that we've converted set the container field from security context
-			if out.SecurityContext != nil && out.SecurityContext.Capabilities != nil {
-				out.Capabilities = *out.SecurityContext.Capabilities
 			}
 			return nil
 		},
@@ -451,23 +445,13 @@ func init() {
 			if err := s.Convert(&in.TerminationMessagePath, &out.TerminationMessagePath, 0); err != nil {
 				return err
 			}
+			if err := s.Convert(&in.Privileged, &out.Privileged, 0); err != nil {
+				return err
+			}
 			if err := s.Convert(&in.ImagePullPolicy, &out.ImagePullPolicy, 0); err != nil {
 				return err
 			}
-			if in.SecurityContext != nil {
-				if in.SecurityContext.Capabilities != nil {
-					if !reflect.DeepEqual(in.SecurityContext.Capabilities.Add, in.Capabilities.Add) ||
-						!reflect.DeepEqual(in.SecurityContext.Capabilities.Drop, in.Capabilities.Drop) {
-						return fmt.Errorf("container capability settings do not match security context settings, cannot convert")
-					}
-				}
-				if in.SecurityContext.Privileged != nil {
-					if in.Privileged != *in.SecurityContext.Privileged {
-						return fmt.Errorf("container privileged settings do not match security context settings, cannot convert")
-					}
-				}
-			}
-			if err := s.Convert(&in.SecurityContext, &out.SecurityContext, 0); err != nil {
+			if err := s.Convert(&in.Capabilities, &out.Capabilities, 0); err != nil {
 				return err
 			}
 			return nil

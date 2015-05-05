@@ -63,7 +63,6 @@ func init() {
 			if obj.TerminationMessagePath == "" {
 				obj.TerminationMessagePath = TerminationMessagePathDefault
 			}
-			defaultSecurityContext(obj)
 		},
 		func(obj *RestartPolicy) {
 			if util.AllPtrFieldsNil(obj) {
@@ -193,47 +192,6 @@ func defaultHostNetworkPorts(containers *[]Container) {
 			if (*containers)[i].Ports[j].HostPort == 0 {
 				(*containers)[i].Ports[j].HostPort = (*containers)[i].Ports[j].ContainerPort
 			}
-		}
-	}
-}
-
-// defaultSecurityContext performs the downward and upward merges of a pod definition
-func defaultSecurityContext(container *Container) {
-	if container.SecurityContext == nil {
-		glog.V(4).Infof("creating security context for container %s", container.Name)
-		container.SecurityContext = &SecurityContext{}
-	}
-	// if there are no capabilities defined on the SecurityContext then copy the container settings
-	if container.SecurityContext.Capabilities == nil {
-		glog.V(4).Infof("downward merge of container.Capabilities for container %s", container.Name)
-		container.SecurityContext.Capabilities = &container.Capabilities
-	} else {
-		// if there are capabilities defined on the security context and the container setting is
-		// empty then assume that it was left off the pod definition and ensure that the container
-		// settings match the security context settings (checked by the convert functions).  If
-		// there are settings in both then don't touch it, the converter will error if they don't
-		// match
-		if len(container.Capabilities.Add) == 0 {
-			glog.V(4).Infof("upward merge of container.Capabilities.Add for container %s", container.Name)
-			container.Capabilities.Add = container.SecurityContext.Capabilities.Add
-		}
-		if len(container.Capabilities.Drop) == 0 {
-			glog.V(4).Infof("upward merge of container.Capabilities.Drop for container %s", container.Name)
-			container.Capabilities.Drop = container.SecurityContext.Capabilities.Drop
-		}
-	}
-	// if there are no privileged settings on the security context then copy the container settings
-	if container.SecurityContext.Privileged == nil {
-		glog.V(4).Infof("downward merge of container.Privileged for container %s", container.Name)
-		container.SecurityContext.Privileged = &container.Privileged
-	} else {
-		// we don't have a good way to know if container.Privileged was set or just defaulted to false
-		// so the best we can do here is check if the securityContext is set to true and the
-		// container is set to false and assume that the Privileged field was left off the container
-		// definition and not an intentional mismatch
-		if *container.SecurityContext.Privileged && !container.Privileged {
-			glog.V(4).Infof("upward merge of container.Privileged for container %s", container.Name)
-			container.Privileged = *container.SecurityContext.Privileged
 		}
 	}
 }

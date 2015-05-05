@@ -18,7 +18,6 @@ package v1
 
 import (
 	"fmt"
-	"reflect"
 
 	newer "github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
@@ -238,22 +237,9 @@ func init() {
 				return err
 			}
 			out.TerminationMessagePath = in.TerminationMessagePath
+			out.Privileged = in.Privileged
 			out.ImagePullPolicy = newer.PullPolicy(in.ImagePullPolicy)
-
-			if in.SecurityContext != nil {
-				if in.SecurityContext.Capabilities != nil {
-					if !reflect.DeepEqual(in.SecurityContext.Capabilities.Add, in.Capabilities.Add) ||
-						!reflect.DeepEqual(in.SecurityContext.Capabilities.Drop, in.Capabilities.Drop) {
-						return fmt.Errorf("container capability settings do not match security context settings, cannot convert")
-					}
-				}
-				if in.SecurityContext.Privileged != nil {
-					if in.Privileged != *in.SecurityContext.Privileged {
-						return fmt.Errorf("container privileged settings do not match security context settings, cannot convert")
-					}
-				}
-			}
-			if err := s.Convert(&in.SecurityContext, &out.SecurityContext, 0); err != nil {
+			if err := s.Convert(&in.Capabilities, &out.Capabilities, 0); err != nil {
 				return err
 			}
 			return nil
@@ -311,18 +297,10 @@ func init() {
 				return err
 			}
 			out.TerminationMessagePath = in.TerminationMessagePath
+			out.Privileged = in.Privileged
 			out.ImagePullPolicy = PullPolicy(in.ImagePullPolicy)
-			if err := s.Convert(&in.SecurityContext, &out.SecurityContext, 0); err != nil {
+			if err := s.Convert(&in.Capabilities, &out.Capabilities, 0); err != nil {
 				return err
-			}
-
-			// now that we've converted set the container field from security context
-			if out.SecurityContext != nil && out.SecurityContext.Privileged != nil {
-				out.Privileged = *out.SecurityContext.Privileged
-			}
-			// now that we've converted set the container field from security context
-			if out.SecurityContext != nil && out.SecurityContext.Capabilities != nil {
-				out.Capabilities = *out.SecurityContext.Capabilities
 			}
 			return nil
 		},

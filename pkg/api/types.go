@@ -623,10 +623,12 @@ type Container struct {
 	Lifecycle      *Lifecycle           `json:"lifecycle,omitempty"`
 	// Required.
 	TerminationMessagePath string `json:"terminationMessagePath,omitempty"`
+	// Optional: Default to false.
+	Privileged bool `json:"privileged,omitempty"`
 	// Required: Policy for pulling images for this container
 	ImagePullPolicy PullPolicy `json:"imagePullPolicy"`
-	// Optional: SecurityContext defines the security options the pod should be run with
-	SecurityContext *SecurityContext `json:"securityContext,omitempty" description:"security options the pod should run with"`
+	// Optional: Capabilities for container.
+	Capabilities Capabilities `json:"capabilities,omitempty"`
 }
 
 // Handler defines a specific action that should be taken
@@ -1873,38 +1875,4 @@ type ComponentStatusList struct {
 	ListMeta `json:"metadata,omitempty"`
 
 	Items []ComponentStatus `json:"items"`
-}
-
-// SecurityContext holds security configuration that will be applied to a container.  SecurityContext
-// contains duplication of some existing fields from the Container resource.  These duplicate fields
-// will be populated based on the Container configuration if they are not set.  Defining them on
-// both the Container AND the SecurityContext will result in an error.
-type SecurityContext struct {
-	// Capabilities are the capabilities to add/drop when running the container
-	Capabilities *Capabilities `json:"capabilities,omitempty" description:"the linux capabilites that should be added or removed"`
-
-	// Run the container in privileged mode
-	Privileged *bool `json:"privileged,omitempty" description:"run the container in privileged mode"`
-
-	// SELinuxOptions are the labels to be applied to the container
-	// and volumes
-	SELinuxOptions *SELinuxOptions `json:"seLinuxOptions,omitempty" description:"options that control the SELinux labels applied"`
-
-	// RunAsUser is the UID to run the entrypoint of the container process.
-	RunAsUser *int64 `json:"runAsUser,omitempty" description:"the user id that runs the first process in the container"`
-}
-
-// SELinuxOptions are the labels to be applied to the container.
-type SELinuxOptions struct {
-	// SELinux user label
-	User string `json:"user,omitempty" description:"the user label to apply to the container"`
-
-	// SELinux role label
-	Role string `json:"role,omitempty" description:"the role label to apply to the container"`
-
-	// SELinux type label
-	Type string `json:"type,omitempty" description:"the type label to apply to the container"`
-
-	// SELinux level label.
-	Level string `json:"level,omitempty" description:"the level label to apply to the container"`
 }
