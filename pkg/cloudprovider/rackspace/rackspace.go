@@ -395,6 +395,14 @@ func (i *Instances) GetNodeResources(name string) (*api.NodeResources, error) {
 	return rsrc, nil
 }
 
+func (i *Instances) Configure(name string, spec *api.NodeSpec) error {
+	return nil
+}
+
+func (i *Instances) Release(name string) error {
+	return nil
+}
+
 func (os *Rackspace) Clusters() (cloudprovider.Clusters, bool) {
 	return nil, false
 }

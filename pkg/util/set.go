@@ -139,6 +139,15 @@ func (s StringSet) List() []string {
 	return res
 }
 
+// Returns a single element from the set.
+func (s StringSet) PopAny() (string, bool) {
+	for key := range s {
+		s.Delete(key)
+		return key, true
+	}
+	return "", false
+}
+
 // Len returns the size of the set.
 func (s StringSet) Len() int {
 	return len(s)

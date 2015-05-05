@@ -32,6 +32,8 @@ fi
 
 NODE_INSTANCE_PREFIX="${INSTANCE_PREFIX}-minion"
 
+ALLOCATE_NODE_CIDRS=true
+
 KUBE_PROMPT_FOR_UPDATE=y
 KUBE_SKIP_UPDATE=${KUBE_SKIP_UPDATE-"n"}
 
@@ -336,31 +338,6 @@ function create-firewall-rule {
   done
 }
 
-# Robustly try to create a route.
-# $1: The name of the route.
-# $2: IP range.
-function create-route {
-  detect-project
-  local attempt=0
-  while true; do
-    if ! gcloud compute routes create "$1" \
-      --project "${PROJECT}" \
-      --destination-range "$2" \
-      --network "${NETWORK}" \
-      --next-hop-instance "$1" \
-      --next-hop-instance-zone "${ZONE}"; then
-        if (( attempt > 5 )); then
-          echo -e "${color_red}Failed to create route $1 ${color_norm}"
-          exit 2
-        fi
-        echo -e "${color_yellow}Attempt $(($attempt+1)) failed to create route $1. Retrying.${color_norm}"
-        attempt=$(($attempt+1))
-    else
-        break
-    fi
-  done
-}
-
 # Robustly try to create an instance template.
 # $1: The name of the instance template.
 # $2: The scopes flag.
@@ -569,23 +546,6 @@ function kube-up {
   # to gcloud's deficiency.
   wait-for-minions-to-run
   detect-minion-names
-
-  # Create the routes and set IP ranges to instance metadata, 5 instances at a time.
-  for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
-    create-route "${MINION_NAMES[$i]}" "${MINION_IP_RANGES[$i]}" &
-    add-instance-metadata "${MINION_NAMES[$i]}" "node-ip-range=${MINION_IP_RANGES[$i]}" &
-
-    if [ $i -ne 0 ] && [ $((i%5)) -eq 0 ]; then
-      echo Waiting for a batch of routes at $i...
-      wait-for-jobs
-    fi
-
-  done
-  create-route "${MASTER_NAME}" "${MASTER_IP_RANGE}"
-
-  # Wait for last batch of jobs.
-  wait-for-jobs
-
   detect-master
 
   echo "Waiting for cluster initialization."
