@@ -1,10 +1,10 @@
 {
   "kind": "Namespace",
-  "apiVersion":"v1beta1",  
-  "id": "development",
-  "spec": {},
-  "status": {},
-  "labels": {
-    "name": "development"
-  }  
+  "apiVersion": "v1beta3",
+  "metadata": {
+    "name": "development",
+    "labels": {
+      "name": "development"
+    }
+  }
 }
