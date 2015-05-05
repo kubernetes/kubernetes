@@ -261,7 +261,9 @@ func ExecLocation(getter ResourceGetter, connInfo client.ConnectionInfoGetter, c
 	if opts.TTY {
 		params.Add(api.ExecTTYParam, "1")
 	}
-	params.Add("command", opts.Command)
+	for _, c := range opts.Command {
+		params.Add("command", c)
+	}
 	loc := &url.URL{
 		Scheme:   nodeScheme,
 		Host:     fmt.Sprintf("%s:%d", nodeHost, nodePort),

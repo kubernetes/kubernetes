@@ -1207,8 +1207,8 @@ type PodExecOptions struct {
 	// Container in which to execute the command.
 	Container string `json:"container,omitempty" description:"the container in which to execute the command. Defaults to only container if there is only one container in the pod."`
 
-	// Command is the remote command to execute
-	Command string `json:"command" description:"the command to execute"`
+	// Command is the remote command to execute; argv array; not executed within a shell.
+	Command []string `json:"command" description:"the command to execute; argv array; not executed within a shell"`
 }
 
 // PodProxyOptions is the query options to a Pod's proxy call
