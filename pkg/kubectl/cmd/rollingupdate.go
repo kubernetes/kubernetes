@@ -34,6 +34,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/resource"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/wait"
 	"github.com/spf13/cobra"
 )
 
@@ -287,6 +288,34 @@ func hashObject(obj runtime.Object, codec runtime.Codec) (string, error) {
 
 const MaxRetries = 3
 
+type updateFunc func(controller *api.ReplicationController)
+
+// updateWithRetries updates applies the given rc as an update.
+func updateWithRetries(rcClient client.ReplicationControllerInterface, rc *api.ReplicationController, applyUpdate updateFunc) (*api.ReplicationController, error) {
+	// Each update could take ~100ms, so give it 0.5 second
+	var err error
+	oldRc := rc
+	err = wait.Poll(10*time.Millisecond, 500*time.Millisecond, func() (bool, error) {
+		// Apply the update, then attempt to push it to the apiserver.
+		applyUpdate(rc)
+		if rc, err = rcClient.Update(rc); err == nil {
+			// rc contains the latest controller post update
+			return true, nil
+		}
+		// Update the controller with the latest resource version, if the update failed we
+		// can't trust rc so use oldRc.Name.
+		if rc, err = rcClient.Get(oldRc.Name); err != nil {
+			// The Get failed: Value in rc cannot be trusted.
+			rc = oldRc
+		}
+		// The Get passed: rc contains the latest controller, expect a poll for the update.
+		return false, nil
+	})
+	// If the error is non-nil the returned controller cannot be trusted, if it is nil, the returned
+	// controller contains the applied update.
+	return rc, err
+}
+
 func addDeploymentKeyToReplicationController(oldRc *api.ReplicationController, client *client.Client, deploymentKey, namespace string, out io.Writer) (*api.ReplicationController, error) {
 	oldHash, err := hashObject(oldRc, client.Codec)
 	if err != nil {
@@ -296,8 +325,9 @@ func addDeploymentKeyToReplicationController(oldRc *api.ReplicationController, c
 	if oldRc.Spec.Template.Labels == nil {
 		oldRc.Spec.Template.Labels = map[string]string{}
 	}
-	oldRc.Spec.Template.Labels[deploymentKey] = oldHash
-	if oldRc, err = client.ReplicationControllers(namespace).Update(oldRc); err != nil {
+	if oldRc, err = updateWithRetries(client.ReplicationControllers(namespace), oldRc, func(rc *api.ReplicationController) {
+		rc.Spec.Template.Labels[deploymentKey] = oldHash
+	}); err != nil {
 		return nil, err
 	}
 
@@ -341,10 +371,11 @@ func addDeploymentKeyToReplicationController(oldRc *api.ReplicationController, c
 	for k, v := range oldRc.Spec.Selector {
 		selectorCopy[k] = v
 	}
-	oldRc.Spec.Selector[deploymentKey] = oldHash
 
 	// Update the selector of the rc so it manages all the pods we updated above
-	if oldRc, err = client.ReplicationControllers(namespace).Update(oldRc); err != nil {
+	if oldRc, err = updateWithRetries(client.ReplicationControllers(namespace), oldRc, func(rc *api.ReplicationController) {
+		rc.Spec.Selector[deploymentKey] = oldHash
+	}); err != nil {
 		return nil, err
 	}
 
