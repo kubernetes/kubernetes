@@ -154,6 +154,13 @@ var _ = Describe("Density", func() {
 			// Tune the threshold for allowed failures.
 			badEvents := BadEvents(events)
 			Expect(badEvents).NotTo(BeNumerically(">", int(math.Floor(0.01*float64(totalPods)))))
+
+			// Verify latency metrics
+			// TODO: Update threshold to 1s once we reach this goal
+			// TODO: We should reset metrics before the test. Currently previous tests influence latency metrics.
+			highLatencyRequests, err := HighLatencyRequests(c, 10*time.Second)
+			expectNoError(err)
+			Expect(highLatencyRequests).NotTo(BeNumerically(">", 0))
 		})
 	}
 })
