@@ -411,6 +411,7 @@ func (gce *GCECloud) DeleteTCPLoadBalancer(name, region string) error {
 		err = gce.waitForRegionOp(op, region)
 		if err != nil {
 			glog.Warningf("Failed waiting for Forwarding Rule %s to be deleted: got error %s.", name, err.Error())
+			return err
 		}
 	}
 	op, err = gce.service.TargetPools.Delete(gce.projectID, region, name).Do()
