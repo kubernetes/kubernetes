@@ -407,10 +407,13 @@ function kube-up {
   echo "Using Internet Gateway $IGW_ID"
 
   echo "Associating route table."
-  ROUTE_TABLE_ID=$($AWS_CMD describe-route-tables --filters Name=vpc-id,Values=$VPC_ID | json_val '["RouteTables"][0]["RouteTableId"]')
-  $AWS_CMD associate-route-table --route-table-id $ROUTE_TABLE_ID --subnet-id $SUBNET_ID > $LOG || true
+  ROUTE_TABLE_ID=$($AWS_CMD describe-route-tables --filters Name=vpc-id,Values=$VPC_ID Name=association.subnet-id,Values=$SUBNET_ID | json_val '["RouteTables"][0]["RouteTableId"]')
+  if [[ -z "$ROUTE_TABLE_ID" ]]; then
+    ROUTE_TABLE_ID=$($AWS_CMD describe-route-tables --filters Name=vpc-id,Values=$VPC_ID | json_val '["RouteTables"][0]["RouteTableId"]')
+    $AWS_CMD associate-route-table --route-table-id $ROUTE_TABLE_ID --subnet-id $SUBNET_ID > $LOG || true
+  fi
   echo "Configuring route table."
-  $AWS_CMD describe-route-tables --filters Name=vpc-id,Values=$VPC_ID > $LOG || true
+  $AWS_CMD describe-route-tables --filters Name=vpc-id,Values=$VPC_ID Name=association.subnet-id,Values=$SUBNET_ID > $LOG || true
   echo "Adding route to route table."
   $AWS_CMD create-route --route-table-id $ROUTE_TABLE_ID --destination-cidr-block 0.0.0.0/0 --gateway-id $IGW_ID > $LOG || true
 
