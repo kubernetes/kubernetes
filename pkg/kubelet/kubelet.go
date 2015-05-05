@@ -600,6 +600,12 @@ func (kl *Kubelet) Run(updates <-chan PodUpdate) {
 		glog.Infof("Running in container %q", kl.resourceContainer)
 	}
 
+	err := kl.imageManager.Start()
+	if err != nil {
+		kl.recorder.Eventf(kl.nodeRef, "imageManagerFailed", "Failed to start ImageManager %v", err)
+		glog.Errorf("Failed to start ImageManager, images may not be garbage collected: %v", err)
+	}
+
 	go kl.syncNodeStatus()
 	// Run the system oom watcher forever.
 	go util.Until(kl.runOOMWatcher, time.Second, util.NeverStop)

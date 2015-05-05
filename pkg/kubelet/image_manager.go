@@ -39,6 +39,9 @@ type imageManager interface {
 	// enough space as per the garbage collection policy.
 	GarbageCollect() error
 
+	// Start async garbage collection of images.
+	Start() error
+
 	// TODO(vmarmol): Have this subsume pulls as well.
 }
 
@@ -104,15 +107,10 @@ func newImageManager(dockerClient dockertools.DockerInterface, cadvisorInterface
 		nodeRef:      nodeRef,
 	}
 
-	err := im.start()
-	if err != nil {
-		return nil, fmt.Errorf("failed to start image manager: %v", err)
-	}
-
 	return im, nil
 }
 
-func (im *realImageManager) start() error {
+func (im *realImageManager) Start() error {
 	// Initial detection make detected time "unknown" in the past.
 	var zero time.Time
 	err := im.detectImages(zero)
