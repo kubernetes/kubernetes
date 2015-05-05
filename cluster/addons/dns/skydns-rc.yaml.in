@@ -31,7 +31,7 @@ desiredState:
                     "-initial-cluster-token=skydns-etcd",
             ]
           - name: kube2sky
-            image: gcr.io/google_containers/kube2sky:1.3
+            image: gcr.io/google_containers/kube2sky:1.4
             volumeMounts:
                - name: dns-token
                  mountPath: /etc/dns_token

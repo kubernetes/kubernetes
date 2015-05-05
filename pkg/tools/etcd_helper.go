@@ -517,7 +517,7 @@ func GetEtcdVersion(host string) (string, error) {
 	}
 	defer response.Body.Close()
 	if response.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("Unsuccessful response from server: %v", err)
+		return "", fmt.Errorf("unsuccessful response from etcd server %q: %v", host, err)
 	}
 	versionBytes, err := ioutil.ReadAll(response.Body)
 	if err != nil {
