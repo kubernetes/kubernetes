@@ -921,6 +921,7 @@ func deepCopy_api_NodeList(in NodeList, out *NodeList, c *conversion.Cloner) err
 func deepCopy_api_NodeSpec(in NodeSpec, out *NodeSpec, c *conversion.Cloner) error {
 	out.PodCIDR = in.PodCIDR
 	out.ExternalID = in.ExternalID
+	out.ProviderID = in.ProviderID
 	out.Unschedulable = in.Unschedulable
 	return nil
 }

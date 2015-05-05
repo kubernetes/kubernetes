@@ -18,6 +18,7 @@ package cloudprovider
 
 import (
 	"errors"
+	"fmt"
 	"net"
 	"strings"
 
@@ -59,6 +60,18 @@ func GetLoadBalancerName(service *api.Service) string {
 		ret = ret[:32]
 	}
 	return ret
+}
+
+func GetInstanceProviderID(cloud Interface, nodeName string) (string, error) {
+	instances, ok := cloud.Instances()
+	if !ok {
+		return "", fmt.Errorf("failed to get instances from cloud provider")
+	}
+	instanceID, err := instances.InstanceID(nodeName)
+	if err != nil {
+		return "", fmt.Errorf("failed to get instance ID from cloud provider: %v", err)
+	}
+	return cloud.ProviderName() + "://" + instanceID, nil
 }
 
 // TCPLoadBalancer is an abstract, pluggable interface for TCP load balancers.

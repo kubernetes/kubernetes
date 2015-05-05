@@ -856,6 +856,7 @@ func deepCopy_v1beta3_NodeList(in NodeList, out *NodeList, c *conversion.Cloner)
 func deepCopy_v1beta3_NodeSpec(in NodeSpec, out *NodeSpec, c *conversion.Cloner) error {
 	out.PodCIDR = in.PodCIDR
 	out.ExternalID = in.ExternalID
+	out.ProviderID = in.ProviderID
 	out.Unschedulable = in.Unschedulable
 	return nil
 }
