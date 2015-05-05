@@ -88,7 +88,7 @@ func RunExpose(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []str
 
 	generatorName := cmdutil.GetFlagString(cmd, "generator")
 
-	generator, found := kubectl.Generators[generatorName]
+	generator, found := f.Generator(generatorName)
 	if !found {
 		return cmdutil.UsageError(cmd, fmt.Sprintf("generator %q not found.", generator))
 	}

@@ -82,7 +82,7 @@ func RunRunContainer(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args
 	}
 
 	generatorName := cmdutil.GetFlagString(cmd, "generator")
-	generator, found := kubectl.Generators[generatorName]
+	generator, found := f.Generator(generatorName)
 	if !found {
 		return cmdutil.UsageError(cmd, fmt.Sprintf("Generator: %s not found.", generator))
 	}
