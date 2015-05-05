@@ -1,8 +1,7 @@
 FROM centos
 ADD kubelet /kubelet
 RUN chmod a+rx /kubelet
-ADD nsenter /nsenter
-RUN chmod a+rx /nsenter
+RUN cp /usr/bin/nsenter /nsenter
 
 VOLUME /var/lib/docker
 VOLUME /var/lib/kubelet
