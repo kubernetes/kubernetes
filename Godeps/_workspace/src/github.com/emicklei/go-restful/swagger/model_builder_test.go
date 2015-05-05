@@ -84,6 +84,49 @@ func TestPrimitiveTypes(t *testing.T) {
  }`)
 }
 
+// clear && go test -v -test.run TestPrimitivePtrTypes ...swagger
+func TestPrimitivePtrTypes(t *testing.T) {
+	type Prims struct {
+		f *float64
+		t *time.Time
+		b *bool
+		s *string
+		i *int
+	}
+	testJsonFromStruct(t, Prims{}, `{
+  "swagger.Prims": {
+   "id": "swagger.Prims",
+   "required": [
+    "f",
+    "t",
+    "b",
+    "s",
+    "i"
+   ],
+   "properties": {
+    "b": {
+     "type": "boolean"
+    },
+    "f": {
+     "type": "number",
+     "format": "double"
+    },
+    "i": {
+     "type": "integer",
+     "format": "int32"
+    },
+    "s": {
+     "type": "string"
+    },
+    "t": {
+     "type": "string",
+     "format": "date-time"
+    }
+   }
+  }
+ }`)
+}
+
 // clear && go test -v -test.run TestS1 ...swagger
 func TestS1(t *testing.T) {
 	type S1 struct {
@@ -702,6 +745,52 @@ func TestEmbeddedStructA5(t *testing.T) {
  }`)
 }
 
+type D2 struct {
+	id int
+	D  []D
+}
+
+type A6 struct {
+	D2 "json:,inline"
+}
+
+// clear && go test -v -test.run TestStructA4 ...swagger
+func TestEmbeddedStructA6(t *testing.T) {
+	testJsonFromStruct(t, A6{}, `{
+  "swagger.A6": {
+   "id": "swagger.A6",
+   "required": [
+    "id",
+    "D"
+   ],
+   "properties": {
+    "D": {
+     "type": "array",
+     "items": {
+      "$ref": "swagger.D"
+     }
+    },
+    "id": {
+     "type": "integer",
+     "format": "int32"
+    }
+   }
+  },
+  "swagger.D": {
+   "id": "swagger.D",
+   "required": [
+    "Id"
+   ],
+   "properties": {
+    "Id": {
+     "type": "integer",
+     "format": "int32"
+    }
+   }
+  }
+ }`)
+}
+
 type ObjectId []byte
 
 type Region struct {
@@ -832,4 +921,60 @@ func TestSlices(t *testing.T) {
 		testJsonFromStruct(t, Customer{}, expected)
 	}
 
+}
+
+type Name struct {
+	Value string
+}
+
+func (n Name) PostBuildModel(m *Model) *Model {
+	m.Description = "titles must be upcase"
+	return m
+}
+
+type TOC struct {
+	Titles []Name
+}
+
+type Discography struct {
+	Title Name
+	TOC
+}
+
+// clear && go test -v -test.run TestEmbeddedStructPull204 ...swagger
+func TestEmbeddedStructPull204(t *testing.T) {
+	b := Discography{}
+	testJsonFromStruct(t, b, `
+{
+  "swagger.Discography": {
+   "id": "swagger.Discography",
+   "required": [
+    "Title",
+    "Titles"
+   ],
+   "properties": {
+    "Title": {
+     "$ref": "swagger.Name"
+    },
+    "Titles": {
+     "type": "array",
+     "items": {
+      "$ref": "swagger.Name"
+     }
+    }
+   }
+  },
+  "swagger.Name": {
+   "id": "swagger.Name",
+   "required": [
+    "Value"
+   ],
+   "properties": {
+    "Value": {
+     "type": "string"
+    }
+   }
+  }
+ }
+`)
 }
