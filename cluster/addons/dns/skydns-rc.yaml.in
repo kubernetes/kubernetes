@@ -22,11 +22,12 @@ spec:
         image: gcr.io/google_containers/etcd:2.0.9
         command:
         - /usr/local/bin/etcd
-        - --addr
-        - 127.0.0.1:4001
-        - --bind-addr
-        - 127.0.0.1:4001
-        - -initial-cluster-token=skydns-etcd
+        - -listen-client-urls
+        - http://127.0.0.1:2379,http://127.0.0.1:4001
+        - -advertise-client-urls
+        - http://127.0.0.1:2379,http://127.0.0.1:4001
+        - -initial-cluster-token
+        - skydns-etcd
       - name: kube2sky
         image: gcr.io/google_containers/kube2sky:1.4
         args:
