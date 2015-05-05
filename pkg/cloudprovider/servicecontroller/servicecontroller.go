@@ -235,26 +235,25 @@ func (s *ServiceController) createLoadBalancerIfNeeded(namespacedName types.Name
 			}
 		}
 	} else {
-		// If we don't have any cached memory of the load balancer and it already
-		// exists, optimistically consider our work done.
-		// TODO: If we could read the spec of the existing load balancer, we could
-		// determine if an update is necessary.
-		exists, err := s.balancer.TCPLoadBalancerExists(s.loadBalancerName(service), s.zone.Region)
+		// If we don't have any cached memory of the load balancer, we have to ask
+		// the cloud provider for what it knows about it.
+		endpoint, exists, err := s.balancer.GetTCPLoadBalancer(s.loadBalancerName(service), s.zone.Region)
 		if err != nil {
 			return fmt.Errorf("Error getting LB for service %s", namespacedName), retryable
 		}
-		if exists && len(service.Spec.PublicIPs) == 0 {
-			// The load balancer exists, but we apparently don't know about its public
-			// IPs, so just delete it and recreate it to get back to a sane state.
-			// TODO: Ideally the cloud provider interface would return the IP for us.
-			glog.Infof("Deleting old LB for service with no public IPs %s", namespacedName)
+		if exists && stringSlicesEqual(service.Spec.PublicIPs, []string{endpoint}) {
+			// TODO: If we could read more of the spec (ports, affinityType) of the
+			// existing load balancer, we could better determine if an update is
+			// necessary in more cases. For now, we optimistically assume that a
+			// matching IP suffices.
+			glog.Infof("LB already exists with endpoint %s for previously uncached service %s", endpoint, namespacedName)
+			return nil, notRetryable
+		} else if exists {
+			glog.Infof("Deleting old LB for previously uncached service %s whose endpoint %s doesn't match the service's desired IPs %v",
+				namespacedName, endpoint, service.Spec.PublicIPs)
 			if err := s.ensureLBDeleted(service); err != nil {
 				return err, retryable
 			}
-		} else if exists {
-			// TODO: Better handle updates for non-cached services, this is optimistic.
-			glog.Infof("LB already exists for service %s", namespacedName)
-			return nil, notRetryable
 		}
 	}
 
@@ -350,7 +349,7 @@ func (s *ServiceController) createExternalLoadBalancer(service *api.Service) err
 func (s *ServiceController) ensureLBDeleted(service *api.Service) error {
 	// This is only needed because not all delete load balancer implementations
 	// are currently idempotent to the LB not existing.
-	if exists, err := s.balancer.TCPLoadBalancerExists(s.loadBalancerName(service), s.zone.Region); err != nil {
+	if _, exists, err := s.balancer.GetTCPLoadBalancer(s.loadBalancerName(service), s.zone.Region); err != nil {
 		return err
 	} else if !exists {
 		return nil
@@ -578,7 +577,7 @@ func (s *ServiceController) lockedUpdateLoadBalancerHosts(service *api.Service, 
 	}
 
 	// It's only an actual error if the load balancer still exists.
-	if exists, err := s.balancer.TCPLoadBalancerExists(name, s.zone.Region); err != nil {
+	if _, exists, err := s.balancer.GetTCPLoadBalancer(name, s.zone.Region); err != nil {
 		glog.Errorf("External error while checking if TCP load balancer %q exists: name, %v")
 	} else if !exists {
 		return nil
