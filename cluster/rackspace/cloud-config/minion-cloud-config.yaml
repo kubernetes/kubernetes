@@ -98,7 +98,7 @@ coreos:
         [Service]
         EnvironmentFile=/run/kubelet/apiservers.env
         ExecStartPre=/usr/bin/ln -sf /opt/kubernetes/server/bin/kubelet /opt/bin/kubelet
-        ExecStart=/opt/bin/kubelet --address=$private_ipv4 --hostname_override=$private_ipv4 --api_servers=${FIRST_APISERVER_URL} --logtostderr=true --config=/opt/kubernetes-manifests --cluster_dns=DNS_SERVER_IP --cluster_domain=DNS_DOMAIN
+        ExecStart=/opt/bin/kubelet --address=$private_ipv4 --hostname_override=$private_ipv4 --api_servers=${FIRST_APISERVER_URL} --logtostderr=true --cluster_dns=DNS_SERVER_IP --cluster_domain=DNS_DOMAIN
         Restart=always
         RestartSec=2
     - name: minion-proxy.service
