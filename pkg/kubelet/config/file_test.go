@@ -31,6 +31,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/validation"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/securitycontext"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 )
 
@@ -105,7 +106,8 @@ func TestReadContainerManifestFromFile(t *testing.T) {
 						Name:  "image",
 						Image: "test/image",
 						TerminationMessagePath: "/dev/termination-log",
-						ImagePullPolicy:        "Always"}},
+						ImagePullPolicy:        "Always",
+						SecurityContext:        securitycontext.ValidSecurityContextWithContainerDefaults()}},
 				},
 			}),
 		},
@@ -131,7 +133,8 @@ func TestReadContainerManifestFromFile(t *testing.T) {
 						Name:  "image",
 						Image: "test/image",
 						TerminationMessagePath: "/dev/termination-log",
-						ImagePullPolicy:        "Always"}},
+						ImagePullPolicy:        "Always",
+						SecurityContext:        securitycontext.ValidSecurityContextWithContainerDefaults()}},
 				},
 			}),
 		},
@@ -182,7 +185,7 @@ func TestReadPodsFromFile(t *testing.T) {
 					Namespace: "mynamespace",
 				},
 				Spec: api.PodSpec{
-					Containers: []api.Container{{Name: "image", Image: "test/image"}},
+					Containers: []api.Container{{Name: "image", Image: "test/image", SecurityContext: securitycontext.ValidSecurityContextWithContainerDefaults()}},
 				},
 			},
 			expected: CreatePodUpdate(kubelet.SET, kubelet.FileSource, &api.Pod{
@@ -200,7 +203,8 @@ func TestReadPodsFromFile(t *testing.T) {
 						Name:  "image",
 						Image: "test/image",
 						TerminationMessagePath: "/dev/termination-log",
-						ImagePullPolicy:        "IfNotPresent"}},
+						ImagePullPolicy:        "IfNotPresent",
+						SecurityContext:        securitycontext.ValidSecurityContextWithContainerDefaults()}},
 				},
 			}),
 		},
@@ -216,7 +220,7 @@ func TestReadPodsFromFile(t *testing.T) {
 					UID: "12345",
 				},
 				Spec: api.PodSpec{
-					Containers: []api.Container{{Name: "image", Image: "test/image"}},
+					Containers: []api.Container{{Name: "image", Image: "test/image", SecurityContext: securitycontext.ValidSecurityContextWithContainerDefaults()}},
 				},
 			},
 			expected: CreatePodUpdate(kubelet.SET, kubelet.FileSource, &api.Pod{
@@ -234,7 +238,8 @@ func TestReadPodsFromFile(t *testing.T) {
 						Name:  "image",
 						Image: "test/image",
 						TerminationMessagePath: "/dev/termination-log",
-						ImagePullPolicy:        "IfNotPresent"}},
+						ImagePullPolicy:        "IfNotPresent",
+						SecurityContext:        securitycontext.ValidSecurityContextWithContainerDefaults()}},
 				},
 			}),
 		},

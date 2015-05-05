@@ -38,6 +38,7 @@ import (
 	kubecontainer "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/prober"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/probe"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/securitycontext"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume"
@@ -187,23 +188,29 @@ func rawValue(value string) *json.RawMessage {
 }
 
 // setIsolators overrides the isolators of the pod manifest if necessary.
+// TODO need an apply config in security context for rkt
 func setIsolators(app *appctypes.App, c *api.Container) error {
-	if len(c.Capabilities.Add) > 0 || len(c.Capabilities.Drop) > 0 || len(c.Resources.Limits) > 0 || len(c.Resources.Requests) > 0 {
+	hasCapRequests := securitycontext.HasCapabilitiesRequest(c)
+	if hasCapRequests || len(c.Resources.Limits) > 0 || len(c.Resources.Requests) > 0 {
 		app.Isolators = []appctypes.Isolator{}
 	}
 
 	// Retained capabilities/privileged.
 	privileged := false
-	if capabilities.Get().AllowPrivileged {
-		privileged = c.Privileged
-	} else if c.Privileged {
-		return fmt.Errorf("privileged is disallowed globally")
+	if !capabilities.Get().AllowPrivileged && securitycontext.HasPrivilegedRequest(c) {
+		return fmt.Errorf("container requested privileged mode, but it is disallowed globally.")
+	} else {
+		if c.SecurityContext != nil && c.SecurityContext.Privileged != nil {
+			privileged = *c.SecurityContext.Privileged
+		}
 	}
 	var addCaps string
 	if privileged {
 		addCaps = getAllCapabilities()
 	} else {
-		addCaps = getCapabilities(c.Capabilities.Add)
+		if hasCapRequests {
+			addCaps = getCapabilities(c.SecurityContext.Capabilities.Add)
+		}
 	}
 	if len(addCaps) > 0 {
 		// TODO(yifan): Replace with constructor, see:
@@ -216,7 +223,10 @@ func setIsolators(app *appctypes.App, c *api.Container) error {
 	}
 
 	// Removed capabilities.
-	dropCaps := getCapabilities(c.Capabilities.Drop)
+	var dropCaps string
+	if hasCapRequests {
+		dropCaps = getCapabilities(c.SecurityContext.Capabilities.Drop)
+	}
 	if len(dropCaps) > 0 {
 		// TODO(yifan): Replace with constructor, see:
 		// https://github.com/appc/spec/issues/268
