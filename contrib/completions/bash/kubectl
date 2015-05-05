@@ -4,7 +4,7 @@
 __debug()
 {
     if [[ -n ${BASH_COMP_DEBUG_FILE} ]]; then
-        echo "$*" >> ${BASH_COMP_DEBUG_FILE}
+        echo "$*" >> "${BASH_COMP_DEBUG_FILE}"
     fi
 }
 
@@ -73,6 +73,13 @@ __handle_reply()
     if [[ ${#COMPREPLY[@]} -eq 0 ]]; then
         declare -F __custom_func >/dev/null && __custom_func
     fi
+}
+
+# The arguments should be in the form "ext1|ext2|extn"
+__handle_filename_extension_flag()
+{
+    local ext="$1"
+    _filedir "@(${ext})"
 }
 
 __handle_flag()
@@ -297,10 +304,10 @@ _kubectl_create()
 
     flags+=("--filename=")
     flags_with_completion+=("--filename")
-    flags_completion+=("_filedir '@(json|yaml|yml)'")
+    flags_completion+=("__handle_filename_extension_flag json|yaml|yml")
     two_word_flags+=("-f")
     flags_with_completion+=("-f")
-    flags_completion+=("_filedir '@(json|yaml|yml)'")
+    flags_completion+=("__handle_filename_extension_flag json|yaml|yml")
     flags+=("--help")
     flags+=("-h")
 
@@ -322,10 +329,10 @@ _kubectl_update()
 
     flags+=("--filename=")
     flags_with_completion+=("--filename")
-    flags_completion+=("_filedir '@(json|yaml|yml)'")
+    flags_completion+=("__handle_filename_extension_flag json|yaml|yml")
     two_word_flags+=("-f")
     flags_with_completion+=("-f")
-    flags_completion+=("_filedir '@(json|yaml|yml)'")
+    flags_completion+=("__handle_filename_extension_flag json|yaml|yml")
     flags+=("--help")
     flags+=("-h")
     flags+=("--patch=")
@@ -351,10 +358,10 @@ _kubectl_delete()
     flags+=("--cascade")
     flags+=("--filename=")
     flags_with_completion+=("--filename")
-    flags_completion+=("_filedir '@(json|yaml|yml)'")
+    flags_completion+=("__handle_filename_extension_flag json|yaml|yml")
     two_word_flags+=("-f")
     flags_with_completion+=("-f")
-    flags_completion+=("_filedir '@(json|yaml|yml)'")
+    flags_completion+=("__handle_filename_extension_flag json|yaml|yml")
     flags+=("--grace-period=")
     flags+=("--help")
     flags+=("-h")
@@ -575,10 +582,10 @@ _kubectl_stop()
     flags+=("--all")
     flags+=("--filename=")
     flags_with_completion+=("--filename")
-    flags_completion+=("_filedir '@(json|yaml|yml)'")
+    flags_completion+=("__handle_filename_extension_flag json|yaml|yml")
     two_word_flags+=("-f")
     flags_with_completion+=("-f")
-    flags_completion+=("_filedir '@(json|yaml|yml)'")
+    flags_completion+=("__handle_filename_extension_flag json|yaml|yml")
     flags+=("--grace-period=")
     flags+=("--help")
     flags+=("-h")
@@ -942,10 +949,9 @@ _kubectl()
 
 __start_kubectl()
 {
-    local cur prev words cword split
+    local cur prev words cword
     _init_completion -s || return
 
-    local completions_func
     local c=0
     local flags=()
     local two_word_flags=()
