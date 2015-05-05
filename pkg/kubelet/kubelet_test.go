@@ -72,6 +72,7 @@ const testKubeletHostname = "testnode"
 
 func newTestKubelet(t *testing.T) *TestKubelet {
 	fakeDocker := &dockertools.FakeDockerClient{Errors: make(map[string]error), RemovedImages: util.StringSet{}}
+	fakeDocker.VersionInfo = []string{"ApiVersion=1.15"}
 	fakeRecorder := &record.FakeRecorder{}
 	fakeKubeClient := &testclient.Fake{}
 	kubelet := &Kubelet{}
@@ -80,6 +81,7 @@ func newTestKubelet(t *testing.T) *TestKubelet {
 	kubelet.os = kubecontainer.FakeOS{}
 
 	kubelet.hostname = "testnode"
+	kubelet.runtimeUpThreshold = maxWaitForContainerRuntime
 	kubelet.networkPlugin, _ = network.InitNetworkPlugin([]network.NetworkPlugin{}, "", network.NewFakeHost(nil))
 	if tempDir, err := ioutil.TempDir("/tmp", "kubelet_test."); err != nil {
 		t.Fatalf("can't make a temp rootdir: %v", err)
@@ -3238,6 +3240,7 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 		},
 	}
 
+	kubelet.updateRuntimeUp()
 	if err := kubelet.updateNodeStatus(); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -3331,6 +3334,7 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 		},
 	}
 
+	kubelet.updateRuntimeUp()
 	if err := kubelet.updateNodeStatus(); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -3353,6 +3357,90 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 	updatedNode.Status.Conditions[0].LastTransitionTime = util.Time{}
 	if !reflect.DeepEqual(expectedNode, updatedNode) {
 		t.Errorf("expected \n%v\n, got \n%v", expectedNode, updatedNode)
+	}
+}
+
+func TestUpdateNodeStatusWithoutContainerRuntime(t *testing.T) {
+	testKubelet := newTestKubelet(t)
+	kubelet := testKubelet.kubelet
+	kubeClient := testKubelet.fakeKubeClient
+	fakeDocker := testKubelet.fakeDocker
+	// This causes returning an error from GetContainerRuntimeVersion() which
+	// simulates that container runtime is down.
+	fakeDocker.VersionInfo = []string{}
+
+	kubeClient.ReactFn = testclient.NewSimpleFake(&api.NodeList{Items: []api.Node{
+		{ObjectMeta: api.ObjectMeta{Name: "testnode"}},
+	}}).ReactFn
+	mockCadvisor := testKubelet.fakeCadvisor
+	machineInfo := &cadvisorApi.MachineInfo{
+		MachineID:      "123",
+		SystemUUID:     "abc",
+		BootID:         "1b3",
+		NumCores:       2,
+		MemoryCapacity: 1024,
+	}
+	mockCadvisor.On("MachineInfo").Return(machineInfo, nil)
+	versionInfo := &cadvisorApi.VersionInfo{
+		KernelVersion:      "3.16.0-0.bpo.4-amd64",
+		ContainerOsVersion: "Debian GNU/Linux 7 (wheezy)",
+		DockerVersion:      "1.5.0",
+	}
+	mockCadvisor.On("VersionInfo").Return(versionInfo, nil)
+
+	expectedNode := &api.Node{
+		ObjectMeta: api.ObjectMeta{Name: "testnode"},
+		Spec:       api.NodeSpec{},
+		Status: api.NodeStatus{
+			Conditions: []api.NodeCondition{
+				{
+					Type:               api.NodeReady,
+					Status:             api.ConditionFalse,
+					Reason:             fmt.Sprintf("container runtime is down"),
+					LastHeartbeatTime:  util.Time{},
+					LastTransitionTime: util.Time{},
+				},
+			},
+			NodeInfo: api.NodeSystemInfo{
+				MachineID:               "123",
+				SystemUUID:              "abc",
+				BootID:                  "1b3",
+				KernelVersion:           "3.16.0-0.bpo.4-amd64",
+				OsImage:                 "Debian GNU/Linux 7 (wheezy)",
+				ContainerRuntimeVersion: "docker://1.5.0",
+				KubeletVersion:          version.Get().String(),
+				KubeProxyVersion:        version.Get().String(),
+			},
+			Capacity: api.ResourceList{
+				api.ResourceCPU:    *resource.NewMilliQuantity(2000, resource.DecimalSI),
+				api.ResourceMemory: *resource.NewQuantity(1024, resource.BinarySI),
+			},
+		},
+	}
+
+	kubelet.runtimeUpThreshold = time.Duration(0)
+	kubelet.updateRuntimeUp()
+	if err := kubelet.updateNodeStatus(); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if len(kubeClient.Actions) != 2 || kubeClient.Actions[1].Action != "update-status-node" {
+		t.Fatalf("unexpected actions: %v", kubeClient.Actions)
+	}
+	updatedNode, ok := kubeClient.Actions[1].Value.(*api.Node)
+	if !ok {
+		t.Errorf("unexpected object type")
+	}
+
+	if updatedNode.Status.Conditions[0].LastHeartbeatTime.IsZero() {
+		t.Errorf("unexpected zero last probe timestamp")
+	}
+	if updatedNode.Status.Conditions[0].LastTransitionTime.IsZero() {
+		t.Errorf("unexpected zero last transition timestamp")
+	}
+	updatedNode.Status.Conditions[0].LastHeartbeatTime = util.Time{}
+	updatedNode.Status.Conditions[0].LastTransitionTime = util.Time{}
+	if !reflect.DeepEqual(expectedNode, updatedNode) {
+		t.Errorf("unexpected objects: %s", util.ObjectDiff(expectedNode, updatedNode))
 	}
 }
 
