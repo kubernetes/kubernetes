@@ -109,6 +109,8 @@ type KubeletServer struct {
 	ReallyCrashForTesting bool
 	// Insert a probability of random errors during calls to the master.
 	ChaosChance float64
+	// Is the kubelet containerized?
+	Containerized bool
 }
 
 // bootstrapping interface for kubelet, targets the initialization protocol
@@ -213,6 +215,7 @@ func (s *KubeletServer) AddFlags(fs *pflag.FlagSet) {
 	// Flags intended for testing, not recommended used in production environments.
 	fs.BoolVar(&s.ReallyCrashForTesting, "really-crash-for-testing", s.ReallyCrashForTesting, "If true, when panics occur crash. Intended for testing.")
 	fs.Float64Var(&s.ChaosChance, "chaos-chance", s.ChaosChance, "If > 0.0, introduce random client errors and latency. Intended for testing. [default=0.0]")
+	fs.BoolVar(&s.Containerized, "containerized", s.Containerized, "Experimental support for running kubelet in a container.  Intended for testing. [default=false]")
 }
 
 // Run runs the specified KubeletServer.  This should never exit.
@@ -271,6 +274,12 @@ func (s *KubeletServer) Run(_ []string) error {
 		KeyFile:  s.TLSPrivateKeyFile,
 	}
 
+	mounter := mount.New()
+	if s.Containerized {
+		glog.Info("Running kubelet in containerized mode (experimental)")
+		mounter = &mount.NsenterMounter{}
+	}
+
 	kcfg := KubeletConfig{
 		Address:                        s.Address,
 		AllowPrivileged:                s.AllowPrivileged,
@@ -310,7 +319,7 @@ func (s *KubeletServer) Run(_ []string) error {
 		ResourceContainer:         s.ResourceContainer,
 		CgroupRoot:                s.CgroupRoot,
 		ContainerRuntime:          s.ContainerRuntime,
-		Mounter:                   mount.New(),
+		Mounter:                   mounter,
 	}
 
 	RunKubelet(&kcfg, nil)
