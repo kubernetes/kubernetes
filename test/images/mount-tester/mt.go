@@ -22,26 +22,31 @@ import (
 	"io/ioutil"
 	"os"
 	"syscall"
+	"time"
 )
 
 var (
-	fsTypePath          = ""
-	fileModePath        = ""
-	filePermPath        = ""
-	readFileContentPath = ""
-	newFilePath0644     = ""
-	newFilePath0666     = ""
-	newFilePath0777     = ""
+	fsTypePath                = ""
+	fileModePath              = ""
+	filePermPath              = ""
+	newFilePath0644           = ""
+	newFilePath0666           = ""
+	newFilePath0777           = ""
+	readFileContentPath       = ""
+	readFileContentInLoopPath = ""
+	retryDuration             = 180
 )
 
 func init() {
 	flag.StringVar(&fsTypePath, "fs_type", "", "Path to print the fs type for")
 	flag.StringVar(&fileModePath, "file_mode", "", "Path to print the mode bits of")
 	flag.StringVar(&filePermPath, "file_perm", "", "Path to print the perms of")
-	flag.StringVar(&readFileContentPath, "file_content", "", "Path to read the file content from")
 	flag.StringVar(&newFilePath0644, "new_file_0644", "", "Path to write to and read from with perm 0644")
 	flag.StringVar(&newFilePath0666, "new_file_0666", "", "Path to write to and read from with perm 0666")
 	flag.StringVar(&newFilePath0777, "new_file_0777", "", "Path to write to and read from with perm 0777")
+	flag.StringVar(&readFileContentPath, "file_content", "", "Path to read the file content from")
+	flag.StringVar(&readFileContentInLoopPath, "file_content_in_loop", "", "Path to read the file content in loop from")
+	flag.IntVar(&retryDuration, "retry_time", 180, "Retry time during the loop")
 }
 
 // This program performs some tests on the filesystem as dictated by the
@@ -97,6 +102,11 @@ func main() {
 	}
 
 	err = readFileContent(readFileContentPath)
+	if err != nil {
+		errs = append(errs, err)
+	}
+
+	err = readFileContentInLoop(readFileContentInLoopPath, retryDuration)
 	if err != nil {
 		errs = append(errs, err)
 	}
@@ -190,4 +200,41 @@ func readWriteNewFile(path string, perm os.FileMode) error {
 	}
 
 	return readFileContent(path)
+}
+
+func readFileContentInLoop(path string, retryDuration int) error {
+	if path == "" {
+		return nil
+	}
+	var content []byte
+	content = testFileContent(path, retryDuration)
+
+	fmt.Printf("content of file %q: %v\n", path, string(content))
+
+	return nil
+}
+
+func testFileContent(filePath string, retryDuration int) []byte {
+	var (
+		contentBytes []byte
+		err          error
+	)
+
+	retryTime := time.Second * time.Duration(retryDuration)
+	for start := time.Now(); time.Since(start) < retryTime; time.Sleep(2 * time.Second) {
+		contentBytes, err = ioutil.ReadFile(filePath)
+		if err == nil {
+			//Expected content "mount-tester new file\n", length 22
+			if len(contentBytes) == 22 {
+				break
+			} else {
+				fmt.Printf("Unexpected length of file: found %d, expected %d.Retry", len(contentBytes), 22)
+			}
+		} else {
+			fmt.Printf("Error read file %s: %v, retry", filePath, err)
+		}
+
+	}
+
+	return contentBytes
 }

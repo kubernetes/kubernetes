@@ -20,3 +20,5 @@ test_args
 up_to
 up_to
 valid_flag
+retry_time
+file_content_in_loop
