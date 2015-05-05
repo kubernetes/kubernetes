@@ -18,11 +18,10 @@ package rkt
 
 // ImageManager manages and garbage collects the container images for rkt.
 type ImageManager struct {
-	runtime *runtime
 }
 
-func NewImageManager(r *runtime) *ImageManager {
-	return &ImageManager{runtime: r}
+func NewImageManager() *ImageManager {
+	return &ImageManager{}
 }
 
 // GarbageCollect collects the images. It is not implemented by rkt yet.
