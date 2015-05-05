@@ -89,7 +89,7 @@ coreos:
         Requires=etcd.service
         After=master-apiserver.service
         [Service]
-        ExecStart=/bin/sh -c 'etcdctl set /corekube/apiservers/$private_ipv4 $private_ipv4'
+        ExecStart=/bin/sh -c 'etcdctl set /corekube/apiservers/$public_ipv4 $public_ipv4'
         Restart=always
         RestartSec=120
     - name: master-controller-manager.service

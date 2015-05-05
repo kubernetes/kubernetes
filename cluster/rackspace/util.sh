@@ -60,7 +60,7 @@ get-password() {
   get-kubeconfig-basicauth
   if [[ -z "${KUBE_USER}" || -z "${KUBE_PASSWORD}" ]]; then
     KUBE_USER=admin
-    KUBE_PASSWORD=$(python -c 'import string,random; print "".join(random.SystemRandom().choice(string.ascii_letters + string.digits) for _ in range(16))')
+    KUBE_PASSWORD=$(python2.7 -c 'import string,random; print "".join(random.SystemRandom().choice(string.ascii_letters + string.digits) for _ in range(16))')
   fi
 }
 
@@ -276,7 +276,7 @@ kube-up() {
   trap "rm -rf ${KUBE_TEMP}" EXIT
 
   get-password
-  python $(dirname $0)/../third_party/htpasswd/htpasswd.py -b -c ${KUBE_TEMP}/htpasswd $KUBE_USER $KUBE_PASSWORD
+  python2.7 $(dirname $0)/../third_party/htpasswd/htpasswd.py -b -c ${KUBE_TEMP}/htpasswd $KUBE_USER $KUBE_PASSWORD
   HTPASSWD=$(cat ${KUBE_TEMP}/htpasswd)
 
   rax-nova-network

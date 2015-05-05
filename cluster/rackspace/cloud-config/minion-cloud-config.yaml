@@ -19,7 +19,7 @@ write_files:
       m=$(echo $(etcdctl ls --recursive /corekube/apiservers | cut -d/ -f4 | sort) | tr ' ' ,)
       mkdir -p /run/kubelet
       echo "APISERVER_IPS=$m" > /run/kubelet/apiservers.env
-      echo "FIRST_APISERVER_URL=http://${m%%\,*}:7080" >> /run/kubelet/apiservers.env
+      echo "FIRST_APISERVER_URL=http://${m%%\,*}:6443" >> /run/kubelet/apiservers.env
   - path: /opt/bin/download-release.sh
     permissions: 0755
     content: |
@@ -75,9 +75,9 @@ coreos:
         After=download-release.service
         Requires=download-release.service
         [Service]
-        EnvironmentFile=/run/kubelet/apiserver.env
+        EnvironmentFile=/run/kubelet/apiservers.env
         ExecStartPre=/usr/bin/ln -sf /opt/kubernetes/server/bin/kubelet /opt/bin/kubelet
-        ExecStart=/opt/bin/kubelet --address=$private_ipv4 --hostname_override=$private_ipv4 --api_servers=$FIRST_APISERVER_URL --logtostderr=true --config=/opt/kubernetes-manifests --cluster_dns=DNS_SERVER_IP --cluster_domain=DNS_DOMAIN
+        ExecStart=/opt/bin/kubelet --address=$private_ipv4 --hostname_override=$private_ipv4 --api_servers=${FIRST_APISERVER_URL} --logtostderr=true --config=/opt/kubernetes-manifests --cluster_dns=DNS_SERVER_IP --cluster_domain=DNS_DOMAIN
         Restart=always
         RestartSec=2
     - name: minion-proxy.service
@@ -93,9 +93,9 @@ coreos:
         After=download-release.service
         Requires=download-release.service
         [Service]
-        EnvironmentFile=/run/kubelet/apiserver.env
+        EnvironmentFile=/run/kubelet/apiservers.env
         ExecStartPre=/usr/bin/ln -sf /opt/kubernetes/server/bin/kube-proxy /opt/bin/kube-proxy
-        ExecStart=/opt/bin/kube-proxy --bind_address=$private_ipv4 --master=$FIRST_APISERVER_URL --logtostderr=true
+        ExecStart=/opt/bin/kube-proxy --bind_address=$private_ipv4 --master=${FIRST_APISERVER_URL} --logtostderr=true
         Restart=always
         RestartSec=2
     - name: kubelet-sighup.path
