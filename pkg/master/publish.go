@@ -18,10 +18,10 @@ package master
 
 import (
 	"net"
-	"reflect"
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/endpoints"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/errors"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/rest"
 
@@ -40,7 +40,7 @@ func (m *Master) serviceWriterLoop(stop chan struct{}) {
 			glog.Errorf("Can't create master namespace: %v", err)
 		}
 		if m.serviceReadWriteIP != nil {
-			if err := m.createMasterServiceIfNeeded("kubernetes", m.serviceReadWriteIP, m.serviceReadWritePort); err != nil {
+			if err := m.createMasterServiceIfNeeded("kubernetes", m.serviceReadWriteIP, m.serviceReadWritePort); err != nil && !errors.IsAlreadyExists(err) {
 				glog.Errorf("Can't create rw service: %v", err)
 			}
 			if err := m.setEndpoints("kubernetes", m.clusterIP, m.publicReadWritePort); err != nil {
@@ -67,7 +67,7 @@ func (m *Master) roServiceWriterLoop(stop chan struct{}) {
 			glog.Errorf("Can't create master namespace: %v", err)
 		}
 		if m.serviceReadOnlyIP != nil {
-			if err := m.createMasterServiceIfNeeded("kubernetes-ro", m.serviceReadOnlyIP, m.serviceReadOnlyPort); err != nil {
+			if err := m.createMasterServiceIfNeeded("kubernetes-ro", m.serviceReadOnlyIP, m.serviceReadOnlyPort); err != nil && !errors.IsAlreadyExists(err) {
 				glog.Errorf("Can't create ro service: %v", err)
 			}
 			if err := m.setEndpoints("kubernetes-ro", m.clusterIP, m.publicReadOnlyPort); err != nil {
@@ -132,15 +132,20 @@ func (m *Master) createMasterServiceIfNeeded(serviceName string, serviceIP net.I
 	return err
 }
 
-// setEndpoints sets the endpoints for the given service.
-// TODO: in a multi-master scenario this needs to consider all masters.
+// setEndpoints sets the endpoints for the given apiserver service (ro or rw).
+// setEndpoints expects that the endpoints objects it manages will all be
+// managed only by setEndpoints; therefore, to understand this, you need only
+// understand the requirements and the body of this function.
+//
+// Requirements:
+//  * All apiservers MUST use the same ports for their {rw, ro} services.
+//  * All apiservers MUST use setEndpoints and only setEndpoints to manage the
+//      endpoints for their {rw, ro} services.
+//  * All apiservers MUST know and agree on the number of apiservers expected
+//      to be running (m.masterCount).
+//  * setEndpoints is called periodically from all apiservers.
+//
 func (m *Master) setEndpoints(serviceName string, ip net.IP, port int) error {
-	// The setting we want to find.
-	want := []api.EndpointSubset{{
-		Addresses: []api.EndpointAddress{{IP: ip.String()}},
-		Ports:     []api.EndpointPort{{Port: port, Protocol: api.ProtocolTCP}},
-	}}
-
 	ctx := api.NewDefaultContext()
 	e, err := m.endpointRegistry.GetEndpoints(ctx, serviceName)
 	if err != nil {
@@ -151,11 +156,63 @@ func (m *Master) setEndpoints(serviceName string, ip net.IP, port int) error {
 			},
 		}
 	}
-	if !reflect.DeepEqual(e.Subsets, want) {
-		e.Subsets = want
-		glog.Infof("setting endpoints for master service %q to %v", serviceName, e)
+
+	// First, determine if the endpoint is in the format we expect (one
+	// subset, one port, N IP addresses).
+	formatCorrect, ipCorrect := m.checkEndpointSubsetFormat(e, ip.String(), port)
+	if !formatCorrect {
+		// Something is egregiously wrong, just re-make the endpoints record.
+		e.Subsets = []api.EndpointSubset{{
+			Addresses: []api.EndpointAddress{{IP: ip.String()}},
+			Ports:     []api.EndpointPort{{Port: port, Protocol: api.ProtocolTCP}},
+		}}
+		glog.Warningf("Resetting endpoints for master service %q to %v", serviceName, e)
+		return m.endpointRegistry.UpdateEndpoints(ctx, e)
+	} else if !ipCorrect {
+		// We *always* add our own IP address; if there are too many IP
+		// addresses, we remove the ones lexicographically after our
+		// own IP address.  Given the requirements stated at the top of
+		// this function, this should cause the list of IP addresses to
+		// become eventually correct.
+		e.Subsets[0].Addresses = append(e.Subsets[0].Addresses, api.EndpointAddress{IP: ip.String()})
+		e.Subsets = endpoints.RepackSubsets(e.Subsets)
+		if addrs := &e.Subsets[0].Addresses; len(*addrs) > m.masterCount {
+			// addrs is a pointer because we're going to mutate it.
+			for i, addr := range *addrs {
+				if addr.IP == ip.String() {
+					for len(*addrs) > m.masterCount {
+						remove := (i + 1) % len(*addrs)
+						*addrs = append((*addrs)[:remove], (*addrs)[remove+1:]...)
+					}
+					break
+				}
+			}
+		}
 		return m.endpointRegistry.UpdateEndpoints(ctx, e)
 	}
 	// We didn't make any changes, no need to actually call update.
 	return nil
+}
+
+// Determine if the endpoint is in the format setEndpoints expect (one subset,
+// one port, N IP addresses); and if the specified IP address is present and
+// the correct number of ip addresses are found.
+func (m *Master) checkEndpointSubsetFormat(e *api.Endpoints, ip string, port int) (formatCorrect, ipCorrect bool) {
+	if len(e.Subsets) != 1 {
+		return false, false
+	}
+	sub := &e.Subsets[0]
+	if len(sub.Ports) != 1 {
+		return false, false
+	}
+	p := &sub.Ports[0]
+	if p.Port != port || p.Protocol != api.ProtocolTCP {
+		return false, false
+	}
+	for _, addr := range sub.Addresses {
+		if addr.IP == ip {
+			return true, len(sub.Addresses) == m.masterCount
+		}
+	}
+	return true, false
 }
