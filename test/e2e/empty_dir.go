@@ -30,16 +30,13 @@ import (
 
 var _ = Describe("emptyDir", func() {
 	var (
-		c         *client.Client
-		podClient client.PodInterface
+		c *client.Client
 	)
 
 	BeforeEach(func() {
 		var err error
 		c, err = loadClient()
 		expectNoError(err)
-
-		podClient = c.Pods(api.NamespaceDefault)
 	})
 
 	It("volume on tmpfs should have the correct mode", func() {
