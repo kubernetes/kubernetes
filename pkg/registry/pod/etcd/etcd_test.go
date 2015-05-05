@@ -32,7 +32,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/registry/pod"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/securitycontext"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/tools/etcdtest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -69,7 +68,6 @@ func validNewPod() *api.Pod {
 					ImagePullPolicy: api.PullAlways,
 
 					TerminationMessagePath: api.TerminationMessagePathDefault,
-					SecurityContext:        securitycontext.ValidSecurityContextWithContainerDefaults(),
 				},
 			},
 		},
@@ -1110,9 +1108,8 @@ func TestEtcdUpdateScheduled(t *testing.T) {
 			Host: "machine",
 			Containers: []api.Container{
 				{
-					Name:            "foobar",
-					Image:           "foo:v1",
-					SecurityContext: securitycontext.ValidSecurityContextWithContainerDefaults(),
+					Name:  "foobar",
+					Image: "foo:v1",
 				},
 			},
 		},
@@ -1134,7 +1131,6 @@ func TestEtcdUpdateScheduled(t *testing.T) {
 					Image:                  "foo:v2",
 					ImagePullPolicy:        api.PullIfNotPresent,
 					TerminationMessagePath: api.TerminationMessagePathDefault,
-					SecurityContext:        securitycontext.ValidSecurityContextWithContainerDefaults(),
 				},
 			},
 			RestartPolicy: api.RestartPolicyAlways,
@@ -1173,8 +1169,7 @@ func TestEtcdUpdateStatus(t *testing.T) {
 			Host: "machine",
 			Containers: []api.Container{
 				{
-					Image:           "foo:v1",
-					SecurityContext: securitycontext.ValidSecurityContextWithContainerDefaults(),
+					Image: "foo:v1",
 				},
 			},
 		},

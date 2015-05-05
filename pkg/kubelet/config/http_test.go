@@ -28,7 +28,6 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/validation"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/runtime"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/securitycontext"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/errors"
 )
@@ -152,8 +151,7 @@ func TestExtractManifestFromHTTP(t *testing.T) {
 							Name:  "1",
 							Image: "foo",
 							TerminationMessagePath: "/dev/termination-log",
-							ImagePullPolicy:        "Always",
-							SecurityContext:        securitycontext.ValidSecurityContextWithContainerDefaults()}},
+							ImagePullPolicy:        "Always"}},
 					},
 				}),
 		},
@@ -179,8 +177,7 @@ func TestExtractManifestFromHTTP(t *testing.T) {
 							Name:  "ctr",
 							Image: "image",
 							TerminationMessagePath: "/dev/termination-log",
-							ImagePullPolicy:        "IfNotPresent",
-							SecurityContext:        securitycontext.ValidSecurityContextWithContainerDefaults()}},
+							ImagePullPolicy:        "IfNotPresent"}},
 					},
 				}),
 		},
@@ -206,8 +203,7 @@ func TestExtractManifestFromHTTP(t *testing.T) {
 							Name:  "1",
 							Image: "foo",
 							TerminationMessagePath: "/dev/termination-log",
-							ImagePullPolicy:        "Always",
-							SecurityContext:        securitycontext.ValidSecurityContextWithContainerDefaults()}},
+							ImagePullPolicy:        "Always"}},
 					},
 				}),
 		},
@@ -237,8 +233,7 @@ func TestExtractManifestFromHTTP(t *testing.T) {
 							Name:  "1",
 							Image: "foo",
 							TerminationMessagePath: "/dev/termination-log",
-							ImagePullPolicy:        "Always",
-							SecurityContext:        securitycontext.ValidSecurityContextWithContainerDefaults()}},
+							ImagePullPolicy:        "Always"}},
 					},
 				},
 				&api.Pod{
@@ -257,8 +252,7 @@ func TestExtractManifestFromHTTP(t *testing.T) {
 							Name:  "1",
 							Image: "foo",
 							TerminationMessagePath: "/dev/termination-log",
-							ImagePullPolicy:        "IfNotPresent",
-							SecurityContext:        securitycontext.ValidSecurityContextWithContainerDefaults()}},
+							ImagePullPolicy:        "IfNotPresent"}},
 					},
 				}),
 		},
@@ -350,8 +344,7 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 							Name:  "1",
 							Image: "foo",
 							TerminationMessagePath: "/dev/termination-log",
-							ImagePullPolicy:        "Always",
-							SecurityContext:        securitycontext.ValidSecurityContextWithContainerDefaults()}},
+							ImagePullPolicy:        "Always"}},
 					},
 				}),
 		},
@@ -403,8 +396,7 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 							Name:  "1",
 							Image: "foo",
 							TerminationMessagePath: "/dev/termination-log",
-							ImagePullPolicy:        "Always",
-							SecurityContext:        securitycontext.ValidSecurityContextWithContainerDefaults()}},
+							ImagePullPolicy:        "Always"}},
 					},
 				},
 				&api.Pod{
@@ -423,8 +415,7 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 							Name:  "2",
 							Image: "bar",
 							TerminationMessagePath: "/dev/termination-log",
-							ImagePullPolicy:        "IfNotPresent",
-							SecurityContext:        securitycontext.ValidSecurityContextWithContainerDefaults()}},
+							ImagePullPolicy:        "IfNotPresent"}},
 					},
 				}),
 		},

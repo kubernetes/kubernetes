@@ -117,7 +117,7 @@ echo "Starting etcd"
 kube::etcd::start
 
 # Admission Controllers to invoke prior to persisting objects in cluster
-ADMISSION_CONTROL=NamespaceLifecycle,NamespaceAutoProvision,LimitRanger,SecurityContextDeny,ResourceQuota
+ADMISSION_CONTROL=NamespaceLifecycle,NamespaceAutoProvision,LimitRanger,ResourceQuota
 
 APISERVER_LOG=/tmp/kube-apiserver.log
 sudo -E "${GO_OUT}/kube-apiserver" \

@@ -513,14 +513,12 @@ type Container struct {
 	Lifecycle      *Lifecycle     `json:"lifecycle,omitempty" description:"actions that the management system should take in response to container lifecycle events; cannot be updated"`
 	// Optional: Defaults to /dev/termination-log
 	TerminationMessagePath string `json:"terminationMessagePath,omitempty" description:"path at which the file to which the container's termination message will be written is mounted into the container's filesystem; message written is intended to be brief final status, such as an assertion failure message; defaults to /dev/termination-log; cannot be updated"`
-	// Deprecated - see SecurityContext.  Optional: Default to false.
-	Privileged bool `json:"privileged,omitempty" description:"whether or not the container is granted privileged status; defaults to false; cannot be updated; deprecated; See SecurityContext"`
+	// Optional: Default to false.
+	Privileged bool `json:"privileged,omitempty" description:"whether or not the container is granted privileged status; defaults to false; cannot be updated"`
 	// Optional: Policy for pulling images for this container
 	ImagePullPolicy PullPolicy `json:"imagePullPolicy" description:"image pull policy; one of PullAlways, PullNever, PullIfNotPresent; defaults to PullAlways if :latest tag is specified, or PullIfNotPresent otherwise; cannot be updated"`
-	// Deprecated - see SecurityContext.  Optional: Capabilities for container.
-	Capabilities Capabilities `json:"capabilities,omitempty" description:"capabilities for container; cannot be updated; deprecated; See SecurityContext"`
-	// Optional: SecurityContext defines the security options the pod should be run with
-	SecurityContext *SecurityContext `json:"securityContext,omitempty" description:"security options the pod should run with"`
+	// Optional: Capabilities for container.
+	Capabilities Capabilities `json:"capabilities,omitempty" description:"capabilities for container; cannot be updated"`
 }
 
 const (
@@ -1718,40 +1716,4 @@ type ComponentStatusList struct {
 	TypeMeta `json:",inline"`
 
 	Items []ComponentStatus `json:"items" description:"list of component status objects"`
-}
-
-// SecurityContext holds security configuration that will be applied to a container.  SecurityContext
-// contains duplication of some existing fields from the Container resource.  These duplicate fields
-// will be populated based on the Container configuration if they are not set.  Defining them on
-// both the Container AND the SecurityContext will result in an error.
-type SecurityContext struct {
-	// Capabilities are the capabilities to add/drop when running the container
-	// Must match Container.Capabilities or be unset.  Will be defaulted to Container.Capabilities if left unset
-	Capabilities *Capabilities `json:"capabilities,omitempty" description:"the linux capabilites that should be added or removed"`
-
-	// Run the container in privileged mode
-	// Must match Container.Privileged or be unset.  Will be defaulted to Container.Privileged if left unset
-	Privileged *bool `json:"privileged,omitempty" description:"run the container in privileged mode"`
-
-	// SELinuxOptions are the labels to be applied to the container
-	// and volumes
-	SELinuxOptions *SELinuxOptions `json:"seLinuxOptions,omitempty" description:"options that control the SELinux labels applied"`
-
-	// RunAsUser is the UID to run the entrypoint of the container process.
-	RunAsUser *int64 `json:"runAsUser,omitempty" description:"the user id that runs the first process in the container"`
-}
-
-// SELinuxOptions are the labels to be applied to the container.
-type SELinuxOptions struct {
-	// SELinux user label
-	User string `json:"user,omitempty" description:"the user label to apply to the container"`
-
-	// SELinux role label
-	Role string `json:"role,omitempty" description:"the role label to apply to the container"`
-
-	// SELinux type label
-	Type string `json:"type,omitempty" description:"the type label to apply to the container"`
-
-	// SELinux level label.
-	Level string `json:"level,omitempty" description:"the level label to apply to the container"`
 }
