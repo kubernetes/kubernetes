@@ -39,13 +39,6 @@ type Generator interface {
 	ParamNames() []GeneratorParam
 }
 
-// Generators is a global list of known generators.
-// TODO: Dynamically create this from a list of template files?
-var Generators map[string]Generator = map[string]Generator{
-	"run-container/v1": BasicReplicationController{},
-	"service/v1":       ServiceGenerator{},
-}
-
 // ValidateParams ensures that all required params are present in the params map
 func ValidateParams(paramSpec []GeneratorParam, params map[string]string) error {
 	for ix := range paramSpec {

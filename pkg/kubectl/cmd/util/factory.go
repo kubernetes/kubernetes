@@ -48,8 +48,9 @@ const (
 // TODO: pass the various interfaces on the factory directly into the command constructors (so the
 // commands are decoupled from the factory).
 type Factory struct {
-	clients *clientCache
-	flags   *pflag.FlagSet
+	clients    *clientCache
+	flags      *pflag.FlagSet
+	generators map[string]kubectl.Generator
 
 	// Returns interfaces for dealing with arbitrary runtime.Objects.
 	Object func() (meta.RESTMapper, runtime.ObjectTyper)
@@ -77,6 +78,8 @@ type Factory struct {
 	Validator func() (validation.Schema, error)
 	// Returns the default namespace to use in cases where no other namespace is specified
 	DefaultNamespace func() (string, error)
+	// Returns the generator for the provided generator name
+	Generator func(name string) (kubectl.Generator, bool)
 }
 
 // NewFactory creates a factory with the default Kubernetes resources defined
@@ -87,6 +90,11 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 
 	flags := pflag.NewFlagSet("", pflag.ContinueOnError)
 	flags.SetNormalizeFunc(util.WordSepNormalizeFunc)
+
+	generators := map[string]kubectl.Generator{
+		"run-container/v1": kubectl.BasicReplicationController{},
+		"service/v1":       kubectl.ServiceGenerator{},
+	}
 
 	clientConfig := optionalClientConfig
 	if optionalClientConfig == nil {
@@ -99,8 +107,9 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 	}
 
 	return &Factory{
-		clients: clients,
-		flags:   flags,
+		clients:    clients,
+		flags:      flags,
+		generators: generators,
 
 		Object: func() (meta.RESTMapper, runtime.ObjectTyper) {
 			cfg, err := clientConfig.ClientConfig()
@@ -220,6 +229,10 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 		},
 		DefaultNamespace: func() (string, error) {
 			return clientConfig.Namespace()
+		},
+		Generator: func(name string) (kubectl.Generator, bool) {
+			generator, ok := generators[name]
+			return generator, ok
 		},
 	}
 }
