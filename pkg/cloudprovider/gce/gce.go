@@ -17,7 +17,6 @@ limitations under the License.
 package gce_cloud
 
 import (
-	"crypto/md5"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -42,8 +41,6 @@ import (
 	"golang.org/x/oauth2/google"
 	"google.golang.org/cloud/compute/metadata"
 )
-
-const LOAD_BALANCER_NAME_MAX_LENGTH = 63
 
 // GCECloud is an implementation of Interface, TCPLoadBalancer and Instances for Google Compute Engine.
 type GCECloud struct {
@@ -269,23 +266,10 @@ func translateAffinityType(affinityType api.AffinityType) GCEAffinityType {
 	}
 }
 
-func normalizeName(name string) string {
-	// If it's short enough, just leave it.
-	if len(name) < LOAD_BALANCER_NAME_MAX_LENGTH-6 {
-		return name
-	}
-	// Hash and truncate
-	hash := md5.Sum([]byte(name))
-	truncated := name[0 : LOAD_BALANCER_NAME_MAX_LENGTH-6]
-	shortHash := hash[0:6]
-	return fmt.Sprintf("%s%s", truncated, string(shortHash))
-}
-
 // CreateTCPLoadBalancer is an implementation of TCPLoadBalancer.CreateTCPLoadBalancer.
 // TODO(a-robinson): Don't just ignore specified IP addresses. Check if they're
 // owned by the project and available to be used, and use them if they are.
-func (gce *GCECloud) CreateTCPLoadBalancer(origName, region string, externalIP net.IP, ports []int, hosts []string, affinityType api.AffinityType) (string, error) {
-	name := normalizeName(origName)
+func (gce *GCECloud) CreateTCPLoadBalancer(name, region string, externalIP net.IP, ports []int, hosts []string, affinityType api.AffinityType) (string, error) {
 	err := gce.makeTargetPool(name, region, hosts, translateAffinityType(affinityType))
 	if err != nil {
 		if !isHTTPErrorCode(err, http.StatusConflict) {
@@ -331,8 +315,7 @@ func (gce *GCECloud) CreateTCPLoadBalancer(origName, region string, externalIP n
 }
 
 // UpdateTCPLoadBalancer is an implementation of TCPLoadBalancer.UpdateTCPLoadBalancer.
-func (gce *GCECloud) UpdateTCPLoadBalancer(origName, region string, hosts []string) error {
-	name := normalizeName(origName)
+func (gce *GCECloud) UpdateTCPLoadBalancer(name, region string, hosts []string) error {
 	pool, err := gce.service.TargetPools.Get(gce.projectID, region, name).Do()
 	if err != nil {
 		return err
@@ -377,8 +360,7 @@ func (gce *GCECloud) UpdateTCPLoadBalancer(origName, region string, hosts []stri
 }
 
 // DeleteTCPLoadBalancer is an implementation of TCPLoadBalancer.DeleteTCPLoadBalancer.
-func (gce *GCECloud) DeleteTCPLoadBalancer(origName, region string) error {
-	name := normalizeName(origName)
+func (gce *GCECloud) DeleteTCPLoadBalancer(name, region string) error {
 	op, err := gce.service.ForwardingRules.Delete(gce.projectID, region, name).Do()
 	if err != nil && isHTTPErrorCode(err, http.StatusNotFound) {
 		glog.Infof("Forwarding rule %s already deleted. Continuing to delete target pool.", name)
