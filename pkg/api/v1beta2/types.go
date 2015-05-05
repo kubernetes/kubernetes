@@ -1415,6 +1415,11 @@ type ObjectReference struct {
 	FieldPath string `json:"fieldPath,omitempty" description:"if referring to a piece of an object instead of an entire object, this string should contain a valid JSON/Go field access statement, such as desiredState.manifest.containers[2]"`
 }
 
+type SerializedReference struct {
+	TypeMeta  `json:",inline"`
+	Reference ObjectReference `json:"reference,omitempty" description:"the reference to an object in the system"`
+}
+
 // Event is a report of an event somewhere in the cluster.
 // TODO: Decide whether to store these separately or with the object they apply to.
 //

@@ -2098,6 +2098,26 @@ func convert_api_SecretVolumeSource_To_v1beta3_SecretVolumeSource(in *newer.Secr
 	return nil
 }
 
+func convert_v1beta3_SerializedReference_To_api_SerializedReference(in *SerializedReference, out *newer.SerializedReference, s conversion.Scope) error {
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
+		return err
+	}
+	if err := s.Convert(&in.Reference, &out.Reference, 0); err != nil {
+		return err
+	}
+	return nil
+}
+
+func convert_api_SerializedReference_To_v1beta3_SerializedReference(in *newer.SerializedReference, out *SerializedReference, s conversion.Scope) error {
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
+		return err
+	}
+	if err := s.Convert(&in.Reference, &out.Reference, 0); err != nil {
+		return err
+	}
+	return nil
+}
+
 func convert_v1beta3_Service_To_api_Service(in *Service, out *newer.Service, s conversion.Scope) error {
 	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 		return err
@@ -2531,6 +2551,7 @@ func init() {
 		convert_api_SecretList_To_v1beta3_SecretList,
 		convert_api_SecretVolumeSource_To_v1beta3_SecretVolumeSource,
 		convert_api_Secret_To_v1beta3_Secret,
+		convert_api_SerializedReference_To_v1beta3_SerializedReference,
 		convert_api_ServiceList_To_v1beta3_ServiceList,
 		convert_api_ServicePort_To_v1beta3_ServicePort,
 		convert_api_ServiceSpec_To_v1beta3_ServiceSpec,
@@ -2621,6 +2642,7 @@ func init() {
 		convert_v1beta3_SecretList_To_api_SecretList,
 		convert_v1beta3_SecretVolumeSource_To_api_SecretVolumeSource,
 		convert_v1beta3_Secret_To_api_Secret,
+		convert_v1beta3_SerializedReference_To_api_SerializedReference,
 		convert_v1beta3_ServiceList_To_api_ServiceList,
 		convert_v1beta3_ServicePort_To_api_ServicePort,
 		convert_v1beta3_ServiceSpec_To_api_ServiceSpec,

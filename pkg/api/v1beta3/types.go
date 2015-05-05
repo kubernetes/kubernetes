@@ -1527,6 +1527,11 @@ type ObjectReference struct {
 	FieldPath string `json:"fieldPath,omitempty" description:"if referring to a piece of an object instead of an entire object, this string should contain a valid JSON/Go field access statement, such as desiredState.manifest.containers[2]"`
 }
 
+type SerializedReference struct {
+	TypeMeta  `json:",inline"`
+	Reference ObjectReference `json:"reference,omitempty" description:"the reference to an object in the system"`
+}
+
 type EventSource struct {
 	// Component from which the event is generated.
 	Component string `json:"component,omitempty" description:"component that generated the event"`

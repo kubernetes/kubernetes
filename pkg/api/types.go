@@ -1591,6 +1591,11 @@ type ObjectReference struct {
 	FieldPath string `json:"fieldPath,omitempty"`
 }
 
+type SerializedReference struct {
+	TypeMeta  `json:",inline"`
+	Reference ObjectReference `json:"reference,omitempty" description:"the reference to an object in the system"`
+}
+
 type EventSource struct {
 	// Component from which the event is generated.
 	Component string `json:"component,omitempty"`
