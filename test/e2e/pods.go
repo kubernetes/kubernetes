@@ -399,7 +399,7 @@ var _ = Describe("Pods", func() {
 			},
 		}
 
-		testContainerOutput("service env", c, pod, []string{
+		testContainerOutput("service env", c, pod, 0, []string{
 			"FOOSERVICE_SERVICE_HOST=",
 			"FOOSERVICE_SERVICE_PORT=",
 			"FOOSERVICE_PORT=",
