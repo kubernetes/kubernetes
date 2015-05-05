@@ -45,6 +45,7 @@ API_HOST=${API_HOST:-127.0.0.1}
 API_CORS_ALLOWED_ORIGINS=${API_CORS_ALLOWED_ORIGINS:-"/127.0.0.1(:[0-9]+)?$,/localhost(:[0-9]+)?$"}
 KUBELET_PORT=${KUBELET_PORT:-10250}
 LOG_LEVEL=${LOG_LEVEL:-3}
+CONTAINER_RUNTIME=${CONTAINER_RUNTIME:-"docker"}
 CHAOS_CHANCE=${CHAOS_CHANCE:-0.0}
 
 # For the common local scenario, fail fast if server is already running.
@@ -144,6 +145,7 @@ CTLRMGR_PID=$!
 KUBELET_LOG=/tmp/kubelet.log
 sudo -E "${GO_OUT}/kubelet" \
   --v=${LOG_LEVEL} \
+  --container_runtime="${CONTAINER_RUNTIME}" \
   --chaos_chance="${CHAOS_CHANCE}" \
   --hostname_override="127.0.0.1" \
   --address="127.0.0.1" \
