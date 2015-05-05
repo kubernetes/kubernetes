@@ -48,6 +48,7 @@ readonly KUBE_TEST_TARGETS=(
   cmd/integration
   cmd/gendocs
   cmd/genman
+  cmd/genbashcomp
   examples/k8petstore/web-server
   github.com/onsi/ginkgo/ginkgo
 )
