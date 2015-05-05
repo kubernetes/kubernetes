@@ -165,6 +165,7 @@ func (s *SwaggerSchema) validateField(value interface{}, apiVersion, fieldName, 
 			}
 		}
 	case "uint64":
+	case "int64":
 	case "integer":
 		_, isNumber := value.(float64)
 		_, isInteger := value.(int)
