@@ -26,7 +26,7 @@ install:
   - ./hack/verify-boilerplate.sh
   - ./hack/verify-description.sh
   - ./hack/travis/install-std-race.sh
-  - ./hack/build-go.sh
+  - ./hack/build-cross.sh
   - GOPATH=$PWD/Godeps/_workspace:$GOPATH go install ./...
   - PATH=$HOME/gopath/bin:./third_party/etcd:$PATH ./hack/verify-gendocs.sh
 
