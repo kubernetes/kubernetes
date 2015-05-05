@@ -23,8 +23,7 @@ import (
 
 var (
 	// TODO(yifan): Maybe set the them as parameters for NewCache().
-	defaultCachePeriod    = time.Second * 2
-	defaultUpdateInterval = time.Millisecond * 100
+	defaultCachePeriod = time.Millisecond * 100
 )
 
 type RuntimeCache interface {
@@ -40,10 +39,7 @@ type podsGetter interface {
 
 // NewRuntimeCache creates a container runtime cache.
 func NewRuntimeCache(getter podsGetter) (RuntimeCache, error) {
-	return &runtimeCache{
-		getter:   getter,
-		updating: false,
-	}, nil
+	return &runtimeCache{getter: getter}, nil
 }
 
 type runtimeCache struct {
@@ -54,10 +50,6 @@ type runtimeCache struct {
 	cacheTime time.Time
 	// The content of the cache.
 	pods []*Pod
-	// Whether the background thread updating the cache is running.
-	updating bool
-	// Time when the background thread should be stopped.
-	updatingThreadStopTime time.Time
 }
 
 // GetPods returns the cached result for ListPods if the result is not
@@ -70,12 +62,6 @@ func (r *runtimeCache) GetPods() ([]*Pod, error) {
 		if err := r.updateCache(); err != nil {
 			return nil, err
 		}
-	}
-	// Stop refreshing thread if there were no requests within the default cache period
-	r.updatingThreadStopTime = time.Now().Add(defaultCachePeriod)
-	if !r.updating {
-		r.updating = true
-		go r.startUpdatingCache()
 	}
 	return r.pods, nil
 }
@@ -97,27 +83,4 @@ func (r *runtimeCache) updateCache() error {
 	r.pods = pods
 	r.cacheTime = time.Now()
 	return nil
-}
-
-// startUpdateingCache continues to invoke GetPods to get the newest result until
-// there are no requests within the default cache period.
-func (r *runtimeCache) startUpdatingCache() {
-	run := true
-	for run {
-		time.Sleep(defaultUpdateInterval)
-		pods, err := r.getter.GetPods(false)
-		cacheTime := time.Now()
-		if err != nil {
-			continue
-		}
-
-		r.Lock()
-		if time.Now().After(r.updatingThreadStopTime) {
-			r.updating = false
-			run = false
-		}
-		r.pods = pods
-		r.cacheTime = cacheTime
-		r.Unlock()
-	}
 }
