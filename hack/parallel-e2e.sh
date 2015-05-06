@@ -34,7 +34,7 @@ function down-clusters {
 function up-clusters {
   for count in $(seq 1 ${clusters}); do
     export KUBE_GCE_INSTANCE_PREFIX=e2e-test-${USER}-${count}
-    export KUBE_GCE_CLUSTER_CLASS_B="10.$((${count}*2-1))"
+    export CLUSTER_IP_RANGE="10.$((${count}*2-1)).0.0/16"
     export MASTER_IP_RANGE="10.$((${count}*2)).0.0/24"
 
     local cluster_dir=${KUBE_ROOT}/_output/e2e/${KUBE_GCE_INSTANCE_PREFIX}
