@@ -124,9 +124,6 @@ func (r *RCExpectations) ExpectDeletions(rc *api.ReplicationController, dels int
 // Decrements the expectation counts of the given rc.
 func (r *RCExpectations) lowerExpectations(rc *api.ReplicationController, add, del int) {
 	if podExp, exists, err := r.GetExpectations(rc); err == nil && exists {
-		if podExp.add > 0 && podExp.del > 0 {
-			glog.V(2).Infof("Controller has both add and del expectations %+v", podExp)
-		}
 		podExp.Seen(int64(add), int64(del))
 		// The expectations might've been modified since the update on the previous line.
 		glog.V(4).Infof("Lowering expectations %+v", podExp)
@@ -165,6 +162,11 @@ func (e *PodExpectations) Seen(add, del int64) {
 func (e *PodExpectations) Fulfilled() bool {
 	// TODO: think about why this line being atomic doesn't matter
 	return atomic.LoadInt64(&e.add) <= 0 && atomic.LoadInt64(&e.del) <= 0
+}
+
+// getExpectations returns the add and del expectations of the pod.
+func (e *PodExpectations) getExpectations() (int64, int64) {
+	return atomic.LoadInt64(&e.add), atomic.LoadInt64(&e.del)
 }
 
 // NewRCExpectations returns a store for PodExpectations.

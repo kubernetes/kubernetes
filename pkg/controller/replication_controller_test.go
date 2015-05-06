@@ -48,6 +48,12 @@ type FakePodControl struct {
 	err            error
 }
 
+// Give each test that starts a background controller upto 1/2 a second.
+// Since we need to start up a goroutine to test watch, this routine needs
+// to get cpu before the test can complete. If the test is starved of cpu,
+// the watch test will take upto 1/2 a second before timing out.
+const controllerTimeout = 500 * time.Millisecond
+
 func init() {
 	api.ForTesting_ReferencesAllowBlankSelfLinks = true
 }
@@ -487,7 +493,8 @@ func TestRCExpectations(t *testing.T) {
 
 	// Expectations have been surpassed
 	if podExp, exists, err := e.GetExpectations(rc); err == nil && exists {
-		if podExp.add != -1 || podExp.del != -1 {
+		add, del := podExp.getExpectations()
+		if add != -1 || del != -1 {
 			t.Errorf("Unexpected pod expectations %#v", podExp)
 		}
 	} else {
@@ -500,7 +507,8 @@ func TestRCExpectations(t *testing.T) {
 	// Next round of rc sync, old expectations are cleared
 	e.setExpectations(rc, 1, 2)
 	if podExp, exists, err := e.GetExpectations(rc); err == nil && exists {
-		if podExp.add != 1 || podExp.del != 2 {
+		add, del := podExp.getExpectations()
+		if add != 1 || del != 2 {
 			t.Errorf("Unexpected pod expectations %#v", podExp)
 		}
 	} else {
@@ -663,7 +671,7 @@ func TestWatchControllers(t *testing.T) {
 
 	select {
 	case <-received:
-	case <-time.After(100 * time.Millisecond):
+	case <-time.After(controllerTimeout):
 		t.Errorf("Expected 1 call but got 0")
 	}
 }
@@ -706,7 +714,7 @@ func TestWatchPods(t *testing.T) {
 
 	select {
 	case <-received:
-	case <-time.After(100 * time.Millisecond):
+	case <-time.After(controllerTimeout):
 		t.Errorf("Expected 1 call but got 0")
 	}
 }
@@ -756,7 +764,7 @@ func TestUpdatePods(t *testing.T) {
 			if !expected.Has(got) {
 				t.Errorf("Expected keys %#v got %v", expected, got)
 			}
-		case <-time.After(100 * time.Millisecond):
+		case <-time.After(controllerTimeout):
 			t.Errorf("Expected update notifications for controllers within 100ms each")
 		}
 	}
@@ -795,7 +803,7 @@ func TestControllerUpdateRequeue(t *testing.T) {
 		if key != expectedKey {
 			t.Errorf("Expected requeue of controller with key %s got %s", expectedKey, key)
 		}
-	case <-time.After(100 * time.Millisecond):
+	case <-time.After(controllerTimeout):
 		manager.queue.ShutDown()
 		t.Errorf("Expected to find an rc in the queue, found none.")
 	}
