@@ -28,6 +28,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/latest"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util/wait"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -136,7 +137,8 @@ var _ = Describe("Services", func() {
 		// Try to find results for each expected name.
 		By("looking for the results for each expected name")
 		var failed []string
-		for try := 1; try < 100; try++ {
+
+		expectNoError(wait.Poll(time.Second*2, time.Second*60, func() (bool, error) {
 			failed = []string{}
 			for _, name := range namesToResolve {
 				_, err := c.Get().
@@ -148,20 +150,20 @@ var _ = Describe("Services", func() {
 					Do().Raw()
 				if err != nil {
 					failed = append(failed, name)
-					fmt.Printf("Lookup using %s for %s failed: %v\n", pod.Name, name, err)
+					Logf("Lookup using %s for %s failed: %v\n", pod.Name, name, err)
 				}
 			}
 			if len(failed) == 0 {
-				break
+				return true, nil
 			}
-			fmt.Printf("lookups using %s failed for: %v\n", pod.Name, failed)
-			time.Sleep(10 * time.Second)
-		}
+			Logf("Lookups using %s failed for: %v\n", pod.Name, failed)
+			return false, nil
+		}))
 		Expect(len(failed)).To(Equal(0))
 
 		// TODO: probe from the host, too.
 
-		fmt.Printf("DNS probes using %s succeeded\n", pod.Name)
+		Logf("DNS probes using %s succeeded\n", pod.Name)
 	})
 
 	It("should provide RW and RO services", func() {
