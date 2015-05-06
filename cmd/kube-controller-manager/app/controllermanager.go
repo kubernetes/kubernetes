@@ -213,7 +213,7 @@ func (s *CMServer) Run(_ []string) error {
 	endpoints := service.NewEndpointController(kubeClient)
 	go endpoints.Run(s.ConcurrentEndpointSyncs, util.NeverStop)
 
-	controllerManager := replicationControllerPkg.NewReplicationManager(kubeClient)
+	controllerManager := replicationControllerPkg.NewReplicationManager(kubeClient, replicationControllerPkg.BurstReplicas)
 	go controllerManager.Run(s.ConcurrentRCSyncs, util.NeverStop)
 
 	cloud := cloudprovider.InitCloudProvider(s.CloudProvider, s.CloudConfigFile)

@@ -524,7 +524,7 @@ func (nc *NodeController) tryUpdateNodeStatus(node *api.Node) (time.Duration, ap
 		// NodeReady condition was last set longer ago than gracePeriod, so update it to Unknown
 		// (regardless of its current value) in the master, without contacting kubelet.
 		if readyCondition == nil {
-			glog.V(2).Infof("node %v is never updated by kubelet")
+			glog.V(2).Infof("node %v is never updated by kubelet", node.Name)
 			node.Status.Conditions = append(node.Status.Conditions, api.NodeCondition{
 				Type:               api.NodeReady,
 				Status:             api.ConditionUnknown,
