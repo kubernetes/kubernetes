@@ -82,6 +82,7 @@ func NewCmdRollingUpdate(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd.Flags().String("image", "", "Image to upgrade the controller to.  Can not be used with --filename/-f")
 	cmd.Flags().String("deployment-label-key", "deployment", "The key to use to differentiate between two different controllers, default 'deployment'.  Only relevant when --image is specified, ignored otherwise")
 	cmd.Flags().Bool("dry-run", false, "If true, print out the changes that would be made, but don't actually make them.")
+	cmd.Flags().Bool("rollback", false, "If true, this is a request to abort an existing rollout that is partially rolled out. It effectively reverses current and next and runs a rollout")
 	cmdutil.AddPrinterFlags(cmd)
 	return cmd
 }
@@ -171,10 +172,15 @@ func RunRollingUpdate(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, arg
 
 		if len(newName) > 0 {
 			newRc, err = client.ReplicationControllers(cmdNamespace).Get(newName)
-			if err != nil && !apierrors.IsNotFound(err) {
-				return err
+			if err != nil {
+				if !apierrors.IsNotFound(err) {
+					return err
+				} else {
+					newRc = nil
+				}
+			} else {
+				fmt.Fprint(out, "Found existing update in progress (%s), resuming.\n", newName)
 			}
-			fmt.Fprint(out, "Found existing update in progress (%s), resuming.\n", newName)
 		}
 		if newRc == nil {
 			// load the old RC into the "new" RC
@@ -257,7 +263,7 @@ func RunRollingUpdate(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, arg
 	if keepOldName {
 		updateCleanupPolicy = kubectl.RenameRollingUpdateCleanupPolicy
 	}
-	err = updater.Update(&kubectl.RollingUpdaterConfig{
+	config := &kubectl.RollingUpdaterConfig{
 		Out:           out,
 		OldRc:         oldRc,
 		NewRc:         newRc,
@@ -265,7 +271,12 @@ func RunRollingUpdate(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, arg
 		Interval:      interval,
 		Timeout:       timeout,
 		CleanupPolicy: updateCleanupPolicy,
-	})
+	}
+	if cmdutil.GetFlagBool(cmd, "rollback") {
+		kubectl.AbortRollingUpdate(config)
+		client.ReplicationControllers(config.NewRc.Namespace).Update(config.NewRc)
+	}
+	err = updater.Update(config)
 	if err != nil {
 		return err
 	}

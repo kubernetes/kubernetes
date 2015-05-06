@@ -59,6 +59,10 @@ existing controller and overwrite at least one (common) label in its replicaSele
     Time delay between polling controller status after update. Valid time units are "ns", "us" (or "µs"), "ms", "s", "m", "h".
 
 .PP
+\fB\-\-rollback\fP=false
+    If true, this is a request to abort an existing rollout that is partially rolled out. It effectively reverses current and next and runs a rollout
+
+.PP
 \fB\-t\fP, \fB\-\-template\fP=""
     Template string or path to template file to use when \-o=template or \-o=templatefile.  The template format is golang templates [
 \[la]http://golang.org/pkg/text/template/#pkg-overview\[ra]]

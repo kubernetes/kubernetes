@@ -38,7 +38,7 @@ it is assumed that the rollout is nearly completed, and ```foo-next``` is rename
 ### Aborting a rollout
 Abort is assumed to want to reverse a rollout in progress.
 
-```kubectl rolling-update rc foo [foo-v2] --abort```
+```kubectl rolling-update rc foo [foo-v2] --rollback```
 
 This is really just semantic sugar for:
 
