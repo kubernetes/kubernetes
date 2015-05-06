@@ -2949,6 +2949,48 @@ func TestValidateSecret(t *testing.T) {
 	}
 }
 
+func TestValidateDockerConfigSecret(t *testing.T) {
+	validDockerSecret := func() api.Secret {
+		return api.Secret{
+			ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "bar"},
+			Type:       api.SecretTypeDockercfg,
+			Data: map[string][]byte{
+				api.DockerConfigKey: []byte(`{"https://index.docker.io/v1/": {"auth": "Y2x1ZWRyb29sZXIwMDAxOnBhc3N3b3Jk","email": "fake@example.com"}}`),
+			},
+		}
+	}
+
+	var (
+		missingDockerConfigKey = validDockerSecret()
+		emptyDockerConfigKey   = validDockerSecret()
+		invalidDockerConfigKey = validDockerSecret()
+	)
+
+	delete(missingDockerConfigKey.Data, api.DockerConfigKey)
+	emptyDockerConfigKey.Data[api.DockerConfigKey] = []byte("")
+	invalidDockerConfigKey.Data[api.DockerConfigKey] = []byte("bad")
+
+	tests := map[string]struct {
+		secret api.Secret
+		valid  bool
+	}{
+		"valid":             {validDockerSecret(), true},
+		"missing dockercfg": {missingDockerConfigKey, false},
+		"empty dockercfg":   {emptyDockerConfigKey, false},
+		"invalid dockercfg": {invalidDockerConfigKey, false},
+	}
+
+	for name, tc := range tests {
+		errs := ValidateSecret(&tc.secret)
+		if tc.valid && len(errs) > 0 {
+			t.Errorf("%v: Unexpected error: %v", name, errs)
+		}
+		if !tc.valid && len(errs) == 0 {
+			t.Errorf("%v: Unexpected non-error", name)
+		}
+	}
+}
+
 func TestValidateEndpoints(t *testing.T) {
 	successCases := map[string]api.Endpoints{
 		"simple endpoint": {

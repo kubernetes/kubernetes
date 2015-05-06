@@ -17,6 +17,7 @@ limitations under the License.
 package validation
 
 import (
+	"encoding/json"
 	"fmt"
 	"net"
 	"path"
@@ -1295,6 +1296,18 @@ func ValidateSecret(secret *api.Secret) errs.ValidationErrorList {
 		}
 	case api.SecretTypeOpaque, "":
 		// no-op
+	case api.SecretTypeDockercfg:
+		dockercfgBytes, exists := secret.Data[api.DockerConfigKey]
+		if !exists {
+			allErrs = append(allErrs, errs.NewFieldRequired(fmt.Sprintf("data[%s]", api.DockerConfigKey)))
+			break
+		}
+
+		// make sure that the content is well-formed json.
+		if err := json.Unmarshal(dockercfgBytes, &map[string]interface{}{}); err != nil {
+			allErrs = append(allErrs, errs.NewFieldInvalid(fmt.Sprintf("data[%s]", api.DockerConfigKey), "<secret contents redacted>", err.Error()))
+		}
+
 	default:
 		// no-op
 	}
