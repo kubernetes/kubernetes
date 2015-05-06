@@ -19,6 +19,7 @@ package kubelet
 import (
 	"sync"
 
+	kubecontainer "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 )
 
@@ -27,18 +28,18 @@ import (
 // take care of the volumePlugins.
 type volumeManager struct {
 	lock       sync.RWMutex
-	volumeMaps map[types.UID]volumeMap
+	volumeMaps map[types.UID]kubecontainer.VolumeMap
 }
 
 func newVolumeManager() *volumeManager {
 	vm := &volumeManager{}
-	vm.volumeMaps = make(map[types.UID]volumeMap)
+	vm.volumeMaps = make(map[types.UID]kubecontainer.VolumeMap)
 	return vm
 }
 
 // SetVolumes sets the volume map for a pod.
 // TODO(yifan): Currently we assume the volume is already mounted, so we only do a book keeping here.
-func (vm *volumeManager) SetVolumes(podUID types.UID, podVolumes volumeMap) {
+func (vm *volumeManager) SetVolumes(podUID types.UID, podVolumes kubecontainer.VolumeMap) {
 	vm.lock.Lock()
 	defer vm.lock.Unlock()
 	vm.volumeMaps[podUID] = podVolumes
@@ -46,7 +47,7 @@ func (vm *volumeManager) SetVolumes(podUID types.UID, podVolumes volumeMap) {
 
 // GetVolumes returns the volume map which are already mounted on the host machine
 // for a pod.
-func (vm *volumeManager) GetVolumes(podUID types.UID) (volumeMap, bool) {
+func (vm *volumeManager) GetVolumes(podUID types.UID) (kubecontainer.VolumeMap, bool) {
 	vm.lock.RLock()
 	defer vm.lock.RUnlock()
 	vol, ok := vm.volumeMaps[podUID]

@@ -23,6 +23,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/volume"
 )
 
 type Version interface {
@@ -204,6 +205,8 @@ type RunContainerOptions struct {
 	// The parent cgroup to pass to Docker
 	CgroupParent string
 }
+
+type VolumeMap map[string]volume.Volume
 
 type Pods []*Pod
 
