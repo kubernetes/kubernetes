@@ -12,18 +12,18 @@
 #     sleep 4
 #     i=$[$i+1]
 #   done
-
-apiVersion: v1beta1
+apiVersion: v1beta3
 kind: Pod
-id: synthetic-logger-0.25lps-pod
-desiredState:
-  manifest:
-    version: v1beta1
-    id: synth-logger-0.25lps
-    containers:
-      - name: synth-lgr
-        image: ubuntu:14.04
-        command: ["bash", "-c", "i=\"0\"; while true; do echo -n \"`hostname`: $i: \"; date --rfc-3339 ns; sleep 4; i=$[$i+1]; done"]
-labels:
-  name: synth-logging-source
- 
+metadata:
+  labels:
+    name: synth-logging-source
+  name: synthetic-logger-0.25lps-pod
+spec:
+  containers:
+  - args:
+    - bash
+    - -c
+    - 'i="0"; while true; do echo -n "`hostname`: $i: "; date --rfc-3339 ns; sleep
+      4; i=$[$i+1]; done'
+    image: ubuntu:14.04
+    name: synth-lgr
