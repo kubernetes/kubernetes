@@ -199,8 +199,10 @@ mount-master-pd() {
 
   # Format and mount the disk, create directories on it for all of the master's
   # persistent data, and link them to where they're used.
+  echo "Mounting master-pd"
   mkdir -p /mnt/master-pd
-  /usr/share/google/safe_format_and_mount -m "mkfs.ext4 -F" "${device_path}" /mnt/master-pd
+  /usr/share/google/safe_format_and_mount -m "mkfs.ext4 -F" "${device_path}" /mnt/master-pd &>/var/log/master-pd-mount.log || \
+    { echo "!!! master-pd mount failed, review /var/log/master-pd-mount.log !!!"; return 1; }
   # Contains all the data stored in etcd
   mkdir -m 700 -p /mnt/master-pd/var/etcd
   # Contains the dynamically generated apiserver auth certs and keys
