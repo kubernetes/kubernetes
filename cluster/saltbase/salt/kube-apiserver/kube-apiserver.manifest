@@ -106,9 +106,6 @@
       { "name": "https",
         "containerPort": {{secure_port}},
         "hostPort": {{secure_port}}},{
-       "name": "http",
-        "containerPort": 7080,
-        "hostPort": 7080},{
        "name": "local",
         "containerPort": 8080,
         "hostPort": 8080}

@@ -98,7 +98,6 @@ func runApiServer(etcdClient tools.EtcdClient, addr net.IP, port int, masterServ
 		Authorizer:            apiserver.NewAlwaysAllowAuthorizer(),
 
 		ReadWritePort:          port,
-		ReadOnlyPort:           port,
 		PublicAddress:          addr,
 		MasterServiceNamespace: masterServiceNamespace,
 	})
