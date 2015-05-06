@@ -26,7 +26,7 @@ function build-kube-env {
 ENV_TIMESTAMP: $(yaml-quote $(date -u +%Y-%m-%dT%T%z))
 INSTANCE_PREFIX: $(yaml-quote ${INSTANCE_PREFIX})
 NODE_INSTANCE_PREFIX: $(yaml-quote ${NODE_INSTANCE_PREFIX})
-KUBE_GCE_CLUSTER_CLASS_B: $(yaml-quote ${KUBE_GCE_CLUSTER_CLASS_B:-10.244})
+CLUSTER_IP_RANGE: $(yaml-quote ${CLUSTER_IP_RANGE:-10.244.0.0/16})
 SERVER_BINARY_TAR_URL: $(yaml-quote ${SERVER_BINARY_TAR_URL})
 SALT_TAR_URL: $(yaml-quote ${SALT_TAR_URL})
 PORTAL_NET: $(yaml-quote ${PORTAL_NET})

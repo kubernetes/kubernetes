@@ -79,7 +79,7 @@ type CMServer struct {
 	NodeMemory   resource.Quantity
 
 	ClusterName       string
-	ClusterClassB     string
+	ClusterCIDR       util.IPNet
 	AllocateNodeCIDRs bool
 	EnableProfiling   bool
 
@@ -147,7 +147,7 @@ func (s *CMServer) AddFlags(fs *pflag.FlagSet) {
 	fs.Var(resource.NewQuantityFlagValue(&s.NodeMemory), "node-memory", "The amount of memory (in bytes) provisioned on each node")
 	fs.StringVar(&s.ClusterName, "cluster-name", s.ClusterName, "The instance prefix for the cluster")
 	fs.BoolVar(&s.EnableProfiling, "profiling", true, "Enable profiling via web interface host:port/debug/pprof/")
-	fs.StringVar(&s.ClusterClassB, "cluster-class-b", "10.244", "Class B network address for Pods in cluster.")
+	fs.Var(&s.ClusterCIDR, "cluster-cidr", "CIDR Range for Pods in cluster.")
 	fs.BoolVar(&s.AllocateNodeCIDRs, "allocate-node-cidrs", false, "Should CIDRs for Pods be allocated and set on the cloud provider.")
 	fs.StringVar(&s.Master, "master", s.Master, "The address of the Kubernetes API server (overrides any value in kubeconfig)")
 	fs.StringVar(&s.Kubeconfig, "kubeconfig", s.Kubeconfig, "Path to kubeconfig file with authorization and master location information.")
@@ -230,7 +230,7 @@ func (s *CMServer) Run(_ []string) error {
 
 	nodeController := nodecontroller.NewNodeController(cloud, s.MinionRegexp, s.MachineList, nodeResources,
 		kubeClient, s.RegisterRetryCount, s.PodEvictionTimeout, util.NewTokenBucketRateLimiter(s.DeletingPodsQps, s.DeletingPodsBurst),
-		s.NodeMonitorGracePeriod, s.NodeStartupGracePeriod, s.NodeMonitorPeriod, s.ClusterName, s.ClusterClassB, s.AllocateNodeCIDRs)
+		s.NodeMonitorGracePeriod, s.NodeStartupGracePeriod, s.NodeMonitorPeriod, s.ClusterName, (*net.IPNet)(&s.ClusterCIDR), s.AllocateNodeCIDRs)
 	nodeController.Run(s.NodeSyncPeriod, s.SyncNodeList)
 
 	serviceController := servicecontroller.New(cloud, kubeClient, s.ClusterName)

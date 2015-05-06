@@ -132,7 +132,7 @@ func runControllerManager(machineList []string, cl *client.Client, nodeMilliCPU,
 
 	const nodeSyncPeriod = 10 * time.Second
 	nodeController := nodecontroller.NewNodeController(
-		nil, "", machineList, nodeResources, cl, 10, 5*time.Minute, util.NewTokenBucketRateLimiter(*deletingPodsQps, *deletingPodsBurst), 40*time.Second, 60*time.Second, 5*time.Second, "", "", false)
+		nil, "", machineList, nodeResources, cl, 10, 5*time.Minute, util.NewTokenBucketRateLimiter(*deletingPodsQps, *deletingPodsBurst), 40*time.Second, 60*time.Second, 5*time.Second, "", nil, false)
 	nodeController.Run(nodeSyncPeriod, true)
 
 	serviceController := servicecontroller.New(nil, cl, "kubernetes")

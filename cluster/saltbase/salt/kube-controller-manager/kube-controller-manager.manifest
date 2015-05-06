@@ -1,6 +1,6 @@
 {% set machines = ""-%}
 {% set cluster_name = "" -%}
-{% set cluster_class_b = "" -%}
+{% set cluster_cidr = "" -%}
 {% set allocate_node_cidrs = "" -%}
 {% set minion_regexp = "--minion_regexp=.*" -%}
 {% set sync_nodes = "--sync_nodes=true" -%}
@@ -11,8 +11,8 @@
 {% if pillar['instance_prefix'] is defined -%}
   {% set cluster_name = "--cluster_name=" + pillar['instance_prefix'] -%}
 {% endif -%}
-{% if pillar['cluster_class_b'] is defined -%}
-  {% set cluster_class_b = "--cluster-class-b=" + pillar['cluster_class_b'] -%}
+{% if pillar['cluster_cidr'] is defined -%}
+  {% set cluster_cidr = "--cluster-cidr=" + pillar['cluster_cidr'] -%}
 {% endif -%}
 {% if pillar['allocate_node_cidrs'] is defined -%}
   {% set allocate_node_cidrs = "--allocate-node-cidrs=" + pillar['allocate_node_cidrs'] -%}
@@ -55,7 +55,7 @@
 {% endif -%}
 {% endif -%}
 
-{% set params = "--master=127.0.0.1:8080" + " " + machines + " " + cluster_name + " " + cluster_class_b + " " + allocate_node_cidrs + " " + minion_regexp + " " + cloud_provider  + " " + sync_nodes + " " + cloud_config + " " + pillar['log_level'] -%}
+{% set params = "--master=127.0.0.1:8080" + " " + machines + " " + cluster_name + " " + cluster_cidr + " " + allocate_node_cidrs + " " + minion_regexp + " " + cloud_provider  + " " + sync_nodes + " " + cloud_config + " " + pillar['log_level'] -%}
 
 {
 "apiVersion": "v1beta3",

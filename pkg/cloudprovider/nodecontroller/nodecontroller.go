@@ -89,7 +89,7 @@ type NodeController struct {
 	// TODO: Change node status monitor to watch based.
 	nodeMonitorPeriod time.Duration
 	clusterName       string
-	clusterClassB     string
+	clusterCIDR       *net.IPNet
 	allocateNodeCIDRs bool
 	// Method for easy mocking in unittest.
 	lookupIP func(host string) ([]net.IP, error)
@@ -110,7 +110,7 @@ func NewNodeController(
 	nodeStartupGracePeriod time.Duration,
 	nodeMonitorPeriod time.Duration,
 	clusterName string,
-	clusterClassB string,
+	clusterCIDR *net.IPNet,
 	allocateNodeCIDRs bool) *NodeController {
 	eventBroadcaster := record.NewBroadcaster()
 	recorder := eventBroadcaster.NewRecorder(api.EventSource{Component: "controllermanager"})
@@ -119,6 +119,9 @@ func NewNodeController(
 		eventBroadcaster.StartRecordingToSink(kubeClient.Events(""))
 	} else {
 		glog.Infof("No api server defined - no events will be sent to API server.")
+	}
+	if allocateNodeCIDRs && clusterCIDR == nil {
+		glog.Fatal("NodeController: Must specify clusterCIDR if allocateNodeCIDRs == true.")
 	}
 	return &NodeController{
 		cloud:                   cloud,
@@ -137,7 +140,7 @@ func NewNodeController(
 		lookupIP:                net.LookupIP,
 		now:                     util.Now,
 		clusterName:             clusterName,
-		clusterClassB:           clusterClassB,
+		clusterCIDR:             clusterCIDR,
 		allocateNodeCIDRs:       allocateNodeCIDRs,
 	}
 }
@@ -145,9 +148,12 @@ func NewNodeController(
 // Generates num pod CIDRs that could be assigned to nodes.
 func (nc *NodeController) generateCIDRs(num int) util.StringSet {
 	res := util.NewStringSet()
+	cidrIP := nc.clusterCIDR.IP.To4()
 	for i := 0; i < num; i++ {
 		// TODO: Make the CIDRs configurable.
-		res.Insert(fmt.Sprintf("%v.%v.0/24", nc.clusterClassB, i))
+		b1 := byte(i >> 8)
+		b2 := byte(i % 256)
+		res.Insert(fmt.Sprintf("%d.%d.%d.0/24", cidrIP[0], cidrIP[1]+b1, cidrIP[2]+b2))
 	}
 	return res
 }
