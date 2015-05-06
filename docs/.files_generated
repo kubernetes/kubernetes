@@ -23,6 +23,8 @@ kubectl_proxy.md
 kubectl_resize.md
 kubectl_rolling-update.md
 kubectl_run-container.md
+kubectl_secrets.md
+kubectl_secrets_create-dockercfg.md
 kubectl_stop.md
 kubectl_update.md
 kubectl_version.md
