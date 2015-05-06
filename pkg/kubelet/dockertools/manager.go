@@ -743,18 +743,18 @@ func (dm *DockerManager) ListImages() ([]kubecontainer.Image, error) {
 
 // TODO(vmarmol): Consider unexporting.
 // PullImage pulls an image from network to local storage.
-func (dm *DockerManager) PullImage(image string) error {
-	return dm.Puller.Pull(image)
+func (dm *DockerManager) PullImage(image kubecontainer.ImageSpec, _ []api.Secret) error {
+	return dm.Puller.Pull(image.Image)
 }
 
 // IsImagePresent checks whether the container image is already in the local storage.
-func (dm *DockerManager) IsImagePresent(image string) (bool, error) {
-	return dm.Puller.IsImagePresent(image)
+func (dm *DockerManager) IsImagePresent(image kubecontainer.ImageSpec) (bool, error) {
+	return dm.Puller.IsImagePresent(image.Image)
 }
 
 // Removes the specified image.
-func (dm *DockerManager) RemoveImage(image string) error {
-	return dm.client.RemoveImage(image)
+func (dm *DockerManager) RemoveImage(image kubecontainer.ImageSpec) error {
+	return dm.client.RemoveImage(image.Image)
 }
 
 // podInfraContainerChanged returns true if the pod infra container has changed.
@@ -1156,8 +1156,9 @@ func (dm *DockerManager) createPodInfraContainer(pod *api.Pod) (kubeletTypes.Doc
 	if err != nil {
 		glog.Errorf("Couldn't make a ref to pod %v, container %v: '%v'", pod.Name, container.Name, err)
 	}
+	spec := kubecontainer.ImageSpec{container.Image}
 	// TODO: make this a TTL based pull (if image older than X policy, pull)
-	ok, err := dm.IsImagePresent(container.Image)
+	ok, err := dm.IsImagePresent(spec)
 	if err != nil {
 		if ref != nil {
 			dm.recorder.Eventf(ref, "failed", "Failed to inspect image %q: %v", container.Image, err)
@@ -1165,7 +1166,7 @@ func (dm *DockerManager) createPodInfraContainer(pod *api.Pod) (kubeletTypes.Doc
 		return "", err
 	}
 	if !ok {
-		if err := dm.PullImage(container.Image); err != nil {
+		if err := dm.PullImage(spec, nil); err != nil {
 			if ref != nil {
 				dm.recorder.Eventf(ref, "failed", "Failed to pull image %q: %v", container.Image, err)
 			}
@@ -1324,7 +1325,8 @@ func (dm *DockerManager) computePodContainerChanges(pod *api.Pod, runningPod kub
 
 // Pull the image for the specified pod and container.
 func (dm *DockerManager) pullImage(pod *api.Pod, container *api.Container) error {
-	present, err := dm.IsImagePresent(container.Image)
+	spec := kubecontainer.ImageSpec{container.Image}
+	present, err := dm.IsImagePresent(spec)
 	if err != nil {
 		ref, err := kubecontainer.GenerateContainerRef(pod, container)
 		if err != nil {
@@ -1340,7 +1342,7 @@ func (dm *DockerManager) pullImage(pod *api.Pod, container *api.Container) error
 		return nil
 	}
 
-	err = dm.PullImage(container.Image)
+	err = dm.PullImage(spec, nil)
 	dm.runtimeHooks.ReportImagePull(pod, container, err)
 	return err
 }

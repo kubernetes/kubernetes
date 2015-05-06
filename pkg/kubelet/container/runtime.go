@@ -34,6 +34,13 @@ type Version interface {
 	String() string
 }
 
+// ImageSpec is an internal representation of an image.  Currently, it wraps the
+// value of a Container's Image field, but in the future it will include more detailed
+// information about the different image types.
+type ImageSpec struct {
+	Image string
+}
+
 // Runtime interface defines the interfaces that should be implemented
 // by a container runtime.
 type Runtime interface {
@@ -61,14 +68,15 @@ type Runtime interface {
 	ExecInContainer(containerID string, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool) error
 	// Forward the specified port from the specified pod to the stream.
 	PortForward(pod *Pod, port uint16, stream io.ReadWriteCloser) error
-	// PullImage pulls an image from the network to local storage.
-	PullImage(image string) error
+	// PullImage pulls an image from the network to local storage using the supplied
+	// secrets if necessary.
+	PullImage(image ImageSpec, secrets []api.Secret) error
 	// IsImagePresent checks whether the container image is already in the local storage.
-	IsImagePresent(image string) (bool, error)
+	IsImagePresent(image ImageSpec) (bool, error)
 	// Gets all images currently on the machine.
 	ListImages() ([]Image, error)
 	// Removes the specified image.
-	RemoveImage(image string) error
+	RemoveImage(image ImageSpec) error
 	// TODO(vmarmol): Unify pod and containerID args.
 	// GetContainerLogs returns logs of a specific container. By
 	// default, it returns a snapshot of the container log. Set 'follow' to true to
