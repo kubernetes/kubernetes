@@ -14,7 +14,7 @@ var _ = os.Stderr
 func TestGenMdDoc(t *testing.T) {
 	c := initializeWithRootCmd()
 	// Need two commands to run the command alphabetical sort
-	cmdEcho.AddCommand(cmdTimes, cmdEchoSub)
+	cmdEcho.AddCommand(cmdTimes, cmdEchoSub, cmdDeprecated)
 	c.AddCommand(cmdPrint, cmdEcho)
 	cmdRootWithRun.PersistentFlags().StringVarP(&flags2a, "rootflag", "r", "two", strtwoParentHelp)
 
@@ -58,5 +58,10 @@ func TestGenMdDoc(t *testing.T) {
 	expected = cmdEchoSub.Short
 	if !strings.Contains(found, expected) {
 		t.Errorf("Unexpected response.\nExpecting to contain: \n %q\nGot:\n %q\n", expected, found)
+	}
+
+	unexpected := cmdDeprecated.Short
+	if strings.Contains(found, unexpected) {
+		t.Errorf("Unexpected response.\nFound: %v\nBut should not have!!\n", unexpected)
 	}
 }

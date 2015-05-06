@@ -22,7 +22,7 @@ func preamble(out *bytes.Buffer) {
 __debug()
 {
     if [[ -n ${BASH_COMP_DEBUG_FILE} ]]; then
-        echo "$*" >> ${BASH_COMP_DEBUG_FILE}
+        echo "$*" >> "${BASH_COMP_DEBUG_FILE}"
     fi
 }
 
@@ -91,6 +91,13 @@ __handle_reply()
     if [[ ${#COMPREPLY[@]} -eq 0 ]]; then
         declare -F __custom_func >/dev/null && __custom_func
     fi
+}
+
+# The arguments should be in the form "ext1|ext2|extn"
+__handle_filename_extension_flag()
+{
+    local ext="$1"
+    _filedir "@(${ext})"
 }
 
 __handle_flag()
@@ -173,10 +180,9 @@ __handle_word()
 func postscript(out *bytes.Buffer, name string) {
 	fmt.Fprintf(out, "__start_%s()\n", name)
 	fmt.Fprintf(out, `{
-    local cur prev words cword split
+    local cur prev words cword
     _init_completion -s || return
 
-    local completions_func
     local c=0
     local flags=()
     local two_word_flags=()
@@ -199,6 +205,9 @@ func postscript(out *bytes.Buffer, name string) {
 func writeCommands(cmd *Command, out *bytes.Buffer) {
 	fmt.Fprintf(out, "    commands=()\n")
 	for _, c := range cmd.Commands() {
+		if len(c.Deprecated) > 0 {
+			continue
+		}
 		fmt.Fprintf(out, "    commands+=(%q)\n", c.Name())
 	}
 	fmt.Fprintf(out, "\n")
@@ -211,7 +220,7 @@ func writeFlagHandler(name string, annotations map[string][]string, out *bytes.B
 			fmt.Fprintf(out, "    flags_with_completion+=(%q)\n", name)
 
 			ext := strings.Join(value, "|")
-			ext = "_filedir '@(" + ext + ")'"
+			ext = "__handle_filename_extension_flag " + ext
 			fmt.Fprintf(out, "    flags_completion+=(%q)\n", ext)
 		}
 	}
@@ -291,6 +300,9 @@ func writeRequiredNoun(cmd *Command, out *bytes.Buffer) {
 
 func gen(cmd *Command, out *bytes.Buffer) {
 	for _, c := range cmd.Commands() {
+		if len(c.Deprecated) > 0 {
+			continue
+		}
 		gen(c, out)
 	}
 	commandName := cmd.CommandPath()

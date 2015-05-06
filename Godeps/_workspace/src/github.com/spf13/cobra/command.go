@@ -48,15 +48,31 @@ type Command struct {
 	ValidArgs []string
 	// Custom functions used by the bash autocompletion generator
 	BashCompletionFunction string
+	// Is this command deprecated and should print this string when used?
+	Deprecated string
 	// Full set of flags
 	flags *flag.FlagSet
 	// Set of flags childrens of this command will inherit
 	pflags *flag.FlagSet
 	// Flags that are declared specifically by this command (not inherited).
 	lflags *flag.FlagSet
-	// Run runs the command.
-	// The args are the arguments after the command name.
+	// The *Run functions are executed in the following order:
+	//   * PersistentPreRun()
+	//   * PreRun()
+	//   * Run()
+	//   * PostRun()
+	//   * PersistentPostRun()
+	// All functions get the same args, the arguments after the command name
+	// PersistentPreRun: children of this command will inherit and execute
+	PersistentPreRun func(cmd *Command, args []string)
+	// PreRun: children of this command will not inherit.
+	PreRun func(cmd *Command, args []string)
+	// Run: Typically the actual work function. Most commands will only implement this
 	Run func(cmd *Command, args []string)
+	// PostRun: run after the Run command.
+	PostRun func(cmd *Command, args []string)
+	// PersistentPostRun: children of this command will inherit and execute after PostRun
+	PersistentPostRun func(cmd *Command, args []string)
 	// Commands is the list of commands supported by this program.
 	commands []*Command
 	// Parent Command for this command
@@ -231,7 +247,7 @@ Examples:
 {{ .Example }}
 {{end}}{{ if .HasRunnableSubCommands}}
 
-Available Commands: {{range .Commands}}{{if .Runnable}}
+Available Commands: {{range .Commands}}{{if and (.Runnable) (not .Deprecated)}}
   {{rpad .Name .NamePadding }} {{.Short}}{{end}}{{end}}
 {{end}}
 {{ if .HasLocalFlags}}Flags:
@@ -239,7 +255,7 @@ Available Commands: {{range .Commands}}{{if .Runnable}}
 {{ if .HasInheritedFlags}}Global Flags:
 {{.InheritedFlags.FlagUsages}}{{end}}{{if or (.HasHelpSubCommands) (.HasRunnableSiblings)}}
 Additional help topics:
-{{if .HasHelpSubCommands}}{{range .Commands}}{{if not .Runnable}} {{rpad .CommandPath .CommandPathPadding}} {{.Short}}{{end}}{{end}}{{end}}{{if .HasRunnableSiblings }}{{range .Parent.Commands}}{{if .Runnable}}{{if not (eq .Name $cmd.Name) }}
+{{if .HasHelpSubCommands}}{{range .Commands}}{{if and (not .Runnable) (not .Deprecated)}} {{rpad .CommandPath .CommandPathPadding}} {{.Short}}{{end}}{{end}}{{end}}{{if .HasRunnableSiblings }}{{range .Parent.Commands}}{{if and (not .Runnable) (not .Deprecated)}}{{if not (eq .Name $cmd.Name) }}
   {{rpad .CommandPath .CommandPathPadding}} {{.Short}}{{end}}{{end}}{{end}}{{end}}
 {{end}}{{ if .HasSubCommands }}
 Use "{{.Root.Name}} help [command]" for more information about a command.
@@ -414,6 +430,10 @@ func (c *Command) execute(a []string) (err error) {
 		return fmt.Errorf("Called Execute() on a nil Command")
 	}
 
+	if len(c.Deprecated) > 0 {
+		c.Printf("Command %q is deprecated, %s\n", c.Name(), c.Deprecated)
+	}
+
 	err = c.ParseFlags(a)
 	if err == flag.ErrHelp {
 		c.Help()
@@ -432,19 +452,40 @@ func (c *Command) execute(a []string) (err error) {
 		c.Usage()
 		r.SetOutput(out)
 		return err
-	} else {
-		// If help is called, regardless of other flags, we print that.
-		// Print help also if c.Run is nil.
-		if c.helpFlagVal || !c.Runnable() {
-			c.Help()
-			return nil
-		}
-
-		c.preRun()
-		argWoFlags := c.Flags().Args()
-		c.Run(c, argWoFlags)
+	}
+	// If help is called, regardless of other flags, we print that.
+	// Print help also if c.Run is nil.
+	if c.helpFlagVal || !c.Runnable() {
+		c.Help()
 		return nil
 	}
+
+	c.preRun()
+	argWoFlags := c.Flags().Args()
+
+	for p := c; p != nil; p = p.Parent() {
+		if p.PersistentPreRun != nil {
+			p.PersistentPreRun(c, argWoFlags)
+			break
+		}
+	}
+	if c.PreRun != nil {
+		c.PreRun(c, argWoFlags)
+	}
+
+	c.Run(c, argWoFlags)
+
+	if c.PostRun != nil {
+		c.PostRun(c, argWoFlags)
+	}
+	for p := c; p != nil; p = p.Parent() {
+		if p.PersistentPostRun != nil {
+			p.PersistentPostRun(c, argWoFlags)
+			break
+		}
+	}
+
+	return nil
 }
 
 func (c *Command) preRun() {
@@ -495,20 +536,9 @@ func (c *Command) Execute() (err error) {
 		args = c.args
 	}
 
-	if len(args) == 0 {
-		// Only the executable is called and the root is runnable, run it
-		if c.Runnable() {
-			err = c.execute([]string(nil))
-		} else {
-			c.Help()
-		}
-	} else {
-		cmd, flags, e := c.Find(args)
-		if e != nil {
-			err = e
-		} else {
-			err = cmd.execute(flags)
-		}
+	cmd, flags, err := c.Find(args)
+	if err == nil {
+		err = cmd.execute(flags)
 	}
 
 	if err != nil {
@@ -535,7 +565,9 @@ func (c *Command) initHelp() {
 			Short: "Help about any command",
 			Long: `Help provides help for any command in the application.
     Simply type ` + c.Name() + ` help [path to command] for full details.`,
-			Run: c.HelpFunc(),
+			Run:               c.HelpFunc(),
+			PersistentPreRun:  func(cmd *Command, args []string) {},
+			PersistentPostRun: func(cmd *Command, args []string) {},
 		}
 	}
 	c.AddCommand(c.helpCommand)
@@ -948,6 +980,13 @@ func (c *Command) mergePersistentFlags() {
 		c.PersistentFlags().VisitAll(addtolocal)
 	}
 	rmerge = func(x *Command) {
+		if !x.HasParent() {
+			flag.CommandLine.VisitAll(func(f *flag.Flag) {
+				if x.PersistentFlags().Lookup(f.Name) == nil {
+					x.PersistentFlags().AddFlag(f)
+				}
+			})
+		}
 		if x.HasPersistentFlags() {
 			x.PersistentFlags().VisitAll(func(f *flag.Flag) {
 				if c.Flags().Lookup(f.Name) == nil {

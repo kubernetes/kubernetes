@@ -85,6 +85,9 @@ func GenMarkdown(cmd *Command, out *bytes.Buffer) {
 		sort.Sort(byName(children))
 
 		for _, child := range children {
+			if len(child.Deprecated) > 0 {
+				continue
+			}
 			cname := name + " " + child.Name()
 			link := cname + ".md"
 			link = strings.Replace(link, " ", "_", -1)
