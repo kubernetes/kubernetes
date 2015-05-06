@@ -531,6 +531,25 @@ func (r *GetWithOptionsRESTStorage) NewGetOptions() (runtime.Object, bool, strin
 
 var _ rest.GetterWithOptions = &GetWithOptionsRESTStorage{}
 
+type NamedCreaterRESTStorage struct {
+	*SimpleRESTStorage
+	createdName string
+}
+
+func (storage *NamedCreaterRESTStorage) Create(ctx api.Context, name string, obj runtime.Object) (runtime.Object, error) {
+	storage.checkContext(ctx)
+	storage.created = obj.(*Simple)
+	storage.createdName = name
+	if err := storage.errors["create"]; err != nil {
+		return nil, err
+	}
+	var err error
+	if storage.injectedFunction != nil {
+		obj, err = storage.injectedFunction(obj)
+	}
+	return obj, err
+}
+
 func extractBody(response *http.Response, object runtime.Object) (string, error) {
 	defer response.Body.Close()
 	body, err := ioutil.ReadAll(response.Body)
@@ -1807,6 +1826,32 @@ func TestCreateChecksDecode(t *testing.T) {
 	}
 	if b, _ := ioutil.ReadAll(response.Body); !strings.Contains(string(b), "must be of type Simple") {
 		t.Errorf("unexpected response: %s", string(b))
+	}
+}
+
+func TestCreateWithName(t *testing.T) {
+	pathName := "helloworld"
+	storage := &NamedCreaterRESTStorage{SimpleRESTStorage: &SimpleRESTStorage{}}
+	handler := handle(map[string]rest.Storage{"simple/sub": storage})
+	server := httptest.NewServer(handler)
+	defer server.Close()
+	client := http.Client{}
+
+	simple := &Simple{Other: "foo"}
+	data, _ := codec.Encode(simple)
+	request, err := http.NewRequest("POST", server.URL+"/api/version/simple/"+pathName+"/sub", bytes.NewBuffer(data))
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	response, err := client.Do(request)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if response.StatusCode != http.StatusCreated {
+		t.Errorf("Unexpected response %#v", response)
+	}
+	if storage.createdName != pathName {
+		t.Errorf("Did not get expected name in create context. Got: %s, Expected: %s", storage.createdName, pathName)
 	}
 }
 
