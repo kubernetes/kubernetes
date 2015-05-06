@@ -1209,6 +1209,10 @@ func (kl *Kubelet) killUnwantedPods(desiredPods map[types.UID]empty,
 	defer close(ch)
 	numWorkers := 0
 	for _, pod := range runningPods {
+		if pod.Name == kubeletTypes.DefaultK8sPodName || pod.Name == kubeletTypes.DefaultAlienPodName {
+			// Filter out unknown pods.
+			continue
+		}
 		if _, found := desiredPods[pod.ID]; found {
 			// Per-pod workers will handle the desired pods.
 			continue

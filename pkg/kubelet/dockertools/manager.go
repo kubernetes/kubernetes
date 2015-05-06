@@ -102,6 +102,12 @@ type DockerManager struct {
 
 	// Hooks injected into the container runtime.
 	runtimeHooks kubecontainer.RuntimeHooks
+
+	// UID of the pod grouping all un-identified kubernetes containers.
+	k8sPodUID types.UID
+
+	// UID of the pod grouping all containers that are not managed by kubelet.
+	alienPodUID types.UID
 }
 
 func NewDockerManager(
@@ -167,6 +173,9 @@ func NewDockerManager(
 	}
 	dm.runner = lifecycle.NewHandlerRunner(httpClient, dm, dm)
 	dm.prober = prober.New(dm, readinessManager, containerRefManager, recorder)
+
+	dm.k8sPodUID = util.NewUUID()
+	dm.alienPodUID = util.NewUUID()
 
 	return dm
 }
@@ -684,25 +693,54 @@ func (dm *DockerManager) GetPods(all bool) ([]*kubecontainer.Pod, error) {
 	pods := make(map[types.UID]*kubecontainer.Pod)
 	var result []*kubecontainer.Pod
 
-	containers, err := GetKubeletDockerContainers(dm.client, all)
+	k8sContainers, alienContainers, err := getContainerLists(dm.client, all)
 	if err != nil {
 		return nil, err
 	}
 
-	// Group containers by pod.
-	for _, c := range containers {
+	// Group k8s containers by pod.
+	for _, c := range k8sContainers {
+		if c == nil {
+			continue
+		}
+
 		converted, err := toRuntimeContainer(c)
 		if err != nil {
-			glog.Errorf("Error examining the container: %v", err)
-			continue
+			glog.V(4).Infof("Error examining the container: %v", err)
+			converted, err = unknownToRuntimeContainer(c)
+			if err != nil {
+				glog.Errorf("Error examining the container: %v", err)
+				continue
+			}
 		}
 
 		podUID, podName, podNamespace, err := getPodInfoFromContainer(c)
 		if err != nil {
+			glog.V(4).Infof("Error examining the container: %v", err)
+			podUID, podName, podNamespace = dm.k8sPodUID, kubeletTypes.DefaultK8sPodName, ""
+		}
+
+		pod, found := pods[podUID]
+		if !found {
+			pod = &kubecontainer.Pod{
+				ID:        podUID,
+				Name:      podName,
+				Namespace: podNamespace,
+			}
+			pods[podUID] = pod
+		}
+		pod.Containers = append(pod.Containers, converted)
+	}
+
+	// Group alien containers to one pod.
+	for _, c := range alienContainers {
+		converted, err := unknownToRuntimeContainer(c)
+		if err != nil {
 			glog.Errorf("Error examining the container: %v", err)
 			continue
 		}
 
+		podUID, podName, podNamespace := dm.alienPodUID, kubeletTypes.DefaultAlienPodName, ""
 		pod, found := pods[podUID]
 		if !found {
 			pod = &kubecontainer.Pod{

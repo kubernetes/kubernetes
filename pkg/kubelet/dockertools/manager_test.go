@@ -27,8 +27,8 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
 	kubecontainer "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/network"
 	kubeprober "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/prober"
+	kubeletTypes "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/probe"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/types"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
@@ -183,6 +183,60 @@ func TestGetPods(t *testing.T) {
 			ID:         types.UID("5678"),
 			Name:       "jlk",
 			Namespace:  "wen",
+			Containers: []*kubecontainer.Container{containers[2]},
+		},
+	}
+
+	fakeDocker.ContainerList = dockerContainers
+	actual, err := manager.GetPods(false)
+	if err != nil {
+		t.Fatalf("unexpected error %v", err)
+	}
+	if !verifyPods(expected, actual) {
+		t.Errorf("expected %#v, got %#v", expected, actual)
+	}
+}
+
+func TestGetUnknownPods(t *testing.T) {
+	manager, fakeDocker := NewSimpleFakeDockerManager()
+	dockerContainers := []docker.APIContainers{
+		{
+			// Misformatted name.
+			ID:    "1111",
+			Names: []string{"/k8s_foo"},
+		},
+		{
+			// Misformatted name.
+			ID:    "2222",
+			Names: []string{"/k8s_bar_qux_1232"},
+		},
+		{
+			// Non-kubelet-managed container.
+			ID:    "3333",
+			Names: []string{"/i_am_a_user_container"},
+		},
+	}
+
+	// Convert the docker containers. This does not affect the test coverage
+	// because the conversion is tested separately in convert_test.go
+	containers := make([]*kubecontainer.Container, len(dockerContainers))
+	for i := range containers {
+		c, err := unknownToRuntimeContainer(&dockerContainers[i])
+		if err != nil {
+			t.Fatalf("unexpected error %v", err)
+		}
+		containers[i] = c
+	}
+
+	expected := []*kubecontainer.Pod{
+		{
+			ID:         manager.k8sPodUID,
+			Name:       kubeletTypes.DefaultK8sPodName,
+			Containers: []*kubecontainer.Container{containers[0], containers[1]},
+		},
+		{
+			ID:         manager.alienPodUID,
+			Name:       kubeletTypes.DefaultAlienPodName,
 			Containers: []*kubecontainer.Container{containers[2]},
 		},
 	}
