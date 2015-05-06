@@ -867,7 +867,7 @@ func TestSyncPodsDeletesWithNoPodInfraContainer(t *testing.T) {
 		// Get pod status.
 		"list", "inspect_container",
 		// Kill the container since pod infra container is not running.
-		"stop",
+		"inspect_container", "stop",
 		// Create pod infra container.
 		"create", "start", "inspect_container",
 		// Create container.
@@ -933,7 +933,7 @@ func TestSyncPodsDeletesWhenSourcesAreReady(t *testing.T) {
 	if err := kubelet.SyncPods([]*api.Pod{}, emptyPodUIDs, map[string]*api.Pod{}, time.Now()); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	verifyCalls(t, fakeDocker, []string{"list", "stop", "stop", "list"})
+	verifyCalls(t, fakeDocker, []string{"list", "inspect_container", "stop", "inspect_container", "stop", "list"})
 
 	// A map iteration is used to delete containers, so must not depend on
 	// order here.
@@ -976,7 +976,7 @@ func TestSyncPodsDeletes(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	verifyCalls(t, fakeDocker, []string{"list", "stop", "stop", "list"})
+	verifyCalls(t, fakeDocker, []string{"list", "inspect_container", "stop", "inspect_container", "stop", "list"})
 
 	// A map iteration is used to delete containers, so must not depend on
 	// order here.
@@ -1062,7 +1062,7 @@ func TestSyncPodsDeletesDuplicate(t *testing.T) {
 		// Check the pod infra container.
 		"inspect_container",
 		// Kill the duplicated container.
-		"stop",
+		"inspect_container", "stop",
 		// Get pod status.
 		"list", "inspect_container", "inspect_container", "inspect_container",
 		// Get pods for deleting orphaned volumes.
@@ -1135,7 +1135,7 @@ func TestSyncPodsBadHash(t *testing.T) {
 		// Check the pod infra container.
 		"inspect_container",
 		// Kill and restart the bad hash container.
-		"stop", "create", "start",
+		"inspect_container", "stop", "create", "start",
 		// Get pod status.
 		"list", "inspect_container", "inspect_container", "inspect_container",
 		// Get pods for deleting orphaned volumes.
@@ -1211,7 +1211,7 @@ func TestSyncPodsUnhealthy(t *testing.T) {
 		// Check the pod infra container.
 		"inspect_container",
 		// Kill the unhealthy container.
-		"stop",
+		"inspect_container", "stop",
 		// Restart the unhealthy container.
 		"create", "start",
 		// Get pod status.
@@ -1736,7 +1736,7 @@ func TestSyncPodEventHandlerFails(t *testing.T) {
 		// Create the container.
 		"create", "start",
 		// Kill the container since event handler fails.
-		"stop",
+		"inspect_container", "stop",
 		// Get pod status.
 		"list", "inspect_container", "inspect_container",
 		// Get pods for deleting orphaned volumes.
@@ -3981,7 +3981,7 @@ func TestSyncPodsWithRestartPolicy(t *testing.T) {
 				// Check the pod infra container.
 				"inspect_container",
 				// Stop the last pod infra container.
-				"stop",
+				"inspect_container", "stop",
 				// Get pod status.
 				"list", "inspect_container", "inspect_container", "inspect_container",
 				// Get pods for deleting orphaned volumes.

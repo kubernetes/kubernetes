@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/testapi"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/record"
 	kubecontainer "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/container"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/network"
@@ -37,7 +38,7 @@ import (
 )
 
 func newTestDockerManager() (*DockerManager, *FakeDockerClient) {
-	fakeDocker := &FakeDockerClient{Errors: make(map[string]error), RemovedImages: util.StringSet{}}
+	fakeDocker := &FakeDockerClient{VersionInfo: docker.Env{"Version=1.1.3", "ApiVersion=1.15"}, Errors: make(map[string]error), RemovedImages: util.StringSet{}}
 	fakeRecorder := &record.FakeRecorder{}
 	readinessManager := kubecontainer.NewReadinessManager()
 	containerRefManager := kubecontainer.NewRefManager()
@@ -295,6 +296,75 @@ func TestKillContainerInPod(t *testing.T) {
 	}
 	if ready := manager.readinessManager.GetReadiness(containerToSpare.ID); !ready {
 		t.Errorf("exepcted container entry ID '%v' to be found. states: %+v", containerToSpare.ID, ready)
+	}
+}
+
+func TestKillContainerInPodWithPreStop(t *testing.T) {
+	manager, fakeDocker := newTestDockerManager()
+	fakeDocker.ExecInspect = &docker.ExecInspect{
+		Running:  false,
+		ExitCode: 0,
+	}
+	expectedCmd := []string{"foo.sh", "bar"}
+	pod := &api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			UID:       "12345678",
+			Name:      "qux",
+			Namespace: "new",
+		},
+		Spec: api.PodSpec{
+			Containers: []api.Container{
+				{
+					Name: "foo",
+					Lifecycle: &api.Lifecycle{
+						PreStop: &api.Handler{
+							Exec: &api.ExecAction{
+								Command: expectedCmd,
+							},
+						},
+					},
+				},
+				{Name: "bar"}}},
+	}
+	podString, err := testapi.Codec().Encode(pod)
+	if err != nil {
+		t.Errorf("unexpected error: %v")
+	}
+	containers := []docker.APIContainers{
+		{
+			ID:    "1111",
+			Names: []string{"/k8s_foo_qux_new_1234_42"},
+		},
+		{
+			ID:    "2222",
+			Names: []string{"/k8s_bar_qux_new_1234_42"},
+		},
+	}
+	containerToKill := &containers[0]
+	fakeDocker.ContainerList = containers
+	fakeDocker.Container = &docker.Container{
+		Config: &docker.Config{
+			Labels: map[string]string{
+				kubernetesPodLabel:       string(podString),
+				kubernetesContainerLabel: "foo",
+			},
+		},
+	}
+	// Set all containers to ready.
+	for _, c := range fakeDocker.ContainerList {
+		manager.readinessManager.SetReadiness(c.ID, true)
+	}
+
+	if err := manager.KillContainerInPod(pod.Spec.Containers[0], pod); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	// Assert the container has been stopped.
+	if err := fakeDocker.AssertStopped([]string{containerToKill.ID}); err != nil {
+		t.Errorf("container was not stopped correctly: %v", err)
+	}
+	verifyCalls(t, fakeDocker, []string{"list", "inspect_container", "create_exec", "start_exec", "stop"})
+	if !reflect.DeepEqual(expectedCmd, fakeDocker.execCmd) {
+		t.Errorf("expected: %v, got %v", expectedCmd, fakeDocker.execCmd)
 	}
 }
 
