@@ -50,6 +50,12 @@ type Authorizer interface {
 	Authorize(a Attributes) (err error)
 }
 
+type AuthorizerFunc func(a Attributes) error
+
+func (f AuthorizerFunc) Authorize(a Attributes) error {
+	return f(a)
+}
+
 // AttributesRecord implements Attributes interface.
 type AttributesRecord struct {
 	User      user.Info
