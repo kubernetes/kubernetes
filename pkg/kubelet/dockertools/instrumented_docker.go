@@ -133,7 +133,7 @@ func (in instrumentedDockerInterface) Version() (*docker.Env, error) {
 func (in instrumentedDockerInterface) Info() (*docker.Env, error) {
 	start := time.Now()
 	defer func() {
-		metrics.DockerOperationsLatency.WithLabelValues("version").Observe(metrics.SinceInMicroseconds(start))
+		metrics.DockerOperationsLatency.WithLabelValues("info").Observe(metrics.SinceInMicroseconds(start))
 	}()
 	return in.client.Info()
 }
