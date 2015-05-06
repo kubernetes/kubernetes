@@ -182,7 +182,6 @@ else
     --volume=/sys:/sys:ro \
     --volume=/var/lib/docker/:/var/lib/docker:ro \
     --volume=/var/lib/kubelet/:/var/lib/kubelet:rw \
-    --volume=/tmp/kubelet.log:/tmp/kubelet.log:rw \
     --net=host \
     --privileged=true \
     -i \
