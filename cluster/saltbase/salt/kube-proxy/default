@@ -5,7 +5,8 @@
 {# TODO(azure-maintainer): add support for distributing kubeconfig with token to kube-proxy #}
 {# so it can use https #}
 {% if grains['cloud'] is defined and grains['cloud'] == 'azure' -%}
-  {% set api_servers = "--master=http://" + ips[0][0] + ":7080" -%}
+  {% set api_servers = "--master=http://" + ips[0][0] -%}
+  {% set api_servers_with_port = api_servers + ":7080" -%}
   {% set kubeconfig = "" -%}
 {% else -%}
   {% set kubeconfig = "--kubeconfig=/var/lib/kube-proxy/kubeconfig" -%}
@@ -15,5 +16,13 @@
     {% set ips = salt['mine.get']('roles:kubernetes-master', 'network.ip_addrs', 'grain').values() -%}
     {% set api_servers = "--master=https://" + ips[0][0] -%}
   {% endif -%}
+
+  # TODO: remove nginx for other cloud providers.
+  {% if grains['cloud'] is defined and grains.cloud in [ 'aws', 'gce' ]  %}
+     {% set api_servers_with_port = api_servers -%}
+  {% else -%}
+    {% set api_servers_with_port = api_servers + ":6443" -%}
+  {% endif -%}
+
 {% endif -%}
-DAEMON_ARGS="{{daemon_args}} {{api_servers}} {{kubeconfig}} {{pillar['log_level']}}"
+DAEMON_ARGS="{{daemon_args}} {{api_servers_with_port}} {{kubeconfig}} {{pillar['log_level']}}"
