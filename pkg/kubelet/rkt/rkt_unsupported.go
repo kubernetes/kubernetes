@@ -34,6 +34,14 @@ var _ kubecontainer.Runtime = &unsupportedRuntime{}
 
 var unsupportedError = fmt.Errorf("rkt runtime is unsupported in this platform")
 
+func New(config *Config,
+	generator kubecontainer.RunContainerOptionsGenerator,
+	recorder record.EventRecorder,
+	containerRefManager *kubecontainer.RefManager,
+	readinessManager *kubecontainer.ReadinessManager) (kubecontainer.Runtime, error) {
+	return nil, unsupportedError
+}
+
 func (ur *unsupportedRuntime) Version() (kubecontainer.Version, error) {
 	return nil, unsupportedError
 }
