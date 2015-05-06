@@ -49,21 +49,6 @@
 			"Rev": "c0ef4539dfab4d21c8ef20ba2924f9fc6f186d35"
 		},
 		{
-			"ImportPath": "github.com/appc/spec/aci",
-			"Comment": "v0.5.1-55-g87808a3",
-			"Rev": "87808a37061a4a2e6204ccea5fd2fc930576db94"
-		},
-		{
-			"ImportPath": "github.com/appc/spec/pkg/acirenderer",
-			"Comment": "v0.5.1-55-g87808a3",
-			"Rev": "87808a37061a4a2e6204ccea5fd2fc930576db94"
-		},
-		{
-			"ImportPath": "github.com/appc/spec/pkg/tarheader",
-			"Comment": "v0.5.1-55-g87808a3",
-			"Rev": "87808a37061a4a2e6204ccea5fd2fc930576db94"
-		},
-		{
 			"ImportPath": "github.com/appc/spec/schema",
 			"Comment": "v0.5.1-55-g87808a3",
 			"Rev": "87808a37061a4a2e6204ccea5fd2fc930576db94"
@@ -73,23 +58,9 @@
 			"Rev": "b965b613227fddccbfffe13eae360ed3fa822f8d"
 		},
 		{
-			"ImportPath": "github.com/camlistore/lock",
-			"Rev": "ae27720f340952636b826119b58130b9c1a847a0"
-		},
-		{
 			"ImportPath": "github.com/codegangsta/negroni",
 			"Comment": "v0.1-62-g8d75e11",
 			"Rev": "8d75e11374a1928608c906fe745b538483e7aeb2"
-		},
-		{
-			"ImportPath": "github.com/coreos/etcd/etcdserver/etcdhttp/httptypes",
-			"Comment": "v2.0.4-288-g866a9d4",
-			"Rev": "866a9d4e41401657ea44bf539b2c5561d6fdcd67"
-		},
-		{
-			"ImportPath": "github.com/coreos/etcd/pkg/types",
-			"Comment": "v2.0.4-288-g866a9d4",
-			"Rev": "866a9d4e41401657ea44bf539b2c5561d6fdcd67"
 		},
 		{
 			"ImportPath": "github.com/coreos/go-etcd/etcd",
@@ -111,66 +82,9 @@
 			"Rev": "97e243d21a8e232e9d8af38ba2366dfcfceebeba"
 		},
 		{
-			"ImportPath": "github.com/coreos/rkt/pkg/aci",
-			"Comment": "v0.5.4",
-			"Rev": "c8a7050a883653266137ae05f6e8f166db52eb67"
-		},
-		{
-			"ImportPath": "github.com/coreos/rkt/pkg/lock",
-			"Comment": "v0.5.4",
-			"Rev": "c8a7050a883653266137ae05f6e8f166db52eb67"
-		},
-		{
-			"ImportPath": "github.com/coreos/rkt/pkg/sys",
-			"Comment": "v0.5.4",
-			"Rev": "c8a7050a883653266137ae05f6e8f166db52eb67"
-		},
-		{
-			"ImportPath": "github.com/coreos/rkt/pkg/tar",
-			"Comment": "v0.5.4",
-			"Rev": "c8a7050a883653266137ae05f6e8f166db52eb67"
-		},
-		{
-			"ImportPath": "github.com/coreos/rkt/store",
-			"Comment": "v0.5.4",
-			"Rev": "c8a7050a883653266137ae05f6e8f166db52eb67"
-		},
-		{
 			"ImportPath": "github.com/cpuguy83/go-md2man/mangen",
 			"Comment": "v1.0.2-5-g2831f11",
 			"Rev": "2831f11f66ff4008f10e2cd7ed9a85e3d3fc2bed"
-		},
-		{
-			"ImportPath": "github.com/cznic/bufs",
-			"Rev": "3dcccbd7064a1689f9c093a988ea11ac00e21f51"
-		},
-		{
-			"ImportPath": "github.com/cznic/exp/lldb",
-			"Rev": "9b0e4be12fbdb7b843e0a658a04c35d160371789"
-		},
-		{
-			"ImportPath": "github.com/cznic/fileutil",
-			"Rev": "21ae57c9dce724a15e88bd9cd46d5668f3e880a5"
-		},
-		{
-			"ImportPath": "github.com/cznic/mathutil",
-			"Rev": "250d0b9d3304c5ea0c4cfc7d9efc7ee528b81f3b"
-		},
-		{
-			"ImportPath": "github.com/cznic/ql",
-			"Rev": "fc1b91b82089d3f132fbed8a7c9f349c3133eb96"
-		},
-		{
-			"ImportPath": "github.com/cznic/sortutil",
-			"Rev": "d4401851b4c370f979b842fa1e45e0b3b718b391"
-		},
-		{
-			"ImportPath": "github.com/cznic/strutil",
-			"Rev": "97bc31f80ac4c9fa9c5dc5fea74c383858988ea2"
-		},
-		{
-			"ImportPath": "github.com/cznic/zappy",
-			"Rev": "47331054e4f96186e3ff772877c0443909368a45"
 		},
 		{
 			"ImportPath": "github.com/davecgh/go-spew/spew",
@@ -432,14 +346,6 @@
 			"Rev": "8adf9e1730c55cdc590de7d49766cb2acc88d8f2"
 		},
 		{
-			"ImportPath": "github.com/petar/GoLLRB/llrb",
-			"Rev": "53be0d36a84c2a886ca057d34b6aa4468df9ccb4"
-		},
-		{
-			"ImportPath": "github.com/peterbourgon/diskv",
-			"Rev": "508f5671a72eeaef05cf8c24abe7fbc1c07faf69"
-		},
-		{
 			"ImportPath": "github.com/prometheus/client_golang/model",
 			"Comment": "0.4.0-1-g692492e",
 			"Rev": "692492e54b553a81013254cc1fba4b6dd76fad30"
@@ -518,14 +424,6 @@
 			"ImportPath": "github.com/xyproto/simpleredis",
 			"Comment": "v1.0-13-g5292687",
 			"Rev": "5292687f5379e01054407da44d7c4590a61fd3de"
-		},
-		{
-			"ImportPath": "golang.org/x/crypto/cast5",
-			"Rev": "a7ead6ddf06233883deca151dffaef2effbf498f"
-		},
-		{
-			"ImportPath": "golang.org/x/crypto/openpgp",
-			"Rev": "a7ead6ddf06233883deca151dffaef2effbf498f"
 		},
 		{
 			"ImportPath": "golang.org/x/crypto/ssh",
