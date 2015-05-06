@@ -38,7 +38,8 @@ func New(config *Config,
 	generator kubecontainer.RunContainerOptionsGenerator,
 	recorder record.EventRecorder,
 	containerRefManager *kubecontainer.RefManager,
-	readinessManager *kubecontainer.ReadinessManager) (kubecontainer.Runtime, error) {
+	readinessManager *kubecontainer.ReadinessManager,
+	volumeGetter volumeGetter) (kubecontainer.Runtime, error) {
 	return nil, unsupportedError
 }
 
