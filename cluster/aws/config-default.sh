@@ -43,7 +43,9 @@ MINION_SCOPES=""
 POLL_SLEEP_INTERVAL=3
 PORTAL_NET="10.0.0.0/16"
 MASTER_IP_RANGE="${MASTER_IP_RANGE:-10.246.0.0/24}"
-
+# If set to Elastic IP, master instance will be associated with this IP.
+# Otherwise new Elastic IP will be aquired
+MASTER_RESERVED_IP="${MASTER_RESERVED_IP:-}"
 
 # When set to true, Docker Cache is enabled by default as part of the cluster bring up.
 ENABLE_DOCKER_REGISTRY_CACHE=true

@@ -365,6 +365,34 @@ function wait-for-instance-running {
   done
 }
 
+function allocate-elastic-ip {
+  $AWS_CMD allocate-address --domain vpc --output text | cut -f3
+}
+
+function assign-ip-to-instance {
+  local ip_address=$1
+  local instance_id=$2
+  local elastic_ip_allocation_id=$($AWS_CMD describe-addresses --public-ips $ip_address --output text | cut -f2)
+  $AWS_CMD associate-address --instance-id $master_instance_id --allocation-id $elastic_ip_allocation_id > /dev/null
+  local association_result=$?
+
+  if [[ $association_result -eq 0 ]]; then
+    echo $ip_address
+  fi
+}
+
+function assign-elastic-ip {
+  local assigned_public_ip=$1
+  local master_instance_id=$2
+
+  if [[ -n $MASTER_RESERVED_IP ]]; then
+    assign-ip-to-instance $MASTER_RESERVED_IP $master_instance_id
+  else
+    assign-ip-to-instance $(allocate-elastic-ip) $master_instance_id
+  fi
+}
+
+
 function kube-up {
   find-release-tars
   upload-server-tars
@@ -505,7 +533,7 @@ function kube-up {
       fi
     else
       KUBE_MASTER=${MASTER_NAME}
-      KUBE_MASTER_IP=${ip}
+      KUBE_MASTER_IP=$(assign-elastic-ip $ip $master_id)
       echo -e " ${color_green}[master running @${KUBE_MASTER_IP}]${color_norm}"
 
       # We are not able to add a route to the instance until that instance is in "running" state.
