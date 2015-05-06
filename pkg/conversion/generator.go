@@ -64,6 +64,8 @@ func (g *generator) GenerateConversionsForType(version string, reflection reflec
 }
 
 func (g *generator) generateConversionsBetween(inType, outType reflect.Type) error {
+	existingConversion := g.scheme.Converter().HasConversionFunc(inType, outType) && g.scheme.Converter().HasConversionFunc(outType, inType)
+
 	// Avoid processing the same type multiple times.
 	if value, found := g.convertibles[inType]; found {
 		if value != outType {
@@ -79,19 +81,50 @@ func (g *generator) generateConversionsBetween(inType, outType reflect.Type) err
 	if inType.Kind() != outType.Kind() {
 		return fmt.Errorf("cannot convert types of different kinds: %v %v", inType, outType)
 	}
+	// We should be able to generate conversions both sides.
 	switch inType.Kind() {
 	case reflect.Map:
-		return g.generateConversionsForMap(inType, outType)
-	case reflect.Ptr:
-		return g.generateConversionsBetween(inType.Elem(), outType.Elem())
-	case reflect.Slice:
-		return g.generateConversionsForSlice(inType, outType)
-	case reflect.Interface:
-		// TODO(wojtek-t): Currently we rely on default conversion functions for interfaces.
-		// Add support for reflect.Interface.
+		inErr := g.generateConversionsForMap(inType, outType)
+		outErr := g.generateConversionsForMap(outType, inType)
+		if !existingConversion && (inErr != nil || outErr != nil) {
+			return inErr
+		}
+		// We don't add it to g.convertibles - maps should be handled correctly
+		// inside appropriate conversion functions.
 		return nil
+	case reflect.Ptr:
+		inErr := g.generateConversionsBetween(inType.Elem(), outType.Elem())
+		outErr := g.generateConversionsBetween(outType.Elem(), inType.Elem())
+		if !existingConversion && (inErr != nil || outErr != nil) {
+			return inErr
+		}
+		// We don't add it to g.convertibles - maps should be handled correctly
+		// inside appropriate conversion functions.
+		return nil
+	case reflect.Slice:
+		inErr := g.generateConversionsForSlice(inType, outType)
+		outErr := g.generateConversionsForSlice(outType, inType)
+		if !existingConversion && (inErr != nil || outErr != nil) {
+			return inErr
+		}
+		// We don't add it to g.convertibles - slices should be handled correctly
+		// inside appropriate conversion functions.
+		return nil
+	case reflect.Interface:
+		// TODO(wojtek-t): Currently we don't support converting interfaces.
+		return fmt.Errorf("interfaces are not supported")
 	case reflect.Struct:
-		return g.generateConversionsForStruct(inType, outType)
+		inErr := g.generateConversionsForStruct(inType, outType)
+		outErr := g.generateConversionsForStruct(outType, inType)
+		if !existingConversion && (inErr != nil || outErr != nil) {
+			return inErr
+		}
+		if !existingConversion {
+			if _, found := g.convertibles[outType]; !found {
+				g.convertibles[inType] = outType
+			}
+		}
+		return nil
 	default:
 		// All simple types should be handled correctly with default conversion.
 		return nil
@@ -119,8 +152,6 @@ func (g *generator) generateConversionsForMap(inType, outType reflect.Type) erro
 	if err := g.generateConversionsBetween(inValue, outValue); err != nil {
 		return err
 	}
-	// We don't add it to g.convertibles - maps should be handled correctly
-	// inside appropriate conversion functions.
 	return nil
 }
 
@@ -130,8 +161,6 @@ func (g *generator) generateConversionsForSlice(inType, outType reflect.Type) er
 	if err := g.generateConversionsBetween(inElem, outElem); err != nil {
 		return err
 	}
-	// We don't add it to g.convertibles - slices should be handled correctly
-	// inside appropriate conversion functions.
 	return nil
 }
 
@@ -151,7 +180,6 @@ func (g *generator) generateConversionsForStruct(inType, outType reflect.Type) e
 			}
 		}
 	}
-	g.convertibles[inType] = outType
 	return nil
 }
 
@@ -476,6 +504,22 @@ func (g *generator) writeConversionForStruct(w io.Writer, inType, outType reflec
 	for i := 0; i < inType.NumField(); i++ {
 		inField := inType.Field(i)
 		outField, _ := outType.FieldByName(inField.Name)
+
+		if g.scheme.Converter().HasConversionFunc(inField.Type, outField.Type) {
+			// Use the conversion method that is already defined.
+			assignFormat := "if err := s.Convert(&in.%s, &out.%s, 0); err != nil {\n"
+			assignStmt := fmt.Sprintf(assignFormat, inField.Name, outField.Name)
+			if err := writeLine(w, indent, assignStmt); err != nil {
+				return err
+			}
+			if err := writeLine(w, indent+1, "return err\n"); err != nil {
+				return err
+			}
+			if err := writeLine(w, indent, "}\n"); err != nil {
+				return err
+			}
+			continue
+		}
 
 		switch inField.Type.Kind() {
 		case reflect.Map, reflect.Ptr, reflect.Slice, reflect.Interface, reflect.Struct:

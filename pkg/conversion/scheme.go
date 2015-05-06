@@ -259,7 +259,12 @@ func (s *Scheme) AddConversionFuncs(conversionFuncs ...interface{}) error {
 // Similar to AddConversionFuncs, but registers conversion functions that were
 // automatically generated.
 func (s *Scheme) AddGeneratedConversionFuncs(conversionFuncs ...interface{}) error {
-	return s.AddConversionFuncs(conversionFuncs...)
+	for _, f := range conversionFuncs {
+		if err := s.converter.RegisterGeneratedConversionFunc(f); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // AddStructFieldConversion allows you to specify a mechanical copy for a moved
