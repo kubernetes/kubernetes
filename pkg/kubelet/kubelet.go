@@ -193,10 +193,6 @@ func NewMainKubelet(
 	if err != nil {
 		return nil, err
 	}
-	imageManager, err := newImageManager(dockerClient, cadvisorInterface, recorder, nodeRef, imageGCPolicy)
-	if err != nil {
-		return nil, fmt.Errorf("failed to initialize image manager: %v", err)
-	}
 	statusManager := newStatusManager(kubeClient)
 	readinessManager := kubecontainer.NewReadinessManager()
 	containerRefManager := kubecontainer.NewRefManager()
@@ -227,7 +223,6 @@ func NewMainKubelet(
 		recorder:                       recorder,
 		cadvisor:                       cadvisorInterface,
 		containerGC:                    containerGC,
-		imageManager:                   imageManager,
 		statusManager:                  statusManager,
 		volumeManager:                  volumeManager,
 		cloud:                          cloud,
@@ -286,6 +281,12 @@ func NewMainKubelet(
 		return nil, fmt.Errorf("timed out waiting for %q to come up: %v", containerRuntime, err)
 	}
 	klet.lastTimestampRuntimeUp = time.Now()
+
+	imageManager, err := newImageManager(klet.containerRuntime, cadvisorInterface, recorder, nodeRef, imageGCPolicy)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize image manager: %v", err)
+	}
+	klet.imageManager = imageManager
 
 	klet.runner = klet.containerRuntime
 	klet.podManager = newBasicPodManager(klet.kubeClient)

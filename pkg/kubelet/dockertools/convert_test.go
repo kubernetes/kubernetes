@@ -72,9 +72,9 @@ func TestUnknownToRuntimeContainer(t *testing.T) {
 
 func TestToRuntimeImage(t *testing.T) {
 	original := &docker.APIImages{
-		ID:       "aeeea",
-		RepoTags: []string{"abc", "def"},
-		Size:     1234,
+		ID:          "aeeea",
+		RepoTags:    []string{"abc", "def"},
+		VirtualSize: 1234,
 	}
 	expected := &kubecontainer.Image{
 		ID:   "aeeea",

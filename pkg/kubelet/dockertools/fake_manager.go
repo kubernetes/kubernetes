@@ -22,6 +22,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/network"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/prober"
 	kubeletTypes "github.com/GoogleCloudPlatform/kubernetes/pkg/kubelet/types"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 )
 
 func NewFakeDockerManager(
@@ -44,4 +45,26 @@ func NewFakeDockerManager(
 	dm.Puller = &FakeDockerPuller{}
 	dm.prober = prober.New(nil, readinessManager, containerRefManager, recorder)
 	return dm
+}
+
+func NewSimpleFakeDockerManager() (*DockerManager, *FakeDockerClient) {
+	fakeDocker := &FakeDockerClient{Errors: make(map[string]error), RemovedImages: util.StringSet{}}
+	fakeRecorder := &record.FakeRecorder{}
+	readinessManager := kubecontainer.NewReadinessManager()
+	containerRefManager := kubecontainer.NewRefManager()
+	networkPlugin, _ := network.InitNetworkPlugin([]network.NetworkPlugin{}, "", network.NewFakeHost(nil))
+	dockerManager := NewFakeDockerManager(
+		fakeDocker,
+		fakeRecorder,
+		readinessManager,
+		containerRefManager,
+		PodInfraContainerImage,
+		0, 0, "",
+		kubecontainer.FakeOS{},
+		networkPlugin,
+		nil,
+		nil,
+		nil)
+
+	return dockerManager, fakeDocker
 }

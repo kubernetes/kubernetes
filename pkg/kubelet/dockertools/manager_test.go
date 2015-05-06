@@ -36,28 +36,6 @@ import (
 	"github.com/fsouza/go-dockerclient"
 )
 
-func newTestDockerManager() (*DockerManager, *FakeDockerClient) {
-	fakeDocker := &FakeDockerClient{Errors: make(map[string]error), RemovedImages: util.StringSet{}}
-	fakeRecorder := &record.FakeRecorder{}
-	readinessManager := kubecontainer.NewReadinessManager()
-	containerRefManager := kubecontainer.NewRefManager()
-	networkPlugin, _ := network.InitNetworkPlugin([]network.NetworkPlugin{}, "", network.NewFakeHost(nil))
-	dockerManager := NewFakeDockerManager(
-		fakeDocker,
-		fakeRecorder,
-		readinessManager,
-		containerRefManager,
-		PodInfraContainerImage,
-		0, 0, "",
-		kubecontainer.FakeOS{},
-		networkPlugin,
-		nil,
-		nil,
-		nil)
-
-	return dockerManager, fakeDocker
-}
-
 func TestSetEntrypointAndCommand(t *testing.T) {
 	cases := []struct {
 		name      string
@@ -145,7 +123,7 @@ func verifyPods(a, b []*kubecontainer.Pod) bool {
 }
 
 func TestGetPods(t *testing.T) {
-	manager, fakeDocker := newTestDockerManager()
+	manager, fakeDocker := NewSimpleFakeDockerManager()
 	dockerContainers := []docker.APIContainers{
 		{
 			ID:    "1111",
@@ -252,7 +230,7 @@ func TestGetUnknownPods(t *testing.T) {
 }
 
 func TestListImages(t *testing.T) {
-	manager, fakeDocker := newTestDockerManager()
+	manager, fakeDocker := NewSimpleFakeDockerManager()
 	dockerImages := []docker.APIImages{{ID: "1111"}, {ID: "2222"}, {ID: "3333"}}
 	expected := util.NewStringSet([]string{"1111", "2222", "3333"}...)
 
@@ -307,7 +285,7 @@ func dockerContainersToPod(containers DockerContainers) kubecontainer.Pod {
 }
 
 func TestKillContainerInPod(t *testing.T) {
-	manager, fakeDocker := newTestDockerManager()
+	manager, fakeDocker := NewSimpleFakeDockerManager()
 
 	pod := &api.Pod{
 		ObjectMeta: api.ObjectMeta{
@@ -353,7 +331,7 @@ func TestKillContainerInPod(t *testing.T) {
 }
 
 func TestKillContainerInPodWithError(t *testing.T) {
-	manager, fakeDocker := newTestDockerManager()
+	manager, fakeDocker := NewSimpleFakeDockerManager()
 
 	pod := &api.Pod{
 		ObjectMeta: api.ObjectMeta{
@@ -428,7 +406,7 @@ func replaceProber(dm *DockerManager, result probe.Result, err error) {
 // Unknown or error.
 //
 func TestProbeContainer(t *testing.T) {
-	manager, _ := newTestDockerManager()
+	manager, _ := NewSimpleFakeDockerManager()
 	dc := &docker.APIContainers{
 		ID:      "foobar",
 		Created: time.Now().Unix(),
