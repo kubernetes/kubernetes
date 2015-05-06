@@ -17,6 +17,7 @@ limitations under the License.
 package gce_cloud
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -42,6 +43,10 @@ import (
 	"google.golang.org/cloud/compute/metadata"
 )
 
+var ErrMetadataConflict = errors.New("Metadata already set at the same key")
+
+const podCIDRMetadataKey string = "node-ip-range"
+
 // GCECloud is an implementation of Interface, TCPLoadBalancer and Instances for Google Compute Engine.
 type GCECloud struct {
 	service          *compute.Service
@@ -49,6 +54,9 @@ type GCECloud struct {
 	projectID        string
 	zone             string
 	instanceID       string
+
+	// We assume here that nodes and master are in the same network. TODO(cjcullen) Fix it.
+	networkName string
 
 	// Used for accessing the metadata server
 	metadataAccess func(string) (string, error)
@@ -113,6 +121,18 @@ func getInstanceID() (string, error) {
 	return parts[0], nil
 }
 
+func getNetworkName() (string, error) {
+	result, err := metadata.Get("instance/network-interfaces/0/network")
+	if err != nil {
+		return "", err
+	}
+	parts := strings.Split(result, "/")
+	if len(parts) != 4 {
+		return "", fmt.Errorf("unexpected response: %s", result)
+	}
+	return parts[3], nil
+}
+
 // newGCECloud creates a new instance of GCECloud.
 func newGCECloud(config io.Reader) (*GCECloud, error) {
 	projectID, zone, err := getProjectAndZone()
@@ -123,6 +143,10 @@ func newGCECloud(config io.Reader) (*GCECloud, error) {
 	// e.g. on a user's machine (not VM) somewhere, we need to have an alternative for
 	// instance id lookup.
 	instanceID, err := getInstanceID()
+	if err != nil {
+		return nil, err
+	}
+	networkName, err := getNetworkName()
 	if err != nil {
 		return nil, err
 	}
@@ -152,6 +176,7 @@ func newGCECloud(config io.Reader) (*GCECloud, error) {
 		projectID:        projectID,
 		zone:             zone,
 		instanceID:       instanceID,
+		networkName:      networkName,
 		metadataAccess:   getMetadata,
 	}, nil
 }
@@ -217,12 +242,13 @@ func (gce *GCECloud) targetPoolURL(name, region string) string {
 	return fmt.Sprintf("https://www.googleapis.com/compute/v1/projects/%s/regions/%s/targetPools/%s", gce.projectID, region, name)
 }
 
-func (gce *GCECloud) waitForRegionOp(op *compute.Operation, region string) error {
+func waitForOp(op *compute.Operation, getOperation func() (*compute.Operation, error)) error {
 	pollOp := op
 	for pollOp.Status != "DONE" {
 		var err error
+		// TODO: add some backoff here.
 		time.Sleep(time.Second)
-		pollOp, err = gce.service.RegionOperations.Get(gce.projectID, region, op.Name).Do()
+		pollOp, err = getOperation()
 		if err != nil {
 			return err
 		}
@@ -234,6 +260,25 @@ func (gce *GCECloud) waitForRegionOp(op *compute.Operation, region string) error
 		}
 	}
 	return nil
+
+}
+
+func (gce *GCECloud) waitForGlobalOp(op *compute.Operation) error {
+	return waitForOp(op, func() (*compute.Operation, error) {
+		return gce.service.GlobalOperations.Get(gce.projectID, op.Name).Do()
+	})
+}
+
+func (gce *GCECloud) waitForRegionOp(op *compute.Operation, region string) error {
+	return waitForOp(op, func() (*compute.Operation, error) {
+		return gce.service.RegionOperations.Get(gce.projectID, region, op.Name).Do()
+	})
+}
+
+func (gce *GCECloud) waitForZoneOp(op *compute.Operation) error {
+	return waitForOp(op, func() (*compute.Operation, error) {
+		return gce.service.ZoneOperations.Get(gce.projectID, gce.zone, op.Name).Do()
+	})
 }
 
 // GetTCPLoadBalancer is an implementation of TCPLoadBalancer.GetTCPLoadBalancer
@@ -504,6 +549,67 @@ func (gce *GCECloud) GetNodeResources(name string) (*api.NodeResources, error) {
 		glog.Errorf("unknown machine: %s", res.MachineType)
 		return nil, nil
 	}
+}
+
+func getMetadataValue(metadata *compute.Metadata, key string) (string, bool) {
+	for _, item := range metadata.Items {
+		if item.Key == key {
+			return item.Value, true
+		}
+	}
+	return "", false
+}
+
+func (gce *GCECloud) Configure(name string, spec *api.NodeSpec) error {
+	instanceName := canonicalizeInstanceName(name)
+	instance, err := gce.service.Instances.Get(gce.projectID, gce.zone, instanceName).Do()
+	if err != nil {
+		return err
+	}
+	if currentValue, ok := getMetadataValue(instance.Metadata, podCIDRMetadataKey); ok {
+		if currentValue == spec.PodCIDR {
+			// IP range already set to proper value.
+			return nil
+		}
+		return ErrMetadataConflict
+	}
+	// We are setting the metadata, so they can be picked-up by the configure-vm.sh script to start docker with the given CIDR for Pods.
+	instance.Metadata.Items = append(instance.Metadata.Items,
+		&compute.MetadataItems{
+			Key:   podCIDRMetadataKey,
+			Value: spec.PodCIDR,
+		})
+	setMetadataCall := gce.service.Instances.SetMetadata(gce.projectID, gce.zone, instanceName, instance.Metadata)
+	setMetadataOp, err := setMetadataCall.Do()
+	if err != nil {
+		return err
+	}
+	err = gce.waitForZoneOp(setMetadataOp)
+	if err != nil {
+		return err
+	}
+	insertCall := gce.service.Routes.Insert(gce.projectID, &compute.Route{
+		Name:            instanceName,
+		DestRange:       spec.PodCIDR,
+		NextHopInstance: fmt.Sprintf("zones/%s/instances/%s", gce.zone, instanceName),
+		Network:         fmt.Sprintf("global/networks/%s", gce.networkName),
+		Priority:        1000,
+	})
+	insertOp, err := insertCall.Do()
+	if err != nil {
+		return err
+	}
+	return gce.waitForGlobalOp(insertOp)
+}
+
+func (gce *GCECloud) Release(name string) error {
+	instanceName := canonicalizeInstanceName(name)
+	deleteCall := gce.service.Routes.Delete(gce.projectID, instanceName)
+	deleteOp, err := deleteCall.Do()
+	if err != nil {
+		return err
+	}
+	return gce.waitForGlobalOp(deleteOp)
 }
 
 func (gce *GCECloud) GetZone() (cloudprovider.Zone, error) {
