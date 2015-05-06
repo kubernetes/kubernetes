@@ -68,6 +68,38 @@ func convert_api_Binding_To_v1beta3_Binding(in *newer.Binding, out *Binding, s c
 	return nil
 }
 
+func convert_api_Capabilities_To_v1beta3_Capabilities(in *newer.Capabilities, out *Capabilities, s conversion.Scope) error {
+	if in.Add != nil {
+		out.Add = make([]CapabilityType, len(in.Add))
+		for i := range in.Add {
+			out.Add[i] = CapabilityType(in.Add[i])
+		}
+	}
+	if in.Drop != nil {
+		out.Drop = make([]CapabilityType, len(in.Drop))
+		for i := range in.Drop {
+			out.Drop[i] = CapabilityType(in.Drop[i])
+		}
+	}
+	return nil
+}
+
+func convert_v1beta3_Capabilities_To_api_Capabilities(in *Capabilities, out *newer.Capabilities, s conversion.Scope) error {
+	if in.Add != nil {
+		out.Add = make([]newer.CapabilityType, len(in.Add))
+		for i := range in.Add {
+			out.Add[i] = newer.CapabilityType(in.Add[i])
+		}
+	}
+	if in.Drop != nil {
+		out.Drop = make([]newer.CapabilityType, len(in.Drop))
+		for i := range in.Drop {
+			out.Drop[i] = newer.CapabilityType(in.Drop[i])
+		}
+	}
+	return nil
+}
+
 func convert_v1beta3_ComponentCondition_To_api_ComponentCondition(in *ComponentCondition, out *newer.ComponentCondition, s conversion.Scope) error {
 	out.Type = newer.ComponentConditionType(in.Type)
 	out.Status = newer.ConditionStatus(in.Status)
@@ -900,6 +932,32 @@ func convert_api_LimitRangeSpec_To_v1beta3_LimitRangeSpec(in *newer.LimitRangeSp
 	return nil
 }
 
+func convert_v1beta3_List_To_api_List(in *List, out *newer.List, s conversion.Scope) error {
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
+		return err
+	}
+	if err := s.Convert(&in.ListMeta, &out.ListMeta, 0); err != nil {
+		return err
+	}
+	if err := s.Convert(&in.Items, &out.Items, 0); err != nil {
+		return err
+	}
+	return nil
+}
+
+func convert_api_List_To_v1beta3_List(in *newer.List, out *List, s conversion.Scope) error {
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
+		return err
+	}
+	if err := s.Convert(&in.ListMeta, &out.ListMeta, 0); err != nil {
+		return err
+	}
+	if err := s.Convert(&in.Items, &out.Items, 0); err != nil {
+		return err
+	}
+	return nil
+}
+
 func convert_v1beta3_ListMeta_To_api_ListMeta(in *ListMeta, out *newer.ListMeta, s conversion.Scope) error {
 	out.SelfLink = in.SelfLink
 	out.ResourceVersion = in.ResourceVersion
@@ -1644,6 +1702,38 @@ func convert_api_PersistentVolumeStatus_To_v1beta3_PersistentVolumeStatus(in *ne
 	return nil
 }
 
+func convert_v1beta3_Pod_To_api_Pod(in *Pod, out *newer.Pod, s conversion.Scope) error {
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
+		return err
+	}
+	if err := s.Convert(&in.ObjectMeta, &out.ObjectMeta, 0); err != nil {
+		return err
+	}
+	if err := s.Convert(&in.Spec, &out.Spec, 0); err != nil {
+		return err
+	}
+	if err := s.Convert(&in.Status, &out.Status, 0); err != nil {
+		return err
+	}
+	return nil
+}
+
+func convert_api_Pod_To_v1beta3_Pod(in *newer.Pod, out *Pod, s conversion.Scope) error {
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
+		return err
+	}
+	if err := s.Convert(&in.ObjectMeta, &out.ObjectMeta, 0); err != nil {
+		return err
+	}
+	if err := s.Convert(&in.Spec, &out.Spec, 0); err != nil {
+		return err
+	}
+	if err := s.Convert(&in.Status, &out.Status, 0); err != nil {
+		return err
+	}
+	return nil
+}
+
 func convert_v1beta3_PodCondition_To_api_PodCondition(in *PodCondition, out *newer.PodCondition, s conversion.Scope) error {
 	out.Type = newer.PodConditionType(in.Type)
 	out.Status = newer.ConditionStatus(in.Status)
@@ -1692,6 +1782,42 @@ func convert_api_PodExecOptions_To_v1beta3_PodExecOptions(in *newer.PodExecOptio
 	return nil
 }
 
+func convert_v1beta3_PodList_To_api_PodList(in *PodList, out *newer.PodList, s conversion.Scope) error {
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
+		return err
+	}
+	if err := s.Convert(&in.ListMeta, &out.ListMeta, 0); err != nil {
+		return err
+	}
+	if in.Items != nil {
+		out.Items = make([]newer.Pod, len(in.Items))
+		for i := range in.Items {
+			if err := s.Convert(&in.Items[i], &out.Items[i], 0); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func convert_api_PodList_To_v1beta3_PodList(in *newer.PodList, out *PodList, s conversion.Scope) error {
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
+		return err
+	}
+	if err := s.Convert(&in.ListMeta, &out.ListMeta, 0); err != nil {
+		return err
+	}
+	if in.Items != nil {
+		out.Items = make([]Pod, len(in.Items))
+		for i := range in.Items {
+			if err := s.Convert(&in.Items[i], &out.Items[i], 0); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
 func convert_v1beta3_PodLogOptions_To_api_PodLogOptions(in *PodLogOptions, out *newer.PodLogOptions, s conversion.Scope) error {
 	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 		return err
@@ -1723,6 +1849,74 @@ func convert_api_PodProxyOptions_To_v1beta3_PodProxyOptions(in *newer.PodProxyOp
 		return err
 	}
 	out.Path = in.Path
+	return nil
+}
+
+func convert_v1beta3_PodSpec_To_api_PodSpec(in *PodSpec, out *newer.PodSpec, s conversion.Scope) error {
+	if in.Volumes != nil {
+		out.Volumes = make([]newer.Volume, len(in.Volumes))
+		for i := range in.Volumes {
+			if err := s.Convert(&in.Volumes[i], &out.Volumes[i], 0); err != nil {
+				return err
+			}
+		}
+	}
+	if in.Containers != nil {
+		out.Containers = make([]newer.Container, len(in.Containers))
+		for i := range in.Containers {
+			if err := s.Convert(&in.Containers[i], &out.Containers[i], 0); err != nil {
+				return err
+			}
+		}
+	}
+	out.RestartPolicy = newer.RestartPolicy(in.RestartPolicy)
+	if in.TerminationGracePeriodSeconds != nil {
+		out.TerminationGracePeriodSeconds = new(int64)
+		*out.TerminationGracePeriodSeconds = *in.TerminationGracePeriodSeconds
+	}
+	out.DNSPolicy = newer.DNSPolicy(in.DNSPolicy)
+	if in.NodeSelector != nil {
+		out.NodeSelector = make(map[string]string)
+		for key, val := range in.NodeSelector {
+			out.NodeSelector[key] = val
+		}
+	}
+	out.Host = in.Host
+	out.HostNetwork = in.HostNetwork
+	return nil
+}
+
+func convert_api_PodSpec_To_v1beta3_PodSpec(in *newer.PodSpec, out *PodSpec, s conversion.Scope) error {
+	if in.Volumes != nil {
+		out.Volumes = make([]Volume, len(in.Volumes))
+		for i := range in.Volumes {
+			if err := s.Convert(&in.Volumes[i], &out.Volumes[i], 0); err != nil {
+				return err
+			}
+		}
+	}
+	if in.Containers != nil {
+		out.Containers = make([]Container, len(in.Containers))
+		for i := range in.Containers {
+			if err := s.Convert(&in.Containers[i], &out.Containers[i], 0); err != nil {
+				return err
+			}
+		}
+	}
+	out.RestartPolicy = RestartPolicy(in.RestartPolicy)
+	if in.TerminationGracePeriodSeconds != nil {
+		out.TerminationGracePeriodSeconds = new(int64)
+		*out.TerminationGracePeriodSeconds = *in.TerminationGracePeriodSeconds
+	}
+	out.DNSPolicy = DNSPolicy(in.DNSPolicy)
+	if in.NodeSelector != nil {
+		out.NodeSelector = make(map[string]string)
+		for key, val := range in.NodeSelector {
+			out.NodeSelector[key] = val
+		}
+	}
+	out.Host = in.Host
+	out.HostNetwork = in.HostNetwork
 	return nil
 }
 
@@ -1800,6 +1994,88 @@ func convert_api_PodStatusResult_To_v1beta3_PodStatusResult(in *newer.PodStatusR
 	return nil
 }
 
+func convert_v1beta3_PodTemplate_To_api_PodTemplate(in *PodTemplate, out *newer.PodTemplate, s conversion.Scope) error {
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
+		return err
+	}
+	if err := s.Convert(&in.ObjectMeta, &out.ObjectMeta, 0); err != nil {
+		return err
+	}
+	if err := s.Convert(&in.Template, &out.Template, 0); err != nil {
+		return err
+	}
+	return nil
+}
+
+func convert_api_PodTemplate_To_v1beta3_PodTemplate(in *newer.PodTemplate, out *PodTemplate, s conversion.Scope) error {
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
+		return err
+	}
+	if err := s.Convert(&in.ObjectMeta, &out.ObjectMeta, 0); err != nil {
+		return err
+	}
+	if err := s.Convert(&in.Template, &out.Template, 0); err != nil {
+		return err
+	}
+	return nil
+}
+
+func convert_v1beta3_PodTemplateList_To_api_PodTemplateList(in *PodTemplateList, out *newer.PodTemplateList, s conversion.Scope) error {
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
+		return err
+	}
+	if err := s.Convert(&in.ListMeta, &out.ListMeta, 0); err != nil {
+		return err
+	}
+	if in.Items != nil {
+		out.Items = make([]newer.PodTemplate, len(in.Items))
+		for i := range in.Items {
+			if err := s.Convert(&in.Items[i], &out.Items[i], 0); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func convert_api_PodTemplateList_To_v1beta3_PodTemplateList(in *newer.PodTemplateList, out *PodTemplateList, s conversion.Scope) error {
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
+		return err
+	}
+	if err := s.Convert(&in.ListMeta, &out.ListMeta, 0); err != nil {
+		return err
+	}
+	if in.Items != nil {
+		out.Items = make([]PodTemplate, len(in.Items))
+		for i := range in.Items {
+			if err := s.Convert(&in.Items[i], &out.Items[i], 0); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func convert_v1beta3_PodTemplateSpec_To_api_PodTemplateSpec(in *PodTemplateSpec, out *newer.PodTemplateSpec, s conversion.Scope) error {
+	if err := s.Convert(&in.ObjectMeta, &out.ObjectMeta, 0); err != nil {
+		return err
+	}
+	if err := s.Convert(&in.Spec, &out.Spec, 0); err != nil {
+		return err
+	}
+	return nil
+}
+
+func convert_api_PodTemplateSpec_To_v1beta3_PodTemplateSpec(in *newer.PodTemplateSpec, out *PodTemplateSpec, s conversion.Scope) error {
+	if err := s.Convert(&in.ObjectMeta, &out.ObjectMeta, 0); err != nil {
+		return err
+	}
+	if err := s.Convert(&in.Spec, &out.Spec, 0); err != nil {
+		return err
+	}
+	return nil
+}
+
 func convert_v1beta3_Probe_To_api_Probe(in *Probe, out *newer.Probe, s conversion.Scope) error {
 	if err := s.Convert(&in.Handler, &out.Handler, 0); err != nil {
 		return err
@@ -1815,6 +2091,118 @@ func convert_api_Probe_To_v1beta3_Probe(in *newer.Probe, out *Probe, s conversio
 	}
 	out.InitialDelaySeconds = in.InitialDelaySeconds
 	out.TimeoutSeconds = in.TimeoutSeconds
+	return nil
+}
+
+func convert_v1beta3_ReplicationController_To_api_ReplicationController(in *ReplicationController, out *newer.ReplicationController, s conversion.Scope) error {
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
+		return err
+	}
+	if err := s.Convert(&in.ObjectMeta, &out.ObjectMeta, 0); err != nil {
+		return err
+	}
+	if err := s.Convert(&in.Spec, &out.Spec, 0); err != nil {
+		return err
+	}
+	if err := s.Convert(&in.Status, &out.Status, 0); err != nil {
+		return err
+	}
+	return nil
+}
+
+func convert_api_ReplicationController_To_v1beta3_ReplicationController(in *newer.ReplicationController, out *ReplicationController, s conversion.Scope) error {
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
+		return err
+	}
+	if err := s.Convert(&in.ObjectMeta, &out.ObjectMeta, 0); err != nil {
+		return err
+	}
+	if err := s.Convert(&in.Spec, &out.Spec, 0); err != nil {
+		return err
+	}
+	if err := s.Convert(&in.Status, &out.Status, 0); err != nil {
+		return err
+	}
+	return nil
+}
+
+func convert_v1beta3_ReplicationControllerList_To_api_ReplicationControllerList(in *ReplicationControllerList, out *newer.ReplicationControllerList, s conversion.Scope) error {
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
+		return err
+	}
+	if err := s.Convert(&in.ListMeta, &out.ListMeta, 0); err != nil {
+		return err
+	}
+	if in.Items != nil {
+		out.Items = make([]newer.ReplicationController, len(in.Items))
+		for i := range in.Items {
+			if err := s.Convert(&in.Items[i], &out.Items[i], 0); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func convert_api_ReplicationControllerList_To_v1beta3_ReplicationControllerList(in *newer.ReplicationControllerList, out *ReplicationControllerList, s conversion.Scope) error {
+	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
+		return err
+	}
+	if err := s.Convert(&in.ListMeta, &out.ListMeta, 0); err != nil {
+		return err
+	}
+	if in.Items != nil {
+		out.Items = make([]ReplicationController, len(in.Items))
+		for i := range in.Items {
+			if err := s.Convert(&in.Items[i], &out.Items[i], 0); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func convert_v1beta3_ReplicationControllerSpec_To_api_ReplicationControllerSpec(in *ReplicationControllerSpec, out *newer.ReplicationControllerSpec, s conversion.Scope) error {
+	out.Replicas = in.Replicas
+	if in.Selector != nil {
+		out.Selector = make(map[string]string)
+		for key, val := range in.Selector {
+			out.Selector[key] = val
+		}
+	}
+	if err := s.Convert(&in.TemplateRef, &out.TemplateRef, 0); err != nil {
+		return err
+	}
+	if err := s.Convert(&in.Template, &out.Template, 0); err != nil {
+		return err
+	}
+	return nil
+}
+
+func convert_api_ReplicationControllerSpec_To_v1beta3_ReplicationControllerSpec(in *newer.ReplicationControllerSpec, out *ReplicationControllerSpec, s conversion.Scope) error {
+	out.Replicas = in.Replicas
+	if in.Selector != nil {
+		out.Selector = make(map[string]string)
+		for key, val := range in.Selector {
+			out.Selector[key] = val
+		}
+	}
+	if err := s.Convert(&in.TemplateRef, &out.TemplateRef, 0); err != nil {
+		return err
+	}
+	if err := s.Convert(&in.Template, &out.Template, 0); err != nil {
+		return err
+	}
+	return nil
+}
+
+func convert_v1beta3_ReplicationControllerStatus_To_api_ReplicationControllerStatus(in *ReplicationControllerStatus, out *newer.ReplicationControllerStatus, s conversion.Scope) error {
+	out.Replicas = in.Replicas
+	return nil
+}
+
+func convert_api_ReplicationControllerStatus_To_v1beta3_ReplicationControllerStatus(in *newer.ReplicationControllerStatus, out *ReplicationControllerStatus, s conversion.Scope) error {
+	out.Replicas = in.Replicas
 	return nil
 }
 
@@ -2010,6 +2398,22 @@ func convert_api_ResourceRequirements_To_v1beta3_ResourceRequirements(in *newer.
 	return nil
 }
 
+func convert_api_SELinuxOptions_To_v1beta3_SELinuxOptions(in *newer.SELinuxOptions, out *SELinuxOptions, s conversion.Scope) error {
+	out.User = in.User
+	out.Role = in.Role
+	out.Type = in.Type
+	out.Level = in.Level
+	return nil
+}
+
+func convert_v1beta3_SELinuxOptions_To_api_SELinuxOptions(in *SELinuxOptions, out *newer.SELinuxOptions, s conversion.Scope) error {
+	out.User = in.User
+	out.Role = in.Role
+	out.Type = in.Type
+	out.Level = in.Level
+	return nil
+}
+
 func convert_v1beta3_Secret_To_api_Secret(in *Secret, out *newer.Secret, s conversion.Scope) error {
 	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
 		return err
@@ -2095,6 +2499,42 @@ func convert_v1beta3_SecretVolumeSource_To_api_SecretVolumeSource(in *SecretVolu
 
 func convert_api_SecretVolumeSource_To_v1beta3_SecretVolumeSource(in *newer.SecretVolumeSource, out *SecretVolumeSource, s conversion.Scope) error {
 	out.SecretName = in.SecretName
+	return nil
+}
+
+func convert_api_SecurityContext_To_v1beta3_SecurityContext(in *newer.SecurityContext, out *SecurityContext, s conversion.Scope) error {
+	if err := s.Convert(&in.Capabilities, &out.Capabilities, 0); err != nil {
+		return err
+	}
+	if in.Privileged != nil {
+		out.Privileged = new(bool)
+		*out.Privileged = *in.Privileged
+	}
+	if err := s.Convert(&in.SELinuxOptions, &out.SELinuxOptions, 0); err != nil {
+		return err
+	}
+	if in.RunAsUser != nil {
+		out.RunAsUser = new(int64)
+		*out.RunAsUser = *in.RunAsUser
+	}
+	return nil
+}
+
+func convert_v1beta3_SecurityContext_To_api_SecurityContext(in *SecurityContext, out *newer.SecurityContext, s conversion.Scope) error {
+	if err := s.Convert(&in.Capabilities, &out.Capabilities, 0); err != nil {
+		return err
+	}
+	if in.Privileged != nil {
+		out.Privileged = new(bool)
+		*out.Privileged = *in.Privileged
+	}
+	if err := s.Convert(&in.SELinuxOptions, &out.SELinuxOptions, 0); err != nil {
+		return err
+	}
+	if in.RunAsUser != nil {
+		out.RunAsUser = new(int64)
+		*out.RunAsUser = *in.RunAsUser
+	}
 	return nil
 }
 
@@ -2476,6 +2916,7 @@ func init() {
 	err := newer.Scheme.AddGeneratedConversionFuncs(
 		convert_api_AWSElasticBlockStoreVolumeSource_To_v1beta3_AWSElasticBlockStoreVolumeSource,
 		convert_api_Binding_To_v1beta3_Binding,
+		convert_api_Capabilities_To_v1beta3_Capabilities,
 		convert_api_ComponentCondition_To_v1beta3_ComponentCondition,
 		convert_api_ComponentStatusList_To_v1beta3_ComponentStatusList,
 		convert_api_ComponentStatus_To_v1beta3_ComponentStatus,
@@ -2511,6 +2952,7 @@ func init() {
 		convert_api_LimitRangeSpec_To_v1beta3_LimitRangeSpec,
 		convert_api_LimitRange_To_v1beta3_LimitRange,
 		convert_api_ListMeta_To_v1beta3_ListMeta,
+		convert_api_List_To_v1beta3_List,
 		convert_api_NFSVolumeSource_To_v1beta3_NFSVolumeSource,
 		convert_api_NamespaceList_To_v1beta3_NamespaceList,
 		convert_api_NamespaceSpec_To_v1beta3_NamespaceSpec,
@@ -2538,19 +2980,31 @@ func init() {
 		convert_api_PersistentVolume_To_v1beta3_PersistentVolume,
 		convert_api_PodCondition_To_v1beta3_PodCondition,
 		convert_api_PodExecOptions_To_v1beta3_PodExecOptions,
+		convert_api_PodList_To_v1beta3_PodList,
 		convert_api_PodLogOptions_To_v1beta3_PodLogOptions,
 		convert_api_PodProxyOptions_To_v1beta3_PodProxyOptions,
+		convert_api_PodSpec_To_v1beta3_PodSpec,
 		convert_api_PodStatusResult_To_v1beta3_PodStatusResult,
 		convert_api_PodStatus_To_v1beta3_PodStatus,
+		convert_api_PodTemplateList_To_v1beta3_PodTemplateList,
+		convert_api_PodTemplateSpec_To_v1beta3_PodTemplateSpec,
+		convert_api_PodTemplate_To_v1beta3_PodTemplate,
+		convert_api_Pod_To_v1beta3_Pod,
 		convert_api_Probe_To_v1beta3_Probe,
+		convert_api_ReplicationControllerList_To_v1beta3_ReplicationControllerList,
+		convert_api_ReplicationControllerSpec_To_v1beta3_ReplicationControllerSpec,
+		convert_api_ReplicationControllerStatus_To_v1beta3_ReplicationControllerStatus,
+		convert_api_ReplicationController_To_v1beta3_ReplicationController,
 		convert_api_ResourceQuotaList_To_v1beta3_ResourceQuotaList,
 		convert_api_ResourceQuotaSpec_To_v1beta3_ResourceQuotaSpec,
 		convert_api_ResourceQuotaStatus_To_v1beta3_ResourceQuotaStatus,
 		convert_api_ResourceQuota_To_v1beta3_ResourceQuota,
 		convert_api_ResourceRequirements_To_v1beta3_ResourceRequirements,
+		convert_api_SELinuxOptions_To_v1beta3_SELinuxOptions,
 		convert_api_SecretList_To_v1beta3_SecretList,
 		convert_api_SecretVolumeSource_To_v1beta3_SecretVolumeSource,
 		convert_api_Secret_To_v1beta3_Secret,
+		convert_api_SecurityContext_To_v1beta3_SecurityContext,
 		convert_api_SerializedReference_To_v1beta3_SerializedReference,
 		convert_api_ServiceList_To_v1beta3_ServiceList,
 		convert_api_ServicePort_To_v1beta3_ServicePort,
@@ -2567,6 +3021,7 @@ func init() {
 		convert_api_Volume_To_v1beta3_Volume,
 		convert_v1beta3_AWSElasticBlockStoreVolumeSource_To_api_AWSElasticBlockStoreVolumeSource,
 		convert_v1beta3_Binding_To_api_Binding,
+		convert_v1beta3_Capabilities_To_api_Capabilities,
 		convert_v1beta3_ComponentCondition_To_api_ComponentCondition,
 		convert_v1beta3_ComponentStatusList_To_api_ComponentStatusList,
 		convert_v1beta3_ComponentStatus_To_api_ComponentStatus,
@@ -2602,6 +3057,7 @@ func init() {
 		convert_v1beta3_LimitRangeSpec_To_api_LimitRangeSpec,
 		convert_v1beta3_LimitRange_To_api_LimitRange,
 		convert_v1beta3_ListMeta_To_api_ListMeta,
+		convert_v1beta3_List_To_api_List,
 		convert_v1beta3_NFSVolumeSource_To_api_NFSVolumeSource,
 		convert_v1beta3_NamespaceList_To_api_NamespaceList,
 		convert_v1beta3_NamespaceSpec_To_api_NamespaceSpec,
@@ -2629,19 +3085,31 @@ func init() {
 		convert_v1beta3_PersistentVolume_To_api_PersistentVolume,
 		convert_v1beta3_PodCondition_To_api_PodCondition,
 		convert_v1beta3_PodExecOptions_To_api_PodExecOptions,
+		convert_v1beta3_PodList_To_api_PodList,
 		convert_v1beta3_PodLogOptions_To_api_PodLogOptions,
 		convert_v1beta3_PodProxyOptions_To_api_PodProxyOptions,
+		convert_v1beta3_PodSpec_To_api_PodSpec,
 		convert_v1beta3_PodStatusResult_To_api_PodStatusResult,
 		convert_v1beta3_PodStatus_To_api_PodStatus,
+		convert_v1beta3_PodTemplateList_To_api_PodTemplateList,
+		convert_v1beta3_PodTemplateSpec_To_api_PodTemplateSpec,
+		convert_v1beta3_PodTemplate_To_api_PodTemplate,
+		convert_v1beta3_Pod_To_api_Pod,
 		convert_v1beta3_Probe_To_api_Probe,
+		convert_v1beta3_ReplicationControllerList_To_api_ReplicationControllerList,
+		convert_v1beta3_ReplicationControllerSpec_To_api_ReplicationControllerSpec,
+		convert_v1beta3_ReplicationControllerStatus_To_api_ReplicationControllerStatus,
+		convert_v1beta3_ReplicationController_To_api_ReplicationController,
 		convert_v1beta3_ResourceQuotaList_To_api_ResourceQuotaList,
 		convert_v1beta3_ResourceQuotaSpec_To_api_ResourceQuotaSpec,
 		convert_v1beta3_ResourceQuotaStatus_To_api_ResourceQuotaStatus,
 		convert_v1beta3_ResourceQuota_To_api_ResourceQuota,
 		convert_v1beta3_ResourceRequirements_To_api_ResourceRequirements,
+		convert_v1beta3_SELinuxOptions_To_api_SELinuxOptions,
 		convert_v1beta3_SecretList_To_api_SecretList,
 		convert_v1beta3_SecretVolumeSource_To_api_SecretVolumeSource,
 		convert_v1beta3_Secret_To_api_Secret,
+		convert_v1beta3_SecurityContext_To_api_SecurityContext,
 		convert_v1beta3_SerializedReference_To_api_SerializedReference,
 		convert_v1beta3_ServiceList_To_api_ServiceList,
 		convert_v1beta3_ServicePort_To_api_ServicePort,
@@ -2660,26 +3128,6 @@ func init() {
 
 	// Add non-generated conversion functions
 	newer.Scheme.AddConversionFuncs(
-		convert_v1beta3_Pod_To_api_Pod,
-		convert_api_Pod_To_v1beta3_Pod,
-		convert_v1beta3_ReplicationController_To_api_ReplicationController,
-		convert_api_ReplicationController_To_v1beta3_ReplicationController,
-		convert_v1beta3_ReplicationControllerList_To_api_ReplicationControllerList,
-		convert_api_ReplicationControllerList_To_v1beta3_ReplicationControllerList,
-		convert_v1beta3_PodList_To_api_PodList,
-		convert_api_PodList_To_v1beta3_PodList,
-		convert_v1beta3_PodTemplate_To_api_PodTemplate,
-		convert_api_PodTemplate_To_v1beta3_PodTemplate,
-		convert_v1beta3_PodTemplateList_To_api_PodTemplateList,
-		convert_api_PodTemplateList_To_v1beta3_PodTemplateList,
-		convert_v1beta3_PodSpec_To_api_PodSpec,
-		convert_api_PodSpec_To_v1beta3_PodSpec,
-		convert_v1beta3_PodTemplateSpec_To_api_PodTemplateSpec,
-		convert_api_PodTemplateSpec_To_v1beta3_PodTemplateSpec,
-		convert_v1beta3_ReplicationControllerSpec_To_api_ReplicationControllerSpec,
-		convert_api_ReplicationControllerSpec_To_v1beta3_ReplicationControllerSpec,
-		convert_v1beta3_ReplicationControllerStatus_To_api_ReplicationControllerStatus,
-		convert_api_ReplicationControllerStatus_To_v1beta3_ReplicationControllerStatus,
 		convert_v1beta3_Container_To_api_Container,
 		convert_api_Container_To_v1beta3_Container,
 	)
@@ -2777,336 +3225,6 @@ func init() {
 		// If one of the conversion functions is malformed, detect it immediately.
 		panic(err)
 	}
-}
-
-func convert_v1beta3_Pod_To_api_Pod(in *Pod, out *newer.Pod, s conversion.Scope) error {
-	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
-		return err
-	}
-	if err := s.Convert(&in.ObjectMeta, &out.ObjectMeta, 0); err != nil {
-		return err
-	}
-	if err := s.Convert(&in.Spec, &out.Spec, 0); err != nil {
-		return err
-	}
-	if err := s.Convert(&in.Status, &out.Status, 0); err != nil {
-		return err
-	}
-	return nil
-}
-
-func convert_api_Pod_To_v1beta3_Pod(in *newer.Pod, out *Pod, s conversion.Scope) error {
-	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
-		return err
-	}
-	if err := s.Convert(&in.ObjectMeta, &out.ObjectMeta, 0); err != nil {
-		return err
-	}
-	if err := s.Convert(&in.Spec, &out.Spec, 0); err != nil {
-		return err
-	}
-	if err := s.Convert(&in.Status, &out.Status, 0); err != nil {
-		return err
-	}
-	return nil
-}
-
-func convert_v1beta3_ReplicationController_To_api_ReplicationController(in *ReplicationController, out *newer.ReplicationController, s conversion.Scope) error {
-	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
-		return err
-	}
-	if err := s.Convert(&in.ObjectMeta, &out.ObjectMeta, 0); err != nil {
-		return err
-	}
-	if err := s.Convert(&in.Spec, &out.Spec, 0); err != nil {
-		return err
-	}
-	if err := s.Convert(&in.Status, &out.Status, 0); err != nil {
-		return err
-	}
-	return nil
-}
-
-func convert_api_ReplicationController_To_v1beta3_ReplicationController(in *newer.ReplicationController, out *ReplicationController, s conversion.Scope) error {
-	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
-		return err
-	}
-	if err := s.Convert(&in.ObjectMeta, &out.ObjectMeta, 0); err != nil {
-		return err
-	}
-	if err := s.Convert(&in.Spec, &out.Spec, 0); err != nil {
-		return err
-	}
-	if err := s.Convert(&in.Status, &out.Status, 0); err != nil {
-		return err
-	}
-	return nil
-}
-
-func convert_v1beta3_ReplicationControllerList_To_api_ReplicationControllerList(in *ReplicationControllerList, out *newer.ReplicationControllerList, s conversion.Scope) error {
-	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
-		return err
-	}
-	if err := s.Convert(&in.ListMeta, &out.ListMeta, 0); err != nil {
-		return err
-	}
-	if in.Items != nil {
-		out.Items = make([]newer.ReplicationController, len(in.Items))
-		for i := range in.Items {
-			if err := s.Convert(&in.Items[i], &out.Items[i], 0); err != nil {
-				return err
-			}
-		}
-	}
-	return nil
-}
-
-func convert_api_ReplicationControllerList_To_v1beta3_ReplicationControllerList(in *newer.ReplicationControllerList, out *ReplicationControllerList, s conversion.Scope) error {
-	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
-		return err
-	}
-	if err := s.Convert(&in.ListMeta, &out.ListMeta, 0); err != nil {
-		return err
-	}
-	if in.Items != nil {
-		out.Items = make([]ReplicationController, len(in.Items))
-		for i := range in.Items {
-			if err := s.Convert(&in.Items[i], &out.Items[i], 0); err != nil {
-				return err
-			}
-		}
-	}
-	return nil
-}
-
-func convert_v1beta3_PodList_To_api_PodList(in *PodList, out *newer.PodList, s conversion.Scope) error {
-	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
-		return err
-	}
-	if err := s.Convert(&in.ListMeta, &out.ListMeta, 0); err != nil {
-		return err
-	}
-	if in.Items != nil {
-		out.Items = make([]newer.Pod, len(in.Items))
-		for i := range in.Items {
-			if err := s.Convert(&in.Items[i], &out.Items[i], 0); err != nil {
-				return err
-			}
-		}
-	}
-	return nil
-}
-
-func convert_api_PodList_To_v1beta3_PodList(in *newer.PodList, out *PodList, s conversion.Scope) error {
-	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
-		return err
-	}
-	if err := s.Convert(&in.ListMeta, &out.ListMeta, 0); err != nil {
-		return err
-	}
-	if in.Items != nil {
-		out.Items = make([]Pod, len(in.Items))
-		for i := range in.Items {
-			if err := s.Convert(&in.Items[i], &out.Items[i], 0); err != nil {
-				return err
-			}
-		}
-	}
-	return nil
-}
-
-func convert_v1beta3_PodTemplate_To_api_PodTemplate(in *PodTemplate, out *newer.PodTemplate, s conversion.Scope) error {
-	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
-		return err
-	}
-	if err := s.Convert(&in.ObjectMeta, &out.ObjectMeta, 0); err != nil {
-		return err
-	}
-	if err := s.Convert(&in.Template, &out.Template, 0); err != nil {
-		return err
-	}
-	return nil
-}
-
-func convert_api_PodTemplate_To_v1beta3_PodTemplate(in *newer.PodTemplate, out *PodTemplate, s conversion.Scope) error {
-	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
-		return err
-	}
-	if err := s.Convert(&in.ObjectMeta, &out.ObjectMeta, 0); err != nil {
-		return err
-	}
-	if err := s.Convert(&in.Template, &out.Template, 0); err != nil {
-		return err
-	}
-	return nil
-}
-
-func convert_v1beta3_PodTemplateList_To_api_PodTemplateList(in *PodTemplateList, out *newer.PodTemplateList, s conversion.Scope) error {
-	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
-		return err
-	}
-	if err := s.Convert(&in.ListMeta, &out.ListMeta, 0); err != nil {
-		return err
-	}
-	if in.Items != nil {
-		out.Items = make([]newer.PodTemplate, len(in.Items))
-		for i := range in.Items {
-			if err := s.Convert(&in.Items[i], &out.Items[i], 0); err != nil {
-				return err
-			}
-		}
-	}
-	return nil
-}
-
-func convert_api_PodTemplateList_To_v1beta3_PodTemplateList(in *newer.PodTemplateList, out *PodTemplateList, s conversion.Scope) error {
-	if err := s.Convert(&in.TypeMeta, &out.TypeMeta, 0); err != nil {
-		return err
-	}
-	if err := s.Convert(&in.ListMeta, &out.ListMeta, 0); err != nil {
-		return err
-	}
-	if in.Items != nil {
-		out.Items = make([]PodTemplate, len(in.Items))
-		for i := range in.Items {
-			if err := s.Convert(&in.Items[i], &out.Items[i], 0); err != nil {
-				return err
-			}
-		}
-	}
-	return nil
-}
-
-func convert_v1beta3_PodSpec_To_api_PodSpec(in *PodSpec, out *newer.PodSpec, s conversion.Scope) error {
-	if in.Volumes != nil {
-		out.Volumes = make([]newer.Volume, len(in.Volumes))
-		for i := range in.Volumes {
-			if err := s.Convert(&in.Volumes[i], &out.Volumes[i], 0); err != nil {
-				return err
-			}
-		}
-	}
-	if in.Containers != nil {
-		out.Containers = make([]newer.Container, len(in.Containers))
-		for i := range in.Containers {
-			if err := s.Convert(&in.Containers[i], &out.Containers[i], 0); err != nil {
-				return err
-			}
-		}
-	}
-	out.RestartPolicy = newer.RestartPolicy(in.RestartPolicy)
-	if in.TerminationGracePeriodSeconds != nil {
-		out.TerminationGracePeriodSeconds = new(int64)
-		*out.TerminationGracePeriodSeconds = *in.TerminationGracePeriodSeconds
-	}
-	out.DNSPolicy = newer.DNSPolicy(in.DNSPolicy)
-	if in.NodeSelector != nil {
-		out.NodeSelector = make(map[string]string)
-		for key, val := range in.NodeSelector {
-			out.NodeSelector[key] = val
-		}
-	}
-	out.Host = in.Host
-	out.HostNetwork = in.HostNetwork
-	return nil
-}
-
-func convert_api_PodSpec_To_v1beta3_PodSpec(in *newer.PodSpec, out *PodSpec, s conversion.Scope) error {
-	if in.Volumes != nil {
-		out.Volumes = make([]Volume, len(in.Volumes))
-		for i := range in.Volumes {
-			if err := s.Convert(&in.Volumes[i], &out.Volumes[i], 0); err != nil {
-				return err
-			}
-		}
-	}
-	if in.Containers != nil {
-		out.Containers = make([]Container, len(in.Containers))
-		for i := range in.Containers {
-			if err := s.Convert(&in.Containers[i], &out.Containers[i], 0); err != nil {
-				return err
-			}
-		}
-	}
-	out.RestartPolicy = RestartPolicy(in.RestartPolicy)
-	if in.TerminationGracePeriodSeconds != nil {
-		out.TerminationGracePeriodSeconds = new(int64)
-		*out.TerminationGracePeriodSeconds = *in.TerminationGracePeriodSeconds
-	}
-	out.DNSPolicy = DNSPolicy(in.DNSPolicy)
-	if in.NodeSelector != nil {
-		out.NodeSelector = make(map[string]string)
-		for key, val := range in.NodeSelector {
-			out.NodeSelector[key] = val
-		}
-	}
-	out.Host = in.Host
-	out.HostNetwork = in.HostNetwork
-	return nil
-}
-
-func convert_v1beta3_PodTemplateSpec_To_api_PodTemplateSpec(in *PodTemplateSpec, out *newer.PodTemplateSpec, s conversion.Scope) error {
-	if err := s.Convert(&in.ObjectMeta, &out.ObjectMeta, 0); err != nil {
-		return err
-	}
-	if err := s.Convert(&in.Spec, &out.Spec, 0); err != nil {
-		return err
-	}
-	return nil
-}
-
-func convert_api_PodTemplateSpec_To_v1beta3_PodTemplateSpec(in *newer.PodTemplateSpec, out *PodTemplateSpec, s conversion.Scope) error {
-	if err := s.Convert(&in.ObjectMeta, &out.ObjectMeta, 0); err != nil {
-		return err
-	}
-	if err := s.Convert(&in.Spec, &out.Spec, 0); err != nil {
-		return err
-	}
-	return nil
-}
-
-func convert_v1beta3_ReplicationControllerSpec_To_api_ReplicationControllerSpec(in *ReplicationControllerSpec, out *newer.ReplicationControllerSpec, s conversion.Scope) error {
-	out.Replicas = in.Replicas
-	if in.Selector != nil {
-		out.Selector = make(map[string]string)
-		for key, val := range in.Selector {
-			out.Selector[key] = val
-		}
-	}
-	if err := s.Convert(&in.TemplateRef, &out.TemplateRef, 0); err != nil {
-		return err
-	}
-	if err := s.Convert(&in.Template, &out.Template, 0); err != nil {
-		return err
-	}
-	return nil
-}
-
-func convert_api_ReplicationControllerSpec_To_v1beta3_ReplicationControllerSpec(in *newer.ReplicationControllerSpec, out *ReplicationControllerSpec, s conversion.Scope) error {
-	out.Replicas = in.Replicas
-	if in.Selector != nil {
-		out.Selector = make(map[string]string)
-		for key, val := range in.Selector {
-			out.Selector[key] = val
-		}
-	}
-	if err := s.Convert(&in.TemplateRef, &out.TemplateRef, 0); err != nil {
-		return err
-	}
-	if err := s.Convert(&in.Template, &out.Template, 0); err != nil {
-		return err
-	}
-	return nil
-}
-
-func convert_v1beta3_ReplicationControllerStatus_To_api_ReplicationControllerStatus(in *ReplicationControllerStatus, out *newer.ReplicationControllerStatus, s conversion.Scope) error {
-	out.Replicas = in.Replicas
-	return nil
-}
-
-func convert_api_ReplicationControllerStatus_To_v1beta3_ReplicationControllerStatus(in *newer.ReplicationControllerStatus, out *ReplicationControllerStatus, s conversion.Scope) error {
-	out.Replicas = in.Replicas
-	return nil
 }
 
 func convert_v1beta3_Container_To_api_Container(in *Container, out *newer.Container, s conversion.Scope) error {
