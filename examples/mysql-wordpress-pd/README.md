@@ -22,7 +22,13 @@ Then, set the gcloud default project name to point to the project you want to us
 gcloud config set project <project-name>
 ```
 
-Next, grab the Kubernetes [release binary](https://github.com/GoogleCloudPlatform/kubernetes/releases). You can do this via:
+Next, grab the Kubernetes [release binary](https://github.com/GoogleCloudPlatform/kubernetes/releases) and start up a Kubernetes cluster:
+```
+$ <kubernetes>/cluster/kube-up.sh
+```
+where `<kubernetes>` is the path to your Kubernetes installation.
+
+Or, as [described here](http://docs.k8s.io/getting-started-guides/gce.md), you can do this via:
 ```shell
 wget -q -O - https://get.k8s.io | bash
 ```
@@ -30,14 +36,6 @@ or
 ```shell
 curl -sS https://get.k8s.io | bash
 ```
-
-Then, start up a Kubernetes cluster as [described here](http://docs.k8s.io/getting-started-guides/gce.md).
-
-```
-$ <kubernetes>/cluster/kube-up.sh
-```
-
-where `<kubernetes>` is the path to your Kubernetes installation.
 
 ## Create two persistent disks
 
@@ -69,37 +67,38 @@ First, **edit `mysql.yaml`**, the mysql pod definition, to use a database passwo
 `mysql.yaml` looks like this:
 
 ```yaml
-apiVersion: v1beta1
-id: mysql
-desiredState:
-  manifest:
-    version: v1beta1
-    id: mysql
-    containers:
-      - name: mysql
-        image: mysql
-        env:
-          - name: MYSQL_ROOT_PASSWORD
-           # change this
-            value: yourpassword
-        cpu: 100
-        ports:
-          - containerPort: 3306
-        volumeMounts:
-            # name must match the volume name below
-          - name: mysql-persistent-storage
-            # mount path within the container
-            mountPath: /var/lib/mysql
-    volumes:
-      - name: mysql-persistent-storage
-        source:
-          persistentDisk:
-            # This GCE PD must already exist
-            pdName: mysql-disk
-            fsType: ext4
-labels:
-  name: mysql
+apiVersion: v1beta3
 kind: Pod
+metadata:
+  name: mysql
+  labels: 
+    name: mysql
+spec: 
+  containers: 
+    - resources:
+        limits :
+          cpu: 1
+      image: mysql
+      name: mysql
+      env:
+        - name: MYSQL_ROOT_PASSWORD
+          # change this
+          value: yourpassword
+      ports: 
+        - containerPort: 3306
+          name: mysql
+      volumeMounts:
+          # name must match the volume name below
+        - name: mysql-persistent-storage
+          # mount path within the container
+          mountPath: /var/lib/mysql
+  volumes:
+    - name: mysql-persistent-storage
+      gcePersistentDisk:
+        # This GCE PD must already exist.
+        pdName: mysql-disk
+        fsType: ext4
+
 ```
 
 Note that we've defined a volume mount for `/var/lib/mysql`, and specified a volume that uses the persistent disk (`mysql-disk`) that you created.
@@ -130,28 +129,26 @@ If you want to do deeper troubleshooting, e.g. if it seems a container is not st
 ### Start the Mysql service
 
 We'll define and start a [service](http://docs.k8s.io/services.md) that lets other pods access the mysql database on a known port and host.
-We will specifically name the service `mysql`.  This will let us leverage the support for [Docker-links-compatible](http://docs.k8s.io/services.md#how-do-they-work) service environment variables when we up the wordpress pod. The wordpress Docker image expects to be linked to a mysql container named `mysql`, as you can see in the "How to use this image" section on the wordpress docker hub [page](https://registry.hub.docker.com/_/wordpress/).
+We will specifically name the service `mysql`.  This will let us leverage the support for [Docker-links-compatible](http://docs.k8s.io/services.md#how-do-they-work) service environment variables when we set up the wordpress pod. The wordpress Docker image expects to be linked to a mysql container named `mysql`, as you can see in the "How to use this image" section on the wordpress docker hub [page](https://registry.hub.docker.com/_/wordpress/).
 
 So if we label our Kubernetes mysql service `mysql`, the wordpress pod will be able to use the Docker-links-compatible environment variables, defined by Kubernetes, to connect to the database.
 
 The `mysql-service.yaml` file looks like this:
 
 ```yaml
+apiVersion: v1beta3
 kind: Service
-apiVersion: v1beta1
-id: mysql
-# the port that this service should serve on
-port: 3306
-# just like the selector in the replication controller,
-# but this time it identifies the set of pods to load balance
-# traffic to.
-selector:
+metadata: 
+  labels: 
+    name: mysql
   name: mysql
-# the container on each pod to connect to, can be a name
-# (e.g. 'www') or a number (e.g. 80)
-containerPort: 3306
-labels:
-  name: mysql
+spec: 
+  ports:
+    # the port that this service should serve on
+    - port: 3306
+  # label keys and values that must match in order to receive traffic for this service
+  selector: 
+    name: mysql
 ```
 
 Start the service like this:
@@ -174,37 +171,34 @@ Once the mysql service is up, start the wordpress pod, specified in
 Note that this config file also defines a volume, this one using the `wordpress-disk` persistent disk that you created.
 
 ```yaml
-apiVersion: v1beta1
-id: wordpress
-desiredState:
-  manifest:
-    version: v1beta1
-    id: frontendController
-    containers:
-      - name: wordpress
-        image: wordpress
-        ports:
-          - containerPort: 80
-        volumeMounts:
-            # name must match the volume name below
-          - name: wordpress-persistent-storage
-            # mount path within the container
-            mountPath: /var/www/html
-        env:
-          - name: WORDPRESS_DB_PASSWORD
-            # change this - must match mysql.yaml password
-            value: yourpassword
-    volumes:
-      - name: wordpress-persistent-storage
-        source:
-          # emptyDir: {}
-          persistentDisk:
-            # This GCE PD must already exist
-            pdName: wordpress-disk
-            fsType: ext4
-labels:
-  name: wpfrontend
+apiVersion: v1beta3
 kind: Pod
+metadata:
+  name: wordpress
+  labels: 
+    name: wordpress
+spec: 
+  containers: 
+    - image: wordpress
+      name: wordpress
+      env:
+        - name: WORDPRESS_DB_PASSWORD
+          # change this - must match mysql.yaml password
+          value: yourpassword
+      ports: 
+        - containerPort: 80
+          name: wordpress
+      volumeMounts:
+          # name must match the volume name below
+        - name: wordpress-persistent-storage
+          # mount path within the container
+          mountPath: /var/www/html
+  volumes:
+    - name: wordpress-persistent-storage
+      gcePersistentDisk:
+        # This GCE PD must already exist.
+        pdName: wordpress-disk
+        fsType: ext4
 ```
 
 Create the pod:
@@ -227,26 +221,23 @@ Once the wordpress pod is running, start its service, specified by `wordpress-se
 The service config file looks like this:
 
 ```yaml
+apiVersion: v1beta3
 kind: Service
-apiVersion: v1beta1
-id: wpfrontend
-# the port that this service should serve on.
-port: 80
-# just like the selector in the replication controller,
-# but this time it identifies the set of pods to load balance
-# traffic to.
-selector:
+metadata: 
+  labels: 
+    name: wpfrontend
   name: wpfrontend
-# the container on each pod to connect to, can be a name
-# (e.g. 'www') or a number (e.g. 80)
-containerPort: 80
-labels:
-  name: wpfrontend
-createExternalLoadBalancer: true
+spec: 
+  createExternalLoadBalancer: true
+  ports:
+    # the port that this service should serve on
+    - port: 80
+  # label keys and values that must match in order to receive traffic for this service
+  selector: 
+    name: wordpress
 ```
 
 Note the `createExternalLoadBalancer` setting.  This will set up the wordpress service behind an external IP.
-`createExternalLoadBalancer` only works on GCE.
 Note also that we've set the service port to 80.  We'll return to that shortly.
 
 Start the service:
