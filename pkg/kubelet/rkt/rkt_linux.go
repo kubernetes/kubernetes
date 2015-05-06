@@ -414,7 +414,7 @@ func (r *runtime) makePodManifest(pod *api.Pod, volumeMap map[string]volume.Volu
 
 // TODO(yifan): Replace with 'rkt images'.
 func (r *runtime) getImageID(imageName string) (string, error) {
-	output, err := r.runCommand("fetch", imageName)
+	output, err := r.runCommand("fetch", dockerPrefix+imageName)
 	if err != nil {
 		return "", err
 	}
@@ -740,31 +740,32 @@ func (r *runtime) writeDockerAuthConfig(image string, creds docker.AuthConfigura
 }
 
 // PullImage invokes 'rkt fetch' to download an aci.
+// TODO(yifan): Now we only support docker images, this should be changed
+// once the format of image is landed, see:
+//
+// https://github.com/GoogleCloudPlatform/kubernetes/issues/7203
+//
 func (r *runtime) PullImage(img string) error {
-	// Use credentials for docker images. This string operation can be cleaned up
-	// once the format of image is landed, see:
-	// https://github.com/GoogleCloudPlatform/kubernetes/issues/7203
-	//
-	if strings.HasPrefix(img, dockerPrefix) {
-		repoToPull, tag := parsers.ParseRepositoryTag(img)
-		// If no tag was specified, use the default "latest".
-		if len(tag) == 0 {
-			tag = "latest"
-		}
-
-		creds, ok := r.dockerKeyring.Lookup(repoToPull)
-		if !ok {
-			glog.V(1).Infof("Pulling image %s without credentials", img)
-		}
-
-		// Let's update a json.
-		// TODO(yifan): Find a way to feed this to rkt.
-		if err := r.writeDockerAuthConfig(img, creds); err != nil {
-			return err
-		}
+	// TODO(yifan): The credential operation is a copy from dockertools package,
+	// Need to resolve the code duplication.
+	repoToPull, tag := parsers.ParseRepositoryTag(img)
+	// If no tag was specified, use the default "latest".
+	if len(tag) == 0 {
+		tag = "latest"
 	}
 
-	output, err := r.runCommand("fetch", img)
+	creds, ok := r.dockerKeyring.Lookup(repoToPull)
+	if !ok {
+		glog.V(1).Infof("Pulling image %s without credentials", img)
+	}
+
+	// Let's update a json.
+	// TODO(yifan): Find a way to feed this to rkt.
+	if err := r.writeDockerAuthConfig(img, creds); err != nil {
+		return err
+	}
+
+	output, err := r.runCommand("fetch", dockerPrefix+img)
 	if err != nil {
 		return fmt.Errorf("rkt: Failed to fetch image: %v:", output)
 	}
@@ -775,7 +776,7 @@ func (r *runtime) PullImage(img string) error {
 // TODO(yifan): 'rkt image' is now landed on master, use that once we bump up
 // the rkt version.
 func (r *runtime) IsImagePresent(img string) (bool, error) {
-	if _, err := r.runCommand("prepare", "--local=true", img); err != nil {
+	if _, err := r.runCommand("prepare", "--local=true", dockerPrefix+img); err != nil {
 		return false, nil
 	}
 	return true, nil
