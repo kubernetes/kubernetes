@@ -40,24 +40,32 @@ port 9376 and carry a label "app=MyApp".
 
 ```json
 {
-  "kind": "Service",
-  "apiVersion": "v1beta1",
-  "id": "myapp",
-  "selector": {
-    "app": "MyApp"
-  },
-  "containerPort": 9376,
-  "protocol": "TCP",
-  "port": 80
+    "kind": "Service",
+    "apiVersion": "v1beta3",
+    "metadata": {
+        "name": "my-service"
+    },
+    "selector": {
+        "app": "MyApp"
+    },
+    "spec": {
+        "ports": [
+            {
+                "protocol": "TCP",
+                "port": 80,
+                "targetPort": 9376
+            }
+        ]
+    }
 }
 ```
 
-This specification will create a new `Service` object named "myapp" which
+This specification will create a new `Service` object named "my-service" which
 targets TCP port 9376 on any `Pod` with the "app=MyApp" label.  Every `Service`
 is also assigned a virtual IP address (called the "portal IP"), which is used by
 the service proxies (see below).  The `Service`'s selector will be evaluated
 continuously and the results will be posted in an `Endpoints` object also named
-"myapp".
+"my-service".
 
 ### Services without selectors
 
@@ -73,23 +81,48 @@ abstract any kind of backend.  For example:
 In any of these scenarios you can define a service without a selector:
 
 ```json
-  "kind": "Service",
-  "apiVersion": "v1beta1",
-  "id": "myapp",
-  "port": 80
+{
+    "kind": "Service",
+    "apiVersion": "v1beta3",
+    "metadata": {
+        "name": "my-service"
+    },
+    "spec": {
+        "ports": [
+            {
+                "protocol": "TCP",
+                "port": 80,
+                "targetPort": 9376
+            }
+        ]
+    }
+}
 ```
 
-Then you can explicitly map the service to a specific endpoint(s):
+Then you can manually map the service to a specific endpoint(s):
 
 ```json
-  "kind": "Endpoints",
-  "apiVersion": "v1beta1",
-  "id": "myapp",
-  "endpoints": ["173.194.112.206:80"]
+{
+    "kind": "Endpoints",
+    "apiVersion": "v1beta3",
+    "metadata": {
+        "name": "my-service"
+    },
+    "subsets": [
+        {
+            "addresses": [
+                { "IP": "1.2.3.4" }
+            ],
+            "ports": [
+                { "port": 80 }
+            ]
+        }
+    ]
+}
 ```
 
-Accessing a `Service` without a selector works the same as if it had selector. The
-traffic will be routed to endpoints defined by the user (`173.194.112.206:80` in
+Accessing a `Service` without a selector works the same as if it had selector.
+The traffic will be routed to endpoints defined by the user (`1.2.3.4:80` in
 this example).
 
 ## Portals and service proxies
@@ -100,8 +133,9 @@ and `Endpoints` objects. For each `Service` it opens a port (random) on the
 local node.  Any connections made to that port will be proxied to one of the
 corresponding backend `Pods`.  Which backend to use is decided based on the
 AffinityPolicy of the `Service`.  Lastly, it installs iptables rules which
-capture traffic to the `Service`'s `Port` on the `Service`'s portal IP and
-redirects that traffic to the previously described port.
+capture traffic to the `Service`'s `Port` on the `Service`'s portal IP (which
+is entirely virtual) and redirects that traffic to the previously described
+port.
 
 The net result is that any traffic bound for the `Service` is proxied to an
 appropriate backend without the clients knowing anything about Kubernetes or
@@ -111,6 +145,9 @@ appropriate backend without the clients knowing anything about Kubernetes or
 
 By default, the choice of backend is random.  Client-IP-based session affinity
 can be selected by setting `service.spec.sessionAffinity` to  `"ClientIP"`.
+
+As of Kubernetes 1.0, `Service`s are a "layer 3" (TCP/UDP over IP) construct.  We do not
+yet have a concept of "layer 7" (HTTP) services.
 
 ### Why not use round-robin DNS?
 
@@ -174,19 +211,20 @@ virtual portal IP.
 
 ## Headless Services
 
-Users can create headless services by specifying "None" for the PortalIP.
-For such services, an IP or DNS is not created and neither are service-specific
-environment variables for the pods created. Additionally, the kube proxy does not
-handle these services and there is no load balancing or proxying being done by the
-platform for them. The endpoints_controller would still create endpoint records in
-etcd for such services, which are also made available via the API. These services
-also take advantage of any UI, readiness probes, etc. that are applicable for
-services in general. 
+Sometimes you don't need or want a single virtual IP.  In this case, you can
+create "headless" services by specifying "None" for the PortalIP.  For such
+services, a virtual IP is not allocated, DNS is not configured (this will be
+fixed), and service-specific environment variables for pods are not created.
+Additionally, the kube proxy does not handle these services and there is no
+load balancing or proxying done by the platform for them. The endpoints
+controller will still create endpoint records in the API for such services.
+These services also take advantage of any UI, readiness probes, etc. that are
+applicable for services in general.
 
-The tradeoff for a developer would be whether to couple to the Kubernetes API or to
-a particular discovery system. This API would not preclude the self-registration
-approach, however, and adapters for other discovery systems could be built upon this
-API, as well.
+The tradeoff for a developer would be whether to couple to the Kubernetes API
+or to a particular discovery system. Applications can still use a
+self-registration pattern and adapters for other discovery systems could be
+built upon this API, as well.
 
 ## External Services
 
@@ -195,8 +233,8 @@ Service onto an external (outside of your cluster, maybe public internet) IP
 address.
 
 On cloud providers which support external load balancers, this should be as
-simple as setting the `createExternalLoadBalancer` flag of the `Service` to
-`true`.  This sets up a cloud-specific load balancer and populates the
+simple as setting the `createExternalLoadBalancer` flag of the `Service` spec
+to `true`.  This sets up a cloud-specific load balancer and populates the
 `publicIPs` field (see below).  Traffic from the external load balancer will be
 directed at the backend `Pods`, though exactly how that works depends on the
 cloud provider.
@@ -209,19 +247,24 @@ through to the backends.  You are then responsible for ensuring that traffic to
 those IPs gets sent to one or more Kubernetes `Nodes`.  As long as the traffic
 arrives at a Node, it will be be subject to the iptables rules.
 
-An example situation might be when a `Node` has both internal and an external
-network interfaces.  If you assign that `Node`'s external IP as a `publicIP`, you
-can then aim traffic at the `Service` port on that `Node` and it will be proxied
-to the backends.
+An common situation is when a `Node` has both internal and an external network
+interfaces.  If you put that `Node`'s external IP in `publicIPs`, you can
+then aim traffic at the `Service` port on that `Node` and it will be proxied to
+the backends.  If you set all `Node`s' external IPs as `publicIPs` you can then
+reach a `Service` through any `Node`, which means you can build your own
+load-balancer or even just use DNS round-robin.  The downside to this approach
+is that all such `Service`s share a port space - only one of them can have port
+80, for example.
 
 ## Choosing your own PortalIP address
-A user can specify their own ```PortalIP``` address as part of a service creation
-request.  For example, if they already have an existing DNS entry that they wish
-to replace, or legacy systems that are configured for a specific IP address and difficult
-to re-configure.  The ```PortalIP``` address that a user chooses must be a valid IP address
-and within the portal net CIDR range that is specified by flag to the API server.  If
-the PortalIP value is invalid, the apiserver returns a ```422``` HTTP status code to
-indicate that the value is invalid.
+
+A user can specify their own `PortalIP` address as part of a service creation
+request.  For example, if they already have an existing DNS entry that they
+wish to replace, or legacy systems that are configured for a specific IP
+address and difficult to re-configure.  The `PortalIP` address that a user
+chooses must be a valid IP address and within the portal net CIDR range that is
+specified by flag to the API server.  If the PortalIP value is invalid, the
+apiserver returns a 422 HTTP status code to indicate that the value is invalid.
 
 ## Shortcomings
 
@@ -232,6 +275,7 @@ portals](https://github.com/GoogleCloudPlatform/kubernetes/issues/1107) for more
 details.
 
 Using the kube-proxy obscures the source-IP of a packet accessing a `Service`.
+This makes some kinds of firewalling impossible.
 
 ## Future work
 
@@ -243,10 +287,13 @@ portal will simply transport the packets there.
 There's a
 [proposal](https://github.com/GoogleCloudPlatform/kubernetes/issues/3760) to
 eliminate userspace proxying in favor of doing it all in iptables.  This should
-perform better, though is less flexible than arbitrary userspace code.
+perform better and fix the source-IP obfuscation, though is less flexible than
+arbitrary userspace code.
 
 We hope to make the situation around external load balancers and public IPs
 simpler and easier to comprehend.
+
+We intend to have first-class support for L7 (HTTP) `Service`s.
 
 ## The gory details of portals
 
@@ -270,7 +317,7 @@ ensure that no two `Services` can collide.  We do that by allocating each
 
 Unlike `Pod` IP addresses, which actually route to a fixed destination,
 `Service` IPs are not actually answered by a single host.  Instead, we use
-`iptables` (packet processing logic in Linux) to define "virtual" IP addresses
+`iptables` (packet processing logic in Linux) to define virtual IP addresses
 which are transparently redirected as needed.  We call the tuple of the
 `Service` IP and the `Service` port the `portal`.  When clients connect to the
 `portal`, their traffic is automatically transported to an appropriate
