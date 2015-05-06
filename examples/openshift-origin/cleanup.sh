@@ -14,21 +14,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Deletes pod, deletes secret
+# Cleans up resources from the example, assumed to be run from Kubernetes repo root
 
-set -o errexit
-set -o nounset
-set -o pipefail
-
-ORIGIN=$(dirname "${BASH_SOURCE}")
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
-
-## Delete the services
-${KUBE_ROOT}/cluster/kubectl.sh delete services origin-api
-${KUBE_ROOT}/cluster/kubectl.sh delete services origin-ui
-
-## Delete the pod
-${KUBE_ROOT}/cluster/kubectl.sh delete pods openshift
-
-## Delete the secret
-${KUBE_ROOT}/cluster/kubectl.sh delete secrets kubernetes-secret
+export OPENSHIFT_EXAMPLE=$(pwd)/examples/openshift-origin
+export OPENSHIFT_CONFIG=${OPENSHIFT_EXAMPLE}/config
+rm -fr ${OPENSHIFT_CONFIG}
+cluster/kubectl.sh delete secrets openshift-config
+cluster/kubectl.sh stop rc openshift
+cluster/kubectl.sh delete rc openshift
+cluster/kubectl.sh delete services openshift
