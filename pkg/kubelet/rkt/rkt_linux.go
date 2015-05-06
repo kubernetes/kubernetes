@@ -745,7 +745,8 @@ func (r *runtime) writeDockerAuthConfig(image string, creds docker.AuthConfigura
 //
 // https://github.com/GoogleCloudPlatform/kubernetes/issues/7203
 //
-func (r *runtime) PullImage(img string) error {
+func (r *runtime) PullImage(image kubecontainer.ImageSpec, _ []api.Secret) error {
+	img := image.Image
 	// TODO(yifan): The credential operation is a copy from dockertools package,
 	// Need to resolve the code duplication.
 	repoToPull, tag := parsers.ParseRepositoryTag(img)
@@ -775,7 +776,8 @@ func (r *runtime) PullImage(img string) error {
 // IsImagePresent returns true if the image is available on the machine.
 // TODO(yifan): 'rkt image' is now landed on master, use that once we bump up
 // the rkt version.
-func (r *runtime) IsImagePresent(img string) (bool, error) {
+func (r *runtime) IsImagePresent(image kubecontainer.ImageSpec) (bool, error) {
+	img := image.Image
 	if _, err := r.runCommand("prepare", "--local=true", dockerPrefix+img); err != nil {
 		return false, nil
 	}
@@ -786,7 +788,7 @@ func (r *runtime) ListImages() ([]kubecontainer.Image, error) {
 	return []kubecontainer.Image{}, fmt.Errorf("rkt: ListImages unimplemented")
 }
 
-func (r *runtime) RemoveImage(image string) error {
+func (r *runtime) RemoveImage(image kubecontainer.ImageSpec) error {
 	return fmt.Errorf("rkt: RemoveImages unimplemented")
 }
 
