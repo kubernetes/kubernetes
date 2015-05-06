@@ -1,6 +1,7 @@
 {% set machines = ""-%}
 {% set cluster_name = "" -%}
 {% set cluster_class_b = "" -%}
+{% set allocate_node_cidrs = "" -%}
 {% set minion_regexp = "--minion_regexp=.*" -%}
 {% set sync_nodes = "--sync_nodes=true" -%}
 
