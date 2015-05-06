@@ -56,9 +56,9 @@ Wait until Mongo is started completely and then set up Meteor:
     kubectl create -f meteor-controller.json
     kubectl create -f meteor-service.json
 
-Note that meteor-service.json creates an external load balancer, so your app should be available through the IP of that load balancer once the Meteor pods are started. On gcloud you can find the IP of your load balancer by running:
+Note that meteor-service.json creates an external load balancer, so your app should be available through the IP of that load balancer once the Meteor pods are started. You can find the IP of your load balancer by running:
 
-    gcloud compute forwarding-rules list k8s-meteor-default-meteor | grep k8s-meteor-default-meteor | awk '{print $3}'
+    kubectl get services/meteor -o template -t "{{.spec.publicIPs}}"
 
 You might have to open up port 80 if it's not open yet in your project. For example:
 
@@ -68,5 +68,4 @@ You might have to open up port 80 if it's not open yet in your project. For exam
 
 
 TODO replace the mongo image with the official mongo? https://registry.hub.docker.com/_/mongo/
-TODO use Kubernetes v1beta3 syntax?
 
