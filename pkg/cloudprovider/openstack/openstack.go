@@ -631,8 +631,8 @@ func (lb *LoadBalancer) UpdateTCPLoadBalancer(name, region string, hosts []strin
 	return nil
 }
 
-func (lb *LoadBalancer) DeleteTCPLoadBalancer(name, region string) error {
-	glog.V(4).Infof("DeleteTCPLoadBalancer(%v, %v)", name, region)
+func (lb *LoadBalancer) EnsureTCPLoadBalancerDeleted(name, region string) error {
+	glog.V(4).Infof("EnsureTCPLoadBalancerDeleted(%v, %v)", name, region)
 
 	// TODO(#8352): Because we look up the pool using the VIP object, if the VIP
 	// is already gone we can't attempt to delete the pool. We should instead

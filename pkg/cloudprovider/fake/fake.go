@@ -115,9 +115,9 @@ func (f *FakeCloud) UpdateTCPLoadBalancer(name, region string, hosts []string) e
 	return f.Err
 }
 
-// DeleteTCPLoadBalancer is a test-spy implementation of TCPLoadBalancer.DeleteTCPLoadBalancer.
+// EnsureTCPLoadBalancerDeleted is a test-spy implementation of TCPLoadBalancer.EnsureTCPLoadBalancerDeleted.
 // It adds an entry "delete" into the internal method call record.
-func (f *FakeCloud) DeleteTCPLoadBalancer(name, region string) error {
+func (f *FakeCloud) EnsureTCPLoadBalancerDeleted(name, region string) error {
 	f.addCall("delete")
 	return f.Err
 }
