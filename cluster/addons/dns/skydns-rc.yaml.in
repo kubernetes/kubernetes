@@ -48,6 +48,9 @@ spec:
         - containerPort: 53
           name: dns
           protocol: UDP
+        - containerPort: 53
+          name: dns-tcp
+          protocol: TCP
         livenessProbe:
           exec:
             command:
