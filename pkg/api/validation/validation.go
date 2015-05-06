@@ -17,6 +17,7 @@ limitations under the License.
 package validation
 
 import (
+	"encoding/json"
 	"fmt"
 	"net"
 	"path"
@@ -27,6 +28,7 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api/resource"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/capabilities"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/credentialprovider"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/util"
 	errs "github.com/GoogleCloudPlatform/kubernetes/pkg/util/fielderrors"
@@ -1287,6 +1289,16 @@ func ValidateSecret(secret *api.Secret) errs.ValidationErrorList {
 		}
 	case api.SecretTypeOpaque, "":
 		// no-op
+	case api.SecretTypeDockercfg:
+		if dockercfgBytes, exists := secret.Data[api.DockerConfigKey]; !exists {
+			allErrs = append(allErrs, errs.NewFieldRequired(fmt.Sprintf("data[%s]", api.DockerConfigKey)))
+		} else {
+			dockercfg := &credentialprovider.DockerConfig{}
+			if err := json.Unmarshal(dockercfgBytes, dockercfg); err != nil {
+				allErrs = append(allErrs, errs.NewFieldInvalid(fmt.Sprintf("data[%s]", api.DockerConfigKey), "****", err.Error()))
+			}
+		}
+
 	default:
 		// no-op
 	}
