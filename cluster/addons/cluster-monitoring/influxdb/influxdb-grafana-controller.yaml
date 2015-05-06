@@ -18,17 +18,18 @@ spec:
       containers: 
         - image: gcr.io/google_containers/heapster_influxdb:v0.3
           name: influxdb
-          ports:
+          ports: 
             - containerPort: 8083
               hostPort: 8083
             - containerPort: 8086
               hostPort: 8086
-        - name: grafana
-          image: gcr.io/google_containers/heapster_grafana:v0.7
+        - image: gcr.io/google_containers/heapster_grafana:v0.7
+          name: grafana
           env: 
-            - name: "INFLUXDB_EXTERNAL_URL"
-              value: '/api/v1beta1/proxy/services/monitoring-grafana/db/'
-            - name: "INFLUXDB_HOST"
-              value: 'monitoring-influxdb'
-            - name: "INFLUXDB_PORT"
-              value: '80'
+            - name: INFLUXDB_EXTERNAL_URL
+              value: /api/v1beta1/proxy/services/monitoring-grafana/db/
+            - name: INFLUXDB_HOST
+              value: monitoring-influxdb
+            - name: INFLUXDB_PORT
+              value: "80"
+

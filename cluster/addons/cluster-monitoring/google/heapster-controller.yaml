@@ -19,17 +19,14 @@ spec:
         - image: gcr.io/google_containers/heapster:v0.11.0
           name: heapster
           env: 
-            - name: "INFLUXDB_HOST"
-              value: "http://monitoring-influxdb"
-            - name: "SINK"
-              value: "influxdb"
-          volumeMounts:
+            - name: FLAGS
+              value: "--poll_duration=2m --stats_resolution=1m --sink=gcm --sink=gcl"
+          volumeMounts: 
             - name: ssl-certs
               mountPath: /etc/ssl/certs
               readOnly: true
-      volumes:
+      volumes: 
         - name: ssl-certs
-          source:
-            hostDir:
-              path: /etc/ssl/certs
+          hostPath: 
+            path: /etc/ssl/certs
 

@@ -651,11 +651,11 @@ function kube::release::package_salt_tarball() {
   cp -R "${KUBE_ROOT}/cluster/saltbase" "${release_stage}/"
 
   # TODO(#3579): This is a temporary hack. It gathers up the yaml,
-  # yaml.in files in cluster/addons (minus any demos) and overlays
+  # yaml.in, json files in cluster/addons (minus any demos) and overlays
   # them into kube-addons, where we expect them. (This pipeline is a
   # fancy copy, stripping anything but the files we don't want.)
   local objects
-  objects=$(cd "${KUBE_ROOT}/cluster/addons" && find . -name \*.yaml -or -name \*.yaml.in | grep -v demo)
+  objects=$(cd "${KUBE_ROOT}/cluster/addons" && find . \( -name \*.yaml -or -name \*.yaml.in -or -name \*.json \) | grep -v demo)
   tar c -C "${KUBE_ROOT}/cluster/addons" ${objects} | tar x -C "${release_stage}/saltbase/salt/kube-addons"
 
   kube::release::clean_cruft
