@@ -13,6 +13,7 @@ base:
 {% endif %}
     - helpers
     - cadvisor
+    - atop
     - kubelet
     - kube-proxy
 {% if pillar.get('enable_node_logging', '').lower() == 'true' and pillar['logging_destination'] is defined %}
@@ -37,6 +38,7 @@ base:
     - nginx
 {% endif %}
     - cadvisor
+    - atop
     - kube-client-tools
     - kube-master-addons
 {% if grains['cloud'] is defined and grains['cloud'] != 'vagrant' %}
