@@ -1,5 +1,3 @@
-// +build linux
-
 /*
 Copyright 2015 The Kubernetes Authors All rights reserved.
 
