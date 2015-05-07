@@ -92,6 +92,11 @@ export KUBE_GKE_NETWORK=${E2E_NETWORK}
 export PATH=${PATH}:/usr/local/go/bin
 export KUBE_SKIP_CONFIRMATIONS=y
 
+# E2E Control Variables
+export E2E_UP="${E2E_UP:-true}"
+export E2E_TEST="${E2E_TEST:-true}"
+export E2E_DOWN="${E2E_DOWN:-true}"
+
 if [[ ${KUBE_RUN_FROM_OUTPUT:-} =~ ^[yY]$ ]]; then
     echo "Found KUBE_RUN_FROM_OUTPUT=y; will use binaries from _output"
     cp _output/release-tars/kubernetes*.tar.gz .
@@ -142,14 +147,20 @@ fi
 export E2E_REPORT_DIR=${WORKSPACE}
 
 ### Set up ###
-go run ./hack/e2e.go ${E2E_OPT} -v --down
-go run ./hack/e2e.go ${E2E_OPT} -v --up
-go run ./hack/e2e.go -v --ctl="version --match-server-version=false"
+if [[ "${E2E_UP,,}" == "true" ]]; then
+	go run ./hack/e2e.go ${E2E_OPT} -v --down
+	go run ./hack/e2e.go ${E2E_OPT} -v --up
+	go run ./hack/e2e.go -v --ctl="version --match-server-version=false"
+fi
 
 ### Run tests ###
 # Jenkins will look at the junit*.xml files for test failures, so don't exit
 # with a nonzero error code if it was only tests that failed.
-go run ./hack/e2e.go ${E2E_OPT} -v --test --test_args="${GINKGO_TEST_ARGS}--ginkgo.noColor" || true
+if [[ "${E2E_TEST,,}" == "true" ]]; then
+	go run ./hack/e2e.go ${E2E_OPT} -v --test --test_args="${GINKGO_TEST_ARGS}--ginkgo.noColor" || true
+fi
 
 ### Clean up ###
-go run ./hack/e2e.go ${E2E_OPT} -v --down
+if [[ "${E2E_DOWN,,}" == "true" ]]; then
+	go run ./hack/e2e.go ${E2E_OPT} -v --down
+fi
