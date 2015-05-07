@@ -119,7 +119,7 @@ var _ = Describe("Density", func() {
 		It(name, func() {
 			totalPods := itArg.podsPerMinion * minionCount
 			RCName = "density" + strconv.Itoa(totalPods) + "-" + uuid
-			fileHndl, err := os.Create(fmt.Sprintf("%s/pod_states.txt", uuid))
+			fileHndl, err := os.Create(fmt.Sprintf("%s/pod_states.csv", uuid))
 			expectNoError(err)
 			defer fileHndl.Close()
 
@@ -150,7 +150,6 @@ var _ = Describe("Density", func() {
 			expectNoError(RunRC(c, RCName, ns, "gcr.io/google_containers/pause:go", totalPods, fileHndl))
 			e2eStartupTime := time.Now().Sub(startTime)
 			Logf("E2E startup time for %d pods: %v", totalPods, e2eStartupTime)
-			fmt.Fprintf(fileHndl, "E2E startup time for %d pods: %v\n", totalPods, e2eStartupTime)
 
 			By("Waiting for all events to be recorded")
 			last := -1

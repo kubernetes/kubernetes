@@ -22,6 +22,7 @@ import (
 	"io/ioutil"
 	"math"
 	"math/rand"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -97,7 +98,7 @@ func (fq *FifoQueue) Push(elem interface{}) {
 func (fq *FifoQueue) Pop() QueueItem {
 	fq.mutex.Lock()
 	var val QueueItem
-	if len(fq.list) >= fq.pos {
+	if len(fq.list)-1 >= fq.pos {
 		val = fq.list[fq.pos]
 		fq.pos++
 	}
@@ -114,7 +115,7 @@ func (fq *FifoQueue) First() QueueItem {
 }
 
 func (fq *FifoQueue) Last() QueueItem {
-	return fq.list[len(fq.list)]
+	return fq.list[len(fq.list)-1]
 }
 
 func (fq *FifoQueue) Reset() {
@@ -592,14 +593,11 @@ func RunRC(c *client.Client, name string, ns, image string, replicas int, podSta
 	failCount := 5
 	for same < failCount && current < replicas {
 		time.Sleep(2 * time.Second)
-		for item := podLists.Pop(); podLists.Len() > 0 && current < replicas; item = podLists.Pop() {
+		for podLists.Len() > 0 && current < replicas {
+			item := podLists.Pop()
 			pods := item.value.([]api.Pod)
 			current = len(pods)
-			msg := fmt.Sprintf("Controller %s: Found %d pods out of %d", name, current, replicas)
-			Logf(msg)
-			if podStatusFile != nil {
-				fmt.Fprintf(podStatusFile, "%s: %s\n", item.createTime, msg)
-			}
+			Logf("Controller %s: Found %d pods out of %d", name, current, replicas)
 			if last < current {
 				same = 0
 			} else if last == current {
@@ -618,11 +616,7 @@ func RunRC(c *client.Client, name string, ns, image string, replicas int, podSta
 	if current != replicas {
 		return fmt.Errorf("Controller %s: Only found %d replicas out of %d", name, current, replicas)
 	}
-	msg := fmt.Sprintf("Controller %s in ns %s: Found %d pods out of %d", name, ns, current, replicas)
-	Logf(msg)
-	if podStatusFile != nil {
-		fmt.Fprintf(podStatusFile, "%s: %s\n", time.Now().String(), msg)
-	}
+	Logf("Controller %s in ns %s: Found %d pods out of %d", name, ns, current, replicas)
 
 	By(fmt.Sprintf("Waiting for all %d replicas to be running with a max container failures of %d", replicas, maxContainerFailures))
 	same = 0
@@ -634,7 +628,8 @@ func RunRC(c *client.Client, name string, ns, image string, replicas int, podSta
 	foundAllPods := false
 	for same < failCount && current < replicas {
 		time.Sleep(2 * time.Second)
-		for item := podLists.Pop(); podLists.Len() > 0 && current < replicas; item = podLists.Pop() {
+		for podLists.Len() > 0 && current < replicas {
+			item := podLists.Pop()
 			current = 0
 			waiting := 0
 			pending := 0
@@ -660,10 +655,9 @@ func RunRC(c *client.Client, name string, ns, image string, replicas int, podSta
 					unknown++
 				}
 			}
-			msg := fmt.Sprintf("Pod States: %d running, %d pending, %d waiting, %d inactive, %d unknown ", current, pending, waiting, inactive, unknown)
-			Logf(msg)
+			Logf("Pod States: %d running, %d pending, %d waiting, %d inactive, %d unknown ", current, pending, waiting, inactive, unknown)
 			if podStatusFile != nil {
-				fmt.Fprintf(podStatusFile, "%s: %s\n", item.createTime, msg)
+				fmt.Fprintf(podStatusFile, "%s, %d, running, %d, pending, %d, waiting, %d, inactive, %d, unknown\n", item.createTime, current, pending, waiting, inactive, unknown)
 			}
 
 			if foundAllPods && len(currentPods) != len(oldPods) {
@@ -1033,7 +1027,9 @@ func getMetrics(c *client.Client) (string, error) {
 func getDebugInfo(c *client.Client) (map[string]string, error) {
 	data := make(map[string]string)
 	for _, key := range []string{"block", "goroutine", "heap", "threadcreate"} {
-		body, err := c.Get().AbsPath(fmt.Sprintf("/debug/pprof/%s", key)).DoRaw()
+		resp, err := http.Get(c.Get().AbsPath(fmt.Sprintf("debug/pprof/%s", key)).URL().String() + "?debug=2")
+		body, err := ioutil.ReadAll(resp.Body)
+		resp.Body.Close()
 		if err != nil {
 			Logf("Warning: Error trying to fetch %s debug data: %v", key, err)
 		}
