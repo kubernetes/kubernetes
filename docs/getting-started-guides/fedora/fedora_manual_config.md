@@ -73,7 +73,7 @@ KUBE_ETCD_SERVERS="--etcd_servers=http://127.0.0.1:4001"
 # Address range to use for services
 KUBE_SERVICE_ADDRESSES="--portal_net=10.254.0.0/16"
 
-# Add you own!
+# Add your own!
 KUBE_API_ARGS=""
 ```
 

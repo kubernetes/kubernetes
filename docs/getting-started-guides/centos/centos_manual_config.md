@@ -99,7 +99,7 @@ KUBELET_PORT="--kubelet_port=10250"
 # Address range to use for services
 KUBE_SERVICE_ADDRESSES="--portal_net=10.254.0.0/16"
 
-# Add you own!
+# Add your own!
 KUBE_API_ARGS=""
 ```
 
