@@ -1,15 +1,13 @@
+apiVersion: v1beta3
 kind: Service
-apiVersion: v1beta1
-id: mysql
-# the port that this service should serve on
-port: 3306
-# just like the selector in the replication controller,
-# but this time it identifies the set of pods to load balance
-# traffic to.
-selector:
+metadata: 
+  labels: 
+    name: mysql
   name: mysql
-# the container on each pod to connect to, can be a name
-# (e.g. 'www') or a number (e.g. 80)
-containerPort: 3306
-labels:
-  name: mysql
+spec: 
+  ports:
+    # the port that this service should serve on
+    - port: 3306
+  # label keys and values that must match in order to receive traffic for this service
+  selector: 
+    name: mysql

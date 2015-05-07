@@ -1,15 +1,14 @@
+apiVersion: v1beta3
 kind: Service
-apiVersion: v1beta1
-id: wpfrontend
-# the port that this service should serve on
-port: 80
-# identifies the set of pods to load balance
-# traffic to.
-selector:
+metadata: 
+  labels: 
+    name: wpfrontend
   name: wpfrontend
-# the container on each pod to connect to, can be a name
-# (e.g. 'www') or a number (e.g. 80)
-containerPort: 80
-labels:
-  name: wpfrontend
-createExternalLoadBalancer: true
+spec: 
+  createExternalLoadBalancer: true
+  ports:
+    # the port that this service should serve on
+    - port: 80
+  # label keys and values that must match in order to receive traffic for this service
+  selector: 
+    name: wordpress
