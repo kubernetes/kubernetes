@@ -2253,6 +2253,14 @@ func convert_v1beta3_PersistentVolumeSource_To_api_PersistentVolumeSource(in *Pe
 	} else {
 		out.Glusterfs = nil
 	}
+	if in.NFS != nil {
+		out.NFS = new(newer.NFSVolumeSource)
+		if err := convert_v1beta3_NFSVolumeSource_To_api_NFSVolumeSource(in.NFS, out.NFS, s); err != nil {
+			return err
+		}
+	} else {
+		out.NFS = nil
+	}
 	return nil
 }
 
@@ -2291,6 +2299,14 @@ func convert_api_PersistentVolumeSource_To_v1beta3_PersistentVolumeSource(in *ne
 		}
 	} else {
 		out.Glusterfs = nil
+	}
+	if in.NFS != nil {
+		out.NFS = new(NFSVolumeSource)
+		if err := convert_api_NFSVolumeSource_To_v1beta3_NFSVolumeSource(in.NFS, out.NFS, s); err != nil {
+			return err
+		}
+	} else {
+		out.NFS = nil
 	}
 	return nil
 }
