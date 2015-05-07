@@ -284,6 +284,14 @@
 			"Comment": "0.13.0-22-ge3aa15a",
 			"Rev": "e3aa15a3bbee5367532ac56aa55be41441c55356"
 		},
+                {
+                        "ImportPath": "github.com/google/go-github/github",
+                        "Rev": "930e6fdb8dc2b11458fdeb55b3cd68e5370a1a28"
+                },
+                {
+                        "ImportPath": "github.com/google/go-querystring/query",
+                        "Rev": "547ef5ac979778feb2f760cdb5f4eae1a2207b86"
+                },
 		{
 			"ImportPath": "github.com/google/gofuzz",
 			"Rev": "bbcb9da2d746f8bdbd6a936686a0a6067ada0ec5"
