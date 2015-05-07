@@ -23,6 +23,7 @@ import (
 	"syscall"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
+	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client/remotecommand"
 	cmdutil "github.com/GoogleCloudPlatform/kubernetes/pkg/kubectl/cmd/util"
 	"github.com/docker/docker/pkg/term"
@@ -39,36 +40,53 @@ $ kubectl exec -p 123456-7890 -c ruby-container -i -t -- bash -il`
 )
 
 func NewCmdExec(f *cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer) *cobra.Command {
+	params := &execParams{}
 	cmd := &cobra.Command{
 		Use:     "exec -p POD -c CONTAINER -- COMMAND [args...]",
 		Short:   "Execute a command in a container.",
 		Long:    "Execute a command in a container.",
 		Example: exec_example,
 		Run: func(cmd *cobra.Command, args []string) {
-			err := RunExec(f, cmdIn, cmdOut, cmdErr, cmd, args)
+			err := RunExec(f, cmd, cmdIn, cmdOut, cmdErr, params, args, &defaultRemoteExecutor{})
 			cmdutil.CheckErr(err)
 		},
 	}
-	cmd.Flags().StringP("pod", "p", "", "Pod name")
+	cmd.Flags().StringVarP(&params.podName, "pod", "p", "", "Pod name")
 	cmd.MarkFlagRequired("pod")
 	// TODO support UID
-	cmd.Flags().StringP("container", "c", "", "Container name")
+	cmd.Flags().StringVarP(&params.containerName, "container", "c", "", "Container name")
 	cmd.MarkFlagRequired("container")
-	cmd.Flags().BoolP("stdin", "i", false, "Pass stdin to the container")
-	cmd.Flags().BoolP("tty", "t", false, "Stdin is a TTY")
+	cmd.Flags().BoolVarP(&params.stdin, "stdin", "i", false, "Pass stdin to the container")
+	cmd.Flags().BoolVarP(&params.tty, "tty", "t", false, "Stdin is a TTY")
 	return cmd
 }
 
-func RunExec(f *cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *cobra.Command, args []string) error {
-	podName := cmdutil.GetFlagString(cmd, "pod")
-	if len(podName) == 0 {
+type remoteExecutor interface {
+	Execute(req *client.Request, config *client.Config, command []string, stdin io.Reader, stdout, stderr io.Writer, tty bool) error
+}
+
+type defaultRemoteExecutor struct{}
+
+func (*defaultRemoteExecutor) Execute(req *client.Request, config *client.Config, command []string, stdin io.Reader, stdout, stderr io.Writer, tty bool) error {
+	executor := remotecommand.New(req, config, command, stdin, stdout, stderr, tty)
+	return executor.Execute()
+}
+
+type execParams struct {
+	podName       string
+	containerName string
+	stdin         bool
+	tty           bool
+}
+
+func RunExec(f *cmdutil.Factory, cmd *cobra.Command, cmdIn io.Reader, cmdOut, cmdErr io.Writer, p *execParams, args []string, re remoteExecutor) error {
+	if len(p.podName) == 0 {
 		return cmdutil.UsageError(cmd, "POD is required for exec")
 	}
 
 	if len(args) < 1 {
 		return cmdutil.UsageError(cmd, "COMMAND is required for exec")
 	}
-
 	namespace, err := f.DefaultNamespace()
 	if err != nil {
 		return err
@@ -79,7 +97,7 @@ func RunExec(f *cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd 
 		return err
 	}
 
-	pod, err := client.Pods(namespace).Get(podName)
+	pod, err := client.Pods(namespace).Get(p.podName)
 	if err != nil {
 		return err
 	}
@@ -88,14 +106,14 @@ func RunExec(f *cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd 
 		glog.Fatalf("Unable to execute command because pod is not running. Current status=%v", pod.Status.Phase)
 	}
 
-	containerName := cmdutil.GetFlagString(cmd, "container")
+	containerName := p.containerName
 	if len(containerName) == 0 {
 		containerName = pod.Spec.Containers[0].Name
 	}
 
 	var stdin io.Reader
-	tty := cmdutil.GetFlagBool(cmd, "tty")
-	if cmdutil.GetFlagBool(cmd, "stdin") {
+	tty := p.tty
+	if p.stdin {
 		stdin = cmdIn
 		if tty {
 			if file, ok := cmdIn.(*os.File); ok {
@@ -135,11 +153,11 @@ func RunExec(f *cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd 
 	}
 
 	req := client.RESTClient.Get().
-		Prefix("proxy").
-		Resource("nodes").
-		Name(pod.Spec.Host).
-		Suffix("exec", namespace, podName, containerName)
+		Resource("pods").
+		Name(pod.Name).
+		Namespace(namespace).
+		SubResource("exec").
+		Param("container", containerName)
 
-	e := remotecommand.New(req, config, args, stdin, cmdOut, cmdErr, tty)
-	return e.Execute()
+	return re.Execute(req, config, args, stdin, cmdOut, cmdErr, tty)
 }
