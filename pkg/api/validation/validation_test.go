@@ -519,7 +519,7 @@ func TestValidateVolumes(t *testing.T) {
 		{Name: "awsebs", VolumeSource: api.VolumeSource{AWSElasticBlockStore: &api.AWSElasticBlockStoreVolumeSource{"my-PD", "ext4", 1, false}}},
 		{Name: "gitrepo", VolumeSource: api.VolumeSource{GitRepo: &api.GitRepoVolumeSource{"my-repo", "hashstring"}}},
 		{Name: "iscsidisk", VolumeSource: api.VolumeSource{ISCSI: &api.ISCSIVolumeSource{"127.0.0.1", "iqn.2015-02.example.com:test", 1, "ext4", false}}},
-		{Name: "secret", VolumeSource: api.VolumeSource{Secret: &api.SecretVolumeSource{"my-secret"}}},
+		{Name: "secret", VolumeSource: api.VolumeSource{Secret: &api.SecretVolumeSource{"my-secret", []api.SecretFileMode{}}}},
 		{Name: "glusterfs", VolumeSource: api.VolumeSource{Glusterfs: &api.GlusterfsVolumeSource{"host1", "path", false}}},
 	}
 	names, errs := validateVolumes(successCase)
@@ -534,6 +534,7 @@ func TestValidateVolumes(t *testing.T) {
 	emptyIQN := api.VolumeSource{ISCSI: &api.ISCSIVolumeSource{"127.0.0.1", "", 1, "ext4", false}}
 	emptyHosts := api.VolumeSource{Glusterfs: &api.GlusterfsVolumeSource{"", "path", false}}
 	emptyPath := api.VolumeSource{Glusterfs: &api.GlusterfsVolumeSource{"host", "", false}}
+	wrongFileMode := api.VolumeSource{Secret: &api.SecretVolumeSource{"my-secret", []api.SecretFileMode{{"data", 0700}}}}
 	errorCases := map[string]struct {
 		V []api.Volume
 		T errors.ValidationErrorType
@@ -547,6 +548,7 @@ func TestValidateVolumes(t *testing.T) {
 		"empty iqn":            {[]api.Volume{{Name: "badiqn", VolumeSource: emptyIQN}}, errors.ValidationErrorTypeRequired, "[0].source.iscsi.iqn"},
 		"empty hosts":          {[]api.Volume{{Name: "badhost", VolumeSource: emptyHosts}}, errors.ValidationErrorTypeRequired, "[0].source.glusterfs.endpoints"},
 		"empty path":           {[]api.Volume{{Name: "badpath", VolumeSource: emptyPath}}, errors.ValidationErrorTypeRequired, "[0].source.glusterfs.path"},
+		"wrong fileMode":       {[]api.Volume{{Name: "badfilemode", VolumeSource: wrongFileMode}}, errors.ValidationErrorTypeForbidden, "[0].source.secret.modes.mode"},
 	}
 	for k, v := range errorCases {
 		_, errs := validateVolumes(v.V)

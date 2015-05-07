@@ -1490,10 +1490,26 @@ func init() {
 		},
 		func(in *newer.SecretVolumeSource, out *SecretVolumeSource, s conversion.Scope) error {
 			out.Target.ID = in.SecretName
+			if in.Modes != nil {
+				out.Modes = make([]SecretFileMode, len(in.Modes))
+				for i := range in.Modes {
+					if err := s.Convert(&in.Modes[i], &out.Modes[i], 0); err != nil {
+						return err
+					}
+				}
+			}
 			return nil
 		},
 		func(in *SecretVolumeSource, out *newer.SecretVolumeSource, s conversion.Scope) error {
 			out.SecretName = in.Target.ID
+			if in.Modes != nil {
+				out.Modes = make([]newer.SecretFileMode, len(in.Modes))
+				for i := range in.Modes {
+					if err := s.Convert(&in.Modes[i], &out.Modes[i], 0); err != nil {
+						return err
+					}
+				}
+			}
 			return nil
 		},
 	)
